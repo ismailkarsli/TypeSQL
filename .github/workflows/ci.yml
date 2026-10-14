@@ -23,11 +23,11 @@ jobs:
       # Conformance tests run against this server instead of starting their own container.
       TYPESQL_PG_URL: postgres://postgres:typesql@localhost:5432/postgres
     steps:
-      - uses: actions/checkout@v5
-      - uses: pnpm/action-setup@v5
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
         with:
           version: 12
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           node-version: 26
           cache: pnpm
@@ -43,18 +43,18 @@ jobs:
     # packages/bench/thresholds.json.
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: pnpm/action-setup@v5
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
         with:
           version: 12
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           node-version: 26
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: node packages/bench/gen.mjs
       - run: node packages/bench/run.mjs
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: bench-results

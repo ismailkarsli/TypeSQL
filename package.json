@@ -2,7 +2,7 @@
   "name": "typesql-monorepo",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@12.3.1",
+  "packageManager": "pnpm@12.11.2",
   "engines": {
     "node": ">=26"
   },
@@ -18,7 +18,7 @@
     "docs:preview": "pnpm --filter @typesql/docs run preview"
   },
   "devDependencies": {
-    "@types/node": "^26.0.0",
+    "@types/node": "^26.6.5",
     "typescript": "7.0.2",
     "vitest": "^5.0.4"
   }
