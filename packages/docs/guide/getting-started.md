@@ -15,11 +15,11 @@ out the row type, the parameter types and any mistakes.
 Install the core package and the adapter for your driver:
 
 ```sh
-pnpm add typesql @typesql/pg pg              # node-postgres
-pnpm add typesql @typesql/postgres postgres  # or postgres.js
+pnpm add @typesql/core @typesql/pg pg              # node-postgres
+pnpm add @typesql/core @typesql/postgres postgres  # or postgres.js
 ```
 
-`typesql` has no runtime dependencies. The adapters add a type map that matches the driver's
+`@typesql/core` has no runtime dependencies. The adapters add a type map that matches the driver's
 parsers and a few helpers to run queries.
 
 If you use Kysely, Drizzle or Prisma, their packages (`@typesql/kysely`, `@typesql/drizzle`,

@@ -1,5 +1,5 @@
 import type { PrismaPromise } from "@prisma/client/runtime/client";
-import type { Query, RowType } from "typesql";
+import type { Query, RowType } from "@typesql/core";
 
 /** Anything with Prisma Client's raw methods: a `PrismaClient`, an extended client or a transaction client. */
 export interface PrismaRawClient {

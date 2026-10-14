@@ -1,4 +1,4 @@
-import { createSql, migrations, type ApplyDdl, type Col, type Generated, type RowType, type SchemaOf } from "typesql";
+import { createSql, migrations, type ApplyDdl, type Col, type Generated, type RowType, type SchemaOf } from "@typesql/core";
 import { check, type Equal } from "./_check.js";
 
 // #region applyddl

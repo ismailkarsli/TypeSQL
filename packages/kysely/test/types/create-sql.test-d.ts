@@ -1,6 +1,6 @@
 import { expectTypeOf, test } from "vitest";
 import type { Kysely, Transaction } from "kysely";
-import type { DefaultTypeMap, ParamsType, RowType, SqlError } from "typesql";
+import type { DefaultTypeMap, ParamsType, RowType, SqlError } from "@typesql/core";
 import { createSql, execute, query, type KyselyExecutor } from "../../src/index.js";
 import type { AuthRole, DB, Mood } from "../fixtures/kysely-codegen.js";
 

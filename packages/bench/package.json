@@ -8,7 +8,7 @@
     "bench": "node ./run.mjs"
   },
   "dependencies": {
-    "typesql": "workspace:*"
+    "@typesql/core": "workspace:*"
   },
   "devDependencies": {
     "typescript": "7.0.2"

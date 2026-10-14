@@ -58,7 +58,7 @@ const q = sql(`SELECT id, email FROM users
 ```
 
 - The value is always sent as a `$n` parameter, never as text. `param` is also exported
-  standalone (`import { param } from "typesql"`).
+  standalone (`import { param } from "@typesql/core"`).
 - Each value's TypeScript type is checked against the type its context gives the parameter:
   `${sql.param("5")}` compared with an `int4` column fails with
   `parameter $1: a string value cannot be used as int4 NOT NULL`; a `string | null` value for a
@@ -160,7 +160,7 @@ Nullable columns add `| null`. `DefaultTypeMap` matches node-postgres defaults (
 `FunctionCatalog` is an augmentable interface; add your own functions:
 
 ```ts
-declare module "typesql" {
+declare module "@typesql/core" {
   interface FunctionCatalog {
     my_func: Sig<["text", "int4"], "bool">;                 // strict: nullable if any arg is
     my_count: Sig<["any"], "int8", { agg: true; nullable: false }>;

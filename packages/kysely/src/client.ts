@@ -1,5 +1,5 @@
 import { CompiledQuery, type QueryResult } from "kysely";
-import type { Query, RowType } from "typesql";
+import type { Query, RowType } from "@typesql/core";
 
 /**
  * What the helpers use from a `Kysely<DB>` or `Transaction<DB>`. Queries run through

@@ -1,4 +1,4 @@
-import { createSql as createCoreSql, type Sql } from "typesql";
+import { createSql as createCoreSql, type Sql } from "@typesql/core";
 import type { FromPrisma, PrismaTypeMapLike } from "./from-prisma.js";
 import type { PrismaTypeMap } from "./type-map.js";
 

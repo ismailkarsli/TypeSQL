@@ -1,6 +1,6 @@
 # Development
 
-The repository is a pnpm workspace: `packages/core` (`typesql`), the driver adapters
+The repository is a pnpm workspace: `packages/core` (`@typesql/core`), the driver adapters
 `packages/pg` and `packages/postgres`, the ORM schema packages `packages/kysely`,
 `packages/drizzle` and `packages/prisma`, `packages/bench` and this site, `packages/docs`.
 

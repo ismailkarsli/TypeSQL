@@ -62,7 +62,7 @@ its adapter:
 | `bytea` | `Buffer` | `Buffer` | `Buffer` |
 | `T[]` | element type `[]` | element type `[]` | element type `[]` |
 
-`createSql` from `typesql` itself uses `DefaultTypeMap`, which matches node-postgres. A custom
+`createSql` from `@typesql/core` itself uses `DefaultTypeMap`, which matches node-postgres. A custom
 map is any object type from Postgres type names to TypeScript types:
 
 <<< @/snippets/type-maps.ts#custom

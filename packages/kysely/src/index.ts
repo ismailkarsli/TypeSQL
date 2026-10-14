@@ -1,4 +1,4 @@
-import { createSql as createCoreSql, type DefaultTypeMap, type Sql } from "typesql";
+import { createSql as createCoreSql, type DefaultTypeMap, type Sql } from "@typesql/core";
 import type { FromKysely, KyselyOptions, KyselyOverrides } from "./from-kysely.js";
 
 export type { FromKysely, KyselyOverrides, KyselyOptions, TableOverride, ColumnOverride, InferColumn, SnakeCase } from "./from-kysely.js";

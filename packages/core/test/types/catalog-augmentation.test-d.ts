@@ -6,7 +6,7 @@ import type { Row, V } from "./_schema.js";
  * `FunctionCatalog` is an augmentable interface. In an application the module specifier is
  * the package name:
  *
- *   declare module "typesql" {
+ *   declare module "@typesql/core" {
  *     interface FunctionCatalog { my_fn: Sig<["text"], "int8"> }
  *   }
  *

@@ -6,12 +6,12 @@ import type { CommonLit, DateTimeT, IntT, IsArr, JsonT, LitToText, NumT, RangeT,
  *
  * Users extend it via module augmentation. In an application:
  *
- *   declare module "typesql" {
+ *   declare module "@typesql/core" {
  *     interface FunctionCatalog { my_func: Sig<["text", "int4"], "bool"> }
  *   }
  *
  * (Augmenting the re-exporting module works because `FunctionCatalog` is an exported
- * interface alias; augmenting `typesql/.../typer/catalog` directly works too.)
+ * interface alias; augmenting `@typesql/core/.../typer/catalog` directly works too.)
  *
  * An entry is one `Sig` or a tuple of `Sig`s (overloads). Overload resolution mimics
  * Postgres: the candidate whose parameters match the most argument types exactly wins;

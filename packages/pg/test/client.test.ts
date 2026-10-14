@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import type { Col, Generated, Nullable } from "typesql";
+import type { Col, Generated, Nullable } from "@typesql/core";
 import {
   createSql,
   execute,

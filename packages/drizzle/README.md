@@ -6,7 +6,7 @@ Use your Drizzle ORM schema as a typesql schema. `FromDrizzle<typeof schema>` tu
 SQL you write is checked against the same tables Drizzle manages.
 
 ```sh
-npm install @typesql/drizzle typesql
+npm install @typesql/drizzle @typesql/core
 ```
 
 `drizzle-orm` (0.45 or later) is a peer dependency.

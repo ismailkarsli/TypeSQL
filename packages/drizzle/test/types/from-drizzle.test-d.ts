@@ -1,6 +1,6 @@
 import { expectTypeOf, test } from "vitest";
 import { integer, pgTable, serial, text, time, timestamp } from "drizzle-orm/pg-core";
-import type { Col, DefaultTypeMap, Generated, Nullable, NullableGenerated, ParamsOf, RowOf, SqlError, Validate } from "typesql";
+import type { Col, DefaultTypeMap, Generated, Nullable, NullableGenerated, ParamsOf, RowOf, SqlError, Validate } from "@typesql/core";
 import type { FromDrizzle } from "../../src/index.js";
 import type { ToCamelCase, ToSnakeCase } from "../../src/casing.js";
 import type * as schema from "../fixtures/schema.js";

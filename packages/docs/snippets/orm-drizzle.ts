@@ -1,4 +1,4 @@
-import type { DefaultTypeMap, ParamsType, RowType } from "typesql";
+import type { DefaultTypeMap, ParamsType, RowType } from "@typesql/core";
 import { check, type Equal } from "./_check.js";
 
 // #region query

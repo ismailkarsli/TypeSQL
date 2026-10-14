@@ -37,7 +37,7 @@
  *     @@map("posts")
  *   }
  */
-import type { Col, Generated, Nullable, ParamsType, RowType } from "typesql";
+import type { Col, Generated, Nullable, ParamsType, RowType } from "@typesql/core";
 import { createSql, executeRaw, queryRaw, type PrismaRawClient } from "@typesql/prisma";
 
 // --- generated: src/db/typesql.ts ---

@@ -6,7 +6,7 @@
       "node"
     ],
     "paths": {
-      "typesql": [
+      "@typesql/core": [
         "../core/src/index.ts"
       ]
     }

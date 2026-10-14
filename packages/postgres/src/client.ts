@@ -1,4 +1,4 @@
-import type { Query, RowType } from "typesql";
+import type { Query, RowType } from "@typesql/core";
 
 /** The shape of a resolved `sql.unsafe()` result the helpers rely on: an array with `count`. */
 export type PostgresJsRows = readonly unknown[] & { readonly count: number };

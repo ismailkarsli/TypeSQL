@@ -10,7 +10,7 @@ The schema a query is checked against can be written by hand (`interface DB { ..
 | `runMigrations(client, m)` | runtime: run the list in order inside one transaction |
 
 ```ts
-import { createSql, migrations, runMigrations, type SchemaOf } from "typesql";
+import { createSql, migrations, runMigrations, type SchemaOf } from "@typesql/core";
 
 export const m = migrations()
   .add("CREATE TYPE mood AS ENUM ('happy', 'sad')")
@@ -201,7 +201,7 @@ Measured with TypeScript 7.0.2 (`tsc --extendedDiagnostics`):
 
 | Input | Instantiations | Check time |
 |---|---|---|
-| importing `typesql` (baseline) | 109K | 0.19 s |
+| importing `@typesql/core` (baseline) | 109K | 0.19 s |
 | a 10-statement migration chain, DDL only | +63K | +0.03 s |
 | the same chain plus one query on the result | 189K total | 0.25 s |
 | 50 statements | 346K | 0.31 s |

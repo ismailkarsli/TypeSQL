@@ -5,7 +5,7 @@ it **inside the type system** and gives you the exact row type, the parameter ty
 (for DDL) the resulting schema. No codegen, no database connection, no build step.
 
 ```ts
-import { createSql, type Col, type Generated, type Nullable } from "typesql";
+import { createSql, type Col, type Generated, type Nullable } from "@typesql/core";
 
 interface DB {
   users: {
@@ -69,7 +69,7 @@ never a silent `any`.
 
 | Package | Contents |
 |---|---|
-| `typesql` | the type engine, `createSql`, fragments, `ApplyDdl`, `migrations()`. Zero dependencies. |
+| `@typesql/core` | the type engine, `createSql`, fragments, `ApplyDdl`, `migrations()`. Zero dependencies. |
 | `@typesql/pg` | `PgTypeMap`, `createSql`, `query`/`one`/`maybeOne`/`many`/`execute`/`transaction` for node-postgres |
 | `@typesql/postgres` | the same for postgres.js (`PostgresJsTypeMap`, `PostgresJsBigIntTypeMap`) |
 | `@typesql/kysely` | `FromKysely`: a Kysely `DB` interface (kysely-codegen, prisma-kysely) as the schema; `query`/`execute` through Kysely |
@@ -124,8 +124,8 @@ The documentation site lives in `packages/docs` (VitePress): run `pnpm docs:dev`
 locally. Its pages pull their code examples from type-checked files, so they read best on the
 site; the Markdown sources are the [guide](packages/docs/guide/getting-started.md),
 the [API reference](packages/docs/reference/api.md), [DDL support](packages/docs/reference/ddl.md),
-[adapters](packages/docs/guide/adapters.md), [ORM schemas](packages/docs/guide/orm-schemas.md), the [type engine](packages/docs/internals/engine.md)
-and [design decisions](packages/docs/internals/decisions.md).
+[adapters](packages/docs/guide/adapters.md), [ORM schemas](packages/docs/guide/orm-schemas.md)
+and the [type engine](packages/docs/internals/engine.md).
 
 ## Development
 

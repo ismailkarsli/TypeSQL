@@ -1,6 +1,6 @@
 import { expectTypeOf, test } from "vitest";
 import type { Decimal, JsonValue } from "@prisma/client/runtime/client";
-import type { Col, Generated, Nullable, NullableGenerated, ParamsType, RowType, SqlError, Validate, View } from "typesql";
+import type { Col, Generated, Nullable, NullableGenerated, ParamsType, RowType, SqlError, Validate, View } from "@typesql/core";
 import type { Prisma } from "../fixtures/client/client.js";
 import type { DB as Generated_DB } from "../fixtures/typesql.js";
 import { createSql, type FromPrisma, type PrismaTypeMap } from "../../src/index.js";

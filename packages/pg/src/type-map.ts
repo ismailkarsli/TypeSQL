@@ -1,4 +1,4 @@
-import type { DefaultTypeMap } from "typesql";
+import type { DefaultTypeMap } from "@typesql/core";
 
 /**
  * The object node-postgres returns for an `interval` column (package `postgres-interval` 1.x,

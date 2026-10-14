@@ -1,4 +1,4 @@
-import { createSql as createCoreSql, type Sql } from "typesql";
+import { createSql as createCoreSql, type Sql } from "@typesql/core";
 import type { PgTypeMap } from "./type-map.js";
 
 export type { PgInterval, PgTypeMap } from "./type-map.js";

@@ -1,6 +1,6 @@
 import { expectTypeOf, test } from "vitest";
 import type { Decimal } from "@prisma/client/runtime/client";
-import type { Col, DefaultTypeMap, Generated, Nullable, NullableGenerated, RowOf, RowType, SqlError, Validate } from "typesql";
+import type { Col, DefaultTypeMap, Generated, Nullable, NullableGenerated, RowOf, RowType, SqlError, Validate } from "@typesql/core";
 import type { DB } from "../fixtures/typesql.js";
 import { createSql } from "../../src/index.js";
 

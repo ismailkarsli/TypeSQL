@@ -3,7 +3,7 @@
  * `pnpm typecheck`; hover the results in your editor. Nothing here needs a database.
  */
 import type { ColumnType, Generated, GeneratedAlways, Kysely } from "kysely";
-import type { DefaultTypeMap, ParamsType, RowType } from "typesql";
+import type { DefaultTypeMap, ParamsType, RowType } from "@typesql/core";
 import { createSql, execute, query } from "@typesql/kysely";
 
 // The interface kysely-codegen emits (trimmed), or the one you wrote by hand for Kysely.

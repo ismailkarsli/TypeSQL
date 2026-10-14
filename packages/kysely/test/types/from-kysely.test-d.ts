@@ -1,6 +1,6 @@
 import { expectTypeOf, test } from "vitest";
 import type { ColumnType, Generated as KGenerated, GeneratedAlways, JSONColumnType } from "kysely";
-import type { Arr, Col, Generated, Nullable, NullableGenerated, View } from "typesql";
+import type { Arr, Col, Generated, Nullable, NullableGenerated, View } from "@typesql/core";
 import type { FromKysely, InferColumn, SnakeCase } from "../../src/index.js";
 import type { DB, Interval, Json, Mood, Numeric, Point, Timestamp, Int8, ArrayType, Generated as CGenerated } from "../fixtures/kysely-codegen.js";
 

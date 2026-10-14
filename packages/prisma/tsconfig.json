@@ -5,7 +5,7 @@
     "noEmit": true,
     "types": ["node"],
     "paths": {
-      "typesql": ["../core/src/index.ts"],
+      "@typesql/core": ["../core/src/index.ts"],
       "@typesql/prisma": ["./src/index.ts"]
     }
   },

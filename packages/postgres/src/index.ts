@@ -1,4 +1,4 @@
-import { createSql as createCoreSql, type Sql } from "typesql";
+import { createSql as createCoreSql, type Sql } from "@typesql/core";
 import type { PostgresJsBigIntTypeMap, PostgresJsTypeMap } from "./type-map.js";
 
 export type { PostgresJsTypeMap, PostgresJsBigIntTypeMap } from "./type-map.js";

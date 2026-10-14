@@ -11,11 +11,11 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@typesql/core": "workspace:*",
     "@typesql/drizzle": "workspace:*",
     "@typesql/kysely": "workspace:*",
     "@typesql/pg": "workspace:*",
-    "@typesql/prisma": "workspace:*",
-    "typesql": "workspace:*"
+    "@typesql/prisma": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",

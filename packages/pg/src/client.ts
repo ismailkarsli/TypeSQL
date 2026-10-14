@@ -1,4 +1,4 @@
-import type { Query, RowType } from "typesql";
+import type { Query, RowType } from "@typesql/core";
 
 /** The subset of a `pg` query result the helpers rely on. */
 export interface PgResult {

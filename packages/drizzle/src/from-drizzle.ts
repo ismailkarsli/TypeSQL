@@ -1,4 +1,4 @@
-import type { Col, Generated, Nullable, NullableGenerated } from "typesql";
+import type { Col, Generated, Nullable, NullableGenerated } from "@typesql/core";
 import type { ToCamelCase, ToSnakeCase } from "./casing.js";
 
 /** Settings of your Drizzle setup that the column types do not record. */

@@ -3,7 +3,7 @@
  * Type-checked by this package's `pnpm typecheck`; hover the results in your editor. Nothing
  * here needs a database.
  */
-import type { ParamsType, RowType } from "typesql";
+import type { ParamsType, RowType } from "@typesql/core";
 import { createSql, type FromDrizzle } from "@typesql/drizzle";
 import * as pg from "@typesql/pg";
 import type * as schema from "./schema.js";

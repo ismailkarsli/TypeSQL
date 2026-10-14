@@ -1,4 +1,4 @@
-import type { DefaultTypeMap } from "typesql";
+import type { DefaultTypeMap } from "@typesql/core";
 
 /**
  * Canonical Postgres type name → TS type as postgres.js 3.x returns it with its default

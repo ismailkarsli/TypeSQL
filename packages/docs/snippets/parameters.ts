@@ -1,4 +1,4 @@
-import type { ParamsType, RowType, TextType } from "typesql";
+import type { ParamsType, RowType, TextType } from "@typesql/core";
 import { check, type Equal } from "./_check.js";
 import { sql } from "./schema.js";
 declare const userId: number;

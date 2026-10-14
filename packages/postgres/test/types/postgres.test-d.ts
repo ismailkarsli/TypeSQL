@@ -1,6 +1,6 @@
 import { expectTypeOf, test } from "vitest";
 import postgres from "postgres";
-import type { Col, Generated, Nullable, ParamsType, RowType, TsTypeOf } from "typesql";
+import type { Col, Generated, Nullable, ParamsType, RowType, TsTypeOf } from "@typesql/core";
 import {
   createBigIntSql,
   createSql,

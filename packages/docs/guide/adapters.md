@@ -1,6 +1,6 @@
 # Adapters
 
-`typesql` is type-only: `sql("SELECT …", …params)` returns `{ text, values }` plus phantom
+`@typesql/core` is type-only: `sql("SELECT …", …params)` returns `{ text, values }` plus phantom
 `Row`/`Params` types. An adapter adds three things for one driver:
 
 1. a **type map** (`PgTypeMap`, `PostgresJsTypeMap`, `PostgresJsBigIntTypeMap`) describing how
@@ -120,11 +120,11 @@ midnight for a `date`. Both maps say `Date`.
 
 Both adapters export `migrate(db, m)`, which runs `m.statements` in order inside one
 transaction (all or nothing). `m` is anything with `statements: readonly string[]`; the
-`migrations()` builder from `typesql` fits, and its `schema` type is what you pass to
+`migrations()` builder from `@typesql/core` fits, and its `schema` type is what you pass to
 `createSql`:
 
 ```ts
-import { migrations, type SchemaOf } from "typesql";
+import { migrations, type SchemaOf } from "@typesql/core";
 import { createSql, migrate } from "@typesql/pg";       // or "@typesql/postgres"
 
 const m = migrations()

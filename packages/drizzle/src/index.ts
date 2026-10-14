@@ -1,9 +1,9 @@
-import { createSql as createCoreSql, type DefaultTypeMap, type Sql } from "typesql";
+import { createSql as createCoreSql, type DefaultTypeMap, type Sql } from "@typesql/core";
 import type { FromDrizzle, FromDrizzleOptions } from "./from-drizzle.js";
 
 export type { FromDrizzle, FromDrizzleOptions, DrizzleColumnTypes } from "./from-drizzle.js";
 export { pgType } from "./pg-type.js";
-export type { Sql, Query, RowType, ParamsType, DefaultTypeMap, TypeMap } from "typesql";
+export type { Sql, Query, RowType, ParamsType, DefaultTypeMap, TypeMap } from "@typesql/core";
 
 /**
  * `createSql` from core with the schema converted from Drizzle definitions:

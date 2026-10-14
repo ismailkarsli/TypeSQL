@@ -1,4 +1,4 @@
-import { createSql, type Col, type Enum, type Generated, type Nullable, type View } from "typesql";
+import { createSql, type Col, type Enum, type Generated, type Nullable, type View } from "@typesql/core";
 
 // #region schema
 export interface DB {

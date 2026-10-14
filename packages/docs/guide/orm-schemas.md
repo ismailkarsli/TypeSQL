@@ -21,7 +21,7 @@ so you can fill those gaps in.
 ## Kysely
 
 ```sh
-pnpm add typesql @typesql/kysely kysely
+pnpm add @typesql/core @typesql/kysely kysely
 ```
 
 Pass the `DB` interface you give to `new Kysely<DB>()`:
@@ -91,7 +91,7 @@ second type argument: `createSql<DB, PgTypeMap>()`.
 ## Drizzle
 
 ```sh
-pnpm add typesql @typesql/drizzle drizzle-orm
+pnpm add @typesql/core @typesql/drizzle drizzle-orm
 ```
 
 Pass your schema module as it is. Tables, views, enums and schemas are converted; relations
@@ -154,7 +154,7 @@ you pass to `drizzle()`. Convert the schema with `FromDrizzle` and use the adapt
 ## Prisma
 
 ```sh
-pnpm add typesql @typesql/prisma
+pnpm add @typesql/core @typesql/prisma
 ```
 
 `@prisma/client` 7 or later is a peer dependency, and only the `postgresql` provider is
@@ -188,7 +188,7 @@ set them.
 |---|---|---|
 | `output` | required | a `.ts` file, or a directory (writes `index.ts`) |
 | `typeName` | `"DB"` | name of the exported interface |
-| `importFrom` | `"typesql"` | module the `Col`/`Nullable`/… helpers are imported from |
+| `importFrom` | `"@typesql/core"` | module the `Col`/`Nullable`/… helpers are imported from |
 
 ### Running queries
 

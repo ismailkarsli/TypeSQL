@@ -1,6 +1,6 @@
 import { expectTypeOf, test } from "vitest";
 import type { Client, Pool, PoolClient } from "pg";
-import type { Col, Generated, Nullable, ParamsType, RowType, TsTypeOf } from "typesql";
+import type { Col, Generated, Nullable, ParamsType, RowType, TsTypeOf } from "@typesql/core";
 import {
   createSql,
   execute,

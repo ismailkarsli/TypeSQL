@@ -1,0 +1,69 @@
+# @typesql/pg
+
+[node-postgres](https://node-postgres.com) (`pg` 8.x) adapter for
+[`@typesql/core`](https://www.npmjs.com/package/@typesql/core): a `createSql` bound to the type
+map of `pg`'s default parsers, and helpers that run a query and return rows typed from it.
+
+```sh
+pnpm add @typesql/core @typesql/pg pg
+```
+
+## Usage
+
+```ts
+import { Pool } from "pg";
+import { createSql, execute, many, maybeOne, one, query, transaction } from "@typesql/pg";
+import type { DB } from "./schema";
+
+const pool = new Pool();
+const sql = createSql<DB>();
+
+const users = await query(pool, sql("SELECT id, email FROM users")); // { id: number; email: string }[]
+const user = await one(pool, sql("SELECT id, email FROM users WHERE id = $1", 7)); // exactly one row, or throws
+const maybe = await maybeOne(pool, sql("SELECT id FROM users WHERE email = $1", "x")); // row | null
+const some = await many(pool, sql("SELECT id FROM posts")); // at least one row, or throws
+const changed = await execute(pool, sql("UPDATE users SET display_name = NULL")); // row count
+
+const id = await transaction(pool, async (client) => {
+  const { id } = await one(client, sql("INSERT INTO users (email) VALUES ($1) RETURNING id", "a@b.c"));
+  await execute(client, sql("INSERT INTO posts (author_id, title) VALUES ($1, $2)", id, "Hello"));
+  return id;
+});
+```
+
+## API
+
+| Export | |
+|---|---|
+| `createSql<DB>()` | core's `createSql<DB, PgTypeMap>()` |
+| `query(client, q)` | `Promise<Row[]>` |
+| `one(client, q)` | `Promise<Row>`; `RowCountError` unless exactly one row |
+| `maybeOne(client, q)` | `Promise<Row \| null>`; `RowCountError` on more than one row |
+| `many(client, q)` | `Promise<[Row, ...Row[]]>`; `RowCountError` on zero rows |
+| `execute(client, q)` | `Promise<number>`, the affected row count |
+| `transaction(pool, fn)` | `BEGIN`, `fn(client)`, `COMMIT`; `ROLLBACK` and rethrow on error |
+| `migrate(pool, m)` | runs `m.statements` (e.g. from core's `migrations()`) in one transaction |
+| `PgTypeMap`, `PgInterval` | the type map, and the `postgres-interval` object type |
+| `RowCountError`, `PgQueryable`, `PgPoolLike`, `PgTransactionClient`, `PgResult`, `MigrationSource` | errors and parameter types |
+
+`client` is anything with `query(text, values)`: a `Pool`, `Client` or `PoolClient`. The
+parameters are structural, so fakes work in tests.
+
+## `PgTypeMap`
+
+What `pg`'s default parsers return:
+
+| Postgres | TypeScript |
+|---|---|
+| `int2`, `int4`, `oid`, `float4`, `float8` | `number` |
+| `int8` (also `count(*)`), `numeric`, `money` | `string` |
+| `bool` | `boolean` |
+| `date`, `timestamp`, `timestamptz` | `Date` |
+| `json`, `jsonb` | `unknown` |
+| `bytea` | `Buffer` |
+| `interval` | `PgInterval` |
+| `point`, `circle` | `{ x, y }`, `{ x, y, radius }` |
+| text-like and other types | `string` |
+
+Arrays map element-wise. The full table, including the array types `pg` leaves as raw text, is
+in the [Adapters guide](https://github.com/ismailkarsli/typesql/blob/main/packages/docs/guide/adapters.md).

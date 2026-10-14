@@ -4,7 +4,7 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   resolve: {
     // Resolve the workspace dependency to core's sources so tests do not need a build step.
-    alias: { "typesql": fileURLToPath(new URL("../core/src/index.ts", import.meta.url)) },
+    alias: { "@typesql/core": fileURLToPath(new URL("../core/src/index.ts", import.meta.url)) },
   },
   test: {
     name: "pg",

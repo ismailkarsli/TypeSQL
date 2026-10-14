@@ -1,4 +1,4 @@
-import type { RowType } from "typesql";
+import type { RowType } from "@typesql/core";
 import { check, type Equal } from "./_check.js";
 import { sql } from "./schema.js";
 

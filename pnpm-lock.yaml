@@ -178,7 +178,7 @@ importers:
 
   packages/bench:
     dependencies:
-      typesql:
+      '@typesql/core':
         specifier: workspace:*
         version: link:../core
     devDependencies:
@@ -206,6 +206,9 @@ importers:
 
   packages/docs:
     dependencies:
+      '@typesql/core':
+        specifier: workspace:*
+        version: link:../core
       '@typesql/drizzle':
         specifier: workspace:*
         version: link:../drizzle
@@ -218,9 +221,6 @@ importers:
       '@typesql/prisma':
         specifier: workspace:*
         version: link:../prisma
-      typesql:
-        specifier: workspace:*
-        version: link:../core
     devDependencies:
       '@types/node':
         specifier: ^26.6.5
@@ -243,7 +243,7 @@ importers:
 
   packages/drizzle:
     dependencies:
-      typesql:
+      '@typesql/core':
         specifier: workspace:*
         version: link:../core
     devDependencies:
@@ -262,7 +262,7 @@ importers:
 
   packages/kysely:
     dependencies:
-      typesql:
+      '@typesql/core':
         specifier: workspace:*
         version: link:../core
     devDependencies:
@@ -278,7 +278,7 @@ importers:
 
   packages/pg:
     dependencies:
-      typesql:
+      '@typesql/core':
         specifier: workspace:*
         version: link:../core
     devDependencies:
@@ -297,7 +297,7 @@ importers:
 
   packages/postgres:
     dependencies:
-      typesql:
+      '@typesql/core':
         specifier: workspace:*
         version: link:../core
     devDependencies:
@@ -313,7 +313,7 @@ importers:
 
   packages/prisma:
     dependencies:
-      typesql:
+      '@typesql/core':
         specifier: workspace:*
         version: link:../core
     devDependencies:

@@ -1,6 +1,6 @@
 import { expectTypeOf, test } from "vitest";
 import { pgTable, serial, timestamp } from "drizzle-orm/pg-core";
-import type { DefaultTypeMap, ParamsType, RowType } from "typesql";
+import type { DefaultTypeMap, ParamsType, RowType } from "@typesql/core";
 import { createSql } from "../../src/index.js";
 import type * as schema from "../fixtures/schema.js";
 

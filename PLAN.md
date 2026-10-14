@@ -81,7 +81,7 @@ message.
 ## 4. Public API (core)
 
 ```ts
-import { createSql, type Col, type Generated, type Nullable } from "typesql";
+import { createSql, type Col, type Generated, type Nullable } from "@typesql/core";
 
 interface DB {
   users: {
@@ -287,7 +287,7 @@ scope order.
   `EXISTS` → non-null `bool`. `x = ANY(...)`/`IN (SELECT ...)` → `bool`.
 - Function catalog: `interface FunctionCatalog { lower: Sig<["text"], "text">; ... }`
   with strictness flags; unknown function → `{ type: "unknown"; nullable: true }`.
-  Users extend via `declare module "typesql" { interface FunctionCatalog {...} }`.
+  Users extend via `declare module "@typesql/core" { interface FunctionCatalog {...} }`.
   Catalog covers string, numeric, date/time, JSON, array, UUID/crypto, and formatting
   functions (full list tracked in `packages/core/src/engine/catalog/`).
 - Special syntaxes: `EXTRACT(f FROM x)` → `numeric`, `SUBSTRING(x FROM n FOR m)`,
