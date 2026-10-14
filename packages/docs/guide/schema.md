@@ -1,5 +1,8 @@
 # Schema and type maps
 
+The schema can be written by hand as shown here, derived from DDL ([Migrations](./migrations)),
+or converted from a Kysely, Drizzle or Prisma schema ([ORM schemas](./orm-schemas)).
+
 ## Declaring tables
 
 A schema is an interface whose keys are tables. Each column is declared with a helper:

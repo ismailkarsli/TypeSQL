@@ -1,0 +1,14 @@
+{
+  "//": "examples/ import the package by name, as user code does.",
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["node"],
+    "paths": {
+      "typesql": ["../core/src/index.ts"],
+      "@typesql/drizzle": ["./src/index.ts"],
+      "@typesql/pg": ["../pg/src/index.ts"]
+    }
+  },
+  "include": ["src", "test", "examples"]
+}

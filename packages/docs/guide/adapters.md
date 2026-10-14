@@ -26,6 +26,10 @@ core's `RowType<Q>`, so the result of `sql(...)` can be passed straight in.
 
 The client parameters are structural, so fakes work in tests without the driver.
 
+`@typesql/kysely` and `@typesql/prisma` can also run queries through the ORM's own client
+(`query`/`execute` on a `Kysely` instance, `queryRaw`/`executeRaw` on Prisma Client). See
+[ORM schemas](./orm-schemas).
+
 ## `@typesql/pg` (node-postgres 8.x)
 
 <<< @/snippets/adapters.ts#pg

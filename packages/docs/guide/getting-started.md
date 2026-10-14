@@ -22,6 +22,10 @@ pnpm add typesql @typesql/postgres postgres  # or postgres.js
 `typesql` has no runtime dependencies. The adapters add a type map that matches the driver's
 parsers and a few helpers to run queries.
 
+If you use Kysely, Drizzle or Prisma, their packages (`@typesql/kysely`, `@typesql/drizzle`,
+`@typesql/prisma`) can turn the schema you already have into the one typesql needs. See
+[ORM schemas](./orm-schemas).
+
 ## Describe the schema
 
 Columns are declared with Postgres type names, not TypeScript types. The type map turns them
@@ -31,7 +35,8 @@ into TypeScript types at the end, so the same schema works with any driver.
 
 `Col` is `NOT NULL`, `Nullable` allows `NULL`, and `Generated` marks a column with a default,
 which makes it optional in `INSERT`. See [Schema and type maps](./schema) for the full list,
-and [Migrations](./migrations) to derive this interface from your DDL instead.
+[Migrations](./migrations) to derive this interface from your DDL instead, and
+[ORM schemas](./orm-schemas) to take it from Kysely, Drizzle or Prisma.
 
 ## Write a query
 
@@ -65,3 +70,4 @@ The number after the message is the index of the offending token.
 - [Parameters](./parameters): `$1`, `:name` and inline `${sql.param(value)}`.
 - [Fragments](./fragments): building statements from pieces.
 - [Writing data](./writing-data): `INSERT`, `UPDATE`, `DELETE` and `RETURNING`.
+- [ORM schemas](./orm-schemas): reuse a Kysely, Drizzle or Prisma schema.

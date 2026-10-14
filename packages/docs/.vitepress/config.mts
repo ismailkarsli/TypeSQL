@@ -22,6 +22,7 @@ export default defineConfig({
           { text: "Writing data", link: "/guide/writing-data" },
           { text: "Migrations", link: "/guide/migrations" },
           { text: "Adapters", link: "/guide/adapters" },
+          { text: "ORM schemas", link: "/guide/orm-schemas" },
           { text: "Errors and limits", link: "/guide/errors-and-limits" },
         ],
       },

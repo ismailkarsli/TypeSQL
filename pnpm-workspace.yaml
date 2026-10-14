@@ -2,3 +2,6 @@ packages:
   - "packages/*"
 allowBuilds:
   esbuild: true
+  # Prisma's postinstall only downloads engines; `prisma generate` does not need them.
+  "@prisma/engines": false
+  prisma: false

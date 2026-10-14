@@ -38,6 +38,8 @@ sql("SELECT nme FROM users");
 ```
 
 The runtime is a thin object `{ text, values }`; `@typesql/pg` and `@typesql/postgres` run it.
+Already using Kysely, Drizzle or Prisma? `@typesql/kysely`, `@typesql/drizzle` and
+`@typesql/prisma` take the schema from it.
 
 ```ts
 import { createSql, query, one } from "@typesql/pg";   // pre-bound to pg's type map
@@ -70,6 +72,9 @@ never a silent `any`.
 | `typesql` | the type engine, `createSql`, fragments, `ApplyDdl`, `migrations()`. Zero dependencies. |
 | `@typesql/pg` | `PgTypeMap`, `createSql`, `query`/`one`/`maybeOne`/`many`/`execute`/`transaction` for node-postgres |
 | `@typesql/postgres` | the same for postgres.js (`PostgresJsTypeMap`, `PostgresJsBigIntTypeMap`) |
+| `@typesql/kysely` | `FromKysely`: a Kysely `DB` interface (kysely-codegen, prisma-kysely) as the schema; `query`/`execute` through Kysely |
+| `@typesql/drizzle` | `FromDrizzle`: Drizzle `pgTable`/`pgView`/`pgEnum`/`pgSchema` definitions as the schema; `pgType` |
+| `@typesql/prisma` | the `typesql-prisma` generator and `FromPrisma`; `queryRaw`/`executeRaw` through Prisma Client |
 | `@typesql/bench` | compile-time budget benchmarks (private) |
 
 ## Schema
@@ -119,7 +124,7 @@ The documentation site lives in `packages/docs` (VitePress): run `pnpm docs:dev`
 locally. Its pages pull their code examples from type-checked files, so they read best on the
 site; the Markdown sources are the [guide](packages/docs/guide/getting-started.md),
 the [API reference](packages/docs/reference/api.md), [DDL support](packages/docs/reference/ddl.md),
-[adapters](packages/docs/guide/adapters.md), the [type engine](packages/docs/internals/engine.md)
+[adapters](packages/docs/guide/adapters.md), [ORM schemas](packages/docs/guide/orm-schemas.md), the [type engine](packages/docs/internals/engine.md)
 and [design decisions](packages/docs/internals/decisions.md).
 
 ## Development

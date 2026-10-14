@@ -1,5 +1,5 @@
 {
-  "//": "Standalone (not extending tsconfig.base.json): Vite's bundled esbuild warns on the base's es2024 target.",
+  "//": "Standalone (not extending tsconfig.base.json): Vite's bundled esbuild warns on the base's es2024 target. kysely and drizzle-orm resolve from the adapter packages: as docs dependencies, drizzle-orm's optional peers pull React 19 into VitePress' tree.",
   "compilerOptions": {
     "target": "es2022",
     "lib": ["es2024"],
@@ -16,7 +16,13 @@
     "paths": {
       "typesql": ["../core/src/index.ts"],
       "@typesql/pg": ["../pg/src/index.ts"],
-      "@typesql/postgres": ["../postgres/src/index.ts"]
+      "@typesql/postgres": ["../postgres/src/index.ts"],
+      "@typesql/kysely": ["../kysely/src/index.ts"],
+      "@typesql/drizzle": ["../drizzle/src/index.ts"],
+      "@typesql/prisma": ["../prisma/src/index.ts"],
+      "kysely": ["../kysely/node_modules/kysely"],
+      "drizzle-orm": ["../drizzle/node_modules/drizzle-orm"],
+      "drizzle-orm/*": ["../drizzle/node_modules/drizzle-orm/*"]
     }
   },
   "include": ["snippets"]

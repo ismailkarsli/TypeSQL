@@ -1,11 +1,12 @@
 # Development
 
-The repository is a pnpm workspace: `packages/core` (`typesql`), `packages/pg`,
-`packages/postgres`, `packages/bench` and this site, `packages/docs`.
+The repository is a pnpm workspace: `packages/core` (`typesql`), the driver adapters
+`packages/pg` and `packages/postgres`, the ORM schema packages `packages/kysely`,
+`packages/drizzle` and `packages/prisma`, `packages/bench` and this site, `packages/docs`.
 
 ```sh
 pnpm install
-pnpm typecheck                 # tsc per package, including the docs examples
+pnpm typecheck                 # tsc per package, including the docs and package examples
 pnpm test                      # vitest: runtime tests, type tests, conformance against Postgres
 pnpm build && pnpm smoke:dist  # build the packages, then import the built output with plain Node
 pnpm docs:dev                  # this site, with hot reload

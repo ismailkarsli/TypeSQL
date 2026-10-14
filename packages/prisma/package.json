@@ -1,0 +1,42 @@
+{
+  "name": "@typesql/prisma",
+  "version": "0.0.1",
+  "description": "Use a Prisma schema as a typesql schema: convert the generated client's types, or generate an exact schema with the typesql-prisma generator.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./generator": {
+      "types": "./dist/generator/index.d.ts",
+      "default": "./dist/generator/index.js"
+    }
+  },
+  "bin": {
+    "typesql-prisma": "./dist/bin.js"
+  },
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "fixtures": "prisma generate --schema test/fixtures/schema.prisma --generator client --no-hints",
+    "typecheck": "pnpm run fixtures && tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "typesql": "workspace:*"
+  },
+  "peerDependencies": {
+    "@prisma/client": ">=7"
+  },
+  "devDependencies": {
+    "@prisma/client": "^7.10.0",
+    "prisma": "^7.10.0",
+    "typescript": "7.0.2",
+    "vitest": "^5.0.4"
+  }
+}

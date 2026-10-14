@@ -181,6 +181,22 @@ Parameter patterns: exact type name, `any`, `anynumeric`, `anystring`, `anyarray
 `$elem1`, `$arr1`, `$common`, `$sum1`, `$avg1`. Flags: `strict`, `nullable`, `agg`, `window`,
 `srf`. Unknown functions are typed `unknown` (nullable); a cast fixes them.
 
+## ORM packages
+
+Each package wraps core's `createSql` with the schema converted from the ORM's types; see
+[ORM schemas](../guide/orm-schemas).
+
+| Package | `createSql` | Schema type | Runs queries |
+|---|---|---|---|
+| `@typesql/kysely` | `createSql<DB, TM = DefaultTypeMap, Overrides = {}, Options = {}>()` | `FromKysely<DB, Overrides, Options>` | `query(db, q)` → `Row[]`, `execute(db, q)` → `number` |
+| `@typesql/drizzle` | `createSql<Schema, TM = DefaultTypeMap, Options = {}>()` | `FromDrizzle<Schema, Options>`; `pgType(column, "type")` pins a column | with a driver adapter |
+| `@typesql/prisma` | `createSql<S, TM = PrismaTypeMap>()`; `S` is a generated `DB` or a `Prisma.TypeMap` | `FromPrisma<Prisma.TypeMap, Overrides>`; the `typesql-prisma` generator | `queryRaw(prisma, q)` → `PrismaPromise<Row[]>`, `executeRaw(prisma, q)` → `PrismaPromise<number>` |
+
+Option and override types: `KyselyOverrides`, `KyselyOptions` (`camelCase`),
+`FromDrizzleOptions` (`casing`, `timestamp`, `time`), `PrismaOverrides` (`$table`, `$schema`,
+per-field `{ column, type, nullable, default }`). The generator's pieces are exported from
+`@typesql/prisma/generator` (`generateSource`, `serveGenerator`).
+
 ## Limits
 
 - Statement size: up to 4096 tokens (the generated `Next` table; regenerate with
