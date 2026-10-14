@@ -1,0 +1,190 @@
+# API
+
+## `createSql<DB, TypeMap = DefaultTypeMap>()`
+
+Returns the typed `sql` function for a schema. Pass the adapter's type map (`PgTypeMap`,
+`PostgresJsTypeMap`) or use the adapter's pre-bound `createSql`.
+
+```ts
+const sql = createSql<DB>();
+```
+
+### `sql(text, ...params)`
+
+`text` must be a string literal (or a template literal without substitutions). The
+statement is parsed at compile time; the result is
+
+```ts
+Query<Row, Params, Text>   // { text: string; values: unknown[] } + phantom types
+```
+
+- `Row` is the projected row (`never` for DML without RETURNING and for DDL).
+- `Params` is the tuple of parameter types: `WHERE id = $1` → `[number]`; INSERT value slots
+  take the column type (`| null` when nullable); `LIMIT $1` → `number`; `$1::T` → `T`;
+  `= ANY($1)` → array; a parameter with no context is `unknown`.
+- `Text` is the final SQL literal (after `:name` rewriting and fragment splicing).
+
+An invalid statement makes the `text` parameter's type an `SqlError<message, tokenIndex>`,
+so the error is reported on the SQL text:
+
+```
+Argument of type '"SELECT nme FROM users"' is not assignable to parameter of type
+  '"SELECT nme FROM users" & SqlError<"column \"nme\" does not exist", 1>'.
+```
+
+### Named parameters
+
+`:name` placeholders are rewritten to `$n` in order of first appearance; the call then takes
+one object:
+
+```ts
+sql("SELECT id FROM users WHERE id = :id AND email = :email", { id: 1, email: "x" });
+// text: "SELECT id FROM users WHERE id = $1 AND email = $2", values: [1, "x"]
+```
+
+`::` casts, `:=` and colons inside string literals are not parameters. Mixing `:name` and
+`$n` in one statement is an error.
+
+### Inline parameters
+
+Values can be written where they are used, inside a template literal, with `sql.param()`:
+
+```ts
+const q = sql(`SELECT id, email FROM users
+               WHERE id = ${sql.param(userId)} AND email = ${sql.param(email)}`);
+// text:   "SELECT id, email FROM users WHERE id = $1 AND email = $2"
+// values: [userId, email]
+// type:   Query<{ id: number; email: string }, [number, string]>
+```
+
+- The value is always sent as a `$n` parameter, never as text. `param` is also exported
+  standalone (`import { param } from "typesql"`).
+- Each value's TypeScript type is checked against the type its context gives the parameter:
+  `${sql.param("5")}` compared with an `int4` column fails with
+  `parameter $1: a string value cannot be used as int4 NOT NULL`; a `string | null` value for a
+  `NOT NULL` column fails too. Strings are accepted for enum columns and any object for JSON,
+  interval and other object-typed columns; with no context (`SELECT ${sql.param(x)}`) anything
+  is accepted.
+- Inline parameters are numbered after the statement's own parameters: `$n` and `:name`
+  parameters keep `$1…$k` and stay call arguments; inline values follow; spliced fragments'
+  values come last.
+- `sql.param()` inside a quoted string or a comment is a compile error (and a runtime error).
+- Tokens are single-use: each `sql.param()` call belongs to one statement. Fragments resolve
+  their inline parameters when created, so a fragment can be reused.
+
+Only literal SQL text is analysed. Interpolating anything that is not a compile-time constant
+is rejected, so a value can never be pasted into the SQL by accident:
+
+```ts
+sql(`SELECT id FROM users WHERE email = '${userInput}'`);
+//  error: the SQL text is not a string literal: pass values as parameters ($1, :name or
+//         ${sql.param(value)}), identifiers with sql.id(), reusable pieces as {slot}
+//         fragments, or use sql.as<Row>() for dynamic SQL
+const table = "users";
+sql(`SELECT id FROM ${table}`);   // fine: a const is folded into the literal
+```
+
+Tagged templates (`` sql`…` ``) are not supported: TypeScript erases the text of a tagged
+template from the types (TypeScript issue #33304), so nothing could be inferred.
+
+### Fragments
+
+```ts
+const where = sql.fragment("WHERE u.id = $1", 7);          // Fragment<"WHERE u.id = $1", [unknown]>
+const q = sql("SELECT u.id FROM users u {where}", { where });
+// Query<{ id: number }, [number], "SELECT u.id FROM users u WHERE u.id = $1">
+```
+
+- `{name}` slots are replaced before inference; the fragment's `$n` are renumbered to follow
+  the outer parameters (outer values first, then fragment values in order of appearance).
+  Only `{identifier}` is a slot; `'{1,2}'` or `'{"a":1}'` inside literals are untouched.
+- A fragment's parameters are typed once spliced (`WHERE u.id = $1` → `number` above), and
+  the values it carries (positional, `:name` or inline) are checked against those types:
+  `sql.fragment("AND age > $1", "eighteen")` spliced next to an `int4` column is an error.
+- Whole queries are spliceable too (`WHERE id IN ({sub})`).
+- `sql.id("col")` → `"col"`; `sql.id("schema", "table")` → `"schema"."table"`.
+- `sql.join([f1, f2], " AND ")` keeps the literal text for tuple inputs; an array input is
+  dynamic.
+- `sql.raw(text)` is dynamic.
+- A dynamic fragment makes the statement text non-literal; the call is rejected with
+  `SqlError<"dynamic SQL fragment …">` — use `sql.as<Row>(text, slots, ...params)`.
+
+### `sql.as<Row>(text, ...params)`
+
+Bypasses inference and asserts the row type. Accepts slots and named parameters like `sql`.
+
+## Public types
+
+| Type | Meaning |
+|---|---|
+| `Query<Row, Params, Text>` | runtime query object with phantom types |
+| `Fragment<Text, Params>` | spliceable SQL piece |
+| `RowType<Q>`, `ParamsType<Q>`, `TextType<Q>` | extract from a `Query`/`Fragment` type |
+| `InlineMarker<T>` | type of `sql.param(value)`: the inline marker encoding `T` |
+| `RowOf<DB, TM, Q>` | row type of a statement literal |
+| `ParamsOf<DB, TM, Q>` | positional parameter tuple |
+| `ParamsArgs<DB, TM, Q>` | what a call site passes (tuple, or `[params: {…}]` for `:name`) |
+| `NamesOf<DB, Q>` | `:name` parameters in order |
+| `Validate<DB, Q>` | `Q` when valid, else `SqlError<message, tokenIndex>` |
+| `Analyze<DB, Q>` | the full analysis result (`kind`, `cols`, `params`, `max`, `names`, `stmt`) |
+| `ApplyDdl<DB, Q>` | schema after a DDL statement or a `;`-separated script |
+| `SqlError<Message, At>` | compile-time error carrier; `At` is the index of the offending token |
+
+## Schema types
+
+```ts
+Col<"text">                  // NOT NULL, no default
+Nullable<"text">             // nullable
+Generated<"int4">            // has a default / identity / serial → optional on INSERT
+NullableGenerated<"text">
+Arr<"int4">                  // int4[]
+Enum<"mood">                 // values in DB["$types"]["mood"]
+View<{ ...columns }>         // read-only relation
+interface DB { users: {...}; auth: { sessions: {...} }; $types: { mood: "a" | "b" } }
+```
+
+Type names are Postgres names; spellings are normalized (`integer` → `int4`, `bigint` →
+`int8`, `boolean` → `bool`, `timestamp with time zone` → `timestamptz`, `serial` → `int4`
+with a default, …). Unknown names are kept as-is (user enums/domains) and resolve to
+`DB["$types"]` or `unknown`.
+
+## Type maps
+
+A type map is `{ [pgTypeName]: TsType }`. Resolution order: exact entry (so a map may define
+`"numeric[]": number[]`), then `T[]` element-wise, then `DB["$types"]`, then `unknown`.
+Nullable columns add `| null`. `DefaultTypeMap` matches node-postgres defaults (`int8` and
+`numeric` as `string`, dates as `Date`, `json/jsonb` as `unknown`).
+
+## Function catalog
+
+`FunctionCatalog` is an augmentable interface; add your own functions:
+
+```ts
+declare module "typesql" {
+  interface FunctionCatalog {
+    my_func: Sig<["text", "int4"], "bool">;                 // strict: nullable if any arg is
+    my_count: Sig<["any"], "int8", { agg: true; nullable: false }>;
+  }
+}
+```
+
+To review the catalog against a Postgres release, `scripts/catalog-from-pg.mjs` prints every
+`pg_proc` overload of each catalog function (argument and return types, strict / aggregate /
+window / set-returning flags) and lists catalog names Postgres does not have:
+
+```sh
+TYPESQL_PG_URL=postgres://postgres:x@localhost:5432/postgres node scripts/catalog-from-pg.mjs [names…]
+```
+
+Parameter patterns: exact type name, `any`, `anynumeric`, `anystring`, `anyarray`,
+`anyjson`, `anydatetime`, `...` (variadic). Return patterns: exact name, `$1`..`$4`,
+`$elem1`, `$arr1`, `$common`, `$sum1`, `$avg1`. Flags: `strict`, `nullable`, `agg`, `window`,
+`srf`. Unknown functions are typed `unknown` (nullable); a cast fixes them.
+
+## Limits
+
+- Statement size: up to 4096 tokens (the generated `Next` table; regenerate with
+  `node scripts/gen-next.mjs <n>` for more). 8 KB statements check in about a second.
+- Left-nested `||` or `+` chains of ~100 terms hit TypeScript's instantiation depth;
+  `AND`/`OR` chains are balanced by the parser and are fine at 200+ terms.
+- For anything the engine rejects, `sql.as<Row>()` is the documented escape hatch.

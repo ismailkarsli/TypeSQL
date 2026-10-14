@@ -1,0 +1,48 @@
+/**
+ * Postgres keyword categories (from `src/include/parser/kwlist.h`), reduced to what the
+ * parser needs to decide whether a word token is an identifier.
+ */
+
+/** Fully reserved: never an identifier, alias, or function name. */
+export type ReservedKeyword =
+  | "all" | "analyse" | "analyze" | "and" | "any" | "array" | "as" | "asc" | "asymmetric" | "both"
+  | "case" | "cast" | "check" | "collate" | "column" | "constraint" | "create" | "current_catalog"
+  | "current_date" | "current_role" | "current_time" | "current_timestamp" | "current_user"
+  | "default" | "deferrable" | "desc" | "distinct" | "do" | "else" | "end" | "except" | "false"
+  | "fetch" | "for" | "foreign" | "from" | "grant" | "group" | "having" | "in" | "initially"
+  | "intersect" | "into" | "lateral" | "leading" | "limit" | "localtime" | "localtimestamp" | "not"
+  | "null" | "offset" | "on" | "only" | "or" | "order" | "placing" | "primary" | "references"
+  | "returning" | "select" | "session_user" | "some" | "symmetric" | "system_user" | "table" | "then" | "to"
+  | "trailing" | "true" | "union" | "unique" | "user" | "using" | "variadic" | "when" | "where"
+  | "window" | "with";
+
+/** Can be column names but not function/type names, and not *bare* table aliases issues. */
+export type ColNameKeyword =
+  | "between" | "bigint" | "bit" | "boolean" | "char" | "character" | "coalesce" | "dec" | "decimal"
+  | "exists" | "extract" | "float" | "greatest" | "grouping" | "inout" | "int" | "integer" | "interval"
+  | "json" | "json_array" | "json_arrayagg" | "json_exists" | "json_object" | "json_objectagg" | "json_query" | "json_scalar" | "json_serialize" | "json_table" | "json_value"
+  | "least" | "merge_action" | "national" | "nchar" | "none" | "normalize" | "nullif" | "numeric" | "out" | "overlay" | "position"
+  | "precision" | "real" | "row" | "setof" | "smallint" | "substring" | "time" | "timestamp"
+  | "treat" | "trim" | "values" | "varchar" | "xmlattributes" | "xmlconcat" | "xmlelement"
+  | "xmlexists" | "xmlforest" | "xmlnamespaces" | "xmlparse" | "xmlpi" | "xmlroot" | "xmlserialize" | "xmltable";
+
+/** Can be function/type names, but not *bare* table aliases (`FROM t left` is a join). */
+export type TypeFuncNameKeyword =
+  | "authorization" | "binary" | "collation" | "concurrently" | "cross" | "current_schema" | "freeze"
+  | "full" | "ilike" | "inner" | "is" | "isnull" | "join" | "left" | "like" | "natural" | "notnull"
+  | "outer" | "overlaps" | "right" | "similar" | "tablesample" | "verbose";
+
+/** Words that cannot be a bare column label (`SELECT a b`) without `AS`. */
+export type NotBareLabel =
+  | ReservedKeyword
+  | "char" | "character" | "day" | "filter" | "hour" | "minute" | "month" | "over" | "precision"
+  | "second" | "varying" | "within" | "without" | "year" | "isnull" | "notnull" | "overlaps";
+
+/** `ColId`: identifier or unreserved/col-name keyword. Usable as table/column name and bare table alias. */
+export type IsColId<W extends string> = W extends ReservedKeyword | TypeFuncNameKeyword ? false : true;
+/** Usable as a plain column/table name (after `AS`, or in `t.col`). */
+export type IsColLabel<W extends string> = W extends ReservedKeyword ? false : true;
+/** Usable as a bare column alias in a target list. */
+export type IsBareLabel<W extends string> = W extends NotBareLabel ? false : true;
+/** Usable as a function or type name. */
+export type IsFuncName<W extends string> = W extends ReservedKeyword | ColNameKeyword ? false : true;

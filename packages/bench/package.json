@@ -1,0 +1,16 @@
+{
+  "name": "@typesql/bench",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "bench": "node ./run.mjs"
+  },
+  "dependencies": {
+    "typesql": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "7.0.2"
+  }
+}

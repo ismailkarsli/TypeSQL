@@ -1,0 +1,25 @@
+{
+  "name": "@typesql/docs",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Documentation site for typesql (VitePress).",
+  "scripts": {
+    "dev": "vitepress dev",
+    "build": "vitepress build",
+    "preview": "vitepress preview",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@typesql/pg": "workspace:*",
+    "typesql": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "@types/pg": "^8.23.1",
+    "pg": "^8.23.1",
+    "postgres": "^3.4.9",
+    "typescript": "7.0.2",
+    "vitepress": "1.6.4"
+  }
+}

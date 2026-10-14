@@ -1,0 +1,11 @@
+node_modules/
+dist/
+*.tsbuildinfo
+scratchpad/
+.vitest/
+coverage/
+packages/bench/results.json
+.vitepress/cache/
+
+# packages/docs is part of the repo (overrides a global "docs" ignore rule).
+!docs/

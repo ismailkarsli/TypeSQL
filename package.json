@@ -1,0 +1,25 @@
+{
+  "name": "typesql-monorepo",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.3.1",
+  "engines": {
+    "node": ">=26"
+  },
+  "scripts": {
+    "build": "pnpm -r --filter './packages/*' --filter '!@typesql/docs' run build",
+    "typecheck": "pnpm -r --filter './packages/*' run typecheck",
+    "test": "vitest run",
+    "test:types": "vitest run --typecheck.only",
+    "bench": "pnpm --filter @typesql/bench run bench",
+    "smoke:dist": "node scripts/smoke-dist.mjs",
+    "docs:dev": "pnpm --filter @typesql/docs run dev",
+    "docs:build": "pnpm --filter @typesql/docs run build",
+    "docs:preview": "pnpm --filter @typesql/docs run preview"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.0",
+    "typescript": "7.0.2",
+    "vitest": "^5.0.4"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "//": "Standalone (not extending tsconfig.base.json): Vite's bundled esbuild warns on the base's es2024 target.",
+  "compilerOptions": {
+    "target": "es2022",
+    "lib": ["es2024"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "exactOptionalPropertyTypes": true,
+    "noUncheckedIndexedAccess": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "types": ["node"],
+    "paths": {
+      "typesql": ["../core/src/index.ts"],
+      "@typesql/pg": ["../pg/src/index.ts"],
+      "@typesql/postgres": ["../postgres/src/index.ts"]
+    }
+  },
+  "include": ["snippets"]
+}

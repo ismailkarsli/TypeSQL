@@ -1,0 +1,5 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": { "noEmit": true, "types": ["node"], "paths": { "typesql": ["../packages/core/src/index.ts"] } },
+  "include": ["*.ts"]
+}

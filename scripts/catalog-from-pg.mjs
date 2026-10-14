@@ -1,0 +1,57 @@
+// Review tool for the function catalog (packages/core/src/engine/typer/catalog.ts).
+//
+// Connects to Postgres (TYPESQL_PG_URL, e.g. postgres://postgres:x@localhost:5432/postgres) and
+// prints every pg_proc overload of each function named in `FunctionCatalog`, in the catalog's
+// `Sig` notation, with strictness, set-returning and aggregate/window flags. It also lists
+// catalog names that do not exist in pg_proc (typos, extension functions).
+//
+//   TYPESQL_PG_URL=postgres://… node scripts/catalog-from-pg.mjs            # all catalog functions
+//   TYPESQL_PG_URL=postgres://… node scripts/catalog-from-pg.mjs lower sum  # selected functions
+//
+// The output is meant for a human diff against catalog.ts after a Postgres upgrade; it does
+// not rewrite the catalog (overload choice and nullability rules are deliberate).
+import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
+
+const require = createRequire(new URL("../packages/core/package.json", import.meta.url));
+const { Client } = require("pg");
+
+const url = process.env.TYPESQL_PG_URL;
+if (!url) {
+  console.error("set TYPESQL_PG_URL (e.g. docker run -d -p 5432:5432 -e POSTGRES_PASSWORD=x postgres:17)");
+  process.exit(2);
+}
+
+const catalogSrc = readFileSync(new URL("../packages/core/src/engine/typer/catalog.ts", import.meta.url), "utf8");
+const body = catalogSrc.slice(catalogSrc.indexOf("export interface FunctionCatalog"), catalogSrc.indexOf("\n}\n", catalogSrc.indexOf("export interface FunctionCatalog")));
+const catalogNames = [...new Set([...body.matchAll(/^\s+([a-z_][a-z0-9_]*):/gm)].map((m) => m[1]))];
+const names = process.argv.slice(2).length ? process.argv.slice(2) : catalogNames;
+
+const client = new Client({ connectionString: url });
+await client.connect();
+const { rows } = await client.query(
+  `SELECT p.proname AS name,
+          coalesce(array_to_string(array(SELECT format_type(t, NULL) FROM unnest(p.proargtypes) AS t), ', '), '') AS args,
+          format_type(p.prorettype, NULL) AS ret,
+          p.proisstrict AS strict, p.proretset AS srf, p.prokind AS kind, p.provariadic <> 0 AS variadic
+     FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'pg_catalog' AND p.proname = ANY($1)
+    ORDER BY p.proname, p.pronargs, args`,
+  [names],
+);
+await client.end();
+
+const found = new Set(rows.map((r) => r.name));
+let current = "";
+for (const r of rows) {
+  if (r.name !== current) {
+    current = r.name;
+    console.log(`\n${r.name}${catalogNames.includes(r.name) ? "" : "   (not in FunctionCatalog)"}`);
+  }
+  const flags = [r.kind === "a" ? "agg" : r.kind === "w" ? "window" : null, r.srf ? "srf" : null, r.strict ? null : "non-strict", r.variadic ? "variadic" : null]
+    .filter(Boolean)
+    .join(", ");
+  console.log(`  (${r.args}) → ${r.ret}${flags ? `   [${flags}]` : ""}`);
+}
+const missing = names.filter((n) => !found.has(n));
+if (missing.length) console.log(`\nnot in pg_catalog (extension or special syntax): ${missing.join(", ")}`);
