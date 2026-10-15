@@ -9,6 +9,8 @@ export type ValidateDdl<DB, Q extends string> =
   string extends Q ? SqlError<"migrations need a string literal; use .raw() for SQL the type checker cannot see", null>
   : ApplyDdl<DB, Q> extends infer R ? (R extends AnyErr ? R : Q) : never;
 
+type GateValidateDdl<DB, Q extends string> = [DB, Q] extends [infer D, infer Q2 extends string] ? ValidateDdl<D, Q2> : never;
+
 /**
  * An immutable list of migration statements plus, at the type level, the schema they
  * produce. Build one with `migrations()`; every `.add()` returns a new builder.
@@ -38,7 +40,7 @@ export class Migrations<DB = {}> {
    * builder's `schema` is the schema after it. Queries and DML (seed data) are validated
    * and leave the schema unchanged.
    */
-  add<const Q extends string>(ddl: Q & ValidateDdl<DB, Q>): Migrations<ApplyDdl<DB, Q>> {
+  add<const Q extends string>(ddl: Q & GateValidateDdl<DB, Q>): Migrations<ApplyDdl<DB, Q>> {
     return new Migrations([...this.statements, ddl]);
   }
 

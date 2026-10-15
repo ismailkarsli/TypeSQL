@@ -122,7 +122,7 @@ type FragCheck<Text extends string, Slotted extends boolean> =
     : never;
 /**
  * Arguments to `sql.fragment`: positional values for its `$n`, or one `:name` object. Applied as
- * `...params: A & FragArgs<Text>` with `A` unconstrained: a constraint that goes through
+ * `...params: A & BoxFragArgs<Text>` with `A` unconstrained: a constraint that goes through
  * `Prepared` cannot be resolved during inference, and TS would replace `A` by the constraint.
  */
 type FragArgs<Text extends string> =
@@ -141,6 +141,15 @@ type EncNamed<Names extends string[], O> = { [I in keyof Names]: Names[I] extend
 type JoinedCarried<Items extends readonly unknown[], Acc extends readonly unknown[] = []> =
   Items extends readonly [infer H, ...infer R] ? JoinedCarried<R, [...Acc, ...(CarriedOf<H> extends infer C extends readonly unknown[] ? C : [])]> : Acc;
 
+type GateCallCheck<DB, TM, Q extends string> = [DB, TM, Q] extends [infer D, infer M, infer Q2 extends string] ? CallCheck<D, M, Q2> : never;
+type GateSlottedCheck<DB, TM, Q extends string, S> =
+  [DB, TM, Q, S] extends [infer D, infer M, infer Q2 extends string, infer S2] ? SlottedCheck<D, M, Q2, S2> : never;
+type GateFragCheck<Text extends string, Slotted extends boolean> =
+  [Text, Slotted] extends [infer T2 extends string, infer B extends boolean] ? FragCheck<T2, B> : never;
+type BoxCallArgs<DB, TM, Q extends string> = Extract<{ [K in Q as `${K}`]: CallArgs<DB, TM, K> }[`${Q}`], readonly unknown[]>;
+type BoxSlottedArgs<DB, TM, Q extends string, S> = Extract<{ [K in Q as `${K}`]: SlottedArgs<DB, TM, K, S> }[`${Q}`], readonly unknown[]>;
+type BoxFragArgs<Text extends string> = Extract<{ [K in Text as `${K}`]: FragArgs<K> }[`${Text}`], readonly unknown[]>;
+
 /**
  * The typed SQL function returned by `createSql<DB, TypeMap>()`.
  *
@@ -153,11 +162,11 @@ type JoinedCarried<Items extends readonly unknown[], Acc extends readonly unknow
  * so the compile error lands on the SQL text.
  */
 export interface Sql<DB, TM> {
-  <const Q extends string>(query: Q & CallCheck<DB, TM, Q>, ...params: CallArgs<DB, TM, Q>): Query<RowOf<DB, TM, PText<Q>>, ParamsOf<DB, TM, PText<Q>>, PText<Q>>;
+  <const Q extends string>(query: Q & GateCallCheck<DB, TM, Q>, ...params: BoxCallArgs<DB, TM, Q>): Query<RowOf<DB, TM, PText<Q>>, ParamsOf<DB, TM, PText<Q>>, PText<Q>>;
   <const Q extends string, const S extends SlotMap>(
-    query: Q & SlottedCheck<DB, TM, Q, S>,
+    query: Q & GateSlottedCheck<DB, TM, Q, S>,
     slots: S & SlotsFor<Q, S>,
-    ...params: SlottedArgs<DB, TM, Q, S>
+    ...params: BoxSlottedArgs<DB, TM, Q, S>
   ): Query<RowOf<DB, TM, SplicedOr<Q, S>>, ParamsOf<DB, TM, SplicedOr<Q, S>>, SplicedOr<Q, S>>;
 
   /** Escape hatch: bypass inference and assert the row type. Accepts slots, `:name` and inline params like the main call. */
@@ -175,11 +184,11 @@ export interface Sql<DB, TM> {
    * `:name` and inline parameters are resolved at creation, so a fragment can be reused; the
    * values' types are checked when the fragment is spliced.
    */
-  fragment<const Text extends string, const A extends readonly unknown[]>(text: Text & FragCheck<Text, false>, ...params: A & FragArgs<Text>): Fragment<PText<Text>, UnknownTuple<FragCount<Text>>, FragCarried<Text, A>>;
+  fragment<const Text extends string, const A extends readonly unknown[]>(text: Text & GateFragCheck<Text, false>, ...params: A & BoxFragArgs<Text>): Fragment<PText<Text>, UnknownTuple<FragCount<Text>>, FragCarried<Text, A>>;
   fragment<const Text extends string, const S extends SlotMap, const A extends readonly unknown[]>(
-    text: Text & FragCheck<Text, true>,
+    text: Text & GateFragCheck<Text, true>,
     slots: S & SlotsFor<Text, S>,
-    ...params: A & FragArgs<Text>
+    ...params: A & BoxFragArgs<Text>
   ): Fragment<SplicedOr<Text, S>, readonly unknown[], [...FragCarried<Text, A>, ...SpliceCarried<PText<Text>, SlotCarried<S>>]>;
 
   /** Quoted identifier fragment: `sql.id("col")` → `"col"`, `sql.id("s", "t")` → `"s"."t"`. */
