@@ -1,6 +1,6 @@
 {
   "name": "@typesql/prisma",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Use a Prisma schema as a typesql schema: convert the generated client's types, or generate an exact schema with the typesql-prisma generator.",
   "license": "MIT",
   "repository": {
@@ -25,8 +25,15 @@
   "bin": {
     "typesql-prisma": "./dist/bin.js"
   },
-  "files": ["dist", "src", "README.md", "LICENSE"],
-  "publishConfig": { "access": "public" },
+  "files": [
+    "dist",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "fixtures": "prisma generate --schema test/fixtures/schema.prisma --generator client --no-hints",

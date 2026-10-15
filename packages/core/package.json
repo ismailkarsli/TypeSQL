@@ -1,6 +1,6 @@
 {
   "name": "@typesql/core",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Type-level Postgres SQL inference for TypeScript. Zero runtime dependencies.",
   "license": "MIT",
   "repository": {
@@ -24,7 +24,9 @@
     "README.md",
     "LICENSE"
   ],
-  "publishConfig": { "access": "public" },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",

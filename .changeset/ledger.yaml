@@ -1,0 +1,25 @@
+"@typesql/core@0.0.2":
+  dir: packages/core
+  intents:
+    - clean-taxis-kick
+    - wide-hats-do
+"@typesql/drizzle@0.0.2":
+  dir: packages/drizzle
+  intents:
+    - wise-snails-clean
+"@typesql/kysely@0.0.2":
+  dir: packages/kysely
+  intents:
+    - wise-snails-clean
+"@typesql/pg@0.0.2":
+  dir: packages/pg
+  intents:
+    - wise-snails-clean
+"@typesql/postgres@0.0.2":
+  dir: packages/postgres
+  intents:
+    - wise-snails-clean
+"@typesql/prisma@0.0.2":
+  dir: packages/prisma
+  intents:
+    - wise-snails-clean

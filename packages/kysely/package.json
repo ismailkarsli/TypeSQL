@@ -1,6 +1,6 @@
 {
   "name": "@typesql/kysely",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Use Kysely database interfaces (kysely-codegen, prisma-kysely) as a typesql schema.",
   "license": "MIT",
   "repository": {
@@ -18,8 +18,15 @@
       "default": "./dist/index.js"
     }
   },
-  "files": ["dist", "src", "README.md", "LICENSE"],
-  "publishConfig": { "access": "public" },
+  "files": [
+    "dist",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
