@@ -1,4 +1,4 @@
-import type { Query, RowType } from "@typesql/core";
+import type { Executor, Query, RowType } from "@typesql/core";
 
 /** The shape of a resolved `sql.unsafe()` result the helpers rely on: an array with `count`. */
 export type PostgresJsRows = readonly unknown[] & { readonly count: number };
@@ -33,6 +33,11 @@ type AnyQuery = Query<unknown, readonly unknown[]>;
 
 function run(sql: PostgresJsQueryable, q: AnyQuery): PromiseLike<PostgresJsRows> {
   return sql.unsafe(q.text, Array.from(q.values));
+}
+
+/** An `Executor` for core's `q.execute()`: runs queries through `sql.unsafe` and resolves to the rows. */
+export function executor(sql: PostgresJsQueryable): Executor {
+  return async (text, values) => Array.from(await sql.unsafe(text, Array.from(values)));
 }
 
 /** Run a query and return all rows (a plain array, without postgres.js' result metadata). */

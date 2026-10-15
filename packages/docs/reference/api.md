@@ -1,9 +1,11 @@
 # API
 
-## `createSql<DB, TypeMap = DefaultTypeMap>()`
+## `createSql<DB, TypeMap = DefaultTypeMap>(executor?)`
 
 Returns the typed `sql` function for a schema. Pass the adapter's type map (`PgTypeMap`,
-`PostgresJsTypeMap`) or use the adapter's pre-bound `createSql`.
+`PostgresJsTypeMap`) or use the adapter's pre-bound `createSql`. The optional `executor` is
+what the queries' `execute*` methods run on; the adapters' `createSql` take the driver client
+instead (`createSql<DB>(pool)`).
 
 ```ts
 const sql = createSql<DB>();
@@ -113,11 +115,28 @@ const q = sql("SELECT u.id FROM users u {where}", { where });
 
 Bypasses inference and asserts the row type. Accepts slots and named parameters like `sql`.
 
+### `q.execute()`, `q.executeTakeFirst()`, `q.executeTakeFirstOrThrow()`
+
+Run a query on the executor bound by `createSql(executor)`, or on the one passed to the call
+(`q.execute(executor(tx))` inside a transaction). Without either they reject.
+
+| Method | Returns |
+|---|---|
+| `execute(executor?)` | `Promise<Row[]>` |
+| `executeTakeFirst(executor?)` | `Promise<Row \| undefined>` |
+| `executeTakeFirstOrThrow(executor?)` | `Promise<Row>`; `NoResultError` (with the statement `text`) on 0 rows |
+
+An `Executor` is `(text, values) => PromiseLike<readonly unknown[]>`. Each adapter exports
+`executor(client)` to build one. The methods are non-enumerable, so a query still
+deep-equals `{ text, values }`.
+
 ## Public types
 
 | Type | Meaning |
 |---|---|
-| `Query<Row, Params, Text>` | runtime query object with phantom types |
+| `Query<Row, Params, Text>` | runtime query object with phantom types and `execute*` methods |
+| `Executor` | `(text, values) => PromiseLike<readonly unknown[]>`, what `execute*` runs on |
+| `NoResultError` | thrown by `executeTakeFirstOrThrow` on 0 rows; carries `text` |
 | `Fragment<Text, Params>` | spliceable SQL piece |
 | `RowType<Q>`, `ParamsType<Q>`, `TextType<Q>` | extract from a `Query`/`Fragment` type |
 | `InlineMarker<T>` | type of `sql.param(value)`: the inline marker encoding `T` |
@@ -188,9 +207,9 @@ Each package wraps core's `createSql` with the schema converted from the ORM's t
 
 | Package | `createSql` | Schema type | Runs queries |
 |---|---|---|---|
-| `@typesql/kysely` | `createSql<DB, TM = DefaultTypeMap, Overrides = {}, Options = {}>()` | `FromKysely<DB, Overrides, Options>` | `query(db, q)` → `Row[]`, `execute(db, q)` → `number` |
-| `@typesql/drizzle` | `createSql<Schema, TM = DefaultTypeMap, Options = {}>()` | `FromDrizzle<Schema, Options>`; `pgType(column, "type")` pins a column | with a driver adapter |
-| `@typesql/prisma` | `createSql<S, TM = PrismaTypeMap>()`; `S` is a generated `DB` or a `Prisma.TypeMap` | `FromPrisma<Prisma.TypeMap, Overrides>`; the `typesql-prisma` generator | `queryRaw(prisma, q)` → `PrismaPromise<Row[]>`, `executeRaw(prisma, q)` → `PrismaPromise<number>` |
+| `@typesql/kysely` | `createSql<DB, TM = DefaultTypeMap, Overrides = {}, Options = {}>(db?)` | `FromKysely<DB, Overrides, Options>` | `query(db, q)` → `Row[]`, `execute(db, q)` → `number`; `q.execute()` with a bound `db` |
+| `@typesql/drizzle` | `createSql<Schema, TM = DefaultTypeMap, Options = {}>(executor?)` | `FromDrizzle<Schema, Options>`; `pgType(column, "type")` pins a column | with a driver adapter, or `q.execute()` with an adapter's `executor(client)` |
+| `@typesql/prisma` | `createSql<S, TM = PrismaTypeMap>(prisma?)`; `S` is a generated `DB` or a `Prisma.TypeMap` | `FromPrisma<Prisma.TypeMap, Overrides>`; the `typesql-prisma` generator | `queryRaw(prisma, q)` → `PrismaPromise<Row[]>`, `executeRaw(prisma, q)` → `PrismaPromise<number>`; `q.execute()` with a bound `prisma` |
 
 Option and override types: `KyselyOverrides`, `KyselyOptions` (`camelCase`),
 `FromDrizzleOptions` (`casing`, `timestamp`, `time`), `PrismaOverrides` (`$table`, `$schema`,

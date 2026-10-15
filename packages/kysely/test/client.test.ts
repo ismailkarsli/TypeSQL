@@ -10,7 +10,7 @@ import {
   type Driver,
   type QueryResult,
 } from "kysely";
-import { createSql, execute, query } from "../src/index.js";
+import { createSql, execute, executor, query } from "../src/index.js";
 import type { DB } from "./fixtures/kysely-codegen.js";
 
 /** A Kysely instance whose driver records each query and answers with `result`. */
@@ -75,5 +75,20 @@ describe("query / execute", () => {
     await expect(execute(db, sql("DELETE FROM posts WHERE author_id = $1", 1))).resolves.toBe(3);
     const none = fakeKysely({ rows: [] });
     await expect(execute(none.db, sql("DELETE FROM posts"))).resolves.toBe(0);
+  });
+});
+
+describe("executor", () => {
+  test("runs the queries' execute methods on the bound instance, bypassing plugins", async () => {
+    const { db, calls } = fakeKysely({ rows: [{ id: 1, display_name: "Ada" }] });
+    const bound = createSql<DB>(db);
+    expect(await bound("SELECT id, display_name FROM users WHERE id = $1", 1).executeTakeFirstOrThrow()).toEqual({ id: 1, display_name: "Ada" });
+    expect(calls).toEqual([{ sql: "SELECT id, display_name FROM users WHERE id = $1", parameters: [1] }]);
+  });
+
+  test("executor(trx) can be passed per call inside a transaction", async () => {
+    const { db } = fakeKysely({ rows: [{ id: 2 }] });
+    const rows = await db.transaction().execute((trx) => sql("SELECT id FROM users").execute(executor(trx)));
+    expect(rows).toEqual([{ id: 2 }]);
   });
 });

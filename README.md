@@ -44,6 +44,9 @@ Already using Kysely, Drizzle or Prisma? `@typesql/kysely`, `@typesql/drizzle` a
 ```ts
 import { createSql, query, one } from "@typesql/pg";   // pre-bound to pg's type map
 const rows = await query(pool, q);                   // Promise<{ id: number; ... }[]>
+
+const db = createSql<DB>(pool);                      // or bind the pool: queries run themselves
+const user = await db("SELECT id, email FROM users WHERE id = $1", 7).executeTakeFirstOrThrow();
 ```
 
 ## What is inferred
@@ -69,8 +72,8 @@ never a silent `any`.
 
 | Package | Contents |
 |---|---|
-| `@typesql/core` | the type engine, `createSql`, fragments, `ApplyDdl`, `migrations()`. Zero dependencies. |
-| `@typesql/pg` | `PgTypeMap`, `createSql`, `query`/`one`/`maybeOne`/`many`/`execute`/`transaction` for node-postgres |
+| `@typesql/core` | the type engine, `createSql`, `q.execute()`/`executeTakeFirst()`/`executeTakeFirstOrThrow()`, fragments, `ApplyDdl`, `migrations()`. Zero dependencies. |
+| `@typesql/pg` | `PgTypeMap`, `createSql(pool?)`, `executor`, `query`/`one`/`maybeOne`/`many`/`execute`/`transaction` for node-postgres |
 | `@typesql/postgres` | the same for postgres.js (`PostgresJsTypeMap`, `PostgresJsBigIntTypeMap`) |
 | `@typesql/kysely` | `FromKysely`: a Kysely `DB` interface (kysely-codegen, prisma-kysely) as the schema; `query`/`execute` through Kysely |
 | `@typesql/drizzle` | `FromDrizzle`: Drizzle `pgTable`/`pgView`/`pgEnum`/`pgSchema` definitions as the schema; `pgType` |

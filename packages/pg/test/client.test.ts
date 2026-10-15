@@ -3,12 +3,14 @@ import type { Col, Generated, Nullable } from "@typesql/core";
 import {
   createSql,
   execute,
+  executor,
   many,
   maybeOne,
   one,
   query,
   transaction,
   migrate,
+  NoResultError,
   RowCountError,
   type PgPoolLike,
   type PgQueryable,
@@ -51,6 +53,24 @@ describe("createSql", () => {
     expect(q.values).toEqual([7]);
     const raw = sql.as<{ n: number }>("SELECT 1 AS n");
     expect(raw).toEqual({ text: "SELECT 1 AS n", values: [] });
+  });
+});
+
+describe("executor", () => {
+  test("runs the queries' execute methods on the bound client", async () => {
+    const { client, calls } = fakeClient([rowA, rowB]);
+    const bound = createSql<DB>(client);
+    const q2 = bound("SELECT id, email, display_name FROM users WHERE id = $1", 7);
+    expect(await q2.execute()).toEqual([rowA, rowB]);
+    expect(await q2.executeTakeFirst()).toEqual(rowA);
+    expect(calls[0]).toEqual({ text: q2.text, values: [7] });
+    expect(Array.isArray(calls[0]!.values)).toBe(true);
+  });
+
+  test("executor(client) can be passed per call", async () => {
+    const { client } = fakeClient([]);
+    expect(await q.executeTakeFirst(executor(client))).toBeUndefined();
+    await expect(q.executeTakeFirstOrThrow(executor(client))).rejects.toBeInstanceOf(NoResultError);
   });
 });
 

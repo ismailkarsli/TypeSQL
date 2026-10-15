@@ -21,6 +21,22 @@ const id = await transaction(pool, async (client) => {
   return id;
 });
 // #endregion pg
+// #region execute
+import { executor } from "@typesql/pg";
+
+const bound = createSql<DB>(pool); // queries run on `pool`
+
+const all = await bound("SELECT id, email FROM users").execute(); // { id: number; email: string }[]
+const first = await bound("SELECT id FROM users WHERE email = $1", "x").executeTakeFirst(); // row | undefined
+const me = await bound("SELECT id, email FROM users WHERE id = $1", 7).executeTakeFirstOrThrow(); // row, or NoResultError
+
+await transaction(pool, async (client) => {
+  await bound("UPDATE users SET display_name = NULL WHERE id = $1", 7).execute(executor(client)); // on the transaction's client
+});
+// #endregion execute
+check<Equal<typeof all, { id: number; email: string }[]>>();
+check<Equal<typeof first, { id: number } | undefined>>();
+check<Equal<typeof me, { id: number; email: string }>>();
 check<Equal<typeof users, { id: number; email: string }[]>>();
 check<Equal<typeof user, { id: number; email: string }>>();
 check<Equal<typeof maybe, { id: number } | null>>();

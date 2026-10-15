@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import type { PrismaPromise } from "@prisma/client/runtime/client";
-import { createSql, executeRaw, queryRaw, type PrismaRawClient } from "../src/index.js";
+import { createSql, executeRaw, executor, queryRaw, type PrismaRawClient } from "../src/index.js";
 
 interface DB {
   users: { id: { type: "int4"; nullable: false; hasDefault: true }; email: { type: "text"; nullable: false; hasDefault: false } };
@@ -23,5 +23,17 @@ test("queryRaw and executeRaw pass the text and bind values to Prisma's raw meth
   expect(calls).toEqual([
     ["query", "SELECT id FROM users WHERE email = $1", "a@b.c"],
     ["execute", "DELETE FROM users WHERE id = $1", 7],
+  ]);
+});
+
+test("the queries' execute methods run through $queryRawUnsafe", async () => {
+  const calls: unknown[][] = [];
+  const prisma = fakeClient(calls);
+  const bound = createSql<DB>(prisma);
+  expect(await bound("SELECT id FROM users WHERE email = $1", "a@b.c").executeTakeFirst()).toEqual({ id: 1 });
+  expect(await createSql<DB>()("SELECT id FROM users").execute(executor(prisma))).toEqual([{ id: 1 }]);
+  expect(calls).toEqual([
+    ["query", "SELECT id FROM users WHERE email = $1", "a@b.c"],
+    ["query", "SELECT id FROM users"],
   ]);
 });

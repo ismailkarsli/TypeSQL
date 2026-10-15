@@ -1,4 +1,4 @@
-import type { Query, RowType } from "@typesql/core";
+import type { Executor, Query, RowType } from "@typesql/core";
 
 /** The subset of a `pg` query result the helpers rely on. */
 export interface PgResult {
@@ -42,6 +42,11 @@ type AnyQuery = Query<unknown, readonly unknown[]>;
 function run(client: PgQueryable, q: AnyQuery): Promise<PgResult> {
   // `pg` requires a mutable array (`QueryConfigValues<I>` matches `Array<U>` only).
   return client.query(q.text, Array.from(q.values));
+}
+
+/** An `Executor` for core's `q.execute()`: runs queries on `client` and resolves to the rows. */
+export function executor(client: PgQueryable): Executor {
+  return async (text, values) => (await client.query(text, Array.from(values))).rows;
 }
 
 /** Run a query and return all rows, typed from the query. */

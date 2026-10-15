@@ -4,12 +4,14 @@ import {
   createBigIntSql,
   createSql,
   execute,
+  executor,
   many,
   maybeOne,
   one,
   query,
   transaction,
   migrate,
+  NoResultError,
   RowCountError,
   type PostgresJsQueryable,
   type PostgresJsRows,
@@ -175,5 +177,22 @@ describe("migrate", () => {
     };
     await expect(migrate(failing, m)).rejects.toThrow("boom");
     expect(f.log).toEqual(["BEGIN", "CREATE TABLE a (id int)", "CREATE TABLE b (id int)", "ROLLBACK"]);
+  });
+});
+
+describe("executor", () => {
+  test("runs the queries' execute methods through unsafe and strips result metadata", async () => {
+    const { client, calls } = fakeSql([{ id: 7 }]);
+    const bound = createSql<DB>(client);
+    const rows = await bound("SELECT id FROM users WHERE id = $1", 7).execute();
+    expect(rows).toEqual([{ id: 7 }]);
+    expect(rows).not.toHaveProperty("count");
+    expect(calls).toEqual([{ text: "SELECT id FROM users WHERE id = $1", params: [7] }]);
+    expect(await createBigIntSql<DB>(client)("SELECT id FROM users").executeTakeFirstOrThrow()).toEqual({ id: 7 });
+  });
+
+  test("executor(sql) can be passed per call", async () => {
+    const { client } = fakeSql([]);
+    await expect(q.executeTakeFirstOrThrow(executor(client))).rejects.toBeInstanceOf(NoResultError);
   });
 });

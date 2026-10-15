@@ -1,5 +1,5 @@
 import type { PrismaPromise } from "@prisma/client/runtime/client";
-import type { Query, RowType } from "@typesql/core";
+import type { Executor, Query, RowType } from "@typesql/core";
 
 /** Anything with Prisma Client's raw methods: a `PrismaClient`, an extended client or a transaction client. */
 export interface PrismaRawClient {
@@ -8,6 +8,11 @@ export interface PrismaRawClient {
 }
 
 type AnyQuery = Query<unknown, readonly unknown[]>;
+
+/** An `Executor` for core's `q.execute()`: runs queries through `prisma.$queryRawUnsafe(text, ...values)`. */
+export function executor(prisma: PrismaRawClient): Executor {
+  return (text, values) => prisma.$queryRawUnsafe<unknown[]>(text, ...values);
+}
 
 /**
  * Run a typesql query through `prisma.$queryRawUnsafe(text, ...values)` and type the rows from

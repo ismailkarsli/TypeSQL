@@ -4,7 +4,7 @@ import type { AnyErr, SqlError } from "./engine/errors.js";
 import type { CheckCarried, Enc, InlineMarker, RewriteInlineStr, Skip } from "./engine/inline.js";
 import type { HasSlots, JoinedText, MaxParamStr, QuotedIdent, SlotNames, Splice, SpliceCarried, Take, UnknownTuple } from "./engine/splice.js";
 import type { DefaultTypeMap } from "./type-map/index.js";
-import { makeFragment, makeQuery, type CARRIED, type Fragment, type Query, type TextType } from "./query.js";
+import { makeFragment, makeQuery, type CARRIED, type Executor, type Fragment, type Query, type TextType } from "./query.js";
 import { joinFragments, maxParam, quoteIdent, rewriteNamed, splice, type Spliceable } from "./runtime/splice.js";
 import { hasInline, param, resolveInline } from "./runtime/inline.js";
 
@@ -239,15 +239,16 @@ function build(text: string, rest: readonly unknown[]): { text: string; values: 
   return slots ? splice(positional, slots, values) : { text: positional, values };
 }
 
-export function createSql<DB, TM = DefaultTypeMap>(): Sql<DB, TM> {
+/** `executor`, when given, is what the queries' `execute*` methods run on by default. */
+export function createSql<DB, TM = DefaultTypeMap>(executor?: Executor): Sql<DB, TM> {
   const call = (query: string, ...rest: readonly unknown[]) => {
     const { text, values } = build(query, rest);
-    return makeQuery(text, values);
+    return makeQuery(text, values, executor);
   };
   const api = Object.assign(call, {
     as: (query: string, ...rest: readonly unknown[]) => {
       const { text, values } = build(query, rest);
-      return makeQuery(text, values);
+      return makeQuery(text, values, executor);
     },
     param,
     fragment: (text: string, ...rest: readonly unknown[]) => {

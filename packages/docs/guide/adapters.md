@@ -26,6 +26,24 @@ core's `RowType<Q>`, so the result of `sql(...)` can be passed straight in.
 
 The client parameters are structural, so fakes work in tests without the driver.
 
+### `q.execute()`
+
+Pass the client to `createSql` and a query runs itself, Kysely-style:
+
+<<< @/snippets/adapters.ts#execute
+
+| Method | Returns | Error |
+|---|---|---|
+| `q.execute()` | `Promise<Row[]>` | — |
+| `q.executeTakeFirst()` | `Promise<Row \| undefined>` | — |
+| `q.executeTakeFirstOrThrow()` | `Promise<Row>` | `NoResultError` (carries `text`) on 0 rows |
+
+Each method also takes an executor, which wins over the bound one: `executor(client)` from the
+adapter wraps any client the helpers accept, e.g. a transaction's. A query from a `createSql()`
+without a client has no executor and rejects unless one is passed. `@typesql/kysely`,
+`@typesql/prisma` and `@typesql/postgres` take their client the same way; `@typesql/drizzle`
+takes an `executor(...)` from a driver adapter.
+
 `@typesql/kysely` and `@typesql/prisma` can also run queries through the ORM's own client
 (`query`/`execute` on a `Kysely` instance, `queryRaw`/`executeRaw` on Prisma Client). See
 [ORM schemas](./orm-schemas).
