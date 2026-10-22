@@ -51,6 +51,20 @@ const db = createSql<DB>(pool);                      // or bind the pool: querie
 const user = await db("SELECT id, email FROM users WHERE id = $1", 7).executeTakeFirstOrThrow();
 ```
 
+## Packages
+
+| Package | Role | Peer dependency | Contents |
+|---|---|---|---|
+| [`@typesql/core`](packages/core) | type engine | none | `createSql`, `q.execute()`/`executeTakeFirst()`/`executeTakeFirstOrThrow()`, fragments, `ApplyDdl`, `migrations()`. Zero dependencies. |
+| [`@typesql/pg`](packages/pg) | driver | `pg` ≥ 8 | node-postgres: `PgTypeMap`, `createSql(pool?)`, `executor`, `query`/`one`/`maybeOne`/`many`/`execute`/`transaction` |
+| [`@typesql/postgres`](packages/postgres) | driver | `postgres` ≥ 3 | postgres.js: the same API, with `PostgresJsTypeMap` and `PostgresJsBigIntTypeMap` |
+| [`@typesql/kysely`](packages/kysely) | ORM schema | `kysely` ≥ 0.27 | `FromKysely`: a Kysely `DB` interface (kysely-codegen, prisma-kysely) as the schema; `query`/`execute` through Kysely |
+| [`@typesql/drizzle`](packages/drizzle) | ORM schema | `drizzle-orm` ≥ 0.45 | `FromDrizzle`: Drizzle `pgTable`/`pgView`/`pgEnum`/`pgSchema` definitions as the schema; `pgType` |
+| [`@typesql/prisma`](packages/prisma) | ORM schema | `@prisma/client` ≥ 7 | the `typesql-prisma` generator and `FromPrisma`; `queryRaw`/`executeRaw` through Prisma Client |
+
+Two more workspace packages are private and not published: `@typesql/docs` (the VitePress
+documentation site) and `@typesql/bench` (compile-time budget benchmarks).
+
 ## What is inferred
 
 | Feature | Status |
@@ -69,18 +83,6 @@ const user = await db("SELECT id, email FROM users WHERE id = $1", 7).executeTak
 
 Unsupported syntax is a compile error with a Postgres-style message and a token position,
 never a silent `any`.
-
-## Packages
-
-| Package | Contents |
-|---|---|
-| `@typesql/core` | the type engine, `createSql`, `q.execute()`/`executeTakeFirst()`/`executeTakeFirstOrThrow()`, fragments, `ApplyDdl`, `migrations()`. Zero dependencies. |
-| `@typesql/pg` | `PgTypeMap`, `createSql(pool?)`, `executor`, `query`/`one`/`maybeOne`/`many`/`execute`/`transaction` for node-postgres |
-| `@typesql/postgres` | the same for postgres.js (`PostgresJsTypeMap`, `PostgresJsBigIntTypeMap`) |
-| `@typesql/kysely` | `FromKysely`: a Kysely `DB` interface (kysely-codegen, prisma-kysely) as the schema; `query`/`execute` through Kysely |
-| `@typesql/drizzle` | `FromDrizzle`: Drizzle `pgTable`/`pgView`/`pgEnum`/`pgSchema` definitions as the schema; `pgType` |
-| `@typesql/prisma` | the `typesql-prisma` generator and `FromPrisma`; `queryRaw`/`executeRaw` through Prisma Client |
-| `@typesql/bench` | compile-time budget benchmarks (private) |
 
 ## Schema
 
