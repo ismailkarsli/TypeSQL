@@ -8,7 +8,7 @@ export type { FromPrisma, PrismaOverrides, ModelOverride, FieldOverride, PrismaS
 export type { PrismaTypeMap } from "./type-map.js";
 export { executor, type PrismaRawClient } from "./client.js";
 
-/** A typesql schema as is, or a generated `Prisma.TypeMap` converted with `FromPrisma`. */
+/** A TypeSQL schema as is, or a generated `Prisma.TypeMap` converted with `FromPrisma`. */
 export type PrismaSchema<S> = S extends PrismaTypeMapLike ? FromPrisma<S> : S;
 
 /** What `createSql<S>(prisma)` returns: core's `Sql` under `PrismaTypeMap`, with `transaction(fn)`. */

@@ -99,7 +99,7 @@ function enumKeys(enums: readonly DmmfEnum[]): Map<string, string> {
 }
 
 /**
- * TypeScript source declaring the typesql schema of a Prisma datamodel (DMMF): database table,
+ * TypeScript source declaring the TypeSQL schema of a Prisma datamodel (DMMF): database table,
  * column and enum names, native types, nullability (scalar lists are nullable: Prisma creates
  * them without NOT NULL) and database defaults. Models in a non-public `@@schema` are nested
  * under `DB[schema]`. Relation fields are skipped; `Unsupported(...)` fields are not in the DMMF.

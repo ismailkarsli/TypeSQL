@@ -1,6 +1,6 @@
 # Migrations
 
-The schema interface does not have to be written by hand: typesql can derive it from the DDL
+The schema interface does not have to be written by hand: TypeSQL can derive it from the DDL
 that creates your database, entirely at the type level.
 
 ## ApplyDdl

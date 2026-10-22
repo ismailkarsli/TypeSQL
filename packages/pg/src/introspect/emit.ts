@@ -51,7 +51,7 @@ function columnNotes(c: IntrospectedColumn): string[] {
 }
 
 /**
- * TypeScript source declaring the typesql schema of an introspected database: `public`
+ * TypeScript source declaring the TypeSQL schema of an introspected database: `public`
  * relations at the top level, other schemas nested (`DB["auth"]["sessions"]`), views and
  * materialized views as `View<…>`, enums under `$types`.
  */
@@ -126,14 +126,14 @@ export function generateSource(db: IntrospectedDatabase, options: GenerateOption
   }
   for (const [schema, rels] of namespaces) {
     if (topLevel.has(schema)) {
-      throw new Error(`schema "${schema}" has the same name as the table "public.${schema}": typesql keeps public relations and schemas in one object`);
+      throw new Error(`schema "${schema}" has the same name as the table "public.${schema}": TypeSQL keeps public relations and schemas in one object`);
     }
     const body = rels.map((r) => `${relDoc(r, "    ")}    ${key(r.name)}: ${relation(r, "    ")};`);
     lines.push(`  ${key(schema)}: {\n${body.join("\n")}\n  };`);
   }
 
   if (db.enums.length > 0) {
-    // typesql's enum registry is flat (`Col<"mood">`, schema qualifiers are dropped), so enums
+    // TypeSQL's enum registry is flat (`Col<"mood">`, schema qualifiers are dropped), so enums
     // of the same name in different schemas share an entry.
     const byName = new Map<string, { values: Set<string>; schemas: string[] }>();
     for (const e of db.enums) {

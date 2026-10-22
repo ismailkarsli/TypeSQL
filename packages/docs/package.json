@@ -3,7 +3,7 @@
   "version": "0.0.5",
   "private": true,
   "type": "module",
-  "description": "Documentation site for typesql (VitePress).",
+  "description": "Documentation site for TypeSQL (VitePress).",
   "scripts": {
     "dev": "vitepress dev",
     "build": "vitepress build",

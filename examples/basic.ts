@@ -1,5 +1,5 @@
 /**
- * typesql examples. Type-check this file with `tsc --noEmit -p examples/tsconfig.json` and hover
+ * TypeSQL examples. Type-check this file with `tsc --noEmit -p examples/tsconfig.json` and hover
  * the results in your editor; nothing here needs a database.
  */
 import { createSql, type Col, type Generated, type Nullable, type RowType, type ApplyDdl } from "@typesql/core";

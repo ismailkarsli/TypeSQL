@@ -1,7 +1,7 @@
 import { defineConfig } from "vitepress";
 
 export default defineConfig({
-  title: "typesql",
+  title: "TypeSQL",
   description: "Type-level Postgres SQL for TypeScript: row and parameter types inferred from SQL string literals, with no codegen.",
   cleanUrls: true,
   themeConfig: {

@@ -1,6 +1,6 @@
 # @typesql/drizzle
 
-Use your Drizzle ORM schema as a typesql schema. `FromDrizzle<typeof schema>` turns
+Use your Drizzle ORM schema as a TypeSQL schema. `FromDrizzle<typeof schema>` turns
 `pgTable`, `pgView`, `pgMaterializedView`, `pgEnum` and `pgSchema` definitions into the
 `DB` type that `createSql` expects, entirely at the type level: no code generation, and the
 SQL you write is checked against the same tables Drizzle manages.
@@ -113,7 +113,7 @@ tables (`FromDrizzle<{ users: typeof users; posts: typeof posts }>`).
 
 ## What gets converted
 
-| Drizzle | typesql |
+| Drizzle | TypeSQL |
 |---|---|
 | `pgTable("users", …)` | `DB["users"]`, keyed by the SQL table name, not the export name |
 | `displayName: text("display_name")` | column `display_name`; columns without an explicit name use the key |
@@ -128,7 +128,7 @@ tables (`FromDrizzle<{ users: typeof users; posts: typeof posts }>`).
 ## Column types
 
 The Postgres type comes from Drizzle's column kind. Drizzle's `mode` options change the JS
-value Drizzle produces, but typesql queries go straight to the driver, so the row type comes
+value Drizzle produces, but TypeSQL queries go straight to the driver, so the row type comes
 from the type map: `bigint({ mode: "number" })` is `int8`, a `string` under node-postgres.
 
 | Drizzle | Postgres |
@@ -157,7 +157,7 @@ from the type map: `bigint({ mode: "number" })` is `int8`, a `string` under node
 | `customType(…)` | `unknown`, unless pinned with `pgType` |
 | `.array()`, `.array().array()` | `T[]`, `T[][]` |
 
-Types typesql has no TS mapping for (`geometry`, `vector`, …) read as `unknown` unless your
+Types TypeSQL has no TS mapping for (`geometry`, `vector`, …) read as `unknown` unless your
 type map has an entry for them.
 
 ### `timestamp` with time zone, and other types Drizzle's types do not record
@@ -209,7 +209,7 @@ createSql<typeof schema, DefaultTypeMap, { casing: "snake_case" }>(db);
 ## Limitations
 
 - **Generated-always columns** (`generatedAlwaysAs`, `generatedAlwaysAsIdentity`) are treated
-  as columns with a default. typesql has no read-only columns, so an `INSERT` that sets one
+  as columns with a default. TypeSQL has no read-only columns, so an `INSERT` that sets one
   type-checks but fails in Postgres (unless `OVERRIDING SYSTEM VALUE` for identities).
 - **`$onUpdate` / `$onUpdateFn`** mark the column as having a default in Drizzle's types, with
   no way to tell them from a SQL default, so such a column is optional in `INSERT` even

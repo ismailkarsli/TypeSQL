@@ -145,7 +145,7 @@ type Build<S, Opts, E = Enums<S>> =
 type Flat<T> = { [K in keyof T]: T[K] } & {};
 
 /**
- * A typesql schema from Drizzle `pg-core` definitions: `FromDrizzle<typeof schema>` with
+ * A TypeSQL schema from Drizzle `pg-core` definitions: `FromDrizzle<typeof schema>` with
  * `import * as schema from "./schema"`. Also accepts a record of tables or a single table.
  *
  * Keys are SQL names (tables, columns, `pgSchema` namespaces); views become `View<…>`;

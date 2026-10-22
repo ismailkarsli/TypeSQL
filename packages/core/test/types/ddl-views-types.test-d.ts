@@ -43,7 +43,7 @@ test("view errors", () => {
   expectTypeOf<A<"CREATE VIEW IF NOT EXISTS v AS SELECT 1">>().toEqualTypeOf<SqlError<"syntax error: expected AS at or near not", 3>>();
   expectTypeOf<A<"CREATE RECURSIVE VIEW v (n) AS SELECT 1">>().toEqualTypeOf<SqlError<"CREATE RECURSIVE VIEW is not supported; write the view as WITH RECURSIVE ... SELECT", 1>>();
   expectTypeOf<A<"CREATE OR REPLACE MATERIALIZED VIEW mv AS SELECT 1">>().toEqualTypeOf<SqlError<"syntax error at or near materialized", 3>>();
-  expectTypeOf<A<"CREATE VIEW v (x) AS SELECT * FROM users">>().toEqualTypeOf<SqlError<"a column name list cannot rename the columns of a * projection (typesql limitation): list the columns explicitly", 0>>();
+  expectTypeOf<A<"CREATE VIEW v (x) AS SELECT * FROM users">>().toEqualTypeOf<SqlError<"a column name list cannot rename the columns of a * projection (TypeSQL limitation): list the columns explicitly", 0>>();
   expectTypeOf<A<"DROP VIEW users">>().toEqualTypeOf<SqlError<'"users" is not a view', 2>>();
   expectTypeOf<A<"DROP VIEW nope">>().toEqualTypeOf<SqlError<'view "nope" does not exist', 2>>();
   expectTypeOf<A<"DROP MATERIALIZED VIEW nope">>().toEqualTypeOf<SqlError<'materialized view "nope" does not exist', 3>>();
@@ -89,7 +89,7 @@ test("schemas", () => {
   expectTypeOf<ApplyDdl<{}, "CREATE SCHEMA a; CREATE SCHEMA b; DROP SCHEMA a, b">>().toEqualTypeOf<{}>();
   expectTypeOf<ApplyDdl<{ app: {} }, "CREATE SCHEMA app">>().toEqualTypeOf<SqlError<'schema "app" already exists', 2>>();
   expectTypeOf<ApplyDdl<{}, "DROP SCHEMA nope">>().toEqualTypeOf<SqlError<'schema "nope" does not exist', 2>>();
-  expectTypeOf<ApplyDdl<{ t: { id: Col<"int4"> } }, "CREATE SCHEMA t">>().toEqualTypeOf<SqlError<'cannot create schema "t": a relation with that name exists (typesql keeps schemas and public relations in one object)', 2>>();
+  expectTypeOf<ApplyDdl<{ t: { id: Col<"int4"> } }, "CREATE SCHEMA t">>().toEqualTypeOf<SqlError<'cannot create schema "t": a relation with that name exists (TypeSQL keeps schemas and public relations in one object)', 2>>();
   expectTypeOf<ApplyDdl<{}, "CREATE SCHEMA s CREATE TABLE t (x int)">>().toEqualTypeOf<SqlError<"schema elements in CREATE SCHEMA are not supported; use separate statements", 3>>();
   expectTypeOf<ApplyDdl<{ app: { t: { id: Col<"int4"> } } }, "DROP SCHEMA app">>().toEqualTypeOf<SqlError<"cannot drop schema app because other objects depend on it", 2>>();
 });

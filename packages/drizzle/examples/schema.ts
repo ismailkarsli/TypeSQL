@@ -1,5 +1,5 @@
 /**
- * The Drizzle schema used by basic.ts: an ordinary Drizzle schema module. The only typesql
+ * The Drizzle schema used by basic.ts: an ordinary Drizzle schema module. The only TypeSQL
  * addition is `pgType`, which pins a type Drizzle's column types do not record.
  */
 import { relations, sql } from "drizzle-orm";

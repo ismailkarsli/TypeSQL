@@ -160,7 +160,7 @@ export async function generatePgCatalog(client) {
     "",
     "/**",
     " * Relations of `pg_catalog` in the {@link PgCatalog} slice. Catalog tables are declared as",
-    " * views too: typesql treats the whole slice as read-only.",
+    " * views too: TypeSQL treats the whole slice as read-only.",
     " */",
     "export interface PgCatalogNamespace {",
     ...namespaces.get("pg_catalog"),

@@ -63,7 +63,7 @@ the key of `jsonb_each`, and so on. Everything else in a view is nullable. This 
 PostgreSQL 16 or later; on older servers every view column is nullable. When you know better,
 set `viewNotNull` in the config: `viewNotNull: (view, column) => view === "index_member"`.
 
-Enums are global in typesql (`Col<"mood">`), so two enums of the same name in different
+Enums are global in TypeSQL (`Col<"mood">`), so two enums of the same name in different
 schemas share one `$types` entry with the labels of both. A schema with the same name as a
 `public` table is an error, because both would be the same key of `DB`.
 

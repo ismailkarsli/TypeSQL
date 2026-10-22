@@ -1,7 +1,7 @@
 {
   "name": "@typesql/drizzle",
   "version": "0.1.0",
-  "description": "Use Drizzle ORM table definitions as a typesql schema.",
+  "description": "Use Drizzle ORM table definitions as a TypeSQL schema.",
   "license": "MIT",
   "repository": {
     "type": "git",

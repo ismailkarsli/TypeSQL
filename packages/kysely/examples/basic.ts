@@ -1,5 +1,5 @@
 /**
- * typesql with a Kysely `DB` interface (@typesql/kysely). Type-checked by this package's
+ * TypeSQL with a Kysely `DB` interface (@typesql/kysely). Type-checked by this package's
  * `pnpm typecheck`; hover the results in your editor. Nothing here needs a database.
  */
 import type { ColumnType, Generated, GeneratedAlways, Kysely } from "kysely";

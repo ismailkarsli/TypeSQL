@@ -2,7 +2,7 @@ import type { ColDesc, PgScalarName, View } from "@typesql/core";
 
 /**
  * Converting a Kysely `DB` interface (kysely-codegen, prisma-kysely or hand-written) into a
- * typesql schema. Kysely describes columns with TS types, typesql with Postgres type names, so
+ * TypeSQL schema. Kysely describes columns with TS types, TypeSQL with Postgres type names, so
  * the conversion reads the TS shape back into a type name. That is lossy (`number` may be
  * `int4` or `float8`); `Overrides` pins the exact type per column.
  *
@@ -48,10 +48,10 @@ export type KyselyOverrides = { readonly [table: string]: TableOverride };
 export type KyselyOptions = { readonly camelCase?: boolean };
 
 /**
- * A typesql schema from a Kysely `DB` interface.
+ * A TypeSQL schema from a Kysely `DB` interface.
  *
  *   type Schema = FromKysely<DB, { users: { id: "int8" } }>;
- *   const sql = createSql<Schema>();            // typesql's createSql
+ *   const sql = createSql<Schema>();            // TypeSQL's createSql
  *
  * `"auth.users"` becomes `Schema["auth"]["users"]`; `"public.users"` becomes `Schema["users"]`.
  * String-literal unions become enums registered in `Schema["$types"]` (see `KyselyOverrides`).

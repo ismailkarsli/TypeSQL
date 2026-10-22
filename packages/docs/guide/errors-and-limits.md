@@ -51,12 +51,12 @@ whole statement.
 ## The escape hatch
 
 `sql.as<Row>(text, …)` skips inference and takes the row type you give it. Use it for SQL that
-typesql does not support or cannot see at compile time (dynamic fragments). It accepts slots,
+TypeSQL does not support or cannot see at compile time (dynamic fragments). It accepts slots,
 `:name` and inline parameters like `sql()`.
 
 ## Limits
 
-typesql runs inside the TypeScript compiler, so it works within the compiler's budgets.
+TypeSQL runs inside the TypeScript compiler, so it works within the compiler's budgets.
 Measured on TypeScript 7.0.2:
 
 | Workload | Cost |
@@ -107,7 +107,7 @@ Measured on TypeScript 7.0.2:
 
 With `declaration` output, TypeScript 7.1 checks that every inferred type can be named from
 the package that exports it. Rows (what `execute*` resolves to) are plain object types and
-can be exported from any package. A `Query`, `Fragment` or `Migrations` value is a typesql
+can be exported from any package. A `Query`, `Fragment` or `Migrations` value is a TypeSQL
 type, so a package that exports one (or a function returning one) without depending on
 `@typesql/core` itself fails:
 
@@ -118,7 +118,7 @@ error TS2883: The inferred type of 'userQuery' cannot be named without a referen
 
 Any of these fixes it:
 
-- Re-export typesql's types from the module that calls `createSql`; TypeScript then names
+- Re-export TypeSQL's types from the module that calls `createSql`; TypeScript then names
   them through that module:
   ```ts
   export const sql = createSql<DB>(executor);

@@ -177,7 +177,7 @@ type NoSchema<S> = SqlError<`schema "${S & string}" does not exist`, null>;
 /** A new top-level relation would overwrite a schema (schemas and public relations share `DB`'s keys). */
 type SchemaClash<DB, Ref extends TableRef> =
   IsTop<Ref["schema"]> extends true
-    ? Ref["name"] extends keyof DB ? SqlError<`cannot create relation "${Ref["name"]}": a schema with that name exists (typesql keeps schemas and public relations in one object)`, null> : null
+    ? Ref["name"] extends keyof DB ? SqlError<`cannot create relation "${Ref["name"]}": a schema with that name exists (TypeSQL keeps schemas and public relations in one object)`, null> : null
     : null;
 /** Checks before adding a relation at `Ref`: `null` when it can be added. */
 type CanCreate<DB, Ref extends TableRef> =
@@ -326,7 +326,7 @@ type NameCols<C extends Cols, Names, Acc extends Cols, TooMany extends string> =
   Names extends readonly [infer N extends string, ...infer NR]
     ? C extends readonly [infer H, ...infer R extends Cols]
       ? H extends { readonly n: string; readonly t: infer I extends ColInfo } ? NameCols<R, NR, [...Acc, { readonly n: N; readonly t: I }], TooMany>
-      : SqlError<"a column name list cannot rename the columns of a * projection (typesql limitation): list the columns explicitly", null>
+      : SqlError<"a column name list cannot rename the columns of a * projection (TypeSQL limitation): list the columns explicitly", null>
       : SqlError<TooMany, null>
     : [...Acc, ...C];
 
@@ -585,7 +585,7 @@ type ApplyCreateSchema<DB, Ine, Name extends string> =
   Name extends "public" ? (Ine extends true ? DB : SqlError<`schema "public" already exists`, null>)
   : Name extends keyof DB
     ? IsSchemaKey<DB, Name> extends true ? (Ine extends true ? DB : SqlError<`schema "${Name}" already exists`, null>)
-    : SqlError<`cannot create schema "${Name}": a relation with that name exists (typesql keeps schemas and public relations in one object)`, null>
+    : SqlError<`cannot create schema "${Name}": a relation with that name exists (TypeSQL keeps schemas and public relations in one object)`, null>
   : SetKey<DB, Name, {}>;
 
 type ApplyDropSchemas<DB, Names, Ife, Casc> =

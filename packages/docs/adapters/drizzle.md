@@ -1,6 +1,6 @@
 # Drizzle
 
-`@typesql/drizzle` converts your Drizzle schema module into a typesql schema and runs queries on
+`@typesql/drizzle` converts your Drizzle schema module into a TypeSQL schema and runs queries on
 the driver client under your Drizzle database. The conversion happens only at the type level:
 there is no code generation and no database connection.
 
@@ -17,7 +17,7 @@ and any other exports are ignored:
 
 SQL uses the database names (`display_name`), not the TypeScript keys (`displayName`).
 
-| Drizzle | typesql |
+| Drizzle | TypeSQL |
 |---|---|
 | `pgTable("users", …)` | table `users`, keyed by the SQL name |
 | `.notNull()`, `.primaryKey()`, `serial`, identity | `NOT NULL` |
@@ -29,7 +29,7 @@ SQL uses the database names (`display_name`), not the TypeScript keys (`displayN
 
 The Postgres type comes from the column kind (`integer` → `int4`, `doublePrecision` →
 `float8`, `uuid` → `uuid`, `.array()` → `[]`, …). Rows are typed by the type map, not by
-Drizzle's `mode`: typesql queries go straight to the driver, so a `bigint({ mode: "number" })`
+Drizzle's `mode`: TypeSQL queries go straight to the driver, so a `bigint({ mode: "number" })`
 column is `int8`, which node-postgres returns as a `string`.
 
 ## Types Drizzle does not record
@@ -66,7 +66,7 @@ go through Drizzle's logger.
 ## Limits
 
 - Generated-always columns count as having a default. Postgres rejects an `INSERT` that sets
-  one, but typesql doesn't.
+  one, but TypeSQL doesn't.
 - `$onUpdate` columns look like they have a default, so `INSERT` doesn't require them.
 - `.$type<T>()` is ignored; rows use the type map (`jsonb().$type<T>()` is `unknown`).
 - `text({ enum: [...] })` is plain `text`: in Drizzle, those values are only a TypeScript

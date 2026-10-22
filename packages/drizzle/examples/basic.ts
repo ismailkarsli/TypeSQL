@@ -1,5 +1,5 @@
 /**
- * typesql with a Drizzle ORM schema (@typesql/drizzle). The schema is in schema.ts.
+ * TypeSQL with a Drizzle ORM schema (@typesql/drizzle). The schema is in schema.ts.
  * Type-checked by this package's `pnpm typecheck`; hover the results in your editor. Nothing
  * here needs a database.
  */

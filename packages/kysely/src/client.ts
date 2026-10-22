@@ -3,7 +3,7 @@ import { runTransaction, type Executor, type SqlDriver } from "@typesql/core";
 
 /**
  * What the adapter uses from a `Kysely<DB>` or `Transaction<DB>`. Queries run through
- * `withoutPlugins()`: typesql's row types describe what the driver returns, so result
+ * `withoutPlugins()`: TypeSQL's row types describe what the driver returns, so result
  * transformers such as `CamelCasePlugin` must not rename the columns (`createSql(db,
  * { rowKeys: "camelCase" })` renames the top-level keys instead, in the types too).
  */

@@ -1,7 +1,7 @@
 {
   "name": "@typesql/postgres",
   "version": "0.1.0",
-  "description": "postgres.js adapter for typesql.",
+  "description": "postgres.js adapter for TypeSQL.",
   "license": "MIT",
   "repository": {
     "type": "git",

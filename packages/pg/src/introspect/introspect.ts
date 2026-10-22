@@ -6,7 +6,7 @@ export type RelationKind = "table" | "partitioned table" | "view" | "materialize
 export interface IntrospectedColumn {
   readonly name: string;
   /**
-   * Canonical Postgres type name as typesql spells it: `int4`, `timestamptz`, `varchar`, an enum
+   * Canonical Postgres type name as TypeSQL spells it: `int4`, `timestamptz`, `varchar`, an enum
    * name, `${T}[]` for arrays. Domains are replaced by their base type; `citext` is `text`.
    */
   readonly type: string;
@@ -77,7 +77,7 @@ const KINDS: Readonly<Record<string, RelationKind>> = {
   f: "foreign table",
 };
 
-/** Postgres type names typesql spells differently. */
+/** Postgres type names TypeSQL spells differently. */
 const TYPE_ALIASES: Readonly<Record<string, string>> = { citext: "text" };
 
 interface TypeRow {

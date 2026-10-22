@@ -1,7 +1,7 @@
 /**
  * Declaration-emit fixture (`declaration-emit.test.ts`): exported values whose inferred types
  * hold rows. Rows must be plain object types, so a package that re-exports them does not need
- * to name a typesql type (TS2883 "cannot be named without a reference to …").
+ * to name a TypeSQL type (TS2883 "cannot be named without a reference to …").
  */
 import { createSql, type Col, type Enum, type Generated, type Nullable } from "../../../src/index.js";
 

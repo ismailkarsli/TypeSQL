@@ -31,7 +31,7 @@ export function sourceFor(options: GeneratorOptions): string {
 
 /** The `typesql-prisma` generator: writes the schema file to the configured `output`. */
 export const generator: GeneratorHandler = {
-  onManifest: () => ({ prettyName: "typesql schema", requiresEngines: [] }),
+  onManifest: () => ({ prettyName: "TypeSQL schema", requiresEngines: [] }),
   async onGenerate(options) {
     const output = options.generator.output?.value;
     if (!output) throw new Error('typesql-prisma: set `output` in the generator block, e.g. output = "../src/db/typesql.ts"');

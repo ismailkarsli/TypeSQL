@@ -54,7 +54,7 @@ function measure(name) {
       memoryMB: Math.round((num("Memory used") ?? 0) / 1024),
       /** Errors reported in the measured file itself (a probe or query that failed to infer). */
       errorCount: inFile.length,
-      /** Errors anywhere else in the program, e.g. typesql itself not compiling. */
+      /** Errors anywhere else in the program, e.g. TypeSQL itself not compiling. */
       otherErrorCount: errors.length - inFile.length,
       errors,
       exitCode: proc.status,

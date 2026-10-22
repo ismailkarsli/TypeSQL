@@ -1,5 +1,5 @@
 /**
- * typesql with a Prisma schema (@typesql/prisma). Type-checked by this package's
+ * TypeSQL with a Prisma schema (@typesql/prisma). Type-checked by this package's
  * `pnpm typecheck`; hover the results in your editor. Nothing here needs a database.
  *
  * The `DB` interface below is what the typesql-prisma generator writes on `prisma generate`

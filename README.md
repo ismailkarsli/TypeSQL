@@ -1,10 +1,10 @@
-# typesql
+# TypeSQL
 
 Type-level Postgres SQL for TypeScript. You write a SQL string literal; the compiler parses
 it **inside the type system** and gives you the exact row type, the parameter types, and
 (for DDL) the resulting schema. No codegen, no database connection, no build step.
 
-![typesql demo: hovering a query shows its inferred row type, and a misspelled column is a compile error](assets/demo.gif)
+![TypeSQL demo: hovering a query shows its inferred row type, and a misspelled column is a compile error](assets/demo.gif)
 
 ```ts
 import { createSql, type Col, type Generated, type Nullable } from "@typesql/core";

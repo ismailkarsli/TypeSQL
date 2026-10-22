@@ -23,7 +23,7 @@ A schema is an interface whose keys are tables. Each column is declared with a h
 
 Type names are Postgres names. Common spellings are normalized, so `integer`, `int` and `int4`
 are the same, as are `bigint`/`int8`, `boolean`/`bool`, `character varying`/`varchar`,
-`double precision`/`float8` and `timestamp with time zone`/`timestamptz`. A name typesql does
+`double precision`/`float8` and `timestamp with time zone`/`timestamptz`. A name TypeSQL does
 not know (an extension type or a domain) is kept as is and maps to `unknown` unless the type
 map or `$types` says otherwise.
 

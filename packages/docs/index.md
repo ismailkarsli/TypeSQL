@@ -2,7 +2,7 @@
 layout: home
 
 hero:
-  name: "typesql"
+  name: "TypeSQL"
   text: "Type-level Postgres SQL for TypeScript"
   tagline: "Write SQL as a string literal. The compiler parses it and gives you the row type, the parameter types and the schema changes. No codegen, no database connection, no build step."
   actions:

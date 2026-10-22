@@ -180,7 +180,7 @@ test("errors", () => {
   expectTypeOf<ApplyDdl<DB, "CREATE TABLE t (a, b) AS SELECT 1 AS x">>().toEqualTypeOf<SqlError<"too many column names were specified", 0>>();
   expectTypeOf<ApplyDdl<DB, "CREATE TABLE t (a int PRIMARY KEY, b int, PRIMARY KEY (b))">>().toEqualTypeOf<SqlError<'multiple primary keys for table "t" are not allowed', 2>>();
   expectTypeOf<ApplyDdl<DB, "CREATE TABLE c () INHERITS (nope)">>().toEqualTypeOf<SqlError<'relation "nope" does not exist', 7>>();
-  expectTypeOf<ApplyDdl<{ app: { t: { id: Col<"int4"> } } }, "CREATE TABLE app (x int)">>().toEqualTypeOf<SqlError<'cannot create relation "app": a schema with that name exists (typesql keeps schemas and public relations in one object)', 2>>();
+  expectTypeOf<ApplyDdl<{ app: { t: { id: Col<"int4"> } } }, "CREATE TABLE app (x int)">>().toEqualTypeOf<SqlError<'cannot create relation "app": a schema with that name exists (TypeSQL keeps schemas and public relations in one object)', 2>>();
   // syntax errors carry the index of the offending token
   expectTypeOf<ApplyDdl<DB, "CREATE TABLE t (id int foo)">>().toEqualTypeOf<SqlError<"syntax error: expected column constraint at or near foo", 6>>();
   expectTypeOf<ApplyDdl<DB, "CREATE TABLE t (id int,)">>().toEqualTypeOf<SqlError<"syntax error: expected column name at or near )", 7>>();

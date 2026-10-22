@@ -1,6 +1,6 @@
 # @typesql/prisma
 
-Use your Prisma schema as a typesql schema, and run typesql queries through Prisma Client's
+Use your Prisma schema as a TypeSQL schema, and run TypeSQL queries through Prisma Client's
 raw query API. There are two ways to get the `DB` type that `createSql` expects:
 
 - **The `typesql-prisma` generator** (recommended). Add it to `schema.prisma`; every
@@ -82,7 +82,7 @@ package script (which put `node_modules/.bin` on the `PATH`). Otherwise use
 
 ### What the generator emits
 
-| Prisma | typesql |
+| Prisma | TypeSQL |
 |---|---|
 | `model User` / `@@map("users")` | `DB["User"]` / `DB["users"]`: the table name |
 | `name String? @map("display_name")` | column `display_name` |
@@ -112,7 +112,7 @@ Postgres types (`@db.*` wins over the scalar default):
 | `Bytes` | `bytea` | `ByteA` → `bytea` |
 
 Length, precision and scale arguments (`VarChar(200)`, `Decimal(10, 2)`) are dropped:
-typesql types columns by type name only.
+TypeSQL types columns by type name only.
 
 The generator speaks Prisma's generator protocol itself (no `@prisma/generator-helper`). Its
 pieces are exported from `@typesql/prisma/generator`: `generateSource(datamodel, options)`

@@ -9,7 +9,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const tsc = resolve(here, "../../../node_modules/.bin/tsc");
 
 /**
- * Rows returned by `execute*` must be plain object types in declaration output. A named typesql
+ * Rows returned by `execute*` must be plain object types in declaration output. A named TypeSQL
  * type in them would make every package that re-exports such a function depend on
  * `@typesql/core` directly; TypeScript 7.1 reports TS2883 otherwise.
  */

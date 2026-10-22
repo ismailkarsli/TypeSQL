@@ -3,7 +3,7 @@ import type { Col, Nullable, View } from "./column.js";
 
 /**
  * Relations of `pg_catalog` in the {@link PgCatalog} slice. Catalog tables are declared as
- * views too: typesql treats the whole slice as read-only.
+ * views too: TypeSQL treats the whole slice as read-only.
  */
 export interface PgCatalogNamespace {
   /** Table `pg_catalog.pg_am`: Access methods. */

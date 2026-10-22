@@ -44,7 +44,7 @@ statement is checked once for each member, and the row type is the union of thei
 
 <<< @/snippets/fragments.ts#id-union
 
-Inside a generic function, the name's type is not known until the call, so typesql cannot
+Inside a generic function, the name's type is not known until the call, so TypeSQL cannot
 check the statement there. A generic constrained to `RelationName<DB>` (the top-level tables
 and views) is widened to all of them: the statement is checked against every relation, and
 the row type is the union of all their rows. Any other generic or `string` name gives a
@@ -63,7 +63,7 @@ stays checked:
 
 <<< @/snippets/fragments.ts#list
 
-typesql does not try every combination. It checks the statement once, with each distinct
+TypeSQL does not try every combination. It checks the statement once, with each distinct
 element present once in the list, in TypeScript's union order. In a list position (`ORDER BY`,
 `GROUP BY`, `SET`, `VALUES` rows, `IN (…)`, an `AND` chain) each element is checked on its own,
 so if that statement is valid, every count and order of the elements is valid too. Every
@@ -81,7 +81,7 @@ checked against the types they get there.
 ## Dynamic SQL
 
 When the shape of a statement is only known at runtime (`sql.raw(text)`, or `sql.join` over an
-array), typesql cannot infer anything, and splicing such a fragment into `sql(…)` is a compile
+array), TypeSQL cannot infer anything, and splicing such a fragment into `sql(…)` is a compile
 error. Use `sql.as<Row>(…)`, which accepts the same arguments, skips inference and lets you
 state the row type:
 

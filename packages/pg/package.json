@@ -1,7 +1,7 @@
 {
   "name": "@typesql/pg",
   "version": "0.1.0",
-  "description": "node-postgres (pg) adapter for typesql, with `typesql introspect` to generate a schema from a live database.",
+  "description": "node-postgres (pg) adapter for TypeSQL, with `typesql introspect` to generate a schema from a live database.",
   "license": "MIT",
   "repository": {
     "type": "git",

@@ -1,5 +1,5 @@
 /**
- * Type-level conversion of a generated Prisma Client (`Prisma.TypeMap`) into a typesql schema.
+ * Type-level conversion of a generated Prisma Client (`Prisma.TypeMap`) into a TypeSQL schema.
  *
  * Everything is read from the generated types: field types from `<Model>FieldRefs`
  * (`FieldRef<"User", "Int">`), nullability from `<Model>OrderByWithRelationInput`, "has a
@@ -150,7 +150,7 @@ type Enums<TM extends PrismaTypeMapLike, O> = {
 };
 
 /**
- * A typesql schema from a generated Prisma Client: `FromPrisma<Prisma.TypeMap>`.
+ * A TypeSQL schema from a generated Prisma Client: `FromPrisma<Prisma.TypeMap>`.
  *
  *   Tables are keyed by model name and columns by field name (relation fields are skipped);
  *   types follow Prisma's PostgreSQL defaults (`PrismaScalarToPg`); enums go to `$types`.

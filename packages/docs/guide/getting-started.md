@@ -1,6 +1,6 @@
 # Getting started
 
-typesql infers types from SQL you write as string literals. You describe your database once
+TypeSQL infers types from SQL you write as string literals. You describe your database once
 as a TypeScript interface; every `sql("…")` call is then parsed by the compiler, which works
 out the row type, the parameter types and any mistakes.
 
@@ -8,7 +8,7 @@ out the row type, the parameter types and any mistakes.
 
 - TypeScript 7 (the native compiler). The engine is tuned for its speed and limits.
 - Node.js 26 or later.
-- PostgreSQL. typesql models Postgres semantics only.
+- PostgreSQL. TypeSQL models Postgres semantics only.
 
 ## Install
 
@@ -23,7 +23,7 @@ pnpm add @typesql/core @typesql/postgres postgres  # or postgres.js
 parsers, and a `createSql<DB>(client)` whose queries run on your client.
 
 If you use Kysely, Drizzle or Prisma, their packages (`@typesql/kysely`, `@typesql/drizzle`,
-`@typesql/prisma`) can turn the schema you already have into the one typesql needs. See
+`@typesql/prisma`) can turn the schema you already have into the one TypeSQL needs. See
 [Adapters](../adapters/).
 
 ## Describe the schema

@@ -1,6 +1,6 @@
 # Kysely
 
-`@typesql/kysely` converts the `DB` interface you give Kysely into a typesql schema and runs
+`@typesql/kysely` converts the `DB` interface you give Kysely into a TypeSQL schema and runs
 queries on your `Kysely` instance. The conversion happens only at the type level: there is no
 code generation and no database connection.
 

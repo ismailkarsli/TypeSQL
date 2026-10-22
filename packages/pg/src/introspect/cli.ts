@@ -16,7 +16,7 @@ export interface IntrospectConfig extends GenerateOptions, IntrospectOptions {
 
 const USAGE = `Usage: typesql introspect [options]
 
-Reads a live Postgres database and writes its typesql schema (tables, views, enums).
+Reads a live Postgres database and writes its TypeSQL schema (tables, views, enums).
 
 Options:
   --url <url>          connection string (default: $DATABASE_URL)
