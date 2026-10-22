@@ -1,4 +1,5 @@
 import type { ColMap } from "./types.js";
+import type { MergeShapes } from "./json.js";
 
 /**
  * Structured values: whole-row references (`t`, `t.*` used as a value) and, see json.ts, JSON
@@ -45,6 +46,6 @@ type AllNullable<M extends ColMap> = [keyof M] extends [never] ? false : false e
 export type ShapedCommon<A extends string, B extends string> =
   [BaseOf<A>] extends [BaseOf<B>]
     ? [BaseOf<B>] extends [BaseOf<A>]
-      ? A extends Shaped<string, infer SA> ? (B extends Shaped<string, infer SB> ? Shaped<BaseOf<A>, SA | SB> : BaseOf<A>) : BaseOf<A>
+      ? A extends Shaped<string, infer SA> ? (B extends Shaped<string, infer SB> ? Shaped<BaseOf<A>, MergeShapes<SA, SB>> : BaseOf<A>) : BaseOf<A>
       : "unknown"
     : "unknown";

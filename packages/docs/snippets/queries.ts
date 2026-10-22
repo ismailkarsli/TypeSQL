@@ -66,6 +66,30 @@ const rows = sql(`
 // #endregion wholerow
 check<Equal<RowType<typeof rows>, { email: string; title: string | null; no_posts: boolean }>>();
 
+// #region json
+const profiles = sql(`
+  SELECT u.id,
+         json_build_object('email', u.email, 'since', u.created_at) AS profile,
+         coalesce((SELECT json_agg(p ORDER BY p.id) FROM posts p WHERE p.author_id = u.id), '[]') AS posts
+  FROM users u`);
+// { id: number;
+//   profile: { email: string; since: string };   ← a timestamp is a string inside JSON
+//   posts: { id: number; author_id: number; title: string; body: string | null; tags: string[] }[] }
+// #endregion json
+check<Equal<RowType<typeof profiles>, {
+  id: number;
+  profile: { email: string; since: string };
+  posts: { id: number; author_id: number; title: string; body: string | null; tags: string[] }[];
+}>>();
+
+// #region jsonread
+const firstTags = sql(`
+  SELECT j -> 'tags' -> 0 AS first_tag, j ->> 'title' AS title
+  FROM (SELECT json_build_object('title', title, 'tags', tags) AS j FROM posts) s`);
+// { first_tag: string | null; title: string | null }
+// #endregion jsonread
+check<Equal<RowType<typeof firstTags>, { first_tag: string | null; title: string | null }>>();
+
 // #region narrowing
 const withTitles = sql(`
   SELECT u.email, p.title

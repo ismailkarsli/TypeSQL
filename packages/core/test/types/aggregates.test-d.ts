@@ -55,8 +55,9 @@ test("ordered-set aggregates take their type from WITHIN GROUP (ORDER BY ...)", 
 });
 
 test("JSON, array and range aggregates", () => {
+  // JSON aggregates collect (or skip) NULL inputs: a non-empty group is never NULL
   expectTypeOf<Row<"SELECT json_agg(id)::text AS a, jsonb_agg(label)::text AS b, json_object_agg(label, id)::text AS c, jsonb_object_agg(label, id)::text AS d, jsonb_agg_strict(n_id)::text AS e, jsonb_object_agg_unique(label, n_id)::text AS f FROM things GROUP BY id">>()
-    .toEqualTypeOf<{ a: string; b: string; c: string; d: string; e: string | null; f: string | null }>();
+    .toEqualTypeOf<{ a: string; b: string; c: string; d: string; e: string; f: string }>();
   expectTypeOf<Row<"SELECT jsonb_agg(id)::text AS a FROM things">>().toEqualTypeOf<{ a: string | null }>();
   // array_agg of arrays stays one-dimensional in the type system (Postgres has no array-of-array type)
   expectTypeOf<Row<"SELECT array_agg(nums) AS a, array_agg(words) AS b, array_agg(n_id) AS c, array_agg(mood) AS d, array_agg(day) AS e FROM things GROUP BY id">>()

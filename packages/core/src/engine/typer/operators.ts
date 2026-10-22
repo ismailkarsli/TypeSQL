@@ -1,5 +1,6 @@
 import type { ColInfo, Info } from "../types.js";
-import type { ShapedCommon } from "../shape.js";
+import type { AnyShaped, BaseOf, ShapedCommon, StripShape } from "../shape.js";
+import type { LitCommon } from "../json.js";
 
 /**
  * Operator typing. `BinOpType<Op, L, R>` → ColInfo, `UnOpType<Op, E>` → ColInfo.
@@ -82,7 +83,7 @@ type BinOpResult<Op extends string, L extends string, R extends string> =
   : Op extends "~" | "~*" | "!~" | "!~*" | "~~" | "~~*" | "!~~" | "!~~*" ? "bool"
   : Op extends "+" | "-" | "*" | "/" | "%" ? Arith<Op, L, R>
   : Op extends "||" ? Concat<L, R>
-  : Op extends "->" | "#>" ? (L extends JsonT ? L : L extends "unknown" ? "unknown" : "unknown")
+  : Op extends "->" | "#>" ? (L extends JsonT ? BaseOf<L> : "unknown")
   : Op extends "->>" | "#>>" ? "text"
   : Op extends "#-" ? "jsonb"
   : Op extends "@>" | "<@" | "?" | "?|" | "?&" | "@?" | "@@" | "-|-" | "~=" ? "bool"
@@ -192,8 +193,8 @@ type ArithUnknown<Op extends string, K extends string, Side extends "l" | "r"> =
  * strings concatenate within their type, everything else (`anynonarray || text`) → text.
  */
 type Concat<L extends string, R extends string> =
-  IsArr<L> extends true ? L
-  : IsArr<R> extends true ? R
+  IsArr<L> extends true ? (L extends R ? L : StripShape<L>)
+  : IsArr<R> extends true ? StripShape<R>
   : L extends "jsonb" ? (R extends "jsonb" | "unknown" ? "jsonb" : "text")
   : R extends "jsonb" ? (L extends "unknown" ? "jsonb" : "text")
   : L extends "bytea" ? (R extends "bytea" | "unknown" ? "bytea" : "text")
@@ -226,8 +227,8 @@ export type CommonLit<A extends string, B extends string> =
   A extends B ? ([B] extends [A] ? A : ShapedCommon<A, B>)
   : A extends UnknownT ? B
   : B extends UnknownT ? A
-  : A extends LitT ? B
-  : B extends LitT ? A
+  : A extends LitT ? (B extends AnyShaped ? LitCommon<A, B> : B)
+  : B extends LitT ? (A extends AnyShaped ? LitCommon<B, A> : A)
   : A extends NumT ? (B extends NumT ? NumCommon<A, B> : "unknown")
   : A extends StrT ? (B extends StrT ? A : "unknown")
   : A extends "timestamptz" ? (B extends TsT | "date" ? "timestamptz" : "unknown")

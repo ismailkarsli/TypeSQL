@@ -92,6 +92,36 @@ so are its columns.
 Selecting the row itself (`SELECT t FROM …`) gives the `record` type of the type map: the
 drivers return its text form, such as `"(1,ada@example.com)"`.
 
+## JSON
+
+JSON built in SQL is typed: `json_build_object` with literal keys is an object,
+`json_build_array` a tuple, `json_agg(x)` an array of `x`, `json_object_agg` an object with
+arbitrary keys, and `to_json(t)` of a whole row an object with one key per column. They nest,
+so a correlated `json_agg` subquery replaces a second round trip:
+
+<<< @/snippets/queries.ts#json
+
+Values inside JSON are typed the way Postgres serializes them, not by the type map:
+
+| Postgres type | Inside JSON |
+|---|---|
+| `int2` … `int8`, `float4`, `float8`, `numeric` | `number` |
+| `bool` | `boolean` |
+| `text`, `uuid`, `date`, `timestamp(tz)`, `interval`, `bytea` (`"\\x…"`), `money`, … | `string` |
+| enums | the enum's values |
+| arrays, `json`, `jsonb`, whole rows | arrays, the embedded value, objects |
+
+`json_agg` keeps `NULL` inputs as `null` elements and is `NULL` over zero rows: outside a
+`GROUP BY` it is nullable, and `coalesce(json_agg(…), '[]')` makes it a plain array. In `CASE`,
+`COALESCE` and `UNION` the branches' shapes are combined (`{ a: number } | { b: string }`).
+
+`->`, `#>` and jsonb subscripts follow a known shape: a literal key or index (`-> 'tags' -> 0`,
+`#> '{tags,0}'`, `['tags'][0]`) gives that member, a missing key or an index past the end gives
+`null`, and a non-literal key or index any member. The result is always nullable. `->>` and
+`#>>` are `string | null`. A `json` / `jsonb` column with no declared shape stays `unknown`.
+
+<<< @/snippets/queries.ts#jsonread
+
 ## Narrowing with WHERE
 
 Conditions in `WHERE` (and in an inner join's `ON`) that rule out `NULL` make the column

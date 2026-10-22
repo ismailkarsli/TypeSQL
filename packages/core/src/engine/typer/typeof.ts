@@ -3,7 +3,8 @@ import type { ResolveColumn, WholeRow } from "../binder/resolve.js";
 import type { SqlError } from "../errors.js";
 import type { ProjectSelect } from "../project/select.js";
 import type { ColInfo, Cols, Ctx, Info, ColMap } from "../types.js";
-import type { ObjShape, Shaped } from "../shape.js";
+import type { BaseOf, ObjShape, Shaped } from "../shape.js";
+import type { BuildObject, JsonArrow, JsonLitCast, LitType } from "../json.js";
 import type { CallType } from "./catalog.js";
 import type { BinOpType, CommonLit, LitToText, NumLitType, UnOpType } from "./operators.js";
 
@@ -33,10 +34,13 @@ export type TypeOf<E extends Expr, C extends Ctx> =
   : E extends { readonly t: "null" } ? Info<"null", true>
   : E extends { readonly t: "param" } ? Info<"unknown", true>
   : E extends { readonly t: "default" } ? SqlError<"DEFAULT is not allowed in this context", null>
-  : E extends { readonly t: "typed" } ? Info<E["type"]>
+  : E extends { readonly t: "typed" } ? Info<LitCast<E["type"], E["v"]>>
   : E extends { readonly t: "bin" } ? TypeBin<E["op"], E["l"], E["r"], C>
   : E extends { readonly t: "un" } ? TypeUn<E["op"], E["e"], C>
-  : E extends { readonly t: "cast" } ? (E["e"] extends { readonly t: "param" } ? Info<E["to"]> : TypeCast<E["to"], E["e"], C>)
+  : E extends { readonly t: "cast" }
+    ? E["e"] extends { readonly t: "param" } ? Info<E["to"]>
+    : E["e"] extends { readonly t: "str"; readonly v: infer V extends string } ? Info<LitCast<E["to"], V>>
+    : TypeCast<E["to"], E["e"], C>
   : E extends { readonly t: "call" } ? TypeCall<Extract<E, Call>, C>
   : E extends { readonly t: "case" } ? TypeCase<E["operand"], E["whens"], E["else"], C>
   : E extends { readonly t: "is" } ? Check<TypeOf<E["e"], C>, Info<"bool">>
@@ -108,7 +112,11 @@ type StringResult<A, B, D> =
 
 type TypeBin<Op extends string, L extends Expr, R extends Expr, C extends Ctx> =
   TypeOperand<L, C> extends infer LT
-    ? LT extends ColInfo ? (TypeOperand<R, C> extends infer RT ? (RT extends ColInfo ? BinOpType<Op, LT, RT> : RT) : never) : LT
+    ? LT extends ColInfo
+      ? TypeOperand<R, C> extends infer RT
+        ? RT extends ColInfo ? (Op extends "->" | "#>" ? (JsonArrow<Op, LT, R, RT> extends infer J extends ColInfo ? J : BinOpType<Op, LT, RT>) : BinOpType<Op, LT, RT>) : RT
+        : never
+      : LT
     : never;
 /** Unary; `-<numeric literal>` is folded like Postgres does (`-2147483648` is int4). */
 type TypeUn<Op extends string, E extends Expr, C extends Ctx> =
@@ -116,8 +124,15 @@ type TypeUn<Op extends string, E extends Expr, C extends Ctx> =
     ? E extends { readonly t: "num"; readonly v: infer V extends string } ? Info<NumLitType<Op extends "-" ? `-${V}` : V>>
     : TypeOf<E, C> extends infer T ? (T extends ColInfo ? UnOpType<Op, T> : T) : never
   : TypeOf<E, C> extends infer T ? (T extends ColInfo ? UnOpType<Op, T> : T) : never;
+/** A cast between json and jsonb keeps the value's shape. */
 type TypeCast<To extends string, E extends Expr, C extends Ctx> =
-  TypeOf<E, C> extends infer T ? (T extends ColInfo ? Info<To, T["nullable"]> : T) : never;
+  TypeOf<E, C> extends infer T
+    ? T extends ColInfo
+      ? Info<To extends "json" | "jsonb" ? (T["type"] extends Shaped<"json" | "jsonb", infer S> ? Shaped<To, S> : To) : To, T["nullable"]>
+      : T
+    : never;
+/** `'…'::T` / `T '…'`: a simple JSON literal cast to json(b) keeps its value (json.ts). */
+type LitCast<To extends string, V extends string> = To extends "json" | "jsonb" ? (JsonLitCast<To, V> extends infer J extends string ? J : To) : To;
 type TypeBetween<E extends Expr, Lo extends Expr, Hi extends Expr, C extends Ctx> =
   TypeOf<E, C> extends infer A
     ? A extends ColInfo
@@ -143,7 +158,10 @@ type TypeIdx<E extends Expr, I extends Expr, C extends Ctx> =
   TypeOf<E, C> extends infer A
     ? A extends ColInfo
       ? TypeOf<I, C> extends infer B
-        ? B extends ColInfo ? Info<A["type"] extends `${infer El}[]` ? El : A["type"] extends "json" | "jsonb" ? A["type"] : "unknown", true> : B
+        ? B extends ColInfo
+          ? JsonArrow<"->", A, I, B> extends infer J extends ColInfo ? J
+          : Info<A["type"] extends `${infer El}[]` ? El : A["type"] extends "json" | "jsonb" ? BaseOf<A["type"]> : "unknown", true>
+          : B
         : never
       : A
     : never;
@@ -173,7 +191,7 @@ export type TypeList<Es extends readonly Expr[], C extends Ctx, Acc extends read
     : Acc;
 
 /** An expression in operand position: a string literal is the untyped `lit` (see `CommonLit`). */
-type TypeOperand<E extends Expr, C extends Ctx> = E extends { readonly t: "str" } ? Info<"lit"> : TypeOf<E, C>;
+type TypeOperand<E extends Expr, C extends Ctx> = E extends { readonly t: "str" } ? Info<LitType<E["v"]>> : TypeOf<E, C>;
 /** `TypeList` with operand typing (internal: the result may contain `lit`). */
 type OperandList<Es extends readonly Expr[], C extends Ctx, Acc extends readonly ColInfo[]> =
   Es extends readonly [infer E extends Expr, ...infer R extends readonly Expr[]]
@@ -257,7 +275,8 @@ type NonStarArgs<Args extends readonly Expr[]> = Args extends readonly [{ readon
 type TypeCall<E extends Call, C extends Ctx> =
   OperandList<NonStarArgs<E["args"]>, C, []> extends infer As
     ? As extends readonly ColInfo[]
-      ? TypeOpt<E["filter"], C> extends infer F
+      ? E["name"] extends "json_build_object" | "jsonb_build_object" ? BuildObject<E["name"] extends "jsonb_build_object" ? "jsonb" : "json", E["args"], As>
+      : TypeOpt<E["filter"], C> extends infer F
         ? F extends ColInfo | null
           ? TypeOpt<E["withinGroup"], C> extends infer W
             ? W extends ColInfo | null

@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { Pool } from "pg";
 import postgres from "postgres";
-import { corpus, schema, type ConformanceCase, type TypeofName } from "./corpus.js";
+import { corpus, jsonCorpus, schema, type ConformanceCase, type JsonCase, type JsonDesc, type TypeofName } from "./corpus.js";
 import { acquireDatabase } from "./db.js";
 
 /**
@@ -51,6 +51,13 @@ function typeofName(value: unknown): TypeofName {
   return value === null ? "null" : (typeof value as TypeofName);
 }
 
+/** Deep typeof of a parsed JSON value (see `JsonDesc`). */
+function jsonDesc(value: unknown): JsonDesc {
+  if (Array.isArray(value)) return value.map(jsonDesc);
+  if (value !== null && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, jsonDesc(v)]));
+  return typeofName(value);
+}
+
 const acquireStarted = performance.now();
 const db = await acquireDatabase();
 if (db) console.info(`[conformance] Postgres from ${db.source} at ${db.url} (${Math.round(performance.now() - acquireStarted)} ms)`);
@@ -80,6 +87,15 @@ describe.skipIf(!db)("conformance against Postgres", () => {
 
       const actualTypes = Object.fromEntries(c.expectKeys.map((key) => [key, typeofName(row[key])]));
       expect(actualTypes).toEqual(c.expectTypes);
+    });
+
+    test.each(jsonCorpus as readonly JsonCase[])("JSON: $name", async (c) => {
+      const { rows } = await driver.exec(c.sql, c.params);
+      expect(rows.length).toBeGreaterThan(0);
+      const row = rows[0]!;
+      expect(Object.keys(row)).toEqual(Object.keys(c.expectJson));
+      const actual = Object.fromEntries(Object.keys(c.expectJson).map((key) => [key, jsonDesc(row[key])]));
+      expect(actual).toEqual(c.expectJson);
     });
   });
 });

@@ -373,3 +373,82 @@ export const corpus = [
     expectTypes: { id: "number", email: "string", display_name: "string", is_admin: "boolean", created_at: "object", birthday: "null", balance: "string", score: "number", meta: "null" },
   },
 ] as const satisfies readonly ConformanceCase[];
+
+/**
+ * Deep `typeof` of a JSON value: a `TypeofName` for scalars, a tuple of descriptors for an
+ * array (one per element), an object of descriptors for an object.
+ */
+export type JsonDesc = TypeofName | readonly JsonDesc[] | { readonly [key: string]: JsonDesc };
+
+export interface JsonCase {
+  readonly name: string;
+  readonly sql: string;
+  readonly params: readonly unknown[];
+  /** Deep `typeof` of each column of the first returned row. */
+  readonly expectJson: Readonly<Record<string, JsonDesc>>;
+}
+
+/**
+ * Typed JSON corpus. `conformance.test-d.ts` asserts that each inferred column type admits the
+ * descriptor (exact object keys, element by element); `conformance.test.ts` asserts that both
+ * drivers return values with exactly that deep `typeof`. Runs after `corpus`, on the seed data.
+ */
+export const jsonCorpus = [
+  {
+    name: "json_build_object: timestamps and dates are strings, numeric and float8 are numbers",
+    sql: "SELECT json_build_object('id', id, 'email', email, 'dn', display_name, 'admin', is_admin, 'at', created_at, 'bday', birthday, 'bal', balance, 'score', score, 'meta', meta) AS o FROM users ORDER BY id LIMIT 1",
+    params: [],
+    expectJson: { o: { id: "number", email: "string", dn: "string", admin: "boolean", at: "string", bday: "string", bal: "number", score: "number", meta: { k: "number" } } },
+  },
+  {
+    name: "json_agg of whole rows in a correlated subquery: int8, text[] and NULLs inside JSON",
+    sql: "SELECT u.id, (SELECT json_agg(p ORDER BY p.id) FROM posts p WHERE p.author_id = u.id) AS posts FROM users u ORDER BY u.id LIMIT 1",
+    params: [],
+    expectJson: {
+      id: "number",
+      posts: [
+        { id: "number", author_id: "number", title: "string", body: "string", tags: ["string", "string"], views: "number", published_at: "string" },
+        { id: "number", author_id: "number", title: "string", body: "null", tags: [], views: "number", published_at: "null" },
+      ],
+    },
+  },
+  {
+    name: "coalesce(jsonb_agg(...), '[]') for a user without posts",
+    sql: "SELECT coalesce((SELECT jsonb_agg(p.title) FROM posts p WHERE p.author_id = u.id), '[]') AS titles FROM users u ORDER BY u.id DESC LIMIT 1",
+    params: [],
+    expectJson: { titles: [] },
+  },
+  {
+    name: "-> and #> follow the built shape, ->> is text, a missing key is NULL",
+    sql: "SELECT j -> 'tags' -> 0 AS first_tag, j #> '{tags,1}' AS second_tag, j -> 'nope' AS missing, j ->> 'views' AS views_text FROM (SELECT json_build_object('tags', tags, 'views', views) AS j FROM posts ORDER BY id LIMIT 1) s",
+    params: [],
+    expectJson: { first_tag: "string", second_tag: "string", missing: "null", views_text: "string" },
+  },
+  {
+    name: "bytea, interval, uuid, int8, numeric, timestamp and arrays inside jsonb",
+    sql: "SELECT jsonb_build_object('b', decode('0102', 'hex'), 'iv', interval '1 day', 'u', gen_random_uuid(), 'big', 9007199254740993::int8, 'n', 1.50::numeric, 'ts', now()::timestamp, 'arr', ARRAY[1, 2]) AS o",
+    params: [],
+    expectJson: { o: { b: "string", iv: "string", u: "string", big: "number", n: "number", ts: "string", arr: ["number", "number"] } },
+  },
+  {
+    name: "json_build_array is a tuple; to_json of a whole row is an object",
+    sql: "SELECT json_build_array(1, 'x', NULL, true) AS a, to_json(u) AS j FROM users u ORDER BY id LIMIT 1",
+    params: [],
+    expectJson: {
+      a: ["number", "string", "null", "boolean"],
+      j: { id: "number", email: "string", display_name: "string", is_admin: "boolean", created_at: "string", birthday: "string", balance: "number", score: "number", meta: { k: "number" } },
+    },
+  },
+  {
+    name: "jsonb_object_agg is an object with arbitrary keys",
+    sql: "SELECT jsonb_object_agg(title, views) AS m FROM posts WHERE author_id = 1",
+    params: [],
+    expectJson: { m: { Hello: "number", Second: "number" } },
+  },
+  {
+    name: "jsonb_array_elements yields the element type",
+    sql: "SELECT value FROM jsonb_array_elements(jsonb_build_array(jsonb_build_object('k', 1))) LIMIT 1",
+    params: [],
+    expectJson: { value: { k: "number" } },
+  },
+] as const satisfies readonly JsonCase[];

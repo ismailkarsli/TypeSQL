@@ -4,14 +4,16 @@ import type { Row, V } from "./_schema.js";
 
 // Whole-row references (a FROM item used as a value), verified against PostgreSQL 17.
 // The value itself is a `record` (`unknown` under the default type map; pg and postgres.js
-// return the text form "(1,ada@example.com,…)"); its columns are reachable with (t).col and (t).*.
+// return the text form "(1,ada@example.com,…)"); its columns are reachable with (t).col and (t).*,
+// and to_json(t) is an object (json.test-d.ts).
 
 test("a FROM item name used as a value is a whole-row reference", () => {
   expectTypeOf<Row<"SELECT u FROM users u">>().toEqualTypeOf<{ u: unknown }>();
   expectTypeOf<Row<"SELECT users FROM users">>().toEqualTypeOf<{ users: unknown }>();
   expectTypeOf<Row<"SELECT s FROM (SELECT id FROM users) s">>().toEqualTypeOf<{ s: unknown }>();
-  expectTypeOf<Row<"SELECT to_json(u) AS a, row_to_json(u) AS b, to_jsonb(u.*) AS c, json_agg(u) AS d FROM users u">>()
-    .toEqualTypeOf<{ a: unknown; b: unknown; c: unknown; d: unknown }>();
+  type U = { id: number; email: string; display_name: string | null; created_at: string };
+  expectTypeOf<Row<"SELECT to_json(u) AS a, row_to_json(u) AS b, to_jsonb(u.*) AS c FROM users u">>().toEqualTypeOf<{ a: U; b: U; c: U }>();
+  expectTypeOf<Row<"SELECT json_agg(u) AS d FROM users u">>().toEqualTypeOf<{ d: U[] | null }>();
   // as a function argument, in count(t.*) and in GROUP BY
   expectTypeOf<Row<"SELECT count(u.*) AS n FROM users u">>().toEqualTypeOf<{ n: string }>();
   expectTypeOf<Row<"SELECT u.id FROM users u GROUP BY u">>().toEqualTypeOf<{ id: number }>();

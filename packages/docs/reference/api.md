@@ -264,8 +264,10 @@ TYPESQL_PG_URL=postgres://postgres:x@localhost:5432/postgres node scripts/catalo
 
 Parameter patterns: exact type name, `any`, `anynumeric`, `anystring`, `anyarray`,
 `anyjson`, `anydatetime`, `...` (variadic). Return patterns: exact name, `$1`..`$4`,
-`$elem1`, `$arr1`, `$common`, `$sum1`, `$avg1`. Flags: `strict`, `nullable`, `agg`, `window`,
-`srf`. Unknown functions are typed `unknown` (nullable); a cast fixes them.
+`$elem1`, `$arr1`, `$common`, `$sum1`, `$avg1`, and the typed-JSON patterns `$jval:json`
+(`to_json`), `$jarr:json` (`json_agg`), `$jrec:json` (`json_object_agg`), `$jtup:json`
+(`json_build_array`), `$jelem:json` (`json_array_elements`), with `jsonb` for the jsonb
+variants. Flags: `strict`, `nullable`, `agg`, `window`, `srf`. Unknown functions are typed `unknown` (nullable); a cast fixes them.
 
 ## ORM packages
 

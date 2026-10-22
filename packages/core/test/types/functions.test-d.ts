@@ -50,9 +50,9 @@ test("date/time functions", () => {
     .toEqualTypeOf<{ a: Date; b: Date; c: string; d: Date; e: Date; f: string; g: string | null; h: Date }>();
 });
 
-test("JSON functions (json/jsonb map to unknown; cast to text to observe nullability)", () => {
-  expectTypeOf<Row<"SELECT to_json(id) AS a, to_jsonb(label)::text AS b, to_jsonb(n_text)::text AS c, jsonb_build_object('a', n_id)::text AS d, jsonb_build_array()::text AS e, json_build_object()::text AS f, json_object(words)::text AS g, jsonb_object(words, words)::text AS h FROM things">>()
-    .toEqualTypeOf<{ a: unknown; b: string; c: string | null; d: string; e: string; f: string; g: string; h: string }>();
+test("JSON functions (cast to text to observe nullability; typed JSON is in json.test-d.ts)", () => {
+  expectTypeOf<Row<"SELECT to_json(id)::text AS a, to_jsonb(label)::text AS b, to_jsonb(n_text)::text AS c, jsonb_build_object('a', n_id)::text AS d, jsonb_build_array()::text AS e, json_build_object()::text AS f, json_object(words)::text AS g, jsonb_object(words, words)::text AS h FROM things">>()
+    .toEqualTypeOf<{ a: string; b: string; c: string | null; d: string; e: string; f: string; g: string; h: string }>();
   expectTypeOf<Row<"SELECT json_array_length(doc) AS a, jsonb_array_length(data) AS b, json_typeof(doc) AS c, jsonb_typeof(n_data) AS d, jsonb_pretty(data) AS e, jsonb_extract_path_text(data, 'a', 'b') AS f, json_extract_path_text(doc, 'a') AS g, jsonb_extract_path(data, 'a')::text AS h FROM things">>()
     .toEqualTypeOf<{ a: number; b: number; c: string; d: string | null; e: string; f: string | null; g: string | null; h: string | null }>();
   expectTypeOf<Row<"SELECT jsonb_set(data, '{a}', '1')::text AS a, jsonb_set(data, words, data, true)::text AS b, jsonb_set_lax(data, '{a}', NULL)::text AS c, jsonb_insert(data, '{a}', '1')::text AS d, jsonb_strip_nulls(n_data)::text AS e, jsonb_concat(data, data)::text AS f, jsonb_delete(data, 'a')::text AS g, jsonb_delete_path(data, words)::text AS h FROM things">>()

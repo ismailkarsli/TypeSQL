@@ -102,7 +102,7 @@ its adapter:
 | `text`, `varchar`, `uuid` | `string` | `string` | `string` |
 | `bool` | `boolean` | `boolean` | `boolean` |
 | `date`, `timestamp`, `timestamptz` | `Date` | `Date` | `Date` |
-| `json`, `jsonb` | `unknown` | `unknown` | `unknown` |
+| `json`, `jsonb` | `unknown` (typed when its shape is known) | `unknown` | `unknown` |
 | `bytea` | `Buffer` | `Buffer` | `Buffer` |
 | `T[]` | element type `[]` | element type `[]` | element type `[]` |
 

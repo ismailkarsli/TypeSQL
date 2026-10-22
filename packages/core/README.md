@@ -58,6 +58,8 @@ can be passed positionally (`$1`), by name (`:email` with an object), or inline 
   window functions) and `INSERT`/`UPDATE`/`DELETE … RETURNING`.
 - **Nullability** from the schema, outer joins, `WHERE` filters and expressions (`COALESCE`,
   aggregates, `CASE`).
+- **Typed JSON**: `json_build_object`, `json_agg`, `to_json(t)` and `->` / `#>` give the JSON's
+  structure, typed as Postgres serializes it.
 - **Postgres column naming** (`?column?`, `count`, `lower`) and Postgres-worded compile errors.
 - **Fragments**: `sql.fragment`, `sql.id`, `sql.join`, `sql.list` (runtime arrays of typed elements), `sql.raw`, spliced into inference with
   `$n` renumbering.

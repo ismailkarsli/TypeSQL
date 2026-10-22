@@ -65,6 +65,16 @@ Measured on TypeScript 7.0.2:
   since that is how the outer side of a join looks. A table whose columns are all nullable is
   therefore typed as a nullable row even when it is not joined.
 
+- Typed JSON (see [JSON](./queries#json)) needs literal keys and paths: `json_build_object(col, …)`
+  or `-> $1` on an object gives plain JSON or the union of all members. Only the string literals
+  `'[]'`, `'{}'`, `'null'`, `'true'` and `'false'` keep their value when they meet typed JSON
+  (`coalesce(json_agg(x), '[]')`); any other literal makes the result `unknown`. Functions that
+  rewrite JSON (`jsonb_set`, `||`, `jsonb_strip_nulls`, `json_populate_record`, `jsonb_path_query`,
+  `json_each`) return plain JSON, and so does `row_to_json(ROW(…))`.
+- Inside JSON, `int8` and `numeric` are numbers: `JSON.parse` rounds integers beyond 2^53, and a
+  `float8` / `numeric` that is `NaN` or `Infinity` is serialized as a string. Elements of
+  Postgres arrays are typed non-null, as for array columns.
+
 Unsupported syntax is always a compile error, never a silent `any`. Notable gaps: `ROWS FROM
 (…)`, tracking which views depend on which tables, and column alias lists on plain tables. The
 [DDL reference](../reference/ddl#limitations) lists the DDL limitations.

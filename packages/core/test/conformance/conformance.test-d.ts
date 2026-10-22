@@ -1,6 +1,6 @@
 import { expectTypeOf, test } from "vitest";
 import type { CheckEnc, DefaultTypeMap, Enc, ParamsOf, RowOf } from "../../src/index.js";
-import type { ConformanceDB, TypeofName, corpus } from "./corpus.js";
+import type { ConformanceDB, TypeofName, corpus, jsonCorpus } from "./corpus.js";
 
 /**
  * Compile-time half of the conformance corpus. For every entry:
@@ -56,4 +56,50 @@ type AllGood = { [C in Case as C["name"]]: { keys: true; types: true; params: tr
 
 test("every corpus entry's inferred row matches expectKeys and expectTypes", () => {
   expectTypeOf<Report>().toEqualTypeOf<AllGood>();
+});
+
+// ─── typed JSON ───
+
+/**
+ * Can a value of TS type `T` have the deep typeof `D`? Some member of `T` must: a scalar
+ * category (as above), an array whose elements admit each element descriptor, or an object with
+ * exactly the descriptor's keys (any keys for an index signature) whose values admit them.
+ */
+type Admits<T, D> = [unknown] extends [T] ? true : true extends (T extends unknown ? AdmitsOne<T, D> : never) ? true : false;
+type AdmitsOne<T, D> =
+  D extends string ? (D extends Categories<T> ? true : false)
+  : D extends readonly unknown[]
+    ? T extends readonly unknown[] ? AllTrue<{ [I in keyof D]: Admits<number extends T["length"] ? T[number] : I extends keyof T ? T[I] : never, D[I]> }> : false
+  : T extends readonly unknown[] ? false
+  : T extends object
+    ? string extends keyof T
+      ? AllTrue<{ [K in keyof D]: Admits<T[string & keyof T], D[K]> }>
+      : [keyof T] extends [keyof D] ? ([keyof D] extends [keyof T] ? AllTrue<{ [K in keyof D]: Admits<T[K & keyof T], D[K]> }> : false) : false
+    : false;
+type AllTrue<R> = false extends R[keyof R] ? false : true;
+
+type JsonCase_ = (typeof jsonCorpus)[number];
+type JsonRow<C extends JsonCase_> = RowOf<ConformanceDB, DefaultTypeMap, C["sql"]>;
+type JsonMismatches<C extends JsonCase_> = {
+  [K in keyof C["expectJson"]]: K extends keyof JsonRow<C>
+    ? (Admits<JsonRow<C>[K], C["expectJson"][K]> extends true ? never : { column: K; expected: C["expectJson"][K]; inferred: JsonRow<C>[K] })
+    : { column: K; missingFromRow: true };
+}[keyof C["expectJson"]];
+type JsonReport = { [C in JsonCase_ as C["name"]]: [JsonMismatches<C>] extends [never] ? true : JsonMismatches<C> };
+type JsonAllGood = { [C in JsonCase_ as C["name"]]: true };
+
+test("every JSON corpus entry's inferred column types admit the returned JSON", () => {
+  expectTypeOf<JsonReport>().toEqualTypeOf<JsonAllGood>();
+});
+
+// The check itself: exact keys, element-wise arrays, unions.
+test("Admits", () => {
+  expectTypeOf<Admits<{ a: number }, { a: "number" }>>().toEqualTypeOf<true>();
+  expectTypeOf<Admits<{ a: number; b: string }, { a: "number" }>>().toEqualTypeOf<false>();
+  expectTypeOf<Admits<{ a: number }, { a: "string" }>>().toEqualTypeOf<false>();
+  expectTypeOf<Admits<(number | null)[], ["number", "null"]>>().toEqualTypeOf<true>();
+  expectTypeOf<Admits<number[], ["number", "null"]>>().toEqualTypeOf<false>();
+  expectTypeOf<Admits<[number, string], ["number", "string"]>>().toEqualTypeOf<true>();
+  expectTypeOf<Admits<{ a: number } | null, "null">>().toEqualTypeOf<true>();
+  expectTypeOf<Admits<{ [k: string]: number }, { x: "number"; y: "number" }>>().toEqualTypeOf<true>();
 });

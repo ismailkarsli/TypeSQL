@@ -1,5 +1,6 @@
 import type { ColInfo, Info } from "../types.js";
 import type { CommonLit, DateTimeT, IntT, IsArr, JsonT, LitToText, NumT, RangeT, StrT } from "./operators.js";
+import type { JsonRet } from "../json.js";
 
 /**
  * Function catalog, verified against PostgreSQL 17 (`pg_proc` + `pg_typeof`).
@@ -39,7 +40,7 @@ import type { CommonLit, DateTimeT, IntT, IsArr, JsonT, LitToText, NumT, RangeT,
  *   of all args) | "$rangeelem1" (subtype of range arg 1) | "$multirange1" (multirange of
  *   range arg 1) | "$wg" / "$wgarr" (type of the WITHIN GROUP (ORDER BY e) expression /
  *   array of it) | "$pct" / "$pctarr" (percentile_cont: interval for interval input, else
- *   float8).
+ *   float8) | "$jval:json" … (typed JSON built from the arguments; see `JsonRet` in json.ts).
  *
  * Flags (`SigFlags`):
  *   strict: true (default)  nullable if any argument is nullable
@@ -47,7 +48,9 @@ import type { CommonLit, DateTimeT, IntT, IsArr, JsonT, LitToText, NumT, RangeT,
  *   strict: [i, j]          nullable if argument i or j (1-based) is nullable; other args may be NULL
  *   nullable: true | false  always / never nullable (overrides everything else)
  *   agg: true               aggregate: nullable when FILTERed, when the query is not grouped
- *                           (empty input → NULL), or when an argument is nullable
+ *                           (empty input → NULL), or when an argument is nullable (with
+ *                           `strict: false`, as for json_agg, which collects NULLs:
+ *                           only when FILTERed or not grouped)
  *   window: true            window-only function
  *   srf: true               set-returning (usable in FROM; `SrfType`)
  */
@@ -67,6 +70,8 @@ export type AnySig = { readonly args: readonly string[]; readonly ret: string } 
 export type Overloads = AnySig | readonly AnySig[];
 
 type Agg = { agg: true };
+/** A JSON aggregate collects NULL inputs (or skips them) instead of returning NULL: non-null for a non-empty group. */
+type AggCollect = { agg: true; strict: false };
 type AggNN = { agg: true; nullable: false };
 type Win = { window: true; nullable: false };
 type WinNullable = { window: true; nullable: true };
@@ -91,18 +96,18 @@ export interface FunctionCatalog {
   any_value: Sig<["any"], "$1", Agg>;
   array_agg: Sig<["any"], "$arr1", Agg>;
   string_agg: [Sig<["bytea", "bytea"], "bytea", Agg>, Sig<["anystring", "anystring"], "text", Agg>];
-  json_agg: Sig<["any"], "json", Agg>;
-  jsonb_agg: Sig<["any"], "jsonb", Agg>;
-  json_agg_strict: Sig<["any"], "json", Agg>;
-  jsonb_agg_strict: Sig<["any"], "jsonb", Agg>;
-  json_object_agg: Sig<["any", "any"], "json", Agg>;
-  jsonb_object_agg: Sig<["any", "any"], "jsonb", Agg>;
-  json_object_agg_strict: Sig<["any", "any"], "json", Agg>;
-  jsonb_object_agg_strict: Sig<["any", "any"], "jsonb", Agg>;
-  json_object_agg_unique: Sig<["any", "any"], "json", Agg>;
-  jsonb_object_agg_unique: Sig<["any", "any"], "jsonb", Agg>;
-  json_object_agg_unique_strict: Sig<["any", "any"], "json", Agg>;
-  jsonb_object_agg_unique_strict: Sig<["any", "any"], "jsonb", Agg>;
+  json_agg: Sig<["any"], "$jarr:json", AggCollect>;
+  jsonb_agg: Sig<["any"], "$jarr:jsonb", AggCollect>;
+  json_agg_strict: Sig<["any"], "$jarrnn:json", AggCollect>;
+  jsonb_agg_strict: Sig<["any"], "$jarrnn:jsonb", AggCollect>;
+  json_object_agg: Sig<["any", "any"], "$jrec:json", AggCollect>;
+  jsonb_object_agg: Sig<["any", "any"], "$jrec:jsonb", AggCollect>;
+  json_object_agg_strict: Sig<["any", "any"], "$jrecnn:json", AggCollect>;
+  jsonb_object_agg_strict: Sig<["any", "any"], "$jrecnn:jsonb", AggCollect>;
+  json_object_agg_unique: Sig<["any", "any"], "$jrec:json", AggCollect>;
+  jsonb_object_agg_unique: Sig<["any", "any"], "$jrec:jsonb", AggCollect>;
+  json_object_agg_unique_strict: Sig<["any", "any"], "$jrecnn:json", AggCollect>;
+  jsonb_object_agg_unique_strict: Sig<["any", "any"], "$jrecnn:jsonb", AggCollect>;
   bool_and: Sig<["bool"], "bool", Agg>;
   bool_or: Sig<["bool"], "bool", Agg>;
   every: Sig<["bool"], "bool", Agg>;
@@ -407,18 +412,18 @@ export interface FunctionCatalog {
   array_ndims: Sig<["anyarray"], "int4", Nullable>;
   array_dims: Sig<["anyarray"], "text", Nullable>;
   array_fill: [Sig<["any", "int4[]"], "$arr1">, Sig<["any", "int4[]", "int4[]"], "$arr1">];
-  array_to_json: [Sig<["anyarray"], "json">, Sig<["anyarray", "bool"], "json">];
+  array_to_json: [Sig<["anyarray"], "$jval:json">, Sig<["anyarray", "bool"], "$jval:json">];
   array_sample: Sig<["anyarray", "int4"], "$1">;
   array_shuffle: Sig<["anyarray"], "$1">;
   trim_array: Sig<["anyarray", "int4"], "$1">;
 
   // ───────────── JSON ─────────────
-  to_json: Sig<["any"], "json">;
-  to_jsonb: Sig<["any"], "jsonb">;
+  to_json: Sig<["any"], "$jval:json">;
+  to_jsonb: Sig<["any"], "$jval:jsonb">;
   json_build_object: Sig<["..."], "json", NN>;
   jsonb_build_object: Sig<["..."], "jsonb", NN>;
-  json_build_array: Sig<["..."], "json", NN>;
-  jsonb_build_array: Sig<["..."], "jsonb", NN>;
+  json_build_array: Sig<["..."], "$jtup:json", NN>;
+  jsonb_build_array: Sig<["..."], "$jtup:jsonb", NN>;
   json_object: [Sig<["text[]"], "json">, Sig<["text[]", "text[]"], "json">];
   jsonb_object: [Sig<["text[]"], "jsonb">, Sig<["text[]", "text[]"], "jsonb">];
   json_array_length: Sig<["json"], "int4">;
@@ -449,14 +454,14 @@ export interface FunctionCatalog {
   jsonb_path_query_tz: [Sig<["jsonb", "jsonpath"], "jsonb", Srf>, Sig<["jsonb", "jsonpath", "jsonb"], "jsonb", Srf>, Sig<["jsonb", "jsonpath", "jsonb", "bool"], "jsonb", Srf>];
   jsonb_path_query_array_tz: [Sig<["jsonb", "jsonpath"], "jsonb">, Sig<["jsonb", "jsonpath", "jsonb"], "jsonb">, Sig<["jsonb", "jsonpath", "jsonb", "bool"], "jsonb">];
   jsonb_path_query_first_tz: [Sig<["jsonb", "jsonpath"], "jsonb", Nullable>, Sig<["jsonb", "jsonpath", "jsonb"], "jsonb", Nullable>, Sig<["jsonb", "jsonpath", "jsonb", "bool"], "jsonb", Nullable>];
-  json_array_elements: Sig<["json"], "json", Srf>;
-  jsonb_array_elements: Sig<["jsonb"], "jsonb", Srf>;
+  json_array_elements: Sig<["json"], "$jelem:json", Srf>;
+  jsonb_array_elements: Sig<["jsonb"], "$jelem:jsonb", Srf>;
   /** A JSON null element becomes SQL NULL in the `_text` variants. */
   json_array_elements_text: Sig<["json"], "text", SrfNullable>;
   jsonb_array_elements_text: Sig<["jsonb"], "text", SrfNullable>;
   json_object_keys: Sig<["json"], "text", Srf>;
   jsonb_object_keys: Sig<["jsonb"], "text", Srf>;
-  row_to_json: [Sig<["any"], "json">, Sig<["any", "bool"], "json">];
+  row_to_json: [Sig<["any"], "$jval:json">, Sig<["any", "bool"], "$jval:json">];
   /** `json_populate_record(null::t, j)` has the type of its first argument. */
   json_populate_record: [Sig<["any", "json"], "$1">, Sig<["any", "json", "bool"], "$1">];
   jsonb_populate_record: Sig<["any", "jsonb"], "$1">;
@@ -661,6 +666,7 @@ type Ret<R extends string, As extends readonly ColInfo[], C extends CallCtx> =
     : R extends "$wgarr" ? ArrOf<C["wg"]>
     : R extends "$pct" ? (C["wg"] extends "interval" ? "interval" : "float8")
     : R extends "$pctarr" ? (C["wg"] extends "interval" ? "interval[]" : "float8[]")
+    : R extends `$j${infer P}` ? JsonRet<P, As>
     : R
   : R;
 
@@ -690,8 +696,9 @@ type CallNullable<S extends AnySig, As extends readonly ColInfo[], C extends Cal
   : S["nullable"] extends true ? true
   : S["agg"] extends true
     ? C["filter"] extends true ? true
-    : C["over"] extends true ? AnyNullable<As>
+    : C["over"] extends true ? (S["strict"] extends false ? false : AnyNullable<As>)
     : C["grouped"] extends false ? true
+    : S["strict"] extends false ? false
     : AnyNullable<As>
   : S["strict"] extends false ? AllNullable<As>
   : S["strict"] extends readonly number[] ? AnyNullableAt<As, S["strict"]>

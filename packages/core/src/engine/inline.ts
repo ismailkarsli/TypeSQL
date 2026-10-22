@@ -4,6 +4,7 @@ import type { Lex } from "./lexer/lex.js";
 import type { Toks } from "./lexer/tokens.js";
 import type { Analyze, ParamsOf } from "./infer.js";
 import type { MaxParamStr } from "./splice.js";
+import type { StripShape } from "./shape.js";
 
 /**
  * Inline parameters: `` sql(`… WHERE id = ${sql.param(userId)}`) ``.
@@ -183,7 +184,7 @@ type Expected<DB, X extends string, N extends number> =
   Analyze<DB, X> extends { readonly params: infer M }
     ? N extends keyof M
       ? First<M[N]> extends { readonly type: infer T extends string; readonly nullable: infer Nl }
-        ? `${T}${Nl extends true ? "" : " NOT NULL"}`
+        ? `${StripShape<T>}${Nl extends true ? "" : " NOT NULL"}`
         : "this parameter"
       : "this parameter"
     : "this parameter";
