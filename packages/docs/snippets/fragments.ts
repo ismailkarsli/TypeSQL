@@ -37,6 +37,18 @@ listed.text; // 'SELECT "display_name" FROM users u WHERE u.id > $1 AND u.email 
 check<Equal<RowType<typeof listed>, { display_name: string | null }>>();
 check<Equal<TextType<typeof listed>, 'SELECT "display_name" FROM users u WHERE u.id > $1 AND u.email LIKE $2'>>();
 
+// #region list
+const SORT = {
+  title: { asc: sql.fragment("p.title"), desc: sql.fragment("p.title DESC") },
+  author: { asc: sql.fragment("p.author_id"), desc: sql.fragment("p.author_id DESC") },
+} as const;
+declare const sortBy: { field: keyof typeof SORT; dir: "asc" | "desc" }[]; // chosen by the user
+const order = sql.list([...sortBy.map(({ field, dir }) => SORT[field][dir]), sql.fragment("p.id")]);
+const sorted = sql("SELECT p.id, p.title FROM posts p ORDER BY {order}", { order });
+// Query<{ id: string; title: string }, []>: checked with each of the five elements once
+// #endregion list
+check<Equal<RowType<typeof sorted>, { id: string; title: string }>>();
+
 // #region dynamic
 declare const userChosenColumns: string[];
 const raw = sql.raw(userChosenColumns.map((c) => `"${c.replaceAll('"', '""')}"`).join(", "));

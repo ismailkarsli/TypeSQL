@@ -2,7 +2,7 @@ import type { ParamsOf, RowOf, Validate } from "./engine/infer.js";
 import type { NamedParams, RewriteNamedStr } from "./engine/named.js";
 import type { AnyErr, SqlError } from "./engine/errors.js";
 import type { CheckCarried, Enc, InlineMarker, RewriteInlineStr, Skip } from "./engine/inline.js";
-import type { HasSlots, JoinedText, MaxParamStr, QuotedIdent, SlotNames, Splice, SpliceCarried, Take, UnknownTuple } from "./engine/splice.js";
+import type { HasSlots, JoinedText, MaxParamStr, QuotedIdent, SlotNames, Splice, SpliceCarried, Take, UnionList, UnknownTuple } from "./engine/splice.js";
 import type { DefaultTypeMap } from "./type-map/index.js";
 import { makeFragment, makeQuery, type CARRIED, type Executor, type Fragment, type Query, type TextType } from "./query.js";
 import type { KeyedRow, RowKeys, SqlOptions } from "./row-keys.js";
@@ -142,6 +142,35 @@ type EncNamed<Names extends string[], O> = { [I in keyof Names]: Names[I] extend
 type JoinedCarried<Items extends readonly unknown[], Acc extends readonly unknown[] = []> =
   Items extends readonly [infer H, ...infer R] ? JoinedCarried<R, [...Acc, ...(CarriedOf<H> extends infer C extends readonly unknown[] ? C : [])]> : Acc;
 
+// ─── lists (dynamic count, typed elements) ───
+
+/**
+ * `[text, carried]` for every element type of a list, split per literal text (a fragment whose
+ * text is a union of literals contributes one pair per member).
+ */
+type ElemPairs<F> =
+  F extends unknown ? (TextType<F> extends infer T extends string ? (T extends unknown ? readonly [T, CarriedOf<F>] : never) : never) : never;
+type AnyDynamic<P> = true extends (P extends readonly [infer T extends string, unknown] ? (IsLiteral<T> extends true ? false : true) : true) ? true : false;
+type PairCarried<Ps extends readonly unknown[], Acc extends readonly unknown[] = []> =
+  Ps extends readonly [readonly [string, infer C extends readonly unknown[]], ...infer R] ? PairCarried<R, [...Acc, ...C]> : Acc;
+type PairTexts<Ps extends readonly unknown[]> = { [I in keyof Ps]: { readonly text: Ps[I] extends readonly [infer T extends string, unknown] ? T : string } };
+
+/**
+ * The representative statement piece of `sql.list(items, sep)`: every distinct element once,
+ * joined with `Sep` and renumbered, plus the values those elements carry. A statement that is
+ * valid with each element present once is valid for any count and order of them in a list
+ * position (ORDER BY, SET, VALUES rows, AND chains, …), so one analysis covers every runtime
+ * combination. Unknown element types or a dynamic element text make the list dynamic.
+ */
+export type ListRep<E, Sep extends string> =
+  [E] extends [never] ? { readonly text: string; readonly carried: [] }
+  : ElemPairs<E> extends infer P
+    ? AnyDynamic<P> extends true ? { readonly text: string; readonly carried: [] }
+    : UnionList<P> extends infer Ps extends readonly unknown[]
+      ? { readonly text: JoinedText<PairTexts<Ps>, Sep>; readonly carried: PairCarried<Ps> }
+      : never
+    : never;
+
 type GateCallCheck<DB, TM, Q extends string> = [DB, TM, Q] extends [infer D, infer M, infer Q2 extends string] ? CallCheck<D, M, Q2> : never;
 type GateSlottedCheck<DB, TM, Q extends string, S> =
   [DB, TM, Q, S] extends [infer D, infer M, infer Q2 extends string, infer S2] ? SlottedCheck<D, M, Q2, S2> : never;
@@ -204,6 +233,14 @@ export interface Sql<DB, TM, Keys extends RowKeys = "preserve"> {
 
   /** Join fragments with a separator; a tuple input keeps the literal text, an array yields a dynamic fragment. */
   join<const Items extends readonly Slottable[], const Sep extends string = ", ">(items: Items, separator?: Sep): Fragment<JoinedText<SlotTexts<Items> extends readonly { readonly text: string }[] ? SlotTexts<Items> : never, Sep>, readonly unknown[], JoinedCarried<Items>>;
+
+  /**
+   * Join a runtime array of fragments whose texts are known: `sql.list(keys.map((k) => SORT[k]))`.
+   * The count and order are dynamic, but every element type is a literal, so the statement is
+   * still checked: it is validated once with each distinct element present (see `ListRep`).
+   * Throws at runtime on an empty array.
+   */
+  list<const Items extends readonly Slottable[], const Sep extends string = ", ">(items: Items, separator?: Sep): Fragment<ListRep<Items[number], Sep>["text"], readonly unknown[], ListRep<Items[number], Sep>["carried"]>;
 
   /** Raw, untyped SQL text. Splicing it forces the override path (`sql.as`). */
   raw(text: string): Fragment<string, [], []>;
@@ -281,6 +318,11 @@ export function createSql<DB, TM = DefaultTypeMap>(executor?: Executor, options?
     },
     id: (...parts: readonly string[]) => makeFragment(quoteIdent(...parts), []),
     join: (items: readonly Spliceable[], separator: string = ", ") => {
+      const r = joinFragments(items, separator);
+      return makeFragment(r.text, r.values);
+    },
+    list: (items: readonly Spliceable[], separator: string = ", ") => {
+      if (items.length === 0) throw new Error("typesql: sql.list() needs at least one item; put a fixed element first (`[base, ...rest]`) or skip the clause");
       const r = joinFragments(items, separator);
       return makeFragment(r.text, r.values);
     },

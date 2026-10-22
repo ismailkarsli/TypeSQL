@@ -109,6 +109,15 @@ export type QuotedIdent<Parts extends readonly string[]> =
   : string;
 type Dq<S extends string> = S extends `${infer A}"${infer B}` ? `${A}""${Dq<B>}` : S;
 
+type UnionToIntersection<U> = (U extends unknown ? (u: U) => void : never) extends (u: infer I) => void ? I : never;
+type LastOf<U> = UnionToIntersection<U extends unknown ? (x: U) => void : never> extends (x: infer L) => void ? L : never;
+/**
+ * Union → tuple, in TypeScript's internal member order (stable for a given program). Tail
+ * recursive; O(n²) in the union size, so only for unions of list elements or columns.
+ */
+export type UnionList<U, Acc extends readonly unknown[] = []> =
+  [U] extends [never] ? Acc : LastOf<U> extends infer L ? UnionList<Exclude<U, L>, [L, ...Acc]> : never;
+
 /** Text of `sql.join([f1, f2], sep)` for tuple inputs; `string` for arrays. */
 export type JoinedText<Items extends readonly { readonly text: string }[], Sep extends string, Off extends number = 0, Acc extends string = "", First extends boolean = true> =
   Items extends readonly [infer H, ...infer R extends readonly { readonly text: string }[]]

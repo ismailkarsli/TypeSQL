@@ -59,7 +59,7 @@ can be passed positionally (`$1`), by name (`:email` with an object), or inline 
 - **Nullability** from the schema, outer joins, `WHERE` filters and expressions (`COALESCE`,
   aggregates, `CASE`).
 - **Postgres column naming** (`?column?`, `count`, `lower`) and Postgres-worded compile errors.
-- **Fragments**: `sql.fragment`, `sql.id`, `sql.join`, `sql.raw`, spliced into inference with
+- **Fragments**: `sql.fragment`, `sql.id`, `sql.join`, `sql.list` (runtime arrays of typed elements), `sql.raw`, spliced into inference with
   `$n` renumbering.
 - **DDL**: `ApplyDdl<DB, "ALTER TABLE …">` and the `migrations()` builder derive the schema from
   your migrations.

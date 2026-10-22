@@ -115,6 +115,10 @@ const q = sql("SELECT u.id FROM users u {where}", { where });
 - `sql.id("col")` → `"col"`; `sql.id("schema", "table")` → `"schema"."table"`.
 - `sql.join([f1, f2], " AND ")` keeps the literal text for tuple inputs; an array input is
   dynamic.
+- `sql.list(items, separator = ", ")` joins a runtime array of fragments whose texts are
+  literals (or unions of literals). The statement is checked once with each distinct element
+  present once; the fragment's text type is that representative text. Throws on an empty
+  array. See [Lists from runtime arrays](../guide/fragments#lists-from-runtime-arrays).
 - `sql.raw(text)` is dynamic.
 - A dynamic fragment makes the statement text non-literal; the call is rejected with
   `SqlError<"dynamic SQL fragment …">` — use `sql.as<Row>(text, slots, ...params)`.
@@ -164,6 +168,7 @@ option, and `camelCase(key)` is the key mapping.
 | `SqlOptions`, `RowKeys` | `createSql`'s options; `"preserve" \| "camelCase"` |
 | `CamelCase<S>`, `CamelCaseKeys<Row>`, `KeyedRow<Row, Keys>` | the key mapping on a string, on a row's top-level keys, and under a `rowKeys` option |
 | `Fragment<Text, Params>` | spliceable SQL piece |
+| `ListRep<Element, Sep>` | the representative text and carried values `sql.list` is checked with |
 | `RowType<Q>`, `ParamsType<Q>`, `TextType<Q>` | extract from a `Query`/`Fragment` type |
 | `InlineMarker<T>` | type of `sql.param(value)`: the inline marker encoding `T` |
 | `RowOf<DB, TM, Q>` | row type of a statement literal |

@@ -78,7 +78,7 @@ documentation site) and `@typesql/bench` (compile-time budget benchmarks).
 | Errors with token positions and "Perhaps you meant …" hints for unknown columns and relations | ✓ |
 | INSERT/UPDATE/DELETE with RETURNING, required-column checks, ON CONFLICT, `EXCLUDED` | ✓ |
 | DDL → schema: `ApplyDdl<DB, "ALTER TABLE …">`, `migrations()` builder, views, enums, schemas | ✓ |
-| Fragments: `{slot}` splicing with `$n` renumbering, `sql.fragment`, `sql.id`, `sql.join`, `sql.raw`; dynamic text falls back to `sql.as<Row>()` | ✓ |
+| Fragments: `{slot}` splicing with `$n` renumbering, `sql.fragment`, `sql.id`, `sql.join`, `sql.list` (runtime arrays of typed elements), `sql.raw`; dynamic text falls back to `sql.as<Row>()` | ✓ |
 | Postgres output column naming (`?column?`, `count`, `case`, `btrim`, casts → type name, last duplicate wins) | ✓ |
 
 Unsupported syntax is a compile error with a Postgres-style message and a token position,

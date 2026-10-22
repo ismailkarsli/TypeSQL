@@ -45,6 +45,9 @@ Measured on TypeScript 7.0.2:
 - Statements can be up to 4096 tokens.
 - Chains of about 100 `||` or `+` operators hit TypeScript's depth limit. `AND`/`OR` chains
   are balanced by the parser and are fine at 200+ terms.
+- `sql.list` checks one statement with every distinct element once, so its cost grows with the
+  number of distinct elements, not with the number of combinations (80 distinct sort
+  elements: ~0.2M instantiations). In a select list it counts every element as selected.
 - In editor hovers, row types list their keys alphabetically (TypeScript 7 orders the keys of
   computed object types). The rows the driver returns keep the `SELECT` order.
 

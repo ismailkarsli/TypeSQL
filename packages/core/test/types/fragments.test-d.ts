@@ -1,5 +1,5 @@
 import { expectTypeOf, test } from "vitest";
-import { createSql, type Col, type Generated, type Nullable, type Query, type Fragment, type SqlError, type Splice, type SlotNames, type QuotedIdent, type JoinedText } from "../../src/index.js";
+import { createSql, type Col, type Generated, type Nullable, type Query, type Fragment, type SqlError, type Splice, type SlotNames, type QuotedIdent, type JoinedText, type ParamsType, type RowType, type TextType } from "../../src/index.js";
 
 interface DB {
   users: { id: Generated<"int4">; email: Col<"text">; display_name: Nullable<"text">; age: Nullable<"int4"> };
@@ -61,6 +61,49 @@ test("dynamic fragments fall back to sql.as", () => {
   const arr: Fragment<"x = 1", []>[] = [];
   const joined = sql.join(arr);
   expectTypeOf(joined).toEqualTypeOf<Fragment<string, readonly unknown[], []>>();
+});
+
+test("sql.list: dynamic count, typed elements", () => {
+  const SORT = {
+    email: { asc: sql.fragment("u.email"), desc: sql.fragment("u.email DESC") },
+    age: { asc: sql.fragment("u.age NULLS LAST"), desc: sql.fragment("u.age DESC NULLS LAST") },
+  } as const;
+  const sort: { field: "email" | "age"; dir: "asc" | "desc" }[] = [];
+  const order = sql.list([...sort.map(({ field, dir }) => SORT[field][dir]), sql.fragment("u.id")]);
+  // the text type lists every distinct element once (in TypeScript's union order)
+  expectTypeOf<TextType<typeof order>>().toEqualTypeOf<"u.age DESC NULLS LAST, u.age NULLS LAST, u.email, u.email DESC, u.id">();
+  const q = sql("SELECT u.id FROM users u ORDER BY {order}", { order });
+  expectTypeOf<RowType<typeof q>>().toEqualTypeOf<{ id: number }>();
+
+  // every element is checked against the statement's scope
+  const typo = sql.list(sort.map(({ field }) => (field === "email" ? sql.fragment("u.emial") : SORT.age.asc)));
+  // @ts-expect-error column u.emial does not exist
+  sql("SELECT u.id FROM users u ORDER BY {typo}", { typo });
+  // @ts-expect-error posts has no column age
+  sql("SELECT p.id FROM posts p ORDER BY {order}", { order });
+
+  // carried values of every element are checked, and params are renumbered
+  const conds = [sql.fragment("u.age > $1", 18), sql.fragment(`u.email = ${sql.param("e")}`)];
+  const where = sql.list(conds, " AND ");
+  const q2 = sql("SELECT u.id FROM users u WHERE u.id > $1 AND {where}", { where }, 1);
+  expectTypeOf<ParamsType<typeof q2>>().toEqualTypeOf<[number, number, string]>();
+  const wrong = sql.list([sql.fragment("u.age > $1", "x"), sql.fragment("u.email = $1", "e")], " AND ");
+  // @ts-expect-error parameter $1: a string value cannot be used as int4
+  sql("SELECT u.id FROM users u WHERE {wrong}", { wrong });
+
+  // a union-typed element (sql.id over a union) contributes each member once
+  const picked: ("email" | "display_name")[] = [];
+  const cols = sql.list(picked.map((c) => sql.id(c)));
+  expectTypeOf<TextType<typeof cols>>().toEqualTypeOf<'"display_name", "email"'>();
+  const q3 = sql("SELECT {cols} FROM users", { cols });
+  // in a select list every element counts as selected
+  expectTypeOf<RowType<typeof q3>>().toEqualTypeOf<{ display_name: string | null; email: string }>();
+
+  // dynamic elements keep the list dynamic
+  const dyn = sql.list([sql.raw("x"), sql.fragment("u.id")]);
+  expectTypeOf(dyn).toEqualTypeOf<Fragment<string, readonly unknown[], []>>();
+  // @ts-expect-error dynamic SQL fragment
+  sql("SELECT u.id FROM users u ORDER BY {dyn}", { dyn });
 });
 
 test("plain calls still work with object params", () => {

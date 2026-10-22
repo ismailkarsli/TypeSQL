@@ -60,6 +60,23 @@ describe("createSql runtime", () => {
   });
 });
 
+describe("sql.list", () => {
+  interface DB { users: { id: { type: "int4"; nullable: false; hasDefault: true }; email: { type: "text"; nullable: false; hasDefault: false } } }
+  const sql = createSql<DB>();
+  const SORT = { id: sql.fragment("id DESC"), email: sql.fragment("email"), near: sql.fragment("abs(id - $1)", 5) } as const;
+  it("joins a runtime array, repeating and renumbering elements", () => {
+    const keys: (keyof typeof SORT)[] = ["near", "email", "near"];
+    const order = sql.list(keys.map((k) => SORT[k]));
+    expect(order).toEqual({ text: "abs(id - $1), email, abs(id - $2)", values: [5, 5] });
+    const q = sql("SELECT id FROM users WHERE id > $1 ORDER BY {order}", { order }, 0);
+    expect(q).toEqual({ text: "SELECT id FROM users WHERE id > $1 ORDER BY abs(id - $2), email, abs(id - $3)", values: [0, 5, 5] });
+    expect(sql.list([SORT.id, SORT.email], " AND ").text).toBe("id DESC AND email");
+  });
+  it("throws on an empty array", () => {
+    expect(() => sql.list([])).toThrow(/sql.list\(\) needs at least one item/);
+  });
+});
+
 describe("named parameters", () => {
   interface DB { users: { id: { type: "int4"; nullable: false; hasDefault: true }; email: { type: "text"; nullable: false; hasDefault: false } } }
   const sql = createSql<DB>();
