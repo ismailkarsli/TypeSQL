@@ -3,7 +3,7 @@ import { executor, type PgQueryable } from "./client.js";
 import type { PgTypeMap } from "./type-map.js";
 
 export { NoResultError, type Executor } from "@typesql/core";
-export type { PgInterval, PgTypeMap } from "./type-map.js";
+export type { PgInterval, PgParamTypeMap, PgTypeMap } from "./type-map.js";
 export {
   query,
   one,

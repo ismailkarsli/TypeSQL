@@ -64,3 +64,7 @@ export type Params<Q extends string> = ParamsOf<DB, DefaultTypeMap, Q>;
 export type V<Q extends string> = Validate<DB, Q>;
 /** TS type of `interval` under the default type map. */
 export type Interval = DefaultTypeMap["interval"];
+/** What an int8 / numeric parameter accepts under the default type map (`DefaultParamTypeMap`). */
+export type BigIn = string | number | bigint;
+/** What a date / timestamp / timestamptz parameter accepts under the default type map. */
+export type DateIn = Date | string;

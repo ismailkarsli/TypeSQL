@@ -63,7 +63,7 @@ test("overrides change inference end to end", () => {
   }>();
   const q = s("SELECT id, balance FROM users WHERE id = $1", "1");
   expectTypeOf<RowType<typeof q>>().toEqualTypeOf<{ id: string; balance: number }>();
-  expectTypeOf<ParamsType<typeof q>>().toEqualTypeOf<[string | null]>();
+  expectTypeOf<ParamsType<typeof q>>().toEqualTypeOf<[string | number | bigint | null]>();
   const j = s("SELECT a.id, a.role FROM auth.users a JOIN auth.sessions s ON s.auth_user_id = a.id");
   expectTypeOf<RowType<typeof j>>().toEqualTypeOf<{ id: string; role: "admin" | "member" }>();
   // one shared enum name: comparable and UNION-able across columns

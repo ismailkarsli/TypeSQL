@@ -55,7 +55,7 @@ test("ON CONFLICT DO UPDATE: SET takes the column type; WHERE sees the target an
 test("UPDATE", () => {
   expectTypeOf<Params<"UPDATE users SET email = $1 WHERE id = $2">>().toEqualTypeOf<[string, number | null]>();
   expectTypeOf<Raw<"UPDATE users SET email = $1, display_name = $2 WHERE id = $3">>().toEqualTypeOf<{ 1: T<"text", false>; 2: T<"text", true>; 3: T<"int4", true> }>();
-  expectTypeOf<Params<"UPDATE posts SET (author_id, title) = ($1, $2) WHERE id = $3">>().toEqualTypeOf<[number, string, string | null]>();
+  expectTypeOf<Params<"UPDATE posts SET (author_id, title) = ($1, $2) WHERE id = $3">>().toEqualTypeOf<[number, string, string | number | bigint | null]>();
   expectTypeOf<Params<"UPDATE posts SET views = views + $1 WHERE title LIKE $2">>().toEqualTypeOf<[number, string | null]>();
   // FROM items, WHERE and RETURNING use the expression rules with the target in scope
   expectTypeOf<Params<"UPDATE users u SET display_name = p.title FROM posts p WHERE p.author_id = u.id AND p.views > $1 RETURNING u.id, $2::text AS tag">>().toEqualTypeOf<[number | null, string]>();
@@ -74,8 +74,8 @@ test("DELETE", () => {
 });
 
 test("parameters inside WITH bodies", () => {
-  expectTypeOf<Params<"WITH p AS (SELECT id FROM posts WHERE title = $1) INSERT INTO users (email) SELECT 'x' FROM p WHERE p.id = $2">>().toEqualTypeOf<[string | null, string | null]>();
-  expectTypeOf<Params<"WITH del AS (DELETE FROM posts WHERE id = $1 RETURNING author_id) UPDATE users SET email = $2 FROM del WHERE users.id = del.author_id">>().toEqualTypeOf<[string | null, string]>();
+  expectTypeOf<Params<"WITH p AS (SELECT id FROM posts WHERE title = $1) INSERT INTO users (email) SELECT 'x' FROM p WHERE p.id = $2">>().toEqualTypeOf<[string | null, string | number | bigint | null]>();
+  expectTypeOf<Params<"WITH del AS (DELETE FROM posts WHERE id = $1 RETURNING author_id) UPDATE users SET email = $2 FROM del WHERE users.id = del.author_id">>().toEqualTypeOf<[string | number | bigint | null, string]>();
 });
 
 test("nullable columns accept null at the sql() boundary", () => {
@@ -96,6 +96,7 @@ test("sql() call sites", () => {
   sql("INSERT INTO users (email) VALUES ($1)", null);
   // @ts-expect-error too many params
   sql("UPDATE users SET email = $1", "a", "b");
-  // @ts-expect-error int8 key under the default type map is a string
+  // int8 params take a string, a number or a bigint
+  sql("DELETE FROM posts WHERE id = $1", "1");
   sql("DELETE FROM posts WHERE id = $1", 1);
 });

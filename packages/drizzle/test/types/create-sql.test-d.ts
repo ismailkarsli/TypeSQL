@@ -22,7 +22,7 @@ test("SELECT with JOIN: row and params", () => {
     tags: string[];
     status: "draft" | "published" | "archived";
   }>();
-  expectTypeOf<ParamsType<typeof q>>().toEqualTypeOf<["happy" | "sad" | null, "draft" | "published" | "archived" | null, string | null]>();
+  expectTypeOf<ParamsType<typeof q>>().toEqualTypeOf<["happy" | "sad" | null, "draft" | "published" | "archived" | null, string | number | bigint | null]>();
   // @ts-expect-error not a value of the enum
   sql("SELECT id FROM users WHERE mood = $1", "angry");
 });
@@ -60,5 +60,5 @@ test("type map and options", () => {
   const esql = createSql<typeof events, Map, { casing: "snake_case"; timestamp: "timestamptz" }>();
   const q = esql("SELECT id, created_at FROM events WHERE created_at > $1", "2024-01-01");
   expectTypeOf<RowType<typeof q>>().toEqualTypeOf<{ id: number; created_at: string }>();
-  expectTypeOf<ParamsType<typeof q>>().toEqualTypeOf<[string | null]>();
+  expectTypeOf<ParamsType<typeof q>>().toEqualTypeOf<[string | Date | null]>();
 });

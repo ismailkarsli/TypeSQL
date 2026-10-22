@@ -77,6 +77,16 @@ test("PostgresJsBigIntTypeMap only changes int8", () => {
   expectTypeOf<Omit<PostgresJsBigIntTypeMap, "int8">>().toEqualTypeOf<Omit<PostgresJsTypeMap, "int8">>();
 });
 
+test("parameters accept PostgresJsParamTypeMap on top of the row types", () => {
+  const q = sql("SELECT id FROM users WHERE created_at > $1 AND id = $2", new Date(), 1);
+  expectTypeOf<ParamsType<typeof q>>().toEqualTypeOf<[Date | string | number | null, number | null]>();
+  // epoch milliseconds: postgres.js serializes dates with new Date(x)
+  sql("SELECT id FROM users WHERE created_at > $1", 0);
+  big("SELECT id FROM posts WHERE id = $1", 1);
+  // @ts-expect-error bool params take only booleans
+  sql("SELECT id FROM users WHERE (created_at IS NOT NULL) = $1", "t");
+});
+
 test("postgres.js Sql, TransactionSql and ReservedSql satisfy the structural interfaces", () => {
   expectTypeOf<postgres.Sql>().toExtend<PostgresJsQueryable>();
   expectTypeOf<postgres.Sql>().toExtend<PostgresJsTransactable>();
@@ -134,7 +144,7 @@ test("DML: execute returns the row count; RETURNING rows follow the type map", (
 
   const ins = big("INSERT INTO posts (author_id, title, tags, view_counts) VALUES ($1, $2, $3, $4) RETURNING id, view_counts", 1, "t", ["a"], [1n]);
   expectTypeOf(one(db, ins)).toEqualTypeOf<Promise<{ id: bigint; view_counts: bigint[] }>>();
-  expectTypeOf<ParamsType<typeof ins>>().toEqualTypeOf<[number, string, (string | null)[], (bigint | null)[]]>();
+  expectTypeOf<ParamsType<typeof ins>>().toEqualTypeOf<[number, string, (string | null)[], (bigint | number | string | null)[]]>();
 });
 
 test("rowKeys: camelCase renames the row keys through the helpers too", () => {

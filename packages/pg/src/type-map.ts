@@ -1,4 +1,4 @@
-import type { DefaultTypeMap } from "@typesql/core";
+import type { DefaultParamTypeMap, DefaultTypeMap } from "@typesql/core";
 
 /**
  * The object node-postgres returns for an `interval` column (package `postgres-interval` 1.x,
@@ -54,6 +54,8 @@ export interface PgInterval {
  * Register your own parser (`pg.types.setTypeParser`) or cast in SQL if you depend on these.
  */
 export interface PgTypeMap extends Omit<DefaultTypeMap, "bytea" | "interval" | "record" | "void"> {
+  /** What parameters accept on top of the row types. */
+  $params: PgParamTypeMap;
   bytea: Buffer;
   interval: PgInterval;
   /** Anonymous `ROW(...)` results have no parser: raw text such as `"(1,foo)"`. */
@@ -61,3 +63,19 @@ export interface PgTypeMap extends Omit<DefaultTypeMap, "bytea" | "interval" | "
   /** `void`-returning functions (`pg_sleep`) yield an empty string. */
   void: string;
 }
+
+/**
+ * TS types `pg` parameters accept on top of the row type (`PgTypeMap["$params"]`). Verified
+ * against `pg/lib/utils.js` (`prepareValue`, 8.x): a `Date` is sent as a timestamp with the
+ * local offset, `Buffer`/typed arrays as bytea, a `bigint` or number with `toString()`, and
+ * objects with `toPostgres()` (such as `PgInterval`) through it; Postgres parses the text.
+ *
+ *   int8, numeric, money          number | bigint | string
+ *   date, timestamp, timestamptz  Date | string
+ *   interval                      string, besides the `PgInterval` row type
+ *   bytea                         Uint8Array, besides `Buffer`
+ *
+ * Plain objects are `JSON.stringify`d and arrays become Postgres array literals, so neither is
+ * listed for other types.
+ */
+export interface PgParamTypeMap extends DefaultParamTypeMap {}

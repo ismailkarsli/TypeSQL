@@ -69,3 +69,25 @@ map is any object type from Postgres type names to TypeScript types:
 
 The full mapping for each driver, including intervals, geometric types and arrays, is on the
 [Adapters](./adapters) page.
+
+### Parameter types
+
+A parameter accepts its type's row type and, on top of it, the entry of the map's `$params`
+key: what the driver can serialize for that type. A map without `$params` gets
+`DefaultParamTypeMap`, which both `pg` and postgres.js handle:
+
+| Postgres type | Parameters also accept |
+|---|---|
+| `int8`, `numeric`, `money` | `number \| bigint \| string` |
+| `date`, `timestamp`, `timestamptz` | `Date \| string` |
+| `interval` | `string` |
+| `bytea` | `Uint8Array` |
+
+So a map that types rows with a custom parser keeps the driver's input types: with
+`timestamptz: string` (a parser that formats timestamps) parameters still accept a `Date`.
+`PgTypeMap` and `PostgresJsTypeMap` declare their own `$params` (`PgParamTypeMap`,
+`PostgresJsParamTypeMap`; postgres.js also takes epoch milliseconds for dates). To change what
+parameters accept, set `$params`; it replaces the default, so extend `DefaultParamTypeMap` (or
+the adapter's) to keep the rest:
+
+<<< @/snippets/type-maps.ts#params

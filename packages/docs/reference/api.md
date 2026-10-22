@@ -200,6 +200,14 @@ A type map is `{ [pgTypeName]: TsType }`. Resolution order: exact entry (so a ma
 Nullable columns add `| null`. `DefaultTypeMap` matches node-postgres defaults (`int8` and
 `numeric` as `string`, dates as `Date`, `json/jsonb` as `unknown`).
 
+Parameters accept the row type plus the map's `$params` entry for the type
+(`TsParamTypeOf<TM, DB, T>`); array elements also accept `null`. A map without `$params` uses
+`DefaultParamTypeMap` (`int8`/`numeric`/`money`: `number | bigint | string`; dates and
+timestamps: `Date | string`; `interval`: `string`; `bytea`: `Uint8Array`). `PgTypeMap` and
+`PostgresJsTypeMap` set `$params` to `PgParamTypeMap` and `PostgresJsParamTypeMap`.
+`ParamTypeMapOf<TM>` is the input map in effect. See
+[parameter types](../guide/schema#parameter-types).
+
 ## Function catalog
 
 `FunctionCatalog` is an augmentable interface; add your own functions:

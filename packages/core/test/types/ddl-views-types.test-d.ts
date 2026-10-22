@@ -159,7 +159,7 @@ test("end to end: query the evolved schema", () => {
 
   const q = sql("SELECT u.id, u.mood, u.moods, p.title, p.published FROM users u JOIN posts p ON p.author_id = u.id WHERE u.id = $1", 1);
   expectTypeOf<RowType<typeof q>>().toEqualTypeOf<{ id: number; mood: "happy" | "sad" | null; moods: ("happy" | "sad")[]; title: string; published: boolean }>();
-  expectTypeOf<ParamsOf<Schema, DefaultTypeMap, "SELECT id FROM users WHERE mood = $1 AND created_at > $2">>().toEqualTypeOf<["happy" | "sad" | null, Date | null]>();
+  expectTypeOf<ParamsOf<Schema, DefaultTypeMap, "SELECT id FROM users WHERE mood = $1 AND created_at > $2">>().toEqualTypeOf<["happy" | "sad" | null, Date | string | null]>();
 
   const ins = sql("INSERT INTO posts (author_id, title) VALUES ($1, $2) RETURNING id, published", 1, "hello");
   expectTypeOf<RowType<typeof ins>>().toEqualTypeOf<{ id: string; published: boolean }>();

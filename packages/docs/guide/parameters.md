@@ -84,11 +84,12 @@ Array elements always accept `null`, whatever the nullability of the array: an `
 parameter takes `(number | null)[]`, so `unnest($1::float8[])` works for bulk inserts with
 nullable values.
 
-The TypeScript type of a parameter is the same as for a result column of that type, so under
-the node-postgres map an `int8` parameter takes a `string`. Cast the parameter to compare with
-a number:
+A parameter accepts the TypeScript type of a result column of its type, plus what the driver
+can serialize for that type (the type map's [`$params`](./schema#parameter-types) entry). Under
+the node-postgres map `int8` and `numeric` rows are strings, but their parameters take
+`number | bigint | string`; `date` and `timestamp[tz]` parameters take `Date | string`:
 
-<<< @/snippets/parameters.ts#int8
+<<< @/snippets/parameters.ts#inputs
 
 ## Only literal SQL is analysed
 

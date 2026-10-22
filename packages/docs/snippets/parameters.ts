@@ -7,9 +7,9 @@ declare const ids: number[];
 
 // #region positional
 const byId = sql("SELECT id, email FROM users WHERE id = $1 AND created_at > $2", 7, new Date());
-// Query<{ id: number; email: string }, [number | null, Date | null]>
+// Query<{ id: number; email: string }, [number | null, Date | string | null]>
 // #endregion positional
-check<Equal<ParamsType<typeof byId>, [number | null, Date | null]>>();
+check<Equal<ParamsType<typeof byId>, [number | null, Date | string | null]>>();
 
 // #region named
 const byEmail = sql("SELECT id FROM users WHERE email = :email OR display_name = :email", { email: "a@b.c" });
@@ -48,12 +48,14 @@ sql("SELECT $1 AS anything", { any: "value" }); // no context: unknown
 sql("SELECT v FROM unnest($1::text[]) AS t(v)", ["a", null]); // (string | null)[] | null: elements accept null
 // #endregion contexts
 
-// #region int8
-// int8 parameters take the same TS type as int8 results: string under the pg type map
-sql("SELECT id FROM posts WHERE id = $1", "42");
-// compare with a number by casting the parameter
-sql("SELECT author_id FROM posts GROUP BY author_id HAVING count(*) >= $1::int4", 3);
-// #endregion int8
+// #region inputs
+// int8 rows are strings under the pg type map; int8 parameters take number | bigint | string
+const post = sql("SELECT id FROM posts WHERE id = $1", 42); // [string | number | bigint | null]
+sql("SELECT author_id FROM posts GROUP BY author_id HAVING count(*) >= $1", 3n);
+// timestamptz rows are Date; timestamptz parameters take Date | string
+sql("SELECT id FROM users WHERE created_at > $1", "2024-01-01T00:00:00Z");
+// #endregion inputs
+check<Equal<ParamsType<typeof post>, [string | number | bigint | null]>>();
 
 // #region constants
 const table = "users";

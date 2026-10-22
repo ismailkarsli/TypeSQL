@@ -54,8 +54,10 @@ test("inline values are checked against the parameter type", () => {
   expectTypeOf<E<typeof nullable>>().toEqualTypeOf<typeof nullable & SqlError<"parameter $1: a string | null value cannot be used as text NOT NULL", 10>>();
   // @ts-expect-error a number[] where text[] is expected
   sql(`UPDATE users SET tags = ${sql.param(ids)}`);
-  // @ts-expect-error a string where a timestamptz (Date) is expected
-  sql(`SELECT id FROM users WHERE created_at > ${sql.param("2020-01-01")}`);
+  // timestamptz params take a Date or a string
+  sql(`SELECT id FROM users WHERE created_at > ${sql.param("2020-01-01")} AND created_at < ${sql.param(new Date())}`);
+  // @ts-expect-error a number where a timestamptz (Date | string) is expected
+  sql(`SELECT id FROM users WHERE created_at > ${sql.param(1)}`);
   // the message names the parameter, the value type and the expected SQL type
   const bad = `SELECT id FROM users WHERE id = ${sql.param("5")}` as const;
   expectTypeOf<E<typeof bad>>().toEqualTypeOf<typeof bad & SqlError<"parameter $1: a string value cannot be used as int4", 7>>();

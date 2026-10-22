@@ -1,4 +1,4 @@
-import type { DefaultTypeMap } from "@typesql/core";
+import type { DefaultParamTypeMap, DefaultTypeMap } from "@typesql/core";
 
 /**
  * Canonical Postgres type name → TS type as postgres.js 3.x returns it with its default
@@ -23,6 +23,8 @@ import type { DefaultTypeMap } from "@typesql/core";
  * element-type[] mapping is exact (int8[] → string[], timestamptz[] → Date[], ...).
  */
 export interface PostgresJsTypeMap extends Omit<DefaultTypeMap, "bytea" | "interval" | "point" | "circle" | "record" | "void"> {
+  /** What parameters accept on top of the row types. */
+  $params: PostgresJsParamTypeMap;
   bytea: Buffer;
   /** No default parser: the Postgres text form, e.g. `"1 day 02:00:00"`. */
   interval: string;
@@ -34,6 +36,26 @@ export interface PostgresJsTypeMap extends Omit<DefaultTypeMap, "bytea" | "inter
   record: string;
   /** `void`-returning functions (`pg_sleep`) yield an empty string. */
   void: string;
+}
+
+/**
+ * TS types postgres.js parameters accept on top of the row type
+ * (`PostgresJsTypeMap["$params"]`). Verified against `postgres/src/types.js` and `Bind` in
+ * `connection.js` (3.4.9): a value is serialized by the serializer of the parameter type the
+ * server reports, and types without one (int8, numeric, money, interval, …) with `'' + x`.
+ *
+ *   int8, numeric, money          number | bigint | string
+ *   date, timestamp, timestamptz  Date | string | number: serialized as `new Date(x).toISOString()`,
+ *                                 so a string must be one JS `Date` parses, a number is epoch ms
+ *   interval                      string
+ *   bytea                         Uint8Array, besides `Buffer`
+ *
+ * `bool` takes only booleans: its serializer sends `'f'` for anything but `true`.
+ */
+export interface PostgresJsParamTypeMap extends Omit<DefaultParamTypeMap, "date" | "timestamp" | "timestamptz"> {
+  date: Date | string | number;
+  timestamp: Date | string | number;
+  timestamptz: Date | string | number;
 }
 
 /**

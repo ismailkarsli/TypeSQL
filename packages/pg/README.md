@@ -44,7 +44,7 @@ const id = await transaction(pool, async (client) => {
 | `executor(client)` | an `Executor` for `q.execute()` and `q.executeCount()` (reports `rowCount`); `createSql<DB>(pool)` binds one |
 | `transaction(pool, fn)` | `BEGIN`, `fn(client)`, `COMMIT`; `ROLLBACK` and rethrow on error |
 | `migrate(pool, m)` | runs `m.statements` (e.g. from core's `migrations()`) in one transaction |
-| `PgTypeMap`, `PgInterval` | the type map, and the `postgres-interval` object type |
+| `PgTypeMap`, `PgParamTypeMap`, `PgInterval` | the type map (rows), what parameters also accept, and the `postgres-interval` object type |
 | `RowCountError`, `PgQueryable`, `PgPoolLike`, `PgTransactionClient`, `PgResult`, `MigrationSource` | errors and parameter types |
 
 `client` is anything with `query(text, values)`: a `Pool`, `Client` or `PoolClient`. The
@@ -68,3 +68,7 @@ What `pg`'s default parsers return:
 
 Arrays map element-wise. The full table, including the array types `pg` leaves as raw text, is
 in the [Adapters guide](https://github.com/ismailkarsli/typesql/blob/main/packages/docs/guide/adapters.md).
+
+Parameters accept the row type and what `pg` serializes for the type (`PgParamTypeMap`):
+`number | bigint | string` for `int8`, `numeric` and `money`, `Date | string` for dates and
+timestamps, `string` for `interval`, `Uint8Array` for `bytea`.

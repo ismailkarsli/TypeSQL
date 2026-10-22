@@ -52,7 +52,7 @@ const counts = await query(dbBig, big("SELECT author_id, count(*) AS n FROM post
 | `executor(db)` | an `Executor` for `q.execute()` and `q.executeCount()` (reports `.count`); `createSql<DB>(db)` binds one |
 | `transaction(db, fn)` | `db.begin(fn)` |
 | `migrate(db, m)` | runs `m.statements` (e.g. from core's `migrations()`) in one transaction |
-| `PostgresJsTypeMap`, `PostgresJsBigIntTypeMap` | the type maps |
+| `PostgresJsTypeMap`, `PostgresJsBigIntTypeMap`, `PostgresJsParamTypeMap` | the type maps (rows), and what parameters also accept |
 | `RowCountError`, `PostgresJsQueryable`, `PostgresJsTransactable`, `PostgresJsRows`, `MigrationSource` | errors and parameter types |
 
 Queries run with `db.unsafe(text, values)`, so the text reaches the server unchanged and values
@@ -74,3 +74,8 @@ postgres.js parses only a few types by default; everything else is the text Post
 
 Arrays map element-wise. Details in the
 [Adapters guide](https://github.com/ismailkarsli/typesql/blob/main/packages/docs/guide/adapters.md).
+
+Parameters accept the row type and what postgres.js serializes for the type
+(`PostgresJsParamTypeMap`): `number | bigint | string` for `int8`, `numeric` and `money`,
+`Date | string | number` (epoch ms) for dates and timestamps, `string` for `interval`,
+`Uint8Array` for `bytea`.

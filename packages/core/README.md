@@ -74,7 +74,8 @@ can be passed positionally (`$1`), by name (`:email` with an object), or inline 
 ## Schema
 
 Columns are declared with Postgres type names; a type map turns them into TypeScript types
-(`DefaultTypeMap` matches node-postgres: `int8` and `numeric` are `string`):
+(`DefaultTypeMap` matches node-postgres: `int8` and `numeric` rows are `string`; their parameters
+also take numbers and bigints, and date parameters take `Date | string`):
 
 | Helper | Meaning |
 |---|---|

@@ -147,6 +147,21 @@ jsonb, uuid, money, time, timetz, numrange). Two mismatches cannot be expressed 
 If you depend on one of these, register a parser with `pg.types.setTypeParser` and use a
 custom type map (`createSql<DB, MyMap>()` from core), or cast in SQL.
 
+Parameters accept the row type plus `PgParamTypeMap` (`PgTypeMap["$params"]`), verified against
+`prepareValue` in `pg/lib/utils.js`: `pg` sends a `Date` as a timestamp with the local offset,
+a `Buffer` or typed array as bytea, an object with `toPostgres()` (such as `PgInterval`)
+through it, and anything else with `toString()`.
+
+| Postgres | Parameters also accept |
+|---|---|
+| `int8`, `numeric`, `money` | `number \| bigint \| string` |
+| `date`, `timestamp`, `timestamptz` | `Date \| string` |
+| `interval` | `string` |
+| `bytea` | `Uint8Array` |
+
+Plain objects are sent as `JSON.stringify` output and arrays as Postgres array literals, so
+they are not accepted for other types.
+
 ## `@typesql/postgres` (postgres.js 3.x)
 
 <<< @/snippets/adapters.ts#postgresjs
@@ -180,6 +195,19 @@ use `PostgresJsBigIntTypeMap` / `createBigIntSql` for those connections (`int8[]
 
 Arrays: postgres.js fetches `pg_type` on connect (`fetch_types: true`, the default) and
 registers an element-wise parser for every array type, so core's `T[]` mapping is exact.
+
+Parameters accept the row type plus `PostgresJsParamTypeMap` (`PostgresJsTypeMap["$params"]`).
+postgres.js serializes each value with the serializer of the parameter type the server
+reports (`Bind` in `src/connection.js`), and with `'' + x` for types without one:
+
+| Postgres | Parameters also accept |
+|---|---|
+| `int8`, `numeric`, `money` | `number \| bigint \| string` |
+| `date`, `timestamp`, `timestamptz` | `Date \| string \| number`: sent as `new Date(x).toISOString()`, so a string must be one JS `Date` can parse and a number is epoch milliseconds |
+| `interval` | `string` |
+| `bytea` | `Uint8Array` |
+
+`bool` parameters take only booleans: the serializer sends `'f'` for anything but `true`.
 
 #### Dates
 

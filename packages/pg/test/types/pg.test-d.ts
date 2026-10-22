@@ -120,10 +120,18 @@ test("invalid SQL is rejected by the pre-bound sql", () => {
   sql("SELECT id FROM users WHERE id = $1");
 });
 
+test("parameters accept PgParamTypeMap on top of the row types", () => {
+  const q = sql("SELECT id FROM users WHERE created_at > $1 AND balance > $2", new Date(), 1.5);
+  expectTypeOf<ParamsType<typeof q>>().toEqualTypeOf<[Date | string | null, string | number | bigint | null]>();
+  sql("SELECT id FROM users WHERE created_at > $1 AND balance > $2", "2024-01-01T00:00:00Z", 2n);
+  // @ts-expect-error pg sends a number as its digits, which is not a timestamp
+  sql("SELECT id FROM users WHERE created_at > $1", 0);
+});
+
 test("DML: execute returns the row count; RETURNING rows flow through query/one", () => {
   const upd = sql("UPDATE posts SET title = $1 WHERE id = $2", "t", "1");
   expectTypeOf<RowType<typeof upd>>().toEqualTypeOf<never>();
-  expectTypeOf<ParamsType<typeof upd>>().toEqualTypeOf<[string, string | null]>();
+  expectTypeOf<ParamsType<typeof upd>>().toEqualTypeOf<[string, string | number | bigint | null]>();
   expectTypeOf(execute(pool, upd)).toEqualTypeOf<Promise<number>>();
 
   const ins = sql("INSERT INTO users (email, balance) VALUES ($1, $2) RETURNING id, created_at", "a@b.c", "0");

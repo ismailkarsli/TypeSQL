@@ -197,6 +197,15 @@ export const corpus = [
     expectTypes: { v: "number" },
   },
   {
+    // what the type map's input side (DefaultParamTypeMap) accepts, sent through each driver
+    name: "params of the input types: Date | string dates, number | bigint | string int8 and numeric",
+    setup: [],
+    sql: "SELECT id FROM users WHERE created_at > $1 AND created_at > $2 AND birthday IS DISTINCT FROM $3 AND balance > $4 AND balance > $5 AND balance > $6 AND id::int8 > $7 AND id::int8 > $8 AND id::int8 > $9 AND created_at + $10 > created_at ORDER BY id LIMIT 1",
+    params: [new Date(0), "1970-01-01T00:00:00Z", new Date(0), -1, -1n, "-1.5", 0, 0n, "0", "1 day"],
+    expectKeys: ["id"],
+    expectTypes: { id: "number" },
+  },
+  {
     name: "WHERE with typed params",
     setup: [],
     sql: "SELECT id, email FROM users WHERE id = $1 AND is_admin = $2",

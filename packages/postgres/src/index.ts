@@ -3,7 +3,7 @@ import { executor, type PostgresJsQueryable } from "./client.js";
 import type { PostgresJsBigIntTypeMap, PostgresJsTypeMap } from "./type-map.js";
 
 export { NoResultError, type Executor } from "@typesql/core";
-export type { PostgresJsTypeMap, PostgresJsBigIntTypeMap } from "./type-map.js";
+export type { PostgresJsTypeMap, PostgresJsBigIntTypeMap, PostgresJsParamTypeMap } from "./type-map.js";
 export {
   query,
   one,
