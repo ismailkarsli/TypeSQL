@@ -25,10 +25,18 @@
     - wet-socks-yell
     - wicked-cats-press
     - wild-cats-pump
+"@typesql/core@0.1.0":
+  dir: packages/core
+  intents:
+    - gentle-maps-kneel
 "@typesql/drizzle@0.0.2":
   dir: packages/drizzle
   intents:
     - wise-snails-clean
+"@typesql/drizzle@0.1.0":
+  dir: packages/drizzle
+  intents:
+    - smart-bottles-matter
 "@typesql/kysely@0.0.2":
   dir: packages/kysely
   intents:
@@ -45,6 +53,10 @@
     - loud-squids-fold
     - shaggy-apes-shave
     - wicked-cats-press
+"@typesql/kysely@0.1.0":
+  dir: packages/kysely
+  intents:
+    - orange-planes-tell
 "@typesql/pg@0.0.2":
   dir: packages/pg
   intents:
@@ -58,6 +70,11 @@
     - mean-rivers-sleep
     - strong-fireants-ask
     - warm-boxes-explode
+"@typesql/pg@0.1.0":
+  dir: packages/pg
+  intents:
+    - brave-knives-crash
+    - orange-planes-tell
 "@typesql/postgres@0.0.2":
   dir: packages/postgres
   intents:
@@ -69,6 +86,11 @@
     - clever-cats-trade
     - loud-squids-fold
     - strong-fireants-ask
+"@typesql/postgres@0.1.0":
+  dir: packages/postgres
+  intents:
+    - brave-knives-crash
+    - orange-planes-tell
 "@typesql/prisma@0.0.2":
   dir: packages/prisma
   intents:
@@ -77,3 +99,8 @@
   dir: packages/prisma
   intents:
     - happy-forks-own
+"@typesql/prisma@0.1.0":
+  dir: packages/prisma
+  intents:
+    - clean-seals-help
+    - orange-planes-tell
