@@ -7,6 +7,24 @@
   dir: packages/core
   intents:
     - brave-roses-obey
+"@typesql/core@0.0.4":
+  dir: packages/core
+  intents:
+    - angry-peaches-do
+    - big-kids-agree
+    - bright-wolves-decide
+    - heavy-lions-shave
+    - khaki-rats-help
+    - loud-squids-fold
+    - lucky-flowers-share
+    - neat-bees-love
+    - new-wasps-give
+    - silly-bears-deliver
+    - thin-cups-crash
+    - wet-pigs-stand
+    - wet-socks-yell
+    - wicked-cats-press
+    - wild-cats-pump
 "@typesql/drizzle@0.0.2":
   dir: packages/drizzle
   intents:
@@ -20,15 +38,42 @@
   intents:
     - dry-keys-shake
     - rare-tables-join
+"@typesql/kysely@0.0.4":
+  dir: packages/kysely
+  intents:
+    - bright-wolves-decide
+    - loud-squids-fold
+    - shaggy-apes-shave
+    - wicked-cats-press
 "@typesql/pg@0.0.2":
   dir: packages/pg
   intents:
     - wise-snails-clean
+"@typesql/pg@0.0.4":
+  dir: packages/pg
+  intents:
+    - big-kids-agree
+    - bright-wolves-decide
+    - loud-squids-fold
+    - mean-rivers-sleep
+    - strong-fireants-ask
+    - warm-boxes-explode
 "@typesql/postgres@0.0.2":
   dir: packages/postgres
   intents:
     - wise-snails-clean
+"@typesql/postgres@0.0.4":
+  dir: packages/postgres
+  intents:
+    - bright-wolves-decide
+    - clever-cats-trade
+    - loud-squids-fold
+    - strong-fireants-ask
 "@typesql/prisma@0.0.2":
   dir: packages/prisma
   intents:
     - wise-snails-clean
+"@typesql/prisma@0.0.4":
+  dir: packages/prisma
+  intents:
+    - happy-forks-own
