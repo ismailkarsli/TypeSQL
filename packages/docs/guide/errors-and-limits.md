@@ -27,7 +27,8 @@ words, operators and literals from 0):
 Wrong positional arguments are ordinary TypeScript errors on the argument
 (`Argument of type 'string' is not assignable to parameter of type 'number'`; for a raw array
 passed to a JSON parameter, `… parameter of type 'NonArrayOrSqlJson<Item[]>'`: pass
-`sql.json(value)`).
+`sql.json(value)`). A statement that does not validate accepts any arguments, so its
+`SqlError` is the only error on the call, never `Expected 2 arguments, but got 3`.
 
 ## The escape hatch
 

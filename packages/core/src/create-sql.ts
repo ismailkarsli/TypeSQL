@@ -85,11 +85,19 @@ type CallCheck<DB, TM, Q extends string> =
         : never
       : P
     : never;
+/**
+ * Arguments of a call. When the statement does not validate (or has slots), this signature
+ * takes none, and the slotted signature takes any (`SlottedArgs`): with arguments, TypeScript
+ * then rejects this one on arity and reports the slotted signature's error, which is the
+ * SqlError on the query text. (An incomplete parameter tuple on both would surface as
+ * "Expected 2 arguments, but got 3" and hide the SqlError.)
+ */
 type CallArgs<DB, TM, Q extends string> =
-  IsLiteral<Q> extends false ? readonly unknown[]
+  IsLiteral<Q> extends false ? []
+  : HasSlots<Q> extends true ? []
   : Prepared<Q> extends [infer X extends string, infer Names extends string[], infer Encs extends readonly string[], infer M extends number]
-    ? ArgsFor<DB, TM, X, Names, Encs, M>
-    : readonly unknown[];
+    ? Validate<DB, X> extends AnyErr ? [] : ArgsFor<DB, TM, X, Names, Encs, M>
+    : [];
 
 /** `true` when every carried value type fits its parameter, else the SqlError. */
 type Carried<DB, TM, X extends string, K extends readonly unknown[]> =
@@ -141,7 +149,9 @@ type SlottedArgs<DB, TM, Q extends string, S> =
   IsLiteral<Q> extends false ? readonly unknown[]
   : Prepared<Q> extends [infer T2 extends string, infer Names extends string[], readonly unknown[], infer M extends number]
     ? Splice<T2, SlotTexts<S>> extends infer X extends string
-      ? Names extends [] ? Take<ArgsOf<DB, TM, X>, M> : [params: NamedParams<Names, Take<ArgsOf<DB, TM, X>, Names["length"]>>]
+      ? string extends X ? readonly unknown[]
+      : Validate<DB, X> extends AnyErr ? readonly unknown[]
+      : Names extends [] ? Take<ArgsOf<DB, TM, X>, M> : [params: NamedParams<Names, Take<ArgsOf<DB, TM, X>, Names["length"]>>]
       : readonly unknown[]
     : readonly unknown[];
 type SplicedOr<Q extends string, S> = SplicedText<Q, S> extends infer X extends string ? X : string;

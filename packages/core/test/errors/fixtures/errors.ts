@@ -36,3 +36,4 @@ export const inlineWrongType = sql(`SELECT id FROM users WHERE id = ${sql.param(
 export const inlineNullable = sql(`INSERT INTO users (email) VALUES (${sql.param(userInput as string | null)})`);
 export const inlineInQuotes = sql(`SELECT id FROM users WHERE email = '${sql.param(userInput)}'`);
 export const fragmentWrongType = sql("SELECT id FROM users WHERE true {f}", { f: sql.fragment("AND id = $1", "seven") });
+export const unknownTableWithParams = sql("SELECT id FROM usrs WHERE id = $1 AND email = $2", 1, "x");

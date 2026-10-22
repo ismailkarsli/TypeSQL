@@ -1,6 +1,6 @@
 import { expectTypeOf, test } from "vitest";
-import type { SqlError } from "../../src/index.js";
-import type { V } from "./_schema.js";
+import { createSql, type SqlError } from "../../src/index.js";
+import type { DB, V } from "./_schema.js";
 
 // Error messages (worded like PostgreSQL 17) and positions. The position is a token index:
 // the offending token for syntax errors, the first occurrence of the named identifier for
@@ -55,4 +55,61 @@ test("unbalanced parentheses", () => {
   expectTypeOf<V<"SELECT id FROM users WHERE id IN (1, 2">>().toEqualTypeOf<SqlError<'syntax error: expected ")" at or near end of input', 11>>();
   expectTypeOf<V<"SELECT (SELECT id FROM users">>().toEqualTypeOf<SqlError<'syntax error: expected ")" at or near end of input', 6>>();
   expectTypeOf<V<"SELECT id FROM (SELECT id FROM users">>().toEqualTypeOf<SqlError<'syntax error: expected ")" at or near end of input', 8>>();
+});
+
+const sql = createSql<DB>();
+
+// Arguments sit on their own lines: an argument-count error ("Expected 2 arguments, but got 3")
+// would land there, outside the @ts-expect-error, and fail the test.
+test("an invalid statement reports its SqlError, not an argument-count error", () => {
+  sql(
+    // @ts-expect-error relation "usrs" does not exist
+    "SELECT id FROM usrs WHERE id = $1 AND email = $2",
+    1,
+    "x",
+  );
+  sql(
+    // @ts-expect-error column "emial" does not exist
+    "SELECT id FROM users WHERE id = $1 AND emial = $2",
+    1,
+    "x",
+  );
+  sql(
+    // @ts-expect-error syntax error at end of input
+    "SELECT id FROM users WHERE id = $1 AND",
+    1,
+  );
+  sql(
+    // @ts-expect-error column "emial" does not exist
+    "SELECT id FROM users WHERE id = :id AND emial = :e",
+    { id: 1, e: "x" },
+  );
+  sql(
+    // @ts-expect-error relation "usrs" does not exist
+    "SELECT id FROM usrs u WHERE u.id = $1 {w}",
+    { w: sql.fragment("AND true") },
+    1,
+    2,
+  );
+  sql(
+    // @ts-expect-error relation "usrs" does not exist
+    `SELECT id FROM usrs WHERE id = $1 AND email = ${sql.param("x")}`,
+    1,
+    2,
+  );
+  // write helpers and lists in slots
+  sql(
+    // @ts-expect-error column "nme" does not exist
+    "UPDATE users SET {set} WHERE nme = $1",
+    { set: sql.set("users", { email: "x" }) },
+    1,
+    2,
+  );
+  sql(
+    // @ts-expect-error column "nme" does not exist
+    "SELECT id FROM users WHERE nme = $1 ORDER BY {order}",
+    { order: sql.list([sql.fragment("id"), sql.fragment("email")]) },
+    1,
+    2,
+  );
 });
