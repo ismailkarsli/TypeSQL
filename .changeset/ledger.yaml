@@ -3,6 +3,10 @@
   intents:
     - clean-taxis-kick
     - wide-hats-do
+"@typesql/core@0.0.3":
+  dir: packages/core
+  intents:
+    - brave-roses-obey
 "@typesql/drizzle@0.0.2":
   dir: packages/drizzle
   intents:
@@ -11,6 +15,11 @@
   dir: packages/kysely
   intents:
     - wise-snails-clean
+"@typesql/kysely@0.0.3":
+  dir: packages/kysely
+  intents:
+    - dry-keys-shake
+    - rare-tables-join
 "@typesql/pg@0.0.2":
   dir: packages/pg
   intents:
