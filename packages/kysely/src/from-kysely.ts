@@ -177,8 +177,10 @@ type StringKind<H> =
   : number extends H ? "numeric"
   : "text";
 
+/** Index signatures (`Record<string, …>`) are jsonb: their `keyof` is `string`, which every key check would match. */
 type ObjectKind<S> =
-  "days" extends keyof S ? "interval"
+  string extends keyof S ? "jsonb"
+  : "days" extends keyof S ? "interval"
   : "radius" extends keyof S ? "circle"
   : "x" | "y" extends keyof S ? "point"
   : "jsonb";

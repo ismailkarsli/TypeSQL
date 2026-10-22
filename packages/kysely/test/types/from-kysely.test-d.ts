@@ -90,6 +90,8 @@ test("inference rules for single columns", () => {
   // `unknown` (prisma-kysely's Json) includes null, like `JsonValue`
   expectTypeOf<InferColumn<unknown>>().toEqualTypeOf<Nullable<"jsonb">>();
   expectTypeOf<InferColumn<{ a: number }>>().toEqualTypeOf<Col<"jsonb">>();
+  // index signatures must not match the interval/circle/point key checks
+  expectTypeOf<InferColumn<Record<string, number>>>().toEqualTypeOf<Col<"jsonb">>();
   expectTypeOf<InferColumn<number[]>>().toEqualTypeOf<Col<"int4[]">>();
   expectTypeOf<InferColumn<number[][]>>().toEqualTypeOf<Col<"int4[]">>();
   expectTypeOf<InferColumn<(string | null)[] | null>>().toEqualTypeOf<Nullable<"text[]">>();
@@ -115,6 +117,7 @@ test("inference rules for single columns", () => {
   expectTypeOf<InferColumn<GeneratedAlways<Int8>>>().toEqualTypeOf<Generated<"int8">>();
   expectTypeOf<InferColumn<KGenerated<Int8>>>().toEqualTypeOf<Generated<"int8">>();
   expectTypeOf<InferColumn<JSONColumnType<{ a: number }>>>().toEqualTypeOf<Col<"jsonb">>();
+  expectTypeOf<InferColumn<JSONColumnType<Record<string, number>>>>().toEqualTypeOf<Col<"jsonb">>();
   expectTypeOf<InferColumn<JSONColumnType<{ a: number } | null, string | null>>>().toEqualTypeOf<Nullable<"jsonb">>();
   expectTypeOf<InferColumn<ColumnType<Date, string, never>>>().toEqualTypeOf<Col<"timestamptz">>();
   // prisma-kysely style: enums as `(typeof Role)[keyof typeof Role]`, Decimal as string, Json as unknown

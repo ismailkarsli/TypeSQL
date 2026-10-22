@@ -88,6 +88,14 @@ test("camelCase option: SQL uses snake_case names", () => {
   expectTypeOf<RowType<typeof q>>().toEqualTypeOf<{ author_id: number; created_at: Date }>();
 });
 
+test("Record<string, …> json columns select as jsonb, not interval", () => {
+  interface JsonDB {
+    events: { id: number; payload: import("kysely").JSONColumnType<Record<string, number>> };
+  }
+  const q = createSql<JsonDB>()("SELECT payload FROM events");
+  expectTypeOf<RowType<typeof q>>().toEqualTypeOf<{ payload: unknown }>();
+});
+
 test("query/execute accept Kysely and Transaction and type rows from the query", () => {
   expectTypeOf<Kysely<DB>>().toExtend<KyselyExecutor>();
   expectTypeOf<Transaction<DB>>().toExtend<KyselyExecutor>();
