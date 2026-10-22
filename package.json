@@ -17,7 +17,8 @@
     "release": "gh workflow run release.yml --ref main && echo \"Release started: https://github.com/ismailkarsli/typesql/actions/workflows/release.yml\"",
     "docs:dev": "pnpm --filter @typesql/docs run dev",
     "docs:build": "pnpm --filter @typesql/docs run build",
-    "docs:preview": "pnpm --filter @typesql/docs run preview"
+    "docs:preview": "pnpm --filter @typesql/docs run preview",
+    "docs:deploy": "pnpm --filter @typesql/docs run deploy"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",

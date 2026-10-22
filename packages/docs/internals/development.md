@@ -10,6 +10,7 @@ pnpm typecheck                 # tsc per package, including the docs and package
 pnpm test                      # vitest: runtime tests, type tests, conformance against Postgres
 pnpm build && pnpm smoke:dist  # build the packages, then import the built output with plain Node
 pnpm docs:dev                  # this site, with hot reload
+pnpm docs:deploy               # build this site and deploy it to typesql.karsli.net
 pnpm change                    # record a change intent; see Releasing
 ```
 

@@ -7,6 +7,8 @@ coverage/
 packages/bench/results.json
 pnpm-publish-summary.json
 .vitepress/cache/
+.wrangler/
+.cloudflare/
 
 # packages/docs is part of the repo (overrides a global "docs" ignore rule).
 !docs/

@@ -1,0 +1,36 @@
+name: docs
+
+# Deploys the docs site (packages/docs) to typesql.karsli.net, a static-assets Cloudflare
+# Worker configured in packages/docs/cloudflare.config.ts. CLOUDFLARE_API_TOKEN is an
+# account-owned token with Workers Scripts: Edit, and Workers Routes: Edit and Zone: Read on
+# the karsli.net zone.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "packages/docs/**"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/docs.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: docs
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6 # version from packageManager in package.json
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm docs:deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
