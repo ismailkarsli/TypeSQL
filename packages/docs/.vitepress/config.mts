@@ -7,6 +7,7 @@ export default defineConfig({
   themeConfig: {
     nav: [
       { text: "Guide", link: "/guide/getting-started", activeMatch: "/guide/" },
+      { text: "Adapters", link: "/adapters/", activeMatch: "/adapters/" },
       { text: "Reference", link: "/reference/api", activeMatch: "/reference/" },
       { text: "Internals", link: "/internals/engine", activeMatch: "/internals/" },
     ],
@@ -22,9 +23,18 @@ export default defineConfig({
           { text: "Fragments", link: "/guide/fragments" },
           { text: "Writing data", link: "/guide/writing-data" },
           { text: "Migrations", link: "/guide/migrations" },
-          { text: "Adapters", link: "/guide/adapters" },
-          { text: "ORM schemas", link: "/guide/orm-schemas" },
           { text: "Errors and limits", link: "/guide/errors-and-limits" },
+        ],
+      },
+      {
+        text: "Adapters",
+        items: [
+          { text: "Overview", link: "/adapters/" },
+          { text: "node-postgres", link: "/adapters/pg" },
+          { text: "postgres.js", link: "/adapters/postgres" },
+          { text: "Kysely", link: "/adapters/kysely" },
+          { text: "Drizzle", link: "/adapters/drizzle" },
+          { text: "Prisma", link: "/adapters/prisma" },
         ],
       },
       {

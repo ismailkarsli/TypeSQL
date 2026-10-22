@@ -71,7 +71,7 @@ postgres.js parses only a few types by default; everything else is the text Post
 | `numeric`, `interval`, `point`, text-like and other types | `string` | `string` |
 
 Arrays map element-wise. Details in the
-[Adapters guide](https://github.com/ismailkarsli/typesql/blob/main/packages/docs/guide/adapters.md).
+[postgres.js adapter page](https://github.com/ismailkarsli/typesql/blob/main/packages/docs/adapters/postgres.md).
 
 Parameters accept the row type and what postgres.js serializes for the type
 (`PostgresJsParamTypeMap`): `number | bigint | string` for `int8`, `numeric` and `money`,

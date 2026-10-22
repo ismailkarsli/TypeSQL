@@ -17,7 +17,7 @@ import type { DB } from "./db/schema.js";
 const sql = createSql<DB>(new Pool());
 ```
 
-Run it again after each migration. Unlike the [ORM schemas](./orm-schemas), which read Postgres
+Run it again after each migration. Unlike the [ORM schemas](../adapters/#orm-schemas), which read Postgres
 types back from TypeScript types, the generated file has the real types: `timestamptz`, `date`
 and `timestamp` stay apart, as do `float8` and `int4`, `uuid` and `text`. Date arithmetic,
 comparisons and aggregates are then typed the way Postgres runs them.

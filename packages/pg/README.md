@@ -80,7 +80,7 @@ What `pg`'s default parsers return:
 | text-like and other types | `string` |
 
 Arrays map element-wise. The full table, including the array types `pg` leaves as raw text, is
-in the [Adapters guide](https://github.com/ismailkarsli/typesql/blob/main/packages/docs/guide/adapters.md).
+on the [node-postgres adapter page](https://github.com/ismailkarsli/typesql/blob/main/packages/docs/adapters/pg.md).
 
 Parameters accept the row type and what `pg` serializes for the type (`PgParamTypeMap`):
 `number | bigint | string` for `int8`, `numeric` and `money`, `Date | string` for dates and

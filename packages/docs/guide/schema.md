@@ -2,7 +2,7 @@
 
 The schema can be written by hand as shown here, generated from a live database
 ([Introspection](./introspect)), derived from DDL ([Migrations](./migrations)), or converted
-from a Kysely, Drizzle or Prisma schema ([ORM schemas](./orm-schemas)).
+from a Kysely, Drizzle or Prisma schema ([ORM schemas](../adapters/#orm-schemas)).
 
 ## Declaring tables
 
@@ -141,8 +141,10 @@ map is any object type from Postgres type names to TypeScript types:
 
 <<< @/snippets/type-maps.ts#custom
 
-The full mapping for each driver, including intervals, geometric types and arrays, is on the
-[Adapters](./adapters) page.
+The full mapping for each driver, including intervals, geometric types and arrays, is on its
+adapter page: [node-postgres](../adapters/pg#pgtypemap),
+[postgres.js](../adapters/postgres#postgresjstypemap-and-postgresjsbiginttypemap) and
+[Prisma](../adapters/prisma#prismatypemap).
 
 ### Parameter types
 

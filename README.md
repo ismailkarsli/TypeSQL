@@ -146,8 +146,7 @@ The documentation site lives in `packages/docs` (VitePress): run `pnpm docs:dev`
 locally. Its pages pull their code examples from type-checked files, so they read best on the
 site; the Markdown sources are the [guide](packages/docs/guide/getting-started.md),
 the [API reference](packages/docs/reference/api.md), [DDL support](packages/docs/reference/ddl.md),
-[adapters](packages/docs/guide/adapters.md), [ORM schemas](packages/docs/guide/orm-schemas.md)
-and the [type engine](packages/docs/internals/engine.md).
+[adapters](packages/docs/adapters/index.md) and the [type engine](packages/docs/internals/engine.md).
 
 ## Development
 

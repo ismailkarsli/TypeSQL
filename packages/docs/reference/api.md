@@ -23,7 +23,7 @@ take the same option after the client.
 On the `sql` of an adapter (`createSql<DB>(client)`): runs `fn(tx)` inside a transaction, where
 `tx` is the same `sql` bound to it. Commits when `fn` resolves and resolves to its result; rolls
 back and rethrows when it throws. `tx.transaction(fn)` nests with a savepoint. Rejects when the
-`sql` has no client. See [Transactions](../guide/adapters#transactions).
+`sql` has no client. See [Transactions](../adapters/#transactions).
 
 ```ts
 const sql = createSql<DB>(pool); // @typesql/pg
@@ -331,8 +331,9 @@ tuple of overloads.
 
 ## ORM packages
 
-Each package wraps core's `createSql` with the schema converted from the ORM's types; see
-[ORM schemas](../guide/orm-schemas).
+Each package wraps core's `createSql` with the schema converted from the ORM's types; see the
+[Kysely](../adapters/kysely), [Drizzle](../adapters/drizzle) and [Prisma](../adapters/prisma)
+adapter pages.
 
 | Package | `createSql` | Schema type | Runs queries |
 |---|---|---|---|

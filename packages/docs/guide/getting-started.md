@@ -24,7 +24,7 @@ parsers, and a `createSql<DB>(client)` whose queries run on your client.
 
 If you use Kysely, Drizzle or Prisma, their packages (`@typesql/kysely`, `@typesql/drizzle`,
 `@typesql/prisma`) can turn the schema you already have into the one typesql needs. See
-[ORM schemas](./orm-schemas).
+[Adapters](../adapters/).
 
 ## Describe the schema
 
@@ -36,7 +36,7 @@ into TypeScript types at the end, so the same schema works with any driver.
 `Col` is `NOT NULL`, `Nullable` allows `NULL`, and `Generated` marks a column with a default,
 which makes it optional in `INSERT`. See [Schema and type maps](./schema) for the full list,
 [Migrations](./migrations) to derive this interface from your DDL instead, and
-[ORM schemas](./orm-schemas) to take it from Kysely, Drizzle or Prisma.
+[Adapters](../adapters/#orm-schemas) to take it from Kysely, Drizzle or Prisma.
 
 ## Write a query
 
@@ -70,4 +70,4 @@ The number after the message is the index of the offending token.
 - [Parameters](./parameters): `$1`, `:name` and inline `${sql.param(value)}`.
 - [Fragments](./fragments): building statements from pieces.
 - [Writing data](./writing-data): `INSERT`, `UPDATE`, `DELETE` and `RETURNING`.
-- [ORM schemas](./orm-schemas): reuse a Kysely, Drizzle or Prisma schema.
+- [Adapters](../adapters/): run queries on your driver, or reuse a Kysely, Drizzle or Prisma schema.
