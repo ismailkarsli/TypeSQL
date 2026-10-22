@@ -817,7 +817,7 @@ export interface InformationSchemaNamespace {
     routine_body: Col<"varchar">;
     routine_definition: Nullable<"varchar">;
     external_name: Nullable<"varchar">;
-    external_language: Nullable<"varchar">;
+    external_language: Col<"varchar">;
     parameter_style: Col<"varchar">;
     is_deterministic: Col<"varchar">;
     sql_data_access: Col<"varchar">;
@@ -924,7 +924,7 @@ export interface InformationSchemaNamespace {
     event_object_catalog: Col<"name">;
     event_object_schema: Col<"name">;
     event_object_table: Col<"name">;
-    action_order: Nullable<"int4">;
+    action_order: Col<"int4">;
     action_condition: Nullable<"varchar">;
     action_statement: Nullable<"varchar">;
     action_orientation: Col<"varchar">;

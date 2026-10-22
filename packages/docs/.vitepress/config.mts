@@ -16,6 +16,7 @@ export default defineConfig({
         items: [
           { text: "Getting started", link: "/guide/getting-started" },
           { text: "Schema and type maps", link: "/guide/schema" },
+          { text: "Introspection", link: "/guide/introspect" },
           { text: "Queries", link: "/guide/queries" },
           { text: "Parameters", link: "/guide/parameters" },
           { text: "Fragments", link: "/guide/fragments" },

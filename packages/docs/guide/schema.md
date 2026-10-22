@@ -1,7 +1,8 @@
 # Schema and type maps
 
-The schema can be written by hand as shown here, derived from DDL ([Migrations](./migrations)),
-or converted from a Kysely, Drizzle or Prisma schema ([ORM schemas](./orm-schemas)).
+The schema can be written by hand as shown here, generated from a live database
+([Introspection](./introspect)), derived from DDL ([Migrations](./migrations)), or converted
+from a Kysely, Drizzle or Prisma schema ([ORM schemas](./orm-schemas)).
 
 ## Declaring tables
 

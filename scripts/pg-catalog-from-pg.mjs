@@ -12,14 +12,17 @@
 // columns, so the generator derives it from the view's query tree (pg_rewrite.ev_action): a
 // column is NOT NULL only when its expression provably cannot be NULL (a NOT NULL table column
 // that no outer join nulls, a non-null constant, a CASE whose every branch is NOT NULL, ...).
-// Columns of set-returning functions (pg_stat_get_activity(), pg_lock_status(), ...) are
-// nullable unless listed in FUNCTION_COLUMNS_NOT_NULL, which was checked against the C source.
+// The analysis lives in packages/pg/src/introspect/nullability.ts (also used by `typesql
+// introspect`). Columns of set-returning functions (pg_stat_get_activity(), pg_lock_status(),
+// ...) are nullable unless listed in FUNCTION_COLUMNS_NOT_NULL, checked against the C source.
 //
 // The output targets the Postgres major version it was generated from (17); the conformance
 // test packages/core/test/conformance/pg-catalog.test.ts regenerates it and compares.
 import { readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
+// Shared with `typesql introspect` (@typesql/pg); loaded through Node's type stripping.
+import { ViewNullability } from "../packages/pg/src/introspect/nullability.ts";
 
 /** Relations in the slice: [schema, name, one-line description]. */
 export const RELATIONS = [
@@ -104,231 +107,23 @@ export const FUNCTION_COLUMNS_NOT_NULL = new Set([
   "pg_available_extensions.name",
 ]);
 
-/** Functions that return a non-NULL value for non-NULL arguments. */
-const NON_NULL_FUNCTIONS = new Set([
-  "current_database", "current_user", "session_user", "pg_get_userbyid", "pg_my_temp_schema", "nameconcatoid",
-  "pg_has_role", "has_table_privilege", "has_column_privilege", "has_any_column_privilege", "has_function_privilege",
-  "has_schema_privilege", "has_sequence_privilege", "has_type_privilege", "pg_relation_is_updatable",
-  "pg_column_is_updatable", "pg_is_other_temp_schema", "pg_stat_get_db_numbackends",
-]);
-
-/**
- * `pg_stat_get_*` statistics accessors returning a number: counters and times report 0 when no
- * statistics exist yet. The exceptions return NULL (checksums disabled, ...).
- */
-const isNonNullStatFunction = (name, retType) =>
-  /^pg_stat_get_/.test(name) && ["int8", "int4", "float8"].includes(retType) && !NULLABLE_STAT_FUNCTIONS.has(name);
-const NULLABLE_STAT_FUNCTIONS = new Set(["pg_stat_get_db_checksum_failures", "pg_stat_get_backend_pid", "pg_stat_get_backend_dbid", "pg_stat_get_backend_userid"]);
-
-// ───────────────────────────── pg_node_tree reader ─────────────────────────────
-
-/** Tokens of the text form of a node tree (`outfuncs.c`). `[ … ]` datum bytes are skipped. */
-function tokenize(s) {
-  const out = [];
-  let i = 0;
-  while (i < s.length) {
-    const c = s[i];
-    if (c === " " || c === "\n" || c === "\t") { i++; continue; }
-    if (c === "(" || c === ")" || c === "{" || c === "}") { out.push(c); i++; continue; }
-    if (c === "[") { i = s.indexOf("]", i) + 1; continue; }
-    if (c === '"') {
-      let v = "";
-      i++;
-      while (s[i] !== '"') { if (s[i] === "\\") i++; v += s[i++]; }
-      i++;
-      out.push({ str: v });
-      continue;
-    }
-    let v = "";
-    while (i < s.length && !" \n\t(){}".includes(s[i])) { if (s[i] === "\\") i++; v += s[i++]; }
-    out.push(v);
-  }
-  return out;
-}
-
-/** Parse a node tree into plain values: `{ _: "VAR", varno: "1", … }`, arrays for lists, null for `<>`. */
-export function parseNodeTree(text) {
-  const toks = tokenize(text);
-  let p = 0;
-  const value = () => {
-    const t = toks[p++];
-    if (t === "{") {
-      const node = { _: toks[p++] };
-      while (toks[p] !== "}") {
-        const label = toks[p++];
-        if (typeof label !== "string" || !label.startsWith(":")) continue; // trailing datum length etc.
-        if (toks[p] === "}" || (typeof toks[p] === "string" && toks[p].startsWith(":"))) { node[label.slice(1)] = null; continue; }
-        node[label.slice(1)] = value();
-      }
-      p++;
-      return node;
-    }
-    if (t === "(") {
-      const list = [];
-      while (toks[p] !== ")") list.push(value());
-      p++;
-      return list;
-    }
-    if (t === "<>") return null;
-    return typeof t === "object" ? t.str : t;
-  };
-  return value();
-}
-
-const asList = (x) => (Array.isArray(x) ? x : []);
-/** A Var's `varnullingrels`: `(b)` is empty, `(b 3)` names an outer join that can null it. */
-const isNulledByOuterJoin = (bitmap) => Array.isArray(bitmap) && bitmap.length > 1;
-
-// ───────────────────────────── analysis ─────────────────────────────
-
-class Catalog {
-  constructor(client) {
-    this.client = client;
-    this.viewCache = new Map();
-    this.attCache = new Map();
-    this.procs = new Map();
-  }
-
-  async load() {
-    const { rows } = await this.client.query(
-      `SELECT p.oid::int8::text AS oid, p.proname AS name, t.typname AS ret
-         FROM pg_proc p JOIN pg_type t ON t.oid = p.prorettype`,
-    );
-    for (const r of rows) this.procs.set(r.oid, r);
-  }
-
-  /** Columns of a relation: name, canonical type, attnotnull, relkind. */
-  async columns(relid) {
-    const key = String(relid);
-    if (this.attCache.has(key)) return this.attCache.get(key);
-    const { rows } = await this.client.query(
-      `SELECT a.attnum, a.attname AS name, a.attnotnull AS notnull, c.relkind,
-              CASE WHEN t.typtype = 'd' THEN bt.typname ELSE t.typname END AS typname,
-              CASE WHEN t.typtype = 'd' THEN bte.typname ELSE te.typname END AS elem
-         FROM pg_attribute a
-         JOIN pg_class c ON c.oid = a.attrelid
-         JOIN pg_type t ON t.oid = a.atttypid
-         LEFT JOIN pg_type bt ON bt.oid = t.typbasetype
-         -- true arrays only: int2vector and oidvector have a typelem too, but are not its typarray
-         LEFT JOIN pg_type te ON te.oid = t.typelem AND te.typarray = t.oid
-         LEFT JOIN pg_type bte ON bte.oid = bt.typelem AND bte.typarray = bt.oid
-        WHERE a.attrelid = $1 AND a.attnum > 0 AND NOT a.attisdropped
-        ORDER BY a.attnum`,
-      [relid],
-    );
-    const cols = rows.map((r) => ({
-      attnum: r.attnum,
-      name: r.name,
-      type: r.elem ? `${r.elem}[]` : r.typname,
-      notnull: r.notnull,
-      relkind: r.relkind,
-    }));
-    this.attCache.set(key, cols);
-    return cols;
-  }
-
-  /** Per-column NOT NULL of a view, from its `_RETURN` rule's query tree. */
-  async viewNotNull(relid) {
-    const key = String(relid);
-    if (this.viewCache.has(key)) return this.viewCache.get(key);
-    const { rows } = await this.client.query(
-      `SELECT r.ev_action, c.relname FROM pg_rewrite r JOIN pg_class c ON c.oid = r.ev_class
-        WHERE r.ev_class = $1 AND r.rulename = '_RETURN'`,
-      [relid],
-    );
-    const relname = rows[0].relname;
-    const query = asList(parseNodeTree(rows[0].ev_action))[0];
-    const result = [];
-    for (const te of asList(query.targetList)) {
-      if (te.resjunk === "true") continue;
-      const notnull = (await this.exprNotNull(te.expr, query)) || FUNCTION_COLUMNS_NOT_NULL.has(`${relname}.${te.resname}`);
-      result.push(notnull);
-    }
-    this.viewCache.set(key, result);
-    return result;
-  }
-
-  /** Is output column `attno` (1-based) of `query` provably NOT NULL? */
-  async queryColNotNull(query, attno) {
-    if (query.setOperations) {
-      for (const rte of asList(query.rtable)) {
-        if (rte.rtekind === "1" && !(await this.queryColNotNull(rte.subquery, attno))) return false;
-      }
-      return true;
-    }
-    const te = asList(query.targetList).filter((t) => t.resjunk !== "true")[attno - 1];
-    return te ? this.exprNotNull(te.expr, query) : false;
-  }
-
-  async varNotNull(v, query) {
-    if (v.varlevelsup !== "0" || isNulledByOuterJoin(v.varnullingrels)) return false;
-    const rte = asList(query.rtable)[Number(v.varno) - 1];
-    const attno = Number(v.varattno);
-    if (!rte || attno <= 0) return false;
-    switch (rte.rtekind) {
-      case "0": { // relation
-        const cols = await this.columns(rte.relid);
-        const col = cols.find((c) => c.attnum === attno);
-        if (!col) return false;
-        if (col.relkind === "v" || col.relkind === "m") {
-          if (col.relkind === "m") return col.notnull;
-          return (await this.viewNotNull(rte.relid))[attno - 1] ?? false;
-        }
-        return col.notnull;
-      }
-      case "1": // subquery
-        return this.queryColNotNull(rte.subquery, attno);
-      case "2": { // join alias
-        const alias = asList(rte.joinaliasvars)[attno - 1];
-        return alias ? this.exprNotNull(alias, query) : false;
-      }
-      default:
-        return false;
-    }
-  }
-
-  async allNotNull(args, query) {
-    for (const a of asList(args)) if (!(await this.exprNotNull(a, query))) return false;
-    return true;
-  }
-
-  async exprNotNull(e, query) {
-    if (e === null || typeof e !== "object") return false;
-    switch (e._) {
-      case "VAR": return this.varNotNull(e, query);
-      case "CONST": return e.constisnull === "false";
-      case "RELABELTYPE": case "COERCEVIAIO": case "COERCETODOMAIN": case "ARRAYCOERCEEXPR": case "COLLATEEXPR":
-        return this.exprNotNull(e.arg, query);
-      case "FUNCEXPR": {
-        const proc = this.procs.get(e.funcid);
-        // format_type(type, typmod) is not strict: a NULL typmod still gives a name.
-        if (proc?.name === "format_type") return this.exprNotNull(asList(e.args)[0], query);
-        // Explicit/implicit casts (funcformat 1, 2) keep a non-NULL input non-NULL.
-        const nonNull = e.funcformat === "1" || e.funcformat === "2"
-          || (proc && (NON_NULL_FUNCTIONS.has(proc.name) || isNonNullStatFunction(proc.name, proc.ret)));
-        return Boolean(nonNull) && e.funcretset === "false" && this.allNotNull(e.args, query);
-      }
-      case "OPEXPR": case "SCALARARRAYOPEXPR": case "BOOLEXPR":
-        return this.allNotNull(e.args, query);
-      case "DISTINCTEXPR": case "NULLTEST": case "BOOLEANTEST": case "ARRAYEXPR": case "ROW":
-        return true;
-      case "COALESCEEXPR": case "MINMAXEXPR": {
-        for (const a of asList(e.args)) if (await this.exprNotNull(a, query)) return true;
-        return false;
-      }
-      case "CASEEXPR": {
-        for (const w of asList(e.args)) if (!(await this.exprNotNull(w.result, query))) return false;
-        return this.exprNotNull(e.defresult, query);
-      }
-      case "SUBLINK": return e.subLinkType === "0" || e.subLinkType === "6"; // EXISTS, ARRAY
-      case "AGGREF": {
-        const proc = this.procs.get(e.aggfnoid);
-        return proc?.name === "count";
-      }
-      default:
-        return false;
-    }
-  }
+/** Column types of a relation (domains replaced by their base type), in column order. */
+async function columnsOf(client, relid) {
+  const { rows } = await client.query(
+    `SELECT a.attname AS name, a.attnotnull AS notnull,
+            CASE WHEN t.typtype = 'd' THEN bt.typname ELSE t.typname END AS typname,
+            CASE WHEN t.typtype = 'd' THEN bte.typname ELSE te.typname END AS elem
+       FROM pg_attribute a
+       JOIN pg_type t ON t.oid = a.atttypid
+       LEFT JOIN pg_type bt ON bt.oid = t.typbasetype
+       -- true arrays only: int2vector and oidvector have a typelem too, but are not its typarray
+       LEFT JOIN pg_type te ON te.oid = t.typelem AND te.typarray = t.oid
+       LEFT JOIN pg_type bte ON bte.oid = bt.typelem AND bte.typarray = bt.oid
+      WHERE a.attrelid = $1 AND a.attnum > 0 AND NOT a.attisdropped
+      ORDER BY a.attnum`,
+    [relid],
+  );
+  return rows.map((r) => ({ name: r.name, type: r.elem ? `${r.elem}[]` : r.typname, notnull: r.notnull }));
 }
 
 // ───────────────────────────── emit ─────────────────────────────
@@ -338,8 +133,9 @@ const key = (name) => (IDENT.test(name) ? name : JSON.stringify(name));
 
 /** Source of packages/core/src/schema/pg-catalog.ts for the connected server. */
 export async function generatePgCatalog(client) {
-  const catalog = new Catalog(client);
-  await catalog.load();
+  const views = new ViewNullability((text, values) => client.query(text, values), {
+    notNull: (view, column) => FUNCTION_COLUMNS_NOT_NULL.has(`${view}.${column}`),
+  });
   const { rows: [{ version }] } = await client.query(`SELECT current_setting('server_version') AS version`);
   const major = version.split(/[.\s]/)[0];
   const namespaces = new Map();
@@ -351,8 +147,8 @@ export async function generatePgCatalog(client) {
     );
     if (rows.length === 0) throw new Error(`relation ${schema}.${name} does not exist on Postgres ${version}`);
     const { oid, relkind } = rows[0];
-    const cols = await catalog.columns(oid);
-    const notnull = relkind === "v" ? await catalog.viewNotNull(oid) : cols.map((c) => c.notnull);
+    const cols = await columnsOf(client, oid);
+    const notnull = relkind === "v" ? await views.notNull(oid) : cols.map((c) => c.notnull);
     const body = cols.map((c, i) => `    ${key(c.name)}: ${notnull[i] ? "Col" : "Nullable"}<${JSON.stringify(c.type)}>;`);
     const kind = relkind === "v" ? "View" : "Table";
     const lines = [`  /** ${kind} \`${schema}.${name}\`: ${description} */`, `  ${key(name)}: View<{`, ...body, "  }>;"];

@@ -56,7 +56,7 @@ const user = await db("SELECT id, email FROM users WHERE id = $1", 7).executeTak
 | Package | Role | Peer dependency | Contents |
 |---|---|---|---|
 | [`@typesql/core`](packages/core) | type engine | none | `createSql`, `q.execute()`/`executeTakeFirst()`/`executeTakeFirstOrThrow()`, fragments, `ApplyDdl`, `migrations()`. Zero dependencies. |
-| [`@typesql/pg`](packages/pg) | driver | `pg` ≥ 8 | node-postgres: `PgTypeMap`, `createSql(pool?)`, `executor`, `query`/`one`/`maybeOne`/`many`/`execute`/`transaction` |
+| [`@typesql/pg`](packages/pg) | driver | `pg` ≥ 8 | node-postgres: `PgTypeMap`, `createSql(pool?)`, `executor`, `query`/`one`/`maybeOne`/`many`/`execute`/`transaction`; the `typesql introspect` CLI |
 | [`@typesql/postgres`](packages/postgres) | driver | `postgres` ≥ 3 | postgres.js: the same API, with `PostgresJsTypeMap` and `PostgresJsBigIntTypeMap` |
 | [`@typesql/kysely`](packages/kysely) | ORM schema | `kysely` ≥ 0.27 | `FromKysely`: a Kysely `DB` interface (kysely-codegen, prisma-kysely) as the schema; `query`/`execute` through Kysely |
 | [`@typesql/drizzle`](packages/drizzle) | ORM schema | `drizzle-orm` ≥ 0.45 | `FromDrizzle`: Drizzle `pgTable`/`pgView`/`pgEnum`/`pgSchema` definitions as the schema; `pgType` |
@@ -102,6 +102,12 @@ interface DB {
 
 System catalogs (`pg_stat_activity`, `pg_tables`, `information_schema.columns`, …) are an
 opt-in slice: `createSql<DB & PgCatalog>()`.
+
+Generate it from a live database with `typesql introspect` (from `@typesql/pg`):
+
+```sh
+pnpm exec typesql introspect --url postgres://localhost/app --out src/db/schema.ts
+```
 
 Or derive the schema from migrations:
 

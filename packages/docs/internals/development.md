@@ -99,6 +99,11 @@ are in `FUNCTION_COLUMNS_NOT_NULL`.
 TYPESQL_PG_URL=postgres://postgres:x@localhost:5432/postgres node scripts/pg-catalog-from-pg.mjs [--check]
 ```
 
+The view analysis lives in `packages/pg/src/introspect/nullability.ts`, shared with
+`typesql introspect`; its end-to-end test (`packages/pg/test/introspect/`) compares the output
+for a fixture database with `schema.generated.ts` (`TYPESQL_UPDATE_FIXTURES=1` rewrites it) and
+type-checks queries against that file.
+
 `packages/core/test/conformance/pg-catalog.test.ts` regenerates the file and compares it when the
 server's major version matches the file's. On any version it selects every relation through
 both drivers and checks the column order, that `NOT NULL` columns hold no NULLs, and the

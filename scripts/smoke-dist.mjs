@@ -34,4 +34,20 @@ for (const adapter of [pg, pgjs]) {
   assert.deepEqual(adapter.createSql()("SELECT 1"), { text: "SELECT 1", values: [] });
 }
 
+const introspect = await import("../packages/pg/dist/introspect/index.js");
+for (const name of ["introspect", "generateSource", "main", "parseNodeTree", "ViewNullability"]) {
+  assert.equal(typeof introspect[name], "function", `@typesql/pg/introspect export ${name}`);
+}
+const generated = introspect.generateSource({
+  version: "17.0",
+  schemas: ["public"],
+  relations: [{ schema: "public", name: "t", kind: "table", comment: null, columns: [{ name: "id", type: "int4", declaredType: "integer", domain: null, nullable: false, hasDefault: true, identity: null, generated: null, default: null, comment: null }] }],
+  enums: [],
+});
+assert.match(generated, /id: Generated<"int4">;/);
+
+const { execFileSync } = await import("node:child_process");
+const help = execFileSync(process.execPath, [new URL("../packages/pg/dist/bin.js", import.meta.url).pathname, "--help"], { encoding: "utf8" });
+assert.match(help, /^Usage: typesql introspect/);
+
 console.log("dist smoke test: ok");

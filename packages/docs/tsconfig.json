@@ -16,6 +16,7 @@
     "paths": {
       "@typesql/core": ["../core/src/index.ts"],
       "@typesql/pg": ["../pg/src/index.ts"],
+      "@typesql/pg/introspect": ["../pg/src/introspect/index.ts"],
       "@typesql/postgres": ["../postgres/src/index.ts"],
       "@typesql/kysely": ["../kysely/src/index.ts"],
       "@typesql/drizzle": ["../drizzle/src/index.ts"],

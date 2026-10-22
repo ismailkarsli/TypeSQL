@@ -57,6 +57,9 @@ interface's table and column keys:
 
 <<< @/snippets/orm-kysely.ts#overrides
 
+To get the exact types without listing overrides, generate the schema from the database
+instead ([Introspection](./introspect)) and keep Kysely for the queries it builds.
+
 An override is a type name (`"float8"`) or a partial descriptor
 (`{ type?, nullable?, hasDefault? }`). `{ $view: true }` marks a table as a view, so writes
 to it are rejected. Without `$types`, each enum column gets its own name (`users.mood`). Two

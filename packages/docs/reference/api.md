@@ -283,7 +283,26 @@ Option and override types: `KyselyOverrides`, `KyselyOptions` (`camelCase`),
 per-field `{ column, type, nullable, default }`). The generator's pieces are exported from
 `@typesql/prisma/generator` (`generateSource`, `serveGenerator`).
 
-## Limits
+## Introspection
+
+`typesql introspect` (bin of `@typesql/pg`) writes the schema of a live database; see
+[Introspection](../guide/introspect).
+
+```sh
+typesql introspect [--url <url>] [--out <file>] [--schema <name>]… [--exclude <pattern>]… [--type-name DB]
+                   [--import-from @typesql/core] [--config <file>] [--no-comments]
+```
+
+`@typesql/pg/introspect` exports:
+
+| Export | |
+|---|---|
+| `introspect(client, { schemas?, exclude?, viewNotNull? })` | `Promise<IntrospectedDatabase>`: `{ version, schemas, relations, enums }` |
+| `generateSource(db, options?)` | the schema file's source; options `typeName`, `importFrom`, `imports`, `columnTypes` (map or function), `columnTypesName`, `column`, `comments` |
+| `main(argv)` | the CLI, returns the exit code |
+| `IntrospectConfig` | the default export of a `--config` module: `url`, `out` and every option above |
+| `ViewNullability`, `parseNodeTree` | the view column nullability analysis |
+
 
 - Statement size: up to 4096 tokens (the generated `Next` table; regenerate with
   `node scripts/gen-next.mjs <n>` for more). 8 KB statements check in about a second.

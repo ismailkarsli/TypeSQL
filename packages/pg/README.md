@@ -50,6 +50,22 @@ const id = await transaction(pool, async (client) => {
 `client` is anything with `query(text, values)`: a `Pool`, `Client` or `PoolClient`. The
 parameters are structural, so fakes work in tests.
 
+## `typesql introspect`
+
+Generates the schema from a live database: tables, views, materialized views and enums, with
+the exact Postgres type of every column (domains as their base type), nullability, defaults,
+identity and generated columns, other schemas nested, and TypeScript types for JSON columns
+from a config file.
+
+```sh
+pnpm exec typesql introspect --url postgres://localhost/app --out src/db/schema.ts
+pnpm exec typesql introspect --schema public,auth --config typesql.config.ts
+```
+
+The same is available from code as `introspect(client)` and `generateSource(db)` in
+`@typesql/pg/introspect`. See the
+[Introspection guide](https://github.com/ismailkarsli/typesql/blob/main/packages/docs/guide/introspect.md).
+
 ## `PgTypeMap`
 
 What `pg`'s default parsers return:
