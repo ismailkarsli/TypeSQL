@@ -10,11 +10,12 @@ pnpm typecheck                 # tsc per package, including the docs and package
 pnpm test                      # vitest: runtime tests, type tests, conformance against Postgres
 pnpm build && pnpm smoke:dist  # build the packages, then import the built output with plain Node
 pnpm docs:dev                  # this site, with hot reload
+pnpm change                    # record a change intent; see Releasing
 ```
 
 Type tests live in `packages/*/test/**/*.test-d.ts` and use `expectTypeOf` and
 `// @ts-expect-error`. The engine's design rules and the TypeScript limits they work around
-are in [Type engine](./engine).
+are in [Type engine](./engine). Versioning and publishing are in [Releasing](./releasing).
 
 ## Conformance tests
 

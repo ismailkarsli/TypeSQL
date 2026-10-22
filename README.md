@@ -144,4 +144,10 @@ pnpm build && pnpm smoke:dist   # import the built packages with plain Node
 pnpm docs:dev                   # the documentation site (packages/docs)
 node packages/bench/gen.mjs && node packages/bench/run.mjs   # compile-time budget (thresholds.json)
 TYPESQL_PG_URL=… node scripts/catalog-from-pg.mjs              # review the function catalog against pg_proc
+pnpm change                     # record a change intent with any change to a published package
+pnpm check:intents              # fail if a published package changed without one (CI runs it too)
 ```
+
+Versions and changelogs use pnpm's built-in release management (`pnpm change`,
+`pnpm version -r`, `pnpm publish -r`); [Releasing](packages/docs/internals/releasing.md) has the
+workflow.

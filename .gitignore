@@ -5,6 +5,7 @@ scratchpad/
 .vitest/
 coverage/
 packages/bench/results.json
+pnpm-publish-summary.json
 .vitepress/cache/
 
 # packages/docs is part of the repo (overrides a global "docs" ignore rule).

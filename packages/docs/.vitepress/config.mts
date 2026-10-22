@@ -38,6 +38,7 @@ export default defineConfig({
         items: [
           { text: "Type engine", link: "/internals/engine" },
           { text: "Development", link: "/internals/development" },
+          { text: "Releasing", link: "/internals/releasing" },
         ],
       },
     ],
