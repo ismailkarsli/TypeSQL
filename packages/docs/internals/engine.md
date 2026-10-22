@@ -113,7 +113,9 @@ RowOf / ParamsOf / Validate                 public projections of Analyze
 - New expression syntax: add an AST node in `ast.ts`, parse it in `parser/expr.ts`
   (prefix or infix), type it in `typer/typeof.ts`, name it in `project/naming.ts`,
   and handle params in `typer/params.ts`. Add tests in `test/types/<feature>.test-d.ts`.
-- New function: add a `Sig` to `FunctionCatalog` in `typer/catalog.ts`.
+- New function: add a `Sig` to `FunctionCatalog` in `typer/catalog.ts`, then regenerate
+  `typer/pg-functions.ts` (the uncurated pg_catalog rest) with
+  `TYPESQL_PG_URL=… node scripts/gen-pg-functions.mjs`.
 - New statement: add to `ast.ts`, parse in `parser/<kind>.ts`, dispatch in
   `parser/stmt.ts`, project in `project/stmt.ts`.
 

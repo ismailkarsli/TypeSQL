@@ -1,12 +1,14 @@
 import type { Toks } from "./lexer/tokens.js";
 import type { Nx } from "./parser/util.js";
+import type { FunctionCatalog } from "./typer/catalog.js";
 
 /**
- * "Did you mean" hints for unknown columns and relations. Runs only on the error path.
+ * "Did you mean" hints for unknown columns, relations and functions. Runs only on the error path.
  *
  * Candidates come from the relations the statement mentions (word tokens that are keys
- * of `DB`, including nested namespaces and views) for column errors, or from all
- * relations for relation errors. The closest candidate within edit distance 2 (and less
+ * of `DB`, including nested namespaces and views) for column errors, from all
+ * relations for relation errors, and from `FunctionCatalog` and `DB["$functions"]` for
+ * function errors. The closest candidate within edit distance 2 (and less
  * than the name's length) is suggested, mirroring Postgres's
  * `HINT: Perhaps you meant to reference the column "users.name".`
  */
@@ -15,7 +17,18 @@ export type WithHint<M extends string, T extends Toks, DB> =
   : M extends `column "${infer Name}" does not exist` ? Hinted<M, Best<Name, ColumnsOf<DB, MentionedRels<T, DB, 0, never>>>, "column">
   : M extends `column ${string}.${infer Name} does not exist` ? Hinted<M, Best<Name, ColumnsOf<DB, MentionedRels<T, DB, 0, never>>>, "column">
   : M extends `relation "${infer Name}" does not exist` ? Hinted<M, Best<Name, RelNames<DB>>, "relation">
+  : M extends `function ${infer Name}(${infer Args}) does not exist. Declare it ${infer Rest}`
+    ? Best<Name, SameStart<Name, FnNames<DB>>> extends infer S extends string
+      ? `function ${Name}(${Args}) does not exist. Perhaps you meant the function "${S}"? Otherwise declare it ${Rest}`
+      : M
   : M;
+
+type FnNames<DB> = (keyof FunctionCatalog & string) | (DB extends { readonly $functions: infer F } ? keyof F & string : never);
+/**
+ * Candidates sharing the name's first character. The catalog has ~450 names, and ranking all of
+ * them cost ~1M instantiations per error; a typo in the first character gets no hint.
+ */
+type SameStart<Name extends string, Cands> = Name extends `${infer C}${string}` ? Extract<Cands, `${C}${string}`> : never;
 
 type Hinted<M extends string, S, What extends string> = S extends string ? `${M}. Perhaps you meant the ${What} "${S}"?` : M;
 
@@ -31,7 +44,7 @@ type RelAt<T extends Toks, I extends number, DB> =
 
 /** Relation names: top-level tables/views and tables inside namespaces. */
 type RelNames<DB> = {
-  [K in keyof DB & string]: K extends "$types" ? never : IsRelation<DB[K]> extends true ? K : NsRelNames<DB[K]>;
+  [K in keyof DB & string]: K extends "$types" | "$functions" ? never : IsRelation<DB[K]> extends true ? K : NsRelNames<DB[K]>;
 }[keyof DB & string];
 type NsRelNames<NS> = { [K in keyof NS & string]: IsRelation<NS[K]> extends true ? K : never }[keyof NS & string];
 

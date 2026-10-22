@@ -287,7 +287,7 @@ type TypeCall<E extends Call, C extends Ctx> =
                   readonly distinct: E["distinct"];
                   readonly hasStar: E["args"] extends readonly [{ readonly t: "star"; readonly tbl: null }] ? true : false;
                   readonly wg: W extends ColInfo ? W["type"] : "unknown";
-                }>
+                }, C["db"]>
               : W
             : never
           : F

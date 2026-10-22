@@ -66,13 +66,14 @@ type Reposition<E, T extends Toks, DB = never> =
     : E;
 
 /**
- * Token index for a semantic error: the first quoted name in the message that occurs in the
- * statement (`null value in column "email" of relation "users"` → `users` when `email` is
- * absent), then `column t.c` forms, then the keyword of `each UNION query …` and
+ * Token index for a semantic error: the function of `function f(…) does not exist`, the
+ * first quoted name in the message that occurs in the statement (`null value in column
+ * "email" of relation "users"` → `users` when `email` is absent), then `column t.c` forms, then the keyword of `each UNION query …` and
  * `UNION|CASE|VALUES|COALESCE types … cannot be matched`.
  */
 type LocateIdent<M extends string, T extends Toks> =
-  M extends `column ${string}.${infer Name} ${string}` ? FindTokOr<T, Name, LocateQuoted<M, T>>
+  M extends `function ${infer Name}(${string}` ? FindTokOr<T, Name, 0>
+  : M extends `column ${string}.${infer Name} ${string}` ? FindTokOr<T, Name, LocateQuoted<M, T>>
   : M extends "DEFAULT is not allowed in this context" ? FindTokOr<T, "default", 0>
   : M extends `each ${infer Op} query ${string}` ? FindTokOr<T, Lowercase<Op>, 0>
   : M extends `${infer Op} types ${string} cannot be matched` ? (Op extends `${string} ${string}` ? LocateQuoted<M, T> : FindTokOr<T, Lowercase<Op>, 0>)

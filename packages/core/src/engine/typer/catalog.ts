@@ -1,4 +1,6 @@
+import type { SqlError } from "../errors.js";
 import type { ColInfo, Info } from "../types.js";
+import type { PgFunctions } from "./pg-functions.js";
 import type { CommonLit, DateTimeT, IntT, IsArr, JsonT, LitToText, NumT, RangeT, StrT } from "./operators.js";
 import type { JsonRet } from "../json.js";
 
@@ -13,6 +15,13 @@ import type { JsonRet } from "../json.js";
  *
  * (Augmenting the re-exporting module works because `FunctionCatalog` is an exported
  * interface alias; augmenting `@typesql/core/.../typer/catalog` directly works too.)
+ *
+ * A schema can also declare its own functions next to its tables, under `$functions`:
+ *
+ *   interface DB { users: { … }; $functions: { my_func: Sig<["text", "int4"], "bool"> } }
+ *
+ * Lookup order: `FunctionCatalog`, then `DB["$functions"]`, then `PgFunctions` (every other
+ * pg_catalog function, return type only). Any other name is an error, as in Postgres.
  *
  * An entry is one `Sig` or a tuple of `Sig`s (overloads). Overload resolution mimics
  * Postgres: the candidate whose parameters match the most argument types exactly wins;
@@ -394,6 +403,20 @@ export interface FunctionCatalog {
   crypt: Sig<["anystring", "anystring"], "text">;
   gen_salt: [Sig<["anystring"], "text">, Sig<["anystring", "int4"], "text">];
 
+  // ───────────── text matching extensions (unaccent, pg_trgm, fuzzystrmatch) ─────────────
+  unaccent: [Sig<["anystring"], "text">, Sig<["any", "anystring"], "text">];
+  similarity: Sig<["anystring", "anystring"], "float4">;
+  word_similarity: Sig<["anystring", "anystring"], "float4">;
+  strict_word_similarity: Sig<["anystring", "anystring"], "float4">;
+  show_trgm: Sig<["anystring"], "text[]">;
+  levenshtein: [Sig<["anystring", "anystring"], "int4">, Sig<["anystring", "anystring", "int4", "int4", "int4"], "int4">];
+  levenshtein_less_equal: [Sig<["anystring", "anystring", "int4"], "int4">, Sig<["anystring", "anystring", "int4", "int4", "int4", "int4"], "int4">];
+  soundex: Sig<["anystring"], "text">;
+  difference: Sig<["anystring", "anystring"], "int4">;
+  metaphone: Sig<["anystring", "int4"], "text">;
+  dmetaphone: Sig<["anystring"], "text">;
+  dmetaphone_alt: Sig<["anystring"], "text">;
+
   // ───────────── arrays ─────────────
   unnest: [Sig<["anyarray"], "$elem1", Srf>, Sig<["anyrange"], "$elem1", Srf>];
   /** `array_length('{}', 1)` is NULL, as are the bounds/dims of an empty array. */
@@ -542,6 +565,23 @@ export interface FunctionCatalog {
   tstzmultirange: Sig<["..."], "tstzmultirange", NN>;
   datemultirange: Sig<["..."], "datemultirange", NN>;
   multirange: Sig<["anyrange"], "$multirange1">;
+
+  // ───────────── enums ─────────────
+  enum_first: Sig<["any"], "$1", NN>;
+  enum_last: Sig<["any"], "$1", NN>;
+  enum_range: [Sig<["any"], "$arr1", NN>, Sig<["any", "any"], "$arr1", NN>];
+
+  // ───────────── function-style casts: `date(ts)`, `int8(x)`, `timestamp(d, t)` ─────────────
+  bool: Sig<["..."], "bool">; int2: Sig<["..."], "int2">; int4: Sig<["..."], "int4">; int8: Sig<["..."], "int8">;
+  float4: Sig<["..."], "float4">; float8: Sig<["..."], "float8">; numeric: Sig<["..."], "numeric">; money: Sig<["..."], "money">;
+  date: Sig<["..."], "date">; time: Sig<["..."], "time">; timetz: Sig<["..."], "timetz">; interval: Sig<["..."], "interval">;
+  timestamp: Sig<["..."], "timestamp">; timestamptz: Sig<["..."], "timestamptz">;
+  bpchar: Sig<["..."], "bpchar">; char: Sig<["..."], "char">; varchar: Sig<["..."], "varchar">; name: Sig<["..."], "name">;
+  bit: Sig<["..."], "bit">; varbit: Sig<["..."], "varbit">; oid: Sig<["..."], "oid">; xid: Sig<["..."], "xid">;
+  regclass: Sig<["..."], "regclass">; xml: Sig<["..."], "xml">;
+  cidr: Sig<["..."], "cidr">; macaddr: Sig<["..."], "macaddr">; macaddr8: Sig<["..."], "macaddr8">;
+  point: Sig<["..."], "point">; lseg: Sig<["..."], "lseg">; box: Sig<["..."], "box">; path: Sig<["..."], "path">;
+  polygon: Sig<["..."], "polygon">; circle: Sig<["..."], "circle">;
 }
 
 // ───────────────────────────── overload resolution ─────────────────────────────
@@ -704,15 +744,42 @@ type CallNullable<S extends AnySig, As extends readonly ColInfo[], C extends Cal
   : S["strict"] extends readonly number[] ? AnyNullableAt<As, S["strict"]>
   : AnyNullable<As>;
 
+/** Functions a schema declares under `$functions` (`{}` when none). */
+type SchemaFunctions<DB> = DB extends { readonly $functions: infer F } ? F : {};
+
 /**
- * Type a function call. Unknown functions → `{ unknown, nullable }` (a cast fixes it).
+ * Catalog entry of a function name, or null when Postgres would not know it:
+ * `FunctionCatalog` (built-ins and augmentations), then the schema's `$functions`, then the
+ * generated `PgFunctions`. Schema qualification is dropped by the parser (`public.f` → `f`).
  */
-export type CallType<Name extends string, As extends readonly ColInfo[], C extends CallCtx> =
-  Name extends keyof FunctionCatalog
-    ? PickSig<FunctionCatalog[Name], As> extends infer S
+export type LookupFn<DB, Name extends string> =
+  Name extends keyof FunctionCatalog ? FunctionCatalog[Name]
+  : Name extends keyof SchemaFunctions<DB> ? SchemaFunctions<DB>[Name]
+  : Name extends keyof PgFunctions ? PgFunctions[Name]
+  : null;
+
+/**
+ * `function f(text, int4) does not exist`, worded like Postgres (untyped literals show as
+ * `unknown`). `Reposition` adds a "Perhaps you meant" hint (suggest.ts).
+ */
+export type UnknownFunction<Name extends string, As extends readonly ColInfo[]> =
+  SqlError<`function ${Name}(${ArgList<As, "">}) does not exist. Declare it in the schema's $functions or in FunctionCatalog`, null>;
+type ArgList<As extends readonly ColInfo[], Acc extends string> =
+  As extends readonly [infer A extends ColInfo, ...infer R extends readonly ColInfo[]]
+    ? ArgList<R, `${Acc}${Acc extends "" ? "" : ", "}${A["type"] extends "lit" | "null" ? "unknown" : A["type"]}`>
+    : Acc;
+
+/**
+ * Type a function call. A name that resolves but whose overloads do not fit the arguments →
+ * `{ unknown, nullable }` (a cast fixes it); an unknown name is an error.
+ */
+export type CallType<Name extends string, As extends readonly ColInfo[], C extends CallCtx, DB = {}> =
+  LookupFn<DB, Name> extends infer O
+    ? O extends null ? UnknownFunction<Name, As>
+    : PickSig<O, As> extends infer S
       ? S extends AnySig ? Info<Ret<S["ret"], As, C>, CallNullable<S, As, C>> : Info<"unknown", true>
       : never
-    : Info<"unknown", true>;
+    : never;
 
 /** Is `name` a catalog function with an aggregate overload? */
 export type IsAggregate<Name extends string> =
@@ -721,9 +788,10 @@ type HasAgg<Sigs extends readonly AnySig[]> =
   Sigs extends readonly [infer S extends AnySig, ...infer R extends readonly AnySig[]] ? (S["agg"] extends true ? true : HasAgg<R>) : false;
 
 /** Set-returning function result element type for FROM, or null if not an SRF. */
-export type SrfType<Name extends string, As extends readonly ColInfo[]> =
-  Name extends keyof FunctionCatalog
-    ? PickSig<FunctionCatalog[Name], As> extends infer S
+export type SrfType<Name extends string, As extends readonly ColInfo[], DB = {}> =
+  LookupFn<DB, Name> extends infer O
+    ? O extends null ? null
+    : PickSig<O, As> extends infer S
       ? S extends AnySig & { readonly srf: true } ? Info<Ret<S["ret"], As, DefaultCtx>, S["nullable"] extends true ? true : AnyNullable<As>> : null
       : never
-    : null;
+    : never;

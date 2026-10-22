@@ -7,7 +7,7 @@ export type { InlineMarker, DefaultMarker, JsonMarker, JsonValue, ValueEnc, Enc,
 export { splice, renumberParams, maxParam, quoteIdent, joinFragments, hasSlots, rewriteNamed, type Spliceable, type SlotValues } from "./runtime/splice.js";
 export type { Splice, SlotNames, HasSlots, MaxParamStr, QuotedIdent, JoinedText, Take, UnknownTuple } from "./engine/splice.js";
 export type {
-  Col, Nullable, Generated, NullableGenerated, Arr, Enum, Json, ColDesc, Table, View, Namespace, Schema, TypeRegistry,
+  Col, Nullable, Generated, NullableGenerated, Arr, Enum, Json, ColDesc, Table, View, Namespace, Schema, TypeRegistry, FunctionRegistry,
   PgTypeName, PgScalarName, NormalizeTypeName, PgCatalog, PgCatalogNamespace, InformationSchemaNamespace,
 } from "./schema/index.js";
 export type { DefaultTypeMap, DefaultParamTypeMap, ParamTypeMapOf, TypeMap, TsTypeOf, TsOf, TsParamTypeOf, EnumsOf } from "./type-map/index.js";

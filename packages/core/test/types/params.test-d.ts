@@ -99,8 +99,8 @@ test("function arguments take the parameter type of the resolved signature", () 
   // polymorphic parameters take the sibling's type; an array sibling contributes its element type
   expectTypeOf<Params<"SELECT coalesce(n_big, $1), greatest(id, $2), nullif(label, $3), array_append(nums, $4), array_cat(nums, $5) FROM things">>().toEqualTypeOf<[BigIn | null, number | null, string | null, number | null, (number | null)[] | null]>();
   expectTypeOf<Params<"SELECT lag(id, $1) OVER (), string_agg(label, $2), array_agg($3), count(*) FILTER (WHERE $4) FROM things">>().toEqualTypeOf<[number | null, string | null, unknown, boolean | null]>();
-  // unknown function: no information
-  expectTypeOf<Params<"SELECT my_unknown_fn($1) FROM things">>().toEqualTypeOf<[unknown]>();
+  // a pg_catalog function without a curated signature: no information
+  expectTypeOf<Params<"SELECT pg_table_size($1) FROM things">>().toEqualTypeOf<[unknown]>();
 });
 
 test("CASE branches, ARRAY elements, boolean contexts", () => {

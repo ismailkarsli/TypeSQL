@@ -9,7 +9,8 @@
 //   TYPESQL_PG_URL=postgres://… node scripts/catalog-from-pg.mjs lower sum  # selected functions
 //
 // The output is meant for a human diff against catalog.ts after a Postgres upgrade; it does
-// not rewrite the catalog (overload choice and nullability rules are deliberate).
+// not rewrite the catalog (overload choice and nullability rules are deliberate). The other
+// pg_catalog functions are generated into pg-functions.ts by scripts/gen-pg-functions.mjs.
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 
@@ -24,7 +25,7 @@ if (!url) {
 
 const catalogSrc = readFileSync(new URL("../packages/core/src/engine/typer/catalog.ts", import.meta.url), "utf8");
 const body = catalogSrc.slice(catalogSrc.indexOf("export interface FunctionCatalog"), catalogSrc.indexOf("\n}\n", catalogSrc.indexOf("export interface FunctionCatalog")));
-const catalogNames = [...new Set([...body.matchAll(/^\s+([a-z_][a-z0-9_]*):/gm)].map((m) => m[1]))];
+const catalogNames = [...new Set([...body.matchAll(/(?:^|; )\s*([a-z_][a-z0-9_]*): (?:\[\s*Sig<|Sig<)/gm)].map((m) => m[1]))];
 const names = process.argv.slice(2).length ? process.argv.slice(2) : catalogNames;
 
 const client = new Client({ connectionString: url });

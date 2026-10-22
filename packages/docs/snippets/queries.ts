@@ -1,6 +1,6 @@
-import type { RowType } from "@typesql/core";
+import { createSql, type Executor, type RowType, type Sig } from "@typesql/core";
 import { check, type Equal } from "./_check.js";
-import { sql } from "./schema.js";
+import { sql, type DB } from "./schema.js";
 
 // #region joins
 const joined = sql(`
@@ -23,8 +23,6 @@ const named = sql(`
 // #endregion naming
 check<Equal<RowType<typeof named>, { "?column?": number; lower: string; id: string; count: string; case: string | null; name: string }>>();
 
-import { createSql, type Executor } from "@typesql/core";
-import type { DB } from "./schema.js";
 declare const executor: Executor;
 // #region row-keys
 const camel = createSql<DB>(executor, { rowKeys: "camelCase" });
@@ -99,11 +97,23 @@ const withTitles = sql(`
 // #endregion narrowing
 check<Equal<RowType<typeof withTitles>, { email: string; title: string }>>();
 
-// #region unknown
-const fn = sql(`SELECT my_extension_fn(id) AS a, my_extension_fn(id)::int4 AS b FROM users`);
-// { a: unknown; b: number | null }
-// #endregion unknown
-check<Equal<RowType<typeof fn>, { a: unknown; b: number | null }>>();
+// #region unknown-function
+// @ts-expect-error function slugify(text) does not exist. Declare it in the schema's $functions or in FunctionCatalog
+sql(`SELECT slugify(email) AS slug FROM users`);
+// #endregion unknown-function
+
+// #region functions
+interface AppDB extends DB {
+  $functions: {
+    slugify: Sig<["text"], "text">; // strict (the default): NULL in, NULL out
+    rank_in: Sig<["int4", "..."], "int8", { nullable: false }>;
+  };
+}
+const appSql = createSql<AppDB>();
+const slugs = appSql(`SELECT slugify(email) AS slug, slugify(display_name) AS alt, rank_in(id, 1, 2) AS r FROM users`);
+// { slug: string; alt: string | null; r: string }
+// #endregion functions
+check<Equal<RowType<typeof slugs>, { slug: string; alt: string | null; r: string }>>();
 
 // #region enum
 const moods = sql(`SELECT mood, count(*) AS n FROM users GROUP BY mood`);

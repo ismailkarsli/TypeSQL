@@ -72,10 +72,10 @@ documentation site) and `@typesql/bench` (compile-time budget benchmarks).
 | SELECT: joins (nullability per join kind, USING/NATURAL), aliases, `*`/`t.*`, WHERE, GROUP BY/HAVING, ORDER BY, LIMIT/OFFSET/FETCH, DISTINCT [ON], FOR UPDATE | ✓ |
 | Subqueries (scalar, EXISTS, IN, ANY/ALL), derived tables, LATERAL, CTEs incl. RECURSIVE, UNION/INTERSECT/EXCEPT, VALUES, set-returning functions in FROM | ✓ |
 | Expressions: operators with numeric/date/JSON/array rules, casts, CASE, COALESCE/NULLIF/GREATEST/LEAST, IS, BETWEEN, IN, LIKE, arrays, subscripts, EXTRACT and friends, window functions | ✓ |
-| Function catalog (string, numeric, date/time, JSON, arrays, aggregates, window) with Postgres nullability; unknown functions are `unknown` (a cast fixes it); extensible via `FunctionCatalog` augmentation | ✓ |
+| Function catalog (string, numeric, date/time, JSON, arrays, aggregates, window) with Postgres nullability; every other `pg_catalog` function known by return type; unknown functions are errors; app functions declared in `$functions` or via `FunctionCatalog` augmentation | ✓ |
 | Parameters: `$n` typed from context (`WHERE id = $1` → `number`), `:name` sugar, inline `${sql.param(value)}` with value type checks | ✓ |
 | Nullability narrowing: `WHERE c IS NOT NULL` / comparisons / inner-join conditions make `c` non-null | ✓ |
-| Errors with token positions and "Perhaps you meant …" hints for unknown columns and relations | ✓ |
+| Errors with token positions and "Perhaps you meant …" hints for unknown columns, relations and functions | ✓ |
 | INSERT/UPDATE/DELETE with RETURNING, required-column checks, ON CONFLICT, `EXCLUDED` | ✓ |
 | Write helpers: `sql.valueOrDefault(x)` (`DEFAULT` for `undefined`), typed `sql.set(table, partial)` and `sql.values(table, rows)` | ✓ |
 | DDL → schema: `ApplyDdl<DB, "ALTER TABLE …">`, `migrations()` builder, views, enums, schemas | ✓ |

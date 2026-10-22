@@ -57,6 +57,12 @@ List enum values under `$types`; a column declared with `Enum<"mood">` then has 
 
 <<< @/snippets/queries.ts#enum
 
+## Functions
+
+App and extension functions that are not built in go under `$functions`, with a `Sig` per
+function (`$functions: { slugify: Sig<["text"], "text"> }`). Calling a function that is
+neither built in nor declared is an error; see [Expressions and functions](./queries#expressions-and-functions).
+
 ## Other schemas
 
 Tables in a Postgres schema other than `public` go in a nested object:

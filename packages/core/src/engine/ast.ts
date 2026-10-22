@@ -330,11 +330,13 @@ export type CreateSchema = { readonly t: "create_schema"; readonly ifNotExists: 
 export type DropSchema = { readonly t: "drop_schema"; readonly ifExists: boolean; readonly names: readonly string[]; readonly cascade: boolean };
 /** `ALTER SCHEMA from RENAME TO to` */
 export type RenameSchema = { readonly t: "rename_schema"; readonly from: string; readonly to: string };
-/** Statements with no schema effect: CREATE INDEX, TRUNCATE, GRANT, COMMENT, CREATE FUNCTION, ... */
+/** `CREATE FUNCTION name(…) RETURNS [SETOF] ret`: registered in `$functions` (arguments unchecked). */
+export type CreateFunction = { readonly t: "create_function"; readonly name: TableRef; readonly ret: string; readonly srf: boolean };
+/** Statements with no schema effect: CREATE INDEX, TRUNCATE, GRANT, COMMENT, CREATE PROCEDURE, ... */
 export type NoopStmt = { readonly t: "noop"; readonly what: string };
 
 export type DdlStmt =
   | CreateTable | CreateTableAs | AlterTable | DropTable | CreateView | DropView
-  | CreateEnum | AlterEnum | DropType | CreateSchema | DropSchema | RenameSchema | NoopStmt;
+  | CreateEnum | AlterEnum | DropType | CreateSchema | DropSchema | RenameSchema | CreateFunction | NoopStmt;
 
 export type Stmt = SelectStmt | InsertStmt | UpdateStmt | DeleteStmt | DdlStmt;

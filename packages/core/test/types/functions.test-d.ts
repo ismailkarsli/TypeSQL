@@ -103,10 +103,26 @@ test("text search and range functions", () => {
   expectTypeOf<Row<"SELECT lower(label) AS a, lower(rng) AS b, lower('x') AS c FROM things">>().toEqualTypeOf<{ a: string; b: number | null; c: string }>();
 });
 
-test("unknown functions yield unknown (nullable), not an error", () => {
-  expectTypeOf<Row<"SELECT my_unknown_fn(id) AS a, my_unknown_fn(id)::text AS b, pg_catalog.lower(label) AS c FROM things">>()
-    .toEqualTypeOf<{ a: unknown; b: string | null; c: string }>();
-  expectTypeOf<V<"SELECT my_unknown_fn(id) FROM things">>().toEqualTypeOf<"SELECT my_unknown_fn(id) FROM things">();
+test("unknown functions are errors, as in Postgres", () => {
+  type Declare = "Declare it in the schema's $functions or in FunctionCatalog";
+  expectTypeOf<V<"SELECT my_unknown_fn(id) FROM things">>().toEqualTypeOf<SqlError<`function my_unknown_fn(int4) does not exist. ${Declare}`, 1>>();
+  // untyped literals and NULL are `unknown`, like Postgres prints them
+  expectTypeOf<V<"SELECT my_unknown_fn(label, 'x', NULL, 1.5) FROM things">>().toEqualTypeOf<SqlError<`function my_unknown_fn(text, unknown, unknown, numeric) does not exist. ${Declare}`, 1>>();
+  expectTypeOf<V<"SELECT 1 FROM things WHERE public.my_unknown_fn(id)">>().toEqualTypeOf<SqlError<`function my_unknown_fn(int4) does not exist. ${Declare}`, 7>>();
+  // a close catalog name is suggested
+  expectTypeOf<V<"SELECT lowr(label) FROM things">>().toEqualTypeOf<SqlError<`function lowr(text) does not exist. Perhaps you meant the function "lower"? Otherwise declare it in the schema's $functions or in FunctionCatalog`, 1>>();
+  // schema qualification is dropped; a known name whose overloads do not fit stays unknown
+  expectTypeOf<Row<"SELECT pg_catalog.lower(label) AS a, lower(label, label) AS b FROM things">>().toEqualTypeOf<{ a: string; b: unknown }>();
+});
+
+test("every pg_catalog function is known; function-style casts are typed", () => {
+  // pg_catalog functions without a curated signature (pg-functions.ts): return type from pg_proc, arguments unchecked
+  expectTypeOf<Row<"SELECT has_table_privilege('things', 'select') AS a, pg_get_viewdef('v'::regclass) AS b, pg_table_size('things') AS c, txid_current_snapshot() AS d FROM things">>()
+    .toEqualTypeOf<{ a: boolean; b: string; c: string; d: unknown }>();
+  expectTypeOf<Row<"SELECT date(at) AS a, int8(id) AS b, float8(n_id) AS c, timestamp(day) AS d, numeric(id) AS e FROM things">>()
+    .toEqualTypeOf<{ a: Date; b: string; c: number | null; d: Date; e: string }>();
+  expectTypeOf<Row<"SELECT unaccent(label) AS a, similarity(label, 'x') AS b, levenshtein(label, 'x') AS c, enum_range(mood) AS d FROM things">>()
+    .toEqualTypeOf<{ a: string; b: number; c: number; d: ("happy" | "sad")[] }>();
   // errors inside arguments still surface
   expectTypeOf<V<"SELECT lower(nope) FROM things">>().toEqualTypeOf<SqlError<'column "nope" does not exist', 3>>();
   expectTypeOf<V<"SELECT count(*) FILTER (WHERE nope) FROM things">>().toEqualTypeOf<SqlError<'column "nope" does not exist', 8>>();

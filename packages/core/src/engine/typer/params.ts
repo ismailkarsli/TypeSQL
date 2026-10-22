@@ -4,7 +4,7 @@ import type { Toks } from "../lexer/tokens.js";
 import type { ColInfo, CteMap, Ctx, Info, Scope, ScopeLevel, MkCtx } from "../types.js";
 import type { BindFrom } from "../binder/from.js";
 import type { BindWith } from "../project/select.js";
-import type { FunctionCatalog, AnySig, PickSig } from "./catalog.js";
+import type { AnySig, LookupFn, PickSig } from "./catalog.js";
 import type { CommonType, DateTimeT } from "./operators.js";
 import type { TypeList, TypeOf } from "./typeof.js";
 
@@ -237,17 +237,18 @@ type ParamsOfWhens<Whens extends readonly { when: Expr; then: Expr }[], C extend
  * unknown. Unknown functions give no type.
  */
 type ParamsOfCall<E extends Call, C extends Ctx, M> =
-  E["name"] extends keyof FunctionCatalog
-    ? TypeList<NonStarArgs<E["args"]>, C, []> extends infer As
+  LookupFn<C["db"], E["name"]> extends infer O
+    ? O extends null ? ParamsOfCallRest<E, C, ParamsOfList<E["args"], C, M, null>>
+    : TypeList<NonStarArgs<E["args"]>, C, []> extends infer As
       ? As extends readonly ColInfo[]
-        ? PickSig<FunctionCatalog[E["name"]], As> extends infer S
+        ? PickSig<O, As> extends infer S
           ? S extends AnySig
             ? ParamsOfCallRest<E, C, ParamsOfArgs<E["args"], S["args"], C, M, PolyOf<E["args"], S["args"], C, "unknown">>>
             : ParamsOfCallRest<E, C, ParamsOfList<E["args"], C, M, null>>
           : never
         : ParamsOfCallRest<E, C, ParamsOfList<E["args"], C, M, null>>
       : never
-    : ParamsOfCallRest<E, C, ParamsOfList<E["args"], C, M, null>>;
+    : never;
 type NonStarArgs<Args extends readonly Expr[]> = Args extends readonly [{ readonly t: "star"; readonly tbl: null }] ? [] : Args;
 /** FILTER (WHERE $1) → bool; WITHIN GROUP (ORDER BY $1) → unknown. */
 type ParamsOfCallRest<E extends Call, C extends Ctx, M> =

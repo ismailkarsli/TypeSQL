@@ -139,10 +139,21 @@ string and array concatenation, comparisons, `IS [NOT] DISTINCT FROM`, `BETWEEN`
 regular expressions, `ANY`/`ALL`, casts in both spellings, `ARRAY[…]`, subscripts and slices,
 `EXTRACT`, `SUBSTRING … FROM … FOR`, `TRIM`, `POSITION`, `AT TIME ZONE`.
 
-More than 380 built-in functions are typed with their Postgres return types and null handling:
-string, numeric, date/time, JSON, array, aggregate and window functions. A function typesql
-does not know is `unknown` rather than an error; a cast gives it a type:
+About 450 built-in functions are typed with their Postgres argument types, return types and
+null handling: string, numeric, date/time, JSON, array, aggregate and window functions,
+function-style casts (`date(ts)`, `int8(x)`) and common extensions (`pgcrypto`, `uuid-ossp`,
+`unaccent`, `pg_trgm`, `fuzzystrmatch`). Every other `pg_catalog` function is known with its
+return type; its arguments are not checked.
 
-<<< @/snippets/queries.ts#unknown
+A function Postgres would not find is an error, with a hint when a known name is close:
 
-To type your own functions, extend the catalog; see [Function catalog](../reference/api#function-catalog).
+<<< @/snippets/queries.ts#unknown-function
+
+Declare your own and extension functions next to the tables, under `$functions`. The
+signatures use the notation of the [function catalog](../reference/api#function-catalog):
+
+<<< @/snippets/queries.ts#functions
+
+Alternatively, augment `FunctionCatalog` (for every schema), or create the function in your
+[migrations](./migrations): `CREATE FUNCTION` records its return type. A cast gives an
+untyped result a type (`my_fn(x)::int4`).

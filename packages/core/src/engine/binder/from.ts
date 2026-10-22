@@ -129,7 +129,7 @@ type FuncBaseCols<Name extends string, Args extends readonly Expr[], CD, Call ex
 type NonNullInfos<As extends readonly ColInfo[]> = { readonly [K in keyof As]: Info<As[K]["type"]> };
 
 type SrfOrScalar<Name extends string, As extends readonly ColInfo[], Call extends Expr, C extends MkCtx<unknown, Scope, CteMap, false>> =
-  SrfType<Name, NonNullInfos<As>> extends infer S
+  SrfType<Name, NonNullInfos<As>, C["db"]> extends infer S
     ? S extends ColInfo ? [{ readonly n: Name extends ValueNamed ? "value" : Name; readonly t: S }]
     : TypeOf<Call, C> extends infer T ? (T extends ColInfo ? [{ readonly n: Name; readonly t: T }] : T) : never
     : never;

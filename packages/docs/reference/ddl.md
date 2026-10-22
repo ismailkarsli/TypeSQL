@@ -54,10 +54,11 @@ syntax the engine does not know is an error instead of being silently ignored.
 | `CREATE SCHEMA [IF NOT EXISTS] name [AUTHORIZATION role]`, `CREATE SCHEMA AUTHORIZATION role` | an empty nested schema |
 | `ALTER SCHEMA name RENAME TO new` | |
 | `DROP SCHEMA [IF EXISTS] a, b [CASCADE]` | |
+| `CREATE [OR REPLACE] FUNCTION name(…) RETURNS [SETOF] type`, `RETURNS TABLE (…)` | `$functions[name]` with the return type (`record` for `TABLE`); arguments are not checked |
 | `SELECT`, `INSERT`, `UPDATE`, `DELETE` (seed data) | checked against the schema at that point; no schema effect |
 
 No schema effect (skipped to the next `;`): `CREATE / ALTER / DROP INDEX`, `SEQUENCE`,
-`FUNCTION`, `PROCEDURE` (`$$` bodies and `BEGIN ATOMIC ... END` bodies included), `TRIGGER`,
+`ALTER / DROP FUNCTION`, `PROCEDURE` (`$$` bodies and `BEGIN ATOMIC ... END` bodies included), `TRIGGER`,
 `EXTENSION`, `POLICY`, `DOMAIN`, `RULE`, composite / range types, `COMMENT ON`, `GRANT`,
 `REVOKE`, `TRUNCATE`, `BEGIN` / `COMMIT` / `ROLLBACK`, `SET`, `DO`, `ANALYZE`, `VACUUM`,
 `REFRESH MATERIALIZED VIEW`, and the other utility statements.

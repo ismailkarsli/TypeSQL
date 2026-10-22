@@ -12,6 +12,7 @@ words, operators and literals from 0):
 | unknown column | `column "nme" does not exist` |
 | typo | `column "emial" does not exist. Perhaps you meant the column "email"?` |
 | unknown table | `relation "post" does not exist. Perhaps you meant the relation "posts"?` |
+| unknown function | `function slugify(text) does not exist. Declare it in the schema's $functions or in FunctionCatalog` (see [functions](./queries#expressions-and-functions)) |
 | ambiguous column | `column reference "id" is ambiguous` |
 | bad alias | `missing FROM-clause entry for table "x"` |
 | syntax | `syntax error at or near garbage`, `syntax error at end of input` |

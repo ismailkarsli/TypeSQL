@@ -1,6 +1,7 @@
 import type { PgTypeName } from "./pg-types.js";
 import type { Shaped } from "../engine/shape.js";
 import type { TsShape } from "../engine/json.js";
+import type { Overloads } from "../engine/typer/catalog.js";
 
 /**
  * Column descriptor. Columns are declared with Postgres type names, not TS types,
@@ -50,5 +51,11 @@ export type TypeRegistry = { readonly [name: string]: string };
  */
 export type Namespace = { readonly [table: string]: Table | View<Table> };
 
-/** The user-declared database. Keys are tables, views, namespaces or `$types`. */
-export type Schema = { readonly [key: string]: Table | View<Table> | Namespace | TypeRegistry };
+/**
+ * App and extension functions of a schema: `interface DB { $functions: { f: Sig<["text"], "int4"> } }`.
+ * Same notation as the augmentable `FunctionCatalog` (one `Sig` or a tuple of overloads).
+ */
+export type FunctionRegistry = { readonly [name: string]: Overloads };
+
+/** The user-declared database. Keys are tables, views, namespaces, `$types` or `$functions`. */
+export type Schema = { readonly [key: string]: Table | View<Table> | Namespace | TypeRegistry | FunctionRegistry };

@@ -120,10 +120,37 @@ type ParseCreate<T extends Toks, I extends number, OrReplace extends boolean> =
     : W extends "recursive" ? Fail<"CREATE RECURSIVE VIEW is not supported; write the view as WITH RECURSIVE ... SELECT", I>
     : W extends "type" ? ParseCreateType<T, Nx<I>>
     : W extends "schema" ? ParseCreateSchema<T, Nx<I>>
-    : W extends "function" | "procedure" ? (SkipRoutine<T, Nx<I>> extends infer J extends number ? Ok<{ t: "noop"; what: `create ${W}` }, J> : never)
+    : W extends "function" ? ParseCreateFunction<T, Nx<I>>
+    : W extends "procedure" ? (SkipRoutine<T, Nx<I>> extends infer J extends number ? Ok<{ t: "noop"; what: `create ${W}` }, J> : never)
     : W extends NoopCreateObject ? Noop<T, I, `create ${W}`>
     : Expected<"TABLE, VIEW, TYPE, SCHEMA, INDEX, FUNCTION, ... after CREATE", T, I>
   : Expected<"object type after CREATE", T, I>;
+
+// ─── CREATE FUNCTION ───
+
+/**
+ * After `FUNCTION`: `name (args) [RETURNS [SETOF] type | RETURNS TABLE (…)] …`. Only the name
+ * and the result type are kept (arguments are not checked); the options and the body are skipped.
+ */
+type ParseCreateFunction<T extends Toks, I extends number> =
+  QualName<T, I> extends [infer Parts extends readonly string[], infer J extends number]
+    ? T[J] extends OpTok<"(">
+      ? FnReturns<T, SkipToCloseParen<T, Nx<J>>> extends infer R
+        ? R extends [infer Ret extends string, infer Srf extends boolean, infer K extends number]
+          ? Ok<{ t: "create_function"; name: RefOf<Parts>; ret: Ret; srf: Srf }, SkipRoutine<T, K>>
+          : R
+        : never
+      : Expected<'"("', T, J>
+    : Expected<"function name", T, I>;
+/** `[ret, setReturning, next]`; without RETURNS (OUT parameters) the result is unknown. */
+type FnReturns<T extends Toks, I extends number> =
+  T[I] extends WordTok<"returns">
+    ? T[Nx<I>] extends WordTok<"table"> ? ["record", true, Nx<I>]
+    : T[Nx<I>] extends WordTok<"setof"> ? FnRetType<T, Nx2<I>, true>
+    : FnRetType<T, Nx<I>, false>
+  : ["unknown", false, I];
+type FnRetType<T extends Toks, I extends number, Srf extends boolean> =
+  ParseTypeName<T, I> extends infer R ? (R extends Ok<infer Ty extends string, infer J extends number> ? [Ty, Srf, J] : R) : never;
 
 // ─── CREATE TABLE ───
 

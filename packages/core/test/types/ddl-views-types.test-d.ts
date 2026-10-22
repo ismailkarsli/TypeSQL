@@ -1,5 +1,5 @@
 import { expectTypeOf, test } from "vitest";
-import { createSql, type ApplyDdl, type Col, type Generated, type Nullable, type NullableGenerated, type RowType, type ParamsOf, type DefaultTypeMap, type SqlError, type View } from "../../src/index.js";
+import { createSql, type ApplyDdl, type Col, type Generated, type Nullable, type NullableGenerated, type RowType, type ParamsOf, type DefaultTypeMap, type RowOf, type SqlError, type Sig, type View } from "../../src/index.js";
 
 interface DB {
   users: { id: Generated<"int4">; email: Col<"text">; name: Nullable<"text">; mood: Nullable<"mood"> };
@@ -101,10 +101,7 @@ test("statements without schema effect leave the schema unchanged", () => {
     CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS users_email_idx ON users (lower(email)) WHERE name IS NOT NULL;
     CREATE INDEX ON posts USING btree (author_id);
     CREATE SEQUENCE IF NOT EXISTS seq START 1;
-    CREATE OR REPLACE FUNCTION touch() RETURNS trigger LANGUAGE plpgsql AS $$
-      BEGIN NEW.updated_at := now(); RETURN NEW; END;
-    $$;
-    CREATE FUNCTION add(a int, b int) RETURNS int LANGUAGE sql IMMUTABLE BEGIN ATOMIC SELECT a + b; END;
+    CREATE PROCEDURE noop() LANGUAGE sql BEGIN ATOMIC SELECT 1; END;
     CREATE TRIGGER t BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION touch();
     DO $$ BEGIN RAISE NOTICE 'hi'; END $$;
     COMMENT ON TABLE users IS 'people; and things';
@@ -120,6 +117,32 @@ test("statements without schema effect leave the schema unchanged", () => {
     ANALYZE users;
     COMMIT;
   `>>().toEqualTypeOf<DB>();
+});
+
+test("CREATE FUNCTION registers the function's result type in $functions", () => {
+  type S = A<`
+    CREATE OR REPLACE FUNCTION touch() RETURNS trigger LANGUAGE plpgsql AS $$
+      BEGIN NEW.updated_at := now(); RETURN NEW; END;
+    $$;
+    CREATE FUNCTION add(a int, b int) RETURNS int LANGUAGE sql IMMUTABLE BEGIN ATOMIC SELECT a + b; END;
+    CREATE FUNCTION public.slugs(t text) RETURNS SETOF varchar(80) AS 'SELECT 1' LANGUAGE sql;
+    CREATE FUNCTION pairs() RETURNS TABLE (a int, b text) AS 'SELECT 1, 2' LANGUAGE sql;
+    CREATE FUNCTION outs(OUT a int) AS 'SELECT 1' LANGUAGE sql;
+  `>;
+  expectTypeOf<S["$functions"]>().toEqualTypeOf<{
+    touch: Sig<["..."], "trigger">;
+    add: Sig<["..."], "int4">;
+    slugs: Sig<["..."], "varchar", { srf: true }>;
+    pairs: Sig<["..."], "record", { srf: true }>;
+    outs: Sig<["..."], "unknown">;
+  }>();
+  expectTypeOf<Omit<S, "$functions">>().toEqualTypeOf<DB>();
+  // queries in the same script, views and later queries see the functions
+  type S2 = A<"CREATE FUNCTION add(a int, b int) RETURNS int AS 'SELECT a + b' LANGUAGE sql; CREATE VIEW sums AS SELECT add(id, 1) AS n FROM users">;
+  expectTypeOf<S2["sums"]>().toEqualTypeOf<View<{ n: Col<"int4"> }>>();
+  expectTypeOf<RowOf<S, DefaultTypeMap, "SELECT add(id, 2) AS n, s FROM users, slugs('x') AS s">>().toEqualTypeOf<{ n: number; s: string }>();
+  expectTypeOf<ApplyDdl<DB, "CREATE VIEW v AS SELECT nope(id) AS n FROM users">>()
+    .toEqualTypeOf<SqlError<"function nope(int4) does not exist. Declare it in the schema's $functions or in FunctionCatalog", 5>>();
 });
 
 test("data statements in scripts are validated and leave the schema unchanged", () => {

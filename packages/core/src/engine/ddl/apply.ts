@@ -8,6 +8,7 @@ import type { AtEnd, Nx, Ok, SyntaxError } from "../parser/util.js";
 import type { ProjectSelect } from "../project/select.js";
 import type { ProjectStmt } from "../project/stmt.js";
 import type { ColInfo, Cols, ColsToMap } from "../types.js";
+import type { Sig } from "../typer/catalog.js";
 
 /**
  * Apply DDL to a schema type.
@@ -18,10 +19,11 @@ import type { ColInfo, Cols, ColsToMap } from "../types.js";
  * Schema layout (see schema/column.ts): tables and views live at the top level of `DB`
  * (`public`), other schemas are nested objects (`DB["auth"]["users"]`), views are
  * `View<cols>` (`{ $view: cols }`), enums live in `DB["$types"]` as unions of string
- * literals. Columns are built with `Col` / `Nullable` / `Generated` / `NullableGenerated`,
- * so results read like a hand-written schema and compare equal to one.
+ * literals, functions from CREATE FUNCTION in `DB["$functions"]` (see catalog.ts). Columns
+ * are built with `Col` / `Nullable` / `Generated` / `NullableGenerated`, so results read like
+ * a hand-written schema and compare equal to one.
  *
- * Statements without a schema effect (indexes, functions, grants, ...) leave the schema
+ * Statements without a schema effect (indexes, procedures, grants, ...) leave the schema
  * unchanged; SELECT / INSERT / UPDATE / DELETE are validated against the schema at that
  * point of the script and leave it unchanged.
  *
@@ -58,6 +60,8 @@ export type ApplyDdlNode<DB, S> =
     ? ApplyDropSchemas<DB, Names, Ife, Casc>
   : S extends { readonly t: "rename_schema"; readonly from: infer F extends string; readonly to: infer To extends string }
     ? ApplyRenameSchema<DB, F, To>
+  : S extends { readonly t: "create_function"; readonly name: { readonly name: infer Name extends string }; readonly ret: infer Ret extends string; readonly srf: infer Srf }
+    ? ApplyCreateFunction<DB, Name, Ret, Srf>
   : SqlError<"unsupported DDL statement", null>;
 
 // ───────────────────────────── scripts ─────────────────────────────
@@ -95,7 +99,8 @@ type RepositionFrom<E, T extends Toks, Start extends number> =
     ? SqlError<M, At extends number ? At : LocateFrom<M, T, Start>>
     : E;
 type LocateFrom<M extends string, T extends Toks, Start extends number> =
-  M extends `${string}"${infer Name}"${string}`
+  M extends `function ${infer Name}(${string}` ? FindTok<T, Name, Start, Start>
+  : M extends `${string}"${infer Name}"${string}`
     ? FindTok<T, LastPart<Name>, Start, Start> extends infer F extends number
       ? M extends `${string} specified more than once` ? (F extends Start ? F : FindTok<T, LastPart<Name>, Nx<F>, F>) : F
       : Start
@@ -158,12 +163,12 @@ type IsNamespace<X> =
   : true;
 /** Top-level key holding a schema (an empty object counts: it may be an empty schema). */
 type IsSchemaKey<DB, K extends string> =
-  K extends keyof DB ? (K extends "$types" ? false : [keyof DB[K]] extends [never] ? true : IsNamespace<DB[K]>) : false;
+  K extends keyof DB ? (K extends MetaKey ? false : [keyof DB[K]] extends [never] ? true : IsNamespace<DB[K]>) : false;
 
 /** Table or view at `Ref`, or `null` when absent (a missing schema counts as absent). */
 type GetRel<DB, Ref extends TableRef> =
   IsTop<Ref["schema"]> extends true
-    ? Ref["name"] extends keyof DB ? (Ref["name"] extends "$types" ? null : IsNamespace<DB[Ref["name"]]> extends true ? null : DB[Ref["name"]]) : null
+    ? Ref["name"] extends keyof DB ? (Ref["name"] extends MetaKey ? null : IsNamespace<DB[Ref["name"]]> extends true ? null : DB[Ref["name"]]) : null
   : Ref["schema"] extends keyof DB ? (Ref["name"] extends keyof DB[Ref["schema"]] ? DB[Ref["schema"]][Ref["name"]] : null)
   : null;
 
@@ -499,6 +504,14 @@ type CheckReplace<Old, New> =
 
 type Types<DB> = DB extends { readonly $types: infer R } ? R : {};
 
+/** Top-level keys that hold registries, not tables or schemas. */
+type MetaKey = "$types" | "$functions";
+
+type Fns<DB> = DB extends { readonly $functions: infer F } ? F : {};
+/** CREATE [OR REPLACE] FUNCTION: register (or replace) `$functions[name]`; arguments are not checked. */
+type ApplyCreateFunction<DB, Name extends string, Ret extends string, Srf> =
+  SetKey<DB, "$functions", SetKey<Fns<DB>, Name, Srf extends true ? Sig<["..."], Ret, { srf: true }> : Sig<["..."], Ret>>>;
+
 type ApplyCreateEnum<DB, Name extends string, Vs extends readonly string[]> =
   Types<DB> extends infer R
     ? Name extends keyof R ? SqlError<`type "${Name}" already exists`, null>
@@ -522,6 +535,7 @@ type ApplyAlterEnum<DB, Name extends string, Act> =
 /** Rename the registry entry and every column typed `F` / `F[]`, in tables, views and nested schemas. */
 type RetypeDeep<DB, F extends string, To extends string> = Rebuild<{
   [K in keyof DB]: K extends "$types" ? RenameKey<DB[K], F, To>
+    : K extends "$functions" ? DB[K]
     : DB[K] extends { readonly $view: infer C } ? AsView<RetypeCols<C, F, To>>
     : IsNamespace<DB[K]> extends true ? RetypeNs<DB[K], F, To>
     : RetypeCols<DB[K], F, To>;
@@ -548,13 +562,14 @@ type ApplyDropTypes<DB, Refs, Ife, Casc> =
 type ColUses<C, N extends string> = TypeOfCol<C> extends N | `${N}[]` ? true : false;
 type TblUses<Tbl, N extends string> = true extends { [C in keyof Tbl]: ColUses<Tbl[C], N> }[keyof Tbl] ? true : false;
 type UsesType<DB, N extends string> =
-  true extends { [K in keyof DB]: K extends "$types" ? false : IsNamespace<DB[K]> extends true ? NsUses<DB[K], N> : TblUses<ColsOf<DB[K]>, N> }[keyof DB] ? true : false;
+  true extends { [K in keyof DB]: K extends MetaKey ? false : IsNamespace<DB[K]> extends true ? NsUses<DB[K], N> : TblUses<ColsOf<DB[K]>, N> }[keyof DB] ? true : false;
 type NsUses<NS, N extends string> = true extends { [K in keyof NS]: TblUses<ColsOf<NS[K]>, N> }[keyof NS] ? true : false;
 
 /** `DROP TYPE ... CASCADE`: drop the registry entry, dependent table columns, and dependent views. */
 type DropTypeCols<DB, N extends string> = Rebuild<{
-  [K in keyof DB as K extends "$types" ? K : IsViewVal<DB[K]> extends true ? (TblUses<ColsOf<DB[K]>, N> extends true ? never : K) : K]:
+  [K in keyof DB as K extends MetaKey ? K : IsViewVal<DB[K]> extends true ? (TblUses<ColsOf<DB[K]>, N> extends true ? never : K) : K]:
     K extends "$types" ? DelKey<DB[K], N>
+    : K extends "$functions" ? DB[K]
     : IsViewVal<DB[K]> extends true ? DB[K]
     : IsNamespace<DB[K]> extends true ? DropTypeNs<DB[K], N>
     : StripCols<DB[K], N>;

@@ -54,8 +54,9 @@ test("string functions and plain (non set-returning) functions", () => {
   expectTypeOf<Row<"SELECT * FROM now() AS t(x)">>().toEqualTypeOf<{ x: Date }>();
   expectTypeOf<Row<"SELECT * FROM lower('A') WITH ORDINALITY">>().toEqualTypeOf<{ lower: string; ordinality: string }>();
   expectTypeOf<Row<"SELECT l FROM users u, lower(u.display_name) l">>().toEqualTypeOf<{ l: string | null }>();
-  // unknown functions are unknown, not an error
-  expectTypeOf<Row<"SELECT * FROM my_unknown_srf(1) AS f">>().toEqualTypeOf<{ f: unknown }>();
+  // unknown functions are an error; with a column definition list the columns are known
+  expectTypeOf<V<"SELECT * FROM my_unknown_srf(1) AS f">>().toEqualTypeOf<SqlError<"function my_unknown_srf(int4) does not exist. Declare it in the schema's $functions or in FunctionCatalog", 3>>();
+  expectTypeOf<Row<"SELECT * FROM my_unknown_rec(1) AS f(a int4, b text)">>().toEqualTypeOf<{ a: number | null; b: string | null }>();
 });
 
 test("implicitly LATERAL", () => {
