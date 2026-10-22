@@ -86,7 +86,7 @@ test("sql.list: dynamic count, typed elements", () => {
   const conds = [sql.fragment("u.age > $1", 18), sql.fragment(`u.email = ${sql.param("e")}`)];
   const where = sql.list(conds, " AND ");
   const q2 = sql("SELECT u.id FROM users u WHERE u.id > $1 AND {where}", { where }, 1);
-  expectTypeOf<ParamsType<typeof q2>>().toEqualTypeOf<[number, number, string]>();
+  expectTypeOf<ParamsType<typeof q2>>().toEqualTypeOf<[number | null, number | null, string | null]>();
   const wrong = sql.list([sql.fragment("u.age > $1", "x"), sql.fragment("u.email = $1", "e")], " AND ");
   // @ts-expect-error parameter $1: a string value cannot be used as int4
   sql("SELECT u.id FROM users u WHERE {wrong}", { wrong });

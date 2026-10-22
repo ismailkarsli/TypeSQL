@@ -1,5 +1,5 @@
 import type { ColDesc, Table, View } from "../schema/column.js";
-import type { TsOf } from "../type-map/index.js";
+import type { TsParamTypeOf } from "../type-map/index.js";
 import type { Enc } from "./inline.js";
 import type { JoinedText, QuotedIdent, UnionList } from "./splice.js";
 
@@ -33,8 +33,10 @@ export type TableOf<DB, T extends string> =
   : T extends `${infer NS}.${infer N}` ? (NS extends keyof DB ? (N extends keyof DB[NS] ? (DB[NS][N] extends Table ? DB[NS][N] : never) : never) : never)
   : never;
 
-/** TS type a column accepts when written (the type map's type, `| null` when nullable). */
-export type ColIn<TM, DB, D extends ColDesc> = TsOf<TM, DB, D>;
+/** TS type a column accepts when written (the type map's parameter type, `| null` when nullable). */
+export type ColIn<TM, DB, D extends ColDesc> =
+  D["type"] extends "null" ? null
+  : D["nullable"] extends true ? TsParamTypeOf<TM, DB, D["type"]> | null : TsParamTypeOf<TM, DB, D["type"]>;
 
 /** `sql.set` input: any subset of the columns; `undefined` values are skipped. */
 export type SetInput<DB, TM, T extends string> =

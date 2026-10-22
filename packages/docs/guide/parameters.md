@@ -52,10 +52,9 @@ or a comment is an error.
 
 ## A value used more than once
 
-Each `${sql.param(x)}` is its own `$n`, even for the same `x`, and each one is checked against
-its own context. That matters for optional filters: in `x IS NULL OR col = x`, only the first
-use accepts `null`. Write a value used more than once as a `:name` (or a `$n`). It is then one
-parameter, and the `IS NULL` test lets that parameter take `null`:
+Each `${sql.param(x)}` is its own `$n`, even for the same `x`: the value is sent once per use,
+and each use is checked against its own context. Write a value used more than once as a
+`:name` (or a `$n`). It is then one parameter, sent once, whose type must fit every use:
 
 <<< @/snippets/parameters.ts#repeated
 

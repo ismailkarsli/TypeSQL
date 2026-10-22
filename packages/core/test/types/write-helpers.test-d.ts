@@ -47,7 +47,7 @@ test("sql.set: typed partial SET list", () => {
   expectTypeOf(set).toEqualTypeOf<Fragment<'"display_name" = $1, "email" = $2', readonly unknown[], ["s0", "s"]>>();
   const q = sql("UPDATE users SET {set} WHERE id = $1 RETURNING id", { set }, 1);
   expectTypeOf<TextType<typeof q>>().toEqualTypeOf<'UPDATE users SET "display_name" = $2, "email" = $3 WHERE id = $1 RETURNING id'>();
-  expectTypeOf<ParamsType<typeof q>>().toEqualTypeOf<[number, string | null, string]>();
+  expectTypeOf<ParamsType<typeof q>>().toEqualTypeOf<[number | null, string | null, string]>();
   // with an alias and more assignments, and in ON CONFLICT DO UPDATE
   const mood = sql.set("users", { mood: "happy", score: 3 });
   sql("UPDATE users u SET {mood}, display_name = 'x' WHERE u.id = $1", { mood }, 1);
@@ -93,4 +93,15 @@ test("sql.values: typed VALUES rows", () => {
   sql.values("users", [{ email: 1 }]);
   // @ts-expect-error column "email" of relation "posts" does not exist
   sql("INSERT INTO posts {lit}", { lit });
+});
+
+test("sql.set and sql.values take parameter input types", () => {
+  // int8 rows are strings under the default map; int8 writes also take number and bigint
+  const n = 7n;
+  const set = sql.set("posts", { id: n });
+  sql("UPDATE posts SET {set} WHERE author_id = $1", { set }, 1);
+  const rows = sql.values("posts", [{ id: 1, author_id: 1, title: "t" }]);
+  sql("INSERT INTO posts {rows}", { rows });
+  // @ts-expect-error int8 writes do not take a boolean
+  sql.set("posts", { id: true });
 });
