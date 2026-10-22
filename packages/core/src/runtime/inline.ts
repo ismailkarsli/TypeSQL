@@ -1,4 +1,4 @@
-import type { InlineMarker } from "../engine/inline.js";
+import type { DefaultMarker, InlineMarker } from "../engine/inline.js";
 
 /**
  * Runtime side of inline parameters.
@@ -24,6 +24,16 @@ export function param<const T>(value: T): InlineMarker<T> {
   return token as InlineMarker<T>;
 }
 
+/** A `valueOrDefault` value: `undefined` becomes `DEFAULT` instead of a parameter. */
+class OrDefault {
+  constructor(readonly value: unknown) {}
+}
+
+/** Like `param`, but an `undefined` value is sent as `DEFAULT` (for INSERT values and SET). */
+export function valueOrDefault<const T>(value: T): DefaultMarker<T> {
+  return param(new OrDefault(value)) as unknown as DefaultMarker<T>;
+}
+
 /** Number of tokens created but not yet used (for leak diagnostics in tests). */
 export function pendingParams(): number {
   return pending.size;
@@ -34,7 +44,8 @@ export function hasInline(text: string): boolean {
 }
 
 /**
- * Replace inline tokens with `$k` (k = start + 1, …) outside quotes and comments; tokens inside
+ * Replace inline tokens with `$k` (k = start + 1, …) outside quotes and comments (a
+ * `valueOrDefault(undefined)` token with `DEFAULT`, taking no number); tokens inside
  * a quoted string, quoted identifier or comment are an error (the type checker rejects them too).
  */
 export function resolveInline(text: string, start: number): { text: string; values: unknown[] } {
@@ -46,8 +57,14 @@ export function resolveInline(text: string, start: number): { text: string; valu
     const inside = opaque.find(([a, b]) => offset >= a && offset < b);
     if (inside) throw new Error(`typesql: sql.param() cannot be used inside ${inside[2]}; remove the surrounding quotes or comment`);
     if (!pending.has(token)) throw new Error("typesql: this sql.param() value was already used by another statement; call sql.param() once per statement");
-    values.push(pending.get(token));
+    const value = pending.get(token);
     used.push(token);
+    if (value instanceof OrDefault) {
+      if (value.value === undefined) return "DEFAULT";
+      values.push(value.value);
+    } else {
+      values.push(value);
+    }
     return `$${++k}`;
   });
   for (const t of used) pending.delete(t);

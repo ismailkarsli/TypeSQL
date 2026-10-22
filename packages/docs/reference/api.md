@@ -120,6 +120,19 @@ const q = sql("SELECT u.id FROM users u {where}", { where });
   present once; the fragment's text type is that representative text. Throws on an empty
   array. See [Lists from runtime arrays](../guide/fragments#lists-from-runtime-arrays).
 - `sql.raw(text)` is dynamic.
+
+### Write helpers
+
+- `` sql.valueOrDefault(value) ``: inline like `sql.param`; `undefined` sends `DEFAULT`. Also
+  exported standalone (`import { valueOrDefault } from "@typesql/core"`). When the value can be
+  `undefined`, the statement is checked a second time with `DEFAULT` in its place.
+- `sql.set(table, values)`: `"a" = $1, "b" = $2` for the defined values. `values` is checked
+  against `SetInput<DB, TM, table>`; throws when no value is defined.
+- `sql.values(table, rows)`: `("a", "b") VALUES ($1, $2), ($3, DEFAULT)`. Rows are checked
+  against `InsertInput<DB, TM, table>`; throws on an empty array.
+- `table` is a `TableName<DB>`: a top-level table, or `"schema.table"`.
+- `set` and `values` are typed like `sql.list`: the text type assigns or lists every key of
+  the input type once (`SetRep`, `ValuesRep`). See [Writing data](../guide/writing-data).
 - A dynamic fragment makes the statement text non-literal; the call is rejected with
   `SqlError<"dynamic SQL fragment …">` — use `sql.as<Row>(text, slots, ...params)`.
 
@@ -171,6 +184,11 @@ option, and `camelCase(key)` is the key mapping.
 | `ListRep<Element, Sep>` | the representative text and carried values `sql.list` is checked with |
 | `RowType<Q>`, `ParamsType<Q>`, `TextType<Q>` | extract from a `Query`/`Fragment` type |
 | `InlineMarker<T>` | type of `sql.param(value)`: the inline marker encoding `T` |
+| `DefaultMarker<T>` | type of `sql.valueOrDefault(value)` |
+| `TableName<DB>` | writable tables: top-level names and `"schema.table"` |
+| `TableOf<DB, T>` | the column descriptors of a `TableName` |
+| `SetInput<DB, TM, T>`, `InsertInput<DB, TM, T>` | what `sql.set` / a `sql.values` row accepts |
+| `SetRep<P>`, `ValuesRep<R>` | the representative text and carried values of `sql.set` / `sql.values` |
 | `RowOf<DB, TM, Q>` | row type of a statement literal |
 | `ParamsOf<DB, TM, Q>` | positional parameter tuple |
 | `ParamsArgs<DB, TM, Q>` | what a call site passes (tuple, or `[params: {…}]` for `:name`) |

@@ -44,6 +44,11 @@ test("INSERT ... RETURNING", () => {
 });
 
 test("VALUES: DEFAULT, multi-row, column list checks", () => {
+  // DEFAULT is a VALUES item only, and stores NULL in a column without a default
+  expectTypeOf<V<"INSERT INTO users (email, display_name) VALUES (DEFAULT, 'x')">>().toEqualTypeOf<SqlError<'null value in column "email" of relation "users" violates not-null constraint', 4>>();
+  expectTypeOf<V<"INSERT INTO users (id, email) VALUES (DEFAULT, 'a'), (DEFAULT, 'b')">>().toEqualTypeOf<"INSERT INTO users (id, email) VALUES (DEFAULT, 'a'), (DEFAULT, 'b')">();
+  expectTypeOf<V<"INSERT INTO users (email, display_name) VALUES ('a', coalesce(DEFAULT, 'b'))">>().toEqualTypeOf<SqlError<"DEFAULT is not allowed in this context", 14>>();
+  expectTypeOf<V<"SELECT DEFAULT FROM users">>().toEqualTypeOf<SqlError<"DEFAULT is not allowed in this context", 1>>();
   expectTypeOf<V<"INSERT INTO users (email, display_name) VALUES ('a', DEFAULT), ('b', 'c')">>().toEqualTypeOf<"INSERT INTO users (email, display_name) VALUES ('a', DEFAULT), ('b', 'c')">();
   expectTypeOf<V<"INSERT INTO users (email) VALUES ('a'), ('b', 'c')">>().toEqualTypeOf<SqlError<"VALUES lists must all be the same length", 0>>();
   expectTypeOf<V<"INSERT INTO users (email) VALUES ('a', 'b')">>().toEqualTypeOf<SqlError<"INSERT has more expressions than target columns", 0>>();
@@ -100,7 +105,8 @@ test("ON CONFLICT", () => {
   expectTypeOf<V<"INSERT INTO users (email) VALUES ('a') ON CONFLICT (lower(email)) WHERE id > 1 DO NOTHING">>().toEqualTypeOf<"INSERT INTO users (email) VALUES ('a') ON CONFLICT (lower(email)) WHERE id > 1 DO NOTHING">();
   // DO UPDATE sees the target (by name or alias) and `excluded`
   expectTypeOf<Row<"INSERT INTO users (email, display_name) VALUES ('a', 'b') ON CONFLICT (email) DO UPDATE SET display_name = excluded.display_name RETURNING id, display_name">>().toEqualTypeOf<{ id: number; display_name: string | null }>();
-  expectTypeOf<Row<"INSERT INTO users AS u (email) VALUES ('a') ON CONFLICT (email) DO UPDATE SET display_name = excluded.email || u.email, email = DEFAULT WHERE u.id > 1 RETURNING u.display_name">>().toEqualTypeOf<{ display_name: string | null }>();
+  expectTypeOf<Row<"INSERT INTO users AS u (email) VALUES ('a') ON CONFLICT (email) DO UPDATE SET display_name = excluded.email || u.email, created_at = DEFAULT WHERE u.id > 1 RETURNING u.display_name">>().toEqualTypeOf<{ display_name: string | null }>();
+  expectTypeOf<V<"INSERT INTO users (email) VALUES ('a') ON CONFLICT (email) DO UPDATE SET email = DEFAULT">>().toEqualTypeOf<SqlError<'null value in column "email" of relation "users" violates not-null constraint', 4>>();
   expectTypeOf<V<"INSERT INTO users (email) VALUES ('a') ON CONFLICT (email) DO UPDATE SET display_name = users.email">>().toEqualTypeOf<"INSERT INTO users (email) VALUES ('a') ON CONFLICT (email) DO UPDATE SET display_name = users.email">();
   // an unqualified column present in both the target and `excluded` is ambiguous (Postgres behaviour)
   expectTypeOf<V<"INSERT INTO users (email) VALUES ('a') ON CONFLICT (email) DO UPDATE SET display_name = email">>().toEqualTypeOf<SqlError<'column reference "email" is ambiguous', 4>>();

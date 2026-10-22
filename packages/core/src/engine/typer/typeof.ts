@@ -31,7 +31,7 @@ export type TypeOf<E extends Expr, C extends Ctx> =
   : E extends { readonly t: "bool" } ? Info<"bool">
   : E extends { readonly t: "null" } ? Info<"null", true>
   : E extends { readonly t: "param" } ? Info<"unknown", true>
-  : E extends { readonly t: "default" } ? Info<"unknown", true>
+  : E extends { readonly t: "default" } ? SqlError<"DEFAULT is not allowed in this context", null>
   : E extends { readonly t: "typed" } ? Info<E["type"]>
   : E extends { readonly t: "bin" } ? TypeBin<E["op"], E["l"], E["r"], C>
   : E extends { readonly t: "un" } ? TypeUn<E["op"], E["e"], C>

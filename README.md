@@ -77,6 +77,7 @@ documentation site) and `@typesql/bench` (compile-time budget benchmarks).
 | Nullability narrowing: `WHERE c IS NOT NULL` / comparisons / inner-join conditions make `c` non-null | ✓ |
 | Errors with token positions and "Perhaps you meant …" hints for unknown columns and relations | ✓ |
 | INSERT/UPDATE/DELETE with RETURNING, required-column checks, ON CONFLICT, `EXCLUDED` | ✓ |
+| Write helpers: `sql.valueOrDefault(x)` (`DEFAULT` for `undefined`), typed `sql.set(table, partial)` and `sql.values(table, rows)` | ✓ |
 | DDL → schema: `ApplyDdl<DB, "ALTER TABLE …">`, `migrations()` builder, views, enums, schemas | ✓ |
 | Fragments: `{slot}` splicing with `$n` renumbering, `sql.fragment`, `sql.id`, `sql.join`, `sql.list` (runtime arrays of typed elements), `sql.raw`; dynamic text falls back to `sql.as<Row>()` | ✓ |
 | Postgres output column naming (`?column?`, `count`, `case`, `btrim`, casts → type name, last duplicate wins) | ✓ |

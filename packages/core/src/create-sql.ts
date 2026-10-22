@@ -1,13 +1,15 @@
 import type { ParamsOf, RowOf, Validate } from "./engine/infer.js";
 import type { NamedParams, RewriteNamedStr } from "./engine/named.js";
 import type { AnyErr, SqlError } from "./engine/errors.js";
-import type { CheckCarried, Enc, InlineMarker, RewriteInlineStr, Skip } from "./engine/inline.js";
+import type { CheckCarried, DefaultMarker, Enc, HasDefaultable, InlineMarker, RewriteInlineStr, Skip, WithDefaults } from "./engine/inline.js";
 import type { HasSlots, JoinedText, MaxParamStr, QuotedIdent, SlotNames, Splice, SpliceCarried, Take, UnionList, UnknownTuple } from "./engine/splice.js";
 import type { DefaultTypeMap } from "./type-map/index.js";
 import { makeFragment, makeQuery, type CARRIED, type Executor, type Fragment, type Query, type TextType } from "./query.js";
 import type { KeyedRow, RowKeys, SqlOptions } from "./row-keys.js";
 import { joinFragments, maxParam, quoteIdent, rewriteNamed, splice, type Spliceable } from "./runtime/splice.js";
-import { hasInline, param, resolveInline } from "./runtime/inline.js";
+import { hasInline, param, resolveInline, valueOrDefault } from "./runtime/inline.js";
+import { buildSet, buildValues } from "./runtime/write.js";
+import type { InsertInput, NoExtraKeys, SetInput, SetRep, TableName, ValuesRep } from "./engine/write.js";
 
 /** Fragments accepted in a slot object: fragments or whole queries (subqueries). */
 export type Slottable = Fragment<string, readonly unknown[], readonly unknown[]> | Query<unknown, readonly unknown[], string>;
@@ -72,7 +74,7 @@ type CallCheck<DB, TM, Q extends string> =
   : Prepared<Q> extends infer P
     ? P extends [infer X extends string, string[], infer Encs extends readonly string[], infer M extends number]
       ? Validate<DB, X> extends infer V
-        ? V extends AnyErr ? V : Carried<DB, TM, X, [...Skip<M>, ...Encs]>
+        ? V extends AnyErr ? V : Carried<DB, TM, X, [...Skip<M>, ...Encs]> extends infer K ? (K extends AnyErr ? K : DefaultsCheck<DB, Q, null>) : never
         : never
       : P
     : never;
@@ -85,6 +87,19 @@ type CallArgs<DB, TM, Q extends string> =
 /** `unknown` when every carried value type fits its parameter, else the SqlError. */
 type Carried<DB, TM, X extends string, K extends readonly unknown[]> =
   K extends readonly null[] ? unknown : CheckCarried<DB, TM, X, K> extends infer C ? (C extends true ? unknown : C) : never;
+
+/**
+ * `sql.valueOrDefault(v)` with a value that can be `undefined`: the statement is checked again
+ * with `DEFAULT` in place of every such marker (one extra analysis, not one per marker: each
+ * position allows `DEFAULT` or not on its own). `S` is the slot object, `null` without slots.
+ */
+type DefaultsCheck<DB, Q extends string, S> =
+  HasDefaultable<Q> extends false ? unknown
+  : PText<WithDefaults<Q>> extends infer X extends string
+    ? (S extends null ? X : Splice<X, SlotTexts<S>>) extends infer X2 extends string
+      ? Validate<DB, X2> extends SqlError<infer Msg extends string, infer At> ? SqlError<`${Msg} (sql.valueOrDefault() sends DEFAULT for undefined)`, At> : unknown
+      : unknown
+    : unknown;
 
 // ─── with slots ───
 
@@ -99,7 +114,8 @@ type SlottedCheck<DB, TM, Q extends string, S> =
         ? X extends string
           ? string extends X ? SqlError<"dynamic SQL fragment: the statement text is not a literal; use sql.as<Row>() to assert the row type", null>
           : Validate<DB, X> extends infer V
-            ? V extends AnyErr ? V : Carried<DB, TM, X, [...Skip<M>, ...Encs, ...SpliceCarried<T2, SlotCarried<S>>]>
+            ? V extends AnyErr ? V
+            : Carried<DB, TM, X, [...Skip<M>, ...Encs, ...SpliceCarried<T2, SlotCarried<S>>]> extends infer K ? (K extends AnyErr ? K : DefaultsCheck<DB, Q, S>) : never
             : never
           : X
         : never
@@ -217,6 +233,15 @@ export interface Sql<DB, TM, Keys extends RowKeys = "preserve"> {
   param<const T>(value: T): InlineMarker<T>;
 
   /**
+   * Like `sql.param(value)`, but `undefined` is sent as `DEFAULT`:
+   * `` VALUES (${sql.param(email)}, ${sql.valueOrDefault(mood)}) ``. The value is checked like a
+   * parameter (without `undefined`); when it can be `undefined`, the statement must also be
+   * valid with `DEFAULT` there (a VALUES item or SET value, and not a NOT NULL column without
+   * a default). Inside `sql.fragment` only the value is checked.
+   */
+  valueOrDefault<const T>(value: T): DefaultMarker<T>;
+
+  /**
    * A spliceable SQL piece (not validated on its own; its parameters are typed once spliced).
    * `:name` and inline parameters are resolved at creation, so a fragment can be reused; the
    * values' types are checked when the fragment is spliced.
@@ -241,6 +266,23 @@ export interface Sql<DB, TM, Keys extends RowKeys = "preserve"> {
    * Throws at runtime on an empty array.
    */
   list<const Items extends readonly Slottable[], const Sep extends string = ", ">(items: Items, separator?: Sep): Fragment<ListRep<Items[number], Sep>["text"], readonly unknown[], ListRep<Items[number], Sep>["carried"]>;
+
+  /**
+   * `SET` list from an object: `sql("UPDATE users SET {set} WHERE id = $1", { set: sql.set("users", input) }, id)`.
+   * Keys must be columns of `table` and values must fit them; `undefined` values are skipped.
+   * Typed with every key of the input type assigned once. Throws at runtime when no value is defined.
+   */
+  set<const T extends TableName<DB>, const P extends SetInput<DB, TM, T>>(table: T, values: NoExtraKeys<P, SetInput<DB, TM, T>>): Fragment<SetRep<P>["text"], readonly unknown[], SetRep<P>["carried"]>;
+
+  /**
+   * Column list and `VALUES` rows from objects: `sql("INSERT INTO users {rows} RETURNING id", { rows: sql.values("users", rows) })`.
+   * NOT NULL columns without a default are required; a missing or `undefined` value is `DEFAULT`.
+   * Typed with every key of the row types once. Throws at runtime on an empty array.
+   */
+  values<const T extends TableName<DB>, const R extends readonly InsertInput<DB, TM, T>[]>(
+    table: T,
+    rows: R & { readonly [I in keyof R]: NoExtraKeys<R[I], InsertInput<DB, TM, T>> },
+  ): Fragment<ValuesRep<R[number]>["text"], readonly unknown[], ValuesRep<R[number]>["carried"]>;
 
   /** Raw, untyped SQL text. Splicing it forces the override path (`sql.as`). */
   raw(text: string): Fragment<string, [], []>;
@@ -312,6 +354,7 @@ export function createSql<DB, TM = DefaultTypeMap>(executor?: Executor, options?
       return makeQuery(text, values, executor, rowKeys);
     },
     param,
+    valueOrDefault,
     fragment: (text: string, ...rest: readonly unknown[]) => {
       const r = build(text, rest);
       return makeFragment(r.text, r.values);
@@ -324,6 +367,14 @@ export function createSql<DB, TM = DefaultTypeMap>(executor?: Executor, options?
     list: (items: readonly Spliceable[], separator: string = ", ") => {
       if (items.length === 0) throw new Error("typesql: sql.list() needs at least one item; put a fixed element first (`[base, ...rest]`) or skip the clause");
       const r = joinFragments(items, separator);
+      return makeFragment(r.text, r.values);
+    },
+    set: (_table: string, values: Readonly<Record<string, unknown>>) => {
+      const r = buildSet(values);
+      return makeFragment(r.text, r.values);
+    },
+    values: (_table: string, rows: readonly Readonly<Record<string, unknown>>[]) => {
+      const r = buildValues(rows);
       return makeFragment(r.text, r.values);
     },
     raw: (text: string) => {

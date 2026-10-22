@@ -39,7 +39,10 @@ test("SET column checks", () => {
   expectTypeOf<V<"UPDATE users SET nope = 1">>().toEqualTypeOf<SqlError<'column "nope" of relation "users" does not exist', 3>>();
   expectTypeOf<V<"UPDATE users SET email = nope">>().toEqualTypeOf<SqlError<'column "nope" does not exist', 5>>();
   expectTypeOf<V<"UPDATE users SET email = NULL">>().toEqualTypeOf<SqlError<'null value in column "email" of relation "users" violates not-null constraint', 3>>();
-  expectTypeOf<V<"UPDATE users SET email = DEFAULT">>().toEqualTypeOf<"UPDATE users SET email = DEFAULT">();
+  // DEFAULT stores NULL in a column without a default
+  expectTypeOf<V<"UPDATE users SET email = DEFAULT">>().toEqualTypeOf<SqlError<'null value in column "email" of relation "users" violates not-null constraint', 3>>();
+  expectTypeOf<V<"UPDATE users SET created_at = DEFAULT, (email, display_name) = ('a', DEFAULT)">>().toEqualTypeOf<"UPDATE users SET created_at = DEFAULT, (email, display_name) = ('a', DEFAULT)">();
+  expectTypeOf<V<"UPDATE users SET display_name = DEFAULT || 'x'">>().toEqualTypeOf<SqlError<"DEFAULT is not allowed in this context", 5>>();
   // SET expressions see the target table by name or alias
   expectTypeOf<V<"UPDATE users SET email = users.email || 'x'">>().toEqualTypeOf<"UPDATE users SET email = users.email || 'x'">();
   expectTypeOf<V<"UPDATE users u SET email = users.email">>().toEqualTypeOf<SqlError<'missing FROM-clause entry for table "users"', 1>>();

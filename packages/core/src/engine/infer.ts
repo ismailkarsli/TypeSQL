@@ -72,6 +72,7 @@ type Reposition<E, T extends Toks, DB = never> =
  */
 type LocateIdent<M extends string, T extends Toks> =
   M extends `column ${string}.${infer Name} ${string}` ? FindTokOr<T, Name, LocateQuoted<M, T>>
+  : M extends "DEFAULT is not allowed in this context" ? FindTokOr<T, "default", 0>
   : M extends `each ${infer Op} query ${string}` ? FindTokOr<T, Lowercase<Op>, 0>
   : M extends `${infer Op} types ${string} cannot be matched` ? (Op extends `${string} ${string}` ? LocateQuoted<M, T> : FindTokOr<T, Lowercase<Op>, 0>)
   : LocateQuoted<M, T>;

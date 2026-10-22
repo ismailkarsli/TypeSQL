@@ -17,6 +17,7 @@ words, operators and literals from 0):
 | syntax | `syntax error at or near garbage`, `syntax error at end of input` |
 | missing `NOT NULL` column | `null value in column "email" of relation "users" violates not-null constraint` |
 | writing to a view | `cannot insert into view "user_stats"` |
+| `DEFAULT` outside a `VALUES` item or `SET` value | `DEFAULT is not allowed in this context` |
 | set operation width | `each UNION query must have the same number of columns` |
 | wrong inline value | `parameter $1: a string value cannot be used as int4` |
 | non-literal SQL | `the SQL text is not a string literal: …` |
@@ -48,6 +49,11 @@ Measured on TypeScript 7.0.2:
 - `sql.list` checks one statement with every distinct element once, so its cost grows with the
   number of distinct elements, not with the number of combinations (80 distinct sort
   elements: ~0.2M instantiations). In a select list it counts every element as selected.
+- `sql.set` and `sql.values` are checked the same way, with every key of the input type once.
+  The schema does not tell identity `GENERATED ALWAYS` columns apart from other columns with a
+  default, so writing one is accepted (Postgres rejects it without `OVERRIDING SYSTEM VALUE`).
+- `sql.valueOrDefault` inside `sql.fragment(…)` has its value type checked, but not whether
+  `DEFAULT` is allowed where the fragment is spliced.
 - In editor hovers, row types list their keys alphabetically (TypeScript 7 orders the keys of
   computed object types). The rows the driver returns keep the `SELECT` order.
 

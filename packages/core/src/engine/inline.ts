@@ -18,6 +18,14 @@ import type { MaxParamStr } from "./splice.js";
  */
 export type InlineMarker<T> = `\u0000P${Enc<T>}\u0000`;
 
+/**
+ * `sql.valueOrDefault(v)`: like `sql.param(v)`, but `undefined` sends `DEFAULT` instead of a
+ * parameter. NUL, "D", "u" when the value can be `undefined` (else "-"), the encoding of the
+ * value without `undefined`, NUL. (No ":", which `:name` rewriting would see.) The statement is typed with `$k` in its place, and checked a second
+ * time with `DEFAULT` there when the value can be `undefined` (`WithDefaults`).
+ */
+export type DefaultMarker<T> = `\u0000D${undefined extends T ? "u" : "-"}${Enc<Exclude<T, undefined>>}\u0000`;
+
 // ───────────────────────────── value type encoding ─────────────────────────────
 
 /**
@@ -138,9 +146,18 @@ type InlineLoop<T extends string, Acc extends string, Encs extends string[], K e
     : never;
 
 type InlineCode<S extends string, Acc extends string, Encs extends string[], K extends number> =
-  S extends `${infer Pre}\u0000P${infer E}\u0000${infer Rest}`
-    ? InlineCode<Rest, `${Acc}${Pre}$${K}`, [...Encs, E], Next[K]>
+  S extends `${infer Pre}\u0000${infer Body}\u0000${infer Rest}`
+    ? InlineCode<Rest, `${Acc}${Pre}$${K}`, [...Encs, MarkerEnc<Body>], Next[K]>
     : [`${Acc}${S}`, Encs, K];
+/** Encoded value type of a marker body: `P<enc>` (sql.param) or `Du<enc>` / `D-<enc>` (sql.valueOrDefault). */
+type MarkerEnc<B extends string> = B extends `P${infer E}` ? E : B extends `Du${infer E}` | `D-${infer E}` ? E : "*";
+
+/** Does the text hold a `sql.valueOrDefault()` whose value can be `undefined`? */
+export type HasDefaultable<S extends string> = S extends `${string}\u0000Du${string}` ? true : false;
+
+/** The text with every `sql.valueOrDefault()` that can be `undefined` replaced by `DEFAULT`. */
+export type WithDefaults<S extends string, Acc extends string = ""> =
+  S extends `${infer Pre}\u0000Du${string}\u0000${infer Rest}` ? WithDefaults<Rest, `${Acc}${Pre}DEFAULT`> : `${Acc}${S}`;
 
 // ───────────────────────────── value checks ─────────────────────────────
 

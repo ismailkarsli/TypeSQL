@@ -47,6 +47,9 @@ the same value in a second statement throws at runtime. Wrap a value you want to
 [fragment](./fragments), which can be spliced any number of times. `sql.param()` inside quotes
 or a comment is an error.
 
+`sql.valueOrDefault(value)` works the same way, but sends `DEFAULT` when the value is
+`undefined`; see [Writing data](./writing-data#optional-values-sql-valueordefault).
+
 ## A value used more than once
 
 Each `${sql.param(x)}` is its own `$n`, even for the same `x`, and each one is checked against

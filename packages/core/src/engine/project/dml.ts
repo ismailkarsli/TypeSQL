@@ -5,7 +5,7 @@ import type { ResolveWritableTable, TableCols } from "../binder/resolve.js";
 import type { AnyErr, SqlError } from "../errors.js";
 import type { ColInfo, ColMap, Cols, CteMap, Ctx, Info, Scope, ScopeItem, ScopeLevel, MkCtx } from "../types.js";
 import type { AddParam, ParamsOfExpr, ParamsOfFromItems, ParamsOfOpt, ParamsOfSelect, ParamsOfTargets } from "../typer/params.js";
-import type { TypeList, TypeOf } from "../typer/typeof.js";
+import type { TypeOf } from "../typer/typeof.js";
 import type { BindWith, ProjectSelect, ProjectTargets } from "./select.js";
 
 /**
@@ -21,7 +21,9 @@ import type { BindWith, ProjectSelect, ProjectTargets } from "./select.js";
  *     expressions`, `VALUES lists must all be the same length`);
  *   - every NOT NULL column without a default is assigned
  *     (`null value in column "c" of relation "t" violates not-null constraint`), also for a
- *     literal `NULL` assigned to such a column;
+ *     literal `NULL` assigned to a NOT NULL column and `DEFAULT` assigned to one without a
+ *     default; `DEFAULT` anywhere but a VALUES item or a SET value is
+ *     `DEFAULT is not allowed in this context`;
  *   - SET columns exist (`column "c" of relation "t" does not exist`), multi-column SET
  *     sources have the right width;
  *   - every expression (VALUES, SET, WHERE, ON CONFLICT, RETURNING) is typed and the first
@@ -149,8 +151,8 @@ type CheckInsertSource<Source extends InsertSource, Cs extends readonly string[]
 
 type CheckRows<Rows extends readonly (readonly Expr[])[], Cs extends readonly string[] | null, Tbl extends Table, Name extends string, C extends Ctx> =
   Rows extends readonly [infer R extends readonly Expr[], ...infer Rest extends readonly (readonly Expr[])[]]
-    ? TypeList<R, C, []> extends infer Ts
-      ? Ts extends readonly ColInfo[]
+    ? CheckValueItems<R, C> extends infer Ts
+      ? Ts extends true
         ? CheckNullLiterals<R, Cs extends readonly string[] ? Cs : [], Tbl, Name> extends infer N
           ? N extends AnyErr ? N : CheckRows<Rest, Cs, Tbl, Name, C>
           : never
@@ -158,16 +160,27 @@ type CheckRows<Rows extends readonly (readonly Expr[])[], Cs extends readonly st
       : never
     : true;
 
+/** Type each item of a VALUES row or multi-column SET source; a bare `DEFAULT` is allowed there and skipped. */
+type CheckValueItems<Es extends readonly Expr[], C extends Ctx> =
+  Es extends readonly [infer E extends Expr, ...infer R extends readonly Expr[]]
+    ? E extends { readonly t: "default" } ? CheckValueItems<R, C>
+    : TypeOf<E, C> extends infer T ? (T extends ColInfo ? CheckValueItems<R, C> : T) : never
+    : true;
+
 type CheckNullLiterals<Es extends readonly Expr[], Cs extends readonly string[], Tbl extends Table, Name extends string> =
   Es extends readonly [infer E extends Expr, ...infer ER extends readonly Expr[]]
     ? Cs extends readonly [infer Col extends string, ...infer CR extends readonly string[]]
       ? E extends { readonly t: "null" }
         ? NotNullCol<Tbl, Col> extends true ? SqlError<`null value in column "${Col}" of relation "${Name}" violates not-null constraint`, null> : CheckNullLiterals<ER, CR, Tbl, Name>
+        : E extends { readonly t: "default" }
+          ? RequiredCol<Tbl, Col> extends true ? SqlError<`null value in column "${Col}" of relation "${Name}" violates not-null constraint`, null> : CheckNullLiterals<ER, CR, Tbl, Name>
         : CheckNullLiterals<ER, CR, Tbl, Name>
       : true
     : true;
 
 type NotNullCol<Tbl extends Table, Col extends string> = Col extends keyof Tbl ? (Tbl[Col]["nullable"] extends false ? true : false) : false;
+/** NOT NULL without a default: `DEFAULT` stores NULL there, which Postgres rejects. */
+type RequiredCol<Tbl extends Table, Col extends string> = Col extends keyof Tbl ? (Tbl[Col] extends { readonly nullable: false; readonly hasDefault: false } ? true : false) : false;
 
 /** Every NOT NULL column without a default must be in `Cs` (skipped when `Cs` is unknown). */
 type CheckRequired<Tbl extends Table, Cs extends readonly string[] | null, Name extends string> =
@@ -202,6 +215,8 @@ type CheckSetItem<S extends SetItem, Tbl extends Table, Name extends string, C e
     ? Col extends keyof Tbl
       ? E extends { readonly t: "null" }
         ? NotNullCol<Tbl, Col> extends true ? SqlError<`null value in column "${Col}" of relation "${Name}" violates not-null constraint`, null> : true
+        : E extends { readonly t: "default" }
+          ? RequiredCol<Tbl, Col> extends true ? SqlError<`null value in column "${Col}" of relation "${Name}" violates not-null constraint`, null> : true
         : CheckExpr<E, C>
       : SqlError<`column "${Col}" of relation "${Name}" does not exist`, null>
   : S extends { readonly t: "setmulti"; readonly cols: infer Cols extends readonly string[]; readonly e: infer E extends Expr }
@@ -215,7 +230,7 @@ type CheckMultiSource<E extends Expr, Cols_ extends readonly string[], C extends
       ? R extends Cols ? (HasStar<R> extends true ? true : WidthCheck<R, Cols_> extends "eq" ? true : SqlError<"number of columns does not match number of values", null>) : R
       : never
   : E extends { readonly t: "row"; readonly items: infer Items extends readonly Expr[] }
-    ? WidthCheck<Items, Cols_> extends "eq" ? (TypeList<Items, C, []> extends infer Ts ? (Ts extends readonly ColInfo[] ? true : Ts) : never) : SqlError<"number of columns does not match number of values", null>
+    ? WidthCheck<Items, Cols_> extends "eq" ? CheckValueItems<Items, C> : SqlError<"number of columns does not match number of values", null>
   : WidthCheck<[E], Cols_> extends "eq" ? CheckExpr<E, C> : SqlError<"number of columns does not match number of values", null>;
 
 type CheckExpr<E extends Expr, C extends Ctx> = TypeOf<E, C> extends infer T ? (T extends ColInfo ? true : T) : never;
