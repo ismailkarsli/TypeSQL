@@ -29,6 +29,10 @@
   dir: packages/core
   intents:
     - gentle-maps-kneel
+"@typesql/core@0.1.1":
+  dir: packages/core
+  intents:
+    - silly-pens-divide
 "@typesql/drizzle@0.0.2":
   dir: packages/drizzle
   intents:
@@ -37,6 +41,10 @@
   dir: packages/drizzle
   intents:
     - smart-bottles-matter
+"@typesql/drizzle@0.1.1":
+  dir: packages/drizzle
+  intents:
+    - silly-pens-divide
 "@typesql/kysely@0.0.2":
   dir: packages/kysely
   intents:
@@ -57,6 +65,10 @@
   dir: packages/kysely
   intents:
     - orange-planes-tell
+"@typesql/kysely@0.1.1":
+  dir: packages/kysely
+  intents:
+    - silly-pens-divide
 "@typesql/pg@0.0.2":
   dir: packages/pg
   intents:
@@ -75,6 +87,10 @@
   intents:
     - brave-knives-crash
     - orange-planes-tell
+"@typesql/pg@0.1.1":
+  dir: packages/pg
+  intents:
+    - silly-pens-divide
 "@typesql/postgres@0.0.2":
   dir: packages/postgres
   intents:
@@ -91,6 +107,10 @@
   intents:
     - brave-knives-crash
     - orange-planes-tell
+"@typesql/postgres@0.1.1":
+  dir: packages/postgres
+  intents:
+    - silly-pens-divide
 "@typesql/prisma@0.0.2":
   dir: packages/prisma
   intents:
@@ -104,3 +124,7 @@
   intents:
     - clean-seals-help
     - orange-planes-tell
+"@typesql/prisma@0.1.1":
+  dir: packages/prisma
+  intents:
+    - silly-pens-divide
