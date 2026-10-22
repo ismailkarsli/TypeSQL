@@ -1,17 +1,18 @@
 #!/usr/bin/env node
 // Measures `tsc --noEmit --extendedDiagnostics` per generated file, writes results.json, prints
-// a table and exits 1 when a file exceeds thresholds.json. `--calibrate` rewrites
+// a table plus the per-query throughput (also to the GitHub job summary when
+// GITHUB_STEP_SUMMARY is set) and exits 1 when a file exceeds thresholds.json. `--calibrate` rewrites
 // thresholds.json from the measured numbers x2 (check time gets a 1.5 s floor: for sub-second
 // files the fixed cost of loading lib.d.ts + core and CPU contention dominate, and instantiation
 // counts are the deterministic signal) before checking.
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const tsc = join(here, "../../node_modules/.bin/tsc");
-const names = ["q1", "q50", "q500", "maxlen"];
+const names = ["q1", "q50", "q500", "mixed50", "maxlen"];
 const calibrate = process.argv.includes("--calibrate");
 const thresholdsPath = join(here, "thresholds.json");
 
@@ -77,7 +78,24 @@ function probes(errors) {
 }
 
 const results = names.map(measure);
-writeFileSync(join(here, "results.json"), JSON.stringify({ measuredAt: new Date().toISOString(), results }, null, 2) + "\n");
+
+/**
+ * Marginal cost of one query: q500 minus q1 (which is mostly loading lib.d.ts and core), per
+ * query. `queriesPerSec` is the check-time throughput an app with many typed queries sees.
+ */
+function throughput() {
+  const q1 = results.find((r) => r.name === "q1");
+  const q500 = results.find((r) => r.name === "q500");
+  if (!q1?.checkTimeSec || !q500?.checkTimeSec || q1.instantiations == null || q500.instantiations == null) return null;
+  const seconds = Math.max(q500.checkTimeSec - q1.checkTimeSec, 0.001);
+  return {
+    instantiationsPerQuery: Math.round((q500.instantiations - q1.instantiations) / 499),
+    checkMsPerQuery: Number(((seconds * 1000) / 499).toFixed(2)),
+    queriesPerSec: Math.round(499 / seconds),
+  };
+}
+const perQuery = throughput();
+writeFileSync(join(here, "results.json"), JSON.stringify({ measuredAt: new Date().toISOString(), throughput: perQuery, results }, null, 2) + "\n");
 
 if (calibrate) {
   const thresholds = {};
@@ -134,6 +152,21 @@ function table(objects) {
   for (const o of objects) console.log(line(keys.map((k) => o[k])));
 }
 table(rows);
+if (perQuery) {
+  console.log(`\nthroughput (q500 - q1): ${perQuery.queriesPerSec} queries/s of check time, ${perQuery.checkMsPerQuery} ms and ${perQuery.instantiationsPerQuery} instantiations per query`);
+}
+if (process.env.GITHUB_STEP_SUMMARY) {
+  const md = [
+    "### Compile-time bench",
+    "",
+    "| file | instantiations | check s | status |",
+    "|---|---|---|---|",
+    ...rows.map((r) => `| ${r.file} | ${r.instantiations} | ${r["check s"]} | ${r.status} |`),
+    "",
+    perQuery ? `Throughput: **${perQuery.queriesPerSec} queries/s** of check time (${perQuery.checkMsPerQuery} ms, ${perQuery.instantiationsPerQuery} instantiations per query).` : "",
+  ];
+  appendFileSync(process.env.GITHUB_STEP_SUMMARY, md.join("\n") + "\n");
+}
 const maxlen = results.find((r) => r.probes);
 if (maxlen) console.log(`\nmaxlen probes: ${maxlen.probes.map((p) => `${p.name}=${p.bytes}B:${p.ok ? "ok" : "FAIL"}`).join("  ")}`);
 for (const r of results) for (const e of r.errors) console.log(`  [${r.name}] ${e.file}:${e.line} ${e.code} ${e.message.slice(0, 140)}`);

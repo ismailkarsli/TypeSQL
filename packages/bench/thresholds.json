@@ -14,6 +14,11 @@
     "checkTimeSec": 6.44,
     "maxErrors": 0
   },
+  "mixed50": {
+    "instantiations": 523624,
+    "checkTimeSec": 1.5,
+    "maxErrors": 0
+  },
   "maxlen": {
     "instantiations": 8716582,
     "checkTimeSec": 2.54,

@@ -57,24 +57,39 @@ first returned row — use `ORDER BY`/`LIMIT` so that row is deterministic.
 `packages/bench` measures what the engine costs the compiler:
 
 ```sh
-node packages/bench/gen.mjs              # writes src/q1.ts, q50.ts, q500.ts, maxlen.ts
+node packages/bench/gen.mjs              # writes src/q1.ts, q50.ts, q500.ts, mixed50.ts, maxlen.ts
 node packages/bench/run.mjs              # tsc --extendedDiagnostics per file; exit 1 on a threshold breach
 node packages/bench/run.mjs --calibrate  # rewrite thresholds.json from the measured numbers
 ```
 
-`qN.ts` holds N distinct realistic SELECTs; `maxlen.ts` holds one statement per size probe
-(0.5, 1, 2, 4 and 8 KB). `thresholds.json` caps instantiations (30% headroom: they are
-deterministic), check time (2x: it is noisy), errors, and the largest statement that must
-still infer. CI runs the bench as a separate job.
+`qN.ts` holds N distinct realistic SELECTs; `mixed50.ts` holds 50 statements that use inline
+`${sql.param()}` values, `:name` parameters, one `{slot}` fragment shared by many statements
+and `sql.id`; `maxlen.ts` holds one statement per size probe (0.5, 1, 2, 4 and 8 KB).
+`thresholds.json` caps instantiations (30% headroom: they are deterministic), check time (2x:
+it is noisy), errors, and the largest statement that must still infer. CI runs the bench as a
+separate job and writes the table to the job summary.
+
+`run.mjs` also prints the marginal cost of one query, q500 minus q1 divided by 499: check
+time per query, queries per second of check time, and instantiations per query. That is the
+number to watch for an app with hundreds of typed queries.
 
 Current numbers on TypeScript 7.0.2:
 
 | File | Instantiations | Check time |
 |---|---|---|
-| q1 | ~130K (mostly loading the library) | ~0.3 s |
-| q50 | ~0.67M | ~0.7 s |
-| q500 | ~5.1M | ~3.9 s |
-| maxlen (all probes pass, up to 8 KB) | ~6.7M | ~1.6 s |
+| q1 | ~135K (mostly loading the library) | ~0.3 s |
+| q50 | ~0.63M | ~0.55 s |
+| q500 | ~4.7M | ~3.3 s |
+| mixed50 | ~0.40M | ~0.45 s |
+| maxlen (all probes pass, up to 8 KB) | ~6.5M | ~1.3 s |
+| per query (q500 − q1) | ~9.2K | ~6.5 ms, ~150 queries/s |
+
+Where a typical query's cost goes (q50, instantiations above loading the library): lexing
+~30%, parsing ~35%, binding and typing ~13%, building the row and parameter types ~17%, the
+call signature (`:name` / inline rewriting, checks) ~4%. Each statement is analysed on its own:
+TypeScript caches type instantiations by their arguments, and two statements that share a
+fragment or a subquery still differ in their text and token tuple, so nothing is reused
+between them.
 
 ## Function catalog review
 

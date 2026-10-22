@@ -34,6 +34,12 @@ test("operators use longest match", () => {
     ["a", "::", "int", "->>", "b", "#>>", "c", "!~*", "d", "<>", "e", "!=", "f", "||", "g", "@>", "h", "<@", "i", "?|", "j", "?&", "k", "@?", "l", "#-", "m", "<=", "n", ">=", "o"]
   >();
   expectTypeOf<Vals<"a->b">>().toEqualTypeOf<["a", "->", "b"]>();
+  // fast paths: punctuation without lookahead, `=` / `:` / `.` with one character of lookahead
+  expectTypeOf<Vals<"f(a,b);x[1]+-y*z%2^3">>().toEqualTypeOf<["f", "(", "a", ",", "b", ")", ";", "x", "[", "1", "]", "+", "-", "y", "*", "z", "%", "2", "^", "3"]>();
+  expectTypeOf<Vals<"a=b c=>d e:=f g::h :i j:k">>().toEqualTypeOf<["a", "=", "b", "c", "=>", "d", "e", ":=", "f", "g", "::", "h", ":", "i", "j", ":", "k"]>();
+  expectTypeOf<Vals<"t.c .5 t.*">>().toEqualTypeOf<["t", ".", "c", ".5", "t", ".", "*"]>();
+  // a word starting with e / b / x is only a string prefix when a quote follows
+  expectTypeOf<Lex<"e x'1' ex b'0' bx E''">>().toEqualTypeOf<[WordTok<"e">, StrTok<"1">, WordTok<"ex">, StrTok<"0">, WordTok<"bx">, StrTok<"">]>();
 });
 
 test("comments are skipped, including nested block comments", () => {

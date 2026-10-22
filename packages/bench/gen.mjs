@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Generates the compile-time stress files: src/q1.ts, src/q50.ts, src/q500.ts (N distinct
-// realistic SELECTs through createSql) and src/maxlen.ts (one statement per size probe).
+// realistic SELECTs through createSql), src/mixed50.ts (50 statements using inline params,
+// :name params and a shared {slot} fragment) and src/maxlen.ts (one statement per size probe).
 // Deterministic, dependency-free. Run `node gen.mjs` then `node run.mjs`.
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -65,6 +66,25 @@ const templates = [
   (i) => [`SELECT * FROM posts WHERE author_id = $1 AND views >= ${i}`, ["5"]],
 ];
 
+/**
+ * Statements exercising the call-site text processing: inline `${sql.param(v)}` values, `:name`
+ * parameters, one fragment spliced into many statements, and `sql.id`. Each yields
+ * `[callSource]`; `i` keeps every statement distinct.
+ */
+const mixedTemplates = [
+  (i) => `sql(\`SELECT u.id, u.email FROM users u WHERE u.id = \${sql.param(${i})} AND u.email <> \${sql.param("x")}\`)`,
+  (i) => `sql("SELECT p.id, p.title FROM posts p WHERE p.author_id = :author AND p.views > :min AND p.id <> ${i}", { author: 1, min: 10 })`,
+  (i) => `sql("SELECT c.id, c.body FROM comments c {recent} AND c.post_id > ${i}", { recent })`,
+  (i) => `sql(\`UPDATE orders SET status = \${sql.param("paid")} WHERE id = \${sql.param("${i}")} RETURNING id, total\`)`,
+  (i) => `sql("SELECT o.id FROM {orders} o WHERE o.user_id = $1 AND o.id > ${i}", { orders: sql.id("orders") }, 3)`,
+];
+
+function mixedFile(count) {
+  const lines = [header, `const recent = sql.fragment("WHERE c.created_at > $1", new Date());`];
+  for (let i = 0; i < count; i++) lines.push(`export const m${i} = ${mixedTemplates[i % mixedTemplates.length](i)};`);
+  return lines.join("\n") + "\n";
+}
+
 function queriesFile(count) {
   const lines = [header];
   for (let i = 0; i < count; i++) {
@@ -106,6 +126,7 @@ const files = {
   "q1.ts": queriesFile(1),
   "q50.ts": queriesFile(50),
   "q500.ts": queriesFile(500),
+  "mixed50.ts": mixedFile(50),
   "maxlen.ts": maxlenFile(),
 };
 for (const [name, content] of Object.entries(files)) {
