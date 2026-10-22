@@ -39,7 +39,7 @@ const sql = createSql<DB>();
 const q = sql(`SELECT u.id, u.email, p.title
                FROM users u LEFT JOIN posts p ON p.author_id = u.id
                WHERE u.id = $1`, 7);
-//    ^? Query<{ id: number; email: string; title: string | null }, [number]>
+//    ^? Query<{ id: number; email: string; title: string | null }, [number | null]>
 
 q.text;   // the SQL, sent to Postgres as is
 q.values; // [7]

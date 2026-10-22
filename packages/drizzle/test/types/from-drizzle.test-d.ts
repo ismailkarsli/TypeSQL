@@ -159,5 +159,5 @@ test("the converted schema validates queries", () => {
   expectTypeOf<V<"INSERT INTO active_users (email) VALUES ('x')">>().toEqualTypeOf<SqlError<'cannot insert into view "active_users"', 2>>();
   expectTypeOf<Row<"SELECT a.type, a.expires_at, u.email FROM auth.accounts a JOIN auth.users u ON u.id = a.id">>()
     .toEqualTypeOf<{ type: "password" | "oauth"; expires_at: Date | null; email: string }>();
-  expectTypeOf<Params<"SELECT 1 FROM auth.accounts WHERE type = $1">>().toEqualTypeOf<["password" | "oauth"]>();
+  expectTypeOf<Params<"SELECT 1 FROM auth.accounts WHERE type = $1">>().toEqualTypeOf<["password" | "oauth" | null]>();
 });

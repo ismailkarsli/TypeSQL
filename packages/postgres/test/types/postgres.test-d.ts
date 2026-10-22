@@ -87,7 +87,7 @@ test("postgres.js Sql, TransactionSql and ReservedSql satisfy the structural int
 
 test("row types flow from Query through the helpers", () => {
   expectTypeOf<RowType<typeof q>>().toEqualTypeOf<Row>();
-  expectTypeOf<ParamsType<typeof q>>().toEqualTypeOf<[number]>();
+  expectTypeOf<ParamsType<typeof q>>().toEqualTypeOf<[number | null]>();
   expectTypeOf(query(db, q)).toEqualTypeOf<Promise<Row[]>>();
   expectTypeOf(one(db, q)).toEqualTypeOf<Promise<Row>>();
   expectTypeOf(maybeOne(db, q)).toEqualTypeOf<Promise<Row | null>>();
@@ -134,7 +134,7 @@ test("DML: execute returns the row count; RETURNING rows follow the type map", (
 
   const ins = big("INSERT INTO posts (author_id, title, tags, view_counts) VALUES ($1, $2, $3, $4) RETURNING id, view_counts", 1, "t", ["a"], [1n]);
   expectTypeOf(one(db, ins)).toEqualTypeOf<Promise<{ id: bigint; view_counts: bigint[] }>>();
-  expectTypeOf<ParamsType<typeof ins>>().toEqualTypeOf<[number, string, string[], bigint[]]>();
+  expectTypeOf<ParamsType<typeof ins>>().toEqualTypeOf<[number, string, (string | null)[], (bigint | null)[]]>();
 });
 
 test("rowKeys: camelCase renames the row keys through the helpers too", () => {

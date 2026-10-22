@@ -179,6 +179,24 @@ export const corpus = [
     expectTypes: { id: "string", title: "string" },
   },
   {
+    // the param types accept null here: LIMIT NULL / OFFSET NULL are no limit / no offset
+    name: "LIMIT/OFFSET params bound to NULL",
+    setup: [],
+    sql: "SELECT id FROM users WHERE email = $1 OR display_name = $2 OR id > 0 ORDER BY id LIMIT $3 OFFSET $4",
+    params: [null, null, null, null],
+    expectKeys: ["id"],
+    expectTypes: { id: "number" },
+  },
+  {
+    // array params accept null elements
+    name: "array param with NULL elements",
+    setup: [],
+    sql: "SELECT v FROM unnest($1::float8[]) WITH ORDINALITY AS x(v, i) ORDER BY i",
+    params: [[1.5, null]],
+    expectKeys: ["v"],
+    expectTypes: { v: "number" },
+  },
+  {
     name: "WHERE with typed params",
     setup: [],
     sql: "SELECT id, email FROM users WHERE id = $1 AND is_admin = $2",

@@ -26,12 +26,12 @@ declare const someText: string;
 
 test("inline parameters become $n, typed from their context", () => {
   const q = sql(`SELECT id, email FROM users WHERE id = ${sql.param(userId)} AND email = ${sql.param(email)}`);
-  expectTypeOf(q).toEqualTypeOf<Query<{ id: number; email: string }, [number, string], "SELECT id, email FROM users WHERE id = $1 AND email = $2">>();
+  expectTypeOf(q).toEqualTypeOf<Query<{ id: number; email: string }, [number | null, string | null], "SELECT id, email FROM users WHERE id = $1 AND email = $2">>();
 
   // after explicit $n (which stay call arguments) and after :name parameters
   const q2 = sql(`SELECT id FROM users WHERE id = $1 AND email = ${sql.param(email)}`, 5);
   expectTypeOf<TextType<typeof q2>>().toEqualTypeOf<"SELECT id FROM users WHERE id = $1 AND email = $2">();
-  expectTypeOf<ParamsType<typeof q2>>().toEqualTypeOf<[number, string]>();
+  expectTypeOf<ParamsType<typeof q2>>().toEqualTypeOf<[number | null, string | null]>();
   const q3 = sql(`SELECT id FROM users WHERE id = :id AND email = ${sql.param(email)}`, { id: 5 });
   expectTypeOf<TextType<typeof q3>>().toEqualTypeOf<"SELECT id FROM users WHERE id = $1 AND email = $2">();
 
@@ -58,7 +58,7 @@ test("inline values are checked against the parameter type", () => {
   sql(`SELECT id FROM users WHERE created_at > ${sql.param("2020-01-01")}`);
   // the message names the parameter, the value type and the expected SQL type
   const bad = `SELECT id FROM users WHERE id = ${sql.param("5")}` as const;
-  expectTypeOf<E<typeof bad>>().toEqualTypeOf<typeof bad & SqlError<"parameter $1: a string value cannot be used as int4 NOT NULL", 7>>();
+  expectTypeOf<E<typeof bad>>().toEqualTypeOf<typeof bad & SqlError<"parameter $1: a string value cannot be used as int4", 7>>();
 });
 
 test("inline params inside quotes or comments are rejected", () => {
@@ -92,7 +92,7 @@ test("SQL text that is not a literal is rejected (no string interpolation of val
 test("fragments carry their values' types; they are checked once spliced", () => {
   const byAge = sql.fragment(`AND age > ${sql.param(18)}`);
   const q = sql("SELECT id FROM users WHERE true {byAge}", { byAge });
-  expectTypeOf(q).toEqualTypeOf<Query<{ id: number }, [number], "SELECT id FROM users WHERE true AND age > $1">>();
+  expectTypeOf(q).toEqualTypeOf<Query<{ id: number }, [number | null], "SELECT id FROM users WHERE true AND age > $1">>();
 
   const wrong = sql.fragment("AND age > $1", "eighteen");
   // @ts-expect-error a string value for an int4 parameter, carried by the fragment

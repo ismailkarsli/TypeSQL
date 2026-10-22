@@ -23,16 +23,16 @@ test("fragments are spliced before inference", () => {
   const where = sql.fragment("WHERE u.id = $1", 7);
   expectTypeOf(where).toEqualTypeOf<Fragment<"WHERE u.id = $1", [unknown], ["n"]>>();
   const q = sql("SELECT u.id, u.email FROM users u {where}", { where });
-  expectTypeOf(q).toEqualTypeOf<Query<{ id: number; email: string }, [number], "SELECT u.id, u.email FROM users u WHERE u.id = $1">>();
+  expectTypeOf(q).toEqualTypeOf<Query<{ id: number; email: string }, [number | null], "SELECT u.id, u.email FROM users u WHERE u.id = $1">>();
 
   // outer params come first; fragment params are renumbered and travel with the fragment
   const q2 = sql("SELECT u.id FROM users u WHERE u.email = $1 {more}", { more: sql.fragment("AND u.age > $1", 18) }, "a@b.c");
-  expectTypeOf(q2).toEqualTypeOf<Query<{ id: number }, [string, number], "SELECT u.id FROM users u WHERE u.email = $1 AND u.age > $2">>();
+  expectTypeOf(q2).toEqualTypeOf<Query<{ id: number }, [string | null, number | null], "SELECT u.id FROM users u WHERE u.email = $1 AND u.age > $2">>();
 
   // a whole query can be spliced as a subquery
   const sub = sql("SELECT author_id FROM posts WHERE title = $1", "x");
   const q3 = sql("SELECT u.id FROM users u WHERE u.id IN ({sub})", { sub });
-  expectTypeOf(q3).toEqualTypeOf<Query<{ id: number }, [string], "SELECT u.id FROM users u WHERE u.id IN (SELECT author_id FROM posts WHERE title = $1)">>();
+  expectTypeOf(q3).toEqualTypeOf<Query<{ id: number }, [string | null], "SELECT u.id FROM users u WHERE u.id IN (SELECT author_id FROM posts WHERE title = $1)">>();
 
   // identifiers and joins
   const col = sql.id("display_name");
@@ -40,7 +40,7 @@ test("fragments are spliced before inference", () => {
   expectTypeOf(q4).toEqualTypeOf<Query<{ display_name: string | null }, [], 'SELECT "display_name" FROM users'>>();
   const conds = sql.join([sql.fragment("age > $1", 1), sql.fragment("email = $1", "e")], " AND ");
   const q5 = sql("SELECT id FROM users WHERE {conds}", { conds });
-  expectTypeOf(q5).toEqualTypeOf<Query<{ id: number }, [number, string], "SELECT id FROM users WHERE age > $1 AND email = $2">>();
+  expectTypeOf(q5).toEqualTypeOf<Query<{ id: number }, [number | null, string | null], "SELECT id FROM users WHERE age > $1 AND email = $2">>();
 
   // errors inside spliced text are reported
   // @ts-expect-error unknown column inside the fragment
@@ -65,5 +65,5 @@ test("dynamic fragments fall back to sql.as", () => {
 
 test("plain calls still work with object params", () => {
   const q = sql("SELECT id FROM users WHERE id = $1", 1);
-  expectTypeOf(q).toEqualTypeOf<Query<{ id: number }, [number], "SELECT id FROM users WHERE id = $1">>();
+  expectTypeOf(q).toEqualTypeOf<Query<{ id: number }, [number | null], "SELECT id FROM users WHERE id = $1">>();
 });

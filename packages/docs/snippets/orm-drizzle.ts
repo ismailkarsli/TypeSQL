@@ -20,7 +20,7 @@ sql("INSERT INTO posts (author_id, title, slug) VALUES ($1, $2, $3) RETURNING id
 // id and created_at have SQL defaults; slug's $defaultFn runs in Drizzle, so raw SQL must set it
 // #endregion query
 check<Equal<RowType<typeof q>, { email: string; display_name: string | null; title: string }>>();
-check<Equal<ParamsType<typeof q>, ["happy" | "sad"]>>();
+check<Equal<ParamsType<typeof q>, ["happy" | "sad" | null]>>();
 // @ts-expect-error -- slug has no SQL default
 sql("INSERT INTO posts (author_id, title) VALUES ($1, $2)", 1, "Hello");
 // @ts-expect-error -- views are read-only

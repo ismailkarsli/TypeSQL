@@ -42,24 +42,24 @@ test("INSERT ... VALUES: column type, nullable iff the column is nullable", () =
 test("INSERT ... SELECT", () => {
   expectTypeOf<Params<"INSERT INTO posts (author_id, title) SELECT $1, $2">>().toEqualTypeOf<[number, string]>();
   expectTypeOf<Raw<"INSERT INTO posts (author_id, title, body) SELECT $1, $2, $3">>().toEqualTypeOf<{ 1: T<"int4", false>; 2: T<"text", false>; 3: T<"text", true> }>();
-  expectTypeOf<Params<"INSERT INTO posts (author_id, title) SELECT id, email FROM users WHERE id = $1 AND email LIKE $2">>().toEqualTypeOf<[number, string]>();
-  expectTypeOf<Params<"INSERT INTO posts (author_id, title) SELECT id, $1 FROM users LIMIT $2">>().toEqualTypeOf<[string, number]>();
+  expectTypeOf<Params<"INSERT INTO posts (author_id, title) SELECT id, email FROM users WHERE id = $1 AND email LIKE $2">>().toEqualTypeOf<[number | null, string | null]>();
+  expectTypeOf<Params<"INSERT INTO posts (author_id, title) SELECT id, $1 FROM users LIMIT $2">>().toEqualTypeOf<[string, number | null]>();
 });
 
 test("ON CONFLICT DO UPDATE: SET takes the column type; WHERE sees the target and excluded", () => {
-  expectTypeOf<Params<"INSERT INTO users (email) VALUES ($1) ON CONFLICT (email) DO UPDATE SET email = $2 WHERE users.id > $3">>().toEqualTypeOf<[string, string, number]>();
-  expectTypeOf<Raw<"INSERT INTO users (email) VALUES ('a') ON CONFLICT (email) DO UPDATE SET display_name = $1 WHERE excluded.email = $2">>().toEqualTypeOf<{ 1: T<"text", true>; 2: T<"text", false> }>();
+  expectTypeOf<Params<"INSERT INTO users (email) VALUES ($1) ON CONFLICT (email) DO UPDATE SET email = $2 WHERE users.id > $3">>().toEqualTypeOf<[string, string, number | null]>();
+  expectTypeOf<Raw<"INSERT INTO users (email) VALUES ('a') ON CONFLICT (email) DO UPDATE SET display_name = $1 WHERE excluded.email = $2">>().toEqualTypeOf<{ 1: T<"text", true>; 2: T<"text", true> }>();
   expectTypeOf<Params<"INSERT INTO posts (author_id, title) VALUES (1, 'x') ON CONFLICT (id) DO UPDATE SET views = posts.views + $1">>().toEqualTypeOf<[number]>();
 });
 
 test("UPDATE", () => {
-  expectTypeOf<Params<"UPDATE users SET email = $1 WHERE id = $2">>().toEqualTypeOf<[string, number]>();
-  expectTypeOf<Raw<"UPDATE users SET email = $1, display_name = $2 WHERE id = $3">>().toEqualTypeOf<{ 1: T<"text", false>; 2: T<"text", true>; 3: T<"int4", false> }>();
-  expectTypeOf<Params<"UPDATE posts SET (author_id, title) = ($1, $2) WHERE id = $3">>().toEqualTypeOf<[number, string, string]>();
-  expectTypeOf<Params<"UPDATE posts SET views = views + $1 WHERE title LIKE $2">>().toEqualTypeOf<[number, string]>();
+  expectTypeOf<Params<"UPDATE users SET email = $1 WHERE id = $2">>().toEqualTypeOf<[string, number | null]>();
+  expectTypeOf<Raw<"UPDATE users SET email = $1, display_name = $2 WHERE id = $3">>().toEqualTypeOf<{ 1: T<"text", false>; 2: T<"text", true>; 3: T<"int4", true> }>();
+  expectTypeOf<Params<"UPDATE posts SET (author_id, title) = ($1, $2) WHERE id = $3">>().toEqualTypeOf<[number, string, string | null]>();
+  expectTypeOf<Params<"UPDATE posts SET views = views + $1 WHERE title LIKE $2">>().toEqualTypeOf<[number, string | null]>();
   // FROM items, WHERE and RETURNING use the expression rules with the target in scope
-  expectTypeOf<Params<"UPDATE users u SET display_name = p.title FROM posts p WHERE p.author_id = u.id AND p.views > $1 RETURNING u.id, $2::text AS tag">>().toEqualTypeOf<[number, string]>();
-  expectTypeOf<Params<"UPDATE users SET email = $1 FROM (SELECT id FROM posts WHERE views = $2) s WHERE s.id = users.id">>().toEqualTypeOf<[string, number]>();
+  expectTypeOf<Params<"UPDATE users u SET display_name = p.title FROM posts p WHERE p.author_id = u.id AND p.views > $1 RETURNING u.id, $2::text AS tag">>().toEqualTypeOf<[number | null, string]>();
+  expectTypeOf<Params<"UPDATE users SET email = $1 FROM (SELECT id FROM posts WHERE views = $2) s WHERE s.id = users.id">>().toEqualTypeOf<[string, number | null]>();
   // the same parameter used twice is unified
   expectTypeOf<Params<"UPDATE users SET email = $1 WHERE email = $1">>().toEqualTypeOf<[string]>();
   // cast beats context
@@ -67,15 +67,15 @@ test("UPDATE", () => {
 });
 
 test("DELETE", () => {
-  expectTypeOf<Params<"DELETE FROM users WHERE id = $1">>().toEqualTypeOf<[number]>();
-  expectTypeOf<Params<"DELETE FROM users u USING posts p WHERE p.author_id = u.id AND p.title = $1 AND u.id = ANY($2) RETURNING u.id">>().toEqualTypeOf<[string, number[]]>();
-  expectTypeOf<Params<"DELETE FROM posts WHERE author_id IN (SELECT id FROM users WHERE email = $1) RETURNING id, $2::int4 AS n">>().toEqualTypeOf<[string, number]>();
+  expectTypeOf<Params<"DELETE FROM users WHERE id = $1">>().toEqualTypeOf<[number | null]>();
+  expectTypeOf<Params<"DELETE FROM users u USING posts p WHERE p.author_id = u.id AND p.title = $1 AND u.id = ANY($2) RETURNING u.id">>().toEqualTypeOf<[string | null, (number | null)[] | null]>();
+  expectTypeOf<Params<"DELETE FROM posts WHERE author_id IN (SELECT id FROM users WHERE email = $1) RETURNING id, $2::int4 AS n">>().toEqualTypeOf<[string | null, number]>();
   expectTypeOf<Params<"DELETE FROM users">>().toEqualTypeOf<[]>();
 });
 
 test("parameters inside WITH bodies", () => {
-  expectTypeOf<Params<"WITH p AS (SELECT id FROM posts WHERE title = $1) INSERT INTO users (email) SELECT 'x' FROM p WHERE p.id = $2">>().toEqualTypeOf<[string, string]>();
-  expectTypeOf<Params<"WITH del AS (DELETE FROM posts WHERE id = $1 RETURNING author_id) UPDATE users SET email = $2 FROM del WHERE users.id = del.author_id">>().toEqualTypeOf<[string, string]>();
+  expectTypeOf<Params<"WITH p AS (SELECT id FROM posts WHERE title = $1) INSERT INTO users (email) SELECT 'x' FROM p WHERE p.id = $2">>().toEqualTypeOf<[string | null, string | null]>();
+  expectTypeOf<Params<"WITH del AS (DELETE FROM posts WHERE id = $1 RETURNING author_id) UPDATE users SET email = $2 FROM del WHERE users.id = del.author_id">>().toEqualTypeOf<[string | null, string]>();
 });
 
 test("nullable columns accept null at the sql() boundary", () => {

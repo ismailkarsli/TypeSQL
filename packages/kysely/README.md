@@ -21,7 +21,7 @@ const q = sql(
     WHERE u.id = $1 AND p.published = $2`,
   1, true,
 );
-//    ^? Query<{ id: number; email: string; title: string; views: string }, [number, boolean]>
+//    ^? Query<{ id: number; email: string; title: string; views: string }, [number | null, boolean | null]>
 
 const rows = await query(db, q); // db: Kysely<DB> or a Transaction<DB>
 ```
@@ -154,7 +154,7 @@ back to the database's snake_case names the way `CamelCasePlugin` does by defaul
 ```ts
 const sql = createSql<DB, DefaultTypeMap, {}, { camelCase: true }>();
 const q = sql("SELECT author_id, created_at FROM blog_posts WHERE id = $1", 1);
-//    ^? Query<{ author_id: number; created_at: Date }, [number]>
+//    ^? Query<{ author_id: number; created_at: Date }, [number | null]>
 ```
 
 Overrides still use the interface's (camelCase) keys. The plugin's non-default options

@@ -67,17 +67,17 @@ test("literals, operators, casts, column naming", () => {
 });
 
 test("params", () => {
-  expectTypeOf<Params<"SELECT id FROM users WHERE id = $1">>().toEqualTypeOf<[number]>();
-  expectTypeOf<Params<"SELECT id FROM users WHERE id = $1 AND email = $2">>().toEqualTypeOf<[number, string]>();
-  expectTypeOf<Params<"SELECT id FROM users WHERE display_name = $1">>().toEqualTypeOf<[string]>();
-  expectTypeOf<Params<"SELECT id FROM users WHERE $1 = id">>().toEqualTypeOf<[number]>();
-  expectTypeOf<Params<"SELECT id FROM users LIMIT $1 OFFSET $2">>().toEqualTypeOf<[number, number]>();
-  expectTypeOf<Params<"SELECT id FROM users WHERE id = $2 AND email = $1">>().toEqualTypeOf<[string, number]>();
+  expectTypeOf<Params<"SELECT id FROM users WHERE id = $1">>().toEqualTypeOf<[number | null]>();
+  expectTypeOf<Params<"SELECT id FROM users WHERE id = $1 AND email = $2">>().toEqualTypeOf<[number | null, string | null]>();
+  expectTypeOf<Params<"SELECT id FROM users WHERE display_name = $1">>().toEqualTypeOf<[string | null]>();
+  expectTypeOf<Params<"SELECT id FROM users WHERE $1 = id">>().toEqualTypeOf<[number | null]>();
+  expectTypeOf<Params<"SELECT id FROM users LIMIT $1 OFFSET $2">>().toEqualTypeOf<[number | null, number | null]>();
+  expectTypeOf<Params<"SELECT id FROM users WHERE id = $2 AND email = $1">>().toEqualTypeOf<[string | null, number | null]>();
   expectTypeOf<Params<"SELECT $1::int4 AS n">>().toEqualTypeOf<[number]>();
-  expectTypeOf<Params<"SELECT id FROM users WHERE id IN ($1, $2)">>().toEqualTypeOf<[number, number]>();
-  expectTypeOf<Params<"SELECT id FROM users WHERE id = ANY($1)">>().toEqualTypeOf<[number[]]>();
-  expectTypeOf<Params<"SELECT id FROM users WHERE email LIKE $1">>().toEqualTypeOf<[string]>();
-  expectTypeOf<Params<"SELECT id FROM users WHERE id = $1 OR id = $1">>().toEqualTypeOf<[number]>();
+  expectTypeOf<Params<"SELECT id FROM users WHERE id IN ($1, $2)">>().toEqualTypeOf<[number | null, number | null]>();
+  expectTypeOf<Params<"SELECT id FROM users WHERE id = ANY($1)">>().toEqualTypeOf<[(number | null)[] | null]>();
+  expectTypeOf<Params<"SELECT id FROM users WHERE email LIKE $1">>().toEqualTypeOf<[string | null]>();
+  expectTypeOf<Params<"SELECT id FROM users WHERE id = $1 OR id = $1">>().toEqualTypeOf<[number | null]>();
   expectTypeOf<Params<"SELECT $1">>().toEqualTypeOf<[unknown]>();
   expectTypeOf<Params<"SELECT id FROM users">>().toEqualTypeOf<[]>();
 });

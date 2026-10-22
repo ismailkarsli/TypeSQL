@@ -28,9 +28,10 @@ Query<Row, Params, Text>   // { text: string; values: unknown[] } + phantom type
 ```
 
 - `Row` is the projected row (`never` for DML without RETURNING and for DDL).
-- `Params` is the tuple of parameter types: `WHERE id = $1` → `[number]`; INSERT value slots
-  take the column type (`| null` when nullable); `LIMIT $1` → `number`; `$1::T` → `T`;
-  `= ANY($1)` → array; a parameter with no context is `unknown`.
+- `Params` is the tuple of parameter types: `WHERE id = $1` → `[number | null]`; INSERT value
+  slots take the column type (`| null` when nullable); `LIMIT $1` → `number | null`;
+  `$1::T` → `T`; `= ANY($1)` → array (elements accept `null`); a parameter with no context is
+  `unknown`. See [Parameters](../guide/parameters#how-parameters-get-their-types).
 - `Text` is the final SQL literal (after `:name` rewriting and fragment splicing).
 
 An invalid statement makes the `text` parameter's type an `SqlError<message, tokenIndex>`,

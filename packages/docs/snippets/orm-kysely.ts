@@ -46,7 +46,7 @@ sql("SELECT s.expires_at FROM auth.sessions s WHERE s.user_id = $1", 1); // "aut
 sql("INSERT INTO posts (author_id, title) VALUES ($1, $2) RETURNING id", 1, "Hello"); // Generated: optional
 // #endregion query
 check<Same<RowType<typeof q>, { email: string; mood: "happy" | "sad"; id: string; title: string }>>();
-check<Equal<ParamsType<typeof q>, ["happy" | "sad"]>>();
+check<Equal<ParamsType<typeof q>, ["happy" | "sad" | null]>>();
 
 // #region overrides
 const sqlx = createSql<DB, DefaultTypeMap, {

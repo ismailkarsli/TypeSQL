@@ -14,7 +14,8 @@ import type { TypeList, TypeOf } from "./typeof.js";
  * times; the TS types are intersected at the boundary).
  *
  * Rules (PLAN §6.7; parameter types verified with PREPARE on PostgreSQL 17):
- *   col <cmp> $1, $1 <cmp> col         → column type, non-null (comparisons, LIKE, regex)
+ *   col <cmp> $1, $1 <cmp> col         → column type, nullable (comparisons, LIKE, regex,
+ *                                        IS DISTINCT FROM; `col = NULL` is legal, it matches nothing)
  *   col <arith> $1, col || $1          → column type (text for `||`), nullable iff the column is;
  *                                        date/time - $1 → same type (Postgres tries the
  *                                        same-type operator first), + $1 → interval;
@@ -29,9 +30,11 @@ import type { TypeList, TypeOf } from "./typeof.js";
  *                                        array arguments contributing their element type
  *                                        (`array_append(nums, $1)` → int4)
  *   SUBSTRING(x FROM $1)               → text (Postgres picks the regex form); FROM 1 FOR $1 → int4
- *   $1::T                              → T (cast beats context), non-null
+ *   $1::T                              → T (cast beats context), nullable iff the context's type
+ *                                        is (`coalesce($1::text, 'x')` accepts null, `VALUES ($1::text)`
+ *                                        for a NOT NULL column does not); non-null without context
  *   $1 IS [NOT] NULL, $1::T IS NULL    → adds `| null` to the intersection of the other uses
- *   LIMIT $1, OFFSET $1                → int4 (number)
+ *   LIMIT $1, OFFSET $1                → int4 (number), nullable (`LIMIT NULL` = no limit)
  *   no context                         → unknown
  */
 export type ParamMap = { readonly [n: number]: ColInfo };
@@ -83,10 +86,9 @@ type NullTested<E extends Expr, M> =
   : E extends { readonly t: "cast"; readonly e: { readonly t: "param"; readonly n: infer N extends number } } ? AddParam<M, N, NullTest>
   : M;
 
-/** Comparison and pattern operators give a non-null param type (`WHERE id = $1` → `number`). */
+/** Comparison and pattern operators: the other operand's type, nullable (`WHERE id = $1` → `number | null`). */
 type IsComparison<Op extends string> = Op extends "=" | "<" | ">" | "<=" | ">=" | "<>" | "!=" | "~" | "~*" | "!~" | "!~*" | "~~" | "~~*" | "!~~" | "!~~*" ? true : false;
-type NotNull<T> = T extends ColInfo ? Mk<T["type"], false> : Mk<"unknown", false>;
-type Typed<T> = T extends ColInfo ? T : Info<"unknown", true>;
+type NullableOf<T> = T extends ColInfo ? Mk<T["type"], true> : Mk<"unknown", true>;
 /** Unconstrained `Info` for computed type names (avoids constraint resolution of recursive aliases). */
 type Mk<T, N extends boolean> = { readonly type: T; readonly nullable: N };
 
@@ -101,13 +103,13 @@ export type ParamsOfExpr<E extends Expr, C extends Ctx, M> =
   : E extends { readonly t: "is" } ? (E["what"] extends "null" ? NullTested<E["e"], ParamsOfExpr<E["e"], C, M>> : ParamsOfExpr<E["e"], C, M>)
   : E extends { readonly t: "isdistinct" } ? ParamsOfBin<"=", E["l"], E["r"], C, M>
   : E extends { readonly t: "between" } ? (E["e"] extends { readonly t: "param"; readonly n: infer N extends number }
-      ? ParamsOfList<[E["lo"], E["hi"]], C, AddParam<M, N, Mk<CommonOfExprs<[E["lo"], E["hi"]], C>, false>>, null>
-      : ParamsOfList<[E["lo"], E["hi"]], C, ParamsOfExpr<E["e"], C, M>, Typed<TypeOf<E["e"], C>>>)
+      ? ParamsOfList<[E["lo"], E["hi"]], C, AddParam<M, N, Mk<CommonOfExprs<[E["lo"], E["hi"]], C>, true>>, null>
+      : ParamsOfList<[E["lo"], E["hi"]], C, ParamsOfExpr<E["e"], C, M>, NullableOf<TypeOf<E["e"], C>>>)
   : E extends { readonly t: "in" } ? (E["e"] extends { readonly t: "param"; readonly n: infer N extends number }
-      ? ParamsOfList<E["list"], C, AddParam<M, N, Mk<CommonOfExprs<E["list"], C>, false>>, null>
-      : ParamsOfList<E["list"], C, ParamsOfExpr<E["e"], C, M>, NotNull<Typed<TypeOf<E["e"], C>>>>)
+      ? ParamsOfList<E["list"], C, AddParam<M, N, Mk<CommonOfExprs<E["list"], C>, true>>, null>
+      : ParamsOfList<E["list"], C, ParamsOfExpr<E["e"], C, M>, NullableOf<TypeOf<E["e"], C>>>)
   : E extends { readonly t: "insub" } ? ParamsOfSelect<E["q"], C["db"], C["scope"], C["ctes"], ParamsOfExpr<E["e"], C, M>>
-  : E extends { readonly t: "like" } ? ParamsOfList<[E["e"], E["pat"]], C, M, Info<"text">>
+  : E extends { readonly t: "like" } ? ParamsOfList<[E["e"], E["pat"]], C, M, Info<"text", true>>
   : E extends { readonly t: "quant" } ? ParamsOfQuant<E["l"], E["r"], C, M>
   : E extends { readonly t: "sub" } ? ParamsOfSelect<E["q"], C["db"], C["scope"], C["ctes"], M>
   : E extends { readonly t: "exists" } ? ParamsOfSelect<E["q"], C["db"], C["scope"], C["ctes"], M>
@@ -140,9 +142,14 @@ type SubstrPosType<S extends Expr, From extends Expr | null, For extends Expr | 
       : Info<"text", true>
     : never;
 
-/** A param in `E` gets type `T` (when `T` is not null); otherwise recurse. */
+/**
+ * A param in `E` gets type `T` (when `T` is not null); a cast param `$n::X` gets `X` with
+ * `T`'s nullability; otherwise recurse.
+ */
 export type ParamsOfOpt<E extends Expr | null, C extends Ctx, M, T> =
   E extends { readonly t: "param"; readonly n: infer N extends number } ? (T extends ColInfo ? AddParam<M, N, T> : M)
+  : E extends { readonly t: "cast"; readonly e: { readonly t: "param"; readonly n: infer N extends number } }
+    ? (T extends ColInfo ? AddParam<M, N, Mk<E["to"], T["nullable"]>> : ParamsOfExpr<E, C, M>)
   : E extends Expr ? ParamsOfExpr<E, C, M>
   : M;
 
@@ -162,10 +169,23 @@ type CommonOfInfos<Ts extends readonly ColInfo[], Acc extends string> =
 type ParamsOfBin<Op extends string, L extends Expr, R extends Expr, C extends Ctx, M> =
   L extends { readonly t: "param"; readonly n: infer N extends number }
     ? R extends { readonly t: "param" } ? (Op extends "and" | "or" ? AddParam<AddParam<M, N, Info<"bool", true>>, R["n"], Info<"bool", true>> : M)
-    : AddParam<ParamsOfExpr<R, C, M>, N, BinParamType<Op, TypeOf<R, C>>>
+    : AddParam<ParamsOfOperand<Op, R, L, C, M>, N, BinParamType<Op, TypeOf<R, C>>>
   : R extends { readonly t: "param"; readonly n: infer N extends number }
-    ? AddParam<ParamsOfExpr<L, C, M>, N, BinParamType<Op, TypeOf<L, C>>>
+    ? AddParam<ParamsOfOperand<Op, L, R, C, M>, N, BinParamType<Op, TypeOf<L, C>>>
+  // a cast param operand (`col = $1::uuid`) gets its cast type with the operator's nullability;
+  // inline here (not through ParamsOfOperand) so operator chains do not nest one more alias per term
+  : L extends { readonly t: "cast"; readonly to: infer T extends string; readonly e: { readonly t: "param"; readonly n: infer N extends number } }
+    ? AddParam<ParamsOfOperand<Op, R, L, C, M>, N, Mk<T, BinNullable<Op, R, C>>>
+  : R extends { readonly t: "cast"; readonly to: infer T extends string; readonly e: { readonly t: "param"; readonly n: infer N extends number } }
+    ? AddParam<ParamsOfExpr<L, C, M>, N, Mk<T, BinNullable<Op, L, C>>>
   : ParamsOfExpr<R, C, ParamsOfExpr<L, C, M>>;
+type ParamsOfOperand<Op extends string, X extends Expr, Other extends Expr, C extends Ctx, M> =
+  X extends { readonly t: "cast"; readonly to: infer T extends string; readonly e: { readonly t: "param"; readonly n: infer N extends number } }
+    ? AddParam<M, N, Mk<T, BinNullable<Op, Other, C>>>
+    : ParamsOfExpr<X, C, M>;
+/** Nullability `BinParamType` gives a param operand next to `Other`. */
+type BinNullable<Op extends string, Other extends Expr, C extends Ctx> =
+  BinParamType<Op, TypeOf<Other, C>> extends { readonly nullable: infer Nl extends boolean } ? Nl : true;
 
 /**
  * Type of a `$n` operand given the operator and the other operand's (possibly erroneous)
@@ -173,7 +193,7 @@ type ParamsOfBin<Op extends string, L extends Expr, R extends Expr, C extends Ct
  */
 type BinParamType<Op extends string, Other> =
   Other extends { readonly type: infer OT extends string; readonly nullable: boolean }
-    ? IsComparison<Op> extends true ? Mk<OT, false>
+    ? IsComparison<Op> extends true ? Mk<OT, true>
     : Op extends "and" | "or" ? Info<"bool", true>
     : Op extends "->" | "->>" | "?" ? Info<"text", true>
     : Op extends "#>" | "#>>" | "?|" | "?&" ? Info<"text[]", true>
@@ -186,10 +206,12 @@ type BinParamType<Op extends string, Other> =
 
 type ParamsOfQuant<L extends Expr, R extends SelectStmt | Expr, C extends Ctx, M> =
   R extends { readonly t: "param"; readonly n: infer N extends number }
-    ? AddParam<ParamsOfExpr<L, C, M>, N, TypeOf<L, C> extends infer LT ? (LT extends ColInfo ? Mk<`${LT["type"]}[]`, false> : Mk<"unknown", true>) : never>
+    ? AddParam<ParamsOfExpr<L, C, M>, N, TypeOf<L, C> extends infer LT ? (LT extends ColInfo ? Mk<`${LT["type"]}[]`, true> : Mk<"unknown", true>) : never>
+  : R extends { readonly t: "cast"; readonly to: infer T extends string; readonly e: { readonly t: "param"; readonly n: infer N extends number } }
+    ? AddParam<ParamsOfExpr<L, C, M>, N, Mk<T, true>>
   : L extends { readonly t: "param"; readonly n: infer N extends number }
     ? R extends SelectStmt ? ParamsOfSelect<R, C["db"], C["scope"], C["ctes"], M>
-    : R extends Expr ? AddParam<ParamsOfExpr<R, C, M>, N, TypeOf<R, C> extends infer RT ? (RT extends { readonly type: `${infer El}[]` } ? Mk<El, false> : Mk<"unknown", true>) : never>
+    : R extends Expr ? AddParam<ParamsOfExpr<R, C, M>, N, TypeOf<R, C> extends infer RT ? (RT extends { readonly type: `${infer El}[]` } ? Mk<El, true> : Mk<"unknown", true>) : never>
     : M
   : R extends SelectStmt ? ParamsOfSelect<R, C["db"], C["scope"], C["ctes"], ParamsOfExpr<L, C, M>>
   : R extends Expr ? ParamsOfExpr<R, C, ParamsOfExpr<L, C, M>>
@@ -198,7 +220,7 @@ type ParamsOfQuant<L extends Expr, R extends SelectStmt | Expr, C extends Ctx, M
 // ─── CASE ───
 
 type ParamsOfCase<Operand extends Expr | null, Whens extends readonly { when: Expr; then: Expr }[], Else extends Expr | null, C extends Ctx, M> =
-  ParamsOfOpt<Else, C, ParamsOfWhens<Whens, C, ParamsOfOpt<Operand, C, M, null>, Operand extends Expr ? Typed<TypeOf<Operand, C>> : Info<"bool", true>, Mk<CommonOfExprs<ThenExprs<Whens, Else, []>, C>, true>>, Mk<CommonOfExprs<ThenExprs<Whens, Else, []>, C>, true>>;
+  ParamsOfOpt<Else, C, ParamsOfWhens<Whens, C, ParamsOfOpt<Operand, C, M, null>, Operand extends Expr ? NullableOf<TypeOf<Operand, C>> : Info<"bool", true>, Mk<CommonOfExprs<ThenExprs<Whens, Else, []>, C>, true>>, Mk<CommonOfExprs<ThenExprs<Whens, Else, []>, C>, true>>;
 type ThenExprs<Whens extends readonly { when: Expr; then: Expr }[], Else extends Expr | null, Acc extends readonly Expr[]> =
   Whens extends readonly [infer W extends { when: Expr; then: Expr }, ...infer R extends readonly { when: Expr; then: Expr }[]] ? ThenExprs<R, Else, [...Acc, W["then"]]> : Else extends Expr ? [...Acc, Else] : Acc;
 type ParamsOfWhens<Whens extends readonly { when: Expr; then: Expr }[], C extends Ctx, M, WT, TT> =
@@ -285,8 +307,11 @@ export type ParamsOfSelect<Q extends SelectStmt, DB, Outer extends Scope, Ctes e
       ? ParamsOfLimit<Q["offset"], ParamsOfLimit<Q["limit"], ParamsOfBody<Q["body"], DB, Outer, C2, M>>>
       : M
     : never;
+/** `LIMIT NULL` / `OFFSET NULL` mean no limit / no offset. */
 type ParamsOfLimit<E extends Expr | null, M> =
-  E extends { readonly t: "param"; readonly n: infer N extends number } ? AddParam<M, N, Info<"int4", false>> : M;
+  E extends { readonly t: "param"; readonly n: infer N extends number } ? AddParam<M, N, Info<"int4", true>>
+  : E extends { readonly t: "cast"; readonly to: infer T extends string; readonly e: { readonly t: "param"; readonly n: infer N extends number } } ? AddParam<M, N, Mk<T, true>>
+  : M;
 
 type ParamsOfBody<B extends SelectBody, DB, Outer extends Scope, Ctes extends CteMap, M> =
   B extends { readonly t: "setop" } ? ParamsOfBody<B["r"], DB, Outer, Ctes, ParamsOfBody<B["l"], DB, Outer, Ctes, M>>

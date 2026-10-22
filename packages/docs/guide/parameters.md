@@ -29,7 +29,7 @@ compile error naming the parameter:
 
 ```ts
 sql(`SELECT id FROM users WHERE id = ${sql.param("7")}`);
-// … SqlError<"parameter $1: a string value cannot be used as int4 NOT NULL", 7>
+// … SqlError<"parameter $1: a string value cannot be used as int4", 7>
 
 sql(`INSERT INTO users (email) VALUES (${sql.param(maybeEmail /* string | null */)})`);
 // … SqlError<"parameter $1: a string | null value cannot be used as text NOT NULL", 8>
@@ -60,19 +60,29 @@ parameter, and the `IS NULL` test lets that parameter take `null`:
 
 | Context | Parameter type |
 |---|---|
-| `col = $1`, `col > $1`, `$1 = col` | the column's type, non-null |
-| `col LIKE $1`, `col ~ $1` | `text`, non-null |
+| `col = $1`, `col > $1`, `$1 = col`, `col IS DISTINCT FROM $1` | the column's type, `\| null` |
+| `col LIKE $1`, `col ~ $1` | `text \| null` |
 | `col + $1`, `col \|\| $1` | the other operand's type and nullability |
 | `INSERT … VALUES ($1)`, `UPDATE … SET col = $1` | the column's type, with `\| null` if the column is nullable |
-| `col IN ($1, $2)` | the column's type for each |
-| `col = ANY($1)` | an array of the column's type |
-| `LIMIT $1`, `OFFSET $1` | `number` |
-| a function argument | the function's parameter type |
-| `$1::T` | `T` (a cast wins over context) |
+| `col IN ($1, $2)`, `$1 BETWEEN a AND b` | the column's type for each, `\| null` |
+| `col = ANY($1)` | an array of the column's type, `\| null` |
+| `LIMIT $1`, `OFFSET $1` | `number \| null` |
+| a function argument | the function's parameter type, `\| null` |
+| `$1::T` | `T` (a cast wins over context), nullable as the context is; non-null without context |
 | `$1 IS NULL`, `$1::T IS NOT NULL` | adds `\| null` to the type the other uses give |
 | anywhere else | `unknown` |
 
 <<< @/snippets/parameters.ts#contexts
+
+`null` is accepted wherever Postgres accepts it: `col = NULL` is legal and matches no row,
+`LIMIT NULL` means no limit, and every function argument may be NULL. It is rejected only in
+an assignment to a `NOT NULL` column (`VALUES`, `SET`), which Postgres would refuse at run time.
+A parameter used in several places accepts null only if every use does, so
+`UPDATE t SET label = $1 WHERE label <> $1` rejects null for a `NOT NULL` `label`.
+
+Array elements always accept `null`, whatever the nullability of the array: an `int4[]`
+parameter takes `(number | null)[]`, so `unnest($1::float8[])` works for bulk inserts with
+nullable values.
 
 The TypeScript type of a parameter is the same as for a result column of that type, so under
 the node-postgres map an `int8` parameter takes a `string`. Cast the parameter to compare with

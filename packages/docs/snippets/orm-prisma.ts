@@ -47,7 +47,7 @@ const stats = await queryRaw(prisma, sql("SELECT count(*) AS n, sum(views) AS vi
 const deleted = await executeRaw(prisma, sql("DELETE FROM posts WHERE author_id = $1", 1)); // number
 // #endregion query
 check<Equal<RowType<typeof q>, { id: number; display_name: string | null; updatedAt: Date }>>();
-check<Equal<ParamsType<typeof q>, ["ADMIN" | "USER" | "guest"]>>();
+check<Equal<ParamsType<typeof q>, ["ADMIN" | "USER" | "guest" | null]>>();
 check<Equal<typeof rows, { id: number; display_name: string | null; updatedAt: Date }[]>>();
 check<Equal<typeof stats, { n: bigint; views: PrismaTypeMap["numeric"] | null }[]>>();
 check<Equal<typeof deleted, number>>();

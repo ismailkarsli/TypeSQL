@@ -38,7 +38,7 @@ test("DELETE ... RETURNING", () => {
 test("DELETE ... USING", () => {
   expectTypeOf<Row<"DELETE FROM users u USING posts p WHERE p.author_id = u.id AND p.title = 'x' RETURNING u.id, p.title, p.body">>().toEqualTypeOf<{ id: number; title: string; body: string | null }>();
   expectTypeOf<Row<"DELETE FROM posts USING users u LEFT JOIN users v ON v.id = u.id WHERE posts.author_id = u.id RETURNING v.email, u.email AS ue">>().toEqualTypeOf<{ email: string | null; ue: string }>();
-  expectTypeOf<Params<"DELETE FROM users u USING posts p WHERE p.author_id = u.id AND p.title = $1 RETURNING u.id">>().toEqualTypeOf<[string]>();
+  expectTypeOf<Params<"DELETE FROM users u USING posts p WHERE p.author_id = u.id AND p.title = $1 RETURNING u.id">>().toEqualTypeOf<[string | null]>();
   expectTypeOf<V<"DELETE FROM users u USING posts p WHERE p.author_id = u.id RETURNING p.nope">>().toEqualTypeOf<SqlError<"column p.nope does not exist", 18>>();
   expectTypeOf<V<"DELETE FROM users USING nope">>().toEqualTypeOf<SqlError<'relation "nope" does not exist', 4>>();
 });

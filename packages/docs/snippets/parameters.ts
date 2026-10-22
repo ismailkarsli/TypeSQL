@@ -7,9 +7,9 @@ declare const ids: number[];
 
 // #region positional
 const byId = sql("SELECT id, email FROM users WHERE id = $1 AND created_at > $2", 7, new Date());
-// Query<{ id: number; email: string }, [number, Date]>
+// Query<{ id: number; email: string }, [number | null, Date | null]>
 // #endregion positional
-check<Equal<ParamsType<typeof byId>, [number, Date]>>();
+check<Equal<ParamsType<typeof byId>, [number | null, Date | null]>>();
 
 // #region named
 const byEmail = sql("SELECT id FROM users WHERE email = :email OR display_name = :email", { email: "a@b.c" });
@@ -39,12 +39,13 @@ check<Equal<ParamsType<typeof optional>, [string | null]>>();
 check<Equal<TextType<typeof optional>, "SELECT id FROM users WHERE ($1::text IS NULL OR display_name = $1)">>();
 
 // #region contexts
-sql("SELECT id FROM users WHERE id = ANY($1)", ids); // number[]
-sql("SELECT id FROM users LIMIT $1 OFFSET $2", 10, 20); // number, number
+sql("SELECT id FROM users WHERE id = ANY($1)", ids); // (number | null)[] | null
+sql("SELECT id FROM users LIMIT $1 OFFSET $2", 10, 20); // number | null, number | null (LIMIT NULL is no limit)
 sql("INSERT INTO users (email, display_name, mood) VALUES ($1, $2, $3)", "a@b.c", null, "happy"); // string, string | null, mood
-sql("SELECT lower($1) AS l", "ABC"); // string, from lower(text)
+sql("SELECT lower($1) AS l", "ABC"); // string | null, from lower(text)
 sql("SELECT $1::int4 + 1 AS n", 41); // number, from the cast
 sql("SELECT $1 AS anything", { any: "value" }); // no context: unknown
+sql("SELECT v FROM unnest($1::text[]) AS t(v)", ["a", null]); // (string | null)[] | null: elements accept null
 // #endregion contexts
 
 // #region int8

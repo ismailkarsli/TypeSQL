@@ -22,7 +22,7 @@ arguments, `:name` objects or `sql.param()`:
 ```ts
 const wrong = sql.fragment("AND p.author_id = $1", "seven");
 sql("SELECT p.id FROM posts p WHERE true {wrong}", { wrong });
-// … SqlError<"parameter $1: a string value cannot be used as int4 NOT NULL", 14>
+// … SqlError<"parameter $1: a string value cannot be used as int4", 14>
 ```
 
 ## Queries as subqueries

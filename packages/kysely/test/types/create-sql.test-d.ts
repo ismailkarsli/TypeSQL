@@ -23,7 +23,7 @@ test("SELECT with JOIN: rows and params", () => {
     views: string;
     edited_at: Date[] | null;
   }>();
-  expectTypeOf<ParamsType<typeof q>>().toEqualTypeOf<[number, boolean]>();
+  expectTypeOf<ParamsType<typeof q>>().toEqualTypeOf<[number | null, boolean | null]>();
 
   const r = sql("SELECT balance, created_at, session_length, location, avatar, moods FROM users WHERE mood = $1", "happy");
   expectTypeOf<RowType<typeof r>>().toEqualTypeOf<{
@@ -34,7 +34,7 @@ test("SELECT with JOIN: rows and params", () => {
     avatar: Uint8Array | null;
     moods: ("happy" | "sad")[];
   }>();
-  expectTypeOf<ParamsType<typeof r>>().toEqualTypeOf<["happy" | "sad"]>();
+  expectTypeOf<ParamsType<typeof r>>().toEqualTypeOf<["happy" | "sad" | null]>();
 });
 
 test("schema-qualified tables", () => {
@@ -47,7 +47,7 @@ test("schema-qualified tables", () => {
 test("INSERT may omit Generated / GeneratedAlways columns, not required ones", () => {
   const q = sql("INSERT INTO posts (author_id, title, tags) VALUES ($1, $2, $3) RETURNING id, published, views", 1, "t", ["a"]);
   expectTypeOf<RowType<typeof q>>().toEqualTypeOf<{ id: string; published: boolean; views: string }>();
-  expectTypeOf<ParamsType<typeof q>>().toEqualTypeOf<[number, string, string[]]>();
+  expectTypeOf<ParamsType<typeof q>>().toEqualTypeOf<[number, string, (string | null)[]]>();
   const u = sql("INSERT INTO users (email, balance) VALUES ($1, $2) RETURNING id, created_at", "a@b.c", "1.5");
   expectTypeOf<RowType<typeof u>>().toEqualTypeOf<{ id: number; created_at: Date }>();
   // @ts-expect-error -- `balance` is NOT NULL without a default
@@ -63,7 +63,7 @@ test("overrides change inference end to end", () => {
   }>();
   const q = s("SELECT id, balance FROM users WHERE id = $1", "1");
   expectTypeOf<RowType<typeof q>>().toEqualTypeOf<{ id: string; balance: number }>();
-  expectTypeOf<ParamsType<typeof q>>().toEqualTypeOf<[string]>();
+  expectTypeOf<ParamsType<typeof q>>().toEqualTypeOf<[string | null]>();
   const j = s("SELECT a.id, a.role FROM auth.users a JOIN auth.sessions s ON s.auth_user_id = a.id");
   expectTypeOf<RowType<typeof j>>().toEqualTypeOf<{ id: string; role: "admin" | "member" }>();
   // one shared enum name: comparable and UNION-able across columns

@@ -129,7 +129,7 @@ test("createSql accepts Prisma.TypeMap; model names are case-sensitive identifie
     roles: ("ADMIN" | "USER" | "GUEST")[] | null;
     createdAt: Date;
   }>();
-  expectTypeOf<ParamsType<typeof q>>().toEqualTypeOf<[number]>();
+  expectTypeOf<ParamsType<typeof q>>().toEqualTypeOf<[number | null]>();
   // Unquoted identifiers fold to lower case, so `User` and `bigNum` must be quoted.
   expectTypeOf<Validate<DB, "SELECT id FROM User">>().toExtend<SqlError<string, number>>();
   expectTypeOf<Validate<DB, 'SELECT bigNum FROM "User"'>>().toExtend<SqlError<string, number>>();

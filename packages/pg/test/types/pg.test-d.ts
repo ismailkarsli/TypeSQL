@@ -78,7 +78,7 @@ test("pg's Pool, Client and PoolClient satisfy the structural interfaces", () =>
 
 test("row types flow from Query through the helpers", () => {
   expectTypeOf<RowType<typeof q>>().toEqualTypeOf<Row>();
-  expectTypeOf<ParamsType<typeof q>>().toEqualTypeOf<[number]>();
+  expectTypeOf<ParamsType<typeof q>>().toEqualTypeOf<[number | null]>();
   expectTypeOf(query(pool, q)).toEqualTypeOf<Promise<Row[]>>();
   expectTypeOf(one(pool, q)).toEqualTypeOf<Promise<Row>>();
   expectTypeOf(maybeOne(pool, q)).toEqualTypeOf<Promise<Row | null>>();
@@ -123,7 +123,7 @@ test("invalid SQL is rejected by the pre-bound sql", () => {
 test("DML: execute returns the row count; RETURNING rows flow through query/one", () => {
   const upd = sql("UPDATE posts SET title = $1 WHERE id = $2", "t", "1");
   expectTypeOf<RowType<typeof upd>>().toEqualTypeOf<never>();
-  expectTypeOf<ParamsType<typeof upd>>().toEqualTypeOf<[string, string]>();
+  expectTypeOf<ParamsType<typeof upd>>().toEqualTypeOf<[string, string | null]>();
   expectTypeOf(execute(pool, upd)).toEqualTypeOf<Promise<number>>();
 
   const ins = sql("INSERT INTO users (email, balance) VALUES ($1, $2) RETURNING id, created_at", "a@b.c", "0");

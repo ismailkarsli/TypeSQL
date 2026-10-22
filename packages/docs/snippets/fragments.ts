@@ -6,9 +6,9 @@ import { sql } from "./schema.js";
 const byAuthor7 = sql.fragment("WHERE p.author_id = $1", 7);
 const q = sql("SELECT p.id, p.title FROM posts p {byAuthor7} ORDER BY p.id", { byAuthor7 });
 q.text; // "SELECT p.id, p.title FROM posts p WHERE p.author_id = $1 ORDER BY p.id"
-// Query<{ id: string; title: string }, [number]>
+// Query<{ id: string; title: string }, [number | null]>
 // #endregion slots
-check<Equal<typeof q, Query<{ id: string; title: string }, [number], "SELECT p.id, p.title FROM posts p WHERE p.author_id = $1 ORDER BY p.id">>>();
+check<Equal<typeof q, Query<{ id: string; title: string }, [number | null], "SELECT p.id, p.title FROM posts p WHERE p.author_id = $1 ORDER BY p.id">>>();
 
 // #region outer
 const byAuthor = sql(
@@ -19,7 +19,7 @@ const byAuthor = sql(
 byAuthor.text; // "SELECT p.title FROM posts p WHERE p.author_id = $1 AND p.title <> $2"
 byAuthor.values; // [42, "draft"]
 // #endregion outer
-check<Equal<ParamsType<typeof byAuthor>, [number, string]>>();
+check<Equal<ParamsType<typeof byAuthor>, [number | null, string | null]>>();
 
 // #region subquery
 const authors = sql("SELECT author_id FROM posts GROUP BY author_id HAVING count(*) >= $1::int4", 3);

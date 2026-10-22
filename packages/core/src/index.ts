@@ -9,7 +9,7 @@ export type {
   Col, Nullable, Generated, NullableGenerated, Arr, Enum, ColDesc, Table, View, Namespace, Schema, TypeRegistry,
   PgTypeName, PgScalarName, NormalizeTypeName,
 } from "./schema/index.js";
-export type { DefaultTypeMap, TypeMap, TsTypeOf, TsOf, EnumsOf } from "./type-map/index.js";
+export type { DefaultTypeMap, TypeMap, TsTypeOf, TsOf, TsParamTypeOf, EnumsOf } from "./type-map/index.js";
 export type { Analyze, RowOf, ParamsOf, ParamsArgs, NamesOf, Validate, KindOf, ApplyDdl, BuildRow } from "./engine/infer.js";
 export type { RewriteNamed, NamedParams } from "./engine/named.js";
 export type { SqlError, AnyErr, IsErr, ErrMsg, ErrAt } from "./engine/errors.js";

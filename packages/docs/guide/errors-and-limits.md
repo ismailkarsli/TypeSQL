@@ -18,7 +18,7 @@ words, operators and literals from 0):
 | missing `NOT NULL` column | `null value in column "email" of relation "users" violates not-null constraint` |
 | writing to a view | `cannot insert into view "user_stats"` |
 | set operation width | `each UNION query must have the same number of columns` |
-| wrong inline value | `parameter $1: a string value cannot be used as int4 NOT NULL` |
+| wrong inline value | `parameter $1: a string value cannot be used as int4` |
 | non-literal SQL | `the SQL text is not a string literal: …` |
 
 Wrong positional arguments are ordinary TypeScript errors on the argument

@@ -93,5 +93,5 @@ test("sql() call sites", () => {
   sql("UPDATE users SET nope = 1");
   // @ts-expect-error view target
   sql("UPDATE active_users SET email = 'a'");
-  expectTypeOf<Params<"UPDATE users SET email = $1 WHERE id = $2">>().toEqualTypeOf<[string, number]>();
+  expectTypeOf<Params<"UPDATE users SET email = $1 WHERE id = $2">>().toEqualTypeOf<[string, number | null]>();
 });

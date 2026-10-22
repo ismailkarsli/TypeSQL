@@ -81,4 +81,15 @@ export type TsOf<TM, DB, T extends { type: string; nullable: boolean }> =
   T["type"] extends "null" ? null
   : T["nullable"] extends true ? TsTypeOf<TM, DB, T["type"]> | null : TsTypeOf<TM, DB, T["type"]>;
 
+/**
+ * The TS type a parameter of Postgres type `T` accepts. Like `TsTypeOf`, except that array
+ * elements also accept `null`: a Postgres array can always hold NULLs, whatever the
+ * nullability of the array itself.
+ */
+export type TsParamTypeOf<TM, DB, T extends string> =
+  T extends keyof TM ? TM[T]
+  : T extends `${infer E}[]` ? (TsParamTypeOf<TM, DB, E> | null)[]
+  : T extends keyof EnumsOf<DB> ? EnumsOf<DB>[T]
+  : unknown;
+
 export type { Schema };
