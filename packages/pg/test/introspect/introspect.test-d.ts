@@ -58,7 +58,7 @@ test("JSON columns get the TS types passed in columnTypes", () => {
 
 test("defaults, identity, serial and generated columns are optional on INSERT", () => {
   const q = sql("INSERT INTO users (email, name, scores) VALUES ($1, $2, $3) RETURNING id, big, greeting", "ann@example.com", "Ann", [1.5]);
-  expectTypeOf<ParamsType<typeof q>>().toEqualTypeOf<[string, string, number[]]>();
+  expectTypeOf<ParamsType<typeof q>>().toEqualTypeOf<[string, string, (number | null)[]]>();
   expectTypeOf<RowType<typeof q>>().toEqualTypeOf<{ id: string; big: string; greeting: string | null }>();
   // name (a NOT NULL domain) and scores have no default
   expectTypeOf<IsErr<Validate<DB, "INSERT INTO users (email, scores) VALUES ($1, $2)">>>().toEqualTypeOf<true>();
