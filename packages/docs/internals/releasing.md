@@ -72,12 +72,14 @@ pnpm release                       # gh workflow run release.yml --ref main
 The workflow runs only when started by hand on `main`, with `pnpm release` or **Run workflow** on
 the Actions tab; pushing publishes nothing. It runs the `ci.yml` checks (`test`, `intents`,
 `bench`) on the current `main`. Once they pass, its `publish` job runs `pnpm version -r` (bump
-versions, write changelog sections, update the ledger), commits the result as
-`chore: release <version>` from `github-actions[bot]` and pushes it to `main`, then builds and
-smoke-tests the packages, runs `pnpm publish -r`, and creates the GitHub releases. The push is
-rejected, and nothing is published, when `main` moved after the run started; start it again.
-A push made with the workflow's token starts no other workflow, so `ci` does not run on the
-release commit, which changes only versions and changelogs.
+versions, write changelog sections, update the ledger) and commits the result to `main` as
+`chore: release <version>` from `github-actions[bot]`, then builds and smoke-tests the
+packages, runs `pnpm publish -r`, and creates the GitHub releases. `main` requires signed
+commits, so the release commit is made through GitHub's API (`scripts/github-commit.mjs`),
+which signs it, not with `git push`. It is rejected, and nothing is published, when `main`
+moved after the run started; start it again. A commit made with the workflow's token starts no
+other workflow, so `ci` does not run on the release commit, which changes only versions and
+changelogs.
 
 `pnpm publish -r` publishes every public package whose manifest version is not on the registry
 yet and skips the rest. A run without pending intents therefore versions nothing and publishes
@@ -85,7 +87,7 @@ nothing. When a public package's current version is not on npm (an earlier run f
 publish, or a release commit was pushed by hand), the run skips `pnpm version -r` and only
 publishes what is missing (see [Pitfalls](#pitfalls)); run it once more to release the intents
 added since. Cutting the release commit by hand still works: `pnpm version -r` on a clean,
-up-to-date `main`, commit, push, then `pnpm release`.
+up-to-date `main`, a signed commit, push, then `pnpm release`.
 
 After a run, check that every bumped version is live:
 

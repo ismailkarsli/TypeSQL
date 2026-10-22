@@ -2,10 +2,10 @@ name: release
 
 # Started by hand only (`pnpm release`, or "Run workflow" on the Actions tab), never by a push.
 # Runs the ci.yml checks on main, applies the pending change intents (`pnpm version -r`) and
-# pushes the release commit, then publishes every package version that is not on npm yet through
-# npm trusted publishing (OIDC, no token), and creates their GitHub releases. npm trusts this
-# workflow file (release.yml) in the `npm` environment, which only deploys from main; see
-# packages/docs/internals/releasing.md.
+# commits the release through the API (signed), then publishes every package version that is not
+# on npm yet through npm trusted publishing (OIDC, no token), and creates their GitHub releases.
+# npm trusts this workflow file (release.yml) in the `npm` environment, which only deploys from
+# main; see packages/docs/internals/releasing.md.
 on:
   workflow_dispatch:
 
@@ -26,7 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: npm
     permissions:
-      contents: write # push the release commit, gh release create
+      contents: write # the release commit, gh release create
       id-token: write # npm trusted publishing
     steps:
       - uses: actions/checkout@v7
@@ -63,12 +63,14 @@ jobs:
           fi
           # "chore: release 0.0.4", or "chore: release 0.0.4, 0.1.0" when versions diverge.
           versions=$(comm -13 <(sort <<<"$before") <(public | sort) | sed 's/.*@//' | sort -uV | paste -sd, - | sed 's/,/, /g')
-          git config user.name "github-actions[bot]"
-          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          # Committed through the API, which signs it (main requires signed commits), and rejected,
+          # so nothing is published, when main moved past the commit the checks ran on.
           git add -A
-          git commit -m "chore: release $versions"
-          # Rejected, so nothing is published, when main moved past the commit the checks ran on.
-          git push origin HEAD:main
+          node scripts/github-commit.mjs main "chore: release $versions"
+          git fetch origin main
+          git reset --hard origin/main
+        env:
+          GH_TOKEN: ${{ github.token }}
       - run: pnpm build
       - run: pnpm smoke:dist
       # The workflow only gets here on main, which is what publish's git checks verify.
