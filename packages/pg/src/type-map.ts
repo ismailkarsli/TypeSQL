@@ -4,19 +4,12 @@ import type { DefaultParamTypeMap, DefaultTypeMap } from "@typesql/core";
  * The object node-postgres returns for an `interval` column (package `postgres-interval` 1.x,
  * wired up by `pg-types`). Fields are only present when non-zero; `toPostgres()` renders the
  * value back to Postgres syntax and `toISO()`/`toISOString()` produce an ISO 8601 duration.
+ *
+ * Written inline in `PgTypeMap` (this alias only reads it back), so row types stay plain
+ * object types: declaration emit in a package without a direct `@typesql/pg` dependency does
+ * not need to name `PgInterval` (TS2883).
  */
-export interface PgInterval {
-  years?: number;
-  months?: number;
-  days?: number;
-  hours?: number;
-  minutes?: number;
-  seconds?: number;
-  milliseconds?: number;
-  toPostgres(): string;
-  toISO(): string;
-  toISOString(): string;
-}
+export type PgInterval = PgTypeMap["interval"];
 
 /**
  * Canonical Postgres type name → TS type as `pg` 8.x returns it with its default type
@@ -59,7 +52,18 @@ export interface PgTypeMap extends Omit<DefaultTypeMap, "bytea" | "interval" | "
   /** What parameters accept on top of the row types. */
   $params: PgParamTypeMap;
   bytea: Buffer;
-  interval: PgInterval;
+  interval: {
+    years?: number;
+    months?: number;
+    days?: number;
+    hours?: number;
+    minutes?: number;
+    seconds?: number;
+    milliseconds?: number;
+    toPostgres(): string;
+    toISO(): string;
+    toISOString(): string;
+  };
   /** Anonymous `ROW(...)` results have no parser: raw text such as `"(1,foo)"`. */
   record: string;
   /** `void`-returning functions (`pg_sleep`) yield an empty string. */

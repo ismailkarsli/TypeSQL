@@ -103,6 +103,30 @@ Measured on TypeScript 7.0.2:
   `float8` / `numeric` that is `NaN` or `Infinity` is serialized as a string. Elements of
   Postgres arrays are typed non-null, as for array columns.
 
+### Exporting queries from another package (TS2883)
+
+With `declaration` output, TypeScript 7.1 checks that every inferred type can be named from
+the package that exports it. Rows (what `execute*` resolves to) are plain object types and
+can be exported from any package. A `Query`, `Fragment` or `Migrations` value is a typesql
+type, so a package that exports one (or a function returning one) without depending on
+`@typesql/core` itself fails:
+
+```
+error TS2883: The inferred type of 'userQuery' cannot be named without a reference to 'Query'
+  from '../../shared/node_modules/@typesql/core/dist'. This is likely not portable.
+```
+
+Any of these fixes it:
+
+- Re-export typesql's types from the module that calls `createSql`; TypeScript then names
+  them through that module:
+  ```ts
+  export const sql = createSql<DB>(executor);
+  export type * from "@typesql/core";
+  ```
+- Add `@typesql/core` to the exporting package's `dependencies`.
+- Export the rows (`execute*` results) instead of the query, or annotate the return type.
+
 Unsupported syntax is always a compile error, never a silent `any`. Notable gaps: `ROWS FROM
 (…)`, tracking which views depend on which tables, and column alias lists on plain tables. The
 [DDL reference](../reference/ddl#limitations) lists the DDL limitations.
