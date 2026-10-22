@@ -50,5 +50,23 @@
     "pg": "^8.23.1",
     "typescript": "7.0.2",
     "vitest": "^5.0.4"
-  }
+  },
+  "homepage": "https://typesql.karsli.net/adapters/pg",
+  "bugs": {
+    "url": "https://github.com/ismailkarsli/typesql/issues"
+  },
+  "author": "İsmail Karslı",
+  "keywords": [
+    "sql",
+    "postgres",
+    "postgresql",
+    "typescript",
+    "type-safe",
+    "type-level",
+    "raw-sql",
+    "no-codegen",
+    "pg",
+    "node-postgres",
+    "introspection"
+  ]
 }

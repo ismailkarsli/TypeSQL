@@ -1,0 +1,5 @@
+{
+  "//": "Sources of the TypeScript Playground links. `pnpm playground` regenerates the links; lines ending in `// error` must fail to compile, every other line must compile.",
+  "extends": "../tsconfig.json",
+  "include": ["*.ts"]
+}

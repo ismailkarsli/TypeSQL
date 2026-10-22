@@ -18,10 +18,12 @@
     "docs:dev": "pnpm --filter @typesql/docs run dev",
     "docs:build": "pnpm --filter @typesql/docs run build",
     "docs:preview": "pnpm --filter @typesql/docs run preview",
-    "docs:deploy": "pnpm --filter @typesql/docs run deploy"
+    "docs:deploy": "pnpm --filter @typesql/docs run deploy",
+    "playground": "node scripts/playground.mjs"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",
+    "lz-string": "^1.5.0",
     "typescript": "7.0.2",
     "vitest": "^5.0.4"
   }

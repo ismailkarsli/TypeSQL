@@ -6,6 +6,9 @@ it **inside the type system** and gives you the exact row type, the parameter ty
 
 ![TypeSQL demo: hovering a query shows its inferred row type, and a misspelled column is a compile error](assets/demo.gif)
 
+**[Try it in the TypeScript Playground](https://www.typescriptlang.org/play/#code/PTAEBUE8AcFMGUCKAZAXKACgewM4BcBzAJ1h1CWQBpRoBDInWAE1ACNIIYEBjIgS2h4A5GTxdQOSPlgBbAHSgAokz55QeABaxyKULQB2LDVgBusIuq3quOVACgQoIlgDuZAyzpFaM2HnNkAGZYADYhrtQeoDJ8+LQA1qR6JKDcWDLQfCHa5s4MoFj6ltr4-PoEcnZ8GVhEagDeqSS0-vAAjiHUYnCgAMKhXeIA4rD65i3Mgz0AcgCuYbSs2VPaGPQ+OFBwK6AASq5b2gC+oIHOMqAARAAC3aQdwGkklwDcdlX6-kSBtNzaACIAIVA9TsoFAs0YDHQoPB4L4THQIzG3n8TAAPJc+J8ACyXAB8L1Ajg0tHcoCYsB+8zw6Cwgj4hVoIQKRQAktN4IpduAwXDZLQsuh+iFMf4AB54AlvOEU2LQEK0SAAfX0Plg6DmCyWsDFsEl0r54N4sAmTGVLSRo3GaLF1VIeB8ggAXobwUcZTRcHhbCCjaAEVaUWbMdi8AAON1w2izTS1ZWBvqhUO4qPgvCqbLC5OXCVSwn+1hYJiQTXzRU6vUGgvut5Hd5pfT4CQdUAAXiaptaHXRQPxAAoAJRvBxgZCKABi4FAACkAPIc6IJJKabT8AgaNQ4BHafTlxbZIkAEgAjOpl2RVKJxGd0hC5AjKo3m212y2Qv2AAZc8e9aezB8mGoACBSyahoDkDM8Gyf1ZTg8EJ12OcAFkIShMhZlAccp1nBdpi9fAyGgUA53wiCYzjIgExYDsAIRWD4NlAB1AAJblFHvBE31PT9qAAdmHOw7j2Vw332FxDnRO4sECUA2gLRxwQAPQAfiE8Q1m8GQyA7TSNkk6TZPkt5FNAVT3kcABBAhiFgAgJncQxUlCWYZCKNVfCCUJwhcTBvVs300lmT5+wAKkHANL0+cNIgkPAygICFDHMUB9GLWAAFpoH8kgcCfQpmziH03xwDovx-RQ-z0WNjCohFqCCkLwuoGRaHFfsoOyCLLPgUBFX8ZtEJQgjiqGJCAFUMFAQEAE1qso6jP0E4T4EdYqO3EgyuBkuKWhwBSwGUtTR1ANl9BCbFtBMZlZiSegSlGNQyVAI8ii8dUvkclhuC0bhEhYWh7OxZsXC0FJVw4e60OYfKmzUUCWQ7S5aCYWhrn1J1sjkNIZFeOxnzUE0zRKsrPw5LkeVO6ZwDnaH8n7BGIoANUs5BxsUXr+yPepSpCOR3pkBnWqyQcjgi3ZFHAcbdmmDkhgDIDOzNC08CWt5hN6Zo0TEg4uCk7bZKJtEDrhcyTuQ2JHUSdwUhxzJslAXJajIQpih0ZA4oShQJz4cVihkexefKxRf2nfRfFAIbUMhAI1eJMAnaIdA0hCVyikucPYEuCksCSNL4fFS27CDsnOW5acORpkayA6zNYGZ1n2c509B14q4WNgMIsEuYd48dog8nQCjauoyLQGmOdp2mcbkA9qJSTINKKSpGMQjwOwgA)** <!-- playground:core -->: edit the SQL and hover the types,
+with nothing to install. The Playground runs TypeScript 6; TypeSQL is built for TypeScript 7.
+
 ```ts
 import { createSql, type Col, type Generated, type Nullable } from "@typesql/core";
 
@@ -58,17 +61,17 @@ await sql.transaction(async (tx) => {                // tx: sql bound to one tra
 
 ## Packages
 
-| Package | Role | Peer dependency | Contents |
+| Package | Role | Peer dependency | Playground |
 |---|---|---|---|
-| [`@typesql/core`](packages/core) | type engine | none | `createSql`, `q.execute()`/`executeTakeFirst()`/`executeTakeFirstOrThrow()`/`executeCount()`, fragments, `ApplyDdl`, `migrations()`. Zero dependencies. |
-| [`@typesql/pg`](packages/pg) | driver | `pg` ≥ 8 | node-postgres: `PgTypeMap`, `createSql(pool)` with `sql.transaction`, `executor`, `migrate`; the `typesql introspect` CLI |
-| [`@typesql/postgres`](packages/postgres) | driver | `postgres` ≥ 3 | postgres.js: the same API, with `PostgresJsTypeMap` and `PostgresJsBigIntTypeMap` |
-| [`@typesql/kysely`](packages/kysely) | ORM schema | `kysely` ≥ 0.27 | `FromKysely`: a Kysely `DB` interface (kysely-codegen, prisma-kysely) as the schema; `createSql(db)` runs queries through Kysely |
-| [`@typesql/drizzle`](packages/drizzle) | ORM schema | `drizzle-orm` ≥ 0.45 | `FromDrizzle`: Drizzle `pgTable`/`pgView`/`pgEnum`/`pgSchema` definitions as the schema; `createSql(db)` runs queries on Drizzle's driver client; `pgType` |
-| [`@typesql/prisma`](packages/prisma) | ORM schema | `@prisma/client` ≥ 7 | the `typesql-prisma` generator and `FromPrisma`; `createSql(prisma)` runs queries through Prisma Client |
+| [`@typesql/core`](packages/core) | type engine | none | [open](https://www.typescriptlang.org/play/#code/PTAEBUE8AcFMGUCKAZAXKACgewM4BcBzAJ1h1CWQBpRoBDInWAE1ACNIIYEBjIgS2h4A5GTxdQOSPlgBbAHSgAokz55QeABaxyKULQB2LDVgBusIuq3quOVACgQoIlgDuZAyzpFaM2HnNkAGZYADYhrtQeoDJ8+LQA1qR6JKDcWDLQfCHa5s4MoFj6ltr4-PoEcnZ8GVhEagDeqSS0-vAAjiHUYnCgAMKhXeIA4rD65i3Mgz0AcgCuYbSs2VPaGPQ+OFBwK6AASq5b2gC+oIHOMqAARAAC3aQdwGkklwDcdlX6-kSBtNzaACIAIVA9TsoFAs0YDHQoPB4L4THQIzG3n8TAAPJc+J8ACyXAB8L1Ajg0tHcoCYsB+8zw6Cwgj4hVoIQKRQAktN4IpduAwXDZLQsuh+iFMf4AB54AlvOEU2LQEK0SAAfX0Plg6DmCyWsDFsEl0r54N4sAmTGVLSRo3GaLF1VIeB8ggAXobwUcZTRcHhbCCjaAEVaUWbMdi8AAON1w2izTS1ZWBvqhUO4qPgvCqbLC5OXCVSwn+1hYJiQTXzRU6vUGgvut5Hd5pfT4CQdUAAXiaptaHXRQPxAAoAJRvBxgZCKABi4FAACkAPIc6IJJKabT8AgaNQ4BHafTlxbZIkAEgAjOpl2RVKJxGd0hC5AjKo3m212y2Qv2AAZc8e9aezB8mGoACBSyahoDkDM8Gyf1ZTg8EJ12OcAFkIShMhZlAccp1nBdpi9fAyGgUA53wiCYzjIgExYDsAIRWD4NlAB1AAJblFHvBE31PT9qAAdmHOw7j2Vw332FxDnRO4sECUA2gLRxwQAPQAfiE8Q1m8GQyA7TSNkk6TZPkt5FNAVT3kcABBAhiFgAgJncQxUlCWYZCKNVfCCUJwhcTBvVs300lmT5+wAKkHANL0+cNIgkPAygICFDHMUB9GLWAAFpoH8kgcCfQpmziH03xwDovx-RQ-z0WNjCohFqCCkLwuoGRaHFfsoOyCLLPgUBFX8ZtEJQgjiqGJCAFUMFAQEAE1qso6jP0E4T4EdYqO3EgyuBkuKWhwBSwGUtTR1ANl9BCbFtBMZlZiSegSlGNQyVAI8ii8dUvkclhuC0bhEhYWh7OxZsXC0FJVw4e60OYfKmzUUCWQ7S5aCYWhrn1J1sjkNIZFeOxnzUE0zRKsrPw5LkeVO6ZwDnaH8n7BGIoANUs5BxsUXr+yPepSpCOR3pkBnWqyQcjgi3ZFHAcbdmmDkhgDIDOzNC08CWt5hN6Zo0TEg4uCk7bZKJtEDrhcyTuQ2JHUSdwUhxzJslAXJajIQpih0ZA4oShQJz4cVihkexefKxRf2nfRfFAIbUMhAI1eJMAnaIdA0hCVyikucPYEuCksCSNL4fFS27CDsnOW5acORpkayA6zNYGZ1n2c509B14q4WNgMIsEuYd48dog8nQCjauoyLQGmOdp2mcbkA9qJSTINKKSpGMQjwOwgA) <!-- playground:core --> |
+| [`@typesql/pg`](packages/pg) | driver | `pg` ≥ 8 | [open](https://www.typescriptlang.org/play/#code/PTAEBUE8AcFMGUCKAZUB3AlgFwBagHYD2AJrALTSEDOWA5gE6xWgAUAAljEwI4A2w0WgEoAdKEQBXWPQxNQ9CflCElkQhPqgACoUK8ANKACG+YvMJpmRxqE5wzAI0jocRrACgQoQQHJmpADMjCV4sb2sqaWZGLA18AC5QDHwsAA5jUwIJAFtpDABjY2YaGXxaKkMsDFyaI2zoK2YAETdYMQAJQgA3aVscWHkmEKwqEXdqynowgG9tXV5QAF9QAPpCbNAAIkFNgG5x+sIp0Fn8xlb4PiWVtY3Nji4qPgFaPYPJsLsB2YBhPUMAOKwfDSVrEQwAORCvCMDl4A2Wq3WWwecCe-HyR1gb08YAA6jIsANcBhmE5QK5TIYjqBaMDQUSkmEkRs1BpQMQ3LCjJFEgADL7opIpNZUOD5MJkMgaBaAMgJQFL1GEqPl+tkjCIRnzxilpEF8gMmgAhE7uUCgCSRehURLTM3mpLERJAkH0MEAHk2ySwABZNgA+fYO0CwdUYXiJP68T1EgAeWADQYdxFJ0BhkAA+vg6rBElDeDC4bAY7B44n7eaHEYYfgDZG9J78Dk8vly8GzrAwRm3M76W6icQY9UmFg6tAsAAvNtLJOUGg203BjBO0AuhmwQdelKpafm4K4I4Z5f16Nb3272zYeEnktlwMV7wSOGk-rEbtYPPQ2Hwoc1Uf1Sdp0WfZFncdxMXwGhvHmUAAF4CFgNA5j0FhThUEEJQwFR4CwUpaESbZqDoRgbRAXhCHyascCI4AjGgaBNiWIR9ggqChXgjsLj4d1jX9FhKD0ZiwNYsInAAQQkA9NHg9EWD5eAAFFkAUn5wG8ERl0MaBNSvWAtJEaAn14F8N3fQwJBEUMjHDB9gzs+yHQAMQAJQAeQAWWg+dvFAAApVyAEkIQtK1mAkUBXOCizlzg9T92o+gj2IWyHNS808XaBTnIUuLJISpLYoAEgARj5QwAHYhJEryRliow0Gs0TIAkqTLNjWB8kk2AWCErwHQAPQAfmElQoMtXp4PqxrQFk+SlJUtTNNAKsawNQxOIHd9QBcjyQqiUAMqynKrPDIrSsMTYjE5NhSzHeERExbJNlEUsOq68AjAAa1gRyMGtLBXPocAcDWNAev2PrzSGkbILCTFFFqyaGuwGa+DkxTlNU4w8sPJb4ZSFgACohFAMT4AIba3M8udaoBNyAFUtFAI0AE1sakpK+Re9rOqJcHcWDaGBawWMkmKK4HHUTIsEIZQQVsN1IKMTCVEjDz3ICtS0H6JRcAGAJFBVpQSL0HoKlANzkGQI0xJ+ABpFxgSZPpQdGcDRrCGmArMJHpvRTVFaoZWqhUFgeUgWtWBFknYP9RdQD66HzWq2YYuWX2UZFuSgsU5y1KC8BXL261WBOgxlurEwDRJgA1MTkHphTyZYErDEKgAmEnsvAennIhIKAUdMqtgYZXYBu2M7raR7NkMAAGbm3qJD7vt+-7AeB0H+eTj2arq5HPljbOIVz-OIULmrmDDnHEqWqosHhWv68b5vW9ADuu4Unu+4HofDCWzY7RYAFkIM9NqS9YArx+n9GgG8QYWG3oMWI9AlA0w0sQECQkBZaGsDmIkJdrADFVB1b6ZgjC0GsrDPosA-qgExLwHICR2b5RiqSYUvoxhTRRrNJo81wA5R2tTIizBDrZWYbjH279zpbHKmA16vNurMQTmAaQax6CJCMDNXCyRaBiwIIQMIJh2E+ncEAA) <!-- playground:pg --> |
+| [`@typesql/postgres`](packages/postgres) | driver | `postgres` ≥ 3 | [open](https://www.typescriptlang.org/play/#code/PTAEBUE8AcFMGUCKAZUB3AlgFwBamgPYDOWA5gE6xEB0AVkaABQACWMVAjgDbCEkVUAlNVCIArrHIYqocmIB26bHiLdqCogEMAZrEZZYADywAaUADdNXCUUFnN8gCayCaIgCgQoTZVBs4zgBGkOg4mlj4xGSUNPT4PkRUAFygGPJYABypDJqgJFLypGYE5N6ggRikaRGYuKAAQpUAkunx5ERppKAE8tTuGAC2hOQR-rCgAN6g8NygAL6g2uQEA6AARHzRVGsA3P1DJRFTAMaU4bCNpC1YM1xmp7Dnt-OLy6trrOyqPJsCRLv7YajdiTUAAYQId1AAHFYPJJOdHGYAHJiLhcTSBLjjBZLFbrT5wb7AY4lWAA-rpSTaTTHcYAEXqk3coFAYkS7RSExZrNSjhSsPh5ERAB41tUACxrAB8e15oFgA00GC4KQhXDFBmMMrlvMcGCI0AxkAA+vJNANYClUejMdjNUYsDqeayHoiTeEBXCEQZHJrBlQsBboFgAF7O1lzXWbIhcl18r1C0Xi9IZCO8zRiXAlE0YfngyFiyXp1lYbDYtWFtZap2y+NB0ixgsa6uOgDaAF101H3HN3O5HLBjhjfKT5CRQI5AilbjtQF5fjFGBson8kiAuARjlYcFFgJpoNA1oJ3GOJ99QABeUBugy3EWM6WMKeCPannoTmNX7xoZURb6MAABvAACiyAgWC4B8mYZZYNiMGaI2oAAGIAEoAPIALKRCQDAAOoABIgahIGgAAJAAjN+ACCyIAJpMA2tiAWYazfMe1BGEOWZ6K+nhgLyAB6AD8-ZeOhii5GO8LHGWPRKHUgFjE2UwVFU6QpIuVDUJc1zzCxqSpt4Tg3gQChYIwABUgimZa5S0gA1t4DBqdUfSDsOPjjGeERTpcM7cCKqmVNUKSua0cx1j55SVN+t4XM06T3o+z6BJcfHRaS5kMNemi-tgMWkEBoHgZB3hZru5C5kipnmVZNnUfAoCKGhWE4VgDDQhhACqAAKDQMZm2ZVXmgHCFxxw8YwfFeEJon8XkahYMK460nJigGotXDUIEsDqXOWCGNQy0OFoskYPJm25Fo5iwIQbnuHlf5bcdK1netjCaEQkDyMcjGGDZl7SsyrJPQVh1AX19LUeApFfqBUGwdi35iIekj6OWsA2YRxGkUNlXVd+lEGQA7ONhjcQY026tFii5floyGEB9JgSBsMoRh2FfjjJE3j4+rmlw2CQPoiG2N+AAMY2cRTk0GBCdV8ays2siJvZ8e4AHAazZV5hzbXc0RvNMaAzDA8TrHsa+85gJIyzkCkJtm34mgOTIuQ1p27hAA) <!-- playground:postgres --> |
+| [`@typesql/kysely`](packages/kysely) | ORM schema | `kysely` ≥ 0.27 | [open](https://www.typescriptlang.org/play/#code/PTAEBUE8AcFMGUCKAZUB3AlgFwBagNKQDOsANpKABQACWMsRAjqcANbFmQCUAdKAJoB7AK4AnAh3KgAIgCFQGAHZZYogGYBDAMawq7EuQC0WwQBNYAc1iLQIrNGFZbogFAhQODYtOG0o7CqKXApEoLi6RFo4sAC2GgA0oF6moKIaaKBIqKLCiqGCNpAi4oQGFEpEWF46fAASggBuqmHRqQzCpFhEPC4YMdCCok4A3hJliQAKgpUWogzSGBqksFpYiXRwoADCgqTCMYpQcOv0oADi1qoaKikAvqBqooIxoABE+pyvANy9-YMjoCmu1A90ezze0As31+AyGoFGWjm1wQzBBDyeL1etHoTBYH3I0LcYHxkGMZks1lsjgcazC-hiMVgphcG10AEllAAOUAAXm2u32h3oAB5Kv5FBZEgAjDAWJROAA+oEU+ylzSVYqUktAMrlylASpVMTV4g1WHFFgAfD9WRA+gwqv1efy9gcjrBhdJkYkvSoDaBNRKfcj-YGrTbTgBZQRmZ2vTzQaCQV7+15EDSmQny1SaHQyeTDFygUDCEiiIgALnhReLClMVYuiiuN2FRpN1prxdiGgwpCrYZ+tdAMRj9dA0djho6pEHtcRsGRpgA+tcG5c0i3wPbKhp+h3i7dZwNKpXq0OMGPG82mcKOVhOfvaxpHDhBkuL1W26pZ8WsNhlv25paj+oAOFKpAYEQ0SXuui7ClKMbLF4j6Hi4twuC4Jh5E4phSs6TYZKUnCerIlqUKMpiLMsqyfrAGRTDMcxEAsSwrFg5GgYhtH0YhlDBLc-FcD8WGVAGqJ8vOyLwMwJFkbhQkYe44CtIwwiqBQUrCL25jiGogzoJ4TjYKApiCAw6BkKQiRZA8+nhG0lSJFEKysEySQWD22EtBEu66FU4EMD0Ik4WkahdM66Q9jhUo8AYbEAGIYpQrzHl0ry8HFqyUAA2q8F6vIkrx-lgyyvAAurwaDRHMyVgRBUFMgVbw8k1mikCQvCwAAHisjiwHxPyYQUolITpCEaKIKR8rilAAAbwAAosgC1bOAJY8N2vaJMIPAjmYTkiMolDQDwF7BAAgvAnEnvEnZDvdD2PQ9aSKKwfGgAA8gAagtABKVAfb90h-aAsj8KAJi5OxJ1nTIC3wFsF1XdApDaLAd1PZjtbxb9H2RiWZahMIoDLfFa0AFIfWyABy13hdAn20ydz64G+F7Ojt7PndT0igTwdWQdBGNY5jADqtR-Qt617VNoAACQAIzCyLj1nLjACqEyg+DnOmLNhUJkm6XCcNTgva5suRcZo2qONk0bT1Wh9QNRJDgAegA-IpYAckQF66BoYycHSXjpqsGAFNKSgpIHuJhIIChOFgCcxBgXU6lppA6Uk3iZCgoCqaoGCBS4VvRTw5qh9of4FHxDu9SolAaEQkCKFoVDml1wQ8paZ5JGgUV0l1PDCNApjIuAGgBbV0xpRlsDsaMAsNWO5pqSClXVf1rws6+ojvpmhUtYkCudY7zsKcWZcQ0iKjSaQsmUJ3XBzcDy3gFLON43ToTi5LSQvjZrLRWoBua82ph9Nay9oL61AKfeuTtG4KQEoNGa80lorTWuzL++NSyqF-hLX6UsZbOkVrAneEpRDJiEqAdwqgniiE-IIJwgcGhLHXoINQ3lhyjlANYfYLggA) <!-- playground:kysely --> |
+| [`@typesql/drizzle`](packages/drizzle) | ORM schema | `drizzle-orm` ≥ 0.45 | — |
+| [`@typesql/prisma`](packages/prisma) | ORM schema | `@prisma/client` ≥ 7 | [open](https://www.typescriptlang.org/play/#code/PTAEBUE8AcFMGUCKAZUB3AlgFwBagAoBOGAzgLYCGoAFAAJYywkCOANsNMeRQJQB0EHLFAM4LVgFpOpSqADmsAHaxCFLAHtC6YliYihoACIAhUBkW7CAMwoBjYQCNYrdWgBQIUOsWhYANxVIUAADaW55JRU1WGCAGnRsPFxhABM1CgcKElgAchIvNB9FCjI9OkpoHnjirAwAkUZ8uhSHPgAqHlAKRRSPMBTYGwBXViwSAQAlCjRQJFRkn0IhxXzcQnUhuTxIDa0iGQoAYVYMJSwBAAl1AK1k0EImEbG+Pr7Qd4VlVQ1bxrZQADeb3e7041wwAy0AF5QAAiURMNhSLiUWHAkEbLDQIZYEEw2F8PjAEiEWzAFrABHiPhjNGed4AXzcGDI0E0uIBoFsD2i8DY8QRBBRFCmaGOpwsoAZoCs6zIcPof3YYVRAG5maz2Q04IDQId1Kx4gBxSLfWApeIAORGrAyrGE0tl6nlsMVYjYwFsmlgsPVbxJZIpVLYNJI8SyES+0V65ksNnsRlMQPewDabSFB1AZHUA1YIQAqtlCMEBG1gG53kMiyQAFyAisgiF1k1R3QpAA8sNjABZYQA+dUg3yUDCsOv61idvwUUk4Gf9wcg1Pp-bhKynVgpELFUol0BlhvvFKkaC2yAAfR3sDr1tYtoc9s7ugAHlgF4f7gbr6AW1E252Ji-d8h2XEJaCGaA0jbABBLBgjrbJcQcIJV1kcUzmqdRQCgjIslSQYKCeUtyyHCCoPNWDxwNJ8WSYLASmgYCpUXUDUKobNcxCfB1BIODiIbNleNreshybPVqNhIYhghJiUzTDM1w3LdgkI3BNAASRSPcDyHVScE0c8xInTse1kkRsHtKjJ3hWBXzMvxTjQYTfzNDsuwsAAOJiGUXAASKk62TEFAMsuFoMMABZdTLVhUAAB84XzeAAFEJl9BsfLcJk3AGWxbQeLlvF40AVQoOs2NFdCLFVUBPB2IY9mFKqsDcL0VlxcRQBhblYF5Nh2xMPtqFKngas8JYVi8HxfOYIZAlFfMVgoKxYHDVg0AoSB8kwXBQAccwt2gGcSlgSwSDcVqitxCgUjIcx8hhaYKGwUBxGoYIUuQZLDnAMwLWwk8z0vE74kkyDo1g2KADEJgAeQi0AqxUfIAHULlS5LP3tLrQF8gBGOIwsi6LYX4WzYFsHFYGoUb0VAAA9AB+C7PEApyugKhEtwjGa5sISBRXuU6Gsm5IyDrWMPLMfJ9rkWNqiGUpiFsaWjAplkKFYF42uK3i1AeroNpet6PuSr6fq6HF9MIQz-q9ZYsGoDpQGg+ASp4sZ4hIRXqAc2AnM6V3QD99mYfh92hJ-OH83wUBjAATUttSbYhYIyefCmqZp9V6XeJmLp13Fc1O80cae42QywVQltsWpvGoagsGfTooT7ERn3ewwzeS8BMbDhHBLGUA0YxpPrdtnH8cJvH08z3R9QdmnadzhnmbeQfxghVXaAGYZRmoKSISX8rhT1E4zhlUdWHyF7zHibjeLkB58hSdQ9EUdRzjcE3opSiZfuiuAWGEch7UD0gZCEAoLKwE6AANWgsgfMyU3bUHxvEXyAAmHg09QYXGcC4UmY0wAqHWIQCWW45z5A-thdImRsjYQIk8NwQA) <!-- playground:prisma --> |
 
 Two more workspace packages are private and not published: `@typesql/docs` (the VitePress
-documentation site) and `@typesql/bench` (compile-time budget benchmarks).
+documentation site) and `@typesql/bench` (compile-time budget and runtime benchmarks).
 
 ## What is inferred
 
@@ -123,17 +126,49 @@ const m = migrations()
 type DB = SchemaOf<typeof m>;
 ```
 
+## Performance
+
+The SQL is parsed by the type checker, so the cost is paid at compile time, in your editor and
+in `tsc`. At runtime nothing is parsed: `sql(…)` builds `{ text, values }` and the driver runs it.
+
+### Compile time
+
+`packages/bench` type-checks generated files of distinct, realistic queries (joins, aggregates,
+parameters) with `tsc --extendedDiagnostics`. On a 4-core Xeon Platinum 8488C:
+
+| File | Instantiations | Check time, TS 7.0.2 | Check time, TS 6.0.3 |
+|---|---|---|---|
+| 1 query (mostly loading the library) | 156K | 0.26 s | 1.48 s |
+| 50 queries | 655K | 0.55 s | 2.47 s |
+| 500 queries | 4.8M | 3.2 s | 10.3 s |
+| 50 queries with `:name` and inline parameters and a shared fragment | 431K | 0.38 s | |
+| one statement each of 0.5, 1, 2, 4 and 8 KB | 6.6M | 1.3 s | |
+
+Each additional query costs about 9.2K instantiations, or about 6 ms of check time on
+TypeScript 7 (about 170 queries per second) and about 18 ms on TypeScript 6. TypeSQL is built
+for the native compiler and its recursion budgets. CI fails a change that takes a bench file
+over its instantiation or check-time budget (`packages/bench/thresholds.json`).
+
+### Runtime
+
+Building a query (Node 26, same machine; `pnpm build && node packages/bench/runtime.mjs`):
+
+| Call | Time |
+|---|---|
+| `sql("… WHERE id = $1", 7)` | 1.1 µs |
+| `:name` parameters | 2.4 µs |
+| inline `${sql.param(…)}` values | 3.9 µs |
+| a `{slot}` fragment | 2.5 µs |
+
+The text goes to the driver as written, and `execute*` returns the driver's rows unchanged (or
+with top-level keys renamed, with `rowKeys: "camelCase"`). `@typesql/core` has no dependencies
+and is 10 KB minified, 3.8 KB gzipped.
+
+To reproduce the compile-time numbers: `node packages/bench/gen.mjs && node packages/bench/run.mjs`.
+
 ## Toolchain and limits
 
-Requires TypeScript ≥ 7.0 (the native compiler) and Node ≥ 26. The engine is written to
-TypeScript's recursion budgets. Measured on TS 7.0.2:
-
-| Workload | Cost |
-|---|---|
-| typical 60-token query (join, GROUP BY, two parameters) | ~28K instantiations |
-| 100 simple queries in one file (`SELECT a, b FROM t WHERE a = $1` shape) | ~0.7 s check time |
-| 100 distinct 60-token queries in one file | ~1.6–2.4 s check time |
-| 8 KB statement | checks, ~1.3 s |
+Requires TypeScript ≥ 7.0 (the native compiler) and Node ≥ 26.
 
 Known ceilings: statements up to 4096 tokens; left-nested `||` or `+` chains of ~100 terms
 (`AND`/`OR` chains are balanced by the parser and are fine at 200+ terms). Past a ceiling,
@@ -157,6 +192,8 @@ pnpm test              # vitest: runtime + type tests; conformance runs against 
 pnpm build && pnpm smoke:dist   # import the built packages with plain Node
 pnpm docs:dev                   # the documentation site (packages/docs)
 node packages/bench/gen.mjs && node packages/bench/run.mjs   # compile-time budget (thresholds.json)
+node packages/bench/runtime.mjs                               # cost of building a query, after pnpm build
+pnpm playground                 # regenerate the TypeScript Playground links (--check: CI's check)
 TYPESQL_PG_URL=… node scripts/catalog-from-pg.mjs              # review the function catalog against pg_proc
 pnpm change                     # record a change intent with any change to a published package
 pnpm check:intents              # fail if a published package changed without one (CI runs it too)

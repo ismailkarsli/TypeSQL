@@ -9,6 +9,7 @@ pnpm install
 pnpm typecheck                 # tsc per package, including the docs and package examples
 pnpm test                      # vitest: runtime tests, type tests, conformance against Postgres
 pnpm build && pnpm smoke:dist  # build the packages, then import the built output with plain Node
+pnpm playground [--check]      # regenerate (or check) the TypeScript Playground links
 pnpm docs:dev                  # this site, with hot reload
 pnpm docs:deploy               # build this site and deploy it to typesql.karsli.net
 pnpm change                    # record a change intent; see Releasing
@@ -17,6 +18,20 @@ pnpm change                    # record a change intent; see Releasing
 Type tests live in `packages/*/test/**/*.test-d.ts` and use `expectTypeOf` and
 `// @ts-expect-error`. The engine's design rules and the TypeScript limits they work around
 are in [Type engine](./engine). Versioning and publishing are in [Releasing](./releasing).
+
+## Playground links
+
+The README, the package READMEs and this site link to the TypeScript Playground. Each link
+opens one file from `packages/docs/playground/`, encoded in the URL, and the Playground loads
+the published packages from npm. A Markdown line with a link carries a `playground:<name>`
+marker naming its file: in an HTML comment, or in a YAML comment in frontmatter.
+
+After editing a file there, run `pnpm playground` to rewrite the links. `pnpm playground --check`
+(run in CI) fails when a link is stale or when a file does not compile as marked: lines ending
+in `// error …` must fail, and every other line must compile. It checks against the workspace
+sources with TypeScript 7. The Playground runs its own latest TypeScript (6.0 as of October
+2026) against the published packages, so open the links after a change to the examples or a
+release.
 
 ## Conformance tests
 
