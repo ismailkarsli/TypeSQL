@@ -20,6 +20,8 @@ words, operators and literals from 0):
 | `DEFAULT` outside a `VALUES` item or `SET` value | `DEFAULT is not allowed in this context` |
 | set operation width | `each UNION query must have the same number of columns` |
 | wrong inline value | `parameter $1: a string value cannot be used as int4` |
+| JSON value outside JSON | `parameter $1: a sql.json() value cannot be used as text NOT NULL` |
+| raw array for JSON | `parameter $1: an array for jsonb NOT NULL must be passed as sql.json(value) …` |
 | non-literal SQL | `the SQL text is not a string literal: …` |
 
 Wrong positional arguments are ordinary TypeScript errors on the argument
@@ -71,6 +73,8 @@ Measured on TypeScript 7.0.2:
   (`coalesce(json_agg(x), '[]')`); any other literal makes the result `unknown`. Functions that
   rewrite JSON (`jsonb_set`, `||`, `jsonb_strip_nulls`, `json_populate_record`, `jsonb_path_query`,
   `json_each`) return plain JSON, and so does `row_to_json(ROW(…))`.
+- A `Json<T>` column's `T` is trusted. Positional and named parameters for it are typed `T` but
+  passed to the driver as they are; only `sql.json()` makes arrays work with node-postgres.
 - Inside JSON, `int8` and `numeric` are numbers: `JSON.parse` rounds integers beyond 2^53, and a
   `float8` / `numeric` that is `NaN` or `Infinity` is serialized as a string. Elements of
   Postgres arrays are typed non-null, as for array columns.

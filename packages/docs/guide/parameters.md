@@ -35,7 +35,8 @@ sql(`INSERT INTO users (email) VALUES (${sql.param(maybeEmail /* string | null *
 // … SqlError<"parameter $1: a string | null value cannot be used as text NOT NULL", 8>
 ```
 
-Strings are accepted for enum columns, and any object for JSON and other object-typed columns.
+Strings are accepted for enum columns, and any object for JSON and other object-typed columns
+(arrays for JSON go through [`sql.json()`](#json-values)).
 With no context (`SELECT ${sql.param(x)}`) anything is accepted.
 
 Inline parameters mix with the other two styles: `$n` and `:name` parameters keep `$1…$k` and
@@ -57,6 +58,31 @@ and each use is checked against its own context. Write a value used more than on
 `:name` (or a `$n`). It is then one parameter, sent once, whose type must fit every use:
 
 <<< @/snippets/parameters.ts#repeated
+
+## JSON values
+
+`${sql.json(value)}` binds a value as JSON. The drivers disagree on what a raw JS value means
+for a `json` / `jsonb` parameter: node-postgres sends an array as a Postgres array literal
+(which Postgres rejects as JSON) and a string as it is, while postgres.js runs
+`JSON.stringify` on every value (so a string you stringified is stored as a JSON string).
+`sql.json()` sends the same JSON text with both, and `null` / `undefined` as SQL `NULL`.
+
+It is accepted only where a `json` / `jsonb` value is expected (or with no context, as in
+`SELECT ${sql.json(v)}::jsonb`), and for a [`Json<T>` column](./schema#typed-json-columns) the
+value is checked against `T`. Because a raw array would not work with node-postgres, passing one
+to a JSON parameter with `sql.param()` is an error:
+
+```ts
+sql(`UPDATE portfolio SET name = ${sql.json({ a: 1 })}`);
+// … SqlError<"parameter $1: a sql.json() value cannot be used as text NOT NULL", 5>
+
+sql(`UPDATE portfolio SET history = ${sql.param(items)}`);
+// … SqlError<"parameter $1: an array for jsonb NOT NULL must be passed as sql.json(value)
+//    (node-postgres sends a JS array as a Postgres array)", 5>
+```
+
+Positional and named parameters are passed to the driver as they are: objects work with both
+drivers, arrays only with postgres.js. Write JSON parameters inline with `sql.json()`.
 
 ## How parameters get their types
 

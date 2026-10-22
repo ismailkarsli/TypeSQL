@@ -18,6 +18,8 @@ import type { StripShape } from "./shape.js";
  * At runtime `sql.param(v)` returns an unforgeable token that `sql()` replaces the same way.
  */
 export type InlineMarker<T> = `\u0000P${Enc<T>}\u0000`;
+/** Marker of `sql.json(value)`: an inline parameter flagged as JSON (`J`) before the value's encoding. */
+export type JsonMarker<T> = `\u0000PJ${Enc<T>}\u0000`;
 
 /**
  * `sql.valueOrDefault(v)`: like `sql.param(v)`, but `undefined` sends `DEFAULT` instead of a
@@ -175,9 +177,32 @@ export type CheckCarried<DB, TM, X extends string, K extends readonly unknown[]>
 type CarriedLoop<DB, X extends string, K extends readonly unknown[], P extends readonly unknown[], I extends number> =
   I extends K["length"] ? true
   : K[I] extends infer E extends string
-    ? CheckEnc<E, P[I]> extends true ? CarriedLoop<DB, X, K, P, Next[I]>
-    : SqlError<`parameter $${Next[I]}: a ${DescribeEnc<E>} value cannot be used as ${Expected<DB, X, Next[I]>}`, FindParam<Lex<X>, Next[I], 0>>
+    ? CheckValue<DB, X, Next[I], E, P[I]> extends infer M extends string
+      ? SqlError<`parameter $${Next[I]}: ${M}`, FindParam<Lex<X>, Next[I], 0>>
+      : CarriedLoop<DB, X, K, P, Next[I]>
     : CarriedLoop<DB, X, K, P, Next[I]>;
+
+/**
+ * `true`, or what is wrong with the value of encoding `E` for parameter `N` (TS type `P`):
+ *   - a `sql.json()` value (`J…`) needs a json / jsonb parameter (or one with no context);
+ *   - a `sql.param()` array for a json / jsonb parameter is refused: node-postgres would send a
+ *     Postgres array literal, so JSON goes through `sql.json()`.
+ */
+type CheckValue<DB, X extends string, N extends number, E extends string, P> =
+  E extends `J${infer R}`
+    ? JsonContext<ParamUses<DB, X, N>> extends false ? `a sql.json() value cannot be used as ${Expected<DB, X, N>}`
+    : CheckEnc<R, P> extends true ? true
+    : `a sql.json() ${DescribeEnc<R>} value cannot be used as ${Expected<DB, X, N>}`
+  : CheckEnc<E, P> extends true
+    ? E extends `${string}[${string}` ? (IsJsonParam<ParamUses<DB, X, N>> extends true ? `an array for ${Expected<DB, X, N>} must be passed as sql.json(value) (node-postgres sends a JS array as a Postgres array)` : true) : true
+  : `a ${DescribeEnc<E>} value cannot be used as ${Expected<DB, X, N>}`;
+
+/** The `ColInfo`s the statement's uses give parameter `N` (never when it has none). */
+type ParamUses<DB, X extends string, N extends number> =
+  Analyze<DB, X> extends { readonly params: infer M } ? (N extends keyof M ? Exclude<M[N], { readonly nullTest: true }> : never) : never;
+type IsJsonParam<U> = [Extract<U, { readonly type: "json" | "jsonb" }>] extends [never] ? false : true;
+/** A json / jsonb use, or no typed use at all. */
+type JsonContext<U> = [U] extends [never] ? true : [Extract<U, { readonly type: "json" | "jsonb" | "unknown" }>] extends [never] ? false : true;
 
 /** `"text NOT NULL"` / `"int4"` for parameter `N` of statement `X`. */
 type Expected<DB, X extends string, N extends number> =

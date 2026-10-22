@@ -1,0 +1,89 @@
+import { expectTypeOf, test } from "vitest";
+import { createSql, type Col, type DefaultTypeMap, type Generated, type Json, type ParamsOf, type ParamsType, type RowOf, type RowType, type SqlError } from "../../src/index.js";
+
+type HistoryItem = { at: string; state: { value: number; label?: string } };
+type Settings = { theme: "dark" | "light"; tags: string[]; limits: Record<string, number> };
+type Event = { kind: "a"; x: number } | { kind: "b"; y: string };
+
+interface DB {
+  portfolio: {
+    id: Generated<"int4">;
+    name: Col<"text">;
+    history: Json<HistoryItem[], { hasDefault: true }>;
+    settings: Json<Settings, { nullable: true }>;
+    pair: Json<[number, string], {}, "json">;
+    event: Json<Event>;
+  };
+}
+type Row<Q extends string> = RowOf<DB, DefaultTypeMap, Q>;
+type Params<Q extends string> = ParamsOf<DB, DefaultTypeMap, Q>;
+const sql = createSql<DB>();
+
+declare const items: HistoryItem[];
+declare const settings: Settings | null;
+
+test("a Json<T> column reads as T", () => {
+  expectTypeOf<Row<"SELECT history, settings, pair, event FROM portfolio">>()
+    .toEqualTypeOf<{ history: HistoryItem[]; settings: Settings | null; pair: [number, string]; event: Event }>();
+  expectTypeOf<Row<"SELECT * FROM portfolio">>()
+    .toEqualTypeOf<{ id: number; name: string; history: HistoryItem[]; settings: Settings | null; pair: [number, string]; event: Event }>();
+  // a type map that reads jsonb as text keeps the text
+  interface TextJsonb extends Omit<DefaultTypeMap, "jsonb"> { jsonb: string }
+  expectTypeOf<RowOf<DB, TextJsonb, "SELECT history, pair FROM portfolio">>().toEqualTypeOf<{ history: string; pair: [number, string] }>();
+});
+
+test("->, ->>, #> and subscripts index into T", () => {
+  expectTypeOf<Row<"SELECT history -> -1 -> 'state' AS last, history -> 0 -> 'state' ->> 'value' AS v, history #> '{0,state,label}' AS label, history[0]['at'] AS at FROM portfolio">>()
+    .toEqualTypeOf<{ last: { value: number; label?: string } | null; v: string | null; label: string | null; at: string | null }>();
+  expectTypeOf<Row<"SELECT settings -> 'theme' AS theme, settings -> 'tags' -> 0 AS tag, settings -> 'limits' -> 'daily' AS daily, settings -> 'nope' AS nope FROM portfolio">>()
+    .toEqualTypeOf<{ theme: "dark" | "light" | null; tag: string | null; daily: number | null; nope: null }>();
+  // tuples by position, unions member by member
+  expectTypeOf<Row<"SELECT pair -> 0 AS a, pair -> 1 AS b, event -> 'kind' AS kind, event -> 'x' AS x FROM portfolio">>()
+    .toEqualTypeOf<{ a: number | null; b: string | null; kind: "a" | "b" | null; x: number | null }>();
+  // an array has no keys, an object no indexes
+  expectTypeOf<Row<"SELECT history -> 'at' AS a, settings -> 0 AS b FROM portfolio">>().toEqualTypeOf<{ a: null; b: null }>();
+});
+
+test("Json<T> columns stay jsonb for operators and functions", () => {
+  expectTypeOf<Row<"SELECT jsonb_array_length(history) AS n, history @> '[]' AS c, settings ? 'theme' AS has, jsonb_typeof(event) AS k FROM portfolio">>()
+    .toEqualTypeOf<{ n: number; c: boolean; has: boolean | null; k: string }>();
+  // functions and operators that rewrite JSON give plain jsonb
+  expectTypeOf<Row<"SELECT history || '[]' AS a, jsonb_set(history, '{0}', '{}') AS b FROM portfolio">>().toEqualTypeOf<{ a: unknown; b: unknown }>();
+  expectTypeOf<Row<"SELECT coalesce(settings -> 'tags', '[]') AS tags, jsonb_agg(history -> 0) AS firsts FROM portfolio">>()
+    .toEqualTypeOf<{ tags: string[]; firsts: (HistoryItem | null)[] | null }>();
+  expectTypeOf<Row<"SELECT to_json(p) -> 'history' AS h, value AS item FROM portfolio p, jsonb_array_elements(p.history)">>()
+    .toEqualTypeOf<{ h: HistoryItem[] | null; item: HistoryItem }>();
+});
+
+test("parameters written to a Json<T> column take T", () => {
+  expectTypeOf<Params<"INSERT INTO portfolio (name, history, settings, pair, event) VALUES ($1, $2, $3, $4, $5)">>()
+    .toEqualTypeOf<[string, HistoryItem[], Settings | null, [number, string], Event]>();
+  expectTypeOf<Params<"UPDATE portfolio SET settings = $1 WHERE history = $2">>().toEqualTypeOf<[Settings | null, HistoryItem[]]>();
+});
+
+test("sql.json() checks the value against T and needs a json / jsonb context", () => {
+  const q = sql(`UPDATE portfolio SET history = ${sql.json(items)}, settings = ${sql.json(settings)} WHERE id = ${sql.param(1)} RETURNING history`);
+  expectTypeOf<RowType<typeof q>>().toEqualTypeOf<{ history: HistoryItem[] }>();
+  expectTypeOf<ParamsType<typeof q>>().toEqualTypeOf<[HistoryItem[], Settings | null, number]>();
+  sql(`SELECT ${sql.json({ a: 1 })}::jsonb AS j`);
+  sql(`SELECT ${sql.json({ a: 1 })} AS j`);
+  sql(`UPDATE portfolio SET event = ${sql.json({ kind: "b", y: "x" })}`);
+
+  // @ts-expect-error a string is not a HistoryItem[]
+  sql(`UPDATE portfolio SET history = ${sql.json("x")}`);
+  // @ts-expect-error null for a NOT NULL column
+  sql(`UPDATE portfolio SET history = ${sql.json(null)}`);
+  // @ts-expect-error sql.json() for a text column
+  sql(`UPDATE portfolio SET name = ${sql.json({ a: 1 })}`);
+  // @ts-expect-error a raw array for a jsonb parameter (node-postgres would send a Postgres array)
+  sql(`UPDATE portfolio SET history = ${sql.param(items)}`);
+
+  type Msg<Q> = Q extends SqlError<infer M, unknown> ? M : never;
+  type CallErr<Q extends string> = Msg<Parameters<typeof sql<Q>>[0]>;
+  expectTypeOf<CallErr<`UPDATE portfolio SET name = \u0000PJo\u0000`>>()
+    .toEqualTypeOf<"parameter $1: a sql.json() value cannot be used as text NOT NULL">();
+  expectTypeOf<CallErr<`UPDATE portfolio SET history = \u0000PJs\u0000`>>()
+    .toEqualTypeOf<"parameter $1: a sql.json() string value cannot be used as jsonb NOT NULL">();
+  expectTypeOf<CallErr<`UPDATE portfolio SET history = \u0000P[o]\u0000`>>()
+    .toEqualTypeOf<"parameter $1: an array for jsonb NOT NULL must be passed as sql.json(value) (node-postgres sends a JS array as a Postgres array)">();
+});

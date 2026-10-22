@@ -16,6 +16,9 @@ sql("INSERT INTO users (display_name) VALUES ($1)", "Ada");
 // … SqlError<"null value in column \"email\" of relation \"users\" violates not-null constraint", 2>
 ```
 
+JSON values for `json` / `jsonb` columns go through `${sql.json(value)}`, which sends JSON text
+with any driver and checks the value against a [`Json<T>`](./schema#typed-json-columns) column.
+
 Also supported: multi-row `VALUES`, `DEFAULT` and `DEFAULT VALUES`, `INSERT … SELECT` (its
 columns are checked against the target list), `OVERRIDING … VALUE`, and inserting into a view
 is an error. `DEFAULT` is only allowed as a whole `VALUES` item or `SET` value, and not for a

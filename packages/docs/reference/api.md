@@ -72,8 +72,8 @@ const q = sql(`SELECT id, email FROM users
 - Each value's TypeScript type is checked against the type its context gives the parameter:
   `${sql.param("5")}` compared with an `int4` column fails with
   `parameter $1: a string value cannot be used as int4 NOT NULL`; a `string | null` value for a
-  `NOT NULL` column fails too. Strings are accepted for enum columns and any object for JSON,
-  interval and other object-typed columns; with no context (`SELECT ${sql.param(x)}`) anything
+  `NOT NULL` column fails too. Strings are accepted for enum columns and any object for JSON
+  (except arrays, see `sql.json()` below), interval and other object-typed columns; with no context (`SELECT ${sql.param(x)}`) anything
   is accepted.
 - Inline parameters are numbered after the statement's own parameters: `$n` and `:name`
   parameters keep `$1…$k` and stay call arguments; inline values follow; spliced fragments'
@@ -81,6 +81,12 @@ const q = sql(`SELECT id, email FROM users
 - `sql.param()` inside a quoted string or a comment is a compile error (and a runtime error).
 - Tokens are single-use: each `sql.param()` call belongs to one statement. Fragments resolve
   their inline parameters when created, so a fragment can be reused.
+- `sql.json(value)` (also exported as `json`) is `sql.param()` for JSON: the value is sent as
+  JSON text by every driver (a `JsonParam`, which implements `toPostgres()` for node-postgres and
+  `toJSON()` for postgres.js), `null` / `undefined` as SQL `NULL`. It fails unless the parameter
+  is `json` / `jsonb` or has no context, and the value is checked against a `Json<T>` column's
+  `T`. A `sql.param()` array for a `json` / `jsonb` parameter is rejected
+  (`parameter $1: an array for jsonb NOT NULL must be passed as sql.json(value) …`).
 
 Only literal SQL text is analysed. Interpolating anything that is not a compile-time constant
 is rejected, so a value can never be pasted into the SQL by accident:
@@ -194,6 +200,8 @@ option, and `camelCase(key)` is the key mapping.
 | `TableOf<DB, T>` | the column descriptors of a `TableName` |
 | `SetInput<DB, TM, T>`, `InsertInput<DB, TM, T>` | what `sql.set` / a `sql.values` row accepts |
 | `SetRep<P>`, `ValuesRep<R>` | the representative text and carried values of `sql.set` / `sql.values` |
+| `JsonMarker<T>` | type of `sql.json(value)` |
+| `JsonParam<T>` | runtime value `sql.json()` binds: `{ value }` with `toPostgres()`, `toJSON()`, `toString()` |
 | `RowOf<DB, TM, Q>` | row type of a statement literal |
 | `ParamsOf<DB, TM, Q>` | positional parameter tuple |
 | `ParamsArgs<DB, TM, Q>` | what a call site passes (tuple, or `[params: {…}]` for `:name`) |
@@ -212,6 +220,7 @@ Generated<"int4">            // has a default / identity / serial → optional o
 NullableGenerated<"text">
 Arr<"int4">                  // int4[]
 Enum<"mood">                 // values in DB["$types"]["mood"]
+Json<Item[]>                 // jsonb holding Item[]; Json<T, { nullable: true }, "json"> for json
 View<{ ...columns }>         // read-only relation
 interface DB { users: {...}; auth: { sessions: {...} }; $types: { mood: "a" | "b" } }
 type WithCatalog = DB & PgCatalog;  // opt-in pg_catalog / information_schema slice
@@ -231,7 +240,9 @@ with a default, …). Unknown names are kept as-is (user enums/domains) and reso
 A type map is `{ [pgTypeName]: TsType }`. Resolution order: exact entry (so a map may define
 `"numeric[]": number[]`), then `T[]` element-wise, then `DB["$types"]`, then `unknown`.
 Nullable columns add `| null`. `DefaultTypeMap` matches node-postgres defaults (`int8` and
-`numeric` as `string`, dates as `Date`, `json/jsonb` as `unknown`).
+`numeric` as `string`, dates as `Date`, `json/jsonb` as `unknown`). A `json` / `jsonb` value with
+a known shape (`Json<T>` columns, JSON built in SQL) is typed from the shape, unless the map reads
+that type as a `string`.
 
 Parameters accept the row type plus the map's `$params` entry for the type
 (`TsParamTypeOf<TM, DB, T>`); array elements also accept `null`. A map without `$params` uses

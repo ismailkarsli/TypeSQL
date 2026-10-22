@@ -16,6 +16,7 @@ A schema is an interface whose keys are tables. Each column is declared with a h
 | `NullableGenerated<"text">` | both |
 | `Arr<"int4">` | an array column, `int4[]` (same as `Col<"int4[]">`) |
 | `Enum<"mood">` | a column of a user enum type, values listed under `$types` |
+| `Json<T>` | a `jsonb` column holding `T` (`Json<T, {}, "json">` for `json`); see [below](#typed-json-columns) |
 | `View<{ … }>` | a view: readable like a table, rejected as an `INSERT`/`UPDATE`/`DELETE` target |
 
 <<< @/snippets/schema.ts#schema
@@ -25,6 +26,28 @@ are the same, as are `bigint`/`int8`, `boolean`/`bool`, `character varying`/`var
 `double precision`/`float8` and `timestamp with time zone`/`timestamptz`. A name typesql does
 not know (an extension type or a domain) is kept as is and maps to `unknown` unless the type
 map or `$types` says otherwise.
+
+## Typed JSON columns
+
+`Json<T>` declares what a `jsonb` column holds. It takes the same flags as `Col` as its second
+argument (`{ nullable: true }`, `{ hasDefault: true }`) and `"json"` as a third for a `json`
+column:
+
+<<< @/snippets/json.ts#schema
+
+The column is still `jsonb` to the SQL: operators (`@>`, `?`) and functions
+(`jsonb_array_length`) work as before. Rows read it as `T`, and `->`, `#>` and subscripts index
+into `T` (an array index gives the element type, a key the property type; see
+[JSON](./queries#json)):
+
+<<< @/snippets/json.ts#read
+
+Parameters written to the column take `T`. Pass JSON values with
+[`sql.json()`](./parameters#json-values), which sends them as JSON text with either driver:
+
+<<< @/snippets/json.ts#write
+
+`T` is trusted, not checked against the database: rows are typed `T` whatever the column holds.
 
 ## Enums
 

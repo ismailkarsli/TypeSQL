@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { Pool } from "pg";
 import postgres from "postgres";
-import { createSql, type Col, type Generated, type Nullable, type RowType } from "../../src/index.js";
+import { createSql, type Col, type Generated, type Json, type Nullable, type RowType } from "../../src/index.js";
 import { acquireDatabase } from "./db.js";
 
 /**
@@ -16,6 +16,12 @@ interface DB {
     age: Nullable<"int4">;
     tags: Generated<"text[]">;
     created_at: Generated<"timestamptz">;
+  };
+  inline_docs: {
+    id: Generated<"int4">;
+    items: Json<{ at: string; n: number }[]>;
+    settings: Json<{ theme: string; tags: string[] }, { nullable: true }, "json">;
+    label: Json<string, { nullable: true }>;
   };
 }
 const sql = createSql<DB>();
@@ -37,9 +43,12 @@ describe.skipIf(!db)("inline parameters against Postgres", () => {
     await pool!.query(`CREATE TABLE inline_users (
       id serial PRIMARY KEY, email text NOT NULL, age int, tags text[] NOT NULL DEFAULT '{}',
       created_at timestamptz NOT NULL DEFAULT now())`);
+    await pool!.query("DROP TABLE IF EXISTS inline_docs");
+    await pool!.query("CREATE TABLE inline_docs (id serial PRIMARY KEY, items jsonb NOT NULL, settings json, label jsonb)");
   });
   afterAll(async () => {
     await pool?.query("DROP TABLE IF EXISTS inline_users");
+    await pool?.query("DROP TABLE IF EXISTS inline_docs");
     await pool?.end();
     await pgjs?.end();
     await db?.close();
@@ -67,6 +76,24 @@ describe.skipIf(!db)("inline parameters against Postgres", () => {
       expect(await run(q)).toEqual([{ n: "0" }]);
       const still = await run(sql("SELECT count(*) AS n FROM inline_users"));
       expect(Number(still[0]!["n"])).toBeGreaterThan(0);
+    });
+
+    test("sql.json() sends arrays, objects and strings as the same JSON in both drivers", async () => {
+      const items = [{ at: "2024-01-02", n: 1 }, { at: "2024-01-03", n: 2.5 }];
+      const settings = { theme: "dark", tags: ["a"] };
+      const ins = sql(`INSERT INTO inline_docs (items, settings, label) VALUES (${sql.json(items)}, ${sql.json(settings)}, ${sql.json("it's")}) RETURNING id, items, settings, label`);
+      const [row] = (await run(ins)) as RowType<typeof ins>[];
+      expect(row).toEqual({ id: row!.id, items, settings, label: "it's" });
+
+      // the text Postgres stored is the JSON, not a Postgres array or a doubly encoded string
+      const text = sql(`SELECT items::text AS items, label::text AS label, jsonb_typeof(items) AS kind, items -> -1 -> 'n' AS last_n FROM inline_docs WHERE id = ${sql.param(row!.id)}`);
+      const [stored] = await run(text);
+      expect(JSON.parse(stored!["items"] as string)).toEqual(items);
+      expect(stored).toEqual({ items: stored!["items"], label: '"it\'s"', kind: "array", last_n: 2.5 });
+
+      // null is SQL NULL
+      const upd = sql(`UPDATE inline_docs SET settings = ${sql.json(null)}, label = ${sql.json(undefined)} WHERE id = ${sql.param(row!.id)} RETURNING settings IS NULL AS s, label IS NULL AS l`);
+      expect(await run(upd)).toEqual([{ s: true, l: true }]);
     });
 
     test("ANY(array), dates, and mixing with named parameters and fragments", async () => {

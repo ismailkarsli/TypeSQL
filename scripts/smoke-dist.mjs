@@ -23,6 +23,12 @@ assert.deepEqual(sql(`SELECT id FROM users WHERE email = ${sql.param(evil)} AND 
   values: [evil, 3],
 });
 
+const doc = sql(`UPDATE docs SET items = ${sql.json([1, 2])}`);
+assert.equal(doc.text, "UPDATE docs SET items = $1");
+assert.ok(doc.values[0] instanceof core.JsonParam);
+assert.equal(doc.values[0].toPostgres(), "[1,2]");
+assert.equal(JSON.stringify(doc.values[0]), "[1,2]");
+
 const m = core.migrations().add("CREATE TABLE t (id int)").add("ALTER TABLE t ADD COLUMN x text");
 assert.deepEqual([...m.statements], ["CREATE TABLE t (id int)", "ALTER TABLE t ADD COLUMN x text"]);
 

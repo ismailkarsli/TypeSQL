@@ -1,4 +1,6 @@
 import type { PgTypeName } from "./pg-types.js";
+import type { Shaped } from "../engine/shape.js";
+import type { TsShape } from "../engine/json.js";
 
 /**
  * Column descriptor. Columns are declared with Postgres type names, not TS types,
@@ -24,6 +26,12 @@ export type Generated<T extends PgTypeName | (string & {})> = Col<T, { hasDefaul
 export type NullableGenerated<T extends PgTypeName | (string & {})> = Col<T, { nullable: true; hasDefault: true }>;
 /** Array column: `Arr<"int4">` is `int4[]`. */
 export type Arr<T extends PgTypeName | (string & {}), Flags extends Partial<ColDesc> = {}> = Col<`${T}[]`, Flags>;
+/**
+ * JSON column holding values of the TS type `T` (jsonb unless `Base` is `"json"`). It is still
+ * jsonb for operators and functions; rows read `T`, `->` / `#>` / subscripts index into `T`, and
+ * parameters written to it take `T` (pass them with `sql.json(value)`).
+ */
+export type Json<T, Flags extends Partial<ColDesc> = {}, Base extends "json" | "jsonb" = "jsonb"> = Col<Shaped<Base, TsShape<T>>, Flags>;
 /** Enum-typed column. The enum's values live in `DB["$types"][Name]`. */
 export type Enum<Name extends string, Flags extends Partial<ColDesc> = {}> = Col<Name, Flags>;
 

@@ -40,7 +40,8 @@ export type JsonShape =
 
 type ArrShape<E> = { readonly k: "arr"; readonly e: E };
 type ValShape<C> = { readonly k: "val"; readonly c: C };
-type TsShape<T> = { readonly k: "ts"; readonly v: T };
+/** A JSON value of TS type `T` (`Json<T>` columns). */
+export type TsShape<T> = { readonly k: "ts"; readonly v: T };
 type NullShape = TsShape<null>;
 
 // ───────────────────────────── literals ─────────────────────────────

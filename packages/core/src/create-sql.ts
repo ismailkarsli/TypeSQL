@@ -1,13 +1,14 @@
 import type { ParamsOf, RowOf, Validate } from "./engine/infer.js";
 import type { NamedParams, RewriteNamedStr } from "./engine/named.js";
 import type { AnyErr, SqlError } from "./engine/errors.js";
-import type { CheckCarried, DefaultMarker, Enc, HasDefaultable, InlineMarker, RewriteInlineStr, Skip, WithDefaults } from "./engine/inline.js";
+import type { CheckCarried, DefaultMarker, Enc, HasDefaultable, InlineMarker, JsonMarker, RewriteInlineStr, Skip, WithDefaults } from "./engine/inline.js";
 import type { HasSlots, JoinedText, MaxParamStr, QuotedIdent, SlotNames, Splice, SpliceCarried, Take, UnionList, UnknownTuple } from "./engine/splice.js";
 import type { DefaultTypeMap } from "./type-map/index.js";
 import { makeFragment, makeQuery, type CARRIED, type Executor, type Fragment, type Query, type TextType } from "./query.js";
 import type { KeyedRow, RowKeys, SqlOptions } from "./row-keys.js";
 import { joinFragments, maxParam, quoteIdent, rewriteNamed, splice, type Spliceable } from "./runtime/splice.js";
 import { hasInline, param, resolveInline, valueOrDefault } from "./runtime/inline.js";
+import { json } from "./runtime/json.js";
 import { buildSet, buildValues } from "./runtime/write.js";
 import type { InsertInput, NoExtraKeys, RelationName, SetInput, SetRep, TableName, ValuesRep } from "./engine/write.js";
 
@@ -257,6 +258,14 @@ export interface Sql<DB, TM, Keys extends RowKeys = "preserve"> {
   valueOrDefault<const T>(value: T): DefaultMarker<T>;
 
   /**
+   * Bind a JSON value inline: `` sql(`UPDATE t SET data = ${sql.json(value)}`) ``. Sent as JSON
+   * text by every driver (a raw JS array would become a Postgres array under node-postgres);
+   * only accepted where a json / jsonb value is expected, and checked against a `Json<T>`
+   * column's `T`. `null` / `undefined` are SQL NULL.
+   */
+  json<const T>(value: T): JsonMarker<T>;
+
+  /**
    * A spliceable SQL piece (not validated on its own; its parameters are typed once spliced).
    * `:name` and inline parameters are resolved at creation, so a fragment can be reused; the
    * values' types are checked when the fragment is spliced.
@@ -381,6 +390,7 @@ export function createSql<DB, TM = DefaultTypeMap>(executor?: Executor, options?
     },
     param,
     valueOrDefault,
+    json,
     fragment: (text: string, ...rest: readonly unknown[]) => {
       const r = build(text, rest);
       return makeFragment(r.text, r.values);

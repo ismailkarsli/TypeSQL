@@ -2,11 +2,12 @@ export { createSql, type Sql, type SlotMap, type Slottable, type SlotsFor, type 
 export { camelCase, type RowKeys, type SqlOptions, type CamelCase, type CamelCaseKeys, type KeyedRow } from "./row-keys.js";
 export { makeQuery, makeFragment, mapRows, rowKeysOf, NoResultError, type Executor, type ExecutorResult, type Query, type Fragment, type RowType, type ParamsType, type TextType, type ROW, type PARAMS, type TEXT, type CARRIED } from "./query.js";
 export { param, valueOrDefault } from "./runtime/inline.js";
-export type { InlineMarker, DefaultMarker, Enc, CheckEnc, DescribeEnc, RewriteInlineStr } from "./engine/inline.js";
+export { json, JsonParam } from "./runtime/json.js";
+export type { InlineMarker, DefaultMarker, JsonMarker, Enc, CheckEnc, DescribeEnc, RewriteInlineStr } from "./engine/inline.js";
 export { splice, renumberParams, maxParam, quoteIdent, joinFragments, hasSlots, rewriteNamed, type Spliceable, type SlotValues } from "./runtime/splice.js";
 export type { Splice, SlotNames, HasSlots, MaxParamStr, QuotedIdent, JoinedText, Take, UnknownTuple } from "./engine/splice.js";
 export type {
-  Col, Nullable, Generated, NullableGenerated, Arr, Enum, ColDesc, Table, View, Namespace, Schema, TypeRegistry,
+  Col, Nullable, Generated, NullableGenerated, Arr, Enum, Json, ColDesc, Table, View, Namespace, Schema, TypeRegistry,
   PgTypeName, PgScalarName, NormalizeTypeName, PgCatalog, PgCatalogNamespace, InformationSchemaNamespace,
 } from "./schema/index.js";
 export type { DefaultTypeMap, DefaultParamTypeMap, ParamTypeMapOf, TypeMap, TsTypeOf, TsOf, TsParamTypeOf, EnumsOf } from "./type-map/index.js";

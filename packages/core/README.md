@@ -50,7 +50,8 @@ sql("SELECT nme FROM users");
 
 The SQL must be a string literal (tagged templates cannot be inferred by TypeScript). Values
 can be passed positionally (`$1`), by name (`:email` with an object), or inline with
-`${sql.param(value)}`; all are sent as bind parameters and checked against their context.
+`${sql.param(value)}` (`${sql.json(value)}` for JSON); all are sent as bind parameters and
+checked against their context.
 
 ## What you get
 
@@ -88,6 +89,7 @@ also take numbers and bigints, and date parameters take `Date | string`):
 | `Generated<"int4">` | has a default: optional in `INSERT` |
 | `NullableGenerated<"text">` | both |
 | `Enum<"mood">` | values in `DB["$types"]["mood"]` |
+| `Json<T>` | `jsonb` holding `T`: rows read `T`, `->` indexes into it, `${sql.json(v)}` writes it |
 | `View<{ … }>` | read-only relation |
 
 Other Postgres schemas nest (`DB["auth"]["sessions"]` is `auth.sessions`). For

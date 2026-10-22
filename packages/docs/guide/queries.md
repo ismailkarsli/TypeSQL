@@ -118,7 +118,8 @@ Values inside JSON are typed the way Postgres serializes them, not by the type m
 `->`, `#>` and jsonb subscripts follow a known shape: a literal key or index (`-> 'tags' -> 0`,
 `#> '{tags,0}'`, `['tags'][0]`) gives that member, a missing key or an index past the end gives
 `null`, and a non-literal key or index any member. The result is always nullable. `->>` and
-`#>>` are `string | null`. A `json` / `jsonb` column with no declared shape stays `unknown`.
+`#>>` are `string | null`. A `json` / `jsonb` column with no declared shape stays `unknown`;
+declare it as a [typed JSON column](./schema#typed-json-columns) to give it one.
 
 <<< @/snippets/queries.ts#jsonread
 
