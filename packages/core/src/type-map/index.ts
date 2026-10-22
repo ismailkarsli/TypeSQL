@@ -138,7 +138,8 @@ export type ParamTypeMapOf<TM> = TM extends { readonly $params: infer P } ? P : 
  */
 export type TsParamTypeOf<TM, DB, T extends string> = ParamTsOf<TM, ParamTypeMapOf<TM>, DB, T>;
 type ParamTsOf<TM, PM, DB, T extends string> =
-  T extends keyof TM ? TM[T] | (T extends keyof PM ? PM[T] : never)
+  T extends AnyShaped ? ShapedTs<TM, DB, T>
+  : T extends keyof TM ? TM[T] | (T extends keyof PM ? PM[T] : never)
   : T extends `${infer E}[]` ? (ParamTsOf<TM, PM, DB, E> | null)[]
   : T extends keyof EnumsOf<DB> ? EnumsOf<DB>[T]
   : unknown;

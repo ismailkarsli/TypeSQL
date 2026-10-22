@@ -25,6 +25,6 @@ check<Equal<RowType<typeof latest>, { id: number; state: { value: number; note?:
 
 // #region write
 const save = sql(`UPDATE portfolio SET history = ${sql.json(history)} WHERE id = ${sql.param(1)}`);
-// ParamsType: [HistoryItem[], number]; the history is sent as JSON text by pg and postgres.js
+// ParamsType: [HistoryItem[], number | null]; the history is sent as JSON text by pg and postgres.js
 // #endregion write
-check<Equal<ParamsType<typeof save>, [HistoryItem[], number]>>();
+check<Equal<ParamsType<typeof save>, [HistoryItem[], number | null]>>();

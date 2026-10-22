@@ -58,13 +58,13 @@ test("Json<T> columns stay jsonb for operators and functions", () => {
 test("parameters written to a Json<T> column take T", () => {
   expectTypeOf<Params<"INSERT INTO portfolio (name, history, settings, pair, event) VALUES ($1, $2, $3, $4, $5)">>()
     .toEqualTypeOf<[string, HistoryItem[], Settings | null, [number, string], Event]>();
-  expectTypeOf<Params<"UPDATE portfolio SET settings = $1 WHERE history = $2">>().toEqualTypeOf<[Settings | null, HistoryItem[]]>();
+  expectTypeOf<Params<"UPDATE portfolio SET settings = $1 WHERE history = $2">>().toEqualTypeOf<[Settings | null, HistoryItem[] | null]>();
 });
 
 test("sql.json() checks the value against T and needs a json / jsonb context", () => {
   const q = sql(`UPDATE portfolio SET history = ${sql.json(items)}, settings = ${sql.json(settings)} WHERE id = ${sql.param(1)} RETURNING history`);
   expectTypeOf<RowType<typeof q>>().toEqualTypeOf<{ history: HistoryItem[] }>();
-  expectTypeOf<ParamsType<typeof q>>().toEqualTypeOf<[HistoryItem[], Settings | null, number]>();
+  expectTypeOf<ParamsType<typeof q>>().toEqualTypeOf<[HistoryItem[], Settings | null, number | null]>();
   sql(`SELECT ${sql.json({ a: 1 })}::jsonb AS j`);
   sql(`SELECT ${sql.json({ a: 1 })} AS j`);
   sql(`UPDATE portfolio SET event = ${sql.json({ kind: "b", y: "x" })}`);
