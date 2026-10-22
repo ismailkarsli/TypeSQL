@@ -146,14 +146,21 @@ type LiteralUnion<S> =
 
 /**
  * Postgres type name from a non-null select type `S` and insert hint `H`. `E` is the name to
- * use for a string-literal union (an enum).
+ * use for a string-literal union (an enum). An array select type is a Postgres array unless
+ * the insert type has no array in it: `JSONColumnType<string[]>` inserts as `string`.
  */
 type PgTypeOf<S, H, E extends string> =
   unknown extends S ? "jsonb"
   : [S] extends [never] ? "text"
   : [S] extends [readonly (infer El)[]]
-    ? `${ScalarOf<ArrayElem<NonNullable<El>>, ArrayElem<ArrayElem<H>>, E>}[]`
+    ? IsJsonInsert<H> extends true ? "jsonb" : `${ScalarOf<ArrayElem<NonNullable<El>>, ArrayElem<ArrayElem<H>>, E>}[]`
     : ScalarOf<S, H, E>;
+
+/** Insert type with no array in it (`string`, `RawBuilder`); `never` (`GeneratedAlways`) tells nothing. */
+type IsJsonInsert<H> =
+  [H] extends [never] ? false
+  : [Extract<H, readonly unknown[]>] extends [never] ? true
+  : false;
 
 /** Element type of an array (one more level for multi-dimensional arrays: Postgres types them alike). */
 type ArrayElem<T> = T extends readonly (infer E)[] ? E : T;

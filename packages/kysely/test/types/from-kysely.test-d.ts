@@ -1,5 +1,5 @@
 import { expectTypeOf, test } from "vitest";
-import type { ColumnType, Generated as KGenerated, GeneratedAlways, JSONColumnType } from "kysely";
+import type { ColumnType, Generated as KGenerated, GeneratedAlways, JSONColumnType, RawBuilder } from "kysely";
 import type { Arr, Col, Generated, Nullable, NullableGenerated, View } from "@typesql/core";
 import type { FromKysely, InferColumn, SnakeCase } from "../../src/index.js";
 import type { DB, Interval, Json, Mood, Numeric, Point, Timestamp, Int8, ArrayType, Generated as CGenerated } from "../fixtures/kysely-codegen.js";
@@ -120,6 +120,15 @@ test("inference rules for single columns", () => {
   expectTypeOf<InferColumn<JSONColumnType<Record<string, number>>>>().toEqualTypeOf<Col<"jsonb">>();
   expectTypeOf<InferColumn<JSONColumnType<{ a: number } | null, string | null>>>().toEqualTypeOf<Nullable<"jsonb">>();
   expectTypeOf<InferColumn<ColumnType<Date, string, never>>>().toEqualTypeOf<Col<"timestamptz">>();
+  // json columns holding a TS array insert as a string or `RawBuilder`, not as an array
+  expectTypeOf<InferColumn<JSONColumnType<string[]>>>().toEqualTypeOf<Col<"jsonb">>();
+  expectTypeOf<InferColumn<JSONColumnType<{ a: number }[]>>>().toEqualTypeOf<Col<"jsonb">>();
+  expectTypeOf<InferColumn<JSONColumnType<string[] | null, string | null>>>().toEqualTypeOf<Nullable<"jsonb">>();
+  expectTypeOf<InferColumn<ColumnType<string[], RawBuilder<string[]>, RawBuilder<string[]>>>>().toEqualTypeOf<Col<"jsonb">>();
+  // no insert type to go by: still a Postgres array
+  expectTypeOf<InferColumn<GeneratedAlways<string[]>>>().toEqualTypeOf<Generated<"text[]">>();
+  expectTypeOf<InferColumn<KGenerated<number[]>>>().toEqualTypeOf<Generated<"int4[]">>();
+  expectTypeOf<InferColumn<CGenerated<ArrayType<Mood>>>>().toEqualTypeOf<Generated<"enum[]">>();
   // prisma-kysely style: enums as `(typeof Role)[keyof typeof Role]`, Decimal as string, Json as unknown
   const Role = { ADMIN: "ADMIN", USER: "USER" } as const;
   type Role = (typeof Role)[keyof typeof Role];
