@@ -3,7 +3,7 @@ import type { AnyErr, SqlError } from "./engine/errors.js";
 
 /**
  * `Q` when the DDL script applies cleanly to `DB`, otherwise the `SqlError`. Used as
- * `ddl: Q & ValidateDdl<DB, Q>` so a bad statement is a compile error on the literal.
+ * `ddl: ValidateDdl<DB, Q> & Q` so a bad statement is a compile error on the literal.
  */
 export type ValidateDdl<DB, Q extends string> =
   string extends Q ? SqlError<"migrations need a string literal; use .raw() for SQL the type checker cannot see", null>
@@ -40,7 +40,7 @@ export class Migrations<DB = {}> {
    * builder's `schema` is the schema after it. Queries and DML (seed data) are validated
    * and leave the schema unchanged.
    */
-  add<const Q extends string>(ddl: Q & GateValidateDdl<DB, Q>): Migrations<ApplyDdl<DB, Q>> {
+  add<const Q extends string>(ddl: GateValidateDdl<DB, Q> & Q): Migrations<ApplyDdl<DB, Q>> {
     return new Migrations([...this.statements, ddl]);
   }
 

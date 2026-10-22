@@ -3,7 +3,7 @@
 ## Reading errors
 
 When a statement is wrong, the type of the SQL argument becomes
-`"…your SQL…" & SqlError<"message", position>`, so the error is reported on the string.
+`SqlError<"message", position> & "…your SQL…"`, so the error is reported on the string.
 Messages use Postgres's wording; the position is the index of the offending token (counting
 words, operators and literals from 0):
 
@@ -29,6 +29,23 @@ Wrong positional arguments are ordinary TypeScript errors on the argument
 passed to a JSON parameter, `… parameter of type 'NonArrayOrSqlJson<Item[]>'`: pass
 `sql.json(value)`). A statement that does not validate accepts any arguments, so its
 `SqlError` is the only error on the call, never `Expected 2 arguments, but got 3`.
+
+### Long statements
+
+TypeScript shortens long types in diagnostics (`…` after a few hundred characters), which can
+cut the SQL text in the parameter type. The `SqlError` comes first so it stays visible, and
+the second line of the diagnostic repeats it:
+
+```
+Argument of type 'string' is not assignable to parameter of type 'SqlError<"parameter $6: a
+  string[] value cannot be used as timestamptz[] NOT NULL", 63> & "INSERT INTO …'.
+  Type 'string' is not assignable to type 'SqlError<"parameter $6: …", 63>'.
+```
+
+`Argument of type 'string'` appears for template literals with `${sql.param(…)}`: TypeScript
+prints the template's widened type in the message. The text was still analysed; the
+`SqlError` is the real error. Set `"noErrorTruncation": true` in `tsconfig.json` to see the
+whole statement.
 
 ## The escape hatch
 

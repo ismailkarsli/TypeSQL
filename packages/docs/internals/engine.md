@@ -101,7 +101,7 @@ RowOf / ParamsOf / Validate                 public projections of Analyze
     left-associative operators (`||`, `+`) are not balanced (types may depend on order);
     chains of ~100 such terms are the practical limit.
 13. **Error carrier properties must not shadow `String.prototype` members.** The call site
-    types the query as `Q & SqlError<…>`; a property named `at` (or `length`, `slice`, …)
+    types the query as `SqlError<…> & Q`; a property named `at` (or `length`, `slice`, …)
     conflicts with the string's apparent type and TypeScript reduces the intersection to
     `never`, which hides the message. `SqlError` uses `position`.
 11. **Build object types with intersections, flatten once.** `ColsToMap` accumulates

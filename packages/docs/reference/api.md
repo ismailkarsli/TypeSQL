@@ -39,7 +39,7 @@ so the error is reported on the SQL text:
 
 ```
 Argument of type '"SELECT nme FROM users"' is not assignable to parameter of type
-  '"SELECT nme FROM users" & SqlError<"column \"nme\" does not exist", 1>'.
+  'SqlError<"column \"nme\" does not exist", 1> & "SELECT nme FROM users"'.
 ```
 
 ### Named parameters

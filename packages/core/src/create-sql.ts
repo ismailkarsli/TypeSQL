@@ -237,9 +237,9 @@ type BoxFragArgs<Text extends string> = Extract<{ [K in Text as `${K}`]: FragArg
  * camelCased keys.
  */
 export interface Sql<DB, TM, Keys extends RowKeys = "preserve"> {
-  <const Q extends string>(query: Q & GateCallCheck<DB, TM, Q>, ...params: BoxCallArgs<DB, TM, Q>): Query<KeyedRow<RowOf<DB, TM, PText<Q>>, Keys>, ParamsOf<DB, TM, PText<Q>>, PText<Q>>;
+  <const Q extends string>(query: GateCallCheck<DB, TM, Q> & Q, ...params: BoxCallArgs<DB, TM, Q>): Query<KeyedRow<RowOf<DB, TM, PText<Q>>, Keys>, ParamsOf<DB, TM, PText<Q>>, PText<Q>>;
   <const Q extends string, const S extends SlotMap>(
-    query: Q & GateSlottedCheck<DB, TM, Q, S>,
+    query: GateSlottedCheck<DB, TM, Q, S> & Q,
     slots: S & SlotsFor<Q, S>,
     ...params: BoxSlottedArgs<DB, TM, Q, S>
   ): Query<KeyedRow<RowOf<DB, TM, SplicedOr<Q, S>>, Keys>, ParamsOf<DB, TM, SplicedOr<Q, S>>, SplicedOr<Q, S>>;
@@ -280,9 +280,9 @@ export interface Sql<DB, TM, Keys extends RowKeys = "preserve"> {
    * `:name` and inline parameters are resolved at creation, so a fragment can be reused; the
    * values' types are checked when the fragment is spliced.
    */
-  fragment<const Text extends string, const A extends readonly unknown[]>(text: Text & GateFragCheck<Text, false>, ...params: A & BoxFragArgs<Text>): Fragment<PText<Text>, UnknownTuple<FragCount<Text>>, FragCarried<Text, A>>;
+  fragment<const Text extends string, const A extends readonly unknown[]>(text: GateFragCheck<Text, false> & Text, ...params: A & BoxFragArgs<Text>): Fragment<PText<Text>, UnknownTuple<FragCount<Text>>, FragCarried<Text, A>>;
   fragment<const Text extends string, const S extends SlotMap, const A extends readonly unknown[]>(
-    text: Text & GateFragCheck<Text, true>,
+    text: GateFragCheck<Text, true> & Text,
     slots: S & SlotsFor<Text, S>,
     ...params: A & BoxFragArgs<Text>
   ): Fragment<SplicedOr<Text, S>, readonly unknown[], [...FragCarried<Text, A>, ...SpliceCarried<PText<Text>, SlotCarried<S>>]>;

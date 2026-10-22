@@ -169,7 +169,8 @@ export type ParamsArgs<DB, TM, Q extends string> =
 
 /**
  * `Validate<DB, Q>` is `Q` when the statement is valid, otherwise the `SqlError`.
- * Used as `query: Q & Validate<DB, Q>` so the error lands on the string literal.
+ * Used as `query: Validate<DB, Q> & Q` so the error lands on the string literal. The error
+ * comes first so it survives TypeScript's truncation of long types in diagnostics.
  */
 export type Validate<DB, Q extends string> =
   Analyze<DB, Q> extends infer R ? (R extends AnyErr ? R : Q) : never;

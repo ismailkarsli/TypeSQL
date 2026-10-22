@@ -55,8 +55,8 @@ would get at runtime:
 ```ts
 sql("SELECT emial FROM users");
 // Argument of type '"SELECT emial FROM users"' is not assignable to parameter of type
-//   '"SELECT emial FROM users" & SqlError<"column \"emial\" does not exist.
-//    Perhaps you meant the column \"email\"?", 1>'.
+//   'SqlError<"column \"emial\" does not exist. Perhaps you meant the column
+//    \"email\"?", 1> & "SELECT emial FROM users"'.
 
 sql("SELECT id FROM users WHERE id = $1", "7");
 // Argument of type 'string' is not assignable to parameter of type 'number'.

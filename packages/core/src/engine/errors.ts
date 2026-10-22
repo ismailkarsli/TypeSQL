@@ -15,7 +15,7 @@ export type ERR = typeof ERR;
 export type SqlError<Message extends string, At = unknown> = {
   readonly [ERR]: Message;
   /**
-   * Token index of the error. (Not named `at`: `Q & SqlError` must stay a non-`never`
+   * Token index of the error. (Not named `at`: `SqlError & Q` must stay a non-`never`
    * intersection with the query string, and `String.prototype.at` would conflict.)
    */
   readonly position: At;

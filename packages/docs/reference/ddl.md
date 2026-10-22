@@ -156,9 +156,9 @@ m2.schema       // phantom: the schema type; undefined at runtime
 SchemaOf<typeof m2>
 ```
 
-- `.add<const Q>(ddl: Q & ValidateDdl<Schema, Q>)` checks `Q` against the schema built so
+- `.add<const Q>(ddl: ValidateDdl<Schema, Q> & Q)` checks `Q` against the schema built so
   far. An error lands on the literal like `sql()` does:
-  `Argument of type '"DROP TABLE nope"' is not assignable to parameter of type '"DROP TABLE nope" & SqlError<"table \"nope\" does not exist", 2>'`.
+  `Argument of type '"DROP TABLE nope"' is not assignable to parameter of type 'SqlError<"table \"nope\" does not exist", 2> & "DROP TABLE nope"'`.
   A non-literal string is rejected (use `.raw()`).
 - Builders are immutable: `.add()` returns a new builder, so a shared prefix can branch.
 - Keep one migration per `.add()`: a single text is limited to ~4000 tokens.

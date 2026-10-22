@@ -25,3 +25,23 @@ test("compile errors read like Postgres errors", async () => {
   expect(lines.length).toBeGreaterThan(0);
   await expect(lines.join("\n")).toMatchFileSnapshot("errors/__snapshots__/errors.txt");
 }, 60_000);
+
+/**
+ * With TypeScript's default truncation, a long statement's text is cut in the diagnostic. The
+ * SqlError leads the parameter type, so every error still shows its message.
+ */
+test("long statements keep the SqlError visible in truncated diagnostics", () => {
+  let out = "";
+  try {
+    execFileSync(tsc, ["-p", resolve(here, "errors/tsconfig.truncated.json"), "--pretty", "false"], { encoding: "utf8", stdio: "pipe" });
+  } catch (e) {
+    out = String((e as { stdout?: string }).stdout ?? "");
+  }
+  const lines = out.split("\n").filter((l) => l.includes("error TS"));
+  expect(lines).toHaveLength(3);
+  for (const line of lines) expect(line).toMatch(/parameter of type 'SqlError<"[^"]/);
+  const all = lines.join("\n");
+  expect(all).toContain("parameter $5: a number[] value cannot be used as timestamptz[] NOT NULL");
+  expect(all).toContain('column \\"tme\\" of relation \\"transaction_item\\" does not exist');
+  expect(all).toContain('relation \\"transaction_itm\\" does not exist');
+}, 60_000);
