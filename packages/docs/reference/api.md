@@ -86,7 +86,9 @@ const q = sql(`SELECT id, email FROM users
   `toJSON()` for postgres.js), `null` / `undefined` as SQL `NULL`. It fails unless the parameter
   is `json` / `jsonb` or has no context, and the value is checked against a `Json<T>` column's
   `T`. A `sql.param()` array for a `json` / `jsonb` parameter is rejected
-  (`parameter $1: an array for jsonb NOT NULL must be passed as sql.json(value) …`).
+  (`parameter $1: an array for jsonb NOT NULL must be passed as sql.json(value) …`), and so is a
+  raw array as a positional or named argument (typed `NonArrayOrSqlJson<T>`): pass
+  `sql.json(value)` as the argument, which is sent as JSON text (only checked to be JSON).
 
 Only literal SQL text is analysed. Interpolating anything that is not a compile-time constant
 is rejected, so a value can never be pasted into the SQL by accident:
@@ -204,10 +206,12 @@ option, and `camelCase(key)` is the key mapping.
 | `SetInput<DB, TM, T>`, `InsertInput<DB, TM, T>` | what `sql.set` / a `sql.values` row accepts |
 | `SetRep<P>`, `ValuesRep<R>` | the representative text and carried values of `sql.set` / `sql.values` |
 | `JsonMarker<T>` | type of `sql.json(value)` |
+| `JsonValue` | any `sql.json()` value (what a json / jsonb argument, `set` or `values` value accepts besides raw values) |
 | `JsonParam<T>` | runtime value `sql.json()` binds: `{ value }` with `toPostgres()`, `toJSON()`, `toString()` |
 | `RowOf<DB, TM, Q>` | row type of a statement literal |
 | `ParamsOf<DB, TM, Q>` | positional parameter tuple |
-| `ParamsArgs<DB, TM, Q>` | what a call site passes (tuple, or `[params: {…}]` for `:name`) |
+| `ArgsOf<DB, TM, Q>` | the tuple a call site passes: `ParamsOf`, with json / jsonb parameters as `NonArrayOrSqlJson<T>` (no raw arrays; `sql.json()` values) |
+| `ParamsArgs<DB, TM, Q>` | what a call site passes (`ArgsOf`, or `[params: {…}]` for `:name`) |
 | `NamesOf<DB, Q>` | `:name` parameters in order |
 | `Validate<DB, Q>` | `Q` when valid, else `SqlError<message, tokenIndex>` |
 | `Analyze<DB, Q>` | the full analysis result (`kind`, `cols`, `params`, `max`, `names`, `stmt`) |

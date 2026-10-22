@@ -81,3 +81,18 @@ describe("sql.json() in sql.set and sql.values", () => {
     expect(() => sql.set("docs", { items: j })).toThrow(/already used by another statement/);
   });
 });
+
+describe("sql.json() as a positional or named argument", () => {
+  it("is sent as a JsonParam", () => {
+    const before = pendingParams();
+    const q = sql("UPDATE docs SET items = $1 WHERE id = $2", sql.json([{ n: 1 }]), 3);
+    expect(q.text).toBe("UPDATE docs SET items = $1 WHERE id = $2");
+    expect(q.values[0]).toBeInstanceOf(JsonParam);
+    expect(q.values[1]).toBe(3);
+    const n = sql("UPDATE docs SET items = :items, meta = :meta WHERE id = :id", { items: sql.json([{ n: 2 }]), meta: { tags: [] }, id: 1 });
+    expect(n.values.map((v) => JSON.stringify(v))).toEqual(['[{"n":2}]', '{"tags":[]}', "1"]);
+    const f = sql.fragment("items = $1", sql.json([]));
+    expect(f.values[0]).toBeInstanceOf(JsonParam);
+    expect(pendingParams()).toBe(before);
+  });
+});

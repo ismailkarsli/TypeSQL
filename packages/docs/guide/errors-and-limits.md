@@ -25,7 +25,9 @@ words, operators and literals from 0):
 | non-literal SQL | `the SQL text is not a string literal: …` |
 
 Wrong positional arguments are ordinary TypeScript errors on the argument
-(`Argument of type 'string' is not assignable to parameter of type 'number'`).
+(`Argument of type 'string' is not assignable to parameter of type 'number'`; for a raw array
+passed to a JSON parameter, `… parameter of type 'NonArrayOrSqlJson<Item[]>'`: pass
+`sql.json(value)`).
 
 ## The escape hatch
 
@@ -58,6 +60,9 @@ Measured on TypeScript 7.0.2:
 - `sql.set` and `sql.values` are checked like `sql.list`, with every key of the input type once.
   The schema does not tell identity `GENERATED ALWAYS` columns apart from other columns with a
   default, so writing one is accepted (Postgres rejects it without `OVERRIDING SYSTEM VALUE`).
+- A `sql.json(value)` passed as a positional or named argument is only checked to be JSON, not
+  against a `Json<T>` column's `T` (it is when written inline, in `sql.set` / `sql.values` or as
+  a `sql.fragment` argument).
 - `sql.valueOrDefault` inside `sql.fragment(…)` has its value type checked, but not whether
   `DEFAULT` is allowed where the fragment is spliced.
 - In editor hovers, row types list their keys alphabetically (TypeScript 7 orders the keys of

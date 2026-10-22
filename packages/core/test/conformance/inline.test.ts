@@ -96,6 +96,22 @@ describe.skipIf(!db)("inline parameters against Postgres", () => {
       expect(await run(upd)).toEqual([{ s: true, l: true }]);
     });
 
+    test("sql.json() as a positional, named or fragment argument", async () => {
+      const items = [{ at: "2024-05-01", n: 7 }];
+      const settings = { theme: "light", tags: ["b"] };
+      const ins = sql("INSERT INTO inline_docs (items, settings, label) VALUES ($1, $2, $3) RETURNING id, items, settings, label", sql.json(items), settings, sql.json("x"));
+      const [row] = (await run(ins)) as RowType<typeof ins>[];
+      expect(row).toEqual({ id: row!.id, items, settings, label: "x" });
+
+      const more = [...items, { at: "2024-05-02", n: 8 }];
+      const upd = sql("UPDATE inline_docs SET items = :items, settings = :settings WHERE id = :id RETURNING jsonb_typeof(items) AS kind, items -> -1 -> 'n' AS last, settings", { items: sql.json(more), settings: sql.json(null), id: row!.id });
+      expect(await run(upd)).toEqual([{ kind: "array", last: 8, settings: null }]);
+
+      const set = sql.fragment("items = $1", sql.json([]));
+      const cleared = sql("UPDATE inline_docs SET {set} WHERE id = $1 RETURNING jsonb_array_length(items) AS n", { set }, row!.id);
+      expect(await run(cleared)).toEqual([{ n: 0 }]);
+    });
+
     test("ANY(array), dates, and mixing with named parameters and fragments", async () => {
       const recent = sql.fragment(`AND created_at > ${sql.param(new Date(0))}`);
       const q = sql(`SELECT count(*) AS n FROM inline_users WHERE email = ANY(${sql.param([`${name}@example.com`, "nobody"])}) AND id > :min {recent}`, { recent }, { min: 0 });

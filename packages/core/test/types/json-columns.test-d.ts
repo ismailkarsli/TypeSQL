@@ -1,6 +1,5 @@
 import { expectTypeOf, test } from "vitest";
-import { createSql, type Col, type DefaultTypeMap, type Fragment, type Generated, type Json, type ParamsOf, type ParamsType, type RowOf, type RowType, type SqlError } from "../../src/index.js";
-import type { SetRep } from "../../src/engine/write.js";
+import { createSql, type ArgsOf, type Col, type DefaultTypeMap, type Fragment, type Generated, type Json, type JsonValue, type NonArrayOrSqlJson, type ParamsArgs, type ParamsOf, type ParamsType, type RowOf, type RowType, type SetRep, type SqlError } from "../../src/index.js";
 
 type HistoryItem = { at: string; state: { value: number; label?: string } };
 type Settings = { theme: "dark" | "light"; tags: string[]; limits: Record<string, number> };
@@ -130,4 +129,47 @@ test("sql.set and sql.values take sql.json() values for JSON columns; raw arrays
     .toEqualTypeOf<"parameter $1: an array for jsonb NOT NULL must be passed as sql.json(value) (node-postgres sends a JS array as a Postgres array)">();
   expectTypeOf<SetErr<{ name: "\u0000PJo\u0000" }>>().toEqualTypeOf<"parameter $1: a sql.json() value cannot be used as text NOT NULL">();
   expectTypeOf<SetErr<{ history: "\u0000PJo\u0000" | "\u0000PJs\u0000" }>>().toEqualTypeOf<"parameter $1: a sql.json() string value cannot be used as jsonb NOT NULL">();
+});
+
+test("positional and named json / jsonb arguments take no raw arrays, but sql.json() values", () => {
+  type Args<Q extends string> = ArgsOf<WriteDB, DefaultTypeMap, Q>;
+  expectTypeOf<Args<"UPDATE portfolio SET history = $1, settings = $2, event = $3 WHERE name = $4">>()
+    .toEqualTypeOf<[NonArrayOrSqlJson<HistoryItem[]>, NonArrayOrSqlJson<Settings | null>, NonArrayOrSqlJson<Event>, string | null]>();
+  expectTypeOf<JsonValue>().toExtend<NonArrayOrSqlJson<HistoryItem[]>>();
+  expectTypeOf<HistoryItem[]>().not.toExtend<NonArrayOrSqlJson<HistoryItem[]>>();
+  expectTypeOf<Settings>().toExtend<NonArrayOrSqlJson<unknown>>();
+  expectTypeOf<Date>().toExtend<NonArrayOrSqlJson<unknown>>();
+  expectTypeOf<readonly string[]>().not.toExtend<NonArrayOrSqlJson<unknown>>();
+  expectTypeOf<ParamsArgs<WriteDB, DefaultTypeMap, "UPDATE docs SET data = :d, tags = :t">>()
+    .toEqualTypeOf<[params: { d: NonArrayOrSqlJson<unknown>; t: (string | null)[] }]>();
+  // statements without a JSON parameter keep ParamsOf
+  expectTypeOf<Args<"UPDATE docs SET tags = $1 WHERE id = $2">>().toEqualTypeOf<ParamsOf<WriteDB, DefaultTypeMap, "UPDATE docs SET tags = $1 WHERE id = $2">>();
+
+  const q = wsql("UPDATE portfolio SET history = $1, settings = $2 WHERE id = $3 RETURNING history", wsql.json(items), settings, 1);
+  // the query's parameter types are still the column types
+  expectTypeOf<ParamsType<typeof q>>().toEqualTypeOf<[HistoryItem[], Settings | null, number | null]>();
+  wsql("UPDATE portfolio SET history = :h WHERE id = :id", { h: wsql.json(items), id: 1 });
+  wsql("UPDATE docs SET data = $1", { a: 1 });
+  wsql("UPDATE docs SET data = $1", "x");
+  wsql("UPDATE docs SET data = $1", null);
+  wsql("UPDATE docs SET data = $1", wsql.json([1, 2]));
+  wsql("UPDATE portfolio SET event = $1", { kind: "a", x: 1 });
+  // fragment arguments carry sql.json() values, checked in the statement
+  wsql("UPDATE portfolio SET {f}", { f: wsql.fragment("history = $1", wsql.json(items)) });
+  wsql("UPDATE portfolio SET {f}", { f: wsql.fragment("history = :h", { h: wsql.json(items) }) });
+
+  // @ts-expect-error HistoryItem[] is not assignable to NonArrayOrSqlJson<HistoryItem[]>
+  wsql("UPDATE portfolio SET history = $1", items);
+  // @ts-expect-error the same with a named parameter
+  wsql("UPDATE portfolio SET history = :h", { h: items });
+  // @ts-expect-error a plain jsonb parameter takes no raw array either
+  wsql("UPDATE docs SET data = $1", [1, 2]);
+  // @ts-expect-error a jsonb comparison
+  wsql("SELECT id FROM docs WHERE data @> $1", ["a"]);
+  // @ts-expect-error Settings is an object, not a string[]
+  wsql("UPDATE portfolio SET settings = $1", ["dark"]);
+  // @ts-expect-error parameter $1: a sql.json() string value cannot be used as jsonb NOT NULL
+  wsql("UPDATE portfolio SET {f}", { f: wsql.fragment("history = $1", wsql.json("x")) });
+  // @ts-expect-error parameter $1: an array for jsonb NOT NULL must be passed as sql.json(value)
+  wsql("UPDATE portfolio SET {f}", { f: wsql.fragment("history = $1", items) });
 });

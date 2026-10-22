@@ -1,13 +1,13 @@
-import type { ParamsOf, RowOf, Validate } from "./engine/infer.js";
+import type { ArgsOf, ParamsOf, RowOf, Validate } from "./engine/infer.js";
 import type { NamedParams, RewriteNamedStr } from "./engine/named.js";
 import type { AnyErr, SqlError } from "./engine/errors.js";
-import type { CheckCarried, DefaultMarker, Enc, HasDefaultable, InlineMarker, JsonMarker, RewriteInlineStr, Skip, WithDefaults } from "./engine/inline.js";
+import type { CheckCarried, DefaultMarker, HasDefaultable, InlineMarker, JsonMarker, RewriteInlineStr, Skip, ValueEnc, WithDefaults } from "./engine/inline.js";
 import type { HasSlots, JoinedText, MaxParamStr, QuotedIdent, SlotNames, Splice, SpliceCarried, Take, UnionList, UnknownTuple } from "./engine/splice.js";
 import type { DefaultTypeMap } from "./type-map/index.js";
 import { makeFragment, makeQuery, type CARRIED, type Executor, type Fragment, type Query, type TextType } from "./query.js";
 import type { KeyedRow, RowKeys, SqlOptions } from "./row-keys.js";
 import { joinFragments, maxParam, quoteIdent, rewriteNamed, splice, type Spliceable } from "./runtime/splice.js";
-import { hasInline, param, resolveInline, valueOrDefault } from "./runtime/inline.js";
+import { hasInline, param, resolveInline, takeValue, valueOrDefault } from "./runtime/inline.js";
 import { json } from "./runtime/json.js";
 import { buildSet, buildValues } from "./runtime/write.js";
 import type { InsertInput, NoExtraKeys, RelationName, SetInput, SetRep, TableName, ValuesRep } from "./engine/write.js";
@@ -71,8 +71,8 @@ type PText<Q extends string> = Prepared<Q> extends [infer X extends string, ...u
 /** Arguments after the query (or after the slots): positional values or one `:name` object. */
 type ArgsFor<DB, TM, X extends string, Names extends string[], Encs extends readonly unknown[], M extends number> =
   Names extends []
-    ? Encs extends readonly [] ? ParamsOf<DB, TM, X> : Take<ParamsOf<DB, TM, X>, M>
-    : [params: NamedParams<Names, Take<ParamsOf<DB, TM, X>, Names["length"]>>];
+    ? Encs extends readonly [] ? ArgsOf<DB, TM, X> : Take<ArgsOf<DB, TM, X>, M>
+    : [params: NamedParams<Names, Take<ArgsOf<DB, TM, X>, Names["length"]>>];
 
 /** `true` when the call is valid; otherwise the SqlError (so it lands on the query literal). */
 type CallCheck<DB, TM, Q extends string> =
@@ -141,7 +141,7 @@ type SlottedArgs<DB, TM, Q extends string, S> =
   IsLiteral<Q> extends false ? readonly unknown[]
   : Prepared<Q> extends [infer T2 extends string, infer Names extends string[], readonly unknown[], infer M extends number]
     ? Splice<T2, SlotTexts<S>> extends infer X extends string
-      ? Names extends [] ? Take<ParamsOf<DB, TM, X>, M> : [params: NamedParams<Names, Take<ParamsOf<DB, TM, X>, Names["length"]>>]
+      ? Names extends [] ? Take<ArgsOf<DB, TM, X>, M> : [params: NamedParams<Names, Take<ArgsOf<DB, TM, X>, Names["length"]>>]
       : readonly unknown[]
     : readonly unknown[];
 type SplicedOr<Q extends string, S> = SplicedText<Q, S> extends infer X extends string ? X : string;
@@ -169,8 +169,8 @@ type FragCarried<Text extends string, A extends readonly unknown[]> =
   Prepared<Text> extends [string, infer Names extends string[], infer Encs extends readonly string[], number]
     ? Names extends [] ? [...EncAll<A>, ...Encs] : [...EncNamed<Names, A[0]>, ...Encs]
     : [];
-type EncAll<A extends readonly unknown[]> = { -readonly [I in keyof A]: Enc<A[I]> };
-type EncNamed<Names extends string[], O> = { [I in keyof Names]: Names[I] extends keyof O ? Enc<O[Names[I]]> : "*" };
+type EncAll<A extends readonly unknown[]> = { -readonly [I in keyof A]: ValueEnc<A[I]> };
+type EncNamed<Names extends string[], O> = { [I in keyof Names]: Names[I] extends keyof O ? ValueEnc<O[Names[I]]> : "*" };
 type JoinedCarried<Items extends readonly unknown[], Acc extends readonly unknown[] = []> =
   Items extends readonly [infer H, ...infer R] ? JoinedCarried<R, [...Acc, ...(CarriedOf<H> extends infer C extends readonly unknown[] ? C : [])]> : Acc;
 
@@ -346,7 +346,7 @@ function build(text: string, rest: readonly unknown[]): { text: string; values: 
     outer = rest.slice(1);
   }
   let positional = text;
-  let values: unknown[] = [...outer];
+  let values: unknown[] = outer.map(takeValue);
   if (NAMED_RE.test(text)) {
     const rn = rewriteNamed(text);
     if (rn.names.length > 0) {
@@ -357,7 +357,7 @@ function build(text: string, rest: readonly unknown[]): { text: string; values: 
       const record = obj as Record<string, unknown>;
       values = rn.names.map((n) => {
         if (!(n in record)) throw new Error(`typesql: missing named parameter :${n}`);
-        return record[n];
+        return takeValue(record[n]);
       });
       positional = rn.text;
     }

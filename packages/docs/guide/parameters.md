@@ -81,8 +81,21 @@ sql(`UPDATE portfolio SET history = ${sql.param(items)}`);
 //    (node-postgres sends a JS array as a Postgres array)", 5>
 ```
 
-Positional and named parameters are passed to the driver as they are: objects work with both
-drivers, arrays only with postgres.js. Write JSON parameters inline with `sql.json()`.
+A `json` / `jsonb` positional or named parameter takes no raw array either; pass
+`sql.json(value)` as the argument (objects and other values work as they are):
+
+```ts
+sql("UPDATE portfolio SET history = $1 WHERE id = $2", sql.json(items), 1);
+sql("UPDATE portfolio SET history = :history WHERE id = :id", { history: sql.json(items), id: 1 });
+
+sql("UPDATE portfolio SET history = $1", items);
+// Argument of type 'HistoryItem[]' is not assignable to parameter of type 'NonArrayOrSqlJson<HistoryItem[]>'.
+```
+
+As an argument, `sql.json(value)` is only checked to be JSON: the value is checked against
+`T` when it is written inline (`${sql.json(value)}`), as a `sql.set` / `sql.values` value or
+as a `sql.fragment` argument. A plain `jsonb` parameter (typed `unknown`) also refuses objects
+with a `length` key; wrap those in `sql.json()`.
 
 ## How parameters get their types
 

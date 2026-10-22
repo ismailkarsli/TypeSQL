@@ -12,6 +12,7 @@ import type { TsOf, TsParamTypeOf } from "../type-map/index.js";
 import type { ApplyDdlAll } from "./ddl/apply.js";
 import type { NamedParams, RewriteNamed } from "./named.js";
 import type { WithHint } from "./suggest.js";
+import type { JsonValue } from "./inline.js";
 
 /**
  * Full pipeline for one statement. Cached by TypeScript per `(DB, Q)`, so the three
@@ -125,6 +126,34 @@ type IntersectUses<U, TM, DB> =
   (U extends { readonly type: infer T extends string } ? (u: TsParamTypeOf<TM, DB, T>) => void : never) extends (u: infer X) => void ? X : never;
 type Inc<I extends number> = Nx<I>;
 
+/**
+ * What a call site passes for each parameter (`ParamsOf`, except for json / jsonb parameters):
+ * node-postgres sends a JS array as a Postgres array literal, so a json / jsonb parameter takes
+ * no raw array, but a `sql.json(value)` (sent as JSON text by every driver) or any other value.
+ */
+export type ArgsOf<DB, TM, Q extends string> =
+  Analyze<DB, Q> extends { readonly params: infer P extends ParamMap }
+    ? [Extract<P[keyof P], { readonly type: "json" | "jsonb" }>] extends [never] ? ParamsOf<DB, TM, Q> : JsonArgs<ParamsOf<DB, TM, Q>, P>
+    : [];
+type JsonArgs<Ps, P> = { [I in keyof Ps]: I extends `${infer N extends number}` ? (Nx<N> extends keyof P ? JsonArg<Ps[I], P[Nx<N>]> : Ps[I]) : Ps[I] };
+type JsonArg<X, U> = [Extract<U, { readonly type: "json" | "jsonb" }>] extends [never] ? X : NonArrayOrSqlJson<X>;
+/**
+ * A json / jsonb argument: `X` without arrays, or a `sql.json()` value. (Named so that the
+ * error for a raw array says what to do; `ArraysNeedSqlJson` keeps it a union, which TS shows
+ * by its alias.)
+ */
+export type NonArrayOrSqlJson<X> = (unknown extends X ? NonArrayValue : Exclude<X, readonly unknown[]>) | JsonValue | ArraysNeedSqlJson;
+/**
+ * Any value but an array (or another object with a `length`). The index-signature member
+ * accepts object literals (no excess-property error), the `object` one interfaces.
+ */
+type NonArrayValue =
+  | string | number | boolean | bigint | null | undefined
+  | (object & { readonly length?: never })
+  | { readonly length?: never; readonly [key: string]: unknown };
+/** No value has this type: see `NonArrayOrSqlJson`. */
+interface ArraysNeedSqlJson { readonly "pass a JSON array as sql.json(value)": never }
+
 /** Named parameter names of a statement in order of first appearance (`[]` when positional). */
 export type NamesOf<DB, Q extends string> =
   Analyze<DB, Q> extends { readonly names: infer N extends readonly string[] } ? N : [];
@@ -135,7 +164,7 @@ export type NamesOf<DB, Q extends string> =
  */
 export type ParamsArgs<DB, TM, Q extends string> =
   NamesOf<DB, Q> extends infer N extends readonly string[]
-    ? N extends readonly [] ? ParamsOf<DB, TM, Q> : [params: NamedParams<N, ParamsOf<DB, TM, Q>>]
+    ? N extends readonly [] ? ArgsOf<DB, TM, Q> : [params: NamedParams<N, ArgsOf<DB, TM, Q>>]
     : never;
 
 /**
