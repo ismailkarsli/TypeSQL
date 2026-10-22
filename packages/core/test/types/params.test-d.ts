@@ -19,6 +19,18 @@ test("casts beat context; LIMIT/OFFSET are numbers; no context is unknown", () =
   expectTypeOf<Params<"SELECT id FROM things WHERE id = $2 AND label = $1">>().toEqualTypeOf<[string, number]>();
 });
 
+test("a parameter tested with IS [NOT] NULL accepts null", () => {
+  // the optional-filter pattern: the other uses give the type, the null test adds `| null`
+  expectTypeOf<Params<"SELECT id FROM things WHERE ($1::text IS NULL OR label = $1)">>().toEqualTypeOf<[string | null]>();
+  expectTypeOf<Params<"SELECT id FROM things WHERE ($1 IS NULL OR id = $1) AND ($2::int4 IS NOT NULL AND id > $2)">>().toEqualTypeOf<[number | null, number | null]>();
+  expectTypeOf<Params<"SELECT id FROM things WHERE $1::int8 IS NULL">>().toEqualTypeOf<[string | null]>();
+  // IS TRUE / IS UNKNOWN do not, nor does a null test on an expression containing the param
+  expectTypeOf<Params<"SELECT id FROM things WHERE $1::bool IS TRUE">>().toEqualTypeOf<[boolean]>();
+  expectTypeOf<Params<"SELECT id FROM things WHERE (id + $1) IS NULL">>().toEqualTypeOf<[number]>();
+  sql("SELECT id FROM things WHERE ($1::text IS NULL OR label = $1)", null);
+  sql("SELECT id FROM things WHERE ($1::text IS NULL OR label = $1)", "x");
+});
+
 test("IN lists, ANY/ALL, BETWEEN, LIKE", () => {
   expectTypeOf<Params<"SELECT id FROM things WHERE id IN ($1, $2)">>().toEqualTypeOf<[number, number]>();
   expectTypeOf<Params<"SELECT id FROM things WHERE $1 IN (1, 2)">>().toEqualTypeOf<[number]>();

@@ -60,6 +60,7 @@ or a comment is an error.
 | `LIMIT $1`, `OFFSET $1` | `number` |
 | a function argument | the function's parameter type |
 | `$1::T` | `T` (a cast wins over context) |
+| `$1 IS NULL`, `$1::T IS NOT NULL` | adds `\| null` to the type the other uses give |
 | anywhere else | `unknown` |
 
 <<< @/snippets/parameters.ts#contexts

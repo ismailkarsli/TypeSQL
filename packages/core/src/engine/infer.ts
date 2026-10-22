@@ -7,7 +7,7 @@ import type { ParseProgram } from "./parser/stmt.js";
 import type { ProjectStmt } from "./project/stmt.js";
 import type { ParamsOfDml } from "./project/dml.js";
 import type { Cols, ColsToMap, Simplify } from "./types.js";
-import type { MaxParam, ParamMap, ParamsOfSelect, ParamsToMap } from "./typer/params.js";
+import type { MaxParam, NullTest, ParamMap, ParamsOfSelect, ParamsToMap } from "./typer/params.js";
 import type { TsOf } from "../type-map/index.js";
 import type { ApplyDdlAll } from "./ddl/apply.js";
 import type { NamedParams, RewriteNamed } from "./named.js";
@@ -110,8 +110,13 @@ type BuildParams<P extends ParamMap, N extends number, TM, DB, I extends number,
  * A parameter used in several places has a union of `ColInfo`s; its TS type is the
  * intersection of each use's TS type. Intersect per `ColInfo` (not per TS union member,
  * which would turn a nullable `string | null` into `string & null` = `never`).
+ * A `$n` tested with `IS [NOT] NULL` (a `NullTest` entry) also accepts null.
  */
 type ParamTs<U, TM, DB> =
+  [Extract<U, NullTest>] extends [never] ? IntersectUses<U, TM, DB>
+  : [Exclude<U, NullTest>] extends [never] ? unknown
+  : IntersectUses<Exclude<U, NullTest>, TM, DB> | null;
+type IntersectUses<U, TM, DB> =
   (U extends { readonly type: string; readonly nullable: boolean } ? (u: TsOf<TM, DB, U>) => void : never) extends (u: infer X) => void ? X : never;
 type Inc<I extends number> = Nx<I>;
 

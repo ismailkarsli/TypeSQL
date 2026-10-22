@@ -30,6 +30,7 @@ import type { TypeList, TypeOf } from "./typeof.js";
  *                                        (`array_append(nums, $1)` → int4)
  *   SUBSTRING(x FROM $1)               → text (Postgres picks the regex form); FROM 1 FOR $1 → int4
  *   $1::T                              → T (cast beats context), non-null
+ *   $1 IS [NOT] NULL, $1::T IS NULL    → adds `| null` to the intersection of the other uses
  *   LIMIT $1, OFFSET $1                → int4 (number)
  *   no context                         → unknown
  */
@@ -75,6 +76,13 @@ type MaxAt<T extends Toks, I extends number, Max extends number> =
 type Gt<A extends number, B extends number> = Tup<B> extends [...Tup<A>, ...unknown[]] ? false : true;
 type Tup<N extends number, A extends unknown[] = []> = A["length"] extends N ? A : Tup<N, [...A, 0]>;
 
+/** Marks a `$n` that the statement tests with `IS [NOT] NULL`: the caller may pass null. */
+export type NullTest = { readonly type: "unknown"; readonly nullable: true; readonly nullTest: true };
+type NullTested<E extends Expr, M> =
+  E extends { readonly t: "param"; readonly n: infer N extends number } ? AddParam<M, N, NullTest>
+  : E extends { readonly t: "cast"; readonly e: { readonly t: "param"; readonly n: infer N extends number } } ? AddParam<M, N, NullTest>
+  : M;
+
 /** Comparison and pattern operators give a non-null param type (`WHERE id = $1` → `number`). */
 type IsComparison<Op extends string> = Op extends "=" | "<" | ">" | "<=" | ">=" | "<>" | "!=" | "~" | "~*" | "!~" | "!~*" | "~~" | "~~*" | "!~~" | "!~~*" ? true : false;
 type NotNull<T> = T extends ColInfo ? Mk<T["type"], false> : Mk<"unknown", false>;
@@ -90,7 +98,7 @@ export type ParamsOfExpr<E extends Expr, C extends Ctx, M> =
   : E extends { readonly t: "cast" } ? (E["e"] extends { readonly t: "param"; readonly n: infer N extends number } ? AddParam<M, N, Info<E["to"], false>> : ParamsOfExpr<E["e"], C, M>)
   : E extends { readonly t: "call" } ? ParamsOfCall<Extract<E, Call>, C, M>
   : E extends { readonly t: "case" } ? ParamsOfCase<E["operand"], E["whens"], E["else"], C, M>
-  : E extends { readonly t: "is" } ? ParamsOfExpr<E["e"], C, M>
+  : E extends { readonly t: "is" } ? (E["what"] extends "null" ? NullTested<E["e"], ParamsOfExpr<E["e"], C, M>> : ParamsOfExpr<E["e"], C, M>)
   : E extends { readonly t: "isdistinct" } ? ParamsOfBin<"=", E["l"], E["r"], C, M>
   : E extends { readonly t: "between" } ? (E["e"] extends { readonly t: "param"; readonly n: infer N extends number }
       ? ParamsOfList<[E["lo"], E["hi"]], C, AddParam<M, N, Mk<CommonOfExprs<[E["lo"], E["hi"]], C>, false>>, null>
