@@ -32,13 +32,24 @@ assert.equal(JSON.stringify(doc.values[0]), "[1,2]");
 const m = core.migrations().add("CREATE TABLE t (id int)").add("ALTER TABLE t ADD COLUMN x text");
 assert.deepEqual([...m.statements], ["CREATE TABLE t (id int)", "ALTER TABLE t ADD COLUMN x text"]);
 
+for (const name of ["createTransactionalSql", "runTransaction"]) {
+  assert.equal(typeof core[name], "function", `core export ${name}`);
+}
+
 for (const adapter of [pg, pgjs]) {
   assert.deepEqual(adapter.createSql()(`SELECT ${adapter.createSql().param(1)}`), { text: "SELECT $1", values: [1] });
-  for (const name of ["createSql", "query", "one", "maybeOne", "many", "execute", "transaction", "migrate"]) {
+  for (const name of ["createSql", "executor", "migrate"]) {
     assert.equal(typeof adapter[name], "function", `adapter export ${name}`);
   }
   assert.deepEqual(adapter.createSql()("SELECT 1"), { text: "SELECT 1", values: [] });
+  assert.equal(typeof adapter.createSql().transaction, "function");
 }
+
+// a pg PoolClient-like fake: BEGIN, the query, COMMIT on it
+const log = [];
+const client = { query: async (text) => (log.push(text), { rows: [{ n: 1 }], rowCount: 1 }), release() {} };
+assert.deepEqual(await pg.createSql(client).transaction((tx) => tx("SELECT 1 AS n").execute()), [{ n: 1 }]);
+assert.deepEqual(log, ["BEGIN", "SELECT 1 AS n", "COMMIT"]);
 
 const introspect = await import("../packages/pg/dist/introspect/index.js");
 for (const name of ["introspect", "generateSource", "main", "parseNodeTree", "ViewNullability"]) {

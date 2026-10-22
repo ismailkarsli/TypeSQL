@@ -29,10 +29,14 @@ export interface DB {
 }
 // #endregion db
 
+import type { Kysely } from "kysely";
+declare const db: Kysely<DB>;
+declare const camelDb: Kysely<CamelDB>; // created with plugins: [new CamelCasePlugin()]
+
 // #region query
 import { createSql } from "@typesql/kysely";
 
-const sql = createSql<DB>();
+const sql = createSql<DB>(db); // db: your Kysely<DB> instance (or a transaction)
 
 const q = sql(
   `SELECT u.email, u.mood, p.id, p.title
@@ -52,7 +56,7 @@ check<Equal<ParamsType<typeof q>, ["happy" | "sad" | null]>>();
 const sqlx = createSql<DB, DefaultTypeMap, {
   posts: { score: "float8" }; // codegen emits `number` for float8; inferred as int4
   $types: { mood: Mood }; // name the enum: columns with exactly these values share it
-}>();
+}>(db);
 
 sql("SELECT avg(score) FROM posts"); // avg(int4) is numeric: { avg: string | null }
 sqlx("SELECT avg(score) FROM posts"); // avg(float8) is float8: { avg: number | null }
@@ -65,15 +69,12 @@ interface CamelDB {
   blogPosts: { id: Generated<number>; authorId: number; createdAt: Generated<Timestamp> };
 }
 
-const camel = createSql<CamelDB, DefaultTypeMap, {}, { camelCase: true }>();
+const camel = createSql<CamelDB, DefaultTypeMap, {}, { camelCase: true }>(camelDb);
 camel("SELECT author_id, created_at FROM blog_posts WHERE id = $1", 1);
 // Query<{ author_id: number; created_at: Date }, [number]>
 // #endregion camel
 check<Equal<RowType<ReturnType<typeof camel<"SELECT author_id, created_at FROM blog_posts WHERE id = $1">>>, { author_id: number; created_at: Date }>>();
 
-import type { Kysely } from "kysely";
-declare const db: Kysely<DB>;
-declare const camelDb: Kysely<CamelDB>; // created with plugins: [new CamelCasePlugin()]
 // #region camel-rows
 const camelRows = createSql<CamelDB, DefaultTypeMap, {}, { camelCase: true }>(camelDb, { rowKeys: "camelCase" });
 const post = await camelRows("SELECT author_id, created_at FROM blog_posts WHERE id = $1", 1).executeTakeFirstOrThrow();
@@ -81,14 +82,18 @@ const post = await camelRows("SELECT author_id, created_at FROM blog_posts WHERE
 // #endregion camel-rows
 check<Equal<typeof post, { authorId: number; createdAt: Date }>>();
 // #region run
-import { execute, query } from "@typesql/kysely";
-
-const drafts = await query(db, sql("SELECT id, title FROM posts WHERE NOT published"));
+const drafts = await sql("SELECT id, title FROM posts WHERE NOT published").execute();
 // { id: string; title: string }[]
 
-const published = await db.transaction().execute((trx) =>
-  execute(trx, sql("UPDATE posts SET published = true WHERE author_id = $1", 1)),
+const published = await sql.transaction((tx) =>
+  tx("UPDATE posts SET published = true WHERE author_id = $1", 1).executeCount(),
 ); // number of affected rows
+
+// inside a Kysely transaction, bind a sql to it to mix builder and SQL queries
+await db.transaction().execute(async (trx) => {
+  await trx.updateTable("posts").set({ published: false }).where("author_id", "=", 1).execute();
+  await createSql<DB>(trx)("DELETE FROM posts WHERE author_id = $1 AND NOT published", 1).execute();
+});
 // #endregion run
 check<Equal<typeof drafts, { id: string; title: string }[]>>();
 check<Equal<typeof published, number>>();

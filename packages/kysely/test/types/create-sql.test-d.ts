@@ -1,7 +1,7 @@
 import { expectTypeOf, test } from "vitest";
 import type { Kysely, Transaction } from "kysely";
 import type { DefaultTypeMap, ParamsType, RowType, SqlError } from "@typesql/core";
-import { createSql, execute, query, type KyselyExecutor } from "../../src/index.js";
+import { createSql, type KyselyExecutor, type KyselySql } from "../../src/index.js";
 import type { AuthRole, DB, Mood } from "../fixtures/kysely-codegen.js";
 
 const sql = createSql<DB>();
@@ -96,12 +96,21 @@ test("Record<string, …> json columns select as jsonb, not interval", () => {
   expectTypeOf<RowType<typeof q>>().toEqualTypeOf<{ payload: unknown }>();
 });
 
-test("query/execute accept Kysely and Transaction and type rows from the query", () => {
+test("createSql accepts Kysely and Transaction; execute* and transaction type rows from the query", () => {
   expectTypeOf<Kysely<DB>>().toExtend<KyselyExecutor>();
   expectTypeOf<Transaction<DB>>().toExtend<KyselyExecutor>();
-  const q = sql("SELECT id, email FROM users");
-  expectTypeOf(query<typeof q>).returns.toEqualTypeOf<Promise<{ id: number; email: string }[]>>();
-  expectTypeOf(execute).returns.toEqualTypeOf<Promise<number>>();
+  const db = {} as Kysely<DB>;
+  const bound = createSql<DB>(db);
+  createSql<DB>({} as Transaction<DB>);
+  expectTypeOf(bound).toEqualTypeOf<KyselySql<DB>>();
+  const q = bound("SELECT id, email FROM users");
+  expectTypeOf(q.execute()).toEqualTypeOf<Promise<{ id: number; email: string }[]>>();
+  expectTypeOf(q.executeCount()).toEqualTypeOf<Promise<number>>();
+  const result = bound.transaction(async (tx) => {
+    expectTypeOf(tx).toEqualTypeOf<KyselySql<DB>>();
+    return tx("SELECT id FROM users").executeTakeFirstOrThrow();
+  });
+  expectTypeOf(result).toEqualTypeOf<Promise<{ id: number }>>();
 });
 
 test("rowKeys: camelCase gives rows the keys CamelCasePlugin would", () => {
@@ -111,7 +120,7 @@ test("rowKeys: camelCase gives rows the keys CamelCasePlugin would", () => {
   const s = createSql<CamelDB, DefaultTypeMap, {}, { camelCase: true }>(undefined, { rowKeys: "camelCase" });
   const q = s("SELECT author_id, created_at FROM blog_posts WHERE id = $1", 1);
   expectTypeOf<RowType<typeof q>>().toEqualTypeOf<{ authorId: number; createdAt: Date }>();
-  expectTypeOf(query<typeof q>).returns.toEqualTypeOf<Promise<{ authorId: number; createdAt: Date }[]>>();
+  expectTypeOf(q.execute()).toEqualTypeOf<Promise<{ authorId: number; createdAt: Date }[]>>();
   const plain = createSql<DB>(undefined, { rowKeys: "preserve" });
   expectTypeOf(plain).toEqualTypeOf(sql);
 });

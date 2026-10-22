@@ -59,11 +59,11 @@ export interface DB {
 ```
 
 ```ts
-import { createSql, queryRaw } from "@typesql/prisma";
+import { createSql } from "@typesql/prisma";
 import type { DB } from "./db/typesql";
 
-const sql = createSql<DB>();
-const rows = await queryRaw(prisma, sql("SELECT id, display_name FROM users WHERE email = $1", email));
+const sql = createSql<DB>(prisma);
+const rows = await sql("SELECT id, display_name FROM users WHERE email = $1", email).execute();
 // { id: number; display_name: string | null }[]
 ```
 
@@ -125,8 +125,8 @@ on stdin/stderr.
 import { createSql } from "@typesql/prisma";
 import type { Prisma } from "./generated/prisma/client";
 
-const sql = createSql<Prisma.TypeMap>();
-// same as createSql<FromPrisma<Prisma.TypeMap>>()
+const sql = createSql<Prisma.TypeMap>(prisma);
+// same as createSql<FromPrisma<Prisma.TypeMap>>(prisma)
 
 sql('SELECT id, email, "createdAt" FROM "User" WHERE role = $1', "ADMIN");
 // Query<{ id: number; email: string; createdAt: Date }, ["ADMIN" | "USER"]>
@@ -190,22 +190,33 @@ field and option names are compile errors. Enum types keep their Prisma name.
 
 ## Running queries through Prisma
 
-`createSql` from this package uses `PrismaTypeMap`, which describes what `$queryRaw` returns.
-`queryRaw` and `executeRaw` run a typesql query with `$queryRawUnsafe(text, ...values)` and
-`$executeRawUnsafe(text, ...values)`. Despite the name, values are always sent as bind
-parameters (`$1`, `$2`, ...), never spliced into the text. Both return a `PrismaPromise`, so they
-work inside `prisma.$transaction([...])`, and accept a transaction client. A `PrismaPromise` cannot
-rename row keys, so `queryRaw` rejects a query from core's `createSql(executor, { rowKeys: "camelCase" })`;
-run that one with `q.execute(executor(prisma))`.
+`createSql<DB>(prisma)` uses `PrismaTypeMap`, which describes what `$queryRaw` returns, and runs
+the queries through Prisma Client: `execute*` with `$queryRawUnsafe(text, ...values)` and
+`executeCount` with `$executeRawUnsafe(text, ...values)`. Despite the name, values are always
+sent as bind parameters (`$1`, `$2`, ...), never spliced into the text. `prisma` is a
+`PrismaClient`, an extended client or a transaction client.
+
+`sql.transaction(fn)` runs `fn` in an interactive `prisma.$transaction(fn)`, with `tx` bound to
+the transaction client; inside one, `tx.transaction(fn)` uses a savepoint.
 
 ```ts
-import { createSql, executeRaw, queryRaw } from "@typesql/prisma";
+import { createSql } from "@typesql/prisma";
 
-const [rows, deleted] = await prisma.$transaction([
-  queryRaw(prisma, sql('SELECT id, "bigNum" FROM "User" WHERE id = $1', 1)), // { id: number; bigNum: bigint }[]
-  executeRaw(prisma, sql("DELETE FROM posts WHERE author_id = $1", 1)),       // number
+const sql = createSql<DB>(prisma);
+
+const [rows, deleted] = await sql.transaction(async (tx) => [
+  await tx('SELECT id, "bigNum" FROM "User" WHERE id = $1', 1).execute(), // { id: number; bigNum: bigint }[]
+  await tx("DELETE FROM posts WHERE author_id = $1", 1).executeCount(),   // number
 ]);
 ```
+
+| Export | |
+|---|---|
+| `createSql<S, TM = PrismaTypeMap>(prisma)` | core's `createSql` with the queries running on `prisma` |
+| `q.execute()`, `q.executeTakeFirst()`, `q.executeTakeFirstOrThrow()`, `q.executeCount()` | `Promise<Row[]>`, `Promise<Row \| undefined>`, `Promise<Row>` (`NoResultError` on 0 rows), `Promise<number>` |
+| `sql.transaction(fn)` | `prisma.$transaction(fn)` with `tx` bound to the transaction client |
+| `executor(prisma)` | an `Executor` for `q.execute(executor)` and core's `createSql(executor)`, e.g. with `{ rowKeys: "camelCase" }` |
+| `PrismaSql<S, TM>`, `PrismaRawClient` | the type `createSql` returns, and what it accepts |
 
 ### `PrismaTypeMap`
 
@@ -230,8 +241,8 @@ Arrays map element-wise. The other Postgres types (`interval`, `macaddr`, geomet
 are `unknown` here, and need a cast in SQL (`duration::text`). Arrays of enums and other
 user-defined types arrive as the raw `{a,b}` text: cast them (`roles::text[]`).
 
-To run the queries with another driver instead, pass its type map: `createSql<DB, PgTypeMap>()`
-with `@typesql/pg`, or use that adapter's `createSql<DB>()` with the generated `DB`.
+To run the queries with another driver instead, use that adapter's `createSql<DB>(client)` with
+the generated `DB` (`@typesql/pg` on the pool behind `@prisma/adapter-pg`, say).
 
 ## Examples
 

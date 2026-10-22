@@ -49,9 +49,8 @@ every later `_` is dropped, and the character after a `_` is upper-cased. Nothin
   Alias one of them to keep both.
 - `sql.as<Row>()` asserts the row as returned, so give it camelCase keys.
 - `RowOf<DB, TM, Q>` still describes the database's names. `RowType<typeof q>` is the renamed row.
-- The adapters' `createSql(client, { rowKeys: "camelCase" })` take the option too, and their
-  `query`/`one`/`maybeOne`/`many` helpers rename the keys the same way. Prisma's
-  `queryRaw` cannot, so it rejects such a query; run it with `q.execute(executor(prisma))`.
+- The adapters' `createSql(client, { rowKeys: "camelCase" })` take the option too, and the
+  `sql` that `sql.transaction(fn)` passes keeps it.
 - The types assume the driver returns the database's names, so leave driver-level renaming
   such as postgres.js' `transform: postgres.camel` off. `@typesql/kysely` already bypasses
   Kysely plugins such as `CamelCasePlugin`.

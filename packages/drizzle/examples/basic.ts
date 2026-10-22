@@ -4,8 +4,9 @@
  * here needs a database.
  */
 import type { ParamsType, RowType } from "@typesql/core";
-import { createSql, type FromDrizzle } from "@typesql/drizzle";
-import * as pg from "@typesql/pg";
+import type { NodePgDatabase } from "drizzle-orm/node-postgres";
+import { createSql } from "@typesql/drizzle";
+import type { PgTypeMap } from "@typesql/pg";
 import type * as schema from "./schema.js";
 
 // The whole module goes in as is: tables, views, enums and schemas are converted, relations
@@ -47,12 +48,20 @@ export type Q4Row = RowType<typeof q4>; // { email: string; expires_at: Date }
 export const q5 = sql(`SELECT created_at AT TIME ZONE 'UTC' AS created_utc FROM users`);
 export type Q5Row = RowType<typeof q5>; // { created_utc: Date }
 
-// 6. Run queries with a driver adapter on the same pool you pass to drizzle(): convert the schema
-//    with FromDrizzle and use the adapter's createSql (here @typesql/pg and its PgTypeMap).
-const pgSql = pg.createSql<FromDrizzle<typeof schema>>();
-declare const pool: pg.PgQueryable; // the pg Pool given to drizzle(pool)
+// 6. Run queries on your Drizzle database: createSql(db) sends them to the driver client under it
+//    (the pg Pool given to drizzle(pool)), and sql.transaction runs them in db.transaction. Pass
+//    the driver's type map; for node-postgres that is PgTypeMap from @typesql/pg.
+declare const db: NodePgDatabase<typeof schema>;
+const dbSql = createSql<typeof schema, PgTypeMap>(db);
 
 export async function postsByMood(m: "happy" | "sad") {
-  return pg.query(pool, pgSql(`SELECT p.id, p.title FROM posts p JOIN users u ON u.id = p.author_id WHERE u.mood = $1`, m));
+  return dbSql(`SELECT p.id, p.title FROM posts p JOIN users u ON u.id = p.author_id WHERE u.mood = $1`, m).execute();
   // Promise<{ id: string; title: string }[]>
+}
+
+export async function publish(id: string) {
+  return dbSql.transaction(async (tx) => {
+    await tx(`UPDATE posts SET published_at = now() WHERE id = $1`, id).execute();
+    return tx(`SELECT title FROM posts WHERE id = $1`, id).executeTakeFirstOrThrow();
+  });
 }

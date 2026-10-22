@@ -1,41 +1,51 @@
 import type { RowType } from "@typesql/core";
-import { check, type Equal, type Same } from "./_check.js";
+import { check, type Equal } from "./_check.js";
 import type { DB } from "./schema.js";
 
 // #region pg
 import { Pool } from "pg";
-import { createSql, execute, many, maybeOne, migrate, one, query, transaction } from "@typesql/pg";
+import { createSql, migrate } from "@typesql/pg";
 
 const pool = new Pool();
-const sql = createSql<DB>();
+const sql = createSql<DB>(pool); // queries run on `pool`
 
-const users = await query(pool, sql("SELECT id, email FROM users")); // { id: number; email: string }[]
-const user = await one(pool, sql("SELECT id, email FROM users WHERE id = $1", 7)); // exactly one row, or throws
-const maybe = await maybeOne(pool, sql("SELECT id FROM users WHERE email = $1", "x")); // row | null
-const some = await many(pool, sql("SELECT id FROM posts")); // [Row, ...Row[]]: at least one row, or throws
-const changed = await execute(pool, sql("UPDATE users SET display_name = NULL")); // row count
+const users = await sql("SELECT id, email FROM users").execute(); // { id: number; email: string }[]
+const maybe = await sql("SELECT id FROM users WHERE email = $1", "x").executeTakeFirst(); // row | undefined
+const user = await sql("SELECT id, email FROM users WHERE id = $1", 7).executeTakeFirstOrThrow(); // row, or NoResultError
+const changed = await sql("UPDATE users SET display_name = NULL").executeCount(); // row count
 
-const id = await transaction(pool, async (client) => {
-  const { id } = await one(client, sql("INSERT INTO users (email) VALUES ($1) RETURNING id", "a@b.c"));
-  await execute(client, sql("INSERT INTO posts (author_id, title) VALUES ($1, $2)", id, "Hello"));
+const id = await sql.transaction(async (tx) => {
+  const { id } = await tx("INSERT INTO users (email) VALUES ($1) RETURNING id", "a@b.c").executeTakeFirstOrThrow();
+  await tx("INSERT INTO posts (author_id, title) VALUES ($1, $2)", id, "Hello").execute();
   return id;
 });
 // #endregion pg
-// #region execute
+// #region transaction
+const postId = await sql.transaction(async (tx) => {
+  // tx is sql bound to the transaction: same type, same helpers
+  const { id } = await tx("INSERT INTO posts (author_id, title) VALUES ($1, $2) RETURNING id", 7, "Draft").executeTakeFirstOrThrow();
+  try {
+    await tx.transaction(async (inner) => {
+      // a savepoint: when this throws, only what ran inside it is rolled back
+      await inner("UPDATE users SET display_name = $1 WHERE id = $2", "Author", 7).execute();
+    });
+  } catch {
+    // the post stays
+  }
+  return id;
+});
+// #endregion transaction
+// #region execute-per-call
 import { executor } from "@typesql/pg";
 
-const bound = createSql<DB>(pool); // queries run on `pool`
-
-const all = await bound("SELECT id, email FROM users").execute(); // { id: number; email: string }[]
-const first = await bound("SELECT id FROM users WHERE email = $1", "x").executeTakeFirst(); // row | undefined
-const me = await bound("SELECT id, email FROM users WHERE id = $1", 7).executeTakeFirstOrThrow(); // row, or NoResultError
-
-await transaction(pool, async (client) => {
-  await bound("UPDATE users SET display_name = NULL WHERE id = $1", 7).execute(executor(client)); // on the transaction's client
-});
-
-const deleted = await bound("DELETE FROM posts WHERE author_id = $1", 7).executeCount(); // rows deleted
-// #endregion execute
+const client = await pool.connect(); // a client you manage yourself
+try {
+  await sql("UPDATE users SET display_name = NULL WHERE id = $1", 7).execute(executor(client)); // on `client`
+  await createSql<DB>(client)("DELETE FROM posts WHERE author_id = $1", 7).execute(); // or bind a sql to it
+} finally {
+  client.release();
+}
+// #endregion execute-per-call
 // #region custom-executor
 import { createSql as createCoreSql, type Executor } from "@typesql/core";
 import type { PgTypeMap } from "@typesql/pg";
@@ -62,20 +72,16 @@ async function wire<Q extends Query<object>>(q: Q): Promise<Wire<RowType<Q>>[]> 
   return (await q.execute()).map(toWire) as Wire<RowType<Q>>[];
 }
 
-const payload = await wire(bound("SELECT id, created_at FROM users")); // { id: number; created_at: string }[]
+const payload = await wire(sql("SELECT id, created_at FROM users")); // { id: number; created_at: string }[]
 // #endregion transform-helper
 check<Equal<typeof payload, { id: number; created_at: string }[]>>();
 check<Equal<Awaited<ReturnType<ReturnType<typeof sqlLogged<"SELECT id FROM users">>["executeCount"]>>, number>>();
-check<Equal<typeof deleted, number>>();
-check<Equal<typeof all, { id: number; email: string }[]>>();
-check<Equal<typeof first, { id: number } | undefined>>();
-check<Equal<typeof me, { id: number; email: string }>>();
 check<Equal<typeof users, { id: number; email: string }[]>>();
+check<Equal<typeof maybe, { id: number } | undefined>>();
 check<Equal<typeof user, { id: number; email: string }>>();
-check<Equal<typeof maybe, { id: number } | null>>();
-check<Same<typeof some, [{ id: string }, ...{ id: string }[]]>>();
 check<Equal<typeof changed, number>>();
 check<Equal<typeof id, number>>();
+check<Equal<typeof postId, string>>();
 void migrate;
 
 // #region postgresjs
@@ -83,18 +89,18 @@ import postgres from "postgres";
 import * as pgjs from "@typesql/postgres";
 
 const db = postgres(process.env["DATABASE_URL"]!);
-const sqlJs = pgjs.createSql<DB>(); // PostgresJsTypeMap
-const posts = await pgjs.query(db, sqlJs("SELECT id, title FROM posts WHERE author_id = $1", 1));
+const sqlJs = pgjs.createSql<DB>(db); // PostgresJsTypeMap
+const posts = await sqlJs("SELECT id, title FROM posts WHERE author_id = $1", 1).execute();
 // { id: string; title: string }[]   int8 is a string by default
 
 // with bigint parsing enabled on the connection
 const dbBig = postgres(process.env["DATABASE_URL"]!, { types: { bigint: postgres.BigInt } });
-const big = pgjs.createBigIntSql<DB>(); // PostgresJsBigIntTypeMap
-const counts = await pgjs.query(dbBig, big("SELECT author_id, count(*) AS n FROM posts GROUP BY author_id"));
+const big = pgjs.createBigIntSql<DB>(dbBig); // PostgresJsBigIntTypeMap
+const counts = await big("SELECT author_id, count(*) AS n FROM posts GROUP BY author_id").execute();
 // { author_id: number; n: bigint }[]
 
-await pgjs.transaction(db, async (tx) => {
-  await pgjs.execute(tx, sqlJs("UPDATE posts SET title = upper(title) WHERE author_id = $1", 1));
+await sqlJs.transaction(async (tx) => {
+  await tx("UPDATE posts SET title = upper(title) WHERE author_id = $1", 1).execute();
 });
 // #endregion postgresjs
 check<Equal<typeof posts, { id: string; title: string }[]>>();

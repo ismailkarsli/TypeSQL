@@ -121,6 +121,17 @@ describe("executeCount", () => {
     await expect(sql("SELECT id FROM users").executeCount(missing)).rejects.toThrow(/did not report a row count/);
   });
 
+  it("runs the executor's count method instead when it has one", async () => {
+    const calls: unknown[] = [];
+    const exec: Executor = Object.assign(async () => [rowA], {
+      count: async (text: string, values: readonly unknown[]) => (calls.push({ text, values }), 4),
+    });
+    const sql = createSql<DB>(exec);
+    expect(await sql("DELETE FROM users WHERE id > $1", 0).executeCount()).toBe(4);
+    expect(await sql("SELECT id FROM users").execute()).toEqual([rowA]);
+    expect(calls).toEqual([{ text: "DELETE FROM users WHERE id > $1", values: [0] }]);
+  });
+
   it("sends the text and values, and rejects without an executor", async () => {
     const calls: unknown[] = [];
     const sql = createSql<DB>();

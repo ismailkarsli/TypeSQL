@@ -1,11 +1,14 @@
 import type { DefaultTypeMap, ParamsType, RowType } from "@typesql/core";
 import { check, type Equal } from "./_check.js";
 
+import type { NodePgDatabase } from "drizzle-orm/node-postgres";
+declare const db: NodePgDatabase; // drizzle(pool) from drizzle-orm/node-postgres
+
 // #region query
 import { createSql } from "@typesql/drizzle";
 import type * as schema from "./orm-drizzle-schema.js";
 
-const sql = createSql<typeof schema>();
+const sql = createSql<typeof schema>(db); // db: your Drizzle database (or a transaction)
 
 const q = sql(
   `SELECT u.email, u.display_name, p.title
@@ -30,16 +33,23 @@ sql("DELETE FROM happy_users");
 createSql<typeof schema, DefaultTypeMap, {
   casing: "snake_case"; // drizzle(client, { casing: "snake_case" })
   timestamp: "timestamptz"; // type of timestamp() columns not pinned with pgType
-}>();
+}>(db);
 // #endregion options
 
-declare const pool: import("@typesql/pg").PgQueryable;
-// #region adapter
-import * as pg from "@typesql/pg";
-import type { FromDrizzle } from "@typesql/drizzle";
+// #region run
+import type { PgTypeMap } from "@typesql/pg";
 
-const pgSql = pg.createSql<FromDrizzle<typeof schema>>(); // PgTypeMap
-const rows = await pg.query(pool, pgSql("SELECT id, title FROM posts WHERE author_id = $1", 1));
+const pgSql = createSql<typeof schema, PgTypeMap>(db); // node-postgres' exact types
+const rows = await pgSql("SELECT id, title FROM posts WHERE author_id = $1", 1).execute();
 // { id: number; title: string }[]
-// #endregion adapter
+
+await pgSql.transaction(async (tx) => {
+  await tx("UPDATE posts SET title = upper(title) WHERE author_id = $1", 1).execute();
+});
+
+// inside a Drizzle transaction, bind a sql to it to mix ORM and SQL queries
+await db.transaction(async (tx) => {
+  await createSql<typeof schema, PgTypeMap>(tx)("DELETE FROM posts WHERE author_id = $1", 1).execute();
+});
+// #endregion run
 check<Equal<typeof rows, { id: number; title: string }[]>>();

@@ -21,4 +21,5 @@ export type { Tok, Toks, WordTok, IdTok, NumTok, StrTok, ParamTok, OpTok } from 
 export type { ParseProgram, ParseStatement } from "./engine/parser/stmt.js";
 export type * as Ast from "./engine/ast.js";
 export type { ColInfo, ColMap, Cols, Scope, ScopeItem, ScopeLevel, Ctx, CteMap } from "./engine/types.js";
+export { createTransactionalSql, runTransaction, type TransactionalSql, type SqlDriver } from "./transaction.js";
 export { Migrations, migrations, runMigrations, type MigrationClient, type SchemaOf, type ValidateDdl } from "./migrations.js";

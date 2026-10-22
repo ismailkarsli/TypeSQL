@@ -39,8 +39,11 @@
     "drizzle-orm": ">=0.45"
   },
   "devDependencies": {
+    "@types/pg": "^8.23.1",
     "@typesql/pg": "workspace:*",
     "drizzle-orm": "^0.45.4",
+    "pg": "^8.23.1",
+    "postgres": "^3.4.9",
     "typescript": "7.0.2",
     "vitest": "^5.0.4"
   }

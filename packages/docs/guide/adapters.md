@@ -1,36 +1,23 @@
 # Adapters
 
 `@typesql/core` is type-only: `sql("SELECT …", …params)` returns `{ text, values }` plus phantom
-`Row`/`Params` types. An adapter adds three things for one driver:
+`Row`/`Params` types. An adapter adds two things for one driver:
 
 1. a **type map** (`PgTypeMap`, `PostgresJsTypeMap`, `PostgresJsBigIntTypeMap`) describing how
    that driver's *default* parsers turn each Postgres type into a JS value;
-2. a pre-bound `createSql<DB>()` that uses that map;
-3. small helpers that run a `Query` on the driver and return rows typed from it:
-   `query`, `one`, `maybeOne`, `many`, `execute`, `transaction`.
-
-The helper surface is identical in both packages:
-
-| Helper | Returns | Error |
-|---|---|---|
-| `query(client, q)` | `Promise<Row[]>` | — |
-| `one(client, q)` | `Promise<Row>` | `RowCountError` (`code: "NO_ROWS" \| "TOO_MANY_ROWS"`) unless exactly 1 row |
-| `maybeOne(client, q)` | `Promise<Row \| null>` | `RowCountError("TOO_MANY_ROWS")` on more than 1 row |
-| `many(client, q)` | `Promise<[Row, ...Row[]]>` | `RowCountError("NO_ROWS")` on 0 rows |
-| `execute(client, q)` | `Promise<number>` (affected rows) | — ; for DML without `RETURNING`, whose `Row` is `never` |
-| `transaction(pool, fn)` | `Promise<T>` from `fn` | rethrows after ROLLBACK |
-
-`RowCountError` carries `code`, `expected` (`"exactly 1"`, `"at most 1"`, `"at least 1"`),
-`actual` and the statement `text`. The `Row` type flows from `Query<Row, Params>` through
-core's `RowType<Q>`, so the result of `sql(...)` can be passed straight in.
+2. a `createSql<DB>(client)` that uses that map and runs the queries on `client`, with
+   `sql.transaction(fn)` for transactions.
 
 The client parameters are structural, so fakes work in tests without the driver.
 
-### `q.execute()`
+## Running queries
 
-Pass the client to `createSql` and a query runs itself, Kysely-style:
+Pass the client to `createSql` and a query runs itself:
 
-<<< @/snippets/adapters.ts#execute
+```ts
+const sql = createSql<DB>(pool);
+const posts = await sql("SELECT id, title FROM posts WHERE author_id = $1", 1).execute();
+```
 
 | Method | Returns | Error |
 |---|---|---|
@@ -39,29 +26,55 @@ Pass the client to `createSql` and a query runs itself, Kysely-style:
 | `q.executeTakeFirstOrThrow()` | `Promise<Row>` | `NoResultError` (carries `text`) on 0 rows |
 | `q.executeCount()` | `Promise<number>` (row count) | rejects if the executor reports no count |
 
-Each method also takes an executor, which wins over the bound one: `executor(client)` from the
-adapter wraps any client the helpers accept, e.g. a transaction's. A query from a `createSql()`
-without a client has no executor and rejects unless one is passed. `@typesql/kysely`,
-`@typesql/prisma` and `@typesql/postgres` take their client the same way; `@typesql/drizzle`
-takes an `executor(...)` from a driver adapter.
-
 `executeCount()` returns the count Postgres reports for the statement: rows affected by
 `INSERT`, `UPDATE`, `DELETE` or `MERGE`, with or without `RETURNING`, rows returned by `SELECT`,
-and 0 for DDL. The `executor(...)` of `@typesql/pg` (`rowCount`), `@typesql/postgres` (`count`)
-and `@typesql/kysely` (`numAffectedRows`, or the number of rows for other statements) report
-it. Prisma's `$queryRawUnsafe` does not, so with `@typesql/prisma` use `executeRaw(prisma, q)`.
+and 0 for DDL. Every adapter reports it: `rowCount` (`pg`), `count` (postgres.js),
+`numAffectedRows` or the number of rows (Kysely), `$executeRawUnsafe` (Prisma), and for Drizzle
+the count of the driver underneath.
 
 `createSql(client, { rowKeys: "camelCase" })` gives camelCase rows, in the types and from
-`execute*` and the helpers alike. See [camelCase row keys](./queries#camelcase-row-keys).
+`execute*` alike. See [camelCase row keys](./queries#camelcase-row-keys).
 
-`@typesql/kysely` and `@typesql/prisma` can also run queries through the ORM's own client
-(`query`/`execute` on a `Kysely` instance, `queryRaw`/`executeRaw` on Prisma Client). See
-[ORM schemas](./orm-schemas).
+The `Row` type flows from `Query<Row, Params>`, so core's `RowType<Q>` names it for your own
+helpers.
+
+## Transactions
+
+`sql.transaction(fn)` runs `fn` with `tx`, the same `sql` bound to one transaction. It commits
+when `fn` resolves and rolls back when it throws (the error is rethrown); it resolves to `fn`'s
+result. `tx.transaction(fn)` nests with a savepoint:
+
+<<< @/snippets/adapters.ts#transaction
+
+| Adapter | `sql.transaction(fn)` | `tx.transaction(fn)` |
+|---|---|---|
+| `@typesql/pg` | on a `Pool`: checks out a client, `BEGIN`…`COMMIT` on it, releases it; on a `Client` or `PoolClient`: `BEGIN`…`COMMIT` on it | `SAVEPOINT` |
+| `@typesql/postgres` | `sql.begin(fn)` | `tx.savepoint(fn)` |
+| `@typesql/kysely` | `db.transaction().execute(fn)` | `SAVEPOINT` on the transaction |
+| `@typesql/prisma` | `prisma.$transaction(fn)` (interactive) | `SAVEPOINT` on the transaction client |
+| `@typesql/drizzle` | `db.transaction(fn)` | Drizzle's nested `tx.transaction(fn)` (a savepoint) |
+
+A `sql` bound to a client that is already in a transaction (a postgres.js `TransactionSql`, a
+Kysely `Transaction`, a Prisma transaction client, a Drizzle `tx`) also uses a savepoint.
+Statements inside one transaction share one connection, so run them one after another, not
+with `Promise.all`.
+
+### Running on another client
+
+Each `execute*` method also takes an executor, which wins over the bound one: `executor(client)`
+from the adapter wraps any client `createSql` accepts. Or bind a `sql` to that client:
+
+<<< @/snippets/adapters.ts#execute-per-call
+
+A `sql` from `createSql<DB>()` without a client builds queries (for types, tests or another
+runner); their `execute*` methods reject unless an executor is passed, and `sql.transaction`
+rejects.
 
 ### Writing an executor
 
 An `Executor` is `(text, values) => PromiseLike<Row[] | { rows, rowCount }>`. Return the
-rows alone when you have no count: everything except `executeCount` works. `rowCount: null`
+rows alone when you have no count: everything except `executeCount` works, unless the executor
+also has a `count(text, values)` method, which `executeCount` then calls. `rowCount: null`
 means the statement has no count, which `executeCount` reads as 0. A wrapper around an
 adapter's executor can return its result unchanged:
 
@@ -99,19 +112,21 @@ declare module "@typesql/core" {
 
 It is global and easy to get wrong. The type parameters must repeat core's exactly (names,
 constraints and defaults). The new signatures only win because TypeScript puts overloads from a
-later declaration first. `RowType<Q>`, and with it the adapters' `query`/`one`/`many` helpers,
-still describe the untransformed row. Prefer the options above. If you do augment, make sure
-the executor's transform and the declared type match.
+later declaration first. `RowType<Q>` still describes the untransformed row. Prefer the options
+above. If you do augment, make sure the executor's transform and the declared type match.
+
 ## `@typesql/pg` (node-postgres 8.x)
 
 <<< @/snippets/adapters.ts#pg
 
 - `PgQueryable` is anything with `query(text, values?) → Promise<{ rows, rowCount }>`:
   `Pool`, `Client` and `PoolClient` all satisfy it.
-- `transaction(pool, fn)` needs `connect()` (a `Pool`): it checks out a client, runs `BEGIN`,
-  `fn(client)`, `COMMIT`, and `ROLLBACK` + rethrow on error. If the `ROLLBACK` itself fails the
-  client is released with the error so the pool discards the connection.
-- `execute` returns `rowCount ?? 0` (`rowCount` is `null` for statements without a count).
+- `sql.transaction(fn)` on a `Pool` checks out a client, runs `BEGIN`, `fn(tx)`, `COMMIT`, and
+  `ROLLBACK` + rethrow on error. If the `ROLLBACK` itself fails the client is released with the
+  error so the pool discards the connection. On a `Client` or `PoolClient` it runs on that
+  connection and leaves releasing it to you. Other queryables are rejected, since `BEGIN` and
+  `COMMIT` must reach one connection.
+- `executeCount` returns `rowCount ?? 0` (`rowCount` is `null` for statements without a count).
 - `values` are copied into a mutable array before being handed to `pg`.
 
 ### `PgTypeMap`
@@ -169,13 +184,13 @@ they are not accepted for other types.
 <<< @/snippets/adapters.ts#postgresjs
 
 - `PostgresJsQueryable` is anything with `unsafe(query, parameters?)`: the `Sql` instance,
-  the `TransactionSql` passed by `begin`, and `ReservedSql` all satisfy it. Helpers call
-  `sql.unsafe(text, values)` so the text goes to the server untouched.
-- `query` returns a plain `Row[]` (postgres.js' result metadata — `count`, `command`,
-  `columns` — is stripped by `Array.from`). `execute` returns the result's `.count` (0 when
-  postgres.js reports `null`, as for DDL).
-- `transaction(sql, fn)` is `sql.begin(fn)`: postgres.js issues `BEGIN`, runs `fn(tx)`,
-  `COMMIT`, or `ROLLBACK` and rethrows.
+  the `TransactionSql` passed by `begin`, and `ReservedSql` all satisfy it. Queries run with
+  `sql.unsafe(text, values)`, so the text goes to the server untouched.
+- `execute` returns a plain `Row[]` (postgres.js' result metadata — `count`, `command`,
+  `columns` — is stripped by `Array.from`). `executeCount` returns the result's `.count` (0
+  when postgres.js reports `null`, as for DDL).
+- `sql.transaction(fn)` is `sql.begin(fn)`: postgres.js issues `BEGIN`, runs `fn(tx)`,
+  `COMMIT`, or `ROLLBACK` and rethrows. On a `TransactionSql` it is `savepoint(fn)`.
 
 ### `PostgresJsTypeMap` and `PostgresJsBigIntTypeMap`
 
@@ -235,7 +250,7 @@ const m = migrations()
   .add("ALTER TABLE users ADD COLUMN display_name text");
 
 await migrate(pool, m);                                // pg: one pooled client, BEGIN … COMMIT
-const sql = createSql<SchemaOf<typeof m>>();
+const sql = createSql<SchemaOf<typeof m>>(pool);
 ```
 
 Statements are sent without parameters (simple query protocol), so `$$`-quoted function

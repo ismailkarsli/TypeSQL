@@ -34,17 +34,17 @@ export interface DB {
 
 declare const prisma: PrismaRawClient;
 // #region query
-import { createSql, executeRaw, queryRaw } from "@typesql/prisma";
+import { createSql } from "@typesql/prisma";
 
-const sql = createSql<DB>(); // PrismaTypeMap: what $queryRaw returns
+const sql = createSql<DB>(prisma); // PrismaTypeMap: what $queryRaw returns
 
 const q = sql(`SELECT id, display_name, "updatedAt" FROM users WHERE role = $1`, "guest");
 // Query<{ id: number; display_name: string | null; updatedAt: Date }, ["ADMIN" | "USER" | "guest"]>
 
-const rows = await queryRaw(prisma, q); // { id: number; display_name: string | null; updatedAt: Date }[]
-const stats = await queryRaw(prisma, sql("SELECT count(*) AS n, sum(views) AS views FROM posts"));
+const rows = await q.execute(); // { id: number; display_name: string | null; updatedAt: Date }[]
+const stats = await sql("SELECT count(*) AS n, sum(views) AS views FROM posts").execute();
 // { n: bigint; views: Decimal | null }[]
-const deleted = await executeRaw(prisma, sql("DELETE FROM posts WHERE author_id = $1", 1)); // number
+const deleted = await sql.transaction((tx) => tx("DELETE FROM posts WHERE author_id = $1", 1).executeCount()); // number
 // #endregion query
 check<Equal<RowType<typeof q>, { id: number; display_name: string | null; updatedAt: Date }>>();
 check<Equal<ParamsType<typeof q>, ["ADMIN" | "USER" | "guest" | null]>>();

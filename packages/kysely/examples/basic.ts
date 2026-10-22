@@ -4,7 +4,7 @@
  */
 import type { ColumnType, Generated, GeneratedAlways, Kysely } from "kysely";
 import type { DefaultTypeMap, ParamsType, RowType } from "@typesql/core";
-import { createSql, execute, query } from "@typesql/kysely";
+import { createSql } from "@typesql/kysely";
 
 // The interface kysely-codegen emits (trimmed), or the one you wrote by hand for Kysely.
 type Int8 = ColumnType<string, bigint | number | string, bigint | number | string>;
@@ -36,7 +36,10 @@ interface DB {
   };
 }
 
-const sql = createSql<DB>();
+// Bind sql to your Kysely instance (or a transaction): queries run on it, with its plugins bypassed,
+// so the rows have exactly the typed keys.
+declare const db: Kysely<DB>;
+const sql = createSql<DB>(db);
 
 // 1. Columns are read back from their TS types: `Int8` is int8 (a string under pg), `Numeric` is
 //    numeric, `Timestamp` is timestamptz.
@@ -82,16 +85,12 @@ const camel = createSql<CamelDB, DefaultTypeMap, {}, { camelCase: true }>();
 export const q6 = camel(`SELECT author_id, created_at FROM blog_posts WHERE id = $1`, 1);
 export type Q6Row = RowType<typeof q6>; // { author_id: number; created_at: Date }
 
-// 7. Run queries on your Kysely instance or a transaction. Plugins are bypassed, so the rows have
-//    exactly the typed keys.
-declare const db: Kysely<DB>;
-
+// 7. Run queries with execute*, and transactions with sql.transaction: `tx` is sql bound to the
+//    transaction (a Kysely `Transaction`).
 export async function publishAll(authorId: number) {
-  const drafts = await query(db, sql(`SELECT id, title FROM posts WHERE author_id = $1 AND NOT published`, authorId));
+  const drafts = await sql(`SELECT id, title FROM posts WHERE author_id = $1 AND NOT published`, authorId).execute();
   // drafts: { id: string; title: string }[]
-  const updated = await db.transaction().execute((trx) =>
-    execute(trx, sql(`UPDATE posts SET published = true WHERE author_id = $1`, authorId)),
-  );
+  const updated = await sql.transaction((tx) => tx(`UPDATE posts SET published = true WHERE author_id = $1`, authorId).executeCount());
   // updated: number (affected rows)
   return { drafts, updated };
 }

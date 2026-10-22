@@ -38,7 +38,7 @@
  *   }
  */
 import type { Col, Generated, Nullable, ParamsType, RowType } from "@typesql/core";
-import { createSql, executeRaw, queryRaw, type PrismaRawClient } from "@typesql/prisma";
+import { createSql, type PrismaRawClient } from "@typesql/prisma";
 
 // --- generated: src/db/typesql.ts ---
 interface DB {
@@ -69,8 +69,10 @@ interface DB {
 }
 // --- end generated ---
 
-// createSql from @typesql/prisma types rows as $queryRaw returns them (PrismaTypeMap).
-const sql = createSql<DB>();
+// createSql from @typesql/prisma types rows as $queryRaw returns them (PrismaTypeMap), and runs
+// the queries through Prisma Client.
+declare const prisma: PrismaRawClient; // a PrismaClient, an extended client or a transaction client
+const sql = createSql<DB>(prisma);
 
 // 1. Tables and columns have their database names (@@map, @map). Enum values are the database
 //    values, so `GUEST @map("guest")` is "guest".
@@ -98,16 +100,16 @@ export const q4 = sql(`INSERT INTO users (email, "updatedAt") VALUES ($1, now())
 export type Q4Row = RowType<typeof q4>; // { id: number; role: "ADMIN" | "USER" | "guest"; created_at: Date }
 // sql(`INSERT INTO posts (author_id, title) VALUES ($1, $2)`, 1, "Hello");  // error: "id" is NOT NULL and has no default
 
-// 5. Run queries through Prisma Client. Values are always sent as bind parameters. Both helpers
-//    return a PrismaPromise, so they also work inside prisma.$transaction([...]).
-declare const prisma: PrismaRawClient; // a PrismaClient, an extended client or a transaction client
-
+// 5. Run queries with execute* ($queryRawUnsafe) and executeCount ($executeRawUnsafe). Values are
+//    always sent as bind parameters. sql.transaction runs in an interactive prisma.$transaction.
 export async function renameUser(id: number, name: string) {
-  const changed = await executeRaw(prisma, sql(`UPDATE users SET display_name = $2, "updatedAt" = now() WHERE id = $1`, id, name));
-  // changed: number (affected rows)
-  const rows = await queryRaw(prisma, sql(`SELECT id, display_name FROM users WHERE id = $1`, id));
-  // rows: { id: number; display_name: string | null }[]
-  return { changed, rows };
+  return sql.transaction(async (tx) => {
+    const changed = await tx(`UPDATE users SET display_name = $2, "updatedAt" = now() WHERE id = $1`, id, name).executeCount();
+    // changed: number (affected rows)
+    const rows = await tx(`SELECT id, display_name FROM users WHERE id = $1`, id).execute();
+    // rows: { id: number; display_name: string | null }[]
+    return { changed, rows };
+  });
 }
 
 // 6. Without the generator: convert the client Prisma already generates. Tables and columns are

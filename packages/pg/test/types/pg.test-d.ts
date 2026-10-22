@@ -3,15 +3,10 @@ import type { Client, Pool, PoolClient } from "pg";
 import type { Col, Generated, Nullable, ParamsType, PgCatalog, RowType, TsTypeOf } from "@typesql/core";
 import {
   createSql,
-  execute,
-  many,
-  maybeOne,
-  one,
-  query,
-  transaction,
   type PgInterval,
   type PgPoolLike,
   type PgQueryable,
+  type PgSql,
   type PgTransactionClient,
   type PgTypeMap,
 } from "../../src/index.js";
@@ -35,8 +30,8 @@ interface DB {
   };
 }
 
-const sql = createSql<DB>();
 declare const pool: Pool;
+const sql = createSql<DB>(pool);
 
 type Row = { id: number; email: string; display_name: string | null };
 const q = sql("SELECT id, email, display_name FROM users WHERE id = $1", 1);
@@ -76,37 +71,41 @@ test("pg's Pool, Client and PoolClient satisfy the structural interfaces", () =>
   expectTypeOf<Pool>().toExtend<PgPoolLike>();
 });
 
-test("row types flow from Query through the helpers", () => {
+test("createSql accepts a Pool, Client or PoolClient", () => {
+  expectTypeOf(sql).toEqualTypeOf<PgSql<DB>>();
+  createSql<DB>({} as Client);
+  createSql<DB>({} as PoolClient);
+});
+
+test("row types flow from Query through execute*", () => {
   expectTypeOf<RowType<typeof q>>().toEqualTypeOf<Row>();
   expectTypeOf<ParamsType<typeof q>>().toEqualTypeOf<[number | null]>();
-  expectTypeOf(query(pool, q)).toEqualTypeOf<Promise<Row[]>>();
-  expectTypeOf(one(pool, q)).toEqualTypeOf<Promise<Row>>();
-  expectTypeOf(maybeOne(pool, q)).toEqualTypeOf<Promise<Row | null>>();
-  expectTypeOf(many(pool, q)).toEqualTypeOf<Promise<[Row, ...Row[]]>>();
-  expectTypeOf(execute(pool, q)).toEqualTypeOf<Promise<number>>();
+  expectTypeOf(q.execute()).toEqualTypeOf<Promise<Row[]>>();
+  expectTypeOf(q.executeTakeFirst()).toEqualTypeOf<Promise<Row | undefined>>();
+  expectTypeOf(q.executeTakeFirstOrThrow()).toEqualTypeOf<Promise<Row>>();
+  expectTypeOf(q.executeCount()).toEqualTypeOf<Promise<number>>();
 });
 
 test("pg-specific result types", () => {
-  expectTypeOf(query(pool, sql("SELECT count(*) FROM users"))).toEqualTypeOf<Promise<{ count: string }[]>>();
-  expectTypeOf(query(pool, sql("SELECT count(*) AS n, max(created_at) AS latest FROM users"))).toEqualTypeOf<
+  expectTypeOf(sql("SELECT count(*) FROM users").execute()).toEqualTypeOf<Promise<{ count: string }[]>>();
+  expectTypeOf(sql("SELECT count(*) AS n, max(created_at) AS latest FROM users").execute()).toEqualTypeOf<
     Promise<{ n: string; latest: Date | null }[]>
   >();
-  expectTypeOf(query(pool, sql("SELECT id, balance, avatar, session_length FROM users"))).toEqualTypeOf<
+  expectTypeOf(sql("SELECT id, balance, avatar, session_length FROM users").execute()).toEqualTypeOf<
     Promise<{ id: number; balance: string; avatar: Buffer | null; session_length: PgInterval | null }[]>
   >();
-  expectTypeOf(query(pool, sql("SELECT p.id, p.tags, p.meta, u.created_at FROM posts p JOIN users u ON u.id = p.author_id"))).toEqualTypeOf<
+  expectTypeOf(sql("SELECT p.id, p.tags, p.meta, u.created_at FROM posts p JOIN users u ON u.id = p.author_id").execute()).toEqualTypeOf<
     Promise<{ id: string; tags: string[]; meta: unknown; created_at: Date }[]>
   >();
-  expectTypeOf(query(pool, sql("SELECT u.email, p.title FROM users u LEFT JOIN posts p ON p.author_id = u.id"))).toEqualTypeOf<
+  expectTypeOf(sql("SELECT u.email, p.title FROM users u LEFT JOIN posts p ON p.author_id = u.id").execute()).toEqualTypeOf<
     Promise<{ email: string; title: string | null }[]>
   >();
 });
 
-test("transaction passes a queryable client and returns the callback's result", () => {
-  const result = transaction(pool, async (client) => {
-    expectTypeOf(client).toExtend<PgQueryable>();
-    expectTypeOf(client).toExtend<PgTransactionClient>();
-    return one(client, q);
+test("sql.transaction passes a sql bound to the transaction and returns the callback's result", () => {
+  const result = sql.transaction(async (tx) => {
+    expectTypeOf(tx).toEqualTypeOf<PgSql<DB>>();
+    return tx("SELECT id, email, display_name FROM users WHERE id = $1", 1).executeTakeFirstOrThrow();
   });
   expectTypeOf(result).toEqualTypeOf<Promise<Row>>();
 });
@@ -128,30 +127,32 @@ test("parameters accept PgParamTypeMap on top of the row types", () => {
   sql("SELECT id FROM users WHERE created_at > $1", 0);
 });
 
-test("DML: execute returns the row count; RETURNING rows flow through query/one", () => {
+test("DML: executeCount returns the row count; RETURNING rows flow through execute*", () => {
   const upd = sql("UPDATE posts SET title = $1 WHERE id = $2", "t", "1");
   expectTypeOf<RowType<typeof upd>>().toEqualTypeOf<never>();
   expectTypeOf<ParamsType<typeof upd>>().toEqualTypeOf<[string, string | number | bigint | null]>();
-  expectTypeOf(execute(pool, upd)).toEqualTypeOf<Promise<number>>();
+  expectTypeOf(upd.executeCount()).toEqualTypeOf<Promise<number>>();
 
   const ins = sql("INSERT INTO users (email, balance) VALUES ($1, $2) RETURNING id, created_at", "a@b.c", "0");
-  expectTypeOf(one(pool, ins)).toEqualTypeOf<Promise<{ id: number; created_at: Date }>>();
+  expectTypeOf(ins.executeTakeFirstOrThrow()).toEqualTypeOf<Promise<{ id: number; created_at: Date }>>();
 
   const del = sql("DELETE FROM posts WHERE author_id = $1 RETURNING id, tags", 1);
-  expectTypeOf(query(pool, del)).toEqualTypeOf<Promise<{ id: string; tags: string[] }[]>>();
+  expectTypeOf(del.execute()).toEqualTypeOf<Promise<{ id: string; tags: string[] }[]>>();
 
   // @ts-expect-error email is NOT NULL without a default
   sql("INSERT INTO users (display_name) VALUES ($1)", "x");
 });
 
-test("rowKeys: camelCase renames the row keys through the helpers too", () => {
+test("rowKeys: camelCase renames the row keys, in transactions too", () => {
   const camel = createSql<DB>(pool, { rowKeys: "camelCase" });
   const cq = camel("SELECT id, display_name, created_at FROM users WHERE id = $1", 1);
   type CamelRow = { id: number; displayName: string | null; createdAt: Date };
   expectTypeOf<RowType<typeof cq>>().toEqualTypeOf<CamelRow>();
   expectTypeOf(cq.execute()).toEqualTypeOf<Promise<CamelRow[]>>();
-  expectTypeOf(query(pool, cq)).toEqualTypeOf<Promise<CamelRow[]>>();
-  expectTypeOf(one(pool, cq)).toEqualTypeOf<Promise<CamelRow>>();
+  expectTypeOf(cq.executeTakeFirstOrThrow()).toEqualTypeOf<Promise<CamelRow>>();
+  camel.transaction(async (tx) => {
+    expectTypeOf(tx).toEqualTypeOf<PgSql<DB, "camelCase">>();
+  });
   expectTypeOf(createSql<DB>(undefined, { rowKeys: "preserve" })).toEqualTypeOf(sql);
   // @ts-expect-error not a rowKeys option
   createSql<DB>(pool, { rowKeys: "snake" });

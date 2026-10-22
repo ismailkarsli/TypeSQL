@@ -3,16 +3,9 @@ import type { Col, ExecutorResult, Generated, Nullable } from "@typesql/core";
 import {
   createBigIntSql,
   createSql,
-  execute,
   executor,
-  many,
-  maybeOne,
-  one,
-  query,
-  transaction,
   migrate,
   NoResultError,
-  RowCountError,
   type PostgresJsQueryable,
   type PostgresJsRows,
   type PostgresJsTransactable,
@@ -42,11 +35,22 @@ function rowList(rows: unknown[], count: number | null): PostgresJsRows {
 function fakeSql(rows: unknown[], count: number | null = rows.length) {
   const calls: Call[] = [];
   const log: string[] = [];
-  const tx: PostgresJsQueryable = {
+  const tx: PostgresJsQueryable & { savepoint(fn: (tx: PostgresJsQueryable) => Promise<unknown>): Promise<unknown> } = {
     async unsafe(text, params) {
       calls.push({ text, params });
       log.push(text);
       return rowList(rows, count);
+    },
+    async savepoint(fn) {
+      log.push("SAVEPOINT");
+      try {
+        const result = await fn(tx);
+        log.push("RELEASE SAVEPOINT");
+        return result;
+      } catch (err) {
+        log.push("ROLLBACK TO SAVEPOINT");
+        throw err;
+      }
     },
   };
   const client: PostgresJsQueryable & PostgresJsTransactable = {
@@ -79,72 +83,10 @@ describe("createSql / createBigIntSql", () => {
   });
 });
 
-describe("query", () => {
-  test("calls unsafe(text, params) with a mutable copy and returns a plain array of rows", async () => {
-    const { client, calls } = fakeSql([rowA, rowB]);
-    const rows = await query(client, q);
-    expect(rows).toEqual([rowA, rowB]);
-    expect(Array.isArray(rows)).toBe(true);
-    expect("count" in rows).toBe(false);
-    expect(calls).toEqual([{ text: q.text, params: [7] }]);
-    expect(calls[0]?.params).not.toBe(q.values);
-  });
-});
-
-describe("one", () => {
-  test("returns the single row", async () => {
-    const { client } = fakeSql([rowA]);
-    await expect(one(client, q)).resolves.toEqual(rowA);
-  });
-
-  test("throws NO_ROWS on an empty result", async () => {
-    const { client } = fakeSql([]);
-    const err = await one(client, q).catch((e: unknown) => e);
-    expect(err).toBeInstanceOf(RowCountError);
-    expect(err).toMatchObject({ name: "RowCountError", code: "NO_ROWS", expected: "exactly 1", actual: 0, text: q.text });
-  });
-
-  test("throws TOO_MANY_ROWS on more than one row", async () => {
-    const { client } = fakeSql([rowA, rowB]);
-    await expect(one(client, q)).rejects.toMatchObject({ code: "TOO_MANY_ROWS", actual: 2 });
-  });
-});
-
-describe("maybeOne", () => {
-  test("null for no rows, the row for one row, throws for more", async () => {
-    await expect(maybeOne(fakeSql([]).client, q)).resolves.toBeNull();
-    await expect(maybeOne(fakeSql([rowB]).client, q)).resolves.toEqual(rowB);
-    await expect(maybeOne(fakeSql([rowA, rowB]).client, q)).rejects.toMatchObject({ code: "TOO_MANY_ROWS", expected: "at most 1", actual: 2 });
-  });
-});
-
-describe("many", () => {
-  test("returns all rows when there is at least one, throws on none", async () => {
-    await expect(many(fakeSql([rowA, rowB]).client, q)).resolves.toEqual([rowA, rowB]);
-    await expect(many(fakeSql([]).client, q)).rejects.toMatchObject({ code: "NO_ROWS", expected: "at least 1", actual: 0 });
-  });
-});
-
-describe("execute", () => {
-  test("returns the result's count", async () => {
-    const { client, calls } = fakeSql([], 4);
-    const del = sql.as<never>("DELETE FROM users WHERE id = $1", 7);
-    await expect(execute(client, del)).resolves.toBe(4);
-    expect(calls).toEqual([{ text: "DELETE FROM users WHERE id = $1", params: [7] }]);
-  });
-
-  test("maps a null count (DDL) to 0", async () => {
-    await expect(execute(fakeSql([], null).client, sql.as<never>("CREATE TABLE t (x int)"))).resolves.toBe(0);
-  });
-});
-
 describe("transaction", () => {
-  test("runs the callback inside begin() with the transaction sql and returns its result", async () => {
+  test("runs the callback inside begin() with a sql bound to the transaction and returns its result", async () => {
     const f = fakeSql([rowA]);
-    const result = await transaction(f.client, async (tx) => {
-      expect(tx).toBe(f.tx);
-      return one(tx, q);
-    });
+    const result = await createSql<DB>(f.client).transaction((tx) => tx("SELECT id, email, display_name FROM users WHERE id = $1", 7).executeTakeFirstOrThrow());
     expect(result).toEqual(rowA);
     expect(f.log).toEqual(["BEGIN", q.text, "COMMIT"]);
   });
@@ -153,11 +95,28 @@ describe("transaction", () => {
     const f = fakeSql([]);
     const boom = new Error("boom");
     await expect(
-      transaction(f.client, async () => {
+      createSql<DB>(f.client).transaction(async () => {
         throw boom;
       }),
     ).rejects.toBe(boom);
     expect(f.log).toEqual(["BEGIN", "ROLLBACK"]);
+  });
+
+  test("tx.transaction, and transaction on a TransactionSql, use savepoint()", async () => {
+    const f = fakeSql([]);
+    await createSql<DB>(f.client).transaction(async (tx) => {
+      await tx.transaction(async (inner) => inner("SELECT id FROM users").execute());
+    });
+    expect(f.log).toEqual(["BEGIN", "SAVEPOINT", "SELECT id FROM users", "RELEASE SAVEPOINT", "COMMIT"]);
+    const g = fakeSql([]);
+    await createBigIntSql<DB>(g.tx).transaction(async () => {});
+    expect(g.log).toEqual(["SAVEPOINT", "RELEASE SAVEPOINT"]);
+  });
+
+  test("rejects without begin or savepoint, and without a client", async () => {
+    const f = fakeSql([]);
+    await expect(createSql<DB>({ unsafe: f.client.unsafe }).transaction(async () => 1)).rejects.toThrow(/needs a postgres.js Sql/);
+    await expect(sql.transaction(async () => 1)).rejects.toThrow(/no client/);
   });
 });
 
@@ -185,13 +144,16 @@ describe("migrate", () => {
 });
 
 describe("executor", () => {
-  test("runs the queries' execute methods through unsafe and strips result metadata", async () => {
+  test("runs the queries' execute methods through unsafe with a mutable copy of the values, and strips result metadata", async () => {
     const { client, calls } = fakeSql([{ id: 7 }]);
     const bound = createSql<DB>(client);
-    const rows = await bound("SELECT id FROM users WHERE id = $1", 7).execute();
+    const bq = bound("SELECT id FROM users WHERE id = $1", 7);
+    const rows = await bq.execute();
     expect(rows).toEqual([{ id: 7 }]);
+    expect(Array.isArray(rows)).toBe(true);
     expect(rows).not.toHaveProperty("count");
     expect(calls).toEqual([{ text: "SELECT id FROM users WHERE id = $1", params: [7] }]);
+    expect(calls[0]?.params).not.toBe(bq.values);
     expect(await createBigIntSql<DB>(client)("SELECT id FROM users").executeTakeFirstOrThrow()).toEqual({ id: 7 });
   });
 
@@ -211,7 +173,7 @@ describe("executor", () => {
 });
 
 describe("rowKeys: camelCase", () => {
-  test("execute* and the helpers return camelCase keys, without result metadata", async () => {
+  test("execute* and transactions return camelCase keys, without result metadata", async () => {
     const raw = { id: 7, display_name: "A", meta_data: { inner_key: 1 } };
     const { client } = fakeSql([raw]);
     const expected = { id: 7, displayName: "A", metaData: { inner_key: 1 } };
@@ -219,8 +181,7 @@ describe("rowKeys: camelCase", () => {
     const rows = await cq.execute();
     expect(rows).toEqual([expected]);
     expect(rows).not.toHaveProperty("count");
-    expect(await query(client, cq)).toEqual([expected]);
-    expect(await one(client, cq)).toEqual(expected);
+    expect(await createSql<DB>(client, { rowKeys: "camelCase" }).transaction((tx) => tx("SELECT display_name FROM users").execute())).toEqual([expected]);
     const big = createBigIntSql<DB>(client, { rowKeys: "camelCase" });
     expect(await big("SELECT display_name FROM users").executeTakeFirst()).toEqual(expected);
   });

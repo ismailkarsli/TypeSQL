@@ -24,9 +24,12 @@ export interface ExecutorResult {
  * Runs a statement and resolves to its rows, or to `{ rows, rowCount }`. Adapters build one from a
  * driver client (`executor(pool)` in `@typesql/pg`, which reports `rowCount`); pass it to
  * `createSql(executor)` or to `q.execute(executor)`. An executor that resolves to the rows alone
- * works for everything except `executeCount`.
+ * works for everything except `executeCount`, unless it also has a `count` method.
  */
-export type Executor = (text: string, values: readonly unknown[]) => PromiseLike<readonly unknown[] | ExecutorResult>;
+export type Executor = ((text: string, values: readonly unknown[]) => PromiseLike<readonly unknown[] | ExecutorResult>) & {
+  /** Runs the statement for its row count; `executeCount` uses it when present (Prisma's `$executeRaw`). */
+  readonly count?: (text: string, values: readonly unknown[]) => PromiseLike<number>;
+};
 
 /** Thrown by `executeTakeFirstOrThrow` when the query returns no rows. */
 export class NoResultError extends Error {
@@ -81,7 +84,7 @@ const ROW_KEYS = Symbol.for("typesql.rowKeys");
 /**
  * Turn rows a driver returned for `q` into the rows `q`'s type describes: a fresh array, with
  * the keys renamed when `q` comes from `createSql(executor, { rowKeys: "camelCase" })`. For
- * helpers that run `q.text` themselves, such as the adapters' `query(client, q)`.
+ * helpers that run `q.text` themselves instead of through an `Executor`.
  */
 export function mapRows<Q extends { readonly text: string }>(q: Q, rows: readonly unknown[]): RowType<Q>[] {
   return applyRowKeys(rows, rowKeysOf(q)) as RowType<Q>[];
@@ -102,13 +105,13 @@ export function makeQuery<Row, Params extends readonly unknown[], Text extends s
   executor?: Executor,
   rowKeys: RowKeys = "preserve",
 ): Query<Row, Params, Text> {
-  const run = async (given?: Executor): Promise<readonly unknown[] | ExecutorResult> => {
+  const pick = (given?: Executor): Executor => {
     const exec = given ?? executor;
     if (!exec) throw new Error("typesql: no executor: pass one to createSql(executor) or to execute(executor)");
-    return exec(text, values);
+    return exec;
   };
   const execute = async (given?: Executor): Promise<unknown[]> => {
-    const result = await run(given);
+    const result = await pick(given)(text, values);
     return applyRowKeys(isRows(result) ? result : result.rows, rowKeys);
   };
   return Object.defineProperties({ text, values }, {
@@ -116,7 +119,9 @@ export function makeQuery<Row, Params extends readonly unknown[], Text extends s
     execute: { value: execute },
     executeCount: {
       value: async (given?: Executor) => {
-        const result = await run(given);
+        const exec = pick(given);
+        if (exec.count) return exec.count(text, values);
+        const result = await exec(text, values);
         if (isRows(result) || result.rowCount === undefined) {
           throw new Error("typesql: the executor did not report a row count: resolve to { rows, rowCount } (the adapters' executor() do)");
         }

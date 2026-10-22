@@ -2,11 +2,11 @@ import type { RowType } from "@typesql/core";
 import { check, type Equal } from "./_check.js";
 // #region query
 import { Pool } from "pg";
-import { createSql, query } from "@typesql/pg";
+import { createSql } from "@typesql/pg";
 import type { DB } from "./schema.js";
 
-const sql = createSql<DB>();
 const pool = new Pool({ connectionString: process.env["DATABASE_URL"] });
+const sql = createSql<DB>(pool);
 
 const recent = sql(
   `SELECT u.id, u.email, p.title
@@ -16,7 +16,7 @@ const recent = sql(
   new Date("2026-01-01"),
 );
 
-const rows = await query(pool, recent);
+const rows = await recent.execute();
 // rows: { id: number; email: string; title: string | null }[]
 // #endregion query
 check<Equal<typeof rows, { id: number; email: string; title: string | null }[]>>();

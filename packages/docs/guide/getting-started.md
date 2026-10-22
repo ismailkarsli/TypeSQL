@@ -20,7 +20,7 @@ pnpm add @typesql/core @typesql/postgres postgres  # or postgres.js
 ```
 
 `@typesql/core` has no runtime dependencies. The adapters add a type map that matches the driver's
-parsers and a few helpers to run queries.
+parsers, and a `createSql<DB>(client)` whose queries run on your client.
 
 If you use Kysely, Drizzle or Prisma, their packages (`@typesql/kysely`, `@typesql/drizzle`,
 `@typesql/prisma`) can turn the schema you already have into the one typesql needs. See

@@ -253,12 +253,21 @@ importers:
         specifier: workspace:*
         version: link:../core
     devDependencies:
+      '@types/pg':
+        specifier: ^8.23.1
+        version: 8.23.1
       '@typesql/pg':
         specifier: workspace:*
         version: link:../pg
       drizzle-orm:
         specifier: ^0.45.4
         version: 0.45.4(@electric-sql/pglite@0.4.3)(@prisma/client@7.10.0(prisma@7.10.0(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@7.0.2))(typescript@7.0.2))(@types/pg@8.23.1)(kysely@0.29.6)(mysql2@3.15.3)(pg@8.23.1)(postgres@3.4.9)(prisma@7.10.0(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@7.0.2))
+      pg:
+        specifier: ^8.23.1
+        version: 8.23.1
+      postgres:
+        specifier: ^3.4.9
+        version: 3.4.9
       typescript:
         specifier: 7.0.2
         version: 7.0.2

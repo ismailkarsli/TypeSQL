@@ -2,9 +2,9 @@ import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import postgres from "postgres";
 import type { Col, Generated } from "@typesql/core";
 import { acquireDatabase } from "../../core/test/conformance/db.js";
-import { createSql, execute, executor, transaction } from "../src/index.js";
+import { createSql, executor } from "../src/index.js";
 
-/** Row counts as postgres.js reports them, against a real Postgres (skipped without one; see core's `db.ts`). */
+/** Row counts as postgres.js reports them, and transactions, against a real Postgres (skipped without one; see core's `db.ts`). */
 interface DB {
   count_pgjs: { id: Generated<"int4">; n: Col<"int4"> };
 }
@@ -24,7 +24,7 @@ describe.skipIf(!db)("row counts against Postgres (postgres.js)", () => {
     await db?.close();
   });
 
-  test("executeCount and execute(sql, q) report the command tag's count", async () => {
+  test("executeCount reports the command tag's count", async () => {
     expect(await sql("INSERT INTO count_pgjs (n) VALUES (1), (2)").executeCount()).toBe(2);
     expect(await sql("INSERT INTO count_pgjs (n) VALUES (3)").execute()).toEqual([]);
     expect(await sql("INSERT INTO count_pgjs (n) VALUES (4), (5) RETURNING id").executeCount()).toBe(2);
@@ -35,10 +35,10 @@ describe.skipIf(!db)("row counts against Postgres (postgres.js)", () => {
     expect(await sql("SELECT id FROM count_pgjs").executeCount()).toBe(5);
     // n: 1 2 13 14 15
     expect(await sql("DELETE FROM count_pgjs WHERE n > $1 RETURNING n", 14).executeCount()).toBe(1);
-    expect(await execute(pgjs!, sql("DELETE FROM count_pgjs WHERE n > $1", 12))).toBe(2);
+    expect(await sql("DELETE FROM count_pgjs WHERE n > $1", 12).executeCount()).toBe(2);
     // n: 1 2; DDL has no count (postgres.js' `count` is null)
     expect(await sql.as<never>("CREATE TABLE count_pgjs_tmp (x int)").executeCount()).toBe(0);
-    expect(await execute(pgjs!, sql.as<never>("DROP TABLE count_pgjs_tmp"))).toBe(0);
+    expect(await sql.as<never>("DROP TABLE count_pgjs_tmp").executeCount()).toBe(0);
   });
 
   test("MERGE counts the rows it changed", async () => {
@@ -47,10 +47,38 @@ describe.skipIf(!db)("row counts against Postgres (postgres.js)", () => {
   });
 
   test("executeCount inside a transaction", async () => {
-    await transaction(pgjs!, async (tx) => {
-      expect(await execute(tx, sql("SELECT id FROM count_pgjs"))).toBe(2);
-      expect(await sql("DELETE FROM count_pgjs").executeCount(executor(tx))).toBe(2);
+    await pgjs!.begin(async (tx) => {
+      expect(await sql("SELECT id FROM count_pgjs").executeCount(executor(tx))).toBe(2);
+      expect(await createSql<DB>(tx)("DELETE FROM count_pgjs").executeCount()).toBe(2);
     });
     expect(await sql("SELECT id FROM count_pgjs").execute()).toEqual([]);
+  });
+
+  test("sql.transaction commits, rolls back on error, and nests with savepoints", async () => {
+    const ns = async () => (await sql("SELECT n FROM count_pgjs ORDER BY n").execute()).map((r) => r.n);
+    await sql.transaction(async (tx) => {
+      await tx("INSERT INTO count_pgjs (n) VALUES ($1), ($2)", 1, 2).execute();
+      expect(await ns()).toEqual([]);
+    });
+    expect(await ns()).toEqual([1, 2]);
+
+    await expect(
+      sql.transaction(async (tx) => {
+        await tx("DELETE FROM count_pgjs").execute();
+        throw new Error("boom");
+      }),
+    ).rejects.toThrow("boom");
+    expect(await ns()).toEqual([1, 2]);
+
+    await sql.transaction(async (tx) => {
+      await expect(
+        tx.transaction(async (inner) => {
+          await inner("INSERT INTO count_pgjs (n) VALUES ($1)", 3).execute();
+          throw new Error("inner");
+        }),
+      ).rejects.toThrow("inner");
+      await tx.transaction((inner) => inner("INSERT INTO count_pgjs (n) VALUES ($1)", 4).execute());
+    });
+    expect(await ns()).toEqual([1, 2, 4]);
   });
 });

@@ -2,9 +2,9 @@ import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { Pool } from "pg";
 import type { Col, Generated } from "@typesql/core";
 import { acquireDatabase } from "../../core/test/conformance/db.js";
-import { createSql, execute, executor } from "../src/index.js";
+import { createSql, executor } from "../src/index.js";
 
-/** Row counts as node-postgres reports them, against a real Postgres (skipped without one; see core's `db.ts`). */
+/** Row counts as node-postgres reports them, and transactions, against a real Postgres (skipped without one; see core's `db.ts`). */
 interface DB {
   count_pg: { id: Generated<"int4">; n: Col<"int4"> };
 }
@@ -24,7 +24,7 @@ describe.skipIf(!db)("row counts against Postgres (pg)", () => {
     await db?.close();
   });
 
-  test("executeCount and execute(client, q) report the command tag's count", async () => {
+  test("executeCount reports the command tag's count", async () => {
     expect(await sql("INSERT INTO count_pg (n) VALUES (1), (2)").executeCount()).toBe(2);
     expect(await sql("INSERT INTO count_pg (n) VALUES (3)").execute()).toEqual([]);
     expect(await sql("INSERT INTO count_pg (n) VALUES (4), (5) RETURNING id").executeCount()).toBe(2);
@@ -35,7 +35,7 @@ describe.skipIf(!db)("row counts against Postgres (pg)", () => {
     expect(await sql("SELECT id FROM count_pg").executeCount()).toBe(5);
     // n: 1 2 13 14 15
     expect(await sql("DELETE FROM count_pg WHERE n > $1 RETURNING n", 14).executeCount()).toBe(1);
-    expect(await execute(pool!, sql("DELETE FROM count_pg WHERE n > $1", 12))).toBe(2);
+    expect(await sql("DELETE FROM count_pg WHERE n > $1", 12).executeCount()).toBe(2);
     // n: 1 2
     expect(await sql.as<never>("CREATE TEMP TABLE count_pg_tmp (x int)").executeCount()).toBe(0);
     expect(await sql.as<never>("DROP TABLE IF EXISTS count_pg_tmp").executeCount()).toBe(0);
@@ -50,11 +50,45 @@ describe.skipIf(!db)("row counts against Postgres (pg)", () => {
     const client = await pool!.connect();
     try {
       await client.query("BEGIN");
-      expect(await execute(client, sql("SELECT id FROM count_pg"))).toBe(2);
-      expect(await sql("DELETE FROM count_pg").executeCount(executor(client))).toBe(2);
+      expect(await sql("SELECT id FROM count_pg").executeCount(executor(client))).toBe(2);
+      expect(await createSql<DB>(client)("DELETE FROM count_pg").executeCount()).toBe(2);
       await client.query("ROLLBACK");
     } finally {
       client.release();
     }
+  });
+
+  test("sql.transaction commits, rolls back on error, and nests with savepoints", async () => {
+    const ns = async () => (await sql("SELECT n FROM count_pg ORDER BY n").execute()).map((r) => r.n);
+    expect(await ns()).toEqual([1, 2]);
+
+    const id = await sql.transaction(async (tx) => {
+      const { id } = await tx("INSERT INTO count_pg (n) VALUES ($1) RETURNING id", 3).executeTakeFirstOrThrow();
+      // the pool's other connection does not see the row until COMMIT
+      expect(await ns()).toEqual([1, 2]);
+      return id;
+    });
+    expect(typeof id).toBe("number");
+    expect(await ns()).toEqual([1, 2, 3]);
+
+    await expect(
+      sql.transaction(async (tx) => {
+        await tx("DELETE FROM count_pg").execute();
+        throw new Error("boom");
+      }),
+    ).rejects.toThrow("boom");
+    expect(await ns()).toEqual([1, 2, 3]);
+
+    await sql.transaction(async (tx) => {
+      await tx("INSERT INTO count_pg (n) VALUES ($1)", 4).execute();
+      await expect(
+        tx.transaction(async (inner) => {
+          await inner("INSERT INTO count_pg (n) VALUES ($1)", 5).execute();
+          throw new Error("inner");
+        }),
+      ).rejects.toThrow("inner");
+      await tx.transaction((inner) => inner("INSERT INTO count_pg (n) VALUES ($1)", 6).execute());
+    });
+    expect(await ns()).toEqual([1, 2, 3, 4, 6]);
   });
 });

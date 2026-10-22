@@ -10,10 +10,11 @@ pnpm exec typesql introspect --url postgres://localhost/app --out src/db/schema.
 ```
 
 ```ts
+import { Pool } from "pg";
 import { createSql } from "@typesql/pg";
 import type { DB } from "./db/schema.js";
 
-const sql = createSql<DB>();
+const sql = createSql<DB>(new Pool());
 ```
 
 Run it again after each migration. Unlike the [ORM schemas](./orm-schemas), which read Postgres

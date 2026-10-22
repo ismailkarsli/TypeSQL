@@ -10,10 +10,10 @@ pnpm add @typesql/core @typesql/kysely kysely
 ```
 
 ```ts
-import { createSql, query } from "@typesql/kysely";
+import { createSql } from "@typesql/kysely";
 import type { DB } from "./db"; // kysely-codegen output
 
-const sql = createSql<DB>();
+const sql = createSql<DB>(db); // db: your Kysely<DB> instance, or a Transaction<DB>
 
 const q = sql(
   `SELECT u.id, u.email, p.title, p.views
@@ -23,18 +23,23 @@ const q = sql(
 );
 //    ^? Query<{ id: number; email: string; title: string; views: string }, [number | null, boolean | null]>
 
-const rows = await query(db, q); // db: Kysely<DB> or a Transaction<DB>
+const rows = await q.execute();
+
+await sql.transaction(async (tx) => {
+  await tx("UPDATE posts SET published = true WHERE author_id = $1", 1).execute();
+});
 ```
 
 ## API
 
 | Export | What it is |
 |---|---|
-| `createSql<DB, TM = DefaultTypeMap, Overrides = {}, Options = {}>(db?, options?)` | core's `createSql<FromKysely<DB, Overrides, Options>, TM>()`; `{ rowKeys: "camelCase" }` gives `CamelCasePlugin`-style row keys |
-| `FromKysely<DB, Overrides = {}, Options = {}>` | the converted schema type, for use with core's `createSql<Schema, TM>()` or the adapters' `createSql<Schema>()` |
-| `query(db, q)` | runs a typesql `Query` through Kysely, `Promise<Row[]>` |
-| `execute(db, q)` | runs a statement, `Promise<number>` (`numAffectedRows`; for other statements the number of rows returned, 0 for DDL) |
-| `executor(db)` | an `Executor` for `q.execute()` and `q.executeCount()`, also bypassing plugins |
+| `createSql<DB, TM = DefaultTypeMap, Overrides = {}, Options = {}>(db, options?)` | core's `createSql<FromKysely<DB, Overrides, Options>, TM>()` with the queries running on `db`; `{ rowKeys: "camelCase" }` gives `CamelCasePlugin`-style row keys |
+| `q.execute()`, `q.executeTakeFirst()`, `q.executeTakeFirstOrThrow()`, `q.executeCount()` | `Promise<Row[]>`, `Promise<Row \| undefined>`, `Promise<Row>` (`NoResultError` on 0 rows), `Promise<number>` (`numAffectedRows`; for other statements the number of rows returned, 0 for DDL) |
+| `sql.transaction(fn)` | `db.transaction().execute(...)` with `tx` bound to the transaction; on a `Transaction`, and for `tx.transaction(fn)`, a savepoint |
+| `FromKysely<DB, Overrides = {}, Options = {}>` | the converted schema type, for use with core's `createSql<Schema, TM>()` or the adapters' `createSql<Schema>(client)` |
+| `KyselySql<DB, TM, Overrides, Options, Keys>` | the type `createSql` returns |
+| `executor(db)` | an `Executor` for `q.execute(executor)` and core's `createSql(executor)`, also bypassing plugins |
 | `InferColumn<T>` | the descriptor inferred for one Kysely column type (handy to check a mapping) |
 | `SnakeCase<S>` | `CamelCasePlugin`'s default camelCase → snake_case mapping, at the type level |
 | `KyselyOverrides`, `TableOverride`, `ColumnOverride`, `KyselyOptions`, `KyselyExecutor` | parameter types |
@@ -48,15 +53,16 @@ import type { PgTypeMap } from "@typesql/pg";
 import { createSql, type FromKysely } from "@typesql/kysely";
 import { createSql as createCoreSql } from "@typesql/core";
 
-const sql = createSql<DB, PgTypeMap>();
-const same = createCoreSql<FromKysely<DB>, PgTypeMap>();
+const sql = createSql<DB, PgTypeMap>(db);
+const same = createCoreSql<FromKysely<DB>, PgTypeMap>(); // types only, no client
 ```
 
-`query` and `execute` send `CompiledQuery.raw(q.text, q.values)` through
+Queries are sent as `CompiledQuery.raw(q.text, q.values)` through
 `db.withoutPlugins().executeQuery(...)`. Plugins are bypassed on purpose: typesql's row types
 describe what Postgres returns (`created_at`), and a result transformer such as
-`CamelCasePlugin` would rename the keys (use `{ rowKeys: "camelCase" }` for camelCase rows). Logging, the dialect and the connection pool are
-unaffected. Any `sql(...)` result can also be run with `@typesql/pg` directly on the pool.
+`CamelCasePlugin` would rename the keys (use `{ rowKeys: "camelCase" }` for camelCase rows).
+Logging, the dialect and the connection pool are unaffected. Inside a Kysely transaction,
+`createSql<DB>(trx)` binds a `sql` to it, so builder and SQL queries share the transaction.
 
 ## How columns are converted
 
@@ -104,7 +110,7 @@ const sql = createSql<DB, DefaultTypeMap, {
   "auth.users": { id: "uuid" };
   active_users: { $view: true };                   // a view: INSERT/UPDATE/DELETE are rejected
   $types: { mood: Mood; "auth.role": AuthRole };   // enum names, see below
-}>();
+}>(db);
 ```
 
 A descriptor may set any of `type`, `nullable` and `hasDefault`; the others stay inferred.
@@ -136,7 +142,7 @@ under `$types` and every column whose values are **exactly** that union gets the
 ```ts
 import type { Mood, AuthRole } from "./db"; // kysely-codegen exports one alias per enum
 
-createSql<DB, DefaultTypeMap, { $types: { mood: Mood; "auth.role": AuthRole } }>();
+createSql<DB, DefaultTypeMap, { $types: { mood: Mood; "auth.role": AuthRole } }>(db);
 ```
 
 If two `$types` entries have the same values the column keeps its derived name; set the column's
@@ -152,7 +158,7 @@ back to the database's snake_case names the way `CamelCasePlugin` does by defaul
 `created_at`, `userID` → `user_id`), so the SQL you write and the rows you get use the real names:
 
 ```ts
-const sql = createSql<DB, DefaultTypeMap, {}, { camelCase: true }>();
+const sql = createSql<DB, DefaultTypeMap, {}, { camelCase: true }>(db);
 const q = sql("SELECT author_id, created_at FROM blog_posts WHERE id = $1", 1);
 //    ^? Query<{ author_id: number; created_at: Date }, [number | null]>
 ```

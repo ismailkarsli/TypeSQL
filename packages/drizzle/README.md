@@ -9,7 +9,8 @@ SQL you write is checked against the same tables Drizzle manages.
 npm install @typesql/drizzle @typesql/core
 ```
 
-`drizzle-orm` (0.45 or later) is a peer dependency.
+`drizzle-orm` (0.45 or later) is a peer dependency. Queries run on node-postgres or postgres.js
+databases.
 
 ## Usage
 
@@ -39,10 +40,13 @@ export const usersRelations = relations(users, ({ many }) => ({ posts: many(post
 
 ```ts
 // db.ts
+import { drizzle } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
 import { createSql } from "@typesql/drizzle";
-import type * as schema from "./schema";
+import * as schema from "./schema";
 
-const sql = createSql<typeof schema>();
+const db = drizzle(new Pool(), { schema });
+const sql = createSql<typeof schema>(db);
 
 const q = sql(
   "SELECT u.email, u.display_name, p.title FROM users u JOIN posts p ON p.author_id = u.id WHERE u.mood = $1",
@@ -50,23 +54,58 @@ const q = sql(
 );
 // Query<{ email: string; display_name: string | null; title: string }, ["happy" | "sad"]>
 
-sql("INSERT INTO posts (author_id, title) VALUES ($1, $2) RETURNING id, created_at", 1, "Hello");
+const post = await sql("INSERT INTO posts (author_id, title) VALUES ($1, $2) RETURNING id, created_at", 1, "Hello").executeTakeFirstOrThrow();
 // id and created_at have defaults, so they can be left out
+
+await sql.transaction(async (tx) => {
+  await tx("UPDATE posts SET title = upper(title) WHERE author_id = $1", 1).execute();
+});
 ```
 
 Queries use SQL names: `display_name`, not `displayName`. Relations and any other
 non-table exports are ignored, so `typeof schema` can be passed as is.
 
-`createSql<Schema, TypeMap, Options>()` uses core's `DefaultTypeMap` unless you pass
-another one. To pair the schema with a driver adapter, convert it with `FromDrizzle` and use
-the adapter's `createSql`:
+`createSql<Schema, TypeMap, Options>(db)` uses core's `DefaultTypeMap` unless you pass
+another one, such as `PgTypeMap` from `@typesql/pg` for node-postgres' exact types:
+`createSql<typeof schema, PgTypeMap>(db)`.
+
+## Running queries
+
+`db` is a Drizzle database on node-postgres or postgres.js (`drizzle-orm/node-postgres`,
+`drizzle-orm/postgres-js`), or a transaction from `db.transaction(fn)`. Queries run on the
+driver client Drizzle holds: the `Pool`, `Client` or postgres.js `sql` you gave `drizzle()`, or
+the transaction's connection. Rows are what the driver returns; Drizzle's column mappers and
+its logger are not involved.
+
+| | |
+|---|---|
+| `q.execute()`, `q.executeTakeFirst()`, `q.executeTakeFirstOrThrow()`, `q.executeCount()` | `Promise<Row[]>`, `Promise<Row \| undefined>`, `Promise<Row>` (`NoResultError` on 0 rows), `Promise<number>` (the driver's row count) |
+| `sql.transaction(fn)` | `db.transaction(fn)` with `tx` bound to the transaction; `tx.transaction(fn)` is Drizzle's nested transaction (a savepoint) |
+| `executor(db)` | an `Executor` for `q.execute(executor)` and core's `createSql(executor)` |
+| `DrizzleSql<Schema, TM, Options>`, `DrizzleDatabase` | the type `createSql` returns, and what it accepts |
+
+To mix ORM and SQL queries in one transaction, bind a `sql` to Drizzle's `tx`:
+
+```ts
+await db.transaction(async (tx) => {
+  await tx.insert(schema.users).values({ email: "a@b.c" });
+  await createSql<typeof schema>(tx)("UPDATE users SET mood = 'happy' WHERE email = $1", "a@b.c").execute();
+});
+```
+
+`drizzle-orm/postgres-js` turns off postgres.js' date parsers on the client it is given, so on
+that driver `date`, `timestamp`, `timestamptz` and `interval` come back as strings: pass a type
+map that says so.
+
+To pair the schema with a driver adapter instead, convert it with `FromDrizzle` and use the
+adapter's `createSql` on the same pool:
 
 ```ts
 import { createSql } from "@typesql/pg";
 import type { FromDrizzle } from "@typesql/drizzle";
 import type * as schema from "./schema";
 
-const sql = createSql<FromDrizzle<typeof schema>>();
+const sql = createSql<FromDrizzle<typeof schema>>(pool);
 ```
 
 `FromDrizzle` also accepts a single table (`FromDrizzle<typeof users>`) or a record of
@@ -129,7 +168,7 @@ type maps, but `timestamp` and `timestamptz` behave differently in SQL (`AT TIME
 `date_trunc`, comparisons with `now()`). Either set the default for all of them:
 
 ```ts
-createSql<typeof schema, DefaultTypeMap, { timestamp: "timestamptz"; time: "timetz" }>();
+createSql<typeof schema, DefaultTypeMap, { timestamp: "timestamptz"; time: "timetz" }>(db);
 // or: FromDrizzle<typeof schema, { timestamp: "timestamptz" }>
 ```
 
@@ -163,7 +202,7 @@ If you create Drizzle with `drizzle(client, { casing: "snake_case" })`, pass the
 setting so column names match what Drizzle sends to Postgres:
 
 ```ts
-createSql<typeof schema, DefaultTypeMap, { casing: "snake_case" }>();
+createSql<typeof schema, DefaultTypeMap, { casing: "snake_case" }>(db);
 // createdAt: timestamp() → column created_at
 ```
 

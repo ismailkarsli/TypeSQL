@@ -6,9 +6,9 @@ expects, so you can write SQL next to your ORM code, checked against the same ta
 
 | Package | Schema from | Runs queries with | Default type map |
 |---|---|---|---|
-| `@typesql/kysely` | your Kysely `DB` interface (kysely-codegen, prisma-kysely, hand-written) | `query`/`execute` on a `Kysely` or `Transaction` | `DefaultTypeMap` (node-postgres) |
-| `@typesql/drizzle` | `typeof schema`: your `pgTable`, `pgView`, `pgEnum`, `pgSchema` exports | a driver adapter, on the pool Drizzle uses | `DefaultTypeMap` (node-postgres) |
-| `@typesql/prisma` | the `typesql-prisma` generator, or the generated client's `Prisma.TypeMap` | `queryRaw`/`executeRaw` on Prisma Client | `PrismaTypeMap` (`$queryRaw` results) |
+| `@typesql/kysely` | your Kysely `DB` interface (kysely-codegen, prisma-kysely, hand-written) | `createSql<DB>(db)`: a `Kysely` or `Transaction` | `DefaultTypeMap` (node-postgres) |
+| `@typesql/drizzle` | `typeof schema`: your `pgTable`, `pgView`, `pgEnum`, `pgSchema` exports | `createSql<typeof schema>(db)`: a Drizzle database or transaction, on node-postgres or postgres.js | `DefaultTypeMap` (node-postgres) |
+| `@typesql/prisma` | the `typesql-prisma` generator, or the generated client's `Prisma.TypeMap` | `createSql<DB>(prisma)`: Prisma Client or a transaction client | `PrismaTypeMap` (`$queryRaw` results) |
 
 The Kysely and Drizzle conversions happen only at the type level: there is no code generation
 and no database connection. Prisma's types leave out the database names and native types, so
@@ -86,9 +86,10 @@ plugin itself stays bypassed, so keys inside JSON values are not renamed. See
 
 The query is sent as `CompiledQuery.raw(text, values)` through `db.withoutPlugins()`. Logging,
 the dialect and the pool still apply, but result transformers such as `CamelCasePlugin` do
-not, so rows keep the keys their type says they have. Kysely's `PostgresDialect` runs on `pg`.
-For the exact `pg` types (`Buffer` for `bytea`, interval objects), pass `PgTypeMap` as the
-second type argument: `createSql<DB, PgTypeMap>()`.
+not, so rows keep the keys their type says they have. `sql.transaction(fn)` runs in
+`db.transaction().execute(...)`, and nests with a savepoint. Kysely's `PostgresDialect` runs on
+`pg`. For the exact `pg` types (`Buffer` for `bytea`, interval objects), pass `PgTypeMap` as the
+second type argument: `createSql<DB, PgTypeMap>(db)`.
 
 ### Limits
 
@@ -146,11 +147,18 @@ If an enum isn't exported, its columns are `text`.
 
 ### Running queries
 
-Drizzle has no API for typed raw rows, so run typesql queries with a driver adapter on the pool
-you pass to `drizzle()`. Convert the schema with `FromDrizzle` and use the adapter's
-`createSql`, which comes with that driver's type map:
+`createSql<typeof schema>(db)` runs the queries on the driver client under `db`: the `Pool`,
+`Client` or postgres.js `sql` you passed to `drizzle()`, or inside `db.transaction(fn)` the
+transaction's connection. Rows are what the driver returns; Drizzle's column mappers are not
+involved. `sql.transaction(fn)` runs in `db.transaction(fn)`. Pass the driver's type map as the
+second type argument:
 
-<<< @/snippets/orm-drizzle.ts#adapter
+<<< @/snippets/orm-drizzle.ts#run
+
+Only node-postgres and postgres.js databases are supported. `drizzle-orm/postgres-js` turns
+off postgres.js' date parsers on the client it is given, so on that driver `date`, `timestamp`,
+`timestamptz` and `interval` come back as strings: use a type map that says so. Queries do not
+go through Drizzle's logger.
 
 ### Limits
 
@@ -202,10 +210,11 @@ set them.
 
 ### Running queries
 
-`queryRaw(prisma, q)` and `executeRaw(prisma, q)` call `$queryRawUnsafe(text, ...values)` and
-`$executeRawUnsafe(text, ...values)`. Despite the names, the values are always sent as bind
-parameters (`$1`, `$2`, …). Both return a `PrismaPromise`, so they work inside
-`prisma.$transaction([...])`, and they also accept a transaction client.
+`createSql<DB>(prisma)` runs `execute*` with `$queryRawUnsafe(text, ...values)` and
+`executeCount` with `$executeRawUnsafe(text, ...values)`. Despite the names, the values are
+always sent as bind parameters (`$1`, `$2`, …). `prisma` may be a `PrismaClient`, an extended
+client or a transaction client. `sql.transaction(fn)` runs in an interactive
+`prisma.$transaction(fn)`; inside one, `tx.transaction(fn)` uses a savepoint.
 
 `createSql` from `@typesql/prisma` uses `PrismaTypeMap`, which describes what `$queryRaw`
 returns:
@@ -222,7 +231,7 @@ returns:
 
 Prisma throws "Unsupported column type" for other types (`interval`, geometric types, ranges);
 they are `unknown` here, so cast them in SQL (`duration::text`). To run the queries with
-another driver, pass its type map: `createSql<DB, PgTypeMap>()`.
+another driver, use that adapter's `createSql<DB>(client)` with the generated `DB`.
 
 ### Without the generator: `FromPrisma`
 

@@ -2,7 +2,7 @@
 
 [node-postgres](https://node-postgres.com) (`pg` 8.x) adapter for
 [`@typesql/core`](https://www.npmjs.com/package/@typesql/core): a `createSql` bound to the type
-map of `pg`'s default parsers, and helpers that run a query and return rows typed from it.
+map of `pg`'s default parsers, whose queries run on your pool and return rows typed from the SQL.
 
 ```sh
 pnpm add @typesql/core @typesql/pg pg
@@ -12,21 +12,20 @@ pnpm add @typesql/core @typesql/pg pg
 
 ```ts
 import { Pool } from "pg";
-import { createSql, execute, many, maybeOne, one, query, transaction } from "@typesql/pg";
+import { createSql } from "@typesql/pg";
 import type { DB } from "./schema";
 
 const pool = new Pool();
-const sql = createSql<DB>();
+const sql = createSql<DB>(pool);
 
-const users = await query(pool, sql("SELECT id, email FROM users")); // { id: number; email: string }[]
-const user = await one(pool, sql("SELECT id, email FROM users WHERE id = $1", 7)); // exactly one row, or throws
-const maybe = await maybeOne(pool, sql("SELECT id FROM users WHERE email = $1", "x")); // row | null
-const some = await many(pool, sql("SELECT id FROM posts")); // at least one row, or throws
-const changed = await execute(pool, sql("UPDATE users SET display_name = NULL")); // row count
+const users = await sql("SELECT id, email FROM users").execute(); // { id: number; email: string }[]
+const maybe = await sql("SELECT id FROM users WHERE email = $1", "x").executeTakeFirst(); // row | undefined
+const user = await sql("SELECT id, email FROM users WHERE id = $1", 7).executeTakeFirstOrThrow(); // row, or NoResultError
+const changed = await sql("UPDATE users SET display_name = NULL").executeCount(); // row count
 
-const id = await transaction(pool, async (client) => {
-  const { id } = await one(client, sql("INSERT INTO users (email) VALUES ($1) RETURNING id", "a@b.c"));
-  await execute(client, sql("INSERT INTO posts (author_id, title) VALUES ($1, $2)", id, "Hello"));
+const id = await sql.transaction(async (tx) => {
+  const { id } = await tx("INSERT INTO users (email) VALUES ($1) RETURNING id", "a@b.c").executeTakeFirstOrThrow();
+  await tx("INSERT INTO posts (author_id, title) VALUES ($1, $2)", id, "Hello").execute();
   return id;
 });
 ```
@@ -35,20 +34,18 @@ const id = await transaction(pool, async (client) => {
 
 | Export | |
 |---|---|
-| `createSql<DB>(pool?, options?)` | core's `createSql<DB, PgTypeMap>()`; `{ rowKeys: "camelCase" }` camelCases the row keys |
-| `query(client, q)` | `Promise<Row[]>` |
-| `one(client, q)` | `Promise<Row>`; `RowCountError` unless exactly one row |
-| `maybeOne(client, q)` | `Promise<Row \| null>`; `RowCountError` on more than one row |
-| `many(client, q)` | `Promise<[Row, ...Row[]]>`; `RowCountError` on zero rows |
-| `execute(client, q)` | `Promise<number>`, the affected row count |
-| `executor(client)` | an `Executor` for `q.execute()` and `q.executeCount()` (reports `rowCount`); `createSql<DB>(pool)` binds one |
-| `transaction(pool, fn)` | `BEGIN`, `fn(client)`, `COMMIT`; `ROLLBACK` and rethrow on error |
+| `createSql<DB>(client, options?)` | core's `createSql<DB, PgTypeMap>()` with the queries running on `client` (a `Pool`, `Client` or `PoolClient`); `{ rowKeys: "camelCase" }` camelCases the row keys |
+| `q.execute()`, `q.executeTakeFirst()`, `q.executeTakeFirstOrThrow()`, `q.executeCount()` | `Promise<Row[]>`, `Promise<Row \| undefined>`, `Promise<Row>` (`NoResultError` on 0 rows), `Promise<number>` (`rowCount`) |
+| `sql.transaction(fn)` | on a `Pool`: checks out a client, `BEGIN`, `fn(tx)`, `COMMIT`, releases it; `ROLLBACK` and rethrow on error. On a `Client` or `PoolClient`: the same on that connection. `tx` is `sql` bound to the transaction; `tx.transaction(fn)` uses a savepoint |
+| `executor(client)` | an `Executor` for `q.execute(executor)` and core's `createSql(executor)` (reports `rowCount`) |
 | `migrate(pool, m)` | runs `m.statements` (e.g. from core's `migrations()`) in one transaction |
+| `PgSql<DB, Keys>` | the type `createSql` returns |
 | `PgTypeMap`, `PgParamTypeMap`, `PgInterval` | the type map (rows), what parameters also accept, and the `postgres-interval` object type |
-| `RowCountError`, `PgQueryable`, `PgPoolLike`, `PgTransactionClient`, `PgResult`, `MigrationSource` | errors and parameter types |
+| `NoResultError`, `PgQueryable`, `PgPoolLike`, `PgTransactionClient`, `PgResult`, `MigrationSource` | errors and parameter types |
 
-`client` is anything with `query(text, values)`: a `Pool`, `Client` or `PoolClient`. The
-parameters are structural, so fakes work in tests.
+`client` is anything with `query(text, values)`. The parameters are structural, so fakes work
+in tests. If the `ROLLBACK` of a pool transaction fails, the client is released with the error
+so the pool discards the connection.
 
 ## `typesql introspect`
 

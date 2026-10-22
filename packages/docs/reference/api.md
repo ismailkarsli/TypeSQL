@@ -5,7 +5,7 @@
 Returns the typed `sql` function for a schema. Pass the adapter's type map (`PgTypeMap`,
 `PostgresJsTypeMap`) or use the adapter's pre-bound `createSql`. The optional `executor` is
 what the queries' `execute*` methods run on; the adapters' `createSql` take the driver client
-instead (`createSql<DB>(pool)`).
+instead (`createSql<DB>(pool)`) and add [`sql.transaction(fn)`](#sql-transaction-fn).
 
 ```ts
 const sql = createSql<DB>();
@@ -17,6 +17,22 @@ const camel = createSql<DB>(executor, { rowKeys: "camelCase" }); // Sql<DB, Defa
 row types and in the rows `execute*` return. See [camelCase row keys](../guide/queries#camelcase-row-keys).
 `@typesql/pg`, `@typesql/postgres` (both `createSql` and `createBigIntSql`) and `@typesql/kysely`
 take the same option after the client.
+
+### `sql.transaction(fn)`
+
+On the `sql` of an adapter (`createSql<DB>(client)`): runs `fn(tx)` inside a transaction, where
+`tx` is the same `sql` bound to it. Commits when `fn` resolves and resolves to its result; rolls
+back and rethrows when it throws. `tx.transaction(fn)` nests with a savepoint. Rejects when the
+`sql` has no client. See [Transactions](../guide/adapters#transactions).
+
+```ts
+const sql = createSql<DB>(pool); // @typesql/pg
+const id = await sql.transaction(async (tx) => {
+  const { id } = await tx("INSERT INTO users (email) VALUES ($1) RETURNING id", "a@b.c").executeTakeFirstOrThrow();
+  await tx("INSERT INTO posts (author_id, title) VALUES ($1, $2)", id, "Hello").execute();
+  return id;
+});
+```
 
 ### `sql(text, ...params)`
 
@@ -158,8 +174,9 @@ Bypasses inference and asserts the row type. Accepts slots and named parameters 
 
 ### `q.execute()`, `q.executeTakeFirst()`, `q.executeTakeFirstOrThrow()`, `q.executeCount()`
 
-Run a query on the executor bound by `createSql(executor)`, or on the one passed to the call
-(`q.execute(executor(tx))` inside a transaction). Without either they reject.
+Run a query on the executor bound by `createSql(executor)` (or by an adapter's
+`createSql(client)`), or on the one passed to the call (`q.execute(executor(client))`). Without
+either they reject.
 
 | Method | Returns |
 |---|---|
@@ -174,13 +191,13 @@ Statements without a count, such as DDL, give 0.
 
 An `Executor` is `(text, values) => PromiseLike<readonly unknown[] | ExecutorResult>`, where
 `ExecutorResult` is `{ rows, rowCount: number | null }` (`null` means no count, read as 0).
-Each adapter exports `executor(client)` to build one. The `@typesql/pg`, `@typesql/postgres` and
-`@typesql/kysely` executors report `rowCount`. An executor that resolves to the rows alone (your
-own, or `@typesql/prisma`'s) works for everything but `executeCount`, which then rejects. Use
-`executeRaw` for Prisma counts. The methods are non-enumerable, so a query still deep-equals
-`{ text, values }`.
+Each adapter exports `executor(client)` to build one; all of them report the count. An executor
+that resolves to the rows alone works for everything but `executeCount`, which then rejects,
+unless the executor has a `count(text, values) => PromiseLike<number>` method, which
+`executeCount` calls instead (`@typesql/prisma`'s runs `$executeRawUnsafe`). The methods are
+non-enumerable, so a query still deep-equals `{ text, values }`.
 
-Code that runs `q.text` itself, as the adapters' `query(client, q)` helpers do, calls
+Code that runs `q.text` itself, instead of through an executor, calls
 `mapRows(q, rows)` to apply the query's `rowKeys` to the driver's rows. `rowKeysOf(q)` returns the
 option, and `camelCase(key)` is the key mapping.
 
@@ -193,6 +210,7 @@ option, and `camelCase(key)` is the key mapping.
 | `ExecutorResult` | `{ rows, rowCount: number \| null }`: an executor result with the statement's row count |
 | `NoResultError` | thrown by `executeTakeFirstOrThrow` on 0 rows; carries `text` |
 | `Sql<DB, TM, Keys = "preserve">` | the `sql` function; `Keys` is the `rowKeys` option |
+| `TransactionalSql<DB, TM, Keys = "preserve">` | an adapter's `sql`: `Sql` plus `transaction(fn)` |
 | `SqlOptions`, `RowKeys` | `createSql`'s options; `"preserve" \| "camelCase"` |
 | `CamelCase<S>`, `CamelCaseKeys<Row>`, `KeyedRow<Row, Keys>` | the key mapping on a string, on a row's top-level keys, and under a `rowKeys` option |
 | `Fragment<Text, Params>` | spliceable SQL piece |
@@ -318,9 +336,9 @@ Each package wraps core's `createSql` with the schema converted from the ORM's t
 
 | Package | `createSql` | Schema type | Runs queries |
 |---|---|---|---|
-| `@typesql/kysely` | `createSql<DB, TM = DefaultTypeMap, Overrides = {}, Options = {}>(db?, { rowKeys? })` | `FromKysely<DB, Overrides, Options>` | `query(db, q)` → `Row[]`, `execute(db, q)` → `number`; `q.execute()` with a bound `db` |
-| `@typesql/drizzle` | `createSql<Schema, TM = DefaultTypeMap, Options = {}>(executor?)` | `FromDrizzle<Schema, Options>`; `pgType(column, "type")` pins a column | with a driver adapter, or `q.execute()` with an adapter's `executor(client)` |
-| `@typesql/prisma` | `createSql<S, TM = PrismaTypeMap>(prisma?)`; `S` is a generated `DB` or a `Prisma.TypeMap` | `FromPrisma<Prisma.TypeMap, Overrides>`; the `typesql-prisma` generator | `queryRaw(prisma, q)` → `PrismaPromise<Row[]>`, `executeRaw(prisma, q)` → `PrismaPromise<number>`; `q.execute()` with a bound `prisma` |
+| `@typesql/kysely` | `createSql<DB, TM = DefaultTypeMap, Overrides = {}, Options = {}>(db?, { rowKeys? })` | `FromKysely<DB, Overrides, Options>` | on a `Kysely` or `Transaction`, plugins bypassed; `sql.transaction` in `db.transaction()` |
+| `@typesql/drizzle` | `createSql<Schema, TM = DefaultTypeMap, Options = {}>(db?)` | `FromDrizzle<Schema, Options>`; `pgType(column, "type")` pins a column | on the driver client under a node-postgres or postgres.js Drizzle database or transaction; `sql.transaction` in `db.transaction` |
+| `@typesql/prisma` | `createSql<S, TM = PrismaTypeMap>(prisma?)`; `S` is a generated `DB` or a `Prisma.TypeMap` | `FromPrisma<Prisma.TypeMap, Overrides>`; the `typesql-prisma` generator | `$queryRawUnsafe` / `$executeRawUnsafe` on Prisma Client or a transaction client; `sql.transaction` in `prisma.$transaction(fn)` |
 
 Option and override types: `KyselyOverrides`, `KyselyOptions` (`camelCase`),
 `FromDrizzleOptions` (`casing`, `timestamp`, `time`), `PrismaOverrides` (`$table`, `$schema`,

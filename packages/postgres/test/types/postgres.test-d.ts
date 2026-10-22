@@ -4,14 +4,10 @@ import type { Col, Generated, Nullable, ParamsType, RowType, TsTypeOf } from "@t
 import {
   createBigIntSql,
   createSql,
-  execute,
-  many,
-  maybeOne,
-  one,
-  query,
-  transaction,
+  type PostgresJsBigIntSql,
   type PostgresJsBigIntTypeMap,
   type PostgresJsQueryable,
+  type PostgresJsSql,
   type PostgresJsTransactable,
   type PostgresJsTypeMap,
 } from "../../src/index.js";
@@ -38,9 +34,9 @@ interface DB {
   };
 }
 
-const sql = createSql<DB>();
-const big = createBigIntSql<DB>();
 declare const db: ReturnType<typeof postgres>;
+const sql = createSql<DB>(db);
+const big = createBigIntSql<DB>(db);
 
 type Row = { id: number; email: string; display_name: string | null };
 const q = sql("SELECT id, email, display_name FROM users WHERE id = $1", 1);
@@ -95,37 +91,46 @@ test("postgres.js Sql, TransactionSql and ReservedSql satisfy the structural int
   expectTypeOf<postgres.ReservedSql>().toExtend<PostgresJsTransactable>();
 });
 
-test("row types flow from Query through the helpers", () => {
+test("createSql accepts a Sql, TransactionSql or ReservedSql", () => {
+  expectTypeOf(sql).toEqualTypeOf<PostgresJsSql<DB>>();
+  expectTypeOf(big).toEqualTypeOf<PostgresJsBigIntSql<DB>>();
+  createSql<DB>({} as postgres.TransactionSql);
+  createSql<DB>({} as postgres.ReservedSql);
+});
+
+test("row types flow from Query through execute*", () => {
   expectTypeOf<RowType<typeof q>>().toEqualTypeOf<Row>();
   expectTypeOf<ParamsType<typeof q>>().toEqualTypeOf<[number | null]>();
-  expectTypeOf(query(db, q)).toEqualTypeOf<Promise<Row[]>>();
-  expectTypeOf(one(db, q)).toEqualTypeOf<Promise<Row>>();
-  expectTypeOf(maybeOne(db, q)).toEqualTypeOf<Promise<Row | null>>();
-  expectTypeOf(many(db, q)).toEqualTypeOf<Promise<[Row, ...Row[]]>>();
-  expectTypeOf(execute(db, q)).toEqualTypeOf<Promise<number>>();
+  expectTypeOf(q.execute()).toEqualTypeOf<Promise<Row[]>>();
+  expectTypeOf(q.executeTakeFirst()).toEqualTypeOf<Promise<Row | undefined>>();
+  expectTypeOf(q.executeTakeFirstOrThrow()).toEqualTypeOf<Promise<Row>>();
+  expectTypeOf(q.executeCount()).toEqualTypeOf<Promise<number>>();
 });
 
 test("driver-specific result types: default map", () => {
-  expectTypeOf(query(db, sql("SELECT count(*) FROM users"))).toEqualTypeOf<Promise<{ count: string }[]>>();
-  expectTypeOf(query(db, sql("SELECT id, view_counts FROM posts"))).toEqualTypeOf<Promise<{ id: string; view_counts: string[] }[]>>();
-  expectTypeOf(query(db, sql("SELECT created_at, birthday, balance, avatar, session_length, location FROM users"))).toEqualTypeOf<
+  expectTypeOf(sql("SELECT count(*) FROM users").execute()).toEqualTypeOf<Promise<{ count: string }[]>>();
+  expectTypeOf(sql("SELECT id, view_counts FROM posts").execute()).toEqualTypeOf<Promise<{ id: string; view_counts: string[] }[]>>();
+  expectTypeOf(sql("SELECT created_at, birthday, balance, avatar, session_length, location FROM users").execute()).toEqualTypeOf<
     Promise<{ created_at: Date; birthday: Date | null; balance: string; avatar: Buffer | null; session_length: string | null; location: string | null }[]>
   >();
 });
 
 test("driver-specific result types: bigint map", () => {
-  expectTypeOf(query(db, big("SELECT count(*) FROM users"))).toEqualTypeOf<Promise<{ count: bigint }[]>>();
-  expectTypeOf(query(db, big("SELECT id, view_counts FROM posts"))).toEqualTypeOf<Promise<{ id: bigint; view_counts: bigint[] }[]>>();
-  expectTypeOf(query(db, big("SELECT sum(author_id) AS s, max(id) AS m FROM posts"))).toEqualTypeOf<Promise<{ s: bigint | null; m: bigint | null }[]>>();
-  expectTypeOf(query(db, big("SELECT id, created_at FROM users"))).toEqualTypeOf<Promise<{ id: number; created_at: Date }[]>>();
+  expectTypeOf(big("SELECT count(*) FROM users").execute()).toEqualTypeOf<Promise<{ count: bigint }[]>>();
+  expectTypeOf(big("SELECT id, view_counts FROM posts").execute()).toEqualTypeOf<Promise<{ id: bigint; view_counts: bigint[] }[]>>();
+  expectTypeOf(big("SELECT sum(author_id) AS s, max(id) AS m FROM posts").execute()).toEqualTypeOf<Promise<{ s: bigint | null; m: bigint | null }[]>>();
+  expectTypeOf(big("SELECT id, created_at FROM users").execute()).toEqualTypeOf<Promise<{ id: number; created_at: Date }[]>>();
 });
 
-test("transaction passes a queryable and returns the callback's result", () => {
-  const result = transaction(db, async (tx) => {
-    expectTypeOf(tx).toExtend<PostgresJsQueryable>();
-    return one(tx, q);
+test("sql.transaction passes a sql bound to the transaction and returns the callback's result", () => {
+  const result = sql.transaction(async (tx) => {
+    expectTypeOf(tx).toEqualTypeOf<PostgresJsSql<DB>>();
+    return tx("SELECT id, email, display_name FROM users WHERE id = $1", 1).executeTakeFirstOrThrow();
   });
   expectTypeOf(result).toEqualTypeOf<Promise<Row>>();
+  big.transaction(async (tx) => {
+    expectTypeOf(tx).toEqualTypeOf<PostgresJsBigIntSql<DB>>();
+  });
 });
 
 test("invalid SQL is rejected by both pre-bound sql functions", () => {
@@ -137,24 +142,25 @@ test("invalid SQL is rejected by both pre-bound sql functions", () => {
   sql("SELECT id FROM users WHERE id = $1", "7");
 });
 
-test("DML: execute returns the row count; RETURNING rows follow the type map", () => {
+test("DML: executeCount returns the row count; RETURNING rows follow the type map", () => {
   const upd = sql("UPDATE posts SET title = $1 WHERE id = $2", "t", "1");
   expectTypeOf<RowType<typeof upd>>().toEqualTypeOf<never>();
-  expectTypeOf(execute(db, upd)).toEqualTypeOf<Promise<number>>();
+  expectTypeOf(upd.executeCount()).toEqualTypeOf<Promise<number>>();
 
   const ins = big("INSERT INTO posts (author_id, title, tags, view_counts) VALUES ($1, $2, $3, $4) RETURNING id, view_counts", 1, "t", ["a"], [1n]);
-  expectTypeOf(one(db, ins)).toEqualTypeOf<Promise<{ id: bigint; view_counts: bigint[] }>>();
+  expectTypeOf(ins.executeTakeFirstOrThrow()).toEqualTypeOf<Promise<{ id: bigint; view_counts: bigint[] }>>();
   expectTypeOf<ParamsType<typeof ins>>().toEqualTypeOf<[number, string, (string | null)[], (bigint | number | string | null)[]]>();
 });
 
-test("rowKeys: camelCase renames the row keys through the helpers too", () => {
+test("rowKeys: camelCase renames the row keys", () => {
   const camel = createSql<DB>(db, { rowKeys: "camelCase" });
   const cq = camel("SELECT id, display_name FROM users WHERE id = $1", 1);
   type CamelRow = { id: number; displayName: string | null };
   expectTypeOf<RowType<typeof cq>>().toEqualTypeOf<CamelRow>();
   expectTypeOf(cq.execute()).toEqualTypeOf<Promise<CamelRow[]>>();
-  expectTypeOf(query(db, cq)).toEqualTypeOf<Promise<CamelRow[]>>();
+  expectTypeOf(cq.executeTakeFirstOrThrow()).toEqualTypeOf<Promise<CamelRow>>();
   const bigCamel = createBigIntSql<DB>(db, { rowKeys: "camelCase" });
   expectTypeOf<RowType<ReturnType<typeof bigCamel<"SELECT count(*) AS user_count FROM users">>>>().toEqualTypeOf<{ userCount: bigint }>();
   expectTypeOf(createBigIntSql<DB>(undefined, {})).toEqualTypeOf(big);
+  expectTypeOf(createSql<DB>(db, { rowKeys: "preserve" })).toEqualTypeOf(sql);
 });

@@ -1,7 +1,9 @@
 import { expectTypeOf, test } from "vitest";
 import { pgTable, serial, timestamp } from "drizzle-orm/pg-core";
 import type { DefaultTypeMap, ParamsType, RowType } from "@typesql/core";
-import { createSql } from "../../src/index.js";
+import type { NodePgDatabase } from "drizzle-orm/node-postgres";
+import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
+import { createSql, type DrizzleDatabase, type DrizzleSql } from "../../src/index.js";
 import type * as schema from "../fixtures/schema.js";
 
 const sql = createSql<typeof schema>();
@@ -61,4 +63,22 @@ test("type map and options", () => {
   const q = esql("SELECT id, created_at FROM events WHERE created_at > $1", "2024-01-01");
   expectTypeOf<RowType<typeof q>>().toEqualTypeOf<{ id: number; created_at: string }>();
   expectTypeOf<ParamsType<typeof q>>().toEqualTypeOf<[string | Date | null]>();
+});
+
+test("createSql takes a Drizzle database or transaction; execute* and transaction type rows", () => {
+  expectTypeOf<NodePgDatabase<typeof schema>>().toExtend<DrizzleDatabase>();
+  expectTypeOf<PostgresJsDatabase<typeof schema>>().toExtend<DrizzleDatabase>();
+  const db = {} as NodePgDatabase<typeof schema>;
+  const bound = createSql<typeof schema>(db);
+  expectTypeOf(bound).toEqualTypeOf<DrizzleSql<typeof schema>>();
+  const q = bound("SELECT id, email FROM users WHERE id = $1", 1);
+  expectTypeOf(q.execute()).toEqualTypeOf<Promise<{ id: number; email: string }[]>>();
+  expectTypeOf(q.executeCount()).toEqualTypeOf<Promise<number>>();
+  const result = bound.transaction(async (tx) => {
+    expectTypeOf(tx).toEqualTypeOf<DrizzleSql<typeof schema>>();
+    return tx("SELECT email FROM users WHERE id = $1", 1).executeTakeFirstOrThrow();
+  });
+  expectTypeOf(result).toEqualTypeOf<Promise<{ email: string }>>();
+  db.transaction(async (tx) => createSql<typeof schema>(tx)("SELECT id FROM users").execute());
+  createSql<typeof schema>({} as PostgresJsDatabase<typeof schema>);
 });

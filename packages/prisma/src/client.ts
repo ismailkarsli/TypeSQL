@@ -1,34 +1,35 @@
 import type { PrismaPromise } from "@prisma/client/runtime/client";
-import { rowKeysOf, type Executor, type Query, type RowType } from "@typesql/core";
+import { runTransaction, type Executor, type SqlDriver } from "@typesql/core";
 
-/** Anything with Prisma Client's raw methods: a `PrismaClient`, an extended client or a transaction client. */
+/**
+ * Anything with Prisma Client's raw methods: a `PrismaClient`, an extended client or a transaction
+ * client. `$transaction` is there on the first two only.
+ */
 export interface PrismaRawClient {
   $queryRawUnsafe<T = unknown>(query: string, ...values: any[]): PrismaPromise<T>;
   $executeRawUnsafe(query: string, ...values: any[]): PrismaPromise<number>;
-}
-
-type AnyQuery = Query<unknown, readonly unknown[]>;
-
-/** An `Executor` for core's `q.execute()`: runs queries through `prisma.$queryRawUnsafe(text, ...values)`. */
-export function executor(prisma: PrismaRawClient): Executor {
-  return (text, values) => prisma.$queryRawUnsafe<unknown[]>(text, ...values);
+  $transaction?<R>(fn: (tx: PrismaRawClient) => Promise<R>): Promise<R>;
 }
 
 /**
- * Run a typesql query through `prisma.$queryRawUnsafe(text, ...values)` and type the rows from
- * the query. Values are always sent as bind parameters (`$n`), never interpolated. The result is
- * a `PrismaPromise`, so it can go into `prisma.$transaction([...])`. A `PrismaPromise` cannot
- * rename row keys, so a query from `createSql(executor, { rowKeys: "camelCase" })` is rejected:
- * run it with `q.execute(executor(prisma))`.
+ * An `Executor` for core's `q.execute()`: runs queries through `prisma.$queryRawUnsafe(text, ...values)`,
+ * and `q.executeCount()` through `prisma.$executeRawUnsafe(text, ...values)`. Values are always
+ * sent as bind parameters (`$n`), never interpolated.
  */
-export function queryRaw<Q extends AnyQuery>(prisma: PrismaRawClient, q: Q): PrismaPromise<RowType<Q>[]> {
-  if (rowKeysOf(q) !== "preserve") {
-    throw new Error('typesql: queryRaw cannot rename row keys (rowKeys: "camelCase"); run the query with q.execute(executor(prisma))');
-  }
-  return prisma.$queryRawUnsafe<RowType<Q>[]>(q.text, ...q.values);
+export function executor(prisma: PrismaRawClient): Executor {
+  return Object.assign((text: string, values: readonly unknown[]) => prisma.$queryRawUnsafe<unknown[]>(text, ...values), {
+    count: (text: string, values: readonly unknown[]) => prisma.$executeRawUnsafe(text, ...values),
+  });
 }
 
-/** Run a statement through `prisma.$executeRawUnsafe(text, ...values)`; resolves to the affected row count. */
-export function executeRaw(prisma: PrismaRawClient, q: AnyQuery): PrismaPromise<number> {
-  return prisma.$executeRawUnsafe(q.text, ...q.values);
+/**
+ * Run `fn` inside an interactive `prisma.$transaction(fn)`. A transaction client cannot start
+ * another one, so inside one `fn` runs in a savepoint.
+ */
+function transaction<T>(prisma: PrismaRawClient, depth: number, fn: (tx: PrismaRawClient) => Promise<T>): Promise<T> {
+  if (prisma.$transaction) return prisma.$transaction(fn);
+  return runTransaction((statement) => prisma.$executeRawUnsafe(statement), () => fn(prisma), { savepoint: `typesql_${depth + 1}` });
 }
+
+/** How `createSql(prisma)` runs queries and transactions. */
+export const driver: SqlDriver<PrismaRawClient> = { executor, transaction };

@@ -1,17 +1,17 @@
 import { CompiledQuery, type QueryResult } from "kysely";
-import { mapRows, type Executor, type Query, type RowType } from "@typesql/core";
+import { runTransaction, type Executor, type SqlDriver } from "@typesql/core";
 
 /**
- * What the helpers use from a `Kysely<DB>` or `Transaction<DB>`. Queries run through
+ * What the adapter uses from a `Kysely<DB>` or `Transaction<DB>`. Queries run through
  * `withoutPlugins()`: typesql's row types describe what the driver returns, so result
  * transformers such as `CamelCasePlugin` must not rename the columns (`createSql(db,
  * { rowKeys: "camelCase" })` renames the top-level keys instead, in the types too).
  */
 export interface KyselyExecutor {
   withoutPlugins(): { executeQuery<R>(query: CompiledQuery<R>): Promise<QueryResult<R>> };
+  transaction(): { execute<T>(fn: (trx: KyselyExecutor) => Promise<T>): Promise<T> };
+  readonly isTransaction: boolean;
 }
-
-type AnyQuery = Query<unknown, readonly unknown[]>;
 
 function run<R>(db: KyselyExecutor, text: string, values: readonly unknown[]): Promise<QueryResult<R>> {
   return db.withoutPlugins().executeQuery(CompiledQuery.raw(text, Array.from(values)) as CompiledQuery<R>);
@@ -36,16 +36,14 @@ export function executor(db: KyselyExecutor): Executor {
   };
 }
 
-/** Run a typesql query on a Kysely instance (or transaction) and return its rows, typed from the query. */
-export async function query<Q extends AnyQuery>(db: KyselyExecutor, q: Q): Promise<RowType<Q>[]> {
-  const result = await run<unknown>(db, q.text, q.values);
-  return mapRows(q, result.rows);
+/**
+ * Run `fn` inside `db.transaction().execute()`. A Kysely `Transaction` cannot start another one,
+ * so inside one `fn` runs in a savepoint.
+ */
+function transaction<T>(db: KyselyExecutor, depth: number, fn: (trx: KyselyExecutor) => Promise<T>): Promise<T> {
+  if (!db.isTransaction) return db.transaction().execute(fn);
+  return runTransaction((statement) => run(db, statement, []), () => fn(db), { savepoint: `typesql_${depth + 1}` });
 }
 
-/**
- * Run a statement for its side effect and return its row count: `numAffectedRows` for
- * INSERT/UPDATE/DELETE/MERGE, otherwise the number of rows returned (0 for DDL).
- */
-export async function execute(db: KyselyExecutor, q: AnyQuery): Promise<number> {
-  return rowCount(await run<unknown>(db, q.text, q.values));
-}
+/** How `createSql(db)` runs queries and transactions. */
+export const driver: SqlDriver<KyselyExecutor> = { executor, transaction };

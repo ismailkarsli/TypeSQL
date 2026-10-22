@@ -44,23 +44,28 @@ Already using Kysely, Drizzle or Prisma? `@typesql/kysely`, `@typesql/drizzle` a
 `@typesql/prisma` take the schema from it.
 
 ```ts
-import { createSql, query, one } from "@typesql/pg";   // pre-bound to pg's type map
-const rows = await query(pool, q);                   // Promise<{ id: number; ... }[]>
+import { createSql } from "@typesql/pg";             // pg's type map, queries run on the pool
+const sql = createSql<DB>(pool);
 
-const db = createSql<DB>(pool);                      // or bind the pool: queries run themselves
-const user = await db("SELECT id, email FROM users WHERE id = $1", 7).executeTakeFirstOrThrow();
+const posts = await sql("SELECT id, title FROM posts WHERE author_id = $1", 1).execute();
+//    ^? { id: string; title: string }[]
+const user = await sql("SELECT id, email FROM users WHERE id = $1", 7).executeTakeFirstOrThrow();
+
+await sql.transaction(async (tx) => {                // tx: sql bound to one transaction
+  await tx("UPDATE posts SET title = upper(title) WHERE author_id = $1", 1).execute();
+});
 ```
 
 ## Packages
 
 | Package | Role | Peer dependency | Contents |
 |---|---|---|---|
-| [`@typesql/core`](packages/core) | type engine | none | `createSql`, `q.execute()`/`executeTakeFirst()`/`executeTakeFirstOrThrow()`, fragments, `ApplyDdl`, `migrations()`. Zero dependencies. |
-| [`@typesql/pg`](packages/pg) | driver | `pg` ≥ 8 | node-postgres: `PgTypeMap`, `createSql(pool?)`, `executor`, `query`/`one`/`maybeOne`/`many`/`execute`/`transaction`; the `typesql introspect` CLI |
+| [`@typesql/core`](packages/core) | type engine | none | `createSql`, `q.execute()`/`executeTakeFirst()`/`executeTakeFirstOrThrow()`/`executeCount()`, fragments, `ApplyDdl`, `migrations()`. Zero dependencies. |
+| [`@typesql/pg`](packages/pg) | driver | `pg` ≥ 8 | node-postgres: `PgTypeMap`, `createSql(pool)` with `sql.transaction`, `executor`, `migrate`; the `typesql introspect` CLI |
 | [`@typesql/postgres`](packages/postgres) | driver | `postgres` ≥ 3 | postgres.js: the same API, with `PostgresJsTypeMap` and `PostgresJsBigIntTypeMap` |
-| [`@typesql/kysely`](packages/kysely) | ORM schema | `kysely` ≥ 0.27 | `FromKysely`: a Kysely `DB` interface (kysely-codegen, prisma-kysely) as the schema; `query`/`execute` through Kysely |
-| [`@typesql/drizzle`](packages/drizzle) | ORM schema | `drizzle-orm` ≥ 0.45 | `FromDrizzle`: Drizzle `pgTable`/`pgView`/`pgEnum`/`pgSchema` definitions as the schema; `pgType` |
-| [`@typesql/prisma`](packages/prisma) | ORM schema | `@prisma/client` ≥ 7 | the `typesql-prisma` generator and `FromPrisma`; `queryRaw`/`executeRaw` through Prisma Client |
+| [`@typesql/kysely`](packages/kysely) | ORM schema | `kysely` ≥ 0.27 | `FromKysely`: a Kysely `DB` interface (kysely-codegen, prisma-kysely) as the schema; `createSql(db)` runs queries through Kysely |
+| [`@typesql/drizzle`](packages/drizzle) | ORM schema | `drizzle-orm` ≥ 0.45 | `FromDrizzle`: Drizzle `pgTable`/`pgView`/`pgEnum`/`pgSchema` definitions as the schema; `createSql(db)` runs queries on Drizzle's driver client; `pgType` |
+| [`@typesql/prisma`](packages/prisma) | ORM schema | `@prisma/client` ≥ 7 | the `typesql-prisma` generator and `FromPrisma`; `createSql(prisma)` runs queries through Prisma Client |
 
 Two more workspace packages are private and not published: `@typesql/docs` (the VitePress
 documentation site) and `@typesql/bench` (compile-time budget benchmarks).

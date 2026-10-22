@@ -1,7 +1,7 @@
-import { mapRows, type Executor, type Query, type RowType } from "@typesql/core";
+import type { Executor, SqlDriver } from "@typesql/core";
 
 /**
- * The shape of a resolved `sql.unsafe()` result the helpers rely on: an array with `count`
+ * The shape of a resolved `sql.unsafe()` result the adapter relies on: an array with `count`
  * (`null` for statements without a count, such as DDL).
  */
 export type PostgresJsRows = readonly unknown[] & { readonly count: number | null };
@@ -19,23 +19,9 @@ export interface PostgresJsTransactable<Tx extends PostgresJsQueryable = Postgre
   begin(fn: (tx: Tx) => Promise<unknown>): Promise<unknown>;
 }
 
-/** Thrown by `one`, `maybeOne` and `many` when the row count does not match. */
-export class RowCountError extends Error {
-  override readonly name = "RowCountError";
-  constructor(
-    readonly code: "NO_ROWS" | "TOO_MANY_ROWS",
-    readonly expected: string,
-    readonly actual: number,
-    readonly text: string,
-  ) {
-    super(`Expected ${expected} row(s) but the query returned ${actual}`);
-  }
-}
-
-type AnyQuery = Query<unknown, readonly unknown[]>;
-
-function run(sql: PostgresJsQueryable, q: AnyQuery): PromiseLike<PostgresJsRows> {
-  return sql.unsafe(q.text, Array.from(q.values));
+/** A `TransactionSql`'s `savepoint(fn)`. */
+interface PostgresJsSavepointable {
+  savepoint(fn: (tx: PostgresJsQueryable) => Promise<unknown>): Promise<unknown>;
 }
 
 /**
@@ -49,51 +35,20 @@ export function executor(sql: PostgresJsQueryable): Executor {
   };
 }
 
-/** Run a query and return all rows (a plain array, without postgres.js' result metadata). */
-export async function query<Q extends AnyQuery>(sql: PostgresJsQueryable, q: Q): Promise<RowType<Q>[]> {
-  const result = await run(sql, q);
-  return mapRows(q, Array.from(result));
-}
-
-/** Exactly one row, otherwise throws `RowCountError`. */
-export async function one<Q extends AnyQuery>(sql: PostgresJsQueryable, q: Q): Promise<RowType<Q>> {
-  const rows = await query(sql, q);
-  if (rows.length !== 1) {
-    throw new RowCountError(rows.length === 0 ? "NO_ROWS" : "TOO_MANY_ROWS", "exactly 1", rows.length, q.text);
-  }
-  return rows[0] as RowType<Q>;
-}
-
-/** Zero or one row (`null` for zero); throws `RowCountError` on more than one. */
-export async function maybeOne<Q extends AnyQuery>(sql: PostgresJsQueryable, q: Q): Promise<RowType<Q> | null> {
-  const rows = await query(sql, q);
-  if (rows.length > 1) throw new RowCountError("TOO_MANY_ROWS", "at most 1", rows.length, q.text);
-  return rows.length === 0 ? null : (rows[0] as RowType<Q>);
-}
-
-/** At least one row, otherwise throws `RowCountError`. */
-export async function many<Q extends AnyQuery>(sql: PostgresJsQueryable, q: Q): Promise<[RowType<Q>, ...RowType<Q>[]]> {
-  const rows = await query(sql, q);
-  if (rows.length === 0) throw new RowCountError("NO_ROWS", "at least 1", 0, q.text);
-  return rows as [RowType<Q>, ...RowType<Q>[]];
-}
-
-/** Run a statement for its side effect and return the affected row count (postgres.js' `.count`, 0 when it is `null`). */
-export async function execute(sql: PostgresJsQueryable, q: AnyQuery): Promise<number> {
-  const result = await run(sql, q);
-  return result.count ?? 0;
-}
-
 /**
- * Run `fn` inside `sql.begin()`: postgres.js issues BEGIN, runs the callback with a
- * transaction-bound `sql`, then COMMIT — or ROLLBACK and rethrow if the callback throws.
+ * Run `fn` inside a transaction: `tx.savepoint(fn)` on a `TransactionSql` (only those have it),
+ * otherwise `sql.begin(fn)`. postgres.js issues BEGIN (or SAVEPOINT), runs the callback with a
+ * transaction-bound `sql`, then COMMIT, or ROLLBACK and rethrow when the callback throws.
  */
-export async function transaction<Tx extends PostgresJsQueryable, T>(
-  sql: PostgresJsTransactable<Tx>,
-  fn: (tx: Tx) => Promise<T>,
-): Promise<T> {
-  return (await sql.begin(fn)) as T;
+async function transaction<T>(sql: PostgresJsQueryable, _depth: number, fn: (tx: PostgresJsQueryable) => Promise<T>): Promise<T> {
+  const { savepoint, begin } = sql as Partial<PostgresJsSavepointable & PostgresJsTransactable>;
+  if (savepoint) return (await savepoint.call(sql, fn)) as T;
+  if (begin) return (await begin.call(sql, fn)) as T;
+  throw new Error("typesql: sql.transaction() needs a postgres.js Sql, ReservedSql or TransactionSql (with begin or savepoint)");
 }
+
+/** How `createSql(sql)` runs queries and transactions. */
+export const driver: SqlDriver<PostgresJsQueryable> = { executor, transaction };
 
 /** Anything carrying an ordered list of DDL statements, e.g. a `migrations()` builder from core. */
 export interface MigrationSource {
@@ -106,7 +61,7 @@ export interface MigrationSource {
  * `$$`-quoted function bodies work.
  */
 export async function migrate<Tx extends PostgresJsQueryable>(sql: PostgresJsTransactable<Tx>, m: MigrationSource): Promise<void> {
-  await transaction(sql, async (tx) => {
+  await sql.begin(async (tx) => {
     for (const statement of m.statements) await tx.unsafe(statement);
   });
 }
