@@ -20,6 +20,12 @@ import type { StripShape } from "./shape.js";
 export type InlineMarker<T> = `\u0000P${Enc<T>}\u0000`;
 /** Marker of `sql.json(value)`: an inline parameter flagged as JSON (`J`) before the value's encoding. */
 export type JsonMarker<T> = `\u0000PJ${Enc<T>}\u0000`;
+/**
+ * Any `sql.json()` value. Where a value is passed rather than spliced into the text (`sql.set`
+ * and `sql.values` values, positional and named arguments), a json / jsonb parameter accepts
+ * one; it carries its value's encoding (`ValueEnc`), which is checked like an inline one.
+ */
+export type JsonValue = `\u0000PJ${string}\u0000`;
 
 /**
  * `sql.valueOrDefault(v)`: like `sql.param(v)`, but `undefined` sends `DEFAULT` instead of a
@@ -155,6 +161,19 @@ type InlineCode<S extends string, Acc extends string, Encs extends string[], K e
 /** Encoded value type of a marker body: `P<enc>` (sql.param) or `Du<enc>` / `D-<enc>` (sql.valueOrDefault). */
 type MarkerEnc<B extends string> = B extends `P${infer E}` ? E : B extends `Du${infer E}` | `D-${infer E}` ? E : "*";
 
+type AnyMarker = `\u0000${string}\u0000`;
+/**
+ * Encoding of a value passed as a value (a `sql.set` / `sql.values` value, a fragment argument):
+ * `Enc<V>`, except that a marker (`sql.json()`, `sql.param()`, `sql.valueOrDefault()`) stands
+ * for the value it wraps, which the runtime unwraps. A union with markers gives a union of
+ * encodings, each checked.
+ */
+export type ValueEnc<V> =
+  0 extends 1 & V ? "*"
+  : [Extract<V, AnyMarker>] extends [never] ? Enc<V>
+  : MarkerEncs<Extract<V, AnyMarker>> | ([Exclude<V, AnyMarker>] extends [never] ? never : Enc<Exclude<V, AnyMarker>>);
+type MarkerEncs<M> = M extends `\u0000${infer B}\u0000` ? MarkerEnc<B> : never;
+
 /** Does the text hold a `sql.valueOrDefault()` whose value can be `undefined`? */
 export type HasDefaultable<S extends string> = S extends `${string}\u0000Du${string}` ? true : false;
 
@@ -177,8 +196,8 @@ export type CheckCarried<DB, TM, X extends string, K extends readonly unknown[]>
 type CarriedLoop<DB, X extends string, K extends readonly unknown[], P extends readonly unknown[], I extends number> =
   I extends K["length"] ? true
   : K[I] extends infer E extends string
-    ? CheckValue<DB, X, Next[I], E, P[I]> extends infer M extends string
-      ? SqlError<`parameter $${Next[I]}: ${M}`, FindParam<Lex<X>, Next[I], 0>>
+    ? Extract<CheckValue<DB, X, Next[I], E, P[I]>, string> extends infer M extends string
+      ? [M] extends [never] ? CarriedLoop<DB, X, K, P, Next[I]> : SqlError<`parameter $${Next[I]}: ${M}`, FindParam<Lex<X>, Next[I], 0>>
       : CarriedLoop<DB, X, K, P, Next[I]>
     : CarriedLoop<DB, X, K, P, Next[I]>;
 

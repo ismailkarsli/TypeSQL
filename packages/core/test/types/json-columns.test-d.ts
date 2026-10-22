@@ -1,5 +1,6 @@
 import { expectTypeOf, test } from "vitest";
-import { createSql, type Col, type DefaultTypeMap, type Generated, type Json, type ParamsOf, type ParamsType, type RowOf, type RowType, type SqlError } from "../../src/index.js";
+import { createSql, type Col, type DefaultTypeMap, type Fragment, type Generated, type Json, type ParamsOf, type ParamsType, type RowOf, type RowType, type SqlError } from "../../src/index.js";
+import type { SetRep } from "../../src/engine/write.js";
 
 type HistoryItem = { at: string; state: { value: number; label?: string } };
 type Settings = { theme: "dark" | "light"; tags: string[]; limits: Record<string, number> };
@@ -86,4 +87,47 @@ test("sql.json() checks the value against T and needs a json / jsonb context", (
     .toEqualTypeOf<"parameter $1: a sql.json() string value cannot be used as jsonb NOT NULL">();
   expectTypeOf<CallErr<`UPDATE portfolio SET history = \u0000P[o]\u0000`>>()
     .toEqualTypeOf<"parameter $1: an array for jsonb NOT NULL must be passed as sql.json(value) (node-postgres sends a JS array as a Postgres array)">();
+});
+
+interface WriteDB extends DB {
+  docs: { id: Generated<"int4">; data: Col<"jsonb", { nullable: true }>; tags: Col<"text[]", { hasDefault: true }>; label: Col<"text", { hasDefault: true }> };
+}
+const wsql = createSql<WriteDB>();
+
+test("sql.set and sql.values take sql.json() values for JSON columns; raw arrays are an error", () => {
+  const set = wsql.set("portfolio", { history: wsql.json(items), settings: wsql.json(settings), event: { kind: "a", x: 1 } });
+  const upd = wsql("UPDATE portfolio SET {set} WHERE id = $1 RETURNING history", { set }, 1);
+  expectTypeOf<RowType<typeof upd>>().toEqualTypeOf<{ history: HistoryItem[] }>();
+  wsql("UPDATE docs SET {set}", { set: wsql.set("docs", { data: wsql.json([1, 2]), tags: ["a"] }) });
+  wsql("UPDATE docs SET {set}", { set: wsql.set("docs", { data: { a: 1 } }) });
+  // one row with a sql.json() value, another with null
+  const rows = [
+    { name: "a", history: wsql.json(items), event: wsql.json({ kind: "a", x: 1 }), pair: wsql.json([1, "a"]) },
+    { name: "b", event: { kind: "b", y: "x" }, settings: null, pair: wsql.json([2, "b"]) },
+  ] as const;
+  wsql("INSERT INTO portfolio {rows}", { rows: wsql.values("portfolio", rows) });
+  const mapped = items.map((h) => ({ name: h.at, history: wsql.json([h]), event: wsql.json({ kind: "a", x: 1 }), pair: wsql.json([1, h.at]) }));
+  wsql("INSERT INTO portfolio {rows} RETURNING id", { rows: wsql.values("portfolio", mapped) });
+
+  // @ts-expect-error parameter $1: an array for jsonb NOT NULL must be passed as sql.json(value)
+  wsql("UPDATE portfolio SET {set}", { set: wsql.set("portfolio", { history: items }) });
+  // @ts-expect-error the same for a plain jsonb column
+  wsql("UPDATE docs SET {set}", { set: wsql.set("docs", { data: [1, 2] }) });
+  // @ts-expect-error and in sql.values rows
+  wsql("INSERT INTO portfolio {rows}", { rows: wsql.values("portfolio", [{ name: "a", history: items, event: { kind: "a", x: 1 }, pair: wsql.json([1, "a"]) }]) });
+  // @ts-expect-error a sql.json() string value cannot be used as jsonb NOT NULL (T is HistoryItem[])
+  wsql("UPDATE portfolio SET {set}", { set: wsql.set("portfolio", { history: wsql.json("x") }) });
+  // @ts-expect-error parameter $4: a sql.json() null | (string | number)[] value cannot be used as json NOT NULL
+  wsql("INSERT INTO portfolio {rows}", { rows: wsql.values("portfolio", [rows[0], { ...rows[1], pair: wsql.json(null as [number, string] | null) }]) });
+  // @ts-expect-error a sql.json() value cannot be used as text NOT NULL
+  wsql("UPDATE docs SET {set}", { set: wsql.set("docs", { label: wsql.json({ a: 1 }) }) });
+  // @ts-expect-error sql.json() is not an int4[]
+  wsql.set("docs", { tags: wsql.json(["a"]), id: wsql.json(1) });
+
+  type Msg<Q> = Q extends SqlError<infer M, unknown> ? M : never;
+  type SetErr<P extends object> = Msg<Parameters<typeof wsql<"UPDATE portfolio SET {set}", { set: Fragment<SetRep<P>["text"], readonly unknown[], SetRep<P>["carried"]> }>>[0]>;
+  expectTypeOf<SetErr<{ history: HistoryItem[] }>>()
+    .toEqualTypeOf<"parameter $1: an array for jsonb NOT NULL must be passed as sql.json(value) (node-postgres sends a JS array as a Postgres array)">();
+  expectTypeOf<SetErr<{ name: "\u0000PJo\u0000" }>>().toEqualTypeOf<"parameter $1: a sql.json() value cannot be used as text NOT NULL">();
+  expectTypeOf<SetErr<{ history: "\u0000PJo\u0000" | "\u0000PJs\u0000" }>>().toEqualTypeOf<"parameter $1: a sql.json() string value cannot be used as jsonb NOT NULL">();
 });

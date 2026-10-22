@@ -78,6 +78,16 @@ nullable columns, enum values for enums). `undefined` values are skipped:
 The table name is only used for typing, and schema tables are written `"schema.table"`:
 `sql.values("auth.sessions", rows)`.
 
+### JSON columns
+
+`sql.set` and `sql.values` pass their values to the driver as parameters, so a JSON value goes
+through `sql.json(value)` there too: it is sent as JSON text by both drivers and checked
+against a [`Json<T>`](./schema#typed-json-columns) column. A plain object also works as it is;
+an array without `sql.json()` is an error, because node-postgres would send it as a Postgres
+array:
+
+<<< @/snippets/json.ts#write-helpers
+
 ## UPDATE
 
 `SET` columns must exist and values take their types. `UPDATE … FROM` joins more tables, and

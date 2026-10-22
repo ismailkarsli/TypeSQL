@@ -1,8 +1,10 @@
+import { takeValue } from "./inline.js";
 import { quoteIdent } from "./splice.js";
 
 /**
  * Runtime side of `sql.set` and `sql.values`. Keys are quoted as identifiers; values become
- * `$n` parameters (never text). The table name is only used by the types.
+ * `$n` parameters (never text). A `sql.json(v)` value is sent as JSON text (`takeValue`). The
+ * table name is only used by the types.
  */
 
 const own = (o: object, k: string) => Object.prototype.hasOwnProperty.call(o, k);
@@ -13,7 +15,7 @@ export function buildSet(values: Readonly<Record<string, unknown>>): { text: str
   const parts: string[] = [];
   const out: unknown[] = [];
   for (const key of Object.keys(values)) {
-    const v = values[key];
+    const v = takeValue(values[key]);
     if (v === undefined) continue;
     out.push(v);
     parts.push(`${quoteIdent(key)} = $${out.length}`);
@@ -32,21 +34,25 @@ export function buildValues(rows: readonly Readonly<Record<string, unknown>>[]):
   if (rows.length === 0) throw new Error("typesql: sql.values() needs at least one row; skip the INSERT when there is nothing to insert");
   const columns: string[] = [];
   const seen = new Set<string>();
-  for (const row of rows) {
+  const taken = rows.map((row) => {
     if (row === null || typeof row !== "object" || Array.isArray(row)) throw new Error("typesql: sql.values() rows must be objects of column values");
+    const out = Object.create(null) as Record<string, unknown>;
     for (const key of Object.keys(row)) {
-      if (!seen.has(key) && row[key] !== undefined) {
+      const v = takeValue(row[key]);
+      out[key] = v;
+      if (!seen.has(key) && v !== undefined) {
         seen.add(key);
         columns.push(key);
       }
     }
-  }
+    return out;
+  });
   if (columns.length === 0) {
     if (rows.length === 1) return { text: "DEFAULT VALUES", values: [] };
     throw new Error("typesql: sql.values() rows have no values; Postgres cannot insert several all-default rows with VALUES");
   }
   const out: unknown[] = [];
-  const tuples = rows.map((row) => {
+  const tuples = taken.map((row) => {
     const items = columns.map((c) => {
       const v = own(row, c) ? row[c] : undefined;
       if (v === undefined) return "DEFAULT";

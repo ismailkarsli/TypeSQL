@@ -43,7 +43,8 @@ into `T` (an array index gives the element type, a key the property type; see
 <<< @/snippets/json.ts#read
 
 Parameters written to the column take `T`. Pass JSON values with
-[`sql.json()`](./parameters#json-values), which sends them as JSON text with either driver:
+[`sql.json()`](./parameters#json-values), which sends them as JSON text with either driver (also
+as [`sql.set` / `sql.values`](./writing-data#json-columns) values):
 
 <<< @/snippets/json.ts#write
 

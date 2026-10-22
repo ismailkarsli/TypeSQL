@@ -140,6 +140,9 @@ const q = sql("SELECT u.id FROM users u {where}", { where });
   against `SetInput<DB, TM, table>`; throws when no value is defined.
 - `sql.values(table, rows)`: `("a", "b") VALUES ($1, $2), ($3, DEFAULT)`. Rows are checked
   against `InsertInput<DB, TM, table>`; throws on an empty array.
+- A `json` / `jsonb` column in `set` / `values` takes `sql.json(value)` (sent as JSON text, the
+  value checked against a `Json<T>` column's `T`) or a raw non-array value; a raw array is an
+  error, as for `sql.param()`.
 - `table` is a `TableName<DB>`: a top-level table, or `"schema.table"`.
 - `set` and `values` are typed like `sql.list`: the text type assigns or lists every key of
   the input type once (`SetRep`, `ValuesRep`). See [Writing data](../guide/writing-data).

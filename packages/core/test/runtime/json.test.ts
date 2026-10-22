@@ -49,3 +49,35 @@ describe("sql.json()", () => {
     expect(pendingParams()).toBe(before);
   });
 });
+
+describe("sql.json() in sql.set and sql.values", () => {
+  it("sends the value as a JsonParam and leaves nothing pending", () => {
+    const before = pendingParams();
+    const items = [{ n: 1 }];
+    const set = sql.set("docs", { items: sql.json(items), meta: { tags: ["a"] } });
+    expect(set.text).toBe('"items" = $1, "meta" = $2');
+    expect(set.values[0]).toBeInstanceOf(JsonParam);
+    expect((set.values[0] as JsonParam).toPostgres()).toBe('[{"n":1}]');
+    expect(set.values[1]).toEqual({ tags: ["a"] });
+    // sql.json(null) is SQL NULL, sql.json(undefined) too (not skipped: it is a value)
+    expect(sql.set("docs", { meta: sql.json(null) }).values).toEqual([null]);
+
+    const v = sql.values("docs", [{ items: sql.json(items) }, { items: sql.json([{ n: 2 }]), meta: sql.json(null) }]);
+    expect(v.text).toBe('("items", "meta") VALUES ($1, DEFAULT), ($2, $3)');
+    expect(v.values.map((x) => JSON.stringify(x))).toEqual(['[{"n":1}]', '[{"n":2}]', "null"]);
+    expect(pendingParams()).toBe(before);
+  });
+
+  it("unwraps sql.param() and sql.valueOrDefault() values too", () => {
+    const set = sql.set("docs", { id: sql.param(1) as unknown as number, meta: sql.valueOrDefault(undefined) as unknown as null });
+    expect(set).toEqual({ text: '"id" = $1', values: [1] });
+    const v = sql.values("docs", [{ items: sql.json([]), id: sql.valueOrDefault(undefined) as unknown as number }]);
+    expect(v.text).toBe('("items") VALUES ($1)');
+  });
+
+  it("refuses a sql.json() value used twice", () => {
+    const j = sql.json([{ n: 1 }]);
+    sql.set("docs", { items: j });
+    expect(() => sql.set("docs", { items: j })).toThrow(/already used by another statement/);
+  });
+});

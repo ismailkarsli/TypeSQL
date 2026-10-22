@@ -34,6 +34,22 @@ export function valueOrDefault<const T>(value: T): DefaultMarker<T> {
   return param(new OrDefault(value)) as unknown as DefaultMarker<T>;
 }
 
+const EXACT = new RegExp(`^\\u0000typesql${PREFIX}[0-9a-z]+\\u0000$`);
+
+/**
+ * A value passed as a value rather than in the SQL text (a `sql.set` / `sql.values` value, a
+ * positional or named argument): a `sql.json()`, `sql.param()` or `sql.valueOrDefault()` token
+ * is replaced by the value it holds (a `JsonParam` for `sql.json()`), and consumed. Anything else
+ * is returned as it is.
+ */
+export function takeValue(value: unknown): unknown {
+  if (typeof value !== "string" || value.charCodeAt(0) !== 0 || !EXACT.test(value)) return value;
+  if (!pending.has(value)) throw new Error("typesql: this sql.json() / sql.param() value was already used by another statement; call it once per statement");
+  const v = pending.get(value);
+  pending.delete(value);
+  return v instanceof OrDefault ? v.value : v;
+}
+
 /** Number of tokens created but not yet used (for leak diagnostics in tests). */
 export function pendingParams(): number {
   return pending.size;

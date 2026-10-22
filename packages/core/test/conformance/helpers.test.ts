@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { Pool } from "pg";
 import postgres from "postgres";
-import { createSql, type Col, type Generated, type Nullable, type RowType } from "../../src/index.js";
+import { createSql, type Col, type Generated, type Json, type Nullable, type RowType } from "../../src/index.js";
 import { acquireDatabase } from "./db.js";
 
 /**
@@ -16,6 +16,13 @@ interface DB {
     price: Col<"int4">;
     note: Nullable<"text">;
     qty: Generated<"int4">;
+  };
+  helper_docs: {
+    id: Generated<"int4">;
+    name: Col<"text">;
+    items: Json<{ at: string; n: number }[]>;
+    settings: Json<{ theme: string; tags: string[] }, { nullable: true }, "json">;
+    data: Nullable<"jsonb">;
   };
 }
 const sql = createSql<DB>();
@@ -36,9 +43,12 @@ describe.skipIf(!db)("fragment helpers against Postgres", () => {
     await pool!.query("DROP TABLE IF EXISTS helper_items");
     await pool!.query("CREATE TABLE helper_items (id serial PRIMARY KEY, name text NOT NULL UNIQUE, price int NOT NULL, note text, qty int NOT NULL DEFAULT 1)");
     await pool!.query("INSERT INTO helper_items (name, price, note) VALUES ('b', 20, NULL), ('a', 20, 'x'), ('c', 10, 'y')");
+    await pool!.query("DROP TABLE IF EXISTS helper_docs");
+    await pool!.query("CREATE TABLE helper_docs (id serial PRIMARY KEY, name text NOT NULL, items jsonb NOT NULL, settings json, data jsonb)");
   });
   afterAll(async () => {
     await pool?.query("DROP TABLE IF EXISTS helper_items");
+    await pool?.query("DROP TABLE IF EXISTS helper_docs");
     await pool?.end();
     await pgjs?.end();
     await db?.close();
@@ -100,6 +110,30 @@ describe.skipIf(!db)("fragment helpers against Postgres", () => {
       const reset = sql(`UPDATE helper_items SET qty = ${sql.valueOrDefault(undefined as number | undefined)} WHERE name = ${sql.param(`${name}-2`)} RETURNING qty`);
       expect(await run(reset)).toEqual([{ qty: 1 }]);
       await run(sql("DELETE FROM helper_items WHERE name LIKE $1", `${name}-%`));
+    });
+
+    test("sql.values and sql.set with JSON columns: sql.json() values and plain objects", async () => {
+      const a = [{ at: "2024-01-02", n: 1 }, { at: "2024-01-03", n: 2.5 }];
+      const b = [{ at: "2024-02-01", n: 3 }];
+      const settings = { theme: "dark", tags: ["x", "y"] };
+      const rows = [
+        { name: `${name}-a`, items: sql.json(a), settings, data: sql.json([1, "two", null]) },
+        { name: `${name}-b`, items: sql.json(b), data: sql.json("it's") },
+      ];
+      const ins = sql("INSERT INTO helper_docs {rows} RETURNING name, items, settings, data", { rows: sql.values("helper_docs", rows) });
+      expect((await run(ins)) as RowType<typeof ins>[]).toEqual([
+        { name: `${name}-a`, items: a, settings, data: [1, "two", null] },
+        { name: `${name}-b`, items: b, settings: null, data: "it's" },
+      ]);
+
+      // stored as JSON arrays and strings, not Postgres arrays or doubly encoded strings
+      const kinds = sql("SELECT jsonb_typeof(items) AS items, jsonb_typeof(data) AS data FROM helper_docs WHERE name LIKE $1 ORDER BY name", `${name}-%`);
+      expect(await run(kinds)).toEqual([{ items: "array", data: "array" }, { items: "array", data: "string" }]);
+
+      const set = sql.set("helper_docs", { items: sql.json([...a, ...b]), settings: sql.json(null), data: { k: [1] } });
+      const upd = sql("UPDATE helper_docs SET {set} WHERE name = $1 RETURNING items -> -1 -> 'n' AS last, settings, data", { set }, `${name}-a`);
+      expect((await run(upd)) as RowType<typeof upd>[]).toEqual([{ last: 3, settings: null, data: { k: [1] } }]);
+      await run(sql("DELETE FROM helper_docs WHERE name LIKE $1", `${name}-%`));
     });
   });
 });

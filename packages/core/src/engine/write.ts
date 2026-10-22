@@ -1,6 +1,6 @@
 import type { ColDesc, Table, View } from "../schema/column.js";
 import type { TsParamTypeOf } from "../type-map/index.js";
-import type { Enc } from "./inline.js";
+import type { JsonValue, ValueEnc } from "./inline.js";
 import type { JoinedText, QuotedIdent, UnionList } from "./splice.js";
 
 /**
@@ -33,10 +33,13 @@ export type TableOf<DB, T extends string> =
   : T extends `${infer NS}.${infer N}` ? (NS extends keyof DB ? (N extends keyof DB[NS] ? (DB[NS][N] extends Table ? DB[NS][N] : never) : never) : never)
   : never;
 
-/** TS type a column accepts when written (the type map's parameter type, `| null` when nullable). */
+/**
+ * TS type a column accepts when written (the type map's parameter type, `| null` when nullable).
+ * A json / jsonb column also takes a `sql.json(value)` (an array has to be one: see `CheckValue`).
+ */
 export type ColIn<TM, DB, D extends ColDesc> =
   D["type"] extends "null" ? null
-  : D["nullable"] extends true ? TsParamTypeOf<TM, DB, D["type"]> | null : TsParamTypeOf<TM, DB, D["type"]>;
+  : (D["nullable"] extends true ? TsParamTypeOf<TM, DB, D["type"]> | null : TsParamTypeOf<TM, DB, D["type"]>) | (D["type"] extends "json" | "jsonb" ? JsonValue : never);
 
 /** `sql.set` input: any subset of the columns; `undefined` values are skipped. */
 export type SetInput<DB, TM, T extends string> =
@@ -62,7 +65,7 @@ type KeysOf<R> = R extends unknown ? keyof R & string : never;
 /** Union of the value types `K` has across the members of `R` (members without `K` add nothing). */
 type ValueAt<R, K extends string> = R extends unknown ? (K extends keyof R ? R[K] : never) : never;
 type CarriedOfKeys<R, Ks extends readonly unknown[], Acc extends readonly unknown[] = []> =
-  Ks extends readonly [infer K extends string, ...infer Rest] ? CarriedOfKeys<R, Rest, [...Acc, Enc<Exclude<ValueAt<R, K>, undefined>>]> : Acc;
+  Ks extends readonly [infer K extends string, ...infer Rest] ? CarriedOfKeys<R, Rest, [...Acc, ValueEnc<Exclude<ValueAt<R, K>, undefined>>]> : Acc;
 
 type Assignments<Ks extends readonly unknown[]> = { [I in keyof Ks]: { readonly text: `${QuotedIdent<[Ks[I] & string]>} = $1` } };
 type Placeholders<Ks extends readonly unknown[]> = { [I in keyof Ks]: { readonly text: "$1" } };
