@@ -30,7 +30,7 @@ const rows = await query(db, q); // db: Kysely<DB> or a Transaction<DB>
 
 | Export | What it is |
 |---|---|
-| `createSql<DB, TM = DefaultTypeMap, Overrides = {}, Options = {}>()` | core's `createSql<FromKysely<DB, Overrides, Options>, TM>()` |
+| `createSql<DB, TM = DefaultTypeMap, Overrides = {}, Options = {}>(db?, options?)` | core's `createSql<FromKysely<DB, Overrides, Options>, TM>()`; `{ rowKeys: "camelCase" }` gives `CamelCasePlugin`-style row keys |
 | `FromKysely<DB, Overrides = {}, Options = {}>` | the converted schema type, for use with core's `createSql<Schema, TM>()` or the adapters' `createSql<Schema>()` |
 | `query(db, q)` | runs a typesql `Query` through Kysely, `Promise<Row[]>` |
 | `execute(db, q)` | runs a statement, `Promise<number>` (`numAffectedRows`; for other statements the number of rows returned, 0 for DDL) |
@@ -55,7 +55,7 @@ const same = createCoreSql<FromKysely<DB>, PgTypeMap>();
 `query` and `execute` send `CompiledQuery.raw(q.text, q.values)` through
 `db.withoutPlugins().executeQuery(...)`. Plugins are bypassed on purpose: typesql's row types
 describe what Postgres returns (`created_at`), and a result transformer such as
-`CamelCasePlugin` would rename the keys. Logging, the dialect and the connection pool are
+`CamelCasePlugin` would rename the keys (use `{ rowKeys: "camelCase" }` for camelCase rows). Logging, the dialect and the connection pool are
 unaffected. Any `sql(...)` result can also be run with `@typesql/pg` directly on the pool.
 
 ## How columns are converted
@@ -159,6 +159,16 @@ const q = sql("SELECT author_id, created_at FROM blog_posts WHERE id = $1", 1);
 
 Overrides still use the interface's (camelCase) keys. The plugin's non-default options
 (`upperCase`, `underscoreBeforeDigits`, `underscoreBetweenUppercaseLetters`) are not modelled.
+
+For camelCase **rows**, add `{ rowKeys: "camelCase" }`. The top-level keys are renamed with
+`CamelCasePlugin`'s default snake_case → camelCase mapping, in the row types and at runtime.
+The plugin itself stays bypassed, so keys inside JSON values are left alone:
+
+```ts
+const sql = createSql<DB, DefaultTypeMap, {}, { camelCase: true }>(db, { rowKeys: "camelCase" });
+const post = await sql("SELECT author_id, created_at FROM blog_posts WHERE id = $1", 1).executeTakeFirstOrThrow();
+//    ^? { authorId: number; createdAt: Date }
+```
 
 ## Limitations
 

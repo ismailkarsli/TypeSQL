@@ -1,5 +1,6 @@
 import { expect, test } from "vitest";
 import type { PrismaPromise } from "@prisma/client/runtime/client";
+import { createSql as createCoreSql } from "@typesql/core";
 import { createSql, executeRaw, executor, queryRaw, type PrismaRawClient } from "../src/index.js";
 
 interface DB {
@@ -36,4 +37,13 @@ test("the queries' execute methods run through $queryRawUnsafe", async () => {
     ["query", "SELECT id FROM users WHERE email = $1", "a@b.c"],
     ["query", "SELECT id FROM users"],
   ]);
+});
+
+test("queryRaw rejects rowKeys: camelCase queries; q.execute(executor(prisma)) runs them", async () => {
+  const calls: unknown[][] = [];
+  const prisma = fakeClient(calls);
+  const camel = createCoreSql<DB>(undefined, { rowKeys: "camelCase" });
+  expect(() => queryRaw(prisma, camel("SELECT id FROM users"))).toThrow(/cannot rename row keys/);
+  expect(calls).toEqual([]);
+  expect(await camel("SELECT id FROM users").execute(executor(prisma))).toEqual([{ id: 1 }]);
 });

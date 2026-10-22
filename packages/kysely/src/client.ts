@@ -1,10 +1,11 @@
 import { CompiledQuery, type QueryResult } from "kysely";
-import type { Executor, Query, RowType } from "@typesql/core";
+import { mapRows, type Executor, type Query, type RowType } from "@typesql/core";
 
 /**
  * What the helpers use from a `Kysely<DB>` or `Transaction<DB>`. Queries run through
  * `withoutPlugins()`: typesql's row types describe what the driver returns, so result
- * transformers such as `CamelCasePlugin` must not rename the columns.
+ * transformers such as `CamelCasePlugin` must not rename the columns (`createSql(db,
+ * { rowKeys: "camelCase" })` renames the top-level keys instead, in the types too).
  */
 export interface KyselyExecutor {
   withoutPlugins(): { executeQuery<R>(query: CompiledQuery<R>): Promise<QueryResult<R>> };
@@ -37,8 +38,8 @@ export function executor(db: KyselyExecutor): Executor {
 
 /** Run a typesql query on a Kysely instance (or transaction) and return its rows, typed from the query. */
 export async function query<Q extends AnyQuery>(db: KyselyExecutor, q: Q): Promise<RowType<Q>[]> {
-  const result = await run<RowType<Q>>(db, q.text, q.values);
-  return result.rows;
+  const result = await run<unknown>(db, q.text, q.values);
+  return mapRows(q, result.rows);
 }
 
 /**

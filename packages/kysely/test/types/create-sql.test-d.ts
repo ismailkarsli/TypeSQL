@@ -103,3 +103,15 @@ test("query/execute accept Kysely and Transaction and type rows from the query",
   expectTypeOf(query<typeof q>).returns.toEqualTypeOf<Promise<{ id: number; email: string }[]>>();
   expectTypeOf(execute).returns.toEqualTypeOf<Promise<number>>();
 });
+
+test("rowKeys: camelCase gives rows the keys CamelCasePlugin would", () => {
+  interface CamelDB {
+    blogPosts: { id: import("kysely").Generated<number>; authorId: number; createdAt: Date };
+  }
+  const s = createSql<CamelDB, DefaultTypeMap, {}, { camelCase: true }>(undefined, { rowKeys: "camelCase" });
+  const q = s("SELECT author_id, created_at FROM blog_posts WHERE id = $1", 1);
+  expectTypeOf<RowType<typeof q>>().toEqualTypeOf<{ authorId: number; createdAt: Date }>();
+  expectTypeOf(query<typeof q>).returns.toEqualTypeOf<Promise<{ authorId: number; createdAt: Date }[]>>();
+  const plain = createSql<DB>(undefined, { rowKeys: "preserve" });
+  expectTypeOf(plain).toEqualTypeOf(sql);
+});

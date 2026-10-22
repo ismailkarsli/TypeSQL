@@ -73,6 +73,13 @@ check<Equal<RowType<ReturnType<typeof camel<"SELECT author_id, created_at FROM b
 
 import type { Kysely } from "kysely";
 declare const db: Kysely<DB>;
+declare const camelDb: Kysely<CamelDB>; // created with plugins: [new CamelCasePlugin()]
+// #region camel-rows
+const camelRows = createSql<CamelDB, DefaultTypeMap, {}, { camelCase: true }>(camelDb, { rowKeys: "camelCase" });
+const post = await camelRows("SELECT author_id, created_at FROM blog_posts WHERE id = $1", 1).executeTakeFirstOrThrow();
+// { authorId: number; createdAt: Date }
+// #endregion camel-rows
+check<Equal<typeof post, { authorId: number; createdAt: Date }>>();
 // #region run
 import { execute, query } from "@typesql/kysely";
 

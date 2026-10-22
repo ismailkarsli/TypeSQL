@@ -23,6 +23,39 @@ row objects the drivers build.
 
 <<< @/snippets/queries.ts#naming
 
+### camelCase row keys
+
+`createSql(executor, { rowKeys: "camelCase" })` renames the top-level keys of every row, in the
+row types and in the rows `execute*` returns. The SQL keeps the database's names:
+
+<<< @/snippets/queries.ts#row-keys
+
+The mapping is the one Kysely's `CamelCasePlugin` uses by default: the first character stays,
+every later `_` is dropped, and the character after a `_` is upper-cased. Nothing else changes.
+
+| Column | Key |
+|---|---|
+| `created_at` | `createdAt` |
+| `address_line_1` | `addressLine1` |
+| `_private` | `_Private` |
+| `a__b`, `trailing_` | `aB`, `trailing` |
+| `HTTP_CODE` | `HTTPCODE` |
+| `fooBar`, `?column?`, `count` | unchanged |
+
+- Only the top-level keys are renamed. Values are left alone, so keys inside `json`/`jsonb`
+  values stay as stored (`CamelCasePlugin` would rename those too).
+- If two columns map to the same key (`user_id` and `"userId"`), the later column wins at
+  runtime, as with duplicate column names. The type is then the union of both columns' types.
+  Alias one of them to keep both.
+- `sql.as<Row>()` asserts the row as returned, so give it camelCase keys.
+- `RowOf<DB, TM, Q>` still describes the database's names. `RowType<typeof q>` is the renamed row.
+- The adapters' `createSql(client, { rowKeys: "camelCase" })` take the option too, and their
+  `query`/`one`/`maybeOne`/`many` helpers rename the keys the same way. Prisma's
+  `queryRaw` cannot, so it rejects such a query; run it with `q.execute(executor(prisma))`.
+- The types assume the driver returns the database's names, so leave driver-level renaming
+  such as postgres.js' `transform: postgres.camel` off. `@typesql/kysely` already bypasses
+  Kysely plugins such as `CamelCasePlugin`.
+
 ## Aggregates
 
 `count` is never null. Other aggregates are nullable when their argument is, and also when

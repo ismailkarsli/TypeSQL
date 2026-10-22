@@ -1,6 +1,6 @@
 # API
 
-## `createSql<DB, TypeMap = DefaultTypeMap>(executor?)`
+## `createSql<DB, TypeMap = DefaultTypeMap>(executor?, options?)`
 
 Returns the typed `sql` function for a schema. Pass the adapter's type map (`PgTypeMap`,
 `PostgresJsTypeMap`) or use the adapter's pre-bound `createSql`. The optional `executor` is
@@ -9,7 +9,14 @@ instead (`createSql<DB>(pool)`).
 
 ```ts
 const sql = createSql<DB>();
+const camel = createSql<DB>(executor, { rowKeys: "camelCase" }); // Sql<DB, DefaultTypeMap, "camelCase">
 ```
+
+`options.rowKeys` is `"preserve"` (the default: rows keep Postgres' column names) or
+`"camelCase"`: the rows' top-level keys are camelCased with `CamelCasePlugin`'s mapping, in the
+row types and in the rows `execute*` return. See [camelCase row keys](../guide/queries#camelcase-row-keys).
+`@typesql/pg`, `@typesql/postgres` (both `createSql` and `createBigIntSql`) and `@typesql/kysely`
+take the same option after the client.
 
 ### `sql(text, ...params)`
 
@@ -114,6 +121,7 @@ const q = sql("SELECT u.id FROM users u {where}", { where });
 ### `sql.as<Row>(text, ...params)`
 
 Bypasses inference and asserts the row type. Accepts slots and named parameters like `sql`.
+`Row` is the row as returned: with `rowKeys: "camelCase"`, write it with camelCase keys.
 
 ### `q.execute()`, `q.executeTakeFirst()`, `q.executeTakeFirstOrThrow()`, `q.executeCount()`
 
@@ -139,6 +147,10 @@ own, or `@typesql/prisma`'s) works for everything but `executeCount`, which then
 `executeRaw` for Prisma counts. The methods are non-enumerable, so a query still deep-equals
 `{ text, values }`.
 
+Code that runs `q.text` itself, as the adapters' `query(client, q)` helpers do, calls
+`mapRows(q, rows)` to apply the query's `rowKeys` to the driver's rows. `rowKeysOf(q)` returns the
+option, and `camelCase(key)` is the key mapping.
+
 ## Public types
 
 | Type | Meaning |
@@ -147,6 +159,9 @@ own, or `@typesql/prisma`'s) works for everything but `executeCount`, which then
 | `Executor` | `(text, values) => PromiseLike<readonly unknown[] \| ExecutorResult>`, what `execute*` runs on |
 | `ExecutorResult` | `{ rows, rowCount: number \| null }`: an executor result with the statement's row count |
 | `NoResultError` | thrown by `executeTakeFirstOrThrow` on 0 rows; carries `text` |
+| `Sql<DB, TM, Keys = "preserve">` | the `sql` function; `Keys` is the `rowKeys` option |
+| `SqlOptions`, `RowKeys` | `createSql`'s options; `"preserve" \| "camelCase"` |
+| `CamelCase<S>`, `CamelCaseKeys<Row>`, `KeyedRow<Row, Keys>` | the key mapping on a string, on a row's top-level keys, and under a `rowKeys` option |
 | `Fragment<Text, Params>` | spliceable SQL piece |
 | `RowType<Q>`, `ParamsType<Q>`, `TextType<Q>` | extract from a `Query`/`Fragment` type |
 | `InlineMarker<T>` | type of `sql.param(value)`: the inline marker encoding `T` |
@@ -217,7 +232,7 @@ Each package wraps core's `createSql` with the schema converted from the ORM's t
 
 | Package | `createSql` | Schema type | Runs queries |
 |---|---|---|---|
-| `@typesql/kysely` | `createSql<DB, TM = DefaultTypeMap, Overrides = {}, Options = {}>(db?)` | `FromKysely<DB, Overrides, Options>` | `query(db, q)` → `Row[]`, `execute(db, q)` → `number`; `q.execute()` with a bound `db` |
+| `@typesql/kysely` | `createSql<DB, TM = DefaultTypeMap, Overrides = {}, Options = {}>(db?, { rowKeys? })` | `FromKysely<DB, Overrides, Options>` | `query(db, q)` → `Row[]`, `execute(db, q)` → `number`; `q.execute()` with a bound `db` |
 | `@typesql/drizzle` | `createSql<Schema, TM = DefaultTypeMap, Options = {}>(executor?)` | `FromDrizzle<Schema, Options>`; `pgType(column, "type")` pins a column | with a driver adapter, or `q.execute()` with an adapter's `executor(client)` |
 | `@typesql/prisma` | `createSql<S, TM = PrismaTypeMap>(prisma?)`; `S` is a generated `DB` or a `Prisma.TypeMap` | `FromPrisma<Prisma.TypeMap, Overrides>`; the `typesql-prisma` generator | `queryRaw(prisma, q)` → `PrismaPromise<Row[]>`, `executeRaw(prisma, q)` → `PrismaPromise<number>`; `q.execute()` with a bound `prisma` |
 

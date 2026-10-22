@@ -1,4 +1,4 @@
-import type { Executor, Query, RowType } from "@typesql/core";
+import { mapRows, type Executor, type Query, type RowType } from "@typesql/core";
 
 /** The subset of a `pg` query result the helpers rely on. */
 export interface PgResult {
@@ -58,7 +58,7 @@ export function executor(client: PgQueryable): Executor {
 /** Run a query and return all rows, typed from the query. */
 export async function query<Q extends AnyQuery>(client: PgQueryable, q: Q): Promise<RowType<Q>[]> {
   const result = await run(client, q);
-  return result.rows as RowType<Q>[];
+  return mapRows(q, result.rows);
 }
 
 /** Exactly one row, otherwise throws `RowCountError`. */

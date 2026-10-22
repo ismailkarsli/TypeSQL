@@ -42,8 +42,8 @@ const counts = await query(dbBig, big("SELECT author_id, count(*) AS n FROM post
 
 | Export | |
 |---|---|
-| `createSql<DB>()` | core's `createSql<DB, PostgresJsTypeMap>()` |
-| `createBigIntSql<DB>()` | core's `createSql<DB, PostgresJsBigIntTypeMap>()`, for `types: { bigint: postgres.BigInt }` |
+| `createSql<DB>(db?, options?)` | core's `createSql<DB, PostgresJsTypeMap>()`; `{ rowKeys: "camelCase" }` camelCases the row keys |
+| `createBigIntSql<DB>(db?, options?)` | core's `createSql<DB, PostgresJsBigIntTypeMap>()`, for `types: { bigint: postgres.BigInt }` |
 | `query(db, q)` | `Promise<Row[]>` (a plain array, result metadata stripped) |
 | `one(db, q)` | `Promise<Row>`; `RowCountError` unless exactly one row |
 | `maybeOne(db, q)` | `Promise<Row \| null>`; `RowCountError` on more than one row |

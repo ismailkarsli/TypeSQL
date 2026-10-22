@@ -23,6 +23,17 @@ const named = sql(`
 // #endregion naming
 check<Equal<RowType<typeof named>, { "?column?": number; lower: string; id: string; count: string; case: string | null; name: string }>>();
 
+import { createSql, type Executor } from "@typesql/core";
+import type { DB } from "./schema.js";
+declare const executor: Executor;
+// #region row-keys
+const camel = createSql<DB>(executor, { rowKeys: "camelCase" });
+
+const rows = await camel("SELECT id, display_name, created_at, count(*) OVER () AS total_count FROM users").execute();
+// { id: number; displayName: string | null; createdAt: Date; totalCount: string }[]
+// #endregion row-keys
+check<Equal<typeof rows, { id: number; displayName: string | null; createdAt: Date; totalCount: string }[]>>();
+
 // #region aggregates
 const totals = sql(`SELECT author_id, count(*) AS n, max(title) AS last FROM posts GROUP BY author_id`);
 // { author_id: number; n: string; last: string }

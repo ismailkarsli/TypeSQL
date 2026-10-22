@@ -60,6 +60,9 @@ adapter's executor can return its result unchanged:
 
 <<< @/snippets/adapters.ts#custom-executor
 
+`createSql(client, { rowKeys: "camelCase" })` gives camelCase rows, in the types and from
+`execute*` and the helpers alike. See [camelCase row keys](./queries#camelcase-row-keys).
+
 `@typesql/kysely` and `@typesql/prisma` can also run queries through the ORM's own client
 (`query`/`execute` on a `Kysely` instance, `queryRaw`/`executeRaw` on Prisma Client). See
 [ORM schemas](./orm-schemas).

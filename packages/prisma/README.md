@@ -194,7 +194,9 @@ field and option names are compile errors. Enum types keep their Prisma name.
 `queryRaw` and `executeRaw` run a typesql query with `$queryRawUnsafe(text, ...values)` and
 `$executeRawUnsafe(text, ...values)`. Despite the name, values are always sent as bind
 parameters (`$1`, `$2`, ...), never spliced into the text. Both return a `PrismaPromise`, so they
-work inside `prisma.$transaction([...])`, and accept a transaction client.
+work inside `prisma.$transaction([...])`, and accept a transaction client. A `PrismaPromise` cannot
+rename row keys, so `queryRaw` rejects a query from core's `createSql(executor, { rowKeys: "camelCase" })`;
+run that one with `q.execute(executor(prisma))`.
 
 ```ts
 import { createSql, executeRaw, queryRaw } from "@typesql/prisma";

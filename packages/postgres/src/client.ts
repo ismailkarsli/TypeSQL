@@ -1,4 +1,4 @@
-import type { Executor, Query, RowType } from "@typesql/core";
+import { mapRows, type Executor, type Query, type RowType } from "@typesql/core";
 
 /**
  * The shape of a resolved `sql.unsafe()` result the helpers rely on: an array with `count`
@@ -52,7 +52,7 @@ export function executor(sql: PostgresJsQueryable): Executor {
 /** Run a query and return all rows (a plain array, without postgres.js' result metadata). */
 export async function query<Q extends AnyQuery>(sql: PostgresJsQueryable, q: Q): Promise<RowType<Q>[]> {
   const result = await run(sql, q);
-  return Array.from(result) as RowType<Q>[];
+  return mapRows(q, Array.from(result));
 }
 
 /** Exactly one row, otherwise throws `RowCountError`. */

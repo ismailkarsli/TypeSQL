@@ -209,3 +209,19 @@ describe("executor", () => {
     await expect(sql.as<never>("CREATE TABLE t (x int)").executeCount(executor(fakeSql([], null).client))).resolves.toBe(0);
   });
 });
+
+describe("rowKeys: camelCase", () => {
+  test("execute* and the helpers return camelCase keys, without result metadata", async () => {
+    const raw = { id: 7, display_name: "A", meta_data: { inner_key: 1 } };
+    const { client } = fakeSql([raw]);
+    const expected = { id: 7, displayName: "A", metaData: { inner_key: 1 } };
+    const cq = createSql<DB>(client, { rowKeys: "camelCase" })("SELECT id, display_name FROM users WHERE id = $1", 7);
+    const rows = await cq.execute();
+    expect(rows).toEqual([expected]);
+    expect(rows).not.toHaveProperty("count");
+    expect(await query(client, cq)).toEqual([expected]);
+    expect(await one(client, cq)).toEqual(expected);
+    const big = createBigIntSql<DB>(client, { rowKeys: "camelCase" });
+    expect(await big("SELECT display_name FROM users").executeTakeFirst()).toEqual(expected);
+  });
+});

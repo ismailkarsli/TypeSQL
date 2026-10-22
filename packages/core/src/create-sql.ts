@@ -5,6 +5,7 @@ import type { CheckCarried, Enc, InlineMarker, RewriteInlineStr, Skip } from "./
 import type { HasSlots, JoinedText, MaxParamStr, QuotedIdent, SlotNames, Splice, SpliceCarried, Take, UnknownTuple } from "./engine/splice.js";
 import type { DefaultTypeMap } from "./type-map/index.js";
 import { makeFragment, makeQuery, type CARRIED, type Executor, type Fragment, type Query, type TextType } from "./query.js";
+import type { KeyedRow, RowKeys, SqlOptions } from "./row-keys.js";
 import { joinFragments, maxParam, quoteIdent, rewriteNamed, splice, type Spliceable } from "./runtime/splice.js";
 import { hasInline, param, resolveInline } from "./runtime/inline.js";
 
@@ -160,16 +161,23 @@ type BoxFragArgs<Text extends string> = Extract<{ [K in Text as `${K}`]: FragArg
  *
  * On an invalid statement the `query` argument's type becomes `SqlError<"...", position>`,
  * so the compile error lands on the SQL text.
+ *
+ * `Keys` is the `rowKeys` option: with `"camelCase"` the row types (and the rows) have
+ * camelCased keys.
  */
-export interface Sql<DB, TM> {
-  <const Q extends string>(query: Q & GateCallCheck<DB, TM, Q>, ...params: BoxCallArgs<DB, TM, Q>): Query<RowOf<DB, TM, PText<Q>>, ParamsOf<DB, TM, PText<Q>>, PText<Q>>;
+export interface Sql<DB, TM, Keys extends RowKeys = "preserve"> {
+  <const Q extends string>(query: Q & GateCallCheck<DB, TM, Q>, ...params: BoxCallArgs<DB, TM, Q>): Query<KeyedRow<RowOf<DB, TM, PText<Q>>, Keys>, ParamsOf<DB, TM, PText<Q>>, PText<Q>>;
   <const Q extends string, const S extends SlotMap>(
     query: Q & GateSlottedCheck<DB, TM, Q, S>,
     slots: S & SlotsFor<Q, S>,
     ...params: BoxSlottedArgs<DB, TM, Q, S>
-  ): Query<RowOf<DB, TM, SplicedOr<Q, S>>, ParamsOf<DB, TM, SplicedOr<Q, S>>, SplicedOr<Q, S>>;
+  ): Query<KeyedRow<RowOf<DB, TM, SplicedOr<Q, S>>, Keys>, ParamsOf<DB, TM, SplicedOr<Q, S>>, SplicedOr<Q, S>>;
 
-  /** Escape hatch: bypass inference and assert the row type. Accepts slots, `:name` and inline params like the main call. */
+  /**
+   * Escape hatch: bypass inference and assert the row type. Accepts slots, `:name` and inline
+   * params like the main call. `Row` is the row as returned, so with `rowKeys: "camelCase"` it
+   * has camelCase keys.
+   */
   as<Row>(query: string, ...params: readonly unknown[]): Query<Row, readonly unknown[]>;
   as<Row>(query: string, slots: SlotMap, ...params: readonly unknown[]): Query<Row, readonly unknown[]>;
 
@@ -248,16 +256,23 @@ function build(text: string, rest: readonly unknown[]): { text: string; values: 
   return slots ? splice(positional, slots, values) : { text: positional, values };
 }
 
-/** `executor`, when given, is what the queries' `execute*` methods run on by default. */
-export function createSql<DB, TM = DefaultTypeMap>(executor?: Executor): Sql<DB, TM> {
+/**
+ * `executor`, when given, is what the queries' `execute*` methods run on by default.
+ * `{ rowKeys: "camelCase" }` camelCases the top-level keys of every row, in the row types and in
+ * the rows `execute*` return (see `CamelCase`); values, JSON included, are not touched.
+ */
+export function createSql<DB, TM = DefaultTypeMap>(executor: Executor | undefined, options: SqlOptions & { readonly rowKeys: "camelCase" }): Sql<DB, TM, "camelCase">;
+export function createSql<DB, TM = DefaultTypeMap>(executor?: Executor, options?: SqlOptions & { readonly rowKeys?: "preserve" }): Sql<DB, TM>;
+export function createSql<DB, TM = DefaultTypeMap>(executor?: Executor, options?: SqlOptions): Sql<DB, TM, RowKeys> {
+  const rowKeys = options?.rowKeys ?? "preserve";
   const call = (query: string, ...rest: readonly unknown[]) => {
     const { text, values } = build(query, rest);
-    return makeQuery(text, values, executor);
+    return makeQuery(text, values, executor, rowKeys);
   };
   const api = Object.assign(call, {
     as: (query: string, ...rest: readonly unknown[]) => {
       const { text, values } = build(query, rest);
-      return makeQuery(text, values, executor);
+      return makeQuery(text, values, executor, rowKeys);
     },
     param,
     fragment: (text: string, ...rest: readonly unknown[]) => {
@@ -274,5 +289,5 @@ export function createSql<DB, TM = DefaultTypeMap>(executor?: Executor): Sql<DB,
       return makeFragment(r.text, r.values);
     },
   });
-  return api as unknown as Sql<DB, TM>;
+  return api as unknown as Sql<DB, TM, RowKeys>;
 }

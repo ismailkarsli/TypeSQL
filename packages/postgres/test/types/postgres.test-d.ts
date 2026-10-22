@@ -136,3 +136,15 @@ test("DML: execute returns the row count; RETURNING rows follow the type map", (
   expectTypeOf(one(db, ins)).toEqualTypeOf<Promise<{ id: bigint; view_counts: bigint[] }>>();
   expectTypeOf<ParamsType<typeof ins>>().toEqualTypeOf<[number, string, string[], bigint[]]>();
 });
+
+test("rowKeys: camelCase renames the row keys through the helpers too", () => {
+  const camel = createSql<DB>(db, { rowKeys: "camelCase" });
+  const cq = camel("SELECT id, display_name FROM users WHERE id = $1", 1);
+  type CamelRow = { id: number; displayName: string | null };
+  expectTypeOf<RowType<typeof cq>>().toEqualTypeOf<CamelRow>();
+  expectTypeOf(cq.execute()).toEqualTypeOf<Promise<CamelRow[]>>();
+  expectTypeOf(query(db, cq)).toEqualTypeOf<Promise<CamelRow[]>>();
+  const bigCamel = createBigIntSql<DB>(db, { rowKeys: "camelCase" });
+  expectTypeOf<RowType<ReturnType<typeof bigCamel<"SELECT count(*) AS user_count FROM users">>>>().toEqualTypeOf<{ userCount: bigint }>();
+  expectTypeOf(createBigIntSql<DB>(undefined, {})).toEqualTypeOf(big);
+});

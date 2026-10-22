@@ -135,3 +135,16 @@ test("DML: execute returns the row count; RETURNING rows flow through query/one"
   // @ts-expect-error email is NOT NULL without a default
   sql("INSERT INTO users (display_name) VALUES ($1)", "x");
 });
+
+test("rowKeys: camelCase renames the row keys through the helpers too", () => {
+  const camel = createSql<DB>(pool, { rowKeys: "camelCase" });
+  const cq = camel("SELECT id, display_name, created_at FROM users WHERE id = $1", 1);
+  type CamelRow = { id: number; displayName: string | null; createdAt: Date };
+  expectTypeOf<RowType<typeof cq>>().toEqualTypeOf<CamelRow>();
+  expectTypeOf(cq.execute()).toEqualTypeOf<Promise<CamelRow[]>>();
+  expectTypeOf(query(pool, cq)).toEqualTypeOf<Promise<CamelRow[]>>();
+  expectTypeOf(one(pool, cq)).toEqualTypeOf<Promise<CamelRow>>();
+  expectTypeOf(createSql<DB>(undefined, { rowKeys: "preserve" })).toEqualTypeOf(sql);
+  // @ts-expect-error not a rowKeys option
+  createSql<DB>(pool, { rowKeys: "snake" });
+});

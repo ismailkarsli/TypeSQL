@@ -70,6 +70,13 @@ pass `{ camelCase: true }`. SQL and rows then use the database's snake_case name
 
 <<< @/snippets/orm-kysely.ts#camel
 
+For camelCase rows, as `CamelCasePlugin` would return them, pass `{ rowKeys: "camelCase" }`.
+The top-level keys are renamed with the plugin's mapping, in the types and at runtime. The
+plugin itself stays bypassed, so keys inside JSON values are not renamed. See
+[camelCase row keys](./queries#camelcase-row-keys).
+
+<<< @/snippets/orm-kysely.ts#camel-rows
+
 ### Running queries
 
 <<< @/snippets/orm-kysely.ts#run

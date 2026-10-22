@@ -66,6 +66,9 @@ can be passed positionally (`$1`), by name (`:email` with an object), or inline 
 - **Running queries**: with `createSql(executor)` (or an adapter's `createSql(client)`), queries
   have `execute()`, `executeTakeFirst()`, `executeTakeFirstOrThrow()` and `executeCount()` (the
   affected row count). An `Executor` resolves to the rows or to `{ rows, rowCount }`.
+- **camelCase rows**: `createSql(executor, { rowKeys: "camelCase" })` renames the rows'
+  top-level keys (`created_at` → `createdAt`, as Kysely's `CamelCasePlugin` does) in the types
+  and at runtime, leaving JSON values alone.
 - **Escape hatch**: `sql.as<Row>(…)` for SQL the engine cannot type.
 
 ## Schema

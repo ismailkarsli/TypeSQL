@@ -35,7 +35,7 @@ const id = await transaction(pool, async (client) => {
 
 | Export | |
 |---|---|
-| `createSql<DB>()` | core's `createSql<DB, PgTypeMap>()` |
+| `createSql<DB>(pool?, options?)` | core's `createSql<DB, PgTypeMap>()`; `{ rowKeys: "camelCase" }` camelCases the row keys |
 | `query(client, q)` | `Promise<Row[]>` |
 | `one(client, q)` | `Promise<Row>`; `RowCountError` unless exactly one row |
 | `maybeOne(client, q)` | `Promise<Row \| null>`; `RowCountError` on more than one row |

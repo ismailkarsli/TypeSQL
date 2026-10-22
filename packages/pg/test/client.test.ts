@@ -265,3 +265,19 @@ describe("migrate", () => {
     expect(f.log).toEqual(["BEGIN", "CREATE TABLE a (id int)", "CREATE TABLE b (id int)", "ROLLBACK"]);
   });
 });
+
+describe("rowKeys: camelCase", () => {
+  test("execute* and the helpers return camelCase keys", async () => {
+    const raw = { id: 7, display_name: "A", meta_data: { inner_key: 1 } };
+    const { client } = fakeClient([raw]);
+    const camel = createSql<DB>(client, { rowKeys: "camelCase" });
+    const cq = camel("SELECT id, display_name FROM users WHERE id = $1", 7);
+    const expected = { id: 7, displayName: "A", metaData: { inner_key: 1 } };
+    expect(await cq.execute()).toEqual([expected]);
+    expect(await query(client, cq)).toEqual([expected]);
+    expect(await one(client, cq)).toEqual(expected);
+    expect(await maybeOne(client, cq)).toEqual(expected);
+    expect(await many(client, cq)).toEqual([expected]);
+    expect(await query(client, q)).toEqual([raw]);
+  });
+});

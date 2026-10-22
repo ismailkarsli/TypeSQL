@@ -10,8 +10,13 @@ import {
   type Driver,
   type QueryResult,
 } from "kysely";
+import { camelCase } from "@typesql/core";
 import { createSql, execute, executor, query } from "../src/index.js";
 import type { DB } from "./fixtures/kysely-codegen.js";
+import { camelCases } from "../../core/test/runtime/camel-cases.js";
+
+/** `CamelCasePlugin`'s own mapping (its `camelCase` and `mapRow` are protected). */
+const plugin = new CamelCasePlugin() as unknown as { camelCase(s: string): string; mapRow(row: Record<string, unknown>): Record<string, unknown> };
 
 /** A Kysely instance whose driver records each query and answers with `result`. */
 function fakeKysely(result: QueryResult<unknown>) {
@@ -103,5 +108,28 @@ describe("executor", () => {
     await expect(sql("DELETE FROM posts").executeCount(executor(del.db))).resolves.toBe(3);
     const sel = fakeKysely({ rows: [{ id: 1 }, { id: 2 }] });
     await expect(createSql<DB>(sel.db)("SELECT id FROM users").executeCount()).resolves.toBe(2);
+  });
+});
+
+describe("rowKeys: camelCase", () => {
+  test.each(camelCases)("%j maps as CamelCasePlugin maps it", (input, expected) => {
+    expect(plugin.camelCase(input)).toBe(expected);
+    expect(camelCase(input)).toBe(plugin.camelCase(input));
+  });
+
+  test("top-level keys are renamed once, as CamelCasePlugin would; JSON values are not", async () => {
+    const settings = { theme_name: "dark", recent_items: [{ item_id: 1 }] };
+    const raw = { id: 1, display_name: "Ada", address_line_1: "x", settings };
+    const { db } = fakeKysely({ rows: [raw] });
+    const camel = createSql<DB>(db, { rowKeys: "camelCase" });
+    const q = camel("SELECT id, display_name FROM users WHERE id = $1", 1);
+    const expected = { id: 1, displayName: "Ada", addressLine1: "x", settings };
+    expect(await q.executeTakeFirstOrThrow()).toEqual(expected);
+    expect(await query(db, q)).toEqual([expected]);
+    expect(await db.transaction().execute((trx) => q.execute(executor(trx)))).toEqual([expected]);
+    // the plugin agrees on the keys, but would also rename inside the JSON value
+    const viaPlugin = plugin.mapRow(raw);
+    expect(Object.keys(viaPlugin)).toEqual(Object.keys(expected));
+    expect(viaPlugin["settings"]).toEqual({ themeName: "dark", recentItems: [{ itemId: 1 }] });
   });
 });

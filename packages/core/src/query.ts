@@ -2,6 +2,8 @@
  * Runtime query object: `{ text, values }` plus phantom row/param/text types, and `execute*`
  * methods that run it. A `Fragment` is a piece of SQL that can be spliced into a query via `{slot}`.
  */
+import { applyRowKeys, type RowKeys } from "./row-keys.js";
+
 export declare const ROW: unique symbol;
 export declare const PARAMS: unique symbol;
 export declare const TEXT: unique symbol;
@@ -73,11 +75,33 @@ export type RowType<Q> = Q extends Query<infer R, readonly unknown[], string> ? 
 export type ParamsType<Q> = Q extends { readonly [PARAMS]?: infer P } ? P : never;
 export type TextType<Q> = Q extends { readonly [TEXT]?: infer T extends string } ? T : string;
 
+/** Where a query keeps its `rowKeys` (non-enumerable); `Symbol.for` so copies of core agree. */
+const ROW_KEYS = Symbol.for("typesql.rowKeys");
+
+/**
+ * Turn rows a driver returned for `q` into the rows `q`'s type describes: a fresh array, with
+ * the keys renamed when `q` comes from `createSql(executor, { rowKeys: "camelCase" })`. For
+ * helpers that run `q.text` themselves, such as the adapters' `query(client, q)`.
+ */
+export function mapRows<Q extends { readonly text: string }>(q: Q, rows: readonly unknown[]): RowType<Q>[] {
+  return applyRowKeys(rows, rowKeysOf(q)) as RowType<Q>[];
+}
+
+/** The `rowKeys` option of the `createSql` that built `q` (`"preserve"` for anything else). */
+export function rowKeysOf(q: { readonly text: string }): RowKeys {
+  return (q as { readonly [ROW_KEYS]?: RowKeys })[ROW_KEYS] ?? "preserve";
+}
+
 /**
  * A plain object whose `execute*` methods are non-enumerable, so it still deep-equals
- * `{ text, values }` (strictly, too).
+ * `{ text, values }` (strictly, too). `rowKeys` renames the keys of the rows `execute*` return.
  */
-export function makeQuery<Row, Params extends readonly unknown[], Text extends string = string>(text: string, values: readonly unknown[], executor?: Executor): Query<Row, Params, Text> {
+export function makeQuery<Row, Params extends readonly unknown[], Text extends string = string>(
+  text: string,
+  values: readonly unknown[],
+  executor?: Executor,
+  rowKeys: RowKeys = "preserve",
+): Query<Row, Params, Text> {
   const run = async (given?: Executor): Promise<readonly unknown[] | ExecutorResult> => {
     const exec = given ?? executor;
     if (!exec) throw new Error("typesql: no executor: pass one to createSql(executor) or to execute(executor)");
@@ -85,9 +109,10 @@ export function makeQuery<Row, Params extends readonly unknown[], Text extends s
   };
   const execute = async (given?: Executor): Promise<unknown[]> => {
     const result = await run(given);
-    return Array.from(isRows(result) ? result : result.rows);
+    return applyRowKeys(isRows(result) ? result : result.rows, rowKeys);
   };
   return Object.defineProperties({ text, values }, {
+    [ROW_KEYS]: { value: rowKeys },
     execute: { value: execute },
     executeCount: {
       value: async (given?: Executor) => {
