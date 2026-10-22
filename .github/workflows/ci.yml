@@ -26,9 +26,7 @@ jobs:
       TYPESQL_PG_URL: postgres://postgres:typesql@localhost:5432/postgres
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-        with:
-          version: 12
+      - uses: pnpm/action-setup@v6 # version from packageManager in package.json
       - uses: actions/setup-node@v7
         with:
           node-version: 26
@@ -62,9 +60,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-        with:
-          version: 12
+      - uses: pnpm/action-setup@v6 # version from packageManager in package.json
       - uses: actions/setup-node@v7
         with:
           node-version: 26
