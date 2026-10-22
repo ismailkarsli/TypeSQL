@@ -85,3 +85,21 @@ catalog names Postgres does not have, for a manual diff after a Postgres upgrade
 ```sh
 TYPESQL_PG_URL=postgres://postgres:x@localhost:5432/postgres node scripts/catalog-from-pg.mjs [names…]
 ```
+
+## System catalog slice
+
+`packages/core/src/schema/pg-catalog.ts` (`PgCatalog`) is generated from a live server. The
+relation list is `RELATIONS` in `scripts/pg-catalog-from-pg.mjs`. Column types come from
+`pg_attribute`, with domains replaced by their base type. Table columns are `NOT NULL` when
+`attnotnull` is set. View columns are `NOT NULL` only when the view's query tree
+(`pg_rewrite.ev_action`) proves it. Set-returning function columns are nullable unless they
+are in `FUNCTION_COLUMNS_NOT_NULL`.
+
+```sh
+TYPESQL_PG_URL=postgres://postgres:x@localhost:5432/postgres node scripts/pg-catalog-from-pg.mjs [--check]
+```
+
+`packages/core/test/conformance/pg-catalog.test.ts` regenerates the file and compares it when the
+server's major version matches the file's. On any version it selects every relation through
+both drivers and checks the column order, that `NOT NULL` columns hold no NULLs, and the
+`typeof` of every value.

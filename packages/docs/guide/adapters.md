@@ -142,7 +142,9 @@ jsonb, uuid, money, time, timetz, numrange). Two mismatches cannot be expressed 
 - array types without a registered parser come back as the raw `{…}` **string**: `name[]`,
   `"char"[]`, `xml[]`, `bit[]`, `varbit[]`, `tsvector[]`, `tsquery[]`, `circle[]`, `line[]`,
   `lseg[]`, `box[]`, `path[]`, `polygon[]`, `int4range[]`, `int8range[]`, `tsrange[]`,
-  `tstzrange[]`, `daterange[]`, `macaddr8[]`, `regclass[]`, `record[]`.
+  `tstzrange[]`, `daterange[]`, `macaddr8[]`, `regclass[]`, `record[]`. `PgTypeMap` declares
+  the two that [`PgCatalog`](./schema#system-catalogs) columns use, `aclitem[]` and
+  `"char"[]`, as `string`.
 
 If you depend on one of these, register a parser with `pg.types.setTypeParser` and use a
 custom type map (`createSql<DB, MyMap>()` from core), or cast in SQL.

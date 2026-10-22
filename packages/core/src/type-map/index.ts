@@ -56,6 +56,14 @@ export interface DefaultTypeMap {
   tsrange: string;
   tstzrange: string;
   daterange: string;
+  /** System types (`pg_catalog` columns, see `PgCatalog`): no driver parses them, so they arrive as text. */
+  xid: string;
+  xid8: string;
+  pg_lsn: string;
+  aclitem: string;
+  int2vector: string;
+  oidvector: string;
+  pg_node_tree: string;
   record: unknown;
   void: void;
   unknown: unknown;

@@ -1,6 +1,6 @@
 import { expectTypeOf, test } from "vitest";
 import type { Client, Pool, PoolClient } from "pg";
-import type { Col, Generated, Nullable, ParamsType, RowType, TsTypeOf } from "@typesql/core";
+import type { Col, Generated, Nullable, ParamsType, PgCatalog, RowType, TsTypeOf } from "@typesql/core";
 import {
   createSql,
   execute,
@@ -155,4 +155,12 @@ test("rowKeys: camelCase renames the row keys through the helpers too", () => {
   expectTypeOf(createSql<DB>(undefined, { rowKeys: "preserve" })).toEqualTypeOf(sql);
   // @ts-expect-error not a rowKeys option
   createSql<DB>(pool, { rowKeys: "snake" });
+});
+
+test("PgCatalog columns under PgTypeMap: unparsed system arrays are raw text", () => {
+  const sql = createSql<DB & PgCatalog>();
+  const q = sql("SELECT relacl, relkind, reloptions FROM pg_class");
+  expectTypeOf<RowType<typeof q>>().toEqualTypeOf<{ relacl: string | null; relkind: string; reloptions: string[] | null }>();
+  const p = sql("SELECT proargmodes, proargtypes, proallargtypes FROM pg_proc");
+  expectTypeOf<RowType<typeof p>>().toEqualTypeOf<{ proargmodes: string | null; proargtypes: string; proallargtypes: number[] | null }>();
 });

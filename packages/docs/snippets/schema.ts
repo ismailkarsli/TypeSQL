@@ -1,4 +1,5 @@
-import { createSql, type Col, type Enum, type Generated, type Nullable, type View } from "@typesql/core";
+import { createSql, type Col, type Enum, type Generated, type Nullable, type PgCatalog, type RowType, type View } from "@typesql/core";
+import { check, type Equal } from "./_check.js";
 
 // #region schema
 export interface DB {
@@ -24,3 +25,23 @@ export interface DB {
 // #region create
 export const sql = createSql<DB>();
 // #endregion create
+
+// #region pg-catalog
+const admin = createSql<DB & PgCatalog>();
+
+const connections = admin(`
+  SELECT state, count(*)::int AS total
+  FROM pg_stat_activity
+  WHERE datname = current_database()
+  GROUP BY state`);
+// { state: string | null; total: number }
+
+const columns = admin(`
+  SELECT column_name, data_type, is_nullable
+  FROM information_schema.columns
+  WHERE table_schema = 'public' AND table_name = $1
+  ORDER BY ordinal_position`, "users");
+// { column_name: string; data_type: string; is_nullable: string }
+// #endregion pg-catalog
+check<Equal<RowType<typeof connections>, { state: string | null; total: number }>>();
+check<Equal<RowType<typeof columns>, { column_name: string; data_type: string; is_nullable: string }>>();

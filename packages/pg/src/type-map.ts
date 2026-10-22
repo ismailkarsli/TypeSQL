@@ -52,6 +52,8 @@ export interface PgInterval {
  *     line[], lseg[], box[], path[], polygon[], int4range[], int8range[], tsrange[],
  *     tstzrange[], daterange[], macaddr8[], regclass[]/regtype[]/regproc[], record[].
  * Register your own parser (`pg.types.setTypeParser`) or cast in SQL if you depend on these.
+ * The two that `PgCatalog` columns use are declared here as the text pg returns: `aclitem[]`
+ * (`relacl`, `datacl`, ...) and `"char"[]` (`proargmodes`).
  */
 export interface PgTypeMap extends Omit<DefaultTypeMap, "bytea" | "interval" | "record" | "void"> {
   /** What parameters accept on top of the row types. */
@@ -62,6 +64,10 @@ export interface PgTypeMap extends Omit<DefaultTypeMap, "bytea" | "interval" | "
   record: string;
   /** `void`-returning functions (`pg_sleep`) yield an empty string. */
   void: string;
+  /** No array parser: the raw `{...}` text, e.g. `"{postgres=arwdDxtm/postgres}"`. */
+  "aclitem[]": string;
+  /** No array parser for `"char"[]`: the raw `{...}` text, e.g. `"{i,o}"`. */
+  "char[]": string;
 }
 
 /**

@@ -335,6 +335,8 @@ export interface FunctionCatalog {
   current_setting: [Sig<["anystring"], "text">, Sig<["anystring", "bool"], "text", Nullable>];
   set_config: Sig<["anystring", "anystring", "bool"], "text">;
   pg_backend_pid: Sig<[], "int4", NN>;
+  pg_cancel_backend: Sig<["int4"], "bool">;
+  pg_terminate_backend: [Sig<["int4"], "bool">, Sig<["int4", "int8"], "bool">];
   version: Sig<[], "text", NN>;
   pg_typeof: Sig<["any"], "regtype", NN>;
   pg_column_size: Sig<["any"], "int4">;

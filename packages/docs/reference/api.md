@@ -214,7 +214,12 @@ Arr<"int4">                  // int4[]
 Enum<"mood">                 // values in DB["$types"]["mood"]
 View<{ ...columns }>         // read-only relation
 interface DB { users: {...}; auth: { sessions: {...} }; $types: { mood: "a" | "b" } }
+type WithCatalog = DB & PgCatalog;  // opt-in pg_catalog / information_schema slice
 ```
+
+`PgCatalog` is `{ pg_catalog: PgCatalogNamespace; information_schema: InformationSchemaNamespace }`.
+Unqualified names that are not in the schema resolve against `DB["pg_catalog"]`, as Postgres
+always searches `pg_catalog`; see [System catalogs](../guide/schema#system-catalogs).
 
 Type names are Postgres names; spellings are normalized (`integer` → `int4`, `bigint` →
 `int8`, `boolean` → `bool`, `timestamp with time zone` → `timestamptz`, `serial` → `int4`

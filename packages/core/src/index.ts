@@ -7,7 +7,7 @@ export { splice, renumberParams, maxParam, quoteIdent, joinFragments, hasSlots, 
 export type { Splice, SlotNames, HasSlots, MaxParamStr, QuotedIdent, JoinedText, Take, UnknownTuple } from "./engine/splice.js";
 export type {
   Col, Nullable, Generated, NullableGenerated, Arr, Enum, ColDesc, Table, View, Namespace, Schema, TypeRegistry,
-  PgTypeName, PgScalarName, NormalizeTypeName,
+  PgTypeName, PgScalarName, NormalizeTypeName, PgCatalog, PgCatalogNamespace, InformationSchemaNamespace,
 } from "./schema/index.js";
 export type { DefaultTypeMap, DefaultParamTypeMap, ParamTypeMapOf, TypeMap, TsTypeOf, TsOf, TsParamTypeOf, EnumsOf } from "./type-map/index.js";
 export type { TableName, RelationName, TableOf, SetInput, InsertInput, SetRep, ValuesRep } from "./engine/write.js";

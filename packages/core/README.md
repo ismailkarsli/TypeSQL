@@ -88,7 +88,9 @@ also take numbers and bigints, and date parameters take `Date | string`):
 | `Enum<"mood">` | values in `DB["$types"]["mood"]` |
 | `View<{ … }>` | read-only relation |
 
-Other Postgres schemas nest (`DB["auth"]["sessions"]` is `auth.sessions`).
+Other Postgres schemas nest (`DB["auth"]["sessions"]` is `auth.sessions`). For
+`pg_stat_activity`, `pg_tables`, `information_schema.columns` and other system catalogs, add the
+opt-in slice: `createSql<DB & PgCatalog>()`.
 
 ## Requirements
 

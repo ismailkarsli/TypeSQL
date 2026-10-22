@@ -43,6 +43,49 @@ interface DB {
 }
 ```
 
+## System catalogs
+
+`pg_catalog` and `information_schema` are not part of a schema by default. To query them,
+intersect your schema with `PgCatalog`:
+
+<<< @/snippets/schema.ts#pg-catalog
+
+`PgCatalog` covers the relations applications and admin tools usually read, as of
+PostgreSQL 17:
+
+- **Statistics**: `pg_stat_activity`, `pg_stat_database`, `pg_stat_all_tables`,
+  `pg_stat_user_tables`, `pg_stat_all_indexes`, `pg_stat_user_indexes`,
+  `pg_statio_user_tables`, `pg_stat_replication`, `pg_locks`.
+- **Catalog views**: `pg_tables`, `pg_views`, `pg_matviews`, `pg_indexes`, `pg_sequences`,
+  `pg_roles`, `pg_settings`, `pg_replication_slots`, `pg_available_extensions`.
+- **Catalog tables**: `pg_class`, `pg_namespace`, `pg_attribute`, `pg_type`, `pg_index`,
+  `pg_constraint`, `pg_database`, `pg_proc`, `pg_enum`, `pg_attrdef`, `pg_description`,
+  `pg_depend`, `pg_extension`, `pg_trigger`, `pg_inherits`, `pg_sequence`, `pg_am`.
+- **`information_schema`**: `schemata`, `tables`, `columns`, `views`, `table_constraints`,
+  `key_column_usage`, `constraint_column_usage`, `referential_constraints`,
+  `check_constraints`, `routines`, `parameters`, `sequences`, `triggers`, `domains`.
+
+How they resolve:
+
+- `pg_catalog` relations work unqualified (`FROM pg_stat_activity`), as in Postgres, and
+  qualified (`FROM pg_catalog.pg_class`). A relation of your own schema with the same name
+  wins.
+- `information_schema` relations need the prefix (`FROM information_schema.columns`).
+- The whole slice is read-only: `UPDATE pg_settings …` is an error.
+
+Column types are the ones Postgres reports. The `information_schema` domains are their base
+types: `sql_identifier` is `name`, `cardinal_number` is `int4`, `character_data` and
+`yes_or_no` are `varchar`, `time_stamp` is `timestamptz`. System types without a driver
+parser (`xid`, `pg_lsn`, `oidvector`, `int2vector`, `aclitem`, `pg_node_tree`) are `string`.
+Under node-postgres, `aclitem[]` and `"char"[]` columns (`relacl`, `proargmodes`) come back as
+the raw `{…}` text, and `PgTypeMap` types them as `string`.
+
+Postgres does not record whether a view column can be NULL. A view column is `NOT NULL` in
+`PgCatalog` only when its definition proves it: for example `pg_tables.tablename` is
+`string`, while `pg_tables.schemaname` (from a `LEFT JOIN`) is `string | null`. The slice is
+generated from a live server by `scripts/pg-catalog-from-pg.mjs`, and the test suite checks it
+against Postgres with both drivers.
+
 ## Type maps
 
 The schema says what Postgres returns; the **type map** says what the driver turns it into.

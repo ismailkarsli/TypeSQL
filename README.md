@@ -100,6 +100,9 @@ interface DB {
 }
 ```
 
+System catalogs (`pg_stat_activity`, `pg_tables`, `information_schema.columns`, …) are an
+opt-in slice: `createSql<DB & PgCatalog>()`.
+
 Or derive the schema from migrations:
 
 ```ts

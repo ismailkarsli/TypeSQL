@@ -5,12 +5,15 @@ import type { ColInfo, ColMap, CteMap, Scope, ScopeItem, ScopeLevel } from "../t
 
 /**
  * Resolve a table reference to its column map.
- * Order: CTEs (unqualified only) → `DB[name]` (unqualified or `public.`) → `DB[schema][name]`.
+ * Order: CTEs (unqualified only) → `DB[name]` (unqualified or `public.`) → `DB["pg_catalog"][name]`
+ * (unqualified only: Postgres always searches `pg_catalog`) → `DB[schema][name]`.
  * Views (`{ $view: cols }`) unwrap to their columns.
  */
 export type ResolveTable<DB, Ref extends TableRef, Ctes extends CteMap> =
   Ref["schema"] extends null
     ? Ref["name"] extends keyof Ctes ? Ctes[Ref["name"]]
+    : Ref["name"] extends keyof DB ? LookupTable<DB, Ref["name"]>
+    : InPgCatalog<DB, Ref["name"]> extends true ? LookupTable<DB["pg_catalog" & keyof DB], Ref["name"]>
     : LookupTable<DB, Ref["name"]>
   : Ref["schema"] extends "public" ? LookupTable<DB, Ref["name"]>
   : Ref["schema"] extends keyof DB ? LookupTable<DB[Ref["schema"]], Ref["name"], `${Ref["schema"]}.${Ref["name"]}`>
@@ -23,6 +26,10 @@ type LookupTable<NS, Name extends string, Display extends string = Name> =
     : SqlError<`"${Display}" is not a table`, null>
     : SqlError<`relation "${Display}" does not exist`, null>;
 
+/** Is `Name` a relation of the schema's `pg_catalog` namespace (see `PgCatalog`)? */
+type InPgCatalog<DB, Name extends string> =
+  DB extends { readonly pg_catalog: infer PC } ? (Name extends keyof PC ? true : false) : false;
+
 /** Strip `hasDefault` so column infos are plain `{ type, nullable }`. */
 export type TableCols<T extends Table> = { readonly [K in keyof T]: { readonly type: T[K]["type"]; readonly nullable: T[K]["nullable"] } };
 
@@ -33,6 +40,7 @@ export type ResolveWritableTable<DB, Ref extends TableRef> =
       ? DB[Ref["name"]] extends View<Table> ? SqlError<`cannot modify view "${Ref["name"]}"`, null>
       : DB[Ref["name"]] extends Table ? DB[Ref["name"]]
       : SqlError<`"${Ref["name"]}" is not a table`, null>
+      : Ref["schema"] extends null ? (InPgCatalog<DB, Ref["name"]> extends true ? SqlError<`cannot modify view "pg_catalog.${Ref["name"]}"`, null> : SqlError<`relation "${Ref["name"]}" does not exist`, null>)
       : SqlError<`relation "${Ref["name"]}" does not exist`, null>
     : Ref["schema"] extends keyof DB
       ? Ref["name"] extends keyof DB[Ref["schema"]]
