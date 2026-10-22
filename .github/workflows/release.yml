@@ -1,10 +1,11 @@
 name: release
 
 # Started by hand only (`pnpm release`, or "Run workflow" on the Actions tab), never by a push.
-# Runs the ci.yml checks on main, then publishes every package version that is not on npm yet,
-# i.e. those of pushed `pnpm version -r` release commits, through npm trusted publishing (OIDC,
-# no token), and creates their GitHub releases. npm trusts this workflow file (release.yml) in
-# the `npm` environment, which only deploys from main; see packages/docs/internals/releasing.md.
+# Runs the ci.yml checks on main, applies the pending change intents (`pnpm version -r`) and
+# pushes the release commit, then publishes every package version that is not on npm yet through
+# npm trusted publishing (OIDC, no token), and creates their GitHub releases. npm trusts this
+# workflow file (release.yml) in the `npm` environment, which only deploys from main; see
+# packages/docs/internals/releasing.md.
 on:
   workflow_dispatch:
 
@@ -25,7 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: npm
     permissions:
-      contents: write # gh release create
+      contents: write # push the release commit, gh release create
       id-token: write # npm trusted publishing
     steps:
       - uses: actions/checkout@v7
@@ -37,6 +38,37 @@ jobs:
           node-version: 26
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Version pending change intents
+        run: |
+          # `name@version` of every public package, one per line.
+          public() {
+            pnpm -r ls --depth -1 --json | node -e '
+              for (const p of JSON.parse(require("fs").readFileSync(0)))
+                if (!p.private) console.log(`${p.name}@${p.version}`)'
+          }
+          # A version that was bumped but never published (an earlier run failed) is published
+          # first: `pnpm version -r` would fold new intents into it and rebuild its changelog
+          # section without the earlier entries. The next run versions the new intents.
+          before=$(public)
+          for pkg in $before; do
+            if ! pnpm view "$pkg" version >/dev/null 2>&1; then
+              echo "::notice::$pkg is not on npm yet; publishing without versioning"
+              exit 0
+            fi
+          done
+          pnpm change status
+          pnpm version -r
+          if [ -z "$(git status --porcelain)" ]; then
+            exit 0
+          fi
+          # "chore: release 0.0.4", or "chore: release 0.0.4, 0.1.0" when versions diverge.
+          versions=$(comm -13 <(sort <<<"$before") <(public | sort) | sed 's/.*@//' | sort -uV | paste -sd, - | sed 's/,/, /g')
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "chore: release $versions"
+          # Rejected, so nothing is published, when main moved past the commit the checks ran on.
+          git push origin HEAD:main
       - run: pnpm build
       - run: pnpm smoke:dist
       # The workflow only gets here on main, which is what publish's git checks verify.

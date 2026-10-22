@@ -60,29 +60,34 @@ pnpm check:intents HEAD~3      # against another base
 
 ## Cutting a release
 
-Packages are published only by the `release` workflow (`.github/workflows/release.yml`) through
-npm trusted publishing; nothing is published from a local machine. From an up-to-date `main`
-with a clean working tree:
+Packages are versioned and published only by the `release` workflow
+(`.github/workflows/release.yml`) through npm trusted publishing; nothing is published from a
+local machine. With the intents to release pushed to `main`:
 
 ```sh
 pnpm change status                 # check the plan: every bump and why
-pnpm version -r --dry-run
-pnpm version -r                    # bump versions, write changelog sections, update the ledger
-git add -A
-git commit -m "chore: release 0.0.4"
-git push
 pnpm release                       # gh workflow run release.yml --ref main
 ```
 
-`pnpm version -r` refuses to run on a dirty tree and, being recursive, creates no commit or tag.
-Pushing publishes nothing; the `release` workflow runs only when started by hand on `main`, with
-`pnpm release` or **Run workflow** on the Actions tab. It runs the `ci.yml` checks (`test`,
-`intents`, `bench`) on the current `main`; once they pass, its `publish` job builds and
-smoke-tests the packages, runs `pnpm publish -r`, and creates the GitHub releases.
+The workflow runs only when started by hand on `main`, with `pnpm release` or **Run workflow** on
+the Actions tab; pushing publishes nothing. It runs the `ci.yml` checks (`test`, `intents`,
+`bench`) on the current `main`. Once they pass, its `publish` job runs `pnpm version -r` (bump
+versions, write changelog sections, update the ledger), commits the result as
+`chore: release <version>` from `github-actions[bot]` and pushes it to `main`, then builds and
+smoke-tests the packages, runs `pnpm publish -r`, and creates the GitHub releases. The push is
+rejected, and nothing is published, when `main` moved after the run started; start it again.
+A push made with the workflow's token starts no other workflow, so `ci` does not run on the
+release commit, which changes only versions and changelogs.
+
 `pnpm publish -r` publishes every public package whose manifest version is not on the registry
-yet and skips the rest, so a run without new versions publishes nothing, and re-running a failed
-run publishes only what is missing. Start the release right after pushing the release commit
-(see [Pitfalls](#pitfalls)), then check that every bumped version is live:
+yet and skips the rest. A run without pending intents therefore versions nothing and publishes
+nothing. When a public package's current version is not on npm (an earlier run failed to
+publish, or a release commit was pushed by hand), the run skips `pnpm version -r` and only
+publishes what is missing (see [Pitfalls](#pitfalls)); run it once more to release the intents
+added since. Cutting the release commit by hand still works: `pnpm version -r` on a clean,
+up-to-date `main`, commit, push, then `pnpm release`.
+
+After a run, check that every bumped version is live:
 
 ```sh
 for p in core pg postgres kysely drizzle prisma; do pnpm view @typesql/$p version; done
@@ -179,8 +184,9 @@ the committed versions break a configured versioning rule.
 - **Publish before cutting the next release.** For a package whose current version was bumped
   but never published, `pnpm version -r` does not bump again: the new intents go into the same
   unreleased version (`0.0.3 → 0.0.3` in `pnpm change status`) and its changelog section is
-  rebuilt without the entries of the earlier run. Run `pnpm release` after every release
-  commit, before the next `pnpm version -r`.
+  rebuilt without the entries of the earlier run. The `release` workflow therefore skips
+  `pnpm version -r` while any public version is unpublished. When cutting a release commit by
+  hand, run `pnpm release` right after it, before the next `pnpm version -r`.
 - **Build first.** The tarballs ship `dist/` and the packages have no publish-time build script;
   the `publish` job builds and smoke-tests the output first. Keep it that way when editing the
   workflow: a bare `pnpm publish -r` publishes whatever `dist/` holds.
