@@ -113,6 +113,10 @@ const q = sql("SELECT u.id FROM users u {where}", { where });
   `sql.fragment("AND age > $1", "eighteen")` spliced next to an `int4` column is an error.
 - Whole queries are spliceable too (`WHERE id IN ({sub})`).
 - `sql.id("col")` → `"col"`; `sql.id("schema", "table")` → `"schema"."table"`.
+  A union of literal names gives a union of texts; the statement is checked once per member
+  (an error in any member is reported) and the row type is the union. A generic name
+  constrained to `RelationName<DB>` is widened to every top-level table and view; any other
+  non-literal name is dynamic.
 - `sql.join([f1, f2], " AND ")` keeps the literal text for tuple inputs; an array input is
   dynamic.
 - `sql.list(items, separator = ", ")` joins a runtime array of fragments whose texts are
@@ -186,6 +190,7 @@ option, and `camelCase(key)` is the key mapping.
 | `InlineMarker<T>` | type of `sql.param(value)`: the inline marker encoding `T` |
 | `DefaultMarker<T>` | type of `sql.valueOrDefault(value)` |
 | `TableName<DB>` | writable tables: top-level names and `"schema.table"` |
+| `RelationName<DB>` | top-level tables and views (what a generic `sql.id(name)` is widened to) |
 | `TableOf<DB, T>` | the column descriptors of a `TableName` |
 | `SetInput<DB, TM, T>`, `InsertInput<DB, TM, T>` | what `sql.set` / a `sql.values` row accepts |
 | `SetRep<P>`, `ValuesRep<R>` | the representative text and carried values of `sql.set` / `sql.values` |

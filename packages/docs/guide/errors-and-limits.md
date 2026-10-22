@@ -49,7 +49,11 @@ Measured on TypeScript 7.0.2:
 - `sql.list` checks one statement with every distinct element once, so its cost grows with the
   number of distinct elements, not with the number of combinations (80 distinct sort
   elements: ~0.2M instantiations). In a select list it counts every element as selected.
-- `sql.set` and `sql.values` are checked the same way, with every key of the input type once.
+- A fragment whose text is a union (`sql.id(name)` with `name: "a" | "b"`) is checked once
+  per member, so two such slots in one statement cost `n × m` checks. A generic `sql.id`
+  over `RelationName<DB>` checks the statement against every table and view. For lists, use
+  `sql.list`, which costs one check.
+- `sql.set` and `sql.values` are checked like `sql.list`, with every key of the input type once.
   The schema does not tell identity `GENERATED ALWAYS` columns apart from other columns with a
   default, so writing one is accepted (Postgres rejects it without `OVERRIDING SYSTEM VALUE`).
 - `sql.valueOrDefault` inside `sql.fragment(…)` has its value type checked, but not whether

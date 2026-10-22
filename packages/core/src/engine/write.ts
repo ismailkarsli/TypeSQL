@@ -23,6 +23,10 @@ export type TableName<DB> =
   | { [NS in keyof DB & string]: NS extends "$types" ? never : IsTable<DB[NS]> extends true ? never : DB[NS] extends View<Table> ? never : NsTables<NS, DB[NS]> }[keyof DB & string];
 type NsTables<NS extends string, N> = { [K in keyof N & string]: IsTable<N[K]> extends true ? `${NS}.${K}` : never }[keyof N & string];
 
+/** Top-level tables and views of a schema (what an unqualified `FROM name` can read). */
+export type RelationName<DB> =
+  { [K in keyof DB & string]: K extends "$types" ? never : DB[K] extends View<Table> ? K : IsTable<DB[K]> extends true ? K : never }[keyof DB & string];
+
 /** The column descriptors of a `TableName`. */
 export type TableOf<DB, T extends string> =
   T extends keyof DB ? (DB[T] extends Table ? DB[T] : never)

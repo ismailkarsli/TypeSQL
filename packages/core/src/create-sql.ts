@@ -9,7 +9,13 @@ import type { KeyedRow, RowKeys, SqlOptions } from "./row-keys.js";
 import { joinFragments, maxParam, quoteIdent, rewriteNamed, splice, type Spliceable } from "./runtime/splice.js";
 import { hasInline, param, resolveInline, valueOrDefault } from "./runtime/inline.js";
 import { buildSet, buildValues } from "./runtime/write.js";
-import type { InsertInput, NoExtraKeys, SetInput, SetRep, TableName, ValuesRep } from "./engine/write.js";
+import type { InsertInput, NoExtraKeys, RelationName, SetInput, SetRep, TableName, ValuesRep } from "./engine/write.js";
+
+/**
+ * `Parts` when every part is a literal (or a union of literals). A generic part leaves this
+ * unresolved, which fails the first `sql.id` overload so the later ones apply.
+ */
+type LiteralParts<Parts extends readonly string[]> = { readonly [I in keyof Parts]: string extends Parts[I] ? never : {} extends Record<Parts[I], 1> ? never : Parts[I] };
 
 /** Fragments accepted in a slot object: fragments or whole queries (subqueries). */
 export type Slottable = Fragment<string, readonly unknown[], readonly unknown[]> | Query<unknown, readonly unknown[], string>;
@@ -67,7 +73,7 @@ type ArgsFor<DB, TM, X extends string, Names extends string[], Encs extends read
     ? Encs extends readonly [] ? ParamsOf<DB, TM, X> : Take<ParamsOf<DB, TM, X>, M>
     : [params: NamedParams<Names, Take<ParamsOf<DB, TM, X>, Names["length"]>>];
 
-/** `unknown` when the call is valid; otherwise the SqlError (so it lands on the query literal). */
+/** `true` when the call is valid; otherwise the SqlError (so it lands on the query literal). */
 type CallCheck<DB, TM, Q extends string> =
   IsLiteral<Q> extends false ? SqlError<NotLiteralMessage, 0>
   : HasSlots<Q> extends true ? never
@@ -84,9 +90,9 @@ type CallArgs<DB, TM, Q extends string> =
     ? ArgsFor<DB, TM, X, Names, Encs, M>
     : readonly unknown[];
 
-/** `unknown` when every carried value type fits its parameter, else the SqlError. */
+/** `true` when every carried value type fits its parameter, else the SqlError. */
 type Carried<DB, TM, X extends string, K extends readonly unknown[]> =
-  K extends readonly null[] ? unknown : CheckCarried<DB, TM, X, K> extends infer C ? (C extends true ? unknown : C) : never;
+  K extends readonly null[] ? true : CheckCarried<DB, TM, X, K>;
 
 /**
  * `sql.valueOrDefault(v)` with a value that can be `undefined`: the statement is checked again
@@ -94,12 +100,21 @@ type Carried<DB, TM, X extends string, K extends readonly unknown[]> =
  * position allows `DEFAULT` or not on its own). `S` is the slot object, `null` without slots.
  */
 type DefaultsCheck<DB, Q extends string, S> =
-  HasDefaultable<Q> extends false ? unknown
+  HasDefaultable<Q> extends false ? true
   : PText<WithDefaults<Q>> extends infer X extends string
     ? (S extends null ? X : Splice<X, SlotTexts<S>>) extends infer X2 extends string
-      ? Validate<DB, X2> extends SqlError<infer Msg extends string, infer At> ? SqlError<`${Msg} (sql.valueOrDefault() sends DEFAULT for undefined)`, At> : unknown
-      : unknown
-    : unknown;
+      ? Extract<Validate<DB, X2>, AnyErr> extends infer E ? ([E] extends [never] ? true : DefaultErr<E>) : never
+      : true
+    : true;
+
+type DefaultErr<E> = E extends SqlError<infer Msg extends string, infer At> ? SqlError<`${Msg} (sql.valueOrDefault() sends DEFAULT for undefined)`, At> : E;
+
+/**
+ * Checks return `true` or an SqlError per member of a union text (a fragment whose text is a
+ * union of literals), so the results are a union. Any error wins; then `unknown` (valid) or
+ * `never` (wrong overload).
+ */
+type Surface<R> = [Extract<R, AnyErr>] extends [never] ? ([R] extends [never] ? never : unknown) : Extract<R, AnyErr>;
 
 // ─── with slots ───
 
@@ -135,7 +150,7 @@ type SplicedOr<Q extends string, S> = SplicedText<Q, S> extends infer X extends 
 type FragCheck<Text extends string, Slotted extends boolean> =
   IsLiteral<Text> extends false ? SqlError<NotLiteralMessage, 0>
   : HasSlots<Text> extends Slotted
-    ? Prepared<Text> extends infer P ? (P extends AnyErr ? P : unknown) : never
+    ? Prepared<Text> extends infer P ? (P extends AnyErr ? P : true) : never
     : never;
 /**
  * Arguments to `sql.fragment`: positional values for its `$n`, or one `:name` object. Applied as
@@ -187,11 +202,11 @@ export type ListRep<E, Sep extends string> =
       : never
     : never;
 
-type GateCallCheck<DB, TM, Q extends string> = [DB, TM, Q] extends [infer D, infer M, infer Q2 extends string] ? CallCheck<D, M, Q2> : never;
+type GateCallCheck<DB, TM, Q extends string> = [DB, TM, Q] extends [infer D, infer M, infer Q2 extends string] ? Surface<CallCheck<D, M, Q2>> : never;
 type GateSlottedCheck<DB, TM, Q extends string, S> =
-  [DB, TM, Q, S] extends [infer D, infer M, infer Q2 extends string, infer S2] ? SlottedCheck<D, M, Q2, S2> : never;
+  [DB, TM, Q, S] extends [infer D, infer M, infer Q2 extends string, infer S2] ? Surface<SlottedCheck<D, M, Q2, S2>> : never;
 type GateFragCheck<Text extends string, Slotted extends boolean> =
-  [Text, Slotted] extends [infer T2 extends string, infer B extends boolean] ? FragCheck<T2, B> : never;
+  [Text, Slotted] extends [infer T2 extends string, infer B extends boolean] ? Surface<FragCheck<T2, B>> : never;
 type BoxCallArgs<DB, TM, Q extends string> = Extract<{ [K in Q as `${K}`]: CallArgs<DB, TM, K> }[`${Q}`], readonly unknown[]>;
 type BoxSlottedArgs<DB, TM, Q extends string, S> = Extract<{ [K in Q as `${K}`]: SlottedArgs<DB, TM, K, S> }[`${Q}`], readonly unknown[]>;
 type BoxFragArgs<Text extends string> = Extract<{ [K in Text as `${K}`]: FragArgs<K> }[`${Text}`], readonly unknown[]>;
@@ -253,8 +268,19 @@ export interface Sql<DB, TM, Keys extends RowKeys = "preserve"> {
     ...params: A & BoxFragArgs<Text>
   ): Fragment<SplicedOr<Text, S>, readonly unknown[], [...FragCarried<Text, A>, ...SpliceCarried<PText<Text>, SlotCarried<S>>]>;
 
-  /** Quoted identifier fragment: `sql.id("col")` → `"col"`, `sql.id("s", "t")` → `"s"."t"`. */
-  id<const Parts extends readonly [string, ...string[]]>(...parts: Parts): Fragment<QuotedIdent<Parts>, [], []>;
+  /**
+   * Quoted identifier fragment: `sql.id("col")` → `"col"`, `sql.id("s", "t")` → `"s"."t"`. A union
+   * of literals gives a union of texts, and the statement is checked once per member.
+   */
+  id<const Parts extends readonly [string, ...string[]]>(...parts: Parts & LiteralParts<Parts>): Fragment<QuotedIdent<Parts>, [], []>;
+  /**
+   * A generic relation name (`<T extends RelationName<DB>>(t: T) => sql.id(t)`) cannot be read
+   * inside the generic function, so it is widened to every table and view: the statement is
+   * checked against each and the row type is the union of their rows.
+   */
+  id(name: RelationName<DB>): Fragment<QuotedIdent<[RelationName<DB>]>, [], []>;
+  /** Any other name (`string`, a generic): a dynamic fragment, for `sql.as<Row>()`. */
+  id(...parts: readonly [string, ...string[]]): Fragment<string, [], []>;
 
   /** Join fragments with a separator; a tuple input keeps the literal text, an array yields a dynamic fragment. */
   join<const Items extends readonly Slottable[], const Sep extends string = ", ">(items: Items, separator?: Sep): Fragment<JoinedText<SlotTexts<Items> extends readonly { readonly text: string }[] ? SlotTexts<Items> : never, Sep>, readonly unknown[], JoinedCarried<Items>>;

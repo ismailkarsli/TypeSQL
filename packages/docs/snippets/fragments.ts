@@ -1,6 +1,6 @@
-import type { ParamsType, Query, RowType, TextType } from "@typesql/core";
+import type { ParamsType, Query, RelationName, RowType, TextType } from "@typesql/core";
 import { check, type Equal } from "./_check.js";
-import { sql } from "./schema.js";
+import { sql, type DB } from "./schema.js";
 
 // #region slots
 const byAuthor7 = sql.fragment("WHERE p.author_id = $1", 7);
@@ -36,6 +36,20 @@ listed.text; // 'SELECT "display_name" FROM users u WHERE u.id > $1 AND u.email 
 // #endregion helpers
 check<Equal<RowType<typeof listed>, { display_name: string | null }>>();
 check<Equal<TextType<typeof listed>, 'SELECT "display_name" FROM users u WHERE u.id > $1 AND u.email LIKE $2'>>();
+
+// #region id-union
+declare const shown: "email" | "display_name";
+const pick = sql.id(shown); // Fragment<'"display_name"' | '"email"'>
+const picked = sql("SELECT {pick} FROM users", { pick });
+// RowType: { display_name: string | null } | { email: string }
+
+function countRows<T extends RelationName<DB>>(table: T) {
+  const t = sql.id(table); // every table and view of DB
+  return sql("SELECT count(*) AS n FROM {t}", { t });
+}
+// #endregion id-union
+check<Equal<RowType<typeof picked>, { display_name: string | null } | { email: string }>>();
+check<Equal<RowType<ReturnType<typeof countRows>>, { n: string }>>();
 
 // #region list
 const SORT = {

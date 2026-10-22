@@ -10,7 +10,7 @@ export type {
   PgTypeName, PgScalarName, NormalizeTypeName,
 } from "./schema/index.js";
 export type { DefaultTypeMap, DefaultParamTypeMap, ParamTypeMapOf, TypeMap, TsTypeOf, TsOf, TsParamTypeOf, EnumsOf } from "./type-map/index.js";
-export type { TableName, TableOf, SetInput, InsertInput, SetRep, ValuesRep } from "./engine/write.js";
+export type { TableName, RelationName, TableOf, SetInput, InsertInput, SetRep, ValuesRep } from "./engine/write.js";
 export type { Analyze, RowOf, ParamsOf, ParamsArgs, NamesOf, Validate, KindOf, ApplyDdl, BuildRow } from "./engine/infer.js";
 export type { RewriteNamed, NamedParams } from "./engine/named.js";
 export type { SqlError, AnyErr, IsErr, ErrMsg, ErrAt } from "./engine/errors.js";

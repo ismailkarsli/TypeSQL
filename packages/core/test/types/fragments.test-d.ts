@@ -1,5 +1,5 @@
 import { expectTypeOf, test } from "vitest";
-import { createSql, type Col, type Generated, type Nullable, type Query, type Fragment, type SqlError, type Splice, type SlotNames, type QuotedIdent, type JoinedText, type ParamsType, type RowType, type TextType } from "../../src/index.js";
+import { createSql, type Col, type Generated, type Nullable, type Query, type Fragment, type SqlError, type Splice, type SlotNames, type QuotedIdent, type JoinedText, type ParamsType, type RelationName, type RowType, type TextType } from "../../src/index.js";
 
 interface DB {
   users: { id: Generated<"int4">; email: Col<"text">; display_name: Nullable<"text">; age: Nullable<"int4"> };
@@ -104,6 +104,43 @@ test("sql.list: dynamic count, typed elements", () => {
   expectTypeOf(dyn).toEqualTypeOf<Fragment<string, readonly unknown[], []>>();
   // @ts-expect-error dynamic SQL fragment
   sql("SELECT u.id FROM users u ORDER BY {dyn}", { dyn });
+});
+
+test("sql.id: unions of literals and generic relation names", () => {
+  // a union of literal names is a union of texts; the statement is checked per member
+  const col = "email" as "email" | "display_name";
+  const c = sql.id(col);
+  expectTypeOf(c).toEqualTypeOf<Fragment<'"display_name"' | '"email"', [], []>>();
+  const q = sql("SELECT {c} FROM users", { c });
+  expectTypeOf<RowType<typeof q>>().toEqualTypeOf<{ display_name: string | null } | { email: string }>();
+  const bad = "email" as "email" | "title";
+  const b = sql.id(bad);
+  // @ts-expect-error column "title" does not exist (in users)
+  sql("SELECT {b} FROM users", { b });
+  // the same for a union statement text
+  // @ts-expect-error column "nope" does not exist
+  sql("SELECT id FROM users" as "SELECT id FROM users" | "SELECT nope FROM users");
+
+  // a generic relation name widens to every relation of the schema
+  function all<T extends RelationName<DB>>(table: T) {
+    const t = sql.id(table);
+    expectTypeOf(t).toEqualTypeOf<Fragment<'"posts"' | '"users"', [], []>>();
+    return sql("SELECT * FROM {t}", { t });
+  }
+  expectTypeOf<RowType<ReturnType<typeof all>>>().toEqualTypeOf<
+    { id: number; email: string; display_name: string | null; age: number | null } | { id: string; author_id: number; title: string }
+  >();
+  // other generic or non-literal names are dynamic: use sql.as
+  function cols<C extends "email" | "age">(name: C) {
+    return sql.id(name);
+  }
+  expectTypeOf<ReturnType<typeof cols>>().toEqualTypeOf<Fragment<string, [], []>>();
+  const s = sql.id("x" as string);
+  expectTypeOf(s).toEqualTypeOf<Fragment<string, [], []>>();
+  // @ts-expect-error dynamic SQL fragment
+  sql("SELECT * FROM {s}", { s });
+  expectTypeOf(sql.id("a", "x" as string)).toEqualTypeOf<Fragment<string, [], []>>();
+  expectTypeOf(sql.id("a", "b")).toEqualTypeOf<Fragment<'"a"."b"', [], []>>();
 });
 
 test("plain calls still work with object params", () => {

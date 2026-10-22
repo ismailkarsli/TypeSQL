@@ -39,6 +39,18 @@ their text as a literal type, so the statement is still fully typed:
 
 <<< @/snippets/fragments.ts#helpers
 
+A name whose type is a union of literals gives a fragment whose text is a union. The
+statement is checked once for each member, and the row type is the union of their rows:
+
+<<< @/snippets/fragments.ts#id-union
+
+Inside a generic function, the name's type is not known until the call, so typesql cannot
+check the statement there. A generic constrained to `RelationName<DB>` (the top-level tables
+and views) is widened to all of them: the statement is checked against every relation, and
+the row type is the union of all their rows. Any other generic or `string` name gives a
+dynamic fragment, for `sql.as`. To check against a narrower set, widen the name yourself:
+`sql.id(name as "users" | "posts")`.
+
 `sql.join` keeps the literal text only for a tuple written in place. Joining an array built at
 runtime gives a fragment whose text is not known at compile time; use `sql.list` for that.
 
