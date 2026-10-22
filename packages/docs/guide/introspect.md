@@ -49,6 +49,7 @@ comparisons and aggregates are then typed the way Postgres runs them.
 | domain | its base type, through domains over domains |
 | `citext` | `"text"` |
 | enum | its name, with the labels in `$types` in sort order |
+| `json` / `jsonb` column given a type in [`columnTypes`](#json-columns) | `Json<T>`, with its flags |
 | other types (`tstzrange`, extension types) | their name; an unknown name maps to `unknown` unless the type map has it |
 | table and column comments | JSDoc |
 | a name that is not a JS identifier (`password:write`) | a quoted key |
@@ -67,25 +68,27 @@ schemas share one `$types` entry with the labels of both. A schema with the same
 
 ## JSON columns
 
-A `jsonb` column is `unknown` by default. Give columns TypeScript types with `columnTypes` in a
-config file:
+A `jsonb` column is `unknown` by default. Give `json` / `jsonb` columns TypeScript types with
+`columnTypes` in a config file:
 
 <<< @/snippets/introspect.ts#config
 
-Each listed column is declared with its key as the type name, and the key's TypeScript type goes
-into a second exported interface, `ColumnTypes`:
+Each listed column is declared as a [`Json<T>` column](./schema#typed-json-columns) of that
+type, with the column's flags (and `"json"` for a `json` column):
 
 <<< @/snippets/introspect.ts#generated
 
-Merge it into the type map:
+It is still `jsonb` to the SQL, rows read it as `T`, `->` / `#>` index into `T`, and values are
+written with [`sql.json()`](./parameters#json-values):
 
 <<< @/snippets/introspect.ts#use
 
 `imports` adds lines after the generated import, for the types `columnTypes` uses. The config
 file can be `.mjs` or, with Node.js 26, `.ts`. `columnTypes` can also be a function of the
-column, for example to read the type from the column comment. `column` replaces a whole
-descriptor: return the TypeScript source to use (any helper of your own), or `undefined` to
-keep the default.
+column, for example to read the type from the column comment. A key that names no column, or a
+column that is not `json` / `jsonb` (`json[]` included), is an error. `column` replaces a whole
+descriptor, for any column: return the TypeScript source to use (any helper of your own), or
+`undefined` to keep the default.
 
 ## From code
 

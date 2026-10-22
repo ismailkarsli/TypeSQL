@@ -2,10 +2,10 @@ import { expectTypeOf, test } from "vitest";
 import { createSql, type IsErr, type ParamsType, type RowType, type SqlError, type Validate } from "@typesql/core";
 import type { PgTypeMap } from "../../src/index.js";
 import type { HistoryItem, Settings } from "./json-types.js";
-import type { ColumnTypes, DB } from "./schema.generated.js";
+import type { DB } from "./schema.generated.js";
 
 /** Queries against the schema `typesql introspect` generated from fixture.ts. */
-const sql = createSql<DB, PgTypeMap & ColumnTypes>();
+const sql = createSql<DB, PgTypeMap>();
 
 test("exact Postgres types: dates, floats, uuid, numeric, arrays, enums, domains", () => {
   const q = sql(`
@@ -49,11 +49,23 @@ test("quoted identifiers", () => {
   expectTypeOf<RowType<typeof q>>().toEqualTypeOf<{ "password:write": boolean | null; "Display Name": string | null }>();
 });
 
-test("JSON columns get the TS types passed in columnTypes", () => {
+test("JSON columns get the TS types passed in columnTypes, as Json<T> columns", () => {
   const q = sql("SELECT history, settings FROM users");
   expectTypeOf<RowType<typeof q>>().toEqualTypeOf<{ history: HistoryItem[]; settings: Settings | null }>();
   const e = sql("SELECT payload FROM events");
   expectTypeOf<RowType<typeof e>>().toEqualTypeOf<{ payload: { kind: string } | null }>();
+  // still json / jsonb to the SQL, and indexed into T
+  const i = sql("SELECT jsonb_array_length(history) AS n, history -> 0 -> 'value' AS first, settings ->> 'theme' AS theme, payload -> 'kind' AS kind FROM users, events");
+  expectTypeOf<RowType<typeof i>>().toEqualTypeOf<{ n: number; first: number | null; theme: string | null; kind: string | null }>();
+});
+
+test("JSON columns are written with sql.json()", () => {
+  const items: HistoryItem[] = [{ at: "2024-01-01", value: 1 }];
+  const q = sql(`UPDATE users SET history = ${sql.json(items)}, settings = $1 WHERE id = $2`, { theme: "dark" }, "id");
+  expectTypeOf<ParamsType<typeof q>>().toEqualTypeOf<[Settings | null, string | null, HistoryItem[]]>();
+  sql("UPDATE users SET {set}", { set: sql.set("users", { history: sql.json(items) }) });
+  // @ts-expect-error a raw array for a jsonb parameter
+  sql("UPDATE users SET history = $1", items);
 });
 
 test("defaults, identity, serial and generated columns are optional on INSERT", () => {

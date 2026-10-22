@@ -318,7 +318,7 @@ typesql introspect [--url <url>] [--out <file>] [--schema <name>]… [--exclude 
 | Export | |
 |---|---|
 | `introspect(client, { schemas?, exclude?, viewNotNull? })` | `Promise<IntrospectedDatabase>`: `{ version, schemas, relations, enums }` |
-| `generateSource(db, options?)` | the schema file's source; options `typeName`, `importFrom`, `imports`, `columnTypes` (map or function), `columnTypesName`, `column`, `comments` |
+| `generateSource(db, options?)` | the schema file's source; options `typeName`, `importFrom`, `imports`, `columnTypes` (map or function; json / jsonb columns become `Json<T>`), `column`, `comments` |
 | `main(argv)` | the CLI, returns the exit code |
 | `IntrospectConfig` | the default export of a `--config` module: `url`, `out` and every option above |
 | `ViewNullability`, `parseNodeTree` | the view column nullability analysis |

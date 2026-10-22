@@ -1,6 +1,6 @@
 import { writeFile } from "node:fs/promises";
 import { Client } from "pg";
-import { createSql, type Col, type Generated, type RowType } from "@typesql/core";
+import { createSql, type Col, type Generated, type Json, type RowType } from "@typesql/core";
 import { generateSource, introspect, type IntrospectConfig } from "@typesql/pg/introspect";
 import type { PgTypeMap } from "@typesql/pg";
 import { check, type Equal } from "./_check.js";
@@ -27,25 +27,25 @@ export interface DB {
     id: Generated<"uuid">;
     name: Col<"text">;
     created_at: Generated<"timestamptz">;
-    history: Generated<"portfolio.history">;
+    history: Json<HistoryItem[], { hasDefault: true }>;
   };
-}
-
-export interface ColumnTypes {
-  "portfolio.history": HistoryItem[];
 }
 // #endregion generated
 
 // #region use
-const sql = createSql<DB, PgTypeMap & ColumnTypes>();
+const sql = createSql<DB, PgTypeMap>();
 
 const recent = sql(`
-  SELECT name, history, created_at::date AS day
+  SELECT name, history, history -> -1 -> 'value' AS last, created_at::date AS day
   FROM portfolio
   WHERE created_at > now() - interval '7 days'`);
-// { name: string; history: HistoryItem[]; day: Date }
+// { name: string; history: HistoryItem[]; last: number | null; day: Date }
+
+declare const history: HistoryItem[];
+const save = sql(`UPDATE portfolio SET history = ${sql.json(history)} WHERE name = $1`, "a");
 // #endregion use
-check<Equal<RowType<typeof recent>, { name: string; history: HistoryItem[]; day: Date }>>();
+check<Equal<RowType<typeof recent>, { name: string; history: HistoryItem[]; last: number | null; day: Date }>>();
+check<Equal<RowType<typeof save>, never>>();
 
 export async function regenerate(): Promise<void> {
   // #region api
