@@ -248,7 +248,7 @@ type ParamsOfCall<E extends Call, C extends Ctx, M> =
         : ParamsOfCallRest<E, C, ParamsOfList<E["args"], C, M, null>>
       : never
     : ParamsOfCallRest<E, C, ParamsOfList<E["args"], C, M, null>>;
-type NonStarArgs<Args extends readonly Expr[]> = Args extends readonly [{ readonly t: "star" }] ? [] : Args;
+type NonStarArgs<Args extends readonly Expr[]> = Args extends readonly [{ readonly t: "star"; readonly tbl: null }] ? [] : Args;
 /** FILTER (WHERE $1) → bool; WITHIN GROUP (ORDER BY $1) → unknown. */
 type ParamsOfCallRest<E extends Call, C extends Ctx, M> =
   ParamsOfOpt<E["withinGroup"], C, ParamsOfOpt<E["filter"], C, M, Info<"bool", true>>, null>;

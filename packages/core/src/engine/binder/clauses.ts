@@ -2,6 +2,7 @@ import type { Expr, NamedWindow, Target, WindowSpec } from "../ast.js";
 import type { AnyErr, ErrMsg, SqlError } from "../errors.js";
 import type { Nx } from "../parser/util.js";
 import type { ColInfo, Cols, Ctx } from "../types.js";
+import type { AnyShaped, BaseOf } from "../shape.js";
 import type { TypeList, TypeOf } from "../typer/typeof.js";
 
 /**
@@ -28,7 +29,8 @@ type DisplayNames = {
 };
 /** Postgres's display name of a canonical type (`format_type`), for messages. */
 export type TypeDisplay<T extends string> =
-  T extends `${infer E}[]` ? `${TypeDisplay<E>}[]` : T extends keyof DisplayNames ? DisplayNames[T] : T;
+  T extends AnyShaped ? BaseOf<T>
+  : T extends `${infer E}[]` ? `${TypeDisplay<E>}[]` : T extends keyof DisplayNames ? DisplayNames[T] : T;
 
 // ─── conditions ───
 

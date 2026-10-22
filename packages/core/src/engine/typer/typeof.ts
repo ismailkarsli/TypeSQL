@@ -1,8 +1,9 @@
 import type { Call, CaseWhen, Expr, SelectStmt } from "../ast.js";
-import type { ResolveColumn } from "../binder/resolve.js";
+import type { ResolveColumn, WholeRow } from "../binder/resolve.js";
 import type { SqlError } from "../errors.js";
 import type { ProjectSelect } from "../project/select.js";
 import type { ColInfo, Cols, Ctx, Info, ColMap } from "../types.js";
+import type { ObjShape, Shaped } from "../shape.js";
 import type { CallType } from "./catalog.js";
 import type { BinOpType, CommonLit, LitToText, NumLitType, UnOpType } from "./operators.js";
 
@@ -59,8 +60,8 @@ export type TypeOf<E extends Expr, C extends Ctx> =
   : E extends { readonly t: "overlay" } ? StringResult<TypeOf<E["e"], C>, null, null>
   : E extends { readonly t: "attz" } ? TypeAtTz<TypeOf<E["e"], C>, TypeOf<E["zone"], C>>
   : E extends { readonly t: "collate" } ? TypeOf<E["e"], C>
-  : E extends { readonly t: "field" } ? Check<TypeOf<E["e"], C>, Info<"unknown", true>>
-  : E extends { readonly t: "star" } ? SqlError<"* is only allowed in a target list or count(*)", null>
+  : E extends { readonly t: "field" } ? TypeField<TypeOf<E["e"], C>, E["name"]>
+  : E extends { readonly t: "star" } ? (E["tbl"] extends string ? WholeRow<C["scope"], E["tbl"], `missing FROM-clause entry for table "${E["tbl"]}"`> : SqlError<"* is only allowed in a target list or count(*)", null>)
   : SqlError<"unsupported expression", null>;
 
 // ─── helpers ───
@@ -80,6 +81,17 @@ type StrictOf<A, B, T extends string> = A extends ColInfo ? (B extends ColInfo ?
 type WithType<A, T extends string> = A extends ColInfo ? Info<T, A["nullable"]> : A;
 type MakeNullable<A> = A extends ColInfo ? Info<A["type"], true> : A;
 type ArrayOf<A> = A extends ColInfo ? Info<A["type"] extends `${string}[]` ? A["type"] : `${A["type"]}[]`> : A;
+/**
+ * `(e).f`: a column of a whole-row value (nullable when the row or the column is); `unknown`
+ * for other composite values. `(e).*` expands only in a target list.
+ */
+type TypeField<A, N extends string> =
+  A extends ColInfo
+    ? N extends "*" ? SqlError<"(e).* is only supported in a target list", null>
+    : A["type"] extends Shaped<"record", ObjShape<infer M extends ColMap>>
+      ? N extends keyof M ? Info<M[N]["type"], Or<A["nullable"], M[N]["nullable"]>> : SqlError<`column "${N}" not found in data type record`, null>
+      : Info<"unknown", true>
+    : A;
 /** Type an optional sub-expression: info, null when absent, or an error. */
 type TypeOpt<E extends Expr | null, C extends Ctx> = E extends Expr ? TypeOf<E, C> : null;
 type NullableOpt<X> = X extends ColInfo ? X["nullable"] : false;
@@ -239,7 +251,7 @@ type TypeWhens<Whens extends readonly CaseWhen[], C extends Ctx, T extends strin
 
 // ─── calls ───
 
-type NonStarArgs<Args extends readonly Expr[]> = Args extends readonly [{ readonly t: "star" }] ? [] : Args;
+type NonStarArgs<Args extends readonly Expr[]> = Args extends readonly [{ readonly t: "star"; readonly tbl: null }] ? [] : Args;
 
 /** Type the arguments, then FILTER and WITHIN GROUP expressions (for errors and the ordered-set result type), then resolve. */
 type TypeCall<E extends Call, C extends Ctx> =
@@ -254,7 +266,7 @@ type TypeCall<E extends Call, C extends Ctx> =
                   readonly over: E["over"];
                   readonly filter: F extends ColInfo ? true : false;
                   readonly distinct: E["distinct"];
-                  readonly hasStar: E["args"] extends readonly [{ readonly t: "star" }] ? true : false;
+                  readonly hasStar: E["args"] extends readonly [{ readonly t: "star"; readonly tbl: null }] ? true : false;
                   readonly wg: W extends ColInfo ? W["type"] : "unknown";
                 }>
               : W

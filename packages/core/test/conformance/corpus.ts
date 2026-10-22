@@ -300,6 +300,22 @@ export const corpus = [
     expectTypes: { key: "string", value: "string" },
   },
   {
+    name: "whole-row reference: the record is its text form, (t).col reaches a column",
+    setup: [],
+    sql: "SELECT u, (u).email, (u).display_name AS dn, u IS NULL AS missing FROM users u ORDER BY id LIMIT 1",
+    params: [],
+    expectKeys: ["u", "email", "dn", "missing"],
+    expectTypes: { u: "string", email: "string", dn: "string", missing: "boolean" },
+  },
+  {
+    name: "(t).* of the null-extended side of a LEFT JOIN",
+    setup: [],
+    sql: "SELECT (p).* FROM users u LEFT JOIN posts p ON p.author_id = u.id ORDER BY u.id DESC LIMIT 1",
+    params: [],
+    expectKeys: ["id", "author_id", "title", "body", "tags", "views", "published_at"],
+    expectTypes: { id: "null", author_id: "null", title: "null", body: "null", tags: "null", views: "null", published_at: "null" },
+  },
+  {
     name: "INSERT ... RETURNING: generated columns are present, omitted nullable column is NULL",
     setup: [],
     sql: "INSERT INTO users (email) VALUES ($1) RETURNING id, email, display_name, created_at, is_admin",

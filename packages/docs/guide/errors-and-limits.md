@@ -61,6 +61,10 @@ Measured on TypeScript 7.0.2:
 - In editor hovers, row types list their keys alphabetically (TypeScript 7 orders the keys of
   computed object types). The rows the driver returns keep the `SELECT` order.
 
+- A whole-row reference (`to_json(t)`, `(t).*`) is nullable when all of the row's columns are,
+  since that is how the outer side of a join looks. A table whose columns are all nullable is
+  therefore typed as a nullable row even when it is not joined.
+
 Unsupported syntax is always a compile error, never a silent `any`. Notable gaps: `ROWS FROM
 (…)`, tracking which views depend on which tables, and column alias lists on plain tables. The
 [DDL reference](../reference/ddl#limitations) lists the DDL limitations.

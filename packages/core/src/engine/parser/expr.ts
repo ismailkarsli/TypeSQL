@@ -53,7 +53,7 @@ type ParseInfix<T extends Toks, L, I extends number, Min extends Prec> =
     ? O extends Terminator ? Ok<L, I>
     : O extends "::" ? (Binds<12, Min> extends true ? ParseCastSuffix<T, L, Nx<I>, Min> : Ok<L, I>)
     : O extends "[" ? (Binds<12, Min> extends true ? ParseSubscript<T, L, Nx<I>, Min> : Ok<L, I>)
-    : O extends "." ? (L extends { readonly t: "row" | "sub" } ? ParseFieldAccess<T, L, Nx<I>, Min> : Ok<L, I>)
+    : O extends "." ? (L extends { readonly t: "row" | "sub" | "field" } ? ParseFieldAccess<T, L, Nx<I>, Min> : Ok<L, I>)
     : O extends ComparisonOp ? (Binds<5, Min> extends true ? ParseComparisonRhs<T, L, O, Nx<I>, Min> : Ok<L, I>)
     : O extends "+" | "-" ? BinRhs<T, L, O, 8, I, Min>
     : O extends "*" | "/" | "%" ? BinRhs<T, L, O, 9, I, Min>
@@ -160,8 +160,10 @@ type ParseSliceHi<T extends Toks, L, Lo, I extends number, Min extends Prec> =
       : never
     : ParseInfix<T, { t: "slice"; e: L; lo: Lo; hi: null }, EatOp<T, I, "]">, Min>;
 
+/** `(e).name` or `(e).*` (name `"*"`). */
 type ParseFieldAccess<T extends Toks, L, I extends number, Min extends Prec> =
-  Ident<T, I> extends [infer N extends string, infer J extends number] ? ParseInfix<T, { t: "field"; e: L; name: N }, J, Min> : Expected<"field name", T, I>;
+  T[I] extends OpTok<"*"> ? ParseInfix<T, { t: "field"; e: L; name: "*" }, Nx<I>, Min>
+  : Ident<T, I> extends [infer N extends string, infer J extends number] ? ParseInfix<T, { t: "field"; e: L; name: N }, J, Min> : Expected<"field name", T, I>;
 
 /** After `IS`. */
 type ParseIs<T extends Toks, L, I extends number, Min extends Prec> =
@@ -319,9 +321,14 @@ type ParseParen<T extends Toks, I extends number> =
               ? EatOp<T, J2, ")"> extends never ? Expected<'")"', T, J2> : Ok<{ t: "row"; items: Items }, EatOp<T, J2, ")">>
               : Y
             : never
+          : T[EatOp<T, J, ")">] extends OpTok<"."> ? ParseParenField<T, E, Nx<EatOp<T, J, ")">>>
           : Ok<E, EatOp<T, J, ")">>
         : X
       : never;
+/** `(e).name` / `(e).*` after a parenthesized expression (the infix loop continues with the result). */
+type ParseParenField<T extends Toks, E, I extends number> =
+  T[I] extends OpTok<"*"> ? Ok<{ t: "field"; e: E; name: "*" }, Nx<I>>
+  : Ident<T, I> extends [infer N extends string, infer J extends number] ? Ok<{ t: "field"; e: E; name: N }, J> : Expected<"field name", T, I>;
 
 /** Identifier-led expression: column ref, `t.*`, function call, or typed literal. */
 type ParseNameExpr<T extends Toks, I extends number> =

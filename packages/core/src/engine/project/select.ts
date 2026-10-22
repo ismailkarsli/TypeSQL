@@ -8,7 +8,8 @@ import type { NarrowKeys, NarrowLevel } from "../binder/narrow.js";
 import type { ExpandStar } from "../binder/resolve.js";
 import type { AnyErr, SqlError } from "../errors.js";
 import type { Nx } from "../parser/util.js";
-import type { ColInfo, ColMap, Cols, ColsToMap, CteMap, Ctx, Info, MkCtx, Scope, ScopeLevel } from "../types.js";
+import type { ColInfo, ColMap, Cols, ColsToMap, CteMap, Ctx, Info, MkCtx, NullableMap, Scope, ScopeLevel } from "../types.js";
+import type { ObjShape, Shaped } from "../shape.js";
 import type { CommonLit, LitToText } from "../typer/operators.js";
 import type { TypeOf } from "../typer/typeof.js";
 import type { ColumnName } from "./naming.js";
@@ -284,6 +285,13 @@ type CheckWindows<Ws extends readonly NamedWindow[], Ts extends readonly Target[
     : never;
 type TargetExprs<Ts extends readonly Target[]> = { readonly [K in keyof Ts]: Ts[K]["e"] };
 
+/** `(t).*` in a target list: the columns of a whole-row value (all nullable when the row is). */
+type FieldStar<A> =
+  A extends ColInfo
+    ? A["type"] extends Shaped<"record", ObjShape<infer M extends ColMap>> ? (A["nullable"] extends true ? NullableMap<M> : M)
+    : SqlError<"(e).* needs a whole-row value such as (t).*", null>
+    : A;
+
 /**
  * Targets → ordered columns, applying Postgres column naming. A `*` / `t.*` target is one
  * `{ star }` entry. `Lit`: an untyped string-literal target is typed `lit` (set operations).
@@ -292,6 +300,10 @@ export type ProjectTargets<Ts extends readonly Target[], C extends Ctx, Acc exte
   Ts[I] extends undefined ? Acc
   : Ts[I]["e"] extends { readonly t: "star"; readonly tbl: infer Tbl extends string | null }
     ? ExpandStar<C["scope"], Tbl> extends infer M
+      ? M extends ColMap ? ProjectTargets<Ts, C, [...Acc, { readonly star: M }], Nx<I>, Lit> : M
+      : never
+  : Ts[I]["e"] extends { readonly t: "field"; readonly name: "*" }
+    ? FieldStar<TypeOf<Ts[I]["e"]["e"], C>> extends infer M
       ? M extends ColMap ? ProjectTargets<Ts, C, [...Acc, { readonly star: M }], Nx<I>, Lit> : M
       : never
     : (Lit extends true ? (Ts[I]["e"] extends { readonly t: "str" } ? Info<"lit"> : TypeOf<Ts[I]["e"], C>) : TypeOf<Ts[I]["e"], C>) extends infer Ty

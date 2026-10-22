@@ -2,6 +2,7 @@ import type { Table, View } from "../../schema/column.js";
 import type { TableRef } from "../ast.js";
 import type { SqlError } from "../errors.js";
 import type { ColInfo, ColMap, CteMap, Scope, ScopeItem, ScopeLevel } from "../types.js";
+import type { RowInfo } from "../shape.js";
 
 /**
  * Resolve a table reference to its column map.
@@ -54,10 +55,11 @@ export type ResolveWritableTable<DB, Ref extends TableRef> =
 
 /**
  * Resolve `tbl.name` or bare `name` against the scope. Innermost level first; a bare
- * name must be unambiguous within the level where it is found.
+ * name must be unambiguous within the level where it is found. A bare name that is no column
+ * at any level but names a FROM item is a whole-row reference (Postgres tries columns first).
  */
 export type ResolveColumn<S extends Scope, Tbl extends string | null, Name extends string> =
-  Tbl extends string ? ResolveQualified<S, Tbl, Name> : ResolveBare<S, Name>;
+  Tbl extends string ? ResolveQualified<S, Tbl, Name> : ResolveBare<S, Name, S>;
 
 type ResolveQualified<S extends Scope, Tbl extends string, Name extends string> =
   S extends readonly [infer L extends ScopeLevel, ...infer Outer extends Scope]
@@ -74,14 +76,25 @@ type FindAlias<L extends ScopeLevel, Tbl extends string> =
     ? I["alias"] extends Tbl ? I : FindAlias<R, Tbl>
     : null;
 
-type ResolveBare<S extends Scope, Name extends string> =
+type ResolveBare<S extends Scope, Name extends string, All extends Scope> =
   S extends readonly [infer L extends ScopeLevel, ...infer Outer extends Scope]
     ? FindBare<L, Name, null> extends infer R
       ? R extends ColInfo ? R
       : R extends "ambiguous" ? SqlError<`column reference "${Name}" is ambiguous`, null>
-      : ResolveBare<Outer, Name>
+      : ResolveBare<Outer, Name, All>
       : never
-    : SqlError<`column "${Name}" does not exist`, null>;
+    : WholeRow<All, Name, `column "${Name}" does not exist`>;
+
+/**
+ * Whole-row reference to the FROM item `Name` (`to_json(t)`, `t.*` as a value, `t IS NULL`):
+ * a `record` shaped like the item's columns (see shape.ts), or the error `Missing`.
+ */
+export type WholeRow<S extends Scope, Name extends string, Missing extends string> =
+  S extends readonly [infer L extends ScopeLevel, ...infer Outer extends Scope]
+    ? FindAlias<L, Name> extends infer Item
+      ? Item extends ScopeItem ? RowInfo<Item["cols"]> : WholeRow<Outer, Name, Missing>
+      : never
+    : SqlError<Missing, null>;
 
 /** Search a level for an unqualified name: info, `"ambiguous"`, or null. */
 type FindBare<L extends ScopeLevel, Name extends string, Found extends ColInfo | null> =

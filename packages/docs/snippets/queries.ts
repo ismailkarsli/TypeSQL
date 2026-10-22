@@ -58,6 +58,14 @@ const structured = sql(`
 // #endregion structure
 check<Equal<RowType<typeof structured>, { email: string; latest: string | null; has_posts: boolean }>>();
 
+// #region wholerow
+const rows = sql(`
+  SELECT u.email, (p).title, p IS NULL AS no_posts
+  FROM users u LEFT JOIN posts p ON p.author_id = u.id`);
+// { email: string; title: string | null; no_posts: boolean }
+// #endregion wholerow
+check<Equal<RowType<typeof rows>, { email: string; title: string | null; no_posts: boolean }>>();
+
 // #region narrowing
 const withTitles = sql(`
   SELECT u.email, p.title

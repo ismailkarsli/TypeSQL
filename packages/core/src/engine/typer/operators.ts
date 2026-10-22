@@ -1,4 +1,5 @@
 import type { ColInfo, Info } from "../types.js";
+import type { ShapedCommon } from "../shape.js";
 
 /**
  * Operator typing. `BinOpType<Op, L, R>` → ColInfo, `UnOpType<Op, E>` → ColInfo.
@@ -218,10 +219,11 @@ export type UnOpType<Op extends string, E extends ColInfo> =
  * numerics follow the implicit cast chain (`NumCommon`); date < timestamp < timestamptz;
  * string types keep the first one (`coalesce(vc, label)` → varchar, verified on PG 17);
  * anything else that differs (int4 vs text, json vs jsonb) has no common type → `unknown`.
+ * Structured values (shape.ts) of the same base type merge their shapes.
  * The result may be `lit` (all branches string literals): resolve it with `LitToText`.
  */
 export type CommonLit<A extends string, B extends string> =
-  A extends B ? A
+  A extends B ? ([B] extends [A] ? A : ShapedCommon<A, B>)
   : A extends UnknownT ? B
   : B extends UnknownT ? A
   : A extends LitT ? B
@@ -237,7 +239,7 @@ export type CommonLit<A extends string, B extends string> =
   : A extends "cidr" ? (B extends "inet" ? "inet" : "unknown")
   : A extends "inet" ? (B extends "cidr" ? "inet" : "unknown")
   : A extends `${infer AE}[]` ? (B extends `${infer BE}[]` ? (CommonLit<AE, BE> extends infer E extends string ? (E extends "unknown" ? "unknown" : `${LitToText<E>}[]`) : never) : "unknown")
-  : "unknown";
+  : ShapedCommon<A, B>;
 
 /**
  * `CommonLit` for callers that type string literals as plain `text` (set operations,

@@ -80,6 +80,18 @@ Also supported: derived tables (`FROM (SELECT …) AS t(a, b)`), `LATERAL`, `VAL
 set-returning functions such as `generate_series`, `unnest` and `jsonb_each` in `FROM`,
 `DISTINCT ON`, named windows, `FOR UPDATE`, and `ORDER BY` / `GROUP BY` by alias or position.
 
+## Whole-row references
+
+A table alias used as a value is the whole row: `to_json(t)`, `json_agg(t)`, `row_to_json(t.*)`,
+`t IS NULL`. As in Postgres, a column of that name wins over the alias. `(t).col` reads one
+column and `(t).*` expands to all of them. The row on the outer side of a join is nullable, and
+so are its columns.
+
+<<< @/snippets/queries.ts#wholerow
+
+Selecting the row itself (`SELECT t FROM …`) gives the `record` type of the type map: the
+drivers return its text form, such as `"(1,ada@example.com)"`.
+
 ## Narrowing with WHERE
 
 Conditions in `WHERE` (and in an inner join's `ON`) that rule out `NULL` make the column
