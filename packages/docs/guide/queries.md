@@ -154,6 +154,7 @@ signatures use the notation of the [function catalog](../reference/api#function-
 
 <<< @/snippets/queries.ts#functions
 
-Alternatively, augment `FunctionCatalog` (for every schema), or create the function in your
+Alternatively, augment `FunctionCatalog` (for every schema, and the simplest route with the
+Kysely, Drizzle and Prisma schema packages), or create the function in your
 [migrations](./migrations): `CREATE FUNCTION` records its return type. A cast gives an
 untyped result a type (`my_fn(x)::int4`).
