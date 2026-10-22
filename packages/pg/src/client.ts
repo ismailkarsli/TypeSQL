@@ -44,9 +44,15 @@ function run(client: PgQueryable, q: AnyQuery): Promise<PgResult> {
   return client.query(q.text, Array.from(q.values));
 }
 
-/** An `Executor` for core's `q.execute()`: runs queries on `client` and resolves to the rows. */
+/**
+ * An `Executor` for core's `q.execute()`: runs queries on `client` and resolves to
+ * `{ rows, rowCount }` (pg's `rowCount`, so `q.executeCount()` works).
+ */
 export function executor(client: PgQueryable): Executor {
-  return async (text, values) => (await client.query(text, Array.from(values))).rows;
+  return async (text, values) => {
+    const { rows, rowCount } = await client.query(text, Array.from(values));
+    return { rows, rowCount };
+  };
 }
 
 /** Run a query and return all rows, typed from the query. */

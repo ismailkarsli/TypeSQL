@@ -39,7 +39,9 @@
     "kysely": ">=0.27"
   },
   "devDependencies": {
+    "@types/pg": "^8.23.1",
     "kysely": "^0.29.6",
+    "pg": "^8.23.1",
     "typescript": "7.0.2",
     "vitest": "^5.0.4"
   }

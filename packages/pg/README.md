@@ -41,6 +41,7 @@ const id = await transaction(pool, async (client) => {
 | `maybeOne(client, q)` | `Promise<Row \| null>`; `RowCountError` on more than one row |
 | `many(client, q)` | `Promise<[Row, ...Row[]]>`; `RowCountError` on zero rows |
 | `execute(client, q)` | `Promise<number>`, the affected row count |
+| `executor(client)` | an `Executor` for `q.execute()` and `q.executeCount()` (reports `rowCount`); `createSql<DB>(pool)` binds one |
 | `transaction(pool, fn)` | `BEGIN`, `fn(client)`, `COMMIT`; `ROLLBACK` and rethrow on error |
 | `migrate(pool, m)` | runs `m.statements` (e.g. from core's `migrations()`) in one transaction |
 | `PgTypeMap`, `PgInterval` | the type map, and the `postgres-interval` object type |

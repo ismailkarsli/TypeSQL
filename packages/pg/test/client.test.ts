@@ -72,6 +72,14 @@ describe("executor", () => {
     expect(await q.executeTakeFirst(executor(client))).toBeUndefined();
     await expect(q.executeTakeFirstOrThrow(executor(client))).rejects.toBeInstanceOf(NoResultError);
   });
+
+  test("resolves to { rows, rowCount }, so executeCount reports pg's rowCount", async () => {
+    const { client } = fakeClient([rowA], 1);
+    await expect(executor(client)("SELECT 1", [])).resolves.toEqual({ rows: [rowA], rowCount: 1 });
+    const del = sql("DELETE FROM users WHERE id = $1", 7);
+    await expect(del.executeCount(executor(fakeClient([], 4).client))).resolves.toBe(4);
+    await expect(sql.as<never>("CREATE TABLE t (x int)").executeCount(executor(fakeClient([], null).client))).resolves.toBe(0);
+  });
 });
 
 describe("query", () => {

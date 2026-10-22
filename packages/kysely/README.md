@@ -33,7 +33,8 @@ const rows = await query(db, q); // db: Kysely<DB> or a Transaction<DB>
 | `createSql<DB, TM = DefaultTypeMap, Overrides = {}, Options = {}>()` | core's `createSql<FromKysely<DB, Overrides, Options>, TM>()` |
 | `FromKysely<DB, Overrides = {}, Options = {}>` | the converted schema type, for use with core's `createSql<Schema, TM>()` or the adapters' `createSql<Schema>()` |
 | `query(db, q)` | runs a typesql `Query` through Kysely, `Promise<Row[]>` |
-| `execute(db, q)` | runs a statement, `Promise<number>` (`numAffectedRows`, or 0) |
+| `execute(db, q)` | runs a statement, `Promise<number>` (`numAffectedRows`; for other statements the number of rows returned, 0 for DDL) |
+| `executor(db)` | an `Executor` for `q.execute()` and `q.executeCount()`, also bypassing plugins |
 | `InferColumn<T>` | the descriptor inferred for one Kysely column type (handy to check a mapping) |
 | `SnakeCase<S>` | `CamelCasePlugin`'s default camelCase → snake_case mapping, at the type level |
 | `KyselyOverrides`, `TableOverride`, `ColumnOverride`, `KyselyOptions`, `KyselyExecutor` | parameter types |

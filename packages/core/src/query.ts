@@ -8,10 +8,23 @@ export declare const TEXT: unique symbol;
 export declare const CARRIED: unique symbol;
 
 /**
- * Runs a statement and resolves to its rows. Adapters build one from a driver client
- * (`executor(pool)` in `@typesql/pg`); pass it to `createSql(executor)` or to `q.execute(executor)`.
+ * What an `Executor` resolves to when it knows the statement's row count, as Postgres reports it
+ * in the command tag: rows affected by `INSERT`, `UPDATE`, `DELETE` or `MERGE` (with or without
+ * `RETURNING`), rows returned by `SELECT`. `null` means the statement has no count (DDL,
+ * `BEGIN`…), which `executeCount` reads as 0.
  */
-export type Executor = (text: string, values: readonly unknown[]) => PromiseLike<readonly unknown[]>;
+export interface ExecutorResult {
+  readonly rows: readonly unknown[];
+  readonly rowCount: number | null;
+}
+
+/**
+ * Runs a statement and resolves to its rows, or to `{ rows, rowCount }`. Adapters build one from a
+ * driver client (`executor(pool)` in `@typesql/pg`, which reports `rowCount`); pass it to
+ * `createSql(executor)` or to `q.execute(executor)`. An executor that resolves to the rows alone
+ * works for everything except `executeCount`.
+ */
+export type Executor = (text: string, values: readonly unknown[]) => PromiseLike<readonly unknown[] | ExecutorResult>;
 
 /** Thrown by `executeTakeFirstOrThrow` when the query returns no rows. */
 export class NoResultError extends Error {
@@ -35,6 +48,12 @@ export interface Query<Row, Params extends readonly unknown[] = readonly unknown
   executeTakeFirst(executor?: Executor): Promise<Row | undefined>;
   /** The first row; throws `NoResultError` when there are none. */
   executeTakeFirstOrThrow(executor?: Executor): Promise<Row>;
+  /**
+   * Run the statement and return its row count: rows affected by `INSERT`/`UPDATE`/`DELETE`/`MERGE`
+   * (with or without `RETURNING`), rows returned by `SELECT`, 0 for statements without a count.
+   * Rejects when the executor resolves to rows alone, since it cannot tell the count.
+   */
+  executeCount(executor?: Executor): Promise<number>;
 }
 
 /**
@@ -59,13 +78,26 @@ export type TextType<Q> = Q extends { readonly [TEXT]?: infer T extends string }
  * `{ text, values }` (strictly, too).
  */
 export function makeQuery<Row, Params extends readonly unknown[], Text extends string = string>(text: string, values: readonly unknown[], executor?: Executor): Query<Row, Params, Text> {
+  const run = async (given?: Executor): Promise<readonly unknown[] | ExecutorResult> => {
+    const exec = given ?? executor;
+    if (!exec) throw new Error("typesql: no executor: pass one to createSql(executor) or to execute(executor)");
+    return exec(text, values);
+  };
   const execute = async (given?: Executor): Promise<unknown[]> => {
-    const run = given ?? executor;
-    if (!run) throw new Error("typesql: no executor: pass one to createSql(executor) or to execute(executor)");
-    return Array.from(await run(text, values));
+    const result = await run(given);
+    return Array.from(isRows(result) ? result : result.rows);
   };
   return Object.defineProperties({ text, values }, {
     execute: { value: execute },
+    executeCount: {
+      value: async (given?: Executor) => {
+        const result = await run(given);
+        if (isRows(result) || result.rowCount === undefined) {
+          throw new Error("typesql: the executor did not report a row count: resolve to { rows, rowCount } (the adapters' executor() do)");
+        }
+        return result.rowCount ?? 0;
+      },
+    },
     executeTakeFirst: { value: async (given?: Executor) => (await execute(given))[0] },
     executeTakeFirstOrThrow: {
       value: async (given?: Executor) => {
@@ -75,6 +107,10 @@ export function makeQuery<Row, Params extends readonly unknown[], Text extends s
       },
     },
   }) as unknown as Query<Row, Params, Text>;
+}
+
+function isRows(result: readonly unknown[] | ExecutorResult): result is readonly unknown[] {
+  return Array.isArray(result);
 }
 
 export function makeFragment<Text extends string, Params extends readonly unknown[], Carried extends readonly unknown[] = readonly unknown[]>(text: string, values: readonly unknown[]): Fragment<Text, Params, Carried> {

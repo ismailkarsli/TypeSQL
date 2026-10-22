@@ -48,7 +48,8 @@ const counts = await query(dbBig, big("SELECT author_id, count(*) AS n FROM post
 | `one(db, q)` | `Promise<Row>`; `RowCountError` unless exactly one row |
 | `maybeOne(db, q)` | `Promise<Row \| null>`; `RowCountError` on more than one row |
 | `many(db, q)` | `Promise<[Row, ...Row[]]>`; `RowCountError` on zero rows |
-| `execute(db, q)` | `Promise<number>`, the affected row count |
+| `execute(db, q)` | `Promise<number>`, the affected row count (0 for DDL) |
+| `executor(db)` | an `Executor` for `q.execute()` and `q.executeCount()` (reports `.count`); `createSql<DB>(db)` binds one |
 | `transaction(db, fn)` | `db.begin(fn)` |
 | `migrate(db, m)` | runs `m.statements` (e.g. from core's `migrations()`) in one transaction |
 | `PostgresJsTypeMap`, `PostgresJsBigIntTypeMap` | the type maps |

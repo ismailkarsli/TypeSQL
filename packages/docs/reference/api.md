@@ -115,7 +115,7 @@ const q = sql("SELECT u.id FROM users u {where}", { where });
 
 Bypasses inference and asserts the row type. Accepts slots and named parameters like `sql`.
 
-### `q.execute()`, `q.executeTakeFirst()`, `q.executeTakeFirstOrThrow()`
+### `q.execute()`, `q.executeTakeFirst()`, `q.executeTakeFirstOrThrow()`, `q.executeCount()`
 
 Run a query on the executor bound by `createSql(executor)`, or on the one passed to the call
 (`q.execute(executor(tx))` inside a transaction). Without either they reject.
@@ -125,17 +125,27 @@ Run a query on the executor bound by `createSql(executor)`, or on the one passed
 | `execute(executor?)` | `Promise<Row[]>` |
 | `executeTakeFirst(executor?)` | `Promise<Row \| undefined>` |
 | `executeTakeFirstOrThrow(executor?)` | `Promise<Row>`; `NoResultError` (with the statement `text`) on 0 rows |
+| `executeCount(executor?)` | `Promise<number>`: the statement's row count |
 
-An `Executor` is `(text, values) => PromiseLike<readonly unknown[]>`. Each adapter exports
-`executor(client)` to build one. The methods are non-enumerable, so a query still
-deep-equals `{ text, values }`.
+`executeCount` returns the count from Postgres' command tag: rows affected by `INSERT`,
+`UPDATE`, `DELETE` or `MERGE`, with or without `RETURNING`, and rows returned by `SELECT`.
+Statements without a count, such as DDL, give 0.
+
+An `Executor` is `(text, values) => PromiseLike<readonly unknown[] | ExecutorResult>`, where
+`ExecutorResult` is `{ rows, rowCount: number | null }` (`null` means no count, read as 0).
+Each adapter exports `executor(client)` to build one. The `@typesql/pg`, `@typesql/postgres` and
+`@typesql/kysely` executors report `rowCount`. An executor that resolves to the rows alone (your
+own, or `@typesql/prisma`'s) works for everything but `executeCount`, which then rejects. Use
+`executeRaw` for Prisma counts. The methods are non-enumerable, so a query still deep-equals
+`{ text, values }`.
 
 ## Public types
 
 | Type | Meaning |
 |---|---|
 | `Query<Row, Params, Text>` | runtime query object with phantom types and `execute*` methods |
-| `Executor` | `(text, values) => PromiseLike<readonly unknown[]>`, what `execute*` runs on |
+| `Executor` | `(text, values) => PromiseLike<readonly unknown[] \| ExecutorResult>`, what `execute*` runs on |
+| `ExecutorResult` | `{ rows, rowCount: number \| null }`: an executor result with the statement's row count |
 | `NoResultError` | thrown by `executeTakeFirstOrThrow` on 0 rows; carries `text` |
 | `Fragment<Text, Params>` | spliceable SQL piece |
 | `RowType<Q>`, `ParamsType<Q>`, `TextType<Q>` | extract from a `Query`/`Fragment` type |

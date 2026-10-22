@@ -33,7 +33,26 @@ const me = await bound("SELECT id, email FROM users WHERE id = $1", 7).executeTa
 await transaction(pool, async (client) => {
   await bound("UPDATE users SET display_name = NULL WHERE id = $1", 7).execute(executor(client)); // on the transaction's client
 });
+
+const deleted = await bound("DELETE FROM posts WHERE author_id = $1", 7).executeCount(); // rows deleted
 // #endregion execute
+// #region custom-executor
+import { createSql as createCoreSql, type Executor } from "@typesql/core";
+import type { PgTypeMap } from "@typesql/pg";
+
+const onPool = executor(pool);
+const logged: Executor = async (text, values) => {
+  const started = performance.now();
+  try {
+    return await onPool(text, values); // { rows, rowCount }: executeCount keeps working
+  } finally {
+    console.debug(`${Math.round(performance.now() - started)} ms`, text);
+  }
+};
+const sqlLogged = createCoreSql<DB, PgTypeMap>(logged);
+// #endregion custom-executor
+check<Equal<Awaited<ReturnType<ReturnType<typeof sqlLogged<"SELECT id FROM users">>["executeCount"]>>, number>>();
+check<Equal<typeof deleted, number>>();
 check<Equal<typeof all, { id: number; email: string }[]>>();
 check<Equal<typeof first, { id: number } | undefined>>();
 check<Equal<typeof me, { id: number; email: string }>>();

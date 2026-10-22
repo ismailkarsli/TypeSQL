@@ -76,6 +76,11 @@ describe("query / execute", () => {
     const none = fakeKysely({ rows: [] });
     await expect(execute(none.db, sql("DELETE FROM posts"))).resolves.toBe(0);
   });
+
+  test("without numAffectedRows (SELECT), execute returns the number of rows", async () => {
+    const { db } = fakeKysely({ rows: [{ id: 1 }, { id: 2 }] });
+    await expect(execute(db, sql("SELECT id FROM users"))).resolves.toBe(2);
+  });
 });
 
 describe("executor", () => {
@@ -90,5 +95,13 @@ describe("executor", () => {
     const { db } = fakeKysely({ rows: [{ id: 2 }] });
     const rows = await db.transaction().execute((trx) => sql("SELECT id FROM users").execute(executor(trx)));
     expect(rows).toEqual([{ id: 2 }]);
+  });
+
+  test("resolves to { rows, rowCount }: numAffectedRows, else the number of rows", async () => {
+    const del = fakeKysely({ rows: [{ id: 1 }], numAffectedRows: 3n });
+    await expect(executor(del.db)("DELETE FROM posts RETURNING id", [])).resolves.toEqual({ rows: [{ id: 1 }], rowCount: 3 });
+    await expect(sql("DELETE FROM posts").executeCount(executor(del.db))).resolves.toBe(3);
+    const sel = fakeKysely({ rows: [{ id: 1 }, { id: 2 }] });
+    await expect(createSql<DB>(sel.db)("SELECT id FROM users").executeCount()).resolves.toBe(2);
   });
 });

@@ -63,6 +63,9 @@ can be passed positionally (`$1`), by name (`:email` with an object), or inline 
   `$n` renumbering.
 - **DDL**: `ApplyDdl<DB, "ALTER TABLE …">` and the `migrations()` builder derive the schema from
   your migrations.
+- **Running queries**: with `createSql(executor)` (or an adapter's `createSql(client)`), queries
+  have `execute()`, `executeTakeFirst()`, `executeTakeFirstOrThrow()` and `executeCount()` (the
+  affected row count). An `Executor` resolves to the rows or to `{ rows, rowCount }`.
 - **Escape hatch**: `sql.as<Row>(…)` for SQL the engine cannot type.
 
 ## Schema

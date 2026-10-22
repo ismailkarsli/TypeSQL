@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import type { Col, Generated, Nullable } from "@typesql/core";
+import type { Col, ExecutorResult, Generated, Nullable } from "@typesql/core";
 import {
   createBigIntSql,
   createSql,
@@ -34,12 +34,12 @@ interface Call {
   params: unknown[] | undefined;
 }
 
-function rowList(rows: unknown[], count: number): PostgresJsRows {
+function rowList(rows: unknown[], count: number | null): PostgresJsRows {
   // postgres.js returns an Array with result metadata attached as properties.
   return Object.assign([...rows], { count, command: "SELECT" });
 }
 
-function fakeSql(rows: unknown[], count = rows.length) {
+function fakeSql(rows: unknown[], count: number | null = rows.length) {
   const calls: Call[] = [];
   const log: string[] = [];
   const tx: PostgresJsQueryable = {
@@ -132,6 +132,10 @@ describe("execute", () => {
     await expect(execute(client, del)).resolves.toBe(4);
     expect(calls).toEqual([{ text: "DELETE FROM users WHERE id = $1", params: [7] }]);
   });
+
+  test("maps a null count (DDL) to 0", async () => {
+    await expect(execute(fakeSql([], null).client, sql.as<never>("CREATE TABLE t (x int)"))).resolves.toBe(0);
+  });
 });
 
 describe("transaction", () => {
@@ -194,5 +198,14 @@ describe("executor", () => {
   test("executor(sql) can be passed per call", async () => {
     const { client } = fakeSql([]);
     await expect(q.executeTakeFirstOrThrow(executor(client))).rejects.toBeInstanceOf(NoResultError);
+  });
+
+  test("resolves to { rows, rowCount }, so executeCount reports postgres.js' count", async () => {
+    const result = (await executor(fakeSql([rowA], 1).client)("SELECT 1", [])) as ExecutorResult;
+    expect(result).toEqual({ rows: [rowA], rowCount: 1 });
+    expect(Array.isArray(result.rows)).toBe(true);
+    expect(result.rows).not.toHaveProperty("count");
+    await expect(sql("DELETE FROM users WHERE id = $1", 7).executeCount(executor(fakeSql([], 3).client))).resolves.toBe(3);
+    await expect(sql.as<never>("CREATE TABLE t (x int)").executeCount(executor(fakeSql([], null).client))).resolves.toBe(0);
   });
 });

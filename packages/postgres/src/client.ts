@@ -1,7 +1,10 @@
 import type { Executor, Query, RowType } from "@typesql/core";
 
-/** The shape of a resolved `sql.unsafe()` result the helpers rely on: an array with `count`. */
-export type PostgresJsRows = readonly unknown[] & { readonly count: number };
+/**
+ * The shape of a resolved `sql.unsafe()` result the helpers rely on: an array with `count`
+ * (`null` for statements without a count, such as DDL).
+ */
+export type PostgresJsRows = readonly unknown[] & { readonly count: number | null };
 
 /**
  * Anything with postgres.js' `unsafe(query, parameters)` method: the `Sql` instance,
@@ -35,9 +38,15 @@ function run(sql: PostgresJsQueryable, q: AnyQuery): PromiseLike<PostgresJsRows>
   return sql.unsafe(q.text, Array.from(q.values));
 }
 
-/** An `Executor` for core's `q.execute()`: runs queries through `sql.unsafe` and resolves to the rows. */
+/**
+ * An `Executor` for core's `q.execute()`: runs queries through `sql.unsafe` and resolves to
+ * `{ rows, rowCount }` (postgres.js' `.count`, so `q.executeCount()` works).
+ */
 export function executor(sql: PostgresJsQueryable): Executor {
-  return async (text, values) => Array.from(await sql.unsafe(text, Array.from(values)));
+  return async (text, values) => {
+    const result = await sql.unsafe(text, Array.from(values));
+    return { rows: Array.from(result), rowCount: result.count ?? null };
+  };
 }
 
 /** Run a query and return all rows (a plain array, without postgres.js' result metadata). */
@@ -69,10 +78,10 @@ export async function many<Q extends AnyQuery>(sql: PostgresJsQueryable, q: Q): 
   return rows as [RowType<Q>, ...RowType<Q>[]];
 }
 
-/** Run a statement for its side effect and return the affected row count (postgres.js' `.count`). */
+/** Run a statement for its side effect and return the affected row count (postgres.js' `.count`, 0 when it is `null`). */
 export async function execute(sql: PostgresJsQueryable, q: AnyQuery): Promise<number> {
   const result = await run(sql, q);
-  return result.count;
+  return result.count ?? 0;
 }
 
 /**

@@ -37,12 +37,28 @@ Pass the client to `createSql` and a query runs itself, Kysely-style:
 | `q.execute()` | `Promise<Row[]>` | — |
 | `q.executeTakeFirst()` | `Promise<Row \| undefined>` | — |
 | `q.executeTakeFirstOrThrow()` | `Promise<Row>` | `NoResultError` (carries `text`) on 0 rows |
+| `q.executeCount()` | `Promise<number>` (row count) | rejects if the executor reports no count |
 
 Each method also takes an executor, which wins over the bound one: `executor(client)` from the
 adapter wraps any client the helpers accept, e.g. a transaction's. A query from a `createSql()`
 without a client has no executor and rejects unless one is passed. `@typesql/kysely`,
 `@typesql/prisma` and `@typesql/postgres` take their client the same way; `@typesql/drizzle`
 takes an `executor(...)` from a driver adapter.
+
+`executeCount()` returns the count Postgres reports for the statement: rows affected by
+`INSERT`, `UPDATE`, `DELETE` or `MERGE`, with or without `RETURNING`, rows returned by `SELECT`,
+and 0 for DDL. The `executor(...)` of `@typesql/pg` (`rowCount`), `@typesql/postgres` (`count`)
+and `@typesql/kysely` (`numAffectedRows`, or the number of rows for other statements) report
+it. Prisma's `$queryRawUnsafe` does not, so with `@typesql/prisma` use `executeRaw(prisma, q)`.
+
+#### Writing an executor
+
+An `Executor` is `(text, values) => PromiseLike<Row[] | { rows, rowCount }>`. Return the
+rows alone when you have no count: everything except `executeCount` works. `rowCount: null`
+means the statement has no count, which `executeCount` reads as 0. A wrapper around an
+adapter's executor can return its result unchanged:
+
+<<< @/snippets/adapters.ts#custom-executor
 
 `@typesql/kysely` and `@typesql/prisma` can also run queries through the ORM's own client
 (`query`/`execute` on a `Kysely` instance, `queryRaw`/`executeRaw` on Prisma Client). See
@@ -101,7 +117,8 @@ custom type map (`createSql<DB, MyMap>()` from core), or cast in SQL.
   the `TransactionSql` passed by `begin`, and `ReservedSql` all satisfy it. Helpers call
   `sql.unsafe(text, values)` so the text goes to the server untouched.
 - `query` returns a plain `Row[]` (postgres.js' result metadata — `count`, `command`,
-  `columns` — is stripped by `Array.from`). `execute` returns the result's `.count`.
+  `columns` — is stripped by `Array.from`). `execute` returns the result's `.count` (0 when
+  postgres.js reports `null`, as for DDL).
 - `transaction(sql, fn)` is `sql.begin(fn)`: postgres.js issues `BEGIN`, runs `fn(tx)`,
   `COMMIT`, or `ROLLBACK` and rethrows.
 
