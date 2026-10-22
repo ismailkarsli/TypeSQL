@@ -7,10 +7,12 @@
 //
 //   node scripts/github-releases.mjs [--dry-run] [--summary pnpm-publish-summary.json]
 //
-// The registry can report the previous versions for a few minutes after a publish. Versions
-// listed in a `pnpm publish -r --report-summary` file count as published without asking it.
-//
-// Needs the GitHub CLI (`gh`), logged in with push access to the repository.
+// With --summary (the release workflow), only the versions listed in that
+// `pnpm publish -r --report-summary` file are released, without asking the registry, which can
+// report the previous versions for a few minutes after a publish. Older versions are left
+// alone: the workflow's GITHUB_TOKEN was refused (HTTP 403) tags on old release commits,
+// whose workflow files differ from main's. Without --summary it backfills every published version that has no release,
+// which needs a `gh` login allowed to do that (a maintainer's).
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 
@@ -65,6 +67,7 @@ const newestCore = (releases) =>
 const pending = [];
 for (const section of sections.values()) {
   const tag = `${section.name}@${section.version}`;
+  if (summaryIndex !== -1 && !justPublished.has(tag)) continue;
   if (succeeds("gh", ["release", "view", tag])) continue;
   if (!(await published(section.name, section.version))) {
     console.log(`skip ${tag}: not on npm yet`);

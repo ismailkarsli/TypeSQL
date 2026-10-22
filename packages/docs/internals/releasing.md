@@ -144,10 +144,14 @@ it creates a release on the repository's Releases tab:
 - `@typesql/core` marked "Latest", the others not, and versions with a prerelease suffix (from a
   [lane](https://pnpm.io/versioning)) marked as prereleases.
 
-It only creates what is missing, so a run also backfills older versions. The registry can report
-the previous versions for a few minutes after a publish, so the job passes it the
-`pnpm publish -r --report-summary` output, whose versions count as published. To preview what
-the next run would create: `node scripts/github-releases.mjs --dry-run` (needs `gh` logged in).
+The workflow creates releases only for the versions it just published (from the
+`pnpm publish -r --report-summary` output, so a registry that still reports the previous
+versions does not matter). Its `GITHUB_TOKEN` was refused (HTTP 403) tags on the 0.0.2 and 0.0.3
+release commits, whose workflow files differ from `main`'s, so older versions are backfilled by
+a maintainer instead: from a checkout
+with `gh` logged in, `node scripts/github-releases.mjs --dry-run` lists every published version
+without a release, and the same command without `--dry-run` creates them. That only touches
+GitHub; nothing is published to npm.
 
 ## Files
 
