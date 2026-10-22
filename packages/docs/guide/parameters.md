@@ -47,6 +47,15 @@ the same value in a second statement throws at runtime. Wrap a value you want to
 [fragment](./fragments), which can be spliced any number of times. `sql.param()` inside quotes
 or a comment is an error.
 
+## A value used more than once
+
+Each `${sql.param(x)}` is its own `$n`, even for the same `x`, and each one is checked against
+its own context. That matters for optional filters: in `x IS NULL OR col = x`, only the first
+use accepts `null`. Write a value used more than once as a `:name` (or a `$n`). It is then one
+parameter, and the `IS NULL` test lets that parameter take `null`:
+
+<<< @/snippets/parameters.ts#repeated
+
 ## How parameters get their types
 
 | Context | Parameter type |

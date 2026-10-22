@@ -51,7 +51,14 @@ and 0 for DDL. The `executor(...)` of `@typesql/pg` (`rowCount`), `@typesql/post
 and `@typesql/kysely` (`numAffectedRows`, or the number of rows for other statements) report
 it. Prisma's `$queryRawUnsafe` does not, so with `@typesql/prisma` use `executeRaw(prisma, q)`.
 
-#### Writing an executor
+`createSql(client, { rowKeys: "camelCase" })` gives camelCase rows, in the types and from
+`execute*` and the helpers alike. See [camelCase row keys](./queries#camelcase-row-keys).
+
+`@typesql/kysely` and `@typesql/prisma` can also run queries through the ORM's own client
+(`query`/`execute` on a `Kysely` instance, `queryRaw`/`executeRaw` on Prisma Client). See
+[ORM schemas](./orm-schemas).
+
+### Writing an executor
 
 An `Executor` is `(text, values) => PromiseLike<Row[] | { rows, rowCount }>`. Return the
 rows alone when you have no count: everything except `executeCount` works. `rowCount: null`
@@ -60,13 +67,41 @@ adapter's executor can return its result unchanged:
 
 <<< @/snippets/adapters.ts#custom-executor
 
-`createSql(client, { rowKeys: "camelCase" })` gives camelCase rows, in the types and from
-`execute*` and the helpers alike. See [camelCase row keys](./queries#camelcase-row-keys).
+### Executors that transform rows
 
-`@typesql/kysely` and `@typesql/prisma` can also run queries through the ORM's own client
-(`query`/`execute` on a `Kysely` instance, `queryRaw`/`executeRaw` on Prisma Client). See
-[ORM schemas](./orm-schemas).
+The row types describe what the driver returns for the SQL: the column names Postgres gives
+and the type map's value types. `execute*` hands back the rows the executor returns, unchanged
+(apart from `rowKeys`). An executor that reshapes rows, such as one that keeps Kysely plugins
+or post-processes values, makes the types wrong. Pick the narrowest fix:
 
+1. **camelCase keys**: use `rowKeys: "camelCase"` and keep the executor plain. With Kysely,
+   use `@typesql/kysely`'s `createSql(db, { rowKeys: "camelCase" })` or `executor(db)`, which
+   bypass plugins, instead of an executor that runs `CamelCasePlugin`.
+2. **Different value types** from your driver's parsers (say `timestamptz` parsed to a string):
+   use a [type map](./schema#type-maps) that says so: `createSql<DB, MyTypeMap>(executor)`.
+3. **Anything else**: keep the executor plain and transform in a typed helper built on
+   `RowType<Q>`:
+
+<<< @/snippets/adapters.ts#transform-helper
+
+Augmenting `Query` also works, and changes the return type of `execute*` for every query in the
+program:
+
+```ts
+declare module "@typesql/core" {
+  interface Query<Row, Params extends readonly unknown[] = readonly unknown[], Text extends string = string> {
+    execute(executor?: Executor): Promise<Wire<Row>[]>;
+    executeTakeFirst(executor?: Executor): Promise<Wire<Row> | undefined>;
+    executeTakeFirstOrThrow(executor?: Executor): Promise<Wire<Row>>;
+  }
+}
+```
+
+It is global and easy to get wrong. The type parameters must repeat core's exactly (names,
+constraints and defaults). The new signatures only win because TypeScript puts overloads from a
+later declaration first. `RowType<Q>`, and with it the adapters' `query`/`one`/`many` helpers,
+still describe the untransformed row. Prefer the options above. If you do augment, make sure
+the executor's transform and the declared type match.
 ## `@typesql/pg` (node-postgres 8.x)
 
 <<< @/snippets/adapters.ts#pg

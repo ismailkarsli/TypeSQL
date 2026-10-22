@@ -51,6 +51,20 @@ const logged: Executor = async (text, values) => {
 };
 const sqlLogged = createCoreSql<DB, PgTypeMap>(logged);
 // #endregion custom-executor
+// #region transform-helper
+import type { Query } from "@typesql/core";
+
+/** Rows as they go out as JSON: dates become ISO strings. */
+type Wire<Row> = { [K in keyof Row]: Row[K] extends Date ? string : Row[K] };
+const toWire = (row: object) => Object.fromEntries(Object.entries(row).map(([k, v]) => [k, v instanceof Date ? v.toISOString() : v]));
+
+async function wire<Q extends Query<object>>(q: Q): Promise<Wire<RowType<Q>>[]> {
+  return (await q.execute()).map(toWire) as Wire<RowType<Q>>[];
+}
+
+const payload = await wire(bound("SELECT id, created_at FROM users")); // { id: number; created_at: string }[]
+// #endregion transform-helper
+check<Equal<typeof payload, { id: number; created_at: string }[]>>();
 check<Equal<Awaited<ReturnType<ReturnType<typeof sqlLogged<"SELECT id FROM users">>["executeCount"]>>, number>>();
 check<Equal<typeof deleted, number>>();
 check<Equal<typeof all, { id: number; email: string }[]>>();

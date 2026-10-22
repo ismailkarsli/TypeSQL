@@ -25,6 +25,19 @@ inline.values; // [userId, email]
 check<Equal<RowType<typeof inline>, { id: number; email: string }>>();
 check<Equal<TextType<typeof inline>, "SELECT id, email FROM users WHERE id = $1 AND email <> $2">>();
 
+declare const name: string | null;
+// #region repeated
+// one parameter used twice: the IS NULL test makes $1 accept null
+const optional = sql("SELECT id FROM users WHERE (:name::text IS NULL OR display_name = :name)", { name });
+optional.text; // "SELECT id FROM users WHERE ($1::text IS NULL OR display_name = $1)"
+
+// two inline values are two parameters, each checked on its own:
+// sql(`SELECT id FROM users WHERE (${sql.param(name)}::text IS NULL OR display_name = ${sql.param(name)})`);
+// … SqlError<"parameter $2: a string | null value cannot be used as text NOT NULL", 14>
+// #endregion repeated
+check<Equal<ParamsType<typeof optional>, [string | null]>>();
+check<Equal<TextType<typeof optional>, "SELECT id FROM users WHERE ($1::text IS NULL OR display_name = $1)">>();
+
 // #region contexts
 sql("SELECT id FROM users WHERE id = ANY($1)", ids); // number[]
 sql("SELECT id FROM users LIMIT $1 OFFSET $2", 10, 20); // number, number
