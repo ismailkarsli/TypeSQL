@@ -77,12 +77,12 @@ Current numbers on TypeScript 7.0.2:
 
 | File | Instantiations | Check time |
 |---|---|---|
-| q1 | ~135K (mostly loading the library) | ~0.3 s |
-| q50 | ~0.63M | ~0.55 s |
-| q500 | ~4.7M | ~3.3 s |
-| mixed50 | ~0.40M | ~0.45 s |
-| maxlen (all probes pass, up to 8 KB) | ~6.5M | ~1.3 s |
-| per query (q500 − q1) | ~9.2K | ~6.5 ms, ~150 queries/s |
+| q1 | ~155K (mostly loading the library) | ~0.25 s |
+| q50 | ~0.65M | ~0.57 s |
+| q500 | ~4.8M | ~3.2 s |
+| mixed50 | ~0.43M | ~0.41 s |
+| maxlen (all probes pass, up to 8 KB) | ~6.6M | ~1.4 s |
+| per query (q500 − q1) | ~9.2K | ~6 ms, ~170 queries/s |
 
 Where a typical query's cost goes (q50, instantiations above loading the library): lexing
 ~30%, parsing ~35%, binding and typing ~13%, building the row and parameter types ~17%, the
