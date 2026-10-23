@@ -257,8 +257,10 @@ export type CommonType<A extends string, B extends string> =
  */
 export type NumLitType<V extends string> =
   V extends `${string}.${string}` | `${string}e${string}` | `${string}E${string}` ? "numeric"
-  : V extends `-${infer D}` ? IntLitType<D, "2147483648", "9223372036854775808">
-  : IntLitType<V, "2147483647", "9223372036854775807">;
+  : V extends `-${infer D}` ? IntLitType<NoUnderscores<D>, "2147483648", "9223372036854775808">
+  : IntLitType<NoUnderscores<V>, "2147483647", "9223372036854775807">;
+/** `1_000_000` → `1000000` (digit separators do not count). */
+type NoUnderscores<V extends string> = V extends `${infer A}_${infer B}` ? NoUnderscores<`${A}${B}`> : V;
 
 type IntLitType<D extends string, Max4 extends string, Max8 extends string> =
   DigitCount<D, []> extends infer N
@@ -268,7 +270,8 @@ type IntLitType<D extends string, Max4 extends string, Max8 extends string> =
     : N extends 19 ? (LeqDigits<D, Max8> extends true ? "int8" : "numeric")
     : "numeric"
     : never;
-type DigitCount<V extends string, Acc extends unknown[]> = V extends `${string}${infer R}` ? DigitCount<R, [...Acc, 0]> : Acc["length"];
+/** Number of digits, capped at 20 (beyond 19 digits every literal is numeric; literals can be thousands of digits long). */
+type DigitCount<V extends string, Acc extends unknown[]> = Acc["length"] extends 20 ? 20 : V extends `${string}${infer R}` ? DigitCount<R, [...Acc, 0]> : Acc["length"];
 
 /** `A <= B` for two digit strings of equal length. */
 type LeqDigits<A extends string, B extends string> =

@@ -140,14 +140,9 @@
       {"line":997,"kind":"rejects","hash":"c53b9f175b882718","pg":"ok","parser":"syntax error: expected column name at or near not","sql":"alter table constr_parent add not null a not valid;"},
       {"line":1003,"kind":"rejects","hash":"d224feaa24e32f33","pg":"ok","parser":"syntax error: expected column name at or near not","sql":"alter table constr_parent2 add not null a not valid;"}
     ],
-    "copy2": [
-      {"line":217,"kind":"rejects","hash":"bf4c5644c79d41ee","pg":"ok","parser":"unterminated quoted string","sql":"COPY y TO stdout WITH CSV FORCE QUOTE col2 ESCAPE E'\\\\' ENCODING 'sql_ascii';"},
-      {"line":224,"kind":"rejects","hash":"66abb580b11d5593","pg":"ok","parser":"unterminated quoted string","sql":"COPY y TO stdout (FORMAT CSV, FORCE_QUOTE (col2), ESCAPE E'\\\\');"}
-    ],
     "create_am": [
       {"line":118,"kind":"accepts","hash":"48e00e883ac497e8","pg":"ERROR:  syntax error at or near \"USING\"","parser":"accepted","sql":"CREATE VIEW tableam_view_heap2 USING heap2 AS SELECT * FROM tableam_tbl_heap2;"},
-      {"line":322,"kind":"rejects","hash":"3a4fe0b6eb7861cc","pg":"ok","parser":"syntax error at or near into","sql":"SELECT INTO tableam_tblselectinto_heapx FROM tableam_tbl_heapx;"},
-      {"line":356,"kind":"accepts","hash":"03a0a51a8f9e7781","pg":"ERROR:  zero-length delimited identifier at or near \"\"\"\"","parser":"accepted","sql":"CREATE TABLE i_am_a_failure() USING \"\";"}
+      {"line":322,"kind":"rejects","hash":"3a4fe0b6eb7861cc","pg":"ok","parser":"syntax error at or near into","sql":"SELECT INTO tableam_tblselectinto_heapx FROM tableam_tbl_heapx;"}
     ],
     "create_index": [
       {"line":139,"kind":"rejects","hash":"9d80a0566bf057a5","pg":"ok","parser":"syntax error at or near |","sql":"SELECT count(*) FROM point_tbl p WHERE p.f1 <<| '(0.0, 0.0)';"},
@@ -272,7 +267,7 @@
       {"line":767,"kind":"rejects","hash":"bb833f4ae94656df","pg":"ERROR:  value for domain orderedpair violates check constraint \"orderedpair_check\"","parser":"subscripted or field assignment targets (col[i] = ..., col.f = ...) are not supported","sql":"update op set f1[2] = 0;"}
     ],
     "encoding": [
-      {"line":255,"kind":"rejects","hash":"8d1929300dbc172f","pg":"ok","parser":"syntax error: expected TO at or near u","sql":"SELECT SUBSTRING('a' SIMILAR U&'\\00AC' ESCAPE U&'\\00A7');"}
+      {"line":255,"kind":"rejects","hash":"8d1929300dbc172f","pg":"ok","parser":"syntax error: expected TO at or near '\\00AC'","sql":"SELECT SUBSTRING('a' SIMILAR U&'\\00AC' ESCAPE U&'\\00A7');"}
     ],
     "equivclass": [
       {"line":321,"kind":"rejects","hash":"dda015d7bddcb673","pg":"ok","parser":"syntax error at or near abort","sql":"abort;"}
@@ -755,12 +750,6 @@
       {"line":1135,"kind":"rejects","hash":"0acab24f7e1f413a","pg":"ERROR:  single boolean result is expected","parser":"syntax error: expected \")\" at or near =>","sql":"SELECT jsonb_path_match('[true, true]', '$[*]', silent => false);"},
       {"line":1143,"kind":"rejects","hash":"484b8c5103172314","pg":"ok","parser":"syntax error: expected \")\" at or near =>","sql":"WITH str(j, num) AS ( SELECT jsonb_build_object('s', s), num FROM unnest('{\"\", \"a\", \"ab\", \"abc\", \"abcd\", \"b\", \"A\", \"A..."}
     ],
-    "jsonpath_encoding": [
-      {"line":21,"kind":"accepts","hash":"d8b3b62e284e9dbb","pg":"ERROR:  unsupported Unicode escape sequence","parser":"accepted","sql":"SELECT '\"\\u0000\"'::jsonpath;"},
-      {"line":35,"kind":"accepts","hash":"654fe1dfa8db6146","pg":"ERROR:  unsupported Unicode escape sequence","parser":"accepted","sql":"select '\"null \\u0000 escape\"'::jsonpath as not_unescaped;"},
-      {"line":44,"kind":"accepts","hash":"b3ea765e282fae71","pg":"ERROR:  unsupported Unicode escape sequence","parser":"accepted","sql":"SELECT '$.\"\\u0000\"'::jsonpath;"},
-      {"line":58,"kind":"accepts","hash":"40ee39523a3f6dda","pg":"ERROR:  unsupported Unicode escape sequence","parser":"accepted","sql":"select '$.\"null \\u0000 escape\"'::jsonpath as not_unescaped;"}
-    ],
     "largeobject": [
       {"line":88,"kind":"rejects","hash":"4e3641a87137fea1","pg":"ok","parser":"syntax error at or near end","sql":"END;"},
       {"line":128,"kind":"rejects","hash":"4e3641a87137fea1","pg":"ok","parser":"syntax error at or near end","sql":"END;"},
@@ -925,34 +914,6 @@
     ],
     "numeric": [
       {"line":1200,"kind":"rejects","hash":"a3347c875cf63657","pg":"ok","parser":"syntax error: expected \",\" or \")\" at or near (","sql":"CREATE TABLE num_typemod_test ( millions numeric(3, -6), thousands numeric(3, -3), units numeric(3, 0), thousandths n..."}
-    ],
-    "numeric_big": [
-      {"line":889,"kind":"crash","hash":"9419be3c311e6d6f","pg":"ok","parser":"TS2589: Type instantiation is excessively deep and possibly infinite.","sql":"WITH t(b, p, bc_result) AS (VALUES (0.12, -2829.8369, 584639489500117524652804931602937908454943289393209666330184932..."},
-      {"line":1201,"kind":"crash","hash":"8a0616a8cc1c458a","pg":"ok","parser":"TS2589: Type instantiation is excessively deep and possibly infinite.","sql":"WITH t(x, bc_result) AS (VALUES (484990182159328900690402236933516249572671683638747490717351807610531884491845416923..."}
-    ],
-    "numerology": [
-      {"line":46,"kind":"accepts","hash":"88128aa4ddf8b0bf","pg":"ERROR:  trailing junk after numeric literal at or near \"123abc\"","parser":"accepted","sql":"SELECT 123abc;"},
-      {"line":47,"kind":"accepts","hash":"d901fc62f8519dae","pg":"ERROR:  trailing junk after numeric literal at or near \"0x0o\"","parser":"accepted","sql":"SELECT 0x0o;"},
-      {"line":48,"kind":"accepts","hash":"7644816bd7c4e34b","pg":"ERROR:  trailing junk after numeric literal at or near \"0.a\"","parser":"accepted","sql":"SELECT 0.a;"},
-      {"line":49,"kind":"accepts","hash":"a12ce8615cdb8088","pg":"ERROR:  trailing junk after numeric literal at or near \"0.0a\"","parser":"accepted","sql":"SELECT 0.0a;"},
-      {"line":50,"kind":"accepts","hash":"e7151c78e9899f02","pg":"ERROR:  trailing junk after numeric literal at or near \".0a\"","parser":"accepted","sql":"SELECT .0a;"},
-      {"line":51,"kind":"accepts","hash":"eca0e296fccb561d","pg":"ERROR:  trailing junk after numeric literal at or near \"0.0e1a\"","parser":"accepted","sql":"SELECT 0.0e1a;"},
-      {"line":52,"kind":"accepts","hash":"eead1e88ea0592f5","pg":"ERROR:  trailing junk after numeric literal at or near \"0.0e\"","parser":"accepted","sql":"SELECT 0.0e;"},
-      {"line":57,"kind":"accepts","hash":"ac1ead8d80ad692c","pg":"ERROR:  invalid binary integer at or near \"0b\"","parser":"accepted","sql":"SELECT 0b;"},
-      {"line":58,"kind":"accepts","hash":"b8ac1f6384007767","pg":"ERROR:  trailing junk after numeric literal at or near \"1b\"","parser":"accepted","sql":"SELECT 1b;"},
-      {"line":59,"kind":"accepts","hash":"c78a1764c540cb98","pg":"ERROR:  trailing junk after numeric literal at or near \"0b0x\"","parser":"accepted","sql":"SELECT 0b0x;"},
-      {"line":61,"kind":"accepts","hash":"966e537d56aed0d4","pg":"ERROR:  invalid octal integer at or near \"0o\"","parser":"accepted","sql":"SELECT 0o;"},
-      {"line":62,"kind":"accepts","hash":"29f4f4dc87532178","pg":"ERROR:  trailing junk after numeric literal at or near \"1o\"","parser":"accepted","sql":"SELECT 1o;"},
-      {"line":63,"kind":"accepts","hash":"ce1e618ae2425034","pg":"ERROR:  trailing junk after numeric literal at or near \"0o0x\"","parser":"accepted","sql":"SELECT 0o0x;"},
-      {"line":65,"kind":"accepts","hash":"ae513631e2c3c96f","pg":"ERROR:  invalid hexadecimal integer at or near \"0x\"","parser":"accepted","sql":"SELECT 0x;"},
-      {"line":66,"kind":"accepts","hash":"a74c3f7c764546e9","pg":"ERROR:  trailing junk after numeric literal at or near \"1x\"","parser":"accepted","sql":"SELECT 1x;"},
-      {"line":67,"kind":"accepts","hash":"39af66bac8e6a742","pg":"ERROR:  trailing junk after numeric literal at or near \"0x0y\"","parser":"accepted","sql":"SELECT 0x0y;"},
-      {"line":92,"kind":"accepts","hash":"106e6bd12ae1e825","pg":"ERROR:  trailing junk after numeric literal at or near \"100_\"","parser":"accepted","sql":"SELECT 100_;"},
-      {"line":93,"kind":"accepts","hash":"13180dc94b050bb8","pg":"ERROR:  trailing junk after numeric literal at or near \"100__000\"","parser":"accepted","sql":"SELECT 100__000;"},
-      {"line":96,"kind":"accepts","hash":"3c84d5478019b677","pg":"ERROR:  trailing junk after numeric literal at or near \"1_000_\"","parser":"accepted","sql":"SELECT 1_000_.5;"},
-      {"line":97,"kind":"accepts","hash":"04cfa5361525907d","pg":"ERROR:  trailing junk after numeric literal at or near \"1_000._5\"","parser":"accepted","sql":"SELECT 1_000._5;"},
-      {"line":98,"kind":"accepts","hash":"4bbbaf3df23de2e7","pg":"ERROR:  trailing junk after numeric literal at or near \"1_000.5_\"","parser":"accepted","sql":"SELECT 1_000.5_;"},
-      {"line":99,"kind":"accepts","hash":"67545d2fb2593951","pg":"ERROR:  trailing junk after numeric literal at or near \"1_000.5e_1\"","parser":"accepted","sql":"SELECT 1_000.5e_1;"}
     ],
     "partition_join": [
       {"line":211,"kind":"rejects","hash":"71e00d14891fad2e","pg":"ok","parser":"syntax error: expected \")\" at or near t1","sql":"SELECT t1.a, t1.phv, t2.b, t2.phv, t3.a + t3.b, t3.phv FROM ((SELECT 50 phv, * FROM prt1 WHERE prt1.b = 0) t1 FULL JO..."}
@@ -1978,14 +1939,6 @@
       {"line":1065,"kind":"rejects","hash":"caad8c62cc37f163","pg":"ok","parser":"syntax error: expected \")\" at or near =>","sql":"SELECT pg_catalog.pg_clear_attribute_stats( schemaname => 'stats_import', relname => 'test', attname => 'arange', inh..."}
     ],
     "strings": [
-      {"line":8,"kind":"rejects","hash":"aa80777d28deaa4f","pg":"ok","parser":"syntax error at or near ' - next line'","sql":"SELECT 'first line' ' - next line' ' - third line' AS \"Three lines to one\";"},
-      {"line":22,"kind":"rejects","hash":"525312bdfbdcb24c","pg":"ok","parser":"syntax error at or near &","sql":"SELECT U&'d\\0061t\\+000061' AS U&\"d\\0061t\\+000061\";"},
-      {"line":23,"kind":"rejects","hash":"cfe6e46e3c56a9f4","pg":"ok","parser":"syntax error at or near '!'","sql":"SELECT U&'d!0061t\\+000061' UESCAPE '!' AS U&\"d*0061t\\+000061\" UESCAPE '*';"},
-      {"line":26,"kind":"rejects","hash":"ba32cc549defa825","pg":"ok","parser":"syntax error at or near '!'","sql":"SELECT U&' \\' UESCAPE '!' AS \"tricky\";"},
-      {"line":27,"kind":"rejects","hash":"66f2b75e0ed0232d","pg":"ok","parser":"syntax error at or near &","sql":"SELECT 'tricky' AS U&\"\\\" UESCAPE '!';"},
-      {"line":34,"kind":"accepts","hash":"8f750a2961ff1245","pg":"ERROR:  invalid Unicode surrogate pair","parser":"accepted","sql":"SELECT U&'wrong: \\db99';"},
-      {"line":46,"kind":"accepts","hash":"98a70f0168eab7f1","pg":"ERROR:  invalid Unicode surrogate pair at or near \"'\"","parser":"accepted","sql":"SELECT E'wrong: \\udb99';"},
-      {"line":48,"kind":"rejects","hash":"b90ad48c1dbd8462","pg":"ERROR:  invalid Unicode surrogate pair at or near \"\\\"","parser":"unterminated quoted string","sql":"SELECT E'wrong: \\udb99\\\\';"},
       {"line":150,"kind":"rejects","hash":"fc9c3f4a90ea73dc","pg":"ok","parser":"syntax error: expected TO at or near 'a#\"(b_d)#\"%'","sql":"SELECT SUBSTRING('abcdefg' SIMILAR 'a#\"(b_d)#\"%' ESCAPE '#') AS \"bcd\";"},
       {"line":155,"kind":"rejects","hash":"0cbbf3cf4806fbb1","pg":"ok","parser":"syntax error: expected TO at or near '#\"(b_d)#\"%'","sql":"SELECT SUBSTRING('abcdefg' SIMILAR '#\"(b_d)#\"%' ESCAPE '#') IS NULL AS \"True\";"},
       {"line":158,"kind":"rejects","hash":"7f9e7a97f74b461b","pg":"ok","parser":"syntax error: expected TO at or near '%'","sql":"SELECT SUBSTRING('abcdefg' SIMILAR '%' ESCAPE NULL) IS NULL AS \"True\";"},
@@ -2078,7 +2031,6 @@
       {"line":369,"kind":"rejects","hash":"9e57a285e68a9719","pg":"ok","parser":"syntax error at or near fetch","sql":"FETCH NEXT FROM c_3;"}
     ],
     "text": [
-      {"line":42,"kind":"rejects","hash":"27c6878084bcd33b","pg":"ok","parser":"unterminated quoted string","sql":"select quote_literal(e'\\\\');"},
       {"line":45,"kind":"rejects","hash":"4cba49c05f14864e","pg":"ok","parser":"syntax error at or near variadic","sql":"select concat_ws(',', variadic array[1,2,3]);"},
       {"line":46,"kind":"rejects","hash":"139cb1bdae8c52b8","pg":"ok","parser":"syntax error at or near variadic","sql":"select concat_ws(',', variadic NULL::int[]);"},
       {"line":50,"kind":"rejects","hash":"7a138c19a40d2c99","pg":"ERROR:  VARIADIC argument must be an array","parser":"syntax error at or near variadic","sql":"select concat_ws(',', variadic 10);"},
@@ -2230,14 +2182,6 @@
     ],
     "tsrf": [
       {"line":168,"kind":"rejects","hash":"572269930fc9b461","pg":"ok","parser":"syntax error at or near |","sql":"SELECT |@|ARRAY[1,2,3];"}
-    ],
-    "tstypes": [
-      {"line":12,"kind":"rejects","hash":"8a972bcdca564c73","pg":"ok","parser":"unterminated quoted string","sql":"SELECT E'''1 \\\\''2'''::tsvector;"},
-      {"line":13,"kind":"rejects","hash":"4b142aca3f090b93","pg":"ok","parser":"unterminated quoted string","sql":"SELECT E'''1 \\\\''2''3'::tsvector;"},
-      {"line":14,"kind":"rejects","hash":"168aea512e13902a","pg":"ok","parser":"unterminated quoted string","sql":"SELECT E'''1 \\\\''2'' 3'::tsvector;"},
-      {"line":15,"kind":"rejects","hash":"e860141b866fe822","pg":"ok","parser":"unterminated quoted string","sql":"SELECT E'''1 \\\\''2'' '' 3'' 4 '::tsvector;"},
-      {"line":33,"kind":"rejects","hash":"f77abe841e433552","pg":"ok","parser":"unterminated quoted string","sql":"SELECT E'''1 \\\\''2'''::tsquery;"},
-      {"line":66,"kind":"rejects","hash":"88500e63323bee52","pg":"ok","parser":"unterminated quoted string","sql":"SELECT E'1&(''2''&('' 4''&(\\\\|5 | ''6 \\\\'' !|&'')))'::tsquery;"}
     ],
     "tuplesort": [
       {"line":168,"kind":"rejects","hash":"bf5f8530de821b7f","pg":"ok","parser":"syntax error at or near declare","sql":"DECLARE c SCROLL CURSOR FOR SELECT noabort_decreasing FROM abbrev_abort_uuids ORDER BY noabort_decreasing;"},

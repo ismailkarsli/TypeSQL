@@ -275,7 +275,7 @@ function isGrammarError(lines) {
   // errors point at a position with a LINE line only); with terse verbosity, `at character N`.
   // Unicode escapes are decoded between the scanner and the grammar.
   const raw = /^ERROR:  .* at (or near ".*"|end of input)( at character \d+)?$/.test(lines[0]) && !/ of jsonpath input/.test(lines[0]);
-  const unicode = /^ERROR:  (unsafe use of string constant with Unicode escapes|invalid Unicode escape( value)?|invalid Unicode surrogate pair|unsupported Unicode escape sequence)( at character \d+)?$/.test(lines[0]) && /^LINE \d+: /.test(lines[1] ?? "");
+  const unicode = /^ERROR:  (unsafe use of string constant with Unicode escapes|invalid Unicode escape( value)?|invalid Unicode surrogate pair)( at character \d+)?$/.test(lines[0]) && /^LINE \d+: /.test(lines[1] ?? "");
   if (!raw && !unicode) return false;
   const next = lines.slice(1).findIndex((l) => /^(ERROR|WARNING|NOTICE|INFO):/.test(l));
   return !lines.slice(1, next < 0 ? undefined : next + 1).some((l) => l.startsWith("CONTEXT:"));
