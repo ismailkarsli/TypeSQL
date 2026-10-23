@@ -12,6 +12,9 @@ The names come from the `DB` type of the `sql` you call, so they follow your sch
 edit it, unsaved changes included. The extension adds suggestions only: errors, hovers and row
 types are TypeScript's, as without it.
 
+The extension is an optional companion. TypeSQL needs only TypeScript, so skip it unless you
+want completions.
+
 ## Setup
 
 1. Install the TypeSQL extension from the

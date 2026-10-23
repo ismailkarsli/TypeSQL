@@ -69,7 +69,9 @@ The TypeSQL extension for VS Code
 ([Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=typesql.typesql),
 [Open VSX](https://open-vsx.org/extension/typesql/typesql)) suggests what can come next inside
 `sql()` strings: tables, views and schemas after `FROM`, `JOIN`, `INTO` and `UPDATE`, and
-columns with their Postgres types after `alias.` and in expressions.
+columns with their Postgres types after `alias.` and in expressions. It is an optional
+companion: TypeSQL checks statements and infers row types without it, so install it only if you
+want completions.
 
 ```ts
 sql("SELECT * FROM |");          // users, posts
