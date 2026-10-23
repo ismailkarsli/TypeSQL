@@ -37,7 +37,8 @@ test("the language server starts the mapper, serves the cache, and picks up what
   // a statement the cache does not have yet: the job adds it
   p.write("src/queries.ts", p.read("src/queries.ts") + `export const added = sql("SELECT title FROM posts WHERE author_id = $1", 1);\n`);
   const log = join(p.dir, "mapper.log");
-  const lsp = startLsp(p.dir, { TYPESQL_CACHE_LOG: log, TYPESQL_CACHE_DELAY: "0" });
+  // CI (set by GitHub Actions) turns the job off; this test needs it on
+  const lsp = startLsp(p.dir, { CI: "", TYPESQL_CACHE: "", TYPESQL_CACHE_LOG: log, TYPESQL_CACHE_DELAY: "0" });
   try {
     await lsp.request("initialize", { processId: process.pid, rootUri: lsp.uri("."), capabilities: { textDocument: { diagnostic: {}, hover: {} } }, initializationOptions: { runExternalCode: true } });
     lsp.notify("initialized", {});
