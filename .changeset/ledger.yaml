@@ -38,6 +38,13 @@
   intents:
     - modern-mails-smash
     - real-houses-heal
+"@typesql/core@0.2.0":
+  dir: packages/core
+  intents:
+    - cool-moose-pretend
+    - hungry-zebras-eat
+    - khaki-queens-kiss
+    - real-tigers-refuse
 "@typesql/drizzle@0.0.2":
   dir: packages/drizzle
   intents:
