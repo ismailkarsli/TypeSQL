@@ -129,7 +129,8 @@ A disagreement is one of:
   SET, …; the summary counts them) are not counted.
 - `crash`: the compiler gave up on the statement (e.g. TS2589), whatever Postgres did.
 
-`baseline.json` lists every current disagreement by file, kind and a hash of the statement text,
+`baseline.json` lists every current disagreement by file, kind and a hash of the statement text
+(there are none today: see [Postgres compatibility](../guide/postgres-compatibility)),
 with its line, a preview, Postgres's error and ours for reading. The run fails when a
 disagreement is not listed (a regression: fix the parser) and when a listed one no longer occurs
 (an improvement: run `--update` so the list only shrinks). It also fails when the baseline was

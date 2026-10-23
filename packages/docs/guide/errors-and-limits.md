@@ -15,7 +15,7 @@ words, operators and literals from 0):
 | unknown function | `function slugify(text) does not exist. Declare it in the schema's $functions or in FunctionCatalog` (see [functions](./queries#expressions-and-functions)) |
 | ambiguous column | `column reference "id" is ambiguous` |
 | bad alias | `missing FROM-clause entry for table "x"` |
-| syntax | `syntax error at or near garbage`, `syntax error at end of input` |
+| syntax | `syntax error at or near garbage`, `syntax error at end of input` ([what Postgres rejects](./postgres-compatibility)) |
 | missing `NOT NULL` column | `null value in column "email" of relation "users" violates not-null constraint` |
 | writing to a view | `cannot insert into view "user_stats"` |
 | `DEFAULT` outside a `VALUES` item or `SET` value | `DEFAULT is not allowed in this context` |

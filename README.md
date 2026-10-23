@@ -1,8 +1,11 @@
 # TypeSQL
 
+[![PostgreSQL 18 regression suite: 49,999 of 49,999 checkable statements agree](https://img.shields.io/badge/PostgreSQL%2018%20regression%20suite-100%25%20agreement-336791?logo=postgresql&logoColor=white)](#tested-against-postgresqls-own-test-suite)
+
 Type-level Postgres SQL for TypeScript. You write a SQL string literal; the compiler parses
 it **inside the type system** and gives you the exact row type, the parameter types, and
-(for DDL) the resulting schema. No codegen, no database connection, no build step.
+(for DDL) the resulting schema. No codegen, no database connection, no build step. The parser
+agrees with Postgres on [every checkable statement of PostgreSQL's own regression tests](#tested-against-postgresqls-own-test-suite).
 
 ![TypeSQL demo: hovering a query shows its inferred row type, and a misspelled column is a compile error](assets/demo.gif)
 
@@ -95,6 +98,23 @@ documentation site) and `@typesql/bench` (compile-time budget and runtime benchm
 
 Unsupported syntax is a compile error with a Postgres-style message and a token position,
 never a silent `any`.
+
+## Tested against PostgreSQL's own test suite
+
+The parser is checked against the regression tests PostgreSQL runs on itself
+(`src/test/regress` of PostgreSQL 18.6, vendored as a submodule in `vendor/postgres` and never
+edited): about 50,000 statements, from everyday queries to `MERGE`, SQL/JSON, `TABLESAMPLE`,
+recursive CTEs with `SEARCH` / `CYCLE` and hundreds of deliberate syntax errors. For each one, the
+expected output that ships with the tests says what Postgres did, and TypeSQL must do the same:
+parse what Postgres parses, reject what it rejects.
+
+| Statements | Agree with Postgres | Disagree | Not checkable statically |
+|---|---|---|---|
+| 50,235 | 49,999 | 0 | 236 (psql variables with unknown values, `standard_conforming_strings = off`) |
+
+CI runs the whole suite on every change and fails on a single disagreement
+(`pnpm pg-regress:setup && pnpm test:pg-regress`). What the comparison covers and what it does not
+is in [Postgres compatibility](packages/docs/guide/postgres-compatibility.md).
 
 ## Schema
 
@@ -198,6 +218,7 @@ The documentation site lives in `packages/docs` (VitePress): run `pnpm docs:dev`
 locally. Its pages pull their code examples from type-checked files, so they read best on the
 site; the Markdown sources are the [guide](packages/docs/guide/getting-started.md),
 the [API reference](packages/docs/reference/api.md), [DDL support](packages/docs/reference/ddl.md),
+[Postgres compatibility](packages/docs/guide/postgres-compatibility.md),
 [adapters](packages/docs/adapters/index.md) and the [type engine](packages/docs/internals/engine.md).
 
 ## Development
