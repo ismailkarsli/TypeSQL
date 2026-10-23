@@ -45,6 +45,21 @@
     - hungry-zebras-eat
     - khaki-queens-kiss
     - real-tigers-refuse
+"@typesql/core@0.3.0":
+  dir: packages/core
+  intents:
+    - calm-taxis-pay
+    - clever-worms-march
+    - funny-owls-glow
+    - giant-shoes-hope
+    - itchy-waves-wave
+    - lucky-pots-visit
+    - quick-olives-join
+    - shiny-pens-guess
+    - sour-cobras-repeat
+    - sour-flowers-draw
+    - wide-plums-sing
+    - wild-books-brush
 "@typesql/drizzle@0.0.2":
   dir: packages/drizzle
   intents:
