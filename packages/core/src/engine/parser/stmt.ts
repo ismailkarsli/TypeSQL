@@ -51,9 +51,9 @@ export type ParseStatement<T extends Toks, I extends number> =
  * the top-level SELECT, the INTO clause is rejected when the query is projected.
  */
 type SelectInto<R> =
-  R extends Ok<infer S extends { readonly body: unknown }, infer J extends number>
-    ? S["body"] extends { readonly t: "simple"; readonly into: infer Ref }
-      ? Ok<{ t: "create_table_as"; ifNotExists: false; table: Ref; cols: null; q: { [K in keyof S]: K extends "body" ? Omit<S["body"], "into"> : S[K] } }, J>
+  R extends readonly [{ readonly body: { readonly into: unknown } }, number]
+    ? R extends Ok<infer S extends { readonly body: { readonly into: unknown } }, infer J extends number>
+      ? Ok<{ t: "create_table_as"; ifNotExists: false; table: S["body"]["into"]; cols: null; q: { [K in keyof S]: K extends "body" ? Omit<S["body"], "into"> : S[K] } }, J>
       : R
     : R;
 

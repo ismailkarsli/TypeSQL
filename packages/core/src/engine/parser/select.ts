@@ -166,9 +166,8 @@ type ParseSimpleSelect<T extends Toks, I extends number> =
   ParseDistinct<T, I> extends infer D
     ? D extends Ok<infer Distinct, infer I1 extends number>
       ? (Distinct extends false ? (EmptyTargetList<T, I1> extends true ? Ok<[], I1> : ParseTargetList<T, I1, []>) : ParseTargetList<T, I1, []>) extends infer TL
-        ? TL extends Ok<infer Targets, infer I2x extends number>
-          ? ParseIntoOpt<T, I2x> extends [infer Into, infer I2 extends number]
-          ? ParseFromOpt<T, I2> extends infer F
+        ? TL extends Ok<infer Targets, infer I2 extends number>
+          ? ParseFromOpt<T, T[I2] extends WordTok<"into"> ? IntoEnd<T, I2> : I2> extends infer F
             ? F extends Ok<infer From, infer I3 extends number>
               ? ParseWhereOpt<T, I3> extends infer Wh
                 ? Wh extends Ok<infer Where, infer I4 extends number>
@@ -178,7 +177,9 @@ type ParseSimpleSelect<T extends Toks, I extends number> =
                         ? Hv extends Ok<infer Having, infer I6 extends number>
                           ? ParseWindowClause<T, I6> extends infer Wn
                             ? Wn extends Ok<infer Windows, infer I7 extends number>
-                              ? Ok<{ t: "simple"; distinct: Distinct; targets: Targets; from: From; where: Where; groupBy: Group; groupingSets: Sets; having: Having; windows: Windows } & Into, I7>
+                              ? T[I2] extends WordTok<"into">
+                                ? Ok<{ t: "simple"; distinct: Distinct; targets: Targets; from: From; where: Where; groupBy: Group; groupingSets: Sets; having: Having; windows: Windows; into: IntoRef<T, I2> }, I7>
+                                : Ok<{ t: "simple"; distinct: Distinct; targets: Targets; from: From; where: Where; groupBy: Group; groupingSets: Sets; having: Having; windows: Windows }, I7>
                               : Wn
                             : never
                           : Hv
@@ -189,22 +190,20 @@ type ParseSimpleSelect<T extends Toks, I extends number> =
                 : never
               : F
             : never
-          : never
           : TL
         : never
       : D
     : never;
 
 /**
- * `INTO [TEMPORARY | TEMP | LOCAL … | GLOBAL … | UNLOGGED] [TABLE] name` (SELECT INTO) →
- * `[{ into: ref }, next]`, or `[{}, I]` without one (the node then has no `into` field).
+ * SELECT INTO: `INTO [TEMPORARY | TEMP | LOCAL … | GLOBAL … | UNLOGGED] [TABLE] name` at token `I`.
+ * The simple-select node then has an `into` field (only then: common queries pay one check).
+ * `IntoEnd`: the index after the clause (`I` when no name follows); `IntoRef`: the table.
  */
-type ParseIntoOpt<T extends Toks, I extends number> =
-  T[I] extends WordTok<"into">
-    ? SkipWord<T, SkipIntoPersistence<T, Nx<I>>, "table"> extends infer J extends number
-      ? QualName<T, J> extends [infer Parts extends readonly string[], infer J2 extends number] ? [{ into: RefOf<Parts> }, J2] : [{}, I]
-      : never
-    : [{}, I];
+type IntoEnd<T extends Toks, I extends number> =
+  QualName<T, SkipWord<T, SkipIntoPersistence<T, Nx<I>>, "table">> extends [unknown, infer J extends number] ? J : I;
+type IntoRef<T extends Toks, I extends number> =
+  QualName<T, SkipWord<T, SkipIntoPersistence<T, Nx<I>>, "table">> extends [infer Parts extends readonly string[], number] ? RefOf<Parts> : null;
 type SkipIntoPersistence<T extends Toks, I extends number> =
   T[I] extends WordTok<"local" | "global"> ? (T[Nx<I>] extends WordTok<"temporary" | "temp"> ? Nx<Nx<I>> : I)
   : SkipWord<T, I, "temporary" | "temp" | "unlogged">;
