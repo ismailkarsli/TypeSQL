@@ -239,6 +239,10 @@ export interface FunctionCatalog {
   parse_ident: [Sig<["anystring"], "text[]">, Sig<["anystring", "bool"], "text[]">];
   unistr: Sig<["anystring"], "text">;
   normalize: [Sig<["anystring"], "text">, Sig<["anystring", "anystring"], "text">];
+  /** `e IS [NFC | NFD | NFKC | NFKD] NORMALIZED` */
+  is_normalized: [Sig<["anystring"], "bool">, Sig<["anystring", "anystring"], "bool">];
+  /** `COLLATION FOR (e)`: the collation's name (Postgres errors for a type without collations). */
+  pg_collation_for: Sig<["any"], "text", NN>;
   convert_from: Sig<["bytea", "anystring"], "text">;
   convert_to: Sig<["anystring", "anystring"], "bytea">;
   convert: Sig<["bytea", "anystring", "anystring"], "bytea">;
@@ -320,6 +324,8 @@ export interface FunctionCatalog {
   justify_hours: Sig<["interval"], "interval">;
   justify_interval: Sig<["interval"], "interval">;
   isfinite: Sig<["any"], "bool">;
+  /** `(start, end | interval) OVERLAPS (start, end | interval)` */
+  overlaps: Sig<["any", "any", "any", "any"], "bool">;
   extract: Sig<["anystring", "any"], "numeric">;
   /** `timezone(zone, timestamptz)` → timestamp and vice versa (the function form of AT TIME ZONE). */
   timezone: [
@@ -352,6 +358,8 @@ export interface FunctionCatalog {
   pg_cancel_backend: Sig<["int4"], "bool">;
   pg_terminate_backend: [Sig<["int4"], "bool">, Sig<["int4", "int8"], "bool">];
   version: Sig<[], "text", NN>;
+  /** `INSERT` / `UPDATE` / `DELETE`: the action of a MERGE row (meant for MERGE's RETURNING list; not checked elsewhere). */
+  merge_action: Sig<[], "text", NN>;
   pg_typeof: Sig<["any"], "regtype", NN>;
   pg_column_size: Sig<["any"], "int4">;
   pg_size_pretty: [Sig<["int8"], "text">, Sig<["numeric"], "text">];
@@ -570,6 +578,17 @@ export interface FunctionCatalog {
   enum_first: Sig<["any"], "$1", NN>;
   enum_last: Sig<["any"], "$1", NN>;
   enum_range: [Sig<["any"], "$arr1", NN>, Sig<["any", "any"], "$arr1", NN>];
+
+  // ───────────── XML (XMLELEMENT, XMLPARSE, ... are special forms: typer/xml.ts) ─────────────
+  /** `XMLEXISTS(x PASSING d)` is parsed as this call. */
+  xmlexists: Sig<["text", "xml"], "bool">;
+  xpath: [Sig<["text", "xml"], "xml[]">, Sig<["text", "xml", "text[]"], "xml[]">];
+  xpath_exists: [Sig<["text", "xml"], "bool">, Sig<["text", "xml", "text[]"], "bool">];
+  xmlcomment: Sig<["text"], "xml">;
+  xmltext: Sig<["text"], "xml">;
+  xml_is_well_formed: Sig<["text"], "bool">;
+  xml_is_well_formed_document: Sig<["text"], "bool">;
+  xml_is_well_formed_content: Sig<["text"], "bool">;
 
   // ───────────── function-style casts: `date(ts)`, `int8(x)`, `timestamp(d, t)` ─────────────
   bool: Sig<["..."], "bool">; int2: Sig<["..."], "int2">; int4: Sig<["..."], "int4">; int8: Sig<["..."], "int8">;

@@ -23,8 +23,12 @@ features:
     details: "$1, :name or inline ${sql.param(value)}. Each parameter takes its type from where it is used, and values are checked against it. Interpolating a value into the SQL text is a compile error."
   - title: "Mistakes are compile errors"
     details: "Unknown columns, ambiguous references, missing NOT NULL columns or syntax errors show up on the SQL string, worded like Postgres errors, with \"Perhaps you meant\" hints."
+  - title: "Agrees with Postgres's own test suite"
+    details: "Every checkable statement of PostgreSQL 18's regression tests, almost 50,000 of them, parses exactly when Postgres parses it, and CI keeps it that way."
+    link: /guide/postgres-compatibility
+    linkText: "How it is tested"
   - title: "The whole statement language"
-    details: "Joins, subqueries, CTEs, set operations, window functions, INSERT/UPDATE/DELETE with RETURNING, ON CONFLICT, and DDL that evolves the schema type."
+    details: "Joins, subqueries, CTEs with SEARCH/CYCLE, set operations, window functions, INSERT/UPDATE/DELETE/MERGE with RETURNING, ON CONFLICT, SQL/JSON and SQL/XML, and DDL that evolves the schema type."
   - title: "Thin runtime"
     details: "A query is { text, values }. Adapters for node-postgres and postgres.js run it, with type maps that match each driver's parsers."
   - title: "Built for TypeScript 7.1"

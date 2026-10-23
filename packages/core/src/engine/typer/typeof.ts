@@ -6,7 +6,9 @@ import type { ColInfo, Cols, Ctx, Info, ColMap } from "../types.js";
 import type { BaseOf, ObjShape, Shaped } from "../shape.js";
 import type { BuildObject, JsonArrow, JsonLitCast, LitType } from "../json.js";
 import type { CallType } from "./catalog.js";
-import type { BinOpType, CommonLit, LitToText, NumLitType, UnOpType } from "./operators.js";
+import type { TypeSqlJson } from "./sqljson.js";
+import type { BinOpType, CommonLit, LitToText, NumLitType, StrT, UnOpType } from "./operators.js";
+import type { TypeXml } from "./xml.js";
 
 /**
  * `TypeOf<E, Ctx>` → `{ type, nullable }` or `SqlError`.
@@ -49,7 +51,7 @@ export type TypeOf<E extends Expr, C extends Ctx> =
   : E extends { readonly t: "in" } ? TypeIn<E["e"], E["list"], C>
   : E extends { readonly t: "insub" } ? StrictBool<TypeOf<E["e"], C>, SubqueryOperand<E["e"], E["q"], C>>
   : E extends { readonly t: "like" } ? StrictBool<TypeOf<E["e"], C>, TypeOf<E["pat"], C>>
-  : E extends { readonly t: "quant" } ? StrictBool<TypeOf<E["l"], C>, E["r"] extends { readonly t: "select" } ? SubqueryOperand<E["l"], E["r"], C> : E["r"] extends Expr ? TypeOf<E["r"], C> : never>
+  : E extends { readonly t: "quant" } ? TypeQuant<E["op"], TypeOf<E["l"], C>, E["r"] extends { readonly t: "select" } ? SubqueryOperand<E["l"], E["r"], C> : E["r"] extends Expr ? TypeOf<E["r"], C> : never, E["r"] extends { readonly t: "select" } ? "sub" : E["r"] extends { readonly t: "str" } ? "lit" : "expr">
   : E extends { readonly t: "sub" } ? MakeNullable<FirstColOf<E["q"], C>>
   : E extends { readonly t: "exists" } ? (ProjectSelect<E["q"], C["db"], C["scope"], C["ctes"]> extends infer R ? (R extends Cols ? Info<"bool"> : R) : never)
   : E extends { readonly t: "array" } ? TypeArrayCtor<E["items"], C>
@@ -59,13 +61,18 @@ export type TypeOf<E extends Expr, C extends Ctx> =
   : E extends { readonly t: "slice" } ? TypeSlice<E["e"], E["lo"], E["hi"], C>
   : E extends { readonly t: "extract" } ? WithType<TypeOf<E["e"], C>, "numeric">
   : E extends { readonly t: "position" } ? StrictOf<TypeOf<E["sub"], C>, TypeOf<E["in"], C>, "int4">
-  : E extends { readonly t: "substring" } ? StringResult<TypeOf<E["e"], C>, TypeOpt<E["from"], C>, TypeOpt<E["for"], C>>
+  : E extends { readonly t: "substring" } ? RegexNull<StringResult<TypeOf<E["e"], C>, TypeOpt<E["from"], C>, TypeOpt<E["for"], C>>, TypeOpt<E["from"], C>>
   : E extends { readonly t: "trim" } ? StringResult<TypeOf<E["e"], C>, TypeOpt<E["chars"], C>, null>
   : E extends { readonly t: "overlay" } ? StringResult<TypeOf<E["e"], C>, null, null>
   : E extends { readonly t: "attz" } ? TypeAtTz<TypeOf<E["e"], C>, TypeOf<E["zone"], C>>
   : E extends { readonly t: "collate" } ? TypeOf<E["e"], C>
   : E extends { readonly t: "field" } ? TypeField<TypeOf<E["e"], C>, E["name"]>
+  : E extends { readonly t: "jsonfn" | "jsonagg" | "isjson" | "jsonfmt" } ? TypeSqlJson<E, C>
   : E extends { readonly t: "star" } ? (E["tbl"] extends string ? WholeRow<C["scope"], E["tbl"], `missing FROM-clause entry for table "${E["tbl"]}"`> : SqlError<"* is only allowed in a target list or count(*)", null>)
+  : E extends { readonly t: "xml" } ? TypeXml<E, C>
+  // a named argument matches any parameter (the catalog has no parameter names); see TypeCall
+  : E extends { readonly t: "named" } ? (TypeOf<E["e"], C> extends infer A ? (A extends ColInfo ? Info<"unknown", A["nullable"]> : A) : never)
+  : E extends { readonly t: "variadic" } ? TypeOf<E["e"], C>
   : SqlError<"unsupported expression", null>;
 
 // ─── helpers ───
@@ -100,6 +107,25 @@ type TypeField<A, N extends string> =
 type TypeOpt<E extends Expr | null, C extends Ctx> = E extends Expr ? TypeOf<E, C> : null;
 type NullableOpt<X> = X extends ColInfo ? X["nullable"] : false;
 
+/**
+ * `l op ANY|ALL (r)`: bool. Postgres requires an array on the right of the array form and an
+ * operator that yields boolean (`33 * ANY (…)`); both are checked where the types are known.
+ */
+type TypeQuant<Op extends string, A, B, R extends "sub" | "lit" | "expr"> =
+  A extends ColInfo
+    ? B extends ColInfo
+      ? R extends "sub" ? Info<"bool", Or<A["nullable"], B["nullable"]>>
+      : R extends "expr" ? (B["type"] extends ScalarType ? SqlError<"op ANY/ALL (array) requires array on right side", null> : QuantOp<Op, A, B>)
+      : QuantOp<Op, A, B>
+      : B
+    : A;
+type QuantOp<Op extends string, A extends ColInfo, B extends ColInfo> =
+  Op extends NonBoolOp ? SqlError<"op ANY/ALL (array) requires operator to yield boolean", null>
+  : Info<"bool", Or<A["nullable"], B["nullable"]>>;
+/** Built-in types that are certainly not arrays. */
+type ScalarType = "int2" | "int4" | "int8" | "numeric" | "float4" | "float8" | "bool" | "text" | "varchar" | "bpchar" | "date" | "time" | "timetz" | "timestamp" | "timestamptz" | "interval" | "uuid" | "bytea" | "json" | "jsonb";
+type NonBoolOp = "+" | "-" | "*" | "/" | "%" | "^" | "||";
+
 /** SUBSTRING / TRIM / OVERLAY: text, or bytea / bit for those inputs; strict over all operands. */
 type StringResult<A, B, D> =
   A extends ColInfo
@@ -109,6 +135,13 @@ type StringResult<A, B, D> =
         : D
       : B
     : A;
+
+/**
+ * `SUBSTRING(t FROM 'pattern')`, `SUBSTRING(t SIMILAR p ESCAPE c)`: the text pattern forms are
+ * NULL when the pattern does not match (an untyped `$n` picks this form too).
+ */
+type RegexNull<R, From> =
+  R extends ColInfo ? (R["type"] extends "text" ? (From extends { readonly type: StrT | "unknown" } ? Info<"text", true> : R) : R) : R;
 
 type TypeBin<Op extends string, L extends Expr, R extends Expr, C extends Ctx> =
   TypeOperand<L, C> extends infer LT
@@ -269,7 +302,26 @@ type TypeWhens<Whens extends readonly CaseWhen[], C extends Ctx, T extends strin
 
 // ─── calls ───
 
+/** `WITHIN GROUP (ORDER BY …)`: every key is typed; the first one gives the ordered-set result type (`mode`, `percentile_disc`). */
+type TypeWithinGroup<W extends Expr | null, C extends Ctx> =
+  W extends { readonly t: "row"; readonly items: infer Items extends readonly Expr[] }
+    ? (TypeList<Items, C, []> extends infer Ls ? (Ls extends readonly [infer F extends ColInfo, ...ColInfo[]] ? F : Ls) : never)
+    : TypeOpt<W, C>;
+
 type NonStarArgs<Args extends readonly Expr[]> = Args extends readonly [{ readonly t: "star"; readonly tbl: null }] ? [] : Args;
+
+/**
+ * `concat(VARIADIC a)` / `concat_ws(sep, VARIADIC a)` are NULL when the array is (they are
+ * otherwise never NULL); `format(f, VARIADIC NULL)` treats it as no arguments.
+ */
+type VariadicNull<E extends Call, As extends readonly ColInfo[], R> =
+  E["name"] extends "concat" | "concat_ws"
+    ? R extends ColInfo
+      ? E["args"] extends readonly [...unknown[], { readonly t: "variadic" }]
+        ? As extends readonly [...unknown[], { readonly nullable: true }] ? Info<R["type"], true> : R
+        : R
+      : R
+    : R;
 
 /** Type the arguments, then FILTER and WITHIN GROUP expressions (for errors and the ordered-set result type), then resolve. */
 type TypeCall<E extends Call, C extends Ctx> =
@@ -278,16 +330,16 @@ type TypeCall<E extends Call, C extends Ctx> =
       ? E["name"] extends "json_build_object" | "jsonb_build_object" ? BuildObject<E["name"] extends "jsonb_build_object" ? "jsonb" : "json", E["args"], As>
       : TypeOpt<E["filter"], C> extends infer F
         ? F extends ColInfo | null
-          ? TypeOpt<E["withinGroup"], C> extends infer W
+          ? TypeWithinGroup<E["withinGroup"], C> extends infer W
             ? W extends ColInfo | null
-              ? CallType<E["name"], As, {
+              ? VariadicNull<E, As, CallType<E["name"], As, {
                   readonly grouped: C["grouped"];
                   readonly over: E["over"];
                   readonly filter: F extends ColInfo ? true : false;
                   readonly distinct: E["distinct"];
                   readonly hasStar: E["args"] extends readonly [{ readonly t: "star"; readonly tbl: null }] ? true : false;
                   readonly wg: W extends ColInfo ? W["type"] : "unknown";
-                }, C["db"]>
+                }, C["db"]>>
               : W
             : never
           : F

@@ -5,6 +5,10 @@ Type-level Postgres SQL for TypeScript. You write a SQL string literal; the comp
 the resulting schema. No codegen, no database connection, no build step. Zero runtime
 dependencies.
 
+Tested against PostgreSQL's own regression suite: on all 49,999 statements of PostgreSQL 18's
+regression tests that can be checked statically, the parser accepts exactly what Postgres accepts
+and rejects its syntax errors ([how it is tested](https://typesql.karsli.net/guide/postgres-compatibility)).
+
 ```sh
 pnpm add @typesql/core
 ```

@@ -1,7 +1,7 @@
 {
   "name": "@typesql/core",
   "version": "0.2.0",
-  "description": "Type-level Postgres SQL inference for TypeScript. Zero runtime dependencies.",
+  "description": "Type-level Postgres SQL inference for TypeScript, tested against PostgreSQL 18's regression suite. Zero runtime dependencies.",
   "license": "MIT",
   "repository": {
     "type": "git",

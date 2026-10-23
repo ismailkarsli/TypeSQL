@@ -1,12 +1,15 @@
-import type { Expr, FromItem, JoinKind, SelectStmt, TableRef } from "../ast.js";
+import type { ColDef, Expr, FromItem, FromTable, JoinKind, SelectStmt, TableRef } from "../ast.js";
 import type { AnyErr, SqlError } from "../errors.js";
 import type { Nx } from "../parser/util.js";
+import type { ColumnName } from "../project/naming.js";
 import type { ProjectSelect } from "../project/select.js";
-import type { ColInfo, ColMap, Cols, ColsToMap, CteMap, Info, MkCtx, NullableMap, Scope, ScopeItem, ScopeLevel } from "../types.js";
+import type { ColInfo, ColMap, Cols, ColsToMap, CteMap, Ctx, Info, MkCtx, NullableMap, Scope, ScopeItem, ScopeLevel } from "../types.js";
 import type { SrfType } from "../typer/catalog.js";
 import type { CommonType } from "../typer/operators.js";
+import type { BindJsonTable } from "../typer/sqljson.js";
 import type { TypeList, TypeOf } from "../typer/typeof.js";
-import type { CheckCondition } from "./clauses.js";
+import type { XmlTableCols } from "../typer/xml.js";
+import type { CheckCondition, TypeDisplay } from "./clauses.js";
 import type { NarrowKeys, NarrowLevel, UsingKeys } from "./narrow.js";
 import type { ResolveTable } from "./resolve.js";
 
@@ -28,10 +31,32 @@ export type BindFromItem<F extends FromItem, DB, Outer extends Scope, Ctes exten
   : F extends { readonly t: "sub" } ? BindSub<F["q"], F["alias"], F["colAliases"], F["lateral"], DB, Outer, Ctes, Sofar>
   : F extends { readonly t: "func" } ? BindFunc<F["call"], F["alias"], F["colAliases"], F["colDefs"], F["withOrdinality"], DB, Outer, Ctes, Sofar>
   : F extends { readonly t: "join" } ? BindJoin<F["kind"], F["l"], F["r"], F["on"], F["using"], F["natural"], DB, Outer, Ctes, Sofar>
+  : F extends { readonly t: "xmltable" } ? BindXmlTable<F, F["alias"], F["colAliases"], DB, Outer, Ctes, Sofar>
+  : F extends { readonly t: "jsontable" } ? BindJsonTable<F["jt"], F["alias"], F["colAliases"], DB, Outer, Ctes, Sofar>
+  : F extends { readonly t: "sample" } ? BindSample<F["table"], F["method"], F["args"], F["repeatable"], DB, Outer, Ctes, Sofar>
+  : F extends { readonly t: "rowsfrom" } ? BindRowsFrom<F["funcs"], F["alias"], F["colAliases"], F["colDefs"], F["withOrdinality"], DB, Outer, Ctes, Sofar>
   : SqlError<"unsupported FROM item", null>;
 
+/**
+ * `XMLTABLE(...) [alias [(cols)]]`: always lateral, named `xmltable` without an alias; a bare
+ * alias does not rename its columns, a column alias list does (positionally).
+ */
+type BindXmlTable<F, Alias extends string | null, CA extends readonly string[] | null, DB, Outer extends Scope, Ctes extends CteMap, Sofar extends ScopeLevel> =
+  F extends { readonly defaultNs: true } ? SqlError<"DEFAULT namespace is not supported", null>
+  : CheckAlias<Alias extends string ? Alias : "xmltable", Sofar> extends infer A
+    ? A extends string
+      ? XmlTableCols<F, MkCtx<DB, [Sofar, ...Outer], Ctes, false>> extends infer Base
+        ? Base extends Cols
+          ? (CA extends readonly string[] ? RenameCols<Base, CA, [], "XMLTABLE function"> : Base) extends infer C2
+            ? C2 extends Cols ? [{ readonly alias: A; readonly cols: ColsToMap<C2>; readonly skip: [] }] : C2
+            : never
+          : Base
+        : never
+      : A
+    : never;
+
 /** `table name "u" specified more than once` when the alias is already used in this level. */
-type CheckAlias<A extends string, Sofar extends ScopeLevel> =
+export type CheckAlias<A extends string, Sofar extends ScopeLevel> =
   A extends Sofar[number]["alias"] ? SqlError<`table name "${A}" specified more than once`, null> : A;
 
 type BindTable<Ref extends TableRef, Alias extends string | null, CA extends readonly string[] | null, DB, Ctes extends CteMap, Sofar extends ScopeLevel> =
@@ -44,6 +69,41 @@ type BindTable<Ref extends TableRef, Alias extends string | null, CA extends rea
           : never
         : A
       : never;
+
+// ─── TABLESAMPLE ───
+
+/**
+ * Sampling methods and the type their argument is coerced to: `system` and `bernoulli` are
+ * built in, `system_rows` and `system_time` come with the contrib modules of the same name.
+ */
+type SampleMethods = { system: "float4"; bernoulli: "float4"; system_rows: "int8"; system_time: "float8" };
+
+/**
+ * `t TABLESAMPLE method (args) [REPEATABLE (seed)]`: the arguments see the outer query
+ * levels only (not the other items of this FROM clause). A CTE cannot be sampled; a view
+ * cannot either, but schemas do not tell views from materialized views, so that is not checked.
+ */
+type BindSample<Tbl extends FromTable, Method extends string, Args extends readonly Expr[], Rep extends Expr | null, DB, Outer extends Scope, Ctes extends CteMap, Sofar extends ScopeLevel> =
+  Tbl["ref"] extends { readonly schema: null; readonly name: keyof Ctes } ? SqlError<"TABLESAMPLE clause can only be applied to tables and materialized views", null>
+  : Method extends keyof SampleMethods
+    ? Args["length"] extends 1
+      ? LateralHint<SampleArgs<[...Args, ...(Rep extends Expr ? [Rep] : [])], [SampleMethods[Method], ...(Rep extends Expr ? ["float8"] : [])], MkCtx<DB, Outer, Ctes, false>, 0>, Sofar, Tbl["alias"] extends string ? Tbl["alias"] : Tbl["ref"]["name"]> extends infer E
+        ? E extends AnyErr ? E : BindTable<Tbl["ref"], Tbl["alias"], Tbl["colAliases"], DB, Ctes, Sofar>
+        : never
+      : SqlError<`tablesample method ${Method} requires 1 argument, not ${Args["length"]}`, null>
+    : SqlError<`tablesample method ${Method} does not exist`, null>;
+/** Each argument must be coercible to its type (numbers are; NULL is rejected when the scan starts). */
+type SampleArgs<Args extends readonly Expr[], Ts extends readonly string[], C extends Ctx, I extends number> =
+  Args[I] extends Expr
+    ? Args[I] extends { readonly t: "null" } ? SqlError<`TABLESAMPLE ${I extends 0 ? "" : "REPEATABLE "}parameter cannot be null`, null>
+    : TypeOf<Args[I], C> extends infer A
+      ? A extends ColInfo
+        ? A["type"] extends "int2" | "int4" | "int8" | "numeric" | "float4" | "float8" | "unknown" | "null" | "lit" ? SampleArgs<Args, Ts, C, Nx<I>>
+        : Args[I] extends { readonly t: "str" } ? SampleArgs<Args, Ts, C, Nx<I>>
+        : SqlError<`argument of ${I extends 0 ? "TABLESAMPLE" : "REPEATABLE"} must be type ${TypeDisplay<Ts[I]>}, not type ${TypeDisplay<A["type"]>}`, null>
+        : A
+      : never
+    : true;
 
 type BindSub<Q extends SelectStmt, Alias extends string | null, ColAliases extends readonly string[] | null, Lateral extends boolean, DB, Outer extends Scope, Ctes extends CteMap, Sofar extends ScopeLevel> =
   (Alias extends string ? CheckAlias<Alias, Sofar> : null) extends infer A
@@ -100,14 +160,31 @@ type BindFunc<Call extends Expr, Alias extends string | null, CA extends readonl
       ? A extends string
         ? FuncBaseCols<Call["name"], Call["args"], CD, Call, MkCtx<DB, [Sofar, ...Outer], Ctes, false>> extends infer Base
           ? Base extends Cols
-            ? FuncRename<Ord extends true ? [...Base, { readonly n: "ordinality"; readonly t: Info<"int8"> }] : Base, Alias, CA, CD extends null ? (Call["name"] extends keyof RecordSrf ? true : false) : true, A> extends infer C2
+            ? FuncRename<Ord extends true ? [...Base, { readonly n: "ordinality"; readonly t: Info<"int8"> }] : Base, Alias, CA, CD extends null ? (Base extends readonly [unknown] ? false : true) : true, A> extends infer C2
               ? C2 extends Cols ? [{ readonly alias: A; readonly cols: ColsToMap<C2>; readonly skip: [] }] : C2
               : never
             : Base
           : never
         : A
       : never
+    : Call extends { readonly t: "cast" } ? BindCastFunc<Call, Alias, CA, Ord, MkCtx<DB, [Sofar, ...Outer], Ctes, false>, Sofar>
     : SqlError<"unsupported function call in FROM", null>;
+
+/** `FROM CAST(e AS T) [AS] a`: one row, one column named like the expression (`T`) or the alias. */
+type BindCastFunc<E extends Expr, Alias extends string | null, CA extends readonly string[] | null, Ord extends boolean, C extends MkCtx<unknown, Scope, CteMap, false>, Sofar extends ScopeLevel> =
+  ColumnName<E, null, C> extends infer N extends string
+    ? CheckAlias<Alias extends string ? Alias : N, Sofar> extends infer A
+      ? A extends string
+        ? TypeOf<E, C> extends infer T
+          ? T extends ColInfo
+            ? FuncRename<Ord extends true ? [{ readonly n: N; readonly t: T }, { readonly n: "ordinality"; readonly t: Info<"int8"> }] : [{ readonly n: N; readonly t: T }], Alias, CA, false, A> extends infer C2
+              ? C2 extends Cols ? [{ readonly alias: A; readonly cols: ColsToMap<C2>; readonly skip: [] }] : C2
+              : never
+            : T
+          : never
+        : A
+      : never
+    : never;
 
 /**
  * Natural (pre-alias) columns of a function in FROM, as ordered entries. A set-returning
@@ -116,7 +193,7 @@ type BindFunc<Call extends Expr, Alias extends string | null, CA extends readonl
  * `unnest`); a plain function in FROM is one row holding the function's value.
  */
 type FuncBaseCols<Name extends string, Args extends readonly Expr[], CD, Call extends Expr, C extends MkCtx<unknown, Scope, CteMap, false>> =
-  CD extends readonly { readonly name: string; readonly type: string }[] ? (TypeList<Args, C, []> extends infer As ? (As extends readonly ColInfo[] ? ColDefsCols<CD, []> : As) : never)
+  CD extends readonly ColDef[] ? (TypeList<Args, C, []> extends infer As ? (As extends readonly ColInfo[] ? ColDefsCols<CD, []> : As) : never)
   : TypeList<Args, C, []> extends infer As
     ? As extends readonly ColInfo[]
       ? Name extends keyof RecordSrf ? RecordSrf[Name]
@@ -140,10 +217,47 @@ type MultiUnnest<As extends readonly ColInfo[], Acc extends Cols> =
     ? MultiUnnest<R, [...Acc, { readonly n: "unnest"; readonly t: Info<A["type"] extends `${infer E}[]` ? E : "unknown", true> }]>
     : Acc;
 
-type ColDefsCols<CD extends readonly { readonly name: string; readonly type: string }[], Acc extends Cols> =
-  CD extends readonly [infer D extends { readonly name: string; readonly type: string }, ...infer R extends readonly { readonly name: string; readonly type: string }[]]
+type ColDefsCols<CD extends readonly ColDef[], Acc extends Cols> =
+  CD extends readonly [infer D extends ColDef, ...infer R extends readonly ColDef[]]
     ? ColDefsCols<R, [...Acc, { readonly n: D["name"]; readonly t: Info<D["type"], true> }]>
     : Acc;
+
+// ─── ROWS FROM ───
+
+type RowsFromFunc = { readonly call: Expr; readonly colDefs: readonly ColDef[] | null };
+
+/**
+ * `ROWS FROM (f(...), g(...)) [WITH ORDINALITY] [AS t(cols)]`: the columns of each function
+ * in order (a multi-argument `unnest` contributes one per array), then `ordinality` (int8).
+ * The functions are zipped and shorter results padded with NULLs, so with more than one
+ * function every column is nullable. One function behaves like the function alone.
+ */
+type BindRowsFrom<Fs extends readonly RowsFromFunc[], Alias extends string | null, CA extends readonly string[] | null, CD extends readonly ColDef[] | null, Ord extends boolean, DB, Outer extends Scope, Ctes extends CteMap, Sofar extends ScopeLevel> =
+  Fs extends readonly [infer F extends RowsFromFunc]
+    ? BindFunc<F["call"], Alias, CA, CD extends null ? F["colDefs"] : CD, Ord, DB, Outer, Ctes, Sofar>
+  : CD extends readonly ColDef[] ? SqlError<"ROWS FROM() with multiple functions cannot have a column definition list", null>
+  : CheckAlias<Alias extends string ? Alias : Fs[0]["call"] extends { readonly name: infer N extends string } ? N : "rows", Sofar> extends infer A
+    ? A extends string
+      ? RowsFromCols<Fs, MkCtx<DB, [Sofar, ...Outer], Ctes, false>, []> extends infer Base
+        ? Base extends Cols
+          ? (Ord extends true ? [...Base, { readonly n: "ordinality"; readonly t: Info<"int8"> }] : Base) extends infer C1 extends Cols
+            ? (CA extends readonly string[] ? RenameCols<C1, CA, [], `table "${A}"`> : C1) extends infer C2
+              ? C2 extends Cols ? [{ readonly alias: A; readonly cols: ColsToMap<C2>; readonly skip: [] }] : C2
+              : never
+            : never
+          : Base
+        : never
+      : A
+    : never;
+type RowsFromCols<Fs extends readonly RowsFromFunc[], C extends MkCtx<unknown, Scope, CteMap, false>, Acc extends Cols> =
+  Fs extends readonly [infer F extends RowsFromFunc, ...infer R extends readonly RowsFromFunc[]]
+    ? F["call"] extends { readonly t: "call" }
+      ? FuncBaseCols<F["call"]["name"], F["call"]["args"], F["colDefs"], F["call"], C> extends infer B
+        ? B extends Cols ? RowsFromCols<R, C, [...Acc, ...NullableCols<B>]> : B
+        : never
+      : SqlError<"unsupported function call in FROM", null>
+    : Acc;
+type NullableCols<B extends Cols> = { readonly [K in keyof B]: B[K] extends { readonly n: infer N extends string; readonly t: infer T extends ColInfo } ? { readonly n: N; readonly t: Info<T["type"], true> } : B[K] };
 
 /**
  * Column naming of a function table: `AS t(a, b)` renames positionally (including the
@@ -161,7 +275,8 @@ type RenameFirst<Base extends Cols, Alias extends string> =
 
 /**
  * `l <kind> JOIN r ON ... | USING (...) | NATURAL`. The right side of a RIGHT/FULL join
- * cannot reference the left side (no LATERAL). An INNER join's ON condition narrows the
+ * cannot reference the left side (no LATERAL). The ON condition sees the two sides only
+ * (not the other items of the FROM clause). An INNER join's ON condition narrows the
  * columns it proves non-null (see narrow.ts); USING / NATURAL columns of an inner join are
  * non-null on both sides.
  */
@@ -170,7 +285,7 @@ type BindJoin<K extends JoinKind, L extends FromItem, R extends FromItem, On ext
     ? LL extends ScopeLevel
       ? (K extends "right" | "full" ? LateralHint<BindFromItem<R, DB, Outer, Ctes, Sofar>, LL, ""> : BindFromItem<R, DB, Outer, Ctes, [...Sofar, ...LL]>) extends infer RL
         ? RL extends ScopeLevel
-          ? CheckCondition<"JOIN/ON", On, MkCtx<DB, [[...Sofar, ...LL, ...RL], ...Outer], Ctes, false>> extends infer Chk
+          ? LateralHint<CheckCondition<"JOIN/ON", On, MkCtx<DB, [[...LL, ...RL], ...Outer], Ctes, false>>, Sofar, ""> extends infer Chk
             ? Chk extends AnyErr ? Chk
             : Natural extends true ? MergeUsing<K, LL, RL, CommonNames<LL, RL>>
             : Using extends readonly string[]

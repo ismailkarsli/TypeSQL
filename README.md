@@ -1,8 +1,11 @@
 # TypeSQL
 
+[![PostgreSQL 18 regression suite: 49,999 of 49,999 checkable statements agree](https://img.shields.io/badge/PostgreSQL%2018%20regression%20suite-100%25%20agreement-336791?logo=postgresql&logoColor=white)](#tested-against-postgresqls-own-test-suite)
+
 Type-level Postgres SQL for TypeScript. You write a SQL string literal; the compiler parses
 it **inside the type system** and gives you the exact row type, the parameter types, and
-(for DDL) the resulting schema. No codegen, no database connection, no build step.
+(for DDL) the resulting schema. No codegen, no database connection, no build step. The parser
+agrees with Postgres on [every checkable statement of PostgreSQL's own regression tests](#tested-against-postgresqls-own-test-suite).
 
 ![TypeSQL demo: hovering a query shows its inferred row type, and a misspelled column is a compile error](assets/demo.gif)
 
@@ -79,13 +82,15 @@ documentation site) and `@typesql/bench` (compile-time budget and runtime benchm
 | Feature | Status |
 |---|---|
 | SELECT: joins (nullability per join kind, USING/NATURAL), aliases, `*`/`t.*`, WHERE, GROUP BY/HAVING, ORDER BY, LIMIT/OFFSET/FETCH, DISTINCT [ON], FOR UPDATE | ✓ |
-| Subqueries (scalar, EXISTS, IN, ANY/ALL), derived tables, LATERAL, CTEs incl. RECURSIVE, UNION/INTERSECT/EXCEPT, VALUES, set-returning functions in FROM | ✓ |
-| Expressions: operators with numeric/date/JSON/array rules, casts, CASE, COALESCE/NULLIF/GREATEST/LEAST, IS, BETWEEN, IN, LIKE, arrays, subscripts, EXTRACT and friends, window functions | ✓ |
+| Subqueries (scalar, EXISTS, IN, ANY/ALL), derived tables, LATERAL, CTEs incl. RECURSIVE (with SEARCH/CYCLE), UNION/INTERSECT/EXCEPT, VALUES, set-returning functions and ROWS FROM in FROM, TABLESAMPLE | ✓ |
+| Expressions: operators with numeric/date/JSON/array rules, casts and typed literals (`timestamp with time zone '…'`), CASE, COALESCE/NULLIF/GREATEST/LEAST, IS [NORMALIZED], BETWEEN, IN, LIKE, `op ANY/ALL`, OVERLAPS, AT TIME ZONE / AT LOCAL, arrays, subscripts, EXTRACT and friends, named and VARIADIC arguments, window functions, SQL/XML (`XMLELEMENT`, `XMLSERIALIZE`, `XMLTABLE`, …) | ✓ |
+| SQL/JSON: `JSON_OBJECT`, `JSON_ARRAY`, `JSON_OBJECTAGG`/`JSON_ARRAYAGG`, `JSON_VALUE`/`JSON_QUERY`/`JSON_EXISTS`, `IS JSON`, `JSON_TABLE` in FROM | ✓ |
 | Function catalog (string, numeric, date/time, JSON, arrays, aggregates, window) with Postgres nullability; every other `pg_catalog` function known by return type; unknown functions are errors; app functions declared in `$functions` or via `FunctionCatalog` augmentation | ✓ |
 | Parameters: `$n` typed from context (`WHERE id = $1` → `number`), `:name` sugar, inline `${sql.param(value)}` with value type checks | ✓ |
 | Nullability narrowing: `WHERE c IS NOT NULL` / comparisons / inner-join conditions make `c` non-null | ✓ |
 | Errors with token positions and "Perhaps you meant …" hints for unknown columns, relations and functions | ✓ |
-| INSERT/UPDATE/DELETE with RETURNING, required-column checks, ON CONFLICT, `EXCLUDED` | ✓ |
+| INSERT/UPDATE/DELETE/MERGE with RETURNING (incl. `old` / `new`), required-column checks, ON CONFLICT, `EXCLUDED`, array / field assignment targets | ✓ |
+| Cursors: `DECLARE … CURSOR FOR query` is checked and its parameters typed; `FETCH` / `MOVE` / `CLOSE` parse (no row type: the query is another statement) | ✓ |
 | Write helpers: `sql.valueOrDefault(x)` (`DEFAULT` for `undefined`), typed `sql.set(table, partial)` and `sql.values(table, rows)` | ✓ |
 | DDL → schema: `ApplyDdl<DB, "ALTER TABLE …">`, `migrations()` builder, views, enums, schemas | ✓ |
 | Fragments: `{slot}` splicing with `$n` renumbering, `sql.fragment`, `sql.id`, `sql.join`, `sql.list` (runtime arrays of typed elements), `sql.raw`; dynamic text falls back to `sql.as<Row>()` | ✓ |
@@ -93,6 +98,23 @@ documentation site) and `@typesql/bench` (compile-time budget and runtime benchm
 
 Unsupported syntax is a compile error with a Postgres-style message and a token position,
 never a silent `any`.
+
+## Tested against PostgreSQL's own test suite
+
+The parser is checked against the regression tests PostgreSQL runs on itself
+(`src/test/regress` of PostgreSQL 18.6, vendored as a submodule in `vendor/postgres` and never
+edited): about 50,000 statements, from everyday queries to `MERGE`, SQL/JSON, `TABLESAMPLE`,
+recursive CTEs with `SEARCH` / `CYCLE` and hundreds of deliberate syntax errors. For each one, the
+expected output that ships with the tests says what Postgres did, and TypeSQL must do the same:
+parse what Postgres parses, reject what it rejects.
+
+| Statements | Agree with Postgres | Disagree | Not checkable statically |
+|---|---|---|---|
+| 50,235 | 49,999 | 0 | 236 (psql variables with unknown values, `standard_conforming_strings = off`) |
+
+CI runs the whole suite on every change and fails on a single disagreement
+(`pnpm pg-regress:setup && pnpm test:pg-regress`). What the comparison covers and what it does not
+is in [Postgres compatibility](packages/docs/guide/postgres-compatibility.md).
 
 ## Schema
 
@@ -196,6 +218,7 @@ The documentation site lives in `packages/docs` (VitePress): run `pnpm docs:dev`
 locally. Its pages pull their code examples from type-checked files, so they read best on the
 site; the Markdown sources are the [guide](packages/docs/guide/getting-started.md),
 the [API reference](packages/docs/reference/api.md), [DDL support](packages/docs/reference/ddl.md),
+[Postgres compatibility](packages/docs/guide/postgres-compatibility.md),
 [adapters](packages/docs/adapters/index.md) and the [type engine](packages/docs/internals/engine.md).
 
 ## Development
@@ -205,6 +228,7 @@ pnpm install
 pnpm typecheck         # tsc per package
 pnpm test              # vitest: runtime + type tests; conformance runs against docker postgres:17 when available
 pnpm build && pnpm smoke:dist   # import the built packages with plain Node
+pnpm pg-regress:setup && pnpm test:pg-regress   # the parser against PostgreSQL 18's regression tests
 pnpm docs:dev                   # the documentation site (packages/docs)
 node packages/bench/gen.mjs && node packages/bench/run.mjs   # compile-time budget (thresholds.json)
 node packages/bench/runtime.mjs                               # cost of building a query, after pnpm build

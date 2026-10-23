@@ -76,8 +76,16 @@ per position, and a column is nullable if any branch can produce `NULL` there.
 <<< @/snippets/queries.ts#structure
 
 Also supported: derived tables (`FROM (SELECT …) AS t(a, b)`), `LATERAL`, `VALUES` lists,
-set-returning functions such as `generate_series`, `unnest` and `jsonb_each` in `FROM`,
-`DISTINCT ON`, named windows, `FOR UPDATE`, and `ORDER BY` / `GROUP BY` by alias or position.
+set-returning functions such as `generate_series`, `unnest` and `jsonb_each` in `FROM`, `ROWS
+FROM (f(…), g(…)) WITH ORDINALITY` (zipped, so every column is nullable), `TABLESAMPLE`, nested
+joins (`a JOIN b LEFT JOIN c ON … ON …`, `((SELECT …) s JOIN t ON …) j`), `SEARCH` / `CYCLE` on
+recursive CTEs (their columns are added to the CTE), `DISTINCT ON`, named windows, `FOR UPDATE`,
+and `ORDER BY` / `GROUP BY` by alias or position.
+
+`DECLARE name CURSOR FOR query` checks the query and types its parameters like a `SELECT`; the
+statement itself returns no rows. `FETCH`, `MOVE` and `CLOSE` are checked for syntax only:
+the cursor's query is another statement, so a `FETCH` has no row type (assert one with
+`sql.as<Row>("FETCH 10 FROM c")`).
 
 ## Whole-row references
 
@@ -122,6 +130,17 @@ declare it as a [typed JSON column](./schema#typed-json-columns) to give it one.
 
 <<< @/snippets/queries.ts#jsonread
 
+The SQL/JSON standard syntax of PostgreSQL 16+ is typed the same way. `JSON_OBJECT(k VALUE v, …)`
+is a `json_build_object` (never `NULL`), `JSON_ARRAY(a, b)` a tuple and `JSON_ARRAY(SELECT …)`
+an array of the query's column, `JSON_ARRAYAGG` / `JSON_OBJECTAGG` are `json_agg` /
+`json_object_agg` (`RETURNING jsonb` makes them `jsonb`). Arrays skip `NULL`s by default, and so
+does `ABSENT ON NULL`: when a nullable value may be left out, the result is plain JSON.
+`JSON_VALUE` is `text` (or its `RETURNING` type), `JSON_QUERY` `jsonb`, `JSON_EXISTS` and
+`IS [NOT] JSON` `bool`. `JSON_TABLE(…)` in `FROM` has the declared columns, all nullable but a
+top-level `FOR ORDINALITY` (`int4`), and sees the `FROM` items before it. Write object pairs as
+`k VALUE v`: in `k: v` the `: v` is read as a [named parameter](./parameters#named-name) when
+`v` is a name.
+
 ## Narrowing with WHERE
 
 Conditions in `WHERE` (and in an inner join's `ON`) that rule out `NULL` make the column
@@ -137,6 +156,13 @@ arithmetic (`timestamptz - timestamptz` is an `interval`), JSON operators (`->>`
 string and array concatenation, comparisons, `IS [NOT] DISTINCT FROM`, `BETWEEN`, `LIKE`,
 regular expressions, `ANY`/`ALL`, casts in both spellings, `ARRAY[…]`, subscripts and slices,
 `EXTRACT`, `SUBSTRING … FROM … FOR`, `TRIM`, `POSITION`, `AT TIME ZONE`.
+
+SQL/XML is typed too: `XMLELEMENT(NAME n, XMLATTRIBUTES(…), …)`, `XMLFOREST`, `XMLCONCAT`,
+`XMLPI`, `XMLROOT`, `XMLPARSE` and `XMLEXISTS(… PASSING …)` have Postgres's types and null
+handling (`XMLELEMENT` is never `NULL`, `XMLFOREST` only when every value is),
+`XMLSERIALIZE(… AS type)` has the type you name, and `x IS [NOT] DOCUMENT` is a boolean.
+`XMLTABLE(… PASSING doc COLUMNS …)` in `FROM` gives the declared columns: nullable unless they
+are `NOT NULL`, `FOR ORDINALITY` or have a non-null `DEFAULT`.
 
 About 450 built-in functions are typed with their Postgres argument types, return types and
 null handling: string, numeric, date/time, JSON, array, aggregate and window functions,

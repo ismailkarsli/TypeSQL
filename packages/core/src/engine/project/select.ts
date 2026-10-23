@@ -1,4 +1,4 @@
-import type { Cte, Expr, FromItem, NamedWindow, SelectBody, SelectStmt, Target, WithClause } from "../ast.js";
+import type { Cte, CteCycle, CteSearch, Expr, FromItem, NamedWindow, SelectBody, SelectStmt, Target, WithClause } from "../ast.js";
 import type { BindFrom, RenameCols } from "../binder/from.js";
 import type {
   CheckCondition, CheckDistinctOnOrder, CheckDistinctOrder, CheckGroupBy, CheckOutputOrder, CheckWindowClause, CheckWindowRefs,
@@ -56,9 +56,13 @@ type AddCte<Ctes extends CteMap, N extends string, M extends ColMap> =
 type BindCte<C extends Cte, Rec extends boolean, DB, Outer extends Scope, Ctes extends CteMap> =
   Rec extends true
     ? C["q"] extends { readonly t: "select"; readonly body: { readonly t: "setop" } }
-      ? RecursiveCte<C["name"], C["cols"], C["q"]["with"], C["q"]["body"], C["q"]["orderBy"], DB, Outer, Ctes>
-      : ProjectCteBody<C, DB, Outer, Ctes>
-    : ProjectCteBody<C, DB, Outer, Ctes>;
+      ? C extends { readonly search: null; readonly cycle: null }
+        ? RecursiveCte<C["name"], C["cols"], C["q"]["with"], C["q"]["body"], C["q"]["orderBy"], DB, Outer, Ctes, null, null>
+        : CheckExpandable<C["q"]["body"]> extends infer E
+          ? E extends AnyErr ? E : RecursiveCte<C["name"], C["cols"], C["q"]["with"], C["q"]["body"], C["q"]["orderBy"], DB, Outer, Ctes, C["search"], C["cycle"]>
+          : never
+      : NotRecursive<C, ProjectCteBody<C, DB, Outer, Ctes>>
+    : NotRecursive<C, ProjectCteBody<C, DB, Outer, Ctes>>;
 
 type ProjectCteBody<C extends Cte, DB, Outer extends Scope, Ctes extends CteMap> =
   ProjectStmt<C["q"], DB, Outer, Ctes> extends infer R
@@ -66,6 +70,81 @@ type ProjectCteBody<C extends Cte, DB, Outer extends Scope, Ctes extends CteMap>
     : R extends null ? SqlError<`WITH query "${C["name"]}" does not have a RETURNING clause`, null>
     : R
     : never;
+
+// ─── SEARCH / CYCLE ───
+
+/**
+ * `SEARCH ... SET seq` and `CYCLE ... SET mark [TO v DEFAULT d] USING path` add columns to a
+ * recursive CTE (also visible to its recursive term): `seq` is `record[]` (DEPTH FIRST) or
+ * `record` (BREADTH FIRST), `mark` is `bool` or the common type of `v` and `d`, `path` is
+ * `record[]`; none is ever NULL. They need a recursive CTE whose two terms are plain SELECTs.
+ */
+type NotRecursive<C extends Cte, R> = C extends { readonly search: null; readonly cycle: null } ? R : SqlError<"WITH query is not recursive", null>;
+/** The recursive term and the non-recursive term must both be plain SELECTs (not set operations). */
+type CheckExpandable<B extends SelectBody> =
+  B extends { readonly t: "setop" }
+    ? IsSetLeaf<B["l"]> extends false ? SqlError<"with a SEARCH or CYCLE clause, the left side of the UNION must be a SELECT", null>
+    : IsSetLeaf<B["r"]> extends false ? SqlError<"with a SEARCH or CYCLE clause, the right side of the UNION must be a SELECT", null>
+    : true
+    : true;
+type IsSetLeaf<B> =
+  B extends { readonly t: "setop" } ? false
+  : B extends { readonly t: "paren"; readonly q: { readonly body: { readonly t: "setop" } } } ? false
+  : true;
+type CheckCteColList<Cols extends readonly string[], M extends ColMap, What extends string, Seen extends string> =
+  Cols extends readonly [infer H extends string, ...infer R extends readonly string[]]
+    ? H extends keyof M
+      ? H extends Seen ? SqlError<`${What} column "${H}" specified more than once`, null> : CheckCteColList<R, M, What, Seen | H>
+      : SqlError<`${What} column "${H}" not in WITH query column list`, null>
+    : true;
+/** The columns SEARCH and CYCLE add (`{}` without them), or an error. `M`: the CTE's columns. */
+type SearchCycleCols<S, Y, M extends ColMap> =
+  SearchCols<S, M> extends infer SC
+    ? SC extends AnyErr ? SC
+    : CycleCols<Y, S, M> extends infer YC
+      ? YC extends AnyErr ? YC : SC & YC extends infer All ? { readonly [K in keyof All]: All[K] } : never
+      : never
+    : never;
+type SearchCols<S, M extends ColMap> =
+  S extends CteSearch
+    ? CheckCteColList<S["cols"], M, "search", never> extends infer E
+      ? E extends AnyErr ? E
+      : S["set"] extends keyof M ? SqlError<`search sequence column name "${S["set"]}" already used in WITH query column list`, null>
+      : { readonly [K in S["set"]]: Info<S["breadth"] extends true ? "record" : "record[]"> }
+      : never
+    : {};
+type CycleCols<Y, S, M extends ColMap> =
+  Y extends CteCycle
+    ? CheckCteColList<Y["cols"], M, "cycle", never> extends infer E
+      ? E extends AnyErr ? E
+      : Y["set"] extends keyof M ? SqlError<`cycle mark column name "${Y["set"]}" already used in WITH query column list`, null>
+      : Y["using"] extends keyof M ? SqlError<`cycle path column name "${Y["using"]}" already used in WITH query column list`, null>
+      : Y["set"] extends Y["using"] ? SqlError<"cycle mark column name and cycle path column name are the same", null>
+      : S extends CteSearch & { readonly set: Y["set"] } ? SqlError<"search sequence column name and cycle mark column name are the same", null>
+      : S extends CteSearch & { readonly set: Y["using"] } ? SqlError<"search sequence column name and cycle path column name are the same", null>
+      : CycleMarkType<Y["to"], Y["default"]> extends infer T
+        ? T extends string ? { readonly [K in Y["set"]]: Info<T> } & { readonly [K in Y["using"]]: Info<"record[]"> } : T
+        : never
+      : never
+    : {};
+/** `TO v DEFAULT d`: their common type (string literals yield; two of them are text), which needs an equality operator. */
+type CycleMarkType<To, Def> =
+  To extends Expr
+    ? Def extends Expr
+      ? ConstType<To> extends infer A extends string
+        ? ConstType<Def> extends infer B extends string
+          ? CommonLit<A, B> extends infer T extends string
+            ? T extends "unknown" ? (A | B extends "unknown" | "null" | "lit" ? "text" : SqlError<`CYCLE types ${TypeDisplay<A>} and ${TypeDisplay<B>} cannot be matched`, null>)
+            : LitToText<T> extends "point" | "polygon" | "json" | "xml" ? SqlError<`could not identify an equality operator for type ${LitToText<T>}`, null>
+            : LitToText<T>
+            : never
+          : never
+        : never
+      : "bool"
+    : "bool";
+type ConstType<E extends Expr> =
+  E extends { readonly t: "str" } ? "lit"
+  : TypeOf<E, MkCtx<unknown, [], {}, false>> extends infer T ? (T extends ColInfo ? T["type"] : "unknown") : never;
 
 /** `WITH a(x, y) AS (...)`: rename positionally; more names than columns is an error. */
 type ApplyCteCols<C extends Cols, Names extends readonly string[] | null, Name extends string> =
@@ -76,30 +155,37 @@ type ApplyCteCols<C extends Cols, Names extends readonly string[] | null, Name e
  * non-recursive term (as in Postgres); nullability is the union over both terms, iterated
  * to a fixpoint (a recursive term can feed a nullable column back into another one).
  */
-type RecursiveCte<Name extends string, Names extends readonly string[] | null, W extends WithClause | null, B extends SelectBody, Order extends readonly Expr[], DB, Outer extends Scope, Ctes extends CteMap> =
+type RecursiveCte<Name extends string, Names extends readonly string[] | null, W extends WithClause | null, B extends SelectBody, Order extends readonly Expr[], DB, Outer extends Scope, Ctes extends CteMap, S, Y> =
   B extends { readonly t: "setop" }
     ? ProjectBody<B["l"], DB, Outer, Ctes, [], false> extends infer C0
       ? C0 extends Cols
         ? ApplyCteCols<C0, Names, Name> extends infer C1
-          ? C1 extends Cols ? RecursiveFix<Name, Names, W, B, Order, DB, Outer, Ctes, ColsToMap<C1>, ColsToMap<C1>, [0]> : C1
+          ? C1 extends Cols
+            ? S | Y extends null ? RecursiveFix<Name, Names, W, B, Order, DB, Outer, Ctes, ColsToMap<C1>, ColsToMap<C1>, [0], null>
+            : SearchCycleCols<S, Y, ColsToMap<C1>> extends infer X
+              ? X extends ColMap ? RecursiveFix<Name, Names, W, B, Order, DB, Outer, Ctes, ColsToMap<C1>, ColsToMap<C1>, [0], X> : X
+              : never
+            : C1
           : never
         : C0
       : never
     : never;
-type RecursiveFix<Name extends string, Names extends readonly string[] | null, W extends WithClause | null, B extends SelectBody, Order extends readonly Expr[], DB, Outer extends Scope, Ctes extends CteMap, M0 extends ColMap, M extends ColMap, Iter extends readonly unknown[]> =
-  ProjectSelectParts<W, B, Order, DB, Outer, AddCte<Ctes, Name, M>> extends infer Full
+/** `X`: the SEARCH / CYCLE columns (or null), added to the self reference and the result. */
+type RecursiveFix<Name extends string, Names extends readonly string[] | null, W extends WithClause | null, B extends SelectBody, Order extends readonly Expr[], DB, Outer extends Scope, Ctes extends CteMap, M0 extends ColMap, M extends ColMap, Iter extends readonly unknown[], X> =
+  ProjectSelectParts<W, B, Order, DB, Outer, AddCte<Ctes, Name, X extends ColMap ? WithExtra<M, X> : M>> extends infer Full
     ? Full extends Cols
       ? ApplyCteCols<Full, Names, Name> extends infer F2
         ? F2 extends Cols
           ? FixStep<M0, ColsToMap<F2>> extends infer Next extends ColMap
-            ? SameNullability<M, Next> extends true ? Next
-            : Iter["length"] extends 3 ? Next
-            : RecursiveFix<Name, Names, W, B, Order, DB, Outer, Ctes, M0, Next, [...Iter, 0]>
+            ? SameNullability<M, Next> extends true ? (X extends ColMap ? WithExtra<Next, X> : Next)
+            : Iter["length"] extends 3 ? (X extends ColMap ? WithExtra<Next, X> : Next)
+            : RecursiveFix<Name, Names, W, B, Order, DB, Outer, Ctes, M0, Next, [...Iter, 0], X>
             : never
           : F2
         : never
       : Full
     : never;
+type WithExtra<M extends ColMap, X extends ColMap> = M & X extends infer All ? { readonly [K in keyof All]: All[K] } : never;
 type FixStep<M0 extends ColMap, Full extends ColMap> = {
   readonly [K in keyof M0]: { readonly type: M0[K]["type"]; readonly nullable: M0[K]["nullable"] extends true ? true : K extends keyof Full ? Full[K]["nullable"] : false };
 };
@@ -108,7 +194,9 @@ type SameNullability<A extends ColMap, B extends ColMap> = false extends { [K in
 // ───────────────────────────── bodies ─────────────────────────────
 
 type ProjectBody<B extends SelectBody, DB, Outer extends Scope, Ctes extends CteMap, Order extends readonly Expr[], Lit extends boolean> =
-  B extends { readonly t: "simple" } ? ProjectSimple<B["distinct"], B["targets"], B["from"], B["where"], B["groupBy"], B["having"], B["windows"], Order, DB, Outer, Ctes, Lit>
+  B extends { readonly t: "simple" }
+    ? B extends { readonly into: unknown } ? SqlError<"SELECT ... INTO is not allowed here", null>
+    : ProjectSimple<B["distinct"], B["targets"], B["from"], B["where"], B["groupBy"], B["having"], B["windows"], Order, DB, Outer, Ctes, Lit>
   : B extends { readonly t: "setop" }
     ? ProjectSetOp<B["l"], B["r"], B["op"], DB, Outer, Ctes> extends infer C
       ? C extends Cols ? (CheckOutputOrder<Order, C> extends infer O ? (O extends AnyErr ? O : C) : never) : C

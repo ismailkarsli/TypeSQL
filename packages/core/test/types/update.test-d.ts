@@ -81,9 +81,14 @@ test("UPDATE inside WITH", () => {
   expectTypeOf<Row<"WITH ids AS (SELECT author_id FROM posts) UPDATE users SET display_name = 'x' FROM ids WHERE ids.author_id = users.id RETURNING users.id">>().toEqualTypeOf<{ id: number }>();
 });
 
-test("unsupported / syntax errors", () => {
-  expectTypeOf<V<"UPDATE users SET email = 'a' WHERE CURRENT OF cur">>().toEqualTypeOf<SqlError<"WHERE CURRENT OF cursor is not supported", 7>>();
-  expectTypeOf<V<"UPDATE users SET email[1] = 'x'">>().toEqualTypeOf<SqlError<"subscripted or field assignment targets (col[i] = ..., col.f = ...) are not supported", 4>>();
+test("WHERE CURRENT OF cursor", () => {
+  expectTypeOf<V<"UPDATE users SET email = 'a' WHERE CURRENT OF cur">>().toEqualTypeOf<"UPDATE users SET email = 'a' WHERE CURRENT OF cur">();
+  expectTypeOf<Row<"UPDATE users SET email = 'a' WHERE CURRENT OF cur RETURNING id">>().toEqualTypeOf<{ id: number }>();
+  expectTypeOf<V<"UPDATE users SET email = 'a' WHERE CURRENT OF">>().toEqualTypeOf<SqlError<"syntax error: expected cursor name at or near end of input", 9>>();
+});
+
+test("syntax errors", () => {
+  expectTypeOf<V<"UPDATE users SET email[1] = 'x'">>().toEqualTypeOf<SqlError<"cannot subscript type text because it does not support subscripting", 0>>();
   expectTypeOf<V<"UPDATE users SET">>().toEqualTypeOf<SqlError<"syntax error: expected column name at or near end of input", 3>>();
   expectTypeOf<V<"UPDATE users email = 'a'">>().toEqualTypeOf<SqlError<'syntax error: expected SET at or near =', 3>>();
 });

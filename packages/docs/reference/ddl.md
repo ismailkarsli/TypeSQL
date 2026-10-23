@@ -38,30 +38,34 @@ syntax the engine does not know is an error instead of being silently ignored.
 
 | Statement | Effect |
 |---|---|
-| `CREATE [TEMP \| UNLOGGED] TABLE [IF NOT EXISTS] [schema.]name (...)` | column definitions, table constraints, `LIKE src [INCLUDING ... \| EXCLUDING ...]`; trailing `INHERITS (...)`, `PARTITION BY ...`, `USING`, `WITH (...)`, `ON COMMIT`, `TABLESPACE` |
+| `CREATE [TEMP \| UNLOGGED] TABLE [IF NOT EXISTS] [schema.]name (...)` | column definitions, table constraints (`PRIMARY KEY (..., c WITHOUT OVERLAPS)`, `NOT NULL c`), `LIKE src [INCLUDING ... \| EXCLUDING ...]`; trailing `INHERITS (...)`, `PARTITION BY ...`, `USING`, `WITH (...)`, `ON COMMIT`, `TABLESPACE` |
 | `CREATE TABLE name PARTITION OF parent FOR VALUES ... \| DEFAULT` | the parent's columns |
-| `CREATE TABLE [IF NOT EXISTS] name [(cols)] AS query [WITH [NO] DATA]` | columns from the query |
-| `ALTER TABLE [IF EXISTS] [ONLY] name action, ...` | `ADD [COLUMN] [IF NOT EXISTS]`, `DROP [COLUMN] [IF EXISTS] ... [CASCADE]`, `ALTER [COLUMN] c [SET DATA] TYPE t [USING e]`, `SET / DROP NOT NULL`, `SET / DROP DEFAULT`, `ADD GENERATED ... AS IDENTITY`, `DROP IDENTITY`, `DROP EXPRESSION`, `ADD [CONSTRAINT n] PRIMARY KEY (cols)`; other actions (constraints, triggers, RLS, owner, storage, ...) have no schema effect |
+| `CREATE TABLE [IF NOT EXISTS] name [(cols)] AS query [WITH [NO] DATA]` | columns from the query (`AS EXECUTE stmt(...)` parses, but is rejected: the prepared statement's columns are unknown) |
+| `CREATE TABLE name OF type [(c WITH OPTIONS ..., ...)]` | parses, but is rejected: the columns of composite types are not tracked |
+| `ALTER TABLE [IF EXISTS] [ONLY] name action, ...` | `ADD [COLUMN] [IF NOT EXISTS]`, `DROP [COLUMN] [IF EXISTS] ... [CASCADE]`, `ALTER [COLUMN] c [SET DATA] TYPE t [USING e]`, `SET / DROP NOT NULL`, `SET / DROP DEFAULT`, `ADD GENERATED ... AS IDENTITY`, `DROP IDENTITY`, `DROP EXPRESSION`, `ADD [CONSTRAINT n] PRIMARY KEY (cols)`, `ADD [CONSTRAINT n] NOT NULL c` (no effect with `NOT VALID`); other actions (constraints, triggers, RLS, owner, storage, ...) have no schema effect |
 | `ALTER TABLE name RENAME [COLUMN] a TO b` / `RENAME TO new` / `SET SCHEMA s` | standalone, as in Postgres (cannot be combined with other actions) |
 | `ALTER VIEW` / `ALTER MATERIALIZED VIEW` | same grammar; views accept renames and defaults only |
 | `DROP TABLE [IF EXISTS] a, b [CASCADE \| RESTRICT]` | |
 | `CREATE [OR REPLACE] [TEMP] VIEW name [(cols)] [WITH (...)] AS query [WITH CHECK OPTION]` | a read-only relation |
+| `CREATE [OR REPLACE] [TEMP] RECURSIVE VIEW name (cols) AS query` | as Postgres: `CREATE VIEW name AS WITH RECURSIVE name (cols) AS (query) SELECT cols FROM name` |
 | `CREATE MATERIALIZED VIEW [IF NOT EXISTS] name [(cols)] ... AS query [WITH [NO] DATA]` | a read-only relation |
 | `DROP [MATERIALIZED] VIEW [IF EXISTS] a, b [CASCADE]` | |
 | `CREATE TYPE name AS ENUM ('a', ...)` | `$types[name]` |
 | `ALTER TYPE name ADD VALUE [IF NOT EXISTS] 'v' [BEFORE \| AFTER 'w']`, `RENAME VALUE 'a' TO 'b'`, `RENAME TO new` | renaming the type also retypes every column using it |
 | `DROP TYPE [IF EXISTS] a, b [CASCADE]` | `CASCADE` drops the columns (and views) that use the type |
 | `CREATE SCHEMA [IF NOT EXISTS] name [AUTHORIZATION role]`, `CREATE SCHEMA AUTHORIZATION role` | an empty nested schema |
+| `CREATE SCHEMA name [AUTHORIZATION role] CREATE TABLE ... CREATE VIEW ... CREATE INDEX ... CREATE SEQUENCE ... CREATE TRIGGER ... GRANT ...` | the schema with its tables and views; as in Postgres, tables are created before views, and unqualified names in the elements find the new schema's relations first |
 | `ALTER SCHEMA name RENAME TO new` | |
 | `DROP SCHEMA [IF EXISTS] a, b [CASCADE]` | |
 | `CREATE [OR REPLACE] FUNCTION name(…) RETURNS [SETOF] type`, `RETURNS TABLE (…)` | `$functions[name]` with the return type (`record` for `TABLE`); arguments are not checked |
-| `SELECT`, `INSERT`, `UPDATE`, `DELETE` (seed data) | checked against the schema at that point; no schema effect |
+| `SELECT`, `INSERT`, `UPDATE`, `DELETE` (seed data), `DECLARE name CURSOR FOR query` | checked against the schema at that point; no schema effect |
 
 No schema effect (skipped to the next `;`): `CREATE / ALTER / DROP INDEX`, `SEQUENCE`,
 `ALTER / DROP FUNCTION`, `PROCEDURE` (`$$` bodies and `BEGIN ATOMIC ... END` bodies included), `TRIGGER`,
 `EXTENSION`, `POLICY`, `DOMAIN`, `RULE`, composite / range types, `COMMENT ON`, `GRANT`,
-`REVOKE`, `TRUNCATE`, `BEGIN` / `COMMIT` / `ROLLBACK`, `SET`, `DO`, `ANALYZE`, `VACUUM`,
-`REFRESH MATERIALIZED VIEW`, and the other utility statements.
+`REVOKE`, `TRUNCATE`, `BEGIN` / `COMMIT` / `ROLLBACK` / `END` / `ABORT`, `SET`, `DO`, `ANALYZE`, `VACUUM`,
+`REFRESH MATERIALIZED VIEW`, `REASSIGN OWNED`, `ALTER TABLE ALL IN TABLESPACE`, and the other utility statements.
+`FETCH`, `MOVE` and `CLOSE` are parsed and have no schema effect either.
 
 ## How columns map to `Col` / `Nullable` / `Generated`
 
@@ -229,15 +233,15 @@ instantiation-depth limit (see the comment on `Build` in `engine/ddl/apply.ts`).
   same column) follow the pass order, but Postgres's prepare-time checks are not modeled.
 - Schemas and public relations share the top-level keys of `DB`: a schema and a public table
   cannot have the same name (an error explains this), and an empty schema `{}` looks like an
-  empty table. `search_path` is ignored. `CREATE SCHEMA ... CREATE TABLE ...` (embedded
-  elements) and `DROP SCHEMA public` are rejected.
+  empty table. `search_path` is ignored (except inside `CREATE SCHEMA ... CREATE ...`, where the
+  new schema comes first, as in Postgres). `DROP SCHEMA public` is rejected.
 - Enums are keyed by unqualified name; label order (`BEFORE` / `AFTER`) is not tracked.
   Composite types, domains and extension types are accepted as column types and map to
   `unknown` unless the type map knows them.
 - A column-name list cannot rename the columns of a `SELECT *` (list the columns), and
   duplicate names hidden inside one `*` (`SELECT * FROM a JOIN b`) are not detected.
-  `CREATE RECURSIVE VIEW` is not supported (write `WITH RECURSIVE` inside the view).
 - `PARTITION OF parent (col WITH OPTIONS ...)` column options and typed tables
-  (`CREATE TABLE t OF type`) are not supported; `SELECT ... INTO new_table` creates nothing.
+  (`CREATE TABLE t OF type`) are not supported, nor is `CREATE TABLE t AS EXECUTE stmt`.
+  `SELECT ... INTO new_table` creates the table like `CREATE TABLE new_table AS SELECT ...`.
 - Temporary tables are added like regular tables.
 - `ALTER TABLE` order of display: modified or added keys move to the end of the hover.

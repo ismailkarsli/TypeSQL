@@ -1,5 +1,6 @@
 import type { IdTok, NumTok, OpTok, Toks, WordTok } from "../lexer/tokens.js";
 import type { NormalizeTypeName } from "../../schema/normalize.js";
+import type { ParseExprList } from "./expr.js";
 import type { EatOp, EatWord, EatWords, Expected, Ident, Nx, Nx2, Nx3, Nx4, Nx5, Ok } from "./util.js";
 
 /**
@@ -23,7 +24,8 @@ type ParseBaseType<T extends Toks, I extends number> =
   T[I] extends IdTok<infer V> ? QualifiedTail<T, V, Nx<I>>
   : T[I] extends WordTok<infer W>
     ? W extends "double" ? (EatWord<T, Nx<I>, "precision"> extends never ? Expected<"PRECISION", T, Nx<I>> : Ok<"float8", EatWord<T, Nx<I>, "precision">>)
-    : W extends "character" | "char" | "nchar" | "national" ? (EatWord<T, Nx<I>, "varying"> extends never ? Ok<"bpchar", Nx<I>> : Ok<"varchar", EatWord<T, Nx<I>, "varying">>)
+    : W extends "national" ? (EatWord<T, Nx<I>, "character" | "char"> extends never ? Expected<"CHARACTER", T, Nx<I>> : ParseBaseType<T, Nx<I>>)
+    : W extends "character" | "char" | "nchar" ? (EatWord<T, Nx<I>, "varying"> extends never ? Ok<"bpchar", Nx<I>> : Ok<"varchar", EatWord<T, Nx<I>, "varying">>)
     : W extends "bit" ? (EatWord<T, Nx<I>, "varying"> extends never ? Ok<"bit", Nx<I>> : Ok<"varbit", EatWord<T, Nx<I>, "varying">>)
     : W extends "timestamp" ? WithTz<T, SkipModifier<T, Nx<I>>, "timestamp", "timestamptz">
     : W extends "time" ? WithTz<T, SkipModifier<T, Nx<I>>, "time", "timetz">
@@ -63,15 +65,20 @@ type SkipIntervalFields<T extends Toks, I extends number> =
     : T[EatWord<T, Nx<I>, "to">] extends WordTok<IntervalField> ? SkipModifier<T, Nx<EatWord<T, Nx<I>, "to">>> : SkipModifier<T, Nx<I>>
     : SkipModifier<T, I>;
 
-/** Skip `( n [, n] )` modifiers. */
+/**
+ * Skip `( n [, n] )` modifiers; other modifier lists (`numeric(3, -6)`, `widget(42, 13, 7)`) are
+ * expression lists in Postgres's grammar (it checks their values later).
+ */
 type SkipModifier<T extends Toks, I extends number> =
   T[I] extends OpTok<"(">
     ? T[Nx<I>] extends NumTok
       ? T[Nx2<I>] extends OpTok<")"> ? Nx3<I>
-      : T[Nx2<I>] extends OpTok<","> ? (T[Nx3<I>] extends NumTok ? (T[Nx4<I>] extends OpTok<")"> ? Nx5<I> : I) : I)
-      : I
-      : I
+      : T[Nx2<I>] extends OpTok<","> ? (T[Nx3<I>] extends NumTok ? (T[Nx4<I>] extends OpTok<")"> ? Nx5<I> : SkipModifierList<T, I>) : SkipModifierList<T, I>)
+      : SkipModifierList<T, I>
+      : SkipModifierList<T, I>
     : I;
+type SkipModifierList<T extends Toks, I extends number> =
+  ParseExprList<T, Nx<I>, []> extends Ok<unknown, infer J extends number> ? (T[J] extends OpTok<")"> ? Nx<J> : I) : I;
 
 type ParseArraySuffix<T extends Toks, I extends number, Base extends string> =
   T[I] extends OpTok<"[">

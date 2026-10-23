@@ -6,7 +6,9 @@ import type { BindFrom } from "../binder/from.js";
 import type { BindWith } from "../project/select.js";
 import type { AnySig, LookupFn, PickSig } from "./catalog.js";
 import type { CommonType, DateTimeT } from "./operators.js";
+import type { ParamsOfJsonTable, ParamsOfSqlJson } from "./sqljson.js";
 import type { TypeList, TypeOf } from "./typeof.js";
+import type { ParamsOfXml, ParamsOfXmlTable } from "./xml.js";
 
 /**
  * Parameter typing: a second pass over the AST that infers `$n` types from context.
@@ -126,6 +128,10 @@ export type ParamsOfExpr<E extends Expr, C extends Ctx, M> =
   : E extends { readonly t: "attz" } ? ParamsOfOpt<E["zone"], C, ParamsOfOpt<E["e"], C, M, Info<"timestamptz", true>>, Info<"text", true>>
   : E extends { readonly t: "collate" } ? ParamsOfExpr<E["e"], C, M>
   : E extends { readonly t: "field" } ? ParamsOfExpr<E["e"], C, M>
+  : E extends { readonly t: "xml" } ? ParamsOfXml<E, C, M>
+  : E extends { readonly t: "jsonfn" | "jsonagg" | "isjson" | "jsonfmt" } ? ParamsOfSqlJson<E, C, M>
+  // `f(name => $1)`: the parameter's position is unknown (the catalog has no names), so it stays untyped
+  : E extends { readonly t: "named" | "variadic" } ? ParamsOfExpr<E["e"], C, M>
   : M;
 
 /**
@@ -300,7 +306,13 @@ type ParamsOfFromItem<F extends FromItem, C extends Ctx, M> =
   F extends { readonly t: "join" } ? ParamsOfOpt<F["on"], C, ParamsOfFromItem<F["r"], C, ParamsOfFromItem<F["l"], C, M>>, Info<"bool">>
   : F extends { readonly t: "sub" } ? ParamsOfSelect<F["q"], C["db"], C["scope"], C["ctes"], M>
   : F extends { readonly t: "func" } ? ParamsOfExpr<F["call"], C, M>
+  : F extends { readonly t: "xmltable" } ? ParamsOfXmlTable<F, C, M>
+  : F extends { readonly t: "jsontable" } ? ParamsOfJsonTable<F["jt"], C, M>
+  : F extends { readonly t: "sample" } ? ParamsOfOpt<F["repeatable"], C, ParamsOfList<F["args"], C, M, Info<F["method"] extends "system_rows" ? "int8" : F["method"] extends "system_time" ? "float8" : "float4">>, Info<"float8">>
+  : F extends { readonly t: "rowsfrom" } ? ParamsOfRowsFrom<F["funcs"], C, M>
   : M;
+type ParamsOfRowsFrom<Fs extends readonly { readonly call: Expr }[], C extends Ctx, M> =
+  Fs extends readonly [infer F extends { readonly call: Expr }, ...infer R extends readonly { readonly call: Expr }[]] ? ParamsOfRowsFrom<R, C, ParamsOfExpr<F["call"], C, M>> : M;
 
 export type ParamsOfSelect<Q extends SelectStmt, DB, Outer extends Scope, Ctes extends CteMap, M> =
   BindWith<Q["with"], DB, Outer, Ctes> extends infer C2

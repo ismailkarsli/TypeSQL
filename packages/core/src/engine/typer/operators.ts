@@ -87,6 +87,9 @@ type BinOpResult<Op extends string, L extends string, R extends string> =
   : Op extends "->>" | "#>>" ? "text"
   : Op extends "#-" ? "jsonb"
   : Op extends "@>" | "<@" | "?" | "?|" | "?&" | "@?" | "@@" | "-|-" | "~=" ? "bool"
+  // geometric position tests (PG `box`, `point`, `polygon`, `circle`, `lseg`, `line` operators)
+  : Op extends "<<|" | "|>>" | "&<|" | "|&>" | "<^" | ">^" | "&<" | "&>" | "?#" | "?-" | "?-|" | "?||" | "<<=" | ">>=" ? "bool"
+  : Op extends "##" ? "point"
   : Op extends "&&" ? (L extends "tsquery" ? "tsquery" : "bool")
   : Op extends "<->" ? (L extends "tsquery" ? "tsquery" : "float8")
   : Op extends "^" ? Pow<L, R>
@@ -211,7 +214,10 @@ export type UnOpType<Op extends string, E extends ColInfo> =
   : Op extends "~" ? Info<E["type"] extends IntT | BitT ? E["type"] : E["type"] extends "inet" | "cidr" ? "inet" : "unknown", E["nullable"]>
   : Op extends "!!" ? Info<E["type"] extends "tsquery" ? "tsquery" : "unknown", E["nullable"]>
   : Op extends "@" ? Info<E["type"] extends NumT ? E["type"] : "unknown", E["nullable"]>
-  : Op extends "|/" | "||/" ? Info<"float8", E["nullable"]>
+  : Op extends "|/" | "||/" | "@-@" ? Info<"float8", E["nullable"]>
+  : Op extends "@@" ? Info<E["type"] extends "unknown" ? "unknown" : "point", E["nullable"]>
+  : Op extends "#" ? Info<E["type"] extends "path" | "polygon" ? "int4" : "unknown", E["nullable"]>
+  : Op extends "?-" | "?|" ? Info<"bool", E["nullable"]>
   : Info<"unknown", true>;
 
 /**
@@ -257,8 +263,10 @@ export type CommonType<A extends string, B extends string> =
  */
 export type NumLitType<V extends string> =
   V extends `${string}.${string}` | `${string}e${string}` | `${string}E${string}` ? "numeric"
-  : V extends `-${infer D}` ? IntLitType<D, "2147483648", "9223372036854775808">
-  : IntLitType<V, "2147483647", "9223372036854775807">;
+  : V extends `-${infer D}` ? IntLitType<NoUnderscores<D>, "2147483648", "9223372036854775808">
+  : IntLitType<NoUnderscores<V>, "2147483647", "9223372036854775807">;
+/** `1_000_000` → `1000000` (digit separators do not count). */
+type NoUnderscores<V extends string> = V extends `${infer A}_${infer B}` ? NoUnderscores<`${A}${B}`> : V;
 
 type IntLitType<D extends string, Max4 extends string, Max8 extends string> =
   DigitCount<D, []> extends infer N
@@ -268,7 +276,8 @@ type IntLitType<D extends string, Max4 extends string, Max8 extends string> =
     : N extends 19 ? (LeqDigits<D, Max8> extends true ? "int8" : "numeric")
     : "numeric"
     : never;
-type DigitCount<V extends string, Acc extends unknown[]> = V extends `${string}${infer R}` ? DigitCount<R, [...Acc, 0]> : Acc["length"];
+/** Number of digits, capped at 20 (beyond 19 digits every literal is numeric; literals can be thousands of digits long). */
+type DigitCount<V extends string, Acc extends unknown[]> = Acc["length"] extends 20 ? 20 : V extends `${string}${infer R}` ? DigitCount<R, [...Acc, 0]> : Acc["length"];
 
 /** `A <= B` for two digit strings of equal length. */
 type LeqDigits<A extends string, B extends string> =

@@ -1,8 +1,8 @@
-import type { Expr, FromItem, InsertSource, OnConflict, SelectStmt, SetItem, TableRef, Target, WithClause } from "../ast.js";
+import type { Expr, FromItem, InsertSource, OnConflict, ReturningOpt, SelectStmt, SetItem, TableRef, Target, TargetInd, WithClause } from "../ast.js";
 import type { OpTok, Toks, WordTok } from "../lexer/tokens.js";
 import type { ParseExpr, SkipOrderTail } from "./expr.js";
 import type { IsSelectStart, ParseFromList, ParseFromOpt, ParseSelectStmt, ParseTargetList, ParseValues, ParseWhereOpt, RefOf } from "./select.js";
-import type { ColIdIdent, EatOp, EatWord, EatWords, Expected, Fail, Ident, Nx, Ok, ParenIdentList, QualName, SkipWord } from "./util.js";
+import type { AnyLabel, ColIdIdent, EatOp, EatWord, EatWords, Expected, Fail, Ident, Nx, Ok, QualName, SkipWord } from "./util.js";
 
 /**
  * DML parsers (index-based, see util.ts). Each receives the token tuple, the index
@@ -12,16 +12,19 @@ import type { ColIdIdent, EatOp, EatWord, EatWords, Expected, Fail, Ident, Nx, O
  *
  * Grammar covered:
  *
- *   INSERT INTO [ONLY] table [AS alias] [(col, ...)] [OVERRIDING {SYSTEM|USER} VALUE]
+ *   INSERT INTO [ONLY] table [AS alias] [(target, ...)] [OVERRIDING {SYSTEM|USER} VALUE]
  *     { VALUES (...), ... | select | DEFAULT VALUES }
  *     [ON CONFLICT [(index_params) [WHERE pred] | ON CONSTRAINT name] DO { NOTHING | UPDATE SET ... [WHERE ...] }]
- *     [RETURNING target_list]
- *   UPDATE [ONLY] table [AS alias] SET { col = expr | col = DEFAULT | (a, b) = (e1, e2) | (a, b) = (select) } [, ...]
- *     [FROM from_list] [WHERE cond] [RETURNING target_list]
- *   DELETE FROM [ONLY] table [AS alias] [USING from_list] [WHERE cond] [RETURNING target_list]
+ *     [returning]
+ *   UPDATE [ONLY] table [*] [AS alias] SET { target = expr | target = DEFAULT | (target, ...) = (e1, ...) | (target, ...) = (select) } [, ...]
+ *     [FROM from_list] [WHERE cond | WHERE CURRENT OF cursor] [returning]
+ *   DELETE FROM [ONLY] table [*] [AS alias] [USING from_list] [WHERE cond | WHERE CURRENT OF cursor] [returning]
  *
- * Not supported (explicit errors): `WHERE CURRENT OF cursor`, `DEFAULT VALUES` together
- * with a column list, indirection in SET targets (`col[1] = …`, `col.field = …`).
+ *   target    = col [ [i] | [lo:hi] | .field ]...    (indirection: `TargetInd` in ast.ts)
+ *   returning = RETURNING [WITH ({OLD | NEW} AS alias, ...)] target_list
+ *
+ * `DEFAULT VALUES` together with a column list is a syntax error. `WHERE CURRENT OF cursor`
+ * is parsed as no WHERE clause (the cursor's row is not known at the type level).
  * The ON CONFLICT conflict target (index columns, predicate, constraint name) is parsed
  * for syntax and discarded: the AST carries no field for it.
  */
@@ -30,10 +33,10 @@ import type { ColIdIdent, EatOp, EatWord, EatWords, Expected, Fail, Ident, Nx, O
 
 export type ParseInsert<T extends Toks, I extends number, W extends WithClause | null> =
   EatWord<T, I, "into"> extends never ? Expected<"INTO", T, I>
-  : ParseDmlTarget<T, EatWord<T, I, "into">, "values" | "overriding"> extends infer Tg
+  : ParseDmlTarget<T, EatWord<T, I, "into">, "values" | "overriding", false> extends infer Tg
     ? Tg extends Ok<[infer Ref extends TableRef, infer Alias extends string | null], infer I1 extends number>
       ? ParseInsertColumns<T, I1> extends infer Cl
-        ? Cl extends Ok<infer Cols extends readonly string[] | null, infer I2 extends number>
+        ? Cl extends Ok<[infer Cols extends readonly string[] | null, infer Ind extends readonly TargetInd[] | null], infer I2 extends number>
           ? ParseOverriding<T, I2> extends infer Ov
             ? Ov extends Ok<unknown, infer I3 extends number>
               ? ParseInsertSource<T, I3, Cols extends null ? false : true> extends infer Src
@@ -41,8 +44,8 @@ export type ParseInsert<T extends Toks, I extends number, W extends WithClause |
                   ? ParseOnConflictOpt<T, I4> extends infer Oc
                     ? Oc extends Ok<infer Conf extends OnConflict | null, infer I5 extends number>
                       ? ParseReturningOpt<T, I5> extends infer Rt
-                        ? Rt extends Ok<infer Ret extends readonly Target[] | null, infer I6 extends number>
-                          ? Ok<{ t: "insert"; with: W; table: Ref; alias: Alias; columns: Cols; source: Source; onConflict: Conf; returning: Ret }, I6>
+                        ? Rt extends Ok<[infer Ret extends readonly Target[] | null, infer Opts extends readonly ReturningOpt[]], infer I6 extends number>
+                          ? Ok<{ t: "insert"; with: W; table: Ref; alias: Alias; columns: Cols; colInd: Ind; source: Source; onConflict: Conf; returning: Ret; retOpts: Opts }, I6>
                           : Rt
                         : never
                       : Oc
@@ -56,12 +59,12 @@ export type ParseInsert<T extends Toks, I extends number, W extends WithClause |
       : Tg
     : never;
 
-/** `(col, ...)` unless the parenthesis opens a sub-select (`INSERT INTO t (SELECT ...)`). */
+/** `(target, ...)` unless the parenthesis opens a sub-select (`INSERT INTO t (SELECT ...)`). */
 type ParseInsertColumns<T extends Toks, I extends number> =
-  T[I] extends OpTok<"("> ? (IsSelectStart<T, Nx<I>> extends true ? Ok<null, I> : ParenIdentList<T, I>) : Ok<null, I>;
+  T[I] extends OpTok<"("> ? (IsSelectStart<T, Nx<I>> extends true ? Ok<[null, null], I> : ParenTargetList<T, I>) : Ok<[null, null], I>;
 
 /** `OVERRIDING {SYSTEM | USER} VALUE` (accepted and ignored). */
-type ParseOverriding<T extends Toks, I extends number> =
+export type ParseOverriding<T extends Toks, I extends number> =
   EatWord<T, I, "overriding"> extends never ? Ok<null, I>
   : EatWord<T, EatWord<T, I, "overriding">, "system" | "user"> extends never ? Expected<"SYSTEM or USER", T, EatWord<T, I, "overriding">>
   : EatWord<T, EatWord<T, EatWord<T, I, "overriding">, "system" | "user">, "value"> extends never ? Expected<"VALUE", T, EatWord<T, EatWord<T, I, "overriding">, "system" | "user">>
@@ -131,7 +134,7 @@ type ParseConflictAction<T extends Toks, I extends number> =
 // ───────────────────────────── UPDATE ─────────────────────────────
 
 export type ParseUpdate<T extends Toks, I extends number, W extends WithClause | null> =
-  ParseDmlTarget<T, I, "set"> extends infer Tg
+  ParseDmlTarget<T, I, "set", true> extends infer Tg
     ? Tg extends Ok<[infer Ref extends TableRef, infer Alias extends string | null], infer I1 extends number>
       ? EatWord<T, I1, "set"> extends never ? Expected<"SET", T, I1>
       : ParseSetList<T, EatWord<T, I1, "set">, []> extends infer St
@@ -141,8 +144,8 @@ export type ParseUpdate<T extends Toks, I extends number, W extends WithClause |
               ? ParseDmlWhere<T, I3> extends infer Wh
                 ? Wh extends Ok<infer Where extends Expr | null, infer I4 extends number>
                   ? ParseReturningOpt<T, I4> extends infer Rt
-                    ? Rt extends Ok<infer Ret extends readonly Target[] | null, infer I5 extends number>
-                      ? Ok<{ t: "update"; with: W; table: Ref; alias: Alias; set: Set; from: From; where: Where; returning: Ret }, I5>
+                    ? Rt extends Ok<[infer Ret extends readonly Target[] | null, infer Opts extends readonly ReturningOpt[]], infer I5 extends number>
+                      ? Ok<{ t: "update"; with: W; table: Ref; alias: Alias; set: Set; from: From; where: Where; returning: Ret; retOpts: Opts }, I5>
                       : Rt
                     : never
                   : Wh
@@ -155,46 +158,104 @@ export type ParseUpdate<T extends Toks, I extends number, W extends WithClause |
     : never;
 
 /** `item [, item ...]` after `SET`. */
-type ParseSetList<T extends Toks, I extends number, Acc extends readonly SetItem[]> =
+export type ParseSetList<T extends Toks, I extends number, Acc extends readonly SetItem[]> =
   ParseSetItem<T, I> extends infer X
     ? X extends Ok<infer Item extends SetItem, infer J extends number>
       ? EatOp<T, J, ","> extends never ? Ok<[...Acc, Item], J> : ParseSetList<T, EatOp<T, J, ",">, [...Acc, Item]>
       : X
     : never;
 
-/** `col = expr` (expr may be `DEFAULT`) or `(a, b) = (e1, e2) | (select)`. */
+/** `target = expr` (expr may be `DEFAULT`) or `(target, ...) = (e1, ...) | (select)`. */
 type ParseSetItem<T extends Toks, I extends number> =
   T[I] extends OpTok<"(">
-    ? ParenIdentList<T, I> extends infer L
-      ? L extends Ok<infer Cols extends readonly string[], infer J extends number>
+    ? ParenTargetList<T, I> extends infer L
+      ? L extends Ok<[infer Cols extends readonly string[], infer Ind extends readonly TargetInd[] | null], infer J extends number>
         ? EatOp<T, J, "="> extends never ? Expected<'"="', T, J>
         : ParseExpr<T, EatOp<T, J, "=">, 0> extends infer X
-          ? X extends Ok<infer E extends Expr, infer J2 extends number> ? Ok<{ t: "setmulti"; cols: Cols; e: E }, J2> : X
+          ? X extends Ok<infer E extends Expr, infer J2 extends number> ? Ok<{ t: "setmulti"; cols: Cols; ind: Ind; e: E }, J2> : X
           : never
         : L
       : never
-  : Ident<T, I> extends [infer Col extends string, infer J extends number]
-    ? EatOp<T, J, "="> extends never
-      ? T[J] extends OpTok<"[" | "."> ? Fail<"subscripted or field assignment targets (col[i] = ..., col.f = ...) are not supported", J>
-      : Expected<'"="', T, J>
-    : ParseExpr<T, EatOp<T, J, "=">, 0> extends infer X
-      ? X extends Ok<infer E extends Expr, infer J2 extends number> ? Ok<{ t: "set"; col: Col; e: E }, J2> : X
+  : ParseAssignTarget<T, I> extends infer Tg
+    ? Tg extends Ok<[infer Col extends string, infer Ind extends TargetInd], infer J extends number>
+      ? EatOp<T, J, "="> extends never ? Expected<'"="', T, J>
+      : ParseExpr<T, EatOp<T, J, "=">, 0> extends infer X
+        ? X extends Ok<infer E extends Expr, infer J2 extends number>
+          ? Ok<Ind extends Expr ? { t: "setind"; col: Col; target: Ind; e: E } : { t: "set"; col: Col; e: E }, J2>
+          : X
+        : never
+      : Tg
+    : never;
+
+// ─── assignment targets ───
+
+/**
+ * `col [indirection]` (`set_target` / `insert_column_item`) → `Ok<[col, TargetInd], next>`.
+ * Indirection is `[i]`, `[lo:hi]` (either bound optional) and `.field`, repeated; it becomes an
+ * expression over the bare column (`a[1].f` → field(idx(col a, 1), f)).
+ */
+export type ParseAssignTarget<T extends Toks, I extends number> =
+  Ident<T, I> extends [infer Col extends string, infer J extends number]
+    ? T[J] extends OpTok<"[" | "."> ? ParseIndirection<T, J, Col, { t: "col"; tbl: null; name: Col }> : Ok<[Col, null], J>
+    : Expected<"column name", T, I>;
+
+type ParseIndirection<T extends Toks, I extends number, Col extends string, E> =
+  T[I] extends OpTok<"["> ? ParseIndSubscript<T, Nx<I>, Col, E>
+  : T[I] extends OpTok<".">
+    ? T[Nx<I>] extends OpTok<"*"> ? ParseIndirection<T, Nx<Nx<I>>, Col, { t: "field"; e: E; name: "*" }>
+    : AnyLabel<T, Nx<I>> extends [infer N extends string, infer J extends number] ? ParseIndirection<T, J, Col, { t: "field"; e: E; name: N }>
+    : Expected<"field name", T, Nx<I>>
+  : Ok<[Col, E], I>;
+
+/** After `[`: `i]`, `lo:hi]`, `:hi]`, `lo:]`, `:]`. */
+type ParseIndSubscript<T extends Toks, I extends number, Col extends string, E> =
+  EatOp<T, I, ":"> extends never
+    ? ParseExpr<T, I, 0> extends infer X
+      ? X extends Ok<infer Ix, infer J extends number>
+        ? EatOp<T, J, "]"> extends never
+          ? EatOp<T, J, ":"> extends never ? Expected<'"]"', T, J> : ParseIndSliceHi<T, EatOp<T, J, ":">, Col, E, Ix>
+          : ParseIndirection<T, EatOp<T, J, "]">, Col, { t: "idx"; e: E; i: Ix }>
+        : X
       : never
-  : Expected<"column name", T, I>;
+    : ParseIndSliceHi<T, EatOp<T, I, ":">, Col, E, null>;
+type ParseIndSliceHi<T extends Toks, I extends number, Col extends string, E, Lo> =
+  EatOp<T, I, "]"> extends never
+    ? ParseExpr<T, I, 0> extends infer X
+      ? X extends Ok<infer Hi, infer J extends number>
+        ? EatOp<T, J, "]"> extends never ? Expected<'"]"', T, J> : ParseIndirection<T, EatOp<T, J, "]">, Col, { t: "slice"; e: E; lo: Lo; hi: Hi }>
+        : X
+      : never
+    : ParseIndirection<T, EatOp<T, I, "]">, Col, { t: "slice"; e: E; lo: Lo; hi: null }>;
+
+/**
+ * `(target, ...)` → `Ok<[cols, ind], next>`: the column names, and the indirection of each
+ * (`null` when no target has any, the common case). Token `I` must be `(`.
+ */
+export type ParenTargetList<T extends Toks, I extends number> =
+  EatOp<T, I, "("> extends never ? Expected<'"("', T, I> : TargetListLoop<T, EatOp<T, I, "(">, [], [], false>;
+type TargetListLoop<T extends Toks, I extends number, Cols extends readonly string[], Inds extends readonly TargetInd[], Any extends boolean> =
+  ParseAssignTarget<T, I> extends infer X
+    ? X extends Ok<[infer N extends string, infer Ind extends TargetInd], infer J extends number>
+      ? EatOp<T, J, ","> extends never
+        ? EatOp<T, J, ")"> extends never ? Expected<'"," or ")"', T, J>
+        : Ok<[[...Cols, N], (Ind extends null ? Any : true) extends true ? [...Inds, Ind] : null], EatOp<T, J, ")">>
+        : TargetListLoop<T, EatOp<T, J, ",">, [...Cols, N], [...Inds, Ind], Ind extends null ? Any : true>
+      : X
+    : never;
 
 // ───────────────────────────── DELETE ─────────────────────────────
 
 export type ParseDelete<T extends Toks, I extends number, W extends WithClause | null> =
   EatWord<T, I, "from"> extends never ? Expected<"FROM", T, I>
-  : ParseDmlTarget<T, EatWord<T, I, "from">, never> extends infer Tg
+  : ParseDmlTarget<T, EatWord<T, I, "from">, never, true> extends infer Tg
     ? Tg extends Ok<[infer Ref extends TableRef, infer Alias extends string | null], infer I1 extends number>
       ? ParseUsingOpt<T, I1> extends infer Us
         ? Us extends Ok<infer Using extends readonly FromItem[], infer I2 extends number>
           ? ParseDmlWhere<T, I2> extends infer Wh
             ? Wh extends Ok<infer Where extends Expr | null, infer I3 extends number>
               ? ParseReturningOpt<T, I3> extends infer Rt
-                ? Rt extends Ok<infer Ret extends readonly Target[] | null, infer I4 extends number>
-                  ? Ok<{ t: "delete"; with: W; table: Ref; alias: Alias; using: Using; where: Where; returning: Ret }, I4>
+                ? Rt extends Ok<[infer Ret extends readonly Target[] | null, infer Opts extends readonly ReturningOpt[]], infer I4 extends number>
+                  ? Ok<{ t: "delete"; with: W; table: Ref; alias: Alias; using: Using; where: Where; returning: Ret; retOpts: Opts }, I4>
                   : Rt
                 : never
               : Wh
@@ -210,13 +271,14 @@ type ParseUsingOpt<T extends Toks, I extends number> =
 // ───────────────────────────── shared ─────────────────────────────
 
 /**
- * `[ONLY] qualified_name [AS alias | alias]` → `Ok<[ref, alias], next>`.
+ * `[ONLY] qualified_name [*] [AS alias | alias]` → `Ok<[ref, alias], next>` (the inheritance
+ * `*` only where `Star` is true: UPDATE, DELETE and MERGE, not INSERT).
  * `Stop` lists unreserved words that follow the table name in this statement and must
  * not be taken as a bare alias (`UPDATE t SET`, `INSERT INTO t VALUES`).
  */
-type ParseDmlTarget<T extends Toks, I extends number, Stop extends string> =
+export type ParseDmlTarget<T extends Toks, I extends number, Stop extends string, Star extends boolean> =
   QualName<T, SkipWord<T, I, "only">> extends [infer Parts extends readonly string[], infer J extends number]
-    ? ParseDmlAlias<T, J, Stop> extends infer A
+    ? ParseDmlAlias<T, Star extends true ? (T[J] extends OpTok<"*"> ? Nx<J> : J) : J, Stop> extends infer A
       ? A extends Ok<infer Alias extends string | null, infer J2 extends number> ? Ok<[RefOf<Parts>, Alias], J2> : A
       : never
     : Expected<"table name", T, SkipWord<T, I, "only">>;
@@ -227,9 +289,31 @@ type ParseDmlAlias<T extends Toks, I extends number, Stop extends string> =
   : ColIdIdent<T, I> extends [infer A extends string, infer J extends number] ? (A extends Stop ? Ok<null, I> : Ok<A, J>)
   : Ok<null, I>;
 
-/** `WHERE cond`; `WHERE CURRENT OF cursor` is rejected explicitly. */
+/** `WHERE cond` or `WHERE CURRENT OF cursor` (no condition the types can use: `null`). */
 type ParseDmlWhere<T extends Toks, I extends number> =
-  EatWords<T, I, ["where", "current", "of"]> extends never ? ParseWhereOpt<T, I> : Fail<"WHERE CURRENT OF cursor is not supported", EatWord<T, I, "where">>;
+  EatWords<T, I, ["where", "current", "of"]> extends never ? ParseWhereOpt<T, I>
+  : ColIdIdent<T, EatWords<T, I, ["where", "current", "of"]>> extends [string, infer J extends number] ? Ok<null, J>
+  : Expected<"cursor name", T, EatWords<T, I, ["where", "current", "of"]>>;
 
-type ParseReturningOpt<T extends Toks, I extends number> =
-  EatWord<T, I, "returning"> extends never ? Ok<null, I> : ParseTargetList<T, EatWord<T, I, "returning">, []>;
+/** `[RETURNING [WITH ({OLD | NEW} AS alias, ...)] target_list]` → `Ok<[targets | null, options], next>`. */
+export type ParseReturningOpt<T extends Toks, I extends number> =
+  EatWord<T, I, "returning"> extends never ? Ok<[null, []], I>
+  : EatWord<T, EatWord<T, I, "returning">, "with"> extends never ? ReturningTargets<T, EatWord<T, I, "returning">, []>
+  : EatOp<T, EatWord<T, EatWord<T, I, "returning">, "with">, "("> extends never ? Expected<'"("', T, EatWord<T, EatWord<T, I, "returning">, "with">>
+  : ParseReturningOpts<T, EatOp<T, EatWord<T, EatWord<T, I, "returning">, "with">, "(">, []>;
+
+type ReturningTargets<T extends Toks, I extends number, Opts extends readonly ReturningOpt[]> =
+  ParseTargetList<T, I, []> extends infer X
+    ? X extends Ok<infer Ts, infer J extends number> ? Ok<[Ts, Opts], J> : X
+    : never;
+
+/** `{OLD | NEW} AS alias [, ...] )`, then the target list. */
+type ParseReturningOpts<T extends Toks, I extends number, Acc extends readonly ReturningOpt[]> =
+  T[I] extends WordTok<infer K extends "old" | "new">
+    ? EatWord<T, Nx<I>, "as"> extends never ? Expected<"AS", T, Nx<I>>
+    : ColIdIdent<T, EatWord<T, Nx<I>, "as">> extends [infer A extends string, infer J extends number]
+      ? EatOp<T, J, ","> extends never
+        ? EatOp<T, J, ")"> extends never ? Expected<'"," or ")"', T, J> : ReturningTargets<T, EatOp<T, J, ")">, [...Acc, { kind: K; alias: A }]>
+        : ParseReturningOpts<T, EatOp<T, J, ",">, [...Acc, { kind: K; alias: A }]>
+      : Expected<"alias", T, EatWord<T, Nx<I>, "as">>
+  : Expected<"OLD or NEW", T, I>;

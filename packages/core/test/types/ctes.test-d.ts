@@ -39,7 +39,7 @@ test("WITH RECURSIVE: typed from the non-recursive term, nullability over both t
   expectTypeOf<Row<"WITH RECURSIVE t AS (SELECT 1 AS n) SELECT * FROM t">>().toEqualTypeOf<{ n: number }>();
   expectTypeOf<Row<"WITH RECURSIVE t(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM t WHERE n < 3), u AS (SELECT n * 2 AS m FROM t) SELECT * FROM u">>()
     .toEqualTypeOf<{ m: number }>();
-  // SEARCH / CYCLE are accepted (the columns they add are not projected)
+  // SEARCH / CYCLE (the columns they add: see cte-search-cycle.test-d.ts)
   expectTypeOf<Row<"WITH RECURSIVE t(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM t WHERE n < 3) SEARCH DEPTH FIRST BY n SET ord SELECT n FROM t">>().toEqualTypeOf<{ n: number }>();
   expectTypeOf<Row<"WITH RECURSIVE t(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM t WHERE n < 3) CYCLE n SET is_cycle USING path SELECT n FROM t">>().toEqualTypeOf<{ n: number }>();
 });

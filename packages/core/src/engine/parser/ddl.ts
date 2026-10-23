@@ -1,11 +1,11 @@
 import type { AlterAction, ColumnDef, LikeClause, TableConstraint, TableRef } from "../ast.js";
 import type { OpTok, StrTok, Tok, Toks, WordTok } from "../lexer/tokens.js";
 import type { SerialTypeName } from "../../schema/normalize.js";
-import type { ParseExpr } from "./expr.js";
+import type { ParseExpr, ParseExprList } from "./expr.js";
 import type { ParseSelectStmt, RefOf } from "./select.js";
 import type { ParseTypeName } from "./typename.js";
 import type {
-  AnyLabel, EatOp, EatWord, EatWords, Expected, Fail, Ident, Nx, Nx2, Nx3, Ok, ParenIdentList, QualName,
+  AnyLabel, ColIdIdent, EatOp, EatWord, EatWords, Expected, Fail, Ident, Nx, Nx2, Nx3, Ok, ParenIdentList, QualName,
   SkipToCloseParen, SkipWord, SkipWords, SyntaxError,
 } from "./util.js";
 
@@ -18,10 +18,10 @@ import type {
  *
  * Statements with a schema effect are parsed structurally, including their trailing
  * clauses, so unsupported syntax is an error rather than silently ignored:
- *   CREATE TABLE (column defs, table constraints, LIKE, INHERITS, PARTITION OF / BY,
- *   storage options, `AS select [WITH [NO] DATA]`), ALTER TABLE / VIEW / MATERIALIZED VIEW,
- *   DROP TABLE / VIEW, CREATE [OR REPLACE] [MATERIALIZED] VIEW, CREATE TYPE ... AS ENUM,
- *   ALTER TYPE, DROP TYPE, CREATE / ALTER / DROP SCHEMA.
+ *   CREATE TABLE (column defs, table constraints, LIKE, INHERITS, PARTITION OF / BY, OF type,
+ *   storage options, `AS select | AS EXECUTE [WITH [NO] DATA]`), ALTER TABLE / VIEW / MATERIALIZED VIEW,
+ *   DROP TABLE / VIEW, CREATE [OR REPLACE] [MATERIALIZED | RECURSIVE] VIEW, CREATE TYPE ... AS ENUM,
+ *   ALTER TYPE, DROP TYPE, CREATE SCHEMA (with its elements), ALTER / DROP SCHEMA.
  *
  * Everything else (indexes, functions, triggers, sequences, grants, transaction control,
  * SET, COMMENT, composite types, domains, ...) is a `NoopStmt`: tokens are skipped up to
@@ -117,7 +117,7 @@ type ParseCreate<T extends Toks, I extends number, OrReplace extends boolean> =
       ? EatWord<T, Nx<I>, "view"> extends never ? Expected<"VIEW", T, Nx<I>>
       : OrReplace extends true ? SyntaxError<T, I>
       : IfNotExists<T, Nx2<I>> extends [infer Ine extends boolean, infer I1 extends number] ? ParseCreateView<T, I1, false, true, Ine> : never
-    : W extends "recursive" ? Fail<"CREATE RECURSIVE VIEW is not supported; write the view as WITH RECURSIVE ... SELECT", I>
+    : W extends "recursive" ? (EatWord<T, Nx<I>, "view"> extends never ? Expected<"VIEW", T, Nx<I>> : ParseRecursiveView<T, Nx2<I>, OrReplace>)
     : W extends "type" ? ParseCreateType<T, Nx<I>>
     : W extends "schema" ? ParseCreateSchema<T, Nx<I>>
     : W extends "function" ? ParseCreateFunction<T, Nx<I>>
@@ -164,14 +164,46 @@ type ParseCreateTable<T extends Toks, I extends number> =
           ? R extends Ok<[infer Cols, infer Cons, infer Like], infer J2 extends number>
             ? ParseTableTail<T, J2, []> extends infer X
               ? X extends [infer Inh, infer J3 extends number]
-                ? Ok<{ t: "create_table"; ifNotExists: Ine; table: RefOf<Parts>; columns: Cols; constraints: Cons; like: Like; inherits: Inh }, J3>
+                ? Ok<{ t: "create_table"; ifNotExists: Ine; table: RefOf<Parts>; columns: Cols; constraints: Cons; like: Like; inherits: Inh; of: null }, J3>
                 : X
               : never
             : R
           : never
+      : T[J] extends WordTok<"of"> ? ParseTypedTable<T, Nx<J>, Ine, RefOf<Parts>>
       : EatWords<T, J, ["partition", "of"]> extends never ? ParseCtasAfterCols<T, J, Ine, RefOf<Parts>, null>
       : ParsePartitionOf<T, EatWords<T, J, ["partition", "of"]>, Ine, RefOf<Parts>>
       : Expected<"table name", T, I1>
+    : never;
+
+/**
+ * After `OF`: `type [( { column WITH OPTIONS constraints | table_constraint } [, ...] )] [table options]`.
+ * The columns come from the composite type, which is not tracked: only the type is kept.
+ */
+type ParseTypedTable<T extends Toks, I extends number, Ine extends boolean, Ref extends TableRef> =
+  QualName<T, I> extends [infer TP extends readonly string[], infer J extends number]
+    ? (T[J] extends OpTok<"("> ? ParseTypedElements<T, Nx<J>, Ref["name"]> : J) extends infer J2
+      ? J2 extends number
+        ? ParseTableTail<T, J2, []> extends infer X
+          ? X extends [readonly [], infer J3 extends number]
+            ? Ok<{ t: "create_table"; ifNotExists: Ine; table: Ref; columns: []; constraints: []; like: []; inherits: []; of: RefOf<TP> }, J3>
+            : X extends [unknown, number] ? SyntaxError<T, J2> // INHERITS
+            : X
+          : never
+        : J2
+      : never
+    : Expected<"type name", T, I>;
+
+/** Elements of a typed table, after `(` → index after `)`, or an error. */
+type ParseTypedElements<T extends Toks, I extends number, TN extends string> =
+  (IsConstraintStart<T, I> extends true ? ParseTableConstraint<T, I>
+  : Ident<T, I> extends [infer Name extends string, infer J extends number]
+    ? ParseColConstraints<T, SkipWords<T, J, ["with", "options"]>, TN, Name, "unknown", false, false, false, false>
+    : Expected<"column name or table constraint", T, I>) extends infer R
+    ? R extends Ok<unknown, infer J extends number>
+      ? T[J] extends OpTok<","> ? ParseTypedElements<T, Nx<J>, TN>
+      : T[J] extends OpTok<")"> ? Nx<J>
+      : Expected<'"," or ")"', T, J>
+      : R
     : never;
 
 /** `( a, b ) AS` — a bare identifier followed by `,` or `)` cannot start a column definition. */
@@ -186,13 +218,26 @@ type ParseCtasCols<T extends Toks, I extends number, Ine extends boolean, Ref ex
 /** `[USING m] [WITH (...)] [ON COMMIT ...] [TABLESPACE ts] AS query [WITH [NO] DATA]` */
 type ParseCtasAfterCols<T extends Toks, I extends number, Ine extends boolean, Ref extends TableRef, Names extends readonly string[] | null> =
   SkipStorage<T, I> extends infer I1 extends number
-    ? EatWord<T, I1, "as"> extends never ? Expected<'"(", AS or PARTITION OF', T, I1>
+    ? EatWord<T, I1, "as"> extends never ? Expected<'"(", AS, OF or PARTITION OF', T, I1>
+    : T[EatWord<T, I1, "as">] extends WordTok<"execute"> ? ParseCtasExecute<T, Nx<EatWord<T, I1, "as">>, Ine, Ref, Names>
     : ParseSelectStmt<T, EatWord<T, I1, "as">> extends infer R
       ? R extends Ok<infer Q, infer J extends number>
         ? Ok<{ t: "create_table_as"; ifNotExists: Ine; table: Ref; cols: Names; q: Q }, SkipWithData<T, J>>
         : R
       : never
     : never;
+
+/** After `AS EXECUTE`: `name [(args)] [WITH [NO] DATA]`. */
+type ParseCtasExecute<T extends Toks, I extends number, Ine extends boolean, Ref extends TableRef, Names extends readonly string[] | null> =
+  Ident<T, I> extends [infer N extends string, infer J extends number]
+    ? (T[J] extends OpTok<"("> ? ParseExprList<T, Nx<J>, []> : Ok<[], J>) extends infer R
+      ? R extends Ok<unknown, infer J2 extends number>
+        ? (T[J] extends OpTok<"("> ? (EatOp<T, J2, ")"> extends never ? Expected<'")"', T, J2> : EatOp<T, J2, ")">) : J2) extends infer J3
+          ? J3 extends number ? Ok<{ t: "create_table_as"; ifNotExists: Ine; table: Ref; cols: Names; q: { t: "execute"; name: N } }, SkipWithData<T, J3>> : J3
+          : never
+        : R
+      : never
+    : Expected<"prepared statement name", T, I>;
 
 /** `[WITH [NO] DATA]` */
 type SkipWithData<T extends Toks, I extends number> =
@@ -205,7 +250,7 @@ type ParsePartitionOf<T extends Toks, I extends number, Ine extends boolean, Ref
       ? J2 extends number
         ? ParseTableTail<T, J2, []> extends infer X
           ? X extends [readonly TableRef[], infer J3 extends number]
-            ? Ok<{ t: "create_table"; ifNotExists: Ine; table: Ref; columns: []; constraints: []; like: []; inherits: [RefOf<PP>] }, J3>
+            ? Ok<{ t: "create_table"; ifNotExists: Ine; table: Ref; columns: []; constraints: []; like: []; inherits: [RefOf<PP>]; of: null }, J3>
             : X
           : never
         : J2
@@ -217,7 +262,8 @@ type SkipPartitionBound<T extends Toks, I extends number> =
   T[I] extends WordTok<"default"> ? Nx<I>
   : EatWords<T, I, ["for", "values"]> extends never ? Expected<"FOR VALUES or DEFAULT", T, I>
   : EatWords<T, I, ["for", "values"]> extends infer J extends number
-    ? T[J] extends WordTok<"in" | "with"> ? (T[Nx<J>] extends OpTok<"("> ? SkipToCloseParen<T, Nx2<J>> : Expected<'"("', T, Nx<J>>)
+    ? T[J] extends WordTok<"in" | "with">
+      ? T[Nx<J>] extends OpTok<"("> ? (T[Nx2<J>] extends OpTok<")"> ? SyntaxError<T, Nx2<J>> : SkipToCloseParen<T, Nx2<J>>) : Expected<'"("', T, Nx<J>>
     : T[J] extends WordTok<"from">
       ? T[Nx<J>] extends OpTok<"(">
         ? SkipToCloseParen<T, Nx2<J>> extends infer K extends number
@@ -243,8 +289,9 @@ type ParseTableTail<T extends Toks, I extends number, Inh extends readonly Table
   : EatWords<T, I, ["partition", "by"]> extends never
     ? SkipStorage<T, I> extends infer J extends number ? (J extends I ? [Inh, I] : ParseTableTail<T, J, Inh>) : never
   : EatWords<T, I, ["partition", "by"]> extends infer J extends number
-    ? T[J] extends WordTok<"range" | "list" | "hash">
-      ? T[Nx<J>] extends OpTok<"("> ? (SkipToCloseParen<T, Nx2<J>> extends infer K extends number ? ParseTableTail<T, K, Inh> : never) : Expected<'"("', T, Nx<J>>
+    // any word: an unknown strategy is a semantic error in Postgres ("unrecognized partitioning strategy")
+    ? ColIdIdent<T, J> extends [string, infer J1 extends number]
+      ? T[J1] extends OpTok<"("> ? (SkipToCloseParen<T, Nx<J1>> extends infer K extends number ? ParseTableTail<T, K, Inh> : never) : Expected<'"("', T, J1>
       : Expected<"RANGE, LIST or HASH", T, J>
     : never;
 
@@ -276,7 +323,7 @@ type ParseTableElements<T extends Toks, I extends number, TN extends string, Col
     : never;
 
 type IsConstraintStart<T extends Toks, I extends number> =
-  T[I] extends WordTok<"constraint" | "primary" | "unique" | "check" | "foreign"> ? true
+  T[I] extends WordTok<"constraint" | "primary" | "unique" | "check" | "foreign" | "not"> ? true
   : T[I] extends WordTok<"exclude"> ? (T[Nx<I>] extends WordTok<"using"> | OpTok<"("> ? true : false)
   : false;
 
@@ -293,12 +340,50 @@ type ParseTableConstraint<T extends Toks, I extends number> =
 
 type ParseTableConstraintBody<T extends Toks, I extends number> =
   EatWords<T, I, ["primary", "key"]> extends never
-    ? T[I] extends WordTok<"unique" | "check" | "foreign" | "exclude" | "not"> ? Ok<{ t: "other" }, SkipToElementEnd<T, Nx<I>>> : Expected<"table constraint", T, I>
+    ? T[I] extends WordTok<"not"> ? ParseNotNullConstraint<T, Nx<I>>
+    : T[I] extends WordTok<"unique" | "check" | "foreign" | "exclude"> ? Ok<{ t: "other" }, SkipToElementEnd<T, Nx<I>>> : Expected<"table constraint", T, I>
     : T[EatWords<T, I, ["primary", "key"]>] extends OpTok<"(">
-      ? ParenIdentList<T, EatWords<T, I, ["primary", "key"]>> extends infer R
+      ? KeyColumns<T, Nx<EatWords<T, I, ["primary", "key"]>>, []> extends infer R
         ? R extends Ok<infer Cols extends readonly string[], infer J extends number> ? Ok<{ t: "pk"; cols: Cols }, SkipToElementEnd<T, J>> : R
         : never
       : Expected<'"("', T, EatWords<T, I, ["primary", "key"]>>;
+
+/** Key columns after `(`: `a, b [WITHOUT OVERLAPS] )` (WITHOUT OVERLAPS on the last one) → `Ok<names, next>`. */
+type KeyColumns<T extends Toks, I extends number, Acc extends readonly string[]> =
+  Ident<T, I> extends [infer N extends string, infer J extends number]
+    ? T[J] extends OpTok<","> ? KeyColumns<T, Nx<J>, [...Acc, N]>
+    : (EatWords<T, J, ["without", "overlaps"]> extends never ? J : EatWords<T, J, ["without", "overlaps"]>) extends infer K extends number
+      ? EatOp<T, K, ")"> extends never ? Expected<'"," or ")"', T, K> : Ok<[...Acc, N], EatOp<T, K, ")">>
+      : never
+    : Expected<"column name", T, I>;
+
+/**
+ * After `NOT` (table constraint): `NULL col [NO INHERIT | NOT VALID | ...]` → `Ok<constraint, next>`.
+ * A NOT VALID constraint does not make the column NOT NULL: existing rows may hold nulls.
+ */
+type ParseNotNullConstraint<T extends Toks, I extends number> =
+  EatWord<T, I, "null"> extends never ? Expected<"NULL", T, I>
+  : Ident<T, EatWord<T, I, "null">> extends [infer C extends string, infer J extends number]
+    ? ConstraintAttrs<T, J, false> extends [infer NotValid, infer J2 extends number]
+      ? Ok<NotValid extends true ? { t: "other" } : { t: "not_null"; col: C }, J2>
+      : never
+    : Expected<"column name", T, EatWord<T, I, "null">>;
+
+/**
+ * Constraint attributes: `[NOT] DEFERRABLE`, `INITIALLY {DEFERRED | IMMEDIATE}`, `[NOT] ENFORCED`,
+ * `NO INHERIT`, `NOT VALID` → `[notValid, next]`.
+ */
+type ConstraintAttrs<T extends Toks, I extends number, NotValid extends boolean> =
+  T[I] extends WordTok<infer W>
+    ? W extends "deferrable" | "enforced" ? ConstraintAttrs<T, Nx<I>, NotValid>
+    : W extends "initially" ? (T[Nx<I>] extends WordTok<"deferred" | "immediate"> ? ConstraintAttrs<T, Nx2<I>, NotValid> : [NotValid, I])
+    : W extends "no" ? (T[Nx<I>] extends WordTok<"inherit"> ? ConstraintAttrs<T, Nx2<I>, NotValid> : [NotValid, I])
+    : W extends "not"
+      ? T[Nx<I>] extends WordTok<"deferrable" | "enforced"> ? ConstraintAttrs<T, Nx2<I>, NotValid>
+      : T[Nx<I>] extends WordTok<"valid"> ? ConstraintAttrs<T, Nx2<I>, true>
+      : [NotValid, I]
+    : [NotValid, I]
+  : [NotValid, I];
 
 /** After `LIKE`: `source [INCLUDING | EXCLUDING option ...]`. */
 type ParseLike<T extends Toks, I extends number> =
@@ -340,12 +425,12 @@ type ParseColConstraints<T extends Toks, I extends number, TN extends string, Na
   T[I] extends WordTok<infer W>
     ? W extends "constraint" ? (AnyLabel<T, Nx<I>> extends [string, infer J extends number] ? ParseColConstraints<T, J, TN, Name, Ty, NN, HD, PK, Nul> : Expected<"constraint name", T, Nx<I>>)
     : W extends "not"
-      ? T[Nx<I>] extends WordTok<"null"> ? (Nul extends true ? NullConflict<Name, TN, I> : ParseColConstraints<T, Nx2<I>, TN, Name, Ty, true, HD, PK, Nul>)
-      : T[Nx<I>] extends WordTok<"deferrable"> ? ParseColConstraints<T, Nx2<I>, TN, Name, Ty, NN, HD, PK, Nul>
+      ? T[Nx<I>] extends WordTok<"null"> ? (Nul extends true ? NullConflict<Name, TN, I> : ParseColConstraints<T, SkipWords<T, Nx2<I>, ["no", "inherit"]>, TN, Name, Ty, true, HD, PK, Nul>)
+      : T[Nx<I>] extends WordTok<"deferrable" | "enforced"> ? ParseColConstraints<T, Nx2<I>, TN, Name, Ty, NN, HD, PK, Nul>
       : Expected<"NULL", T, Nx<I>>
     : W extends "null" ? (NN extends true ? NullConflict<Name, TN, I> : ParseColConstraints<T, Nx<I>, TN, Name, Ty, NN, HD, PK, true>)
     : W extends "default"
-      ? ParseExpr<T, Nx<I>, 0> extends infer R
+      ? ParseBExpr<T, Nx<I>> extends infer R
         ? R extends Ok<unknown, infer J extends number> ? ParseColConstraints<T, J, TN, Name, Ty, NN, true, PK, Nul> : R
         : never
     : W extends "primary"
@@ -364,13 +449,30 @@ type ParseColConstraints<T extends Toks, I extends number, TN extends string, Na
         : G extends [false, infer J extends number] ? ParseColConstraints<T, J, TN, Name, Ty, NN, true, PK, Nul>
         : G
         : never
-    : W extends "deferrable" ? ParseColConstraints<T, Nx<I>, TN, Name, Ty, NN, HD, PK, Nul>
+    : W extends "deferrable" | "enforced" ? ParseColConstraints<T, Nx<I>, TN, Name, Ty, NN, HD, PK, Nul>
     : W extends "initially" ? ParseColConstraints<T, Nx2<I>, TN, Name, Ty, NN, HD, PK, Nul>
     : W extends "collate"
       ? QualName<T, Nx<I>> extends [unknown, infer J extends number] ? ParseColConstraints<T, J, TN, Name, Ty, NN, HD, PK, Nul> : Expected<"collation name", T, Nx<I>>
     : W extends "compression" | "storage" ? ParseColConstraints<T, Nx2<I>, TN, Name, Ty, NN, HD, PK, Nul>
     : Expected<"column constraint", T, I>
   : Ok<{ name: Name; type: Ty; notNull: PK extends true ? true : NN; hasDefault: HD; primaryKey: PK }, I>;
+
+/**
+ * A column DEFAULT is a `b_expr` in Postgres's grammar: operators and comparisons, but no
+ * AND / OR / NOT / IN / LIKE / BETWEEN / IS NULL at the top level (`DEFAULT 1 IN (1, 2)` is a
+ * syntax error; parenthesize). Comparisons and IS [NOT] DISTINCT FROM do not chain.
+ */
+type ParseBExpr<T extends Toks, I extends number> =
+  ParseExpr<T, I, 7> extends infer R
+    ? R extends Ok<unknown, infer J extends number>
+      ? T[J] extends OpTok<"=" | "<" | ">" | "<=" | ">=" | "<>" | "!="> ? ParseExpr<T, Nx<J>, 7>
+      : T[J] extends WordTok<"is">
+        ? EatWords<T, Nx<J>, ["distinct", "from"]> extends never
+          ? EatWords<T, Nx<J>, ["not", "distinct", "from"]> extends never ? R : ParseExpr<T, EatWords<T, Nx<J>, ["not", "distinct", "from"]>, 7>
+          : ParseExpr<T, EatWords<T, Nx<J>, ["distinct", "from"]>, 7>
+      : R
+      : R
+    : never;
 
 /** `[INCLUDE (...)] [WITH (...)] [USING INDEX TABLESPACE name]` after PRIMARY KEY / UNIQUE. */
 type SkipIndexParams<T extends Toks, I extends number> =
@@ -402,9 +504,12 @@ type SkipRefActions<T extends Toks, I extends number> =
 type ParseGenerated<T extends Toks, I extends number> =
   EatWords<T, I, ["always", "as", "identity"]> extends never
     ? EatWords<T, I, ["by", "default", "as", "identity"]> extends never
-      ? EatWords<T, I, ["always", "as"]> extends never ? Expected<"ALWAYS or BY DEFAULT", T, I>
-      : T[EatWords<T, I, ["always", "as"]>] extends OpTok<"("> ? [false, SkipWord<T, SkipToCloseParen<T, Nx<EatWords<T, I, ["always", "as"]>>>, "stored" | "virtual">]
-      : Expected<'"(" or IDENTITY', T, EatWords<T, I, ["always", "as"]>>
+      // `BY DEFAULT AS (expr)` parses; Postgres then requires GENERATED ALWAYS
+      ? (EatWords<T, I, ["always", "as"]> extends never ? EatWords<T, I, ["by", "default", "as"]> : EatWords<T, I, ["always", "as"]>) extends infer J extends number
+        ? [J] extends [never] ? Expected<"ALWAYS or BY DEFAULT", T, I>
+        : T[J] extends OpTok<"("> ? [false, SkipWord<T, SkipToCloseParen<T, Nx<J>>, "stored" | "virtual">]
+        : Expected<'"(" or IDENTITY', T, J>
+        : never
       : [true, SkipParenOpt<T, EatWords<T, I, ["by", "default", "as", "identity"]>>]
     : [true, SkipParenOpt<T, EatWords<T, I, ["always", "as", "identity"]>>];
 
@@ -418,10 +523,16 @@ type ParseCreateView<T extends Toks, I extends number, OrReplace extends boolean
   QualName<T, I> extends [infer Parts extends readonly string[], infer J extends number]
     ? T[J] extends OpTok<"(">
       ? ParenIdentList<T, J> extends infer R
-        ? R extends Ok<infer Names extends readonly string[], infer J2 extends number> ? (SkipStorage<T, J2> extends infer J3 extends number ? ParseViewAs<T, J3, OrReplace, Mat, Ine, RefOf<Parts>, Names> : never) : R
+        ? R extends Ok<infer Names extends readonly string[], infer J2 extends number> ? (SkipViewStorage<T, J2, Mat> extends infer J3 extends number ? ParseViewAs<T, J3, OrReplace, Mat, Ine, RefOf<Parts>, Names> : never) : R
         : never
-      : SkipStorage<T, J> extends infer J2 extends number ? ParseViewAs<T, J2, OrReplace, Mat, Ine, RefOf<Parts>, null> : never
+      : SkipViewStorage<T, J, Mat> extends infer J2 extends number ? ParseViewAs<T, J2, OrReplace, Mat, Ine, RefOf<Parts>, null> : never
     : Expected<"view name", T, I>;
+
+/** A plain view takes only `WITH (options)`; USING and TABLESPACE are for materialized views. */
+type SkipViewStorage<T extends Toks, I extends number, Mat extends boolean> =
+  Mat extends true ? SkipStorage<T, I>
+  : T[I] extends WordTok<"with"> ? (T[Nx<I>] extends OpTok<"("> ? SkipToCloseParen<T, Nx2<I>> : I)
+  : I;
 
 type ParseViewAs<T extends Toks, I extends number, OrReplace extends boolean, Mat extends boolean, Ine extends boolean, Ref extends TableRef, Names extends readonly string[] | null> =
   EatWord<T, I, "as"> extends never ? Expected<"AS", T, I>
@@ -430,6 +541,37 @@ type ParseViewAs<T extends Toks, I extends number, OrReplace extends boolean, Ma
       ? Ok<{ t: "create_view"; orReplace: OrReplace; materialized: Mat; ifNotExists: Ine; view: Ref; cols: Names; q: Q }, Mat extends true ? SkipWithData<T, J> : SkipCheckOption<T, J>>
       : R
     : never;
+
+/**
+ * After `RECURSIVE VIEW`: `name (cols) [WITH (...)] AS query [WITH CHECK OPTION]`. Postgres rewrites it to
+ * `CREATE VIEW name AS WITH RECURSIVE name (cols) AS (query) SELECT cols FROM name`; so does this.
+ */
+type ParseRecursiveView<T extends Toks, I extends number, OrReplace extends boolean> =
+  QualName<T, I> extends [infer Parts extends readonly string[], infer J extends number]
+    ? ParenIdentList<T, J> extends infer R
+      ? R extends Ok<infer Names extends readonly string[], infer J2 extends number>
+        ? SkipStorage<T, J2> extends infer J3 extends number
+          ? EatWord<T, J3, "as"> extends never ? Expected<"AS", T, J3>
+          : ParseSelectStmt<T, EatWord<T, J3, "as">> extends infer Q
+            ? Q extends Ok<infer S, infer J4 extends number>
+              ? Ok<{ t: "create_view"; orReplace: OrReplace; materialized: false; ifNotExists: false; view: RefOf<Parts>; cols: Names; q: RecursiveViewQuery<RefOf<Parts>["name"], Names, S> }, SkipCheckOption<T, J4>>
+              : Q
+            : never
+          : never
+        : R
+      : never
+    : Expected<"view name", T, I>;
+
+type RecursiveViewQuery<N extends string, Names extends readonly string[], S> = {
+  t: "select";
+  with: { recursive: true; ctes: [{ name: N; cols: Names; q: S; search: null; cycle: null }] };
+  body: {
+    t: "simple"; distinct: false; targets: { [K in keyof Names]: { e: { t: "col"; tbl: null; name: Names[K] }; alias: null } };
+    from: [{ t: "table"; ref: { schema: null; name: N }; alias: null; colAliases: null }];
+    where: null; groupBy: null; groupingSets: false; having: null; windows: [];
+  };
+  orderBy: []; limit: null; offset: null;
+};
 
 /** `[WITH [CASCADED | LOCAL] CHECK OPTION]` */
 type SkipCheckOption<T extends Toks, I extends number> =
@@ -459,21 +601,104 @@ type ParseEnumValues<T extends Toks, I extends number, Acc extends readonly stri
   : Expected<"enum label", T, I>;
 
 /**
- * After `SCHEMA`: `[IF NOT EXISTS] name [AUTHORIZATION role]` | `[IF NOT EXISTS] AUTHORIZATION role`.
- * Embedded schema elements (`CREATE SCHEMA s CREATE TABLE ...`) are rejected: write separate statements.
+ * After `SCHEMA`: `[IF NOT EXISTS] name [AUTHORIZATION role] [element ...]` | `[IF NOT EXISTS] AUTHORIZATION role [element ...]`.
+ * Without a name the schema is named after the role (unknown for CURRENT_ROLE / CURRENT_USER / SESSION_USER).
  */
 type ParseCreateSchema<T extends Toks, I extends number> =
   IfNotExists<T, I> extends [infer Ine extends boolean, infer I1 extends number]
     ? T[I1] extends WordTok<"authorization">
-      ? AnyLabel<T, Nx<I1>> extends [infer Role extends string, infer J extends number] ? SchemaEnd<T, J, { t: "create_schema"; ifNotExists: Ine; name: Role }> : Expected<"role name", T, Nx<I1>>
+      ? AnyLabel<T, Nx<I1>> extends [infer Role extends string, infer J extends number]
+        ? SchemaElements<T, J, Ine, Role, T[Nx<I1>] extends WordTok<"current_role" | "current_user" | "session_user"> ? false : true, [], []>
+        : Expected<"role name", T, Nx<I1>>
       : Ident<T, I1> extends [infer Name extends string, infer J extends number]
         ? T[J] extends WordTok<"authorization">
-          ? AnyLabel<T, Nx<J>> extends [string, infer J2 extends number] ? SchemaEnd<T, J2, { t: "create_schema"; ifNotExists: Ine; name: Name }> : Expected<"role name", T, Nx<J>>
-          : SchemaEnd<T, J, { t: "create_schema"; ifNotExists: Ine; name: Name }>
+          ? AnyLabel<T, Nx<J>> extends [string, infer J2 extends number] ? SchemaElements<T, J2, Ine, Name, true, [], []> : Expected<"role name", T, Nx<J>>
+          : SchemaElements<T, J, Ine, Name, true, [], []>
       : Expected<"schema name", T, I1>
     : never;
-type SchemaEnd<T extends Toks, I extends number, S> =
-  T[I] extends WordTok<"create" | "grant"> ? Fail<"schema elements in CREATE SCHEMA are not supported; use separate statements", I> : Ok<S, I>;
+
+/**
+ * Schema elements: CREATE TABLE / VIEW / INDEX / SEQUENCE / TRIGGER and GRANT, without `;` between them.
+ * Tables and views are kept (`Tbls`, `Views`: Postgres creates the tables first), named in schema `S`;
+ * the others have no schema effect and are skipped. `Known`: `S` is known (not CURRENT_ROLE).
+ */
+type SchemaElements<T extends Toks, I extends number, Ine extends boolean, S extends string, Known extends boolean, Tbls extends readonly unknown[], Views extends readonly unknown[]> =
+  T[I] extends WordTok<"create" | "grant">
+    ? Ine extends true ? Fail<"CREATE SCHEMA IF NOT EXISTS cannot include schema elements", I>
+    : T[I] extends WordTok<"grant"> ? SchemaElements<T, SkipElement<T, Nx<I>, [], false>, Ine, S, Known, Tbls, Views>
+    : SchemaElement<T, Nx<I>, S, Known, false, false> extends infer R
+      ? R extends Ok<infer E, infer J extends number>
+        ? E extends { readonly t: "create_table" } ? SchemaElements<T, J, Ine, S, Known, [...Tbls, E], Views>
+        : E extends { readonly t: "create_view" } ? SchemaElements<T, J, Ine, S, Known, Tbls, [...Views, E]>
+        : SchemaElements<T, J, Ine, S, Known, Tbls, Views>
+        : R
+      : never
+  : Ok<{ t: "create_schema"; ifNotExists: Ine; name: S; elements: [...Tbls, ...Views] }, I>;
+
+/** One element after `CREATE` → `Ok<create_table | create_view | null, next>` or error. */
+type SchemaElement<T extends Toks, I extends number, S extends string, Known extends boolean, OrR extends boolean, Temp extends boolean> =
+  T[I] extends WordTok<infer W>
+    ? W extends "or" ? (EatWord<T, Nx<I>, "replace"> extends never ? Expected<"REPLACE", T, Nx<I>> : SchemaElement<T, Nx2<I>, S, Known, true, Temp>)
+    : W extends "temp" | "temporary" | "local" | "global" | "unlogged" ? SchemaElement<T, Nx<I>, S, Known, OrR, W extends "unlogged" ? Temp : true>
+    : W extends "table" | "view" | "recursive"
+      ? Temp extends true ? Fail<"cannot create temporary relation in non-temporary schema", I>
+      : (W extends "table" ? ParseCreateTable<T, Nx<I>>
+        : W extends "view" ? ParseCreateView<T, Nx<I>, OrR, false, false>
+        : EatWord<T, Nx<I>, "view"> extends never ? Expected<"VIEW", T, Nx<I>> : ParseRecursiveView<T, Nx2<I>, OrR>) extends infer R
+        ? R extends Ok<infer E, infer J extends number>
+          ? E extends { readonly t: "create_table_as" } ? SyntaxError<T, I>
+          : E extends { readonly t: "create_table"; readonly table: infer Ref extends TableRef } ? InSchema<T, J, S, Known, Ref, Requalify<E, S>, IfNotExists<T, Nx<I>>[1]>
+          : E extends { readonly t: "create_view"; readonly view: infer Ref extends TableRef } ? InSchema<T, J, S, Known, Ref, Requalify<E, S>, W extends "view" ? Nx<I> : Nx2<I>>
+          : R
+          : R
+        : never
+    : W extends "sequence" ? (QualName<T, IfNotExists<T, Nx<I>>[1]> extends [infer P extends readonly string[], number] ? InSchema<T, SkipElement<T, Nx<I>, [], true>, S, Known, RefOf<P>, null, IfNotExists<T, Nx<I>>[1]> : Expected<"sequence name", T, Nx<I>>)
+    : W extends "index" | "unique" | "trigger" | "constraint"
+      ? SkipElement<T, Nx<I>, [], true> extends infer J extends number
+        ? ElementOn<T, Nx<I>, J> extends infer K extends number
+          ? QualName<T, SkipWord<T, K, "only">> extends [infer P extends readonly string[], number] ? InSchema<T, J, S, Known, RefOf<P>, null, SkipWord<T, K, "only">> : Ok<null, J>
+          : Ok<null, J>
+        : never
+    : Expected<"TABLE, VIEW, INDEX, SEQUENCE or TRIGGER", T, I>
+  : Expected<"TABLE, VIEW, INDEX, SEQUENCE or TRIGGER", T, I>;
+
+/** The element's relation, created in schema `S`. */
+type Requalify<E, S extends string> =
+  E extends { readonly t: "create_table"; readonly ifNotExists: infer A; readonly table: { readonly name: infer N }; readonly columns: infer B; readonly constraints: infer C; readonly like: infer D; readonly inherits: infer F; readonly of: infer G }
+    ? { t: "create_table"; ifNotExists: A; table: { schema: S; name: N }; columns: B; constraints: C; like: D; inherits: F; of: G }
+  : E extends { readonly t: "create_view"; readonly orReplace: infer A; readonly materialized: infer B; readonly ifNotExists: infer C; readonly view: { readonly name: infer N }; readonly cols: infer D; readonly q: infer Q }
+    ? { t: "create_view"; orReplace: A; materialized: B; ifNotExists: C; view: { schema: S; name: N }; cols: D; q: Q }
+  : E;
+
+/** An element may name its own schema only: `Ok<E, J>`, or Postgres's error at the name (token `At`). */
+type InSchema<T extends Toks, J extends number, S extends string, Known extends boolean, Ref extends TableRef, E, At extends number> =
+  Ref["schema"] extends string
+    ? Known extends true
+      ? Ref["schema"] extends S ? Ok<E, J> : Fail<`CREATE specifies a schema (${Ref["schema"]}) different from the one being created (${S})`, At>
+      : Ok<E, J>
+    : Ok<E, J>;
+
+/** Index after the first `ON` between `I` and `End` (the relation of an index or trigger), or `null`. */
+type ElementOn<T extends Toks, I extends number, End extends number> =
+  I extends End ? null : T[I] extends WordTok<"on"> ? Nx<I> : T[I] extends OpTok<"("> ? null : ElementOn<T, Nx<I>, End>;
+
+/**
+ * Skip a schema element without a schema effect: up to the next depth-0 `CREATE` / `GRANT` that
+ * starts an element, or the end of the statement. `Stop` is false right after `GRANT`, `,` and
+ * `WITH`, where `CREATE` / `GRANT` is a privilege (`GRANT CREATE ON ...`, `WITH GRANT OPTION`).
+ */
+type SkipElement<T extends Toks, I extends number, D extends readonly unknown[], Stop extends boolean> =
+  T[I] extends OpTok<infer O>
+    ? O extends ";" ? (D extends readonly [] ? I : SkipElement<T, Nx<I>, D, true>)
+    : O extends "(" ? SkipElement<T, Nx<I>, [...D, 0], true>
+    : O extends ")" ? SkipElement<T, Nx<I>, D extends readonly [unknown, ...infer D2] ? D2 : [], true>
+    : SkipElement<T, Nx<I>, D, O extends "," ? false : true>
+  : T[I] extends WordTok<infer W>
+    ? W extends "create" | "grant"
+      ? Stop extends true ? (D extends readonly [] ? I : SkipElement<T, Nx<I>, D, true>) : SkipElement<T, Nx<I>, D, true>
+      : SkipElement<T, Nx<I>, D, W extends "with" ? false : true>
+  : T[I] extends Tok ? SkipElement<T, Nx<I>, D, true>
+  : I;
 
 // ───────────────────────────── ALTER ─────────────────────────────
 
@@ -506,7 +731,9 @@ type ParseAlterSchema<T extends Toks, I extends number> =
  * `RENAME ...` and `SET SCHEMA` form a statement of their own (as in Postgres's grammar).
  */
 type ParseAlterTable<T extends Toks, I extends number> =
-  IfExists<T, I> extends [infer Ife extends boolean, infer I1 extends number]
+  // ALL IN TABLESPACE ts [OWNED BY roles] SET TABLESPACE ts2 [NOWAIT]: moves storage only
+  T[I] extends WordTok<"all"> ? (EatWords<T, Nx<I>, ["in", "tablespace"]> extends never ? Expected<"IN TABLESPACE", T, Nx<I>> : Noop<T, I, "alter table all in tablespace">)
+  : IfExists<T, I> extends [infer Ife extends boolean, infer I1 extends number]
     ? QualName<T, SkipWord<T, I1, "only">> extends [infer Parts extends readonly string[], infer J extends number]
       ? (EatOp<T, J, "*"> extends never ? J : EatOp<T, J, "*">) extends infer J1 extends number
         ? IsStandalone<T, J1> extends true
@@ -540,7 +767,8 @@ type ParseAlterAction<T extends Toks, I extends number, TN extends string> =
     ? W extends "add" ? ParseAlterAdd<T, Nx<I>, TN>
     : W extends "drop" ? ParseAlterDrop<T, Nx<I>>
     : W extends "alter" ? ParseAlterColumn<T, Nx<I>>
-    : W extends "set" | "owner" | "enable" | "disable" | "validate" | "cluster" | "inherit" | "no" | "of" | "not" | "replica" | "attach" | "detach" | "force" | "reset" | "options" ? NoopAction<T, I>
+    : W extends "set" ? (T[Nx<I>] extends WordTok<"with"> ? SyntaxError<T, Nx<I>> : NoopAction<T, I>) // SET WITH OIDS is gone
+    : W extends "owner" | "enable" | "disable" | "validate" | "cluster" | "inherit" | "no" | "of" | "not" | "replica" | "attach" | "detach" | "force" | "reset" | "options" ? NoopAction<T, I>
     : Expected<"ALTER TABLE action", T, I>
   : Expected<"ALTER TABLE action", T, I>;
 
@@ -548,7 +776,7 @@ type ParseAlterAction<T extends Toks, I extends number, TN extends string> =
 type ParseAlterAdd<T extends Toks, I extends number, TN extends string> =
   T[I] extends WordTok<"constraint">
     ? AnyLabel<T, Nx<I>> extends [string, infer J extends number] ? ParseAddConstraintBody<T, J> : Expected<"constraint name", T, Nx<I>>
-  : T[I] extends WordTok<"primary"> ? ParseAddConstraintBody<T, I>
+  : T[I] extends WordTok<"primary" | "not"> ? ParseAddConstraintBody<T, I>
   : T[I] extends WordTok<"unique" | "check" | "foreign" | "exclude"> ? NoopAction<T, I>
   : IfNotExists<T, SkipWord<T, I, "column">> extends [infer Ine extends boolean, infer I1 extends number]
     ? ParseColumnDef<T, I1, TN> extends infer R
@@ -557,9 +785,13 @@ type ParseAlterAdd<T extends Toks, I extends number, TN extends string> =
     : never;
 
 type ParseAddConstraintBody<T extends Toks, I extends number> =
-  EatWords<T, I, ["primary", "key"]> extends never ? NoopAction<T, I>
+  T[I] extends WordTok<"not">
+    ? ParseNotNullConstraint<T, Nx<I>> extends infer R
+      ? R extends Ok<infer C, infer J extends number> ? Ok<C extends { readonly col: infer N } ? { t: "set_not_null"; name: N } : { t: "noop" }, J> : R
+      : never
+  : EatWords<T, I, ["primary", "key"]> extends never ? NoopAction<T, I>
   : T[EatWords<T, I, ["primary", "key"]>] extends OpTok<"(">
-    ? ParenIdentList<T, EatWords<T, I, ["primary", "key"]>> extends infer R
+    ? KeyColumns<T, Nx<EatWords<T, I, ["primary", "key"]>>, []> extends infer R
       ? R extends Ok<infer Cols extends readonly string[], infer J extends number> ? Ok<{ t: "add_pk"; cols: Cols }, SkipToActionEnd<T, J>> : R
       : never
     : NoopAction<T, I>; // PRIMARY KEY USING INDEX name

@@ -63,7 +63,8 @@ test("DELETE inside WITH", () => {
 
 test("unsupported / syntax errors", () => {
   expectTypeOf<V<"DELETE users">>().toEqualTypeOf<SqlError<"syntax error: expected FROM at or near users", 1>>();
-  expectTypeOf<V<"DELETE FROM users WHERE CURRENT OF c">>().toEqualTypeOf<SqlError<"WHERE CURRENT OF cursor is not supported", 4>>();
+  expectTypeOf<V<"DELETE FROM users WHERE CURRENT OF c">>().toEqualTypeOf<"DELETE FROM users WHERE CURRENT OF c">();
+  expectTypeOf<Row<"DELETE FROM users WHERE CURRENT OF c RETURNING *">>().toEqualTypeOf<Row<"DELETE FROM users RETURNING *">>();
   expectTypeOf<V<"DELETE FROM users u USING">>().toEqualTypeOf<SqlError<"syntax error: expected table name, subquery or function at or near end of input", 5>>();
 });
 
