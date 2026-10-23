@@ -101,3 +101,28 @@ describe("named parameters", () => {
     expect(q2).toEqual({ text: "SELECT id FROM users u WHERE email = $1 AND id > $2", values: ["e", 18] });
   });
 });
+
+describe("text plans are remembered per text", () => {
+  interface DB { users: { id: { type: "int4"; nullable: false; hasDefault: true }; email: { type: "text"; nullable: false; hasDefault: false } } }
+  it("the same text with other fragments, values and offsets", () => {
+    const sql = createSql<DB>();
+    const text = "SELECT u.id FROM users u {where} AND u.email = $1";
+    const a = sql.fragment("WHERE u.id > $1", 1);
+    const b = sql.fragment("WHERE u.id > $1 AND u.id < $2", 1, 9);
+    expect(sql(text, { where: a }, "x")).toEqual({ text: "SELECT u.id FROM users u WHERE u.id > $2 AND u.email = $1", values: ["x", 1] });
+    expect(sql(text, { where: b }, "y")).toEqual({ text: "SELECT u.id FROM users u WHERE u.id > $2 AND u.id < $3 AND u.email = $1", values: ["y", 1, 9] });
+    expect(sql(text, { where: a }, "z")).toEqual({ text: "SELECT u.id FROM users u WHERE u.id > $2 AND u.email = $1", values: ["z", 1] });
+    // the fragment again, at another offset
+    expect(sql("SELECT 1 FROM users u {where}", { where: a })).toEqual({ text: "SELECT 1 FROM users u WHERE u.id > $1", values: [1] });
+    expect(splice("{x} {x}", { x: { text: "$1", values: [5] } }, [])).toEqual({ text: "$1 $2", values: [5, 5] });
+  });
+
+  it("named parameters: the rewrite is shared, the values are not", () => {
+    const sql = createSql<DB>();
+    const text = "SELECT id FROM users WHERE email = :email AND id > :min";
+    expect(sql(text, { email: "a", min: 1 })).toEqual({ text: "SELECT id FROM users WHERE email = $1 AND id > $2", values: ["a", 1] });
+    expect(sql(text, { email: "b", min: 2 })).toEqual({ text: "SELECT id FROM users WHERE email = $1 AND id > $2", values: ["b", 2] });
+    // @ts-expect-error -- :min is missing
+    expect(() => sql(text, { email: "c" })).toThrow("missing named parameter :min");
+  });
+});

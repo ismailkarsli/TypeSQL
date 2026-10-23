@@ -16,6 +16,23 @@ export type SlotValues = { readonly [name: string]: Spliceable };
 
 const SLOT = /\{([A-Za-z_][A-Za-z0-9_]*)\}/g;
 
+/**
+ * `fn` remembered per text. A program has a fixed set of statement texts, so these stay small;
+ * past `limit` entries (texts built at runtime) the memo starts over.
+ */
+function memo<V>(fn: (text: string) => V, limit = 10_000): (text: string) => V {
+  const cache = new Map<string, V>();
+  return (text) => {
+    let v = cache.get(text);
+    if (v === undefined) {
+      v = fn(text);
+      if (cache.size >= limit) cache.clear();
+      cache.set(text, v);
+    }
+    return v;
+  };
+}
+
 /** Highest `$n` in `text` (0 if none), skipping literals and comments. */
 export function maxParam(text: string): number {
   let max = 0;
@@ -98,18 +115,42 @@ function scan(text: string, onParam: (n: number) => string | null): string {
  * appearance. Unknown slots throw.
  */
 export function splice(text: string, slots: SlotValues, values: readonly unknown[]): { text: string; values: unknown[] } {
-  let offset = Math.max(maxParam(text), values.length);
+  const plan = splicePlan(text);
+  let offset = Math.max(plan.max, values.length);
   const allValues: unknown[] = [...values];
-  const out = text.replace(SLOT, (_m, name: string) => {
+  let out = plan.parts[0]!;
+  plan.names.forEach((name, i) => {
     const frag = slots[name];
     if (frag === undefined) throw new Error(`typesql: unknown fragment slot {${name}}`);
-    const renumbered = renumberParams(frag.text, offset);
+    out += (offset === 0 ? frag.text : renumbered(`${offset}\0${frag.text}`)) + plan.parts[i + 1]!;
     offset += frag.values.length;
     allValues.push(...frag.values);
-    return renumbered;
   });
   return { text: out, values: allValues };
 }
+
+/** A query text split at its `{slot}`s (`parts` around `names`), and its highest `$n`. */
+const splicePlan = memo((text: string) => {
+  const parts: string[] = [];
+  const names: string[] = [];
+  let last = 0;
+  for (const m of text.matchAll(SLOT)) {
+    parts.push(text.slice(last, m.index));
+    names.push(m[1]!);
+    last = m.index + m[0].length;
+  }
+  parts.push(text.slice(last));
+  return { parts, names, max: maxParam(text) };
+});
+
+/** `renumberParams` of a fragment text, keyed by `${offset}\0${text}`. */
+const renumbered = memo((key: string) => {
+  const at = key.indexOf("\0");
+  return renumberParams(key.slice(at + 1), Number(key.slice(0, at)));
+});
+
+/** `rewriteNamed`, remembered per text (the result is shared: do not modify it). */
+export const rewriteNamedOnce: (text: string) => { readonly text: string; readonly names: readonly string[] } = memo(rewriteNamed);
 
 /**
  * Rewrite `:name` parameters to `$k` (first-appearance order) outside literals/comments,

@@ -156,13 +156,13 @@ Building a query (Node 26, same machine; `pnpm build && node packages/bench/runt
 | Call | Time |
 |---|---|
 | `sql("… WHERE id = $1", 7)` | 1.1 µs |
-| `:name` parameters | 2.4 µs |
-| inline `${sql.param(…)}` values | 3.9 µs |
-| a `{slot}` fragment | 2.5 µs |
+| `:name` parameters | 1.3 µs |
+| inline `${sql.param(…)}` values | 4.0 µs |
+| a `{slot}` fragment | 1.6 µs |
 
 The text goes to the driver as written, and `execute*` returns the driver's rows unchanged (or
 with top-level keys renamed, with `rowKeys: "camelCase"`). `@typesql/core` has no dependencies
-and is 10 KB minified, 3.8 KB gzipped.
+and is 10 KB minified, 4.0 KB gzipped.
 
 To reproduce the compile-time numbers: `node packages/bench/gen.mjs && node packages/bench/run.mjs`.
 

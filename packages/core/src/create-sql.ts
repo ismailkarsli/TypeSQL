@@ -6,7 +6,7 @@ import type { HasSlots, JoinedText, MaxParamStr, QuotedIdent, SlotNames, Splice,
 import type { DefaultTypeMap } from "./type-map/index.js";
 import { makeFragment, makeQuery, type CARRIED, type Executor, type Fragment, type Query, type TextType } from "./query.js";
 import type { KeyedRow, RowKeys, SqlOptions } from "./row-keys.js";
-import { joinFragments, maxParam, quoteIdent, rewriteNamed, splice, type Spliceable } from "./runtime/splice.js";
+import { joinFragments, maxParam, quoteIdent, rewriteNamedOnce, splice, type Spliceable } from "./runtime/splice.js";
 import { hasInline, param, resolveInline, takeValue, valueOrDefault } from "./runtime/inline.js";
 import { json } from "./runtime/json.js";
 import { buildSet, buildValues } from "./runtime/write.js";
@@ -395,7 +395,7 @@ function build(text: string, rest: readonly unknown[]): { text: string; values: 
   let positional = text;
   let values: unknown[] = outer.map(takeValue);
   if (NAMED_RE.test(text)) {
-    const rn = rewriteNamed(text);
+    const rn = rewriteNamedOnce(text);
     if (rn.names.length > 0) {
       const obj = outer[0];
       if (outer.length !== 1 || obj === null || typeof obj !== "object") {
