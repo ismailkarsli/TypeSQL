@@ -7,7 +7,7 @@ it **inside the type system** and gives you the exact row type, the parameter ty
 (for DDL) the resulting schema. No codegen, no database connection, no build step. The parser
 agrees with Postgres on [every checkable statement of PostgreSQL's own regression tests](#tested-against-postgresqls-own-test-suite).
 
-![TypeSQL demo: hovering a query shows its inferred row type, and a misspelled column is a compile error](assets/demo.gif)
+![TypeSQL demo: table and column completions inside a query, hovering a query shows its inferred row type, and a misspelled column is a compile error](assets/demo.gif)
 
 **[Try it in the TypeScript Playground](https://www.typescriptlang.org/play/#code/PTAEBUE8AcFMGUCKAZAXKACgewM4BcBzAJ1h1CWQBpRoBDInWAE1ACNIIYEBjIgS2h4A5GTxdQOSPlgBbAHSgAokz55QeABaxyKULQB2LDVgBusIuq3quOVACgQoIlgDuZAyzpFaM2HnNkAGZYADYhrtQeoDJ8+LQA1qR6JKDcWDLQfCHa5s4MoFj6ltr4-PoEcnZ8GVhEagDeqSS0-vAAjiHUYnCgAMKhXeIA4rD65i3Mgz0AcgCuYbSs2VPaGPQ+OFBwK6AASq5b2gC+oIHOMqAARAAC3aQdwGkklwDcdlX6-kSBtNzaACIAIVA9TsoFAs0YDHQoPB4L4THQIzG3n8TAAPJc+J8ACyXAB8L1Ajg0tHcoCYsB+8zw6Cwgj4hVoIQKRQAktN4IpduAwXDZLQsuh+iFMf4AB54AlvOEU2LQEK0SAAfX0Plg6DmCyWsDFsEl0r54N4sAmTGVLSRo3GaLF1VIeB8ggAXobwUcZTRcHhbCCjaAEVaUWbMdi8AAON1w2izTS1ZWBvqhUO4qPgvCqbLC5OXCVSwn+1hYJiQTXzRU6vUGgvut5Hd5pfT4CQdUAAXiaptaHXRQPxAAoAJRvBxgZCKABi4FAACkAPIc6IJJKabT8AgaNQ4BHafTlxbZIkAEgAjOpl2RVKJxGd0hC5AjKo3m212y2Qv2AAZc8e9aezB8mGoACBSyahoDkDM8Gyf1ZTg8EJ12OcAFkIShMhZlAccp1nBdpi9fAyGgUA53wiCYzjIgExYDsAIRWD4NlAB1AAJblFHvBE31PT9qAAdmHOw7j2Vw332FxDnRO4sECUA2gLRxwQAPQAfiE8Q1m8GQyA7TSNkk6TZPkt5FNAVT3kcABBAhiFgAgJncQxUlCWYZCKNVfCCUJwhcTBvVs300lmT5+wAKkHANL0+cNIgkPAygICFDHMUB9GLWAAFpoH8kgcCfQpmziH03xwDovx-RQ-z0WNjCohFqCCkLwuoGRaHFfsoOyCLLPgUBFX8ZtEJQgjiqGJCAFUMFAQEAE1qso6jP0E4T4EdYqO3EgyuBkuKWhwBSwGUtTR1ANl9BCbFtBMZlZiSegSlGNQyVAI8ii8dUvkclhuC0bhEhYWh7OxZsXC0FJVw4e60OYfKmzUUCWQ7S5aCYWhrn1J1sjkNIZFeOxnzUE0zRKsrPw5LkeVO6ZwDnaH8n7BGIoANUs5BxsUXr+yPepSpCOR3pkBnWqyQcjgi3ZFHAcbdmmDkhgDIDOzNC08CWt5hN6Zo0TEg4uCk7bZKJtEDrhcyTuQ2JHUSdwUhxzJslAXJajIQpih0ZA4oShQJz4cVihkexefKxRf2nfRfFAIbUMhAI1eJMAnaIdA0hCVyikucPYEuCksCSNL4fFS27CDsnOW5acORpkayA6zNYGZ1n2c509B14q4WNgMIsEuYd48dog8nQCjauoyLQGmOdp2mcbkA9qJSTINKKSpGMQjwOwgA)** <!-- playground:core -->: edit the SQL and hover the types,
 with nothing to install. The Playground runs TypeScript 6, which TypeSQL does not support, so treat
@@ -63,6 +63,24 @@ await sql.transaction(async (tx) => {                // tx: sql bound to one tra
 });
 ```
 
+## Editor completions
+
+The TypeSQL extension for VS Code
+([Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=typesql.typesql),
+[Open VSX](https://open-vsx.org/extension/typesql/typesql)) suggests what can come next inside
+`sql()` strings: tables, views and schemas after `FROM`, `JOIN`, `INTO` and `UPDATE`, and
+columns with their Postgres types after `alias.` and in expressions.
+
+```ts
+sql("SELECT * FROM |");          // users, posts
+sql("SELECT u.| FROM users u");  // id: int4, email: text, display_name: text | null
+```
+
+The names come from the `DB` type of the `sql` you call, unsaved edits included. Errors, hovers
+and row types stay TypeScript's own. It needs `@typesql/core` 0.4.0 or later and a language
+server on TypeScript 7.1; [Editor completions](packages/docs/guide/editor.md) covers the setup.
+The source is in [`packages/vscode`](packages/vscode).
+
 ## Packages
 
 | Package | Role | Peer dependency | Playground |
@@ -76,9 +94,6 @@ await sql.transaction(async (tx) => {                // tx: sql bound to one tra
 
 Two more workspace packages are private and not published: `@typesql/docs` (the VitePress
 documentation site) and `@typesql/bench` (compile-time budget and runtime benchmarks).
-
-The VS Code extension in [`packages/vscode`](packages/vscode) suggests tables, views and
-columns inside `sql()` strings; see [Editor completions](packages/docs/guide/editor.md).
 
 ## What is inferred
 
@@ -222,7 +237,8 @@ locally. Its pages pull their code examples from type-checked files, so they rea
 site; the Markdown sources are the [guide](packages/docs/guide/getting-started.md),
 the [API reference](packages/docs/reference/api.md), [DDL support](packages/docs/reference/ddl.md),
 [Postgres compatibility](packages/docs/guide/postgres-compatibility.md),
-[adapters](packages/docs/adapters/index.md) and the [type engine](packages/docs/internals/engine.md).
+[adapters](packages/docs/adapters/index.md), [editor completions](packages/docs/guide/editor.md)
+and the [type engine](packages/docs/internals/engine.md).
 
 ## Development
 
