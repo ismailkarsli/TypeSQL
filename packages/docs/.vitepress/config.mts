@@ -24,6 +24,7 @@ export default defineConfig({
           { text: "Writing data", link: "/guide/writing-data" },
           { text: "Migrations", link: "/guide/migrations" },
           { text: "Errors and limits", link: "/guide/errors-and-limits" },
+          { text: "Type cache", link: "/guide/caching" },
         ],
       },
       {

@@ -105,9 +105,14 @@ opt-in slice: `createSql<DB & PgCatalog>()`.
 TypeScript 7.1 or later (the native compiler; `7.1.0-beta` works) and Node.js 26 or later.
 PostgreSQL semantics only.
 
+Optionally, a [type cache](https://github.com/ismailkarsli/typesql/blob/main/packages/docs/guide/caching.md)
+file, which TypeScript 7.1's content mappers let this package serve and keep up to date, saves
+recomputing query types on every `tsc` run and every edit.
+
 ## Documentation
 
 [Guide](https://github.com/ismailkarsli/typesql/blob/main/packages/docs/guide/getting-started.md) ·
 [API reference](https://github.com/ismailkarsli/typesql/blob/main/packages/docs/reference/api.md) ·
 [DDL support](https://github.com/ismailkarsli/typesql/blob/main/packages/docs/reference/ddl.md) ·
-[Errors and limits](https://github.com/ismailkarsli/typesql/blob/main/packages/docs/guide/errors-and-limits.md)
+[Errors and limits](https://github.com/ismailkarsli/typesql/blob/main/packages/docs/guide/errors-and-limits.md) ·
+[Type cache](https://github.com/ismailkarsli/typesql/blob/main/packages/docs/guide/caching.md)

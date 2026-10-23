@@ -232,9 +232,11 @@ option, and `camelCase(key)` is the key mapping.
 | `ParamsArgs<DB, TM, Q>` | what a call site passes (`ArgsOf`, or `[params: {…}]` for `:name`) |
 | `NamesOf<DB, Q>` | `:name` parameters in order |
 | `Validate<DB, Q>` | `Q` when valid, else `SqlError<message, tokenIndex>` |
-| `Analyze<DB, Q>` | the full analysis result (`kind`, `cols`, `params`, `max`, `names`, `stmt`) |
+| `Analyze<DB, Q>` | the full analysis result (`kind`, `cols`, `params`, `max`, `names`, `stmt`); never served from the type cache |
+| `Analysis<DB, Q>` | what `RowOf`, `ParamsOf` and `Validate` read: `Analyze` without `stmt`, from the [type cache](../guide/caching) when it has a usable entry |
 | `ApplyDdl<DB, Q>` | schema after a DDL statement or a `;`-separated script |
 | `SqlError<Message, At>` | compile-time error carrier; `At` is the index of the offending token |
+| `QueryCache`, `QueryCacheKeys`, `CacheSnapshots`, `DdlCache`, `DdlCacheKeys`, `CacheVersion`, … | what a [type cache](../guide/caching) file declares; generated, not written by hand |
 
 ## Schema types
 

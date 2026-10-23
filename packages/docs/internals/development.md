@@ -79,16 +79,24 @@ first returned row — use `ORDER BY`/`LIMIT` so that row is deterministic.
 
 ```sh
 node packages/bench/gen.mjs              # writes src/q1.ts, q50.ts, q500.ts, mixed50.ts, maxlen.ts
-node packages/bench/run.mjs              # tsc --extendedDiagnostics per file; exit 1 on a threshold breach
+pnpm --filter @typesql/core build        # the …d and …c variants use the built package
+node packages/bench/run.mjs              # tsc --extendedDiagnostics per variant; exit 1 on a threshold breach
 node packages/bench/run.mjs --calibrate  # rewrite thresholds.json from the measured numbers
 ```
 
 `qN.ts` holds N distinct realistic SELECTs; `mixed50.ts` holds 50 statements that use inline
 `${sql.param()}` values, `:name` parameters, one `{slot}` fragment shared by many statements
 and `sql.id`; `maxlen.ts` holds one statement per size probe (0.5, 1, 2, 4 and 8 KB).
+Each file is measured in up to three ways: against core's TypeScript sources (`q1` … `maxlen`),
+against the built package with `skipLibCheck`, as an application compiles (`q1d`, `q50d`,
+`q500d`), and with a [type cache](../guide/caching) generated for the file and served by the
+content mapper (`q50c`, `q500c`). `q500s` uses a cache generated for another schema, so every
+entry is stale and must cost what no cache costs.
+
 `thresholds.json` caps instantiations (30% headroom: they are deterministic), check time (2x:
-it is noisy), errors, and the largest statement that must still infer. CI runs the bench as a
-separate job and writes the table to the job summary.
+it is noisy), errors, and the largest statement that must still infer; for the cache, the
+instantiations of one hit (q500c − q50c over 450, at most 250) and a stale cache against no cache
+(at most 1.05x). CI runs the bench as a separate job and writes the table to the job summary.
 
 `run.mjs` also prints the marginal cost of one query, q500 minus q1 divided by 499: check
 time per query, queries per second of check time, and instantiations per query. That is the
@@ -98,12 +106,16 @@ Current numbers on TypeScript 7.1.0-beta:
 
 | File | Instantiations | Check time |
 |---|---|---|
-| q1 | ~148K (mostly loading the library) | ~0.20 s |
+| q1 | ~149K (mostly checking core's sources) | ~0.22 s |
 | q50 | ~0.65M | ~0.50 s |
-| q500 | ~4.8M | ~3.1 s |
-| mixed50 | ~0.42M | ~0.46 s |
-| maxlen (all probes pass, up to 8 KB) | ~6.6M | ~1.1 s |
-| per query (q500 − q1) | ~9.2K | ~6 ms, ~170 queries/s |
+| q500 | ~4.7M | ~2.8 s |
+| mixed50 | ~0.42M | ~0.43 s |
+| maxlen (all probes pass, up to 8 KB) | ~6.6M | ~0.95 s |
+| per query (q500 − q1) | ~9.2K | ~5 ms, ~190 queries/s |
+| q1d / q50d / q500d | ~18K / ~0.52M / ~4.6M | ~0.04 / ~0.31 / ~2.6 s |
+| q50c / q500c (type cache) | ~20K / ~0.12M | ~0.02 / ~0.13 s |
+| per cache hit (q500c − q50c) | ~230 | |
+| q500s (stale cache) | ~4.7M (1.01x q500d) | ~2.6 s |
 
 Where a typical query's cost goes (q50, instantiations above loading the library): lexing
 ~30%, parsing ~35%, binding and typing ~13%, building the row and parameter types ~17%, the

@@ -5,30 +5,80 @@
 // thresholds.json from the measured numbers x2 (check time gets a 1.5 s floor: for sub-second
 // files the fixed cost of loading lib.d.ts + core and CPU contention dominate, and instantiation
 // counts are the deterministic signal) before checking.
+//
+// Variants: the sources against core's sources (q1 … maxlen), the same files against the built
+// package with skipLibCheck, as an application compiles them (…d), with a type cache generated
+// for the file and served by the content mapper (…c), and with a cache generated for another
+// schema, every entry stale (q500s). The cached variants need `pnpm --filter @typesql/core build`.
 import { spawnSync } from "node:child_process";
-import { appendFileSync, existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const tsc = join(here, "../../node_modules/.bin/tsc");
-const names = ["q1", "q50", "q500", "mixed50", "maxlen"];
+const core = join(here, "../core");
+const dist = { extends: "./tsconfig.json", compilerOptions: { paths: {} } };
+const cached = { extends: "./tsconfig.json", compilerOptions: { paths: {} }, contentMappers: [{ package: "@typesql/core", extensions: [".typesqlcache"] }] };
+const variants = [
+  { name: "q1", files: ["src/q1.ts"] },
+  { name: "q50", files: ["src/q50.ts"] },
+  { name: "q500", files: ["src/q500.ts"] },
+  { name: "mixed50", files: ["src/mixed50.ts"] },
+  { name: "maxlen", files: ["src/maxlen.ts"] },
+  { name: "q1d", config: dist, files: ["src/q1.ts"] },
+  { name: "q50d", config: dist, files: ["src/q50.ts"] },
+  { name: "q500d", config: dist, files: ["src/q500.ts"] },
+  { name: "q50c", config: cached, files: ["src/q50.ts", "cache/q50.typesqlcache"], cache: { from: ["src/q50.ts"] } },
+  { name: "q500c", config: cached, files: ["src/q500.ts", "cache/q500.typesqlcache"], cache: { from: ["src/q500.ts"] } },
+  { name: "q500s", config: cached, files: ["src/q500.ts", "cache/q500s.typesqlcache"], cache: { from: ["cache/q500s-schema.ts"] } },
+];
+const names = variants.map((v) => v.name);
 const calibrate = process.argv.includes("--calibrate");
 const thresholdsPath = join(here, "thresholds.json");
 
-for (const name of names) {
+for (const name of ["q1", "q50", "q500", "mixed50", "maxlen"]) {
   if (!existsSync(join(here, "src", `${name}.ts`))) {
     console.error(`missing src/${name}.ts — run \`node gen.mjs\` first`);
     process.exit(2);
   }
 }
 
-function measure(name) {
+/** Generate the type caches of the cached variants with the job from the built package. */
+async function generateCaches() {
+  const job = join(core, "dist/cache/job.js");
+  if (!existsSync(job)) {
+    console.error("the cached variants need the built package: run `pnpm --filter @typesql/core build` first");
+    process.exit(2);
+  }
+  const { generate } = await import(pathToFileURL(job).href);
+  const engine = /export type CacheVersion = "([^"]*)"/.exec(readFileSync(join(core, "dist/engine/cache.d.ts"), "utf8"))[1];
+  mkdirSync(join(here, "cache"), { recursive: true });
+  // the stale variant's schema: q500's with an enum registry, which every entry depends on
+  writeFileSync(join(here, "cache/q500s-schema.ts"), readFileSync(join(here, "src/q500.ts"), "utf8").replace("interface DB {", 'interface DB {\n  $types: { mood: "happy" | "sad" };'));
+  for (const v of variants.filter((v) => v.cache)) {
+    const cacheFile = join(here, v.files[1]);
+    writeFileSync(cacheFile, "{}\n");
+    const configFile = join(here, `tsconfig.gen-${v.name}.json`);
+    writeFileSync(configFile, JSON.stringify({ ...dist, include: [], files: [...v.cache.from, "cache/__typesql_probe__.ts"] }));
+    try {
+      const r = await generate({ configFile, cacheFile, engine, isCorePath: (p) => p.startsWith(join(core, "dist") + "/") });
+      console.log(`cache for ${v.name}: ${r.computed} entries in ${(r.ms / 1000).toFixed(1)} s`);
+    } finally {
+      unlinkSync(configFile);
+    }
+  }
+}
+await generateCaches();
+
+function measure(variant) {
+  const { name } = variant;
   const configPath = join(here, `tsconfig.${name}.json`);
-  writeFileSync(configPath, JSON.stringify({ extends: "./tsconfig.json", include: [], files: [`src/${name}.ts`] }, null, 2));
+  writeFileSync(configPath, JSON.stringify({ ...(variant.config ?? { extends: "./tsconfig.json" }), include: [], files: variant.files }, null, 2));
   try {
     const started = performance.now();
-    const proc = spawnSync(tsc, ["--noEmit", "--extendedDiagnostics", "-p", configPath], { cwd: here, encoding: "utf8" });
+    const args = ["--noEmit", "--extendedDiagnostics", "-p", configPath, ...(variant.cache ? ["--runExternalCode"] : [])];
+    const proc = spawnSync(tsc, args, { cwd: here, encoding: "utf8", env: { ...process.env, TYPESQL_CACHE: "off" } });
     const wallTimeSec = (performance.now() - started) / 1000;
     const out = `${proc.stdout ?? ""}${proc.stderr ?? ""}`;
     const num = (label) => {
@@ -41,7 +91,7 @@ function measure(name) {
       code: m[4],
       message: m[5],
     }));
-    const file = `src/${name}.ts`;
+    const file = variant.files[0];
     const inFile = errors.filter((e) => e.file.replaceAll("\\", "/").endsWith(file));
     const result = {
       name,
@@ -77,7 +127,7 @@ function probes(errors) {
   return found;
 }
 
-const results = names.map(measure);
+const results = variants.map(measure);
 
 /**
  * Marginal cost of one query: q500 minus q1 (which is mostly loading lib.d.ts and core), per
@@ -95,7 +145,19 @@ function throughput() {
   };
 }
 const perQuery = throughput();
-writeFileSync(join(here, "results.json"), JSON.stringify({ measuredAt: new Date().toISOString(), throughput: perQuery, results }, null, 2) + "\n");
+
+/**
+ * Cost of a cache hit, q500c - q50c per query, and of a stale cache against no cache (q500s /
+ * q500d): a stale entry must cost what the analysis costs, plus its lookup.
+ */
+function cacheCost() {
+  const get = (n) => results.find((r) => r.name === n)?.instantiations;
+  const [c50, c500, s500, d500] = ["q50c", "q500c", "q500s", "q500d"].map(get);
+  if ([c50, c500, s500, d500].some((x) => x == null)) return null;
+  return { instantiationsPerHit: Math.round((c500 - c50) / 450), staleRatio: Number((s500 / d500).toFixed(3)) };
+}
+const cache = cacheCost();
+writeFileSync(join(here, "results.json"), JSON.stringify({ measuredAt: new Date().toISOString(), throughput: perQuery, cache, results }, null, 2) + "\n");
 
 if (calibrate) {
   const thresholds = {};
@@ -111,6 +173,8 @@ if (calibrate) {
       thresholds[r.name].minOkBytes = Math.max(0, ...r.probes.filter((p) => p.ok).map((p) => p.bytes));
     }
   }
+  // a hit must stay under 250 instantiations (the design target); a stale cache must cost what no cache does
+  if (cache) thresholds.cache = { instantiationsPerHit: Math.min(250, Math.ceil(cache.instantiationsPerHit * 1.3)), staleRatio: 1.05 };
   writeFileSync(thresholdsPath, JSON.stringify(thresholds, null, 2) + "\n");
   console.log(`wrote thresholds.json (measured x2)`);
 }
@@ -132,6 +196,7 @@ const rows = results.map((r) => {
   }
   if (problems.length) failures.push({ name: r.name, problems });
   return {
+    variant: r.name,
     file: r.file,
     instantiations: r.instantiations ?? "?",
     types: r.types ?? "?",
@@ -152,6 +217,14 @@ function table(objects) {
   for (const o of objects) console.log(line(keys.map((k) => o[k])));
 }
 table(rows);
+if (cache) {
+  console.log(`\ntype cache: ${cache.instantiationsPerHit} instantiations per hit (q500c - q50c), stale cache ${cache.staleRatio}x no cache (q500s / q500d)`);
+  const t = thresholds.cache;
+  const problems = [];
+  if (t && cache.instantiationsPerHit > t.instantiationsPerHit) problems.push(`instantiations per hit > ${t.instantiationsPerHit}`);
+  if (t && cache.staleRatio > t.staleRatio) problems.push(`stale cache costs more than ${t.staleRatio}x no cache`);
+  if (problems.length) failures.push({ name: "cache", problems });
+}
 if (perQuery) {
   console.log(`\nthroughput (q500 - q1): ${perQuery.queriesPerSec} queries/s of check time, ${perQuery.checkMsPerQuery} ms and ${perQuery.instantiationsPerQuery} instantiations per query`);
 }
@@ -159,11 +232,12 @@ if (process.env.GITHUB_STEP_SUMMARY) {
   const md = [
     "### Compile-time bench",
     "",
-    "| file | instantiations | check s | status |",
-    "|---|---|---|---|",
-    ...rows.map((r) => `| ${r.file} | ${r.instantiations} | ${r["check s"]} | ${r.status} |`),
+    "| variant | file | instantiations | check s | status |",
+    "|---|---|---|---|---|",
+    ...rows.map((r) => `| ${r.variant} | ${r.file} | ${r.instantiations} | ${r["check s"]} | ${r.status} |`),
     "",
     perQuery ? `Throughput: **${perQuery.queriesPerSec} queries/s** of check time (${perQuery.checkMsPerQuery} ms, ${perQuery.instantiationsPerQuery} instantiations per query).` : "",
+    cache ? `Type cache: ${cache.instantiationsPerHit} instantiations per hit; a stale cache costs ${cache.staleRatio}x no cache.` : "",
   ];
   appendFileSync(process.env.GITHUB_STEP_SUMMARY, md.join("\n") + "\n");
 }

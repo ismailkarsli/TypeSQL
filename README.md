@@ -135,19 +135,34 @@ in `tsc`. At runtime nothing is parsed: `sql(…)` builds `{ text, values }` and
 ### Compile time
 
 `packages/bench` type-checks generated files of distinct, realistic queries (joins, aggregates,
-parameters) with `tsc --extendedDiagnostics`. On a 4-core Xeon Platinum 8488C:
+parameters) with `tsc --extendedDiagnostics`, on a 4-core Xeon Platinum 8488C with TypeScript
+7.1.0-beta. Compiled against the built package with `skipLibCheck`, as an application is:
 
-| File | Instantiations | Check time, TS 7.1.0-beta |
+| File | Instantiations | Check time | With the [type cache](packages/docs/guide/caching.md) |
+|---|---|---|---|
+| 1 query | 18K | 0.04 s | |
+| 50 queries | 517K | 0.31 s | 20K, 0.02 s |
+| 500 queries | 4.6M | 2.6 s | 123K, 0.13 s |
+
+Each additional query costs about 9.2K instantiations, or about 5 ms of check time (about 190
+queries per second). TypeScript keeps a result only for the life of one program, so the editor
+computes it again after every edit and `tsc` on every run. The optional type cache keeps the
+results in a file the checker reads instead: a cached query costs about 230 instantiations, and an
+entry is used only while everything it was computed from is unchanged.
+
+Against TypeSQL's own sources, which `skipLibCheck` does not skip, the bench also covers the other
+call forms and long statements:
+
+| File | Instantiations | Check time |
 |---|---|---|
-| 1 query (mostly loading the library) | 148K | 0.20 s |
-| 50 queries | 647K | 0.50 s |
-| 500 queries | 4.8M | 3.1 s |
-| 50 queries with `:name` and inline parameters and a shared fragment | 424K | 0.46 s |
-| one statement each of 0.5, 1, 2, 4 and 8 KB | 6.6M | 1.1 s |
+| 1 query (mostly checking TypeSQL's sources) | 149K | 0.22 s |
+| 500 queries | 4.7M | 2.8 s |
+| 50 queries with `:name` and inline parameters and a shared fragment | 422K | 0.43 s |
+| one statement each of 0.5, 1, 2, 4 and 8 KB | 6.6M | 0.95 s |
 
-Each additional query costs about 9.2K instantiations, or about 6 ms of check time (about 170
-queries per second). TypeSQL is built for the native compiler and its recursion budgets. CI fails a change that takes a bench file
-over its instantiation or check-time budget (`packages/bench/thresholds.json`).
+TypeSQL is built for the native compiler and its recursion budgets. CI fails a change that takes
+a bench file over its instantiation or check-time budget, or a cache hit over 250 instantiations
+(`packages/bench/thresholds.json`).
 
 ### Runtime
 
@@ -164,7 +179,7 @@ The text goes to the driver as written, and `execute*` returns the driver's rows
 with top-level keys renamed, with `rowKeys: "camelCase"`). `@typesql/core` has no dependencies
 and is 10 KB minified, 4.0 KB gzipped.
 
-To reproduce the compile-time numbers: `node packages/bench/gen.mjs && node packages/bench/run.mjs`.
+To reproduce the compile-time numbers: `node packages/bench/gen.mjs && pnpm --filter @typesql/core build && node packages/bench/run.mjs`.
 
 ## Toolchain and limits
 

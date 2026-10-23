@@ -22,8 +22,26 @@ ParseProgram<Toks> → Stmt engine/parser   (recursive descent + Pratt)
 ProjectStmt<Stmt, DB, Outer, Ctes> → Cols | null   engine/project (+ binder, typer)
 ParamsOfStmt<Stmt, DB> → ParamMap          engine/typer/params
 Analyze<DB, Q> → { kind, cols, params, max, stmt } | SqlError      engine/infer
-RowOf / ParamsOf / Validate                 public projections of Analyze
+Analysis<DB, Q> → Analyze without stmt, or a type cache entry      engine/infer, engine/cache
+RowOf / ParamsOf / Validate                 public projections of Analysis
 ```
+
+## Type cache
+
+`engine/cache.ts` holds the type-level side of the [type cache](../guide/caching), whose
+content mapper and job live in `src/cache/`. Three lookups test `keyof QueryCacheKeys` (or
+`DdlCacheKeys`) first, so a program without a cache pays one conditional each:
+
+- `Analysis<DB, Q>` (what the projections read; `Analyze` itself is never cached),
+- the plain `sql()` call (`GateCallCheck`, `BoxCallArgs`, `CallRet` in `create-sql.ts`),
+- `ApplyDdl<DB, Q>`, whose cached result is the step's effect applied to `DB`.
+
+An entry is used only when its dependencies compare equal (`Same`): mutual assignability of
+*expanded* copies, because relating two instantiations of one alias goes by its measured
+variances, and `Col`'s flags only appear in conditionals. Freshness is decided per group of
+entries (`GroupStale`, once per program), so a lookup is an indexed access plus a few
+conditionals. Run `pnpm cache-version` after changing anything under `src/` (except `cache/`
+and `runtime/`): an entry computed by other sources is never used.
 
 ## Result conventions
 
@@ -123,6 +141,9 @@ RowOf / ParamsOf / Validate                 public projections of Analyze
 
 - `pnpm test:types` runs vitest in typecheck mode over `test/types/*.test-d.ts`.
   Use `expectTypeOf<Row<"…">>().toEqualTypeOf<{…}>()` and `// @ts-expect-error`.
+- The `core-types-cached` project runs the same files again against a type cache generated from
+  them: an engine change that the cache would serve differently fails there. `test/cache/`
+  has the cache's own tests.
 - Quick iteration: `./node_modules/.bin/tsc --noEmit --strict --target es2024
   --moduleResolution bundler --module esnext --skipLibCheck <file>` on a scratch file
   under `scratchpad/`. Add `--extendedDiagnostics` to see instantiation counts.

@@ -69,6 +69,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: node packages/bench/gen.mjs
+      # the cached variants run the content mapper and job from the built package
+      - run: pnpm --filter @typesql/core build
       - run: node packages/bench/run.mjs
       - uses: actions/upload-artifact@v7
         if: always()
