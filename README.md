@@ -205,6 +205,7 @@ pnpm install
 pnpm typecheck         # tsc per package
 pnpm test              # vitest: runtime + type tests; conformance runs against docker postgres:17 when available
 pnpm build && pnpm smoke:dist   # import the built packages with plain Node
+pnpm pg-regress:setup && pnpm test:pg-regress   # the parser against PostgreSQL 18's regression tests
 pnpm docs:dev                   # the documentation site (packages/docs)
 node packages/bench/gen.mjs && node packages/bench/run.mjs   # compile-time budget (thresholds.json)
 node packages/bench/runtime.mjs                               # cost of building a query, after pnpm build

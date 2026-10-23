@@ -1,0 +1,258 @@
+#!/usr/bin/env node
+// Runs the type-level parser (`ParseProgram<Lex<sql>>`) over every statement of PostgreSQL's
+// regression tests in vendor/postgres and compares the outcome with what Postgres did, read
+// from the tests' expected output. Disagreements known today are listed in baseline.json; the
+// run fails on a new one and on a listed one that went away.
+//
+//   node run.mjs [--update] [test …]
+//
+// `--update` rewrites baseline.json (only the named tests' entries when tests are named).
+// See packages/docs/internals/development.md.
+import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, join, relative } from "node:path";
+import { fileURLToPath } from "node:url";
+import { classify } from "./psql.mjs";
+
+const here = dirname(fileURLToPath(import.meta.url));
+const root = join(here, "../../../..");
+const vendor = join(root, "vendor/postgres");
+const regress = join(vendor, "src/test/regress");
+const engine = join(root, "packages/core/src/engine");
+const cache = join(root, "node_modules/.cache/typesql-pg-regress");
+const tsc = join(root, "node_modules/.bin/tsc");
+const baselinePath = join(here, "baseline.json");
+
+const args = process.argv.slice(2);
+const update = args.includes("--update");
+const only = args.filter((a) => !a.startsWith("--"));
+
+// ───────────────────────────── the official tests ─────────────────────────────
+
+if (!existsSync(join(regress, "sql"))) {
+  fail("vendor/postgres is not checked out. Run `pnpm pg-regress:setup`.");
+}
+const dirty = git(vendor, "status", "--porcelain");
+if (dirty) {
+  fail(`vendor/postgres has local changes:\n${dirty}\n\nThe official tests are the gold source and must never be modified. Restore them with \`git -C vendor/postgres checkout -- .\` and \`git -C vendor/postgres clean -fd\`.`);
+}
+const commit = git(vendor, "rev-parse", "HEAD");
+const version = /^\s*version:\s*'([^']+)'/m.exec(readFileSync(join(vendor, "meson.build"), "utf8"))?.[1] ?? "unknown";
+
+const tests = readdirSync(join(regress, "sql"))
+  .filter((f) => f.endsWith(".sql"))
+  .map((f) => f.slice(0, -4))
+  .filter((t) => only.length === 0 || only.includes(t))
+  .sort();
+const unknownNames = only.filter((t) => !tests.includes(t));
+if (unknownNames.length) fail(`no such test: ${unknownNames.join(", ")}`);
+
+// ───────────────────────────── generate and check ─────────────────────────────
+
+/** Result of a statement the parser skips to the next `;` (utility statements without a schema effect). */
+const SKIPPED = "<skipped>";
+const HEADER = [
+  `import type { Lex } from "${relative(cache, join(engine, "lexer/lex.js"))}";`,
+  `import type { Toks } from "${relative(cache, join(engine, "lexer/tokens.js"))}";`,
+  `import type { ParseProgram } from "${relative(cache, join(engine, "parser/stmt.js"))}";`,
+  `import type { SqlError } from "${relative(cache, join(engine, "errors.js"))}";`,
+  `/** "ok", "${SKIPPED}" for a statement the parser skips without validating it, or the lexer's or parser's error message. */`,
+  `type R<Q extends string> = Lex<Q> extends infer T`,
+  `  ? T extends SqlError<infer M, any> ? M`,
+  `  : T extends Toks ? (ParseProgram<T> extends infer S ? (S extends SqlError<infer M, any> ? M : S extends { t: "noop" } ? "${SKIPPED}" : "ok") : never)`,
+  `  : "the lexer returned neither tokens nor an error"`,
+  `  : never;`,
+];
+
+rmSync(cache, { recursive: true, force: true });
+mkdirSync(cache, { recursive: true });
+writeFileSync(join(cache, "tsconfig.json"), JSON.stringify({
+  extends: relative(cache, join(root, "tsconfig.base.json")),
+  compilerOptions: { noEmit: true, declaration: false, declarationMap: false, sourceMap: false, noErrorTruncation: true, types: [] },
+  include: ["*.ts"],
+}, null, 2));
+
+/** @type {{ test: string, stmt: import("./psql.mjs").Statement, ours?: string, crash?: string }[]} */
+const checked = [];
+/** `${test}.ts:${line}` → entry in `checked` */
+const byLine = new Map();
+let skippedVars = 0;
+let skippedStrings = 0;
+for (const test of tests) {
+  const outFile = join(regress, "expected", `${test}.out`);
+  if (!existsSync(outFile)) fail(`no expected output for ${test}`);
+  const stmts = classify(readFileSync(join(regress, "sql", `${test}.sql`), "utf8"), readFileSync(outFile, "utf8"));
+  const lines = [...HEADER];
+  for (const stmt of stmts) {
+    if (stmt.psqlVars) { skippedVars++; continue; }
+    if (stmt.nonstandardStrings) { skippedStrings++; continue; }
+    const entry = { test, stmt };
+    checked.push(entry);
+    lines.push(`export const s${checked.length}: "ok" = null! as R<${JSON.stringify(stmt.sql)}>; // line ${stmt.line}`);
+    byLine.set(`${test}.ts:${lines.length}`, entry);
+  }
+  writeFileSync(join(cache, `${test}.ts`), `${lines.join("\n")}\n`);
+}
+
+const started = performance.now();
+const proc = spawnSync(tsc, ["-p", join(cache, "tsconfig.json"), "--pretty", "false"], { encoding: "utf8", maxBuffer: 1 << 30 });
+const seconds = (performance.now() - started) / 1000;
+if (proc.error) throw proc.error;
+const output = `${proc.stdout}${proc.stderr}`;
+// A diagnostic is one line; elaborations of it are indented lines that follow.
+for (const m of output.matchAll(/^(.*?)\((\d+),\d+\): error (TS\d+): (.*)$/gm)) {
+  const entry = byLine.get(`${m[1].replace(/^.*[\\/]/, "")}:${m[2]}`);
+  if (!entry) fail(`unexpected diagnostic outside the generated statements:\n${m[0]}\n\n${output.slice(0, 4000)}`);
+  const type = m[4].match(/^Type '(.*)' is not assignable to type '"ok"'\.$/)?.[1];
+  if (m[3] === "TS2322" && type !== undefined) entry.ours ??= unquote(type);
+  else entry.crash ??= `${m[3]}: ${m[4]}`;
+}
+if (proc.status !== 0 && !checked.some((e) => e.ours !== undefined || e.crash !== undefined)) {
+  fail(`tsc failed without diagnostics on the generated statements:\n${output.slice(0, 4000)}`);
+}
+
+// ───────────────────────────── compare ─────────────────────────────
+
+/**
+ * - `rejects`: Postgres parsed the statement (it ran, or failed after parsing); we report an
+ *   error. When Postgres failed after parsing and ours is a semantic error too (not a syntax
+ *   error, an unsupported feature or a lexical error), both reject it: agreement.
+ * - `accepts`: Postgres reported a syntax error; we parse the statement. A statement the parser
+ *   skips without validating (`SKIPPED`) is not counted.
+ * - `crash`: the compiler gave up (e.g. TS2589, instantiation too deep), whatever Postgres did.
+ */
+function kindOf(e) {
+  if (e.crash) return "crash";
+  if (e.stmt.pg === "unknown") return null;
+  if (e.stmt.pg === "syntax-error") return e.ours === undefined ? "accepts" : null;
+  if (e.ours === undefined || e.ours === SKIPPED) return null;
+  if (e.stmt.pg === "error" && isSemantic(e.ours)) return null;
+  return "rejects";
+}
+const isSemantic = (message) =>
+  !/^syntax error|^unterminated|^unexpected character|not supported/.test(message);
+
+const hashOf = (sql) => createHash("sha256").update(sql).digest("hex").slice(0, 16);
+const preview = (sql) => {
+  const flat = sql.replace(/\s+/g, " ");
+  return flat.length > 120 ? `${flat.slice(0, 117)}...` : flat;
+};
+
+const current = {};
+const tally = { statements: checked.length + skippedVars + skippedStrings, psqlVariables: skippedVars, nonstandardStrings: skippedStrings, pgUnknown: 0, agree: 0, skipped: 0, rejects: 0, accepts: 0, crash: 0 };
+for (const e of checked) {
+  const kind = kindOf(e);
+  if (e.ours === SKIPPED) tally.skipped++;
+  if (e.stmt.pg === "unknown" && kind === null) tally.pgUnknown++;
+  else if (kind === null) tally.agree++;
+  else tally[kind]++;
+  if (!kind) continue;
+  (current[e.test] ??= []).push({
+    line: e.stmt.line,
+    kind,
+    hash: hashOf(e.stmt.sql),
+    pg: e.stmt.pgError ?? e.stmt.pg,
+    parser: e.crash ?? e.ours ?? "accepted",
+    sql: preview(e.stmt.sql),
+  });
+}
+
+const baseline = existsSync(baselinePath) ? JSON.parse(readFileSync(baselinePath, "utf8")) : null;
+const keyOf = (test, m) => `${test} ${m.kind} ${m.hash}`;
+
+/** Multiset difference a − b over mismatch keys. */
+function minus(a, b) {
+  const counts = new Map();
+  for (const [test, list] of Object.entries(b)) for (const m of list) counts.set(keyOf(test, m), (counts.get(keyOf(test, m)) ?? 0) + 1);
+  const left = [];
+  for (const [test, list] of Object.entries(a)) {
+    for (const m of list) {
+      const k = keyOf(test, m);
+      if (counts.get(k)) counts.set(k, counts.get(k) - 1);
+      else left.push({ test, ...m });
+    }
+  }
+  return left;
+}
+
+const scoped = (mismatches) => Object.fromEntries(Object.entries(mismatches ?? {}).filter(([t]) => tests.includes(t)));
+const expected = scoped(baseline?.mismatches);
+const added = minus(current, expected);
+const fixed = minus(expected, current);
+
+const summary = [
+  `PostgreSQL ${version} regression tests (${commit.slice(0, 10)}), ${tests.length} files, tsc ${seconds.toFixed(1)} s`,
+  "",
+  `| Statements | Agree | Parser rejects | Parser accepts | Compiler crash | Postgres outcome unknown | Not checked: psql variables | Not checked: standard_conforming_strings off |`,
+  `|---|---|---|---|---|---|---|---|`,
+  `| ${tally.statements} | ${tally.agree} | ${tally.rejects} | ${tally.accepts} | ${tally.crash} | ${tally.pgUnknown} | ${tally.psqlVariables} | ${tally.nonstandardStrings} |`,
+  "",
+  `${tally.skipped} statements are utility statements the parser skips to the next \`;\` without validating them (counted as agreeing unless Postgres reports a syntax error).`,
+].join("\n");
+console.log(summary);
+if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `## PostgreSQL regression tests\n\n${summary}\n`);
+
+if (update) {
+  const mismatches = only.length ? { ...baseline?.mismatches, ...Object.fromEntries(tests.map((t) => [t, undefined])) } : {};
+  Object.assign(mismatches, current);
+  const sorted = Object.fromEntries(Object.keys(mismatches).filter((t) => mismatches[t]?.length).sort().map((t) => [t, mismatches[t]]));
+  writeBaseline({ postgres: version, commit, mismatches: sorted });
+  console.log(`\nWrote ${relative(root, baselinePath)}: ${added.length} added, ${fixed.length} removed.`);
+  process.exit(0);
+}
+
+let failed = false;
+if (!baseline) {
+  console.error(`\nNo baseline. Run \`pnpm test:pg-regress --update\` to create ${relative(root, baselinePath)}.`);
+  process.exit(1);
+}
+if (baseline.commit !== commit) {
+  console.error(`\nbaseline.json is for PostgreSQL ${baseline.postgres} (${baseline.commit.slice(0, 10)}), vendor/postgres is ${version} (${commit.slice(0, 10)}). Run \`pnpm test:pg-regress --update\` and review the diff.`);
+  failed = true;
+}
+const show = (list) => {
+  for (const m of list.slice(0, 50)) console.error(`  ${m.test}.sql:${m.line}  [${m.kind}]  ${m.sql}\n      postgres: ${m.pg}\n      parser:   ${m.parser}`);
+  if (list.length > 50) console.error(`  … and ${list.length - 50} more`);
+};
+if (added.length) {
+  failed = true;
+  console.error(`\n${added.length} new disagreement(s) with Postgres:`);
+  show(added);
+}
+if (fixed.length) {
+  failed = true;
+  console.error(`\n${fixed.length} disagreement(s) in baseline.json no longer occur (nice). Run \`pnpm test:pg-regress --update\` to remove them:`);
+  show(fixed);
+}
+if (failed) process.exit(1);
+console.log("\nMatches baseline.json.");
+
+// ───────────────────────────── helpers ─────────────────────────────
+
+function git(cwd, ...argv) {
+  const r = spawnSync("git", ["-C", cwd, ...argv], { encoding: "utf8" });
+  if (r.status !== 0) fail(`git ${argv.join(" ")} failed in ${relative(root, cwd)}:\n${r.stderr}`);
+  return r.stdout.trim();
+}
+
+/** One mismatch per line, so baseline diffs read well. */
+function writeBaseline(b) {
+  const tests = Object.entries(b.mismatches).map(([t, list]) => `    ${JSON.stringify(t)}: [\n${list.map((m) => `      ${JSON.stringify(m)}`).join(",\n")}\n    ]`);
+  const text = `{\n  "postgres": ${JSON.stringify(b.postgres)},\n  "commit": ${JSON.stringify(b.commit)},\n  "mismatches": {\n${tests.join(",\n")}\n  }\n}\n`;
+  writeFileSync(baselinePath, text);
+}
+
+/** The text of a string literal type as tsc prints it; other types as printed. */
+function unquote(type) {
+  try {
+    return /^".*"$/.test(type) ? JSON.parse(type) : type;
+  } catch {
+    return type;
+  }
+}
+
+function fail(message) {
+  console.error(message);
+  process.exit(1);
+}

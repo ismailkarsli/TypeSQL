@@ -9,6 +9,8 @@ pnpm install
 pnpm typecheck                 # tsc per package, including the docs and package examples
 pnpm test                      # vitest: runtime tests, type tests, conformance against Postgres
 pnpm build && pnpm smoke:dist  # build the packages, then import the built output with plain Node
+pnpm pg-regress:setup          # check out PostgreSQL's regression tests (vendor/postgres)
+pnpm test:pg-regress           # the parser against them; see PostgreSQL regression tests
 pnpm playground [--check]      # regenerate (or check) the TypeScript Playground links
 pnpm cache-version [--check]   # update (or check) CacheVersion after changing core's types
 pnpm docs:dev                  # this site, with hot reload
@@ -72,6 +74,71 @@ TYPESQL_PG_URL=postgres://postgres:typesql@localhost:5432/postgres ./node_module
 To add a case: append to `corpus` (keep `as const` so `sql` stays a literal type), add any
 new table to both `schema` and `ConformanceDB`, and give `expectTypes` the `typeof` of the
 first returned row — use `ORDER BY`/`LIMIT` so that row is deterministic.
+
+## PostgreSQL regression tests
+
+`vendor/postgres` is a git submodule of [PostgreSQL](https://github.com/postgres/postgres)
+pinned to a release tag (`REL_18_6`). The parser is tested against its regression suite,
+`src/test/regress/sql/*.sql`, with `src/test/regress/expected/*.out` as the record of what
+Postgres did with each statement.
+
+**These files are the gold source. Never modify, reformat, add or delete anything under
+`vendor/postgres`**, not even to skip a statement or work around a failure. The runner refuses to
+run when the submodule has local changes. Disagreements are recorded on our side, in
+`packages/core/test/pg-regress/baseline.json`.
+
+```sh
+pnpm pg-regress:setup             # sparse, shallow checkout of the pinned commit (~20 MB)
+pnpm test:pg-regress              # all 233 files, ~45 s and ~2.7 GB of memory
+pnpm test:pg-regress join with    # only these files
+pnpm test:pg-regress --update     # rewrite baseline.json (only the named files' entries, if named)
+```
+
+A plain `git submodule update --init vendor/postgres` works too; it checks out the whole
+PostgreSQL tree. CI runs the suite as its own job, `pg-regress`; `pnpm test` does not run it.
+
+How a run works (`packages/core/test/pg-regress/`):
+
+1. `psql.mjs` splits each `.sql` file into the statements psql sends, following psql's lexer
+   (`src/fe_utils/psqlscan.l`): quotes and dollar quotes, nested comments, parentheses,
+   `BEGIN ATOMIC` bodies, `\;`, `\g` and friends, `\r`, COPY FROM STDIN data and
+   `standard_conforming_strings`. Two kinds of statements are not checked: those that use psql
+   variables (`:name`), whose text depends on a value we don't have, and those run with
+   `standard_conforming_strings` off that contain a backslash, whose string literals mean
+   something else than the parser (which follows the default) reads.
+2. It finds each statement's outcome in the expected output (`psql -a` echoes the input, so the
+   result of a statement is what follows its last line): `ok`, `error` (Postgres parsed it, then
+   failed), `syntax-error` (`ERROR:  syntax error at or near …` / `at end of input` without a
+   `CONTEXT` line, and with the caret outside string literals: a syntax error in a function body,
+   which Postgres parses while running CREATE FUNCTION or DO, is an `error`), or `unknown` when
+   it cannot tell.
+3. `run.mjs` writes one `.ts` file per test to `node_modules/.cache/typesql-pg-regress/`, each
+   statement checked as `ParseProgram<Lex<sql>>`, runs `tsc` once over all of them and reads the
+   result of every statement from the diagnostics.
+
+A disagreement is one of:
+
+- `rejects`: Postgres parsed the statement, our parser returns an error. When Postgres failed
+  after parsing and our error is a semantic one too (not a syntax error, an unsupported feature
+  or a lexical error), both reject the statement and they agree.
+- `accepts`: Postgres reported a syntax error, our parser accepts the statement. Utility
+  statements the parser skips to the next `;` without validating them (CREATE INDEX, GRANT,
+  SET, …; the summary counts them) are not counted.
+- `crash`: the compiler gave up on the statement (e.g. TS2589), whatever Postgres did.
+
+`baseline.json` lists every current disagreement by file, kind and a hash of the statement text,
+with its line, a preview, Postgres's error and ours for reading. The run fails when a
+disagreement is not listed (a regression: fix the parser) and when a listed one no longer occurs
+(an improvement: run `--update` so the list only shrinks). It also fails when the baseline was
+written for a different commit of `vendor/postgres`.
+
+To move to a new PostgreSQL release:
+
+```sh
+pnpm pg-regress:setup REL_18_7    # fetch and check out the tag
+pnpm test:pg-regress --update     # review the baseline diff: new statements, new disagreements
+git add vendor/postgres packages/core/test/pg-regress/baseline.json
+```
 
 ## Compile-time bench
 

@@ -11,6 +11,8 @@
     "typecheck": "pnpm -r --filter './packages/*' run typecheck",
     "test": "vitest run",
     "test:types": "vitest run --typecheck.only",
+    "test:pg-regress": "node packages/core/test/pg-regress/run.mjs",
+    "pg-regress:setup": "node packages/core/test/pg-regress/setup.mjs",
     "bench": "pnpm --filter @typesql/bench run bench",
     "smoke:dist": "node scripts/smoke-dist.mjs",
     "check:intents": "node scripts/check-intents.mjs",
