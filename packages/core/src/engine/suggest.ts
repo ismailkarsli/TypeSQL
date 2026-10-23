@@ -48,12 +48,12 @@ type RelNames<DB> = {
 }[keyof DB & string];
 type NsRelNames<NS> = { [K in keyof NS & string]: IsRelation<NS[K]> extends true ? K : never }[keyof NS & string];
 
-type IsRelation<X> =
+export type IsRelation<X> =
   X extends { readonly $view: unknown } ? true
   : X extends object ? (X[keyof X] extends { readonly type: string } ? true : false)
   : false;
 
-type RelCols<X> = X extends { readonly $view: infer C } ? keyof C & string : keyof X & string;
+export type RelCols<X> = X extends { readonly $view: infer C } ? keyof C & string : keyof X & string;
 
 /** Column names of the given relations (looked up at top level and in every namespace). */
 type ColumnsOf<DB, Rels> = {

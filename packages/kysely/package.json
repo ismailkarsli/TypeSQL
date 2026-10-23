@@ -42,7 +42,7 @@
     "@types/pg": "^8.23.1",
     "kysely": "^0.29.6",
     "pg": "^8.23.1",
-    "typescript": "7.0.2",
+    "typescript": "7.1.0-beta",
     "vitest": "^5.0.4"
   },
   "homepage": "https://typesql.karsli.net/adapters/kysely",

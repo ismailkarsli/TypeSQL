@@ -14,6 +14,11 @@ pnpm check:intents
 - Use `patch` for fixes. Ask before `minor`, `major` or `none`.
 - Write the summary like the existing `.changeset/*.md` files.
 
+## Type cache version
+
+After changing `packages/core/src` (except `src/cache/` and `src/runtime/`), run
+`pnpm cache-version` and commit the updated `CacheVersion`. CI checks it.
+
 ## Releases
 
 Don't release, publish, tag, or edit `.changeset/ledger.yaml` or `.changeset/changelogs/`

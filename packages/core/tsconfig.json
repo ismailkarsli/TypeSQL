@@ -12,6 +12,7 @@
     "test"
   ],
   "exclude": [
-    "test/errors/fixtures"
+    "test/errors/fixtures",
+    "test/cache"
   ]
 }

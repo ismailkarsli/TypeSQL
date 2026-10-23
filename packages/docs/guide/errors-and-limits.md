@@ -57,14 +57,14 @@ TypeSQL does not support or cannot see at compile time (dynamic fragments). It a
 ## Limits
 
 TypeSQL runs inside the TypeScript compiler, so it works within the compiler's budgets.
-Measured on TypeScript 7.0.2:
+Measured on TypeScript 7.1.0-beta:
 
 | Workload | Cost |
 |---|---|
-| a typical query (join, `GROUP BY`, two parameters) | ~30K type instantiations |
-| 100 simple queries in one file | ~0.7 s check time |
-| 100 larger queries in one file | ~2 s check time |
-| one 8 KB statement | infers, ~1.5 s |
+| a typical query (join, `GROUP BY`, two parameters) | ~28K type instantiations |
+| 100 simple queries in one file | ~0.6 s check time |
+| 100 larger queries in one file (joins, CTEs, aggregates) | ~1.2 s check time |
+| one 8 KB statement | infers, ~0.7 s |
 
 - Statements can be up to 4096 tokens.
 - Chains of about 100 `||` or `+` operators hit TypeScript's depth limit. `AND`/`OR` chains

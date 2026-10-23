@@ -13,6 +13,7 @@ import type { ApplyDdlAll } from "./ddl/apply.js";
 import type { NamedParams, RewriteNamed } from "./named.js";
 import type { WithHint } from "./suggest.js";
 import type { JsonValue } from "./inline.js";
+import type { CachedAnalysis, CachedDdl, DdlCacheKeys, QueryCacheKeys } from "./cache.js";
 
 /**
  * Full pipeline for one statement. Cached by TypeScript per `(DB, Q)`, so the three
@@ -47,6 +48,13 @@ export type Analyze<DB, Q extends string> =
         : never
       : T0
     : never;
+
+/**
+ * `Analyze` without `stmt`, from the type cache when it has a fresh entry for `(DB, Q)` (see
+ * cache.ts). What the projections below read; `Analyze` itself is never cached.
+ */
+export type Analysis<DB, Q extends string> =
+  [Q] extends [keyof QueryCacheKeys] ? (CachedAnalysis<DB, Q> extends infer C ? ([C] extends [never] ? Analyze<DB, Q> : C) : never) : Analyze<DB, Q>;
 
 type ParamsOfStmt<S extends Stmt, DB> =
   S extends SelectStmt ? ParamsOfSelect<S, DB, [], {}, never>
@@ -93,7 +101,7 @@ type IsTok<T extends Toks, I extends number, Name extends string> = T[I] extends
 
 /** Row type of a statement (`never` for DML without RETURNING and for DDL). */
 export type RowOf<DB, TM, Q extends string> =
-  Analyze<DB, Q> extends { readonly cols: infer C }
+  Analysis<DB, Q> extends { readonly cols: infer C }
     ? C extends Cols ? BuildRow<ColsToMap<C>, TM, DB> : never
     : never;
 
@@ -102,7 +110,7 @@ export type BuildRow<M extends { readonly [k: string]: { readonly type: string; 
 
 /** Parameter tuple of a statement. Untyped params are `unknown`. */
 export type ParamsOf<DB, TM, Q extends string> =
-  Analyze<DB, Q> extends { readonly params: infer P extends ParamMap; readonly max: infer N extends number }
+  Analysis<DB, Q> extends { readonly params: infer P extends ParamMap; readonly max: infer N extends number }
     ? BuildParams<P, N, TM, DB, 1, []>
     : [];
 
@@ -133,7 +141,7 @@ type Inc<I extends number> = Nx<I>;
  * no raw array, but a `sql.json(value)` (sent as JSON text by every driver) or any other value.
  */
 export type ArgsOf<DB, TM, Q extends string> =
-  Analyze<DB, Q> extends { readonly params: infer P extends ParamMap }
+  Analysis<DB, Q> extends { readonly params: infer P extends ParamMap }
     ? [Extract<P[keyof P], { readonly type: "json" | "jsonb" }>] extends [never] ? ParamsOf<DB, TM, Q> : JsonArgs<ParamsOf<DB, TM, Q>, P>
     : [];
 type JsonArgs<Ps, P> = { [I in keyof Ps]: I extends `${infer N extends number}` ? (Nx<N> extends keyof P ? JsonArg<Ps[I], P[Nx<N>]> : Ps[I]) : Ps[I] };
@@ -157,7 +165,7 @@ interface ArraysNeedSqlJson { readonly "pass a JSON array as sql.json(value)": n
 
 /** Named parameter names of a statement in order of first appearance (`[]` when positional). */
 export type NamesOf<DB, Q extends string> =
-  Analyze<DB, Q> extends { readonly names: infer N extends readonly string[] } ? N : [];
+  Analysis<DB, Q> extends { readonly names: infer N extends readonly string[] } ? N : [];
 
 /**
  * Argument list a call site must pass after the query: a single object for `:name`
@@ -174,15 +182,17 @@ export type ParamsArgs<DB, TM, Q extends string> =
  * comes first so it survives TypeScript's truncation of long types in diagnostics.
  */
 export type Validate<DB, Q extends string> =
-  Analyze<DB, Q> extends infer R ? (R extends AnyErr ? R : Q) : never;
+  Analysis<DB, Q> extends infer R ? (R extends AnyErr ? R : Q) : never;
 
 /** Kind of statement: "select" | "insert" | ... */
-export type KindOf<DB, Q extends string> = Analyze<DB, Q> extends { readonly kind: infer K } ? K : never;
+export type KindOf<DB, Q extends string> = Analysis<DB, Q> extends { readonly kind: infer K } ? K : never;
 
 /**
  * Apply a DDL script (one or more `;`-separated statements) to a schema: the new schema,
- * or `SqlError<message, tokenIndex>`. See engine/ddl/apply.ts.
+ * or `SqlError<message, tokenIndex>`. See engine/ddl/apply.ts. From the type cache (`DdlCache`)
+ * when it has a fresh entry for the step.
  */
-export type ApplyDdl<DB, Q extends string> = ApplyDdlAll<DB, Q>;
+export type ApplyDdl<DB, Q extends string> =
+  [Q] extends [keyof DdlCacheKeys] ? (CachedDdl<DB, Q> extends infer C ? ([C] extends [never] ? ApplyDdlAll<DB, Q> : C) : never) : ApplyDdlAll<DB, Q>;
 
 export type { AnyErr, ErrAt, ErrMsg, SqlError };

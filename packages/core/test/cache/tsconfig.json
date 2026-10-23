@@ -1,0 +1,5 @@
+{
+  "extends": "../../../../tsconfig.base.json",
+  "compilerOptions": { "noEmit": true, "types": [], "paths": { "@typesql/core": ["../../src/index.ts"] } },
+  "include": ["hooks", "stale/*.ts", "stale/.generated/cache.ts"]
+}

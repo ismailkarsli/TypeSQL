@@ -65,7 +65,16 @@ export type NamedParams<Names extends readonly string[], Params extends readonly
  * are copied verbatim (as the runtime does); `::` and `:=` are not parameters.
  */
 export type RewriteNamedStr<Text extends string> =
-  Text extends `${string}:${string}` ? NamedLoop<Text, "", []> : [Text, []];
+  MayHaveName<Text> extends true ? NamedLoop<Text, "", []> : [Text, []];
+
+/**
+ * `true` when some `:` (not part of `::`) is followed by a name start, ignoring quotes and
+ * comments: a cheap pre-check so that texts whose only colons are `::` casts skip the rewrite.
+ */
+type MayHaveName<S extends string> =
+  S extends `${string}:${infer Rest}`
+    ? Rest extends `${infer C}${infer R2}` ? (C extends ":" ? MayHaveName<R2> : C extends NStart ? true : MayHaveName<Rest>) : false
+    : false;
 
 type NamedLoop<T extends string, Acc extends string, Names extends string[]> =
   SplitFirst<T> extends [infer Code extends string, infer O extends string, infer Rest extends string]
@@ -82,13 +91,14 @@ type NChar = NStart | "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9";
 /** Rewrite `:name` occurrences in a quote-free code segment. */
 type RewriteCode<S extends string, Acc extends string, Names extends string[]> =
   S extends `${infer Pre}:${infer Rest}`
-    ? Rest extends `:${infer Rest2}` ? RewriteCode<Rest2, `${Acc}${Pre}::`, Names>
-    : Rest extends `=${infer Rest2}` ? RewriteCode<Rest2, `${Acc}${Pre}:=`, Names>
-    : Rest extends `${infer C extends NStart}${infer Rest2}`
-      ? TakeName<Rest2, C> extends [infer Name extends string, infer Rest3 extends string]
-        ? RewriteCode<Rest3, `${Acc}${Pre}$${IndexOf<Names, Name>}`, Name extends Names[number] ? Names : [...Names, Name]>
-        : never
-      : RewriteCode<Rest, `${Acc}${Pre}:`, Names>
+    ? Rest extends `${infer C}${infer Rest2}`
+      ? C extends ":" | "=" ? RewriteCode<Rest2, `${Acc}${Pre}:${C}`, Names>
+      : C extends NStart
+        ? TakeName<Rest2, C> extends [infer Name extends string, infer Rest3 extends string]
+          ? RewriteCode<Rest3, `${Acc}${Pre}$${IndexOf<Names, Name>}`, Name extends Names[number] ? Names : [...Names, Name]>
+          : never
+        : RewriteCode<Rest, `${Acc}${Pre}:`, Names>
+      : [`${Acc}${S}`, Names]
     : [`${Acc}${S}`, Names];
 type TakeName<S extends string, Acc extends string> =
   S extends `${infer C}${infer R}` ? (C extends NChar ? TakeName<R, `${Acc}${C}`> : [Acc, S]) : [Acc, S];
