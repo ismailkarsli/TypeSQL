@@ -110,7 +110,7 @@ test("unknown names get a did-you-mean hint", () => {
   expectTypeOf<Validate<DB, "SELECT emial FROM users">>().toEqualTypeOf<SqlError<'column "emial" does not exist. Perhaps you meant the column "email"?', 1>>();
   expectTypeOf<Validate<DB, "SELECT p.titel FROM posts p">>().toEqualTypeOf<SqlError<'column p.titel does not exist. Perhaps you meant the column "title"?', 3>>();
   expectTypeOf<Validate<DB, "SELECT 1 FROM post">>().toEqualTypeOf<SqlError<'relation "post" does not exist. Perhaps you meant the relation "posts"?', 3>>();
-  // `user` is a reserved word: a syntax error, as in Postgres
-  expectTypeOf<Validate<DB, "SELECT 1 FROM user">>().toEqualTypeOf<SqlError<"syntax error: expected table name, subquery or function at or near user", 3>>();
+  // `order` is a reserved word: a syntax error, as in Postgres (`FROM user` is the function `user`)
+  expectTypeOf<Validate<DB, "SELECT 1 FROM order">>().toEqualTypeOf<SqlError<"syntax error: expected table name, subquery or function at or near order", 3>>();
   expectTypeOf<Validate<DB, "SELECT zzz FROM users">>().toEqualTypeOf<SqlError<'column "zzz" does not exist', 1>>();
 });

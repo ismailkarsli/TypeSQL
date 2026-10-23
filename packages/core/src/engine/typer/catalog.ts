@@ -239,6 +239,10 @@ export interface FunctionCatalog {
   parse_ident: [Sig<["anystring"], "text[]">, Sig<["anystring", "bool"], "text[]">];
   unistr: Sig<["anystring"], "text">;
   normalize: [Sig<["anystring"], "text">, Sig<["anystring", "anystring"], "text">];
+  /** `e IS [NFC | NFD | NFKC | NFKD] NORMALIZED` */
+  is_normalized: [Sig<["anystring"], "bool">, Sig<["anystring", "anystring"], "bool">];
+  /** `COLLATION FOR (e)`: the collation's name (Postgres errors for a type without collations). */
+  pg_collation_for: Sig<["any"], "text", NN>;
   convert_from: Sig<["bytea", "anystring"], "text">;
   convert_to: Sig<["anystring", "anystring"], "bytea">;
   convert: Sig<["bytea", "anystring", "anystring"], "bytea">;
@@ -320,6 +324,8 @@ export interface FunctionCatalog {
   justify_hours: Sig<["interval"], "interval">;
   justify_interval: Sig<["interval"], "interval">;
   isfinite: Sig<["any"], "bool">;
+  /** `(start, end | interval) OVERLAPS (start, end | interval)` */
+  overlaps: Sig<["any", "any", "any", "any"], "bool">;
   extract: Sig<["anystring", "any"], "numeric">;
   /** `timezone(zone, timestamptz)` → timestamp and vice versa (the function form of AT TIME ZONE). */
   timezone: [

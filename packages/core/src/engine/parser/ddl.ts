@@ -523,10 +523,16 @@ type ParseCreateView<T extends Toks, I extends number, OrReplace extends boolean
   QualName<T, I> extends [infer Parts extends readonly string[], infer J extends number]
     ? T[J] extends OpTok<"(">
       ? ParenIdentList<T, J> extends infer R
-        ? R extends Ok<infer Names extends readonly string[], infer J2 extends number> ? (SkipStorage<T, J2> extends infer J3 extends number ? ParseViewAs<T, J3, OrReplace, Mat, Ine, RefOf<Parts>, Names> : never) : R
+        ? R extends Ok<infer Names extends readonly string[], infer J2 extends number> ? (SkipViewStorage<T, J2, Mat> extends infer J3 extends number ? ParseViewAs<T, J3, OrReplace, Mat, Ine, RefOf<Parts>, Names> : never) : R
         : never
-      : SkipStorage<T, J> extends infer J2 extends number ? ParseViewAs<T, J2, OrReplace, Mat, Ine, RefOf<Parts>, null> : never
+      : SkipViewStorage<T, J, Mat> extends infer J2 extends number ? ParseViewAs<T, J2, OrReplace, Mat, Ine, RefOf<Parts>, null> : never
     : Expected<"view name", T, I>;
+
+/** A plain view takes only `WITH (options)`; USING and TABLESPACE are for materialized views. */
+type SkipViewStorage<T extends Toks, I extends number, Mat extends boolean> =
+  Mat extends true ? SkipStorage<T, I>
+  : T[I] extends WordTok<"with"> ? (T[Nx<I>] extends OpTok<"("> ? SkipToCloseParen<T, Nx2<I>> : I)
+  : I;
 
 type ParseViewAs<T extends Toks, I extends number, OrReplace extends boolean, Mat extends boolean, Ine extends boolean, Ref extends TableRef, Names extends readonly string[] | null> =
   EatWord<T, I, "as"> extends never ? Expected<"AS", T, I>

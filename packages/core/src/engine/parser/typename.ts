@@ -24,7 +24,8 @@ type ParseBaseType<T extends Toks, I extends number> =
   T[I] extends IdTok<infer V> ? QualifiedTail<T, V, Nx<I>>
   : T[I] extends WordTok<infer W>
     ? W extends "double" ? (EatWord<T, Nx<I>, "precision"> extends never ? Expected<"PRECISION", T, Nx<I>> : Ok<"float8", EatWord<T, Nx<I>, "precision">>)
-    : W extends "character" | "char" | "nchar" | "national" ? (EatWord<T, Nx<I>, "varying"> extends never ? Ok<"bpchar", Nx<I>> : Ok<"varchar", EatWord<T, Nx<I>, "varying">>)
+    : W extends "national" ? (EatWord<T, Nx<I>, "character" | "char"> extends never ? Expected<"CHARACTER", T, Nx<I>> : ParseBaseType<T, Nx<I>>)
+    : W extends "character" | "char" | "nchar" ? (EatWord<T, Nx<I>, "varying"> extends never ? Ok<"bpchar", Nx<I>> : Ok<"varchar", EatWord<T, Nx<I>, "varying">>)
     : W extends "bit" ? (EatWord<T, Nx<I>, "varying"> extends never ? Ok<"bit", Nx<I>> : Ok<"varbit", EatWord<T, Nx<I>, "varying">>)
     : W extends "timestamp" ? WithTz<T, SkipModifier<T, Nx<I>>, "timestamp", "timestamptz">
     : W extends "time" ? WithTz<T, SkipModifier<T, Nx<I>>, "time", "timetz">

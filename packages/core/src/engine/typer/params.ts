@@ -130,6 +130,8 @@ export type ParamsOfExpr<E extends Expr, C extends Ctx, M> =
   : E extends { readonly t: "field" } ? ParamsOfExpr<E["e"], C, M>
   : E extends { readonly t: "xml" } ? ParamsOfXml<E, C, M>
   : E extends { readonly t: "jsonfn" | "jsonagg" | "isjson" | "jsonfmt" } ? ParamsOfSqlJson<E, C, M>
+  // `f(name => $1)`: the parameter's position is unknown (the catalog has no names), so it stays untyped
+  : E extends { readonly t: "named" | "variadic" } ? ParamsOfExpr<E["e"], C, M>
   : M;
 
 /**

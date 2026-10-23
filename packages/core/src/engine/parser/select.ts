@@ -59,7 +59,10 @@ export type ParseOrderByOpt<T extends Toks, I extends number> =
 type ParseLimitOffset<T extends Toks, I extends number, Lim, Off> =
   EatWord<T, I, "limit"> extends never
     ? EatWord<T, I, "offset"> extends never
-      ? EatWord<T, I, "fetch"> extends never ? Ok<[Lim, Off], I> : ParseFetch<T, EatWord<T, I, "fetch">, Off>
+      ? EatWord<T, I, "fetch"> extends never ? Ok<[Lim, Off], I>
+      : ParseFetch<T, EatWord<T, I, "fetch">, Off> extends infer F
+        ? F extends Ok<readonly [infer E, unknown], infer J extends number> ? ParseLimitOffset<T, J, E, Off> : F
+        : never
       : ParseExpr<T, EatWord<T, I, "offset">, 0> extends infer X
         ? X extends Ok<infer E, infer J extends number> ? ParseLimitOffset<T, SkipWord<T, J, "row" | "rows">, Lim, E> : X
         : never
@@ -244,7 +247,8 @@ export type ParseFromItem<T extends Toks, I extends number> =
     : never;
 
 export type ParseFromPrimary<T extends Toks, I extends number> =
-  T[I] extends WordTok<"lateral"> ? ParseFromPrimaryLateral<T, Nx<I>, true>
+  T[I] extends WordTok<FromFuncWord> ? FromSpecialFunc<T, I>
+  : T[I] extends WordTok<"lateral"> ? ParseFromPrimaryLateral<T, Nx<I>, true>
   : T[I] extends WordTok<"only"> ? ParseFromPrimaryLateral<T, Nx<I>, false>
   : T[I] extends WordTok<"rows"> ? (T[Nx<I>] extends WordTok<"from"> ? Fail<"ROWS FROM (...) is not supported", I> : ParseFromPrimaryLateral<T, I, false>)
   : ParseFromPrimaryLateral<T, I, false>;
@@ -290,6 +294,21 @@ type ParseNamedFromItem<T extends Toks, I extends number, Lateral extends boolea
         ? AR extends [infer A, infer CA, infer J2 extends number] ? Ok<{ t: "table"; ref: RefOf<Parts>; alias: A; colAliases: CA }, J2> : AR
         : never
     : Expected<"table name, subquery or function", T, I>;
+
+/**
+ * Function-like syntax in FROM (`func_expr_common_subexpr`): `CURRENT_DATE`, `LOCALTIMESTAMP(3)`,
+ * `CAST(… AS T)`, `COLLATION FOR (…)`. These words are never table names.
+ */
+type FromFuncWord =
+  | "current_date" | "current_time" | "current_timestamp" | "localtime" | "localtimestamp" | "current_role" | "current_user"
+  | "session_user" | "system_user" | "user" | "current_catalog" | "current_schema" | "cast" | "collation";
+type FromSpecialFunc<T extends Toks, I extends number> =
+  T[I] extends WordTok<"collation"> ? (T[Nx<I>] extends WordTok<"for"> ? FromFuncExpr<T, I> : ParseFromPrimaryLateral<T, I, false>)
+  : FromFuncExpr<T, I>;
+type FromFuncExpr<T extends Toks, I extends number> =
+  ParseExpr<T, I, 13> extends infer X
+    ? X extends Ok<infer Call, infer J extends number> ? ParseFuncAlias<T, Call, false, J> : X
+    : never;
 
 /**
  * `(a JOIN b ...) [AS] j [(cols)]`: an alias on a parenthesized join hides the inner table

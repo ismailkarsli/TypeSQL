@@ -1,6 +1,7 @@
 import type { Expr, FromItem, JoinKind, SelectStmt, TableRef } from "../ast.js";
 import type { AnyErr, SqlError } from "../errors.js";
 import type { Nx } from "../parser/util.js";
+import type { ColumnName } from "../project/naming.js";
 import type { ProjectSelect } from "../project/select.js";
 import type { ColInfo, ColMap, Cols, ColsToMap, CteMap, Info, MkCtx, NullableMap, Scope, ScopeItem, ScopeLevel } from "../types.js";
 import type { SrfType } from "../typer/catalog.js";
@@ -129,7 +130,24 @@ type BindFunc<Call extends Expr, Alias extends string | null, CA extends readonl
           : never
         : A
       : never
+    : Call extends { readonly t: "cast" } ? BindCastFunc<Call, Alias, CA, Ord, MkCtx<DB, [Sofar, ...Outer], Ctes, false>, Sofar>
     : SqlError<"unsupported function call in FROM", null>;
+
+/** `FROM CAST(e AS T) [AS] a`: one row, one column named like the expression (`T`) or the alias. */
+type BindCastFunc<E extends Expr, Alias extends string | null, CA extends readonly string[] | null, Ord extends boolean, C extends MkCtx<unknown, Scope, CteMap, false>, Sofar extends ScopeLevel> =
+  ColumnName<E, null, C> extends infer N extends string
+    ? CheckAlias<Alias extends string ? Alias : N, Sofar> extends infer A
+      ? A extends string
+        ? TypeOf<E, C> extends infer T
+          ? T extends ColInfo
+            ? FuncRename<Ord extends true ? [{ readonly n: N; readonly t: T }, { readonly n: "ordinality"; readonly t: Info<"int8"> }] : [{ readonly n: N; readonly t: T }], Alias, CA, false, A> extends infer C2
+              ? C2 extends Cols ? [{ readonly alias: A; readonly cols: ColsToMap<C2>; readonly skip: [] }] : C2
+              : never
+            : T
+          : never
+        : A
+      : never
+    : never;
 
 /**
  * Natural (pre-alias) columns of a function in FROM, as ordered entries. A set-returning

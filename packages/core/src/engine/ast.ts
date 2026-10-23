@@ -30,7 +30,12 @@ export type BinOp = { readonly t: "bin"; readonly op: string; readonly l: Expr; 
 export type UnOp = { readonly t: "un"; readonly op: string; readonly e: Expr };
 /** `e::T` or `CAST(e AS T)`. `to` is canonical. */
 export type Cast = { readonly t: "cast"; readonly e: Expr; readonly to: string };
-/** Function call, aggregate, or window call. */
+/**
+ * Function call, aggregate, or window call. `args` may end with `NamedArg`s and a `VariadicArg`.
+ * Special syntax that Postgres turns into a function call is a `Call` too:
+ * `COLLATION FOR (e)` → `pg_collation_for(e)`, `e AT LOCAL` → `timezone(e)`,
+ * `(a, b) OVERLAPS (c, d)` → `overlaps(a, b, c, d)`, `e IS [form] NORMALIZED` → `is_normalized(e[, 'form'])`.
+ */
 export type Call = {
   readonly t: "call";
   readonly name: string;
@@ -42,7 +47,7 @@ export type Call = {
   readonly over: boolean;
   /** The window specification when `over` is true (`OVER name` → `{ name, partition: [], order: [] }`). */
   readonly win: WindowSpec | null;
-  /** `WITHIN GROUP (ORDER BY e)` — the ordered expression, if any. */
+  /** `WITHIN GROUP (ORDER BY e, ...)` — the first ordered expression, if any. */
   readonly withinGroup: Expr | null;
 };
 /** `[existing_window] [PARTITION BY ...] [ORDER BY ...] [frame]` — the frame clause is parsed and discarded. */
@@ -81,7 +86,7 @@ export type Slice = { readonly t: "slice"; readonly e: Expr; readonly lo: Expr |
 export type Extract = { readonly t: "extract"; readonly field: string; readonly e: Expr };
 /** `POSITION(sub IN str)` */
 export type Position = { readonly t: "position"; readonly sub: Expr; readonly in: Expr };
-/** `SUBSTRING(e [FROM a] [FOR b])` and `SUBSTRING(e SIMILAR p ESCAPE c)` */
+/** `SUBSTRING(e [FROM a] [FOR b])`; `SUBSTRING(e SIMILAR p ESCAPE c)` is `from: p, for: c` (both are `substring(text, text, text)`). */
 export type Substring = { readonly t: "substring"; readonly e: Expr; readonly from: Expr | null; readonly for: Expr | null };
 /** `TRIM([BOTH|LEADING|TRAILING] [chars FROM] e)`; `side` is "both" when omitted (Postgres names the column btrim / ltrim / rtrim). */
 export type Trim = { readonly t: "trim"; readonly e: Expr; readonly chars: Expr | null; readonly side: "both" | "leading" | "trailing" };
@@ -93,6 +98,10 @@ export type AtTimeZone = { readonly t: "attz"; readonly e: Expr; readonly zone: 
 export type Collate = { readonly t: "collate"; readonly e: Expr; readonly collation: string };
 /** `(e).field` — composite field access */
 export type FieldAccess = { readonly t: "field"; readonly e: Expr; readonly name: string };
+/** `name => e` / `name := e`: a named argument (call arguments only; positional ones come first). */
+export type NamedArg = { readonly t: "named"; readonly name: string; readonly e: Expr };
+/** `VARIADIC e`: an array passed as the variadic parameter (the last call argument only). */
+export type VariadicArg = { readonly t: "variadic"; readonly e: Expr };
 /** `GROUPING(...)`, `NULLIF`, `COALESCE`, `GREATEST`, `LEAST` are `Call`s with those names. */
 /**
  * SQL/XML special forms (parser/xml.ts, typer/xml.ts): `XMLCONCAT(args)`,
@@ -147,7 +156,7 @@ export type ExprNode =
   | BinOp | UnOp | Cast | Call | CaseExpr | IsTest | IsDistinct | Between | InList | InSub | Like
   | Quantified | ScalarSub | Exists | ArrayCtor | ArraySub | RowCtor | Subscript | Slice
   | Extract | Position | Substring | Trim | Overlay | AtTimeZone | Collate | FieldAccess | XmlExpr
-  | JsonFormat | IsJson | JsonFn | JsonAgg;
+  | JsonFormat | IsJson | JsonFn | JsonAgg | NamedArg | VariadicArg;
 
 /** Discriminants of expression nodes. */
 export type ExprTag = ExprNode["t"];
