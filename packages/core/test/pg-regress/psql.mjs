@@ -114,14 +114,14 @@ export function splitPsql(text) {
       if (line === "\\.") copyBlocks--;
       continue;
     }
-    // In a branch that does not run, only the \if family of meta-commands is read.
-    if (!running() && !quote && !commentDepth) {
-      const cmd = /^\s*\\(if|elif|else|endif)\b(.*)$/.exec(line);
-      if (cmd) branch(cmd[1], cmd[2]);
-      continue;
-    }
     let i = 0;
     while (i < line.length) {
+      // In a branch that does not run, only meta-commands are read (and only the \if family acts).
+      if (!running() && !quote && !commentDepth && line[i] !== "\\") {
+        const k = line.indexOf("\\", i);
+        if (k < 0) break;
+        i = k;
+      }
       const c = line[i];
       if (commentDepth) {
         if (line.startsWith("*/", i)) { commentDepth--; buf += "*/"; i += 2; }
@@ -159,19 +159,24 @@ export function splitPsql(text) {
           continue;
         }
         if (line[i + 1] === ":") { buf += ":"; i += 2; continue; }
+        // `\\` ends a meta-command; the SQL text goes on after it.
+        if (line[i + 1] === "\\") { i += 2; continue; }
         const cmd = /^\\([A-Za-z_?!.]*)/.exec(line.slice(i))[1];
-        const args = line.slice(i + 1 + cmd.length);
+        // The arguments end at the next unquoted backslash: another meta-command, or `\\`.
+        let end = i + 1 + cmd.length;
+        for (let q = false; end < line.length && (q || line[end] !== "\\"); end++) if (line[end] === "'") q = !q;
+        const args = line.slice(i + 1 + cmd.length, end);
         if (cmd === "if" || cmd === "elif" || cmd === "else" || cmd === "endif") branch(cmd, args);
+        else if (!running()) { /* skipped */ }
         else if (cmd === "set") setVar(args);
         else if (cmd === "unset") vars.delete(args.trim());
         else if (cmd === "getenv") vars.set(args.trim().split(/\s+/)[0], null);
         else if (cmd === "gset") gset = true;
         else if (cmd === "r" || cmd === "reset") reset();
-        else if (cmd === "copy" && /\bfrom\s+p?stdin\b/i.test(line)) copyBlocks++;
-        // The rest of the line is the meta-command's arguments, except that a sending command
-        // can follow (`\bind 1 2 \g`).
-        if (SENDS.has(cmd) || /\\(g|gx|gset|gexec|gdesc|sendpipeline)\b/.test(line.slice(i + 1))) flush(ln);
-        break;
+        else if (cmd === "copy" && /\bfrom\s+p?stdin\b/i.test(args)) copyBlocks++;
+        if (SENDS.has(cmd) && running()) flush(ln);
+        i = end;
+        continue;
       }
       if (startLine < 0) { startLine = ln; startIdx = buf.length; }
       if (c === "'") {
