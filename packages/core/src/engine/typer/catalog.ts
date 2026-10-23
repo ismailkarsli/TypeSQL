@@ -571,6 +571,17 @@ export interface FunctionCatalog {
   enum_last: Sig<["any"], "$1", NN>;
   enum_range: [Sig<["any"], "$arr1", NN>, Sig<["any", "any"], "$arr1", NN>];
 
+  // ───────────── XML (XMLELEMENT, XMLPARSE, ... are special forms: typer/xml.ts) ─────────────
+  /** `XMLEXISTS(x PASSING d)` is parsed as this call. */
+  xmlexists: Sig<["text", "xml"], "bool">;
+  xpath: [Sig<["text", "xml"], "xml[]">, Sig<["text", "xml", "text[]"], "xml[]">];
+  xpath_exists: [Sig<["text", "xml"], "bool">, Sig<["text", "xml", "text[]"], "bool">];
+  xmlcomment: Sig<["text"], "xml">;
+  xmltext: Sig<["text"], "xml">;
+  xml_is_well_formed: Sig<["text"], "bool">;
+  xml_is_well_formed_document: Sig<["text"], "bool">;
+  xml_is_well_formed_content: Sig<["text"], "bool">;
+
   // ───────────── function-style casts: `date(ts)`, `int8(x)`, `timestamp(d, t)` ─────────────
   bool: Sig<["..."], "bool">; int2: Sig<["..."], "int2">; int4: Sig<["..."], "int4">; int8: Sig<["..."], "int8">;
   float4: Sig<["..."], "float4">; float8: Sig<["..."], "float8">; numeric: Sig<["..."], "numeric">; money: Sig<["..."], "money">;

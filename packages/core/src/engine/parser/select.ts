@@ -4,6 +4,7 @@ import type { IsBareLabel } from "./keywords.js";
 import type { ParseExpr, ParseExprList, ParseOrderList, ParseWindowSpec } from "./expr.js";
 import type { ParseStatement } from "./stmt.js";
 import type { ParseTypeName } from "./typename.js";
+import type { ParseXmlTable } from "./xml.js";
 import type { AnyLabel, ColIdIdent, EatOp, EatWord, EatWords, Expected, Fail, Ident, Nx, Ok, ParenIdentList, QualName, SkipToCloseParen, SkipWord, SkipWords, SyntaxError } from "./util.js";
 
 /**
@@ -265,7 +266,8 @@ type ParseFromPrimaryLateral<T extends Toks, I extends number, Lateral extends b
         : never
   : QualName<T, I> extends [infer Parts extends readonly string[], infer J extends number]
     ? T[J] extends OpTok<"(">
-      ? ParseExpr<T, I, 13> extends infer X
+      ? T[I] extends WordTok<"xmltable"> ? ParseXmlTable<T, Nx<J>>
+      : ParseExpr<T, I, 13> extends infer X
         ? X extends Ok<infer Call, infer J2 extends number> ? ParseFuncAlias<T, Call, Lateral, J2> : X
         : never
       : ParseAliasChecked<T, SkipInheritanceStar<T, J>> extends infer AR
@@ -354,7 +356,7 @@ export type ParseAlias<T extends Toks, I extends number> =
   : ColIdIdent<T, I> extends [infer A extends string, infer J extends number] ? ParseColAliases<T, A, J>
   : [null, null, I];
 /** `ParseAlias`, but `AS` followed by something that cannot be a table alias (`AS order`) is a syntax error there. */
-type ParseAliasChecked<T extends Toks, I extends number> =
+export type ParseAliasChecked<T extends Toks, I extends number> =
   T[I] extends WordTok<"as"> ? (ColIdIdent<T, Nx<I>> extends [string, number] ? ParseAlias<T, I> : SyntaxError<T, Nx<I>>) : ParseAlias<T, I>;
 type ParseColAliases<T extends Toks, A extends string, I extends number> =
   T[I] extends OpTok<"(">

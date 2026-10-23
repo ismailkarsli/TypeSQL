@@ -138,6 +138,13 @@ string and array concatenation, comparisons, `IS [NOT] DISTINCT FROM`, `BETWEEN`
 regular expressions, `ANY`/`ALL`, casts in both spellings, `ARRAY[…]`, subscripts and slices,
 `EXTRACT`, `SUBSTRING … FROM … FOR`, `TRIM`, `POSITION`, `AT TIME ZONE`.
 
+SQL/XML is typed too: `XMLELEMENT(NAME n, XMLATTRIBUTES(…), …)`, `XMLFOREST`, `XMLCONCAT`,
+`XMLPI`, `XMLROOT`, `XMLPARSE` and `XMLEXISTS(… PASSING …)` have Postgres's types and null
+handling (`XMLELEMENT` is never `NULL`, `XMLFOREST` only when every value is),
+`XMLSERIALIZE(… AS type)` has the type you name, and `x IS [NOT] DOCUMENT` is a boolean.
+`XMLTABLE(… PASSING doc COLUMNS …)` in `FROM` gives the declared columns: nullable unless they
+are `NOT NULL`, `FOR ORDINALITY` or have a non-null `DEFAULT`.
+
 About 450 built-in functions are typed with their Postgres argument types, return types and
 null handling: string, numeric, date/time, JSON, array, aggregate and window functions,
 function-style casts (`date(ts)`, `int8(x)`) and common extensions (`pgcrypto`, `uuid-ossp`,

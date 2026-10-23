@@ -5,6 +5,7 @@ import type { ReservedKeyword } from "./keywords.js";
 import type { IsSelectStart, ParseSelectStmt } from "./select.js";
 import type { ParseTypeName } from "./typename.js";
 import type { EatOp, EatWord, EatWords, Expected, Fail, Ident, Nx, Ok, QualName, SkipToCloseParen, SkipWord, SyntaxError } from "./util.js";
+import type { ParseXmlFunc, XmlFuncKeyword, XmlIsDocument } from "./xml.js";
 
 /**
  * Pratt expression parser with Postgres precedence (index-based token access).
@@ -176,6 +177,7 @@ type ParseIs<T extends Toks, L, I extends number, Min extends Prec> =
 type ParseIsBody<T extends Toks, L, I extends number, Min extends Prec, Not extends boolean> =
   T[I] extends WordTok<infer W>
     ? W extends "null" | "true" | "false" | "unknown" ? ParseInfix<T, IsTest_<L, W, Not>, Nx<I>, Min>
+    : W extends "document" ? ParseInfix<T, XmlIsDocument<L, Not>, Nx<I>, Min>
     : W extends "distinct"
       ? EatWord<T, Nx<I>, "from"> extends never ? Expected<"FROM", T, Nx<I>>
       : ParseExpr<T, EatWord<T, Nx<I>, "from">, 5> extends infer X
@@ -286,6 +288,7 @@ type ParsePrefix<T extends Toks, I extends number> =
       ? (T[Nx<I>] extends OpTok<"("> ? (T[Nx<Nx<I>>] extends NumTok ? SpecialValue<T, W, I> : ParseNameExpr<T, I>) : SpecialValue<T, W, I>)
     : W extends "interval" ? (T[Nx<I>] extends StrTok<infer V> ? Ok<{ t: "typed"; type: "interval"; v: V }, SkipIntervalQualifier<T, Nx<Nx<I>>>> : ParseNameExpr<T, I>)
     : W extends "operator" ? (T[Nx<I>] extends OpTok<"("> ? ParseUnary<T, "operator", SkipToCloseParen<T, Nx<Nx<I>>>> : ParseNameExpr<T, I>)
+    : W extends XmlFuncKeyword ? (T[Nx<I>] extends OpTok<"("> ? ParseXmlFunc<T, W, Nx<Nx<I>>> : ParseNameExpr<T, I>)
     : W extends ReservedKeyword ? SyntaxError<T, I>
     : ParseNameExpr<T, I>
   : Fail<"syntax error at end of input", I>;

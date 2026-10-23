@@ -7,6 +7,7 @@ import type { BaseOf, ObjShape, Shaped } from "../shape.js";
 import type { BuildObject, JsonArrow, JsonLitCast, LitType } from "../json.js";
 import type { CallType } from "./catalog.js";
 import type { BinOpType, CommonLit, LitToText, NumLitType, UnOpType } from "./operators.js";
+import type { TypeXml } from "./xml.js";
 
 /**
  * `TypeOf<E, Ctx>` → `{ type, nullable }` or `SqlError`.
@@ -66,6 +67,7 @@ export type TypeOf<E extends Expr, C extends Ctx> =
   : E extends { readonly t: "collate" } ? TypeOf<E["e"], C>
   : E extends { readonly t: "field" } ? TypeField<TypeOf<E["e"], C>, E["name"]>
   : E extends { readonly t: "star" } ? (E["tbl"] extends string ? WholeRow<C["scope"], E["tbl"], `missing FROM-clause entry for table "${E["tbl"]}"`> : SqlError<"* is only allowed in a target list or count(*)", null>)
+  : E extends { readonly t: "xml" } ? TypeXml<E, C>
   : SqlError<"unsupported expression", null>;
 
 // ─── helpers ───

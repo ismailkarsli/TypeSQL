@@ -6,6 +6,7 @@ import type { ColInfo, ColMap, Cols, ColsToMap, CteMap, Info, MkCtx, NullableMap
 import type { SrfType } from "../typer/catalog.js";
 import type { CommonType } from "../typer/operators.js";
 import type { TypeList, TypeOf } from "../typer/typeof.js";
+import type { XmlTableCols } from "../typer/xml.js";
 import type { CheckCondition } from "./clauses.js";
 import type { NarrowKeys, NarrowLevel, UsingKeys } from "./narrow.js";
 import type { ResolveTable } from "./resolve.js";
@@ -28,7 +29,26 @@ export type BindFromItem<F extends FromItem, DB, Outer extends Scope, Ctes exten
   : F extends { readonly t: "sub" } ? BindSub<F["q"], F["alias"], F["colAliases"], F["lateral"], DB, Outer, Ctes, Sofar>
   : F extends { readonly t: "func" } ? BindFunc<F["call"], F["alias"], F["colAliases"], F["colDefs"], F["withOrdinality"], DB, Outer, Ctes, Sofar>
   : F extends { readonly t: "join" } ? BindJoin<F["kind"], F["l"], F["r"], F["on"], F["using"], F["natural"], DB, Outer, Ctes, Sofar>
+  : F extends { readonly t: "xmltable" } ? BindXmlTable<F, F["alias"], F["colAliases"], DB, Outer, Ctes, Sofar>
   : SqlError<"unsupported FROM item", null>;
+
+/**
+ * `XMLTABLE(...) [alias [(cols)]]`: always lateral, named `xmltable` without an alias; a bare
+ * alias does not rename its columns, a column alias list does (positionally).
+ */
+type BindXmlTable<F, Alias extends string | null, CA extends readonly string[] | null, DB, Outer extends Scope, Ctes extends CteMap, Sofar extends ScopeLevel> =
+  F extends { readonly defaultNs: true } ? SqlError<"DEFAULT namespace is not supported", null>
+  : CheckAlias<Alias extends string ? Alias : "xmltable", Sofar> extends infer A
+    ? A extends string
+      ? XmlTableCols<F, MkCtx<DB, [Sofar, ...Outer], Ctes, false>> extends infer Base
+        ? Base extends Cols
+          ? (CA extends readonly string[] ? RenameCols<Base, CA, [], "XMLTABLE function"> : Base) extends infer C2
+            ? C2 extends Cols ? [{ readonly alias: A; readonly cols: ColsToMap<C2>; readonly skip: [] }] : C2
+            : never
+          : Base
+        : never
+      : A
+    : never;
 
 /** `table name "u" specified more than once` when the alias is already used in this level. */
 type CheckAlias<A extends string, Sofar extends ScopeLevel> =

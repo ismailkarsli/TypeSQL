@@ -94,13 +94,30 @@ export type Collate = { readonly t: "collate"; readonly e: Expr; readonly collat
 /** `(e).field` — composite field access */
 export type FieldAccess = { readonly t: "field"; readonly e: Expr; readonly name: string };
 /** `GROUPING(...)`, `NULLIF`, `COALESCE`, `GREATEST`, `LEAST` are `Call`s with those names. */
+/**
+ * SQL/XML special forms (parser/xml.ts, typer/xml.ts): `XMLCONCAT(args)`,
+ * `XMLELEMENT(NAME n [, XMLATTRIBUTES(named)] [, args])`, `XMLFOREST(named)`, `XMLPI(NAME n [, arg])`,
+ * `XMLROOT(xml, VERSION v | NO VALUE [, STANDALONE ...])` (args: xml[, version]),
+ * `XMLPARSE(DOCUMENT | CONTENT arg)`, `XMLSERIALIZE(DOCUMENT | CONTENT arg AS to)`,
+ * `arg IS DOCUMENT` (`IS NOT DOCUMENT` is `NOT (arg IS DOCUMENT)`). Element, attribute and PI
+ * names are not kept. `XMLEXISTS(x PASSING d)` is the call `xmlexists(x, d)`, as in Postgres.
+ */
+export type XmlExpr = {
+  readonly t: "xml";
+  readonly op: "concat" | "element" | "forest" | "pi" | "root" | "parse" | "serialize" | "document";
+  readonly args: readonly Expr[];
+  /** XMLATTRIBUTES / XMLFOREST values (any type). */
+  readonly named: readonly Expr[];
+  /** XMLSERIALIZE's target type (canonical), else null. */
+  readonly to: string | null;
+};
 
 /** The precise union of expression nodes (documentation and tooling; not used as a constraint). */
 export type ExprNode =
   | ColRef | Star | NumLit | StrLit | BoolLit | NullLit | Param | DefaultExpr | TypedLit
   | BinOp | UnOp | Cast | Call | CaseExpr | IsTest | IsDistinct | Between | InList | InSub | Like
   | Quantified | ScalarSub | Exists | ArrayCtor | ArraySub | RowCtor | Subscript | Slice
-  | Extract | Position | Substring | Trim | Overlay | AtTimeZone | Collate | FieldAccess;
+  | Extract | Position | Substring | Trim | Overlay | AtTimeZone | Collate | FieldAccess | XmlExpr;
 
 /** Discriminants of expression nodes. */
 export type ExprTag = ExprNode["t"];
@@ -147,6 +164,28 @@ export type FromFunc = {
   readonly lateral: boolean;
   readonly withOrdinality: boolean;
 };
+/** `XMLTABLE` column: `name type [PATH p] [DEFAULT d] [[NOT] NULL]`, or `name FOR ORDINALITY` (int4, not null). */
+export type XmlTableCol = {
+  readonly name: string;
+  readonly type: string;
+  readonly path: Expr | null;
+  readonly def: Expr | null;
+  readonly notNull: boolean;
+  readonly ordinality: boolean;
+};
+/** `[LATERAL] XMLTABLE([XMLNAMESPACES(uri AS name, ...),] row PASSING doc COLUMNS ...) [alias [(cols)]]`, always lateral. */
+export type FromXmlTable = {
+  readonly t: "xmltable";
+  /** XMLNAMESPACES URIs. */
+  readonly ns: readonly Expr[];
+  /** `XMLNAMESPACES(DEFAULT uri)` was given (parsed, then rejected like Postgres). */
+  readonly defaultNs: boolean;
+  readonly row: Expr;
+  readonly doc: Expr;
+  readonly cols: readonly XmlTableCol[];
+  readonly alias: string | null;
+  readonly colAliases: readonly string[] | null;
+};
 export type JoinKind = "inner" | "left" | "right" | "full" | "cross";
 export type FromJoin = {
   readonly t: "join";
@@ -157,7 +196,7 @@ export type FromJoin = {
   readonly using: readonly string[] | null;
   readonly natural: boolean;
 };
-export type FromItem = FromTable | FromSub | FromFunc | FromJoin;
+export type FromItem = FromTable | FromSub | FromFunc | FromJoin | FromXmlTable;
 
 export type Cte = {
   readonly name: string;
