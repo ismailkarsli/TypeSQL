@@ -166,7 +166,8 @@ type ParseSimpleSelect<T extends Toks, I extends number> =
   ParseDistinct<T, I> extends infer D
     ? D extends Ok<infer Distinct, infer I1 extends number>
       ? (Distinct extends false ? (EmptyTargetList<T, I1> extends true ? Ok<[], I1> : ParseTargetList<T, I1, []>) : ParseTargetList<T, I1, []>) extends infer TL
-        ? TL extends Ok<infer Targets, infer I2 extends number>
+        ? TL extends Ok<infer Targets, infer I2x extends number>
+          ? ParseIntoOpt<T, I2x> extends [infer Into, infer I2 extends number]
           ? ParseFromOpt<T, I2> extends infer F
             ? F extends Ok<infer From, infer I3 extends number>
               ? ParseWhereOpt<T, I3> extends infer Wh
@@ -177,7 +178,7 @@ type ParseSimpleSelect<T extends Toks, I extends number> =
                         ? Hv extends Ok<infer Having, infer I6 extends number>
                           ? ParseWindowClause<T, I6> extends infer Wn
                             ? Wn extends Ok<infer Windows, infer I7 extends number>
-                              ? Ok<{ t: "simple"; distinct: Distinct; targets: Targets; from: From; where: Where; groupBy: Group; groupingSets: Sets; having: Having; windows: Windows }, I7>
+                              ? Ok<{ t: "simple"; distinct: Distinct; targets: Targets; from: From; where: Where; groupBy: Group; groupingSets: Sets; having: Having; windows: Windows } & Into, I7>
                               : Wn
                             : never
                           : Hv
@@ -188,10 +189,25 @@ type ParseSimpleSelect<T extends Toks, I extends number> =
                 : never
               : F
             : never
+          : never
           : TL
         : never
       : D
     : never;
+
+/**
+ * `INTO [TEMPORARY | TEMP | LOCAL … | GLOBAL … | UNLOGGED] [TABLE] name` (SELECT INTO) →
+ * `[{ into: ref }, next]`, or `[{}, I]` without one (the node then has no `into` field).
+ */
+type ParseIntoOpt<T extends Toks, I extends number> =
+  T[I] extends WordTok<"into">
+    ? SkipWord<T, SkipIntoPersistence<T, Nx<I>>, "table"> extends infer J extends number
+      ? QualName<T, J> extends [infer Parts extends readonly string[], infer J2 extends number] ? [{ into: RefOf<Parts> }, J2] : [{}, I]
+      : never
+    : [{}, I];
+type SkipIntoPersistence<T extends Toks, I extends number> =
+  T[I] extends WordTok<"local" | "global"> ? (T[Nx<I>] extends WordTok<"temporary" | "temp"> ? Nx<Nx<I>> : I)
+  : SkipWord<T, I, "temporary" | "temp" | "unlogged">;
 
 type ParseDistinct<T extends Toks, I extends number> =
   EatWord<T, I, "all"> extends never
@@ -207,7 +223,7 @@ type ParseDistinct<T extends Toks, I extends number> =
 
 /** `SELECT FROM t`, `EXISTS (SELECT FROM ...)`: Postgres accepts an empty target list (a zero-column row), but not after DISTINCT. */
 type EmptyTargetList<T extends Toks, I extends number> =
-  T[I] extends WordTok<"from" | "where" | "group" | "having" | "window" | "order" | "limit" | "offset" | "fetch" | "for" | "union" | "intersect" | "except"> ? true
+  T[I] extends WordTok<"from" | "into" | "where" | "group" | "having" | "window" | "order" | "limit" | "offset" | "fetch" | "for" | "union" | "intersect" | "except" | "returning"> ? true
   : T[I] extends OpTok<")" | ";"> ? true
   : T[I] extends undefined ? true
   : false;

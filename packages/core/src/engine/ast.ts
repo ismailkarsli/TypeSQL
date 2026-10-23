@@ -334,10 +334,22 @@ export type InsertSource =
   | { readonly t: "select"; readonly q: SelectStmt }
   | { readonly t: "default" };
 
+/**
+ * Indirection on an assignment target (`a[1] = …`, `c.f = …`, `INSERT INTO t (a[1:2], c.f)`):
+ * the target as an expression rooted at the bare column (`{ t: "col", tbl: null, name }`),
+ * wrapped in `idx` / `slice` / `field` nodes, or `null` when the column is assigned whole.
+ */
+export type TargetInd = Expr | null;
+
 export type SetItem =
   | { readonly t: "set"; readonly col: string; readonly e: Expr }
-  /** `SET (a, b) = (1, 2)` or `= (SELECT ...)` */
-  | { readonly t: "setmulti"; readonly cols: readonly string[]; readonly e: Expr };
+  /** `SET a[1] = e`, `SET c.f = e`: `target` is the indirection (see `TargetInd`). */
+  | { readonly t: "setind"; readonly col: string; readonly target: Expr; readonly e: Expr }
+  /** `SET (a, b) = (1, 2)` or `= (SELECT ...)`; `ind` is null unless a target has indirection. */
+  | { readonly t: "setmulti"; readonly cols: readonly string[]; readonly ind: readonly TargetInd[] | null; readonly e: Expr };
+
+/** `RETURNING WITH (OLD AS o, NEW AS n)` options, in order (`[]` without the clause). */
+export type ReturningOpt = { readonly kind: "old" | "new"; readonly alias: string };
 
 export type OnConflict =
   | { readonly t: "nothing" }
@@ -349,9 +361,12 @@ export type InsertStmt = {
   readonly table: TableRef;
   readonly alias: string | null;
   readonly columns: readonly string[] | null;
+  /** Indirection per column (`INSERT INTO t (a[1], c.f)`), `null` when no column has any. */
+  readonly colInd: readonly TargetInd[] | null;
   readonly source: InsertSource;
   readonly onConflict: OnConflict | null;
   readonly returning: readonly Target[] | null;
+  readonly retOpts: readonly ReturningOpt[];
 };
 export type UpdateStmt = {
   readonly t: "update";
@@ -360,8 +375,10 @@ export type UpdateStmt = {
   readonly alias: string | null;
   readonly set: readonly SetItem[];
   readonly from: readonly FromItem[];
+  /** `WHERE CURRENT OF cursor` is `null` (the cursor's row is not known at the type level). */
   readonly where: Expr | null;
   readonly returning: readonly Target[] | null;
+  readonly retOpts: readonly ReturningOpt[];
 };
 export type DeleteStmt = {
   readonly t: "delete";
@@ -369,9 +386,40 @@ export type DeleteStmt = {
   readonly table: TableRef;
   readonly alias: string | null;
   readonly using: readonly FromItem[];
+  /** `WHERE CURRENT OF cursor` is `null` (the cursor's row is not known at the type level). */
   readonly where: Expr | null;
   readonly returning: readonly Target[] | null;
+  readonly retOpts: readonly ReturningOpt[];
 };
+
+/**
+ * `WHEN [NOT] MATCHED [BY SOURCE | BY TARGET] [AND cond] THEN action` of MERGE.
+ * `match`: `"matched"`, `"source"` (NOT MATCHED BY SOURCE) or `"target"` (NOT MATCHED [BY TARGET]).
+ */
+export type MergeWhen = {
+  readonly match: "matched" | "source" | "target";
+  readonly cond: Expr | null;
+  readonly action: MergeAction;
+};
+export type MergeAction =
+  | { readonly t: "update"; readonly set: readonly SetItem[] }
+  | { readonly t: "delete" }
+  /** `INSERT [(cols)] [OVERRIDING …] VALUES (…)`; `values` is `null` for `DEFAULT VALUES`. */
+  | { readonly t: "insert"; readonly columns: readonly string[] | null; readonly colInd: readonly TargetInd[] | null; readonly values: readonly Expr[] | null }
+  | { readonly t: "nothing" };
+export type MergeStmt = {
+  readonly t: "merge";
+  readonly with: WithClause | null;
+  readonly table: TableRef;
+  readonly alias: string | null;
+  readonly source: FromItem;
+  readonly on: Expr;
+  readonly whens: readonly MergeWhen[];
+  readonly returning: readonly Target[] | null;
+  readonly retOpts: readonly ReturningOpt[];
+};
+/** The DML statements (they share WITH, a target table and RETURNING). */
+export type DmlStmt = InsertStmt | UpdateStmt | DeleteStmt | MergeStmt;
 
 // ───────────────────────────── DDL ─────────────────────────────
 
@@ -484,4 +532,4 @@ export type DdlStmt =
   | CreateEnum | AlterEnum | DropType | CreateSchema | DropSchema | RenameSchema | CreateFunction | NoopStmt
   | DeclareCursor | FetchStmt | CloseCursor;
 
-export type Stmt = SelectStmt | InsertStmt | UpdateStmt | DeleteStmt | DdlStmt;
+export type Stmt = SelectStmt | InsertStmt | UpdateStmt | DeleteStmt | MergeStmt | DdlStmt;

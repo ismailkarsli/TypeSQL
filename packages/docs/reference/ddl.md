@@ -241,7 +241,7 @@ instantiation-depth limit (see the comment on `Build` in `engine/ddl/apply.ts`).
 - A column-name list cannot rename the columns of a `SELECT *` (list the columns), and
   duplicate names hidden inside one `*` (`SELECT * FROM a JOIN b`) are not detected.
 - `PARTITION OF parent (col WITH OPTIONS ...)` column options and typed tables
-  (`CREATE TABLE t OF type`) are not supported, nor is `CREATE TABLE t AS EXECUTE stmt`;
-  `SELECT ... INTO new_table` creates nothing.
+  (`CREATE TABLE t OF type`) are not supported, nor is `CREATE TABLE t AS EXECUTE stmt`.
+  `SELECT ... INTO new_table` creates the table like `CREATE TABLE new_table AS SELECT ...`.
 - Temporary tables are added like regular tables.
 - `ALTER TABLE` order of display: modified or added keys move to the end of the hover.

@@ -1,4 +1,4 @@
-import type { DeleteStmt, InsertStmt, SelectStmt, Stmt, UpdateStmt } from "./ast.js";
+import type { DmlStmt, SelectStmt, Stmt } from "./ast.js";
 import type { AnyErr, ErrAt, ErrMsg, SqlError } from "./errors.js";
 import type { Lex } from "./lexer/lex.js";
 import type { Toks } from "./lexer/tokens.js";
@@ -58,7 +58,7 @@ export type Analysis<DB, Q extends string> =
 
 type ParamsOfStmt<S extends Stmt, DB> =
   S extends SelectStmt ? ParamsOfSelect<S, DB, [], {}, never>
-  : S extends InsertStmt | UpdateStmt | DeleteStmt ? ParamsOfDml<S, DB, {}, never>
+  : S extends DmlStmt ? ParamsOfDml<S, DB, {}, never>
   : S extends { readonly t: "declare_cursor"; readonly q: infer Q extends SelectStmt } ? ParamsOfSelect<Q, DB, [], {}, never>
   : never;
 
@@ -84,6 +84,7 @@ type LocateIdent<M extends string, T extends Toks> =
   M extends `function ${infer Name}(${string}` ? FindTokOr<T, Name, 0>
   : M extends `column ${string}.${infer Name} ${string}` ? FindTokOr<T, Name, LocateQuoted<M, T>>
   : M extends "DEFAULT is not allowed in this context" ? FindTokOr<T, "default", 0>
+  : M extends "SELECT ... INTO is not allowed here" ? FindSelectInto<T, 0, false>
   : M extends `each ${infer Op} query ${string}` ? FindTokOr<T, Lowercase<Op>, 0>
   : M extends `${infer Op} types ${string} cannot be matched` ? (Op extends `${string} ${string}` ? LocateQuoted<M, T> : FindTokOr<T, Lowercase<Op>, 0>)
   : LocateQuoted<M, T>;
@@ -98,6 +99,12 @@ type FindTok<T extends Toks, Name extends string, I extends number> =
     : IsTok<T, Nx<Nx<Nx<I>>>, Name> extends true ? Nx<Nx<Nx<I>>>
     : FindTok<T, Name, Nx<Nx<Nx<Nx<I>>>>>
     : -1;
+/** The first `INTO` that does not follow `INSERT` / `MERGE` (`AfterDml`: the previous token was one of them). */
+type FindSelectInto<T extends Toks, I extends number, AfterDml extends boolean> =
+  T[I] extends { readonly k: string }
+    ? IsTok<T, I, "into"> extends true ? (AfterDml extends true ? FindSelectInto<T, Nx<I>, false> : I)
+    : FindSelectInto<T, Nx<I>, T[I] extends { readonly k: "w"; readonly v: "insert" | "merge" } ? true : false>
+    : 0;
 type IsTok<T extends Toks, I extends number, Name extends string> = T[I] extends { readonly k: "w" | "id"; readonly v: Name } ? true : false;
 
 /** Row type of a statement (`never` for DML without RETURNING and for DDL). */

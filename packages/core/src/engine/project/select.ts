@@ -194,7 +194,9 @@ type SameNullability<A extends ColMap, B extends ColMap> = false extends { [K in
 // ───────────────────────────── bodies ─────────────────────────────
 
 type ProjectBody<B extends SelectBody, DB, Outer extends Scope, Ctes extends CteMap, Order extends readonly Expr[], Lit extends boolean> =
-  B extends { readonly t: "simple" } ? ProjectSimple<B["distinct"], B["targets"], B["from"], B["where"], B["groupBy"], B["having"], B["windows"], Order, DB, Outer, Ctes, Lit>
+  B extends { readonly t: "simple" }
+    ? B extends { readonly into: unknown } ? SqlError<"SELECT ... INTO is not allowed here", null>
+    : ProjectSimple<B["distinct"], B["targets"], B["from"], B["where"], B["groupBy"], B["having"], B["windows"], Order, DB, Outer, Ctes, Lit>
   : B extends { readonly t: "setop" }
     ? ProjectSetOp<B["l"], B["r"], B["op"], DB, Outer, Ctes> extends infer C
       ? C extends Cols ? (CheckOutputOrder<Order, C> extends infer O ? (O extends AnyErr ? O : C) : never) : C

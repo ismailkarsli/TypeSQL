@@ -358,6 +358,8 @@ export interface FunctionCatalog {
   pg_cancel_backend: Sig<["int4"], "bool">;
   pg_terminate_backend: [Sig<["int4"], "bool">, Sig<["int4", "int8"], "bool">];
   version: Sig<[], "text", NN>;
+  /** `INSERT` / `UPDATE` / `DELETE`: the action of a MERGE row (meant for MERGE's RETURNING list; not checked elsewhere). */
+  merge_action: Sig<[], "text", NN>;
   pg_typeof: Sig<["any"], "regtype", NN>;
   pg_column_size: Sig<["any"], "int4">;
   pg_size_pretty: [Sig<["int8"], "text">, Sig<["numeric"], "text">];

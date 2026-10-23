@@ -1,6 +1,6 @@
 # Writing data
 
-`INSERT`, `UPDATE` and `DELETE` are checked against the schema like queries. With
+`INSERT`, `UPDATE`, `DELETE` and `MERGE` are checked against the schema like queries. With
 `RETURNING`, they have a row type; without it the row type is `never`, and adapters'
 `execute()` returns the affected row count.
 
@@ -95,6 +95,12 @@ array:
 
 <<< @/snippets/writing-data.ts#update
 
+Targets can assign an array element or slice, a `jsonb` key or a field of a composite column:
+`SET tags[1] = $1`, `SET data['k'] = $1`, `INSERT INTO t (tags[1:2], addr.city)`. The value
+takes the element / slice / field type (`unknown` for a composite the schema does not
+describe), and subscripting a type without subscripts is an error. `WHERE CURRENT OF cursor`
+is accepted; the cursor's row is not checked.
+
 ## Upserts
 
 `ON CONFLICT … DO NOTHING` and `DO UPDATE SET … WHERE …` are supported; `EXCLUDED` refers to
@@ -109,8 +115,36 @@ the row that was proposed for insertion:
 `RETURNING *` expands to the target table's columns, or to every table in `FROM`/`USING`, as
 in Postgres.
 
+## RETURNING old and new values
+
+As in PostgreSQL 18, `RETURNING` can read the row before (`old`) and after (`new`) the change,
+renamed with `RETURNING WITH (OLD AS o, NEW AS n)`. `old` columns are nullable in an `INSERT`
+(there is no old row) and `new` columns in a `DELETE`:
+
+```ts
+sql("UPDATE users SET email = $1 WHERE id = $2 RETURNING old.email AS was, new.email AS now", "a@b.c", 1);
+// Row: { was: string; now: string }
+```
+
+## MERGE
+
+`MERGE INTO target USING source ON … WHEN [NOT] MATCHED [BY SOURCE | BY TARGET] [AND …] THEN
+…` is checked like the statements its actions resemble: `UPDATE SET` and `INSERT` columns and
+values, required columns, parameters typed from their columns. Each `WHEN` clause sees what
+Postgres lets it see (`NOT MATCHED` only the source, `NOT MATCHED BY SOURCE` only the target).
+`RETURNING` can use both tables, `merge_action()`, `old` and `new`; source columns are nullable
+when a `NOT MATCHED BY SOURCE` action returns rows:
+
+```ts
+sql(`MERGE INTO accounts a USING deltas d ON a.id = d.sid
+     WHEN MATCHED THEN UPDATE SET balance = a.balance + d.delta
+     WHEN NOT MATCHED THEN INSERT (id, balance) VALUES (d.sid, d.delta)
+     RETURNING merge_action() AS action, a.id, new.balance`);
+// Row: { action: string; id: number; balance: string }
+```
+
 ## Data-modifying CTEs
 
-Statements with `RETURNING` can feed a `WITH` clause:
+Statements with `RETURNING` (`MERGE` included) can feed a `WITH` clause:
 
 <<< @/snippets/writing-data.ts#cte

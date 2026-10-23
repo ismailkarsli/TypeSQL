@@ -60,7 +60,7 @@ type ParseInfix<T extends Toks, L, I extends number, Min extends Prec> =
     ? O extends Terminator ? Ok<L, I>
     : O extends "::" ? (Binds<12, Min> extends true ? ParseCastSuffix<T, L, Nx<I>, Min> : Ok<L, I>)
     : O extends "[" ? (Binds<12, Min> extends true ? ParseSubscript<T, L, Nx<I>, Min> : Ok<L, I>)
-    : O extends "." ? (L extends { readonly t: "row" | "sub" | "field" | "idx" } ? ParseFieldAccess<T, L, Nx<I>, Min> : Ok<L, I>)
+    : O extends "." ? (L extends { readonly t: "row" | "sub" | "field" | "idx" | "slice" } ? ParseFieldAccess<T, L, Nx<I>, Min> : Ok<L, I>)
     : O extends ComparisonOp ? (Binds<5, Min> extends true ? ParseComparisonRhs<T, L, O, Nx<I>, Min> : Ok<L, I>)
     : O extends "+" | "-" ? BinRhs<T, L, O, 8, I, Min>
     : O extends "*" | "/" | "%" ? BinRhs<T, L, O, 9, I, Min>
