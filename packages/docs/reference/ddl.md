@@ -198,16 +198,16 @@ transaction.
 
 ## Cost
 
-Measured with TypeScript 7.0.2 (`tsc --extendedDiagnostics`):
+Measured with TypeScript 7.1.0-beta (`tsc --extendedDiagnostics`):
 
 | Input | Instantiations | Check time |
 |---|---|---|
-| importing `@typesql/core` (baseline) | 109K | 0.19 s |
-| a 10-statement migration chain, DDL only | +63K | +0.03 s |
-| the same chain plus one query on the result | 189K total | 0.25 s |
-| 50 statements | 346K | 0.31 s |
-| 200 statements and four queries | 1.38M | 1.1 s |
-| `test/types/ddl-views-types.test-d.ts` (≈60 assertions) | 442K | 0.43 s |
+| importing `@typesql/core` (baseline) | 131K | 0.16 s |
+| a 10-statement migration chain, DDL only | +33K | +0.01 s |
+| the same chain plus one query on the result | 186K total | 0.17 s |
+| 50 statements | 297K | 0.22 s |
+| 200 statements and four queries | 1.15M | 0.53 s |
+| `test/types/ddl-views-types.test-d.ts` (≈60 assertions) | 474K | 0.38 s |
 
 Each statement rebuilds the table it changes and the top-level map; unchanged tables are
 reused as they are. Every stored object is built from single-key parts, so a schema does

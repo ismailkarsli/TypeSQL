@@ -5,12 +5,13 @@ as a TypeScript interface; every `sql("…")` call is then parsed by the compile
 out the row type, the parameter types and any mistakes.
 
 To try it first, [open an example in the TypeScript Playground](https://www.typescriptlang.org/play/#code/PTAEBUE8AcFMGUCKAZAXKACgewM4BcBzAJ1h1CWQBpRoBDInWAE1ACNIIYEBjIgS2h4A5GTxdQOSPlgBbAHSgAokz55QeABaxyKULQB2LDVgBusIuq3quOVACgQoIlgDuZAyzpFaM2HnNkAGZYADYhrtQeoDJ8+LQA1qR6JKDcWDLQfCHa5s4MoFj6ltr4-PoEcnZ8GVhEagDeqSS0-vAAjiHUYnCgAMKhXeIA4rD65i3Mgz0AcgCuYbSs2VPaGPQ+OFBwK6AASq5b2gC+oIHOMqAARAAC3aQdwGkklwDcdlX6-kSBtNzaACIAIVA9TsoFAs0YDHQoPB4L4THQIzG3n8TAAPJc+J8ACyXAB8L1Ajg0tHcoCYsB+8zw6Cwgj4hVoIQKRQAktN4IpduAwXDZLQsuh+iFMf4AB54AlvOEU2LQEK0SAAfX0Plg6DmCyWsDFsEl0r54N4sAmTGVLSRo3GaLF1VIeB8ggAXobwUcZTRcHhbCCjaAEVaUWbMdi8AAON1w2izTS1ZWBvqhUO4qPgvCqbLC5OXCVSwn+1hYJiQTXzRU6vUGgvut5Hd5pfT4CQdUAAXiaptaHXRQPxAAoAJRvBxgZCKABi4FAACkAPIc6IJJKabT8AgaNQ4BHafTlxbZIkAEgAjOpl2RVKJxGd0hC5AjKo3m212y2Qv2AAZc8e9aezB8mGoACBSyahoDkDM8Gyf1ZTg8EJ12OcAFkIShMhZlAccp1nBdpi9fAyGgUA53wiCYzjIgExYDsAIRWD4NlAB1AAJblFHvBE31PT9qAAdmHOw7j2Vw332FxDnRO4sECUA2gLRxwQAPQAfiE8Q1m8GQyA7TSNkk6TZPkt5FNAVT3kcABBAhiFgAgJncQxUlCWYZCKNVfCCUJwhcTBvVs300lmT5+wAKkHANL0+cNIgkPAygICFDHMUB9GLWAAFpoH8kgcCfQpmziH03xwDovx-RQ-z0WNjCohFqCCkLwuoGRaHFfsoOyCLLPgUBFX8ZtEJQgjiqGJCAFUMFAQEAE1qso6jP0E4T4EdYqO3EgyuBkuKWhwBSwGUtTR1ANl9BCbFtBMZlZiSegSlGNQyVAI8ii8dUvkclhuC0bhEhYWh7OxZsXC0FJVw4e60OYfKmzUUCWQ7S5aCYWhrn1J1sjkNIZFeOxnzUE0zRKsrPw5LkeVO6ZwDnaH8n7BGIoANUs5BxsUXr+yPepSpCOR3pkBnWqyQcjgi3ZFHAcbdmmDkhgDIDOzNC08CWt5hN6Zo0TEg4uCk7bZKJtEDrhcyTuQ2JHUSdwUhxzJslAXJajIQpih0ZA4oShQJz4cVihkexefKxRf2nfRfFAIbUMhAI1eJMAnaIdA0hCVyikucPYEuCksCSNL4fFS27CDsnOW5acORpkayA6zNYGZ1n2c509B14q4WNgMIsEuYd48dog8nQCjauoyLQGmOdp2mcbkA9qJSTINKKSpGMQjwOwgA) <!-- playground:core -->: edit
-the SQL and hover the types, with nothing to install. The Playground runs TypeScript 6;
-TypeSQL is built for TypeScript 7.
+the SQL and hover the types, with nothing to install. The Playground runs TypeScript 6, which
+TypeSQL does not support, so treat it as a demo.
 
 ## Requirements
 
-- TypeScript 7 (the native compiler). The engine is tuned for its speed and limits.
+- TypeScript 7.1 or later (the native compiler; `7.1.0-beta` works). The engine is tuned for
+  its speed and limits. `@typesql/core` declares it as a peer dependency.
 - Node.js 26 or later.
 - PostgreSQL. TypeSQL models Postgres semantics only.
 

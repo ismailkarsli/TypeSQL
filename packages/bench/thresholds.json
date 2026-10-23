@@ -1,27 +1,27 @@
 {
   "q1": {
-    "instantiations": 161919,
+    "instantiations": 192662,
     "checkTimeSec": 1.5,
     "maxErrors": 0
   },
   "q50": {
-    "instantiations": 847295,
+    "instantiations": 840909,
     "checkTimeSec": 1.5,
     "maxErrors": 0
   },
   "q500": {
-    "instantiations": 6531506,
-    "checkTimeSec": 6.44,
+    "instantiations": 6185157,
+    "checkTimeSec": 6.26,
     "maxErrors": 0
   },
   "mixed50": {
-    "instantiations": 523624,
+    "instantiations": 551169,
     "checkTimeSec": 1.5,
     "maxErrors": 0
   },
   "maxlen": {
-    "instantiations": 8716582,
-    "checkTimeSec": 2.54,
+    "instantiations": 8531956,
+    "checkTimeSec": 2.27,
     "maxErrors": 0,
     "minOkBytes": 8219
   }

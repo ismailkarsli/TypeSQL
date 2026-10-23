@@ -88,15 +88,15 @@ separate job and writes the table to the job summary.
 time per query, queries per second of check time, and instantiations per query. That is the
 number to watch for an app with hundreds of typed queries.
 
-Current numbers on TypeScript 7.0.2:
+Current numbers on TypeScript 7.1.0-beta:
 
 | File | Instantiations | Check time |
 |---|---|---|
-| q1 | ~155K (mostly loading the library) | ~0.25 s |
-| q50 | ~0.65M | ~0.57 s |
-| q500 | ~4.8M | ~3.2 s |
-| mixed50 | ~0.43M | ~0.41 s |
-| maxlen (all probes pass, up to 8 KB) | ~6.6M | ~1.4 s |
+| q1 | ~148K (mostly loading the library) | ~0.20 s |
+| q50 | ~0.65M | ~0.50 s |
+| q500 | ~4.8M | ~3.1 s |
+| mixed50 | ~0.42M | ~0.46 s |
+| maxlen (all probes pass, up to 8 KB) | ~6.6M | ~1.1 s |
 | per query (q500 − q1) | ~9.2K | ~6 ms, ~170 queries/s |
 
 Where a typical query's cost goes (q50, instantiations above loading the library): lexing

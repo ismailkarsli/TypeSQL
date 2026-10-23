@@ -32,11 +32,14 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run"
   },
+  "peerDependencies": {
+    "typescript": ">=7.1.0-beta"
+  },
   "devDependencies": {
     "@types/pg": "^8.23.1",
     "pg": "^8.23.1",
     "postgres": "^3.4.9",
-    "typescript": "7.0.2",
+    "typescript": "7.1.0-beta",
     "vitest": "^5.0.4"
   },
   "homepage": "https://typesql.karsli.net",

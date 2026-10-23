@@ -27,7 +27,7 @@ features:
     details: "Joins, subqueries, CTEs, set operations, window functions, INSERT/UPDATE/DELETE with RETURNING, ON CONFLICT, and DDL that evolves the schema type."
   - title: "Thin runtime"
     details: "A query is { text, values }. Adapters for node-postgres and postgres.js run it, with type maps that match each driver's parsers."
-  - title: "Built for TypeScript 7"
+  - title: "Built for TypeScript 7.1"
     details: "The engine is written to the native compiler's recursion budgets: 100 simple queries in a file check in under a second, and statements up to 8 KB infer."
 ---
 

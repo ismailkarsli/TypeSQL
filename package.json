@@ -24,7 +24,7 @@
   "devDependencies": {
     "@types/node": "^26.6.5",
     "lz-string": "^1.5.0",
-    "typescript": "7.0.2",
+    "typescript": "7.1.0-beta",
     "vitest": "^5.0.4"
   }
 }

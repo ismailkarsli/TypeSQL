@@ -102,7 +102,8 @@ opt-in slice: `createSql<DB & PgCatalog>()`.
 
 ## Requirements
 
-TypeScript 7 (the native compiler) and Node.js 26 or later. PostgreSQL semantics only.
+TypeScript 7.1 or later (the native compiler; `7.1.0-beta` works) and Node.js 26 or later.
+PostgreSQL semantics only.
 
 ## Documentation
 

@@ -1,10 +1,10 @@
 # Type engine
 
 Everything under `packages/core/src/engine/**` is type-level code that runs in the
-TypeScript checker. These conventions are the result of measurements on TypeScript 7.0
-(`tsc`, the native compiler). Read this before touching the engine.
+TypeScript checker. These conventions are the result of measurements on TypeScript 7.0 and
+7.1 (`tsc`, the native compiler). Read this before touching the engine.
 
-## Measured limits (TS 7.0.2)
+## Measured limits (TS 7.0.2, unchanged in 7.1.0-beta)
 
 | Limit | Value | Consequence |
 |---|---|---|
