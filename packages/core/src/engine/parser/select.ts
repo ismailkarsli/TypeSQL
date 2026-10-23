@@ -2,6 +2,7 @@ import type { Cte, Expr, FromItem, JoinKind, SelectBody, Target } from "../ast.j
 import type { IdTok, OpTok, Toks, WordTok } from "../lexer/tokens.js";
 import type { IsBareLabel } from "./keywords.js";
 import type { ParseExpr, ParseExprList, ParseOrderList, ParseWindowSpec } from "./expr.js";
+import type { ParseJsonTable } from "./json.js";
 import type { ParseStatement } from "./stmt.js";
 import type { ParseTypeName } from "./typename.js";
 import type { ParseXmlTable } from "./xml.js";
@@ -264,7 +265,22 @@ type ParseFromPrimaryLateral<T extends Toks, I extends number, Lateral extends b
           ? EatOp<T, J, ")"> extends never ? Expected<'")"', T, J> : ParseParenJoinAlias<T, F, EatOp<T, J, ")">>
           : X
         : never
-  : QualName<T, I> extends [infer Parts extends readonly string[], infer J extends number]
+  : T[I] extends WordTok<"json_table"> ? (T[Nx<I>] extends OpTok<"("> ? ParseJsonTableItem<T, Nx<Nx<I>>> : ParseNamedFromItem<T, I, Lateral>)
+  : ParseNamedFromItem<T, I, Lateral>;
+
+/** `JSON_TABLE(…) [[AS] alias [(cols)]]` after `JSON_TABLE(` (parser/json.ts); always lateral. */
+type ParseJsonTableItem<T extends Toks, I extends number> =
+  ParseJsonTable<T, I> extends infer X
+    ? X extends Ok<infer JT, infer J extends number>
+      ? ParseAliasChecked<T, J> extends infer AR
+        ? AR extends [infer A, infer CA, infer J2 extends number] ? Ok<{ t: "jsontable"; jt: JT; alias: A; colAliases: CA }, J2> : AR
+        : never
+      : X
+    : never;
+
+/** Table, view or function in FROM. */
+type ParseNamedFromItem<T extends Toks, I extends number, Lateral extends boolean> =
+  QualName<T, I> extends [infer Parts extends readonly string[], infer J extends number]
     ? T[J] extends OpTok<"(">
       ? T[I] extends WordTok<"xmltable"> ? ParseXmlTable<T, Nx<J>>
       : ParseExpr<T, I, 13> extends infer X

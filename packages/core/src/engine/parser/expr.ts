@@ -2,6 +2,7 @@ import type { IsTest } from "../ast.js";
 import type { IdTok, NumTok, OpTok, ParamTok, StrTok, Toks, WordTok } from "../lexer/tokens.js";
 import type { NormalizeTypeName } from "../../schema/normalize.js";
 import type { ReservedKeyword } from "./keywords.js";
+import type { JsonFuncWord, ParseJsonFunc, SkipUniqueKeys } from "./json.js";
 import type { IsSelectStart, ParseSelectStmt } from "./select.js";
 import type { ParseTypeName } from "./typename.js";
 import type { EatOp, EatWord, EatWords, Expected, Fail, Ident, Nx, Ok, QualName, SkipToCloseParen, SkipWord, SyntaxError } from "./util.js";
@@ -178,6 +179,8 @@ type ParseIsBody<T extends Toks, L, I extends number, Min extends Prec, Not exte
   T[I] extends WordTok<infer W>
     ? W extends "null" | "true" | "false" | "unknown" ? ParseInfix<T, IsTest_<L, W, Not>, Nx<I>, Min>
     : W extends "document" ? ParseInfix<T, XmlIsDocument<L, Not>, Nx<I>, Min>
+    // `IS [NOT] JSON [VALUE | SCALAR | ARRAY | OBJECT] [WITH | WITHOUT UNIQUE [KEYS]]` (parser/json.ts)
+    : W extends "json" ? ParseInfix<T, { t: "isjson"; e: L; not: Not }, SkipUniqueKeys<T, SkipWord<T, Nx<I>, "value" | "scalar" | "array" | "object">>, Min>
     : W extends "distinct"
       ? EatWord<T, Nx<I>, "from"> extends never ? Expected<"FROM", T, Nx<I>>
       : ParseExpr<T, EatWord<T, Nx<I>, "from">, 5> extends infer X
@@ -343,7 +346,8 @@ type ParseParenField<T extends Toks, E, I extends number> =
 /** Identifier-led expression: column ref, `t.*`, function call, or typed literal. */
 type ParseNameExpr<T extends Toks, I extends number> =
   QualName<T, I> extends [infer Parts extends readonly string[], infer J extends number]
-    ? T[J] extends OpTok<"("> ? ParseCall<T, LastOf<Parts>, Nx<J>>
+    ? T[J] extends OpTok<"(">
+      ? (T[I] extends WordTok<infer W extends JsonFuncWord> ? (T[Nx<I>] extends OpTok<"("> ? ParseJsonFunc<T, W, I> : ParseCall<T, LastOf<Parts>, Nx<J>>) : ParseCall<T, LastOf<Parts>, Nx<J>>)
     : T[J] extends OpTok<"."> ? (T[Nx<J>] extends OpTok<"*"> ? Ok<{ t: "star"; tbl: LastOf<Parts> }, Nx<Nx<J>>> : SyntaxError<T, Nx<J>>)
     : T[J] extends StrTok<infer V>
       ? Parts extends readonly [infer Ty extends string] ? Ok<{ t: "typed"; type: NormalizeTypeName<Ty>; v: V }, Nx<J>> : SyntaxError<T, J>
@@ -358,7 +362,7 @@ type ColRefOf<Parts extends readonly string[]> =
   : never;
 
 /** After `name(`. */
-type ParseCall<T extends Toks, Name extends string, I extends number> =
+export type ParseCall<T extends Toks, Name extends string, I extends number> =
   T[I] extends OpTok<")"> ? ParseCallSuffix<T, Name, [], false, Nx<I>>
   : T[I] extends OpTok<"*"> ? (T[Nx<I>] extends OpTok<")"> ? ParseCallSuffix<T, Name, [{ t: "star"; tbl: null }], false, Nx<Nx<I>>> : SyntaxError<T, Nx<I>>)
   : EatWord<T, I, "distinct"> extends never
@@ -409,7 +413,7 @@ type ParseWithinGroup<T extends Toks, I extends number> =
       : X
     : never;
 
-type ParseFilter<T extends Toks, I extends number> =
+export type ParseFilter<T extends Toks, I extends number> =
   EatWord<T, I, "filter"> extends never ? Ok<null, I>
   : EatOp<T, EatWord<T, I, "filter">, "("> extends never ? Expected<'"("', T, EatWord<T, I, "filter">>
   : EatWord<T, EatOp<T, EatWord<T, I, "filter">, "(">, "where"> extends never ? Expected<"WHERE", T, EatOp<T, EatWord<T, I, "filter">, "(">>
@@ -420,7 +424,7 @@ type ParseFilter<T extends Toks, I extends number> =
     : never;
 
 /** `OVER (spec)` or `OVER name` → `Ok<WindowSpec | null, next>`. */
-type ParseOver<T extends Toks, I extends number> =
+export type ParseOver<T extends Toks, I extends number> =
   EatWord<T, I, "over"> extends never ? Ok<null, I>
   : T[EatWord<T, I, "over">] extends OpTok<"("> ? ParseWindowSpec<T, Nx<EatWord<T, I, "over">>>
   : T[EatWord<T, I, "over">] extends WordTok<infer W> | IdTok<infer W> ? Ok<{ name: W; partition: []; order: [] }, Nx<EatWord<T, I, "over">>>

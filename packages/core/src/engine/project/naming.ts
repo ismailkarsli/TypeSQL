@@ -14,7 +14,8 @@ import type { ProjectSelect } from "./select.js";
  *     ROW(...) / (a, b) → row | (SELECT c ...) → c, or ?column? when that column is unnamed
  *     | EXTRACT → extract | POSITION → position | SUBSTRING → substring | TRIM → btrim / ltrim / rtrim (by side) |
  *     OVERLAY → overlay | AT TIME ZONE → timezone | (e).f → f | XMLELEMENT → xmlelement (and
- *     xmlconcat, xmlforest, xmlpi, xmlroot, xmlparse, xmlserialize; XMLEXISTS is a call)
+ *     xmlconcat, xmlforest, xmlpi, xmlroot, xmlparse, xmlserialize; XMLEXISTS is a call) | SQL/JSON functions
+ *     (JSON_OBJECT(…), JSON_VALUE(…), JSON_ARRAYAGG(…), …) → their lowercase name
  *   e[i], e[lo:hi], e COLLATE c → name of e (any strength)
  *   e::T / CAST(e AS T) → name of e if strong, else T's canonical name with any array
  *     suffix stripped, weak (`1::int4::int8` → int8, `now()::date::text` → now)
@@ -49,6 +50,7 @@ type Fig<E extends Expr, C extends Ctx> =
   : E extends { readonly t: "idx" | "slice" | "collate" } ? Fig<E["e"], C>
   : E extends { readonly t: "field" } ? E["name"]
   : E extends { readonly t: "xml" } ? (E["op"] extends "document" ? null : `xml${E["op"]}`)
+  : E extends { readonly t: "jsonfn" | "jsonagg" } ? E["fn"]
   : null;
 
 type StripArray<T extends string> = T extends `${infer B}[]` ? B : T;

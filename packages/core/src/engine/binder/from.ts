@@ -5,6 +5,7 @@ import type { ProjectSelect } from "../project/select.js";
 import type { ColInfo, ColMap, Cols, ColsToMap, CteMap, Info, MkCtx, NullableMap, Scope, ScopeItem, ScopeLevel } from "../types.js";
 import type { SrfType } from "../typer/catalog.js";
 import type { CommonType } from "../typer/operators.js";
+import type { BindJsonTable } from "../typer/sqljson.js";
 import type { TypeList, TypeOf } from "../typer/typeof.js";
 import type { XmlTableCols } from "../typer/xml.js";
 import type { CheckCondition } from "./clauses.js";
@@ -30,6 +31,7 @@ export type BindFromItem<F extends FromItem, DB, Outer extends Scope, Ctes exten
   : F extends { readonly t: "func" } ? BindFunc<F["call"], F["alias"], F["colAliases"], F["colDefs"], F["withOrdinality"], DB, Outer, Ctes, Sofar>
   : F extends { readonly t: "join" } ? BindJoin<F["kind"], F["l"], F["r"], F["on"], F["using"], F["natural"], DB, Outer, Ctes, Sofar>
   : F extends { readonly t: "xmltable" } ? BindXmlTable<F, F["alias"], F["colAliases"], DB, Outer, Ctes, Sofar>
+  : F extends { readonly t: "jsontable" } ? BindJsonTable<F["jt"], F["alias"], F["colAliases"], DB, Outer, Ctes, Sofar>
   : SqlError<"unsupported FROM item", null>;
 
 /**
@@ -51,7 +53,7 @@ type BindXmlTable<F, Alias extends string | null, CA extends readonly string[] |
     : never;
 
 /** `table name "u" specified more than once` when the alias is already used in this level. */
-type CheckAlias<A extends string, Sofar extends ScopeLevel> =
+export type CheckAlias<A extends string, Sofar extends ScopeLevel> =
   A extends Sofar[number]["alias"] ? SqlError<`table name "${A}" specified more than once`, null> : A;
 
 type BindTable<Ref extends TableRef, Alias extends string | null, CA extends readonly string[] | null, DB, Ctes extends CteMap, Sofar extends ScopeLevel> =

@@ -112,12 +112,42 @@ export type XmlExpr = {
   readonly to: string | null;
 };
 
+// SQL/JSON (parser/json.ts, typer/sqljson.ts)
+
+/** `e FORMAT JSON [ENCODING …]`: a text / bytea value embedded as JSON. */
+export type JsonFormat = { readonly t: "jsonfmt"; readonly e: Expr };
+/** `e IS [NOT] JSON [VALUE | SCALAR | ARRAY | OBJECT] [WITH | WITHOUT UNIQUE [KEYS]]` */
+export type IsJson = { readonly t: "isjson"; readonly e: Expr; readonly not: boolean };
+/** `JSON(…)`, `JSON_SCALAR`, `JSON_SERIALIZE`, `JSON_OBJECT`, `JSON_ARRAY`, `JSON_EXISTS`, `JSON_VALUE`, `JSON_QUERY`. */
+export type JsonFn = {
+  readonly t: "jsonfn";
+  /** The function, also Postgres's output column name. */
+  readonly fn: "json" | "json_scalar" | "json_serialize" | "json_object" | "json_array" | "json_exists" | "json_value" | "json_query";
+  /** JSON_OBJECT: `[k1, v1, k2, v2, …]`; query functions: `[context item, path]`; others: the values. */
+  readonly args: readonly Expr[];
+  /** `PASSING` values (query functions). */
+  readonly passing: readonly Expr[];
+  /** `DEFAULT e ON EMPTY | ON ERROR` expressions (query functions). */
+  readonly defaults: readonly Expr[];
+  /** `JSON_ARRAY(query)` */
+  readonly q: SelectStmt | null;
+  /** `RETURNING` type (canonical), or null. */
+  readonly ret: string | null;
+  /** `ABSENT ON NULL` (JSON_OBJECT, JSON_ARRAY). */
+  readonly absent: boolean;
+  /** `UNKNOWN ON ERROR` (JSON_EXISTS). */
+  readonly unknownOnError: boolean;
+};
+/** `JSON_OBJECTAGG` / `JSON_ARRAYAGG`: `e` is the `json[b]_[object_]agg[_strict]` call they mean. */
+export type JsonAgg = { readonly t: "jsonagg"; readonly fn: "json_objectagg" | "json_arrayagg"; readonly e: Call; readonly ret: string | null };
+
 /** The precise union of expression nodes (documentation and tooling; not used as a constraint). */
 export type ExprNode =
   | ColRef | Star | NumLit | StrLit | BoolLit | NullLit | Param | DefaultExpr | TypedLit
   | BinOp | UnOp | Cast | Call | CaseExpr | IsTest | IsDistinct | Between | InList | InSub | Like
   | Quantified | ScalarSub | Exists | ArrayCtor | ArraySub | RowCtor | Subscript | Slice
-  | Extract | Position | Substring | Trim | Overlay | AtTimeZone | Collate | FieldAccess | XmlExpr;
+  | Extract | Position | Substring | Trim | Overlay | AtTimeZone | Collate | FieldAccess | XmlExpr
+  | JsonFormat | IsJson | JsonFn | JsonAgg;
 
 /** Discriminants of expression nodes. */
 export type ExprTag = ExprNode["t"];
@@ -196,7 +226,26 @@ export type FromJoin = {
   readonly using: readonly string[] | null;
   readonly natural: boolean;
 };
-export type FromItem = FromTable | FromSub | FromFunc | FromJoin | FromXmlTable;
+/** A JSON_TABLE column: `{ n: name, t: { type, nullable } }` (an output column entry). */
+export type JsonTableCol = { readonly n: string; readonly t: { readonly type: string; readonly nullable: boolean } };
+/** `JSON_TABLE(…) [alias [(cols)]]`, always lateral (parser/json.ts `ParseJsonTable`). */
+export type FromJsonTable = {
+  readonly t: "jsontable";
+  readonly jt: {
+    readonly ctx: Expr;
+    readonly path: Expr;
+    readonly passing: readonly Expr[];
+    /** Output columns in Postgres's order (nested paths' columns after their parent's). */
+    readonly cols: readonly JsonTableCol[];
+    /** Path and column names, in declaration order (must be distinct). */
+    readonly names: readonly string[];
+    /** DEFAULT expressions and the type of their column. */
+    readonly defs: readonly { readonly e: Expr; readonly type: string }[];
+  };
+  readonly alias: string | null;
+  readonly colAliases: readonly string[] | null;
+};
+export type FromItem = FromTable | FromSub | FromFunc | FromJoin | FromXmlTable | FromJsonTable;
 
 export type Cte = {
   readonly name: string;

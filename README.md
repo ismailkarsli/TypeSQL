@@ -81,6 +81,7 @@ documentation site) and `@typesql/bench` (compile-time budget and runtime benchm
 | SELECT: joins (nullability per join kind, USING/NATURAL), aliases, `*`/`t.*`, WHERE, GROUP BY/HAVING, ORDER BY, LIMIT/OFFSET/FETCH, DISTINCT [ON], FOR UPDATE | ✓ |
 | Subqueries (scalar, EXISTS, IN, ANY/ALL), derived tables, LATERAL, CTEs incl. RECURSIVE, UNION/INTERSECT/EXCEPT, VALUES, set-returning functions in FROM | ✓ |
 | Expressions: operators with numeric/date/JSON/array rules, casts, CASE, COALESCE/NULLIF/GREATEST/LEAST, IS, BETWEEN, IN, LIKE, arrays, subscripts, EXTRACT and friends, window functions, SQL/XML (`XMLELEMENT`, `XMLSERIALIZE`, `XMLTABLE`, …) | ✓ |
+| SQL/JSON: `JSON_OBJECT`, `JSON_ARRAY`, `JSON_OBJECTAGG`/`JSON_ARRAYAGG`, `JSON_VALUE`/`JSON_QUERY`/`JSON_EXISTS`, `IS JSON`, `JSON_TABLE` in FROM | ✓ |
 | Function catalog (string, numeric, date/time, JSON, arrays, aggregates, window) with Postgres nullability; every other `pg_catalog` function known by return type; unknown functions are errors; app functions declared in `$functions` or via `FunctionCatalog` augmentation | ✓ |
 | Parameters: `$n` typed from context (`WHERE id = $1` → `number`), `:name` sugar, inline `${sql.param(value)}` with value type checks | ✓ |
 | Nullability narrowing: `WHERE c IS NOT NULL` / comparisons / inner-join conditions make `c` non-null | ✓ |

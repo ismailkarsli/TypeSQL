@@ -127,6 +127,17 @@ declare it as a [typed JSON column](./schema#typed-json-columns) to give it one.
 
 <<< @/snippets/queries.ts#jsonread
 
+The SQL/JSON standard syntax of PostgreSQL 16+ is typed the same way. `JSON_OBJECT(k VALUE v, …)`
+is a `json_build_object` (never `NULL`), `JSON_ARRAY(a, b)` a tuple and `JSON_ARRAY(SELECT …)`
+an array of the query's column, `JSON_ARRAYAGG` / `JSON_OBJECTAGG` are `json_agg` /
+`json_object_agg` (`RETURNING jsonb` makes them `jsonb`). Arrays skip `NULL`s by default, and so
+does `ABSENT ON NULL`: when a nullable value may be left out, the result is plain JSON.
+`JSON_VALUE` is `text` (or its `RETURNING` type), `JSON_QUERY` `jsonb`, `JSON_EXISTS` and
+`IS [NOT] JSON` `bool`. `JSON_TABLE(…)` in `FROM` has the declared columns, all nullable but a
+top-level `FOR ORDINALITY` (`int4`), and sees the `FROM` items before it. Write object pairs as
+`k VALUE v`: in `k: v` the `: v` is read as a [named parameter](./parameters#named-name) when
+`v` is a name.
+
 ## Narrowing with WHERE
 
 Conditions in `WHERE` (and in an inner join's `ON`) that rule out `NULL` make the column
