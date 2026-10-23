@@ -91,9 +91,6 @@
       {"line":766,"kind":"rejects","hash":"e5b54937d6d49c73","pg":"ok","parser":"subscripted or field assignment targets (col[i] = ..., col.f = ...) are not supported","sql":"update op set f1[2] = 3;"},
       {"line":767,"kind":"rejects","hash":"bb833f4ae94656df","pg":"ERROR:  value for domain orderedpair violates check constraint \"orderedpair_check\"","parser":"subscripted or field assignment targets (col[i] = ..., col.f = ...) are not supported","sql":"update op set f1[2] = 0;"}
     ],
-    "errors": [
-      {"line":29,"kind":"accepts","hash":"ee886be433813847","pg":"ERROR:  syntax error at or near \"from\"","parser":"accepted","sql":"select distinct from pg_database;"}
-    ],
     "generated_stored": [
       {"line":101,"kind":"rejects","hash":"f9ba3fd05ccc76bb","pg":"ok","parser":"syntax error at or near merge","sql":"MERGE INTO gtestm t USING (VALUES (1, 10), (2, 20)) v(id, f1) ON t.id = v.id WHEN MATCHED THEN UPDATE SET f1 = v.f1 W..."},
       {"line":113,"kind":"rejects","hash":"6ea8018030d141ec","pg":"ok","parser":"syntax error at or near merge","sql":"MERGE INTO gtestm t USING gtestm AS s ON 2 * t.a = s.b WHEN MATCHED THEN DELETE RETURNING *;"}
@@ -154,19 +151,6 @@
     ],
     "insert_conflict": [
       {"line":126,"kind":"rejects","hash":"c60d0442743006e8","pg":"ERROR:  column \"insertconflicttest\" of relation \"insertconflicttest\" does not exist","parser":"subscripted or field assignment targets (col[i] = ..., col.f = ...) are not supported","sql":"insert into insertconflicttest values (3, 'Kiwi') on conflict (key, fruit) do update set insertconflicttest.fruit = '..."}
-    ],
-    "join": [
-      {"line":1292,"kind":"rejects","hash":"d86d97ac36d0c261","pg":"ok","parser":"syntax error: expected ON or USING at or near left","sql":"select t1.unique2, t1.stringu1, t2.unique1, t2.stringu2 from tenk1 t1 inner join int4_tbl i1 left join (select v1.x2,..."},
-      {"line":1324,"kind":"rejects","hash":"b66c013474b0c8db","pg":"ok","parser":"syntax error: expected ON or USING at or near left","sql":"select ss1.d1 from tenk1 as t1 inner join tenk1 as t2 on t1.tenthous = t2.ten inner join int8_tbl as i8 left join int..."},
-      {"line":1356,"kind":"rejects","hash":"fbeeb6808951d5ad","pg":"ok","parser":"syntax error: expected ON or USING at or near left","sql":"select t1.unique2, t1.stringu1, t2.unique1, t2.stringu2 from tenk1 t1 inner join int4_tbl i1 left join (select v1.x2,..."},
-      {"line":1790,"kind":"rejects","hash":"77f6dfc2e565ee07","pg":"ok","parser":"syntax error: expected \")\" at or near ss1","sql":"select * from int4_tbl i0 left join ( (select *, 123 as x from int4_tbl i1) ss1 left join (select *, q2 as x from int..."},
-      {"line":1816,"kind":"rejects","hash":"d40cbbf3980bb9c1","pg":"ok","parser":"syntax error: expected ON or USING at or near left","sql":"select t1.* from text_tbl t1 left join (select *, '***'::text as d1 from int8_tbl i8b1) b1 left join int8_tbl i8 left..."},
-      {"line":1839,"kind":"rejects","hash":"c46461c2a894d787","pg":"ok","parser":"syntax error: expected ON or USING at or near left","sql":"select t1.* from text_tbl t1 left join (select *, '***'::text as d1 from int8_tbl i8b1) b1 left join int8_tbl i8 left..."},
-      {"line":1863,"kind":"rejects","hash":"1fe77646e73e764c","pg":"ok","parser":"syntax error: expected ON or USING at or near left","sql":"select t1.* from text_tbl t1 left join (select *, '***'::text as d1 from int8_tbl i8b1) b1 left join int8_tbl i8 left..."},
-      {"line":1977,"kind":"rejects","hash":"d21711636ab26ecc","pg":"ok","parser":"syntax error: expected \")\" at or near as","sql":"select 1 from int4_tbl as i4 inner join ((select 42 as n from int4_tbl x1 left join int8_tbl x2 on f1 = q1) as ss1 ri..."},
-      {"line":2022,"kind":"rejects","hash":"3df6bfa03254d321","pg":"ok","parser":"syntax error: expected ON or USING at or near join","sql":"select ss2.* from int4_tbl i41 left join int8_tbl i8 join (select i42.f1 as c1, i43.f1 as c2, 42 as c3 from int4_tbl ..."},
-      {"line":3083,"kind":"rejects","hash":"d887ae954c97351f","pg":"ok","parser":"syntax error: expected ON or USING at or near join","sql":"select 1 from emp1 full join (select * from emp1 t1 join emp1 t2 join emp1 t3 on t2.id = t3.id on true where false) s..."},
-      {"line":3286,"kind":"rejects","hash":"370424df449f740a","pg":"ok","parser":"syntax error: expected \")\" at or near ss1","sql":"select * from ((select f1/2 as x from int4_tbl) ss1 join int4_tbl i4 on x = f1) j, lateral (select x) ss2(y);"}
     ],
     "jsonb": [
       {"line":1350,"kind":"rejects","hash":"d4b5782d1b3b56b1","pg":"ok","parser":"subscripted or field assignment targets (col[i] = ..., col.f = ...) are not supported","sql":"update test_jsonb_subscript set test_json['a'] = '1' where id = 1;"},
@@ -310,9 +294,6 @@
     "misc": [
       {"line":48,"kind":"rejects","hash":"f557cd654208cf7b","pg":"ok","parser":"syntax error at or near into","sql":"SELECT two, stringu1, ten, string4 INTO TABLE tmp FROM onek;"}
     ],
-    "partition_join": [
-      {"line":211,"kind":"rejects","hash":"71e00d14891fad2e","pg":"ok","parser":"syntax error: expected \")\" at or near t1","sql":"SELECT t1.a, t1.phv, t2.b, t2.phv, t3.a + t3.b, t3.phv FROM ((SELECT 50 phv, * FROM prt1 WHERE prt1.b = 0) t1 FULL JO..."}
-    ],
     "partition_prune": [
       {"line":1409,"kind":"rejects","hash":"942ce6f76810c8a7","pg":"ok","parser":"syntax error at or near merge","sql":"merge into part_abc_view pt using (select stable_one() as pid) as q join part_abc_1 pt1 on (q.pid = pt1.a) on pt.a = ..."},
       {"line":1419,"kind":"rejects","hash":"6895ccad7d0253c4","pg":"ok","parser":"syntax error at or near merge","sql":"merge into part_abc_view pt using (select stable_one() + 2 as pid) as q join part_abc_1 pt1 on (q.pid = pt1.a) on pt...."},
@@ -373,30 +354,6 @@
       {"line":1271,"kind":"rejects","hash":"d1104de374b74c73","pg":"ok","parser":"syntax error at or near merge","sql":"MERGE INTO testpub_merge_no_ri USING testpub_merge_pk s ON s.a >= 1 WHEN MATCHED THEN DO NOTHING WHEN NOT MATCHED THE..."},
       {"line":1276,"kind":"rejects","hash":"bde78f1eb5f8ce53","pg":"ok","parser":"syntax error at or near merge","sql":"MERGE INTO testpub_merge_pk USING testpub_merge_no_ri s ON s.a >= 1 WHEN MATCHED AND s.a > 0 THEN UPDATE SET b = s.b ..."}
     ],
-    "rangefuncs": [
-      {"line":25,"kind":"rejects","hash":"49618e2171e989e5","pg":"ok","parser":"ROWS FROM (...) is not supported","sql":"select * from rows from(rngfunct(1),rngfunct(2)) with ordinality as z(a,b,c,d,ord);"},
-      {"line":26,"kind":"rejects","hash":"34353c34b7f70427","pg":"ok","parser":"ROWS FROM (...) is not supported","sql":"create temporary view vw_ord as select * from (values (1)) v(n) join rows from(rngfunct(1),rngfunct(2)) with ordinali..."},
-      {"line":34,"kind":"rejects","hash":"25a03f549b7d0575","pg":"ok","parser":"ROWS FROM (...) is not supported","sql":"select * from rows from(unnest(array[10,20],array['foo','bar'],array[1.0])) with ordinality as z(a,b,c,ord);"},
-      {"line":35,"kind":"rejects","hash":"ef5888f4745c572d","pg":"ok","parser":"ROWS FROM (...) is not supported","sql":"select * from rows from(unnest(array[10,20],array['foo','bar']), generate_series(101,102)) with ordinality as z(a,b,c..."},
-      {"line":40,"kind":"rejects","hash":"91b8ea82cc6f8058","pg":"ok","parser":"ROWS FROM (...) is not supported","sql":"create temporary view vw_ord as select * from rows from(unnest(array[10,20],array['foo','bar'],array[1.0])) as z(a,b,c);"},
-      {"line":44,"kind":"rejects","hash":"799bcb041fd4093a","pg":"ok","parser":"ROWS FROM (...) is not supported","sql":"create temporary view vw_ord as select * from rows from(unnest(array[10,20],array['foo','bar']), generate_series(1,2)..."},
-      {"line":51,"kind":"rejects","hash":"5ae78d9bcc977bd1","pg":"ok","parser":"ROWS FROM (...) is not supported","sql":"declare rf_cur scroll cursor for select * from rows from(generate_series(1,5),generate_series(1,2)) with ordinality a..."},
-      {"line":148,"kind":"rejects","hash":"5f54cfccfc726455","pg":"ok","parser":"ROWS FROM (...) is not supported","sql":"SELECT * FROM ROWS FROM( getrngfunc6(1) AS (rngfuncid int, rngfuncsubid int, rngfuncname text) ) WITH ORDINALITY;"},
-      {"line":153,"kind":"rejects","hash":"5088c85591ab6419","pg":"ok","parser":"ROWS FROM (...) is not supported","sql":"CREATE VIEW vw_getrngfunc AS SELECT * FROM ROWS FROM( getrngfunc6(1) AS (rngfuncid int, rngfuncsubid int, rngfuncname..."},
-      {"line":162,"kind":"rejects","hash":"5d2af56e392aa528","pg":"ok","parser":"ROWS FROM (...) is not supported","sql":"SELECT * FROM ROWS FROM( getrngfunc7(1) AS (rngfuncid int, rngfuncsubid int, rngfuncname text) ) WITH ORDINALITY;"},
-      {"line":167,"kind":"rejects","hash":"4416d0df76f58728","pg":"ok","parser":"ROWS FROM (...) is not supported","sql":"CREATE VIEW vw_getrngfunc AS SELECT * FROM ROWS FROM( getrngfunc7(1) AS (rngfuncid int, rngfuncsubid int, rngfuncname..."},
-      {"line":197,"kind":"rejects","hash":"a71d8504b8355f2d","pg":"ok","parser":"ROWS FROM (...) is not supported","sql":"select * from rows from(getrngfunc1(1),getrngfunc2(1),getrngfunc3(1),getrngfunc4(1),getrngfunc5(1), getrngfunc6(1) AS..."},
-      {"line":202,"kind":"rejects","hash":"68f8747bb30119ae","pg":"ok","parser":"ROWS FROM (...) is not supported","sql":"select * from rows from(getrngfunc9(1),getrngfunc8(1), getrngfunc7(1) AS (rngfuncid int, rngfuncsubid int, rngfuncnam..."},
-      {"line":208,"kind":"rejects","hash":"7b9a95dfa62fd396","pg":"ok","parser":"ROWS FROM (...) is not supported","sql":"create temporary view vw_rngfunc as select * from rows from(getrngfunc9(1), getrngfunc7(1) AS (rngfuncid int, rngfunc..."},
-      {"line":253,"kind":"rejects","hash":"4af066644b356fc0","pg":"ok","parser":"ROWS FROM (...) is not supported","sql":"SELECT * FROM (VALUES (1),(2),(3)) v(r) LEFT JOIN ROWS FROM( rngfunc_sql(11,13), rngfunc_mat(11,13) ) WITH ORDINALITY..."},
-      {"line":292,"kind":"rejects","hash":"2b48ee4c22928b00","pg":"ok","parser":"ROWS FROM (...) is not supported","sql":"SELECT * FROM (VALUES (1),(2),(3)) v(r), ROWS FROM( rngfunc_sql(11,11), rngfunc_mat(10+r,13) );"},
-      {"line":294,"kind":"rejects","hash":"59867b4020728423","pg":"ok","parser":"ROWS FROM (...) is not supported","sql":"SELECT * FROM (VALUES (1),(2),(3)) v(r), ROWS FROM( rngfunc_sql(10+r,13), rngfunc_mat(11,11) );"},
-      {"line":296,"kind":"rejects","hash":"55a6c57a4f89ed1c","pg":"ok","parser":"ROWS FROM (...) is not supported","sql":"SELECT * FROM (VALUES (1),(2),(3)) v(r), ROWS FROM( rngfunc_sql(10+r,13), rngfunc_mat(10+r,13) );"},
-      {"line":299,"kind":"rejects","hash":"245acd4386c41519","pg":"ok","parser":"ROWS FROM (...) is not supported","sql":"SELECT * FROM generate_series(1,2) r1, generate_series(r1,3) r2, ROWS FROM( rngfunc_sql(10+r1,13), rngfunc_mat(10+r2,..."},
-      {"line":675,"kind":"rejects","hash":"63c6135bb8ac524f","pg":"ok","parser":"ROWS FROM (...) is not supported","sql":"SELECT * FROM ROWS FROM(generate_series(10,11), get_users()) WITH ORDINALITY;"},
-      {"line":676,"kind":"rejects","hash":"a634653c2652628c","pg":"ok","parser":"ROWS FROM (...) is not supported","sql":"SELECT * FROM ROWS FROM(get_users(), generate_series(10,11)) WITH ORDINALITY;"},
-      {"line":679,"kind":"rejects","hash":"a37d1048f90e1666","pg":"ok","parser":"ROWS FROM (...) is not supported","sql":"create temp view usersview as SELECT * FROM ROWS FROM(get_users(), generate_series(10,11)) WITH ORDINALITY;"}
-    ],
     "returning": [
       {"line":198,"kind":"rejects","hash":"0d8d54f56e98b8bb","pg":"ERROR:  table name \"foo\" specified more than once","parser":"syntax error at or near with","sql":"INSERT INTO foo DEFAULT VALUES RETURNING WITH (new AS foo) *;"},
       {"line":199,"kind":"rejects","hash":"9a7e76f5c06a9723","pg":"ERROR:  OLD cannot be specified multiple times","parser":"syntax error at or near with","sql":"INSERT INTO foo DEFAULT VALUES RETURNING WITH (old AS o, new AS n, old AS o) *;"},
@@ -407,8 +364,6 @@
       {"line":342,"kind":"rejects","hash":"f296cabf5e33f857","pg":"ok","parser":"syntax error at or near returning","sql":"INSERT INTO zerocol SELECT RETURNING old.tableoid::regclass, old.ctid, new.tableoid::regclass, new.ctid, ctid, *;"}
     ],
     "rowsecurity": [
-      {"line":121,"kind":"rejects","hash":"8d94027f04854f63","pg":"ok","parser":"syntax error at or near tablesample","sql":"SELECT * FROM document TABLESAMPLE BERNOULLI(50) REPEATABLE(0) WHERE f_leak(dtitle) ORDER BY did;"},
-      {"line":130,"kind":"rejects","hash":"8d94027f04854f63","pg":"ok","parser":"syntax error at or near tablesample","sql":"SELECT * FROM document TABLESAMPLE BERNOULLI(50) REPEATABLE(0) WHERE f_leak(dtitle) ORDER BY did;"},
       {"line":837,"kind":"rejects","hash":"6cb4bee8720c962d","pg":"ERROR:  new row violates row-level security policy for table \"document\"","parser":"syntax error at or near merge","sql":"MERGE INTO document d USING (SELECT 1 as sdid) s ON did = s.sdid WHEN MATCHED THEN UPDATE SET dnotes = dnotes || ' no..."},
       {"line":844,"kind":"rejects","hash":"999c120b62cfbf76","pg":"ok","parser":"syntax error at or near merge","sql":"MERGE INTO document d USING (SELECT 1 as sdid) s ON did = s.sdid WHEN MATCHED THEN UPDATE SET dnotes = dnotes || ' no..."},
       {"line":851,"kind":"rejects","hash":"6575f03b0e373b9a","pg":"ok","parser":"syntax error at or near merge","sql":"MERGE INTO document d USING (SELECT 1 as sdid) s ON did = s.sdid WHEN MATCHED THEN UPDATE SET dnotes = dnotes || ' no..."},
@@ -452,35 +407,6 @@
       {"line":115,"kind":"rejects","hash":"bde2c45f61bfc8c3","pg":"ERROR:  SELECT ... INTO is not allowed here","parser":"syntax error: expected \")\" at or near into","sql":"SELECT * FROM (SELECT 1 INTO f) bar;"},
       {"line":116,"kind":"rejects","hash":"2f086f9c5924ca88","pg":"ERROR:  views must not contain SELECT INTO","parser":"syntax error at or near into","sql":"CREATE VIEW foo AS SELECT 1 INTO int4_tbl;"},
       {"line":117,"kind":"rejects","hash":"a0a1a409862ae4ae","pg":"ERROR:  SELECT ... INTO is not allowed here","parser":"syntax error at or near into","sql":"INSERT INTO int4_tbl SELECT 1 INTO f;"}
-    ],
-    "tablesample": [
-      {"line":7,"kind":"rejects","hash":"9256a22f0e1bb2d3","pg":"ok","parser":"syntax error at or near tablesample","sql":"SELECT t.id FROM test_tablesample AS t TABLESAMPLE SYSTEM (50) REPEATABLE (0);"},
-      {"line":8,"kind":"rejects","hash":"4b00c72cd571921c","pg":"ok","parser":"syntax error at or near tablesample","sql":"SELECT id FROM test_tablesample TABLESAMPLE SYSTEM (100.0/11) REPEATABLE (0);"},
-      {"line":9,"kind":"rejects","hash":"5902ea1a1e5ed8dc","pg":"ok","parser":"syntax error at or near tablesample","sql":"SELECT id FROM test_tablesample TABLESAMPLE SYSTEM (50) REPEATABLE (0);"},
-      {"line":10,"kind":"rejects","hash":"c33e1a4ba2b1a5aa","pg":"ok","parser":"syntax error at or near tablesample","sql":"SELECT id FROM test_tablesample TABLESAMPLE BERNOULLI (50) REPEATABLE (0);"},
-      {"line":11,"kind":"rejects","hash":"4c048496ad111489","pg":"ok","parser":"syntax error at or near tablesample","sql":"SELECT id FROM test_tablesample TABLESAMPLE BERNOULLI (5.5) REPEATABLE (0);"},
-      {"line":14,"kind":"rejects","hash":"1bc51d1112bc712b","pg":"ok","parser":"syntax error at or near tablesample","sql":"SELECT count(*) FROM test_tablesample TABLESAMPLE SYSTEM (100);"},
-      {"line":15,"kind":"rejects","hash":"c4fb1014622c6c55","pg":"ok","parser":"syntax error at or near tablesample","sql":"SELECT count(*) FROM test_tablesample TABLESAMPLE SYSTEM (100) REPEATABLE (1+2);"},
-      {"line":16,"kind":"rejects","hash":"6ee0b07d4cafea41","pg":"ok","parser":"syntax error at or near tablesample","sql":"SELECT count(*) FROM test_tablesample TABLESAMPLE SYSTEM (100) REPEATABLE (0.4);"},
-      {"line":18,"kind":"rejects","hash":"20d55393543c9e9d","pg":"ok","parser":"syntax error at or near tablesample","sql":"CREATE VIEW test_tablesample_v1 AS SELECT id FROM test_tablesample TABLESAMPLE SYSTEM (10*2) REPEATABLE (2);"},
-      {"line":20,"kind":"rejects","hash":"5dae12bb1386930e","pg":"ok","parser":"syntax error at or near tablesample","sql":"CREATE VIEW test_tablesample_v2 AS SELECT id FROM test_tablesample TABLESAMPLE SYSTEM (99);"},
-      {"line":27,"kind":"rejects","hash":"841fcf3437775b50","pg":"ok","parser":"syntax error at or near tablesample","sql":"DECLARE tablesample_cur SCROLL CURSOR FOR SELECT id FROM test_tablesample TABLESAMPLE SYSTEM (50) REPEATABLE (0);"},
-      {"line":34,"kind":"rejects","hash":"5902ea1a1e5ed8dc","pg":"ok","parser":"syntax error at or near tablesample","sql":"SELECT id FROM test_tablesample TABLESAMPLE SYSTEM (50) REPEATABLE (0);"},
-      {"line":58,"kind":"rejects","hash":"0f4a24bcfdef05e2","pg":"ok","parser":"syntax error at or near tablesample","sql":"select count(*) from person tablesample bernoulli (100);"},
-      {"line":62,"kind":"rejects","hash":"972ae67afe9fc5db","pg":"ok","parser":"syntax error at or near tablesample","sql":"SELECT count(*) FROM test_tablesample TABLESAMPLE bernoulli (('1'::text < '0'::text)::int);"},
-      {"line":65,"kind":"rejects","hash":"4a30604b3d973758","pg":"ok","parser":"syntax error: expected \")\" at or near tablesample","sql":"select * from (values (0),(100)) v(pct), lateral (select count(*) from tenk1 tablesample bernoulli (pct)) ss;"},
-      {"line":68,"kind":"rejects","hash":"1ecea938fcdad777","pg":"ok","parser":"syntax error: expected \")\" at or near tablesample","sql":"select * from (values (0),(100)) v(pct), lateral (select count(*) from tenk1 tablesample system (pct)) ss;"},
-      {"line":76,"kind":"rejects","hash":"6bbd094590889225","pg":"ok","parser":"syntax error: expected \")\" at or near tablesample","sql":"select pct, count(unique1) from (values (0),(100)) v(pct), lateral (select * from tenk1 tablesample bernoulli (pct)) ..."},
-      {"line":80,"kind":"rejects","hash":"fec9fc234ffc7f06","pg":"ok","parser":"syntax error: expected \")\" at or near tablesample","sql":"select pct, count(unique1) from (values (0),(100)) v(pct), lateral (select * from tenk1 tablesample system (pct)) ss ..."},
-      {"line":86,"kind":"rejects","hash":"bf5d58befe6f697e","pg":"ERROR:  tablesample method foobar does not exist","parser":"syntax error at or near tablesample","sql":"SELECT id FROM test_tablesample TABLESAMPLE FOOBAR (1);"},
-      {"line":88,"kind":"rejects","hash":"988f339701c3c926","pg":"ERROR:  TABLESAMPLE parameter cannot be null","parser":"syntax error at or near tablesample","sql":"SELECT id FROM test_tablesample TABLESAMPLE SYSTEM (NULL);"},
-      {"line":89,"kind":"rejects","hash":"aba4d0edb1d9e9cc","pg":"ERROR:  TABLESAMPLE REPEATABLE parameter cannot be null","parser":"syntax error at or near tablesample","sql":"SELECT id FROM test_tablesample TABLESAMPLE SYSTEM (50) REPEATABLE (NULL);"},
-      {"line":91,"kind":"rejects","hash":"45698bc9044fd49c","pg":"ERROR:  sample percentage must be between 0 and 100","parser":"syntax error at or near tablesample","sql":"SELECT id FROM test_tablesample TABLESAMPLE BERNOULLI (-1);"},
-      {"line":92,"kind":"rejects","hash":"b004cfc457161241","pg":"ERROR:  sample percentage must be between 0 and 100","parser":"syntax error at or near tablesample","sql":"SELECT id FROM test_tablesample TABLESAMPLE BERNOULLI (200);"},
-      {"line":93,"kind":"rejects","hash":"77da83735c7b2d8c","pg":"ERROR:  sample percentage must be between 0 and 100","parser":"syntax error at or near tablesample","sql":"SELECT id FROM test_tablesample TABLESAMPLE SYSTEM (-1);"},
-      {"line":94,"kind":"rejects","hash":"2b53b0f8fc0d1239","pg":"ERROR:  sample percentage must be between 0 and 100","parser":"syntax error at or near tablesample","sql":"SELECT id FROM test_tablesample TABLESAMPLE SYSTEM (200);"},
-      {"line":96,"kind":"rejects","hash":"c42e16a360bed7e9","pg":"ERROR:  TABLESAMPLE clause can only be applied to tables and materialized views","parser":"syntax error at or near tablesample","sql":"SELECT id FROM test_tablesample_v1 TABLESAMPLE BERNOULLI (1);"},
-      {"line":99,"kind":"rejects","hash":"67569221949ad904","pg":"ERROR:  TABLESAMPLE clause can only be applied to tables and materialized views","parser":"syntax error at or near tablesample","sql":"WITH query_select AS (SELECT * FROM test_tablesample) SELECT * FROM query_select TABLESAMPLE BERNOULLI (5.5) REPEATAB..."}
     ],
     "triggers": [
       {"line":1001,"kind":"rejects","hash":"d16c71219acec5f9","pg":"ERROR:  tuple to be updated or deleted was already modified by an operation triggered by the current command","parser":"syntax error at or near merge","sql":"merge into parent p using (values (1)) as v(id) on p.aid = v.id when matched then update set val1 = 'b';"},
@@ -599,36 +525,7 @@
     "update": [
       {"line":35,"kind":"rejects","hash":"21e9c355dff8346f","pg":"ERROR:  column \"t\" of relation \"update_test\" does not exist","parser":"subscripted or field assignment targets (col[i] = ..., col.f = ...) are not supported","sql":"UPDATE update_test t SET t.b = t.b + 10 WHERE t.a = 10;"}
     ],
-    "window": [
-      {"line":1107,"kind":"accepts","hash":"dd367e6df8854acb","pg":"ERROR:  syntax error at or near \"ORDER\"","parser":"accepted","sql":"SELECT * FROM rank() OVER (ORDER BY random());"}
-    ],
     "with": [
-      {"line":416,"kind":"rejects","hash":"ed631a1c3e8736fa","pg":"ok","parser":"syntax error: expected AS at or near set","sql":"with recursive search_graph(f, t, label) as ( select * from graph0 g union all select g.* from graph0 g, search_graph..."},
-      {"line":425,"kind":"rejects","hash":"c6fcc51a52f87b53","pg":"ok","parser":"syntax error: expected AS at or near set","sql":"with recursive search_graph(f, t, label) as ( select * from graph0 g union distinct select g.* from graph0 g, search_..."},
-      {"line":444,"kind":"rejects","hash":"dabed5b2d10f4733","pg":"ok","parser":"syntax error: expected AS at or near set","sql":"with recursive search_graph(f, t, label) as ( select * from graph0 g union all select g.* from graph0 g, search_graph..."},
-      {"line":453,"kind":"rejects","hash":"c5c908897ba72394","pg":"ok","parser":"syntax error: expected AS at or near set","sql":"with recursive search_graph(f, t, label) as ( select * from graph0 g union distinct select g.* from graph0 g, search_..."},
-      {"line":498,"kind":"rejects","hash":"046b1c5ec8d9c461","pg":"ERROR:  search column \"foo\" not in WITH query column list","parser":"syntax error: expected AS at or near set","sql":"with recursive search_graph(f, t, label) as ( select * from graph0 g union all select g.* from graph0 g, search_graph..."},
-      {"line":507,"kind":"rejects","hash":"619a06140d3c12fa","pg":"ERROR:  search sequence column name \"label\" already used in WITH query column list","parser":"syntax error: expected AS at or near set","sql":"with recursive search_graph(f, t, label) as ( select * from graph0 g union all select g.* from graph0 g, search_graph..."},
-      {"line":516,"kind":"rejects","hash":"5a531efdde0a22e7","pg":"ERROR:  search column \"f\" specified more than once","parser":"syntax error: expected AS at or near ,","sql":"with recursive search_graph(f, t, label) as ( select * from graph0 g union all select g.* from graph0 g, search_graph..."},
-      {"line":525,"kind":"rejects","hash":"dc68c878524c02ab","pg":"ERROR:  with a SEARCH or CYCLE clause, the left side of the UNION must be a SELECT","parser":"syntax error: expected AS at or near set","sql":"with recursive search_graph(f, t, label) as ( select * from graph0 g union all select * from graph0 g union all selec..."},
-      {"line":536,"kind":"rejects","hash":"9fc56ed30ccf4ae1","pg":"ERROR:  with a SEARCH or CYCLE clause, the right side of the UNION must be a SELECT","parser":"syntax error: expected AS at or near set","sql":"with recursive search_graph(f, t, label) as ( select * from graph0 g union all (select * from graph0 g union all sele..."},
-      {"line":558,"kind":"rejects","hash":"28290c01a33fba8f","pg":"ok","parser":"syntax error: expected AS at or near set","sql":"create temp view v_search as with recursive search_graph(f, t, label) as ( select * from graph0 g union all select g...."},
-      {"line":626,"kind":"rejects","hash":"089cc07d5a6b794d","pg":"ok","parser":"syntax error: expected AS at or near set","sql":"with recursive search_graph(f, t, label) as ( select * from graph g union all select g.* from graph g, search_graph s..."},
-      {"line":635,"kind":"rejects","hash":"bcf78d20e737a9c5","pg":"ok","parser":"syntax error: expected AS at or near set","sql":"with recursive search_graph(f, t, label) as ( select * from graph g union distinct select g.* from graph g, search_gr..."},
-      {"line":671,"kind":"rejects","hash":"4c1745aa1587a344","pg":"ok","parser":"syntax error: expected AS at or near set","sql":"with recursive graph(f, t, label) as ( values (1, 2, 'arc 1 -> 2'), (1, 3, 'arc 1 -> 3'), (2, 3, 'arc 2 -> 3'), (1, 4..."},
-      {"line":698,"kind":"rejects","hash":"c65cb0c473dcc35d","pg":"ok","parser":"syntax error: expected AS at or near set","sql":"with recursive search_graph(f, t, label) as ( select * from graph g union all select g.* from graph g, search_graph s..."},
-      {"line":708,"kind":"rejects","hash":"8601a90a95df7e48","pg":"ok","parser":"syntax error: expected AS at or near set","sql":"with recursive search_graph(f, t, label) as ( select * from graph g union all select g.* from graph g, search_graph s..."},
-      {"line":719,"kind":"rejects","hash":"94abb7266fd88516","pg":"ERROR:  cycle column \"foo\" not in WITH query column list","parser":"syntax error: expected AS at or near set","sql":"with recursive search_graph(f, t, label) as ( select * from graph g union all select g.* from graph g, search_graph s..."},
-      {"line":728,"kind":"rejects","hash":"d6653fe6780d25ad","pg":"ERROR:  CYCLE types boolean and integer cannot be matched","parser":"syntax error: expected AS at or near set","sql":"with recursive search_graph(f, t, label) as ( select * from graph g union all select g.* from graph g, search_graph s..."},
-      {"line":737,"kind":"rejects","hash":"527ada6f64f4258b","pg":"ERROR:  could not identify an equality operator for type point","parser":"syntax error: expected AS at or near set","sql":"with recursive search_graph(f, t, label) as ( select * from graph g union all select g.* from graph g, search_graph s..."},
-      {"line":746,"kind":"rejects","hash":"c9c4d145881c20fe","pg":"ERROR:  cycle mark column name \"label\" already used in WITH query column list","parser":"syntax error: expected AS at or near set","sql":"with recursive search_graph(f, t, label) as ( select * from graph g union all select g.* from graph g, search_graph s..."},
-      {"line":755,"kind":"rejects","hash":"066a6219d06e780c","pg":"ERROR:  cycle path column name \"label\" already used in WITH query column list","parser":"syntax error: expected AS at or near set","sql":"with recursive search_graph(f, t, label) as ( select * from graph g union all select g.* from graph g, search_graph s..."},
-      {"line":764,"kind":"rejects","hash":"b680c6a8f6cd079c","pg":"ERROR:  cycle mark column name and cycle path column name are the same","parser":"syntax error: expected AS at or near set","sql":"with recursive search_graph(f, t, label) as ( select * from graph g union all select g.* from graph g, search_graph s..."},
-      {"line":773,"kind":"rejects","hash":"ded71394a27a932f","pg":"ERROR:  cycle column \"f\" specified more than once","parser":"syntax error: expected AS at or near ,","sql":"with recursive search_graph(f, t, label) as ( select * from graph g union all select g.* from graph g, search_graph s..."},
-      {"line":782,"kind":"rejects","hash":"ab69b62d1f5ef9ab","pg":"ERROR:  search sequence column name and cycle mark column name are the same","parser":"syntax error: expected AS at or near set","sql":"with recursive search_graph(f, t, label) as ( select * from graph g union all select g.* from graph g, search_graph s..."},
-      {"line":792,"kind":"rejects","hash":"8f1d0d0080ba6298","pg":"ERROR:  search sequence column name and cycle path column name are the same","parser":"syntax error: expected AS at or near set","sql":"with recursive search_graph(f, t, label) as ( select * from graph g union all select g.* from graph g, search_graph s..."},
-      {"line":803,"kind":"rejects","hash":"37f9432ac70b7005","pg":"ok","parser":"syntax error: expected AS at or near set","sql":"create temp view v_cycle1 as with recursive search_graph(f, t, label) as ( select * from graph g union all select g.*..."},
-      {"line":813,"kind":"rejects","hash":"aeae12647dc9b8dc","pg":"ok","parser":"syntax error: expected AS at or near set","sql":"create temp view v_cycle2 as with recursive search_graph(f, t, label) as ( select * from graph g union all select g.*..."},
       {"line":1510,"kind":"rejects","hash":"4c93178feacb827e","pg":"ERROR:  WITH RECURSIVE is not supported for MERGE statement","parser":"syntax error: expected SELECT, INSERT, UPDATE or DELETE after WITH at or near merge","sql":"WITH RECURSIVE cte_basic AS (SELECT 1 a, 'cte_basic val' b) MERGE INTO m USING (select 0 k, 'merge source SubPlan' v)..."},
       {"line":1516,"kind":"rejects","hash":"417a7b6c851305c2","pg":"ok","parser":"syntax error: expected SELECT, INSERT, UPDATE or DELETE after WITH at or near merge","sql":"WITH cte_basic AS MATERIALIZED (SELECT 1 a, 'cte_basic val' b) MERGE INTO m USING (select 0 k, 'merge source SubPlan'..."},
       {"line":1531,"kind":"rejects","hash":"9af3b45d7a041c0d","pg":"ok","parser":"syntax error: expected SELECT, INSERT, UPDATE or DELETE after WITH at or near merge","sql":"WITH cte_init AS MATERIALIZED (SELECT 1 a, 'cte_init val' b) MERGE INTO m USING (select 1 k, 'merge source InitPlan' ..."},

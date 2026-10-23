@@ -165,7 +165,7 @@ export type ParseValues<T extends Toks, I extends number, Acc extends readonly u
 type ParseSimpleSelect<T extends Toks, I extends number> =
   ParseDistinct<T, I> extends infer D
     ? D extends Ok<infer Distinct, infer I1 extends number>
-      ? (EmptyTargetList<T, I1> extends true ? Ok<[], I1> : ParseTargetList<T, I1, []>) extends infer TL
+      ? (Distinct extends false ? (EmptyTargetList<T, I1> extends true ? Ok<[], I1> : ParseTargetList<T, I1, []>) : ParseTargetList<T, I1, []>) extends infer TL
         ? TL extends Ok<infer Targets, infer I2 extends number>
           ? ParseFromOpt<T, I2> extends infer F
             ? F extends Ok<infer From, infer I3 extends number>
@@ -205,7 +205,7 @@ type ParseDistinct<T extends Toks, I extends number> =
       : never
     : Ok<false, EatWord<T, I, "all">>;
 
-/** `SELECT FROM t`, `EXISTS (SELECT FROM ...)`: Postgres accepts an empty target list (a zero-column row). */
+/** `SELECT FROM t`, `EXISTS (SELECT FROM ...)`: Postgres accepts an empty target list (a zero-column row), but not after DISTINCT. */
 type EmptyTargetList<T extends Toks, I extends number> =
   T[I] extends WordTok<"from" | "where" | "group" | "having" | "window" | "order" | "limit" | "offset" | "fetch" | "for" | "union" | "intersect" | "except"> ? true
   : T[I] extends OpTok<")" | ";"> ? true
@@ -250,7 +250,6 @@ export type ParseFromPrimary<T extends Toks, I extends number> =
   T[I] extends WordTok<FromFuncWord> ? FromSpecialFunc<T, I>
   : T[I] extends WordTok<"lateral"> ? ParseFromPrimaryLateral<T, Nx<I>, true>
   : T[I] extends WordTok<"only"> ? ParseFromPrimaryLateral<T, Nx<I>, false>
-  : T[I] extends WordTok<"rows"> ? (T[Nx<I>] extends WordTok<"from"> ? Fail<"ROWS FROM (...) is not supported", I> : ParseFromPrimaryLateral<T, I, false>)
   : ParseFromPrimaryLateral<T, I, false>;
 
 type ParseFromPrimaryLateral<T extends Toks, I extends number, Lateral extends boolean> =
@@ -258,18 +257,15 @@ type ParseFromPrimaryLateral<T extends Toks, I extends number, Lateral extends b
     ? IsSelectStart<T, Nx<I>> extends true
       ? ParseSelectStmt<T, Nx<I>> extends infer X
         ? X extends Ok<infer S, infer J extends number>
-          ? EatOp<T, J, ")"> extends never ? Expected<'")"', T, J>
+          ? EatOp<T, J, ")"> extends never ? ParenJoinOr<T, I, Expected<'")"', T, J>>
           : ParseAliasChecked<T, EatOp<T, J, ")">> extends infer AR
             ? AR extends [infer A, infer CA, infer J2 extends number] ? Ok<{ t: "sub"; q: S; alias: A; colAliases: CA; lateral: Lateral }, J2> : AR
             : never
-          : X
+          : ParenJoinOr<T, I, X>
         : never
-      : ParseFromItem<T, Nx<I>> extends infer X
-        ? X extends Ok<infer F, infer J extends number>
-          ? EatOp<T, J, ")"> extends never ? Expected<'")"', T, J> : ParseParenJoinAlias<T, F, EatOp<T, J, ")">>
-          : X
-        : never
+      : ParseParenJoin<T, I>
   : T[I] extends WordTok<"json_table"> ? (T[Nx<I>] extends OpTok<"("> ? ParseJsonTableItem<T, Nx<Nx<I>>> : ParseNamedFromItem<T, I, Lateral>)
+  : T[I] extends WordTok<"rows"> ? (T[Nx<I>] extends WordTok<"from"> ? ParseRowsFrom<T, Nx<Nx<I>>, Lateral> : ParseNamedFromItem<T, I, Lateral>)
   : ParseNamedFromItem<T, I, Lateral>;
 
 /** `JSON_TABLE(…) [[AS] alias [(cols)]]` after `JSON_TABLE(` (parser/json.ts); always lateral. */
@@ -282,16 +278,20 @@ type ParseJsonTableItem<T extends Toks, I extends number> =
       : X
     : never;
 
-/** Table, view or function in FROM. */
+/** Table (with optional TABLESAMPLE), view or function call in FROM. */
 type ParseNamedFromItem<T extends Toks, I extends number, Lateral extends boolean> =
   QualName<T, I> extends [infer Parts extends readonly string[], infer J extends number]
     ? T[J] extends OpTok<"(">
       ? T[I] extends WordTok<"xmltable"> ? ParseXmlTable<T, Nx<J>>
-      : ParseExpr<T, I, 13> extends infer X
+      : ParseFromCall<T, I, J> extends infer X
         ? X extends Ok<infer Call, infer J2 extends number> ? ParseFuncAlias<T, Call, Lateral, J2> : X
         : never
       : ParseAliasChecked<T, SkipInheritanceStar<T, J>> extends infer AR
-        ? AR extends [infer A, infer CA, infer J2 extends number] ? Ok<{ t: "table"; ref: RefOf<Parts>; alias: A; colAliases: CA }, J2> : AR
+        ? AR extends [infer A, infer CA, infer J2 extends number]
+          ? T[J2] extends WordTok<"tablesample">
+            ? ParseTableSample<T, { t: "table"; ref: RefOf<Parts>; alias: A; colAliases: CA }, Nx<J2>>
+            : Ok<{ t: "table"; ref: RefOf<Parts>; alias: A; colAliases: CA }, J2>
+          : AR
         : never
     : Expected<"table name, subquery or function", T, I>;
 
@@ -311,6 +311,91 @@ type FromFuncExpr<T extends Toks, I extends number> =
     : never;
 
 /**
+ * `((SELECT ...) s JOIN ...)`: a parenthesized item that starts like a subquery but is a
+ * join (Postgres's `'(' joined_table ')'`). Tried when reading a subquery fails.
+ */
+type ParenJoinOr<T extends Toks, I extends number, E> = T[Nx<I>] extends OpTok<"("> ? ParseParenJoin<T, I> : E;
+/** `( joined_table ) [alias]`: the parentheses must hold a join (`(t)` and `((SELECT 1) s)` are syntax errors). */
+type ParseParenJoin<T extends Toks, I extends number> =
+  ParseFromItem<T, Nx<I>> extends infer X
+    ? X extends Ok<infer F, infer J extends number>
+      ? EatOp<T, J, ")"> extends never ? Expected<'")"', T, J>
+      : F extends { readonly t: "join" } ? ParseParenJoinAlias<T, F, EatOp<T, J, ")">>
+      : SyntaxError<T, J>
+      : X
+    : never;
+
+/**
+ * A function in FROM is `func_expr_windowless`: `f() OVER (...)`, `FILTER (...)` and
+ * `WITHIN GROUP (...)` are syntax errors there (Postgres reads `over` / `filter` / `within`
+ * as the alias and fails on what follows; `GROUP` then starts a GROUP BY). `J` is the index
+ * of the call's `(`.
+ */
+type ParseFromCall<T extends Toks, I extends number, J extends number> =
+  ParseExpr<T, I, 13> extends infer X
+    ? X extends Ok<infer Call, number>
+      ? Call extends { readonly over: true } | { readonly filter: Expr } | { readonly withinGroup: Expr } ? WindowlessError<T, SkipToCloseParen<T, Nx<J>>> : X
+      : X
+    : never;
+type WindowlessError<T extends Toks, K extends number> =
+  T[Nx<K>] extends OpTok<"("> | WordTok<"group"> ? SyntaxError<T, Nx<Nx<K>>> : SyntaxError<T, Nx<K>>;
+
+/** After `TABLESAMPLE`: `method (args) [REPEATABLE (seed)]`. */
+type ParseTableSample<T extends Toks, Tbl, I extends number> =
+  QualName<T, I> extends [infer M extends readonly string[], infer J extends number]
+    ? EatOp<T, J, "("> extends never ? Expected<'"("', T, J>
+    : ParseExprList<T, EatOp<T, J, "(">, []> extends infer X
+      ? X extends Ok<infer Args, infer J2 extends number>
+        ? EatOp<T, J2, ")"> extends never ? Expected<'")"', T, J2>
+        : ParseRepeatable<T, EatOp<T, J2, ")">> extends infer R
+          ? R extends Ok<infer Rep, infer J3 extends number>
+            ? Ok<{ t: "sample"; table: Tbl; method: M extends readonly [...string[], infer L extends string] ? L : never; args: Args; repeatable: Rep }, J3>
+            : R
+          : never
+        : X
+      : never
+    : Expected<"tablesample method", T, I>;
+type ParseRepeatable<T extends Toks, I extends number> =
+  EatWord<T, I, "repeatable"> extends never ? Ok<null, I>
+  : EatOp<T, EatWord<T, I, "repeatable">, "("> extends never ? Expected<'"("', T, EatWord<T, I, "repeatable">>
+  : ParseExpr<T, EatOp<T, EatWord<T, I, "repeatable">, "(">, 0> extends infer X
+    ? X extends Ok<infer E, infer J extends number>
+      ? EatOp<T, J, ")"> extends never ? Expected<'")"', T, J> : Ok<E, EatOp<T, J, ")">>
+      : X
+    : never;
+
+/** After `ROWS FROM`: `(f(...) [AS (coldefs)], ...) [WITH ORDINALITY] [alias]`. */
+type ParseRowsFrom<T extends Toks, I extends number, Lateral extends boolean> =
+  EatOp<T, I, "("> extends never ? Expected<'"("', T, I>
+  : ParseRowsFromItems<T, EatOp<T, I, "(">, []> extends infer X
+    ? X extends Ok<infer Funcs, infer J extends number>
+      ? ParseFuncAlias<T, null, Lateral, J> extends infer Y
+        ? Y extends Ok<{ readonly alias: infer A; readonly colAliases: infer CA; readonly colDefs: infer CD; readonly withOrdinality: infer Ord }, infer J2 extends number>
+          ? Ok<{ t: "rowsfrom"; funcs: Funcs; alias: A; colAliases: CA; colDefs: CD; lateral: Lateral; withOrdinality: Ord }, J2>
+          : Y
+        : never
+      : X
+    : never;
+type ParseRowsFromItems<T extends Toks, I extends number, Acc extends readonly unknown[]> =
+  QualName<T, I> extends [unknown, infer J extends number]
+    ? T[J] extends OpTok<"(">
+      ? ParseFromCall<T, I, J> extends infer X
+        ? X extends Ok<infer Call, infer J2 extends number>
+          ? ParseItemColDefs<T, J2> extends infer D
+            ? D extends Ok<infer Defs, infer J3 extends number>
+              ? EatOp<T, J3, ","> extends never
+                ? EatOp<T, J3, ")"> extends never ? Expected<'"," or ")"', T, J3> : Ok<[...Acc, { call: Call; colDefs: Defs }], EatOp<T, J3, ")">>
+                : ParseRowsFromItems<T, EatOp<T, J3, ",">, [...Acc, { call: Call; colDefs: Defs }]>
+              : D
+            : never
+          : X
+        : never
+      : Expected<'"("', T, J>
+    : Expected<"function call", T, I>;
+type ParseItemColDefs<T extends Toks, I extends number> =
+  T[I] extends WordTok<"as"> ? (T[Nx<I>] extends OpTok<"("> ? ParseColDefs<T, Nx<Nx<I>>, []> : Expected<'"("', T, Nx<I>>) : Ok<null, I>;
+
+/**
  * `(a JOIN b ...) [AS] j [(cols)]`: an alias on a parenthesized join hides the inner table
  * names, exactly like a derived table, so it is represented as `(SELECT * FROM a JOIN b ...) j`
  * (LATERAL, so LATERAL items inside still see earlier FROM items).
@@ -318,7 +403,7 @@ type FromFuncExpr<T extends Toks, I extends number> =
 type ParseParenJoinAlias<T extends Toks, F, I extends number> =
   ParseAliasChecked<T, I> extends infer A
     ? A extends [infer Al extends string, infer CA, infer J extends number]
-      ? ParseJoins<T, {
+      ? Ok<{
           t: "sub";
           q: {
             t: "select"; with: null;
@@ -327,7 +412,7 @@ type ParseParenJoinAlias<T extends Toks, F, I extends number> =
           };
           alias: Al; colAliases: CA; lateral: true;
         }, J>
-      : A extends [null, null, infer J extends number] ? ParseJoins<T, F, J>
+      : A extends [null, null, infer J extends number] ? Ok<F, J>
       : A
     : never;
 
@@ -415,25 +500,38 @@ type ParseJoinKind<T extends Toks, I extends number> =
     : null
   : null;
 
+/**
+ * Right side of a join. A qualified join (one that needs ON / USING) takes a whole joined
+ * table on its right, so `a JOIN b LEFT JOIN c ON p ON q` is `a JOIN (b LEFT JOIN c ON p) ON q`
+ * (Postgres's `table_ref` grammar); CROSS and NATURAL joins take a single item (left-assoc).
+ */
 type ParseJoinRhs<T extends Toks, L, K extends JoinKind, Natural extends boolean, I extends number> =
   ParseFromPrimary<T, I> extends infer X
     ? X extends Ok<infer Rt, infer J extends number>
       ? K extends "cross" ? ParseJoins<T, { t: "join"; kind: "cross"; l: L; r: Rt; on: null; using: null; natural: false }, J>
       : Natural extends true ? ParseJoins<T, { t: "join"; kind: K; l: L; r: Rt; on: null; using: null; natural: true }, J>
-      : EatWord<T, J, "on"> extends never
-        ? EatWord<T, J, "using"> extends never ? Expected<"ON or USING", T, J>
-        : ParenIdentList<T, EatWord<T, J, "using">> extends infer U
-          ? U extends Ok<infer Cols, infer J2 extends number>
-            ? ParseJoins<T, { t: "join"; kind: K; l: L; r: Rt; on: null; using: Cols; natural: false }, SkipUsingAlias<T, J2>>
-            : U
-          : never
-        : ParseExpr<T, EatWord<T, J, "on">, 0> extends infer On
-          ? On extends Ok<infer Cond, infer J2 extends number>
-            ? ParseJoins<T, { t: "join"; kind: K; l: L; r: Rt; on: Cond; using: null; natural: false }, J2>
-            : On
-          : never
+      : T[J] extends WordTok<"on" | "using"> ? ParseJoinQual<T, L, K, Rt, J>
+      : ParseJoins<T, Rt, J> extends infer Y
+        ? Y extends Ok<infer Rt2, infer J2 extends number>
+          ? J2 extends J ? Expected<"ON or USING", T, J> : ParseJoinQual<T, L, K, Rt2, J2>
+          : Y
+        : never
       : X
     : never;
+/** `ON cond | USING (cols) [AS alias]` after the right side of a qualified join. */
+type ParseJoinQual<T extends Toks, L, K extends JoinKind, Rt, J extends number> =
+  EatWord<T, J, "on"> extends never
+    ? EatWord<T, J, "using"> extends never ? Expected<"ON or USING", T, J>
+    : ParenIdentList<T, EatWord<T, J, "using">> extends infer U
+      ? U extends Ok<infer Cols, infer J2 extends number>
+        ? ParseJoins<T, { t: "join"; kind: K; l: L; r: Rt; on: null; using: Cols; natural: false }, SkipUsingAlias<T, J2>>
+        : U
+      : never
+    : ParseExpr<T, EatWord<T, J, "on">, 0> extends infer On
+      ? On extends Ok<infer Cond, infer J2 extends number>
+        ? ParseJoins<T, { t: "join"; kind: K; l: L; r: Rt; on: Cond; using: null; natural: false }, J2>
+        : On
+      : never;
 /** `USING (...) AS join_alias` (PG 14+): the alias is accepted but not bound. */
 type SkipUsingAlias<T extends Toks, I extends number> = T[I] extends WordTok<"as"> ? (T[Nx<I>] extends WordTok | IdTok ? Nx<Nx<I>> : I) : I;
 
@@ -497,32 +595,90 @@ type ParseCtes<T extends Toks, I extends number, Acc extends readonly unknown[],
       : ParseStatement<T, EatOp<T, SkipMaterialized<T, EatWord<T, J2, "as">>, "(">> extends infer X
         ? X extends Ok<infer S, infer J3 extends number>
           ? EatOp<T, J3, ")"> extends never ? Expected<'")"', T, J3>
-          : SkipCteSearchCycle<T, EatOp<T, J3, ")">> extends infer J4 extends number
-            ? EatOp<T, J4, ","> extends never
-              ? Ok<{ recursive: Rec; ctes: [...Acc, { name: Name; cols: Cols; q: S }] }, J4>
-              : ParseCtes<T, EatOp<T, J4, ",">, [...Acc, { name: Name; cols: Cols; q: S }], Rec>
-            : never
+          : T[EatOp<T, J3, ")">] extends WordTok<"search" | "cycle">
+            ? ParseSearchCycle<T, EatOp<T, J3, ")">> extends infer SC
+              ? SC extends Ok<[infer Search, infer Cycle], infer J4 extends number>
+                ? CteNext<T, J4, [...Acc, { name: Name; cols: Cols; q: S; search: Search; cycle: Cycle }], Rec>
+                : SC
+              : never
+            : CteNext<T, EatOp<T, J3, ")">, [...Acc, { name: Name; cols: Cols; q: S; search: null; cycle: null }], Rec>
           : X
         : never
       : never
     : Expected<"CTE name", T, I>;
+type CteNext<T extends Toks, I extends number, Acc extends readonly unknown[], Rec extends boolean> =
+  EatOp<T, I, ","> extends never ? Ok<{ recursive: Rec; ctes: Acc }, I> : ParseCtes<T, EatOp<T, I, ",">, Acc, Rec>;
 type ParseCteCols<T extends Toks, I extends number> =
   T[I] extends OpTok<"(">
     ? ParenIdentList<T, I> extends Ok<infer Cols extends readonly string[], infer J extends number> ? [Cols, J] : [null, I]
     : [null, I];
 type SkipMaterialized<T extends Toks, I extends number> =
   EatWords<T, I, ["not", "materialized"]> extends never ? SkipWord<T, I, "materialized"> : EatWords<T, I, ["not", "materialized"]>;
-/**
- * `SEARCH {DEPTH|BREADTH} FIRST BY cols SET col` / `CYCLE cols SET col [TO v DEFAULT d] [USING path]` —
- * skipped up to the next `,` or the main statement. (The columns they add are not projected.)
- */
-type SkipCteSearchCycle<T extends Toks, I extends number> =
-  T[I] extends WordTok<"search" | "cycle"> ? SkipUntilCteEnd<T, Nx<I>> : I;
-type SkipUntilCteEnd<T extends Toks, I extends number> =
-  T[I] extends OpTok<","> ? I
-  : T[I] extends WordTok<"select" | "insert" | "update" | "delete" | "values" | "table"> ? I
-  : T[I] extends OpTok<"("> ? I
-  : T[I] extends { readonly k: string } ? SkipUntilCteEnd<T, Nx<I>>
-  : I;
+
+/** `[SEARCH ...] [CYCLE ...]` after a CTE's `)` → `Ok<[search | null, cycle | null], next>`. */
+type ParseSearchCycle<T extends Toks, I extends number> =
+  ParseCteSearch<T, I> extends infer S
+    ? S extends Ok<infer Search, infer J extends number>
+      ? ParseCteCycle<T, J> extends infer C
+        ? C extends Ok<infer Cycle, infer J2 extends number> ? Ok<[Search, Cycle], J2> : C
+        : never
+      : S
+    : never;
+/** `SEARCH {DEPTH | BREADTH} FIRST BY col, ... SET seq_col` */
+type ParseCteSearch<T extends Toks, I extends number> =
+  T[I] extends WordTok<"search">
+    ? T[Nx<I>] extends WordTok<infer D extends "depth" | "breadth">
+      ? EatWords<T, Nx<Nx<I>>, ["first", "by"]> extends never ? Expected<"FIRST BY", T, Nx<Nx<I>>>
+      : ParseColIdList<T, EatWords<T, Nx<Nx<I>>, ["first", "by"]>, []> extends infer X
+        ? X extends Ok<infer Cols, infer J extends number>
+          ? ParseSetCol<T, J> extends infer SC
+            ? SC extends Ok<infer Set, infer J2 extends number> ? Ok<{ breadth: D extends "breadth" ? true : false; cols: Cols; set: Set }, J2> : SC
+            : never
+          : X
+        : never
+      : Expected<"DEPTH or BREADTH", T, Nx<I>>
+    : Ok<null, I>;
+/** `CYCLE col, ... SET mark_col [TO value DEFAULT default] USING path_col` */
+type ParseCteCycle<T extends Toks, I extends number> =
+  T[I] extends WordTok<"cycle">
+    ? ParseColIdList<T, Nx<I>, []> extends infer X
+      ? X extends Ok<infer Cols, infer J extends number>
+        ? ParseSetCol<T, J> extends infer SC
+          ? SC extends Ok<infer Mark, infer J2 extends number>
+            ? T[J2] extends WordTok<"to">
+              ? ParseCycleConst<T, Nx<J2>> extends infer V
+                ? V extends Ok<infer To, infer J3 extends number>
+                  ? EatWord<T, J3, "default"> extends never ? Expected<"DEFAULT", T, J3>
+                  : ParseCycleConst<T, EatWord<T, J3, "default">> extends infer D
+                    ? D extends Ok<infer Def, infer J4 extends number> ? ParseCycleUsing<T, J4, Cols, Mark, To, Def> : D
+                    : never
+                  : V
+                : never
+              : ParseCycleUsing<T, J2, Cols, Mark, null, null>
+            : SC
+          : never
+        : X
+      : never
+    : Ok<null, I>;
+type ParseCycleUsing<T extends Toks, I extends number, Cols, Mark, To, Def> =
+  EatWord<T, I, "using"> extends never ? Expected<"USING", T, I>
+  : ColIdIdent<T, EatWord<T, I, "using">> extends [infer P extends string, infer J extends number]
+    ? Ok<{ cols: Cols; set: Mark; to: To; default: Def; using: P }, J>
+    : Expected<"column name", T, EatWord<T, I, "using">>;
+/** `TO` / `DEFAULT` values are constants (`AexprConst`): numbers, strings, booleans, NULL, `type 'literal'`. */
+type ParseCycleConst<T extends Toks, I extends number> =
+  ParseExpr<T, I, 13> extends infer X
+    ? X extends Ok<infer E, number>
+      ? E extends { readonly t: "num" | "str" | "bool" | "null" | "typed" } ? X : SyntaxError<T, I>
+      : X
+    : never;
+type ParseSetCol<T extends Toks, I extends number> =
+  EatWord<T, I, "set"> extends never ? Expected<"SET", T, I>
+  : ColIdIdent<T, EatWord<T, I, "set">> extends [infer N extends string, infer J extends number] ? Ok<N, J> : Expected<"column name", T, EatWord<T, I, "set">>;
+/** `col, col, ...` (no parentheses) */
+type ParseColIdList<T extends Toks, I extends number, Acc extends readonly string[]> =
+  ColIdIdent<T, I> extends [infer N extends string, infer J extends number]
+    ? EatOp<T, J, ","> extends never ? Ok<[...Acc, N], J> : ParseColIdList<T, EatOp<T, J, ",">, [...Acc, N]>
+    : Expected<"column name", T, I>;
 
 export type { Cte, Expr, FromItem, SelectBody, Target };

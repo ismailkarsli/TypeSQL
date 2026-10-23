@@ -564,7 +564,7 @@ type ParseRecursiveView<T extends Toks, I extends number, OrReplace extends bool
 
 type RecursiveViewQuery<N extends string, Names extends readonly string[], S> = {
   t: "select";
-  with: { recursive: true; ctes: [{ name: N; cols: Names; q: S }] };
+  with: { recursive: true; ctes: [{ name: N; cols: Names; q: S; search: null; cycle: null }] };
   body: {
     t: "simple"; distinct: false; targets: { [K in keyof Names]: { e: { t: "col"; tbl: null; name: Names[K] }; alias: null } };
     from: [{ t: "table"; ref: { schema: null; name: N }; alias: null; colAliases: null }];

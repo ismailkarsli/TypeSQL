@@ -76,8 +76,11 @@ per position, and a column is nullable if any branch can produce `NULL` there.
 <<< @/snippets/queries.ts#structure
 
 Also supported: derived tables (`FROM (SELECT …) AS t(a, b)`), `LATERAL`, `VALUES` lists,
-set-returning functions such as `generate_series`, `unnest` and `jsonb_each` in `FROM`,
-`DISTINCT ON`, named windows, `FOR UPDATE`, and `ORDER BY` / `GROUP BY` by alias or position.
+set-returning functions such as `generate_series`, `unnest` and `jsonb_each` in `FROM`, `ROWS
+FROM (f(…), g(…)) WITH ORDINALITY` (zipped, so every column is nullable), `TABLESAMPLE`, nested
+joins (`a JOIN b LEFT JOIN c ON … ON …`, `((SELECT …) s JOIN t ON …) j`), `SEARCH` / `CYCLE` on
+recursive CTEs (their columns are added to the CTE), `DISTINCT ON`, named windows, `FOR UPDATE`,
+and `ORDER BY` / `GROUP BY` by alias or position.
 
 `DECLARE name CURSOR FOR query` checks the query and types its parameters like a `SELECT`; the
 statement itself returns no rows. `FETCH`, `MOVE` and `CLOSE` are checked for syntax only:

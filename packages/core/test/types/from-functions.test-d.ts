@@ -66,7 +66,7 @@ test("implicitly LATERAL", () => {
 });
 
 test("errors", () => {
-  expectTypeOf<V<"SELECT * FROM ROWS FROM (generate_series(1, 2), generate_series(3, 4))">>().toEqualTypeOf<SqlError<"ROWS FROM (...) is not supported", 3>>();
+  expectTypeOf<V<"SELECT * FROM generate_series(1, 2) OVER ()">>().toEqualTypeOf<SqlError<"syntax error at or near )", 11>>();
   expectTypeOf<V<"SELECT * FROM jsonb_to_recordset('[]')">>().toEqualTypeOf<SqlError<'a column definition list is required for functions returning "record"', 0>>();
   expectTypeOf<V<"SELECT * FROM json_to_recordset('[]') WITH ORDINALITY AS (a int, b text)">>()
     .toEqualTypeOf<SqlError<"WITH ORDINALITY cannot be used with a column definition list", 10>>();

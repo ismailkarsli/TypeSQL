@@ -47,7 +47,7 @@ export type Call = {
   readonly over: boolean;
   /** The window specification when `over` is true (`OVER name` → `{ name, partition: [], order: [] }`). */
   readonly win: WindowSpec | null;
-  /** `WITHIN GROUP (ORDER BY e, ...)` — the first ordered expression, if any. */
+  /** `WITHIN GROUP (ORDER BY e, ...)` — the ordered expression, or a `row` of them when there are several (the first types the result). */
   readonly withinGroup: Expr | null;
 };
 /** `[existing_window] [PARTITION BY ...] [ORDER BY ...] [frame]` — the frame clause is parsed and discarded. */
@@ -199,7 +199,7 @@ export type FromFunc = {
   readonly call: Expr;
   readonly alias: string | null;
   readonly colAliases: readonly string[] | null;
-  readonly colDefs: readonly { readonly name: string; readonly type: string }[] | null;
+  readonly colDefs: readonly ColDef[] | null;
   readonly lateral: boolean;
   readonly withOrdinality: boolean;
 };
@@ -254,12 +254,39 @@ export type FromJsonTable = {
   readonly alias: string | null;
   readonly colAliases: readonly string[] | null;
 };
-export type FromItem = FromTable | FromSub | FromFunc | FromJoin | FromXmlTable | FromJsonTable;
+/** Column definition list entry of a function in FROM (`AS (a int, b text)`). */
+export type ColDef = { readonly name: string; readonly type: string };
+/** `table [AS alias] TABLESAMPLE method (args) [REPEATABLE (seed)]` */
+export type FromSample = {
+  readonly t: "sample";
+  readonly table: FromTable;
+  readonly method: string;
+  readonly args: readonly Expr[];
+  readonly repeatable: Expr | null;
+};
+/** `ROWS FROM (f(...) [AS (coldefs)], ...) [WITH ORDINALITY] [AS] alias [(cols) | (coldefs)]` */
+export type FromRowsFrom = {
+  readonly t: "rowsfrom";
+  readonly funcs: readonly { readonly call: Expr; readonly colDefs: readonly ColDef[] | null }[];
+  readonly alias: string | null;
+  readonly colAliases: readonly string[] | null;
+  readonly colDefs: readonly ColDef[] | null;
+  readonly lateral: boolean;
+  readonly withOrdinality: boolean;
+};
+export type FromItem = FromTable | FromSub | FromFunc | FromJoin | FromXmlTable | FromJsonTable | FromSample | FromRowsFrom;
+
+/** `SEARCH {DEPTH | BREADTH} FIRST BY cols SET seq` */
+export type CteSearch = { readonly breadth: boolean; readonly cols: readonly string[]; readonly set: string };
+/** `CYCLE cols SET mark [TO value DEFAULT default] USING path` (`to` / `default` are constants) */
+export type CteCycle = { readonly cols: readonly string[]; readonly set: string; readonly to: Expr | null; readonly default: Expr | null; readonly using: string };
 
 export type Cte = {
   readonly name: string;
   readonly cols: readonly string[] | null;
   readonly q: Stmt;
+  readonly search: CteSearch | null;
+  readonly cycle: CteCycle | null;
 };
 export type WithClause = { readonly recursive: boolean; readonly ctes: readonly Cte[] };
 

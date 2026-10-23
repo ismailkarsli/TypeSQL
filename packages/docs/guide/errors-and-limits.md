@@ -127,6 +127,6 @@ Any of these fixes it:
 - Add `@typesql/core` to the exporting package's `dependencies`.
 - Export the rows (`execute*` results) instead of the query, or annotate the return type.
 
-Unsupported syntax is always a compile error, never a silent `any`. Notable gaps: `ROWS FROM
-(…)`, tracking which views depend on which tables, and column alias lists on plain tables. The
+Unsupported syntax is always a compile error, never a silent `any`. Notable gaps: tracking
+which views depend on which tables, and column alias lists on plain tables. The
 [DDL reference](../reference/ddl#limitations) lists the DDL limitations.

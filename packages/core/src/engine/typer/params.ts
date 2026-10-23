@@ -308,7 +308,11 @@ type ParamsOfFromItem<F extends FromItem, C extends Ctx, M> =
   : F extends { readonly t: "func" } ? ParamsOfExpr<F["call"], C, M>
   : F extends { readonly t: "xmltable" } ? ParamsOfXmlTable<F, C, M>
   : F extends { readonly t: "jsontable" } ? ParamsOfJsonTable<F["jt"], C, M>
+  : F extends { readonly t: "sample" } ? ParamsOfOpt<F["repeatable"], C, ParamsOfList<F["args"], C, M, Info<F["method"] extends "system_rows" ? "int8" : F["method"] extends "system_time" ? "float8" : "float4">>, Info<"float8">>
+  : F extends { readonly t: "rowsfrom" } ? ParamsOfRowsFrom<F["funcs"], C, M>
   : M;
+type ParamsOfRowsFrom<Fs extends readonly { readonly call: Expr }[], C extends Ctx, M> =
+  Fs extends readonly [infer F extends { readonly call: Expr }, ...infer R extends readonly { readonly call: Expr }[]] ? ParamsOfRowsFrom<R, C, ParamsOfExpr<F["call"], C, M>> : M;
 
 export type ParamsOfSelect<Q extends SelectStmt, DB, Outer extends Scope, Ctes extends CteMap, M> =
   BindWith<Q["with"], DB, Outer, Ctes> extends infer C2

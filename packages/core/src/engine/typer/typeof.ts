@@ -302,6 +302,12 @@ type TypeWhens<Whens extends readonly CaseWhen[], C extends Ctx, T extends strin
 
 // ─── calls ───
 
+/** `WITHIN GROUP (ORDER BY …)`: every key is typed; the first one gives the ordered-set result type (`mode`, `percentile_disc`). */
+type TypeWithinGroup<W extends Expr | null, C extends Ctx> =
+  W extends { readonly t: "row"; readonly items: infer Items extends readonly Expr[] }
+    ? (TypeList<Items, C, []> extends infer Ls ? (Ls extends readonly [infer F extends ColInfo, ...ColInfo[]] ? F : Ls) : never)
+    : TypeOpt<W, C>;
+
 type NonStarArgs<Args extends readonly Expr[]> = Args extends readonly [{ readonly t: "star"; readonly tbl: null }] ? [] : Args;
 
 /**
@@ -324,7 +330,7 @@ type TypeCall<E extends Call, C extends Ctx> =
       ? E["name"] extends "json_build_object" | "jsonb_build_object" ? BuildObject<E["name"] extends "jsonb_build_object" ? "jsonb" : "json", E["args"], As>
       : TypeOpt<E["filter"], C> extends infer F
         ? F extends ColInfo | null
-          ? TypeOpt<E["withinGroup"], C> extends infer W
+          ? TypeWithinGroup<E["withinGroup"], C> extends infer W
             ? W extends ColInfo | null
               ? VariadicNull<E, As, CallType<E["name"], As, {
                   readonly grouped: C["grouped"];

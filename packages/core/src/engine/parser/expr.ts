@@ -523,8 +523,10 @@ type ParseWithinGroup<T extends Toks, I extends number> =
   : EatOp<T, EatWords<T, I, ["within", "group"]>, "("> extends never ? Expected<'"("', T, EatWords<T, I, ["within", "group"]>>
   : EatWords<T, EatOp<T, EatWords<T, I, ["within", "group"]>, "(">, ["order", "by"]> extends never ? Expected<"ORDER BY", T, EatOp<T, EatWords<T, I, ["within", "group"]>, "(">>
   : ParseOrderList<T, EatWords<T, EatOp<T, EatWords<T, I, ["within", "group"]>, "(">, ["order", "by"]>> extends infer X
-    ? X extends Ok<readonly [infer E, ...unknown[]], infer J extends number>
-      ? EatOp<T, J, ")"> extends never ? Expected<'")"', T, J> : Ok<E, EatOp<T, J, ")">>
+    ? X extends Ok<infer Es, infer J extends number>
+      ? EatOp<T, J, ")"> extends never ? Expected<'")"', T, J>
+      // several sort keys (hypothetical-set aggregates: `rank(1, 2) WITHIN GROUP (ORDER BY a, b)`) are kept as a row
+      : Ok<Es extends readonly [infer E] ? E : { t: "row"; items: Es }, EatOp<T, J, ")">>
       : X
     : never;
 
