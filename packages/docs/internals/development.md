@@ -101,15 +101,15 @@ How a run works (`packages/core/test/pg-regress/`):
 
 1. `psql.mjs` splits each `.sql` file into the statements psql sends, following psql's lexer
    (`src/fe_utils/psqlscan.l`): quotes and dollar quotes, nested comments, parentheses,
-   `BEGIN ATOMIC` bodies, `\;`, `\g` and friends, `\r`, COPY FROM STDIN data and
+   `BEGIN ATOMIC` bodies, `\;`, `\g` and friends, `\r`, `\if` with a literal condition, COPY FROM STDIN data and
    `standard_conforming_strings`. Two kinds of statements are not checked: those that use psql
    variables (`:name`), whose text depends on a value we don't have, and those run with
    `standard_conforming_strings` off that contain a backslash, whose string literals mean
    something else than the parser (which follows the default) reads.
 2. It finds each statement's outcome in the expected output (`psql -a` echoes the input, so the
    result of a statement is what follows its last line): `ok`, `error` (Postgres parsed it, then
-   failed), `syntax-error` (`ERROR:  syntax error at or near …` / `at end of input` without a
-   `CONTEXT` line, and with the caret outside string literals: a syntax error in a function body,
+   failed), `syntax-error` (an error of the scanner or the grammar, `… at or near "…"` /
+   `at end of input`, without a `CONTEXT` line, and with the caret outside string literals: a syntax error in a function body,
    which Postgres parses while running CREATE FUNCTION or DO, is an `error`), or `unknown` when
    it cannot tell.
 3. `run.mjs` writes one `.ts` file per test to `node_modules/.cache/typesql-pg-regress/`, each

@@ -3,7 +3,7 @@
 // (src/fe_utils/psqlscan.l) that decide where a statement ends.
 
 /** Meta-commands that send the query buffer. */
-const SENDS = new Set(["g", "gx", "gset", "gexec", "gdesc", "crosstabview", "watch", "sendpipeline"]);
+const SENDS = new Set(["g", "gx", "gset", "gexec", "gdesc", "crosstabview", "watch", "sendpipeline", "parse"]);
 // Identifier characters as psql's lexer sees them: every non-ASCII character counts as a letter.
 const IDENT_START = /[A-Za-z_]|[^\x00-\x7f]/;
 const IDENT_CONT = /[A-Za-z0-9_$]|[^\x00-\x7f]/;
@@ -16,7 +16,7 @@ const DOLLAR_QUOTE = /^\$(?:(?:[A-Za-z_]|[^\x00-\x7f])(?:[A-Za-z0-9_]|[^\x00-\x7
  * @property {number} line      1-based line of the first token.
  * @property {number} endLine   1-based line where the statement ends.
  * @property {boolean} psqlVars Uses `:name`, `:'name'` or `:"name"`; psql substitutes a value we don't know.
- * @property {boolean} conditional Inside `\if`, which may not run.
+ * @property {boolean} conditional Inside an `\if` branch whose condition we cannot evaluate (a variable).
  * @property {boolean} nonstandardStrings Run with standard_conforming_strings off and has a backslash:
  *   its string literals mean something else than the parser (which follows the default) reads.
  * @property {"ok" | "error" | "syntax-error" | "unknown"} [pg] Set by `classify`.
@@ -42,7 +42,14 @@ export function splitPsql(text) {
   /** First unquoted words at parenthesis depth 0, as psql records them. */
   let initIdents = [];
   let psqlVars = false;
-  let ifDepth = 0;
+  /**
+   * One entry per open `\if`: whether the current branch runs (`null`: unknown, it tests a
+   * variable) and whether an earlier branch ran. psql reads nothing in a branch that does not run.
+   * @type {{ active: boolean | null, taken: boolean | null }[]}
+   */
+  const ifs = [];
+  const running = () => ifs.every((b) => b.active !== false);
+  const conditional = () => ifs.some((b) => b.active === null);
   /** COPY FROM STDIN blocks that follow the current line (several with `\;`). */
   let copyBlocks = 0;
   let stdStrings = true;
@@ -67,7 +74,7 @@ export function splitPsql(text) {
   const flush = (endLine) => {
     const sql = buf.slice(startIdx).trim();
     if (startLine >= 0 && sql !== ";") {
-      out.push({ sql, line: startLine + 1, endLine: endLine + 1, psqlVars, conditional: ifDepth > 0, nonstandardStrings: !stdStrings && sql.includes("\\") });
+      out.push({ sql, line: startLine + 1, endLine: endLine + 1, psqlVars, conditional: conditional(), nonstandardStrings: !stdStrings && sql.includes("\\") });
       if (isCopyFromStdin()) copyBlocks++;
       const words = sql.replace(/--[^\n]*/g, "").toLowerCase().split(/[\s=]+/).filter(Boolean);
       if ((words[0] === "set" || words[0] === "reset") && words.includes("standard_conforming_strings")) {
@@ -82,6 +89,12 @@ export function splitPsql(text) {
     if (copyBlocks > 0) {
       out.dataLines.add(ln);
       if (line === "\\.") copyBlocks--;
+      continue;
+    }
+    // In a branch that does not run, only the \if family of meta-commands is read.
+    if (!running() && !quote && !commentDepth) {
+      const cmd = /^\s*\\(if|elif|else|endif)\b(.*)$/.exec(line);
+      if (cmd) branch(cmd[1], cmd[2]);
       continue;
     }
     let i = 0;
@@ -124,8 +137,7 @@ export function splitPsql(text) {
         }
         if (line[i + 1] === ":") { buf += ":"; i += 2; continue; }
         const cmd = /^\\([A-Za-z_?!.]*)/.exec(line.slice(i))[1];
-        if (cmd === "if") ifDepth++;
-        else if (cmd === "endif") ifDepth--;
+        if (cmd === "if" || cmd === "elif" || cmd === "else" || cmd === "endif") branch(cmd, line.slice(i + 1 + cmd.length));
         else if (cmd === "r" || cmd === "reset") reset();
         else if (cmd === "copy" && /\bfrom\s+p?stdin\b/i.test(line)) copyBlocks++;
         // The rest of the line is the meta-command's arguments, except that a sending command
@@ -172,6 +184,22 @@ export function splitPsql(text) {
   }
   flush(lines.length - 1);
   return out;
+
+  /** `\if expr`, `\elif expr`, `\else`, `\endif`. Only literal booleans are evaluated. */
+  function branch(cmd, arg) {
+    const value = () => {
+      const v = arg.trim().toLowerCase();
+      return /^(t|tr|tru|true|y|ye|yes|on|1)$/.test(v) ? true : /^(f|fa|fal|fals|false|n|no|off|0)$/.test(v) ? false : null;
+    };
+    if (cmd === "if") { const v = value(); ifs.push({ active: v, taken: v }); return; }
+    const b = ifs.at(-1);
+    if (!b) return;
+    if (cmd === "endif") { ifs.pop(); return; }
+    // An earlier branch ran: this one does not. Unknown earlier branches make this one unknown.
+    const v = cmd === "else" ? true : value();
+    b.active = b.taken === true ? false : b.taken === null ? (v === false ? false : null) : v;
+    if (b.active !== false) b.taken = b.taken === null || b.active === null ? null : true;
+  }
 
   /** psql counts BEGIN/CASE/END inside CREATE [OR REPLACE] FUNCTION|PROCEDURE (BEGIN ATOMIC bodies). */
   function trackIdent(word) {
@@ -243,7 +271,12 @@ export function classify(sqlText, outText) {
  * @param {string[]} lines the error line and what follows it
  */
 function isGrammarError(lines) {
-  if (!/^ERROR:  syntax error at (or near ".*"|end of input)$/.test(lines[0])) return false;
+  // The scanner's and the grammar's errors end in `at or near "…"` / `at end of input` (other
+  // errors point at a position with a LINE line only); with terse verbosity, `at character N`.
+  // Unicode escapes are decoded between the scanner and the grammar.
+  const raw = /^ERROR:  .* at (or near ".*"|end of input)( at character \d+)?$/.test(lines[0]) && !/ of jsonpath input/.test(lines[0]);
+  const unicode = /^ERROR:  (unsafe use of string constant with Unicode escapes|invalid Unicode escape( value)?|invalid Unicode surrogate pair|unsupported Unicode escape sequence)( at character \d+)?$/.test(lines[0]) && /^LINE \d+: /.test(lines[1] ?? "");
+  if (!raw && !unicode) return false;
   const next = lines.slice(1).findIndex((l) => /^(ERROR|WARNING|NOTICE|INFO):/.test(l));
   return !lines.slice(1, next < 0 ? undefined : next + 1).some((l) => l.startsWith("CONTEXT:"));
 }
