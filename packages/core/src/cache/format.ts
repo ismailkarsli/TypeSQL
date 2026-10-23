@@ -125,9 +125,8 @@ export function render(file: CacheFile | null, id: string, engine: string): stri
     snapshots.push(`    ${lit(`${id}#${g}`)}: D_${g};`);
     const body = entries.map(([key, e]) => {
       keys.add(key);
-      const base = `r: ${union(e.r)}${e.a ? `; a: ${e.a}` : ""}`;
-      const variants = e.c?.length ? e.c.map((c) => `{ ${base}; c: { m: M_${c.m}; k: ${c.k}; g: ${c.g}; p: ${c.p}; q: ${c.q} } }`) : [`{ ${base} }`];
-      return `      ${lit(key)}: ${variants.join(" | ")};`;
+      const calls = e.c?.length ? `; c: ${e.c.map((c) => `{ m: M_${c.m}; k: ${c.k}; g: ${c.g}; p: ${c.p}; q: ${c.q} }`).join(" | ")}` : "";
+      return `      ${lit(key)}: { r: ${union(e.r)}${e.a ? `; a: ${e.a}` : ""}${calls} };`;
     });
     groups.push(`    ${lit(`${id}#${g}`)}: {\n${body.join("\n")}\n    };`);
   }

@@ -57,7 +57,10 @@ export function merge(file: CacheFile, mine: Contribution, owner: string): Cache
     Object.assign(target.w, group.w);
     Object.assign(target.q, group.q);
     for (const [key, entry] of Object.entries(group.entries)) {
-      target.entries[key] = entry;
+      // keep the call variants (type maps, rowKeys) other projects computed for this key
+      const theirs = (target.entries[key]?.c ?? []).filter((c) => !entry.c?.some((m) => m.m === c.m && m.k === c.k));
+      const c = [...(entry.c ?? []), ...theirs];
+      target.entries[key] = { ...entry, ...(c.length ? { c } : {}) };
       own(groupEntryId(g, key));
     }
   }

@@ -44,6 +44,16 @@ describe("a file shared by several projects", () => {
   });
 });
 
+test("call variants of other projects for the same statement are kept", () => {
+  const call = (k: string) => ({ m: "m1", k, g: "unknown", p: "[]", q: "__T.Query<{}, [], \"S\">" });
+  const withCall = (k: string): Contribution => ({ groups: { g: { ...group([], ["s"]), entries: { S: { r: ["s", "*"], a: "{}", c: [call(k)] } } } }, maps: { m1: "{}" }, ddl: {} });
+  let file = merge(emptyCache("v"), withCall('"preserve"'), "app");
+  file = merge(file, withCall('"camelCase"'), "tests");
+  expect(file.groups.g!.entries.S!.c!.map((c) => c.k).sort()).toEqual(['"camelCase"', '"preserve"']);
+  file = merge(file, withCall('"preserve"'), "app");
+  expect(file.groups.g!.entries.S!.c).toHaveLength(2);
+});
+
 describe("writing", () => {
   test("writes through a temporary file, and reports an unchanged file", async () => {
     const dir = mkdtempSync(join(tmpdir(), "typesql-cache-"));

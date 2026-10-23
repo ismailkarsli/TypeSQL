@@ -15,7 +15,7 @@ beforeAll(() => {
     "tsconfig.ci.json": JSON.stringify({ extends: "./tsconfig.json", contentMappers: null }),
     "tsconfig.off.json": tsconfig({ contentMappers: undefined }),
     "src/db.ts": SCHEMA,
-    "src/queries.ts": queries(40) + `export const bad = sql("SELECT nmae FROM users");\n`,
+    "src/queries.ts": queries(40) + `export const bad = sql("SELECT nmae FROM users");\nexport const wrongArgument = sql("SELECT id FROM users WHERE id = $1", "one");\n`,
     "src/generated/queries.typesqlcache": "{}\n",
     "tests/tsconfig.json": JSON.stringify({ extends: "../tsconfig.json", include: ["../src", "."] }),
     "tests/more.ts": queries(5, 100, "../src/db.js"),
@@ -32,7 +32,7 @@ describe("tsc and the content mapper", () => {
       const r = p.tsc(["-p", config, "--listFiles"], { TYPESQL_CACHE_LOG: log });
       expect(r.out).not.toContain("TS18068");
       expect(r.out).not.toContain(".typesqlcache");
-      expect(errors(r.out).filter((l) => !l.includes("nmae"))).toEqual([]);
+      expect(errors(r.out)).toHaveLength(2);
     }
     expect(existsSync(log)).toBe(false);
   });
@@ -45,7 +45,7 @@ describe("tsc and the content mapper", () => {
     const cold = check("tsconfig.ci.json");
     const warm = check("tsconfig.json", ["--runExternalCode"]);
     expect(errors(warm.out)).toEqual(errors(cold.out));
-    expect(errors(cold.out)).toHaveLength(1);
+    expect(errors(cold.out)).toHaveLength(2);
   });
 
   test("a generated cache: the same diagnostics, far fewer instantiations", async () => {
@@ -55,13 +55,24 @@ describe("tsc and the content mapper", () => {
     const cold = check("tsconfig.ci.json");
     const warm = check("tsconfig.json", ["--runExternalCode"]);
     expect(errors(warm.out)).toEqual(errors(cold.out));
+    // the SQL error and the wrong argument (TS2345 from the cached parameter types)
+    expect(errors(warm.out).map((l) => /error (TS\d+)/.exec(l)![1])).toEqual(["TS2345", "TS2345"]);
     expect(instantiations(warm.out)).toBeLessThan(instantiations(cold.out) / 5);
+  }, 120_000);
+
+  test("a job that tsc cuts short leaves the file as it was, or complete", () => {
+    const before = p.read("src/generated/queries.typesqlcache");
+    p.write("src/generated/queries.typesqlcache", "{}\n");
+    check("tsconfig.json", ["--runExternalCode"], { TYPESQL_CACHE_DELAY: "0" });
+    const after = p.read("src/generated/queries.typesqlcache");
+    expect(after === "{}\n" || parseCache(after) !== null).toBe(true);
+    p.write("src/generated/queries.typesqlcache", before);
   }, 120_000);
 
   test("two cache files in one program do not conflict, and both serve entries", () => {
     p.write("src/other/more.typesqlcache", p.read("src/generated/queries.typesqlcache"));
     const warm = check("tsconfig.json", ["--runExternalCode"]);
-    expect(errors(warm.out).filter((l) => !l.includes("nmae"))).toEqual([]);
+    expect(errors(warm.out)).toHaveLength(2);
     expect(warm.out).not.toContain("TS2717");
     p.write("src/generated/queries.typesqlcache", "{}\n");
     const one = check("tsconfig.json", ["--runExternalCode"]);

@@ -351,7 +351,10 @@ export class Session {
       const isErr = !(g.flags & 2); // TypeFlags.Unknown: a valid call's check is `unknown`
       const e = entryFor(s.g, s.key, depsOf([s.key, ...s.extraWords], isErr));
       if (text !== s.key) e.t = text;
-      e.c.push({ m: s.map.id, k: s.keys, g: await print(g), p: await print(p), q: await print(q) });
+      const call: CallEntry = { m: s.map.id, k: s.keys, g: await print(g), p: await print(p), q: await print(q) };
+      // two call sites with the same text: one variant (identical variants would show as a union)
+      if (e.c.some((c: CallEntry) => c.m === call.m && c.k === call.k)) return;
+      e.c.push(call);
       computed++;
     }));
     const ddlNew: { [key: string]: DdlEntry[] } = {};

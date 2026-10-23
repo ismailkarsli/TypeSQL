@@ -11,7 +11,7 @@ import { hasInline, param, resolveInline, takeValue, valueOrDefault } from "./ru
 import { json } from "./runtime/json.js";
 import { buildSet, buildValues } from "./runtime/write.js";
 import type { InsertInput, NoExtraKeys, RelationName, SetInput, SetRep, TableName, ValuesRep } from "./engine/write.js";
-import type { CallEntry, FreshVariants, IsUnion, OneOf, QueryCacheKeys, Same } from "./engine/cache.js";
+import type { CallEntry, FreshVariants, IsUnion, OneOf, QueryCacheKeys, Same, Second } from "./engine/cache.js";
 
 /**
  * `Parts` when every part is a literal (or a union of literals). A generic part leaves this
@@ -237,7 +237,7 @@ type BoxFragArgs<Text extends string> = Extract<{ [K in Text as `${K}`]: FragArg
 /** The cached call (`never` on a miss), for a key of `QueryCacheKeys`. Exported for tests. */
 export type CallCached<DB, TM, Keys, Q extends string> =
   IsUnion<Q> extends true ? never
-  : OneOf<FreshVariants<DB, Q> extends infer V ? (V extends { readonly c: infer C extends CallEntry } ? ([Keys] extends [C["k"]] ? (Same<TM, C["m"]> extends true ? C : never) : never) : never) : never>;
+  : Second<OneOf<FreshVariants<DB, Q> extends infer V ? (V extends [infer G, { readonly c: infer C extends CallEntry }] ? (C extends unknown ? ([Keys] extends [C["k"]] ? (Same<TM, C["m"]> extends true ? [G, C] : never) : never) : never) : never) : never>>;
 /**
  * What the type cache stores for the plain call `sql(Q, …)` (engine/cache.ts `CallEntry`): the
  * query argument's check, the arguments after it and the return type. The cache job's probe file

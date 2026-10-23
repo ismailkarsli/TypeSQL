@@ -49,7 +49,7 @@ export interface DdlCacheKeys {}
  * Version of the engine's output. An entry computed by another version is never used. It is a
  * hash of the type-level sources, kept up to date by `node scripts/cache-version.mjs`.
  */
-export type CacheVersion = "ab8842bc551b";
+export type CacheVersion = "75a9c70c2ab6";
 
 /** A relation, function or catalog entry that did not exist when the entry was computed. */
 export interface Missing { readonly "typesql.missing": true }
@@ -139,7 +139,7 @@ export type HintIndex<DB> = {
   : { [R in keyof DB[K] & string]: IsRelation<DB[K][R]> extends true ? R | `${R}.${RelCols<DB[K][R]>}` : never }[keyof DB[K] & string];
 }[keyof DB & string];
 
-/** One cache entry: a key in one group (and, with `c`, for one type map and `rowKeys`). */
+/** One cache entry: a key in one group (`c`: one per type map and `rowKeys`, a union). */
 export type CacheEntry = {
   /** Dependencies: words, pairs, `"*"`, and `"!h"` for errors. */
   readonly r: string;
@@ -170,9 +170,13 @@ type FreshIn<DB, G, E> =
     : E extends { readonly r: infer R } ? ([Extract<S, R>] extends [never] ? E : never) : never
     : never;
 
-/** Fresh entries of `Q` across groups (usually one; never when none). */
+/**
+ * Fresh entries of `Q` across groups, each as `[group, entry]` (usually one; never when none).
+ * The group keeps entries of two files apart even when their types are the same, so `OneOf`
+ * picks one of them rather than taking both as one type.
+ */
 export type FreshVariants<DB, Q extends string> =
-  { [G in keyof QueryCache]: Q extends keyof QueryCache[G] ? FreshIn<DB, G, QueryCache[G][Q]> : never }[keyof QueryCache];
+  { [G in keyof QueryCache]: Q extends keyof QueryCache[G] ? (FreshIn<DB, G, QueryCache[G][Q]> extends infer E ? ([E] extends [never] ? never : [G, E]) : never) : never }[keyof QueryCache];
 
 /**
  * One member of a union (the last, in TypeScript's order); itself for a non-union. Several fresh
@@ -191,7 +195,10 @@ export type IsUnion<T, U = T> = T extends unknown ? ([U] extends [T] ? false : t
  */
 export type CachedAnalysis<DB, Q extends string> =
   IsUnion<Q> extends true ? never
-  : OneOf<FreshVariants<DB, Q> extends infer V ? (V extends { readonly a: infer A } ? A : never) : never>;
+  : Second<OneOf<FreshVariants<DB, Q> extends infer V ? (V extends [infer G, { readonly a: infer A }] ? [G, A] : never) : never>>;
+
+/** `P[1]`, and `never` for `never` (where `never extends [unknown, infer X]` would give `unknown`). */
+export type Second<P> = [P] extends [never] ? never : P extends [unknown, infer X] ? X : never;
 
 // ─── generation (used by the job's probe file, src/cache/**) ───
 

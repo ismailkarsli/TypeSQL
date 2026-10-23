@@ -101,3 +101,34 @@ test("CI=1 or TYPESQL_CACHE=off: the mapper serves the file but starts no job", 
     }
   }
 }, 120_000);
+
+test("hover text is the same with and without the cache", async () => {
+  const cacheFile = join(p.dir, "src/generated/queries.typesqlcache");
+  writeFileSync(cacheFile, "{}\n");
+  await generate({ configFile: join(p.dir, "tsconfig.json"), cacheFile, engine: engineVersion(), isCorePath: (f) => f.startsWith(join(p.corePackage, "dist")) });
+  p.write("tsconfig.nocache.json", JSON.stringify({ extends: "./tsconfig.json", contentMappers: null }));
+  const hovers = async (config: string | null): Promise<string[]> => {
+    if (config) p.write("tsconfig.json", p.read(config));
+    const lsp = startLsp(p.dir, { TYPESQL_CACHE: "off" });
+    try {
+      await lsp.request("initialize", { processId: process.pid, rootUri: lsp.uri("."), capabilities: { textDocument: { hover: {} } }, initializationOptions: { runExternalCode: true } });
+      lsp.notify("initialized", {});
+      const uri = lsp.uri("src/queries.ts");
+      const text = p.read("src/queries.ts");
+      lsp.notify("textDocument/didOpen", { textDocument: { uri, languageId: "typescript", version: 1, text } });
+      const lines = text.split("\n").map((l, i) => [l, i] as const).filter(([l]) => /^export const \w+ = sql\(/.test(l));
+      const out: string[] = [];
+      for (const [, line] of lines) out.push(((await lsp.request("textDocument/hover", { textDocument: { uri }, position: { line, character: 14 } })).result as { contents: { value: string } }).contents.value);
+      return out;
+    } finally {
+      await lsp.close();
+    }
+  };
+  const main = p.read("tsconfig.json");
+  const warm = await hovers(null);
+  const cold = await hovers("tsconfig.nocache.json");
+  p.write("tsconfig.json", main);
+  expect(warm.length).toBeGreaterThanOrEqual(10);
+  for (let i = 0; i < warm.length; i++) if (warm[i] !== cold[i]) console.log(`WARM: ${warm[i]}\nCOLD: ${cold[i]}`);
+  expect(warm).toEqual(cold);
+}, 120_000);
