@@ -1,6 +1,6 @@
-## 0.1.4
+## 0.1.5
 
 ### Patch Changes
 
 - Updated dependencies:
-  - @typesql/core@0.3.0
+  - @typesql/core@0.4.0

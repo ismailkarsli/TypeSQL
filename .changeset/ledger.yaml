@@ -60,6 +60,10 @@
     - sour-flowers-draw
     - wide-plums-sing
     - wild-books-brush
+"@typesql/core@0.4.0":
+  dir: packages/core
+  intents:
+    - heavy-cows-repeat
 "@typesql/drizzle@0.0.2":
   dir: packages/drizzle
   intents:
@@ -179,3 +183,7 @@
   intents:
     - modern-mails-smash
     - real-houses-heal
+typesql@0.0.1:
+  dir: packages/vscode
+  intents:
+    - clean-owls-kiss
