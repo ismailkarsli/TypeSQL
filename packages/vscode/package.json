@@ -2,7 +2,7 @@
   "name": "typesql",
   "displayName": "TypeSQL",
   "description": "Completions for tables and columns inside TypeSQL's sql() strings, on top of TypeScript 7.",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "private": true,
   "preview": true,
   "publisher": "typesql",

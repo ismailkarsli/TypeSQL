@@ -187,3 +187,7 @@ typesql@0.0.1:
   dir: packages/vscode
   intents:
     - clean-owls-kiss
+typesql@0.0.2:
+  dir: packages/vscode
+  intents:
+    - pretty-moles-sip
