@@ -67,12 +67,18 @@ jobs:
           fi
           # "chore: release 0.0.4", or "chore: release 0.0.4, 0.1.0" when versions diverge.
           versions=$(comm -13 <(sort <<<"$before") <(public | sort) | sed 's/.*@//' | sort -uV | paste -sd, - | sed 's/,/, /g')
-          # a release of the VS Code extension alone (a private package) bumps no public version
-          versions=${versions:-"VS Code extension $(node -p 'require("./packages/vscode/package.json").version')"}
+          # a release of the VS Code extension alone (a private package) bumps no public version;
+          # with no version bumped at all, pnpm only pruned changelog sections npm now confirms
+          extension=$(node -p 'require("./packages/vscode/package.json").version')
+          if [ -z "$versions" ] && [ "$extension" != "$(git show HEAD:packages/vscode/package.json | node -p 'JSON.parse(require("fs").readFileSync(0)).version')" ]; then
+            versions="VS Code extension $extension"
+          fi
           # Committed through the API, which signs it (main requires signed commits), and rejected,
           # so nothing is published, when main moved past the commit the checks ran on.
           git add -A
-          node scripts/github-commit.mjs main "chore: release $versions"
+          message="chore: release $versions"
+          [ -n "$versions" ] || message="chore: prune changelog sections of published versions"
+          node scripts/github-commit.mjs main "$message"
           git fetch origin main
           git reset --hard origin/main
         env:
@@ -119,7 +125,8 @@ jobs:
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
-          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          # the identity only publishes to the Marketplace: it has no Azure subscription or role
+          allow-no-subscriptions: true
       # The identity's Marketplace id, which is added to the publisher once (see releasing.md).
       - name: Marketplace identity
         if: vars.VSCODE_MARKETPLACE == 'true'

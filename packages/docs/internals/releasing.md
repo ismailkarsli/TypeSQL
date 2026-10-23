@@ -201,13 +201,19 @@ be the same on both registries.
    retired on December 1, 2026):
    1. Create the publisher `typesql` at
       [marketplace.visualstudio.com/manage](https://marketplace.visualstudio.com/manage).
-   2. In the Azure portal, create a user-assigned managed identity and give it the Reader role
-      on a subscription. Under **Federated credentials**, add one for GitHub Actions:
-      organization `ismailkarsli`, repository `typesql`, entity **Environment**, environment
-      `vscode` (subject `repo:ismailkarsli/typesql:environment:vscode`, audience
-      `api://AzureADTokenExchange`).
+   2. In the Azure portal, create a user-assigned managed identity. It needs no Azure role or
+      subscription: the workflow logs in with `allow-no-subscriptions`. Under **Federated
+      credentials**, add one with the scenario **Other issuer** (the GitHub scenario builds a
+      subject in the old format):
+      - issuer `https://token.actions.githubusercontent.com`, without a trailing slash;
+      - subject `repo:ismailkarsli@17887754/TypeSQL@1418220756:environment:vscode`: this
+        repository uses immutable subject claims, which carry the owner's and the repository's
+        ids, and Entra compares the subject case-sensitively (`TypeSQL`, not `typesql`). The
+        `azure/login` step prints the subject GitHub sends (`subject claim - …`); copy it from
+        there if it ever changes;
+      - audience `api://AzureADTokenExchange`.
    3. On the `vscode` environment, set the variables `AZURE_CLIENT_ID` (the identity's client
-      id), `AZURE_TENANT_ID` and `AZURE_SUBSCRIPTION_ID`, and `VSCODE_MARKETPLACE` to `true`.
+      id) and `AZURE_TENANT_ID`, and `VSCODE_MARKETPLACE` to `true`.
    4. Run the release workflow. The `extension` job's **Marketplace identity** step prints the
       identity's Marketplace id; publishing fails until that id is a member of the publisher.
       Add it on the publisher's **Members** page with the Contributor role, then
