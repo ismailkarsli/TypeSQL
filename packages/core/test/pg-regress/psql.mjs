@@ -2,6 +2,13 @@
 // output to find what the server did with each one. Mirrors the rules of psql's lexer
 // (src/fe_utils/psqlscan.l) that decide where a statement ends.
 
+/** Variables psql sets itself (their values depend on the session). */
+const PSQL_VARIABLES = new Set([
+  "AUTOCOMMIT", "DBNAME", "ENCODING", "ERROR", "HOST", "LASTOID", "LAST_ERROR_MESSAGE", "LAST_ERROR_SQLSTATE", "PORT",
+  "ROW_COUNT", "SERVER_VERSION_NAME", "SERVER_VERSION_NUM", "SHELL_ERROR", "SHELL_EXIT_CODE", "SQLSTATE", "USER",
+  "VERSION", "VERSION_NAME", "VERSION_NUM", "PIPELINE_SYNC_COUNT", "PIPELINE_COMMAND_COUNT", "PIPELINE_RESULT_COUNT",
+]);
+
 /** Meta-commands that send the query buffer. */
 const SENDS = new Set(["g", "gx", "gset", "gexec", "gdesc", "crosstabview", "watch", "sendpipeline", "parse"]);
 // Identifier characters as psql's lexer sees them: every non-ASCII character counts as a letter.
@@ -15,7 +22,7 @@ const DOLLAR_QUOTE = /^\$(?:(?:[A-Za-z_]|[^\x00-\x7f])(?:[A-Za-z0-9_]|[^\x00-\x7
  * @property {string} sql       Text sent to the server, without the comments before it.
  * @property {number} line      1-based line of the first token.
  * @property {number} endLine   1-based line where the statement ends.
- * @property {boolean} psqlVars Uses `:name`, `:'name'` or `:"name"`; psql substitutes a value we don't know.
+ * @property {boolean} psqlVars Uses a psql variable whose value we don't know (see `splitPsql`).
  * @property {boolean} conditional Inside an `\if` branch whose condition we cannot evaluate (a variable).
  * @property {boolean} nonstandardStrings Run with standard_conforming_strings off and has a backslash:
  *   its string literals mean something else than the parser (which follows the default) reads.
@@ -26,6 +33,12 @@ const DOLLAR_QUOTE = /^\$(?:(?:[A-Za-z_]|[^\x00-\x7f])(?:[A-Za-z0-9_]|[^\x00-\x7
 /**
  * Split a psql script into statements. `result.dataLines` holds the 0-based lines that are
  * COPY FROM STDIN data.
+ *
+ * psql variables are substituted where the text psql sends can be known: `:'name'` is always a
+ * string literal and `:"name"` a quoted identifier (whatever the value), and `:name` takes the
+ * value of an earlier `\set name value`. A variable whose value is unknown (`\gset`,
+ * `\getenv`, psql's own variables) used bare makes the statement `psqlVars`. An undefined
+ * variable is sent as written, as psql does (`arr[1:n]` is a slice).
  * @param {string} text
  * @returns {Statement[] & { dataLines: Set<number> }}
  */
@@ -42,6 +55,13 @@ export function splitPsql(text) {
   /** First unquoted words at parenthesis depth 0, as psql records them. */
   let initIdents = [];
   let psqlVars = false;
+  let substitutedSemicolon = false;
+  /** psql variables: name → value, or `null` when set but unknown (`\getenv`). */
+  const vars = new Map();
+  /** A `\gset` ran: it defines variables named after its query's columns. */
+  let gset = false;
+  const known = (name) => vars.has(name) || PSQL_VARIABLES.has(name);
+  const maybeDefined = (name) => known(name) || gset;
   /**
    * One entry per open `\if`: whether the current branch runs (`null`: unknown, it tests a
    * variable) and whether an earlier branch ran. psql reads nothing in a branch that does not run.
@@ -69,12 +89,15 @@ export function splitPsql(text) {
     beginDepth = 0;
     initIdents = [];
     psqlVars = false;
+    substitutedSemicolon = false;
   };
 
   const flush = (endLine) => {
     const sql = buf.slice(startIdx).trim();
     if (startLine >= 0 && sql !== ";") {
-      out.push({ sql, line: startLine + 1, endLine: endLine + 1, psqlVars, conditional: conditional(), nonstandardStrings: !stdStrings && sql.includes("\\") });
+      // psql scans a substituted value like typed input: a `;` in it ends a statement.
+      const parts = substitutedSemicolon ? splitPsql(sql).map((p) => p.sql) : [sql];
+      for (const part of parts) out.push({ sql: part, line: startLine + 1, endLine: endLine + 1, psqlVars, conditional: conditional(), nonstandardStrings: !stdStrings && part.includes("\\") });
       if (isCopyFromStdin()) copyBlocks++;
       const words = sql.replace(/--[^\n]*/g, "").toLowerCase().split(/[\s=]+/).filter(Boolean);
       if ((words[0] === "set" || words[0] === "reset") && words.includes("standard_conforming_strings")) {
@@ -137,7 +160,12 @@ export function splitPsql(text) {
         }
         if (line[i + 1] === ":") { buf += ":"; i += 2; continue; }
         const cmd = /^\\([A-Za-z_?!.]*)/.exec(line.slice(i))[1];
-        if (cmd === "if" || cmd === "elif" || cmd === "else" || cmd === "endif") branch(cmd, line.slice(i + 1 + cmd.length));
+        const args = line.slice(i + 1 + cmd.length);
+        if (cmd === "if" || cmd === "elif" || cmd === "else" || cmd === "endif") branch(cmd, args);
+        else if (cmd === "set") setVar(args);
+        else if (cmd === "unset") vars.delete(args.trim());
+        else if (cmd === "getenv") vars.set(args.trim().split(/\s+/)[0], null);
+        else if (cmd === "gset") gset = true;
         else if (cmd === "r" || cmd === "reset") reset();
         else if (cmd === "copy" && /\bfrom\s+p?stdin\b/i.test(line)) copyBlocks++;
         // The rest of the line is the meta-command's arguments, except that a sending command
@@ -160,8 +188,26 @@ export function splitPsql(text) {
         buf += c; i++;
         continue;
       }
-      if (c === ":" && line[i + 1] !== ":" && buf.slice(-1) !== ":" && bracketDepth === 0 && /^:(['"]?[A-Za-z_]|\{\?)/.test(line.slice(i))) {
-        psqlVars = true;
+      if (c === ":" && line[i + 1] !== ":" && buf.slice(-1) !== ":") {
+        const v = /^:(?:(['"])([A-Za-z0-9_]+)\1|([A-Za-z0-9_]+)|\{\?([A-Za-z0-9_]+)\})/.exec(line.slice(i));
+        if (v) {
+          const [all, q, qname, bare, test] = v;
+          const name = qname ?? bare ?? test;
+          if (q && maybeDefined(name)) {
+            // A literal or identifier whatever the value: substitute a stand-in of the same kind.
+            const text = vars.get(name) ?? name;
+            buf += q === "'" ? `'${text.replaceAll("'", "''")}'` : `"${text.replaceAll('"', '""')}"`;
+            i += all.length;
+            continue;
+          }
+          if (bare && typeof vars.get(name) === "string") {
+            buf += vars.get(name);
+            if (vars.get(name).includes(";")) substitutedSemicolon = true;
+            i += all.length;
+            continue;
+          }
+          if (test || (bare && known(name)) || (bare && gset && bracketDepth === 0)) psqlVars = true;
+        }
       }
       if (c === "(") parenDepth++;
       if (c === ")" && parenDepth > 0) parenDepth--;
@@ -184,6 +230,17 @@ export function splitPsql(text) {
   }
   flush(lines.length - 1);
   return out;
+
+  /** `\set name [value ...]`: plain words and '...' quoted values are kept; anything else is unknown. */
+  function setVar(args) {
+    const m = /^\s*([A-Za-z0-9_]+)\s*(.*)$/.exec(args);
+    if (!m) return;
+    const [, name, rest] = m;
+    const value = rest.trim();
+    if (/^[^'"`\s\\:]*$/.test(value)) vars.set(name, value);
+    else if (/^'([^'\\]|'')*'$/.test(value)) vars.set(name, value.slice(1, -1).replaceAll("''", "'"));
+    else vars.set(name, null);
+  }
 
   /** `\if expr`, `\elif expr`, `\else`, `\endif`. Only literal booleans are evaluated. */
   function branch(cmd, arg) {

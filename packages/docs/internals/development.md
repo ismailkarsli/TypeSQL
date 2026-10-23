@@ -89,7 +89,7 @@ run when the submodule has local changes. Disagreements are recorded on our side
 
 ```sh
 pnpm pg-regress:setup             # sparse, shallow checkout of the pinned commit (~20 MB)
-pnpm test:pg-regress              # all 233 files, ~45 s and ~2.7 GB of memory
+pnpm test:pg-regress              # all 233 files, ~1 min, under 1 GB of memory
 pnpm test:pg-regress join with    # only these files
 pnpm test:pg-regress --update     # rewrite baseline.json (only the named files' entries, if named)
 ```
@@ -102,8 +102,10 @@ How a run works (`packages/core/test/pg-regress/`):
 1. `psql.mjs` splits each `.sql` file into the statements psql sends, following psql's lexer
    (`src/fe_utils/psqlscan.l`): quotes and dollar quotes, nested comments, parentheses,
    `BEGIN ATOMIC` bodies, `\;`, `\g` and friends, `\r`, `\if` with a literal condition, COPY FROM STDIN data and
-   `standard_conforming_strings`. Two kinds of statements are not checked: those that use psql
-   variables (`:name`), whose text depends on a value we don't have, and those run with
+   `standard_conforming_strings`. psql variables are substituted where the text psql sends is
+   known (`:'v'` is a string literal and `:"v"` an identifier whatever their value; `:v` after
+   `\set v value`). Two kinds of statements are not checked: those that use a psql variable whose
+   value we don't have (set by `\gset`, `\getenv` or psql itself), and those run with
    `standard_conforming_strings` off that contain a backslash, whose string literals mean
    something else than the parser (which follows the default) reads.
 2. It finds each statement's outcome in the expected output (`psql -a` echoes the input, so the
@@ -113,8 +115,9 @@ How a run works (`packages/core/test/pg-regress/`):
    which Postgres parses while running CREATE FUNCTION or DO, is an `error`), or `unknown` when
    it cannot tell.
 3. `run.mjs` writes one `.ts` file per test to `node_modules/.cache/typesql-pg-regress/`, each
-   statement checked as `ParseProgram<Lex<sql>>`, runs `tsc` once over all of them and reads the
-   result of every statement from the diagnostics.
+   statement checked as `ParseProgram<Lex<sql>>`, runs `tsc` over them in batches of about 6000
+   statements (one run over all of them needs ~3 GB) and reads the result of every statement from
+   the diagnostics.
 
 A disagreement is one of:
 

@@ -67,11 +67,16 @@ const HEADER = [
 
 rmSync(cache, { recursive: true, force: true });
 mkdirSync(cache, { recursive: true });
-writeFileSync(join(cache, "tsconfig.json"), JSON.stringify({
+/** Statements per tsc run: one run over all of them needs ~3 GB; batches keep the peak low. */
+const BATCH = 6000;
+const tsconfig = (files) => JSON.stringify({
   extends: relative(cache, join(root, "tsconfig.base.json")),
   compilerOptions: { noEmit: true, declaration: false, declarationMap: false, sourceMap: false, noErrorTruncation: true, types: [] },
-  include: ["*.ts"],
-}, null, 2));
+  files,
+}, null, 2);
+/** @type {string[][]} test files per tsc run */
+const batches = [[]];
+let batchSize = 0;
 
 /** @type {{ test: string, stmt: import("./psql.mjs").Statement, ours?: string, crash?: string }[]} */
 const checked = [];
@@ -93,24 +98,32 @@ for (const test of tests) {
     byLine.set(`${test}.ts:${lines.length}`, entry);
   }
   writeFileSync(join(cache, `${test}.ts`), `${lines.join("\n")}\n`);
+  if (batchSize > 0 && batchSize + stmts.length > BATCH) { batches.push([]); batchSize = 0; }
+  batches.at(-1).push(`${test}.ts`);
+  batchSize += stmts.length;
 }
 
 const started = performance.now();
-const proc = spawnSync(tsc, ["-p", join(cache, "tsconfig.json"), "--pretty", "false"], { encoding: "utf8", maxBuffer: 1 << 30 });
+for (const [n, files] of batches.entries()) {
+  const config = join(cache, `tsconfig.${n}.json`);
+  writeFileSync(config, tsconfig(files));
+  const proc = spawnSync(tsc, ["-p", config, "--pretty", "false"], { encoding: "utf8", maxBuffer: 1 << 30 });
+  if (proc.error) throw proc.error;
+  const output = `${proc.stdout}${proc.stderr}`;
+  if (proc.signal) fail(`tsc was killed (${proc.signal}) checking ${files.join(", ")}; out of memory?`);
+  // A diagnostic is one line; elaborations of it are indented lines that follow.
+  let found = 0;
+  for (const m of output.matchAll(/^(.*?)\((\d+),\d+\): error (TS\d+): (.*)$/gm)) {
+    const entry = byLine.get(`${m[1].replace(/^.*[\\/]/, "")}:${m[2]}`);
+    if (!entry) fail(`unexpected diagnostic outside the generated statements:\n${m[0]}\n\n${output.slice(0, 4000)}`);
+    const type = m[4].match(/^Type '(.*)' is not assignable to type '"ok"'\.$/)?.[1];
+    if (m[3] === "TS2322" && type !== undefined) entry.ours ??= unquote(type);
+    else entry.crash ??= `${m[3]}: ${m[4]}`;
+    found++;
+  }
+  if (proc.status !== 0 && found === 0) fail(`tsc failed without diagnostics on ${files.join(", ")}:\n${output.slice(0, 4000)}`);
+}
 const seconds = (performance.now() - started) / 1000;
-if (proc.error) throw proc.error;
-const output = `${proc.stdout}${proc.stderr}`;
-// A diagnostic is one line; elaborations of it are indented lines that follow.
-for (const m of output.matchAll(/^(.*?)\((\d+),\d+\): error (TS\d+): (.*)$/gm)) {
-  const entry = byLine.get(`${m[1].replace(/^.*[\\/]/, "")}:${m[2]}`);
-  if (!entry) fail(`unexpected diagnostic outside the generated statements:\n${m[0]}\n\n${output.slice(0, 4000)}`);
-  const type = m[4].match(/^Type '(.*)' is not assignable to type '"ok"'\.$/)?.[1];
-  if (m[3] === "TS2322" && type !== undefined) entry.ours ??= unquote(type);
-  else entry.crash ??= `${m[3]}: ${m[4]}`;
-}
-if (proc.status !== 0 && !checked.some((e) => e.ours !== undefined || e.crash !== undefined)) {
-  fail(`tsc failed without diagnostics on the generated statements:\n${output.slice(0, 4000)}`);
-}
 
 // ───────────────────────────── compare ─────────────────────────────
 
