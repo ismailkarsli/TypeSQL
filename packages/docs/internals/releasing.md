@@ -222,14 +222,19 @@ be the same on both registries.
    1. Log in at [open-vsx.org](https://open-vsx.org) with GitHub, link an Eclipse account and
       sign the Publisher Agreement (profile page).
    2. Create an access token (**Settings → Access Tokens**) and the namespace, once, from a
-      terminal: `npx ovsx create-namespace typesql -p <token>`. Delete the token afterwards; the
-      workflow does not use it.
-   3. Under [trusted publishers](https://open-vsx.org/user-settings/trusted-publishers), add one
-      for the namespace `typesql`: repository `ismailkarsli/typesql`, workflow `release.yml`,
-      environment `vscode`. Like npm's, the trust names the workflow file: renaming `release.yml`
-      means registering it again.
-   4. Set the variable `OPEN_VSX` to `true` on the `vscode` environment, and run the release
-      again: with nothing new to release, it publishes the current version to Open VSX.
+      terminal: `npx ovsx create-namespace typesql -p <token>`.
+   3. Publish the first version by hand: a trusted publisher can only be added to an extension
+      that exists. From the release commit, run `pnpm --filter "typesql..." run build`, then in
+      `packages/vscode` `pnpm exec vsce package --no-dependencies --out typesql.vsix` and
+      `pnpm exec ovsx publish typesql.vsix -p <token>`. Delete the token afterwards; the workflow
+      does not use it. Open VSX checks `extensionDependencies` against its own registry, which is
+      why the manifest has none (`TypeScriptTeam.native-preview` is only on the Marketplace).
+   4. Under [trusted publishers](https://open-vsx.org/user-settings/trusted-publishers), add one
+      for the namespace `typesql`: owner `ismailkarsli`, repository `typesql`, workflow
+      `release.yml`, environment `vscode`. Like npm's, the trust names the workflow file:
+      renaming `release.yml` means registering it again.
+   5. Set the variable `OPEN_VSX` to `true` on the `vscode` environment. Later releases publish
+      there too.
 
 ## Files
 

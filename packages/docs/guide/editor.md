@@ -19,8 +19,9 @@ want completions.
 
 1. Install the TypeSQL extension from the
    [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=typesql.typesql)
-   or [Open VSX](https://open-vsx.org/extension/typesql/typesql). It installs the TypeScript 7
-   extension (`TypeScriptTeam.native-preview`) with it.
+   or [Open VSX](https://open-vsx.org/extension/typesql/typesql), and the
+   [TypeScript 7 extension](https://marketplace.visualstudio.com/items?itemName=TypeScriptTeam.native-preview)
+   (`TypeScriptTeam.native-preview`) next to it.
 2. Have `@typesql/core` 0.4.0 or later in the project, directly or through an adapter
    (`@typesql/pg`, `@typesql/postgres`, `@typesql/kysely`, `@typesql/drizzle`,
    `@typesql/prisma`). The extension loads the project's own copy, so suggestions follow the

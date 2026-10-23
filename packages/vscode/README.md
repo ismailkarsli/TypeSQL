@@ -15,10 +15,11 @@ extension.
 
 ## Requirements
 
-- The TypeScript 7 extension (`TypeScriptTeam.native-preview`), installed with this one, with its
-  language server on TypeScript 7.1 or later. Version 1.0 of the TypeScript 7 extension bundles
-  TypeScript 7.0, which is not enough: add `typescript@7.1.0-beta` (or later) to the project and
-  set `"js/ts.tsdk.path": "node_modules/typescript"` in `.vscode/settings.json`, then choose
+- The [TypeScript 7 extension](https://marketplace.visualstudio.com/items?itemName=TypeScriptTeam.native-preview)
+  (`TypeScriptTeam.native-preview`), with its language server on TypeScript 7.1 or later.
+  Version 1.0 of the TypeScript 7 extension bundles TypeScript 7.0, which is not enough: add
+  `typescript@7.1.0-beta` (or later) to the project and set
+  `"js/ts.tsdk.path": "node_modules/typescript"` in `.vscode/settings.json`, then choose
   **Allow** when asked; or install the **TypeScript 7 Nightly** extension.
 - `@typesql/core` 0.4.0 or later in the project, directly or through an adapter
   (`@typesql/pg`, `@typesql/postgres`, `@typesql/kysely`, `@typesql/drizzle`,

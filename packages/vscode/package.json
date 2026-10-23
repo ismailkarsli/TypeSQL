@@ -31,9 +31,6 @@
     "typescript",
     "completions"
   ],
-  "extensionDependencies": [
-    "TypeScriptTeam.native-preview"
-  ],
   "activationEvents": [
     "onLanguage:typescript",
     "onLanguage:typescriptreact",
