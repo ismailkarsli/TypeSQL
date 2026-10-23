@@ -59,6 +59,21 @@ test("ADD PRIMARY KEY makes the columns NOT NULL", () => {
   expectTypeOf<A<"ALTER TABLE users ADD CONSTRAINT users_pk PRIMARY KEY (email, name) DEFERRABLE">["users"]["name"]>().toEqualTypeOf<Col<"text">>();
 });
 
+test("ADD [CONSTRAINT n] NOT NULL col makes the column NOT NULL (not when NOT VALID)", () => {
+  expectTypeOf<A<"ALTER TABLE users ADD COLUMN b int, ADD NOT NULL b">["users"]["b"]>().toEqualTypeOf<Col<"int4">>();
+  expectTypeOf<A<"ALTER TABLE users ADD CONSTRAINT nn NOT NULL name NO INHERIT">["users"]["name"]>().toEqualTypeOf<Col<"text">>();
+  expectTypeOf<A<"ALTER TABLE users ADD NOT NULL name NOT VALID">["users"]["name"]>().toEqualTypeOf<Nullable<"text">>();
+  expectTypeOf<A<"ALTER TABLE users ADD NOT NULL nope">>().toEqualTypeOf<SqlError<'column "nope" of relation "users" does not exist', 6>>();
+  expectTypeOf<A<"ALTER TABLE users ADD CONSTRAINT pk PRIMARY KEY (id, name WITHOUT OVERLAPS)">["users"]["name"]>().toEqualTypeOf<Col<"text">>();
+  expectTypeOf<A<"ALTER TABLE users ADD COLUMN x int CHECK (x > 0) NOT ENFORCED">["users"]["x"]>().toEqualTypeOf<Nullable<"int4">>();
+});
+
+test("ALTER TABLE ALL IN TABLESPACE has no schema effect; SET WITH OIDS is a syntax error", () => {
+  expectTypeOf<A<"ALTER TABLE ALL IN TABLESPACE a OWNED BY bob SET TABLESPACE b NOWAIT; ALTER MATERIALIZED VIEW ALL IN TABLESPACE a SET TABLESPACE b">>().toEqualTypeOf<DB>();
+  expectTypeOf<A<"ALTER TABLE users SET WITHOUT OIDS">>().toEqualTypeOf<DB>();
+  expectTypeOf<A<"ALTER TABLE users SET WITH OIDS">>().toEqualTypeOf<SqlError<"syntax error at or near with", 4>>();
+});
+
 test("multiple actions, IF EXISTS, ONLY, no-op actions", () => {
   expectTypeOf<A<`ALTER TABLE ONLY users
       ADD COLUMN age int,

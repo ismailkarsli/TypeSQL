@@ -35,9 +35,10 @@ export type ApplyDdlStmt<DB, S extends DdlStmt> = ApplyDdlNode<DB, S>;
 
 /** Same as `ApplyDdlStmt` without the constraint (pitfall 12: dispatch on `t` only). */
 export type ApplyDdlNode<DB, S> =
-  S extends { readonly t: "noop" } ? DB
-  : S extends { readonly t: "create_table"; readonly ifNotExists: infer Ine; readonly table: infer Ref extends TableRef; readonly columns: infer Defs; readonly constraints: infer Cons; readonly like: infer Likes; readonly inherits: infer Inh }
-    ? ApplyCreateTable<DB, Ine, Ref, Defs, Cons, Likes, Inh>
+  S extends { readonly t: "noop" | "fetch" | "move" | "close_cursor" } ? DB
+  : S extends { readonly t: "declare_cursor"; readonly q: infer Q extends SelectStmt } ? (ProjectSelect<Q, DB, [], {}> extends infer C ? (C extends AnyErr ? C : DB) : never)
+  : S extends { readonly t: "create_table"; readonly ifNotExists: infer Ine; readonly table: infer Ref extends TableRef; readonly columns: infer Defs; readonly constraints: infer Cons; readonly like: infer Likes; readonly inherits: infer Inh; readonly of: infer Of }
+    ? Of extends TableRef ? ApplyTypedTable<DB, Ine, Ref, Of> : ApplyCreateTable<DB, Ine, Ref, Defs, Cons, Likes, Inh>
   : S extends { readonly t: "create_table_as"; readonly ifNotExists: infer Ine; readonly table: infer Ref extends TableRef; readonly cols: infer Names; readonly q: infer Q }
     ? ApplyCreateTableAs<DB, Ine, Ref, Names, Q>
   : S extends { readonly t: "alter_table"; readonly ifExists: infer Ife; readonly table: infer Ref extends TableRef; readonly actions: infer As }
@@ -54,8 +55,8 @@ export type ApplyDdlNode<DB, S> =
     ? ApplyAlterEnum<DB, Name, Act>
   : S extends { readonly t: "drop_type"; readonly ifExists: infer Ife; readonly names: infer Refs; readonly cascade: infer Casc }
     ? ApplyDropTypes<DB, Refs, Ife, Casc>
-  : S extends { readonly t: "create_schema"; readonly ifNotExists: infer Ine; readonly name: infer Name extends string }
-    ? ApplyCreateSchema<DB, Ine, Name>
+  : S extends { readonly t: "create_schema"; readonly ifNotExists: infer Ine; readonly name: infer Name extends string; readonly elements: infer Els }
+    ? ApplyCreateSchema<DB, Ine, Name> extends infer DB2 ? (DB2 extends AnyErr ? DB2 : ApplyElements<DB2, Name, Els>) : never
   : S extends { readonly t: "drop_schema"; readonly ifExists: infer Ife; readonly names: infer Names; readonly cascade: infer Casc }
     ? ApplyDropSchemas<DB, Names, Ife, Casc>
   : S extends { readonly t: "rename_schema"; readonly from: infer F extends string; readonly to: infer To extends string }
@@ -230,6 +231,12 @@ type DisplayType<T extends string> = T extends `${infer E}[]` ? `${DisplayType<E
 
 // ───────────────────────────── CREATE TABLE ─────────────────────────────
 
+/** `CREATE TABLE t OF type`: the columns come from a composite type, which TypeSQL does not track. */
+type ApplyTypedTable<DB, Ine, Ref extends TableRef, Of extends TableRef> =
+  GetRel<DB, Ref> extends null
+    ? SqlError<`typed table "${Ref["name"]}" (CREATE TABLE ... OF ${Of["name"]}) is not supported: TypeSQL does not track the columns of composite types; list the columns`, null>
+    : Ine extends true ? DB : SqlError<`relation "${Ref["name"]}" already exists`, null>;
+
 type ApplyCreateTable<DB, Ine, Ref extends TableRef, Defs, Cons, Likes, Inh> =
   GetRel<DB, Ref> extends null
     ? CanCreate<DB, Ref> extends infer E
@@ -240,7 +247,7 @@ type ApplyCreateTable<DB, Ine, Ref extends TableRef, Defs, Cons, Likes, Inh> =
       : never
     : Ine extends true ? DB : SqlError<`relation "${Ref["name"]}" already exists`, null>;
 
-/** Inherited columns, then LIKE columns, then local definitions; then the primary key's NOT NULL. */
+/** Inherited columns, then LIKE columns, then local definitions; then NOT NULL for the primary key and table-level NOT NULL constraints. */
 type BuildTable<DB, TN extends string, Defs, Cons, Likes, Inh> =
   AddInherits<Inh, DB, {}> extends infer A0
     ? A0 extends AnyErr ? A0
@@ -249,7 +256,12 @@ type BuildTable<DB, TN extends string, Defs, Cons, Likes, Inh> =
         ? AddDefs<Defs, Acc1, keyof A0, Seen1> extends infer A2
           ? A2 extends AnyErr ? A2
           : PrimaryKey<Defs, Cons, A2, TN> extends infer Pk
-            ? Pk extends readonly [infer P] ? Rebuild<{ [K in keyof A2]: K extends P ? WithNullable<A2[K], false> : A2[K] }> : Pk
+            ? Pk extends readonly [infer P]
+              ? ConNotNulls<Cons> extends infer NN
+                ? [Exclude<NN, keyof A2>] extends [never] ? Rebuild<{ [K in keyof A2]: K extends P | NN ? WithNullable<A2[K], false> : A2[K] }>
+                : SqlError<`column "${PickOne<Exclude<NN, keyof A2>> & string}" of relation "${TN}" does not exist`, null>
+                : never
+              : Pk
             : never
           : never
         : A1
@@ -310,6 +322,8 @@ type ColPks<Defs, Acc extends readonly unknown[]> =
   Defs extends readonly [infer D, ...infer R] ? ColPks<R, D extends { readonly primaryKey: true; readonly name: infer N } ? [...Acc, [N]] : Acc> : Acc;
 type ConPks<Cons, Acc extends readonly unknown[]> =
   Cons extends readonly [infer C, ...infer R] ? ConPks<R, C extends { readonly t: "pk"; readonly cols: infer Cs } ? [...Acc, Cs] : Acc> : Acc;
+/** Columns of table-level `NOT NULL col` constraints (a union). */
+type ConNotNulls<Cons> = Cons extends readonly (infer C)[] ? (C extends { readonly t: "not_null"; readonly col: infer N } ? N : never) : never;
 type FirstMissing<Cs, Tbl> =
   Cs extends readonly [infer C, ...infer R] ? (C extends keyof Tbl ? FirstMissing<R, Tbl> : C) : null;
 
@@ -317,7 +331,7 @@ type FirstMissing<Cs, Tbl> =
 
 /** Project the query, apply the column-name list, reject duplicate names → column map or error. */
 type QueryCols<DB, Q, Names, TooMany extends string> =
-  (Q extends SelectStmt ? ProjectSelect<Q, DB, [], {}> : SqlError<"unsupported query", null>) extends infer C
+  (Q extends SelectStmt ? ProjectSelect<Q, DB, [], {}> : Q extends { readonly t: "execute"; readonly name: infer N extends string } ? SqlError<`CREATE TABLE ... AS EXECUTE ${N} is not supported: the columns of a prepared statement are unknown`, null> : SqlError<"unsupported query", null>) extends infer C
     ? C extends Cols
       ? NameCols<C, Names, [], TooMany> extends infer C2
         ? C2 extends Cols
@@ -475,18 +489,19 @@ type ModifyCol<D, Kind, A, C extends string, TN extends string> =
 
 // ───────────────────────────── views ─────────────────────────────
 
-type ApplyCreateView<DB, OrR, Mat, Ine, Ref extends TableRef, Names, Q> =
+type ApplyCreateView<DB, OrR, Mat, Ine, Ref extends TableRef, Names, Q, QDB = DB> =
   GetRel<DB, Ref> extends infer Rel
     ? Rel extends null
-      ? CanCreate<DB, Ref> extends infer E ? (E extends AnyErr ? E : BuildView<DB, Ref, Names, Q, null>) : never
+      ? CanCreate<DB, Ref> extends infer E ? (E extends AnyErr ? E : BuildView<DB, Ref, Names, Q, null, QDB>) : never
     : Ine extends true ? DB
     : OrR extends true
-      ? IsViewVal<Rel> extends true ? BuildView<DB, Ref, Names, Q, ColsOf<Rel>> : SqlError<`"${Display<Ref>}" is not a view`, null>
+      ? IsViewVal<Rel> extends true ? BuildView<DB, Ref, Names, Q, ColsOf<Rel>, QDB> : SqlError<`"${Display<Ref>}" is not a view`, null>
     : SqlError<`relation "${Ref["name"]}" already exists`, null>
     : never;
 
-type BuildView<DB, Ref extends TableRef, Names, Q, Old> =
-  QueryCols<DB, Q, Names, "CREATE VIEW specifies more column names than columns"> extends infer M
+/** `QDB`: the schema the query is checked against (inside CREATE SCHEMA, the new schema comes first). */
+type BuildView<DB, Ref extends TableRef, Names, Q, Old, QDB = DB> =
+  QueryCols<QDB, Q, Names, "CREATE VIEW specifies more column names than columns"> extends infer M
     ? M extends AnyErr ? M
     : ViewTable<M> extends infer V
       ? (Old extends null ? null : CheckReplace<Old, V>) extends infer E
@@ -593,6 +608,31 @@ type ApplyCreateSchema<DB, Ine, Name extends string> =
     ? IsSchemaKey<DB, Name> extends true ? (Ine extends true ? DB : SqlError<`schema "${Name}" already exists`, null>)
     : SqlError<`cannot create schema "${Name}": a relation with that name exists (TypeSQL keeps schemas and public relations in one object)`, null>
   : SetKey<DB, Name, {}>;
+
+/**
+ * Elements of CREATE SCHEMA (tables, then views; already named in schema `S`). Postgres runs them with
+ * `S` first in the search path: unqualified INHERITS / LIKE parents and view queries see `S`'s relations
+ * before public ones.
+ */
+type ApplyElements<DB, S extends string, Els> =
+  Els extends readonly [infer E, ...infer R]
+    ? (E extends { readonly t: "create_table"; readonly ifNotExists: infer Ine; readonly table: infer Ref extends TableRef; readonly columns: infer Defs; readonly constraints: infer Cons; readonly like: infer Likes; readonly inherits: infer Inh; readonly of: infer Of }
+        ? Of extends TableRef ? ApplyTypedTable<DB, Ine, Ref, Of>
+        : ApplyCreateTable<DB, Ine, Ref, Defs, Cons, InSearchPath<DB, S, Likes>, InSearchPath<DB, S, Inh>>
+      : E extends { readonly t: "create_view"; readonly orReplace: infer OrR; readonly materialized: infer Mat; readonly ifNotExists: infer Ine; readonly view: infer Ref extends TableRef; readonly cols: infer Names; readonly q: infer Q }
+        ? ApplyCreateView<DB, OrR, Mat, Ine, Ref, Names, Q, S extends keyof DB ? ApplyPatch<DB, DB[S], never> : DB>
+      : DB) extends infer DB2
+      ? DB2 extends AnyErr ? DB2 : ApplyElements<DB2, S, R>
+      : never
+    : DB;
+/** Unqualified relation names (TableRef or LIKE clause entries) that exist in schema `S`, qualified with `S`. */
+type InSearchPath<DB, S extends string, Items> = {
+  [K in keyof Items]: Items[K] extends { readonly schema: null; readonly name: infer N }
+    ? (S extends keyof DB ? (N extends keyof DB[S] ? { schema: S; name: N } : Items[K]) : Items[K])
+    : Items[K] extends { readonly ref: { readonly schema: null; readonly name: infer N }; readonly defaults: infer D }
+      ? (S extends keyof DB ? (N extends keyof DB[S] ? { ref: { schema: S; name: N }; defaults: D } : Items[K]) : Items[K])
+    : Items[K];
+};
 
 type ApplyDropSchemas<DB, Names, Ife, Casc> =
   Names extends readonly [infer N extends string, ...infer Rest]

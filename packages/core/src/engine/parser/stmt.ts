@@ -3,6 +3,7 @@ import type { OpTok, Toks, WordTok } from "../lexer/tokens.js";
 import type { ParseDdl } from "./ddl.js";
 import type { ParseDelete, ParseInsert, ParseUpdate } from "./dml.js";
 import type { ParseSelectAfterWith, ParseWith } from "./select.js";
+import type { ParseCursorStmt } from "./utility.js";
 import type { AtEnd, EatOp, Expected, Fail, Near, Nx, Ok } from "./util.js";
 
 /**
@@ -25,7 +26,8 @@ export type DdlKeyword =
   | "create" | "alter" | "drop" | "truncate" | "comment" | "grant" | "revoke" | "set" | "reset"
   | "begin" | "commit" | "rollback" | "start" | "savepoint" | "release" | "analyze" | "vacuum"
   | "reindex" | "cluster" | "refresh" | "lock" | "notify" | "listen" | "unlisten" | "discard"
-  | "explain" | "show" | "do" | "call" | "security" | "import" | "copy" | "prepare" | "execute" | "deallocate" | "checkpoint" | "load";
+  | "explain" | "show" | "do" | "call" | "security" | "import" | "copy" | "prepare" | "execute" | "deallocate" | "checkpoint" | "load"
+  | "end" | "abort" | "reassign";
 
 /** Dispatch on the first token. `Ok<Stmt, next>` or error. */
 export type ParseStatement<T extends Toks, I extends number> =
@@ -36,6 +38,7 @@ export type ParseStatement<T extends Toks, I extends number> =
     : W extends "update" ? ParseUpdate<T, Nx<I>, null>
     : W extends "delete" ? ParseDelete<T, Nx<I>, null>
     : W extends DdlKeyword ? ParseDdl<T, I>
+    : W extends "declare" | "fetch" | "move" | "close" ? ParseCursorStmt<T, I>
     : Fail<`syntax error at or near ${Near<T, I>}`, I>
   : T[I] extends OpTok<"("> ? ParseSelectAfterWith<T, I, null>
   : Expected<"a SQL statement", T, I>;

@@ -301,6 +301,8 @@ export type ColumnDef = {
 };
 export type TableConstraint =
   | { readonly t: "pk"; readonly cols: readonly string[] }
+  /** table-level `NOT NULL col` */
+  | { readonly t: "not_null"; readonly col: string }
   | { readonly t: "other" };
 
 /** `LIKE other_table [INCLUDING ...]`. `defaults` is true with INCLUDING DEFAULTS | IDENTITY | GENERATED | ALL. */
@@ -316,6 +318,8 @@ export type CreateTable = {
   readonly like: readonly LikeClause[];
   /** `INHERITS (parents)` or `PARTITION OF parent`: parent columns come first, with their defaults */
   readonly inherits: readonly TableRef[];
+  /** `OF type`: a typed table, whose columns come from a composite type (not tracked: ApplyDdl rejects it) */
+  readonly of: TableRef | null;
 };
 /** `CREATE TABLE name [(cols)] AS select`. Columns come from the query; all nullable, no defaults (as Postgres). */
 export type CreateTableAs = {
@@ -323,8 +327,10 @@ export type CreateTableAs = {
   readonly ifNotExists: boolean;
   readonly table: TableRef;
   readonly cols: readonly string[] | null;
-  readonly q: SelectStmt;
+  /** the query, or `AS EXECUTE name(…)` (a prepared statement, whose columns are unknown) */
+  readonly q: SelectStmt | ExecuteSource;
 };
+export type ExecuteSource = { readonly t: "execute"; readonly name: string };
 export type AlterAction =
   | { readonly t: "add_column"; readonly ifNotExists: boolean; readonly col: ColumnDef }
   | { readonly t: "drop_column"; readonly ifExists: boolean; readonly name: string }
@@ -365,7 +371,12 @@ export type AlterEnum = {
   readonly action: { readonly t: "add_value"; readonly value: string; readonly ifNotExists: boolean } | { readonly t: "rename_value"; readonly from: string; readonly to: string } | { readonly t: "rename"; readonly to: string } | { readonly t: "noop" };
 };
 export type DropType = { readonly t: "drop_type"; readonly ifExists: boolean; readonly names: readonly TableRef[]; readonly cascade: boolean };
-export type CreateSchema = { readonly t: "create_schema"; readonly ifNotExists: boolean; readonly name: string };
+/**
+ * `CREATE SCHEMA name [AUTHORIZATION role] [element ...]`. `elements` holds the embedded CREATE TABLE
+ * and CREATE VIEW statements (the other elements have no schema effect), tables first, then views:
+ * the order Postgres runs them in. Their names are qualified with the new schema.
+ */
+export type CreateSchema = { readonly t: "create_schema"; readonly ifNotExists: boolean; readonly name: string; readonly elements: readonly (CreateTable | CreateView)[] };
 export type DropSchema = { readonly t: "drop_schema"; readonly ifExists: boolean; readonly names: readonly string[]; readonly cascade: boolean };
 /** `ALTER SCHEMA from RENAME TO to` */
 export type RenameSchema = { readonly t: "rename_schema"; readonly from: string; readonly to: string };
@@ -374,8 +385,18 @@ export type CreateFunction = { readonly t: "create_function"; readonly name: Tab
 /** Statements with no schema effect: CREATE INDEX, TRUNCATE, GRANT, COMMENT, CREATE PROCEDURE, ... */
 export type NoopStmt = { readonly t: "noop"; readonly what: string };
 
+// ───────────────────────────── cursors ─────────────────────────────
+
+/** `DECLARE name [options] CURSOR [WITH[OUT] HOLD] FOR query`: the query is checked; the statement returns no rows. */
+export type DeclareCursor = { readonly t: "declare_cursor"; readonly name: string; readonly q: SelectStmt };
+/** `FETCH` / `MOVE [direction] [FROM | IN] cursor`. The cursor's query is another statement: no row type. */
+export type FetchStmt = { readonly t: "fetch" | "move"; readonly cursor: string };
+/** `CLOSE name | ALL` (`cursor` is `null` for ALL). */
+export type CloseCursor = { readonly t: "close_cursor"; readonly cursor: string | null };
+
 export type DdlStmt =
   | CreateTable | CreateTableAs | AlterTable | DropTable | CreateView | DropView
-  | CreateEnum | AlterEnum | DropType | CreateSchema | DropSchema | RenameSchema | CreateFunction | NoopStmt;
+  | CreateEnum | AlterEnum | DropType | CreateSchema | DropSchema | RenameSchema | CreateFunction | NoopStmt
+  | DeclareCursor | FetchStmt | CloseCursor;
 
 export type Stmt = SelectStmt | InsertStmt | UpdateStmt | DeleteStmt | DdlStmt;

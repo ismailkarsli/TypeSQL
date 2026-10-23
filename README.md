@@ -86,6 +86,7 @@ documentation site) and `@typesql/bench` (compile-time budget and runtime benchm
 | Nullability narrowing: `WHERE c IS NOT NULL` / comparisons / inner-join conditions make `c` non-null | ✓ |
 | Errors with token positions and "Perhaps you meant …" hints for unknown columns, relations and functions | ✓ |
 | INSERT/UPDATE/DELETE with RETURNING, required-column checks, ON CONFLICT, `EXCLUDED` | ✓ |
+| Cursors: `DECLARE … CURSOR FOR query` is checked and its parameters typed; `FETCH` / `MOVE` / `CLOSE` parse (no row type: the query is another statement) | ✓ |
 | Write helpers: `sql.valueOrDefault(x)` (`DEFAULT` for `undefined`), typed `sql.set(table, partial)` and `sql.values(table, rows)` | ✓ |
 | DDL → schema: `ApplyDdl<DB, "ALTER TABLE …">`, `migrations()` builder, views, enums, schemas | ✓ |
 | Fragments: `{slot}` splicing with `$n` renumbering, `sql.fragment`, `sql.id`, `sql.join`, `sql.list` (runtime arrays of typed elements), `sql.raw`; dynamic text falls back to `sql.as<Row>()` | ✓ |

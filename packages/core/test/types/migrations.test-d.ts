@@ -66,6 +66,26 @@ test("starting from an existing schema", () => {
   expectTypeOf<SchemaOf<typeof m2>>().toEqualTypeOf<{ users: { id: Generated<"int4">; email: Col<"text">; bio: NullableGenerated<"text"> } }>();
 });
 
+test("schema elements, recursive views, table-level NOT NULL and cursors in migrations", () => {
+  const m2 = migrations()
+    .add(`CREATE SCHEMA app
+      CREATE VIEW active AS SELECT id, parent FROM nodes WHERE parent IS NOT NULL
+      CREATE TABLE nodes (id int PRIMARY KEY, parent int, label text, NOT NULL label)
+      CREATE INDEX nodes_parent_idx ON nodes (parent)`)
+    .add("CREATE RECURSIVE VIEW app.tree (id, depth) AS SELECT id, 0 FROM app.nodes WHERE parent IS NULL UNION ALL SELECT n.id, t.depth + 1 FROM app.nodes n JOIN tree t ON n.parent = t.id")
+    .add("ALTER TABLE app.nodes ADD COLUMN w int, ADD NOT NULL w")
+    .add("BEGIN; DECLARE c CURSOR FOR SELECT label FROM app.nodes; FETCH 10 FROM c; CLOSE c; END");
+  expectTypeOf<SchemaOf<typeof m2>>().toEqualTypeOf<{
+    app: {
+      nodes: { id: Col<"int4">; parent: Nullable<"int4">; label: Col<"text">; w: Col<"int4"> };
+      active: View<{ id: Col<"int4">; parent: Col<"int4"> }>;
+      tree: View<{ id: Col<"int4">; depth: Col<"int4"> }>;
+    };
+  }>();
+  // @ts-expect-error column "nope" does not exist
+  m2.add("DECLARE c2 CURSOR FOR SELECT nope FROM app.nodes");
+});
+
 test("raw() appends unchecked SQL and keeps or asserts the schema", () => {
   const m2 = m.raw("SELECT pg_advisory_lock(1)");
   expectTypeOf<SchemaOf<typeof m2>>().toEqualTypeOf<Expected>();

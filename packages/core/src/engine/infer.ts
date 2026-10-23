@@ -59,6 +59,7 @@ export type Analysis<DB, Q extends string> =
 type ParamsOfStmt<S extends Stmt, DB> =
   S extends SelectStmt ? ParamsOfSelect<S, DB, [], {}, never>
   : S extends InsertStmt | UpdateStmt | DeleteStmt ? ParamsOfDml<S, DB, {}, never>
+  : S extends { readonly t: "declare_cursor"; readonly q: infer Q extends SelectStmt } ? ParamsOfSelect<Q, DB, [], {}, never>
   : never;
 
 /**

@@ -28,6 +28,14 @@ test("CREATE OR REPLACE VIEW and IF NOT EXISTS", () => {
   expectTypeOf<ApplyDdl<DB3, "CREATE MATERIALIZED VIEW IF NOT EXISTS mv AS SELECT email FROM users">>().toEqualTypeOf<DB3>();
 });
 
+test("CREATE RECURSIVE VIEW is WITH RECURSIVE over the view's name and columns", () => {
+  expectTypeOf<A<"CREATE RECURSIVE VIEW nums (n) AS VALUES (1) UNION ALL SELECT n + 1 FROM nums WHERE n < 5">["nums"]>().toEqualTypeOf<View<{ n: Col<"int4"> }>>();
+  expectTypeOf<A<`CREATE OR REPLACE TEMP RECURSIVE VIEW chain (id, email, depth) AS
+    SELECT id, email, 0 FROM users WHERE id = 1
+    UNION ALL SELECT u.id, u.email, c.depth + 1 FROM users u JOIN chain c ON u.id = c.id + 1`>["chain"]>().toEqualTypeOf<View<{ id: Col<"int4">; email: Col<"text">; depth: Col<"int4"> }>>();
+  expectTypeOf<A<"CREATE SCHEMA s; CREATE RECURSIVE VIEW s.r (x) AS SELECT name FROM users">["s"]>().toEqualTypeOf<{ r: View<{ x: Nullable<"text"> }> }>();
+});
+
 test("DROP VIEW", () => {
   type DB2 = A<"CREATE VIEW v AS SELECT id FROM users; CREATE MATERIALIZED VIEW mv AS SELECT email FROM users">;
   expectTypeOf<ApplyDdl<DB2, "DROP VIEW v">>().toEqualTypeOf<A<"CREATE MATERIALIZED VIEW mv AS SELECT email FROM users">>();
@@ -41,7 +49,8 @@ test("view errors", () => {
   expectTypeOf<A<"CREATE VIEW v (a, b, c) AS SELECT 1, 2">>().toEqualTypeOf<SqlError<"CREATE VIEW specifies more column names than columns", 0>>();
   expectTypeOf<A<"CREATE VIEW v AS SELECT id, id FROM users">>().toEqualTypeOf<SqlError<'column "id" specified more than once', 7>>();
   expectTypeOf<A<"CREATE VIEW IF NOT EXISTS v AS SELECT 1">>().toEqualTypeOf<SqlError<"syntax error: expected AS at or near not", 3>>();
-  expectTypeOf<A<"CREATE RECURSIVE VIEW v (n) AS SELECT 1">>().toEqualTypeOf<SqlError<"CREATE RECURSIVE VIEW is not supported; write the view as WITH RECURSIVE ... SELECT", 1>>();
+  expectTypeOf<A<"CREATE RECURSIVE VIEW v AS SELECT 1">>().toEqualTypeOf<SqlError<'syntax error: expected "(" at or near as', 4>>();
+  expectTypeOf<A<"CREATE RECURSIVE VIEW v (n) AS SELECT nope">>().toEqualTypeOf<SqlError<'column "nope" does not exist', 9>>();
   expectTypeOf<A<"CREATE OR REPLACE MATERIALIZED VIEW mv AS SELECT 1">>().toEqualTypeOf<SqlError<"syntax error at or near materialized", 3>>();
   expectTypeOf<A<"CREATE VIEW v (x) AS SELECT * FROM users">>().toEqualTypeOf<SqlError<"a column name list cannot rename the columns of a * projection (TypeSQL limitation): list the columns explicitly", 0>>();
   expectTypeOf<A<"DROP VIEW users">>().toEqualTypeOf<SqlError<'"users" is not a view', 2>>();
@@ -90,8 +99,31 @@ test("schemas", () => {
   expectTypeOf<ApplyDdl<{ app: {} }, "CREATE SCHEMA app">>().toEqualTypeOf<SqlError<'schema "app" already exists', 2>>();
   expectTypeOf<ApplyDdl<{}, "DROP SCHEMA nope">>().toEqualTypeOf<SqlError<'schema "nope" does not exist', 2>>();
   expectTypeOf<ApplyDdl<{ t: { id: Col<"int4"> } }, "CREATE SCHEMA t">>().toEqualTypeOf<SqlError<'cannot create schema "t": a relation with that name exists (TypeSQL keeps schemas and public relations in one object)', 2>>();
-  expectTypeOf<ApplyDdl<{}, "CREATE SCHEMA s CREATE TABLE t (x int)">>().toEqualTypeOf<SqlError<"schema elements in CREATE SCHEMA are not supported; use separate statements", 3>>();
   expectTypeOf<ApplyDdl<{ app: { t: { id: Col<"int4"> } } }, "DROP SCHEMA app">>().toEqualTypeOf<SqlError<"cannot drop schema app because other objects depend on it", 2>>();
+});
+
+test("CREATE SCHEMA with elements: tables, then views, in the new schema, which comes first in the search path", () => {
+  expectTypeOf<ApplyDdl<{}, "CREATE SCHEMA s CREATE TABLE t (x int)">>().toEqualTypeOf<{ s: { t: { x: Nullable<"int4"> } } }>();
+  expectTypeOf<ApplyDdl<{ abc: { z: Col<"text"> } }, `CREATE SCHEMA s
+    CREATE UNIQUE INDEX abc_a_idx ON abc (a)
+    CREATE VIEW abc_view AS SELECT a + 1 AS a, b FROM abc
+    CREATE TABLE abc (a serial, b int UNIQUE)
+    CREATE SEQUENCE seq
+    GRANT SELECT, CREATE ON abc TO public WITH GRANT OPTION
+    CREATE TABLE abc2 (LIKE abc, NOT NULL b)
+    CREATE TRIGGER trg BEFORE INSERT ON abc EXECUTE FUNCTION f()`>>().toEqualTypeOf<{
+    abc: { z: Col<"text"> };
+    s: { abc: { a: Generated<"int4">; b: Nullable<"int4"> }; abc2: { a: Col<"int4">; b: Col<"int4"> }; abc_view: View<{ a: Col<"int4">; b: Nullable<"int4"> }> };
+  }>();
+  // a public relation is found when the new schema has no relation of that name
+  expectTypeOf<ApplyDdl<{ abc: { z: Col<"text"> } }, "CREATE SCHEMA s CREATE VIEW v AS SELECT z FROM abc">>().toEqualTypeOf<{ abc: { z: Col<"text"> }; s: { v: View<{ z: Col<"text"> }> } }>();
+  expectTypeOf<ApplyDdl<{}, "CREATE SCHEMA AUTHORIZATION bob CREATE TABLE bob.t (x int NOT NULL)">>().toEqualTypeOf<{ bob: { t: { x: Col<"int4"> } } }>();
+  expectTypeOf<ApplyDdl<{}, "CREATE SCHEMA s AUTHORIZATION bob CREATE TABLE other.t (x int)">>().toEqualTypeOf<SqlError<"CREATE specifies a schema (other) different from the one being created (s)", 7>>();
+  expectTypeOf<ApplyDdl<{}, "CREATE SCHEMA s CREATE INDEX ON other.t (x)">>().toEqualTypeOf<SqlError<"CREATE specifies a schema (other) different from the one being created (s)", 6>>();
+  expectTypeOf<ApplyDdl<{}, "CREATE SCHEMA s CREATE TEMP VIEW v AS SELECT 1">>().toEqualTypeOf<SqlError<"cannot create temporary relation in non-temporary schema", 5>>();
+  expectTypeOf<ApplyDdl<{}, "CREATE SCHEMA IF NOT EXISTS s CREATE TABLE t (x int)">>().toEqualTypeOf<SqlError<"CREATE SCHEMA IF NOT EXISTS cannot include schema elements", 6>>();
+  expectTypeOf<ApplyDdl<{}, "CREATE SCHEMA s CREATE VIEW v AS SELECT c FROM abc CREATE TABLE abc (a int)">>().toEqualTypeOf<SqlError<'column "c" does not exist', 8>>();
+  expectTypeOf<ApplyDdl<{}, "CREATE SCHEMA s CREATE TABLE t AS SELECT 1">>().toEqualTypeOf<SqlError<"syntax error at or near table", 4>>();
 });
 
 test("statements without schema effect leave the schema unchanged", () => {

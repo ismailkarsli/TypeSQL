@@ -79,6 +79,11 @@ Also supported: derived tables (`FROM (SELECT …) AS t(a, b)`), `LATERAL`, `VAL
 set-returning functions such as `generate_series`, `unnest` and `jsonb_each` in `FROM`,
 `DISTINCT ON`, named windows, `FOR UPDATE`, and `ORDER BY` / `GROUP BY` by alias or position.
 
+`DECLARE name CURSOR FOR query` checks the query and types its parameters like a `SELECT`; the
+statement itself returns no rows. `FETCH`, `MOVE` and `CLOSE` are checked for syntax only:
+the cursor's query is another statement, so a `FETCH` has no row type (assert one with
+`sql.as<Row>("FETCH 10 FROM c")`).
+
 ## Whole-row references
 
 A table alias used as a value is the whole row: `to_json(t)`, `json_agg(t)`, `row_to_json(t.*)`,
