@@ -38,6 +38,8 @@ jobs:
       - run: pnpm playground --check
       - run: pnpm build
       - run: pnpm smoke:dist
+      # the VS Code extension packages (release.yml publishes the same .vsix)
+      - run: pnpm --filter typesql exec vsce package --no-dependencies --out "$RUNNER_TEMP/typesql.vsix"
       - run: pnpm test
       - run: pnpm docs:build
 

@@ -6,3 +6,5 @@ allowBuilds:
   # Prisma's postinstall only downloads engines; `prisma generate` does not need them.
   "@prisma/engines": false
   prisma: false
+  # vsce's postinstall fetches a signing tool; `vsce package` does not sign.
+  "@vscode/vsce-sign": false

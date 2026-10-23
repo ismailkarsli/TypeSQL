@@ -26,6 +26,7 @@ export default defineConfig({
           { text: "Errors and limits", link: "/guide/errors-and-limits" },
           { text: "Postgres compatibility", link: "/guide/postgres-compatibility" },
           { text: "Type cache", link: "/guide/caching" },
+          { text: "Editor completions", link: "/guide/editor" },
         ],
       },
       {

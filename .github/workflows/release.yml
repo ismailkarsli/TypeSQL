@@ -5,7 +5,9 @@ name: release
 # commits the release through the API (signed), then publishes every package version that is not
 # on npm yet through npm trusted publishing (OIDC, no token), and creates their GitHub releases.
 # npm trusts this workflow file (release.yml) in the `npm` environment, which only deploys from
-# main; see packages/docs/internals/releasing.md.
+# main. The `extension` job then publishes the VS Code extension to the Visual Studio Marketplace
+# (Microsoft Entra ID) and Open VSX (trusted publishing) when its version is not there yet, from
+# the `vscode` environment. See packages/docs/internals/releasing.md.
 on:
   workflow_dispatch:
 
@@ -25,6 +27,8 @@ jobs:
     needs: checks
     runs-on: ubuntu-latest
     environment: npm
+    outputs:
+      sha: ${{ steps.release.outputs.sha }}
     permissions:
       contents: write # the release commit, gh release create
       id-token: write # npm trusted publishing
@@ -63,6 +67,8 @@ jobs:
           fi
           # "chore: release 0.0.4", or "chore: release 0.0.4, 0.1.0" when versions diverge.
           versions=$(comm -13 <(sort <<<"$before") <(public | sort) | sed 's/.*@//' | sort -uV | paste -sd, - | sed 's/,/, /g')
+          # a release of the VS Code extension alone (a private package) bumps no public version
+          versions=${versions:-"VS Code extension $(node -p 'require("./packages/vscode/package.json").version')"}
           # Committed through the API, which signs it (main requires signed commits), and rejected,
           # so nothing is published, when main moved past the commit the checks ran on.
           git add -A
@@ -71,6 +77,8 @@ jobs:
           git reset --hard origin/main
         env:
           GH_TOKEN: ${{ github.token }}
+      - id: release
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - run: pnpm build
       - run: pnpm smoke:dist
       # The workflow only gets here on main, which is what publish's git checks verify.
@@ -78,3 +86,47 @@ jobs:
       - run: node scripts/github-releases.mjs --summary pnpm-publish-summary.json
         env:
           GH_TOKEN: ${{ github.token }}
+
+  extension:
+    # The VS Code extension (packages/vscode, private on npm), from the commit `publish` released.
+    # Each registry gets the version unless it has it already (--skip-duplicate), so a run after a
+    # failed one publishes what is missing. A registry is skipped until its variable
+    # (VSCODE_MARKETPLACE, OPEN_VSX, on the vscode environment) is true, once its setup is done.
+    needs: publish
+    runs-on: ubuntu-latest
+    environment: vscode
+    permissions:
+      contents: read
+      id-token: write # azure/login (Marketplace) and Open VSX trusted publishing
+    defaults:
+      run:
+        working-directory: packages/vscode
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.publish.outputs.sha }}
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # the extension compiles against @typesql/core's built types
+      - run: pnpm --filter "typesql..." run build
+      - run: pnpm exec vsce package --no-dependencies --out typesql.vsix
+      - uses: azure/login@v2
+        if: vars.VSCODE_MARKETPLACE == 'true'
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      # The identity's Marketplace id, which is added to the publisher once (see releasing.md).
+      - name: Marketplace identity
+        if: vars.VSCODE_MARKETPLACE == 'true'
+        run: az rest -u https://app.vssps.visualstudio.com/_apis/profile/profiles/me --resource 499b84ac-1321-427f-aa17-267ca6975798 --query id -o tsv
+      - name: Publish to the Visual Studio Marketplace
+        if: vars.VSCODE_MARKETPLACE == 'true'
+        run: pnpm exec vsce publish --azure-credential --packagePath typesql.vsix --skip-duplicate
+      - name: Publish to Open VSX
+        if: vars.OPEN_VSX == 'true'
+        run: pnpm exec ovsx publish typesql.vsix --trusted-publishing --skip-duplicate

@@ -119,4 +119,5 @@ recomputing query types on every `tsc` run and every edit.
 [API reference](https://github.com/ismailkarsli/typesql/blob/main/packages/docs/reference/api.md) ·
 [DDL support](https://github.com/ismailkarsli/typesql/blob/main/packages/docs/reference/ddl.md) ·
 [Errors and limits](https://github.com/ismailkarsli/typesql/blob/main/packages/docs/guide/errors-and-limits.md) ·
-[Type cache](https://github.com/ismailkarsli/typesql/blob/main/packages/docs/guide/caching.md)
+[Type cache](https://github.com/ismailkarsli/typesql/blob/main/packages/docs/guide/caching.md) ·
+[Editor completions](https://github.com/ismailkarsli/typesql/blob/main/packages/docs/guide/editor.md)

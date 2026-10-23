@@ -2,7 +2,8 @@
 
 The repository is a pnpm workspace: `packages/core` (`@typesql/core`), the driver adapters
 `packages/pg` and `packages/postgres`, the ORM schema packages `packages/kysely`,
-`packages/drizzle` and `packages/prisma`, `packages/bench` and this site, `packages/docs`.
+`packages/drizzle` and `packages/prisma`, the VS Code extension `packages/vscode`,
+`packages/bench` and this site, `packages/docs`.
 
 ```sh
 pnpm install
@@ -24,8 +25,42 @@ are in [Type engine](./engine). Versioning and publishing are in [Releasing](./r
 
 `CacheVersion` (`packages/core/src/engine/cache.ts`) is a hash of core's type-level sources: a
 type cache entry made by another version is never used. After changing anything under
-`packages/core/src` (except `src/cache/` and `src/runtime/`), run `pnpm cache-version`; CI runs
-it with `--check`.
+`packages/core/src` (except `src/cache/`, `src/editor/` and `src/runtime/`), run
+`pnpm cache-version`; CI runs it with `--check`.
+
+## VS Code extension
+
+`packages/vscode` is the extension behind [Editor completions](../guide/editor). It holds only
+the VS Code side; what to suggest is computed by `@typesql/core/editor`
+(`packages/core/src/editor/`), which the extension loads from the project being edited:
+
+| Module | What it does |
+|---|---|
+| `core/src/editor/scan.ts` | The scanner: what may be typed at the cursor (relation, columns of which FROM items, nothing). |
+| `core/src/editor/schema.ts` | Relations and columns of a `DB` type, read with the checker, columns only when asked for. |
+| `core/src/editor/call.ts` | The `sql()` / `tx()` / `sql.fragment()` / `sql.as()` literal at the cursor and its `DB` type. |
+| `core/src/editor/complete.ts` | `completionsAt`: the items and the LSP ranges they replace. |
+| `vscode/src/session.ts` | The API session on the TypeScript 7 language server, and the client matching its version. |
+| `vscode/src/extension.ts` | The LSP middleware (TypeScript 7.1's extension API) or, on the TypeScript 7 extension 1.0, a completion provider of its own. |
+
+```sh
+pnpm vitest run packages/core/test/editor   # scanner cases, completions through tsc --lsp
+pnpm --filter typesql test                   # merging, module lookup, sessions through tsc --lsp
+pnpm --filter "typesql..." run build         # @typesql/core, then the extension
+pnpm --filter typesql run package            # packages/vscode/typesql.vsix
+```
+
+To try a change, install `typesql.vsix` with **Extensions: Install from VSIX…** and reload the
+window; after changing `packages/core/src/editor/`, rebuild core and run **TypeScript: Restart TS
+Server** instead. The extension finds `@typesql/core/editor` by resolving it from the edited
+file, so try it in a project that has `@typesql/core` in `node_modules` (a workspace package such
+as `packages/pg`, or a scratch project with `node_modules/@typesql/core` linked to
+`packages/core`), not in `examples/`, which gets core through a tsconfig `paths` alias.
+
+The language server must run TypeScript 7.1: version 1.0 of the TypeScript 7 extension bundles
+7.0, whose API cannot read the editor's program. `.vscode/settings.json` sets `js/ts.tsdk.path`
+to the workspace's `typescript`; VS Code asks once to allow it. The **TypeSQL** output channel
+logs the API client the session picked and any error.
 
 ## Playground links
 

@@ -77,6 +77,9 @@ await sql.transaction(async (tx) => {                // tx: sql bound to one tra
 Two more workspace packages are private and not published: `@typesql/docs` (the VitePress
 documentation site) and `@typesql/bench` (compile-time budget and runtime benchmarks).
 
+The VS Code extension in [`packages/vscode`](packages/vscode) suggests tables, views and
+columns inside `sql()` strings; see [Editor completions](packages/docs/guide/editor.md).
+
 ## What is inferred
 
 | Feature | Status |
