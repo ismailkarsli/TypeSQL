@@ -145,6 +145,12 @@ type SetKey<O, K extends string, V> =
   Build<{ [P in keyof O]: Single<P & string, P extends K ? V : O[P]> }[keyof O] | (K extends keyof O ? never : Single<K, V>)>;
 type DelKey<O, K> = Build<{ [P in keyof O]: P extends K ? never : Single<P & string, O[P]> }[keyof O]>;
 type RenameKey<O, From, To extends string> = Build<{ [P in keyof O]: Single<P extends From ? To : P & string, O[P]> }[keyof O]>;
+/**
+ * `DB` with `Del`'s keys removed and `Set`'s keys set: a cached step's effect (engine/cache.ts
+ * `DdlEffect`), rebuilt from single-key parts like every other schema.
+ */
+export type ApplyPatch<DB, Set, Del> =
+  Build<{ [P in keyof DB]: P extends Del | keyof Set ? never : Single<P & string, DB[P]> }[keyof DB] | { [K in keyof Set]: Single<K & string, Set[K]> }[keyof Set]>;
 /** One member of a union (the last one TypeScript sees). */
 type PickOne<U> =
   (U extends unknown ? (x: () => U) => void : never) extends (x: infer F) => void ? (F extends () => infer R ? R : never) : never;

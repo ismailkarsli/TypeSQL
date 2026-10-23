@@ -10,6 +10,7 @@ pnpm typecheck                 # tsc per package, including the docs and package
 pnpm test                      # vitest: runtime tests, type tests, conformance against Postgres
 pnpm build && pnpm smoke:dist  # build the packages, then import the built output with plain Node
 pnpm playground [--check]      # regenerate (or check) the TypeScript Playground links
+pnpm cache-version [--check]   # update (or check) CacheVersion after changing core's types
 pnpm docs:dev                  # this site, with hot reload
 pnpm docs:deploy               # build this site and deploy it to typesql.karsli.net
 pnpm change                    # record a change intent; see Releasing
@@ -18,6 +19,11 @@ pnpm change                    # record a change intent; see Releasing
 Type tests live in `packages/*/test/**/*.test-d.ts` and use `expectTypeOf` and
 `// @ts-expect-error`. The engine's design rules and the TypeScript limits they work around
 are in [Type engine](./engine). Versioning and publishing are in [Releasing](./releasing).
+
+`CacheVersion` (`packages/core/src/engine/cache.ts`) is a hash of core's type-level sources: a
+type cache entry made by another version is never used. After changing anything under
+`packages/core/src` (except `src/cache/` and `src/runtime/`), run `pnpm cache-version`; CI runs
+it with `--check`.
 
 ## Playground links
 

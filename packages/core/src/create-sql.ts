@@ -11,6 +11,7 @@ import { hasInline, param, resolveInline, takeValue, valueOrDefault } from "./ru
 import { json } from "./runtime/json.js";
 import { buildSet, buildValues } from "./runtime/write.js";
 import type { InsertInput, NoExtraKeys, RelationName, SetInput, SetRep, TableName, ValuesRep } from "./engine/write.js";
+import type { CallEntry, FreshVariants, IsUnion, OneOf, QueryCacheKeys, Same } from "./engine/cache.js";
 
 /**
  * `Parts` when every part is a literal (or a union of literals). A generic part leaves this
@@ -213,14 +214,38 @@ export type ListRep<E, Sep extends string> =
       : never
     : never;
 
-type GateCallCheck<DB, TM, Q extends string> = [DB, TM, Q] extends [infer D, infer M, infer Q2 extends string] ? Surface<CallCheck<D, M, Q2>> : never;
+type GateCallCheck<DB, TM, Keys, Q extends string> =
+  [DB, TM, Q] extends [infer D, infer M, infer Q2 extends string]
+    ? [Q2] extends [keyof QueryCacheKeys] ? (CallCached<D, M, Keys, Q2> extends infer C ? ([C] extends [never] ? Surface<CallCheck<D, M, Q2>> : C extends CallEntry ? C["g"] : never) : never) : Surface<CallCheck<D, M, Q2>>
+    : never;
 type GateSlottedCheck<DB, TM, Q extends string, S> =
   [DB, TM, Q, S] extends [infer D, infer M, infer Q2 extends string, infer S2] ? Surface<SlottedCheck<D, M, Q2, S2>> : never;
 type GateFragCheck<Text extends string, Slotted extends boolean> =
   [Text, Slotted] extends [infer T2 extends string, infer B extends boolean] ? Surface<FragCheck<T2, B>> : never;
-type BoxCallArgs<DB, TM, Q extends string> = Extract<{ [K in Q as `${K}`]: CallArgs<DB, TM, K> }[`${Q}`], readonly unknown[]>;
+type BoxCallArgs<DB, TM, Keys, Q extends string> =
+  Extract<{ [K in Q as `${K}`]: [K] extends [keyof QueryCacheKeys] ? (CallCached<DB, TM, Keys, K> extends infer C ? ([C] extends [never] ? CallArgs<DB, TM, K> : C extends CallEntry ? C["p"] : never) : never) : CallArgs<DB, TM, K> }[`${Q}`], readonly unknown[]>;
 type BoxSlottedArgs<DB, TM, Q extends string, S> = Extract<{ [K in Q as `${K}`]: SlottedArgs<DB, TM, K, S> }[`${Q}`], readonly unknown[]>;
 type BoxFragArgs<Text extends string> = Extract<{ [K in Text as `${K}`]: FragArgs<K> }[`${Text}`], readonly unknown[]>;
+
+// ─── type cache (engine/cache.ts) ───
+
+/**
+ * The cached `sql(Q, …)` call for this `DB`, type map and `rowKeys`, or `never` on a miss. A hit
+ * replaces the check, the arguments and the return type below with what they were when the
+ * entry was computed, so the call skips the text rewrites and the row and parameter builders.
+ */
+type CallCached<DB, TM, Keys, Q extends string> =
+  IsUnion<Q> extends true ? never
+  : OneOf<FreshVariants<DB, Q> extends infer V ? (V extends { readonly c: infer C extends CallEntry } ? ([Keys] extends [C["k"]] ? (Same<TM, C["m"]> extends true ? C : never) : never) : never) : never>;
+/**
+ * Return type of the plain `sql()` call. The cache test sits inside `GateCallCheck`, `BoxCallArgs`
+ * and here rather than in wrappers around them, so that without a cache a call costs what it
+ * did before.
+ */
+type CallRet<DB, TM, Keys extends RowKeys, Q extends string> =
+  [Q] extends [keyof QueryCacheKeys]
+    ? CallCached<DB, TM, Keys, Q> extends infer C ? ([C] extends [never] ? Query<KeyedRow<RowOf<DB, TM, PText<Q>>, Keys>, ParamsOf<DB, TM, PText<Q>>, PText<Q>> : C extends CallEntry ? C["q"] : never) : never
+    : Query<KeyedRow<RowOf<DB, TM, PText<Q>>, Keys>, ParamsOf<DB, TM, PText<Q>>, PText<Q>>;
 
 /**
  * The typed SQL function returned by `createSql<DB, TypeMap>()`.
@@ -237,7 +262,7 @@ type BoxFragArgs<Text extends string> = Extract<{ [K in Text as `${K}`]: FragArg
  * camelCased keys.
  */
 export interface Sql<DB, TM, Keys extends RowKeys = "preserve"> {
-  <const Q extends string>(query: GateCallCheck<DB, TM, Q> & Q, ...params: BoxCallArgs<DB, TM, Q>): Query<KeyedRow<RowOf<DB, TM, PText<Q>>, Keys>, ParamsOf<DB, TM, PText<Q>>, PText<Q>>;
+  <const Q extends string>(query: GateCallCheck<DB, TM, Keys, Q> & Q, ...params: BoxCallArgs<DB, TM, Keys, Q>): CallRet<DB, TM, Keys, Q>;
   <const Q extends string, const S extends SlotMap>(
     query: GateSlottedCheck<DB, TM, Q, S> & Q,
     slots: S & SlotsFor<Q, S>,

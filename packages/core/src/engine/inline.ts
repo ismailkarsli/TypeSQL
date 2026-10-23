@@ -2,7 +2,7 @@ import type { SqlError } from "./errors.js";
 import type { Next } from "./lexer/next.js";
 import type { Lex } from "./lexer/lex.js";
 import type { Toks } from "./lexer/tokens.js";
-import type { Analyze, ParamsOf } from "./infer.js";
+import type { Analysis, ParamsOf } from "./infer.js";
 import type { MaxParamStr } from "./splice.js";
 import type { StripShape } from "./shape.js";
 
@@ -231,14 +231,14 @@ type CheckValue<DB, X extends string, N extends number, E extends string, P> =
 
 /** The `ColInfo`s the statement's uses give parameter `N` (never when it has none). */
 type ParamUses<DB, X extends string, N extends number> =
-  Analyze<DB, X> extends { readonly params: infer M } ? (N extends keyof M ? Exclude<M[N], { readonly nullTest: true }> : never) : never;
+  Analysis<DB, X> extends { readonly params: infer M } ? (N extends keyof M ? Exclude<M[N], { readonly nullTest: true }> : never) : never;
 type IsJsonParam<U> = [Extract<U, { readonly type: "json" | "jsonb" }>] extends [never] ? false : true;
 /** A json / jsonb use, or no typed use at all. */
 type JsonContext<U> = [U] extends [never] ? true : [Extract<U, { readonly type: "json" | "jsonb" | "unknown" }>] extends [never] ? false : true;
 
 /** `"text NOT NULL"` / `"int4"` for parameter `N` of statement `X`. */
 type Expected<DB, X extends string, N extends number> =
-  Analyze<DB, X> extends { readonly params: infer M }
+  Analysis<DB, X> extends { readonly params: infer M }
     ? N extends keyof M
       ? First<M[N]> extends { readonly type: infer T extends string; readonly nullable: infer Nl }
         ? `${StripShape<T>}${Nl extends true ? "" : " NOT NULL"}`

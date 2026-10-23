@@ -12,7 +12,8 @@ export type {
 } from "./schema/index.js";
 export type { DefaultTypeMap, DefaultParamTypeMap, ParamTypeMapOf, TypeMap, TsTypeOf, TsOf, TsParamTypeOf, EnumsOf } from "./type-map/index.js";
 export type { TableName, RelationName, TableOf, SetInput, InsertInput, SetRep, ValuesRep } from "./engine/write.js";
-export type { Analyze, RowOf, ParamsOf, ArgsOf, NonArrayOrSqlJson, ParamsArgs, NamesOf, Validate, KindOf, ApplyDdl, BuildRow } from "./engine/infer.js";
+export type { Analyze, Analysis, RowOf, ParamsOf, ArgsOf, NonArrayOrSqlJson, ParamsArgs, NamesOf, Validate, KindOf, ApplyDdl, BuildRow } from "./engine/infer.js";
+export type { QueryCache, QueryCacheKeys, CacheSnapshots, DdlCache, DdlCacheKeys, CacheVersion, Missing, Builtin, DbSnapshot, CacheEntry, CallEntry, HintIndex, CacheAnalysis, DdlEffect } from "./engine/cache.js";
 export type { RewriteNamed, NamedParams } from "./engine/named.js";
 export type { SqlError, AnyErr, IsErr, ErrMsg, ErrAt } from "./engine/errors.js";
 export type { FunctionCatalog, Sig, SigFlags } from "./engine/typer/catalog.js";
