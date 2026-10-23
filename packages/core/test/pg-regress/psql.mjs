@@ -281,8 +281,8 @@ export function splitPsql(text) {
  * Split `sqlText` and set `pg` on each statement from `outText`, the expected output of
  * `psql -a`. psql echoes every input line except blank lines and COPY data, and prints a
  * statement's result after the line the statement ends on. A statement whose surrounding lines
- * cannot be found in the output, that shares its last line with another statement that may
- * have failed, or that sits inside `\if`, is `unknown`.
+ * cannot be found in the output, that shares its last line with other statements when a syntax
+ * error is reported after it, or that sits in an `\if` branch we cannot evaluate, is `unknown`.
  * @param {string} sqlText
  * @param {string} outText
  * @returns {Statement[]}
@@ -313,9 +313,14 @@ export function classify(sqlText, outText) {
     const at = region.findIndex((l) => /^(ERROR|FATAL|PANIC):/.test(l));
     if (at < 0) { s.pg = "ok"; continue; }
     s.pgError = region[at];
-    s.pg = endingOn.get(s.endLine) > 1 ? "unknown"
-      : isGrammarError(region.slice(at)) && !inQuotedText(s.sql, region.slice(at)) ? "syntax-error"
-      : "error";
+    if (endingOn.get(s.endLine) > 1) {
+      // Several statements end on this line and share the output. Without a grammar error among
+      // the errors, every one of them was parsed (a `\;` group is parsed as a whole first).
+      const grammar = region.some((l, k) => /^(ERROR|FATAL|PANIC):/.test(l) && isGrammarError(region.slice(k)));
+      s.pg = grammar ? "unknown" : "error";
+      continue;
+    }
+    s.pg = isGrammarError(region.slice(at)) && !inQuotedText(s.sql, region.slice(at)) ? "syntax-error" : "error";
   }
   return stmts;
 }
