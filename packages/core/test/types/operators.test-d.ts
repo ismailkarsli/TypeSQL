@@ -1,5 +1,6 @@
 import { expectTypeOf, test } from "vitest";
-import type { Row, Interval } from "./_schema.js";
+import type { SqlError } from "../../src/index.js";
+import type { Row, Interval, V } from "./_schema.js";
 
 // Every expectation here was checked against PostgreSQL 17 with `select pg_typeof(...)`.
 // Default type map: int2/int4/float4/float8 → number, int8/numeric → string, date/timestamp(tz) → Date,
@@ -122,4 +123,15 @@ test("casts and typed literals", () => {
 test("unsupported combinations yield unknown, never an error", () => {
   expectTypeOf<Row<"SELECT flag + flag AS a, day * 2 AS b, at + at AS c, nums + nums AS d, id + label AS e FROM things">>()
     .toEqualTypeOf<{ a: unknown; b: unknown; c: unknown; d: unknown; e: unknown }>();
+});
+
+test("any operator: prefix operators bind looser than arithmetic, unknown operators type as unknown", () => {
+  // `@ a + b` is `@ (a + b)` in Postgres (prefix operators take `%prec Op`); `-` binds tightest
+  expectTypeOf<Row<"SELECT @ small + small AS a, - small + 1 AS b, |/ ratio AS c FROM things">>()
+    .toEqualTypeOf<{ a: number; b: number; c: number }>();
+  // user-defined operators parse; their result is unknown until cast
+  expectTypeOf<Row<"SELECT id *= id AS a, (id ~<~ id)::bool AS b, @#@ id AS c, OPERATOR(pg_catalog.+) id AS d FROM things">>()
+    .toEqualTypeOf<{ a: unknown; b: boolean; c: unknown; d: unknown }>();
+  // MathOp tokens cannot be prefix operators
+  expectTypeOf<V<"SELECT < id FROM things">>().toEqualTypeOf<SqlError<"syntax error at or near <", 1>>();
 });

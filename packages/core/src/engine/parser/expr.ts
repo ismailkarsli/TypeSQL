@@ -43,7 +43,12 @@ type Binds<Bp extends Prec, Min extends Prec> = Bp extends Geq[Min] ? true : fal
 type NextPrec = { 0: 1; 1: 2; 2: 3; 3: 4; 4: 5; 5: 6; 6: 7; 7: 8; 8: 9; 9: 10; 10: 11; 11: 12; 12: 13; 13: 13 };
 
 type ComparisonOp = "=" | "<" | ">" | "<=" | ">=" | "<>" | "!=";
-type UnaryOp = "-" | "+" | "~" | "!" | "@" | "|/" | "||/" | "!!";
+/**
+ * Operators that cannot be prefix operators (Postgres's MathOp tokens, `=>` and punctuation).
+ * Any other operator can: `-x`, `+x` bind tightest; `@ x`, `@@ box`, `|/ x`, user-defined
+ * `@#@ x` bind looser than the arithmetic operators (`%prec Op`: `@ a + b` is `@ (a + b)`).
+ */
+type NotPrefixOp = "*" | "/" | "%" | "^" | "<" | ">" | "=" | "<=" | ">=" | "<>" | "!=" | "=>" | ")" | "," | ";" | "]" | "." | ":" | "::" | ":=";
 type Terminator = ")" | "," | ";" | "]" | ":";
 
 // ───────────────────────────── infix loop ─────────────────────────────
@@ -255,10 +260,11 @@ type ParsePrefix<T extends Toks, I extends number> =
   : T[I] extends ParamTok<infer N> ? Ok<{ t: "param"; n: N }, Nx<I>>
   : T[I] extends OpTok<infer O>
     ? O extends "(" ? ParseParen<T, Nx<I>>
-    : O extends UnaryOp ? ParseUnary<T, O, Nx<I>>
+    : O extends "-" | "+" ? ParseUnary<T, O, Nx<I>>
     : O extends "*" ? Ok<{ t: "star"; tbl: null }, Nx<I>>
     : O extends "[" ? ParseArrayLiteral<T, Nx<I>>
-    : SyntaxError<T, I>
+    : O extends NotPrefixOp ? SyntaxError<T, I>
+    : ParseUnary<T, O, Nx<I>>
   : T[I] extends IdTok ? ParseNameExpr<T, I>
   : T[I] extends WordTok<infer W>
     ? W extends "null" ? Ok<{ t: "null" }, Nx<I>>
@@ -279,6 +285,7 @@ type ParsePrefix<T extends Toks, I extends number> =
     : W extends SpecialValueFunction
       ? (T[Nx<I>] extends OpTok<"("> ? (T[Nx<Nx<I>>] extends NumTok ? SpecialValue<T, W, I> : ParseNameExpr<T, I>) : SpecialValue<T, W, I>)
     : W extends "interval" ? (T[Nx<I>] extends StrTok<infer V> ? Ok<{ t: "typed"; type: "interval"; v: V }, SkipIntervalQualifier<T, Nx<Nx<I>>>> : ParseNameExpr<T, I>)
+    : W extends "operator" ? (T[Nx<I>] extends OpTok<"("> ? ParseUnary<T, "operator", SkipToCloseParen<T, Nx<Nx<I>>>> : ParseNameExpr<T, I>)
     : W extends ReservedKeyword ? SyntaxError<T, I>
     : ParseNameExpr<T, I>
   : Fail<"syntax error at end of input", I>;
@@ -300,7 +307,7 @@ type SkipIntervalQualifier<T extends Toks, I extends number> =
   : SkipPrecision<T, I>;
 
 type ParseUnary<T extends Toks, O extends string, I extends number> =
-  ParseExpr<T, I, O extends "not" ? 3 : 11> extends infer X
+  ParseExpr<T, I, O extends "not" ? 3 : O extends "-" | "+" ? 11 : 8> extends infer X
     ? X extends Ok<infer E, infer J extends number> ? Ok<{ t: "un"; op: O; e: E }, J> : X
     : never;
 

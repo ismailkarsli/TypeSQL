@@ -16,12 +16,11 @@ type Nx<I extends number> = Next[I];
  * The budget is a numeric counter (`Nx`), not a tuple that is sliced each step: slicing
  * a 250-element tuple per token cost 42% of the lexer's check time.
  *
- * Dispatch on the first character, cheapest checks first: words, numbers, then punctuation
- * that needs no lookahead (`Punct1`) and `=`, `:`, `.` with one character of lookahead,
- * before comments, quotes and the general `LexOp` (which builds 2–4 character candidates).
- * The fast paths cut the lexer's instantiations by ~20% on the bench queries.
+ * Dispatch on the first character, cheapest checks first: words, numbers, punctuation that
+ * needs no lookahead (`Punct1`), operator characters (`LexOperator`, which also starts the
+ * `--` and block comments), `:` and `.` with one character of lookahead, then quotes.
  *
- * Helpers that can fail (`TakeQuoted`, `LexOp`, `SkipBlock`) return `null`, never
+ * Helpers that can fail (`TakeQuoted`, `SkipBlock`) return `null`, never
  * `never`: `never extends [infer A, infer B]` takes the true branch.
  */
 export type Lex<Q extends string> = LexAll<Q, []>;
@@ -45,20 +44,12 @@ type LexChunk<S extends string, Acc extends readonly Tok[], B extends number> =
 /** Error marker carrying the chunk-local tokens so the outer loop can compute the token index. */
 type Err<M extends string, Acc extends readonly Tok[]> = ["err", M, Acc];
 
-/** Four-character operators. */
-type Op4 = "!~~*";
-/** Three-character operators. */
-type Op3 = "->>" | "#>>" | "!~*" | "!~~" | "~~*" | "<->" | "||/" | "<<=" | ">>=" | "-|-" | "@-@" | "@@@" | "?-|" | "?||";
-/** Two-character operators. */
-type Op2 =
-  | "::" | "->" | "#>" | "@>" | "<@" | "?|" | "?&" | "||" | "<=" | ">=" | "<>" | "!=" | "!~" | "~*" | "~~"
-  | "#-" | "&&" | "@@" | "<<" | ">>" | ":=" | "=>" | "@?" | "|/" | "!!" | "&<" | "&>" | "?-" | "?#" | "##" | "<^" | ">^" | "~=";
-/** Punctuation that never starts a longer operator, a comment or a number: one token, no lookahead. */
-type Punct1 = "(" | ")" | "," | ";" | "[" | "]" | "+" | "*" | "%" | "^";
-/** Single-character operators and punctuation. */
-type Op1 =
-  | "(" | ")" | "," | ";" | "." | "[" | "]" | "+" | "-" | "*" | "/" | "%" | "^" | "<" | ">" | "=" | "~"
-  | "!" | "@" | "#" | "&" | "|" | "?" | ":";
+/** Punctuation that is never part of an operator: one token, no lookahead. */
+type Punct1 = "(" | ")" | "," | ";" | "[" | "]";
+/** Characters operators are made of (Postgres `op_chars`). */
+type OpChar = "~" | "!" | "@" | "#" | "^" | "&" | "|" | "`" | "?" | "+" | "-" | "*" | "/" | "%" | "<" | ">" | "=";
+/** An operator ending in `+` or `-` keeps it only if it also contains one of these. */
+type OpSpecial = "~" | "!" | "@" | "#" | "^" | "&" | "|" | "`" | "?" | "%";
 
 type LexStep<S extends string, Acc extends readonly Tok[], B extends number> =
   S extends `${infer C}${infer R}`
@@ -75,12 +66,9 @@ type LexStep<S extends string, Acc extends readonly Tok[], B extends number> =
           : LexWord<R, C, Acc, B>)
     : C extends Digit ? LexShortInt<S, R, C, Acc, B, []>
     : C extends Punct1 ? LexChunk<R, [...Acc, OpTok<C>], B>
-    : C extends "=" ? (R extends `>${infer R2}` ? LexChunk<R2, [...Acc, OpTok<"=>">], B> : LexChunk<R, [...Acc, OpTok<"=">], B>)
+    : C extends OpChar ? LexOperator<C, R, Acc, B>
     : C extends ":" ? (R extends `:${infer R2}` ? LexChunk<R2, [...Acc, OpTok<"::">], B> : R extends `=${infer R2}` ? LexChunk<R2, [...Acc, OpTok<":=">], B> : LexChunk<R, [...Acc, OpTok<":">], B>)
     : C extends "." ? (R extends `${Digit}${string}` ? LexNumber<S, Acc, B> : LexChunk<R, [...Acc, OpTok<".">], B>)
-    : S extends `--${infer R1}` ? LexChunk<SkipLine<R1>, Acc, B>
-    : S extends `/*${infer R1}`
-      ? (SkipBlock<R1, [0]> extends infer R2 ? (R2 extends string ? LexChunk<R2, Acc, B> : Err<"unterminated /* comment", Acc>) : never)
     : C extends '"'
       ? (TakeQuoted<R, '"', ""> extends [infer V extends string, infer R2 extends string]
           ? (V extends "" ? Err<ZeroLength, Acc> : LexChunk<R2, [...Acc, IdTok<V>], B>)
@@ -96,7 +84,6 @@ type LexStep<S extends string, Acc extends readonly Tok[], B extends number> =
                 ? (R1 extends `${infer Body}$${Tag}$${infer R2}` ? LexChunk<R2, [...Acc, StrTok<Body>], B> : Err<"unterminated dollar-quoted string", Acc>)
                 : Err<`syntax error at or near "$"`, Acc>)
             : Err<`syntax error at or near "$"`, Acc>)
-    : LexOp<C, R> extends [infer O extends string, infer R2 extends string] ? LexChunk<R2, [...Acc, OpTok<O>], B>
     : C extends NonIdAscii ? Err<`unexpected character "${C}"`, Acc>
     : TakeWord<R, C, true> extends [infer V extends string, infer R2 extends string, boolean]
       ? LexChunk<R2, [...Acc, WordTok<FoldAscii<V, "">>], B>
@@ -170,28 +157,36 @@ type LexWord<R extends string, C extends string, Acc extends readonly Tok[], B e
     : never;
 
 /**
- * Longest-match operator: try 4, 3, 2, then 1 chars. (A union-constrained `infer`
- * only ever matches a single character, so the candidates are built explicitly.)
- * `null` when `C` does not start an operator.
+ * After operator character `C` (Postgres `scan.l`): `--` and a block comment, a single-character
+ * operator (the common case: no other operator character follows), or the longest run of
+ * operator characters, cut before an embedded comment start. A run longer than one character
+ * cannot end in `+` or `-` unless it contains an `OpSpecial` character (`a+-b` is `+` and `-b`,
+ * `@-` stays one operator); the dropped characters are lexed again.
  */
-type LexOp<C extends string, R extends string> =
-  R extends `${infer D}${infer E}${infer F}${infer R4}`
-    ? `${C}${D}${E}${F}` extends Op4 ? [`${C}${D}${E}${F}`, R4]
-    : `${C}${D}${E}` extends Op3 ? [`${C}${D}${E}`, `${F}${R4}`]
-    : `${C}${D}` extends Op2 ? [`${C}${D}`, `${E}${F}${R4}`]
-    : C extends Op1 ? [C, R]
-    : null
-  : R extends `${infer D}${infer E}${infer R3}`
-    ? `${C}${D}${E}` extends Op3 ? [`${C}${D}${E}`, R3]
-    : `${C}${D}` extends Op2 ? [`${C}${D}`, `${E}${R3}`]
-    : C extends Op1 ? [C, R]
-    : null
-  : R extends `${infer D}${infer R2}`
-    ? `${C}${D}` extends Op2 ? [`${C}${D}`, R2]
-    : C extends Op1 ? [C, R]
-    : null
-  : C extends Op1 ? [C, R]
-  : null;
+type LexOperator<C extends string, R extends string, Acc extends readonly Tok[], B extends number> =
+  R extends `${infer N}${infer R1}`
+    ? N extends OpChar
+      ? C extends "-" ? (N extends "-" ? LexChunk<SkipLine<R1>, Acc, B> : LexOpRun<C, R, Acc, B>)
+      : C extends "/" ? (N extends "*" ? (SkipBlock<R1, [0]> extends infer R2 ? (R2 extends string ? LexChunk<R2, Acc, B> : Err<"unterminated /* comment", Acc>) : never) : LexOpRun<C, R, Acc, B>)
+      : LexOpRun<C, R, Acc, B>
+      : LexChunk<R, [...Acc, OpTok<C>], B>
+    : LexChunk<R, [...Acc, OpTok<C>], B>;
+type LexOpRun<C extends string, R extends string, Acc extends readonly Tok[], B extends number> =
+  OpRun<R, C> extends [infer O extends string, infer R2 extends string]
+    ? TrimOp<O, R2> extends [infer O2 extends string, infer R3 extends string] ? LexChunk<R3, [...Acc, OpTok<O2>], B> : never
+    : never;
+type OpRun<S extends string, Acc extends string> =
+  S extends `${infer C}${infer R}`
+    ? C extends OpChar
+      ? C extends "-" ? (R extends `-${string}` ? [Acc, S] : OpRun<R, `${Acc}${C}`>)
+      : C extends "/" ? (R extends `*${string}` ? [Acc, S] : OpRun<R, `${Acc}${C}`>)
+      : OpRun<R, `${Acc}${C}`>
+      : [Acc, S]
+    : [Acc, S];
+type TrimOp<O extends string, R extends string> =
+  O extends `${infer P}+` ? (P extends "" ? [O, R] : P extends `${string}${OpSpecial}${string}` ? [O, R] : TrimOp<P, `+${R}`>)
+  : O extends `${infer P}-` ? (P extends "" ? [O, R] : P extends `${string}${OpSpecial}${string}` ? [O, R] : TrimOp<P, `-${R}`>)
+  : [O, R];
 
 type SkipWs<S extends string> = S extends `${infer C}${infer R}` ? (C extends Ws ? SkipWs<R> : S) : S;
 type SkipLine<S extends string> = S extends `${infer _}\n${infer R}` ? R : "";

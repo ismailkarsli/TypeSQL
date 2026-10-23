@@ -42,6 +42,15 @@ test("operators use longest match", () => {
   expectTypeOf<Lex<"e x'1' ex b'0' bx E''">>().toEqualTypeOf<[WordTok<"e">, StrTok<"1">, WordTok<"ex">, StrTok<"0">, WordTok<"bx">, StrTok<"">]>();
 });
 
+test("operators follow Postgres's rules: any run of operator characters, trailing + / - split off", () => {
+  // user-defined and geometric operators are single tokens
+  expectTypeOf<Vals<"a *= b ~<~ c |>> d <<| e &<| f @-@ g !=- h">>().toEqualTypeOf<["a", "*=", "b", "~<~", "c", "|>>", "d", "<<|", "e", "&<|", "f", "@-@", "g", "!=-", "h"]>();
+  // a trailing + / - is a separate token unless the operator has one of ~ ! @ # ^ & | ` ? %
+  expectTypeOf<Vals<"a+-b c*-1 d<-e f@-g">>().toEqualTypeOf<["a", "+", "-", "b", "c", "*", "-", "1", "d", "<", "-", "e", "f", "@-", "g"]>();
+  // comments end an operator
+  expectTypeOf<Vals<"a+--c\nb */*x*/ c">>().toEqualTypeOf<["a", "+", "b", "*", "c"]>();
+});
+
 test("comments are skipped, including nested block comments", () => {
   expectTypeOf<Vals<"SELECT 1 -- trailing\n, 2 /* block */ , /* outer /* inner */ still comment */ 3">>().toEqualTypeOf<["select", "1", ",", "2", ",", "3"]>();
   expectTypeOf<Vals<"SELECT 1 -- no newline at the end">>().toEqualTypeOf<["select", "1"]>();

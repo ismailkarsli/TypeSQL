@@ -87,6 +87,9 @@ type BinOpResult<Op extends string, L extends string, R extends string> =
   : Op extends "->>" | "#>>" ? "text"
   : Op extends "#-" ? "jsonb"
   : Op extends "@>" | "<@" | "?" | "?|" | "?&" | "@?" | "@@" | "-|-" | "~=" ? "bool"
+  // geometric position tests (PG `box`, `point`, `polygon`, `circle`, `lseg`, `line` operators)
+  : Op extends "<<|" | "|>>" | "&<|" | "|&>" | "<^" | ">^" | "&<" | "&>" | "?#" | "?-" | "?-|" | "?||" | "<<=" | ">>=" ? "bool"
+  : Op extends "##" ? "point"
   : Op extends "&&" ? (L extends "tsquery" ? "tsquery" : "bool")
   : Op extends "<->" ? (L extends "tsquery" ? "tsquery" : "float8")
   : Op extends "^" ? Pow<L, R>
@@ -211,7 +214,10 @@ export type UnOpType<Op extends string, E extends ColInfo> =
   : Op extends "~" ? Info<E["type"] extends IntT | BitT ? E["type"] : E["type"] extends "inet" | "cidr" ? "inet" : "unknown", E["nullable"]>
   : Op extends "!!" ? Info<E["type"] extends "tsquery" ? "tsquery" : "unknown", E["nullable"]>
   : Op extends "@" ? Info<E["type"] extends NumT ? E["type"] : "unknown", E["nullable"]>
-  : Op extends "|/" | "||/" ? Info<"float8", E["nullable"]>
+  : Op extends "|/" | "||/" | "@-@" ? Info<"float8", E["nullable"]>
+  : Op extends "@@" ? Info<E["type"] extends "unknown" ? "unknown" : "point", E["nullable"]>
+  : Op extends "#" ? Info<E["type"] extends "path" | "polygon" ? "int4" : "unknown", E["nullable"]>
+  : Op extends "?-" | "?|" ? Info<"bool", E["nullable"]>
   : Info<"unknown", true>;
 
 /**

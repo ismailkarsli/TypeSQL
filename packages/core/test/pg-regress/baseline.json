@@ -3,14 +3,7 @@
   "commit": "724edf9bde9d356724ad384a2e196edc3c9f80f7",
   "mismatches": {
     "aggregates": [
-      {"line":579,"kind":"rejects","hash":"b9e80dc256f24668","pg":"ok","parser":"syntax error at or near =","sql":"select a, count(*) from t_having group by a having a *= row(1.0)::avg_rec;"},
-      {"line":584,"kind":"rejects","hash":"f0a8749a1c5d194e","pg":"ok","parser":"syntax error at or near =","sql":"select a, count(*) from t_having group by a having a *= any (array[row(1.0)::avg_rec]);"},
-      {"line":753,"kind":"rejects","hash":"ce288841d1a83996","pg":"ok","parser":"syntax error: expected \")\" at or near <","sql":"select aggfns(distinct a,a,c order by c using ~<~,a) from (values (1,3,'foo'),(0,null,null),(2,2,'bar'),(3,1,'baz')) ..."},
-      {"line":756,"kind":"rejects","hash":"261e1b986a27885d","pg":"ok","parser":"syntax error: expected \")\" at or near <","sql":"select aggfns(distinct a,a,c order by c using ~<~) from (values (1,3,'foo'),(0,null,null),(2,2,'bar'),(3,1,'baz')) v(..."},
-      {"line":762,"kind":"rejects","hash":"a22a64cf7b10ea9c","pg":"ok","parser":"syntax error: expected \")\" at or near <","sql":"select aggfns(distinct a,b,c order by a,c using ~<~,b) from (values (1,3,'foo'),(0,null,null),(2,2,'bar'),(3,1,'baz')..."},
-      {"line":814,"kind":"rejects","hash":"6bb43038cbd5a684","pg":"ok","parser":"syntax error: expected \")\" at or near <","sql":"create or replace view agg_view1 as select aggfns(a,b,c order by c using ~<~) from (values (1,3,'foo'),(0,null,null),..."},
-      {"line":821,"kind":"rejects","hash":"665e70dca581b501","pg":"ok","parser":"syntax error: expected \")\" at or near <","sql":"create or replace view agg_view1 as select aggfns(distinct a,b,c order by a,c using ~<~,b) from (values (1,3,'foo'),(..."},
-      {"line":986,"kind":"rejects","hash":"fce06d52939af718","pg":"ok","parser":"syntax error: expected \")\" at or near <","sql":"select aggfns(distinct a,b,c order by a,c using ~<~,b) filter (where a > 1) from (values (1,3,'foo'),(0,null,null),(2..."},
+      {"line":584,"kind":"rejects","hash":"f0a8749a1c5d194e","pg":"ok","parser":"syntax error at or near any","sql":"select a, count(*) from t_having group by a having a *= any (array[row(1.0)::avg_rec]);"},
       {"line":1072,"kind":"rejects","hash":"4538de1525a5ec9c","pg":"ERROR:  function rank(integer, name, name) does not exist","parser":"syntax error: expected \")\" at or near ,","sql":"select rank(3) within group (order by stringu1,stringu2) from tenk1;"},
       {"line":1084,"kind":"rejects","hash":"aa0153f2d388b69e","pg":"ok","parser":"syntax error: expected \")\" at or near ,","sql":"create view aggordview1 as select ten, percentile_disc(0.5) within group (order by thousand) as p50, percentile_disc(..."}
     ],
@@ -82,17 +75,6 @@
       {"line":745,"kind":"rejects","hash":"5f357b8bc6661af3","pg":"ok","parser":"syntax error: expected \",\" or \")\" at or near [","sql":"insert into t1 (f1[5].q1) values(42);"},
       {"line":747,"kind":"rejects","hash":"02239fb532cb9834","pg":"ok","parser":"subscripted or field assignment targets (col[i] = ..., col.f = ...) are not supported","sql":"update t1 set f1[5].q2 = 43;"}
     ],
-    "box": [
-      {"line":120,"kind":"rejects","hash":"389dcd5e02066f2e","pg":"ok","parser":"syntax error at or near @@","sql":"SELECT @@(b1.f1) AS p FROM BOX_TBL b1;"},
-      {"line":167,"kind":"rejects","hash":"a0746b48186e30e0","pg":"ok","parser":"syntax error at or near |","sql":"SELECT * FROM box_temp WHERE f1 <<| '(10,4.33334),(5,100)';"},
-      {"line":170,"kind":"rejects","hash":"b2aac9f0acfb10a1","pg":"ok","parser":"syntax error at or near |","sql":"SELECT * FROM box_temp WHERE f1 &<| '(10,4.3333334),(5,1)';"},
-      {"line":173,"kind":"rejects","hash":"c2555c07470f869a","pg":"ok","parser":"syntax error at or near &>","sql":"SELECT * FROM box_temp WHERE f1 |&> '(49.99,49.99),(49.99,49.99)';"},
-      {"line":176,"kind":"rejects","hash":"59f339c945c78b66","pg":"ok","parser":"syntax error at or near >>","sql":"SELECT * FROM box_temp WHERE f1 |>> '(37,38),(39,40)';"},
-      {"line":240,"kind":"rejects","hash":"a857c057e610bf67","pg":"ok","parser":"syntax error at or near |","sql":"SELECT count(*) FROM quad_box_tbl WHERE b <<| box '((100,200),(300,500))';"},
-      {"line":241,"kind":"rejects","hash":"023b896e3673bc3d","pg":"ok","parser":"syntax error at or near |","sql":"SELECT count(*) FROM quad_box_tbl WHERE b &<| box '((100,200),(300,500))';"},
-      {"line":242,"kind":"rejects","hash":"7e0a4ea01545496a","pg":"ok","parser":"syntax error at or near &>","sql":"SELECT count(*) FROM quad_box_tbl WHERE b |&> box '((100,200),(300,500))';"},
-      {"line":243,"kind":"rejects","hash":"bf68ce0a148c1c39","pg":"ok","parser":"syntax error at or near >>","sql":"SELECT count(*) FROM quad_box_tbl WHERE b |>> box '((100,200),(300,500))';"}
-    ],
     "collate": [
       {"line":272,"kind":"rejects","hash":"94fd80f7210be075","pg":"ok","parser":"syntax error at or near (","sql":"SELECT collation for ('foo');"},
       {"line":273,"kind":"rejects","hash":"fb12437358c3dc54","pg":"ok","parser":"syntax error at or near (","sql":"SELECT collation for ('foo'::text);"},
@@ -145,40 +127,7 @@
       {"line":322,"kind":"rejects","hash":"3a4fe0b6eb7861cc","pg":"ok","parser":"syntax error at or near into","sql":"SELECT INTO tableam_tblselectinto_heapx FROM tableam_tbl_heapx;"}
     ],
     "create_index": [
-      {"line":139,"kind":"rejects","hash":"9d80a0566bf057a5","pg":"ok","parser":"syntax error at or near |","sql":"SELECT count(*) FROM point_tbl p WHERE p.f1 <<| '(0.0, 0.0)';"},
-      {"line":141,"kind":"rejects","hash":"43731fd2002e665d","pg":"ok","parser":"syntax error at or near >>","sql":"SELECT count(*) FROM point_tbl p WHERE p.f1 |>> '(0.0, 0.0)';"},
-      {"line":212,"kind":"rejects","hash":"9d80a0566bf057a5","pg":"ok","parser":"syntax error at or near |","sql":"SELECT count(*) FROM point_tbl p WHERE p.f1 <<| '(0.0, 0.0)';"},
-      {"line":216,"kind":"rejects","hash":"43731fd2002e665d","pg":"ok","parser":"syntax error at or near >>","sql":"SELECT count(*) FROM point_tbl p WHERE p.f1 |>> '(0.0, 0.0)';"},
-      {"line":861,"kind":"rejects","hash":"28b2420db718ded6","pg":"ok","parser":"syntax error at or near <","sql":"SELECT count(*) FROM dupindexcols WHERE f1 BETWEEN 'WA' AND 'ZZZ' and id < 1000 and f1 ~<~ 'YX';"},
       {"line":1498,"kind":"rejects","hash":"4e3641a87137fea1","pg":"ok","parser":"syntax error at or near end","sql":"END;"}
-    ],
-    "create_index_spgist": [
-      {"line":49,"kind":"rejects","hash":"ec476cc3094f5049","pg":"ok","parser":"syntax error at or near |","sql":"SELECT count(*) FROM quad_point_tbl WHERE p <<| '(5000, 4000)';"},
-      {"line":51,"kind":"rejects","hash":"3cb54da0eeb13d33","pg":"ok","parser":"syntax error at or near >>","sql":"SELECT count(*) FROM quad_point_tbl WHERE p |>> '(5000, 4000)';"},
-      {"line":75,"kind":"rejects","hash":"d7eff75591a52cf0","pg":"ok","parser":"syntax error at or near <","sql":"SELECT count(*) FROM radix_text_tbl WHERE t ~<~ 'Aztec Ct ';"},
-      {"line":79,"kind":"rejects","hash":"bf4b94969622b92a","pg":"ok","parser":"syntax error at or near <=","sql":"SELECT count(*) FROM radix_text_tbl WHERE t ~<=~ 'Aztec Ct ';"},
-      {"line":87,"kind":"rejects","hash":"dd040c78376fd98e","pg":"ok","parser":"syntax error at or near >=","sql":"SELECT count(*) FROM radix_text_tbl WHERE t ~>=~ 'Worth St ';"},
-      {"line":91,"kind":"rejects","hash":"52be984058a4b0ea","pg":"ok","parser":"syntax error at or near >","sql":"SELECT count(*) FROM radix_text_tbl WHERE t ~>~ 'Worth St ';"},
-      {"line":130,"kind":"rejects","hash":"ec476cc3094f5049","pg":"ok","parser":"syntax error at or near |","sql":"SELECT count(*) FROM quad_point_tbl WHERE p <<| '(5000, 4000)';"},
-      {"line":134,"kind":"rejects","hash":"3cb54da0eeb13d33","pg":"ok","parser":"syntax error at or near >>","sql":"SELECT count(*) FROM quad_point_tbl WHERE p |>> '(5000, 4000)';"},
-      {"line":188,"kind":"rejects","hash":"275a59c269e7e392","pg":"ok","parser":"syntax error at or near |","sql":"SELECT count(*) FROM kd_point_tbl WHERE p <<| '(5000, 4000)';"},
-      {"line":192,"kind":"rejects","hash":"6c9284ef0f42170e","pg":"ok","parser":"syntax error at or near >>","sql":"SELECT count(*) FROM kd_point_tbl WHERE p |>> '(5000, 4000)';"},
-      {"line":260,"kind":"rejects","hash":"d7eff75591a52cf0","pg":"ok","parser":"syntax error at or near <","sql":"SELECT count(*) FROM radix_text_tbl WHERE t ~<~ 'Aztec Ct ';"},
-      {"line":268,"kind":"rejects","hash":"bf4b94969622b92a","pg":"ok","parser":"syntax error at or near <=","sql":"SELECT count(*) FROM radix_text_tbl WHERE t ~<=~ 'Aztec Ct ';"},
-      {"line":284,"kind":"rejects","hash":"dd040c78376fd98e","pg":"ok","parser":"syntax error at or near >=","sql":"SELECT count(*) FROM radix_text_tbl WHERE t ~>=~ 'Worth St ';"},
-      {"line":292,"kind":"rejects","hash":"52be984058a4b0ea","pg":"ok","parser":"syntax error at or near >","sql":"SELECT count(*) FROM radix_text_tbl WHERE t ~>~ 'Worth St ';"},
-      {"line":337,"kind":"rejects","hash":"ec476cc3094f5049","pg":"ok","parser":"syntax error at or near |","sql":"SELECT count(*) FROM quad_point_tbl WHERE p <<| '(5000, 4000)';"},
-      {"line":341,"kind":"rejects","hash":"3cb54da0eeb13d33","pg":"ok","parser":"syntax error at or near >>","sql":"SELECT count(*) FROM quad_point_tbl WHERE p |>> '(5000, 4000)';"},
-      {"line":365,"kind":"rejects","hash":"275a59c269e7e392","pg":"ok","parser":"syntax error at or near |","sql":"SELECT count(*) FROM kd_point_tbl WHERE p <<| '(5000, 4000)';"},
-      {"line":369,"kind":"rejects","hash":"6c9284ef0f42170e","pg":"ok","parser":"syntax error at or near >>","sql":"SELECT count(*) FROM kd_point_tbl WHERE p |>> '(5000, 4000)';"},
-      {"line":393,"kind":"rejects","hash":"d7eff75591a52cf0","pg":"ok","parser":"syntax error at or near <","sql":"SELECT count(*) FROM radix_text_tbl WHERE t ~<~ 'Aztec Ct ';"},
-      {"line":401,"kind":"rejects","hash":"bf4b94969622b92a","pg":"ok","parser":"syntax error at or near <=","sql":"SELECT count(*) FROM radix_text_tbl WHERE t ~<=~ 'Aztec Ct ';"},
-      {"line":417,"kind":"rejects","hash":"dd040c78376fd98e","pg":"ok","parser":"syntax error at or near >=","sql":"SELECT count(*) FROM radix_text_tbl WHERE t ~>=~ 'Worth St ';"},
-      {"line":425,"kind":"rejects","hash":"52be984058a4b0ea","pg":"ok","parser":"syntax error at or near >","sql":"SELECT count(*) FROM radix_text_tbl WHERE t ~>~ 'Worth St ';"}
-    ],
-    "create_operator": [
-      {"line":23,"kind":"rejects","hash":"f727ab07eec87de7","pg":"ok","parser":"syntax error at or near #","sql":"SELECT @#@ 24;"},
-      {"line":49,"kind":"rejects","hash":"407192a800237fff","pg":"ok","parser":"syntax error at or near !=","sql":"SELECT !=- 10;"}
     ],
     "create_role": [
       {"line":129,"kind":"rejects","hash":"2922f2d684c1b74f","pg":"ERROR:  permission denied to reassign objects","parser":"syntax error at or near reassign","sql":"REASSIGN OWNED BY regress_tenant TO regress_createrole;"}
@@ -215,8 +164,7 @@
       {"line":201,"kind":"rejects","hash":"02d4e90b4f822ae9","pg":"ok","parser":"syntax error: expected column constraint at or near no","sql":"CREATE TABLE noinh_con_copy (a int CHECK (a > 0) NO INHERIT, b int not null, c int not null no inherit);"}
     ],
     "create_type": [
-      {"line":179,"kind":"rejects","hash":"9a64eba14d9f78af","pg":"ERROR:  invalid NUMERIC type modifier","parser":"syntax error: expected \",\" or \")\" at or near (","sql":"CREATE TEMP TABLE mytab (foo widget(42,13,7));"},
-      {"line":218,"kind":"rejects","hash":"1f8a2b44e92c4813","pg":"ok","parser":"syntax error at or near %","sql":"SELECT point '(1,2)' <% widget '(0,0,3)' AS t, point '(1,2)' <% widget '(0,0,1)' AS f;"}
+      {"line":179,"kind":"rejects","hash":"9a64eba14d9f78af","pg":"ERROR:  invalid NUMERIC type modifier","parser":"syntax error: expected \",\" or \")\" at or near (","sql":"CREATE TEMP TABLE mytab (foo widget(42,13,7));"}
     ],
     "create_view": [
       {"line":29,"kind":"rejects","hash":"830f94acd969215e","pg":"ok","parser":"syntax error at or near into","sql":"SELECT * INTO TABLE ramp FROM ONLY road WHERE name ~ '.*Ramp';"},
@@ -318,27 +266,6 @@
       {"line":964,"kind":"rejects","hash":"faabbe3175ebf08b","pg":"ok","parser":"syntax error at or near fetch","sql":"fetch 1 from curs;"},
       {"line":965,"kind":"rejects","hash":"c5658f6868f97b80","pg":"ok","parser":"WHERE CURRENT OF cursor is not supported","sql":"update gtest_cursor set a = 99 where current of curs;"},
       {"line":967,"kind":"rejects","hash":"58392c4f2d3f3748","pg":"ok","parser":"WHERE CURRENT OF cursor is not supported","sql":"delete from gtest_cursor where current of curs;"}
-    ],
-    "geometry": [
-      {"line":16,"kind":"rejects","hash":"1aeaedee20697c61","pg":"ok","parser":"syntax error at or near @@","sql":"SELECT (@@ f1) AS center FROM BOX_TBL;"},
-      {"line":22,"kind":"rejects","hash":"e28595c8147e799c","pg":"ok","parser":"syntax error at or near @@","sql":"SELECT (@@ f1) AS center FROM CIRCLE_TBL;"},
-      {"line":25,"kind":"rejects","hash":"d7d56a67f7278b2a","pg":"ok","parser":"syntax error at or near @@","sql":"SELECT (@@ f1) AS center FROM POLYGON_TBL WHERE (# f1) > 2;"},
-      {"line":115,"kind":"rejects","hash":"e7a9ab3a461993c5","pg":"ok","parser":"syntax error at or near ?|","sql":"SELECT s FROM LINE_TBL WHERE ?| s;"},
-      {"line":118,"kind":"rejects","hash":"453a046adad9c087","pg":"ok","parser":"syntax error at or near ?-","sql":"SELECT s FROM LINE_TBL WHERE ?- s;"},
-      {"line":153,"kind":"rejects","hash":"1117ecd48084a30c","pg":"ok","parser":"syntax error at or near @-@","sql":"SELECT s, @-@ s FROM LSEG_TBL;"},
-      {"line":156,"kind":"rejects","hash":"68d1c7bb597b220f","pg":"ok","parser":"syntax error at or near ?|","sql":"SELECT s FROM LSEG_TBL WHERE ?| s;"},
-      {"line":159,"kind":"rejects","hash":"42e77cb652a58ad7","pg":"ok","parser":"syntax error at or near ?-","sql":"SELECT s FROM LSEG_TBL WHERE ?- s;"},
-      {"line":162,"kind":"rejects","hash":"b2f9deea8174b65f","pg":"ok","parser":"syntax error at or near @@","sql":"SELECT s, @@ s FROM LSEG_TBL;"},
-      {"line":276,"kind":"rejects","hash":"1e679cb45ea4aef8","pg":"ok","parser":"syntax error at or near @-@","sql":"SELECT f1, @-@ f1 FROM PATH_TBL;"},
-      {"line":375,"kind":"rejects","hash":"da4167c71be2a914","pg":"ok","parser":"syntax error at or near |","sql":"SELECT p1.f1, p2.f1 FROM POLYGON_TBL p1, POLYGON_TBL p2 WHERE p1.f1 <<| p2.f1;"},
-      {"line":378,"kind":"rejects","hash":"86a368ff873c3464","pg":"ok","parser":"syntax error at or near |","sql":"SELECT p1.f1, p2.f1 FROM POLYGON_TBL p1, POLYGON_TBL p2 WHERE p1.f1 &<| p2.f1;"},
-      {"line":381,"kind":"rejects","hash":"f3f42c8b442a3d60","pg":"ok","parser":"syntax error at or near >>","sql":"SELECT p1.f1, p2.f1 FROM POLYGON_TBL p1, POLYGON_TBL p2 WHERE p1.f1 |>> p2.f1;"},
-      {"line":384,"kind":"rejects","hash":"fae41b0da34b5af5","pg":"ok","parser":"syntax error at or near &>","sql":"SELECT p1.f1, p2.f1 FROM POLYGON_TBL p1, POLYGON_TBL p2 WHERE p1.f1 |&> p2.f1;"},
-      {"line":399,"kind":"rejects","hash":"b5fe3b3bfe6f2db4","pg":"ok","parser":"syntax error at or near #","sql":"SELECT circle(f1) FROM POLYGON_TBL WHERE (# f1) >= 3;"},
-      {"line":445,"kind":"rejects","hash":"0a6900620acc1470","pg":"ok","parser":"syntax error at or near |","sql":"SELECT c1.f1, c2.f1 FROM CIRCLE_TBL c1, CIRCLE_TBL c2 WHERE c1.f1 <<| c2.f1;"},
-      {"line":448,"kind":"rejects","hash":"9c25fabafa1c0517","pg":"ok","parser":"syntax error at or near >>","sql":"SELECT c1.f1, c2.f1 FROM CIRCLE_TBL c1, CIRCLE_TBL c2 WHERE c1.f1 |>> c2.f1;"},
-      {"line":451,"kind":"rejects","hash":"14f72423922d7004","pg":"ok","parser":"syntax error at or near |","sql":"SELECT c1.f1, c2.f1 FROM CIRCLE_TBL c1, CIRCLE_TBL c2 WHERE c1.f1 &<| c2.f1;"},
-      {"line":454,"kind":"rejects","hash":"d1acd652c8235393","pg":"ok","parser":"syntax error at or near &>","sql":"SELECT c1.f1, c2.f1 FROM CIRCLE_TBL c1, CIRCLE_TBL c2 WHERE c1.f1 |&> c2.f1;"}
     ],
     "groupingsets": [
       {"line":69,"kind":"rejects","hash":"b27f3a43ae985873","pg":"ok","parser":"syntax error: expected \")\" at or near ,","sql":"select a, b, grouping(a,b), array_agg(v order by v), string_agg(v::text, ':' order by v desc), percentile_disc(0.5) w..."}
@@ -937,17 +864,6 @@
       {"line":1915,"kind":"rejects","hash":"4ad9d6b418f1809a","pg":"ERROR:  cursor \"test1\" does not exist","parser":"syntax error at or near fetch","sql":"fetch next from test1;"},
       {"line":3759,"kind":"rejects","hash":"3cad279a8445c86c","pg":"ok","parser":"syntax error at or near end","sql":"end;"}
     ],
-    "point": [
-      {"line":31,"kind":"rejects","hash":"9c34be749c8dc227","pg":"ok","parser":"syntax error at or near >>","sql":"SELECT p.* FROM POINT_TBL p WHERE '(0.0,0.0)' |>> p.f1;"},
-      {"line":34,"kind":"rejects","hash":"a0b8afe12f4ae720","pg":"ok","parser":"syntax error at or near |","sql":"SELECT p.* FROM POINT_TBL p WHERE p.f1 <<| '(0.0, 0.0)';"},
-      {"line":74,"kind":"rejects","hash":"f1387fe09b72ad14","pg":"ok","parser":"syntax error at or near >>","sql":"SELECT p1.f1 AS point1, p2.f1 AS point2, (p1.f1 <-> p2.f1) AS distance FROM POINT_TBL p1, POINT_TBL p2 WHERE (p1.f1 <..."}
-    ],
-    "polygon": [
-      {"line":96,"kind":"rejects","hash":"54438e0deacf26ab","pg":"ok","parser":"syntax error at or near |","sql":"SELECT count(*) FROM quad_poly_tbl WHERE p <<| polygon '((300,300),(400,600),(600,500),(700,200))';"},
-      {"line":100,"kind":"rejects","hash":"036f39e5e2881f45","pg":"ok","parser":"syntax error at or near |","sql":"SELECT count(*) FROM quad_poly_tbl WHERE p &<| polygon '((300,300),(400,600),(600,500),(700,200))';"},
-      {"line":104,"kind":"rejects","hash":"148aaee57c627c1a","pg":"ok","parser":"syntax error at or near &>","sql":"SELECT count(*) FROM quad_poly_tbl WHERE p |&> polygon '((300,300),(400,600),(600,500),(700,200))';"},
-      {"line":108,"kind":"rejects","hash":"8f0d627b2e9fdc00","pg":"ok","parser":"syntax error at or near >>","sql":"SELECT count(*) FROM quad_poly_tbl WHERE p |>> polygon '((300,300),(400,600),(600,500),(700,200))';"}
-    ],
     "polymorphism": [
       {"line":684,"kind":"rejects","hash":"40e0030ef2829f7c","pg":"ok","parser":"syntax error at or near variadic","sql":"select concat('|', variadic array[1,2,33]);"},
       {"line":685,"kind":"rejects","hash":"e761fa664f5dbd5f","pg":"ok","parser":"syntax error at or near variadic","sql":"select concat('|', variadic array[]::int[]);"},
@@ -1260,8 +1176,6 @@
     ],
     "privileges": [
       {"line":70,"kind":"rejects","hash":"81687d88db711bd1","pg":"ok","parser":"syntax error at or near reassign","sql":"REASSIGN OWNED BY regress_priv_user2 TO regress_priv_user4;"},
-      {"line":332,"kind":"rejects","hash":"9cf39dd9bb04a7fd","pg":"ok","parser":"syntax error at or near <","sql":"CREATE VIEW atest12v AS SELECT * FROM atest12 WHERE b <<< 5;"},
-      {"line":334,"kind":"rejects","hash":"76dde664cedd166f","pg":"ok","parser":"syntax error at or near <","sql":"CREATE VIEW atest12sbv WITH (security_barrier=true) AS SELECT * FROM atest12 WHERE b <<< 5;"},
       {"line":619,"kind":"rejects","hash":"1af93ddaac5c7cbf","pg":"ERROR:  permission denied for table msource","parser":"syntax error at or near merge","sql":"MERGE INTO mtarget t USING msource s ON t.a = s.a WHEN MATCHED THEN UPDATE SET b = s.b WHEN NOT MATCHED THEN INSERT V..."},
       {"line":626,"kind":"rejects","hash":"02959ebc58db290f","pg":"ERROR:  permission denied for table msource","parser":"syntax error at or near merge","sql":"MERGE INTO mtarget t USING msource s ON t.a = s.a WHEN MATCHED THEN UPDATE SET b = 'x' WHEN NOT MATCHED THEN INSERT V..."},
       {"line":633,"kind":"rejects","hash":"1e7289199e9ab42e","pg":"ERROR:  permission denied for table msource","parser":"syntax error at or near merge","sql":"MERGE INTO mtarget t USING msource s ON t.a = s.a WHEN MATCHED AND s.b = 'x' THEN UPDATE SET b = 'x' WHEN NOT MATCHED..."},
@@ -1372,58 +1286,14 @@
       {"line":1728,"kind":"rejects","hash":"b00caec1df4573e6","pg":"ok","parser":"WHERE CURRENT OF cursor is not supported","sql":"DELETE FROM current_check WHERE CURRENT OF current_check_cursor RETURNING *;"},
       {"line":1744,"kind":"rejects","hash":"74963ec4acf82705","pg":"ok","parser":"syntax error at or near declare","sql":"DECLARE current_check_cursor CURSOR FOR SELECT * FROM current_check_2;"},
       {"line":1745,"kind":"rejects","hash":"776ff0fd9990bf4a","pg":"ok","parser":"syntax error at or near fetch","sql":"FETCH FROM current_check_cursor;"},
-      {"line":1748,"kind":"rejects","hash":"d9292d8bab2e99ff","pg":"ok","parser":"WHERE CURRENT OF cursor is not supported","sql":"UPDATE current_check_2 SET b = 'Manzana' WHERE CURRENT OF current_check_cursor;"},
-      {"line":2210,"kind":"rejects","hash":"d48b107103c29eb0","pg":"ok","parser":"syntax error at or near <","sql":"SELECT * FROM rls_tbl WHERE a <<< 1000;"},
-      {"line":2232,"kind":"rejects","hash":"d48b107103c29eb0","pg":"ok","parser":"syntax error at or near <","sql":"SELECT * FROM rls_tbl WHERE a <<< 1000;"},
-      {"line":2233,"kind":"rejects","hash":"a845276e33d07d04","pg":"ERROR:  permission denied for table rls_child_tbl","parser":"syntax error at or near <","sql":"SELECT * FROM rls_child_tbl WHERE a <<< 1000;"},
-      {"line":2234,"kind":"rejects","hash":"fe717f805791e38b","pg":"ok","parser":"syntax error at or near <","sql":"SELECT * FROM rls_ptbl WHERE a <<< 1000;"},
-      {"line":2235,"kind":"rejects","hash":"d3b1440d3bfe4d0f","pg":"ok","parser":"syntax error at or near <","sql":"SELECT * FROM rls_part WHERE a <<< 1000;"},
-      {"line":2236,"kind":"rejects","hash":"43be093beb301818","pg":"ok","parser":"syntax error at or near <","sql":"SELECT * FROM (SELECT * FROM rls_tbl UNION ALL SELECT * FROM rls_tbl) t WHERE a <<< 1000;"},
-      {"line":2238,"kind":"rejects","hash":"4f54de847dcce0f6","pg":"ERROR:  permission denied for table rls_child_tbl","parser":"syntax error at or near <","sql":"SELECT * FROM (SELECT * FROM rls_child_tbl UNION ALL SELECT * FROM rls_child_tbl) t WHERE a <<< 1000;"},
-      {"line":2250,"kind":"rejects","hash":"d48b107103c29eb0","pg":"ERROR:  permission denied for table rls_tbl","parser":"syntax error at or near <","sql":"SELECT * FROM rls_tbl WHERE a <<< 1000;"},
-      {"line":2251,"kind":"rejects","hash":"140ead712195a533","pg":"ERROR:  permission denied for view rls_tbl_view","parser":"syntax error at or near <","sql":"SELECT * FROM rls_tbl_view WHERE a <<< 1000;"},
-      {"line":2252,"kind":"rejects","hash":"a845276e33d07d04","pg":"ok","parser":"syntax error at or near <","sql":"SELECT * FROM rls_child_tbl WHERE a <<< 1000;"},
-      {"line":2253,"kind":"rejects","hash":"43be093beb301818","pg":"ERROR:  permission denied for table rls_tbl","parser":"syntax error at or near <","sql":"SELECT * FROM (SELECT * FROM rls_tbl UNION ALL SELECT * FROM rls_tbl) t WHERE a <<< 1000;"},
-      {"line":2255,"kind":"rejects","hash":"4f54de847dcce0f6","pg":"ok","parser":"syntax error at or near <","sql":"SELECT * FROM (SELECT * FROM rls_child_tbl UNION ALL SELECT * FROM rls_child_tbl) t WHERE a <<< 1000;"}
+      {"line":1748,"kind":"rejects","hash":"d9292d8bab2e99ff","pg":"ok","parser":"WHERE CURRENT OF cursor is not supported","sql":"UPDATE current_check_2 SET b = 'Manzana' WHERE CURRENT OF current_check_cursor;"}
     ],
     "rowtypes": [
       {"line":67,"kind":"rejects","hash":"18799458864ae458","pg":"ok","parser":"subscripted or field assignment targets (col[i] = ..., col.f = ...) are not supported","sql":"update people set fn.suffix = 'Jr';"},
       {"line":71,"kind":"rejects","hash":"6cd5c64a16085188","pg":"ok","parser":"syntax error: expected \",\" or \")\" at or near .","sql":"insert into quadtable (f1, q.c1.r, q.c2.i) values(44,55,66);"},
       {"line":73,"kind":"rejects","hash":"3c5bcaef5937fb20","pg":"ok","parser":"subscripted or field assignment targets (col[i] = ..., col.f = ...) are not supported","sql":"update quadtable set q.c1.r = 12 where f1 = 2;"},
       {"line":75,"kind":"rejects","hash":"b71582577d15258e","pg":"ERROR:  subfield \"c1\" is of type complex but expression is of type integer","parser":"subscripted or field assignment targets (col[i] = ..., col.f = ...) are not supported","sql":"update quadtable set q.c1 = 12;"},
-      {"line":91,"kind":"rejects","hash":"6ff686e432c62682","pg":"ok","parser":"subscripted or field assignment targets (col[i] = ..., col.f = ...) are not supported","sql":"update people set fn.first = 'Jack';"},
-      {"line":113,"kind":"rejects","hash":"a435a36d2fac67b9","pg":"ok","parser":"syntax error at or near <=","sql":"select ROW('ABC','DEF') ~<=~ ROW('DEF','ABC') as true;"},
-      {"line":114,"kind":"rejects","hash":"78d9a0f60bae4f4f","pg":"ok","parser":"syntax error at or near >=","sql":"select ROW('ABC','DEF') ~>=~ ROW('DEF','ABC') as false;"},
-      {"line":265,"kind":"rejects","hash":"a091a0cd0e84ca64","pg":"ok","parser":"syntax error at or near <","sql":"select row(1, 2)::testtype1 *< row(1, 3)::testtype1;"},
-      {"line":266,"kind":"rejects","hash":"737f984977e5a713","pg":"ok","parser":"syntax error at or near <=","sql":"select row(1, 2)::testtype1 *<= row(1, 3)::testtype1;"},
-      {"line":267,"kind":"rejects","hash":"c07eda1af9f12fcb","pg":"ok","parser":"syntax error at or near =","sql":"select row(1, 2)::testtype1 *= row(1, 2)::testtype1;"},
-      {"line":268,"kind":"rejects","hash":"3e2dfa4768906d89","pg":"ok","parser":"syntax error at or near <>","sql":"select row(1, 2)::testtype1 *<> row(1, 3)::testtype1;"},
-      {"line":269,"kind":"rejects","hash":"0aee4e111e5e3d87","pg":"ok","parser":"syntax error at or near >=","sql":"select row(1, 3)::testtype1 *>= row(1, 2)::testtype1;"},
-      {"line":270,"kind":"rejects","hash":"c430baab299d9695","pg":"ok","parser":"syntax error at or near >","sql":"select row(1, 3)::testtype1 *> row(1, 2)::testtype1;"},
-      {"line":273,"kind":"rejects","hash":"256ba4e7356b848a","pg":"ok","parser":"syntax error at or near <","sql":"select row(1, -2)::testtype1 *< row(1, -3)::testtype1;"},
-      {"line":274,"kind":"rejects","hash":"e456c0ba7711e588","pg":"ok","parser":"syntax error at or near <=","sql":"select row(1, -2)::testtype1 *<= row(1, -3)::testtype1;"},
-      {"line":275,"kind":"rejects","hash":"4d1013dbb9c0b956","pg":"ok","parser":"syntax error at or near =","sql":"select row(1, -2)::testtype1 *= row(1, -3)::testtype1;"},
-      {"line":276,"kind":"rejects","hash":"37c02d219ea5e38e","pg":"ok","parser":"syntax error at or near <>","sql":"select row(1, -2)::testtype1 *<> row(1, -2)::testtype1;"},
-      {"line":277,"kind":"rejects","hash":"e9d2ccac2c7dc755","pg":"ok","parser":"syntax error at or near >=","sql":"select row(1, -3)::testtype1 *>= row(1, -2)::testtype1;"},
-      {"line":278,"kind":"rejects","hash":"60aee558e9ddd918","pg":"ok","parser":"syntax error at or near >","sql":"select row(1, -3)::testtype1 *> row(1, -2)::testtype1;"},
-      {"line":282,"kind":"rejects","hash":"dc84ffd34c903916","pg":"ok","parser":"syntax error at or near <","sql":"select row(1, -2)::testtype1 *< row(1, 3)::testtype1;"},
-      {"line":286,"kind":"rejects","hash":"4207afcf60b47148","pg":"ok","parser":"syntax error at or near <","sql":"select row(1, true)::testtype2 *< row(2, true)::testtype2;"},
-      {"line":287,"kind":"rejects","hash":"3ea228b59a04a0a0","pg":"ok","parser":"syntax error at or near <","sql":"select row(-2, true)::testtype2 *< row(-1, true)::testtype2;"},
-      {"line":288,"kind":"rejects","hash":"129761b011a8228b","pg":"ok","parser":"syntax error at or near <","sql":"select row(0, false)::testtype2 *< row(0, true)::testtype2;"},
-      {"line":289,"kind":"rejects","hash":"68bdf3e91899e8ec","pg":"ok","parser":"syntax error at or near <>","sql":"select row(0, false)::testtype2 *<> row(0, true)::testtype2;"},
-      {"line":292,"kind":"rejects","hash":"9617046d567c7099","pg":"ok","parser":"syntax error at or near <","sql":"select row(1, 'abc')::testtype3 *< row(1, 'abd')::testtype3;"},
-      {"line":293,"kind":"rejects","hash":"823099f5afa0603e","pg":"ok","parser":"syntax error at or near <","sql":"select row(1, 'abc')::testtype3 *< row(1, 'abcd')::testtype3;"},
-      {"line":294,"kind":"rejects","hash":"20dcbd8af9b4a8dd","pg":"ok","parser":"syntax error at or near >","sql":"select row(1, 'abc')::testtype3 *> row(1, 'abd')::testtype3;"},
-      {"line":295,"kind":"rejects","hash":"60eeea995aac0503","pg":"ok","parser":"syntax error at or near <>","sql":"select row(1, 'abc')::testtype3 *<> row(1, 'abd')::testtype3;"},
-      {"line":298,"kind":"rejects","hash":"76893ee12ed511bd","pg":"ok","parser":"syntax error at or near <","sql":"select row(1, '(1,2)')::testtype4 *< row(1, '(1,3)')::testtype4;"},
-      {"line":299,"kind":"rejects","hash":"ec951b3013e90a13","pg":"ok","parser":"syntax error at or near <>","sql":"select row(1, '(1,2)')::testtype4 *<> row(1, '(1,3)')::testtype4;"},
-      {"line":302,"kind":"rejects","hash":"ad1933db6e8be0fe","pg":"ERROR:  cannot compare dissimilar column types integer and text at record column 2","parser":"syntax error at or near <","sql":"select row(1, 2)::testtype1 *< row(1, 'abc')::testtype3;"},
-      {"line":303,"kind":"rejects","hash":"171706505c6951df","pg":"ERROR:  cannot compare dissimilar column types integer and text at record column 2","parser":"syntax error at or near <>","sql":"select row(1, 2)::testtype1 *<> row(1, 'abc')::testtype3;"},
-      {"line":305,"kind":"rejects","hash":"ee25e5f5f0f4ed28","pg":"ERROR:  cannot compare record types with different numbers of columns","parser":"syntax error at or near <","sql":"select row(1, 2)::testtype1 *< row(1)::testtype5;"},
-      {"line":306,"kind":"rejects","hash":"f0f57c307afb4a1d","pg":"ERROR:  cannot compare record types with different numbers of columns","parser":"syntax error at or near <>","sql":"select row(1, 2)::testtype1 *<> row(1)::testtype5;"},
-      {"line":310,"kind":"rejects","hash":"44a60fb4119e2dda","pg":"ok","parser":"syntax error at or near <","sql":"select row(1, '(1,2)')::testtype6 *< row(1, '(1,3)')::testtype6;"},
-      {"line":311,"kind":"rejects","hash":"820146c635f91752","pg":"ok","parser":"syntax error at or near >=","sql":"select row(1, '(1,2)')::testtype6 *>= row(1, '(1,3)')::testtype6;"},
-      {"line":312,"kind":"rejects","hash":"bde9d6f8396df657","pg":"ok","parser":"syntax error at or near <>","sql":"select row(1, '(1,2)')::testtype6 *<> row(1, '(1,3)')::testtype6;"}
+      {"line":91,"kind":"rejects","hash":"6ff686e432c62682","pg":"ok","parser":"subscripted or field assignment targets (col[i] = ..., col.f = ...) are not supported","sql":"update people set fn.first = 'Jack';"}
     ],
     "rules": [
       {"line":1262,"kind":"rejects","hash":"629491fe8d496d1a","pg":"ERROR:  cannot execute MERGE on relation \"rule_merge1\"","parser":"syntax error at or near merge","sql":"MERGE INTO rule_merge1 t USING (SELECT 1 AS a) s ON t.a = s.a WHEN MATCHED AND t.a < 2 THEN UPDATE SET b = b || ' upd..."},
@@ -1442,9 +1312,6 @@
     ],
     "select_parallel": [
       {"line":157,"kind":"rejects","hash":"df0078a1ffe2ef54","pg":"ok","parser":"syntax error: expected \")\" at or near ::","sql":"select count((unique1)) from tenk1 where hundred = any ((select array_agg(i) from generate_series(1, 100, 15) i)::int..."}
-    ],
-    "select_views": [
-      {"line":8,"kind":"rejects","hash":"657f825444aeca99","pg":"ok","parser":"syntax error at or near #","sql":"SELECT name, #thepath FROM iexit ORDER BY name COLLATE \"C\", 2;"}
     ],
     "sequence": [
       {"line":235,"kind":"rejects","hash":"82968886bc193b46","pg":"ok","parser":"syntax error at or near any","sql":"SELECT * FROM information_schema.sequences WHERE sequence_name ~ ANY(ARRAY['sequence_test', 'serialtest']) ORDER BY s..."},
@@ -1910,26 +1777,6 @@
       {"line":511,"kind":"rejects","hash":"8d4e42aa3ddc4148","pg":"ERROR:  bit string length 4 does not match type bit(3)","parser":"syntax error: expected \")\" at or near returning","sql":"SELECT JSON_VALUE(jsonb '\"111\"', '$.a' RETURNING bit(3) DEFAULT '1111' ON EMPTY);"}
     ],
     "stats_ext": [
-      {"line":1677,"kind":"rejects","hash":"d27cef8fa11bf6f8","pg":"ERROR:  permission denied for table priv_test_tbl","parser":"syntax error at or near <","sql":"SELECT * FROM tststats.priv_test_tbl WHERE a <<< 0 AND b <<< 0;"},
-      {"line":1678,"kind":"rejects","hash":"8bb1d76de343b613","pg":"ERROR:  permission denied for table priv_test_tbl","parser":"syntax error at or near <","sql":"SELECT * FROM tststats.priv_test_tbl WHERE a <<< 0 OR b <<< 0;"},
-      {"line":1679,"kind":"rejects","hash":"fe0fa9adc9df1739","pg":"ERROR:  permission denied for table priv_test_tbl","parser":"syntax error at or near <","sql":"SELECT * FROM tststats.priv_test_tbl t WHERE a <<< 0 AND (b <<< 0 OR t.* <<< (1, 1) IS NOT NULL);"},
-      {"line":1681,"kind":"rejects","hash":"ebf5578b75b7e7ab","pg":"ERROR:  permission denied for table priv_test_tbl","parser":"syntax error at or near <","sql":"DELETE FROM tststats.priv_test_tbl WHERE a <<< 0 AND b <<< 0;"},
-      {"line":1691,"kind":"rejects","hash":"de9890c318c3bb2c","pg":"ok","parser":"syntax error at or near <","sql":"SELECT * FROM tststats.priv_test_view WHERE a <<< 0 AND b <<< 0;"},
-      {"line":1692,"kind":"rejects","hash":"87718a9d59f62a07","pg":"ok","parser":"syntax error at or near <","sql":"SELECT * FROM tststats.priv_test_view WHERE a <<< 0 OR b <<< 0;"},
-      {"line":1693,"kind":"rejects","hash":"6eaaf57bf6dade3e","pg":"ok","parser":"syntax error at or near <","sql":"SELECT * FROM tststats.priv_test_view t WHERE a <<< 0 AND (b <<< 0 OR t.* <<< (1, 1) IS NOT NULL);"},
-      {"line":1695,"kind":"rejects","hash":"72f46b9ed17810eb","pg":"ok","parser":"syntax error at or near <","sql":"DELETE FROM tststats.priv_test_view WHERE a <<< 0 AND b <<< 0;"},
-      {"line":1705,"kind":"rejects","hash":"d27cef8fa11bf6f8","pg":"ok","parser":"syntax error at or near <","sql":"SELECT * FROM tststats.priv_test_tbl WHERE a <<< 0 AND b <<< 0;"},
-      {"line":1706,"kind":"rejects","hash":"8bb1d76de343b613","pg":"ok","parser":"syntax error at or near <","sql":"SELECT * FROM tststats.priv_test_tbl WHERE a <<< 0 OR b <<< 0;"},
-      {"line":1707,"kind":"rejects","hash":"fe0fa9adc9df1739","pg":"ok","parser":"syntax error at or near <","sql":"SELECT * FROM tststats.priv_test_tbl t WHERE a <<< 0 AND (b <<< 0 OR t.* <<< (1, 1) IS NOT NULL);"},
-      {"line":1709,"kind":"rejects","hash":"ebf5578b75b7e7ab","pg":"ok","parser":"syntax error at or near <","sql":"DELETE FROM tststats.priv_test_tbl WHERE a <<< 0 AND b <<< 0;"},
-      {"line":1718,"kind":"rejects","hash":"90dab8cf3c563742","pg":"ERROR:  permission denied for table priv_test_parent_tbl","parser":"syntax error at or near <","sql":"SELECT * FROM tststats.priv_test_parent_tbl WHERE a <<< 0 AND b <<< 0;"},
-      {"line":1719,"kind":"rejects","hash":"cbfb2e9e82a66058","pg":"ERROR:  permission denied for table priv_test_parent_tbl","parser":"syntax error at or near <","sql":"SELECT * FROM tststats.priv_test_parent_tbl WHERE a <<< 0 OR b <<< 0;"},
-      {"line":1720,"kind":"rejects","hash":"d53b972b7e7bfd5b","pg":"ERROR:  permission denied for table priv_test_parent_tbl","parser":"syntax error at or near <","sql":"SELECT * FROM tststats.priv_test_parent_tbl t WHERE a <<< 0 AND (b <<< 0 OR t.* <<< (1, 1) IS NOT NULL);"},
-      {"line":1722,"kind":"rejects","hash":"7f0e6d0f18ac4d1c","pg":"ERROR:  permission denied for table priv_test_parent_tbl","parser":"syntax error at or near <","sql":"DELETE FROM tststats.priv_test_parent_tbl WHERE a <<< 0 AND b <<< 0;"},
-      {"line":1732,"kind":"rejects","hash":"90dab8cf3c563742","pg":"ok","parser":"syntax error at or near <","sql":"SELECT * FROM tststats.priv_test_parent_tbl WHERE a <<< 0 AND b <<< 0;"},
-      {"line":1733,"kind":"rejects","hash":"cbfb2e9e82a66058","pg":"ok","parser":"syntax error at or near <","sql":"SELECT * FROM tststats.priv_test_parent_tbl WHERE a <<< 0 OR b <<< 0;"},
-      {"line":1734,"kind":"rejects","hash":"d53b972b7e7bfd5b","pg":"ok","parser":"syntax error at or near <","sql":"SELECT * FROM tststats.priv_test_parent_tbl t WHERE a <<< 0 AND (b <<< 0 OR t.* <<< (1, 1) IS NOT NULL);"},
-      {"line":1736,"kind":"rejects","hash":"7f0e6d0f18ac4d1c","pg":"ok","parser":"syntax error at or near <","sql":"DELETE FROM tststats.priv_test_parent_tbl WHERE a <<< 0 AND b <<< 0;"},
       {"line":1766,"kind":"rejects","hash":"784c5380374a619f","pg":"ok","parser":"schema elements in CREATE SCHEMA are not supported; use separate statements","sql":"CREATE SCHEMA sts_sch1 CREATE TABLE sts_sch1.tbl (a INT, b INT, c INT GENERATED ALWAYS AS (b * 2) STORED);"}
     ],
     "stats_import": [
@@ -1960,14 +1807,6 @@
       {"line":241,"kind":"rejects","hash":"4e3641a87137fea1","pg":"ok","parser":"syntax error at or near end","sql":"END;"}
     ],
     "subselect": [
-      {"line":946,"kind":"rejects","hash":"e882d4dd4f3cc949","pg":"ok","parser":"syntax error at or near =","sql":"SELECT * FROM (SELECT DISTINCT ON (a) id, a FROM pdt ORDER BY a, id) s WHERE a *= ROW(1.0)::t_rec;"},
-      {"line":956,"kind":"rejects","hash":"12d62a31689a690c","pg":"ok","parser":"syntax error at or near =","sql":"SELECT * FROM ( SELECT id, a, count(*) OVER (PARTITION BY a) AS cnt FROM pdt ) s WHERE a *= ROW(1.0)::t_rec;"},
-      {"line":965,"kind":"rejects","hash":"8813bb73e8cdca63","pg":"ok","parser":"syntax error at or near =","sql":"SELECT * FROM (SELECT DISTINCT a FROM pdt) s WHERE a *= ROW(1.0)::t_rec;"},
-      {"line":987,"kind":"rejects","hash":"0af0fd9ea81bda5b","pg":"ok","parser":"syntax error at or near =","sql":"SELECT * FROM (SELECT a FROM u1 UNION SELECT a FROM u2) s WHERE a *= ROW(1.0)::t_rec;"},
-      {"line":995,"kind":"rejects","hash":"42d57a8d560f6b80","pg":"ok","parser":"syntax error at or near =","sql":"SELECT * FROM (SELECT a FROM u1 INTERSECT SELECT a FROM u2) s WHERE a *= ROW(1.0)::t_rec;"},
-      {"line":1003,"kind":"rejects","hash":"be762d71c680c3cd","pg":"ok","parser":"syntax error at or near =","sql":"SELECT * FROM (SELECT a FROM u1 INTERSECT ALL SELECT a FROM u2) s WHERE a *= ROW(1.0)::t_rec;"},
-      {"line":1016,"kind":"rejects","hash":"b949b357f14cb3ad","pg":"ok","parser":"syntax error at or near =","sql":"SELECT * FROM ( (SELECT a FROM u1 UNION SELECT a FROM u2) UNION ALL SELECT a FROM u2 ) s WHERE a *= ROW(1.0)::t_rec;"},
-      {"line":1028,"kind":"rejects","hash":"02e703eff1e52402","pg":"ok","parser":"syntax error at or near =","sql":"SELECT * FROM (SELECT a FROM u1 UNION ALL SELECT a FROM u2) s WHERE a *= ROW(1.0)::t_rec;"},
       {"line":1079,"kind":"rejects","hash":"9b13469dcd737602","pg":"ok","parser":"syntax error at or near declare","sql":"declare c1 scroll cursor for select * from generate_series(1,4) i where i <> all (values (2),(3));"},
       {"line":1083,"kind":"rejects","hash":"b53f8b8c05447c5a","pg":"ok","parser":"syntax error at or near move","sql":"move forward all in c1;"},
       {"line":1084,"kind":"rejects","hash":"d351e995ad4717b9","pg":"ok","parser":"syntax error at or near fetch","sql":"fetch backward all in c1;"}
@@ -2179,9 +2018,6 @@
       {"line":168,"kind":"rejects","hash":"d9c955bb50472568","pg":"ok","parser":"syntax error at or near any","sql":"SELECT count(*) FROM test_tsvector WHERE a @@ any ('{wr,qh}');"},
       {"line":201,"kind":"rejects","hash":"d9c955bb50472568","pg":"ok","parser":"syntax error at or near any","sql":"SELECT count(*) FROM test_tsvector WHERE a @@ any ('{wr,qh}');"},
       {"line":240,"kind":"rejects","hash":"d9c955bb50472568","pg":"ok","parser":"syntax error at or near any","sql":"SELECT count(*) FROM test_tsvector WHERE a @@ any ('{wr,qh}');"}
-    ],
-    "tsrf": [
-      {"line":168,"kind":"rejects","hash":"572269930fc9b461","pg":"ok","parser":"syntax error at or near |","sql":"SELECT |@|ARRAY[1,2,3];"}
     ],
     "tuplesort": [
       {"line":168,"kind":"rejects","hash":"bf5f8530de821b7f","pg":"ok","parser":"syntax error at or near declare","sql":"DECLARE c SCROLL CURSOR FOR SELECT noabort_decreasing FROM abbrev_abort_uuids ORDER BY noabort_decreasing;"},
