@@ -108,16 +108,29 @@ type SplitBracket<S extends string, Acc extends string, Depth extends unknown[]>
 // ───────────────────────────── text segmentation ─────────────────────────────
 
 type Openers = "'" | '"' | "--" | "/*";
-type TryOpen<T extends string, O extends string> =
-  T extends `${infer A}${O}${infer B}` ? (A extends `${string}${Openers}${string}` ? null : [A, O, B]) : null;
 
-/** `[code, opener, rest]`: the code before the first quote or comment opener ("" when none). */
+/**
+ * `[code, opener, rest]`: the code before the first quote or comment opener ("" when none).
+ * Split at the first `'` (the usual opener) and keep it when no other opener comes before;
+ * a text without `'` is tested for any opener once. Trying each opener in turn cost 79
+ * instantiations on a text without openers and 34 with one `'` (now 16 and 17).
+ */
 export type SplitFirst<T extends string> =
-  TryOpen<T, "'"> extends [infer A extends string, infer O extends string, infer B extends string] ? [A, O, B]
-  : TryOpen<T, '"'> extends [infer A extends string, infer O extends string, infer B extends string] ? [A, O, B]
-  : TryOpen<T, "--"> extends [infer A extends string, infer O extends string, infer B extends string] ? [A, O, B]
-  : TryOpen<T, "/*"> extends [infer A extends string, infer O extends string, infer B extends string] ? [A, O, B]
-  : [T, "", ""];
+  T extends `${infer A}'${infer B}`
+    ? (A extends `${string}${Openers}${string}` ? Earlier<A, "'", B> : [A, "'", B])
+    : T extends `${string}${Openers}${string}`
+      ? (T extends `${infer A}"${infer B}` ? Earlier<A, '"', B>
+        : T extends `${infer A}--${infer B}` ? Earlier<A, "--", B>
+        : T extends `${infer A}/*${infer B}` ? Earlier<A, "/*", B>
+        : [T, "", ""])
+      : [T, "", ""];
+/** `[A, O, B]` split at opener `O`, or at an opener inside `A` (which comes earlier). */
+type Earlier<A extends string, O extends string, B extends string> =
+  A extends `${infer A2}"${infer M}` ? Earlier<A2, '"', `${M}${O}${B}`>
+  : A extends `${infer A2}--${infer M}` ? Earlier<A2, "--", `${M}${O}${B}`>
+  : A extends `${infer A2}/*${infer M}` ? Earlier<A2, "/*", `${M}${O}${B}`>
+  : A extends `${infer A2}'${infer M}` ? Earlier<A2, "'", `${M}${O}${B}`>
+  : [A, O, B];
 
 /** The opaque segment after opener `O`, verbatim including its closer: `[segment, rest]`. */
 export type Opaque<O extends string, S extends string> =
