@@ -18,7 +18,7 @@ types are TypeScript's, as without it.
    [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=typesql.typesql)
    or [Open VSX](https://open-vsx.org/extension/typesql/typesql). It installs the TypeScript 7
    extension (`TypeScriptTeam.native-preview`) with it.
-2. Have `@typesql/core` 0.3.0 or later in the project, directly or through an adapter
+2. Have `@typesql/core` 0.4.0 or later in the project, directly or through an adapter
    (`@typesql/pg`, `@typesql/postgres`, `@typesql/kysely`, `@typesql/drizzle`,
    `@typesql/prisma`). The extension loads the project's own copy, so suggestions follow the
    version the project checks with.

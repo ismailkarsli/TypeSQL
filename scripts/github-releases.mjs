@@ -60,6 +60,23 @@ async function published(name, version) {
   return version in packuments.get(name).versions;
 }
 
+/**
+ * `gh release create`, retried on a GitHub server error. GitHub can answer 5xx and still create
+ * the release, so after an error the release counts as created if it exists.
+ */
+async function create(tag, args) {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return run("gh", args).trim();
+    } catch (e) {
+      if (succeeds("gh", ["release", "view", tag])) return `${tag}: created (GitHub answered ${String(e.stderr).trim()})`;
+      if (attempt === 3 || !/HTTP 5\d\d/.test(String(e.stderr))) throw e;
+      console.log(`${tag}: ${String(e.stderr).trim()}, retrying`);
+      await new Promise((r) => setTimeout(r, attempt * 5000));
+    }
+  }
+}
+
 const isPushed = (commit) => git("branch", "-r", "--contains", commit).trim() !== "";
 const newestCore = (releases) =>
   releases.filter((r) => r.name === LATEST && !r.version.includes("-")).at(-1);
@@ -97,7 +114,7 @@ for (const release of pending) {
   if (dryRun) {
     console.log(`would create ${release.tag} at ${release.commit.slice(0, 7)}${release === latest ? " (latest)" : ""}\n${notes}`);
   } else {
-    console.log(run("gh", args).trim());
+    console.log(await create(release.tag, args));
   }
 }
 

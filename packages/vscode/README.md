@@ -20,7 +20,7 @@ extension.
   TypeScript 7.0, which is not enough: add `typescript@7.1.0-beta` (or later) to the project and
   set `"js/ts.tsdk.path": "node_modules/typescript"` in `.vscode/settings.json`, then choose
   **Allow** when asked; or install the **TypeScript 7 Nightly** extension.
-- `@typesql/core` 0.3.0 or later in the project, directly or through an adapter
+- `@typesql/core` 0.4.0 or later in the project, directly or through an adapter
   (`@typesql/pg`, `@typesql/postgres`, `@typesql/kysely`, `@typesql/drizzle`,
   `@typesql/prisma`).
 
