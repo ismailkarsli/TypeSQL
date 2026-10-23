@@ -11,12 +11,15 @@ pnpm check:intents
 ```
 
 - Name only the packages you changed.
+- The VS Code extension (`packages/vscode`, package name `typesql`) is released the same way:
+  add `pnpm change typesql …` with every user-facing change to it. `pnpm check:intents` does not
+  catch a missing one.
 - Use `patch` for fixes. Ask before `minor`, `major` or `none`.
 - Write the summary like the existing `.changeset/*.md` files.
 
 ## Type cache version
 
-After changing `packages/core/src` (except `src/cache/` and `src/runtime/`), run
+After changing `packages/core/src` (except `src/cache/`, `src/editor/` and `src/runtime/`), run
 `pnpm cache-version` and commit the updated `CacheVersion`. CI checks it.
 
 ## PostgreSQL regression tests

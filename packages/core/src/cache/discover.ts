@@ -184,7 +184,8 @@ function nodesIn(sf: SourceFile, kinds: Kinds): { calls: CallExpression[]; refs:
   return { calls, refs };
 }
 
-async function isCoreRef(type: Type, names: readonly string[], isCorePath: (path: string) => boolean): Promise<boolean> {
+/** Whether `type` is a reference to one of core's `names` (`Sql`, `Migrations`, …). */
+export async function isCoreRef(type: Type, names: readonly string[], isCorePath: (path: string) => boolean): Promise<boolean> {
   if (!type.isTypeReference()) return false;
   const sym = await type.getSymbol();
   return !!sym && names.includes(sym.name) && sym.declarations.some((d) => isCorePath(d.path));

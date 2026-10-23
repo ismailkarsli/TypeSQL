@@ -10,7 +10,9 @@ releases. See pnpm's [release management](https://pnpm.io/versioning) docs for t
 The published packages are `@typesql/core`, `@typesql/pg`, `@typesql/postgres`,
 `@typesql/kysely`, `@typesql/drizzle` and `@typesql/prisma`. `@typesql/bench` and
 `@typesql/docs` are private: they are never published, but they still get a version and a
-committed `CHANGELOG.md` whenever a package they depend on is released.
+committed `CHANGELOG.md` whenever a package they depend on is released. The VS Code extension
+(`packages/vscode`, package name `typesql`) is private on npm too, and is published to the
+Visual Studio Marketplace and Open VSX instead (see [VS Code extension](#vs-code-extension)).
 
 ## Recording a change
 
@@ -159,6 +161,69 @@ a maintainer instead: from a checkout
 with `gh` logged in, `node scripts/github-releases.mjs --dry-run` lists every published version
 without a release, and the same command without `--dry-run` creates them. That only touches
 GitHub; nothing is published to npm.
+
+## VS Code extension
+
+The extension in `packages/vscode` (`typesql.typesql`, marked preview) is versioned like the npm
+packages but published by the `release` workflow's `extension` job, after `publish`:
+
+- **Versions.** Only an intent naming it releases it: `pnpm change typesql --bump patch --summary "…"`.
+  A release of `@typesql/core` does not bump it (core is only a devDependency: the extension loads
+  the project's copy of `@typesql/core/editor`). `pnpm check:intents` does not cover it, since it
+  is private on npm; add the intent with every user-facing change to `packages/vscode`.
+  `pnpm version -r` writes its committed `packages/vscode/CHANGELOG.md`, which the `.vsix` ships
+  and the Marketplace shows. Both registries reject prerelease suffixes (`0.1.0-beta.1`).
+- **Publishing.** The job checks out the release commit, builds `@typesql/core` and the
+  extension, packages `typesql.vsix` and publishes it with `vsce publish --azure-credential` and
+  `ovsx publish --trusted-publishing`, both with `--skip-duplicate`: a run publishes the current
+  version wherever it is missing and skips it elsewhere, so a failed job is retried with
+  **Re-run failed jobs**, or by the next release. No token is stored: the Marketplace accepts a
+  Microsoft Entra ID token of a managed identity that trusts this workflow, Open VSX an OIDC
+  token of the workflow.
+- **Switches.** Each registry is skipped until its variable is `true`: `VSCODE_MARKETPLACE` and
+  `OPEN_VSX`, set on the `vscode` environment (**Settings → Environments → vscode → Environment
+  variables**; repository variables work too). Releases work without them; set each once its
+  setup below is done. Setting one later and running the release again publishes the current
+  version there, even when there is nothing new to release.
+
+After a release, check the listings:
+[Marketplace](https://marketplace.visualstudio.com/items?itemName=typesql.typesql) and
+[Open VSX](https://open-vsx.org/extension/typesql/typesql).
+
+### One-time setup
+
+The publisher id `typesql` is the `publisher` field of `packages/vscode/package.json` and must
+be the same on both registries.
+
+1. **GitHub environment.** Create the environment `vscode` under **Settings → Environments**,
+   limited to the `main` branch, so no other branch can obtain the tokens below.
+2. **Visual Studio Marketplace** (Microsoft Entra ID; Azure DevOps personal access tokens are
+   retired on December 1, 2026):
+   1. Create the publisher `typesql` at
+      [marketplace.visualstudio.com/manage](https://marketplace.visualstudio.com/manage).
+   2. In the Azure portal, create a user-assigned managed identity and give it the Reader role
+      on a subscription. Under **Federated credentials**, add one for GitHub Actions:
+      organization `ismailkarsli`, repository `typesql`, entity **Environment**, environment
+      `vscode` (subject `repo:ismailkarsli/typesql:environment:vscode`, audience
+      `api://AzureADTokenExchange`).
+   3. On the `vscode` environment, set the variables `AZURE_CLIENT_ID` (the identity's client
+      id), `AZURE_TENANT_ID` and `AZURE_SUBSCRIPTION_ID`, and `VSCODE_MARKETPLACE` to `true`.
+   4. Run the release workflow. The `extension` job's **Marketplace identity** step prints the
+      identity's Marketplace id; publishing fails until that id is a member of the publisher.
+      Add it on the publisher's **Members** page with the Contributor role, then
+      **Re-run failed jobs**.
+3. **Open VSX** (trusted publishing):
+   1. Log in at [open-vsx.org](https://open-vsx.org) with GitHub, link an Eclipse account and
+      sign the Publisher Agreement (profile page).
+   2. Create an access token (**Settings → Access Tokens**) and the namespace, once, from a
+      terminal: `npx ovsx create-namespace typesql -p <token>`. Delete the token afterwards; the
+      workflow does not use it.
+   3. Under [trusted publishers](https://open-vsx.org/user-settings/trusted-publishers), add one
+      for the namespace `typesql`: repository `ismailkarsli/typesql`, workflow `release.yml`,
+      environment `vscode`. Like npm's, the trust names the workflow file: renaming `release.yml`
+      means registering it again.
+   4. Set the variable `OPEN_VSX` to `true` on the `vscode` environment, and run the release
+      again: with nothing new to release, it publishes the current version to Open VSX.
 
 ## Files
 
