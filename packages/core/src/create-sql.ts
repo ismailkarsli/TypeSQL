@@ -234,9 +234,21 @@ type BoxFragArgs<Text extends string> = Extract<{ [K in Text as `${K}`]: FragArg
  * replaces the check, the arguments and the return type below with what they were when the
  * entry was computed, so the call skips the text rewrites and the row and parameter builders.
  */
-type CallCached<DB, TM, Keys, Q extends string> =
+/** The cached call (`never` on a miss), for a key of `QueryCacheKeys`. Exported for tests. */
+export type CallCached<DB, TM, Keys, Q extends string> =
   IsUnion<Q> extends true ? never
   : OneOf<FreshVariants<DB, Q> extends infer V ? (V extends { readonly c: infer C extends CallEntry } ? ([Keys] extends [C["k"]] ? (Same<TM, C["m"]> extends true ? C : never) : never) : never) : never>;
+/**
+ * What the type cache stores for the plain call `sql(Q, …)` (engine/cache.ts `CallEntry`): the
+ * query argument's check, the arguments after it and the return type. The cache job's probe file
+ * evaluates it in a program without a cache.
+ */
+export type CallTypes<DB, TM, Keys extends RowKeys, Q extends string> = {
+  readonly g: GateCallCheck<DB, TM, Keys, Q>;
+  readonly p: BoxCallArgs<DB, TM, Keys, Q>;
+  readonly q: CallRet<DB, TM, Keys, Q>;
+};
+
 /**
  * Return type of the plain `sql()` call. The cache test sits inside `GateCallCheck`, `BoxCallArgs`
  * and here rather than in wrappers around them, so that without a cache a call costs what it

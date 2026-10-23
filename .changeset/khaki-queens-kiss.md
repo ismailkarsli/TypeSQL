@@ -2,4 +2,4 @@
 "@typesql/core": minor
 ---
 
-Type-level hooks for an optional type cache: query, call and DDL results can come from a generated cache (`QueryCache`, `DdlCache`), used only while everything they were computed from is unchanged; without one nothing changes.
+An optional type cache: with TypeScript 7.1, list `@typesql/core` under `contentMappers` in tsconfig and add a `.typesqlcache` file, and a background job keeps it filled with query, call and DDL results that the checker uses instead of recomputing them, only while everything they were computed from is unchanged.

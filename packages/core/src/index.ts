@@ -1,4 +1,4 @@
-export { createSql, type Sql, type SlotMap, type Slottable, type SlotsFor, type SplicedText, type ListRep } from "./create-sql.js";
+export { createSql, type Sql, type SlotMap, type Slottable, type SlotsFor, type SplicedText, type ListRep, type CallTypes } from "./create-sql.js";
 export { camelCase, type RowKeys, type SqlOptions, type CamelCase, type CamelCaseKeys, type KeyedRow } from "./row-keys.js";
 export { makeQuery, makeFragment, mapRows, rowKeysOf, NoResultError, type Executor, type ExecutorResult, type Query, type Fragment, type RowType, type ParamsType, type TextType, type ROW, type PARAMS, type TEXT, type CARRIED } from "./query.js";
 export { param, valueOrDefault } from "./runtime/inline.js";

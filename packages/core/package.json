@@ -24,12 +24,20 @@
     "README.md",
     "LICENSE"
   ],
+  "typescript": {
+    "contentMapper": {
+      "exec": [
+        "node",
+        "dist/cache/mapper.js"
+      ]
+    }
+  },
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p test/cache/tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p test/cache/tsconfig.check.json --noEmit",
     "test": "vitest run"
   },
   "peerDependencies": {

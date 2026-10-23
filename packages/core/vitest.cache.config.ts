@@ -6,6 +6,7 @@ export default defineConfig({
   test: {
     name: "core-cache",
     include: ["test/cache/**/*.test.ts"],
+    globalSetup: ["test/cache/stale/setup.ts"],
     typecheck: {
       enabled: true,
       include: ["test/cache/**/*.test-d.ts"],

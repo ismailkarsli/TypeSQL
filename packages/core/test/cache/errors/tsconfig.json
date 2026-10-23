@@ -1,0 +1,5 @@
+{
+  "extends": "../../../../../tsconfig.base.json",
+  "compilerOptions": { "noEmit": true, "types": [], "noErrorTruncation": true, "paths": { "@typesql/core": ["../../../src/index.ts"] } },
+  "include": ["../../errors/fixtures/errors.ts", ".generated/cache.ts"]
+}
