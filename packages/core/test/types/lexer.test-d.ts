@@ -11,6 +11,9 @@ import type {
 import type { SqlError } from "../../src/index.js";
 import type { Row, V } from "./_schema.js";
 
+/** A bit string's token: a string token marked `bits`. */
+type BitTok<V extends string> = StrTok<V> & { readonly bits: true };
+
 /** Token values only, for compact assertions. */
 type Vals<Q extends string> =
 	Lex<Q> extends infer T
@@ -44,8 +47,39 @@ test("string literals: '' escapes, E'' (escapes kept raw), B'' / X'', dollar quo
 		[WordTok<"select">, StrTok<"a\\'b">]
 	>();
 	expectTypeOf<Lex<"SELECT X'1F', B'101'">>().toEqualTypeOf<
-		[WordTok<"select">, StrTok<"1F">, OpTok<",">, StrTok<"101">]
+		[WordTok<"select">, BitTok<"1F">, OpTok<",">, BitTok<"101">]
 	>();
+	// their digits are checked, as Postgres's bit input does
+	expectTypeOf<V<"SELECT B'102'">>().toEqualTypeOf<
+		SqlError<'"2" is not a valid binary digit', 1>
+	>();
+	expectTypeOf<V<"SELECT 1, X'1g'">>().toEqualTypeOf<
+		SqlError<'"g" is not a valid hexadecimal digit', 3>
+	>();
+	expectTypeOf<
+		V<"SELECT B'', X'09afAF'">
+	>().toEqualTypeOf<"SELECT B'', X'09afAF'">();
+	// a word before `&` that is not U&'' / U&""
+	expectTypeOf<Vals<"SELECT u&1, a&b">>().toEqualTypeOf<
+		["select", "u", "&", "1", ",", "a", "&", "b"]
+	>();
+	// non-ASCII letters are identifier characters; only ASCII letters fold
+	expectTypeOf<Row<"SELECT 1 AS ÉTÉ, 2 AS café">>().toEqualTypeOf<{
+		ÉtÉ: number;
+		café: number;
+	}>();
+	// N'…' is NCHAR '…' (a character literal); another letter before a quote is a word
+	expectTypeOf<Lex<"SELECT N'abc', ux'a'">>().toEqualTypeOf<
+		[
+			WordTok<"select">,
+			WordTok<"nchar">,
+			StrTok<"abc">,
+			OpTok<",">,
+			WordTok<"ux">,
+			StrTok<"a">,
+		]
+	>();
+	expectTypeOf<Row<"SELECT N'abc' AS a">>().toEqualTypeOf<{ a: string }>();
 	expectTypeOf<Lex<"SELECT $$it's $1$$, $fn$ a $$ b $fn$">>().toEqualTypeOf<
 		[WordTok<"select">, StrTok<"it's $1">, OpTok<",">, StrTok<" a $$ b ">]
 	>();
@@ -184,9 +218,9 @@ test("operators use longest match", () => {
 	expectTypeOf<Lex<"e x'1' ex b'0' bx E''">>().toEqualTypeOf<
 		[
 			WordTok<"e">,
-			StrTok<"1">,
+			BitTok<"1">,
 			WordTok<"ex">,
-			StrTok<"0">,
+			BitTok<"0">,
 			WordTok<"bx">,
 			StrTok<"">,
 		]
@@ -220,9 +254,46 @@ test("operators follow Postgres's rules: any run of operator characters, trailin
 	expectTypeOf<Vals<"a+-b c*-1 d<-e f@-g">>().toEqualTypeOf<
 		["a", "+", "-", "b", "c", "*", "-", "1", "d", "<", "-", "e", "f", "@-", "g"]
 	>();
+	expectTypeOf<
+		Vals<"1 ~- 1 !- 1 @- 1 #- 1 ^- 1 &- 1 |- 1 `- 1 ?- 1 %- 1 @` 1">
+	>().toEqualTypeOf<
+		[
+			"1",
+			"~-",
+			"1",
+			"!-",
+			"1",
+			"@-",
+			"1",
+			"#-",
+			"1",
+			"^-",
+			"1",
+			"&-",
+			"1",
+			"|-",
+			"1",
+			"`-",
+			"1",
+			"?-",
+			"1",
+			"%-",
+			"1",
+			"@`",
+			"1",
+		]
+	>();
 	// comments end an operator
 	expectTypeOf<Vals<"a+--c\nb */*x*/ c">>().toEqualTypeOf<
 		["a", "+", "b", "*", "c"]
+	>();
+	expectTypeOf<Vals<"a @--c\nb">>().toEqualTypeOf<["a", "@", "b"]>();
+	// at the end of input; `/` not followed by `*`
+	expectTypeOf<Vals<"a @@">>().toEqualTypeOf<["a", "@@"]>();
+	expectTypeOf<Vals<"a /= b">>().toEqualTypeOf<["a", "/=", "b"]>();
+	// trailing + / - is dropped again and again (`++` is two operators)
+	expectTypeOf<Vals<"a *+b c @+d e ++f g -+h">>().toEqualTypeOf<
+		["a", "*", "+", "b", "c", "@+", "d", "e", "+", "+", "f", "g", "-", "+", "h"]
 	>();
 });
 
@@ -236,20 +307,53 @@ test("comments are skipped, including nested block comments", () => {
 });
 
 test("lexer errors carry the index of the token that could not be produced", () => {
+	// Postgres names the rest of the input from the opening quote
 	expectTypeOf<Lex<"SELECT 'abc">>().toEqualTypeOf<
-		SqlError<"unterminated quoted string", 1>
+		SqlError<`unterminated quoted string at or near "'abc"`, 1>
 	>();
 	expectTypeOf<Lex<'SELECT "abc'>>().toEqualTypeOf<
-		SqlError<"unterminated quoted identifier", 1>
+		SqlError<'unterminated quoted identifier at or near ""abc"', 1>
 	>();
 	expectTypeOf<Lex<"SELECT 1 /* open">>().toEqualTypeOf<
-		SqlError<"unterminated /* comment", 2>
+		SqlError<'unterminated /* comment at or near "/* open"', 2>
 	>();
 	expectTypeOf<Lex<"SELECT 1 /* a /* b */">>().toEqualTypeOf<
-		SqlError<"unterminated /* comment", 2>
+		SqlError<'unterminated /* comment at or near "/* a /* b */"', 2>
 	>();
 	expectTypeOf<Lex<"SELECT $$abc">>().toEqualTypeOf<
-		SqlError<"unterminated dollar-quoted string", 1>
+		SqlError<'unterminated dollar-quoted string at or near "$$abc"', 1>
+	>();
+	expectTypeOf<Lex<"SELECT E'abc">>().toEqualTypeOf<
+		SqlError<`unterminated quoted string at or near "E'abc"`, 1>
+	>();
+	expectTypeOf<Lex<"SELECT b'101">>().toEqualTypeOf<
+		SqlError<`unterminated bit string literal at or near "b'101"`, 1>
+	>();
+	expectTypeOf<Lex<"SELECT x'1F">>().toEqualTypeOf<
+		SqlError<`unterminated hexadecimal string literal at or near "x'1F"`, 1>
+	>();
+	expectTypeOf<Lex<"SELECT U&'abc">>().toEqualTypeOf<
+		SqlError<`unterminated quoted string at or near "U&'abc"`, 1>
+	>();
+	expectTypeOf<Lex<'SELECT 1 AS U&"abc'>>().toEqualTypeOf<
+		SqlError<'unterminated quoted identifier at or near "U&"abc"', 3>
+	>();
+	expectTypeOf<Lex<'SELECT 1 AS U&""'>>().toEqualTypeOf<
+		SqlError<'zero-length delimited identifier at or near "U&"""', 3>
+	>();
+	expectTypeOf<Lex<'SELECT 1 AS U&"\\db99"'>>().toEqualTypeOf<
+		SqlError<"invalid Unicode surrogate pair", 3>
+	>();
+	// a character no token starts with
+	expectTypeOf<Lex<"SELECT \\">>().toEqualTypeOf<
+		SqlError<'syntax error at or near "\\"', 1>
+	>();
+	expectTypeOf<Lex<"SELECT {">>().toEqualTypeOf<
+		SqlError<'syntax error at or near "{"', 1>
+	>();
+	// a dollar tag starts like an identifier
+	expectTypeOf<Lex<"SELECT $+$ x $+$">>().toEqualTypeOf<
+		SqlError<'syntax error at or near "$"', 1>
 	>();
 });
 
@@ -272,6 +376,11 @@ test("string literals: continuation across newlines, E'' backslash parity, U&'' 
 	expectTypeOf<Row<'SELECT 1 AS U&"\\00E4"'>>().toEqualTypeOf<{
 		"\u00e4": number;
 	}>();
+	// a doubled escape character is the character; beyond Latin-1 the escape is kept as written
+	expectTypeOf<Row<'SELECT 1 AS U&"a\\\\b", 2 AS U&"\\01E4"'>>().toEqualTypeOf<{
+		"a\\b": number;
+		"\\01E4": number;
+	}>();
 });
 
 test("Unicode escapes are validated like Postgres", () => {
@@ -287,6 +396,65 @@ test("Unicode escapes are validated like Postgres", () => {
 	expectTypeOf<Lex<"SELECT E'\\udb99\\udc00 ok', E'\\u061'">>().toEqualTypeOf<
 		SqlError<"invalid Unicode escape", 3>
 	>();
+	// every escape is checked, after a valid one or another backslash escape too
+	expectTypeOf<Lex<"SELECT E'\\U0061'">>().toEqualTypeOf<
+		SqlError<"invalid Unicode escape", 1>
+	>();
+	expectTypeOf<Lex<"SELECT E'a\\nb\\u061'">>().toEqualTypeOf<
+		SqlError<"invalid Unicode escape", 1>
+	>();
+	expectTypeOf<Lex<"SELECT U&'\\+12'">>().toEqualTypeOf<
+		SqlError<"invalid Unicode escape", 1>
+	>();
+	expectTypeOf<Lex<"SELECT E'\\udb99\\U12'">>().toEqualTypeOf<
+		SqlError<"invalid Unicode escape", 1>
+	>();
+	expectTypeOf<Lex<"SELECT U&'\\0061\\db99'">>().toEqualTypeOf<
+		SqlError<"invalid Unicode surrogate pair", 1>
+	>();
+	expectTypeOf<Lex<"SELECT U&'\\db99x'">>().toEqualTypeOf<
+		SqlError<"invalid Unicode surrogate pair", 1>
+	>();
+	expectTypeOf<Lex<"SELECT E'\\u0000'">>().toEqualTypeOf<
+		SqlError<'invalid Unicode escape value at or near "\\u0000"', 1>
+	>();
+	expectTypeOf<Lex<"SELECT E'\\U12345678'">>().toEqualTypeOf<
+		SqlError<'invalid Unicode escape value at or near "\\U12345678"', 1>
+	>();
+	// a doubled escape character, surrogate pairs written with \\U, \\+ or in U& strings
+	type Lexes<Q extends string> =
+		Lex<Q> extends readonly unknown[] ? true : Lex<Q>;
+	expectTypeOf<
+		[
+			Lexes<"SELECT U&'a\\\\b'">,
+			Lexes<"SELECT U&'\\db99\\dc00'">,
+			Lexes<"SELECT E'\\udb99\\U0000dc00'">,
+			Lexes<"SELECT U&'\\+00db99\\+00dc00'">,
+			Lexes<"SELECT U&'a!!b' UESCAPE '!'">,
+		]
+	>().toEqualTypeOf<[true, true, true, true, true]>();
+	// in an E'' string Postgres points at the escape, or at what follows a high surrogate
+	expectTypeOf<Lex<"SELECT E'\\udc99'">>().toEqualTypeOf<
+		SqlError<'invalid Unicode surrogate pair at or near "\\udc99"', 1>
+	>();
+	expectTypeOf<Lex<"SELECT E'\\U00110000'">>().toEqualTypeOf<
+		SqlError<'invalid Unicode escape value at or near "\\U00110000"', 1>
+	>();
+	expectTypeOf<Lex<"SELECT E'\\udb99'">>().toEqualTypeOf<
+		SqlError<`invalid Unicode surrogate pair at or near "'"`, 1>
+	>();
+	expectTypeOf<Lex<"SELECT E'\\udb99x'">>().toEqualTypeOf<
+		SqlError<'invalid Unicode surrogate pair at or near "x"', 1>
+	>();
+	expectTypeOf<Lex<"SELECT E'\\udb99\\u0061'">>().toEqualTypeOf<
+		SqlError<'invalid Unicode surrogate pair at or near "\\u0061"', 1>
+	>();
+	expectTypeOf<Lex<"SELECT E'\\udb99\\U00000061'">>().toEqualTypeOf<
+		SqlError<'invalid Unicode surrogate pair at or near "\\U00000061"', 1>
+	>();
+	expectTypeOf<Lex<"SELECT E'\\udb99\\u00'">>().toEqualTypeOf<
+		SqlError<"invalid Unicode escape", 1>
+	>();
 	expectTypeOf<Lex<"SELECT U&'x' UESCAPE +">>().toEqualTypeOf<
 		SqlError<
 			'UESCAPE must be followed by a simple string literal at or near "+"',
@@ -298,6 +466,80 @@ test("Unicode escapes are validated like Postgres", () => {
 	>();
 	expectTypeOf<Lex<'SELECT 1 AS ""'>>().toEqualTypeOf<
 		SqlError<'zero-length delimited identifier at or near """"', 3>
+	>();
+});
+
+test("code points: every plane, surrogate ranges, hex digits; UESCAPE only as a word", () => {
+	type Lexes<Q extends string> =
+		Lex<Q> extends readonly unknown[] ? true : Lex<Q>;
+	expectTypeOf<
+		[
+			Lexes<"SELECT E'\\U00010000'">,
+			Lexes<"SELECT E'\\U00020000'">,
+			Lexes<"SELECT E'\\U00030000'">,
+			Lexes<"SELECT E'\\U00040000'">,
+			Lexes<"SELECT E'\\U00050000'">,
+			Lexes<"SELECT E'\\U00060000'">,
+			Lexes<"SELECT E'\\U00070000'">,
+			Lexes<"SELECT E'\\U00080000'">,
+			Lexes<"SELECT E'\\U00090000'">,
+			Lexes<"SELECT E'\\U000a0000'">,
+			Lexes<"SELECT E'\\U000b0000'">,
+			Lexes<"SELECT E'\\U000c0000'">,
+			Lexes<"SELECT E'\\U000d0000'">,
+			Lexes<"SELECT E'\\U000e0000'">,
+			Lexes<"SELECT E'\\U000f0000'">,
+			Lexes<"SELECT E'\\U00100000'">,
+			Lexes<"SELECT E'\\ud800\\udc00'">,
+			Lexes<"SELECT E'\\ud9ff\\udfff'">,
+			Lexes<"SELECT E'\\uda00\\udd00'">,
+			Lexes<"SELECT E'\\udb00\\ude00'">,
+			Lexes<"SELECT E'\\ud7ff'">,
+			Lexes<"SELECT U&'x' uescapes">,
+			Lexes<"SELECT U&'x' uescapeé">,
+			Lexes<"SELECT U&'x' uescape1">,
+			Lexes<"SELECT U&'x!0061' UESCAPE'!'">,
+		]
+	>().toEqualTypeOf<
+		[
+			true,
+			true,
+			true,
+			true,
+			true,
+			true,
+			true,
+			true,
+			true,
+			true,
+			true,
+			true,
+			true,
+			true,
+			true,
+			true,
+			true,
+			true,
+			true,
+			true,
+			true,
+			true,
+			true,
+			true,
+			true,
+		]
+	>();
+	expectTypeOf<Lex<"SELECT E'\\u12zz'">>().toEqualTypeOf<
+		SqlError<"invalid Unicode escape", 1>
+	>();
+	expectTypeOf<Lex<"SELECT U&'\\+12zz34'">>().toEqualTypeOf<
+		SqlError<"invalid Unicode escape", 1>
+	>();
+	expectTypeOf<Lex<"SELECT E'\\U00zz0000'">>().toEqualTypeOf<
+		SqlError<"invalid Unicode escape", 1>
+	>();
+	expectTypeOf<Lex<"SELECT U&'x' UESCAPE '!!'">>().toEqualTypeOf<
+		SqlError<`invalid Unicode escape character at or near "'!!'"`, 1>
 	>();
 });
 
@@ -322,11 +564,21 @@ test("numbers: digit separators, radix prefixes and trailing junk follow Postgre
 			".2",
 		]
 	>();
+	// the junk is the number and the identifier characters after it, as Postgres reports it
 	expectTypeOf<Lex<"SELECT 123abc">>().toEqualTypeOf<
-		SqlError<'trailing junk after numeric literal at or near "123a"', 1>
+		SqlError<'trailing junk after numeric literal at or near "123abc"', 1>
 	>();
 	expectTypeOf<Lex<"SELECT 100__000">>().toEqualTypeOf<
-		SqlError<'trailing junk after numeric literal at or near "100_"', 1>
+		SqlError<'trailing junk after numeric literal at or near "100__000"', 1>
+	>();
+	expectTypeOf<Lex<"SELECT 1_000._5, 1é">>().toEqualTypeOf<
+		SqlError<'trailing junk after numeric literal at or near "1_000._5"', 1>
+	>();
+	expectTypeOf<Lex<"SELECT 1_000.5e_1">>().toEqualTypeOf<
+		SqlError<'trailing junk after numeric literal at or near "1_000.5e_1"', 1>
+	>();
+	expectTypeOf<Lex<"SELECT 1é">>().toEqualTypeOf<
+		SqlError<'trailing junk after numeric literal at or near "1é"', 1>
 	>();
 	expectTypeOf<Lex<"SELECT 0.0e+a">>().toEqualTypeOf<
 		SqlError<'trailing junk after numeric literal at or near "0.0e+"', 1>
@@ -336,6 +588,9 @@ test("numbers: digit separators, radix prefixes and trailing junk follow Postgre
 	>();
 	expectTypeOf<Lex<"SELECT $1a">>().toEqualTypeOf<
 		SqlError<'trailing junk after parameter at or near "$1a"', 1>
+	>();
+	expectTypeOf<Lex<"SELECT $0_1">>().toEqualTypeOf<
+		SqlError<'trailing junk after parameter at or near "$0_1"', 1>
 	>();
 	// digit separators do not count towards the int4 / int8 / numeric choice; very long literals are numeric
 	type D1200 =

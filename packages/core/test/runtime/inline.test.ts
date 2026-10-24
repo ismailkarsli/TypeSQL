@@ -42,6 +42,18 @@ describe("inline parameters", () => {
 		});
 	});
 
+	it("are numbered after every positional value, and after every $n of the text", () => {
+		// sql.as is not checked: the text may not use every value, or use more than it has
+		expect(sql.as(`SELECT $1, ${param("x")}`, 1, 2)).toEqual({
+			text: "SELECT $1, $3",
+			values: [1, 2, "x"],
+		});
+		expect(sql.as(`SELECT $2, ${param("x")}`, 1)).toEqual({
+			text: "SELECT $2, $3",
+			values: [1, "x"],
+		});
+	});
+
 	it("never put the value into the SQL text", () => {
 		const evil = "x'; DROP TABLE users; --";
 		const q = sql(`SELECT id FROM users WHERE email = ${sql.param(evil)}`);

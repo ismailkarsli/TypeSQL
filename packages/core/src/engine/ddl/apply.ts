@@ -746,12 +746,14 @@ type ApplyCreateTableAs<DB, Ine, Ref extends TableRef, Names, Q> =
 
 /** CREATE TABLE AS keeps names and types only: every column is nullable, without default (as Postgres). */
 type CtasTable<M> = Rebuild<{
-	[K in keyof M]: MkCol<TypeOfCol<M[K]>, true, false>;
+	[K in keyof M]: MkCol<StoredType<M[K]>, true, false>;
 }>;
 /** View columns keep the query's nullability. */
 type ViewTable<M> = Rebuild<{
-	[K in keyof M]: MkCol<TypeOfCol<M[K]>, NullOf<M[K]>, false>;
+	[K in keyof M]: MkCol<StoredType<M[K]>, NullOf<M[K]>, false>;
 }>;
+/** The type a query column is stored as: an untyped NULL (`SELECT NULL AS x`) is text, as in Postgres. */
+type StoredType<C> = TypeOfCol<C> extends "null" ? "text" : TypeOfCol<C>;
 
 // ───────────────────────────── DROP TABLE / VIEW ─────────────────────────────
 

@@ -26,11 +26,16 @@ export type NullLit = { readonly t: "null" };
 export type Param = { readonly t: "param"; readonly n: number };
 /** `DEFAULT` in INSERT/UPDATE value positions. */
 export type DefaultExpr = { readonly t: "default" };
-/** Typed literal: `DATE '2020-01-01'`, `interval '1 day'`, `int4 '1'`. `type` is canonical. */
+/**
+ * Typed literal: `DATE '2020-01-01'`, `interval '1 day'`, `int4 '1'`. `type` is canonical. A
+ * bit string (`B'101'`, `X'1F'`) is one of type `bit` with `bits: true` (digits as written): it
+ * names no column.
+ */
 export type TypedLit = {
 	readonly t: "typed";
 	readonly type: string;
 	readonly v: string;
+	readonly bits?: true;
 };
 /** Binary operator, including `and`/`or` (op lowercased for word operators). */
 export type BinOp = {

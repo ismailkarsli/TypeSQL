@@ -30,7 +30,7 @@ export type ResolveTable<
 				? LookupTable<DB["pg_catalog" & keyof DB], Ref["name"]>
 				: LookupTable<DB, Ref["name"]>
 	: Ref["schema"] extends "public"
-		? LookupTable<DB, Ref["name"]>
+		? LookupTable<DB, Ref["name"], `public.${Ref["name"]}`>
 		: Ref["schema"] extends keyof DB
 			? LookupTable<
 					DB[Ref["schema"]],
@@ -47,7 +47,7 @@ type LookupTable<
 	Name extends string,
 	Display extends string = Name,
 > = Name extends keyof NS
-	? NS[Name] extends View<infer Cols extends Table>
+	? NS[Name] extends View<infer Cols>
 		? TableCols<Cols>
 		: NS[Name] extends Table
 			? TableCols<NS[Name]>
@@ -86,14 +86,14 @@ export type ResolveWritableTable<
 			? InPgCatalog<DB, Ref["name"]> extends true
 				? SqlError<`cannot modify view "pg_catalog.${Ref["name"]}"`, null>
 				: SqlError<`relation "${Ref["name"]}" does not exist`, null>
-			: SqlError<`relation "${Ref["name"]}" does not exist`, null>
+			: SqlError<`relation "public.${Ref["name"]}" does not exist`, null>
 	: Ref["schema"] extends keyof DB
 		? Ref["name"] extends keyof DB[Ref["schema"]]
 			? DB[Ref["schema"]][Ref["name"]] extends View<Table>
 				? SqlError<`cannot modify view "${Ref["schema"]}.${Ref["name"]}"`, null>
 				: DB[Ref["schema"]][Ref["name"]] extends Table
 					? DB[Ref["schema"]][Ref["name"]]
-					: SqlError<`"${Ref["schema"]}.${Ref["name"]}" is not a table`, null>
+					: SqlError<`"${Ref["schema"]}.${Ref["name"]}" is not a table`, null> // type-mutate: equivalent never-false – a namespace holds only tables and views
 			: SqlError<
 					`relation "${Ref["schema"]}.${Ref["name"]}" does not exist`,
 					null
@@ -131,16 +131,24 @@ type ResolveQualified<
 			? Name extends keyof Item["cols"]
 				? Item["cols"][Name]
 				: SqlError<`column ${Tbl}.${Name} does not exist`, null>
-			: ResolveQualified<Outer, Tbl, Name>
+			: Item extends null
+				? ResolveQualified<Outer, Tbl, Name>
+				: Item
 		: never
 	: SqlError<`missing FROM-clause entry for table "${Tbl}"`, null>;
 
+/**
+ * The item of a level named `Tbl`, `null`, or an error when two are (only `excluded` can be:
+ * `INSERT INTO t AS excluded … ON CONFLICT DO UPDATE`; FROM rejects a repeated name first).
+ */
 type FindAlias<L extends ScopeLevel, Tbl extends string> = L extends readonly [
 	infer I extends ScopeItem,
 	...infer R extends ScopeLevel,
 ]
 	? I["alias"] extends Tbl
-		? I
+		? FindAlias<R, Tbl> extends null
+			? I
+			: SqlError<`table reference "${Tbl}" is ambiguous`, null>
 		: FindAlias<R, Tbl>
 	: null;
 
@@ -176,7 +184,9 @@ export type WholeRow<
 	? FindAlias<L, Name> extends infer Item
 		? Item extends ScopeItem
 			? RowInfo<Item["cols"]>
-			: WholeRow<Outer, Name, Missing>
+			: Item extends null
+				? WholeRow<Outer, Name, Missing>
+				: Item
 		: never
 	: SqlError<Missing, null>;
 
@@ -210,13 +220,16 @@ export type ExpandStar<
 		? FindAlias<L, Tbl> extends infer Item
 			? Item extends ScopeItem
 				? Item["cols"]
-				: ExpandStar<Outer, Tbl>
+				: Item extends null
+					? ExpandStar<Outer, Tbl>
+					: Item
 			: never
 		: L extends readonly []
 			? SqlError<"SELECT * with no tables specified is not valid", null>
 			: L extends readonly [
+						// type-mutate: equivalent cond-false – a fast path: ExpandAll gives the same map for one item without skips
 						{
-							readonly cols: infer M extends ColMap;
+							readonly cols: infer M;
 							readonly skip: readonly [];
 						},
 					]
@@ -224,7 +237,7 @@ export type ExpandStar<
 				: ExpandAll<L, []>
 	: Tbl extends string
 		? SqlError<`missing FROM-clause entry for table "${Tbl}"`, null>
-		: SqlError<"SELECT * with no tables specified is not valid", null>;
+		: SqlError<"SELECT * with no tables specified is not valid", null>; // type-mutate: equivalent never-false – a scope always has a level
 
 /**
  * All visible columns of a level in FROM order. Duplicate names collapse like the row
@@ -248,10 +261,10 @@ type ExpandAll<
 			]
 		>
 	: { readonly [K in AllKeys<Maps[number]>]: LastWith<Maps, K> };
-type AllKeys<M> = M extends ColMap ? keyof M : never;
+type AllKeys<M> = M extends ColMap ? keyof M : never; // type-mutate: equivalent cond-true – M is a ColMap: the test only distributes over a union
 type LastWith<Maps extends readonly ColMap[], K> = Maps extends readonly [
 	...infer R extends readonly ColMap[],
-	infer M extends ColMap,
+	infer M,
 ]
 	? K extends keyof M
 		? M[K]

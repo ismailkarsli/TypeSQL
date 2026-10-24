@@ -67,7 +67,7 @@ export type ProjectMerge<
 	Ctes extends CteMap,
 > =
 	ResolveTarget<DB, S["table"], S["alias"], "merge into"> extends infer Tg
-		? Tg extends Target_<infer Tbl extends Table, infer Item extends ScopeItem>
+		? Tg extends Target_<infer Tbl extends Table, infer Item>
 			? BindFrom<[S["source"]], DB, Outer, Ctes> extends infer L
 				? L extends ScopeLevel
 					? Item["alias"] extends L[number]["alias"]
@@ -128,7 +128,7 @@ type NullableLevel<L extends ScopeLevel> = {
 				readonly cols: NullableMap<L[I]["cols"]>;
 				readonly skip: L[I]["skip"];
 			}
-		: L[I];
+		: L[I]; // type-mutate: equivalent never-false – every member of a ScopeLevel is a ScopeItem
 };
 
 /** Some WHEN clause has this action. */
@@ -148,7 +148,7 @@ type HiddenNames<
 	M extends MergeWhen["match"],
 	Item extends ScopeItem,
 	L extends ScopeLevel,
-> = M extends "matched"
+> = M extends "matched" // type-mutate: equivalent cond-false – a matched clause sees both names, so no error names a hidden one
 	? never
 	: M extends "source"
 		? L[number]["alias"]
@@ -204,7 +204,7 @@ type CheckWhens<
 						W["cond"] extends null ? Done | W["match"] : Done
 					>
 			: never
-	: true;
+	: true; // type-mutate: equivalent bool-flip – ProjectMerge only looks for an error
 
 type CheckWhen<
 	W extends MergeWhen,
@@ -227,7 +227,7 @@ type CheckWhen<
 							readonly values: infer Vals extends readonly Expr[] | null;
 						}
 					? CheckMergeInsert<Cols, Ind, Vals, Tbl, Name, C>
-					: true
+					: true // type-mutate: equivalent bool-flip – CheckWhens only looks for an error
 		: never;
 
 /** `INSERT [(cols)] VALUES (…)` / `INSERT DEFAULT VALUES` (`Vals` null): the checks of INSERT. */
@@ -285,7 +285,7 @@ type CheckMergeInsert<
  */
 export type ParamsOfMerge<S extends MergeStmt, DB, Ctes extends CteMap, M> =
 	ResolveTarget<DB, S["table"], S["alias"], "merge into"> extends infer Tg
-		? Tg extends Target_<infer Tbl extends Table, infer Item extends ScopeItem>
+		? Tg extends Target_<infer Tbl extends Table, infer Item>
 			? BindFrom<[S["source"]], DB, [], Ctes> extends infer L
 				? L extends ScopeLevel
 					? ParamsOfReturning<
@@ -309,16 +309,16 @@ export type ParamsOfMerge<S extends MergeStmt, DB, Ctes extends CteMap, M> =
 									DmlCtx<DB, [Item, ...L], [], Ctes>,
 									ParamsOfFromItems<
 										[S["source"]],
-										MkCtx<DB, [], Ctes, false>,
+										MkCtx<DB, [], Ctes, false>, // type-mutate: equivalent bool-flip – no aggregate can be directly in a FROM item
 										M
 									>,
 									Info<"bool">
 								>
 							>
 						>
-					: M
+					: M // type-mutate: equivalent never-false – only reached for statements ProjectMerge accepted, whose source binds
 				: never
-			: M
+			: M // type-mutate: equivalent never-false – only reached for statements ProjectMerge accepted, whose target resolves
 		: never;
 
 type ParamsOfWhens<
@@ -358,7 +358,7 @@ type ParamsOfWhen<W extends MergeWhen, Tbl extends Table, C extends Ctx, M> =
 			? ParamsOfSet<Set, Tbl, C, M1>
 			: W["action"] extends {
 						readonly t: "insert";
-						readonly columns: infer Cols extends readonly string[] | null;
+						readonly columns: infer Cols;
 						readonly colInd: infer Ind extends readonly TargetInd[] | null;
 						readonly values: infer Vals extends readonly Expr[];
 					}
@@ -373,14 +373,14 @@ type ParamsOfWhen<W extends MergeWhen, Tbl extends Table, C extends Ctx, M> =
 					: ParamsOfRowInfos<
 							Vals,
 							TargetInfos<
-								Cols extends readonly string[] ? Cols : [],
+								Cols extends readonly string[] ? Cols : [], // type-mutate: equivalent never-false – an indirection comes with a column list
 								Ind,
 								Tbl,
 								C
 							>,
 							C,
 							ParamsOfInds<
-								Cols extends readonly string[] ? Cols : [],
+								Cols extends readonly string[] ? Cols : [], // type-mutate: equivalent never-false – an indirection comes with a column list
 								Ind,
 								Tbl,
 								C,

@@ -217,6 +217,13 @@ test("SELECT * across joins: duplicate names keep the last column (like the row 
 		display_name: string | null;
 		created_at: Date;
 	}>();
+	// a column after the star replaces the star's column of that name
+	expectTypeOf<Row<"SELECT *, 'x' AS id FROM users">>().toEqualTypeOf<{
+		email: string;
+		display_name: string | null;
+		created_at: Date;
+		id: string;
+	}>();
 	expectTypeOf<
 		Row<"SELECT u.*, p.id AS post_id FROM users u LEFT JOIN posts p ON p.author_id = u.id">
 	>().toEqualTypeOf<{
@@ -270,10 +277,10 @@ test("table references: ONLY, *, schemas, namespaces, views, aliases", () => {
 		SqlError<"syntax error at or near left", 5>
 	>();
 	expectTypeOf<V<"SELECT * FROM auth.nope">>().toEqualTypeOf<
-		SqlError<'relation "auth.nope" does not exist', 0>
+		SqlError<'relation "auth.nope" does not exist', 3>
 	>();
 	expectTypeOf<V<"SELECT * FROM nope.users">>().toEqualTypeOf<
-		SqlError<'relation "nope.users" does not exist', 0>
+		SqlError<'relation "nope.users" does not exist', 3>
 	>();
 	expectTypeOf<V<"SELECT * FROM users, public.users">>().toEqualTypeOf<
 		SqlError<'table name "users" specified more than once', 3>

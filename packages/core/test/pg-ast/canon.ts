@@ -115,7 +115,9 @@ export type Ex<E> = E extends {
 															readonly type: infer Ty extends string;
 															readonly v: infer V extends string;
 														}
-													? `('${V}'::${Ty})`
+													? E extends { readonly bits: true }
+														? `'${V}'`
+														: `('${V}'::${Ty})`
 													: E extends {
 																readonly t: "case";
 																readonly operand: infer O;

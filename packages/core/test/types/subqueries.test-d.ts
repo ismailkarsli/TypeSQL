@@ -47,6 +47,62 @@ test("EXISTS, IN (SELECT ...), = ANY / ALL / SOME (SELECT ...)", () => {
 		Row<"SELECT EXISTS (SELECT FROM posts WHERE author_id = u.id) AS e FROM users u">
 	>().toEqualTypeOf<{ e: boolean }>();
 	expectTypeOf<Row<"SELECT FROM users">>().toEqualTypeOf<{}>();
+	// whatever clause follows; not after DISTINCT
+	type Empty<Q extends string> = V<Q> extends Q ? true : V<Q>;
+	expectTypeOf<
+		[
+			Empty<"SELECT ALL FROM users">,
+			Empty<"SELECT WHERE true">,
+			Empty<"SELECT GROUP BY ()">,
+			Empty<"SELECT HAVING true">,
+			Empty<"SELECT WINDOW w AS ()">,
+			Empty<"SELECT LIMIT 1">,
+			Empty<"SELECT OFFSET 1">,
+			Empty<"SELECT FETCH FIRST ROW ONLY">,
+			Empty<"SELECT FOR UPDATE">,
+			Empty<"SELECT UNION SELECT">,
+			Empty<"SELECT INTERSECT SELECT">,
+			Empty<"SELECT EXCEPT SELECT">,
+			Empty<"SELECT EXISTS (SELECT)">,
+			Empty<"SELECT;">,
+			Empty<"SELECT">,
+		]
+	>().toEqualTypeOf<
+		[
+			true,
+			true,
+			true,
+			true,
+			true,
+			true,
+			true,
+			true,
+			true,
+			true,
+			true,
+			true,
+			true,
+			true,
+			true,
+		]
+	>();
+	expectTypeOf<
+		V<"SELECT INTO e0 FROM users">
+	>().toEqualTypeOf<"SELECT INTO e0 FROM users">();
+	expectTypeOf<V<"SELECT ORDER BY 1">>().toEqualTypeOf<
+		SqlError<"ORDER BY position 1 is not in select list", 0>
+	>();
+	expectTypeOf<V<"SELECT DISTINCT FROM users">>().toEqualTypeOf<
+		SqlError<"syntax error at or near from", 2>
+	>();
+	expectTypeOf<
+		V<"SELECT DISTINCT ON (id email) id FROM users">
+	>().toEqualTypeOf<
+		SqlError<'syntax error: expected ")" at or near email', 5>
+	>();
+	expectTypeOf<V<"SELECT DISTINCT ON (,) id FROM users">>().toEqualTypeOf<
+		SqlError<"syntax error at or near ,", 4>
+	>();
 	expectTypeOf<
 		Row<"SELECT id FROM users WHERE id IN (SELECT author_id FROM posts)">
 	>().toEqualTypeOf<{ id: number }>();
@@ -192,4 +248,48 @@ test("subqueries with the wrong number of columns (Postgres messages)", () => {
 	expectTypeOf<
 		E<"SELECT (id, email) = ANY (SELECT author_id, title, id FROM posts) FROM users">
 	>().toEqualTypeOf<"subquery has too many columns">();
+	// no columns at all; a star of one column is one column
+	expectTypeOf<
+		E<"SELECT (SELECT)">
+	>().toEqualTypeOf<"subquery must return only one column">();
+	expectTypeOf<
+		E<"SELECT 1 IN (SELECT FROM users)">
+	>().toEqualTypeOf<"subquery has too few columns">();
+	expectTypeOf<
+		E<"SELECT 1 = ANY (SELECT s.* FROM (SELECT) s)">
+	>().toEqualTypeOf<"subquery has too few columns">();
+	expectTypeOf<
+		E<"SELECT ARRAY(SELECT s.* FROM (SELECT) s)">
+	>().toEqualTypeOf<"subquery must return only one column">();
+	expectTypeOf<
+		Row<"SELECT (SELECT s.* FROM (SELECT 1 AS a) s) AS v">
+	>().toEqualTypeOf<{ v: number | null }>();
+	// a star's width is not counted
+	expectTypeOf<
+		E<"SELECT (id, email, display_name, created_at) IN (SELECT users.* FROM users) FROM users">
+	>().toEqualTypeOf<"ok">();
+	// errors inside the subquery
+	expectTypeOf<
+		E<"SELECT EXISTS (SELECT nope FROM users)">
+	>().toEqualTypeOf<'column "nope" does not exist'>();
+});
+
+test("a row compared with a subquery compares with its single row; no row gives NULL", () => {
+	type E<Q extends string> =
+		V<Q> extends SqlError<infer M extends string, unknown> ? M : "ok";
+	expectTypeOf<
+		Row<"SELECT (id, email) = (SELECT author_id, title FROM posts LIMIT 1) AS a, (id, email) < (SELECT 1, 'a') AS b FROM users">
+	>().toEqualTypeOf<{ a: boolean | null; b: boolean | null }>();
+	expectTypeOf<
+		E<"SELECT (id, email) = (SELECT author_id FROM posts) FROM users">
+	>().toEqualTypeOf<"subquery has too few columns">();
+	expectTypeOf<
+		E<"SELECT (id, email) <> (SELECT author_id, title, id FROM posts) FROM users">
+	>().toEqualTypeOf<"subquery has too many columns">();
+	expectTypeOf<
+		E<"SELECT (id, nope) = (SELECT author_id, title FROM posts) FROM users">
+	>().toEqualTypeOf<'column "nope" does not exist'>();
+	expectTypeOf<
+		E<"SELECT (id, email) = (SELECT author_id, nope FROM posts) FROM users">
+	>().toEqualTypeOf<'column "nope" does not exist'>();
 });

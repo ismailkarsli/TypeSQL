@@ -166,10 +166,45 @@ test("ORDER BY of a set operation: output names and positions only", () => {
 	expectTypeOf<
 		V<"SELECT id FROM users UNION SELECT author_id FROM posts ORDER BY 2">
 	>().toEqualTypeOf<SqlError<"ORDER BY position 2 is not in select list", 0>>();
+	// output names, through a star too
+	expectTypeOf<
+		V<"SELECT id AS x, email AS x FROM users UNION SELECT 1, 'a' ORDER BY x">
+	>().toEqualTypeOf<SqlError<'ORDER BY "x" is ambiguous', 3>>();
+	expectTypeOf<
+		V<"SELECT * FROM users UNION SELECT * FROM users ORDER BY email">
+	>().toEqualTypeOf<"SELECT * FROM users UNION SELECT * FROM users ORDER BY email">();
+	expectTypeOf<
+		V<"SELECT * FROM users UNION SELECT * FROM users ORDER BY nope">
+	>().toEqualTypeOf<SqlError<'column "nope" does not exist', 11>>();
+	expectTypeOf<
+		V<"SELECT *, id FROM users UNION SELECT *, id FROM users ORDER BY id">
+	>().toEqualTypeOf<SqlError<'ORDER BY "id" is ambiguous', 3>>();
+	// positions: leading zeros; past int4 not an integer
+	expectTypeOf<
+		V<"SELECT id FROM users UNION SELECT author_id FROM posts ORDER BY 01">
+	>().toEqualTypeOf<"SELECT id FROM users UNION SELECT author_id FROM posts ORDER BY 01">();
+	expectTypeOf<
+		V<"SELECT id FROM users UNION SELECT author_id FROM posts ORDER BY 05">
+	>().toEqualTypeOf<SqlError<"ORDER BY position 5 is not in select list", 0>>();
+	expectTypeOf<
+		V<"SELECT id FROM users UNION SELECT author_id FROM posts ORDER BY 0">
+	>().toEqualTypeOf<SqlError<"ORDER BY position 0 is not in select list", 0>>();
+	expectTypeOf<
+		V<"SELECT id FROM users UNION SELECT author_id FROM posts ORDER BY 3000000000">
+	>().toEqualTypeOf<SqlError<"non-integer constant in ORDER BY", 0>>();
+	expectTypeOf<
+		V<"SELECT * FROM users UNION SELECT * FROM users ORDER BY 3">
+	>().toEqualTypeOf<"SELECT * FROM users UNION SELECT * FROM users ORDER BY 3">();
 	expectTypeOf<
 		V<"SELECT id FROM users UNION SELECT id FROM posts FOR UPDATE">
 	>().toEqualTypeOf<
 		SqlError<"FOR UPDATE is not allowed with UNION/INTERSECT/EXCEPT", 9>
+	>();
+	// after LIMIT too
+	expectTypeOf<
+		V<"SELECT id FROM users UNION SELECT id FROM posts LIMIT 1 FOR UPDATE">
+	>().toEqualTypeOf<
+		SqlError<"FOR UPDATE is not allowed with UNION/INTERSECT/EXCEPT", 11>
 	>();
 });
 

@@ -19,7 +19,15 @@ import type {
 } from "./dml.js";
 import type { ParseExpr, ParseExprList } from "./expr.js";
 import type { ParseFromItem } from "./select.js";
-import type { EatOp, EatWord, EatWords, Expected, Nx, Ok } from "./util.js";
+import type {
+	EatOp,
+	EatWord,
+	EatWords,
+	Expected,
+	Nx,
+	Ok,
+	SyntaxErrorAt,
+} from "./util.js";
 
 /**
  * MERGE (PostgreSQL 15+, with PostgreSQL 17's BY SOURCE / BY TARGET and RETURNING). `I` is the
@@ -46,35 +54,20 @@ export type ParseMerge<
 	EatWord<T, I, "into"> extends never
 		? Expected<"INTO", T, I>
 		: ParseDmlTarget<T, EatWord<T, I, "into">, never, true> extends infer Tg
-			? Tg extends Ok<
-					[infer Ref extends TableRef, infer Alias extends string | null],
-					infer I1 extends number
-				>
+			? Tg extends Ok<[infer Ref extends TableRef, infer Alias], infer I1>
 				? EatWord<T, I1, "using"> extends never
 					? Expected<"USING", T, I1>
 					: ParseFromItem<T, EatWord<T, I1, "using">> extends infer Src
-						? Src extends Ok<infer Source, infer I2 extends number>
+						? Src extends Ok<infer Source, infer I2>
 							? EatWord<T, I2, "on"> extends never
 								? Expected<"ON", T, I2>
 								: ParseExpr<T, EatWord<T, I2, "on">, 0> extends infer On
-									? On extends Ok<
-											infer Cond extends Expr,
-											infer I3 extends number
-										>
+									? On extends Ok<infer Cond, infer I3>
 										? T[I3] extends WordTok<"when">
 											? ParseWhens<T, I3, []> extends infer Ws
-												? Ws extends Ok<
-														infer Whens extends readonly MergeWhen[],
-														infer I4 extends number
-													>
+												? Ws extends Ok<infer Whens, infer I4>
 													? ParseReturningOpt<T, I4> extends infer Rt
-														? Rt extends Ok<
-																[
-																	infer Ret extends readonly Target[] | null,
-																	infer Opts extends readonly ReturningOpt[],
-																],
-																infer I5 extends number
-															>
+														? Rt extends Ok<[infer Ret, infer Opts], infer I5>
 															? Ok<
 																	{
 																		t: "merge";
@@ -109,7 +102,7 @@ type ParseWhens<
 > =
 	T[I] extends WordTok<"when">
 		? ParseWhen<T, Nx<I>> extends infer X
-			? X extends Ok<infer When extends MergeWhen, infer J extends number>
+			? X extends Ok<infer When extends MergeWhen, infer J>
 				? ParseWhens<T, J, [...Acc, When]>
 				: X
 			: never
@@ -150,7 +143,7 @@ type ParseWhenCond<
 	EatWord<T, I, "and"> extends never
 		? ParseThen<T, I, M, null>
 		: ParseExpr<T, EatWord<T, I, "and">, 0> extends infer X
-			? X extends Ok<infer Cond extends Expr, infer J extends number>
+			? X extends Ok<infer Cond extends Expr, infer J>
 				? ParseThen<T, J, M, Cond>
 				: X
 			: never;
@@ -164,7 +157,7 @@ type ParseThen<
 	EatWord<T, I, "then"> extends never
 		? Expected<"THEN", T, I>
 		: ParseAction<T, EatWord<T, I, "then">, M> extends infer X
-			? X extends Ok<infer A extends MergeAction, infer J extends number>
+			? X extends Ok<infer A extends MergeAction, infer J>
 				? Ok<{ match: M; cond: Cond; action: A }, J>
 				: X
 			: never;
@@ -178,20 +171,21 @@ type ParseAction<
 	EatWords<T, I, ["do", "nothing"]> extends never
 		? M extends "target"
 			? EatWord<T, I, "insert"> extends never
-				? Expected<"INSERT or DO NOTHING", T, I>
+				? T[I] extends WordTok<"do">
+					? SyntaxErrorAt<T, Nx<I>>
+					: Expected<"INSERT or DO NOTHING", T, I>
 				: ParseMergeInsert<T, EatWord<T, I, "insert">>
 			: EatWord<T, I, "delete"> extends never
 				? EatWords<T, I, ["update", "set"]> extends never
-					? Expected<"UPDATE, DELETE or DO NOTHING", T, I>
+					? T[I] extends WordTok<"update" | "do">
+						? SyntaxErrorAt<T, Nx<I>>
+						: Expected<"UPDATE, DELETE or DO NOTHING", T, I>
 					: ParseSetList<
 								T,
 								EatWords<T, I, ["update", "set"]>,
 								[]
 							> extends infer X
-						? X extends Ok<
-								infer Set extends readonly SetItem[],
-								infer J extends number
-							>
+						? X extends Ok<infer Set, infer J>
 							? Ok<{ t: "update"; set: Set }, J>
 							: X
 						: never
@@ -206,15 +200,9 @@ type ParseMergeInsert<T extends Toks, I extends number> =
 					? ParenTargetList<T, I>
 					: Ok<[null, null], I>
 			) extends infer Cl
-			? Cl extends Ok<
-					[
-						infer Cols extends readonly string[] | null,
-						infer Ind extends readonly TargetInd[] | null,
-					],
-					infer J extends number
-				>
+			? Cl extends Ok<[infer Cols, infer Ind], infer J>
 				? ParseOverriding<T, J> extends infer Ov
-					? Ov extends Ok<unknown, infer J2 extends number>
+					? Ov extends Ok<unknown, infer J2>
 						? EatWord<T, J2, "values"> extends never
 							? Expected<"VALUES", T, J2>
 							: EatOp<T, EatWord<T, J2, "values">, "("> extends never
@@ -224,10 +212,7 @@ type ParseMergeInsert<T extends Toks, I extends number> =
 											EatOp<T, EatWord<T, J2, "values">, "(">,
 											[]
 										> extends infer X
-									? X extends Ok<
-											infer Vals extends readonly Expr[],
-											infer J3 extends number
-										>
+									? X extends Ok<infer Vals, infer J3>
 										? EatOp<T, J3, ")"> extends never
 											? Expected<'")"', T, J3>
 											: Ok<

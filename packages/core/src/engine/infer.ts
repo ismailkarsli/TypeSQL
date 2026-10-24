@@ -103,7 +103,8 @@ type Reposition<E, T extends Toks, DB = never> =
 		: E;
 
 /**
- * Token index for a semantic error: the function of `function f(…) does not exist`, the
+ * Token index for a semantic error: the function of `function f(…) does not exist` and of a
+ * call decoration it does not take (`FILTER specified, but f is not …`), the
  * first quoted name in the message that occurs in the statement (`null value in column
  * "email" of relation "users"` → `users` when `email` is absent), then `column t.c` forms, then the keyword of `each UNION query …` and
  * `UNION|CASE|VALUES|COALESCE types … cannot be matched`.
@@ -113,24 +114,36 @@ type LocateIdent<
 	T extends Toks,
 > = M extends `function ${infer Name}(${string}`
 	? FindTokOr<T, Name, 0>
-	: M extends `column ${string}.${infer Name} ${string}`
-		? FindTokOr<T, Name, LocateQuoted<M, T>>
-		: M extends "DEFAULT is not allowed in this context"
-			? FindTokOr<T, "default", 0>
-			: M extends "SELECT ... INTO is not allowed here"
-				? FindSelectInto<T, 0, false>
-				: M extends `each ${infer Op} query ${string}`
-					? FindTokOr<T, Lowercase<Op>, 0>
-					: M extends `${infer Op} types ${string} cannot be matched`
-						? Op extends `${string} ${string}`
-							? LocateQuoted<M, T>
-							: FindTokOr<T, Lowercase<Op>, 0>
-						: LocateQuoted<M, T>;
+	: M extends
+				| `${infer Name}(*) ${string}`
+				| `window function ${infer Name} requires ${string}`
+				| `${string} specified, but ${infer Name} is not ${string}`
+		? FindTokOr<T, Name, 0>
+		: M extends `column ${string}.${infer Name} ${string}`
+			? FindTokOr<T, Name, LocateQuoted<M, T>>
+			: M extends "DEFAULT is not allowed in this context"
+				? FindTokOr<T, "default", 0>
+				: M extends "SELECT ... INTO is not allowed here"
+					? FindSelectInto<T, 0, false>
+					: M extends `each ${infer Op} query ${string}`
+						? FindTokOr<T, Lowercase<Op>, 0>
+						: M extends `${infer Op} types ${string} cannot be matched`
+							? Op extends `${string} ${string}`
+								? LocateQuoted<M, T>
+								: FindTokOr<T, Lowercase<Op>, 0>
+							: LocateQuoted<M, T>;
 type LocateQuoted<
 	M extends string,
 	T extends Toks,
 > = M extends `${string}"${infer Name}"${infer Rest}`
-	? FindTokOr<T, Name, LocateQuoted<Rest, T>>
+	? FindTokOr<
+			T,
+			Name,
+			// a qualified name (`relation "public.t"`) is at its first part, as in Postgres
+			Name extends `${infer First}.${string}`
+				? FindTokOr<T, First, LocateQuoted<Rest, T>>
+				: LocateQuoted<Rest, T>
+		>
 	: 0;
 type FindTokOr<T extends Toks, Name extends string, Else extends number> =
 	FindTok<T, Name, 0> extends infer I extends number

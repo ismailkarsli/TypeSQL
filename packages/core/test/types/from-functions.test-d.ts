@@ -153,6 +153,9 @@ test("errors", () => {
 	expectTypeOf<
 		V<"SELECT * FROM generate_series(1, 2) OVER ()">
 	>().toEqualTypeOf<SqlError<"syntax error at or near )", 11>>();
+	expectTypeOf<V<"SELECT * FROM generate_series(1, 2) OVER w">>().toEqualTypeOf<
+		SqlError<"syntax error at or near w", 10>
+	>();
 	expectTypeOf<V<"SELECT * FROM jsonb_to_recordset('[]')">>().toEqualTypeOf<
 		SqlError<
 			'a column definition list is required for functions returning "record"',

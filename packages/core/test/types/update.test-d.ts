@@ -108,9 +108,24 @@ test("multi-column SET", () => {
 	expectTypeOf<
 		V<"UPDATE users SET (email, display_name) = (SELECT title, body FROM posts LIMIT 1)">
 	>().toEqualTypeOf<"UPDATE users SET (email, display_name) = (SELECT title, body FROM posts LIMIT 1)">();
+	// the source must be a row or a subquery, even for one column
 	expectTypeOf<
-		V<"UPDATE users SET (email) = ('a')">
-	>().toEqualTypeOf<"UPDATE users SET (email) = ('a')">();
+		V<"UPDATE users SET (email) = ROW('a')">
+	>().toEqualTypeOf<"UPDATE users SET (email) = ROW('a')">();
+	expectTypeOf<V<"UPDATE users SET (email) = ('a')">>().toEqualTypeOf<
+		SqlError<
+			"source for a multiple-column UPDATE item must be a sub-SELECT or ROW() expression",
+			0
+		>
+	>();
+	expectTypeOf<
+		V<"UPDATE users SET (email, display_name) = 'x'">
+	>().toEqualTypeOf<
+		SqlError<
+			"source for a multiple-column UPDATE item must be a sub-SELECT or ROW() expression",
+			0
+		>
+	>();
 	expectTypeOf<
 		V<"UPDATE users SET (email, display_name) = ('a', 'b', 'c')">
 	>().toEqualTypeOf<
@@ -204,6 +219,34 @@ test("syntax errors", () => {
 	>();
 	expectTypeOf<V<"UPDATE users email = 'a'">>().toEqualTypeOf<
 		SqlError<"syntax error: expected SET at or near =", 3>
+	>();
+	// each clause's error, at the token Postgres names
+	type E<Q extends string> =
+		V<Q> extends SqlError<infer M extends string, infer At> ? [M, At] : "ok";
+	expectTypeOf<
+		[
+			E<"UPDATE nope SET email = 'a'">,
+			E<"UPDATE users SET email 'a'">,
+			E<"UPDATE users SET email = +">,
+			E<"UPDATE users SET (email display_name) = ('a', 'b')">,
+			E<"UPDATE users SET (email, display_name) ('a', 'b')">,
+			E<"UPDATE users SET (email, display_name) = ('a',">,
+			E<"UPDATE users SET email = 'a' FROM nope">,
+			E<"UPDATE users SET email = 'a' WHERE nope">,
+			E<"UPDATE users SET email = 'a' RETURNING +">,
+		]
+	>().toEqualTypeOf<
+		[
+			['relation "nope" does not exist', 1],
+			["syntax error: expected \"=\" at or near 'a'", 4],
+			["syntax error at end of input", 6],
+			['syntax error: expected "," or ")" at or near display_name', 5],
+			['syntax error: expected "=" at or near (', 8],
+			["syntax error at end of input", 12],
+			['relation "nope" does not exist', 7],
+			['column "nope" does not exist', 7],
+			["syntax error at end of input", 8],
+		]
 	>();
 });
 

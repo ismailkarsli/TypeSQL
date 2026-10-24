@@ -59,7 +59,7 @@ export type ParseDdl<T extends Toks, I extends number> =
 				: W extends "drop"
 					? ParseDrop<T, Nx<I>>
 					: Noop<T, I, W>
-		: SyntaxErrorAt<T, I>;
+		: SyntaxErrorAt<T, I>; // type-mutate: equivalent – ParseStatement calls it only on a DDL keyword
 
 type Noop<T extends Toks, I extends number, What extends string> = Ok<
 	{ t: "noop"; what: What },
@@ -467,25 +467,27 @@ type ParseCtasAfterCols<
 	Ref extends TableRef,
 	Names extends readonly string[] | null,
 > =
-	SkipStorage<T, I> extends infer I1 extends number
-		? EatWord<T, I1, "as"> extends never
-			? Expected<'"(", AS, OF or PARTITION OF', T, I1>
-			: T[EatWord<T, I1, "as">] extends WordTok<"execute">
-				? ParseCtasExecute<T, Nx<EatWord<T, I1, "as">>, Ine, Ref, Names>
-				: ParseSelectStmt<T, EatWord<T, I1, "as">> extends infer R
-					? R extends Ok<infer Q, infer J extends number>
-						? Ok<
-								{
-									t: "create_table_as";
-									ifNotExists: Ine;
-									table: Ref;
-									cols: Names;
-									q: Q;
-								},
-								SkipWithData<T, J>
-							>
-						: R
-					: never
+	SkipStorage<T, I> extends infer I1
+		? I1 extends number
+			? EatWord<T, I1, "as"> extends never
+				? Expected<'"(", AS, OF or PARTITION OF', T, I1>
+				: T[EatWord<T, I1, "as">] extends WordTok<"execute">
+					? ParseCtasExecute<T, Nx<EatWord<T, I1, "as">>, Ine, Ref, Names>
+					: ParseSelectStmt<T, EatWord<T, I1, "as">> extends infer R
+						? R extends Ok<infer Q, infer J extends number>
+							? Ok<
+									{
+										t: "create_table_as";
+										ifNotExists: Ine;
+										table: Ref;
+										cols: Names;
+										q: Q;
+									},
+									SkipWithData<T, J>
+								>
+							: R
+						: never
+			: I1
 		: never;
 
 /** After `AS EXECUTE`: `name [(args)] [WITH [NO] DATA]`. */
@@ -616,10 +618,12 @@ type ParseTableTail<
 					: R
 				: never
 		: EatWords<T, I, ["partition", "by"]> extends never
-			? SkipStorage<T, I> extends infer J extends number
-				? J extends I
-					? [Inh, I]
-					: ParseTableTail<T, J, Inh>
+			? SkipStorage<T, I> extends infer J
+				? J extends number
+					? J extends I
+						? [Inh, I]
+						: ParseTableTail<T, J, Inh>
+					: J
 				: never
 			: EatWords<T, I, ["partition", "by"]> extends infer J extends number
 				? // any word: an unknown strategy is a semantic error in Postgres ("unrecognized partitioning strategy")
@@ -632,7 +636,10 @@ type ParseTableTail<
 					: Expected<"RANGE, LIST or HASH", T, J>
 				: never;
 
-/** `USING method`, `WITH (...)`, `WITHOUT OIDS`, `ON COMMIT ...`, `TABLESPACE name` (any order, any number). */
+/**
+ * `USING method`, `WITH (...)`, `WITHOUT OIDS`, `ON COMMIT ...`, `TABLESPACE name` (any order, any
+ * number): the index after them, or an error (`WITH` takes only a parenthesized list).
+ */
 type SkipStorage<T extends Toks, I extends number> =
 	T[I] extends WordTok<"using" | "tablespace">
 		? SkipStorage<T, Nx2<I>>
@@ -641,7 +648,7 @@ type SkipStorage<T extends Toks, I extends number> =
 				? SkipToCloseParen<T, Nx2<I>> extends infer J extends number
 					? SkipStorage<T, J>
 					: never
-				: I
+				: SyntaxErrorAt<T, Nx<I>>
 			: T[I] extends WordTok<"without">
 				? T[Nx<I>] extends WordTok<"oids">
 					? SkipStorage<T, Nx2<I>>
@@ -1182,13 +1189,17 @@ type ParseCreateView<
 						infer Names extends readonly string[],
 						infer J2 extends number
 					>
-					? SkipViewStorage<T, J2, Mat> extends infer J3 extends number
-						? ParseViewAs<T, J3, OrReplace, Mat, Ine, RefOf<Parts>, Names>
+					? SkipViewStorage<T, J2, Mat> extends infer J3
+						? J3 extends number
+							? ParseViewAs<T, J3, OrReplace, Mat, Ine, RefOf<Parts>, Names>
+							: J3
 						: never
 					: R
 				: never
-			: SkipViewStorage<T, J, Mat> extends infer J2 extends number
-				? ParseViewAs<T, J2, OrReplace, Mat, Ine, RefOf<Parts>, null>
+			: SkipViewStorage<T, J, Mat> extends infer J2
+				? J2 extends number
+					? ParseViewAs<T, J2, OrReplace, Mat, Ine, RefOf<Parts>, null>
+					: J2
 				: never
 		: Expected<"view name", T, I>;
 
@@ -1202,7 +1213,7 @@ type SkipViewStorage<
 	: T[I] extends WordTok<"with">
 		? T[Nx<I>] extends OpTok<"(">
 			? SkipToCloseParen<T, Nx2<I>>
-			: I
+			: SyntaxErrorAt<T, Nx<I>>
 		: I;
 
 type ParseViewAs<
@@ -1270,7 +1281,7 @@ type ParseRecursiveView<
 									>
 								: Q
 							: never
-					: never
+					: SkipStorage<T, J2>
 				: R
 			: never
 		: Expected<"view name", T, I>;

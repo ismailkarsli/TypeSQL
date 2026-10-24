@@ -266,4 +266,29 @@ export interface AuthDB {
 }
 `);
 	}, 30_000);
+
+	test("the CLI takes --exclude more than once", async () => {
+		const stdout: string[] = [];
+		const code = await main(
+			[
+				"introspect",
+				"--exclude",
+				"events_*",
+				"--exclude",
+				"auth.session_*,users",
+			],
+			{
+				stdout: (s) => stdout.push(s),
+				stderr: () => undefined,
+				env: { DATABASE_URL: url },
+				cwd: process.cwd(),
+			},
+		);
+		expect(code).toBe(0);
+		const text = stdout.join("");
+		for (const name of ["events_", "session_counts", " users:"])
+			expect(text).not.toContain(name);
+		for (const name of [" events:", " sessions:", " user_flags:"])
+			expect(text).toContain(name);
+	}, 30_000);
 });

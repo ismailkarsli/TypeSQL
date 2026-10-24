@@ -1,10 +1,12 @@
 import type { Call, CaseWhen, Expr, SelectStmt } from "../ast.js";
+import type { TypeDisplay } from "../binder/clauses.js";
 import type { ResolveColumn, WholeRow } from "../binder/resolve.js";
 import type { SqlError } from "../errors.js";
 import type { BuildObject, JsonArrow, JsonLitCast, LitType } from "../json.js";
+import type { NoSubscript } from "../project/dml.js";
 import type { ProjectSelect } from "../project/select.js";
 import type { BaseOf, ObjShape, Shaped } from "../shape.js";
-import type { ColInfo, ColMap, Cols, Ctx, Info } from "../types.js";
+import type { ColEntry, ColInfo, ColMap, Cols, Ctx, Info } from "../types.js";
 import type { CallType } from "./catalog.js";
 import type {
 	BinOpType,
@@ -104,7 +106,7 @@ export type TypeOf<E extends Expr, C extends Ctx> = E extends {
 																									E["r"],
 																									C
 																								>
-																							: E["r"] extends Expr
+																							: E["r"] extends Expr // type-mutate: equivalent cond-true – the right side is a subquery (above) or an expression
 																								? TypeOf<E["r"], C>
 																								: never,
 																						E["r"] extends {
@@ -307,6 +309,7 @@ export type TypeOf<E extends Expr, C extends Ctx> = E extends {
 																																									: A
 																																								: never
 																																							: E extends {
+																																										// type-mutate: equivalent cond-true – every kind of expression is handled above
 																																										readonly t: "variadic";
 																																									}
 																																								? TypeOf<
@@ -321,7 +324,7 @@ export type TypeOf<E extends Expr, C extends Ctx> = E extends {
 // ─── helpers ───
 
 export type Or<A extends boolean, B extends boolean> = A extends true
-	? true
+	? true // type-mutate: equivalent never-true – a never nullability is read with `extends true`, as nullable
 	: B extends true
 		? true
 		: false;
@@ -330,7 +333,7 @@ export type AnyNullable<As extends readonly ColInfo[]> = As extends readonly [
 	...infer R extends readonly ColInfo[],
 ]
 	? A["nullable"] extends true
-		? true
+		? true // type-mutate: equivalent never-true – a never nullability is read with `extends true`, as nullable
 		: AnyNullable<R>
 	: false;
 /** Literal-aware common type of a list (may be `lit`; see `CommonLit`). */
@@ -371,7 +374,7 @@ type ArrayOf<A> = A extends ColInfo
 type TypeField<A, N extends string> = A extends ColInfo
 	? N extends "*"
 		? SqlError<"(e).* is only supported in a target list", null>
-		: A["type"] extends Shaped<"record", ObjShape<infer M extends ColMap>>
+		: A["type"] extends Shaped<"record", ObjShape<infer M>>
 			? N extends keyof M
 				? Info<M[N]["type"], Or<A["nullable"], M[N]["nullable"]>>
 				: SqlError<`column "${N}" not found in data type record`, null>
@@ -434,12 +437,19 @@ type ScalarType =
 	| "jsonb";
 type NonBoolOp = "+" | "-" | "*" | "/" | "%" | "^" | "||";
 
-/** SUBSTRING / TRIM / OVERLAY: text, or bytea / bit for those inputs; strict over all operands. */
+/**
+ * SUBSTRING / TRIM / OVERLAY: text, or bytea / bit for those inputs (Postgres has only the
+ * `bit` forms, which take a `varbit` too); strict over all operands.
+ */
 type StringResult<A, B, D> = A extends ColInfo
 	? B extends ColInfo | null
 		? D extends ColInfo | null
 			? Info<
-					A["type"] extends "bytea" | "bit" | "varbit" ? A["type"] : "text",
+					A["type"] extends "bytea"
+						? "bytea"
+						: A["type"] extends "bit" | "varbit"
+							? "bit"
+							: "text",
 					Or<A["nullable"], Or<NullableOpt<B>, NullableOpt<D>>>
 				>
 			: D
@@ -451,14 +461,41 @@ type StringResult<A, B, D> = A extends ColInfo
  * NULL when the pattern does not match (an untyped `$n` picks this form too).
  */
 type RegexNull<R, From> = R extends ColInfo
-	? R["type"] extends "text"
+	? R["type"] extends "text" // type-mutate: equivalent cond-true – only text can take a text pattern (bytea / bit SUBSTRING takes integers)
 		? From extends { readonly type: StrT | "unknown" }
 			? Info<"text", true>
 			: R
 		: R
 	: R;
 
-type TypeBin<Op extends string, L extends Expr, R extends Expr, C extends Ctx> =
+type TypeBin<
+	Op extends string,
+	L extends Expr,
+	R extends Expr,
+	C extends Ctx,
+> = L extends { readonly t: "row" }
+	? R extends { readonly t: "sub"; readonly q: infer Q extends SelectStmt }
+		? Op extends RowCompareOp
+			? RowCompareSub<L, Q, C>
+			: TypeBinOperands<Op, L, R, C>
+		: TypeBinOperands<Op, L, R, C>
+	: TypeBinOperands<Op, L, R, C>;
+type RowCompareOp = "=" | "<>" | "!=" | "<" | ">" | "<=" | ">=";
+/**
+ * `(a, b) = (SELECT x, y …)` compares the row with the subquery's single row (Postgres's
+ * ROWCOMPARE sublink): the widths must match, and no row gives NULL.
+ */
+type RowCompareSub<
+	L extends Expr,
+	Q extends SelectStmt,
+	C extends Ctx,
+> = Check2<TypeOf<L, C>, SubqueryOperand<L, Q, C>, Info<"bool", true>>;
+type TypeBinOperands<
+	Op extends string,
+	L extends Expr,
+	R extends Expr,
+	C extends Ctx,
+> =
 	TypeOperand<L, C> extends infer LT
 		? LT extends ColInfo
 			? TypeOperand<R, C> extends infer RT
@@ -475,7 +512,7 @@ type TypeBin<Op extends string, L extends Expr, R extends Expr, C extends Ctx> =
 /** Unary; `-<numeric literal>` is folded like Postgres does (`-2147483648` is int4). */
 type TypeUn<Op extends string, E extends Expr, C extends Ctx> = Op extends
 	| "-"
-	| "+"
+	| "+" // type-mutate: equivalent union-drop – unary plus of a literal types like the literal (UnOpType) either way
 	? E extends { readonly t: "num"; readonly v: infer V extends string }
 		? Info<NumLitType<Op extends "-" ? `-${V}` : V>>
 		: TypeOf<E, C> extends infer T
@@ -558,20 +595,27 @@ type TypeIdx<E extends Expr, I extends Expr, C extends Ctx> =
 		? A extends ColInfo
 			? TypeOf<I, C> extends infer B
 				? B extends ColInfo
-					? JsonArrow<"->", A, I, B> extends infer J extends ColInfo
-						? J
-						: Info<
-								A["type"] extends `${infer El}[]`
-									? El
-									: A["type"] extends "json" | "jsonb"
-										? BaseOf<A["type"]>
-										: "unknown",
-								true
-							>
+					? BaseOf<A["type"]> extends NoSubscript
+						? NoSubscriptErr<A["type"]>
+						: JsonArrow<"->", A, I, B> extends infer J extends ColInfo
+							? J
+							: Info<
+									A["type"] extends `${infer El}[]`
+										? El
+										: BaseOf<A["type"]> extends "jsonb"
+											? "jsonb"
+											: "unknown",
+									true
+								>
 					: B
 				: never
 			: A
 		: never;
+/** Postgres's error for subscripting a type that has none (`json`, `text`, …). */
+type NoSubscriptErr<T extends string> = SqlError<
+	`cannot subscript type ${TypeDisplay<T>} because it does not support subscripting`,
+	null
+>;
 /** `e[lo:hi]`: same array type, nullable if the array is. */
 type TypeSlice<
 	E extends Expr,
@@ -585,7 +629,11 @@ type TypeSlice<
 				? B extends ColInfo | null
 					? TypeOpt<Hi, C> extends infer D
 						? D extends ColInfo | null
-							? Info<A["type"], A["nullable"]>
+							? BaseOf<A["type"]> extends NoSubscript
+								? NoSubscriptErr<A["type"]>
+								: BaseOf<A["type"]> extends "jsonb"
+									? SqlError<"jsonb subscript does not support slices", null>
+									: Info<A["type"], A["nullable"]>
 							: D
 						: never
 					: B
@@ -696,28 +744,31 @@ type IsLonger<
 > = A extends readonly [unknown, ...infer AR]
 	? B extends readonly [unknown, ...infer BR]
 		? IsLonger<AR, BR>
-		: true
+		: true // type-mutate: equivalent never-false – a never result reads as true (`IsLonger<…> extends true`), the same answer
 	: false;
 
 /**
  * The single column of a subquery. Postgres: scalar and ARRAY subqueries with ≠ 1 column fail
- * with "subquery must return only one column"; IN / ANY / ALL with "subquery has too many columns".
+ * with "subquery must return only one column"; IN / ANY / ALL with "subquery has too many
+ * columns" or "subquery has too few columns".
  */
 type OnlyCol<R extends Cols, TooMany extends string> = R extends readonly [
-	infer H,
+	infer H extends ColEntry,
 ]
-	? H extends { readonly t: infer T extends ColInfo }
+	? H extends { readonly t: infer T }
 		? T
-		: H extends { readonly star: infer M extends ColMap }
-			? StarCol<M, TooMany>
-			: Info<"unknown", true>
+		: StarCol<Extract<H, { readonly star: ColMap }>["star"], TooMany>
 	: R extends readonly []
-		? SqlError<"subquery must return only one column", null>
+		? SqlError<TooFew<TooMany>, null>
 		: SqlError<TooMany, null>;
+type TooFew<TooMany extends string> =
+	TooMany extends "subquery has too many columns"
+		? "subquery has too few columns"
+		: TooMany;
 type StarCol<M extends ColMap, TooMany extends string> = [keyof M] extends [
 	never,
 ]
-	? SqlError<"subquery must return only one column", null>
+	? SqlError<TooFew<TooMany>, null>
 	: IsUnion<keyof M> extends true
 		? SqlError<TooMany, null>
 		: M[keyof M];
@@ -787,7 +838,7 @@ type TypeWithinGroup<W extends Expr | null, C extends Ctx> = W extends {
 	readonly items: infer Items extends readonly Expr[];
 }
 	? TypeList<Items, C, []> extends infer Ls
-		? Ls extends readonly [infer F extends ColInfo, ...ColInfo[]]
+		? Ls extends readonly [infer F, ...ColInfo[]]
 			? F
 			: Ls
 		: never
@@ -847,6 +898,7 @@ type TypeCall<E extends Call, C extends Ctx> =
 												]
 													? true
 													: false;
+												readonly withinGroup: W extends ColInfo ? true : false;
 												readonly wg: W extends ColInfo ? W["type"] : "unknown";
 											},
 											C["db"]

@@ -49,6 +49,23 @@ test("DISTINCT and DISTINCT ON do not change the row type; DISTINCT ON is valida
 			0
 		>
 	>();
+	// a DISTINCT ON expression after another key; one missing after others
+	expectTypeOf<
+		V<"SELECT DISTINCT ON (author_id) author_id, title FROM posts ORDER BY title, author_id">
+	>().toEqualTypeOf<
+		SqlError<
+			"SELECT DISTINCT ON expressions must match initial ORDER BY expressions",
+			0
+		>
+	>();
+	expectTypeOf<
+		V<"SELECT DISTINCT ON (author_id, title) author_id, title FROM posts ORDER BY author_id, id">
+	>().toEqualTypeOf<
+		SqlError<
+			"SELECT DISTINCT ON expressions must match initial ORDER BY expressions",
+			0
+		>
+	>();
 	// SELECT DISTINCT: ORDER BY expressions must be in the select list
 	expectTypeOf<
 		Row<"SELECT DISTINCT id, email FROM users ORDER BY email">
@@ -64,6 +81,23 @@ test("DISTINCT and DISTINCT ON do not change the row type; DISTINCT ON is valida
 			0
 		>
 	>();
+	// after a star a column is one of its columns; an expression is not
+	expectTypeOf<
+		V<"SELECT DISTINCT * FROM users ORDER BY id + 1">
+	>().toEqualTypeOf<
+		SqlError<
+			"for SELECT DISTINCT, ORDER BY expressions must appear in select list",
+			0
+		>
+	>();
+	type Ok<Q extends string> = V<Q> extends Q ? "ok" : V<Q>;
+	expectTypeOf<
+		[
+			Ok<"SELECT DISTINCT * FROM users ORDER BY email, 1">,
+			Ok<"SELECT DISTINCT u.* FROM users u ORDER BY u.email">,
+			Ok<"SELECT DISTINCT *, id + 1 AS n FROM users ORDER BY n, id + 1">,
+		]
+	>().toEqualTypeOf<["ok", "ok", "ok"]>();
 });
 
 test("ORDER BY: output names, positions and input expressions", () => {
@@ -123,7 +157,28 @@ test("ORDER BY: output names, positions and input expressions", () => {
 	>().toEqualTypeOf<SqlError<'ORDER BY "id" is ambiguous', 3>>();
 	expectTypeOf<
 		V<"SELECT id AS x, email AS x FROM users ORDER BY x">
-	>().toEqualTypeOf<SqlError<'ORDER BY "x" is ambiguous', 3>>();
+	>().toEqualTypeOf<SqlError<'ORDER BY "x" is ambiguous', 3>>(); // the same column through a star, or with and without its qualifier, is not ambiguous
+	type Ok<Q extends string> = V<Q> extends Q ? true : V<Q>;
+	expectTypeOf<
+		[
+			Ok<"SELECT *, id FROM users ORDER BY id">,
+			Ok<"SELECT * FROM users ORDER BY email">,
+			Ok<"SELECT u.id, id FROM users u ORDER BY id">,
+			Ok<"SELECT id, u.id FROM users u ORDER BY id">,
+			Ok<"SELECT u.id, u.id FROM users u ORDER BY id">,
+			// after a star, a position is not checked
+			Ok<"SELECT * FROM users ORDER BY 2">,
+			// every digit; leading zeros
+			Ok<"SELECT 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 ORDER BY 10, 9, 8, 7, 6, 5, 4, 3, 2, 01">,
+		]
+	>().toEqualTypeOf<[true, true, true, true, true, true, true]>();
+	expectTypeOf<V<"SELECT id FROM users ORDER BY 05">>().toEqualTypeOf<
+		SqlError<"ORDER BY position 5 is not in select list", 0>
+	>();
+	// past int4 the literal is not an integer to Postgres
+	expectTypeOf<V<"SELECT id FROM users ORDER BY 3000000000">>().toEqualTypeOf<
+		SqlError<"non-integer constant in ORDER BY", 0>
+	>();
 });
 
 test("GROUP BY: input columns first, then output names and positions", () => {
@@ -154,6 +209,10 @@ test("GROUP BY: input columns first, then output names and positions", () => {
 	expectTypeOf<
 		V<"SELECT id AS x, email AS x FROM users GROUP BY x">
 	>().toEqualTypeOf<SqlError<'GROUP BY "x" is ambiguous', 3>>();
+	// an input column comes first, even when it is ambiguous and an output column has the name
+	expectTypeOf<
+		V<"SELECT u.id FROM users u, users v GROUP BY id">
+	>().toEqualTypeOf<SqlError<'column reference "id" is ambiguous', 3>>();
 	expectTypeOf<V<"SELECT 1 FROM users HAVING nope > 1">>().toEqualTypeOf<
 		SqlError<'column "nope" does not exist', 5>
 	>();
@@ -172,6 +231,19 @@ test("LIMIT / OFFSET / FETCH and locking clauses do not change the row", () => {
 	expectTypeOf<
 		Row<"SELECT id FROM users ORDER BY id FETCH NEXT ROW WITH TIES">
 	>().toEqualTypeOf<{ id: number }>();
+	// ROW and ROWS are the same word, with and without a count
+	expectTypeOf<
+		V<"SELECT id FROM users FETCH FIRST ROWS ONLY">
+	>().toEqualTypeOf<"SELECT id FROM users FETCH FIRST ROWS ONLY">();
+	expectTypeOf<
+		V<"SELECT id FROM users FETCH FIRST 5 ROW ONLY">
+	>().toEqualTypeOf<"SELECT id FROM users FETCH FIRST 5 ROW ONLY">();
+	expectTypeOf<V<"SELECT id FROM users FETCH x">>().toEqualTypeOf<
+		SqlError<"syntax error: expected FIRST or NEXT at or near x", 5>
+	>();
+	expectTypeOf<V<"SELECT id FROM users ORDER BY">>().toEqualTypeOf<
+		SqlError<"syntax error at end of input", 6>
+	>();
 	expectTypeOf<
 		Row<"SELECT * FROM users ORDER BY id FOR UPDATE SKIP LOCKED LIMIT 1">
 	>().toEqualTypeOf<{
@@ -182,6 +254,9 @@ test("LIMIT / OFFSET / FETCH and locking clauses do not change the row", () => {
 	}>();
 	expectTypeOf<
 		Row<"SELECT id FROM users u FOR SHARE OF u NOWAIT">
+	>().toEqualTypeOf<{ id: number }>();
+	expectTypeOf<
+		Row<"SELECT a.id FROM users a, users b FOR UPDATE OF a, b SKIP LOCKED">
 	>().toEqualTypeOf<{ id: number }>();
 	expectTypeOf<
 		Row<"SELECT id FROM users FOR NO KEY UPDATE FOR KEY SHARE">

@@ -53,7 +53,208 @@ test("subscripted and field assignment targets", () => {
 	>().toEqualTypeOf<"UPDATE items SET tags[id] = name">();
 });
 
+test("built-in types without subscripting, by Postgres's name", () => {
+	type No<T extends string> =
+		Validate<{ x: { c: Col<T> } }, "UPDATE x SET c[1] = NULL"> extends SqlError<
+			infer M,
+			unknown
+		>
+			? M
+			: never;
+	expectTypeOf<
+		[
+			No<"bool">,
+			No<"int2">,
+			No<"int4">,
+			No<"int8">,
+			No<"float4">,
+			No<"float8">,
+			No<"numeric">,
+			No<"money">,
+			No<"text">,
+			No<"varchar">,
+			No<"bpchar">,
+			No<"char">,
+			No<"bytea">,
+			No<"date">,
+			No<"time">,
+			No<"timetz">,
+			No<"timestamp">,
+			No<"timestamptz">,
+			No<"interval">,
+			No<"uuid">,
+			No<"json">,
+			No<"xml">,
+			No<"inet">,
+			No<"cidr">,
+			No<"macaddr">,
+			No<"macaddr8">,
+			No<"bit">,
+			No<"varbit">,
+			No<"oid">,
+			No<"regclass">,
+			No<"regtype">,
+			No<"regproc">,
+			No<"path">,
+			No<"polygon">,
+			No<"circle">,
+			No<"tsvector">,
+			No<"tsquery">,
+			No<"int4range">,
+			No<"int8range">,
+			No<"numrange">,
+			No<"tsrange">,
+			No<"tstzrange">,
+			No<"daterange">,
+		]
+	>().toEqualTypeOf<
+		[
+			`cannot subscript type boolean because it does not support subscripting`,
+			`cannot subscript type smallint because it does not support subscripting`,
+			`cannot subscript type integer because it does not support subscripting`,
+			`cannot subscript type bigint because it does not support subscripting`,
+			`cannot subscript type real because it does not support subscripting`,
+			`cannot subscript type double precision because it does not support subscripting`,
+			`cannot subscript type numeric because it does not support subscripting`,
+			`cannot subscript type money because it does not support subscripting`,
+			`cannot subscript type text because it does not support subscripting`,
+			`cannot subscript type character varying because it does not support subscripting`,
+			`cannot subscript type character because it does not support subscripting`,
+			`cannot subscript type "char" because it does not support subscripting`,
+			`cannot subscript type bytea because it does not support subscripting`,
+			`cannot subscript type date because it does not support subscripting`,
+			`cannot subscript type time without time zone because it does not support subscripting`,
+			`cannot subscript type time with time zone because it does not support subscripting`,
+			`cannot subscript type timestamp without time zone because it does not support subscripting`,
+			`cannot subscript type timestamp with time zone because it does not support subscripting`,
+			`cannot subscript type interval because it does not support subscripting`,
+			`cannot subscript type uuid because it does not support subscripting`,
+			`cannot subscript type json because it does not support subscripting`,
+			`cannot subscript type xml because it does not support subscripting`,
+			`cannot subscript type inet because it does not support subscripting`,
+			`cannot subscript type cidr because it does not support subscripting`,
+			`cannot subscript type macaddr because it does not support subscripting`,
+			`cannot subscript type macaddr8 because it does not support subscripting`,
+			`cannot subscript type bit because it does not support subscripting`,
+			`cannot subscript type bit varying because it does not support subscripting`,
+			`cannot subscript type oid because it does not support subscripting`,
+			`cannot subscript type regclass because it does not support subscripting`,
+			`cannot subscript type regtype because it does not support subscripting`,
+			`cannot subscript type regproc because it does not support subscripting`,
+			`cannot subscript type path because it does not support subscripting`,
+			`cannot subscript type polygon because it does not support subscripting`,
+			`cannot subscript type circle because it does not support subscripting`,
+			`cannot subscript type tsvector because it does not support subscripting`,
+			`cannot subscript type tsquery because it does not support subscripting`,
+			`cannot subscript type int4range because it does not support subscripting`,
+			`cannot subscript type int8range because it does not support subscripting`,
+			`cannot subscript type numrange because it does not support subscripting`,
+			`cannot subscript type tsrange because it does not support subscripting`,
+			`cannot subscript type tstzrange because it does not support subscripting`,
+			`cannot subscript type daterange because it does not support subscripting`,
+		]
+	>();
+});
+
+test("assignment target syntax: subscripts, slices and fields (Postgres's errors and positions)", () => {
+	type E<Q extends string> =
+		V<Q> extends SqlError<infer M extends string, infer At> ? [M, At] : "ok";
+	expectTypeOf<
+		[
+			E<"UPDATE items SET tags[1 = 'a'">,
+			E<"UPDATE items SET tags[1:2 = '{}'">,
+			E<"UPDATE items SET tags[+] = 'a'">,
+			E<"UPDATE items SET tags[1:+] = '{}'">,
+			E<"UPDATE items SET name. = 'a'">,
+			E<"UPDATE items SET name.* = 'a'">,
+			E<"INSERT INTO items (tags[1], name.*) VALUES ('a', 'b')">,
+		]
+	>().toEqualTypeOf<
+		[
+			['syntax error: expected "]" at or near end of input', 8],
+			['syntax error: expected "]" at or near end of input', 10],
+			["syntax error at or near ]", 6],
+			["syntax error at or near ]", 8],
+			["syntax error: expected field name at or near =", 5],
+			['row expansion via "*" is not supported here', 3],
+			['row expansion via "*" is not supported here', 9],
+		]
+	>();
+	expectTypeOf<
+		[
+			E<"UPDATE items SET tags[1:] = '{}'">,
+			E<"UPDATE items SET tags[:2] = '{}'">,
+			E<"UPDATE items SET tags[:] = '{}'">,
+			E<"UPDATE items * SET name = 'a'">,
+			E<"DELETE FROM items * WHERE id = 1">,
+		]
+	>().toEqualTypeOf<["ok", "ok", "ok", "ok", "ok"]>();
+});
+
 test("assignment target errors", () => {
+	// SET (a, b) = …: indirection checked; a subquery's width is not checked after a star (Postgres: number of columns does not match number of values)
+	expectTypeOf<
+		V<"UPDATE items SET (name[1], tags) = ('a', '{}')">
+	>().toEqualTypeOf<
+		SqlError<
+			"cannot subscript type text because it does not support subscripting",
+			0
+		>
+	>();
+	expectTypeOf<
+		V<"UPDATE items SET (name, tags) = (SELECT * FROM items)">
+	>().toEqualTypeOf<"UPDATE items SET (name, tags) = (SELECT * FROM items)">();
+	// the source's width is unknown after a star
+	expectTypeOf<
+		V<"INSERT INTO items SELECT * FROM items">
+	>().toEqualTypeOf<"INSERT INTO items SELECT * FROM items">();
+	// every VALUES row is checked
+	expectTypeOf<
+		V<"INSERT INTO items (name, tags, data) VALUES ('a', '{}', '{}'), (NULL, '{}', '{}')">
+	>().toEqualTypeOf<
+		SqlError<
+			'null value in column "name" of relation "items" violates not-null constraint',
+			4
+		>
+	>();
+	// a field after a subscript; the second of two targets; a plain column next to one with indirection
+	expectTypeOf<V<"UPDATE items SET name[1].f = 'x'">>().toEqualTypeOf<
+		SqlError<
+			"cannot subscript type text because it does not support subscripting",
+			0
+		>
+	>();
+	expectTypeOf<
+		V<"INSERT INTO items (tags[1], name[1]) VALUES ('a', 'b')">
+	>().toEqualTypeOf<
+		SqlError<
+			"cannot subscript type text because it does not support subscripting",
+			0
+		>
+	>();
+	expectTypeOf<
+		V<"INSERT INTO items (name, tags[1]) VALUES (NULL, 'x')">
+	>().toEqualTypeOf<
+		SqlError<
+			'null value in column "name" of relation "items" violates not-null constraint',
+			4
+		>
+	>();
+	// a subscript is typed against the input columns
+	expectTypeOf<V<"UPDATE items SET tags[nope] = 'x'">>().toEqualTypeOf<
+		SqlError<
+			'column "nope" does not exist. Perhaps you meant the column "name"?',
+			5
+		>
+	>();
+	expectTypeOf<
+		V<"INSERT INTO items (name, tags[nope]) VALUES ('a', 'x')">
+	>().toEqualTypeOf<
+		SqlError<
+			'column "nope" does not exist. Perhaps you meant the column "name"?',
+			8
+		>
+	>();
 	expectTypeOf<V<"UPDATE items SET name[1] = 'x'">>().toEqualTypeOf<
 		SqlError<
 			"cannot subscript type text because it does not support subscripting",
@@ -92,6 +293,34 @@ test("parameters of indirected targets take the element / field type", () => {
 	expectTypeOf<
 		Params<"INSERT INTO items (name, tags[1], data) VALUES ($1, $2, $3)">
 	>().toEqualTypeOf<[string, string | null, unknown]>();
+	// SET (…) = ROW: by position; a subquery's parameters are not typed by the targets
+	expectTypeOf<
+		Params<"UPDATE items SET (tags[1], name) = ($1, $2)">
+	>().toEqualTypeOf<[string | null, string]>();
+	expectTypeOf<
+		Params<"UPDATE items SET (name, data) = (SELECT $1, $2)">
+	>().toEqualTypeOf<[unknown, unknown]>();
+	// in RETURNING a bare column is the target's (not old's or new's)
+	expectTypeOf<
+		[
+			Params<"UPDATE items SET name = 'x' RETURNING id = $1 AS x">,
+			Params<"DELETE FROM items RETURNING id = $1 AS x">,
+			Params<"INSERT INTO items (name, tags, data) VALUES ('a', '{}', '{}') RETURNING id = $1 AS x">,
+		]
+	>().toEqualTypeOf<[[number | null], [number | null], [number | null]]>();
+	// every VALUES row; a SELECT's bare targets; a set operation's are not typed by the targets
+	expectTypeOf<
+		Params<"INSERT INTO items (name, tags[1], data) VALUES ($1, $2, '{}'), ($3, $4, '{}')">
+	>().toEqualTypeOf<[string, string | null, string, string | null]>();
+	expectTypeOf<
+		Params<"INSERT INTO items (name, tags[1], data) SELECT $1, $2, '{}'">
+	>().toEqualTypeOf<[string, string | null]>();
+	expectTypeOf<
+		Params<"INSERT INTO items (name, tags[1], data) SELECT $1, upper($2), '{}'">
+	>().toEqualTypeOf<[string, string | null]>();
+	expectTypeOf<
+		Params<"INSERT INTO items (name, tags[1], data) SELECT $1, $2, '{}' UNION SELECT 'a', 'b', '{}'">
+	>().toEqualTypeOf<[unknown, unknown]>();
 });
 
 test("WHERE CURRENT OF", () => {
@@ -117,11 +346,12 @@ test("RETURNING old / new (PostgreSQL 18)", () => {
 	}>();
 	// UPDATE: both
 	expectTypeOf<
-		Row<"UPDATE logs SET msg = 'x' RETURNING old.msg AS before, new.msg AS after, old.item_id">
+		Row<"UPDATE logs SET msg = 'x' RETURNING old.msg AS before, new.msg AS after, old.item_id, new.item_id AS ni">
 	>().toEqualTypeOf<{
 		before: string | null;
 		after: string | null;
 		item_id: number;
+		ni: number;
 	}>();
 	// DELETE: no new row
 	expectTypeOf<
@@ -145,6 +375,11 @@ test("RETURNING old / new (PostgreSQL 18)", () => {
 test("RETURNING old / new: Postgres's errors and masking", () => {
 	expectTypeOf<
 		V<"INSERT INTO logs (item_id) VALUES (1) RETURNING WITH (new AS logs) *">
+	>().toEqualTypeOf<
+		SqlError<'table name "logs" specified more than once', 2>
+	>();
+	expectTypeOf<
+		V<"INSERT INTO logs (item_id) VALUES (1) RETURNING WITH (old AS logs) *">
 	>().toEqualTypeOf<
 		SqlError<'table name "logs" specified more than once', 2>
 	>();
@@ -196,5 +431,23 @@ test("SELECT INTO creates a table", () => {
 	>();
 	expectTypeOf<V<"INSERT INTO logs (item_id) SELECT 1 INTO f">>().toEqualTypeOf<
 		SqlError<"SELECT ... INTO is not allowed here", 8>
+	>();
+	// LOCAL / GLOBAL TEMP[ORARY]; LOCAL alone is not a persistence
+	type DB3 = ApplyDdl<
+		DB,
+		"SELECT 1 AS a INTO LOCAL TEMP t1; SELECT 1 AS b INTO GLOBAL TEMPORARY TABLE t2"
+	>;
+	expectTypeOf<
+		RowOf<DB3, DefaultTypeMap, "SELECT * FROM t1, t2">
+	>().toEqualTypeOf<{
+		a: number | null;
+		b: number | null;
+	}>();
+	expectTypeOf<V<"SELECT 1 AS a INTO LOCAL x">>().toEqualTypeOf<
+		SqlError<"syntax error at or near x", 6>
+	>();
+	// a name is required
+	expectTypeOf<V<"SELECT 1 INTO TEMP TABLE">>().toEqualTypeOf<
+		SqlError<"syntax error at or near end of input", 5>
 	>();
 });

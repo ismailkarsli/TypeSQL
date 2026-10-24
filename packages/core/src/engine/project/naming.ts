@@ -23,6 +23,7 @@ import type { ProjectSelect } from "./select.js";
  *   e::T / CAST(e AS T) → name of e if strong, else T's canonical name with any array
  *     suffix stripped, weak (`1::int4::int8` → int8, `now()::date::text` → now)
  *   typed literal `T 'x'` → T, weak (it is a cast of a constant: `interval '1 day'::text` → text)
+ *     (not a bit string: `B'1'` → ?column?)
  *   CASE → the ELSE branch's name if strong (`CASE ... ELSE id END` → id), else case, weak
  *     (`(CASE WHEN x THEN 1 END)::text` → text)
  *   literals, params, operators (incl. -1, NOT x, x IS NULL, x IN (...)) → ?column?
@@ -55,7 +56,9 @@ type Fig<E extends Expr, C extends Ctx> = E extends { readonly t: "col" }
 					: Weak<StripArray<E["to"]>>
 				: never
 			: E extends { readonly t: "typed" }
-				? Weak<E["type"]>
+				? E extends { readonly bits: true }
+					? null
+					: Weak<E["type"]>
 				: E extends { readonly t: "case" }
 					? E["else"] extends Expr
 						? Fig<E["else"], C> extends infer N

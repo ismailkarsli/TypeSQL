@@ -27,7 +27,7 @@ import type {
  */
 export type ParseTypeName<T extends Toks, I extends number> =
 	ParseBaseType<T, I> extends infer R
-		? R extends Ok<infer Base extends string, infer J extends number>
+		? R extends Ok<infer Base extends string, infer J>
 			? ParseArraySuffix<T, SkipModifier<T, J>, NormalizeTypeName<Base>>
 			: R
 		: never;
@@ -70,7 +70,7 @@ type ParseBaseType<T extends Toks, I extends number> =
 /** `float` is float8; `float(p)` is float4 for p ≤ 24 and float8 for 25 ≤ p ≤ 53 (Postgres). The modifier is consumed here. */
 type FloatPrecision<T extends Toks, I extends number> =
 	T[I] extends OpTok<"(">
-		? T[Nx<I>] extends NumTok<infer P extends string>
+		? T[Nx<I>] extends NumTok<infer P>
 			? T[Nx2<I>] extends OpTok<")">
 				? Ok<SmallFloat<P> extends true ? "float4" : "float8", Nx3<I>>
 				: Expected<'")"', T, Nx2<I>>
@@ -125,10 +125,7 @@ type ReservedTypeWord =
 type QualifiedTail<T extends Toks, First extends string, I extends number> =
 	EatOp<T, I, "."> extends never
 		? Ok<First, I>
-		: Ident<T, EatOp<T, I, ".">> extends [
-					infer N extends string,
-					infer J extends number,
-				]
+		: Ident<T, EatOp<T, I, ".">> extends [infer N, infer J extends number]
 			? Ok<N, J>
 			: Expected<"type name", T, EatOp<T, I, ".">>;
 
@@ -173,7 +170,7 @@ type SkipModifier<T extends Toks, I extends number> =
 			: SkipModifierList<T, I>
 		: I;
 type SkipModifierList<T extends Toks, I extends number> =
-	ParseExprList<T, Nx<I>, []> extends Ok<unknown, infer J extends number>
+	ParseExprList<T, Nx<I>, []> extends Ok<unknown, infer J>
 		? T[J] extends OpTok<")">
 			? Nx<J>
 			: I

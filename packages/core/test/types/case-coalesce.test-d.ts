@@ -1,5 +1,6 @@
 import { expectTypeOf, test } from "vitest";
-import type { Row } from "./_schema.js";
+import type { SqlError } from "../../src/index.js";
+import type { Row, V } from "./_schema.js";
 
 // CASE / COALESCE / NULLIF / GREATEST / LEAST, verified against PostgreSQL 18.
 // Common-type resolution follows the implicit cast chain int2 → int4 → int8 → numeric → float4 → float8,
@@ -113,4 +114,26 @@ test("column names", () => {
 		greatest: number;
 		least: number;
 	}>();
+});
+
+test("CASE: an error in any part is the result", () => {
+	type E<Q extends string> =
+		V<Q> extends SqlError<infer M extends string, unknown> ? M : "ok";
+	expectTypeOf<
+		[
+			E<"SELECT CASE nope WHEN 1 THEN 1 END">,
+			E<"SELECT CASE WHEN nope THEN 1 END">,
+			E<"SELECT CASE WHEN true THEN nope END">,
+			E<"SELECT CASE WHEN true THEN 1 ELSE nope END">,
+			E<"SELECT CASE WHEN true THEN 1 WHEN false THEN nope END">,
+		]
+	>().toEqualTypeOf<
+		[
+			'column "nope" does not exist',
+			'column "nope" does not exist',
+			'column "nope" does not exist',
+			'column "nope" does not exist',
+			'column "nope" does not exist',
+		]
+	>();
 });

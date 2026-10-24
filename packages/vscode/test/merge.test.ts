@@ -107,3 +107,12 @@ test("an item whose edit starts on the literal's line at another character is ke
 	const r = merge([before, echo, after], { ...ours, items: [] });
 	expect(r).toEqual([before, after]);
 });
+
+test("an item whose edit starts at the literal's character on another line is kept", () => {
+	const below = {
+		label: "y",
+		kind: 6 as const,
+		textEdit: { range: { start: pos(2, 5), end: pos(2, 6) }, newText: "y" },
+	};
+	expect(merge([echo, below], { ...ours, items: [] })).toEqual([below]);
+});

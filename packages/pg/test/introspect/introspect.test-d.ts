@@ -153,5 +153,5 @@ test("other schemas nest; views and materialized views are read-only", () => {
 	>();
 	expectTypeOf<
 		Validate<DB, "UPDATE auth.session_counts SET n = 0">
-	>().toEqualTypeOf<SqlError<'cannot update view "auth.session_counts"', 0>>();
+	>().toEqualTypeOf<SqlError<'cannot update view "auth.session_counts"', 1>>();
 });

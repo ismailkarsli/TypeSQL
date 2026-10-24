@@ -71,6 +71,64 @@ test("syntax errors: trailing garbage, missing pieces", () => {
 	expectTypeOf<V<"SELECT id FROM users ORDER id">>().toEqualTypeOf<
 		SqlError<"syntax error at or near order", 4>
 	>();
+	// one statement, with an optional `;`
+	expectTypeOf<V<"SELECT 1 AS a;">>().toEqualTypeOf<"SELECT 1 AS a;">();
+	expectTypeOf<V<"SELECT 1 AS a; SELECT 2">>().toEqualTypeOf<
+		SqlError<"syntax error at or near select: only one statement is allowed", 5>
+	>();
+	expectTypeOf<V<"1">>().toEqualTypeOf<
+		SqlError<"syntax error: expected a SQL statement at or near 1", 0>
+	>();
+	// after WITH: SELECT, VALUES, TABLE, ( …), data statements
+	expectTypeOf<
+		V<"WITH x AS (SELECT 1 AS a) VALUES (1)">
+	>().toEqualTypeOf<"WITH x AS (SELECT 1 AS a) VALUES (1)">();
+	expectTypeOf<
+		V<"WITH x AS (SELECT 1 AS a) TABLE x">
+	>().toEqualTypeOf<"WITH x AS (SELECT 1 AS a) TABLE x">();
+	expectTypeOf<
+		V<"WITH x AS (SELECT 1 AS a) (SELECT * FROM x)">
+	>().toEqualTypeOf<"WITH x AS (SELECT 1 AS a) (SELECT * FROM x)">();
+	expectTypeOf<V<"WITH x AS (SELECT 1 AS a) foo">>().toEqualTypeOf<
+		SqlError<
+			"syntax error: expected SELECT, INSERT, UPDATE, DELETE or MERGE after WITH at or near foo",
+			9
+		>
+	>();
+	expectTypeOf<V<"WITH x AS (SELECT 1 AS a) 1">>().toEqualTypeOf<
+		SqlError<
+			"syntax error: expected SELECT, INSERT, UPDATE, DELETE or MERGE after WITH at or near 1",
+			9
+		>
+	>();
+	expectTypeOf<V<"(SELECT 1 UNION SELECT 2">>().toEqualTypeOf<
+		SqlError<'syntax error: expected ")" at or near end of input', 6>
+	>();
+	expectTypeOf<V<"SELECT 1 GROUP BY">>().toEqualTypeOf<
+		SqlError<"syntax error at end of input", 4>
+	>();
+	expectTypeOf<V<"SELECT DISTINCT ON 1">>().toEqualTypeOf<
+		SqlError<'syntax error: expected "(" at or near 1', 3>
+	>();
+	expectTypeOf<V<"SELECT 1 WINDOW w AS (">>().toEqualTypeOf<
+		SqlError<'syntax error: expected ")" at or near end of input', 6>
+	>();
+	expectTypeOf<V<"TABLE 1">>().toEqualTypeOf<
+		SqlError<"syntax error: expected table name at or near 1", 1>
+	>();
+	expectTypeOf<V<"VALUES 1">>().toEqualTypeOf<
+		SqlError<'syntax error: expected "(" at or near 1', 1>
+	>();
+	expectTypeOf<V<"VALUES (1">>().toEqualTypeOf<
+		SqlError<'syntax error: expected ")" at or near end of input', 3>
+	>();
+	// AS takes a label: Postgres fails at what follows it
+	expectTypeOf<V<"SELECT id AS 5 FROM users">>().toEqualTypeOf<
+		SqlError<"syntax error at or near 5", 3>
+	>();
+	expectTypeOf<V<"SELECT id AS">>().toEqualTypeOf<
+		SqlError<"syntax error at or near end of input", 3>
+	>();
 	expectTypeOf<V<"SELECT id, FROM users">>().toEqualTypeOf<
 		SqlError<"syntax error at or near from", 3>
 	>();

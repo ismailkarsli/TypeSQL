@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Runs the type-level parser (`ParseProgram<Lex<sql>>`) over every statement of PostgreSQL's
 // regression tests in vendor/postgres and compares the outcome with what Postgres did, read
-// from the tests' expected output. Disagreements known today are listed in baseline.json; the
+// from the tests' expected output: whether the statement parses and, for a syntax error, the
+// token it is at. Disagreements known today are listed in baseline.json; the
 // run fails on a new one and on a listed one that went away.
 //
 //   node run.ts [--update] [test …]
@@ -205,21 +206,42 @@ const seconds = (performance.now() - started) / 1000;
  *   error, an unsupported feature or a lexical error), both reject it: agreement.
  * - `accepts`: Postgres reported a syntax error; we parse the statement. A statement the parser
  *   skips without validating (`SKIPPED`) is not counted.
+ * - `position`: both report a syntax error, at different tokens (Postgres's `at or near "…"` /
+ *   `at end of input` against ours).
  * - `crash`: the compiler gave up (e.g. TS2589, instantiation too deep), whatever Postgres did.
  */
-function kindOf(e: Checked): "crash" | "accepts" | "rejects" | null {
+function kindOf(
+	e: Checked,
+): "crash" | "accepts" | "rejects" | "position" | null {
 	if (e.crash) return "crash";
 	if (e.stmt.pg === "unknown") return null;
-	if (e.stmt.pg === "syntax-error")
-		return e.ours === undefined ? "accepts" : null;
+	if (e.stmt.pg === "syntax-error") {
+		if (e.ours === undefined) return "accepts";
+		if (e.ours === SKIPPED) return null;
+		const pg = nearOf(e.stmt.pgError!, true);
+		return pg !== null && nearOf(e.ours, false) !== pg ? "position" : null;
+	}
 	if (e.ours === undefined || e.ours === SKIPPED) return null;
 	if (e.stmt.pg === "error" && isSemantic(e.ours)) return null;
 	return "rejects";
 }
+/**
+ * The token a syntax error points at, lowercased, or `""` for the end of input; `null` when the
+ * message names no token. Postgres and our lexer quote it (`at or near "ANY"`); our parser does
+ * not and may add a note after it (`at or near create: only one statement is allowed`).
+ */
+function nearOf(message: string, postgres: boolean): string | null {
+	if (/ at end of input( at character \d+)?$/.test(message)) return "";
+	const parser = postgres
+		? null
+		: /^syntax error(?:: .*?)? at or near (.*?)(?:: [^:]*)?$/.exec(message);
+	if (parser)
+		return parser[1] === "end of input" ? "" : parser[1]!.toLowerCase();
+	const quoted = / at or near "(.*)"( at character \d+)?$/.exec(message);
+	return quoted ? quoted[1]!.toLowerCase() : null;
+}
 const isSemantic = (message: string): boolean =>
-	!/^syntax error|^unterminated|^unexpected character|not supported/.test(
-		message,
-	);
+	!/^syntax error|^unterminated|not supported/.test(message);
 
 const current: Entries = {};
 const tally = {
@@ -231,6 +253,7 @@ const tally = {
 	skipped: 0,
 	rejects: 0,
 	accepts: 0,
+	position: 0,
 	crash: 0,
 };
 for (const e of checked) {
@@ -261,9 +284,9 @@ const { added, fixed } = compareBaseline(
 const summary = [
 	`PostgreSQL ${version} regression tests (${commit.slice(0, 10)}), ${tests.length} files, tsc ${seconds.toFixed(1)} s`,
 	"",
-	`| Statements | Agree | Parser rejects | Parser accepts | Compiler crash | Postgres outcome unknown | Not checked: psql variables | Not checked: standard_conforming_strings off |`,
-	`|---|---|---|---|---|---|---|---|`,
-	`| ${tally.statements} | ${tally.agree} | ${tally.rejects} | ${tally.accepts} | ${tally.crash} | ${tally.pgUnknown} | ${tally.psqlVariables} | ${tally.nonstandardStrings} |`,
+	`| Statements | Agree | Parser rejects | Parser accepts | Syntax error elsewhere | Compiler crash | Postgres outcome unknown | Not checked: psql variables | Not checked: standard_conforming_strings off |`,
+	`|---|---|---|---|---|---|---|---|---|`,
+	`| ${tally.statements} | ${tally.agree} | ${tally.rejects} | ${tally.accepts} | ${tally.position} | ${tally.crash} | ${tally.pgUnknown} | ${tally.psqlVariables} | ${tally.nonstandardStrings} |`,
 	"",
 	`${tally.skipped} statements are utility statements the parser skips to the next \`;\` without validating them (counted as agreeing unless Postgres reports a syntax error).`,
 ].join("\n");

@@ -289,7 +289,7 @@ type BinRhs<
 		? T[Nx<I>] extends WordTok<infer Q extends "any" | "some" | "all">
 			? T[Nx2<I>] extends OpTok<"(">
 				? ParseQuantified<T, L, O, Q extends "all" ? "all" : "any", Nx3<I>, Min>
-				: SyntaxErrorAt<T, Nx<I>>
+				: SyntaxErrorAt<T, Nx2<I>>
 			: ParseExpr<T, Nx<I>, NextPrec[Bp]> extends infer X
 				? X extends Ok<infer Rhs, infer J extends number>
 					? ParseInfix<T, { t: "bin"; op: O; l: L; r: Rhs }, J, Min>
@@ -719,7 +719,9 @@ type ParsePrefix<T extends Toks, I extends number> =
 	T[I] extends NumTok<infer V>
 		? Ok<{ t: "num"; v: V }, Nx<I>>
 		: T[I] extends StrTok<infer V>
-			? Ok<{ t: "str"; v: V }, Nx<I>>
+			? T[I] extends { readonly bits: true }
+				? Ok<{ t: "typed"; type: "bit"; v: V; bits: true }, Nx<I>>
+				: Ok<{ t: "str"; v: V }, Nx<I>>
 			: T[I] extends ParamTok<infer N>
 				? Ok<{ t: "param"; n: N }, Nx<I>>
 				: T[I] extends OpTok<infer O>
@@ -786,11 +788,7 @@ type ParsePrefix<T extends Toks, I extends number> =
 																									EatOp<T, Nx<I>, "(">
 																								>
 																						: W extends SpecialValueFunction
-																							? T[Nx<I>] extends OpTok<"(">
-																								? T[Nx<Nx<I>>] extends NumTok
-																									? SpecialValue<T, W, I>
-																									: ParseNameExpr<T, I>
-																								: SpecialValue<T, W, I>
+																							? ParseSpecialValue<T, W, I>
 																							: W extends "operator"
 																								? T[Nx<I>] extends OpTok<"(">
 																									? ParseUnary<
@@ -911,7 +909,32 @@ type SpecialValueFunction =
 	| "user"
 	| "system_user";
 
-/** `current_date`, `current_time(3)`, ...: a zero-argument call named after the keyword. `current_schema()` with parens is a regular call. */
+/** The special value functions that take a precision: `current_time(3)`. */
+type PrecisionValueFunction =
+	| "current_timestamp"
+	| "current_time"
+	| "localtime"
+	| "localtimestamp";
+
+/**
+ * A special value function at `I`. `current_schema()` with parens is a regular call; the
+ * others take no parentheses, or only a precision, and Postgres fails at the first token
+ * that does not fit.
+ */
+type ParseSpecialValue<T extends Toks, W extends string, I extends number> =
+	T[Nx<I>] extends OpTok<"(">
+		? W extends "current_schema"
+			? ParseNameExpr<T, I>
+			: W extends PrecisionValueFunction
+				? T[Nx2<I>] extends NumTok
+					? T[Nx3<I>] extends OpTok<")">
+						? SpecialValue<T, W, I>
+						: SyntaxErrorAt<T, Nx3<I>>
+					: SyntaxErrorAt<T, Nx2<I>>
+				: SyntaxErrorAt<T, Nx<I>>
+		: SpecialValue<T, W, I>;
+
+/** `current_date`, `current_time(3)`, ...: a zero-argument call named after the keyword. */
 type SpecialValue<T extends Toks, W extends string, I extends number> = Ok<
 	{
 		t: "call";
@@ -1006,11 +1029,14 @@ type ParseNameExpr<T extends Toks, I extends number> =
 					? Ok<{ t: "star"; tbl: LastOf<Parts> }, Nx<Nx<J>>>
 					: SyntaxErrorAt<T, Nx<J>>
 				: T[J] extends StrTok<infer V>
-					? Parts extends readonly [infer Ty extends string]
-						? Ok<{ t: "typed"; type: NormalizeTypeName<Ty>; v: V }, Nx<J>>
+					? Parts["length"] extends 1 | 2
+						? Ok<
+								{ t: "typed"; type: NormalizeTypeName<LastOf<Parts>>; v: V },
+								Nx<J>
+							>
 						: SyntaxErrorAt<T, J>
 					: Ok<ColRefOf<Parts>, J>
-		: SyntaxErrorAt<T, I>;
+		: SyntaxErrorAt<T, I>; // type-mutate: equivalent – every caller passes an identifier or a non-reserved word, which QualName accepts
 
 type LastOf<Parts extends readonly string[]> = Parts extends readonly [
 	...string[],
@@ -1106,7 +1132,9 @@ type ParseArg<T extends Toks, I extends number, Names extends string> =
 						? Ok<{ t: "named"; name: N; e: E }, J>
 						: X
 					: never
-			: SyntaxErrorAt<T, I>
+			: T[I] extends WordTok<ReservedKeyword>
+				? SyntaxErrorAt<T, I>
+				: SyntaxErrorAt<T, Nx<I>>
 		: [Names] extends [never]
 			? ParseExpr<T, I, 0>
 			: ParseExpr<T, I, 0> extends infer X

@@ -5,6 +5,44 @@ import type { DB, Interval, Params, Row, V } from "./_schema.js";
 // Special expression syntax of PostgreSQL 18 (gram.y), with the types and output column names
 // (`FigureColnameInternal`) Postgres gives it.
 
+test("a cast to SETOF T is a cast to T", () => {
+	expectTypeOf<
+		Row<"SELECT 1::setof int8 AS a, CAST('x' AS setof text) AS b">
+	>().toEqualTypeOf<{ a: string; b: string }>();
+});
+
+test("typed literals with a qualified type name", () => {
+	// the schema is dropped, as in casts
+	expectTypeOf<Row<"SELECT pg_catalog.int4 '1' AS a">>().toEqualTypeOf<{
+		a: number;
+	}>();
+	// Postgres: cross-database references are not implemented: a.b.c
+	expectTypeOf<V<"SELECT a.b.c 'x'">>().toEqualTypeOf<
+		SqlError<"syntax error at or near 'x'", 6>
+	>();
+	expectTypeOf<V<"SELECT things.(1) FROM things">>().toEqualTypeOf<
+		SqlError<"syntax error at or near (", 3>
+	>();
+});
+
+test("special value functions take no arguments, or only a precision", () => {
+	expectTypeOf<V<"SELECT current_user(1)">>().toEqualTypeOf<
+		SqlError<"syntax error at or near (", 2>
+	>();
+	expectTypeOf<V<"SELECT current_date()">>().toEqualTypeOf<
+		SqlError<"syntax error at or near (", 2>
+	>();
+	expectTypeOf<V<"SELECT localtime('a')">>().toEqualTypeOf<
+		SqlError<"syntax error at or near 'a'", 3>
+	>();
+	expectTypeOf<V<"SELECT current_time()">>().toEqualTypeOf<
+		SqlError<"syntax error at or near )", 3>
+	>();
+	expectTypeOf<V<"SELECT current_timestamp(1, 2)">>().toEqualTypeOf<
+		SqlError<"syntax error at or near ,", 4>
+	>();
+});
+
 test("typed literals with keyword type names", () => {
 	expectTypeOf<
 		Row<"SELECT timestamp with time zone '2001-12-27 04:05:06+08' AS a, timestamp without time zone 'today' AS b, timestamp(2) without time zone 'now' AS c, time with time zone '04:05+08' AS d, time(3) without time zone '04:05' AS e">
@@ -65,6 +103,14 @@ test("named arguments match any parameter; VARIADIC passes an array", () => {
 	expectTypeOf<V<"SELECT make_interval(days => 1, days := 2)">>().toEqualTypeOf<
 		SqlError<'argument name "days" used more than once', 7>
 	>();
+	// an argument name is a function or type name; Postgres fails at the `=>` after anything else,
+	// and at a reserved word itself
+	expectTypeOf<V<"SELECT concat(1 => 1)">>().toEqualTypeOf<
+		SqlError<"syntax error at or near =>", 4>
+	>();
+	expectTypeOf<V<"SELECT concat(select => 1)">>().toEqualTypeOf<
+		SqlError<"syntax error at or near select", 3>
+	>();
 
 	expectTypeOf<
 		Row<"SELECT concat_ws(',', VARIADIC nums) AS a, format('%s, %s', VARIADIC words) AS b, concat(VARIADIC n_nums) AS c, concat_ws(',', VARIADIC n_nums) AS d, format('x', VARIADIC n_nums) AS e FROM things">
@@ -103,6 +149,192 @@ test("quantified predicates with any operator", () => {
 	expectTypeOf<V<"SELECT 33 = ANY (44)">>().toEqualTypeOf<
 		SqlError<"op ANY/ALL (array) requires array on right side", 0>
 	>();
+	expectTypeOf<V<"SELECT 1 + ANY 2">>().toEqualTypeOf<
+		SqlError<"syntax error at or near 2", 4>
+	>();
+	expectTypeOf<V<"SELECT 1 = ANY 2">>().toEqualTypeOf<
+		SqlError<"syntax error at or near 2", 4>
+	>();
+	expectTypeOf<V<"SELECT 'a' LIKE ANY 'a'">>().toEqualTypeOf<
+		SqlError<"syntax error at or near 'a'", 4>
+	>();
+	expectTypeOf<V<"SELECT 'a' SIMILAR TO ANY (ARRAY['a'])">>().toEqualTypeOf<
+		SqlError<"syntax error at or near any", 4>
+	>();
+});
+
+test("ANY / ALL of a scalar is an error, for every scalar type", () => {
+	expectTypeOf<V<"SELECT 1 = ANY (small) FROM things">>().toEqualTypeOf<
+		SqlError<"op ANY/ALL (array) requires array on right side", 0>
+	>();
+	expectTypeOf<V<"SELECT 1 = ANY (id) FROM things">>().toEqualTypeOf<
+		SqlError<"op ANY/ALL (array) requires array on right side", 0>
+	>();
+	expectTypeOf<V<"SELECT 1 = ANY (big) FROM things">>().toEqualTypeOf<
+		SqlError<"op ANY/ALL (array) requires array on right side", 0>
+	>();
+	expectTypeOf<V<"SELECT 1 = ANY (price) FROM things">>().toEqualTypeOf<
+		SqlError<"op ANY/ALL (array) requires array on right side", 0>
+	>();
+	expectTypeOf<V<"SELECT 1 = ANY (score) FROM things">>().toEqualTypeOf<
+		SqlError<"op ANY/ALL (array) requires array on right side", 0>
+	>();
+	expectTypeOf<V<"SELECT 1 = ANY (ratio) FROM things">>().toEqualTypeOf<
+		SqlError<"op ANY/ALL (array) requires array on right side", 0>
+	>();
+	expectTypeOf<V<"SELECT 1 = ANY (flag) FROM things">>().toEqualTypeOf<
+		SqlError<"op ANY/ALL (array) requires array on right side", 0>
+	>();
+	expectTypeOf<V<"SELECT 1 = ANY (label) FROM things">>().toEqualTypeOf<
+		SqlError<"op ANY/ALL (array) requires array on right side", 0>
+	>();
+	expectTypeOf<V<"SELECT 1 = ANY (vc) FROM things">>().toEqualTypeOf<
+		SqlError<"op ANY/ALL (array) requires array on right side", 0>
+	>();
+	expectTypeOf<
+		V<"SELECT 1 = ANY (('x'::char(1))) FROM things">
+	>().toEqualTypeOf<
+		SqlError<"op ANY/ALL (array) requires array on right side", 0>
+	>();
+	expectTypeOf<V<"SELECT 1 = ANY (day) FROM things">>().toEqualTypeOf<
+		SqlError<"op ANY/ALL (array) requires array on right side", 0>
+	>();
+	expectTypeOf<V<"SELECT 1 = ANY (clock) FROM things">>().toEqualTypeOf<
+		SqlError<"op ANY/ALL (array) requires array on right side", 0>
+	>();
+	expectTypeOf<
+		V<"SELECT 1 = ANY (('1:00'::timetz)) FROM things">
+	>().toEqualTypeOf<
+		SqlError<"op ANY/ALL (array) requires array on right side", 0>
+	>();
+	expectTypeOf<V<"SELECT 1 = ANY (ts) FROM things">>().toEqualTypeOf<
+		SqlError<"op ANY/ALL (array) requires array on right side", 0>
+	>();
+	expectTypeOf<V<"SELECT 1 = ANY (at) FROM things">>().toEqualTypeOf<
+		SqlError<"op ANY/ALL (array) requires array on right side", 0>
+	>();
+	expectTypeOf<V<"SELECT 1 = ANY (dur) FROM things">>().toEqualTypeOf<
+		SqlError<"op ANY/ALL (array) requires array on right side", 0>
+	>();
+	expectTypeOf<V<"SELECT 1 = ANY (uid) FROM things">>().toEqualTypeOf<
+		SqlError<"op ANY/ALL (array) requires array on right side", 0>
+	>();
+	expectTypeOf<V<"SELECT 1 = ANY (bin) FROM things">>().toEqualTypeOf<
+		SqlError<"op ANY/ALL (array) requires array on right side", 0>
+	>();
+	expectTypeOf<V<"SELECT 1 = ANY (doc) FROM things">>().toEqualTypeOf<
+		SqlError<"op ANY/ALL (array) requires array on right side", 0>
+	>();
+	expectTypeOf<V<"SELECT 1 = ANY (data) FROM things">>().toEqualTypeOf<
+		SqlError<"op ANY/ALL (array) requires array on right side", 0>
+	>();
+});
+
+test("ANY / ALL needs an operator that yields boolean", () => {
+	expectTypeOf<V<"SELECT 33 + ANY ('{1,2}'::int4[])">>().toEqualTypeOf<
+		SqlError<"op ANY/ALL (array) requires operator to yield boolean", 0>
+	>();
+	expectTypeOf<V<"SELECT 33 - ANY ('{1,2}'::int4[])">>().toEqualTypeOf<
+		SqlError<"op ANY/ALL (array) requires operator to yield boolean", 0>
+	>();
+	expectTypeOf<V<"SELECT 33 * ANY ('{1,2}'::int4[])">>().toEqualTypeOf<
+		SqlError<"op ANY/ALL (array) requires operator to yield boolean", 0>
+	>();
+	expectTypeOf<V<"SELECT 33 / ANY ('{1,2}'::int4[])">>().toEqualTypeOf<
+		SqlError<"op ANY/ALL (array) requires operator to yield boolean", 0>
+	>();
+	expectTypeOf<V<"SELECT 33 % ANY ('{1,2}'::int4[])">>().toEqualTypeOf<
+		SqlError<"op ANY/ALL (array) requires operator to yield boolean", 0>
+	>();
+	expectTypeOf<V<"SELECT 33 ^ ANY ('{1,2}'::int4[])">>().toEqualTypeOf<
+		SqlError<"op ANY/ALL (array) requires operator to yield boolean", 0>
+	>();
+	expectTypeOf<V<"SELECT 'a' || ANY ('{b}'::text[])">>().toEqualTypeOf<
+		SqlError<"op ANY/ALL (array) requires operator to yield boolean", 0>
+	>();
+});
+
+test("an error inside a construct is the construct's error", () => {
+	expectTypeOf<V<"SELECT nope BETWEEN 1 AND 2 FROM things">>().toEqualTypeOf<
+		SqlError<'column "nope" does not exist', 1>
+	>();
+	expectTypeOf<V<"SELECT 1 BETWEEN 1 AND nope FROM things">>().toEqualTypeOf<
+		SqlError<'column "nope" does not exist', 5>
+	>();
+	expectTypeOf<V<"SELECT 1 BETWEEN nope AND 2 FROM things">>().toEqualTypeOf<
+		SqlError<'column "nope" does not exist', 3>
+	>();
+	expectTypeOf<V<"SELECT nope IN (1) FROM things">>().toEqualTypeOf<
+		SqlError<'column "nope" does not exist', 1>
+	>();
+	expectTypeOf<V<"SELECT 1 IN (1, nope) FROM things">>().toEqualTypeOf<
+		SqlError<'column "nope" does not exist', 6>
+	>();
+	expectTypeOf<V<"SELECT ARRAY[1, nope] FROM things">>().toEqualTypeOf<
+		SqlError<'column "nope" does not exist', 5>
+	>();
+	expectTypeOf<V<"SELECT nums[nope:1] FROM things">>().toEqualTypeOf<
+		SqlError<'column "nope" does not exist', 3>
+	>();
+	expectTypeOf<V<"SELECT nope[1:2] FROM things">>().toEqualTypeOf<
+		SqlError<'column "nope" does not exist', 1>
+	>();
+	expectTypeOf<V<"SELECT substring(nope FROM 1) FROM things">>().toEqualTypeOf<
+		SqlError<'column "nope" does not exist', 3>
+	>();
+	expectTypeOf<
+		V<"SELECT substring(label FROM 1 FOR nope) FROM things">
+	>().toEqualTypeOf<SqlError<'column "nope" does not exist', 7>>();
+	expectTypeOf<
+		V<"SELECT substring(label FROM nope) FROM things">
+	>().toEqualTypeOf<SqlError<'column "nope" does not exist', 5>>();
+	expectTypeOf<V<"SELECT nums[1:(nope)] FROM things">>().toEqualTypeOf<
+		SqlError<'column "nope" does not exist', 6>
+	>();
+	expectTypeOf<V<"SELECT EXISTS (SELECT nope) FROM things">>().toEqualTypeOf<
+		SqlError<'column "nope" does not exist', 4>
+	>();
+	expectTypeOf<V<"SELECT ROW(1, nope) FROM things">>().toEqualTypeOf<
+		SqlError<'column "nope" does not exist', 5>
+	>();
+	expectTypeOf<V<"SELECT make_interval(days => nope)">>().toEqualTypeOf<
+		SqlError<'column "nope" does not exist', 5>
+	>();
+	expectTypeOf<V<"SELECT nope IS NULL FROM things">>().toEqualTypeOf<
+		SqlError<'column "nope" does not exist', 1>
+	>();
+	expectTypeOf<V<"SELECT 1 IS DISTINCT FROM nope FROM things">>().toEqualTypeOf<
+		SqlError<'column "nope" does not exist', 5>
+	>();
+	expectTypeOf<V<"SELECT extract(year FROM nope) FROM things">>().toEqualTypeOf<
+		SqlError<'column "nope" does not exist', 5>
+	>();
+	expectTypeOf<V<"SELECT position('a' IN nope) FROM things">>().toEqualTypeOf<
+		SqlError<'column "nope" does not exist', 5>
+	>();
+	expectTypeOf<V<"SELECT (nope).f FROM things">>().toEqualTypeOf<
+		SqlError<'column "nope" does not exist', 2>
+	>();
+});
+
+test("NULL, unary plus, json ↔ jsonb casts, SUBSTRING forms", () => {
+	expectTypeOf<
+		Row<"SELECT coalesce(NULL, n_text) AS a, +2147483648 AS b, jsonb_build_object('a', 1)::json AS c, substring(bin FROM 1) AS d, substring(B'101' FROM 2) AS e, substring(B'101'::varbit FROM 2) AS f, substring(label FROM 'a.') AS g FROM things">
+	>().toEqualTypeOf<{
+		a: string | null;
+		b: string;
+		c: { a: number };
+		d: Uint8Array;
+		e: string;
+		f: string;
+		g: string | null;
+	}>();
+});
+
+test("SUBSTRING is NULL when any argument is; ARRAY(SELECT array) stays one level", () => {
+	expectTypeOf<
+		Row<"SELECT substring(label FROM n_id) AS a, substring(label FROM 1 FOR n_id) AS b, ARRAY(SELECT words FROM things) AS c FROM things">
+	>().toEqualTypeOf<{ a: string | null; b: string | null; c: string[] }>();
 });
 
 test("COLLATION FOR, OVERLAPS, AT LOCAL, IS NORMALIZED", () => {
@@ -117,6 +349,9 @@ test("COLLATION FOR, OVERLAPS, AT LOCAL, IS NORMALIZED", () => {
 			"wrong number of parameters on left side of OVERLAPS expression",
 			9
 		>
+	>();
+	expectTypeOf<V<"SELECT (1, 2) OVERLAPS 3">>().toEqualTypeOf<
+		SqlError<"syntax error at or near 3", 7>
 	>();
 	expectTypeOf<
 		Row<"SELECT at AT LOCAL AS a, ts AT LOCAL AS b, n_at AT LOCAL, clock AT LOCAL AS c FROM things">

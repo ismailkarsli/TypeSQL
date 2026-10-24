@@ -10,6 +10,7 @@ import type {
 } from "./chars.js";
 import type { Next } from "./next.js";
 import type {
+	BitTok,
 	IdTok,
 	NumTok,
 	OpTok,
@@ -64,7 +65,7 @@ type LexAll<S extends string, Acc extends readonly Tok[]> =
 							infer M extends string,
 							infer T extends readonly Tok[],
 						]
-					? SqlError<M, [...Acc, ...T]["length"]>
+					? SqlError<M, [...Acc, ...T]["length"]> // type-mutate: equivalent tuple-swap – the length is the same either way
 					: never
 		: never;
 
@@ -116,15 +117,23 @@ type LexStep<
 			? R extends `${infer Q extends "'" | "&"}${infer R1}` // one check per word for E'', B'', X'', U&'', U&""
 				? Q extends "'"
 					? C extends "E" | "e"
-						? LexEString<R1, Acc, B>
+						? LexEString<R1, Acc, B, S>
 						: C extends "B" | "b" | "X" | "x"
-							? LexString<TakeString<R1, "">, Acc, B>
-							: LexWord<R, C, Acc, B>
+							? LexBitString<
+									TakeString<R1, "">,
+									Acc,
+									B,
+									C extends "B" | "b" ? "binary" : "hexadecimal",
+									S
+								>
+							: C extends "N" | "n" // N'…' is NCHAR '…', as Postgres's scanner reads it
+								? LexChunk<R, [...Acc, WordTok<"nchar">], B>
+								: LexWord<R, C, Acc, B>
 					: C extends "U" | "u"
 						? R1 extends `'${infer R2}`
-							? LexUString<R2, Acc, B>
+							? LexUString<R2, Acc, B, S>
 							: R1 extends `"${infer R2}`
-								? LexUIdent<R2, Acc, B>
+								? LexUIdent<R2, Acc, B, S>
 								: LexWord<R, C, Acc, B>
 						: LexWord<R, C, Acc, B>
 				: LexWord<R, C, Acc, B>
@@ -152,9 +161,17 @@ type LexStep<
 										? V extends ""
 											? Err<ZeroLength, Acc>
 											: LexChunk<R2, [...Acc, IdTok<V>], B>
-										: Err<"unterminated quoted identifier", Acc>
+										: Err<
+												`unterminated quoted identifier at or near "${S}"`,
+												Acc
+											>
 									: C extends "'"
-										? LexString<TakeString<R, "">, Acc, B>
+										? LexString<
+												TakeString<R, "">,
+												Acc,
+												B,
+												`unterminated quoted string at or near "${S}"`
+											>
 										: C extends "$"
 											? R extends `${infer D extends Digit}${infer R1}`
 												? TakeDigits<R1, D> extends [
@@ -172,11 +189,14 @@ type LexStep<
 													? Tag extends `${IdStart}${string}` | ""
 														? R1 extends `${infer Body}$${Tag}$${infer R2}`
 															? LexChunk<R2, [...Acc, StrTok<Body>], B>
-															: Err<"unterminated dollar-quoted string", Acc>
+															: Err<
+																	`unterminated dollar-quoted string at or near "${S}"`,
+																	Acc
+																>
 														: Err<`syntax error at or near "$"`, Acc>
 													: Err<`syntax error at or near "$"`, Acc>
 											: C extends NonIdAscii
-												? Err<`unexpected character "${C}"`, Acc>
+												? Err<`syntax error at or near "${C}"`, Acc> // `\`, `{`, `}`: no token starts with them
 												: TakeWord<R, C, true> extends [
 															infer V extends string,
 															infer R2 extends string,
@@ -186,31 +206,63 @@ type LexStep<
 													: never
 	: never;
 
-/** A string literal token from `[value, rest]`, or "unterminated quoted string". */
-type LexString<X, Acc extends readonly Tok[], B extends number> = X extends [
-	infer V extends string,
-	infer R2 extends string,
-]
+/** A string literal token from `[value, rest]`, or the error `M` (unterminated). */
+type LexString<
+	X,
+	Acc extends readonly Tok[],
+	B extends number,
+	M extends string,
+> = X extends [infer V extends string, infer R2 extends string]
 	? LexChunk<R2, [...Acc, StrTok<V>], B>
-	: Err<"unterminated quoted string", Acc>;
+	: Err<M, Acc>;
+
+/** `B'…'` / `X'…'`: every character a binary / hexadecimal digit (checked by Postgres's bit input). */
+type LexBitString<
+	X,
+	Acc extends readonly Tok[],
+	B extends number,
+	Radix extends "binary" | "hexadecimal",
+	S extends string,
+> = X extends [infer V extends string, infer R2 extends string]
+	? NotDigit<
+			V,
+			Radix extends "binary" ? "0" | "1" : HexDigit
+		> extends infer D extends string
+		? Err<`"${D}" is not a valid ${Radix} digit`, Acc>
+		: LexChunk<R2, [...Acc, BitTok<V>], B>
+	: Err<
+			`unterminated ${Radix extends "binary" ? "bit" : "hexadecimal"} string literal at or near "${S}"`,
+			Acc
+		>;
+/** The first character of `V` that is not a `D`, or null. */
+type NotDigit<
+	V extends string,
+	D extends string,
+> = V extends `${infer C}${infer R}`
+	? C extends D
+		? NotDigit<R, D>
+		: C
+	: null;
 
 /** `E'...'`: backslash escapes (kept raw), `\u` / `\U` escapes validated. */
 type LexEString<
 	R1 extends string,
 	Acc extends readonly Tok[],
 	B extends number,
+	S extends string,
 > =
 	TakeEString<R1, ""> extends [infer V extends string, infer R2 extends string]
 		? CheckEscapes<V> extends infer M extends string
 			? Err<M, Acc>
 			: LexChunk<R2, [...Acc, StrTok<V>], B>
-		: Err<"unterminated quoted string", Acc>;
+		: Err<`unterminated quoted string at or near "${S}"`, Acc>;
 
 /** `U&'...' [UESCAPE 'c']`: the value stays raw; its escapes are validated (unicode.ts). */
 type LexUString<
 	R1 extends string,
 	Acc extends readonly Tok[],
 	B extends number,
+	S extends string,
 > =
 	TakeString<R1, ""> extends [infer V extends string, infer R2 extends string]
 		? UEscape<R2> extends infer U
@@ -220,20 +272,21 @@ type LexUString<
 					: LexChunk<R3, [...Acc, StrTok<V>], B>
 				: Err<U & string, Acc>
 			: never
-		: Err<"unterminated quoted string", Acc>;
+		: Err<`unterminated quoted string at or near "${S}"`, Acc>;
 
 /** `U&"..." [UESCAPE 'c']`: a quoted identifier with its escapes decoded. */
 type LexUIdent<
 	R1 extends string,
 	Acc extends readonly Tok[],
 	B extends number,
+	S extends string,
 > =
 	TakeQuoted<R1, '"', ""> extends [
 		infer V extends string,
 		infer R2 extends string,
 	]
 		? V extends ""
-			? Err<ZeroLength, Acc>
+			? Err<'zero-length delimited identifier at or near "U&"""', Acc>
 			: UEscape<R2> extends infer U
 				? U extends [infer E extends string, infer R3 extends string]
 					? CheckUEscapes<V, E> extends infer M extends string
@@ -241,7 +294,7 @@ type LexUIdent<
 						: LexChunk<R3, [...Acc, IdTok<DecodeU<V, E>>], B>
 					: Err<U & string, Acc>
 				: never
-		: Err<"unterminated quoted identifier", Acc>;
+		: Err<`unterminated quoted identifier at or near "${S}"`, Acc>;
 
 type ZeroLength = 'zero-length delimited identifier at or near """"';
 
@@ -258,12 +311,12 @@ type LexShortInt<
 	K extends readonly unknown[],
 > = R extends `${infer N}${infer R2}`
 	? N extends Digit
-		? K extends readonly [0, 0, 0]
+		? K extends readonly [0, 0, 0] // type-mutate: equivalent cond-swap cond-true cond-false – a fast path: LexNumber lexes the same token
 			? LexNumber<S0, Acc, B>
 			: LexShortInt<S0, R2, `${V}${N}`, Acc, B, [...K, 0]>
-		: N extends "."
+		: N extends "." // type-mutate: equivalent cond-true – a fast path: LexNumber lexes the same token
 			? LexNumber<S0, Acc, B>
-			: N extends NonIdAscii
+			: N extends NonIdAscii // type-mutate: equivalent cond-false – a fast path: LexNumber lexes the same token
 				? LexChunk<R, [...Acc, NumTok<V>], B>
 				: LexNumber<S0, Acc, B>
 	: LexChunk<R, [...Acc, NumTok<V>], B>;
@@ -281,15 +334,28 @@ type LexNumber<S extends string, Acc extends readonly Tok[], B extends number> =
 			: Err<N & string, Acc>
 		: never;
 
-/** The first character of `R` when it would continue an identifier (a letter, `_` or a non-ASCII character), else `null`. */
-type JunkAt<R extends string> = R extends `${infer C}${string}`
-	? C extends IdStart
-		? C
-		: C extends NonIdAscii | Digit | "$"
-			? null
-			: C
+/**
+ * The identifier at the start of `R` when one starts there (a letter, `_` or a non-ASCII
+ * character, then identifier characters), else `null`: Postgres's junk token is the number and
+ * all of it (`100__000`, `1_000._5`).
+ */
+type JunkAt<R extends string> = R extends `${infer C}${infer R1}`
+	? C extends NonIdAscii | Digit | "$"
+		? null
+		: `${C}${IdRun<R1>}`
 	: null;
+/** The identifier characters at the start of `R`. */
+type IdRun<
+	R extends string,
+	Acc extends string = "",
+> = R extends `${infer C}${infer R1}`
+	? C extends NonIdAscii
+		? Acc
+		: IdRun<R1, `${Acc}${C}`>
+	: Acc;
 
+/** The word starting with `C` (no non-ASCII character seen yet). */
+type WordAt<R extends string, C extends string> = TakeWord<R, C, false>; // type-mutate: equivalent bool-flip – for an ASCII word, folding ASCII letters is lowercasing
 /** An unquoted identifier or keyword starting with `C`, folded to lowercase. */
 type LexWord<
 	R extends string,
@@ -297,7 +363,7 @@ type LexWord<
 	Acc extends readonly Tok[],
 	B extends number,
 > =
-	TakeWord<R, C, false> extends [
+	WordAt<R, C> extends [
 		infer V extends string,
 		infer R2 extends string,
 		infer NonAscii extends boolean,
@@ -335,7 +401,7 @@ type LexOperator<
 					? SkipBlock<R1, [0]> extends infer R2
 						? R2 extends string
 							? LexChunk<R2, Acc, B>
-							: Err<"unterminated /* comment", Acc>
+							: Err<`unterminated /* comment at or near "${C}${R}"`, Acc>
 						: never
 					: LexOpRun<C, R, Acc, B>
 				: LexOpRun<C, R, Acc, B>
@@ -568,14 +634,14 @@ type TakeExponent<
 	S extends string,
 > = S extends `${infer E extends "e" | "E"}${infer R}`
 	? R extends `${infer Sign extends "+" | "-"}${infer R2}`
-		? DigitRun<R2, ""> extends [infer X extends string, infer R3 extends string]
+		? DigitRun<R2, ""> extends [infer X extends string, infer R3]
 			? X extends ""
 				? `trailing junk after numeric literal at or near "${V}${E}${Sign}"`
 				: [`${V}${E}${Sign}${X}`, R3]
 			: never
 		: DigitRun<R, ""> extends [infer X extends string, infer R3 extends string]
 			? X extends ""
-				? `trailing junk after numeric literal at or near "${V}${E}"`
+				? `trailing junk after numeric literal at or near "${V}${E}${IdRun<R>}"`
 				: [`${V}${E}${X}`, R3]
 			: never
 	: [V, S];

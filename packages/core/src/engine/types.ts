@@ -47,20 +47,10 @@ export type Ctx = {
 	/** Function catalog, operator table etc. are global; type map is applied at the boundary. */
 };
 
-export type Nullable<T extends ColInfo> = {
-	readonly type: T["type"];
-	readonly nullable: true;
-};
-export type NotNull<T extends ColInfo> = {
-	readonly type: T["type"];
-	readonly nullable: false;
-};
 export type Info<T extends string, N extends boolean = false> = {
 	readonly type: T;
 	readonly nullable: N;
 };
-
-export type Bool<N extends boolean = false> = Info<"bool", N>;
 
 /** Mark every column of a map nullable (outer joins). */
 export type NullableMap<M extends ColMap> = {
@@ -68,15 +58,6 @@ export type NullableMap<M extends ColMap> = {
 		readonly type: M[K]["type"];
 		readonly nullable: true;
 	};
-};
-
-/** Left-to-right merge: keys of `B` override `A`; order = A's keys then new keys of B. */
-export type MergeMap<A extends ColMap, B extends ColMap> = {
-	readonly [K in keyof A | keyof B]: K extends keyof B
-		? B[K]
-		: K extends keyof A
-			? A[K]
-			: never;
 };
 
 /**
@@ -87,15 +68,15 @@ export type MergeMap<A extends ColMap, B extends ColMap> = {
  * accumulator). Mixed star/plain projections fall back to the accumulator.
  */
 export type ColsToMap<C extends Cols> = C extends readonly [
-	{ readonly star: infer M extends ColMap },
+	{ readonly star: infer M extends ColMap }, // type-mutate: equivalent cond-false infer-bare – the lone-star fast path gives the map SlowMap would, and a star of Cols is a ColMap
 ]
 	? M
-	: C[number] extends { readonly n: string }
+	: C[number] extends { readonly n: string } // type-mutate: equivalent cond-false – PlainMap is a fast path: SlowMap gives the same map
 		? PlainMap<C>
 		: SlowMap<C, {}>;
 
 type PlainMap<C extends Cols> = {
-	[E in C[number] as E extends { readonly n: infer N extends string }
+	[E in C[number] as E extends { readonly n: infer N extends string } // type-mutate: equivalent infer-bare – an entry's n of Cols is a string
 		? N
 		: never]: E extends { readonly n: infer N extends string }
 		? LastT<C, N>
@@ -106,24 +87,24 @@ type LastT<C extends Cols, N extends string> = C extends readonly [
 	...infer R extends Cols,
 	infer L,
 ]
-	? L extends { readonly n: N; readonly t: infer T extends ColInfo }
+	? L extends { readonly n: N; readonly t: infer T }
 		? T
 		: LastT<R, N>
 	: never;
 
 type SlowMap<C extends Cols, Acc> = C extends readonly [
-	infer H extends ColEntry,
+	infer H,
 	...infer R extends Cols,
 ]
-	? H extends { readonly star: infer M extends ColMap }
+	? H extends { readonly star: infer M }
 		? SlowMap<R, Omit<Acc, keyof M> & M>
 		: H extends {
 					readonly n: infer N extends string;
-					readonly t: infer T extends ColInfo;
+					readonly t: infer T;
 				}
 			? SlowMap<
 					R,
-					N extends keyof Acc
+					N extends keyof Acc // type-mutate: equivalent cond-true – Omit of a key Acc does not have leaves Acc as it is
 						? Omit<Acc, N> & { readonly [K in N]: T }
 						: Acc & { readonly [K in N]: T }
 				>

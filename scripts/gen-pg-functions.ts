@@ -108,11 +108,6 @@ for (const r of rows) {
 	fns.set(r.name, f);
 }
 
-const UNREACHABLE: Record<string, string> = {
-	overlay:
-		"OVERLAY(… PLACING …) is special syntax and the plain call form is rejected by the parser",
-};
-
 let out = `/**
  * Every other callable \`pg_catalog\` function of PostgreSQL ${version.split(" ")[0]}: names with the
  * return type from \`pg_proc\` but without curated argument signatures. Arguments are not checked
@@ -134,13 +129,7 @@ for (const [name, f] of fns) {
 		f.window ? "window: true" : null,
 		ret === "unknown" || !f.strict ? "nullable: true" : null,
 	].filter(Boolean);
-	const equivalent =
-		ret === "record" && flags.length === 1 && f.srf
-			? " // type-mutate: equivalent bool-flip – a record result types the same with or without srf"
-			: UNREACHABLE[name]
-				? ` // type-mutate: equivalent – ${UNREACHABLE[name]}`
-				: "";
-	out += `  ${name}: Sig<["..."], ${JSON.stringify(ret)}${flags.length ? `, { ${flags.join("; ")} }` : ""}>;${equivalent}\n`;
+	out += `  ${name}: Sig<["..."], ${JSON.stringify(ret)}${flags.length ? `, { ${flags.join("; ")} }` : ""}>;\n`;
 }
 out += "}\n";
 writeFileSync(

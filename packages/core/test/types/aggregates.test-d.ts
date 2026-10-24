@@ -1,5 +1,6 @@
 import { expectTypeOf, test } from "vitest";
-import type { Interval, Row } from "./_schema.js";
+import type { SqlError } from "../../src/index.js";
+import type { Interval, Row, V } from "./_schema.js";
 
 // Aggregate result types and nullability, verified against PostgreSQL 18:
 // an aggregate over an empty input is NULL (except count / regr_count → 0), so without GROUP BY
@@ -190,4 +191,55 @@ test("aggregates in HAVING and nested in expressions", () => {
 	expectTypeOf<
 		Row<"SELECT sum(price) * 2 AS doubled, coalesce(max(n_text), 'none') AS m FROM things">
 	>().toEqualTypeOf<{ doubled: string | null; m: string }>();
+});
+
+test("*, DISTINCT, FILTER and OVER need an aggregate; a window function needs OVER (Postgres messages)", () => {
+	type E<Q extends string> =
+		V<Q> extends SqlError<infer M extends string, infer At> ? [M, At] : "ok";
+	expectTypeOf<E<"SELECT now(*)">>().toEqualTypeOf<
+		["now(*) specified, but now is not an aggregate function", 1]
+	>();
+	expectTypeOf<E<"SELECT lower(DISTINCT label) FROM things">>().toEqualTypeOf<
+		["DISTINCT specified, but lower is not an aggregate function", 1]
+	>();
+	expectTypeOf<
+		E<"SELECT lower(label) FILTER (WHERE flag) FROM things">
+	>().toEqualTypeOf<
+		["FILTER specified, but lower is not an aggregate function", 1]
+	>();
+	expectTypeOf<
+		E<"SELECT id, concat(label) OVER () FROM things">
+	>().toEqualTypeOf<
+		[
+			"OVER specified, but concat is not a window function nor an aggregate function",
+			3,
+		]
+	>();
+	expectTypeOf<E<"SELECT row_number() FROM things">>().toEqualTypeOf<
+		["window function row_number requires an OVER clause", 1]
+	>();
+	expectTypeOf<E<"SELECT rank() FROM things">>().toEqualTypeOf<
+		["window function rank requires an OVER clause", 1]
+	>();
+	expectTypeOf<E<"SELECT count() FROM things">>().toEqualTypeOf<
+		["count(*) must be used to call a parameterless aggregate function", 1]
+	>();
+	expectTypeOf<
+		E<"SELECT count(DISTINCT id) OVER () FROM things">
+	>().toEqualTypeOf<["DISTINCT is not implemented for window functions", 0]>();
+	expectTypeOf<
+		E<"SELECT ntile(DISTINCT 2) OVER () FROM things">
+	>().toEqualTypeOf<["DISTINCT is not implemented for window functions", 0]>();
+	expectTypeOf<
+		E<"SELECT rank() FILTER (WHERE flag) OVER () FROM things">
+	>().toEqualTypeOf<
+		["FILTER is not implemented for non-aggregate window functions", 0]
+	>();
+	expectTypeOf<
+		[
+			E<"SELECT count(*), count(id) OVER (), sum(id) FILTER (WHERE flag) OVER () FROM things">,
+			E<"SELECT row_number(*) OVER (), rank() OVER () FROM things">,
+			E<"SELECT mode() WITHIN GROUP (ORDER BY id) FROM things">,
+		]
+	>().toEqualTypeOf<["ok", "ok", "ok"]>();
 });

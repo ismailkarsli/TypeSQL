@@ -44,8 +44,8 @@ describe("the canonical form of our parse tree", () => {
 			Canon<"SELECT * FROM (a FULL JOIN b ON true) AS j(x), ONLY t AS u, v * AS w, f(1) WITH ORDINALITY AS g(a, n), h() AS k(a int), ROWS FROM (f(), g() AS (b text)) AS r">
 		>().toEqualTypeOf<"SELECT * FROM LATERAL (SELECT * FROM (a FULL JOIN b ON true)) AS j(x), t AS u, v AS w, f(1) WITH ORDINALITY AS g(a, n), h() AS k (a int4), ROWS FROM (f(), g() AS (b text)) AS r">();
 		expectTypeOf<
-			Canon<"SELECT 1 UNION SELECT 2 INTERSECT SELECT 3 EXCEPT ALL (SELECT 4 ORDER BY 1) ORDER BY 1 LIMIT 2 OFFSET 1">
-		>().toEqualTypeOf<"((SELECT 1 UNION (SELECT 2 INTERSECT SELECT 3)) EXCEPT ALL (SELECT 4 ORDER BY 1)) ORDER BY 1 LIMIT 2 OFFSET 1">();
+			Canon<"SELECT 1 UNION SELECT 2 INTERSECT ALL SELECT 3 EXCEPT ALL (SELECT 4 ORDER BY 1) ORDER BY 1 LIMIT 2 OFFSET 1">
+		>().toEqualTypeOf<"((SELECT 1 UNION (SELECT 2 INTERSECT ALL SELECT 3)) EXCEPT ALL (SELECT 4 ORDER BY 1)) ORDER BY 1 LIMIT 2 OFFSET 1">();
 		expectTypeOf<
 			Canon<"WITH RECURSIVE r(n) AS (VALUES (1) UNION ALL SELECT n + 1 FROM r) CYCLE n SET c USING p SELECT DISTINCT ON (n) n FROM r LIMIT ALL">
 		>().toEqualTypeOf<"WITH RECURSIVE r(n) AS ((VALUES (1) UNION ALL SELECT (n + 1) FROM r)) CYCLE n SET c USING p SELECT DISTINCT ON (n) n FROM r">();

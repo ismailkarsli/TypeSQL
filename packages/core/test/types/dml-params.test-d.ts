@@ -95,6 +95,22 @@ test("INSERT ... SELECT", () => {
 	>().toEqualTypeOf<[string, number | null]>();
 });
 
+test("without a column list, or through a set operation, parameters are not typed by the columns", () => {
+	// a TS object type has no key order, so the columns' order is unknown
+	expectTypeOf<Params<"INSERT INTO users VALUES ($1, $2)">>().toEqualTypeOf<
+		[unknown, unknown]
+	>();
+	expectTypeOf<Params<"INSERT INTO users SELECT $1, $2">>().toEqualTypeOf<
+		[unknown, unknown]
+	>();
+	expectTypeOf<
+		Params<"INSERT INTO users (email) SELECT $1 UNION SELECT 'a'">
+	>().toEqualTypeOf<[unknown]>();
+	expectTypeOf<
+		Params<"WITH x AS (SELECT $1::int AS n) INSERT INTO users (email) SELECT $2">
+	>().toEqualTypeOf<[number, string]>();
+});
+
 test("ON CONFLICT DO UPDATE: SET takes the column type; WHERE sees the target and excluded", () => {
 	expectTypeOf<
 		Params<"INSERT INTO users (email) VALUES ($1) ON CONFLICT (email) DO UPDATE SET email = $2 WHERE users.id > $3">

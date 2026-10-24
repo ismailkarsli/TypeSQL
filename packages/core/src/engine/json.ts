@@ -49,7 +49,6 @@ type ArrShape<E> = { readonly k: "arr"; readonly e: E };
 type ValShape<C> = { readonly k: "val"; readonly c: C };
 /** A JSON value of TS type `T` (`Json<T>` columns). */
 export type TsShape<T> = { readonly k: "ts"; readonly v: T };
-type NullShape = TsShape<null>;
 
 // ───────────────────────────── literals ─────────────────────────────
 
@@ -74,14 +73,9 @@ type LitTs<V extends string> = V extends "[]"
 			? null
 			: boolean;
 
-/** `'…'::json` / `json '…'`: a simple JSON literal keeps its value; `null` when it has no shape. */
-export type JsonLitCast<To extends string, V extends string> = To extends
-	| "json"
-	| "jsonb"
-	? LitType<V> extends Shaped<"lit", infer S>
-		? Shaped<To, S>
-		: null
-	: null;
+/** `'…'::json` / `json '…'` (`To` is json or jsonb): a simple JSON literal keeps its value; `null` when it has no shape. */
+export type JsonLitCast<To extends string, V extends string> =
+	LitType<V> extends Shaped<"lit", infer S> ? Shaped<To, S> : null;
 
 /**
  * `CommonLit` of a string literal `L` and a shaped value `X`: the literal takes `X`'s type.
@@ -110,7 +104,7 @@ export type MergeShapes<A, B> = [B] extends [TsShape<[]>]
 type ArrayLike<S> = [S] extends [ArrShape<unknown>]
 	? true
 	: [S] extends [TsShape<infer T>]
-		? [] extends T
+		? [] extends T // type-mutate: equivalent never-true – a never passes the callers' `ArrayLike<…> extends true` too
 			? true
 			: false
 		: false;
@@ -123,7 +117,8 @@ type ValInfo<A extends ColInfo> = A["type"] extends "lit"
 	: A;
 
 /**
- * JSON return patterns of the function catalog (`Sig<…, "$jval:json">`):
+ * JSON return patterns of the function catalog (`Sig<…, "$jval:json">`); the functions have the
+ * arguments their pattern reads:
  *   $jval:B    to_json / row_to_json / array_to_json: the first argument, serialized
  *   $jarr:B    json_agg: array of the first argument (NULLs included)
  *   $jarrnn:B  json_agg_strict: array of the first argument, NULLs skipped
@@ -134,33 +129,23 @@ type ValInfo<A extends ColInfo> = A["type"] extends "lit"
 export type JsonRet<
 	P extends string,
 	As extends readonly ColInfo[],
-> = P extends `${infer K}:${infer B extends string}`
+> = P extends `${infer K}:${infer B}`
 	? K extends "val"
-		? As[0] extends ColInfo
-			? Shaped<B, ValShape<Info<LitToText<As[0]["type"]>>>>
-			: B
+		? Shaped<B, ValShape<Info<LitToText<As[0]["type"]>>>>
 		: K extends "arr"
-			? As[0] extends ColInfo
-				? Shaped<B, ArrShape<ValInfo<As[0]>>>
-				: B
+			? Shaped<B, ArrShape<ValInfo<As[0]>>>
 			: K extends "arrnn"
-				? As[0] extends ColInfo
-					? Shaped<B, ArrShape<Info<LitToText<As[0]["type"]>>>>
-					: B
+				? Shaped<B, ArrShape<Info<LitToText<As[0]["type"]>>>>
 				: K extends "rec"
-					? As[1] extends ColInfo
-						? Shaped<B, { readonly k: "rec"; readonly v: ValInfo<As[1]> }>
-						: B
+					? Shaped<B, { readonly k: "rec"; readonly v: ValInfo<As[1]> }>
 					: K extends "recnn"
-						? As[1] extends ColInfo
-							? Shaped<
-									B,
-									{
-										readonly k: "rec";
-										readonly v: Info<LitToText<As[1]["type"]>>;
-									}
-								>
-							: B
+						? Shaped<
+								B,
+								{
+									readonly k: "rec";
+									readonly v: Info<LitToText<As[1]["type"]>>;
+								}
+							>
 						: K extends "tup"
 							? Shaped<
 									B,
@@ -169,12 +154,8 @@ export type JsonRet<
 										readonly es: { readonly [I in keyof As]: ValInfo<As[I]> };
 									}
 								>
-							: K extends "elem"
-								? As[0] extends ColInfo
-									? StepOf<As[0]["type"], B, "idx", number>
-									: B
-								: B
-	: "unknown";
+							: StepOf<As[0]["type"], B, "idx", number> // elem
+	: "unknown"; // type-mutate: equivalent never-false – every pattern of the catalog is kind:base
 
 /**
  * `json_build_object(k1, v1, …)` with literal keys: an object shape (a repeated key keeps its
@@ -198,21 +179,19 @@ export type BuildObject<
 		: Args[I] extends { readonly t: "null" }
 			? SqlError<"null value not allowed for object key", null>
 			: KeyOf<Args[I]> extends infer K extends string
-				? As[Nx<I>] extends infer A extends ColInfo
-					? BuildObject<
-							B,
-							Args,
-							As,
-							Nx<Nx<I>>,
-							(K extends keyof Acc ? Omit<Acc, K> : Acc) & {
-								readonly [P in K]: ValInfo<A>;
-							}
-						>
-					: Info<B>
+				? BuildObject<
+						B,
+						Args,
+						As,
+						Nx<Nx<I>>,
+						Without<Acc, K> & { readonly [P in K]: ValInfo<As[Nx<I>]> }
+					>
 				: Info<B>;
+/** `Acc` without key `K` (a repeated key keeps its last value). */
+type Without<Acc, K extends string> = K extends keyof Acc ? Omit<Acc, K> : Acc; // type-mutate: equivalent cond-true – Omit of a key Acc does not have leaves Acc as it is
 type KeyOf<E> = E extends {
 	readonly t: "str" | "num";
-	readonly v: infer V extends string;
+	readonly v: infer V;
 }
 	? V
 	: null;
@@ -270,15 +249,15 @@ type StepOf<
 	K extends string | number,
 > =
 	ShapeOfType<T> extends infer S
-		? S extends null
+		? [S] extends [null]
 			? B
 			: Reshape<B, Step<S, Kind, K>>
 		: B;
-/** A step result: `unknown` (no shape left) is the plain type. */
+/** A step result: `unknown` (no shape left) is the plain type; a step that only misses has no value (NULL). */
 type Reshape<B extends string, S> = [S] extends [never]
-	? Shaped<B, NullShape>
-	: [S] extends [TsShape<infer T>]
-		? unknown extends T
+	? Shaped<B, TsShape<never>>
+	: [S] extends [TsShape<infer T>] // type-mutate: equivalent cond-false – a ts shape of unknown reads as plain JSON wherever it goes
+		? unknown extends T // type-mutate: equivalent cond-false – a ts shape of unknown reads as plain JSON wherever it goes
 			? B
 			: Shaped<B, S>
 		: Shaped<B, S>;
@@ -298,7 +277,9 @@ type Walk<
 /**
  * One step into a shape (distributes over a union of shapes). `key`: object key; `idx`: array
  * index (number = any element); `seg`: a `#>` path element, an index for arrays and a key for
- * objects. Missing keys, out-of-range indexes and keys on arrays (and the reverse) give NULL.
+ * objects. Missing keys, out-of-range indexes and keys on arrays (and the reverse) are SQL NULL,
+ * not a JSON `null`: they give `never` here (`coalesce(x -> 'nope', '[]')` is `[]`), and a step
+ * that only misses is NULL (`Reshape`).
  */
 type Step<
 	S,
@@ -306,20 +287,20 @@ type Step<
 	K extends string | number,
 > = S extends { readonly k: "obj"; readonly m: infer M }
 	? Kind extends "idx"
-		? NullShape
+		? never
 		: K extends keyof M
 			? ValShape<M[K]>
 			: string extends K
 				? ValShape<M[keyof M]>
-				: NullShape
+				: never
 	: S extends { readonly k: "rec"; readonly v: infer V }
 		? Kind extends "idx"
-			? NullShape
+			? never
 			: ValShape<V>
 		: S extends { readonly k: "arr"; readonly e: infer E }
 			? IndexOk<Kind, K> extends true
 				? ValShape<E>
-				: NullShape
+				: never
 			: S extends {
 						readonly k: "tup";
 						readonly es: infer Es extends readonly unknown[];
@@ -327,23 +308,21 @@ type Step<
 				? IndexOk<Kind, K> extends true
 					? K extends keyof Es
 						? ValShape<Es[K]>
-						: K extends `${number}`
-							? K extends `-${string}`
-								? ValShape<Es[number]>
-								: NullShape
-							: ValShape<Es[number]>
-					: NullShape
+						: K extends `-${string}`
+							? ValShape<Es[number]>
+							: never
+					: never
 				: S extends { readonly k: "val"; readonly c: infer C extends ColInfo }
 					? StepVal<C["type"], Kind, K>
 					: S extends { readonly k: "ts"; readonly v: infer T }
 						? TsShape<StepTs<T, Kind, K>>
-						: TsShape<unknown>;
+						: never;
 type IndexOk<Kind extends string, K> = Kind extends "key"
 	? false
 	: K extends number
-		? true
+		? true // type-mutate: equivalent never-true – a never passes the callers' `IndexOk<…> extends true` too
 		: K extends `${number}`
-			? true
+			? true // type-mutate: equivalent never-true – a never passes the callers' `IndexOk<…> extends true` too
 			: false;
 
 /** Step into a serialized SQL value: shaped JSON and rows have shapes; arrays index; scalars give NULL. */
@@ -359,12 +338,12 @@ type StepVal<
 				: T extends `${infer E}[]`
 					? IndexOk<Kind, K> extends true
 						? ValShape<Info<E, true>>
-						: NullShape
-					: NullShape
+						: never
+					: never
 			: Step<S, Kind, K>
 		: never;
 
-/** Step into a TypeScript type (`Json<T>` columns): `T[K]` for objects, `T[number]` for arrays, null otherwise. */
+/** Step into a TypeScript type (`Json<T>` columns): `T[K]` for objects, `T[number]` for arrays; a miss is `never` (see `Step`). */
 type StepTs<
 	T,
 	Kind extends "key" | "idx" | "seg",
@@ -374,25 +353,26 @@ type StepTs<
 	: T extends readonly unknown[]
 		? IndexOk<Kind, K> extends true
 			? TsIndex<T, K>
-			: null
+			: never
 		: T extends object
 			? Kind extends "idx"
-				? null
+				? never
 				: K extends keyof T
-					? Exclude<T[K], undefined> | (undefined extends T[K] ? null : never)
+					? Exclude<T[K], undefined>
 					: string extends K
 						? Exclude<T[keyof T], undefined>
 						: string extends keyof T
-							? Exclude<T[string & keyof T], undefined> | null
-							: null
-			: null;
+							? Exclude<T[string & keyof T], undefined>
+							: never
+			: never;
+/** An element of `T`: by position for a literal index into a tuple (past its end, or negative from the end, any element). */
 type TsIndex<
 	T extends readonly unknown[],
 	K,
 > = K extends `${infer N extends number}`
 	? `${N}` extends keyof T
-		? Exclude<T[N], undefined> | (undefined extends T[N] ? null : never)
-		: T[number] | (number extends T["length"] ? never : null)
+		? Exclude<T[N], undefined>
+		: T[number]
 	: T[number];
 
 /** `'{a,0,b}'` → `["a", "0", "b"]`; `null` for quoted or escaped elements. */
@@ -439,10 +419,10 @@ export type JsonTs<S, DB> = S extends { readonly k: "obj"; readonly m: infer M }
 					? JsonValueTs<C, DB>
 					: S extends { readonly k: "ts"; readonly v: infer T }
 						? T
-						: unknown;
+						: unknown; // type-mutate: equivalent never-false – every kind of shape is handled above
 
 /** TS type of an SQL value inside JSON (distributes over a union of infos). */
-type JsonValueTs<C extends ColInfo, DB> = C extends ColInfo
+type JsonValueTs<C extends ColInfo, DB> = C extends ColInfo // type-mutate: equivalent cond-true – C is a ColInfo: the test only distributes over a union
 	? C["nullable"] extends true
 		? JsonOfType<C["type"], DB> | null
 		: JsonOfType<C["type"], DB>
@@ -483,7 +463,7 @@ type JsonStringT =
 
 type JsonOfType<T extends string, DB> = T extends AnyShaped
 	? ShapeOfType<T> extends infer S
-		? S extends null
+		? S extends null // type-mutate: equivalent cond-false – JsonTs of no shape is unknown too
 			? unknown
 			: JsonTs<S, DB>
 		: never

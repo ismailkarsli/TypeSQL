@@ -2,9 +2,11 @@ import { expectTypeOf, test } from "vitest";
 import type {
 	ApplyDdl,
 	Col,
+	DefaultTypeMap,
 	Generated,
 	Nullable,
 	NullableGenerated,
+	RowOf,
 	SqlError,
 	View,
 } from "../../src/index.js";
@@ -312,6 +314,13 @@ test("CREATE TABLE AS: columns from the query, all nullable, no defaults", () =>
 		name: Nullable<"text">;
 		n: Nullable<"int8">;
 	}>();
+	// an untyped NULL is stored as text, in tables and views (Postgres resolves it so)
+	type N = ApplyDdl<
+		{},
+		"CREATE TABLE t AS SELECT NULL AS x; CREATE VIEW v AS SELECT NULL AS x"
+	>;
+	expectTypeOf<N["t"]>().toEqualTypeOf<{ x: Nullable<"text"> }>();
+	expectTypeOf<N["v"]>().toEqualTypeOf<View<{ x: Nullable<"text"> }>>();
 });
 
 test("errors", () => {
@@ -510,6 +519,9 @@ test("typed tables and CREATE TABLE AS EXECUTE parse; their columns are unknown"
 		>
 	>();
 	expectTypeOf<
+		D<"CREATE TABLE t OF person_type (id WITH OPTIONS NOT NULL) INHERITS (p)">
+	>().toEqualTypeOf<SqlError<"syntax error at or near inherits", 12>>();
+	expectTypeOf<
 		D<"CREATE TEMP TABLE t (a) AS EXECUTE q(200, 'x') WITH NO DATA">
 	>().toEqualTypeOf<
 		SqlError<
@@ -517,6 +529,31 @@ test("typed tables and CREATE TABLE AS EXECUTE parse; their columns are unknown"
 			0
 		>
 	>();
+});
+
+test("WITH takes a parenthesized list of storage options", () => {
+	expectTypeOf<
+		ApplyDdl<{}, "CREATE TABLE t (a int) WITH (fillfactor = 70)">
+	>().toEqualTypeOf<{ t: { a: Nullable<"int4"> } }>();
+	// Postgres fails at the token after WITH (WITH OIDS is gone)
+	expectTypeOf<D<"CREATE TABLE t (a int) WITH OIDS">>().toEqualTypeOf<
+		SqlError<"syntax error at or near oids", 8>
+	>();
+	expectTypeOf<D<"CREATE TABLE t (a int) WITH;">>().toEqualTypeOf<
+		SqlError<"syntax error at or near ;", 8>
+	>();
+	expectTypeOf<D<"CREATE TABLE t WITH AS SELECT 1">>().toEqualTypeOf<
+		SqlError<"syntax error at or near as", 4>
+	>();
+	expectTypeOf<D<"CREATE VIEW v WITH x AS SELECT 1">>().toEqualTypeOf<
+		SqlError<"syntax error at or near x", 4>
+	>();
+	expectTypeOf<
+		D<"CREATE MATERIALIZED VIEW m WITH x AS SELECT 1">
+	>().toEqualTypeOf<SqlError<"syntax error at or near x", 5>>();
+	expectTypeOf<
+		D<"CREATE RECURSIVE VIEW v (a) WITH x AS SELECT 1">
+	>().toEqualTypeOf<SqlError<"syntax error at or near x", 8>>();
 });
 
 test("float(p) maps to float4 for p <= 24, float8 otherwise", () => {
@@ -530,4 +567,132 @@ test("float(p) maps to float4 for p <= 24, float8 otherwise", () => {
 	expectTypeOf<S["f"]["d"]["type"]>().toEqualTypeOf<"float8">();
 	expectTypeOf<S["f"]["e"]["type"]>().toEqualTypeOf<"float4">();
 	expectTypeOf<S["f"]["g"]["type"]>().toEqualTypeOf<"float8">();
+	// every precision up to 24
+	type P = ApplyDdl<
+		{},
+		"CREATE TABLE p (a1 float(1), a2 float(2), a3 float(3), a4 float(4), a5 float(5), a6 float(6), a7 float(7), a8 float(8), a9 float(9), a10 float(10), a11 float(11), a12 float(12), a13 float(13), a14 float(14), a15 float(15), a16 float(16), a17 float(17), a18 float(18), a19 float(19), a20 float(20), a21 float(21), a22 float(22), a23 float(23), a24 float(24), a53 float(53))"
+	>["p"];
+	expectTypeOf<
+		{ [K in keyof P]: P[K]["type"] }[Exclude<keyof P, "a53">]
+	>().toEqualTypeOf<"float4">();
+	expectTypeOf<P["a53"]["type"]>().toEqualTypeOf<"float8">();
+	expectTypeOf<D<"CREATE TABLE t (a float(5)">>().toEqualTypeOf<
+		SqlError<'syntax error: expected "," or ")" at or near end of input', 9>
+	>();
+	expectTypeOf<D<"CREATE TABLE t (a float(x))">>().toEqualTypeOf<
+		SqlError<"syntax error: expected precision at or near x", 7>
+	>();
+});
+
+test("interval fields and type modifiers are skipped", () => {
+	expectTypeOf<
+		D<`CREATE TABLE t (a interval year, b interval month, c interval day, d interval hour, e interval minute, f interval second(3), g interval year to month, h interval day to hour, i interval hour to second(2), j interval minute to second, k numeric(3, -6), l varchar(10), m bit varying(8), n timestamp(3), o interval(2), p numeric(10, 2) array, q int array[4])`>["t"]
+	>().toEqualTypeOf<{
+		a: Nullable<"interval">;
+		b: Nullable<"interval">;
+		c: Nullable<"interval">;
+		d: Nullable<"interval">;
+		e: Nullable<"interval">;
+		f: Nullable<"interval">;
+		g: Nullable<"interval">;
+		h: Nullable<"interval">;
+		i: Nullable<"interval">;
+		j: Nullable<"interval">;
+		k: Nullable<"numeric">;
+		l: Nullable<"varchar">;
+		m: Nullable<"varbit">;
+		n: Nullable<"timestamp">;
+		o: Nullable<"interval">;
+		p: Nullable<"numeric[]">;
+		q: Nullable<"int4[]">;
+	}>();
+	expectTypeOf<
+		D<"CREATE TABLE t (r int[3], s int[2][3], u text array, w int array[2])">["t"]
+	>().toEqualTypeOf<{
+		r: Nullable<"int4[]">;
+		s: Nullable<"int4[]">;
+		u: Nullable<"text[]">;
+		w: Nullable<"int4[]">;
+	}>();
+	// the modifier list ends at the type's parenthesis, not at an enclosing one
+	expectTypeOf<
+		RowOf<{}, DefaultTypeMap, "SELECT (CAST(1 AS int) - 1) AS a">
+	>().toEqualTypeOf<{ a: number }>();
+});
+
+test("type names written with keywords, quoted names; what is not a type name", () => {
+	expectTypeOf<
+		D<`CREATE TABLE t (a "text", b char, c nchar, d national character, e national char varying(3), f bit, g bit varying(4), h interval day to second)`>["t"]
+	>().toEqualTypeOf<{
+		a: Nullable<"text">;
+		b: Nullable<"bpchar">;
+		c: Nullable<"bpchar">;
+		d: Nullable<"bpchar">;
+		e: Nullable<"varchar">;
+		f: Nullable<"bit">;
+		g: Nullable<"varbit">;
+		h: Nullable<"interval">;
+	}>();
+	// Postgres: type "double" does not exist (only DOUBLE PRECISION is a type)
+	expectTypeOf<D<"CREATE TABLE t (a double)">>().toEqualTypeOf<
+		SqlError<"syntax error: expected PRECISION at or near )", 6>
+	>();
+	expectTypeOf<D<"CREATE TABLE t (a national x)">>().toEqualTypeOf<
+		SqlError<"syntax error: expected CHARACTER at or near x", 6>
+	>();
+	expectTypeOf<D<"CREATE TABLE t (a select)">>().toEqualTypeOf<
+		SqlError<"syntax error: expected type name at or near select", 5>
+	>();
+	expectTypeOf<D<"CREATE TABLE t (a 1)">>().toEqualTypeOf<
+		SqlError<"syntax error: expected type name at or near 1", 5>
+	>();
+	// reserved words that cannot name a type
+	type Reserved<W extends string> = D<`CREATE TABLE t (a ${W})`>;
+	expectTypeOf<
+		[
+			Reserved<"select">,
+			Reserved<"from">,
+			Reserved<"where">,
+			Reserved<"and">,
+			Reserved<"or">,
+			Reserved<"not">,
+			Reserved<"as">,
+			Reserved<"null">,
+			Reserved<"true">,
+			Reserved<"false">,
+			Reserved<"case">,
+			Reserved<"when">,
+			Reserved<"then">,
+			Reserved<"else">,
+			Reserved<"end">,
+		]
+	>().toEqualTypeOf<
+		[
+			SqlError<"syntax error: expected type name at or near select", 5>,
+			SqlError<"syntax error: expected type name at or near from", 5>,
+			SqlError<"syntax error: expected type name at or near where", 5>,
+			SqlError<"syntax error: expected type name at or near and", 5>,
+			SqlError<"syntax error: expected type name at or near or", 5>,
+			SqlError<"syntax error: expected type name at or near not", 5>,
+			SqlError<"syntax error: expected type name at or near as", 5>,
+			SqlError<"syntax error: expected type name at or near null", 5>,
+			SqlError<"syntax error: expected type name at or near true", 5>,
+			SqlError<"syntax error: expected type name at or near false", 5>,
+			SqlError<"syntax error: expected type name at or near case", 5>,
+			SqlError<"syntax error: expected type name at or near when", 5>,
+			SqlError<"syntax error: expected type name at or near then", 5>,
+			SqlError<"syntax error: expected type name at or near else", 5>,
+			SqlError<"syntax error: expected type name at or near end", 5>,
+		]
+	>();
+	// a schema-qualified type name keeps the name
+	expectTypeOf<
+		D<"CREATE TABLE t (a pg_catalog.int8, b app.mood)">["t"]
+	>().toEqualTypeOf<{
+		a: Nullable<"int8">;
+		b: Nullable<"mood">;
+	}>();
+	expectTypeOf<D<"CREATE TABLE t (a pg_catalog.)">>().toEqualTypeOf<
+		SqlError<"syntax error: expected type name at or near )", 7>
+	>();
 });

@@ -263,6 +263,24 @@ test("ON CONFLICT", () => {
 	expectTypeOf<
 		V<"INSERT INTO users (email) VALUES ('a') ON CONFLICT (email) DO UPDATE SET display_name = users.email">
 	>().toEqualTypeOf<"INSERT INTO users (email) VALUES ('a') ON CONFLICT (email) DO UPDATE SET display_name = users.email">();
+	// a target named `excluded` makes `excluded.` ambiguous in DO UPDATE (not in RETURNING, which has no `excluded`)
+	expectTypeOf<
+		V<"INSERT INTO users AS excluded (email) VALUES ('a') ON CONFLICT (email) DO UPDATE SET display_name = excluded.email">
+	>().toEqualTypeOf<SqlError<'table reference "excluded" is ambiguous', 4>>();
+	expectTypeOf<
+		V<"INSERT INTO users AS excluded (email) VALUES ('a') ON CONFLICT (email) DO UPDATE SET display_name = 'x' RETURNING excluded.id">
+	>().toEqualTypeOf<"INSERT INTO users AS excluded (email) VALUES ('a') ON CONFLICT (email) DO UPDATE SET display_name = 'x' RETURNING excluded.id">();
+	// … as a whole row and in a star too
+	expectTypeOf<
+		V<"INSERT INTO users AS excluded (email) VALUES ('a') ON CONFLICT (email) DO UPDATE SET display_name = row_to_json(excluded)::text">
+	>().toEqualTypeOf<SqlError<'table reference "excluded" is ambiguous', 4>>();
+	expectTypeOf<
+		V<"INSERT INTO users AS excluded (email) VALUES ('a') ON CONFLICT (email) DO UPDATE SET display_name = (SELECT count(*) FROM (SELECT excluded.*) x)::text">
+	>().toEqualTypeOf<SqlError<'table reference "excluded" is ambiguous', 4>>();
+	// the WHERE of DO UPDATE is checked
+	expectTypeOf<
+		V<"INSERT INTO users (email) VALUES ('a') ON CONFLICT (email) DO UPDATE SET display_name = 'x' WHERE nope">
+	>().toEqualTypeOf<SqlError<'column "nope" does not exist', 22>>();
 	// an unqualified column present in both the target and `excluded` is ambiguous (Postgres behaviour)
 	expectTypeOf<
 		V<"INSERT INTO users (email) VALUES ('a') ON CONFLICT (email) DO UPDATE SET display_name = email">
@@ -330,6 +348,63 @@ test("syntax errors", () => {
 	expectTypeOf<
 		V<"INSERT INTO users (email) VALUES ('a') RETURNING nope">
 	>().toEqualTypeOf<SqlError<'column "nope" does not exist', 11>>();
+	// each clause's error, at the token Postgres names
+	type E<Q extends string> =
+		V<Q> extends SqlError<infer M extends string, infer At> ? [M, At] : "ok";
+	expectTypeOf<
+		[
+			E<"INSERT INTO users * VALUES ('a')">,
+			E<"INSERT INTO users (email VALUES ('a')">,
+			E<"INSERT INTO users OVERRIDING x VALUE">,
+			E<"INSERT INTO users OVERRIDING SYSTEM (1)">,
+			E<"INSERT INTO users OVERRIDING USER VALUES ('a')">,
+			E<"INSERT INTO users DEFAULT x">,
+			E<"INSERT INTO users (email) VALUES ('a') ON CONFLICT ON CONSTRAINT DO NOTHING">,
+			E<"INSERT INTO users (email) VALUES ('a') ON CONFLICT (email DO NOTHING">,
+			E<"INSERT INTO users (email) VALUES ('a') ON CONFLICT (email) WHERE email > DO NOTHING">,
+			E<"INSERT INTO users (email) VALUES ('a') RETURNING id +">,
+			E<"INSERT INTO users (email) VALUES ('a') ON CONFLICT (email) NOTHING">,
+			E<"INSERT INTO users (email) VALUES ('a') ON CONFLICT (lower(email) DO NOTHING">,
+			E<"INSERT INTO users (email) VALUES ('a') ON CONFLICT (email WHERE) DO NOTHING">,
+			E<"INSERT INTO users (email) VALUES ('a') ON CONFLICT (email DESC) DO NOTHING">,
+			E<"INSERT INTO users (email) VALUES ('a') ON CONFLICT (id, email ASC) DO NOTHING">,
+			E<"INSERT INTO users (email) VALUES ('a') ON CONFLICT (email NULLS FIRST) DO NOTHING">,
+			E<"INSERT INTO users (email) VALUES ('a') ON CONFLICT (email) DO UPDATE SET email = +">,
+			E<"INSERT INTO users (email) VALUES ('a') ON CONFLICT (email) DO UPDATE SET email = 'b' WHERE +">,
+		]
+	>().toEqualTypeOf<
+		[
+			[
+				"syntax error: expected VALUES, SELECT or DEFAULT VALUES at or near *",
+				3,
+			],
+			['syntax error: expected "," or ")" at or near values', 5],
+			["syntax error: expected SYSTEM or USER at or near x", 4],
+			["syntax error: expected VALUE at or near (", 5],
+			["syntax error: expected VALUE at or near values", 5],
+			["syntax error: expected VALUES at or near x", 4],
+			["syntax error: expected constraint name at or near do", 14],
+			['syntax error: expected "," or ")" at or near do', 14],
+			["syntax error at or near do", 18],
+			["syntax error at end of input", 13],
+			["syntax error: expected DO at or near nothing", 15],
+			['syntax error: expected "," or ")" at or near do', 17],
+			['syntax error: expected "," or ")" at or near where', 14],
+			["ASC/DESC is not allowed in ON CONFLICT clause", 13],
+			["ASC/DESC is not allowed in ON CONFLICT clause", 15],
+			["NULLS FIRST/LAST is not allowed in ON CONFLICT clause", 13],
+			["syntax error at end of input", 21],
+			["syntax error at end of input", 23],
+		]
+	>();
+	expectTypeOf<
+		[
+			E<"INSERT INTO users (email) OVERRIDING SYSTEM VALUE VALUES ('a')">,
+			E<"INSERT INTO users (SELECT id, email, display_name, created_at FROM users)">,
+			E<"INSERT INTO users (email) VALUES ('a') ON CONFLICT (id, email) WHERE id > 1 DO NOTHING">,
+			E<"INSERT INTO users (email) VALUES ('a') ON CONFLICT (email text_pattern_ops) DO NOTHING">,
+		]
+	>().toEqualTypeOf<["ok", "ok", "ok", "ok"]>();
 });
 
 test("sql() call sites", () => {

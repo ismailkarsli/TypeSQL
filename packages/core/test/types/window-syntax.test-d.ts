@@ -55,6 +55,97 @@ test("named windows: WINDOW w AS (...), OVER w, OVER (w ...), chained definition
 	>().toEqualTypeOf<{ id: number }>();
 });
 
+test("window references: inherited ORDER BY, windows inside expressions and subqueries", () => {
+	expectTypeOf<
+		V<"SELECT rank() OVER (w) FROM users WINDOW w AS (ORDER BY id)">
+	>().toEqualTypeOf<"SELECT rank() OVER (w) FROM users WINDOW w AS (ORDER BY id)">();
+	expectTypeOf<
+		V<"SELECT rank() OVER (w ORDER BY id) FROM users WINDOW w AS (PARTITION BY email)">
+	>().toEqualTypeOf<"SELECT rank() OVER (w ORDER BY id) FROM users WINDOW w AS (PARTITION BY email)">();
+	expectTypeOf<V<"SELECT sum(id) OVER nope + 1 FROM users">>().toEqualTypeOf<
+		SqlError<'window "nope" does not exist', 6>
+	>();
+	expectTypeOf<
+		V<"SELECT rank() OVER w3 FROM users WINDOW w1 AS (ORDER BY id), w2 AS (w1), w3 AS (w2 ORDER BY email)">
+	>().toEqualTypeOf<
+		SqlError<'cannot override ORDER BY clause of window "w2"', 17>
+	>();
+	expectTypeOf<
+		V<"SELECT rank() OVER w3 FROM users WINDOW w1 AS (PARTITION BY email), w2 AS (w1 ORDER BY id), w3 AS (w2 ORDER BY id)">
+	>().toEqualTypeOf<
+		SqlError<'cannot override ORDER BY clause of window "w2"', 17>
+	>();
+	expectTypeOf<
+		V<"SELECT rank() OVER w3 FROM users WINDOW w1 AS (PARTITION BY email), w2 AS (w1), w3 AS (w2 ORDER BY id)">
+	>().toEqualTypeOf<"SELECT rank() OVER w3 FROM users WINDOW w1 AS (PARTITION BY email), w2 AS (w1), w3 AS (w2 ORDER BY id)">();
+	expectTypeOf<
+		V<"SELECT (SELECT sum(1) OVER w FROM users WINDOW w AS ()) AS a, EXISTS (SELECT sum(1) OVER w FROM users WINDOW w AS ()) AS b, ARRAY(SELECT sum(1) OVER w FROM users WINDOW w AS ()) AS c, 1 IN (SELECT sum(1) OVER w FROM users WINDOW w AS ()) AS d FROM users">
+	>().toEqualTypeOf<"SELECT (SELECT sum(1) OVER w FROM users WINDOW w AS ()) AS a, EXISTS (SELECT sum(1) OVER w FROM users WINDOW w AS ()) AS b, ARRAY(SELECT sum(1) OVER w FROM users WINDOW w AS ()) AS c, 1 IN (SELECT sum(1) OVER w FROM users WINDOW w AS ()) AS d FROM users">();
+});
+
+test("windows anywhere in an expression are checked (not inside subqueries)", () => {
+	expectTypeOf<
+		V<"SELECT CASE WHEN sum(id) OVER nope > 0 THEN 1 END FROM users">
+	>().toEqualTypeOf<SqlError<'window "nope" does not exist', 8>>();
+	expectTypeOf<
+		V<"SELECT CASE sum(id) OVER nope WHEN 1 THEN 1 END FROM users">
+	>().toEqualTypeOf<SqlError<'window "nope" does not exist', 7>>();
+	expectTypeOf<
+		V<"SELECT CASE WHEN true THEN 1 ELSE sum(id) OVER nope END FROM users">
+	>().toEqualTypeOf<SqlError<'window "nope" does not exist', 12>>();
+	expectTypeOf<
+		V<"SELECT CASE WHEN true THEN sum(id) OVER nope END FROM users">
+	>().toEqualTypeOf<SqlError<'window "nope" does not exist', 10>>();
+	expectTypeOf<
+		V<"SELECT ARRAY[1, sum(id) OVER nope] FROM users">
+	>().toEqualTypeOf<SqlError<'window "nope" does not exist', 10>>();
+	expectTypeOf<
+		V<"SELECT ROW(1, sum(id) OVER nope) FROM users">
+	>().toEqualTypeOf<SqlError<'window "nope" does not exist', 10>>();
+	expectTypeOf<
+		V<"SELECT 1 IS DISTINCT FROM sum(id) OVER nope FROM users">
+	>().toEqualTypeOf<SqlError<'window "nope" does not exist', 10>>();
+	expectTypeOf<
+		V<"SELECT sum(id) OVER nope BETWEEN 1 AND 2 FROM users">
+	>().toEqualTypeOf<SqlError<'window "nope" does not exist', 6>>();
+	expectTypeOf<
+		V<"SELECT 1 BETWEEN sum(id) OVER nope AND 2 FROM users">
+	>().toEqualTypeOf<SqlError<'window "nope" does not exist', 8>>();
+	expectTypeOf<
+		V<"SELECT 1 IN (2, sum(id) OVER nope) FROM users">
+	>().toEqualTypeOf<SqlError<'window "nope" does not exist', 11>>();
+	expectTypeOf<
+		V<"SELECT email LIKE email || (sum(id) OVER nope)::text FROM users">
+	>().toEqualTypeOf<SqlError<'window "nope" does not exist', 11>>();
+	expectTypeOf<
+		V<"SELECT (ARRAY[1])[sum(id) OVER nope] FROM users">
+	>().toEqualTypeOf<SqlError<'window "nope" does not exist', 13>>();
+	expectTypeOf<
+		V<"SELECT now() AT TIME ZONE (sum(id) OVER nope)::text FROM users">
+	>().toEqualTypeOf<SqlError<'window "nope" does not exist', 13>>();
+	expectTypeOf<
+		V<"SELECT 1 = ANY (ARRAY[sum(id) OVER nope]) FROM users">
+	>().toEqualTypeOf<SqlError<'window "nope" does not exist', 12>>();
+	expectTypeOf<
+		V<"SELECT 1 = ANY (SELECT sum(id) OVER w FROM users WINDOW w AS ()) FROM users">
+	>().toEqualTypeOf<"SELECT 1 = ANY (SELECT sum(id) OVER w FROM users WINDOW w AS ()) FROM users">();
+	expectTypeOf<
+		V<"SELECT (sum(id) OVER nope)::text FROM users">
+	>().toEqualTypeOf<SqlError<'window "nope" does not exist', 7>>();
+	expectTypeOf<
+		V<"SELECT 1 + 2 + sum(id) OVER nope FROM users">
+	>().toEqualTypeOf<SqlError<'window "nope" does not exist', 10>>();
+	expectTypeOf<
+		V<"SELECT coalesce(1, 2, sum(id) OVER nope) FROM users">
+	>().toEqualTypeOf<SqlError<'window "nope" does not exist', 12>>();
+});
+
+test("a window in the operand of IN (SELECT …) is checked", () => {
+	expectTypeOf<
+		V<"SELECT sum(id) OVER nope IN (SELECT 1) FROM users">
+	>().toEqualTypeOf<SqlError<'window "nope" does not exist', 6>>();
+});
+
 test("window errors", () => {
 	expectTypeOf<V<"SELECT rank() OVER w FROM things">>().toEqualTypeOf<
 		SqlError<'window "w" does not exist', 5>

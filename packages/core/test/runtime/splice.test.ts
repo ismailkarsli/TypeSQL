@@ -127,6 +127,25 @@ describe("createSql runtime", () => {
 			text: "SELECT $1::jsonb",
 			values: [{ a: 1 }],
 		});
+		// braces in a literal look like a slot; the first argument is still a value unless every
+		// member of it is a fragment
+		expect(sql.as("SELECT '{a}'::text[], $1::int", 5)).toEqual({
+			text: "SELECT '{a}'::text[], $1::int",
+			values: [5],
+		});
+		expect(sql.as("SELECT '{a}'::text[] WHERE id = :id", { id: 5 })).toEqual({
+			text: "SELECT '{a}'::text[] WHERE id = $1",
+			values: [5],
+		});
+	});
+
+	it(":name parameters take exactly one object argument", () => {
+		const message =
+			"typesql: a statement with :name parameters takes exactly one object argument";
+		expect(() => sql.as("SELECT :id")).toThrow(message);
+		expect(() => sql.as("SELECT :id", { id: 1 }, 2)).toThrow(message);
+		expect(() => sql.as("SELECT :id", null)).toThrow(message);
+		expect(() => sql.as("SELECT :id", 1)).toThrow(message);
 	});
 });
 

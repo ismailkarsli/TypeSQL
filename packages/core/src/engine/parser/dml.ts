@@ -12,7 +12,7 @@ import type {
 	WithClause,
 } from "../ast.js";
 import type { OpTok, Toks, WordTok } from "../lexer/tokens.js";
-import type { ParseExpr, SkipOrderTail } from "./expr.js";
+import type { ParseExpr } from "./expr.js";
 import type {
 	IsSelectStart,
 	ParseFromList,
@@ -233,16 +233,23 @@ type ParseConflictTarget<T extends Toks, I extends number> =
 				? Ok<null, J>
 				: Expected<"constraint name", T, EatWords<T, I, ["on", "constraint"]>>;
 
-/** `expr [opclass] [ASC|DESC] [NULLS FIRST|LAST], ...)` — `I` is just inside the paren. */
+/**
+ * `expr [opclass], ...)` — `I` is just inside the paren. A sort order (`ASC`, `NULLS FIRST`)
+ * parses but is rejected, as Postgres does for an ON CONFLICT target.
+ */
 type ParseIndexParams<T extends Toks, I extends number> =
 	ParseExpr<T, I, 0> extends infer X
 		? X extends Ok<unknown, infer J extends number>
-			? SkipOrderTail<T, SkipOpClass<T, J>> extends infer J2 extends number
-				? EatOp<T, J2, ","> extends never
-					? EatOp<T, J2, ")"> extends never
-						? Expected<'"," or ")"', T, J2>
-						: Ok<null, EatOp<T, J2, ")">>
-					: ParseIndexParams<T, EatOp<T, J2, ",">>
+			? SkipOpClass<T, J> extends infer J2 extends number
+				? T[J2] extends WordTok<"asc" | "desc">
+					? Fail<"ASC/DESC is not allowed in ON CONFLICT clause", I>
+					: T[J2] extends WordTok<"nulls">
+						? Fail<"NULLS FIRST/LAST is not allowed in ON CONFLICT clause", I>
+						: EatOp<T, J2, ","> extends never
+							? EatOp<T, J2, ")"> extends never
+								? Expected<'"," or ")"', T, J2>
+								: Ok<null, EatOp<T, J2, ")">>
+							: ParseIndexParams<T, EatOp<T, J2, ",">>
 				: never
 			: X
 		: never;
@@ -406,29 +413,35 @@ type ParseSetItem<T extends Toks, I extends number> =
 export type ParseAssignTarget<T extends Toks, I extends number> =
 	Ident<T, I> extends [infer Col extends string, infer J extends number]
 		? T[J] extends OpTok<"[" | ".">
-			? ParseIndirection<T, J, Col, { t: "col"; tbl: null; name: Col }>
+			? ParseIndirection<T, J, [Col, I], { t: "col"; tbl: null; name: Col }>
 			: Ok<[Col, null], J>
 		: Expected<"column name", T, I>;
 
-type ParseIndirection<T extends Toks, I extends number, Col extends string, E> =
+/** `Tg`: the target column and its token. */
+type ParseIndirection<
+	T extends Toks,
+	I extends number,
+	Tg extends readonly [string, number],
+	E,
+> =
 	T[I] extends OpTok<"[">
-		? ParseIndSubscript<T, Nx<I>, Col, E>
+		? ParseIndSubscript<T, Nx<I>, Tg, E>
 		: T[I] extends OpTok<".">
 			? T[Nx<I>] extends OpTok<"*">
-				? ParseIndirection<T, Nx<Nx<I>>, Col, { t: "field"; e: E; name: "*" }>
+				? Fail<'row expansion via "*" is not supported here', Tg[1]>
 				: AnyLabel<T, Nx<I>> extends [
 							infer N extends string,
 							infer J extends number,
 						]
-					? ParseIndirection<T, J, Col, { t: "field"; e: E; name: N }>
+					? ParseIndirection<T, J, Tg, { t: "field"; e: E; name: N }>
 					: Expected<"field name", T, Nx<I>>
-			: Ok<[Col, E], I>;
+			: Ok<[Tg[0], E], I>;
 
 /** After `[`: `i]`, `lo:hi]`, `:hi]`, `lo:]`, `:]`. */
 type ParseIndSubscript<
 	T extends Toks,
 	I extends number,
-	Col extends string,
+	Tg extends readonly [string, number],
 	E,
 > =
 	EatOp<T, I, ":"> extends never
@@ -437,20 +450,15 @@ type ParseIndSubscript<
 				? EatOp<T, J, "]"> extends never
 					? EatOp<T, J, ":"> extends never
 						? Expected<'"]"', T, J>
-						: ParseIndSliceHi<T, EatOp<T, J, ":">, Col, E, Ix>
-					: ParseIndirection<
-							T,
-							EatOp<T, J, "]">,
-							Col,
-							{ t: "idx"; e: E; i: Ix }
-						>
+						: ParseIndSliceHi<T, EatOp<T, J, ":">, Tg, E, Ix>
+					: ParseIndirection<T, EatOp<T, J, "]">, Tg, { t: "idx"; e: E; i: Ix }>
 				: X
 			: never
-		: ParseIndSliceHi<T, EatOp<T, I, ":">, Col, E, null>;
+		: ParseIndSliceHi<T, EatOp<T, I, ":">, Tg, E, null>;
 type ParseIndSliceHi<
 	T extends Toks,
 	I extends number,
-	Col extends string,
+	Tg extends readonly [string, number],
 	E,
 	Lo,
 > =
@@ -462,7 +470,7 @@ type ParseIndSliceHi<
 					: ParseIndirection<
 							T,
 							EatOp<T, J, "]">,
-							Col,
+							Tg,
 							{ t: "slice"; e: E; lo: Lo; hi: Hi }
 						>
 				: X
@@ -470,7 +478,7 @@ type ParseIndSliceHi<
 		: ParseIndirection<
 				T,
 				EatOp<T, I, "]">,
-				Col,
+				Tg,
 				{ t: "slice"; e: E; lo: Lo; hi: null }
 			>;
 
@@ -478,10 +486,13 @@ type ParseIndSliceHi<
  * `(target, ...)` → `Ok<[cols, ind], next>`: the column names, and the indirection of each
  * (`null` when no target has any, the common case). Token `I` must be `(`.
  */
-export type ParenTargetList<T extends Toks, I extends number> =
-	EatOp<T, I, "("> extends never
-		? Expected<'"("', T, I>
-		: TargetListLoop<T, EatOp<T, I, "(">, [], [], false>;
+export type ParenTargetList<T extends Toks, I extends number> = TargetListLoop<
+	T,
+	Nx<I>,
+	[],
+	[],
+	false
+>;
 type TargetListLoop<
 	T extends Toks,
 	I extends number,
@@ -500,9 +511,11 @@ type TargetListLoop<
 					: Ok<
 							[
 								[...Cols, N],
-								(Ind extends null ? Any : true) extends true
+								Any extends true
 									? [...Inds, Ind]
-									: null,
+									: Ind extends null
+										? null
+										: [...Inds, Ind],
 							],
 							EatOp<T, J, ")">
 						>
@@ -511,7 +524,7 @@ type TargetListLoop<
 						EatOp<T, J, ",">,
 						[...Cols, N],
 						[...Inds, Ind],
-						Ind extends null ? Any : true
+						Ind extends null ? Any : true // type-mutate: equivalent never-false – Any is read with `extends true`, so never counts as true
 					>
 			: X
 		: never;

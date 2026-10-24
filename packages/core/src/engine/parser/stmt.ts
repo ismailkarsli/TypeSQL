@@ -14,7 +14,7 @@ import type { ParseCursorStmt } from "./utility.js";
  */
 export type ParseProgram<T extends Toks> =
 	ParseStatement<T, 0> extends infer X
-		? X extends Ok<infer S extends Stmt, infer J extends number>
+		? X extends Ok<infer S extends Stmt, infer J>
 			? AtEnd<T, J> extends true
 				? S
 				: EatOp<T, J, ";"> extends never
@@ -106,7 +106,7 @@ type SelectInto<R> = R extends readonly [
 ]
 	? R extends Ok<
 			infer S extends { readonly body: { readonly into: unknown } },
-			infer J extends number
+			infer J
 		>
 		? Ok<
 				{
@@ -120,12 +120,12 @@ type SelectInto<R> = R extends readonly [
 				},
 				J
 			>
-		: R
+		: R // type-mutate: equivalent never-false – an Ok tuple of that shape always matches Ok
 	: R;
 
 type ParseWithStatement<T extends Toks, I extends number> =
 	ParseWith<T, I> extends infer W
-		? W extends Ok<infer Wc extends WithClause, infer J extends number>
+		? W extends Ok<infer Wc extends WithClause, infer J>
 			? T[J] extends WordTok<infer K>
 				? K extends "select" | "values" | "table"
 					? SelectInto<ParseSelectAfterWith<T, J, Wc>>

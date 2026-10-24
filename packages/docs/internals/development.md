@@ -170,6 +170,9 @@ A disagreement is one of:
 - `accepts`: Postgres reported a syntax error, our parser accepts the statement. Utility
   statements the parser skips to the next `;` without validating them (CREATE INDEX, GRANT,
   SET, …; the summary counts them) are not counted.
+- `position`: both report a syntax error, at different tokens. Postgres's message names the token
+  (`at or near "…"`, or `at end of input`), and so does ours (`at or near …`): the two must name
+  the same one, compared case-insensitively. Skipped utility statements are not compared.
 - `crash`: the compiler gave up on the statement (e.g. TS2589), whatever Postgres did.
 
 `baseline.json` lists every current disagreement by file, kind and a hash of the statement text
@@ -192,7 +195,7 @@ git add vendor/postgres packages/core/test/pg-regress/baseline.json
 
 ## Parse trees
 
-pg-regress only checks *whether* a statement parses. `pnpm test:pg-ast`
+pg-regress only checks *whether* a statement parses, and where a syntax error is. `pnpm test:pg-ast`
 (`packages/core/test/pg-ast/`) checks *how*: every statement of the regression tests that
 PostgreSQL's own parser accepts, and every statement of our type tests, is parsed by both
 parsers and printed in one canonical, fully parenthesized form, then compared as text:
@@ -393,7 +396,11 @@ engine agrees with PostgreSQL on every statement the oracles can replay.
 
 No coverage tool sees inside conditional types, so mutation testing is the coverage measure for
 `packages/core/src/engine`, `schema` and `type-map`: `scripts/type-mutate.ts` changes one type
-at a time and checks that some type test fails.
+at a time and checks that some type test fails. The generated function table
+(`engine/typer/pg-functions.ts`) is skipped: its entries are copied from `pg_proc` and checked by
+the oracles, so a test per entry would only restate it (`--mutate <path>` still reaches it). A
+curated table the oracles check the same way is skipped with a comment on the line before its
+declaration, `// type-mutate: table – <reason>` (`FunctionCatalog` in `typer/catalog.ts`).
 
 ```sh
 pnpm mutate:types --changed                  # mutants on lines changed since the base; survivors fail
@@ -410,7 +417,7 @@ The mutators (`scripts/type-mutate/sites.ts`), found with the TypeScript AST:
 | Mutator | Mutant |
 |---|---|
 | `cond-swap` | the branches of a conditional type swapped |
-| `cond-true`, `cond-false` | its test always / never taken: one branch in both places |
+| `cond-true`, `cond-false` | its test always / never taken: one branch in both places (not `cond-true`, nor `never-false`, when the test always matches: `X extends infer S` without a constraint, `X extends unknown`, `X extends any`) |
 | `never-true`, `never-false` | a branch replaced with `never` |
 | `bool-flip` | `true` ↔ `false` |
 | `union-drop` | one member of a union of string literals dropped |

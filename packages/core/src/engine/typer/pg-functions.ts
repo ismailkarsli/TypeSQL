@@ -11,7 +11,7 @@ import type { Sig } from "./catalog.js";
 
 export interface PgFunctions {
   acldefault: Sig<["..."], "aclitem[]">;
-  aclexplode: Sig<["..."], "record", { srf: true }>; // type-mutate: equivalent bool-flip – a record result types the same with or without srf
+  aclexplode: Sig<["..."], "record", { srf: true }>;
   amvalidate: Sig<["..."], "bool">;
   area: Sig<["..."], "float8">;
   array_reverse: Sig<["..."], "unknown", { nullable: true }>;
@@ -79,11 +79,11 @@ export interface PgFunctions {
   isparallel: Sig<["..."], "bool">;
   isperp: Sig<["..."], "bool">;
   isvertical: Sig<["..."], "bool">;
-  json_each: Sig<["..."], "record", { srf: true }>; // type-mutate: equivalent bool-flip – a record result types the same with or without srf
-  json_each_text: Sig<["..."], "record", { srf: true }>; // type-mutate: equivalent bool-flip – a record result types the same with or without srf
+  json_each: Sig<["..."], "record", { srf: true }>;
+  json_each_text: Sig<["..."], "record", { srf: true }>;
   json_to_tsvector: Sig<["..."], "tsvector">;
-  jsonb_each: Sig<["..."], "record", { srf: true }>; // type-mutate: equivalent bool-flip – a record result types the same with or without srf
-  jsonb_each_text: Sig<["..."], "record", { srf: true }>; // type-mutate: equivalent bool-flip – a record result types the same with or without srf
+  jsonb_each: Sig<["..."], "record", { srf: true }>;
+  jsonb_each_text: Sig<["..."], "record", { srf: true }>;
   jsonb_populate_record_valid: Sig<["..."], "bool", { nullable: true }>;
   jsonb_to_tsvector: Sig<["..."], "tsvector">;
   lgamma: Sig<["..."], "float8">;
@@ -122,15 +122,15 @@ export interface PgFunctions {
   numeric_sqrt: Sig<["..."], "numeric">;
   numrange_subdiff: Sig<["..."], "float8">;
   oidvectortypes: Sig<["..."], "text">;
-  overlay: Sig<["..."], "unknown", { nullable: true }>; // type-mutate: equivalent – OVERLAY(… PLACING …) is special syntax and the plain call form is rejected by the parser
+  overlay: Sig<["..."], "unknown", { nullable: true }>;
   pclose: Sig<["..."], "path">;
   pg_advisory_lock_shared: Sig<["..."], "void">;
   pg_advisory_unlock_all: Sig<["..."], "void">;
   pg_advisory_unlock_shared: Sig<["..."], "bool">;
   pg_advisory_xact_lock_shared: Sig<["..."], "void">;
-  pg_available_extension_versions: Sig<["..."], "record", { srf: true }>; // type-mutate: equivalent bool-flip – a record result types the same with or without srf
-  pg_available_extensions: Sig<["..."], "record", { srf: true }>; // type-mutate: equivalent bool-flip – a record result types the same with or without srf
-  pg_available_wal_summaries: Sig<["..."], "record", { srf: true }>; // type-mutate: equivalent bool-flip – a record result types the same with or without srf
+  pg_available_extension_versions: Sig<["..."], "record", { srf: true }>;
+  pg_available_extensions: Sig<["..."], "record", { srf: true }>;
+  pg_available_wal_summaries: Sig<["..."], "record", { srf: true }>;
   pg_backup_start: Sig<["..."], "pg_lsn">;
   pg_backup_stop: Sig<["..."], "record">;
   pg_basetype: Sig<["..."], "regtype">;
@@ -144,7 +144,7 @@ export interface PgFunctions {
   pg_column_compression: Sig<["..."], "text">;
   pg_column_is_updatable: Sig<["..."], "bool">;
   pg_column_toast_chunk_id: Sig<["..."], "oid">;
-  pg_config: Sig<["..."], "record", { srf: true }>; // type-mutate: equivalent bool-flip – a record result types the same with or without srf
+  pg_config: Sig<["..."], "record", { srf: true }>;
   pg_control_checkpoint: Sig<["..."], "record">;
   pg_control_init: Sig<["..."], "record">;
   pg_control_recovery: Sig<["..."], "record">;
@@ -161,25 +161,25 @@ export interface PgFunctions {
   pg_current_wal_insert_lsn: Sig<["..."], "pg_lsn">;
   pg_current_wal_lsn: Sig<["..."], "pg_lsn">;
   pg_current_xact_id_if_assigned: Sig<["..."], "xid8">;
-  pg_cursor: Sig<["..."], "record", { srf: true }>; // type-mutate: equivalent bool-flip – a record result types the same with or without srf
+  pg_cursor: Sig<["..."], "record", { srf: true }>;
   pg_database_collation_actual_version: Sig<["..."], "text">;
   pg_describe_object: Sig<["..."], "text">;
   pg_drop_replication_slot: Sig<["..."], "void">;
   pg_encoding_max_length: Sig<["..."], "int4">;
   pg_encoding_to_char: Sig<["..."], "name">;
-  pg_event_trigger_ddl_commands: Sig<["..."], "record", { srf: true }>; // type-mutate: equivalent bool-flip – a record result types the same with or without srf
-  pg_event_trigger_dropped_objects: Sig<["..."], "record", { srf: true }>; // type-mutate: equivalent bool-flip – a record result types the same with or without srf
+  pg_event_trigger_ddl_commands: Sig<["..."], "record", { srf: true }>;
+  pg_event_trigger_dropped_objects: Sig<["..."], "record", { srf: true }>;
   pg_event_trigger_table_rewrite_oid: Sig<["..."], "oid">;
   pg_event_trigger_table_rewrite_reason: Sig<["..."], "int4">;
   pg_export_snapshot: Sig<["..."], "text">;
   pg_extension_config_dump: Sig<["..."], "void">;
-  pg_extension_update_paths: Sig<["..."], "record", { srf: true }>; // type-mutate: equivalent bool-flip – a record result types the same with or without srf
+  pg_extension_update_paths: Sig<["..."], "record", { srf: true }>;
   pg_filenode_relation: Sig<["..."], "regclass">;
   pg_function_is_visible: Sig<["..."], "bool">;
   pg_get_acl: Sig<["..."], "aclitem[]">;
-  pg_get_aios: Sig<["..."], "record", { srf: true }>; // type-mutate: equivalent bool-flip – a record result types the same with or without srf
-  pg_get_backend_memory_contexts: Sig<["..."], "record", { srf: true }>; // type-mutate: equivalent bool-flip – a record result types the same with or without srf
-  pg_get_catalog_foreign_keys: Sig<["..."], "record", { srf: true }>; // type-mutate: equivalent bool-flip – a record result types the same with or without srf
+  pg_get_aios: Sig<["..."], "record", { srf: true }>;
+  pg_get_backend_memory_contexts: Sig<["..."], "record", { srf: true }>;
+  pg_get_catalog_foreign_keys: Sig<["..."], "record", { srf: true }>;
   pg_get_constraintdef: Sig<["..."], "text">;
   pg_get_expr: Sig<["..."], "text">;
   pg_get_function_arg_default: Sig<["..."], "text">;
@@ -189,33 +189,33 @@ export interface PgFunctions {
   pg_get_function_sqlbody: Sig<["..."], "text">;
   pg_get_functiondef: Sig<["..."], "text">;
   pg_get_indexdef: Sig<["..."], "text">;
-  pg_get_keywords: Sig<["..."], "record", { srf: true }>; // type-mutate: equivalent bool-flip – a record result types the same with or without srf
-  pg_get_loaded_modules: Sig<["..."], "record", { srf: true }>; // type-mutate: equivalent bool-flip – a record result types the same with or without srf
-  pg_get_multixact_members: Sig<["..."], "record", { srf: true }>; // type-mutate: equivalent bool-flip – a record result types the same with or without srf
+  pg_get_keywords: Sig<["..."], "record", { srf: true }>;
+  pg_get_loaded_modules: Sig<["..."], "record", { srf: true }>;
+  pg_get_multixact_members: Sig<["..."], "record", { srf: true }>;
   pg_get_object_address: Sig<["..."], "record">;
   pg_get_partition_constraintdef: Sig<["..."], "text">;
   pg_get_partkeydef: Sig<["..."], "text">;
-  pg_get_publication_tables: Sig<["..."], "record", { srf: true }>; // type-mutate: equivalent bool-flip – a record result types the same with or without srf
+  pg_get_publication_tables: Sig<["..."], "record", { srf: true }>;
   pg_get_replica_identity_index: Sig<["..."], "regclass">;
   pg_get_replication_slots: Sig<["..."], "record", { srf: true; nullable: true }>;
   pg_get_ruledef: Sig<["..."], "text">;
   pg_get_sequence_data: Sig<["..."], "record">;
   pg_get_serial_sequence: Sig<["..."], "text">;
-  pg_get_shmem_allocations: Sig<["..."], "record", { srf: true }>; // type-mutate: equivalent bool-flip – a record result types the same with or without srf
-  pg_get_shmem_allocations_numa: Sig<["..."], "record", { srf: true }>; // type-mutate: equivalent bool-flip – a record result types the same with or without srf
+  pg_get_shmem_allocations: Sig<["..."], "record", { srf: true }>;
+  pg_get_shmem_allocations_numa: Sig<["..."], "record", { srf: true }>;
   pg_get_statisticsobjdef: Sig<["..."], "text">;
   pg_get_statisticsobjdef_columns: Sig<["..."], "text">;
   pg_get_statisticsobjdef_expressions: Sig<["..."], "text[]">;
   pg_get_triggerdef: Sig<["..."], "text">;
   pg_get_userbyid: Sig<["..."], "name">;
   pg_get_viewdef: Sig<["..."], "text">;
-  pg_get_wait_events: Sig<["..."], "record", { srf: true }>; // type-mutate: equivalent bool-flip – a record result types the same with or without srf
+  pg_get_wait_events: Sig<["..."], "record", { srf: true }>;
   pg_get_wal_replay_pause_state: Sig<["..."], "text">;
-  pg_get_wal_resource_managers: Sig<["..."], "record", { srf: true }>; // type-mutate: equivalent bool-flip – a record result types the same with or without srf
+  pg_get_wal_resource_managers: Sig<["..."], "record", { srf: true }>;
   pg_get_wal_summarizer_state: Sig<["..."], "record">;
   pg_has_role: Sig<["..."], "bool">;
-  pg_hba_file_rules: Sig<["..."], "record", { srf: true }>; // type-mutate: equivalent bool-flip – a record result types the same with or without srf
-  pg_ident_file_mappings: Sig<["..."], "record", { srf: true }>; // type-mutate: equivalent bool-flip – a record result types the same with or without srf
+  pg_hba_file_rules: Sig<["..."], "record", { srf: true }>;
+  pg_ident_file_mappings: Sig<["..."], "record", { srf: true }>;
   pg_identify_object: Sig<["..."], "record">;
   pg_identify_object_as_address: Sig<["..."], "record">;
   pg_import_system_collations: Sig<["..."], "int4">;
@@ -235,7 +235,7 @@ export interface PgFunctions {
   pg_last_wal_replay_lsn: Sig<["..."], "pg_lsn">;
   pg_last_xact_replay_timestamp: Sig<["..."], "timestamptz">;
   pg_listening_channels: Sig<["..."], "text", { srf: true }>;
-  pg_lock_status: Sig<["..."], "record", { srf: true }>; // type-mutate: equivalent bool-flip – a record result types the same with or without srf
+  pg_lock_status: Sig<["..."], "record", { srf: true }>;
   pg_log_backend_memory_contexts: Sig<["..."], "bool">;
   pg_log_standby_snapshot: Sig<["..."], "pg_lsn">;
   pg_logical_emit_message: Sig<["..."], "pg_lsn">;
@@ -243,17 +243,17 @@ export interface PgFunctions {
   pg_logical_slot_get_changes: Sig<["..."], "record", { srf: true; nullable: true }>;
   pg_logical_slot_peek_binary_changes: Sig<["..."], "record", { srf: true; nullable: true }>;
   pg_logical_slot_peek_changes: Sig<["..."], "record", { srf: true; nullable: true }>;
-  pg_ls_archive_statusdir: Sig<["..."], "record", { srf: true }>; // type-mutate: equivalent bool-flip – a record result types the same with or without srf
+  pg_ls_archive_statusdir: Sig<["..."], "record", { srf: true }>;
   pg_ls_dir: Sig<["..."], "text", { srf: true }>;
-  pg_ls_logdir: Sig<["..."], "record", { srf: true }>; // type-mutate: equivalent bool-flip – a record result types the same with or without srf
-  pg_ls_logicalmapdir: Sig<["..."], "record", { srf: true }>; // type-mutate: equivalent bool-flip – a record result types the same with or without srf
-  pg_ls_logicalsnapdir: Sig<["..."], "record", { srf: true }>; // type-mutate: equivalent bool-flip – a record result types the same with or without srf
-  pg_ls_replslotdir: Sig<["..."], "record", { srf: true }>; // type-mutate: equivalent bool-flip – a record result types the same with or without srf
-  pg_ls_summariesdir: Sig<["..."], "record", { srf: true }>; // type-mutate: equivalent bool-flip – a record result types the same with or without srf
-  pg_ls_tmpdir: Sig<["..."], "record", { srf: true }>; // type-mutate: equivalent bool-flip – a record result types the same with or without srf
-  pg_ls_waldir: Sig<["..."], "record", { srf: true }>; // type-mutate: equivalent bool-flip – a record result types the same with or without srf
+  pg_ls_logdir: Sig<["..."], "record", { srf: true }>;
+  pg_ls_logicalmapdir: Sig<["..."], "record", { srf: true }>;
+  pg_ls_logicalsnapdir: Sig<["..."], "record", { srf: true }>;
+  pg_ls_replslotdir: Sig<["..."], "record", { srf: true }>;
+  pg_ls_summariesdir: Sig<["..."], "record", { srf: true }>;
+  pg_ls_tmpdir: Sig<["..."], "record", { srf: true }>;
+  pg_ls_waldir: Sig<["..."], "record", { srf: true }>;
   pg_lsn: Sig<["..."], "pg_lsn">;
-  pg_mcv_list_items: Sig<["..."], "record", { srf: true }>; // type-mutate: equivalent bool-flip – a record result types the same with or without srf
+  pg_mcv_list_items: Sig<["..."], "record", { srf: true }>;
   pg_my_temp_schema: Sig<["..."], "oid">;
   pg_nextoid: Sig<["..."], "oid">;
   pg_notification_queue_usage: Sig<["..."], "float8">;
@@ -261,12 +261,12 @@ export interface PgFunctions {
   pg_opclass_is_visible: Sig<["..."], "bool">;
   pg_operator_is_visible: Sig<["..."], "bool">;
   pg_opfamily_is_visible: Sig<["..."], "bool">;
-  pg_options_to_table: Sig<["..."], "record", { srf: true }>; // type-mutate: equivalent bool-flip – a record result types the same with or without srf
+  pg_options_to_table: Sig<["..."], "record", { srf: true }>;
   pg_partition_ancestors: Sig<["..."], "regclass", { srf: true }>;
   pg_partition_root: Sig<["..."], "regclass">;
-  pg_partition_tree: Sig<["..."], "record", { srf: true }>; // type-mutate: equivalent bool-flip – a record result types the same with or without srf
-  pg_prepared_statement: Sig<["..."], "record", { srf: true }>; // type-mutate: equivalent bool-flip – a record result types the same with or without srf
-  pg_prepared_xact: Sig<["..."], "record", { srf: true }>; // type-mutate: equivalent bool-flip – a record result types the same with or without srf
+  pg_partition_tree: Sig<["..."], "record", { srf: true }>;
+  pg_prepared_statement: Sig<["..."], "record", { srf: true }>;
+  pg_prepared_xact: Sig<["..."], "record", { srf: true }>;
   pg_promote: Sig<["..."], "bool">;
   pg_read_binary_file: Sig<["..."], "bytea">;
   pg_read_file: Sig<["..."], "text">;
@@ -294,8 +294,8 @@ export interface PgFunctions {
   pg_sequence_last_value: Sig<["..."], "int8">;
   pg_sequence_parameters: Sig<["..."], "record">;
   pg_settings_get_flags: Sig<["..."], "text[]">;
-  pg_show_all_file_settings: Sig<["..."], "record", { srf: true }>; // type-mutate: equivalent bool-flip – a record result types the same with or without srf
-  pg_show_all_settings: Sig<["..."], "record", { srf: true }>; // type-mutate: equivalent bool-flip – a record result types the same with or without srf
+  pg_show_all_file_settings: Sig<["..."], "record", { srf: true }>;
+  pg_show_all_settings: Sig<["..."], "record", { srf: true }>;
   pg_show_replication_origin_status: Sig<["..."], "record", { srf: true; nullable: true }>;
   pg_size_bytes: Sig<["..."], "int8">;
   pg_snapshot_xip: Sig<["..."], "xid8", { srf: true }>;
@@ -316,7 +316,7 @@ export interface PgFunctions {
   pg_stat_get_backend_client_port: Sig<["..."], "int4">;
   pg_stat_get_backend_dbid: Sig<["..."], "oid">;
   pg_stat_get_backend_idset: Sig<["..."], "int4", { srf: true }>;
-  pg_stat_get_backend_io: Sig<["..."], "record", { srf: true }>; // type-mutate: equivalent bool-flip – a record result types the same with or without srf
+  pg_stat_get_backend_io: Sig<["..."], "record", { srf: true }>;
   pg_stat_get_backend_pid: Sig<["..."], "int4">;
   pg_stat_get_backend_start: Sig<["..."], "timestamptz">;
   pg_stat_get_backend_subxact: Sig<["..."], "record">;
@@ -381,7 +381,7 @@ export interface PgFunctions {
   pg_stat_get_function_self_time: Sig<["..."], "float8">;
   pg_stat_get_function_total_time: Sig<["..."], "float8">;
   pg_stat_get_ins_since_vacuum: Sig<["..."], "int8">;
-  pg_stat_get_io: Sig<["..."], "record", { srf: true }>; // type-mutate: equivalent bool-flip – a record result types the same with or without srf
+  pg_stat_get_io: Sig<["..."], "record", { srf: true }>;
   pg_stat_get_last_analyze_time: Sig<["..."], "timestamptz">;
   pg_stat_get_last_autoanalyze_time: Sig<["..."], "timestamptz">;
   pg_stat_get_last_autovacuum_time: Sig<["..."], "timestamptz">;
@@ -390,8 +390,8 @@ export interface PgFunctions {
   pg_stat_get_live_tuples: Sig<["..."], "int8">;
   pg_stat_get_mod_since_analyze: Sig<["..."], "int8">;
   pg_stat_get_numscans: Sig<["..."], "int8">;
-  pg_stat_get_progress_info: Sig<["..."], "record", { srf: true }>; // type-mutate: equivalent bool-flip – a record result types the same with or without srf
-  pg_stat_get_recovery_prefetch: Sig<["..."], "record", { srf: true }>; // type-mutate: equivalent bool-flip – a record result types the same with or without srf
+  pg_stat_get_progress_info: Sig<["..."], "record", { srf: true }>;
+  pg_stat_get_recovery_prefetch: Sig<["..."], "record", { srf: true }>;
   pg_stat_get_replication_slot: Sig<["..."], "record">;
   pg_stat_get_slru: Sig<["..."], "record", { srf: true; nullable: true }>;
   pg_stat_get_snapshot_timestamp: Sig<["..."], "timestamptz">;
@@ -443,9 +443,9 @@ export interface PgFunctions {
   pg_tablespace_databases: Sig<["..."], "oid", { srf: true }>;
   pg_tablespace_location: Sig<["..."], "text">;
   pg_tablespace_size: Sig<["..."], "int8">;
-  pg_timezone_abbrevs_abbrevs: Sig<["..."], "record", { srf: true }>; // type-mutate: equivalent bool-flip – a record result types the same with or without srf
-  pg_timezone_abbrevs_zone: Sig<["..."], "record", { srf: true }>; // type-mutate: equivalent bool-flip – a record result types the same with or without srf
-  pg_timezone_names: Sig<["..."], "record", { srf: true }>; // type-mutate: equivalent bool-flip – a record result types the same with or without srf
+  pg_timezone_abbrevs_abbrevs: Sig<["..."], "record", { srf: true }>;
+  pg_timezone_abbrevs_zone: Sig<["..."], "record", { srf: true }>;
+  pg_timezone_names: Sig<["..."], "record", { srf: true }>;
   pg_trigger_depth: Sig<["..."], "int4">;
   pg_try_advisory_lock_shared: Sig<["..."], "bool">;
   pg_try_advisory_xact_lock: Sig<["..."], "bool">;
@@ -459,7 +459,7 @@ export interface PgFunctions {
   pg_wal_lsn_diff: Sig<["..."], "numeric">;
   pg_wal_replay_pause: Sig<["..."], "void">;
   pg_wal_replay_resume: Sig<["..."], "void">;
-  pg_wal_summary_contents: Sig<["..."], "record", { srf: true }>; // type-mutate: equivalent bool-flip – a record result types the same with or without srf
+  pg_wal_summary_contents: Sig<["..."], "record", { srf: true }>;
   pg_walfile_name: Sig<["..."], "text">;
   pg_walfile_name_offset: Sig<["..."], "record">;
   pg_xact_commit_timestamp: Sig<["..."], "timestamptz">;
@@ -496,10 +496,10 @@ export interface PgFunctions {
   to_regprocedure: Sig<["..."], "regprocedure">;
   to_regrole: Sig<["..."], "regrole">;
   to_regtypemod: Sig<["..."], "int4">;
-  ts_debug: Sig<["..."], "record", { srf: true }>; // type-mutate: equivalent bool-flip – a record result types the same with or without srf
-  ts_parse: Sig<["..."], "record", { srf: true }>; // type-mutate: equivalent bool-flip – a record result types the same with or without srf
-  ts_stat: Sig<["..."], "record", { srf: true }>; // type-mutate: equivalent bool-flip – a record result types the same with or without srf
-  ts_token_type: Sig<["..."], "record", { srf: true }>; // type-mutate: equivalent bool-flip – a record result types the same with or without srf
+  ts_debug: Sig<["..."], "record", { srf: true }>;
+  ts_parse: Sig<["..."], "record", { srf: true }>;
+  ts_stat: Sig<["..."], "record", { srf: true }>;
+  ts_token_type: Sig<["..."], "record", { srf: true }>;
   tsrange_subdiff: Sig<["..."], "float8">;
   tstzrange_subdiff: Sig<["..."], "float8">;
   txid_current_if_assigned: Sig<["..."], "int8">;

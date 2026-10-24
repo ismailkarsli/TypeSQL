@@ -171,6 +171,9 @@ test("XMLTABLE", () => {
 		SqlError<'option name "__pg__is_not_null" cannot be used in XMLTABLE', 11>
 	>();
 	expectTypeOf<
+		V<"SELECT * FROM XMLTABLE('/r' PASSING null COLUMNS v1 int NOT 1)">
+	>().toEqualTypeOf<SqlError<"syntax error at or near 1", 12>>();
+	expectTypeOf<
 		V<"SELECT * FROM XMLTABLE('/r' PASSING null COLUMNS a int PATH 'a' PATH 'b')">
 	>().toEqualTypeOf<
 		SqlError<"only one PATH value per column is allowed", 13>

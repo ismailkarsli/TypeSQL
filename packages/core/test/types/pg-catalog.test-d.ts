@@ -27,7 +27,7 @@ test("the slice is opt-in: catalog relations are unknown without PgCatalog", () 
 	expectTypeOf<
 		Validate<App, "SELECT table_name FROM information_schema.tables">
 	>().toEqualTypeOf<
-		SqlError<'relation "information_schema.tables" does not exist', 0>
+		SqlError<'relation "information_schema.tables" does not exist', 3>
 	>();
 });
 
@@ -69,7 +69,40 @@ test("schema relations win over pg_catalog; public. never falls back", () => {
 		Row<"SELECT viewname FROM pg_catalog.pg_views">
 	>().toEqualTypeOf<{ viewname: string }>();
 	expectTypeOf<V<"SELECT tablename FROM public.pg_tables">>().toEqualTypeOf<
-		SqlError<'relation "pg_tables" does not exist', 5>
+		SqlError<'relation "public.pg_tables" does not exist', 3>
+	>();
+});
+
+test("data statements: a catalog relation is a view, a namespace is not a table, qualified names stay qualified", () => {
+	interface Ns extends PgCatalog {
+		users: { id: Col<"int4"> };
+		auth: { sessions: { id: Col<"uuid"> } };
+	}
+	type W<S extends string> = Validate<Ns, S>;
+	expectTypeOf<W<"UPDATE pg_class SET relname = 'x'">>().toEqualTypeOf<
+		SqlError<'cannot update view "pg_catalog.pg_class"', 0>
+	>();
+	expectTypeOf<W<"UPDATE nope SET x = 1">>().toEqualTypeOf<
+		SqlError<'relation "nope" does not exist', 1>
+	>();
+	// without the slice, the catalog relation is unknown
+	expectTypeOf<
+		Validate<App, "UPDATE pg_class SET relname = 'x'">
+	>().toEqualTypeOf<SqlError<'relation "pg_class" does not exist', 1>>();
+	expectTypeOf<W<"UPDATE auth SET x = 1">>().toEqualTypeOf<
+		SqlError<'"auth" is not a table', 1>
+	>();
+	expectTypeOf<W<"UPDATE public.nope SET x = 1">>().toEqualTypeOf<
+		SqlError<'relation "public.nope" does not exist', 1>
+	>();
+	expectTypeOf<W<"UPDATE nope.t SET x = 1">>().toEqualTypeOf<
+		SqlError<'relation "nope.t" does not exist', 1>
+	>();
+	expectTypeOf<W<"UPDATE auth.nope SET x = 1">>().toEqualTypeOf<
+		SqlError<'relation "auth.nope" does not exist', 1>
+	>();
+	expectTypeOf<W<"SELECT * FROM public.nope">>().toEqualTypeOf<
+		SqlError<'relation "public.nope" does not exist', 3>
 	>();
 });
 
@@ -102,7 +135,7 @@ test("catalog relations are read-only", () => {
 		SqlError<'cannot update view "pg_catalog.pg_settings"', 0>
 	>();
 	expectTypeOf<V<"DELETE FROM pg_catalog.pg_class">>().toEqualTypeOf<
-		SqlError<'cannot delete from view "pg_catalog.pg_class"', 0>
+		SqlError<'cannot delete from view "pg_catalog.pg_class"', 2>
 	>();
 });
 

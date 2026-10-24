@@ -1,6 +1,19 @@
 import { expectTypeOf, test } from "vitest";
+import type { Analyze, NormalizeTypeName } from "../../src/engine/index.js";
 import type { SqlError } from "../../src/index.js";
-import type { Interval, Row, V } from "./_schema.js";
+import type { DB, Interval, Row, V } from "./_schema.js";
+
+/** Postgres type of each column (the default type map gives timestamp and timestamptz one TS type). */
+type Types<Q extends string> =
+	Analyze<DB, Q> extends {
+		readonly cols: infer C extends readonly {
+			readonly t: { readonly type: string };
+		}[];
+	}
+		? { -readonly [K in keyof C]: C[K]["t"]["type"] }
+		: never;
+type Err<Q extends string> =
+	V<Q> extends SqlError<infer M extends string, unknown> ? M : "ok";
 
 // Every expectation here was checked against PostgreSQL 18 with `select pg_typeof(...)`.
 // Default type map: int2/int4/float4/float8 → number, int8/numeric → string, date/timestamp(tz) → Date,
@@ -164,6 +177,17 @@ test("AT TIME ZONE flips timestamp/timestamptz; EXTRACT → numeric, date_part �
 		Row<"SELECT at AT TIME ZONE 'utc' AS a, ts AT TIME ZONE 'utc' AS b, clock AT TIME ZONE 'utc' AS c, day AT TIME ZONE 'utc' AS d FROM things">
 	>().toEqualTypeOf<{ a: Date; b: Date; c: string; d: Date }>();
 	expectTypeOf<
+		Types<"SELECT at AT TIME ZONE 'utc', ts AT TIME ZONE 'utc', clock AT TIME ZONE 'utc', day AT TIME ZONE 'utc' FROM things">
+	>().toEqualTypeOf<["timestamp", "timestamptz", "timetz", "timestamp"]>();
+	expectTypeOf<
+		[
+			Err<"SELECT nope AT TIME ZONE 'utc'">,
+			Err<"SELECT now() AT TIME ZONE nope">,
+		]
+	>().toEqualTypeOf<
+		['column "nope" does not exist', 'column "nope" does not exist']
+	>();
+	expectTypeOf<
 		Row<"SELECT EXTRACT(year FROM at) AS a, EXTRACT(epoch FROM dur) AS b, date_part('year', at) AS c, EXTRACT(hour FROM n_at) AS d FROM things">
 	>().toEqualTypeOf<{ a: string; b: string; c: number; d: string | null }>();
 });
@@ -268,8 +292,71 @@ test("arrays, subscripts, slices, ARRAY / ROW constructors", () => {
 		Row<"SELECT ROW(1, 'a') AS a, (1, 2) AS b, ROW(n_id) AS c FROM things">
 	>().toEqualTypeOf<{ a: unknown; b: unknown; c: unknown }>();
 	expectTypeOf<
-		Row<"SELECT data[0] AS a, doc['a'] AS b FROM things">
-	>().toEqualTypeOf<{ a: unknown; b: unknown }>();
+		Row<"SELECT data[0] AS a, nums[1:2] AS b FROM things">
+	>().toEqualTypeOf<{ a: unknown; b: number[] }>();
+	// json, text, … have no subscripts; jsonb has no slices
+	expectTypeOf<V<"SELECT doc['a'] FROM things">>().toEqualTypeOf<
+		SqlError<
+			"cannot subscript type json because it does not support subscripting",
+			0
+		>
+	>();
+	expectTypeOf<V<"SELECT label[1:2] FROM things">>().toEqualTypeOf<
+		SqlError<
+			"cannot subscript type text because it does not support subscripting",
+			0
+		>
+	>();
+	expectTypeOf<
+		V<"SELECT (json_build_object('a', 1))['a'] FROM things">
+	>().toEqualTypeOf<
+		SqlError<
+			"cannot subscript type json because it does not support subscripting",
+			0
+		>
+	>();
+	expectTypeOf<V<"SELECT data[0:1] FROM things">>().toEqualTypeOf<
+		SqlError<"jsonb subscript does not support slices", 0>
+	>();
+	// errors inside a bound, a ROW or an ARRAY item
+	expectTypeOf<
+		[
+			Err<"SELECT nums[nope:1] FROM things">,
+			Err<"SELECT nums[1:(nope)] FROM things">,
+			Err<"SELECT ROW(1, nope)">,
+		]
+	>().toEqualTypeOf<
+		[
+			'column "nope" does not exist',
+			'column "nope" does not exist',
+			'column "nope" does not exist',
+		]
+	>();
+});
+
+test("bit strings are bit constants; SUBSTRING / OVERLAY of a bit string is bit", () => {
+	expectTypeOf<
+		Types<"SELECT B'101', X'1F', B'101'::varbit, substring(B'101' FROM 2), substring(B'101'::varbit FROM 2), overlay(B'101'::varbit PLACING B'1' FROM 1), B'101'::varbit || B'1', 'x'">
+	>().toEqualTypeOf<
+		["bit", "bit", "varbit", "bit", "bit", "bit", "varbit", "text"]
+	>();
+	// a bit string names no column (a typed literal names its type)
+	expectTypeOf<Row<"SELECT B'101', bit '1', B'1'::text">>().toEqualTypeOf<{
+		"?column?": string;
+		bit: string;
+		text: string;
+	}>();
+});
+
+test("type spellings normalize to the catalog names, arrays element-wise", () => {
+	expectTypeOf<
+		[
+			NormalizeTypeName<"integer">,
+			NormalizeTypeName<"integer[]">,
+			NormalizeTypeName<"double precision[][]">,
+			NormalizeTypeName<"mood[]">,
+		]
+	>().toEqualTypeOf<["int4", "int4[]", "float8[][]", "mood[]"]>();
 });
 
 test("casts and typed literals", () => {

@@ -97,10 +97,36 @@ test("->, ->>, #> and subscripts index into T", () => {
 		kind: "a" | "b" | null;
 		x: number | null;
 	}>();
-	// an array has no keys, an object no indexes
+	// an array has no keys, an object no indexes, a string neither
 	expectTypeOf<
-		Row<"SELECT history -> 'at' AS a, settings -> 0 AS b FROM portfolio">
-	>().toEqualTypeOf<{ a: null; b: null }>();
+		Row<"SELECT history -> 'at' AS a, settings -> 0 AS b, settings -> 'theme' -> 'length' AS c FROM portfolio">
+	>().toEqualTypeOf<{ a: null; b: null; c: null }>();
+	// a non-literal key follows every key; an index past a tuple's end may be any element
+	expectTypeOf<
+		Row<"SELECT settings -> name AS a, pair -> 5 AS b FROM portfolio">
+	>().toEqualTypeOf<{
+		a: "dark" | "light" | string[] | Record<string, number> | null;
+		b: number | string | null;
+	}>();
+	// a step that misses is SQL NULL, which coalesce replaces: no JSON null inside the value
+	expectTypeOf<
+		Row<"SELECT coalesce(pair -> 0, '[]') AS a, coalesce(history -> 5, '[]') AS b, coalesce(settings -> 'limits', '[]') AS c, coalesce(history -> 'at', '[]') AS d, coalesce(settings -> 'nope', '[]') AS e FROM portfolio">
+	>().toEqualTypeOf<{
+		a: number | [];
+		b: HistoryItem | [];
+		c: Record<string, number> | [];
+		d: [];
+		e: [];
+	}>();
+});
+
+test("a step into unknown stays unknown", () => {
+	interface Meta {
+		docs: { meta: Json<{ extra: unknown }> };
+	}
+	expectTypeOf<
+		RowOf<Meta, DefaultTypeMap, "SELECT meta -> 'extra' -> 'x' AS a FROM docs">
+	>().toEqualTypeOf<{ a: unknown }>();
 });
 
 test("Json<T> columns stay jsonb for operators and functions", () => {

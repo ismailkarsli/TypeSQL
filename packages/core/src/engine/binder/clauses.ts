@@ -2,6 +2,7 @@ import type { Expr, NamedWindow, Target, WindowSpec } from "../ast.js";
 import type { AnyErr, ErrMsg, SqlError } from "../errors.js";
 import type { Nx } from "../parser/util.js";
 import type { AnyShaped, BaseOf } from "../shape.js";
+import type { NumLitType } from "../typer/operators.js";
 import type { TypeList, TypeOf } from "../typer/typeof.js";
 import type { ColInfo, Cols, Ctx } from "../types.js";
 
@@ -31,6 +32,8 @@ type DisplayNames = {
 	bool: "boolean";
 	varchar: "character varying";
 	bpchar: "character";
+	char: '"char"';
+	varbit: "bit varying";
 	timestamptz: "timestamp with time zone";
 	timestamp: "timestamp without time zone";
 	timetz: "time with time zone";
@@ -167,17 +170,28 @@ type Ordinal<
 > =
 	DigitsOnly<V> extends false
 		? SqlError<`non-integer constant in ${Clause}`, null>
-		: HasStar<Cs> extends true
-			? null
-			: V extends `${infer N extends number}`
-				? N extends 0
-					? SqlError<`${Clause} position ${V} is not in select list`, null>
-					: [null, ...Ts][N] extends infer T
-						? T extends Target
-							? T["e"]
-							: SqlError<`${Clause} position ${V} is not in select list`, null>
-						: never
-				: SqlError<`non-integer constant in ${Clause}`, null>;
+		: NumLitType<NoLeadingZeros<V>> extends "int4"
+			? HasStar<Cs> extends true
+				? null
+				: NoLeadingZeros<V> extends `${infer N extends number}`
+					? N extends 0
+						? SqlError<`${Clause} position 0 is not in select list`, null>
+						: [null, ...Ts][N] extends infer T
+							? T extends Target
+								? T["e"]
+								: SqlError<
+										`${Clause} position ${N} is not in select list`,
+										null
+									>
+							: never
+					: never
+			: SqlError<`non-integer constant in ${Clause}`, null>; // past int4, as Postgres reads it
+/** `007` → `7` (an ordinal is the integer the literal denotes). */
+type NoLeadingZeros<V extends string> = V extends `0${infer R}`
+	? R extends ""
+		? "0"
+		: NoLeadingZeros<R>
+	: V;
 
 type CheckExpr<E extends Expr, C extends Ctx> =
 	TypeOf<E, C> extends infer T ? (T extends ColInfo ? E : T) : never;
@@ -230,7 +244,7 @@ type ResolveGroupKey<
 					readonly name: infer N extends string;
 				}
 			? TypeOf<E, C> extends infer T
-				? T extends ColInfo
+				? T extends ColInfo // type-mutate: equivalent cond-false – CheckGroupBy only looks for an error, and the output lookup gives none for a typed column
 					? E
 					: ErrMsg<T> extends `column "${string}" does not exist`
 						? OutputExprs<Ts, Cs, N, [], 0> extends infer Ms extends
@@ -271,13 +285,13 @@ export type CheckGroupBy<
 	I extends number = 0,
 > = Items extends readonly Expr[]
 	? Items[I] extends undefined
-		? true
+		? true // type-mutate: equivalent bool-flip – the callers only look for an error
 		: ResolveGroupKey<Items[I], Ts, Cs, C> extends infer K
 			? K extends AnyErr
 				? K
 				: CheckGroupBy<Items, Ts, Cs, C, Nx<I>>
 			: never
-	: true;
+	: true; // type-mutate: equivalent bool-flip – the callers only look for an error
 
 /**
  * `SELECT DISTINCT ON (d...) ... ORDER BY o...`: the ORDER BY must start with DISTINCT ON
@@ -299,9 +313,9 @@ type DistinctWalk<
 > = O[I] extends undefined
 	? Skipped extends true
 		? AllIn<D, Seen> extends true
-			? true
+			? true // type-mutate: equivalent bool-flip – the callers only look for an error
 			: DistinctOnErr
-		: true
+		: true // type-mutate: equivalent bool-flip – the callers only look for an error
 	: InList<O[I], D> extends true
 		? Skipped extends true
 			? DistinctOnErr
@@ -314,21 +328,21 @@ type AllIn<
 	? InList<H, Seen> extends true
 		? AllIn<R, Seen>
 		: false
-	: true;
+	: true; // type-mutate: equivalent never-false – a never passes the caller's `AllIn<…> extends true` too
 type DistinctOnErr = SqlError<
 	"SELECT DISTINCT ON expressions must match initial ORDER BY expressions",
 	null
 >;
 
-/** `SELECT DISTINCT ... ORDER BY o`: every ORDER BY expression must be one of the targets. */
+/**
+ * `SELECT DISTINCT ... ORDER BY o`: every ORDER BY expression must be one of the targets. With a
+ * `*` target a column reference is taken to be one of its columns.
+ */
 export type CheckDistinctOrder<
 	O extends readonly unknown[],
 	Ts extends readonly Target[],
 	Cs extends Cols,
-> =
-	HasStar<Cs> extends true
-		? true
-		: DistinctOrderWalk<O, TargetExprs<Ts, [], 0>, 0>;
+> = DistinctOrderWalk<O, TargetExprs<Ts, [], 0>, HasStar<Cs>, 0>;
 type TargetExprs<
 	Ts extends readonly Target[],
 	Acc extends readonly unknown[],
@@ -339,17 +353,20 @@ type TargetExprs<
 type DistinctOrderWalk<
 	O extends readonly unknown[],
 	Es extends readonly unknown[],
+	Star extends boolean,
 	I extends number,
 > = O[I] extends undefined
 	? true
 	: O[I] extends null
-		? DistinctOrderWalk<O, Es, Nx<I>>
+		? DistinctOrderWalk<O, Es, Star, Nx<I>>
 		: InList<O[I], Es> extends true
-			? DistinctOrderWalk<O, Es, Nx<I>>
-			: SqlError<
-					"for SELECT DISTINCT, ORDER BY expressions must appear in select list",
-					null
-				>;
+			? DistinctOrderWalk<O, Es, Star, Nx<I>>
+			: [Star, O[I]] extends [true, { readonly t: "col" }]
+				? DistinctOrderWalk<O, Es, Star, Nx<I>>
+				: SqlError<
+						"for SELECT DISTINCT, ORDER BY expressions must appear in select list",
+						null
+					>;
 
 /** ORDER BY of a set operation: output names and positions only. */
 export type CheckOutputOrder<
@@ -357,7 +374,7 @@ export type CheckOutputOrder<
 	Cs extends Cols,
 	I extends number = 0,
 > = Items[I] extends undefined
-	? true
+	? true // type-mutate: equivalent bool-flip – the caller only looks for an error
 	: OutputOrderItem<Items[I], Cs> extends infer R
 		? R extends AnyErr
 			? R
@@ -369,15 +386,17 @@ type OutputOrderItem<E extends Expr, Cs extends Cols> = E extends {
 }
 	? DigitsOnly<V> extends false
 		? SqlError<"non-integer constant in ORDER BY", null>
-		: HasStar<Cs> extends true
-			? true
-			: V extends `${infer N extends number}`
-				? N extends 0
-					? PosErr<V>
-					: [null, ...Cs][N] extends undefined
-						? PosErr<V>
-						: true
-				: PosErr<V>
+		: NumLitType<NoLeadingZeros<V>> extends "int4"
+			? HasStar<Cs> extends true
+				? true
+				: NoLeadingZeros<V> extends `${infer N extends number}`
+					? [null, ...Cs][N] extends undefined
+						? PosErr<`${N}`>
+						: N extends 0
+							? PosErr<"0">
+							: true
+					: never
+			: SqlError<"non-integer constant in ORDER BY", null>
 	: E extends { readonly t: "str" }
 		? SqlError<"non-integer constant in ORDER BY", null>
 		: E extends {
@@ -489,7 +508,7 @@ export type CheckWindowRefs<
 	C extends Ctx,
 	I extends number = 0,
 > = Es[I] extends undefined
-	? true
+	? true // type-mutate: equivalent bool-flip – the callers only look for an error
 	: CheckSpecs<Wins<Es[I]>, Defs, C> extends infer R
 		? R extends AnyErr
 			? R
@@ -499,7 +518,7 @@ export type CheckWindowRefs<
 type CheckSpecs<Ss, Defs extends WindowDefs, C extends Ctx> = [Ss] extends [
 	never,
 ]
-	? true
+	? true // type-mutate: equivalent bool-flip – the callers only look for an error
 	: (
 				Ss extends WindowSpec
 					? CheckWindowSpec<Ss, Defs, C> extends infer X
@@ -510,7 +529,7 @@ type CheckSpecs<Ss, Defs extends WindowDefs, C extends Ctx> = [Ss] extends [
 					: never
 			) extends infer Errs
 		? [Errs] extends [never]
-			? true
+			? true // type-mutate: equivalent bool-flip – the callers only look for an error
 			: FirstOf<Errs>
 		: never;
 type FirstOf<U> = (U extends unknown ? (u: U) => void : never) extends (
@@ -519,20 +538,23 @@ type FirstOf<U> = (U extends unknown ? (u: U) => void : never) extends (
 	? F
 	: U;
 
+/**
+ * Nodes without a window inside: leaves, and subqueries (their own query level). A shortcut: the
+ * last branch of `Wins` gives `never` for them too (`x IN (SELECT …)` is not one: its `x` is walked).
+ */
 type LeafTag =
-	| "col"
-	| "num"
-	| "str"
-	| "bool"
-	| "null"
-	| "param"
-	| "default"
-	| "typed"
-	| "star"
-	| "sub"
-	| "exists"
-	| "arraysub"
-	| "insub";
+	| "col" // type-mutate: equivalent union-drop – a shortcut: Wins gives never for this node anyway
+	| "num" // type-mutate: equivalent union-drop – a shortcut: Wins gives never for this node anyway
+	| "str" // type-mutate: equivalent union-drop – a shortcut: Wins gives never for this node anyway
+	| "bool" // type-mutate: equivalent union-drop – a shortcut: Wins gives never for this node anyway
+	| "null" // type-mutate: equivalent union-drop – a shortcut: Wins gives never for this node anyway
+	| "param" // type-mutate: equivalent union-drop – a shortcut: Wins gives never for this node anyway
+	| "default" // type-mutate: equivalent union-drop – a shortcut: Wins gives never for this node anyway
+	| "typed" // type-mutate: equivalent union-drop – a shortcut: Wins gives never for this node anyway
+	| "star" // type-mutate: equivalent union-drop – a shortcut: Wins gives never for this node anyway
+	| "sub" // type-mutate: equivalent union-drop – a shortcut: Wins gives never for this node anyway
+	| "exists" // type-mutate: equivalent union-drop – a shortcut: Wins gives never for this node anyway
+	| "arraysub"; // type-mutate: equivalent union-drop – a shortcut: Wins gives never for this node anyway
 /**
  * Window specifications of the calls in an expression, as a union (`never` when there are
  * none). Subqueries are not entered (they are their own query level). Plain recursion over
@@ -602,8 +624,16 @@ type Wins<E> = E extends { readonly t: LeafTag } | null
 												readonly zone: unknown;
 											}
 										? Wins<E["e"]> | Wins<E["zone"]>
-										: E extends { readonly t: "quant"; readonly l: unknown }
-											? Wins<E["l"]>
+										: E extends {
+													readonly t: "quant";
+													readonly l: unknown;
+													readonly r: unknown;
+												}
+											? // the right side is an array expression, or a subquery (its own level)
+													| Wins<E["l"]>
+													| (E["r"] extends { readonly t: "select" }
+															? never
+															: Wins<E["r"]>)
 											: E extends { readonly e: unknown }
 												? Wins<E["e"]>
 												: never;

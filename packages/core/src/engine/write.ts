@@ -12,8 +12,8 @@ import type { JoinedText, QuotedIdent, UnionList } from "./splice.js";
  * spliced into is checked with that text, so the columns are checked again in context.
  */
 
-type IsTable<X> =
-	X extends View<Table> ? false : X extends Table ? true : false;
+/** A table (a view is `{ $view: … }`, never a `Table`; nor is `$types` or a namespace). */
+type IsTable<X> = X extends Table ? true : false;
 
 /**
  * Writable tables of a schema: top-level tables, and `"schema.table"` for tables in a
@@ -21,20 +21,14 @@ type IsTable<X> =
  */
 export type TableName<DB> =
 	| {
-			[K in keyof DB & string]: K extends "$types"
-				? never
-				: IsTable<DB[K]> extends true
-					? K
-					: never;
+			[K in keyof DB & string]: IsTable<DB[K]> extends true ? K : never;
 	  }[keyof DB & string]
 	| {
-			[NS in keyof DB & string]: NS extends "$types"
+			[NS in keyof DB & string]: IsTable<DB[NS]> extends true
 				? never
-				: IsTable<DB[NS]> extends true
+				: DB[NS] extends View<Table>
 					? never
-					: DB[NS] extends View<Table>
-						? never
-						: NsTables<NS, DB[NS]>;
+					: NsTables<NS, DB[NS]>; // `$types` has no tables
 	  }[keyof DB & string];
 type NsTables<NS extends string, N> = {
 	[K in keyof N & string]: IsTable<N[K]> extends true ? `${NS}.${K}` : never;
@@ -42,13 +36,11 @@ type NsTables<NS extends string, N> = {
 
 /** Top-level tables and views of a schema (what an unqualified `FROM name` can read). */
 export type RelationName<DB> = {
-	[K in keyof DB & string]: K extends "$types"
-		? never
-		: DB[K] extends View<Table>
+	[K in keyof DB & string]: DB[K] extends View<Table>
+		? K
+		: IsTable<DB[K]> extends true
 			? K
-			: IsTable<DB[K]> extends true
-				? K
-				: never;
+			: never;
 }[keyof DB & string];
 
 /** The column descriptors of a `TableName`. */
@@ -70,7 +62,7 @@ export type TableOf<DB, T extends string> = T extends keyof DB
  * TS type a column accepts when written (the type map's parameter type, `| null` when nullable).
  * A json / jsonb column also takes a `sql.json(value)` (an array has to be one: see `CheckValue`).
  */
-export type ColIn<TM, DB, D extends ColDesc> = D["type"] extends "null"
+export type ColIn<TM, DB, D extends ColDesc> = D["type"] extends "null" // type-mutate: equivalent cond-false never-true – no column has type null (CREATE TABLE AS and views store an untyped NULL as text)
 	? null
 	:
 			| (D["nullable"] extends true

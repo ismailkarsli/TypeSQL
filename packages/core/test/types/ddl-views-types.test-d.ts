@@ -394,6 +394,21 @@ test("statements without schema effect leave the schema unchanged", () => {
     COMMIT;
   `>
 	>().toEqualTypeOf<DB>();
+	// every other utility statement
+	expectTypeOf<
+		A<`
+    START TRANSACTION; SAVEPOINT s; RELEASE SAVEPOINT s; ROLLBACK; RESET search_path; VACUUM users;
+    REINDEX TABLE users; CLUSTER users; REFRESH MATERIALIZED VIEW mv; LOCK TABLE users; NOTIFY ch;
+    LISTEN ch; UNLISTEN ch; DISCARD ALL; EXPLAIN SELECT 1; SHOW search_path; CALL p();
+    SECURITY LABEL ON TABLE users IS 'x'; IMPORT FOREIGN SCHEMA s FROM SERVER srv INTO public;
+    COPY users TO STDOUT; PREPARE q AS SELECT 1; EXECUTE q; DEALLOCATE q; CHECKPOINT; LOAD 'x';
+    BEGIN; END; BEGIN; ABORT; REASSIGN OWNED BY a TO b;
+  `>
+	>().toEqualTypeOf<DB>();
+	// SELECT INTO checks that the table is new
+	expectTypeOf<A<"SELECT 1 AS a INTO users">>().toEqualTypeOf<
+		SqlError<'relation "users" already exists', 5>
+	>();
 });
 
 test("CREATE FUNCTION registers the function's result type in $functions", () => {

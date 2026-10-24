@@ -160,6 +160,48 @@ test("relations after FROM: the ones the statement uses first, then the rest and
 	]);
 });
 
+test("WITH queries come first", async () => {
+	expect(
+		(await items(`sql("WITH recent AS (SELECT 1) SELECT * FROM |");`)).slice(
+			0,
+			2,
+		),
+	).toEqual(["recent: WITH query", "users: table"]);
+});
+
+test("each item's kind and sort key", async () => {
+	const raw = async (marked: string): Promise<string[]> => {
+		const { result } = await complete(
+			"src/raw.ts",
+			`import { sql } from "./db.js";\n${marked}\n`,
+		);
+		return result!.items.map((i) => `${i.label} ${i.kind} ${i.sortText}`);
+	};
+	expect(
+		await raw(`sql("WITH recent AS (SELECT 1) SELECT * FROM posts, |");`),
+	).toEqual([
+		"recent cte 00000",
+		"users table 20000",
+		"posts table 10001",
+		"active_users view 20002",
+		"UserAccounts table 20003",
+		"auth namespace 30000",
+		"pg_catalog namespace 30001",
+		"information_schema namespace 30002",
+	]);
+	expect(
+		await raw(`sql("SELECT * FROM posts p, active_users a WHERE |");`),
+	).toEqual([
+		"id column 00000000",
+		"author_id column 00000001",
+		"title column 00000002",
+		// a name is offered once
+		"email column 00010001",
+		"p alias 90000",
+		"a alias 90001",
+	]);
+});
+
 test("relations of a namespace", async () => {
 	expect(await items(`sql("SELECT * FROM auth.|");`)).toEqual([
 		"sessions: table",

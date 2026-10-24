@@ -9,9 +9,11 @@ import {
 	type InsertInput,
 	type Nullable,
 	type ParamsType,
+	type RelationName,
 	type RowType,
 	type SqlError,
 	type TableName,
+	type TableOf,
 	type TextType,
 	type View,
 } from "../../src/index.js";
@@ -125,6 +127,15 @@ test("TableName and InsertInput", () => {
 	expectTypeOf<TableName<DB>>().toEqualTypeOf<
 		"users" | "posts" | "auth.sessions"
 	>();
+	// what FROM reads unqualified: tables and views, not namespaces or $types
+	expectTypeOf<RelationName<DB>>().toEqualTypeOf<"users" | "posts" | "stats">();
+	expectTypeOf<TableOf<DB, "auth.sessions">>().toEqualTypeOf<
+		DB["auth"]["sessions"]
+	>();
+	expectTypeOf<TableOf<DB, "posts">>().toEqualTypeOf<DB["posts"]>();
+	expectTypeOf<TableOf<DB, "stats">>().toBeNever();
+	expectTypeOf<TableOf<DB, "auth">>().toBeNever();
+	expectTypeOf<TableOf<DB, "auth.nope">>().toBeNever();
 	expectTypeOf<
 		InsertInput<DB, { text: string; int4: number }, "posts">
 	>().toEqualTypeOf<{

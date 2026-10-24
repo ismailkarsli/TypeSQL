@@ -106,6 +106,7 @@ type Nullable = { nullable: true };
 type Srf = { srf: true };
 type SrfNullable = { srf: true; nullable: true };
 
+// type-mutate: table – each signature, flag and overload pick is compared with pg_proc and with Postgres's own resolution by the functions oracle (test/oracle/functions.ts)
 export interface FunctionCatalog {
 	// ───────────── aggregates ─────────────
 	count: Sig<["..."], "int8", AggNN>;
@@ -793,8 +794,8 @@ export interface FunctionCatalog {
 	jsonb_extract_path_text: Sig<["jsonb", "..."], "text", Nullable>;
 	json_typeof: Sig<["json"], "text">;
 	jsonb_typeof: Sig<["jsonb"], "text">;
-	json_strip_nulls: [Sig<["json"], "json">, Sig<["json", "bool"], "json">]; // type-mutate: equivalent tuple-swap – one overload per arity, and a two-argument call falls back to the only two-argument one
-	jsonb_strip_nulls: [Sig<["jsonb"], "jsonb">, Sig<["jsonb", "bool"], "jsonb">]; // type-mutate: equivalent tuple-swap – one overload per arity, and a two-argument call falls back to the only two-argument one
+	json_strip_nulls: [Sig<["json"], "json">, Sig<["json", "bool"], "json">];
+	jsonb_strip_nulls: [Sig<["jsonb"], "jsonb">, Sig<["jsonb", "bool"], "jsonb">];
 	jsonb_set: [
 		Sig<["jsonb", "text[]", "jsonb"], "jsonb">,
 		Sig<["jsonb", "text[]", "jsonb", "bool"], "jsonb">,
@@ -1090,7 +1091,7 @@ type ToList<S> = S extends readonly AnySig[]
 	? S
 	: S extends AnySig
 		? readonly [S]
-		: readonly [];
+		: readonly []; // type-mutate: equivalent never-false – a catalog entry is a signature or a list of them
 
 /**
  * How well does actual type `A` satisfy parameter pattern `P`?
@@ -1218,12 +1219,12 @@ type ArgsMatch<
 					? ArgsMatch<PR, AR, [...Score, 0]>
 					: K extends "c"
 						? ArgsMatch<PR, AR, Score>
-						: false
+						: false // type-mutate: equivalent bool-flip – BestSig reads only a tuple score: true and false both mean no match
 				: never
-			: false
+			: false // type-mutate: equivalent bool-flip – BestSig reads only a tuple score: true and false both mean no match
 		: As extends readonly []
 			? Score
-			: false;
+			: false; // type-mutate: equivalent bool-flip – BestSig reads only a tuple score: true and false both mean no match
 
 /** Best-scoring overload (ties → earlier), or null. */
 type BestSig<
@@ -1261,8 +1262,8 @@ type ArityFallback<
 type ArityOk<
 	Ps extends readonly string[],
 	As extends readonly ColInfo[],
-> = Ps extends readonly [...infer Fixed extends readonly string[], "..."]
-	? As extends readonly [...{ [K in keyof Fixed]: unknown }, ...unknown[]]
+> = Ps extends readonly [...infer Fixed, "..."]
+	? As extends readonly [...{ [K in keyof Fixed]: unknown }, ...unknown[]] // type-mutate: equivalent tuple-swap – the elements are all unknown: at least that many either way
 		? true
 		: false
 	: Ps["length"] extends As["length"]
@@ -1336,23 +1337,16 @@ export type CallCtx = {
 	readonly filter: boolean;
 	readonly distinct: boolean;
 	readonly hasStar: boolean;
+	readonly withinGroup: boolean;
 	/** Type of the `WITHIN GROUP (ORDER BY e)` expression, or "unknown". */
 	readonly wg: string;
-};
-type DefaultCtx = {
-	grouped: false;
-	over: false;
-	filter: false;
-	distinct: false;
-	hasStar: false;
-	wg: "unknown";
 };
 
 type Ret<
 	R extends string,
 	As extends readonly ColInfo[],
-	C extends CallCtx,
-> = R extends `$${string}`
+	C extends { readonly wg: string },
+> = R extends `$${string}` // type-mutate: equivalent cond-true – a shortcut: a return type without "$" falls through to itself
 	? R extends "$1"
 		? TypeAt<As, 0>
 		: R extends "$2"
@@ -1385,7 +1379,7 @@ type Ret<
 															: "float8[]"
 														: R extends `$j${infer P}`
 															? JsonRet<P, As>
-															: R
+															: R // type-mutate: equivalent never-false – no signature returns another "$" form
 	: R;
 
 // ───────────────────────────── nullability ─────────────────────────────
@@ -1398,16 +1392,14 @@ type AnyNullable<As extends readonly ColInfo[]> = As extends readonly [
 		? true
 		: AnyNullable<R>
 	: false;
-type AllNullable<As extends readonly ColInfo[]> = As extends readonly []
-	? true
-	: As extends readonly [
-				infer A extends ColInfo,
-				...infer R extends readonly ColInfo[],
-			]
-		? A["nullable"] extends true
-			? AllNullable<R>
-			: false
-		: true;
+type AllNullable<As extends readonly ColInfo[]> = As extends readonly [
+	infer A extends ColInfo,
+	...infer R extends readonly ColInfo[],
+]
+	? A["nullable"] extends true
+		? AllNullable<R>
+		: false
+	: true;
 type Prev = { 1: 0; 2: 1; 3: 2; 4: 3; 5: 4; 6: 5; 7: 6; 8: 7 };
 /** Any of the 1-based argument positions `Idx` nullable? */
 type AnyNullableAt<
@@ -1418,7 +1410,7 @@ type AnyNullableAt<
 	...infer R extends readonly number[],
 ]
 	? As[Prev[I]] extends { readonly nullable: true }
-		? true
+		? true // type-mutate: equivalent never-true – a never nullability is read with `extends true`, as nullable
 		: AnyNullableAt<As, R>
 	: false;
 
@@ -1439,13 +1431,13 @@ type CallNullable<
 		? true
 		: S["agg"] extends true
 			? C["filter"] extends true
-				? true
+				? true // type-mutate: equivalent never-true – a never nullability is read with `extends true`, as nullable
 				: C["over"] extends true
 					? S["strict"] extends false
 						? false
 						: AnyNullable<As>
 					: C["grouped"] extends false
-						? true
+						? true // type-mutate: equivalent never-true – a never nullability is read with `extends true`, as nullable
 						: S["strict"] extends false
 							? false
 							: AnyNullable<As>
@@ -1513,24 +1505,53 @@ export type CallType<
 			? UnknownFunction<Name, As>
 			: PickSig<O, As> extends infer S
 				? S extends AnySig
-					? Info<Ret<S["ret"], As, C>, CallNullable<S, As, C>>
+					? CallMisuse<Name, S, As, C> extends infer M extends string
+						? SqlError<M, null>
+						: Info<Ret<S["ret"], As, C>, CallNullable<S, As, C>>
 					: Info<"unknown", true>
 				: never
 		: never;
 
-/** Is `name` a catalog function with an aggregate overload? */
-export type IsAggregate<Name extends string> =
-	Name extends keyof FunctionCatalog
-		? HasAgg<ToList<FunctionCatalog[Name]>>
-		: false;
-type HasAgg<Sigs extends readonly AnySig[]> = Sigs extends readonly [
-	infer S extends AnySig,
-	...infer R extends readonly AnySig[],
-]
-	? S["agg"] extends true
-		? true
-		: HasAgg<R>
-	: false;
+/**
+ * A call decoration the resolved function does not take, worded like Postgres
+ * (ParseFuncOrColumn), or null: `*`, DISTINCT, FILTER and OVER need an aggregate (OVER also
+ * takes a window function), a window function needs OVER, and an aggregate without arguments
+ * is written `f(*)`.
+ */
+type CallMisuse<
+	Name extends string,
+	S extends AnySig,
+	As extends readonly ColInfo[],
+	C extends CallCtx,
+> = S["agg"] extends true
+	? As extends readonly []
+		? C["hasStar"] extends true
+			? null
+			: C["withinGroup"] extends true
+				? null
+				: `${Name}(*) must be used to call a parameterless aggregate function`
+		: C["over"] extends true
+			? C["distinct"] extends true
+				? "DISTINCT is not implemented for window functions"
+				: null
+			: null
+	: S["window"] extends true
+		? C["over"] extends true
+			? C["distinct"] extends true
+				? "DISTINCT is not implemented for window functions"
+				: C["filter"] extends true
+					? "FILTER is not implemented for non-aggregate window functions"
+					: null
+			: `window function ${Name} requires an OVER clause`
+		: C["hasStar"] extends true
+			? `${Name}(*) specified, but ${Name} is not an aggregate function`
+			: C["distinct"] extends true
+				? `DISTINCT specified, but ${Name} is not an aggregate function`
+				: C["filter"] extends true
+					? `FILTER specified, but ${Name} is not an aggregate function`
+					: C["over"] extends true
+						? `OVER specified, but ${Name} is not a window function nor an aggregate function`
+						: null;
 
 /** Set-returning function result element type for FROM, or null if not an SRF. */
 export type SrfType<
@@ -1538,15 +1559,13 @@ export type SrfType<
 	As extends readonly ColInfo[],
 	DB = {},
 > =
-	LookupFn<DB, Name> extends infer O
-		? O extends null
-			? null
-			: PickSig<O, As> extends infer S
-				? S extends AnySig & { readonly srf: true }
-					? Info<
-							Ret<S["ret"], As, DefaultCtx>,
-							S["nullable"] extends true ? true : AnyNullable<As>
-						>
-					: null
-				: never
+	PickSig<LookupFn<DB, Name>, As> extends infer S
+		? S extends AnySig & { readonly srf: true }
+			? Info<
+					Ret<S["ret"], As, { readonly wg: "unknown" }>,
+					S["nullable"] extends true
+						? true // type-mutate: equivalent never-true – a never nullability is read with `extends true`, as nullable
+						: AnyNullable<As>
+				>
+			: null
 		: never;

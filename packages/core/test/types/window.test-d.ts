@@ -50,6 +50,10 @@ test("aggregates as window functions: the frame is never empty, so nullability f
 		g: string;
 		h: boolean;
 	}>();
+	// one that collects NULL inputs is never NULL over a frame, even of NULL inputs
+	expectTypeOf<
+		Row<"SELECT (json_agg(n_id) OVER ())::text AS a, (json_agg(id) OVER ())::text AS b FROM things">
+	>().toEqualTypeOf<{ a: string; b: string }>();
 	// FILTER can empty the frame
 	expectTypeOf<
 		Row<"SELECT sum(id) FILTER (WHERE flag) OVER () AS a, count(id) FILTER (WHERE flag) OVER () AS b FROM things">
