@@ -4,8 +4,8 @@
 // is what the type oracle's replay COPYs). The clone is shallow and fetches file contents only
 // for those paths, ~25 MB instead of the whole tree.
 //
-//   node setup.mjs          check out the commit the repository pins
-//   node setup.mjs <ref>    move the submodule to another tag or commit, e.g. REL_18_7, then
+//   node setup.ts          check out the commit the repository pins
+//   node setup.ts <ref>    move the submodule to another tag or commit, e.g. REL_18_7, then
 //                           run `pnpm test:pg-regress --update` and commit both
 //
 // A plain `git submodule update --init vendor/postgres` also works; it checks out the whole tree.
@@ -62,13 +62,13 @@ if (head !== pinned) {
   console.log(`This differs from the pinned commit ${pinned}. Run \`pnpm test:pg-regress --update\`, review the baseline diff, and commit ${path} with it.`);
 }
 
-function git(cwd, ...args) {
+function git(cwd: string, ...args: string[]): string {
   const r = spawnSync("git", ["-C", cwd, ...args], { encoding: "utf8" });
   if (r.status !== 0) fail(`git ${args.join(" ")} failed:\n${r.stderr}`);
   return r.stdout.trim();
 }
 
-function fail(message) {
+function fail(message: string): never {
   console.error(message);
   process.exit(1);
 }

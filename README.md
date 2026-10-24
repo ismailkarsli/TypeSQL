@@ -217,7 +217,7 @@ a bench file over its instantiation or check-time budget, or a cache hit over 25
 
 ### Runtime
 
-Building a query (Node 26, same machine; `pnpm build && node packages/bench/runtime.mjs`):
+Building a query (Node 26, same machine; `pnpm build && node packages/bench/runtime.ts`):
 
 | Call | Time |
 |---|---|
@@ -230,7 +230,7 @@ The text goes to the driver as written, and `execute*` returns the driver's rows
 with top-level keys renamed, with `rowKeys: "camelCase"`). `@typesql/core` has no dependencies
 and is 10 KB minified, 4.0 KB gzipped.
 
-To reproduce the compile-time numbers: `node packages/bench/gen.mjs && pnpm --filter @typesql/core build && node packages/bench/run.mjs`.
+To reproduce the compile-time numbers: `node packages/bench/gen.ts && pnpm --filter @typesql/core build && node packages/bench/run.ts`.
 
 ## Toolchain and limits
 
@@ -260,10 +260,10 @@ pnpm test              # vitest: runtime + type tests; conformance runs against 
 pnpm build && pnpm smoke:dist   # import the built packages with plain Node
 pnpm pg-regress:setup && pnpm test:pg-regress   # the parser against PostgreSQL 18's regression tests
 pnpm docs:dev                   # the documentation site (packages/docs)
-node packages/bench/gen.mjs && node packages/bench/run.mjs   # compile-time budget (thresholds.json)
-node packages/bench/runtime.mjs                               # cost of building a query, after pnpm build
+node packages/bench/gen.ts && node packages/bench/run.ts   # compile-time budget (thresholds.json)
+node packages/bench/runtime.ts                               # cost of building a query, after pnpm build
 pnpm playground                 # regenerate the TypeScript Playground links (--check: CI's check)
-TYPESQL_PG_URL=… node scripts/catalog-from-pg.mjs              # review the function catalog against pg_proc
+TYPESQL_PG_URL=… node scripts/catalog-from-pg.ts              # review the function catalog against pg_proc
 pnpm change                     # record a change intent with any change to a published package
 pnpm check:intents              # fail if a published package changed without one (CI runs it too)
 ```

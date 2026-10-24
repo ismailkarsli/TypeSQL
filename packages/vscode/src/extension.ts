@@ -12,8 +12,8 @@
  *
  * Anything that fails or takes longer than the budget adds nothing.
  */
-import path = require("node:path");
-import vscode = require("vscode");
+import * as path from "node:path";
+import * as vscode from "vscode";
 import type { ExtensionAPI, TypeScriptSDK } from "typescript/vscode";
 import type { Completions, CompletionItem as SqlItem } from "@typesql/core/editor";
 import { mayBeInSqlLiteral } from "./literal.js";

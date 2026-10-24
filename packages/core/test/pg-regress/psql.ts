@@ -17,26 +17,37 @@ const IDENT_CONT = /[A-Za-z0-9_$]|[^\x00-\x7f]/;
 const WORD = /^(?:[A-Za-z_]|[^\x00-\x7f])(?:[A-Za-z0-9_$]|[^\x00-\x7f])*/;
 const DOLLAR_QUOTE = /^\$(?:(?:[A-Za-z_]|[^\x00-\x7f])(?:[A-Za-z0-9_]|[^\x00-\x7f])*)?\$/;
 
-/**
- * @typedef {object} Statement
- * @property {string} sql       Text sent to the server, without the comments before it.
- * @property {number} line      1-based line of the first token.
- * @property {number} endLine   1-based line where the statement ends.
- * @property {boolean} psqlVars Uses a psql variable whose value we don't know (see `splitPsql`).
- * @property {boolean} conditional Inside an `\if` branch whose condition we cannot evaluate (a variable).
- * @property {boolean} nonstandardStrings Run with standard_conforming_strings off and has a backslash:
- *   its string literals mean something else than the parser (which follows the default) reads.
- * @property {"ok" | "error" | "syntax-error" | "unknown"} [pg] Set by `classify`.
- * @property {string} [pgError] First error line Postgres printed for it.
- * @property {string} [copyData] For COPY FROM STDIN: the data lines that follow it, up to `\.`.
- */
+export interface Statement {
+  /** Text sent to the server, without the comments before it. */
+  sql: string;
+  /** 1-based line of the first token. */
+  line: number;
+  /** 1-based line where the statement ends. */
+  endLine: number;
+  /** Uses a psql variable whose value we don't know (see `splitPsql`). */
+  psqlVars: boolean;
+  /** Inside an `\if` branch whose condition we cannot evaluate (a variable). */
+  conditional: boolean;
+  /**
+   * Run with standard_conforming_strings off and has a backslash: its string literals mean
+   * something else than the parser (which follows the default) reads.
+   */
+  nonstandardStrings: boolean;
+  /** Set by `classify`. */
+  pg?: "ok" | "error" | "syntax-error" | "unknown";
+  /** First error line Postgres printed for it. */
+  pgError?: string;
+  /** For COPY FROM STDIN: the data lines that follow it, up to `\.`. */
+  copyData?: string;
+}
 
-/**
- * @typedef {object} SplitOptions
- * @property {Record<string, string>} [env] Environment for `\getenv`. Given, `\getenv` reads it
- *   and `\set` concatenates its arguments (`\set f :dir '/data/x'`) as psql does; without it
- *   (pg-regress) both leave the variable unknown.
- */
+export interface SplitOptions {
+  /**
+   * Environment for `\getenv`. Given, `\getenv` reads it and `\set` concatenates its arguments
+   * (`\set f :dir '/data/x'`) as psql does; without it (pg-regress) both leave the variable unknown.
+   */
+  env?: Record<string, string>;
+}
 
 /**
  * Split a psql script into statements. `result.dataLines` holds the 0-based lines that are
@@ -47,13 +58,10 @@ const DOLLAR_QUOTE = /^\$(?:(?:[A-Za-z_]|[^\x00-\x7f])(?:[A-Za-z0-9_]|[^\x00-\x7
  * value of an earlier `\set name value`. A variable whose value is unknown (`\gset`,
  * `\getenv`, psql's own variables) used bare makes the statement `psqlVars`. An undefined
  * variable is sent as written, as psql does (`arr[1:n]` is a slice).
- * @param {string} text
- * @param {SplitOptions} [options]
- * @returns {Statement[] & { dataLines: Set<number> }}
  */
-export function splitPsql(text, options = {}) {
+export function splitPsql(text: string, options: SplitOptions = {}): Statement[] & { dataLines: Set<number> } {
   const lines = text.split("\n");
-  const out = Object.assign([], { dataLines: new Set() });
+  const out = Object.assign<Statement[], { dataLines: Set<number> }>([], { dataLines: new Set() });
   let buf = "";
   /** Line and buffer offset of the statement's first token. */
   let startLine = -1;
@@ -62,34 +70,32 @@ export function splitPsql(text, options = {}) {
   let bracketDepth = 0;
   let beginDepth = 0;
   /** First unquoted words at parenthesis depth 0, as psql records them. */
-  let initIdents = [];
+  let initIdents: string[] = [];
   let psqlVars = false;
   let substitutedSemicolon = false;
   /** psql variables: name → value, or `null` when set but unknown (`\getenv`). */
-  const vars = new Map();
+  const vars = new Map<string, string | null>();
   /** A `\gset` ran: it defines variables named after its query's columns. */
   let gset = false;
-  const known = (name) => vars.has(name) || PSQL_VARIABLES.has(name);
-  const maybeDefined = (name) => known(name) || gset;
+  const known = (name: string): boolean => vars.has(name) || PSQL_VARIABLES.has(name);
+  const maybeDefined = (name: string): boolean => known(name) || gset;
   /**
    * One entry per open `\if`: whether the current branch runs (`null`: unknown, it tests a
    * variable) and whether an earlier branch ran. psql reads nothing in a branch that does not run.
-   * @type {{ active: boolean | null, taken: boolean | null }[]}
    */
-  const ifs = [];
+  const ifs: { active: boolean | null; taken: boolean | null }[] = [];
   const running = () => ifs.every((b) => b.active !== false);
   const conditional = () => ifs.some((b) => b.active === null);
   /** COPY FROM STDIN blocks that follow the current line (several with `\;`). */
   let copyBlocks = 0;
-  const copying = [];
+  const copying: (Statement | undefined)[] = [];
   let stdStrings = true;
   let commentDepth = 0;
   /**
    * Open quote: `'` (backslash escapes only with standard_conforming_strings off), `e'`
    * (always), `raw'` (never: U&'', B'', X''), `"`, or a dollar quote's delimiter.
-   * @type {null | string}
    */
-  let quote = null;
+  let quote: null | string = null;
 
   const reset = () => {
     buf = "";
@@ -102,7 +108,7 @@ export function splitPsql(text, options = {}) {
     substitutedSemicolon = false;
   };
 
-  const flush = (endLine) => {
+  const flush = (endLine: number): void => {
     const sql = buf.slice(startIdx).trim();
     if (startLine >= 0 && sql !== ";") {
       // psql scans a substituted value like typed input: a `;` in it ends a statement.
@@ -121,7 +127,7 @@ export function splitPsql(text, options = {}) {
   };
 
   for (let ln = 0; ln < lines.length; ln++) {
-    const line = lines[ln];
+    const line = lines[ln]!;
     if (copyBlocks > 0) {
       out.dataLines.add(ln);
       const target = copying[0];
@@ -139,7 +145,7 @@ export function splitPsql(text, options = {}) {
         if (k < 0) break;
         i = k;
       }
-      const c = line[i];
+      const c = line[i]!;
       if (commentDepth) {
         if (line.startsWith("*/", i)) { commentDepth--; buf += "*/"; i += 2; }
         else if (line.startsWith("/*", i)) { commentDepth++; buf += "/*"; i += 2; }
@@ -178,7 +184,7 @@ export function splitPsql(text, options = {}) {
         if (line[i + 1] === ":") { buf += ":"; i += 2; continue; }
         // `\\` ends a meta-command; the SQL text goes on after it.
         if (line[i + 1] === "\\") { i += 2; continue; }
-        const cmd = /^\\([A-Za-z_?!.]*)/.exec(line.slice(i))[1];
+        const cmd = /^\\([A-Za-z_?!.]*)/.exec(line.slice(i))![1]!;
         // The arguments end at the next unquoted backslash: another meta-command, or `\\`.
         let end = i + 1 + cmd.length;
         for (let q = false; end < line.length && (q || line[end] !== "\\"); end++) if (line[end] === "'") q = !q;
@@ -189,7 +195,7 @@ export function splitPsql(text, options = {}) {
         else if (cmd === "unset") vars.delete(args.trim());
         else if (cmd === "getenv") {
           const [name, from] = args.trim().split(/\s+/);
-          vars.set(name, options.env ? options.env[from] ?? null : null);
+          vars.set(name!, options.env ? options.env[from ?? ""] ?? null : null);
         }
         else if (cmd === "gset") gset = true;
         else if (cmd === "r" || cmd === "reset") reset();
@@ -201,7 +207,7 @@ export function splitPsql(text, options = {}) {
       if (startLine < 0) { startLine = ln; startIdx = buf.length; }
       if (c === "'") {
         const prev = buf.slice(-1);
-        const prefixed = (p) => p.test(prev) && !IDENT_CONT.test(buf.slice(-2, -1));
+        const prefixed = (p: RegExp): boolean => p.test(prev) && !IDENT_CONT.test(buf.slice(-2, -1));
         quote = prefixed(/[eE]/) ? "e'" : prefixed(/[bBxX]/) || (prev === "&" && /(^|[^A-Za-z0-9_$])[uU]&$/.test(buf.slice(-3))) ? "raw'" : "'";
         buf += c; i++;
         continue;
@@ -217,7 +223,7 @@ export function splitPsql(text, options = {}) {
         const v = /^:(?:(['"])([A-Za-z0-9_]+)\1|([A-Za-z0-9_]+)|\{\?([A-Za-z0-9_]+)\})/.exec(line.slice(i));
         if (v) {
           const [all, q, qname, bare, test] = v;
-          const name = qname ?? bare ?? test;
+          const name = (qname ?? bare ?? test)!;
           if (q && maybeDefined(name)) {
             // A literal or identifier whatever the value: substitute a stand-in of the same kind.
             const text = vars.get(name) ?? name;
@@ -227,7 +233,7 @@ export function splitPsql(text, options = {}) {
           }
           if (bare && typeof vars.get(name) === "string") {
             buf += vars.get(name);
-            if (vars.get(name).includes(";")) substitutedSemicolon = true;
+            if (vars.get(name)!.includes(";")) substitutedSemicolon = true;
             i += all.length;
             continue;
           }
@@ -239,7 +245,7 @@ export function splitPsql(text, options = {}) {
       if (c === "[") bracketDepth++;
       if (c === "]" && bracketDepth > 0) bracketDepth--;
       if (IDENT_START.test(c) && !IDENT_CONT.test(buf.slice(-1))) {
-        const word = WORD.exec(line.slice(i))[0];
+        const word = WORD.exec(line.slice(i))![0];
         if (parenDepth === 0) trackIdent(word.toLowerCase());
         buf += word; i += word.length;
         continue;
@@ -257,10 +263,10 @@ export function splitPsql(text, options = {}) {
   return out;
 
   /** `\set name [value ...]`: plain words and '...' quoted values are kept; anything else is unknown. */
-  function setVar(args) {
+  function setVar(args: string): void {
     const m = /^\s*([A-Za-z0-9_]+)\s*(.*)$/.exec(args);
     if (!m) return;
-    const [, name, rest] = m;
+    const [, name, rest] = m as RegExpExecArray & [string, string, string];
     const value = rest.trim();
     if (options.env) return void vars.set(name, concatenated(value));
     if (/^[^'"`\s\\:]*$/.test(value)) vars.set(name, value);
@@ -268,7 +274,7 @@ export function splitPsql(text, options = {}) {
     else vars.set(name, null);
   }
 
-  function concatenated(value) {
+  function concatenated(value: string): string | null {
     let out = "";
     for (const m of value.matchAll(/:([A-Za-z0-9_]+)|'((?:[^'\\]|'')*)'|([^\s'":\\]+)|(\S)/g)) {
       if (m[1] !== undefined) {
@@ -283,7 +289,7 @@ export function splitPsql(text, options = {}) {
   }
 
   /** `\if expr`, `\elif expr`, `\else`, `\endif`. Only literal booleans are evaluated. */
-  function branch(cmd, arg) {
+  function branch(cmd: string, arg: string): void {
     const value = () => {
       const v = arg.trim().toLowerCase();
       return /^(t|tr|tru|true|y|ye|yes|on|1)$/.test(v) ? true : /^(f|fa|fal|fals|false|n|no|off|0)$/.test(v) ? false : null;
@@ -299,7 +305,7 @@ export function splitPsql(text, options = {}) {
   }
 
   /** psql counts BEGIN/CASE/END inside CREATE [OR REPLACE] FUNCTION|PROCEDURE (BEGIN ATOMIC bodies). */
-  function trackIdent(word) {
+  function trackIdent(word: string): void {
     if (initIdents.length < 8) initIdents.push(word);
     const [a, b, c, d] = initIdents;
     const routine = a === "create" && (b === "function" || b === "procedure" || (b === "or" && c === "replace" && (d === "function" || d === "procedure")));
@@ -310,7 +316,7 @@ export function splitPsql(text, options = {}) {
   }
 
   /** COPY, then FROM STDIN or FROM STDOUT within the first words (the grammar treats both as stdin). */
-  function isCopyFromStdin() {
+  function isCopyFromStdin(): boolean {
     if (initIdents[0] !== "copy") return false;
     const from = initIdents.indexOf("from", 1);
     return from > 0 && from < 7 && (initIdents[from + 1] === "stdin" || initIdents[from + 1] === "stdout");
@@ -323,38 +329,34 @@ export function splitPsql(text, options = {}) {
  * statement's result after the line the statement ends on. A statement whose surrounding lines
  * cannot be found in the output, that shares its last line with other statements when a syntax
  * error is reported after it, or that sits in an `\if` branch we cannot evaluate, is `unknown`.
- * @param {string} sqlText
- * @param {string} outText
- * @param {SplitOptions} [options]
- * @returns {Statement[]}
  */
-export function classify(sqlText, outText, options = {}) {
+export function classify(sqlText: string, outText: string, options: SplitOptions = {}): Statement[] {
   const stmts = splitPsql(sqlText, options);
   const inLines = sqlText.split("\n");
   const outLines = outText.split("\n");
-  const echoed = (i) => inLines[i].trim() !== "" && !stmts.dataLines.has(i);
+  const echoed = (i: number): boolean => inLines[i]!.trim() !== "" && !stmts.dataLines.has(i);
   /** Output line of each echoed input line, or -1. */
-  const pos = new Array(inLines.length).fill(-1);
+  const pos = new Array<number>(inLines.length).fill(-1);
   for (let i = 0, cur = 0; i < inLines.length; i++) {
     if (!echoed(i)) continue;
     let j = cur;
     while (j < outLines.length && outLines[j] !== inLines[i]) j++;
     if (j < outLines.length) { pos[i] = j; cur = j + 1; }
   }
-  const endingOn = new Map();
+  const endingOn = new Map<number, number>();
   for (const s of stmts) endingOn.set(s.endLine, (endingOn.get(s.endLine) ?? 0) + 1);
   for (const s of stmts) {
     const last = s.endLine - 1;
     let next = last + 1;
     while (next < inLines.length && !echoed(next)) next++;
-    const from = pos[last];
-    const to = next < inLines.length ? pos[next] : outLines.length;
+    const from = pos[last]!;
+    const to = next < inLines.length ? pos[next]! : outLines.length;
     if (s.conditional || from < 0 || to < 0) { s.pg = "unknown"; continue; }
     const region = outLines.slice(from + 1, to);
     const at = region.findIndex((l) => /^(ERROR|FATAL|PANIC):/.test(l));
     if (at < 0) { s.pg = "ok"; continue; }
-    s.pgError = region[at];
-    if (endingOn.get(s.endLine) > 1) {
+    s.pgError = region[at]!;
+    if (endingOn.get(s.endLine)! > 1) {
       // Several statements end on this line and share the output. Without a grammar error among
       // the errors, every one of them was parsed (a `\;` group is parsed as a whole first).
       const grammar = region.some((l, k) => /^(ERROR|FATAL|PANIC):/.test(l) && isGrammarError(region.slice(k)));
@@ -371,14 +373,14 @@ export function classify(sqlText, outText, options = {}) {
  * CONTEXT line. Input functions (jsonpath, tsvector, regtype, …) word their errors differently
  * or add a CONTEXT line. Syntax errors in a SQL function body look exactly like the parser's
  * and stay in.
- * @param {string[]} lines the error line and what follows it
+ * @param lines the error line and what follows it
  */
-function isGrammarError(lines) {
+function isGrammarError(lines: string[]): boolean {
   // The scanner's and the grammar's errors end in `at or near "…"` / `at end of input` (other
   // errors point at a position with a LINE line only); with terse verbosity, `at character N`.
   // Unicode escapes are decoded between the scanner and the grammar.
-  const raw = /^ERROR:  .* at (or near ".*"|end of input)( at character \d+)?$/.test(lines[0]) && !/ of jsonpath input/.test(lines[0]);
-  const unicode = /^ERROR:  (unsafe use of string constant with Unicode escapes|invalid Unicode escape( value)?|invalid Unicode surrogate pair)( at character \d+)?$/.test(lines[0]) && /^LINE \d+: /.test(lines[1] ?? "");
+  const raw = /^ERROR:  .* at (or near ".*"|end of input)( at character \d+)?$/.test(lines[0]!) && !/ of jsonpath input/.test(lines[0]!);
+  const unicode = /^ERROR:  (unsafe use of string constant with Unicode escapes|invalid Unicode escape( value)?|invalid Unicode surrogate pair)( at character \d+)?$/.test(lines[0]!) && /^LINE \d+: /.test(lines[1] ?? "");
   if (!raw && !unicode) return false;
   const next = lines.slice(1).findIndex((l) => /^(ERROR|WARNING|NOTICE|INFO):/.test(l));
   return !lines.slice(1, next < 0 ? undefined : next + 1).some((l) => l.startsWith("CONTEXT:"));
@@ -388,14 +390,13 @@ function isGrammarError(lines) {
  * Does the error's caret (`LINE n: …` and the `^` line under it) point into a quoted string of
  * the statement? Then the syntax error is in a function body Postgres parsed while running
  * CREATE FUNCTION / DO, not in the statement. Unknown positions count as outside.
- * @param {string} sql
- * @param {string[]} lines the error line and what follows it
+ * @param lines the error line and what follows it
  */
-function inQuotedText(sql, lines) {
+function inQuotedText(sql: string, lines: string[]): boolean {
   const at = lines.findIndex((l) => /^LINE \d+: /.test(l));
   if (at < 0 || !lines[at + 1]?.includes("^")) return false;
-  const [, n, excerpt] = /^LINE (\d+): (.*)$/.exec(lines[at]);
-  const caret = lines[at + 1].indexOf("^") - `LINE ${n}: `.length;
+  const [, n, excerpt] = /^LINE (\d+): (.*)$/.exec(lines[at]!)! as RegExpExecArray & [string, string, string];
+  const caret = lines[at + 1]!.indexOf("^") - `LINE ${n}: `.length;
   const sqlLines = sql.split("\n");
   const line = sqlLines[Number(n) - 1];
   if (line === undefined) return false;
@@ -409,8 +410,8 @@ function inQuotedText(sql, lines) {
 }
 
 /** `[start, end]` offsets of the string literals and dollar-quoted strings in `sql`. */
-function quotedSpans(sql) {
-  const spans = [];
+function quotedSpans(sql: string): [number, number][] {
+  const spans: [number, number][] = [];
   for (let i = 0; i < sql.length; ) {
     if (sql.startsWith("--", i)) { const e = sql.indexOf("\n", i); i = e < 0 ? sql.length : e; continue; }
     if (sql.startsWith("/*", i)) { const e = sql.indexOf("*/", i + 2); i = e < 0 ? sql.length : e + 2; continue; }

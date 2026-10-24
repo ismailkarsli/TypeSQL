@@ -2,9 +2,12 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
-import { coverageFiles, root } from "./coverage-files.mjs";
+import { coverageFiles, root } from "./coverage-files.ts";
 
-const KEYS = ["lines", "branches", "functions", "statements"];
+const KEYS = ["lines", "branches", "functions", "statements"] as const;
+type Key = (typeof KEYS)[number];
+/** Uncovered lines, branches, functions and statements of a file. */
+type Uncovered = Partial<Record<Key, number>>;
 const args = process.argv.slice(2);
 const unknown = args.filter((a) => a !== "--no-run" && a !== "--reset");
 if (unknown.length) {
@@ -32,17 +35,17 @@ if (!existsSync(summaryFile)) {
   process.exit(1);
 }
 
-const summary = JSON.parse(readFileSync(summaryFile, "utf8"));
-const measured = new Map();
+const summary = JSON.parse(readFileSync(summaryFile, "utf8")) as Record<string, Record<Key, { total: number; covered: number }>>;
+const measured = new Map<string, Record<Key, number>>();
 for (const [file, s] of Object.entries(summary)) {
   if (file === "total") continue;
-  measured.set(relative(root, file).replaceAll("\\", "/"), Object.fromEntries(KEYS.map((k) => [k, s[k].total - s[k].covered])));
+  measured.set(relative(root, file).replaceAll("\\", "/"), Object.fromEntries(KEYS.map((k) => [k, s[k].total - s[k].covered])) as Record<Key, number>);
 }
 
-const current = JSON.parse(readFileSync(thresholdsFile, "utf8"));
+const current = JSON.parse(readFileSync(thresholdsFile, "utf8")) as { uncovered: Record<string, Uncovered> };
 const before = current.uncovered;
-const after = {};
-const changes = [];
+const after: Record<string, Uncovered> = {};
+const changes: string[] = [];
 for (const file of coverageFiles()) {
   const m = measured.get(file);
   if (!m) {
@@ -50,7 +53,7 @@ for (const file of coverageFiles()) {
     process.exit(1);
   }
   const old = before[file] ?? {};
-  const next = {};
+  const next: Uncovered = {};
   for (const k of KEYS) {
     const value = reset ? m[k] : Math.min(old[k] ?? 0, m[k]);
     if (value !== (old[k] ?? 0)) changes.push(`${file} ${k}: ${old[k] ?? 0} -> ${value}`);

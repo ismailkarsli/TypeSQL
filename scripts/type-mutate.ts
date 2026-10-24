@@ -1,11 +1,12 @@
 #!/usr/bin/env node
-import { execFileSync } from "node:child_process";
+import { execFileSync, type ChildProcess } from "node:child_process";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
-import { findMutants, MUTATORS } from "./type-mutate/sites.mjs";
+import type { API, ConfiguredProjectId, Diagnostic, Program, Snapshot } from "typescript/async";
+import { findMutants, MUTATORS } from "./type-mutate/sites.ts";
 import {
   anchorLines,
   assignIds,
@@ -25,7 +26,32 @@ import {
   summarize,
   TestOrder,
   updateKillMap,
-} from "./type-mutate/support.mjs";
+  type MutantResult,
+  type Report,
+  type Status,
+  type Summary,
+} from "./type-mutate/support.ts";
+
+interface CheckResult {
+  status: Status;
+  checks: number;
+  killedBy?: string;
+  diagnostic?: string;
+  tried?: string[];
+}
+
+// a mutant as it is selected; the check fills in the rest
+type Mutant = Omit<MutantResult, "status" | "killedBy"> & {
+  endLine: number;
+  endColumn: number;
+  lines: number[];
+  lineText: string;
+  start: number;
+  end: number;
+  equivalent: string | undefined;
+  ms?: number;
+} & Partial<CheckResult>;
+type Checked = Mutant & CheckResult;
 
 const SCRIPT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const DEFAULT_MUTATE = ["packages/core/src/engine/**/*.ts", "packages/core/src/schema/**/*.ts", "packages/core/src/type-map/**/*.ts"];
@@ -57,22 +83,22 @@ const { values: opts, positionals } = parseArgs({
 });
 
 const ROOT = resolve(opts.root ?? SCRIPT_ROOT);
-const rel = (abs) => relative(ROOT, abs).split("\\").join("/");
-const absPath = (p) => resolve(p);
-const pathOr = (p, fallback) => (p ? resolve(p) : join(ROOT, fallback));
-const git = (...args) => execFileSync("git", args, { cwd: ROOT, encoding: "utf8", maxBuffer: 256 << 20 });
-const tryGit = (...args) => {
+const rel = (abs: string) => relative(ROOT, abs).split("\\").join("/");
+const absPath = (p: string) => resolve(p);
+const pathOr = (p: string | undefined, fallback: string) => (p ? resolve(p) : join(ROOT, fallback));
+const git = (...args: string[]) => execFileSync("git", args, { cwd: ROOT, encoding: "utf8", maxBuffer: 256 << 20 });
+const tryGit = (...args: string[]) => {
   try {
     return git(...args).trim();
   } catch {
     return undefined;
   }
 };
-const log = (s) => process.stderr.write(`${s}\n`);
-const secs = (ms) => `${(ms / 1000).toFixed(1)}s`;
+const log = (s: string) => process.stderr.write(`${s}\n`);
+const secs = (ms: number) => `${(ms / 1000).toFixed(1)}s`;
 
-async function merge(files) {
-  const reports = files.map((f) => JSON.parse(readFileSync(absPath(f), "utf8")));
+async function merge(files: string[]) {
+  const reports = files.map((f) => JSON.parse(readFileSync(absPath(f), "utf8")) as Report);
   const report = mergeReports(reports);
   write(report);
   const killMapPath = pathOr(opts["kill-map"], DEFAULT_KILL_MAP);
@@ -83,7 +109,7 @@ async function merge(files) {
   log(`type-mutate: merged ${reports.length} report(s): ${describe(report.summary)}; kill map ${rel(killMapPath)} (${Object.keys(map.sites).length} entries${report.complete ? ", stale entries dropped" : ""})`);
 }
 
-async function run() {
+async function run(): Promise<number> {
   const started = Date.now();
   const configFile = pathOr(opts.project, "packages/core/tsconfig.json");
   const projectDir = dirname(configFile);
@@ -94,8 +120,8 @@ async function run() {
   const shard = opts.shard ? parseShard(opts.shard) : null;
   const sites = opts.sites ? parseSites(opts.sites) : null;
 
-  let base = null;
-  let changed = null;
+  let base: string | null = null;
+  let changed: Map<string, Set<number>> | null = null;
   if (opts.changed) {
     base = resolveBase();
     changed = changedLines(base);
@@ -111,11 +137,11 @@ async function run() {
     const targets = all.map(rel).filter((f) => matchesFile(f, mutatePatterns) && !tests.includes(f) && (!opts.files || matchesFile(f, opts.files)) && (!changed || changed.has(f)));
     if (opts.files && !targets.length && !changed) throw new Error(`--files ${opts.files.join(" ")}: no type-level file of ${rel(configFile)} matches`);
 
-    const files = new Map();
-    const mutants = [];
+    const files = new Map<string, { text: string; starts: number[] }>();
+    const mutants: Mutant[] = [];
     let index = 0;
     for (const file of targets) {
-      const sf = await program.getSourceFile(join(ROOT, file));
+      const sf = (await program.getSourceFile(join(ROOT, file)))!;
       const text = sf.text;
       const starts = lineStarts(text);
       const markers = equivalenceMarkers(text);
@@ -127,12 +153,12 @@ async function run() {
         const n = index++;
         if (!mutators.includes(m.mutator)) return;
         if (sites && !sites(file, lines)) return;
-        if (changed && ![...lines].some((l) => changed.get(file).has(l))) return;
+        if (changed && ![...lines].some((l) => changed.get(file)!.has(l))) return;
         if (!inShard(n, shard)) return;
-        const at = position(starts, m.anchors[0].start);
-        const end = position(starts, m.anchors[0].end);
+        const at = position(starts, m.anchors[0]!.start);
+        const end = position(starts, m.anchors[0]!.end);
         mutants.push({
-          id: ids[i],
+          id: ids[i]!,
           file,
           line: at.line,
           column: at.column,
@@ -154,7 +180,7 @@ async function run() {
     let selected = mutants;
     if (opts.sample) {
       const n = Number(opts.sample);
-      selected = n >= mutants.length ? mutants : Array.from({ length: n }, (_, i) => mutants[Math.floor((i * mutants.length) / n)]);
+      selected = n >= mutants.length ? mutants : Array.from({ length: n }, (_, i) => mutants[Math.floor((i * mutants.length) / n)]!);
     }
     log(`type-mutate: ${selected.length} mutant(s) in ${new Set(selected.map((m) => m.file)).size} file(s)${shard ? ` (shard ${shard.index}/${shard.count})` : ""}; ${tests.length} test files`);
 
@@ -189,18 +215,18 @@ async function run() {
         done++;
         continue;
       }
-      const { text } = files.get(m.file);
+      const { text } = files.get(m.file)!;
       const mutatedText = text.slice(0, m.start) + m.mutated + text.slice(m.end);
       const t = Date.now();
       const result = await session.check(m.file, mutatedText, order.order(m.id, m.file), srcFiles.filter((f) => f !== m.file));
       m.ms = Date.now() - t;
       Object.assign(m, result);
       if (m.status === "survived" && m.equivalent) m.status = "equivalent";
-      if (m.status === "killed") order.recordKill(m.file, m.killedBy);
+      if (m.status === "killed") order.recordKill(m.file, m.killedBy!);
       done++;
       // a fresh TypeScript process now and then keeps its memory in check over a long run
       if (done % REOPEN_EVERY === 0 && done < selected.length) await session.close().then(() => session.open());
-      const line = `[${done}/${selected.length}] ${m.status.padEnd(10)} ${m.file}:${m.line}:${m.column} ${m.mutator} (${m.killedBy ? `${m.killedBy.replace(/^.*\//, "")}, ` : ""}${m.checks} check(s), ${secs(m.ms)})`;
+      const line = `[${done}/${selected.length}] ${m.status!.padEnd(10)} ${m.file}:${m.line}:${m.column} ${m.mutator} (${m.killedBy ? `${m.killedBy.replace(/^.*\//, "")}, ` : ""}${m.checks} check(s), ${secs(m.ms)})`;
       if (opts.verbose || m.status === "survived" || m.status === "timeout") log(line);
       else if (done % 25 === 0) log(`${line} …`);
     }
@@ -217,9 +243,10 @@ async function run() {
       durationMs: Date.now() - started,
       files: [...new Set(selected.map((m) => m.file))].sort(),
       tests,
-      summary: summarize(selected),
-      mutants: selected.map(({ start, end, lines, equivalent, ...m }) => ({ ...m, ...(m.status === "equivalent" ? { equivalentReason: equivalent } : {}) })),
-    };
+      // every selected mutant has been checked by now
+      summary: summarize(selected as Checked[]),
+      mutants: (selected as Checked[]).map(({ start, end, lines, equivalent, ...m }) => ({ ...m, ...(m.status === "equivalent" ? { equivalentReason: equivalent } : {}) })),
+    } satisfies Report;
     write(report);
     if (selected.length) {
       mkdirSync(dirname(killMapPath), { recursive: true });
@@ -239,11 +266,11 @@ async function run() {
   }
 }
 
-function describe(s) {
+function describe(s: Summary) {
   return `${s.total} mutants: ${s.killed} killed, ${s.timeout} timed out, ${s.survived} survived, ${s.equivalent} equivalent, ${s.invalid} invalid; score ${s.score ?? "–"}%`;
 }
 
-function write(report) {
+function write(report: Report) {
   if (opts.report) {
     mkdirSync(dirname(absPath(opts.report)), { recursive: true });
     writeFileSync(absPath(opts.report), `${JSON.stringify(report)}\n`);
@@ -269,7 +296,7 @@ function resolveBase() {
   throw new Error("type-mutate: no base: set BASE or --base, or have a main branch");
 }
 
-function changedLines(base) {
+function changedLines(base: string) {
   const out = parseDiff(git("diff", "--unified=0", "--no-color", "--no-ext-diff", base, "--"));
   for (const f of git("ls-files", "--others", "--exclude-standard").split("\n").filter(Boolean)) {
     const n = readFileSync(join(ROOT, f), "utf8").split("\n").length;
@@ -278,22 +305,29 @@ function changedLines(base) {
   return out;
 }
 
-async function loadTypeScript(configFile) {
+async function loadTypeScript(configFile: string) {
   let req = createRequire(configFile);
   try {
     req.resolve("typescript/async");
   } catch {
     req = createRequire(import.meta.url);
   }
-  const load = (spec) => import(pathToFileURL(req.resolve(spec)).href);
-  const [api, fs, ast] = await Promise.all([load("typescript/async"), load("typescript/fs"), load("typescript/ast")]);
+  const load = (spec: string) => import(pathToFileURL(req.resolve(spec)).href);
+  const [api, fs, ast] = (await Promise.all([load("typescript/async"), load("typescript/fs"), load("typescript/ast")])) as [typeof import("typescript/async"), typeof import("typescript/fs"), typeof import("typescript/ast")];
   return { API: api.API, createFileSystemLayer: fs.createFileSystemLayer, SyntaxKind: ast.SyntaxKind };
 }
 
-const errorsOf = (ds) => ds.filter((d) => d.category === 1);
+type TypeScript = Awaited<ReturnType<typeof loadTypeScript>>;
+
+const errorsOf = (ds: readonly Diagnostic[]) => ds.filter((d) => d.category === 1);
 
 class Session {
-  constructor(ts, configFile, timeoutMs) {
+  ts: TypeScript;
+  configFile: string;
+  timeoutMs: number;
+  api: API | undefined;
+  base: Snapshot | undefined;
+  constructor(ts: TypeScript, configFile: string, timeoutMs: number) {
     this.ts = ts;
     this.configFile = configFile;
     this.timeoutMs = timeoutMs;
@@ -301,13 +335,13 @@ class Session {
     this.base = undefined;
   }
 
-  async open() {
+  async open(): Promise<Program<ConfiguredProjectId>> {
     this.api = new this.ts.API({ cwd: dirname(this.configFile) });
     this.base = await this.api.createSnapshot({ openProjects: [this.configFile] });
     return this.program(this.base);
   }
 
-  program(snapshot) {
+  program(snapshot: Snapshot): Program<ConfiguredProjectId> {
     const project = snapshot.getConfiguredProject(this.configFile);
     if (!project) throw new Error(`type-mutate: project ${this.configFile} did not load`);
     return project.program;
@@ -322,21 +356,22 @@ class Session {
 
   async restart() {
     try {
-      this.api?.client?.process?.kill("SIGKILL");
+      // the client and its process are private in the API's types
+      (this.api as unknown as { client?: { process?: ChildProcess } } | undefined)?.client?.process?.kill("SIGKILL");
     } catch {}
     await this.close().catch(() => {});
     await this.open();
   }
 
   // test files are checked one per call, stopping at the first error: a call for several files is no faster (measured)
-  async check(file, text, tests, srcFiles) {
-    let timer;
-    const timeout = new Promise((_, reject) => (timer = setTimeout(() => reject(new Error("timeout")), this.timeoutMs)));
+  async check(file: string, text: string, tests: string[], srcFiles: string[]): Promise<CheckResult> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_, reject) => (timer = setTimeout(() => reject(new Error("timeout")), this.timeoutMs)));
     const work = this.checkWorker(file, text, tests, srcFiles);
     try {
       return await Promise.race([work, timeout]);
     } catch (e) {
-      if (e.message !== "timeout") throw e;
+      if ((e as Error).message !== "timeout") throw e;
       work.catch(() => {});
       await this.restart();
       return { status: "timeout", checks: 0 };
@@ -345,22 +380,22 @@ class Session {
     }
   }
 
-  async checkWorker(file, text, tests, srcFiles) {
+  async checkWorker(file: string, text: string, tests: string[], srcFiles: string[]): Promise<CheckResult> {
     const abs = join(ROOT, file);
-    const snapshot = await this.base.update({ fileSystem: this.ts.createFileSystemLayer([[abs, text]]), fileNotifications: { changed: [abs] }, ensurePrograms: true });
-    const message = (d) => `TS${d.code}: ${d.text}`.slice(0, 500);
+    const snapshot = await this.base!.update({ fileSystem: this.ts.createFileSystemLayer([[abs, text]]), fileNotifications: { changed: [abs] }, ensurePrograms: true });
+    const message = (d: Diagnostic) => `TS${d.code}: ${d.text}`.slice(0, 500);
     try {
       const program = this.program(snapshot);
       const own = errorsOf([...(await program.getSyntacticDiagnostics(abs)), ...(await program.getSemanticDiagnostics(abs))]);
-      if (own.length) return { status: "invalid", diagnostic: message(own[0]), checks: 1 };
-      const tried = [];
+      if (own.length) return { status: "invalid", diagnostic: message(own[0]!), checks: 1 };
+      const tried: string[] = [];
       for (const test of tests) {
         const errors = errorsOf(await program.getSemanticDiagnostics(join(ROOT, test)));
         tried.push(test);
-        if (errors.length) return { status: "killed", killedBy: test, diagnostic: message(errors[0]), checks: tried.length + 1 };
+        if (errors.length) return { status: "killed", killedBy: test, diagnostic: message(errors[0]!), checks: tried.length + 1 };
       }
       const errors = errorsOf(await program.getSemanticDiagnostics(srcFiles.map((f) => join(ROOT, f))));
-      if (errors.length) return { status: "invalid", diagnostic: `${errors[0].fileName ? rel(errors[0].fileName) : "?"}: ${message(errors[0])}`, checks: tried.length + 2 };
+      if (errors.length) return { status: "invalid", diagnostic: `${errors[0]!.fileName ? rel(errors[0]!.fileName) : "?"}: ${message(errors[0]!)}`, checks: tried.length + 2 };
       return { status: "survived", checks: tried.length + 2, tried };
     } finally {
       void snapshot.dispose().catch(() => {});

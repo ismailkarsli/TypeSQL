@@ -1,4 +1,4 @@
-/** test/pg-regress/run.mjs loads this file through Node's type stripping: erasable syntax and Node built-ins only. */
+/** test/pg-regress/run.ts loads this file through Node's type stripping: erasable syntax and Node built-ins only. */
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 

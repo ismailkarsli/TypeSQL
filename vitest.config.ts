@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { defineConfig } from "vitest/config";
-import { coverageExclude, coverageFiles, coverageInclude } from "./scripts/coverage-files.mjs";
+import { coverageExclude, coverageFiles, coverageInclude } from "./scripts/coverage-files.ts";
 
 // A runtime file missing from coverage-thresholds.json (a new one) must be fully covered.
 const uncovered: Record<string, Partial<Record<"lines" | "branches" | "functions" | "statements", number>>> = JSON.parse(

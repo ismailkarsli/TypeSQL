@@ -1,4 +1,4 @@
-// Lets Node run the generator from TypeScript sources (`node --import ./test/fixtures/ts-resolve.mjs
+// Lets Node run the generator from TypeScript sources (`node --import ./test/fixtures/ts-resolve.ts
 // ./src/bin.ts`): Node strips the types itself; this maps the `./x.js` import specifiers used in
 // src/ to the `./x.ts` files on disk.
 import { registerHooks } from "node:module";

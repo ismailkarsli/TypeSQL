@@ -1,9 +1,12 @@
-import { coverageFiles } from "./scripts/coverage-files.mjs";
+import type { Stryker } from "@stryker-mutator/core";
+import { coverageFiles } from "./scripts/coverage-files.ts";
+
+// `PartialStrykerOptions` from @stryker-mutator/api, which is not a direct dependency.
+type PartialStrykerOptions = ConstructorParameters<typeof Stryker>[0];
 
 const mutate = process.env.TYPESQL_MUTATE?.split("\n").filter(Boolean) ?? coverageFiles();
 const files = [...new Set(mutate.map((m) => m.replace(/:\d+(-\d+)?$/, "")))];
 
-/** @type {import("@stryker-mutator/api/core").PartialStrykerOptions} */
 export default {
   testRunner: "vitest",
   plugins: ["@stryker-mutator/vitest-runner"],
@@ -16,7 +19,7 @@ export default {
   mutate,
   // `// @ts-nocheck` in the mutated files only: tests that run tsc must not see the instrumented
   // code's type errors, and tests that compare generated files byte for byte must not see the comment.
-  disableTypeChecks: files.length === 1 ? files[0] : `{${files.join(",")}}`,
+  disableTypeChecks: files.length === 1 ? files[0]! : `{${files.join(",")}}`,
   concurrency: 2,
   timeoutMS: 10000,
   dryRunTimeoutMinutes: 20,
@@ -24,4 +27,4 @@ export default {
   jsonReporter: { fileName: "reports/mutation/mutation.json" },
   htmlReporter: { fileName: "reports/mutation/mutation.html" },
   clearTextReporter: { allowColor: false, logTests: false, reportScoreTable: true },
-};
+} satisfies PartialStrykerOptions;

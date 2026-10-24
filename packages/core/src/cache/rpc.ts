@@ -10,8 +10,11 @@ export type Handler = (params: unknown) => unknown;
 export type Handlers = { readonly [method: string]: Handler };
 
 export class RpcError extends Error {
-  constructor(readonly code: number, message: string) {
+  readonly code: number;
+
+  constructor(code: number, message: string) {
     super(message);
+    this.code = code;
   }
 }
 export const MethodNotFound = -32601;

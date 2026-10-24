@@ -1,11 +1,11 @@
 import { afterAll, describe, expect, test } from "vitest";
 import { API } from "typescript/sync";
-import { findViolations } from "./check-expect-error.mjs";
+import { findViolations } from "./check-expect-error.ts";
 
 const api = new API({ cwd: import.meta.dirname });
 afterAll(() => api.close());
 
-const check = (text) => findViolations(api, "/virtual/x.test-d.ts", text).map(({ line, kind }) => `${line}:${kind}`);
+const check = (text: string): string[] => findViolations(api, "/virtual/x.test-d.ts", text).map(({ line, kind }) => `${line}:${kind}`);
 
 describe("flagged", () => {
   test("a Row or RowOf assertion after @ts-expect-error", () => {

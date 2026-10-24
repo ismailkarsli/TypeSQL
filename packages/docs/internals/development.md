@@ -142,7 +142,7 @@ PostgreSQL tree. CI runs the suite as its own job, `pg-regress`; `pnpm test` doe
 
 How a run works (`packages/core/test/pg-regress/`):
 
-1. `psql.mjs` splits each `.sql` file into the statements psql sends, following psql's lexer
+1. `psql.ts` splits each `.sql` file into the statements psql sends, following psql's lexer
    (`src/fe_utils/psqlscan.l`): quotes and dollar quotes, nested comments, parentheses,
    `BEGIN ATOMIC` bodies, `\;`, `\g` and friends, `\r`, `\if` with a literal condition, COPY FROM STDIN data and
    `standard_conforming_strings`. psql variables are substituted where the text psql sends is
@@ -157,7 +157,7 @@ How a run works (`packages/core/test/pg-regress/`):
    `at end of input`, without a `CONTEXT` line, and with the caret outside string literals: a syntax error in a function body,
    which Postgres parses while running CREATE FUNCTION or DO, is an `error`), or `unknown` when
    it cannot tell.
-3. `run.mjs` writes one `.ts` file per test to `node_modules/.cache/typesql-pg-regress/`, each
+3. `run.ts` writes one `.ts` file per test to `node_modules/.cache/typesql-pg-regress/`, each
    statement checked as `ParseProgram<Lex<sql>>`, runs `tsc` over them in batches of about 6000
    statements (one run over all of them needs ~3 GB) and reads the result of every statement from
    the diagnostics.
@@ -281,7 +281,7 @@ function the test declares by catalog augmentation, a role or a constraint a `DB
 express, a NOT NULL violation the seeded rows never reach). The baselines work like pg-regress's:
 keyed by file, kind and statement hash; the run fails on a new disagreement and on a listed one
 that went away. An `unsound` entry needs an `issue` (a number, or `"pending"` until it is
-opened; `node scripts/issues.mjs baseline <baseline.json…>` opens them and writes the numbers in).
+opened; `node scripts/issues.ts baseline <baseline.json…>` opens them and writes the numbers in).
 A statement that makes the compiler fail or hang is found by splitting its batch (`batches.ts`)
 and reported as `crash`.
 
@@ -360,10 +360,10 @@ A failure is shrunk to a minimal statement failing the same property; its signat
 property and the sorted node kinds. The run prints how many nullable output columns returned a
 NULL (a low ratio means the data or the predicates need work).
 
-`node scripts/issues.mjs fuzz --report out.json` opens an issue per new signature (label `fuzz`,
+`node scripts/issues.ts fuzz --report out.json` opens an issue per new signature (label `fuzz`,
 at most 5 per run; a known signature gets a comment when its counterexample is shorter), and
-`issues.mjs fuzz-open --out open.json` exports the open issues' statements for `pnpm fuzz
---replay open.json`, after which `issues.mjs fuzz` comments on those that no longer fail.
+`issues.ts fuzz-open --out open.json` exports the open issues' statements for `pnpm fuzz
+--replay open.json`, after which `issues.ts fuzz` comments on those that no longer fail.
 `--dry-run` prints the issues instead.
 
 ## Definition of done
@@ -392,7 +392,7 @@ engine agrees with PostgreSQL on every statement the oracles can replay.
 ## Type-level mutation testing
 
 No coverage tool sees inside conditional types, so mutation testing is the coverage measure for
-`packages/core/src/engine`, `schema` and `type-map`: `scripts/type-mutate.mjs` changes one type
+`packages/core/src/engine`, `schema` and `type-map`: `scripts/type-mutate.ts` changes one type
 at a time and checks that some type test fails.
 
 ```sh
@@ -402,10 +402,10 @@ pnpm mutate:types --files narrow.ts          # every mutant of a file (a glob, o
 pnpm mutate:types --sites narrow.ts:60-70    # mutants on those lines
 pnpm mutate:types --list --sites expr.ts:71  # print the mutants, check nothing
 pnpm mutate:types --shard 3/16 --report r.json --summary r.md   # one shard of a full run
-node scripts/type-mutate.mjs merge --report all.json --summary all.md r-*.json
+node scripts/type-mutate.ts merge --report all.json --summary all.md r-*.json
 ```
 
-The mutators (`scripts/type-mutate/sites.mjs`), found with the TypeScript AST:
+The mutators (`scripts/type-mutate/sites.ts`), found with the TypeScript AST:
 
 | Mutator | Mutant |
 |---|---|
@@ -452,7 +452,7 @@ kill map from them.
 A green run should mean that every changed line is pinned by a test that fails when the line is
 wrong. Coverage and mutation testing check that for runtime code (`packages/*/src` without
 core's `engine`, `schema` and `type-map`, which are types only; the list is
-`scripts/coverage-files.mjs`), and the type tests must name the exact errors they expect:
+`scripts/coverage-files.ts`), and the type tests must name the exact errors they expect:
 
 ```sh
 pnpm coverage                          # vitest run --coverage (v8); needs Postgres for the DB suites
@@ -470,7 +470,7 @@ them; `--no-run` reads the last run's `coverage/coverage-summary.json`, `--reset
 measured counts as they are (only for a reviewed reset). The goal is 100% lines and branches;
 `/* v8 ignore next */` is only for defensive code that cannot run, with a comment saying why.
 
-**Mutation testing.** StrykerJS (`stryker.config.mjs`) changes one operator, condition, literal
+**Mutation testing.** StrykerJS (`stryker.config.ts`) changes one operator, condition, literal
 or block at a time and runs the tests that cover it; a mutant no test kills marks a line no
 test pins down. `--changed` mutates the lines changed since the merge base of `--base` (default
 `$BASE`, else `main`), uncommitted and untracked files included, and fails on any mutant that
@@ -530,10 +530,10 @@ argument, a slot or an inline value) and inside a call, where it pins where the 
 `packages/bench` measures what the engine costs the compiler:
 
 ```sh
-node packages/bench/gen.mjs              # writes src/q1.ts, q50.ts, q500.ts, mixed50.ts, maxlen.ts
+node packages/bench/gen.ts              # writes src/q1.ts, q50.ts, q500.ts, mixed50.ts, maxlen.ts
 pnpm --filter @typesql/core build        # the …d and …c variants use the built package
-node packages/bench/run.mjs              # tsc --extendedDiagnostics per variant; exit 1 on a threshold breach
-node packages/bench/run.mjs --calibrate  # rewrite thresholds.json from the measured numbers
+node packages/bench/run.ts              # tsc --extendedDiagnostics per variant; exit 1 on a threshold breach
+node packages/bench/run.ts --calibrate  # rewrite thresholds.json from the measured numbers
 ```
 
 `qN.ts` holds N distinct realistic SELECTs; `mixed50.ts` holds 50 statements that use inline
@@ -550,7 +550,7 @@ it is noisy), errors, and the largest statement that must still infer; for the c
 instantiations of one hit (q500c − q50c over 450, at most 250) and a stale cache against no cache
 (at most 1.05x). CI runs the bench as a separate job and writes the table to the job summary.
 
-`run.mjs` also prints the marginal cost of one query, q500 minus q1 divided by 499: check
+`run.ts` also prints the marginal cost of one query, q500 minus q1 divided by 499: check
 time per query, queries per second of check time, and instantiations per query. That is the
 number to watch for an app with hundreds of typed queries.
 
@@ -578,25 +578,25 @@ between them.
 
 ## Function catalog review
 
-`scripts/catalog-from-pg.mjs` prints every `pg_proc` overload of each function in the catalog
+`scripts/catalog-from-pg.ts` prints every `pg_proc` overload of each function in the catalog
 (argument and return types, strict / aggregate / window / set-returning flags) and lists
 catalog names Postgres does not have, for a manual diff after a Postgres upgrade:
 
 ```sh
-TYPESQL_PG_URL=postgres://postgres:x@localhost:5432/postgres node scripts/catalog-from-pg.mjs [names…]
+TYPESQL_PG_URL=postgres://postgres:x@localhost:5432/postgres node scripts/catalog-from-pg.ts [names…]
 ```
 
 ## System catalog slice
 
 `packages/core/src/schema/pg-catalog.ts` (`PgCatalog`) is generated from a live server. The
-relation list is `RELATIONS` in `scripts/pg-catalog-from-pg.mjs`. Column types come from
+relation list is `RELATIONS` in `scripts/pg-catalog-from-pg.ts`. Column types come from
 `pg_attribute`, with domains replaced by their base type. Table columns are `NOT NULL` when
 `attnotnull` is set. View columns are `NOT NULL` only when the view's query tree
 (`pg_rewrite.ev_action`) proves it. Set-returning function columns are nullable unless they
 are in `FUNCTION_COLUMNS_NOT_NULL`.
 
 ```sh
-TYPESQL_PG_URL=postgres://postgres:x@localhost:5432/postgres node scripts/pg-catalog-from-pg.mjs [--check]
+TYPESQL_PG_URL=postgres://postgres:x@localhost:5432/postgres node scripts/pg-catalog-from-pg.ts [--check]
 ```
 
 The view analysis lives in `packages/pg/src/introspect/nullability.ts`, shared with

@@ -29,8 +29,11 @@ export function editorPath(fileName: string): string | null {
 export class Loader {
   private readonly byDir = new Map<string, Promise<EditorModule | null>>();
   private readonly byPath = new Map<string, Promise<EditorModule>>();
+  private readonly log: (message: string) => void;
 
-  constructor(private readonly log: (message: string) => void) {}
+  constructor(log: (message: string) => void) {
+    this.log = log;
+  }
 
   load(fileName: string): Promise<EditorModule | null> {
     const dir = dirname(fileName);

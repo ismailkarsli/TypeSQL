@@ -56,7 +56,7 @@ export function pgStatements(sql: string): [string, string][] | null {
 
 export async function regressionStatements(tests: readonly string[], tally: Tally): Promise<Statement[]> {
   await loadParser();
-  const { classify } = (await import(pathToFileURL(join(root, "packages/core/test/pg-regress/psql.mjs")).href)) as { classify: Classify };
+  const { classify } = (await import(pathToFileURL(join(root, "packages/core/test/pg-regress/psql.ts")).href)) as { classify: Classify };
   const count = (k: string): void => void (tally[k] = (tally[k] ?? 0) + 1);
   const out: Statement[] = [];
   for (const test of tests) {

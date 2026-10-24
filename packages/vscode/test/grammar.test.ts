@@ -4,7 +4,7 @@
  * `injectTo` and `tokenTypes` of package.json.
  */
 import { readFileSync } from "node:fs";
-import path = require("node:path");
+import * as path from "node:path";
 import { beforeAll, expect, test } from "vitest";
 import { INITIAL, Registry, parseRawGrammar, type IGrammar } from "vscode-textmate";
 import { loadWASM, OnigScanner, OnigString } from "vscode-oniguruma";

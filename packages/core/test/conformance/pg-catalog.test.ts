@@ -111,7 +111,7 @@ describe.skipIf(!db)("PgCatalog against Postgres", () => {
       if (process.env["TYPESQL_REQUIRE_DB"] === "1") throw new Error(`generated from PostgreSQL ${generatedFrom}, server is ${major}`);
       ctx.skip(`generated from PostgreSQL ${generatedFrom}, server is ${major}`);
     }
-    const generator = new URL("../../../../scripts/pg-catalog-from-pg.mjs", import.meta.url).href;
+    const generator = new URL("../../../../scripts/pg-catalog-from-pg.ts", import.meta.url).href;
     const { generatePgCatalog } = (await import(generator)) as { generatePgCatalog(c: Client): Promise<string> };
     expect(await generatePgCatalog(client)).toBe(source);
   }, 60_000);

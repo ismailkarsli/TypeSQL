@@ -1,7 +1,7 @@
 import { defineConfig } from "vitest/config";
 
 // Every Stryker worker runs its own vitest; the DB suites drop and recreate their tables, so each
-// worker gets its own database (created by scripts/mutate-runtime.mjs).
+// worker gets its own database (created by scripts/mutate-runtime.ts).
 const worker = process.env.STRYKER_MUTATOR_WORKER;
 const url = process.env.TYPESQL_PG_URL;
 if (worker !== undefined && url) {

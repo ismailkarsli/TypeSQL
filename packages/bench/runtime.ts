@@ -2,9 +2,13 @@
 // Runtime cost of building a query: `sql(...)` turns the call into `{ text, values }` (named and
 // inline parameters rewritten to $n, fragments spliced). Nothing is parsed at runtime. Imports the
 // built package, so run `pnpm build` first.
-import { createSql } from "@typesql/core";
+import { createSql, type Col, type Generated } from "@typesql/core";
 
-const sql = createSql();
+interface DB {
+  users: { id: Generated<"int4">; email: Col<"text"> };
+}
+
+const sql = createSql<DB>();
 const where = sql.fragment("WHERE u.id > $1", 100);
 const cases = {
   "positional $1": () => sql("SELECT id, email FROM users WHERE id = $1", 7),
@@ -14,7 +18,7 @@ const cases = {
 };
 
 const N = 1_000_000;
-let sink;
+let sink: { readonly text: string } | undefined;
 for (const [name, build] of Object.entries(cases)) {
   for (let i = 0; i < N / 10; i++) sink = build(); // warm up
   const started = performance.now();
@@ -22,4 +26,4 @@ for (const [name, build] of Object.entries(cases)) {
   const ns = ((performance.now() - started) * 1e6) / N;
   console.log(`${name.padEnd(18)} ${(ns / 1000).toFixed(2)} µs per call`);
 }
-if (!sink.text) throw new Error("unreachable");
+if (!sink!.text) throw new Error("unreachable");

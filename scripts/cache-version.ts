@@ -2,7 +2,7 @@
 // decide what the type checker computes, so a type cache entry made by another version of the
 // engine is never used. `--check` (CI) fails instead of writing when it is out of date.
 //
-//   node scripts/cache-version.mjs [--check]
+//   node scripts/cache-version.ts [--check]
 //
 // Hashed: every .ts file under packages/core/src except src/cache/ (the content mapper and its
 // job, which run in Node), src/editor/ (editor completions, which run in Node) and src/runtime/
@@ -15,7 +15,7 @@ const root = join(import.meta.dirname, "../packages/core/src");
 const target = join(root, "engine/cache.ts");
 const line = /^export type CacheVersion = "[^"]*";$/m;
 
-function files(dir) {
+function files(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
     const p = join(dir, e.name);
     if (e.isDirectory()) return p === join(root, "cache") || p === join(root, "editor") || p === join(root, "runtime") ? [] : files(p);

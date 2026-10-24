@@ -26,7 +26,11 @@ export function param<const T>(value: T): InlineMarker<T> {
 
 /** A `valueOrDefault` value: `undefined` becomes `DEFAULT` instead of a parameter. */
 class OrDefault {
-  constructor(readonly value: unknown) {}
+  readonly value: unknown;
+
+  constructor(value: unknown) {
+    this.value = value;
+  }
 }
 
 /** Like `param`, but an `undefined` value is sent as `DEFAULT` (for INSERT values and SET). */

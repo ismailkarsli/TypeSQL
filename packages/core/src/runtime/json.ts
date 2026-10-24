@@ -9,7 +9,11 @@ import { param } from "./inline.js";
  * serializer calls `toJSON()`, and its text serializer (`'' + x`) calls `toString()`.
  */
 export class JsonParam<T = unknown> {
-  constructor(readonly value: T) {}
+  readonly value: T;
+
+  constructor(value: T) {
+    this.value = value;
+  }
   toPostgres(): string {
     return JSON.stringify(this.value);
   }

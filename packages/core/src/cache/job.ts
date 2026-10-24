@@ -55,8 +55,10 @@ const lit = (s: string): string => JSON.stringify(s);
 export class Session {
   private readonly session: ProbeSession;
   readonly probe: string;
+  private readonly o: JobOptions;
 
-  constructor(private readonly o: JobOptions) {
+  constructor(o: JobOptions) {
+    this.o = o;
     this.probe = join(dirname(o.cacheFile), "__typesql_probe__.ts");
     this.session = new ProbeSession(o.configFile, this.probe);
   }
@@ -446,8 +448,10 @@ export class Job {
   private idle: NodeJS.Timeout | undefined;
   private running: Promise<unknown> = Promise.resolve();
   private stopped = false;
+  private readonly o: JobOptions & { readonly debounceMs?: number; readonly idleMs?: number };
 
-  constructor(private readonly o: JobOptions & { readonly debounceMs?: number; readonly idleMs?: number }) {
+  constructor(o: JobOptions & { readonly debounceMs?: number; readonly idleMs?: number }) {
+    this.o = o;
     this.session = new Session(o);
   }
 

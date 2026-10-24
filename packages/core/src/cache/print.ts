@@ -25,13 +25,16 @@ const KEYWORDS = new Set([
 
 export class Printer {
   private readonly globals = new Map<string, Promise<boolean>>();
+  private readonly checker: Checker;
+  private readonly at: Node;
+  /** Paths of `@typesql/core`'s own declarations (src or dist). */
+  private readonly isCorePath: (path: string) => boolean;
 
-  constructor(
-    private readonly checker: Checker,
-    private readonly at: Node,
-    /** Paths of `@typesql/core`'s own declarations (src or dist). */
-    private readonly isCorePath: (path: string) => boolean,
-  ) {}
+  constructor(checker: Checker, at: Node, isCorePath: (path: string) => boolean) {
+    this.checker = checker;
+    this.at = at;
+    this.isCorePath = isCorePath;
+  }
 
   print(type: Type): Promise<string> {
     return this.checker.typeToString(type, this.at, FLAGS);

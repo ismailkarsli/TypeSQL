@@ -5,17 +5,32 @@
 // `Sig` notation, with strictness, set-returning and aggregate/window flags. It also lists
 // catalog names that do not exist in pg_proc (typos, extension functions).
 //
-//   TYPESQL_PG_URL=postgres://… node scripts/catalog-from-pg.mjs            # all catalog functions
-//   TYPESQL_PG_URL=postgres://… node scripts/catalog-from-pg.mjs lower sum  # selected functions
+//   TYPESQL_PG_URL=postgres://… node scripts/catalog-from-pg.ts            # all catalog functions
+//   TYPESQL_PG_URL=postgres://… node scripts/catalog-from-pg.ts lower sum  # selected functions
 //
 // The output is meant for a human diff against catalog.ts after a Postgres upgrade; it does
 // not rewrite the catalog (overload choice and nullability rules are deliberate). The other
-// pg_catalog functions are generated into pg-functions.ts by scripts/gen-pg-functions.mjs.
+// pg_catalog functions are generated into pg-functions.ts by scripts/gen-pg-functions.ts.
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 
 const require = createRequire(new URL("../packages/core/package.json", import.meta.url));
-const { Client } = require("pg");
+/** The part of a `pg` Client this script uses; `R` is the type of the result rows. */
+interface PgClient {
+  connect(): Promise<void>;
+  query<R extends readonly unknown[]>(text: string, values?: unknown[]): Promise<{ rows: R }>;
+  end(): Promise<void>;
+}
+interface ProcRow {
+  name: string;
+  args: string;
+  ret: string;
+  strict: boolean;
+  srf: boolean;
+  kind: string;
+  variadic: boolean;
+}
+const { Client } = require("pg") as { Client: new (config: { connectionString: string }) => PgClient };
 
 const url = process.env.TYPESQL_PG_URL;
 if (!url) {
@@ -25,12 +40,12 @@ if (!url) {
 
 const catalogSrc = readFileSync(new URL("../packages/core/src/engine/typer/catalog.ts", import.meta.url), "utf8");
 const body = catalogSrc.slice(catalogSrc.indexOf("export interface FunctionCatalog"), catalogSrc.indexOf("\n}\n", catalogSrc.indexOf("export interface FunctionCatalog")));
-const catalogNames = [...new Set([...body.matchAll(/(?:^|; )\s*([a-z_][a-z0-9_]*): (?:\[\s*Sig<|Sig<)/gm)].map((m) => m[1]))];
+const catalogNames = [...new Set([...body.matchAll(/(?:^|; )\s*([a-z_][a-z0-9_]*): (?:\[\s*Sig<|Sig<)/gm)].map((m) => m[1]!))];
 const names = process.argv.slice(2).length ? process.argv.slice(2) : catalogNames;
 
 const client = new Client({ connectionString: url });
 await client.connect();
-const { rows } = await client.query(
+const { rows } = await client.query<ProcRow[]>(
   `SELECT p.proname AS name,
           coalesce(array_to_string(array(SELECT format_type(t, NULL) FROM unnest(p.proargtypes) AS t), ', '), '') AS args,
           format_type(p.prorettype, NULL) AS ret,

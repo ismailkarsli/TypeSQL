@@ -12,7 +12,7 @@ generator client {
 
 generator typesql {
   // Runs the generator from source; installed projects use provider = "typesql-prisma".
-  provider = "node --import ./test/fixtures/ts-resolve.mjs ./src/bin.ts"
+  provider = "node --import ./test/fixtures/ts-resolve.ts ./src/bin.ts"
   output   = "./typesql.ts"
 }
 

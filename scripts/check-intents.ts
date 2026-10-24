@@ -2,7 +2,7 @@
 // (`.changeset/*.md`, written by `pnpm change`) added in the same range names the package.
 // A `--bump none` intent counts: it records that the change needs no release.
 //
-//   node scripts/check-intents.mjs [base]   # base defaults to origin/main
+//   node scripts/check-intents.ts [base]   # base defaults to origin/main
 //
 // "Shipped files" are the package's `files` entries plus package.json; a package.json change
 // that only touches "version" (a `pnpm version -r` release commit) does not count.
@@ -10,8 +10,8 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-const git = (...args) => execFileSync("git", args, { encoding: "utf8" });
-const tryGit = (...args) => {
+const git = (...args: string[]): string => execFileSync("git", args, { encoding: "utf8" });
+const tryGit = (...args: string[]): string | undefined => {
   try {
     return git(...args);
   } catch {
@@ -26,10 +26,21 @@ if (/^0+$/.test(arg) || tryGit("rev-parse", "--verify", "--quiet", `${arg}^{comm
 }
 const base = git("merge-base", arg, "HEAD").trim();
 
-const packages = readdirSync("packages")
+interface Manifest {
+  name: string;
+  private?: boolean;
+  files?: string[];
+}
+interface Package {
+  dir: string;
+  manifestPath: string;
+  manifest: Manifest;
+}
+
+const packages: Package[] = readdirSync("packages")
   .map((dir) => ({ dir: `packages/${dir}`, manifestPath: join("packages", dir, "package.json") }))
   .filter((p) => existsSync(p.manifestPath))
-  .map((p) => ({ ...p, manifest: JSON.parse(readFileSync(p.manifestPath, "utf8")) }))
+  .map((p) => ({ ...p, manifest: JSON.parse(readFileSync(p.manifestPath, "utf8")) as Manifest }))
   .filter((p) => !p.manifest.private);
 
 const changed = new Set(
@@ -39,12 +50,12 @@ const changed = new Set(
     .filter(Boolean),
 );
 
-const withoutVersion = (text) => {
+const withoutVersion = (text: string): string => {
   const { version, ...rest } = JSON.parse(text);
   return JSON.stringify(rest);
 };
 
-function shippedChange(pkg) {
+function shippedChange(pkg: Package): string | undefined {
   for (const file of changed) {
     if (!file.startsWith(`${pkg.dir}/`)) continue;
     const rel = file.slice(pkg.dir.length + 1);
@@ -59,22 +70,22 @@ function shippedChange(pkg) {
 }
 
 // Front matter keys of an intent: package names, or `./dir` for ambiguous names.
-function intentTargets(text) {
+function intentTargets(text: string): string[] {
   const match = /^---\r?\n([\s\S]*?)\r?\n---/.exec(text);
   if (!match) return [];
-  return match[1]
+  return match[1]!
     .split(/\r?\n/)
     .map((line) => /^\s*["']?([^"':]+?)["']?\s*:/.exec(line)?.[1])
-    .filter(Boolean)
+    .filter((key): key is string => Boolean(key))
     .map((key) => key.replace(/^\.\//, "").replace(/\/$/, ""));
 }
 
-const isIntent = (file) => /^\.changeset\/[^/]+\.md$/.test(file) && file !== ".changeset/README.md";
+const isIntent = (file: string): boolean => /^\.changeset\/[^/]+\.md$/.test(file) && file !== ".changeset/README.md";
 
 // Intents added in the range, including ones a release commit in the range has since consumed
 // and deleted (read from the commit that added them), plus uncommitted ones.
-const intentTexts = [];
-let commit;
+const intentTexts: string[] = [];
+let commit: string | undefined;
 for (const line of git("log", "--format=%x00%H", "--name-only", "--diff-filter=AM", `${base}..HEAD`, "--", ".changeset").split("\n")) {
   if (line.startsWith("\0")) commit = line.slice(1);
   else if (isIntent(line)) intentTexts.push(git("show", `${commit}:${line}`));

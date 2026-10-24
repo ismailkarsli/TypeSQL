@@ -10,7 +10,7 @@
  * else (function calls outside a short list, scalar subqueries, set-returning function columns)
  * is nullable. On PostgreSQL 15 and older every column reference counts as nullable.
  *
- * This module has no imports so that scripts/pg-catalog-from-pg.mjs can load it with Node's
+ * This module has no imports so that scripts/pg-catalog-from-pg.ts can load it with Node's
  * type stripping.
  */
 

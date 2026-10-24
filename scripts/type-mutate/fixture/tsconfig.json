@@ -4,6 +4,7 @@
     "lib": ["es2022"],
     "module": "nodenext",
     "strict": true,
+    "erasableSyntaxOnly": true,
     "noEmit": true,
     "types": []
   },

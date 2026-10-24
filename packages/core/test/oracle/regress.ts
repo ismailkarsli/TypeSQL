@@ -3,8 +3,7 @@ import { createInterface } from "node:readline";
 import { join } from "node:path";
 import { PROBE_HEAD, ProbeSession, parseTypeText, readAnalysis, type Evaluated } from "../../src/cache/evaluate.js";
 import { scanNames } from "../../src/cache/scan.js";
-// @ts-expect-error -- plain JavaScript (psql.mjs), typed by its JSDoc only
-import { classify } from "../pg-regress/psql.mjs";
+import { classify } from "../pg-regress/psql.js";
 import { compareStatement, normalizeOurs, type Observed, type Ours, type Server } from "./compare.js";
 import type { Disagreement } from "./kinds.js";
 import { Connection, isRejection, type Ran, type ServerError } from "./replay.js";

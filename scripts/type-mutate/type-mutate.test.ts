@@ -6,22 +6,25 @@ import { fileURLToPath } from "node:url";
 import { API } from "typescript/async";
 import { SyntaxKind } from "typescript/ast";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
-import { findMutants } from "./sites.mjs";
-import { assignIds, equivalence, equivalenceMarkers, fallbackOrder, inShard, lineStarts, markdownSummary, mergeReports, parseDiff, parseShard, parseSites, position, readKillMap, summarize, TestOrder, updateKillMap } from "./support.mjs";
+import { findMutants } from "./sites.ts";
+import { assignIds, equivalence, equivalenceMarkers, fallbackOrder, inShard, lineStarts, markdownSummary, mergeReports, parseDiff, parseShard, parseSites, position, readKillMap, summarize, TestOrder, updateKillMap, type KillMap, type MutantResult, type Report, type Status } from "./support.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const script = join(here, "..", "type-mutate.mjs");
+const script = join(here, "..", "type-mutate.ts");
 const fixture = join(here, "fixture");
 
+// what a run writes for each mutant, as far as the tests look
+type RunMutant = MutantResult & { checks: number; tried?: string[] };
+
 describe("mutation sites", () => {
-  let api;
+  let api: API | undefined;
   beforeAll(() => {
     api = new API({ cwd: here });
   });
   afterAll(() => api?.close());
 
-  const mutants = async (text) => {
-    const retained = await api.createSourceFile("/x.ts", text);
+  const mutants = async (text: string) => {
+    const retained = await api!.createSourceFile("/x.ts", text);
     try {
       return findMutants(retained.sourceFile, SyntaxKind).map((m) => ({ mutator: m.mutator, scope: m.scope, mutated: text.slice(0, m.start) + m.text + text.slice(m.end) }));
     } finally {
@@ -44,7 +47,7 @@ describe("mutation sites", () => {
   test("a branch that uses an infer name is not moved out of its scope", async () => {
     const ms = await mutants("type A<T> = T extends [infer X] ? X : 0;");
     expect(ms.map((m) => m.mutator)).toEqual(["cond-false", "never-true", "never-false"]);
-    expect(ms[0].mutated).toBe("type A<T> = T extends [infer X] ? 0 : 0;");
+    expect(ms[0]!.mutated).toBe("type A<T> = T extends [infer X] ? 0 : 0;");
   });
 
   test("true/false literal types flip; an edit two mutators make is tried once", async () => {
@@ -95,7 +98,7 @@ describe("bookkeeping", () => {
 
   test("changed lines from git diff -U0, deletions mark the lines around the gap", () => {
     const diff = ["diff --git a/x.ts b/x.ts", "--- a/x.ts", "+++ b/x.ts", "@@ -3 +3 @@", "-a", "+b", "@@ -10,2 +12,3 @@", "@@ -20,2 +22,0 @@", "+++ /dev/null"].join("\n");
-    expect([...parseDiff(diff).get("x.ts")].sort((a, b) => a - b)).toEqual([3, 12, 13, 14, 22, 23]);
+    expect([...parseDiff(diff).get("x.ts")!].sort((a, b) => a - b)).toEqual([3, 12, 13, 14, 22, 23]);
   });
 
   test("equivalence markers, with and without a mutator list", () => {
@@ -125,7 +128,7 @@ describe("bookkeeping", () => {
   test("test order: the kill map's file first, then kills in the same source file, then overall", () => {
     const tests = fallbackOrder(["b.test.ts", "z.test-d.ts", "a.test-d.ts", "helper.ts"]);
     expect(tests).toEqual(["a.test-d.ts", "z.test-d.ts", "helper.ts", "b.test.ts"]);
-    const order = new TestOrder(tests, { version: 1, sites: { "s.ts#m#A#1": "b.test.ts", "s.ts#m#A#2": "z.test-d.ts", "t.ts#m#A#1": "helper.ts", "t.ts#m#A#2": "helper.ts", "gone.ts#m#A#1": "gone.test-d.ts" } });
+    const order = new TestOrder(tests, { version: 1, updated: null, commit: null, sites: { "s.ts#m#A#1": "b.test.ts", "s.ts#m#A#2": "z.test-d.ts", "t.ts#m#A#1": "helper.ts", "t.ts#m#A#2": "helper.ts", "gone.ts#m#A#1": "gone.test-d.ts" } });
     expect(order.order("s.ts#m#A#1", "s.ts")[0]).toBe("b.test.ts");
     expect(order.order("s.ts#m#A#9", "s.ts")).toEqual(["z.test-d.ts", "b.test.ts", "helper.ts", "a.test-d.ts"]);
     expect(order.order("u.ts#m#A#1", "u.ts")).toEqual(["helper.ts", "z.test-d.ts", "b.test.ts", "a.test-d.ts"]);
@@ -134,12 +137,12 @@ describe("bookkeeping", () => {
   test("kill map updates, reports merge, summaries", () => {
     const map = readKillMap(JSON.stringify({ version: 1, sites: { a: "t1", b: "t1", c: "t2" } }));
     expect(readKillMap("not json").sites).toEqual({});
-    const mutant = (id, status, extra = {}) => ({ id, file: "f.ts", line: 1, column: 1, mutator: "bool-flip", description: "d", original: "true", mutated: "false", status, ...extra });
+    const mutant = (id: string, status: Status, extra: Partial<MutantResult> = {}): MutantResult => ({ id, file: "f.ts", line: 1, column: 1, mutator: "bool-flip", description: "d", original: "true", mutated: "false", status, ...extra });
     const next = updateKillMap(map, [mutant("a", "survived"), mutant("d", "killed", { killedBy: "t3" })]);
     expect(next.sites).toEqual({ b: "t1", c: "t2", d: "t3" });
     expect(updateKillMap(map, [mutant("d", "killed", { killedBy: "t3" })], { prune: true }).sites).toEqual({ d: "t3" });
 
-    const shard = (index, mutants) => ({ version: 1, mode: "full", shard: { index, count: 2 }, files: ["f.ts"], durationMs: 1, summary: summarize(mutants), mutants });
+    const shard = (index: number, mutants: MutantResult[]): Report => ({ version: 1, mode: "full", shard: { index, count: 2 }, files: ["f.ts"], durationMs: 1, summary: summarize(mutants), mutants });
     const merged = mergeReports([shard(1, [mutant("a", "killed", { killedBy: "t" })]), shard(2, [mutant("b", "survived"), mutant("c", "invalid")])]);
     expect(merged.complete).toBe(true);
     expect(merged.summary).toEqual({ total: 3, killed: 1, timeout: 0, survived: 1, equivalent: 0, invalid: 1, score: 50 });
@@ -151,38 +154,38 @@ describe("bookkeeping", () => {
 });
 
 describe("runs over the fixture project", { timeout: 120_000 }, () => {
-  const run = (cwd, args, env = {}) => spawnSync(process.execPath, [script, "--root", cwd, "--project", "tsconfig.json", "--mutate", "src/**", ...args], { cwd, encoding: "utf8", env: { ...process.env, ...env, GITHUB_STEP_SUMMARY: "" } });
+  const run = (cwd: string, args: string[], env: Record<string, string> = {}) => spawnSync(process.execPath, [script, "--root", cwd, "--project", "tsconfig.json", "--mutate", "src/**", ...args], { cwd, encoding: "utf8", env: { ...process.env, ...env, GITHUB_STEP_SUMMARY: "" } });
 
   test("a full run: killed, survived, marked equivalent and invalid mutants, a report and a kill map", () => {
     const out = mkdtempSync(join(tmpdir(), "type-mutate-"));
     try {
       const r = run(fixture, ["--report", join(out, "r.json"), "--summary", join(out, "s.md"), "--kill-map", join(out, "k.json")]);
       expect(r.status, r.stderr).toBe(0);
-      const report = JSON.parse(readFileSync(join(out, "r.json"), "utf8"));
-      const status = (line, mutator) => report.mutants.filter((m) => m.line === line && m.mutator === mutator).map((m) => m.status);
+      const report = JSON.parse(readFileSync(join(out, "r.json"), "utf8")) as Report<RunMutant>;
+      const status = (line: number, mutator: string) => report.mutants.filter((m) => m.line === line && m.mutator === mutator).map((m) => m.status);
       expect(status(7, "sibling-swap")).toEqual(["killed"]);
       expect(status(8, "cond-false")).toEqual(["survived"]);
       expect(status(10, "tuple-swap")).toEqual(["killed"]);
       expect(status(18, "never-false")).toEqual(["equivalent"]);
       expect(status(18, "never-true")).toEqual(["killed"]);
       // dropping "not" breaks `Power<"not">` in the mutated file itself
-      expect(report.mutants.find((m) => m.mutator === "union-drop" && m.original.includes('"not"')).status).toBe("invalid");
-      expect(report.mutants.find((m) => m.mutator === "union-drop" && m.original.includes('"and"')).killedBy).toBe("test/logic.test-d.ts");
-      const survivor = report.mutants.find((m) => m.status === "survived");
+      expect(report.mutants.find((m) => m.mutator === "union-drop" && m.original.includes('"not"'))!.status).toBe("invalid");
+      expect(report.mutants.find((m) => m.mutator === "union-drop" && m.original.includes('"and"'))!.killedBy).toBe("test/logic.test-d.ts");
+      const survivor = report.mutants.find((m) => m.status === "survived")!;
       expect(survivor.tried).toEqual(["test/logic.test-d.ts", "test/more.test-d.ts"]);
       expect(survivor.file).toBe("src/logic.ts");
       expect(report.summary.total).toBe(report.mutants.length);
       expect(readFileSync(join(out, "s.md"), "utf8")).toContain("### Survivors");
-      const killMap = JSON.parse(readFileSync(join(out, "k.json"), "utf8"));
+      const killMap = JSON.parse(readFileSync(join(out, "k.json"), "utf8")) as KillMap;
       const killed = report.mutants.filter((m) => m.status === "killed");
       expect(Object.keys(killMap.sites).sort()).toEqual(killed.map((m) => m.id).sort());
 
       const m = spawnSync(process.execPath, [script, "merge", "--report", join(out, "m.json"), "--kill-map", join(out, "k2.json"), join(out, "r.json")], { encoding: "utf8", env: { ...process.env, GITHUB_STEP_SUMMARY: "" } });
       expect(m.status, m.stderr).toBe(0);
-      const merged = JSON.parse(readFileSync(join(out, "m.json"), "utf8"));
+      const merged = JSON.parse(readFileSync(join(out, "m.json"), "utf8")) as Report;
       expect(merged.complete).toBe(true);
       expect(merged.summary).toEqual(report.summary);
-      expect(JSON.parse(readFileSync(join(out, "k2.json"), "utf8")).sites).toEqual(killMap.sites);
+      expect((JSON.parse(readFileSync(join(out, "k2.json"), "utf8")) as KillMap).sites).toEqual(killMap.sites);
     } finally {
       rmSync(out, { recursive: true, force: true });
     }
@@ -192,7 +195,7 @@ describe("runs over the fixture project", { timeout: 120_000 }, () => {
     const repo = mkdtempSync(join(tmpdir(), "type-mutate-"));
     try {
       cpSync(fixture, repo, { recursive: true });
-      const git = (...args) => execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", ...args], { cwd: repo, encoding: "utf8" });
+      const git = (...args: string[]) => execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", ...args], { cwd: repo, encoding: "utf8" });
       git("init", "-q", "-b", "main");
       git("add", ".");
       git("commit", "-q", "-m", "fixture");
@@ -204,7 +207,7 @@ describe("runs over the fixture project", { timeout: 120_000 }, () => {
       writeFileSync(file, original.replace("Pair<1, 2>", "Pair<1, 2 >"));
       let r = run(repo, ["--changed", "--report", join(repo, "r.json"), ...killMap], { BASE: "main" });
       expect(r.status, r.stderr).toBe(1);
-      let report = JSON.parse(readFileSync(join(repo, "r.json"), "utf8"));
+      let report = JSON.parse(readFileSync(join(repo, "r.json"), "utf8")) as Report<RunMutant>;
       expect(report.mode).toBe("changed");
       expect(new Set(report.mutants.map((m) => m.line))).toEqual(new Set([7, 8]));
       expect(report.mutants.filter((m) => m.status === "survived").map((m) => m.mutator)).toContain("cond-false");
@@ -212,12 +215,12 @@ describe("runs over the fixture project", { timeout: 120_000 }, () => {
       writeFileSync(file, original.replace("Pair<1, 2>", "Pair<1, 2> // type-mutate: equivalent – for the test").replace('O extends "and" ? Pair<2, 3>', 'O extends "and" ? Pair<2, 3> // type-mutate: equivalent – for the test'));
       r = run(repo, ["--changed", "--report", join(repo, "r.json"), ...killMap], { BASE: "main" });
       expect(r.status, r.stderr).toBe(0);
-      report = JSON.parse(readFileSync(join(repo, "r.json"), "utf8"));
+      report = JSON.parse(readFileSync(join(repo, "r.json"), "utf8")) as Report<RunMutant>;
       expect(report.summary.survived).toBe(0);
       expect(report.mutants.every((m) => m.status === "equivalent" && m.checks === 0)).toBe(true);
       r = run(repo, ["--changed", "--check-equivalent", "--report", join(repo, "r.json"), ...killMap], { BASE: "main" });
       expect(r.status, r.stderr).toBe(0);
-      report = JSON.parse(readFileSync(join(repo, "r.json"), "utf8"));
+      report = JSON.parse(readFileSync(join(repo, "r.json"), "utf8")) as Report<RunMutant>;
       expect(report.mutants.some((m) => m.status === "killed")).toBe(true);
       expect(report.mutants.filter((m) => m.status === "equivalent").every((m) => m.checks > 0)).toBe(true);
 

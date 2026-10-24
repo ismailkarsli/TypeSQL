@@ -49,7 +49,7 @@ and `runtime/`): an entry computed by other sources is never used.
   `P<T extends Toks, I extends number> = Ok<Node, J> | SqlError` where `T` is the whole
   token tuple, `I` the current index and `J` the index after the node. `Ok<N, J>` is
   `readonly [N, J]`. `T[I]` is `undefined` past the end. `Nx<I>` (= I + 1) is a lookup in
-  the generated `Next` table (`lexer/next.ts`, regenerate with `node scripts/gen-next.mjs`).
+  the generated `Next` table (`lexer/next.ts`, regenerate with `node scripts/gen-next.ts`).
   Propagate with:
   ```ts
   ParseX<T, I> extends infer R ? R extends Ok<infer N, infer J extends number> ? … : R : never
@@ -133,7 +133,7 @@ and `runtime/`): an entry computed by other sources is never used.
   and handle params in `typer/params.ts`. Add tests in `test/types/<feature>.test-d.ts`.
 - New function: add a `Sig` to `FunctionCatalog` in `typer/catalog.ts`, then regenerate
   `typer/pg-functions.ts` (the uncurated pg_catalog rest) with
-  `TYPESQL_PG_URL=… node scripts/gen-pg-functions.mjs`.
+  `TYPESQL_PG_URL=… node scripts/gen-pg-functions.ts`.
 - New statement: add to `ast.ts`, parse in `parser/<kind>.ts`, dispatch in
   `parser/stmt.ts`, project in `project/stmt.ts`.
 

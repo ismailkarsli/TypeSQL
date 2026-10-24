@@ -100,7 +100,7 @@ jobs:
         with:
           pattern: fuzz-*
           merge-multiple: true
-      - run: node scripts/issues.mjs fuzz-open --out open-issues.json
+      - run: node scripts/issues.ts fuzz-open --out open-issues.json
       - run: pnpm fuzz --replay open-issues.json --report replayed.json || true
       - name: one report
         run: |
@@ -111,7 +111,7 @@ jobs:
             const failures = shards.flatMap((r) => r.failures).sort((a, b) => a.sql.length - b.sql.length);
             fs.writeFileSync("fuzz.json", JSON.stringify({ seed: shards.map((r) => r.seed).join(","), failures, replayed }, null, 2));
             console.log(`${failures.length} failures from ${shards.length} shards; nullable columns that returned a NULL: ${shards.reduce((a, r) => a + r.nullRatio.nulled, 0)}/${shards.reduce((a, r) => a + r.nullRatio.nullable, 0)}`);'
-      - run: node scripts/issues.mjs fuzz --report fuzz.json
+      - run: node scripts/issues.ts fuzz --report fuzz.json
       - uses: actions/upload-artifact@v7
         with:
           name: fuzz
@@ -171,7 +171,7 @@ jobs:
           path: node_modules/.cache/typesql-type-mutate
           key: type-mutate-kill-map-${{ github.run_id }}
           restore-keys: type-mutate-kill-map-
-      - run: node scripts/type-mutate.mjs merge --report type-mutate.json --summary type-mutate.md type-mutate-*.json
+      - run: node scripts/type-mutate.ts merge --report type-mutate.json --summary type-mutate.md type-mutate-*.json
       - uses: actions/cache/save@v6
         with:
           path: node_modules/.cache/typesql-type-mutate
@@ -188,4 +188,4 @@ jobs:
             const fs = require("fs");
             const r = JSON.parse(fs.readFileSync("type-mutate.json", "utf8"));
             fs.writeFileSync("survivors.json", JSON.stringify({ survivors: r.mutants.filter((m) => m.status === "survived") }));'
-          node scripts/issues.mjs mutation --report survivors.json
+          node scripts/issues.ts mutation --report survivors.json

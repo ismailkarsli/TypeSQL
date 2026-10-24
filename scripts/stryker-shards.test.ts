@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
-import { mergeReports, shardFiles } from "./stryker-shards.mjs";
+import { mergeReports, shardFiles } from "./stryker-shards.ts";
 
-const files = [["a.ts", 50], ["b.ts", 40], ["c.ts", 30], ["d.ts", 20], ["e.ts", 10], ["f.ts", 10]];
+const files: [string, number][] = [["a.ts", 50], ["b.ts", 40], ["c.ts", 30], ["d.ts", 20], ["e.ts", 10], ["f.ts", 10]];
 
 test("shards split the files by size, every file in one shard", () => {
   const shards = [1, 2, 3].map((index) => shardFiles(files, { index, count: 3 }));
@@ -13,7 +13,7 @@ test("shards split the files by size, every file in one shard", () => {
 });
 
 test("a merged report takes each file from the shard that mutated it", () => {
-  const mutants = (status) => ({ language: "typescript", source: "", mutants: [{ id: "1", status }] });
+  const mutants = (status: string) => ({ language: "typescript", source: "", mutants: [{ id: "1", status }] });
   const reports = [
     { schemaVersion: "2", thresholds: { high: 80, low: 60 }, files: { "a.ts": mutants("Killed"), "b.ts": mutants("Survived") }, testFiles: { "t1.test.ts": { tests: [] } } },
     { schemaVersion: "2", thresholds: { high: 80, low: 60 }, files: { "a.ts": mutants("Survived"), "b.ts": mutants("Killed") }, testFiles: { "t2.test.ts": { tests: [] } } },

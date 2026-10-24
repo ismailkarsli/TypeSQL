@@ -2,6 +2,7 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "noEmit": true,
+    "allowImportingTsExtensions": true,
     "types": [
       "node"
     ],
@@ -12,7 +13,8 @@
     }
   },
   "include": [
-    "src"
+    "src",
+    "*.ts"
   ],
   "exclude": [
     "src/maxlen.ts"

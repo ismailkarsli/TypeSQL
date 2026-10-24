@@ -4,7 +4,7 @@ Versions and changelogs are managed by pnpm itself (pnpm ≥ 11.13; the reposito
 `packageManager`), not by a Changesets dependency: `pnpm change` records what changed,
 `pnpm version -r` turns that into versions and changelogs, and `pnpm publish -r`, run only by
 the `release` workflow through npm trusted publishing, publishes. Two scripts fill the gaps pnpm leaves:
-`scripts/check-intents.mjs` enforces intents and `scripts/github-releases.mjs` creates GitHub
+`scripts/check-intents.ts` enforces intents and `scripts/github-releases.ts` creates GitHub
 releases. See pnpm's [release management](https://pnpm.io/versioning) docs for the full model.
 
 The published packages are `@typesql/core`, `@typesql/pg`, `@typesql/postgres`,
@@ -77,7 +77,7 @@ the Actions tab; pushing publishes nothing. It runs the `ci.yml` checks (`test`,
 versions, write changelog sections, update the ledger) and commits the result to `main` as
 `chore: release <version>` from `github-actions[bot]`, then builds and smoke-tests the
 packages, runs `pnpm publish -r`, and creates the GitHub releases. `main` requires signed
-commits, so the release commit is made through GitHub's API (`scripts/github-commit.mjs`),
+commits, so the release commit is made through GitHub's API (`scripts/github-commit.ts`),
 which signs it, not with `git push`. It is rejected, and nothing is published, when `main`
 moved after the run started; start it again. A commit made with the workflow's token starts no
 other workflow, so `ci` does not run on the release commit, which changes only versions and
@@ -142,7 +142,7 @@ checks it against the workflow's repository.
 
 ## GitHub releases
 
-pnpm creates no git tags and no GitHub releases, so `scripts/github-releases.mjs` does, as the
+pnpm creates no git tags and no GitHub releases, so `scripts/github-releases.ts` does, as the
 last step of the `publish` job. For every package version that is on npm and has no release yet,
 it creates a release on the repository's Releases tab:
 
@@ -158,7 +158,7 @@ The workflow creates releases only for the versions it just published (from the
 versions does not matter). Its `GITHUB_TOKEN` was refused (HTTP 403) tags on the 0.0.2 and 0.0.3
 release commits, whose workflow files differ from `main`'s, so older versions are backfilled by
 a maintainer instead: from a checkout
-with `gh` logged in, `node scripts/github-releases.mjs --dry-run` lists every published version
+with `gh` logged in, `node scripts/github-releases.ts --dry-run` lists every published version
 without a release, and the same command without `--dry-run` creates them. That only touches
 GitHub; nothing is published to npm.
 

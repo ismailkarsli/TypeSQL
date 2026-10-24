@@ -2,12 +2,36 @@
 // Tests run against TypeScript sources, which hides problems that only exist in emitted
 // JavaScript (e.g. a value re-export of a `declare const`). Run after `pnpm build`.
 import assert from "node:assert/strict";
+import type { Col, Json } from "../packages/core/src/index.ts";
 
-const core = await import("../packages/core/dist/index.js");
-const pg = await import("../packages/pg/dist/index.js");
-const pgjs = await import("../packages/postgres/dist/index.js");
+// dist/ only exists after a build and typechecking runs before one, so the imports are typed
+// from the sources: core's exactly, the adapters loosely (their sources import `@typesql/core`,
+// which resolves to core's dist/).
+type Core = typeof import("../packages/core/src/index.ts");
+interface AdapterSql {
+  (text: string): unknown;
+  param(value: unknown): string;
+  transaction<T>(fn: (tx: (text: string) => { execute(): Promise<T> }) => Promise<T>): Promise<T>;
+}
+interface Adapter {
+  readonly [name: string]: unknown;
+  createSql(client?: unknown): AdapterSql;
+}
+interface Introspect {
+  readonly [name: string]: unknown;
+  generateSource(db: unknown): string;
+}
+const dist = (path: string): Promise<unknown> => import(new URL(`../packages/${path}`, import.meta.url).href);
 
-const sql = core.createSql();
+const core = (await dist("core/dist/index.js")) as Core;
+const pg = (await dist("pg/dist/index.js")) as Adapter;
+const pgjs = (await dist("postgres/dist/index.js")) as Adapter;
+
+interface DB {
+  users: { id: Col<"int4">; email: Col<"text">; age: Col<"int4">; display_name: Col<"text"> };
+  docs: { items: Json<number[]> };
+}
+const sql = core.createSql<DB>();
 assert.deepEqual(sql("SELECT id FROM users WHERE id = $1", 7), { text: "SELECT id FROM users WHERE id = $1", values: [7] });
 
 const where = sql.fragment("AND age > :min", { min: 18 });
@@ -32,7 +56,7 @@ assert.equal(JSON.stringify(doc.values[0]), "[1,2]");
 const m = core.migrations().add("CREATE TABLE t (id int)").add("ALTER TABLE t ADD COLUMN x text");
 assert.deepEqual([...m.statements], ["CREATE TABLE t (id int)", "ALTER TABLE t ADD COLUMN x text"]);
 
-for (const name of ["createTransactionalSql", "runTransaction"]) {
+for (const name of ["createTransactionalSql", "runTransaction"] as const) {
   assert.equal(typeof core[name], "function", `core export ${name}`);
 }
 
@@ -46,12 +70,12 @@ for (const adapter of [pg, pgjs]) {
 }
 
 // a pg PoolClient-like fake: BEGIN, the query, COMMIT on it
-const log = [];
-const client = { query: async (text) => (log.push(text), { rows: [{ n: 1 }], rowCount: 1 }), release() {} };
+const log: string[] = [];
+const client = { query: async (text: string) => (log.push(text), { rows: [{ n: 1 }], rowCount: 1 }), release() {} };
 assert.deepEqual(await pg.createSql(client).transaction((tx) => tx("SELECT 1 AS n").execute()), [{ n: 1 }]);
 assert.deepEqual(log, ["BEGIN", "SELECT 1 AS n", "COMMIT"]);
 
-const introspect = await import("../packages/pg/dist/introspect/index.js");
+const introspect = (await dist("pg/dist/introspect/index.js")) as Introspect;
 for (const name of ["introspect", "generateSource", "main", "parseNodeTree", "ViewNullability"]) {
   assert.equal(typeof introspect[name], "function", `@typesql/pg/introspect export ${name}`);
 }

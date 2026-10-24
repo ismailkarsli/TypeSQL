@@ -3,8 +3,43 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join, relative } from "node:path";
-import { coverageFiles, root } from "./coverage-files.mjs";
-import { mergeReports, shardFiles } from "./stryker-shards.mjs";
+import { coverageFiles, root } from "./coverage-files.ts";
+import { mergeReports, shardFiles } from "./stryker-shards.ts";
+
+/** The parts of a Stryker mutation-testing report (mutation-testing-report-schema) read here. */
+interface Position {
+  line: number;
+  column: number;
+}
+type MutantStatus = "Killed" | "Survived" | "NoCoverage" | "CompileError" | "RuntimeError" | "Timeout" | "Ignored" | "Pending";
+interface MutantResult {
+  id: string;
+  mutatorName: string;
+  replacement: string;
+  status: MutantStatus;
+  location: { start: Position; end: Position };
+}
+interface MutationReport {
+  schemaVersion: string;
+  files: Record<string, { language: string; source: string; mutants: MutantResult[] }>;
+  testFiles?: Record<string, unknown>;
+}
+/** A mutant with its file (relative to the root) and that file's source. */
+type Mutant = MutantResult & { file: string; source: string };
+
+type Counts = ReturnType<typeof count>;
+type Row = Counts & { score: number | null; coveredScore: number | null };
+interface Shard {
+  index: number;
+  count: number;
+}
+/** reports/mutation/summary.json, as a --shard run writes it. */
+interface ShardSummary {
+  commit: string;
+  seconds: number;
+  shard: Shard;
+  mutated: string[];
+}
 
 const reportDir = join(root, "reports", "mutation");
 const incrementalFile = join(root, "reports", "stryker-incremental.json");
@@ -17,22 +52,22 @@ let changed = false;
 let baseArg = process.env.BASE || "main";
 let concurrency = 2;
 let runStryker = true;
-let shard = null;
+let shard: Shard | null = null;
 let incremental = false;
 let force = false;
 let merge = false;
 let mergedSeconds = 0;
-const only = [];
+const only: string[] = [];
 for (let i = 0; i < args.length; i++) {
-  const a = args[i];
+  const a = args[i]!;
   if (a === "--changed") changed = true;
-  else if (a === "--base") baseArg = args[++i];
+  else if (a === "--base") baseArg = args[++i]!;
   else if (a === "--concurrency") concurrency = Number(args[++i]);
   else if (a === "--no-run") runStryker = false;
   else if (a === "--shard") {
     const m = /^(\d+)\/(\d+)$/.exec(args[++i] ?? "");
-    if (!m || +m[1] < 1 || +m[1] > +m[2]) fail(`--shard takes <i>/<n>, 1 <= i <= n\n${usage}`);
-    shard = { index: +m[1], count: +m[2] };
+    if (!m || +m[1]! < 1 || +m[1]! > +m[2]!) fail(`--shard takes <i>/<n>, 1 <= i <= n\n${usage}`);
+    shard = { index: +m[1]!, count: +m[2]! };
   } else if (a === "--incremental") incremental = true;
   else if (a === "--force") force = true;
   else if (a === "--merge") merge = true;
@@ -48,12 +83,11 @@ if (shard && (changed || only.length)) fail(`--shard takes neither --changed nor
 if (force && !incremental) fail(`--force goes with --incremental\n${usage}`);
 if (merge && (changed || shard || incremental || !only.length)) fail(`--merge takes the shards' report directories only\n${usage}`);
 
-const git = (...a) => execFileSync("git", a, { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 });
+const git = (...a: string[]) => execFileSync("git", a, { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 });
 const runtime = new Set(coverageFiles());
 
-/** @type {Map<string, Array<[number, number]>>} */
-const ranges = new Map();
-let mutate;
+const ranges = new Map<string, Array<[number, number]>>();
+let mutate: string[];
 if (merge) {
   mergeShards(only);
   runStryker = false;
@@ -80,7 +114,7 @@ if (merge) {
   mutate = [...ranges].flatMap(([file, rs]) => rs.map(([a, b]) => `${file}:${a}-${b}`));
   console.log(`mutate:runtime: ${mutate.length} changed range(s) in ${ranges.size} file(s) since ${base.slice(0, 7)}:\n  ${mutate.join("\n  ")}`);
 } else {
-  for (const f of only) if (!runtime.has(f)) fail(`${f} is not a runtime source file (see scripts/coverage-files.mjs)`);
+  for (const f of only) if (!runtime.has(f)) fail(`${f} is not a runtime source file (see scripts/coverage-files.ts)`);
   mutate = only.length ? only : shard ? shardFiles([...runtime].map((f) => [f, statSync(join(root, f)).size]), shard) : [...runtime];
   if (shard) console.log(`mutate:runtime: shard ${shard.index}/${shard.count}, ${mutate.length} file(s):\n  ${mutate.join("\n  ")}`);
 }
@@ -93,7 +127,7 @@ if (runStryker) {
   rmSync(join(reportDir, "mutation.json"), { force: true });
   const more = incremental ? ["--incremental", "--incrementalFile", relative(root, incrementalFile), ...(force ? ["--force"] : [])] : [];
   if (incremental) console.log(`mutate:runtime: incremental${force ? " (forced)" : ""}, ${existsSync(incrementalFile) ? "from" : "no previous results at"} ${relative(root, incrementalFile)}`);
-  const run = spawnSync("pnpm", ["exec", "stryker", "run", "--concurrency", String(concurrency), ...more], {
+  const run = spawnSync("pnpm", ["exec", "stryker", "run", "stryker.config.ts", "--concurrency", String(concurrency), ...more], {
     cwd: root,
     stdio: "inherit",
     env: { ...process.env, TYPESQL_MUTATE: mutate.join("\n"), TYPESQL_REQUIRE_DB: "1" },
@@ -104,10 +138,10 @@ let seconds = Math.round((Date.now() - started) / 1000);
 if (merge) seconds = mergedSeconds;
 if (!existsSync(join(reportDir, "mutation.json"))) fail(`no report at ${relative(root, reportDir)}/mutation.json`);
 
-const report = JSON.parse(readFileSync(join(reportDir, "mutation.json"), "utf8"));
+const report = JSON.parse(readFileSync(join(reportDir, "mutation.json"), "utf8")) as MutationReport;
 // an incremental report also carries the previous results of the files this run did not mutate
 const mutated = new Set(mutate.map((m) => m.replace(/:\d+(-\d+)?$/, "")));
-const mutants = Object.entries(report.files).flatMap(([file, f]) => {
+const mutants = Object.entries(report.files).flatMap(([file, f]): Mutant[] => {
   const rel = relative(root, join(root, file)).replaceAll("\\", "/");
   return mutated.has(rel) ? f.mutants.map((m) => ({ ...m, file: rel, source: f.source })) : [];
 });
@@ -129,16 +163,16 @@ if (changed) {
     process.exit(1);
   }
 } else {
-  const byPackage = new Map();
-  const byFile = new Map();
+  const byPackage = new Map<string, Mutant[]>();
+  const byFile = new Map<string, Mutant[]>();
   for (const m of mutants) {
-    const pkg = m.file.split("/")[1];
-    for (const [map, key] of [[byPackage, pkg], [byFile, m.file]]) {
+    const pkg = m.file.split("/")[1]!;
+    for (const [map, key] of [[byPackage, pkg], [byFile, m.file]] as const) {
       if (!map.has(key)) map.set(key, []);
-      map.get(key).push(m);
+      map.get(key)!.push(m);
     }
   }
-  const row = (ms) => {
+  const row = (ms: Mutant[]): Row => {
     const c = count(ms);
     return { ...c, score: score(c), coveredScore: score({ ...c, noCoverage: 0 }) };
   };
@@ -154,7 +188,7 @@ if (changed) {
   };
   mkdirSync(reportDir, { recursive: true });
   writeFileSync(join(reportDir, "summary.json"), `${JSON.stringify(result)}\n`);
-  const table = (title, entries) =>
+  const table = (title: string, entries: Array<[string, Row]>) =>
     `| ${title} | Score | Covered score | Killed | Timeout | Survived | No coverage | Ignored | Errors |\n|---|---:|---:|---:|---:|---:|---:|---:|---:|\n` +
     entries.map(([k, r]) => `| ${k} | ${pct(r.score)} | ${pct(r.coveredScore)} | ${r.killed} | ${r.timeout} | ${r.survived} | ${r.noCoverage} | ${r.ignored} | ${r.errors} |`).join("\n");
   const what = shard ? `, shard ${shard.index}/${shard.count}` : merge ? `, ${only.length} shards` : "";
@@ -167,15 +201,15 @@ if (changed) {
   console.log(`\n${md}\nmutate:runtime: reports in ${relative(root, reportDir)}/ (summary.json, summary.md, mutation.json, mutation.html).`);
 }
 
-function mergeShards(dirs) {
+function mergeShards(dirs: string[]) {
   const shards = dirs.map((dir) => {
-    const read = (f) => (existsSync(join(dir, f)) ? JSON.parse(readFileSync(join(dir, f), "utf8")) : null);
-    const summary = read("mutation/summary.json");
-    const report = read("mutation/mutation.json");
+    const read = <T,>(f: string): T | null => (existsSync(join(dir, f)) ? (JSON.parse(readFileSync(join(dir, f), "utf8")) as T) : null);
+    const summary = read<ShardSummary>("mutation/summary.json");
+    const report = read<MutationReport>("mutation/mutation.json");
     if (!summary?.shard || !report) fail(`${dir} is not a shard's reports/ directory (needs mutation/summary.json from --shard and mutation/mutation.json)`);
-    return { dir, summary, report, incremental: read("stryker-incremental.json") };
+    return { dir, summary, report, incremental: read<MutationReport>("stryker-incremental.json") };
   });
-  const count = shards[0].summary.shard.count;
+  const count = shards[0]!.summary.shard.count;
   const indexes = shards.map((s) => s.summary.shard.index).sort((a, b) => a - b);
   if (shards.some((s) => s.summary.shard.count !== count) || indexes.join() !== Array.from({ length: count }, (_, i) => i + 1).join())
     fail(`--merge needs the reports of shards 1..${count} once each, got ${indexes.join(", ")} of ${count}`);
@@ -183,10 +217,11 @@ function mergeShards(dirs) {
   const owner = new Map(shards.flatMap((s) => s.summary.mutated.map((f) => [f, s])));
   const missing = [...runtime].filter((f) => !owner.has(f));
   if (missing.length) fail(`--merge: no shard mutated ${missing.join(", ")}`);
-  const ownerOf = (file) => shards.indexOf(owner.get(relative(root, join(root, file)).replaceAll("\\", "/")));
-  const combine = (pick) => {
+  // -1, no shard, for a file none of them mutated
+  const ownerOf = (file: string) => shards.indexOf(owner.get(relative(root, join(root, file)).replaceAll("\\", "/"))!);
+  const combine = (pick: (s: (typeof shards)[number]) => MutationReport | null) => {
     const reports = shards.map(pick);
-    return reports.some((r) => !r) ? null : mergeReports(reports, ownerOf);
+    return reports.some((r) => !r) ? null : mergeReports(reports as MutationReport[], ownerOf);
   };
   mkdirSync(reportDir, { recursive: true });
   writeFileSync(join(reportDir, "mutation.json"), JSON.stringify(combine((s) => s.report)));
@@ -197,23 +232,23 @@ function mergeShards(dirs) {
   console.log(`mutate:runtime: merged ${count} shards${inc ? ", and their incremental results," : ""} into ${relative(root, reportDir)}/mutation.json`);
 }
 
-function fail(message) {
+function fail(message: string): never {
   console.error(`mutate:runtime: ${message}`);
   process.exit(1);
 }
 
-function changedLines(base) {
-  const out = new Map();
-  let file;
+function changedLines(base: string) {
+  const out = new Map<string, number[]>();
+  let file: string | undefined;
   for (const line of git("diff", "--unified=0", "--no-color", "--no-ext-diff", base, "--").split("\n")) {
     if (line.startsWith("+++ ")) {
       file = line === "+++ /dev/null" ? undefined : line.slice(6);
       if (file !== undefined && !out.has(file)) out.set(file, []);
     } else if (file !== undefined && line.startsWith("@@")) {
-      const m = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/.exec(line);
+      const m = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/.exec(line)!;
       const start = Number(m[1]);
       const n = m[2] === undefined ? 1 : Number(m[2]);
-      for (let i = 0; i < n; i++) out.get(file).push(start + i);
+      for (let i = 0; i < n; i++) out.get(file)!.push(start + i);
     }
   }
   for (const file of git("ls-files", "--others", "--exclude-standard").split("\n").filter(Boolean)) {
@@ -224,9 +259,9 @@ function changedLines(base) {
   return out;
 }
 
-function toRanges(lines) {
+function toRanges(lines: number[]) {
   const sorted = [...new Set(lines)].sort((a, b) => a - b);
-  const rs = [];
+  const rs: Array<[number, number]> = [];
   for (const l of sorted) {
     const last = rs.at(-1);
     if (last && l === last[1] + 1) last[1] = l;
@@ -236,20 +271,27 @@ function toRanges(lines) {
 }
 
 function disabledWithoutReason() {
-  const found = [];
+  const found: string[] = [];
   for (const [file, rs] of ranges) {
     const text = readFileSync(join(root, file), "utf8").split("\n");
     for (const [a, b] of rs)
       for (let l = a; l <= b; l++) {
         const m = /Stryker disable\b[^:]*(:\s*\S)?/.exec(text[l - 1] ?? "");
-        if (m && !m[1]) found.push(`${file}:${l}: ${text[l - 1].trim()}`);
+        if (m && !m[1]) found.push(`${file}:${l}: ${text[l - 1]!.trim()}`);
       }
   }
   return found;
 }
 
-async function createWorkerDatabases(url, n) {
-  const { Client } = createRequire(join(root, "packages/core/package.json"))("pg");
+/** The part of `pg`'s Client used here. */
+type PgClient = new (config: { connectionString: string }) => {
+  connect(): Promise<void>;
+  query(text: string, values?: unknown[]): Promise<{ rowCount: number | null }>;
+  end(): Promise<void>;
+};
+
+async function createWorkerDatabases(url: string, n: number) {
+  const { Client }: { Client: PgClient } = createRequire(join(root, "packages/core/package.json"))("pg");
   const client = new Client({ connectionString: url });
   await client.connect();
   try {
@@ -263,7 +305,7 @@ async function createWorkerDatabases(url, n) {
   }
 }
 
-function count(ms) {
+function count(ms: Mutant[]) {
   const c = { killed: 0, timeout: 0, survived: 0, noCoverage: 0, ignored: 0, errors: 0 };
   for (const m of ms) {
     if (m.status === "Killed") c.killed++;
@@ -276,30 +318,30 @@ function count(ms) {
   return c;
 }
 
-function score(c) {
+function score(c: Counts) {
   const valid = c.killed + c.timeout + c.survived + c.noCoverage;
   return valid ? ((c.killed + c.timeout) / valid) * 100 : null;
 }
 
-function pct(n) {
+function pct(n: number | null) {
   return n === null ? "n/a" : `${n.toFixed(1)}%`;
 }
 
-function fmtCounts(c) {
+function fmtCounts(c: Counts) {
   return `${c.killed} killed, ${c.timeout} timed out, ${c.survived} survived, ${c.noCoverage} without coverage, ${c.ignored} ignored`;
 }
 
-function oneLine(s) {
+function oneLine(s: string) {
   return s.replace(/\s*\n\s*/g, " ").slice(0, 160);
 }
 
-function original(m) {
+function original(m: Mutant) {
   const lines = m.source.split("\n");
   const { start, end } = m.location;
-  if (start.line === end.line) return lines[start.line - 1].slice(start.column - 1, end.column - 1);
-  return [lines[start.line - 1].slice(start.column - 1), ...lines.slice(start.line, end.line - 1), lines[end.line - 1].slice(0, end.column - 1)].join("\n");
+  if (start.line === end.line) return lines[start.line - 1]!.slice(start.column - 1, end.column - 1);
+  return [lines[start.line - 1]!.slice(start.column - 1), ...lines.slice(start.line, end.line - 1), lines[end.line - 1]!.slice(0, end.column - 1)].join("\n");
 }
 
-function summary(md) {
+function summary(md: string) {
   if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${md}\n`);
 }

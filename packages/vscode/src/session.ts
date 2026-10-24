@@ -56,11 +56,12 @@ const IS_7_0 = /unknown API method "getCurrentLanguageServerSnapshot"/;
 export class Session {
   private connection: Promise<Connection | null> | undefined;
   private readonly loader: Loader;
+  private readonly connector: Connector;
+  private readonly log: (message: string) => void;
 
-  constructor(
-    private readonly connector: Connector,
-    private readonly log: (message: string) => void,
-  ) {
+  constructor(connector: Connector, log: (message: string) => void) {
+    this.connector = connector;
+    this.log = log;
     this.loader = new Loader(log);
   }
 

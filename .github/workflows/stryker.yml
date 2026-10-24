@@ -56,7 +56,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          KEY: ${{ hashFiles('pnpm-lock.yaml', 'stryker.config.mjs', 'vitest.stryker.config.ts') }}
+          KEY: ${{ hashFiles('pnpm-lock.yaml', 'stryker.config.ts', 'vitest.stryker.config.ts') }}
         run: |
           id=$(gh run list --workflow stryker.yml --branch main --status success --limit 1 --json databaseId --jq '.[0].databaseId // empty')
           if [ -z "$id" ] || ! gh run download "$id" --name stryker-incremental --dir "$RUNNER_TEMP/previous"; then
@@ -93,10 +93,10 @@ jobs:
         with:
           pattern: stryker-shard-*
           path: shards
-      - run: node scripts/mutate-runtime.mjs --merge shards/*
+      - run: node scripts/mutate-runtime.ts --merge shards/*
       - run: echo "$KEY" > reports/stryker-incremental.key
         env:
-          KEY: ${{ hashFiles('pnpm-lock.yaml', 'stryker.config.mjs', 'vitest.stryker.config.ts') }}
+          KEY: ${{ hashFiles('pnpm-lock.yaml', 'stryker.config.ts', 'vitest.stryker.config.ts') }}
       - uses: actions/upload-artifact@v7
         with:
           name: stryker

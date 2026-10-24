@@ -114,7 +114,7 @@ the raw `{…}` text, and `PgTypeMap` types them as `string`.
 Postgres does not record whether a view column can be NULL. A view column is `NOT NULL` in
 `PgCatalog` only when its definition proves it: for example `pg_tables.tablename` is
 `string`, while `pg_tables.schemaname` (from a `LEFT JOIN`) is `string | null`. The slice is
-generated from a live server by `scripts/pg-catalog-from-pg.mjs`, and the test suite checks it
+generated from a live server by `scripts/pg-catalog-from-pg.ts`, and the test suite checks it
 against Postgres with both drivers.
 
 ## Type maps

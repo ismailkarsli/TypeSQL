@@ -4,7 +4,7 @@
 // from the tests' expected output. Disagreements known today are listed in baseline.json; the
 // run fails on a new one and on a listed one that went away.
 //
-//   node run.mjs [--update] [test …]
+//   node run.ts [--update] [test …]
 //
 // `--update` rewrites baseline.json (only the named tests' entries when tests are named).
 // See packages/docs/internals/development.md.
@@ -12,8 +12,8 @@ import { spawnSync } from "node:child_process";
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
-import { compareBaseline, hashOf, preview, readBaseline, scoped, showEntries, sortedEntries, writeBaseline } from "../oracle/baseline.ts";
-import { classify } from "./psql.mjs";
+import { compareBaseline, hashOf, preview, readBaseline, scoped, showEntries, sortedEntries, writeBaseline, type BaselineEntry, type Entries, type Located } from "../oracle/baseline.ts";
+import { classify, type Statement } from "./psql.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "../../../..");
@@ -69,19 +69,24 @@ rmSync(cache, { recursive: true, force: true });
 mkdirSync(cache, { recursive: true });
 /** Statements per tsc run: one run over all of them needs ~3 GB; batches keep the peak low. */
 const BATCH = 6000;
-const tsconfig = (files) => JSON.stringify({
+const tsconfig = (files: string[]): string => JSON.stringify({
   extends: relative(cache, join(root, "tsconfig.base.json")),
   compilerOptions: { noEmit: true, declaration: false, declarationMap: false, sourceMap: false, noErrorTruncation: true, types: [] },
   files,
 }, null, 2);
-/** @type {string[][]} test files per tsc run */
-const batches = [[]];
+/** Test files per tsc run. */
+const batches: string[][] = [[]];
 let batchSize = 0;
 
-/** @type {{ test: string, stmt: import("./psql.mjs").Statement, ours?: string, crash?: string }[]} */
-const checked = [];
+interface Checked {
+  test: string;
+  stmt: Statement;
+  ours?: string;
+  crash?: string;
+}
+const checked: Checked[] = [];
 /** `${test}.ts:${line}` → entry in `checked` */
-const byLine = new Map();
+const byLine = new Map<string, Checked>();
 let skippedVars = 0;
 let skippedStrings = 0;
 for (const test of tests) {
@@ -92,14 +97,14 @@ for (const test of tests) {
   for (const stmt of stmts) {
     if (stmt.psqlVars) { skippedVars++; continue; }
     if (stmt.nonstandardStrings) { skippedStrings++; continue; }
-    const entry = { test, stmt };
+    const entry: Checked = { test, stmt };
     checked.push(entry);
     lines.push(`export const s${checked.length}: "ok" = null! as R<${JSON.stringify(stmt.sql)}>; // line ${stmt.line}`);
     byLine.set(`${test}.ts:${lines.length}`, entry);
   }
   writeFileSync(join(cache, `${test}.ts`), `${lines.join("\n")}\n`);
   if (batchSize > 0 && batchSize + stmts.length > BATCH) { batches.push([]); batchSize = 0; }
-  batches.at(-1).push(`${test}.ts`);
+  batches.at(-1)!.push(`${test}.ts`);
   batchSize += stmts.length;
 }
 
@@ -114,9 +119,9 @@ for (const [n, files] of batches.entries()) {
   // A diagnostic is one line; elaborations of it are indented lines that follow.
   let found = 0;
   for (const m of output.matchAll(/^(.*?)\((\d+),\d+\): error (TS\d+): (.*)$/gm)) {
-    const entry = byLine.get(`${m[1].replace(/^.*[\\/]/, "")}:${m[2]}`);
+    const entry = byLine.get(`${m[1]!.replace(/^.*[\\/]/, "")}:${m[2]}`);
     if (!entry) fail(`unexpected diagnostic outside the generated statements:\n${m[0]}\n\n${output.slice(0, 4000)}`);
-    const type = m[4].match(/^Type '(.*)' is not assignable to type '"ok"'\.$/)?.[1];
+    const type = m[4]!.match(/^Type '(.*)' is not assignable to type '"ok"'\.$/)?.[1];
     if (m[3] === "TS2322" && type !== undefined) entry.ours ??= unquote(type);
     else entry.crash ??= `${m[3]}: ${m[4]}`;
     found++;
@@ -135,7 +140,7 @@ const seconds = (performance.now() - started) / 1000;
  *   skips without validating (`SKIPPED`) is not counted.
  * - `crash`: the compiler gave up (e.g. TS2589, instantiation too deep), whatever Postgres did.
  */
-function kindOf(e) {
+function kindOf(e: Checked): "crash" | "accepts" | "rejects" | null {
   if (e.crash) return "crash";
   if (e.stmt.pg === "unknown") return null;
   if (e.stmt.pg === "syntax-error") return e.ours === undefined ? "accepts" : null;
@@ -143,10 +148,10 @@ function kindOf(e) {
   if (e.stmt.pg === "error" && isSemantic(e.ours)) return null;
   return "rejects";
 }
-const isSemantic = (message) =>
+const isSemantic = (message: string): boolean =>
   !/^syntax error|^unterminated|^unexpected character|not supported/.test(message);
 
-const current = {};
+const current: Entries = {};
 const tally = { statements: checked.length + skippedVars + skippedStrings, psqlVariables: skippedVars, nonstandardStrings: skippedStrings, pgUnknown: 0, agree: 0, skipped: 0, rejects: 0, accepts: 0, crash: 0 };
 for (const e of checked) {
   const kind = kindOf(e);
@@ -181,7 +186,7 @@ console.log(summary);
 if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `## PostgreSQL regression tests\n\n${summary}\n`);
 
 if (update) {
-  const mismatches = only.length ? { ...baseline?.entries, ...Object.fromEntries(tests.map((t) => [t, undefined])) } : {};
+  const mismatches = only.length ? { ...baseline?.entries, ...Object.fromEntries(tests.map((t): [string, BaselineEntry[]] => [t, []])) } : {};
   Object.assign(mismatches, current);
   writeBaseline(baselinePath, { postgres: version, commit }, "mismatches", sortedEntries(mismatches));
   console.log(`\nWrote ${relative(root, baselinePath)}: ${added.length} added, ${fixed.length} removed.`);
@@ -197,7 +202,7 @@ if (baseline.pins.commit !== commit) {
   console.error(`\nbaseline.json is for PostgreSQL ${baseline.pins.postgres} (${String(baseline.pins.commit).slice(0, 10)}), vendor/postgres is ${version} (${commit.slice(0, 10)}). Run \`pnpm test:pg-regress --update\` and review the diff.`);
   failed = true;
 }
-const show = (list) => console.error(showEntries(list, (m) => `  ${m.group}.sql:${m.line}  [${m.kind}]  ${m.sql}\n      postgres: ${m.pg}\n      parser:   ${m.parser}`));
+const show = (list: readonly Located[]): void => console.error(showEntries(list, (m) => `  ${m.group}.sql:${m.line}  [${m.kind}]  ${m.sql}\n      postgres: ${m.pg}\n      parser:   ${m.parser}`));
 if (added.length) {
   failed = true;
   console.error(`\n${added.length} new disagreement(s) with Postgres:`);
@@ -213,22 +218,22 @@ console.log("\nMatches baseline.json.");
 
 // ───────────────────────────── helpers ─────────────────────────────
 
-function git(cwd, ...argv) {
+function git(cwd: string, ...argv: string[]): string {
   const r = spawnSync("git", ["-C", cwd, ...argv], { encoding: "utf8" });
   if (r.status !== 0) fail(`git ${argv.join(" ")} failed in ${relative(root, cwd)}:\n${r.stderr}`);
   return r.stdout.trim();
 }
 
 /** The text of a string literal type as tsc prints it; other types as printed. */
-function unquote(type) {
+function unquote(type: string): string {
   try {
-    return /^".*"$/.test(type) ? JSON.parse(type) : type;
+    return /^".*"$/.test(type) ? (JSON.parse(type) as string) : type;
   } catch {
     return type;
   }
 }
 
-function fail(message) {
+function fail(message: string): never {
   console.error(message);
   process.exit(1);
 }
