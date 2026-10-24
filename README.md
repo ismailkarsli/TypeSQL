@@ -81,7 +81,8 @@ sql("SELECT u.| FROM users u");  // id: int4, email: text, display_name: text | 
 The names come from the `DB` type of the `sql` you call, unsaved edits included. Errors, hovers
 and row types stay TypeScript's own. It needs `@typesql/core` 0.4.0 or later and a language
 server on TypeScript 7.1; [Editor completions](packages/docs/guide/editor.md) covers the setup.
-The source is in [`packages/vscode`](packages/vscode).
+The extension also highlights the SQL in these strings, with no setup. The source is in
+[`packages/vscode`](packages/vscode).
 
 ## Packages
 

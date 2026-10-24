@@ -1,0 +1,242 @@
+{
+  "$comment": "SQL highlighting inside sql(), tx(), sql.fragment(), sql.as<Row>() and /* sql */ string literals. Injected into TypeScript and JavaScript. Every rule inside a literal stops at the literal's closing quote, so an unterminated SQL string or comment never runs past it, and takes escapes first, so an escaped quote never closes it. In \"…\" and '…', a line ends a rule unless it ends in a backslash (a line continuation).",
+  "scopeName": "inline.typesql",
+  "injectionSelector": "L:source.ts -comment -string, L:source.tsx -comment -string, L:source.js -comment -string, L:source.js.jsx -comment -string",
+  "patterns": [{ "include": "#call" }, { "include": "#marked" }],
+  "repository": {
+    "call": {
+      "$comment": "sql(…), tx(…), any name ending in Sql, SQL or _sql, and their .fragment(…) and .as<Row>(…), when a quote, a comment or the line's end follows the `(`, so `sql(text: string)` method declarations stay TypeScript's. The call is consumed up to its `)`; arguments after the first are TypeScript.",
+      "begin": "(?<![\\w$])(?:((?:sql|tx|[A-Za-z_$][\\w$]*(?:Sql|SQL|_sql))(?![\\w$]))\\s*(\\??\\.)\\s*(fragment|as)|((?:sql|tx|[A-Za-z_$][\\w$]*(?:Sql|SQL|_sql))(?![\\w$])))(?:\\s*(<[^()]*>))?(?=\\s*\\(\\s*(?:[`\"'/]|$))",
+      "beginCaptures": {
+        "1": { "name": "variable.other.object.ts" },
+        "2": { "name": "punctuation.accessor.ts" },
+        "3": { "name": "entity.name.function.ts" },
+        "4": { "name": "entity.name.function.ts" },
+        "5": { "patterns": [{ "include": "source.ts#type-arguments" }] }
+      },
+      "end": "\\)",
+      "endCaptures": { "0": { "name": "meta.brace.round.ts" } },
+      "patterns": [
+        { "include": "#first-argument" },
+        { "include": "source.ts#expression" },
+        { "include": "source.ts#punctuation-comma" }
+      ]
+    },
+    "first-argument": {
+      "begin": "\\G\\s*(\\()",
+      "beginCaptures": { "1": { "name": "meta.brace.round.ts" } },
+      "end": "(?<=[`\"'])|(?=[^\\s`\"'])",
+      "patterns": [{ "include": "#literal" }]
+    },
+    "marked": {
+      "$comment": "A literal right after a /* sql */ comment, for calls with other names.",
+      "begin": "(/\\*)\\s*(?i:sql)\\s*(\\*/)(?=\\s*[`\"'])",
+      "beginCaptures": {
+        "0": { "name": "comment.block.ts" },
+        "1": { "name": "punctuation.definition.comment.ts" },
+        "2": { "name": "punctuation.definition.comment.ts" }
+      },
+      "end": "(?<=[`\"'])|(?=[^\\s`\"'])",
+      "patterns": [{ "include": "#literal" }]
+    },
+    "literal": {
+      "patterns": [{ "include": "#literal-double" }, { "include": "#literal-single" }, { "include": "#literal-template" }]
+    },
+    "literal-double": {
+      "begin": "\"",
+      "beginCaptures": { "0": { "name": "string.quoted.double.ts punctuation.definition.string.begin.ts" } },
+      "end": "(\")|(?<![\\\\\\n])$",
+      "endCaptures": { "1": { "name": "string.quoted.double.ts punctuation.definition.string.end.ts" } },
+      "contentName": "meta.embedded.line.sql",
+      "patterns": [
+        { "include": "#line-comment-double" },
+        { "include": "#block-comment-double" },
+        { "include": "#string-double" },
+        { "include": "#identifier-double" },
+        { "include": "#dollar-string-double" },
+        { "include": "#tokens" }
+      ]
+    },
+    "literal-single": {
+      "begin": "'",
+      "beginCaptures": { "0": { "name": "string.quoted.single.ts punctuation.definition.string.begin.ts" } },
+      "end": "(')|(?<![\\\\\\n])$",
+      "endCaptures": { "1": { "name": "string.quoted.single.ts punctuation.definition.string.end.ts" } },
+      "contentName": "meta.embedded.line.sql",
+      "patterns": [
+        { "include": "#line-comment-single" },
+        { "include": "#block-comment-single" },
+        { "include": "#string-single" },
+        { "include": "#identifier-single" },
+        { "include": "#dollar-string-single" },
+        { "include": "#tokens" }
+      ]
+    },
+    "literal-template": {
+      "begin": "`",
+      "beginCaptures": { "0": { "name": "string.template.ts punctuation.definition.string.template.begin.ts" } },
+      "end": "`",
+      "endCaptures": { "0": { "name": "string.template.ts punctuation.definition.string.template.end.ts" } },
+      "contentName": "meta.embedded.block.sql",
+      "patterns": [
+        { "include": "source.ts#template-substitution-element" },
+        { "include": "#line-comment-template" },
+        { "include": "#block-comment-template" },
+        { "include": "#string-template" },
+        { "include": "#identifier-template" },
+        { "include": "#dollar-string-template" },
+        { "include": "#tokens" }
+      ]
+    },
+
+    "line-comment-double": {
+      "begin": "--",
+      "beginCaptures": { "0": { "name": "punctuation.definition.comment.sql" } },
+      "end": "(?=\")|(?<![\\\\\\n])$",
+      "name": "comment.line.double-dash.sql",
+      "patterns": [{ "include": "#escape" }]
+    },
+    "line-comment-single": {
+      "begin": "--",
+      "beginCaptures": { "0": { "name": "punctuation.definition.comment.sql" } },
+      "end": "(?=')|(?<![\\\\\\n])$",
+      "name": "comment.line.double-dash.sql",
+      "patterns": [{ "include": "#escape" }]
+    },
+    "line-comment-template": {
+      "begin": "--",
+      "beginCaptures": { "0": { "name": "punctuation.definition.comment.sql" } },
+      "end": "(?=`)|(?<![\\\\\\n])$",
+      "name": "comment.line.double-dash.sql",
+      "patterns": [{ "include": "source.ts#template-substitution-element" }, { "include": "#escape" }]
+    },
+    "block-comment-double": {
+      "begin": "/\\*",
+      "end": "\\*/|(?=\")|(?<![\\\\\\n])$",
+      "captures": { "0": { "name": "punctuation.definition.comment.sql" } },
+      "name": "comment.block.sql",
+      "patterns": [{ "include": "#block-comment-double" }, { "include": "#escape" }]
+    },
+    "block-comment-single": {
+      "begin": "/\\*",
+      "end": "\\*/|(?=')|(?<![\\\\\\n])$",
+      "captures": { "0": { "name": "punctuation.definition.comment.sql" } },
+      "name": "comment.block.sql",
+      "patterns": [{ "include": "#block-comment-single" }, { "include": "#escape" }]
+    },
+    "block-comment-template": {
+      "begin": "/\\*",
+      "end": "\\*/|(?=`)",
+      "captures": { "0": { "name": "punctuation.definition.comment.sql" } },
+      "name": "comment.block.sql",
+      "patterns": [{ "include": "#block-comment-template" }, { "include": "source.ts#template-substitution-element" }, { "include": "#escape" }]
+    },
+
+    "string-double": {
+      "begin": "(?:[eEbBxXnN]|[uU]&)?'",
+      "beginCaptures": { "0": { "name": "punctuation.definition.string.begin.sql" } },
+      "end": "'(?!')|(?=\")|(?<![\\\\\\n])$",
+      "endCaptures": { "0": { "name": "punctuation.definition.string.end.sql" } },
+      "name": "string.quoted.single.sql",
+      "patterns": [{ "include": "#doubled-quote" }, { "include": "#escape" }]
+    },
+    "string-single": {
+      "begin": "(?:[eEbBxXnN]|[uU]&)?\\\\'",
+      "beginCaptures": { "0": { "name": "punctuation.definition.string.begin.sql" } },
+      "end": "\\\\'(?!\\\\')|(?=')|(?<![\\\\\\n])$",
+      "endCaptures": { "0": { "name": "punctuation.definition.string.end.sql" } },
+      "name": "string.quoted.single.sql",
+      "patterns": [{ "match": "\\\\'\\\\'", "name": "constant.character.escape.sql" }, { "include": "#escape" }]
+    },
+    "string-template": {
+      "begin": "(?:[eEbBxXnN]|[uU]&)?'",
+      "beginCaptures": { "0": { "name": "punctuation.definition.string.begin.sql" } },
+      "end": "'(?!')|(?=`)",
+      "endCaptures": { "0": { "name": "punctuation.definition.string.end.sql" } },
+      "name": "string.quoted.single.sql",
+      "patterns": [{ "include": "#doubled-quote" }, { "include": "source.ts#template-substitution-element" }, { "include": "#escape" }]
+    },
+    "doubled-quote": { "match": "''", "name": "constant.character.escape.sql" },
+
+    "identifier-double": {
+      "begin": "\\\\\"",
+      "end": "\\\\\"|(?=\")|(?<![\\\\\\n])$",
+      "captures": { "0": { "name": "punctuation.definition.identifier.sql" } },
+      "name": "meta.identifier.quoted.sql"
+    },
+    "identifier-single": {
+      "begin": "\"",
+      "end": "\"|(?=')|(?<![\\\\\\n])$",
+      "captures": { "0": { "name": "punctuation.definition.identifier.sql" } },
+      "name": "meta.identifier.quoted.sql",
+      "patterns": [{ "include": "#escape" }]
+    },
+    "identifier-template": {
+      "begin": "\"",
+      "end": "\"|(?=`)",
+      "captures": { "0": { "name": "punctuation.definition.identifier.sql" } },
+      "name": "meta.identifier.quoted.sql",
+      "patterns": [{ "include": "source.ts#template-substitution-element" }, { "include": "#escape" }]
+    },
+
+    "dollar-string-double": {
+      "begin": "\\$([A-Za-z_][\\w]*|)\\$",
+      "end": "\\$\\1\\$|(?=\")|(?<![\\\\\\n])$",
+      "captures": { "0": { "name": "punctuation.definition.string.sql" } },
+      "name": "string.quoted.other.dollar.sql",
+      "patterns": [{ "include": "#escape" }]
+    },
+    "dollar-string-single": {
+      "begin": "\\$([A-Za-z_][\\w]*|)\\$",
+      "end": "\\$\\1\\$|(?=')|(?<![\\\\\\n])$",
+      "captures": { "0": { "name": "punctuation.definition.string.sql" } },
+      "name": "string.quoted.other.dollar.sql",
+      "patterns": [{ "include": "#escape" }]
+    },
+    "dollar-string-template": {
+      "begin": "\\$([A-Za-z_][\\w]*|)\\$",
+      "end": "\\$\\1\\$|(?=`)",
+      "captures": { "0": { "name": "punctuation.definition.string.sql" } },
+      "name": "string.quoted.other.dollar.sql",
+      "patterns": [{ "include": "#escape" }]
+    },
+
+    "escape": { "include": "source.ts#string-character-escape" },
+
+    "tokens": {
+      "patterns": [
+        { "include": "#escape" },
+        { "match": "\\$\\d+", "name": "variable.parameter.positional.sql" },
+        { "match": "(?<![:\\w$])(:)([A-Za-z_][\\w$]*)", "captures": { "1": { "name": "punctuation.definition.variable.sql" } }, "name": "variable.parameter.named.sql" },
+        {
+          "match": "(\\{)([A-Za-z_][\\w$]*)(\\})",
+          "captures": {
+            "1": { "name": "punctuation.definition.slot.begin.sql" },
+            "2": { "name": "variable.other.slot.sql" },
+            "3": { "name": "punctuation.definition.slot.end.sql" }
+          }
+        },
+        {
+          "match": "(::)\\s*([A-Za-z_][\\w$]*)",
+          "captures": { "1": { "name": "keyword.operator.cast.sql" }, "2": { "name": "storage.type.sql" } }
+        },
+        { "match": "(?<![\\w$])(?:0[xX][0-9A-Fa-f_]+|0[oO][0-7_]+|0[bB][01_]+|(?:\\d[\\d_]*(?:\\.[\\d_]*)?|\\.\\d[\\d_]*)(?:[eE][+-]?\\d+)?)(?![\\w$])", "name": "constant.numeric.sql" },
+        { "match": "(?i)(?<![\\w$])(?:true|false|null)(?![\\w$])", "name": "constant.language.sql" },
+        {
+          "match": "(?i)(?<![\\w$])(?:bigint|bigserial|bit|bool|boolean|box|bytea|char|character|cidr|circle|date|daterange|decimal|double|float|float4|float8|inet|int|int2|int4|int4range|int8|int8range|integer|interval|json|jsonb|jsonpath|line|lseg|macaddr|macaddr8|money|numeric|numrange|path|point|polygon|precision|real|record|regclass|regtype|serial|serial2|serial4|serial8|smallint|smallserial|text|time|timestamp|timestamptz|timetz|tsquery|tsrange|tstzrange|tsvector|uuid|varbit|varchar|varying|void|xml)(?![\\w$])",
+          "name": "storage.type.sql"
+        },
+        {
+          "match": "(?i)(?<![\\w$])(?:add|after|all|alter|always|analyze|and|any|array|as|asc|asymmetric|at|authorization|before|begin|between|both|by|cascade|case|cast|check|collate|column|commit|concurrently|conflict|constraint|create|cross|cube|current_catalog|current_date|current_role|current_schema|current_time|current_timestamp|current_user|database|declare|default|deferrable|deferred|delete|desc|distinct|do|domain|drop|each|else|end|enum|escape|except|exclude|execute|exists|explain|extension|fetch|filter|first|following|for|foreign|from|full|function|generated|grant|group|grouping|having|identity|if|ilike|immediate|in|include|index|initially|inner|insert|intersect|into|is|isnull|join|key|language|last|lateral|leading|left|like|limit|localtime|localtimestamp|lock|locked|materialized|matched|merge|natural|next|no|not|nothing|notnull|nowait|nulls|of|offset|on|only|or|order|ordinality|outer|over|overlaps|overriding|partition|placing|preceding|primary|procedure|range|recursive|references|release|rename|replace|restrict|returning|returns|revoke|right|rollback|rollup|row|rows|savepoint|schema|select|sequence|session_user|set|sets|share|similar|skip|some|stored|symmetric|system_user|table|tablesample|temp|temporary|then|ties|to|trailing|transaction|trigger|truncate|unbounded|union|unique|unlogged|update|user|using|values|variadic|verbose|view|when|where|window|with|within|without|zone)(?![\\w$])",
+          "name": "keyword.other.sql"
+        },
+        { "match": "[A-Za-z_][\\w$]*(?=\\()", "name": "entity.name.function.sql" },
+        { "match": "[-+*/<>=~!@#%^&|?]+", "name": "keyword.operator.sql" },
+        { "match": ",", "name": "punctuation.separator.comma.sql" },
+        { "match": ";", "name": "punctuation.terminator.statement.sql" },
+        { "match": "\\.", "name": "punctuation.accessor.sql" },
+        { "match": "[A-Za-z_][\\w$]*" }
+      ]
+    }
+  }
+}

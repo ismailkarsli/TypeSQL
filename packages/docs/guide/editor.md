@@ -9,11 +9,12 @@ sql("SELECT u.| FROM users u");  // id: int4, email: text, display_name: text | 
 ```
 
 The names come from the `DB` type of the `sql` you call, so they follow your schema as you
-edit it, unsaved changes included. The extension adds suggestions only: errors, hovers and row
-types are TypeScript's, as without it.
+edit it, unsaved changes included. The extension also highlights the SQL in these strings
+([Syntax highlighting](#syntax-highlighting)). Errors, hovers and row types are TypeScript's, as
+without it.
 
 The extension is an optional companion. TypeSQL needs only TypeScript, so skip it unless you
-want completions.
+want completions or highlighting.
 
 ## Setup
 
@@ -64,6 +65,23 @@ or read as a keyword are inserted in double quotes (`"UserAccounts"`, `"order"`)
 work in `sql()`, in `tx()` inside `sql.transaction()`, in `sql.fragment()` and `sql.as()`, in
 template literals across lines, and between `${sql.param()}` values. There are none inside
 string literals, comments and quoted identifiers.
+
+## Syntax highlighting
+
+The extension colors the SQL inside these string literals: keywords, types, functions,
+strings, comments, numbers, `$1` and `:name` parameters and `{slot}` fragments. The rest of the
+call stays TypeScript, and so does `${sql.param(…)}` inside a template literal.
+
+| Highlighted | Example |
+|---|---|
+| a call of `sql`, `tx` or a name ending in `Sql`, `SQL` or `_sql`, also as a member | `sql("…")`, `tx('…')`, `` db.sql(`…`) ``, `pgSql("…")` |
+| `.fragment()` and `.as()` on those | `sql.fragment("…")`, `sql.as<Row>("…")` |
+| any string after a `/* sql */` comment | `camel(/* sql */ "…")`, `const text = /* sql */ "…"` |
+
+Only the first argument is SQL, and only when it is a string or template literal. Highlighting
+reads the text, not the types: it needs neither the TypeScript 7 extension nor `@typesql/core`,
+and a call of another `sql` function with a literal is colored as well. For an `sql` under
+another name, such as `camel` or `admin`, put `/* sql */` before the string.
 
 ## How it works
 

@@ -31,7 +31,7 @@ type cache entry made by another version is never used. After changing anything 
 ## VS Code extension
 
 `packages/vscode` is the extension behind [Editor completions](../guide/editor). It holds only
-the VS Code side; what to suggest is computed by `@typesql/core/editor`
+the VS Code side and the SQL highlighting grammar; what to suggest is computed by `@typesql/core/editor`
 (`packages/core/src/editor/`), which the extension loads from the project being edited:
 
 | Module | What it does |
@@ -42,6 +42,7 @@ the VS Code side; what to suggest is computed by `@typesql/core/editor`
 | `core/src/editor/complete.ts` | `completionsAt`: the items and the LSP ranges they replace. |
 | `vscode/src/session.ts` | The API session on the TypeScript 7 language server, and the client matching its version. |
 | `vscode/src/extension.ts` | The LSP middleware (TypeScript 7.1's extension API) or, on the TypeScript 7 extension 1.0, a completion provider of its own. |
+| `vscode/syntaxes/sql-injection.tmLanguage.json` | The TextMate grammar injected into TypeScript and JavaScript that highlights SQL in `sql()` literals; `vscode/test/grammar.test.ts` tokenizes it with vscode-textmate on VS Code's own TypeScript grammar. |
 
 ```sh
 pnpm vitest run packages/core/test/editor   # scanner cases, completions through tsc --lsp

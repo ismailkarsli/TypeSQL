@@ -2,7 +2,7 @@
 
 Completions inside [TypeSQL](https://typesql.karsli.net)'s `sql()` strings: tables, views and
 schemas after `FROM` / `JOIN` / `INTO` / `UPDATE`, columns after `alias.` and in expressions,
-with their Postgres types.
+with their Postgres types. The SQL in these strings is highlighted as well.
 
 ```ts
 sql("SELECT * FROM |");          // users, posts, auth, …
@@ -13,7 +13,16 @@ The names come from the `DB` type of the `sql` you call, so they follow your sch
 it, unsaved changes included. Errors and row types still come from TypeScript, as without the
 extension.
 
+## Highlighting
+
+The SQL in `sql()`, `tx()`, `sql.fragment()` and `sql.as<Row>()` strings is highlighted:
+keywords, types, functions, strings, comments, `$1` and `:name` parameters and `{slot}`
+fragments. So are calls of any name ending in `Sql`, `SQL` or `_sql` (`pgSql("…")`), and any
+string after a `/* sql */` comment (`camel(/* sql */ "…")`). Highlighting needs nothing below.
+
 ## Requirements
+
+The completions need:
 
 - The [TypeScript 7 extension](https://marketplace.visualstudio.com/items?itemName=TypeScriptTeam.native-preview)
   (`TypeScriptTeam.native-preview`), with its language server on TypeScript 7.1 or later.
