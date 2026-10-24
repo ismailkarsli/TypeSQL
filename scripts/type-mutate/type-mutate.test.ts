@@ -357,6 +357,10 @@ describe("bookkeeping", () => {
 		const md = markdownSummary(merged);
 		expect(md).toContain("| `f.ts` | 3 | 1 | 1 | 0 | 1 | 50% |");
 		expect(md).toContain("- `f.ts:1:1` **bool-flip**");
+		// no table for a run without survivors
+		expect(
+			markdownSummary(mergeReports([shard(1, [mutant("a", "killed")])])),
+		).not.toContain("| File |");
 	});
 });
 
@@ -422,7 +426,7 @@ describe("runs over the fixture project", { timeout: 120_000 }, () => {
 			expect(survivor.file).toBe("src/logic.ts");
 			expect(report.summary.total).toBe(report.mutants.length);
 			expect(readFileSync(join(out, "s.md"), "utf8")).toContain(
-				"### Survivors",
+				"#### Survivors",
 			);
 			const killMap = JSON.parse(
 				readFileSync(join(out, "k.json"), "utf8"),

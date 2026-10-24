@@ -1,4 +1,4 @@
-import { appendFileSync, writeFileSync } from "node:fs";
+import { writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { afterAll, beforeAll, expect, test } from "vitest";
 import type { Database } from "../conformance/db.js";
@@ -14,6 +14,7 @@ import {
 	writeBaseline,
 } from "./baseline.js";
 import { functionsOracle } from "./functions.js";
+import { baselineProblems, counts, groups, jobSummary } from "./job-summary.js";
 import { NEEDS_ISSUE } from "./kinds.js";
 import { checkedTests, regressOracle, schedule } from "./regress.js";
 import { Connection } from "./replay.js";
@@ -70,12 +71,9 @@ function settle(
 		.join(", ");
 	const summary = `${part} oracle on PostgreSQL ${version}: ${tally}`;
 	log(summary + (r.notes.length ? `\n  ${r.notes.join("\n  ")}` : ""));
-	if (process.env["GITHUB_STEP_SUMMARY"])
-		appendFileSync(
-			process.env["GITHUB_STEP_SUMMARY"],
-			`## ${part} oracle\n\n${summary}\n`,
-		);
+	const title = `${part} oracle`;
 	if (update) {
+		jobSummary(title, counts(r.tally));
 		const merged: Entries = Object.fromEntries(
 			Object.entries(previous).filter(([g]) => !keep(g)),
 		);
@@ -103,14 +101,21 @@ function settle(
 						? ""
 						: `--${part}`;
 	const cmd = `pnpm test:oracle ${flag} --update`.replace(/\s+/g, " ");
-	if (!baseline)
+	if (!baseline) {
+		jobSummary(title, counts(r.tally), [`no baseline: run \`${cmd}\``]);
 		return [
 			`No baseline for the ${part} oracle. Run \`${cmd}\` to create ${relative(root, path)}.`,
 		];
-	if (String(baseline.pins.postgres).split(".")[0] !== version.split(".")[0])
+	}
+	const problems = baselineProblems(added, fixed, cmd);
+	if (String(baseline.pins.postgres).split(".")[0] !== version.split(".")[0]) {
+		problems.unshift(
+			`the baseline is for PostgreSQL ${String(baseline.pins.postgres)}, the server is ${version}`,
+		);
 		failures.push(
 			`${relative(root, path)} is for PostgreSQL ${String(baseline.pins.postgres)}, the server is ${version}. Run \`${cmd}\` and review the diff.`,
 		);
+	}
 	const show = (list: Parameters<typeof showEntries>[0]) =>
 		showEntries(
 			list,
@@ -126,10 +131,15 @@ function settle(
 			`${fixed.length} ${part} disagreement(s) in the baseline no longer occur (nice). Run \`${cmd}\` to remove them:\n${show(fixed)}`,
 		);
 	const noIssue = missingIssues(previous, NEEDS_ISSUE);
-	if (noIssue.length)
+	if (noIssue.length) {
+		problems.push(
+			`${noIssue.length} unsound in the baseline without an issue: ${groups(noIssue)}`,
+		);
 		failures.push(
 			`${noIssue.length} unsound entr(y/ies) in ${relative(root, path)} without an issue:\n${show(noIssue)}`,
 		);
+	}
+	jobSummary(title, counts(r.tally), problems);
 	return failures;
 }
 

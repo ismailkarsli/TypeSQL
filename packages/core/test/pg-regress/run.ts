@@ -11,7 +11,6 @@
 // See packages/docs/internals/development.md.
 import { spawnSync } from "node:child_process";
 import {
-	appendFileSync,
 	existsSync,
 	mkdirSync,
 	readdirSync,
@@ -34,6 +33,7 @@ import {
 	sortedEntries,
 	writeBaseline,
 } from "../oracle/baseline.ts";
+import { baselineProblems, jobSummary } from "../oracle/job-summary.ts";
 import { classify, type Statement } from "./psql.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -291,11 +291,29 @@ const summary = [
 	`${tally.skipped} statements are utility statements the parser skips to the next \`;\` without validating them (counted as agreeing unless Postgres reports a syntax error).`,
 ].join("\n");
 console.log(summary);
-if (process.env.GITHUB_STEP_SUMMARY)
-	appendFileSync(
-		process.env.GITHUB_STEP_SUMMARY,
-		`## PostgreSQL regression tests\n\n${summary}\n`,
-	);
+const title = "PostgreSQL regression tests";
+const nonzero = (pairs: [string, number][]): string[] =>
+	pairs.filter(([, n]) => n).map(([k, n]) => `${k} ${n}`);
+const notChecked = tally.psqlVariables + tally.nonstandardStrings;
+const line = [
+	`PostgreSQL ${version}, ${tests.length} files: ${tally.statements} statements`,
+	`agree ${tally.agree}`,
+	...nonzero([
+		["parser rejects", tally.rejects],
+		["parser accepts", tally.accepts],
+		["syntax error elsewhere", tally.position],
+		["compiler crash", tally.crash],
+		["Postgres outcome unknown", tally.pgUnknown],
+	]),
+	...(notChecked
+		? [
+				`not checked ${notChecked} (${nonzero([
+					["psql variables", tally.psqlVariables],
+					["standard_conforming_strings off", tally.nonstandardStrings],
+				]).join(", ")})`,
+			]
+		: []),
+].join(" · ");
 
 if (update) {
 	const mismatches = only.length
@@ -316,11 +334,13 @@ if (update) {
 	console.log(
 		`\nWrote ${relative(root, baselinePath)}: ${added.length} added, ${fixed.length} removed.`,
 	);
+	jobSummary(title, line);
 	process.exit(0);
 }
 
 let failed = false;
 if (!baseline) {
+	jobSummary(title, line, ["no baseline: run `pnpm test:pg-regress --update`"]);
 	console.error(
 		`\nNo baseline. Run \`pnpm test:pg-regress --update\` to create ${relative(root, baselinePath)}.`,
 	);
@@ -352,6 +372,14 @@ if (fixed.length) {
 	);
 	show(fixed);
 }
+jobSummary(title, line, [
+	...(baseline.pins.commit === commit
+		? []
+		: [
+				`the baseline is for PostgreSQL ${baseline.pins.postgres} (${String(baseline.pins.commit).slice(0, 10)}), vendor/postgres is ${version} (${commit.slice(0, 10)})`,
+			]),
+	...baselineProblems(added, fixed, "pnpm test:pg-regress --update"),
+]);
 if (failed) process.exit(1);
 console.log("\nMatches baseline.json.");
 

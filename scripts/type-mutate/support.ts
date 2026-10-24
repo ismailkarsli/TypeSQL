@@ -369,14 +369,20 @@ export function markdownSummary(
 			: report.shard
 				? ` (shard ${report.shard.index}/${report.shard.count})`
 				: "";
-	lines.push(`## Type-level mutation testing${scope}`, "");
+	lines.push(
+		`### ${s.survived ? "❌" : "✅"} Type-level mutation testing${scope}`,
+		"",
+	);
 	lines.push(
 		`${s.total} mutants: ${s.killed} killed, ${s.timeout} timed out, **${s.survived} survived**, ${s.equivalent} marked equivalent, ${s.invalid} invalid (do not compile). Score: ${s.score ?? "–"}%.`,
 		"",
 	);
-	if (!s.total) return lines.join("\n") + "\n";
+	const survivors = report.mutants.filter((m) => m.status === "survived");
+	if (!survivors.length) return lines.join("\n") + "\n";
+	const withSurvivors = new Set(survivors.map((m) => m.file));
 	const byFile = new Map<string, MutantResult[]>();
 	for (const m of report.mutants) {
+		if (!withSurvivors.has(m.file)) continue;
 		let f = byFile.get(m.file);
 		if (!f) {
 			f = [];
@@ -394,19 +400,16 @@ export function markdownSummary(
 			`| \`${file}\` | ${f.total} | ${f.killed + f.timeout} | ${f.survived} | ${f.equivalent} | ${f.invalid} | ${f.score ?? "–"}% |`,
 		);
 	}
-	const survivors = report.mutants.filter((m) => m.status === "survived");
-	if (survivors.length) {
-		lines.push("", "### Survivors", "");
-		for (const m of survivors.slice(0, maxSurvivors)) {
-			const edit = `\`${oneLine(m.original, 80)}\` → \`${oneLine(m.mutated, 80) || "(removed)"}\``;
-			lines.push(
-				`- \`${m.file}:${m.line}:${m.column}\` **${m.mutator}**${m.scope && m.scope !== "-" ? ` in \`${m.scope}\`` : ""}: ${m.description.includes(edit) ? m.description : `${m.description}: ${edit}`}`,
-			);
-		}
-		if (survivors.length > maxSurvivors)
-			lines.push(
-				`- … and ${survivors.length - maxSurvivors} more (see the report)`,
-			);
+	lines.push("", "#### Survivors", "");
+	for (const m of survivors.slice(0, maxSurvivors)) {
+		const edit = `\`${oneLine(m.original, 80)}\` → \`${oneLine(m.mutated, 80) || "(removed)"}\``;
+		lines.push(
+			`- \`${m.file}:${m.line}:${m.column}\` **${m.mutator}**${m.scope && m.scope !== "-" ? ` in \`${m.scope}\`` : ""}: ${m.description.includes(edit) ? m.description : `${m.description}: ${edit}`}`,
+		);
 	}
+	if (survivors.length > maxSurvivors)
+		lines.push(
+			`- … and ${survivors.length - maxSurvivors} more (see the report)`,
+		);
 	return lines.join("\n") + "\n";
 }

@@ -431,13 +431,15 @@ if (perQuery) {
 }
 if (process.env.GITHUB_STEP_SUMMARY) {
 	const md = [
-		"### Compile-time bench",
+		`### ${failures.length ? "❌" : "✅"} Compile-time bench`,
 		"",
-		"| variant | file | instantiations | check s | status |",
-		"|---|---|---|---|---|",
+		...failures.map((f) => `- ${f.name}: ${f.problems.join(", ")}`),
+		...(failures.length ? [""] : []),
+		"| variant | instantiations | check s | status |",
+		"|---|---:|---:|---|",
 		...rows.map(
 			(r) =>
-				`| ${r.variant} | ${r.file} | ${r.instantiations} | ${r["check s"]} | ${r.status} |`,
+				`| ${r.variant} | ${r.instantiations} | ${r["check s"]} | ${r.status} |`,
 		),
 		"",
 		perQuery

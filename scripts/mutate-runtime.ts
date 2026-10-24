@@ -246,7 +246,7 @@ if (changed) {
 		`\nmutate:runtime --changed: ${inRange.length} mutant(s) on changed lines in ${seconds} s: ${fmtCounts(counts)}.`,
 	);
 	summary(
-		`### Runtime mutation testing (changed lines)\n\n${inRange.length} mutants, ${fmtCounts(counts)}, ${seconds} s.\n${bad.length ? `\n${bad.map((m) => `- \`${m.file}:${m.location.start.line}\` ${m.status}: ${m.mutatorName} → \`${oneLine(m.replacement)}\``).join("\n")}\n` : ""}`,
+		`### ${bad.length ? "❌" : "✅"} Runtime mutation testing (changed lines)\n\n${inRange.length} mutants: ${fmtCounts(counts)}.\n${bad.length ? `\n${bad.map((m) => `- \`${m.file}:${m.location.start.line}\` ${m.status}: ${m.mutatorName} → \`${oneLine(m.replacement)}\``).join("\n")}\n` : ""}`,
 	);
 	if (bad.length) {
 		console.error(

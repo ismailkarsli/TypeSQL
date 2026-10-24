@@ -13,6 +13,12 @@ import {
 	withIssues,
 	writeBaseline,
 } from "../oracle/baseline.js";
+import {
+	baselineProblems,
+	counts,
+	groups,
+	jobSummary,
+} from "../oracle/job-summary.js";
 import { NEEDS_ISSUE } from "../oracle/kinds.js";
 import { acquireOracleServer } from "../oracle/server.js";
 import { fuzz, type Property } from "./run.js";
@@ -76,6 +82,7 @@ test("fuzz: generated statements against Postgres", async (ctx) => {
 			process.env["TYPESQL_FUZZ_REPORT"],
 			`${JSON.stringify(report)}\n`,
 		);
+	const line = `seed ${seed}: ${report.checked} statements · failing ${report.failing}${report.failing ? ` (${counts(report.counts, [])})` : ""} · nullable columns that returned a NULL ${report.nullRatio.nulled}/${report.nullRatio.nullable}`;
 	if (replayFile) return;
 
 	const entries: Entries = {};
@@ -91,6 +98,11 @@ test("fuzz: generated statements against Postgres", async (ctx) => {
 		});
 	}
 	if (!isCiRun) {
+		jobSummary(
+			"fuzz",
+			line,
+			report.failing ? [`${report.failing} failing statement(s)`] : [],
+		);
 		expect(
 			report.failures
 				.map((f) => `[${f.property}] ${f.sql}\n    ${f.detail}`)
@@ -103,15 +115,26 @@ test("fuzz: generated statements against Postgres", async (ctx) => {
 	if (process.env["TYPESQL_FUZZ_UPDATE"] === "1") {
 		writeBaseline(baselinePath, { seed, runs }, "failing", current);
 		console.log(`Wrote ${relative(root, baselinePath)}`);
+		jobSummary("fuzz", line);
 		return;
 	}
 	const failures: string[] = [];
-	if (!baseline || !existsSync(baselinePath))
+	const problems: string[] = [];
+	if (!baseline || !existsSync(baselinePath)) {
+		problems.push("no baseline: run `pnpm fuzz --update`");
 		failures.push(
 			`No baseline. Run \`pnpm fuzz --update\` to create ${relative(root, baselinePath)}.`,
 		);
-	else {
+	} else {
 		const { added, fixed } = compareBaseline(current, baseline.entries);
+		problems.push(
+			...baselineProblems(
+				added,
+				fixed,
+				"pnpm fuzz --update",
+				"failing statement(s)",
+			),
+		);
 		const show = (l: Parameters<typeof showEntries>[0]) =>
 			showEntries(
 				l,
@@ -127,10 +150,15 @@ test("fuzz: generated statements against Postgres", async (ctx) => {
 				`${fixed.length} statement(s) in the baseline no longer fail (nice). Run \`pnpm fuzz --update\`:\n${show(fixed)}`,
 			);
 		const noIssue = missingIssues(baseline.entries, NEEDS_ISSUE);
-		if (noIssue.length)
+		if (noIssue.length) {
+			problems.push(
+				`${noIssue.length} unsound in the baseline without an issue: ${groups(noIssue)}`,
+			);
 			failures.push(
 				`${noIssue.length} unsound entr(y/ies) without an issue:\n${show(noIssue)}`,
 			);
+		}
 	}
+	jobSummary("fuzz", line, problems);
 	expect(failures.join("\n\n")).toBe("");
 });

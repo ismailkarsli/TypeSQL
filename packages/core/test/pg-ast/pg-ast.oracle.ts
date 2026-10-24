@@ -15,6 +15,7 @@ import {
 	sortedEntries,
 	writeBaseline,
 } from "../oracle/baseline.js";
+import { baselineProblems, counts, jobSummary } from "../oracle/job-summary.js";
 import { evaluateCanon, probeSession } from "./ours.js";
 import { OUT } from "./pg-canon.js";
 import {
@@ -153,11 +154,8 @@ test("parse trees against PostgreSQL's parser", async () => {
 			", ",
 		)}; evaluated in ${evalSeconds.toFixed(0)} s, ${((performance.now() - started) / 1000).toFixed(0)} s in all`;
 	log(summary);
-	if (process.env["GITHUB_STEP_SUMMARY"])
-		appendFileSync(
-			process.env["GITHUB_STEP_SUMMARY"],
-			`## Parse trees (pg-ast)\n\n${summary}\n`,
-		);
+	const title = "Parse trees (pg-ast)";
+	const line = `PostgreSQL ${version}: ${counts(tally, order)}`;
 
 	if (update) {
 		const merged: Entries = only.length
@@ -166,6 +164,7 @@ test("parse trees against PostgreSQL's parser", async () => {
 				)
 			: {};
 		Object.assign(merged, entries);
+		jobSummary(title, line);
 		writeBaseline(
 			baselinePath,
 			{ postgres: version, commit },
@@ -178,15 +177,24 @@ test("parse trees against PostgreSQL's parser", async () => {
 		return;
 	}
 	const failures: string[] = [];
-	if (!baseline)
+	const problems: string[] = [];
+	if (!baseline) {
+		problems.push("no baseline: run `pnpm test:pg-ast --update`");
 		failures.push(
 			`No baseline. Run \`pnpm test:pg-ast --update\` to create ${relative(root, baselinePath)}.`,
 		);
-	else {
-		if (baseline.pins["commit"] !== commit)
+	} else {
+		problems.push(
+			...baselineProblems(added, fixed, "pnpm test:pg-ast --update"),
+		);
+		if (baseline.pins["commit"] !== commit) {
+			problems.unshift(
+				`the baseline is for PostgreSQL ${String(baseline.pins["postgres"])} (${String(baseline.pins["commit"]).slice(0, 10)}), vendor/postgres is ${version} (${commit.slice(0, 10)})`,
+			);
 			failures.push(
 				`baseline.json is for PostgreSQL ${String(baseline.pins["postgres"])} (${String(baseline.pins["commit"]).slice(0, 10)}), vendor/postgres is ${version} (${commit.slice(0, 10)}). Run \`pnpm test:pg-ast --update\` and review the diff.`,
 			);
+		}
 		const show = (list: Parameters<typeof showEntries>[0]) =>
 			showEntries(
 				list,
@@ -202,6 +210,7 @@ test("parse trees against PostgreSQL's parser", async () => {
 				`${fixed.length} disagreement(s) in baseline.json no longer occur (nice). Run \`pnpm test:pg-ast --update\` to remove them:\n${show(fixed)}`,
 			);
 	}
+	jobSummary(title, line, problems);
 	expect(failures.join("\n\n")).toBe("");
 });
 
