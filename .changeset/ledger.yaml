@@ -191,3 +191,7 @@ typesql@0.0.2:
   dir: packages/vscode
   intents:
     - pretty-moles-sip
+typesql@0.0.3:
+  dir: packages/vscode
+  intents:
+    - spicy-moose-travel
