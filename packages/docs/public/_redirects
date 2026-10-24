@@ -1,2 +1,14 @@
-/guide/adapters /adapters/ 301
-/guide/orm-schemas /adapters/#orm-schemas 301
+/guide/adapters /adapters/pg 301
+/guide/orm-schemas /guide/orms 301
+/guide/getting-started /guide/quick-start 301
+/guide/fragments /guide/dynamic-sql 301
+/guide/errors-and-limits /guide/errors 301
+/guide/caching /guide/performance#type-cache 301
+/adapters/ /adapters/pg 301
+/adapters /adapters/pg 301
+/adapters/kysely /guide/orms#kysely 301
+/adapters/drizzle /guide/orms#drizzle 301
+/adapters/prisma /guide/orms#prisma 301
+/internals/engine /guide/type-engine 301
+/internals/development https://github.com/ismailkarsli/TypeSQL/blob/main/packages/docs/internals/development.md 301
+/internals/releasing https://github.com/ismailkarsli/TypeSQL/blob/main/packages/docs/internals/releasing.md 301

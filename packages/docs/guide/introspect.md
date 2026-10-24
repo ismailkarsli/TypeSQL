@@ -1,13 +1,17 @@
-# Introspection
+# From a live database
 
-`typesql introspect` reads a live Postgres database and writes its schema as a TypeScript file:
-tables, views, materialized views and enums, with the exact Postgres type of every column. It
-ships with `@typesql/pg` and connects with `pg`:
+`typesql introspect` reads your Postgres database and writes its schema to a TypeScript file. You get every table, view, materialized view and enum, with the exact Postgres type of each column.
+
+## Generate the schema
+
+The command ships with `@typesql/pg` and connects with `pg`:
 
 ```sh
-pnpm add -D @typesql/pg pg
-pnpm exec typesql introspect --url postgres://localhost/app --out src/db/schema.ts
+npm install -D @typesql/pg pg
+npx typesql introspect --url postgres://localhost/app --out src/db/schema.ts
 ```
+
+Then use the generated `DB` type, and run the command again after each migration:
 
 ```ts
 import { Pool } from "pg";
@@ -17,27 +21,26 @@ import type { DB } from "./db/schema.js";
 const sql = createSql<DB>(new Pool());
 ```
 
-Run it again after each migration. Unlike the [ORM schemas](../adapters/#orm-schemas), which read Postgres
-types back from TypeScript types, the generated file has the real types: `timestamptz`, `date`
-and `timestamp` stay apart, as do `float8` and `int4`, `uuid` and `text`. Date arithmetic,
-comparisons and aggregates are then typed the way Postgres runs them.
+::: tip Why introspect?
+The file has the real Postgres types: `timestamptz`, `date` and `timestamp` stay apart, as do `float8` and `int4`, or `uuid` and `text`. [ORM schemas](./orms) read types back from TypeScript types, which can't tell these apart.
+:::
 
 ## Options
 
-| Option | |
+| Option | What it does |
 |---|---|
 | `--url <url>` | connection string; default `$DATABASE_URL` |
 | `--out <file>` | output file; default stdout |
 | `--schema <name>` | schema to read; repeat it or comma-separate (`--schema public,auth`). Default: every schema except `pg_catalog`, `information_schema` and `pg_*` |
-| `--exclude <pattern>` | relation to leave out: a name or `schema.name`, `*` matches anything (`--exclude 'kysely_migration*'`); repeat it or comma-separate |
+| `--exclude <pattern>` | relation to leave out: a name or `schema.name`, where `*` matches anything (`--exclude 'kysely_migration*'`); repeat it or comma-separate |
 | `--type-name <name>` | name of the interface; default `DB` |
-| `--import-from <module>` | where `Col`, `View`, ... are imported from; default `@typesql/core` |
+| `--import-from <module>` | where `Col`, `View`, … are imported from; default `@typesql/core` |
 | `--config <file>` | a module whose default export holds these options and the ones below |
 | `--no-comments` | leave out the JSDoc (comments, domains, generated columns) |
 
 ## What is generated
 
-| Database | Schema |
+| In the database | In the schema |
 |---|---|
 | table in `public` | `DB["users"]` |
 | table in another schema | `DB["auth"]["sessions"]` |
@@ -47,7 +50,7 @@ comparisons and aggregates are then typed the way Postgres runs them.
 | `DEFAULT`, `serial`, identity, `GENERATED ALWAYS AS (…) STORED` | `Generated`: optional in `INSERT` |
 | `int4`, `timestamptz`, `uuid`, `numeric(12,2)`, `varchar(40)`, … | `"int4"`, `"timestamptz"`, `"uuid"`, `"numeric"`, `"varchar"` |
 | array column | `"int4[]"`, `"mood[]"` |
-| domain | its base type, through domains over domains |
+| domain | its base type, also through domains over domains |
 | `citext` | `"text"` |
 | enum | its name, with the labels in `$types` in sort order |
 | `json` / `jsonb` column given a type in [`columnTypes`](#json-columns) | `Json<T>`, with its flags |
@@ -55,47 +58,39 @@ comparisons and aggregates are then typed the way Postgres runs them.
 | table and column comments | JSDoc |
 | a name that is not a JS identifier (`password:write`) | a quoted key |
 
-Postgres does not record whether a view column can be NULL. A view column is `NOT NULL` only
-when its definition proves it: a `NOT NULL` column of a table that no outer join or `ROLLUP`
-nulls, a constant, `count(*)`, `row_number()`, a `coalesce` with a `NOT NULL` argument, a CASE
-whose every branch is `NOT NULL`, a built-in operator or cast over `NOT NULL` values (not `->>`),
-the key of `jsonb_each`, and so on. Everything else in a view is nullable. This needs
-PostgreSQL 16 or later; on older servers every view column is nullable. When you know better,
-set `viewNotNull` in the config: `viewNotNull: (view, column) => view === "index_member"`.
-
-Enums are global in TypeSQL (`Col<"mood">`), so two enums of the same name in different
-schemas share one `$types` entry with the labels of both. A schema with the same name as a
-`public` table is an error, because both would be the same key of `DB`.
+Enums are global in TypeSQL, so two enums with the same name in different schemas share one `$types` entry. A schema with the same name as a `public` table is an error, because both would be the same key of `DB`.
 
 ## JSON columns
 
-A `jsonb` column is `unknown` by default. Give `json` / `jsonb` columns TypeScript types with
-`columnTypes` in a config file:
+A `jsonb` column is `unknown` by default. To give `json` and `jsonb` columns TypeScript types, list them under `columnTypes` in a config file:
 
 <<< @/snippets/introspect.ts#config
 
-Each listed column is declared as a [`Json<T>` column](./schema#typed-json-columns) of that
-type, with the column's flags (and `"json"` for a `json` column):
+Each listed column becomes a [`Json<T>` column](./schema#typed-json-columns) of that type, with the column's flags (and `"json"` for a `json` column):
 
 <<< @/snippets/introspect.ts#generated
 
-It is still `jsonb` to the SQL, rows read it as `T`, `->` / `#>` index into `T`, and values are
-written with [`sql.json()`](./parameters#json-values):
+Rows read the column as `T`, and you write values with [`sql.json()`](./parameters#json-values):
 
 <<< @/snippets/introspect.ts#use
 
-`imports` adds lines after the generated import, for the types `columnTypes` uses. The config
-file can be `.mjs` or, with Node.js 26, `.ts`. `columnTypes` can also be a function of the
-column, for example to read the type from the column comment. A key that names no column, or a
-column that is not `json` / `jsonb` (`json[]` included), is an error. `column` replaces a whole
-descriptor, for any column: return the TypeScript source to use (any helper of your own), or
-`undefined` to keep the default.
+- `imports` adds lines after the generated import, for the types `columnTypes` uses.
+- The config file can be `.mjs`, or `.ts` with Node.js 26.
+- `columnTypes` can also be a function of the column, for example to read the type from the column comment.
+- A key that names no column is an error. So is a column that is not `json` or `jsonb` (`json[]` included).
+- `column` replaces a whole column descriptor, for any column. Return the TypeScript source to use (any helper of your own), or `undefined` to keep the default.
 
 ## From code
 
-`@typesql/pg/introspect` exports the pieces: `introspect(client, options)` reads the database
-through any `pg` client and returns plain data (relations, columns with their types, defaults,
-identity and generated expressions, comments, enums), and `generateSource(data, options)`
-writes the file.
+`@typesql/pg/introspect` exports the two steps, so you can run them from your own script:
+
+- `introspect(client, options)` reads the database through any `pg` client. It returns plain data: relations, columns with their types, defaults, identity and generated expressions, comments and enums.
+- `generateSource(data, options)` writes the file's source.
 
 <<< @/snippets/introspect.ts#api
+
+## View columns
+
+Postgres doesn't record whether a view column can be NULL. TypeSQL marks one `NOT NULL` only when the view's definition proves it: a `NOT NULL` table column that no outer join or `ROLLUP` makes nullable, a constant, `count(*)`, `row_number()`, a `coalesce` with a `NOT NULL` argument, a `CASE` whose every branch is `NOT NULL`, or a built-in operator or cast over `NOT NULL` values (not `->>`). This needs PostgreSQL 16 or later; on older servers every view column is nullable.
+
+When you know better, set `viewNotNull` in the config: `viewNotNull: (view, column) => view === "index_member"`.

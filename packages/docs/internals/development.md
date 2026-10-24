@@ -3,7 +3,7 @@
 The repository is a pnpm workspace: `packages/core` (`@typesql/core`), the driver adapters
 `packages/pg` and `packages/postgres`, the ORM schema packages `packages/kysely`,
 `packages/drizzle` and `packages/prisma`, the VS Code extension `packages/vscode`,
-`packages/bench` and this site, `packages/docs`.
+`packages/bench` and the docs site, `packages/docs`.
 
 ```sh
 pnpm install
@@ -19,15 +19,15 @@ pnpm test:pg-ast               # our parse trees against PostgreSQL's parser; se
 pnpm mutate:types --changed    # type-level mutation testing; see Type-level mutation testing
 pnpm playground [--check]      # regenerate (or check) the TypeScript Playground links
 pnpm cache-version [--check]   # update (or check) CacheVersion after changing core's types
-pnpm docs:dev                  # this site, with hot reload
-pnpm docs:deploy               # build this site and deploy it to typesql.karsli.net
+pnpm docs:dev                  # the docs site, with hot reload
+pnpm docs:deploy               # build the docs site and deploy it to typesql.karsli.net
 pnpm change                    # record a change intent; see Releasing
 ```
 
 Type tests live in `packages/*/test/**/*.test-d.ts` and use `expectTypeOf` and, for
 argument-shape errors only, `// @ts-expect-error` (see [Coverage and mutation
 testing](#coverage-and-mutation-testing)). The engine's design rules and the TypeScript limits they work around
-are in [Type engine](./engine). Versioning and publishing are in [Releasing](./releasing).
+are in [Type engine](../guide/type-engine.md). Versioning and publishing are in [Releasing](./releasing.md).
 
 `CacheVersion` (`packages/core/src/engine/cache.ts`) is a hash of core's type-level sources: a
 type cache entry made by another version is never used. After changing anything under
@@ -36,7 +36,7 @@ type cache entry made by another version is never used. After changing anything 
 
 ## VS Code extension
 
-`packages/vscode` is the extension behind [Editor completions](../guide/editor). It holds only
+`packages/vscode` is the extension behind [Editor completions](../guide/editor.md). It holds only
 the VS Code side and the SQL highlighting grammar; what to suggest is computed by `@typesql/core/editor`
 (`packages/core/src/editor/`), which the extension loads from the project being edited:
 
@@ -71,7 +71,7 @@ logs the API client the session picked and any error.
 
 ## Playground links
 
-The README, the package READMEs and this site link to the TypeScript Playground. Each link
+The README, the package READMEs and the docs site link to the TypeScript Playground. Each link
 opens one file from `packages/docs/playground/`, encoded in the URL, and the Playground loads
 the published packages from npm. A Markdown line with a link carries a `playground:<name>`
 marker naming its file: in an HTML comment, or in a YAML comment in frontmatter.
@@ -173,7 +173,7 @@ A disagreement is one of:
 - `crash`: the compiler gave up on the statement (e.g. TS2589), whatever Postgres did.
 
 `baseline.json` lists every current disagreement by file, kind and a hash of the statement text
-(there are none today: see [Postgres compatibility](../guide/postgres-compatibility)),
+(there are none today: see [Postgres compatibility](../guide/postgres-compatibility.md)),
 with its line, a preview, Postgres's error and ours for reading. The run fails when a
 disagreement is not listed (a regression: fix the parser) and when a listed one no longer occurs
 (an improvement: run `--update` so the list only shrinks). It also fails when the baseline was
@@ -541,7 +541,7 @@ node packages/bench/run.ts --calibrate  # rewrite thresholds.json from the measu
 and `sql.id`; `maxlen.ts` holds one statement per size probe (0.5, 1, 2, 4 and 8 KB).
 Each file is measured in up to three ways: against core's TypeScript sources (`q1` … `maxlen`),
 against the built package with `skipLibCheck`, as an application compiles (`q1d`, `q50d`,
-`q500d`), and with a [type cache](../guide/caching) generated for the file and served by the
+`q500d`), and with a [type cache](../guide/performance.md) generated for the file and served by the
 content mapper (`q50c`, `q500c`). `q500s` uses a cache generated for another schema, so every
 entry is stale and must cost what no cache costs.
 

@@ -109,15 +109,16 @@ opt-in slice: `createSql<DB & PgCatalog>()`.
 TypeScript 7.1 or later (the native compiler; `7.1.0-beta` works) and Node.js 26 or later.
 PostgreSQL semantics only.
 
-Optionally, a [type cache](https://github.com/ismailkarsli/typesql/blob/main/packages/docs/guide/caching.md)
+Optionally, a [type cache](https://typesql.karsli.net/guide/performance#type-cache)
 file, which TypeScript 7.1's content mappers let this package serve and keep up to date, saves
 recomputing query types on every `tsc` run and every edit.
 
 ## Documentation
 
-[Guide](https://github.com/ismailkarsli/typesql/blob/main/packages/docs/guide/getting-started.md) ·
-[API reference](https://github.com/ismailkarsli/typesql/blob/main/packages/docs/reference/api.md) ·
-[DDL support](https://github.com/ismailkarsli/typesql/blob/main/packages/docs/reference/ddl.md) ·
-[Errors and limits](https://github.com/ismailkarsli/typesql/blob/main/packages/docs/guide/errors-and-limits.md) ·
-[Type cache](https://github.com/ismailkarsli/typesql/blob/main/packages/docs/guide/caching.md) ·
-[Editor completions](https://github.com/ismailkarsli/typesql/blob/main/packages/docs/guide/editor.md)
+[Guide](https://typesql.karsli.net/guide/introduction) ·
+[API reference](https://typesql.karsli.net/reference/api) ·
+[DDL support](https://typesql.karsli.net/reference/ddl) ·
+[Errors](https://typesql.karsli.net/guide/errors) ·
+[Limits](https://typesql.karsli.net/guide/limits) ·
+[Type cache](https://typesql.karsli.net/guide/performance#type-cache) ·
+[VS Code extension](https://typesql.karsli.net/guide/editor)

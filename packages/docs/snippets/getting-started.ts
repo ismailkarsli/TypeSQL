@@ -28,7 +28,3 @@ check<
 		{ id: number; email: string; title: string | null }
 	>
 >();
-// #region text
-recent.text; // "SELECT u.id, u.email, p.title FROM users u …"  (sent as is)
-recent.values; // [Date]
-// #endregion text

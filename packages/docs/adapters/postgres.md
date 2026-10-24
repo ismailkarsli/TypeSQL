@@ -1,91 +1,35 @@
 # postgres.js
 
-`@typesql/postgres` runs queries on postgres.js 3.x and types rows with `PostgresJsTypeMap`, or
-`PostgresJsBigIntTypeMap` for connections that parse `int8` to `bigint`.
+`@typesql/postgres` runs your queries on postgres.js (`postgres` 3.x).
 
 ```sh
-pnpm add @typesql/core @typesql/postgres postgres
+npm install @typesql/core @typesql/postgres postgres
 ```
 
 [Open an example in the TypeScript Playground](https://www.typescriptlang.org/play/#code/PTAEBUE8AcFMGUCKAZUB3AlgFwBamgPYDOWA5gE6xEB0AVkaABQACWMVAjgDbCEkVUAlNVCIArrHIYqocmIB26bHiLdqCogEMAZrEZZYADywAaUADdNXCUUFnN8gCayCaIgCgQoTZVBs4zgBGkOg4mlj4xGSUNPT4PkRUAFygGPJYABypDJqgJFLypGYE5N6ggRikaRGYuKAAQpUAkunx5ERppKAE8tTu7hgAtoTkEf6woADeoADCBFxmAOKw8pLhsI5mAHJiXFyagVwTAL6g2uQEg6AARKzsqjwAxiWw1wDcA8MlEdOPlOuNUgtLDwbhmP6wdagrigU7nS43O5wB68KICIjvT4jMbsKagaGws4XK7XPjRKiYgbpSTaTSPCYAEXqU3cAEgxIl2ilJmzWRhHCllqtyOtHAAea7VAAs1wAfB9WazYINNBguCk5lwJQZjHKFazHBgiNB9pAAPryTSDWApHZ7A5HbVGLB63kQ0Vm8KClZrAzi65YIZULBW6BYABertZxwVZKI3N5-O9wtFEuqGSjrM0YlwJTNSdm8zT6Rl8t5gawRw1RYDzszIdI8cLWtrxgA2gBdKMx9zHfqOWCPfa+Z7yEigRyBFLQt6gLxk9GMUlomJJEBcAiPKw4KLATTQaDXQTuUfjh6gAC8oHdBmhYqZssYk8EHxPPXHccv3jQqoiD0YbIAAbwAAosgIEzOAqSbH42BHGYDYMAAYgASgA8gAspEJAMAA6gAEiBKEgaAAAkACMX4AIJbAAmkwiGCIBJhstcDzXCxwhGIOOZ6C+nhgKAQkAHoAPz9F4aGKLko6rI8gY9EodSAeMTbTBUVTpCkC4xNQgLArCzGpOkWQOM4zwKFgjAAFSCNelwTIEdIANbeAwGnVH0A5Dj4EynhEk6AtO3BiuplTVCkHmtMcZb+eUlRfjesD6ekd4Pk+gSAvxcUWekDBXpoP7YPFpAAaywFgRBUHZrm5D5jBuVWbZoBUfAoCKKhmHYVgDCLOhACqAAKDT0TVO51fyzHuFxhg8QYjD8V4QmgGJElgA81BYCKY50gpihGnkaiBLAmmzlghibdtWjyRgikHbkWjmLAhCee4hW-odXCXQ4117YwmhEJA8iPAxhh2ResoslmRVjIYZXlUNDJUeAJGfqBUEVkcX5iAekj6HBsB2QRREkWNeb8l+FFTYqADsLGsjNc18QqcWKAVMN+HDvKAQylUo6AnVYZ+xPEdePiGpaXDYJA+iaI24OgAADNTjOPLxcyWQtCpLSJ4nHPx7j-hV4GQdBAvoULUR4YRouIaAzCQ1TZhsdwR6zl4kgXOQKR2w7fiaM5Mi5DqWCdu4QA) <!-- playground:postgres --> to hover the types and edit the SQL, with nothing to install.
 
+## Create `sql`
+
+Pass your postgres.js connection to `createSql`. If the connection parses `int8` to `bigint`, use `createBigIntSql` instead:
+
 <<< @/snippets/adapters.ts#postgresjs
 
-- `PostgresJsQueryable` is anything with `unsafe(query, parameters?)`: the `Sql` instance,
-  the `TransactionSql` passed by `begin`, and `ReservedSql` all satisfy it. Queries run with
-  `sql.unsafe(text, values)`, so the text goes to the server untouched.
-- `execute` returns a plain `Row[]` (postgres.js' result metadata — `count`, `command`,
-  `columns` — is stripped by `Array.from`). `executeCount` returns the result's `.count` (0
-  when postgres.js reports `null`, as for DDL).
-- `sql.transaction(fn)` is `sql.begin(fn)`: postgres.js issues `BEGIN`, runs `fn(tx)`,
-  `COMMIT`, or `ROLLBACK` and rethrows. On a `TransactionSql` it is `savepoint(fn)`.
+It takes the `Sql` instance, the `TransactionSql` that `begin` passes, or a `ReservedSql`. Queries run with `unsafe(text, values)`, so the text reaches the server as written.
 
-See the [overview](./#running-queries) for the `execute*` methods, transactions and executors
-that every adapter shares.
+## Run queries
 
-## `PostgresJsTypeMap` and `PostgresJsBigIntTypeMap`
+The `execute*` methods are the same as with [node-postgres](./pg#run-queries). `execute()` returns a plain array, without postgres.js' result metadata (`count`, `command`, `columns`).
 
-Verified against `postgres@3.4.9/src/types.js`. The default parsers are only:
+Pass `{ rowKeys: "camelCase" }` as the second argument for [camelCase row keys](../guide/queries#camelcase-row-keys), and leave postgres.js' own `transform: postgres.camel` off.
 
-| OIDs | Postgres | TS |
-|---|---|---|
-| 21, 23, 26, 700, 701 | `int2`, `int4`, `oid`, `float4`, `float8` | `number` |
-| 16 | `bool` | `boolean` |
-| 1082, 1114, 1184 | `date`, `timestamp`, `timestamptz` | `Date` (`new Date(x)`) |
-| 114, 3802 | `json`, `jsonb` | `unknown` (`JSON.parse`) |
-| 17 | `bytea` | `Buffer` |
+## Transactions
 
-Everything else is the text Postgres sent, i.e. `string`: notably `int8`, `numeric`,
-`interval`, `point`, `circle`, `record`, `void`. With
-`postgres({ types: { bigint: postgres.BigInt } })` int8 (OID 20) is parsed to `bigint`;
-use `PostgresJsBigIntTypeMap` / `createBigIntSql` for those connections (`int8[]` becomes
-`bigint[]`).
+`sql.transaction(fn)` is postgres.js' `begin(fn)`, and on a `TransactionSql` it is `savepoint(fn)`. See [Transactions](../guide/transactions).
 
-Arrays: postgres.js fetches `pg_type` on connect (`fetch_types: true`, the default) and
-registers an element-wise parser for every array type, so core's `T[]` mapping is exact.
+## Types
 
-### Parameters
-
-Parameters accept the row type plus `PostgresJsParamTypeMap` (`PostgresJsTypeMap["$params"]`).
-postgres.js serializes each value with the serializer of the parameter type the server
-reports (`Bind` in `src/connection.js`), and with `'' + x` for types without one:
-
-| Postgres | Parameters also accept |
-|---|---|
-| `int8`, `numeric`, `money` | `number \| bigint \| string` |
-| `date`, `timestamp`, `timestamptz` | `Date \| string \| number`: sent as `new Date(x).toISOString()`, so a string must be one JS `Date` can parse and a number is epoch milliseconds |
-| `interval` | `string` |
-| `bytea` | `Uint8Array` |
-
-`bool` parameters take only booleans: the serializer sends `'f'` for anything but `true`.
-
-### Dates
-
-`date` is not a string under postgres.js: `types.date.from` is
-`[1082, 1114, 1184]`, so `date`, `timestamp` and `timestamptz` are all `Date` by default, the
-same as `pg`. The remaining difference is how the text is parsed: postgres.js does
-`new Date("1815-12-10")`, which is UTC midnight, whereas `pg`'s `postgres-date` yields local
-midnight for a `date`. Both maps say `Date`.
+Rows are typed with `PostgresJsTypeMap`, which matches postgres.js' default parsers. Numbers, booleans, dates, JSON and `bytea` are parsed; everything else, including `int8` and `numeric`, is the text Postgres sent. Arrays are parsed element by element. The full table is in [Type mapping](../reference/type-mapping#postgres-js).
 
 ## Migrations
 
-`migrate(db, m)` runs `m.statements` in order inside one transaction (all or nothing). `m` is
-anything with `statements: readonly string[]`; the `migrations()` builder from `@typesql/core`
-fits, and its `schema` type is what you pass to `createSql`:
-
-```ts
-import { migrations, type SchemaOf } from "@typesql/core";
-import { createSql, migrate } from "@typesql/postgres";
-
-const m = migrations()
-  .add("CREATE TABLE users (id serial PRIMARY KEY, email text NOT NULL)")
-  .add("ALTER TABLE users ADD COLUMN display_name text");
-
-await migrate(db, m);
-const sql = createSql<SchemaOf<typeof m>>(db);
-```
-
-Statements are sent without parameters (simple query protocol), so `$$`-quoted function
-bodies and multi-statement scripts work. `migrate` does not track which migrations have
-already run; keep a `schema_migrations` table or use a dedicated tool for that and use
-`migrations()` for the types. See [Migrations](../guide/migrations).
+`migrate(db, m)` runs a [`migrations()`](../guide/migrations) builder's statements in one transaction. See [From migrations](../guide/migrations#running-migrations).

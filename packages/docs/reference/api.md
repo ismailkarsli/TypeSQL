@@ -1,250 +1,210 @@
 # API
 
-## `createSql<DB, TypeMap = DefaultTypeMap>(executor?, options?)`
+Everything `@typesql/core` exports, plus the extra exports of the adapter and ORM packages. Each entry links to the guide page that explains it.
 
-Returns the typed `sql` function for a schema. Pass the adapter's type map (`PgTypeMap`,
-`PostgresJsTypeMap`) or use the adapter's pre-bound `createSql`. The optional `executor` is
-what the queries' `execute*` methods run on; the adapters' `createSql` take the driver client
-instead (`createSql<DB>(pool)`) and add [`sql.transaction(fn)`](#sql-transaction-fn).
+## `createSql`
 
 ```ts
-const sql = createSql<DB>();
-const camel = createSql<DB>(executor, { rowKeys: "camelCase" }); // Sql<DB, DefaultTypeMap, "camelCase">
+createSql<DB, TypeMap = DefaultTypeMap>(executor?, options?): Sql<DB, TypeMap, Keys>
 ```
 
-`options.rowKeys` is `"preserve"` (the default: rows keep Postgres' column names) or
-`"camelCase"`: the rows' top-level keys are camelCased with `CamelCasePlugin`'s mapping, in the
-row types and in the rows `execute*` return. See [camelCase row keys](../guide/queries#camelcase-row-keys).
-`@typesql/pg`, `@typesql/postgres` (both `createSql` and `createBigIntSql`) and `@typesql/kysely`
-take the same option after the client.
+Returns the typed `sql` function for a schema.
 
-### `sql.transaction(fn)`
+- `DB` is your [schema](../guide/schema). `TypeMap` turns Postgres types into TypeScript types ([Type mapping](./type-mapping)).
+- `executor` is what `execute*` runs on. Without one, `sql` only builds queries.
+- `options.rowKeys` is `"preserve"` (the default) or `"camelCase"`. See [camelCase row keys](../guide/queries#camelcase-row-keys).
 
-On the `sql` of an adapter (`createSql<DB>(client)`): runs `fn(tx)` inside a transaction, where
-`tx` is the same `sql` bound to it. Commits when `fn` resolves and resolves to its result; rolls
-back and rethrows when it throws. `tx.transaction(fn)` nests with a savepoint. Rejects when the
-`sql` has no client. See [Transactions](../adapters/#transactions).
+The adapters export their own `createSql`, which takes the driver client and adds [`sql.transaction(fn)`](#sql-transaction-fn):
 
-```ts
-const sql = createSql<DB>(pool); // @typesql/pg
-const id = await sql.transaction(async (tx) => {
-  const { id } = await tx("INSERT INTO users (email) VALUES ($1) RETURNING id", "a@b.c").executeTakeFirstOrThrow();
-  await tx("INSERT INTO posts (author_id, title) VALUES ($1, $2)", id, "Hello").execute();
-  return id;
-});
-```
+| Package | `createSql` |
+|---|---|
+| `@typesql/pg` | `createSql<DB>(pool, options?)`, with `PgTypeMap` |
+| `@typesql/postgres` | `createSql<DB>(sql, options?)` with `PostgresJsTypeMap`; `createBigIntSql<DB>(sql, options?)` with `PostgresJsBigIntTypeMap` |
+| `@typesql/kysely`, `@typesql/drizzle`, `@typesql/prisma` | see [ORM packages](#orm-packages) |
 
-### `sql(text, ...params)`
+## `sql(text, ...params)`
 
-`text` must be a string literal (or a template literal without substitutions). The
-statement is parsed at compile time; the result is
+Parses the statement at compile time and returns `Query<Row, Params, Text>`: `{ text, values }` plus phantom types.
 
-```ts
-Query<Row, Params, Text>   // { text: string; values: unknown[] } + phantom types
-```
+| Type argument | Meaning |
+|---|---|
+| `Row` | the row type; `never` for `INSERT` / `UPDATE` / `DELETE` without `RETURNING`, and for DDL |
+| `Params` | the tuple of parameter types ([how they are typed](../guide/parameters)) |
+| `Text` | the final SQL literal, after `:name` rewriting and fragment splicing |
 
-- `Row` is the projected row (`never` for DML without RETURNING and for DDL).
-- `Params` is the tuple of parameter types: `WHERE id = $1` → `[number | null]`; INSERT value
-  slots take the column type (`| null` when nullable); `LIMIT $1` → `number | null`;
-  `$1::T` → `T`; `= ANY($1)` → array (elements accept `null`); a parameter with no context is
-  `unknown`. See [Parameters](../guide/parameters#how-parameters-get-their-types).
-- `Text` is the final SQL literal (after `:name` rewriting and fragment splicing).
-
-An invalid statement makes the `text` parameter's type an `SqlError<message, tokenIndex>`,
-so the error is reported on the SQL text:
-
-```
-Argument of type '"SELECT nme FROM users"' is not assignable to parameter of type
-  'SqlError<"column \"nme\" does not exist", 1> & "SELECT nme FROM users"'.
-```
+- `text` must be a string literal, or a template literal whose substitutions are compile-time constants. Anything else is an error ([Only literal SQL is analysed](../guide/parameters)).
+- An invalid statement makes the `text` parameter's type `SqlError<message, tokenIndex>`, so the error shows on the SQL text ([Errors](../guide/errors)).
+- Tagged templates (`` sql`…` ``) are not supported: TypeScript erases their text from the types.
 
 ### Named parameters
-
-`:name` placeholders are rewritten to `$n` in order of first appearance; the call then takes
-one object:
 
 ```ts
 sql("SELECT id FROM users WHERE id = :id AND email = :email", { id: 1, email: "x" });
 // text: "SELECT id FROM users WHERE id = $1 AND email = $2", values: [1, "x"]
 ```
 
-`::` casts, `:=` and colons inside string literals are not parameters. Mixing `:name` and
-`$n` in one statement is an error.
+- `:name` becomes `$n` in order of first appearance, and the call takes one object. A name used twice is one parameter.
+- `::` casts, `:=` and colons inside string literals are not parameters.
+- Mixing `:name` and `$n` in one statement is an error.
 
-### Inline parameters
+## Inline values
 
-Values can be written where they are used, inside a template literal, with `sql.param()`:
+| Function | Sends |
+|---|---|
+| `sql.param(value)` (also `param`) | the value as a `$n` parameter |
+| `sql.json(value)` (also `json`) | the value as JSON text; `null` and `undefined` as SQL `NULL` |
+| `sql.valueOrDefault(value)` (also `valueOrDefault`) | the value, or `DEFAULT` when it is `undefined` |
 
-```ts
-const q = sql(`SELECT id, email FROM users
-               WHERE id = ${sql.param(userId)} AND email = ${sql.param(email)}`);
-// text:   "SELECT id, email FROM users WHERE id = $1 AND email = $2"
-// values: [userId, email]
-// type:   Query<{ id: number; email: string }, [number, string]>
-```
+- The value's type is checked against the parameter's type. Strings are accepted for enums, objects for JSON and other object-typed columns, and anything when there is no context.
+- Inline values are numbered after the statement's `$n` / `:name` parameters. Values carried by spliced fragments come last.
+- Each `sql.param()` belongs to one statement. Inside quotes or a comment it is an error.
+- `sql.json()` is an error unless the parameter is `json` / `jsonb` or has no context. A `Json<T>` column checks the value against `T`. A raw array for a JSON parameter is an error with `sql.param()` and as a call argument (`NonArrayOrSqlJson<T>`).
+- With `sql.valueOrDefault()`, a value that can be `undefined` makes the statement be checked a second time with `DEFAULT` in its place.
 
-- The value is always sent as a `$n` parameter, never as text. `param` is also exported
-  standalone (`import { param } from "@typesql/core"`).
-- Each value's TypeScript type is checked against the type its context gives the parameter:
-  `${sql.param("5")}` compared with an `int4` column fails with
-  `parameter $1: a string value cannot be used as int4 NOT NULL`; a `string | null` value for a
-  `NOT NULL` column fails too. Strings are accepted for enum columns and any object for JSON
-  (except arrays, see `sql.json()` below), interval and other object-typed columns; with no context (`SELECT ${sql.param(x)}`) anything
-  is accepted.
-- Inline parameters are numbered after the statement's own parameters: `$n` and `:name`
-  parameters keep `$1…$k` and stay call arguments; inline values follow; spliced fragments'
-  values come last.
-- `sql.param()` inside a quoted string or a comment is a compile error (and a runtime error).
-- Tokens are single-use: each `sql.param()` call belongs to one statement. Fragments resolve
-  their inline parameters when created, so a fragment can be reused.
-- `sql.json(value)` (also exported as `json`) is `sql.param()` for JSON: the value is sent as
-  JSON text by every driver (a `JsonParam`, which implements `toPostgres()` for node-postgres and
-  `toJSON()` for postgres.js), `null` / `undefined` as SQL `NULL`. It fails unless the parameter
-  is `json` / `jsonb` or has no context, and the value is checked against a `Json<T>` column's
-  `T`. A `sql.param()` array for a `json` / `jsonb` parameter is rejected
-  (`parameter $1: an array for jsonb NOT NULL must be passed as sql.json(value) …`), and so is a
-  raw array as a positional or named argument (typed `NonArrayOrSqlJson<T>`): pass
-  `sql.json(value)` as the argument, which is sent as JSON text (only checked to be JSON).
+See [Parameters](../guide/parameters), [JSON values](../guide/parameters#json-values) and [Optional values](../guide/writing-data#optional-values-sql-valueordefault).
 
-Only literal SQL text is analysed. Interpolating anything that is not a compile-time constant
-is rejected, so a value can never be pasted into the SQL by accident:
+## Fragments
 
 ```ts
-sql(`SELECT id FROM users WHERE email = '${userInput}'`);
-//  error: the SQL text is not a string literal: pass values as parameters ($1, :name or
-//         ${sql.param(value)}), identifiers with sql.id(), reusable pieces as {slot}
-//         fragments, or use sql.as<Row>() for dynamic SQL
-const table = "users";
-sql(`SELECT id FROM ${table}`);   // fine: a const is folded into the literal
-```
-
-Tagged templates (`` sql`…` ``) are not supported: TypeScript erases the text of a tagged
-template from the types (TypeScript issue #33304), so nothing could be inferred.
-
-### Fragments
-
-```ts
-const where = sql.fragment("WHERE u.id = $1", 7);          // Fragment<"WHERE u.id = $1", [unknown]>
+const where = sql.fragment("WHERE u.id = $1", 7); // Fragment<"WHERE u.id = $1", [unknown]>
 const q = sql("SELECT u.id FROM users u {where}", { where });
 // Query<{ id: number }, [number], "SELECT u.id FROM users u WHERE u.id = $1">
 ```
 
-- `{name}` slots are replaced before inference; the fragment's `$n` are renumbered to follow
-  the outer parameters (outer values first, then fragment values in order of appearance).
-  Only `{identifier}` is a slot; `'{1,2}'` or `'{"a":1}'` inside literals are untouched.
-- A fragment's parameters are typed once spliced (`WHERE u.id = $1` → `number` above), and
-  the values it carries (positional, `:name` or inline) are checked against those types:
-  `sql.fragment("AND age > $1", "eighteen")` spliced next to an `int4` column is an error.
-- Whole queries are spliceable too (`WHERE id IN ({sub})`).
-- `sql.id("col")` → `"col"`; `sql.id("schema", "table")` → `"schema"."table"`.
-  A union of literal names gives a union of texts; the statement is checked once per member
-  (an error in any member is reported) and the row type is the union. A generic name
-  constrained to `RelationName<DB>` is widened to every top-level table and view; any other
-  non-literal name is dynamic.
-- `sql.join([f1, f2], " AND ")` keeps the literal text for tuple inputs; an array input is
-  dynamic.
-- `sql.list(items, separator = ", ")` joins a runtime array of fragments whose texts are
-  literals (or unions of literals). The statement is checked once with each distinct element
-  present once; the fragment's text type is that representative text. Throws on an empty
-  array. See [Lists from runtime arrays](../guide/fragments#lists-from-runtime-arrays).
-- `sql.raw(text)` is dynamic.
+| Function | Result |
+|---|---|
+| `sql.fragment(text, ...params)` | a piece of SQL to splice into a `{name}` slot |
+| `sql.id("col")`, `sql.id("schema", "table")` | a quoted identifier: `"col"`, `"schema"."table"` |
+| `sql.join([f1, f2], separator)` | the fragments joined; literal text only for a tuple written in place |
+| `sql.list(items, separator = ", ")` | a runtime array of fragments with literal texts, joined; throws when empty |
+| `sql.raw(text)` | dynamic text, sent as is |
 
-### Write helpers
+- Only `{identifier}` is a slot. Braces inside string literals are left alone.
+- A fragment's `$n` are renumbered after the outer parameters, and its values are checked once spliced. Whole queries can be spliced too.
+- `sql.id` over a union of names is checked once per member; the row type is the union. A generic name constrained to `RelationName<DB>` is widened to every table and view. Any other non-literal name is dynamic.
+- `sql.list` checks the statement once, with each distinct element once ([Lists from runtime arrays](../guide/dynamic-sql#lists-from-runtime-arrays)).
+- A dynamic fragment is rejected by `sql()`. Use `sql.as<Row>()`.
 
-- `` sql.valueOrDefault(value) ``: inline like `sql.param`; `undefined` sends `DEFAULT`. Also
-  exported standalone (`import { valueOrDefault } from "@typesql/core"`). When the value can be
-  `undefined`, the statement is checked a second time with `DEFAULT` in its place.
-- `sql.set(table, values)`: `"a" = $1, "b" = $2` for the defined values. `values` is checked
-  against `SetInput<DB, TM, table>`; throws when no value is defined.
-- `sql.values(table, rows)`: `("a", "b") VALUES ($1, $2), ($3, DEFAULT)`. Rows are checked
-  against `InsertInput<DB, TM, table>`; throws on an empty array.
-- A `json` / `jsonb` column in `set` / `values` takes `sql.json(value)` (sent as JSON text, the
-  value checked against a `Json<T>` column's `T`) or a raw non-array value; a raw array is an
-  error, as for `sql.param()`.
-- `table` is a `TableName<DB>`: a top-level table, or `"schema.table"`.
-- `set` and `values` are typed like `sql.list`: the text type assigns or lists every key of
-  the input type once (`SetRep`, `ValuesRep`). See [Writing data](../guide/writing-data).
-- A dynamic fragment makes the statement text non-literal; the call is rejected with
-  `SqlError<"dynamic SQL fragment …">` — use `sql.as<Row>(text, slots, ...params)`.
+See [Dynamic SQL](../guide/dynamic-sql).
 
-### `sql.as<Row>(text, ...params)`
+## Write helpers
 
-Bypasses inference and asserts the row type. Accepts slots and named parameters like `sql`.
-`Row` is the row as returned: with `rowKeys: "camelCase"`, write it with camelCase keys.
+| Function | Builds | Input type |
+|---|---|---|
+| `sql.set(table, values)` | `"a" = $1, "b" = $2` for the defined values; throws when none is defined | `SetInput<DB, TM, table>` |
+| `sql.values(table, rows)` | `("a", "b") VALUES ($1, $2), ($3, DEFAULT)`; throws on an empty array | `InsertInput<DB, TM, table>` |
 
-### `q.execute()`, `q.executeTakeFirst()`, `q.executeTakeFirstOrThrow()`, `q.executeCount()`
+`table` is a `TableName<DB>`: a top-level table, or `"schema.table"`. JSON columns take `sql.json(value)` or a raw non-array value. See [Inserting and updating](../guide/writing-data).
 
-Run a query on the executor bound by `createSql(executor)` (or by an adapter's
-`createSql(client)`), or on the one passed to the call (`q.execute(executor(client))`). Without
-either they reject.
+## `sql.as<Row>(text, ...params)`
+
+Skips inference and uses the row type you give. It accepts slots, `:name` and inline values like `sql()`. With `rowKeys: "camelCase"`, write `Row` with camelCase keys. Use it for SQL TypeSQL can't type ([Errors](../guide/errors)).
+
+## `sql.transaction(fn)`
+
+Only on an adapter's `sql`. Runs `fn(tx)` in a transaction, where `tx` is the same `sql` bound to it.
+
+- Commits and resolves to `fn`'s result when `fn` resolves. Rolls back and rethrows when it throws.
+- `tx.transaction(fn)` nests with a savepoint.
+- Rejects when the `sql` has no client.
+
+See [Transactions](../guide/transactions).
+
+## Running queries
 
 | Method | Returns |
 |---|---|
-| `execute(executor?)` | `Promise<Row[]>` |
-| `executeTakeFirst(executor?)` | `Promise<Row \| undefined>` |
-| `executeTakeFirstOrThrow(executor?)` | `Promise<Row>`; `NoResultError` (with the statement `text`) on 0 rows |
-| `executeCount(executor?)` | `Promise<number>`: the statement's row count |
+| `q.execute(executor?)` | `Promise<Row[]>` |
+| `q.executeTakeFirst(executor?)` | `Promise<Row \| undefined>` |
+| `q.executeTakeFirstOrThrow(executor?)` | `Promise<Row>`; rejects with `NoResultError` (carrying `text`) on 0 rows |
+| `q.executeCount(executor?)` | `Promise<number>`: rows affected by `INSERT` / `UPDATE` / `DELETE` / `MERGE`, rows returned by `SELECT`, 0 for DDL |
 
-`executeCount` returns the count from Postgres' command tag: rows affected by `INSERT`,
-`UPDATE`, `DELETE` or `MERGE`, with or without `RETURNING`, and rows returned by `SELECT`.
-Statements without a count, such as DDL, give 0.
+The methods run on the executor passed to the call, or else on the one `createSql` bound. Without either, they reject. They are non-enumerable, so a query still deep-equals `{ text, values }`.
 
-An `Executor` is `(text, values) => PromiseLike<readonly unknown[] | ExecutorResult>`, where
-`ExecutorResult` is `{ rows, rowCount: number | null }` (`null` means no count, read as 0).
-Each adapter exports `executor(client)` to build one; all of them report the count. An executor
-that resolves to the rows alone works for everything but `executeCount`, which then rejects,
-unless the executor has a `count(text, values) => PromiseLike<number>` method, which
-`executeCount` calls instead (`@typesql/prisma`'s runs `$executeRawUnsafe`). The methods are
-non-enumerable, so a query still deep-equals `{ text, values }`.
+Every adapter reports the row count for `executeCount`: `rowCount` (`pg`), `count` (postgres.js), `numAffectedRows` or the number of rows (Kysely), `$executeRawUnsafe` (Prisma), and for Drizzle the count of the driver underneath.
 
-Code that runs `q.text` itself, instead of through an executor, calls
-`mapRows(q, rows)` to apply the query's `rowKeys` to the driver's rows. `rowKeysOf(q)` returns the
-option, and `camelCase(key)` is the key mapping.
+### Executors
+
+```ts
+type Executor = (text: string, values: unknown[]) => PromiseLike<readonly unknown[] | ExecutorResult>;
+type ExecutorResult = { rows: readonly unknown[]; rowCount: number | null };
+```
+
+- Each adapter exports `executor(client)`.
+- `rowCount: null` means no count, read as 0.
+- An executor that returns only rows works for everything but `executeCount`, unless it has a `count(text, values)` method.
+
+See [Custom executor](../adapters/custom-executor).
+
+### Running `q.text` yourself
+
+| Function | Does |
+|---|---|
+| `mapRows(q, rows)` | applies the query's `rowKeys` option to the driver's rows |
+| `rowKeysOf(q)` | returns the query's `rowKeys` option |
+| `camelCase(key)` | the camelCase key mapping |
 
 ## Public types
 
+### Queries and the `sql` function
+
 | Type | Meaning |
 |---|---|
-| `Query<Row, Params, Text>` | runtime query object with phantom types and `execute*` methods |
-| `Executor` | `(text, values) => PromiseLike<readonly unknown[] \| ExecutorResult>`, what `execute*` runs on |
-| `ExecutorResult` | `{ rows, rowCount: number \| null }`: an executor result with the statement's row count |
-| `NoResultError` | thrown by `executeTakeFirstOrThrow` on 0 rows; carries `text` |
+| `Query<Row, Params, Text>` | the runtime query object, with phantom types and `execute*` methods |
 | `Sql<DB, TM, Keys = "preserve">` | the `sql` function; `Keys` is the `rowKeys` option |
 | `TransactionalSql<DB, TM, Keys = "preserve">` | an adapter's `sql`: `Sql` plus `transaction(fn)` |
 | `SqlOptions`, `RowKeys` | `createSql`'s options; `"preserve" \| "camelCase"` |
+| `Executor` | what `execute*` runs on |
+| `ExecutorResult` | `{ rows, rowCount: number \| null }` |
+| `NoResultError` | thrown by `executeTakeFirstOrThrow` on 0 rows; carries `text` |
+| `RowType<Q>`, `ParamsType<Q>`, `TextType<Q>` | the row, parameters and text of a `Query` or `Fragment` type |
 | `CamelCase<S>`, `CamelCaseKeys<Row>`, `KeyedRow<Row, Keys>` | the key mapping on a string, on a row's top-level keys, and under a `rowKeys` option |
-| `Fragment<Text, Params>` | spliceable SQL piece |
+
+### Fragments and inline values
+
+| Type | Meaning |
+|---|---|
+| `Fragment<Text, Params>` | a spliceable SQL piece |
 | `ListRep<Element, Sep>` | the representative text and carried values `sql.list` is checked with |
-| `RowType<Q>`, `ParamsType<Q>`, `TextType<Q>` | extract from a `Query`/`Fragment` type |
-| `InlineMarker<T>` | type of `sql.param(value)`: the inline marker encoding `T` |
-| `DefaultMarker<T>` | type of `sql.valueOrDefault(value)` |
+| `InlineMarker<T>` | the type of `sql.param(value)` |
+| `DefaultMarker<T>` | the type of `sql.valueOrDefault(value)` |
+| `JsonMarker<T>` | the type of `sql.json(value)` |
+| `JsonValue` | any `sql.json()` value: what a json / jsonb argument, `set` or `values` value accepts besides raw values |
+| `JsonParam<T>` | the runtime value `sql.json()` binds: `{ value }` with `toPostgres()`, `toJSON()`, `toString()` |
+
+### Tables and write helpers
+
+| Type | Meaning |
+|---|---|
 | `TableName<DB>` | writable tables: top-level names and `"schema.table"` |
 | `RelationName<DB>` | top-level tables and views (what a generic `sql.id(name)` is widened to) |
 | `TableOf<DB, T>` | the column descriptors of a `TableName` |
-| `SetInput<DB, TM, T>`, `InsertInput<DB, TM, T>` | what `sql.set` / a `sql.values` row accepts |
+| `SetInput<DB, TM, T>`, `InsertInput<DB, TM, T>` | what `sql.set` and a `sql.values` row accept |
 | `SetRep<P>`, `ValuesRep<R>` | the representative text and carried values of `sql.set` / `sql.values` |
-| `JsonMarker<T>` | type of `sql.json(value)` |
-| `JsonValue` | any `sql.json()` value (what a json / jsonb argument, `set` or `values` value accepts besides raw values) |
-| `JsonParam<T>` | runtime value `sql.json()` binds: `{ value }` with `toPostgres()`, `toJSON()`, `toString()` |
-| `RowOf<DB, TM, Q>` | row type of a statement literal |
-| `ParamsOf<DB, TM, Q>` | positional parameter tuple |
-| `ArgsOf<DB, TM, Q>` | the tuple a call site passes: `ParamsOf`, with json / jsonb parameters as `NonArrayOrSqlJson<T>` (no raw arrays; `sql.json()` values) |
-| `ParamsArgs<DB, TM, Q>` | what a call site passes (`ArgsOf`, or `[params: {…}]` for `:name`) |
-| `NamesOf<DB, Q>` | `:name` parameters in order |
+
+### Statement analysis
+
+| Type | Meaning |
+|---|---|
+| `RowOf<DB, TM, Q>` | the row type of a statement literal |
+| `ParamsOf<DB, TM, Q>` | the positional parameter tuple |
+| `ArgsOf<DB, TM, Q>` | the tuple a call site passes: `ParamsOf`, with json / jsonb parameters as `NonArrayOrSqlJson<T>` |
+| `ParamsArgs<DB, TM, Q>` | what a call site passes: `ArgsOf`, or `[params: {…}]` for `:name` |
+| `NamesOf<DB, Q>` | the `:name` parameters in order |
 | `Validate<DB, Q>` | `Q` when valid, else `SqlError<message, tokenIndex>` |
 | `Analyze<DB, Q>` | the full analysis result (`kind`, `cols`, `params`, `max`, `names`, `stmt`); never served from the type cache |
-| `Analysis<DB, Q>` | what `RowOf`, `ParamsOf` and `Validate` read: `Analyze` without `stmt`, from the [type cache](../guide/caching) when it has a usable entry |
-| `ApplyDdl<DB, Q>` | schema after a DDL statement or a `;`-separated script |
-| `SqlError<Message, At>` | compile-time error carrier; `At` is the index of the offending token |
-| `QueryCache`, `QueryCacheKeys`, `CacheSnapshots`, `DdlCache`, `DdlCacheKeys`, `CacheVersion`, … | what a [type cache](../guide/caching) file declares; generated, not written by hand |
+| `Analysis<DB, Q>` | what `RowOf`, `ParamsOf` and `Validate` read: `Analyze` without `stmt`, from the [type cache](../guide/performance#type-cache) when it has a usable entry |
+| `ApplyDdl<DB, Q>` | the schema after a DDL statement or a `;`-separated script |
+| `SqlError<Message, At>` | the compile-time error carrier; `At` is the index of the offending token |
+| `QueryCache`, `QueryCacheKeys`, `CacheSnapshots`, `DdlCache`, `DdlCacheKeys`, `CacheVersion`, … | what a [type cache](../guide/performance#type-cache) file declares; generated, not written by hand |
 
 ## Schema types
 
 ```ts
 Col<"text">                  // NOT NULL, no default
 Nullable<"text">             // nullable
-Generated<"int4">            // has a default / identity / serial → optional on INSERT
-NullableGenerated<"text">
+Generated<"int4">            // has a default / identity / serial: optional on INSERT
+NullableGenerated<"text">    // both
 Arr<"int4">                  // int4[]
 Enum<"mood">                 // values in DB["$types"]["mood"]
 Json<Item[]>                 // jsonb holding Item[]; Json<T, { nullable: true }, "json"> for json
@@ -253,124 +213,99 @@ interface DB { users: {...}; auth: { sessions: {...} }; $types: { mood: "a" | "b
 type WithCatalog = DB & PgCatalog;  // opt-in pg_catalog / information_schema slice
 ```
 
-`PgCatalog` is `{ pg_catalog: PgCatalogNamespace; information_schema: InformationSchemaNamespace }`.
-Unqualified names that are not in the schema resolve against `DB["pg_catalog"]`, as Postgres
-always searches `pg_catalog`; see [System catalogs](../guide/schema#system-catalogs).
-
-Type names are Postgres names; spellings are normalized (`integer` → `int4`, `bigint` →
-`int8`, `boolean` → `bool`, `timestamp with time zone` → `timestamptz`, `serial` → `int4`
-with a default, …). Unknown names are kept as-is (user enums/domains) and resolve to
-`DB["$types"]` or `unknown`.
+`PgCatalog` is `{ pg_catalog: PgCatalogNamespace; information_schema: InformationSchemaNamespace }`. See [Declaring tables](../guide/schema) for type names and [System catalogs](../guide/schema#system-catalogs).
 
 ## Type maps
 
-A type map is `{ [pgTypeName]: TsType }`. Resolution order: exact entry (so a map may define
-`"numeric[]": number[]`), then `T[]` element-wise, then `DB["$types"]`, then `unknown`.
-Nullable columns add `| null`. `DefaultTypeMap` matches node-postgres defaults (`int8` and
-`numeric` as `string`, dates as `Date`, `json/jsonb` as `unknown`). A `json` / `jsonb` value with
-a known shape (`Json<T>` columns, JSON built in SQL) is typed from the shape, unless the map reads
-that type as a `string`.
+| Export | Meaning |
+|---|---|
+| `DefaultTypeMap` | node-postgres defaults; what core's `createSql` uses |
+| `DefaultParamTypeMap` | what parameters accept when a map has no `$params` |
+| `PgTypeMap`, `PgParamTypeMap` | `@typesql/pg` |
+| `PostgresJsTypeMap`, `PostgresJsBigIntTypeMap`, `PostgresJsParamTypeMap` | `@typesql/postgres` |
+| `PrismaTypeMap` | `@typesql/prisma` |
+| `ParamTypeMapOf<TM>` | the parameter map in effect for `TM` |
+| `TsParamTypeOf<TM, DB, T>` | what a parameter of Postgres type `T` accepts |
 
-Parameters accept the row type plus the map's `$params` entry for the type
-(`TsParamTypeOf<TM, DB, T>`); array elements also accept `null`. A map without `$params` uses
-`DefaultParamTypeMap` (`int8`/`numeric`/`money`: `number | bigint | string`; dates and
-timestamps: `Date | string`; `interval`: `string`; `bytea`: `Uint8Array`). `PgTypeMap` and
-`PostgresJsTypeMap` set `$params` to `PgParamTypeMap` and `PostgresJsParamTypeMap`.
-`ParamTypeMapOf<TM>` is the input map in effect. See
-[parameter types](../guide/schema#parameter-types).
+The tables, the resolution order and custom maps are in [Type mapping](./type-mapping).
 
 ## Function catalog
 
-A function call is looked up in, in order:
+A function call is looked up in this order:
 
 1. `FunctionCatalog`: the built-in signatures, plus your augmentations.
-2. `DB["$functions"]`: functions declared on the schema (or by `CREATE FUNCTION` in migrations).
-3. The other `pg_catalog` functions: return type only, arguments not checked (generated by
-   `scripts/gen-pg-functions.ts`).
+2. `DB["$functions"]`: functions declared on the schema, or by `CREATE FUNCTION` in migrations.
+3. The other `pg_catalog` functions: return type only, arguments not checked.
 
-Schema qualification is ignored (`public.f(x)` is `f`). Any other name is an error:
-`function f(int4) does not exist. Declare it in the schema's $functions or in FunctionCatalog`.
-A known name whose overloads do not fit the arguments is `unknown` (nullable); a cast fixes it.
-
-Declare app and extension functions on the schema (`FunctionRegistry` is the key's type):
+Schema qualification is ignored (`public.f(x)` is `f`). Any other name is an error. A known name whose overloads don't fit the arguments is `unknown` (nullable); a cast fixes it. How to declare your own functions is in [Expressions and functions](../guide/queries#expressions-and-functions).
 
 ```ts
 interface DB {
   users: { … };
-  $functions: {
-    immutable_unaccent: Sig<["text"], "text">;
-    my_count: Sig<["any"], "int8", { agg: true; nullable: false }>;
-  };
+  $functions: { immutable_unaccent: Sig<["text"], "text"> }; // this schema only
 }
-```
 
-or, for every schema, augment `FunctionCatalog`:
-
-```ts
 declare module "@typesql/core" {
   interface FunctionCatalog {
-    my_func: Sig<["text", "int4"], "bool">;                 // strict: nullable if any arg is
-    my_count: Sig<["any"], "int8", { agg: true; nullable: false }>;
+    my_count: Sig<["any"], "int8", { agg: true; nullable: false }>; // every schema
   }
 }
 ```
 
-To review the catalog against a Postgres release, `scripts/catalog-from-pg.ts` prints every
-`pg_proc` overload of each catalog function (argument and return types, strict / aggregate /
-window / set-returning flags) and lists catalog names Postgres does not have:
+### Signatures
 
-```sh
-TYPESQL_PG_URL=postgres://postgres:x@localhost:5432/postgres node scripts/catalog-from-pg.ts [names…]
-```
+An entry is one `Sig<Params, Return, Flags>` or a tuple of overloads. `FunctionRegistry` is the type of a `$functions` entry.
 
-Parameter patterns: exact type name, `any`, `anynumeric`, `anystring`, `anyarray`,
-`anyjson`, `anydatetime`, `...` (variadic). Return patterns: exact name, `$1`..`$4`,
-`$elem1`, `$arr1`, `$common`, `$sum1`, `$avg1`, and the typed-JSON patterns `$jval:json`
-(`to_json`), `$jarr:json` (`json_agg`), `$jrec:json` (`json_object_agg`), `$jtup:json`
-(`json_build_array`), `$jelem:json` (`json_array_elements`), with `jsonb` for the jsonb
-variants. Flags: `strict`, `nullable`, `agg`, `window`, `srf`. An entry is one `Sig` or a
-tuple of overloads.
+| Part | Values |
+|---|---|
+| Parameter patterns | an exact type name, `any`, `anynumeric`, `anystring`, `anyarray`, `anyjson`, `anydatetime`, `...` (variadic) |
+| Return patterns | an exact name, `$1`..`$4`, `$elem1`, `$arr1`, `$common`, `$sum1`, `$avg1` |
+| Typed-JSON return patterns | `$jval:json` (`to_json`), `$jarr:json` (`json_agg`), `$jrec:json` (`json_object_agg`), `$jtup:json` (`json_build_array`), `$jelem:json` (`json_array_elements`); `jsonb` for the jsonb variants |
+| Flags | `strict` (the default: nullable if any argument is), `nullable`, `agg`, `window`, `srf` |
+
+## Migrations
+
+| Export | Meaning |
+|---|---|
+| `migrations<DB = {}>()` | a builder of DDL statements whose type tracks the schema |
+| `SchemaOf<M>` | the schema of a builder |
+| `runMigrations(client, m)` | runs `m.statements` in one transaction (`@typesql/core`) |
+| `migrate(db, m)` | the same, from `@typesql/pg` and `@typesql/postgres` |
+
+See [DDL support](./ddl#migrations) and [From migrations](../guide/migrations).
 
 ## ORM packages
 
-Each package wraps core's `createSql` with the schema converted from the ORM's types; see the
-[Kysely](../adapters/kysely), [Drizzle](../adapters/drizzle) and [Prisma](../adapters/prisma)
-adapter pages.
+Each package wraps core's `createSql` with the schema converted from the ORM's types. See [From Kysely, Drizzle or Prisma](../guide/orms).
 
 | Package | `createSql` | Schema type | Runs queries |
 |---|---|---|---|
-| `@typesql/kysely` | `createSql<DB, TM = DefaultTypeMap, Overrides = {}, Options = {}>(db?, { rowKeys? })` | `FromKysely<DB, Overrides, Options>` | on a `Kysely` or `Transaction`, plugins bypassed; `sql.transaction` in `db.transaction()` |
-| `@typesql/drizzle` | `createSql<Schema, TM = DefaultTypeMap, Options = {}>(db?)` | `FromDrizzle<Schema, Options>`; `pgType(column, "type")` pins a column | on the driver client under a node-postgres or postgres.js Drizzle database or transaction; `sql.transaction` in `db.transaction` |
-| `@typesql/prisma` | `createSql<S, TM = PrismaTypeMap>(prisma?)`; `S` is a generated `DB` or a `Prisma.TypeMap` | `FromPrisma<Prisma.TypeMap, Overrides>`; the `typesql-prisma` generator | `$queryRawUnsafe` / `$executeRawUnsafe` on Prisma Client or a transaction client; `sql.transaction` in `prisma.$transaction(fn)` |
+| `@typesql/kysely` | `createSql<DB, TM = DefaultTypeMap, Overrides = {}, Options = {}>(db?, { rowKeys? })` | `FromKysely<DB, Overrides, Options>` | on a `Kysely` or `Transaction`, plugins bypassed |
+| `@typesql/drizzle` | `createSql<Schema, TM = DefaultTypeMap, Options = {}>(db?)` | `FromDrizzle<Schema, Options>`; `pgType(column, "type")` pins a column | on the driver client under a node-postgres or postgres.js Drizzle database |
+| `@typesql/prisma` | `createSql<S, TM = PrismaTypeMap>(prisma?)`; `S` is a generated `DB` or a `Prisma.TypeMap` | `FromPrisma<Prisma.TypeMap, Overrides>`; the `typesql-prisma` generator | `$queryRawUnsafe` / `$executeRawUnsafe` on Prisma Client |
 
-Option and override types: `KyselyOverrides`, `KyselyOptions` (`camelCase`),
-`FromDrizzleOptions` (`casing`, `timestamp`, `time`), `PrismaOverrides` (`$table`, `$schema`,
-per-field `{ column, type, nullable, default }`). The generator's pieces are exported from
-`@typesql/prisma/generator` (`generateSource`, `serveGenerator`).
+| Option type | Fields |
+|---|---|
+| `KyselyOverrides` | per table and column: a type name or `{ type?, nullable?, hasDefault? }`; `$view: true` |
+| `KyselyOptions` | `camelCase` |
+| `FromDrizzleOptions` | `casing`, `timestamp`, `time` |
+| `PrismaOverrides` | `$table`, `$schema`, per field `{ column, type, nullable, default }` |
+
+The Prisma generator's pieces are exported from `@typesql/prisma/generator` (`generateSource`, `serveGenerator`).
 
 ## Introspection
 
-`typesql introspect` (bin of `@typesql/pg`) writes the schema of a live database; see
-[Introspection](../guide/introspect).
+`typesql introspect` (the bin of `@typesql/pg`) writes the schema of a live database. See [From a live database](../guide/introspect) for the options.
 
 ```sh
 typesql introspect [--url <url>] [--out <file>] [--schema <name>]… [--exclude <pattern>]… [--type-name DB]
                    [--import-from @typesql/core] [--config <file>] [--no-comments]
 ```
 
-`@typesql/pg/introspect` exports:
-
-| Export | |
+| Export of `@typesql/pg/introspect` | Meaning |
 |---|---|
 | `introspect(client, { schemas?, exclude?, viewNotNull? })` | `Promise<IntrospectedDatabase>`: `{ version, schemas, relations, enums }` |
-| `generateSource(db, options?)` | the schema file's source; options `typeName`, `importFrom`, `imports`, `columnTypes` (map or function; json / jsonb columns become `Json<T>`), `column`, `comments` |
-| `main(argv)` | the CLI, returns the exit code |
+| `generateSource(db, options?)` | the schema file's source; options `typeName`, `importFrom`, `imports`, `columnTypes`, `column`, `comments` |
+| `main(argv)` | the CLI; returns the exit code |
 | `IntrospectConfig` | the default export of a `--config` module: `url`, `out` and every option above |
 | `ViewNullability`, `parseNodeTree` | the view column nullability analysis |
-
-
-- Statement size: up to 4096 tokens (the generated `Next` table; regenerate with
-  `node scripts/gen-next.ts <n>` for more). 8 KB statements check in about a second.
-- Left-nested `||` or `+` chains of ~100 terms hit TypeScript's instantiation depth;
-  `AND`/`OR` chains are balanced by the parser and are fine at 200+ terms.
-- For anything the engine rejects, `sql.as<Row>()` is the documented escape hatch.

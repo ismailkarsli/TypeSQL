@@ -60,7 +60,7 @@ The `LEFT JOIN` makes `title` nullable, and `$1` takes the type of `u.id`.
 
 ## Use with Kysely, Drizzle or Prisma
 
-Already have a schema in one of them? `@typesql/kysely`, `@typesql/drizzle` and `@typesql/prisma` turn it into the one TypeSQL needs. See [ORM schemas](https://typesql.karsli.net/adapters/#orm-schemas).
+Already have a schema in one of them? `@typesql/kysely`, `@typesql/drizzle` and `@typesql/prisma` turn it into the one TypeSQL needs. See [From Kysely, Drizzle or Prisma](https://typesql.karsli.net/guide/orms).
 
 ## Editor support
 

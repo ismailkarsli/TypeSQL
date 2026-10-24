@@ -1,37 +1,50 @@
-# Queries
+# Selecting data
 
-Everything below is inferred from the SQL text alone. The comments show the row type the
-compiler reports; each example is type-checked as part of this site's build.
+This page shows what TypeSQL infers from a `SELECT`: column names, column types and when a column can be `NULL`. The comments in the examples show the row type the compiler reports. For the full list of supported syntax, see [Supported SQL](../reference/sql).
 
 ## Joins and nullability
 
-Columns are nullable when the schema says so, and also when an outer join can fill them with
-`NULL`: the right side of a `LEFT JOIN`, the left side of a `RIGHT JOIN`, both sides of a
-`FULL JOIN`. Views are read like tables.
+A column is nullable when the schema says so. It is also nullable when an outer join can fill it with `NULL`:
+
+- the right side of a `LEFT JOIN`
+- the left side of a `RIGHT JOIN`
+- both sides of a `FULL JOIN`
 
 <<< @/snippets/queries.ts#joins
 
-`posts` is a `string` here because `count(*)`-style `int8` values are strings under
-node-postgres; see [type maps](./schema#type-maps).
+Views are read like tables. `posts` is a `string` here because `count(*)`-style `int8` values are strings under node-postgres. See [Type mapping](../reference/type-mapping).
+
+## Narrowing with WHERE
+
+A condition that rules out `NULL` makes the column non-null in the result. This works in `WHERE` and in an inner join's `ON`.
+
+<<< @/snippets/queries.ts#narrowing
+
+These conditions narrow: `IS NOT NULL`, comparisons such as `= $1` or `> 0`, `LIKE`, `IN` and `BETWEEN`.
+
+Narrowing only goes through a top-level `AND`. `OR` and `NOT` never narrow.
 
 ## Column names
 
-Unaliased expressions get the names Postgres gives them: a column keeps its name, a function
-call is named after the function, a cast keeps the name of what it casts, `CASE` is `case`, and
-anything else is `?column?`. When two columns have the same name, the last one wins, as in the
-row objects the drivers build.
+A column you don't alias gets the name Postgres gives it:
 
 <<< @/snippets/queries.ts#naming
 
+- A column keeps its name.
+- A function call is named after the function.
+- A cast keeps the name of what it casts.
+- `CASE` is named `case`.
+- Anything else is `?column?`.
+
+When two columns have the same name, the last one wins. The drivers build their row objects the same way.
+
 ### camelCase row keys
 
-`createSql(executor, { rowKeys: "camelCase" })` renames the top-level keys of every row, in the
-row types and in the rows `execute*` returns. The SQL keeps the database's names:
+Pass `{ rowKeys: "camelCase" }` to `createSql` to get camelCase keys. The row types and the rows `execute*` returns both change. The SQL keeps the database's names.
 
 <<< @/snippets/queries.ts#row-keys
 
-The mapping is the one Kysely's `CamelCasePlugin` uses by default: the first character stays,
-every later `_` is dropped, and the character after a `_` is upper-cased. Nothing else changes.
+The mapping is the default of Kysely's `CamelCasePlugin`: the first character stays, every later `_` is dropped, and the character after a `_` becomes upper case.
 
 | Column | Key |
 |---|---|
@@ -42,73 +55,45 @@ every later `_` is dropped, and the character after a `_` is upper-cased. Nothin
 | `HTTP_CODE` | `HTTPCODE` |
 | `fooBar`, `?column?`, `count` | unchanged |
 
-- Only the top-level keys are renamed. Values are left alone, so keys inside `json`/`jsonb`
-  values stay as stored (`CamelCasePlugin` would rename those too).
-- If two columns map to the same key (`user_id` and `"userId"`), the later column wins at
-  runtime, as with duplicate column names. The type is then the union of both columns' types.
-  Alias one of them to keep both.
-- `sql.as<Row>()` asserts the row as returned, so give it camelCase keys.
-- `RowOf<DB, TM, Q>` still describes the database's names. `RowType<typeof q>` is the renamed row.
-- The adapters' `createSql(client, { rowKeys: "camelCase" })` take the option too, and the
-  `sql` that `sql.transaction(fn)` passes keeps it.
-- The types assume the driver returns the database's names, so leave driver-level renaming
-  such as postgres.js' `transform: postgres.camel` off. `@typesql/kysely` already bypasses
-  Kysely plugins such as `CamelCasePlugin`.
+Things to know:
+
+- Only top-level keys are renamed. Keys inside `json` and `jsonb` values stay as stored.
+- If two columns map to the same key (`user_id` and `"userId"`), the later one wins at runtime and the type is the union of both. Alias one of them to keep both.
+- `sql.as<Row>()` takes the row as returned, so give it camelCase keys.
+- `RowOf<DB, TM, Q>` still uses the database's names. `RowType<typeof q>` is the renamed row.
+- The adapters' `createSql(client, { rowKeys: "camelCase" })` take the option too, and `tx` inside `sql.transaction(fn)` keeps it.
+- Turn off renaming in the driver, such as postgres.js' `transform: postgres.camel`. The types assume the driver returns the database's names. `@typesql/kysely` already bypasses Kysely plugins such as `CamelCasePlugin`.
 
 ## Aggregates
 
-`count` is never null. Other aggregates are nullable when their argument is, and also when
-there is no `GROUP BY`, because an aggregate over zero rows returns `NULL`. `sum` of integers is
-`int8` (or `numeric` for `int8` input), `avg` is `numeric`, as in Postgres.
+`count` is never null. Other aggregates are nullable when their argument is nullable. Without a `GROUP BY` they are always nullable, because an aggregate over zero rows returns `NULL`.
 
 <<< @/snippets/queries.ts#aggregates
 
-Window functions work the same way: `row_number()`, `rank()` and friends are non-null `int8`;
-`lag()`, `lead()` and `first_value()` are nullable.
+Result types follow Postgres: `sum` of integers is `int8` (`numeric` for `int8` input), and `avg` is `numeric`.
+
+Window functions work the same way. `row_number()`, `rank()` and similar functions are non-null `int8`. `lag()`, `lead()` and `first_value()` are nullable.
 
 ## Subqueries, CTEs and set operations
 
-Scalar subqueries are always nullable (they can return no row). `EXISTS` is a non-null
-boolean. CTEs, including `WITH RECURSIVE`, become tables for the rest of the statement. In
-`UNION`, `INTERSECT` and `EXCEPT`, column names come from the first branch, types are combined
-per position, and a column is nullable if any branch can produce `NULL` there.
-
 <<< @/snippets/queries.ts#structure
 
-Also supported: derived tables (`FROM (SELECT …) AS t(a, b)`), `LATERAL`, `VALUES` lists,
-set-returning functions such as `generate_series`, `unnest` and `jsonb_each` in `FROM`, `ROWS
-FROM (f(…), g(…)) WITH ORDINALITY` (zipped, so every column is nullable), `TABLESAMPLE`, nested
-joins (`a JOIN b LEFT JOIN c ON … ON …`, `((SELECT …) s JOIN t ON …) j`), `SEARCH` / `CYCLE` on
-recursive CTEs (their columns are added to the CTE), `DISTINCT ON`, named windows, `FOR UPDATE`,
-and `ORDER BY` / `GROUP BY` by alias or position.
+- A scalar subquery is always nullable, because it can return no row.
+- `EXISTS` is a non-null boolean.
+- A CTE, including `WITH RECURSIVE`, works like a table for the rest of the statement.
+- In `UNION`, `INTERSECT` and `EXCEPT`, column names come from the first branch. A column is nullable if any branch can return `NULL` there.
 
-`DECLARE name CURSOR FOR query` checks the query and types its parameters like a `SELECT`; the
-statement itself returns no rows. `FETCH`, `MOVE` and `CLOSE` are checked for syntax only:
-the cursor's query is another statement, so a `FETCH` has no row type (assert one with
-`sql.as<Row>("FETCH 10 FROM c")`).
-
-## Whole-row references
-
-A table alias used as a value is the whole row: `to_json(t)`, `json_agg(t)`, `row_to_json(t.*)`,
-`t IS NULL`. As in Postgres, a column of that name wins over the alias. `(t).col` reads one
-column and `(t).*` expands to all of them. The row on the outer side of a join is nullable, and
-so are its columns.
-
-<<< @/snippets/queries.ts#wholerow
-
-Selecting the row itself (`SELECT t FROM …`) gives the `record` type of the type map: the
-drivers return its text form, such as `"(1,ada@example.com)"`.
+Derived tables, `LATERAL`, `VALUES`, set-returning functions in `FROM`, cursors and more are covered in [Supported SQL](../reference/sql).
 
 ## JSON
 
-JSON built in SQL is typed: `json_build_object` with literal keys is an object,
-`json_build_array` a tuple, `json_agg(x)` an array of `x`, `json_object_agg` an object with
-arbitrary keys, and `to_json(t)` of a whole row an object with one key per column. They nest,
-so a correlated `json_agg` subquery replaces a second round trip:
+JSON you build in SQL is typed. Nested `json_agg` subqueries can replace a second round trip:
 
 <<< @/snippets/queries.ts#json
 
-Values inside JSON are typed the way Postgres serializes them, not by the type map:
+`json_build_object` with literal keys is an object, `json_build_array` a tuple, and `json_agg(x)` an array of `x`. In `CASE`, `COALESCE` and `UNION` the branches' shapes are combined (`{ a: number } | { b: string }`). The SQL/JSON standard syntax (`JSON_OBJECT`, `JSON_TABLE`, …) is typed too; see [Supported SQL](../reference/sql#json-and-sql-json).
+
+Values inside JSON are typed the way Postgres writes them as JSON, not by the type map:
 
 | Postgres type | Inside JSON |
 |---|---|
@@ -118,68 +103,48 @@ Values inside JSON are typed the way Postgres serializes them, not by the type m
 | enums | the enum's values |
 | arrays, `json`, `jsonb`, whole rows | arrays, the embedded value, objects |
 
-`json_agg` keeps `NULL` inputs as `null` elements and is `NULL` over zero rows: outside a
-`GROUP BY` it is nullable, and `coalesce(json_agg(…), '[]')` makes it a plain array. In `CASE`,
-`COALESCE` and `UNION` the branches' shapes are combined (`{ a: number } | { b: string }`).
+`json_agg` returns `NULL` over zero rows, so outside a `GROUP BY` it is nullable. `coalesce(json_agg(…), '[]')` makes it a plain array. `NULL` inputs stay as `null` elements.
 
-`->`, `#>` and jsonb subscripts follow a known shape: a literal key or index (`-> 'tags' -> 0`,
-`#> '{tags,0}'`, `['tags'][0]`) gives that member, a missing key or an index past the end gives
-`null`, and a non-literal key or index any member. The result is always nullable. `->>` and
-`#>>` are `string | null`. A `json` / `jsonb` column with no declared shape stays `unknown`;
-declare it as a [typed JSON column](./schema#typed-json-columns) to give it one.
+### Reading JSON
+
+`->`, `#>` and jsonb subscripts follow a known shape:
 
 <<< @/snippets/queries.ts#jsonread
 
-The SQL/JSON standard syntax of PostgreSQL 16+ is typed the same way. `JSON_OBJECT(k VALUE v, …)`
-is a `json_build_object` (never `NULL`), `JSON_ARRAY(a, b)` a tuple and `JSON_ARRAY(SELECT …)`
-an array of the query's column, `JSON_ARRAYAGG` / `JSON_OBJECTAGG` are `json_agg` /
-`json_object_agg` (`RETURNING jsonb` makes them `jsonb`). Arrays skip `NULL`s by default, and so
-does `ABSENT ON NULL`: when a nullable value may be left out, the result is plain JSON.
-`JSON_VALUE` is `text` (or its `RETURNING` type), `JSON_QUERY` `jsonb`, `JSON_EXISTS` and
-`IS [NOT] JSON` `bool`. `JSON_TABLE(…)` in `FROM` has the declared columns, all nullable but a
-top-level `FOR ORDINALITY` (`int4`), and sees the `FROM` items before it. Write object pairs as
-`k VALUE v`: in `k: v` the `: v` is read as a [named parameter](./parameters#named-name) when
-`v` is a name.
+- A literal key or index (`-> 'tags' -> 0`, `#> '{tags,0}'`, `['tags'][0]`) gives that member.
+- A missing key, or an index past the end, gives `null`.
+- A key or index that is not a literal gives any member.
+- The result is always nullable. `->>` and `#>>` are `string | null`.
 
-## Narrowing with WHERE
+A `json` or `jsonb` column with no declared shape stays `unknown`. Declare it as a [typed JSON column](./schema#typed-json-columns) to give it one. Typed JSON needs literal keys and paths; see [Limits](./limits).
 
-Conditions in `WHERE` (and in an inner join's `ON`) that rule out `NULL` make the column
-non-null in the result: `IS NOT NULL`, comparisons such as `= $1` or `> 0`, `LIKE`, `IN`,
-`BETWEEN`. Narrowing goes through top-level `AND` only; `OR` and `NOT` never narrow.
+## Whole-row references
 
-<<< @/snippets/queries.ts#narrowing
+A table alias used as a value is the whole row: `to_json(t)`, `json_agg(t)`, `row_to_json(t.*)`, `t IS NULL`.
+
+<<< @/snippets/queries.ts#wholerow
+
+- `(t).col` reads one column, and `(t).*` expands to all of them.
+- As in Postgres, a column with the alias's name wins over the alias.
+- A row on the outer side of a join is nullable, and so are its columns.
+- `SELECT t FROM …` gives the type map's `record` type. The drivers return its text form, such as `"(1,ada@example.com)"`.
 
 ## Expressions and functions
 
-Operators follow Postgres's rules: numeric promotion (`int4 + int8` is `int8`), date
-arithmetic (`timestamptz - timestamptz` is an `interval`), JSON operators (`->>` is `text`),
-string and array concatenation, comparisons, `IS [NOT] DISTINCT FROM`, `BETWEEN`, `LIKE`,
-regular expressions, `ANY`/`ALL`, casts in both spellings, `ARRAY[…]`, subscripts and slices,
-`EXTRACT`, `SUBSTRING … FROM … FOR`, `TRIM`, `POSITION`, `AT TIME ZONE`.
+Operators follow Postgres's rules. For example, `int4 + int8` is `int8`, `timestamptz - timestamptz` is an `interval`, and `->>` is `text`.
 
-SQL/XML is typed too: `XMLELEMENT(NAME n, XMLATTRIBUTES(…), …)`, `XMLFOREST`, `XMLCONCAT`,
-`XMLPI`, `XMLROOT`, `XMLPARSE` and `XMLEXISTS(… PASSING …)` have Postgres's types and null
-handling (`XMLELEMENT` is never `NULL`, `XMLFOREST` only when every value is),
-`XMLSERIALIZE(… AS type)` has the type you name, and `x IS [NOT] DOCUMENT` is a boolean.
-`XMLTABLE(… PASSING doc COLUMNS …)` in `FROM` gives the declared columns: nullable unless they
-are `NOT NULL`, `FOR ORDINALITY` or have a non-null `DEFAULT`.
+About 450 built-in functions are typed with their argument types, return types and null handling, and every other `pg_catalog` function by its return type. See [Supported SQL](../reference/sql#functions) for what's covered.
 
-About 450 built-in functions are typed with their Postgres argument types, return types and
-null handling: string, numeric, date/time, JSON, array, aggregate and window functions,
-function-style casts (`date(ts)`, `int8(x)`) and common extensions (`pgcrypto`, `uuid-ossp`,
-`unaccent`, `pg_trgm`, `fuzzystrmatch`). Every other `pg_catalog` function is known with its
-return type; its arguments are not checked.
-
-A function Postgres would not find is an error, with a hint when a known name is close:
+A function Postgres would not find is an error. A close known name gives a hint:
 
 <<< @/snippets/queries.ts#unknown-function
 
-Declare your own and extension functions next to the tables, under `$functions`. The
-signatures use the notation of the [function catalog](../reference/api#function-catalog):
+Declare your own functions and extension functions next to the tables, under `$functions`. The signatures use the notation of the [function catalog](../reference/api#function-catalog):
 
 <<< @/snippets/queries.ts#functions
 
-Alternatively, augment `FunctionCatalog` (for every schema, and the simplest route with the
-Kysely, Drizzle and Prisma schema packages), or create the function in your
-[migrations](./migrations): `CREATE FUNCTION` records its return type. A cast gives an
-untyped result a type (`my_fn(x)::int4`).
+You can also:
+
+- augment `FunctionCatalog`, which works for every schema and is the simplest way with the Kysely, Drizzle and Prisma schema packages;
+- create the function in your [migrations](./migrations): `CREATE FUNCTION` records its return type;
+- cast an untyped result: `my_fn(x)::int4`.
