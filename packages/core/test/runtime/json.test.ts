@@ -1,12 +1,8 @@
 import { describe, expect, it } from "vitest";
-import {
-	createSql,
-	type Generated,
-	type Json,
-	JsonParam,
-	json,
-} from "../../src/index.js";
+import { JsonParam } from "../../src/adapter.js";
+import { createSql, type Generated, type Json } from "../../src/index.js";
 import { pendingParams } from "../../src/runtime/inline.js";
+import { json } from "../../src/runtime/json.js";
 
 interface DB {
 	docs: {
@@ -88,17 +84,14 @@ describe("sql.json() in sql.set and sql.values", () => {
 		expect(pendingParams()).toBe(before);
 	});
 
-	it("unwraps sql.param() and sql.valueOrDefault() values too", () => {
+	it("unwraps sql.param() values too, undefined included", () => {
 		const set = sql.set("docs", {
 			id: sql.param(1) as unknown as number,
-			meta: sql.valueOrDefault(undefined) as unknown as null,
+			meta: sql.param(undefined) as unknown as null,
 		});
 		expect(set).toEqual({ text: '"id" = $1', values: [1] });
 		const v = sql.values("docs", [
-			{
-				items: sql.json([]),
-				id: sql.valueOrDefault(undefined) as unknown as number,
-			},
+			{ items: sql.json([]), id: sql.param(undefined) as unknown as number },
 		]);
 		expect(v.text).toBe('("items") VALUES ($1)');
 	});

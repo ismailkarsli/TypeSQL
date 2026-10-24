@@ -2,7 +2,7 @@
 // are typed by what postgres.js parses: int8 is a string, or a bigint with BigInt parsing on.
 
 import type { Col, Generated, Nullable } from "@typesql/core";
-import { createBigIntSql, createSql } from "@typesql/postgres";
+import { createSql } from "@typesql/postgres";
 import type { Sql } from "postgres";
 
 interface DB {
@@ -31,7 +31,7 @@ const posts = await sql(
 
 // On a connection with `types: { bigint: postgres.BigInt }`, int8 and count(*) come back as bigint.
 declare const dbBig: Sql<{ bigint: bigint }>;
-const big = createBigIntSql<DB>(dbBig);
+const big = createSql<DB>(dbBig, { bigint: true });
 const counts = await big(
 	`SELECT author_id, count(*) AS n FROM posts GROUP BY author_id`,
 ).execute();

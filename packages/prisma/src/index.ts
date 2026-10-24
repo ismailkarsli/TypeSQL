@@ -1,13 +1,9 @@
-import { createTransactionalSql, type TransactionalSql } from "@typesql/core";
+import type { TransactionalSql } from "@typesql/core";
+import { createTransactionalSql } from "@typesql/core/adapter";
 import { driver, type PrismaRawClient } from "./client.js";
 import type { FromPrisma, PrismaTypeMapLike } from "./from-prisma.js";
 import type { PrismaTypeMap } from "./type-map.js";
 
-export {
-	type Executor,
-	NoResultError,
-	type TransactionalSql,
-} from "@typesql/core";
 export { executor, type PrismaRawClient } from "./client.js";
 export type {
 	FieldOverride,

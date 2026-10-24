@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
-	type Col,
 	createTransactionalSql,
-	type DefaultTypeMap,
-	type Executor,
-	type Generated,
 	runTransaction,
 	type SqlDriver,
+} from "../../src/adapter.js";
+import type {
+	Col,
+	DefaultTypeMap,
+	Executor,
+	Generated,
 } from "../../src/index.js";
 
 interface DB {

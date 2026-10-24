@@ -47,7 +47,7 @@ sql(`INSERT INTO users (email) VALUES (${sql.param(maybeEmail /* string | null *
 
 Strings are accepted for enum columns, and any object for JSON and other object-typed columns (arrays for JSON go through [`sql.json()`](#json-values)). With no context (`SELECT ${sql.param(x)}`), anything is accepted. `sql.param()` inside quotes or a comment is an error.
 
-`sql.valueOrDefault(value)` works like `sql.param()`, but sends `DEFAULT` when the value is `undefined`. See [Inserting and updating](./writing-data#optional-values-sql-valueordefault).
+A value that is `undefined` is sent as `DEFAULT`, and one that can be `undefined` is only accepted where `DEFAULT` is. See [Inserting and updating](./writing-data#optional-values).
 
 ::: warning One statement per value
 A `sql.param()` value belongs to one statement. Using the same value in a second statement throws at runtime. To reuse a value, wrap it in a [fragment](./dynamic-sql), which can be spliced any number of times.

@@ -10,7 +10,7 @@ npm install @typesql/core @typesql/postgres postgres
 
 ## Create `sql`
 
-Pass your postgres.js connection to `createSql`. If the connection parses `int8` to `bigint`, use `createBigIntSql` instead:
+Pass your postgres.js connection to `createSql`. If the connection parses `int8` to `bigint`, pass `{ bigint: true }`:
 
 <<< @/snippets/adapters.ts#postgresjs
 

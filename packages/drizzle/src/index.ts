@@ -1,22 +1,8 @@
-import {
-	createTransactionalSql,
-	type DefaultTypeMap,
-	type TransactionalSql,
-} from "@typesql/core";
+import type { DefaultTypeMap, TransactionalSql } from "@typesql/core";
+import { createTransactionalSql } from "@typesql/core/adapter";
 import { type DrizzleDatabase, driver } from "./client.js";
 import type { FromDrizzle, FromDrizzleOptions } from "./from-drizzle.js";
 
-export type {
-	DefaultTypeMap,
-	Executor,
-	ParamsType,
-	Query,
-	RowType,
-	Sql,
-	TransactionalSql,
-	TypeMap,
-} from "@typesql/core";
-export { NoResultError } from "@typesql/core";
 export { type DrizzleDatabase, executor } from "./client.js";
 export type {
 	DrizzleColumnTypes,

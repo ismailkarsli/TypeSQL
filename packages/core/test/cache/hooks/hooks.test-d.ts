@@ -1,6 +1,6 @@
 import { expectTypeOf, test } from "vitest";
+import type { Analyze, ValidateDdl } from "../../../src/engine/index.js";
 import {
-	type Analyze,
 	type ApplyDdl,
 	type Col,
 	createSql,
@@ -10,7 +10,6 @@ import {
 	type RowOf,
 	type SchemaOf,
 	type SqlError,
-	type ValidateDdl,
 } from "../../../src/index.js";
 import "./cache.js";
 

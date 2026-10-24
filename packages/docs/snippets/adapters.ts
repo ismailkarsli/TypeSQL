@@ -145,7 +145,7 @@ const posts = await sqlJs(
 const dbBig = postgres(process.env["DATABASE_URL"]!, {
 	types: { bigint: postgres.BigInt },
 });
-const big = pgjs.createBigIntSql<DB>(dbBig); // PostgresJsBigIntTypeMap
+const big = pgjs.createSql<DB>(dbBig, { bigint: true }); // PostgresJsBigIntTypeMap
 const counts = await big(
 	"SELECT author_id, count(*) AS n FROM posts GROUP BY author_id",
 ).execute();

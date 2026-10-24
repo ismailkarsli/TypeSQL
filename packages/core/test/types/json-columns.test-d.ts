@@ -1,20 +1,22 @@
 import { expectTypeOf, test } from "vitest";
+import type {
+	ArgsOf,
+	JsonValue,
+	NonArrayOrSqlJson,
+	ParamsArgs,
+	SetRep,
+} from "../../src/engine/index.js";
 import {
-	type ArgsOf,
 	type Col,
 	createSql,
 	type DefaultTypeMap,
 	type Fragment,
 	type Generated,
 	type Json,
-	type JsonValue,
-	type NonArrayOrSqlJson,
-	type ParamsArgs,
 	type ParamsOf,
 	type ParamsType,
 	type RowOf,
 	type RowType,
-	type SetRep,
 	type SqlError,
 } from "../../src/index.js";
 

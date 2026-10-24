@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
+import { createSql } from "../../src/index.js";
 import {
-	createSql,
 	joinFragments,
 	maxParam,
 	quoteIdent,
 	renumberParams,
 	rewriteNamed,
 	splice,
-} from "../../src/index.js";
+} from "../../src/runtime/splice.js";
 
 describe("renumberParams", () => {
 	it("offsets placeholders outside literals and comments", () => {
@@ -130,7 +130,7 @@ describe("createSql runtime", () => {
 	});
 });
 
-describe("sql.list", () => {
+describe("sql.join over an array", () => {
 	interface DB {
 		users: {
 			id: { type: "int4"; nullable: false; hasDefault: true };
@@ -145,7 +145,7 @@ describe("sql.list", () => {
 	} as const;
 	it("joins a runtime array, repeating and renumbering elements", () => {
 		const keys: (keyof typeof SORT)[] = ["near", "email", "near"];
-		const order = sql.list(keys.map((k) => SORT[k]));
+		const order = sql.join(keys.map((k) => SORT[k]));
 		expect(order).toEqual({
 			text: "abs(id - $1), email, abs(id - $2)",
 			values: [5, 5],
@@ -159,12 +159,12 @@ describe("sql.list", () => {
 			text: "SELECT id FROM users WHERE id > $1 ORDER BY abs(id - $2), email, abs(id - $3)",
 			values: [0, 5, 5],
 		});
-		expect(sql.list([SORT.id, SORT.email], " AND ").text).toBe(
+		expect(sql.join([SORT.id, SORT.email], " AND ").text).toBe(
 			"id DESC AND email",
 		);
 	});
 	it("throws on an empty array", () => {
-		expect(() => sql.list([])).toThrow(/sql.list\(\) needs at least one item/);
+		expect(() => sql.join([])).toThrow(/sql.join\(\) needs at least one item/);
 	});
 });
 

@@ -132,7 +132,7 @@ export class Session {
 		let { program, checker, sf } = await this.withProbe(PROBE_HEAD);
 		let printer = new Printer(checker, sf, o.isCorePath);
 		const print = async (t: Type): Promise<string> =>
-			coreNames(await printer.print(t), ["@typesql/core"]);
+			coreNames(await printer.print(t));
 		const include = (f: string): boolean =>
 			f !== this.probe &&
 			!f.endsWith(".d.ts") &&
@@ -163,9 +163,7 @@ export class Session {
 		};
 		const snap = async (t: Type | undefined): Promise<string | null> =>
 			t
-				? printer
-						.snapshot(t)
-						.then((s) => (s === null ? null : coreNames(s, ["@typesql/core"])))
+				? printer.snapshot(t).then((s) => (s === null ? null : coreNames(s)))
 				: MISSING;
 		const prop = async (
 			t: Type | undefined,
@@ -769,7 +767,7 @@ async function snapshotTypeMap(
 		const t = await checker.getTypeOfSymbol(p);
 		const v = await printer.snapshot(t);
 		if (v === null) return null;
-		parts.push(`${lit(p.name)}: ${coreNames(v, ["@typesql/core"])}`);
+		parts.push(`${lit(p.name)}: ${coreNames(v)}`);
 	}
 	return `{ ${parts.join("; ")} }`;
 }

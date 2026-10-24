@@ -13,7 +13,7 @@ import { acquireDatabase } from "./db.js";
 
 /**
  * Fragment helpers whose runtime text differs from the representative text the types check
- * (`sql.list`, `sql.set`, `sql.values`, `sql.valueOrDefault`): the SQL they generate must run
+ * (`sql.join`, `sql.set`, `sql.values`, `sql.param(undefined)`): the SQL they generate must run
  * on a real Postgres through both drivers.
  */
 interface DB {
@@ -85,7 +85,7 @@ describe.skipIf(!db)("fragment helpers against Postgres", () => {
 	});
 
 	describe.each(drivers)("$name", ({ name, run }) => {
-		test("sql.list: ORDER BY and WHERE from runtime arrays", async () => {
+		test("sql.join: ORDER BY and WHERE from runtime arrays", async () => {
 			const SORT = {
 				name: {
 					asc: sql.fragment("i.name"),
@@ -104,7 +104,7 @@ describe.skipIf(!db)("fragment helpers against Postgres", () => {
 				{ field: "price", dir: "desc" },
 				{ field: "name", dir: "asc" },
 			];
-			const order = sql.list([
+			const order = sql.join([
 				...sort.map(({ field, dir }) => SORT[field][dir]),
 				sql.fragment("i.id"),
 			]);
@@ -117,7 +117,7 @@ describe.skipIf(!db)("fragment helpers against Postgres", () => {
 				{ name: "c" },
 			]);
 
-			const near = sql.list([SORT.near.asc, SORT.name.asc]);
+			const near = sql.join([SORT.near.asc, SORT.name.asc]);
 			const q2 = sql(
 				"SELECT i.name FROM helper_items i WHERE i.price > $1 ORDER BY {near}",
 				{ near },
@@ -135,14 +135,14 @@ describe.skipIf(!db)("fragment helpers against Postgres", () => {
 				sql.fragment(`i.note IS NOT NULL`),
 				sql.fragment("i.name <> $1", "zzz"),
 			];
-			const where = sql.list(filters, " AND ");
+			const where = sql.join(filters, " AND ");
 			const q3 = sql("SELECT i.name FROM helper_items i WHERE {where}", {
 				where,
 			});
 			expect(await run(q3)).toEqual([{ name: "a" }]);
 		});
 
-		test("sql.values, sql.set and sql.valueOrDefault", async () => {
+		test("sql.values, sql.set and sql.param(undefined)", async () => {
 			const rows: {
 				name: string;
 				price: number;
@@ -194,14 +194,14 @@ describe.skipIf(!db)("fragment helpers against Postgres", () => {
 			const qty: number | undefined = rows[0]!.qty;
 			const note: string | null | undefined = rows[0]!.note;
 			const one = sql(
-				`INSERT INTO helper_items (name, price, qty, note) VALUES (${sql.param(`${name}-4`)}, 4, ${sql.valueOrDefault(qty)}, ${sql.valueOrDefault(note)}) RETURNING qty, note`,
+				`INSERT INTO helper_items (name, price, qty, note) VALUES (${sql.param(`${name}-4`)}, 4, ${sql.param(qty)}, ${sql.param(note)}) RETURNING qty, note`,
 			);
 			expect(one.text).toBe(
 				"INSERT INTO helper_items (name, price, qty, note) VALUES ($1, 4, DEFAULT, DEFAULT) RETURNING qty, note",
 			);
 			expect(await run(one)).toEqual([{ qty: 1, note: null }]);
 			const reset = sql(
-				`UPDATE helper_items SET qty = ${sql.valueOrDefault(undefined as number | undefined)} WHERE name = ${sql.param(`${name}-2`)} RETURNING qty`,
+				`UPDATE helper_items SET qty = ${sql.param(undefined as number | undefined)} WHERE name = ${sql.param(`${name}-2`)} RETURNING qty`,
 			);
 			expect(await run(reset)).toEqual([{ qty: 1 }]);
 			await run(

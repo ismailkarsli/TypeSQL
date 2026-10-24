@@ -1,6 +1,6 @@
 import { expectTypeOf, test } from "vitest";
+import type { Analyze } from "../../src/engine/index.js";
 import {
-	type Analyze,
 	type Col,
 	createSql,
 	type DefaultTypeMap,

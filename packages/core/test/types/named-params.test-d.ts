@@ -1,13 +1,12 @@
 import { expectTypeOf, test } from "vitest";
+import type { NamesOf, ParamsArgs } from "../../src/engine/index.js";
 import {
 	type Col,
 	createSql,
 	type DefaultTypeMap,
 	type Fragment,
 	type Generated,
-	type NamesOf,
 	type Nullable,
-	type ParamsArgs,
 	type Query,
 	type SqlError,
 	type Validate,

@@ -101,7 +101,7 @@ const SORT = {
 	},
 } as const;
 declare const sortBy: { field: keyof typeof SORT; dir: "asc" | "desc" }[]; // chosen by the user
-const order = sql.list([
+const order = sql.join([
 	...sortBy.map(({ field, dir }) => SORT[field][dir]),
 	sql.fragment("p.id"),
 ]);

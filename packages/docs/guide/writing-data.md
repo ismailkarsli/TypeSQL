@@ -73,19 +73,23 @@ A statement with `RETURNING`, `MERGE` included, can feed a `WITH` clause:
 
 <<< @/snippets/writing-data.ts#cte
 
-## Optional values: `sql.valueOrDefault`
+## Optional values
 
-`sql.valueOrDefault(value)` works like `sql.param(value)`, but sends `DEFAULT` when the value is `undefined`. The column's default stays in the database, so you don't copy it into a `coalesce(…)`:
+A `sql.param(value)` whose value is `undefined` sends `DEFAULT` instead of a parameter. The column's default stays in the database, so you don't copy it into a `coalesce(…)`:
 
-<<< @/snippets/writing-data.ts#value-or-default
+<<< @/snippets/writing-data.ts#optional-values
 
-The value is checked like a parameter, without `undefined`. When it can be `undefined`, the statement is checked a second time with `DEFAULT` in its place. So using it for a `NOT NULL` column without a default is an error, and so is using it outside a `VALUES` item or `SET` value:
+The value is checked like any parameter, without `undefined`. When it can be `undefined`, the statement is checked a second time with `DEFAULT` in its place. So such a value for a `NOT NULL` column without a default is an error, and so is one outside a `VALUES` item or `SET` value:
 
 ```ts
-sql(`INSERT INTO users (email) VALUES (${sql.valueOrDefault(maybeEmail)})`);
+sql(`INSERT INTO users (email) VALUES (${sql.param(maybeEmail)})`);
 // … SqlError<"null value in column \"email\" of relation \"users\" violates not-null constraint
-//            (sql.valueOrDefault() sends DEFAULT for undefined)", 4>
+//            (sql.param() sends DEFAULT for undefined)", 4>
+sql(`SELECT id FROM users WHERE email = ${sql.param(maybeEmail)}`);
+// … SqlError<"DEFAULT is not allowed in this context (sql.param() sends DEFAULT for undefined)", 7>
 ```
+
+Narrow the value first, or pass `maybeEmail ?? null` to send `NULL`. `sql.fragment(…)` refuses a value that can be `undefined`: a fragment is checked where it is spliced, with `$n` for its values, so a `DEFAULT` there couldn't be checked. `any` and `unknown` values are not checked.
 
 ## Partial updates: `sql.set`
 

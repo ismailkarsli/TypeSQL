@@ -1,10 +1,10 @@
-import {
-	createTransactionalSql,
-	type DefaultTypeMap,
-	type RowKeys,
-	type SqlOptions,
-	type TransactionalSql,
+import type {
+	DefaultTypeMap,
+	RowKeys,
+	SqlOptions,
+	TransactionalSql,
 } from "@typesql/core";
+import { createTransactionalSql } from "@typesql/core/adapter";
 import { driver, type KyselyExecutor } from "./client.js";
 import type {
 	FromKysely,
@@ -12,11 +12,6 @@ import type {
 	KyselyOverrides,
 } from "./from-kysely.js";
 
-export {
-	type Executor,
-	NoResultError,
-	type TransactionalSql,
-} from "@typesql/core";
 export { executor, type KyselyExecutor } from "./client.js";
 export type {
 	ColumnOverride,

@@ -1,6 +1,6 @@
 # API
 
-Everything `@typesql/core` exports, plus the extra exports of the adapter and ORM packages. Each entry links to the guide page that explains it.
+Everything `@typesql/core` exports, plus `@typesql/core/adapter` and the extra exports of the adapter and ORM packages. Each entry links to the guide page that explains it.
 
 ## `createSql`
 
@@ -19,7 +19,7 @@ The adapters export their own `createSql`, which takes the driver client and add
 | Package | `createSql` |
 |---|---|
 | `@typesql/pg` | `createSql<DB>(pool, options?)`, with `PgTypeMap` |
-| `@typesql/postgres` | `createSql<DB>(sql, options?)` with `PostgresJsTypeMap`; `createBigIntSql<DB>(sql, options?)` with `PostgresJsBigIntTypeMap` |
+| `@typesql/postgres` | `createSql<DB>(sql, options?)` with `PostgresJsTypeMap`, or `PostgresJsBigIntTypeMap` with `{ bigint: true }` |
 | `@typesql/kysely`, `@typesql/drizzle`, `@typesql/prisma` | see [ORM packages](#orm-packages) |
 
 ## `sql(text, ...params)`
@@ -51,17 +51,16 @@ sql("SELECT id FROM users WHERE id = :id AND email = :email", { id: 1, email: "x
 
 | Function | Sends |
 |---|---|
-| `sql.param(value)` (also `param`) | the value as a `$n` parameter |
-| `sql.json(value)` (also `json`) | the value as JSON text; `null` and `undefined` as SQL `NULL` |
-| `sql.valueOrDefault(value)` (also `valueOrDefault`) | the value, or `DEFAULT` when it is `undefined` |
+| `sql.param(value)` | the value as a `$n` parameter, or `DEFAULT` when it is `undefined` |
+| `sql.json(value)` | the value as JSON text; `null` and `undefined` as SQL `NULL` |
 
 - The value's type is checked against the parameter's type. Strings are accepted for enums, objects for JSON and other object-typed columns, and anything when there is no context.
 - Inline values are numbered after the statement's `$n` / `:name` parameters. Values carried by spliced fragments come last.
 - Each `sql.param()` belongs to one statement. Inside quotes or a comment it is an error.
 - `sql.json()` is an error unless the parameter is `json` / `jsonb` or has no context. A `Json<T>` column checks the value against `T`. A raw array for a JSON parameter is an error with `sql.param()` and as a call argument (`NonArrayOrSqlJson<T>`).
-- With `sql.valueOrDefault()`, a value that can be `undefined` makes the statement be checked a second time with `DEFAULT` in its place.
+- A `sql.param()` value that can be `undefined` makes the statement be checked a second time with `DEFAULT` in its place, so it only fits a `VALUES` item or a `SET` value. `sql.fragment()` refuses such a value. `any` and `unknown` values are not checked.
 
-See [Parameters](../guide/parameters), [JSON values](../guide/parameters#json-values) and [Optional values](../guide/writing-data#optional-values-sql-valueordefault).
+See [Parameters](../guide/parameters), [JSON values](../guide/parameters#json-values) and [Optional values](../guide/writing-data#optional-values).
 
 ## Fragments
 
@@ -75,14 +74,13 @@ const q = sql("SELECT u.id FROM users u {where}", { where });
 |---|---|
 | `sql.fragment(text, ...params)` | a piece of SQL to splice into a `{name}` slot |
 | `sql.id("col")`, `sql.id("schema", "table")` | a quoted identifier: `"col"`, `"schema"."table"` |
-| `sql.join([f1, f2], separator)` | the fragments joined; literal text only for a tuple written in place |
-| `sql.list(items, separator = ", ")` | a runtime array of fragments with literal texts, joined; throws when empty |
+| `sql.join(items, separator = ", ")` | the fragments joined: a tuple keeps its literal text, a runtime array of fragments with literal texts is checked as a list; throws when empty |
 | `sql.raw(text)` | dynamic text, sent as is |
 
 - Only `{identifier}` is a slot. Braces inside string literals are left alone.
 - A fragment's `$n` are renumbered after the outer parameters, and its values are checked once spliced. Whole queries can be spliced too.
 - `sql.id` over a union of names is checked once per member; the row type is the union. A generic name constrained to `RelationName<DB>` is widened to every table and view. Any other non-literal name is dynamic.
-- `sql.list` checks the statement once, with each distinct element once ([Lists from runtime arrays](../guide/dynamic-sql#lists-from-runtime-arrays)).
+- `sql.join` over an array checks the statement once, with each distinct element once ([Lists from runtime arrays](../guide/dynamic-sql#lists-from-runtime-arrays)).
 - A dynamic fragment is rejected by `sql()`. Use `sql.as<Row>()`.
 
 See [Dynamic SQL](../guide/dynamic-sql).
@@ -136,13 +134,19 @@ type ExecutorResult = { rows: readonly unknown[]; rowCount: number | null };
 
 See [Custom executor](../adapters/custom-executor).
 
-### Running `q.text` yourself
+### `@typesql/core/adapter`
 
-| Function | Does |
+What adapters and custom executors build on.
+
+| Export | Does |
 |---|---|
-| `mapRows(q, rows)` | applies the query's `rowKeys` option to the driver's rows |
+| `mapRows(q, rows)` | applies the query's `rowKeys` option to the driver's rows, for code that runs `q.text` itself |
 | `rowKeysOf(q)` | returns the query's `rowKeys` option |
 | `camelCase(key)` | the camelCase key mapping |
+| `createTransactionalSql(client, driver, options?)` | core's `createSql` bound to a driver's client, with `sql.transaction(fn)` |
+| `SqlDriver<C>` | how a driver runs statements and transactions on its client `C` |
+| `runTransaction(run, fn, options?)` | `BEGIN` / `COMMIT` / `ROLLBACK` (or a savepoint) around `fn`, for drivers without a transaction API |
+| `JsonParam<T>` | the runtime value `sql.json()` binds: `{ value }` with `toPostgres()`, `toJSON()`, `toString()` |
 
 ## Public types
 
@@ -158,19 +162,7 @@ See [Custom executor](../adapters/custom-executor).
 | `ExecutorResult` | `{ rows, rowCount: number \| null }` |
 | `NoResultError` | thrown by `executeTakeFirstOrThrow` on 0 rows; carries `text` |
 | `RowType<Q>`, `ParamsType<Q>`, `TextType<Q>` | the row, parameters and text of a `Query` or `Fragment` type |
-| `CamelCase<S>`, `CamelCaseKeys<Row>`, `KeyedRow<Row, Keys>` | the key mapping on a string, on a row's top-level keys, and under a `rowKeys` option |
-
-### Fragments and inline values
-
-| Type | Meaning |
-|---|---|
 | `Fragment<Text, Params>` | a spliceable SQL piece |
-| `ListRep<Element, Sep>` | the representative text and carried values `sql.list` is checked with |
-| `InlineMarker<T>` | the type of `sql.param(value)` |
-| `DefaultMarker<T>` | the type of `sql.valueOrDefault(value)` |
-| `JsonMarker<T>` | the type of `sql.json(value)` |
-| `JsonValue` | any `sql.json()` value: what a json / jsonb argument, `set` or `values` value accepts besides raw values |
-| `JsonParam<T>` | the runtime value `sql.json()` binds: `{ value }` with `toPostgres()`, `toJSON()`, `toString()` |
 
 ### Tables and write helpers
 
@@ -180,7 +172,6 @@ See [Custom executor](../adapters/custom-executor).
 | `RelationName<DB>` | top-level tables and views (what a generic `sql.id(name)` is widened to) |
 | `TableOf<DB, T>` | the column descriptors of a `TableName` |
 | `SetInput<DB, TM, T>`, `InsertInput<DB, TM, T>` | what `sql.set` and a `sql.values` row accept |
-| `SetRep<P>`, `ValuesRep<R>` | the representative text and carried values of `sql.set` / `sql.values` |
 
 ### Statement analysis
 
@@ -188,15 +179,13 @@ See [Custom executor](../adapters/custom-executor).
 |---|---|
 | `RowOf<DB, TM, Q>` | the row type of a statement literal |
 | `ParamsOf<DB, TM, Q>` | the positional parameter tuple |
-| `ArgsOf<DB, TM, Q>` | the tuple a call site passes: `ParamsOf`, with json / jsonb parameters as `NonArrayOrSqlJson<T>` |
-| `ParamsArgs<DB, TM, Q>` | what a call site passes: `ArgsOf`, or `[params: {…}]` for `:name` |
-| `NamesOf<DB, Q>` | the `:name` parameters in order |
 | `Validate<DB, Q>` | `Q` when valid, else `SqlError<message, tokenIndex>` |
-| `Analyze<DB, Q>` | the full analysis result (`kind`, `cols`, `params`, `max`, `names`, `stmt`); never served from the type cache |
-| `Analysis<DB, Q>` | what `RowOf`, `ParamsOf` and `Validate` read: `Analyze` without `stmt`, from the [type cache](../guide/performance#type-cache) when it has a usable entry |
 | `ApplyDdl<DB, Q>` | the schema after a DDL statement or a `;`-separated script |
 | `SqlError<Message, At>` | the compile-time error carrier; `At` is the index of the offending token |
-| `QueryCache`, `QueryCacheKeys`, `CacheSnapshots`, `DdlCache`, `DdlCacheKeys`, `CacheVersion`, … | what a [type cache](../guide/performance#type-cache) file declares; generated, not written by hand |
+
+### `@typesql/core/engine`
+
+The engine's other types are exported from `@typesql/core/engine`, so that a declaration file or the [type cache](../guide/performance#type-cache) can name them: the markers `sql.param()` and `sql.json()` return, the representative texts of `sql.join`, `sql.set` and `sql.values`, `Analyze` and `Analysis`, `ArgsOf`, `CamelCaseKeys`, the lexer, parser and type cache types, and so on. They change with the engine and are not a stable API.
 
 ## Schema types
 
@@ -254,7 +243,7 @@ declare module "@typesql/core" {
 
 ### Signatures
 
-An entry is one `Sig<Params, Return, Flags>` or a tuple of overloads. `FunctionRegistry` is the type of a `$functions` entry.
+An entry is one `Sig<Params, Return, Flags>` or a tuple of overloads.
 
 | Part | Values |
 |---|---|
@@ -291,7 +280,7 @@ Each package wraps core's `createSql` with the schema converted from the ORM's t
 | `FromDrizzleOptions` | `casing`, `timestamp`, `time` |
 | `PrismaOverrides` | `$table`, `$schema`, per field `{ column, type, nullable, default }` |
 
-The Prisma generator's pieces are exported from `@typesql/prisma/generator` (`generateSource`, `serveGenerator`).
+`@typesql/prisma/generator` exports `generateSource(datamodel, options?)`, the source the `typesql-prisma` generator writes.
 
 ## Introspection
 
@@ -306,6 +295,4 @@ typesql introspect [--url <url>] [--out <file>] [--schema <name>]… [--exclude 
 |---|---|
 | `introspect(client, { schemas?, exclude?, viewNotNull? })` | `Promise<IntrospectedDatabase>`: `{ version, schemas, relations, enums }` |
 | `generateSource(db, options?)` | the schema file's source; options `typeName`, `importFrom`, `imports`, `columnTypes`, `column`, `comments` |
-| `main(argv)` | the CLI; returns the exit code |
 | `IntrospectConfig` | the default export of a `--config` module: `url`, `out` and every option above |
-| `ViewNullability`, `parseNodeTree` | the view column nullability analysis |

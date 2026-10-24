@@ -1,10 +1,10 @@
 import { expectTypeOf, test } from "vitest";
+import type { KindOf } from "../../src/engine/index.js";
 import {
 	type Col,
 	createSql,
 	type DefaultTypeMap,
 	type Generated,
-	type KindOf,
 	type Nullable,
 	type ParamsOf,
 	type RowOf,

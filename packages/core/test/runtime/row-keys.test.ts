@@ -1,11 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { camelCase, mapRows } from "../../src/adapter.js";
 import {
 	type Col,
-	camelCase,
 	createSql,
 	type Executor,
 	type Generated,
-	mapRows,
 	type Nullable,
 } from "../../src/index.js";
 import { camelCases } from "./camel-cases.js";

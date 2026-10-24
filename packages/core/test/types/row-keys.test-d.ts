@@ -1,13 +1,15 @@
 import { expectTypeOf, test } from "vitest";
+import type {
+	CamelCase,
+	CamelCaseKeys,
+	KeyedRow,
+} from "../../src/engine/index.js";
 import {
-	type CamelCase,
-	type CamelCaseKeys,
 	type Col,
 	createSql,
 	type DefaultTypeMap,
 	type Executor,
 	type Generated,
-	type KeyedRow,
 	type Nullable,
 	type RowType,
 	type Sql,

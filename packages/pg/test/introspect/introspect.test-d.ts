@@ -1,11 +1,11 @@
 import {
 	createSql,
-	type IsErr,
 	type ParamsType,
 	type RowType,
 	type SqlError,
 	type Validate,
 } from "@typesql/core";
+import type { IsErr } from "@typesql/core/engine";
 import { expectTypeOf, test } from "vitest";
 import type { PgTypeMap } from "../../src/index.js";
 import type { HistoryItem, Settings } from "./json-types.js";

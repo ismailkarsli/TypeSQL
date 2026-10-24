@@ -1,10 +1,10 @@
 import { expectTypeOf, test } from "vitest";
+import type { KindOf } from "../../src/engine/index.js";
 import type {
 	ApplyDdl,
 	Col,
 	DefaultTypeMap,
 	Generated,
-	KindOf,
 	Nullable,
 	ParamsOf,
 	RowOf,

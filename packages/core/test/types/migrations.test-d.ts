@@ -1,4 +1,5 @@
 import { expectTypeOf, test } from "vitest";
+import type { ValidateDdl } from "../../src/engine/index.js";
 import {
 	type Col,
 	createSql,
@@ -10,7 +11,6 @@ import {
 	type RowType,
 	type SchemaOf,
 	type SqlError,
-	type ValidateDdl,
 	type View,
 } from "../../src/index.js";
 

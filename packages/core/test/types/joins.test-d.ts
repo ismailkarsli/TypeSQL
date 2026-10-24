@@ -1,11 +1,10 @@
 import { expectTypeOf, test } from "vitest";
+import type { Lex, ParseProgram } from "../../src/engine/index.js";
 import type {
 	Col,
 	DefaultTypeMap,
 	Generated,
-	Lex,
 	Nullable,
-	ParseProgram,
 	RowOf,
 	SqlError,
 	Validate,

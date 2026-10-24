@@ -6,18 +6,18 @@ import { PassThrough } from "node:stream";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { describe, expect, test } from "vitest";
+import type { DmmfDatamodel, DmmfField } from "../src/generator/dmmf.js";
 import {
-	type DmmfDatamodel,
-	type DmmfField,
-	type GeneratorHandler,
-	type GeneratorOptions,
 	generateSource,
 	hasDbDefault,
-	outputFile,
-	serveGenerator,
-	sourceFor,
 	viewNames,
-} from "../src/generator/index.js";
+} from "../src/generator/emit.js";
+import { outputFile, sourceFor } from "../src/generator/index.js";
+import {
+	type GeneratorHandler,
+	type GeneratorOptions,
+	serveGenerator,
+} from "../src/generator/protocol.js";
 
 const field = (
 	name: string,

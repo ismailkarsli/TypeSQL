@@ -5,10 +5,10 @@ import type {
 	NumTok,
 	OpTok,
 	ParamTok,
-	SqlError,
 	StrTok,
 	WordTok,
-} from "../../src/index.js";
+} from "../../src/engine/index.js";
+import type { SqlError } from "../../src/index.js";
 import type { Row, V } from "./_schema.js";
 
 /** Token values only, for compact assertions. */

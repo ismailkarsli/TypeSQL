@@ -8,7 +8,7 @@ Each adapter's `createSql` picks the map that matches its driver. `createSql` fr
 
 The common types under each driver's default parsers:
 
-| Postgres type | `@typesql/pg` | `@typesql/postgres` | `@typesql/postgres` (`createBigIntSql`) |
+| Postgres type | `@typesql/pg` | `@typesql/postgres` | `@typesql/postgres` (`{ bigint: true }`) |
 |---|---|---|---|
 | `int2`, `int4`, `float4`, `float8` | `number` | `number` | `number` |
 | `int8` (`count(*)`, `bigserial`) | `string` | `string` | `bigint` |
@@ -79,7 +79,7 @@ Everything else is the text Postgres sent, so `string`: notably `int8`, `numeric
 
 ### bigint connections
 
-With `postgres({ types: { bigint: postgres.BigInt } })`, `int8` (OID 20) is parsed to `bigint`. Use `PostgresJsBigIntTypeMap`, or `createBigIntSql`, for those connections. `int8[]` then becomes `bigint[]`.
+With `postgres({ types: { bigint: postgres.BigInt } })`, `int8` (OID 20) is parsed to `bigint`. Use `PostgresJsBigIntTypeMap`, or `createSql(sql, { bigint: true })`, for those connections. `int8[]` then becomes `bigint[]`.
 
 ### Arrays
 

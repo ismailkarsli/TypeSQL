@@ -1,10 +1,14 @@
-import type { Col, Generated, Nullable } from "@typesql/core";
+import {
+	type Col,
+	type Generated,
+	NoResultError,
+	type Nullable,
+} from "@typesql/core";
 import { describe, expect, test } from "vitest";
 import {
 	createSql,
 	executor,
 	migrate,
-	NoResultError,
 	type PgPoolLike,
 	type PgQueryable,
 	type PgTransactionClient,

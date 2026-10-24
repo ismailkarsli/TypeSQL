@@ -49,11 +49,11 @@ Inside a generic function, the name isn't known until the call:
 - Any other generic or `string` name gives a dynamic fragment, which needs [`sql.as`](#fully-dynamic-sql).
 - To check against a smaller set, narrow the name yourself: `sql.id(name as "users" | "posts")`.
 
-`sql.join` keeps the literal text only for a tuple written in place. For an array built at runtime, use `sql.list`.
+`sql.join(items, separator = ", ")` keeps the literal text for a tuple written in place. An array built at runtime is checked as a list, below.
 
 ## Lists from runtime arrays
 
-`sql.list(items, separator = ", ")` joins an array whose length and order are only known at runtime, such as sort keys a user picked. Each element's text must be known at compile time (fragments from a constant table, or `sql.id` over a union of names), so the statement stays checked:
+`sql.join` also joins an array whose length and order are only known at runtime, such as sort keys a user picked. Each element's text must be known at compile time (fragments from a constant table, or `sql.id` over a union of names), so the statement stays checked:
 
 <<< @/snippets/fragments.ts#list
 
@@ -69,7 +69,7 @@ An empty array throws at runtime. Always include a fixed element, like the `p.id
 
 ## Fully dynamic SQL
 
-Sometimes the shape of a statement is only known at runtime: `sql.raw(text)`, or `sql.join` over an array. TypeSQL can't infer anything then, and splicing such a fragment into `sql(…)` is a compile error.
+Sometimes the shape of a statement is only known at runtime: `sql.raw(text)`, or `sql.join` over an array of fragments whose texts aren't known. TypeSQL can't infer anything then, and splicing such a fragment into `sql(…)` is a compile error.
 
 Use `sql.as<Row>(…)` instead. It takes the same arguments, skips inference, and lets you state the row type:
 

@@ -1,17 +1,8 @@
-import {
-	createTransactionalSql,
-	type RowKeys,
-	type SqlOptions,
-	type TransactionalSql,
-} from "@typesql/core";
+import type { RowKeys, SqlOptions, TransactionalSql } from "@typesql/core";
+import { createTransactionalSql } from "@typesql/core/adapter";
 import { driver, type PgQueryable } from "./client.js";
 import type { PgTypeMap } from "./type-map.js";
 
-export {
-	type Executor,
-	NoResultError,
-	type TransactionalSql,
-} from "@typesql/core";
 export {
 	executor,
 	type MigrationSource,

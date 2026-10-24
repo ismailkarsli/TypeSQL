@@ -1,11 +1,15 @@
-import type { Col, ExecutorResult, Generated, Nullable } from "@typesql/core";
+import {
+	type Col,
+	type ExecutorResult,
+	type Generated,
+	NoResultError,
+	type Nullable,
+} from "@typesql/core";
 import { describe, expect, test } from "vitest";
 import {
-	createBigIntSql,
 	createSql,
 	executor,
 	migrate,
-	NoResultError,
 	type PostgresJsQueryable,
 	type PostgresJsRows,
 	type PostgresJsTransactable,
@@ -77,13 +81,13 @@ function fakeSql(rows: unknown[], count: number | null = rows.length) {
 const rowA = { id: 7, email: "a@example.com", display_name: null };
 const rowB = { id: 8, email: "b@example.com", display_name: "B" };
 
-describe("createSql / createBigIntSql", () => {
+describe("createSql", () => {
 	test("build { text, values }", () => {
 		expect(q.text).toBe(
 			"SELECT id, email, display_name FROM users WHERE id = $1",
 		);
 		expect(q.values).toEqual([7]);
-		const big = createBigIntSql<DB>();
+		const big = createSql<DB>(undefined, { bigint: true });
 		expect(big("SELECT count(*) FROM users")).toEqual({
 			text: "SELECT count(*) FROM users",
 			values: [],
@@ -134,7 +138,7 @@ describe("transaction", () => {
 			"COMMIT",
 		]);
 		const g = fakeSql([]);
-		await createBigIntSql<DB>(g.tx).transaction(async () => {});
+		await createSql<DB>(g.tx, { bigint: true }).transaction(async () => {});
 		expect(g.log).toEqual(["SAVEPOINT", "RELEASE SAVEPOINT"]);
 	});
 
@@ -196,7 +200,7 @@ describe("executor", () => {
 		]);
 		expect(calls[0]?.params).not.toBe(bq.values);
 		expect(
-			await createBigIntSql<DB>(client)(
+			await createSql<DB>(client, { bigint: true })(
 				"SELECT id FROM users",
 			).executeTakeFirstOrThrow(),
 		).toEqual({ id: 7 });
@@ -247,7 +251,7 @@ describe("rowKeys: camelCase", () => {
 				tx("SELECT display_name FROM users").execute(),
 			),
 		).toEqual([expected]);
-		const big = createBigIntSql<DB>(client, { rowKeys: "camelCase" });
+		const big = createSql<DB>(client, { rowKeys: "camelCase", bigint: true });
 		expect(
 			await big("SELECT display_name FROM users").executeTakeFirst(),
 		).toEqual(expected);

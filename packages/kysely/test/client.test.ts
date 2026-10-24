@@ -1,4 +1,4 @@
-import { camelCase } from "@typesql/core";
+import { camelCase } from "@typesql/core/adapter";
 import {
 	CamelCasePlugin,
 	type CompiledQuery,

@@ -42,7 +42,7 @@ Map each allowed choice to a fragment. The statement is checked once for each ch
 
 <<< @/snippets/recipes.ts#sort
 
-To sort by several user-picked keys, use [`sql.list`](./dynamic-sql#lists-from-runtime-arrays).
+To sort by several user-picked keys, use [`sql.join` over an array](./dynamic-sql#lists-from-runtime-arrays).
 
 ## Nested results in one query
 

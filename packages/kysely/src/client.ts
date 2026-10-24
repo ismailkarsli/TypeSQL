@@ -1,4 +1,5 @@
-import { type Executor, runTransaction, type SqlDriver } from "@typesql/core";
+import type { Executor } from "@typesql/core";
+import { runTransaction, type SqlDriver } from "@typesql/core/adapter";
 import { CompiledQuery, type QueryResult } from "kysely";
 
 /**

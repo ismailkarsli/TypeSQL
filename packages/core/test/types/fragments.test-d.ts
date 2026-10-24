@@ -1,18 +1,20 @@
 import { expectTypeOf, test } from "vitest";
+import type {
+	JoinedText,
+	QuotedIdent,
+	SlotNames,
+	Splice,
+} from "../../src/engine/index.js";
 import {
 	type Col,
 	createSql,
 	type Fragment,
 	type Generated,
-	type JoinedText,
 	type Nullable,
 	type ParamsType,
 	type Query,
-	type QuotedIdent,
 	type RelationName,
 	type RowType,
-	type SlotNames,
-	type Splice,
 	type SqlError,
 	type TextType,
 } from "../../src/index.js";
@@ -138,14 +140,19 @@ test("dynamic fragments fall back to sql.as", () => {
 	sql("SELECT id FROM users {raw}", { raw });
 	const ok = sql.as<{ id: number }>("SELECT id FROM users {raw}", { raw });
 	expectTypeOf(ok).toEqualTypeOf<Query<{ id: number }, readonly unknown[]>>();
-	const arr: Fragment<"x = 1", []>[] = [];
+	// joining an array of fragments whose texts are not known
+	const arr: Fragment[] = [];
 	const joined = sql.join(arr);
 	expectTypeOf(joined).toEqualTypeOf<
 		Fragment<string, readonly unknown[], []>
 	>();
 });
 
-test("sql.list: dynamic count, typed elements", () => {
+test("sql.join over an array: dynamic count, typed elements", () => {
+	const same: Fragment<"u.id = 1", []>[] = [];
+	expectTypeOf(sql.join(same, " OR ")).toEqualTypeOf<
+		Fragment<"u.id = 1", readonly unknown[], []>
+	>();
 	const SORT = {
 		email: { asc: sql.fragment("u.email"), desc: sql.fragment("u.email DESC") },
 		age: {
@@ -154,7 +161,7 @@ test("sql.list: dynamic count, typed elements", () => {
 		},
 	} as const;
 	const sort: { field: "email" | "age"; dir: "asc" | "desc" }[] = [];
-	const order = sql.list([
+	const order = sql.join([
 		...sort.map(({ field, dir }) => SORT[field][dir]),
 		sql.fragment("u.id"),
 	]);
@@ -166,7 +173,7 @@ test("sql.list: dynamic count, typed elements", () => {
 	expectTypeOf<RowType<typeof q>>().toEqualTypeOf<{ id: number }>();
 
 	// every element is checked against the statement's scope
-	const typo = sql.list(
+	const typo = sql.join(
 		sort.map(({ field }) =>
 			field === "email" ? sql.fragment("u.emial") : SORT.age.asc,
 		),
@@ -181,7 +188,7 @@ test("sql.list: dynamic count, typed elements", () => {
 		sql.fragment("u.age > $1", 18),
 		sql.fragment(`u.email = ${sql.param("e")}`),
 	];
-	const where = sql.list(conds, " AND ");
+	const where = sql.join(conds, " AND ");
 	const q2 = sql(
 		"SELECT u.id FROM users u WHERE u.id > $1 AND {where}",
 		{ where },
@@ -190,7 +197,7 @@ test("sql.list: dynamic count, typed elements", () => {
 	expectTypeOf<ParamsType<typeof q2>>().toEqualTypeOf<
 		[number | null, number | null, string | null]
 	>();
-	const wrong = sql.list(
+	const wrong = sql.join(
 		[sql.fragment("u.age > $1", "x"), sql.fragment("u.email = $1", "e")],
 		" AND ",
 	);
@@ -199,7 +206,7 @@ test("sql.list: dynamic count, typed elements", () => {
 
 	// a union-typed element (sql.id over a union) contributes each member once
 	const picked: ("email" | "display_name")[] = [];
-	const cols = sql.list(picked.map((c) => sql.id(c)));
+	const cols = sql.join(picked.map((c) => sql.id(c)));
 	expectTypeOf<
 		TextType<typeof cols>
 	>().toEqualTypeOf<'"display_name", "email"'>();
@@ -211,7 +218,7 @@ test("sql.list: dynamic count, typed elements", () => {
 	}>();
 
 	// dynamic elements keep the list dynamic
-	const dyn = sql.list([sql.raw("x"), sql.fragment("u.id")]);
+	const dyn = sql.join([sql.raw("x"), sql.fragment("u.id")]);
 	expectTypeOf(dyn).toEqualTypeOf<Fragment<string, readonly unknown[], []>>();
 	// @ts-expect-error dynamic SQL fragment
 	sql("SELECT u.id FROM users u ORDER BY {dyn}", { dyn });

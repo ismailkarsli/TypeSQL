@@ -8,7 +8,7 @@ An executor is the function a query runs on. The adapters build one from your dr
 
 <<< @/snippets/custom-executor.ts#without-client
 
-`mapRows(q, rows)` types the driver's rows as the query's rows and applies its [`rowKeys`](../guide/queries#camelcase-row-keys) option. The `execute*` methods of such a query reject unless you pass them an executor, and so does `sql.transaction`.
+`mapRows(q, rows)`, from `@typesql/core/adapter`, types the driver's rows as the query's rows and applies its [`rowKeys`](../guide/queries#camelcase-row-keys) option. The `execute*` methods of such a query reject unless you pass them an executor, and so does `sql.transaction`.
 
 ## Run on another client
 

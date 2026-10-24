@@ -3,8 +3,9 @@
  * change both together.
  */
 
+import type { Lex, ParseProgram } from "../../src/engine/index.js";
 import type { Toks } from "../../src/engine/lexer/tokens.js";
-import type { Lex, ParseProgram, SqlError } from "../../src/index.js";
+import type { SqlError } from "../../src/index.js";
 
 export type Out = "…";
 

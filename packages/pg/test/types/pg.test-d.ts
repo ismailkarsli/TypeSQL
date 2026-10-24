@@ -6,8 +6,8 @@ import type {
 	PgCatalog,
 	RowType,
 	SqlError,
-	TsTypeOf,
 } from "@typesql/core";
+import type { TsTypeOf } from "@typesql/core/engine";
 import type { Client, Pool, PoolClient } from "pg";
 import { expectTypeOf, test } from "vitest";
 import {

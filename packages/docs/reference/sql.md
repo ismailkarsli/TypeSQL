@@ -108,7 +108,7 @@ Values inside JSON are typed the way Postgres serializes them. See [JSON](../gui
 
 ## Parameters
 
-`$1`, `:name`, and inline `${sql.param(value)}`, `${sql.json(value)}` and `${sql.valueOrDefault(value)}`. See [Parameters](../guide/parameters).
+`$1`, `:name`, and inline `${sql.param(value)}` and `${sql.json(value)}`. See [Parameters](../guide/parameters).
 
 ## Nullability narrowing
 

@@ -4,30 +4,6 @@ import type { DmmfDatamodel } from "./dmmf.js";
 import { generateSource, viewNames } from "./emit.js";
 import type { GeneratorHandler, GeneratorOptions } from "./protocol.js";
 
-export type {
-	DmmfDatamodel,
-	DmmfEnum,
-	DmmfField,
-	DmmfFieldDefault,
-	DmmfModel,
-} from "./dmmf.js";
-export {
-	type EmitOptions,
-	generateSource,
-	hasDbDefault,
-	NATIVE_TYPES,
-	pgTypeOf,
-	SCALAR_TYPES,
-	viewNames,
-} from "./emit.js";
-export {
-	type GeneratorConfig,
-	type GeneratorHandler,
-	type GeneratorManifest,
-	type GeneratorOptions,
-	serveGenerator,
-} from "./protocol.js";
-
 const configString = (
 	v: string | readonly string[] | undefined,
 ): string | undefined => (typeof v === "string" ? v : undefined);

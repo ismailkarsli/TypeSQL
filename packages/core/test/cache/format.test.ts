@@ -8,7 +8,7 @@ import {
 } from "../../src/cache/format.js";
 import { scanNames, touchesAllTables } from "../../src/cache/scan.js";
 
-const HEAD = 'import type * as __T from "@typesql/core";\nexport {};\n';
+const HEAD = 'import type * as __T from "@typesql/core/engine";\nexport {};\n';
 const sample: CacheFile = {
 	...emptyCache("v1"),
 	groups: {
@@ -55,7 +55,7 @@ describe("cache file", () => {
 
 	test("entries render into the augmentation, grouped by file id and snapshot", () => {
 		const text = render(sample, "f00d", "v1");
-		expect(text).toContain('declare module "@typesql/core"');
+		expect(text).toContain('declare module "@typesql/core/engine"');
 		expect(text).toContain('"SELECT id FROM users": true;');
 		expect(text).toContain('"f00d#g1": D_g1;');
 		expect(text).toContain(

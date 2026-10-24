@@ -5,7 +5,8 @@ import { Pool } from "pg";
 const pool = new Pool();
 
 // #region without-client
-import { createSql, mapRows } from "@typesql/core";
+import { createSql } from "@typesql/core";
+import { mapRows } from "@typesql/core/adapter";
 
 const sql = createSql<DB>(); // builds queries, runs none
 

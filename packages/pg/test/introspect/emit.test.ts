@@ -1,11 +1,11 @@
 import { describe, expect, test } from "vitest";
+import { main } from "../../src/introspect/cli.js";
 import {
 	generateSource,
 	type IntrospectedColumn,
 	type IntrospectedDatabase,
-	main,
-	parseNodeTree,
 } from "../../src/introspect/index.js";
+import { parseNodeTree } from "../../src/introspect/nullability.js";
 
 const col = (
 	name: string,

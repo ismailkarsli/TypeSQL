@@ -1,9 +1,9 @@
 /// <reference types="node" />
 /**
  * The `.typesqlcache` file: JSON written by the job (job.ts), turned by the content mapper
- * (mapper.ts) into a module augmentation of `@typesql/core` (engine/cache.ts describes what the
+ * (mapper.ts) into a module augmentation of `@typesql/core/engine` (engine/cache.ts describes what the
  * checker does with it). Type texts are TypeScript as printed relative to the cache file's
- * directory; `__T` is `@typesql/core`.
+ * directory; `__T` is `@typesql/core/engine`.
  */
 import { createHash } from "node:crypto";
 
@@ -146,7 +146,7 @@ export function render(
 	id: string,
 	engine: string,
 ): string {
-	const head = `// Generated from a TypeSQL type cache; see https://typesql.karsli.net/guide/caching\nimport type * as __T from "@typesql/core";\nexport {};\n`;
+	const head = `// Generated from a TypeSQL type cache; see https://typesql.karsli.net/guide/caching\nimport type * as __T from "@typesql/core/engine";\nexport {};\n`;
 	if (!file || file.engine !== engine) return head;
 	const out: string[] = [head];
 	const keys = new Set<string>();
@@ -178,7 +178,7 @@ export function render(
 		});
 		return `      ${lit(key)}: ${variants.join(" | ")};`;
 	});
-	out.push(`declare module "@typesql/core" {\n`);
+	out.push(`declare module "@typesql/core/engine" {\n`);
 	if (keys.size) {
 		out.push(
 			`  interface QueryCacheKeys {\n${[...keys].map((k) => `    ${lit(k)}: true;`).join("\n")}\n  }\n`,
