@@ -410,6 +410,8 @@ pnpm mutate:types --sites narrow.ts:60-70    # mutants on those lines
 pnpm mutate:types --list --sites expr.ts:71  # print the mutants, check nothing
 pnpm mutate:types --shard 3/16 --report r.json --summary r.md   # one shard of a full run
 node scripts/type-mutate.ts merge --report all.json --summary all.md r-*.json
+pnpm mutate:types --files narrow.ts --compiler tsrs              # check with tsrs instead of TypeScript
+pnpm mutate:types --files narrow.ts --profile                    # where each mutant's check spent its time
 ```
 
 The mutators (`scripts/type-mutate/sites.ts`), found with the TypeScript AST:
@@ -453,6 +455,22 @@ A killed mutant costs about a second with a kill map; a survivor costs a check o
 file (15–30 s). A full run (about 23 000 mutants, a quarter of them surviving) is sharded
 (`--shard i/n` takes every n-th mutant), and `merge` joins the shards' reports and rebuilds the
 kill map from them.
+
+`--compiler tsrs` checks with [tsrs](https://github.com/oxc-project/tsrs), a Rust port of
+TypeScript 7 with the same API (`tsrs/unstable/*`), installed as a dev dependency. It finds the
+same mutants and, on a sample of 12, gave every one the same status at about 2.7× the speed
+and a third of the memory; TypeScript stays the default, because tsrs follows a TypeScript 7.1
+dev build rather than the version the project uses. `TYPE_MUTATE_COMPILER=tsrs pnpm vitest run
+scripts/type-mutate` runs the script's own tests on it.
+
+`--profile` adds `profile` to the report: per mutant, the time of the snapshot update, of the
+mutated file, of each test file and of the other source files, and the time of the clean check.
+The run ends with the shares and the slowest test files. On a sample, the type tests took 95% of
+the time and the runtime tests 3%.
+
+The API checks the files of a `getSemanticDiagnostics` call one after another on one checker per
+program, so a call for several files is no faster; running several snapshots of one mutant side
+by side made no difference on a sample (one survivor, a busy machine).
 
 ## Coverage and mutation testing
 

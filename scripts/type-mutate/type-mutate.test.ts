@@ -9,8 +9,6 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { SyntaxKind } from "typescript/ast";
-import { API } from "typescript/async";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { findMutants } from "./sites.ts";
 import {
@@ -32,9 +30,22 @@ import {
 	readKillMap,
 	type Status,
 	summarize,
+	summarizeProfile,
 	TestOrder,
 	updateKillMap,
 } from "./support.ts";
+
+// TYPE_MUTATE_COMPILER=tsrs runs these tests on tsrs, a Rust port of TypeScript 7 with the same API
+const compiler = process.env.TYPE_MUTATE_COMPILER ?? "typescript";
+const modules = (part: string) =>
+	compiler === "tsrs" ? `tsrs/unstable/${part}` : `typescript/${part}`;
+const { SyntaxKind } = (await import(
+	modules("ast")
+)) as typeof import("typescript/ast");
+const { API } = (await import(
+	modules("async")
+)) as typeof import("typescript/async");
+type API = InstanceType<typeof API>;
 
 const here = dirname(fileURLToPath(import.meta.url));
 const script = join(here, "..", "type-mutate.ts");
@@ -361,6 +372,65 @@ describe("bookkeeping", () => {
 		expect(
 			markdownSummary(mergeReports([shard(1, [mutant("a", "killed")])])),
 		).not.toContain("| File |");
+
+		const profiled = mergeReports([
+			{
+				...shard(1, []),
+				profile: {
+					clean: 5,
+					mutants: [
+						{ id: "a", status: "killed", update: 1, own: 2, tests: [] },
+					],
+				},
+			},
+			{
+				...shard(2, []),
+				profile: {
+					clean: 7,
+					mutants: [
+						{ id: "b", status: "survived", update: 1, own: 2, tests: [] },
+					],
+				},
+			},
+		]);
+		expect(profiled.profile?.clean).toBe(7);
+		expect(profiled.profile?.mutants.map((m) => m.id)).toEqual(["a", "b"]);
+		expect(merged.profile).toBeUndefined();
+	});
+
+	test("profile summary: type tests against the others, slowest test files first", () => {
+		const s = summarizeProfile([
+			{
+				id: "a",
+				status: "killed",
+				update: 10,
+				own: 20,
+				tests: [["x.test-d.ts", 5]],
+			},
+			{
+				id: "b",
+				status: "survived",
+				update: 10,
+				own: 20,
+				tests: [
+					["x.test-d.ts", 7],
+					["y.test.ts", 100],
+				],
+				sources: 3,
+			},
+		]);
+		expect(s).toEqual({
+			mutants: 2,
+			update: 20,
+			own: 40,
+			sources: 3,
+			typeTests: 12,
+			otherTests: 100,
+			byTest: [
+				{ file: "y.test.ts", ms: 100, checks: 1 },
+				{ file: "x.test-d.ts", ms: 12, checks: 2 },
+			],
+		});
 	});
 });
 
@@ -376,6 +446,8 @@ describe("runs over the fixture project", { timeout: 120_000 }, () => {
 				"tsconfig.json",
 				"--mutate",
 				"src/**",
+				"--compiler",
+				compiler,
 				...args,
 			],
 			{
@@ -465,6 +537,54 @@ describe("runs over the fixture project", { timeout: 120_000 }, () => {
 				(JSON.parse(readFileSync(join(out, "k2.json"), "utf8")) as KillMap)
 					.sites,
 			).toEqual(killMap.sites);
+		} finally {
+			rmSync(out, { recursive: true, force: true });
+		}
+	});
+
+	test("--profile: where the time went; bad option values fail", () => {
+		const out = mkdtempSync(join(tmpdir(), "type-mutate-"));
+		try {
+			const statuses = (args: string[]) => {
+				const r = run(fixture, [
+					"--kill-map",
+					join(out, `k${args.length}.json`),
+					"--report",
+					join(out, "r.json"),
+					...args,
+				]);
+				expect(r.status, r.stderr).toBe(0);
+				const report = JSON.parse(readFileSync(join(out, "r.json"), "utf8"));
+				return {
+					report: report as Report<RunMutant>,
+					stderr: r.stderr,
+					statuses: Object.fromEntries(
+						(report as Report).mutants.map((m) => [m.id, m.status]),
+					),
+				};
+			};
+			const plain = statuses([]);
+			expect(plain.report.profile).toBeUndefined();
+			expect(plain.report.compiler).toBe(compiler);
+			const profiled = statuses(["--profile"]);
+			expect(profiled.statuses).toEqual(plain.statuses);
+			const profile = profiled.report.profile!;
+			expect(profile.mutants.map((m) => m.id).sort()).toEqual(
+				profiled.report.mutants.map((m) => m.id).sort(),
+			);
+			const survivor = profile.mutants.find((m) => m.status === "survived")!;
+			expect(survivor.tests.map(([f]) => f).sort()).toEqual([
+				"test/logic.test-d.ts",
+				"test/more.test-d.ts",
+			]);
+			expect(survivor.sources).toBeTypeOf("number");
+			expect(profiled.stderr).toContain("slowest test files");
+
+			for (const bad of [["--compiler", "tsc"]]) {
+				const r = run(fixture, bad);
+				expect(r.status).not.toBe(0);
+				expect(r.stderr).toContain(bad[0]);
+			}
 		} finally {
 			rmSync(out, { recursive: true, force: true });
 		}

@@ -27,6 +27,7 @@ import {
 	fallbackOrder,
 	inShard,
 	lineStarts,
+	type MutantProfile,
 	type MutantResult,
 	markdownSummary,
 	matchesFile,
@@ -40,6 +41,7 @@ import {
 	type Status,
 	type Summary,
 	summarize,
+	summarizeProfile,
 	TestOrder,
 	updateKillMap,
 } from "./type-mutate/support.ts";
@@ -50,7 +52,10 @@ interface CheckResult {
 	killedBy?: string;
 	// why an invalid mutant does not compile
 	diagnostic?: string;
+	profile?: CheckProfile;
 }
+
+type CheckProfile = Omit<MutantProfile, "id" | "status">;
 
 // a mutant as it is selected; the check fills in the rest
 type Mutant = Omit<MutantResult, "status" | "killedBy"> & {
@@ -100,6 +105,8 @@ const { values: opts, positionals } = parseArgs({
 		timeout: { type: "string" },
 		verbose: { type: "boolean", default: false },
 		"check-equivalent": { type: "boolean", default: false },
+		compiler: { type: "string", default: "typescript" },
+		profile: { type: "boolean", default: false },
 	},
 });
 
@@ -174,7 +181,7 @@ async function run(): Promise<number> {
 		);
 	}
 
-	const ts = await loadTypeScript(configFile);
+	const ts = await loadTypeScript(configFile, opts.compiler!);
 	const session = new Session(
 		ts,
 		configFile,
@@ -267,6 +274,7 @@ async function run(): Promise<number> {
 		}
 
 		// the unmutated project must be clean, or every mutant would be "killed"
+		let cleanMs = 0;
 		if (selected.length) {
 			const t = Date.now();
 			const errors = errorsOf(await program.getSemanticDiagnostics(all));
@@ -279,11 +287,11 @@ async function run(): Promise<number> {
 					`type-mutate: ${rel(configFile)} has ${errors.length} type error(s) without mutations; fix them first`,
 				);
 			}
+			cleanMs = Date.now() - t;
 			// a mutant may send the checker into a very long instantiation
-			if (!opts.timeout)
-				session.timeoutMs = Math.max(60_000, 4 * (Date.now() - t));
+			if (!opts.timeout) session.timeoutMs = Math.max(60_000, 4 * cleanMs);
 			log(
-				`type-mutate: project is clean (${secs(Date.now() - t)}); timeout per mutant ${secs(session.timeoutMs)}`,
+				`type-mutate: project is clean (${secs(cleanMs)}); timeout per mutant ${secs(session.timeoutMs)}`,
 			);
 		}
 
@@ -294,6 +302,7 @@ async function run(): Promise<number> {
 		const order = new TestOrder(tests, killMap);
 		const srcFiles = all.map(rel).filter((f) => !tests.includes(f));
 
+		const profiles: MutantProfile[] = [];
 		let done = 0;
 		for (const m of selected) {
 			// the changed-lines gate trusts equivalence markers; full runs and --check-equivalent still check them
@@ -313,7 +322,10 @@ async function run(): Promise<number> {
 				srcFiles.filter((f) => f !== m.file),
 			);
 			m.ms = Date.now() - t;
-			Object.assign(m, result);
+			const { profile, ...rest } = result;
+			Object.assign(m, rest);
+			if (opts.profile && profile)
+				profiles.push({ id: m.id, status: rest.status, ...profile });
 			if (m.status === "survived" && m.equivalent) m.status = "equivalent";
 			if (m.status === "killed") order.recordKill(m.file, m.killedBy!);
 			done++;
@@ -331,6 +343,7 @@ async function run(): Promise<number> {
 			tool: "type-mutate",
 			commit: tryGit("rev-parse", "HEAD") ?? null,
 			base,
+			compiler: opts.compiler,
 			mode: opts.changed
 				? "changed"
 				: opts.files || opts.sites || opts.mutators || opts.sample
@@ -352,6 +365,9 @@ async function run(): Promise<number> {
 						: {}),
 				}),
 			),
+			...(opts.profile
+				? { profile: { clean: cleanMs, mutants: profiles } }
+				: {}),
 		} satisfies Report;
 		write(report);
 		if (selected.length) {
@@ -363,6 +379,7 @@ async function run(): Promise<number> {
 		}
 
 		const survivors = report.mutants.filter((m) => m.status === "survived");
+		if (opts.profile) logProfile(profiles);
 		log(
 			`type-mutate: ${describe(report.summary)} in ${secs(report.durationMs)}`,
 		);
@@ -380,6 +397,21 @@ async function run(): Promise<number> {
 	} finally {
 		await session.close();
 	}
+}
+
+function logProfile(profiles: readonly MutantProfile[]) {
+	const p = summarizeProfile(profiles);
+	const all = p.update + p.own + p.typeTests + p.otherTests + p.sources;
+	const share = (ms: number) =>
+		`${secs(ms)} (${all ? Math.round((ms / all) * 100) : 0}%)`;
+	log(
+		`type-mutate: profile of ${p.mutants} mutant(s): snapshot updates ${share(p.update)}, mutated files ${share(p.own)}, type tests (.test-d.ts) ${share(p.typeTests)}, other tests ${share(p.otherTests)}, other sources ${share(p.sources)}`,
+	);
+	log("  slowest test files (total, checks, average):");
+	for (const t of p.byTest.slice(0, 10))
+		log(
+			`    ${secs(t.ms).padStart(8)} ${String(t.checks).padStart(5)} ${secs(t.ms / t.checks).padStart(7)}  ${t.file}`,
+		);
 }
 
 function describe(s: Summary) {
@@ -434,18 +466,29 @@ function changedLines(base: string) {
 	return out;
 }
 
-async function loadTypeScript(configFile: string) {
+// tsrs (a Rust port of TypeScript 7) ships the same API under other paths
+const COMPILERS: Record<string, (part: "async" | "fs" | "ast") => string> = {
+	typescript: (part) => `typescript/${part}`,
+	tsrs: (part) => `tsrs/unstable/${part}`,
+};
+
+async function loadTypeScript(configFile: string, compiler: string) {
+	const spec = COMPILERS[compiler];
+	if (!spec)
+		throw new Error(
+			`--compiler: expected ${Object.keys(COMPILERS).join(" or ")}, got ${JSON.stringify(compiler)}`,
+		);
 	let req = createRequire(configFile);
 	try {
-		req.resolve("typescript/async");
+		req.resolve(spec("async"));
 	} catch {
 		req = createRequire(import.meta.url);
 	}
-	const load = (spec: string) => import(pathToFileURL(req.resolve(spec)).href);
+	const load = (s: string) => import(pathToFileURL(req.resolve(s)).href);
 	const [api, fs, ast] = (await Promise.all([
-		load("typescript/async"),
-		load("typescript/fs"),
-		load("typescript/ast"),
+		load(spec("async")),
+		load(spec("fs")),
+		load(spec("ast")),
 	])) as [
 		typeof import("typescript/async"),
 		typeof import("typescript/fs"),
@@ -547,39 +590,54 @@ class Session {
 		srcFiles: string[],
 	): Promise<CheckResult> {
 		const abs = join(ROOT, file);
+		const since = (t: number) => Math.round(performance.now() - t);
+		let t = performance.now();
 		const snapshot = await this.base!.update({
 			fileSystem: this.ts.createFileSystemLayer([[abs, text]]),
 			fileNotifications: { changed: [abs] },
 			ensurePrograms: true,
 		});
+		const profile: CheckProfile = { update: since(t), own: 0, tests: [] };
 		const message = (d: Diagnostic) => `TS${d.code}: ${d.text}`.slice(0, 500);
 		try {
 			const program = this.program(snapshot);
+			t = performance.now();
 			const own = errorsOf([
 				...(await program.getSyntacticDiagnostics(abs)),
 				...(await program.getSemanticDiagnostics(abs)),
 			]);
+			profile.own = since(t);
 			if (own.length)
-				return { status: "invalid", diagnostic: message(own[0]!), checks: 1 };
+				return {
+					status: "invalid",
+					diagnostic: message(own[0]!),
+					checks: 1,
+					profile,
+				};
 			for (const [i, test] of tests.entries()) {
+				t = performance.now();
 				const errors = errorsOf(
 					await program.getSemanticDiagnostics(join(ROOT, test)),
 				);
+				profile.tests.push([test, since(t)]);
 				if (errors.length)
-					return { status: "killed", killedBy: test, checks: i + 2 };
+					return { status: "killed", killedBy: test, checks: i + 2, profile };
 			}
+			t = performance.now();
 			const errors = errorsOf(
 				await program.getSemanticDiagnostics(
 					srcFiles.map((f) => join(ROOT, f)),
 				),
 			);
+			profile.sources = since(t);
 			if (errors.length)
 				return {
 					status: "invalid",
 					diagnostic: `${errors[0]!.fileName ? rel(errors[0]!.fileName) : "?"}: ${message(errors[0]!)}`,
 					checks: tests.length + 2,
+					profile,
 				};
-			return { status: "survived", checks: tests.length + 2 };
+			return { status: "survived", checks: tests.length + 2, profile };
 		} finally {
 			void snapshot.dispose().catch(() => {});
 		}

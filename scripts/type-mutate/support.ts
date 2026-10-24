@@ -46,6 +46,72 @@ export type Summary = Record<Status, number> & {
 	score: number | null;
 };
 
+// --profile: where one mutant's check spent its time, in ms
+export interface MutantProfile {
+	id: string;
+	status: Status;
+	// the snapshot with the mutated file
+	update: number;
+	// the mutated file itself
+	own: number;
+	// each test file checked, in order
+	tests: [file: string, ms: number][];
+	// the other source files, after every test accepted the mutant
+	sources?: number;
+}
+
+export interface Profile {
+	clean: number;
+	mutants: MutantProfile[];
+}
+
+export interface ProfileSummary {
+	mutants: number;
+	update: number;
+	own: number;
+	sources: number;
+	// all checks of type test files (`.test-d.ts`) and of the others
+	typeTests: number;
+	otherTests: number;
+	// per test file: total ms over all mutants, and how many mutants checked it
+	byTest: { file: string; ms: number; checks: number }[];
+}
+
+export function summarizeProfile(
+	mutants: readonly MutantProfile[],
+): ProfileSummary {
+	const byTest = new Map<
+		string,
+		{ file: string; ms: number; checks: number }
+	>();
+	const s: ProfileSummary = {
+		mutants: mutants.length,
+		update: 0,
+		own: 0,
+		sources: 0,
+		typeTests: 0,
+		otherTests: 0,
+		byTest: [],
+	};
+	for (const m of mutants) {
+		s.update += m.update;
+		s.own += m.own;
+		s.sources += m.sources ?? 0;
+		for (const [file, ms] of m.tests) {
+			if (file.endsWith(".test-d.ts")) s.typeTests += ms;
+			else s.otherTests += ms;
+			const t = byTest.get(file) ?? { file, ms: 0, checks: 0 };
+			t.ms += ms;
+			t.checks++;
+			byTest.set(file, t);
+		}
+	}
+	s.byTest = [...byTest.values()].sort(
+		(a, b) => b.ms - a.ms || (a.file < b.file ? -1 : 1),
+	);
+	return s;
+}
+
 export interface Report<M extends MutantResult = MutantResult> {
 	version: 1;
 	tool?: "type-mutate";
@@ -62,6 +128,8 @@ export interface Report<M extends MutantResult = MutantResult> {
 	mutants: M[];
 	// merged reports: all shards of a full run
 	complete?: boolean;
+	compiler?: string;
+	profile?: Profile;
 }
 
 export function lineStarts(text: string): number[] {
@@ -340,10 +408,19 @@ export function mergeReports(reports: readonly Report[]): Report {
 		indexes.size === count &&
 		reports.length === count;
 	const first = reports[0]!;
+	const profiles = reports.flatMap((r) => (r.profile ? [r.profile] : []));
 	return {
 		...first,
 		shard: null,
 		complete,
+		...(profiles.length
+			? {
+					profile: {
+						clean: Math.max(...profiles.map((p) => p.clean)),
+						mutants: profiles.flatMap((p) => p.mutants),
+					},
+				}
+			: {}),
 		durationMs: reports.reduce((a, r) => a + (r.durationMs ?? 0), 0),
 		files: [...new Set(reports.flatMap((r) => r.files))].sort(),
 		summary: summarize(mutants),
