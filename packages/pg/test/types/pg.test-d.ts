@@ -1,6 +1,6 @@
 import { expectTypeOf, test } from "vitest";
 import type { Client, Pool, PoolClient } from "pg";
-import type { Col, Generated, Nullable, ParamsType, PgCatalog, RowType, TsTypeOf } from "@typesql/core";
+import type { Col, Generated, Nullable, ParamsType, PgCatalog, RowType, SqlError, TsTypeOf } from "@typesql/core";
 import {
   createSql,
   type PgInterval,
@@ -111,8 +111,7 @@ test("sql.transaction passes a sql bound to the transaction and returns the call
 });
 
 test("invalid SQL is rejected by the pre-bound sql", () => {
-  // @ts-expect-error unknown column
-  sql("SELECT nope FROM users");
+  expectTypeOf<Parameters<typeof sql<"SELECT nope FROM users">>[0]>().toEqualTypeOf<SqlError<'column "nope" does not exist', 1> & "SELECT nope FROM users">();
   // @ts-expect-error wrong param type
   sql("SELECT id FROM users WHERE id = $1", "7");
   // @ts-expect-error missing param

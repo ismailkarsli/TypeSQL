@@ -2,7 +2,7 @@ import { expectTypeOf, test } from "vitest";
 import type { SqlError } from "../../src/index.js";
 import type { Row, V } from "./_schema.js";
 
-// WITH / WITH RECURSIVE, verified against PostgreSQL 17.
+// WITH / WITH RECURSIVE, verified against PostgreSQL 18.
 
 test("CTEs see earlier CTEs, column lists rename positionally", () => {
   expectTypeOf<Row<"WITH a AS (SELECT id, email FROM users), b AS (SELECT id + 1 AS n, email FROM a) SELECT * FROM b">>()

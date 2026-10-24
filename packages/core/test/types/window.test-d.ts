@@ -1,7 +1,7 @@
 import { expectTypeOf, test } from "vitest";
 import type { Row } from "./_schema.js";
 
-// Window functions, verified against PostgreSQL 17.
+// Window functions, verified against PostgreSQL 18.
 
 test("ranking functions are int8 / float8 and never null", () => {
   expectTypeOf<Row<"SELECT row_number() OVER () AS a, rank() OVER (ORDER BY id) AS b, dense_rank() OVER (PARTITION BY flag ORDER BY id) AS c, percent_rank() OVER (ORDER BY id) AS d, cume_dist() OVER (ORDER BY id) AS e, ntile(4) OVER (ORDER BY id) AS f FROM things">>()

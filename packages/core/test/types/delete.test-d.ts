@@ -74,8 +74,6 @@ test("sql() call sites", () => {
   expectTypeOf(q.text).toEqualTypeOf<string>();
   // @ts-expect-error wrong param type
   sql("DELETE FROM users WHERE id = $1", "1");
-  // @ts-expect-error unknown column
-  sql("DELETE FROM users WHERE nope = 1");
-  // @ts-expect-error view target
-  sql("DELETE FROM active_users");
+  expectTypeOf<Validate<DB, "DELETE FROM users WHERE nope = 1">>().toEqualTypeOf<SqlError<'column "nope" does not exist', 4>>();
+  expectTypeOf<Validate<DB, "DELETE FROM active_users">>().toEqualTypeOf<SqlError<'cannot delete from view "active_users"', 2>>();
 });

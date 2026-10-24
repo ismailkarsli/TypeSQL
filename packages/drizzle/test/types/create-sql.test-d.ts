@@ -1,6 +1,6 @@
 import { expectTypeOf, test } from "vitest";
 import { pgTable, serial, timestamp } from "drizzle-orm/pg-core";
-import type { DefaultTypeMap, ParamsType, RowType } from "@typesql/core";
+import type { DefaultTypeMap, ParamsType, RowType, SqlError } from "@typesql/core";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import { createSql, type DrizzleDatabase, type DrizzleSql } from "../../src/index.js";
@@ -49,8 +49,8 @@ test("schemas, views, arrays and extension types", () => {
 
   const v = sql("SELECT id, email, mood FROM active_users WHERE id = $1", 1);
   expectTypeOf<RowType<typeof v>>().toEqualTypeOf<{ id: number; email: string; mood: "happy" | "sad" | null }>();
-  // @ts-expect-error views are read-only
-  sql("INSERT INTO active_users (email) VALUES ('x')");
+  expectTypeOf<Parameters<typeof sql<"INSERT INTO active_users (email) VALUES ('x')">>[0]>()
+    .toEqualTypeOf<SqlError<'cannot insert into view "active_users"', 2> & "INSERT INTO active_users (email) VALUES ('x')">();
 
   const k = sql("SELECT ints, matrix, moods, data, embedding FROM kitchen_sink");
   expectTypeOf<RowType<typeof k>>().toEqualTypeOf<{ ints: number[]; matrix: number[][]; moods: ("happy" | "sad")[] | null; data: unknown; embedding: unknown }>();

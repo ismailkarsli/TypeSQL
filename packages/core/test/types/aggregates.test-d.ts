@@ -1,7 +1,7 @@
 import { expectTypeOf, test } from "vitest";
 import type { Row, Interval } from "./_schema.js";
 
-// Aggregate result types and nullability, verified against PostgreSQL 17:
+// Aggregate result types and nullability, verified against PostgreSQL 18:
 // an aggregate over an empty input is NULL (except count / regr_count → 0), so without GROUP BY
 // every other aggregate is nullable; with GROUP BY it is nullable only if its argument is.
 

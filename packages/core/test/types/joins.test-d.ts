@@ -1,7 +1,7 @@
 import { expectTypeOf, test } from "vitest";
-import type { Col, DefaultTypeMap, Generated, Nullable, RowOf, SqlError, Validate, View } from "../../src/index.js";
+import type { Col, DefaultTypeMap, Generated, Lex, Nullable, ParseProgram, RowOf, SqlError, Validate, View } from "../../src/index.js";
 
-// Joins, FROM-item naming and WHERE-based nullability narrowing, verified against PostgreSQL 17.
+// Joins, FROM-item naming and WHERE-based nullability narrowing, verified against PostgreSQL 18.
 
 interface DB {
   users: { id: Generated<"int4">; email: Col<"text">; display_name: Nullable<"text">; created_at: Generated<"timestamptz"> };
@@ -14,6 +14,7 @@ interface DB {
 }
 type Row<Q extends string> = RowOf<DB, DefaultTypeMap, Q>;
 type V<Q extends string> = Validate<DB, Q>;
+type Body<Q extends string> = ParseProgram<Lex<Q>> extends { readonly body: infer B } ? B : never;
 type User = { id: number; email: string; display_name: string | null; created_at: Date };
 
 test("join kinds and nullability", () => {
@@ -135,6 +136,28 @@ test("WHERE narrowing goes through AND only, never OR / NOT, and stays in its qu
   expectTypeOf<Row<"SELECT (SELECT c.v) AS v FROM c WHERE c.v IS NOT NULL">>().toEqualTypeOf<{ v: string | null }>();
   // narrowing changes nullability only, never the type
   expectTypeOf<Row<"SELECT x FROM b WHERE x IS NOT NULL">>().toEqualTypeOf<{ x: string }>();
+});
+
+test("WHERE narrowing follows AND/OR precedence: AND binds tighter", () => {
+  expectTypeOf<Row<"SELECT v FROM c WHERE x = 1 OR true AND v IS NOT NULL">>().toEqualTypeOf<{ v: string | null }>();
+  expectTypeOf<Row<"SELECT v FROM c WHERE v IS NOT NULL AND true OR x = 1">>().toEqualTypeOf<{ v: string | null }>();
+  expectTypeOf<Row<"SELECT v FROM c WHERE (x = 1 OR true) AND v IS NOT NULL">>().toEqualTypeOf<{ v: string }>();
+  expectTypeOf<Body<"SELECT 1 WHERE a = 1 OR b AND c">>().toMatchTypeOf<{ readonly where: { readonly t: "bin"; readonly op: "or"; readonly r: { readonly t: "bin"; readonly op: "and" } } }>();
+  expectTypeOf<Body<"SELECT 1 WHERE a AND b OR c">>().toMatchTypeOf<{ readonly where: { readonly t: "bin"; readonly op: "or"; readonly l: { readonly t: "bin"; readonly op: "and" } } }>();
+});
+
+test("WHERE narrowing: NOT BETWEEN narrows its operand, never its bounds", () => {
+  // 0 NOT BETWEEN 1 AND NULL is TRUE (0 < 1), so x stays nullable
+  expectTypeOf<Row<"SELECT x FROM c WHERE 0 NOT BETWEEN 1 AND x">>().toEqualTypeOf<{ x: number | null }>();
+  expectTypeOf<Row<"SELECT x FROM c WHERE 5 NOT BETWEEN x AND 1">>().toEqualTypeOf<{ x: number | null }>();
+  expectTypeOf<Row<"SELECT x FROM c WHERE x NOT BETWEEN 1 AND 2">>().toEqualTypeOf<{ x: number }>();
+  expectTypeOf<Row<"SELECT x FROM c WHERE 0 BETWEEN 1 AND x">>().toEqualTypeOf<{ x: number }>();
+});
+
+test("WHERE narrowing of a USING column narrows the merged column only, not the hidden side's", () => {
+  expectTypeOf<Row<"SELECT x, b.x AS bx FROM a LEFT JOIN b USING (x) WHERE x IS NOT NULL">>().toEqualTypeOf<{ x: string; bx: string | null }>();
+  expectTypeOf<Row<"SELECT b.x FROM a LEFT JOIN b USING (x) WHERE x IS NOT NULL">>().toEqualTypeOf<{ x: string | null }>();
+  expectTypeOf<Row<"SELECT b.x FROM a LEFT JOIN b USING (x) WHERE b.x IS NOT NULL">>().toEqualTypeOf<{ x: string }>();
 });
 
 test("WHERE / HAVING must be boolean", () => {

@@ -16,8 +16,8 @@ test("JSON, JSON_SCALAR, JSON_SERIALIZE", () => {
     .toEqualTypeOf<{ json_serialize: string; b: Uint8Array | null; c: string }>();
   expectTypeOf<V<"SELECT JSON(id) FROM things">>().toEqualTypeOf<SqlError<"cannot cast type integer to json", 0>>();
   expectTypeOf<V<"SELECT JSON_SERIALIZE('1' RETURNING jsonb)">>().toEqualTypeOf<SqlError<"cannot use type jsonb in RETURNING clause of JSON_SERIALIZE()", 0>>();
-  // @ts-expect-error JSON() needs an argument
-  expectTypeOf<Row<"SELECT JSON()">>().toEqualTypeOf<{}>();
+  // JSON() needs an argument
+  expectTypeOf<V<"SELECT JSON()">>().toEqualTypeOf<SqlError<"syntax error at or near )", 3>>();
 });
 
 test("JSON_OBJECT is an object like json_build_object, never NULL", () => {
@@ -60,8 +60,8 @@ test("JSON_EXISTS, JSON_VALUE, JSON_QUERY", () => {
     .toEqualTypeOf<{ json_value: string | null; b: number | null; c: Date | null }>();
   expectTypeOf<Row<"SELECT JSON_QUERY(data, '$.a' WITH CONDITIONAL WRAPPER EMPTY ARRAY ON EMPTY), JSON_QUERY(data, '$.a' RETURNING text OMIT QUOTES ON SCALAR STRING) AS b, JSON_QUERY(label FORMAT JSON, '$' RETURNING int[]) AS c FROM things">>()
     .toEqualTypeOf<{ json_query: unknown; b: string | null; c: number[] | null }>();
-  // @ts-expect-error JSON_EXISTS has no ON EMPTY
-  expectTypeOf<Row<"SELECT JSON_EXISTS(data, '$.a' FALSE ON EMPTY) FROM things">>().toEqualTypeOf<{}>();
+  // JSON_EXISTS has no ON EMPTY
+  expectTypeOf<V<"SELECT JSON_EXISTS(data, '$.a' FALSE ON EMPTY) FROM things">>().toEqualTypeOf<SqlError<"syntax error at or near empty", 8>>();
 });
 
 test("IS JSON", () => {
@@ -89,12 +89,11 @@ test("JSON_TABLE: declared column types, nullable; nested paths' columns last", 
     .toEqualTypeOf<SqlError<"JSON_TABLE function has 1 columns available but 2 columns specified", 0>>();
   expectTypeOf<V<"SELECT * FROM JSON_TABLE(jsonb '[]', '$' || '.a' COLUMNS (b int))">>()
     .toEqualTypeOf<SqlError<"only string constants are supported in JSON_TABLE path specification", 0>>();
-  // @ts-expect-error JSON_TABLE is only allowed in FROM
-  expectTypeOf<Row<"SELECT JSON_TABLE(jsonb '[]', '$' COLUMNS (a int))">>().toEqualTypeOf<{}>();
-  // @ts-expect-error only one FOR ORDINALITY column per path
-  expectTypeOf<Row<"SELECT * FROM JSON_TABLE(jsonb '[]', '$' COLUMNS (a FOR ORDINALITY, b FOR ORDINALITY))">>().toEqualTypeOf<{}>();
-  // @ts-expect-error the JSON_TABLE level only allows ERROR or EMPTY [ARRAY] ON ERROR
-  expectTypeOf<Row<"SELECT * FROM JSON_TABLE(jsonb '[]', '$' COLUMNS (a int) NULL ON ERROR)">>().toEqualTypeOf<{}>();
+  // JSON_TABLE is only allowed in FROM
+  expectTypeOf<V<"SELECT JSON_TABLE(jsonb '[]', '$' COLUMNS (a int))">>().toEqualTypeOf<SqlError<"syntax error at or near (", 2>>();
+  expectTypeOf<V<"SELECT * FROM JSON_TABLE(jsonb '[]', '$' COLUMNS (a FOR ORDINALITY, b FOR ORDINALITY))">>()
+    .toEqualTypeOf<SqlError<"only one FOR ORDINALITY column is allowed", 15>>();
+  expectTypeOf<V<"SELECT * FROM JSON_TABLE(jsonb '[]', '$' COLUMNS (a int) NULL ON ERROR)">>().toEqualTypeOf<SqlError<"invalid ON ERROR behavior", 14>>();
 });
 
 test("parameters", () => {

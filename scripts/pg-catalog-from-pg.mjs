@@ -16,7 +16,7 @@
 // introspect`). Columns of set-returning functions (pg_stat_get_activity(), pg_lock_status(),
 // ...) are nullable unless listed in FUNCTION_COLUMNS_NOT_NULL, checked against the C source.
 //
-// The output targets the Postgres major version it was generated from (17); the conformance
+// The output targets the Postgres major version it was generated from (18); the conformance
 // test packages/core/test/conformance/pg-catalog.test.ts regenerates it and compares.
 import { readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -201,7 +201,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const { Client } = require("pg");
   const url = process.env.TYPESQL_PG_URL;
   if (!url) {
-    console.error("set TYPESQL_PG_URL (e.g. docker run -d -p 5432:5432 -e POSTGRES_PASSWORD=x postgres:17)");
+    console.error("set TYPESQL_PG_URL (e.g. docker run -d -p 5432:5432 -e POSTGRES_PASSWORD=x postgres:18)");
     process.exit(2);
   }
   const client = new Client({ connectionString: url });

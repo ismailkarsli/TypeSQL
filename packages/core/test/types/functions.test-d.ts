@@ -1,8 +1,8 @@
 import { expectTypeOf, test } from "vitest";
-import type { SqlError } from "../../src/index.js";
-import type { Row, V, Interval } from "./_schema.js";
+import type { CacheAnalysis, SqlError } from "../../src/index.js";
+import type { DB, Row, V, Interval } from "./_schema.js";
 
-// Return types verified against PostgreSQL 17 (`pg_proc` and `select pg_typeof(f(...))`).
+// Return types verified against PostgreSQL 18 (`pg_proc` and `select pg_typeof(f(...))`).
 // Default type map: int2/int4/float4/float8 → number, int8/numeric → string, bytea → Uint8Array,
 // date/timestamp(tz) → Date, time → string, interval → Interval, json(b) → unknown, void → void.
 
@@ -22,6 +22,21 @@ test("string functions", () => {
   // special syntax forms
   expectTypeOf<Row<"SELECT substring(label FROM 1 FOR 2) AS a, substring(bin FROM 1) AS b, trim(BOTH 'x' FROM label) AS c, trim(label, 'x') AS d, position('a' IN label) AS e, overlay(label PLACING 'x' FROM 1 FOR 2) AS f, substring(n_text, 1) AS g FROM things">>()
     .toEqualTypeOf<{ a: string; b: Uint8Array; c: string; d: string; e: number; f: string; g: string | null }>();
+});
+
+test("PostgreSQL 18 overloads: reverse(bytea), json(b)_strip_nulls(…, strip_in_arrays)", () => {
+  expectTypeOf<Row<"SELECT reverse(bin) AS a, reverse(label) AS b, jsonb_strip_nulls(data, true)::text AS c, json_strip_nulls(doc, false)::text AS d, jsonb_strip_nulls(data, n_flag)::text AS e FROM things">>()
+    .toEqualTypeOf<{ a: Uint8Array; b: string; c: string; d: string; e: string | null }>();
+  // an untyped NULL resolves to text, Postgres's preferred string type
+  expectTypeOf<Row<"SELECT reverse(NULL) AS a">>().toEqualTypeOf<{ a: string | null }>();
+});
+
+test("PostgreSQL 18 functions without curated signatures: results nullable where pg_proc says so", () => {
+  // `unknown` and `void` results hide NULL in a row type: the analysis keeps it
+  type Nullable<Q extends string> = CacheAnalysis<DB, Q> extends { readonly cols: infer C extends readonly { readonly t: { readonly nullable: boolean } }[] } ? { [K in keyof C]: C[K]["t"]["nullable"] } : never;
+  expectTypeOf<Nullable<"SELECT array_reverse(nums) AS a, array_sort(nums) AS b FROM things">>().toEqualTypeOf<[true, true]>();
+  expectTypeOf<Nullable<"SELECT pg_clear_attribute_stats('s', 't', 'c', false) AS a, pg_clear_relation_stats('s', 't') AS b">>().toEqualTypeOf<[true, true]>();
+  expectTypeOf<Row<"SELECT pg_restore_attribute_stats('relation', 'x') AS a, pg_restore_relation_stats('relation', 'x') AS b">>().toEqualTypeOf<{ a: boolean | null; b: boolean | null }>();
 });
 
 test("numeric functions: integer inputs pick the float8 overload, numeric stays numeric", () => {

@@ -108,6 +108,19 @@ describe.skipIf(!db)("typesql introspect against Postgres", () => {
     }
   }, 30_000);
 
+  test("views that read each other (Postgres allows the cycle) are introspected, as nullable", async () => {
+    await client.query("CREATE SCHEMA cyc");
+    try {
+      await client.query("CREATE VIEW cyc.v1 AS SELECT 1 AS a");
+      await client.query("CREATE VIEW cyc.v2 AS SELECT a FROM cyc.v1");
+      await client.query("CREATE OR REPLACE VIEW cyc.v1 AS SELECT a FROM cyc.v2");
+      const info = await introspect(client, { schemas: ["cyc"] });
+      expect(info.relations.map((r) => [r.name, r.columns.map((c) => [c.name, c.nullable])])).toEqual([["v1", [["a", true]]], ["v2", [["a", true]]]]);
+    } finally {
+      await client.query("DROP SCHEMA cyc CASCADE");
+    }
+  }, 30_000);
+
   test("the default schema list skips system schemas, public first", async () => {
     const info = await introspect(client);
     expect(info.schemas).toEqual(["public", "auth"]);

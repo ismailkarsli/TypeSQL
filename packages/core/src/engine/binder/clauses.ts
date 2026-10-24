@@ -9,7 +9,7 @@ import type { TypeList, TypeOf } from "../typer/typeof.js";
  * Validation of the clauses that refer to a query level's output: ORDER BY, GROUP BY,
  * DISTINCT ON, the WINDOW clause and window references, and boolean conditions.
  * Every check returns `true` (or the resolved keys) or an `SqlError`. Messages follow
- * PostgreSQL 17.
+ * PostgreSQL 18.
  *
  * Name resolution (Postgres `findTargetlistEntrySQL92`):
  *   - an integer literal is a 1-based output position;

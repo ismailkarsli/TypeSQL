@@ -14,7 +14,7 @@ import type { TypeXml } from "./xml.js";
  * `TypeOf<E, Ctx>` → `{ type, nullable }` or `SqlError`.
  * Every rule evaluates its operands first and propagates the first error.
  *
- * Nullability rules (verified against PostgreSQL 17):
+ * Nullability rules (verified against PostgreSQL 18):
  *   IS [NOT] NULL/TRUE/FALSE/DISTINCT FROM, EXISTS, ARRAY[...], ROW(...) → never null
  *   scalar subquery, array subscript, NULLIF, JSON extraction → always nullable
  *   AND/OR/NOT, comparisons, LIKE, BETWEEN, IN, = ANY → nullable if any operand is

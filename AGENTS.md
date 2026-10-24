@@ -31,6 +31,16 @@ test pass. Record disagreements in `packages/core/test/pg-regress/baseline.json`
 PostgreSQL release; a new disagreement is a parser regression to fix. See
 [packages/docs/internals/development.md](packages/docs/internals/development.md).
 
+## Definition of done
+
+A change to the engine or a new feature is done when the checks in
+[packages/docs/internals/development.md](packages/docs/internals/development.md#definition-of-done)
+pass: exact type tests (with a negative case for every nullability rule), no new disagreement in
+the type oracles (`pnpm test:oracle`, with `--regress --views` for engine changes) or the fuzzer
+(`pnpm fuzz`), changed-lines mutation testing (`pnpm mutate:types --changed`,
+`pnpm mutate:runtime --changed`), coverage thresholds, and the change intent and `CacheVersion`.
+Engine bugs the oracles find are baselined with an issue; fix them in their own commits.
+
 ## Releases
 
 Don't release, publish, tag, or edit `.changeset/ledger.yaml` or `.changeset/changelogs/`

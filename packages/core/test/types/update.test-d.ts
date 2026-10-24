@@ -97,9 +97,7 @@ test("sql() call sites", () => {
   sql("UPDATE users SET email = $1 WHERE id = $2", "a", 1);
   // @ts-expect-error wrong param types
   sql("UPDATE users SET email = $1 WHERE id = $2", 1, "a");
-  // @ts-expect-error unknown SET column
-  sql("UPDATE users SET nope = 1");
-  // @ts-expect-error view target
-  sql("UPDATE active_users SET email = 'a'");
+  expectTypeOf<Validate<DB, "UPDATE users SET nope = 1">>().toEqualTypeOf<SqlError<'column "nope" of relation "users" does not exist', 3>>();
+  expectTypeOf<Validate<DB, "UPDATE active_users SET email = 'a'">>().toEqualTypeOf<SqlError<'cannot update view "active_users"', 1>>();
   expectTypeOf<Params<"UPDATE users SET email = $1 WHERE id = $2">>().toEqualTypeOf<[string, number | null]>();
 });

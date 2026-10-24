@@ -9,10 +9,10 @@
 // `--update` rewrites baseline.json (only the named tests' entries when tests are named).
 // See packages/docs/internals/development.md.
 import { spawnSync } from "node:child_process";
-import { createHash } from "node:crypto";
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
+import { compareBaseline, hashOf, preview, readBaseline, scoped, showEntries, sortedEntries, writeBaseline } from "../oracle/baseline.ts";
 import { classify } from "./psql.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -146,12 +146,6 @@ function kindOf(e) {
 const isSemantic = (message) =>
   !/^syntax error|^unterminated|^unexpected character|not supported/.test(message);
 
-const hashOf = (sql) => createHash("sha256").update(sql).digest("hex").slice(0, 16);
-const preview = (sql) => {
-  const flat = sql.replace(/\s+/g, " ");
-  return flat.length > 120 ? `${flat.slice(0, 117)}...` : flat;
-};
-
 const current = {};
 const tally = { statements: checked.length + skippedVars + skippedStrings, psqlVariables: skippedVars, nonstandardStrings: skippedStrings, pgUnknown: 0, agree: 0, skipped: 0, rejects: 0, accepts: 0, crash: 0 };
 for (const e of checked) {
@@ -171,28 +165,8 @@ for (const e of checked) {
   });
 }
 
-const baseline = existsSync(baselinePath) ? JSON.parse(readFileSync(baselinePath, "utf8")) : null;
-const keyOf = (test, m) => `${test} ${m.kind} ${m.hash}`;
-
-/** Multiset difference a − b over mismatch keys. */
-function minus(a, b) {
-  const counts = new Map();
-  for (const [test, list] of Object.entries(b)) for (const m of list) counts.set(keyOf(test, m), (counts.get(keyOf(test, m)) ?? 0) + 1);
-  const left = [];
-  for (const [test, list] of Object.entries(a)) {
-    for (const m of list) {
-      const k = keyOf(test, m);
-      if (counts.get(k)) counts.set(k, counts.get(k) - 1);
-      else left.push({ test, ...m });
-    }
-  }
-  return left;
-}
-
-const scoped = (mismatches) => Object.fromEntries(Object.entries(mismatches ?? {}).filter(([t]) => tests.includes(t)));
-const expected = scoped(baseline?.mismatches);
-const added = minus(current, expected);
-const fixed = minus(expected, current);
+const baseline = readBaseline(baselinePath, "mismatches");
+const { added, fixed } = compareBaseline(current, scoped(baseline?.entries ?? {}, (t) => tests.includes(t)));
 
 const summary = [
   `PostgreSQL ${version} regression tests (${commit.slice(0, 10)}), ${tests.length} files, tsc ${seconds.toFixed(1)} s`,
@@ -207,10 +181,9 @@ console.log(summary);
 if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `## PostgreSQL regression tests\n\n${summary}\n`);
 
 if (update) {
-  const mismatches = only.length ? { ...baseline?.mismatches, ...Object.fromEntries(tests.map((t) => [t, undefined])) } : {};
+  const mismatches = only.length ? { ...baseline?.entries, ...Object.fromEntries(tests.map((t) => [t, undefined])) } : {};
   Object.assign(mismatches, current);
-  const sorted = Object.fromEntries(Object.keys(mismatches).filter((t) => mismatches[t]?.length).sort().map((t) => [t, mismatches[t]]));
-  writeBaseline({ postgres: version, commit, mismatches: sorted });
+  writeBaseline(baselinePath, { postgres: version, commit }, "mismatches", sortedEntries(mismatches));
   console.log(`\nWrote ${relative(root, baselinePath)}: ${added.length} added, ${fixed.length} removed.`);
   process.exit(0);
 }
@@ -220,14 +193,11 @@ if (!baseline) {
   console.error(`\nNo baseline. Run \`pnpm test:pg-regress --update\` to create ${relative(root, baselinePath)}.`);
   process.exit(1);
 }
-if (baseline.commit !== commit) {
-  console.error(`\nbaseline.json is for PostgreSQL ${baseline.postgres} (${baseline.commit.slice(0, 10)}), vendor/postgres is ${version} (${commit.slice(0, 10)}). Run \`pnpm test:pg-regress --update\` and review the diff.`);
+if (baseline.pins.commit !== commit) {
+  console.error(`\nbaseline.json is for PostgreSQL ${baseline.pins.postgres} (${String(baseline.pins.commit).slice(0, 10)}), vendor/postgres is ${version} (${commit.slice(0, 10)}). Run \`pnpm test:pg-regress --update\` and review the diff.`);
   failed = true;
 }
-const show = (list) => {
-  for (const m of list.slice(0, 50)) console.error(`  ${m.test}.sql:${m.line}  [${m.kind}]  ${m.sql}\n      postgres: ${m.pg}\n      parser:   ${m.parser}`);
-  if (list.length > 50) console.error(`  … and ${list.length - 50} more`);
-};
+const show = (list) => console.error(showEntries(list, (m) => `  ${m.group}.sql:${m.line}  [${m.kind}]  ${m.sql}\n      postgres: ${m.pg}\n      parser:   ${m.parser}`));
 if (added.length) {
   failed = true;
   console.error(`\n${added.length} new disagreement(s) with Postgres:`);
@@ -247,13 +217,6 @@ function git(cwd, ...argv) {
   const r = spawnSync("git", ["-C", cwd, ...argv], { encoding: "utf8" });
   if (r.status !== 0) fail(`git ${argv.join(" ")} failed in ${relative(root, cwd)}:\n${r.stderr}`);
   return r.stdout.trim();
-}
-
-/** One mismatch per line, so baseline diffs read well. */
-function writeBaseline(b) {
-  const tests = Object.entries(b.mismatches).map(([t, list]) => `    ${JSON.stringify(t)}: [\n${list.map((m) => `      ${JSON.stringify(m)}`).join(",\n")}\n    ]`);
-  const text = `{\n  "postgres": ${JSON.stringify(b.postgres)},\n  "commit": ${JSON.stringify(b.commit)},\n  "mismatches": {\n${tests.join(",\n")}\n  }\n}\n`;
-  writeFileSync(baselinePath, text);
 }
 
 /** The text of a string literal type as tsc prints it; other types as printed. */

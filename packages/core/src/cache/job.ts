@@ -18,12 +18,10 @@
  * computed cold.
  */
 import { watch, type FSWatcher } from "node:fs";
-import { createRequire } from "node:module";
 import { dirname, join, relative, sep } from "node:path";
-import { pathToFileURL } from "node:url";
-import type { API as AsyncAPI, Checker, Program, Snapshot, Type } from "typescript/async";
-import type { Node, SourceFile, VariableStatement } from "typescript/ast";
-import { discover, type Kinds } from "./discover.js";
+import type { Checker, Type } from "typescript/async";
+import { discover } from "./discover.js";
+import { badDeclarations, declarations, declTypes, evaluateAnalyses, lineOf, PROBE_HEAD, ProbeSession } from "./evaluate.js";
 import { canonical, hash, render, type CacheFile, type CallEntry, type DdlEntry, type Entry, type Group, type Snapshot as DepSnapshot } from "./format.js";
 import { coreNames, names, Printer } from "./print.js";
 import { scanNames, touchesAllTables } from "./scan.js";
@@ -50,67 +48,32 @@ export interface PassResult {
   readonly ms: number;
 }
 
-/** The project's `typescript` package: its async API, fs helpers and syntax kinds. */
-interface TypeScript {
-  readonly API: typeof AsyncAPI;
-  readonly createFileSystemLayer: (files: readonly (readonly [string, string])[]) => unknown;
-  readonly kinds: Kinds & { readonly VariableStatement: number };
-}
-
-async function loadTypeScript(configFile: string): Promise<TypeScript> {
-  const req = createRequire(configFile);
-  const load = (spec: string): Promise<Record<string, unknown>> => import(pathToFileURL(req.resolve(spec)).href) as Promise<Record<string, unknown>>;
-  const [api, fs, ast] = await Promise.all([load("typescript/async"), load("typescript/fs"), load("typescript/ast")]);
-  const SyntaxKind = ast.SyntaxKind as Record<string, number>;
-  return {
-    API: api.API as typeof AsyncAPI,
-    createFileSystemLayer: fs.createFileSystemLayer as TypeScript["createFileSystemLayer"],
-    kinds: {
-      CallExpression: SyntaxKind.CallExpression!,
-      PropertyAccessExpression: SyntaxKind.PropertyAccessExpression!,
-      TypeReference: SyntaxKind.TypeReference!,
-      LiteralType: SyntaxKind.LiteralType!,
-      StringLiteral: SyntaxKind.StringLiteral!,
-      TypeAliasDeclaration: SyntaxKind.TypeAliasDeclaration!,
-      VariableStatement: SyntaxKind.VariableStatement!,
-    },
-  };
-}
-
-const PROBE_HEAD = `import type * as __T from "@typesql/core";\nexport declare const __v: __T.CacheVersion;\nexport declare const __fc: __T.FunctionCatalog;\n`;
 const MISSING = "__T.Missing";
 const lit = (s: string): string => JSON.stringify(s);
 
 /** One TypeScript session on one project; `pass()` brings the cache file up to date. */
 export class Session {
-  private ts: TypeScript | undefined;
-  private api: AsyncAPI | undefined;
-  private snapshot: Snapshot | undefined;
-  private changed = new Set<string>();
-  private disposed = false;
+  private readonly session: ProbeSession;
   readonly probe: string;
 
   constructor(private readonly o: JobOptions) {
     this.probe = join(dirname(o.cacheFile), "__typesql_probe__.ts");
+    this.session = new ProbeSession(o.configFile, this.probe);
   }
 
   /** Files changed on disk since the last pass (the next pass tells TypeScript). */
   markChanged(files: Iterable<string>): void {
-    for (const f of files) this.changed.add(f);
+    this.session.markChanged(files);
   }
 
   /** Close the TypeScript session; the next pass opens a new one. */
-  async close(): Promise<void> {
-    const api = this.api;
-    this.api = undefined;
-    this.snapshot = undefined;
-    await api?.close();
+  close(): Promise<void> {
+    return this.session.close();
   }
 
   /** Close for good: a pass in progress fails at its next request instead of reopening. */
-  async dispose(): Promise<void> {
-    this.disposed = true;
-    await this.close();
+  dispose(): Promise<void> {
+    return this.session.dispose();
   }
 
   private log(m: string): void {
@@ -118,26 +81,11 @@ export class Session {
   }
 
   /** A program snapshot with `probe` as the probe file's content. */
-  private async withProbe(probe: string): Promise<{ program: Program; checker: Checker; sf: SourceFile }> {
-    if (this.disposed) throw new Error("typesql: the job was stopped");
-    const ts = (this.ts ??= await loadTypeScript(this.o.configFile));
-    const fileSystem = ts.createFileSystemLayer([[this.probe, probe]]) as never;
-    if (!this.api || !this.snapshot) {
-      this.api = new ts.API({ cwd: dirname(this.o.configFile) });
-      this.snapshot = await this.api.createSnapshot({ openProjects: [this.o.configFile], fileSystem });
-      this.changed.clear();
-    } else {
-      const changed = [...this.changed, this.probe];
-      this.changed.clear();
-      const previous = this.snapshot;
-      this.snapshot = await previous.update({ fileSystem, fileNotifications: { changed }, ensurePrograms: true });
-      void previous.dispose();
-    }
-    const project = this.snapshot.getConfiguredProject(this.o.configFile);
-    if (!project) throw new Error(`typesql: project ${this.o.configFile} did not load`);
-    const sf = await project.program.getSourceFile(this.probe);
-    if (!sf) throw new Error(`typesql: ${relative(dirname(this.o.configFile), this.o.cacheFile)} is not in a directory the project includes .ts files from`);
-    return { program: project.program, checker: project.checker, sf };
+  private withProbe(probe: string) {
+    return this.session.withProbe(probe).catch((e: Error) => {
+      if (/is not in a directory the project includes/.test(e.message)) throw new Error(`typesql: ${relative(dirname(this.o.configFile), this.o.cacheFile)} is not in a directory the project includes .ts files from`);
+      throw e;
+    });
   }
 
   async pass(): Promise<PassResult> {
@@ -145,7 +93,7 @@ export class Session {
     const o = this.o;
     const owner = relative(dirname(o.cacheFile), o.configFile).split(sep).join("/");
     const existing = readCache(o.cacheFile, o.engine);
-    const kinds = (this.ts ??= await loadTypeScript(o.configFile)).kinds;
+    const kinds = (await this.session.typescript()).kinds;
 
     // ── 1. discover, and print everything that comes from the project's types ──
     let { program, checker, sf } = await this.withProbe(PROBE_HEAD);
@@ -327,8 +275,8 @@ export class Session {
     });
     ({ program, checker, sf } = await this.withProbe(probe));
     printer = new Printer(checker, sf, o.isCorePath);
-    let types = await declTypes(checker, sf, kinds);
-    let bad = await badDeclarations(program, sf, kinds);
+    const types = await declTypes(checker, sf, kinds);
+    const bad = await badDeclarations(program, sf);
     const version = await print(types.get("__v")!);
     if (version !== lit(o.engine)) throw new Error(`typesql: the project's @typesql/core has CacheVersion ${version}, this job ${o.engine}`);
     const hints = new Map<string, string>();
@@ -389,23 +337,18 @@ export class Session {
       } else analyses.push({ g: site.g, text, site });
     }
     if (analyses.length) {
-      let probe2 = probe;
-      analyses.forEach((a, i) => (probe2 += `export declare const __a_${i}: __T.CacheAnalysis<DB_${a.g.id}, ${lit(a.text)}>;\n`));
-      ({ program, checker, sf } = await this.withProbe(probe2));
-      printer = new Printer(checker, sf, o.isCorePath);
-      types = await declTypes(checker, sf, kinds);
-      bad = await badDeclarations(program, sf, kinds);
-      await Promise.all(analyses.map(async (a, i) => {
-        const t = types.get(`__a_${i}`);
-        if (!t || bad.has(`__a_${i}`)) return;
-        const text = await print(t);
-        const isErr = /^__T\.SqlError</.test(text);
+      const results = await evaluateAnalyses(this.session, probe, analyses.map((a) => ({ db: `DB_${a.g.id}`, text: a.text })), o.isCorePath);
+      analyses.forEach((a, i) => {
+        const r = results[i]!;
+        if (!("text" in r)) return;
+        // Stryker disable next-line Regex: an analysis is an SqlError or an object type, which never holds one
+        const isErr = /^__T\.SqlError</.test(r.text);
         // function-name typos hint from the whole catalog, which no dependency covers
-        if (isErr && /function .* does not exist/.test(text)) return;
+        if (isErr && /function .* does not exist/.test(r.text)) return;
         const e = entryFor(a.g, a.text, depsOf([a.text, ...a.site.extraWords], isErr));
-        e.a = text;
+        e.a = r.text;
         computed++;
-      }));
+      });
     }
 
     // ── 4. merge, validate, write ──
@@ -595,52 +538,6 @@ function stringLiterals(text: string): string[] {
 }
 
 const sameTuple = (a: readonly string[] | undefined, b: readonly string[] | null | undefined): boolean => !!a && !!b && a.length === b.length && a.every((x, i) => x === b[i]);
-
-/** `export declare const name: …` declarations of the probe, by name. */
-function declarations(sf: SourceFile, kinds: TypeScript["kinds"]): Map<string, Node> {
-  const out = new Map<string, Node>();
-  for (const st of sf.statements) {
-    if (st.kind !== kinds.VariableStatement) continue;
-    const d = (st as VariableStatement).declarationList.declarations[0];
-    if (d && "text" in d.name) out.set((d.name as { text: string }).text, d.name);
-  }
-  return out;
-}
-
-async function declTypes(checker: Checker, sf: SourceFile, kinds: TypeScript["kinds"]): Promise<Map<string, Type>> {
-  const decls = declarations(sf, kinds);
-  const names = [...decls.keys()];
-  const types = names.length ? await checker.getTypeAtLocation(names.map((n) => decls.get(n)!)) : [];
-  return new Map(names.map((n, i) => [n, types[i]!]));
-}
-
-/** Probe declarations whose line has a compile error (an alias the probe could not resolve, …). */
-async function badDeclarations(program: Program, sf: SourceFile, kinds: TypeScript["kinds"]): Promise<Set<string>> {
-  const errors = (await program.getSemanticDiagnostics(sf.fileName)).filter((d) => d.category === 1);
-  if (!errors.length) return new Set();
-  const badLines = new Set(errors.map((d) => d.startPosition?.line ?? lineOf(sf.text, d.pos)));
-  // an alias line (`type X = …`) poisons the declarations that use it: drop by alias name
-  const lines = sf.text.split("\n");
-  const badAliases = new Set<string>();
-  lines.forEach((l, i) => {
-    const m = /^type (\w+) =/.exec(l);
-    if (m && badLines.has(i)) badAliases.add(m[1]!);
-  });
-  const out = new Set<string>();
-  lines.forEach((l, i) => {
-    const m = /^export declare const (\w+):/.exec(l);
-    if (!m) return;
-    if (badLines.has(i) || [...badAliases].some((a) => new RegExp(`\\b${a}\\b`).test(l))) out.add(m[1]!);
-  });
-  void kinds;
-  return out;
-}
-
-const lineOf = (text: string, offset: number): number => {
-  let line = 0;
-  for (let i = 0; i < offset && i < text.length; i++) if (text.charCodeAt(i) === 10) line++;
-  return line;
-};
 
 /** The rendered file with each line mapped to the entry (`CacheFile.owners` id) it belongs to. */
 function renderWithLines(file: CacheFile): { text: string; lines: Map<number, string> } {

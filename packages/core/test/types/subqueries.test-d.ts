@@ -2,7 +2,7 @@ import { expectTypeOf, test } from "vitest";
 import type { SqlError } from "../../src/index.js";
 import type { Row, V } from "./_schema.js";
 
-// Subqueries, derived tables and LATERAL, verified against PostgreSQL 17.
+// Subqueries, derived tables and LATERAL, verified against PostgreSQL 18.
 
 test("scalar subqueries are nullable and named after the inner first target", () => {
   expectTypeOf<Row<"SELECT (SELECT max(id) FROM users) AS m">>().toEqualTypeOf<{ m: number | null }>();

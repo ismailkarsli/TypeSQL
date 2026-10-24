@@ -19,7 +19,7 @@ const { Client } = require("pg");
 
 const url = process.env.TYPESQL_PG_URL;
 if (!url) {
-  console.error("set TYPESQL_PG_URL (e.g. docker run -d -p 5432:5432 -e POSTGRES_PASSWORD=x postgres:17)");
+  console.error("set TYPESQL_PG_URL (e.g. docker run -d -p 5432:5432 -e POSTGRES_PASSWORD=x postgres:18)");
   process.exit(2);
 }
 

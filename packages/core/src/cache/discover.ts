@@ -20,6 +20,7 @@ export interface Kinds {
 export interface SqlSite {
   /** The query literal (with `:name` and `${sql.param()}` markers as written). */
   readonly key: string;
+  readonly file: string;
   readonly db: Type;
   readonly tm: Type;
   readonly keys: Type;
@@ -30,11 +31,13 @@ export interface SqlSite {
 /** A statement written as a type: `RowOf<DB, TM, "SELECT …">`, or a literal argument of the project's own alias. */
 export interface TypeSite {
   readonly key: string;
+  readonly file: string;
   readonly db: Type;
 }
 
 export interface DdlSite {
   readonly key: string;
+  readonly file: string;
   /** The schema before the step (`Migrations<DB>`'s `DB`). */
   readonly db: Type;
 }
@@ -80,14 +83,15 @@ export async function discover(
         fileDbs.set(db.id, db);
         const key = literalOf(args[qAt]!, kinds);
         if (key === null) return;
-        (sym!.name in DDL_ALIASES ? ddl : types).push({ key, db });
+        (sym!.name in DDL_ALIASES ? ddl : types).push({ key, db, file: fileName });
         return;
       }
       // the project's own alias of a core one: `type Row<Q extends string> = RowOf<DB, TM, Q>`
       const wrapped = sym && !isCore ? await wrappedCoreAlias(sym, program, checker, kinds, isCorePath, aliasMemo) : null;
       if (wrapped) {
         const key = args[wrapped.param] ? literalOf(args[wrapped.param]!, kinds) : null;
-        if (key !== null) (wrapped.ddl ? ddl : types).push({ key, db: wrapped.db });
+        // Stryker disable next-line ConditionalExpression: a null key (the alias given a non-literal) gives no entry either way; this skips evaluating it
+        if (key !== null) (wrapped.ddl ? ddl : types).push({ key, db: wrapped.db, file: fileName });
       } else if (!isCore) {
         for (const a of args) {
           const key = literalOf(a, kinds);
@@ -106,7 +110,8 @@ export async function discover(
         const a = args[i]!;
         if (!a.isStringLiteralType() || !(await isCoreRef(r, ["Migrations"], isCorePath))) return;
         const [db] = await checker.getTypeArguments(r as never);
-        if (db) ddl.push({ key: a.value, db });
+        // Stryker disable next-line ConditionalExpression: a Migrations<DB> receiver has its type argument
+        if (db) ddl.push({ key: a.value, db, file: fileName });
       }));
     }
 
@@ -123,10 +128,10 @@ export async function discover(
       if (!a.isStringLiteralType()) return;
       const call = others[i]!;
       const slots = SLOT.test(a.value) && call.arguments.length > 1 ? await checker.getTypeAtLocation(call.arguments[1]!) : null;
-      sql.push({ key: a.value, db, tm, keys, slots });
+      sql.push({ key: a.value, db, tm, keys, slots, file: fileName });
     }));
 
-    for (const key of loose) for (const db of fileDbs.values()) (LOOKS_LIKE_DDL.test(key) ? ddl : types).push({ key, db });
+    for (const key of loose) for (const db of fileDbs.values()) (LOOKS_LIKE_DDL.test(key) ? ddl : types).push({ key, db, file: fileName });
   }
   return { sql, types, ddl };
 }

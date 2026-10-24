@@ -3,7 +3,7 @@ import type { Cols, Ctx } from "../types.js";
 import type { ProjectSelect } from "./select.js";
 
 /**
- * Postgres output column naming (`FigureColnameInternal`), verified against PostgreSQL 17.
+ * Postgres output column naming (`FigureColnameInternal`), verified against PostgreSQL 18.
  *
  * Postgres ranks a candidate name by strength: 2 for a "real" name, 1 for a fallback that
  * an enclosing cast or CASE may replace, 0 for none (`?column?`). Here `Fig<E>` returns a

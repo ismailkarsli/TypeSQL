@@ -140,10 +140,9 @@ test("sql() call sites", () => {
   sql("INSERT INTO users (email) VALUES ($1) RETURNING id", 1);
   // @ts-expect-error missing param
   sql("INSERT INTO users (email) VALUES ($1)");
-  // @ts-expect-error unknown column
-  sql("INSERT INTO users (emial) VALUES ('a')");
-  // @ts-expect-error required column missing
-  sql("INSERT INTO users (display_name) VALUES ('a')");
-  // @ts-expect-error view target
-  sql("INSERT INTO active_users (email) VALUES ('a')");
+  expectTypeOf<Validate<DB, "INSERT INTO users (emial) VALUES ('a')">>()
+    .toEqualTypeOf<SqlError<'column "emial" of relation "users" does not exist. Perhaps you meant the column "email"?', 4>>();
+  expectTypeOf<Validate<DB, "INSERT INTO users (display_name) VALUES ('a')">>()
+    .toEqualTypeOf<SqlError<'null value in column "email" of relation "users" violates not-null constraint', 2>>();
+  expectTypeOf<Validate<DB, "INSERT INTO active_users (email) VALUES ('a')">>().toEqualTypeOf<SqlError<'cannot insert into view "active_users"', 2>>();
 });

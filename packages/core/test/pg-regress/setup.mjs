@@ -1,7 +1,8 @@
 #!/usr/bin/env node
-// Checks out the vendor/postgres submodule with only what the regression run reads:
-// src/test/regress/{sql,expected} (and the top-level files, which hold the version). The clone
-// is shallow and fetches file contents only for those paths, ~20 MB instead of the whole tree.
+// Checks out the vendor/postgres submodule with only what the regression runs read:
+// src/test/regress/{sql,expected,data} (and the top-level files, which hold the version; `data`
+// is what the type oracle's replay COPYs). The clone is shallow and fetches file contents only
+// for those paths, ~25 MB instead of the whole tree.
 //
 //   node setup.mjs          check out the commit the repository pins
 //   node setup.mjs <ref>    move the submodule to another tag or commit, e.g. REL_18_7, then
@@ -17,7 +18,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "../../../..");
 const path = "vendor/postgres";
 const vendor = join(root, path);
 const url = "https://github.com/postgres/postgres.git";
-const sparse = ["src/test/regress/sql", "src/test/regress/expected"];
+const sparse = ["src/test/regress/sql", "src/test/regress/expected", "src/test/regress/data"];
 const ref = process.argv[2];
 
 // `git ls-files -s` prints `160000 <sha> 0\t<path>` for a submodule.
@@ -39,6 +40,10 @@ if (!existsSync(join(vendor, ".git")) && existsSync(modules)) {
   git(root, "submodule", "absorbgitdirs", "--", path);
 } else if (spawnSync("git", ["-C", vendor, "config", "--bool", "core.sparseCheckout"], { encoding: "utf8" }).stdout.trim() !== "true") {
   console.log(`${path} is a full checkout; leaving it as is.`);
+} else {
+  // A sparse checkout from before a path was added to `sparse`.
+  const listed = git(vendor, "sparse-checkout", "list").split("\n");
+  if (sparse.some((p) => !listed.includes(p))) git(vendor, "sparse-checkout", "set", ...sparse);
 }
 
 const target = ref ?? pinned;

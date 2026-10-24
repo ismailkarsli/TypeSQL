@@ -5,7 +5,7 @@ import type { LitCommon } from "../json.js";
 /**
  * Operator typing. `BinOpType<Op, L, R>` → ColInfo, `UnOpType<Op, E>` → ColInfo.
  *
- * Every rule here was checked against PostgreSQL 17 (`select pg_typeof(...)`), see the
+ * Every rule here was checked against PostgreSQL 18 (`select pg_typeof(...)`), see the
  * comments on the individual tables. Strict operators are nullable when either side is
  * nullable; JSON extraction operators are always nullable (missing key → NULL). Unknown
  * combinations yield `unknown` (nullable), which a cast fixes.
@@ -118,7 +118,7 @@ type BitOp<L extends string, R extends string> =
 type Shift<L extends string> = L extends IntT | BitT ? L : "bool";
 
 /**
- * Arithmetic (`+ - * / %`). Table verified against PG 17; rows not listed are errors in
+ * Arithmetic (`+ - * / %`). Table verified against PG 18; rows not listed are errors in
  * Postgres and yield `unknown`. `unknown` operands resolve like an untyped literal: to the
  * only candidate operator for the other side (`ts + '1 day'` → ts) or `unknown` when
  * Postgres itself would report an ambiguity (`date + '1'`).
@@ -224,7 +224,7 @@ export type UnOpType<Op extends string, E extends ColInfo> =
  * Common type of two branch types (CASE, COALESCE, GREATEST, ARRAY, ...), following
  * Postgres's UNION/CASE resolution: `unknown`/`null`/`lit` yield to the other side;
  * numerics follow the implicit cast chain (`NumCommon`); date < timestamp < timestamptz;
- * string types keep the first one (`coalesce(vc, label)` → varchar, verified on PG 17);
+ * string types keep the first one (`coalesce(vc, label)` → varchar, verified on PG 18);
  * anything else that differs (int4 vs text, json vs jsonb) has no common type → `unknown`.
  * Structured values (shape.ts) of the same base type merge their shapes.
  * The result may be `lit` (all branches string literals): resolve it with `LitToText`.

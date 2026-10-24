@@ -2,7 +2,7 @@ import { expectTypeOf, test } from "vitest";
 import { createSql, type SqlError } from "../../src/index.js";
 import type { DB, V } from "./_schema.js";
 
-// Error messages (worded like PostgreSQL 17) and positions. The position is a token index:
+// Error messages (worded like PostgreSQL 18) and positions. The position is a token index:
 // the offending token for syntax errors, the first occurrence of the named identifier for
 // semantic errors (0 when the message names none).
 

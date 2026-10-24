@@ -10,7 +10,7 @@ import type { EnumsOf } from "../type-map/index.js";
  * Typed JSON. A `json` / `jsonb` value whose structure is known carries it as a shape (see
  * shape.ts): `Shaped<"jsonb", S>`. Shapes describe the value in SQL terms and are turned into
  * TypeScript types only at the row boundary (`JsonTs`), with Postgres's JSON serialization
- * rules (verified on PostgreSQL 17, `to_json` / `json_build_object` / `json_agg`):
+ * rules (verified on PostgreSQL 18, `to_json` / `json_build_object` / `json_agg`):
  *
  *   int2 int4 int8 float4 float8 numeric      → number (JSON numbers; `JSON.parse` loses int8
  *                                               precision beyond 2^53, NaN/Infinity are strings)

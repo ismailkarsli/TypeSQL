@@ -149,6 +149,7 @@ export class ViewNullability {
   private readonly query: QueryFn;
   private readonly options: NullabilityOptions;
   private readonly views = new Map<string, Promise<boolean[]>>();
+  private readonly analyzing = new Set<string>();
   private readonly atts = new Map<string, Promise<Att[]>>();
   private procs: Promise<Map<string, Proc>> | null = null;
   private operators: Promise<Map<string, Proc>> | null = null;
@@ -161,9 +162,13 @@ export class ViewNullability {
   /** NOT NULL flags of the view's columns, in column order. `relid` is the view's `pg_class.oid`. */
   notNull(relid: string | number): Promise<boolean[]> {
     const key = String(relid);
+    // CREATE OR REPLACE VIEW allows a view that reads itself through others: waiting for its own
+    // analysis would never end
+    if (this.analyzing.has(key)) return Promise.resolve([]);
     let cached = this.views.get(key);
     if (!cached) {
-      cached = this.analyze(key);
+      this.analyzing.add(key);
+      cached = this.analyze(key).finally(() => this.analyzing.delete(key));
       this.views.set(key, cached);
     }
     return cached;

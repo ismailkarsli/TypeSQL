@@ -102,8 +102,7 @@ test("errors", () => {
   expectTypeOf<Validate<DB, "SELECT id FROM users WHERE">>().toEqualTypeOf<SqlError<"syntax error at end of input", 5>>();
   expectTypeOf<Validate<DB, "SELEC id FROM users">>().toEqualTypeOf<SqlError<"syntax error at or near selec", 0>>();
   expectTypeOf<Validate<DB, "SELECT id FROM users">>().toEqualTypeOf<"SELECT id FROM users">();
-  // @ts-expect-error unknown column
-  sql("SELECT nme FROM users");
+  expectTypeOf<Validate<DB, "SELECT nme FROM users">>().toEqualTypeOf<SqlError<'column "nme" does not exist', 1>>();
 });
 
 test("unknown names get a did-you-mean hint", () => {

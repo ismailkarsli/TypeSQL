@@ -15,7 +15,7 @@ const { Client } = require("pg");
 
 const url = process.env.TYPESQL_PG_URL;
 if (!url) {
-  console.error("set TYPESQL_PG_URL (e.g. docker run -d -p 5432:5432 -e POSTGRES_PASSWORD=x postgres:17)");
+  console.error("set TYPESQL_PG_URL (e.g. docker run -d -p 5432:5432 -e POSTGRES_PASSWORD=x postgres:18)");
   process.exit(2);
 }
 
@@ -68,6 +68,10 @@ for (const r of rows) {
   fns.set(r.name, f);
 }
 
+const UNREACHABLE = {
+  overlay: "OVERLAY(… PLACING …) is special syntax and the plain call form is rejected by the parser",
+};
+
 let out = `/**
  * Every other callable \`pg_catalog\` function of PostgreSQL ${version.split(" ")[0]}: names with the
  * return type from \`pg_proc\` but without curated argument signatures. Arguments are not checked
@@ -89,7 +93,11 @@ for (const [name, f] of fns) {
     f.window ? "window: true" : null,
     ret === "unknown" || !f.strict ? "nullable: true" : null,
   ].filter(Boolean);
-  out += `  ${name}: Sig<["..."], ${JSON.stringify(ret)}${flags.length ? `, { ${flags.join("; ")} }` : ""}>;\n`;
+  const equivalent =
+    ret === "record" && flags.length === 1 && f.srf ? " // type-mutate: equivalent bool-flip – a record result types the same with or without srf"
+    : UNREACHABLE[name] ? ` // type-mutate: equivalent – ${UNREACHABLE[name]}`
+    : "";
+  out += `  ${name}: Sig<["..."], ${JSON.stringify(ret)}${flags.length ? `, { ${flags.join("; ")} }` : ""}>;${equivalent}\n`;
 }
 out += "}\n";
 writeFileSync(new URL("../packages/core/src/engine/typer/pg-functions.ts", import.meta.url), out);

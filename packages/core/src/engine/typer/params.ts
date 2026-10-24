@@ -15,7 +15,7 @@ import type { ParamsOfXml, ParamsOfXmlTable } from "./xml.js";
  * `ParamMap` is `{ [n]: ColInfo | ColInfo | ... }` (a union when `$n` is used several
  * times; the TS types are intersected at the boundary).
  *
- * Rules (PLAN §6.7; parameter types verified with PREPARE on PostgreSQL 17):
+ * Rules (PLAN §6.7; parameter types verified with PREPARE on PostgreSQL 18):
  *   col <cmp> $1, $1 <cmp> col         → column type, nullable (comparisons, LIKE, regex,
  *                                        IS DISTINCT FROM; `col = NULL` is legal, it matches nothing)
  *   col <arith> $1, col || $1          → column type (text for `||`), nullable iff the column is;

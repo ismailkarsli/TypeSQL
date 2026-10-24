@@ -5,7 +5,7 @@ import type { CommonLit, DateTimeT, IntT, IsArr, JsonT, LitToText, NumT, RangeT,
 import type { JsonRet } from "../json.js";
 
 /**
- * Function catalog, verified against PostgreSQL 17 (`pg_proc` + `pg_typeof`).
+ * Function catalog, verified against PostgreSQL 18 (`pg_proc` + `pg_typeof`).
  *
  * Users extend it via module augmentation. In an application:
  *
@@ -195,7 +195,7 @@ export interface FunctionCatalog {
   btrim: [Sig<["bytea", "bytea"], "bytea">, Sig<["anystring"], "text">, Sig<["anystring", "anystring"], "text">];
   repeat: Sig<["anystring", "int4"], "text">;
   replace: Sig<["anystring", "anystring", "anystring"], "text">;
-  reverse: Sig<["anystring"], "text">;
+  reverse: [Sig<["anystring"], "text">, Sig<["bytea"], "bytea">];
   split_part: Sig<["anystring", "anystring", "int4"], "text">;
   strpos: Sig<["anystring", "anystring"], "int4">;
   substr: [Sig<["bytea", "int4"], "bytea">, Sig<["bytea", "int4", "int4"], "bytea">, Sig<["anystring", "int4"], "text">, Sig<["anystring", "int4", "int4"], "text">];
@@ -466,8 +466,8 @@ export interface FunctionCatalog {
   jsonb_extract_path_text: Sig<["jsonb", "..."], "text", Nullable>;
   json_typeof: Sig<["json"], "text">;
   jsonb_typeof: Sig<["jsonb"], "text">;
-  json_strip_nulls: Sig<["json"], "json">;
-  jsonb_strip_nulls: Sig<["jsonb"], "jsonb">;
+  json_strip_nulls: [Sig<["json"], "json">, Sig<["json", "bool"], "json">]; // type-mutate: equivalent tuple-swap – one overload per arity, and a two-argument call falls back to the only two-argument one
+  jsonb_strip_nulls: [Sig<["jsonb"], "jsonb">, Sig<["jsonb", "bool"], "jsonb">]; // type-mutate: equivalent tuple-swap – one overload per arity, and a two-argument call falls back to the only two-argument one
   jsonb_set: [Sig<["jsonb", "text[]", "jsonb"], "jsonb">, Sig<["jsonb", "text[]", "jsonb", "bool"], "jsonb">];
   jsonb_set_lax: [
     Sig<["jsonb", "text[]", "jsonb"], "jsonb", { strict: [1, 2] }>, Sig<["jsonb", "text[]", "jsonb", "bool"], "jsonb", { strict: [1, 2] }>,

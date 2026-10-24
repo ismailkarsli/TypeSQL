@@ -3,7 +3,7 @@ import type { SqlError } from "../../src/index.js";
 import type { Row, V } from "./_schema.js";
 
 // DISTINCT [ON], ORDER BY, GROUP BY references, LIMIT / OFFSET / FETCH, locking, TABLE.
-// Verified against PostgreSQL 17.
+// Verified against PostgreSQL 18.
 
 test("DISTINCT and DISTINCT ON do not change the row type; DISTINCT ON is validated", () => {
   expectTypeOf<Row<"SELECT DISTINCT id FROM users">>().toEqualTypeOf<{ id: number }>();

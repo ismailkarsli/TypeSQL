@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createSql, joinFragments, maxParam, quoteIdent, renumberParams, splice } from "../../src/index.js";
+import { createSql, joinFragments, maxParam, quoteIdent, renumberParams, rewriteNamed, splice } from "../../src/index.js";
 
 describe("renumberParams", () => {
   it("offsets placeholders outside literals and comments", () => {
@@ -90,6 +90,16 @@ describe("named parameters", () => {
   });
   it("throws on missing names", () => {
     expect(() => sql.as("SELECT :a, :b", { a: 1 })).toThrow(/missing named parameter :b/);
+  });
+  it("leaves :name inside literals, quoted identifiers, comments and dollar quotes as text", () => {
+    const keep = (text: string) => expect(rewriteNamed(`${text} = :id`)).toEqual({ text: `${text} = $1`, names: ["id"] });
+    keep("SELECT ':x'");
+    keep('SELECT ":x"');
+    keep("SELECT 1 -- :x\n");
+    keep("SELECT 1 /* :x */");
+    keep("SELECT $$ :x $$");
+    keep("SELECT $body$ :x $$ :y $body$");
+    expect(rewriteNamed("DO $$ BEGIN PERFORM :x; END $$")).toEqual({ text: "DO $$ BEGIN PERFORM :x; END $$", names: [] });
   });
   it("combines with fragments", () => {
     const where = sql.fragment("WHERE id > :min", { min: 18 });

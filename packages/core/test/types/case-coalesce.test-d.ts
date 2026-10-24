@@ -1,7 +1,7 @@
 import { expectTypeOf, test } from "vitest";
 import type { Row } from "./_schema.js";
 
-// CASE / COALESCE / NULLIF / GREATEST / LEAST, verified against PostgreSQL 17.
+// CASE / COALESCE / NULLIF / GREATEST / LEAST, verified against PostgreSQL 18.
 // Common-type resolution follows the implicit cast chain int2 → int4 → int8 → numeric → float4 → float8,
 // date → timestamp → timestamptz; an untyped literal yields to the other branch.
 

@@ -175,7 +175,7 @@ if (calibrate) {
   }
   // a hit must stay under 250 instantiations (the design target); a stale cache must cost what no cache does
   if (cache) thresholds.cache = { instantiationsPerHit: Math.min(250, Math.ceil(cache.instantiationsPerHit * 1.3)), staleRatio: 1.05 };
-  writeFileSync(thresholdsPath, JSON.stringify(thresholds, null, 2) + "\n");
+  writeFileSync(thresholdsPath, JSON.stringify(thresholds) + "\n");
   console.log(`wrote thresholds.json (measured x2)`);
 }
 

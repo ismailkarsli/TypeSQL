@@ -2,7 +2,7 @@ import { expectTypeOf, test } from "vitest";
 import type { SqlError } from "../../src/index.js";
 import type { Row, V } from "./_schema.js";
 
-// VALUES lists, verified against PostgreSQL 17.
+// VALUES lists, verified against PostgreSQL 18.
 
 test("standalone VALUES: column1, column2, ... with common types", () => {
   expectTypeOf<Row<"VALUES (1, 'a'), (2, 'b')">>().toEqualTypeOf<{ column1: number; column2: string }>();

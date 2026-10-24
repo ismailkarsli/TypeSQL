@@ -2,7 +2,7 @@ import { expectTypeOf, test } from "vitest";
 import type { DefaultTypeMap, RowOf, SqlError } from "../../src/index.js";
 import type { DB, Row, V } from "./_schema.js";
 
-// Typed JSON built in SQL, verified against PostgreSQL 17 through pg and postgres.js (see the
+// Typed JSON built in SQL, verified against PostgreSQL 18 through pg and postgres.js (see the
 // JSON corpus in test/conformance). Inside JSON, values are serialized by Postgres: numbers
 // (int8 and numeric included) are numbers, timestamps / dates / intervals / bytea / uuid are
 // strings, enums are their values, arrays are arrays and nested JSON is embedded.

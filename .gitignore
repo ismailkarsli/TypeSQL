@@ -14,3 +14,6 @@ pnpm-publish-summary.json
 # packages/docs is part of the repo (overrides a global "docs" ignore rule).
 !docs/
 *.vsix
+.stryker-tmp/
+reports/
+stryker-setup-*.js

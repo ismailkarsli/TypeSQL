@@ -42,3 +42,10 @@ test("outside a statement literal the response is unchanged", () => {
   const list = { isIncomplete: false, items: [echo] };
   expect(merge(list, null)).toBe(list);
 });
+
+test("an item whose edit starts on the literal's line at another character is kept", () => {
+  const before = { label: "sql", kind: 6 as const, textEdit: { range: { start: pos(1, 0), end: pos(1, 3) }, newText: "sql" } };
+  const after = { label: "x", kind: 6 as const, textEdit: { insert: { start: pos(1, 22), end: pos(1, 22) }, replace: { start: pos(1, 22), end: pos(1, 23) }, newText: "x" } };
+  const r = merge([before, echo, after], { ...ours, items: [] });
+  expect(r).toEqual([before, after]);
+});

@@ -2,7 +2,7 @@ import { expectTypeOf, test } from "vitest";
 import type { SqlError } from "../../src/index.js";
 import type { Row, Interval, V } from "./_schema.js";
 
-// Every expectation here was checked against PostgreSQL 17 with `select pg_typeof(...)`.
+// Every expectation here was checked against PostgreSQL 18 with `select pg_typeof(...)`.
 // Default type map: int2/int4/float4/float8 → number, int8/numeric → string, date/timestamp(tz) → Date,
 // time/timetz → string, interval → Interval, json(b) → unknown, bool → boolean.
 

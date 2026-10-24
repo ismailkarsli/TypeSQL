@@ -2,7 +2,7 @@ import { expectTypeOf, test } from "vitest";
 import type { SqlError } from "../../src/index.js";
 import type { Row, V } from "./_schema.js";
 
-// Whole-row references (a FROM item used as a value), verified against PostgreSQL 17.
+// Whole-row references (a FROM item used as a value), verified against PostgreSQL 18.
 // The value itself is a `record` (`unknown` under the default type map; pg and postgres.js
 // return the text form "(1,ada@example.com,…)"); its columns are reachable with (t).col and (t).*,
 // and to_json(t) is an object (json.test-d.ts).

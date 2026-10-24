@@ -2,7 +2,7 @@ import { expectTypeOf, test } from "vitest";
 import type { SqlError } from "../../src/index.js";
 import type { Row, V } from "./_schema.js";
 
-// Functions in FROM, verified against PostgreSQL 17. They are implicitly LATERAL. A
+// Functions in FROM, verified against PostgreSQL 18. They are implicitly LATERAL. A
 // set-returning function yields no row for NULL input, so its column is not nullable
 // unless the function can return NULL elements.
 

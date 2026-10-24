@@ -49,6 +49,7 @@
   },
   "devDependencies": {
     "@types/pg": "^8.23.1",
+    "libpg-query": "18.1.5",
     "pg": "^8.23.1",
     "postgres": "^3.4.9",
     "typescript": "7.1.0-beta",

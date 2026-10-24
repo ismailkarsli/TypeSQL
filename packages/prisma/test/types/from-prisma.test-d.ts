@@ -131,15 +131,16 @@ test("createSql accepts Prisma.TypeMap; model names are case-sensitive identifie
   }>();
   expectTypeOf<ParamsType<typeof q>>().toEqualTypeOf<[number | null]>();
   // Unquoted identifiers fold to lower case, so `User` and `bigNum` must be quoted.
-  expectTypeOf<Validate<DB, "SELECT id FROM User">>().toExtend<SqlError<string, number>>();
-  expectTypeOf<Validate<DB, 'SELECT bigNum FROM "User"'>>().toExtend<SqlError<string, number>>();
+  // (`FROM User` is `FROM CURRENT_USER`, whose one column is named "user")
+  expectTypeOf<Validate<DB, "SELECT id FROM User">>().toEqualTypeOf<SqlError<'column "id" does not exist', 1>>();
+  expectTypeOf<Validate<DB, 'SELECT bigNum FROM "User"'>>().toEqualTypeOf<SqlError<'column "bignum" does not exist. Perhaps you meant the column "bigNum"?', 1>>();
 });
 
 test("INSERT requires NOT NULL columns without a default; views are read-only", () => {
   const ins = sql('INSERT INTO "User" (email, "bigNum", ratio, price) VALUES ($1, $2, $3, $4) RETURNING id, "createdAt"', "a@b.c", 1n, 1.5, {} as Decimal);
   expectTypeOf<RowType<typeof ins>>().toEqualTypeOf<{ id: number; createdAt: Date }>();
-  expectTypeOf<Validate<DB, 'INSERT INTO "User" (email) VALUES ($1)'>>().toExtend<SqlError<string, number>>();
-  expectTypeOf<Validate<DB, 'INSERT INTO "ActiveUser" (id, email) VALUES (1, $1)'>>().toExtend<SqlError<string, number>>();
+  expectTypeOf<Validate<DB, 'INSERT INTO "User" (email) VALUES ($1)'>>().toEqualTypeOf<SqlError<'null value in column "ratio" of relation "User" violates not-null constraint', 2>>();
+  expectTypeOf<Validate<DB, 'INSERT INTO "ActiveUser" (id, email) VALUES (1, $1)'>>().toEqualTypeOf<SqlError<'cannot insert into view "ActiveUser"', 2>>();
 });
 
 test("PrismaTypeMap is the default; another type map can be passed", () => {

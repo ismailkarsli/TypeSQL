@@ -10,7 +10,8 @@ import { acquireDatabase } from "./db.js";
  *   - every relation can be selected through both drivers, its columns come back in the declared
  *     order, NOT NULL columns hold no NULLs and every value has the `typeof` the declared type
  *     maps to (`DefaultTypeMap` / `PgTypeMap` for pg, `PostgresJsTypeMap` for postgres.js).
- * Skips (does not fail) when no database can be obtained; see `db.ts`.
+ * Skips (does not fail) when no database can be obtained, and the regeneration check on another
+ * major, unless `TYPESQL_REQUIRE_DB=1`; see `db.ts`.
  */
 
 const source = readFileSync(new URL("../../src/schema/pg-catalog.ts", import.meta.url), "utf8");
@@ -105,7 +106,11 @@ describe.skipIf(!db)("PgCatalog against Postgres", () => {
   }, 60_000);
 
   test("the checked-in file is what the generator writes for this server", async (ctx) => {
-    if (major !== generatedFrom) ctx.skip(`generated from PostgreSQL ${generatedFrom}, server is ${major}`);
+    if (major !== generatedFrom) {
+      // CI runs the major the file is generated from: there the comparison must not drop out silently.
+      if (process.env["TYPESQL_REQUIRE_DB"] === "1") throw new Error(`generated from PostgreSQL ${generatedFrom}, server is ${major}`);
+      ctx.skip(`generated from PostgreSQL ${generatedFrom}, server is ${major}`);
+    }
     const generator = new URL("../../../../scripts/pg-catalog-from-pg.mjs", import.meta.url).href;
     const { generatePgCatalog } = (await import(generator)) as { generatePgCatalog(c: Client): Promise<string> };
     expect(await generatePgCatalog(client)).toBe(source);

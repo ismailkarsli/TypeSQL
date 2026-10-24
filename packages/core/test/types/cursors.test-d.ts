@@ -55,8 +55,7 @@ test("sql() over cursor statements", () => {
   sql("CLOSE c");
   // @ts-expect-error the parameter is a number
   sql("DECLARE c CURSOR FOR SELECT email FROM users WHERE id = $1", "x");
-  // @ts-expect-error column "nope" does not exist
-  sql("DECLARE c CURSOR FOR SELECT nope FROM users");
+  expectTypeOf<V<"DECLARE c CURSOR FOR SELECT nope FROM users">>().toEqualTypeOf<SqlError<'column "nope" does not exist. Perhaps you meant the column "name"?', 5>>();
 });
 
 test("cursor statements in a migration script leave the schema unchanged; DECLARE is checked", () => {

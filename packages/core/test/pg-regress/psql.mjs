@@ -28,6 +28,14 @@ const DOLLAR_QUOTE = /^\$(?:(?:[A-Za-z_]|[^\x00-\x7f])(?:[A-Za-z0-9_]|[^\x00-\x7
  *   its string literals mean something else than the parser (which follows the default) reads.
  * @property {"ok" | "error" | "syntax-error" | "unknown"} [pg] Set by `classify`.
  * @property {string} [pgError] First error line Postgres printed for it.
+ * @property {string} [copyData] For COPY FROM STDIN: the data lines that follow it, up to `\.`.
+ */
+
+/**
+ * @typedef {object} SplitOptions
+ * @property {Record<string, string>} [env] Environment for `\getenv`. Given, `\getenv` reads it
+ *   and `\set` concatenates its arguments (`\set f :dir '/data/x'`) as psql does; without it
+ *   (pg-regress) both leave the variable unknown.
  */
 
 /**
@@ -40,9 +48,10 @@ const DOLLAR_QUOTE = /^\$(?:(?:[A-Za-z_]|[^\x00-\x7f])(?:[A-Za-z0-9_]|[^\x00-\x7
  * `\getenv`, psql's own variables) used bare makes the statement `psqlVars`. An undefined
  * variable is sent as written, as psql does (`arr[1:n]` is a slice).
  * @param {string} text
+ * @param {SplitOptions} [options]
  * @returns {Statement[] & { dataLines: Set<number> }}
  */
-export function splitPsql(text) {
+export function splitPsql(text, options = {}) {
   const lines = text.split("\n");
   const out = Object.assign([], { dataLines: new Set() });
   let buf = "";
@@ -72,6 +81,7 @@ export function splitPsql(text) {
   const conditional = () => ifs.some((b) => b.active === null);
   /** COPY FROM STDIN blocks that follow the current line (several with `\;`). */
   let copyBlocks = 0;
+  const copying = [];
   let stdStrings = true;
   let commentDepth = 0;
   /**
@@ -98,7 +108,10 @@ export function splitPsql(text) {
       // psql scans a substituted value like typed input: a `;` in it ends a statement.
       const parts = substitutedSemicolon ? splitPsql(sql).map((p) => p.sql) : [sql];
       for (const part of parts) out.push({ sql: part, line: startLine + 1, endLine: endLine + 1, psqlVars, conditional: conditional(), nonstandardStrings: !stdStrings && part.includes("\\") });
-      if (isCopyFromStdin()) copyBlocks++;
+      if (isCopyFromStdin()) {
+        copyBlocks++;
+        copying.push(out.at(-1));
+      }
       const words = sql.replace(/--[^\n]*/g, "").toLowerCase().split(/[\s=]+/).filter(Boolean);
       if ((words[0] === "set" || words[0] === "reset") && words.includes("standard_conforming_strings")) {
         stdStrings = words[0] === "reset" || !/\b(off|false)\b/.test(words.slice(2).join(" "));
@@ -111,7 +124,11 @@ export function splitPsql(text) {
     const line = lines[ln];
     if (copyBlocks > 0) {
       out.dataLines.add(ln);
-      if (line === "\\.") copyBlocks--;
+      const target = copying[0];
+      if (line === "\\.") {
+        copyBlocks--;
+        copying.shift();
+      } else if (target) target.copyData = `${target.copyData ?? ""}${line}\n`;
       continue;
     }
     let i = 0;
@@ -170,7 +187,10 @@ export function splitPsql(text) {
         else if (!running()) { /* skipped */ }
         else if (cmd === "set") setVar(args);
         else if (cmd === "unset") vars.delete(args.trim());
-        else if (cmd === "getenv") vars.set(args.trim().split(/\s+/)[0], null);
+        else if (cmd === "getenv") {
+          const [name, from] = args.trim().split(/\s+/);
+          vars.set(name, options.env ? options.env[from] ?? null : null);
+        }
         else if (cmd === "gset") gset = true;
         else if (cmd === "r" || cmd === "reset") reset();
         else if (cmd === "copy" && /\bfrom\s+p?stdin\b/i.test(args)) copyBlocks++;
@@ -242,9 +262,24 @@ export function splitPsql(text) {
     if (!m) return;
     const [, name, rest] = m;
     const value = rest.trim();
+    if (options.env) return void vars.set(name, concatenated(value));
     if (/^[^'"`\s\\:]*$/.test(value)) vars.set(name, value);
     else if (/^'([^'\\]|'')*'$/.test(value)) vars.set(name, value.slice(1, -1).replaceAll("''", "'"));
     else vars.set(name, null);
+  }
+
+  function concatenated(value) {
+    let out = "";
+    for (const m of value.matchAll(/:([A-Za-z0-9_]+)|'((?:[^'\\]|'')*)'|([^\s'":\\]+)|(\S)/g)) {
+      if (m[1] !== undefined) {
+        const v = vars.get(m[1]);
+        if (typeof v !== "string") return null;
+        out += v;
+      } else if (m[2] !== undefined) out += m[2].replaceAll("''", "'");
+      else if (m[3] !== undefined) out += m[3];
+      else return null;
+    }
+    return out;
   }
 
   /** `\if expr`, `\elif expr`, `\else`, `\endif`. Only literal booleans are evaluated. */
@@ -290,10 +325,11 @@ export function splitPsql(text) {
  * error is reported after it, or that sits in an `\if` branch we cannot evaluate, is `unknown`.
  * @param {string} sqlText
  * @param {string} outText
+ * @param {SplitOptions} [options]
  * @returns {Statement[]}
  */
-export function classify(sqlText, outText) {
-  const stmts = splitPsql(sqlText);
+export function classify(sqlText, outText, options = {}) {
+  const stmts = splitPsql(sqlText, options);
   const inLines = sqlText.split("\n");
   const outLines = outText.split("\n");
   const echoed = (i) => inLines[i].trim() !== "" && !stmts.dataLines.has(i);

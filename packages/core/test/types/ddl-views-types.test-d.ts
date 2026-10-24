@@ -1,5 +1,5 @@
 import { expectTypeOf, test } from "vitest";
-import { createSql, type ApplyDdl, type Col, type Generated, type Nullable, type NullableGenerated, type RowType, type ParamsOf, type DefaultTypeMap, type RowOf, type SqlError, type Sig, type View } from "../../src/index.js";
+import { createSql, type ApplyDdl, type Col, type Generated, type Nullable, type NullableGenerated, type RowType, type ParamsOf, type DefaultTypeMap, type RowOf, type SqlError, type Sig, type Validate, type View } from "../../src/index.js";
 
 interface DB {
   users: { id: Generated<"int4">; email: Col<"text">; name: Nullable<"text">; mood: Nullable<"mood"> };
@@ -222,8 +222,6 @@ test("end to end: query the evolved schema", () => {
   const v = sql("SELECT email, n FROM post_counts WHERE id = $1", 1);
   expectTypeOf<RowType<typeof v>>().toEqualTypeOf<{ email: string; n: string }>();
 
-  // @ts-expect-error views are read-only
-  sql("INSERT INTO post_counts (id) VALUES (1)");
-  // @ts-expect-error title is NOT NULL without default
-  sql("INSERT INTO posts (author_id) VALUES (1)");
+  expectTypeOf<Validate<Schema, "INSERT INTO post_counts (id) VALUES (1)">>().toEqualTypeOf<SqlError<'cannot insert into view "post_counts"', 2>>();
+  expectTypeOf<Validate<Schema, "INSERT INTO posts (author_id) VALUES (1)">>().toEqualTypeOf<SqlError<'null value in column "title" of relation "posts" violates not-null constraint', 2>>();
 });

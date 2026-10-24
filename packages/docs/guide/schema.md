@@ -82,7 +82,7 @@ intersect your schema with `PgCatalog`:
 <<< @/snippets/schema.ts#pg-catalog
 
 `PgCatalog` covers the relations applications and admin tools usually read, as of
-PostgreSQL 17:
+PostgreSQL 18:
 
 - **Statistics**: `pg_stat_activity`, `pg_stat_database`, `pg_stat_all_tables`,
   `pg_stat_user_tables`, `pg_stat_all_indexes`, `pg_stat_user_indexes`,

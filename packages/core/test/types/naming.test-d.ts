@@ -2,7 +2,7 @@ import { expectTypeOf, test } from "vitest";
 import type { Row, Interval } from "./_schema.js";
 
 // Output column names follow Postgres's FigureColname; every case below was checked
-// against PostgreSQL 17 by reading the result headers.
+// against PostgreSQL 18 by reading the result headers.
 
 test("literals and operators are ?column?; the last duplicate wins", () => {
   expectTypeOf<Row<"SELECT 1, 'a', true, 1.5, NULL FROM users">>().toEqualTypeOf<{ "?column?": null }>();

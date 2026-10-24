@@ -40,8 +40,7 @@ test("SELECT with JOIN: rows and params", () => {
 test("schema-qualified tables", () => {
   const q = sql("SELECT a.role, s.expires_at FROM auth.users a JOIN auth.sessions s ON s.auth_user_id = a.id WHERE a.user_id = $1", 1);
   expectTypeOf<RowType<typeof q>>().toEqualTypeOf<{ role: "admin" | "member"; expires_at: Date }>();
-  // @ts-expect-error -- `sessions` lives in the auth schema
-  sql("SELECT id FROM sessions");
+  expectTypeOf<Parameters<typeof sql<"SELECT id FROM sessions">>[0]>().toEqualTypeOf<SqlError<'relation "sessions" does not exist', 3> & "SELECT id FROM sessions">();
 });
 
 test("INSERT may omit Generated / GeneratedAlways columns, not required ones", () => {
@@ -50,8 +49,8 @@ test("INSERT may omit Generated / GeneratedAlways columns, not required ones", (
   expectTypeOf<ParamsType<typeof q>>().toEqualTypeOf<[number, string, (string | null)[]]>();
   const u = sql("INSERT INTO users (email, balance) VALUES ($1, $2) RETURNING id, created_at", "a@b.c", "1.5");
   expectTypeOf<RowType<typeof u>>().toEqualTypeOf<{ id: number; created_at: Date }>();
-  // @ts-expect-error -- `balance` is NOT NULL without a default
-  sql("INSERT INTO users (email) VALUES ('a')");
+  expectTypeOf<Parameters<typeof sql<"INSERT INTO users (email) VALUES ('a')">>[0]>()
+    .toEqualTypeOf<SqlError<'null value in column "balance" of relation "users" violates not-null constraint', 2> & "INSERT INTO users (email) VALUES ('a')">();
 });
 
 test("overrides change inference end to end", () => {
@@ -75,7 +74,7 @@ test("derived enum names are distinct types (as distinct Postgres enums would be
   const e = sql("SELECT mood FROM users UNION SELECT mood FROM users");
   expectTypeOf<RowType<typeof e>>().toEqualTypeOf<{ mood: "happy" | "sad" | null }>();
   type Err = Parameters<typeof sql<"SELECT mood FROM users UNION SELECT role FROM auth.users">>[0];
-  expectTypeOf<Err>().toExtend<SqlError<string, number>>();
+  expectTypeOf<Err>().toEqualTypeOf<SqlError<"UNION types users.mood and auth.users.role cannot be matched", 4> & "SELECT mood FROM users UNION SELECT role FROM auth.users">();
 });
 
 test("camelCase option: SQL uses snake_case names", () => {

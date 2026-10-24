@@ -3,7 +3,7 @@ import type { SqlError } from "../../src/index.js";
 import type { Row, V } from "./_schema.js";
 
 // Window clause syntax and name resolution (window function typing: window.test-d.ts).
-// Verified against PostgreSQL 17.
+// Verified against PostgreSQL 18.
 
 test("OVER (), PARTITION BY, ORDER BY and frame clauses", () => {
   expectTypeOf<Row<"SELECT row_number() OVER () AS rn FROM things">>().toEqualTypeOf<{ rn: string }>();

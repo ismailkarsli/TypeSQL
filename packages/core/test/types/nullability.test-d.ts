@@ -1,7 +1,7 @@
 import { expectTypeOf, test } from "vitest";
 import type { Row } from "./_schema.js";
 
-// Expression nullability rules, verified against PostgreSQL 17.
+// Expression nullability rules, verified against PostgreSQL 18.
 
 test("three-valued logic: AND/OR/NOT are nullable if an operand is; IS forms never are", () => {
   expectTypeOf<Row<"SELECT flag AND flag AS a, flag AND n_flag AS b, n_flag OR flag AS c, NOT flag AS d, NOT n_flag AS e, n_flag AND NULL AS f FROM things">>()

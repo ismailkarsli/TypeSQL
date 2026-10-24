@@ -256,7 +256,7 @@ and the [type engine](packages/docs/internals/engine.md).
 ```sh
 pnpm install
 pnpm typecheck         # tsc per package
-pnpm test              # vitest: runtime + type tests; conformance runs against docker postgres:17 when available
+pnpm test              # vitest: runtime + type tests; conformance runs against docker postgres:18 when available
 pnpm build && pnpm smoke:dist   # import the built packages with plain Node
 pnpm pg-regress:setup && pnpm test:pg-regress   # the parser against PostgreSQL 18's regression tests
 pnpm docs:dev                   # the documentation site (packages/docs)

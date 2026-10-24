@@ -11,7 +11,15 @@
     "typecheck": "pnpm -r --filter './packages/*' run typecheck",
     "test": "vitest run",
     "test:types": "vitest run --typecheck.only",
+    "coverage": "vitest run --coverage",
+    "coverage:ratchet": "node scripts/coverage-ratchet.mjs",
+    "mutate:runtime": "node scripts/mutate-runtime.mjs",
+    "check:expect-error": "node scripts/check-expect-error.mjs",
     "test:pg-regress": "node packages/core/test/pg-regress/run.mjs",
+    "test:oracle": "node scripts/oracle.mjs",
+    "fuzz": "node scripts/fuzz.mjs",
+    "test:pg-ast": "node scripts/pg-ast.mjs",
+    "mutate:types": "node scripts/type-mutate.mjs",
     "pg-regress:setup": "node packages/core/test/pg-regress/setup.mjs",
     "bench": "pnpm --filter @typesql/bench run bench",
     "smoke:dist": "node scripts/smoke-dist.mjs",
@@ -25,7 +33,11 @@
     "playground": "node scripts/playground.mjs"
   },
   "devDependencies": {
+    "@stryker-mutator/core": "10.1.1",
+    "@stryker-mutator/vitest-runner": "10.1.1",
     "@types/node": "^26.6.5",
+    "@vitest/coverage-v8": "5.0.4",
+    "fast-check": "^4.10.2",
     "lz-string": "^1.5.0",
     "typescript": "7.1.0-beta",
     "vitest": "^5.0.4"
