@@ -1,8 +1,9 @@
 import type { ParamsType, RowType } from "@typesql/core";
-// #region custom
-import { createSql, type DefaultTypeMap } from "@typesql/core";
 import { check, type Equal } from "./_check.js";
 import type { DB } from "./schema.js";
+
+// #region custom
+import { createSql, type DefaultTypeMap } from "@typesql/core";
 
 interface MyMap extends Omit<DefaultTypeMap, "int8"> {
 	int8: number; // you registered an int8 parser that returns numbers

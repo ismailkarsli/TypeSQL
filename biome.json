@@ -59,6 +59,16 @@
 	},
 	"overrides": [
 		{
+			"includes": ["packages/docs/snippets/**"],
+			"assist": {
+				"actions": {
+					"source": {
+						"organizeImports": "off"
+					}
+				}
+			}
+		},
+		{
 			"includes": ["scripts/type-mutate/fixture/src/logic.ts"],
 			"formatter": {
 				"enabled": false

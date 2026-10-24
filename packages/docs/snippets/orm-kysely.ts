@@ -1,8 +1,9 @@
 import type { DefaultTypeMap, ParamsType, RowType } from "@typesql/core";
+import { check, type Equal, type Same } from "./_check.js";
+
 // #region db
 // db.ts: kysely-codegen output (trimmed), or the interface you wrote for Kysely
 import type { ColumnType, Generated, GeneratedAlways } from "kysely";
-import { check, type Equal, type Same } from "./_check.js";
 
 export type Int8 = ColumnType<
 	string,
@@ -34,11 +35,9 @@ export interface DB {
 		expires_at: Timestamp;
 	};
 }
-
 // #endregion db
 
 import type { Kysely } from "kysely";
-
 declare const db: Kysely<DB>;
 declare const camelDb: Kysely<CamelDB>; // created with plugins: [new CamelCasePlugin()]
 

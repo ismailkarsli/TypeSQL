@@ -1,9 +1,10 @@
 import type { RowType } from "@typesql/core";
-import { createSql, migrate } from "@typesql/pg";
-// #region pg
-import { Pool } from "pg";
 import { check, type Equal } from "./_check.js";
 import type { DB } from "./schema.js";
+
+// #region pg
+import { Pool } from "pg";
+import { createSql, migrate } from "@typesql/pg";
 
 const pool = new Pool();
 const sql = createSql<DB>(pool); // queries run on `pool`
@@ -56,7 +57,6 @@ const postId = await sql.transaction(async (tx) => {
 	}
 	return id;
 });
-
 // #endregion transaction
 // #region execute-per-call
 import { executor } from "@typesql/pg";
@@ -73,7 +73,6 @@ try {
 } finally {
 	client.release();
 }
-
 // #endregion execute-per-call
 // #region custom-executor
 import { createSql as createCoreSql, type Executor } from "@typesql/core";
@@ -89,7 +88,6 @@ const logged: Executor = async (text, values) => {
 	}
 };
 const sqlLogged = createCoreSql<DB, PgTypeMap>(logged);
-
 // #endregion custom-executor
 // #region transform-helper
 import type { Query } from "@typesql/core";
@@ -131,9 +129,9 @@ check<Equal<typeof id, number>>();
 check<Equal<typeof postId, string>>();
 void migrate;
 
-import * as pgjs from "@typesql/postgres";
 // #region postgresjs
 import postgres from "postgres";
+import * as pgjs from "@typesql/postgres";
 
 const db = postgres(process.env["DATABASE_URL"]!);
 const sqlJs = pgjs.createSql<DB>(db); // PostgresJsTypeMap

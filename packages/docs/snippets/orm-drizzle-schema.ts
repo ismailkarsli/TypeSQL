@@ -50,7 +50,6 @@ export const happyUsers = pgView("happy_users").as((qb) =>
 export const usersRelations = relations(users, ({ many }) => ({
 	posts: many(posts),
 }));
-
 // #endregion schema
 
 // #region pgtype

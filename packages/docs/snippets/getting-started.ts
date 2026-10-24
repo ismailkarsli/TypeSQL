@@ -1,8 +1,8 @@
 import type { RowType } from "@typesql/core";
-import { createSql } from "@typesql/pg";
+import { check, type Equal } from "./_check.js";
 // #region query
 import { Pool } from "pg";
-import { check, type Equal } from "./_check.js";
+import { createSql } from "@typesql/pg";
 import type { DB } from "./schema.js";
 
 const pool = new Pool({ connectionString: process.env["DATABASE_URL"] });
