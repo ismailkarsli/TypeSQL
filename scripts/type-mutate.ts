@@ -48,8 +48,8 @@ interface CheckResult {
 	status: Status;
 	checks: number;
 	killedBy?: string;
+	// why an invalid mutant does not compile
 	diagnostic?: string;
-	tried?: string[];
 }
 
 // a mutant as it is selected; the check fills in the rest
@@ -57,7 +57,6 @@ type Mutant = Omit<MutantResult, "status" | "killedBy"> & {
 	endLine: number;
 	endColumn: number;
 	lines: number[];
-	lineText: string;
 	start: number;
 	end: number;
 	equivalent: string | undefined;
@@ -236,10 +235,6 @@ async function run(): Promise<number> {
 					mutator: m.mutator,
 					scope: m.scope,
 					description: m.description,
-					lineText: text.slice(
-						starts[at.line - 1],
-						(starts[at.line] ?? text.length + 1) - 1,
-					),
 					start: m.start,
 					end: m.end,
 					original: m.original,
@@ -303,7 +298,7 @@ async function run(): Promise<number> {
 		for (const m of selected) {
 			// the changed-lines gate trusts equivalence markers; full runs and --check-equivalent still check them
 			if (m.equivalent && opts.changed && !opts["check-equivalent"]) {
-				Object.assign(m, { status: "equivalent", checks: 0, ms: 0, tried: [] });
+				Object.assign(m, { status: "equivalent", checks: 0, ms: 0 });
 				done++;
 				continue;
 			}
@@ -566,19 +561,12 @@ class Session {
 			]);
 			if (own.length)
 				return { status: "invalid", diagnostic: message(own[0]!), checks: 1 };
-			const tried: string[] = [];
-			for (const test of tests) {
+			for (const [i, test] of tests.entries()) {
 				const errors = errorsOf(
 					await program.getSemanticDiagnostics(join(ROOT, test)),
 				);
-				tried.push(test);
 				if (errors.length)
-					return {
-						status: "killed",
-						killedBy: test,
-						diagnostic: message(errors[0]!),
-						checks: tried.length + 1,
-					};
+					return { status: "killed", killedBy: test, checks: i + 2 };
 			}
 			const errors = errorsOf(
 				await program.getSemanticDiagnostics(
@@ -589,9 +577,9 @@ class Session {
 				return {
 					status: "invalid",
 					diagnostic: `${errors[0]!.fileName ? rel(errors[0]!.fileName) : "?"}: ${message(errors[0]!)}`,
-					checks: tried.length + 2,
+					checks: tests.length + 2,
 				};
-			return { status: "survived", checks: tried.length + 2, tried };
+			return { status: "survived", checks: tests.length + 2 };
 		} finally {
 			void snapshot.dispose().catch(() => {});
 		}

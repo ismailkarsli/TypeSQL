@@ -447,7 +447,7 @@ lines says why no test can tell the difference:
 ```
 
 `--report` writes every mutant as JSON (file, line, column, mutator, original and mutated text,
-status, the test file that killed it, and for a survivor every test file tried in order);
+status, the test file that killed it, and for an invalid one the compiler error);
 `--summary` writes markdown with the survivors per file, and `GITHUB_STEP_SUMMARY` gets it too.
 A killed mutant costs about a second with a kill map; a survivor costs a check of every test
 file (15–30 s). A full run (about 23 000 mutants, a quarter of them surviving) is sharded

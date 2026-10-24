@@ -41,7 +41,7 @@ const script = join(here, "..", "type-mutate.ts");
 const fixture = join(here, "fixture");
 
 // what a run writes for each mutant, as far as the tests look
-type RunMutant = MutantResult & { checks: number; tried?: string[] };
+type RunMutant = MutantResult & { checks: number; diagnostic?: string };
 
 describe("mutation sites", () => {
 	let api: API | undefined;
@@ -417,10 +417,8 @@ describe("runs over the fixture project", { timeout: 120_000 }, () => {
 				)!.killedBy,
 			).toBe("test/logic.test-d.ts");
 			const survivor = report.mutants.find((m) => m.status === "survived")!;
-			expect(survivor.tried).toEqual([
-				"test/logic.test-d.ts",
-				"test/more.test-d.ts",
-			]);
+			// both test files, the mutated file and the rest of the sources
+			expect(survivor.checks).toBe(4);
 			expect(survivor.file).toBe("src/logic.ts");
 			expect(report.summary.total).toBe(report.mutants.length);
 			expect(readFileSync(join(out, "s.md"), "utf8")).toContain(
@@ -430,6 +428,12 @@ describe("runs over the fixture project", { timeout: 120_000 }, () => {
 				readFileSync(join(out, "k.json"), "utf8"),
 			) as KillMap;
 			const killed = report.mutants.filter((m) => m.status === "killed");
+			expect(killed.every((m) => m.diagnostic === undefined)).toBe(true);
+			expect(
+				report.mutants
+					.filter((m) => m.status === "invalid")
+					.every((m) => m.diagnostic),
+			).toBe(true);
 			expect(Object.keys(killMap.sites).sort()).toEqual(
 				killed.map((m) => m.id).sort(),
 			);
