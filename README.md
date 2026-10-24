@@ -137,6 +137,14 @@ CI runs the whole suite on every change and fails on a single disagreement
 (`pnpm pg-regress:setup && pnpm test:pg-regress`). What the comparison covers and what it does not
 is in [Postgres compatibility](packages/docs/guide/postgres-compatibility.md).
 
+## SQLite and MySQL
+
+TypeSQL supports only PostgreSQL today. SQLite and MySQL support is planned: you will write
+queries in each database's own dialect and get row and parameter types the same way, with no
+codegen and no database connection. Each dialect brings its own grammar, column type names,
+function catalog and nullability rules, so it gets its own parser rules and type map, along with
+drivers for that database.
+
 ## Schema
 
 Columns are declared with **Postgres type names** so expression typing can follow Postgres
