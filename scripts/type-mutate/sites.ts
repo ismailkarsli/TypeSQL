@@ -47,6 +47,9 @@ export const MUTATORS = [
 	"infer-bare",
 ];
 
+/** `// type-mutate: table – <reason>` on the lines before a declaration: none of it is mutated. */
+const TABLE_MARKER = /\/\/\s*type-mutate:\s*table\s*(?:–|—|\s-+)\s*\S/;
+
 export function findMutants(
 	sf: SourceFile,
 	SyntaxKind: typeof SyntaxKindEnum,
@@ -156,6 +159,13 @@ export function findMutants(
 		const inferred = inferNames(c.extendsType);
 		// cond-swap and cond-true would move a true branch that uses an `infer` name out of its scope
 		const trueUsesInfer = uses(t, inferred);
+		// `X extends infer S` (no constraint), `X extends unknown` and `X extends any` always match:
+		// the false branch cannot be reached, so mutants that only change it are equivalent
+		const alwaysMatches =
+			(c.extendsType.kind === K.InferType &&
+				!(c.extendsType as InferTypeNode).typeParameter.constraint) ||
+			c.extendsType.kind === K.UnknownKeyword ||
+			c.extendsType.kind === K.AnyKeyword;
 		if (src(t) !== src(f)) {
 			if (!trueUsesInfer)
 				add(
@@ -166,7 +176,7 @@ export function findMutants(
 					[at],
 					`swap the branches of ${where}`,
 				);
-			if (!trueUsesInfer)
+			if (!trueUsesInfer && !alwaysMatches)
 				add(
 					"cond-true",
 					f.getStart(),
@@ -193,7 +203,7 @@ export function findMutants(
 				leaf(t) ? [at, range(t)] : [at],
 				`the true branch of ${where} is \`never\``,
 			);
-		if (!isNever(f))
+		if (!isNever(f) && !alwaysMatches)
 			add(
 				"never-false",
 				f.getStart(),
@@ -242,6 +252,13 @@ export function findMutants(
 
 	const visit = (n: Node) => {
 		const outer = scope;
+		// a table checked elsewhere (the oracles compare it with Postgres's catalogs) is not mutated
+		if (
+			(n.kind === K.TypeAliasDeclaration ||
+				n.kind === K.InterfaceDeclaration) &&
+			TABLE_MARKER.test(text.slice(n.pos, n.getStart()))
+		)
+			return;
 		if (
 			(n.kind === K.TypeAliasDeclaration ||
 				n.kind === K.InterfaceDeclaration) &&

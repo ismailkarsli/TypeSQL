@@ -71,6 +71,11 @@ const DEFAULT_MUTATE = [
 	"packages/core/src/schema/**/*.ts",
 	"packages/core/src/type-map/**/*.ts",
 ];
+/**
+ * Generated tables, not mutated by default: each entry is copied from Postgres's catalogs (the
+ * oracles check them against a live server), so a test per entry would only restate the table.
+ */
+const DEFAULT_SKIP = ["packages/core/src/engine/typer/pg-functions.ts"];
 const DEFAULT_KILL_MAP =
 	"node_modules/.cache/typesql-type-mutate/kill-map.json";
 const REOPEN_EVERY = 250;
@@ -189,6 +194,7 @@ async function run(): Promise<number> {
 			.filter(
 				(f) =>
 					matchesFile(f, mutatePatterns) &&
+					(opts.mutate !== undefined || !matchesFile(f, DEFAULT_SKIP)) &&
 					!tests.includes(f) &&
 					(!opts.files || matchesFile(f, opts.files)) &&
 					(!changed || changed.has(f)),

@@ -85,6 +85,48 @@ describe("mutation sites", () => {
 		expect(ms[0]!.mutated).toBe("type A<T> = T extends [infer X] ? 0 : 0;");
 	});
 
+	test("the false branch of `X extends infer S` / `unknown` / `any` cannot be reached and is not mutated", async () => {
+		const ms = await mutants("type A<T> = F<T> extends infer X ? [X] : 0;");
+		expect(ms.map((m) => m.mutator)).toEqual(["cond-false", "never-true"]);
+		expect(
+			(await mutants("type A<T> = T extends unknown ? [T] : 0;")).map(
+				(m) => m.mutator,
+			),
+		).toEqual(["cond-swap", "cond-false", "never-true"]);
+		expect(
+			(await mutants("type A<T> = T extends any ? [T] : 0;")).map(
+				(m) => m.mutator,
+			),
+		).toEqual(["cond-swap", "cond-false", "never-true"]);
+		// a constraint can fail
+		const constrained = await mutants(
+			"type A<T> = F<T> extends infer X extends string ? [X] : 0;",
+		);
+		expect(constrained.map((m) => m.mutator)).toEqual([
+			"cond-false",
+			"never-true",
+			"infer-bare",
+			"never-false",
+		]);
+	});
+
+	test("a declaration marked as a table is not mutated", async () => {
+		const text =
+			"type A = [true, false];\n// type-mutate: table – checked by the oracles\ninterface T { f: [1, 2]; g: true }\ntype B = true;";
+		expect((await mutants(text)).map((m) => m.scope)).toEqual([
+			"A",
+			"A",
+			"A",
+			"B",
+		]);
+		// a reason is required
+		expect(
+			(await mutants("// type-mutate: table\ntype C = true;")).map(
+				(m) => m.mutator,
+			),
+		).toEqual(["bool-flip"]);
+	});
+
 	test("true/false literal types flip; an edit two mutators make is tried once", async () => {
 		const ms = await mutants("type A = [true, false];");
 		expect(ms.map((m) => [m.mutator, m.mutated])).toEqual([
