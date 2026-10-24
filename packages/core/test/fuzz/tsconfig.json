@@ -4,7 +4,11 @@
 		"noEmit": true,
 		"types": [],
 		"rootDir": "../..",
-		"paths": { "@typesql/core": ["../../src/index.ts"] }
+		"paths": {
+			"@typesql/core/engine": ["../../src/engine/index.ts"],
+			"@typesql/core/adapter": ["../../src/adapter.ts"],
+			"@typesql/core": ["../../src/index.ts"]
+		}
 	},
 	"include": [".probe/*.ts"]
 }
