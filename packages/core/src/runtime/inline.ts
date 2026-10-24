@@ -19,23 +19,23 @@ let counter = 0;
 
 /** Bind `value` as a parameter at this position of a template literal. */
 export function param<const T>(value: T): InlineMarker<T> {
-  const token = `\u0000typesql${PREFIX}${(counter++).toString(36)}\u0000`;
-  pending.set(token, value);
-  return token as InlineMarker<T>;
+	const token = `\u0000typesql${PREFIX}${(counter++).toString(36)}\u0000`;
+	pending.set(token, value);
+	return token as InlineMarker<T>;
 }
 
 /** A `valueOrDefault` value: `undefined` becomes `DEFAULT` instead of a parameter. */
 class OrDefault {
-  readonly value: unknown;
+	readonly value: unknown;
 
-  constructor(value: unknown) {
-    this.value = value;
-  }
+	constructor(value: unknown) {
+		this.value = value;
+	}
 }
 
 /** Like `param`, but an `undefined` value is sent as `DEFAULT` (for INSERT values and SET). */
 export function valueOrDefault<const T>(value: T): DefaultMarker<T> {
-  return param(new OrDefault(value)) as unknown as DefaultMarker<T>;
+	return param(new OrDefault(value)) as unknown as DefaultMarker<T>;
 }
 
 const EXACT = new RegExp(`^\\u0000typesql${PREFIX}[0-9a-z]+\\u0000$`);
@@ -47,20 +47,28 @@ const EXACT = new RegExp(`^\\u0000typesql${PREFIX}[0-9a-z]+\\u0000$`);
  * is returned as it is.
  */
 export function takeValue(value: unknown): unknown {
-  if (typeof value !== "string" || value.charCodeAt(0) !== 0 || !EXACT.test(value)) return value;
-  if (!pending.has(value)) throw new Error("typesql: this sql.json() / sql.param() value was already used by another statement; call it once per statement");
-  const v = pending.get(value);
-  pending.delete(value);
-  return v instanceof OrDefault ? v.value : v;
+	if (
+		typeof value !== "string" ||
+		value.charCodeAt(0) !== 0 ||
+		!EXACT.test(value)
+	)
+		return value;
+	if (!pending.has(value))
+		throw new Error(
+			"typesql: this sql.json() / sql.param() value was already used by another statement; call it once per statement",
+		);
+	const v = pending.get(value);
+	pending.delete(value);
+	return v instanceof OrDefault ? v.value : v;
 }
 
 /** Number of tokens created but not yet used (for leak diagnostics in tests). */
 export function pendingParams(): number {
-  return pending.size;
+	return pending.size;
 }
 
 export function hasInline(text: string): boolean {
-  return text.includes("\u0000");
+	return text.includes("\u0000");
 }
 
 /**
@@ -68,69 +76,93 @@ export function hasInline(text: string): boolean {
  * `valueOrDefault(undefined)` token with `DEFAULT`, taking no number); tokens inside
  * a quoted string, quoted identifier or comment are an error (the type checker rejects them too).
  */
-export function resolveInline(text: string, start: number): { text: string; values: unknown[] } {
-  const opaque = opaqueRanges(text);
-  const values: unknown[] = [];
-  const used: string[] = [];
-  let k = start;
-  const out = text.replace(TOKEN, (token: string, _id: string, offset: number) => {
-    const inside = opaque.find(([a, b]) => offset >= a && offset < b);
-    if (inside) throw new Error(`typesql: sql.param() cannot be used inside ${inside[2]}; remove the surrounding quotes or comment`);
-    if (!pending.has(token)) throw new Error("typesql: this sql.param() value was already used by another statement; call sql.param() once per statement");
-    const value = pending.get(token);
-    used.push(token);
-    if (value instanceof OrDefault) {
-      if (value.value === undefined) return "DEFAULT";
-      values.push(value.value);
-    } else {
-      values.push(value);
-    }
-    return `$${++k}`;
-  });
-  for (const t of used) pending.delete(t);
-  if (out.includes("\u0000")) throw new Error("typesql: the SQL text contains a NUL character that is not a sql.param() token");
-  return { text: out, values };
+export function resolveInline(
+	text: string,
+	start: number,
+): { text: string; values: unknown[] } {
+	const opaque = opaqueRanges(text);
+	const values: unknown[] = [];
+	const used: string[] = [];
+	let k = start;
+	const out = text.replace(
+		TOKEN,
+		(token: string, _id: string, offset: number) => {
+			const inside = opaque.find(([a, b]) => offset >= a && offset < b);
+			if (inside)
+				throw new Error(
+					`typesql: sql.param() cannot be used inside ${inside[2]}; remove the surrounding quotes or comment`,
+				);
+			if (!pending.has(token))
+				throw new Error(
+					"typesql: this sql.param() value was already used by another statement; call sql.param() once per statement",
+				);
+			const value = pending.get(token);
+			used.push(token);
+			if (value instanceof OrDefault) {
+				if (value.value === undefined) return "DEFAULT";
+				values.push(value.value);
+			} else {
+				values.push(value);
+			}
+			return `$${++k}`;
+		},
+	);
+	for (const t of used) pending.delete(t);
+	if (out.includes("\u0000"))
+		throw new Error(
+			"typesql: the SQL text contains a NUL character that is not a sql.param() token",
+		);
+	return { text: out, values };
 }
 
 /** `[start, end, description]` of quoted strings, quoted identifiers and comments. */
 function opaqueRanges(text: string): [number, number, string][] {
-  const ranges: [number, number, string][] = [];
-  const len = text.length;
-  let i = 0;
-  while (i < len) {
-    const c = text[i]!;
-    if (c === "'" || c === '"') {
-      let j = i + 1;
-      while (j < len) {
-        if (text[j] === c) {
-          if (text[j + 1] === c) { j += 2; continue; }
-          break;
-        }
-        j++;
-      }
-      ranges.push([i, j + 1, c === "'" ? "a quoted string" : "a quoted identifier"]);
-      i = j + 1;
-    } else if (c === "-" && text[i + 1] === "-") {
-      const j = text.indexOf("\n", i);
-      const end = j === -1 ? len : j;
-      ranges.push([i, end, "a comment"]);
-      i = end;
-    } else if (c === "/" && text[i + 1] === "*") {
-      const j = text.indexOf("*/", i + 2);
-      const end = j === -1 ? len : j + 2;
-      ranges.push([i, end, "a comment"]);
-      i = end;
-    } else {
-      i++;
-    }
-  }
-  return ranges;
+	const ranges: [number, number, string][] = [];
+	const len = text.length;
+	let i = 0;
+	while (i < len) {
+		const c = text[i]!;
+		if (c === "'" || c === '"') {
+			let j = i + 1;
+			while (j < len) {
+				if (text[j] === c) {
+					if (text[j + 1] === c) {
+						j += 2;
+						continue;
+					}
+					break;
+				}
+				j++;
+			}
+			ranges.push([
+				i,
+				j + 1,
+				c === "'" ? "a quoted string" : "a quoted identifier",
+			]);
+			i = j + 1;
+		} else if (c === "-" && text[i + 1] === "-") {
+			const j = text.indexOf("\n", i);
+			const end = j === -1 ? len : j;
+			ranges.push([i, end, "a comment"]);
+			i = end;
+		} else if (c === "/" && text[i + 1] === "*") {
+			const j = text.indexOf("*/", i + 2);
+			const end = j === -1 ? len : j + 2;
+			ranges.push([i, end, "a comment"]);
+			i = end;
+		} else {
+			i++;
+		}
+	}
+	return ranges;
 }
 
 function randomHex(bytes: number): string {
-  const a = new Uint8Array(bytes);
-  const crypto = (globalThis as { crypto?: { getRandomValues(a: Uint8Array): Uint8Array } }).crypto;
-  if (crypto) crypto.getRandomValues(a);
-  else for (let i = 0; i < bytes; i++) a[i] = Math.floor(Math.random() * 256);
-  return Array.from(a, (b) => b.toString(16).padStart(2, "0")).join("");
+	const a = new Uint8Array(bytes);
+	const crypto = (
+		globalThis as { crypto?: { getRandomValues(a: Uint8Array): Uint8Array } }
+	).crypto;
+	if (crypto) crypto.getRandomValues(a);
+	else for (let i = 0; i < bytes; i++) a[i] = Math.floor(Math.random() * 256);
+	return Array.from(a, (b) => b.toString(16).padStart(2, "0")).join("");
 }

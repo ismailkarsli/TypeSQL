@@ -34,6 +34,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm change check
+      - run: pnpm lint
       - run: pnpm cache-version --check
       - run: pnpm typecheck
       - run: pnpm playground --check

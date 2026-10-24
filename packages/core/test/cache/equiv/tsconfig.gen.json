@@ -1,6 +1,11 @@
 {
-  "extends": "../../../../../tsconfig.base.json",
-  "compilerOptions": { "noEmit": true, "types": ["node"], "rootDir": "../../..", "paths": { "@typesql/core": ["../../../src/index.ts"] } },
-  "include": ["../../types", ".generated/*.ts"],
-  "exclude": [".generated/cache.ts"]
+	"extends": "../../../../../tsconfig.base.json",
+	"compilerOptions": {
+		"noEmit": true,
+		"types": ["node"],
+		"rootDir": "../../..",
+		"paths": { "@typesql/core": ["../../../src/index.ts"] }
+	},
+	"include": ["../../types", ".generated/*.ts"],
+	"exclude": [".generated/cache.ts"]
 }

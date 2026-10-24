@@ -7,12 +7,12 @@ import type { Col, Generated, Nullable } from "@typesql/core";
 import { createSql } from "../../src/index.js";
 
 interface DB {
-  users: {
-    id: Generated<"int4">;
-    avatar: Nullable<"bytea">;
-    session_length: Nullable<"interval">;
-    location: Nullable<"point">;
-  };
+	users: {
+		id: Generated<"int4">;
+		avatar: Nullable<"bytea">;
+		session_length: Nullable<"interval">;
+		location: Nullable<"point">;
+	};
 }
 const sql = createSql<DB>();
 

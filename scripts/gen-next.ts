@@ -1,5 +1,6 @@
 // Regenerates packages/core/src/engine/lexer/next.ts (token index successor table).
 import { writeFileSync } from "node:fs";
+
 const N = Number(process.argv[2] ?? 4096);
 let s = `/**
  * Successor table for token indexes: \`Next[i]\` is \`i + 1\` for 0 ≤ i < ${N}.
@@ -17,4 +18,7 @@ export interface Next {
 `;
 for (let i = 0; i < N; i++) s += `  readonly ${i}: ${i + 1};\n`;
 s += `}\n\n/** Highest token index supported by the parser. */\nexport type MaxTokens = ${N};\n`;
-writeFileSync(new URL("../packages/core/src/engine/lexer/next.ts", import.meta.url), s);
+writeFileSync(
+	new URL("../packages/core/src/engine/lexer/next.ts", import.meta.url),
+	s,
+);

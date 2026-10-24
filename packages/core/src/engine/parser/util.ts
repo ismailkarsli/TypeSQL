@@ -1,6 +1,15 @@
 import type { SqlError } from "../errors.js";
 import type { Next } from "../lexer/next.js";
-import type { IdTok, NumTok, OpTok, ParamTok, StrTok, Tok, Toks, WordTok } from "../lexer/tokens.js";
+import type {
+	IdTok,
+	NumTok,
+	OpTok,
+	ParamTok,
+	StrTok,
+	Tok,
+	Toks,
+	WordTok,
+} from "../lexer/tokens.js";
 import type { IsColId, IsColLabel } from "./keywords.js";
 
 /**
@@ -26,49 +35,89 @@ export type Nx4<I extends number> = Nx<Nx3<I>>;
 export type Nx5<I extends number> = Nx<Nx4<I>>;
 
 /** Error positioned at token index `I`. */
-export type Fail<Message extends string, I extends number> = SqlError<Message, I>;
+export type Fail<Message extends string, I extends number> = SqlError<
+	Message,
+	I
+>;
 
 /** Human-readable spelling of token `I`, for "at or near" messages. */
-export type Near<T extends Toks, I extends number> =
-  T[I] extends infer H
-    ? H extends WordTok<infer V> ? V
-    : H extends IdTok<infer V> ? `"${V}"`
-    : H extends OpTok<infer V> ? V
-    : H extends NumTok<infer V> ? V
-    : H extends StrTok<infer V> ? `'${V}'`
-    : H extends ParamTok<infer V> ? `$${V}`
-    : "end of input"
-    : never;
+export type Near<T extends Toks, I extends number> = T[I] extends infer H
+	? H extends WordTok<infer V>
+		? V
+		: H extends IdTok<infer V>
+			? `"${V}"`
+			: H extends OpTok<infer V>
+				? V
+				: H extends NumTok<infer V>
+					? V
+					: H extends StrTok<infer V>
+						? `'${V}'`
+						: H extends ParamTok<infer V>
+							? `$${V}`
+							: "end of input"
+	: never;
 
-export type SyntaxError<T extends Toks, I extends number> = Fail<`syntax error at or near ${Near<T, I>}`, I>;
-export type Expected<What extends string, T extends Toks, I extends number> = Fail<`syntax error: expected ${What} at or near ${Near<T, I>}`, I>;
+export type SyntaxErrorAt<T extends Toks, I extends number> = Fail<
+	`syntax error at or near ${Near<T, I>}`,
+	I
+>;
+export type Expected<
+	What extends string,
+	T extends Toks,
+	I extends number,
+> = Fail<`syntax error: expected ${What} at or near ${Near<T, I>}`, I>;
 
 // ─── Peeking ───
 
-export type AtEnd<T extends Toks, I extends number> = T[I] extends Tok ? false : true;
+export type AtEnd<T extends Toks, I extends number> = T[I] extends Tok
+	? false
+	: true;
 /** True if token `I` is the word `W` (W is a lowercase keyword or a union of them). */
-export type AtWord<T extends Toks, I extends number, W extends string> = T[I] extends WordTok<infer V> ? (V extends W ? true : false) : false;
+export type AtWord<T extends Toks, I extends number, W extends string> =
+	T[I] extends WordTok<infer V> ? (V extends W ? true : false) : false;
 /** True if token `I` is the operator/punct `O`. */
-export type AtOp<T extends Toks, I extends number, O extends string> = T[I] extends OpTok<infer V> ? (V extends O ? true : false) : false;
-export type HeadWord<T extends Toks, I extends number> = T[I] extends WordTok<infer V> ? V : never;
-export type HeadOp<T extends Toks, I extends number> = T[I] extends OpTok<infer V> ? V : never;
+export type AtOp<T extends Toks, I extends number, O extends string> =
+	T[I] extends OpTok<infer V> ? (V extends O ? true : false) : false;
+export type HeadWord<T extends Toks, I extends number> =
+	T[I] extends WordTok<infer V> ? V : never;
+export type HeadOp<T extends Toks, I extends number> =
+	T[I] extends OpTok<infer V> ? V : never;
 
 // ─── Consuming (result: next index, or `never`; only test with `extends never`) ───
 
-export type EatWord<T extends Toks, I extends number, W extends string> = T[I] extends WordTok<infer V> ? (V extends W ? Nx<I> : never) : never;
-export type EatOp<T extends Toks, I extends number, O extends string> = T[I] extends OpTok<infer V> ? (V extends O ? Nx<I> : never) : never;
+export type EatWord<T extends Toks, I extends number, W extends string> =
+	T[I] extends WordTok<infer V> ? (V extends W ? Nx<I> : never) : never;
+export type EatOp<T extends Toks, I extends number, O extends string> =
+	T[I] extends OpTok<infer V> ? (V extends O ? Nx<I> : never) : never;
 /** Consume a run of words: `EatWords<T, I, ["with", "time", "zone"]>` → index after, or never. */
-export type EatWords<T extends Toks, I extends number, Ws extends readonly string[]> =
-  Ws extends readonly [infer W extends string, ...infer R extends readonly string[]]
-    ? EatWord<T, I, W> extends never ? never : EatWords<T, EatWord<T, I, W>, R>
-    : I;
+export type EatWords<
+	T extends Toks,
+	I extends number,
+	Ws extends readonly string[],
+> = Ws extends readonly [
+	infer W extends string,
+	...infer R extends readonly string[],
+]
+	? EatWord<T, I, W> extends never
+		? never
+		: EatWords<T, EatWord<T, I, W>, R>
+	: I;
 /** Consume word `W` or fail. */
-export type ExpectWord<T extends Toks, I extends number, W extends string> = EatWord<T, I, W> extends never ? Expected<Uppercase<W>, T, I> : EatWord<T, I, W>;
+export type ExpectWord<T extends Toks, I extends number, W extends string> =
+	EatWord<T, I, W> extends never
+		? Expected<Uppercase<W>, T, I>
+		: EatWord<T, I, W>;
 /** Consume op `O` or fail. */
-export type ExpectOp<T extends Toks, I extends number, O extends string> = EatOp<T, I, O> extends never ? Expected<`"${O}"`, T, I> : EatOp<T, I, O>;
+export type ExpectOp<T extends Toks, I extends number, O extends string> =
+	EatOp<T, I, O> extends never ? Expected<`"${O}"`, T, I> : EatOp<T, I, O>;
 /** Skip word `W` if present (always succeeds). */
-export type SkipWord<T extends Toks, I extends number, W extends string> = EatWord<T, I, W> extends never ? I : EatWord<T, I, W>;
-export type SkipWords<T extends Toks, I extends number, Ws extends readonly string[]> = EatWords<T, I, Ws> extends never ? I : EatWords<T, I, Ws>;
+export type SkipWord<T extends Toks, I extends number, W extends string> =
+	EatWord<T, I, W> extends never ? I : EatWord<T, I, W>;
+export type SkipWords<
+	T extends Toks,
+	I extends number,
+	Ws extends readonly string[],
+> = EatWords<T, I, Ws> extends never ? I : EatWords<T, I, Ws>;
 
 // ─── Identifiers ───
 
@@ -79,49 +128,88 @@ export type SkipWords<T extends Toks, I extends number, Ws extends readonly stri
  * with `never`: `never extends [infer A, infer B]` takes the *true* branch.
  */
 export type Ident<T extends Toks, I extends number> =
-  T[I] extends IdTok<infer V> ? [V, Nx<I>]
-  : T[I] extends WordTok<infer V> ? (IsColLabel<V> extends true ? [V, Nx<I>] : null)
-  : null;
+	T[I] extends IdTok<infer V>
+		? [V, Nx<I>]
+		: T[I] extends WordTok<infer V>
+			? IsColLabel<V> extends true
+				? [V, Nx<I>]
+				: null
+			: null;
 
 /** Identifier usable as a bare table alias (also excludes `left`, `join`, `is`, ...): `[name, next]` or `null`. */
 export type ColIdIdent<T extends Toks, I extends number> =
-  T[I] extends IdTok<infer V> ? [V, Nx<I>]
-  : T[I] extends WordTok<infer V> ? (IsColId<V> extends true ? [V, Nx<I>] : null)
-  : null;
+	T[I] extends IdTok<infer V>
+		? [V, Nx<I>]
+		: T[I] extends WordTok<infer V>
+			? IsColId<V> extends true
+				? [V, Nx<I>]
+				: null
+			: null;
 
 /** Any word or quoted identifier (after `AS`, Postgres accepts every keyword): `[name, next]` or `null`. */
 export type AnyLabel<T extends Toks, I extends number> =
-  T[I] extends IdTok<infer V> ? [V, Nx<I>]
-  : T[I] extends WordTok<infer V> ? [V, Nx<I>]
-  : null;
+	T[I] extends IdTok<infer V>
+		? [V, Nx<I>]
+		: T[I] extends WordTok<infer V>
+			? [V, Nx<I>]
+			: null;
 
 /** Identifier or fail. */
 export type ExpectIdent<T extends Toks, I extends number> =
-  Ident<T, I> extends [infer N extends string, infer J extends number] ? Ok<N, J> : Expected<"identifier", T, I>;
+	Ident<T, I> extends [infer N extends string, infer J extends number]
+		? Ok<N, J>
+		: Expected<"identifier", T, I>;
 
 /** Qualified name `a`, `a.b`, `a.b.c` → `[parts, next]` (max 3 parts) or `null`. */
 export type QualName<T extends Toks, I extends number> =
-  Ident<T, I> extends [infer A extends string, infer I1 extends number]
-    ? EatOp<T, I1, "."> extends never ? [[A], I1]
-    : Ident<T, EatOp<T, I1, ".">> extends [infer B extends string, infer I2 extends number]
-      ? EatOp<T, I2, "."> extends never ? [[A, B], I2]
-      : Ident<T, EatOp<T, I2, ".">> extends [infer C extends string, infer I3 extends number] ? [[A, B, C], I3] : [[A, B], I2]
-      : [[A], I1]
-    : null;
+	Ident<T, I> extends [infer A extends string, infer I1 extends number]
+		? EatOp<T, I1, "."> extends never
+			? [[A], I1]
+			: Ident<T, EatOp<T, I1, ".">> extends [
+						infer B extends string,
+						infer I2 extends number,
+					]
+				? EatOp<T, I2, "."> extends never
+					? [[A, B], I2]
+					: Ident<T, EatOp<T, I2, ".">> extends [
+								infer C extends string,
+								infer I3 extends number,
+							]
+						? [[A, B, C], I3]
+						: [[A, B], I2]
+				: [[A], I1]
+		: null;
 
 /** `(a, b, c)` → `Ok<names, next>` or error. Token `I` must be `(`. */
 export type ParenIdentList<T extends Toks, I extends number> =
-  EatOp<T, I, "("> extends never ? Expected<'"("', T, I> : IdentListLoop<T, EatOp<T, I, "(">, []>;
-type IdentListLoop<T extends Toks, I extends number, Acc extends readonly string[]> =
-  Ident<T, I> extends [infer N extends string, infer J extends number]
-    ? EatOp<T, J, ","> extends never
-      ? EatOp<T, J, ")"> extends never ? Expected<'"," or ")"', T, J> : Ok<[...Acc, N], EatOp<T, J, ")">>
-      : IdentListLoop<T, EatOp<T, J, ",">, [...Acc, N]>
-    : Expected<"identifier", T, I>;
+	EatOp<T, I, "("> extends never
+		? Expected<'"("', T, I>
+		: IdentListLoop<T, EatOp<T, I, "(">, []>;
+type IdentListLoop<
+	T extends Toks,
+	I extends number,
+	Acc extends readonly string[],
+> =
+	Ident<T, I> extends [infer N extends string, infer J extends number]
+		? EatOp<T, J, ","> extends never
+			? EatOp<T, J, ")"> extends never
+				? Expected<'"," or ")"', T, J>
+				: Ok<[...Acc, N], EatOp<T, J, ")">>
+			: IdentListLoop<T, EatOp<T, J, ",">, [...Acc, N]>
+		: Expected<"identifier", T, I>;
 
 /** Skip tokens up to and including the `)` matching an already-consumed `(`. */
-export type SkipToCloseParen<T extends Toks, I extends number, Depth extends readonly unknown[] = []> =
-  T[I] extends OpTok<"("> ? SkipToCloseParen<T, Nx<I>, [...Depth, 0]>
-  : T[I] extends OpTok<")"> ? (Depth extends readonly [unknown, ...infer D2] ? SkipToCloseParen<T, Nx<I>, D2> : Nx<I>)
-  : T[I] extends Tok ? SkipToCloseParen<T, Nx<I>, Depth>
-  : I;
+export type SkipToCloseParen<
+	T extends Toks,
+	I extends number,
+	Depth extends readonly unknown[] = [],
+> =
+	T[I] extends OpTok<"(">
+		? SkipToCloseParen<T, Nx<I>, [...Depth, 0]>
+		: T[I] extends OpTok<")">
+			? Depth extends readonly [unknown, ...infer D2]
+				? SkipToCloseParen<T, Nx<I>, D2>
+				: Nx<I>
+			: T[I] extends Tok
+				? SkipToCloseParen<T, Nx<I>, Depth>
+				: I;

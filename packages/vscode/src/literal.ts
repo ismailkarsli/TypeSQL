@@ -11,18 +11,19 @@ const CALL = /[A-Za-z_$][\w$]*(?:<[^()]*>)?\(\s*(["'`])/g;
 const WINDOW = 20_000;
 
 export function mayBeInSqlLiteral(text: string, offset: number): boolean {
-  const window = text.slice(Math.max(0, offset - WINDOW), offset);
-  let open = false;
-  for (const m of window.matchAll(CALL)) open = !closes(window, m.index + m[0].length, m[1]!);
-  return open;
+	const window = text.slice(Math.max(0, offset - WINDOW), offset);
+	let open = false;
+	for (const m of window.matchAll(CALL))
+		open = !closes(window, m.index + m[0].length, m[1]!);
+	return open;
 }
 
 /** Whether the literal opened with `quote` before `from` ends before the end of `s`. */
 function closes(s: string, from: number, quote: string): boolean {
-  for (let i = from; i < s.length; i++) {
-    const c = s[i];
-    if (c === "\\") i++;
-    else if (c === quote || (quote !== "`" && c === "\n")) return true;
-  }
-  return false;
+	for (let i = from; i < s.length; i++) {
+		const c = s[i];
+		if (c === "\\") i++;
+		else if (c === quote || (quote !== "`" && c === "\n")) return true;
+	}
+	return false;
 }

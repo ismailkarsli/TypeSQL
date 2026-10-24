@@ -1,5 +1,5 @@
 {
-  "extends": "../../../../tsconfig.base.json",
-  "compilerOptions": { "noEmit": true, "types": [], "noErrorTruncation": true },
-  "include": ["fixtures/errors.ts"]
+	"extends": "../../../../tsconfig.base.json",
+	"compilerOptions": { "noEmit": true, "types": [], "noErrorTruncation": true },
+	"include": ["fixtures/errors.ts"]
 }

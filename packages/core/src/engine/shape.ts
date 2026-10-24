@@ -1,5 +1,5 @@
-import type { ColMap } from "./types.js";
 import type { MergeShapes } from "./json.js";
+import type { ColMap } from "./types.js";
 
 /**
  * Structured values: whole-row references (`t`, `t.*` used as a value) and, see json.ts, JSON
@@ -20,14 +20,24 @@ export type AnyShaped = { readonly shape: unknown };
 export type ObjShape<M extends ColMap> = { readonly k: "obj"; readonly m: M };
 
 /** The plain name under a brand (`json`, `jsonb`, `record`, or `lit` for JSON-looking string literals). */
-export type BaseOf<T extends string> =
-  T extends "jsonb" ? "jsonb" : T extends "json" ? "json" : T extends "record" ? "record" : T extends "lit" ? "lit" : T;
+export type BaseOf<T extends string> = T extends "jsonb"
+	? "jsonb"
+	: T extends "json"
+		? "json"
+		: T extends "record"
+			? "record"
+			: T extends "lit"
+				? "lit"
+				: T;
 
 /** Drop the brand of a type name (and of an array's element type). */
-export type StripShape<T extends string> =
-  T extends AnyShaped ? BaseOf<T>
-  : T extends `${infer E}[]` ? (E extends AnyShaped ? `${BaseOf<E>}[]` : T)
-  : T;
+export type StripShape<T extends string> = T extends AnyShaped
+	? BaseOf<T>
+	: T extends `${infer E}[]`
+		? E extends AnyShaped
+			? `${BaseOf<E>}[]`
+			: T
+		: T;
 
 /**
  * Type of a whole-row reference: the row's columns as an object shape. Nullable only when every
@@ -35,17 +45,29 @@ export type StripShape<T extends string> =
  * that has a NOT NULL column cannot be the NULL row. (A table whose columns are all nullable is
  * therefore typed nullable too.)
  */
-export type RowInfo<M extends ColMap> = { readonly type: Shaped<"record", ObjShape<M>>; readonly nullable: AllNullable<M> };
-type AllNullable<M extends ColMap> = [keyof M] extends [never] ? false : false extends M[keyof M]["nullable"] ? false : true;
+export type RowInfo<M extends ColMap> = {
+	readonly type: Shaped<"record", ObjShape<M>>;
+	readonly nullable: AllNullable<M>;
+};
+type AllNullable<M extends ColMap> = [keyof M] extends [never]
+	? false
+	: false extends M[keyof M]["nullable"]
+		? false
+		: true;
 
 /**
  * Common type of two names where at least one may be branded (`CommonLit`'s fallback): the
  * same base type merges the shapes (a branch is either one), a plain value of that type drops
  * the shape (it could hold anything), different base types have no common type.
  */
-export type ShapedCommon<A extends string, B extends string> =
-  [BaseOf<A>] extends [BaseOf<B>]
-    ? [BaseOf<B>] extends [BaseOf<A>]
-      ? A extends Shaped<string, infer SA> ? (B extends Shaped<string, infer SB> ? Shaped<BaseOf<A>, MergeShapes<SA, SB>> : BaseOf<A>) : BaseOf<A>
-      : "unknown"
-    : "unknown";
+export type ShapedCommon<A extends string, B extends string> = [
+	BaseOf<A>,
+] extends [BaseOf<B>]
+	? [BaseOf<B>] extends [BaseOf<A>]
+		? A extends Shaped<string, infer SA>
+			? B extends Shaped<string, infer SB>
+				? Shaped<BaseOf<A>, MergeShapes<SA, SB>>
+				: BaseOf<A>
+			: BaseOf<A>
+		: "unknown"
+	: "unknown";

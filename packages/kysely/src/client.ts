@@ -1,5 +1,5 @@
+import { type Executor, runTransaction, type SqlDriver } from "@typesql/core";
 import { CompiledQuery, type QueryResult } from "kysely";
-import { runTransaction, type Executor, type SqlDriver } from "@typesql/core";
 
 /**
  * What the adapter uses from a `Kysely<DB>` or `Transaction<DB>`. Queries run through
@@ -8,13 +8,25 @@ import { runTransaction, type Executor, type SqlDriver } from "@typesql/core";
  * { rowKeys: "camelCase" })` renames the top-level keys instead, in the types too).
  */
 export interface KyselyExecutor {
-  withoutPlugins(): { executeQuery<R>(query: CompiledQuery<R>): Promise<QueryResult<R>> };
-  transaction(): { execute<T>(fn: (trx: KyselyExecutor) => Promise<T>): Promise<T> };
-  readonly isTransaction: boolean;
+	withoutPlugins(): {
+		executeQuery<R>(query: CompiledQuery<R>): Promise<QueryResult<R>>;
+	};
+	transaction(): {
+		execute<T>(fn: (trx: KyselyExecutor) => Promise<T>): Promise<T>;
+	};
+	readonly isTransaction: boolean;
 }
 
-function run<R>(db: KyselyExecutor, text: string, values: readonly unknown[]): Promise<QueryResult<R>> {
-  return db.withoutPlugins().executeQuery(CompiledQuery.raw(text, Array.from(values)) as CompiledQuery<R>);
+function run<R>(
+	db: KyselyExecutor,
+	text: string,
+	values: readonly unknown[],
+): Promise<QueryResult<R>> {
+	return db
+		.withoutPlugins()
+		.executeQuery(
+			CompiledQuery.raw(text, Array.from(values)) as CompiledQuery<R>,
+		);
 }
 
 /**
@@ -22,7 +34,9 @@ function run<R>(db: KyselyExecutor, text: string, values: readonly unknown[]): P
  * count is the rows returned (SELECT), or 0 (DDL), as Postgres' command tag says.
  */
 function rowCount(result: QueryResult<unknown>): number {
-  return result.numAffectedRows === undefined ? result.rows.length : Number(result.numAffectedRows);
+	return result.numAffectedRows === undefined
+		? result.rows.length
+		: Number(result.numAffectedRows);
 }
 
 /**
@@ -30,19 +44,27 @@ function rowCount(result: QueryResult<unknown>): number {
  * without its plugins, and resolves to `{ rows, rowCount }` so `q.executeCount()` works.
  */
 export function executor(db: KyselyExecutor): Executor {
-  return async (text, values) => {
-    const result = await run<unknown>(db, text, values);
-    return { rows: result.rows, rowCount: rowCount(result) };
-  };
+	return async (text, values) => {
+		const result = await run<unknown>(db, text, values);
+		return { rows: result.rows, rowCount: rowCount(result) };
+	};
 }
 
 /**
  * Run `fn` inside `db.transaction().execute()`. A Kysely `Transaction` cannot start another one,
  * so inside one `fn` runs in a savepoint.
  */
-function transaction<T>(db: KyselyExecutor, depth: number, fn: (trx: KyselyExecutor) => Promise<T>): Promise<T> {
-  if (!db.isTransaction) return db.transaction().execute(fn);
-  return runTransaction((statement) => run(db, statement, []), () => fn(db), { savepoint: `typesql_${depth + 1}` });
+function transaction<T>(
+	db: KyselyExecutor,
+	depth: number,
+	fn: (trx: KyselyExecutor) => Promise<T>,
+): Promise<T> {
+	if (!db.isTransaction) return db.transaction().execute(fn);
+	return runTransaction(
+		(statement) => run(db, statement, []),
+		() => fn(db),
+		{ savepoint: `typesql_${depth + 1}` },
+	);
 }
 
 /** How `createSql(db)` runs queries and transactions. */

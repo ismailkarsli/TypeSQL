@@ -1,19 +1,11 @@
 {
-  "extends": "../../tsconfig.base.json",
-  "compilerOptions": {
-    "rootDir": ".",
-    "noEmit": true,
-    "allowImportingTsExtensions": true,
-    "types": [
-      "node"
-    ]
-  },
-  "include": [
-    "src",
-    "test"
-  ],
-  "exclude": [
-    "test/errors/fixtures",
-    "test/cache"
-  ]
+	"extends": "../../tsconfig.base.json",
+	"compilerOptions": {
+		"rootDir": ".",
+		"noEmit": true,
+		"allowImportingTsExtensions": true,
+		"types": ["node"]
+	},
+	"include": ["src", "test"],
+	"exclude": ["test/errors/fixtures", "test/cache"]
 }

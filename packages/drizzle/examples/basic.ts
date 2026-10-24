@@ -4,9 +4,9 @@
  * here needs a database.
  */
 import type { ParamsType, RowType } from "@typesql/core";
-import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { createSql } from "@typesql/drizzle";
 import type { PgTypeMap } from "@typesql/pg";
+import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type * as schema from "./schema.js";
 
 // The whole module goes in as is: tables, views, enums and schemas are converted, relations
@@ -16,28 +16,36 @@ const sql = createSql<typeof schema>();
 // 1. Queries use SQL names (`display_name`, `author_id`), not the TS keys. Enum columns carry
 //    the enum's values.
 export const q1 = sql(
-  `SELECT u.email, u.display_name, p.title, p.tags
+	`SELECT u.email, u.display_name, p.title, p.tags
    FROM users u JOIN posts p ON p.author_id = u.id
    WHERE u.mood = $1`,
-  "happy",
+	"happy",
 );
 export type Q1Row = RowType<typeof q1>; // { email: string; display_name: string | null; title: string; tags: string[] }
 export type Q1Params = ParamsType<typeof q1>; // ["happy" | "sad"]
 
 // 2. Row types come from the driver, not from Drizzle's `mode`: bigint({ mode: "number" }) is int8,
 //    a string under node-postgres.
-export const q2 = sql(`SELECT id, published_at FROM posts WHERE author_id = $1`, 1);
+export const q2 = sql(
+	`SELECT id, published_at FROM posts WHERE author_id = $1`,
+	1,
+);
 export type Q2Row = RowType<typeof q2>; // { id: string; published_at: Date | null }
 
 // 3. SQL defaults (`defaultNow`, `default`, identity, serial) make a column optional in INSERT;
 //    `$defaultFn` runs in Drizzle only, so `slug` must be supplied.
-export const q3 = sql(`INSERT INTO posts (author_id, title, slug) VALUES ($1, $2, $3) RETURNING id, tags`, 1, "Hello", "hello");
+export const q3 = sql(
+	`INSERT INTO posts (author_id, title, slug) VALUES ($1, $2, $3) RETURNING id, tags`,
+	1,
+	"Hello",
+	"hello",
+);
 export type Q3Row = RowType<typeof q3>; // { id: string; tags: string[] }
 // sql(`INSERT INTO posts (author_id, title) VALUES ($1, $2)`, 1, "Hello");  // error: "slug" is NOT NULL and has no default
 
 // 4. pgSchema tables are namespaced; views are readable but not writable.
 export const q4 = sql(
-  `SELECT h.email, s.expires_at
+	`SELECT h.email, s.expires_at
    FROM happy_users h JOIN auth.sessions s ON s.user_id = h.id`,
 );
 export type Q4Row = RowType<typeof q4>; // { email: string; expires_at: Date }
@@ -45,7 +53,9 @@ export type Q4Row = RowType<typeof q4>; // { email: string; expires_at: Date }
 
 // 5. `pgType` pinned created_at to timestamptz, so timestamptz-only behaviour type-checks the
 //    way Postgres runs it: AT TIME ZONE turns it into a timestamp.
-export const q5 = sql(`SELECT created_at AT TIME ZONE 'UTC' AS created_utc FROM users`);
+export const q5 = sql(
+	`SELECT created_at AT TIME ZONE 'UTC' AS created_utc FROM users`,
+);
 export type Q5Row = RowType<typeof q5>; // { created_utc: Date }
 
 // 6. Run queries on your Drizzle database: createSql(db) sends them to the driver client under it
@@ -55,13 +65,22 @@ declare const db: NodePgDatabase<typeof schema>;
 const dbSql = createSql<typeof schema, PgTypeMap>(db);
 
 export async function postsByMood(m: "happy" | "sad") {
-  return dbSql(`SELECT p.id, p.title FROM posts p JOIN users u ON u.id = p.author_id WHERE u.mood = $1`, m).execute();
-  // Promise<{ id: string; title: string }[]>
+	return dbSql(
+		`SELECT p.id, p.title FROM posts p JOIN users u ON u.id = p.author_id WHERE u.mood = $1`,
+		m,
+	).execute();
+	// Promise<{ id: string; title: string }[]>
 }
 
 export async function publish(id: string) {
-  return dbSql.transaction(async (tx) => {
-    await tx(`UPDATE posts SET published_at = now() WHERE id = $1`, id).execute();
-    return tx(`SELECT title FROM posts WHERE id = $1`, id).executeTakeFirstOrThrow();
-  });
+	return dbSql.transaction(async (tx) => {
+		await tx(
+			`UPDATE posts SET published_at = now() WHERE id = $1`,
+			id,
+		).execute();
+		return tx(
+			`SELECT title FROM posts WHERE id = $1`,
+			id,
+		).executeTakeFirstOrThrow();
+	});
 }

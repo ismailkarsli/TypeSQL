@@ -1,19 +1,30 @@
+import type { TsOf, TsParamTypeOf } from "../type-map/index.js";
 import type { DmlStmt, SelectStmt, Stmt } from "./ast.js";
+import type {
+	CachedAnalysis,
+	CachedDdl,
+	DdlCacheKeys,
+	QueryCacheKeys,
+} from "./cache.js";
+import type { ApplyDdlAll } from "./ddl/apply.js";
 import type { AnyErr, ErrAt, ErrMsg, SqlError } from "./errors.js";
+import type { JsonValue } from "./inline.js";
 import type { Lex } from "./lexer/lex.js";
 import type { Toks } from "./lexer/tokens.js";
-import type { Nx } from "./parser/util.js";
-import type { ParseProgram } from "./parser/stmt.js";
-import type { ProjectStmt } from "./project/stmt.js";
-import type { ParamsOfDml } from "./project/dml.js";
-import type { Cols, ColsToMap, Simplify } from "./types.js";
-import type { MaxParam, NullTest, ParamMap, ParamsOfSelect, ParamsToMap } from "./typer/params.js";
-import type { TsOf, TsParamTypeOf } from "../type-map/index.js";
-import type { ApplyDdlAll } from "./ddl/apply.js";
 import type { NamedParams, RewriteNamed } from "./named.js";
+import type { ParseProgram } from "./parser/stmt.js";
+import type { Nx } from "./parser/util.js";
+import type { ParamsOfDml } from "./project/dml.js";
+import type { ProjectStmt } from "./project/stmt.js";
 import type { WithHint } from "./suggest.js";
-import type { JsonValue } from "./inline.js";
-import type { CachedAnalysis, CachedDdl, DdlCacheKeys, QueryCacheKeys } from "./cache.js";
+import type {
+	MaxParam,
+	NullTest,
+	ParamMap,
+	ParamsOfSelect,
+	ParamsToMap,
+} from "./typer/params.js";
+import type { Cols, ColsToMap, Simplify } from "./types.js";
 
 /**
  * Full pipeline for one statement. Cached by TypeScript per `(DB, Q)`, so the three
@@ -23,44 +34,59 @@ import type { CachedAnalysis, CachedDdl, DdlCacheKeys, QueryCacheKeys } from "./
  * `names` lists `:name` parameters in order of first appearance (`[]` for `$n` statements).
  */
 export type Analyze<DB, Q extends string> =
-  Lex<Q> extends infer T0
-    ? T0 extends Toks
-      ? RewriteNamed<T0> extends infer RN
-        ? RN extends [infer T extends Toks, infer Names extends readonly string[]]
-          ? ParseProgram<T> extends infer S
-            ? S extends Stmt
-              ? ProjectStmt<S, DB, [], {}> extends infer C
-                ? C extends Cols | null
-                  ? {
-                      readonly kind: S["t"];
-                      readonly cols: C;
-                      // the parameter pass re-types expressions; skip it when there are no `$n`
-                      readonly params: MaxParam<T> extends 0 ? {} : ParamsToMap<ParamsOfStmt<S, DB>>;
-                      readonly max: MaxParam<T>;
-                      readonly names: Names;
-                      readonly stmt: S;
-                    }
-                  : Reposition<C, T, DB>
-                : never
-              : Reposition<S, T, DB>
-            : never
-          : RN
-        : never
-      : T0
-    : never;
+	Lex<Q> extends infer T0
+		? T0 extends Toks
+			? RewriteNamed<T0> extends infer RN
+				? RN extends [
+						infer T extends Toks,
+						infer Names extends readonly string[],
+					]
+					? ParseProgram<T> extends infer S
+						? S extends Stmt
+							? ProjectStmt<S, DB, [], {}> extends infer C
+								? C extends Cols | null
+									? {
+											readonly kind: S["t"];
+											readonly cols: C;
+											// the parameter pass re-types expressions; skip it when there are no `$n`
+											readonly params: MaxParam<T> extends 0
+												? {}
+												: ParamsToMap<ParamsOfStmt<S, DB>>;
+											readonly max: MaxParam<T>;
+											readonly names: Names;
+											readonly stmt: S;
+										}
+									: Reposition<C, T, DB>
+								: never
+							: Reposition<S, T, DB>
+						: never
+					: RN
+				: never
+			: T0
+		: never;
 
 /**
  * `Analyze` without `stmt`, from the type cache when it has a fresh entry for `(DB, Q)` (see
  * cache.ts). What the projections below read; `Analyze` itself is never cached.
  */
-export type Analysis<DB, Q extends string> =
-  [Q] extends [keyof QueryCacheKeys] ? (CachedAnalysis<DB, Q> extends infer C ? ([C] extends [never] ? Analyze<DB, Q> : C) : never) : Analyze<DB, Q>;
+export type Analysis<DB, Q extends string> = [Q] extends [keyof QueryCacheKeys]
+	? CachedAnalysis<DB, Q> extends infer C
+		? [C] extends [never]
+			? Analyze<DB, Q>
+			: C
+		: never
+	: Analyze<DB, Q>;
 
-type ParamsOfStmt<S extends Stmt, DB> =
-  S extends SelectStmt ? ParamsOfSelect<S, DB, [], {}, never>
-  : S extends DmlStmt ? ParamsOfDml<S, DB, {}, never>
-  : S extends { readonly t: "declare_cursor"; readonly q: infer Q extends SelectStmt } ? ParamsOfSelect<Q, DB, [], {}, never>
-  : never;
+type ParamsOfStmt<S extends Stmt, DB> = S extends SelectStmt
+	? ParamsOfSelect<S, DB, [], {}, never>
+	: S extends DmlStmt
+		? ParamsOfDml<S, DB, {}, never>
+		: S extends {
+					readonly t: "declare_cursor";
+					readonly q: infer Q extends SelectStmt;
+				}
+			? ParamsOfSelect<Q, DB, [], {}, never>
+			: never;
 
 /**
  * Error positions are token indexes. Parser errors already carry the index of the
@@ -70,9 +96,11 @@ type ParamsOfStmt<S extends Stmt, DB> =
  * relations get a "Perhaps you meant …" hint when a close name exists (see suggest.ts).
  */
 type Reposition<E, T extends Toks, DB = never> =
-  E extends SqlError<infer M extends string, infer At>
-    ? At extends null ? SqlError<WithHint<M, T, DB>, LocateIdent<M, T>> : SqlError<M, At>
-    : E;
+	E extends SqlError<infer M extends string, infer At>
+		? At extends null
+			? SqlError<WithHint<M, T, DB>, LocateIdent<M, T>>
+			: SqlError<M, At>
+		: E;
 
 /**
  * Token index for a semantic error: the function of `function f(…) does not exist`, the
@@ -80,67 +108,141 @@ type Reposition<E, T extends Toks, DB = never> =
  * "email" of relation "users"` → `users` when `email` is absent), then `column t.c` forms, then the keyword of `each UNION query …` and
  * `UNION|CASE|VALUES|COALESCE types … cannot be matched`.
  */
-type LocateIdent<M extends string, T extends Toks> =
-  M extends `function ${infer Name}(${string}` ? FindTokOr<T, Name, 0>
-  : M extends `column ${string}.${infer Name} ${string}` ? FindTokOr<T, Name, LocateQuoted<M, T>>
-  : M extends "DEFAULT is not allowed in this context" ? FindTokOr<T, "default", 0>
-  : M extends "SELECT ... INTO is not allowed here" ? FindSelectInto<T, 0, false>
-  : M extends `each ${infer Op} query ${string}` ? FindTokOr<T, Lowercase<Op>, 0>
-  : M extends `${infer Op} types ${string} cannot be matched` ? (Op extends `${string} ${string}` ? LocateQuoted<M, T> : FindTokOr<T, Lowercase<Op>, 0>)
-  : LocateQuoted<M, T>;
-type LocateQuoted<M extends string, T extends Toks> =
-  M extends `${string}"${infer Name}"${infer Rest}` ? FindTokOr<T, Name, LocateQuoted<Rest, T>> : 0;
-type FindTokOr<T extends Toks, Name extends string, Else extends number> = FindTok<T, Name, 0> extends infer I extends number ? (I extends -1 ? Else : I) : Else;
-type FindTok<T extends Toks, Name extends string, I extends number> =
-  T[I] extends { readonly k: string }
-    ? IsTok<T, I, Name> extends true ? I
-    : IsTok<T, Nx<I>, Name> extends true ? Nx<I>
-    : IsTok<T, Nx<Nx<I>>, Name> extends true ? Nx<Nx<I>>
-    : IsTok<T, Nx<Nx<Nx<I>>>, Name> extends true ? Nx<Nx<Nx<I>>>
-    : FindTok<T, Name, Nx<Nx<Nx<Nx<I>>>>>
-    : -1;
+type LocateIdent<
+	M extends string,
+	T extends Toks,
+> = M extends `function ${infer Name}(${string}`
+	? FindTokOr<T, Name, 0>
+	: M extends `column ${string}.${infer Name} ${string}`
+		? FindTokOr<T, Name, LocateQuoted<M, T>>
+		: M extends "DEFAULT is not allowed in this context"
+			? FindTokOr<T, "default", 0>
+			: M extends "SELECT ... INTO is not allowed here"
+				? FindSelectInto<T, 0, false>
+				: M extends `each ${infer Op} query ${string}`
+					? FindTokOr<T, Lowercase<Op>, 0>
+					: M extends `${infer Op} types ${string} cannot be matched`
+						? Op extends `${string} ${string}`
+							? LocateQuoted<M, T>
+							: FindTokOr<T, Lowercase<Op>, 0>
+						: LocateQuoted<M, T>;
+type LocateQuoted<
+	M extends string,
+	T extends Toks,
+> = M extends `${string}"${infer Name}"${infer Rest}`
+	? FindTokOr<T, Name, LocateQuoted<Rest, T>>
+	: 0;
+type FindTokOr<T extends Toks, Name extends string, Else extends number> =
+	FindTok<T, Name, 0> extends infer I extends number
+		? I extends -1
+			? Else
+			: I
+		: Else;
+type FindTok<
+	T extends Toks,
+	Name extends string,
+	I extends number,
+> = T[I] extends { readonly k: string }
+	? IsTok<T, I, Name> extends true
+		? I
+		: IsTok<T, Nx<I>, Name> extends true
+			? Nx<I>
+			: IsTok<T, Nx<Nx<I>>, Name> extends true
+				? Nx<Nx<I>>
+				: IsTok<T, Nx<Nx<Nx<I>>>, Name> extends true
+					? Nx<Nx<Nx<I>>>
+					: FindTok<T, Name, Nx<Nx<Nx<Nx<I>>>>>
+	: -1;
 /** The first `INTO` that does not follow `INSERT` / `MERGE` (`AfterDml`: the previous token was one of them). */
-type FindSelectInto<T extends Toks, I extends number, AfterDml extends boolean> =
-  T[I] extends { readonly k: string }
-    ? IsTok<T, I, "into"> extends true ? (AfterDml extends true ? FindSelectInto<T, Nx<I>, false> : I)
-    : FindSelectInto<T, Nx<I>, T[I] extends { readonly k: "w"; readonly v: "insert" | "merge" } ? true : false>
-    : 0;
-type IsTok<T extends Toks, I extends number, Name extends string> = T[I] extends { readonly k: "w" | "id"; readonly v: Name } ? true : false;
+type FindSelectInto<
+	T extends Toks,
+	I extends number,
+	AfterDml extends boolean,
+> = T[I] extends { readonly k: string }
+	? IsTok<T, I, "into"> extends true
+		? AfterDml extends true
+			? FindSelectInto<T, Nx<I>, false>
+			: I
+		: FindSelectInto<
+				T,
+				Nx<I>,
+				T[I] extends { readonly k: "w"; readonly v: "insert" | "merge" }
+					? true
+					: false
+			>
+	: 0;
+type IsTok<
+	T extends Toks,
+	I extends number,
+	Name extends string,
+> = T[I] extends { readonly k: "w" | "id"; readonly v: Name } ? true : false;
 
 /** Row type of a statement (`never` for DML without RETURNING and for DDL). */
 export type RowOf<DB, TM, Q extends string> =
-  Analysis<DB, Q> extends { readonly cols: infer C }
-    ? C extends Cols ? BuildRow<ColsToMap<C>, TM, DB> : never
-    : never;
+	Analysis<DB, Q> extends { readonly cols: infer C }
+		? C extends Cols
+			? BuildRow<ColsToMap<C>, TM, DB>
+			: never
+		: never;
 
-export type BuildRow<M extends { readonly [k: string]: { readonly type: string; readonly nullable: boolean } }, TM, DB> =
-  Simplify<{ -readonly [K in keyof M]: TsOf<TM, DB, M[K]> }>;
+export type BuildRow<
+	M extends {
+		readonly [k: string]: { readonly type: string; readonly nullable: boolean };
+	},
+	TM,
+	DB,
+> = Simplify<{ -readonly [K in keyof M]: TsOf<TM, DB, M[K]> }>;
 
 /** Parameter tuple of a statement. Untyped params are `unknown`. */
 export type ParamsOf<DB, TM, Q extends string> =
-  Analysis<DB, Q> extends { readonly params: infer P extends ParamMap; readonly max: infer N extends number }
-    ? BuildParams<P, N, TM, DB, 1, []>
-    : [];
+	Analysis<DB, Q> extends {
+		readonly params: infer P extends ParamMap;
+		readonly max: infer N extends number;
+	}
+		? BuildParams<P, N, TM, DB, 1, []>
+		: [];
 
-type BuildParams<P extends ParamMap, N extends number, TM, DB, I extends number, Acc extends unknown[]> =
-  Acc["length"] extends N ? Acc
-  : BuildParams<P, N, TM, DB, Inc<I>, [...Acc, I extends keyof P ? ParamTs<P[I], TM, DB> : unknown]>;
+type BuildParams<
+	P extends ParamMap,
+	N extends number,
+	TM,
+	DB,
+	I extends number,
+	Acc extends unknown[],
+> = Acc["length"] extends N
+	? Acc
+	: BuildParams<
+			P,
+			N,
+			TM,
+			DB,
+			Inc<I>,
+			[...Acc, I extends keyof P ? ParamTs<P[I], TM, DB> : unknown]
+		>;
 /**
  * A parameter used in several places has a union of `ColInfo`s; its TS type is the
  * intersection of each use's TS type (without null), plus `| null` when every use accepts
  * null, or when the statement tests the `$n` with `IS [NOT] NULL` (a `NullTest` entry).
  * Uses with conflicting types (`id = $1 AND label = $1`) give `never`, not `null`.
  */
-type ParamTs<U, TM, DB> =
-  [Exclude<U, NullTest>] extends [never] ? unknown
-  : IntersectUses<Exclude<U, NullTest>, TM, DB> extends infer X
-    ? [X] extends [never] ? never
-    : [Extract<U, NullTest | { readonly nullable: false }>] extends [never] ? X | null
-    : [Extract<U, NullTest>] extends [never] ? X
-    : X | null
-    : never;
-type IntersectUses<U, TM, DB> =
-  (U extends { readonly type: infer T extends string } ? (u: TsParamTypeOf<TM, DB, T>) => void : never) extends (u: infer X) => void ? X : never;
+type ParamTs<U, TM, DB> = [Exclude<U, NullTest>] extends [never]
+	? unknown
+	: IntersectUses<Exclude<U, NullTest>, TM, DB> extends infer X
+		? [X] extends [never]
+			? never
+			: [Extract<U, NullTest | { readonly nullable: false }>] extends [never]
+				? X | null
+				: [Extract<U, NullTest>] extends [never]
+					? X
+					: X | null
+		: never;
+type IntersectUses<U, TM, DB> = (
+	U extends { readonly type: infer T extends string }
+		? (u: TsParamTypeOf<TM, DB, T>) => void
+		: never
+) extends (u: infer X) => void
+	? X
+	: never;
 type Inc<I extends number> = Nx<I>;
 
 /**
@@ -149,40 +251,66 @@ type Inc<I extends number> = Nx<I>;
  * no raw array, but a `sql.json(value)` (sent as JSON text by every driver) or any other value.
  */
 export type ArgsOf<DB, TM, Q extends string> =
-  Analysis<DB, Q> extends { readonly params: infer P extends ParamMap }
-    ? [Extract<P[keyof P], { readonly type: "json" | "jsonb" }>] extends [never] ? ParamsOf<DB, TM, Q> : JsonArgs<ParamsOf<DB, TM, Q>, P>
-    : [];
-type JsonArgs<Ps, P> = { [I in keyof Ps]: I extends `${infer N extends number}` ? (Nx<N> extends keyof P ? JsonArg<Ps[I], P[Nx<N>]> : Ps[I]) : Ps[I] };
-type JsonArg<X, U> = [Extract<U, { readonly type: "json" | "jsonb" }>] extends [never] ? X : NonArrayOrSqlJson<X>;
+	Analysis<DB, Q> extends { readonly params: infer P extends ParamMap }
+		? [Extract<P[keyof P], { readonly type: "json" | "jsonb" }>] extends [never]
+			? ParamsOf<DB, TM, Q>
+			: JsonArgs<ParamsOf<DB, TM, Q>, P>
+		: [];
+type JsonArgs<Ps, P> = {
+	[I in keyof Ps]: I extends `${infer N extends number}`
+		? Nx<N> extends keyof P
+			? JsonArg<Ps[I], P[Nx<N>]>
+			: Ps[I]
+		: Ps[I];
+};
+type JsonArg<X, U> = [Extract<U, { readonly type: "json" | "jsonb" }>] extends [
+	never,
+]
+	? X
+	: NonArrayOrSqlJson<X>;
 /**
  * A json / jsonb argument: `X` without arrays, or a `sql.json()` value. (Named so that the
  * error for a raw array says what to do; `ArraysNeedSqlJson` keeps it a union, which TS shows
  * by its alias.)
  */
-export type NonArrayOrSqlJson<X> = (unknown extends X ? NonArrayValue : Exclude<X, readonly unknown[]>) | JsonValue | ArraysNeedSqlJson;
+export type NonArrayOrSqlJson<X> =
+	| (unknown extends X ? NonArrayValue : Exclude<X, readonly unknown[]>)
+	| JsonValue
+	| ArraysNeedSqlJson;
 /**
  * Any value but an array (or another object with a `length`). The index-signature member
  * accepts object literals (no excess-property error), the `object` one interfaces.
  */
 type NonArrayValue =
-  | string | number | boolean | bigint | null | undefined
-  | (object & { readonly length?: never })
-  | { readonly length?: never; readonly [key: string]: unknown };
+	| string
+	| number
+	| boolean
+	| bigint
+	| null
+	| undefined
+	| (object & { readonly length?: never })
+	| { readonly length?: never; readonly [key: string]: unknown };
 /** No value has this type: see `NonArrayOrSqlJson`. */
-interface ArraysNeedSqlJson { readonly "pass a JSON array as sql.json(value)": never }
+interface ArraysNeedSqlJson {
+	readonly "pass a JSON array as sql.json(value)": never;
+}
 
 /** Named parameter names of a statement in order of first appearance (`[]` when positional). */
 export type NamesOf<DB, Q extends string> =
-  Analysis<DB, Q> extends { readonly names: infer N extends readonly string[] } ? N : [];
+	Analysis<DB, Q> extends { readonly names: infer N extends readonly string[] }
+		? N
+		: [];
 
 /**
  * Argument list a call site must pass after the query: a single object for `:name`
  * statements, the positional tuple otherwise.
  */
 export type ParamsArgs<DB, TM, Q extends string> =
-  NamesOf<DB, Q> extends infer N extends readonly string[]
-    ? N extends readonly [] ? ArgsOf<DB, TM, Q> : [params: NamedParams<N, ArgsOf<DB, TM, Q>>]
-    : never;
+	NamesOf<DB, Q> extends infer N extends readonly string[]
+		? N extends readonly []
+			? ArgsOf<DB, TM, Q>
+			: [params: NamedParams<N, ArgsOf<DB, TM, Q>>]
+		: never;
 
 /**
  * `Validate<DB, Q>` is `Q` when the statement is valid, otherwise the `SqlError`.
@@ -190,17 +318,23 @@ export type ParamsArgs<DB, TM, Q extends string> =
  * comes first so it survives TypeScript's truncation of long types in diagnostics.
  */
 export type Validate<DB, Q extends string> =
-  Analysis<DB, Q> extends infer R ? (R extends AnyErr ? R : Q) : never;
+	Analysis<DB, Q> extends infer R ? (R extends AnyErr ? R : Q) : never;
 
 /** Kind of statement: "select" | "insert" | ... */
-export type KindOf<DB, Q extends string> = Analysis<DB, Q> extends { readonly kind: infer K } ? K : never;
+export type KindOf<DB, Q extends string> =
+	Analysis<DB, Q> extends { readonly kind: infer K } ? K : never;
 
 /**
  * Apply a DDL script (one or more `;`-separated statements) to a schema: the new schema,
  * or `SqlError<message, tokenIndex>`. See engine/ddl/apply.ts. From the type cache (`DdlCache`)
  * when it has a fresh entry for the step.
  */
-export type ApplyDdl<DB, Q extends string> =
-  [Q] extends [keyof DdlCacheKeys] ? (CachedDdl<DB, Q> extends infer C ? ([C] extends [never] ? ApplyDdlAll<DB, Q> : C) : never) : ApplyDdlAll<DB, Q>;
+export type ApplyDdl<DB, Q extends string> = [Q] extends [keyof DdlCacheKeys]
+	? CachedDdl<DB, Q> extends infer C
+		? [C] extends [never]
+			? ApplyDdlAll<DB, Q>
+			: C
+		: never
+	: ApplyDdlAll<DB, Q>;
 
 export type { AnyErr, ErrAt, ErrMsg, SqlError };

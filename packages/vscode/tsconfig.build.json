@@ -1,15 +1,15 @@
 {
-  "extends": "../../tsconfig.base.json",
-  "compilerOptions": {
-    "module": "nodenext",
-    "moduleResolution": "nodenext",
-    "verbatimModuleSyntax": false,
-    "rootDir": "./src",
-    "outDir": "./dist",
-    "noEmit": false,
-    "declaration": false,
-    "declarationMap": false,
-    "types": ["node", "vscode"]
-  },
-  "include": ["src"]
+	"extends": "../../tsconfig.base.json",
+	"compilerOptions": {
+		"module": "nodenext",
+		"moduleResolution": "nodenext",
+		"verbatimModuleSyntax": false,
+		"rootDir": "./src",
+		"outDir": "./dist",
+		"noEmit": false,
+		"declaration": false,
+		"declarationMap": false,
+		"types": ["node", "vscode"]
+	},
+	"include": ["src"]
 }

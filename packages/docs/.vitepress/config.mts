@@ -1,62 +1,70 @@
 import { defineConfig } from "vitepress";
 
 export default defineConfig({
-  title: "TypeSQL",
-  description: "Type-level Postgres SQL for TypeScript: row and parameter types inferred from SQL string literals, with no codegen.",
-  cleanUrls: true,
-  themeConfig: {
-    nav: [
-      { text: "Guide", link: "/guide/getting-started", activeMatch: "/guide/" },
-      { text: "Adapters", link: "/adapters/", activeMatch: "/adapters/" },
-      { text: "Reference", link: "/reference/api", activeMatch: "/reference/" },
-      { text: "Internals", link: "/internals/engine", activeMatch: "/internals/" },
-    ],
-    sidebar: [
-      {
-        text: "Guide",
-        items: [
-          { text: "Getting started", link: "/guide/getting-started" },
-          { text: "Schema and type maps", link: "/guide/schema" },
-          { text: "Introspection", link: "/guide/introspect" },
-          { text: "Queries", link: "/guide/queries" },
-          { text: "Parameters", link: "/guide/parameters" },
-          { text: "Fragments", link: "/guide/fragments" },
-          { text: "Writing data", link: "/guide/writing-data" },
-          { text: "Migrations", link: "/guide/migrations" },
-          { text: "Errors and limits", link: "/guide/errors-and-limits" },
-          { text: "Postgres compatibility", link: "/guide/postgres-compatibility" },
-          { text: "Type cache", link: "/guide/caching" },
-          { text: "Editor completions", link: "/guide/editor" },
-        ],
-      },
-      {
-        text: "Adapters",
-        items: [
-          { text: "Overview", link: "/adapters/" },
-          { text: "node-postgres", link: "/adapters/pg" },
-          { text: "postgres.js", link: "/adapters/postgres" },
-          { text: "Kysely", link: "/adapters/kysely" },
-          { text: "Drizzle", link: "/adapters/drizzle" },
-          { text: "Prisma", link: "/adapters/prisma" },
-        ],
-      },
-      {
-        text: "Reference",
-        items: [
-          { text: "API", link: "/reference/api" },
-          { text: "DDL support", link: "/reference/ddl" },
-        ],
-      },
-      {
-        text: "Internals",
-        items: [
-          { text: "Type engine", link: "/internals/engine" },
-          { text: "Development", link: "/internals/development" },
-          { text: "Releasing", link: "/internals/releasing" },
-        ],
-      },
-    ],
-    search: { provider: "local" },
-    outline: { level: [2, 3] },
-  },
+	title: "TypeSQL",
+	description:
+		"Type-level Postgres SQL for TypeScript: row and parameter types inferred from SQL string literals, with no codegen.",
+	cleanUrls: true,
+	themeConfig: {
+		nav: [
+			{ text: "Guide", link: "/guide/getting-started", activeMatch: "/guide/" },
+			{ text: "Adapters", link: "/adapters/", activeMatch: "/adapters/" },
+			{ text: "Reference", link: "/reference/api", activeMatch: "/reference/" },
+			{
+				text: "Internals",
+				link: "/internals/engine",
+				activeMatch: "/internals/",
+			},
+		],
+		sidebar: [
+			{
+				text: "Guide",
+				items: [
+					{ text: "Getting started", link: "/guide/getting-started" },
+					{ text: "Schema and type maps", link: "/guide/schema" },
+					{ text: "Introspection", link: "/guide/introspect" },
+					{ text: "Queries", link: "/guide/queries" },
+					{ text: "Parameters", link: "/guide/parameters" },
+					{ text: "Fragments", link: "/guide/fragments" },
+					{ text: "Writing data", link: "/guide/writing-data" },
+					{ text: "Migrations", link: "/guide/migrations" },
+					{ text: "Errors and limits", link: "/guide/errors-and-limits" },
+					{
+						text: "Postgres compatibility",
+						link: "/guide/postgres-compatibility",
+					},
+					{ text: "Type cache", link: "/guide/caching" },
+					{ text: "Editor completions", link: "/guide/editor" },
+				],
+			},
+			{
+				text: "Adapters",
+				items: [
+					{ text: "Overview", link: "/adapters/" },
+					{ text: "node-postgres", link: "/adapters/pg" },
+					{ text: "postgres.js", link: "/adapters/postgres" },
+					{ text: "Kysely", link: "/adapters/kysely" },
+					{ text: "Drizzle", link: "/adapters/drizzle" },
+					{ text: "Prisma", link: "/adapters/prisma" },
+				],
+			},
+			{
+				text: "Reference",
+				items: [
+					{ text: "API", link: "/reference/api" },
+					{ text: "DDL support", link: "/reference/ddl" },
+				],
+			},
+			{
+				text: "Internals",
+				items: [
+					{ text: "Type engine", link: "/internals/engine" },
+					{ text: "Development", link: "/internals/development" },
+					{ text: "Releasing", link: "/internals/releasing" },
+				],
+			},
+		],
+		search: { provider: "local" },
+		outline: { level: [2, 3] },
+	},
 });

@@ -1,11 +1,11 @@
 {
-  "extends": "../../tsconfig.base.json",
-  "compilerOptions": {
-    "noEmit": true,
-    "types": ["node"],
-    "paths": {
-      "@typesql/core": ["../core/src/index.ts"]
-    }
-  },
-  "include": ["src", "test"]
+	"extends": "../../tsconfig.base.json",
+	"compilerOptions": {
+		"noEmit": true,
+		"types": ["node"],
+		"paths": {
+			"@typesql/core": ["../core/src/index.ts"]
+		}
+	},
+	"include": ["src", "test"]
 }

@@ -1,14 +1,41 @@
-import { createTransactionalSql, type DefaultTypeMap, type RowKeys, type SqlOptions, type TransactionalSql } from "@typesql/core";
+import {
+	createTransactionalSql,
+	type DefaultTypeMap,
+	type RowKeys,
+	type SqlOptions,
+	type TransactionalSql,
+} from "@typesql/core";
 import { driver, type KyselyExecutor } from "./client.js";
-import type { FromKysely, KyselyOptions, KyselyOverrides } from "./from-kysely.js";
+import type {
+	FromKysely,
+	KyselyOptions,
+	KyselyOverrides,
+} from "./from-kysely.js";
 
-export { NoResultError, type Executor, type TransactionalSql } from "@typesql/core";
-export type { FromKysely, KyselyOverrides, KyselyOptions, TableOverride, ColumnOverride, InferColumn, SnakeCase } from "./from-kysely.js";
+export {
+	type Executor,
+	NoResultError,
+	type TransactionalSql,
+} from "@typesql/core";
 export { executor, type KyselyExecutor } from "./client.js";
+export type {
+	ColumnOverride,
+	FromKysely,
+	InferColumn,
+	KyselyOptions,
+	KyselyOverrides,
+	SnakeCase,
+	TableOverride,
+} from "./from-kysely.js";
 
 /** What `createSql<DB>(db)` returns: core's `Sql` over `FromKysely<DB, ...>`, with `transaction(fn)`. */
-export type KyselySql<DB, TM = DefaultTypeMap, Overrides extends KyselyOverrides = {}, Options extends KyselyOptions = {}, Keys extends RowKeys = "preserve"> =
-  TransactionalSql<FromKysely<DB, Overrides, Options>, TM, Keys>;
+export type KyselySql<
+	DB,
+	TM = DefaultTypeMap,
+	Overrides extends KyselyOverrides = {},
+	Options extends KyselyOptions = {},
+	Keys extends RowKeys = "preserve",
+> = TransactionalSql<FromKysely<DB, Overrides, Options>, TM, Keys>;
 
 /**
  * `createSql` from core with a Kysely `DB` interface as the schema:
@@ -25,17 +52,36 @@ export type KyselySql<DB, TM = DefaultTypeMap, Overrides extends KyselyOverrides
  *
  *   const sql = createSql<DB, DefaultTypeMap, {}, { camelCase: true }>(db, { rowKeys: "camelCase" });
  */
-export function createSql<DB, TM = DefaultTypeMap, Overrides extends KyselyOverrides = {}, Options extends KyselyOptions = {}>(
-  db: KyselyExecutor | undefined,
-  options: { readonly rowKeys: "camelCase" },
+export function createSql<
+	DB,
+	TM = DefaultTypeMap,
+	Overrides extends KyselyOverrides = {},
+	Options extends KyselyOptions = {},
+>(
+	db: KyselyExecutor | undefined,
+	options: { readonly rowKeys: "camelCase" },
 ): KyselySql<DB, TM, Overrides, Options, "camelCase">;
-export function createSql<DB, TM = DefaultTypeMap, Overrides extends KyselyOverrides = {}, Options extends KyselyOptions = {}>(
-  db?: KyselyExecutor,
-  options?: { readonly rowKeys?: "preserve" },
+export function createSql<
+	DB,
+	TM = DefaultTypeMap,
+	Overrides extends KyselyOverrides = {},
+	Options extends KyselyOptions = {},
+>(
+	db?: KyselyExecutor,
+	options?: { readonly rowKeys?: "preserve" },
 ): KyselySql<DB, TM, Overrides, Options>;
-export function createSql<DB, TM = DefaultTypeMap, Overrides extends KyselyOverrides = {}, Options extends KyselyOptions = {}>(
-  db?: KyselyExecutor,
-  options?: SqlOptions,
+export function createSql<
+	DB,
+	TM = DefaultTypeMap,
+	Overrides extends KyselyOverrides = {},
+	Options extends KyselyOptions = {},
+>(
+	db?: KyselyExecutor,
+	options?: SqlOptions,
 ): KyselySql<DB, TM, Overrides, Options, RowKeys> {
-  return createTransactionalSql<FromKysely<DB, Overrides, Options>, TM, KyselyExecutor>(db, driver, options);
+	return createTransactionalSql<
+		FromKysely<DB, Overrides, Options>,
+		TM,
+		KyselyExecutor
+	>(db, driver, options);
 }

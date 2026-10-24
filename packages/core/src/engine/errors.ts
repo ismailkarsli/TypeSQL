@@ -13,12 +13,12 @@ declare const ERR: unique symbol;
 export type ERR = typeof ERR;
 
 export type SqlError<Message extends string, At = unknown> = {
-  readonly [ERR]: Message;
-  /**
-   * Token index of the error. (Not named `at`: `SqlError & Q` must stay a non-`never`
-   * intersection with the query string, and `String.prototype.at` would conflict.)
-   */
-  readonly position: At;
+	readonly [ERR]: Message;
+	/**
+	 * Token index of the error. (Not named `at`: `SqlError & Q` must stay a non-`never`
+	 * intersection with the query string, and `String.prototype.at` would conflict.)
+	 */
+	readonly position: At;
 };
 
 /** Any error, regardless of message/position. */
@@ -31,7 +31,11 @@ export type ErrMsg<T> = T extends SqlError<infer M, any> ? M : never;
 export type ErrAt<T> = T extends SqlError<any, infer A> ? A : never;
 
 /** Re-tag an error with a new position. */
-export type Reposition<E, At> = E extends SqlError<infer M, any> ? SqlError<M, At> : E;
+export type Reposition<E, At> =
+	E extends SqlError<infer M, any> ? SqlError<M, At> : E;
 
 /** Error raised with the remaining token count as position. */
-export type ErrAtRest<Message extends string, Rest extends readonly unknown[]> = SqlError<Message, Rest["length"]>;
+export type ErrAtRest<
+	Message extends string,
+	Rest extends readonly unknown[],
+> = SqlError<Message, Rest["length"]>;

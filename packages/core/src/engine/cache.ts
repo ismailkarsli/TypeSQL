@@ -1,9 +1,9 @@
 import type { EnumsOf } from "../type-map/index.js";
-import type { FunctionCatalog } from "./typer/catalog.js";
-import type { IsRelation, RelCols } from "./suggest.js";
+import type { ApplyPatch } from "./ddl/apply.js";
 import type { Analyze } from "./infer.js";
 import type { AnyShaped, BaseOf } from "./shape.js";
-import type { ApplyPatch } from "./ddl/apply.js";
+import type { IsRelation, RelCols } from "./suggest.js";
+import type { FunctionCatalog } from "./typer/catalog.js";
 
 /**
  * Type cache: results computed ahead of time by the content mapper's background job
@@ -30,10 +30,13 @@ import type { ApplyPatch } from "./ddl/apply.js";
  * nothing stale is one indexed access. `QueryCacheKeys` repeats every key with the same type
  * `true`, which merges, so a miss is one `keyof` check however many files there are.
  */
+// biome-ignore lint/suspicious/noEmptyInterface: cache files augment it
 export interface QueryCache {}
 /** Every key in `QueryCache`, across files. */
+// biome-ignore lint/suspicious/noEmptyInterface: cache files augment it
 export interface QueryCacheKeys {}
 /** The snapshot (`DbSnapshot`) of each group of `QueryCache`. */
+// biome-ignore lint/suspicious/noEmptyInterface: cache files augment it
 export interface CacheSnapshots {}
 
 /**
@@ -41,23 +44,29 @@ export interface CacheSnapshots {}
  * carries its own snapshot (`d`, of the schema before the step): every step of a migration
  * chain starts from a different schema, so there is nothing to share.
  */
+// biome-ignore lint/suspicious/noEmptyInterface: cache files augment it
 export interface DdlCache {}
 /** Every key in `DdlCache`, across files. */
+// biome-ignore lint/suspicious/noEmptyInterface: cache files augment it
 export interface DdlCacheKeys {}
 
 /**
  * Version of the engine's output. An entry computed by another version is never used. It is a
  * hash of the type-level sources, kept up to date by `node scripts/cache-version.ts`.
  */
-export type CacheVersion = "8df63f0067ad";
+export type CacheVersion = "67b1aa0c4b03";
 
 /** A relation, function or catalog entry that did not exist when the entry was computed. */
-export interface Missing { readonly "typesql.missing": true }
+export interface Missing {
+	readonly "typesql.missing": true;
+}
 /**
  * `FunctionCatalog[name]` is one of TypeSQL's built-in entries (which an augmentation cannot
  * change, and which `CacheVersion` covers).
  */
-export interface Builtin { readonly "typesql.builtin": true }
+export interface Builtin {
+	readonly "typesql.builtin": true;
+}
 
 /**
  * What a cache file's entries for one `DB` type were computed from. Entries name the parts they
@@ -77,12 +86,19 @@ export interface Builtin { readonly "typesql.builtin": true }
  *   whole schema.
  */
 export type DbSnapshot = {
-  readonly v: string;
-  readonly t: unknown;
-  readonly w: { readonly [word: string]: readonly [rel: unknown, pg: unknown, fn: unknown, cat: unknown] };
-  readonly q: { readonly [pair: string]: unknown };
-  readonly h?: unknown;
-  readonly all?: unknown;
+	readonly v: string;
+	readonly t: unknown;
+	readonly w: {
+		readonly [word: string]: readonly [
+			rel: unknown,
+			pg: unknown,
+			fn: unknown,
+			cat: unknown,
+		];
+	};
+	readonly q: { readonly [pair: string]: unknown };
+	readonly h?: unknown;
+	readonly all?: unknown;
 };
 
 /**
@@ -91,12 +107,28 @@ export type DbSnapshot = {
  * an entry's dependencies.
  */
 export type Stale<DB, D extends DbSnapshot> =
-  | (D["v"] extends CacheVersion ? never : "*")
-  | (Same<EnumsOf<DB>, D["t"]> extends true ? never : "*")
-  | { [W in keyof D["w"] & string]: WordFresh<DB, W, D["w"][W]> extends true ? never : W }[keyof D["w"] & string]
-  | { [P in keyof D["q"] & string]: Same<PairOf<DB, P>, D["q"][P]> extends true ? never : P }[keyof D["q"] & string]
-  | (D extends { readonly h: infer H } ? (Same<HintIndex<DB>, H> extends true ? never : "!h") : never)
-  | (D extends { readonly all: infer A } ? (Same<DB, A> extends true ? never : "!all") : never);
+	| (D["v"] extends CacheVersion ? never : "*")
+	| (Same<EnumsOf<DB>, D["t"]> extends true ? never : "*")
+	| {
+			[W in keyof D["w"] & string]: WordFresh<DB, W, D["w"][W]> extends true
+				? never
+				: W;
+	  }[keyof D["w"] & string]
+	| {
+			[P in keyof D["q"] & string]: Same<PairOf<DB, P>, D["q"][P]> extends true
+				? never
+				: P;
+	  }[keyof D["q"] & string]
+	| (D extends { readonly h: infer H }
+			? Same<HintIndex<DB>, H> extends true
+				? never
+				: "!h"
+			: never)
+	| (D extends { readonly all: infer A }
+			? Same<DB, A> extends true
+				? never
+				: "!all"
+			: never);
 
 /**
  * The comparison every dependency uses: mutual assignability of expanded copies. Comparing the
@@ -111,94 +143,168 @@ type Mutual<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
  * Objects and tuples mapped member by member down to literals. Functions, and the TS type of a
  * typed JSON column (`TsShape`, possibly recursive), are kept as they are.
  */
-type Expand<T> =
-  T extends (...args: never) => unknown ? T
-  : T extends { readonly k: "ts"; readonly v: unknown } ? T
-  : T extends object ? { [K in keyof T]: Expand<T[K]> }
-  : T;
+type Expand<T> = T extends (...args: never) => unknown
+	? T
+	: T extends { readonly k: "ts"; readonly v: unknown }
+		? T
+		: T extends object
+			? { [K in keyof T]: Expand<T[K]> }
+			: T;
 
 type WordFresh<DB, W extends string, S extends readonly unknown[]> =
-  Same<W extends keyof DB ? DB[W] : Missing, S[0]> extends false ? false
-  : Same<PgRel<DB, W>, S[1]> extends false ? false
-  : Same<SchemaFn<DB, W>, S[2]> extends false ? false
-  : S[3] extends Builtin ? true
-  : Same<W extends keyof FunctionCatalog ? FunctionCatalog[W] : Missing, S[3]>;
+	Same<W extends keyof DB ? DB[W] : Missing, S[0]> extends false
+		? false
+		: Same<PgRel<DB, W>, S[1]> extends false
+			? false
+			: Same<SchemaFn<DB, W>, S[2]> extends false
+				? false
+				: S[3] extends Builtin
+					? true
+					: Same<
+							W extends keyof FunctionCatalog ? FunctionCatalog[W] : Missing,
+							S[3]
+						>;
 
-type PgRel<DB, W extends string> = DB extends { readonly pg_catalog: infer PC } ? (W extends keyof PC ? PC[W] : Missing) : Missing;
-type SchemaFn<DB, W extends string> = DB extends { readonly $functions: infer F } ? (W extends keyof F ? F[W] : Missing) : Missing;
-type PairOf<DB, P extends string> =
-  P extends `${infer A}.${infer B}` ? (A extends keyof DB ? (B extends keyof DB[A] ? DB[A][B] : Missing) : Missing) : Missing;
+type PgRel<DB, W extends string> = DB extends { readonly pg_catalog: infer PC }
+	? W extends keyof PC
+		? PC[W]
+		: Missing
+	: Missing;
+type SchemaFn<DB, W extends string> = DB extends {
+	readonly $functions: infer F;
+}
+	? W extends keyof F
+		? F[W]
+		: Missing
+	: Missing;
+type PairOf<DB, P extends string> = P extends `${infer A}.${infer B}`
+	? A extends keyof DB
+		? B extends keyof DB[A]
+			? DB[A][B]
+			: Missing
+		: Missing
+	: Missing;
 
 /**
  * Names a hint can suggest: every relation name (top level and inside schemas) and every
  * `relation.column`. A misspelled-name error depends on these, not only on what it mentions.
  */
 export type HintIndex<DB> = {
-  [K in keyof DB & string]: K extends "$types" | "$functions" ? never
-  : IsRelation<DB[K]> extends true ? K | `${K}.${RelCols<DB[K]>}`
-  : { [R in keyof DB[K] & string]: IsRelation<DB[K][R]> extends true ? R | `${R}.${RelCols<DB[K][R]>}` : never }[keyof DB[K] & string];
+	[K in keyof DB & string]: K extends "$types" | "$functions"
+		? never
+		: IsRelation<DB[K]> extends true
+			? K | `${K}.${RelCols<DB[K]>}`
+			: {
+					[R in keyof DB[K] & string]: IsRelation<DB[K][R]> extends true
+						? R | `${R}.${RelCols<DB[K][R]>}`
+						: never;
+				}[keyof DB[K] & string];
 }[keyof DB & string];
 
 /** One cache entry: a key in one group (`c`: one per type map and `rowKeys`, a union). */
 export type CacheEntry = {
-  /** Dependencies: words, pairs, `"*"`, and `"!h"` for errors. */
-  readonly r: string;
-  /** The analysis (`Analysis`) of the key as positional text. */
-  readonly a?: unknown;
-  /** The `sql()` call with the key as its literal (see create-sql.ts `CallCached`). */
-  readonly c?: CallEntry;
+	/** Dependencies: words, pairs, `"*"`, and `"!h"` for errors. */
+	readonly r: string;
+	/** The analysis (`Analysis`) of the key as positional text. */
+	readonly a?: unknown;
+	/** The `sql()` call with the key as its literal (see create-sql.ts `CallCached`). */
+	readonly c?: CallEntry;
 };
 export type CallEntry = {
-  /** Type map snapshot and `rowKeys` the call was computed with. */
-  readonly m: unknown;
-  readonly k: string;
-  /** The query argument's check: `unknown` when valid, else the SqlError. */
-  readonly g: unknown;
-  /** Arguments after the query. */
-  readonly p: readonly unknown[];
-  /** Return type. */
-  readonly q: unknown;
+	/** Type map snapshot and `rowKeys` the call was computed with. */
+	readonly m: unknown;
+	readonly k: string;
+	/** The query argument's check: `unknown` when valid, else the SqlError. */
+	readonly g: unknown;
+	/** Arguments after the query. */
+	readonly p: readonly unknown[];
+	/** Return type. */
+	readonly q: unknown;
 };
 
 /** What changed in `DB` since group `G`'s snapshot (`"*"` for a group without one). */
-type GroupStale<DB, G> = G extends keyof CacheSnapshots ? (CacheSnapshots[G] extends infer D extends DbSnapshot ? Stale<DB, D> : "*") : "*";
+type GroupStale<DB, G> = G extends keyof CacheSnapshots
+	? CacheSnapshots[G] extends infer D extends DbSnapshot
+		? Stale<DB, D>
+		: "*"
+	: "*";
 
 /** The entry of `Q` in group `G` when its dependencies are unchanged in `DB`. */
 type FreshIn<DB, G, E> =
-  GroupStale<DB, G> extends infer S
-    ? [S] extends [never] ? E
-    : E extends { readonly r: infer R } ? ([Extract<S, R>] extends [never] ? E : never) : never
-    : never;
+	GroupStale<DB, G> extends infer S
+		? [S] extends [never]
+			? E
+			: E extends { readonly r: infer R }
+				? [Extract<S, R>] extends [never]
+					? E
+					: never
+				: never
+		: never;
 
 /**
  * Fresh entries of `Q` across groups, each as `[group, entry]` (usually one; never when none).
  * The group keeps entries of two files apart even when their types are the same, so `OneOf`
  * picks one of them rather than taking both as one type.
  */
-export type FreshVariants<DB, Q extends string> =
-  { [G in keyof QueryCache]: Q extends keyof QueryCache[G] ? (FreshIn<DB, G, QueryCache[G][Q]> extends infer E ? ([E] extends [never] ? never : [G, E]) : never) : never }[keyof QueryCache];
+export type FreshVariants<DB, Q extends string> = {
+	[G in keyof QueryCache]: Q extends keyof QueryCache[G]
+		? FreshIn<DB, G, QueryCache[G][Q]> extends infer E
+			? [E] extends [never]
+				? never
+				: [G, E]
+			: never
+		: never;
+}[keyof QueryCache];
 
 /**
  * One member of a union (the last, in TypeScript's order); itself for a non-union. Several fresh
  * entries for one key (from several cache files) are equivalent; this keeps one.
  */
 export type OneOf<U> = IsUnion<U> extends false ? U : LastOf<U>;
-type LastOf<U> = UnionToIntersection<U extends unknown ? (x: U) => void : never> extends (x: infer L) => void ? L : never;
-type UnionToIntersection<U> = (U extends unknown ? (u: U) => void : never) extends (u: infer I) => void ? I : never;
+type LastOf<U> =
+	UnionToIntersection<U extends unknown ? (x: U) => void : never> extends (
+		x: infer L,
+	) => void
+		? L
+		: never;
+type UnionToIntersection<U> = (
+	U extends unknown
+		? (u: U) => void
+		: never
+) extends (u: infer I) => void
+	? I
+	: never;
 
 /** `true` for a union of more than one member, `false` for one type, `never` for `never`. */
-export type IsUnion<T, U = T> = T extends unknown ? ([U] extends [T] ? false : true) : never;
+export type IsUnion<T, U = T> = T extends unknown
+	? [U] extends [T]
+		? false
+		: true
+	: never;
 
 /**
  * The cached analysis of a key of `QueryCacheKeys`, or `never` on a miss. A union `Q` (a fragment with a union text)
  * is never looked up: each member would need its own entry.
  */
 export type CachedAnalysis<DB, Q extends string> =
-  IsUnion<Q> extends true ? never
-  : Second<OneOf<FreshVariants<DB, Q> extends infer V ? (V extends [infer G, { readonly a: infer A }] ? [G, A] : never) : never>>;
+	IsUnion<Q> extends true
+		? never
+		: Second<
+				OneOf<
+					FreshVariants<DB, Q> extends infer V
+						? V extends [infer G, { readonly a: infer A }]
+							? [G, A]
+							: never
+						: never
+				>
+			>;
 
 /** `P[1]`, and `never` for `never` (where `never extends [unknown, infer X]` would give `unknown`). */
-export type Second<P> = [P] extends [never] ? never : P extends [unknown, infer X] ? X : never;
+export type Second<P> = [P] extends [never]
+	? never
+	: P extends [unknown, infer X]
+		? X
+		: never;
 
 // ─── generation (used by the job's probe file, src/cache/**) ───
 
@@ -208,37 +314,75 @@ export type Second<P> = [P] extends [never] ? never : P extends [unknown, infer 
  * printed type only names what `@typesql/core` exports.
  */
 export type CacheAnalysis<DB, Q extends string> =
-  Analyze<DB, Q> extends infer R
-    ? R extends { readonly stmt: unknown; readonly kind: infer K; readonly cols: infer C; readonly params: infer P; readonly max: infer M; readonly names: infer N }
-      ? { readonly kind: K; readonly cols: Plain<C>; readonly params: Plain<P>; readonly max: M; readonly names: N }
-      : R
-    : never;
+	Analyze<DB, Q> extends infer R
+		? R extends {
+				readonly stmt: unknown;
+				readonly kind: infer K;
+				readonly cols: infer C;
+				readonly params: infer P;
+				readonly max: infer M;
+				readonly names: infer N;
+			}
+			? {
+					readonly kind: K;
+					readonly cols: Plain<C>;
+					readonly params: Plain<P>;
+					readonly max: M;
+					readonly names: N;
+				}
+			: R
+		: never;
 
 /**
  * The same type without aliases: objects and tuples are mapped member by member, branded type
  * names (`Shaped`) are rebuilt. A `TsShape`'s TS type is kept as it is.
  */
-export type Plain<T> =
-  T extends { readonly k: "ts"; readonly v: infer V } ? { readonly k: "ts"; readonly v: V }
-  : T extends string ? (T extends AnyShaped ? BaseOf<T> & { readonly shape: Plain<T["shape"]> } : T)
-  : T extends object ? { [K in keyof T]: Plain<T[K]> }
-  : T;
+export type Plain<T> = T extends { readonly k: "ts"; readonly v: infer V }
+	? { readonly k: "ts"; readonly v: V }
+	: T extends string
+		? T extends AnyShaped
+			? BaseOf<T> & { readonly shape: Plain<T["shape"]> }
+			: T
+		: T extends object
+			? { [K in keyof T]: Plain<T[K]> }
+			: T;
 
 /**
  * The schema after DDL script `Q`, from a fresh `DdlCache` entry: the error, or the step's
  * effect (`s`: keys set, `x`: keys removed) applied to `DB`. `never` on a miss.
  */
 export type CachedDdl<DB, Q extends string> =
-  IsUnion<Q> extends true ? never
-  : OneOf<DdlVariants<Q> extends infer V ? (V extends { readonly d: infer D extends DbSnapshot; readonly r: infer R } ? ([Extract<Stale<DB, D>, R>] extends [never] ? DdlResult<DB, V> : never) : never) : never>;
-type DdlVariants<Q extends string> = { [F in keyof DdlCache]: Q extends keyof DdlCache[F] ? DdlCache[F][Q] : never }[keyof DdlCache];
-type DdlResult<DB, V> =
-  V extends { readonly e: infer E } ? E
-  : V extends { readonly s: infer S; readonly x: infer X } ? ApplyPatch<DB, S, X>
-  : never;
+	IsUnion<Q> extends true
+		? never
+		: OneOf<
+				DdlVariants<Q> extends infer V
+					? V extends {
+							readonly d: infer D extends DbSnapshot;
+							readonly r: infer R;
+						}
+						? [Extract<Stale<DB, D>, R>] extends [never]
+							? DdlResult<DB, V>
+							: never
+						: never
+					: never
+			>;
+type DdlVariants<Q extends string> = {
+	[F in keyof DdlCache]: Q extends keyof DdlCache[F] ? DdlCache[F][Q] : never;
+}[keyof DdlCache];
+type DdlResult<DB, V> = V extends { readonly e: infer E }
+	? E
+	: V extends { readonly s: infer S; readonly x: infer X }
+		? ApplyPatch<DB, S, X>
+		: never;
 
 /** What a `DdlCache` entry stores for a step that applies: the keys it sets and the keys it removes. */
 export type DdlEffect<Before, After> = {
-  readonly s: { [K in keyof After as K extends keyof Before ? (Same<Before[K], After[K]> extends true ? never : K) : K]: After[K] };
-  readonly x: Exclude<keyof Before, keyof After>;
+	readonly s: {
+		[K in keyof After as K extends keyof Before
+			? Same<Before[K], After[K]> extends true
+				? never
+				: K
+			: K]: After[K];
+	};
+	readonly x: Exclude<keyof Before, keyof After>;
 };

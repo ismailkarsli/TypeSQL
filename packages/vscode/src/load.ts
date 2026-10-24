@@ -10,53 +10,63 @@ import type * as Editor from "@typesql/core/editor";
 
 export type EditorModule = typeof Editor;
 
-const ADAPTERS = ["@typesql/pg", "@typesql/postgres", "@typesql/kysely", "@typesql/drizzle", "@typesql/prisma"];
+const ADAPTERS = [
+	"@typesql/pg",
+	"@typesql/postgres",
+	"@typesql/kysely",
+	"@typesql/drizzle",
+	"@typesql/prisma",
+];
 
 /** The path of the `@typesql/core/editor` module for `fileName`, or null. */
 export function editorPath(fileName: string): string | null {
-  const req = createRequire(fileName);
-  for (const via of [null, ...ADAPTERS]) {
-    try {
-      return (via === null ? req : createRequire(req.resolve(via))).resolve("@typesql/core/editor");
-    } catch {
-      // not installed, or a version of @typesql/core without editor support
-    }
-  }
-  return null;
+	const req = createRequire(fileName);
+	for (const via of [null, ...ADAPTERS]) {
+		try {
+			return (via === null ? req : createRequire(req.resolve(via))).resolve(
+				"@typesql/core/editor",
+			);
+		} catch {
+			// not installed, or a version of @typesql/core without editor support
+		}
+	}
+	return null;
 }
 
 /** Loads editor modules, once per directory and once per module path. */
 export class Loader {
-  private readonly byDir = new Map<string, Promise<EditorModule | null>>();
-  private readonly byPath = new Map<string, Promise<EditorModule>>();
-  private readonly log: (message: string) => void;
+	private readonly byDir = new Map<string, Promise<EditorModule | null>>();
+	private readonly byPath = new Map<string, Promise<EditorModule>>();
+	private readonly log: (message: string) => void;
 
-  constructor(log: (message: string) => void) {
-    this.log = log;
-  }
+	constructor(log: (message: string) => void) {
+		this.log = log;
+	}
 
-  load(fileName: string): Promise<EditorModule | null> {
-    const dir = dirname(fileName);
-    let m = this.byDir.get(dir);
-    if (!m) {
-      m = this.resolve(fileName);
-      this.byDir.set(dir, m);
-    }
-    return m;
-  }
+	load(fileName: string): Promise<EditorModule | null> {
+		const dir = dirname(fileName);
+		let m = this.byDir.get(dir);
+		if (!m) {
+			m = this.resolve(fileName);
+			this.byDir.set(dir, m);
+		}
+		return m;
+	}
 
-  private async resolve(fileName: string): Promise<EditorModule | null> {
-    const path = editorPath(fileName);
-    if (path === null) {
-      this.log(`no @typesql/core with an "./editor" export found from ${dirname(fileName)}`);
-      return null;
-    }
-    let m = this.byPath.get(path);
-    if (!m) {
-      this.log(`loading ${path}`);
-      m = import(pathToFileURL(path).href) as Promise<EditorModule>;
-      this.byPath.set(path, m);
-    }
-    return m;
-  }
+	private async resolve(fileName: string): Promise<EditorModule | null> {
+		const path = editorPath(fileName);
+		if (path === null) {
+			this.log(
+				`no @typesql/core with an "./editor" export found from ${dirname(fileName)}`,
+			);
+			return null;
+		}
+		let m = this.byPath.get(path);
+		if (!m) {
+			this.log(`loading ${path}`);
+			m = import(pathToFileURL(path).href) as Promise<EditorModule>;
+			this.byPath.set(path, m);
+		}
+		return m;
+	}
 }

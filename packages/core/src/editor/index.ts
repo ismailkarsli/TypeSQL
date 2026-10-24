@@ -12,29 +12,49 @@ import { dirname, join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { EditorKinds } from "./call.js";
 
-export { sqlCallAt, type EditorKinds, type SqlCall } from "./call.js";
-export { completions, completionsAt, quoteIdent, type CompletionItem, type Completions, type Range } from "./complete.js";
-export { contextAt, fold, type Context, type Cte, type Expect, type RelRef, type ScopeItem } from "./scan.js";
-export { schemaOf, type Column, type Relation, type Schema } from "./schema.js";
+export { type EditorKinds, type SqlCall, sqlCallAt } from "./call.js";
+export {
+	type CompletionItem,
+	type Completions,
+	completions,
+	completionsAt,
+	quoteIdent,
+	type Range,
+} from "./complete.js";
+export {
+	type Context,
+	type Cte,
+	contextAt,
+	type Expect,
+	fold,
+	type RelRef,
+	type ScopeItem,
+} from "./scan.js";
+export { type Column, type Relation, type Schema, schemaOf } from "./schema.js";
 
 /** The package root (dist/editor/ or src/editor/ → the directory with package.json). */
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 /** Whether a declaration belongs to this copy of `@typesql/core` (its dist or src). */
-export const isCorePath = (path: string): boolean => path.startsWith(join(root, "dist") + sep) || path.startsWith(join(root, "src") + sep);
+export const isCorePath = (path: string): boolean =>
+	path.startsWith(join(root, "dist") + sep) ||
+	path.startsWith(join(root, "src") + sep);
 
 /** The `EditorKinds` from `typescript/ast`'s `SyntaxKind`. */
-export function editorKinds(syntaxKind: Readonly<Record<string, number | string>>): EditorKinds {
-  const k = (name: string): number => {
-    const v = syntaxKind[name];
-    if (typeof v !== "number") throw new Error(`typesql: SyntaxKind.${name} is missing`);
-    return v;
-  };
-  return {
-    CallExpression: k("CallExpression"),
-    PropertyAccessExpression: k("PropertyAccessExpression"),
-    StringLiteral: k("StringLiteral"),
-    NoSubstitutionTemplateLiteral: k("NoSubstitutionTemplateLiteral"),
-    TemplateExpression: k("TemplateExpression"),
-  };
+export function editorKinds(
+	syntaxKind: Readonly<Record<string, number | string>>,
+): EditorKinds {
+	const k = (name: string): number => {
+		const v = syntaxKind[name];
+		if (typeof v !== "number")
+			throw new Error(`typesql: SyntaxKind.${name} is missing`);
+		return v;
+	};
+	return {
+		CallExpression: k("CallExpression"),
+		PropertyAccessExpression: k("PropertyAccessExpression"),
+		StringLiteral: k("StringLiteral"),
+		NoSubstitutionTemplateLiteral: k("NoSubstitutionTemplateLiteral"),
+		TemplateExpression: k("TemplateExpression"),
+	};
 }

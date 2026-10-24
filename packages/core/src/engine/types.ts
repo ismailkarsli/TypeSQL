@@ -12,7 +12,9 @@ export type ColMap = { readonly [name: string]: ColInfo };
  * Ordered projection: one entry per target. A `*` / `t.*` target becomes a single
  * `{ star }` entry so column order is preserved without needing `keyof` → tuple.
  */
-export type ColEntry = { readonly n: string; readonly t: ColInfo } | { readonly star: ColMap };
+export type ColEntry =
+	| { readonly n: string; readonly t: ColInfo }
+	| { readonly star: ColMap };
 export type Cols = readonly ColEntry[];
 
 /**
@@ -22,7 +24,11 @@ export type Cols = readonly ColEntry[];
  * - `cols`: columns reachable by qualified reference.
  * - `skip`: columns hidden from unqualified lookup and `*` (merged by USING).
  */
-export type ScopeItem = { readonly alias: string | null; readonly cols: ColMap; readonly skip: readonly string[] };
+export type ScopeItem = {
+	readonly alias: string | null;
+	readonly cols: ColMap;
+	readonly skip: readonly string[];
+};
 /** One query level, in FROM order. */
 export type ScopeLevel = readonly ScopeItem[];
 /** Innermost level first; outer levels follow (correlated subqueries, LATERAL). */
@@ -33,26 +39,44 @@ export type CteMap = { readonly [name: string]: ColMap };
 
 /** Analysis context threaded through typer and projector. */
 export type Ctx = {
-  readonly db: unknown;
-  readonly scope: Scope;
-  readonly ctes: CteMap;
-  /** The current query level has a GROUP BY (aggregates cannot see an empty input). */
-  readonly grouped: boolean;
-  /** Function catalog, operator table etc. are global; type map is applied at the boundary. */
+	readonly db: unknown;
+	readonly scope: Scope;
+	readonly ctes: CteMap;
+	/** The current query level has a GROUP BY (aggregates cannot see an empty input). */
+	readonly grouped: boolean;
+	/** Function catalog, operator table etc. are global; type map is applied at the boundary. */
 };
 
-export type Nullable<T extends ColInfo> = { readonly type: T["type"]; readonly nullable: true };
-export type NotNull<T extends ColInfo> = { readonly type: T["type"]; readonly nullable: false };
-export type Info<T extends string, N extends boolean = false> = { readonly type: T; readonly nullable: N };
+export type Nullable<T extends ColInfo> = {
+	readonly type: T["type"];
+	readonly nullable: true;
+};
+export type NotNull<T extends ColInfo> = {
+	readonly type: T["type"];
+	readonly nullable: false;
+};
+export type Info<T extends string, N extends boolean = false> = {
+	readonly type: T;
+	readonly nullable: N;
+};
 
 export type Bool<N extends boolean = false> = Info<"bool", N>;
 
 /** Mark every column of a map nullable (outer joins). */
-export type NullableMap<M extends ColMap> = { readonly [K in keyof M]: { readonly type: M[K]["type"]; readonly nullable: true } };
+export type NullableMap<M extends ColMap> = {
+	readonly [K in keyof M]: {
+		readonly type: M[K]["type"];
+		readonly nullable: true;
+	};
+};
 
 /** Left-to-right merge: keys of `B` override `A`; order = A's keys then new keys of B. */
 export type MergeMap<A extends ColMap, B extends ColMap> = {
-  readonly [K in keyof A | keyof B]: K extends keyof B ? B[K] : K extends keyof A ? A[K] : never;
+	readonly [K in keyof A | keyof B]: K extends keyof B
+		? B[K]
+		: K extends keyof A
+			? A[K]
+			: never;
 };
 
 /**
@@ -62,27 +86,49 @@ export type MergeMap<A extends ColMap, B extends ColMap> = {
  * key-remapped mapped type (≈15 instantiations for 7 columns vs ≈700 for an
  * accumulator). Mixed star/plain projections fall back to the accumulator.
  */
-export type ColsToMap<C extends Cols> =
-  C extends readonly [{ readonly star: infer M extends ColMap }] ? M
-  : C[number] extends { readonly n: string } ? PlainMap<C>
-  : SlowMap<C, {}>;
+export type ColsToMap<C extends Cols> = C extends readonly [
+	{ readonly star: infer M extends ColMap },
+]
+	? M
+	: C[number] extends { readonly n: string }
+		? PlainMap<C>
+		: SlowMap<C, {}>;
 
 type PlainMap<C extends Cols> = {
-  [E in C[number] as E extends { readonly n: infer N extends string } ? N : never]: E extends { readonly n: infer N extends string } ? LastT<C, N> : never;
+	[E in C[number] as E extends { readonly n: infer N extends string }
+		? N
+		: never]: E extends { readonly n: infer N extends string }
+		? LastT<C, N>
+		: never;
 };
 /** Type of the last entry named `N` (Postgres row objects keep the last duplicate). */
-type LastT<C extends Cols, N extends string> =
-  C extends readonly [...infer R extends Cols, infer L]
-    ? L extends { readonly n: N; readonly t: infer T extends ColInfo } ? T : LastT<R, N>
-    : never;
+type LastT<C extends Cols, N extends string> = C extends readonly [
+	...infer R extends Cols,
+	infer L,
+]
+	? L extends { readonly n: N; readonly t: infer T extends ColInfo }
+		? T
+		: LastT<R, N>
+	: never;
 
-type SlowMap<C extends Cols, Acc> =
-  C extends readonly [infer H extends ColEntry, ...infer R extends Cols]
-    ? H extends { readonly star: infer M extends ColMap } ? SlowMap<R, Omit<Acc, keyof M> & M>
-    : H extends { readonly n: infer N extends string; readonly t: infer T extends ColInfo }
-      ? SlowMap<R, N extends keyof Acc ? Omit<Acc, N> & { readonly [K in N]: T } : Acc & { readonly [K in N]: T }>
-      : never
-    : { readonly [K in keyof Acc]: Acc[K] };
+type SlowMap<C extends Cols, Acc> = C extends readonly [
+	infer H extends ColEntry,
+	...infer R extends Cols,
+]
+	? H extends { readonly star: infer M extends ColMap }
+		? SlowMap<R, Omit<Acc, keyof M> & M>
+		: H extends {
+					readonly n: infer N extends string;
+					readonly t: infer T extends ColInfo;
+				}
+			? SlowMap<
+					R,
+					N extends keyof Acc
+						? Omit<Acc, N> & { readonly [K in N]: T }
+						: Acc & { readonly [K in N]: T }
+				>
+			: never
+	: { readonly [K in keyof Acc]: Acc[K] };
 
 /** Prettify an object type for display. */
 export type Simplify<T> = { [K in keyof T]: T[K] } & {};
@@ -92,4 +138,14 @@ export type Simplify<T> = { [K in keyof T]: T[K] } & {};
  * contexts are then the same type, so `TypeOf` results computed during projection are reused
  * by the parameter pass (−18% instantiations on the 100-query benchmark).
  */
-export type MkCtx<DB, S extends Scope, Ctes extends CteMap, G extends boolean> = { readonly db: DB; readonly scope: S; readonly ctes: Ctes; readonly grouped: G };
+export type MkCtx<
+	DB,
+	S extends Scope,
+	Ctes extends CteMap,
+	G extends boolean,
+> = {
+	readonly db: DB;
+	readonly scope: S;
+	readonly ctes: Ctes;
+	readonly grouped: G;
+};

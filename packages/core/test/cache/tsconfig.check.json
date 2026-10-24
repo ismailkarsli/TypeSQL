@@ -1,5 +1,11 @@
 {
-  // `pnpm typecheck`: everything but the tests that need a generated cache (vitest generates it)
-  "extends": "./tsconfig.json",
-  "include": ["*.ts", "hooks", "stale/schema.ts", "stale/setup.ts", "equiv/setup.ts"]
+	// `pnpm typecheck`: everything but the tests that need a generated cache (vitest generates it)
+	"extends": "./tsconfig.json",
+	"include": [
+		"*.ts",
+		"hooks",
+		"stale/schema.ts",
+		"stale/setup.ts",
+		"equiv/setup.ts"
+	]
 }

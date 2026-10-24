@@ -1,5 +1,10 @@
 {
-  "extends": "../../../../tsconfig.base.json",
-  "compilerOptions": { "noEmit": true, "types": ["node"], "rootDir": "../..", "paths": { "@typesql/core": ["../../src/index.ts"] } },
-  "include": [".probe/__functions_probe__.ts"]
+	"extends": "../../../../tsconfig.base.json",
+	"compilerOptions": {
+		"noEmit": true,
+		"types": ["node"],
+		"rootDir": "../..",
+		"paths": { "@typesql/core": ["../../src/index.ts"] }
+	},
+	"include": [".probe/__functions_probe__.ts"]
 }

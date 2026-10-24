@@ -48,30 +48,31 @@ export type PgInterval = PgTypeMap["interval"];
  * The two that `PgCatalog` columns use are declared here as the text pg returns: `aclitem[]`
  * (`relacl`, `datacl`, ...) and `"char"[]` (`proargmodes`).
  */
-export interface PgTypeMap extends Omit<DefaultTypeMap, "bytea" | "interval" | "record" | "void"> {
-  /** What parameters accept on top of the row types. */
-  $params: PgParamTypeMap;
-  bytea: Buffer;
-  interval: {
-    years?: number;
-    months?: number;
-    days?: number;
-    hours?: number;
-    minutes?: number;
-    seconds?: number;
-    milliseconds?: number;
-    toPostgres(): string;
-    toISO(): string;
-    toISOString(): string;
-  };
-  /** Anonymous `ROW(...)` results have no parser: raw text such as `"(1,foo)"`. */
-  record: string;
-  /** `void`-returning functions (`pg_sleep`) yield an empty string. */
-  void: string;
-  /** No array parser: the raw `{...}` text, e.g. `"{postgres=arwdDxtm/postgres}"`. */
-  "aclitem[]": string;
-  /** No array parser for `"char"[]`: the raw `{...}` text, e.g. `"{i,o}"`. */
-  "char[]": string;
+export interface PgTypeMap
+	extends Omit<DefaultTypeMap, "bytea" | "interval" | "record" | "void"> {
+	/** What parameters accept on top of the row types. */
+	$params: PgParamTypeMap;
+	bytea: Buffer;
+	interval: {
+		years?: number;
+		months?: number;
+		days?: number;
+		hours?: number;
+		minutes?: number;
+		seconds?: number;
+		milliseconds?: number;
+		toPostgres(): string;
+		toISO(): string;
+		toISOString(): string;
+	};
+	/** Anonymous `ROW(...)` results have no parser: raw text such as `"(1,foo)"`. */
+	record: string;
+	/** `void`-returning functions (`pg_sleep`) yield an empty string. */
+	void: string;
+	/** No array parser: the raw `{...}` text, e.g. `"{postgres=arwdDxtm/postgres}"`. */
+	"aclitem[]": string;
+	/** No array parser for `"char"[]`: the raw `{...}` text, e.g. `"{i,o}"`. */
+	"char[]": string;
 }
 
 /**

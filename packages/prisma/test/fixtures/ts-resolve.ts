@@ -4,12 +4,13 @@
 import { registerHooks } from "node:module";
 
 registerHooks({
-  resolve(specifier, context, next) {
-    try {
-      return next(specifier, context);
-    } catch (err) {
-      if (/^\.\.?\//.test(specifier) && specifier.endsWith(".js")) return next(specifier.slice(0, -3) + ".ts", context);
-      throw err;
-    }
-  },
+	resolve(specifier, context, next) {
+		try {
+			return next(specifier, context);
+		} catch (err) {
+			if (/^\.\.?\//.test(specifier) && specifier.endsWith(".js"))
+				return next(specifier.slice(0, -3) + ".ts", context);
+			throw err;
+		}
+	},
 });

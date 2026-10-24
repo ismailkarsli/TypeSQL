@@ -1,31 +1,31 @@
 {
-  "name": "@typesql/docs",
-  "version": "0.0.10",
-  "private": true,
-  "type": "module",
-  "description": "Documentation site for TypeSQL (VitePress).",
-  "scripts": {
-    "dev": "vitepress dev",
-    "build": "vitepress build",
-    "preview": "vitepress preview",
-    "deploy": "vitepress build && cf deploy",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
-  },
-  "dependencies": {
-    "@typesql/core": "workspace:*",
-    "@typesql/drizzle": "workspace:*",
-    "@typesql/kysely": "workspace:*",
-    "@typesql/pg": "workspace:*",
-    "@typesql/prisma": "workspace:*"
-  },
-  "devDependencies": {
-    "@types/node": "^26.6.5",
-    "@types/pg": "^8.23.1",
-    "cf": "1.0.0-beta.12",
-    "pg": "^8.23.1",
-    "postgres": "^3.4.9",
-    "typescript": "7.1.0-beta",
-    "vitepress": "1.6.4",
-    "wrangler": "^4.151.3"
-  }
+	"name": "@typesql/docs",
+	"version": "0.0.10",
+	"private": true,
+	"type": "module",
+	"description": "Documentation site for TypeSQL (VitePress).",
+	"scripts": {
+		"dev": "vitepress dev",
+		"build": "vitepress build",
+		"preview": "vitepress preview",
+		"deploy": "vitepress build && cf deploy",
+		"typecheck": "tsc -p tsconfig.json --noEmit"
+	},
+	"dependencies": {
+		"@typesql/core": "workspace:*",
+		"@typesql/drizzle": "workspace:*",
+		"@typesql/kysely": "workspace:*",
+		"@typesql/pg": "workspace:*",
+		"@typesql/prisma": "workspace:*"
+	},
+	"devDependencies": {
+		"@types/node": "^26.6.5",
+		"@types/pg": "^8.23.1",
+		"cf": "1.0.0-beta.12",
+		"pg": "^8.23.1",
+		"postgres": "^3.4.9",
+		"typescript": "7.1.0-beta",
+		"vitepress": "1.6.4",
+		"wrangler": "^4.151.3"
+	}
 }

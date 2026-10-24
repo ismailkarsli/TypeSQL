@@ -9,20 +9,20 @@ import { param } from "./inline.js";
  * serializer calls `toJSON()`, and its text serializer (`'' + x`) calls `toString()`.
  */
 export class JsonParam<T = unknown> {
-  readonly value: T;
+	readonly value: T;
 
-  constructor(value: T) {
-    this.value = value;
-  }
-  toPostgres(): string {
-    return JSON.stringify(this.value);
-  }
-  toJSON(): T {
-    return this.value;
-  }
-  toString(): string {
-    return JSON.stringify(this.value);
-  }
+	constructor(value: T) {
+		this.value = value;
+	}
+	toPostgres(): string {
+		return JSON.stringify(this.value);
+	}
+	toJSON(): T {
+		return this.value;
+	}
+	toString(): string {
+		return JSON.stringify(this.value);
+	}
 }
 
 /**
@@ -31,5 +31,7 @@ export class JsonParam<T = unknown> {
  * a json / jsonb value is expected. `null` and `undefined` are SQL NULL.
  */
 export function json<const T>(value: T): JsonMarker<T> {
-  return param(value === null || value === undefined ? null : new JsonParam(value)) as unknown as JsonMarker<T>;
+	return param(
+		value === null || value === undefined ? null : new JsonParam(value),
+	) as unknown as JsonMarker<T>;
 }

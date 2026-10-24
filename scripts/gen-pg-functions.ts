@@ -10,30 +10,49 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 
-const require = createRequire(new URL("../packages/core/package.json", import.meta.url));
+const require = createRequire(
+	new URL("../packages/core/package.json", import.meta.url),
+);
 /** The part of a `pg` Client this script uses; `R` is the type of the result rows. */
 interface PgClient {
-  connect(): Promise<void>;
-  query<R extends readonly unknown[]>(text: string): Promise<{ rows: R }>;
-  end(): Promise<void>;
+	connect(): Promise<void>;
+	query<R extends readonly unknown[]>(text: string): Promise<{ rows: R }>;
+	end(): Promise<void>;
 }
-const { Client } = require("pg") as { Client: new (config: { connectionString: string }) => PgClient };
+const { Client } = require("pg") as {
+	Client: new (config: { connectionString: string }) => PgClient;
+};
 
 const url = process.env.TYPESQL_PG_URL;
 if (!url) {
-  console.error("set TYPESQL_PG_URL (e.g. docker run -d -p 5432:5432 -e POSTGRES_PASSWORD=x postgres:18)");
-  process.exit(2);
+	console.error(
+		"set TYPESQL_PG_URL (e.g. docker run -d -p 5432:5432 -e POSTGRES_PASSWORD=x postgres:18)",
+	);
+	process.exit(2);
 }
 
-const catalogSrc = readFileSync(new URL("../packages/core/src/engine/typer/catalog.ts", import.meta.url), "utf8");
+const catalogSrc = readFileSync(
+	new URL("../packages/core/src/engine/typer/catalog.ts", import.meta.url),
+	"utf8",
+);
 const start = catalogSrc.indexOf("export interface FunctionCatalog");
 const body = catalogSrc.slice(start, catalogSrc.indexOf("\n}\n", start));
-const curated = new Set([...body.matchAll(/(?:^|; )\s*([a-z_][a-z0-9_]*): (?:\[\s*Sig<|Sig<)/gm)].map((m) => m[1]!));
+const curated = new Set(
+	[...body.matchAll(/(?:^|; )\s*([a-z_][a-z0-9_]*): (?:\[\s*Sig<|Sig<)/gm)].map(
+		(m) => m[1]!,
+	),
+);
 
 const client = new Client({ connectionString: url });
 await client.connect();
-const { rows: [{ version }] } = await client.query<[{ version: string }]>("SELECT current_setting('server_version') AS version");
-const { rows } = await client.query<{ name: string; srf: boolean; kind: string; strict: boolean; ret: string }[]>(`
+const {
+	rows: [{ version }],
+} = await client.query<[{ version: string }]>(
+	"SELECT current_setting('server_version') AS version",
+);
+const { rows } = await client.query<
+	{ name: string; srf: boolean; kind: string; strict: boolean; ret: string }[]
+>(`
   WITH bad AS (
     SELECT oid FROM pg_type
      WHERE typname IN ('internal', 'cstring', 'trigger', 'event_trigger', 'language_handler', 'fdw_handler',
@@ -62,20 +81,36 @@ const { rows } = await client.query<{ name: string; srf: boolean; kind: string; 
 await client.end();
 
 /** name → { rets, srf, agg, window, strict } over all overloads. */
-const fns = new Map<string, { rets: Set<string>; srf: boolean; agg: boolean; window: boolean; strict: boolean }>();
+const fns = new Map<
+	string,
+	{
+		rets: Set<string>;
+		srf: boolean;
+		agg: boolean;
+		window: boolean;
+		strict: boolean;
+	}
+>();
 for (const r of rows) {
-  if (curated.has(r.name)) continue;
-  const f = fns.get(r.name) ?? { rets: new Set<string>(), srf: true, agg: true, window: true, strict: true };
-  f.rets.add(r.ret);
-  f.srf &&= r.srf;
-  f.agg &&= r.kind === "a";
-  f.window &&= r.kind === "w";
-  f.strict &&= r.strict;
-  fns.set(r.name, f);
+	if (curated.has(r.name)) continue;
+	const f = fns.get(r.name) ?? {
+		rets: new Set<string>(),
+		srf: true,
+		agg: true,
+		window: true,
+		strict: true,
+	};
+	f.rets.add(r.ret);
+	f.srf &&= r.srf;
+	f.agg &&= r.kind === "a";
+	f.window &&= r.kind === "w";
+	f.strict &&= r.strict;
+	fns.set(r.name, f);
 }
 
 const UNREACHABLE: Record<string, string> = {
-  overlay: "OVERLAY(… PLACING …) is special syntax and the plain call form is rejected by the parser",
+	overlay:
+		"OVERLAY(… PLACING …) is special syntax and the plain call form is rejected by the parser",
 };
 
 let out = `/**
@@ -92,19 +127,26 @@ import type { Sig } from "./catalog.js";
 export interface PgFunctions {
 `;
 for (const [name, f] of fns) {
-  const ret = f.rets.size === 1 ? [...f.rets][0] : "unknown";
-  const flags = [
-    f.srf ? "srf: true" : null,
-    f.agg ? "agg: true" : null,
-    f.window ? "window: true" : null,
-    ret === "unknown" || !f.strict ? "nullable: true" : null,
-  ].filter(Boolean);
-  const equivalent =
-    ret === "record" && flags.length === 1 && f.srf ? " // type-mutate: equivalent bool-flip – a record result types the same with or without srf"
-    : UNREACHABLE[name] ? ` // type-mutate: equivalent – ${UNREACHABLE[name]}`
-    : "";
-  out += `  ${name}: Sig<["..."], ${JSON.stringify(ret)}${flags.length ? `, { ${flags.join("; ")} }` : ""}>;${equivalent}\n`;
+	const ret = f.rets.size === 1 ? [...f.rets][0] : "unknown";
+	const flags = [
+		f.srf ? "srf: true" : null,
+		f.agg ? "agg: true" : null,
+		f.window ? "window: true" : null,
+		ret === "unknown" || !f.strict ? "nullable: true" : null,
+	].filter(Boolean);
+	const equivalent =
+		ret === "record" && flags.length === 1 && f.srf
+			? " // type-mutate: equivalent bool-flip – a record result types the same with or without srf"
+			: UNREACHABLE[name]
+				? ` // type-mutate: equivalent – ${UNREACHABLE[name]}`
+				: "";
+	out += `  ${name}: Sig<["..."], ${JSON.stringify(ret)}${flags.length ? `, { ${flags.join("; ")} }` : ""}>;${equivalent}\n`;
 }
 out += "}\n";
-writeFileSync(new URL("../packages/core/src/engine/typer/pg-functions.ts", import.meta.url), out);
-console.log(`wrote ${fns.size} functions (${curated.size} curated in FunctionCatalog)`);
+writeFileSync(
+	new URL("../packages/core/src/engine/typer/pg-functions.ts", import.meta.url),
+	out,
+);
+console.log(
+	`wrote ${fns.size} functions (${curated.size} curated in FunctionCatalog)`,
+);

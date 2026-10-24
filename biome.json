@@ -1,0 +1,68 @@
+{
+	"$schema": "https://biomejs.dev/schemas/2.6.2/schema.json",
+	"vcs": {
+		"enabled": true,
+		"clientKind": "git",
+		"useIgnoreFile": true
+	},
+	"files": {
+		"ignoreUnknown": false,
+		"includes": [
+			"**",
+			"!!vendor",
+			"!!.changeset",
+			"!packages/core/src/engine/lexer/next.ts",
+			"!packages/core/src/engine/typer/pg-functions.ts",
+			"!packages/core/src/schema/pg-catalog.ts",
+			"!packages/bench/src",
+			"!packages/bench/thresholds.json",
+			"!packages/pg/test/introspect/schema.generated.ts",
+			"!packages/prisma/test/fixtures/typesql.ts",
+			"!packages/kysely/test/fixtures/kysely-codegen.ts",
+			"!packages/core/test/oracle/baselines",
+			"!packages/core/test/fuzz/baseline.json",
+			"!packages/core/test/fuzz/corpus/candidates.json",
+			"!packages/core/test/pg-ast/baseline.json",
+			"!packages/core/test/pg-regress/baseline.json",
+			"!coverage-thresholds.json",
+			"!pnpm-lock.yaml",
+			"!**/CHANGELOG.md"
+		]
+	},
+	"formatter": {
+		"enabled": true,
+		"indentStyle": "tab"
+	},
+	"linter": {
+		"enabled": true,
+		"rules": {
+			"preset": "recommended"
+		}
+	},
+	"javascript": {
+		"formatter": {
+			"quoteStyle": "double"
+		}
+	},
+	"markdown": {
+		"formatter": {
+			"enabled": false
+		}
+	},
+	"assist": {
+		"enabled": true,
+		"actions": {
+			"source": {
+				"organizeImports": "on"
+			}
+		}
+	},
+	"overrides": [
+		{
+			"includes": ["scripts/type-mutate/fixture/src/logic.ts"],
+			"formatter": {
+				"enabled": false
+			}
+		}
+	]
+}

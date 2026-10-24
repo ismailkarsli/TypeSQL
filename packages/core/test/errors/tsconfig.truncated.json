@@ -1,5 +1,5 @@
 {
-  "extends": "../../../../tsconfig.base.json",
-  "compilerOptions": { "noEmit": true, "types": [] },
-  "include": ["fixtures/long.ts"]
+	"extends": "../../../../tsconfig.base.json",
+	"compilerOptions": { "noEmit": true, "types": [] },
+	"include": ["fixtures/long.ts"]
 }

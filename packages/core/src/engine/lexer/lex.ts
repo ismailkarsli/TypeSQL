@@ -1,8 +1,29 @@
 import type { SqlError } from "../errors.js";
-import type { Digit, HexDigit, IdChar, IdStart, NonIdAscii, Upper, Ws } from "./chars.js";
-import type { IdTok, NumTok, OpTok, ParamTok, StrTok, Tok, WordTok } from "./tokens.js";
+import type {
+	Digit,
+	HexDigit,
+	IdChar,
+	IdStart,
+	NonIdAscii,
+	Upper,
+	Ws,
+} from "./chars.js";
 import type { Next } from "./next.js";
-import type { CheckEscapes, CheckUEscapes, DecodeU, UEscape } from "./unicode.js";
+import type {
+	IdTok,
+	NumTok,
+	OpTok,
+	ParamTok,
+	StrTok,
+	Tok,
+	WordTok,
+} from "./tokens.js";
+import type {
+	CheckEscapes,
+	CheckUEscapes,
+	DecodeU,
+	UEscape,
+} from "./unicode.js";
 
 type Nx<I extends number> = Next[I];
 
@@ -29,17 +50,33 @@ export type Lex<Q extends string> = LexAll<Q, []>;
 type ChunkSize = 250;
 
 type LexAll<S extends string, Acc extends readonly Tok[]> =
-  LexChunk<S, [], 0> extends infer R
-    ? R extends ["done", infer T extends readonly Tok[]] ? [...Acc, ...T]
-    : R extends ["more", infer T extends readonly Tok[], infer Rest extends string] ? LexAll<Rest, [...Acc, ...T]>
-    : R extends ["err", infer M extends string, infer T extends readonly Tok[]] ? SqlError<M, [...Acc, ...T]["length"]>
-    : never
-    : never;
+	LexChunk<S, [], 0> extends infer R
+		? R extends ["done", infer T extends readonly Tok[]]
+			? [...Acc, ...T]
+			: R extends [
+						"more",
+						infer T extends readonly Tok[],
+						infer Rest extends string,
+					]
+				? LexAll<Rest, [...Acc, ...T]>
+				: R extends [
+							"err",
+							infer M extends string,
+							infer T extends readonly Tok[],
+						]
+					? SqlError<M, [...Acc, ...T]["length"]>
+					: never
+		: never;
 
-type LexChunk<S extends string, Acc extends readonly Tok[], B extends number> =
-  S extends "" ? ["done", Acc]
-  : B extends ChunkSize ? ["more", Acc, S]
-  : LexStep<S, Acc, Nx<B>>;
+type LexChunk<
+	S extends string,
+	Acc extends readonly Tok[],
+	B extends number,
+> = S extends ""
+	? ["done", Acc]
+	: B extends ChunkSize
+		? ["more", Acc, S]
+		: LexStep<S, Acc, Nx<B>>;
 
 /** Error marker carrying the chunk-local tokens so the outer loop can compute the token index. */
 type Err<M extends string, Acc extends readonly Tok[]> = ["err", M, Acc];
@@ -47,79 +84,164 @@ type Err<M extends string, Acc extends readonly Tok[]> = ["err", M, Acc];
 /** Punctuation that is never part of an operator: one token, no lookahead. */
 type Punct1 = "(" | ")" | "," | ";" | "[" | "]";
 /** Characters operators are made of (Postgres `op_chars`). */
-type OpChar = "~" | "!" | "@" | "#" | "^" | "&" | "|" | "`" | "?" | "+" | "-" | "*" | "/" | "%" | "<" | ">" | "=";
+type OpChar =
+	| "~"
+	| "!"
+	| "@"
+	| "#"
+	| "^"
+	| "&"
+	| "|"
+	| "`"
+	| "?"
+	| "+"
+	| "-"
+	| "*"
+	| "/"
+	| "%"
+	| "<"
+	| ">"
+	| "=";
 /** An operator ending in `+` or `-` keeps it only if it also contains one of these. */
 type OpSpecial = "~" | "!" | "@" | "#" | "^" | "&" | "|" | "`" | "?" | "%";
 
-type LexStep<S extends string, Acc extends readonly Tok[], B extends number> =
-  S extends `${infer C}${infer R}`
-    ? C extends Ws ? LexChunk<SkipWs<R>, Acc, B>
-    : C extends IdStart
-      ? (R extends `${infer Q extends "'" | "&"}${infer R1}` // one check per word for E'', B'', X'', U&'', U&""
-          ? (Q extends "'"
-              ? (C extends "E" | "e" ? LexEString<R1, Acc, B>
-                : C extends "B" | "b" | "X" | "x" ? LexString<TakeString<R1, "">, Acc, B>
-                : LexWord<R, C, Acc, B>)
-            : C extends "U" | "u"
-              ? (R1 extends `'${infer R2}` ? LexUString<R2, Acc, B> : R1 extends `"${infer R2}` ? LexUIdent<R2, Acc, B> : LexWord<R, C, Acc, B>)
-            : LexWord<R, C, Acc, B>)
-          : LexWord<R, C, Acc, B>)
-    : C extends Digit ? LexShortInt<S, R, C, Acc, B, []>
-    : C extends Punct1 ? LexChunk<R, [...Acc, OpTok<C>], B>
-    : C extends OpChar ? LexOperator<C, R, Acc, B>
-    : C extends ":" ? (R extends `:${infer R2}` ? LexChunk<R2, [...Acc, OpTok<"::">], B> : R extends `=${infer R2}` ? LexChunk<R2, [...Acc, OpTok<":=">], B> : LexChunk<R, [...Acc, OpTok<":">], B>)
-    : C extends "." ? (R extends `${Digit}${string}` ? LexNumber<S, Acc, B> : LexChunk<R, [...Acc, OpTok<".">], B>)
-    : C extends '"'
-      ? (TakeQuoted<R, '"', ""> extends [infer V extends string, infer R2 extends string]
-          ? (V extends "" ? Err<ZeroLength, Acc> : LexChunk<R2, [...Acc, IdTok<V>], B>)
-          : Err<"unterminated quoted identifier", Acc>)
-    : C extends "'" ? LexString<TakeString<R, "">, Acc, B>
-    : C extends "$"
-      ? (R extends `${infer D extends Digit}${infer R1}`
-          ? (TakeDigits<R1, D> extends [infer V extends string, infer R2 extends string]
-              ? (JunkAt<R2> extends infer J extends string ? Err<`trailing junk after parameter at or near "$${V}${J}"`, Acc> : LexChunk<R2, [...Acc, ParamTok<ToNum<V>>], B>)
-              : never)
-          : R extends `${infer Tag}$${infer R1}`
-            ? (Tag extends `${IdStart}${string}` | ""
-                ? (R1 extends `${infer Body}$${Tag}$${infer R2}` ? LexChunk<R2, [...Acc, StrTok<Body>], B> : Err<"unterminated dollar-quoted string", Acc>)
-                : Err<`syntax error at or near "$"`, Acc>)
-            : Err<`syntax error at or near "$"`, Acc>)
-    : C extends NonIdAscii ? Err<`unexpected character "${C}"`, Acc>
-    : TakeWord<R, C, true> extends [infer V extends string, infer R2 extends string, boolean]
-      ? LexChunk<R2, [...Acc, WordTok<FoldAscii<V, "">>], B>
-      : never
-  : never;
+type LexStep<
+	S extends string,
+	Acc extends readonly Tok[],
+	B extends number,
+> = S extends `${infer C}${infer R}`
+	? C extends Ws
+		? LexChunk<SkipWs<R>, Acc, B>
+		: C extends IdStart
+			? R extends `${infer Q extends "'" | "&"}${infer R1}` // one check per word for E'', B'', X'', U&'', U&""
+				? Q extends "'"
+					? C extends "E" | "e"
+						? LexEString<R1, Acc, B>
+						: C extends "B" | "b" | "X" | "x"
+							? LexString<TakeString<R1, "">, Acc, B>
+							: LexWord<R, C, Acc, B>
+					: C extends "U" | "u"
+						? R1 extends `'${infer R2}`
+							? LexUString<R2, Acc, B>
+							: R1 extends `"${infer R2}`
+								? LexUIdent<R2, Acc, B>
+								: LexWord<R, C, Acc, B>
+						: LexWord<R, C, Acc, B>
+				: LexWord<R, C, Acc, B>
+			: C extends Digit
+				? LexShortInt<S, R, C, Acc, B, []>
+				: C extends Punct1
+					? LexChunk<R, [...Acc, OpTok<C>], B>
+					: C extends OpChar
+						? LexOperator<C, R, Acc, B>
+						: C extends ":"
+							? R extends `:${infer R2}`
+								? LexChunk<R2, [...Acc, OpTok<"::">], B>
+								: R extends `=${infer R2}`
+									? LexChunk<R2, [...Acc, OpTok<":=">], B>
+									: LexChunk<R, [...Acc, OpTok<":">], B>
+							: C extends "."
+								? R extends `${Digit}${string}`
+									? LexNumber<S, Acc, B>
+									: LexChunk<R, [...Acc, OpTok<".">], B>
+								: C extends '"'
+									? TakeQuoted<R, '"', ""> extends [
+											infer V extends string,
+											infer R2 extends string,
+										]
+										? V extends ""
+											? Err<ZeroLength, Acc>
+											: LexChunk<R2, [...Acc, IdTok<V>], B>
+										: Err<"unterminated quoted identifier", Acc>
+									: C extends "'"
+										? LexString<TakeString<R, "">, Acc, B>
+										: C extends "$"
+											? R extends `${infer D extends Digit}${infer R1}`
+												? TakeDigits<R1, D> extends [
+														infer V extends string,
+														infer R2 extends string,
+													]
+													? JunkAt<R2> extends infer J extends string
+														? Err<
+																`trailing junk after parameter at or near "$${V}${J}"`,
+																Acc
+															>
+														: LexChunk<R2, [...Acc, ParamTok<ToNum<V>>], B>
+													: never
+												: R extends `${infer Tag}$${infer R1}`
+													? Tag extends `${IdStart}${string}` | ""
+														? R1 extends `${infer Body}$${Tag}$${infer R2}`
+															? LexChunk<R2, [...Acc, StrTok<Body>], B>
+															: Err<"unterminated dollar-quoted string", Acc>
+														: Err<`syntax error at or near "$"`, Acc>
+													: Err<`syntax error at or near "$"`, Acc>
+											: C extends NonIdAscii
+												? Err<`unexpected character "${C}"`, Acc>
+												: TakeWord<R, C, true> extends [
+															infer V extends string,
+															infer R2 extends string,
+															boolean,
+														]
+													? LexChunk<R2, [...Acc, WordTok<FoldAscii<V, "">>], B>
+													: never
+	: never;
 
 /** A string literal token from `[value, rest]`, or "unterminated quoted string". */
-type LexString<X, Acc extends readonly Tok[], B extends number> =
-  X extends [infer V extends string, infer R2 extends string] ? LexChunk<R2, [...Acc, StrTok<V>], B> : Err<"unterminated quoted string", Acc>;
+type LexString<X, Acc extends readonly Tok[], B extends number> = X extends [
+	infer V extends string,
+	infer R2 extends string,
+]
+	? LexChunk<R2, [...Acc, StrTok<V>], B>
+	: Err<"unterminated quoted string", Acc>;
 
 /** `E'...'`: backslash escapes (kept raw), `\u` / `\U` escapes validated. */
-type LexEString<R1 extends string, Acc extends readonly Tok[], B extends number> =
-  TakeEString<R1, ""> extends [infer V extends string, infer R2 extends string]
-    ? (CheckEscapes<V> extends infer M extends string ? Err<M, Acc> : LexChunk<R2, [...Acc, StrTok<V>], B>)
-    : Err<"unterminated quoted string", Acc>;
+type LexEString<
+	R1 extends string,
+	Acc extends readonly Tok[],
+	B extends number,
+> =
+	TakeEString<R1, ""> extends [infer V extends string, infer R2 extends string]
+		? CheckEscapes<V> extends infer M extends string
+			? Err<M, Acc>
+			: LexChunk<R2, [...Acc, StrTok<V>], B>
+		: Err<"unterminated quoted string", Acc>;
 
 /** `U&'...' [UESCAPE 'c']`: the value stays raw; its escapes are validated (unicode.ts). */
-type LexUString<R1 extends string, Acc extends readonly Tok[], B extends number> =
-  TakeString<R1, ""> extends [infer V extends string, infer R2 extends string]
-    ? UEscape<R2> extends infer U
-      ? U extends [infer E extends string, infer R3 extends string]
-        ? (CheckUEscapes<V, E> extends infer M extends string ? Err<M, Acc> : LexChunk<R3, [...Acc, StrTok<V>], B>)
-        : Err<U & string, Acc>
-      : never
-    : Err<"unterminated quoted string", Acc>;
+type LexUString<
+	R1 extends string,
+	Acc extends readonly Tok[],
+	B extends number,
+> =
+	TakeString<R1, ""> extends [infer V extends string, infer R2 extends string]
+		? UEscape<R2> extends infer U
+			? U extends [infer E extends string, infer R3 extends string]
+				? CheckUEscapes<V, E> extends infer M extends string
+					? Err<M, Acc>
+					: LexChunk<R3, [...Acc, StrTok<V>], B>
+				: Err<U & string, Acc>
+			: never
+		: Err<"unterminated quoted string", Acc>;
 
 /** `U&"..." [UESCAPE 'c']`: a quoted identifier with its escapes decoded. */
-type LexUIdent<R1 extends string, Acc extends readonly Tok[], B extends number> =
-  TakeQuoted<R1, '"', ""> extends [infer V extends string, infer R2 extends string]
-    ? V extends "" ? Err<ZeroLength, Acc>
-    : UEscape<R2> extends infer U
-      ? U extends [infer E extends string, infer R3 extends string]
-        ? (CheckUEscapes<V, E> extends infer M extends string ? Err<M, Acc> : LexChunk<R3, [...Acc, IdTok<DecodeU<V, E>>], B>)
-        : Err<U & string, Acc>
-      : never
-    : Err<"unterminated quoted identifier", Acc>;
+type LexUIdent<
+	R1 extends string,
+	Acc extends readonly Tok[],
+	B extends number,
+> =
+	TakeQuoted<R1, '"', ""> extends [
+		infer V extends string,
+		infer R2 extends string,
+	]
+		? V extends ""
+			? Err<ZeroLength, Acc>
+			: UEscape<R2> extends infer U
+				? U extends [infer E extends string, infer R3 extends string]
+					? CheckUEscapes<V, E> extends infer M extends string
+						? Err<M, Acc>
+						: LexChunk<R3, [...Acc, IdTok<DecodeU<V, E>>], B>
+					: Err<U & string, Acc>
+				: never
+		: Err<"unterminated quoted identifier", Acc>;
 
 type ZeroLength = 'zero-length delimited identifier at or near """"';
 
@@ -127,34 +249,68 @@ type ZeroLength = 'zero-length delimited identifier at or near """"';
  * Fast path for the common short integer (`LIMIT 20`, `= 1`): up to four digits followed by
  * whitespace or punctuation other than `.`. Anything else goes to `LexNumber`, from the start `S0`.
  */
-type LexShortInt<S0 extends string, R extends string, V extends string, Acc extends readonly Tok[], B extends number, K extends readonly unknown[]> =
-  R extends `${infer N}${infer R2}`
-    ? N extends Digit ? (K extends readonly [0, 0, 0] ? LexNumber<S0, Acc, B> : LexShortInt<S0, R2, `${V}${N}`, Acc, B, [...K, 0]>)
-    : N extends "." ? LexNumber<S0, Acc, B>
-    : N extends NonIdAscii ? LexChunk<R, [...Acc, NumTok<V>], B>
-    : LexNumber<S0, Acc, B>
-    : LexChunk<R, [...Acc, NumTok<V>], B>;
+type LexShortInt<
+	S0 extends string,
+	R extends string,
+	V extends string,
+	Acc extends readonly Tok[],
+	B extends number,
+	K extends readonly unknown[],
+> = R extends `${infer N}${infer R2}`
+	? N extends Digit
+		? K extends readonly [0, 0, 0]
+			? LexNumber<S0, Acc, B>
+			: LexShortInt<S0, R2, `${V}${N}`, Acc, B, [...K, 0]>
+		: N extends "."
+			? LexNumber<S0, Acc, B>
+			: N extends NonIdAscii
+				? LexChunk<R, [...Acc, NumTok<V>], B>
+				: LexNumber<S0, Acc, B>
+	: LexChunk<R, [...Acc, NumTok<V>], B>;
 
 /**
  * A number, then a check that no identifier character follows it (`123abc`, `1x`, `100_` are
  * "trailing junk", as in Postgres 15+).
  */
 type LexNumber<S extends string, Acc extends readonly Tok[], B extends number> =
-  TakeNumber<S> extends infer N
-    ? N extends [infer V extends string, infer R2 extends string]
-      ? (JunkAt<R2> extends infer J extends string ? Err<`trailing junk after numeric literal at or near "${V}${J}"`, Acc> : LexChunk<R2, [...Acc, NumTok<V>], B>)
-      : Err<N & string, Acc>
-    : never;
+	TakeNumber<S> extends infer N
+		? N extends [infer V extends string, infer R2 extends string]
+			? JunkAt<R2> extends infer J extends string
+				? Err<`trailing junk after numeric literal at or near "${V}${J}"`, Acc>
+				: LexChunk<R2, [...Acc, NumTok<V>], B>
+			: Err<N & string, Acc>
+		: never;
 
 /** The first character of `R` when it would continue an identifier (a letter, `_` or a non-ASCII character), else `null`. */
-type JunkAt<R extends string> =
-  R extends `${infer C}${string}` ? (C extends IdStart ? C : C extends NonIdAscii | Digit | "$" ? null : C) : null;
+type JunkAt<R extends string> = R extends `${infer C}${string}`
+	? C extends IdStart
+		? C
+		: C extends NonIdAscii | Digit | "$"
+			? null
+			: C
+	: null;
 
 /** An unquoted identifier or keyword starting with `C`, folded to lowercase. */
-type LexWord<R extends string, C extends string, Acc extends readonly Tok[], B extends number> =
-  TakeWord<R, C, false> extends [infer V extends string, infer R2 extends string, infer NonAscii extends boolean]
-    ? LexChunk<R2, [...Acc, WordTok<NonAscii extends true ? FoldAscii<V, ""> : Lowercase<V>>], B>
-    : never;
+type LexWord<
+	R extends string,
+	C extends string,
+	Acc extends readonly Tok[],
+	B extends number,
+> =
+	TakeWord<R, C, false> extends [
+		infer V extends string,
+		infer R2 extends string,
+		infer NonAscii extends boolean,
+	]
+		? LexChunk<
+				R2,
+				[
+					...Acc,
+					WordTok<NonAscii extends true ? FoldAscii<V, ""> : Lowercase<V>>,
+				],
+				B
+			>
+		: never;
 
 /**
  * After operator character `C` (Postgres `scan.l`): `--` and a block comment, a single-character
@@ -163,32 +319,74 @@ type LexWord<R extends string, C extends string, Acc extends readonly Tok[], B e
  * cannot end in `+` or `-` unless it contains an `OpSpecial` character (`a+-b` is `+` and `-b`,
  * `@-` stays one operator); the dropped characters are lexed again.
  */
-type LexOperator<C extends string, R extends string, Acc extends readonly Tok[], B extends number> =
-  R extends `${infer N}${infer R1}`
-    ? N extends OpChar
-      ? C extends "-" ? (N extends "-" ? LexChunk<SkipLine<R1>, Acc, B> : LexOpRun<C, R, Acc, B>)
-      : C extends "/" ? (N extends "*" ? (SkipBlock<R1, [0]> extends infer R2 ? (R2 extends string ? LexChunk<R2, Acc, B> : Err<"unterminated /* comment", Acc>) : never) : LexOpRun<C, R, Acc, B>)
-      : LexOpRun<C, R, Acc, B>
-      : LexChunk<R, [...Acc, OpTok<C>], B>
-    : LexChunk<R, [...Acc, OpTok<C>], B>;
-type LexOpRun<C extends string, R extends string, Acc extends readonly Tok[], B extends number> =
-  OpRun<R, C> extends [infer O extends string, infer R2 extends string]
-    ? TrimOp<O, R2> extends [infer O2 extends string, infer R3 extends string] ? LexChunk<R3, [...Acc, OpTok<O2>], B> : never
-    : never;
-type OpRun<S extends string, Acc extends string> =
-  S extends `${infer C}${infer R}`
-    ? C extends OpChar
-      ? C extends "-" ? (R extends `-${string}` ? [Acc, S] : OpRun<R, `${Acc}${C}`>)
-      : C extends "/" ? (R extends `*${string}` ? [Acc, S] : OpRun<R, `${Acc}${C}`>)
-      : OpRun<R, `${Acc}${C}`>
-      : [Acc, S]
-    : [Acc, S];
-type TrimOp<O extends string, R extends string> =
-  O extends `${infer P}+` ? (P extends "" ? [O, R] : P extends `${string}${OpSpecial}${string}` ? [O, R] : TrimOp<P, `+${R}`>)
-  : O extends `${infer P}-` ? (P extends "" ? [O, R] : P extends `${string}${OpSpecial}${string}` ? [O, R] : TrimOp<P, `-${R}`>)
-  : [O, R];
+type LexOperator<
+	C extends string,
+	R extends string,
+	Acc extends readonly Tok[],
+	B extends number,
+> = R extends `${infer N}${infer R1}`
+	? N extends OpChar
+		? C extends "-"
+			? N extends "-"
+				? LexChunk<SkipLine<R1>, Acc, B>
+				: LexOpRun<C, R, Acc, B>
+			: C extends "/"
+				? N extends "*"
+					? SkipBlock<R1, [0]> extends infer R2
+						? R2 extends string
+							? LexChunk<R2, Acc, B>
+							: Err<"unterminated /* comment", Acc>
+						: never
+					: LexOpRun<C, R, Acc, B>
+				: LexOpRun<C, R, Acc, B>
+		: LexChunk<R, [...Acc, OpTok<C>], B>
+	: LexChunk<R, [...Acc, OpTok<C>], B>;
+type LexOpRun<
+	C extends string,
+	R extends string,
+	Acc extends readonly Tok[],
+	B extends number,
+> =
+	OpRun<R, C> extends [infer O extends string, infer R2 extends string]
+		? TrimOp<O, R2> extends [infer O2 extends string, infer R3 extends string]
+			? LexChunk<R3, [...Acc, OpTok<O2>], B>
+			: never
+		: never;
+type OpRun<
+	S extends string,
+	Acc extends string,
+> = S extends `${infer C}${infer R}`
+	? C extends OpChar
+		? C extends "-"
+			? R extends `-${string}`
+				? [Acc, S]
+				: OpRun<R, `${Acc}${C}`>
+			: C extends "/"
+				? R extends `*${string}`
+					? [Acc, S]
+					: OpRun<R, `${Acc}${C}`>
+				: OpRun<R, `${Acc}${C}`>
+		: [Acc, S]
+	: [Acc, S];
+type TrimOp<O extends string, R extends string> = O extends `${infer P}+`
+	? P extends ""
+		? [O, R]
+		: P extends `${string}${OpSpecial}${string}`
+			? [O, R]
+			: TrimOp<P, `+${R}`>
+	: O extends `${infer P}-`
+		? P extends ""
+			? [O, R]
+			: P extends `${string}${OpSpecial}${string}`
+				? [O, R]
+				: TrimOp<P, `-${R}`>
+		: [O, R];
 
-type SkipWs<S extends string> = S extends `${infer C}${infer R}` ? (C extends Ws ? SkipWs<R> : S) : S;
+type SkipWs<S extends string> = S extends `${infer C}${infer R}`
+	? C extends Ws
+		? SkipWs<R>
+		: S
+	: S;
 type SkipLine<S extends string> = S extends `${infer _}\n${infer R}` ? R : "";
 
 /**
@@ -196,66 +394,116 @@ type SkipLine<S extends string> = S extends `${infer _}\n${infer R}` ? R : "";
  * holds one entry per open comment. Each `/*` before the next `*\/` opens a level.
  * Result: the rest of the input, or `null` when unterminated.
  */
-type SkipBlock<S extends string, Depth extends readonly unknown[]> =
-  S extends `${infer Pre}*/${infer R}`
-    ? CountOpens<Pre, Depth> extends readonly [unknown, ...infer D2]
-      ? D2 extends readonly [] ? R : SkipBlock<R, D2>
-      : never
-    : null;
-type CountOpens<S extends string, Depth extends readonly unknown[]> =
-  S extends `${string}/*${infer R}` ? CountOpens<R, [...Depth, 0]> : Depth;
+type SkipBlock<
+	S extends string,
+	Depth extends readonly unknown[],
+> = S extends `${infer Pre}*/${infer R}`
+	? CountOpens<Pre, Depth> extends readonly [unknown, ...infer D2]
+		? D2 extends readonly []
+			? R
+			: SkipBlock<R, D2>
+		: never
+	: null;
+type CountOpens<
+	S extends string,
+	Depth extends readonly unknown[],
+> = S extends `${string}/*${infer R}` ? CountOpens<R, [...Depth, 0]> : Depth;
 
 /** Consume up to the closing quote `Qc`, unescaping doubled quotes. `null` when unterminated. */
-type TakeQuoted<S extends string, Qc extends string, Acc extends string> =
-  S extends `${infer Body}${Qc}${infer R}`
-    ? R extends `${Qc}${infer R2}` ? TakeQuoted<R2, Qc, `${Acc}${Body}${Qc}`> : [`${Acc}${Body}`, R]
-    : null;
+type TakeQuoted<
+	S extends string,
+	Qc extends string,
+	Acc extends string,
+> = S extends `${infer Body}${Qc}${infer R}`
+	? R extends `${Qc}${infer R2}`
+		? TakeQuoted<R2, Qc, `${Acc}${Body}${Qc}`>
+		: [`${Acc}${Body}`, R]
+	: null;
 
 /** `E'...'` body: like `TakeQuoted` but a backslash-escaped quote does not terminate. Escapes are kept raw. */
-type TakeEscaped<S extends string, Acc extends string> =
-  S extends `${infer Body}'${infer R}`
-    ? OddBackslashes<Body> extends true ? TakeEscaped<R, `${Acc}${Body}'`>
-    : R extends `'${infer R2}` ? TakeEscaped<R2, `${Acc}${Body}'`>
-    : [`${Acc}${Body}`, R]
-    : null;
+type TakeEscaped<
+	S extends string,
+	Acc extends string,
+> = S extends `${infer Body}'${infer R}`
+	? OddBackslashes<Body> extends true
+		? TakeEscaped<R, `${Acc}${Body}'`>
+		: R extends `'${infer R2}`
+			? TakeEscaped<R2, `${Acc}${Body}'`>
+			: [`${Acc}${Body}`, R]
+	: null;
 /** Does `S` end in an odd number of backslashes (so that a quote after it is escaped)? `\\` is an escaped backslash. */
-type OddBackslashes<S extends string> = S extends `${infer P}\\` ? (OddBackslashes<P> extends true ? false : true) : false;
+type OddBackslashes<S extends string> = S extends `${infer P}\\`
+	? OddBackslashes<P> extends true
+		? false
+		: true
+	: false;
 
 /**
  * A `'...'` literal and its continuations: Postgres joins string literals separated by whitespace
  * that contains a newline (`'a'` newline `'b'` is `'ab'`). `[value, rest]` or `null`.
  */
 type TakeString<S extends string, Acc extends string> =
-  TakeQuoted<S, "'", ""> extends [infer V extends string, infer R extends string]
-    ? Continuation<R> extends infer R1 extends string ? TakeString<R1, `${Acc}${V}`> : [`${Acc}${V}`, R]
-    : null;
+	TakeQuoted<S, "'", ""> extends [
+		infer V extends string,
+		infer R extends string,
+	]
+		? Continuation<R> extends infer R1 extends string
+			? TakeString<R1, `${Acc}${V}`>
+			: [`${Acc}${V}`, R]
+		: null;
 type TakeEString<S extends string, Acc extends string> =
-  TakeEscaped<S, ""> extends [infer V extends string, infer R extends string]
-    ? Continuation<R> extends infer R1 extends string ? TakeEString<R1, `${Acc}${V}`> : [`${Acc}${V}`, R]
-    : null;
+	TakeEscaped<S, ""> extends [infer V extends string, infer R extends string]
+		? Continuation<R> extends infer R1 extends string
+			? TakeEString<R1, `${Acc}${V}`>
+			: [`${Acc}${V}`, R]
+		: null;
 /** After a closing quote: the rest after the next opening quote when only whitespace with a newline is in between, else `null`. */
-type Continuation<R extends string> =
-  R extends `${infer W}'${infer R1}` ? (W extends `${string}\n${string}` ? (AllWs<W> extends true ? R1 : null) : null) : null;
-type AllWs<W extends string> = W extends `${infer C}${infer R}` ? (C extends Ws ? AllWs<R> : false) : true;
+type Continuation<R extends string> = R extends `${infer W}'${infer R1}`
+	? W extends `${string}\n${string}`
+		? AllWs<W> extends true
+			? R1
+			: null
+		: null
+	: null;
+type AllWs<W extends string> = W extends `${infer C}${infer R}`
+	? C extends Ws
+		? AllWs<R>
+		: false
+	: true;
 
 /**
  * Identifier characters: ASCII `IdChar`, or any non-ASCII character. `NonAscii` records
  * whether a non-ASCII character was seen (then only ASCII letters are folded).
  * Result: `[word, rest, nonAscii]`.
  */
-type TakeWord<S extends string, Acc extends string, NonAscii extends boolean> =
-  S extends `${infer C}${infer R}`
-    ? C extends IdChar ? TakeWord<R, `${Acc}${C}`, NonAscii>
-    : C extends NonIdAscii ? [Acc, S, NonAscii]
-    : TakeWord<R, `${Acc}${C}`, true>
-    : [Acc, S, NonAscii];
+type TakeWord<
+	S extends string,
+	Acc extends string,
+	NonAscii extends boolean,
+> = S extends `${infer C}${infer R}`
+	? C extends IdChar
+		? TakeWord<R, `${Acc}${C}`, NonAscii>
+		: C extends NonIdAscii
+			? [Acc, S, NonAscii]
+			: TakeWord<R, `${Acc}${C}`, true>
+	: [Acc, S, NonAscii];
 
 /** Lowercase ASCII letters only (Postgres folding in UTF-8 databases). */
-type FoldAscii<S extends string, Acc extends string> =
-  S extends `${infer C}${infer R}` ? FoldAscii<R, `${Acc}${C extends Upper ? Lowercase<C> : C}`> : Acc;
+type FoldAscii<
+	S extends string,
+	Acc extends string,
+> = S extends `${infer C}${infer R}`
+	? FoldAscii<R, `${Acc}${C extends Upper ? Lowercase<C> : C}`>
+	: Acc;
 
-type TakeDigits<S extends string, Acc extends string> =
-  S extends `${infer C}${infer R}` ? (C extends Digit ? TakeDigits<R, `${Acc}${C}`> : [Acc, S]) : [Acc, S];
+type TakeDigits<
+	S extends string,
+	Acc extends string,
+> = S extends `${infer C}${infer R}`
+	? C extends Digit
+		? TakeDigits<R, `${Acc}${C}`>
+		: [Acc, S]
+	: [Acc, S];
 
 /**
  * `0x…`, `0o…`, `0b…`, or `digits [ . [digits] ] [ e [+-] digits ]` (or `. digits …`), with
@@ -263,38 +511,75 @@ type TakeDigits<S extends string, Acc extends string> =
  * message for a prefix without digits or an exponent without digits.
  */
 type TakeNumber<S extends string> =
-  S extends `0${infer P extends "x" | "X" | "o" | "O" | "b" | "B"}${infer R}`
-    ? (Lowercase<P> extends "x" ? TakeRadix<R, HexDigit, `0${P}`, "hexadecimal"> : Lowercase<P> extends "o" ? TakeRadix<R, OctDigit, `0${P}`, "octal"> : TakeRadix<R, "0" | "1", `0${P}`, "binary">)
-    : TakeDecimal<S>;
+	S extends `0${infer P extends "x" | "X" | "o" | "O" | "b" | "B"}${infer R}`
+		? Lowercase<P> extends "x"
+			? TakeRadix<R, HexDigit, `0${P}`, "hexadecimal">
+			: Lowercase<P> extends "o"
+				? TakeRadix<R, OctDigit, `0${P}`, "octal">
+				: TakeRadix<R, "0" | "1", `0${P}`, "binary">
+		: TakeDecimal<S>;
 type OctDigit = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7";
-type TakeRadix<S extends string, D extends string, Acc extends string, Kind extends string> =
-  S extends `${infer C extends D}${infer R}` ? TakeRadix<R, D, `${Acc}${C}`, Kind>
-  : S extends `_${infer C extends D}${infer R}` ? TakeRadix<R, D, `${Acc}_${C}`, Kind>
-  : Acc extends `0${infer _P}${infer _D}${infer _R}` ? [Acc, S] // at least one digit after the prefix
-  : `invalid ${Kind} integer at or near "${Acc}"`;
+type TakeRadix<
+	S extends string,
+	D extends string,
+	Acc extends string,
+	Kind extends string,
+> = S extends `${infer C extends D}${infer R}`
+	? TakeRadix<R, D, `${Acc}${C}`, Kind>
+	: S extends `_${infer C extends D}${infer R}`
+		? TakeRadix<R, D, `${Acc}_${C}`, Kind>
+		: Acc extends `0${infer _P}${infer _D}${infer _R}`
+			? [Acc, S] // at least one digit after the prefix
+			: `invalid ${Kind} integer at or near "${Acc}"`;
 type TakeDecimal<S extends string> =
-  DigitRun<S, ""> extends [infer Int extends string, infer R1 extends string]
-    ? R1 extends `.${infer R2}`
-      ? R2 extends `.${string}` ? [Int, R1] // `1..2`: the integer, then `..`
-      : DigitRun<R2, ""> extends [infer Frac extends string, infer R3 extends string] ? TakeExponent<`${Int}.${Frac}`, R3> : never
-      : TakeExponent<Int, R1>
-    : never;
+	DigitRun<S, ""> extends [infer Int extends string, infer R1 extends string]
+		? R1 extends `.${infer R2}`
+			? R2 extends `.${string}`
+				? [Int, R1] // `1..2`: the integer, then `..`
+				: DigitRun<R2, ""> extends [
+							infer Frac extends string,
+							infer R3 extends string,
+						]
+					? TakeExponent<`${Int}.${Frac}`, R3>
+					: never
+			: TakeExponent<Int, R1>
+		: never;
 /**
  * Digits with single `_` separators between them, four at a time when possible (numbers can be
  * thousands of digits long). Characters are inferred unconstrained and tested afterwards: a
  * template built from `infer X extends Digit` parts is a 10^4-member union at declaration time.
  */
-type DigitRun<S extends string, Acc extends string> =
-  S extends `${infer A extends Digit}${infer R}`
-    ? R extends `${infer B}${infer C}${infer D}${infer R2}` ? ([B | C | D] extends [Digit] ? DigitRun<R2, `${Acc}${A}${B}${C}${D}`> : DigitRun<R, `${Acc}${A}`>) : DigitRun<R, `${Acc}${A}`>
-  : Acc extends "" ? [Acc, S]
-  : S extends `_${infer A extends Digit}${infer R}` ? DigitRun<R, `${Acc}_${A}`>
-  : [Acc, S];
-type TakeExponent<V extends string, S extends string> =
-  S extends `${infer E extends "e" | "E"}${infer R}`
-    ? R extends `${infer Sign extends "+" | "-"}${infer R2}`
-      ? (DigitRun<R2, ""> extends [infer X extends string, infer R3 extends string] ? (X extends "" ? `trailing junk after numeric literal at or near "${V}${E}${Sign}"` : [`${V}${E}${Sign}${X}`, R3]) : never)
-      : (DigitRun<R, ""> extends [infer X extends string, infer R3 extends string] ? (X extends "" ? `trailing junk after numeric literal at or near "${V}${E}"` : [`${V}${E}${X}`, R3]) : never)
-    : [V, S];
+type DigitRun<
+	S extends string,
+	Acc extends string,
+> = S extends `${infer A extends Digit}${infer R}`
+	? R extends `${infer B}${infer C}${infer D}${infer R2}`
+		? [B | C | D] extends [Digit]
+			? DigitRun<R2, `${Acc}${A}${B}${C}${D}`>
+			: DigitRun<R, `${Acc}${A}`>
+		: DigitRun<R, `${Acc}${A}`>
+	: Acc extends ""
+		? [Acc, S]
+		: S extends `_${infer A extends Digit}${infer R}`
+			? DigitRun<R, `${Acc}_${A}`>
+			: [Acc, S];
+type TakeExponent<
+	V extends string,
+	S extends string,
+> = S extends `${infer E extends "e" | "E"}${infer R}`
+	? R extends `${infer Sign extends "+" | "-"}${infer R2}`
+		? DigitRun<R2, ""> extends [infer X extends string, infer R3 extends string]
+			? X extends ""
+				? `trailing junk after numeric literal at or near "${V}${E}${Sign}"`
+				: [`${V}${E}${Sign}${X}`, R3]
+			: never
+		: DigitRun<R, ""> extends [infer X extends string, infer R3 extends string]
+			? X extends ""
+				? `trailing junk after numeric literal at or near "${V}${E}"`
+				: [`${V}${E}${X}`, R3]
+			: never
+	: [V, S];
 
-type ToNum<S extends string> = S extends `${infer N extends number}` ? N : never;
+type ToNum<S extends string> = S extends `${infer N extends number}`
+	? N
+	: never;

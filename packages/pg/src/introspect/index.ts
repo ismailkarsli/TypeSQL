@@ -1,12 +1,17 @@
+export { type IntrospectConfig, main } from "./cli.js";
+export { type GenerateOptions, generateSource } from "./emit.js";
 export {
-  introspect,
-  type IntrospectOptions,
-  type IntrospectedDatabase,
-  type IntrospectedRelation,
-  type IntrospectedColumn,
-  type IntrospectedEnum,
-  type RelationKind,
+	type IntrospectedColumn,
+	type IntrospectedDatabase,
+	type IntrospectedEnum,
+	type IntrospectedRelation,
+	type IntrospectOptions,
+	introspect,
+	type RelationKind,
 } from "./introspect.js";
-export { generateSource, type GenerateOptions } from "./emit.js";
-export { ViewNullability, parseNodeTree, type NullabilityOptions, type QueryFn } from "./nullability.js";
-export { main, type IntrospectConfig } from "./cli.js";
+export {
+	type NullabilityOptions,
+	parseNodeTree,
+	type QueryFn,
+	ViewNullability,
+} from "./nullability.js";

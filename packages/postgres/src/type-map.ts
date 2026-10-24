@@ -22,20 +22,24 @@ import type { DefaultParamTypeMap, DefaultTypeMap } from "@typesql/core";
  * registers an element-wise array parser for every array type, so core's `T[]` →
  * element-type[] mapping is exact (int8[] → string[], timestamptz[] → Date[], ...).
  */
-export interface PostgresJsTypeMap extends Omit<DefaultTypeMap, "bytea" | "interval" | "point" | "circle" | "record" | "void"> {
-  /** What parameters accept on top of the row types. */
-  $params: PostgresJsParamTypeMap;
-  bytea: Buffer;
-  /** No default parser: the Postgres text form, e.g. `"1 day 02:00:00"`. */
-  interval: string;
-  /** No default parser: `"(1,2)"`. */
-  point: string;
-  /** No default parser: `"<(1,2),3>"`. */
-  circle: string;
-  /** Anonymous `ROW(...)` results: raw text such as `"(1,foo)"`. */
-  record: string;
-  /** `void`-returning functions (`pg_sleep`) yield an empty string. */
-  void: string;
+export interface PostgresJsTypeMap
+	extends Omit<
+		DefaultTypeMap,
+		"bytea" | "interval" | "point" | "circle" | "record" | "void"
+	> {
+	/** What parameters accept on top of the row types. */
+	$params: PostgresJsParamTypeMap;
+	bytea: Buffer;
+	/** No default parser: the Postgres text form, e.g. `"1 day 02:00:00"`. */
+	interval: string;
+	/** No default parser: `"(1,2)"`. */
+	point: string;
+	/** No default parser: `"<(1,2),3>"`. */
+	circle: string;
+	/** Anonymous `ROW(...)` results: raw text such as `"(1,foo)"`. */
+	record: string;
+	/** `void`-returning functions (`pg_sleep`) yield an empty string. */
+	void: string;
 }
 
 /**
@@ -52,10 +56,11 @@ export interface PostgresJsTypeMap extends Omit<DefaultTypeMap, "bytea" | "inter
  *
  * `bool` takes only booleans: its serializer sends `'f'` for anything but `true`.
  */
-export interface PostgresJsParamTypeMap extends Omit<DefaultParamTypeMap, "date" | "timestamp" | "timestamptz"> {
-  date: Date | string | number;
-  timestamp: Date | string | number;
-  timestamptz: Date | string | number;
+export interface PostgresJsParamTypeMap
+	extends Omit<DefaultParamTypeMap, "date" | "timestamp" | "timestamptz"> {
+	date: Date | string | number;
+	timestamp: Date | string | number;
+	timestamptz: Date | string | number;
 }
 
 /**
@@ -64,6 +69,7 @@ export interface PostgresJsParamTypeMap extends Omit<DefaultParamTypeMap, "date"
  * and `int8` columns become `bigint`; `int8[]` becomes `bigint[]`. Everything else is as in
  * `PostgresJsTypeMap`.
  */
-export interface PostgresJsBigIntTypeMap extends Omit<PostgresJsTypeMap, "int8"> {
-  int8: bigint;
+export interface PostgresJsBigIntTypeMap
+	extends Omit<PostgresJsTypeMap, "int8"> {
+	int8: bigint;
 }

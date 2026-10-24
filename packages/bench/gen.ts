@@ -54,16 +54,43 @@ const sql = createSql<DB>();
 
 /** Each template yields [sqlText, runtimeArgsAsSource]; `i` makes every statement textually distinct. */
 const templates: ((i: number) => [text: string, args: string[]])[] = [
-  (i) => [`SELECT u.id, u.email, u.display_name FROM users u WHERE u.id = $1 AND u.is_admin = ${i % 2 === 0}`, ["1"]],
-  (i) => [`SELECT p.id, p.title, u.email FROM posts p JOIN users u ON u.id = p.author_id WHERE p.views > ${i} ORDER BY p.views DESC LIMIT $1`, ["10"]],
-  (i) => [`SELECT u.email, count(*) AS n FROM users u LEFT JOIN posts p ON p.author_id = u.id WHERE u.id <> ${i} GROUP BY u.email ORDER BY n DESC`, []],
-  (i) => [`SELECT c.id, c.body, p.title FROM comments c JOIN posts p ON p.id = c.post_id WHERE c.author_id = $1 AND c.created_at > $2 AND p.views >= ${i}`, ["7", "new Date()"]],
-  (i) => [`SELECT t.name, count(*) AS uses FROM tags t JOIN post_tags pt ON pt.tag_id = t.id WHERE t.id > ${i} GROUP BY t.name`, []],
-  (i) => [`SELECT o.id, o.total::float8 AS total, CASE WHEN o.status = 'paid' THEN 'ok' ELSE 'pending' END AS state FROM orders o WHERE o.user_id = $1 AND o.id <> ${i}`, ["3"]],
-  (i) => [`SELECT coalesce(u.display_name, u.email) AS name, u.is_admin FROM users u WHERE u.balance > ${i} ORDER BY u.created_at DESC LIMIT $1 OFFSET $2`, ["20", "0"]],
-  (i) => [`SELECT p.id, p.title || ' by ' || u.email AS label FROM posts p JOIN users u ON u.id = p.author_id WHERE p.published_at IS NOT NULL AND p.views <> ${i}`, []],
-  (i) => [`SELECT o.user_id, sum(o.total) AS spent, max(o.placed_at) AS last_order FROM orders o WHERE o.id > ${i} GROUP BY o.user_id HAVING count(*) > 2`, []],
-  (i) => [`SELECT * FROM posts WHERE author_id = $1 AND views >= ${i}`, ["5"]],
+	(i) => [
+		`SELECT u.id, u.email, u.display_name FROM users u WHERE u.id = $1 AND u.is_admin = ${i % 2 === 0}`,
+		["1"],
+	],
+	(i) => [
+		`SELECT p.id, p.title, u.email FROM posts p JOIN users u ON u.id = p.author_id WHERE p.views > ${i} ORDER BY p.views DESC LIMIT $1`,
+		["10"],
+	],
+	(i) => [
+		`SELECT u.email, count(*) AS n FROM users u LEFT JOIN posts p ON p.author_id = u.id WHERE u.id <> ${i} GROUP BY u.email ORDER BY n DESC`,
+		[],
+	],
+	(i) => [
+		`SELECT c.id, c.body, p.title FROM comments c JOIN posts p ON p.id = c.post_id WHERE c.author_id = $1 AND c.created_at > $2 AND p.views >= ${i}`,
+		["7", "new Date()"],
+	],
+	(i) => [
+		`SELECT t.name, count(*) AS uses FROM tags t JOIN post_tags pt ON pt.tag_id = t.id WHERE t.id > ${i} GROUP BY t.name`,
+		[],
+	],
+	(i) => [
+		`SELECT o.id, o.total::float8 AS total, CASE WHEN o.status = 'paid' THEN 'ok' ELSE 'pending' END AS state FROM orders o WHERE o.user_id = $1 AND o.id <> ${i}`,
+		["3"],
+	],
+	(i) => [
+		`SELECT coalesce(u.display_name, u.email) AS name, u.is_admin FROM users u WHERE u.balance > ${i} ORDER BY u.created_at DESC LIMIT $1 OFFSET $2`,
+		["20", "0"],
+	],
+	(i) => [
+		`SELECT p.id, p.title || ' by ' || u.email AS label FROM posts p JOIN users u ON u.id = p.author_id WHERE p.published_at IS NOT NULL AND p.views <> ${i}`,
+		[],
+	],
+	(i) => [
+		`SELECT o.user_id, sum(o.total) AS spent, max(o.placed_at) AS last_order FROM orders o WHERE o.id > ${i} GROUP BY o.user_id HAVING count(*) > 2`,
+		[],
+	],
+	(i) => [`SELECT * FROM posts WHERE author_id = $1 AND views >= ${i}`, ["5"]],
 ];
 
 /**
@@ -72,26 +99,39 @@ const templates: ((i: number) => [text: string, args: string[]])[] = [
  * `[callSource]`; `i` keeps every statement distinct.
  */
 const mixedTemplates: ((i: number) => string)[] = [
-  (i) => `sql(\`SELECT u.id, u.email FROM users u WHERE u.id = \${sql.param(${i})} AND u.email <> \${sql.param("x")}\`)`,
-  (i) => `sql("SELECT p.id, p.title FROM posts p WHERE p.author_id = :author AND p.views > :min AND p.id <> ${i}", { author: 1, min: 10 })`,
-  (i) => `sql("SELECT c.id, c.body FROM comments c {recent} AND c.post_id > ${i}", { recent })`,
-  (i) => `sql(\`UPDATE orders SET status = \${sql.param("paid")} WHERE id = \${sql.param("${i}")} RETURNING id, total\`)`,
-  (i) => `sql("SELECT o.id FROM {orders} o WHERE o.user_id = $1 AND o.id > ${i}", { orders: sql.id("orders") }, 3)`,
+	(i) =>
+		`sql(\`SELECT u.id, u.email FROM users u WHERE u.id = \${sql.param(${i})} AND u.email <> \${sql.param("x")}\`)`,
+	(i) =>
+		`sql("SELECT p.id, p.title FROM posts p WHERE p.author_id = :author AND p.views > :min AND p.id <> ${i}", { author: 1, min: 10 })`,
+	(i) =>
+		`sql("SELECT c.id, c.body FROM comments c {recent} AND c.post_id > ${i}", { recent })`,
+	(i) =>
+		`sql(\`UPDATE orders SET status = \${sql.param("paid")} WHERE id = \${sql.param("${i}")} RETURNING id, total\`)`,
+	(i) =>
+		`sql("SELECT o.id FROM {orders} o WHERE o.user_id = $1 AND o.id > ${i}", { orders: sql.id("orders") }, 3)`,
 ];
 
 function mixedFile(count: number): string {
-  const lines = [header, `const recent = sql.fragment("WHERE c.created_at > $1", new Date());`];
-  for (let i = 0; i < count; i++) lines.push(`export const m${i} = ${mixedTemplates[i % mixedTemplates.length]!(i)};`);
-  return lines.join("\n") + "\n";
+	const lines = [
+		header,
+		`const recent = sql.fragment("WHERE c.created_at > $1", new Date());`,
+	];
+	for (let i = 0; i < count; i++)
+		lines.push(
+			`export const m${i} = ${mixedTemplates[i % mixedTemplates.length]!(i)};`,
+		);
+	return lines.join("\n") + "\n";
 }
 
 function queriesFile(count: number): string {
-  const lines = [header];
-  for (let i = 0; i < count; i++) {
-    const [text, args] = templates[i % templates.length]!(i);
-    lines.push(`export const q${i} = sql(${JSON.stringify(text)}${args.length ? ", " + args.join(", ") : ""});`);
-  }
-  return lines.join("\n") + "\n";
+	const lines = [header];
+	for (let i = 0; i < count; i++) {
+		const [text, args] = templates[i % templates.length]!(i);
+		lines.push(
+			`export const q${i} = sql(${JSON.stringify(text)}${args.length ? ", " + args.join(", ") : ""});`,
+		);
+	}
+	return lines.join("\n") + "\n";
 }
 
 /**
@@ -101,35 +141,47 @@ function queriesFile(count: number): string {
  * (measured on TS 7.0.2), so that shape would measure nesting depth rather than statement size.
  */
 function longSelect(targetBytes: number): string {
-  const cols = ["u.id", "u.email", "u.display_name", "u.is_admin", "u.balance", "u.created_at"];
-  const selectParts: string[] = [];
-  const inParts: string[] = [];
-  for (let n = 0; ; n++) {
-    selectParts.push(`${cols[n % cols.length]} AS c${n}`);
-    inParts.push(String(n));
-    const text = `SELECT ${selectParts.join(", ")} FROM users u WHERE u.id IN (${inParts.join(", ")}) ORDER BY u.id`;
-    if (text.length >= targetBytes) return text;
-  }
+	const cols = [
+		"u.id",
+		"u.email",
+		"u.display_name",
+		"u.is_admin",
+		"u.balance",
+		"u.created_at",
+	];
+	const selectParts: string[] = [];
+	const inParts: string[] = [];
+	for (let n = 0; ; n++) {
+		selectParts.push(`${cols[n % cols.length]} AS c${n}`);
+		inParts.push(String(n));
+		const text = `SELECT ${selectParts.join(", ")} FROM users u WHERE u.id IN (${inParts.join(", ")}) ORDER BY u.id`;
+		if (text.length >= targetBytes) return text;
+	}
 }
 
 function maxlenFile(): string {
-  const lines = [header, "// One probe per line; run.ts maps tsc error lines back to probes."];
-  for (const kb of [0.5, 1, 2, 4, 8]) {
-    const text = longSelect(kb * 1024);
-    const name = `len${String(kb).replace(".", "_")}k`;
-    lines.push(`export const ${name} = sql(${JSON.stringify(text)}); // ${text.length} bytes`);
-  }
-  return lines.join("\n") + "\n";
+	const lines = [
+		header,
+		"// One probe per line; run.ts maps tsc error lines back to probes.",
+	];
+	for (const kb of [0.5, 1, 2, 4, 8]) {
+		const text = longSelect(kb * 1024);
+		const name = `len${String(kb).replace(".", "_")}k`;
+		lines.push(
+			`export const ${name} = sql(${JSON.stringify(text)}); // ${text.length} bytes`,
+		);
+	}
+	return lines.join("\n") + "\n";
 }
 
 const files = {
-  "q1.ts": queriesFile(1),
-  "q50.ts": queriesFile(50),
-  "q500.ts": queriesFile(500),
-  "mixed50.ts": mixedFile(50),
-  "maxlen.ts": maxlenFile(),
+	"q1.ts": queriesFile(1),
+	"q50.ts": queriesFile(50),
+	"q500.ts": queriesFile(500),
+	"mixed50.ts": mixedFile(50),
+	"maxlen.ts": maxlenFile(),
 };
 for (const [name, content] of Object.entries(files)) {
-  writeFileSync(join(out, name), content);
-  console.log(`wrote src/${name} (${content.length} bytes)`);
+	writeFileSync(join(out, name), content);
+	console.log(`wrote src/${name} (${content.length} bytes)`);
 }

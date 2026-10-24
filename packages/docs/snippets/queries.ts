@@ -1,6 +1,11 @@
-import { createSql, type Executor, type RowType, type Sig } from "@typesql/core";
+import {
+	createSql,
+	type Executor,
+	type RowType,
+	type Sig,
+} from "@typesql/core";
 import { check, type Equal } from "./_check.js";
-import { sql, type DB } from "./schema.js";
+import { type DB, sql } from "./schema.js";
 
 // #region joins
 const joined = sql(`
@@ -10,7 +15,12 @@ const joined = sql(`
   JOIN user_stats s ON s.user_id = u.id`);
 // { email: string; title: string | null; posts: string }
 // #endregion joins
-check<Equal<RowType<typeof joined>, { email: string; title: string | null; posts: string }>>();
+check<
+	Equal<
+		RowType<typeof joined>,
+		{ email: string; title: string | null; posts: string }
+	>
+>();
 
 // #region naming
 const named = sql(`
@@ -21,24 +31,52 @@ const named = sql(`
 // { "?column?": number; lower: string; id: string; count: string;
 //   case: string | null; name: string }
 // #endregion naming
-check<Equal<RowType<typeof named>, { "?column?": number; lower: string; id: string; count: string; case: string | null; name: string }>>();
+check<
+	Equal<
+		RowType<typeof named>,
+		{
+			"?column?": number;
+			lower: string;
+			id: string;
+			count: string;
+			case: string | null;
+			name: string;
+		}
+	>
+>();
 
 declare const executor: Executor;
 // #region row-keys
 const camel = createSql<DB>(executor, { rowKeys: "camelCase" });
 
-const rows = await camel("SELECT id, display_name, created_at, count(*) OVER () AS total_count FROM users").execute();
+const rows = await camel(
+	"SELECT id, display_name, created_at, count(*) OVER () AS total_count FROM users",
+).execute();
 // { id: number; displayName: string | null; createdAt: Date; totalCount: string }[]
 // #endregion row-keys
-check<Equal<typeof rows, { id: number; displayName: string | null; createdAt: Date; totalCount: string }[]>>();
+check<
+	Equal<
+		typeof rows,
+		{
+			id: number;
+			displayName: string | null;
+			createdAt: Date;
+			totalCount: string;
+		}[]
+	>
+>();
 
 // #region aggregates
-const totals = sql(`SELECT author_id, count(*) AS n, max(title) AS last FROM posts GROUP BY author_id`);
+const totals = sql(
+	`SELECT author_id, count(*) AS n, max(title) AS last FROM posts GROUP BY author_id`,
+);
 // { author_id: number; n: string; last: string }
 const overall = sql(`SELECT count(*) AS n, max(title) AS last FROM posts`);
 // { n: string; last: string | null }   ← no GROUP BY: max() of zero rows is NULL
 // #endregion aggregates
-check<Equal<RowType<typeof totals>, { author_id: number; n: string; last: string }>>();
+check<
+	Equal<RowType<typeof totals>, { author_id: number; n: string; last: string }>
+>();
 check<Equal<RowType<typeof overall>, { n: string; last: string | null }>>();
 
 // #region structure
@@ -54,7 +92,12 @@ const structured = sql(`
   SELECT 'nobody', NULL, false`);
 // { email: string; latest: string | null; has_posts: boolean }
 // #endregion structure
-check<Equal<RowType<typeof structured>, { email: string; latest: string | null; has_posts: boolean }>>();
+check<
+	Equal<
+		RowType<typeof structured>,
+		{ email: string; latest: string | null; has_posts: boolean }
+	>
+>();
 
 // #region wholerow
 const withPosts = sql(`
@@ -62,7 +105,12 @@ const withPosts = sql(`
   FROM users u LEFT JOIN posts p ON p.author_id = u.id`);
 // { email: string; title: string | null; no_posts: boolean }
 // #endregion wholerow
-check<Equal<RowType<typeof withPosts>, { email: string; title: string | null; no_posts: boolean }>>();
+check<
+	Equal<
+		RowType<typeof withPosts>,
+		{ email: string; title: string | null; no_posts: boolean }
+	>
+>();
 
 // #region json
 const profiles = sql(`
@@ -74,11 +122,22 @@ const profiles = sql(`
 //   profile: { email: string; since: string };   ← a timestamp is a string inside JSON
 //   posts: { id: number; author_id: number; title: string; body: string | null; tags: string[] }[] }
 // #endregion json
-check<Equal<RowType<typeof profiles>, {
-  id: number;
-  profile: { email: string; since: string };
-  posts: { id: number; author_id: number; title: string; body: string | null; tags: string[] }[];
-}>>();
+check<
+	Equal<
+		RowType<typeof profiles>,
+		{
+			id: number;
+			profile: { email: string; since: string };
+			posts: {
+				id: number;
+				author_id: number;
+				title: string;
+				body: string | null;
+				tags: string[];
+			}[];
+		}
+	>
+>();
 
 // #region jsonread
 const firstTags = sql(`
@@ -86,7 +145,12 @@ const firstTags = sql(`
   FROM (SELECT json_build_object('title', title, 'tags', tags) AS j FROM posts) s`);
 // { first_tag: string | null; title: string | null }
 // #endregion jsonread
-check<Equal<RowType<typeof firstTags>, { first_tag: string | null; title: string | null }>>();
+check<
+	Equal<
+		RowType<typeof firstTags>,
+		{ first_tag: string | null; title: string | null }
+	>
+>();
 
 // #region narrowing
 const withTitles = sql(`
@@ -104,19 +168,25 @@ sql(`SELECT slugify(email) AS slug FROM users`);
 
 // #region functions
 interface AppDB extends DB {
-  $functions: {
-    slugify: Sig<["text"], "text">; // strict (the default): NULL in, NULL out
-    rank_in: Sig<["int4", "..."], "int8", { nullable: false }>;
-  };
+	$functions: {
+		slugify: Sig<["text"], "text">; // strict (the default): NULL in, NULL out
+		rank_in: Sig<["int4", "..."], "int8", { nullable: false }>;
+	};
 }
 const appSql = createSql<AppDB>();
-const slugs = appSql(`SELECT slugify(email) AS slug, slugify(display_name) AS alt, rank_in(id, 1, 2) AS r FROM users`);
+const slugs = appSql(
+	`SELECT slugify(email) AS slug, slugify(display_name) AS alt, rank_in(id, 1, 2) AS r FROM users`,
+);
 // { slug: string; alt: string | null; r: string }
 // #endregion functions
-check<Equal<RowType<typeof slugs>, { slug: string; alt: string | null; r: string }>>();
+check<
+	Equal<RowType<typeof slugs>, { slug: string; alt: string | null; r: string }>
+>();
 
 // #region enum
 const moods = sql(`SELECT mood, count(*) AS n FROM users GROUP BY mood`);
 // { mood: "happy" | "neutral" | "sad"; n: string }
 // #endregion enum
-check<Equal<RowType<typeof moods>, { mood: "happy" | "neutral" | "sad"; n: string }>>();
+check<
+	Equal<RowType<typeof moods>, { mood: "happy" | "neutral" | "sad"; n: string }>
+>();
