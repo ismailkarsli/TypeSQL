@@ -595,22 +595,60 @@ type TypeIdx<E extends Expr, I extends Expr, C extends Ctx> =
 		? A extends ColInfo
 			? TypeOf<I, C> extends infer B
 				? B extends ColInfo
-					? BaseOf<A["type"]> extends NoSubscript
-						? NoSubscriptErr<A["type"]>
-						: JsonArrow<"->", A, I, B> extends infer J extends ColInfo
-							? J
-							: Info<
-									A["type"] extends `${infer El}[]`
-										? El
-										: BaseOf<A["type"]> extends "jsonb"
-											? "jsonb"
-											: "unknown",
-									true
-								>
+					? ChainOverArray<E, C> extends infer R extends string
+						? Info<ChainSliced<E> extends true ? R : ElemType<R>, true>
+						: BaseOf<A["type"]> extends NoSubscript
+							? NoSubscriptErr<A["type"]>
+							: JsonArrow<"->", A, I, B> extends infer J extends ColInfo
+								? J
+								: Info<
+										A["type"] extends `${infer El}[]`
+											? El
+											: BaseOf<A["type"]> extends keyof SubscriptElem
+												? SubscriptElem[BaseOf<A["type"]>]
+												: "unknown",
+										true
+									>
 					: B
 				: never
 			: A
 		: never;
+/**
+ * `a[i][j]`, `a[i:j][k]`: the subscripts after an array apply to that array together, as in
+ * Postgres (one per dimension; the types do not count dimensions): the array's type, or null when
+ * `E` is not a subscript of an array.
+ */
+type ChainOverArray<E extends Expr, C extends Ctx> = E extends {
+	readonly t: "idx" | "slice";
+}
+	? TypeOf<ChainRoot<E>, C> extends {
+			readonly type: infer T extends `${string}[]`;
+		}
+		? T
+		: null
+	: null;
+type ChainRoot<E extends Expr> = E extends {
+	readonly t: "idx" | "slice";
+	readonly e: infer X extends Expr;
+}
+	? ChainRoot<X>
+	: E;
+/** Is any subscript of the chain a slice? Then the result is an array. */
+type ChainSliced<E> = E extends { readonly t: "slice" }
+	? true
+	: E extends { readonly t: "idx"; readonly e: infer X }
+		? ChainSliced<X>
+		: false;
+type ElemType<T extends string> = T extends `${infer El}[]` ? El : T;
+/** Element type of the built-in types other than arrays that take a subscript (`pg_type.typsubscript`). */
+type SubscriptElem = {
+	jsonb: "jsonb";
+	point: "float8";
+	line: "float8";
+	lseg: "point";
+	box: "point";
+	name: "char";
+};
 /** Postgres's error for subscripting a type that has none (`json`, `text`, …). */
 type NoSubscriptErr<T extends string> = SqlError<
 	`cannot subscript type ${TypeDisplay<T>} because it does not support subscripting`,
@@ -629,11 +667,13 @@ type TypeSlice<
 				? B extends ColInfo | null
 					? TypeOpt<Hi, C> extends infer D
 						? D extends ColInfo | null
-							? BaseOf<A["type"]> extends NoSubscript
-								? NoSubscriptErr<A["type"]>
-								: BaseOf<A["type"]> extends "jsonb"
-									? SqlError<"jsonb subscript does not support slices", null>
-									: Info<A["type"], A["nullable"]>
+							? ChainOverArray<E, C> extends infer R extends string
+								? Info<R, true>
+								: BaseOf<A["type"]> extends NoSubscript
+									? NoSubscriptErr<A["type"]>
+									: BaseOf<A["type"]> extends "jsonb"
+										? SqlError<"jsonb subscript does not support slices", null>
+										: Info<A["type"], A["nullable"]>
 							: D
 						: never
 					: B
@@ -753,7 +793,7 @@ type IsLonger<
  * columns" or "subquery has too few columns".
  */
 type OnlyCol<R extends Cols, TooMany extends string> = R extends readonly [
-	infer H extends ColEntry,
+	infer H,
 ]
 	? H extends { readonly t: infer T }
 		? T
@@ -898,7 +938,9 @@ type TypeCall<E extends Call, C extends Ctx> =
 												]
 													? true
 													: false;
-												readonly withinGroup: W extends ColInfo ? true : false;
+												readonly withinGroup: W extends ColInfo
+													? true // type-mutate: equivalent never-true – read with `extends true`, where never counts as true
+													: false;
 												readonly wg: W extends ColInfo ? W["type"] : "unknown";
 											},
 											C["db"]

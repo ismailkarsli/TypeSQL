@@ -20,7 +20,7 @@ type Targets<Q extends string> =
 
 test("expression nodes conform to ExprNode", () => {
 	expectTypeOf<
-		Targets<"SELECT a IS NULL, a IS TRUE, a IS NOT FALSE, a IS UNKNOWN">
+		Targets<"SELECT a IS NULL, a IS TRUE, a IS NOT FALSE, a IS UNKNOWN, B'1', int4 '1'">
 	>().toExtend<ExprNode>();
 	expectTypeOf<
 		Targets<"SELECT a LIKE 'x', a ILIKE 'x', a SIMILAR TO 'x', a = ANY (b), a < ALL (b)">

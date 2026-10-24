@@ -1,5 +1,6 @@
 import type { TsOf, TsParamTypeOf } from "../type-map/index.js";
 import type { DmlStmt, SelectStmt, Stmt } from "./ast.js";
+import type { NoLeadingZeros } from "./binder/clauses.js";
 import type {
 	CachedAnalysis,
 	CachedDdl,
@@ -12,6 +13,7 @@ import type { JsonValue } from "./inline.js";
 import type { Lex } from "./lexer/lex.js";
 import type { Toks } from "./lexer/tokens.js";
 import type { NamedParams, RewriteNamed } from "./named.js";
+import type { IntoName } from "./parser/select.js";
 import type { ParseProgram } from "./parser/stmt.js";
 import type { Nx } from "./parser/util.js";
 import type { ParamsOfDml } from "./project/dml.js";
@@ -37,10 +39,7 @@ export type Analyze<DB, Q extends string> =
 	Lex<Q> extends infer T0
 		? T0 extends Toks
 			? RewriteNamed<T0> extends infer RN
-				? RN extends [
-						infer T extends Toks,
-						infer Names extends readonly string[],
-					]
+				? RN extends [infer T extends Toks, infer Names]
 					? ParseProgram<T> extends infer S
 						? S extends Stmt
 							? ProjectStmt<S, DB, [], {}> extends infer C
@@ -49,7 +48,7 @@ export type Analyze<DB, Q extends string> =
 											readonly kind: S["t"];
 											readonly cols: C;
 											// the parameter pass re-types expressions; skip it when there are no `$n`
-											readonly params: MaxParam<T> extends 0
+											readonly params: MaxParam<T> extends 0 // type-mutate: equivalent cond-false, never-true – a shortcut: a statement without parameters maps to {} (or never) either way, read as no parameters
 												? {}
 												: ParamsToMap<ParamsOfStmt<S, DB>>;
 											readonly max: MaxParam<T>;
@@ -69,9 +68,9 @@ export type Analyze<DB, Q extends string> =
  * `Analyze` without `stmt`, from the type cache when it has a fresh entry for `(DB, Q)` (see
  * cache.ts). What the projections below read; `Analyze` itself is never cached.
  */
-export type Analysis<DB, Q extends string> = [Q] extends [keyof QueryCacheKeys]
-	? CachedAnalysis<DB, Q> extends infer C
-		? [C] extends [never]
+export type Analysis<DB, Q extends string> = [Q] extends [keyof QueryCacheKeys] // type-mutate: equivalent – the type tests run without a cache; test/cache checks hits in its own project
+	? CachedAnalysis<DB, Q> extends infer C // type-mutate: equivalent – reached with a cache only (test/cache)
+		? [C] extends [never] // type-mutate: equivalent – reached with a cache only (test/cache)
 			? Analyze<DB, Q>
 			: C
 		: never
@@ -96,18 +95,18 @@ type ParamsOfStmt<S extends Stmt, DB> = S extends SelectStmt
  * relations get a "Perhaps you meant …" hint when a close name exists (see suggest.ts).
  */
 type Reposition<E, T extends Toks, DB = never> =
-	E extends SqlError<infer M extends string, infer At>
+	E extends SqlError<infer M, infer At>
 		? At extends null
 			? SqlError<WithHint<M, T, DB>, LocateIdent<M, T>>
 			: SqlError<M, At>
-		: E;
+		: E; // type-mutate: equivalent never-false – only errors are repositioned
 
 /**
  * Token index for a semantic error: the function of `function f(…) does not exist` and of a
  * call decoration it does not take (`FILTER specified, but f is not …`), the
  * first quoted name in the message that occurs in the statement (`null value in column
  * "email" of relation "users"` → `users` when `email` is absent), then `column t.c` forms, then the keyword of `each UNION query …` and
- * `UNION|CASE|VALUES|COALESCE types … cannot be matched`.
+ * `UNION|INTERSECT|EXCEPT|VALUES|CYCLE types … cannot be matched`.
  */
 type LocateIdent<
 	M extends string,
@@ -124,14 +123,14 @@ type LocateIdent<
 			: M extends "DEFAULT is not allowed in this context"
 				? FindTokOr<T, "default", 0>
 				: M extends "SELECT ... INTO is not allowed here"
-					? FindSelectInto<T, 0, false>
-					: M extends `each ${infer Op} query ${string}`
-						? FindTokOr<T, Lowercase<Op>, 0>
-						: M extends `${infer Op} types ${string} cannot be matched`
-							? Op extends `${string} ${string}`
-								? LocateQuoted<M, T>
-								: FindTokOr<T, Lowercase<Op>, 0>
-							: LocateQuoted<M, T>;
+					? FindSelectInto<T, 0, false> // type-mutate: equivalent bool-flip – the first token is never INTO, and the flag is recomputed at each token
+					: M extends `${infer Cl} ${string} position ${infer N} is not in select list`
+						? FindNumFrom<T, FindTokOr<T, Lowercase<Cl>, 0>, N>
+						: M extends `each ${infer Op} query ${string}`
+							? FindTokOr<T, Lowercase<Op>, 0>
+							: M extends `${infer Op} types ${string} cannot be matched`
+								? FindTokOr<T, Lowercase<Op>, 0>
+								: LocateQuoted<M, T>;
 type LocateQuoted<
 	M extends string,
 	T extends Toks,
@@ -150,7 +149,7 @@ type FindTokOr<T extends Toks, Name extends string, Else extends number> =
 		? I extends -1
 			? Else
 			: I
-		: Else;
+		: Else; // type-mutate: equivalent never-false – FindTok always gives a number
 type FindTok<
 	T extends Toks,
 	Name extends string,
@@ -166,7 +165,7 @@ type FindTok<
 					? Nx<Nx<Nx<I>>>
 					: FindTok<T, Name, Nx<Nx<Nx<Nx<I>>>>>
 	: -1;
-/** The first `INTO` that does not follow `INSERT` / `MERGE` (`AfterDml`: the previous token was one of them). */
+/** The name after the first `INTO` that does not follow `INSERT` / `MERGE` (`AfterDml`: the previous token was one of them), where Postgres reports it. */
 type FindSelectInto<
 	T extends Toks,
 	I extends number,
@@ -175,7 +174,7 @@ type FindSelectInto<
 	? IsTok<T, I, "into"> extends true
 		? AfterDml extends true
 			? FindSelectInto<T, Nx<I>, false>
-			: I
+			: IntoName<T, I>
 		: FindSelectInto<
 				T,
 				Nx<I>,
@@ -183,12 +182,28 @@ type FindSelectInto<
 					? true
 					: false
 			>
+	: 0; // type-mutate: equivalent never-false – the error is raised for a statement with such an INTO only
+/** The first number token from `I` on that is `N` (leading zeros aside), or 0. */
+type FindNumFrom<
+	T extends Toks,
+	I extends number,
+	N extends string,
+> = T[I] extends {
+	readonly k: string;
+}
+	? T[I] extends { readonly k: "n"; readonly v: infer V extends string }
+		? NoLeadingZeros<V> extends N
+			? I
+			: FindNumFrom<T, Nx<I>, N>
+		: FindNumFrom<T, Nx<I>, N>
 	: 0;
 type IsTok<
 	T extends Toks,
 	I extends number,
 	Name extends string,
-> = T[I] extends { readonly k: "w" | "id"; readonly v: Name } ? true : false;
+> = T[I] extends { readonly k: "w" | "id"; readonly v: Name }
+	? true // type-mutate: equivalent never-true – read with `extends true`, where never counts as true
+	: false;
 
 /** Row type of a statement (`never` for DML without RETURNING and for DDL). */
 export type RowOf<DB, TM, Q extends string> =
@@ -264,7 +279,7 @@ type Inc<I extends number> = Nx<I>;
  * no raw array, but a `sql.json(value)` (sent as JSON text by every driver) or any other value.
  */
 export type ArgsOf<DB, TM, Q extends string> =
-	Analysis<DB, Q> extends { readonly params: infer P extends ParamMap }
+	Analysis<DB, Q> extends { readonly params: infer P }
 		? [Extract<P[keyof P], { readonly type: "json" | "jsonb" }>] extends [never]
 			? ParamsOf<DB, TM, Q>
 			: JsonArgs<ParamsOf<DB, TM, Q>, P>
@@ -274,7 +289,7 @@ type JsonArgs<Ps, P> = {
 		? Nx<N> extends keyof P
 			? JsonArg<Ps[I], P[Nx<N>]>
 			: Ps[I]
-		: Ps[I];
+		: Ps[I]; // type-mutate: equivalent never-false – a tuple's mapped keys are its indexes
 };
 type JsonArg<X, U> = [Extract<U, { readonly type: "json" | "jsonb" }>] extends [
 	never,
@@ -310,9 +325,7 @@ interface ArraysNeedSqlJson {
 
 /** Named parameter names of a statement in order of first appearance (`[]` when positional). */
 export type NamesOf<DB, Q extends string> =
-	Analysis<DB, Q> extends { readonly names: infer N extends readonly string[] }
-		? N
-		: [];
+	Analysis<DB, Q> extends { readonly names: infer N } ? N : [];
 
 /**
  * Argument list a call site must pass after the query: a single object for `:name`
@@ -342,9 +355,9 @@ export type KindOf<DB, Q extends string> =
  * or `SqlError<message, tokenIndex>`. See engine/ddl/apply.ts. From the type cache (`DdlCache`)
  * when it has a fresh entry for the step.
  */
-export type ApplyDdl<DB, Q extends string> = [Q] extends [keyof DdlCacheKeys]
-	? CachedDdl<DB, Q> extends infer C
-		? [C] extends [never]
+export type ApplyDdl<DB, Q extends string> = [Q] extends [keyof DdlCacheKeys] // type-mutate: equivalent – the type tests run without a cache; test/cache checks hits in its own project
+	? CachedDdl<DB, Q> extends infer C // type-mutate: equivalent – reached with a cache only (test/cache)
+		? [C] extends [never] // type-mutate: equivalent – reached with a cache only (test/cache)
 			? ApplyDdlAll<DB, Q>
 			: C
 		: never

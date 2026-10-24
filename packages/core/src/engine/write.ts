@@ -13,7 +13,9 @@ import type { JoinedText, QuotedIdent, UnionList } from "./splice.js";
  */
 
 /** A table (a view is `{ $view: … }`, never a `Table`; nor is `$types` or a namespace). */
-type IsTable<X> = X extends Table ? true : false;
+type IsTable<X> = X extends Table
+	? true // type-mutate: equivalent never-true – read with `extends true`, where never counts as true
+	: false;
 
 /**
  * Writable tables of a schema: top-level tables, and `"schema.table"` for tables in a
@@ -24,7 +26,7 @@ export type TableName<DB> =
 			[K in keyof DB & string]: IsTable<DB[K]> extends true ? K : never;
 	  }[keyof DB & string]
 	| {
-			[NS in keyof DB & string]: IsTable<DB[NS]> extends true
+			[NS in keyof DB & string]: IsTable<DB[NS]> extends true // type-mutate: equivalent cond-false – a table's columns are not tables, so it adds no names
 				? never
 				: DB[NS] extends View<Table>
 					? never

@@ -403,10 +403,16 @@ type FromAfterInto<T extends Toks, I extends number> =
 type IntoEnd<T extends Toks, I extends number> =
 	SkipWord<T, SkipIntoPersistence<T, Nx<I>>, "table"> extends infer K extends
 		number
-		? QualName<T, K> extends [unknown, infer J extends number]
+		? QualName<T, K> extends [unknown, infer J]
 			? J
 			: SyntaxErrorAt<T, K>
 		: never;
+/** The name after `INTO [TEMP | UNLOGGED | …] [TABLE]`; `I` is the index of INTO. */
+export type IntoName<T extends Toks, I extends number> = SkipWord<
+	T,
+	SkipIntoPersistence<T, Nx<I>>,
+	"table"
+>;
 type IntoRef<T extends Toks, I extends number> =
 	QualName<T, SkipWord<T, SkipIntoPersistence<T, Nx<I>>, "table">> extends [
 		infer Parts extends readonly string[],
@@ -1275,7 +1281,8 @@ type ParseCtes<
 					? Expected<'"("', T, SkipMaterialized<T, EatWord<T, J2, "as">>>
 					: ParseStatement<
 								T,
-								EatOp<T, SkipMaterialized<T, EatWord<T, J2, "as">>, "(">
+								EatOp<T, SkipMaterialized<T, EatWord<T, J2, "as">>, "(">,
+								false
 							> extends infer X
 						? X extends Ok<infer S, infer J3 extends number>
 							? EatOp<T, J3, ")"> extends never

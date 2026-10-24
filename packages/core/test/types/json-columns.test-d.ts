@@ -332,6 +332,9 @@ test("positional and named json / jsonb arguments take no raw arrays, but sql.js
 		NonArrayOrSqlJson<HistoryItem[]>
 	>();
 	expectTypeOf<Settings>().toExtend<NonArrayOrSqlJson<unknown>>();
+	// a typed column takes its own shape, not any other value
+	expectTypeOf<Settings>().toExtend<NonArrayOrSqlJson<Settings | null>>();
+	expectTypeOf<number>().not.toExtend<NonArrayOrSqlJson<Settings | null>>();
 	expectTypeOf<Date>().toExtend<NonArrayOrSqlJson<unknown>>();
 	expectTypeOf<readonly string[]>().not.toExtend<NonArrayOrSqlJson<unknown>>();
 	expectTypeOf<

@@ -145,6 +145,9 @@ test("view errors", () => {
 	expectTypeOf<A<"CREATE VIEW IF NOT EXISTS v AS SELECT 1">>().toEqualTypeOf<
 		SqlError<"syntax error: expected AS at or near not", 3>
 	>();
+	expectTypeOf<A<"CREATE VIEW v WITH x AS SELECT 1">>().toEqualTypeOf<
+		SqlError<"syntax error at or near x", 4>
+	>();
 	expectTypeOf<A<"CREATE RECURSIVE VIEW v AS SELECT 1">>().toEqualTypeOf<
 		SqlError<'syntax error: expected "(" at or near as', 4>
 	>();

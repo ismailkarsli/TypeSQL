@@ -293,6 +293,9 @@ test("parameters of indirected targets take the element / field type", () => {
 	expectTypeOf<
 		Params<"INSERT INTO items (name, tags[1], data) VALUES ($1, $2, $3)">
 	>().toEqualTypeOf<[string, string | null, unknown]>();
+	expectTypeOf<
+		Params<"MERGE INTO items i USING notes n ON i.id = n.id WHEN NOT MATCHED THEN INSERT (name, tags[1], data) VALUES ($1, $2, $3)">
+	>().toEqualTypeOf<[string, string | null, unknown]>();
 	// SET (…) = ROW: by position; a subquery's parameters are not typed by the targets
 	expectTypeOf<
 		Params<"UPDATE items SET (tags[1], name) = ($1, $2)">
@@ -426,11 +429,22 @@ test("SELECT INTO creates a table", () => {
 	expectTypeOf<
 		RowOf<DB2, DefaultTypeMap, "SELECT * FROM copy">
 	>().toEqualTypeOf<{ id: number | null; label: string | null }>();
+	// at the new table's name, as in Postgres
 	expectTypeOf<V<"SELECT * FROM (SELECT 1 INTO f) bar">>().toEqualTypeOf<
-		SqlError<"SELECT ... INTO is not allowed here", 6>
+		SqlError<"SELECT ... INTO is not allowed here", 7>
 	>();
 	expectTypeOf<V<"INSERT INTO logs (item_id) SELECT 1 INTO f">>().toEqualTypeOf<
-		SqlError<"SELECT ... INTO is not allowed here", 8>
+		SqlError<"SELECT ... INTO is not allowed here", 9>
+	>();
+	expectTypeOf<
+		V<"SELECT * FROM (SELECT 1 INTO TEMP TABLE f) bar">
+	>().toEqualTypeOf<SqlError<"SELECT ... INTO is not allowed here", 9>>();
+	expectTypeOf<
+		V<"MERGE INTO logs l USING (SELECT 1 AS id INTO f) s ON l.id = s.id WHEN MATCHED THEN DELETE">
+	>().toEqualTypeOf<SqlError<"SELECT ... INTO is not allowed here", 11>>();
+	// a WITH query keeps its INTO, which is rejected: only a top-level SELECT creates a table
+	expectTypeOf<V<"WITH x AS (SELECT 1 INTO f) SELECT 1">>().toEqualTypeOf<
+		SqlError<"SELECT ... INTO is not allowed here", 7>
 	>();
 	// LOCAL / GLOBAL TEMP[ORARY]; LOCAL alone is not a persistence
 	type DB3 = ApplyDdl<

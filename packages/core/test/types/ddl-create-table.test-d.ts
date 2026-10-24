@@ -321,6 +321,16 @@ test("CREATE TABLE AS: columns from the query, all nullable, no defaults", () =>
 	>;
 	expectTypeOf<N["t"]>().toEqualTypeOf<{ x: Nullable<"text"> }>();
 	expectTypeOf<N["v"]>().toEqualTypeOf<View<{ x: Nullable<"text"> }>>();
+	// a name with nothing that makes a table; an error in the query
+	expectTypeOf<D<"CREATE TABLE t foo">>().toEqualTypeOf<
+		SqlError<
+			'syntax error: expected "(", AS, OF or PARTITION OF at or near foo',
+			3
+		>
+	>();
+	expectTypeOf<D<"CREATE TABLE t AS SELECT +">>().toEqualTypeOf<
+		SqlError<"syntax error at end of input", 6>
+	>();
 });
 
 test("errors", () => {

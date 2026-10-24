@@ -48,7 +48,11 @@ test("EXISTS, IN (SELECT ...), = ANY / ALL / SOME (SELECT ...)", () => {
 	>().toEqualTypeOf<{ e: boolean }>();
 	expectTypeOf<Row<"SELECT FROM users">>().toEqualTypeOf<{}>();
 	// whatever clause follows; not after DISTINCT
-	type Empty<Q extends string> = V<Q> extends Q ? true : V<Q>;
+	type Empty<Q extends string> = [V<Q>] extends [never]
+		? "never"
+		: V<Q> extends Q
+			? true
+			: V<Q>;
 	expectTypeOf<
 		[
 			Empty<"SELECT ALL FROM users">,
@@ -90,7 +94,7 @@ test("EXISTS, IN (SELECT ...), = ANY / ALL / SOME (SELECT ...)", () => {
 		V<"SELECT INTO e0 FROM users">
 	>().toEqualTypeOf<"SELECT INTO e0 FROM users">();
 	expectTypeOf<V<"SELECT ORDER BY 1">>().toEqualTypeOf<
-		SqlError<"ORDER BY position 1 is not in select list", 0>
+		SqlError<"ORDER BY position 1 is not in select list", 3>
 	>();
 	expectTypeOf<V<"SELECT DISTINCT FROM users">>().toEqualTypeOf<
 		SqlError<"syntax error at or near from", 2>
@@ -292,4 +296,19 @@ test("a row compared with a subquery compares with its single row; no row gives 
 	expectTypeOf<
 		E<"SELECT (id, email) = (SELECT author_id, nope FROM posts) FROM users">
 	>().toEqualTypeOf<'column "nope" does not exist'>();
+	// every comparison operator; a row with a row; a value with a scalar subquery
+	expectTypeOf<
+		Row<"SELECT (id, email) <> (SELECT 1, 'a') AS a, (id, email) != (SELECT 1, 'a') AS b, (id, email) < (SELECT 1, 'a') AS c, (id, email) > (SELECT 1, 'a') AS d, (id, email) <= (SELECT 1, 'a') AS e, (id, email) >= (SELECT 1, 'a') AS f, (id, email) = (1, 'a') AS g FROM users">
+	>().toEqualTypeOf<{
+		a: boolean | null;
+		b: boolean | null;
+		c: boolean | null;
+		d: boolean | null;
+		e: boolean | null;
+		f: boolean | null;
+		g: boolean;
+	}>();
+	expectTypeOf<
+		E<"SELECT id = (SELECT 1, 2) FROM users">
+	>().toEqualTypeOf<"subquery must return only one column">();
 });

@@ -165,7 +165,9 @@ test("ORDER BY of a set operation: output names and positions only", () => {
 	>();
 	expectTypeOf<
 		V<"SELECT id FROM users UNION SELECT author_id FROM posts ORDER BY 2">
-	>().toEqualTypeOf<SqlError<"ORDER BY position 2 is not in select list", 0>>();
+	>().toEqualTypeOf<
+		SqlError<"ORDER BY position 2 is not in select list", 11>
+	>();
 	// output names, through a star too
 	expectTypeOf<
 		V<"SELECT id AS x, email AS x FROM users UNION SELECT 1, 'a' ORDER BY x">
@@ -185,10 +187,14 @@ test("ORDER BY of a set operation: output names and positions only", () => {
 	>().toEqualTypeOf<"SELECT id FROM users UNION SELECT author_id FROM posts ORDER BY 01">();
 	expectTypeOf<
 		V<"SELECT id FROM users UNION SELECT author_id FROM posts ORDER BY 05">
-	>().toEqualTypeOf<SqlError<"ORDER BY position 5 is not in select list", 0>>();
+	>().toEqualTypeOf<
+		SqlError<"ORDER BY position 5 is not in select list", 11>
+	>();
 	expectTypeOf<
 		V<"SELECT id FROM users UNION SELECT author_id FROM posts ORDER BY 0">
-	>().toEqualTypeOf<SqlError<"ORDER BY position 0 is not in select list", 0>>();
+	>().toEqualTypeOf<
+		SqlError<"ORDER BY position 0 is not in select list", 11>
+	>();
 	expectTypeOf<
 		V<"SELECT id FROM users UNION SELECT author_id FROM posts ORDER BY 3000000000">
 	>().toEqualTypeOf<SqlError<"non-integer constant in ORDER BY", 0>>();

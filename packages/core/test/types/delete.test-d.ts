@@ -124,6 +124,33 @@ test("unsupported / syntax errors", () => {
 	expectTypeOf<
 		Row<"DELETE FROM users WHERE CURRENT OF c RETURNING *">
 	>().toEqualTypeOf<Row<"DELETE FROM users RETURNING *">>();
+	type E<Q extends string> =
+		V<Q> extends SqlError<infer M extends string, infer At> ? [M, At] : "ok";
+	expectTypeOf<
+		[
+			E<"DELETE FROM nope">,
+			E<"DELETE FROM users AS 1">,
+			E<"DELETE FROM users WHERE nope">,
+			E<"DELETE FROM users RETURNING +">,
+			E<"DELETE FROM users RETURNING WITH OLD AS o id">,
+			E<"DELETE FROM users RETURNING WITH (OLD o) id">,
+			E<"DELETE FROM users RETURNING WITH (OLD AS o NEW AS n) id">,
+			E<"DELETE FROM users RETURNING WITH (OLD AS 1) id">,
+			E<"DELETE FROM users RETURNING WITH (x AS o) id">,
+		]
+	>().toEqualTypeOf<
+		[
+			['relation "nope" does not exist', 2],
+			["syntax error: expected alias at or near 1", 4],
+			['column "nope" does not exist', 4],
+			["syntax error at end of input", 5],
+			['syntax error: expected "(" at or near old', 5],
+			["syntax error: expected AS at or near o", 7],
+			['syntax error: expected "," or ")" at or near new', 9],
+			["syntax error: expected alias at or near 1", 8],
+			["syntax error: expected OLD or NEW at or near x", 6],
+		]
+	>();
 	expectTypeOf<V<"DELETE FROM users u USING">>().toEqualTypeOf<
 		SqlError<
 			"syntax error: expected table name, subquery or function at or near end of input",

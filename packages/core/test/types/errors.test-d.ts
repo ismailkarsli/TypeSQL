@@ -19,6 +19,10 @@ test("unknown relations, columns and table aliases", () => {
 	expectTypeOf<V<"SELECT id FROM users WHERE nope = 1">>().toEqualTypeOf<
 		SqlError<'column "nope" does not exist', 5>
 	>();
+	// a quoted name is found too
+	expectTypeOf<V<'SELECT id, "Nope" FROM users'>>().toEqualTypeOf<
+		SqlError<'column "Nope" does not exist', 3>
+	>();
 	expectTypeOf<
 		V<"SELECT * FROM users WHERE id = (SELECT max(id) FROM posts WHERE zzz = 1)">
 	>().toEqualTypeOf<SqlError<'column "zzz" does not exist', 16>>();

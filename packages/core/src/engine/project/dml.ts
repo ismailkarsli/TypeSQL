@@ -376,7 +376,7 @@ type ProjectInsert<
 	Ctes extends CteMap,
 > =
 	ResolveTarget<DB, S["table"], S["alias"], "insert into"> extends infer Tg
-		? Tg extends Target_<infer Tbl extends Table, infer Item>
+		? Tg extends Target_<infer Tbl, infer Item>
 			? InsertTargetCols<
 					S["columns"],
 					S["source"],
@@ -663,7 +663,7 @@ type RequiredCol<Tbl extends Table, Col extends string> = Col extends keyof Tbl
 	? Tbl[Col] extends { readonly nullable: false; readonly hasDefault: false }
 		? true
 		: false
-	: false; // type-mutate: equivalent bool-flip – the callers pass existing columns (checked first)
+	: false; // type-mutate: equivalent bool-flip, never-false – the callers pass existing columns (checked first)
 
 /** Every NOT NULL column without a default must be in `Cs` (skipped when `Cs` is unknown). */
 export type CheckRequired<
@@ -793,7 +793,7 @@ type CheckSetItem<
 							: CheckMultiSource<E, Cols, C>
 						: never
 				: never
-			: true; // type-mutate: equivalent bool-flip – a SET item is one of the three kinds above
+			: true; // type-mutate: equivalent bool-flip, never-false – a SET item is one of the three kinds above
 
 /** `(a, b) = (e1, e2)` / `= ROW(…)` / `= (SELECT ...)`: width must match, expressions typed; any other source is an error. */
 export type CheckMultiSource<
@@ -837,7 +837,7 @@ type ProjectUpdate<
 	Ctes extends CteMap,
 > =
 	ResolveTarget<DB, S["table"], S["alias"], "update"> extends infer Tg
-		? Tg extends Target_<infer Tbl, infer Item extends ScopeItem>
+		? Tg extends Target_<infer Tbl, infer Item>
 			? BindFrom<S["from"], DB, Outer, Ctes> extends infer L
 				? L extends ScopeLevel
 					? CheckSet<
@@ -879,7 +879,7 @@ type ProjectDelete<
 	Ctes extends CteMap,
 > =
 	ResolveTarget<DB, S["table"], S["alias"], "delete from"> extends infer Tg
-		? Tg extends Target_<infer Tbl extends Table, infer Item>
+		? Tg extends Target_<infer Tbl, infer Item>
 			? BindFrom<S["using"], DB, Outer, Ctes> extends infer L
 				? L extends ScopeLevel
 					? CheckOptExpr<
@@ -1093,7 +1093,7 @@ type ParamsOfCteList<
 
 type ParamsOfInsert<S extends InsertStmt, DB, Ctes extends CteMap, M> =
 	ResolveTarget<DB, S["table"], S["alias"], "insert into"> extends infer Tg
-		? Tg extends Target_<infer Tbl, infer Item extends ScopeItem>
+		? Tg extends Target_<infer Tbl, infer Item>
 			? InsertTargetCols<
 					S["columns"],
 					S["source"],
@@ -1414,7 +1414,7 @@ export type ParamsOfReturning<
 
 type ParamsOfUpdate<S extends UpdateStmt, DB, Ctes extends CteMap, M> =
 	ResolveTarget<DB, S["table"], S["alias"], "update"> extends infer Tg
-		? Tg extends Target_<infer Tbl extends Table, infer Item>
+		? Tg extends Target_<infer Tbl, infer Item>
 			? BindFrom<S["from"], DB, [], Ctes> extends infer L
 				? L extends ScopeLevel
 					? ParamsOfReturning<
@@ -1449,7 +1449,7 @@ type ParamsOfUpdate<S extends UpdateStmt, DB, Ctes extends CteMap, M> =
 
 type ParamsOfDelete<S extends DeleteStmt, DB, Ctes extends CteMap, M> =
 	ResolveTarget<DB, S["table"], S["alias"], "delete from"> extends infer Tg
-		? Tg extends Target_<infer Tbl extends Table, infer Item>
+		? Tg extends Target_<infer Tbl, infer Item>
 			? BindFrom<S["using"], DB, [], Ctes> extends infer L
 				? L extends ScopeLevel
 					? ParamsOfReturning<

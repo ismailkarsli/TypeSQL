@@ -90,7 +90,11 @@ test("DISTINCT and DISTINCT ON do not change the row type; DISTINCT ON is valida
 			0
 		>
 	>();
-	type Ok<Q extends string> = V<Q> extends Q ? "ok" : V<Q>;
+	type Ok<Q extends string> = [V<Q>] extends [never]
+		? "never"
+		: V<Q> extends Q
+			? "ok"
+			: V<Q>;
 	expectTypeOf<
 		[
 			Ok<"SELECT DISTINCT * FROM users ORDER BY email, 1">,
@@ -128,10 +132,10 @@ test("ORDER BY: output names, positions and input expressions", () => {
 		Row<"SELECT id, (SELECT 1) AS s FROM users ORDER BY s">
 	>().toEqualTypeOf<{ id: number; s: number | null }>();
 	expectTypeOf<V<"SELECT id FROM users ORDER BY 2">>().toEqualTypeOf<
-		SqlError<"ORDER BY position 2 is not in select list", 0>
+		SqlError<"ORDER BY position 2 is not in select list", 6>
 	>();
 	expectTypeOf<V<"SELECT id FROM users ORDER BY 0">>().toEqualTypeOf<
-		SqlError<"ORDER BY position 0 is not in select list", 0>
+		SqlError<"ORDER BY position 0 is not in select list", 6>
 	>();
 	expectTypeOf<V<"SELECT id FROM users ORDER BY -1">>().toEqualTypeOf<
 		SqlError<"ORDER BY position -1 is not in select list", 0>
@@ -158,7 +162,11 @@ test("ORDER BY: output names, positions and input expressions", () => {
 	expectTypeOf<
 		V<"SELECT id AS x, email AS x FROM users ORDER BY x">
 	>().toEqualTypeOf<SqlError<'ORDER BY "x" is ambiguous', 3>>(); // the same column through a star, or with and without its qualifier, is not ambiguous
-	type Ok<Q extends string> = V<Q> extends Q ? true : V<Q>;
+	type Ok<Q extends string> = [V<Q>] extends [never]
+		? "never"
+		: V<Q> extends Q
+			? true
+			: V<Q>;
 	expectTypeOf<
 		[
 			Ok<"SELECT *, id FROM users ORDER BY id">,
@@ -173,7 +181,7 @@ test("ORDER BY: output names, positions and input expressions", () => {
 		]
 	>().toEqualTypeOf<[true, true, true, true, true, true, true]>();
 	expectTypeOf<V<"SELECT id FROM users ORDER BY 05">>().toEqualTypeOf<
-		SqlError<"ORDER BY position 5 is not in select list", 0>
+		SqlError<"ORDER BY position 5 is not in select list", 6>
 	>();
 	// past int4 the literal is not an integer to Postgres
 	expectTypeOf<V<"SELECT id FROM users ORDER BY 3000000000">>().toEqualTypeOf<
@@ -197,8 +205,14 @@ test("GROUP BY: input columns first, then output names and positions", () => {
 	expectTypeOf<
 		Row<"SELECT u.id FROM users u GROUP BY u.id, ROLLUP (email)">
 	>().toEqualTypeOf<{ id: number }>();
+	expectTypeOf<V<"SELECT id FROM users GROUP BY 0">>().toEqualTypeOf<
+		SqlError<"GROUP BY position 0 is not in select list", 6>
+	>();
+	expectTypeOf<V<"SELECT DISTINCT ON (0) id FROM users">>().toEqualTypeOf<
+		SqlError<"DISTINCT ON position 0 is not in select list", 4>
+	>();
 	expectTypeOf<V<"SELECT id FROM users GROUP BY 2">>().toEqualTypeOf<
-		SqlError<"GROUP BY position 2 is not in select list", 0>
+		SqlError<"GROUP BY position 2 is not in select list", 6>
 	>();
 	expectTypeOf<V<"SELECT id FROM users GROUP BY 'x'">>().toEqualTypeOf<
 		SqlError<"non-integer constant in GROUP BY", 0>

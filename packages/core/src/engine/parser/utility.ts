@@ -1,3 +1,4 @@
+import type { SqlError } from "../errors.js";
 import type { NumTok, OpTok, Toks, WordTok } from "../lexer/tokens.js";
 import type { ParseSelectStmt } from "./select.js";
 import type {
@@ -33,39 +34,50 @@ export type ParseCursorStmt<T extends Toks, I extends number> =
 // ─── DECLARE ───
 
 type ParseDeclare<T extends Toks, I extends number> =
-	ColIdIdent<T, I> extends [infer N extends string, infer J extends number]
-		? CursorOptions<T, J> extends infer K extends number
-			? EatWord<T, K, "cursor"> extends never
-				? Expected<"CURSOR", T, K>
-				: SkipHold<T, EatWord<T, K, "cursor">> extends infer L extends number
-					? EatWord<T, L, "for"> extends never
-						? Expected<"FOR", T, L>
-						: ParseSelectStmt<T, EatWord<T, L, "for">> extends infer R
-							? R extends Ok<infer Q, infer J2 extends number>
-								? T[J2] extends WordTok<"into">
-									? Fail<"SELECT ... INTO is not allowed here", J2>
-									: Ok<{ t: "declare_cursor"; name: N; q: Q }, J2>
-								: R
-							: never
-					: never
+	ColIdIdent<T, I> extends [infer N, infer J extends number]
+		? CursorOptions<T, J, never> extends infer K
+			? K extends number
+				? EatWord<T, K, "cursor"> extends never
+					? Expected<"CURSOR", T, K>
+					: SkipHold<T, EatWord<T, K, "cursor">> extends infer L
+						? L extends number
+							? EatWord<T, L, "for"> extends never
+								? Expected<"FOR", T, L>
+								: ParseSelectStmt<T, EatWord<T, L, "for">> extends infer R
+									? R extends Ok<infer Q, infer J2>
+										? Ok<{ t: "declare_cursor"; name: N; q: Q }, J2>
+										: R
+									: never
+							: L
+						: never
+				: K
 			: never
 		: Expected<"cursor name", T, I>;
 
-/** `BINARY`, `ASENSITIVE`, `INSENSITIVE`, `SCROLL`, `NO SCROLL`, in any order. */
-type CursorOptions<T extends Toks, I extends number> =
-	T[I] extends WordTok<"binary" | "asensitive" | "insensitive" | "scroll">
-		? CursorOptions<T, Nx<I>>
+/**
+ * `BINARY`, `ASENSITIVE`, `INSENSITIVE`, `SCROLL`, `NO SCROLL`, in any order → index after
+ * them, or an error: Postgres rejects a contradictory pair. `Seen`: the options so far.
+ */
+type CursorOptions<T extends Toks, I extends number, Seen extends string> =
+	T[I] extends WordTok<
+		infer W extends "binary" | "asensitive" | "insensitive" | "scroll"
+	>
+		? CursorOptions<T, Nx<I>, Seen | W>
 		: T[I] extends WordTok<"no">
 			? T[Nx<I>] extends WordTok<"scroll">
-				? CursorOptions<T, Nx2<I>>
-				: I
-			: I;
+				? CursorOptions<T, Nx2<I>, Seen | "no scroll">
+				: Expected<"SCROLL", T, Nx<I>>
+			: "asensitive" | "insensitive" extends Seen
+				? SqlError<"cannot specify both ASENSITIVE and INSENSITIVE", null>
+				: "scroll" | "no scroll" extends Seen
+					? SqlError<"cannot specify both SCROLL and NO SCROLL", null>
+					: I;
 
 type SkipHold<T extends Toks, I extends number> =
 	T[I] extends WordTok<"with" | "without">
 		? T[Nx<I>] extends WordTok<"hold">
 			? Nx2<I>
-			: I
+			: Expected<"HOLD", T, Nx<I>>
 		: I;
 
 // ─── FETCH / MOVE ───
@@ -75,23 +87,19 @@ type SkipHold<T extends Toks, I extends number> =
  * (`FETCH next` fetches from a cursor named `next`, as in Postgres).
  */
 type ParseFetch<T extends Toks, I extends number, K extends "fetch" | "move"> =
-	ColIdIdent<T, I> extends [infer N extends string, infer J extends number]
-		? (
-				AtEnd<T, J> extends true
-					? true
-					: T[J] extends OpTok<";">
-						? true
-						: false
-			) extends true
+	ColIdIdent<T, I> extends [infer N, infer J extends number]
+		? AtEnd<T, J> extends true
 			? Ok<{ t: K; cursor: N }, J>
-			: FetchFrom<T, FetchDirection<T, I>, K>
+			: T[J] extends OpTok<";">
+				? Ok<{ t: K; cursor: N }, J>
+				: FetchFrom<T, FetchDirection<T, I>, K>
 		: FetchFrom<T, FetchDirection<T, I>, K>;
 
 /** `[FROM | IN] name` after the direction. */
 type FetchFrom<T extends Toks, D, K extends "fetch" | "move"> = D extends number
 	? (T[D] extends WordTok<"from" | "in"> ? Nx<D> : D) extends infer J extends
 			number
-		? ColIdIdent<T, J> extends [infer N extends string, infer J2 extends number]
+		? ColIdIdent<T, J> extends [infer N, infer J2 extends number]
 			? Ok<{ t: K; cursor: N }, J2>
 			: Expected<"cursor name", T, J>
 		: never
@@ -106,7 +114,7 @@ type FetchDirection<T extends Toks, I extends number> =
 		? W extends "next" | "prior" | "first" | "last" | "all"
 			? Nx<I>
 			: W extends "absolute" | "relative"
-				? SignedInt<T, Nx<I>> extends infer J extends number
+				? SignedInt<T, Nx<I>> extends infer J
 					? J extends Nx<I>
 						? Expected<"integer", T, J>
 						: J
@@ -118,13 +126,13 @@ type FetchDirection<T extends Toks, I extends number> =
 					: I
 		: SignedInt<T, I>;
 
-/** `[+ | -] integer` → index after it, or `I`. */
+/** `[+ | -] integer` → index after it, `I` when there is none, or an error for a lone sign. */
 type SignedInt<T extends Toks, I extends number> = T[I] extends NumTok
 	? Nx<I>
 	: T[I] extends OpTok<"+" | "-">
 		? T[Nx<I>] extends NumTok
 			? Nx2<I>
-			: I
+			: Expected<"integer", T, Nx<I>>
 		: I;
 
 // ─── CLOSE ───
@@ -132,6 +140,6 @@ type SignedInt<T extends Toks, I extends number> = T[I] extends NumTok
 type ParseClose<T extends Toks, I extends number> =
 	T[I] extends WordTok<"all">
 		? Ok<{ t: "close_cursor"; cursor: null }, Nx<I>>
-		: ColIdIdent<T, I> extends [infer N extends string, infer J extends number]
+		: ColIdIdent<T, I> extends [infer N, infer J extends number]
 			? Ok<{ t: "close_cursor"; cursor: N }, J>
 			: Expected<"cursor name or ALL", T, I>;

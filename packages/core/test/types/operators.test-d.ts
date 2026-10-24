@@ -318,6 +318,17 @@ test("arrays, subscripts, slices, ARRAY / ROW constructors", () => {
 	expectTypeOf<V<"SELECT data[0:1] FROM things">>().toEqualTypeOf<
 		SqlError<"jsonb subscript does not support slices", 0>
 	>();
+	// subscripts in a row apply to the array together (one per dimension); a slice among them gives the array
+	expectTypeOf<
+		Types<"SELECT nums[1][2], nums[1][1][1], nums[1][1:2], nums[1:1][2], words[1][1] FROM things">
+	>().toEqualTypeOf<["int4", "int4", "int4[]", "int4[]", "text"]>();
+	// jsonb by any key; the geometric types and name take an index too
+	expectTypeOf<
+		Types<"SELECT data[id], ('(1,2)'::point)[0], ('{1,-1,0}'::line)[0], ('[(0,0),(1,1)]'::lseg)[0], ('((0,0),(1,1))'::box)[1], ('ab'::name)[0] FROM things">
+	>().toEqualTypeOf<["jsonb", "float8", "float8", "point", "point", "char"]>();
+	expectTypeOf<
+		Err<"SELECT label[1][1] FROM things">
+	>().toEqualTypeOf<"cannot subscript type text because it does not support subscripting">();
 	// errors inside a bound, a ROW or an ARRAY item
 	expectTypeOf<
 		[
@@ -332,6 +343,12 @@ test("arrays, subscripts, slices, ARRAY / ROW constructors", () => {
 			'column "nope" does not exist',
 		]
 	>();
+});
+
+test("a prefix operator on a literal: - and + fold into it; others are operators", () => {
+	expectTypeOf<
+		Types<"SELECT -2147483648, +1, |/ 25, @ -1, ~ 5">
+	>().toEqualTypeOf<["int4", "int4", "float8", "int4", "int4"]>();
 });
 
 test("bit strings are bit constants; SUBSTRING / OVERLAY of a bit string is bit", () => {

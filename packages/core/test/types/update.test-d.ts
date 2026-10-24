@@ -225,6 +225,8 @@ test("syntax errors", () => {
 		V<Q> extends SqlError<infer M extends string, infer At> ? [M, At] : "ok";
 	expectTypeOf<
 		[
+			E<"UPDATE 1 SET email = 'a'">,
+			E<"UPDATE users SET email = 'a' FROM (">,
 			E<"UPDATE nope SET email = 'a'">,
 			E<"UPDATE users SET email 'a'">,
 			E<"UPDATE users SET email = +">,
@@ -237,6 +239,11 @@ test("syntax errors", () => {
 		]
 	>().toEqualTypeOf<
 		[
+			["syntax error: expected table name at or near 1", 1],
+			[
+				"syntax error: expected table name, subquery or function at or near end of input",
+				8,
+			],
 			['relation "nope" does not exist', 1],
 			["syntax error: expected \"=\" at or near 'a'", 4],
 			["syntax error at end of input", 6],

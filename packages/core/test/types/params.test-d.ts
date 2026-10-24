@@ -1,4 +1,9 @@
 import { expectTypeOf, test } from "vitest";
+import type {
+	ArgsOf,
+	NamesOf,
+	NonArrayOrSqlJson,
+} from "../../src/engine/index.js";
 import {
 	createSql,
 	type DefaultParamTypeMap,
@@ -329,4 +334,32 @@ test("runtime call site", () => {
 	// int8 rows are strings under the default type map; int8 params also take numbers and bigints
 	sql("SELECT id FROM posts WHERE id = $1", 1n);
 	sql("SELECT id FROM posts WHERE id = $1", 1);
+});
+
+test("an unused $n is unknown; an invalid statement has no parameters", () => {
+	expectTypeOf<Params<"SELECT $2::int4">>().toEqualTypeOf<[unknown, number]>();
+	expectTypeOf<ArgsOf<DB, DefaultTypeMap, "SELECT $2::jsonb">>().toEqualTypeOf<
+		[unknown, NonArrayOrSqlJson<unknown>]
+	>();
+	// only tested for NULL: no type to take
+	expectTypeOf<Params<"SELECT 1 WHERE $1 IS NULL">>().toEqualTypeOf<
+		[unknown]
+	>();
+	expectTypeOf<
+		[
+			Params<"SELECT nope FROM users">,
+			ArgsOf<DB, DefaultTypeMap, "SELECT nope FROM users">,
+			NamesOf<DB, "SELECT nope FROM users">,
+		]
+	>().toEqualTypeOf<[[], [], []]>();
+	// json and jsonb parameters both take sql.json() values
+	expectTypeOf<
+		ArgsOf<
+			DB,
+			DefaultTypeMap,
+			"UPDATE things SET data = $1, doc = $2, label = $3"
+		>
+	>().toEqualTypeOf<
+		[NonArrayOrSqlJson<unknown>, NonArrayOrSqlJson<unknown>, string]
+	>();
 });

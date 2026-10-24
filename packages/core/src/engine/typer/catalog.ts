@@ -1264,10 +1264,10 @@ type ArityOk<
 	As extends readonly ColInfo[],
 > = Ps extends readonly [...infer Fixed, "..."]
 	? As extends readonly [...{ [K in keyof Fixed]: unknown }, ...unknown[]] // type-mutate: equivalent tuple-swap – the elements are all unknown: at least that many either way
-		? true
+		? true // type-mutate: equivalent never-true – ArityFallback reads it with `extends true`, where never counts as true
 		: false
 	: Ps["length"] extends As["length"]
-		? true
+		? true // type-mutate: equivalent never-true – ArityFallback reads it with `extends true`, where never counts as true
 		: false;
 
 /** Resolve a catalog entry against argument types: the chosen `Sig`, or null. */
@@ -1304,7 +1304,7 @@ type ElemOf<T extends string> = T extends `${infer E}[]`
 /** Array of `T`; Postgres has no arrays of arrays, so `T[]` stays `T[]`. */
 type ArrOf<T extends string> = T extends `${string}[]`
 	? T
-	: T extends "unknown" | "null"
+	: T extends "null"
 		? "unknown[]"
 		: `${T}[]`;
 type RangeSubtype = {

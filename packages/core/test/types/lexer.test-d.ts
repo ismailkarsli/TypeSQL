@@ -80,6 +80,16 @@ test("string literals: '' escapes, E'' (escapes kept raw), B'' / X'', dollar quo
 		]
 	>();
 	expectTypeOf<Row<"SELECT N'abc' AS a">>().toEqualTypeOf<{ a: string }>();
+	expectTypeOf<Lex<"SELECT n'a', t'b'">>().toEqualTypeOf<
+		[
+			WordTok<"select">,
+			WordTok<"nchar">,
+			StrTok<"a">,
+			OpTok<",">,
+			WordTok<"t">,
+			StrTok<"b">,
+		]
+	>();
 	expectTypeOf<Lex<"SELECT $$it's $1$$, $fn$ a $$ b $fn$">>().toEqualTypeOf<
 		[WordTok<"select">, StrTok<"it's $1">, OpTok<",">, StrTok<" a $$ b ">]
 	>();
@@ -461,6 +471,16 @@ test("Unicode escapes are validated like Postgres", () => {
 			1
 		>
 	>();
+	expectTypeOf<Lex<"SELECT U&'x' UESCAPE">>().toEqualTypeOf<
+		SqlError<
+			"UESCAPE must be followed by a simple string literal at end of input",
+			1
+		>
+	>();
+	// a longer word is an alias, not UESCAPE
+	expectTypeOf<Row<"SELECT U&'x' uescapes">>().toEqualTypeOf<{
+		uescapes: string;
+	}>();
 	expectTypeOf<Lex<"SELECT U&'x' UESCAPE '+'">>().toEqualTypeOf<
 		SqlError<"invalid Unicode escape character at or near \"'+'\"", 1>
 	>();

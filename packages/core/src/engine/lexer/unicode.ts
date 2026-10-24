@@ -203,7 +203,9 @@ type EscapeChar<S extends string> = S extends `'${infer Ch}'${infer Rest}`
 				: [One, Rest]
 			: `invalid Unicode escape character at or near "'${Ch}'"`
 		: `invalid Unicode escape character at or near "''"`
-	: `UESCAPE must be followed by a simple string literal at or near "${S extends `${infer N}${string}` ? N : ""}"`;
+	: S extends `${infer N}${string}`
+		? `UESCAPE must be followed by a simple string literal at or near "${N}"`
+		: "UESCAPE must be followed by a simple string literal at end of input";
 type SkipWsOnly<S extends string> = S extends `${infer C}${infer R}`
 	? C extends Ws
 		? SkipWsOnly<R>

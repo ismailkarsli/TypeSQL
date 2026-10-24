@@ -67,7 +67,7 @@ export type ProjectMerge<
 	Ctes extends CteMap,
 > =
 	ResolveTarget<DB, S["table"], S["alias"], "merge into"> extends infer Tg
-		? Tg extends Target_<infer Tbl extends Table, infer Item>
+		? Tg extends Target_<infer Tbl, infer Item>
 			? BindFrom<[S["source"]], DB, Outer, Ctes> extends infer L
 				? L extends ScopeLevel
 					? Item["alias"] extends L[number]["alias"]
@@ -285,7 +285,7 @@ type CheckMergeInsert<
  */
 export type ParamsOfMerge<S extends MergeStmt, DB, Ctes extends CteMap, M> =
 	ResolveTarget<DB, S["table"], S["alias"], "merge into"> extends infer Tg
-		? Tg extends Target_<infer Tbl extends Table, infer Item>
+		? Tg extends Target_<infer Tbl, infer Item>
 			? BindFrom<[S["source"]], DB, [], Ctes> extends infer L
 				? L extends ScopeLevel
 					? ParamsOfReturning<

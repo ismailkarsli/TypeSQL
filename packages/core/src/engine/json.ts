@@ -463,7 +463,7 @@ type JsonStringT =
 
 type JsonOfType<T extends string, DB> = T extends AnyShaped
 	? ShapeOfType<T> extends infer S
-		? S extends null // type-mutate: equivalent cond-false – JsonTs of no shape is unknown too
+		? S extends null // type-mutate: equivalent cond-false, never-true – a shaped type always has a shape (ShapeOfType); JsonTs of none would be unknown too
 			? unknown
 			: JsonTs<S, DB>
 		: never

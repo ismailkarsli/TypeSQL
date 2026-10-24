@@ -187,7 +187,7 @@ type Ordinal<
 					: never
 			: SqlError<`non-integer constant in ${Clause}`, null>; // past int4, as Postgres reads it
 /** `007` → `7` (an ordinal is the integer the literal denotes). */
-type NoLeadingZeros<V extends string> = V extends `0${infer R}`
+export type NoLeadingZeros<V extends string> = V extends `0${infer R}`
 	? R extends ""
 		? "0"
 		: NoLeadingZeros<R>
@@ -388,13 +388,13 @@ type OutputOrderItem<E extends Expr, Cs extends Cols> = E extends {
 		? SqlError<"non-integer constant in ORDER BY", null>
 		: NumLitType<NoLeadingZeros<V>> extends "int4"
 			? HasStar<Cs> extends true
-				? true
+				? true // type-mutate: equivalent bool-flip – the caller only looks for an error
 				: NoLeadingZeros<V> extends `${infer N extends number}`
 					? [null, ...Cs][N] extends undefined
 						? PosErr<`${N}`>
 						: N extends 0
 							? PosErr<"0">
-							: true
+							: true // type-mutate: equivalent bool-flip – the caller only looks for an error
 					: never
 			: SqlError<"non-integer constant in ORDER BY", null>
 	: E extends { readonly t: "str" }
@@ -631,7 +631,7 @@ type Wins<E> = E extends { readonly t: LeafTag } | null
 												}
 											? // the right side is an array expression, or a subquery (its own level)
 													| Wins<E["l"]>
-													| (E["r"] extends { readonly t: "select" }
+													| (E["r"] extends { readonly t: "select" } // type-mutate: equivalent cond-false – Wins finds no window in a select node either
 															? never
 															: Wins<E["r"]>)
 											: E extends { readonly e: unknown }

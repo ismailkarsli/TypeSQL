@@ -195,7 +195,7 @@ type Types<Q extends string> =
 
 test("an overload that fits by type wins; without one, the first that fits by arity", () => {
 	expectTypeOf<
-		Types<"SELECT typed_or_any(id, id), one_bool(id), one_bool(id, id), two_bools_and_more(id, id, id), two_bools_and_more(id) FROM things">
+		Types<"SELECT typed_or_any(id, id), one_bool(id), one_bool(id, id), two_bools_and_more(id, id, id, id), two_bools_and_more(id) FROM things">
 	>().toEqualTypeOf<["int4", "bool", "unknown", "bool", "unknown"]>();
 });
 

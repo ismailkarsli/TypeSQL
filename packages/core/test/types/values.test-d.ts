@@ -81,7 +81,7 @@ test("VALUES errors", () => {
 		SqlError<"VALUES types integer and text cannot be matched", 0>
 	>();
 	expectTypeOf<V<"VALUES (1) ORDER BY 2">>().toEqualTypeOf<
-		SqlError<"ORDER BY position 2 is not in select list", 0>
+		SqlError<"ORDER BY position 2 is not in select list", 6>
 	>();
 	expectTypeOf<V<"VALUES (nope)">>().toEqualTypeOf<
 		SqlError<'column "nope" does not exist', 2>

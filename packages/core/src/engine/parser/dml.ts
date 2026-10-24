@@ -78,42 +78,21 @@ export type ParseInsert<
 					"values" | "overriding",
 					false
 				> extends infer Tg
-			? Tg extends Ok<
-					[infer Ref extends TableRef, infer Alias extends string | null],
-					infer I1 extends number
-				>
+			? Tg extends Ok<[infer Ref, infer Alias], infer I1>
 				? ParseInsertColumns<T, I1> extends infer Cl
-					? Cl extends Ok<
-							[
-								infer Cols extends readonly string[] | null,
-								infer Ind extends readonly TargetInd[] | null,
-							],
-							infer I2 extends number
-						>
+					? Cl extends Ok<[infer Cols, infer Ind], infer I2>
 						? ParseOverriding<T, I2> extends infer Ov
-							? Ov extends Ok<unknown, infer I3 extends number>
+							? Ov extends Ok<unknown, infer I3>
 								? ParseInsertSource<
 										T,
 										I3,
 										Cols extends null ? false : true
 									> extends infer Src
-									? Src extends Ok<
-											infer Source extends InsertSource,
-											infer I4 extends number
-										>
+									? Src extends Ok<infer Source, infer I4>
 										? ParseOnConflictOpt<T, I4> extends infer Oc
-											? Oc extends Ok<
-													infer Conf extends OnConflict | null,
-													infer I5 extends number
-												>
+											? Oc extends Ok<infer Conf, infer I5>
 												? ParseReturningOpt<T, I5> extends infer Rt
-													? Rt extends Ok<
-															[
-																infer Ret extends readonly Target[] | null,
-																infer Opts extends readonly ReturningOpt[],
-															],
-															infer I6 extends number
-														>
+													? Rt extends Ok<[infer Ret, infer Opts], infer I6>
 														? Ok<
 																{
 																	t: "insert";
@@ -193,7 +172,7 @@ type ParseInsertSource<
 					: Ok<{ t: "default" }, EatWord<T, Nx<I>, "values">>
 			: IsSelectStart<T, I> extends true
 				? ParseSelectStmt<T, I> extends infer X
-					? X extends Ok<infer Q extends SelectStmt, infer J extends number>
+					? X extends Ok<infer Q, infer J>
 						? Ok<{ t: "select"; q: Q }, J>
 						: X
 					: never
@@ -205,7 +184,7 @@ type ParseOnConflictOpt<T extends Toks, I extends number> =
 	EatWords<T, I, ["on", "conflict"]> extends never
 		? Ok<null, I>
 		: ParseConflictTarget<T, EatWords<T, I, ["on", "conflict"]>> extends infer X
-			? X extends Ok<unknown, infer J extends number>
+			? X extends Ok<unknown, infer J>
 				? ParseConflictAction<T, J>
 				: X
 			: never;
@@ -214,11 +193,11 @@ type ParseOnConflictOpt<T extends Toks, I extends number> =
 type ParseConflictTarget<T extends Toks, I extends number> =
 	T[I] extends OpTok<"(">
 		? ParseIndexParams<T, Nx<I>> extends infer X
-			? X extends Ok<unknown, infer J extends number>
+			? X extends Ok<unknown, infer J>
 				? EatWord<T, J, "where"> extends never
 					? Ok<null, J>
 					: ParseExpr<T, EatWord<T, J, "where">, 0> extends infer P
-						? P extends Ok<unknown, infer J2 extends number>
+						? P extends Ok<unknown, infer J2 extends number> // type-mutate: equivalent cond-false – the caller reads only the index of an Ok
 							? Ok<null, J2>
 							: P
 						: never
@@ -239,7 +218,7 @@ type ParseConflictTarget<T extends Toks, I extends number> =
  */
 type ParseIndexParams<T extends Toks, I extends number> =
 	ParseExpr<T, I, 0> extends infer X
-		? X extends Ok<unknown, infer J extends number>
+		? X extends Ok<unknown, infer J>
 			? SkipOpClass<T, J> extends infer J2 extends number
 				? T[J2] extends WordTok<"asc" | "desc">
 					? Fail<"ASC/DESC is not allowed in ON CONFLICT clause", I>
@@ -253,10 +232,11 @@ type ParseIndexParams<T extends Toks, I extends number> =
 				: never
 			: X
 		: never;
+/** An operator class name, if any (`NULLS` is the only following word that is not reserved). */
 type SkipOpClass<T extends Toks, I extends number> =
-	T[I] extends WordTok<"asc" | "desc" | "nulls" | "where">
+	T[I] extends WordTok<"nulls">
 		? I
-		: ColIdIdent<T, I> extends [string, infer J extends number]
+		: ColIdIdent<T, I> extends [string, infer J]
 			? J
 			: I;
 
@@ -271,15 +251,9 @@ type ParseConflictAction<T extends Toks, I extends number> =
 							EatWords<T, EatWord<T, I, "do">, ["update", "set"]>,
 							[]
 						> extends infer X
-					? X extends Ok<
-							infer Set extends readonly SetItem[],
-							infer J extends number
-						>
+					? X extends Ok<infer Set, infer J>
 						? ParseWhereOpt<T, J> extends infer Wh
-							? Wh extends Ok<
-									infer Where extends Expr | null,
-									infer J2 extends number
-								>
+							? Wh extends Ok<infer Where, infer J2>
 								? Ok<{ t: "update"; set: Set; where: Where }, J2>
 								: Wh
 							: never
@@ -295,35 +269,17 @@ export type ParseUpdate<
 	W extends WithClause | null,
 > =
 	ParseDmlTarget<T, I, "set", true> extends infer Tg
-		? Tg extends Ok<
-				[infer Ref extends TableRef, infer Alias extends string | null],
-				infer I1 extends number
-			>
+		? Tg extends Ok<[infer Ref, infer Alias], infer I1>
 			? EatWord<T, I1, "set"> extends never
 				? Expected<"SET", T, I1>
 				: ParseSetList<T, EatWord<T, I1, "set">, []> extends infer St
-					? St extends Ok<
-							infer Set extends readonly SetItem[],
-							infer I2 extends number
-						>
+					? St extends Ok<infer Set, infer I2>
 						? ParseFromOpt<T, I2> extends infer Fr
-							? Fr extends Ok<
-									infer From extends readonly FromItem[],
-									infer I3 extends number
-								>
+							? Fr extends Ok<infer From, infer I3>
 								? ParseDmlWhere<T, I3> extends infer Wh
-									? Wh extends Ok<
-											infer Where extends Expr | null,
-											infer I4 extends number
-										>
+									? Wh extends Ok<infer Where, infer I4>
 										? ParseReturningOpt<T, I4> extends infer Rt
-											? Rt extends Ok<
-													[
-														infer Ret extends readonly Target[] | null,
-														infer Opts extends readonly ReturningOpt[],
-													],
-													infer I5 extends number
-												>
+											? Rt extends Ok<[infer Ret, infer Opts], infer I5>
 												? Ok<
 														{
 															t: "update";
@@ -356,7 +312,7 @@ export type ParseSetList<
 	Acc extends readonly SetItem[],
 > =
 	ParseSetItem<T, I> extends infer X
-		? X extends Ok<infer Item extends SetItem, infer J extends number>
+		? X extends Ok<infer Item extends SetItem, infer J>
 			? EatOp<T, J, ","> extends never
 				? Ok<[...Acc, Item], J>
 				: ParseSetList<T, EatOp<T, J, ",">, [...Acc, Item]>
@@ -367,31 +323,22 @@ export type ParseSetList<
 type ParseSetItem<T extends Toks, I extends number> =
 	T[I] extends OpTok<"(">
 		? ParenTargetList<T, I> extends infer L
-			? L extends Ok<
-					[
-						infer Cols extends readonly string[],
-						infer Ind extends readonly TargetInd[] | null,
-					],
-					infer J extends number
-				>
+			? L extends Ok<[infer Cols, infer Ind], infer J>
 				? EatOp<T, J, "="> extends never
 					? Expected<'"="', T, J>
 					: ParseExpr<T, EatOp<T, J, "=">, 0> extends infer X
-						? X extends Ok<infer E extends Expr, infer J2 extends number>
+						? X extends Ok<infer E, infer J2>
 							? Ok<{ t: "setmulti"; cols: Cols; ind: Ind; e: E }, J2>
 							: X
 						: never
 				: L
 			: never
 		: ParseAssignTarget<T, I> extends infer Tg
-			? Tg extends Ok<
-					[infer Col extends string, infer Ind extends TargetInd],
-					infer J extends number
-				>
+			? Tg extends Ok<[infer Col, infer Ind], infer J>
 				? EatOp<T, J, "="> extends never
 					? Expected<'"="', T, J>
 					: ParseExpr<T, EatOp<T, J, "=">, 0> extends infer X
-						? X extends Ok<infer E extends Expr, infer J2 extends number>
+						? X extends Ok<infer E, infer J2>
 							? Ok<
 									Ind extends Expr
 										? { t: "setind"; col: Col; target: Ind; e: E }
@@ -429,10 +376,7 @@ type ParseIndirection<
 		: T[I] extends OpTok<".">
 			? T[Nx<I>] extends OpTok<"*">
 				? Fail<'row expansion via "*" is not supported here', Tg[1]>
-				: AnyLabel<T, Nx<I>> extends [
-							infer N extends string,
-							infer J extends number,
-						]
+				: AnyLabel<T, Nx<I>> extends [infer N, infer J extends number]
 					? ParseIndirection<T, J, Tg, { t: "field"; e: E; name: N }>
 					: Expected<"field name", T, Nx<I>>
 			: Ok<[Tg[0], E], I>;
@@ -446,7 +390,7 @@ type ParseIndSubscript<
 > =
 	EatOp<T, I, ":"> extends never
 		? ParseExpr<T, I, 0> extends infer X
-			? X extends Ok<infer Ix, infer J extends number>
+			? X extends Ok<infer Ix, infer J>
 				? EatOp<T, J, "]"> extends never
 					? EatOp<T, J, ":"> extends never
 						? Expected<'"]"', T, J>
@@ -464,7 +408,7 @@ type ParseIndSliceHi<
 > =
 	EatOp<T, I, "]"> extends never
 		? ParseExpr<T, I, 0> extends infer X
-			? X extends Ok<infer Hi, infer J extends number>
+			? X extends Ok<infer Hi, infer J>
 				? EatOp<T, J, "]"> extends never
 					? Expected<'"]"', T, J>
 					: ParseIndirection<
@@ -491,7 +435,7 @@ export type ParenTargetList<T extends Toks, I extends number> = TargetListLoop<
 	Nx<I>,
 	[],
 	[],
-	false
+	false // type-mutate: equivalent bool-flip – a list of null indirections reads like null
 >;
 type TargetListLoop<
 	T extends Toks,
@@ -503,7 +447,7 @@ type TargetListLoop<
 	ParseAssignTarget<T, I> extends infer X
 		? X extends Ok<
 				[infer N extends string, infer Ind extends TargetInd],
-				infer J extends number
+				infer J
 			>
 			? EatOp<T, J, ","> extends never
 				? EatOp<T, J, ")"> extends never
@@ -511,9 +455,9 @@ type TargetListLoop<
 					: Ok<
 							[
 								[...Cols, N],
-								Any extends true
+								Any extends true // type-mutate: equivalent cond-true – a list of null indirections reads like null
 									? [...Inds, Ind]
-									: Ind extends null
+									: Ind extends null // type-mutate: equivalent cond-false – a list of null indirections reads like null
 										? null
 										: [...Inds, Ind],
 							],
@@ -524,7 +468,7 @@ type TargetListLoop<
 						EatOp<T, J, ",">,
 						[...Cols, N],
 						[...Inds, Ind],
-						Ind extends null ? Any : true // type-mutate: equivalent never-false – Any is read with `extends true`, so never counts as true
+						Ind extends null ? Any : true // type-mutate: equivalent never-false, cond-false – Any is read with `extends true` (never counts as true), and a list of null indirections reads like null
 					>
 			: X
 		: never;
@@ -539,28 +483,13 @@ export type ParseDelete<
 	EatWord<T, I, "from"> extends never
 		? Expected<"FROM", T, I>
 		: ParseDmlTarget<T, EatWord<T, I, "from">, never, true> extends infer Tg
-			? Tg extends Ok<
-					[infer Ref extends TableRef, infer Alias extends string | null],
-					infer I1 extends number
-				>
+			? Tg extends Ok<[infer Ref, infer Alias], infer I1>
 				? ParseUsingOpt<T, I1> extends infer Us
-					? Us extends Ok<
-							infer Using extends readonly FromItem[],
-							infer I2 extends number
-						>
+					? Us extends Ok<infer Using, infer I2>
 						? ParseDmlWhere<T, I2> extends infer Wh
-							? Wh extends Ok<
-									infer Where extends Expr | null,
-									infer I3 extends number
-								>
+							? Wh extends Ok<infer Where, infer I3>
 								? ParseReturningOpt<T, I3> extends infer Rt
-									? Rt extends Ok<
-											[
-												infer Ret extends readonly Target[] | null,
-												infer Opts extends readonly ReturningOpt[],
-											],
-											infer I4 extends number
-										>
+									? Rt extends Ok<[infer Ret, infer Opts], infer I4>
 										? Ok<
 												{
 													t: "delete";
@@ -611,7 +540,7 @@ export type ParseDmlTarget<
 				Star extends true ? (T[J] extends OpTok<"*"> ? Nx<J> : J) : J,
 				Stop
 			> extends infer A
-			? A extends Ok<infer Alias extends string | null, infer J2 extends number>
+			? A extends Ok<infer Alias, infer J2>
 				? Ok<[RefOf<Parts>, Alias], J2>
 				: A
 			: never
@@ -619,10 +548,10 @@ export type ParseDmlTarget<
 
 type ParseDmlAlias<T extends Toks, I extends number, Stop extends string> =
 	T[I] extends WordTok<"as">
-		? Ident<T, Nx<I>> extends [infer A extends string, infer J extends number]
+		? Ident<T, Nx<I>> extends [infer A, infer J extends number]
 			? Ok<A, J>
 			: Expected<"alias", T, Nx<I>>
-		: ColIdIdent<T, I> extends [infer A extends string, infer J extends number]
+		: ColIdIdent<T, I> extends [infer A, infer J extends number]
 			? A extends Stop
 				? Ok<null, I>
 				: Ok<A, J>
@@ -663,7 +592,7 @@ type ReturningTargets<
 	Opts extends readonly ReturningOpt[],
 > =
 	ParseTargetList<T, I, []> extends infer X
-		? X extends Ok<infer Ts, infer J extends number>
+		? X extends Ok<infer Ts, infer J>
 			? Ok<[Ts, Opts], J>
 			: X
 		: never;

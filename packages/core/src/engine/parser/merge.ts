@@ -54,7 +54,7 @@ export type ParseMerge<
 	EatWord<T, I, "into"> extends never
 		? Expected<"INTO", T, I>
 		: ParseDmlTarget<T, EatWord<T, I, "into">, never, true> extends infer Tg
-			? Tg extends Ok<[infer Ref extends TableRef, infer Alias], infer I1>
+			? Tg extends Ok<[infer Ref, infer Alias], infer I1>
 				? EatWord<T, I1, "using"> extends never
 					? Expected<"USING", T, I1>
 					: ParseFromItem<T, EatWord<T, I1, "using">> extends infer Src
@@ -157,7 +157,7 @@ type ParseThen<
 	EatWord<T, I, "then"> extends never
 		? Expected<"THEN", T, I>
 		: ParseAction<T, EatWord<T, I, "then">, M> extends infer X
-			? X extends Ok<infer A extends MergeAction, infer J>
+			? X extends Ok<infer A, infer J>
 				? Ok<{ match: M; cond: Cond; action: A }, J>
 				: X
 			: never;

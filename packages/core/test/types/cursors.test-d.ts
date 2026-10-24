@@ -52,7 +52,7 @@ test("DECLARE errors", () => {
 		>
 	>();
 	expectTypeOf<V<"DECLARE c CURSOR FOR SELECT 1 INTO t">>().toEqualTypeOf<
-		SqlError<"SELECT ... INTO is not allowed here", 6>
+		SqlError<"SELECT ... INTO is not allowed here", 7>
 	>();
 	expectTypeOf<
 		V<"DECLARE c CURSOR FOR INSERT INTO users (email) VALUES ('a')">
@@ -65,6 +65,34 @@ test("DECLARE errors", () => {
 	expectTypeOf<V<"DECLARE c FOR SELECT 1">>().toEqualTypeOf<
 		SqlError<"syntax error: expected CURSOR at or near for", 2>
 	>();
+	type E<Q extends string> =
+		V<Q> extends SqlError<infer M extends string, infer At> ? [M, At] : "ok";
+	expectTypeOf<
+		[
+			E<"DECLARE 1 CURSOR FOR SELECT 1">,
+			E<"DECLARE c CURSOR SELECT 1">,
+			E<"DECLARE c NO x CURSOR FOR SELECT 1">,
+			E<"DECLARE c CURSOR WITH x FOR SELECT 1">,
+			E<"DECLARE c ASENSITIVE BINARY INSENSITIVE CURSOR FOR SELECT 1">,
+			E<"DECLARE c SCROLL NO SCROLL CURSOR FOR SELECT 1">,
+		]
+	>().toEqualTypeOf<
+		[
+			["syntax error: expected cursor name at or near 1", 1],
+			["syntax error: expected FOR at or near select", 3],
+			["syntax error: expected SCROLL at or near x", 3],
+			["syntax error: expected HOLD at or near x", 4],
+			["cannot specify both ASENSITIVE and INSENSITIVE", 0],
+			["cannot specify both SCROLL and NO SCROLL", 0],
+		]
+	>();
+	// every option, in any order
+	expectTypeOf<
+		[
+			E<"DECLARE c BINARY INSENSITIVE SCROLL CURSOR WITH HOLD FOR SELECT 1">,
+			E<"DECLARE c ASENSITIVE NO SCROLL CURSOR WITHOUT HOLD FOR SELECT 1">,
+		]
+	>().toEqualTypeOf<["ok", "ok"]>();
 });
 
 test("FETCH / MOVE / CLOSE: every direction form; FETCH has no row type (the cursor's query is another statement)", () => {
@@ -100,6 +128,31 @@ test("FETCH / MOVE / CLOSE: every direction form; FETCH has no row type (the cur
 	>();
 	expectTypeOf<V<"FETCH 1 2">>().toEqualTypeOf<
 		SqlError<"syntax error: expected cursor name at or near 2", 2>
+	>();
+	expectTypeOf<V<"FETCH c d">>().toEqualTypeOf<
+		SqlError<"syntax error at or near d", 2>
+	>();
+	expectTypeOf<V<"FETCH - FROM c">>().toEqualTypeOf<
+		SqlError<"syntax error: expected integer at or near from", 2>
+	>();
+	expectTypeOf<
+		[
+			V<"FETCH -1 FROM c">,
+			V<"MOVE + 1 IN c">,
+			V<"FETCH FORWARD c">,
+			V<"FETCH c;">,
+			V<"FETCH next;">,
+			V<"FETCH ALL FROM c">,
+		]
+	>().toEqualTypeOf<
+		[
+			"FETCH -1 FROM c",
+			"MOVE + 1 IN c",
+			"FETCH FORWARD c",
+			"FETCH c;",
+			"FETCH next;",
+			"FETCH ALL FROM c",
+		]
 	>();
 	expectTypeOf<V<"CLOSE">>().toEqualTypeOf<
 		SqlError<

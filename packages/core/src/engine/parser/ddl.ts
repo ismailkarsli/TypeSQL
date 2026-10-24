@@ -474,7 +474,7 @@ type ParseCtasAfterCols<
 				: T[EatWord<T, I1, "as">] extends WordTok<"execute">
 					? ParseCtasExecute<T, Nx<EatWord<T, I1, "as">>, Ine, Ref, Names>
 					: ParseSelectStmt<T, EatWord<T, I1, "as">> extends infer R
-						? R extends Ok<infer Q, infer J extends number>
+						? R extends Ok<infer Q, infer J>
 							? Ok<
 									{
 										t: "create_table_as";
