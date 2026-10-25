@@ -1,14 +1,19 @@
 /**
- * An API session on the TypeScript 7 language server, and completions through it. No `vscode`
- * import: the extension passes in how to reach the server.
+ * An API session on the TypeScript 7 language server, and completions through it. Editor
+ * independent: the VS Code extension and the proxy (proxy.ts) pass in how to reach the server.
  */
 import { realpathSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import type { Completions } from "@typesql/core/editor";
 import type { API, Snapshot } from "typescript/async";
-import { Loader } from "./load.js";
+import type { EditorKinds } from "./complete/call.js";
+import {
+	type Completions,
+	completionsAt,
+	editorKinds,
+} from "./complete/index.js";
+import { CorePaths } from "./core.js";
 
 /** The parts of TypeScript's API package a session uses. */
 export interface TypeScriptModules {
@@ -29,6 +34,8 @@ export interface Connector {
 	 * server's snapshot is used.
 	 */
 	modules(fileName: string): readonly (() => Promise<TypeScriptModules>)[];
+	/** How to get TypeScript 7.1 in this editor, logged when the server runs 7.0. */
+	readonly upgrade?: string;
 }
 
 /** Loads `typescript/async` and `typescript/ast` of the `typescript` package resolved from `from` (a file). */
@@ -61,7 +68,7 @@ export interface Position {
 
 interface Connection {
 	readonly api: API<true>;
-	readonly syntaxKind: Readonly<Record<string, number>>;
+	readonly kinds: EditorKinds;
 }
 
 /** The server is TypeScript 7.0: its API has no language server snapshots. */
@@ -69,14 +76,14 @@ const IS_7_0 = /unknown API method "getCurrentLanguageServerSnapshot"/;
 
 export class Session {
 	private connection: Promise<Connection | null> | undefined;
-	private readonly loader: Loader;
+	private readonly cores: CorePaths;
 	private readonly connector: Connector;
 	private readonly log: (message: string) => void;
 
 	constructor(connector: Connector, log: (message: string) => void) {
 		this.connector = connector;
 		this.log = log;
-		this.loader = new Loader(log);
+		this.cores = new CorePaths(log);
 	}
 
 	/** A session with an API client the server understands, or null (logged once) when there is none. */
@@ -122,13 +129,12 @@ export class Session {
 				this.log(
 					`API session open (client: typescript ${ts.version} at ${ts.dir})`,
 				);
-				return { api, syntaxKind: ts.SyntaxKind };
+				return { api, kinds: editorKinds(ts.SyntaxKind) };
 			} catch (e) {
 				void api.close().catch(() => {});
 				if (IS_7_0.test(String(e))) {
 					this.log(
-						"the language server runs TypeScript 7.0, whose API cannot read the editor's program: completions need TypeScript 7.1. " +
-							'Install the "TypeScript 7 Nightly" extension, or set "js/ts.tsdk.path" to a TypeScript 7.1 package and allow it.',
+						`the language server runs TypeScript 7.0, whose API cannot read the editor's program: completions need TypeScript 7.1.${this.connector.upgrade ? ` ${this.connector.upgrade}` : ""}`,
 					);
 					return null;
 				}
@@ -155,21 +161,21 @@ export class Session {
 	): Promise<Completions | null> {
 		if (!uri.startsWith("file:")) return null;
 		const fileName = fileURLToPath(uri);
-		const editor = await this.loader.load(fileName);
-		if (!editor) return null;
+		const isCorePath = this.cores.for(fileName);
+		if (!isCorePath) return null;
 		const connection = await this.connect(uri, fileName);
 		if (!connection) return null;
-		const { api, syntaxKind } = connection;
+		const { api, kinds } = connection;
 		const run = async (s: Snapshot): Promise<Completions | null> => {
 			const project = await s.getDefaultProjectForFile({ uri });
 			if (!project) return null;
-			return editor.completionsAt(
+			return completionsAt(
 				project.program,
 				project.checker,
-				editor.editorKinds(syntaxKind),
+				kinds,
 				{ uri },
 				position,
-				editor.isCorePath,
+				isCorePath,
 			);
 		};
 		const snapshot = await api.getCurrentLanguageServerSnapshot();

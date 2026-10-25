@@ -7,7 +7,7 @@
 		"noEmit": true,
 		"types": ["node", "vscode"],
 		"paths": {
-			"@typesql/core/editor": ["../core/src/editor/index.ts"]
+			"@typesql/language-server": ["../language-server/src/index.ts"]
 		}
 	},
 	"include": ["src", "test"]

@@ -18,7 +18,6 @@ import type {
 	Program,
 	Type,
 } from "typescript/async";
-import { isCoreRef } from "../cache/discover.js";
 
 /** SyntaxKind values (typescript/ast), passed in so this module loads nothing at runtime. */
 export interface EditorKinds {
@@ -166,3 +165,18 @@ const escapes = (s: string): string =>
 	s.replace(/\\(.)/gs, (_, c: string) =>
 		c === '"' || c === "'" || c === "`" ? ` ${c}` : "  ",
 	);
+
+/** Whether `type` is a reference to one of core's `names` (`Sql`, `TransactionalSql`). */
+async function isCoreRef(
+	type: Type,
+	names: readonly string[],
+	isCorePath: (path: string) => boolean,
+): Promise<boolean> {
+	if (!type.isTypeReference()) return false;
+	const sym = await type.getSymbol();
+	return (
+		!!sym &&
+		names.includes(sym.name) &&
+		sym.declarations.some((d) => isCorePath(d.path))
+	);
+}

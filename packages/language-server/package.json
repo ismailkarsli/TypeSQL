@@ -1,0 +1,49 @@
+{
+	"name": "@typesql/language-server",
+	"version": "0.0.0",
+	"description": "TypeScript 7's language server with completions for tables and columns inside TypeSQL's sql() strings, for Neovim, Zed and other editors.",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/ismailkarsli/typesql.git",
+		"directory": "packages/language-server"
+	},
+	"homepage": "https://typesql.karsli.net/guide/neovim",
+	"bugs": {
+		"url": "https://github.com/ismailkarsli/typesql/issues"
+	},
+	"author": "İsmail Karslı",
+	"type": "module",
+	"bin": {
+		"typesql-language-server": "./dist/bin.js"
+	},
+	"files": [
+		"dist",
+		"src",
+		"README.md",
+		"LICENSE"
+	],
+	"publishConfig": {
+		"access": "public"
+	},
+	"scripts": {
+		"build": "tsc -p tsconfig.build.json",
+		"typecheck": "tsc -p tsconfig.json --noEmit",
+		"test": "vitest run"
+	},
+	"devDependencies": {
+		"@types/node": "^26.6.5",
+		"@typesql/core": "workspace:*",
+		"typescript": "7.1.0-beta",
+		"vitest": "^5.0.4"
+	},
+	"keywords": [
+		"sql",
+		"postgres",
+		"typescript",
+		"language-server",
+		"lsp",
+		"zed",
+		"completions"
+	]
+}

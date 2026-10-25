@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 export const root = fileURLToPath(new URL("..", import.meta.url));
 
 export const coverageInclude = [
-	"packages/{core,pg,postgres,kysely,drizzle,prisma,vscode}/src/**/*.{ts,mts}",
+	"packages/{core,pg,postgres,kysely,drizzle,prisma,vscode,language-server}/src/**/*.{ts,mts}",
 ];
 
 // core's engine, schema and type-map are type-level only: no runtime code to cover or mutate.

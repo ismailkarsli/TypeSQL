@@ -5,8 +5,7 @@
 //   node scripts/cache-version.ts [--check]
 //
 // Hashed: every .ts file under packages/core/src except src/cache/ (the content mapper and its
-// job, which run in Node), src/editor/ (editor completions, which run in Node) and src/runtime/
-// (runtime code), with the CacheVersion line blanked.
+// job, which run in Node) and src/runtime/ (runtime code), with the CacheVersion line blanked.
 import { createHash } from "node:crypto";
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
@@ -19,9 +18,7 @@ function files(dir: string): string[] {
 	return readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
 		const p = join(dir, e.name);
 		if (e.isDirectory())
-			return p === join(root, "cache") ||
-				p === join(root, "editor") ||
-				p === join(root, "runtime")
+			return p === join(root, "cache") || p === join(root, "runtime")
 				? []
 				: files(p);
 		return e.name.endsWith(".ts") ? [p] : [];

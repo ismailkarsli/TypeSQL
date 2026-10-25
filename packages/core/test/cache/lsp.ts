@@ -1,6 +1,7 @@
 /** A minimal LSP client for `tsc --lsp --stdio`: requests, notifications, and answers to the server's requests. */
-import { type ChildProcess, spawn } from "node:child_process";
+import { spawn } from "node:child_process";
 import { join } from "node:path";
+import type { Readable, Writable } from "node:stream";
 import { pathToFileURL } from "node:url";
 
 export interface Lsp {
@@ -14,11 +15,21 @@ export interface Lsp {
 }
 
 export function startLsp(dir: string, env: NodeJS.ProcessEnv): Lsp {
-	const server: ChildProcess = spawn(
+	const server = spawn(
 		join(dir, "node_modules/typescript/bin/tsc"),
 		["--lsp", "--stdio"],
 		{ cwd: dir, env: { ...process.env, ...env }, stdio: "pipe" },
 	);
+	return connectLsp(dir, server.stdin, server.stdout, () => server.kill());
+}
+
+/** A client on a server's stdin and stdout; `kill` stops the server after `close`. */
+export function connectLsp(
+	dir: string,
+	stdin: Writable,
+	stdout: Readable,
+	kill: () => void,
+): Lsp {
 	let buffer = Buffer.alloc(0);
 	let id = 0;
 	const waiting = new Map<
@@ -27,10 +38,10 @@ export function startLsp(dir: string, env: NodeJS.ProcessEnv): Lsp {
 	>();
 	const send = (m: object): void => {
 		const body = Buffer.from(JSON.stringify({ jsonrpc: "2.0", ...m }));
-		server.stdin!.write(`Content-Length: ${body.length}\r\n\r\n`);
-		server.stdin!.write(body);
+		stdin.write(`Content-Length: ${body.length}\r\n\r\n`);
+		stdin.write(body);
 	};
-	server.stdout!.on("data", (d: Buffer) => {
+	stdout.on("data", (d: Buffer) => {
 		buffer = Buffer.concat([buffer, d]);
 		for (;;) {
 			const end = buffer.indexOf("\r\n\r\n");
@@ -79,7 +90,7 @@ export function startLsp(dir: string, env: NodeJS.ProcessEnv): Lsp {
 			]);
 			this.notify("exit", null);
 			await new Promise((r) => setTimeout(r, 300));
-			server.kill();
+			kill();
 		},
 	};
 }

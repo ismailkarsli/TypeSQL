@@ -24,10 +24,6 @@
 		"./engine": {
 			"types": "./dist/engine/index.d.ts",
 			"default": "./dist/engine/index.js"
-		},
-		"./editor": {
-			"types": "./dist/editor/index.d.ts",
-			"default": "./dist/editor/index.js"
 		}
 	},
 	"files": [

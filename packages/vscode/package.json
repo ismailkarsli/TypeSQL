@@ -12,7 +12,7 @@
 		"url": "git+https://github.com/ismailkarsli/typesql.git",
 		"directory": "packages/vscode"
 	},
-	"homepage": "https://typesql.karsli.net/guide/editor",
+	"homepage": "https://typesql.karsli.net/guide/vscode",
 	"bugs": {
 		"url": "https://github.com/ismailkarsli/typesql/issues"
 	},
@@ -71,16 +71,17 @@
 		}
 	},
 	"scripts": {
-		"build": "tsc -p tsconfig.build.json",
+		"build": "esbuild src/extension.ts --bundle --platform=node --target=node22 --format=cjs --external:vscode --sourcemap --outfile=dist/extension.js",
 		"typecheck": "tsc -p tsconfig.json --noEmit",
 		"test": "vitest run",
-		"package": "tsc -p tsconfig.build.json && vsce package --no-dependencies --out typesql.vsix"
+		"package": "pnpm run build && vsce package --no-dependencies --out typesql.vsix"
 	},
 	"devDependencies": {
 		"@types/node": "^26.6.5",
 		"@types/vscode": "~1.101.0",
-		"@typesql/core": "workspace:*",
+		"@typesql/language-server": "workspace:*",
 		"@vscode/vsce": "^4.0.0",
+		"esbuild": "^0.28.2",
 		"ovsx": "^1.3.0",
 		"tm-grammars": "^1.32.22",
 		"typescript": "7.1.0-beta",

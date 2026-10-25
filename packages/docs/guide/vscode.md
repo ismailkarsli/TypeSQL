@@ -14,7 +14,7 @@ The extension is optional: errors, hovers and row types come from TypeScript, wi
 ## Setup
 
 1. Install the TypeSQL extension from the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=typesql.typesql) or [Open VSX](https://open-vsx.org/extension/typesql/typesql). Install the [TypeScript 7 extension](https://marketplace.visualstudio.com/items?itemName=TypeScriptTeam.native-preview) (`TypeScriptTeam.native-preview`) too.
-2. Have `@typesql/core` 0.4.0 or later in the project, directly or through an adapter (`@typesql/pg`, `@typesql/postgres`, `@typesql/kysely`, `@typesql/drizzle`, `@typesql/prisma`). The extension loads the project's own copy, so suggestions match the version the project checks with.
+2. Have `@typesql/core` 0.4.0 or later in the project, directly or through an adapter (`@typesql/pg`, `@typesql/postgres`, `@typesql/kysely`, `@typesql/drizzle`, `@typesql/prisma`).
 3. Run the language server on TypeScript 7.1 or later, as below.
 
 ### Use TypeScript 7.1
@@ -80,7 +80,7 @@ The extension asks the TypeScript language server that is already running (no se
 
 ## Troubleshooting
 
-- The **TypeSQL** output channel logs which `@typesql/core` and which TypeScript API client the extension loaded, slow requests and errors. It also says so when the language server runs TypeScript 7.0, or when no client matches it.
+- The **TypeSQL** output channel logs which `@typesql/core` and which TypeScript API client the extension uses, slow requests and errors. It also says so when the language server runs TypeScript 7.0, or when no client matches it.
 - Suggestions you see without the extension, such as words from open files (the `abc` icon), come from VS Code. `"editor.wordBasedSuggestions": "off"` turns them off.
 - With version 1.0 of the TypeScript 7 extension, the list also shows one item from TypeScript: the whole statement text, which would replace the string. That version doesn't let other extensions drop it; TypeScript 7.1's extension API does.
 - After installing or upgrading `@typesql/core` or `typescript`, run **TypeScript: Restart TS Server** so the extension looks them up again.

@@ -70,4 +70,4 @@ The number after the message is the position of the wrong token. [Errors and tro
 - [Parameters](./parameters): `$1`, `:name` and inline `${sql.param(value)}`.
 - [Inserting and updating](./writing-data): `INSERT`, `UPDATE`, `DELETE` and `RETURNING`.
 - [Dynamic SQL](./dynamic-sql): build statements from pieces.
-- [VS Code extension](./editor): completions and highlighting inside your SQL strings.
+- Editor support for [VS Code](./vscode), [Zed](./zed) and [Neovim](./neovim): completions and highlighting inside your SQL strings.

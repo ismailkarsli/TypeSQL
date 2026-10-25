@@ -1,7 +1,7 @@
 /**
  * TypeSQL for VS Code: completions inside `sql()` strings.
  *
- * Items come from `@typesql/core/editor` (the project's own copy) through an API session on the
+ * Items come from `@typesql/language-server` (bundled) through an API session on the
  * TypeScript 7 extension's language server, so they read the server's program without a second
  * process. Two ways in, depending on that extension's API:
  *
@@ -13,23 +13,24 @@
  * Anything that fails or takes longer than the budget adds nothing.
  */
 import * as path from "node:path";
-import type {
-	Completions,
-	CompletionItem as SqlItem,
-} from "@typesql/core/editor";
-import type { ExtensionAPI, TypeScriptSDK } from "typescript/vscode";
-import * as vscode from "vscode";
-import { mayBeInSqlLiteral } from "./literal.js";
-import { merge } from "./merge.js";
 import {
+	type Completions,
 	type Connector,
+	mayBeInSqlLiteral,
+	merge,
 	Session,
+	type CompletionItem as SqlItem,
 	type TypeScriptModules,
 	typescriptModules,
-} from "./session.js";
+} from "@typesql/language-server";
+import type { ExtensionAPI, TypeScriptSDK } from "typescript/vscode";
+import * as vscode from "vscode";
 
 const TYPESCRIPT_EXTENSION = "TypeScriptTeam.native-preview";
 const NIGHTLY_EXTENSION = "TypeScriptTeam.vscode-typescript-nightly";
+/** Logged when the language server runs TypeScript 7.0. */
+const UPGRADE =
+	'Install the "TypeScript 7 Nightly" extension, or set "js/ts.tsdk.path" to a TypeScript 7.1 package and allow it.';
 /** Milliseconds a request may take before it adds nothing. */
 const BUDGET_MS = 150;
 const LANGUAGES = [
@@ -85,7 +86,9 @@ export async function activate(
 	let session: Session | undefined;
 	const restart = (connector: Connector): void => {
 		const old = session;
-		session = new Session(connector, (m) => log.info(m));
+		session = new Session({ ...connector, upgrade: UPGRADE }, (m) =>
+			log.info(m),
+		);
 		void old?.close();
 	};
 	context.subscriptions.push({ dispose: () => void session?.close() });

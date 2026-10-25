@@ -31,38 +31,54 @@ are in [Type engine](../guide/type-engine.md). Versioning and publishing are in 
 
 `CacheVersion` (`packages/core/src/engine/cache.ts`) is a hash of core's type-level sources: a
 type cache entry made by another version is never used. After changing anything under
-`packages/core/src` (except `src/cache/`, `src/editor/` and `src/runtime/`), run
+`packages/core/src` (except `src/cache/` and `src/runtime/`), run
 `pnpm cache-version`; CI runs it with `--check`.
 
-## VS Code extension
+## Editor tooling
 
-`packages/vscode` is the extension behind [Editor completions](../guide/editor.md). It holds only
-the VS Code side and the SQL highlighting grammar; what to suggest is computed by `@typesql/core/editor`
-(`packages/core/src/editor/`), which the extension loads from the project being edited:
+Core has no editor code. Everything that does not depend on one editor is in
+`packages/language-server`; each editor's package holds only the glue for that editor:
+
+| Package | What it holds |
+|---|---|
+| `language-server` (`@typesql/language-server`) | The completions, the API session they run on, and `typesql-language-server`: a proxy in front of the project's `tsc --lsp --stdio` for editors whose extensions can't reach TypeScript's server (Zed, Neovim). |
+| `vscode` (`typesql`, private on npm) | `extension.ts`, which bundles `language-server`'s sources with esbuild, and the TextMate grammar that highlights SQL. |
+| `zed` (Zed's registry, not npm) | Rust compiled to WebAssembly that installs `@typesql/language-server` from npm and starts it with Zed's Node. |
+
+Neovim needs no package: [Neovim](../guide/neovim.md) shows the `vim.lsp.config` and the
+tree-sitter injection query to copy.
 
 | Module | What it does |
 |---|---|
-| `core/src/editor/scan.ts` | The scanner: what may be typed at the cursor (relation, columns of which FROM items, nothing). |
-| `core/src/editor/schema.ts` | Relations and columns of a `DB` type, read with the checker, columns only when asked for. |
-| `core/src/editor/call.ts` | The `sql()` / `tx()` / `sql.fragment()` / `sql.as()` literal at the cursor and its `DB` type. |
-| `core/src/editor/complete.ts` | `completionsAt`: the items and the LSP ranges they replace. |
-| `vscode/src/session.ts` | The API session on the TypeScript 7 language server, and the client matching its version. |
+| `language-server/src/complete/scan.ts` | The scanner: what may be typed at the cursor (relation, columns of which FROM items, nothing). |
+| `language-server/src/complete/schema.ts` | Relations and columns of a `DB` type, read with the checker, columns only when asked for. It reads core's schema representation (`$view`, `$types`, `$functions`, a column's `type`): keep it in step when that changes. |
+| `language-server/src/complete/call.ts` | The `sql()` / `tx()` / `sql.fragment()` / `sql.as()` literal at the cursor and its `DB` type. |
+| `language-server/src/complete/complete.ts` | `completionsAt`: the items and the LSP ranges they replace. |
+| `language-server/src/core.ts` | The project's `@typesql/core` directory, whose declarations mark core's `Sql` and `TransactionalSql`. |
+| `language-server/src/session.ts` | The API session on the TypeScript 7 language server, and the client matching its version. |
+| `language-server/src/proxy.ts` | The proxy: passes messages through, takes the root from `initialize`, adds our items to completion responses. |
 | `vscode/src/extension.ts` | The LSP middleware (TypeScript 7.1's extension API) or, on the TypeScript 7 extension 1.0, a completion provider of its own. |
 | `vscode/syntaxes/sql-injection.tmLanguage.json` | The TextMate grammar injected into TypeScript and JavaScript that highlights SQL in `sql()` literals; `vscode/test/grammar.test.ts` tokenizes it with vscode-textmate on VS Code's own TypeScript grammar. |
 
 ```sh
-pnpm vitest run packages/core/test/editor   # scanner cases, completions through tsc --lsp
-pnpm --filter typesql test                   # merging, module lookup, sessions through tsc --lsp
-pnpm --filter "typesql..." run build         # @typesql/core, then the extension
-pnpm --filter typesql run package            # packages/vscode/typesql.vsix
+pnpm --filter @typesql/language-server test   # scanner cases, completions, sessions and the proxy through tsc --lsp
+pnpm --filter @typesql/language-server build  # dist/bin.js, for Zed and Neovim
+pnpm --filter typesql test                    # the highlighting grammar
+pnpm --filter typesql run package             # packages/vscode/typesql.vsix, bundled with esbuild
+cargo check --manifest-path packages/zed/Cargo.toml
 ```
 
-To try a change, install `typesql.vsix` with **Extensions: Install from VSIX…** and reload the
-window; after changing `packages/core/src/editor/`, rebuild core and run **TypeScript: Restart TS
-Server** instead. The extension finds `@typesql/core/editor` by resolving it from the edited
-file, so try it in a project that has `@typesql/core` in `node_modules` (a workspace package such
-as `packages/pg`, or a scratch project with `node_modules/@typesql/core` linked to
-`packages/core`), not in `examples/`, which gets core through a tsconfig `paths` alias.
+To try a change:
+
+- **VS Code**: install `typesql.vsix` with **Extensions: Install from VSIX…** and reload the window.
+- **Zed**: run **zed: install dev extension** on `packages/zed` and point `lsp.typesql.binary` at
+  `packages/language-server/dist/bin.js` (see the guide's troubleshooting).
+- **Neovim**: set `cmd = { "node", "/path/to/packages/language-server/dist/bin.js" }`.
+
+Completions find the project's `@typesql/core` by resolving it from the edited file, so try them in
+a project that has `@typesql/core` in `node_modules` (a workspace package such as `packages/pg`, or
+a scratch project with `node_modules/@typesql/core` linked to `packages/core`), not in `examples/`,
+which gets core through a tsconfig `paths` alias.
 
 The language server must run TypeScript 7.1: version 1.0 of the TypeScript 7 extension bundles
 7.0, whose API cannot read the editor's program. `.vscode/settings.json` sets `js/ts.tsdk.path`

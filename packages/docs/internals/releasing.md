@@ -8,7 +8,7 @@ the `release` workflow through npm trusted publishing, publishes. Two scripts fi
 releases. See pnpm's [release management](https://pnpm.io/versioning) docs for the full model.
 
 The published packages are `@typesql/core`, `@typesql/pg`, `@typesql/postgres`,
-`@typesql/kysely`, `@typesql/drizzle` and `@typesql/prisma`. `@typesql/bench` and
+`@typesql/kysely`, `@typesql/drizzle`, `@typesql/prisma` and `@typesql/language-server`. `@typesql/bench` and
 `@typesql/docs` are private: they are never published, but they still get a version and a
 committed `CHANGELOG.md` whenever a package they depend on is released. The VS Code extension
 (`packages/vscode`, package name `typesql`) is private on npm too, and is published to the
@@ -94,7 +94,7 @@ up-to-date `main`, a signed commit, push, then `pnpm release`.
 After a run, check that every bumped version is live:
 
 ```sh
-for p in core pg postgres kysely drizzle prisma; do pnpm view @typesql/$p version; done
+for p in core pg postgres kysely drizzle prisma language-server; do pnpm view @typesql/$p version; done
 ```
 
 ## Trusted publishing
@@ -114,7 +114,7 @@ Setup, done once for this repository:
    the trust for every published package, in a terminal:
 
    ```sh
-   for p in core pg postgres kysely drizzle prisma; do
+   for p in core pg postgres kysely drizzle prisma language-server; do
      npm trust github @typesql/$p --file release.yml --repo ismailkarsli/typesql --env npm --allow-publish --yes
      sleep 2
    done
@@ -168,13 +168,13 @@ The extension in `packages/vscode` (`typesql.typesql`, marked preview) is versio
 packages but published by the `release` workflow's `extension` job, after `publish`:
 
 - **Versions.** Only an intent naming it releases it: `pnpm change typesql --bump patch --summary "…"`.
-  A release of `@typesql/core` does not bump it (core is only a devDependency: the extension loads
-  the project's copy of `@typesql/core/editor`). `pnpm check:intents` does not cover it, since it
-  is private on npm; add the intent with every user-facing change to `packages/vscode`.
+  A release of `@typesql/language-server` does not bump it, although the extension bundles that
+  package's sources: add a `typesql` intent too when a change to `packages/language-server` changes
+  what VS Code users see. `pnpm check:intents` does not cover it, since it is private on npm; add
+  the intent with every user-facing change to `packages/vscode`.
   `pnpm version -r` writes its committed `packages/vscode/CHANGELOG.md`, which the `.vsix` ships
   and the Marketplace shows. Both registries reject prerelease suffixes (`0.1.0-beta.1`).
-- **Publishing.** The job checks out the release commit, builds `@typesql/core` and the
-  extension, packages `typesql.vsix` and publishes it with `vsce publish --azure-credential` and
+- **Publishing.** The job checks out the release commit, builds the extension, packages `typesql.vsix` and publishes it with `vsce publish --azure-credential` and
   `ovsx publish --trusted-publishing`, both with `--skip-duplicate`: a run publishes the current
   version wherever it is missing and skips it elsewhere, so a failed job is retried with
   **Re-run failed jobs**, or by the next release. No token is stored: the Marketplace accepts a

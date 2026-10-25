@@ -1,6 +1,6 @@
 import type { Checker, Type } from "typescript/async";
 import { expect, test } from "vitest";
-import { schemaOf } from "../../src/editor/schema.js";
+import { schemaOf } from "../../src/complete/schema.js";
 
 test("the schema is read once per checker and DB type", async () => {
 	let reads = 0;

@@ -68,7 +68,7 @@ yarn add -D typescript@7.1.0-beta
 
 :::
 
-Your editor should check the project with TypeScript 7.1 as well. [VS Code extension](./editor#setup) shows how to point VS Code at it.
+Your editor should check the project with TypeScript 7.1 as well. [VS Code extension](./vscode#setup) shows how to point VS Code at it.
 
 ## Using Kysely, Drizzle or Prisma
 
@@ -84,7 +84,7 @@ See [From Kysely, Drizzle or Prisma](./orms).
 
 ## Editor extension (optional)
 
-The [VS Code extension](./editor) completes table and column names inside your SQL strings and highlights the SQL. Types and errors work without it.
+The [VS Code extension](./vscode), and `@typesql/language-server` in [Zed](./zed) and [Neovim](./neovim), complete table and column names inside your SQL strings and highlight the SQL. Types and errors work without them.
 
 ## Next
 

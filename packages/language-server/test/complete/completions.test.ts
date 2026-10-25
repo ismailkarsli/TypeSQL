@@ -8,13 +8,17 @@ import { pathToFileURL } from "node:url";
 import { SyntaxKind } from "typescript/ast";
 import type { API } from "typescript/async";
 import { afterAll, beforeAll, expect, test } from "vitest";
+import { type Lsp, startLsp } from "../../../core/test/cache/lsp.js";
+import {
+	type TempProject,
+	tempProject,
+	tsconfig,
+} from "../../../core/test/cache/project.js";
 import {
 	type Completions,
 	completionsAt,
 	editorKinds,
-} from "../../src/editor/index.js";
-import { type Lsp, startLsp } from "../cache/lsp.js";
-import { type TempProject, tempProject, tsconfig } from "../cache/project.js";
+} from "../../src/complete/index.js";
 
 const packages = resolve(import.meta.dirname, "../../..");
 

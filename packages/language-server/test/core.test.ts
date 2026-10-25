@@ -10,10 +10,10 @@ import Module from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterAll, beforeAll, expect, test } from "vitest";
-import { editorPath, Loader } from "../src/load.js";
+import { CorePaths, corePackage } from "../src/core.js";
 
 // pnpm's bin shims set NODE_PATH to the workspace's packages, where Node would find @typesql/core
-// from anywhere; the extension host has no such NODE_PATH
+// from anywhere; the editor has no such NODE_PATH
 const nodePath = process.env.NODE_PATH;
 const initPaths = (): void =>
 	(Module as unknown as { _initPaths(): void })._initPaths();
@@ -22,7 +22,9 @@ beforeAll(() => {
 	initPaths();
 });
 
-const root = realpathSync(mkdtempSync(join(tmpdir(), "typesql-vscode-")));
+const root = realpathSync(
+	mkdtempSync(join(tmpdir(), "typesql-language-server-")),
+);
 afterAll(() => {
 	rmSync(root, { recursive: true, force: true });
 	process.env.NODE_PATH = nodePath;
@@ -41,16 +43,13 @@ const pkg = (dir: string, name: string, exports: object): void => {
 	for (const target of Object.values(exports) as { default: string }[])
 		write(join(dir, target.default), "export {};\n");
 };
-const CORE = {
-	".": { default: "./dist/index.js" },
-	"./editor": { default: "./dist/editor/index.js" },
-};
+const CORE = { ".": { default: "./dist/index.js" } };
 
 test("@typesql/core next to the project", () => {
 	pkg("app/node_modules/@typesql/core", "@typesql/core", CORE);
 	write("app/src/q.ts", "");
-	expect(editorPath(join(root, "app/src/q.ts"))).toBe(
-		join(root, "app/node_modules/@typesql/core/dist/editor/index.js"),
+	expect(corePackage(join(root, "app/src/q.ts"))).toBe(
+		join(root, "app/node_modules/@typesql/core"),
 	);
 });
 
@@ -67,42 +66,41 @@ test("@typesql/core only as an adapter's dependency (pnpm layout)", () => {
 		"dir",
 	);
 	write("pnpm-app/src/q.ts", "");
-	expect(editorPath(join(root, "pnpm-app/src/q.ts"))).toBe(
-		join(
-			root,
-			"store/@typesql/pg/node_modules/@typesql/core/dist/editor/index.js",
-		),
+	expect(corePackage(join(root, "pnpm-app/src/q.ts"))).toBe(
+		join(root, "store/@typesql/pg/node_modules/@typesql/core"),
 	);
 });
 
-test("an older @typesql/core without the editor export, or none", () => {
-	pkg("old/node_modules/@typesql/core", "@typesql/core", {
-		".": { default: "./dist/index.js" },
-	});
-	write("old/src/q.ts", "");
-	expect(editorPath(join(root, "old/src/q.ts"))).toBeNull();
+test("no @typesql/core", () => {
 	write("none/src/q.ts", "");
-	expect(editorPath(join(root, "none/src/q.ts"))).toBeNull();
+	expect(corePackage(join(root, "none/src/q.ts"))).toBeNull();
 });
 
-test("Loader: one load per directory and one import per module path; a log line for each", async () => {
+test("CorePaths: one lookup per directory, a log line per package; paths in its dist and src", () => {
 	pkg("multi/node_modules/@typesql/core", "@typesql/core", CORE);
 	write("multi/a/q.ts", "");
 	write("multi/b/q.ts", "");
 	write("missing/q.ts", "");
 	const log: string[] = [];
-	const loader = new Loader((m) => log.push(m));
-	const a = loader.load(join(root, "multi/a/q.ts"));
-	expect(loader.load(join(root, "multi/a/r.ts"))).toBe(a);
-	const b = loader.load(join(root, "multi/b/q.ts"));
+	const cores = new CorePaths((m) => log.push(m));
+	const a = cores.for(join(root, "multi/a/q.ts"));
+	expect(cores.for(join(root, "multi/a/r.ts"))).toBe(a);
+	const b = cores.for(join(root, "multi/b/q.ts"));
 	expect(b).not.toBe(a);
-	const [ma, mb] = await Promise.all([a, b]);
-	expect(ma).not.toBeNull();
-	expect(mb).toBe(ma);
-	expect(await loader.load(join(root, "missing/q.ts"))).toBeNull();
-	expect(await loader.load(join(root, "missing/r.ts"))).toBeNull();
+	expect(cores.for(join(root, "missing/q.ts"))).toBeNull();
+	expect(cores.for(join(root, "missing/r.ts"))).toBeNull();
 	expect(log).toEqual([
-		`loading ${join(root, "multi/node_modules/@typesql/core/dist/editor/index.js")}`,
-		`no @typesql/core with an "./editor" export found from ${join(root, "missing")}`,
+		`using @typesql/core at ${join(root, "multi/node_modules/@typesql/core")}`,
+		`no @typesql/core found from ${join(root, "missing")}`,
 	]);
+	const core = join(root, "multi/node_modules/@typesql/core");
+	expect(
+		[
+			"dist/index.d.ts",
+			"src/query.ts",
+			"package.json",
+			"distant/x.d.ts",
+			"../core2/dist/x.d.ts",
+		].map((f) => a?.(join(core, f))),
+	).toEqual([true, true, false, false, false]);
 });

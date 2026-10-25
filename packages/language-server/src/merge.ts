@@ -7,15 +7,15 @@
  */
 
 import type {
-	Completions,
-	CompletionItem as SqlItem,
-} from "@typesql/core/editor";
-import type {
 	CompletionItem,
 	CompletionItemKind,
 	CompletionList,
 	Range,
 } from "typescript/vscode";
+import type {
+	Completions,
+	CompletionItem as SqlItem,
+} from "./complete/index.js";
 
 type Result = CompletionItem[] | CompletionList | null;
 

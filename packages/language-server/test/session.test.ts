@@ -1,4 +1,4 @@
-/** `Session` against `tsc --lsp`, connected the way the TypeScript 7 extension 1.0 allows. */
+/** `Session` against `tsc --lsp`, connected through `custom/initializeAPISession` as the proxy and the TypeScript 7 extension 1.0 do. */
 import { join } from "node:path";
 import { afterAll, beforeAll, expect, test } from "vitest";
 import { type Lsp, startLsp } from "../../core/test/cache/lsp.js";
@@ -68,9 +68,7 @@ test("completions through the server's snapshot, with the project's own @typesql
 	});
 	const r = await session.complete(uri, position(text, offset), text);
 	expect(r?.items.map((i) => i.label)).toEqual(["id", "email", "name"]);
-	expect(logs).toContain(
-		`loading ${join(p.corePackage, "dist/editor/index.js")}`,
-	);
+	expect(logs).toContain(`using @typesql/core at ${p.corePackage}`);
 });
 
 test("the editor's text when the server has not seen the latest edit", async () => {
@@ -115,41 +113,46 @@ test("outside a statement literal, and for files without @typesql/core", async (
 });
 
 test("a TypeScript 7.0 server: one log line saying what to install, then no requests", async () => {
-	let snapshots = 0;
-	const api = {
-		fromLSPConnection: async () => ({
-			getCurrentLanguageServerSnapshot: async () => {
-				snapshots++;
-				throw new Error(
-					'api: invalid request: unknown API method "getCurrentLanguageServerSnapshot"',
-				);
+	for (const upgrade of [
+		'Install the "TypeScript 7 Nightly" extension.',
+		undefined,
+	]) {
+		let snapshots = 0;
+		const api = {
+			fromLSPConnection: async () => ({
+				getCurrentLanguageServerSnapshot: async () => {
+					snapshots++;
+					throw new Error(
+						'api: invalid request: unknown API method "getCurrentLanguageServerSnapshot"',
+					);
+				},
+				close: async () => {},
+			}),
+		};
+		const log: string[] = [];
+		const s = new Session(
+			{
+				pipe: async () => "pipe",
+				modules: () => [
+					async () => ({
+						API: api as never,
+						SyntaxKind: {},
+						dir: "/ts",
+						version: "7.0.2",
+					}),
+				],
+				...(upgrade === undefined ? {} : { upgrade }),
 			},
-			close: async () => {},
-		}),
-	};
-	const log: string[] = [];
-	const s = new Session(
-		{
-			pipe: async () => "pipe",
-			modules: () => [
-				async () => ({
-					API: api as never,
-					SyntaxKind: {},
-					dir: "/ts",
-					version: "7.0.2",
-				}),
-			],
-		},
-		(m) => log.push(m),
-	);
-	const uri = lsp.uri("src/a.ts");
-	expect(await s.complete(uri, { line: 1, character: 14 })).toBeNull();
-	expect(await s.complete(uri, { line: 1, character: 14 })).toBeNull();
-	expect(snapshots).toBe(1);
-	expect(log.filter((l) => l.includes("TypeScript 7.0"))).toHaveLength(1);
-	expect(log.find((l) => l.includes("TypeScript 7.0"))).toContain(
-		"TypeScript 7 Nightly",
-	);
+			(m) => log.push(m),
+		);
+		const uri = lsp.uri("src/a.ts");
+		expect(await s.complete(uri, { line: 1, character: 14 })).toBeNull();
+		expect(await s.complete(uri, { line: 1, character: 14 })).toBeNull();
+		expect(snapshots).toBe(1);
+		expect(log.filter((l) => l.includes("TypeScript 7.0"))).toEqual([
+			`the language server runs TypeScript 7.0, whose API cannot read the editor's program: completions need TypeScript 7.1.${upgrade ? ` ${upgrade}` : ""}`,
+		]);
+	}
 });
 
 test("an API client that does not match the server is skipped for the next one", async () => {

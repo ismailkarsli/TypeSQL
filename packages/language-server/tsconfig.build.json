@@ -9,7 +9,7 @@
 		"noEmit": false,
 		"declaration": false,
 		"declarationMap": false,
-		"types": ["node", "vscode"]
+		"types": ["node"]
 	},
 	"include": ["src"]
 }

@@ -63,7 +63,11 @@ export default defineConfig({
 			},
 			{
 				text: "Editor",
-				items: [{ text: "VS Code extension", link: "/guide/editor" }],
+				items: [
+					{ text: "VS Code", link: "/guide/vscode" },
+					{ text: "Zed", link: "/guide/zed" },
+					{ text: "Neovim", link: "/guide/neovim" },
+				],
 			},
 			{
 				text: "Going further",

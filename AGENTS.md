@@ -19,7 +19,7 @@ pnpm check:intents
 
 ## Type cache version
 
-After changing `packages/core/src` (except `src/cache/`, `src/editor/` and `src/runtime/`), run
+After changing `packages/core/src` (except `src/cache/` and `src/runtime/`), run
 `pnpm cache-version` and commit the updated `CacheVersion`. CI checks it.
 
 ## PostgreSQL regression tests

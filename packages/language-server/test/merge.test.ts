@@ -1,5 +1,5 @@
-import type { Completions } from "@typesql/core/editor";
 import { expect, test } from "vitest";
+import type { Completions } from "../src/complete/index.js";
 import { merge } from "../src/merge.js";
 
 const pos = (line: number, character: number) => ({ line, character });

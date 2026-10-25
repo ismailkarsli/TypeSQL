@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { contextAt, type ScopeItem } from "../../src/editor/scan.js";
+import { contextAt, type ScopeItem } from "../../src/complete/scan.js";
 
 /** The context at `|`, written short: `none`, `relation [schema]`, `columns <sources> [| aliases]`. */
 function at(marked: string): string {

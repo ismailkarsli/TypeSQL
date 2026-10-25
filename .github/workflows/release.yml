@@ -117,7 +117,7 @@ jobs:
           node-version: 26
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      # the extension compiles against @typesql/core's built types
+      # the extension bundles @typesql/language-server's sources
       - run: pnpm --filter "typesql..." run build
       - run: pnpm exec vsce package --no-dependencies --out typesql.vsix
       - uses: azure/login@v2
