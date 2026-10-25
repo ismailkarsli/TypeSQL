@@ -243,3 +243,52 @@ test("*, DISTINCT, FILTER and OVER need an aggregate; a window function needs OV
 		]
 	>().toEqualTypeOf<["ok", "ok", "ok"]>();
 });
+
+test("grouping sets: a column a set leaves out is NULL there; the empty set is a row even for no input", () => {
+	expectTypeOf<
+		Row<"SELECT email, count(*) AS n, sum(id) AS s, max(1) AS m FROM users GROUP BY ROLLUP (email)">
+	>().toEqualTypeOf<{
+		email: string | null;
+		n: string;
+		s: string | null;
+		m: number | null;
+	}>();
+	expectTypeOf<
+		Row<"SELECT id, email FROM users GROUP BY CUBE (id, email)">
+	>().toEqualTypeOf<{ id: number | null; email: string | null }>();
+	expectTypeOf<
+		Row<"SELECT id, email FROM users GROUP BY ROLLUP (id), CUBE (email)">
+	>().toEqualTypeOf<{ id: number | null; email: string | null }>();
+	expectTypeOf<
+		Row<"SELECT id FROM users GROUP BY GROUPING SETS ((id), ())">
+	>().toEqualTypeOf<{ id: number | null }>();
+	// GROUPING SETS before or after a ROLLUP: every column
+	expectTypeOf<
+		Row<"SELECT id, email FROM users GROUP BY GROUPING SETS ((id), ()), ROLLUP (email)">
+	>().toEqualTypeOf<{ id: number | null; email: string | null }>();
+	expectTypeOf<
+		Row<"SELECT id, email FROM users GROUP BY ROLLUP (email), GROUPING SETS ((id), ())">
+	>().toEqualTypeOf<{ id: number | null; email: string | null }>();
+	expectTypeOf<
+		Row<"SELECT sum(id) AS s FROM users GROUP BY ()">
+	>().toEqualTypeOf<{ s: string | null }>();
+	// a plain item is in every set (and see distinct-order.test-d.ts); a column of the level by
+	// name, qualified or not
+	expectTypeOf<
+		Row<"SELECT u.email FROM users u GROUP BY u.id, ROLLUP (email)">
+	>().toEqualTypeOf<{ email: string | null }>();
+	expectTypeOf<
+		Row<"SELECT p.title, u.email FROM users u JOIN posts p ON p.author_id = u.id GROUP BY u.email, ROLLUP (p.title)">
+	>().toEqualTypeOf<{ title: string | null; email: string }>();
+	// an output name or an expression: every column may be left out
+	expectTypeOf<
+		Row<"SELECT lower(email) AS e, id FROM users GROUP BY id, ROLLUP (e)">
+	>().toEqualTypeOf<{ e: string | null; id: number | null }>();
+	expectTypeOf<
+		Row<"SELECT id, email FROM users GROUP BY id, ROLLUP ((email, id))">
+	>().toEqualTypeOf<{ id: number | null; email: string | null }>();
+	// without grouping sets every group has its columns, and no group is empty
+	expectTypeOf<
+		Row<"SELECT id, email FROM users GROUP BY id, email">
+	>().toEqualTypeOf<{ id: number; email: string }>();
+});

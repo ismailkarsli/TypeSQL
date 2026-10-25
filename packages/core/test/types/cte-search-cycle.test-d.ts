@@ -27,6 +27,24 @@ test("added columns", () => {
 	expectTypeOf<
 		Row<Rec<"CYCLE n SET c TO 1 DEFAULT 0 USING p SELECT c FROM t">>
 	>().toEqualTypeOf<{ c: number }>();
+	// a string literal yields to the other value; a value of type unknown yields too, but not to
+	// NULL or another unknown: then the mark is text
+	expectTypeOf<
+		Row<Rec<"CYCLE n SET c TO '1' DEFAULT 0 USING p SELECT c FROM t">>
+	>().toEqualTypeOf<{ c: number }>();
+	expectTypeOf<
+		Row<
+			Rec<"CYCLE n SET c TO unknown 'a' DEFAULT unknown 'b' USING p SELECT c FROM t">
+		>
+	>().toEqualTypeOf<{ c: string }>();
+	expectTypeOf<
+		Row<
+			Rec<"CYCLE n SET c TO NULL DEFAULT unknown 'b' USING p SELECT c FROM t">
+		>
+	>().toEqualTypeOf<{ c: string }>();
+	expectTypeOf<
+		Row<Rec<"CYCLE n SET c TO 'a' DEFAULT unknown 'b' USING p SELECT c FROM t">>
+	>().toEqualTypeOf<{ c: string }>();
 	expectTypeOf<
 		Row<
 			Rec<"SEARCH DEPTH FIRST BY n SET ord CYCLE n SET c USING p SELECT * FROM t">
@@ -67,6 +85,41 @@ test("errors", () => {
 	>().toEqualTypeOf<
 		SqlError<'cycle column "foo" not in WITH query column list', 24>
 	>();
+	// (with a recursive term that does not name n, which would be ambiguous first)
+	expectTypeOf<
+		V<"WITH RECURSIVE t(n) AS (SELECT 1 UNION ALL SELECT 2 FROM t WHERE false) CYCLE n SET n USING p SELECT 1 FROM t">
+	>().toEqualTypeOf<
+		SqlError<
+			'cycle mark column name "n" already used in WITH query column list',
+			4
+		>
+	>();
+	expectTypeOf<
+		V<"WITH RECURSIVE t(n) AS (SELECT 1 UNION ALL SELECT 2 FROM t WHERE false) CYCLE n SET c USING n SELECT 1 FROM t">
+	>().toEqualTypeOf<
+		SqlError<
+			'cycle path column name "n" already used in WITH query column list',
+			4
+		>
+	>();
+	expectTypeOf<
+		V<
+			Rec<"SEARCH DEPTH FIRST BY n SET s CYCLE n SET s USING p SELECT * FROM t">
+		>
+	>().toEqualTypeOf<
+		SqlError<
+			"search sequence column name and cycle mark column name are the same",
+			0
+		>
+	>();
+	// the SEARCH clause is checked first
+	expectTypeOf<
+		V<
+			Rec<"SEARCH DEPTH FIRST BY foo SET s CYCLE bar SET c USING p SELECT * FROM t">
+		>
+	>().toEqualTypeOf<
+		SqlError<'search column "foo" not in WITH query column list', 27>
+	>();
 	expectTypeOf<V<Rec<"CYCLE n SET c USING c SELECT * FROM t">>>().toEqualTypeOf<
 		SqlError<
 			"cycle mark column name and cycle path column name are the same",
@@ -95,6 +148,66 @@ test("errors", () => {
 	>().toEqualTypeOf<
 		SqlError<"could not identify an equality operator for type point", 0>
 	>();
+	// types without an equality operator (no default btree or hash operator class) or without <>
+	type Mark<T extends string, L extends string> = V<
+		Rec<`CYCLE n SET c TO ${T} '${L}' DEFAULT ${T} '${L}' USING p SELECT * FROM t`>
+	>;
+	expectTypeOf<
+		[
+			Mark<"polygon", "((0,0),(1,1),(1,0))">,
+			Mark<"json", "1">,
+			Mark<"xml", "<a/>">,
+			Mark<"box", "(0,0),(1,1)">,
+			Mark<"circle", "<(0,0),1>">,
+			Mark<"jsonpath", "$">,
+			Mark<"line", "{1,1,1}">,
+			Mark<"lseg", "[(0,0),(1,1)]">,
+			Mark<"path", "((0,0),(1,1))">,
+			Mark<"pg_snapshot", "10:20:">,
+			Mark<"refcursor", "a">,
+			Mark<"txid_snapshot", "10:20:">,
+		]
+	>().toEqualTypeOf<
+		[
+			SqlError<"could not identify an equality operator for type polygon", 0>,
+			SqlError<"could not identify an equality operator for type json", 0>,
+			SqlError<"could not identify an equality operator for type xml", 0>,
+			SqlError<"could not identify an equality operator for type box", 0>,
+			SqlError<"could not identify an equality operator for type circle", 0>,
+			SqlError<"could not identify an equality operator for type jsonpath", 0>,
+			SqlError<"could not identify an equality operator for type line", 0>,
+			SqlError<"could not identify an equality operator for type lseg", 0>,
+			SqlError<"could not identify an equality operator for type path", 0>,
+			SqlError<
+				"could not identify an equality operator for type pg_snapshot",
+				0
+			>,
+			SqlError<"could not identify an equality operator for type refcursor", 0>,
+			SqlError<
+				"could not identify an equality operator for type txid_snapshot",
+				0
+			>,
+		]
+	>();
+	expectTypeOf<
+		[Mark<"aclitem", "postgres=r/postgres">, Mark<"cid", "1">]
+	>().toEqualTypeOf<
+		[
+			SqlError<"could not identify an inequality operator for type aclitem", 0>,
+			SqlError<"could not identify an inequality operator for type cid", 0>,
+		]
+	>();
+	// jsonb, ranges, varchar, regclass, money compare
+	expectTypeOf<
+		[
+			Row<
+				Rec<"CYCLE n SET c TO jsonb '1' DEFAULT jsonb '2' USING p SELECT c FROM t">
+			>,
+			Row<
+				Rec<"CYCLE n SET c TO int4range '[1,2)' DEFAULT int4range '[1,3)' USING p SELECT c FROM t">
+			>,
+		]
+	>().toEqualTypeOf<[{ c: unknown }, { c: string }]>();
 	// TO / DEFAULT are constants
 	expectTypeOf<
 		V<Rec<"CYCLE n SET c TO -1 DEFAULT 0 USING p SELECT * FROM t">>

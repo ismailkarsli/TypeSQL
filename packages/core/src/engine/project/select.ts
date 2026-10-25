@@ -7,6 +7,7 @@ import type {
 	NamedWindow,
 	SelectBody,
 	SelectStmt,
+	SetOp,
 	Target,
 	WithClause,
 } from "../ast.js";
@@ -92,23 +93,22 @@ export type ProjectSelectParts<
 /**
  * Add the CTEs of a WITH clause to the CTE map. Each CTE sees the previous ones (and
  * shadows an outer CTE or table of the same name); a RECURSIVE CTE also sees itself.
+ * Without a WITH clause the list of CTEs is `never`, which binds none.
  */
 export type BindWith<
 	W extends WithClause | null,
 	DB,
 	Outer extends Scope,
 	Ctes extends CteMap,
-> = W extends null
-	? Ctes
-	: BindCtes<
-			NonNullable<W>["ctes"],
-			NonNullable<W>["recursive"],
-			DB,
-			Outer,
-			Ctes,
-			never,
-			0
-		>;
+> = BindCtes<
+	NonNullable<W>["ctes"],
+	NonNullable<W>["recursive"],
+	DB,
+	Outer,
+	Ctes,
+	never,
+	0
+>;
 
 type BindCtes<
 	Cs extends readonly Cte[],
@@ -139,13 +139,11 @@ type BindCtes<
 				: M
 			: never;
 
-type AddCte<
-	Ctes extends CteMap,
-	N extends string,
-	M extends ColMap,
-> = N extends keyof Ctes
-	? Omit<Ctes, N> & { readonly [K in N]: M }
-	: Ctes & { readonly [K in N]: M };
+/** Add (or replace: an inner WITH shadows an outer CTE of the same name) the CTE `N`. */
+type AddCte<Ctes extends CteMap, N extends string, M extends ColMap> = Omit<
+	Ctes,
+	N
+> & { readonly [K in N]: M };
 
 type BindCte<
 	C extends Cte,
@@ -158,8 +156,10 @@ type BindCte<
 			readonly t: "select";
 			readonly body: { readonly t: "setop" };
 		}
-		? C extends { readonly search: null; readonly cycle: null }
-			? RecursiveCte<
+		? CheckExpandable<
+				C,
+				C["q"]["body"],
+				RecursiveCte<
 					C["name"],
 					C["cols"],
 					C["q"]["with"],
@@ -168,25 +168,10 @@ type BindCte<
 					DB,
 					Outer,
 					Ctes,
-					null,
-					null
+					C["search"],
+					C["cycle"]
 				>
-			: CheckExpandable<C["q"]["body"]> extends infer E
-				? E extends AnyErr
-					? E
-					: RecursiveCte<
-							C["name"],
-							C["cols"],
-							C["q"]["with"],
-							C["q"]["body"],
-							C["q"]["orderBy"],
-							DB,
-							Outer,
-							Ctes,
-							C["search"],
-							C["cycle"]
-						>
-				: never
+			>
 		: NotRecursive<C, ProjectCteBody<C, DB, Outer, Ctes>>
 	: NotRecursive<C, ProjectCteBody<C, DB, Outer, Ctes>>;
 
@@ -225,28 +210,33 @@ type NotRecursive<C extends Cte, R> = C extends {
 }
 	? R
 	: SqlError<"WITH query is not recursive", null>;
-/** The recursive term and the non-recursive term must both be plain SELECTs (not set operations). */
-type CheckExpandable<B extends SelectBody> = B extends { readonly t: "setop" }
-	? IsSetLeaf<B["l"]> extends false
+/**
+ * `R`, the recursive CTE `C` with the UNION `B`; with SEARCH or CYCLE, the recursive term and the
+ * non-recursive term must both be plain SELECTs (not set operations).
+ */
+type CheckExpandable<C extends Cte, B extends SetOp, R> = C extends {
+	readonly search: null;
+	readonly cycle: null;
+}
+	? R
+	: B["l"] extends SetOperand
 		? SqlError<
 				"with a SEARCH or CYCLE clause, the left side of the UNION must be a SELECT",
 				null
 			>
-		: IsSetLeaf<B["r"]> extends false
+		: B["r"] extends SetOperand
 			? SqlError<
 					"with a SEARCH or CYCLE clause, the right side of the UNION must be a SELECT",
 					null
 				>
-			: true
-	: true;
-type IsSetLeaf<B> = B extends { readonly t: "setop" }
-	? false
-	: B extends {
-				readonly t: "paren";
-				readonly q: { readonly body: { readonly t: "setop" } };
-			}
-		? false
-		: true;
+			: R;
+/** A set operation, parenthesized or not. */
+type SetOperand =
+	| { readonly t: "setop" }
+	| {
+			readonly t: "paren";
+			readonly q: { readonly body: { readonly t: "setop" } };
+	  };
 type CheckCteColList<
 	Cols extends readonly string[],
 	M extends ColMap,
@@ -261,14 +251,14 @@ type CheckCteColList<
 			? SqlError<`${What} column "${H}" specified more than once`, null>
 			: CheckCteColList<R, M, What, Seen | H>
 		: SqlError<`${What} column "${H}" not in WITH query column list`, null>
-	: true;
+	: true; // type-mutate: equivalent bool-flip – the callers only look for an error
 /** The columns SEARCH and CYCLE add (`{}` without them), or an error. `M`: the CTE's columns. */
 type SearchCycleCols<S, Y, M extends ColMap> =
 	SearchCols<S, M> extends infer SC
 		? SC extends AnyErr
 			? SC
 			: CycleCols<Y, S, M> extends infer YC
-				? YC extends AnyErr
+				? YC extends AnyErr // type-mutate: equivalent cond-false – merged with the search columns, the error keeps its message and position, all an error is read for
 					? YC
 					: SC & YC extends infer All
 						? { readonly [K in keyof All]: All[K] }
@@ -329,36 +319,64 @@ type CycleCols<Y, S, M extends ColMap> = Y extends CteCycle
 									: never
 		: never
 	: {};
-/** `TO v DEFAULT d`: their common type (string literals yield; two of them are text), which needs an equality operator. */
-type CycleMarkType<To, Def> = To extends Expr
-	? Def extends Expr
-		? ConstType<To> extends infer A extends string
-			? ConstType<Def> extends infer B extends string
-				? CommonLit<A, B> extends infer T extends string
-					? T extends "unknown"
-						? A | B extends "unknown" | "null" | "lit"
-							? "text"
-							: SqlError<
-									`CYCLE types ${TypeDisplay<A>} and ${TypeDisplay<B>} cannot be matched`,
-									null
-								>
-						: LitToText<T> extends "point" | "polygon" | "json" | "xml"
+/**
+ * `TO v DEFAULT d`: their common type (string literals yield; two of them are text; with a value
+ * of type `unknown`, which yields to anything but `unknown` and NULL, it is text too), which
+ * needs an equality and an inequality operator.
+ */
+type CycleMarkType<To, Def> = [To, Def] extends [
+	infer V extends Expr,
+	infer D extends Expr,
+]
+	? ConstType<V> extends infer A extends string
+		? ConstType<D> extends infer B extends string
+			? CommonLit<A, B> extends infer T extends string
+				? T extends "unknown"
+					? B extends "unknown"
+						? "text"
+						: SqlError<
+								`CYCLE types ${TypeDisplay<A>} and ${TypeDisplay<B>} cannot be matched`,
+								null
+							>
+					: LitToText<T> extends NoEquality
+						? SqlError<
+								`could not identify an equality operator for type ${LitToText<T>}`,
+								null
+							>
+						: LitToText<T> extends "aclitem" | "cid"
 							? SqlError<
-									`could not identify an equality operator for type ${LitToText<T>}`,
+									`could not identify an inequality operator for type ${LitToText<T>}`,
 									null
 								>
 							: LitToText<T>
-					: never
 				: never
 			: never
-		: "bool"
+		: never
 	: "bool";
+/** The types a constant can have that have no default btree or hash operator class (pg_opclass, PostgreSQL 18). */
+type NoEquality =
+	| "box"
+	| "circle"
+	| "json"
+	| "jsonpath"
+	| "line"
+	| "lseg"
+	| "path"
+	| "pg_snapshot"
+	| "point"
+	| "polygon"
+	| "refcursor"
+	| "txid_snapshot"
+	| "xml";
 type ConstType<E extends Expr> = E extends { readonly t: "str" }
 	? "lit"
-	: TypeOf<E, MkCtx<unknown, [], {}, false>> extends infer T
+	: TypeOf<
+				E,
+				MkCtx<unknown, [], {}, false> // type-mutate: equivalent bool-flip – a constant has no aggregate, the only thing grouped changes
+			> extends infer T
 		? T extends ColInfo
 			? T["type"]
-			: "unknown"
+			: "unknown" // type-mutate: equivalent never-false – TypeOf of a constant is a type
 		: never;
 
 /** `WITH a(x, y) AS (...)`: rename positionally; more names than columns is an error. */
@@ -379,57 +397,49 @@ type RecursiveCte<
 	Name extends string,
 	Names extends readonly string[] | null,
 	W extends WithClause | null,
-	B extends SelectBody,
+	B extends SetOp,
 	Order extends readonly Expr[],
 	DB,
 	Outer extends Scope,
 	Ctes extends CteMap,
 	S,
 	Y,
-> = B extends { readonly t: "setop" }
-	? ProjectBody<B["l"], DB, Outer, Ctes, [], false> extends infer C0
-		? C0 extends Cols
-			? ApplyCteCols<C0, Names, Name> extends infer C1
-				? C1 extends Cols
-					? S | Y extends null
-						? RecursiveFix<
-								Name,
-								Names,
-								W,
-								B,
-								Order,
-								DB,
-								Outer,
-								Ctes,
-								ColsToMap<C1>,
-								ColsToMap<C1>,
-								[0],
-								null
-							>
-						: SearchCycleCols<S, Y, ColsToMap<C1>> extends infer X
-							? X extends ColMap
-								? RecursiveFix<
-										Name,
-										Names,
-										W,
-										B,
-										Order,
-										DB,
-										Outer,
-										Ctes,
-										ColsToMap<C1>,
-										ColsToMap<C1>,
-										[0],
-										X
-									>
-								: X
-							: never
-					: C1
+> =
+	BindWith<W, DB, Outer, Ctes> extends infer C2
+		? C2 extends CteMap
+			? ProjectBody<B["l"], DB, Outer, C2, [], false> extends infer C0
+				? C0 extends Cols
+					? ApplyCteCols<C0, Names, Name> extends infer C1
+						? C1 extends Cols
+							? SearchCycleCols<S, Y, ColsToMap<C1>> extends infer X
+								? X extends ColMap
+									? RecursiveFix<
+											Name,
+											Names,
+											W,
+											B,
+											Order,
+											DB,
+											Outer,
+											Ctes,
+											ColsToMap<C1>,
+											ColsToMap<C1>,
+											[0],
+											X
+										>
+									: X
+								: never
+							: C1
+						: never
+					: C0
 				: never
-			: C0
-		: never
-	: never;
-/** `X`: the SEARCH / CYCLE columns (or null), added to the self reference and the result. */
+			: C2
+		: never;
+/**
+ * One step of the fixpoint: the whole UNION with the self reference typed `M`. Each step can
+ * only make columns nullable, so it ends; after four steps every column is typed nullable.
+ * `X`: the SEARCH / CYCLE columns (`{}` without them), added to the self reference and the result.
+ */
 type RecursiveFix<
 	Name extends string,
 	Names extends readonly string[] | null,
@@ -442,7 +452,7 @@ type RecursiveFix<
 	M0 extends ColMap,
 	M extends ColMap,
 	Iter extends readonly unknown[],
-	X,
+	X extends ColMap,
 > =
 	ProjectSelectParts<
 		W,
@@ -450,20 +460,16 @@ type RecursiveFix<
 		Order,
 		DB,
 		Outer,
-		AddCte<Ctes, Name, X extends ColMap ? WithExtra<M, X> : M>
+		AddCte<Ctes, Name, WithExtra<M, X>>
 	> extends infer Full
 		? Full extends Cols
 			? ApplyCteCols<Full, Names, Name> extends infer F2
 				? F2 extends Cols
 					? FixStep<M0, ColsToMap<F2>> extends infer Next extends ColMap
-						? SameNullability<M, Next> extends true
-							? X extends ColMap
-								? WithExtra<Next, X>
-								: Next
-							: Iter["length"] extends 3
-								? X extends ColMap
-									? WithExtra<Next, X>
-									: Next
+						? [Changed<M, Next>] extends [never]
+							? WithExtra<Next, X>
+							: Iter["length"] extends 4
+								? WithExtra<NullableMap<Next>, X>
 								: RecursiveFix<
 										Name,
 										Names,
@@ -479,32 +485,26 @@ type RecursiveFix<
 										X
 									>
 						: never
-					: F2
+					: F2 // type-mutate: equivalent never-false – the names fit the non-recursive term, renamed first
 				: never
 			: Full
 		: never;
 type WithExtra<M extends ColMap, X extends ColMap> = M & X extends infer All
 	? { readonly [K in keyof All]: All[K] }
 	: never;
+/** The non-recursive term's types; the whole UNION's nullability (which includes that term's). */
 type FixStep<M0 extends ColMap, Full extends ColMap> = {
 	readonly [K in keyof M0]: {
 		readonly type: M0[K]["type"];
-		readonly nullable: M0[K]["nullable"] extends true
-			? true
-			: K extends keyof Full
-				? Full[K]["nullable"]
-				: false;
+		readonly nullable: Full[K & string]["nullable"];
 	};
 };
-type SameNullability<A extends ColMap, B extends ColMap> = false extends {
-	[K in keyof A]: K extends keyof B
-		? [A[K]["nullable"]] extends [B[K]["nullable"]]
-			? true
-			: false
-		: false;
-}[keyof A]
-	? false
-	: true;
+/** The columns whose nullability differs between two steps. */
+type Changed<A extends ColMap, B extends ColMap> = {
+	[K in keyof A]: [A[K]["nullable"]] extends [B[K & string]["nullable"]]
+		? never
+		: K;
+}[keyof A];
 
 // ───────────────────────────── bodies ─────────────────────────────
 
@@ -524,6 +524,7 @@ type ProjectBody<
 				B["from"],
 				B["where"],
 				B["groupBy"],
+				B["groupingSets"],
 				B["having"],
 				B["windows"],
 				Order,
@@ -566,7 +567,7 @@ type ProjectBody<
 								Lit
 							>
 						: SqlError<"multiple ORDER BY clauses not allowed", null>
-				: SqlError<"unsupported query body", null>;
+				: SqlError<"unsupported query body", null>; // type-mutate: equivalent never-false – a body is one of these four
 
 // ─── set operations ───
 
@@ -592,7 +593,9 @@ type ProjectSetOp<
  * Names come from the left branch; per position the type is the common type (untyped
  * string literals yield to the other branch, Postgres's `select_common_type`; no common
  * type is an error) and nullability is the union. Alignment stops at the first `*` entry
- * (its width is unknown).
+ * (its width is unknown). `unknown` (a type we do not know) yields to every type but itself:
+ * `CommonLit` is `unknown` with an `unknown` right side only when the left is `unknown` or NULL,
+ * and so is the column.
  */
 type AlignSetOp<
 	L extends Cols,
@@ -611,7 +614,7 @@ type AlignSetOp<
 		? R[I] extends { readonly t: infer RT extends ColInfo }
 			? CommonLit<LT["type"], RT["type"]> extends infer T extends string
 				? T extends "unknown"
-					? LT["type"] | RT["type"] extends "unknown" | "null" | "lit"
+					? RT["type"] extends "unknown"
 						? AlignSetOp<
 								L,
 								R,
@@ -619,32 +622,10 @@ type AlignSetOp<
 								[...Acc, { readonly n: N; readonly t: Info<"unknown", true> }],
 								Nx<I>
 							>
-						: LT["type"] extends "unknown"
-							? AlignSetOp<
-									L,
-									R,
-									Op,
-									[
-										...Acc,
-										{ readonly n: N; readonly t: Info<"unknown", true> },
-									],
-									Nx<I>
-								>
-							: RT["type"] extends "unknown"
-								? AlignSetOp<
-										L,
-										R,
-										Op,
-										[
-											...Acc,
-											{ readonly n: N; readonly t: Info<"unknown", true> },
-										],
-										Nx<I>
-									>
-								: SqlError<
-										`${Op} types ${TypeDisplay<LT["type"]>} and ${TypeDisplay<RT["type"]>} cannot be matched`,
-										null
-									>
+						: SqlError<
+								`${Op} types ${TypeDisplay<LT["type"]>} and ${TypeDisplay<RT["type"]>} cannot be matched`,
+								null
+							>
 					: AlignSetOp<
 							L,
 							R,
@@ -679,9 +660,9 @@ type RestFrom<
 // ─── VALUES ───
 
 /**
- * `VALUES (...), ...`: columns `column1`, `column2`, ...; per column the common type over
- * the rows (string literals yield, like in set operations) and nullable if any row is.
- * ORDER BY sees the columns (by name, position or in expressions).
+ * `VALUES (...), ...` (the parser takes one row or more): columns `column1`, `column2`, ...;
+ * per column the common type over the rows (string literals yield, like in set operations) and
+ * nullable if any row is. ORDER BY sees the columns (by name, position or in expressions).
  */
 type ProjectValues<
 	Rows extends readonly (readonly Expr[])[],
@@ -689,45 +670,52 @@ type ProjectValues<
 	Outer extends Scope,
 	Ctes extends CteMap,
 	Order extends readonly Expr[],
-> = Rows[0] extends readonly Expr[]
-	? OperandRow<Rows[0], MkCtx<DB, Outer, Ctes, false>, [], 0> extends infer T0
+> =
+	OperandRow<
+		Rows[0],
+		MkCtx<DB, Outer, Ctes, false>, // type-mutate: equivalent bool-flip – aggregates are not allowed in VALUES, so no valid statement depends on it
+		[],
+		0
+	> extends infer T0
 		? T0 extends readonly ColInfo[]
-			? MergeRows<Rows, T0, MkCtx<DB, Outer, Ctes, false>, 1> extends infer Ts
+			? MergeRows<
+					Rows,
+					T0,
+					MkCtx<DB, Outer, Ctes, false>, // type-mutate: equivalent bool-flip – aggregates are not allowed in VALUES, so no valid statement depends on it
+					1
+				> extends infer Ts
 				? Ts extends readonly ColInfo[]
 					? ValuesCols<Ts, 1, []> extends infer Cs extends Cols
-						? Order extends readonly []
-							? Cs
-							: ResolveSortKeys<
-										Order,
-										"ORDER BY",
-										ValuesTargets<Cs>,
-										Cs,
-										MkCtx<
-											DB,
-											[
-												[
-													{
-														readonly alias: "*VALUES*";
-														readonly cols: ColsToMap<Cs>;
-														readonly skip: [];
-													},
-												],
-												...Outer,
-											],
-											Ctes,
-											false
-										>
-									> extends infer K
-								? K extends AnyErr
-									? K
-									: Cs
-								: never
+						? ResolveSortKeys<
+								Order,
+								"ORDER BY",
+								ValuesTargets<Cs>,
+								Cs,
+								MkCtx<
+									DB,
+									[
+										[
+											{
+												readonly alias: "*VALUES*";
+												readonly cols: ColsToMap<Cs>;
+												readonly skip: [];
+											},
+										],
+										...Outer,
+									],
+									Ctes,
+									false // type-mutate: equivalent bool-flip – the keys are only checked for errors, and grouped changes only nullability
+								>
+							> extends infer K
+							? K extends AnyErr
+								? K
+								: Cs
+							: never
 						: never
 					: Ts
 				: never
 			: T0
-		: never
-	: SqlError<"VALUES requires at least one row", null>;
+		: never;
 
 /** Type a row in operand position (string literals are `lit`). */
 type OperandRow<
@@ -766,34 +754,31 @@ type MergeRows<
 		: never
 	: Acc;
 
+/** Per column the common type of two rows of the same length (`unknown` as in `AlignSetOp`). */
 type ZipCommon<
 	A extends readonly ColInfo[],
 	B extends readonly ColInfo[],
 	Acc extends readonly ColInfo[],
 	I extends number,
 > = A[I] extends ColInfo
-	? B[I] extends ColInfo
-		? CommonLit<A[I]["type"], B[I]["type"]> extends infer T extends string
-			? T extends "unknown"
-				? A[I]["type"] extends "unknown"
-					? ZipCommon<A, B, [...Acc, Info<"unknown", true>], Nx<I>>
-					: B[I]["type"] extends "unknown"
-						? ZipCommon<A, B, [...Acc, Info<"unknown", true>], Nx<I>>
-						: SqlError<
-								`VALUES types ${TypeDisplay<A[I]["type"]>} and ${TypeDisplay<B[I]["type"]>} cannot be matched`,
-								null
-							>
-				: ZipCommon<
-						A,
-						B,
-						[
-							...Acc,
-							Info<T, A[I]["nullable"] extends true ? true : B[I]["nullable"]>,
-						],
-						Nx<I>
+	? CommonLit<A[I]["type"], B[I]["type"]> extends infer T extends string
+		? T extends "unknown"
+			? B[I]["type"] extends "unknown"
+				? ZipCommon<A, B, [...Acc, Info<"unknown", true>], Nx<I>>
+				: SqlError<
+						`VALUES types ${TypeDisplay<A[I]["type"]>} and ${TypeDisplay<B[I]["type"]>} cannot be matched`,
+						null
 					>
-			: never
-		: Acc
+			: ZipCommon<
+					A,
+					B,
+					[
+						...Acc,
+						Info<T, A[I]["nullable"] extends true ? true : B[I]["nullable"]>,
+					],
+					Nx<I>
+				>
+		: never
 	: Acc;
 
 type ValuesCols<
@@ -816,12 +801,13 @@ type ValuesCols<
 			]
 		>
 	: Acc;
+/** The columns as a target list, for ORDER BY positions and names. */
 type ValuesTargets<Cs extends Cols> = {
 	readonly [K in keyof Cs]: {
 		readonly e: {
 			readonly t: "col";
 			readonly tbl: null;
-			readonly name: Cs[K] extends { readonly n: infer N } ? N : never;
+			readonly name: Cs[K] extends { readonly n: infer N } ? N : never; // type-mutate: equivalent cond-false – the keys are only checked for errors, and VALUES column names are distinct, so none is ambiguous
 		};
 		readonly alias: null;
 	};
@@ -830,9 +816,9 @@ type ValuesTargets<Cs extends Cols> = {
 // ─── simple select ───
 
 /**
- * FROM → scope; WHERE narrows nullability (binder/narrow.ts); targets are projected in
- * the narrowed scope; then WHERE / HAVING / ORDER BY / GROUP BY / DISTINCT [ON] / WINDOW
- * are validated (binder/clauses.ts).
+ * FROM → scope; WHERE narrows nullability (binder/narrow.ts); grouping sets make the columns
+ * they may leave out nullable; targets are projected in that scope; then WHERE / HAVING /
+ * ORDER BY / GROUP BY / DISTINCT [ON] / WINDOW are validated (binder/clauses.ts).
  */
 type ProjectSimple<
 	Distinct,
@@ -840,6 +826,7 @@ type ProjectSimple<
 	From extends readonly FromItem[],
 	Where extends Expr | null,
 	GroupBy extends readonly Expr[] | null,
+	Sets,
 	Having extends Expr | null,
 	Ws extends readonly NamedWindow[],
 	Order extends readonly Expr[],
@@ -850,19 +837,13 @@ type ProjectSimple<
 > =
 	BindFrom<From, DB, Outer, Ctes> extends infer L
 		? L extends ScopeLevel
-			? (
-					Where extends null
-						? L
-						: NarrowLevel<L, NarrowKeys<Where>>
-				) extends infer L2 extends ScopeLevel
+			? SetsLevel<
+					NarrowLevel<L, NarrowKeys<Where>>,
+					Sets
+				> extends infer L2 extends ScopeLevel
 				? ProjectTargets<
 						Ts,
-						MkCtx<
-							DB,
-							[L2, ...Outer],
-							Ctes,
-							GroupBy extends null ? false : true
-						>,
+						MkCtx<DB, [L2, ...Outer], Ctes, Grouped<GroupBy, Sets>>,
 						[],
 						0,
 						Lit
@@ -877,18 +858,8 @@ type ProjectSimple<
 								Having,
 								Ws,
 								Order,
-								MkCtx<
-									DB,
-									[L, ...Outer],
-									Ctes,
-									GroupBy extends null ? false : true
-								>,
-								MkCtx<
-									DB,
-									[L2, ...Outer],
-									Ctes,
-									GroupBy extends null ? false : true
-								>
+								MkCtx<DB, [L, ...Outer], Ctes, Grouped<GroupBy, Sets>>,
+								MkCtx<DB, [L2, ...Outer], Ctes, Grouped<GroupBy, Sets>>
 							> extends infer R
 							? R extends AnyErr
 								? R
@@ -899,6 +870,51 @@ type ProjectSimple<
 				: never
 			: L
 		: never;
+
+/**
+ * A GROUP BY without grouping sets: aggregates then see no empty input. The empty grouping set
+ * (`()`, and in ROLLUP and CUBE) yields a row even for no input rows, as no GROUP BY does.
+ */
+type Grouped<GroupBy, Sets> = Sets extends false
+	? GroupBy extends null
+		? false // type-mutate: equivalent never-true – read with extends false, never counts as not grouped
+		: true
+	: false; // type-mutate: equivalent never-false – read with extends false, never counts as not grouped
+
+/**
+ * Grouping sets: a column that a set leaves out is NULL in that set's rows. `Sets`: the ROLLUP /
+ * CUBE items (columns of this level, or anything else: then every column), or `true` (GROUPING
+ * SETS, `()`: every column).
+ */
+type SetsLevel<L extends ScopeLevel, Sets> = Sets extends false
+	? L
+	: NullLevel<L, Sets extends readonly unknown[] ? LeftOut<L, Sets> : string>;
+/** The names of the items `Is`, if all are columns of the level `L`; else `string` (all of them). */
+type LeftOut<
+	L extends ScopeLevel,
+	Is extends readonly unknown[],
+> = Is extends readonly [infer H, ...infer R]
+	? H extends { readonly t: "col"; readonly name: infer N }
+		? N extends LevelNames<L>
+			? N | LeftOut<L, R>
+			: string
+		: string
+	: never;
+type LevelNames<L extends ScopeLevel> = {
+	[I in keyof L]: keyof L[I]["cols"];
+}[number];
+/** Mark the columns `Names` of every item of a level nullable. */
+type NullLevel<L extends ScopeLevel, Names> = {
+	readonly [I in keyof L]: {
+		readonly alias: L[I]["alias"];
+		readonly cols: {
+			readonly [K in keyof L[I]["cols"]]: K extends Names
+				? { readonly type: L[I]["cols"][K]["type"]; readonly nullable: true }
+				: L[I]["cols"][K];
+		};
+		readonly skip: L[I]["skip"];
+	};
+};
 
 type CheckSimple<
 	Distinct,
@@ -947,16 +963,12 @@ type CheckDistinct<
 		? DK extends AnyErr
 			? DK
 			: DK extends readonly unknown[]
-				? OKeys extends readonly []
-					? true
-					: CheckDistinctOnOrder<DK, OKeys>
+				? CheckDistinctOnOrder<DK, OKeys>
 				: never
 		: never
 	: Distinct extends true
-		? OKeys extends readonly []
-			? true
-			: CheckDistinctOrder<OKeys, Ts, Cs>
-		: true;
+		? CheckDistinctOrder<OKeys, Ts, Cs>
+		: true; // type-mutate: equivalent bool-flip – the callers only look for an error
 
 type CheckWindows<
 	Ws extends readonly NamedWindow[],
@@ -979,7 +991,7 @@ type TargetExprs<Ts extends readonly Target[]> = {
 
 /** `(t).*` in a target list: the columns of a whole-row value (all nullable when the row is). */
 type FieldStar<A> = A extends ColInfo
-	? A["type"] extends Shaped<"record", ObjShape<infer M extends ColMap>>
+	? A["type"] extends Shaped<"record", ObjShape<infer M>>
 		? A["nullable"] extends true
 			? NullableMap<M>
 			: M
@@ -1030,7 +1042,7 @@ export type ProjectTargets<
 									Nx<I>,
 									Lit
 								>
-							: N
+							: N // type-mutate: equivalent never-false – ColumnName is always a name
 						: never
 					: Ty
 				: never;

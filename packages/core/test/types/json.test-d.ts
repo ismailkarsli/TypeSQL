@@ -161,6 +161,13 @@ test("branches merge: CASE, COALESCE, UNION", () => {
 	expectTypeOf<
 		Row<"SELECT coalesce('[]'::json, json_agg(id)) AS a, coalesce('[]'::json, json_build_object('a', 1)) AS b FROM things">
 	>().toEqualTypeOf<{ a: number[]; b: [] | { a: number } }>();
+	// a plain JSON value drops the shape; two JSON literals are text, and plain JSON next to an array
+	expectTypeOf<
+		Row<"SELECT coalesce(to_json(u), t.doc) AS a, coalesce(t.doc, to_json(u)) AS b FROM users u, things t">
+	>().toEqualTypeOf<{ a: unknown; b: unknown }>();
+	expectTypeOf<
+		Row<"SELECT coalesce('[]', '{}') AS a, coalesce('[]', '{}', json_agg(id)) AS b FROM things">
+	>().toEqualTypeOf<{ a: string; b: unknown }>();
 	// json and jsonb have no common type
 	expectTypeOf<
 		Row<"SELECT coalesce(json_build_object('a', 1), jsonb_build_object('a', 1)) AS a">

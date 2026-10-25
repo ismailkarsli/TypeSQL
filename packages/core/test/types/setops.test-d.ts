@@ -1,9 +1,17 @@
 import { expectTypeOf, test } from "vitest";
-import type { Lex, ParseProgram } from "../../src/engine/index.js";
+import type { Analyze, Lex, ParseProgram } from "../../src/engine/index.js";
 import type { SqlError } from "../../src/index.js";
-import type { Row, V } from "./_schema.js";
+import type { DB, Row, V } from "./_schema.js";
 
 // UNION / INTERSECT / EXCEPT, verified against PostgreSQL 18.
+
+/** Nullability of the first column (for types whose row type `unknown` hides it). */
+type N<Q extends string> =
+	Analyze<DB, Q> extends {
+		readonly cols: readonly [{ readonly t: { readonly nullable: infer B } }];
+	}
+		? B
+		: "error";
 
 type Body<Q extends string> =
 	ParseProgram<Lex<Q>> extends { readonly body: infer B } ? B : never;
@@ -57,10 +65,36 @@ test("names from the first branch, common type and nullability per position", ()
 	expectTypeOf<Row<"VALUES (1) UNION SELECT 2">>().toEqualTypeOf<{
 		column1: number;
 	}>();
+	expectTypeOf<
+		[
+			N<"SELECT n_id FROM things UNION SELECT 1">,
+			N<"SELECT 1 AS a UNION SELECT n_id FROM things">,
+			N<"SELECT id FROM things UNION SELECT 1">,
+		]
+	>().toEqualTypeOf<[true, true, false]>();
+	// a * on the right: the left's columns
+	expectTypeOf<
+		Row<"SELECT id, email, display_name, created_at FROM users UNION ALL SELECT * FROM users">
+	>().toEqualTypeOf<{
+		id: number;
+		email: string;
+		display_name: string | null;
+		created_at: Date;
+	}>();
+	// a value of a type we do not know yields to every type but its own, and NULL
+	expectTypeOf<
+		Row<"SELECT a::text AS b FROM (SELECT NULL AS a UNION ALL SELECT (ROW(1, 2)).f1) s">
+	>().toEqualTypeOf<{ b: string | null }>();
+	expectTypeOf<
+		Row<"SELECT a::text AS b FROM (SELECT (ROW(1, 2)).f1 AS a UNION ALL SELECT (ROW(3, 4)).f1) s">
+	>().toEqualTypeOf<{ b: string | null }>();
 });
 
 test("untyped string literals take the other branch's type; real text does not", () => {
 	expectTypeOf<Row<"SELECT 1 AS x UNION SELECT '2'">>().toEqualTypeOf<{
+		x: number;
+	}>();
+	expectTypeOf<Row<"SELECT '1' AS x UNION SELECT 2">>().toEqualTypeOf<{
 		x: number;
 	}>();
 	expectTypeOf<Row<"SELECT 'a' AS x UNION SELECT 'b'">>().toEqualTypeOf<{
@@ -217,5 +251,14 @@ test("ORDER BY of a set operation: output names and positions only", () => {
 test("set-op type errors point at the operator", () => {
 	expectTypeOf<V<"SELECT 1 UNION SELECT label FROM things">>().toEqualTypeOf<
 		SqlError<"UNION types integer and text cannot be matched", 2>
+	>();
+});
+
+test("errors in either branch", () => {
+	expectTypeOf<V<"SELECT nope AS a UNION SELECT 1">>().toEqualTypeOf<
+		SqlError<'column "nope" does not exist', 1>
+	>();
+	expectTypeOf<V<"SELECT 1 AS a UNION SELECT nope">>().toEqualTypeOf<
+		SqlError<'column "nope" does not exist', 6>
 	>();
 });

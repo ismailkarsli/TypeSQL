@@ -1,6 +1,15 @@
 import { expectTypeOf, test } from "vitest";
+import type { Analyze } from "../../src/engine/index.js";
 import type { SqlError } from "../../src/index.js";
-import type { Row, V } from "./_schema.js";
+import type { DB, Row, V } from "./_schema.js";
+
+/** Nullability of the first column. */
+type N<Q extends string> =
+	Analyze<DB, Q> extends {
+		readonly cols: readonly [{ readonly t: { readonly nullable: infer B } }];
+	}
+		? B
+		: "error";
 
 // VALUES lists, verified against PostgreSQL 18.
 
@@ -38,6 +47,24 @@ test("a column is nullable if any row has NULL (or a nullable expression) there"
 	expectTypeOf<Row<"VALUES (NULL), (1)">>().toEqualTypeOf<{
 		column1: number | null;
 	}>();
+	// in any row
+	expectTypeOf<Row<"VALUES (1), (2), (NULL)">>().toEqualTypeOf<{
+		column1: number | null;
+	}>();
+	expectTypeOf<
+		[
+			N<"VALUES (NULL::int4), (1)">,
+			N<"VALUES (1), (NULL::int4)">,
+			N<"VALUES (1), (2)">,
+		]
+	>().toEqualTypeOf<[true, true, false]>();
+	// a value of a type we do not know yields to every type but its own, and NULL
+	expectTypeOf<
+		Row<"SELECT column1::text AS b FROM (VALUES (NULL), ((ROW(1, 2)).f1)) v">
+	>().toEqualTypeOf<{ b: string | null }>();
+	expectTypeOf<
+		Row<"SELECT column1::text AS b FROM (VALUES ((ROW(1, 2)).f1), ((ROW(3, 4)).f1)) v">
+	>().toEqualTypeOf<{ b: string | null }>();
 	expectTypeOf<
 		Row<"SELECT * FROM users u, LATERAL (VALUES (u.id), (u.display_name::int4)) v(x)">
 	>().toEqualTypeOf<{
@@ -85,6 +112,9 @@ test("VALUES errors", () => {
 	>();
 	expectTypeOf<V<"VALUES (nope)">>().toEqualTypeOf<
 		SqlError<'column "nope" does not exist', 2>
+	>();
+	expectTypeOf<V<"VALUES (1), (nope)">>().toEqualTypeOf<
+		SqlError<'column "nope" does not exist', 6>
 	>();
 	expectTypeOf<
 		V<"SELECT * FROM (VALUES (1, 'a')) AS v(a, b, c)">

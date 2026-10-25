@@ -34,26 +34,22 @@ export type BaseOf<T extends string> = T extends "jsonb"
 export type StripShape<T extends string> = T extends AnyShaped
 	? BaseOf<T>
 	: T extends `${infer E}[]`
-		? E extends AnyShaped
-			? `${BaseOf<E>}[]`
-			: T
+		? `${BaseOf<E>}[]`
 		: T;
 
 /**
  * Type of a whole-row reference: the row's columns as an object shape. Nullable only when every
  * column is: the null-extended side of an outer join makes every column nullable, and a row
  * that has a NOT NULL column cannot be the NULL row. (A table whose columns are all nullable is
- * therefore typed nullable too.)
+ * therefore typed nullable too, and so is a row without columns.)
  */
 export type RowInfo<M extends ColMap> = {
 	readonly type: Shaped<"record", ObjShape<M>>;
 	readonly nullable: AllNullable<M>;
 };
-type AllNullable<M extends ColMap> = [keyof M] extends [never]
+type AllNullable<M extends ColMap> = false extends M[keyof M]["nullable"]
 	? false
-	: false extends M[keyof M]["nullable"]
-		? false
-		: true;
+	: true;
 
 /**
  * Common type of two names where at least one may be branded (`CommonLit`'s fallback): the
@@ -63,11 +59,9 @@ type AllNullable<M extends ColMap> = [keyof M] extends [never]
 export type ShapedCommon<A extends string, B extends string> = [
 	BaseOf<A>,
 ] extends [BaseOf<B>]
-	? [BaseOf<B>] extends [BaseOf<A>]
-		? A extends Shaped<string, infer SA>
-			? B extends Shaped<string, infer SB>
-				? Shaped<BaseOf<A>, MergeShapes<SA, SB>>
-				: BaseOf<A>
+	? A extends Shaped<string, infer SA>
+		? B extends Shaped<string, infer SB>
+			? Shaped<BaseOf<A>, MergeShapes<SA, SB>>
 			: BaseOf<A>
-		: "unknown"
+		: BaseOf<A>
 	: "unknown";

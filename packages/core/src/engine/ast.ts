@@ -502,8 +502,11 @@ export type SimpleSelect = {
 	readonly where: Expr | null;
 	/** `null` when there is no GROUP BY at all (matters for aggregate nullability). */
 	readonly groupBy: readonly Expr[] | null;
-	/** GROUP BY uses ROLLUP / CUBE / GROUPING SETS (grouped columns become nullable). */
-	readonly groupingSets: boolean;
+	/**
+	 * Grouping sets (grouped columns become nullable): `false` without; the ROLLUP / CUBE items,
+	 * which a set may leave out; `true` with GROUPING SETS or `()` (their sets are not kept).
+	 */
+	readonly groupingSets: boolean | readonly Expr[];
 	readonly having: Expr | null;
 	/** `WINDOW name AS (...), ...` */
 	readonly windows: readonly NamedWindow[];

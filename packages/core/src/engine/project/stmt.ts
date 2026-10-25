@@ -1,4 +1,4 @@
-import type { DdlStmt, DmlStmt, Stmt } from "../ast.js";
+import type { DmlStmt, Stmt } from "../ast.js";
 import type { AnyErr } from "../errors.js";
 import type { Cols, CteMap, Scope } from "../types.js";
 import type { ProjectDml } from "./dml.js";
@@ -8,7 +8,7 @@ import type { ProjectSelectParts } from "./select.js";
  * Project any statement:
  *   SELECT / VALUES → `Cols`
  *   DML (INSERT / UPDATE / DELETE / MERGE) with RETURNING → `Cols`; without → `null`
- *   DDL → `null`; DECLARE … CURSOR checks its query, then `null` (it returns no rows)
+ *   DDL (every other statement) → `null`; DECLARE … CURSOR checks its query, then `null` (it returns no rows)
  * or `SqlError`. SELECT is recognized by its tag only (no structural comparison of the tree).
  */
 export type ProjectStmt<
@@ -33,8 +33,6 @@ export type ProjectStmt<
 					? C
 					: null
 				: never
-			: S extends DdlStmt
-				? null
-				: never;
+			: null;
 
 export type { Cols };

@@ -1182,11 +1182,15 @@ type ParseGroupByOpt<T extends Toks, I extends number> =
 				false
 			>;
 
+/**
+ * `Sets`: `false` without grouping sets; the items of ROLLUP / CUBE (they may be left out of a
+ * set); `true` once GROUPING SETS or `()` appears (its sets are not kept).
+ */
 type ParseGroupItems<
 	T extends Toks,
 	I extends number,
 	Acc extends readonly unknown[],
-	Sets extends boolean,
+	Sets extends GroupSets,
 > =
 	T[I] extends WordTok<"rollup" | "cube">
 		? T[Nx<I>] extends OpTok<"(">
@@ -1197,7 +1201,14 @@ type ParseGroupItems<
 					>
 					? EatOp<T, J, ")"> extends never
 						? Expected<'")"', T, J>
-						: GroupNext<T, EatOp<T, J, ")">, [...Acc, ...Items], true>
+						: GroupNext<
+								T,
+								EatOp<T, J, ")">,
+								[...Acc, ...Items],
+								Sets extends true
+									? true
+									: [...(Sets extends readonly unknown[] ? Sets : []), ...Items] // type-mutate: equivalent tuple-swap – the items are read as a set of names
+							>
 					: X
 				: never
 			: Expected<'"("', T, Nx<I>>
@@ -1216,11 +1227,12 @@ type ParseGroupItems<
 					? GroupNext<T, Nx<Nx<I>>, Acc, true>
 					: ParseGroupExpr<T, I, Acc, Sets>
 				: ParseGroupExpr<T, I, Acc, Sets>;
+type GroupSets = boolean | readonly unknown[];
 type ParseGroupExpr<
 	T extends Toks,
 	I extends number,
 	Acc extends readonly unknown[],
-	Sets extends boolean,
+	Sets extends GroupSets,
 > =
 	ParseExpr<T, I, 0> extends infer X
 		? X extends Ok<infer E, infer J extends number>
@@ -1231,7 +1243,7 @@ type GroupNext<
 	T extends Toks,
 	I extends number,
 	Acc extends readonly unknown[],
-	Sets extends boolean,
+	Sets extends GroupSets,
 > =
 	EatOp<T, I, ","> extends never
 		? Ok<[Acc, Sets], I>

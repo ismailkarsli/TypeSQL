@@ -1,11 +1,20 @@
 import { expectTypeOf, test } from "vitest";
+import type { Analyze } from "../../src/engine/index.js";
 import type { SqlError } from "../../src/index.js";
-import type { Row, V } from "./_schema.js";
+import type { DB, Row, V } from "./_schema.js";
 
 // Whole-row references (a FROM item used as a value), verified against PostgreSQL 18.
 // The value itself is a `record` (`unknown` under the default type map; pg and postgres.js
 // return the text form "(1,ada@example.com,…)"); its columns are reachable with (t).col and (t).*,
 // and to_json(t) is an object (json.test-d.ts).
+
+/** Nullability of the first column (a record's row type `unknown` hides it). */
+type N<Q extends string> =
+	Analyze<DB, Q> extends {
+		readonly cols: readonly [{ readonly t: { readonly nullable: infer B } }];
+	}
+		? B
+		: "error";
 
 test("a FROM item name used as a value is a whole-row reference", () => {
 	expectTypeOf<Row<"SELECT u FROM users u">>().toEqualTypeOf<{ u: unknown }>();
@@ -64,6 +73,18 @@ test("(t).col and (t).* reach the row's columns", () => {
 	expectTypeOf<
 		Row<"SELECT (s).* FROM (SELECT id, email AS mail FROM users) s">
 	>().toEqualTypeOf<{ id: number; mail: string }>();
+	// a row that may be NULL: every column may be
+	expectTypeOf<
+		Row<"SELECT (CASE WHEN u.id > 0 THEN u END).* FROM users u">
+	>().toEqualTypeOf<{
+		id: number | null;
+		email: string | null;
+		display_name: string | null;
+		created_at: Date | null;
+	}>();
+	expectTypeOf<V<"SELECT (nope).* FROM users">>().toEqualTypeOf<
+		SqlError<'column "nope" does not exist', 2>
+	>();
 	expectTypeOf<V<"SELECT (u).nope FROM users u">>().toEqualTypeOf<
 		SqlError<'column "nope" not found in data type record', 5>
 	>();
@@ -93,6 +114,33 @@ test("the null-extended side of an outer join is a nullable row", () => {
 		body: string | null;
 		tags: string[] | null;
 		meta: unknown;
+	}>();
+	// the row itself is NULL there: to_json of it is
+	expectTypeOf<
+		Row<"SELECT to_json(p) AS j FROM users u LEFT JOIN posts p ON p.author_id = u.id">
+	>().toEqualTypeOf<{
+		j: {
+			id: number | null;
+			author_id: number | null;
+			title: string | null;
+			body: string | null;
+			tags: string[] | null;
+			meta: unknown;
+		} | null;
+	}>();
+	expectTypeOf<
+		[
+			N<"SELECT p FROM users u LEFT JOIN posts p ON p.author_id = u.id">,
+			N<"SELECT u FROM users u LEFT JOIN posts p ON p.author_id = u.id">,
+			N<"SELECT s FROM users u LEFT JOIN (SELECT) s ON u.id < 0">,
+		]
+	>().toEqualTypeOf<[true, false, true]>();
+	// a row without columns may be the null-extended one: nothing tells, so it is nullable
+	expectTypeOf<
+		Row<"SELECT to_json(s) AS a FROM users u LEFT JOIN (SELECT) s ON u.id < 0">
+	>().toEqualTypeOf<{ a: Record<string, never> | null }>();
+	expectTypeOf<Row<"SELECT to_json(s) AS a FROM (SELECT) s">>().toEqualTypeOf<{
+		a: Record<string, never> | null;
 	}>();
 	// WHERE p.id IS NOT NULL proves the row exists
 	expectTypeOf<

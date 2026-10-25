@@ -112,6 +112,12 @@ test("inline values are checked against the parameter type", () => {
 		typeof bad &
 			SqlError<"parameter $1: a string value cannot be used as int4", 7>
 	>();
+	// an array of whole rows is named record[]
+	const rows = `SELECT ARRAY[u] = ${sql.param(5)} AS x FROM users u` as const;
+	expectTypeOf<E<typeof rows>>().toEqualTypeOf<
+		typeof rows &
+			SqlError<"parameter $1: a number value cannot be used as record[]", 6>
+	>();
 });
 
 test("inline params inside quotes or comments are rejected", () => {

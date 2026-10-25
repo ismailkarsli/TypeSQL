@@ -45,6 +45,10 @@ test("a CTE shadows a table; [NOT] MATERIALIZED is accepted", () => {
 	expectTypeOf<
 		Row<"WITH a AS MATERIALIZED (SELECT 1 AS x), b AS NOT MATERIALIZED (SELECT 2 AS y) SELECT * FROM a, b">
 	>().toEqualTypeOf<{ x: number; y: number }>();
+	// an inner WITH shadows an outer CTE: only its columns
+	expectTypeOf<
+		Row<"WITH a AS (SELECT 1 AS x) SELECT * FROM (WITH a AS (SELECT display_name AS y FROM users) SELECT * FROM a) s">
+	>().toEqualTypeOf<{ y: string | null }>();
 });
 
 test("WITH RECURSIVE: typed from the non-recursive term, nullability over both terms", () => {
@@ -61,6 +65,39 @@ test("WITH RECURSIVE: typed from the non-recursive term, nullability over both t
 	expectTypeOf<
 		Row<"WITH RECURSIVE tree AS (SELECT id, author_id, 0 AS depth FROM posts WHERE author_id = 1 UNION ALL SELECT p.id, p.author_id, t.depth + 1 FROM posts p JOIN tree t ON p.author_id = t.id) SELECT * FROM tree">
 	>().toEqualTypeOf<{ id: string; author_id: number; depth: number }>();
+	// a NULL that takes three steps to reach the last column
+	expectTypeOf<
+		Row<"WITH RECURSIVE t(n, a, b, c) AS (SELECT 1, 1, 1, 1 UNION ALL SELECT n + 1, NULL::int4, a, b FROM t WHERE n < 9) SELECT * FROM t">
+	>().toEqualTypeOf<{
+		n: number;
+		a: number | null;
+		b: number | null;
+		c: number | null;
+	}>();
+	// one that takes four: after four steps every column is typed nullable
+	expectTypeOf<
+		Row<"WITH RECURSIVE t(n, a, b, c, d) AS (SELECT 1, 1, 1, 1, 1 UNION ALL SELECT n + 1, NULL::int4, a, b, c FROM t WHERE n < 9) SELECT * FROM t">
+	>().toEqualTypeOf<{
+		n: number | null;
+		a: number | null;
+		b: number | null;
+		c: number | null;
+		d: number | null;
+	}>();
+	expectTypeOf<
+		Row<"WITH RECURSIVE t(n, a, b, c, d) AS (SELECT 1, 1, 1, 1, 1 UNION ALL SELECT n + 1, NULL::int4, a, b, c FROM t WHERE n < 9) CYCLE n SET m USING p SELECT n, m FROM t">
+	>().toEqualTypeOf<{ n: number | null; m: boolean }>();
+	// a string literal in the non-recursive term is text
+	expectTypeOf<
+		Row<"WITH RECURSIVE t(x) AS (SELECT 'a' UNION ALL SELECT x || 'b' FROM t WHERE length(x) < 3) SELECT x FROM t">
+	>().toEqualTypeOf<{ x: string }>();
+	// the query's own WITH, and a non-recursive term that is itself a UNION
+	expectTypeOf<
+		Row<"WITH RECURSIVE t(n) AS (WITH s AS (SELECT 1 AS x) SELECT x FROM s UNION ALL SELECT n + 1 FROM t WHERE n < 3) SELECT * FROM t">
+	>().toEqualTypeOf<{ n: number }>();
+	expectTypeOf<
+		Row<"WITH RECURSIVE t(n) AS (SELECT 1 UNION SELECT 2 UNION ALL SELECT n + 1 FROM t WHERE n < 3) SELECT * FROM t">
+	>().toEqualTypeOf<{ n: number }>();
 	// RECURSIVE without a self reference, and a later CTE using a recursive one
 	expectTypeOf<
 		Row<"WITH RECURSIVE t AS (SELECT 1 AS n) SELECT * FROM t">
@@ -96,6 +133,28 @@ test("CTE errors", () => {
 		V<"WITH a AS (SELECT id FROM users), a AS (SELECT 1) SELECT * FROM a">
 	>().toEqualTypeOf<
 		SqlError<'WITH query name "a" specified more than once', 1>
+	>();
+	// without RECURSIVE a CTE does not see itself
+	expectTypeOf<
+		V<"WITH t(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM t WHERE n < 3) SELECT * FROM t">
+	>().toEqualTypeOf<SqlError<'relation "t" does not exist', 1>>();
+	// errors in either term of a recursive CTE, in its own WITH, in its column list
+	expectTypeOf<
+		V<"WITH RECURSIVE t(n) AS (SELECT nope UNION ALL SELECT n + 1 FROM t WHERE n < 3) SELECT * FROM t">
+	>().toEqualTypeOf<SqlError<'column "nope" does not exist', 9>>();
+	expectTypeOf<
+		V<"WITH RECURSIVE t(n) AS (SELECT 1 UNION ALL SELECT nope FROM t) SELECT * FROM t">
+	>().toEqualTypeOf<SqlError<'column "nope" does not exist', 13>>();
+	expectTypeOf<
+		V<"WITH RECURSIVE t(n) AS (WITH s AS (SELECT nope) SELECT 1 UNION ALL SELECT n + 1 FROM t WHERE n < 3) SELECT * FROM t">
+	>().toEqualTypeOf<SqlError<'column "nope" does not exist', 13>>();
+	expectTypeOf<
+		V<"WITH RECURSIVE t(n, m) AS (SELECT 1 UNION ALL SELECT n + 1 FROM t WHERE n < 3) SELECT * FROM t">
+	>().toEqualTypeOf<
+		SqlError<
+			'WITH query "t" has 1 columns available but 2 columns specified',
+			2
+		>
 	>();
 	// a CTE cannot see a later one (here: no such table either)
 	expectTypeOf<

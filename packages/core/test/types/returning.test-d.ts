@@ -101,6 +101,10 @@ test("RETURNING expressions follow Postgres column naming", () => {
 	expectTypeOf<
 		Row<"INSERT INTO users (email) VALUES ('a') RETURNING $1::text AS tag, id">
 	>().toEqualTypeOf<{ tag: string; id: number }>();
+	// a string literal is text
+	expectTypeOf<
+		Row<"DELETE FROM users RETURNING 'a' AS a, id">
+	>().toEqualTypeOf<{ a: string; id: number }>();
 });
 
 test("RETURNING scope errors", () => {

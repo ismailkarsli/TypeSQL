@@ -84,6 +84,10 @@ test("window references: inherited ORDER BY, windows inside expressions and subq
 });
 
 test("windows anywhere in an expression are checked (not inside subqueries)", () => {
+	// in ORDER BY too
+	expectTypeOf<
+		V<"SELECT id FROM users ORDER BY row_number() OVER nope">
+	>().toEqualTypeOf<SqlError<'window "nope" does not exist', 10>>();
 	expectTypeOf<
 		V<"SELECT CASE WHEN sum(id) OVER nope > 0 THEN 1 END FROM users">
 	>().toEqualTypeOf<SqlError<'window "nope" does not exist', 8>>();
