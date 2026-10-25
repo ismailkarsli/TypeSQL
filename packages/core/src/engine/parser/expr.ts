@@ -912,24 +912,38 @@ type ConstTypeWord =
 	| "numeric"
 	| "float";
 type ParseConstTypeLit<T extends Toks, I extends number> =
-	ParseTypeName<T, I> extends Ok<
-		infer Ty extends string,
-		infer J extends number
-	>
+	ParseTypeName<T, I> extends Ok<infer Ty, infer J>
 		? T[J] extends StrTok<infer V>
-			? Ok<
-					{ t: "typed"; type: Ty; v: V },
-					Ty extends "interval" ? SkipIntervalQualifier<T, Nx<J>> : Nx<J>
-				>
+			? Ty extends `${string}[]`
+				? ParseNameExpr<T, I> // a `ConstTypename` has no array bounds: `numeric[] '{1}'` subscripts a column
+				: Ty extends "interval"
+					? ParseIntervalLit<T, I, V, J>
+					: Ok<{ t: "typed"; type: Ty; v: V }, Nx<J>>
 			: ParseNameExpr<T, I>
 		: ParseNameExpr<T, I>;
+
+/**
+ * `INTERVAL '…' [fields]` or `INTERVAL (p) '…'` (`ConstInterval`), the string at `J`: the
+ * fields come after the string, and not after a precision (`interval day '1'` and
+ * `interval(2) '1' day` are syntax errors).
+ */
+type ParseIntervalLit<T extends Toks, I extends number, V, J extends number> =
+	T[Nx<I>] extends OpTok<"(">
+		? Ok<{ t: "typed"; type: "interval"; v: V }, Nx<J>>
+		: Nx<I> extends J
+			? IntervalFields<T, Nx<J>> extends infer K
+				? K extends number
+					? Ok<{ t: "typed"; type: "interval"; v: V }, K>
+					: K
+				: never
+			: SyntaxErrorAt<T, Nx<I>>;
 
 /** After `COLLATION FOR`: `(e)`, which Postgres calls as `pg_collation_for(e)`. */
 type ParseCollationFor<T extends Toks, I extends number> =
 	EatOp<T, I, "("> extends never
 		? Expected<'"("', T, I>
 		: ParseExpr<T, EatOp<T, I, "(">, 0> extends infer X
-			? X extends Ok<infer E, infer J extends number>
+			? X extends Ok<infer E, infer J>
 				? EatOp<T, J, ")"> extends never
 					? Expected<'")"', T, J>
 					: Ok<CallOf<"pg_collation_for", [E]>, EatOp<T, J, ")">>
@@ -939,7 +953,7 @@ type ParseCollationFor<T extends Toks, I extends number> =
 /** After `NORMALIZE(`: `e [, NFC | NFD | NFKC | NFKD])`; the form is a keyword, passed as a string. */
 type ParseNormalize<T extends Toks, I extends number> =
 	ParseExpr<T, I, 0> extends infer X
-		? X extends Ok<infer E, infer J extends number>
+		? X extends Ok<infer E, infer J>
 			? T[J] extends OpTok<")">
 				? Ok<CallOf<"normalize", [E]>, Nx<J>>
 				: T[J] extends OpTok<",">
@@ -988,16 +1002,16 @@ type ParseSpecialValue<T extends Toks, W extends string, I extends number> =
 		? W extends "current_schema"
 			? ParseNameExpr<T, I>
 			: W extends PrecisionValueFunction
-				? T[Nx2<I>] extends NumTok
-					? T[Nx3<I>] extends OpTok<")">
-						? SpecialValue<T, W, I>
-						: SyntaxErrorAt<T, Nx3<I>>
-					: SyntaxErrorAt<T, Nx2<I>>
+				? ParsePrecision<T, Nx2<I>> extends infer J
+					? J extends number
+						? SpecialValue<W, J>
+						: J
+					: never
 				: SyntaxErrorAt<T, Nx<I>>
-		: SpecialValue<T, W, I>;
+		: SpecialValue<W, Nx<I>>;
 
-/** `current_date`, `current_time(3)`, ...: a zero-argument call named after the keyword. */
-type SpecialValue<T extends Toks, W extends string, I extends number> = Ok<
+/** `current_date`, `current_time(3)`, ...: a zero-argument call named after the keyword, ending before `J`. */
+type SpecialValue<W extends string, J extends number> = Ok<
 	{
 		t: "call";
 		name: W;
@@ -1008,25 +1022,43 @@ type SpecialValue<T extends Toks, W extends string, I extends number> = Ok<
 		win: null;
 		withinGroup: null;
 	},
-	SkipPrecision<T, Nx<I>>
+	J
 >;
-type SkipPrecision<T extends Toks, I extends number> =
-	T[I] extends OpTok<"(">
-		? T[Nx<I>] extends NumTok
-			? T[Nx<Nx<I>>] extends OpTok<")">
-				? Nx<Nx<Nx<I>>>
-				: I
-			: I
-		: I;
+/** After `(`: a precision `p)` → the index after `)`, or a syntax error. */
+type ParsePrecision<T extends Toks, I extends number> = T[I] extends NumTok
+	? T[Nx<I>] extends OpTok<")">
+		? Nx2<I>
+		: SyntaxErrorAt<T, Nx<I>>
+	: SyntaxErrorAt<T, I>;
 type IntervalField = "year" | "month" | "day" | "hour" | "minute" | "second";
-type SkipIntervalQualifier<T extends Toks, I extends number> =
-	T[I] extends WordTok<IntervalField>
-		? T[Nx<I>] extends WordTok<"to">
-			? T[Nx<Nx<I>>] extends WordTok<IntervalField>
-				? SkipPrecision<T, Nx<Nx<Nx<I>>>>
-				: SkipPrecision<T, Nx<I>>
-			: SkipPrecision<T, Nx<I>>
-		: SkipPrecision<T, I>;
+/** The fields `F TO …` can end with (`YEAR TO MONTH`, `DAY TO SECOND`, …; nothing after MONTH or SECOND). */
+type IntervalTo = {
+	year: "month";
+	day: "hour" | "minute" | "second";
+	hour: "minute" | "second";
+	minute: "second";
+};
+/**
+ * The fields after an interval literal's string (`opt_interval`): `YEAR`, …, `SECOND [(p)]`,
+ * `YEAR TO MONTH`, `DAY TO HOUR`, …, `MINUTE TO SECOND [(p)]` → the next index, or a syntax error.
+ */
+type IntervalFields<T extends Toks, I extends number> =
+	T[I] extends WordTok<infer F extends IntervalField>
+		? F extends "second"
+			? SecondPrecision<T, Nx<I>>
+			: T[Nx<I>] extends WordTok<"to">
+				? F extends keyof IntervalTo
+					? T[Nx2<I>] extends WordTok<infer G extends IntervalTo[F]>
+						? G extends "second"
+							? SecondPrecision<T, Nx3<I>>
+							: Nx3<I>
+						: SyntaxErrorAt<T, Nx2<I>>
+					: SyntaxErrorAt<T, Nx<I>>
+				: Nx<I>
+		: I;
+/** `SECOND` may take a precision: `second(3)`. */
+type SecondPrecision<T extends Toks, I extends number> =
+	T[I] extends OpTok<"("> ? ParsePrecision<T, Nx<I>> : I;
 
 type ParseUnary<T extends Toks, O extends string, I extends number> =
 	ParseExpr<
@@ -1034,7 +1066,7 @@ type ParseUnary<T extends Toks, O extends string, I extends number> =
 		I,
 		O extends "not" ? 3 : O extends "-" | "+" ? 11 : 8
 	> extends infer X
-		? X extends Ok<infer E, infer J extends number>
+		? X extends Ok<infer E, infer J>
 			? Ok<{ t: "un"; op: O; e: E }, J>
 			: X
 		: never;
@@ -1043,19 +1075,19 @@ type ParseUnary<T extends Toks, O extends string, I extends number> =
 type ParseParen<T extends Toks, I extends number> =
 	IsSelectStart<T, I> extends true
 		? ParseSelectStmt<T, I> extends infer X
-			? X extends Ok<infer S, infer J extends number>
+			? X extends Ok<infer S, infer J>
 				? EatOp<T, J, ")"> extends never
 					? Expected<'")"', T, J>
 					: Ok<{ t: "sub"; q: S }, EatOp<T, J, ")">>
 				: X
 			: never
 		: ParseExpr<T, I, 0> extends infer X
-			? X extends Ok<infer E, infer J extends number>
+			? X extends Ok<infer E, infer J>
 				? EatOp<T, J, ")"> extends never
 					? EatOp<T, J, ","> extends never
 						? Expected<'")"', T, J>
 						: ParseExprList<T, EatOp<T, J, ",">, [E]> extends infer Y
-							? Y extends Ok<infer Items, infer J2 extends number>
+							? Y extends Ok<infer Items, infer J2>
 								? EatOp<T, J2, ")"> extends never
 									? Expected<'")"', T, J2>
 									: Ok<{ t: "row"; items: Items }, EatOp<T, J2, ")">>
@@ -1102,21 +1134,17 @@ type ParseNameExpr<T extends Toks, I extends number> =
 
 type LastOf<Parts extends readonly string[]> = Parts extends readonly [
 	...string[],
-	infer L extends string,
+	infer L,
 ]
 	? L
 	: never;
 type ColRefOf<Parts extends readonly string[]> = Parts extends readonly [
-	infer C extends string,
+	infer C,
 ]
 	? { t: "col"; tbl: null; name: C }
-	: Parts extends readonly [infer Tb extends string, infer C extends string]
+	: Parts extends readonly [infer Tb, infer C]
 		? { t: "col"; tbl: Tb; name: C }
-		: Parts extends readonly [
-					string,
-					infer Tb extends string,
-					infer C extends string,
-				]
+		: Parts extends readonly [string, infer Tb, infer C]
 			? { t: "col"; tbl: Tb; name: C }
 			: never;
 
@@ -1139,7 +1167,7 @@ type ParseCallArgs<
 	Distinct extends boolean,
 > =
 	ParseArgList<T, I, [], never> extends infer X
-		? X extends Ok<infer Args, infer J extends number>
+		? X extends Ok<infer Args, infer J>
 			? SkipAggOrderBy<T, J> extends infer J2
 				? J2 extends number
 					? EatOp<T, J2, ")"> extends never
@@ -1162,24 +1190,25 @@ type ParseArgList<
 > =
 	T[I] extends WordTok<"variadic">
 		? ParseArg<T, Nx<I>, Names> extends infer X
-			? X extends Ok<infer E, infer J extends number>
+			? X extends Ok<infer E, infer J>
 				? Ok<[...Acc, { t: "variadic"; e: E }], J>
 				: X
 			: never
 		: ParseArg<T, I, Names> extends infer X
-			? X extends Ok<infer E, infer J extends number>
+			? X extends Ok<infer E, infer J>
 				? EatOp<T, J, ","> extends never
 					? Ok<[...Acc, E], J>
 					: ParseArgList<
 							T,
 							EatOp<T, J, ",">,
 							[...Acc, E],
-							E extends {
-								readonly t: "named";
-								readonly name: infer N extends string;
-							}
-								? Names | N
-								: Names
+							| Names
+							| (E extends {
+									readonly t: "named";
+									readonly name: infer N extends string;
+							  }
+									? N
+									: never)
 						>
 				: X
 			: never;
@@ -1190,7 +1219,7 @@ type ParseArg<T extends Toks, I extends number, Names extends string> =
 			? N extends Names
 				? Fail<`argument name "${N}" used more than once`, I>
 				: ParseExpr<T, Nx2<I>, 0> extends infer X
-					? X extends Ok<infer E, infer J extends number>
+					? X extends Ok<infer E, infer J>
 						? Ok<{ t: "named"; name: N; e: E }, J>
 						: X
 					: never
@@ -1219,7 +1248,7 @@ type SkipAggOrderBy<T extends Toks, I extends number> =
 	EatWords<T, I, ["order", "by"]> extends never
 		? I
 		: ParseOrderList<T, EatWords<T, I, ["order", "by"]>> extends infer X
-			? X extends Ok<unknown, infer J extends number>
+			? X extends Ok<unknown, infer J>
 				? J
 				: X
 			: never;
@@ -1233,11 +1262,11 @@ type ParseCallSuffix<
 	I extends number,
 > =
 	ParseWithinGroup<T, I> extends infer W
-		? W extends Ok<infer WG, infer I1 extends number>
+		? W extends Ok<infer WG, infer I1>
 			? ParseFilter<T, I1> extends infer F
-				? F extends Ok<infer Flt, infer I2 extends number>
+				? F extends Ok<infer Flt, infer I2>
 					? ParseOver<T, I2> extends infer O
-						? O extends Ok<infer Ov, infer I3 extends number>
+						? O extends Ok<infer Ov, infer I3>
 							? Ok<
 									{
 										t: "call";
@@ -1245,7 +1274,7 @@ type ParseCallSuffix<
 										args: Args;
 										distinct: Distinct;
 										filter: Flt;
-										over: Ov extends null ? false : true;
+										over: Ov extends null ? false : true; // type-mutate: equivalent never-false – read with `extends true`, where never counts as true
 										win: Ov;
 										withinGroup: WG;
 									},
@@ -1282,7 +1311,7 @@ type ParseWithinGroup<T extends Toks, I extends number> =
 								["order", "by"]
 							>
 						> extends infer X
-					? X extends Ok<infer Es, infer J extends number>
+					? X extends Ok<infer Es, infer J>
 						? EatOp<T, J, ")"> extends never
 							? Expected<'")"', T, J>
 							: // several sort keys (hypothetical-set aggregates: `rank(1, 2) WITHIN GROUP (ORDER BY a, b)`) are kept as a row
@@ -1309,7 +1338,7 @@ export type ParseFilter<T extends Toks, I extends number> =
 							EatWord<T, EatOp<T, EatWord<T, I, "filter">, "(">, "where">,
 							0
 						> extends infer X
-					? X extends Ok<infer E, infer J extends number>
+					? X extends Ok<infer E, infer J>
 						? EatOp<T, J, ")"> extends never
 							? Expected<'")"', T, J>
 							: Ok<E, EatOp<T, J, ")">>
@@ -1328,26 +1357,30 @@ export type ParseOver<T extends Toks, I extends number> =
 
 /**
  * Window specification after `(`: `[existing_window] [PARTITION BY exprs] [ORDER BY items] [frame] )`.
- * The frame clause (`ROWS | RANGE | GROUPS ... [EXCLUDE ...]`) is parsed and discarded.
+ * The frame clause (`ROWS | RANGE | GROUPS ... [EXCLUDE ...]`) is checked and discarded.
  */
 export type ParseWindowSpec<T extends Toks, I extends number> =
-	WindowBaseName<T, I> extends [
-		infer Name extends string | null,
-		infer I1 extends number,
-	]
+	WindowBaseName<T, I> extends [infer Name, infer I1 extends number]
 		? ParseWindowPartition<T, I1> extends infer P
-			? P extends Ok<infer Part, infer I2 extends number>
+			? P extends Ok<infer Part, infer I2>
 				? ParseWindowOrder<T, I2> extends infer O
-					? O extends Ok<infer Ord, infer I3 extends number>
-						? SkipFrame<T, I3> extends infer I4
-							? I4 extends number
-								? EatOp<T, I4, ")"> extends never
-									? Expected<'")"', T, I4>
-									: Ok<
-											{ name: Name; partition: Part; order: Ord },
-											EatOp<T, I4, ")">
-										>
-								: I4
+					? O extends Ok<infer Ord, infer I3>
+						? ParseFrame<T, I3> extends infer F
+							? F extends Ok<infer Kinds, infer I4>
+								? FrameOrderError<
+										T[I3],
+										Kinds,
+										Name,
+										Ord
+									> extends infer M extends string
+									? Fail<M, I3>
+									: EatOp<T, I4, ")"> extends never
+										? Expected<'")"', T, I4>
+										: Ok<
+												{ name: Name; partition: Part; order: Ord },
+												EatOp<T, I4, ")">
+											>
+								: F
 							: never
 						: O
 					: never
@@ -1370,52 +1403,95 @@ type ParseWindowOrder<T extends Toks, I extends number> =
 	EatWords<T, I, ["order", "by"]> extends never
 		? Ok<[], I>
 		: ParseOrderList<T, EatWords<T, I, ["order", "by"]>>;
-/** `[ROWS | RANGE | GROUPS] (BETWEEN bound AND bound | bound) [EXCLUDE ...]` → next index or error. */
-type SkipFrame<T extends Toks, I extends number> =
+/**
+ * `[ROWS | RANGE | GROUPS] (BETWEEN bound AND bound | bound) [EXCLUDE ...]` → `Ok<kinds of
+ * the bounds, next>` or error. The bounds are checked as Postgres's grammar checks them; a
+ * single bound ends at the current row.
+ */
+type ParseFrame<T extends Toks, I extends number> =
 	EatWord<T, I, "rows" | "range" | "groups"> extends never
-		? I
-		: EatWord<
-					T,
-					EatWord<T, I, "rows" | "range" | "groups">,
-					"between"
-				> extends never
-			? ParseFrameBound<
-					T,
-					EatWord<T, I, "rows" | "range" | "groups">
-				> extends infer J
-				? J extends number
-					? SkipExclude<T, J>
-					: J
+		? Ok<never, I>
+		: EatWord<T, Nx<I>, "between"> extends never
+			? ParseFrameBound<T, Nx<I>> extends infer B
+				? B extends readonly [infer S, infer J extends number]
+					? S extends "unbounded following"
+						? Fail<"frame start cannot be UNBOUNDED FOLLOWING", I>
+						: S extends "following"
+							? Fail<
+									"frame starting from following row cannot end with current row",
+									I
+								>
+							: FrameExclusion<T, S, J>
+					: B
 				: never
-			: ParseFrameBound<
-						T,
-						EatWord<T, EatWord<T, I, "rows" | "range" | "groups">, "between">
-					> extends infer J
-				? J extends number
+			: ParseFrameBound<T, Nx2<I>> extends infer B
+				? B extends readonly [infer S, infer J extends number]
 					? EatWord<T, J, "and"> extends never
 						? Expected<"AND", T, J>
-						: ParseFrameBound<T, EatWord<T, J, "and">> extends infer J2
-							? J2 extends number
-								? SkipExclude<T, J2>
-								: J2
+						: ParseFrameBound<T, Nx<J>> extends infer B2
+							? B2 extends readonly [infer E, infer J2 extends number]
+								? FrameError<S, E> extends infer M extends string
+									? Fail<M, I>
+									: FrameExclusion<T, S | E, J2>
+								: B2
 							: never
-					: J
+					: B
 				: never;
-/** `UNBOUNDED PRECEDING | UNBOUNDED FOLLOWING | CURRENT ROW | expr PRECEDING | expr FOLLOWING` → next index or error. */
+/** `[EXCLUDE ...]` after the bounds → `Ok<Kinds, next>` or error. */
+type FrameExclusion<T extends Toks, Kinds, I extends number> =
+	SkipExclude<T, I> extends infer J
+		? J extends number
+			? Ok<Kinds, J>
+			: J
+		: never;
+/**
+ * Postgres's checks of a frame (mode token `Mode`, bound kinds `Kinds`) against the window's
+ * own ORDER BY; a window built on a named one may take that one's ORDER BY.
+ */
+type FrameOrderError<Mode, Kinds, Name, Ord> = [Name, Ord] extends [
+	null,
+	readonly [],
+]
+	? Mode extends WordTok<"groups">
+		? "GROUPS mode requires an ORDER BY clause"
+		: Mode extends WordTok<"range">
+			? [Extract<Kinds, "preceding" | "following">] extends [never]
+				? null
+				: "RANGE with offset PRECEDING/FOLLOWING requires exactly one ORDER BY column"
+			: null
+	: null;
+/** The error of a `BETWEEN S AND E` frame, or null. */
+type FrameError<S, E> = S extends "unbounded following"
+	? "frame start cannot be UNBOUNDED FOLLOWING"
+	: E extends "unbounded preceding"
+		? "frame end cannot be UNBOUNDED PRECEDING"
+		: S extends "current row"
+			? E extends "preceding"
+				? "frame starting from current row cannot have preceding rows"
+				: null
+			: S extends "following"
+				? E extends "preceding" | "current row"
+					? "frame starting from following row cannot have preceding rows"
+					: null
+				: null;
+/**
+ * `UNBOUNDED PRECEDING | UNBOUNDED FOLLOWING | CURRENT ROW | expr PRECEDING | expr FOLLOWING`
+ * → `[kind, next]` (`"preceding"` / `"following"` for an offset) or error.
+ */
 type ParseFrameBound<T extends Toks, I extends number> =
 	EatWords<T, I, ["unbounded", "preceding"]> extends never
 		? EatWords<T, I, ["unbounded", "following"]> extends never
 			? EatWords<T, I, ["current", "row"]> extends never
 				? ParseExpr<T, I, 0> extends infer X
-					? X extends Ok<unknown, infer J extends number>
-						? EatWord<T, J, "preceding" | "following"> extends never
-							? Expected<"PRECEDING or FOLLOWING", T, J>
-							: EatWord<T, J, "preceding" | "following">
+					? X extends Ok<unknown, infer J>
+						? T[J] extends WordTok<infer D extends "preceding" | "following">
+							? [D, Nx<J>]
+							: Expected<"PRECEDING or FOLLOWING", T, J>
 						: X
 					: never
-				: EatWords<T, I, ["current", "row"]>
-			: EatWords<T, I, ["unbounded", "following"]>
-		: EatWords<T, I, ["unbounded", "preceding"]>;
+				: ["current row", Nx2<I>]
+			: ["unbounded following", Nx2<I>]
+		: ["unbounded preceding", Nx2<I>];
 type SkipExclude<T extends Toks, I extends number> =
 	EatWord<T, I, "exclude"> extends never
 		? I
@@ -1434,7 +1510,7 @@ type SkipExclude<T extends Toks, I extends number> =
 type ParseCase<T extends Toks, I extends number> =
 	EatWord<T, I, "when"> extends never
 		? ParseExpr<T, I, 0> extends infer X
-			? X extends Ok<infer Operand, infer J extends number>
+			? X extends Ok<infer Operand, infer J>
 				? ParseCaseWhens<T, Operand, J, []>
 				: X
 			: never
@@ -1454,7 +1530,7 @@ type ParseCaseWhens<
 						EatWord<T, I, "end">
 					>
 			: ParseExpr<T, EatWord<T, I, "else">, 0> extends infer X
-				? X extends Ok<infer E, infer J extends number>
+				? X extends Ok<infer E, infer J>
 					? EatWord<T, J, "end"> extends never
 						? Expected<"END", T, J>
 						: Ok<
@@ -1464,11 +1540,11 @@ type ParseCaseWhens<
 					: X
 				: never
 		: ParseExpr<T, EatWord<T, I, "when">, 0> extends infer X
-			? X extends Ok<infer W, infer J extends number>
+			? X extends Ok<infer W, infer J>
 				? EatWord<T, J, "then"> extends never
 					? Expected<"THEN", T, J>
 					: ParseExpr<T, EatWord<T, J, "then">, 0> extends infer Y
-						? Y extends Ok<infer Th, infer J2 extends number>
+						? Y extends Ok<infer Th, infer J2>
 							? ParseCaseWhens<T, Operand, J2, [...Acc, { when: W; then: Th }]>
 							: Y
 						: never
@@ -1479,11 +1555,11 @@ type ParseCast<T extends Toks, I extends number> =
 	EatOp<T, I, "("> extends never
 		? Expected<'"("', T, I>
 		: ParseExpr<T, EatOp<T, I, "(">, 0> extends infer X
-			? X extends Ok<infer E, infer J extends number>
+			? X extends Ok<infer E, infer J>
 				? EatWord<T, J, "as"> extends never
 					? Expected<"AS", T, J>
 					: ParseTypeName<T, EatWord<T, J, "as">> extends infer Y
-						? Y extends Ok<infer Ty extends string, infer J2 extends number>
+						? Y extends Ok<infer Ty, infer J2>
 							? EatOp<T, J2, ")"> extends never
 								? Expected<'")"', T, J2>
 								: Ok<{ t: "cast"; e: E; to: Ty }, EatOp<T, J2, ")">>
@@ -1508,7 +1584,7 @@ type ParseArray<T extends Toks, I extends number> =
 		? EatOp<T, I, "("> extends never
 			? Expected<'"[" or "("', T, I>
 			: ParseSelectStmt<T, EatOp<T, I, "(">> extends infer X
-				? X extends Ok<infer S, infer J extends number>
+				? X extends Ok<infer S, infer J>
 					? EatOp<T, J, ")"> extends never
 						? Expected<'")"', T, J>
 						: Ok<{ t: "arraysub"; q: S }, EatOp<T, J, ")">>
@@ -1519,7 +1595,7 @@ type ParseArray<T extends Toks, I extends number> =
 type ParseArrayLiteral<T extends Toks, I extends number> =
 	EatOp<T, I, "]"> extends never
 		? ParseExprList<T, I, []> extends infer X
-			? X extends Ok<infer Items, infer J extends number>
+			? X extends Ok<infer Items, infer J>
 				? EatOp<T, J, "]"> extends never
 					? Expected<'"]"', T, J>
 					: Ok<{ t: "array"; items: Items }, EatOp<T, J, "]">>
@@ -1531,7 +1607,7 @@ type ParseArrayLiteral<T extends Toks, I extends number> =
 type ParseRow<T extends Toks, I extends number> =
 	EatOp<T, I, ")"> extends never
 		? ParseExprList<T, I, []> extends infer X
-			? X extends Ok<infer Items, infer J extends number>
+			? X extends Ok<infer Items, infer J>
 				? EatOp<T, J, ")"> extends never
 					? Expected<'")"', T, J>
 					: Ok<{ t: "row"; items: Items }, EatOp<T, J, ")">>
@@ -1546,7 +1622,7 @@ type ParseExtract<T extends Toks, I extends number> = T[I] extends
 	? EatWord<T, Nx<I>, "from"> extends never
 		? Expected<"FROM", T, Nx<I>>
 		: ParseExpr<T, EatWord<T, Nx<I>, "from">, 0> extends infer X
-			? X extends Ok<infer E, infer J extends number>
+			? X extends Ok<infer E, infer J>
 				? EatOp<T, J, ")"> extends never
 					? Expected<'")"', T, J>
 					: Ok<{ t: "extract"; field: F; e: E }, EatOp<T, J, ")">>
@@ -1557,11 +1633,11 @@ type ParseExtract<T extends Toks, I extends number> = T[I] extends
 /** After `POSITION(`: `sub IN str`. The first operand stops before `IN`. */
 type ParsePosition<T extends Toks, I extends number> =
 	ParseExpr<T, I, 7> extends infer X
-		? X extends Ok<infer Sub, infer J extends number>
+		? X extends Ok<infer Sub, infer J>
 			? EatWord<T, J, "in"> extends never
 				? Expected<"IN", T, J>
 				: ParseExpr<T, EatWord<T, J, "in">, 0> extends infer Y
-					? Y extends Ok<infer In, infer J2 extends number>
+					? Y extends Ok<infer In, infer J2>
 						? EatOp<T, J2, ")"> extends never
 							? Expected<'")"', T, J2>
 							: Ok<{ t: "position"; sub: Sub; in: In }, EatOp<T, J2, ")">>
@@ -1570,74 +1646,72 @@ type ParsePosition<T extends Toks, I extends number> =
 			: X
 		: never;
 
-/** After `SUBSTRING(`: `e FROM a FOR b`, `e FOR b`, `e SIMILAR p ESCAPE c`, or `e, a[, b]`. */
+/**
+ * After `SUBSTRING(`: `e FROM a [FOR b]`, `e FOR b [FROM a]`, `e SIMILAR p ESCAPE c`, or
+ * `e, a[, b]`.
+ */
 type ParseSubstring<T extends Toks, I extends number> =
 	ParseExpr<T, I, 0> extends infer X
-		? X extends Ok<infer E, infer J extends number>
+		? X extends Ok<infer E, infer J>
 			? EatOp<T, J, ","> extends never
-				? ParseSubstringFromFor<T, E, J, null>
+				? ParseSubstringFromFor<T, E, J>
 				: ParseExprList<T, EatOp<T, J, ",">, []> extends infer Y
-					? Y extends Ok<infer Rest, infer J2 extends number>
-						? EatOp<T, J2, ")"> extends never
-							? Expected<'")"', T, J2>
-							: Ok<
-									{
-										t: "substring";
-										e: E;
-										from: Rest extends readonly [infer F, ...unknown[]]
-											? F
-											: null;
-										for: Rest extends readonly [unknown, infer G, ...unknown[]]
-											? G
-											: null;
-									},
-									EatOp<T, J2, ")">
-								>
+					? Y extends Ok<readonly [infer From, ...infer More], infer J2>
+						? CloseSubstring<
+								T,
+								E,
+								From,
+								More extends readonly [infer For, ...unknown[]] ? For : null,
+								J2
+							>
 						: Y
 					: never
 			: X
 		: never;
-type ParseSubstringFromFor<T extends Toks, E, I extends number, From> =
+/** After `SUBSTRING(e`. */
+type ParseSubstringFromFor<T extends Toks, E, I extends number> =
 	EatWord<T, I, "from"> extends never
 		? EatWord<T, I, "for"> extends never
 			? EatWord<T, I, "similar"> extends never
-				? EatOp<T, I, ")"> extends never
-					? Expected<'")"', T, I>
-					: Ok<
-							{ t: "substring"; e: E; from: From; for: null },
-							EatOp<T, I, ")">
-						>
-				: ParseExpr<T, EatWord<T, I, "similar">, 0> extends infer X
-					? X extends Ok<infer Pat, infer J extends number>
-						? EatWord<T, J, "escape"> extends never
+				? CloseSubstring<T, E, null, null, I>
+				: SubstringOperands<
+							T,
+							EatWord<T, I, "similar">,
+							"escape"
+						> extends infer X
+					? X extends Ok<{ a: infer P; b: infer C }, infer J>
+						? C extends null
 							? Expected<"ESCAPE", T, J>
-							: ParseExpr<T, EatWord<T, J, "escape">, 0> extends infer Y
-								? Y extends Ok<infer Esc, infer J2 extends number>
-									? EatOp<T, J2, ")"> extends never
-										? Expected<'")"', T, J2>
-										: Ok<
-												{ t: "substring"; e: E; from: Pat; for: Esc },
-												EatOp<T, J2, ")">
-											>
-									: Y
-								: never
+							: CloseSubstring<T, E, P, C, J>
 						: X
 					: never
-			: ParseExpr<T, EatWord<T, I, "for">, 0> extends infer X
-				? X extends Ok<infer For, infer J extends number>
-					? EatOp<T, J, ")"> extends never
-						? Expected<'")"', T, J>
-						: Ok<
-								{ t: "substring"; e: E; from: From; for: For },
-								EatOp<T, J, ")">
-							>
+			: SubstringOperands<T, EatWord<T, I, "for">, "from"> extends infer X
+				? X extends Ok<{ a: infer For; b: infer From }, infer J>
+					? CloseSubstring<T, E, From, For, J>
 					: X
 				: never
-		: ParseExpr<T, EatWord<T, I, "from">, 0> extends infer X
-			? X extends Ok<infer Fr, infer J extends number>
-				? ParseSubstringFromFor<T, E, J, Fr>
+		: SubstringOperands<T, EatWord<T, I, "from">, "for"> extends infer X
+			? X extends Ok<{ a: infer From; b: infer For }, infer J>
+				? CloseSubstring<T, E, From, For, J>
 				: X
 			: never;
+/** `a [W b]` → `Ok<{ a; b }, next>` (`b` is null without `W`). */
+type SubstringOperands<T extends Toks, I extends number, W extends string> =
+	ParseExpr<T, I, 0> extends infer X
+		? X extends Ok<infer A, infer J>
+			? EatWord<T, J, W> extends never
+				? Ok<{ a: A; b: null }, J>
+				: ParseExpr<T, EatWord<T, J, W>, 0> extends infer Y
+					? Y extends Ok<infer B, infer J2>
+						? Ok<{ a: A; b: B }, J2>
+						: Y
+					: never
+			: X
+		: never;
+type CloseSubstring<T extends Toks, E, From, For, I extends number> =
+	EatOp<T, I, ")"> extends never
+		? Expected<'")"', T, I>
+		: Ok<{ t: "substring"; e: E; from: From; for: For }, EatOp<T, I, ")">>;
 
 /** After `TRIM(`: `[BOTH|LEADING|TRAILING] [chars FROM] e` or `(e)` / `(e, chars)`. */
 type ParseTrim<T extends Toks, I extends number> =
@@ -1647,7 +1721,7 @@ type ParseTrim<T extends Toks, I extends number> =
 type ParseTrimBody<T extends Toks, I extends number, Side extends string> =
 	EatWord<T, I, "from"> extends never
 		? ParseExpr<T, I, 0> extends infer X
-			? X extends Ok<infer E1, infer J extends number>
+			? X extends Ok<infer E1, infer J>
 				? EatWord<T, J, "from"> extends never
 					? EatOp<T, J, ","> extends never
 						? EatOp<T, J, ")"> extends never
@@ -1657,7 +1731,7 @@ type ParseTrimBody<T extends Toks, I extends number, Side extends string> =
 									EatOp<T, J, ")">
 								>
 						: ParseExpr<T, EatOp<T, J, ",">, 0> extends infer Y
-							? Y extends Ok<infer C, infer J2 extends number>
+							? Y extends Ok<infer C, infer J2>
 								? EatOp<T, J2, ")"> extends never
 									? Expected<'")"', T, J2>
 									: Ok<
@@ -1667,7 +1741,7 @@ type ParseTrimBody<T extends Toks, I extends number, Side extends string> =
 								: Y
 							: never
 					: ParseExpr<T, EatWord<T, J, "from">, 0> extends infer Y
-						? Y extends Ok<infer E, infer J2 extends number>
+						? Y extends Ok<infer E, infer J2>
 							? EatOp<T, J2, ")"> extends never
 								? Expected<'")"', T, J2>
 								: Ok<
@@ -1679,7 +1753,7 @@ type ParseTrimBody<T extends Toks, I extends number, Side extends string> =
 				: X
 			: never
 		: ParseExpr<T, EatWord<T, I, "from">, 0> extends infer X
-			? X extends Ok<infer E, infer J extends number>
+			? X extends Ok<infer E, infer J>
 				? EatOp<T, J, ")"> extends never
 					? Expected<'")"', T, J>
 					: Ok<{ t: "trim"; e: E; chars: null; side: Side }, EatOp<T, J, ")">>
@@ -1689,24 +1763,20 @@ type ParseTrimBody<T extends Toks, I extends number, Side extends string> =
 /** After `OVERLAY(`: `e PLACING p FROM a [FOR b]`. */
 type ParseOverlay<T extends Toks, I extends number> =
 	ParseExpr<T, I, 0> extends infer X
-		? X extends Ok<infer E, infer J extends number>
+		? X extends Ok<infer E, infer J>
 			? EatWord<T, J, "placing"> extends never
 				? Expected<"PLACING", T, J>
 				: ParseExpr<T, EatWord<T, J, "placing">, 0> extends infer Y
-					? Y extends Ok<unknown, infer J2 extends number>
+					? Y extends Ok<infer P, infer J2>
 						? EatWord<T, J2, "from"> extends never
 							? Expected<"FROM", T, J2>
 							: ParseExpr<T, EatWord<T, J2, "from">, 0> extends infer Z
-								? Z extends Ok<unknown, infer J3 extends number>
+								? Z extends Ok<infer From, infer J3>
 									? EatWord<T, J3, "for"> extends never
-										? EatOp<T, J3, ")"> extends never
-											? Expected<'")"', T, J3>
-											: Ok<{ t: "overlay"; e: E }, EatOp<T, J3, ")">>
+										? CloseOverlay<T, E, P, From, null, J3>
 										: ParseExpr<T, EatWord<T, J3, "for">, 0> extends infer V
-											? V extends Ok<unknown, infer J4 extends number>
-												? EatOp<T, J4, ")"> extends never
-													? Expected<'")"', T, J4>
-													: Ok<{ t: "overlay"; e: E }, EatOp<T, J4, ")">>
+											? V extends Ok<infer For, infer J4>
+												? CloseOverlay<T, E, P, From, For, J4>
 												: V
 											: never
 									: Z
@@ -1715,6 +1785,13 @@ type ParseOverlay<T extends Toks, I extends number> =
 					: never
 			: X
 		: never;
+type CloseOverlay<T extends Toks, E, P, From, For, I extends number> =
+	EatOp<T, I, ")"> extends never
+		? Expected<'")"', T, I>
+		: Ok<
+				{ t: "overlay"; e: E; placing: P; from: From; for: For },
+				EatOp<T, I, ")">
+			>;
 
 // ───────────────────────────── lists ─────────────────────────────
 
@@ -1725,7 +1802,7 @@ export type ParseExprList<
 	Acc extends readonly unknown[],
 > =
 	ParseExpr<T, I, 0> extends infer X
-		? X extends Ok<infer E, infer J extends number>
+		? X extends Ok<infer E, infer J>
 			? EatOp<T, J, ","> extends never
 				? Ok<[...Acc, E], J>
 				: ParseExprList<T, EatOp<T, J, ",">, [...Acc, E]>
@@ -1739,7 +1816,7 @@ export type ParseOrderList<
 	Acc extends readonly unknown[] = [],
 > =
 	ParseExpr<T, I, 0> extends infer X
-		? X extends Ok<infer E, infer J extends number>
+		? X extends Ok<infer E, infer J>
 			? EatOp<T, SkipOrderTail<T, J>, ","> extends never
 				? Ok<[...Acc, E], SkipOrderTail<T, J>>
 				: ParseOrderList<T, EatOp<T, SkipOrderTail<T, J>, ",">, [...Acc, E]>

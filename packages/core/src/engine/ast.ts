@@ -185,7 +185,13 @@ export type Trim = {
 	readonly side: "both" | "leading" | "trailing";
 };
 /** `OVERLAY(e PLACING p FROM a [FOR b])` */
-export type Overlay = { readonly t: "overlay"; readonly e: Expr };
+export type Overlay = {
+	readonly t: "overlay";
+	readonly e: Expr;
+	readonly placing: Expr;
+	readonly from: Expr;
+	readonly for: Expr | null;
+};
 /** `e AT TIME ZONE z` */
 export type AtTimeZone = {
 	readonly t: "attz";

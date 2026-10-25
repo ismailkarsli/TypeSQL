@@ -225,11 +225,24 @@ export type TypeOf<E extends Expr, C extends Ctx> = E extends {
 																																		readonly t: "overlay";
 																																	}
 																																? StringResult<
-																																		TypeOf<
-																																			E["e"],
+																																		StringResult<
+																																			TypeOf<
+																																				E["e"],
+																																				C
+																																			>,
+																																			TypeOf<
+																																				E["placing"],
+																																				C
+																																			>,
+																																			TypeOf<
+																																				E["from"],
+																																				C
+																																			>
+																																		>,
+																																		TypeOpt<
+																																			E["for"],
 																																			C
 																																		>,
-																																		null,
 																																		null
 																																	>
 																																: E extends {

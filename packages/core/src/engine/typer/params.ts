@@ -364,10 +364,25 @@ export type ParamsOfExpr<E extends Expr, C extends Ctx, M> = E extends {
 																											readonly t: "overlay";
 																										}
 																									? ParamsOfOpt<
-																											E["e"],
+																											E["for"],
 																											C,
-																											M,
-																											Info<"text", true>
+																											ParamsOfOpt<
+																												E["from"],
+																												C,
+																												ParamsOfOpt<
+																													E["placing"],
+																													C,
+																													ParamsOfOpt<
+																														E["e"],
+																														C,
+																														M,
+																														Info<"text", true>
+																													>,
+																													Info<"text", true>
+																												>,
+																												Info<"int4", true>
+																											>,
+																											Info<"int4", true>
 																										>
 																									: E extends {
 																												readonly t: "attz";
@@ -434,7 +449,8 @@ export type ParamsOfExpr<E extends Expr, C extends Ctx, M> = E extends {
 /**
  * Type of a `$n` in SUBSTRING's FROM / FOR. With an unknown argument Postgres prefers the
  * string category, i.e. the regex form `substring(text, text [, text])`, unless the other
- * position is an integer (`FROM 1 FOR $1` → int4; there is no form for a bigint or numeric).
+ * position is an integer (`FROM 1 FOR $1` → int4; there is no form for a bigint or numeric),
+ * or there is no FROM (`FOR $1` is `FROM 1 FOR $1`).
  * bytea / bit strings only have the integer form.
  */
 type SubstrPosType<
@@ -445,13 +461,15 @@ type SubstrPosType<
 > =
 	TypeOf<S, C> extends { readonly type: "bytea" | "bit" | "varbit" }
 		? Info<"int4", true>
-		: (From extends { readonly t: "param" } ? For : From) extends infer Sib
-			? Sib extends Expr
-				? TypeOf<Sib, C> extends { readonly type: "int2" | "int4" }
-					? Info<"int4", true>
+		: From extends null
+			? Info<"int4", true> // `FOR n` alone is `substring(s, 1, n)`
+			: (From extends { readonly t: "param" } ? For : From) extends infer Sib
+				? Sib extends Expr
+					? TypeOf<Sib, C> extends { readonly type: "int2" | "int4" }
+						? Info<"int4", true>
+						: Info<"text", true>
 					: Info<"text", true>
-				: Info<"text", true>
-			: never;
+				: never;
 
 /**
  * A param in `E` gets type `T` (when `T` is not null); a cast param `$n::X` gets `X` with
