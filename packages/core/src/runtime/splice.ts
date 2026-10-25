@@ -17,10 +17,13 @@ export type SlotValues = { readonly [name: string]: Spliceable };
 const SLOT = /\{([A-Za-z_][A-Za-z0-9_]*)\}/g;
 
 /**
- * `fn` remembered per text. A program has a fixed set of statement texts, so these stay small;
- * past `limit` entries (texts built at runtime) the memo starts over.
+ * `fn` remembered per argument. A program has a fixed set of statement texts (and column
+ * names), so these stay small; past `limit` entries (texts built at runtime) the memo starts over.
  */
-function memo<V>(fn: (text: string) => V, limit = 10_000): (text: string) => V {
+export function memo<V>(
+	fn: (text: string) => V,
+	limit = 10_000,
+): (text: string) => V {
 	const cache = new Map<string, V>();
 	return (text) => {
 		let v = cache.get(text);
@@ -32,6 +35,29 @@ function memo<V>(fn: (text: string) => V, limit = 10_000): (text: string) => V {
 		return v;
 	};
 }
+
+/**
+ * A quoted string or quoted identifier (`''` / `""` escapes), a `--` comment or a block
+ * comment, each running to the end of the text when unclosed. No capturing group, so the
+ * expressions built from it number their own groups from 1.
+ */
+export const QUOTED =
+	/'(?:[^']|'')*'?|"(?:[^"]|"")*"?|--[^\n]*|\/\*[\s\S]*?(?:\*\/|$)/;
+/** A dollar-quoted string (`$$ … $$`, `$tag$ … $tag$`; to the end when unclosed). Group 1: the opener. */
+const DOLLAR_QUOTED = /(\$(?:[A-Za-z_][A-Za-z0-9_]*)?\$)[\s\S]*?(?:\1|$)/;
+/** Text to copy, or (group 2) the number of a `$n`. */
+const PARAMS = new RegExp(
+	`${QUOTED.source}|${DOLLAR_QUOTED.source}|\\$(\\d+)`,
+	"g",
+);
+/**
+ * Text to copy, or (group 2) the name of a `:name`. A run of colons (`::` casts) is copied, so
+ * a colon right after another one never starts a name.
+ */
+const NAMED = new RegExp(
+	`${QUOTED.source}|${DOLLAR_QUOTED.source}|::+|:([A-Za-z_][A-Za-z0-9_]*)`,
+	"g",
+);
 
 /** Highest `$n` in `text` (0 if none), skipping literals and comments. */
 export function maxParam(text: string): number {
@@ -50,66 +76,13 @@ export function renumberParams(text: string, offset: number): string {
 }
 
 /**
- * Walk `text`; for every `$n` placeholder call `onParam(n)`. If it returns a string,
- * that string replaces the placeholder in the returned text.
+ * Call `onParam(n)` for every `$n` placeholder of `text` outside literals and comments; when it
+ * returns a string, that string replaces the placeholder in the returned text.
  */
 function scan(text: string, onParam: (n: number) => string | null): string {
-	let out = "";
-	let i = 0;
-	const len = text.length;
-	while (i < len) {
-		const c = text[i]!;
-		if (c === "'" || c === '"') {
-			// quoted string / identifier with doubled-quote escapes
-			let j = i + 1;
-			while (j < len) {
-				if (text[j] === c) {
-					if (text[j + 1] === c) {
-						j += 2;
-						continue;
-					}
-					break;
-				}
-				j++;
-			}
-			out += text.slice(i, j + 1);
-			i = j + 1;
-		} else if (c === "-" && text[i + 1] === "-") {
-			const j = text.indexOf("\n", i);
-			const end = j === -1 ? len : j;
-			out += text.slice(i, end);
-			i = end;
-		} else if (c === "/" && text[i + 1] === "*") {
-			const j = text.indexOf("*/", i + 2);
-			const end = j === -1 ? len : j + 2;
-			out += text.slice(i, end);
-			i = end;
-		} else if (c === "$") {
-			const m = /^\$(\d+)/.exec(text.slice(i));
-			if (m) {
-				const n = Number(m[1]);
-				const rep = onParam(n);
-				out += rep ?? m[0];
-				i += m[0].length;
-			} else {
-				// dollar-quoted string: $tag$ ... $tag$
-				const dq = /^\$([A-Za-z_][A-Za-z0-9_]*)?\$/.exec(text.slice(i));
-				if (dq) {
-					const close = text.indexOf(dq[0], i + dq[0].length);
-					const end = close === -1 ? len : close + dq[0].length;
-					out += text.slice(i, end);
-					i = end;
-				} else {
-					out += c;
-					i++;
-				}
-			}
-		} else {
-			out += c;
-			i++;
-		}
-	}
-	return out;
+	return text.replace(PARAMS, (m: string, _open?: string, n?: string) =>
+		n === undefined ? m : (onParam(Number(n)) ?? m),
+	);
 }
 
 /**
@@ -171,90 +144,16 @@ export const rewriteNamedOnce: (text: string) => {
  */
 export function rewriteNamed(text: string): { text: string; names: string[] } {
 	const names: string[] = [];
-	let out = "";
-	let i = 0;
-	const len = text.length;
-	const skipLiteral = (): boolean => {
-		const c = text[i]!;
-		if (c === "'" || c === '"') {
-			let j = i + 1;
-			while (j < len) {
-				if (text[j] === c) {
-					if (text[j + 1] === c) {
-						j += 2;
-						continue;
-					}
-					break;
-				}
-				j++;
-			}
-			out += text.slice(i, j + 1);
-			i = j + 1;
-			return true;
-		}
-		if (c === "-" && text[i + 1] === "-") {
-			const j = text.indexOf("\n", i);
-			const end = j === -1 ? len : j;
-			out += text.slice(i, end);
-			i = end;
-			return true;
-		}
-		if (c === "/" && text[i + 1] === "*") {
-			const j = text.indexOf("*/", i + 2);
-			const end = j === -1 ? len : j + 2;
-			out += text.slice(i, end);
-			i = end;
-			return true;
-		}
-		if (c === "$") {
-			const dq = /^\$([A-Za-z_][A-Za-z0-9_]*)?\$/.exec(text.slice(i));
-			if (dq) {
-				const close = text.indexOf(dq[0], i + dq[0].length);
-				const end = close === -1 ? len : close + dq[0].length;
-				out += text.slice(i, end);
-				i = end;
-				return true;
-			}
-		}
-		return false;
-	};
-	while (i < len) {
-		if (skipLiteral()) continue;
-		const c = text[i]!;
-		if (c === ":") {
-			if (text[i + 1] === ":") {
-				out += "::";
-				i += 2;
-				continue;
-			}
-			if (text[i - 1] === ":") {
-				out += c;
-				i++;
-				continue;
-			}
-			const m = /^:([A-Za-z_][A-Za-z0-9_]*)/.exec(text.slice(i));
-			if (m) {
-				const name = m[1]!;
-				let k = names.indexOf(name);
-				if (k === -1) {
-					names.push(name);
-					k = names.length - 1;
-				}
-				out += `$${k + 1}`;
-				i += m[0].length;
-				continue;
-			}
-		}
-		out += c;
-		i++;
-	}
+	const out = text.replace(
+		NAMED,
+		(m: string, _open?: string, name?: string) => {
+			if (name === undefined) return m;
+			let k = names.indexOf(name);
+			if (k === -1) k = names.push(name) - 1;
+			return `$${k + 1}`;
+		},
+	);
 	return { text: out, names };
-}
-
-/** Does the text contain at least one `{name}` slot? */
-export function hasSlots(text: string): boolean {
-	SLOT.lastIndex = 0;
-	return SLOT.test(text);
 }
 
 /** Quote an identifier (or dotted path) the Postgres way: `"a"."b"`, doubling embedded quotes. */

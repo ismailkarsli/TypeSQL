@@ -98,6 +98,7 @@ describe("executeTakeFirstOrThrow", () => {
 		expect(err).toBeInstanceOf(NoResultError);
 		expect(err).toMatchObject({
 			name: "NoResultError",
+			message: "The query returned no rows",
 			text: "SELECT id FROM users",
 		});
 	});

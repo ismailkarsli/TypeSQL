@@ -3,6 +3,7 @@ import { createSql } from "../../src/index.js";
 import {
 	joinFragments,
 	maxParam,
+	memo,
 	quoteIdent,
 	renumberParams,
 	rewriteNamed,
@@ -28,6 +29,82 @@ describe("renumberParams", () => {
 	it("maxParam ignores literals", () => {
 		expect(maxParam("SELECT $2, '$9', $1")).toBe(2);
 		expect(maxParam("SELECT 1")).toBe(0);
+		expect(maxParam("SELECT 'x', $$ $3 $$")).toBe(0);
+		expect(maxParam("SELECT $10, $9")).toBe(10);
+	});
+	// [text, text with every $n outside literals and comments offset by 1]
+	const cases = [
+		["'$1' $1", "'$1' $2"],
+		["'it''s $1' $1", "'it''s $1' $2"],
+		["'' $1 ''", "'' $2 ''"],
+		["$1 '$1", "$2 '$1"],
+		["$1 'it''", "$2 'it''"],
+		['"$1" $1', '"$1" $2'],
+		['"we""ird $1" $1', '"we""ird $1" $2'],
+		['"" $1', '"" $2'],
+		['$1 "$1', '$2 "$1'],
+		["-- $1\n$1", "-- $1\n$2"],
+		["$1 -- $1", "$2 -- $1"],
+		["-$1 - $1", "-$2 - $2"],
+		["/* $1 */ $1 /* $1 */", "/* $1 */ $2 /* $1 */"],
+		["$1 /* $1", "$2 /* $1"],
+		["/*/ $1", "/*/ $1"],
+		["/ $1 * $1 */", "/ $2 * $2 */"],
+		["$$ $1 $$ $1 $$ $1 $$", "$$ $1 $$ $2 $$ $1 $$"],
+		["$a$ $1 $$ $1 $b$ $1 $a$ $1", "$a$ $1 $$ $1 $b$ $1 $a$ $2"],
+		["$1 $$ $1", "$2 $$ $1"],
+		["$1 $a$ $1 $a", "$2 $a$ $1 $a"],
+		["$a $1 a$ $1", "$a $2 a$ $2"],
+		["$1a$ $1", "$2a$ $2"],
+		["$ $1 $", "$ $2 $"],
+		["$10 $1", "$11 $2"],
+	] as const;
+	it.each(cases)("%j → %j", (text, expected) => {
+		expect(renumberParams(text, 1)).toBe(expected);
+	});
+	it("reads a dollar-quote tag as the types do: a letter or _, then letters, digits, _", () => {
+		for (const tag of [
+			"A",
+			"Z",
+			"a",
+			"z",
+			"_",
+			"xA",
+			"xZ",
+			"xa",
+			"xz",
+			"x0",
+			"x9",
+			"x_",
+		])
+			expect(renumberParams(`$${tag}$ $1 $${tag}$ $1`, 1)).toBe(
+				`$${tag}$ $1 $${tag}$ $2`,
+			);
+	});
+	it("keeps a text without an offset", () => {
+		expect(renumberParams("$1 $2", 0)).toBe("$1 $2");
+	});
+});
+
+describe("memo", () => {
+	it("computes once per argument, and starts over at its limit", () => {
+		const calls: string[] = [];
+		const upper = memo((s: string) => {
+			calls.push(s);
+			return s.toUpperCase();
+		}, 2);
+		expect(upper("a")).toBe("A");
+		expect(upper("a")).toBe("A");
+		expect(upper("b")).toBe("B");
+		expect(upper("a")).toBe("A");
+		expect(upper("b")).toBe("B");
+		expect(calls).toEqual(["a", "b"]);
+		// the memo holds 2: c clears it and is kept alone
+		expect(upper("c")).toBe("C");
+		expect(upper("c")).toBe("C");
+		expect(calls).toEqual(["a", "b", "c"]);
+		expect(upper("a")).toBe("A");
+		expect(calls).toEqual(["a", "b", "c", "a"]);
 	});
 });
 
@@ -233,6 +310,34 @@ describe("named parameters", () => {
 			names: ["n"],
 		});
 	});
+	it("reads a name as the types do: a letter or _, then letters, digits, _", () => {
+		expect(
+			rewriteNamed(":A :Z :a :z :_ :xA :xZ :xa :xz :x0 :x9 :x_ :x- :0 :xA"),
+		).toEqual({
+			text: "$1 $2 $3 $4 $5 $6 $7 $8 $9 $10 $11 $12 $13- :0 $6",
+			names: [
+				"A",
+				"Z",
+				"a",
+				"z",
+				"_",
+				"xA",
+				"xZ",
+				"xa",
+				"xz",
+				"x0",
+				"x9",
+				"x_",
+				"x",
+			],
+		});
+	});
+	it("never reads a colon right after another one as a parameter", () => {
+		expect(rewriteNamed("SELECT 1::int, :::a, ::::b, :c")).toEqual({
+			text: "SELECT 1::int, :::a, ::::b, $1",
+			names: ["c"],
+		});
+	});
 	it("throws on missing names", () => {
 		expect(() => sql.as("SELECT :a, :b", { a: 1 })).toThrow(
 			/missing named parameter :b/,
@@ -250,6 +355,30 @@ describe("named parameters", () => {
 		keep("SELECT 1 /* :x */");
 		keep("SELECT $$ :x $$");
 		keep("SELECT $body$ :x $$ :y $body$");
+		keep("SELECT ':x'':y'");
+		keep("SELECT '', ''");
+		keep('SELECT ":x"":y"');
+		keep("SELECT 1 /* :x */ + 1 /* :y */");
+		keep("SELECT $$ :x $$ + $$ :y $$");
+		keep("SELECT $a$ :x $a$ + $b$ :y $b$");
+		expect(rewriteNamed(":a ':b")).toEqual({ text: "$1 ':b", names: ["a"] });
+		expect(rewriteNamed(':a ":b')).toEqual({ text: '$1 ":b', names: ["a"] });
+		expect(rewriteNamed(":a -- :b")).toEqual({
+			text: "$1 -- :b",
+			names: ["a"],
+		});
+		expect(rewriteNamed(":a /* :b")).toEqual({
+			text: "$1 /* :b",
+			names: ["a"],
+		});
+		expect(rewriteNamed(":a $$ :b")).toEqual({
+			text: "$1 $$ :b",
+			names: ["a"],
+		});
+		expect(rewriteNamed(":a $x$ :b $x")).toEqual({
+			text: "$1 $x$ :b $x",
+			names: ["a"],
+		});
 		expect(rewriteNamed("DO $$ BEGIN PERFORM :x; END $$")).toEqual({
 			text: "DO $$ BEGIN PERFORM :x; END $$",
 			names: [],

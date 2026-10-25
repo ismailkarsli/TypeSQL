@@ -128,8 +128,8 @@ export function makeQuery<
 >(
 	text: string,
 	values: readonly unknown[],
-	executor?: Executor,
-	rowKeys: RowKeys = "preserve",
+	executor: Executor | undefined,
+	rowKeys: RowKeys,
 ): Query<Row, Params, Text> {
 	const pick = (given?: Executor): Executor => {
 		const exec = given ?? executor;

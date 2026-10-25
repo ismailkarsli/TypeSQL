@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createSql } from "../../src/index.js";
-import { param, pendingParams } from "../../src/runtime/inline.js";
+import { param, pendingParams, takeValue } from "../../src/runtime/inline.js";
 
 interface DB {
 	users: {
@@ -98,6 +98,37 @@ describe("inline parameters", () => {
 		expect(() => sql.as(`SELECT "${param(1)}"`)).toThrow(
 			/inside a quoted identifier/,
 		);
+		const inside = [
+			[`SELECT 'it''s ${param(1)}'`, "a quoted string"],
+			[`SELECT '${param(1)}`, "a quoted string"],
+			[`SELECT "a""${param(1)}"`, "a quoted identifier"],
+			[`SELECT "${param(1)}`, "a quoted identifier"],
+			[`SELECT 1 /* ${param(1)} */`, "a comment"],
+			[`SELECT 1 /* ${param(1)}`, "a comment"],
+			[`SELECT 1 -- ${param(1)}`, "a comment"],
+		] as const;
+		for (const [text, where] of inside)
+			expect(() => sql.as(text)).toThrow(
+				`typesql: sql.param() cannot be used inside ${where}; remove the surrounding quotes or comment`,
+			);
+	});
+
+	it("are read after quoted strings, quoted identifiers and comments", () => {
+		const before = pendingParams();
+		expect(
+			sql.as(
+				`SELECT 'a', '', "b", 1 -- c\n, ${param(1)} /* d */ + ${param(2)}, '-- /*'`,
+			),
+		).toEqual({
+			text: "SELECT 'a', '', \"b\", 1 -- c\n, $1 /* d */ + $2, '-- /*'",
+			values: [1, 2],
+		});
+		// in a dollar-quoted string too, as the types read it
+		expect(sql.as(`SELECT $$ ${param(3)} $$`)).toEqual({
+			text: "SELECT $$ $1 $$",
+			values: [3],
+		});
+		expect(pendingParams()).toBe(before);
 	});
 
 	it("are single-use: a token cannot be replayed in another statement", () => {
@@ -121,10 +152,51 @@ describe("inline parameters", () => {
 		);
 	});
 
+	it("only a string that is exactly a token is taken as a value", () => {
+		const before = pendingParams();
+		const token = param(4);
+		expect(takeValue([token])).toEqual([token]);
+		expect(takeValue(` ${token}`)).toBe(` ${token}`);
+		expect(takeValue(token)).toBe(4);
+		expect(() => takeValue(token)).toThrow(/already used/);
+		expect(takeValue(5)).toBe(5);
+		expect(pendingParams()).toBe(before);
+	});
+
 	it("leave nothing pending after use", () => {
 		const before = pendingParams();
 		sql(`SELECT id FROM users WHERE id = ${sql.param(1)}`);
 		sql.fragment(`AND id = ${sql.param(2)}`);
 		expect(pendingParams()).toBe(before);
+	});
+});
+
+describe("the token prefix", () => {
+	afterEach(() => {
+		vi.restoreAllMocks();
+		vi.unstubAllGlobals();
+		vi.resetModules();
+	});
+	const tokenOf = async () => {
+		vi.resetModules();
+		const m = await import("../../src/runtime/inline.js");
+		const token: string = m.param(1);
+		expect(m.resolveInline(`SELECT ${token}`, 0)).toEqual({
+			text: "SELECT $1",
+			values: [1],
+		});
+		return token;
+	};
+	it("is 8 random bytes from crypto.getRandomValues", async () => {
+		vi.spyOn(globalThis.crypto, "getRandomValues").mockImplementation((a) => {
+			(a as Uint8Array).fill(0xab);
+			return a;
+		});
+		expect(await tokenOf()).toBe("\u0000typesqlabababababababab0\u0000");
+	});
+	it("comes from Math.random without crypto", async () => {
+		vi.stubGlobal("crypto", undefined);
+		vi.spyOn(Math, "random").mockReturnValue(0.01);
+		expect(await tokenOf()).toBe("\u0000typesql02020202020202020\u0000");
 	});
 });

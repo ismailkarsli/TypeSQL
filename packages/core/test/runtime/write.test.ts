@@ -82,6 +82,12 @@ describe("sql.set", () => {
 			/nothing to update/,
 		);
 	});
+	it("throws on anything but an object of column values", () => {
+		for (const bad of [null, undefined, 5, "ab", ["x"]])
+			expect(() =>
+				sql.set("users", bad as unknown as { email: string }),
+			).toThrow("typesql: sql.set() takes an object of column values");
+	});
 	it("quotes keys", () => {
 		expect(sql.set("users", { ['we"ird' as "email"]: "x" })).toEqual({
 			text: '"we""ird" = $1',
@@ -125,6 +131,17 @@ describe("sql.values", () => {
 		);
 		expect(one).toEqual({ text: "DEFAULT VALUES", values: [] });
 		expect(() => sql.values("users", [])).toThrow(/needs at least one row/);
+		for (const bad of [null, undefined, { email: "a" }, "ab", 5])
+			expect(() =>
+				sql.values("users", bad as unknown as { email: string }[]),
+			).toThrow("typesql: sql.values() takes an array of rows");
+		for (const bad of [null, undefined, 5, "ab", ["x"]])
+			expect(() =>
+				sql.values("users", [
+					{ email: "a" },
+					bad as unknown as { email: string },
+				]),
+			).toThrow("typesql: sql.values() rows must be objects of column values");
 		expect(() =>
 			sql.values("users", [{} as { email: string }, {} as { email: string }]),
 		).toThrow(/several all-default rows/);

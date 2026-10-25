@@ -5,6 +5,8 @@
  * are left as they are.
  */
 
+import { memo } from "./runtime/splice.js";
+
 /** `"preserve"` (the default): rows keep the names Postgres gives the columns. `"camelCase"`: see `CamelCase`. */
 export type RowKeys = "preserve" | "camelCase";
 
@@ -47,22 +49,18 @@ export type KeyedRow<Row, K extends RowKeys> = K extends "camelCase"
 	? CamelCaseKeys<Row>
 	: Row;
 
-const cache = new Map<string, string>();
+const camelCased = memo((key: string) => {
+	let mapped = key[0]!;
+	for (let i = 1; i < key.length; i++) {
+		const c = key[i]!;
+		if (c !== "_") mapped += key[i - 1] === "_" ? c.toUpperCase() : c;
+	}
+	return mapped;
+});
 
 /** The runtime twin of `CamelCase<S>`. */
 export function camelCase(key: string): string {
-	if (!key.includes("_")) return key;
-	let mapped = cache.get(key);
-	if (mapped === undefined) {
-		mapped = key[0]!;
-		for (let i = 1; i < key.length; i++) {
-			const c = key[i]!;
-			if (c !== "_") mapped += key[i - 1] === "_" ? c.toUpperCase() : c;
-		}
-		if (cache.size >= 10_000) cache.clear();
-		cache.set(key, mapped);
-	}
-	return mapped;
+	return key.includes("_") ? camelCased(key) : key;
 }
 
 function camelCaseRow(row: unknown): unknown {

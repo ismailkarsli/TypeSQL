@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { camelCase, mapRows } from "../../src/adapter.js";
+import { camelCase, mapRows, rowKeysOf } from "../../src/adapter.js";
 import {
 	type Col,
 	createSql,
@@ -112,6 +112,16 @@ describe("rowKeys: camelCase", () => {
 		expect(same).toEqual(rows);
 		expect(same).not.toBe(rows);
 		expect(mapRows({ text: "SELECT 1", values: [] }, rows)).toEqual(rows);
+	});
+
+	it("rowKeysOf tells a query's rowKeys, preserve for anything but a camelCase query", () => {
+		const camel = createSql<DB>(undefined, { rowKeys: "camelCase" });
+		expect(rowKeysOf(camel("SELECT 1"))).toBe("camelCase");
+		expect(rowKeysOf(createSql<DB>()("SELECT 1"))).toBe("preserve");
+		expect(rowKeysOf({ text: "SELECT 1" })).toBe("preserve");
+		// under a registered symbol, so another copy of core reads it too
+		const q = camel("SELECT 1") as unknown as Record<symbol, unknown>;
+		expect(q[Symbol.for("typesql.rowKeys")]).toBe("camelCase");
 	});
 });
 
