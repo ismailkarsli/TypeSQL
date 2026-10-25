@@ -8,12 +8,12 @@ import type {
 	EatWord,
 	EatWords,
 	Expected,
+	Fail,
 	Nx,
 	Nx2,
 	Nx3,
-	Nx4,
-	Nx5,
 	Ok,
+	SyntaxErrorAt,
 } from "./util.js";
 
 /**
@@ -23,19 +23,22 @@ import type {
  *   timestamp(3) with time zone | time without time zone | interval day to second
  *   "MyEnum" | myschema.mood | pg_catalog.int4 | text[] | int[][] | int array | int array[3]
  *
- * Type modifiers are skipped. Schema qualification is dropped (`myschema.mood` → `mood`).
- * Array suffixes become `T[]` (multi-dimensional arrays collapse to one level, as Postgres does).
+ * Type modifiers are skipped, where Postgres's grammar takes them: a length or precision `(n)`
+ * (character types, `timestamp`, `time`, `interval`, `float`), a list `(…)` (`numeric`, `bit`,
+ * user-defined types), none for `int`, `boolean`, `double precision`, …. Schema qualification is
+ * dropped (`myschema.mood` → `mood`). Array suffixes become `T[]` (multi-dimensional arrays
+ * collapse to one level, as Postgres does).
  */
 export type ParseTypeName<T extends Toks, I extends number> =
 	ParseBaseType<T, I> extends infer R
 		? R extends Ok<infer Base extends string, infer J>
-			? ParseArraySuffix<T, SkipModifier<T, J>, NormalizeTypeName<Base>>
+			? ParseArraySuffix<T, J, NormalizeTypeName<Base>>
 			: R
 		: never;
 
 type ParseBaseType<T extends Toks, I extends number> =
 	T[I] extends IdTok<infer V>
-		? QualifiedTail<T, V, Nx<I>>
+		? TypeModifiers<T, QualifiedTail<T, V, Nx<I>>>
 		: T[I] extends WordTok<infer W>
 			? W extends "double"
 				? EatWord<T, Nx<I>, "precision"> extends never
@@ -47,39 +50,62 @@ type ParseBaseType<T extends Toks, I extends number> =
 						: ParseBaseType<T, Nx<I>>
 					: W extends "character" | "char" | "nchar"
 						? EatWord<T, Nx<I>, "varying"> extends never
-							? Ok<"bpchar", Nx<I>>
-							: Ok<"varchar", EatWord<T, Nx<I>, "varying">>
+							? OkAt<"bpchar", OptPrecision<T, Nx<I>>>
+							: OkAt<"varchar", OptPrecision<T, EatWord<T, Nx<I>, "varying">>>
 						: W extends "bit"
 							? EatWord<T, Nx<I>, "varying"> extends never
-								? Ok<"bit", Nx<I>>
-								: Ok<"varbit", EatWord<T, Nx<I>, "varying">>
-							: W extends "timestamp"
-								? WithTz<T, SkipModifier<T, Nx<I>>, "timestamp", "timestamptz">
-								: W extends "time"
-									? WithTz<T, SkipModifier<T, Nx<I>>, "time", "timetz">
-									: W extends "interval"
-										? Ok<"interval", SkipIntervalFields<T, Nx<I>>>
-										: W extends "float"
-											? FloatPrecision<T, Nx<I>>
-											: W extends "setof"
-												? ParseBaseType<T, Nx<I>>
-												: W extends NotTypeFuncName
-													? W extends ColNameTypeWord
-														? Ok<W, Nx<I>>
-														: Expected<"type name", T, I>
-													: QualifiedTail<T, W, Nx<I>>
+								? TypeModifiers<T, Ok<"bit", Nx<I>>>
+								: TypeModifiers<T, Ok<"varbit", EatWord<T, Nx<I>, "varying">>>
+							: W extends "timestamp" | "time"
+								? OptPrecision<T, Nx<I>> extends infer J
+									? J extends number
+										? WithTz<T, J, W>
+										: J
+									: never
+								: W extends "interval"
+									? OkAt<
+											"interval",
+											T[Nx<I>] extends OpTok<"(">
+												? ParsePrecision<T, Nx2<I>> // `interval(p)`: no fields after it
+												: IntervalFields<T, Nx<I>>
+										>
+									: W extends "float"
+										? FloatPrecision<T, Nx<I>>
+										: W extends "setof"
+											? ParseBaseType<T, Nx<I>>
+											: W extends NotTypeFuncName
+												? W extends "dec" | "decimal" | "numeric"
+													? TypeModifiers<T, Ok<W, Nx<I>>>
+													: W extends "varchar"
+														? OkAt<W, OptPrecision<T, Nx<I>>>
+														: W extends ColNameTypeWord
+															? Ok<W, Nx<I>>
+															: Expected<"type name", T, I>
+												: TypeModifiers<T, QualifiedTail<T, W, Nx<I>>>
 			: Expected<"type name", T, I>;
 
-/** `float` is float8; `float(p)` is float4 for p ≤ 24 and float8 for 25 ≤ p ≤ 53 (Postgres). The modifier is consumed here. */
+/** `Ok<Name, J>`, or the error `J`. */
+type OkAt<Name extends string, J> = J extends number ? Ok<Name, J> : J;
+
+/** `float` is float8; `float(p)` is float4 for p ≤ 24 and float8 for 25 ≤ p ≤ 53, else an error (Postgres). The modifier is consumed here. */
 type FloatPrecision<T extends Toks, I extends number> =
 	T[I] extends OpTok<"(">
 		? T[Nx<I>] extends NumTok<infer P>
 			? T[Nx2<I>] extends OpTok<")">
-				? Ok<SmallFloat<P> extends true ? "float4" : "float8", Nx3<I>>
+				? P extends SmallFloat
+					? Ok<"float4", Nx3<I>>
+					: P extends BigFloat
+						? Ok<"float8", Nx3<I>>
+						: Fail<
+								P extends "0"
+									? "precision for type float must be at least 1 bit"
+									: "precision for type float must be less than 54 bits",
+								Nx<I>
+							>
 				: Expected<'")"', T, Nx2<I>>
 			: Expected<"precision", T, Nx<I>>
 		: Ok<"float8", I>;
-type SmallFloat<P extends string> = P extends
+type SmallFloat =
 	| "1"
 	| "2"
 	| "3"
@@ -103,26 +129,50 @@ type SmallFloat<P extends string> = P extends
 	| "21"
 	| "22"
 	| "23"
-	| "24"
-	? true
-	: false;
+	| "24";
+type BigFloat =
+	| "25"
+	| "26"
+	| "27"
+	| "28"
+	| "29"
+	| "30"
+	| "31"
+	| "32"
+	| "33"
+	| "34"
+	| "35"
+	| "36"
+	| "37"
+	| "38"
+	| "39"
+	| "40"
+	| "41"
+	| "42"
+	| "43"
+	| "44"
+	| "45"
+	| "46"
+	| "47"
+	| "48"
+	| "49"
+	| "50"
+	| "51"
+	| "52"
+	| "53";
 
 /**
- * Column-name keywords that are type names by themselves (`SimpleTypename`); the others
- * (`between`, `values`, …) are no type name, nor are reserved keywords.
+ * Column-name keywords that are type names by themselves, without modifiers (`SimpleTypename`);
+ * the others (`between`, `values`, …) are no type name, nor are reserved keywords.
  */
 type ColNameTypeWord =
 	| "bigint"
 	| "boolean"
-	| "dec"
-	| "decimal"
 	| "int"
 	| "integer"
 	| "json"
-	| "numeric"
 	| "real"
-	| "smallint"
-	| "varchar";
+	| "smallint";
 
 /** `schema.name` → name (drops the qualifier). */
 type QualifiedTail<T extends Toks, First extends string, I extends number> =
@@ -132,69 +182,101 @@ type QualifiedTail<T extends Toks, First extends string, I extends number> =
 			? Ok<N, J>
 			: Expected<"type name", T, EatOp<T, I, ".">>;
 
-type WithTz<
-	T extends Toks,
-	I extends number,
-	Plain extends string,
-	Tz extends string,
-> =
+/** `timestamp` / `time` [`(p)`] then `WITH TIME ZONE` (`timestamptz`, `timetz`) or `WITHOUT TIME ZONE`. */
+type WithTz<T extends Toks, I extends number, W extends string> =
 	EatWords<T, I, ["with", "time", "zone"]> extends never
 		? EatWords<T, I, ["without", "time", "zone"]> extends never
-			? Ok<Plain, I>
-			: Ok<Plain, EatWords<T, I, ["without", "time", "zone"]>>
-		: Ok<Tz, EatWords<T, I, ["with", "time", "zone"]>>;
-
-type IntervalField = "year" | "month" | "day" | "hour" | "minute" | "second";
-type SkipIntervalFields<T extends Toks, I extends number> =
-	T[I] extends WordTok<IntervalField>
-		? EatWord<T, Nx<I>, "to"> extends never
-			? SkipModifier<T, Nx<I>>
-			: T[EatWord<T, Nx<I>, "to">] extends WordTok<IntervalField>
-				? SkipModifier<T, Nx<EatWord<T, Nx<I>, "to">>>
-				: SkipModifier<T, Nx<I>>
-		: SkipModifier<T, I>;
+			? Ok<W, I>
+			: Ok<W, EatWords<T, I, ["without", "time", "zone"]>>
+		: Ok<`${W}tz`, EatWords<T, I, ["with", "time", "zone"]>>;
 
 /**
- * Skip `( n [, n] )` modifiers; other modifier lists (`numeric(3, -6)`, `widget(42, 13, 7)`) are
- * expression lists in Postgres's grammar (it checks their values later).
+ * A list of type modifiers `(…)` after the type name `R` (`opt_type_modifiers`): expressions in
+ * Postgres's grammar (`numeric(3, -6)`, `widget(42, 13, 7)`; it checks their values later).
  */
-type SkipModifier<T extends Toks, I extends number> =
-	T[I] extends OpTok<"(">
-		? T[Nx<I>] extends NumTok
-			? T[Nx2<I>] extends OpTok<")">
-				? Nx3<I>
-				: T[Nx2<I>] extends OpTok<",">
-					? T[Nx3<I>] extends NumTok
-						? T[Nx4<I>] extends OpTok<")">
-							? Nx5<I>
-							: SkipModifierList<T, I>
-						: SkipModifierList<T, I>
-					: SkipModifierList<T, I>
-			: SkipModifierList<T, I>
-		: I;
-type SkipModifierList<T extends Toks, I extends number> =
-	ParseExprList<T, Nx<I>, []> extends Ok<unknown, infer J>
-		? T[J] extends OpTok<")">
-			? Nx<J>
-			: I
+type TypeModifiers<T extends Toks, R> =
+	R extends Ok<infer N, infer J>
+		? T[J] extends OpTok<"(">
+			? ParseExprList<T, Nx<J>, []> extends infer X
+				? X extends Ok<unknown, infer K>
+					? T[K] extends OpTok<")">
+						? Ok<N, Nx<K>>
+						: Expected<'")"', T, K>
+					: X
+				: never
+			: R
+		: R;
+
+/** After `(`: a precision `p)` → the index after `)`, or a syntax error. */
+export type ParsePrecision<
+	T extends Toks,
+	I extends number,
+> = T[I] extends NumTok
+	? T[Nx<I>] extends OpTok<")">
+		? Nx2<I>
+		: SyntaxErrorAt<T, Nx<I>>
+	: SyntaxErrorAt<T, I>;
+/** An optional precision `(p)` at `I` → the index after it, or a syntax error. */
+type OptPrecision<T extends Toks, I extends number> =
+	T[I] extends OpTok<"("> ? ParsePrecision<T, Nx<I>> : I;
+
+type IntervalField = "year" | "month" | "day" | "hour" | "minute" | "second";
+/** The fields `F TO …` can end with (`YEAR TO MONTH`, `DAY TO SECOND`, …; nothing after MONTH or SECOND). */
+type IntervalTo = {
+	year: "month";
+	day: "hour" | "minute" | "second";
+	hour: "minute" | "second";
+	minute: "second";
+};
+/**
+ * The fields of an interval (`opt_interval`): `YEAR`, …, `SECOND [(p)]`, `YEAR TO MONTH`,
+ * `DAY TO HOUR`, …, `MINUTE TO SECOND [(p)]` → the next index, or a syntax error.
+ */
+export type IntervalFields<T extends Toks, I extends number> =
+	T[I] extends WordTok<infer F extends IntervalField>
+		? F extends "second"
+			? OptPrecision<T, Nx<I>>
+			: T[Nx<I>] extends WordTok<"to">
+				? F extends keyof IntervalTo
+					? T[Nx2<I>] extends WordTok<infer G extends IntervalTo[F]>
+						? G extends "second"
+							? OptPrecision<T, Nx3<I>>
+							: Nx3<I>
+						: SyntaxErrorAt<T, Nx2<I>>
+					: SyntaxErrorAt<T, Nx<I>>
+				: Nx<I>
 		: I;
 
+/**
+ * `[]` / `[n]` bounds, any number of them, or one `ARRAY` / `ARRAY[n]` (Postgres takes no bounds
+ * after ARRAY, nor ARRAY after bounds).
+ */
 type ParseArraySuffix<T extends Toks, I extends number, Base extends string> =
+	T[I] extends WordTok<"array">
+		? T[Nx<I>] extends OpTok<"[">
+			? OkAt<Arr<Base>, NumThen<T, Nx2<I>, "]">>
+			: Ok<Arr<Base>, Nx<I>>
+		: ArrayBounds<T, I, Base>;
+type ArrayBounds<T extends Toks, I extends number, Base extends string> =
 	T[I] extends OpTok<"[">
-		? T[Nx<I>] extends OpTok<"]">
-			? ParseArraySuffix<T, Nx2<I>, Arr<Base>>
-			: T[Nx<I>] extends NumTok
-				? T[Nx2<I>] extends OpTok<"]">
-					? ParseArraySuffix<T, Nx3<I>, Arr<Base>>
-					: Ok<Base, I>
-				: Ok<Base, I>
-		: T[I] extends WordTok<"array">
-			? T[Nx<I>] extends OpTok<"[">
-				? T[Nx2<I>] extends NumTok
-					? T[Nx3<I>] extends OpTok<"]">
-						? Ok<Arr<Base>, Nx4<I>>
-						: Ok<Arr<Base>, Nx<I>>
-					: Ok<Arr<Base>, Nx<I>>
-				: Ok<Arr<Base>, Nx<I>>
-			: Ok<Base, I>;
+		? (
+				T[Nx<I>] extends OpTok<"]">
+					? Nx2<I>
+					: NumThen<T, Nx<I>, "]">
+			) extends infer J
+			? J extends number
+				? ArrayBounds<T, J, Arr<Base>>
+				: J
+			: never
+		: Ok<Base, I>;
+/** A number then `C` at `I` → the index after `C`, or a syntax error. */
+type NumThen<
+	T extends Toks,
+	I extends number,
+	C extends string,
+> = T[I] extends NumTok
+	? T[Nx<I>] extends OpTok<C>
+		? Nx2<I>
+		: SyntaxErrorAt<T, Nx<I>>
+	: SyntaxErrorAt<T, I>;
 type Arr<Base extends string> = Base extends `${string}[]` ? Base : `${Base}[]`;

@@ -74,7 +74,27 @@ test("interval literals take the fields of opt_interval after the string", () =>
 		SqlError<"syntax error at or near to", 4>
 	>();
 	expectTypeOf<V<"SELECT interval '1' day to hour(2)">>().toEqualTypeOf<
-		SqlError<"syntax error at or near )", 8>
+		SqlError<"syntax error at or near (", 6>
+	>();
+	// a cast to interval takes the same fields, or a precision and no fields
+	expectTypeOf<
+		Row<"SELECT CAST('1' AS interval day to minute) AS a, '1'::interval(3) AS b, '1'::interval second(3) AS c">
+	>().toEqualTypeOf<{ a: Interval; b: Interval; c: Interval }>();
+	expectTypeOf<V<"SELECT '1'::interval year to day">>().toEqualTypeOf<
+		SqlError<"syntax error at or near day", 6>
+	>();
+	expectTypeOf<V<"SELECT '1'::interval day (3)">>().toEqualTypeOf<
+		SqlError<"syntax error at or near (", 5>
+	>();
+	expectTypeOf<V<"SELECT '1'::interval(3) day">>().toEqualTypeOf<
+		SqlError<"syntax error at or near day", 7>
+	>();
+	// a parenthesis after an operand is no operator: the type's modifier list is not closed
+	expectTypeOf<V<"SELECT '1'::numeric(5">>().toEqualTypeOf<
+		SqlError<'syntax error: expected ")" at or near end of input', 6>
+	>();
+	expectTypeOf<V<"SELECT 1 (5">>().toEqualTypeOf<
+		SqlError<"syntax error at or near (", 2>
 	>();
 	expectTypeOf<V<"SELECT interval '1' second(x)">>().toEqualTypeOf<
 		SqlError<"syntax error at or near x", 5>

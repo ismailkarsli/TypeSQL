@@ -93,21 +93,21 @@ type Continue<R extends string, E extends string> = E extends "e"
 	: CheckUEscapes<R, E>;
 
 /** `[rest]` after a low-surrogate escape at the start of `R`, or `null`. */
-type LowSurrogateNext<R extends string, E extends string> = (
-	E extends "e"
-		? R extends `\\u${infer R2}`
-			? Hex4<R2>
-			: R extends `\\U${infer R2}`
-				? Hex8<R2>
-				: null
-		: R extends `${E}+${infer R2}`
-			? Hex6<R2>
-			: R extends `${E}${infer R2}`
-				? Hex4<R2>
-				: null
-) extends [infer H extends string, infer R3]
+type LowSurrogateNext<R extends string, E extends string> = E extends "e"
+	? R extends `\\u${infer R2}`
+		? IfLow<Hex4<R2>>
+		: R extends `\\U${infer R2}`
+			? IfLow<Hex8<R2>>
+			: null
+	: R extends `${E}+${infer R2}`
+		? IfLow<Hex6<R2>>
+		: R extends `${E}${infer R2}`
+			? IfLow<Hex4<R2>>
+			: null;
+/** `[rest]` when the escape's digits `[digits, rest]` are a low surrogate, else `null`. */
+type IfLow<X> = X extends [infer H extends string, infer R]
 	? CodePoint<H> extends "low"
-		? [R3]
+		? [R]
 		: null
 	: null;
 

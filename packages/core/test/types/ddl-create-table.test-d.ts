@@ -503,15 +503,19 @@ test("DEFAULT is a b_expr: no top-level IN / LIKE / AND (parenthesize)", () => {
 
 test("type modifiers, partition strategies and bounds", () => {
 	expectTypeOf<
-		D<"CREATE TABLE t (a numeric(3, -6), b numeric(3, 0), c widget(42, 13, 7), d varchar(+10))">
+		D<'CREATE TABLE t (a numeric(3, -6), b numeric(3, 0), c "numeric"(10, 2), d varchar(10))'>
 	>().toEqualTypeOf<{
 		t: {
 			a: Nullable<"numeric">;
 			b: Nullable<"numeric">;
-			c: Nullable<"widget">;
+			c: Nullable<"numeric">;
 			d: Nullable<"varchar">;
 		};
 	}>();
+	// a list for a user-defined type; a length is a number only (`Iconst`)
+	expectTypeOf<
+		D<"CREATE TABLE t (a numeric(3, -6), b numeric(3, 0), c widget(42, 13, 7), d varchar(+10))">
+	>().toEqualTypeOf<SqlError<"syntax error at or near +", 34>>();
 	// any strategy name parses (Postgres: unrecognized partitioning strategy "magic")
 	expectTypeOf<
 		D<"CREATE TABLE t (a int) PARTITION BY magic (a)">
@@ -645,6 +649,123 @@ test("interval fields and type modifiers are skipped", () => {
 	expectTypeOf<
 		RowOf<{}, DefaultTypeMap, "SELECT (CAST(1 AS int) - 1) AS a">
 	>().toEqualTypeOf<{ a: number }>();
+});
+
+test("type modifiers where Postgres's grammar takes them: a length, a list, interval fields, array bounds", () => {
+	expectTypeOf<
+		D<"CREATE TABLE t (a timestamp(3) with time zone, b time(2) with time zone, c time(2) without time zone, d bit(3), e dec(3, 1), f decimal(3), g interval minute to second(2), h int[2][], i char(3)[])">["t"]
+	>().toEqualTypeOf<{
+		a: Nullable<"timestamptz">;
+		b: Nullable<"timetz">;
+		c: Nullable<"time">;
+		d: Nullable<"bit">;
+		e: Nullable<"numeric">;
+		f: Nullable<"numeric">;
+		g: Nullable<"interval">;
+		h: Nullable<"int4[]">;
+		i: Nullable<"bpchar[]">;
+	}>();
+	// float(p): every precision from 25 to 53 is float8; 0 and 54 are errors
+	type F =
+		D<"CREATE TABLE f (b25 float(25), b26 float(26), b27 float(27), b28 float(28), b29 float(29), b30 float(30), b31 float(31), b32 float(32), b33 float(33), b34 float(34), b35 float(35), b36 float(36), b37 float(37), b38 float(38), b39 float(39), b40 float(40), b41 float(41), b42 float(42), b43 float(43), b44 float(44), b45 float(45), b46 float(46), b47 float(47), b48 float(48), b49 float(49), b50 float(50), b51 float(51), b52 float(52), b53 float(53))">["f"];
+	expectTypeOf<
+		{ [K in keyof F]: F[K]["type"] }[keyof F]
+	>().toEqualTypeOf<"float8">();
+	expectTypeOf<D<"CREATE TABLE t (a float(0))">>().toEqualTypeOf<
+		SqlError<"precision for type float must be at least 1 bit", 7>
+	>();
+	expectTypeOf<D<"CREATE TABLE t (a float(54))">>().toEqualTypeOf<
+		SqlError<"precision for type float must be less than 54 bits", 7>
+	>();
+	expectTypeOf<D<"CREATE TABLE t (a float(5 x))">>().toEqualTypeOf<
+		SqlError<'syntax error: expected ")" at or near x', 8>
+	>();
+	// interval fields: only YEAR TO MONTH, DAY / HOUR / MINUTE TO a smaller field; a precision after SECOND or INTERVAL only
+	expectTypeOf<D<"CREATE TABLE t (a interval year to day)">>().toEqualTypeOf<
+		SqlError<"syntax error at or near day", 8>
+	>();
+	expectTypeOf<D<"CREATE TABLE t (a interval minute to hour)">>().toEqualTypeOf<
+		SqlError<"syntax error at or near hour", 8>
+	>();
+	expectTypeOf<D<"CREATE TABLE t (a interval month to year)">>().toEqualTypeOf<
+		SqlError<"syntax error at or near to", 7>
+	>();
+	expectTypeOf<D<"CREATE TABLE t (a interval day to)">>().toEqualTypeOf<
+		SqlError<"syntax error at or near )", 8>
+	>();
+	expectTypeOf<
+		D<"CREATE TABLE t (a interval second to minute)">
+	>().toEqualTypeOf<
+		SqlError<"syntax error: expected column constraint at or near to", 7>
+	>();
+	expectTypeOf<D<"CREATE TABLE t (a interval day (3))">>().toEqualTypeOf<
+		SqlError<'syntax error: expected "," or ")" at or near (', 7>
+	>();
+	expectTypeOf<D<"CREATE TABLE t (a interval(3) day)">>().toEqualTypeOf<
+		SqlError<"syntax error: expected column constraint at or near day", 9>
+	>();
+	// no modifier after int, double precision or WITH TIME ZONE; one number for a length or precision
+	expectTypeOf<D<"CREATE TABLE t (a int(3))">>().toEqualTypeOf<
+		SqlError<'syntax error: expected "," or ")" at or near (', 6>
+	>();
+	expectTypeOf<D<"CREATE TABLE t (a double precision(3))">>().toEqualTypeOf<
+		SqlError<'syntax error: expected "," or ")" at or near (', 7>
+	>();
+	expectTypeOf<
+		D<"CREATE TABLE t (a timestamp with time zone(3))">
+	>().toEqualTypeOf<
+		SqlError<'syntax error: expected "," or ")" at or near (', 9>
+	>();
+	expectTypeOf<D<"CREATE TABLE t (a timestamp(3, 4))">>().toEqualTypeOf<
+		SqlError<"syntax error at or near ,", 8>
+	>();
+	expectTypeOf<D<"CREATE TABLE t (a time(x))">>().toEqualTypeOf<
+		SqlError<"syntax error at or near x", 7>
+	>();
+	expectTypeOf<D<"CREATE TABLE t (a varchar(3, 4))">>().toEqualTypeOf<
+		SqlError<"syntax error at or near ,", 8>
+	>();
+	expectTypeOf<D<"CREATE TABLE t (a character(a))">>().toEqualTypeOf<
+		SqlError<"syntax error at or near a", 7>
+	>();
+	// a modifier list is a list of expressions, closed by its parenthesis
+	expectTypeOf<D<"CREATE TABLE t (a numeric(5 6))">>().toEqualTypeOf<
+		SqlError<'syntax error: expected ")" at or near 6', 8>
+	>();
+	expectTypeOf<D<"CREATE TABLE t (a numeric(+))">>().toEqualTypeOf<
+		SqlError<"syntax error at or near )", 8>
+	>();
+	expectTypeOf<D<"CREATE TABLE t (a numeric(5, +))">>().toEqualTypeOf<
+		SqlError<"syntax error at or near )", 10>
+	>();
+	expectTypeOf<D<"CREATE TABLE t (a numeric())">>().toEqualTypeOf<
+		SqlError<"syntax error at or near )", 7>
+	>();
+	// array bounds: `[]` or `[n]`, repeated; ARRAY once, with no bounds after it
+	expectTypeOf<D<"CREATE TABLE t (a int[5 x])">>().toEqualTypeOf<
+		SqlError<"syntax error at or near x", 8>
+	>();
+	expectTypeOf<D<"CREATE TABLE t (a int[x])">>().toEqualTypeOf<
+		SqlError<"syntax error at or near x", 7>
+	>();
+	expectTypeOf<D<"CREATE TABLE t (a int array[x])">>().toEqualTypeOf<
+		SqlError<"syntax error at or near x", 8>
+	>();
+	expectTypeOf<D<"CREATE TABLE t (a int array[])">>().toEqualTypeOf<
+		SqlError<"syntax error at or near ]", 8>
+	>();
+	expectTypeOf<D<"CREATE TABLE t (a int array[1 x])">>().toEqualTypeOf<
+		SqlError<"syntax error at or near x", 9>
+	>();
+	expectTypeOf<D<"CREATE TABLE t (a int[] array)">>().toEqualTypeOf<
+		SqlError<"syntax error: expected column constraint at or near array", 8>
+	>();
+	expectTypeOf<D<"CREATE TABLE t (a int array array)">>().toEqualTypeOf<
+		SqlError<"syntax error: expected column constraint at or near array", 7>
+	>();
+	expectTypeOf<D<"CREATE TABLE t (a int array[1][])">>().toEqualTypeOf<
+		SqlError<'syntax error: expected "," or ")" at or near [', 10>
+	>();
 });
 
 test("type names written with keywords, quoted names; what is not a type name", () => {

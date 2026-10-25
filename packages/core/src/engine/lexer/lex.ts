@@ -2,7 +2,6 @@ import type { SqlError } from "../errors.js";
 import type {
 	Digit,
 	HexDigit,
-	IdChar,
 	IdStart,
 	NonIdAscii,
 	Upper,
@@ -32,9 +31,9 @@ type Nx<I extends number> = Next[I];
  * Type-level lexer. `Lex<Q>` is a tuple of tokens or an `SqlError<message, tokenIndex>`
  * (the index of the token that could not be produced).
  *
- * Budget strategy: the main loop handles one token per iteration (whitespace and
- * comments are consumed in nested loops). After `ChunkSize` tokens the loop restarts so
- * the 1000-iteration tail-recursion cap is never hit; the outer loop concatenates chunks.
+ * Budget strategy: the main loop handles one token, one whitespace character or one comment
+ * per iteration. After `ChunkSize` iterations the loop restarts so the 1000-iteration
+ * tail-recursion cap is never hit; the outer loop concatenates chunks.
  * The budget is a numeric counter (`Nx`), not a tuple that is sliced each step: slicing
  * a 250-element tuple per token cost 42% of the lexer's check time.
  *
@@ -47,7 +46,7 @@ type Nx<I extends number> = Next[I];
  */
 export type Lex<Q extends string> = LexAll<Q, []>;
 
-/** Tokens per chunk: restart the loop before the 1000-iteration tail-recursion cap. */
+/** Iterations per chunk: restart the loop before the 1000-iteration tail-recursion cap. */
 type ChunkSize = 250;
 
 type LexAll<S extends string, Acc extends readonly Tok[]> =
@@ -112,7 +111,7 @@ type LexStep<
 	B extends number,
 > = S extends `${infer C}${infer R}`
 	? C extends Ws
-		? LexChunk<SkipWs<R>, Acc, B>
+		? LexChunk<R, Acc, B>
 		: C extends IdStart
 			? R extends `${infer Q extends "'" | "&"}${infer R1}` // one check per word for E'', B'', X'', U&'', U&""
 				? Q extends "'"
@@ -197,13 +196,7 @@ type LexStep<
 													: Err<`syntax error at or near "$"`, Acc>
 											: C extends NonIdAscii
 												? Err<`syntax error at or near "${C}"`, Acc> // `\`, `{`, `}`: no token starts with them
-												: TakeWord<R, C, true> extends [
-															infer V extends string,
-															infer R2 extends string,
-															boolean,
-														]
-													? LexChunk<R2, [...Acc, WordTok<FoldAscii<V, "">>], B>
-													: never
+												: LexWord<R, C, Acc, B> // a non-ASCII character starts an identifier
 	: never;
 
 /** A string literal token from `[value, rest]`, or the error `M` (unterminated). */
@@ -310,7 +303,7 @@ type LexShortInt<
 	B extends number,
 	K extends readonly unknown[],
 > = R extends `${infer N}${infer R2}`
-	? N extends Digit
+	? N extends Digit // type-mutate: equivalent cond-false – a fast path: LexNumber lexes the same token
 		? K extends readonly [0, 0, 0] // type-mutate: equivalent cond-swap cond-true cond-false – a fast path: LexNumber lexes the same token
 			? LexNumber<S0, Acc, B>
 			: LexShortInt<S0, R2, `${V}${N}`, Acc, B, [...K, 0]>
@@ -354,28 +347,15 @@ type IdRun<
 		: IdRun<R1, `${Acc}${C}`>
 	: Acc;
 
-/** The word starting with `C` (no non-ASCII character seen yet). */
-type WordAt<R extends string, C extends string> = TakeWord<R, C, false>; // type-mutate: equivalent bool-flip – for an ASCII word, folding ASCII letters is lowercasing
-/** An unquoted identifier or keyword starting with `C`, folded to lowercase. */
+/** An unquoted identifier or keyword starting with `C`, its ASCII letters folded to lowercase. */
 type LexWord<
 	R extends string,
 	C extends string,
 	Acc extends readonly Tok[],
 	B extends number,
 > =
-	WordAt<R, C> extends [
-		infer V extends string,
-		infer R2 extends string,
-		infer NonAscii extends boolean,
-	]
-		? LexChunk<
-				R2,
-				[
-					...Acc,
-					WordTok<NonAscii extends true ? FoldAscii<V, ""> : Lowercase<V>>,
-				],
-				B
-			>
+	TakeWord<R, C> extends [infer V extends string, infer R2 extends string]
+		? LexChunk<R2, [...Acc, WordTok<FoldAscii<V, "">>], B>
 		: never;
 
 /**
@@ -391,7 +371,7 @@ type LexOperator<
 	Acc extends readonly Tok[],
 	B extends number,
 > = R extends `${infer N}${infer R1}`
-	? N extends OpChar
+	? N extends OpChar // type-mutate: equivalent cond-true – a fast path: LexOpRun lexes the same one-character operator
 		? C extends "-"
 			? N extends "-"
 				? LexChunk<SkipLine<R1>, Acc, B>
@@ -448,11 +428,6 @@ type TrimOp<O extends string, R extends string> = O extends `${infer P}+`
 				: TrimOp<P, `-${R}`>
 		: [O, R];
 
-type SkipWs<S extends string> = S extends `${infer C}${infer R}`
-	? C extends Ws
-		? SkipWs<R>
-		: S
-	: S;
 type SkipLine<S extends string> = S extends `${infer _}\n${infer R}` ? R : "";
 
 /**
@@ -501,7 +476,7 @@ type TakeEscaped<
 type OddBackslashes<S extends string> = S extends `${infer P}\\`
 	? OddBackslashes<P> extends true
 		? false
-		: true
+		: true // type-mutate: equivalent never-false – read with extends true, never counts as true
 	: false;
 
 /**
@@ -535,24 +510,17 @@ type AllWs<W extends string> = W extends `${infer C}${infer R}`
 	? C extends Ws
 		? AllWs<R>
 		: false
-	: true;
+	: true; // type-mutate: equivalent never-false – read with extends true, never counts as true
 
-/**
- * Identifier characters: ASCII `IdChar`, or any non-ASCII character. `NonAscii` records
- * whether a non-ASCII character was seen (then only ASCII letters are folded).
- * Result: `[word, rest, nonAscii]`.
- */
+/** The identifier characters (all but `NonIdAscii`) at the start of `S`, after `Acc`: `[word, rest]`. */
 type TakeWord<
 	S extends string,
 	Acc extends string,
-	NonAscii extends boolean,
 > = S extends `${infer C}${infer R}`
-	? C extends IdChar
-		? TakeWord<R, `${Acc}${C}`, NonAscii>
-		: C extends NonIdAscii
-			? [Acc, S, NonAscii]
-			: TakeWord<R, `${Acc}${C}`, true>
-	: [Acc, S, NonAscii];
+	? C extends NonIdAscii
+		? [Acc, S]
+		: TakeWord<R, `${Acc}${C}`>
+	: [Acc, S];
 
 /** Lowercase ASCII letters only (Postgres folding in UTF-8 databases). */
 type FoldAscii<
@@ -594,9 +562,24 @@ type TakeRadix<
 	? TakeRadix<R, D, `${Acc}${C}`, Kind>
 	: S extends `_${infer C extends D}${infer R}`
 		? TakeRadix<R, D, `${Acc}_${C}`, Kind>
-		: Acc extends `0${infer _P}${infer _D}${infer _R}`
-			? [Acc, S] // at least one digit after the prefix
-			: `invalid ${Kind} integer at or near "${Acc}"`;
+		: RadixEnd<Acc, S, IdRun<S>, Kind>;
+/**
+ * After the digits `Acc` of `0x…` / `0o…` / `0b…`: Postgres reads `0` and the identifier after it
+ * as one junk token (`0o19`, `0xg`, `0x1_`) unless the digits are all of it (`J`, the identifier
+ * characters left, is empty); with no digit, `0x` or `0x_` alone is an invalid integer.
+ */
+type RadixEnd<
+	Acc extends string,
+	S extends string,
+	J extends string,
+	Kind extends string,
+> = Acc extends `0${infer _P}${infer _D}${infer _R}` // at least one digit after the prefix
+	? J extends ""
+		? [Acc, S]
+		: `trailing junk after numeric literal at or near "${Acc}${J}"`
+	: J extends "" | "_"
+		? `invalid ${Kind} integer at or near "${Acc}${J}"`
+		: `trailing junk after numeric literal at or near "${Acc}${J}"`;
 type TakeDecimal<S extends string> =
 	DigitRun<S, ""> extends [infer Int extends string, infer R1 extends string]
 		? R1 extends `.${infer R2}`
@@ -639,7 +622,7 @@ type TakeExponent<
 				? `trailing junk after numeric literal at or near "${V}${E}${Sign}"`
 				: [`${V}${E}${Sign}${X}`, R3]
 			: never
-		: DigitRun<R, ""> extends [infer X extends string, infer R3 extends string]
+		: DigitRun<R, ""> extends [infer X extends string, infer R3]
 			? X extends ""
 				? `trailing junk after numeric literal at or near "${V}${E}${IdRun<R>}"`
 				: [`${V}${E}${X}`, R3]

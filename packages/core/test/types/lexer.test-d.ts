@@ -34,8 +34,8 @@ test('words fold to lowercase; quoted identifiers keep case and unescape ""', ()
 		]
 	>();
 	// non-ASCII identifier characters are accepted; only ASCII letters fold
-	expectTypeOf<Vals<"SELECT Café, naïve">>().toEqualTypeOf<
-		["select", "café", ",", "naïve"]
+	expectTypeOf<Vals<"SELECT Café, naïve, CafÉ">>().toEqualTypeOf<
+		["select", "café", ",", "naïve", ",", "cafÉ"]
 	>();
 });
 
@@ -60,8 +60,25 @@ test("string literals: '' escapes, E'' (escapes kept raw), B'' / X'', dollar quo
 		V<"SELECT B'', X'09afAF'">
 	>().toEqualTypeOf<"SELECT B'', X'09afAF'">();
 	// a word before `&` that is not U&'' / U&""
-	expectTypeOf<Vals<"SELECT u&1, a&b">>().toEqualTypeOf<
-		["select", "u", "&", "1", ",", "a", "&", "b"]
+	expectTypeOf<Vals<"SELECT u&1, a&b, a&'x', b&\"y\"">>().toEqualTypeOf<
+		[
+			"select",
+			"u",
+			"&",
+			"1",
+			",",
+			"a",
+			"&",
+			"b",
+			",",
+			"a",
+			"&",
+			"x",
+			",",
+			"b",
+			"&",
+			"y",
+		]
 	>();
 	// non-ASCII letters are identifier characters; only ASCII letters fold
 	expectTypeOf<Row<"SELECT 1 AS ÉTÉ, 2 AS café">>().toEqualTypeOf<{
@@ -371,8 +388,11 @@ test("lexer errors carry the index of the token that could not be produced", () 
 	expectTypeOf<Lex<"SELECT {">>().toEqualTypeOf<
 		SqlError<'syntax error at or near "{"', 1>
 	>();
-	// a dollar tag starts like an identifier
+	// a dollar tag starts like an identifier, and ends with `$`
 	expectTypeOf<Lex<"SELECT $+$ x $+$">>().toEqualTypeOf<
+		SqlError<'syntax error at or near "$"', 1>
+	>();
+	expectTypeOf<Lex<"SELECT $x">>().toEqualTypeOf<
 		SqlError<'syntax error at or near "$"', 1>
 	>();
 });
@@ -386,10 +406,18 @@ test("string literals: continuation across newlines, E'' backslash parity, U&'' 
 	expectTypeOf<Vals<"SELECT E'\\\\', e'a\\'b'">>().toEqualTypeOf<
 		["select", "\\\\", ",", "a\\'b"]
 	>();
+	// in an E'' string a doubled quote is a quote too, and continuation lines join
+	expectTypeOf<Vals<"SELECT E'it''s', E'a'\n  'b'">>().toEqualTypeOf<
+		["select", "it's", ",", "ab"]
+	>();
 	// U& identifiers are decoded (ASCII / Latin-1 code points); U& string values stay raw
 	expectTypeOf<
 		Vals<"SELECT U&'d\\0061t' AS U&\"d\\0061t\\+000061\"">
 	>().toEqualTypeOf<["select", "d\\0061t", "as", "data"]>();
+	// u& in lowercase too
+	expectTypeOf<Vals<"SELECT u&'\\0061' AS u&\"d\\0061t\"">>().toEqualTypeOf<
+		["select", "\\0061", "as", "dat"]
+	>();
 	expectTypeOf<
 		Vals<"SELECT 1 AS U&\"d*0061t\\+000061\" UESCAPE '*'">
 	>().toEqualTypeOf<["select", "1", "as", "dat\\+000061"]>();
@@ -494,6 +522,12 @@ test("Unicode escapes are validated like Postgres", () => {
 	expectTypeOf<Lex<"SELECT U&'x' UESCAPE '+'">>().toEqualTypeOf<
 		SqlError<"invalid Unicode escape character at or near \"'+'\"", 1>
 	>();
+	expectTypeOf<Lex<"SELECT 1 AS U&\"a\" UESCAPE '+'">>().toEqualTypeOf<
+		SqlError<"invalid Unicode escape character at or near \"'+'\"", 3>
+	>();
+	expectTypeOf<Lex<"SELECT U&'x' UESCAPE ''">>().toEqualTypeOf<
+		SqlError<"invalid Unicode escape character at or near \"''\"", 1>
+	>();
 	expectTypeOf<Lex<'SELECT 1 AS ""'>>().toEqualTypeOf<
 		SqlError<'zero-length delimited identifier at or near """"', 3>
 	>();
@@ -571,6 +605,42 @@ test("code points: every plane, surrogate ranges, hex digits; UESCAPE only as a 
 	expectTypeOf<Lex<"SELECT U&'x' UESCAPE '!!'">>().toEqualTypeOf<
 		SqlError<`invalid Unicode escape character at or near "'!!'"`, 1>
 	>();
+	// too few hex digits, or a non-hex digit first
+	expectTypeOf<
+		[
+			Lex<"SELECT U&'\\+1'">,
+			Lex<"SELECT U&'\\+zz1234'">,
+			Lex<"SELECT E'\\U1'">,
+			Lex<"SELECT E'\\Uzz123456'">,
+		]
+	>().toEqualTypeOf<
+		[
+			SqlError<"invalid Unicode escape", 1>,
+			SqlError<"invalid Unicode escape", 1>,
+			SqlError<"invalid Unicode escape", 1>,
+			SqlError<"invalid Unicode escape", 1>,
+		]
+	>();
+	// eight digits above 10FFFF, even when the first two are 01..10
+	expectTypeOf<Lex<"SELECT E'\\U01000000'">>().toEqualTypeOf<
+		SqlError<'invalid Unicode escape value at or near "\\U01000000"', 1>
+	>();
+	// the escapes after a valid one, or after a surrogate pair, are checked too
+	expectTypeOf<
+		[
+			Lex<"SELECT E'\\u0061\\u061'">,
+			Lex<"SELECT E'\\udb99\\udc00\\u061'">,
+			Lex<"SELECT U&'\\db99\\dc00\\061'">,
+			Lex<"SELECT U&'\\db99\\+00dc00\\061'">,
+		]
+	>().toEqualTypeOf<
+		[
+			SqlError<"invalid Unicode escape", 1>,
+			SqlError<"invalid Unicode escape", 1>,
+			SqlError<"invalid Unicode escape", 1>,
+			SqlError<"invalid Unicode escape", 1>,
+		]
+	>();
 });
 
 test("numbers: digit separators, radix prefixes and trailing junk follow Postgres 16+", () => {
@@ -616,6 +686,47 @@ test("numbers: digit separators, radix prefixes and trailing junk follow Postgre
 	expectTypeOf<Lex<"SELECT 0x">>().toEqualTypeOf<
 		SqlError<'invalid hexadecimal integer at or near "0x"', 1>
 	>();
+	expectTypeOf<Lex<"SELECT 0x_">>().toEqualTypeOf<
+		SqlError<'invalid hexadecimal integer at or near "0x_"', 1>
+	>();
+	expectTypeOf<Lex<"SELECT 1e, 2">>().toEqualTypeOf<
+		SqlError<'trailing junk after numeric literal at or near "1e"', 1>
+	>();
+	// after 0x / 0o / 0b, `0` and the identifier after it are the junk: a digit of another radix too
+	type Junk<N extends string> = SqlError<
+		`trailing junk after numeric literal at or near "${N}"`,
+		1
+	>;
+	expectTypeOf<
+		[
+			Lex<"SELECT 0o19">,
+			Lex<"SELECT 0b12">,
+			Lex<"SELECT 0o8">,
+			Lex<"SELECT 0b2">,
+			Lex<"SELECT 0xg">,
+			Lex<"SELECT 0x_g">,
+			Lex<"SELECT 0x1_g">,
+			Lex<"SELECT 0x1_">,
+			Lex<"SELECT 0x1$">,
+			Lex<"SELECT 0x1é">,
+		]
+	>().toEqualTypeOf<
+		[
+			Junk<"0o19">,
+			Junk<"0b12">,
+			Junk<"0o8">,
+			Junk<"0b2">,
+			Junk<"0xg">,
+			Junk<"0x_g">,
+			Junk<"0x1_g">,
+			Junk<"0x1_">,
+			Junk<"0x1$">,
+			Junk<"0x1é">,
+		]
+	>();
+	expectTypeOf<Vals<"SELECT 0o_7, 0O1234567, 0X1F, 0x1.5">>().toEqualTypeOf<
+		["select", "0o_7", ",", "0O1234567", ",", "0X1F", ",", "0x1", ".5"]
+	>();
 	expectTypeOf<Lex<"SELECT $1a">>().toEqualTypeOf<
 		SqlError<'trailing junk after parameter at or near "$1a"', 1>
 	>();
@@ -640,6 +751,16 @@ test("lexing feeds the engine end to end", () => {
 	expectTypeOf<
 		V<"SELECT id FROM things WHERE label = 'a''b' -- comment">
 	>().toEqualTypeOf<"SELECT id FROM things WHERE label = 'a''b' -- comment">();
+});
+
+test("long runs of whitespace are lexed in chunks too", () => {
+	type S10 = "          ";
+	type S100 = `${S10}${S10}${S10}${S10}${S10}${S10}${S10}${S10}${S10}${S10}`;
+	type S1000 =
+		`${S100}${S100}${S100}${S100}${S100}${S100}${S100}${S100}${S100}${S100}`;
+	expectTypeOf<Vals<`SELECT${S1000}${S1000}\n${S1000} 1`>>().toEqualTypeOf<
+		["select", "1"]
+	>();
 });
 
 test("long statements are lexed in chunks (4 KB, > 1000 tokens)", () => {

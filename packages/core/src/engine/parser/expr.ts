@@ -20,7 +20,11 @@ import type {
 	IsSelectStart,
 	ParseSelectStmt,
 } from "./select.js";
-import type { ParseTypeName } from "./typename.js";
+import type {
+	IntervalFields,
+	ParsePrecision,
+	ParseTypeName,
+} from "./typename.js";
 import type {
 	AnyLabel,
 	EatOp,
@@ -133,7 +137,7 @@ type NotPrefixOp =
 	| ":"
 	| "::"
 	| ":=";
-type Terminator = ")" | "," | ";" | "]" | ":";
+type Terminator = "(" | ")" | "," | ";" | "]" | ":";
 
 // ───────────────────────────── infix loop ─────────────────────────────
 
@@ -1067,41 +1071,6 @@ type SpecialValue<W extends string, J extends number> = Ok<
 	},
 	J
 >;
-/** After `(`: a precision `p)` → the index after `)`, or a syntax error. */
-type ParsePrecision<T extends Toks, I extends number> = T[I] extends NumTok
-	? T[Nx<I>] extends OpTok<")">
-		? Nx2<I>
-		: SyntaxErrorAt<T, Nx<I>>
-	: SyntaxErrorAt<T, I>;
-type IntervalField = "year" | "month" | "day" | "hour" | "minute" | "second";
-/** The fields `F TO …` can end with (`YEAR TO MONTH`, `DAY TO SECOND`, …; nothing after MONTH or SECOND). */
-type IntervalTo = {
-	year: "month";
-	day: "hour" | "minute" | "second";
-	hour: "minute" | "second";
-	minute: "second";
-};
-/**
- * The fields after an interval literal's string (`opt_interval`): `YEAR`, …, `SECOND [(p)]`,
- * `YEAR TO MONTH`, `DAY TO HOUR`, …, `MINUTE TO SECOND [(p)]` → the next index, or a syntax error.
- */
-type IntervalFields<T extends Toks, I extends number> =
-	T[I] extends WordTok<infer F extends IntervalField>
-		? F extends "second"
-			? SecondPrecision<T, Nx<I>>
-			: T[Nx<I>] extends WordTok<"to">
-				? F extends keyof IntervalTo
-					? T[Nx2<I>] extends WordTok<infer G extends IntervalTo[F]>
-						? G extends "second"
-							? SecondPrecision<T, Nx3<I>>
-							: Nx3<I>
-						: SyntaxErrorAt<T, Nx2<I>>
-					: SyntaxErrorAt<T, Nx<I>>
-				: Nx<I>
-		: I;
-/** `SECOND` may take a precision: `second(3)`. */
-type SecondPrecision<T extends Toks, I extends number> =
-	T[I] extends OpTok<"("> ? ParsePrecision<T, Nx<I>> : I;
 
 type ParseUnary<T extends Toks, O extends string, I extends number> =
 	ParseExpr<

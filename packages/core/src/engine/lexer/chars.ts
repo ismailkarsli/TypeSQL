@@ -44,12 +44,11 @@ export type Lower =
 	| "z";
 export type Upper = Uppercase<Lower>;
 export type IdStart = Lower | Upper | "_";
-export type IdChar = IdStart | Digit | "$";
 /**
- * Every ASCII character that can never be part of an identifier. Any character that is
- * neither `IdChar` nor one of these is non-ASCII and is accepted as an identifier
- * character (`café`, `naïve`), as Postgres does. Non-ASCII letters are not case-folded
- * (Postgres folds only ASCII letters in UTF-8 databases).
+ * Every ASCII character that can never be part of an identifier. Every other character is an
+ * identifier character: an ASCII letter, digit, `_` or `$`, or any non-ASCII character (`café`,
+ * `naïve`), as Postgres reads them. Non-ASCII letters are not case-folded (Postgres folds only
+ * ASCII letters in UTF-8 databases).
  */
 export type NonIdAscii =
 	| Ws
