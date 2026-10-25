@@ -34,7 +34,6 @@ import type {
 	Nx3,
 	Ok,
 	QualName,
-	SkipToCloseParen,
 	SkipWord,
 	SyntaxErrorAt,
 } from "./util.js";
@@ -56,7 +55,7 @@ export type ParseExpr<
 	Min extends MinPrec = 0,
 > =
 	ParsePrefix<T, I> extends infer R
-		? R extends Ok<infer L, infer J extends number>
+		? R extends Ok<infer L, infer J>
 			? ParseInfix<T, L, J, Min>
 			: R
 		: never;
@@ -109,12 +108,12 @@ type NextPrec = {
 
 type ComparisonOp = "=" | "<" | ">" | "<=" | ">=" | "<>" | "!=";
 /**
- * Operators that cannot be prefix operators (Postgres's MathOp tokens, `=>` and punctuation).
- * Any other operator can: `-x`, `+x` bind tightest; `@ x`, `@@ box`, `|/ x`, user-defined
- * `@#@ x` bind looser than the arithmetic operators (`%prec Op`: `@ a + b` is `@ (a + b)`).
+ * Operators that cannot be prefix operators (Postgres's MathOp tokens, `=>` and punctuation;
+ * a leading `*` is a star). Any other operator can: `-x`, `+x` bind tightest; `@ x`, `@@ box`,
+ * `|/ x`, user-defined `@#@ x` bind looser than the arithmetic operators (`%prec Op`: `@ a + b`
+ * is `@ (a + b)`).
  */
 type NotPrefixOp =
-	| "*"
 	| "/"
 	| "%"
 	| "^"
@@ -169,13 +168,11 @@ type ParseInfixAt<T extends Toks, L, I extends number, Min extends MinPrec> =
 					? ParseCastSuffix<T, L, Nx<I>, Min>
 					: Ok<L, I>
 				: O extends "["
-					? Binds<12, Min> extends true
+					? L extends Indirectable | { readonly t: "col" | "param" }
 						? ParseSubscript<T, L, Nx<I>, Min>
 						: Ok<L, I>
 					: O extends "."
-						? L extends {
-								readonly t: "row" | "sub" | "field" | "idx" | "slice";
-							}
+						? L extends Indirectable
 							? ParseFieldAccess<T, L, Nx<I>, Min>
 							: Ok<L, I>
 						: O extends ComparisonOp
@@ -183,14 +180,14 @@ type ParseInfixAt<T extends Toks, L, I extends number, Min extends MinPrec> =
 								? ParseComparisonRhs<T, L, O, Nx<I>, Min>
 								: Ok<L, I>
 							: O extends "+" | "-"
-								? BinRhs<T, L, O, 8, I, Min>
+								? BinRhs<T, L, O, 8, I, Nx<I>, Min>
 								: O extends "*" | "/" | "%"
-									? BinRhs<T, L, O, 9, I, Min>
+									? BinRhs<T, L, O, 9, I, Nx<I>, Min>
 									: O extends "^"
-										? BinRhs<T, L, O, 10, I, Min>
+										? BinRhs<T, L, O, 10, I, Nx<I>, Min>
 										: O extends "=>" | ":="
 											? Ok<L, I>
-											: BinRhs<T, L, O, 7, I, Min>
+											: BinRhs<T, L, O, 7, I, Nx<I>, Min>
 		: T[I] extends WordTok<infer W>
 			? W extends "and"
 				? Binds<2, Min> extends true
@@ -263,6 +260,44 @@ type ParseInfixAt<T extends Toks, L, I extends number, Min extends MinPrec> =
 																	: Ok<L, I>
 			: Ok<L, I>;
 
+/**
+ * What a subscript or a field selection may follow (Postgres's `indirection`, at any
+ * precedence): a column or a parameter (subscript only), a subquery, another indirection, or a
+ * parenthesized expression (`(e)[i]`, `(e).f`, read by ParseParen). `f(x)[1]`, `ARRAY[1][1]`,
+ * `'a'[1]` and `ROW(1, 2).f1` are syntax errors.
+ */
+type Indirectable = { readonly t: "sub" | "field" | "idx" | "slice" };
+
+/**
+ * Comparisons, IS DISTINCT FROM, LIKE / ILIKE / SIMILAR TO and BETWEEN are `%nonassoc`: an
+ * operator of the same precedence right after the right operand is a syntax error (`a = b = c`,
+ * `a IS DISTINCT FROM b IS NULL`, `a LIKE b IN (c)`), even one that could be a label. Otherwise
+ * the infix loop goes on with `L`.
+ */
+type NonAssoc<
+	T extends Toks,
+	L,
+	J extends number,
+	Min extends MinPrec,
+	P extends 4 | 5 | 6,
+> = PrecAt<T, J> extends P ? SyntaxErrorAt<T, J> : ParseInfix<T, L, J, Min>;
+/** The precedence (4, 5 or 6) of the non-associative operator at `J`, else 0. */
+type PrecAt<T extends Toks, J extends number> =
+	T[J] extends OpTok<ComparisonOp>
+		? 5
+		: T[J] extends WordTok<infer W>
+			? W extends "is" | "isnull" | "notnull"
+				? 4
+				: W extends Prec6Word
+					? 6 // type-mutate: equivalent never-true – only a LIKE or BETWEEN operand ends at such a word (a lower operator's operand takes it), and never counts as 6
+					: W extends "not"
+						? T[Nx<J>] extends WordTok<Prec6Word>
+							? 6 // type-mutate: equivalent never-true – only a LIKE or BETWEEN operand ends at NOT LIKE … (a lower operator's operand takes it), and never counts as 6
+							: 0
+						: 0
+			: 0;
+type Prec6Word = "like" | "ilike" | "similar" | "between" | "in";
+
 type IsTest_<E, What extends IsTest["what"], Not extends boolean> = {
 	t: "is";
 	e: E;
@@ -287,7 +322,7 @@ type ParseChain<
 	Min extends MinPrec,
 > =
 	ParseExpr<T, I, P> extends infer X
-		? X extends Ok<infer E, infer J extends number>
+		? X extends Ok<infer E, infer J>
 			? T[J] extends WordTok<Op>
 				? Min extends "target"
 					? T[Nx<J>] extends OpTok<",">
@@ -305,46 +340,40 @@ type Balance<
 	Op extends string,
 > = Items extends readonly [infer Only]
 	? Only
-	: Balance<PairUp<Items, Op, 0, []>, Op>;
+	: Balance<PairUp<Items, Op, []>, Op>;
 type PairUp<
 	Items extends readonly unknown[],
 	Op extends string,
-	I extends number,
 	Acc extends readonly unknown[],
-> = Items[I] extends undefined
-	? Acc
-	: Items[Nx<I>] extends undefined
-		? [...Acc, Items[I]]
-		: PairUp<
-				Items,
-				Op,
-				Nx<Nx<I>>,
-				[...Acc, { t: "bin"; op: Op; l: Items[I]; r: Items[Nx<I>] }]
-			>;
+> = Items extends readonly [infer A, infer B, ...infer Rest]
+	? PairUp<Rest, Op, [...Acc, { t: "bin"; op: Op; l: A; r: B }]>
+	: [...Acc, ...Items];
 
 /**
- * Generic binary operator at token `I`: parse the right operand at `NextPrec[Bp]` (left-assoc), then continue.
- * `l op ANY|SOME|ALL (…)` works with every operator (Postgres checks later that it yields boolean).
+ * Generic binary operator at token `I0`, its right operand at `I`: parse the operand at
+ * `NextPrec[Bp]` (left-assoc), then continue. `l op ANY|SOME|ALL (…)` works with every operator
+ * (Postgres checks later that it yields boolean).
  */
 type BinRhs<
 	T extends Toks,
 	L,
 	O extends string,
 	Bp extends Prec,
+	I0 extends number,
 	I extends number,
 	Min extends MinPrec,
 > =
 	Binds<Bp, Min> extends true
-		? T[Nx<I>] extends WordTok<infer Q extends "any" | "some" | "all">
-			? T[Nx2<I>] extends OpTok<"(">
-				? ParseQuantified<T, L, O, Q extends "all" ? "all" : "any", Nx3<I>, Min>
-				: SyntaxErrorAt<T, Nx2<I>>
-			: ParseExpr<T, Nx<I>, NextPrec[Bp]> extends infer X
-				? X extends Ok<infer Rhs, infer J extends number>
+		? T[I] extends WordTok<infer Q extends "any" | "some" | "all">
+			? T[Nx<I>] extends OpTok<"(">
+				? ParseQuantified<T, L, O, Q extends "all" ? "all" : "any", Nx2<I>, Min>
+				: SyntaxErrorAt<T, Nx<I>>
+			: ParseExpr<T, I, NextPrec[Bp]> extends infer X
+				? X extends Ok<infer Rhs, infer J>
 					? ParseInfix<T, { t: "bin"; op: O; l: L; r: Rhs }, J, Min>
 					: X
 				: never
-		: Ok<L, I>;
+		: Ok<L, I0>;
 
 /** `l <cmp> rhs` where rhs may be `ANY|SOME|ALL (subquery | array)`. `I` is after the operator. */
 type ParseComparisonRhs<
@@ -366,14 +395,14 @@ type ParseComparisonRhs<
 				>
 			: SyntaxErrorAt<T, Nx<I>>
 		: ParseExpr<T, I, 6> extends infer X
-			? X extends Ok<infer Rhs, infer J extends number>
-				? ParseInfix<T, { t: "bin"; op: O; l: L; r: Rhs }, J, Min>
+			? X extends Ok<infer Rhs, infer J>
+				? NonAssoc<T, { t: "bin"; op: O; l: L; r: Rhs }, J, Min, 5>
 				: X
 			: never;
 
 /**
- * `I` is just inside the paren. A subquery that does not end at the paren is the start of an
- * expression: `= ANY ((SELECT …)::int[])`.
+ * `I` is just inside the paren. What does not read as a subquery ending at the paren is an
+ * expression: `= ANY (arr)`, `= ANY ((SELECT …)::int[])`.
  */
 type ParseQuantified<
 	T extends Toks,
@@ -383,19 +412,15 @@ type ParseQuantified<
 	I extends number,
 	Min extends MinPrec,
 > =
-	IsSelectStart<T, I> extends true
-		? ParseSelectStmt<T, I> extends infer X
-			? X extends Ok<infer S, infer J extends number>
-				? EatOp<T, J, ")"> extends never
-					? ParseQuantifiedExpr<T, L, O, Q, I, Min>
-					: ParseInfix<
-							T,
-							{ t: "quant"; l: L; op: O; q: Q; r: S },
-							EatOp<T, J, ")">,
-							Min
-						>
-				: ParseQuantifiedExpr<T, L, O, Q, I, Min>
-			: never
+	ParseSelectStmt<T, I> extends Ok<infer S, infer J>
+		? EatOp<T, J, ")"> extends never
+			? ParseQuantifiedExpr<T, L, O, Q, I, Min>
+			: ParseInfix<
+					T,
+					{ t: "quant"; l: L; op: O; q: Q; r: S },
+					EatOp<T, J, ")">,
+					Min
+				>
 		: ParseQuantifiedExpr<T, L, O, Q, I, Min>;
 type ParseQuantifiedExpr<
 	T extends Toks,
@@ -406,7 +431,7 @@ type ParseQuantifiedExpr<
 	Min extends MinPrec,
 > =
 	ParseExpr<T, I, 0> extends infer X
-		? X extends Ok<infer A, infer J extends number>
+		? X extends Ok<infer A, infer J>
 			? EatOp<T, J, ")"> extends never
 				? Expected<'")"', T, J>
 				: ParseInfix<
@@ -420,7 +445,7 @@ type ParseQuantifiedExpr<
 
 type ParseCastSuffix<T extends Toks, L, I extends number, Min extends MinPrec> =
 	ParseTypeName<T, I> extends infer X
-		? X extends Ok<infer Ty extends string, infer J extends number>
+		? X extends Ok<infer Ty, infer J>
 			? ParseInfix<T, { t: "cast"; e: L; to: Ty }, J, Min>
 			: X
 		: never;
@@ -429,7 +454,7 @@ type ParseCastSuffix<T extends Toks, L, I extends number, Min extends MinPrec> =
 type ParseSubscript<T extends Toks, L, I extends number, Min extends MinPrec> =
 	EatOp<T, I, ":"> extends never
 		? ParseExpr<T, I, 0> extends infer X
-			? X extends Ok<infer Ix, infer J extends number>
+			? X extends Ok<infer Ix, infer J>
 				? EatOp<T, J, "]"> extends never
 					? EatOp<T, J, ":"> extends never
 						? Expected<'"]"', T, J>
@@ -447,7 +472,7 @@ type ParseSliceHi<
 > =
 	EatOp<T, I, "]"> extends never
 		? ParseExpr<T, I, 0> extends infer X
-			? X extends Ok<infer Hi, infer J extends number>
+			? X extends Ok<infer Hi, infer J>
 				? EatOp<T, J, "]"> extends never
 					? Expected<'"]"', T, J>
 					: ParseInfix<
@@ -532,12 +557,13 @@ type ParseIsBody<
 								? EatWord<T, Nx<I>, "from"> extends never
 									? Expected<"FROM", T, Nx<I>>
 									: ParseExpr<T, EatWord<T, Nx<I>, "from">, 5> extends infer X
-										? X extends Ok<infer Rhs, infer J extends number>
-											? ParseInfix<
+										? X extends Ok<infer Rhs, infer J>
+											? NonAssoc<
 													T,
 													{ t: "isdistinct"; l: L; r: Rhs; not: Not },
 													J,
-													Min
+													Min,
+													4
 												>
 											: X
 										: never
@@ -574,7 +600,10 @@ type ParseNegated<
 						: Ok<L, I0>
 		: Ok<L, I0>;
 
-/** After `IN`: `(subquery)` or `(list)`. */
+/**
+ * After `IN`: `(subquery)` or `(list)`. A parenthesized subquery that does not end at the paren
+ * starts the list: `IN ((SELECT 1), 2)`.
+ */
 type ParseIn<
 	T extends Toks,
 	L,
@@ -586,9 +615,11 @@ type ParseIn<
 		? Expected<'"("', T, I>
 		: IsSelectStart<T, EatOp<T, I, "(">> extends true
 			? ParseSelectStmt<T, EatOp<T, I, "(">> extends infer X
-				? X extends Ok<infer S, infer J extends number>
+				? X extends Ok<infer S, infer J>
 					? EatOp<T, J, ")"> extends never
-						? Expected<'")"', T, J>
+						? T[EatOp<T, I, "(">] extends OpTok<"(">
+							? ParseInList<T, L, EatOp<T, I, "(">, Min, Not>
+							: Expected<'")"', T, J>
 						: ParseInfix<
 								T,
 								{ t: "insub"; e: L; q: S; not: Not },
@@ -597,18 +628,27 @@ type ParseIn<
 							>
 					: X
 				: never
-			: ParseExprList<T, EatOp<T, I, "(">, []> extends infer X
-				? X extends Ok<infer List, infer J extends number>
-					? EatOp<T, J, ")"> extends never
-						? Expected<'")"', T, J>
-						: ParseInfix<
-								T,
-								{ t: "in"; e: L; list: List; not: Not },
-								EatOp<T, J, ")">,
-								Min
-							>
-					: X
-				: never;
+			: ParseInList<T, L, EatOp<T, I, "(">, Min, Not>;
+/** `IN (` list `)`, `I` after the paren. */
+type ParseInList<
+	T extends Toks,
+	L,
+	I extends number,
+	Min extends MinPrec,
+	Not extends boolean,
+> =
+	ParseExprList<T, I, []> extends infer X
+		? X extends Ok<infer List, infer J>
+			? EatOp<T, J, ")"> extends never
+				? Expected<'")"', T, J>
+				: ParseInfix<
+						T,
+						{ t: "in"; e: L; list: List; not: Not },
+						EatOp<T, J, ")">,
+						Min
+					>
+			: X
+		: never;
 
 type ParseLike<
 	T extends Toks,
@@ -632,21 +672,23 @@ type ParseLike<
 					>
 				: SyntaxErrorAt<T, Nx<I>>
 		: ParseExpr<T, I, 7> extends infer X
-			? X extends Ok<infer Pat, infer J extends number>
+			? X extends Ok<infer Pat, infer J>
 				? EatWord<T, J, "escape"> extends never
-					? ParseInfix<
+					? NonAssoc<
 							T,
 							{ t: "like"; e: L; pat: Pat; kind: Kind; not: Not },
 							J,
-							Min
+							Min,
+							6
 						>
 					: ParseExpr<T, EatWord<T, J, "escape">, 7> extends infer Y
-						? Y extends Ok<unknown, infer J2 extends number>
-							? ParseInfix<
+						? Y extends Ok<unknown, infer J2>
+							? NonAssoc<
 									T,
 									{ t: "like"; e: L; pat: Pat; kind: Kind; not: Not },
 									J2,
-									Min
+									Min,
+									6
 								>
 							: Y
 						: never
@@ -670,16 +712,17 @@ type ParseBetween<
 	Not extends boolean,
 > =
 	ParseExpr<T, SkipWord<T, I, "symmetric" | "asymmetric">, 7> extends infer X
-		? X extends Ok<infer Lo, infer J extends number>
+		? X extends Ok<infer Lo, infer J>
 			? EatWord<T, J, "and"> extends never
 				? Expected<"AND", T, J>
 				: ParseExpr<T, EatWord<T, J, "and">, 7> extends infer Y
-					? Y extends Ok<infer Hi, infer J2 extends number>
-						? ParseInfix<
+					? Y extends Ok<infer Hi, infer J2>
+						? NonAssoc<
 								T,
 								{ t: "between"; e: L; lo: Lo; hi: Hi; not: Not },
 								J2,
-								Min
+								Min,
+								6
 							>
 						: Y
 					: never
@@ -693,7 +736,7 @@ type ParseAtTimeZone<T extends Toks, L, I extends number, Min extends MinPrec> =
 		: EatWords<T, I, ["time", "zone"]> extends never
 			? Expected<"TIME ZONE or LOCAL", T, I>
 			: ParseExpr<T, EatWords<T, I, ["time", "zone"]>, 11> extends infer X
-				? X extends Ok<infer Z, infer J extends number>
+				? X extends Ok<infer Z, infer J>
 					? ParseInfix<T, { t: "attz"; e: L; zone: Z }, J, Min>
 					: X
 				: never;
@@ -717,7 +760,7 @@ type ParseOverlaps<
 	Min extends MinPrec,
 > = Ls extends readonly [infer A, infer B]
 	? ParsePrefix<T, I> extends infer X
-		? X extends Ok<infer R, infer J extends number>
+		? X extends Ok<infer R, infer J>
 			? R extends {
 					readonly t: "row";
 					readonly items: readonly [infer C, infer D];
@@ -744,7 +787,10 @@ type CallOf<Name extends string, Args> = {
 	withinGroup: null;
 };
 
-/** `OPERATOR(schema.op)` — treated as a generic operator at precedence 7. */
+/**
+ * `OPERATOR(schema.op)`: the operator `op`, at Op precedence (7) whatever its symbol. `I` is after
+ * OPERATOR, `I0` at it; without a paren the word ends the operand (a label).
+ */
 type ParseOperatorSyntax<
 	T extends Toks,
 	L,
@@ -753,25 +799,31 @@ type ParseOperatorSyntax<
 	I0 extends number,
 > =
 	T[I] extends OpTok<"(">
-		? BinRhsAt<T, L, "operator", 7, SkipToCloseParen<T, Nx<I>>, Min, I0>
+		? QualOp<T, Nx<I>> extends [infer O extends string, infer J extends number]
+			? BinRhs<T, L, O, 7, I0, J, Min>
+			: SyntaxErrorAt<T, Extract<QualOp<T, Nx<I>>, number>>
 		: Ok<L, I0>;
-/** Like BinRhs but the right operand starts at `I` (already past the operator). */
-type BinRhsAt<
-	T extends Toks,
-	L,
-	O extends string,
-	Bp extends Prec,
-	I extends number,
-	Min extends MinPrec,
-	I0 extends number,
-> =
-	Binds<Bp, Min> extends true
-		? ParseExpr<T, I, NextPrec[Bp]> extends infer X
-			? X extends Ok<infer Rhs, infer J extends number>
-				? ParseInfix<T, { t: "bin"; op: O; l: L; r: Rhs }, J, Min>
+/**
+ * `name.name.op)` of `OPERATOR(…)` from `I`: `[op, index after the paren]`, or the index of the
+ * token that does not fit.
+ */
+type QualOp<T extends Toks, I extends number> =
+	T[I] extends OpTok<infer O>
+		? T[Nx<I>] extends OpTok<")">
+			? [O, Nx2<I>]
+			: Nx<I>
+		: T[Nx<I>] extends OpTok<".">
+			? QualOp<T, Nx2<I>>
+			: Nx<I>;
+/** `OPERATOR(schema.op) e`: a prefix operator at Op precedence, whatever its symbol (`I` is after the paren). */
+type ParseQualPrefix<T extends Toks, I extends number> =
+	QualOp<T, I> extends [infer O, infer J extends number]
+		? ParseExpr<T, J, 8> extends infer X
+			? X extends Ok<infer E, infer J2>
+				? Ok<{ t: "un"; op: O; e: E }, J2>
 				: X
 			: never
-		: Ok<L, I0>;
+		: SyntaxErrorAt<T, Extract<QualOp<T, I>, number>>;
 
 // ───────────────────────────── prefix ─────────────────────────────
 
@@ -787,15 +839,13 @@ type ParsePrefix<T extends Toks, I extends number> =
 				: T[I] extends OpTok<infer O>
 					? O extends "("
 						? ParseParen<T, Nx<I>>
-						: O extends "-" | "+"
-							? ParseUnary<T, O, Nx<I>>
-							: O extends "*"
-								? Ok<{ t: "star"; tbl: null }, Nx<I>>
-								: O extends "["
-									? ParseArrayLiteral<T, Nx<I>>
-									: O extends NotPrefixOp
-										? SyntaxErrorAt<T, I>
-										: ParseUnary<T, O, Nx<I>>
+						: O extends "*"
+							? Ok<{ t: "star"; tbl: null }, Nx<I>>
+							: O extends "["
+								? ParseArrayLiteral<T, Nx<I>>
+								: O extends NotPrefixOp
+									? SyntaxErrorAt<T, I>
+									: ParseUnary<T, O, Nx<I>>
 					: T[I] extends IdTok
 						? ParseNameExpr<T, I>
 						: T[I] extends WordTok<infer W>
@@ -853,14 +903,7 @@ type ParsePrefix<T extends Toks, I extends number> =
 																							? ParseSpecialValue<T, W, I>
 																							: W extends "operator"
 																								? T[Nx<I>] extends OpTok<"(">
-																									? ParseUnary<
-																											T,
-																											"operator",
-																											SkipToCloseParen<
-																												T,
-																												Nx<Nx<I>>
-																											>
-																										>
+																									? ParseQualPrefix<T, Nx2<I>>
 																									: ParseNameExpr<T, I>
 																								: W extends XmlFuncKeyword
 																									? T[Nx<I>] extends OpTok<"(">
@@ -1095,7 +1138,9 @@ type ParseParen<T extends Toks, I extends number> =
 							: never
 					: T[EatOp<T, J, ")">] extends OpTok<".">
 						? ParseParenField<T, E, Nx<EatOp<T, J, ")">>>
-						: Ok<E, EatOp<T, J, ")">>
+						: T[EatOp<T, J, ")">] extends OpTok<"[">
+							? ParseSubscript<T, E, Nx<EatOp<T, J, ")">>, 13>
+							: Ok<E, EatOp<T, J, ")">>
 				: X
 			: never;
 /** `(e).name` / `(e).*` after a parenthesized expression (the infix loop continues with the result). */

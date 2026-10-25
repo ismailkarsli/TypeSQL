@@ -527,10 +527,10 @@ test("any operator: prefix operators bind looser than arithmetic, unknown operat
 	expectTypeOf<
 		Row<"SELECT @ small + small AS a, - small + 1 AS b, |/ ratio AS c FROM things">
 	>().toEqualTypeOf<{ a: number; b: number; c: number }>();
-	// user-defined operators parse; their result is unknown until cast
+	// user-defined operators parse; their result is unknown until cast. OPERATOR(pg_catalog.+) is +
 	expectTypeOf<
 		Row<"SELECT id *= id AS a, (id ~<~ id)::bool AS b, @#@ id AS c, OPERATOR(pg_catalog.+) id AS d FROM things">
-	>().toEqualTypeOf<{ a: unknown; b: boolean; c: unknown; d: unknown }>();
+	>().toEqualTypeOf<{ a: unknown; b: boolean; c: unknown; d: number }>();
 	// MathOp tokens cannot be prefix operators
 	expectTypeOf<V<"SELECT < id FROM things">>().toEqualTypeOf<
 		SqlError<"syntax error at or near <", 1>

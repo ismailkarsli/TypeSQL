@@ -190,7 +190,7 @@ test("->, #> and subscripts follow the shape; ->> and #>> are text", () => {
 		Row<"SELECT json_build_array(1, 'x') -> 1 AS a, json_build_array(1, 'x') -> 5 AS b, json_build_array(1, 'x') -> 'k' AS c, jsonb_build_object('a', 1) -> 0 AS d">
 	>().toEqualTypeOf<{ a: string | null; b: null; c: null; d: null }>();
 	expectTypeOf<
-		Row<"SELECT jsonb_build_object('a', jsonb_build_object('b', 2.5))['a']['b'] AS a, to_jsonb(u) -> 'email' AS b FROM users u">
+		Row<"SELECT (jsonb_build_object('a', jsonb_build_object('b', 2.5)))['a']['b'] AS a, to_jsonb(u) -> 'email' AS b FROM users u">
 	>().toEqualTypeOf<{ a: number | null; b: string | null }>();
 	// a non-literal key or index follows every key / element
 	expectTypeOf<
