@@ -93,9 +93,9 @@ test("syntax errors: trailing garbage, missing pieces", () => {
 	>().toEqualTypeOf<
 		SqlError<"syntax error: expected identifier at or near 1", 10>
 	>();
-	// a "(" never closed
+	// a "(" never closed: the operand after the operator name is where PostgreSQL stops
 	expectTypeOf<V<"SELECT 1 OPERATOR(pg_catalog.+ 2">>().toEqualTypeOf<
-		SqlError<"syntax error at end of input", 8>
+		SqlError<"syntax error at or near 2", 7>
 	>();
 	expectTypeOf<
 		V<"SELECT count(*) FROM users GROUP BY GROUPING SETS ((id)">
