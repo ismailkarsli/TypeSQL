@@ -337,7 +337,9 @@ test("the function-like keywords in FROM", () => {
 	expectTypeOf<V<"SELECT * FROM CAST(1 AS int">>().toEqualTypeOf<
 		SqlError<'syntax error: expected ")" at or near end of input', 8>
 	>();
-	expectTypeOf<Row<"SELECT * FROM collation for ('a'::text) c">>().toEqualTypeOf<{
+	expectTypeOf<
+		Row<"SELECT * FROM collation for ('a'::text) c">
+	>().toEqualTypeOf<{
 		c: string;
 	}>();
 	expectTypeOf<
