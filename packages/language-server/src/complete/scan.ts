@@ -60,7 +60,8 @@ const NONE: Context["expect"] = { kind: "none" };
  * named parameter (`:name`), `x` `{slot}`, `o` operator or punctuation.
  */
 interface Tok {
-	readonly k: "w" | "q" | "s" | "n" | "p" | "x" | "o";
+	/** word, quoted name, value (string, number or parameter), slot, operator */
+	readonly k: "w" | "q" | "v" | "x" | "o";
 	readonly v: string;
 	readonly s: number;
 	readonly e: number;
@@ -109,6 +110,21 @@ function lex(text: string, offset: number): { toks: Tok[]; inside: boolean } {
 	const push = (k: Tok["k"], s: number, v = text.slice(s, i)): void => {
 		toks.push({ k, v, s, e: i });
 	};
+	/** A string, dollar-quoted string, number or parameter at `i`: `i` moves past it. */
+	const value = (): boolean => {
+		const string = take(STRING);
+		if (string) {
+			take(string[1] ? ESCAPE_STRING_REST : STRING_REST);
+			return true;
+		}
+		const tag = take(DOLLAR_TAG)?.[0];
+		if (tag) {
+			const end = text.indexOf(tag, i);
+			i = end === -1 ? n : end + tag.length;
+			return true;
+		}
+		return !!(take(NUMBER) || take(NAMED_PARAM));
+	};
 	/** A comment ran from `s` to `i`; `open`: the cursor at `i` is in it too. */
 	const comment = (s: number, open: boolean): void => {
 		if (s < offset && (offset < i || (open && offset === i))) inside = true;
@@ -134,10 +150,9 @@ function lex(text: string, offset: number): { toks: Tok[]; inside: boolean } {
 			comment(s, depth > 0);
 			continue;
 		}
-		const string = take(STRING);
-		if (string) {
-			take(string[1] ? ESCAPE_STRING_REST : STRING_REST);
-			push("s", s);
+		if (value()) {
+			// Stryker disable next-line StringLiteral: a value token is only told apart from words, quoted names, slots and operators, as a token of any other kind name would be
+			push("v", s);
 			continue;
 		}
 		const quoted = take(QUOTED);
@@ -145,14 +160,7 @@ function lex(text: string, offset: number): { toks: Tok[]; inside: boolean } {
 			push("q", s, quoted[1]!.replaceAll('""', '"'));
 			continue;
 		}
-		const tag = take(DOLLAR_TAG)?.[0];
-		if (tag) {
-			const end = text.indexOf(tag, i);
-			i = end === -1 ? n : end + tag.length;
-			push("s", s);
-		} else if (take(NUMBER)) push("n", s);
-		else if (take(NAMED_PARAM)) push("p", s);
-		else if (take(SLOT)) push("x", s);
+		if (take(SLOT)) push("x", s);
 		else if (take(WORD)) push("w", s, fold(text.slice(s, i)));
 		else {
 			if (!take(OPERATOR)) take(PUNCTUATION);
@@ -365,7 +373,8 @@ function structure(toks: readonly Tok[]): { at: At[]; used: RelRef[] } {
 						cte = null;
 					} else after = null;
 					i = inner.i;
-					if (out && depth0) out.push(t, { k: "o", v: ")", s: 0, e: 0 });
+					// the `)`, or the `(` again when the subquery is not closed
+					if (out && depth0) out.push(t, toks[i] ?? t);
 					continue;
 				}
 				const prev = word(i - 1);

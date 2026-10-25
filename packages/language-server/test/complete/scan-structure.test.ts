@@ -222,6 +222,8 @@ test.each<[string, string]>([
 	["SELECT count(*) + 1", "()"],
 	["SELECT -(a)", "()"],
 	["SELECT count((a))", "(count)"],
+	// a subquery: its alias names it; without one nothing does
+	["SELECT (SELECT 1) y, (VALUES (2)) AS z, (SELECT 3)", "(y,z)"],
 	["SELECT id, active AND", "(id)"],
 	["SELECT a, FROM t", "(a)"],
 	['SELECT a ","', "(,)"],
