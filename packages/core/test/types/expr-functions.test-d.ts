@@ -503,6 +503,9 @@ test("EXTRACT and POSITION", () => {
 	expectTypeOf<V<"SELECT POSITION(+ IN label) FROM things">>().toEqualTypeOf<
 		SqlError<"syntax error at or near in", 4>
 	>();
+	expectTypeOf<
+		V<"SELECT position(nosuch IN label) FROM things">
+	>().toEqualTypeOf<SqlError<'column "nosuch" does not exist', 3>>();
 	expectTypeOf<V<"SELECT POSITION('a' IN +) FROM things">>().toEqualTypeOf<
 		SqlError<"syntax error at or near )", 6>
 	>();
@@ -689,4 +692,50 @@ test("ORDER BY items: USING and NULLS", () => {
 	expectTypeOf<
 		V<"SELECT id FROM things ORDER BY id USING foo">
 	>().toEqualTypeOf<SqlError<"syntax error at or near using", 7>>();
+});
+
+test("EXTRACT is NULL for an infinite value in the fields that do not grow with time", () => {
+	// ±Infinity for an infinite timestamp, timestamptz or date
+	expectTypeOf<
+		Row<"SELECT EXTRACT(year FROM at) AS a, EXTRACT(decade FROM ts) AS b, EXTRACT(century FROM day) AS c, EXTRACT(millennium FROM at) AS d, EXTRACT(julian FROM ts) AS e, EXTRACT(isoyear FROM day) AS f, EXTRACT(epoch FROM at) AS g, EXTRACT('YEAR' FROM at) AS h FROM things">
+	>().toEqualTypeOf<{
+		a: string;
+		b: string;
+		c: string;
+		d: string;
+		e: string;
+		f: string;
+		g: string;
+		h: string;
+	}>();
+	expectTypeOf<
+		Row<"SELECT EXTRACT(day FROM at) AS a, EXTRACT(month FROM ts) AS b, EXTRACT(dow FROM day) AS c, EXTRACT('Day' FROM at) AS d, EXTRACT(year FROM n_at) AS e FROM things">
+	>().toEqualTypeOf<{
+		a: string | null;
+		b: string | null;
+		c: string | null;
+		d: string | null;
+		e: string | null;
+	}>();
+	// an infinite interval is ±Infinity in hours and days too
+	expectTypeOf<
+		Row<"SELECT EXTRACT(year FROM dur) AS a, EXTRACT(decade FROM dur) AS b, EXTRACT(century FROM dur) AS c, EXTRACT(millennium FROM dur) AS d, EXTRACT(epoch FROM dur) AS e, EXTRACT(day FROM dur) AS f, EXTRACT(hour FROM dur) AS g, EXTRACT(minute FROM dur) AS h, EXTRACT(month FROM dur) AS i FROM things">
+	>().toEqualTypeOf<{
+		a: string;
+		b: string;
+		c: string;
+		d: string;
+		e: string;
+		f: string;
+		g: string;
+		h: string | null;
+		i: string | null;
+	}>();
+	// a time is never infinite
+	expectTypeOf<
+		Row<"SELECT EXTRACT(hour FROM clock) AS a, EXTRACT(minute FROM clock) AS b FROM things">
+	>().toEqualTypeOf<{ a: string; b: string }>();
+	expectTypeOf<
+		Row<"SELECT coalesce(EXTRACT(day FROM at), 0) AS a, coalesce(EXTRACT(minute FROM dur), 0) AS b FROM things">
+	>().toEqualTypeOf<{ a: string; b: string }>();
 });

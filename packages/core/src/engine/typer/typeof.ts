@@ -166,9 +166,11 @@ export type TypeOf<E extends Expr, C extends Ctx> = E extends {
 																											: E extends {
 																														readonly t: "extract";
 																													}
-																												? WithType<
+																												? TypeExtract<
 																														TypeOf<E["e"], C>,
-																														"numeric"
+																														Lowercase<
+																															E["field"]
+																														>
 																													>
 																												: E extends {
 																															readonly t: "position";
@@ -373,9 +375,37 @@ type StrictOf<A, B, T extends string> = A extends ColInfo
 		? Info<T, Or<A["nullable"], B["nullable"]>>
 		: B
 	: A;
-type WithType<A, T extends string> = A extends ColInfo
-	? Info<T, A["nullable"]>
+/**
+ * `EXTRACT(field FROM e)`: numeric, and NULL for an infinite timestamp, date or interval in
+ * the fields that do not grow with time (`day`, `month`, `second`, …; `year`, `epoch`, … are
+ * ±Infinity).
+ */
+type TypeExtract<A, F extends string> = A extends ColInfo
+	? Info<"numeric", Or<A["nullable"], ExtractNull<A["type"], F>>>
 	: A;
+type ExtractNull<T, F> = T extends "timestamp" | "timestamptz" | "date"
+	? F extends
+			| "year"
+			| "decade"
+			| "century"
+			| "millennium"
+			| "julian"
+			| "isoyear"
+			| "epoch"
+		? false
+		: true // type-mutate: equivalent never-false – a never nullability is read with `extends true`, as nullable
+	: T extends "interval"
+		? F extends
+				| "year"
+				| "decade"
+				| "century"
+				| "millennium"
+				| "epoch"
+				| "day"
+				| "hour"
+			? false
+			: true // type-mutate: equivalent never-false – a never nullability is read with `extends true`, as nullable
+		: false;
 type MakeNullable<A> = A extends ColInfo ? Info<A["type"], true> : A;
 type ArrayOf<A> = A extends ColInfo
 	? Info<A["type"] extends `${string}[]` ? A["type"] : `${A["type"]}[]`>
