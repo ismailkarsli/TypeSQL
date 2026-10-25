@@ -54,7 +54,7 @@ export interface DdlCacheKeys {}
  * Version of the engine's output. An entry computed by another version is never used. It is a
  * hash of the type-level sources, kept up to date by `node scripts/cache-version.ts`.
  */
-export type CacheVersion = "c9b09bc7cacd";
+export type CacheVersion = "315681137e4c";
 
 /** A relation, function or catalog entry that did not exist when the entry was computed. */
 export interface Missing {

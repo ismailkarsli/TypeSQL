@@ -132,20 +132,25 @@ export type AnyLabel<T extends Toks, I extends number> =
  * labels (`t.from`, `public.select`).
  */
 export type QualName<T extends Toks, I extends number> =
-	Ident<T, I> extends [infer A, infer I1 extends number]
-		? EatOp<T, I1, "."> extends never
-			? [[A], I1]
-			: AnyLabel<T, EatOp<T, I1, ".">> extends [
-						infer B,
-						infer I2 extends number,
-					]
-				? EatOp<T, I2, "."> extends never // type-mutate: equivalent cond-false – without a ".", AnyLabel<T, never> reads T[never], the union of all tokens, which holds the "." before B: no label, so [[A, B], I2] all the same
-					? [[A, B], I2]
-					: AnyLabel<T, EatOp<T, I2, ".">> extends [infer C, infer I3]
-						? [[A, B, C], I3]
-						: [[A, B], I2]
-				: [[A], I1]
+	Ident<T, I> extends [infer A extends string, infer I1 extends number]
+		? QualParts<T, I1, [A]>
 		: null;
+/** The `.label`s after the first part: a `.` without a label after it is not consumed. */
+type QualParts<
+	T extends Toks,
+	I extends number,
+	Acc extends readonly string[],
+> =
+	EatOp<T, I, "."> extends never
+		? [Acc, I]
+		: AnyLabel<T, EatOp<T, I, ".">> extends [
+					infer B extends string,
+					infer J extends number,
+				]
+			? Acc extends readonly [unknown, unknown]
+				? [[...Acc, B], J]
+				: QualParts<T, J, [...Acc, B]>
+			: [Acc, I];
 
 /**
  * The name of a call at `I` (`func_name`): a qualified name, or a type/function-name keyword

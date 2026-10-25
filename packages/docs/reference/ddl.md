@@ -20,7 +20,7 @@ Statements with a schema effect are parsed completely, including their trailing 
 
 | Statement | Effect |
 |---|---|
-| `CREATE [TEMP \| UNLOGGED] TABLE [IF NOT EXISTS] [schema.]name (...)` | column definitions, table constraints (`PRIMARY KEY (..., c WITHOUT OVERLAPS)`, `NOT NULL c`), `LIKE src [INCLUDING ... \| EXCLUDING ...]`; trailing `INHERITS (...)`, `PARTITION BY ...`, `USING`, `WITH (...)`, `ON COMMIT`, `TABLESPACE` |
+| `CREATE [TEMP \| UNLOGGED] TABLE [IF NOT EXISTS] [schema.]name (...)` | column definitions, table constraints (`PRIMARY KEY (..., c WITHOUT OVERLAPS)`, `NOT NULL c`), `LIKE src [INCLUDING ... \| EXCLUDING ...]`; trailing `INHERITS (...)`, `PARTITION BY ...`, `USING`, `WITH (...)`, `ON COMMIT`, `TABLESPACE`, in this order |
 | `CREATE TABLE name PARTITION OF parent FOR VALUES ... \| DEFAULT` | the parent's columns |
 | `CREATE TABLE [IF NOT EXISTS] name [(cols)] AS query [WITH [NO] DATA]` | columns from the query |
 | `CREATE TABLE name AS EXECUTE stmt(...)` | parses, but is rejected: the prepared statement's columns are unknown |

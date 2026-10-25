@@ -163,6 +163,9 @@ describe("the canonical form of Postgres's parse tree", () => {
 		expect(canon("CREATE MATERIALIZED VIEW v (a) AS SELECT 1")).toBe(
 			"CREATE MATERIALIZED VIEW v(a) AS SELECT 1",
 		);
+		expect(canon("CREATE RECURSIVE VIEW v (n) AS SELECT 1")).toBe(
+			"CREATE VIEW v(n) AS WITH RECURSIVE v(n) AS (SELECT 1) SELECT n FROM v",
+		);
 		expect(canon("CREATE INDEX ON t (a)")).toBe(OUT);
 	});
 

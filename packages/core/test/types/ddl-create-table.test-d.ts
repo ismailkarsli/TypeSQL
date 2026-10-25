@@ -40,10 +40,27 @@ test("NOT NULL, NULL, DEFAULT, PRIMARY KEY", () => {
 			flag: NullableGenerated<"bool">;
 		};
 	}>();
-	// PRIMARY KEY wins over an explicit NULL (verified on Postgres 17)
-	expectTypeOf<D<"CREATE TABLE t (a int NULL PRIMARY KEY)">>().toEqualTypeOf<{
-		t: { a: Col<"int4"> };
-	}>();
+	// a table's PRIMARY KEY wins over an explicit NULL; the column's own conflicts with it
+	expectTypeOf<
+		D<"CREATE TABLE t (a int NULL, PRIMARY KEY (a))">
+	>().toEqualTypeOf<{ t: { a: Col<"int4"> } }>();
+	expectTypeOf<
+		[
+			D<"CREATE TABLE t (a int NULL PRIMARY KEY)">,
+			D<"CREATE TABLE t (a int PRIMARY KEY NULL)">,
+		]
+	>().toEqualTypeOf<
+		[
+			SqlError<
+				'conflicting NULL/NOT NULL declarations for column "a" of table "t"',
+				7
+			>,
+			SqlError<
+				'conflicting NULL/NOT NULL declarations for column "a" of table "t"',
+				8
+			>,
+		]
+	>();
 });
 
 test("serial types are NOT NULL with a default", () => {

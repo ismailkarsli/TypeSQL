@@ -73,6 +73,9 @@ describe("the canonical form of our parse tree", () => {
 		expectTypeOf<
 			Canon<"CREATE MATERIALIZED VIEW v (a) AS SELECT 1">
 		>().toEqualTypeOf<"CREATE MATERIALIZED VIEW v(a) AS SELECT 1">();
+		expectTypeOf<
+			Canon<"CREATE RECURSIVE VIEW v (n) AS SELECT 1">
+		>().toEqualTypeOf<"CREATE VIEW v(n) AS WITH RECURSIVE v(n) AS (SELECT 1) SELECT n FROM v">();
 		expectTypeOf<Canon<"CREATE INDEX ON t (a)">>().toEqualTypeOf<"…">();
 		expectTypeOf<
 			Canon<"CREATE TABLE IF NOT EXISTS s.t (a serial PRIMARY KEY, b int NOT NULL DEFAULT 1, c int GENERATED ALWAYS AS IDENTITY, d text CHECK (d <> ''), PRIMARY KEY (a), NOT NULL d, UNIQUE (b), LIKE u INCLUDING DEFAULTS) INHERITS (p)">
