@@ -93,6 +93,18 @@ test("WHERE is type-checked", () => {
 	>().toEqualTypeOf<"DELETE FROM users WHERE EXISTS (SELECT 1 FROM posts p WHERE p.author_id = users.id)">();
 });
 
+test("USING: the target's name is taken", () => {
+	expectTypeOf<V<"DELETE FROM users USING users">>().toEqualTypeOf<
+		SqlError<'table name "users" specified more than once', 2>
+	>();
+	expectTypeOf<V<"DELETE FROM users USING posts users">>().toEqualTypeOf<
+		SqlError<'table name "users" specified more than once', 2>
+	>();
+	expectTypeOf<
+		V<"DELETE FROM users u USING users">
+	>().toEqualTypeOf<"DELETE FROM users u USING users">();
+});
+
 test("target table errors", () => {
 	expectTypeOf<V<"DELETE FROM active_users">>().toEqualTypeOf<
 		SqlError<'cannot delete from view "active_users"', 2>
@@ -112,6 +124,10 @@ test("DELETE inside WITH", () => {
 	expectTypeOf<
 		Row<"WITH gone AS (DELETE FROM users WHERE id = 1 RETURNING id) DELETE FROM posts USING gone WHERE posts.author_id = gone.id RETURNING posts.id">
 	>().toEqualTypeOf<{ id: string }>();
+	// an error in a WITH query is the statement's
+	expectTypeOf<V<"WITH x AS (SELECT nope) DELETE FROM users">>().toEqualTypeOf<
+		SqlError<'column "nope" does not exist', 5>
+	>();
 });
 
 test("unsupported / syntax errors", () => {

@@ -17,7 +17,7 @@ import type {
 	UpdateStmt,
 	WithClause,
 } from "../ast.js";
-import type { TypeDisplay } from "../binder/clauses.js";
+import type { HasStar, TypeDisplay } from "../binder/clauses.js";
 import type { BindFrom } from "../binder/from.js";
 import type { ResolveWritableTable, TableCols } from "../binder/resolve.js";
 import type { AnyErr, SqlError } from "../errors.js";
@@ -55,16 +55,21 @@ import type { BindWith, ProjectSelect, ProjectTargets } from "./select.js";
  * Checks performed (messages follow Postgres):
  *   - the target is a writable table (`relation "x" does not exist`, `cannot insert into view "v"`);
  *     CTE names are not DML targets, exactly as in Postgres;
- *   - INSERT column list: columns exist, VALUES rows / SELECT width match the column count
- *     (`INSERT has more expressions than target columns` / `... more target columns than
- *     expressions`, `VALUES lists must all be the same length`);
+ *   - INSERT column list: columns exist and are listed once (`column "c" specified more than
+ *     once`, unless only elements or fields of it are assigned), VALUES rows / SELECT width
+ *     match the column count (`INSERT has more expressions than target columns` / `... more
+ *     target columns than expressions`, `VALUES lists must all be the same length`);
  *   - every NOT NULL column without a default is assigned
  *     (`null value in column "c" of relation "t" violates not-null constraint`), also for a
  *     literal `NULL` assigned to a NOT NULL column and `DEFAULT` assigned to one without a
  *     default; `DEFAULT` anywhere but a VALUES item or a SET value is
- *     `DEFAULT is not allowed in this context`;
- *   - SET columns exist (`column "c" of relation "t" does not exist`), multi-column SET
- *     sources have the right width;
+ *     `DEFAULT is not allowed in this context`, and through an indirection `cannot set an
+ *     array element to DEFAULT` / `cannot set a subfield to DEFAULT`;
+ *   - SET, in Postgres's order: the values are typed (multi-column sources have the right
+ *     width), then the columns exist (`column "c" of relation "t" does not exist`) and take
+ *     what is assigned, then none is assigned twice (`multiple assignments to same column "c"`);
+ *   - UPDATE's FROM and DELETE's USING do not reuse the target's name
+ *     (`table name "t" specified more than once`);
  *   - every expression (VALUES, SET, WHERE, ON CONFLICT, RETURNING) is typed and the first
  *     error propagates.
  *
@@ -100,9 +105,7 @@ export type ProjectDml<
 					? ProjectUpdate<Extract<S, UpdateStmt>, DB, Outer, C2>
 					: S extends { readonly t: "delete" }
 						? ProjectDelete<Extract<S, DeleteStmt>, DB, Outer, C2>
-						: S extends { readonly t: "merge" }
-							? ProjectMerge<Extract<S, MergeStmt>, DB, Outer, C2>
-							: never
+						: ProjectMerge<Extract<S, MergeStmt>, DB, Outer, C2>
 			: C2
 		: never;
 
@@ -143,13 +146,11 @@ export type DmlCtx<
 	Ctes extends CteMap,
 > = MkCtx<DB, [Level, ...Outer], Ctes, false>; // type-mutate: equivalent bool-flip – aggregates are not allowed directly in data statements, so no valid statement depends on it
 
-/** `{ type, nullable }` of a table column (without `hasDefault`), or `null` for an unknown name. */
-export type ColInfoOf<
-	Tbl extends Table,
-	Col extends string,
-> = Col extends keyof Tbl // type-mutate: equivalent cond-true – the callers pass existing columns (checked first, or a statement already validated)
-	? { readonly type: Tbl[Col]["type"]; readonly nullable: Tbl[Col]["nullable"] }
-	: null;
+/** `{ type, nullable }` of a table column (without `hasDefault`); the callers pass existing columns (checked first, or a statement already validated). */
+export type ColInfoOf<Tbl extends Table, Col extends string> = {
+	readonly type: Tbl[Col & keyof Tbl]["type"];
+	readonly nullable: Tbl[Col & keyof Tbl]["nullable"];
+};
 
 // ───────────────────────────── indirection ─────────────────────────────
 
@@ -179,25 +180,22 @@ type IndCtx<Tbl extends Table, Col extends string, C extends Ctx> = MkCtx<
 >;
 
 /**
- * What an assignment to `Col` with indirection `Ind` stores: the column's info without
- * indirection; with it, the element / slice / field type, nullable (a NULL element or field is
- * fine in a NOT NULL column). `SqlError` when the indirection does not type-check. `null` for
- * an unknown column (reported by the existence check).
+ * What an assignment to the existing column `Col` with indirection `Ind` stores: the column's
+ * info without indirection; with it, the element / slice / field type, nullable (a NULL element
+ * or field is fine in a NOT NULL column). `SqlError` when the indirection does not type-check.
  */
 export type AssignInfo<
 	Tbl extends Table,
 	Col extends string,
 	Ind,
 	C extends Ctx,
-> = Col extends keyof Tbl // type-mutate: equivalent cond-true – the callers pass existing columns (checked first, or a statement already validated)
-	? Ind extends Expr
-		? TypeOf<Ind, IndCtx<Tbl, Col, C>> extends infer X
-			? X extends ColInfo
-				? Info<X["type"], true>
-				: X
-			: never
-		: ColInfoOf<Tbl, Col>
-	: null;
+> = Ind extends Expr
+	? TypeOf<Ind, IndCtx<Tbl, Col, C>> extends infer X
+		? X extends ColInfo
+			? Info<X["type"], true>
+			: X
+		: never
+	: ColInfoOf<Tbl, Col>;
 
 /** Built-in types without subscripting (arrays, `jsonb`, `point`, `name`, … have it; unknown types may be domains over arrays). */
 export type NoSubscript =
@@ -244,55 +242,23 @@ export type NoSubscript =
 	| "tsrange"
 	| "tstzrange"
 	| "daterange";
-/** `AssignInfo` for the parameter pass (errors are the main pass's business). */
+/** `AssignInfo` for the parameter pass, of a statement already validated (so never an error). */
 type AssignParamInfo<
 	Tbl extends Table,
 	Col extends string,
 	Ind,
 	C extends Ctx,
-> =
-	AssignInfo<Tbl, Col, Ind, C> extends infer X
-		? X extends ColInfo
-			? X
-			: null
-		: never;
+> = Extract<AssignInfo<Tbl, Col, Ind, C>, ColInfo>;
 
-/** Type-check the indirection of each target (`Ind` is null when no target has any). */
-export type CheckInds<
+/** The indirection of each target of `Cs`, `null` for a whole column (`Ind` is null when no target has any, else it has an entry for every target). */
+export type AssignTargets<
 	Cs extends readonly string[],
 	Ind extends readonly TargetInd[] | null,
-	Tbl extends Table,
-	C extends Ctx,
-> = Ind extends readonly TargetInd[] ? CheckIndsLoop<Cs, Ind, Tbl, C, 0> : true;
-type CheckIndsLoop<
-	Cs extends readonly string[],
-	Ind extends readonly TargetInd[],
-	Tbl extends Table,
-	C extends Ctx,
-	I extends number,
-> = Cs[I] extends string
-	? Ind[I] extends Expr
-		? AssignInfo<Tbl, Cs[I], Ind[I], C> extends infer X
-			? X extends AnyErr
-				? X
-				: CheckIndsLoop<Cs, Ind, Tbl, C, Nx<I>>
-			: never
-		: CheckIndsLoop<Cs, Ind, Tbl, C, Nx<I>>
-	: true; // type-mutate: equivalent bool-flip – the callers only look for an error
-
-/** Column names for the NULL-literal check: a target with indirection does not store NULL in the column (`""` never matches). */
-export type NullCheckCols<
-	Cs extends readonly string[],
-	Ind extends readonly TargetInd[] | null,
-> = Ind extends readonly TargetInd[] // type-mutate: equivalent cond-true – mapping the names over a null Ind gives the same names
-	? {
-			readonly [K in keyof Cs]: K extends keyof Ind
-				? Ind[K] extends null
-					? Cs[K]
-					: ""
-				: Cs[K]; // type-mutate: equivalent never-false – Ind has an entry for every target
-		}
-	: Cs;
+> = {
+	readonly [K in keyof Cs]: Ind extends readonly TargetInd[]
+		? Ind[K & keyof Ind]
+		: null;
+};
 
 /** Infos of the targets (`AssignParamInfo` of each), for typing `$n` by position. */
 export type TargetInfos<
@@ -304,11 +270,7 @@ export type TargetInfos<
 	readonly [K in keyof Cs]: AssignParamInfo<
 		Tbl,
 		Cs[K],
-		Ind extends readonly TargetInd[]
-			? K extends keyof Ind
-				? Ind[K]
-				: null // type-mutate: equivalent never-false – Ind has an entry for every target
-			: null,
+		AssignTargets<Cs, Ind>[K],
 		C
 	>;
 };
@@ -322,7 +284,7 @@ export type ParamsOfInds<
 	M,
 > = Ind extends readonly TargetInd[]
 	? ParamsOfIndsLoop<Cs, Ind, Tbl, C, M, 0>
-	: M; // type-mutate: equivalent never-false – only called for targets with indirection
+	: M;
 type ParamsOfIndsLoop<
 	Cs extends readonly string[],
 	Ind extends readonly TargetInd[],
@@ -353,6 +315,7 @@ type ProjectInsert<
 		? Tg extends Target_<infer Tbl, infer Item>
 			? InsertTargetCols<
 					S["columns"],
+					S["colInd"],
 					S["source"],
 					Tbl,
 					S["table"]["name"],
@@ -361,53 +324,41 @@ type ProjectInsert<
 					Ctes
 				> extends infer Cs
 				? Cs extends readonly string[] | null
-					? CheckInds<
-							Cs extends readonly string[] ? Cs : [], // type-mutate: equivalent never-false – without a column list there is no indirection to check
+					? CheckInsertSource<
+							S["source"],
+							Cs extends readonly string[] ? Cs : [],
 							S["colInd"],
 							Tbl,
-							MkCtx<DB, Outer, Ctes, false>
-						> extends infer Ci
-						? Ci extends AnyErr
-							? Ci
-							: CheckInsertSource<
-										S["source"],
-										Cs extends readonly string[]
-											? NullCheckCols<Cs, S["colInd"]>
-											: null,
-										Tbl,
-										S["table"]["name"],
-										DB,
-										Outer,
-										Ctes
-									> extends infer Chk
-								? Chk extends AnyErr
-									? Chk
-									: CheckRequired<Tbl, Cs, S["table"]["name"]> extends infer Rq
-										? Rq extends AnyErr
-											? Rq
-											: CheckOnConflict<
-														S["onConflict"],
-														Tbl,
-														Item,
-														S["table"]["name"],
-														DB,
-														Outer,
-														Ctes
-													> extends infer Oc
-												? Oc extends AnyErr
-													? Oc
-													: ProjectReturning<
-															S["returning"],
-															S["retOpts"],
-															[Item],
-															TableCols<Tbl>,
-															true,
-															false,
-															DB,
-															Outer,
-															Ctes
-														>
-												: never
+							S["table"]["name"],
+							MkCtx<DB, Outer, Ctes, false> // type-mutate: equivalent bool-flip – aggregates are not allowed in VALUES nor in an assignment target, so no valid statement depends on it
+						> extends infer Chk
+						? Chk extends AnyErr
+							? Chk
+							: CheckRequired<Tbl, Cs, S["table"]["name"]> extends infer Rq
+								? Rq extends AnyErr
+									? Rq
+									: CheckOnConflict<
+												S["onConflict"],
+												Tbl,
+												Item,
+												S["table"]["name"],
+												DB,
+												Outer,
+												Ctes
+											> extends infer Oc
+										? Oc extends AnyErr
+											? Oc
+											: ProjectReturning<
+													S["returning"],
+													S["retOpts"],
+													[Item],
+													TableCols<Tbl>,
+													true,
+													false,
+													DB,
+													Outer,
+													Ctes
+												>
 										: never
 								: never
 						: never
@@ -423,6 +374,7 @@ type ProjectInsert<
  */
 type InsertTargetCols<
 	Columns extends readonly string[] | null,
+	Ind extends readonly TargetInd[] | null,
 	Source extends InsertSource,
 	Tbl extends Table,
 	Name extends string,
@@ -434,7 +386,13 @@ type InsertTargetCols<
 		? W extends AnyErr
 			? W
 			: Columns extends readonly string[]
-				? CheckColsExist<Columns, Tbl, Name> extends infer E
+				? CheckAssignedCols<
+						Columns,
+						AssignTargets<Columns, Ind>,
+						Tbl,
+						Name,
+						"insert"
+					> extends infer E
 					? E extends AnyErr
 						? E
 						: W extends readonly unknown[]
@@ -489,13 +447,7 @@ type SourceWidth<
 					: C
 				: C
 			: never
-		: Source extends { readonly t: "default" }
-			? []
-			: SqlError<
-					// type-mutate: equivalent never-false – an INSERT source is VALUES, a query or DEFAULT VALUES
-					"INSERT source must be VALUES, a query or DEFAULT VALUES",
-					null
-				>;
+		: []; // DEFAULT VALUES
 
 type SameLength<
 	Rows extends readonly (readonly unknown[])[],
@@ -507,7 +459,7 @@ type SameLength<
 	? WidthCheck<R, Ref> extends "eq"
 		? SameLength<Rest, Ref> // type-mutate: equivalent never-true – a never passes the caller's `SameLength<…> extends true` too
 		: false
-	: true;
+	: true; // type-mutate: equivalent never-false – a never passes the caller's `SameLength<…> extends true` too
 
 /** Compare two widths: `"eq"`, `"more"` (A longer), `"fewer"` (B longer). */
 export type WidthCheck<
@@ -521,44 +473,61 @@ export type WidthCheck<
 		? "fewer"
 		: "eq";
 
-export type HasStar<C extends Cols> = C[number] extends infer E
-	? (E extends { readonly star: ColMap } ? true : false) extends false
-		? false
-		: true
-	: false;
-
-export type CheckColsExist<
-	Columns extends readonly string[],
+/**
+ * Postgres's checks of the assigned columns `Cs`, in order: each exists, and a column assigned
+ * whole is assigned only once, while its elements or fields may be assigned several times
+ * (`Tgs`: `AssignTargets` of `Cs`, `null` for a whole assignment). INSERT's column list says
+ * `column "c" specified more than once`; UPDATE's rewriter, after the statement is analyzed,
+ * `multiple assignments to same column "c"`.
+ */
+export type CheckAssignedCols<
+	Cs extends readonly string[],
+	Tgs extends readonly TargetInd[],
 	Tbl extends Table,
 	Name extends string,
-> = Columns extends readonly [
-	infer C extends string,
-	...infer R extends readonly string[],
-]
+	Kind extends "insert" | "update",
+	Whole extends string = never,
+	Part extends string = never,
+	I extends number = 0,
+> = Cs[I] extends infer C extends string
 	? C extends keyof Tbl
-		? CheckColsExist<R, Tbl, Name>
+		? Tgs[I] extends Expr
+			? C extends Whole
+				? AssignedTwice<C, Kind>
+				: CheckAssignedCols<Cs, Tgs, Tbl, Name, Kind, Whole, Part | C, Nx<I>>
+			: C extends Whole | Part
+				? AssignedTwice<C, Kind>
+				: CheckAssignedCols<Cs, Tgs, Tbl, Name, Kind, Whole | C, Part, Nx<I>>
 		: SqlError<`column "${C}" of relation "${Name}" does not exist`, null>
 	: true; // type-mutate: equivalent bool-flip – the callers only look for an error
+type AssignedTwice<C extends string, Kind> = Kind extends "insert"
+	? SqlError<`column "${C}" specified more than once`, null>
+	: SqlError<`multiple assignments to same column "${C}"`, null>;
 
-/** Type every VALUES row (outer scope only) and reject literal NULL in NOT NULL columns. */
+/**
+ * An INSERT's source against its targets `Cs` (with indirection `Ind`; `[]` without a column
+ * list): each VALUES row is typed (outer scope only), then checked against the targets; a
+ * query's targets are checked without values (`CheckTargets`).
+ */
 type CheckInsertSource<
 	Source extends InsertSource,
-	Cs extends readonly string[] | null,
+	Cs extends readonly string[],
+	Ind extends readonly TargetInd[] | null,
 	Tbl extends Table,
 	Name extends string,
-	DB,
-	Outer extends Scope,
-	Ctes extends CteMap,
+	C extends Ctx,
 > = Source extends {
 	readonly t: "values";
 	readonly rows: infer Rows extends readonly (readonly Expr[])[];
 }
-	? CheckRows<Rows, Cs, Tbl, Name, MkCtx<DB, Outer, Ctes, false>> // type-mutate: equivalent bool-flip – aggregates are not allowed in VALUES, so no valid statement depends on it
-	: true; // type-mutate: equivalent bool-flip – the callers only look for an error
+	? CheckRows<Rows, Cs, AssignTargets<Cs, Ind>, Tbl, Name, C>
+	: CheckTargets<Cs, AssignTargets<Cs, Ind>, [], Tbl, Name, C>;
 
-type CheckRows<
+/** Type each row (`CheckValueItems`), then check what it stores in the targets (`CheckTargets`). */
+export type CheckRows<
 	Rows extends readonly (readonly Expr[])[],
-	Cs extends readonly string[] | null,
+	Cs extends readonly string[],
+	Tgs extends readonly TargetInd[],
 	Tbl extends Table,
 	Name extends string,
 	C extends Ctx,
@@ -568,15 +537,10 @@ type CheckRows<
 ]
 	? CheckValueItems<R, C> extends infer Ts
 		? Ts extends true
-			? CheckNullLiterals<
-					R,
-					Cs extends readonly string[] ? Cs : [],
-					Tbl,
-					Name
-				> extends infer N
+			? CheckTargets<Cs, Tgs, R, Tbl, Name, C> extends infer N
 				? N extends AnyErr
 					? N
-					: CheckRows<Rest, Cs, Tbl, Name, C>
+					: CheckRows<Rest, Cs, Tgs, Tbl, Name, C>
 				: never
 			: Ts
 		: never
@@ -599,45 +563,59 @@ export type CheckValueItems<
 			: never
 	: true;
 
-export type CheckNullLiterals<
-	Es extends readonly Expr[],
+/**
+ * What each assignment stores, in order (Postgres's transformAssignedExpr, after the values are
+ * typed): the column exists; `DEFAULT` cannot be stored in an element or a field (a NULL can),
+ * and the indirection is typed (`AssignInfo`); a literal `NULL`, or a `DEFAULT` where there is
+ * no default, in a NOT NULL column is a NOT NULL violation. `Cs`: the columns, `Tgs`: their
+ * `AssignTargets`, `Es`: the values (`null`, or none, for the columns of a query).
+ */
+export type CheckTargets<
 	Cs extends readonly string[],
+	Tgs extends readonly TargetInd[],
+	Es extends readonly (Expr | null)[],
 	Tbl extends Table,
 	Name extends string,
-> = Es extends readonly [infer E, ...infer ER extends readonly Expr[]]
-	? Cs extends readonly [
-			infer Col extends string,
-			...infer CR extends readonly string[],
-		]
-		? E extends { readonly t: "null" }
-			? NotNullCol<Tbl, Col> extends true
-				? SqlError<
-						`null value in column "${Col}" of relation "${Name}" violates not-null constraint`,
-						null
-					>
-				: CheckNullLiterals<ER, CR, Tbl, Name>
-			: E extends { readonly t: "default" }
-				? RequiredCol<Tbl, Col> extends true
-					? SqlError<
-							`null value in column "${Col}" of relation "${Name}" violates not-null constraint`,
-							null
-						>
-					: CheckNullLiterals<ER, CR, Tbl, Name>
-				: CheckNullLiterals<ER, CR, Tbl, Name>
-		: true
-	: true;
+	C extends Ctx,
+	I extends number = 0,
+> = Cs[I] extends infer Col extends string
+	? Col extends keyof Tbl
+		? Tgs[I] extends Expr
+			? Es[I] extends { readonly t: "default" }
+				? DefaultIntoInd<Tgs[I]>
+				: AssignInfo<Tbl, Col, Tgs[I], C> extends infer X
+					? X extends AnyErr
+						? X
+						: CheckTargets<Cs, Tgs, Es, Tbl, Name, C, Nx<I>>
+					: never
+			: Es[I] extends { readonly t: "null" }
+				? Tbl[Col]["nullable"] extends false
+					? NullViolation<Col, Name>
+					: CheckTargets<Cs, Tgs, Es, Tbl, Name, C, Nx<I>>
+				: Es[I] extends { readonly t: "default" }
+					? Tbl[Col] extends {
+							readonly nullable: false;
+							readonly hasDefault: false;
+						}
+						? NullViolation<Col, Name>
+						: CheckTargets<Cs, Tgs, Es, Tbl, Name, C, Nx<I>>
+					: CheckTargets<Cs, Tgs, Es, Tbl, Name, C, Nx<I>>
+		: SqlError<`column "${Col}" of relation "${Name}" does not exist`, null>
+	: true; // type-mutate: equivalent bool-flip – the callers only look for an error
 
-type NotNullCol<Tbl extends Table, Col extends string> = Col extends keyof Tbl
-	? Tbl[Col]["nullable"] extends false
-		? true
-		: false
-	: false;
-/** NOT NULL without a default: `DEFAULT` stores NULL there, which Postgres rejects. */
-type RequiredCol<Tbl extends Table, Col extends string> = Col extends keyof Tbl
-	? Tbl[Col] extends { readonly nullable: false; readonly hasDefault: false }
-		? true
-		: false
-	: false; // type-mutate: equivalent bool-flip, never-false – the callers pass existing columns (checked first)
+type NullViolation<Col extends string, Name extends string> = SqlError<
+	`null value in column "${Col}" of relation "${Name}" violates not-null constraint`,
+	null
+>;
+
+/** `DEFAULT` assigned through an indirection: Postgres names its first step (on the bare column). */
+type DefaultIntoInd<Ind> = Ind extends { readonly e: infer In }
+	? In extends { readonly t: "col" }
+		? Ind extends { readonly t: "field" }
+			? SqlError<"cannot set a subfield to DEFAULT", null>
+			: SqlError<"cannot set an array element to DEFAULT", null>
+		: DefaultIntoInd<In>
+	: never;
 
 /** Every NOT NULL column without a default must be in `Cs` (skipped when `Cs` is unknown). */
 export type CheckRequired<
@@ -646,7 +624,7 @@ export type CheckRequired<
 	Name extends string,
 > = Cs extends readonly string[]
 	? [MissingRequired<Tbl, Cs[number]>] extends [never]
-		? true
+		? true // type-mutate: equivalent bool-flip – the callers only look for an error
 		: SqlError<
 				`null value in column "${FirstOf<MissingRequired<Tbl, Cs[number]>> & string}" of relation "${Name}" violates not-null constraint`,
 				null
@@ -696,78 +674,91 @@ type CheckOnConflict<
 
 // ───────────────────────────── SET ─────────────────────────────
 
+/**
+ * A SET list, in Postgres's order: every value is typed (`CheckSetValues`), then each target is
+ * checked (`CheckTargets`), then the rewriter rejects a column assigned twice (`CheckAssignedCols`).
+ */
 export type CheckSet<
 	Set extends readonly SetItem[],
 	Tbl extends Table,
 	Name extends string,
 	C extends Ctx,
+> =
+	CheckSetValues<Set, C> extends infer X
+		? X extends AnyErr
+			? X
+			: SetTargets<Set, [], [], []> extends [
+						infer Cs extends readonly string[],
+						infer Tgs extends readonly TargetInd[],
+						infer Es extends readonly (Expr | null)[],
+					]
+				? CheckTargets<Cs, Tgs, Es, Tbl, Name, C> extends infer Y
+					? Y extends AnyErr
+						? Y
+						: CheckAssignedCols<Cs, Tgs, Tbl, Name, "update">
+					: never
+				: never
+		: never;
+type CheckSetValues<
+	Set extends readonly SetItem[],
+	C extends Ctx,
 > = Set extends readonly [
 	infer S extends SetItem,
 	...infer R extends readonly SetItem[],
 ]
-	? CheckSetItem<S, Tbl, Name, C> extends infer X
+	? (
+			S extends {
+				readonly t: "setmulti";
+				readonly cols: infer Cols extends readonly string[];
+			}
+				? CheckMultiSource<S["e"], Cols, C>
+				: CheckValueItems<[S["e"]], C>
+		) extends infer X
 		? X extends AnyErr
 			? X
-			: CheckSet<R, Tbl, Name, C>
+			: CheckSetValues<R, C>
 		: never
-	: true; // type-mutate: equivalent bool-flip – the callers only look for an error
-
-type CheckSetItem<
-	S extends SetItem,
-	Tbl extends Table,
-	Name extends string,
-	C extends Ctx,
-> = S extends {
-	readonly t: "set";
-	readonly col: infer Col extends string;
-	readonly e: infer E extends Expr;
-}
-	? Col extends keyof Tbl
-		? E extends { readonly t: "null" }
-			? NotNullCol<Tbl, Col> extends true
-				? SqlError<
-						`null value in column "${Col}" of relation "${Name}" violates not-null constraint`,
-						null
-					>
-				: true // type-mutate: equivalent bool-flip – CheckSet only looks for an error
-			: E extends { readonly t: "default" }
-				? RequiredCol<Tbl, Col> extends true
-					? SqlError<
-							`null value in column "${Col}" of relation "${Name}" violates not-null constraint`,
-							null
-						>
-					: true // type-mutate: equivalent bool-flip – CheckSet only looks for an error
-				: CheckExpr<E, C>
-		: SqlError<`column "${Col}" of relation "${Name}" does not exist`, null>
-	: S extends {
-				readonly t: "setind";
-				readonly col: infer Col extends string;
-				readonly target: infer Ind;
-				readonly e: infer E extends Expr;
-			}
-		? Col extends keyof Tbl
-			? AssignInfo<Tbl, Col, Ind, C> extends infer X
-				? X extends AnyErr
-					? X
-					: CheckExpr<E, C>
-				: never
-			: SqlError<`column "${Col}" of relation "${Name}" does not exist`, null>
+	: true; // type-mutate: equivalent bool-flip – CheckSet only looks for an error
+/** The columns a SET list assigns, in order, their `AssignTargets` and the values (`null` from a sub-SELECT). */
+type SetTargets<
+	Set extends readonly SetItem[],
+	Cs extends readonly string[],
+	Tgs extends readonly TargetInd[],
+	Es extends readonly (Expr | null)[],
+> = Set extends readonly [
+	infer S extends SetItem,
+	...infer R extends readonly SetItem[],
+]
+	? S extends { readonly t: "set"; readonly col: infer Col extends string }
+		? SetTargets<R, [...Cs, Col], [...Tgs, null], [...Es, S["e"]]>
 		: S extends {
-					readonly t: "setmulti";
-					readonly cols: infer Cols extends readonly string[];
-					readonly ind: infer Ind extends readonly TargetInd[] | null;
-					readonly e: infer E extends Expr;
+					readonly t: "setind";
+					readonly col: infer Col extends string;
+					readonly target: infer Ind extends Expr;
 				}
-			? CheckColsExist<Cols, Tbl, Name> extends infer X
-				? X extends AnyErr
-					? X
-					: CheckInds<Cols, Ind, Tbl, C> extends infer Y
-						? Y extends AnyErr
-							? Y
-							: CheckMultiSource<E, Cols, C>
-						: never
-				: never
-			: true; // type-mutate: equivalent bool-flip, never-false – a SET item is one of the three kinds above
+			? SetTargets<R, [...Cs, Col], [...Tgs, Ind], [...Es, S["e"]]>
+			: SetTargets<
+					R,
+					[...Cs, ...Extract<S, { readonly t: "setmulti" }>["cols"]],
+					[
+						...Tgs,
+						...AssignTargets<
+							Extract<S, { readonly t: "setmulti" }>["cols"],
+							Extract<S, { readonly t: "setmulti" }>["ind"]
+						>,
+					],
+					[
+						...Es,
+						...(S["e"] extends {
+							readonly t: "row";
+							readonly items: infer Items extends readonly Expr[];
+						}
+							? Items
+							: Nulls<Extract<S, { readonly t: "setmulti" }>["cols"]>),
+					]
+				>
+	: [Cs, Tgs, Es];
+type Nulls<Cs extends readonly string[]> = { readonly [K in keyof Cs]: null };
 
 /** `(a, b) = (e1, e2)` / `= ROW(…)` / `= (SELECT ...)`: width must match, expressions typed; any other source is an error. */
 export type CheckMultiSource<
@@ -780,7 +771,7 @@ export type CheckMultiSource<
 			? HasStar<R> extends true
 				? true // type-mutate: equivalent bool-flip – the callers only look for an error
 				: WidthCheck<R, Cols_> extends "eq"
-					? true
+					? true // type-mutate: equivalent bool-flip – the callers only look for an error
 					: SqlError<"number of columns does not match number of values", null>
 			: R
 		: never
@@ -796,8 +787,8 @@ export type CheckMultiSource<
 				null
 			>;
 
-export type CheckExpr<E extends Expr, C extends Ctx> =
-	TypeOf<E, C> extends infer T ? (T extends ColInfo ? true : T) : never;
+/** `ColInfo` or `SqlError`: the callers only look for an error. */
+export type CheckExpr<E extends Expr, C extends Ctx> = TypeOf<E, C>;
 export type CheckOptExpr<E extends Expr | null, C extends Ctx> = E extends Expr
 	? CheckExpr<E, C>
 	: true; // type-mutate: equivalent bool-flip – the callers only look for an error
@@ -814,33 +805,38 @@ type ProjectUpdate<
 		? Tg extends Target_<infer Tbl, infer Item>
 			? BindFrom<S["from"], DB, Outer, Ctes> extends infer L
 				? L extends ScopeLevel
-					? CheckSet<
-							S["set"],
-							Tbl,
-							S["table"]["name"],
-							DmlCtx<DB, [Item, ...L], Outer, Ctes>
-						> extends infer R
-						? R extends AnyErr
-							? R
-							: CheckOptExpr<
-										S["where"],
-										DmlCtx<DB, [Item, ...L], Outer, Ctes>
-									> extends infer Wc
-								? Wc extends AnyErr
-									? Wc
-									: ProjectReturning<
-											S["returning"],
-											S["retOpts"],
-											[Item, ...L],
-											TableCols<Tbl>,
-											false,
-											false,
-											DB,
-											Outer,
-											Ctes
-										>
-								: never
-						: never
+					? Item["alias"] extends L[number]["alias"]
+						? SqlError<
+								`table name "${Item["alias"]}" specified more than once`,
+								null
+							>
+						: CheckSet<
+									S["set"],
+									Tbl,
+									S["table"]["name"],
+									DmlCtx<DB, [Item, ...L], Outer, Ctes>
+								> extends infer R
+							? R extends AnyErr
+								? R
+								: CheckOptExpr<
+											S["where"],
+											DmlCtx<DB, [Item, ...L], Outer, Ctes>
+										> extends infer Wc
+									? Wc extends AnyErr
+										? Wc
+										: ProjectReturning<
+												S["returning"],
+												S["retOpts"],
+												[Item, ...L],
+												TableCols<Tbl>,
+												false,
+												false,
+												DB,
+												Outer,
+												Ctes
+											>
+									: never
+							: never
 					: L
 				: never
 			: Tg
@@ -856,24 +852,29 @@ type ProjectDelete<
 		? Tg extends Target_<infer Tbl, infer Item>
 			? BindFrom<S["using"], DB, Outer, Ctes> extends infer L
 				? L extends ScopeLevel
-					? CheckOptExpr<
-							S["where"],
-							DmlCtx<DB, [Item, ...L], Outer, Ctes>
-						> extends infer Wc
-						? Wc extends AnyErr
-							? Wc
-							: ProjectReturning<
-									S["returning"],
-									S["retOpts"],
-									[Item, ...L],
-									TableCols<Tbl>,
-									false,
-									true,
-									DB,
-									Outer,
-									Ctes
-								>
-						: never
+					? Item["alias"] extends L[number]["alias"]
+						? SqlError<
+								`table name "${Item["alias"]}" specified more than once`,
+								null
+							>
+						: CheckOptExpr<
+									S["where"],
+									DmlCtx<DB, [Item, ...L], Outer, Ctes>
+								> extends infer Wc
+							? Wc extends AnyErr
+								? Wc
+								: ProjectReturning<
+										S["returning"],
+										S["retOpts"],
+										[Item, ...L],
+										TableCols<Tbl>,
+										false,
+										true,
+										DB,
+										Outer,
+										Ctes
+									>
+							: never
 					: L
 				: never
 			: Tg
@@ -906,7 +907,7 @@ export type ProjectReturning<
 			[]
 		> extends infer ON
 		? ON extends ScopeLevel
-			? ProjectTargets<Ret, MkCtx<DB, [Level, ON, ...Outer], Ctes, false>, []>
+			? ProjectTargets<Ret, MkCtx<DB, [Level, ON, ...Outer], Ctes, false>, []> // type-mutate: equivalent bool-flip – aggregates are not allowed in RETURNING (the engine does not reject them), so no valid statement depends on it
 			: ON
 		: never
 	: null;
@@ -1030,11 +1031,9 @@ export type ParamsOfDml<S extends DmlStmt, DB, Ctes extends CteMap, M> =
 						? ParamsOfUpdate<Extract<S, UpdateStmt>, DB, C2, M1>
 						: S extends { readonly t: "delete" }
 							? ParamsOfDelete<Extract<S, DeleteStmt>, DB, C2, M1>
-							: S extends { readonly t: "merge" }
-								? ParamsOfMerge<Extract<S, MergeStmt>, DB, C2, M1>
-								: M1 // type-mutate: equivalent never-false – a data statement is one of the four kinds above
+							: ParamsOfMerge<Extract<S, MergeStmt>, DB, C2, M1>
 				: never
-			: M
+			: M // type-mutate: equivalent never-false – only reached for statements ProjectDml accepted, whose WITH binds
 		: never;
 
 /** Parameters inside the bodies of a WITH clause (SELECT and DML CTEs). */
@@ -1059,9 +1058,7 @@ type ParamsOfCteList<
 			Ctes,
 			Q extends SelectStmt
 				? ParamsOfSelect<Q, DB, [], Ctes, M>
-				: Q extends DmlStmt
-					? ParamsOfDml<Q, DB, Ctes, M>
-					: M
+				: ParamsOfDml<Extract<Q, DmlStmt>, DB, Ctes, M> // a CTE ProjectDml accepted is a query or a data statement
 		>
 	: M;
 
@@ -1070,6 +1067,7 @@ type ParamsOfInsert<S extends InsertStmt, DB, Ctes extends CteMap, M> =
 		? Tg extends Target_<infer Tbl, infer Item>
 			? InsertTargetCols<
 					S["columns"],
+					S["colInd"],
 					S["source"],
 					Tbl,
 					S["table"]["name"],
@@ -1082,7 +1080,7 @@ type ParamsOfInsert<S extends InsertStmt, DB, Ctes extends CteMap, M> =
 						S["retOpts"],
 						[Item],
 						TableCols<Tbl>,
-						true,
+						true, // type-mutate: equivalent bool-flip – parameters in RETURNING are typed nullable either way
 						false, // type-mutate: equivalent bool-flip – parameters in RETURNING are typed nullable either way
 						DB,
 						Ctes,
@@ -1098,7 +1096,7 @@ type ParamsOfInsert<S extends InsertStmt, DB, Ctes extends CteMap, M> =
 								S["colInd"],
 								Tbl,
 								DB,
-								Ctes,
+								MkCtx<DB, [], Ctes, false>, // type-mutate: equivalent bool-flip – aggregates are not allowed in VALUES nor in an assignment target, so no valid statement depends on it
 								M
 							>
 						>
@@ -1107,60 +1105,52 @@ type ParamsOfInsert<S extends InsertStmt, DB, Ctes extends CteMap, M> =
 			: M // type-mutate: equivalent never-false – only reached for statements ProjectDml accepted, whose target resolves
 		: never;
 
+/**
+ * Parameters of an INSERT into the targets `Cs` (with indirection `Ind`): those in the targets'
+ * subscripts, then the source's. A bare `$n` (or `$n::T`) of a VALUES row or of a plain SELECT's
+ * targets takes the type of what its target stores (`TargetInfos`; nothing past the targets, as
+ * without a column list); everything else goes through the expression pass. `C`: the outer scope.
+ */
 type ParamsOfInsertSource<
 	Source extends InsertSource,
 	Cs extends readonly string[],
 	Ind extends readonly TargetInd[] | null,
 	Tbl extends Table,
 	DB,
-	Ctes extends CteMap,
-	M,
-> = Ind extends null
-	? Source extends {
-			readonly t: "values";
-			readonly rows: infer Rows extends readonly (readonly Expr[])[];
-		}
-		? ParamsOfRows<Rows, Cs, Tbl, MkCtx<DB, [], Ctes, false>, M>
-		: Source extends {
-					readonly t: "select";
-					readonly q: infer Q extends SelectStmt;
-				}
-			? ParamsOfSelectTargets<Q, Cs, Tbl, ParamsOfSelect<Q, DB, [], Ctes, M>>
-			: M
-	: ParamsOfIndSource<
-			Source,
-			TargetInfos<Cs, Ind, Tbl, MkCtx<DB, [], Ctes, false>>,
-			DB,
-			Ctes,
-			ParamsOfInds<Cs, Ind, Tbl, MkCtx<DB, [], Ctes, false>, M>
-		>;
-
-/** INSERT source when a target has indirection: `$n` takes the type of what its target stores. */
-type ParamsOfIndSource<
-	Source extends InsertSource,
-	Infos extends readonly (ColInfo | null)[],
-	DB,
-	Ctes extends CteMap,
+	C extends Ctx,
 	M,
 > = Source extends {
 	readonly t: "values";
 	readonly rows: infer Rows extends readonly (readonly Expr[])[];
 }
-	? ParamsOfInfoRows<Rows, Infos, MkCtx<DB, [], Ctes, false>, M> // type-mutate: equivalent bool-flip – aggregates are not allowed in VALUES, so no valid statement depends on it
+	? ParamsOfInfoRows<
+			Rows,
+			TargetInfos<Cs, Ind, Tbl, C>,
+			C,
+			ParamsOfInds<Cs, Ind, Tbl, C, M>
+		>
 	: Source extends {
 				readonly t: "select";
 				readonly q: infer Q extends SelectStmt;
 			}
-		? Q["body"] extends {
-				readonly t: "simple";
-				readonly targets: infer Ts extends readonly Target[];
-			}
-			? ParamsOfInfoTargets<Ts, Infos, ParamsOfSelect<Q, DB, [], Ctes, M>>
-			: ParamsOfSelect<Q, DB, [], Ctes, M>
-		: M;
+		? ParamsOfSelect<
+				Q,
+				DB,
+				[],
+				C["ctes"],
+				ParamsOfInds<Cs, Ind, Tbl, C, M>
+			> extends infer M1
+			? Q["body"] extends {
+					readonly t: "simple";
+					readonly targets: infer Ts extends readonly Target[];
+				}
+				? ParamsOfInfoTargets<Ts, TargetInfos<Cs, Ind, Tbl, C>, M1>
+				: M1
+			: never
+		: ParamsOfInds<Cs, Ind, Tbl, C, M>; // DEFAULT VALUES
 type ParamsOfInfoRows<
 	Rows extends readonly (readonly Expr[])[],
-	Infos extends readonly (ColInfo | null)[],
+	Infos extends readonly ColInfo[],
 	C extends Ctx,
 	M,
 > = Rows extends readonly [
@@ -1172,32 +1162,26 @@ type ParamsOfInfoRows<
 /** Zip expressions with target infos: a bare `$n` (or `$n::T`) takes the info, anything else recurses. */
 export type ParamsOfRowInfos<
 	Es extends readonly Expr[],
-	Infos extends readonly (ColInfo | null)[],
+	Infos extends readonly ColInfo[],
 	C extends Ctx,
 	M,
 > = Es extends readonly [
 	infer E extends Expr,
 	...infer ER extends readonly Expr[],
 ]
-	? Infos extends readonly [
-			infer CI,
-			...infer IR extends readonly (ColInfo | null)[],
-		]
+	? Infos extends readonly [infer CI, ...infer IR extends readonly ColInfo[]]
 		? ParamsOfRowInfos<ER, IR, C, ParamsOfOpt<E, C, M, CI>>
 		: ParamsOfRowInfos<ER, [], C, ParamsOfExpr<E, C, M>>
 	: M;
 type ParamsOfInfoTargets<
 	Ts extends readonly Target[],
-	Infos extends readonly (ColInfo | null)[],
+	Infos extends readonly ColInfo[],
 	M,
 > = Ts extends readonly [
 	infer T extends Target,
 	...infer TR extends readonly Target[],
 ]
-	? Infos extends readonly [
-			infer CI,
-			...infer IR extends readonly (ColInfo | null)[],
-		]
+	? Infos extends readonly [infer CI, ...infer IR extends readonly ColInfo[]]
 		? ParamsOfInfoTargets<
 				TR,
 				IR,
@@ -1205,84 +1189,7 @@ type ParamsOfInfoTargets<
 					readonly t: "param";
 					readonly n: infer N extends number;
 				}
-					? CI extends ColInfo
-						? AddParam<M, N, CI>
-						: M
-					: M
-			>
-		: M
-	: M;
-
-type ParamsOfRows<
-	Rows extends readonly (readonly Expr[])[],
-	Cs extends readonly string[],
-	Tbl extends Table,
-	C extends Ctx,
-	M,
-> = Rows extends readonly [
-	infer R extends readonly Expr[],
-	...infer Rest extends readonly (readonly Expr[])[],
-]
-	? ParamsOfRows<Rest, Cs, Tbl, C, ParamsOfRowCols<R, Cs, Tbl, C, M>>
-	: M;
-
-/** Zip expressions with target columns: a bare `$n` takes the column's type, anything else recurses. */
-export type ParamsOfRowCols<
-	Es extends readonly Expr[],
-	Cs extends readonly string[],
-	Tbl extends Table,
-	C extends Ctx,
-	M,
-> = Es extends readonly [
-	infer E extends Expr,
-	...infer ER extends readonly Expr[],
-]
-	? Cs extends readonly [
-			infer Col extends string,
-			...infer CR extends readonly string[],
-		]
-		? ParamsOfRowCols<ER, CR, Tbl, C, ParamsOfOpt<E, C, M, ColInfoOf<Tbl, Col>>>
-		: ParamsOfRowCols<ER, [], Tbl, C, ParamsOfExpr<E, C, M>>
-	: M;
-
-/** `INSERT INTO t (a, b) SELECT $1, $2`: bare parameter targets take the target column types. */
-type ParamsOfSelectTargets<
-	Q extends SelectStmt,
-	Cs extends readonly string[],
-	Tbl extends Table,
-	M,
-> = Q["body"] extends {
-	readonly t: "simple";
-	readonly targets: infer Ts extends readonly Target[];
-}
-	? ParamsOfTargetCols<Ts, Cs, Tbl, M>
-	: M;
-type ParamsOfTargetCols<
-	Ts extends readonly Target[],
-	Cs extends readonly string[],
-	Tbl extends Table,
-	M,
-> = Ts extends readonly [
-	infer T extends Target,
-	...infer TR extends readonly Target[],
-]
-	? Cs extends readonly [
-			infer Col extends string,
-			...infer CR extends readonly string[],
-		]
-		? ParamsOfTargetCols<
-				TR,
-				CR,
-				Tbl,
-				T["e"] extends {
-					readonly t: "param";
-					readonly n: infer N extends number;
-				}
-					? ColInfoOf<Tbl, Col> extends infer CI
-						? CI extends ColInfo // type-mutate: equivalent cond-true – the columns exist (a statement already validated)
-							? AddParam<M, N, CI>
-							: M
-						: never
+					? AddParam<M, N, CI>
 					: M
 			>
 		: M
@@ -1302,7 +1209,7 @@ type ParamsOfOnConflict<
 }
 	? ParamsOfOpt<
 			Where,
-			DmlCtx<DB, [Item, ExcludedItem<Tbl>], [], Ctes>,
+			DmlCtx<DB, [Item, ExcludedItem<Tbl>], [], Ctes>, // type-mutate: equivalent tuple-swap – a name in both is ambiguous either way (FindAlias)
 			ParamsOfSet<Set, Tbl, DmlCtx<DB, [Item, ExcludedItem<Tbl>], [], Ctes>, M>, // type-mutate: equivalent tuple-swap – a name in both is ambiguous either way (FindAlias)
 			Info<"bool">
 		>
@@ -1346,16 +1253,14 @@ export type ParamsOfSet<
 								readonly t: "row";
 								readonly items: infer Items extends readonly Expr[];
 							}
-							? Ind extends null
-								? ParamsOfRowCols<Items, Cols_, Tbl, C, M>
-								: ParamsOfRowInfos<
-										Items,
-										TargetInfos<Cols_, Ind, Tbl, C>,
-										C,
-										ParamsOfInds<Cols_, Ind, Tbl, C, M>
-									>
+							? ParamsOfRowInfos<
+									Items,
+									TargetInfos<Cols_, Ind, Tbl, C>,
+									C,
+									ParamsOfInds<Cols_, Ind, Tbl, C, M>
+								>
 							: ParamsOfExpr<E, C, ParamsOfInds<Cols_, Ind, Tbl, C, M>>
-						: M
+						: M // type-mutate: equivalent never-false – a SET item is one of the three kinds above
 		>
 	: M;
 
@@ -1381,7 +1286,19 @@ export type ParamsOfReturning<
 			[]
 		> extends infer ON
 		? ON extends ScopeLevel
-			? ParamsOfTargets<Ret, MkCtx<DB, [Level, ON], Ctes, false>, M>
+			? ParamsOfTargets<
+					Ret,
+					MkCtx<
+						DB,
+						[
+							Level, // type-mutate: equivalent tuple-swap – old / new are reached qualified only, by names Level does not have; only `*`, which holds no parameter, reads the first level
+							ON,
+						],
+						Ctes,
+						false // type-mutate: equivalent bool-flip – aggregates are not allowed in RETURNING, so no valid statement depends on it
+					>,
+					M
+				>
 			: M // type-mutate: equivalent never-false – OLD / NEW were validated with the statement
 		: never
 	: M;

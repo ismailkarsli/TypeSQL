@@ -167,10 +167,10 @@ describe.skipIf(!db)("fragment helpers against Postgres", () => {
 				{ name: `${name}-3`, note: null, qty: 1 },
 			]);
 
+			// not `price`: the statement assigns it, and Postgres rejects a second assignment
 			const patch: {
 				note?: string | null | undefined;
 				qty?: number | undefined;
-				price?: number | undefined;
 			} = { note: "patched", qty: undefined };
 			const set = sql.set("helper_items", patch);
 			const upd = sql(

@@ -295,6 +295,129 @@ test("assignment target errors", () => {
 	>();
 });
 
+test("DEFAULT cannot be stored through an indirection (Postgres names its first step)", () => {
+	expectTypeOf<V<"UPDATE items SET tags[1] = DEFAULT">>().toEqualTypeOf<
+		SqlError<"cannot set an array element to DEFAULT", 0>
+	>();
+	expectTypeOf<V<"UPDATE items SET data['k'] = DEFAULT">>().toEqualTypeOf<
+		SqlError<"cannot set an array element to DEFAULT", 0>
+	>();
+	expectTypeOf<V<"UPDATE items SET addr.city = DEFAULT">>().toEqualTypeOf<
+		SqlError<"cannot set a subfield to DEFAULT", 0>
+	>();
+	expectTypeOf<V<"UPDATE items SET addr.city[1] = DEFAULT">>().toEqualTypeOf<
+		SqlError<"cannot set a subfield to DEFAULT", 0>
+	>();
+	expectTypeOf<V<"UPDATE items SET tags[1].x = DEFAULT">>().toEqualTypeOf<
+		SqlError<"cannot set an array element to DEFAULT", 0>
+	>();
+	expectTypeOf<
+		V<"UPDATE items SET (name, tags[1]) = ('a', DEFAULT)">
+	>().toEqualTypeOf<SqlError<"cannot set an array element to DEFAULT", 0>>();
+	expectTypeOf<
+		V<"INSERT INTO items (name, tags[1], data) VALUES ('a', DEFAULT, '{}')">
+	>().toEqualTypeOf<SqlError<"cannot set an array element to DEFAULT", 0>>();
+	expectTypeOf<
+		V<"INSERT INTO items (name, tags, data, addr.city) VALUES ('a', '{}', '{}', DEFAULT)">
+	>().toEqualTypeOf<SqlError<"cannot set a subfield to DEFAULT", 0>>();
+	expectTypeOf<
+		V<"INSERT INTO items (name, tags[1], data) VALUES ('a', 'x', '{}'), ('b', DEFAULT, '{}')">
+	>().toEqualTypeOf<SqlError<"cannot set an array element to DEFAULT", 0>>();
+	expectTypeOf<
+		V<"MERGE INTO items i USING notes n ON i.id = n.id WHEN MATCHED THEN UPDATE SET addr.city = DEFAULT">
+	>().toEqualTypeOf<SqlError<"cannot set a subfield to DEFAULT", 0>>();
+	expectTypeOf<
+		V<"MERGE INTO items i USING notes n ON i.id = n.id WHEN NOT MATCHED THEN INSERT (name, tags[1], data) VALUES ('a', DEFAULT, '{}')">
+	>().toEqualTypeOf<SqlError<"cannot set an array element to DEFAULT", 0>>();
+	// a NULL can be stored there, and DEFAULT in the whole column
+	expectTypeOf<
+		V<"UPDATE items SET tags[1] = NULL, addr.city = NULL, scores = DEFAULT">
+	>().toEqualTypeOf<"UPDATE items SET tags[1] = NULL, addr.city = NULL, scores = DEFAULT">();
+	expectTypeOf<
+		V<"INSERT INTO items (name, tags[1], data, scores, addr.city) VALUES ('a', NULL, '{}', DEFAULT, NULL)">
+	>().toEqualTypeOf<"INSERT INTO items (name, tags[1], data, scores, addr.city) VALUES ('a', NULL, '{}', DEFAULT, NULL)">();
+	// before the subscripts
+	expectTypeOf<V<"UPDATE items SET tags[nope] = DEFAULT">>().toEqualTypeOf<
+		SqlError<"cannot set an array element to DEFAULT", 0>
+	>();
+	expectTypeOf<
+		V<"INSERT INTO items (name, tags[nope]) VALUES ('a', DEFAULT)">
+	>().toEqualTypeOf<SqlError<"cannot set an array element to DEFAULT", 0>>();
+	// the value is typed first
+	expectTypeOf<V<"UPDATE items SET tags[1] = nope">>().toEqualTypeOf<
+		SqlError<
+			'column "nope" does not exist. Perhaps you meant the column "name"?',
+			8
+		>
+	>();
+});
+
+test("Postgres's order: the values, then each target, then a second assignment", () => {
+	expectTypeOf<
+		V<"INSERT INTO items (name, tags[nope]) VALUES (nope2, 'x')">
+	>().toEqualTypeOf<SqlError<'column "nope2" does not exist', 13>>();
+	expectTypeOf<
+		V<"UPDATE items SET tags[nope] = 1, name = nope2">
+	>().toEqualTypeOf<SqlError<'column "nope2" does not exist', 12>>();
+	expectTypeOf<
+		V<"UPDATE items SET (name, nope) = ('a', 'b'), pos = nope2">
+	>().toEqualTypeOf<SqlError<'column "nope2" does not exist', 17>>();
+	expectTypeOf<
+		V<"UPDATE items SET (name, nope) = (SELECT 'a', 'b')">
+	>().toEqualTypeOf<
+		SqlError<
+			'column "nope" of relation "items" does not exist. Perhaps you meant the column "name"?',
+			6
+		>
+	>();
+	expectTypeOf<
+		V<"MERGE INTO items i USING notes n ON i.id = n.id WHEN MATCHED THEN UPDATE SET nope = 1, name = nope2">
+	>().toEqualTypeOf<SqlError<'column "nope2" does not exist', 26>>();
+	expectTypeOf<
+		V<"UPDATE items SET name = 'a', name = 'b', tags[nope] = 'x'">
+	>().toEqualTypeOf<
+		SqlError<
+			'column "nope" does not exist. Perhaps you meant the column "name"?',
+			13
+		>
+	>();
+});
+
+test("a column assigned whole is assigned once; its elements or fields any number of times", () => {
+	expectTypeOf<
+		V<"INSERT INTO items (name, tags, tags[1], data) VALUES ('a', '{}', 'x', '{}')">
+	>().toEqualTypeOf<SqlError<'column "tags" specified more than once', 6>>();
+	expectTypeOf<
+		V<"INSERT INTO items (name, tags[1], tags, data) VALUES ('a', 'x', '{}', '{}')">
+	>().toEqualTypeOf<SqlError<'column "tags" specified more than once', 6>>();
+	expectTypeOf<
+		V<"UPDATE items SET tags = '{}', tags[1] = 'a'">
+	>().toEqualTypeOf<
+		SqlError<'multiple assignments to same column "tags"', 3>
+	>();
+	expectTypeOf<
+		V<"UPDATE items SET tags[1] = 'a', tags = '{}'">
+	>().toEqualTypeOf<
+		SqlError<'multiple assignments to same column "tags"', 3>
+	>();
+	expectTypeOf<
+		V<"UPDATE items SET (tags, name) = ('{}', 'a'), tags[1] = 'b'">
+	>().toEqualTypeOf<
+		SqlError<'multiple assignments to same column "tags"', 4>
+	>();
+	expectTypeOf<
+		V<"UPDATE items SET tags[1] = 'a', (name, tags[2]) = ('b', 'c'), scores[1] = 1, scores[2] = 2">
+	>().toEqualTypeOf<"UPDATE items SET tags[1] = 'a', (name, tags[2]) = ('b', 'c'), scores[1] = 1, scores[2] = 2">();
+	expectTypeOf<
+		V<"MERGE INTO items i USING notes n ON i.id = n.id WHEN MATCHED THEN UPDATE SET name = 'a', name = 'b'">
+	>().toEqualTypeOf<
+		SqlError<'multiple assignments to same column "name"', 20>
+	>();
+	expectTypeOf<
+		V<"MERGE INTO items i USING notes n ON i.id = n.id WHEN NOT MATCHED THEN INSERT (name, tags, data, name) VALUES ('a', '{}', '{}', 'b')">
+	>().toEqualTypeOf<SqlError<'column "name" specified more than once', 21>>();
+});
+
 test("parameters of indirected targets take the element / field type", () => {
 	expectTypeOf<
 		Params<"UPDATE items SET tags[$1] = $2, scores[1:2] = $3 WHERE id = $4">
@@ -339,6 +462,16 @@ test("parameters of indirected targets take the element / field type", () => {
 	expectTypeOf<
 		Params<"INSERT INTO items (name, tags[1], data) SELECT $1, $2, '{}' UNION SELECT 'a', 'b', '{}'">
 	>().toEqualTypeOf<[unknown, unknown]>();
+	// parameters before a target without indirection stay
+	expectTypeOf<
+		Params<"UPDATE items SET name = $1, (scores, tags[1]) = ($2, $3)">
+	>().toEqualTypeOf<[string, (number | null)[] | null, string | null]>();
+	expectTypeOf<
+		Params<"WITH x AS (SELECT $1::int4 AS n) INSERT INTO items (name, tags[1], data) VALUES ($2, $3, '{}')">
+	>().toEqualTypeOf<[number, string, string | null]>();
+	expectTypeOf<
+		Params<"WITH x AS (SELECT $1::int4 AS n) INSERT INTO notes DEFAULT VALUES">
+	>().toEqualTypeOf<[number]>();
 });
 
 test("WHERE CURRENT OF", () => {
@@ -385,6 +518,13 @@ test("RETURNING old / new (PostgreSQL 18)", () => {
 	expectTypeOf<
 		Row<"UPDATE logs SET msg = 'x' RETURNING WITH (OLD AS o, NEW AS n) o.msg AS a, n.msg AS b">
 	>().toEqualTypeOf<{ a: string | null; b: string | null }>();
+	// renamed to the other one's name: that name is taken, no default row is added under it
+	expectTypeOf<
+		Row<"UPDATE logs SET msg = 'x' RETURNING WITH (OLD AS new) new.item_id">
+	>().toEqualTypeOf<{ item_id: number }>();
+	expectTypeOf<
+		Row<"DELETE FROM logs RETURNING WITH (NEW AS old) old.item_id">
+	>().toEqualTypeOf<{ item_id: number | null }>();
 	// `*` stays the target's columns
 	expectTypeOf<Row<"DELETE FROM logs RETURNING *">>().toEqualTypeOf<{
 		id: string;

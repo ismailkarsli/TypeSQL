@@ -15,19 +15,17 @@ import type {
 	ScopeLevel,
 } from "../types.js";
 import type {
-	CheckColsExist,
+	AssignTargets,
+	CheckAssignedCols,
 	CheckExpr,
-	CheckInds,
-	CheckNullLiterals,
 	CheckOptExpr,
 	CheckRequired,
+	CheckRows,
 	CheckSet,
 	CheckValueItems,
 	DmlCtx,
-	NullCheckCols,
 	ParamsOfInds,
 	ParamsOfReturning,
-	ParamsOfRowCols,
 	ParamsOfRowInfos,
 	ParamsOfSet,
 	ProjectReturning,
@@ -122,13 +120,11 @@ type ReturningSource<Ws extends readonly MergeWhen[], L extends ScopeLevel> = [
 	? L
 	: NullableLevel<L>;
 type NullableLevel<L extends ScopeLevel> = {
-	readonly [I in keyof L]: L[I] extends ScopeItem
-		? {
-				readonly alias: L[I]["alias"];
-				readonly cols: NullableMap<L[I]["cols"]>;
-				readonly skip: L[I]["skip"];
-			}
-		: L[I]; // type-mutate: equivalent never-false – every member of a ScopeLevel is a ScopeItem
+	readonly [I in keyof L]: {
+		readonly alias: L[I]["alias"];
+		readonly cols: NullableMap<L[I]["cols"]>;
+		readonly skip: L[I]["skip"];
+	};
 };
 
 /** Some WHEN clause has this action. */
@@ -240,7 +236,13 @@ type CheckMergeInsert<
 	C extends Ctx,
 > = Vals extends readonly Expr[]
 	? Cols extends readonly string[]
-		? CheckColsExist<Cols, Tbl, Name> extends infer E
+		? CheckAssignedCols<
+				Cols,
+				AssignTargets<Cols, Ind>,
+				Tbl,
+				Name,
+				"insert"
+			> extends infer E
 			? E extends AnyErr
 				? E
 				: WidthCheck<Vals, Cols> extends infer Wd
@@ -251,23 +253,17 @@ type CheckMergeInsert<
 									"INSERT has more target columns than expressions",
 									null
 								>
-							: CheckInds<Cols, Ind, Tbl, C> extends infer Ci
-								? Ci extends AnyErr
-									? Ci
-									: CheckValueItems<Vals, C> extends infer V
-										? V extends AnyErr
-											? V
-											: CheckNullLiterals<
-														Vals,
-														NullCheckCols<Cols, Ind>,
-														Tbl,
-														Name
-													> extends infer N
-												? N extends AnyErr
-													? N
-													: CheckRequired<Tbl, Cols, Name>
-												: never
-										: never
+							: CheckRows<
+										[Vals],
+										Cols,
+										AssignTargets<Cols, Ind>,
+										Tbl,
+										Name,
+										C
+									> extends infer V
+								? V extends AnyErr
+									? V
+									: CheckRequired<Tbl, Cols, Name>
 								: never
 					: never
 			: never
@@ -362,30 +358,28 @@ type ParamsOfWhen<W extends MergeWhen, Tbl extends Table, C extends Ctx, M> =
 						readonly colInd: infer Ind extends readonly TargetInd[] | null;
 						readonly values: infer Vals extends readonly Expr[];
 					}
-				? Ind extends null
-					? ParamsOfRowCols<
-							Vals,
-							Cols extends readonly string[] ? Cols : [],
-							Tbl,
-							C,
-							M1
-						>
-					: ParamsOfRowInfos<
-							Vals,
-							TargetInfos<
-								Cols extends readonly string[] ? Cols : [], // type-mutate: equivalent never-false – an indirection comes with a column list
-								Ind,
-								Tbl,
-								C
-							>,
-							C,
-							ParamsOfInds<
-								Cols extends readonly string[] ? Cols : [], // type-mutate: equivalent never-false – an indirection comes with a column list
-								Ind,
-								Tbl,
-								C,
-								M1
-							>
-						>
+				? ParamsOfMergeInsert<
+						Vals,
+						Cols extends readonly string[] ? Cols : [],
+						Ind,
+						Tbl,
+						C,
+						M1
+					>
 				: M1
 		: never;
+
+/** INSERT values: those in the targets' subscripts, then a bare `$n` takes what its target stores (`TargetInfos`). */
+type ParamsOfMergeInsert<
+	Vals extends readonly Expr[],
+	Cs extends readonly string[],
+	Ind extends readonly TargetInd[] | null,
+	Tbl extends Table,
+	C extends Ctx,
+	M,
+> = ParamsOfRowInfos<
+	Vals,
+	TargetInfos<Cs, Ind, Tbl, C>,
+	C,
+	ParamsOfInds<Cs, Ind, Tbl, C, M>
+>;

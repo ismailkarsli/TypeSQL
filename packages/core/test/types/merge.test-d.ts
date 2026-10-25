@@ -75,6 +75,9 @@ test("RETURNING: merge_action(), target, source and old / new", () => {
 	expectTypeOf<
 		Row<"MERGE INTO accounts a USING deltas d ON a.id = d.sid WHEN NOT MATCHED BY SOURCE THEN DELETE RETURNING a.id, d.sid">
 	>().toEqualTypeOf<{ id: number; sid: number | null }>();
+	expectTypeOf<
+		Row<"MERGE INTO accounts a USING deltas d ON a.id = d.sid WHEN NOT MATCHED BY SOURCE THEN UPDATE SET note = 'x' RETURNING a.id, d.sid">
+	>().toEqualTypeOf<{ id: number; sid: number | null }>();
 	// ... unless that action is DO NOTHING (no row is returned)
 	expectTypeOf<
 		Row<"MERGE INTO accounts a USING deltas d ON a.id = d.sid WHEN NOT MATCHED BY SOURCE THEN DO NOTHING WHEN MATCHED THEN DELETE RETURNING d.sid">
@@ -369,6 +372,9 @@ test("parameters take their context's type", () => {
 	expectTypeOf<
 		Params<"MERGE INTO accounts a USING deltas d ON a.id = d.sid WHEN NOT MATCHED THEN INSERT VALUES ($1, $2)">
 	>().toEqualTypeOf<[unknown, unknown]>();
+	expectTypeOf<
+		Params<"MERGE INTO accounts a USING deltas d ON a.id = d.sid WHEN NOT MATCHED THEN INSERT VALUES ($1::int4, 0)">
+	>().toEqualTypeOf<[number]>();
 	// an INSERT column with a subscript takes the element's type
 	interface Tagged {
 		items: { id: Col<"int4">; tags: Nullable<"text[]"> };

@@ -29,6 +29,7 @@ The error has two parts:
 | missing `NOT NULL` column | `null value in column "email" of relation "users" violates not-null constraint` |
 | writing to a view | `cannot insert into view "user_stats"` |
 | `DEFAULT` outside a `VALUES` item or `SET` value | `DEFAULT is not allowed in this context` |
+| a column assigned twice | `multiple assignments to same column "email"` (`UPDATE`), `column "email" specified more than once` (`INSERT`) |
 | set operation width | `each UNION query must have the same number of columns` |
 | wrong inline value | `parameter $1: a string value cannot be used as int4` |
 | JSON value outside JSON | `parameter $1: a sql.json() value cannot be used as text NOT NULL` |

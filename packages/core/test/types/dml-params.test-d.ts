@@ -109,6 +109,16 @@ test("without a column list, or through a set operation, parameters are not type
 	expectTypeOf<
 		Params<"WITH x AS (SELECT $1::int AS n) INSERT INTO users (email) SELECT $2">
 	>().toEqualTypeOf<[number, string]>();
+	// the expression rules still apply
+	expectTypeOf<
+		Params<"INSERT INTO posts VALUES (DEFAULT, $1::int4, 'x', NULL, DEFAULT)">
+	>().toEqualTypeOf<[number]>();
+	expectTypeOf<
+		Params<"INSERT INTO posts SELECT 1, $1::int4, 'x', NULL, 0">
+	>().toEqualTypeOf<[number]>();
+	expectTypeOf<
+		Params<"INSERT INTO users (email) SELECT $1::text UNION SELECT 'a'">
+	>().toEqualTypeOf<[string]>();
 });
 
 test("ON CONFLICT DO UPDATE: SET takes the column type; WHERE sees the target and excluded", () => {
@@ -155,6 +165,10 @@ test("UPDATE", () => {
 	expectTypeOf<Params<"UPDATE posts SET title = $1::text">>().toEqualTypeOf<
 		[string]
 	>();
+	// a sub-SELECT source: the expression rules
+	expectTypeOf<
+		Params<"UPDATE users SET (email, display_name) = (SELECT $1::text, 'x')">
+	>().toEqualTypeOf<[string]>();
 });
 
 test("DELETE", () => {
@@ -177,6 +191,10 @@ test("parameters inside WITH bodies", () => {
 	expectTypeOf<
 		Params<"WITH del AS (DELETE FROM posts WHERE id = $1 RETURNING author_id) UPDATE users SET email = $2 FROM del WHERE users.id = del.author_id">
 	>().toEqualTypeOf<[string | number | bigint | null, string]>();
+	// a data-modifying WITH query keeps the parameters of the ones before it
+	expectTypeOf<
+		Params<"WITH a AS (SELECT $1::int4 AS x), d AS (DELETE FROM posts WHERE id = 1 RETURNING id) UPDATE users SET email = $2">
+	>().toEqualTypeOf<[number, string]>();
 });
 
 test("nullable columns accept null at the sql() boundary", () => {

@@ -99,7 +99,7 @@ Narrow the value first, or pass `maybeEmail ?? null` to send `NULL`. `sql.fragme
 
 - Keys must be columns of the table, and values must fit them: `null` only for nullable columns, enum values for enums.
 - Keys that are not columns are errors, even on a variable whose type has extra keys, because they would be sent.
-- Splice it into `UPDATE … SET {set}` or `ON CONFLICT … DO UPDATE SET {set}`. Other assignments can follow: `SET {set}, updated_at = now()`.
+- Splice it into `UPDATE … SET {set}` or `ON CONFLICT … DO UPDATE SET {set}`. Other assignments can follow: `SET {set}, updated_at = now()`, for columns that are not keys of the input type (Postgres rejects a second assignment: `multiple assignments to same column "updated_at"`).
 
 ::: warning Empty input
 If no value is defined at runtime, `sql.set` throws, because Postgres needs at least one assignment. Skip the `UPDATE` (or `SELECT` the row) when the input is empty.

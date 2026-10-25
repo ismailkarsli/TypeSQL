@@ -123,6 +123,18 @@ test("VALUES: DEFAULT, multi-row, column list checks", () => {
 			4
 		>
 	>();
+	// a column is listed once, checked in order with the names
+	expectTypeOf<
+		V<"INSERT INTO users (email, email) VALUES ('a', 'b')">
+	>().toEqualTypeOf<SqlError<'column "email" specified more than once', 4>>();
+	expectTypeOf<
+		V<"INSERT INTO users (email, email, nope) VALUES ('a', 'b', 'c')">
+	>().toEqualTypeOf<SqlError<'column "email" specified more than once', 4>>();
+	expectTypeOf<
+		V<"INSERT INTO users (nope, email, email) VALUES ('a', 'b', 'c')">
+	>().toEqualTypeOf<
+		SqlError<'column "nope" of relation "users" does not exist', 4>
+	>();
 	// expressions in VALUES are typed against the outer scope only
 	expectTypeOf<V<"INSERT INTO users (email) VALUES (nope)">>().toEqualTypeOf<
 		SqlError<'column "nope" does not exist', 8>

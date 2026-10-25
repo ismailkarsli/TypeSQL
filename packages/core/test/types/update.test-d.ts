@@ -73,6 +73,17 @@ test("SET column checks", () => {
 	expectTypeOf<V<"UPDATE users SET email = nope">>().toEqualTypeOf<
 		SqlError<'column "nope" does not exist', 5>
 	>();
+	// every value is typed before the targets are checked, as in Postgres
+	expectTypeOf<V<"UPDATE users SET nope = 1, email = nope2">>().toEqualTypeOf<
+		SqlError<'column "nope2" does not exist', 9>
+	>();
+	// every item is checked, not only the first
+	expectTypeOf<V<"UPDATE users SET email = 'a', nope = 1">>().toEqualTypeOf<
+		SqlError<'column "nope" of relation "users" does not exist', 7>
+	>();
+	expectTypeOf<
+		V<"UPDATE users SET email = 'a', display_name = nope">
+	>().toEqualTypeOf<SqlError<'column "nope" does not exist', 9>>();
 	expectTypeOf<V<"UPDATE users SET email = NULL">>().toEqualTypeOf<
 		SqlError<
 			'null value in column "email" of relation "users" violates not-null constraint',
@@ -141,6 +152,59 @@ test("multi-column SET", () => {
 	>().toEqualTypeOf<
 		SqlError<'column "nope" of relation "users" does not exist', 6>
 	>();
+	expectTypeOf<
+		V<"UPDATE users SET (email, display_name) = (SELECT nope)">
+	>().toEqualTypeOf<SqlError<'column "nope" does not exist', 11>>();
+	// a NULL, or a DEFAULT without a default, in a NOT NULL column, as for a single column
+	expectTypeOf<
+		V<"UPDATE users SET (email, display_name) = (NULL, 'x')">
+	>().toEqualTypeOf<
+		SqlError<
+			'null value in column "email" of relation "users" violates not-null constraint',
+			4
+		>
+	>();
+	expectTypeOf<
+		V<"UPDATE users SET (display_name, email) = ROW(NULL, 'x')">
+	>().toEqualTypeOf<"UPDATE users SET (display_name, email) = ROW(NULL, 'x')">();
+	expectTypeOf<
+		V<"UPDATE users SET (display_name, email) = ROW(DEFAULT, DEFAULT)">
+	>().toEqualTypeOf<
+		SqlError<
+			'null value in column "email" of relation "users" violates not-null constraint',
+			6
+		>
+	>();
+	expectTypeOf<
+		V<"UPDATE users SET (created_at, display_name) = (DEFAULT, DEFAULT)">
+	>().toEqualTypeOf<"UPDATE users SET (created_at, display_name) = (DEFAULT, DEFAULT)">();
+});
+
+test("a column is assigned once (checked after the rest of the statement, as by Postgres's rewriter)", () => {
+	expectTypeOf<V<"UPDATE users SET email = 'a', email = 'b'">>().toEqualTypeOf<
+		SqlError<'multiple assignments to same column "email"', 3>
+	>();
+	expectTypeOf<
+		V<"UPDATE users SET (email, display_name) = ('a', 'b'), display_name = 'c'">
+	>().toEqualTypeOf<
+		SqlError<'multiple assignments to same column "display_name"', 6>
+	>();
+	expectTypeOf<
+		V<"UPDATE users SET display_name = 'c', (email, display_name) = ROW('a', 'b')">
+	>().toEqualTypeOf<
+		SqlError<'multiple assignments to same column "display_name"', 3>
+	>();
+	expectTypeOf<
+		V<"UPDATE users SET email = 'a', email = 'b', display_name = nope">
+	>().toEqualTypeOf<SqlError<'column "nope" does not exist', 13>>();
+	expectTypeOf<
+		V<"INSERT INTO users (email) VALUES ('a') ON CONFLICT (email) DO UPDATE SET email = 'b', email = 'c'">
+	>().toEqualTypeOf<
+		SqlError<'multiple assignments to same column "email"', 4>
+	>();
+	expectTypeOf<
+		V<"UPDATE users SET email = 'a', display_name = 'b'">
+	>().toEqualTypeOf<"UPDATE users SET email = 'a', display_name = 'b'">();
 });
 
 test("UPDATE ... FROM: items are inner-joined to the target, nullability from the FROM clause", () => {
@@ -159,6 +223,16 @@ test("UPDATE ... FROM: items are inner-joined to the target, nullability from th
 	expectTypeOf<V<"UPDATE users SET email = 'a' FROM nope">>().toEqualTypeOf<
 		SqlError<'relation "nope" does not exist', 7>
 	>();
+	// the target's name is taken
+	expectTypeOf<V<"UPDATE users SET email = 'a' FROM users">>().toEqualTypeOf<
+		SqlError<'table name "users" specified more than once', 1>
+	>();
+	expectTypeOf<
+		V<"UPDATE users u SET email = 'a' FROM posts JOIN posts u ON true">
+	>().toEqualTypeOf<SqlError<'table name "u" specified more than once', 2>>();
+	expectTypeOf<
+		V<"UPDATE users u SET email = 'a' FROM users">
+	>().toEqualTypeOf<"UPDATE users u SET email = 'a' FROM users">();
 });
 
 test("WHERE is type-checked", () => {

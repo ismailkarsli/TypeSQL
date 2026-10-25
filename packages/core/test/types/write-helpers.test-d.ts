@@ -201,6 +201,10 @@ test("sql.set: typed partial SET list", () => {
 	const title = sql.set("posts", { title: "t" });
 	// @ts-expect-error column "title" of relation "users" does not exist
 	sql("UPDATE users SET {title}", { title });
+	// a key of the input that the statement assigns too: Postgres rejects the second assignment
+	const withEmail = sql.set("users", {} as { email?: string });
+	// @ts-expect-error multiple assignments to same column "email"
+	sql("UPDATE users SET {withEmail}, email = 'x'", { withEmail });
 });
 
 test("sql.values: typed VALUES rows", () => {
