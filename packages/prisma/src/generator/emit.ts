@@ -2,9 +2,9 @@ import type { DmmfDatamodel, DmmfEnum, DmmfField, DmmfModel } from "./dmmf.js";
 
 export interface EmitOptions {
 	/** Module the column helpers are imported from. Default `"@typesql/core"`. */
-	readonly importFrom?: string;
+	readonly importFrom?: string | undefined;
 	/** Name of the exported interface. Default `"DB"`. */
-	readonly typeName?: string;
+	readonly typeName?: string | undefined;
 	/** Names of models declared with `view` (they become `View<...>`). See `viewNames`. */
 	readonly views?: readonly string[];
 }
@@ -52,13 +52,11 @@ export const NATIVE_TYPES: Readonly<Record<string, string>> = {
 	ByteA: "bytea",
 };
 
-/** `@default(fn())` functions that become a database DEFAULT. */
-const DB_DEFAULT_FUNCTIONS = new Set([
-	"autoincrement",
-	"now",
-	"dbgenerated",
-	"sequence",
-]);
+/**
+ * `@default(fn())` functions that become a database DEFAULT on PostgreSQL (`sequence()` is
+ * CockroachDB's: Prisma rejects it for the postgresql provider).
+ */
+const DB_DEFAULT_FUNCTIONS = new Set(["autoincrement", "now", "dbgenerated"]);
 
 /** Names of the `view` blocks in a Prisma schema text (views appear as models in the DMMF). */
 export function viewNames(schema: string): string[] {
@@ -130,7 +128,7 @@ export function generateSource(
 	options: EmitOptions = {},
 ): string {
 	const typeName = options.typeName ?? "DB";
-	const views = new Set(options.views ?? []);
+	const views = new Set(options.views);
 	const enums = enumKeys(datamodel.enums);
 	const used = new Set<string>();
 

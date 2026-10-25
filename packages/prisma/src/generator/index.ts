@@ -8,9 +8,9 @@ const configString = (
 	v: string | readonly string[] | undefined,
 ): string | undefined => (typeof v === "string" ? v : undefined);
 
-/** File the generator writes: `output` itself when it names a `.ts` file, else `<output>/index.ts`. */
+/** File the generator writes: `output` itself when it names a `.ts` (`.mts`, `.cts`) file, else `<output>/index.ts`. */
 export function outputFile(output: string): string {
-	return /^\.[mc]?ts$/.test(extname(output))
+	return [".ts", ".mts", ".cts"].includes(extname(output))
 		? output
 		: join(output, "index.ts");
 }
@@ -30,12 +30,8 @@ export function sourceFor(options: GeneratorOptions): string {
 	}
 	const { importFrom, typeName } = options.generator.config;
 	return generateSource(options.dmmf.datamodel as DmmfDatamodel, {
-		...(configString(importFrom) !== undefined && {
-			importFrom: configString(importFrom)!,
-		}),
-		...(configString(typeName) !== undefined && {
-			typeName: configString(typeName)!,
-		}),
+		importFrom: configString(importFrom),
+		typeName: configString(typeName),
 		views: viewNames(options.datamodel),
 	});
 }

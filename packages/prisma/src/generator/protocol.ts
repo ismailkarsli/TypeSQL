@@ -110,6 +110,7 @@ export function serveGenerator(
 	input: Readable = process.stdin,
 	output: Writable = process.stderr,
 ): Promise<void> {
+	// Stryker disable next-line ArrayDeclaration: a non-promise element in Promise.all resolves at once and the result is discarded, so no input can tell `["Stryker was here"]` from `[]`
 	const pending: Promise<void>[] = [];
 	const lines = createInterface({ input, crlfDelay: Infinity });
 	lines.on("line", (line) => {
