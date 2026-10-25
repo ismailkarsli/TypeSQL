@@ -99,6 +99,11 @@ describe.skipIf(!db)("typesql introspect against Postgres", () => {
 			hasDefault: true,
 			default: null,
 		});
+		expect(col("small")).toMatchObject({
+			type: "int2",
+			identity: "by default",
+			hasDefault: true,
+		});
 		expect(col("serial_no")).toMatchObject({
 			type: "int4",
 			hasDefault: true,
@@ -191,12 +196,162 @@ describe.skipIf(!db)("typesql introspect against Postgres", () => {
 		}
 	}, 30_000);
 
+	test("view columns: which expressions are NOT NULL", async () => {
+		await client.query("CREATE SCHEMA nul");
+		try {
+			await client.query(
+				"CREATE TABLE nul.a (id int NOT NULL, x int, b bool NOT NULL, nb bool, t text NOT NULL, nt text)",
+			);
+			await client.query(
+				"CREATE TABLE nul.b (id int NOT NULL, y int NOT NULL)",
+			);
+			await client.query(`CREATE VIEW nul.exprs AS SELECT
+			    b AND b AS and_, b AND nb AS and_null, NOT nb AS not_null,
+			    ROW(id, x)::nul.b AS row_, ARRAY[nt] AS array_, nt IS NULL AS is_null,
+			    nt IS DISTINCT FROM t AS distinct_, nb IS TRUE AS is_true,
+			    coalesce(nt, x::text) AS coalesce_null,
+			    EXISTS (SELECT FROM nul.b) AS exists_, ARRAY(SELECT y FROM nul.b) AS array_sub,
+			    (SELECT y FROM nul.b LIMIT 1) AS scalar_sub, id IN (SELECT y FROM nul.b) AS in_sub
+			  FROM nul.a`);
+			await client.query(`CREATE VIEW nul.froms AS SELECT
+			    r.p, r.q, c.x AS c, s.z, a AS whole, generate_series(1, 2) AS srf, j.id AS full_using,
+			    vals.n AS values_, u.v AS unnest_, un.k AS union_, un_null.k AS union_null
+			  FROM nul.a a,
+			    ROWS FROM (generate_series(1, 2), generate_series(1, 3)) AS r(p, q),
+			    coalesce(1, 2) AS c(x),
+			    LATERAL (SELECT a.id AS z) s,
+			    nul.a AS f FULL JOIN nul.b USING (id) AS j,
+			    (VALUES (1)) AS vals(n),
+			    unnest(ARRAY[1]) AS u(v),
+			    (SELECT id AS k FROM nul.a UNION ALL SELECT y FROM nul.b) AS un,
+			    (SELECT id AS k FROM nul.a UNION SELECT x FROM nul.a) AS un_null`);
+			await client.query(`CREATE VIEW nul.calls AS SELECT
+			    CASE WHEN b THEN 1 ELSE 2 END AS case_, CASE WHEN b THEN 1 END AS case_no_else,
+			    CASE WHEN b THEN x ELSE 1 END AS case_null_branch,
+			    pg_stat_get_numscans('nul.a'::regclass) AS stat_int8,
+			    pg_stat_get_db_numbackends(1::oid) AS stat_int4,
+			    pg_stat_get_db_blk_read_time(1::oid) AS stat_float8,
+			    pg_stat_get_backend_pid(1) AS stat_nullable,
+			    pg_stat_get_last_vacuum_time('nul.a'::regclass) AS stat_time,
+			    round(id) AS implicit_cast, format_type('int4'::regtype, NULL) AS format_type_,
+			    nullif(t, 'x') AS nullif_
+			  FROM nul.a`);
+			const info = await introspect(client, { schemas: ["nul"] });
+			const nullable = (name: string) =>
+				Object.fromEntries(
+					info.relations
+						.find((r) => r.name === name)!
+						.columns.map((c) => [c.name, c.nullable]),
+				);
+			expect(nullable("exprs")).toEqual({
+				and_: false,
+				and_null: true,
+				not_null: true,
+				row_: false,
+				array_: false,
+				is_null: false,
+				distinct_: false,
+				is_true: false,
+				coalesce_null: true,
+				exists_: false,
+				array_sub: false,
+				scalar_sub: true,
+				in_sub: true,
+			});
+			// ROWS FROM pads the shorter function with NULLs; the lateral subquery reads an outer
+			// column, a function in FROM that is no function call, a whole-row reference, a
+			// set-returning function in SELECT and a FULL JOIN's merged column: all unproven.
+			expect(nullable("froms")).toEqual({
+				p: true,
+				q: true,
+				c: true,
+				z: true,
+				whole: true,
+				srf: true,
+				full_using: true,
+				values_: true,
+				unnest_: true,
+				union_: false,
+				union_null: true,
+			});
+			expect(nullable("calls")).toEqual({
+				case_: false,
+				case_no_else: true,
+				case_null_branch: true,
+				stat_int8: false,
+				stat_int4: false,
+				stat_float8: false,
+				stat_nullable: true,
+				stat_time: true,
+				implicit_cast: false,
+				format_type_: false,
+				nullif_: true,
+			});
+		} finally {
+			await client.query("DROP SCHEMA nul CASCADE");
+		}
+	}, 30_000);
+
+	test("types: arrays, domains over arrays, fixed-length types, enums of other schemas, types created meanwhile", async () => {
+		await client.query("CREATE SCHEMA typ");
+		try {
+			await client.query("CREATE DOMAIN typ.ints AS int4[]");
+			await client.query(
+				"CREATE TABLE typ.t (p point, n name, d typ.ints, ds typ.ints[], r auth.role, rs auth.role[])",
+			);
+			await client.query("CREATE TABLE typ.empty ()");
+			// A table whose type is created after introspect read the types.
+			let created = false;
+			const racing = {
+				query: async (text: string, values?: unknown[]) => {
+					const result = await client.query(text, values);
+					if (!created && text.includes("FROM pg_type t JOIN")) {
+						created = true;
+						await client.query("CREATE TYPE typ.late AS ENUM ('x')");
+						await client.query("CREATE TABLE typ.late_t (l typ.late)");
+					}
+					return result;
+				},
+			};
+			const info = await introspect(racing, { schemas: ["typ"] });
+			expect(
+				info.relations.map((r) => [
+					r.name,
+					r.columns.map((c) => `${c.name}:${c.type}:${c.domain}:${c.nullable}`),
+				]),
+			).toEqual([
+				["empty", []],
+				["late_t", ["l:unknown:null:true"]],
+				[
+					"t",
+					[
+						"p:point:null:true",
+						"n:name:null:true",
+						"d:int4[]:typ.ints:true",
+						"ds:int4[]:null:true",
+						"r:role:null:true",
+						"rs:role[]:null:true",
+					],
+				],
+			]);
+			expect(info.enums).toEqual([
+				{ schema: "typ", name: "late", values: ["x"] },
+				{ schema: "auth", name: "role", values: ["member", "admin"] },
+			]);
+		} finally {
+			await client.query("DROP SCHEMA typ CASCADE");
+		}
+	}, 30_000);
+
 	test("the default schema list skips system schemas, public first", async () => {
 		const info = await introspect(client);
 		expect(info.schemas).toEqual(["public", "auth"]);
 		await expect(introspect(client, { schemas: ["nope"] })).rejects.toThrow(
 			'schema "nope" does not exist',
 		);
+		await expect(
+			introspect(client, { schemas: ["nope", "public", "nada"] }),
+		).rejects.toThrow('schema "nope", "nada" does not exist');
 	}, 30_000);
 
 	test("the CLI writes the same file with --config", async () => {
@@ -265,6 +420,74 @@ export interface AuthDB {
   };
 }
 `);
+	}, 30_000);
+
+	test("the CLI trims --schema lists and takes --import-from", async () => {
+		const stdout: string[] = [];
+		const code = await main(
+			["introspect", "--schema", "auth, ", "--import-from", "./core.js"],
+			{
+				stdout: (s) => stdout.push(s),
+				stderr: () => undefined,
+				env: { DATABASE_URL: url },
+				cwd: process.cwd(),
+			},
+		);
+		expect(code).toBe(0);
+		const text = stdout.join("");
+		expect(text).toContain('} from "./core.js";\n');
+		expect(text).toContain("  auth: {");
+		expect(text).not.toContain("users");
+	}, 30_000);
+
+	test("the CLI takes every setting from --config when no flag overrides it", async () => {
+		const dir = await mkdtemp(join(tmpdir(), "typesql-introspect-"));
+		try {
+			writeFileSync(
+				join(dir, "typesql.config.mjs"),
+				`export default ${JSON.stringify({
+					url,
+					out: "gen/db.ts",
+					schemas: ["auth"],
+					exclude: ["session_counts"],
+					typeName: "AuthDB",
+					importFrom: "./core.js",
+					comments: false,
+				})};`,
+			);
+			const stderr: string[] = [];
+			const code = await main(
+				["introspect", "--config", "typesql.config.mjs"],
+				{
+					stdout: () => undefined,
+					stderr: (s) => stderr.push(s),
+					env: {},
+					cwd: dir,
+				},
+			);
+			expect(stderr.join("")).toBe("typesql introspect: wrote gen/db.ts\n");
+			expect(code).toBe(0);
+			expect(body(await readFile(join(dir, "gen/db.ts"), "utf8"))).toBe(
+				`import type { Col, Generated, Nullable } from "./core.js";
+
+export interface AuthDB {
+  auth: {
+    sessions: {
+      token: Col<"uuid">;
+      user_id: Col<"uuid">;
+      role: Generated<"role">;
+      expires_at: Nullable<"timestamptz">;
+    };
+  };
+  $types: {
+    role: "member" | "admin";
+  };
+}
+`,
+			);
+		} finally {
+			await rm(dir, { recursive: true, force: true });
+		}
 	}, 30_000);
 
 	test("the CLI takes --exclude more than once", async () => {

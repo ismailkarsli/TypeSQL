@@ -56,9 +56,7 @@ async function pgConnect(
 	try {
 		({ Client } = (await import("pg")).default);
 	} catch {
-		throw new Error(
-			'typesql introspect needs the "pg" package: npm install pg',
-		);
+		throw new Error('the "pg" package is not installed: npm install pg');
 	}
 	const client = new Client({ connectionString: url });
 	await client.connect();
@@ -117,19 +115,17 @@ export async function main(
 			io.stderr("typesql introspect: pass --url or set DATABASE_URL\n");
 			return 2;
 		}
-		const list = (v: string[] | undefined) =>
-			v?.flatMap((s) =>
+		const list = (v: string[]) =>
+			v.flatMap((s) =>
 				s
 					.split(",")
 					.map((x) => x.trim())
 					.filter(Boolean),
 			);
-		const schemas = list(values.schema) ?? config.schemas;
-		const exclude = list(values.exclude) ?? config.exclude;
 		const options: IntrospectConfig = {
 			...config,
-			...(schemas !== undefined && { schemas }),
-			...(exclude !== undefined && { exclude }),
+			...(values.schema && { schemas: list(values.schema) }),
+			...(values.exclude && { exclude: list(values.exclude) }),
 			...(values["type-name"] !== undefined && {
 				typeName: values["type-name"],
 			}),

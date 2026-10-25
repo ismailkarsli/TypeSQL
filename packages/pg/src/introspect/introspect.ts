@@ -104,15 +104,17 @@ interface TypeRow {
 interface ResolvedType {
 	readonly type: string;
 	readonly notnull: boolean;
-	readonly enumOid: string | null;
+	/** The type under the domains and arrays: the enum the column uses, if it is one. */
+	readonly scalarOid: string;
 	readonly domain: string | null;
 }
 
 function resolver(types: ReadonlyMap<string, TypeRow>) {
 	const resolve = (oid: string): ResolvedType => {
 		const t = types.get(oid);
+		// A type created after the types were read (a concurrent CREATE TYPE and CREATE TABLE)
 		if (!t)
-			return { type: "unknown", notnull: false, enumOid: null, domain: null };
+			return { type: "unknown", notnull: false, scalarOid: oid, domain: null };
 		if (t.typtype === "d") {
 			const base = resolve(t.basetype);
 			return {
@@ -121,20 +123,22 @@ function resolver(types: ReadonlyMap<string, TypeRow>) {
 				domain: `${t.schema}.${t.name}`,
 			};
 		}
-		const elem = t.elem !== "0" ? types.get(t.elem) : undefined;
+		// `typelem` is "0" (no type) for scalars; fixed-length types like `point` have one but are
+		// not its array type.
+		const elem = types.get(t.elem);
 		if (elem && elem.array === t.oid) {
 			const inner = resolve(elem.oid);
 			return {
 				type: inner.type.endsWith("[]") ? inner.type : `${inner.type}[]`,
 				notnull: false,
-				enumOid: inner.enumOid,
+				scalarOid: inner.scalarOid,
 				domain: null,
 			};
 		}
 		return {
 			type: TYPE_ALIASES[t.name] ?? t.name,
 			notnull: false,
-			enumOid: t.typtype === "e" ? t.oid : null,
+			scalarOid: t.oid,
 			domain: null,
 		};
 	};
@@ -187,7 +191,7 @@ export async function introspect(
 	);
 	const resolve = resolver(types);
 
-	const excluded = (options.exclude ?? []).map(globToRegExp);
+	const excluded = options.exclude?.map(globToRegExp);
 	const relRows = (
 		await q<{
 			oid: string;
@@ -205,7 +209,7 @@ export async function introspect(
 		)
 	).filter(
 		(r) =>
-			!excluded.some(
+			!excluded?.some(
 				(re) => re.test(r.name) || re.test(`${r.schema}.${r.name}`),
 			),
 	);
@@ -240,16 +244,17 @@ export async function introspect(
 			...(options.viewNotNull && { notNull: options.viewNotNull }),
 		},
 	);
-	const usedEnums = new Set<string>();
+	/** Types the columns use: their enums are read even outside `schemas`. */
+	const usedTypes = new Set<string>();
 	const relations: IntrospectedRelation[] = [];
 	for (const rel of relRows) {
 		const kind = KINDS[rel.relkind]!;
 		const isView = kind === "view" || kind === "materialized view";
-		const viewNotNull = isView ? await views.notNull(rel.oid) : [];
+		const viewNotNull = isView ? await views.notNull(rel.oid) : null;
 		const columns = (colsByRel.get(rel.oid) ?? []).map(
 			(c, i): IntrospectedColumn => {
 				const t = resolve(c.typid);
-				if (t.enumOid) usedEnums.add(t.enumOid);
+				usedTypes.add(t.scalarOid);
 				const generated = c.generated !== "" ? c.default : null;
 				const identity =
 					c.identity === "a"
@@ -262,10 +267,9 @@ export async function introspect(
 					type: t.type,
 					declaredType: c.declared,
 					domain: t.domain,
-					nullable: isView ? !viewNotNull[i] : !(c.notnull || t.notnull),
-					hasDefault:
-						!isView &&
-						(c.default !== null || identity !== null || generated !== null),
+					nullable: viewNotNull ? !viewNotNull[i] : !(c.notnull || t.notnull),
+					// A generated column's expression is its `default` row in pg_attrdef.
+					hasDefault: !isView && (c.default !== null || identity !== null),
 					identity,
 					generated,
 					default: generated === null ? c.default : null,
@@ -294,7 +298,7 @@ export async function introspect(
       WHERE n.nspname = ANY($1::text[]) OR t.oid = ANY($2::oid[])
       GROUP BY t.oid, n.nspname, t.typname
       ORDER BY t.typname, n.nspname`,
-		[schemas, [...usedEnums]],
+		[schemas, [...usedTypes]],
 	);
 	const enums = enumRows.map(({ schema, name, values }) => ({
 		schema,

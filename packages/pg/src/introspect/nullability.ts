@@ -309,7 +309,7 @@ export class ViewNullability {
 
 	/** A built-in operator that returns a value for non-NULL operands. */
 	private async strictOperator(e: Node): Promise<boolean> {
-		const op = (await this.loadOperators()).get(str(e["opno"]) ?? "");
+		const op = (await this.loadOperators()).get(String(e["opno"]));
 		return op?.system === true && !NULLABLE_OPERATORS.has(op.name);
 	}
 
@@ -336,19 +336,18 @@ export class ViewNullability {
 	}
 
 	/** Is output column `attno` (1-based) of a (sub)query NOT NULL? */
-	private async queryColumn(query: Node, attno: number): Promise<boolean> {
+	private async queryColumn(
+		value: NodeValue | undefined,
+		attno: number,
+	): Promise<boolean> {
+		const query = node(value);
+		if (!query) return false;
 		if (query["setOperations"]) {
-			// UNION / INTERSECT / EXCEPT: every arm (a subquery in the range table) must be NOT NULL.
-			for (const r of list(query["rtable"])) {
-				const rte = node(r);
-				const sub = node(rte?.["subquery"]);
-				if (
-					rte?.["rtekind"] === "1" &&
-					sub &&
-					!(await this.queryColumn(sub, attno))
-				)
+			// UNION / INTERSECT / EXCEPT: every arm must be NOT NULL. The range table of a set
+			// operation holds its arms, as subqueries, and nothing else.
+			for (const r of list(query["rtable"]))
+				if (!(await this.queryColumn(node(r)?.["subquery"], attno)))
 					return false;
-			}
 			return true;
 		}
 		const entries = list(query["targetList"])
@@ -377,20 +376,16 @@ export class ViewNullability {
 					return (await this.notNull(relid))[attno - 1] ?? false;
 				return att.notnull;
 			}
-			case "1": {
-				// subquery
-				const sub = node(rte["subquery"]);
-				return sub ? this.queryColumn(sub, attno) : false;
-			}
+			case "1": // subquery
+				return this.queryColumn(rte["subquery"], attno);
 			case "2": // join alias variable
-				return this.expr(list(rte["joinaliasvars"])[attno - 1] ?? null, query);
+				return this.expr(list(rte["joinaliasvars"])[attno - 1], query);
 			case "3": // function in FROM
 				return this.functionColumn(rte, attno);
 			case "9": // PostgreSQL 18 GROUP BY expressions
-				return this.expr(list(rte["groupexprs"])[attno - 1] ?? null, query);
-			default:
-				return false;
+				return this.expr(list(rte["groupexprs"])[attno - 1], query);
 		}
+		return false; // VALUES, CTEs, table functions, ...
 	}
 
 	/** Column `attno` of a single set-returning function in FROM (`WITH ORDINALITY` adds a NOT NULL counter). */
@@ -402,7 +397,7 @@ export class ViewNullability {
 		if (rte["funcordinality"] === "true" && attno === count + 1) return true;
 		const call = node(only["funcexpr"]);
 		if (call?._ !== "FUNCEXPR") return false;
-		const proc = (await this.loadProcs()).get(str(call["funcid"]) ?? "");
+		const proc = (await this.loadProcs()).get(String(call["funcid"]));
 		return (
 			proc?.system === true &&
 			(NON_NULL_SRF_COLUMNS[proc.name]?.includes(attno) ?? false)
@@ -436,10 +431,10 @@ export class ViewNullability {
 				return this.expr(e["arg"], query);
 			case "FUNCEXPR": {
 				if (e["funcretset"] !== "false") return false;
-				const proc = (await this.loadProcs()).get(str(e["funcid"]) ?? "");
+				const proc = (await this.loadProcs()).get(String(e["funcid"]));
 				// format_type(type, typmod) is not strict: a NULL typmod still gives a name.
 				if (proc?.system && proc.name === "format_type")
-					return this.expr(list(e["args"])[0] ?? null, query);
+					return this.expr(list(e["args"])[0], query);
 				// Explicit and implicit casts (funcformat 1, 2) keep a non-NULL input non-NULL.
 				const castLike = e["funcformat"] === "1" || e["funcformat"] === "2";
 				const known =
@@ -460,7 +455,7 @@ export class ViewNullability {
 				return (
 					(await this.strictOperator(e)) &&
 					array?._ === "ARRAYEXPR" &&
-					(await this.expr(left ?? null, query)) &&
+					(await this.expr(left, query)) &&
 					this.all(array["elements"], query)
 				);
 			}
@@ -468,7 +463,7 @@ export class ViewNullability {
 			case "NULLTEST":
 			case "BOOLEANTEST":
 			case "ARRAYEXPR":
-			case "ROW":
+			case "ROWEXPR":
 				return true;
 			case "COALESCEEXPR":
 			case "MINMAXEXPR":
@@ -482,17 +477,16 @@ export class ViewNullability {
 			case "SUBLINK": // EXISTS (0) and ARRAY (6) sublinks are never NULL
 				return e["subLinkType"] === "0" || e["subLinkType"] === "6";
 			case "AGGREF": {
-				const proc = (await this.loadProcs()).get(str(e["aggfnoid"]) ?? "");
+				const proc = (await this.loadProcs()).get(String(e["aggfnoid"]));
 				return proc?.system === true && NON_NULL_AGGREGATES.has(proc.name);
 			}
 			case "WINDOWFUNC": {
-				const proc = (await this.loadProcs()).get(str(e["winfnoid"]) ?? "");
+				const proc = (await this.loadProcs()).get(String(e["winfnoid"]));
 				return (
 					proc?.system === true && NON_NULL_WINDOW_FUNCTIONS.has(proc.name)
 				);
 			}
-			default:
-				return false;
 		}
+		return false;
 	}
 }

@@ -101,16 +101,13 @@ export function generateSource(
 		let ts: string | undefined;
 		if (typeof columnTypes === "function") ts = columnTypes(col, rel);
 		else {
+			// The keys contain a dot, so no key is a property every object has.
 			const k =
-				qualified in columnTypes
-					? qualified
-					: rel.schema === "public" && short in columnTypes
-						? short
-						: undefined;
-			if (k !== undefined) {
-				usedKeys.add(k);
-				ts = columnTypes[k];
-			}
+				rel.schema === "public" && !(qualified in columnTypes)
+					? short
+					: qualified;
+			usedKeys.add(k);
+			ts = columnTypes[k];
 		}
 		if (ts !== undefined && col.type !== "json" && col.type !== "jsonb") {
 			throw new Error(
@@ -240,10 +237,8 @@ export function generateSource(
 		"}",
 		"",
 	];
-	const unknownKeys =
-		typeof columnTypes === "function"
-			? []
-			: Object.keys(columnTypes).filter((k) => !usedKeys.has(k));
+	// A function has no keys of its own.
+	const unknownKeys = Object.keys(columnTypes).filter((k) => !usedKeys.has(k));
 	if (unknownKeys.length > 0 && options.column === undefined) {
 		throw new Error(
 			`columnTypes: no column ${unknownKeys.map((k) => JSON.stringify(k)).join(", ")} (keys are "table.column" for public tables, else "schema.table.column")`,
