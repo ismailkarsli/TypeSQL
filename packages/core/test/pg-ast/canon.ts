@@ -477,7 +477,7 @@ type Simple<B> = B extends {
 	readonly having: infer H;
 	readonly windows: infer Wn;
 }
-	? `SELECT${D extends true ? " DISTINCT" : D extends readonly unknown[] ? ` DISTINCT ON (${ExList<D>})` : ""}${Ts extends readonly [unknown, ...unknown[]] ? ` ${Targets<Ts>}` : ""}${Fr extends readonly [unknown, ...unknown[]] ? ` FROM ${FromList<Fr>}` : ""}${W extends null ? "" : ` WHERE ${ExS<W>}`}${G extends readonly unknown[] ? ` GROUP BY${GS extends true ? " [SETS]" : ""}${G extends readonly [unknown, ...unknown[]] ? ` ${ExList<G>}` : ""}` : ""}${H extends null ? "" : ` HAVING ${ExS<H>}`}${Wn extends readonly [unknown, ...unknown[]] ? ` WINDOW ${Windows<Wn>}` : ""}`
+	? `SELECT${D extends true ? " DISTINCT" : D extends readonly unknown[] ? ` DISTINCT ON (${ExList<D>})` : ""}${Ts extends readonly [unknown, ...unknown[]] ? ` ${Targets<Ts>}` : ""}${Fr extends readonly [unknown, ...unknown[]] ? ` FROM ${FromList<Fr>}` : ""}${W extends null ? "" : ` WHERE ${ExS<W>}`}${G extends readonly unknown[] ? ` GROUP BY${GS extends false ? "" : " [SETS]"}${G extends readonly [unknown, ...unknown[]] ? ` ${ExList<G>}` : ""}` : ""}${H extends null ? "" : ` HAVING ${ExS<H>}`}${Wn extends readonly [unknown, ...unknown[]] ? ` WINDOW ${Windows<Wn>}` : ""}`
 	: "?simple";
 
 type Targets<

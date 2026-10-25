@@ -80,7 +80,7 @@ describe("the canonical form of Postgres's parse tree", () => {
 			canon(
 				"SELECT a OPERATOR(pg_catalog.+) b, E'a\\'b', U&'d\\0061t', 'it''s'",
 			),
-		).toBe("SELECT (a operator b), 'a\\'b', 'd\\0061t', 'it's'");
+		).toBe("SELECT (a + b), 'a\\'b', 'd\\0061t', 'it's'");
 	});
 
 	test("calls: DISTINCT, *, named and variadic arguments, WITHIN GROUP, FILTER, OVER", () => {

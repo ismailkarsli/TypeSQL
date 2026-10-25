@@ -824,14 +824,10 @@ export class PgCanon {
 		const op = name.at(-1)!;
 		switch (n.kind) {
 			case "AEXPR_OP": {
-				// `OPERATOR(schema.op)`: our parser keeps the operator as "operator" (expr.ts `ParseOperatorSyntax`)
-				const o =
-					name.length > 1 || /^operator\s*\(/i.test(this.at(n.location, 16))
-						? "operator"
-						: op;
+				// `OPERATOR(schema.op)` is the operator `op`, as our parser reads it (expr.ts `ParseOperatorSyntax`)
 				return n.lexpr
-					? `(${this.expr(n.lexpr)} ${o} ${this.expr(n.rexpr)})`
-					: `(${o} ${this.expr(n.rexpr)})`;
+					? `(${this.expr(n.lexpr)} ${op} ${this.expr(n.rexpr)})`
+					: `(${op} ${this.expr(n.rexpr)})`;
 			}
 			case "AEXPR_OP_ANY":
 			case "AEXPR_OP_ALL":
