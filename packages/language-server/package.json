@@ -1,6 +1,6 @@
 {
 	"name": "@typesql/language-server",
-	"version": "0.0.0",
+	"version": "0.0.1",
 	"description": "TypeScript 7's language server with completions for tables and columns inside TypeSQL's sql() strings, for Neovim, Zed and other editors.",
 	"license": "MIT",
 	"repository": {

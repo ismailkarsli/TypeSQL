@@ -1,5 +1,13 @@
 # typesql
 
+## 0.0.4
+
+### Patch Changes
+
+- The extension's README is shorter and links to the docs site for setup and troubleshooting.
+
+- The extension bundles its completions instead of loading `@typesql/core/editor` from the project, which needs only `@typesql/core` in `node_modules`.
+
 ## 0.0.3
 
 ### Patch Changes

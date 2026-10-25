@@ -78,6 +78,48 @@
     - tall-dragons-know
     - thick-rocks-fix
     - weak-wombats-pay
+"@typesql/core@0.6.0":
+  dir: packages/core
+  intents:
+    - afraid-pots-nail
+    - big-swans-eat
+    - big-zebras-draw
+    - brave-planes-stay
+    - breezy-dodos-flash
+    - breezy-swans-remain
+    - calm-snakes-tell
+    - cool-emus-study
+    - curly-seals-sleep
+    - empty-geese-film
+    - fair-planes-tie
+    - fresh-frogs-worry
+    - friendly-frogs-relate
+    - good-eels-glow
+    - heavy-snails-kiss
+    - hungry-buses-camp
+    - itchy-moles-hunt
+    - khaki-rabbits-dream
+    - large-camels-smoke
+    - large-flies-report
+    - little-buses-sleep
+    - lucky-insects-lick
+    - mighty-carrots-grin
+    - modern-spiders-visit
+    - nice-beds-camp
+    - old-rocks-nail
+    - pretty-worms-sing
+    - proud-melons-sneeze
+    - purple-shirts-press
+    - quick-bears-hear
+    - quick-beds-help
+    - sharp-shoes-end
+    - small-cows-sniff
+    - sour-swans-travel
+    - strong-emus-melt
+    - tiny-moles-bow
+    - vast-wasps-remember
+    - wild-dragons-cheat
+    - wise-jars-cry
 "@typesql/drizzle@0.0.2":
   dir: packages/drizzle
   intents:
@@ -98,6 +140,10 @@
   dir: packages/drizzle
   intents:
     - silent-olives-remain
+"@typesql/drizzle@0.2.1":
+  dir: packages/drizzle
+  intents:
+    - little-buses-sleep
 "@typesql/kysely@0.0.2":
   dir: packages/kysely
   intents:
@@ -131,6 +177,14 @@
   dir: packages/kysely
   intents:
     - silent-olives-remain
+"@typesql/kysely@0.2.1":
+  dir: packages/kysely
+  intents:
+    - little-buses-sleep
+"@typesql/language-server@0.0.1":
+  dir: packages/language-server
+  intents:
+    - shaggy-cows-win
 "@typesql/pg@0.0.2":
   dir: packages/pg
   intents:
@@ -164,6 +218,10 @@
     - empty-dodos-smell
     - empty-maps-remember
     - silent-olives-remain
+"@typesql/pg@0.2.1":
+  dir: packages/pg
+  intents:
+    - little-buses-sleep
 "@typesql/postgres@0.0.2":
   dir: packages/postgres
   intents:
@@ -195,6 +253,10 @@
     - afraid-hounds-draw
     - silent-olives-remain
     - tidy-zebras-rescue
+"@typesql/postgres@0.2.1":
+  dir: packages/postgres
+  intents:
+    - little-buses-sleep
 "@typesql/prisma@0.0.2":
   dir: packages/prisma
   intents:
@@ -222,6 +284,10 @@
   intents:
     - lucky-shirts-doubt
     - silent-olives-remain
+"@typesql/prisma@0.2.1":
+  dir: packages/prisma
+  intents:
+    - little-buses-sleep
 typesql@0.0.1:
   dir: packages/vscode
   intents:
@@ -234,3 +300,8 @@ typesql@0.0.3:
   dir: packages/vscode
   intents:
     - spicy-moose-travel
+typesql@0.0.4:
+  dir: packages/vscode
+  intents:
+    - fresh-kids-exist
+    - friendly-cherries-drum
