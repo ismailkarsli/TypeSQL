@@ -84,7 +84,7 @@ See [From Kysely, Drizzle or Prisma](./orms).
 
 ## Editor extension (optional)
 
-The [VS Code extension](./vscode), and `@typesql/language-server` in [Zed](./zed) and [Neovim](./neovim), complete table and column names inside your SQL strings and highlight the SQL. Types and errors work without them.
+The [VS Code extension](./vscode), and `@typesql/language-server` in [Neovim](./neovim), complete table and column names inside your SQL strings and highlight the SQL. Types and errors work without them.
 
 ## Next
 

@@ -74,7 +74,7 @@ sql("SELECT * FROM |");          // users, posts
 sql("SELECT u.| FROM users u");  // id: int4, email: text, display_name: text | null
 ```
 
-Suggestions come from your `DB` type and follow it as you edit, unsaved changes included. See [VS Code extension](https://typesql.karsli.net/guide/vscode) for the setup. [Zed](https://typesql.karsli.net/guide/zed) and [Neovim](https://typesql.karsli.net/guide/neovim) get the same completions through `@typesql/language-server`.
+Suggestions come from your `DB` type and follow it as you edit, unsaved changes included. See [VS Code extension](https://typesql.karsli.net/guide/vscode) for the setup. [Neovim](https://typesql.karsli.net/guide/neovim) gets the same completions through `@typesql/language-server`.
 
 ## Try it online
 

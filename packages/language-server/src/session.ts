@@ -1,6 +1,7 @@
 /**
  * An API session on the TypeScript 7 language server, and completions through it. Editor
- * independent: the VS Code extension and the proxy (proxy.ts) pass in how to reach the server.
+ * independent: the VS Code extension and the completion server (server.ts) pass in how to reach
+ * the server.
  */
 import { realpathSync } from "node:fs";
 import { createRequire } from "node:module";

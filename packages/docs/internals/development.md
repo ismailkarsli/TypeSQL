@@ -41,12 +41,11 @@ Core has no editor code. Everything that does not depend on one editor is in
 
 | Package | What it holds |
 |---|---|
-| `language-server` (`@typesql/language-server`) | The completions, the API session they run on, and `typesql-language-server`: a proxy in front of the project's `tsc --lsp --stdio` for editors whose extensions can't reach TypeScript's server (Zed, Neovim). |
+| `language-server` (`@typesql/language-server`) | The completions, the API session they run on, and `typesql-language-server <pipe>`: the JSON-RPC server that Neovim's `vim.lsp` hook connects to TypeScript 7's API session. |
 | `vscode` (`typesql`, private on npm) | `extension.ts`, which bundles `language-server`'s sources with esbuild, and the TextMate grammar that highlights SQL. |
-| `zed` (Zed's registry, not npm) | Rust compiled to WebAssembly that installs `@typesql/language-server` from npm and starts it with Zed's Node. |
 
-Neovim needs no package: [Neovim](../guide/neovim.md) shows the `vim.lsp.config` and the
-tree-sitter injection query to copy.
+Neovim needs no package of its own: [Neovim](../guide/neovim.md) shows the `vim.lsp` config and
+the tree-sitter injection query to copy.
 
 | Module | What it does |
 |---|---|
@@ -56,24 +55,21 @@ tree-sitter injection query to copy.
 | `language-server/src/complete/complete.ts` | `completionsAt`: the items and the LSP ranges they replace. |
 | `language-server/src/core.ts` | The project's `@typesql/core` directory, whose declarations mark core's `Sql` and `TransactionalSql`. |
 | `language-server/src/session.ts` | The API session on the TypeScript 7 language server, and the client matching its version. |
-| `language-server/src/proxy.ts` | The proxy: passes messages through, takes the root from `initialize`, adds our items to completion responses. |
+| `language-server/src/server.ts` | The completion server: connects to the API session pipe, adds our items to completion responses. |
 | `vscode/src/extension.ts` | The LSP middleware (TypeScript 7.1's extension API) or, on the TypeScript 7 extension 1.0, a completion provider of its own. |
 | `vscode/syntaxes/sql-injection.tmLanguage.json` | The TextMate grammar injected into TypeScript and JavaScript that highlights SQL in `sql()` literals; `vscode/test/grammar.test.ts` tokenizes it with vscode-textmate on VS Code's own TypeScript grammar. |
 
 ```sh
-pnpm --filter @typesql/language-server test   # scanner cases, completions, sessions and the proxy through tsc --lsp
-pnpm --filter @typesql/language-server build  # dist/bin.js, for Zed and Neovim
+pnpm --filter @typesql/language-server test   # scanner cases, completions, sessions and the server through tsc --lsp
+pnpm --filter @typesql/language-server build  # dist/bin.js, for Neovim
 pnpm --filter typesql test                    # the highlighting grammar
 pnpm --filter typesql run package             # packages/vscode/typesql.vsix, bundled with esbuild
-cargo check --manifest-path packages/zed/Cargo.toml
 ```
 
 To try a change:
 
 - **VS Code**: install `typesql.vsix` with **Extensions: Install from VSIX…** and reload the window.
-- **Zed**: run **zed: install dev extension** on `packages/zed` and point `lsp.typesql.binary` at
-  `packages/language-server/dist/bin.js` (see the guide's troubleshooting).
-- **Neovim**: set `cmd = { "node", "/path/to/packages/language-server/dist/bin.js" }`.
+- **Neovim**: pass `{"node", "/path/to/packages/language-server/dist/bin.js", res.pipe}` to `vim.lsp.rpc.start`.
 
 Completions find the project's `@typesql/core` by resolving it from the edited file, so try them in
 a project that has `@typesql/core` in `node_modules` (a workspace package such as `packages/pg`, or

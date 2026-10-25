@@ -1,9 +1,8 @@
-/** `typesql-language-server [root]`: the proxy, for the root given as an argument (made absolute) or none. */
-import { resolve } from "node:path";
+/** `typesql-language-server <pipe>`: starts the completion server with `pipe`. */
 import { afterEach, expect, test, vi } from "vitest";
 
 const start = vi.hoisted(() => vi.fn());
-vi.mock("../src/proxy.js", () => ({ start }));
+vi.mock("../src/server.js", () => ({ start }));
 
 const argv = process.argv;
 afterEach(() => {
@@ -11,17 +10,9 @@ afterEach(() => {
 	start.mockClear();
 });
 
-const run = async (...args: string[]): Promise<unknown[][]> => {
-	process.argv = ["node", "typesql-language-server", ...args];
+test("passes the pipe argument to start()", async () => {
+	process.argv = ["node", "typesql-language-server", "/tmp/tsgo.sock"];
 	vi.resetModules();
 	await import("../src/bin.js");
-	return start.mock.calls;
-};
-
-test("no root: the editor's workspace", async () => {
-	expect(await run()).toEqual([[undefined]]);
-});
-
-test("a root, relative to the current directory", async () => {
-	expect(await run("some/project")).toEqual([[resolve("some/project")]]);
+	expect(start.mock.calls).toEqual([["/tmp/tsgo.sock"]]);
 });

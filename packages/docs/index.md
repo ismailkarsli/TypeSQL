@@ -24,7 +24,7 @@ features:
   - title: "Mistakes are compile errors"
     details: "A misspelled column, an unknown table or a wrong parameter is caught in your editor, worded like Postgres."
   - title: "Editor support"
-    details: "VS Code, Zed and Neovim complete tables and columns and highlight the SQL inside your strings."
+    details: "VS Code and Neovim complete tables and columns and highlight the SQL inside your strings."
     link: /guide/vscode
     linkText: "Set it up"
 ---

@@ -1,10 +1,8 @@
 #!/usr/bin/env node
 /**
- * `typesql-language-server [root]`: the proxy (proxy.ts) on stdin and stdout, for the project at
- * `root` (default: the workspace of the editor's `initialize` request).
+ * `typesql-language-server <pipe>`: the completion server (server.ts) on stdin and stdout, for
+ * the TypeScript 7.1 language server whose `custom/initializeAPISession` returned `pipe`.
  */
-import { resolve } from "node:path";
-import { start } from "./proxy.js";
+import { start } from "./server.js";
 
-const [root] = process.argv.slice(2);
-start(root === undefined ? undefined : resolve(root));
+start(process.argv[2]!);

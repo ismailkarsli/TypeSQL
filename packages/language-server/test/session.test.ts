@@ -1,5 +1,4 @@
-/** `Session` against `tsc --lsp`, connected through `custom/initializeAPISession` as the proxy and the TypeScript 7 extension 1.0 do. */
-import { join } from "node:path";
+/** `Session` against `tsc --lsp`, connected through `custom/initializeAPISession` as the completion server and the TypeScript 7 extension 1.0 do. */
 import { afterAll, beforeAll, expect, test } from "vitest";
 import { type Lsp, startLsp } from "../../core/test/cache/lsp.js";
 import {

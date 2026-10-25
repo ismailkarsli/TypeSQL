@@ -30,7 +30,7 @@ Yes. Values are always sent as parameters, and SQL text that isn't a compile-tim
 
 ## Do I need the VS Code extension?
 
-No. Types, hovers and errors come from TypeScript in any editor. The editor support ([VS Code](./vscode), [Zed](./zed), [Neovim](./neovim)) adds completions and syntax highlighting inside your SQL strings.
+No. Types, hovers and errors come from TypeScript in any editor. The editor support ([VS Code](./vscode), [Neovim](./neovim)) adds completions and syntax highlighting inside your SQL strings.
 
 ## Does it slow down my editor or `tsc`?
 
