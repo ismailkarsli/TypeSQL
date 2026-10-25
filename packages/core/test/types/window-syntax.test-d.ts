@@ -144,6 +144,25 @@ test("windows anywhere in an expression are checked (not inside subqueries)", ()
 	>().toEqualTypeOf<SqlError<'window "nope" does not exist', 12>>();
 });
 
+test("of several windows in an expression, the first Postgres meets is reported", () => {
+	expectTypeOf<
+		V<"SELECT count(*) OVER w1 + count(*) OVER w2 FROM users">
+	>().toEqualTypeOf<SqlError<'window "w1" does not exist', 6>>();
+	expectTypeOf<
+		V<"SELECT count(*) OVER w2 + count(*) OVER w1 FROM users">
+	>().toEqualTypeOf<SqlError<'window "w2" does not exist', 6>>();
+	// a valid window first
+	expectTypeOf<
+		V<"SELECT count(*) OVER () + count(*) OVER w FROM users">
+	>().toEqualTypeOf<SqlError<'window "w" does not exist', 14>>();
+	expectTypeOf<
+		V<"SELECT CASE WHEN count(*) OVER w3 > 1 THEN count(*) OVER w2 ELSE count(*) OVER w1 END FROM users">
+	>().toEqualTypeOf<SqlError<'window "w3" does not exist', 8>>();
+	expectTypeOf<
+		V<"SELECT coalesce(count(*) OVER w2, count(*) OVER w1) FROM users">
+	>().toEqualTypeOf<SqlError<'window "w2" does not exist', 8>>();
+});
+
 test("a window in the operand of IN (SELECT …) is checked", () => {
 	expectTypeOf<
 		V<"SELECT sum(id) OVER nope IN (SELECT 1) FROM users">

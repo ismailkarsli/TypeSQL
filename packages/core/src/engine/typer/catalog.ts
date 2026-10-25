@@ -1,3 +1,4 @@
+import type { TypeDisplay } from "../binder/clauses.js";
 import type { SqlError } from "../errors.js";
 import type { JsonRet } from "../json.js";
 import type { ColInfo, Info } from "../types.js";
@@ -1474,19 +1475,22 @@ export type UnknownFunction<
 	Name extends string,
 	As extends readonly ColInfo[],
 > = SqlError<
-	`function ${Name}(${ArgList<As, "">}) does not exist. Declare it in the schema's $functions or in FunctionCatalog`,
+	`function ${Name}(${ArgList<As, "", false>}) does not exist. Declare it in the schema's $functions or in FunctionCatalog`,
 	null
 >;
+/** The argument types of a call, for a message: canonical names, or Postgres's (`Shown`). */
 type ArgList<
 	As extends readonly ColInfo[],
 	Acc extends string,
+	Shown extends boolean,
 > = As extends readonly [
 	infer A extends ColInfo,
 	...infer R extends readonly ColInfo[],
 ]
 	? ArgList<
 			R,
-			`${Acc}${Acc extends "" ? "" : ", "}${A["type"] extends "lit" | "null" ? "unknown" : A["type"]}`
+			`${Acc}${Acc extends "" ? "" : ", "}${A["type"] extends "lit" | "null" ? "unknown" : Shown extends true ? TypeDisplay<A["type"]> : A["type"]}`,
+			Shown
 		>
 	: Acc;
 
@@ -1515,8 +1519,9 @@ export type CallType<
 /**
  * A call decoration the resolved function does not take, worded like Postgres
  * (ParseFuncOrColumn), or null: `*`, DISTINCT, FILTER and OVER need an aggregate (OVER also
- * takes a window function), a window function needs OVER, and an aggregate without arguments
- * is written `f(*)`.
+ * takes a window function), a window function needs OVER, an aggregate without arguments
+ * is written `f(*)`, and an ordered-set aggregate needs WITHIN GROUP (without it Postgres finds
+ * no function of the direct arguments alone; a hypothetical-set one takes any arguments).
  */
 type CallMisuse<
 	Name extends string,
@@ -1524,17 +1529,13 @@ type CallMisuse<
 	As extends readonly ColInfo[],
 	C extends CallCtx,
 > = S["agg"] extends true
-	? As extends readonly []
-		? C["hasStar"] extends true
-			? null
-			: C["withinGroup"] extends true
-				? null
-				: `${Name}(*) must be used to call a parameterless aggregate function`
-		: C["over"] extends true
-			? C["distinct"] extends true
-				? "DISTINCT is not implemented for window functions"
-				: null
-			: null
+	? C["withinGroup"] extends true
+		? AggMisuse<Name, As, C>
+		: S["ret"] extends "$wg" | "$wgarr" | "$pct" | "$pctarr"
+			? `function ${Name}(${ArgList<As, "", true>}) does not exist`
+			: Name extends "rank" | "dense_rank" | "percent_rank" | "cume_dist"
+				? `WITHIN GROUP is required for ordered-set aggregate ${Name}`
+				: AggMisuse<Name, As, C>
 	: S["window"] extends true
 		? C["over"] extends true
 			? C["distinct"] extends true
@@ -1552,6 +1553,21 @@ type CallMisuse<
 					: C["over"] extends true
 						? `OVER specified, but ${Name} is not a window function nor an aggregate function`
 						: null;
+type AggMisuse<
+	Name extends string,
+	As extends readonly ColInfo[],
+	C extends CallCtx,
+> = As extends readonly []
+	? C["hasStar"] extends true
+		? null
+		: C["withinGroup"] extends true
+			? null
+			: `${Name}(*) must be used to call a parameterless aggregate function`
+	: C["over"] extends true
+		? C["distinct"] extends true
+			? "DISTINCT is not implemented for window functions"
+			: null
+		: null;
 
 /** Set-returning function result element type for FROM, or null if not an SRF. */
 export type SrfType<

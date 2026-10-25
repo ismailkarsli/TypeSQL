@@ -1,6 +1,5 @@
 import type { TsOf, TsParamTypeOf } from "../type-map/index.js";
 import type { DmlStmt, SelectStmt, Stmt } from "./ast.js";
-import type { NoLeadingZeros } from "./binder/clauses.js";
 import type {
 	CachedAnalysis,
 	CachedDdl,
@@ -19,6 +18,7 @@ import type { Nx } from "./parser/util.js";
 import type { ParamsOfDml } from "./project/dml.js";
 import type { ProjectStmt } from "./project/stmt.js";
 import type { WithHint } from "./suggest.js";
+import type { IntLitValue } from "./typer/operators.js";
 import type {
 	MaxParam,
 	NullTest,
@@ -103,7 +103,7 @@ type Reposition<E, T extends Toks, DB = never> =
 
 /**
  * Token index for a semantic error: the function of `function f(…) does not exist` and of a
- * call decoration it does not take (`FILTER specified, but f is not …`), the
+ * call decoration it does not take or needs (`FILTER specified, but f is not …`), the
  * first quoted name in the message that occurs in the statement (`null value in column
  * "email" of relation "users"` → `users` when `email` is absent), then `column t.c` forms, then the keyword of `each UNION query …` and
  * `UNION|INTERSECT|EXCEPT|VALUES|CYCLE types … cannot be matched`. A keyword is looked up
@@ -117,6 +117,7 @@ type LocateIdent<
 	: M extends
 				| `${infer Name}(*) ${string}`
 				| `window function ${infer Name} requires ${string}`
+				| `WITHIN GROUP is required for ordered-set aggregate ${infer Name}`
 				| `${string} specified, but ${infer Name} is not ${string}`
 		? FindTokOr<T, Name, 0>
 		: M extends `column ${string}.${infer Name} ${string}`
@@ -126,7 +127,12 @@ type LocateIdent<
 				: M extends "SELECT ... INTO is not allowed here"
 					? FindSelectInto<T, 0, null>
 					: M extends `${infer Cl} ${string} position ${infer N} is not in select list`
-						? FindNumFrom<T, FindKwOr<T, Lowercase<Cl>, 0>, N>
+						? FindNumFrom<
+								T,
+								FindKwOr<T, Lowercase<Cl>, 0>,
+								N extends `-${infer D}` ? D : N,
+								null
+							>
 						: M extends `each ${infer Op} query ${string}`
 							? FindKwOr<T, Lowercase<Op>, 0>
 							: M extends `${infer Op} types ${string} cannot be matched`
@@ -187,19 +193,37 @@ type FindSelectInto<T extends Toks, I extends number, Prev> =
 			? FindSelectInto<T, Nx<I>, T[I]>
 			: IntoName<T, I>
 		: FindSelectInto<T, Nx<I>, T[I]>;
-/** The first number token from `I` on that is `N` (leading zeros aside), or 0. */
+/**
+ * The first integer constant from `I` on whose value is `N` (`0x10`, `016` and `1_6` are 16), or 0;
+ * under unary minuses (`-16`, `- -16`, `-(16)`) the first minus, where Postgres reports it.
+ * `Minus`: the first `-` of the run of `-` and `(` before the current token.
+ */
 type FindNumFrom<
 	T extends Toks,
 	I extends number,
 	N extends string,
+	Minus extends number | null,
 > = T[I] extends {
 	readonly k: string;
 }
 	? T[I] extends { readonly k: "n"; readonly v: infer V extends string }
-		? NoLeadingZeros<V> extends N
-			? I
-			: FindNumFrom<T, Nx<I>, N>
-		: FindNumFrom<T, Nx<I>, N>
+		? IntLitValue<V> extends N
+			? Minus extends number
+				? Minus
+				: I
+			: FindNumFrom<T, Nx<I>, N, null>
+		: T[I] extends { readonly k: "o"; readonly v: "-" | "(" }
+			? FindNumFrom<
+					T,
+					Nx<I>,
+					N,
+					Minus extends number
+						? Minus
+						: T[I] extends { readonly v: "-" }
+							? I
+							: null
+				>
+			: FindNumFrom<T, Nx<I>, N, null>
 	: 0;
 /** Row type of a statement (`never` for DML without RETURNING and for DDL). */
 export type RowOf<DB, TM, Q extends string> =

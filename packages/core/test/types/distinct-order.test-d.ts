@@ -138,7 +138,7 @@ test("ORDER BY: output names, positions and input expressions", () => {
 		SqlError<"ORDER BY position 0 is not in select list", 6>
 	>();
 	expectTypeOf<V<"SELECT id FROM users ORDER BY -1">>().toEqualTypeOf<
-		SqlError<"ORDER BY position -1 is not in select list", 0>
+		SqlError<"ORDER BY position -1 is not in select list", 6>
 	>();
 	expectTypeOf<V<"SELECT id, email FROM users ORDER BY 1.5">>().toEqualTypeOf<
 		SqlError<"non-integer constant in ORDER BY", 0>
@@ -237,6 +237,122 @@ test("GROUP BY: input columns first, then output names and positions", () => {
 	expectTypeOf<V<"SELECT 1 FROM users HAVING nope > 1">>().toEqualTypeOf<
 		SqlError<'column "nope" does not exist', 5>
 	>();
+});
+
+test("positions are integer constants as Postgres folds them: any radix, digit separators, unary minus", () => {
+	type Ok<Q extends string> = V<Q> extends Q ? true : V<Q>;
+	expectTypeOf<
+		[
+			Ok<"SELECT 1, 2 ORDER BY 0x2, 0o1, 0b10, 0_1">,
+			Ok<"SELECT 1, 2 ORDER BY 0X2, 0O1, 0B10">,
+			Ok<"SELECT id FROM users ORDER BY - -1">,
+			Ok<"SELECT id FROM users GROUP BY 0x1">,
+			Ok<"SELECT DISTINCT ON (0b1) id FROM users">,
+		]
+	>().toEqualTypeOf<[true, true, true, true, true]>();
+	expectTypeOf<V<"SELECT id FROM users ORDER BY 0x10">>().toEqualTypeOf<
+		SqlError<"ORDER BY position 16 is not in select list", 6>
+	>();
+	expectTypeOf<V<"SELECT id FROM users ORDER BY 0o17">>().toEqualTypeOf<
+		SqlError<"ORDER BY position 15 is not in select list", 6>
+	>();
+	expectTypeOf<V<"SELECT id FROM users ORDER BY 0b101">>().toEqualTypeOf<
+		SqlError<"ORDER BY position 5 is not in select list", 6>
+	>();
+	expectTypeOf<V<"SELECT id FROM users ORDER BY 1_0">>().toEqualTypeOf<
+		SqlError<"ORDER BY position 10 is not in select list", 6>
+	>();
+	expectTypeOf<V<"SELECT id FROM users ORDER BY 0x7fffffff">>().toEqualTypeOf<
+		SqlError<"ORDER BY position 2147483647 is not in select list", 6>
+	>();
+	expectTypeOf<
+		V<"SELECT id FROM users ORDER BY 0b1111111111111111111111111111111">
+	>().toEqualTypeOf<
+		SqlError<"ORDER BY position 2147483647 is not in select list", 6>
+	>();
+	// past int4 (`0x80000000` is int8) the literal is not an integer to Postgres
+	expectTypeOf<V<"SELECT id FROM users ORDER BY 0x80000000">>().toEqualTypeOf<
+		SqlError<"non-integer constant in ORDER BY", 0>
+	>();
+	// unary minus folds into the constant, however often and around parentheses
+	expectTypeOf<V<"SELECT id FROM users ORDER BY - -2">>().toEqualTypeOf<
+		SqlError<"ORDER BY position 2 is not in select list", 6>
+	>();
+	expectTypeOf<V<"SELECT id FROM users ORDER BY -(2)">>().toEqualTypeOf<
+		SqlError<"ORDER BY position -2 is not in select list", 6>
+	>();
+	expectTypeOf<V<"SELECT id FROM users ORDER BY (2)">>().toEqualTypeOf<
+		SqlError<"ORDER BY position 2 is not in select list", 7>
+	>();
+	expectTypeOf<V<"SELECT id FROM users ORDER BY -0">>().toEqualTypeOf<
+		SqlError<"ORDER BY position 0 is not in select list", 6>
+	>();
+	expectTypeOf<V<"SELECT id FROM users ORDER BY -0x10">>().toEqualTypeOf<
+		SqlError<"ORDER BY position -16 is not in select list", 6>
+	>();
+	expectTypeOf<V<"SELECT id FROM users ORDER BY -1.5">>().toEqualTypeOf<
+		SqlError<"non-integer constant in ORDER BY", 0>
+	>();
+	// 2147483648 is no integer, so neither is its negation
+	expectTypeOf<V<"SELECT id FROM users ORDER BY -2147483648">>().toEqualTypeOf<
+		SqlError<"non-integer constant in ORDER BY", 0>
+	>();
+	expectTypeOf<V<"SELECT id FROM users GROUP BY -1">>().toEqualTypeOf<
+		SqlError<"GROUP BY position -1 is not in select list", 6>
+	>();
+	expectTypeOf<V<"SELECT id FROM users GROUP BY -1.5">>().toEqualTypeOf<
+		SqlError<"non-integer constant in GROUP BY", 0>
+	>();
+	expectTypeOf<V<"SELECT DISTINCT ON (-1) id FROM users">>().toEqualTypeOf<
+		SqlError<"DISTINCT ON position -1 is not in select list", 4>
+	>();
+	// a star leaves positions unchecked, but 0 and negative ones are never in the list
+	expectTypeOf<V<"SELECT * FROM users ORDER BY 0">>().toEqualTypeOf<
+		SqlError<"ORDER BY position 0 is not in select list", 6>
+	>();
+	expectTypeOf<V<"SELECT * FROM users ORDER BY -1">>().toEqualTypeOf<
+		SqlError<"ORDER BY position -1 is not in select list", 6>
+	>();
+	// the error is at the constant, not at an earlier non-integer of the same digits
+	expectTypeOf<V<"SELECT id FROM users ORDER BY 2.0 + id, 2">>().toEqualTypeOf<
+		SqlError<"ORDER BY position 2 is not in select list", 10>
+	>();
+	expectTypeOf<V<"SELECT id FROM users ORDER BY -id, 2">>().toEqualTypeOf<
+		SqlError<"ORDER BY position 2 is not in select list", 9>
+	>();
+});
+
+test("an output name for several different expressions is ambiguous", () => {
+	expectTypeOf<
+		V<"SELECT id AS x, id + 1 AS x FROM users ORDER BY x">
+	>().toEqualTypeOf<SqlError<'ORDER BY "x" is ambiguous', 3>>();
+	expectTypeOf<
+		V<"SELECT id + 1 AS x, id + 2 AS x FROM users ORDER BY x">
+	>().toEqualTypeOf<SqlError<'ORDER BY "x" is ambiguous', 5>>();
+	expectTypeOf<
+		V<"SELECT id AS x, id AS x, email AS x FROM users ORDER BY x">
+	>().toEqualTypeOf<SqlError<'ORDER BY "x" is ambiguous', 3>>();
+	// a star's column against an output name
+	expectTypeOf<
+		V<"SELECT *, id AS email FROM users ORDER BY email">
+	>().toEqualTypeOf<SqlError<'ORDER BY "email" is ambiguous', 5>>();
+	expectTypeOf<
+		Row<"SELECT id + 1 AS x, id + 1 AS x FROM users ORDER BY x">
+	>().toEqualTypeOf<{ x: number }>();
+});
+
+test("every GROUP BY item is checked; a DISTINCT ON position after a star is not", () => {
+	expectTypeOf<V<"SELECT 1 FROM users GROUP BY id, nosuch">>().toEqualTypeOf<
+		SqlError<'column "nosuch" does not exist', 8>
+	>();
+	expectTypeOf<
+		Row<"SELECT DISTINCT ON (1) * FROM users ORDER BY id">
+	>().toEqualTypeOf<{
+		id: number;
+		email: string;
+		display_name: string | null;
+		created_at: Date;
+	}>();
 });
 
 test("LIMIT / OFFSET / FETCH and locking clauses do not change the row", () => {

@@ -252,6 +252,9 @@ test("AT TIME ZONE flips timestamp/timestamptz; EXTRACT â†’ numeric, date_part â
 		Row<"SELECT at AT TIME ZONE 'utc' AS a, ts AT TIME ZONE 'utc' AS b, clock AT TIME ZONE 'utc' AS c, day AT TIME ZONE 'utc' AS d FROM things">
 	>().toEqualTypeOf<{ a: Date; b: Date; c: string; d: Date }>();
 	expectTypeOf<
+		Types<"SELECT '12:00+02'::timetz AT TIME ZONE 'utc', clock AT TIME ZONE 'utc' FROM things">
+	>().toEqualTypeOf<["timetz", "timetz"]>();
+	expectTypeOf<
 		Types<"SELECT at AT TIME ZONE 'utc', ts AT TIME ZONE 'utc', clock AT TIME ZONE 'utc', day AT TIME ZONE 'utc' FROM things">
 	>().toEqualTypeOf<["timestamp", "timestamptz", "timetz", "timestamp"]>();
 	expectTypeOf<
@@ -397,6 +400,26 @@ test("arrays, subscripts, slices, ARRAY / ROW constructors", () => {
 	expectTypeOf<
 		Types<"SELECT nums[1][2], nums[1][1][1], nums[1][1:2], nums[1:1][2], words[1][1] FROM things">
 	>().toEqualTypeOf<["int4", "int4", "int4[]", "int4[]", "text"]>();
+	// a slice deeper in the chain too
+	expectTypeOf<
+		Types<"SELECT nums[1:2][1][1], nums[1][1:2][1][1] FROM things">
+	>().toEqualTypeOf<["int4[]", "int4[]"]>();
+	// a jsonb subscript chain takes no slice
+	expectTypeOf<
+		Err<"SELECT data['a'][1:2] FROM things">
+	>().toEqualTypeOf<"jsonb subscript does not support slices">();
+	// the other types that take an index take no slice; a value of unknown type takes one
+	expectTypeOf<
+		[Err<"SELECT ('(1,2)'::point)[0:1]">, Err<"SELECT ('ab'::name)[0:1]">]
+	>().toEqualTypeOf<
+		[
+			"slices of fixed-length arrays not implemented",
+			"slices of fixed-length arrays not implemented",
+		]
+	>();
+	expectTypeOf<
+		Row<"SELECT ((ROW(ARRAY[1, 2])).f1)[1:2]::int4[] AS a">
+	>().toEqualTypeOf<{ a: number[] | null }>();
 	// jsonb by any key; the geometric types and name take an index too
 	expectTypeOf<
 		Types<"SELECT data[id], ('(1,2)'::point)[0], ('{1,-1,0}'::line)[0], ('[(0,0),(1,1)]'::lseg)[0], ('((0,0),(1,1))'::box)[1], ('ab'::name)[0] FROM things">

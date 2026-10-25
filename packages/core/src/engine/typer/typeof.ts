@@ -1,12 +1,20 @@
-import type { Call, CaseWhen, Expr, SelectStmt } from "../ast.js";
+import type {
+	Call,
+	CaseWhen,
+	Expr,
+	NamedArg,
+	SelectStmt,
+	VariadicArg,
+} from "../ast.js";
 import type { TypeDisplay } from "../binder/clauses.js";
 import type { ResolveColumn, WholeRow } from "../binder/resolve.js";
 import type { SqlError } from "../errors.js";
 import type { BuildObject, JsonArrow, JsonLitCast, LitType } from "../json.js";
+import type { Nx } from "../parser/util.js";
 import type { NoSubscript } from "../project/dml.js";
 import type { ProjectSelect } from "../project/select.js";
 import type { BaseOf, ObjShape, Shaped } from "../shape.js";
-import type { ColEntry, ColInfo, ColMap, Cols, Ctx, Info } from "../types.js";
+import type { ColInfo, ColMap, Cols, Ctx, Info } from "../types.js";
 import type { CallType } from "./catalog.js";
 import type {
 	BinOpType,
@@ -94,254 +102,247 @@ export type TypeOf<E extends Expr, C extends Ctx> = E extends {
 																					TypeOf<E["e"], C>,
 																					TypeOf<E["pat"], C>
 																				>
-																			: E extends { readonly t: "quant" }
-																				? TypeQuant<
+																			: E extends {
+																						readonly t: "quant";
+																						readonly r: infer Q extends
+																							SelectStmt;
+																					}
+																				? SubCompare<
 																						E["op"],
-																						TypeOf<E["l"], C>,
-																						E["r"] extends {
-																							readonly t: "select";
-																						}
-																							? SubqueryOperand<
-																									E["l"],
-																									E["r"],
-																									C
-																								>
-																							: E["r"] extends Expr // type-mutate: equivalent cond-true – the right side is a subquery (above) or an expression
+																						E["l"],
+																						Q,
+																						C,
+																						false
+																					>
+																				: E extends { readonly t: "quant" }
+																					? TypeQuant<
+																							E["op"],
+																							TypeOf<E["l"], C>,
+																							E["r"] extends Expr // type-mutate: equivalent cond-true – the right side is a subquery (above) or an expression
 																								? TypeOf<E["r"], C>
 																								: never,
-																						E["r"] extends {
-																							readonly t: "select";
-																						}
-																							? "sub"
-																							: E["r"] extends {
-																										readonly t: "str";
-																									}
+																							E["r"] extends {
+																								readonly t: "str";
+																							}
 																								? "lit"
 																								: "expr"
-																					>
-																				: E extends { readonly t: "sub" }
-																					? MakeNullable<FirstColOf<E["q"], C>>
-																					: E extends { readonly t: "exists" }
-																						? ProjectSelect<
-																								E["q"],
-																								C["db"],
-																								C["scope"],
-																								C["ctes"]
-																							> extends infer R
-																							? R extends Cols
-																								? Info<"bool">
-																								: R
-																							: never
-																						: E extends { readonly t: "array" }
-																							? TypeArrayCtor<E["items"], C>
+																						>
+																					: E extends { readonly t: "sub" }
+																						? MakeNullable<
+																								FirstColOf<E["q"], C>
+																							>
+																						: E extends { readonly t: "exists" }
+																							? ProjectSelect<
+																									E["q"],
+																									C["db"],
+																									C["scope"],
+																									C["ctes"]
+																								> extends infer R
+																								? R extends Cols
+																									? Info<"bool">
+																									: R
+																								: never
 																							: E extends {
-																										readonly t: "arraysub";
+																										readonly t: "array";
 																									}
-																								? ArrayOf<FirstColOf<E["q"], C>>
+																								? TypeArrayCtor<E["items"], C>
 																								: E extends {
-																											readonly t: "row";
+																											readonly t: "arraysub";
 																										}
-																									? TypeList<
-																											E["items"],
-																											C,
-																											[]
-																										> extends infer Ls
-																										? Ls extends readonly ColInfo[]
-																											? Info<"record">
-																											: Ls
-																										: never
+																									? ArrayOf<
+																											FirstColOf<E["q"], C>
+																										>
 																									: E extends {
-																												readonly t: "idx";
+																												readonly t: "row";
 																											}
-																										? TypeIdx<E["e"], E["i"], C>
+																										? TypeList<
+																												E["items"],
+																												C,
+																												[]
+																											> extends infer Ls
+																											? Ls extends readonly ColInfo[]
+																												? Info<"record">
+																												: Ls
+																											: never
 																										: E extends {
-																													readonly t: "slice";
+																													readonly t: "idx";
 																												}
-																											? TypeSlice<
+																											? TypeIdx<
 																													E["e"],
-																													E["lo"],
-																													E["hi"],
+																													E["i"],
 																													C
 																												>
 																											: E extends {
-																														readonly t: "extract";
+																														readonly t: "slice";
 																													}
-																												? TypeExtract<
-																														TypeOf<E["e"], C>,
-																														Lowercase<
-																															E["field"]
-																														>
+																												? TypeSlice<
+																														E["e"],
+																														E["lo"],
+																														E["hi"],
+																														C
 																													>
 																												: E extends {
-																															readonly t: "position";
+																															readonly t: "extract";
 																														}
-																													? StrictOf<
-																															TypeOf<
-																																E["sub"],
-																																C
-																															>,
-																															TypeOf<
-																																E["in"],
-																																C
-																															>,
-																															"int4"
+																													? TypeExtract<
+																															TypeOf<E["e"], C>,
+																															Lowercase<
+																																E["field"]
+																															>
 																														>
 																													: E extends {
-																																readonly t: "substring";
+																																readonly t: "position";
 																															}
-																														? RegexNull<
-																																StringResult<
-																																	TypeOf<
-																																		E["e"],
-																																		C
+																														? StrictOf<
+																																TypeOf<
+																																	E["sub"],
+																																	C
+																																>,
+																																TypeOf<
+																																	E["in"],
+																																	C
+																																>,
+																																"int4"
+																															>
+																														: E extends {
+																																	readonly t: "substring";
+																																}
+																															? RegexNull<
+																																	StringResult<
+																																		TypeOf<
+																																			E["e"],
+																																			C
+																																		>,
+																																		TypeOpt<
+																																			E["from"],
+																																			C
+																																		>,
+																																		TypeOpt<
+																																			E["for"],
+																																			C
+																																		>
 																																	>,
 																																	TypeOpt<
 																																		E["from"],
 																																		C
-																																	>,
-																																	TypeOpt<
-																																		E["for"],
-																																		C
 																																	>
-																																>,
-																																TypeOpt<
-																																	E["from"],
-																																	C
-																																>
-																															>
-																														: E extends {
-																																	readonly t: "trim";
-																																}
-																															? StringResult<
-																																	TypeOf<
-																																		E["e"],
-																																		C
-																																	>,
-																																	TypeOpt<
-																																		E["chars"],
-																																		C
-																																	>,
-																																	null
 																																>
 																															: E extends {
-																																		readonly t: "overlay";
+																																		readonly t: "trim";
 																																	}
 																																? StringResult<
-																																		StringResult<
-																																			TypeOf<
-																																				E["e"],
-																																				C
-																																			>,
-																																			TypeOf<
-																																				E["placing"],
-																																				C
-																																			>,
-																																			TypeOf<
-																																				E["from"],
-																																				C
-																																			>
+																																		TypeOf<
+																																			E["e"],
+																																			C
 																																		>,
 																																		TypeOpt<
-																																			E["for"],
+																																			E["chars"],
 																																			C
 																																		>,
 																																		null
 																																	>
 																																: E extends {
-																																			readonly t: "attz";
+																																			readonly t: "overlay";
 																																		}
-																																	? TypeAtTz<
-																																			TypeOf<
-																																				E["e"],
+																																	? StringResult<
+																																			StringResult<
+																																				TypeOf<
+																																					E["e"],
+																																					C
+																																				>,
+																																				TypeOf<
+																																					E["placing"],
+																																					C
+																																				>,
+																																				TypeOf<
+																																					E["from"],
+																																					C
+																																				>
+																																			>,
+																																			TypeOpt<
+																																				E["for"],
 																																				C
 																																			>,
-																																			TypeOf<
-																																				E["zone"],
-																																				C
-																																			>
+																																			null
 																																		>
 																																	: E extends {
-																																				readonly t: "collate";
+																																				readonly t: "attz";
 																																			}
-																																		? TypeOf<
-																																				E["e"],
-																																				C
+																																		? TypeAtTz<
+																																				TypeOf<
+																																					E["e"],
+																																					C
+																																				>,
+																																				TypeOf<
+																																					E["zone"],
+																																					C
+																																				>
 																																			>
 																																		: E extends {
-																																					readonly t: "field";
+																																					readonly t: "collate";
 																																				}
-																																			? TypeField<
-																																					TypeOf<
-																																						E["e"],
-																																						C
-																																					>,
-																																					E["name"]
+																																			? TypeOf<
+																																					E["e"],
+																																					C
 																																				>
 																																			: E extends {
-																																						readonly t:
-																																							| "jsonfn"
-																																							| "jsonagg"
-																																							| "isjson"
-																																							| "jsonfmt";
+																																						readonly t: "field";
 																																					}
-																																				? TypeSqlJson<
-																																						E,
-																																						C
+																																				? TypeField<
+																																						TypeOf<
+																																							E["e"],
+																																							C
+																																						>,
+																																						E["name"]
 																																					>
 																																				: E extends {
-																																							readonly t: "star";
+																																							readonly t:
+																																								| "jsonfn"
+																																								| "jsonagg"
+																																								| "isjson"
+																																								| "jsonfmt";
 																																						}
-																																					? E["tbl"] extends string
-																																						? WholeRow<
-																																								C["scope"],
-																																								E["tbl"],
-																																								`missing FROM-clause entry for table "${E["tbl"]}"`
-																																							>
-																																						: SqlError<
-																																								"* is only allowed in a target list or count(*)",
-																																								null
-																																							>
+																																					? TypeSqlJson<
+																																							E,
+																																							C
+																																						>
 																																					: E extends {
-																																								readonly t: "xml";
+																																								readonly t: "star";
 																																							}
-																																						? TypeXml<
-																																								E,
-																																								C
-																																							>
-																																						: // a named argument matches any parameter (the catalog has no parameter names); see TypeCall
-																																							E extends {
-																																									readonly t: "named";
+																																						? E["tbl"] extends string
+																																							? WholeRow<
+																																									C["scope"],
+																																									E["tbl"],
+																																									`missing FROM-clause entry for table "${E["tbl"]}"`
+																																								>
+																																							: SqlError<
+																																									"* is only allowed in a target list or count(*)",
+																																									null
+																																								>
+																																						: E extends {
+																																									readonly t: "xml";
 																																								}
-																																							? TypeOf<
-																																									E["e"],
+																																							? TypeXml<
+																																									E,
 																																									C
-																																								> extends infer A
-																																								? A extends ColInfo
-																																									? Info<
-																																											"unknown",
-																																											A["nullable"]
-																																										>
-																																									: A
-																																								: never
-																																							: E extends {
-																																										// type-mutate: equivalent cond-true – every kind of expression is handled above
-																																										readonly t: "variadic";
-																																									}
-																																								? TypeOf<
-																																										E["e"],
-																																										C
-																																									>
-																																								: SqlError<
-																																										"unsupported expression",
-																																										null
-																																									>;
+																																								>
+																																							: // the last kinds, call arguments `name => e` and `VARIADIC e`: the type of `e` (overloads are
+																																								// picked by the argument types in order, as named arguments mostly come)
+																																								TypeOf<
+																																									Extract<
+																																										E,
+																																										| NamedArg
+																																										| VariadicArg
+																																									>["e"],
+																																									C
+																																								>;
 
 // ─── helpers ───
 
 export type Or<A extends boolean, B extends boolean> = A extends true
 	? true // type-mutate: equivalent never-true – a never nullability is read with `extends true`, as nullable
 	: B extends true
-		? true
+		? true // type-mutate: equivalent never-true – a never nullability is read with `extends true`, as nullable
 		: false;
 export type AnyNullable<As extends readonly ColInfo[]> = As extends readonly [
 	infer A extends ColInfo,
@@ -437,16 +438,14 @@ type TypeQuant<
 	Op extends string,
 	A,
 	B,
-	R extends "sub" | "lit" | "expr",
+	R extends "lit" | "expr",
 > = A extends ColInfo
 	? B extends ColInfo
-		? R extends "sub"
-			? Info<"bool", Or<A["nullable"], B["nullable"]>>
-			: R extends "expr"
-				? B["type"] extends ScalarType
-					? SqlError<"op ANY/ALL (array) requires array on right side", null>
-					: QuantOp<Op, A, B>
+		? R extends "expr"
+			? B["type"] extends ScalarType
+				? SqlError<"op ANY/ALL (array) requires array on right side", null>
 				: QuantOp<Op, A, B>
+			: QuantOp<Op, A, B>
 		: B
 	: A;
 type QuantOp<
@@ -518,21 +517,76 @@ type TypeBin<
 	C extends Ctx,
 > = L extends { readonly t: "row" }
 	? R extends { readonly t: "sub"; readonly q: infer Q extends SelectStmt }
-		? Op extends RowCompareOp
-			? RowCompareSub<L, Q, C>
-			: TypeBinOperands<Op, L, R, C>
+		? SubCompare<Op, L, Q, C, true>
 		: TypeBinOperands<Op, L, R, C>
 	: TypeBinOperands<Op, L, R, C>;
-type RowCompareOp = "=" | "<>" | "!=" | "<" | ">" | "<=" | ">=";
 /**
- * `(a, b) = (SELECT x, y …)` compares the row with the subquery's single row (Postgres's
- * ROWCOMPARE sublink): the widths must match, and no row gives NULL.
+ * `l op ANY|ALL (SELECT …)`, and `(a, b) op (SELECT x, y …)` with any operator (Postgres's
+ * ROWCOMPARE sublink, which no row makes NULL: `Row`): bool. The widths must match, and the
+ * operands are compared pairwise (`make_row_comparison_op`).
  */
-type RowCompareSub<
+type SubCompare<
+	Op extends string,
 	L extends Expr,
 	Q extends SelectStmt,
 	C extends Ctx,
-> = Check2<TypeOf<L, C>, SubqueryOperand<L, Q, C>, Info<"bool", true>>;
+	Row extends boolean,
+> =
+	TypeOf<L, C> extends infer A
+		? A extends ColInfo
+			? SubqueryOperand<L, Q, C> extends infer B
+				? B extends ColInfo
+					? PairwiseOp<
+							Op,
+							L extends {
+								readonly t: "row";
+								readonly items: infer Items extends readonly Expr[];
+							}
+								? OperandList<Items, C, []>
+								: [TypeOperand<L, C>],
+							ProjectSelect<Q, C["db"], C["scope"], C["ctes"]>,
+							0
+						> extends infer X
+						? X extends true
+							? Info<
+									"bool",
+									Row extends true
+										? true // type-mutate: equivalent never-true – a never nullability is read with `extends true`, as nullable
+										: Or<A["nullable"], B["nullable"]>
+								>
+							: X
+						: never
+					: B
+				: never
+			: A
+		: never;
+type RowCompareOp = "=" | "<>" | "!=" | "<" | ">" | "<=" | ">=";
+/**
+ * Each pair's operator must yield boolean (operators the types do not tell are taken to), and a
+ * row of several columns needs a comparison operator; `true` or the error. `I`: pairs so far.
+ */
+type PairwiseOp<
+	Op extends string,
+	Ls,
+	Rs,
+	I extends number,
+> = Ls extends readonly [infer L extends ColInfo, ...infer LR]
+	? Rs extends readonly [{ readonly t: infer R extends ColInfo }, ...infer RR]
+		? BinOpType<Op, L, R>["type"] extends "bool" | "unknown"
+			? PairwiseOp<Op, LR, RR, Nx<I>>
+			: SqlError<
+					`row comparison operator must yield type boolean, not type ${TypeDisplay<BinOpType<Op, L, R>["type"]>}`,
+					null
+				>
+		: true // after a `*` entry the columns are not known in order
+	: I extends 0 | 1
+		? true
+		: Op extends RowCompareOp
+			? true
+			: SqlError<
+					`could not determine interpretation of row comparison operator ${Op}`,
+					null
+				>;
 type TypeBinOperands<
 	Op extends string,
 	L extends Expr,
@@ -568,8 +622,38 @@ type TypeUn<Op extends string, E extends Expr, C extends Ctx> = Op extends
 			? UnOpType<Op, T>
 			: T
 		: never;
-/** A cast between json and jsonb keeps the value's shape. */
-type TypeCast<To extends string, E extends Expr, C extends Ctx> =
+/**
+ * A cast between json and jsonb keeps the value's shape. An `ARRAY[…]` cast to an array type takes
+ * that type, the arrays inside it too (`ARRAY[]::int4[]`, `ARRAY[ARRAY[], ARRAY[1]]::int4[]`).
+ */
+type TypeCast<To extends string, E extends Expr, C extends Ctx> = E extends {
+	readonly t: "array";
+	readonly items: infer Items;
+}
+	? To extends `${string}[]`
+		? CastItems<Items, C> extends infer X
+			? X extends true
+				? Info<To>
+				: X
+			: never
+		: TypeOfCast<To, E, C>
+	: TypeOfCast<To, E, C>;
+/** The items of an `ARRAY[…]` under a cast to an array type: `true` or the first error. */
+type CastItems<Items, C extends Ctx> = Items extends readonly [
+	infer H extends Expr,
+	...infer R,
+]
+	? (
+			H extends { readonly t: "array"; readonly items: infer HI }
+				? CastItems<HI, C>
+				: Check<TypeOf<H, C>, true>
+		) extends infer X
+		? X extends true
+			? CastItems<R, C>
+			: X
+		: never
+	: true;
+type TypeOfCast<To extends string, E extends Expr, C extends Ctx> =
 	TypeOf<E, C> extends infer T
 		? T extends ColInfo
 			? Info<
@@ -621,12 +705,17 @@ type TypeIn<E extends Expr, List extends readonly Expr[], C extends Ctx> =
 			: A
 		: never;
 /** `ARRAY[...]`: array of the common element type (`ARRAY[1, 2.5]` → numeric[]; nested arrays stay one level). */
-type TypeArrayCtor<Items extends readonly Expr[], C extends Ctx> =
+type TypeArrayCtor<
+	Items extends readonly Expr[],
+	C extends Ctx,
+> = Items extends readonly [] ? EmptyArrayErr : TypeArrayItems<Items, C>;
+type TypeArrayItems<Items extends readonly Expr[], C extends Ctx> =
 	OperandList<Items, C, []> extends infer Ls
 		? Ls extends readonly ColInfo[]
 			? Info<ArrayTypeOf<LitToText<CommonOf<Ls, "unknown">>>>
 			: Ls
 		: never;
+type EmptyArrayErr = SqlError<"cannot determine type of empty array", null>;
 type ArrayTypeOf<T extends string> = T extends `${string}[]`
 	? T
 	: T extends "unknown" | "null"
@@ -652,11 +741,9 @@ type TypeIdx<E extends Expr, I extends Expr, C extends Ctx> =
 							: JsonArrow<"->", A, I, B> extends infer J extends ColInfo
 								? J
 								: Info<
-										A["type"] extends `${infer El}[]`
-											? El
-											: BaseOf<A["type"]> extends keyof SubscriptElem
-												? SubscriptElem[BaseOf<A["type"]>]
-												: "unknown",
+										BaseOf<A["type"]> extends keyof SubscriptElem
+											? SubscriptElem[BaseOf<A["type"]>]
+											: "unknown",
 										true
 									>
 					: B
@@ -664,19 +751,16 @@ type TypeIdx<E extends Expr, I extends Expr, C extends Ctx> =
 			: A
 		: never;
 /**
- * `a[i][j]`, `a[i:j][k]`: the subscripts after an array apply to that array together, as in
- * Postgres (one per dimension; the types do not count dimensions): the array's type, or null when
- * `E` is not a subscript of an array.
+ * `a[i]`, `a[i][j]`, `a[i:j][k]`: the subscripts after an array apply to that array together, as in
+ * Postgres (one per dimension; the types do not count dimensions): the type of the array under
+ * the subscripts of `E` (`E` itself when it is none), or null when that is not an array.
  */
-type ChainOverArray<E extends Expr, C extends Ctx> = E extends {
-	readonly t: "idx" | "slice";
-}
-	? TypeOf<ChainRoot<E>, C> extends {
-			readonly type: infer T extends `${string}[]`;
-		}
+type ChainOverArray<E extends Expr, C extends Ctx> =
+	TypeOf<ChainRoot<E>, C> extends {
+		readonly type: infer T extends `${string}[]`;
+	}
 		? T
-		: null
-	: null;
+		: null;
 /** The array under the indexes (a slice of an array has its type, so the walk can stop at one). */
 type ChainRoot<E extends Expr> = E extends {
 	readonly t: "idx";
@@ -706,7 +790,7 @@ type ChainNullable<E extends Expr, C extends Ctx> = E extends {
 type EnumName<DB> = DB extends { readonly $types: infer T } ? keyof T : never;
 /** Is any subscript of the chain a slice? Then the result is an array. */
 type ChainSliced<E> = E extends { readonly t: "slice" }
-	? true
+	? true // type-mutate: equivalent never-true – read with `extends true`, where never counts as true
 	: E extends { readonly t: "idx"; readonly e: infer X }
 		? ChainSliced<X>
 		: false;
@@ -745,10 +829,15 @@ type TypeSlice<
 									? NoSubscriptErr<A["type"]>
 									: BaseOf<A["type"]> extends "jsonb"
 										? SqlError<"jsonb subscript does not support slices", null>
-										: Info<
-												A["type"],
-												Or<A["nullable"], Or<NullableOpt<B>, NullableOpt<D>>>
-											>
+										: BaseOf<A["type"]> extends keyof SubscriptElem
+											? SqlError<
+													"slices of fixed-length arrays not implemented",
+													null
+												>
+											: Info<
+													A["type"],
+													Or<A["nullable"], Or<NullableOpt<B>, NullableOpt<D>>>
+												>
 							: D
 						: never
 					: B
@@ -759,13 +848,11 @@ type TypeSlice<
 type TypeAtTz<A, B> = A extends ColInfo
 	? B extends ColInfo
 		? Info<
-				A["type"] extends "timestamptz"
-					? "timestamp"
-					: A["type"] extends "timestamp"
-						? "timestamptz"
-						: A["type"] extends "time" | "timetz"
-							? "timetz"
-							: "timestamp",
+				A["type"] extends "timestamp"
+					? "timestamptz"
+					: A["type"] extends "time" | "timetz"
+						? "timetz"
+						: "timestamp", // timestamptz, and date (as timestamptz)
 				Or<A["nullable"], B["nullable"]>
 			>
 		: B
@@ -850,7 +937,7 @@ type HasStarEntry<R extends Cols> = R extends readonly [
 	...infer Rest extends Cols,
 ]
 	? H extends { readonly star: unknown }
-		? true
+		? true // type-mutate: equivalent never-true – read with `extends true`, where never counts as true
 		: HasStarEntry<Rest>
 	: false;
 type IsLonger<
@@ -887,7 +974,7 @@ type StarCol<M extends ColMap, TooMany extends string> = [keyof M] extends [
 	: IsUnion<keyof M> extends true
 		? SqlError<TooMany, null>
 		: M[keyof M];
-type IsUnion<U> = [U] extends [UnionToIntersection<U>] ? false : true;
+type IsUnion<U> = [U] extends [UnionToIntersection<U>] ? false : true; // type-mutate: equivalent never-false – read with `extends true`, where never counts as true
 type UnionToIntersection<U> = (
 	U extends unknown
 		? (u: U) => void
@@ -1006,17 +1093,19 @@ type TypeCall<E extends Call, C extends Ctx> =
 											{
 												readonly grouped: C["grouped"];
 												readonly over: E["over"];
-												readonly filter: F extends ColInfo ? true : false;
+												readonly filter: F extends ColInfo
+													? true // type-mutate: equivalent never-true – read with `extends true`, where never counts as true
+													: false;
 												readonly distinct: E["distinct"];
 												readonly hasStar: E["args"] extends readonly [
 													{ readonly t: "star"; readonly tbl: null },
 												]
-													? true
+													? true // type-mutate: equivalent never-true – read with `extends true`, where never counts as true
 													: false;
 												readonly withinGroup: W extends ColInfo
 													? true // type-mutate: equivalent never-true – read with `extends true`, where never counts as true
 													: false;
-												readonly wg: W extends ColInfo ? W["type"] : "unknown";
+												readonly wg: W extends ColInfo ? W["type"] : "unknown"; // type-mutate: equivalent never-false – read by the WITHIN GROUP signatures only, which CallMisuse rejects without one
 											},
 											C["db"]
 										>

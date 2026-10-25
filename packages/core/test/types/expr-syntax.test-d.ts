@@ -92,6 +92,10 @@ test("named arguments match any parameter; VARIADIC passes an array", () => {
 	expectTypeOf<
 		Row<"SELECT * FROM jsonb_path_query('[1, 2]', '$[*]', silent => true) AS v">
 	>().toEqualTypeOf<{ v: unknown }>();
+	// a named argument keeps its type, which picks the overload
+	expectTypeOf<
+		Row<"SELECT random(min => 1.5, max => 2.5) AS a, random(min => big, max => big) AS b, random(min => 1, max => 2) AS c FROM things">
+	>().toEqualTypeOf<{ a: string; b: string; c: number }>();
 	expectTypeOf<Params<"SELECT make_interval(days => $1)">>().toEqualTypeOf<
 		[unknown]
 	>();
@@ -161,6 +165,89 @@ test("quantified predicates with any operator", () => {
 	expectTypeOf<V<"SELECT 'a' SIMILAR TO ANY (ARRAY['a'])">>().toEqualTypeOf<
 		SqlError<"syntax error at or near any", 4>
 	>();
+});
+
+test("comparisons with a subquery compare the operands pairwise, with any operator", () => {
+	expectTypeOf<
+		Row<"SELECT ROW(ARRAY[1]) && (SELECT ARRAY[1]) AS a, 'a' ~~ ANY (SELECT 'b') AS b, (1, 2) < (SELECT 1, 2) AS c, (1, 2) = (SELECT * FROM (SELECT 1 AS a, 2 AS b) s) AS d, 1 = ANY (SELECT * FROM (SELECT 1 AS a) s) AS e, n_id = ALL (SELECT 1) AS f, (id, 2) <> ANY (SELECT 1, 2) AS g FROM things">
+	>().toEqualTypeOf<{
+		a: boolean | null;
+		b: boolean;
+		c: boolean | null;
+		d: boolean | null;
+		e: boolean;
+		f: boolean | null;
+		g: boolean;
+	}>();
+	// an operator whose result the types do not tell is taken to yield boolean
+	expectTypeOf<
+		Row<"SELECT 'abc' ^@ ANY (SELECT 'a'::text) AS a">
+	>().toEqualTypeOf<{ a: boolean }>();
+	// each pair's operator must yield boolean
+	expectTypeOf<V<"SELECT 1 + ANY (SELECT 1)">>().toEqualTypeOf<
+		SqlError<
+			"row comparison operator must yield type boolean, not type integer",
+			0
+		>
+	>();
+	expectTypeOf<V<"SELECT 'a' || ALL (SELECT 'b'::text)">>().toEqualTypeOf<
+		SqlError<
+			"row comparison operator must yield type boolean, not type text",
+			0
+		>
+	>();
+	expectTypeOf<V<"SELECT 1 - ALL (SELECT 1.5)">>().toEqualTypeOf<
+		SqlError<
+			"row comparison operator must yield type boolean, not type numeric",
+			0
+		>
+	>();
+	expectTypeOf<V<"SELECT (1, 2) + (SELECT 1, 2)">>().toEqualTypeOf<
+		SqlError<
+			"row comparison operator must yield type boolean, not type integer",
+			0
+		>
+	>();
+	expectTypeOf<V<"SELECT (1, 2) + ANY (SELECT 1, 2)">>().toEqualTypeOf<
+		SqlError<
+			"row comparison operator must yield type boolean, not type integer",
+			0
+		>
+	>();
+	expectTypeOf<V<"SELECT ROW(1) + (SELECT 1)">>().toEqualTypeOf<
+		SqlError<
+			"row comparison operator must yield type boolean, not type integer",
+			0
+		>
+	>();
+	// the second pair
+	expectTypeOf<
+		V<"SELECT (rng, 1) << (SELECT rng, 2 FROM things) FROM things">
+	>().toEqualTypeOf<
+		SqlError<
+			"row comparison operator must yield type boolean, not type integer",
+			0
+		>
+	>();
+	// several columns need a comparison operator
+	expectTypeOf<
+		V<"SELECT (ARRAY[1], ARRAY[2]) && (SELECT ARRAY[1], ARRAY[2])">
+	>().toEqualTypeOf<
+		SqlError<
+			"could not determine interpretation of row comparison operator &&",
+			0
+		>
+	>();
+	// the widths first
+	expectTypeOf<V<"SELECT (1, 2) + (SELECT 1)">>().toEqualTypeOf<
+		SqlError<"subquery has too few columns", 0>
+	>();
+	expectTypeOf<
+		V<"SELECT (nope, 2) = (SELECT 1, 2) FROM things">
+	>().toEqualTypeOf<SqlError<'column "nope" does not exist', 2>>();
+	expectTypeOf<
+		V<"SELECT (1, 2) = (SELECT nope, 2) FROM things">
+	>().toEqualTypeOf<SqlError<'column "nope" does not exist', 9>>();
 });
 
 test("ANY / ALL of a scalar is an error, for every scalar type", () => {
@@ -314,6 +401,24 @@ test("an error inside a construct is the construct's error", () => {
 	>();
 	expectTypeOf<V<"SELECT (nope).f FROM things">>().toEqualTypeOf<
 		SqlError<'column "nope" does not exist', 2>
+	>();
+	expectTypeOf<V<"SELECT nope LIKE 'x' FROM things">>().toEqualTypeOf<
+		SqlError<'column "nope" does not exist', 1>
+	>();
+	expectTypeOf<V<"SELECT nope = ANY (ARRAY[1]) FROM things">>().toEqualTypeOf<
+		SqlError<'column "nope" does not exist', 1>
+	>();
+	expectTypeOf<V<"SELECT -nope FROM things">>().toEqualTypeOf<
+		SqlError<'column "nope" does not exist', 2>
+	>();
+	expectTypeOf<V<"SELECT ~nope FROM things">>().toEqualTypeOf<
+		SqlError<'column "nope" does not exist', 2>
+	>();
+	expectTypeOf<V<"SELECT nope IS DISTINCT FROM 1 FROM things">>().toEqualTypeOf<
+		SqlError<'column "nope" does not exist', 1>
+	>();
+	expectTypeOf<V<"SELECT 1 = ANY (ARRAY[nope]) FROM things">>().toEqualTypeOf<
+		SqlError<'column "nope" does not exist', 7>
 	>();
 });
 

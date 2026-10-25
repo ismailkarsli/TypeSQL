@@ -454,4 +454,10 @@ test("WHERE / HAVING must be boolean", () => {
 	expectTypeOf<Row<"SELECT id FROM users WHERE 'true'">>().toEqualTypeOf<{
 		id: number;
 	}>();
+	expectTypeOf<Row<"SELECT id FROM users WHERE $1">>().toEqualTypeOf<{
+		id: number;
+	}>();
+	expectTypeOf<V<"SELECT id FROM users WHERE ARRAY[id]">>().toEqualTypeOf<
+		SqlError<"argument of WHERE must be type boolean, not type integer[]", 0>
+	>();
 });

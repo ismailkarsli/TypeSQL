@@ -242,6 +242,36 @@ test("ORDER BY of a set operation: output names and positions only", () => {
 	expectTypeOf<
 		V<"SELECT * FROM users UNION SELECT * FROM users ORDER BY 3">
 	>().toEqualTypeOf<"SELECT * FROM users UNION SELECT * FROM users ORDER BY 3">();
+	// positions in any radix; unary minus folds into the constant; 0 and negative positions are
+	// never in the list, even after a star
+	expectTypeOf<
+		V<"SELECT id FROM users UNION SELECT author_id FROM posts ORDER BY 0x1">
+	>().toEqualTypeOf<"SELECT id FROM users UNION SELECT author_id FROM posts ORDER BY 0x1">();
+	expectTypeOf<
+		V<"SELECT id FROM users UNION SELECT author_id FROM posts ORDER BY 0x10">
+	>().toEqualTypeOf<
+		SqlError<"ORDER BY position 16 is not in select list", 11>
+	>();
+	expectTypeOf<
+		V<"SELECT id FROM users UNION SELECT author_id FROM posts ORDER BY -1">
+	>().toEqualTypeOf<
+		SqlError<"ORDER BY position -1 is not in select list", 11>
+	>();
+	expectTypeOf<
+		V<"SELECT * FROM users UNION SELECT * FROM users ORDER BY 0">
+	>().toEqualTypeOf<
+		SqlError<"ORDER BY position 0 is not in select list", 11>
+	>();
+	expectTypeOf<
+		V<"SELECT id FROM users UNION SELECT author_id FROM posts ORDER BY 1.5">
+	>().toEqualTypeOf<SqlError<"non-integer constant in ORDER BY", 0>>();
+	expectTypeOf<
+		V<"SELECT id FROM users UNION SELECT author_id FROM posts ORDER BY 'x'">
+	>().toEqualTypeOf<SqlError<"non-integer constant in ORDER BY", 0>>();
+	// every item is checked
+	expectTypeOf<
+		V<"SELECT id FROM users UNION SELECT author_id FROM posts ORDER BY id, nosuch">
+	>().toEqualTypeOf<SqlError<'column "nosuch" does not exist', 13>>();
 	expectTypeOf<
 		V<"SELECT id FROM users UNION SELECT id FROM posts FOR UPDATE">
 	>().toEqualTypeOf<

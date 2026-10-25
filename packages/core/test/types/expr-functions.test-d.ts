@@ -472,6 +472,65 @@ test("ARRAY and ROW constructors", () => {
 	expectTypeOf<
 		Row<"SELECT ARRAY[]::int4[] AS a, ARRAY[1, 2] AS b, ARRAY(SELECT 1) AS c">
 	>().toEqualTypeOf<{ a: number[]; b: number[]; c: number[] }>();
+	// no element to take a type from: text for NULL and an untyped parameter; an empty ARRAY
+	// needs a cast to an array type
+	expectTypeOf<
+		Row<"SELECT ARRAY[NULL] AS a, ARRAY[$1] AS b, CAST(ARRAY[] AS text[]) AS c, ARRAY[ARRAY[]]::int4[] AS d, ARRAY[1]::text AS e">
+	>().toEqualTypeOf<{
+		a: string[];
+		b: string[];
+		c: string[];
+		d: number[];
+		e: string;
+	}>();
+	// its parameters: text, or the element type of a cast
+	expectTypeOf<
+		[
+			Params<"SELECT ARRAY[$1] AS a">,
+			Params<"SELECT ARRAY[$1, NULL]::text AS a">,
+			Params<"SELECT ARRAY[$1]::int4[] AS a">,
+			Params<"SELECT ARRAY[ARRAY[$1], ARRAY[$2]]::int4[] AS a">,
+		]
+	>().toEqualTypeOf<
+		[
+			[string | null],
+			[string | null],
+			[number | null],
+			[number | null, number | null],
+		]
+	>();
+	expectTypeOf<V<"SELECT ARRAY[]">>().toEqualTypeOf<
+		SqlError<"cannot determine type of empty array", 0>
+	>();
+	expectTypeOf<V<"SELECT ARRAY[]::text">>().toEqualTypeOf<
+		SqlError<"cannot determine type of empty array", 0>
+	>();
+	expectTypeOf<V<"SELECT ARRAY[1] || ARRAY[]">>().toEqualTypeOf<
+		SqlError<"cannot determine type of empty array", 0>
+	>();
+	expectTypeOf<V<"SELECT ARRAY[ARRAY[], ARRAY[1]]">>().toEqualTypeOf<
+		SqlError<"cannot determine type of empty array", 0>
+	>();
+	// a cast to an array type types the arrays inside too
+	expectTypeOf<
+		Row<"SELECT ARRAY[ARRAY[], ARRAY[]::int4[]]::int4[] AS a, ARRAY[ARRAY[1], ARRAY['2']]::int4[] AS b, ARRAY[ARRAY[1, 2], ARRAY[3, 4]]::text[] AS c">
+	>().toEqualTypeOf<{ a: number[]; b: number[]; c: string[] }>();
+	expectTypeOf<V<"SELECT ARRAY[ARRAY[], ARRAY[1]]::text">>().toEqualTypeOf<
+		SqlError<"cannot determine type of empty array", 0>
+	>();
+	expectTypeOf<
+		[
+			V<"SELECT ARRAY[nope]::int4[] FROM things">,
+			V<"SELECT ARRAY[1, nope]::int4[] FROM things">,
+			V<"SELECT ARRAY[ARRAY[nope]]::int4[] FROM things">,
+		]
+	>().toEqualTypeOf<
+		[
+			SqlError<'column "nope" does not exist', 3>,
+			SqlError<'column "nope" does not exist', 5>,
+			SqlError<'column "nope" does not exist', 5>,
+		]
+	>();
 	expectTypeOf<V<"SELECT ARRAY 1">>().toEqualTypeOf<
 		SqlError<'syntax error: expected "[" or "(" at or near 1', 2>
 	>();

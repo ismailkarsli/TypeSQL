@@ -290,6 +290,10 @@ test("casts: json <-> jsonb keep the shape, text does not", () => {
 		g: unknown;
 		h: boolean;
 	}>();
+	// a value of no JSON shape cast to json(b) is plain JSON
+	expectTypeOf<
+		Row<"SELECT label::json AS a, label::jsonb AS b FROM things">
+	>().toEqualTypeOf<{ a: unknown; b: unknown }>();
 });
 
 test("a type map that reads JSON as text keeps the text", () => {

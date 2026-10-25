@@ -776,3 +776,66 @@ type DigitRank = {
 	e: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 	f: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 };
+
+/**
+ * The value of an integer literal in decimal, as Postgres prints it (`0x1F` → `31`, `0b101` → `5`,
+ * `1_000` → `1000`, `007` → `7`); `null` for a literal that is not an integer (`1.5`, `1e3`).
+ */
+export type IntLitValue<V extends string> =
+	Lowercase<
+		NoUnderscores<V>
+	> extends `0${infer P extends keyof Radix}${infer Ds}`
+		? FromRadix<Ds, Radix[P], keyof DigitRank, "0">
+		: FromRadix<Lowercase<NoUnderscores<V>>, Ten, Digit, "0">;
+type Digit = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9";
+type Ten = DigitRank["a"];
+type Radix = {
+	x: [...DigitRank["f"], 0];
+	o: DigitRank["8"];
+	b: DigitRank["2"];
+};
+/** Horner's rule over the digits `Ds` (of `Dg`) in radix `R`, on the decimal digits of the value so far, least significant first (`Rev`). */
+type FromRadix<
+	Ds extends string,
+	R extends unknown[],
+	Dg extends keyof DigitRank,
+	Rev extends string,
+> = Ds extends `${infer C extends Dg}${infer Rest}`
+	? FromRadix<Rest, R, Dg, MulAdd<Rev, R, DigitRank[C], "">>
+	: Ds extends ""
+		? Reverse<Rev, "">
+		: null;
+/** `Rev` × `R` + `Carry`, on decimal digits least significant first. */
+type MulAdd<
+	Rev extends string,
+	R extends unknown[],
+	Carry extends unknown[],
+	Out extends string,
+> = Rev extends `${infer D extends Digit}${infer Rest}`
+	? DivMod10<
+			[...Times<DigitRank[D], R, []>, ...Carry], // type-mutate: equivalent tuple-swap – only the length counts
+			[]
+		> extends [infer Q extends unknown[], infer M extends number]
+		? MulAdd<Rest, R, Q, `${Out}${M}`>
+		: never
+	: Carry extends []
+		? Out
+		: MulAdd<"0", R, Carry, Out>;
+type Times<
+	N extends unknown[],
+	R extends unknown[],
+	Acc extends unknown[],
+> = N extends [unknown, ...infer NR]
+	? Times<NR, R, [...Acc, ...R]> // type-mutate: equivalent tuple-swap – only the length counts
+	: Acc;
+/** A tuple's length `n` → `[n / 10 as a tuple, n % 10]`. */
+type DivMod10<T extends unknown[], Q extends unknown[]> = T extends [
+	...Ten, // type-mutate: equivalent tuple-swap – only the length counts
+	...infer Rest,
+]
+	? DivMod10<Rest, [...Q, 0]>
+	: [Q, T["length"]];
+type Reverse<
+	S extends string,
+	Acc extends string,
+> = S extends `${infer C}${infer R}` ? Reverse<R, `${C}${Acc}`> : Acc;

@@ -194,7 +194,14 @@ export type ParamsOfExpr<E extends Expr, C extends Ctx, M> = E extends {
 						readonly n: infer N extends number;
 					}
 					? AddParam<M, N, Info<E["to"], false>>
-					: ParamsOfExpr<E["e"], C, M>
+					: E["e"] extends {
+								readonly t: "array";
+								readonly items: infer Items extends readonly Expr[];
+							}
+						? E["to"] extends `${infer El}[]`
+							? CastArrayParams<Items, C, M, El>
+							: ParamsOfExpr<E["e"], C, M>
+						: ParamsOfExpr<E["e"], C, M>
 				: E extends { readonly t: "call" }
 					? ParamsOfCall<Extract<E, Call>, C, M>
 					: E extends { readonly t: "case" }
@@ -285,7 +292,12 @@ export type ParamsOfExpr<E extends Expr, C extends Ctx, M> = E extends {
 																			E["items"],
 																			C,
 																			M,
-																			Mk<CommonOfExprs<E["items"], C>, true>
+																			Mk<
+																				UntypedText<
+																					CommonOfExprs<E["items"], C>
+																				>,
+																				true
+																			>
 																		>
 																	: E extends { readonly t: "row" }
 																		? ParamsOfList<E["items"], C, M, null>
@@ -505,6 +517,31 @@ export type ParamsOfList<
 	...infer R extends readonly Expr[],
 ]
 	? ParamsOfList<R, C, ParamsOfOpt<E, C, M, T>, T>
+	: M;
+
+/** An `ARRAY[…]` of parameters (and NULLs) only is text[], as in Postgres. */
+type UntypedText<T> = T extends "unknown" ? "text" : T;
+/** `ARRAY[…]::T[]`: the parameters in it, in arrays inside it too, are `T`. */
+type CastArrayParams<
+	Items extends readonly Expr[],
+	C extends Ctx,
+	M,
+	El extends string,
+> = Items extends readonly [
+	infer E extends Expr,
+	...infer R extends readonly Expr[],
+]
+	? CastArrayParams<
+			R,
+			C,
+			E extends {
+				readonly t: "array";
+				readonly items: infer I extends readonly Expr[];
+			}
+				? CastArrayParams<I, C, M, El>
+				: ParamsOfOpt<E, C, M, Mk<El, true>>,
+			El
+		>
 	: M;
 
 /** Common type of the non-NULL expressions of a list ("unknown" if none or on error; a parameter is unknown too). */

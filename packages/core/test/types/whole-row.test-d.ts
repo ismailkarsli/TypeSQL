@@ -91,6 +91,10 @@ test("(t).col and (t).* reach the row's columns", () => {
 	expectTypeOf<V<"SELECT (ROW(1, 2)).*">>().toEqualTypeOf<
 		SqlError<"(e).* needs a whole-row value such as (t).*", 0>
 	>();
+	// a field of another composite value is of unknown type, and may be NULL
+	expectTypeOf<
+		Row<"SELECT ((ROW(1, NULL::int4)).f2)::int4 AS v">
+	>().toEqualTypeOf<{ v: number | null }>();
 	expectTypeOf<V<"SELECT to_json((u).*) FROM users u">>().toEqualTypeOf<
 		SqlError<"(e).* is only supported in a target list", 0>
 	>();

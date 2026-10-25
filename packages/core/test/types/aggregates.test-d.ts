@@ -140,6 +140,53 @@ test("ordered-set aggregates take their type from WITHIN GROUP (ORDER BY ...)", 
 	expectTypeOf<
 		Row<"SELECT mode() WITHIN GROUP (ORDER BY day) AS a, percentile_disc(0.5) WITHIN GROUP (ORDER BY mood) AS b FROM things">
 	>().toEqualTypeOf<{ a: Date | null; b: "happy" | "sad" | null }>();
+	// without WITHIN GROUP Postgres finds no function of the direct arguments alone; a
+	// hypothetical-set aggregate takes any arguments, and needs WITHIN GROUP
+	expectTypeOf<
+		[
+			V<"SELECT percentile_cont(0.5) FROM things">,
+			V<"SELECT percentile_cont(ARRAY[0.5]) FROM things">,
+			V<"SELECT percentile_disc(1) FROM things">,
+			V<"SELECT percentile_disc(ARRAY[0.5]) FROM things">,
+			V<"SELECT percentile_disc('x') FROM things">,
+			V<"SELECT mode() FROM things">,
+			V<"SELECT percentile_cont(0.5) OVER () FROM things">,
+		]
+	>().toEqualTypeOf<
+		[
+			SqlError<"function percentile_cont(numeric) does not exist", 1>,
+			SqlError<"function percentile_cont(numeric[]) does not exist", 1>,
+			SqlError<"function percentile_disc(integer) does not exist", 1>,
+			SqlError<"function percentile_disc(numeric[]) does not exist", 1>,
+			SqlError<"function percentile_disc(unknown) does not exist", 1>,
+			SqlError<"function mode() does not exist", 1>,
+			SqlError<"function percentile_cont(numeric) does not exist", 1>,
+		]
+	>();
+	expectTypeOf<
+		[
+			V<"SELECT rank(1) FROM things">,
+			V<"SELECT dense_rank(1) FROM things">,
+			V<"SELECT percent_rank(1) FROM things">,
+			V<"SELECT cume_dist(1) FROM things">,
+		]
+	>().toEqualTypeOf<
+		[
+			SqlError<"WITHIN GROUP is required for ordered-set aggregate rank", 1>,
+			SqlError<
+				"WITHIN GROUP is required for ordered-set aggregate dense_rank",
+				1
+			>,
+			SqlError<
+				"WITHIN GROUP is required for ordered-set aggregate percent_rank",
+				1
+			>,
+			SqlError<
+				"WITHIN GROUP is required for ordered-set aggregate cume_dist",
+				1
+			>,
+		]
+	>();
 });
 
 test("JSON, array and range aggregates", () => {
