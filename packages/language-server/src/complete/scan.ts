@@ -407,23 +407,23 @@ function structure(toks: readonly Tok[]): { at: At[]; used: RelRef[] } {
 				let item: Item | null = null;
 				if (depth0 && after) {
 					kind =
-						after === lv.target && (clause === "into" || clause === "insert")
-							? "target"
-							: "names";
+						// `INSERT INTO t AS u (…)`: the target's column list
+						after === lv.target && clause === "into" ? "target" : "names";
 					item = after;
 					after = null;
-				} else if (depth0 && clause === "with" && cte) {
+				} else if (cte) {
+					// `WITH c(a, b)`: the names list; the body's columns no longer matter
 					kind = "names";
 					item = cte;
+					cte = null;
 				} else if (prev === "insert" || prev === "conflict") kind = "target";
-				else if (prev === "using" && clause === "using") kind = "using";
 				else if (
 					prev === "values" ||
 					(clause === "values" && depth0 && is(i - 1, ","))
 				)
 					kind = "values";
 				here.opens = kind;
-				if (kind === "names" && item) item.columns = [];
+				if (kind === "names") item!.columns = [];
 				parens.push({ kind, item });
 				if (depth0 && out) out.push(t);
 				continue;
@@ -437,9 +437,9 @@ function structure(toks: readonly Tok[]): { at: At[]; used: RelRef[] } {
 				if (parens.length === 0) {
 					if (out) out.push(t);
 					// `FROM f(x) AS y`: the alias may follow a function call
-					if (p.kind === "expr" && clause === "from-call") {
+					if (clause === "from-call") {
 						clause = "from";
-						after = lv.items.at(-1) ?? null;
+						after = lv.items.at(-1)!;
 						aliased = false;
 					}
 				}
@@ -447,8 +447,8 @@ function structure(toks: readonly Tok[]): { at: At[]; used: RelRef[] } {
 			}
 			if (!depth0) {
 				const p = parens.at(-1)!;
-				if (p.kind === "names" && p.item && (t.k === "w" || t.k === "q"))
-					p.item.columns!.push(t.v);
+				if (p.kind === "names" && (t.k === "w" || t.k === "q"))
+					p.item!.columns!.push(t.v);
 				continue;
 			}
 
@@ -480,8 +480,7 @@ function structure(toks: readonly Tok[]): { at: At[]; used: RelRef[] } {
 					is(i + 1, ".") &&
 					(toks[i + 2]?.k === "w" || toks[i + 2]?.k === "q")
 				) {
-					at[i + 1] = { ...here, relNext: false };
-					at[i + 2] = here;
+					at[i + 1] = at[i + 2] = here;
 					ref = { schema: t.v, name: toks[i + 2]!.v };
 					i += 2;
 				}
@@ -505,52 +504,39 @@ function structure(toks: readonly Tok[]): { at: At[]; used: RelRef[] } {
 			if (t.k === "o" && t.v === ",") {
 				if (out) endOutput(), (out = []);
 				if (clause === "from") here.relNext = expectRel = true;
-				else if (clause === "with") cteNext = true;
+				// the next word names a CTE (read only in WITH)
+				else cteNext = true;
 				continue;
 			}
 			if (t.k === "o" && t.v === ";") {
-				endOutput();
+				// a statement's own output names are never read
+				out = null;
 				lv = { parent, items: [], ctes: [], outputs: null, target: null };
 				clause = "";
 				continue;
 			}
-			if (
-				clause === "with" &&
-				cteNext &&
-				(t.k === "w" || t.k === "q") &&
-				w !== "recursive"
-			) {
-				cte = { name: t.v, rel: null, columns: null };
-				lv.ctes.push(cte);
+			if (clause === "with" && cteNext && w !== "recursive") {
 				cteNext = false;
-				continue;
-			}
-			if (w === null) {
-				if (out) out.push(t);
-				continue;
+				if (t.k === "w" || t.k === "q") {
+					cte = { name: t.v, rel: null, columns: null };
+					lv.ctes.push(cte);
+					continue;
+				}
 			}
 			switch (w) {
 				case "with":
-					if (clause === "" || clause === "with") {
+					// not `WITH ORDINALITY`, `WITH TIME ZONE`, `WITH TIES`
+					if (clause === "") {
 						clause = "with";
 						cteNext = true;
 					}
 					break;
 				case "select":
-					endOutput();
-					clause = "select";
-					if (lv.outputs === null) {
-						lv.outputs = [];
-						out = [];
-					}
-					break;
 				case "returning":
-					endOutput();
-					clause = "returning";
-					if (lv.outputs === null) {
-						lv.outputs = [];
-						out = [];
-					}
+					// the level's output names, as the last select list or RETURNING reads them
+					clause = w;
+					lv.outputs = [];
+					out = [];
 					break;
 				case "from":
 					endOutput();
@@ -563,41 +549,34 @@ function structure(toks: readonly Tok[]): { at: At[]; used: RelRef[] } {
 					here.relNext = expectRel = true;
 					break;
 				case "into":
-					if (clause === "insert" || clause === "merge" || clause === "")
+					if (clause === "insert" || clause === "merge")
 						targetNext = !lv.target;
-					endOutput();
 					clause = "into";
 					here.relNext = expectRel = true;
 					break;
 				case "update":
-					if (lv.target) clause = "update";
-					else {
-						clause = "update";
-						targetNext = true;
-						here.relNext = expectRel = true;
-					}
+					// `ON CONFLICT DO UPDATE` and MERGE update the target; `FOR [NO KEY] UPDATE` locks rows
+					if (lv.target || word(i - 1) === "for" || word(i - 1) === "key")
+						break;
+					targetNext = true;
+					here.relNext = expectRel = true;
 					break;
 				case "table":
-					if (clause === "" || clause === "with") {
-						clause = "from";
-						here.relNext = expectRel = true;
-					}
+					here.relNext = expectRel = true;
 					break;
 				case "using":
 					if (
 						clause === "into" ||
-						(clause === "from" &&
-							lv.target !== null &&
-							lv.items.length === 1 &&
-							lv.items[0] === lv.target)
+						(clause === "from" && lv.target !== null && lv.items.length === 1)
 					) {
 						// DELETE FROM t USING …, MERGE INTO t USING …
 						clause = "from";
 						here.relNext = expectRel = true;
-					} else clause = "using";
+					}
+					// else `JOIN … USING (…)` or `ORDER BY … USING <`
 					break;
 				case "conflict":
-					clause = "conflict";
+					clause = w;
 					// `excluded` names the row proposed for insertion
 					if (lv.target?.rel)
 						lv.items.push({
@@ -611,12 +590,9 @@ function structure(toks: readonly Tok[]): { at: At[]; used: RelRef[] } {
 				case "except": {
 					endOutput();
 					// the next branch has its own FROM items; the first branch's outputs name the columns
-					const outputs = first.outputs;
-					lv = { parent, items: [], ctes: lv.ctes, outputs, target: null };
-					clause = "";
+					lv = { ...lv, items: [] };
 					break;
 				}
-				case "on":
 				case "where":
 				case "group":
 				case "order":
@@ -629,7 +605,6 @@ function structure(toks: readonly Tok[]): { at: At[]; used: RelRef[] } {
 				case "delete":
 				case "insert":
 				case "merge":
-				case "do":
 					endOutput();
 					clause = w;
 					break;
@@ -641,14 +616,8 @@ function structure(toks: readonly Tok[]): { at: At[]; used: RelRef[] } {
 		return { level: first, i };
 	};
 
-	let i = 0;
-	while (i < toks.length) {
-		// a stray `)` at the top: keep reading after it in a new level
-		const r = level(i, null);
-		i = r.i + 1;
-		if (r.i < toks.length)
-			at[r.i] = { level: r.level, clause: "", paren: null };
-	}
+	// a stray `)` at the top (it has no `At`): keep reading after it in a new level
+	for (let i = 0; toks[i]; ) i = level(i, null).i + 1;
 	return { at, used };
 }
 
@@ -656,34 +625,15 @@ function structure(toks: readonly Tok[]): { at: At[]; used: RelRef[] } {
 function outputName(toks: readonly Tok[]): string | null {
 	const last = toks.at(-1);
 	if (!last) return null;
-	const named = last.k === "q" || (last.k === "w" && !NOT_ALIAS.has(last.v));
-	if (named && toks.length === 1) return last.v;
-	const before = toks.at(-2);
-	if (named && before?.k === "w" && before.v === "as") return last.v;
-	if (named && before?.k === "o" && before.v === ".") return last.v;
-	// `expr alias`
-	if (
-		named &&
-		before &&
-		(before.k === "w" ||
-			before.k === "q" ||
-			before.k === "n" ||
-			before.k === "s" ||
-			before.k === "p" ||
-			(before.k === "o" && before.v === ")"))
-	)
-		return last.v;
-	// `f(…)`
+	if (last.k === "q" || (last.k === "w" && !NOT_ALIAS.has(last.v))) {
+		// `name`, `t.name`, `expr alias`, `expr AS alias`
+		const before = toks.at(-2);
+		if (!before || before.k !== "o" || before.v === ")" || before.v === ".")
+			return last.v;
+	}
+	// `f(…)`: the arguments are not in `toks`, so the third token is the `)`
 	const head = toks[0]!;
-	if (
-		head.k === "w" &&
-		toks[1]?.k === "o" &&
-		toks[1].v === "(" &&
-		last.k === "o" &&
-		last.v === ")" &&
-		toks.length === 3
-	)
-		return head.v;
+	if (toks.length === 3 && head.k === "w" && toks[1]!.v === "(") return head.v;
 	return null;
 }
 
@@ -713,8 +663,8 @@ function expectAfter(
 	j: number,
 ): Expect {
 	const t = toks[j]!;
-	const a = at[j];
-	if (!a) return NONE;
+	if (t.v === ")") return NONE;
+	const a = at[j]!;
 	const scope = (): Expect => {
 		const sources: ScopeItem[] = [];
 		for (let l: Level | null = a.level; l; l = l.parent)
@@ -749,7 +699,7 @@ function expectAfter(
 	});
 
 	// `alias.` / `schema.` / `schema.table.`
-	if (t.k === "o" && t.v === ".") {
+	if (t.v === ".") {
 		const q: string[] = [];
 		let k = j;
 		while (
@@ -762,22 +712,17 @@ function expectAfter(
 			if (q.length === 2) break;
 		}
 		if (!q.length) return NONE;
-		if (k >= 0 && at[k]?.relNext)
-			return q.length === 1 ? relation(q[0]!) : NONE;
+		if (at[k]?.relNext) return q.length === 1 ? relation(q[0]!) : NONE;
 		return qualified(a.level, q);
 	}
 	if (a.relNext) return relation(null);
-	if (t.k === "o" && t.v === "(") {
+	if (t.v === "(") {
 		const opens = a.opens;
-		return opens === "target"
-			? target()
-			: opens === "expr" || opens === "using"
-				? scope()
-				: NONE;
+		return opens === "target" ? target() : opens === "expr" ? scope() : NONE;
 	}
 	if (t.k === "o" && t.v === ",") {
 		if (a.paren === "target") return target();
-		if (a.paren === "expr" || a.paren === "using") return scope();
+		if (a.paren === "expr") return scope();
 		if (a.paren) return NONE;
 		if (a.clause === "set") return target();
 		return a.clause === "select" ||
@@ -791,13 +736,7 @@ function expectAfter(
 		if (t.v === "set") return target();
 		return BEFORE_EXPR.has(t.v) ? scope() : NONE;
 	}
-	if (
-		t.k === "o" &&
-		t.v !== ")" &&
-		t.v !== "::" &&
-		t.v !== ";" &&
-		t.v !== "]"
-	) {
+	if (t.k === "o" && t.v !== "::" && t.v !== ";" && t.v !== "]") {
 		if (t.v === "*") {
 			const p = toks[j - 1];
 			if (
