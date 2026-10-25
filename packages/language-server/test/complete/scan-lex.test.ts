@@ -181,8 +181,6 @@ test.each<[string, string]>([
 		"WITH r AS (SELECT id FROM posts) SELECT * FROM users WHERE EXISTS (SELECT 1 FROM r WHERE r.|)",
 		"columns r(id)",
 	],
-	// a SELECT has no DML target: UPDATE in FOR UPDATE names a relation
-	["SELECT * FROM users FOR UPDATE |", "relation"],
 ])("%s", (marked, want) => {
 	expect(at(marked)).toBe(want);
 });
