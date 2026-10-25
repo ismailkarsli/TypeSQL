@@ -71,6 +71,22 @@ test("@typesql/core only as an adapter's dependency (pnpm layout)", () => {
 	);
 });
 
+test.each([
+	"@typesql/postgres",
+	"@typesql/kysely",
+	"@typesql/drizzle",
+	"@typesql/prisma",
+])("@typesql/core only as a dependency of %s", (adapter) => {
+	const dir = adapter.replace("@typesql/", "via-");
+	const core = `${dir}/node_modules/${adapter}/node_modules/@typesql/core`;
+	pkg(core, "@typesql/core", CORE);
+	pkg(`${dir}/node_modules/${adapter}`, adapter, {
+		".": { default: "./dist/index.js" },
+	});
+	write(`${dir}/src/q.ts`, "");
+	expect(corePackage(join(root, `${dir}/src/q.ts`))).toBe(join(root, core));
+});
+
 test("no @typesql/core", () => {
 	write("none/src/q.ts", "");
 	expect(corePackage(join(root, "none/src/q.ts"))).toBeNull();

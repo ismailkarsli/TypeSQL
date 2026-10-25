@@ -3,7 +3,7 @@ import type { ChildProcess } from "node:child_process";
 import Module from "node:module";
 import { PassThrough } from "node:stream";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { afterAll, beforeAll, expect, test } from "vitest";
+import { afterAll, beforeAll, expect, test, vi } from "vitest";
 import { connectLsp, type Lsp } from "../../core/test/cache/lsp.js";
 import {
 	SCHEMA,
@@ -116,7 +116,12 @@ test("adds the columns in scope and drops TypeScript's item with the statement",
 		["name", "text | null"],
 	]);
 	expect(logs).toContain(`using @typesql/core at ${p.corePackage}`);
-	expect(logs.some((l) => /^3 items in \d+ ms$/.test(l))).toBe(true);
+	const ms = logs
+		.map((l) => /^3 items in (\d+) ms$/.exec(l)?.[1])
+		.find((m) => m !== undefined);
+	expect(Number(ms)).toBeLessThan(60_000);
+	// TypeScript's own log goes to the editor's log as it is
+	expect(child?.stderr).toBeNull();
 }, 60_000);
 
 test("follows the editor's edits, incremental and whole", async () => {
@@ -150,6 +155,16 @@ test("follows the editor's edits, incremental and whole", async () => {
 	expect(relations.map((i) => i.label)).toEqual(
 		expect.arrayContaining(["users", "posts"]),
 	);
+}, 60_000);
+
+test("in a literal of another call: TypeScript's answers, nothing logged", async () => {
+	const { text, position } = split(
+		`const f = (s: string): string => s;\nf("SELECT * FROM |");\n`,
+	);
+	const uri = open("src/d.ts", text);
+	const before = logs.length;
+	await complete(uri, position);
+	expect(logs.slice(before)).toEqual([]);
 }, 60_000);
 
 test("outside a statement literal, and after the document closes: TypeScript's answers only", async () => {
@@ -264,6 +279,7 @@ test("the root is the first workspace folder, the root URI, the root path or the
 	for (const [params, root] of [
 		[{ rootUri: pathToFileURL("/a").href }, "/a"],
 		[{ workspaceFolders: null, rootUri: null, rootPath: "/b" }, "/b"],
+		[{ workspaceFolders: [], rootUri: pathToFileURL("/c").href }, "/c"],
 		[{}, process.cwd()],
 	] as const) {
 		const f = fake({});
@@ -279,6 +295,22 @@ test("a server that does not start: the editor's initialize request fails", asyn
 		"cannot start TypeScript's language server from /nowhere: no typescript here";
 	expect(r.error).toEqual({ code: -32603, message });
 	expect(f.log).toEqual([message]);
+});
+
+test("a server that does not start, with a reason that is no Error", async () => {
+	const editor = { readable: new PassThrough(), writable: new PassThrough() };
+	const log: string[] = [];
+	proxy(
+		editor,
+		() => Promise.reject("no typescript"),
+		(m) => log.push(m),
+	);
+	const client = connectLsp("/", editor.readable, editor.writable, () => {});
+	const r = await client.request("initialize", { rootPath: "/nowhere" });
+	const message =
+		"cannot start TypeScript's language server from /nowhere: no typescript";
+	expect(r.error).toEqual({ code: -32603, message });
+	expect(log).toEqual([message]);
 });
 
 test("an error from the server, unknown documents and text outside a literal pass through", async () => {
@@ -298,7 +330,7 @@ test("an error from the server, unknown documents and text outside a literal pas
 	error = false;
 	f.client.notify("textDocument/didChange", {
 		textDocument: { uri: "file:///unknown.ts" },
-		contentChanges: [{ text: "x" }],
+		contentChanges: [{ text: TEXT }],
 	});
 	expect(await f.complete("file:///unknown.ts")).toEqual(ITEMS);
 	f.open("file:///outside.ts", "const a = 1 + ");
@@ -331,6 +363,18 @@ test("failing and late lookups add nothing and are logged", async () => {
 	expect(await refused.complete()).toEqual(ITEMS);
 	expect(refused.log).toEqual(["refused"]);
 
+	// an error without a stack: its message
+	const bare = new Error("bare");
+	delete bare.stack;
+	const stackless = fake(
+		{ fromLSPConnection: () => Promise.reject(bare) },
+		pipe,
+	);
+	await stackless.initialize();
+	stackless.open();
+	expect(await stackless.complete()).toEqual(ITEMS);
+	expect(stackless.log).toEqual(["bare"]);
+
 	const late = fake(
 		{ fromLSPConnection: () => new Promise(() => {}) },
 		pipe,
@@ -348,4 +392,91 @@ test("the editor's end closes the server's input", async () => {
 	const ended = new Promise((r) => f.server.writable.on("finish", r));
 	f.editor.readable.end();
 	await ended;
+});
+
+/** An API whose connection fails: counts how often the proxy asked for our items. */
+function asking() {
+	const counter = { asked: 0 };
+	const api = {
+		fromLSPConnection: async () => {
+			counter.asked++;
+			throw new Error("asked");
+		},
+	};
+	return { counter, api };
+}
+
+test("an initialize request without capabilities", async () => {
+	const f = fake({});
+	const r = await f.client.request("initialize", { rootPath: "/a" });
+	expect(r.result).toEqual(ITEMS);
+});
+
+test("the cursor's offset: past the last line is the end; a line starts after its newline", async () => {
+	const { counter, api } = asking();
+	const f = fake(api, (method) => ({
+		result: method === "custom/initializeAPISession" ? { pipe: "p" } : ITEMS,
+	}));
+	await f.initialize();
+	const at = async (text: string, line: number, character: number) => {
+		f.open(URI, text);
+		await f.client.request("textDocument/completion", {
+			textDocument: { uri: URI },
+			position: { line, character },
+		});
+		return counter.asked;
+	};
+	expect(await at(TEXT, 3, 0)).toBe(1);
+	expect(await at(`\n${TEXT}");\nconst x = 1;`, 1, TEXT.length)).toBe(2);
+	expect(await at(`\n${TEXT}");\nconst x = 1;`, 2, 0)).toBe(2);
+});
+
+test("a closed document is not looked up", async () => {
+	const { counter, api } = asking();
+	const f = fake(api);
+	await f.initialize();
+	f.open();
+	f.client.notify("textDocument/didClose", { textDocument: { uri: URI } });
+	expect(await f.complete()).toEqual(ITEMS);
+	expect(counter.asked).toBe(0);
+	expect(f.log).toEqual([]);
+});
+
+test("no items of ours (not a core call): the server's, nothing logged but the session", async () => {
+	const snapshot = {
+		getDefaultProjectForFile: async () => undefined,
+		dispose: async () => {},
+	};
+	const f = fake(
+		{
+			fromLSPConnection: async () => ({
+				getCurrentLanguageServerSnapshot: async () => snapshot,
+				close: async () => {},
+			}),
+		},
+		(method) => ({
+			result: method === "custom/initializeAPISession" ? { pipe: "p" } : ITEMS,
+		}),
+	);
+	await f.initialize();
+	f.open();
+	expect(await f.complete()).toEqual(ITEMS);
+	expect(f.log).toEqual(["API session open (client: typescript 7.1.0 at /ts)"]);
+});
+
+test("the budget's timer is cleared once our items are in", async () => {
+	const { counter, api } = asking();
+	vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+	try {
+		const f = fake(api, (method) => ({
+			result: method === "custom/initializeAPISession" ? { pipe: "p" } : ITEMS,
+		}));
+		await f.initialize();
+		f.open();
+		expect(await f.complete()).toEqual(ITEMS);
+		expect(counter.asked).toBe(1);
+		expect(vi.getTimerCount()).toBe(0);
+	} finally {
+		vi.useRealTimers();
+	}
 });

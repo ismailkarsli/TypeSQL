@@ -66,7 +66,6 @@ export async function sqlCallAt(
 	const literal = call.arguments[0]!;
 	const parts = textOf(file, literal, kinds);
 	if (
-		!parts ||
 		offset < parts.start ||
 		offset > parts.end ||
 		parts.holes.some(([s, e]) => offset > s && offset < e)
@@ -94,7 +93,10 @@ export async function sqlCallAt(
 		: null;
 }
 
-/** The innermost call whose first argument is a string or template literal containing `offset`. */
+/**
+ * The innermost call around `offset` whose first argument is a string or template literal. The
+ * literal itself may not contain `offset`; then no literal does, but in a `${…}` of an outer one.
+ */
 function callAt(
 	file: SourceFile,
 	offset: number,
@@ -102,16 +104,19 @@ function callAt(
 ): CallExpression | null {
 	let found: CallExpression | null = null;
 	const visit = (n: Node): void => {
-		if (offset < n.pos || offset > n.end) return;
+		if (
+			// Stryker disable next-line EqualityOperator: a node whose leading trivia starts at `offset` holds no literal that contains it (a literal does only after its opening quote)
+			offset < n.pos ||
+			offset > n.end
+		)
+			return;
 		if (n.kind === kinds.CallExpression) {
 			const arg = (n as CallExpression).arguments[0];
 			if (
 				arg &&
 				(arg.kind === kinds.StringLiteral ||
 					arg.kind === kinds.NoSubstitutionTemplateLiteral ||
-					arg.kind === kinds.TemplateExpression) &&
-				offset > arg.getStart(file) &&
-				offset <= arg.end
+					arg.kind === kinds.TemplateExpression)
 			) {
 				found = n as CallExpression;
 			}
@@ -132,14 +137,14 @@ function textOf(
 	end: number;
 	text: string;
 	holes: [number, number][];
-} | null {
+} {
 	const src = file.text;
 	const open = literal.getStart(file);
 	const quote = src[open];
 	const start = open + 1;
 	// an unterminated literal (still being typed) has no closing quote
 	let end = literal.end;
-	if (end - 1 > open && src[end - 1] === quote && src[end - 2] !== "\\") end--;
+	if (end - 1 > open && src[end - 1] === quote && !escaped(src, end - 1)) end--;
 	const holes: [number, number][] = [];
 	if (literal.kind === kinds.TemplateExpression) {
 		const t = literal as TemplateExpression;
@@ -158,6 +163,13 @@ function textOf(
 		i = e;
 	}
 	return { start, end, text, holes };
+}
+
+/** Whether the character at `i` is escaped: after an odd number of backslashes. */
+function escaped(s: string, i: number): boolean {
+	let n = 0;
+	while (s[i - n - 1] === "\\") n++;
+	return n % 2 === 1;
 }
 
 /** Escape sequences replaced by text of the same length: `\"` → ` "`, `\n` → two spaces. */

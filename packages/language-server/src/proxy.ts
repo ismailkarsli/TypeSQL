@@ -63,12 +63,14 @@ export async function spawnTypeScript(
 export function start(root?: string): void {
 	proxy(
 		{ readable: process.stdin, writable: process.stdout },
-		async (workspace) => {
-			const { server, child } = await spawnTypeScript(root ?? workspace);
+		async (dir) => {
+			const { server, child } = await spawnTypeScript(dir);
 			child.on("exit", (code) => process.exit(code ?? 0));
 			return server;
 		},
 		(m) => process.stderr.write(`typesql: ${m}\n`),
+		BUDGET_MS,
+		root,
 	);
 }
 
@@ -108,22 +110,23 @@ interface ClientParams extends CompletionParams {
 }
 
 /**
- * Passes messages between `client` (the editor) and the server `startServer` starts for the
- * workspace of the editor's `initialize` request, and adds our items to the server's completion
- * responses within `budget` milliseconds.
+ * Passes messages between `client` (the editor) and the server `startServer` starts for `root`
+ * (default: the workspace of the editor's `initialize` request), and adds our items to the
+ * server's completion responses within `budget` milliseconds.
  */
 export function proxy(
 	client: Peer,
 	startServer: (root: string) => Promise<Server>,
 	log: (message: string) => void,
 	budget = BUDGET_MS,
+	root?: string,
 ): void {
 	/** The editor's text of open documents, for the cheap test before a lookup. */
 	const texts = new Map<string, string>();
 	/** The editor's completion requests the server has not answered yet. */
 	const pending = new Map<Id, CompletionParams>();
 	/** Our own requests to the server. */
-	const own = new Map<string, (m: Message) => void>();
+	const own = new Map<Id, (m: Message) => void>();
 	let next = 0;
 	let server: Promise<Server | undefined> | undefined;
 	let session: Session | undefined;
@@ -186,16 +189,18 @@ export function proxy(
 		);
 		session = current;
 		read(s.readable, (m, raw) => {
-			if (m.method === undefined && m.id !== undefined) {
-				const resolve = typeof m.id === "string" ? own.get(m.id) : undefined;
+			// a response: to one of our requests, or to the editor's completion request
+			if (m.method === undefined) {
+				const id = m.id as Id;
+				const resolve = own.get(id);
 				if (resolve) {
-					own.delete(m.id as string);
+					own.delete(id);
 					resolve(m);
 					return;
 				}
-				const params = pending.get(m.id);
+				const params = pending.get(id);
 				if (params) {
-					pending.delete(m.id);
+					pending.delete(id);
 					void answer(current, m, params).then((r) =>
 						client.writable.write(frame(r)),
 					);
@@ -211,16 +216,16 @@ export function proxy(
 		switch (m.method) {
 			case "initialize": {
 				const folder = params.workspaceFolders?.[0]?.uri ?? params.rootUri;
-				const root = folder
-					? fileURLToPath(folder)
-					: (params.rootPath ?? process.cwd());
-				server = startServer(root).then(
+				const dir =
+					root ??
+					(folder ? fileURLToPath(folder) : (params.rootPath ?? process.cwd()));
+				server = startServer(dir).then(
 					(s) => {
 						serve(s);
 						return s;
 					},
 					(e: unknown) => {
-						const message = `cannot start TypeScript's language server from ${root}: ${e instanceof Error ? e.message : String(e)}`;
+						const message = `cannot start TypeScript's language server from ${dir}: ${e instanceof Error ? e.message : String(e)}`;
 						log(message);
 						client.writable.write(
 							frame({ id: m.id as Id, error: { code: -32603, message } }),
@@ -277,12 +282,16 @@ function read(
 		for (;;) {
 			const end = buffer.indexOf("\r\n\r\n");
 			if (end < 0) return;
-			const length = Number(
-				/Content-Length: *(\d+)/i.exec(buffer.subarray(0, end).toString())?.[1],
-			);
-			if (buffer.length < end + 4 + length) return;
-			const raw = buffer.subarray(0, end + 4 + length);
-			buffer = buffer.subarray(end + 4 + length);
+			const header = buffer.subarray(0, end).toString();
+			const length = /Content-Length: *(\d+)/i.exec(header)?.[1];
+			if (length === undefined)
+				throw new Error(
+					`no Content-Length in the header ${JSON.stringify(header)}`,
+				);
+			const size = end + 4 + Number(length);
+			if (buffer.length < size) return;
+			const raw = buffer.subarray(0, size);
+			buffer = buffer.subarray(size);
 			onMessage(JSON.parse(raw.subarray(end + 4).toString()) as Message, raw);
 		}
 	});

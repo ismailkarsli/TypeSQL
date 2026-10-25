@@ -20,9 +20,10 @@ export function mayBeInSqlLiteral(text: string, offset: number): boolean {
 
 /** Whether the literal opened with `quote` before `from` ends before the end of `s`. */
 function closes(s: string, from: number, quote: string): boolean {
-	for (let i = from; i < s.length; i++) {
-		const c = s[i];
-		if (c === "\\") i++;
+	let escaped = false;
+	for (const c of s.slice(from)) {
+		if (escaped) escaped = false;
+		else if (c === "\\") escaped = true;
 		else if (c === quote || (quote !== "`" && c === "\n")) return true;
 	}
 	return false;

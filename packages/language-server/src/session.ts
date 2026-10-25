@@ -205,10 +205,9 @@ export class Session {
 	async close(): Promise<void> {
 		const c = this.connection;
 		this.connection = undefined;
-		try {
-			await (await c)?.api.close();
-		} catch {
-			// the server is gone already
-		}
+		// none yet, one that failed to open, or no client matched
+		const connection = await c?.catch(() => undefined);
+		// the server may be gone already
+		await connection?.api.close().catch(() => {});
 	}
 }

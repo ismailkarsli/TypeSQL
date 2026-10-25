@@ -16,6 +16,22 @@ test.each([
 	['sql("a \\" b |', true],
 	['sql("a"); f("b", |', false],
 	["const a = 1 + |", false],
+	// one-letter and digit-bearing callee names
+	['f("SELECT * FROM |', true],
+	['sql2("SELECT * FROM |', true],
+	// a quoted literal ends at the end of its line, a template literal does not
+	['sql("SELECT *\nFROM |', false],
+	["sql('SELECT *\nFROM |", false],
+	// the literal ends after an escape, or right after its opening quote
+	['sql("a \\" b"); const x = |', false],
+	['sql("a \\\\"); const x = |', false],
+	['sql(""); const x = |', false],
 ])("%s", (marked, want) => {
 	expect(at(marked)).toBe(want);
+});
+
+test("only the last 20000 characters before the cursor are read", () => {
+	const filler = "x".repeat(25_000);
+	expect(at(`sql("${filler}|`)).toBe(false);
+	expect(at(`sql("|${filler}`)).toBe(true);
 });
