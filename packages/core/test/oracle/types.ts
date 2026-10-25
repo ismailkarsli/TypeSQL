@@ -83,8 +83,11 @@ const NOT_RUN =
 	/^\s*(begin|commit|end|rollback|abort|start\s+transaction|savepoint|release|prepare\s+transaction|vacuum|checkpoint|set\s+(session\s+)?characteristics|discard|reindex\s+database|create\s+database|drop\s+database|alter\s+system)\b/i;
 /** Server errors a DDL step meets because our `DB` has no constraints (foreign keys, ON CONFLICT targets). */
 const MISSING_CONSTRAINTS = new Set(["42830", "42P10"]);
-/** The contrib TABLESAMPLE methods the engine types, in pg_catalog so `public` holds only the test's schema. */
-const EXTENSIONS = ["tsm_system_rows", "tsm_system_time"];
+/**
+ * The contrib types and TABLESAMPLE methods the engine types (`citext` columns, `TABLESAMPLE
+ * SYSTEM_ROWS`), in pg_catalog so `public` holds only the test's schema.
+ */
+const EXTENSIONS = ["citext", "tsm_system_rows", "tsm_system_time"];
 
 export async function typesOracle(
 	url: string,

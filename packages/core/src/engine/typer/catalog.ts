@@ -5,7 +5,6 @@ import type {
 	CommonLit,
 	DateTimeT,
 	IntT,
-	IsArr,
 	JsonT,
 	LitToText,
 	NumT,
@@ -1119,7 +1118,7 @@ export type MatchKind<P extends string, A extends string> = A extends
 						? "x"
 						: false
 					: P extends "anyarray"
-						? IsArr<A> extends true
+						? A extends `${string}[]`
 							? "x"
 							: false
 						: P extends "anyjson"
