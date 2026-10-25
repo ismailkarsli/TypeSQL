@@ -56,8 +56,8 @@ const NONE: Context["expect"] = { kind: "none" };
 // ───────────────────────────── lexer ─────────────────────────────
 
 /**
- * `w` unquoted word (folded), `q` quoted identifier, `s` string, `n` number, `p` parameter
- * (`$1`, `:name`), `x` `{slot}`, `o` operator or punctuation.
+ * `w` unquoted word (folded), `q` quoted identifier, `s` string, `n` number (or `$1`), `p`
+ * named parameter (`:name`), `x` `{slot}`, `o` operator or punctuation.
  */
 interface Tok {
 	readonly k: "w" | "q" | "s" | "n" | "p" | "x" | "o";
@@ -66,137 +66,97 @@ interface Tok {
 	readonly e: number;
 }
 
-const WORD_START = /[A-Za-z_\u0080-￿]/;
-const WORD = /[A-Za-z0-9_$\u0080-￿]/;
-const OP = /[+\-*/<>=~!@#%^&|`?]/;
+const WORD = /[A-Za-z_\u0080-￿][A-Za-z0-9_$\u0080-￿]*/y;
+/** To the end of the line. */
+const LINE_COMMENT = /--[^\n\r]*/y;
+/** The delimiters of (nested) block comments. */
+const COMMENT_MARK = /\/\*|\*\//g;
+/** A string's prefix and opening quote; group 1 for `E'…'`, where backslashes escape. */
+const STRING = /(?:([eE])|[bBxXnN]|[uU]&)?'/y;
+/** The rest of a string. `'a''b'` reads as two strings, which the scan cannot tell apart from one. */
+const STRING_REST = /[^']*'?/y;
+const ESCAPE_STRING_REST = /(?:[^'\\]|\\.|'')*'?/sy;
+/** Group 1: the name, `""` for each `"`. */
+const QUOTED = /(?:[uU]&)?"((?:[^"]|"")*)"?/y;
+const DOLLAR_TAG = /\$(?:[A-Za-z_\u0080-￿][A-Za-z0-9_\u0080-￿]*)?\$/y;
+/** With trailing letters (`0x1F`, `1_000`, `1abc`), like PostgreSQL. */
+const NUMBER =
+	/(?:[0-9]|[.$][0-9])[0-9._]*(?:[eE][-+])?[A-Za-z0-9_$\u0080-￿]*/y;
+const NAMED_PARAM = /:[A-Za-z_][A-Za-z0-9_$\u0080-￿]*/y;
+const SLOT = /\{[A-Za-z_][A-Za-z0-9_]*\}/y;
+/** Any other character, or `::`. */
+const PUNCTUATION = /::|./sy;
+/** Operator characters, up to a comment. */
+const OPERATOR = /(?:(?!--|\/\*)[+\-*/<>=~!@#%^&|`?])+/y;
 
 /** Postgres folds unquoted names to lower case. */
 export const fold = (s: string): string =>
-	s.replace(/[A-Z]+/g, (m) => m.toLowerCase());
+	s.replace(/[A-Z]/g, (m) => m.toLowerCase());
 
-/** Tokens, and whether `offset` is inside a string, comment, quoted identifier or slot. */
+/** Tokens, and whether `offset` is inside a comment. */
 function lex(text: string, offset: number): { toks: Tok[]; inside: boolean } {
 	const toks: Tok[] = [];
 	let inside = false;
 	const n = text.length;
-	/** Something that is not code ran from `s` to `e` (`open`: no closing delimiter). */
-	const skipped = (s: number, e: number, open: boolean): void => {
-		if (s < offset && (offset < e || (open && offset <= e))) inside = true;
-	};
 	let i = 0;
+	/** The match of the sticky `re` at `i`; `i` moves past it. */
+	const take = (re: RegExp): RegExpExecArray | null => {
+		re.lastIndex = i;
+		const m = re.exec(text);
+		if (m) i = re.lastIndex;
+		return m;
+	};
+	const push = (k: Tok["k"], s: number, v = text.slice(s, i)): void => {
+		toks.push({ k, v, s, e: i });
+	};
+	/** A comment ran from `s` to `i`; `open`: the cursor at `i` is in it too. */
+	const comment = (s: number, open: boolean): void => {
+		if (s < offset && (offset < i || (open && offset === i))) inside = true;
+	};
 	while (i < n) {
-		const c = text[i]!;
 		const s = i;
-		if (/\s/.test(c)) {
+		if (/\s/.test(text[i]!)) {
 			i++;
-		} else if (c === "-" && text[i + 1] === "-") {
-			while (i < n && text[i] !== "\n") i++;
-			skipped(s, i, true);
-		} else if (c === "/" && text[i + 1] === "*") {
+			continue;
+		}
+		if (take(LINE_COMMENT)) {
+			comment(s, true);
+			continue;
+		}
+		if (text.startsWith("/*", i)) {
 			let depth = 0;
-			while (i < n) {
-				if (text[i] === "/" && text[i + 1] === "*") depth++, (i += 2);
-				else if (text[i] === "*" && text[i + 1] === "/") {
-					i += 2;
-					if (--depth === 0) break;
-				} else i++;
+			COMMENT_MARK.lastIndex = i;
+			for (let c = COMMENT_MARK.exec(text); c; c = COMMENT_MARK.exec(text)) {
+				depth += c[0] === "/*" ? 1 : -1;
+				if (depth === 0) break;
 			}
-			skipped(s, i, depth > 0);
-		} else if (
-			c === "'" ||
-			(/[eEbBxXnN]/.test(c) && text[i + 1] === "'") ||
-			((c === "u" || c === "U") && text[i + 1] === "&" && text[i + 2] === "'")
-		) {
-			const backslash = c === "e" || c === "E";
-			i = text.indexOf("'", i) + 1;
-			let closed = false;
-			while (i < n) {
-				if (backslash && text[i] === "\\") i += 2;
-				else if (text[i] === "'") {
-					if (text[i + 1] === "'") i += 2;
-					else {
-						i++;
-						closed = true;
-						break;
-					}
-				} else i++;
-			}
-			skipped(s, Math.min(i, n), !closed);
-			toks.push({ k: "s", v: "", s, e: i });
-		} else if (
-			c === '"' ||
-			((c === "u" || c === "U") && text[i + 1] === "&" && text[i + 2] === '"')
-		) {
-			i = text.indexOf('"', i) + 1;
-			let v = "";
-			let closed = false;
-			while (i < n) {
-				if (text[i] === '"') {
-					if (text[i + 1] === '"') (v += '"'), (i += 2);
-					else {
-						i++;
-						closed = true;
-						break;
-					}
-				} else v += text[i++];
-			}
-			skipped(s, Math.min(i, n), !closed);
-			toks.push({ k: "q", v, s, e: i });
-		} else if (c === "$" && /[0-9]/.test(text[i + 1] ?? "")) {
-			i++;
-			while (i < n && /[0-9]/.test(text[i]!)) i++;
-			toks.push({ k: "p", v: text.slice(s, i), s, e: i });
-		} else if (
-			c === "$" &&
-			/^\$([A-Za-z_][A-Za-z0-9_]*)?\$/.test(text.slice(i, i + 64))
-		) {
-			const tag = /^\$([A-Za-z_][A-Za-z0-9_]*)?\$/.exec(
-				text.slice(i, i + 64),
-			)![0];
-			const end = text.indexOf(tag, i + tag.length);
-			i = end < 0 ? n : end + tag.length;
-			skipped(s, i, end < 0);
-			toks.push({ k: "s", v: "", s, e: i });
-		} else if (c === ":" && text[i + 1] === ":") {
-			i += 2;
-			toks.push({ k: "o", v: "::", s, e: i });
-		} else if (c === ":" && /[A-Za-z_]/.test(text[i + 1] ?? "")) {
-			i++;
-			while (i < n && WORD.test(text[i]!)) i++;
-			toks.push({ k: "p", v: text.slice(s, i), s, e: i });
-		} else if (
-			c === "{" &&
-			/^\{[A-Za-z_][A-Za-z0-9_]*\}/.test(text.slice(i, i + 256))
-		) {
-			i = text.indexOf("}", i) + 1;
-			skipped(s, i, false);
-			toks.push({ k: "x", v: text.slice(s, i), s, e: i });
-		} else if (
-			/[0-9]/.test(c) ||
-			(c === "." && /[0-9]/.test(text[i + 1] ?? ""))
-		) {
-			while (i < n && /[0-9._]/.test(text[i]!)) i++;
-			if (/[eE]/.test(text[i] ?? "") && /[-+0-9]/.test(text[i + 1] ?? "")) {
-				i += 2;
-				while (i < n && /[0-9]/.test(text[i]!)) i++;
-			}
-			while (i < n && WORD.test(text[i]!)) i++;
-			toks.push({ k: "n", v: text.slice(s, i), s, e: i });
-		} else if (WORD_START.test(c)) {
-			while (i < n && WORD.test(text[i]!)) i++;
-			toks.push({ k: "w", v: fold(text.slice(s, i)), s, e: i });
-		} else if (OP.test(c)) {
-			while (
-				i < n &&
-				OP.test(text[i]!) &&
-				!(text[i] === "-" && text[i + 1] === "-") &&
-				!(text[i] === "/" && text[i + 1] === "*")
-			)
-				i++;
-			toks.push({ k: "o", v: text.slice(s, i), s, e: i });
-		} else {
-			i++;
-			toks.push({ k: "o", v: c, s, e: i });
+			i = depth === 0 ? COMMENT_MARK.lastIndex : n;
+			comment(s, depth > 0);
+			continue;
+		}
+		const string = take(STRING);
+		if (string) {
+			take(string[1] ? ESCAPE_STRING_REST : STRING_REST);
+			push("s", s);
+			continue;
+		}
+		const quoted = take(QUOTED);
+		if (quoted) {
+			push("q", s, quoted[1]!.replaceAll('""', '"'));
+			continue;
+		}
+		const tag = take(DOLLAR_TAG)?.[0];
+		if (tag) {
+			const end = text.indexOf(tag, i);
+			i = end === -1 ? n : end + tag.length;
+			push("s", s);
+		} else if (take(NUMBER)) push("n", s);
+		else if (take(NAMED_PARAM)) push("p", s);
+		else if (take(SLOT)) push("x", s);
+		else if (take(WORD)) push("w", s, fold(text.slice(s, i)));
+		else {
+			if (!take(OPERATOR)) take(PUNCTUATION);
+			push("o", s);
 		}
 	}
 	return { toks, inside };
@@ -204,8 +164,17 @@ function lex(text: string, offset: number): { toks: Tok[]; inside: boolean } {
 
 // ───────────────────────────── structure ─────────────────────────────
 
-/** Words that start a query inside parentheses. */
-const QUERY_START = new Set(["select", "with", "values", "table"]);
+/** Words that start a query (or a data-modifying statement) inside parentheses. */
+const QUERY_START: ReadonlySet<string | null> = new Set([
+	"select",
+	"with",
+	"values",
+	"table",
+	"insert",
+	"update",
+	"delete",
+	"merge",
+]);
 /** Words that cannot be an alias right after a FROM item (keywords that end it). */
 const NOT_ALIAS = new Set([
 	"as",
@@ -281,8 +250,6 @@ const BEFORE_EXPR = new Set([
 type ParenKind =
 	/** A column list of the DML target: `INSERT INTO t (…)`, `ON CONFLICT (…)`. */
 	| "target"
-	/** `JOIN … USING (…)`. */
-	| "using"
 	/** Column names of a CTE or alias: `WITH c(a, b)`, `AS x(a, b)`. */
 	| "names"
 	| "values"
@@ -309,13 +276,14 @@ interface At {
 	readonly level: Level;
 	readonly clause: string;
 	readonly paren: ParenKind | null;
-	/** For `(`: the kind of parenthesis it opens (`query` for a subquery). */
-	opens?: ParenKind | "query";
+	/** For `(`: the kind of parenthesis it opens (none for a subquery). */
+	opens?: ParenKind;
 	/** A relation name may follow this token. */
 	relNext?: boolean;
 }
 
 function structure(toks: readonly Tok[]): { at: At[]; used: RelRef[] } {
+	// Stryker disable next-line ArrayDeclaration: `level` writes `at[i]` before anything reads it, so no initial element is ever seen
 	const at: At[] = [];
 	const used: RelRef[] = [];
 	const word = (i: number): string | null =>
@@ -345,9 +313,10 @@ function structure(toks: readonly Tok[]): { at: At[]; used: RelRef[] } {
 		let targetNext = false;
 		/** The last FROM item, while its alias may follow. */
 		let after: Item | null = null;
-		let aliased = false;
-		/** In `WITH`: the next word names a CTE. */
-		let cteNext = false;
+		/** Whether `after` has its alias; set with `after`. */
+		let aliased: boolean | undefined;
+		/** In `WITH`: the next word names a CTE; set by `WITH`. */
+		let cteNext: boolean | undefined;
 		let cte: Item | null = null;
 		/** Depth-0 tokens of the current select-list item. */
 		let out: Tok[] | null = null;
@@ -387,18 +356,15 @@ function structure(toks: readonly Tok[]): { at: At[]; used: RelRef[] } {
 			const depth0 = parens.length === 0;
 
 			if (is(i, "(")) {
-				if (QUERY_START.has(word(i + 1) ?? "")) {
-					here.opens = "query";
+				if (QUERY_START.has(word(i + 1))) {
 					const inner = level(i + 1, lv);
 					if (expectRel && depth0) {
 						addItem({ name: "", rel: null, columns: inner.level.outputs });
-					} else if (clause === "with" && cte && depth0) {
+					} else if (cte) {
 						cte.columns ??= inner.level.outputs;
 						cte = null;
-					} else if (after) after = null;
+					} else after = null;
 					i = inner.i;
-					if (i < toks.length)
-						at[i] = { level: lv, clause, paren: parens.at(-1)?.kind ?? null };
 					if (out && depth0) out.push(t, { k: "o", v: ")", s: 0, e: 0 });
 					continue;
 				}
