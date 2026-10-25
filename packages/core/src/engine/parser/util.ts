@@ -72,16 +72,6 @@ export type Expected<
 export type AtEnd<T extends Toks, I extends number> = T[I] extends Tok
 	? false
 	: true;
-/** True if token `I` is the word `W` (W is a lowercase keyword or a union of them). */
-export type AtWord<T extends Toks, I extends number, W extends string> =
-	T[I] extends WordTok<infer V> ? (V extends W ? true : false) : false;
-/** True if token `I` is the operator/punct `O`. */
-export type AtOp<T extends Toks, I extends number, O extends string> =
-	T[I] extends OpTok<infer V> ? (V extends O ? true : false) : false;
-export type HeadWord<T extends Toks, I extends number> =
-	T[I] extends WordTok<infer V> ? V : never;
-export type HeadOp<T extends Toks, I extends number> =
-	T[I] extends OpTok<infer V> ? V : never;
 
 // ─── Consuming (result: next index, or `never`; only test with `extends never`) ───
 
@@ -102,14 +92,6 @@ export type EatWords<
 		? never
 		: EatWords<T, EatWord<T, I, W>, R>
 	: I;
-/** Consume word `W` or fail. */
-export type ExpectWord<T extends Toks, I extends number, W extends string> =
-	EatWord<T, I, W> extends never
-		? Expected<Uppercase<W>, T, I>
-		: EatWord<T, I, W>;
-/** Consume op `O` or fail. */
-export type ExpectOp<T extends Toks, I extends number, O extends string> =
-	EatOp<T, I, O> extends never ? Expected<`"${O}"`, T, I> : EatOp<T, I, O>;
 /** Skip word `W` if present (always succeeds). */
 export type SkipWord<T extends Toks, I extends number, W extends string> =
 	EatWord<T, I, W> extends never ? I : EatWord<T, I, W>;
@@ -145,30 +127,21 @@ export type AnyLabel<T extends Toks, I extends number> =
 			? [V, Nx<I>]
 			: null;
 
-/** Identifier or fail. */
-export type ExpectIdent<T extends Toks, I extends number> =
-	Ident<T, I> extends [infer N extends string, infer J extends number]
-		? Ok<N, J>
-		: Expected<"identifier", T, I>;
-
 /**
  * Qualified name `a`, `a.b`, `a.b.c` → `[parts, next]` (max 3 parts) or `null`: a `ColId`, then
  * labels (`t.from`, `public.select`).
  */
 export type QualName<T extends Toks, I extends number> =
-	Ident<T, I> extends [infer A extends string, infer I1 extends number]
+	Ident<T, I> extends [infer A, infer I1 extends number]
 		? EatOp<T, I1, "."> extends never
 			? [[A], I1]
 			: AnyLabel<T, EatOp<T, I1, ".">> extends [
-						infer B extends string,
+						infer B,
 						infer I2 extends number,
 					]
-				? EatOp<T, I2, "."> extends never
+				? EatOp<T, I2, "."> extends never // type-mutate: equivalent cond-false – without a ".", AnyLabel<T, never> reads T[never], the union of all tokens, which holds the "." before B: no label, so [[A, B], I2] all the same
 					? [[A, B], I2]
-					: AnyLabel<T, EatOp<T, I2, ".">> extends [
-								infer C extends string,
-								infer I3 extends number,
-							]
+					: AnyLabel<T, EatOp<T, I2, ".">> extends [infer C, infer I3]
 						? [[A, B, C], I3]
 						: [[A, B], I2]
 				: [[A], I1]
@@ -203,18 +176,24 @@ type IdentListLoop<
 			: IdentListLoop<T, EatOp<T, J, ",">, [...Acc, N]>
 		: Expected<"identifier", T, I>;
 
-/** Skip tokens up to and including the `)` matching an already-consumed `(`. */
+/**
+ * Skip tokens up to and including the `)` matching an already-consumed `(`. Without one, the
+ * end-of-input index, or with `OrFail` a syntax error there.
+ */
 export type SkipToCloseParen<
 	T extends Toks,
 	I extends number,
 	Depth extends readonly unknown[] = [],
+	OrFail extends boolean = false,
 > =
 	T[I] extends OpTok<"(">
-		? SkipToCloseParen<T, Nx<I>, [...Depth, 0]>
+		? SkipToCloseParen<T, Nx<I>, [...Depth, 0], OrFail>
 		: T[I] extends OpTok<")">
 			? Depth extends readonly [unknown, ...infer D2]
-				? SkipToCloseParen<T, Nx<I>, D2>
+				? SkipToCloseParen<T, Nx<I>, D2, OrFail>
 				: Nx<I>
 			: T[I] extends Tok
-				? SkipToCloseParen<T, Nx<I>, Depth>
-				: I;
+				? SkipToCloseParen<T, Nx<I>, Depth, OrFail>
+				: OrFail extends true
+					? SyntaxErrorAt<T, I>
+					: I;

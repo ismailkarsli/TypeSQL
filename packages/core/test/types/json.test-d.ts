@@ -282,3 +282,14 @@ test("a type map that reads JSON as text keeps the text", () => {
 		>
 	>().toEqualTypeOf<{ a: string; b: { a: number } }>();
 });
+
+test("a type map without a JSON entry types JSON values from their shape", () => {
+	type NoJson = Omit<DefaultTypeMap, "json" | "jsonb">;
+	expectTypeOf<
+		RowOf<
+			DB,
+			NoJson,
+			"SELECT json_build_object('a', 1) AS a, jsonb_build_object('a', 1) AS b"
+		>
+	>().toEqualTypeOf<{ a: { a: number }; b: { a: number } }>();
+});

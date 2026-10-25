@@ -1,6 +1,10 @@
 import { expectTypeOf, test } from "vitest";
 import type { ExprNode, Stmt } from "../../src/engine/ast.js";
-import type { Lex, ParseProgram } from "../../src/engine/index.js";
+import type {
+	Lex,
+	ParseProgram,
+	ParseStatement,
+} from "../../src/engine/index.js";
 
 // The parser builds its trees as literal types, which nothing checks against the declared AST
 // types (ast.ts): these statements, one per kind of node, keep the two in step. `Expr` is
@@ -54,4 +58,31 @@ test("statements conform to Stmt", () => {
 	>().toExtend<Stmt>();
 	expectTypeOf<Parsed<"FETCH NEXT FROM c">>().toExtend<Stmt>();
 	expectTypeOf<Parsed<"MOVE c">>().toExtend<Stmt>();
+});
+
+test("ParseStatement gives the statement and the index of the token after it", () => {
+	type R = ParseStatement<Lex<"SELECT 1, 2 ;">, 0>;
+	expectTypeOf<R[0]>().toExtend<Stmt>();
+	expectTypeOf<R[1]>().toEqualTypeOf<4>();
+});
+
+test("a three-part name is catalog.schema.name; the catalog is not kept", () => {
+	type FromRef<Q extends string> =
+		Parsed<Q> extends {
+			readonly body: { readonly from: readonly [{ readonly ref: infer R }] };
+		}
+			? R
+			: never;
+	expectTypeOf<FromRef<"SELECT 1 FROM c.s.t">>().toEqualTypeOf<{
+		schema: "s";
+		name: "t";
+	}>();
+	expectTypeOf<FromRef<"SELECT 1 FROM s.t">>().toEqualTypeOf<{
+		schema: "s";
+		name: "t";
+	}>();
+	expectTypeOf<FromRef<"SELECT 1 FROM t">>().toEqualTypeOf<{
+		schema: null;
+		name: "t";
+	}>();
 });

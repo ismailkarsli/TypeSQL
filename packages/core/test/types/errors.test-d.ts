@@ -76,6 +76,36 @@ test("syntax errors: trailing garbage, missing pieces", () => {
 	expectTypeOf<V<"SELECT id FROM users ORDER id">>().toEqualTypeOf<
 		SqlError<"syntax error at or near order", 4>
 	>();
+	// the token is spelled as written: a quoted identifier in quotes, a parameter with `$`
+	expectTypeOf<V<'SELECT id "a" "b" FROM users'>>().toEqualTypeOf<
+		SqlError<'syntax error at or near "b"', 3>
+	>();
+	expectTypeOf<V<"SELECT id FROM users WHERE id = $1 $2">>().toEqualTypeOf<
+		SqlError<"syntax error at or near $2", 8>
+	>();
+	// a qualified name with a "." and no name after it
+	expectTypeOf<V<"SELECT 1 FROM public.users.;">>().toEqualTypeOf<
+		SqlError<"syntax error at or near .", 6>
+	>();
+	// a parenthesized list of names holds only names
+	expectTypeOf<
+		V<"SELECT 1 FROM users JOIN posts USING (id, 1)">
+	>().toEqualTypeOf<
+		SqlError<"syntax error: expected identifier at or near 1", 10>
+	>();
+	// a "(" never closed
+	expectTypeOf<V<"SELECT 1 OPERATOR(pg_catalog.+ 2">>().toEqualTypeOf<
+		SqlError<"syntax error at end of input", 8>
+	>();
+	expectTypeOf<
+		V<"SELECT count(*) FROM users GROUP BY GROUPING SETS ((id)">
+	>().toEqualTypeOf<SqlError<"syntax error at or near end of input", 15>>();
+	expectTypeOf<
+		V<"SELECT count(*) FROM users GROUP BY GROUPING SETS id">
+	>().toEqualTypeOf<SqlError<'syntax error: expected "(" at or near id', 11>>();
+	expectTypeOf<
+		V<"SELECT count(*) FROM users GROUP BY GROUPING SETS ((id), ()), email">
+	>().toEqualTypeOf<"SELECT count(*) FROM users GROUP BY GROUPING SETS ((id), ()), email">();
 	// one statement, with an optional `;`
 	expectTypeOf<V<"SELECT 1 AS a;">>().toEqualTypeOf<"SELECT 1 AS a;">();
 	expectTypeOf<V<"SELECT 1 AS a; SELECT 2">>().toEqualTypeOf<

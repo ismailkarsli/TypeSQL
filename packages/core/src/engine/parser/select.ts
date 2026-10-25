@@ -1204,7 +1204,11 @@ type ParseGroupItems<
 		: T[I] extends WordTok<"grouping">
 			? T[Nx<I>] extends WordTok<"sets">
 				? T[Nx<Nx<I>>] extends OpTok<"(">
-					? GroupNext<T, SkipToCloseParen<T, Nx<Nx<Nx<I>>>>, Acc, true>
+					? SkipToCloseParen<T, Nx<Nx<Nx<I>>>, [], true> extends infer J
+						? J extends number
+							? GroupNext<T, J, Acc, true>
+							: J
+						: never
 					: Expected<'"("', T, Nx<Nx<I>>>
 				: ParseGroupExpr<T, I, Acc, Sets>
 			: T[I] extends OpTok<"(">

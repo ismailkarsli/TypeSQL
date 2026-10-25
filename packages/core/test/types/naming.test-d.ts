@@ -1,4 +1,5 @@
 import { expectTypeOf, test } from "vitest";
+import type { Col, DefaultTypeMap, RowOf } from "../../src/index.js";
 import type { Interval, Row } from "./_schema.js";
 
 // Output column names follow Postgres's FigureColname; every case below was checked
@@ -231,4 +232,12 @@ test("enums resolve through $types", () => {
 		mood: "happy" | "sad";
 		n_mood: "happy" | "sad" | null;
 	}>();
+	// enum labels are strings: a `$types` that is not a registry of strings declares no enum
+	interface NumberLevels {
+		t: { l: Col<"level"> };
+		$types: { level: 1 | 2 };
+	}
+	expectTypeOf<
+		RowOf<NumberLevels, DefaultTypeMap, "SELECT l FROM t">
+	>().toEqualTypeOf<{ l: unknown }>();
 });

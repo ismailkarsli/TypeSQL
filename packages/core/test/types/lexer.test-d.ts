@@ -307,6 +307,16 @@ test("operators follow Postgres's rules: any run of operator characters, trailin
 	>();
 });
 
+test("whitespace is space, tab, newline, carriage return, form feed and vertical tab", () => {
+	expectTypeOf<Vals<"SELECT\t1\r,\f2\v,\n3 , 4">>().toEqualTypeOf<
+		["select", "1", ",", "2", ",", "3", ",", "4"]
+	>();
+	expectTypeOf<Row<"SELECT\t1\rAS\fa,\v2\nAS b">>().toEqualTypeOf<{
+		a: number;
+		b: number;
+	}>();
+});
+
 test("comments are skipped, including nested block comments", () => {
 	expectTypeOf<
 		Vals<"SELECT 1 -- trailing\n, 2 /* block */ , /* outer /* inner */ still comment */ 3">
