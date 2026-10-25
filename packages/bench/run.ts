@@ -10,6 +10,9 @@
 // package with skipLibCheck, as an application compiles them (…d), with a type cache generated
 // for the file and served by the content mapper (…c), and with a cache generated for another
 // schema, every entry stale (q500s). The cached variants need `pnpm --filter @typesql/core build`.
+//
+// `--compiler tsrs` measures with tsrs (a Rust port of TypeScript 7) instead of tsc. The
+// thresholds are calibrated with tsc, so `--calibrate` needs the default compiler.
 import { spawnSync } from "node:child_process";
 import {
 	appendFileSync,
@@ -78,7 +81,13 @@ interface CacheThreshold {
 type Thresholds = { [variant: string]: Threshold } & { cache?: CacheThreshold };
 
 const here = dirname(fileURLToPath(import.meta.url));
-const tsc = join(here, "../../node_modules/.bin/tsc");
+const compilerArg = process.argv.indexOf("--compiler");
+const compiler = compilerArg === -1 ? "tsc" : process.argv[compilerArg + 1];
+if (compiler !== "tsc" && compiler !== "tsrs") {
+	console.error(`unknown --compiler ${compiler}: use tsc or tsrs`);
+	process.exit(2);
+}
+const tsc = join(here, "../../node_modules/.bin", compiler);
 const core = join(here, "../core");
 const dist = { extends: "./tsconfig.json", compilerOptions: { paths: {} } };
 const cached = {
@@ -116,6 +125,10 @@ const variants: Variant[] = [
 ];
 const names = variants.map((v) => v.name);
 const calibrate = process.argv.includes("--calibrate");
+if (calibrate && compiler !== "tsc") {
+	console.error("--calibrate measures with tsc: drop --compiler");
+	process.exit(2);
+}
 const thresholdsPath = join(here, "thresholds.json");
 
 for (const name of ["q1", "q50", "q500", "mixed50", "maxlen"]) {
@@ -315,6 +328,7 @@ writeFileSync(
 	JSON.stringify(
 		{
 			measuredAt: new Date().toISOString(),
+			compiler,
 			throughput: perQuery,
 			cache,
 			results,

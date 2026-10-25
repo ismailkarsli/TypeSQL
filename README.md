@@ -126,6 +126,17 @@ type DB = SchemaOf<typeof m>;
 
 The parser is checked against the regression tests PostgreSQL runs on itself, about 50,000 statements. TypeSQL agrees with Postgres on every one that can be checked statically: it parses what Postgres parses and rejects what Postgres rejects. CI fails on a single disagreement. See [Postgres compatibility](https://typesql.karsli.net/guide/postgres-compatibility).
 
+## Compile time
+
+A query costs about 5 ms of check time with `tsc` and about 2 ms with [tsrs](https://github.com/oxc-project/tsrs), a Rust port of TypeScript 7. A file of 500 queries:
+
+| | `tsc` | tsrs |
+|---|---|---|
+| 500 queries | 2.6 s | 1.1 s |
+| with the [type cache](https://typesql.karsli.net/guide/performance#type-cache) | 0.13 s | 0.02 s |
+
+See [Performance](https://typesql.karsli.net/guide/performance) for how this is measured.
+
 ## Documentation
 
 The full guide is at **[typesql.karsli.net](https://typesql.karsli.net)**. It covers the SQL TypeSQL supports, parameters and fragments, writing data, performance and the type cache, and known limits.
