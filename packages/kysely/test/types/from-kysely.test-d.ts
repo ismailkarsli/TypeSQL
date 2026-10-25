@@ -143,6 +143,20 @@ test("overrides: type names, descriptors, enum names, views", () => {
 		feeling: "happy" | "sad";
 		"auth.users.role": "admin" | "member";
 	}>();
+	// every built-in type the engine types is one, system types included
+	type K = FromKysely<
+		{ t: { kind: "r" | "v"; kinds: ("r" | "v")[]; lsn: "0/0"; k: "r" | "v" } },
+		{ t: { kind: "char"; kinds: "char[]"; lsn: "pg_lsn"; k: "relkind" } }
+	>;
+	expectTypeOf<K>().toEqualTypeOf<{
+		t: {
+			kind: Col<"char">;
+			kinds: Col<"char[]">;
+			lsn: Col<"pg_lsn">;
+			k: Col<"relkind">;
+		};
+		$types: { relkind: "r" | "v" };
+	}>();
 });
 
 test("ambiguous $types matches fall back to the derived name", () => {

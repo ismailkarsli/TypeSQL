@@ -36,10 +36,10 @@ import type { Cols, ColsToMap, Simplify } from "./types.js";
  * `names` lists `:name` parameters in order of first appearance (`[]` for `$n` statements).
  */
 export type Analyze<DB, Q extends string> =
-	Lex<Q> extends infer T0
-		? T0 extends Toks
-			? RewriteNamed<T0> extends infer RN
-				? RN extends [infer T extends Toks, infer Names]
+	RewriteNamed<Q> extends infer RN
+		? RN extends [infer Q1 extends string, infer Names]
+			? Lex<Q1> extends infer T
+				? T extends Toks
 					? ParseProgram<T> extends infer S
 						? S extends Stmt
 							? ProjectStmt<S, DB, [], {}> extends infer C
@@ -59,9 +59,9 @@ export type Analyze<DB, Q extends string> =
 								: never
 							: Reposition<S, T, DB>
 						: never
-					: RN
+					: T
 				: never
-			: T0
+			: RN
 		: never;
 
 /**

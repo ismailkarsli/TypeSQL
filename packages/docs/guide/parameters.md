@@ -27,7 +27,7 @@ The call takes one object. TypeSQL rewrites the names to `$1`, `$2`, … in orde
 
 <<< @/snippets/parameters.ts#named
 
-`::` casts and colons inside strings are not parameters. You can't mix `:name` and `$n` in one statement.
+Only a colon directly followed by a name is one: `::` casts, `:=`, `: v` and colons inside strings, comments and dollar-quoted strings are not parameters. You can't mix `:name` and `$n` in one statement.
 
 ## Inline: `${sql.param(value)}`
 

@@ -215,6 +215,24 @@ describe("named parameters", () => {
 			values: [3],
 		});
 	});
+	it("reads only a colon directly followed by a name as a parameter, as the types do", () => {
+		expect(
+			rewriteNamed(
+				"SELECT tags[1: n], tags[1:2], json_object('a': id), json_object('b':'c'), f(d := :d, h:=:h), id AS x$y WHERE id = :id",
+			),
+		).toEqual({
+			text: "SELECT tags[1: n], tags[1:2], json_object('a': id), json_object('b':'c'), f(d := $1, h:=$2), id AS x$y WHERE id = $3",
+			names: ["d", "h", "id"],
+		});
+		expect(rewriteNamed("SELECT x$,y$ FROM s(x$, y$) WHERE x$ = :id")).toEqual({
+			text: "SELECT x$,y$ FROM s(x$, y$) WHERE x$ = $1",
+			names: ["id"],
+		});
+		expect(rewriteNamed("SELECT tags[1:n]")).toEqual({
+			text: "SELECT tags[1$1]",
+			names: ["n"],
+		});
+	});
 	it("throws on missing names", () => {
 		expect(() => sql.as("SELECT :a, :b", { a: 1 })).toThrow(
 			/missing named parameter :b/,

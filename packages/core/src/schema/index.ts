@@ -24,15 +24,4 @@ export type {
 	PgCatalog,
 	PgCatalogNamespace,
 } from "./pg-catalog.js";
-export type {
-	DateTimeType,
-	ElemOf,
-	FloatType,
-	IntType,
-	IsArray,
-	JsonType,
-	NumericType,
-	PgScalarName,
-	PgTypeName,
-	StringType,
-} from "./pg-types.js";
+export type { PgScalarName, PgTypeName } from "./pg-types.js";

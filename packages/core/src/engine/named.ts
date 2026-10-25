@@ -1,69 +1,25 @@
 import type { SqlError } from "./errors.js";
 import type { Opaque, SplitFirst } from "./inline.js";
-import type { OpTok, ParamTok, Tok, Toks, WordTok } from "./lexer/tokens.js";
-import type { Nx } from "./parser/util.js";
+import type { MaxParamStr } from "./splice.js";
 
 /**
  * Named parameter sugar: `:name` is rewritten to `$k` where `k` is the position of the
- * name's first appearance. Done on the token stream, so `::` casts, `:=` and colons inside
- * string literals are never touched.
+ * name's first appearance. Done on the text, as the runtime does (`rewriteNamed` in
+ * runtime/splice.ts), so the statement checked is the one sent: `::` casts, `:=`, a colon
+ * followed by a space (`JSON_OBJECT('k': v)`, `a[1: n]`) and colons inside quoted strings,
+ * quoted identifiers, comments and dollar-quoted strings are never touched.
  *
- * `RewriteNamed<T>` → `[tokens, names]` (`names` is `[]` when the statement uses `$n`).
+ * `RewriteNamed<Q>` → `[text, names]` (`names` is `[]` when the statement uses `$n`).
  * Mixing `:name` and `$n` is an error.
  */
-export type RewriteNamed<T extends Toks> =
-	HasNamed<T, 0> extends true
-		? Rewrite<T, 0, [], [], HasPositional<T, 0>>
-		: [T, []];
-
-/** Walks are unrolled ×4 so statements of ~4000 tokens stay under the 1000-iteration cap. */
-type HasNamed<T extends Toks, I extends number> = T[I] extends Tok
-	? NamedAt<T, I> extends true
-		? true
-		: NamedAt<T, Nx<I>> extends true
-			? true
-			: NamedAt<T, Nx<Nx<I>>> extends true
-				? true
-				: NamedAt<T, Nx<Nx<Nx<I>>>> extends true
-					? true
-					: HasNamed<T, Nx<Nx<Nx<Nx<I>>>>>
-	: false;
-type NamedAt<T extends Toks, I extends number> =
-	T[I] extends OpTok<":"> ? (T[Nx<I>] extends WordTok ? true : false) : false;
-
-type HasPositional<T extends Toks, I extends number> = T[I] extends Tok
-	? T[I] extends ParamTok
-		? true
-		: T[Nx<I>] extends ParamTok
-			? true
-			: T[Nx<Nx<I>>] extends ParamTok
-				? true
-				: T[Nx<Nx<Nx<I>>>] extends ParamTok
-					? true
-					: HasPositional<T, Nx<Nx<Nx<Nx<I>>>>>
-	: false;
-
-type Rewrite<
-	T extends Toks,
-	I extends number,
-	Acc extends Tok[],
-	Names extends string[],
-	Mixed extends boolean,
-> = Mixed extends true
-	? SqlError<"cannot mix named (:name) and positional ($n) parameters", I>
-	: T[I] extends OpTok<":">
-		? T[Nx<I>] extends WordTok<infer Name>
-			? Rewrite<
-					T,
-					Nx<Nx<I>>,
-					[...Acc, ParamTok<IndexOf<Names, Name>>],
-					Name extends Names[number] ? Names : [...Names, Name],
-					false
-				>
-			: Rewrite<T, Nx<I>, [...Acc, OpTok<":">], Names, false>
-		: T[I] extends Tok
-			? Rewrite<T, Nx<I>, [...Acc, T[I]], Names, false>
-			: [Acc, Names];
+export type RewriteNamed<Q extends string> =
+	RewriteNamedStr<Q> extends [infer T, infer Names]
+		? Names extends []
+			? [T, []]
+			: MaxParamStr<Q> extends 0
+				? [T, Names]
+				: SqlError<"cannot mix named (:name) and positional ($n) parameters", 0>
+		: never;
 
 /** 1-based position of `Name` in `Names`, or `Names["length"] + 1` when absent. */
 type IndexOf<
@@ -76,43 +32,32 @@ type IndexOf<
 		: IndexOf<R, Name, [...Acc, 0]>
 	: [...Acc, 0]["length"];
 
-/** Object type for named parameters given the positional tuple (`names[i]` ↔ `params[i]`). */
+/**
+ * Object type for named parameters given the positional tuple (`names[i]` ↔ `params[i]`).
+ * A name the rewrite took for code that PostgreSQL reads inside a literal or a comment
+ * (`E'\':a'`, or after the inner closer of a nested block comment; the runtime reads them
+ * alike) has no parameter: `never`, as no value sent for it would be accepted.
+ */
 export type NamedParams<
 	Names extends readonly string[],
 	Params extends readonly unknown[],
-	Acc = {},
-> = Names extends readonly [
-	infer H extends string,
-	...infer R extends readonly string[],
-]
-	? Params extends readonly [infer P, ...infer PR extends readonly unknown[]]
-		? NamedParams<R, PR, Acc & { [K in H]: P }>
-		: NamedParams<R, [], Acc & { [K in H]: unknown }>
-	: { [K in keyof Acc]: Acc[K] };
+> = {
+	-readonly [I in keyof Names & `${number}` as Names[I]]: Params[I &
+		keyof Params];
+} extends infer O
+	? { [K in keyof O]: O[K] } // spelled out, not shown as `NamedParams<…>`
+	: never;
 
-// ───────────────────────────── string-level rewrite (call sites, fragments) ─────────────────────────────
+// ───────────────────────────── text rewrite ─────────────────────────────
 
 /**
  * `RewriteNamedStr<Text>` → `[text with :name → $k, names]`, operating on the literal
- * itself (needed before fragment splicing). Quoted strings, quoted identifiers and comments
- * are copied verbatim (as the runtime does); `::` and `:=` are not parameters.
+ * itself (needed before fragment splicing).
  */
 export type RewriteNamedStr<Text extends string> =
-	MayHaveName<Text> extends true ? NamedLoop<Text, "", []> : [Text, []];
-
-/**
- * `true` when some `:` (not part of `::`) is followed by a name start, ignoring quotes and
- * comments: a cheap pre-check so that texts whose only colons are `::` casts skip the rewrite.
- */
-type MayHaveName<S extends string> = S extends `${string}:${infer Rest}`
-	? Rest extends `${infer C}${infer R2}`
-		? C extends ":"
-			? MayHaveName<R2>
-			: C extends NStart
-				? true
-				: MayHaveName<Rest>
-		: false
-	: false;
+	Text extends `${string}:${string}` // type-mutate: equivalent cond-true – a shortcut: a text without a colon has no name, and the loop copies it
+		? NamedLoop<Text, "", []>
+		: [Text, []];
 
 type NamedLoop<T extends string, Acc extends string, Names extends string[]> =
 	SplitFirst<T> extends [
@@ -120,20 +65,58 @@ type NamedLoop<T extends string, Acc extends string, Names extends string[]> =
 		infer O extends string,
 		infer Rest extends string,
 	]
-		? RewriteCode<Code, "", Names> extends [
-				infer C extends string,
-				infer N2 extends string[],
+		? DollarOpen<Code, ""> extends [
+				infer Pre extends string,
+				infer Tag extends string,
+				infer InCode extends string,
 			]
-			? O extends ""
-				? [`${Acc}${C}`, N2]
-				: Opaque<O, Rest> extends [
-							infer Seg extends string,
-							infer After extends string,
-						]
-					? NamedLoop<After, `${Acc}${C}${O}${Seg}`, N2>
+			? RewriteCode<Pre, "", Names> extends [
+					infer C extends string,
+					infer N2 extends string[],
+				]
+				? DollarBody<`${InCode}${O}${Rest}`, Tag> extends [
+						infer Seg extends string,
+						infer After extends string,
+					]
+					? NamedLoop<After, `${Acc}${C}${Tag}${Seg}`, N2>
 					: never
-			: never
+				: never
+			: RewriteCode<Code, "", Names> extends [
+						infer C extends string,
+						infer N2 extends string[],
+					]
+				? O extends ""
+					? [`${Acc}${C}`, N2]
+					: Opaque<O, Rest> extends [
+								infer Seg extends string,
+								infer After extends string,
+							]
+						? NamedLoop<After, `${Acc}${C}${O}${Seg}`, N2>
+						: never
+				: never
 		: never;
+
+/**
+ * `[code before, opener, code after]` at the first dollar-quote opener (`$$`, `$tag$`) in a
+ * code segment, else `null`. The runtime's rule: a `$` followed by an optional name and a `$`.
+ */
+type DollarOpen<
+	S extends string,
+	Acc extends string,
+> = S extends `${infer A}$${infer B}`
+	? B extends `$${infer R}`
+		? [`${Acc}${A}`, "$$", R]
+		: B extends `${infer C extends NStart}${infer R}`
+			? TakeName<R, C> extends [infer Tag extends string, `$${infer R2}`]
+				? [`${Acc}${A}`, `$${Tag}$`, R2]
+				: DollarOpen<B, `${Acc}${A}$`>
+			: DollarOpen<B, `${Acc}${A}$`>
+	: null;
+/** A dollar-quoted body up to and including its closer: `[segment, rest]` (unclosed: the rest of the text). */
+type DollarBody<
+	S extends string,
+	Tag extends string,
+> = S extends `${infer Body}${Tag}${infer R}` ? [`${Body}${Tag}`, R] : [S, ""];
 
 type NStart =
 	| "a"
@@ -191,34 +174,33 @@ type NStart =
 	| "_";
 type NChar = NStart | "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9";
 
-/** Rewrite `:name` occurrences in a quote-free code segment. */
+/**
+ * Rewrite `:name` occurrences in a quote-free code segment: a `:` directly followed by a
+ * name start, not part of `::`.
+ */
 type RewriteCode<
 	S extends string,
 	Acc extends string,
 	Names extends string[],
 > = S extends `${infer Pre}:${infer Rest}`
-	? Rest extends `${infer C}${infer Rest2}`
-		? C extends ":" | "="
-			? RewriteCode<Rest2, `${Acc}${Pre}:${C}`, Names>
-			: C extends NStart
-				? TakeName<Rest2, C> extends [
-						infer Name extends string,
-						infer Rest3 extends string,
-					]
-					? RewriteCode<
-							Rest3,
-							`${Acc}${Pre}$${IndexOf<Names, Name>}`,
-							Name extends Names[number] ? Names : [...Names, Name]
-						>
-					: never
-				: RewriteCode<Rest, `${Acc}${Pre}:`, Names>
-		: [`${Acc}${S}`, Names]
+	? Rest extends `:${infer Rest2}`
+		? RewriteCode<Rest2, `${Acc}${Pre}::`, Names>
+		: Rest extends `${infer C extends NStart}${infer Rest2}`
+			? TakeName<Rest2, C> extends [
+					infer Name extends string,
+					infer Rest3 extends string,
+				]
+				? RewriteCode<
+						Rest3,
+						`${Acc}${Pre}$${IndexOf<Names, Name>}`,
+						Name extends Names[number] ? Names : [...Names, Name]
+					>
+				: never
+			: RewriteCode<Rest, `${Acc}${Pre}:`, Names>
 	: [`${Acc}${S}`, Names];
 type TakeName<
 	S extends string,
 	Acc extends string,
-> = S extends `${infer C}${infer R}`
-	? C extends NChar
-		? TakeName<R, `${Acc}${C}`>
-		: [Acc, S]
+> = S extends `${infer C extends NChar}${infer R}`
+	? TakeName<R, `${Acc}${C}`>
 	: [Acc, S];

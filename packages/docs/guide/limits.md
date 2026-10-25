@@ -21,6 +21,7 @@ When you hit a limit, [`sql.as<Row>()`](./errors#when-typesql-can-t-type-a-state
 - Only literal SQL is analysed: a string literal, or a template literal whose substitutions are compile-time constants. Anything else is an error; see [Parameters](./parameters).
 - Tagged templates (`` sql`…` ``) are not supported, because TypeScript does not expose their text to the type system.
 - Mixing `:name` and `$n` parameters in one statement is an error.
+- A colon directly followed by a name is a [named parameter](./parameters#named-name), also in an array slice: `a[1:n]` is `a[1$1]`. Write `a[1: n]` for a slice up to the column `n`.
 
 ## Fragments and lists
 
@@ -44,7 +45,7 @@ The schema does not tell identity `GENERATED ALWAYS` columns apart from other co
 - A plain `jsonb` parameter (typed `unknown`) refuses objects with a `length` key. Wrap those in `sql.json()`.
 - Inside JSON, `int8` and `numeric` are numbers. `JSON.parse` rounds integers beyond 2^53, and a `float8` / `numeric` that is `NaN` or `Infinity` is serialized as a string.
 - Elements of Postgres arrays are typed non-null, as for array columns.
-- In `JSON_OBJECT`, write pairs as `k VALUE v`. In `k: v`, the `: v` is read as a [named parameter](./parameters#named-name) when `v` is a name.
+- In `JSON_OBJECT`, write pairs as `k VALUE v` or `k: v`. In `k:v`, the `:v` is read as a [named parameter](./parameters#named-name) when `v` is a name.
 
 ## Types and hovers
 
