@@ -195,9 +195,9 @@ type Lt<A extends number, B extends number> = A extends B
 		? true
 		: false;
 type Abs<A extends number, B extends number> =
-	Lt<A, B> extends true ? Sub<B, A> : Sub<A, B>; // type-mutate: equivalent cond-true – only a pruning bound: a wrong one computes the distance in full
+	Lt<A, B> extends true ? Sub<B, A> : Sub<A, B>; // type-mutate: equivalent cond-true cond-false cond-swap bool-flip – only a pruning bound: a wrong one computes the distance in full
 type Sub<A extends number, B extends number> =
-	Tup<A> extends [...Tup<B>, ...infer R] ? R["length"] : 0; // type-mutate: equivalent tuple-swap never-false – the tuples hold only 0s; Abs subtracts the smaller
+	Tup<A> extends [...Tup<B>, ...infer R] ? R["length"] : 0; // type-mutate: equivalent tuple-swap never-false cond-false – the tuples hold only 0s; Abs subtracts the smaller; a 0 only stops Dist pruning
 type Tup<N extends number, A extends unknown[] = []> = A["length"] extends N
 	? A
 	: Tup<N, [...A, 0]>;

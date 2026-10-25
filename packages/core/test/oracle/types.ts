@@ -83,6 +83,8 @@ const NOT_RUN =
 	/^\s*(begin|commit|end|rollback|abort|start\s+transaction|savepoint|release|prepare\s+transaction|vacuum|checkpoint|set\s+(session\s+)?characteristics|discard|reindex\s+database|create\s+database|drop\s+database|alter\s+system)\b/i;
 /** Server errors a DDL step meets because our `DB` has no constraints (foreign keys, ON CONFLICT targets). */
 const MISSING_CONSTRAINTS = new Set(["42830", "42P10"]);
+/** The contrib TABLESAMPLE methods the engine types, in pg_catalog so `public` holds only the test's schema. */
+const EXTENSIONS = ["tsm_system_rows", "tsm_system_time"];
 
 export async function typesOracle(
 	url: string,
@@ -200,6 +202,10 @@ export async function typesOracle(
 				await admin.exec(`CREATE DATABASE ${dbName}`);
 				const conn = new Connection(withDatabase(url, dbName));
 				try {
+					for (const e of EXTENSIONS)
+						await conn.exec(
+							`CREATE EXTENSION IF NOT EXISTS "${e}" SCHEMA pg_catalog`,
+						);
 					const failed: string[] = [];
 					const created: Relation[] = [];
 					for (const stmt of schemaDdl(g.db)) {
