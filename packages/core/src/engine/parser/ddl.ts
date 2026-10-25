@@ -126,8 +126,10 @@ type SkipRoutine<T extends Toks, I extends number> =
 				? SkipAtomic<T, Nx2<I>, []> // the body comes last
 				: SkipRoutine<T, Nx<I>>
 			: T[I] extends OpTok<"(">
-				? SkipToCloseParen<T, Nx<I>> extends infer J extends number
-					? SkipRoutine<T, J>
+				? SkipToCloseParen<T, Nx<I>> extends infer J
+					? J extends number
+						? SkipRoutine<T, J>
+						: J
 					: never
 				: T[I] extends Tok
 					? SkipRoutine<T, Nx<I>>
@@ -290,14 +292,23 @@ type ParseCreateFunction<T extends Toks, I extends number> =
 		infer J extends number,
 	]
 		? T[J] extends OpTok<"(">
-			? FnReturns<T, SkipToCloseParen<T, Nx<J>>> extends infer R
-				? R extends [infer Ret, infer Srf, infer K extends number]
-					? RoutineEnd<
-							T,
-							K,
-							{ t: "create_function"; name: RefOf<Parts>; ret: Ret; srf: Srf }
-						>
-					: R
+			? SkipToCloseParen<T, Nx<J>> extends infer J1
+				? J1 extends number
+					? FnReturns<T, J1> extends infer R
+						? R extends [infer Ret, infer Srf, infer K extends number]
+							? RoutineEnd<
+									T,
+									K,
+									{
+										t: "create_function";
+										name: RefOf<Parts>;
+										ret: Ret;
+										srf: Srf;
+									}
+								>
+							: R
+						: never
+					: J1
 				: never
 			: Expected<'"("', T, J>
 		: Expected<"function name", T, I>;
@@ -538,26 +549,30 @@ type ParsePartitionOf<
 		infer PP extends readonly string[],
 		infer J extends number,
 	]
-		? SkipPartitionBound<T, SkipParenOpt<T, J>> extends infer J2
-			? J2 extends number
-				? PartitionTail<T, J2> extends infer J3
-					? J3 extends number
-						? Ok<
-								{
-									t: "create_table";
-									ifNotExists: Ine;
-									table: Ref;
-									columns: [];
-									constraints: [];
-									like: [];
-									inherits: [RefOf<PP>];
-									of: null;
-								},
-								J3
-							>
-						: J3
+		? SkipParenOpt<T, J> extends infer J1
+			? J1 extends number
+				? SkipPartitionBound<T, J1> extends infer J2
+					? J2 extends number
+						? PartitionTail<T, J2> extends infer J3
+							? J3 extends number
+								? Ok<
+										{
+											t: "create_table";
+											ifNotExists: Ine;
+											table: Ref;
+											columns: [];
+											constraints: [];
+											like: [];
+											inherits: [RefOf<PP>];
+											of: null;
+										},
+										J3
+									>
+								: J3
+							: never
+						: J2
 					: never
-				: J2
+				: J1
 			: never
 		: Expected<"parent table name", T, I>;
 
@@ -576,12 +591,14 @@ type SkipPartitionBound<T extends Toks, I extends number> =
 						: Expected<'"("', T, Nx<J>>
 					: T[J] extends WordTok<"from">
 						? T[Nx<J>] extends OpTok<"(">
-							? SkipToCloseParen<T, Nx2<J>> extends infer K extends number
-								? EatWord<T, K, "to"> extends never
-									? Expected<"TO", T, K>
-									: T[EatWord<T, K, "to">] extends OpTok<"(">
-										? SkipToCloseParen<T, Nx<EatWord<T, K, "to">>>
-										: Expected<'"("', T, EatWord<T, K, "to">>
+							? SkipToCloseParen<T, Nx2<J>> extends infer K
+								? K extends number
+									? EatWord<T, K, "to"> extends never
+										? Expected<"TO", T, K>
+										: T[EatWord<T, K, "to">] extends OpTok<"(">
+											? SkipToCloseParen<T, Nx<EatWord<T, K, "to">>>
+											: Expected<'"("', T, EatWord<T, K, "to">>
+									: K
 								: never
 							: Expected<'"("', T, Nx<J>>
 						: Expected<"IN, FROM or WITH", T, J>
@@ -610,7 +627,11 @@ type PartitionTail<T extends Toks, I extends number> =
 			? // any word: an unknown strategy is a semantic error in Postgres ("unrecognized partitioning strategy")
 				Ident<T, J> extends [string, infer J1 extends number]
 				? T[J1] extends OpTok<"(">
-					? SkipStorage<T, SkipToCloseParen<T, Nx<J1>>, false>
+					? SkipToCloseParen<T, Nx<J1>> extends infer J2
+						? J2 extends number
+							? SkipStorage<T, J2, false>
+							: J2
+						: never
 					: Expected<'"("', T, J1>
 				: Expected<"RANGE, LIST or HASH", T, J>
 			: never;
@@ -960,44 +981,37 @@ type ParseColConstraints<
 								? Expected<"KEY", T, Nx<I>>
 								: Nul extends true
 									? NullConflict<Name, TN, I>
-									: SkipIndexParams<T, Nx2<I>> extends infer J extends number
-										? ParseColConstraints<T, J, TN, Name, Ty, NN, HD, true, Nul>
-										: never
-							: W extends "unique"
-								? SkipIndexParams<
-										T,
-										SkipNullsDistinct<T, Nx<I>>
-									> extends infer J extends number
-									? ParseColConstraints<T, J, TN, Name, Ty, NN, HD, PK, Nul>
-									: never
-								: W extends "check"
-									? T[Nx<I>] extends OpTok<"(">
-										? SkipToCloseParen<T, Nx2<I>> extends infer J extends number
+									: SkipIndexParams<T, Nx2<I>> extends infer J
+										? J extends number
 											? ParseColConstraints<
 													T,
-													SkipWords<T, J, ["no", "inherit"]>,
+													J,
 													TN,
 													Name,
 													Ty,
 													NN,
 													HD,
-													PK,
+													true,
 													Nul
 												>
-											: never
-										: Expected<'"("', T, Nx<I>>
-									: W extends "references"
-										? QualName<T, Nx<I>> extends [
-												unknown,
-												infer J extends number,
-											]
-											? SkipRefActions<
-													T,
-													SkipParenOpt<T, J>
-												> extends infer J2 extends number
+											: J
+										: never
+							: W extends "unique"
+								? SkipIndexParams<
+										T,
+										SkipNullsDistinct<T, Nx<I>>
+									> extends infer J
+									? J extends number
+										? ParseColConstraints<T, J, TN, Name, Ty, NN, HD, PK, Nul>
+										: J
+									: never
+								: W extends "check"
+									? T[Nx<I>] extends OpTok<"(">
+										? SkipToCloseParen<T, Nx2<I>> extends infer J
+											? J extends number
 												? ParseColConstraints<
 														T,
-														J2,
+														SkipWords<T, J, ["no", "inherit"]>,
 														TN,
 														Name,
 														Ty,
@@ -1006,6 +1020,32 @@ type ParseColConstraints<
 														PK,
 														Nul
 													>
+												: J
+											: never
+										: Expected<'"("', T, Nx<I>>
+									: W extends "references"
+										? QualName<T, Nx<I>> extends [
+												unknown,
+												infer J extends number,
+											]
+											? SkipParenOpt<T, J> extends infer J1
+												? J1 extends number
+													? SkipRefActions<T, J1> extends infer J2
+														? J2 extends number
+															? ParseColConstraints<
+																	T,
+																	J2,
+																	TN,
+																	Name,
+																	Ty,
+																	NN,
+																	HD,
+																	PK,
+																	Nul
+																>
+															: J2
+														: never
+													: J1
 												: never
 											: Expected<"referenced table", T, Nx<I>>
 										: W extends "generated"
@@ -1112,14 +1152,16 @@ type ParseBExpr<T extends Toks, I extends number> =
 		: never;
 
 /** `[WITH (...)] [USING INDEX TABLESPACE name]` after a column's PRIMARY KEY / UNIQUE (INCLUDE is for table constraints). */
-type SkipIndexParams<T extends Toks, I extends number> = SkipIndexTablespace<
-	T,
+type SkipIndexParams<T extends Toks, I extends number> =
 	T[I] extends WordTok<"with">
 		? T[Nx<I>] extends OpTok<"(">
-			? SkipToCloseParen<T, Nx2<I>>
-			: I
-		: I
->;
+			? SkipToCloseParen<T, Nx2<I>> extends infer J
+				? J extends number
+					? SkipIndexTablespace<T, J>
+					: J
+				: never
+			: SkipIndexTablespace<T, I>
+		: SkipIndexTablespace<T, I>;
 type SkipIndexTablespace<T extends Toks, I extends number> =
 	EatWords<T, I, ["using", "index", "tablespace"]> extends never
 		? I
@@ -1142,8 +1184,10 @@ type SkipRefActions<T extends Toks, I extends number> =
 				? T[Nx2<I>] extends WordTok<"no">
 					? SkipRefActions<T, Nx2<Nx2<I>>>
 					: T[Nx2<I>] extends WordTok<"set">
-						? SkipParenOpt<T, Nx2<Nx2<I>>> extends infer J extends number
-							? SkipRefActions<T, J>
+						? SkipParenOpt<T, Nx2<Nx2<I>>> extends infer J
+							? J extends number
+								? SkipRefActions<T, J>
+								: J
 							: never
 						: SkipRefActions<T, Nx3<I>>
 				: I
@@ -1151,7 +1195,7 @@ type SkipRefActions<T extends Toks, I extends number> =
 
 /**
  * After `GENERATED`: `ALWAYS AS IDENTITY [(opts)]` | `BY DEFAULT AS IDENTITY [(opts)]` |
- * `ALWAYS AS (expr) [STORED | VIRTUAL]` → `[isIdentity, next]`.
+ * `ALWAYS AS (expr) [STORED | VIRTUAL]` → `[isIdentity, next]`, or an error.
  */
 type ParseGenerated<T extends Toks, I extends number> =
 	EatWords<T, I, ["always", "as", "identity"]> extends never
@@ -1165,17 +1209,21 @@ type ParseGenerated<T extends Toks, I extends number> =
 				? [J] extends [never]
 					? Expected<"ALWAYS or BY DEFAULT", T, I>
 					: T[J] extends OpTok<"(">
-						? [
-								false,
-								SkipWord<T, SkipToCloseParen<T, Nx<J>>, "stored" | "virtual">,
-							]
+						? SkipToCloseParen<T, Nx<J>> extends infer K
+							? K extends number
+								? [false, SkipWord<T, K, "stored" | "virtual">]
+								: K
+							: never
 						: Expected<'"(" or IDENTITY', T, J>
 				: never
-			: [
-					true,
-					SkipParenOpt<T, EatWords<T, I, ["by", "default", "as", "identity"]>>,
-				]
-		: [true, SkipParenOpt<T, EatWords<T, I, ["always", "as", "identity"]>>];
+			: IdentityNext<
+					SkipParenOpt<T, EatWords<T, I, ["by", "default", "as", "identity"]>>
+				>
+		: IdentityNext<
+				SkipParenOpt<T, EatWords<T, I, ["always", "as", "identity"]>>
+			>;
+/** `[true, next]` after an identity column's options, or their error. */
+type IdentityNext<J> = J extends number ? [true, J] : J;
 
 // ─── CREATE VIEW ───
 

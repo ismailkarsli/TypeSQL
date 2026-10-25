@@ -161,10 +161,16 @@ test("branches merge: CASE, COALESCE, UNION", () => {
 	expectTypeOf<
 		Row<"SELECT coalesce('[]'::json, json_agg(id)) AS a, coalesce('[]'::json, json_build_object('a', 1)) AS b FROM things">
 	>().toEqualTypeOf<{ a: number[]; b: [] | { a: number } }>();
+	expectTypeOf<
+		Row<"SELECT CASE WHEN flag THEN json_build_object('a', 1) ELSE json_agg(id) END AS a, CASE WHEN flag THEN json_agg(id) ELSE json_build_object('a', 1) END AS b FROM things GROUP BY flag">
+	>().toEqualTypeOf<{
+		a: { a: number } | number[];
+		b: number[] | { a: number };
+	}>();
 	// a plain JSON value drops the shape; two JSON literals are text, and plain JSON next to an array
 	expectTypeOf<
-		Row<"SELECT coalesce(to_json(u), t.doc) AS a, coalesce(t.doc, to_json(u)) AS b FROM users u, things t">
-	>().toEqualTypeOf<{ a: unknown; b: unknown }>();
+		Row<"SELECT coalesce(to_json(u), t.doc) AS a, coalesce(t.doc, to_json(u)) AS b, coalesce(t.doc, '[]') AS c FROM users u, things t">
+	>().toEqualTypeOf<{ a: unknown; b: unknown; c: unknown }>();
 	expectTypeOf<
 		Row<"SELECT coalesce('[]', '{}') AS a, coalesce('[]', '{}', json_agg(id)) AS b FROM things">
 	>().toEqualTypeOf<{ a: string; b: unknown }>();
@@ -189,6 +195,10 @@ test("->, #> and subscripts follow the shape; ->> and #>> are text", () => {
 	expectTypeOf<
 		Row<"SELECT json_build_array(1, 'x') -> 1 AS a, json_build_array(1, 'x') -> 5 AS b, json_build_array(1, 'x') -> 'k' AS c, jsonb_build_object('a', 1) -> 0 AS d">
 	>().toEqualTypeOf<{ a: string | null; b: null; c: null; d: null }>();
+	// a text key never indexes an array, nor an integer an object, even when they read alike
+	expectTypeOf<
+		Row<"SELECT json_build_array(1, 'x') -> '0' AS a, json_build_object('0', 1) -> 0 AS b, json_agg(id) #> '{a}' AS c, json_build_object('t', nums) -> 't' -> '0' AS d FROM things GROUP BY nums">
+	>().toEqualTypeOf<{ a: null; b: null; c: null; d: null }>();
 	expectTypeOf<
 		Row<"SELECT (jsonb_build_object('a', jsonb_build_object('b', 2.5)))['a']['b'] AS a, to_jsonb(u) -> 'email' AS b FROM users u">
 	>().toEqualTypeOf<{ a: number | null; b: string | null }>();
@@ -252,6 +262,10 @@ test("NULL inside JSON is null", () => {
 	expectTypeOf<
 		Row<"SELECT json_build_object('n', NULL) AS a, json_build_array(NULL, 1) AS b">
 	>().toEqualTypeOf<{ a: { n: null }; b: [null, number] }>();
+	// narrowed by IS NOT NULL (no row passes), a NULL column is still null
+	expectTypeOf<
+		Row<"SELECT json_build_object('n', x) AS a FROM (SELECT NULL AS x) s WHERE x IS NOT NULL">
+	>().toEqualTypeOf<{ a: { n: null } }>();
 });
 
 test("json(b)_array_elements yields the element type", () => {
@@ -265,7 +279,7 @@ test("json(b)_array_elements yields the element type", () => {
 
 test("casts: json <-> jsonb keep the shape, text does not", () => {
 	expectTypeOf<
-		Row<`SELECT json_build_object('a', 1)::jsonb AS a, json_build_object('a', 1)::text AS b, '[]'::jsonb AS c, jsonb '{}' AS d, 'null'::json AS e, 'true'::jsonb AS f, '{"a": 1}'::jsonb AS g`>
+		Row<`SELECT json_build_object('a', 1)::jsonb AS a, json_build_object('a', 1)::text AS b, '[]'::jsonb AS c, jsonb '{}' AS d, 'null'::json AS e, 'true'::jsonb AS f, '{"a": 1}'::jsonb AS g, 'false'::json AS h`>
 	>().toEqualTypeOf<{
 		a: { a: number };
 		b: string;
@@ -274,6 +288,7 @@ test("casts: json <-> jsonb keep the shape, text does not", () => {
 		e: null;
 		f: boolean;
 		g: unknown;
+		h: boolean;
 	}>();
 });
 

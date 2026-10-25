@@ -58,7 +58,7 @@ type LookupTable<
 type InPgCatalog<DB, Name extends string> = DB extends {
 	readonly pg_catalog: infer PC;
 }
-	? Name extends keyof PC
+	? Name extends keyof PC // type-mutate: equivalent never-true – a never passes the callers' `InPgCatalog<…> extends true` too
 		? true
 		: false
 	: false;
@@ -93,7 +93,7 @@ export type ResolveWritableTable<
 				? SqlError<`cannot modify view "${Ref["schema"]}.${Ref["name"]}"`, null>
 				: DB[Ref["schema"]][Ref["name"]] extends Table
 					? DB[Ref["schema"]][Ref["name"]]
-					: SqlError<`"${Ref["schema"]}.${Ref["name"]}" is not a table`, null> // type-mutate: equivalent never-false – a namespace holds only tables and views
+					: SqlError<`"${Ref["schema"]}.${Ref["name"]}" is not a table`, null>
 			: SqlError<
 					`relation "${Ref["schema"]}.${Ref["name"]}" does not exist`,
 					null
@@ -235,9 +235,8 @@ export type ExpandStar<
 					]
 				? M
 				: ExpandAll<L, []>
-	: Tbl extends string
-		? SqlError<`missing FROM-clause entry for table "${Tbl}"`, null>
-		: SqlError<"SELECT * with no tables specified is not valid", null>; // type-mutate: equivalent never-false – a scope always has a level
+	: // only `t.*` gets past the outermost level: a SELECT's scope always has one
+		SqlError<`missing FROM-clause entry for table "${Tbl}"`, null>;
 
 /**
  * All visible columns of a level in FROM order. Duplicate names collapse like the row
@@ -255,7 +254,7 @@ type ExpandAll<
 			R,
 			[
 				...Maps,
-				I["skip"] extends readonly []
+				I["skip"] extends readonly [] // type-mutate: equivalent cond-false – a fast path: Omit of no names gives the same columns
 					? I["cols"]
 					: Omit<I["cols"], I["skip"][number]>,
 			]

@@ -101,7 +101,7 @@ export type MergeShapes<A, B> = [B] extends [TsShape<[]>]
 			? B
 			: A | B
 		: A | B;
-type ArrayLike<S> = [S] extends [ArrShape<unknown>]
+type ArrayLike<S> = [S] extends [ArrShape<unknown>] // type-mutate: equivalent never-true – a never passes the callers' `ArrayLike<…> extends true` too
 	? true
 	: [S] extends [TsShape<infer T>]
 		? [] extends T // type-mutate: equivalent never-true – a never passes the callers' `ArrayLike<…> extends true` too
@@ -206,7 +206,7 @@ type ShapeOfType<T extends string> =
  * `L -> R`, `L #> R` and `L[R]` on a shaped JSON value (`null` when `L` has no shape, or the
  * step cannot be followed: the caller then uses the plain operator rules). `R` is the operand
  * AST, so literal keys, indexes and paths are followed precisely; a non-literal text key or
- * integer index (`RT`) follows every key / element.
+ * integer index (`RT`, a negative one too) follows every key / element.
  */
 export type JsonArrow<
 	Op extends string,
@@ -225,20 +225,11 @@ export type JsonArrow<
 				? Info<StepOf<L["type"], BaseOf<L["type"]>, "key", V>, true>
 				: R extends { readonly t: "num"; readonly v: infer V extends string }
 					? Info<StepOf<L["type"], BaseOf<L["type"]>, "idx", V>, true>
-					: R extends {
-								readonly t: "un";
-								readonly op: "-";
-								readonly e: { readonly t: "num" };
-							}
+					: RT["type"] extends IntT
 						? Info<StepOf<L["type"], BaseOf<L["type"]>, "idx", number>, true>
-						: RT["type"] extends IntT
-							? Info<StepOf<L["type"], BaseOf<L["type"]>, "idx", number>, true>
-							: RT["type"] extends StrT
-								? Info<
-										StepOf<L["type"], BaseOf<L["type"]>, "key", string>,
-										true
-									>
-								: null
+						: RT["type"] extends StrT
+							? Info<StepOf<L["type"], BaseOf<L["type"]>, "key", string>, true>
+							: null
 		: null;
 
 /** One step from type name `T`; the result is a `B` (json/jsonb), shaped when the step's target is known. */
@@ -361,9 +352,7 @@ type StepTs<
 					? Exclude<T[K], undefined>
 					: string extends K
 						? Exclude<T[keyof T], undefined>
-						: string extends keyof T
-							? Exclude<T[string & keyof T], undefined>
-							: never
+						: never
 			: never;
 /** An element of `T`: by position for a literal index into a tuple (past its end, or negative from the end, any element). */
 type TsIndex<

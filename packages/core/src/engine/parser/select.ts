@@ -701,7 +701,7 @@ type ParseFromCall<T extends Toks, I extends number, J extends number> =
 					| { readonly over: true }
 					| { readonly filter: Expr }
 					| { readonly withinGroup: Expr }
-				? WindowlessError<T, SkipToCloseParen<T, Nx<J>>>
+				? WindowlessError<T, Extract<SkipToCloseParen<T, Nx<J>>, number>> // the call parsed: its `(` is closed
 				: X
 			: X
 		: never;
@@ -1215,7 +1215,7 @@ type ParseGroupItems<
 		: T[I] extends WordTok<"grouping">
 			? T[Nx<I>] extends WordTok<"sets">
 				? T[Nx<Nx<I>>] extends OpTok<"(">
-					? SkipToCloseParen<T, Nx<Nx<Nx<I>>>, [], true> extends infer J
+					? SkipToCloseParen<T, Nx<Nx<Nx<I>>>> extends infer J
 						? J extends number
 							? GroupNext<T, J, Acc, true>
 							: J

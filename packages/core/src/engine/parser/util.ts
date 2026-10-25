@@ -182,23 +182,20 @@ type IdentListLoop<
 		: Expected<"identifier", T, I>;
 
 /**
- * Skip tokens up to and including the `)` matching an already-consumed `(`. Without one, the
- * end-of-input index, or with `OrFail` a syntax error there.
+ * Skip tokens up to and including the `)` matching an already-consumed `(` → the index after
+ * it. Without one, a syntax error at the end of input.
  */
 export type SkipToCloseParen<
 	T extends Toks,
 	I extends number,
 	Depth extends readonly unknown[] = [],
-	OrFail extends boolean = false,
 > =
 	T[I] extends OpTok<"(">
-		? SkipToCloseParen<T, Nx<I>, [...Depth, 0], OrFail>
+		? SkipToCloseParen<T, Nx<I>, [...Depth, 0]>
 		: T[I] extends OpTok<")">
 			? Depth extends readonly [unknown, ...infer D2]
-				? SkipToCloseParen<T, Nx<I>, D2, OrFail>
+				? SkipToCloseParen<T, Nx<I>, D2>
 				: Nx<I>
 			: T[I] extends Tok
-				? SkipToCloseParen<T, Nx<I>, Depth, OrFail>
-				: OrFail extends true
-					? SyntaxErrorAt<T, I>
-					: I;
+				? SkipToCloseParen<T, Nx<I>, Depth>
+				: SyntaxErrorAt<T, I>;

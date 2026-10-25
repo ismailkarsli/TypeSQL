@@ -99,8 +99,8 @@ test("->, ->>, #> and subscripts index into T", () => {
 	}>();
 	// an array has no keys, an object no indexes, a string neither
 	expectTypeOf<
-		Row<"SELECT history -> 'at' AS a, settings -> 0 AS b, settings -> 'theme' -> 'length' AS c FROM portfolio">
-	>().toEqualTypeOf<{ a: null; b: null; c: null }>();
+		Row<"SELECT history -> 'at' AS a, settings -> 0 AS b, settings -> 'theme' -> 'length' AS c, settings -> 'limits' -> 0 AS d FROM portfolio">
+	>().toEqualTypeOf<{ a: null; b: null; c: null; d: null }>();
 	// a non-literal key follows every key; an index past a tuple's end may be any element
 	expectTypeOf<
 		Row<"SELECT settings -> name AS a, pair -> 5 AS b FROM portfolio">
@@ -122,11 +122,15 @@ test("->, ->>, #> and subscripts index into T", () => {
 
 test("a step into unknown stays unknown", () => {
 	interface Meta {
-		docs: { meta: Json<{ extra: unknown }> };
+		docs: { meta: Json<{ extra: unknown }>; free: Json<unknown> };
 	}
 	expectTypeOf<
-		RowOf<Meta, DefaultTypeMap, "SELECT meta -> 'extra' -> 'x' AS a FROM docs">
-	>().toEqualTypeOf<{ a: unknown }>();
+		RowOf<
+			Meta,
+			DefaultTypeMap,
+			"SELECT meta -> 'extra' -> 'x' AS a, free -> 'x' AS b, free -> 0 AS c FROM docs"
+		>
+	>().toEqualTypeOf<{ a: unknown; b: unknown; c: unknown }>();
 });
 
 test("Json<T> columns stay jsonb for operators and functions", () => {

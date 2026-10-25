@@ -76,7 +76,8 @@ test("schema relations win over pg_catalog; public. never falls back", () => {
 test("data statements: a catalog relation is a view, a namespace is not a table, qualified names stay qualified", () => {
 	interface Ns extends PgCatalog {
 		users: { id: Col<"int4"> };
-		auth: { sessions: { id: Col<"uuid"> } };
+		// a namespace inside a namespace: not something Postgres has, but a type can say it
+		auth: { sessions: { id: Col<"uuid"> }; inner: { t: { id: Col<"int4"> } } };
 	}
 	type W<S extends string> = Validate<Ns, S>;
 	expectTypeOf<W<"UPDATE pg_class SET relname = 'x'">>().toEqualTypeOf<
@@ -91,6 +92,12 @@ test("data statements: a catalog relation is a view, a namespace is not a table,
 	>().toEqualTypeOf<SqlError<'relation "pg_class" does not exist', 1>>();
 	expectTypeOf<W<"UPDATE auth SET x = 1">>().toEqualTypeOf<
 		SqlError<'"auth" is not a table', 1>
+	>();
+	expectTypeOf<W<"SELECT * FROM auth">>().toEqualTypeOf<
+		SqlError<'"auth" is not a table', 3>
+	>();
+	expectTypeOf<W<"UPDATE auth.inner SET id = 1">>().toEqualTypeOf<
+		SqlError<'"auth.inner" is not a table', 1>
 	>();
 	expectTypeOf<W<"UPDATE public.nope SET x = 1">>().toEqualTypeOf<
 		SqlError<'relation "public.nope" does not exist', 1>
