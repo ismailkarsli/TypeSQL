@@ -28,8 +28,8 @@
 		"access": "public"
 	},
 	"scripts": {
-		"build": "tsc -p tsconfig.build.json",
-		"typecheck": "tsc -p tsconfig.json --noEmit",
+		"build": "tsrs -p tsconfig.build.json",
+		"typecheck": "tsrs -p tsconfig.json --noEmit",
 		"test": "vitest run"
 	},
 	"dependencies": {
@@ -42,6 +42,7 @@
 		"@types/pg": "^8.23.1",
 		"kysely": "^0.29.6",
 		"pg": "^8.23.1",
+		"tsrs": "0.18.0-ts7.1.0-dev.20260929",
 		"typescript": "7.1.0-beta",
 		"vitest": "^5.0.4"
 	},

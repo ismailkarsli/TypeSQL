@@ -35,16 +35,16 @@ import {
 	updateKillMap,
 } from "./support.ts";
 
-// TYPE_MUTATE_COMPILER=tsrs runs these tests on tsrs, a Rust port of TypeScript 7 with the same API
-const compiler = process.env.TYPE_MUTATE_COMPILER ?? "typescript";
+// TYPE_MUTATE_COMPILER=typescript runs these tests on typescript instead of tsrs
+const compiler = process.env.TYPE_MUTATE_COMPILER ?? "tsrs";
 const modules = (part: string) =>
 	compiler === "tsrs" ? `tsrs/unstable/${part}` : `typescript/${part}`;
 const { SyntaxKind } = (await import(
 	modules("ast")
-)) as typeof import("typescript/ast");
+)) as typeof import("tsrs/unstable/ast");
 const { API } = (await import(
 	modules("async")
-)) as typeof import("typescript/async");
+)) as typeof import("tsrs/unstable/async");
 type API = InstanceType<typeof API>;
 
 const here = dirname(fileURLToPath(import.meta.url));

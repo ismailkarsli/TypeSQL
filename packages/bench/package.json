@@ -4,13 +4,14 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
-		"typecheck": "tsc -p tsconfig.json --noEmit",
+		"typecheck": "tsrs -p tsconfig.json --noEmit",
 		"bench": "node ./run.ts"
 	},
 	"dependencies": {
 		"@typesql/core": "workspace:*"
 	},
 	"devDependencies": {
+		"tsrs": "0.18.0-ts7.1.0-dev.20260929",
 		"typescript": "7.1.0-beta"
 	}
 }

@@ -9,6 +9,7 @@ export default defineConfig({
 		globalSetup: ["test/cache/stale/setup.ts"],
 		typecheck: {
 			enabled: true,
+			checker: "tsrs",
 			include: ["test/cache/**/*.test-d.ts"],
 			tsconfig: "./test/cache/tsconfig.json",
 		},

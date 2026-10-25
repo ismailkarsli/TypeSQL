@@ -25,7 +25,7 @@ The bench also checks the other call forms and long statements against TypeSQL's
 | 50 queries with `:name` and inline parameters and a shared fragment | 422K | 0.43 s | 0.14 s |
 | one statement each of 0.5, 1, 2, 4 and 8 KB | 6.6M | 0.95 s | 0.31 s |
 
-CI measures with `tsc` and fails a change that takes a bench file over its instantiation or check-time budget, or a cache hit over 250 instantiations (`packages/bench/thresholds.json`).
+CI measures with `tsrs` and `tsc` and fails a change that takes a bench file over its instantiation or check-time budget, or a cache hit over 250 instantiations (`packages/bench/thresholds.json`).
 
 ## Runtime
 
@@ -45,8 +45,7 @@ Building a query (Node 26, same machine):
 From a clone of the repository:
 
 ```sh
-node packages/bench/gen.ts && pnpm --filter @typesql/core build && node packages/bench/run.ts   # compile time
-node packages/bench/run.ts --compiler tsrs                                                      # compile time with tsrs
+node packages/bench/gen.ts && pnpm --filter @typesql/core build && node packages/bench/run.ts   # compile time (tsrs and tsc)
 pnpm build && node packages/bench/runtime.ts                                                    # runtime
 ```
 

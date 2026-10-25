@@ -9,7 +9,7 @@
 		"build": "vitepress build",
 		"preview": "vitepress preview",
 		"deploy": "vitepress build && cf deploy",
-		"typecheck": "tsc -p tsconfig.json --noEmit"
+		"typecheck": "tsrs -p tsconfig.json --noEmit"
 	},
 	"dependencies": {
 		"@typesql/core": "workspace:*",
@@ -24,6 +24,7 @@
 		"cf": "1.0.0-beta.12",
 		"pg": "^8.23.1",
 		"postgres": "^3.4.9",
+		"tsrs": "0.18.0-ts7.1.0-dev.20260929",
 		"typescript": "7.1.0-beta",
 		"vitepress": "1.6.4",
 		"wrangler": "^4.151.3"

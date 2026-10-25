@@ -17,7 +17,7 @@ import type {
 	Diagnostic,
 	Program,
 	Snapshot,
-} from "typescript/async";
+} from "tsrs/unstable/async";
 import { findMutants, MUTATORS } from "./type-mutate/sites.ts";
 import {
 	anchorLines,
@@ -105,7 +105,7 @@ const { values: opts, positionals } = parseArgs({
 		timeout: { type: "string" },
 		verbose: { type: "boolean", default: false },
 		"check-equivalent": { type: "boolean", default: false },
-		compiler: { type: "string", default: "typescript" },
+		compiler: { type: "string", default: "tsrs" },
 		profile: { type: "boolean", default: false },
 	},
 });
@@ -490,9 +490,9 @@ async function loadTypeScript(configFile: string, compiler: string) {
 		load(spec("fs")),
 		load(spec("ast")),
 	])) as [
-		typeof import("typescript/async"),
-		typeof import("typescript/fs"),
-		typeof import("typescript/ast"),
+		typeof import("tsrs/unstable/async"),
+		typeof import("tsrs/unstable/fs"),
+		typeof import("tsrs/unstable/ast"),
 	];
 	return {
 		API: api.API,

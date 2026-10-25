@@ -19,6 +19,7 @@ export default defineConfig({
 		globalSetup: ["./test/setup.ts"],
 		typecheck: {
 			enabled: true,
+			checker: "tsrs",
 			include: ["test/**/*.test-d.ts"],
 			tsconfig: "./tsconfig.json",
 		},

@@ -9,6 +9,7 @@ export default defineConfig({
 		globalSetup: ["test/cache/equiv/setup.ts"],
 		typecheck: {
 			enabled: true,
+			checker: "tsrs",
 			include: ["test/types/**/*.test-d.ts"],
 			tsconfig: "./test/cache/equiv/tsconfig.json",
 		},

@@ -42,7 +42,7 @@ const vendor = join(root, "vendor/postgres");
 const regress = join(vendor, "src/test/regress");
 const engine = join(root, "packages/core/src/engine");
 const cache = join(root, "node_modules/.cache/typesql-pg-regress");
-const tsc = join(root, "node_modules/.bin/tsc");
+const tsc = join(root, "node_modules/.bin/tsrs");
 const baselinePath = join(here, "baseline.json");
 
 const args = process.argv.slice(2);

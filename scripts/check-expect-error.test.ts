@@ -1,4 +1,4 @@
-import { API } from "typescript/sync";
+import { API } from "tsrs/unstable/sync";
 import { afterAll, describe, expect, test } from "vitest";
 import { findViolations } from "./check-expect-error.ts";
 

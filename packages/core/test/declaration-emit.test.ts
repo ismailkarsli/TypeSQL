@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { expect, test } from "vitest";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const tsc = resolve(here, "../../../node_modules/.bin/tsc");
+const tsc = resolve(here, "../../../node_modules/.bin/tsrs");
 
 /**
  * Rows returned by `execute*` must be plain object types in declaration output. A named TypeSQL

@@ -7,6 +7,7 @@ export default defineConfig({
 		exclude: ["test/cache/**"],
 		typecheck: {
 			enabled: true,
+			checker: "tsrs",
 			include: ["test/**/*.test-d.ts"],
 			exclude: ["test/cache/**"],
 			tsconfig: "./tsconfig.json",

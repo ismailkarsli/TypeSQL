@@ -1,18 +1,17 @@
 #!/usr/bin/env node
-// Measures `tsc --noEmit --extendedDiagnostics` per generated file, writes results.json, prints
-// a table plus the per-query throughput (also to the GitHub job summary when
-// GITHUB_STEP_SUMMARY is set) and exits 1 when a file exceeds thresholds.json. `--calibrate` rewrites
-// thresholds.json from the measured numbers x2 (check time gets a 1.5 s floor: for sub-second
-// files the fixed cost of loading lib.d.ts + core and CPU contention dominate, and instantiation
-// counts are the deterministic signal) before checking.
+// Measures `tsrs` and `tsc` (`--noEmit --extendedDiagnostics`) per generated file, writes
+// results.json, prints a table plus the per-query throughput for both compilers (also to the
+// GitHub job summary when GITHUB_STEP_SUMMARY is set) and exits 1 when a file exceeds
+// thresholds.json. `--calibrate` rewrites thresholds.json from the measured numbers x2 (check time
+// gets a 1.5 s floor: for sub-second files the fixed cost of loading lib.d.ts + core and CPU
+// contention dominate, and instantiation counts are the deterministic signal) before checking.
 //
 // Variants: the sources against core's sources (q1 … maxlen), the same files against the built
 // package with skipLibCheck, as an application compiles them (…d), with a type cache generated
 // for the file and served by the content mapper (…c), and with a cache generated for another
 // schema, every entry stale (q500s). The cached variants need `pnpm --filter @typesql/core build`.
 //
-// `--compiler tsrs` measures with tsrs (a Rust port of TypeScript 7) instead of tsc. The
-// thresholds are calibrated with tsc, so `--calibrate` needs the default compiler.
+// `--compiler tsrs` or `--compiler tsc` measures with that compiler only.
 import { spawnSync } from "node:child_process";
 import {
 	appendFileSync,
@@ -80,14 +79,20 @@ interface CacheThreshold {
 /** thresholds.json: one entry per variant, and `cache` for the type cache's costs. */
 type Thresholds = { [variant: string]: Threshold } & { cache?: CacheThreshold };
 
+type Compiler = "tsrs" | "tsc";
 const here = dirname(fileURLToPath(import.meta.url));
 const compilerArg = process.argv.indexOf("--compiler");
-const compiler = compilerArg === -1 ? "tsc" : process.argv[compilerArg + 1];
-if (compiler !== "tsc" && compiler !== "tsrs") {
-	console.error(`unknown --compiler ${compiler}: use tsc or tsrs`);
+const onlyCompiler =
+	compilerArg === -1 ? undefined : process.argv[compilerArg + 1];
+if (
+	onlyCompiler !== undefined &&
+	onlyCompiler !== "tsc" &&
+	onlyCompiler !== "tsrs"
+) {
+	console.error(`unknown --compiler ${onlyCompiler}: use tsc or tsrs`);
 	process.exit(2);
 }
-const tsc = join(here, "../../node_modules/.bin", compiler);
+const compilers: Compiler[] = onlyCompiler ? [onlyCompiler] : ["tsrs", "tsc"];
 const core = join(here, "../core");
 const dist = { extends: "./tsconfig.json", compilerOptions: { paths: {} } };
 const cached = {
@@ -123,10 +128,9 @@ const variants: Variant[] = [
 		cache: { from: ["cache/q500s-schema.ts"] },
 	},
 ];
-const names = variants.map((v) => v.name);
 const calibrate = process.argv.includes("--calibrate");
-if (calibrate && compiler !== "tsc") {
-	console.error("--calibrate measures with tsc: drop --compiler");
+if (calibrate && onlyCompiler !== undefined && onlyCompiler !== "tsrs") {
+	console.error("--calibrate measures with tsrs: drop --compiler");
 	process.exit(2);
 }
 const thresholdsPath = join(here, "thresholds.json");
@@ -189,8 +193,9 @@ async function generateCaches(): Promise<void> {
 }
 await generateCaches();
 
-function measure(variant: Variant): Result {
+function measure(variant: Variant, compiler: Compiler): Result {
 	const { name } = variant;
+	const bin = join(here, "../../node_modules/.bin", compiler);
 	const configPath = join(here, `tsconfig.${name}.json`);
 	writeFileSync(
 		configPath,
@@ -213,7 +218,7 @@ function measure(variant: Variant): Result {
 			configPath,
 			...(variant.cache ? ["--runExternalCode"] : []),
 		];
-		const proc = spawnSync(tsc, args, {
+		const proc = spawnSync(bin, args, {
 			cwd: here,
 			encoding: "utf8",
 			env: { ...process.env, TYPESQL_CACHE: "off" },
@@ -277,19 +282,23 @@ function probes(errors: TscError[]): Probe[] {
 	return found;
 }
 
-const results = variants.map(measure);
+const byCompiler = Object.fromEntries(
+	compilers.map((c) => [c, variants.map((v) => measure(v, c))]),
+) as Record<Compiler, Result[]>;
+const primaryCompiler: Compiler = compilers[0]!;
+const results = byCompiler[primaryCompiler];
 
 /**
  * Marginal cost of one query: q500 minus q1 (which is mostly loading lib.d.ts and core), per
  * query. `queriesPerSec` is the check-time throughput an app with many typed queries sees.
  */
-function throughput(): {
+function throughput(list: Result[]): {
 	instantiationsPerQuery: number;
 	checkMsPerQuery: number;
 	queriesPerSec: number;
 } | null {
-	const q1 = results.find((r) => r.name === "q1");
-	const q500 = results.find((r) => r.name === "q500");
+	const q1 = list.find((r) => r.name === "q1");
+	const q500 = list.find((r) => r.name === "q500");
 	if (
 		!q1?.checkTimeSec ||
 		!q500?.checkTimeSec ||
@@ -306,15 +315,18 @@ function throughput(): {
 		queriesPerSec: Math.round(499 / seconds),
 	};
 }
-const perQuery = throughput();
+const throughputByCompiler = Object.fromEntries(
+	compilers.map((c) => [c, throughput(byCompiler[c])]),
+) as Record<Compiler, ReturnType<typeof throughput>>;
+const perQuery = throughputByCompiler[primaryCompiler];
 
 /**
  * Cost of a cache hit, q500c - q50c per query, and of a stale cache against no cache (q500s /
  * q500d): a stale entry must cost what the analysis costs, plus its lookup.
  */
-function cacheCost(): CacheThreshold | null {
+function cacheCost(list: Result[]): CacheThreshold | null {
 	const get = (n: string): number | null | undefined =>
-		results.find((r) => r.name === n)?.instantiations;
+		list.find((r) => r.name === n)?.instantiations;
 	const [c50, c500, s500, d500] = ["q50c", "q500c", "q500s", "q500d"].map(get);
 	if ([c50, c500, s500, d500].some((x) => x == null)) return null;
 	return {
@@ -322,16 +334,16 @@ function cacheCost(): CacheThreshold | null {
 		staleRatio: Number((s500! / d500!).toFixed(3)),
 	};
 }
-const cache = cacheCost();
+const cache = cacheCost(results);
 writeFileSync(
 	join(here, "results.json"),
 	JSON.stringify(
 		{
 			measuredAt: new Date().toISOString(),
-			compiler,
-			throughput: perQuery,
+			compiler: onlyCompiler ?? compilers,
+			throughput: onlyCompiler ? perQuery : throughputByCompiler,
 			cache,
-			results,
+			results: onlyCompiler ? results : byCompiler,
 		},
 		null,
 		2,
@@ -375,41 +387,67 @@ const thresholds: Thresholds = existsSync(thresholdsPath)
 	? (JSON.parse(readFileSync(thresholdsPath, "utf8")) as Thresholds)
 	: {};
 const failures: { name: string; problems: string[] }[] = [];
-const rows = results.map((r) => {
+const rows = results.map((r, idx) => {
 	const t = thresholds[r.name];
 	const problems: string[] = [];
-	if (t) {
-		if (r.instantiations == null || r.instantiations > t.instantiations)
-			problems.push(`instantiations > ${t.instantiations}`);
-		if (r.checkTimeSec == null || r.checkTimeSec > t.checkTimeSec)
-			problems.push(`check time > ${t.checkTimeSec}s`);
-		if (r.errorCount > (t.maxErrors ?? 0))
-			problems.push(`${r.errorCount} error(s) in file`);
-		if (r.otherErrorCount > 0)
-			problems.push(
-				`${r.otherErrorCount} error(s) outside the file (core does not compile?)`,
-			);
-		if (t.minOkBytes != null) {
-			const maxOk = Math.max(
-				0,
-				...(r.probes ?? []).filter((p) => p.ok).map((p) => p.bytes),
-			);
-			if (maxOk < t.minOkBytes)
-				problems.push(`max OK statement ${maxOk} B < ${t.minOkBytes} B`);
+	for (const c of compilers) {
+		const rc = byCompiler[c][idx]!;
+		const tag = compilers.length > 1 ? ` (${c})` : "";
+		if (t) {
+			if (rc.instantiations == null || rc.instantiations > t.instantiations)
+				problems.push(`instantiations${tag} > ${t.instantiations}`);
+			if (rc.checkTimeSec == null || rc.checkTimeSec > t.checkTimeSec)
+				problems.push(`check time${tag} > ${t.checkTimeSec}s`);
+			if (rc.errorCount > (t.maxErrors ?? 0))
+				problems.push(`${rc.errorCount} error(s) in file${tag}`);
+			if (rc.otherErrorCount > 0)
+				problems.push(
+					`${rc.otherErrorCount} error(s) outside the file${tag} (core does not compile?)`,
+				);
+			if (t.minOkBytes != null) {
+				const maxOk = Math.max(
+					0,
+					...(rc.probes ?? []).filter((p) => p.ok).map((p) => p.bytes),
+				);
+				if (maxOk < t.minOkBytes)
+					problems.push(
+						`max OK statement${tag} ${maxOk} B < ${t.minOkBytes} B`,
+					);
+			}
 		}
 	}
 	if (problems.length) failures.push({ name: r.name, problems });
+	if (compilers.length === 1) {
+		return {
+			variant: r.name,
+			file: r.file,
+			instantiations: r.instantiations ?? "?",
+			types: r.types ?? "?",
+			"check s": r.checkTimeSec ?? "?",
+			"total s": r.totalTimeSec ?? "?",
+			"mem MB": r.memoryMB,
+			errors: r.otherErrorCount
+				? `${r.errorCount}+${r.otherErrorCount}`
+				: r.errorCount,
+			status: problems.length ? "FAIL" : t ? "ok" : "no threshold",
+		};
+	}
+	const tsrsRes = byCompiler.tsrs[idx]!;
+	const tscRes = byCompiler.tsc[idx]!;
 	return {
 		variant: r.name,
 		file: r.file,
-		instantiations: r.instantiations ?? "?",
-		types: r.types ?? "?",
-		"check s": r.checkTimeSec ?? "?",
-		"total s": r.totalTimeSec ?? "?",
-		"mem MB": r.memoryMB,
-		errors: r.otherErrorCount
-			? `${r.errorCount}+${r.otherErrorCount}`
-			: r.errorCount,
+		instantiations: tsrsRes.instantiations ?? "?",
+		types: tsrsRes.types ?? "?",
+		"tsrs check s": tsrsRes.checkTimeSec ?? "?",
+		"tsc check s": tscRes.checkTimeSec ?? "?",
+		"tsrs total s": tsrsRes.totalTimeSec ?? "?",
+		"tsc total s": tscRes.totalTimeSec ?? "?",
+		"tsrs MB": tsrsRes.memoryMB,
+		"tsc MB": tscRes.memoryMB,
+		errors: tsrsRes.otherErrorCount
+			? `${tsrsRes.errorCount}+${tsrsRes.otherErrorCount}`
+			: tsrsRes.errorCount,
 		status: problems.length ? "FAIL" : t ? "ok" : "no threshold",
 	};
 });
@@ -438,27 +476,40 @@ if (cache) {
 		problems.push(`stale cache costs more than ${t.staleRatio}x no cache`);
 	if (problems.length) failures.push({ name: "cache", problems });
 }
-if (perQuery) {
-	console.log(
-		`\nthroughput (q500 - q1): ${perQuery.queriesPerSec} queries/s of check time, ${perQuery.checkMsPerQuery} ms and ${perQuery.instantiationsPerQuery} instantiations per query`,
-	);
+for (const c of compilers) {
+	const pq = throughputByCompiler[c];
+	if (pq) {
+		const label = compilers.length > 1 ? ` (${c})` : "";
+		console.log(
+			`\nthroughput (q500 - q1)${label}: ${pq.queriesPerSec} queries/s of check time, ${pq.checkMsPerQuery} ms and ${pq.instantiationsPerQuery} instantiations per query`,
+		);
+	}
 }
 if (process.env.GITHUB_STEP_SUMMARY) {
+	const both = compilers.length > 1;
 	const md = [
-		`### ${failures.length ? "❌" : "✅"} Compile-time bench`,
+		`### ${failures.length ? "❌" : "✅"} Compile-time bench${onlyCompiler ? ` (${onlyCompiler})` : ""}`,
 		"",
 		...failures.map((f) => `- ${f.name}: ${f.problems.join(", ")}`),
 		...(failures.length ? [""] : []),
-		"| variant | instantiations | check s | status |",
-		"|---|---:|---:|---|",
-		...rows.map(
-			(r) =>
-				`| ${r.variant} | ${r.instantiations} | ${r["check s"]} | ${r.status} |`,
+		both
+			? "| variant | instantiations | check s (`tsrs`) | check s (`tsc`) | status |"
+			: "| variant | instantiations | check s | status |",
+		both ? "|---|---:|---:|---:|---|" : "|---|---:|---:|---|",
+		...rows.map((r) =>
+			both
+				? `| ${r.variant} | ${r.instantiations} | ${(r as Record<string, unknown>)["tsrs check s"]} | ${(r as Record<string, unknown>)["tsc check s"]} | ${r.status} |`
+				: `| ${r.variant} | ${r.instantiations} | ${(r as Record<string, unknown>)["check s"]} | ${r.status} |`,
 		),
 		"",
-		perQuery
-			? `Throughput: **${perQuery.queriesPerSec} queries/s** of check time (${perQuery.checkMsPerQuery} ms, ${perQuery.instantiationsPerQuery} instantiations per query).`
-			: "",
+		...compilers
+			.map((c) => {
+				const pq = throughputByCompiler[c];
+				if (!pq) return "";
+				const label = both ? ` (${c})` : "";
+				return `Throughput${label}: **${pq.queriesPerSec} queries/s** of check time (${pq.checkMsPerQuery} ms, ${pq.instantiationsPerQuery} instantiations per query).`;
+			})
+			.filter(Boolean),
 		cache
 			? `Type cache: ${cache.instantiationsPerHit} instantiations per hit; a stale cache costs ${cache.staleRatio}x no cache.`
 			: "",
@@ -470,11 +521,12 @@ if (maxlen)
 	console.log(
 		`\nmaxlen probes: ${maxlen.probes!.map((p) => `${p.name}=${p.bytes}B:${p.ok ? "ok" : "FAIL"}`).join("  ")}`,
 	);
-for (const r of results)
-	for (const e of r.errors)
-		console.log(
-			`  [${r.name}] ${e.file}:${e.line} ${e.code} ${e.message.slice(0, 140)}`,
-		);
+for (const c of compilers)
+	for (const r of byCompiler[c])
+		for (const e of r.errors)
+			console.log(
+				`  [${r.name}${compilers.length > 1 ? `/${c}` : ""}] ${e.file}:${e.line} ${e.code} ${e.message.slice(0, 140)}`,
+			);
 
 if (failures.length) {
 	console.error(`\nthreshold violations:`);

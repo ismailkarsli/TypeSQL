@@ -44,18 +44,19 @@
 		"access": "public"
 	},
 	"scripts": {
-		"build": "tsc -p tsconfig.build.json",
-		"typecheck": "tsc -p tsconfig.json --noEmit && tsc -p test/cache/tsconfig.check.json --noEmit",
+		"build": "tsrs -p tsconfig.build.json",
+		"typecheck": "tsrs -p tsconfig.json --noEmit && tsrs -p test/cache/tsconfig.check.json --noEmit",
 		"test": "vitest run"
 	},
 	"peerDependencies": {
-		"typescript": ">=7.1.0-beta"
+		"typescript": ">=7.0.0-0"
 	},
 	"devDependencies": {
 		"@types/pg": "^8.23.1",
 		"libpg-query": "18.1.5",
 		"pg": "^8.23.1",
 		"postgres": "^3.4.9",
+		"tsrs": "0.18.0-ts7.1.0-dev.20260929",
 		"typescript": "7.1.0-beta",
 		"vitest": "^5.0.4"
 	},

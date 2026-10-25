@@ -12,7 +12,7 @@ import type {
 	TypeAliasDeclaration,
 	TypeNode,
 	UnionTypeNode,
-} from "typescript/ast";
+} from "tsrs/unstable/ast";
 
 export interface Range {
 	start: number;

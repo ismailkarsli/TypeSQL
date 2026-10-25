@@ -7,7 +7,7 @@ The repository is a pnpm workspace: `packages/core` (`@typesql/core`), the drive
 
 ```sh
 pnpm install
-pnpm typecheck                 # tsc per package, including the docs and package examples
+pnpm typecheck                 # tsrs per package, including the docs and package examples
 pnpm test                      # vitest: runtime tests, type tests, conformance against Postgres
 pnpm coverage                  # the same with coverage; fails below the per-file thresholds
 pnpm mutate:runtime --changed  # mutation testing of the changed runtime lines (StrykerJS)
@@ -28,6 +28,18 @@ Type tests live in `packages/*/test/**/*.test-d.ts` and use `expectTypeOf` and, 
 argument-shape errors only, `// @ts-expect-error` (see [Coverage and mutation
 testing](#coverage-and-mutation-testing)). The engine's design rules and the TypeScript limits they work around
 are in [Type engine](../guide/type-engine.md). Versioning and publishing are in [Releasing](./releasing.md).
+
+`tsrs` (a Rust port of TypeScript 7.1) is the default compiler, typechecker and API package
+across the repository. Official `typescript` (`tsc`) is kept in `devDependencies` as a backup
+plan during development (with no runtime fallback in our scripts and tests):
+
+```sh
+./node_modules/.bin/tsc -p packages/core/tsconfig.json --noEmit       # typecheck a package with tsc
+pnpm test:types -- --typecheck.checker=tsc                            # run type tests with tsc
+pnpm mutate:types --changed --compiler typescript                     # type-mutate with typescript
+TYPE_MUTATE_COMPILER=typescript pnpm vitest run scripts/type-mutate   # type-mutate's own tests on typescript
+node packages/bench/run.ts --compiler tsc                             # compile-time bench with tsc
+```
 
 `CacheVersion` (`packages/core/src/engine/cache.ts`) is a hash of core's type-level sources: a
 type cache entry made by another version is never used. After changing anything under
@@ -78,7 +90,7 @@ which gets core through a tsconfig `paths` alias.
 
 The language server must run TypeScript 7.1: version 1.0 of the TypeScript 7 extension bundles
 7.0, whose API cannot read the editor's program. `.vscode/settings.json` sets `js/ts.tsdk.path`
-to the workspace's `typescript`; VS Code asks once to allow it. The **TypeSQL** output channel
+to the workspace's `typescript/lib`; VS Code asks once to allow it. The **TypeSQL** output channel
 logs the API client the session picked and any error.
 
 ## Playground links
@@ -170,7 +182,7 @@ How a run works (`packages/core/test/pg-regress/`):
    which Postgres parses while running CREATE FUNCTION or DO, is an `error`), or `unknown` when
    it cannot tell.
 3. `run.ts` writes one `.ts` file per test to `node_modules/.cache/typesql-pg-regress/`, each
-   statement checked as `ParseProgram<Lex<sql>>`, runs `tsc` over them in batches of about 6000
+   statement checked as `ParseProgram<Lex<sql>>`, runs `tsrs` over them in batches of about 6000
    statements (one run over all of them needs ~3 GB) and reads the result of every statement from
    the diagnostics.
 
@@ -422,7 +434,7 @@ pnpm mutate:types --sites narrow.ts:60-70    # mutants on those lines
 pnpm mutate:types --list --sites expr.ts:71  # print the mutants, check nothing
 pnpm mutate:types --shard 3/16 --report r.json --summary r.md   # one shard of a full run
 node scripts/type-mutate.ts merge --report all.json --summary all.md r-*.json
-pnpm mutate:types --files narrow.ts --compiler tsrs              # check with tsrs instead of TypeScript
+pnpm mutate:types --files narrow.ts --compiler typescript        # check with typescript instead of tsrs
 pnpm mutate:types --files narrow.ts --profile                    # where each mutant's check spent its time
 ```
 
@@ -440,7 +452,7 @@ The mutators (`scripts/type-mutate/sites.ts`), found with the TypeScript AST:
 | `infer-bare` | `infer X extends C` → `infer X` |
 
 One TypeScript session loads `packages/core/tsconfig.json` (sources and tests). Per mutant, the
-mutated file is overlaid in memory (no `tsc`, no vitest) and the test files under
+mutated file is overlaid in memory (no CLI process per mutant, no vitest) and the test files under
 `packages/core/test` are checked one at a time until one has an error: the mutant is
 **killed**. A mutant every test file accepts **survived**; one whose own file, or another
 source file, no longer compiles is **invalid** and does not count. Test files are tried in
@@ -468,12 +480,10 @@ file (15–30 s). A full run (about 23 000 mutants, a quarter of them surviving)
 (`--shard i/n` takes every n-th mutant), and `merge` joins the shards' reports and rebuilds the
 kill map from them.
 
-`--compiler tsrs` checks with [tsrs](https://github.com/oxc-project/tsrs), a Rust port of
-TypeScript 7 with the same API (`tsrs/unstable/*`), installed as a dev dependency. It finds the
-same mutants and, on a sample of 12, gave every one the same status at about 2.7× the speed
-and a third of the memory; TypeScript stays the default, because tsrs follows a TypeScript 7.1
-dev build rather than the version the project uses. `TYPE_MUTATE_COMPILER=tsrs pnpm vitest run
-scripts/type-mutate` runs the script's own tests on it.
+By default it checks with [tsrs](https://github.com/oxc-project/tsrs) (`tsrs/unstable/*`), which
+runs at about 2.7× the speed and a third of the memory of `typescript`. `--compiler typescript`
+checks with `typescript` instead, and `TYPE_MUTATE_COMPILER=typescript pnpm vitest run
+scripts/type-mutate` runs the script's own tests on `typescript`.
 
 `--profile` adds `profile` to the report: per mutant, the time of the snapshot update, of the
 mutated file, of each test file and of the other source files, and the time of the clean check.
@@ -567,10 +577,11 @@ argument, a slot or an inline value) and inside a call, where it pins where the 
 `packages/bench` measures what the engine costs the compiler:
 
 ```sh
-node packages/bench/gen.ts              # writes src/q1.ts, q50.ts, q500.ts, mixed50.ts, maxlen.ts
-pnpm --filter @typesql/core build        # the …d and …c variants use the built package
-node packages/bench/run.ts              # tsc --extendedDiagnostics per variant; exit 1 on a threshold breach
-node packages/bench/run.ts --calibrate  # rewrite thresholds.json from the measured numbers
+node packages/bench/gen.ts               # writes src/q1.ts, q50.ts, q500.ts, mixed50.ts, maxlen.ts
+pnpm --filter @typesql/core build         # the …d and …c variants use the built package
+node packages/bench/run.ts               # tsrs and tsc --extendedDiagnostics per variant; exit 1 on a threshold breach
+node packages/bench/run.ts --compiler tsrs # measure with tsrs only (or --compiler tsc for tsc only)
+node packages/bench/run.ts --calibrate   # rewrite thresholds.json from the measured numbers
 ```
 
 `qN.ts` holds N distinct realistic SELECTs; `mixed50.ts` holds 50 statements that use inline
@@ -591,20 +602,20 @@ instantiations of one hit (q500c − q50c over 450, at most 250) and a stale cac
 time per query, queries per second of check time, and instantiations per query. That is the
 number to watch for an app with hundreds of typed queries.
 
-Current numbers on TypeScript 7.1.0-beta:
+Current numbers (`tsc` from TypeScript 7.1.0-beta and tsrs 0.18.0):
 
-| File | Instantiations | Check time |
-|---|---|---|
-| q1 | ~149K (mostly checking core's sources) | ~0.22 s |
-| q50 | ~0.65M | ~0.50 s |
-| q500 | ~4.7M | ~2.8 s |
-| mixed50 | ~0.42M | ~0.43 s |
-| maxlen (all probes pass, up to 8 KB) | ~6.6M | ~0.95 s |
-| per query (q500 − q1) | ~9.2K | ~5 ms, ~190 queries/s |
-| q1d / q50d / q500d | ~18K / ~0.52M / ~4.6M | ~0.04 / ~0.31 / ~2.6 s |
-| q50c / q500c (type cache) | ~20K / ~0.12M | ~0.02 / ~0.13 s |
-| per cache hit (q500c − q50c) | ~230 | |
-| q500s (stale cache) | ~4.7M (1.01x q500d) | ~2.6 s |
+| File | Instantiations | Check time, `tsc` | Check time, tsrs |
+|---|---|---|---|
+| q1 | ~149K (mostly checking core's sources) | ~0.22 s | ~0.08 s |
+| q50 | ~0.65M | ~0.50 s | ~0.27 s |
+| q500 | ~4.7M | ~2.8 s | ~1.2 s |
+| mixed50 | ~0.42M | ~0.43 s | ~0.14 s |
+| maxlen (all probes pass, up to 8 KB) | ~6.6M | ~0.95 s | ~0.31 s |
+| per query (q500 − q1) | ~9.2K | ~5 ms, ~190 queries/s | ~2.2 ms, ~450 queries/s |
+| q1d / q50d / q500d | ~18K / ~0.52M / ~4.6M | ~0.04 / ~0.31 / ~2.6 s | ~0.02 / ~0.14 / ~1.1 s |
+| q50c / q500c (type cache) | ~20K / ~0.12M | ~0.02 / ~0.13 s | ~0.006 / ~0.02 s |
+| per cache hit (q500c − q50c) | ~230 | | |
+| q500s (stale cache) | ~4.7M (1.01x q500d) | ~2.6 s | ~1.3 s |
 
 Where a typical query's cost goes (q50, instantiations above loading the library): lexing
 ~30%, parsing ~35%, binding and typing ~13%, building the row and parameter types ~17%, the

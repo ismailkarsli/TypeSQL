@@ -15,8 +15,8 @@ import {
 	type SourceFile,
 	SyntaxKind,
 	type TypeReferenceNode,
-} from "typescript/ast";
-import { API } from "typescript/sync";
+} from "tsrs/unstable/ast";
+import { API } from "tsrs/unstable/sync";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 

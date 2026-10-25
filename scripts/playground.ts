@@ -87,7 +87,7 @@ for (const name of sources.keys()) {
 
 if (check) {
 	const tsc = spawnSync(
-		join(root, "node_modules/.bin/tsc"),
+		join(root, "node_modules/.bin/tsrs"),
 		["-p", join(sourceDir, "tsconfig.json"), "--pretty", "false"],
 		{
 			cwd: root,

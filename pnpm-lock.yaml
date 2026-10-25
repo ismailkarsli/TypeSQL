@@ -203,6 +203,9 @@ importers:
         specifier: workspace:*
         version: link:../core
     devDependencies:
+      tsrs:
+        specifier: 0.18.0-ts7.1.0-dev.20260929
+        version: 0.18.0-ts7.1.0-dev.20260929
       typescript:
         specifier: 7.1.0-beta
         version: 7.1.0-beta
@@ -221,6 +224,9 @@ importers:
       postgres:
         specifier: ^3.4.9
         version: 3.4.9
+      tsrs:
+        specifier: 0.18.0-ts7.1.0-dev.20260929
+        version: 0.18.0-ts7.1.0-dev.20260929
       typescript:
         specifier: 7.1.0-beta
         version: 7.1.0-beta
@@ -261,6 +267,9 @@ importers:
       postgres:
         specifier: ^3.4.9
         version: 3.4.9
+      tsrs:
+        specifier: 0.18.0-ts7.1.0-dev.20260929
+        version: 0.18.0-ts7.1.0-dev.20260929
       typescript:
         specifier: 7.1.0-beta
         version: 7.1.0-beta
@@ -292,6 +301,9 @@ importers:
       postgres:
         specifier: ^3.4.9
         version: 3.4.9
+      tsrs:
+        specifier: 0.18.0-ts7.1.0-dev.20260929
+        version: 0.18.0-ts7.1.0-dev.20260929
       typescript:
         specifier: 7.1.0-beta
         version: 7.1.0-beta
@@ -314,6 +326,9 @@ importers:
       pg:
         specifier: ^8.23.1
         version: 8.23.1
+      tsrs:
+        specifier: 0.18.0-ts7.1.0-dev.20260929
+        version: 0.18.0-ts7.1.0-dev.20260929
       typescript:
         specifier: 7.1.0-beta
         version: 7.1.0-beta
@@ -329,6 +344,9 @@ importers:
       '@typesql/core':
         specifier: workspace:*
         version: link:../core
+      tsrs:
+        specifier: 0.18.0-ts7.1.0-dev.20260929
+        version: 0.18.0-ts7.1.0-dev.20260929
       typescript:
         specifier: 7.1.0-beta
         version: 7.1.0-beta
@@ -348,6 +366,9 @@ importers:
       pg:
         specifier: ^8.23.1
         version: 8.23.1
+      tsrs:
+        specifier: 0.18.0-ts7.1.0-dev.20260929
+        version: 0.18.0-ts7.1.0-dev.20260929
       typescript:
         specifier: 7.1.0-beta
         version: 7.1.0-beta
@@ -364,6 +385,9 @@ importers:
       postgres:
         specifier: ^3.4.9
         version: 3.4.9
+      tsrs:
+        specifier: 0.18.0-ts7.1.0-dev.20260929
+        version: 0.18.0-ts7.1.0-dev.20260929
       typescript:
         specifier: 7.1.0-beta
         version: 7.1.0-beta
@@ -383,6 +407,9 @@ importers:
       prisma:
         specifier: ^7.10.0
         version: 7.10.0(@types/react@19.3.0)(magicast@0.5.5)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@7.1.0-beta)
+      tsrs:
+        specifier: 0.18.0-ts7.1.0-dev.20260929
+        version: 0.18.0-ts7.1.0-dev.20260929
       typescript:
         specifier: 7.1.0-beta
         version: 7.1.0-beta
@@ -413,6 +440,9 @@ importers:
       tm-grammars:
         specifier: ^1.32.22
         version: 1.32.22
+      tsrs:
+        specifier: 0.18.0-ts7.1.0-dev.20260929
+        version: 0.18.0-ts7.1.0-dev.20260929
       typescript:
         specifier: 7.1.0-beta
         version: 7.1.0-beta
