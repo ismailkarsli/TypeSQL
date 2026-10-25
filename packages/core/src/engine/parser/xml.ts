@@ -53,7 +53,7 @@ type XmlNode<Op extends string, Args, Named, To> = {
 };
 
 /** `l IS [NOT] DOCUMENT`. */
-export type XmlIsDocument<L, Not extends boolean> = Not extends true
+export type XmlIsDocument<L, Not extends boolean> = Not extends true // type-mutate: equivalent – IS NOT DOCUMENT types as IS DOCUMENT does (bool, the operand's nullability, ?column?) and nothing narrows on either
 	? { t: "un"; op: "not"; e: XmlNode<"document", [L], [], null> }
 	: XmlNode<"document", [L], [], null>;
 
@@ -66,13 +66,13 @@ export type ParseXmlFunc<
 	? ParseXmlElement<T, I>
 	: W extends "xmlforest"
 		? ParseNamedList<T, I, false, [], []> extends infer X
-			? X extends Ok<infer Named, infer J extends number>
+			? X extends Ok<infer Named, infer J>
 				? Ok<XmlNode<"forest", [], Named, null>, J>
 				: X
 			: never
 		: W extends "xmlconcat"
 			? ParseExprList<T, I, []> extends infer X
-				? X extends Ok<infer Args, infer J extends number>
+				? X extends Ok<infer Args, infer J>
 					? Close<T, J, XmlNode<"concat", Args, [], null>>
 					: X
 				: never
@@ -95,10 +95,7 @@ type Close<T extends Toks, J extends number, N> =
 type XmlName<T extends Toks, I extends number> =
 	EatWord<T, I, "name"> extends never
 		? Expected<"NAME", T, I>
-		: AnyLabel<T, EatWord<T, I, "name">> extends [
-					infer N extends string,
-					infer J extends number,
-				]
+		: AnyLabel<T, EatWord<T, I, "name">> extends [infer N, infer J]
 			? [N, J]
 			: Expected<"name", T, EatWord<T, I, "name">>;
 
@@ -118,7 +115,7 @@ type ParseElementBody<T extends Toks, I extends number> =
 	T[I] extends WordTok<"xmlattributes">
 		? T[Nx<I>] extends OpTok<"(">
 			? ParseNamedList<T, Nx<Nx<I>>, true, [], []> extends infer X
-				? X extends Ok<infer Named, infer J extends number>
+				? X extends Ok<infer Named, infer J>
 					? T[J] extends OpTok<",">
 						? ParseElementContent<T, Nx<J>, Named>
 						: Close<T, J, XmlNode<"element", [], Named, null>>
@@ -128,7 +125,7 @@ type ParseElementBody<T extends Toks, I extends number> =
 		: ParseElementContent<T, I, []>;
 type ParseElementContent<T extends Toks, I extends number, Named> =
 	ParseExprList<T, I, []> extends infer X
-		? X extends Ok<infer Args, infer J extends number>
+		? X extends Ok<infer Args, infer J>
 			? Close<T, J, XmlNode<"element", Args, Named, null>>
 			: X
 		: never;
@@ -145,18 +142,15 @@ type ParseNamedList<
 	Names extends readonly string[],
 > =
 	ParseExpr<T, I, 0> extends infer X
-		? X extends Ok<infer E, infer J extends number>
+		? X extends Ok<infer E, infer J>
 			? (
 					T[J] extends WordTok<"as">
-						? AnyLabel<T, Nx<J>> extends [
-								infer N extends string,
-								infer J2 extends number,
-							]
+						? AnyLabel<T, Nx<J>> extends [infer N, infer J2]
 							? [N, J2]
 							: Expected<"name", T, Nx<J>>
 						: E extends {
 									readonly t: "col";
-									readonly name: infer N extends string;
+									readonly name: infer N;
 								}
 							? [N, J]
 							: Fail<
@@ -198,7 +192,7 @@ type ParseXmlPi<T extends Toks, I extends number> =
 				? Ok<XmlNode<"pi", [], [], null>, Nx<J>>
 				: T[J] extends OpTok<",">
 					? ParseExpr<T, Nx<J>, 0> extends infer X
-						? X extends Ok<infer E, infer J2 extends number>
+						? X extends Ok<infer E, infer J2>
 							? Close<T, J2, XmlNode<"pi", [E], [], null>>
 							: X
 						: never
@@ -208,7 +202,7 @@ type ParseXmlPi<T extends Toks, I extends number> =
 
 type ParseXmlRoot<T extends Toks, I extends number> =
 	ParseExpr<T, I, 0> extends infer X
-		? X extends Ok<infer E, infer J extends number>
+		? X extends Ok<infer E, infer J>
 			? EatOp<T, J, ","> extends never
 				? Expected<'","', T, J>
 				: EatWord<T, EatOp<T, J, ",">, "version"> extends never
@@ -217,7 +211,7 @@ type ParseXmlRoot<T extends Toks, I extends number> =
 								T,
 								EatWord<T, EatOp<T, J, ",">, "version">
 							> extends infer V
-						? V extends Ok<infer Ver, infer J2 extends number>
+						? V extends Ok<infer Ver, infer J2>
 							? RootStandalone<T, J2> extends infer S
 								? S extends number
 									? Close<
@@ -259,30 +253,25 @@ type ParseXmlParse<T extends Toks, I extends number> =
 	EatWord<T, I, "document" | "content"> extends never
 		? Expected<"DOCUMENT or CONTENT", T, I>
 		: ParseExpr<T, EatWord<T, I, "document" | "content">, 0> extends infer X
-			? X extends Ok<infer E, infer J extends number>
+			? X extends Ok<infer E, infer J>
 				? Close<T, SkipWhitespaceOption<T, J>, XmlNode<"parse", [E], [], null>>
 				: X
 			: never;
+/** `[PRESERVE | STRIP] WHITESPACE` → next index (`EatWord` at a `never` index is `never`). */
 type SkipWhitespaceOption<T extends Toks, I extends number> =
-	EatWord<T, I, "preserve" | "strip"> extends never
+	EatWord<T, EatWord<T, I, "preserve" | "strip">, "whitespace"> extends never
 		? I
-		: EatWord<
-					T,
-					EatWord<T, I, "preserve" | "strip">,
-					"whitespace"
-				> extends never
-			? I
-			: EatWord<T, EatWord<T, I, "preserve" | "strip">, "whitespace">;
+		: EatWord<T, EatWord<T, I, "preserve" | "strip">, "whitespace">;
 
 type ParseXmlSerialize<T extends Toks, I extends number> =
 	EatWord<T, I, "document" | "content"> extends never
 		? Expected<"DOCUMENT or CONTENT", T, I>
 		: ParseExpr<T, EatWord<T, I, "document" | "content">, 0> extends infer X
-			? X extends Ok<infer E, infer J extends number>
+			? X extends Ok<infer E, infer J>
 				? EatWord<T, J, "as"> extends never
 					? Expected<"AS", T, J>
 					: ParseTypeName<T, EatWord<T, J, "as">> extends infer Y
-						? Y extends Ok<infer Ty extends string, infer J2 extends number>
+						? Y extends Ok<infer Ty, infer J2>
 							? Close<T, SkipIndent<T, J2>, XmlNode<"serialize", [E], [], Ty>>
 							: Y
 						: never
@@ -298,7 +287,7 @@ type SkipIndent<T extends Toks, I extends number> =
 /** `XMLEXISTS(x PASSING d)` is Postgres's function `xmlexists(text, xml)`; both operands are `c_expr`s. */
 type ParseXmlExists<T extends Toks, I extends number> =
 	ParseExpr<T, I, 13> extends infer X
-		? X extends Ok<infer Path, infer J extends number>
+		? X extends Ok<infer Path, infer J>
 			? EatWord<T, J, "passing"> extends never
 				? Expected<"PASSING", T, J>
 				: ParseExpr<
@@ -306,7 +295,7 @@ type ParseXmlExists<T extends Toks, I extends number> =
 							SkipMech<T, EatWord<T, J, "passing">>,
 							13
 						> extends infer Y
-					? Y extends Ok<infer Doc, infer J2 extends number>
+					? Y extends Ok<infer Doc, infer J2>
 						? Close<
 								T,
 								SkipMech<T, J2>,
@@ -325,13 +314,11 @@ type ParseXmlExists<T extends Toks, I extends number> =
 					: never
 			: X
 		: never;
-/** `BY REF` / `BY VALUE` (no effect). */
+/** `BY REF` / `BY VALUE` (no effect; `EatWord` at a `never` index is `never`). */
 type SkipMech<T extends Toks, I extends number> =
-	EatWord<T, I, "by"> extends never
+	EatWord<T, EatWord<T, I, "by">, "ref" | "value"> extends never
 		? I
-		: EatWord<T, EatWord<T, I, "by">, "ref" | "value"> extends never
-			? I
-			: EatWord<T, EatWord<T, I, "by">, "ref" | "value">;
+		: EatWord<T, EatWord<T, I, "by">, "ref" | "value">;
 
 // ─── XMLTABLE ───
 
@@ -346,9 +333,9 @@ export type ParseXmlTable<T extends Toks, I extends number> = (
 			: Ok<[[], false], I>
 		: Ok<[[], false], I>
 ) extends infer NS
-	? NS extends Ok<[infer Ns, infer Dflt], infer I1 extends number>
+	? NS extends Ok<[infer Ns, infer Dflt], infer I1>
 		? ParseExpr<T, I1, 13> extends infer R
-			? R extends Ok<infer Row, infer I2 extends number>
+			? R extends Ok<infer Row, infer I2>
 				? EatWord<T, I2, "passing"> extends never
 					? Expected<"PASSING", T, I2>
 					: ParseExpr<
@@ -356,7 +343,7 @@ export type ParseXmlTable<T extends Toks, I extends number> = (
 								SkipMech<T, EatWord<T, I2, "passing">>,
 								13
 							> extends infer D
-						? D extends Ok<infer Doc, infer I3 extends number>
+						? D extends Ok<infer Doc, infer I3>
 							? EatWord<T, SkipMech<T, I3>, "columns"> extends never
 								? Expected<"COLUMNS", T, SkipMech<T, I3>>
 								: ParseXmlCols<
@@ -364,7 +351,7 @@ export type ParseXmlTable<T extends Toks, I extends number> = (
 											EatWord<T, SkipMech<T, I3>, "columns">,
 											[]
 										> extends infer CS
-									? CS extends Ok<infer Cols, infer I4 extends number>
+									? CS extends Ok<infer Cols, infer I4>
 										? EatOp<T, I4, ")"> extends never
 											? Expected<'")"', T, I4>
 											: ParseAliasChecked<T, EatOp<T, I4, ")">> extends infer AR
@@ -405,12 +392,12 @@ type ParseNamespaces<
 > =
 	T[I] extends WordTok<"default">
 		? ParseExpr<T, Nx<I>, 5> extends infer X
-			? X extends Ok<infer E, infer J extends number>
+			? X extends Ok<infer E, infer J>
 				? NamespacesNext<T, J, [...Acc, E], true>
 				: X
 			: never
 		: ParseExpr<T, I, 5> extends infer X
-			? X extends Ok<infer E, infer J extends number>
+			? X extends Ok<infer E, infer J>
 				? EatWord<T, J, "as"> extends never
 					? Expected<"AS", T, J>
 					: AnyLabel<T, EatWord<T, J, "as">> extends [
@@ -444,7 +431,7 @@ type ParseXmlCols<
 	Ident<T, I> extends [infer N extends string, infer J extends number]
 		? EatWords<T, J, ["for", "ordinality"]> extends never
 			? ParseTypeName<T, J> extends infer X
-				? X extends Ok<infer Ty extends string, infer J2 extends number>
+				? X extends Ok<infer Ty extends string, infer J2>
 					? ParseColOptions<T, J2, N, Ty, null, null, null, Acc>
 					: X
 				: never
@@ -485,7 +472,7 @@ type ParseColOptions<
 		? W extends "path"
 			? Path extends null
 				? ParseExpr<T, Nx<I>, 5> extends infer X
-					? X extends Ok<infer E, infer J extends number>
+					? X extends Ok<infer E, infer J>
 						? ParseColOptions<T, J, N, Ty, E, Def, NN, Acc>
 						: X
 					: never
@@ -493,7 +480,7 @@ type ParseColOptions<
 			: W extends "default"
 				? Def extends null
 					? ParseExpr<T, Nx<I>, 5> extends infer X
-						? X extends Ok<infer E, infer J extends number>
+						? X extends Ok<infer E, infer J>
 							? ParseColOptions<T, J, N, Ty, Path, E, NN, Acc>
 							: X
 						: never
@@ -515,39 +502,36 @@ type ParseColOptions<
 									I
 								>
 						: W extends ReservedKeyword
-							? XmlColsNext<
-									T,
-									I,
-									[
-										...Acc,
-										{
-											name: N;
-											type: Ty;
-											path: Path;
-											def: Def;
-											notNull: NN extends true ? true : false;
-											ordinality: false;
-										},
-									]
-								>
+							? ColDone<T, I, N, Ty, Path, Def, NN, Acc>
 							: UnknownColOption<T, I, W>
 		: T[I] extends IdTok<infer W>
 			? UnknownColOption<T, I, W>
-			: XmlColsNext<
-					T,
-					I,
-					[
-						...Acc,
-						{
-							name: N;
-							type: Ty;
-							path: Path;
-							def: Def;
-							notNull: NN extends true ? true : false;
-							ordinality: false;
-						},
-					]
-				>;
+			: ColDone<T, I, N, Ty, Path, Def, NN, Acc>;
+/** The column's options end at `I`: add it and go on. */
+type ColDone<
+	T extends Toks,
+	I extends number,
+	N extends string,
+	Ty extends string,
+	Path,
+	Def,
+	NN,
+	Acc extends readonly unknown[],
+> = XmlColsNext<
+	T,
+	I,
+	[
+		...Acc,
+		{
+			name: N;
+			type: Ty;
+			path: Path;
+			def: Def;
+			notNull: NN extends true ? true : false; // type-mutate: equivalent never-true – a never notNull is read with `extends true`, as NOT NULL
+			ordinality: false;
+		},
+	]
+>;
 /** `IDENT b_expr`: Postgres parses any option name, then rejects the unknown ones. */
 type UnknownColOption<T extends Toks, I extends number, W extends string> =
 	ParseExpr<T, Nx<I>, 5> extends infer X

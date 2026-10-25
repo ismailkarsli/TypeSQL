@@ -172,50 +172,49 @@ type XmlCols<
 		: D["ordinality"] extends true
 			? Ord extends true
 				? SqlError<"only one FOR ORDINALITY column is allowed", null>
-				: XmlCols<
+				: XmlCol<D, R, C, Acc, true>
+			: XmlCol<D, R, C, Acc, Ord>
+	: Acc;
+/** One column (FOR ORDINALITY is a NOT NULL int4 without PATH or DEFAULT), then the rest. */
+type XmlCol<
+	D extends XmlTableCol,
+	R extends readonly XmlTableCol[],
+	C extends Ctx,
+	Acc extends Cols,
+	Ord extends boolean,
+> = (
+	D["path"] extends Expr
+		? Coerce<D["path"], C, "text", "XMLTABLE">
+		: Info<"text">
+) extends infer P
+	? P extends ColInfo
+		? (D["def"] extends Expr ? TypeOf<D["def"], C> : null) extends infer Df
+			? Df extends ColInfo | null
+				? XmlCols<
 						R,
 						C,
-						[...Acc, { readonly n: D["name"]; readonly t: Info<"int4"> }],
-						true
+						[
+							...Acc,
+							{
+								readonly n: D["name"];
+								readonly t: Info<
+									D["type"],
+									D["notNull"] extends true
+										? false
+										: Df extends ColInfo
+											? Df["nullable"]
+											: true
+								>;
+							},
+						],
+						Ord
 					>
-			: (
-						D["path"] extends Expr
-							? Coerce<D["path"], C, "text", "XMLTABLE">
-							: Info<"text">
-					) extends infer P
-				? P extends ColInfo
-					? (
-							D["def"] extends Expr
-								? TypeOf<D["def"], C>
-								: null
-						) extends infer Df
-						? Df extends ColInfo | null
-							? XmlCols<
-									R,
-									C,
-									[
-										...Acc,
-										{
-											readonly n: D["name"];
-											readonly t: Info<
-												D["type"],
-												D["notNull"] extends true
-													? false
-													: Df extends ColInfo
-														? Df["nullable"]
-														: true
-											>;
-										},
-									],
-									Ord
-								>
-							: Df
-						: never
-					: P
-				: never
-	: Acc;
+				: Df
+			: never
+		: P
+	: never;
 type ColNames<Acc extends Cols> = Acc[number] extends infer E
-	? E extends { readonly n: infer N extends string }
+	? E extends { readonly n: infer N }
 		? N
 		: never
 	: never;
@@ -244,7 +243,7 @@ export type ParamsOfXml<
 							ParamsOfOpt<X, C, M, Info<"xml", true>>,
 							Info<"text", true>
 						>
-					: M
+					: never
 				: ParamsOfList<E["args"], C, M, Info<"xml", true>>;
 
 /** XMLTABLE: URIs, row and column paths text, the document xml, a DEFAULT the column's type. */
@@ -269,7 +268,7 @@ export type ParamsOfXmlTable<F, C extends Ctx, M> = F extends {
 				Info<"xml", true>
 			>
 		>
-	: M;
+	: never;
 type ParamsOfXmlCols<
 	Cs extends readonly XmlTableCol[],
 	C extends Ctx,
