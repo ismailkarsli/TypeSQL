@@ -118,12 +118,19 @@ test("untyped string literals take the other branch's type; real text does not",
 	expectTypeOf<V<"SELECT 'a' UNION SELECT 'b' UNION SELECT 1">>().toEqualTypeOf<
 		SqlError<"UNION types text and integer cannot be matched", 2>
 	>();
+	// at the keyword, not at a quoted name spelled like it
+	expectTypeOf<V<'SELECT 1 AS "union" UNION SELECT true'>>().toEqualTypeOf<
+		SqlError<"UNION types integer and boolean cannot be matched", 4>
+	>();
 });
 
 test("column count mismatch", () => {
 	expectTypeOf<
 		V<"SELECT id FROM users UNION SELECT id, email FROM users">
 	>().toEqualTypeOf<
+		SqlError<"each UNION query must have the same number of columns", 4>
+	>();
+	expectTypeOf<V<'SELECT 1 AS "union" UNION SELECT 1, 2'>>().toEqualTypeOf<
 		SqlError<"each UNION query must have the same number of columns", 4>
 	>();
 	expectTypeOf<

@@ -28,7 +28,11 @@ interface DB {
 	};
 	posts: { id: Generated<"int8">; author_id: Col<"int4">; title: Col<"text"> };
 	stats: View<{ n: Col<"int8"> }>;
-	auth: { sessions: { id: Col<"uuid">; user_id: Col<"int4"> } };
+	events: { id: Generated<"int8">; note: Nullable<"text"> };
+	auth: {
+		sessions: { id: Col<"uuid">; user_id: Col<"int4"> };
+		active: View<{ user_id: Col<"int4"> }>;
+	};
 	$types: { mood: "happy" | "sad" };
 }
 const sql = createSql<DB>();
@@ -125,10 +129,12 @@ test("sql.param: a parameter, or DEFAULT for undefined", () => {
 
 test("TableName and InsertInput", () => {
 	expectTypeOf<TableName<DB>>().toEqualTypeOf<
-		"users" | "posts" | "auth.sessions"
+		"users" | "posts" | "events" | "auth.sessions"
 	>();
 	// what FROM reads unqualified: tables and views, not namespaces or $types
-	expectTypeOf<RelationName<DB>>().toEqualTypeOf<"users" | "posts" | "stats">();
+	expectTypeOf<RelationName<DB>>().toEqualTypeOf<
+		"users" | "posts" | "stats" | "events"
+	>();
 	expectTypeOf<TableOf<DB, "auth.sessions">>().toEqualTypeOf<
 		DB["auth"]["sessions"]
 	>();
@@ -136,6 +142,7 @@ test("TableName and InsertInput", () => {
 	expectTypeOf<TableOf<DB, "stats">>().toBeNever();
 	expectTypeOf<TableOf<DB, "auth">>().toBeNever();
 	expectTypeOf<TableOf<DB, "auth.nope">>().toBeNever();
+	expectTypeOf<TableOf<DB, "auth.active">>().toBeNever();
 	expectTypeOf<
 		InsertInput<DB, { text: string; int4: number }, "posts">
 	>().toEqualTypeOf<{
@@ -221,6 +228,14 @@ test("sql.values: typed VALUES rows", () => {
 	expectTypeOf<ParamsType<typeof up>>().toEqualTypeOf<[string, number]>();
 	const sess = sql.values("auth.sessions", [{ id: "x", user_id: 1 }]);
 	sql("INSERT INTO auth.sessions {sess}", { sess });
+	// a row without keys is DEFAULT VALUES
+	const none = sql.values("events", [{}]);
+	expectTypeOf<TextType<typeof none>>().toEqualTypeOf<"DEFAULT VALUES">();
+	const ins = sql("INSERT INTO events {none} RETURNING id", { none });
+	expectTypeOf<
+		TextType<typeof ins>
+	>().toEqualTypeOf<"INSERT INTO events DEFAULT VALUES RETURNING id">();
+	expectTypeOf<RowType<typeof ins>>().toEqualTypeOf<{ id: string }>();
 
 	// @ts-expect-error email is required (NOT NULL without a default)
 	sql.values("users", [{ display_name: "x" }]);

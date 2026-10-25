@@ -214,6 +214,13 @@ test("GROUP BY: input columns first, then output names and positions", () => {
 	expectTypeOf<V<"SELECT id FROM users GROUP BY 2">>().toEqualTypeOf<
 		SqlError<"GROUP BY position 2 is not in select list", 6>
 	>();
+	// at the number after the clause's keyword, not after a quoted name spelled like it
+	expectTypeOf<V<'SELECT 1 AS "order", 3 ORDER BY 3'>>().toEqualTypeOf<
+		SqlError<"ORDER BY position 3 is not in select list", 8>
+	>();
+	expectTypeOf<V<'SELECT 1 AS "group", 3 GROUP BY 3'>>().toEqualTypeOf<
+		SqlError<"GROUP BY position 3 is not in select list", 8>
+	>();
 	expectTypeOf<V<"SELECT id FROM users GROUP BY 'x'">>().toEqualTypeOf<
 		SqlError<"non-integer constant in GROUP BY", 0>
 	>();

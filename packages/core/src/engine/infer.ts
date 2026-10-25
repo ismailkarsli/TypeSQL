@@ -11,7 +11,7 @@ import type { ApplyDdlAll } from "./ddl/apply.js";
 import type { AnyErr, ErrAt, ErrMsg, SqlError } from "./errors.js";
 import type { JsonValue } from "./inline.js";
 import type { Lex } from "./lexer/lex.js";
-import type { Toks } from "./lexer/tokens.js";
+import type { IdTok, Toks, WordTok } from "./lexer/tokens.js";
 import type { NamedParams, RewriteNamed } from "./named.js";
 import type { IntoName } from "./parser/select.js";
 import type { ParseProgram } from "./parser/stmt.js";
@@ -72,7 +72,7 @@ export type Analysis<DB, Q extends string> = [Q] extends [keyof QueryCacheKeys] 
 	? CachedAnalysis<DB, Q> extends infer C // type-mutate: equivalent – reached with a cache only (test/cache)
 		? [C] extends [never] // type-mutate: equivalent – reached with a cache only (test/cache)
 			? Analyze<DB, Q>
-			: C
+			: C // type-mutate: equivalent never-false – reached with a cache only (test/cache)
 		: never
 	: Analyze<DB, Q>;
 
@@ -106,7 +106,8 @@ type Reposition<E, T extends Toks, DB = never> =
  * call decoration it does not take (`FILTER specified, but f is not …`), the
  * first quoted name in the message that occurs in the statement (`null value in column
  * "email" of relation "users"` → `users` when `email` is absent), then `column t.c` forms, then the keyword of `each UNION query …` and
- * `UNION|INTERSECT|EXCEPT|VALUES|CYCLE types … cannot be matched`.
+ * `UNION|INTERSECT|EXCEPT|VALUES|CYCLE types … cannot be matched`. A keyword is looked up
+ * among the words only: a quoted identifier spelled like it (`AS "union"`) is a name.
  */
 type LocateIdent<
 	M extends string,
@@ -121,15 +122,15 @@ type LocateIdent<
 		: M extends `column ${string}.${infer Name} ${string}`
 			? FindTokOr<T, Name, LocateQuoted<M, T>>
 			: M extends "DEFAULT is not allowed in this context"
-				? FindTokOr<T, "default", 0>
+				? FindKwOr<T, "default", 0>
 				: M extends "SELECT ... INTO is not allowed here"
-					? FindSelectInto<T, 0, false> // type-mutate: equivalent bool-flip – the first token is never INTO, and the flag is recomputed at each token
+					? FindSelectInto<T, 0, null>
 					: M extends `${infer Cl} ${string} position ${infer N} is not in select list`
-						? FindNumFrom<T, FindTokOr<T, Lowercase<Cl>, 0>, N>
+						? FindNumFrom<T, FindKwOr<T, Lowercase<Cl>, 0>, N>
 						: M extends `each ${infer Op} query ${string}`
-							? FindTokOr<T, Lowercase<Op>, 0>
+							? FindKwOr<T, Lowercase<Op>, 0>
 							: M extends `${infer Op} types ${string} cannot be matched`
-								? FindTokOr<T, Lowercase<Op>, 0>
+								? FindKwOr<T, Lowercase<Op>, 0>
 								: LocateQuoted<M, T>;
 type LocateQuoted<
 	M extends string,
@@ -144,45 +145,48 @@ type LocateQuoted<
 				: LocateQuoted<Rest, T>
 		>
 	: 0;
-type FindTokOr<T extends Toks, Name extends string, Else extends number> =
-	FindTok<T, Name, 0> extends infer I extends number
+/** The first word or quoted identifier `Name`, or `Else`. */
+type FindTokOr<
+	T extends Toks,
+	Name extends string,
+	Else extends number,
+> = FindOr<T, WordTok<Name> | IdTok<Name>, Else>;
+/** The first keyword `Kw` (a word, not a quoted identifier), or `Else`. */
+type FindKwOr<T extends Toks, Kw extends string, Else extends number> = FindOr<
+	T,
+	WordTok<Kw>,
+	Else
+>;
+type FindOr<T extends Toks, P, Else extends number> =
+	FindTok<T, P, 0> extends infer I extends number
 		? I extends -1
 			? Else
 			: I
 		: Else; // type-mutate: equivalent never-false – FindTok always gives a number
-type FindTok<
-	T extends Toks,
-	Name extends string,
-	I extends number,
-> = T[I] extends { readonly k: string }
-	? IsTok<T, I, Name> extends true
+/** Index of the first token from `I` on that is a `P`, or -1. */
+type FindTok<T extends Toks, P, I extends number> = T[I] extends {
+	readonly k: string;
+}
+	? T[I] extends P
 		? I
-		: IsTok<T, Nx<I>, Name> extends true
+		: T[Nx<I>] extends P
 			? Nx<I>
-			: IsTok<T, Nx<Nx<I>>, Name> extends true
+			: T[Nx<Nx<I>>] extends P
 				? Nx<Nx<I>>
-				: IsTok<T, Nx<Nx<Nx<I>>>, Name> extends true
+				: T[Nx<Nx<Nx<I>>>] extends P
 					? Nx<Nx<Nx<I>>>
-					: FindTok<T, Name, Nx<Nx<Nx<Nx<I>>>>>
+					: FindTok<T, P, Nx<Nx<Nx<Nx<I>>>>>
 	: -1;
-/** The name after the first `INTO` that does not follow `INSERT` / `MERGE` (`AfterDml`: the previous token was one of them), where Postgres reports it. */
-type FindSelectInto<
-	T extends Toks,
-	I extends number,
-	AfterDml extends boolean,
-> = T[I] extends { readonly k: string }
-	? IsTok<T, I, "into"> extends true
-		? AfterDml extends true
-			? FindSelectInto<T, Nx<I>, false>
+/**
+ * The name after the first `INTO` keyword that does not follow `INSERT` / `MERGE` (`Prev`: the
+ * token before `I`), where Postgres reports it. Only called for a statement that has one.
+ */
+type FindSelectInto<T extends Toks, I extends number, Prev> =
+	T[I] extends WordTok<"into">
+		? Prev extends WordTok<"insert" | "merge">
+			? FindSelectInto<T, Nx<I>, T[I]>
 			: IntoName<T, I>
-		: FindSelectInto<
-				T,
-				Nx<I>,
-				T[I] extends { readonly k: "w"; readonly v: "insert" | "merge" }
-					? true
-					: false
-			>
-	: 0; // type-mutate: equivalent never-false – the error is raised for a statement with such an INTO only
+		: FindSelectInto<T, Nx<I>, T[I]>;
 /** The first number token from `I` on that is `N` (leading zeros aside), or 0. */
 type FindNumFrom<
 	T extends Toks,
@@ -197,14 +201,6 @@ type FindNumFrom<
 			: FindNumFrom<T, Nx<I>, N>
 		: FindNumFrom<T, Nx<I>, N>
 	: 0;
-type IsTok<
-	T extends Toks,
-	I extends number,
-	Name extends string,
-> = T[I] extends { readonly k: "w" | "id"; readonly v: Name }
-	? true // type-mutate: equivalent never-true – read with `extends true`, where never counts as true
-	: false;
-
 /** Row type of a statement (`never` for DML without RETURNING and for DDL). */
 export type RowOf<DB, TM, Q extends string> =
 	Analysis<DB, Q> extends { readonly cols: infer C }
@@ -245,17 +241,17 @@ type BuildParams<
 			TM,
 			DB,
 			Inc<I>,
-			[...Acc, I extends keyof P ? ParamTs<P[I], TM, DB> : unknown]
+			[...Acc, ParamTs<P[I & keyof P], TM, DB>]
 		>;
 /**
  * A parameter used in several places has a union of `ColInfo`s; its TS type is the
  * intersection of each use's TS type (without null), plus `| null` when every use accepts
  * null, or when the statement tests the `$n` with `IS [NOT] NULL` (a `NullTest` entry).
- * Uses with conflicting types (`id = $1 AND label = $1`) give `never`, not `null`.
+ * Uses with conflicting types (`id = $1 AND label = $1`) give `never`, not `null`. A `$n` with no
+ * typed use (unused, or only tested for NULL) is `unknown`, the intersection of no types.
  */
-type ParamTs<U, TM, DB> = [Exclude<U, NullTest>] extends [never]
-	? unknown
-	: IntersectUses<Exclude<U, NullTest>, TM, DB> extends infer X
+type ParamTs<U, TM, DB> =
+	IntersectUses<Exclude<U, NullTest>, TM, DB> extends infer X
 		? [X] extends [never]
 			? never
 			: [Extract<U, NullTest | { readonly nullable: false }>] extends [never]
@@ -280,9 +276,7 @@ type Inc<I extends number> = Nx<I>;
  */
 export type ArgsOf<DB, TM, Q extends string> =
 	Analysis<DB, Q> extends { readonly params: infer P }
-		? [Extract<P[keyof P], { readonly type: "json" | "jsonb" }>] extends [never]
-			? ParamsOf<DB, TM, Q>
-			: JsonArgs<ParamsOf<DB, TM, Q>, P>
+		? JsonArgs<ParamsOf<DB, TM, Q>, P>
 		: [];
 type JsonArgs<Ps, P> = {
 	[I in keyof Ps]: I extends `${infer N extends number}`
@@ -359,7 +353,7 @@ export type ApplyDdl<DB, Q extends string> = [Q] extends [keyof DdlCacheKeys] //
 	? CachedDdl<DB, Q> extends infer C // type-mutate: equivalent – reached with a cache only (test/cache)
 		? [C] extends [never] // type-mutate: equivalent – reached with a cache only (test/cache)
 			? ApplyDdlAll<DB, Q>
-			: C
+			: C // type-mutate: equivalent never-false – reached with a cache only (test/cache)
 		: never
 	: ApplyDdlAll<DB, Q>;
 

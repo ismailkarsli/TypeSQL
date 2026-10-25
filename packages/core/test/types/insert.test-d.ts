@@ -97,6 +97,10 @@ test("VALUES: DEFAULT, multi-row, column list checks", () => {
 	expectTypeOf<V<"SELECT DEFAULT FROM users">>().toEqualTypeOf<
 		SqlError<"DEFAULT is not allowed in this context", 1>
 	>();
+	// at the keyword, not at a quoted name spelled like it
+	expectTypeOf<V<'SELECT 1 AS "default" WHERE DEFAULT'>>().toEqualTypeOf<
+		SqlError<"DEFAULT is not allowed in this context", 5>
+	>();
 	expectTypeOf<
 		V<"INSERT INTO users (email, display_name) VALUES ('a', DEFAULT), ('b', 'c')">
 	>().toEqualTypeOf<"INSERT INTO users (email, display_name) VALUES ('a', DEFAULT), ('b', 'c')">();

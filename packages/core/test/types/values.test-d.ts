@@ -107,6 +107,12 @@ test("VALUES errors", () => {
 	expectTypeOf<V<"VALUES (1), ('a'::text)">>().toEqualTypeOf<
 		SqlError<"VALUES types integer and text cannot be matched", 0>
 	>();
+	// at the keyword, not at a quoted name spelled like it
+	expectTypeOf<
+		V<'SELECT 1 AS "values" FROM (VALUES (1), (true)) v'>
+	>().toEqualTypeOf<
+		SqlError<"VALUES types integer and boolean cannot be matched", 6>
+	>();
 	expectTypeOf<V<"VALUES (1) ORDER BY 2">>().toEqualTypeOf<
 		SqlError<"ORDER BY position 2 is not in select list", 6>
 	>();

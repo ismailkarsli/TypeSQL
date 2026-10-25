@@ -348,6 +348,9 @@ test("WHERE CURRENT OF", () => {
 	expectTypeOf<
 		V<"UPDATE items SET name = 'x' WHERE CURRENT OF c">
 	>().toEqualTypeOf<"UPDATE items SET name = 'x' WHERE CURRENT OF c">();
+	expectTypeOf<V<"DELETE FROM items WHERE CURRENT OF">>().toEqualTypeOf<
+		SqlError<"syntax error: expected cursor name at or near end of input", 6>
+	>();
 });
 
 test("RETURNING old / new (PostgreSQL 18)", () => {
@@ -448,6 +451,10 @@ test("SELECT INTO creates a table", () => {
 	expectTypeOf<V<"SELECT * FROM (SELECT 1 INTO f) bar">>().toEqualTypeOf<
 		SqlError<"SELECT ... INTO is not allowed here", 7>
 	>();
+	// at the keyword's name, not after a quoted name spelled like it
+	expectTypeOf<
+		V<'SELECT 1 AS "into" FROM (SELECT 1 INTO f) bar'>
+	>().toEqualTypeOf<SqlError<"SELECT ... INTO is not allowed here", 9>>();
 	expectTypeOf<V<"INSERT INTO logs (item_id) SELECT 1 INTO f">>().toEqualTypeOf<
 		SqlError<"SELECT ... INTO is not allowed here", 9>
 	>();
