@@ -1,42 +1,24 @@
 # TypeSQL for VS Code
 
-Completions inside [TypeSQL](https://typesql.karsli.net)'s `sql()` strings: tables, views and
-schemas after `FROM` / `JOIN` / `INTO` / `UPDATE`, columns after `alias.` and in expressions,
-with their Postgres types. The SQL in these strings is highlighted as well.
+Completions and syntax highlighting for the SQL inside [TypeSQL](https://typesql.karsli.net)'s `sql()` strings.
 
 ```ts
 sql("SELECT * FROM |");          // users, posts, auth, …
 sql("SELECT u.| FROM users u");  // id: int4, email: text, display_name: text | null
 ```
 
-The names come from the `DB` type of the `sql` you call, so they follow your schema as you edit
-it, unsaved changes included. Errors and row types still come from TypeScript, as without the
-extension.
+- **Completions** for tables, views and schemas after `FROM`, `JOIN`, `INTO` and `UPDATE`, and for columns with their Postgres types after `alias.` and in expressions. They come from your `DB` type and follow it as you edit, unsaved changes included.
+- **Syntax highlighting** for keywords, types, functions, strings, `$1` parameters and more, in `sql()` and `tx()` strings and in any string after a `/* sql */` comment.
 
-## Highlighting
-
-The SQL in `sql()`, `tx()`, `sql.fragment()` and `sql.as<Row>()` strings is highlighted:
-keywords, types, functions, strings, comments, `$1` and `:name` parameters and `{slot}`
-fragments. So are calls of any name ending in `Sql`, `SQL` or `_sql` (`pgSql("…")`), and any
-string after a `/* sql */` comment (`camel(/* sql */ "…")`). Highlighting needs nothing below.
+Errors, hovers and row types come from TypeScript, with or without this extension.
 
 ## Requirements
 
-The completions need:
+Highlighting works on its own. Completions need:
 
-- The [TypeScript 7 extension](https://marketplace.visualstudio.com/items?itemName=TypeScriptTeam.native-preview)
-  (`TypeScriptTeam.native-preview`), with its language server on TypeScript 7.1 or later.
-  Version 1.0 of the TypeScript 7 extension bundles TypeScript 7.0, which is not enough: add
-  `typescript@7.1.0-beta` (or later) to the project and set
-  `"js/ts.tsdk.path": "node_modules/typescript"` in `.vscode/settings.json`, then choose
-  **Allow** when asked; or install the **TypeScript 7 Nightly** extension.
-- `@typesql/core` 0.4.0 or later in the project, directly or through an adapter
-  (`@typesql/pg`, `@typesql/postgres`, `@typesql/kysely`, `@typesql/drizzle`,
-  `@typesql/prisma`).
+- The [TypeScript 7 extension](https://marketplace.visualstudio.com/items?itemName=TypeScriptTeam.native-preview), running TypeScript 7.1 or later. Its version 1.0 bundles TypeScript 7.0, so [point it at TypeScript 7.1](https://typesql.karsli.net/guide/editor#use-typescript-7-1) or install the **TypeScript 7 Nightly** extension.
+- `@typesql/core` 0.4.0 or later in the project, directly or through an adapter.
 
-## Settings
+Set `"typesql.completions.enable": false` to turn completions off. The **TypeSQL** output channel logs what the extension loads and any error.
 
-- `typesql.completions.enable` (default `true`).
-
-The **TypeSQL** output channel logs what the extension loads and any error. See
-[Editor completions](https://typesql.karsli.net/guide/editor) for details.
+See [VS Code extension](https://typesql.karsli.net/guide/editor) for setup and troubleshooting.
