@@ -93,32 +93,32 @@ export async function activate(
 	};
 	context.subscriptions.push({ dispose: () => void session?.close() });
 
-	/** Our completions, or undefined when there are none, the request failed or it was late. */
+	/** Our completions, or null when there are none, the request failed or it was late. */
 	const complete = async (
 		uri: string,
 		position: { line: number; character: number },
 		text: string | undefined,
-	): Promise<Completions | null | undefined> => {
+	): Promise<Completions | null> => {
 		const s = session;
-		if (!s || !enabled()) return undefined;
+		if (!s || !enabled()) return null;
 		if (
 			text !== undefined &&
 			!mayBeInSqlLiteral(text, offsetOf(text, position))
 		)
-			return undefined;
+			return null;
 		try {
 			const started = Date.now();
 			const ours = await withBudget(s.complete(uri, position, text));
 			if (ours === "late") {
 				log.warn(`completions took longer than ${BUDGET_MS} ms; skipped`);
-				return undefined;
+				return null;
 			}
 			if (ours)
 				log.trace(`${ours.items.length} items in ${Date.now() - started} ms`);
 			return ours;
 		} catch (e) {
 			log.error(e instanceof Error ? e : String(e));
-			return undefined;
+			return null;
 		}
 	};
 
@@ -151,14 +151,15 @@ export async function activate(
 			}),
 			full.registerLspMiddleware(
 				"textDocument/completion",
-				async (result, { params }) => {
-					const ours = await complete(
-						params.textDocument.uri,
-						params.position,
-						textOf(params.textDocument.uri),
-					);
-					return ours === undefined ? result : merge(result, ours);
-				},
+				async (result, { params }) =>
+					merge(
+						result,
+						await complete(
+							params.textDocument.uri,
+							params.position,
+							textOf(params.textDocument.uri),
+						),
+					),
 			),
 		);
 		return;
