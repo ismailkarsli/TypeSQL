@@ -75,11 +75,11 @@ type Fn<
 	F extends string,
 	Args,
 	Ret,
-	Absent = false,
+	Absent = false, // type-mutate: equivalent bool-flip – read only for JSON_OBJECT / JSON_ARRAY values, which pass their own
 	Passing = [],
 	Defaults = [],
 	Q = null,
-	Unknown = false,
+	Unknown = false, // type-mutate: equivalent bool-flip – read only for JSON_EXISTS, which passes its own
 > = {
 	t: "jsonfn";
 	fn: F;
@@ -99,11 +99,11 @@ type Close<T extends Toks, I extends number, N> =
 
 // ───────────────────────────── clauses ─────────────────────────────
 
-/** `FORMAT JSON [ENCODING name]` → next index, or `never`. */
-type EatFormat<T extends Toks, I extends number> =
-	EatWords<T, I, ["format", "json"]> extends never
-		? never
-		: SkipEncoding<T, EatWords<T, I, ["format", "json"]>>;
+/** `FORMAT JSON [ENCODING name]` → next index, or `never` (SkipEncoding keeps a `never`). */
+type EatFormat<T extends Toks, I extends number> = SkipEncoding<
+	T,
+	EatWords<T, I, ["format", "json"]>
+>;
 type SkipEncoding<T extends Toks, I extends number> =
 	T[I] extends WordTok<"encoding">
 		? T[Nx<I>] extends WordTok | IdTok
@@ -116,7 +116,7 @@ type SkipFormat<T extends Toks, I extends number> =
 /** `a_expr [FORMAT JSON [ENCODING name]]`: the expression, wrapped in `jsonfmt` when formatted. */
 type ParseJsonValue<T extends Toks, I extends number> =
 	ParseExpr<T, I, 0> extends infer X
-		? X extends Ok<infer E, infer J extends number>
+		? X extends Ok<infer E, infer J>
 			? EatFormat<T, J> extends never
 				? X
 				: Ok<{ t: "jsonfmt"; e: E }, EatFormat<T, J>>
@@ -128,7 +128,7 @@ type ParseReturning<T extends Toks, I extends number> =
 	EatWord<T, I, "returning"> extends never
 		? Ok<null, I>
 		: ParseTypeName<T, EatWord<T, I, "returning">> extends infer X
-			? X extends Ok<infer Ty, infer J extends number>
+			? X extends Ok<infer Ty, infer J>
 				? Ok<Ty, SkipFormat<T, J>>
 				: X
 			: never;
@@ -193,7 +193,7 @@ type ParsePassingList<
 	Acc extends readonly unknown[],
 > =
 	ParseJsonValue<T, I> extends infer X
-		? X extends Ok<infer E, infer J extends number>
+		? X extends Ok<infer E, infer J>
 			? EatWord<T, J, "as"> extends never
 				? Expected<"AS", T, J>
 				: AnyLabel<T, EatWord<T, J, "as">> extends [
@@ -353,16 +353,16 @@ type ParseUnaryFn<
 	I extends number,
 > = W extends "json_scalar"
 	? ParseExpr<T, I, 0> extends infer X
-		? X extends Ok<infer E, infer J extends number>
+		? X extends Ok<infer E, infer J>
 			? Close<T, J, Fn<W, [E], null>>
 			: X
 		: never
 	: ParseJsonValue<T, I> extends infer X
-		? X extends Ok<infer E, infer J extends number>
+		? X extends Ok<infer E, infer J>
 			? W extends "json"
 				? Close<T, SkipUniqueKeys<T, J>, Fn<W, [E], null>>
 				: ParseReturning<T, J> extends infer R
-					? R extends Ok<infer Ret, infer J2 extends number>
+					? R extends Ok<infer Ret, infer J2>
 						? Close<T, J2, Fn<W, [E], Ret>>
 						: R
 					: never
@@ -378,7 +378,7 @@ type ParseObject<T extends Toks, I extends number> =
 		: T[I] extends WordTok<"returning">
 			? ObjectOptions<T, I, []>
 			: ParseExpr<T, I, 0> extends infer X
-				? X extends Ok<infer K, infer J extends number>
+				? X extends Ok<infer K, infer J>
 					? T[J] extends OpTok<":"> | WordTok<"value">
 						? ParsePairValue<T, [K], Nx<J>>
 						: ParseCall<T, "json_object", I>
@@ -391,7 +391,7 @@ type ParsePairs<
 	I extends number,
 > =
 	ParseExpr<T, I, 0> extends infer X
-		? X extends Ok<infer K, infer J extends number>
+		? X extends Ok<infer K, infer J>
 			? T[J] extends OpTok<":"> | WordTok<"value">
 				? ParsePairValue<T, [...Acc, K], Nx<J>>
 				: Expected<'":" or VALUE', T, J>
@@ -404,7 +404,7 @@ type ParsePairValue<
 	I extends number,
 > =
 	ParseJsonValue<T, I> extends infer X
-		? X extends Ok<infer V, infer J extends number>
+		? X extends Ok<infer V, infer J>
 			? EatOp<T, J, ","> extends never
 				? ObjectOptions<T, J, [...Acc, V]>
 				: ParsePairs<T, [...Acc, V], EatOp<T, J, ",">>
@@ -412,12 +412,9 @@ type ParsePairValue<
 		: never;
 /** `[NULL | ABSENT ON NULL] [WITH | WITHOUT UNIQUE [KEYS]] [RETURNING …] )` */
 type ObjectOptions<T extends Toks, I extends number, Args> =
-	NullClause<T, I, false> extends [
-		infer Absent extends boolean,
-		infer I1 extends number,
-	]
+	NullClause<T, I, false> extends [infer Absent, infer I1 extends number]
 		? ParseReturning<T, SkipUniqueKeys<T, I1>> extends infer R
-			? R extends Ok<infer Ret, infer J extends number>
+			? R extends Ok<infer Ret, infer J>
 				? Close<T, J, Fn<"json_object", Args, Ret, Absent>>
 				: R
 			: never
@@ -428,15 +425,27 @@ type ObjectOptions<T extends Toks, I extends number, Args> =
 /** After `JSON_ARRAY(`: values, a query, or only options. Arrays skip NULLs unless `NULL ON NULL`. */
 type ParseArrayCtor<T extends Toks, I extends number> =
 	T[I] extends OpTok<")">
-		? Ok<Fn<"json_array", [], null, true>, Nx<I>>
+		? Ok<Fn<"json_array", [], null>, Nx<I>>
 		: T[I] extends WordTok<"returning">
 			? ArrayOptions<T, I, []>
 			: T[I] extends WordTok<"select" | "with" | "values" | "table">
 				? ParseSelectStmt<T, I> extends infer X
-					? X extends Ok<infer S, infer J extends number>
+					? X extends Ok<infer S, infer J>
 						? ParseReturning<T, SkipFormat<T, J>> extends infer R
-							? R extends Ok<infer Ret, infer J2 extends number>
-								? Close<T, J2, Fn<"json_array", [], Ret, true, [], [], S>>
+							? R extends Ok<infer Ret, infer J2>
+								? Close<
+										T,
+										J2,
+										Fn<
+											"json_array",
+											[],
+											Ret,
+											true, // type-mutate: equivalent bool-flip – JSON_ARRAY(query) skips NULLs itself; absent is not read
+											[],
+											[],
+											S
+										>
+									>
 								: R
 							: never
 						: X
@@ -448,19 +457,16 @@ type ParseArrayValues<
 	Acc extends readonly unknown[],
 > =
 	ParseJsonValue<T, I> extends infer X
-		? X extends Ok<infer V, infer J extends number>
+		? X extends Ok<infer V, infer J>
 			? EatOp<T, J, ","> extends never
 				? ArrayOptions<T, J, [...Acc, V]>
 				: ParseArrayValues<T, EatOp<T, J, ",">, [...Acc, V]>
 			: X
 		: never;
 type ArrayOptions<T extends Toks, I extends number, Args> =
-	NullClause<T, I, true> extends [
-		infer Absent extends boolean,
-		infer I1 extends number,
-	]
+	NullClause<T, I, true> extends [infer Absent, infer I1 extends number]
 		? ParseReturning<T, I1> extends infer R
-			? R extends Ok<infer Ret, infer J extends number>
+			? R extends Ok<infer Ret, infer J>
 				? Close<T, J, Fn<"json_array", Args, Ret, Absent>>
 				: R
 			: never
@@ -471,16 +477,16 @@ type ArrayOptions<T extends Toks, I extends number, Args> =
 /** `JSON_OBJECTAGG(key : value [NULL | ABSENT ON NULL] [WITH | WITHOUT UNIQUE [KEYS]] [RETURNING …]) [FILTER …] [OVER …]` */
 type ParseObjectAgg<T extends Toks, I extends number> =
 	ParseExpr<T, I, 0> extends infer X
-		? X extends Ok<infer K, infer J extends number>
+		? X extends Ok<infer K, infer J>
 			? T[J] extends OpTok<":"> | WordTok<"value">
 				? ParseJsonValue<T, Nx<J>> extends infer Y
-					? Y extends Ok<infer V, infer J2 extends number>
+					? Y extends Ok<infer V, infer J2>
 						? NullClause<T, J2, false> extends [
-								infer Absent extends boolean,
+								infer Absent,
 								infer J3 extends number,
 							]
 							? ParseReturning<T, SkipUniqueKeys<T, J3>> extends infer R
-								? R extends Ok<infer Ret, infer J4 extends number>
+								? R extends Ok<infer Ret, infer J4>
 									? EatOp<T, J4, ")"> extends never
 										? Expected<'")"', T, J4>
 										: AggSuffix<
@@ -503,15 +509,15 @@ type ParseObjectAgg<T extends Toks, I extends number> =
 /** `JSON_ARRAYAGG(value [ORDER BY …] [NULL | ABSENT ON NULL] [RETURNING …]) [FILTER …] [OVER …]`; NULLs are skipped by default. */
 type ParseArrayAgg<T extends Toks, I extends number> =
 	ParseJsonValue<T, I> extends infer X
-		? X extends Ok<infer V, infer J extends number>
+		? X extends Ok<infer V, infer J>
 			? SkipOrderBy<T, J> extends infer J1
 				? J1 extends number
 					? NullClause<T, J1, true> extends [
-							infer Absent extends boolean,
+							infer Absent,
 							infer J2 extends number,
 						]
 						? ParseReturning<T, J2> extends infer R
-							? R extends Ok<infer Ret, infer J3 extends number>
+							? R extends Ok<infer Ret, infer J3>
 								? EatOp<T, J3, ")"> extends never
 									? Expected<'")"', T, J3>
 									: AggSuffix<
@@ -533,7 +539,7 @@ type SkipOrderBy<T extends Toks, I extends number> =
 	EatWords<T, I, ["order", "by"]> extends never
 		? I
 		: ParseOrderList<T, EatWords<T, I, ["order", "by"]>> extends infer X
-			? X extends Ok<unknown, infer J extends number>
+			? X extends Ok<unknown, infer J>
 				? J
 				: X
 			: never;
@@ -548,9 +554,9 @@ type AggSuffix<
 	I extends number,
 > =
 	ParseFilter<T, I> extends infer X
-		? X extends Ok<infer Flt, infer I1 extends number>
+		? X extends Ok<infer Flt, infer I1>
 			? ParseOver<T, I1> extends infer O
-				? O extends Ok<infer Ov, infer I2 extends number>
+				? O extends Ok<infer Ov, infer I2>
 					? Ok<
 							{
 								t: "jsonagg";
@@ -562,7 +568,7 @@ type AggSuffix<
 									args: Args;
 									distinct: false;
 									filter: Flt;
-									over: Ov extends null ? false : true;
+									over: Ov extends null ? false : true; // type-mutate: equivalent never-false – read with `extends true`, where never counts as true
 									win: Ov;
 									withinGroup: null;
 								};
@@ -579,17 +585,17 @@ type AggSuffix<
 /** After `(`: `context [FORMAT JSON], path [PASSING …]` and the function's options. */
 type ParseQueryFn<T extends Toks, W extends string, I extends number> =
 	ParseJsonValue<T, I> extends infer X
-		? X extends Ok<infer Cx, infer J extends number>
+		? X extends Ok<infer Cx, infer J>
 			? EatOp<T, J, ","> extends never
 				? Expected<'","', T, J>
 				: ParseExpr<T, EatOp<T, J, ",">, 0> extends infer Y
-					? Y extends Ok<infer Path, infer J2 extends number>
+					? Y extends Ok<infer Path, infer J2>
 						? ParsePassing<T, J2> extends infer P
-							? P extends Ok<infer Passing, infer J3 extends number>
+							? P extends Ok<infer Passing, infer J3>
 								? W extends "json_exists"
 									? QueryTail<T, W, [Cx, Path], Passing, null, J3>
 									: ParseReturning<T, J3> extends infer R
-										? R extends Ok<infer Ret, infer J4 extends number>
+										? R extends Ok<infer Ret, infer J4>
 											? QueryTail<
 													T,
 													W,
@@ -635,11 +641,11 @@ type QueryTail<
 						W,
 						Args,
 						Ret,
-						false,
+						false, // type-mutate: equivalent bool-flip – absent is read only for JSON_OBJECT / JSON_ARRAY
 						Passing,
 						DefaultsOf<Bs>,
 						null,
-						Bs[1] extends { k: "unknown" } ? true : false
+						Bs[1] extends { k: "unknown" } ? true : false // type-mutate: equivalent never-true – read through Or, where never counts as true
 					>
 				>
 			: B
@@ -659,17 +665,17 @@ type QueryTail<
  */
 export type ParseJsonTable<T extends Toks, I extends number> =
 	ParseJsonValue<T, I> extends infer X
-		? X extends Ok<infer Cx, infer J extends number>
+		? X extends Ok<infer Cx, infer J>
 			? EatOp<T, J, ","> extends never
 				? Expected<'","', T, J>
 				: ParseExpr<T, EatOp<T, J, ",">, 0> extends infer Y
-					? Y extends Ok<infer Path, infer J2 extends number>
+					? Y extends Ok<infer Path, infer J2>
 						? PathName<T, J2> extends [
 								infer Names extends readonly string[],
 								infer J3 extends number,
 							]
 							? ParsePassing<T, J3> extends infer P
-								? P extends Ok<infer Passing, infer J4 extends number>
+								? P extends Ok<infer Passing, infer J4>
 									? EatWord<T, J4, "columns"> extends never
 										? Expected<"COLUMNS", T, J4>
 										: EatOp<T, EatWord<T, J4, "columns">, "("> extends never
@@ -690,7 +696,7 @@ export type ParseJsonTable<T extends Toks, I extends number> =
 															names: unknown;
 															defs: unknown;
 														},
-														infer J5 extends number
+														infer J5
 													>
 													? ParseBehaviors<
 															T,
@@ -725,14 +731,11 @@ export type ParseJsonTable<T extends Toks, I extends number> =
 		: never;
 /** `[AS name]` after a path → `[names, next]`. */
 type PathName<T extends Toks, I extends number> =
-	EatWord<T, I, "as"> extends never
-		? [[], I]
-		: Ident<T, EatWord<T, I, "as">> extends [
-					infer N extends string,
-					infer J extends number,
-				]
+	T[I] extends WordTok<"as">
+		? Ident<T, Nx<I>> extends [infer N, infer J]
 			? [[N], J]
-			: [[], I];
+			: [[], I]
+		: [[], I];
 
 /**
  * Column definitions up to `)`. `Own`: this level's columns; `Nest`: its nested paths' columns;
@@ -795,7 +798,7 @@ type ParseColumn<
 	Ident<T, I> extends [infer N extends string, infer J extends number]
 		? EatWords<T, J, ["for", "ordinality"]> extends never
 			? ParseTypeName<T, J> extends infer X
-				? X extends Ok<infer Ty extends string, infer J2 extends number>
+				? X extends Ok<infer Ty extends string, infer J2>
 					? T[J2] extends WordTok<"exists">
 						? // name type EXISTS [PATH '…'] [behavior ON ERROR] (never a DEFAULT)
 							ParsePathOpt<T, Nx<J2>> extends infer P
@@ -866,7 +869,7 @@ type ParseColumn<
 						T,
 						EatWords<T, J, ["for", "ordinality"]>,
 						Top,
-						[...Own, Col<N, "int4", Top extends true ? false : true>],
+						[...Own, Col<N, "int4", Top extends true ? false : true>], // type-mutate: equivalent never-false – a never nullability is read with `extends true`, as nullable
 						Nest,
 						[...Names, N],
 						Defs,
@@ -937,7 +940,7 @@ type ParseNested<
 								names: infer Ns extends readonly unknown[];
 								defs: infer Ds extends readonly unknown[];
 							},
-							infer J2 extends number
+							infer J2
 						>
 						? ColumnsNext<T, J2, Top, Own, [...Nest, ...Cs], Ns, Ds, Ord>
 						: X

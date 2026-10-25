@@ -51,9 +51,7 @@ export type TypeSqlJson<E extends Expr, C extends Ctx> = E extends {
 		? TypeIsJson<TypeOf<E["e"], C>>
 		: E extends { readonly t: "jsonagg" }
 			? AggResult<TypeOf<E["e"], C>, E["ret"]>
-			: E extends { readonly t: "jsonfn" }
-				? TypeFn<E, C>
-				: SqlError<"unsupported expression", null>;
+			: TypeFn<E, C>;
 
 /** Built-in types Postgres does not read JSON text from (it reports them; other types are string-like or unknown here). */
 type NonString =
@@ -67,12 +65,11 @@ type NonString =
 	| "record"
 	| `${string}[]`
 	| `${string}range`;
-type IsNonString<T extends string> = T extends NonString ? true : false;
 
 type TypeFormat<A> = A extends ColInfo
 	? BaseOf<A["type"]> extends "json" | "jsonb"
 		? A
-		: IsNonString<A["type"]> extends true
+		: A["type"] extends NonString
 			? SqlError<
 					"cannot use non-string types with explicit FORMAT JSON clause",
 					null
@@ -81,7 +78,7 @@ type TypeFormat<A> = A extends ColInfo
 	: A;
 
 type TypeIsJson<A> = A extends ColInfo
-	? IsNonString<A["type"]> extends true
+	? A["type"] extends NonString
 		? SqlError<
 				`cannot use type ${TypeDisplay<A["type"]>} in IS JSON predicate`,
 				null
@@ -138,19 +135,18 @@ type FnResult<
 								: TypeArray<RetOr<E["ret"], "json">, As, E["absent"]>;
 
 /** `JSON(v)`: text / bytea / json input; a JSON literal keeps its value (`JSON('[]')`). */
-type TypeParse<V, A extends ColInfo> =
-	IsNonString<A["type"]> extends true
-		? SqlError<`cannot cast type ${TypeDisplay<A["type"]>} to json`, null>
-		: (
-					V extends { readonly t: "jsonfmt"; readonly e: infer In }
-						? In
-						: V
-				) extends { readonly t: "str"; readonly v: infer S extends string }
-			? Info<
-					JsonLitCast<"json", S> extends infer J extends string ? J : "json",
-					A["nullable"]
-				>
-			: Info<"json", A["nullable"]>;
+type TypeParse<V, A extends ColInfo> = A["type"] extends NonString
+	? SqlError<`cannot cast type ${TypeDisplay<A["type"]>} to json`, null>
+	: (
+				V extends { readonly t: "jsonfmt"; readonly e: infer In }
+					? In
+					: V
+			) extends { readonly t: "str"; readonly v: infer S extends string }
+		? Info<
+				JsonLitCast<"json", S> extends infer J extends string ? J : "json",
+				A["nullable"]
+			>
+		: Info<"json", A["nullable"]>;
 
 type TypeSerialize<R extends string, A extends ColInfo> = R extends
 	| "json"
@@ -170,14 +166,14 @@ type CheckKeys<
 	? As[I]["type"] extends "json" | "jsonb" | "record" | `${string}[]`
 		? SqlError<"key value must be scalar, not array, composite, or json", null>
 		: CheckKeys<As, Nx<Nx<I>>>
-	: true;
+	: true; // type-mutate: equivalent bool-flip – no error: the caller reads only an error
 /** Is a value (odd position) nullable? */
 type NullableValue<
 	As extends readonly ColInfo[],
 	I extends number,
 > = As[I] extends ColInfo
 	? As[I]["nullable"] extends true
-		? true
+		? true // type-mutate: equivalent never-true – read with `extends true`, where never counts as true
 		: NullableValue<As, Nx<Nx<I>>>
 	: false;
 
@@ -208,7 +204,7 @@ type TypeObject<
 		: never;
 
 type AnyNull<As extends readonly ColInfo[]> =
-	As[number]["nullable"] extends false ? false : true;
+	As[number]["nullable"] extends false ? false : true; // type-mutate: equivalent never-false – read with `extends true`, where never counts as true
 type TypeArray<
 	R extends string,
 	As extends readonly ColInfo[],
@@ -245,9 +241,9 @@ export type ParamsOfSqlJson<E extends Expr, C extends Ctx, M> = E extends {
 				Info<"bool", true>
 			>
 		: ParamsOfList<
-				[...E["args"], ...E["passing"], ...E["defaults"]],
+				[...E["args"], ...E["passing"], ...E["defaults"]], // type-mutate: equivalent tuple-swap – parameters collect into a union: order does not matter
 				C,
-				E["q"] extends SelectStmt
+				E["q"] extends SelectStmt // type-mutate: equivalent cond-true – ParamsOfSelect finds no parameters in no query
 					? ParamsOfSelect<E["q"], C["db"], C["scope"], C["ctes"], M>
 					: M,
 				Info<"text", true>
@@ -258,6 +254,8 @@ export type ParamsOfSqlJson<E extends Expr, C extends Ctx, M> = E extends {
 /**
  * Bind `JSON_TABLE(…) [alias [(cols)]]` (always lateral: it sees the FROM items before it).
  * The default alias is `json_table`. Column types come from the declarations (parser/json.ts).
+ * Errors come in Postgres's order: a path that is not a string constant, a repeated name, the
+ * context item, PASSING values and DEFAULTs, then the alias.
  */
 export type BindJsonTable<
 	J extends FromJsonTable["jt"],
@@ -267,55 +265,53 @@ export type BindJsonTable<
 	Outer extends Scope,
 	Ctes extends CteMap,
 	Sofar extends ScopeLevel,
-> =
-	CheckAlias<Alias extends string ? Alias : "json_table", Sofar> extends infer A
-		? A extends string
-			? TypeList<
-					[J["ctx"], J["path"], ...J["passing"], ...J["defs"]],
-					MkCtx<DB, [Sofar, ...Outer], Ctes, false>,
-					[]
-				> extends infer Ts
+> = J["path"] extends { readonly t: "str" }
+	? DuplicateName<J["names"], never> extends infer D
+		? D extends string
+			? SqlError<`duplicate JSON_TABLE column or path name: ${D}`, null>
+			: TypeList<
+						[J["ctx"], ...J["passing"], ...J["defs"]],
+						MkCtx<DB, [Sofar, ...Outer], Ctes, false>, // type-mutate: equivalent bool-flip – FROM items take no aggregates
+						[]
+					> extends infer Ts
 				? Ts extends readonly ColInfo[]
-					? J["path"] extends { readonly t: "str" }
-						? DuplicateName<J["names"], never, 0> extends infer D
-							? D extends string
-								? SqlError<
-										`duplicate JSON_TABLE column or path name: ${D}`,
-										null
-									>
-								: (
-											CA extends readonly string[]
-												? RenameCols<J["cols"], CA, [], "JSON_TABLE function">
-												: J["cols"]
-										) extends infer C2
-									? C2 extends Cols
-										? [
-												{
-													readonly alias: A;
-													readonly cols: ColsToMap<C2>;
-													readonly skip: [];
-												},
-											]
-										: C2
-									: never
-							: never
-						: SqlError<
-								"only string constants are supported in JSON_TABLE path specification",
-								null
-							>
+					? CheckAlias<
+							Alias extends string ? Alias : "json_table",
+							Sofar
+						> extends infer A
+						? A extends string
+							? (
+									CA extends readonly string[]
+										? RenameCols<J["cols"], CA, [], "JSON_TABLE function">
+										: J["cols"]
+								) extends infer C2
+								? C2 extends Cols
+									? [
+											{
+												readonly alias: A;
+												readonly cols: ColsToMap<C2>;
+												readonly skip: [];
+											},
+										]
+									: C2
+								: never
+							: A
+						: never
 					: Ts
 				: never
-			: A
-		: never;
+		: never
+	: SqlError<
+			"only string constants are supported in JSON_TABLE path specification",
+			null
+		>;
 /** The first name that repeats an earlier one, or null. */
-type DuplicateName<
-	Ns extends readonly string[],
-	Seen,
-	I extends number,
-> = Ns[I] extends string
-	? Ns[I] extends Seen
-		? Ns[I]
-		: DuplicateName<Ns, Seen | Ns[I], Nx<I>>
+type DuplicateName<Ns extends readonly string[], Seen> = Ns extends readonly [
+	infer N,
+	...infer R extends readonly string[],
+]
+	? N extends Seen
+		? N
+		: DuplicateName<R, Seen | N>
 	: null;
 
 /** Parameters of a JSON_TABLE: the context item and PASSING values are text (the path is a string constant). */
@@ -324,7 +320,7 @@ export type ParamsOfJsonTable<
 	C extends Ctx,
 	M,
 > = ParamsOfList<
-	[J["ctx"], ...J["passing"], ...J["defs"]],
+	[J["ctx"], ...J["passing"], ...J["defs"]], // type-mutate: equivalent tuple-swap – parameters collect into a union: order does not matter
 	C,
 	M,
 	Info<"text", true>
