@@ -427,8 +427,8 @@ export type FromJsonTable = {
 		readonly cols: readonly JsonTableCol[];
 		/** Path and column names, in declaration order (must be distinct). */
 		readonly names: readonly string[];
-		/** DEFAULT expressions and the type of their column. */
-		readonly defs: readonly { readonly e: Expr; readonly type: string }[];
+		/** The columns' DEFAULT expressions. */
+		readonly defs: readonly Expr[];
 	};
 	readonly alias: string | null;
 	readonly colAliases: readonly string[] | null;

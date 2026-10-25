@@ -1,3 +1,4 @@
+import type { PgScalarName } from "../../schema/pg-types.js";
 import type { IdTok, OpTok, StrTok, Toks, WordTok } from "../lexer/tokens.js";
 import type {
 	ParseCall,
@@ -208,32 +209,45 @@ type ParsePassingList<
 
 /**
  * One behavior: `DEFAULT expr | ERROR | NULL | TRUE | FALSE | UNKNOWN | EMPTY [ARRAY | OBJECT]`
- * → `Ok<{ k }, next>`, or `null` when there is none.
+ * → `Ok<{ k, at }, next>` (`at`: its first token), or `null` when there is none.
  */
 type ParseBehavior<T extends Toks, I extends number> =
 	T[I] extends WordTok<infer W>
 		? W extends "default"
 			? ParseExpr<T, Nx<I>, 0> extends infer X
-				? X extends Ok<infer E, infer J extends number>
-					? Ok<{ k: "default"; e: E }, J>
+				? X extends Ok<infer E, infer J>
+					? Ok<{ k: "default"; e: E; at: I }, J>
 					: X
 				: never
 			: W extends "error" | "null" | "true" | "false" | "unknown"
-				? Ok<{ k: W }, Nx<I>>
+				? Ok<{ k: W; at: I }, Nx<I>>
 				: W extends "empty"
 					? T[Nx<I>] extends WordTok<"object">
-						? Ok<{ k: "emptyobj" }, Nx<Nx<I>>>
-						: Ok<{ k: "empty" }, SkipWord<T, Nx<I>, "array">>
+						? Ok<{ k: "emptyobj"; at: I }, Nx<Nx<I>>>
+						: Ok<{ k: "empty"; at: I }, SkipWord<T, Nx<I>, "array">>
 					: null
 		: null;
+
+/** The behaviors each context allows (`empty` is EMPTY [ARRAY]). */
+type ValueBehavior = "error" | "null" | "default"; // JSON_VALUE, scalar columns
+type QueryBehavior = ValueBehavior | "empty" | "emptyobj"; // JSON_QUERY, formatted columns
+type ExistsBehavior = "error" | "true" | "false" | "unknown"; // JSON_EXISTS, EXISTS columns
+type TableBehavior = "error" | "empty"; // the JSON_TABLE level
 
 /**
  * `[behavior ON EMPTY] [behavior ON ERROR]` → `Ok<[onEmpty | null, onError | null], next>`.
  * `Empty` false: only `ON ERROR` is allowed (JSON_EXISTS, EXISTS columns, the JSON_TABLE level).
+ * Each behavior must be one of `Allowed`; `Of` names the column in the message.
  */
-type ParseBehaviors<T extends Toks, I extends number, Empty extends boolean> =
+type ParseBehaviors<
+	T extends Toks,
+	I extends number,
+	Empty extends boolean,
+	Allowed extends string,
+	Of extends string,
+> =
 	ParseBehavior<T, I> extends infer B
-		? B extends Ok<infer B1, infer J extends number>
+		? B extends Ok<infer B1, infer J>
 			? EatWords<T, J, ["on", "error"]> extends never
 				? EatWords<T, J, ["on", "empty"]> extends never
 					? Expected<
@@ -243,34 +257,93 @@ type ParseBehaviors<T extends Toks, I extends number, Empty extends boolean> =
 						>
 					: Empty extends false
 						? SyntaxErrorAt<T, Nx<J>>
-						: ParseOnError<T, EatWords<T, J, ["on", "empty"]>, B1>
-				: Ok<[null, B1], EatWords<T, J, ["on", "error"]>>
+						: ParseOnError<T, EatWords<T, J, ["on", "empty"]>, B1, Allowed, Of>
+				: CheckBehaviors<
+						[null, B1],
+						EatWords<T, J, ["on", "error"]>,
+						Allowed,
+						Of
+					>
 			: B extends null
 				? Ok<[null, null], I>
 				: B
 		: never;
-type ParseOnError<T extends Toks, I extends number, OnEmpty> =
+type ParseOnError<
+	T extends Toks,
+	I extends number,
+	OnEmpty,
+	Allowed extends string,
+	Of extends string,
+> =
 	ParseBehavior<T, I> extends infer B
-		? B extends Ok<infer B2, infer J extends number>
+		? B extends Ok<infer B2, infer J>
 			? EatWords<T, J, ["on", "error"]> extends never
 				? Expected<"ON ERROR", T, J>
-				: Ok<[OnEmpty, B2], EatWords<T, J, ["on", "error"]>>
+				: CheckBehaviors<
+						[OnEmpty, B2],
+						EatWords<T, J, ["on", "error"]>,
+						Allowed,
+						Of
+					>
 			: B extends null
-				? Ok<[OnEmpty, null], I>
+				? CheckBehaviors<[OnEmpty, null], I, Allowed, Of>
 				: B
 		: never;
 
+/**
+ * Postgres checks the kinds first (ON EMPTY, then ON ERROR), then that each DEFAULT is a
+ * constant, function or operator expression (not a parameter, column or subquery).
+ */
+type CheckBehaviors<
+	Bs extends readonly [unknown, unknown],
+	J extends number,
+	Allowed extends string,
+	Of extends string,
+> = CheckKind<
+	Bs[0],
+	Allowed,
+	`invalid ON EMPTY behavior${Of}`,
+	CheckKind<
+		Bs[1],
+		Allowed,
+		`invalid ON ERROR behavior${Of}`,
+		CheckDefault<Bs[0], CheckDefault<Bs[1], Ok<Bs, J>>>
+	>
+>;
+type CheckKind<
+	B,
+	Allowed extends string,
+	Message extends string,
+	R,
+> = B extends {
+	k: infer K;
+	at: infer At extends number;
+}
+	? K extends Allowed
+		? R
+		: Fail<Message, At>
+	: R;
+/** A DEFAULT Postgres rejects: a bare parameter (cast or not), column or subquery. */
+type NotDefault =
+	| { readonly t: "param" | "col" | "sub" }
+	| { readonly t: "cast"; readonly e: { readonly t: "param" } };
+type CheckDefault<B, R> = B extends {
+	k: "default";
+	e: NotDefault;
+	at: infer At extends number;
+}
+	? Fail<
+			"can only specify a constant, non-aggregate function, or operator expression for DEFAULT",
+			Nx<At>
+		>
+	: R;
+
 /** DEFAULT expressions of a behavior pair. */
-type DefaultsOf<Bs> = Bs extends readonly [infer A, infer B]
-	? A extends { k: "default"; e: infer E }
-		? B extends { k: "default"; e: infer F }
-			? [E, F]
-			: [E]
-		: B extends { k: "default"; e: infer F }
-			? [F]
-			: []
-	: [];
-type IsUnknown<B> = B extends { k: "unknown" } ? true : false;
+type DefaultsOf<Bs extends readonly [unknown, unknown]> = [
+	...DefaultOf<Bs[0]>,
+	...DefaultOf<Bs[1]>,
+];
+type DefaultOf<B> = B extends { k: "default"; e: infer E } ? [E] : [];
 
 // ───────────────────────────── JSON(), JSON_SCALAR(), JSON_SERIALIZE() ─────────────────────────────
 
@@ -543,8 +616,18 @@ type QueryTail<
 	Ret,
 	I extends number,
 > =
-	ParseBehaviors<T, I, W extends "json_exists" ? false : true> extends infer B
-		? B extends Ok<infer Bs, infer J extends number>
+	ParseBehaviors<
+		T,
+		I,
+		W extends "json_exists" ? false : true,
+		W extends "json_exists"
+			? ExistsBehavior
+			: W extends "json_value"
+				? ValueBehavior
+				: QueryBehavior,
+		""
+	> extends infer B
+		? B extends Ok<infer Bs extends readonly [unknown, unknown], infer J>
 			? Close<
 					T,
 					J,
@@ -556,7 +639,7 @@ type QueryTail<
 						Passing,
 						DefaultsOf<Bs>,
 						null,
-						Bs extends readonly [unknown, infer E] ? IsUnknown<E> : false
+						Bs[1] extends { k: "unknown" } ? true : false
 					>
 				>
 			: B
@@ -572,7 +655,7 @@ type QueryTail<
  * paths' columns, depth first), each `{ n, t: { type, nullable } }`: the declared type, nullable
  * (no item, or a sibling NESTED path's row), except a top-level FOR ORDINALITY column (int4).
  * `names` lists the column and path names in declaration order (they must be distinct);
- * `defs` the DEFAULT expressions with their column's type.
+ * `defs` the DEFAULT expressions.
  */
 export type ParseJsonTable<T extends Toks, I extends number> =
 	ParseJsonValue<T, I> extends infer X
@@ -609,25 +692,26 @@ export type ParseJsonTable<T extends Toks, I extends number> =
 														},
 														infer J5 extends number
 													>
-													? ParseBehaviors<T, J5, false> extends infer B
-														? B extends Ok<
-																readonly [unknown, infer OnErr],
-																infer J6 extends number
-															>
-															? OnErr extends { k: "error" | "empty" } | null
-																? Close<
-																		T,
-																		J6,
-																		{
-																			ctx: Cx;
-																			path: Path;
-																			passing: Passing;
-																			cols: Body["cols"];
-																			names: Body["names"];
-																			defs: Body["defs"];
-																		}
-																	>
-																: Fail<"invalid ON ERROR behavior", J5>
+													? ParseBehaviors<
+															T,
+															J5,
+															false,
+															TableBehavior,
+															""
+														> extends infer B
+														? B extends Ok<unknown, infer J6>
+															? Close<
+																	T,
+																	J6,
+																	{
+																		ctx: Cx;
+																		path: Path;
+																		passing: Passing;
+																		cols: Body["cols"];
+																		names: Body["names"];
+																		defs: Body["defs"];
+																	}
+																>
 															: B
 														: never
 													: Cs
@@ -713,11 +797,17 @@ type ParseColumn<
 			? ParseTypeName<T, J> extends infer X
 				? X extends Ok<infer Ty extends string, infer J2 extends number>
 					? T[J2] extends WordTok<"exists">
-						? // name type EXISTS [PATH '…'] [behavior ON ERROR]
+						? // name type EXISTS [PATH '…'] [behavior ON ERROR] (never a DEFAULT)
 							ParsePathOpt<T, Nx<J2>> extends infer P
 							? P extends number
-								? ParseBehaviors<T, P, false> extends infer B
-									? B extends Ok<infer Bs, infer J3 extends number>
+								? ParseBehaviors<
+										T,
+										P,
+										false,
+										ExistsBehavior,
+										` for column "${N}"`
+									> extends infer B
+									? B extends Ok<unknown, infer J3>
 										? ColumnsNext<
 												T,
 												J3,
@@ -725,7 +815,7 @@ type ParseColumn<
 												[...Own, Col<N, Ty, true>],
 												Nest,
 												[...Names, N],
-												[...Defs, ...TypedDefs<DefaultsOf<Bs>, Ty>],
+												Defs,
 												Ord
 											>
 										: B
@@ -738,9 +828,22 @@ type ParseColumn<
 								? ParseBehaviors<
 										T,
 										SkipQuotes<T, SkipWrapper<T, P>>,
-										true
+										true,
+										ColumnBehavior<
+											Ty,
+											[
+												SkipFormat<T, J2>,
+												SkipQuotes<T, SkipWrapper<T, P>>,
+											] extends [J2, P]
+												? false
+												: true
+										>,
+										` for column "${N}"`
 									> extends infer B
-									? B extends Ok<infer Bs, infer J3 extends number>
+									? B extends Ok<
+											infer Bs extends readonly [unknown, unknown],
+											infer J3
+										>
 										? ColumnsNext<
 												T,
 												J3,
@@ -748,7 +851,7 @@ type ParseColumn<
 												[...Own, Col<N, Ty, true>],
 												Nest,
 												[...Names, N],
-												[...Defs, ...TypedDefs<DefaultsOf<Bs>, Ty>],
+												[...Defs, ...DefaultsOf<Bs>],
 												Ord
 											>
 										: B
@@ -774,9 +877,23 @@ type Col<N extends string, Ty extends string, Nullable extends boolean> = {
 	n: N;
 	t: { type: Ty; nullable: Nullable };
 };
-type TypedDefs<Es, Ty extends string> = {
-	[K in keyof Es]: { e: Es[K]; type: Ty };
-};
+/**
+ * Behaviors of a regular column: a formatted one (FORMAT JSON, a wrapper or quotes clause, or a
+ * type other than a built-in scalar) is read like JSON_QUERY, a scalar one like JSON_VALUE.
+ * Enums and domains count as formatted here: their columns accept JSON_QUERY's behaviors.
+ */
+type ColumnBehavior<
+	Ty extends string,
+	Formatted extends boolean,
+> = Formatted extends true
+	? QueryBehavior
+	: Ty extends ScalarType
+		? ValueBehavior
+		: QueryBehavior;
+type ScalarType = Exclude<
+	PgScalarName,
+	"json" | "jsonb" | "record" | "void" | "unknown" | `any${string}`
+>;
 /** `[PATH 'string']` → next index or error. */
 type ParsePathOpt<T extends Toks, I extends number> =
 	EatWord<T, I, "path"> extends never

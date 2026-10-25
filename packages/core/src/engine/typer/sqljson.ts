@@ -230,8 +230,8 @@ type TypeArrayQuery<R extends string, A> = A extends ColInfo
 
 /**
  * `$n` in SQL/JSON syntax: values, keys, context items, paths and PASSING values are text
- * (Postgres coerces an unknown value to text); DEFAULT … ON EMPTY / ON ERROR takes the
- * RETURNING type; `FILTER (WHERE $n)` is bool.
+ * (Postgres coerces an unknown value to text); `FILTER (WHERE $n)` is bool. A DEFAULT … ON
+ * EMPTY / ON ERROR is never a bare parameter (the parser rejects one, as Postgres does).
  */
 export type ParamsOfSqlJson<E extends Expr, C extends Ctx, M> = E extends {
 	readonly t: "jsonfmt" | "isjson";
@@ -244,36 +244,14 @@ export type ParamsOfSqlJson<E extends Expr, C extends Ctx, M> = E extends {
 				ParamsOfList<E["e"]["args"], C, M, Info<"text", true>>,
 				Info<"bool", true>
 			>
-		: E extends { readonly t: "jsonfn" }
-			? ParamsOfList<
-					E["defaults"],
-					C,
-					ParamsOfList<
-						E["passing"],
-						C,
-						ParamsOfList<
-							E["args"],
-							C,
-							E["q"] extends SelectStmt
-								? ParamsOfSelect<E["q"], C["db"], C["scope"], C["ctes"], M>
-								: M,
-							Info<"text", true>
-						>,
-						Info<"text", true>
-					>,
-					Info<
-						RetOr<
-							E["ret"],
-							E["fn"] extends "json_query"
-								? "jsonb"
-								: E["fn"] extends "json_exists"
-									? "bool"
-									: "text"
-						>,
-						true
-					>
-				>
-			: M;
+		: ParamsOfList<
+				[...E["args"], ...E["passing"], ...E["defaults"]],
+				C,
+				E["q"] extends SelectStmt
+					? ParamsOfSelect<E["q"], C["db"], C["scope"], C["ctes"], M>
+					: M,
+				Info<"text", true>
+			>;
 
 // ───────────────────────────── JSON_TABLE ─────────────────────────────
 
@@ -293,7 +271,7 @@ export type BindJsonTable<
 	CheckAlias<Alias extends string ? Alias : "json_table", Sofar> extends infer A
 		? A extends string
 			? TypeList<
-					[J["ctx"], J["path"], ...J["passing"], ...DefExprs<J["defs"]>],
+					[J["ctx"], J["path"], ...J["passing"], ...J["defs"]],
 					MkCtx<DB, [Sofar, ...Outer], Ctes, false>,
 					[]
 				> extends infer Ts
@@ -329,9 +307,6 @@ export type BindJsonTable<
 				: never
 			: A
 		: never;
-type DefExprs<Ds extends readonly { readonly e: Expr }[]> = {
-	[K in keyof Ds]: Ds[K]["e"];
-};
 /** The first name that repeats an earlier one, or null. */
 type DuplicateName<
 	Ns extends readonly string[],
@@ -343,30 +318,14 @@ type DuplicateName<
 		: DuplicateName<Ns, Seen | Ns[I], Nx<I>>
 	: null;
 
-/** Parameters of a JSON_TABLE: context item, path and PASSING values are text; DEFAULTs take their column's type. */
+/** Parameters of a JSON_TABLE: the context item and PASSING values are text (the path is a string constant). */
 export type ParamsOfJsonTable<
 	J extends FromJsonTable["jt"],
 	C extends Ctx,
 	M,
-> = ParamsOfDefs<
-	J["defs"],
+> = ParamsOfList<
+	[J["ctx"], ...J["passing"], ...J["defs"]],
 	C,
-	ParamsOfList<
-		[J["ctx"], J["path"], ...J["passing"]],
-		C,
-		M,
-		Info<"text", true>
-	>,
-	0
->;
-type ParamsOfDefs<
-	Ds extends readonly { readonly e: Expr; readonly type: string }[],
-	C extends Ctx,
 	M,
-	I extends number,
-> = Ds[I] extends {
-	readonly e: infer E extends Expr;
-	readonly type: infer T extends string;
-}
-	? ParamsOfDefs<Ds, C, ParamsOfOpt<E, C, M, Info<T, true>>, Nx<I>>
-	: M;
+	Info<"text", true>
+>;

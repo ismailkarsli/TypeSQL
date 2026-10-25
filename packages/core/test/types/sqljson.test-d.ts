@@ -214,15 +214,110 @@ test("JSON_TABLE: declared column types, nullable; nested paths' columns last", 
 	>().toEqualTypeOf<SqlError<"invalid ON ERROR behavior", 14>>();
 });
 
+test("ON EMPTY / ON ERROR: the behaviors each function or column allows", () => {
+	expectTypeOf<
+		Row<"SELECT JSON_EXISTS(data, '$' TRUE ON ERROR) AS a, JSON_EXISTS(data, '$' FALSE ON ERROR) AS b, JSON_EXISTS(data, '$' ERROR ON ERROR) AS c FROM things">
+	>().toEqualTypeOf<{ a: boolean; b: boolean; c: boolean }>();
+	expectTypeOf<
+		V<"SELECT JSON_EXISTS(data, '$' NULL ON ERROR) FROM things">
+	>().toEqualTypeOf<SqlError<"invalid ON ERROR behavior", 6>>();
+	expectTypeOf<
+		Row<"SELECT JSON_VALUE(data, '$' NULL ON EMPTY ERROR ON ERROR) AS a, JSON_VALUE(data, '$' RETURNING int DEFAULT '1'::int ON EMPTY DEFAULT 1 + 2 ON ERROR) AS b, JSON_VALUE(data, '$' DEFAULT NULL ON ERROR) AS c FROM things">
+	>().toEqualTypeOf<{ a: string | null; b: number | null; c: string | null }>();
+	expectTypeOf<
+		V<"SELECT JSON_VALUE(data, '$' EMPTY ON ERROR) FROM things">
+	>().toEqualTypeOf<SqlError<"invalid ON ERROR behavior", 6>>();
+	expectTypeOf<
+		Row<"SELECT JSON_QUERY(data, '$' EMPTY OBJECT ON EMPTY EMPTY ARRAY ON ERROR) AS a, JSON_QUERY(data, '$' EMPTY ON EMPTY NULL ON ERROR) AS b FROM things">
+	>().toEqualTypeOf<{ a: unknown; b: unknown }>();
+	expectTypeOf<
+		V<"SELECT JSON_QUERY(data, '$' FALSE ON EMPTY) FROM things">
+	>().toEqualTypeOf<SqlError<"invalid ON EMPTY behavior", 6>>();
+	expectTypeOf<
+		V<"SELECT JSON_QUERY(data, '$' UNKNOWN ON ERROR) FROM things">
+	>().toEqualTypeOf<SqlError<"invalid ON ERROR behavior", 6>>();
+	// the kinds are checked before the DEFAULT expressions
+	expectTypeOf<
+		V<"SELECT JSON_VALUE(data, '$' DEFAULT $1 ON EMPTY TRUE ON ERROR) FROM things">
+	>().toEqualTypeOf<SqlError<"invalid ON ERROR behavior", 10>>();
+	// columns: scalar ones like JSON_VALUE, formatted ones (FORMAT JSON, a wrapper or quotes
+	// clause, a JSON, array or composite type) like JSON_QUERY, EXISTS ones like JSON_EXISTS
+	expectTypeOf<
+		Row<"SELECT * FROM JSON_TABLE(jsonb '1', '$' COLUMNS (a int[] EMPTY ON ERROR, b text FORMAT JSON EMPTY OBJECT ON EMPTY, c text KEEP QUOTES EMPTY ON EMPTY, d text WITHOUT WRAPPER EMPTY ON EMPTY, e jsonb EMPTY ARRAY ON ERROR, f int NULL ON EMPTY DEFAULT 1 ON ERROR, g bool EXISTS UNKNOWN ON ERROR) EMPTY ARRAY ON ERROR)">
+	>().toEqualTypeOf<{
+		a: number[] | null;
+		b: string | null;
+		c: string | null;
+		d: string | null;
+		e: unknown;
+		f: number | null;
+		g: boolean | null;
+	}>();
+	expectTypeOf<
+		V<"SELECT * FROM JSON_TABLE(jsonb '1', '$' COLUMNS (a int EMPTY ON ERROR))">
+	>().toEqualTypeOf<SqlError<'invalid ON ERROR behavior for column "a"', 13>>();
+	expectTypeOf<
+		V<"SELECT * FROM JSON_TABLE(jsonb '1', '$' COLUMNS (a int TRUE ON EMPTY))">
+	>().toEqualTypeOf<SqlError<'invalid ON EMPTY behavior for column "a"', 13>>();
+	expectTypeOf<
+		V<"SELECT * FROM JSON_TABLE(jsonb '1', '$' COLUMNS (a text FORMAT JSON UNKNOWN ON ERROR))">
+	>().toEqualTypeOf<SqlError<'invalid ON ERROR behavior for column "a"', 15>>();
+	expectTypeOf<
+		V<"SELECT * FROM JSON_TABLE(jsonb '1', '$' COLUMNS (a int, b bool EXISTS DEFAULT true ON ERROR))">
+	>().toEqualTypeOf<SqlError<'invalid ON ERROR behavior for column "b"', 17>>();
+});
+
+test("a DEFAULT is a constant, function or operator expression", () => {
+	expectTypeOf<
+		V<"SELECT JSON_VALUE(data, '$' RETURNING int DEFAULT $1 ON EMPTY) FROM things">
+	>().toEqualTypeOf<
+		SqlError<
+			"can only specify a constant, non-aggregate function, or operator expression for DEFAULT",
+			9
+		>
+	>();
+	expectTypeOf<
+		V<"SELECT JSON_VALUE(data, '$' DEFAULT $1::int ON EMPTY) FROM things">
+	>().toEqualTypeOf<
+		SqlError<
+			"can only specify a constant, non-aggregate function, or operator expression for DEFAULT",
+			7
+		>
+	>();
+	expectTypeOf<
+		V<"SELECT JSON_VALUE(data, '$' DEFAULT 'x' ON EMPTY DEFAULT id ON ERROR) FROM things">
+	>().toEqualTypeOf<
+		SqlError<
+			"can only specify a constant, non-aggregate function, or operator expression for DEFAULT",
+			11
+		>
+	>();
+	expectTypeOf<
+		V<"SELECT JSON_QUERY(data, '$' DEFAULT (SELECT 1) ON ERROR) FROM things">
+	>().toEqualTypeOf<
+		SqlError<
+			"can only specify a constant, non-aggregate function, or operator expression for DEFAULT",
+			7
+		>
+	>();
+	expectTypeOf<
+		V<"SELECT * FROM JSON_TABLE(jsonb '1', '$' COLUMNS (a int DEFAULT $1 ON EMPTY))">
+	>().toEqualTypeOf<
+		SqlError<
+			"can only specify a constant, non-aggregate function, or operator expression for DEFAULT",
+			14
+		>
+	>();
+});
+
 test("parameters", () => {
 	expectTypeOf<
-		Params<"SELECT JSON_VALUE($1, $2 PASSING $3 AS x RETURNING int DEFAULT $4 ON EMPTY), JSON_OBJECT('a' VALUE $5), $6 IS JSON, JSON_ARRAYAGG($7) FILTER (WHERE $8)">
+		Params<"SELECT JSON_VALUE($1, '$' PASSING $2 AS x RETURNING int DEFAULT $3 + 1 ON EMPTY), JSON_OBJECT('a' VALUE $4), $5 IS JSON, JSON_ARRAYAGG($6) FILTER (WHERE $7)">
 	>().toEqualTypeOf<
 		[
 			string | null,
 			string | null,
-			string | null,
-			number | null,
+			number,
 			string | null,
 			string | null,
 			string | null,
@@ -230,6 +325,6 @@ test("parameters", () => {
 		]
 	>();
 	expectTypeOf<
-		Params<"SELECT * FROM JSON_TABLE($1, '$' COLUMNS (a int PATH '$.a' DEFAULT $2 ON EMPTY))">
-	>().toEqualTypeOf<[string | null, number | null]>();
+		Params<"SELECT * FROM JSON_TABLE($1, '$' COLUMNS (a int PATH '$.a' DEFAULT $2 + 1 ON EMPTY))">
+	>().toEqualTypeOf<[string | null, number]>();
 });
