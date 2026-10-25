@@ -64,7 +64,7 @@ type MentionedRels<T extends Toks, DB, I extends number, Acc> = T[I] extends {
 	: Acc;
 type RelAt<T extends Toks, I extends number, DB> = T[I] extends {
 	readonly k: "w" | "id";
-	readonly v: infer V extends string;
+	readonly v: infer V;
 }
 	? V extends RelNames<DB>
 		? V
@@ -73,7 +73,7 @@ type RelAt<T extends Toks, I extends number, DB> = T[I] extends {
 
 /** Relation names: top-level tables/views and tables inside namespaces. */
 type RelNames<DB> = {
-	[K in keyof DB & string]: K extends "$types" | "$functions"
+	[K in keyof DB & string]: K extends "$types" | "$functions" // type-mutate: equivalent cond-false union-drop – a shortcut: neither holds relations
 		? never
 		: IsRelation<DB[K]> extends true
 			? K
@@ -83,10 +83,10 @@ type NsRelNames<NS> = {
 	[K in keyof NS & string]: IsRelation<NS[K]> extends true ? K : never;
 }[keyof NS & string];
 
-export type IsRelation<X> = X extends { readonly $view: unknown }
+export type IsRelation<X> = X extends { readonly $view: unknown } // type-mutate: equivalent never-true – read with extends true, never counts as true
 	? true
-	: X extends object
-		? X[keyof X] extends { readonly type: string }
+	: X extends object // type-mutate: equivalent cond-true – a primitive's members are not column descriptors either
+		? X[keyof X] extends { readonly type: string } // type-mutate: equivalent never-true – read with extends true, never counts as true
 			? true
 			: false
 		: false;
@@ -182,7 +182,7 @@ type Lev<A extends string[], B extends string[]> = A extends []
 				: never
 			: never;
 
-type Cap<N extends number> = Lt<N, 3> extends true ? N : 3;
+type Cap<N extends number> = Lt<N, 3> extends true ? N : 3; // type-mutate: equivalent cond-true – a bound: any distance over 2 gives no hint
 type Inc<N extends number> = N extends 0 ? 1 : N extends 1 ? 2 : 3;
 type Min3<A extends number, B extends number, C extends number> = Min<
 	A,
@@ -191,13 +191,13 @@ type Min3<A extends number, B extends number, C extends number> = Min<
 type Min<A extends number, B extends number> = Lt<A, B> extends true ? A : B;
 type Lt<A extends number, B extends number> = A extends B
 	? false
-	: Tup<B> extends [...Tup<A>, ...unknown[]]
+	: Tup<B> extends [...Tup<A>, ...unknown[]] // type-mutate: equivalent tuple-swap never-true – the tuples hold only 0s; read with extends true, never counts as true
 		? true
 		: false;
 type Abs<A extends number, B extends number> =
-	Lt<A, B> extends true ? Sub<B, A> : Sub<A, B>;
+	Lt<A, B> extends true ? Sub<B, A> : Sub<A, B>; // type-mutate: equivalent cond-true – only a pruning bound: a wrong one computes the distance in full
 type Sub<A extends number, B extends number> =
-	Tup<A> extends [...Tup<B>, ...infer R] ? R["length"] : 0;
+	Tup<A> extends [...Tup<B>, ...infer R] ? R["length"] : 0; // type-mutate: equivalent tuple-swap never-false – the tuples hold only 0s; Abs subtracts the smaller
 type Tup<N extends number, A extends unknown[] = []> = A["length"] extends N
 	? A
 	: Tup<N, [...A, 0]>;

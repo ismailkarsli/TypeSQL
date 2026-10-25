@@ -118,7 +118,8 @@ test("USING: merged columns, qualified access, star order", () => {
 		z: number;
 		w: string;
 	}>();
-	// nullability of the merged column: inner → never null; LEFT → the left column; RIGHT → the right one; FULL → both
+	// nullability of the merged column: inner → never null; LEFT → the left column; RIGHT → the right one; FULL → either
+	// (a row of one side without a match has that side's NULL)
 	expectTypeOf<
 		Row<"SELECT x, b.x AS bx FROM a JOIN b USING (x)">
 	>().toEqualTypeOf<{ x: string; bx: string }>();
@@ -129,7 +130,7 @@ test("USING: merged columns, qualified access, star order", () => {
 		x: string | null;
 	}>();
 	expectTypeOf<Row<"SELECT x FROM a FULL JOIN b USING (x)">>().toEqualTypeOf<{
-		x: string;
+		x: string | null;
 	}>();
 	expectTypeOf<Row<"SELECT x FROM b FULL JOIN c USING (x)">>().toEqualTypeOf<{
 		x: string | null;

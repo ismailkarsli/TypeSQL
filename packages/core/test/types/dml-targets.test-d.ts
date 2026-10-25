@@ -47,6 +47,10 @@ test("subscripted and field assignment targets", () => {
 	expectTypeOf<
 		V<"UPDATE items SET (tags[1], name) = ('a', 'b')">
 	>().toEqualTypeOf<"UPDATE items SET (tags[1], name) = ('a', 'b')">();
+	// subscripts in a row on an array apply to it together
+	expectTypeOf<
+		V<"UPDATE items SET scores[1][2] = 1, tags[1:1][1:2] = '{}'">
+	>().toEqualTypeOf<"UPDATE items SET scores[1][2] = 1, tags[1:1][1:2] = '{}'">();
 	// a subscript is an expression of the statement's scope
 	expectTypeOf<
 		V<"UPDATE items SET tags[id] = name">
@@ -106,6 +110,12 @@ test("built-in types without subscripting, by Postgres's name", () => {
 			No<"tsrange">,
 			No<"tstzrange">,
 			No<"daterange">,
+			Validate<
+				{ x: { c: Col<"mood"> }; $types: { mood: "a" | "b" } },
+				"UPDATE x SET c[1] = NULL"
+			> extends SqlError<infer M, unknown>
+				? M
+				: never,
 		]
 	>().toEqualTypeOf<
 		[
@@ -152,6 +162,7 @@ test("built-in types without subscripting, by Postgres's name", () => {
 			`cannot subscript type tsrange because it does not support subscripting`,
 			`cannot subscript type tstzrange because it does not support subscripting`,
 			`cannot subscript type daterange because it does not support subscripting`,
+			`cannot subscript type mood because it does not support subscripting`,
 		]
 	>();
 });
@@ -289,6 +300,10 @@ test("parameters of indirected targets take the element / field type", () => {
 		Params<"UPDATE items SET tags[$1] = $2, scores[1:2] = $3 WHERE id = $4">
 	>().toEqualTypeOf<
 		[number, string | null, (number | null)[] | null, number | null]
+	>();
+	// a NULL slice leaves a non-null array as it is
+	expectTypeOf<Params<"UPDATE items SET tags[1:2] = $1">>().toEqualTypeOf<
+		[(string | null)[] | null]
 	>();
 	expectTypeOf<
 		Params<"INSERT INTO items (name, tags[1], data) VALUES ($1, $2, $3)">

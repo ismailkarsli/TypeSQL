@@ -10,7 +10,7 @@ import type { Opaque, SplitFirst } from "./inline.js";
  * A fragment whose text is not a literal (`sql.raw`, `sql.join` over a non-tuple array)
  * makes the result `string`, which `Validate` reports as a dynamic fragment.
  */
-export type Splice<Q extends string, S> = string extends Q
+export type Splice<Q extends string, S> = string extends Q // type-mutate: equivalent cond-false – a shortcut: string matches no slot, so SpliceLoop gives string too
 	? string
 	: SpliceLoop<Q, S, MaxParamStr<Q>, "">;
 
@@ -114,13 +114,13 @@ type IdChar = IdStart | Digit;
 type IsSlotName<N extends string> = N extends `${IdStart}${infer R}`
 	? AllIdChars<R>
 	: false;
-type AllIdChars<S extends string> = S extends ""
+type AllIdChars<S extends string> = S extends "" // type-mutate: equivalent never-true – a never result reads as true
 	? true
 	: S extends `${infer C}${infer R}`
-		? C extends IdChar
+		? C extends IdChar // type-mutate: equivalent never-true – a never result reads as true
 			? AllIdChars<R>
 			: false
-		: false;
+		: false; // type-mutate: equivalent bool-flip never-false – a non-empty string has a first character
 
 /** Slot names present in a query literal. */
 export type SlotNames<Q extends string> =
@@ -143,7 +143,7 @@ type Renumber<
 	T extends string,
 	Off extends number,
 	Acc extends string,
-> = T extends `${infer Pre}$${infer D extends Digit}${infer Rest}`
+> = T extends `${infer Pre}$${infer D}${infer Rest}`
 	? TakeDigits<Rest, D> extends [
 			infer N extends string,
 			infer R2 extends string,
@@ -159,10 +159,7 @@ type RenumberNext<
 	Acc extends string,
 	Max extends number,
 > =
-	Renumber<T, Off, Acc> extends [
-		infer Txt extends string,
-		infer M2 extends number,
-	]
+	Renumber<T, Off, Acc> extends [infer Txt, infer M2 extends number]
 		? [Txt, Gt<M2, Max> extends true ? M2 : Max]
 		: never;
 
@@ -183,7 +180,7 @@ type ToNum<S extends string> = S extends `${infer N extends number}`
 export type MaxParamStr<
 	T extends string,
 	Max extends number = 0,
-> = T extends `${string}$${string}` ? MaxLoop<T, Max> : Max;
+> = T extends `${string}$${string}` ? MaxLoop<T, Max> : Max; // type-mutate: equivalent cond-true – a shortcut: MaxLoop finds no $n either
 type MaxLoop<T extends string, Max extends number> =
 	SplitFirst<T> extends [
 		infer Code extends string,
@@ -195,7 +192,7 @@ type MaxLoop<T extends string, Max extends number> =
 				? M
 				: Opaque<O, Rest> extends [string, infer After extends string]
 					? MaxLoop<After, M>
-					: M
+					: M // type-mutate: equivalent never-false – Opaque always splits (an unclosed quote or comment runs to the end)
 			: never
 		: never;
 type MaxIn<
@@ -214,12 +211,12 @@ type Tup<N extends number, A extends unknown[] = []> = A["length"] extends N
 	? A
 	: Tup<N, [...A, 0]>;
 type Add<A extends number, B extends number> = [
-	...Tup<A>,
+	...Tup<A>, // type-mutate: equivalent tuple-swap – the length is the same
 	...Tup<B>,
 ]["length"] &
 	number;
 type Gt<A extends number, B extends number> =
-	Tup<B> extends [...Tup<A>, ...unknown[]] ? false : true;
+	Tup<B> extends [...Tup<A>, ...unknown[]] ? false : true; // type-mutate: equivalent tuple-swap never-false – the tuples hold only 0s; a never result reads as true
 
 /** Tuple of `N` `unknown`s (untyped fragment parameters). */
 export type UnknownTuple<
@@ -303,9 +300,7 @@ export type JoinedText<
 						false
 					>
 				: never
-		: string
-	: Items extends readonly []
-		? Acc
-		: number extends Items["length"]
-			? string
-			: Acc;
+		: string // type-mutate: equivalent never-false – every item has a text (the constraint)
+	: number extends Items["length"]
+		? string
+		: Acc;

@@ -1,5 +1,5 @@
 import type { Expr, SelectStmt } from "../ast.js";
-import type { Cols, Ctx } from "../types.js";
+import type { Ctx } from "../types.js";
 import type { ProjectSelect } from "./select.js";
 
 /**
@@ -38,7 +38,7 @@ export type ColumnName<
 	: Fig<E, C> extends infer N
 		? N extends string
 			? N
-			: N extends { readonly weak: infer W extends string }
+			: N extends { readonly weak: infer W }
 				? W
 				: "?column?"
 		: never;
@@ -60,7 +60,7 @@ type Fig<E extends Expr, C extends Ctx> = E extends { readonly t: "col" }
 					? null
 					: Weak<E["type"]>
 				: E extends { readonly t: "case" }
-					? E["else"] extends Expr
+					? E["else"] extends Expr // type-mutate: equivalent cond-true – without ELSE, Fig<null> is null, which names it case too
 						? Fig<E["else"], C> extends infer N
 							? N extends string
 								? N
@@ -102,6 +102,7 @@ type Fig<E extends Expr, C extends Ctx> = E extends { readonly t: "col" }
 																			? null
 																			: `xml${E["op"]}`
 																		: E extends {
+																					// type-mutate: equivalent cond-true – the other nodes have no fn: unknown names ?column? as null does
 																					readonly t: "jsonfn" | "jsonagg";
 																				}
 																			? E["fn"]
@@ -112,12 +113,7 @@ type StripArray<T extends string> = T extends `${infer B}[]` ? B : T;
 /** A scalar subquery is named after its single column, which is `?column?` when unnamed (still strong). */
 type SubName<Q extends SelectStmt, C extends Ctx> =
 	ProjectSelect<Q, C["db"], C["scope"], C["ctes"]> extends infer R
-		? R extends Cols
-			? R extends readonly [
-					{ readonly n: infer N extends string },
-					...unknown[],
-				]
-				? N
-				: "?column?"
-			: "?column?"
+		? R extends readonly [{ readonly n: infer N }, ...unknown[]]
+			? N
+			: "?column?" // type-mutate: equivalent never-false – an error or a subquery without columns is reported before the name is read
 		: never;

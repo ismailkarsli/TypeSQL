@@ -191,14 +191,10 @@ export type AssignInfo<
 	C extends Ctx,
 > = Col extends keyof Tbl // type-mutate: equivalent cond-true – the callers pass existing columns (checked first, or a statement already validated)
 	? Ind extends Expr
-		? CheckSubscripts<Ind, IndCtx<Tbl, Col, C>> extends infer K
-			? K extends AnyErr
-				? K
-				: TypeOf<Ind, IndCtx<Tbl, Col, C>> extends infer X
-					? X extends ColInfo
-						? Info<X["type"], true>
-						: X
-					: never
+		? TypeOf<Ind, IndCtx<Tbl, Col, C>> extends infer X
+			? X extends ColInfo
+				? Info<X["type"], true>
+				: X
 			: never
 		: ColInfoOf<Tbl, Col>
 	: null;
@@ -248,28 +244,6 @@ export type NoSubscript =
 	| "tsrange"
 	| "tstzrange"
 	| "daterange";
-/** Postgres's errors for subscripting a type that has none, and for a `jsonb` slice. */
-type CheckSubscripts<E, C extends Ctx> = E extends {
-	readonly t: "idx" | "slice";
-	readonly e: infer B extends Expr;
-}
-	? TypeOf<B, C> extends infer BT
-		? BT extends ColInfo
-			? BT["type"] extends NoSubscript
-				? SqlError<
-						`cannot subscript type ${TypeDisplay<BT["type"]>} because it does not support subscripting`,
-						null
-					>
-				: E extends { readonly t: "slice" }
-					? BT["type"] extends "jsonb"
-						? SqlError<"jsonb subscript does not support slices", null>
-						: CheckSubscripts<B, C>
-					: CheckSubscripts<B, C>
-			: BT
-		: never
-	: E extends { readonly t: "field"; readonly e: infer B }
-		? CheckSubscripts<B, C>
-		: true;
 /** `AssignInfo` for the parameter pass (errors are the main pass's business). */
 type AssignParamInfo<
 	Tbl extends Table,

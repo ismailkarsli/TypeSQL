@@ -1,4 +1,5 @@
 import { expectTypeOf, test } from "vitest";
+import type { ErrAt, ErrMsg, IsErr } from "../../src/engine/index.js";
 import { createSql, type SqlError } from "../../src/index.js";
 import type { DB, V } from "./_schema.js";
 
@@ -250,4 +251,15 @@ test("an invalid statement reports its SqlError, not an argument-count error", (
 		1,
 		2,
 	);
+});
+
+test("the engine's error helpers read an SqlError", () => {
+	type E = V<"SELECT nope FROM users">;
+	expectTypeOf<[IsErr<E>, IsErr<"SELECT 1">]>().toEqualTypeOf<[true, false]>();
+	expectTypeOf<[ErrMsg<E>, ErrAt<E>]>().toEqualTypeOf<
+		['column "nope" does not exist', 1]
+	>();
+	expectTypeOf<[ErrMsg<"SELECT 1">, ErrAt<"SELECT 1">]>().toEqualTypeOf<
+		[never, never]
+	>();
 });

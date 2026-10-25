@@ -197,7 +197,7 @@ type ParseConflictTarget<T extends Toks, I extends number> =
 				? EatWord<T, J, "where"> extends never
 					? Ok<null, J>
 					: ParseExpr<T, EatWord<T, J, "where">, 0> extends infer P
-						? P extends Ok<unknown, infer J2 extends number> // type-mutate: equivalent cond-false – the caller reads only the index of an Ok
+						? P extends Ok<unknown, infer J2> // type-mutate: equivalent cond-false – the caller reads only the index of an Ok
 							? Ok<null, J2>
 							: P
 						: never

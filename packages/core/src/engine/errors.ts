@@ -29,13 +29,3 @@ export type IsErr<T> = T extends AnyErr ? true : false;
 /** Message of an error (or never). */
 export type ErrMsg<T> = T extends SqlError<infer M, any> ? M : never;
 export type ErrAt<T> = T extends SqlError<any, infer A> ? A : never;
-
-/** Re-tag an error with a new position. */
-export type Reposition<E, At> =
-	E extends SqlError<infer M, any> ? SqlError<M, At> : E;
-
-/** Error raised with the remaining token count as position. */
-export type ErrAtRest<
-	Message extends string,
-	Rest extends readonly unknown[],
-> = SqlError<Message, Rest["length"]>;

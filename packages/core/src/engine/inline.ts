@@ -5,6 +5,7 @@ import type { Next } from "./lexer/next.js";
 import type { Toks } from "./lexer/tokens.js";
 import type { StripShape } from "./shape.js";
 import type { MaxParamStr } from "./splice.js";
+import type { NullTest } from "./typer/params.js";
 
 /**
  * Inline parameters: `` sql(`… WHERE id = ${sql.param(userId)}`) ``.
@@ -50,7 +51,7 @@ export type DefaultMarker<T> = `\u0000Du${Enc<Exclude<T, undefined>>}\u0000`;
  * 0 null, u undefined, d Date, y Uint8Array (Buffer), o other object, [e] array of e,
  * * any/unknown. Literal types widen (`42` → `n`).
  */
-export type Enc<T> = 0 extends 1 & T
+export type Enc<T> = 0 extends 1 & T // type-mutate: equivalent cond-false – a shortcut: unknown extends any too
 	? "*"
 	: unknown extends T
 		? "*"
@@ -72,16 +73,16 @@ type ObjFlag<T> = [
  */
 export type CheckEnc<E extends string, P> = unknown extends P
 	? true
-	: E extends ""
+	: E extends "" // type-mutate: equivalent cond-false – "" matches no branch below and ends in true too
 		? true
-		: E extends `*${string}`
+		: E extends `*${string}` // type-mutate: equivalent cond-false – FlagOk passes a "*" too
 			? true
 			: E extends `[${infer R}`
 				? SplitBracket<R, "", []> extends [
 						infer Inner extends string,
 						infer After extends string,
 					]
-					? [Extract<P, readonly unknown[]>] extends [never]
+					? [Extract<P, readonly unknown[]>] extends [never] // type-mutate: equivalent cond-false – the element check fails against never too
 						? false
 						: CheckEnc<
 									Inner,
@@ -94,7 +95,7 @@ export type CheckEnc<E extends string, P> = unknown extends P
 					? FlagOk<C, P> extends true
 						? CheckEnc<R, P>
 						: false
-					: true;
+					: true; // type-mutate: equivalent never-false bool-flip – a non-empty string has a first character
 type FlagOk<C extends string, P> = C extends "s"
 	? Has<P, string>
 	: C extends "n"
@@ -111,12 +112,12 @@ type FlagOk<C extends string, P> = C extends "s"
 							? Has<P, Uint8Array>
 							: C extends "o"
 								? Has<P, object>
-								: true;
-type Has<P, U> = [Extract<P, U>] extends [never] ? false : true;
+								: true; // type-mutate: equivalent never-false – read with extends true, never counts as true
+type Has<P, U> = [Extract<P, U>] extends [never] ? false : true; // type-mutate: equivalent never-false – read with extends true, never counts as true
 
 /** `"n0"` → `"number | null"`, `"[s]"` → `"string[]"`. */
 export type DescribeEnc<E extends string> = JoinBar<DescParts<E, []>>;
-type DescParts<E extends string, Acc extends string[]> = E extends ""
+type DescParts<E extends string, Acc extends string[]> = E extends "" // type-mutate: equivalent cond-false – "" matches no other branch, which gives Acc too
 	? Acc
 	: E extends `[${infer R}`
 		? SplitBracket<R, "", []> extends [
@@ -135,7 +136,7 @@ type DescParts<E extends string, Acc extends string[]> = E extends ""
 			: Acc
 		: E extends `${infer C}${infer R}`
 			? DescParts<R, [...Acc, FlagName<C>]>
-			: Acc;
+			: Acc; // type-mutate: equivalent never-false – a non-empty string has a first character
 type FlagName<C extends string> = C extends "s"
 	? "string"
 	: C extends "n"
@@ -155,7 +156,7 @@ type FlagName<C extends string> = C extends "s"
 								: C extends "o"
 									? "object"
 									: "unknown";
-type JoinBar<Parts extends string[]> = Parts extends [infer A extends string]
+type JoinBar<Parts extends string[]> = Parts extends [infer A]
 	? A
 	: Parts extends [infer A extends string, ...infer R extends string[]]
 		? `${A} | ${JoinBar<R>}`
@@ -178,7 +179,8 @@ type SplitBracket<
 
 // ───────────────────────────── text segmentation ─────────────────────────────
 
-type Openers = "'" | '"' | "--" | "/*";
+/** Openers other than `'` (SplitFirst splits at the first `'` before looking for them). */
+type Openers = '"' | "--" | "/*";
 
 /**
  * `[code, opener, rest]`: the code before the first quote or comment opener ("" when none).
@@ -187,17 +189,17 @@ type Openers = "'" | '"' | "--" | "/*";
  * instantiations on a text without openers and 34 with one `'` (now 16 and 17).
  */
 export type SplitFirst<T extends string> = T extends `${infer A}'${infer B}`
-	? A extends `${string}${Openers}${string}`
+	? A extends `${string}${Openers}${string}` // type-mutate: equivalent cond-true – a shortcut: Earlier finds no earlier opener either
 		? Earlier<A, "'", B>
 		: [A, "'", B]
-	: T extends `${string}${Openers}${string}`
+	: T extends `${string}${Openers}${string}` // type-mutate: equivalent cond-true – a shortcut: the checks below find none either
 		? T extends `${infer A}"${infer B}`
 			? Earlier<A, '"', B>
 			: T extends `${infer A}--${infer B}`
 				? Earlier<A, "--", B>
 				: T extends `${infer A}/*${infer B}`
 					? Earlier<A, "/*", B>
-					: [T, "", ""]
+					: [T, "", ""] // type-mutate: equivalent never-false – the text has one of these openers (checked above)
 		: [T, "", ""];
 /** `[A, O, B]` split at opener `O`, or at an opener inside `A` (which comes earlier). */
 type Earlier<
@@ -210,7 +212,7 @@ type Earlier<
 		? Earlier<A2, "--", `${M}${O}${B}`>
 		: A extends `${infer A2}/*${infer M}`
 			? Earlier<A2, "/*", `${M}${O}${B}`>
-			: A extends `${infer A2}'${infer M}`
+			: A extends `${infer A2}'${infer M}` // type-mutate: equivalent cond-false never-true – the text before an opener has no ' (SplitFirst splits at the first one)
 				? Earlier<A2, "'", `${M}${O}${B}`>
 				: [A, O, B];
 
@@ -248,7 +250,7 @@ type HasMarker<S extends string> = S extends `${string}\u0000${string}`
  * comment (the runtime refuses those too).
  */
 export type RewriteInlineStr<T extends string, Start extends number> =
-	HasMarker<T> extends false ? [T, []] : InlineLoop<T, "", [], Next[Start]>;
+	HasMarker<T> extends false ? [T, []] : InlineLoop<T, "", [], Next[Start]>; // type-mutate: equivalent cond-false – a shortcut: the loop gives the same for a text without markers
 
 type InlineLoop<
 	T extends string,
@@ -304,9 +306,9 @@ type AnyMarker = `\u0000${string}\u0000`;
  * for the value it wraps, which the runtime unwraps. A union with markers gives a union of
  * encodings, each checked.
  */
-export type ValueEnc<V> = 0 extends 1 & V
+export type ValueEnc<V> = 0 extends 1 & V // type-mutate: equivalent cond-false – a shortcut: any gives Enc<any>, "*"
 	? "*"
-	: [Extract<V, AnyMarker>] extends [never]
+	: [Extract<V, AnyMarker>] extends [never] // type-mutate: equivalent cond-false – a shortcut: no marker adds nothing to the union
 		? Enc<V>
 		:
 				| MarkerEncs<Extract<V, AnyMarker>>
@@ -339,9 +341,9 @@ export type CheckCarried<
 	TM,
 	X extends string,
 	K extends readonly unknown[],
-> = K extends readonly []
+> = K extends readonly [] // type-mutate: equivalent cond-false – a shortcut: the loop gives true for no values
 	? true
-	: number extends K["length"]
+	: number extends K["length"] // type-mutate: equivalent cond-false – a shortcut: the loop gives true for an array (I is never its length)
 		? true
 		: CarriedLoop<DB, X, K, ParamsOf<DB, TM, X>, 0>;
 
@@ -361,7 +363,7 @@ type CarriedLoop<
 			? [M] extends [never]
 				? CarriedLoop<DB, X, K, P, Next[I]>
 				: SqlError<`parameter $${Next[I]}: ${M}`, FindParam<Lex<X>, Next[I], 0>>
-			: CarriedLoop<DB, X, K, P, Next[I]>
+			: CarriedLoop<DB, X, K, P, Next[I]> // type-mutate: equivalent never-false – Extract<…, string> always fits the infer
 		: CarriedLoop<DB, X, K, P, Next[I]>;
 
 /**
@@ -380,35 +382,35 @@ type CheckValue<
 	? JsonContext<ParamUses<DB, X, N>> extends false
 		? `a sql.json() value cannot be used as ${Expected<DB, X, N>}`
 		: CheckEnc<R, P> extends true
-			? true
+			? true // type-mutate: equivalent never-true bool-flip – only a message (a string) is read
 			: `a sql.json() ${DescribeEnc<R>} value cannot be used as ${Expected<DB, X, N>}`
 	: CheckEnc<E, P> extends true
 		? E extends `${string}[${string}`
 			? IsJsonParam<ParamUses<DB, X, N>> extends true
 				? `an array for ${Expected<DB, X, N>} must be passed as sql.json(value) (node-postgres sends a JS array as a Postgres array)`
-				: true
-			: true
+				: true // type-mutate: equivalent never-false bool-flip – only a message (a string) is read
+			: true // type-mutate: equivalent never-false bool-flip – only a message (a string) is read
 		: `a ${DescribeEnc<E>} value cannot be used as ${Expected<DB, X, N>}`;
 
 /** The `ColInfo`s the statement's uses give parameter `N` (never when it has none). */
 type ParamUses<DB, X extends string, N extends number> =
 	Analysis<DB, X> extends { readonly params: infer M }
 		? N extends keyof M
-			? Exclude<M[N], { readonly nullTest: true }>
+			? Exclude<M[N], NullTest>
 			: never
 		: never;
 type IsJsonParam<U> = [
 	Extract<U, { readonly type: "json" | "jsonb" }>,
 ] extends [never]
 	? false
-	: true;
+	: true; // type-mutate: equivalent never-false – read with extends true, never counts as true
 /** A json / jsonb use, or no typed use at all. */
 type JsonContext<U> = [U] extends [never]
 	? true
 	: [Extract<U, { readonly type: "json" | "jsonb" | "unknown" }>] extends [
 				never,
 			]
-		? false
+		? false // type-mutate: equivalent never-true – read with extends false, never counts as false
 		: true;
 
 /** `"text NOT NULL"` / `"int4"` for parameter `N` of statement `X`. */
@@ -420,9 +422,9 @@ type Expected<DB, X extends string, N extends number> =
 					readonly nullable: infer Nl;
 				}
 				? `${StripShape<T>}${Nl extends true ? "" : " NOT NULL"}`
-				: "this parameter"
-			: "this parameter"
-		: "this parameter";
+				: "this parameter" // type-mutate: equivalent never-false – a parameter with uses has a type
+			: "this parameter" // type-mutate: equivalent never-false – a parameter without uses is unknown, which every value fits
+		: "this parameter"; // type-mutate: equivalent never-false – a statement with an error is reported before its values
 type First<U> = (U extends unknown ? (u: () => U) => void : never) extends (
 	u: infer F,
 ) => void
@@ -434,10 +436,10 @@ type First<U> = (U extends unknown ? (u: () => U) => void : never) extends (
 type FindParam<T, N extends number, I extends number> = T extends Toks
 	? T[I] extends { readonly k: "$"; readonly v: N }
 		? I
-		: T[I] extends { readonly k: string }
+		: T[I] extends { readonly k: string } // type-mutate: equivalent cond-true – the $n named by the error is in the statement
 			? FindParam<T, N, Next[I]>
-			: 0
-	: 0;
+			: 0 // type-mutate: equivalent never-false – the $n named by the error is in the statement
+	: 0; // type-mutate: equivalent never-false – a statement that does not lex is reported before its values
 
 /** `null` × N: positions whose values are call arguments. */
 export type Skip<

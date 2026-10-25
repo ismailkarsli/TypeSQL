@@ -10,7 +10,7 @@ import Module from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterAll, beforeAll, expect, test } from "vitest";
-import { editorPath } from "../src/load.js";
+import { editorPath, Loader } from "../src/load.js";
 
 // pnpm's bin shims set NODE_PATH to the workspace's packages, where Node would find @typesql/core
 // from anywhere; the extension host has no such NODE_PATH
@@ -83,4 +83,26 @@ test("an older @typesql/core without the editor export, or none", () => {
 	expect(editorPath(join(root, "old/src/q.ts"))).toBeNull();
 	write("none/src/q.ts", "");
 	expect(editorPath(join(root, "none/src/q.ts"))).toBeNull();
+});
+
+test("Loader: one load per directory and one import per module path; a log line for each", async () => {
+	pkg("multi/node_modules/@typesql/core", "@typesql/core", CORE);
+	write("multi/a/q.ts", "");
+	write("multi/b/q.ts", "");
+	write("missing/q.ts", "");
+	const log: string[] = [];
+	const loader = new Loader((m) => log.push(m));
+	const a = loader.load(join(root, "multi/a/q.ts"));
+	expect(loader.load(join(root, "multi/a/r.ts"))).toBe(a);
+	const b = loader.load(join(root, "multi/b/q.ts"));
+	expect(b).not.toBe(a);
+	const [ma, mb] = await Promise.all([a, b]);
+	expect(ma).not.toBeNull();
+	expect(mb).toBe(ma);
+	expect(await loader.load(join(root, "missing/q.ts"))).toBeNull();
+	expect(await loader.load(join(root, "missing/r.ts"))).toBeNull();
+	expect(log).toEqual([
+		`loading ${join(root, "multi/node_modules/@typesql/core/dist/editor/index.js")}`,
+		`no @typesql/core with an "./editor" export found from ${join(root, "missing")}`,
+	]);
 });

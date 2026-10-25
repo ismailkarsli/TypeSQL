@@ -54,18 +54,18 @@ export interface DdlCacheKeys {}
  * Version of the engine's output. An entry computed by another version is never used. It is a
  * hash of the type-level sources, kept up to date by `node scripts/cache-version.ts`.
  */
-export type CacheVersion = "ad1e84bafd33";
+export type CacheVersion = "6715a1050090";
 
 /** A relation, function or catalog entry that did not exist when the entry was computed. */
 export interface Missing {
-	readonly "typesql.missing": true;
+	readonly "typesql.missing": true; // type-mutate: equivalent bool-flip – a brand: the key tells it apart, not the value
 }
 /**
  * `FunctionCatalog[name]` is one of TypeSQL's built-in entries (which an augmentation cannot
  * change, and which `CacheVersion` covers).
  */
 export interface Builtin {
-	readonly "typesql.builtin": true;
+	readonly "typesql.builtin": true; // type-mutate: equivalent bool-flip – a brand: the key tells it apart, not the value
 }
 
 /**
@@ -145,9 +145,9 @@ type Mutual<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
  */
 type Expand<T> = T extends (...args: never) => unknown
 	? T
-	: T extends { readonly k: "ts"; readonly v: unknown }
+	: T extends { readonly k: "ts"; readonly v: unknown } // type-mutate: equivalent cond-false – stops at a TS type, which may be recursive; an expanded copy compares the same
 		? T
-		: T extends object
+		: T extends object // type-mutate: equivalent cond-true – a mapped type over a primitive is the primitive
 			? { [K in keyof T]: Expand<T[K]> }
 			: T;
 
@@ -158,7 +158,7 @@ type WordFresh<DB, W extends string, S extends readonly unknown[]> =
 			? false
 			: Same<SchemaFn<DB, W>, S[2]> extends false
 				? false
-				: S[3] extends Builtin
+				: S[3] extends Builtin // type-mutate: equivalent never-true – read with extends true, never counts as true
 					? true
 					: Same<
 							W extends keyof FunctionCatalog ? FunctionCatalog[W] : Missing,
@@ -190,7 +190,7 @@ type PairOf<DB, P extends string> = P extends `${infer A}.${infer B}`
  * `relation.column`. A misspelled-name error depends on these, not only on what it mentions.
  */
 export type HintIndex<DB> = {
-	[K in keyof DB & string]: K extends "$types" | "$functions"
+	[K in keyof DB & string]: K extends "$types" | "$functions" // type-mutate: equivalent cond-false union-drop – a shortcut: neither holds relations
 		? never
 		: IsRelation<DB[K]> extends true
 			? K | `${K}.${RelCols<DB[K]>}`
@@ -222,17 +222,20 @@ export type CallEntry = {
 	readonly q: unknown;
 };
 
-/** What changed in `DB` since group `G`'s snapshot (`"*"` for a group without one). */
-type GroupStale<DB, G> = G extends keyof CacheSnapshots
-	? CacheSnapshots[G] extends infer D extends DbSnapshot
+/**
+ * What changed in `DB` since group `G`'s snapshot (`"*"` for a group without one). The cache
+ * interfaces are parameters (defaulting to the augmented ones) so that tests can pass their own.
+ */
+type GroupStale<DB, G, Snaps> = G extends keyof Snaps
+	? Snaps[G] extends infer D extends DbSnapshot
 		? Stale<DB, D>
 		: "*"
 	: "*";
 
 /** The entry of `Q` in group `G` when its dependencies are unchanged in `DB`. */
-type FreshIn<DB, G, E> =
-	GroupStale<DB, G> extends infer S
-		? [S] extends [never]
+type FreshIn<DB, G, E, Snaps> =
+	GroupStale<DB, G, Snaps> extends infer S
+		? [S] extends [never] // type-mutate: equivalent cond-false – a shortcut: nothing stale intersects no dependency
 			? E
 			: E extends { readonly r: infer R }
 				? [Extract<S, R>] extends [never]
@@ -246,21 +249,26 @@ type FreshIn<DB, G, E> =
  * The group keeps entries of two files apart even when their types are the same, so `OneOf`
  * picks one of them rather than taking both as one type.
  */
-export type FreshVariants<DB, Q extends string> = {
-	[G in keyof QueryCache]: Q extends keyof QueryCache[G]
-		? FreshIn<DB, G, QueryCache[G][Q]> extends infer E
+export type FreshVariants<
+	DB,
+	Q extends string,
+	QC = QueryCache,
+	Snaps = CacheSnapshots,
+> = {
+	[G in keyof QC]: Q extends keyof QC[G]
+		? FreshIn<DB, G, QC[G][Q], Snaps> extends infer E
 			? [E] extends [never]
 				? never
 				: [G, E]
 			: never
 		: never;
-}[keyof QueryCache];
+}[keyof QC];
 
 /**
  * One member of a union (the last, in TypeScript's order); itself for a non-union. Several fresh
  * entries for one key (from several cache files) are equivalent; this keeps one.
  */
-export type OneOf<U> = IsUnion<U> extends false ? U : LastOf<U>;
+export type OneOf<U> = IsUnion<U> extends false ? U : LastOf<U>; // type-mutate: equivalent cond-false – a shortcut: LastOf of one type is that type, of never never
 type LastOf<U> =
 	UnionToIntersection<U extends unknown ? (x: U) => void : never> extends (
 		x: infer L,
@@ -286,12 +294,17 @@ export type IsUnion<T, U = T> = T extends unknown
  * The cached analysis of a key of `QueryCacheKeys`, or `never` on a miss. A union `Q` (a fragment with a union text)
  * is never looked up: each member would need its own entry.
  */
-export type CachedAnalysis<DB, Q extends string> =
+export type CachedAnalysis<
+	DB,
+	Q extends string,
+	QC = QueryCache,
+	Snaps = CacheSnapshots,
+> =
 	IsUnion<Q> extends true
 		? never
 		: Second<
 				OneOf<
-					FreshVariants<DB, Q> extends infer V
+					FreshVariants<DB, Q, QC, Snaps> extends infer V
 						? V extends [infer G, { readonly a: infer A }]
 							? [G, A]
 							: never
@@ -340,10 +353,10 @@ export type CacheAnalysis<DB, Q extends string> =
 export type Plain<T> = T extends { readonly k: "ts"; readonly v: infer V }
 	? { readonly k: "ts"; readonly v: V }
 	: T extends string
-		? T extends AnyShaped
+		? T extends AnyShaped // type-mutate: equivalent cond-false – the same type without the alias: only printing tells them apart
 			? BaseOf<T> & { readonly shape: Plain<T["shape"]> }
 			: T
-		: T extends object
+		: T extends object // type-mutate: equivalent cond-true – a mapped type over a primitive is the primitive
 			? { [K in keyof T]: Plain<T[K]> }
 			: T;
 
@@ -351,11 +364,11 @@ export type Plain<T> = T extends { readonly k: "ts"; readonly v: infer V }
  * The schema after DDL script `Q`, from a fresh `DdlCache` entry: the error, or the step's
  * effect (`s`: keys set, `x`: keys removed) applied to `DB`. `never` on a miss.
  */
-export type CachedDdl<DB, Q extends string> =
+export type CachedDdl<DB, Q extends string, DC = DdlCache> =
 	IsUnion<Q> extends true
 		? never
 		: OneOf<
-				DdlVariants<Q> extends infer V
+				DdlVariants<Q, DC> extends infer V
 					? V extends {
 							readonly d: infer D extends DbSnapshot;
 							readonly r: infer R;
@@ -366,9 +379,9 @@ export type CachedDdl<DB, Q extends string> =
 						: never
 					: never
 			>;
-type DdlVariants<Q extends string> = {
-	[F in keyof DdlCache]: Q extends keyof DdlCache[F] ? DdlCache[F][Q] : never;
-}[keyof DdlCache];
+type DdlVariants<Q extends string, DC> = {
+	[F in keyof DC]: Q extends keyof DC[F] ? DC[F][Q] : never;
+}[keyof DC];
 type DdlResult<DB, V> = V extends { readonly e: infer E }
 	? E
 	: V extends { readonly s: infer S; readonly x: infer X }

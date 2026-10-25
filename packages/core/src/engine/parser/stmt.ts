@@ -109,24 +109,22 @@ export type ParseStatement<
  */
 type SelectInto<R, Into extends boolean> = Into extends false
 	? R
-	: R extends readonly [{ readonly body: { readonly into: unknown } }, number]
-		? R extends Ok<
+	: R extends Ok<
 				infer S extends { readonly body: { readonly into: unknown } },
 				infer J
 			>
-			? Ok<
-					{
-						t: "create_table_as";
-						ifNotExists: false;
-						table: S["body"]["into"];
-						cols: null;
-						q: {
-							[K in keyof S]: K extends "body" ? Omit<S["body"], "into"> : S[K];
-						};
-					},
-					J
-				>
-			: R // type-mutate: equivalent never-false – an Ok tuple of that shape always matches Ok
+		? Ok<
+				{
+					t: "create_table_as";
+					ifNotExists: false;
+					table: S["body"]["into"];
+					cols: null;
+					q: {
+						[K in keyof S]: K extends "body" ? Omit<S["body"], "into"> : S[K];
+					};
+				},
+				J
+			>
 		: R;
 
 type ParseWithStatement<

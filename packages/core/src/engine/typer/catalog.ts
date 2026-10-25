@@ -915,11 +915,12 @@ export interface FunctionCatalog {
 	inet_merge: Sig<["inet", "inet"], "cidr">;
 
 	// ───────────── text search ─────────────
+	// the text forms first: a parameter (which matches both) is text, as in Postgres
 	to_tsvector: [
-		Sig<["anyjson"], "tsvector">,
 		Sig<["anystring"], "tsvector">,
-		Sig<["any", "anyjson"], "tsvector">,
+		Sig<["anyjson"], "tsvector">,
 		Sig<["any", "anystring"], "tsvector">,
+		Sig<["any", "anyjson"], "tsvector">,
 	];
 	to_tsquery: [
 		Sig<["anystring"], "tsquery">,
@@ -950,14 +951,14 @@ export interface FunctionCatalog {
 		Sig<["float4[]", "tsvector", "tsquery", "int4"], "float4">,
 	];
 	ts_headline: [
-		Sig<["anyjson", "tsquery"], "$1">,
-		Sig<["anyjson", "tsquery", "anystring"], "$1">,
 		Sig<["anystring", "tsquery"], "text">,
 		Sig<["anystring", "tsquery", "anystring"], "text">,
-		Sig<["any", "anyjson", "tsquery"], "$2">,
-		Sig<["any", "anyjson", "tsquery", "anystring"], "$2">,
+		Sig<["anyjson", "tsquery"], "$1">,
+		Sig<["anyjson", "tsquery", "anystring"], "$1">,
 		Sig<["any", "anystring", "tsquery"], "text">,
 		Sig<["any", "anystring", "tsquery", "anystring"], "text">,
+		Sig<["any", "anyjson", "tsquery"], "$2">,
+		Sig<["any", "anyjson", "tsquery", "anystring"], "$2">,
 	];
 	setweight: [
 		Sig<["tsvector", "anystring"], "tsvector">,

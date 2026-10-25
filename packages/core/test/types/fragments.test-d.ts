@@ -1,10 +1,16 @@
 import { expectTypeOf, test } from "vitest";
 import type {
+	HasSlots,
 	JoinedText,
 	QuotedIdent,
 	SlotNames,
 	Splice,
 } from "../../src/engine/index.js";
+import type {
+	MaxParamStr,
+	SpliceCarried,
+	Take,
+} from "../../src/engine/splice.js";
 import {
 	type Col,
 	createSql,
@@ -49,6 +55,40 @@ test("type-level splice", () => {
 	expectTypeOf<
 		SlotNames<"SELECT {a}, {b_c} FROM t WHERE x = '{1}'">
 	>().toEqualTypeOf<"a" | "b_c">();
+	// a slot name is an identifier: a letter or _, then letters, digits and _
+	expectTypeOf<
+		SlotNames<"{9x} {a-b} {_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789}">
+	>().toEqualTypeOf<"_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789">();
+	// a non-literal query, or a slot value that is not a fragment, gives string
+	expectTypeOf<
+		[Splice<string, { a: { text: "x" } }>, Splice<"SELECT {a}", { a: 1 }>]
+	>().toEqualTypeOf<[string, string]>();
+	// carried values: one set per occurrence of a slot, in order; braces that are not a slot are
+	// skipped, a slot without carried values adds none, an unknown slot ends the list (Splice
+	// reports it)
+	expectTypeOf<
+		SpliceCarried<"SELECT '{1,2}', {a}, {b}, {a}", { a: [1]; b: [2, 3] }>
+	>().toEqualTypeOf<[1, 2, 3, 1]>();
+	expectTypeOf<
+		SpliceCarried<"SELECT {a}, {b}, {zz}, {a}", { a: [1]; b: 2 }>
+	>().toEqualTypeOf<[1]>();
+	expectTypeOf<
+		[HasSlots<"SELECT {a}">, HasSlots<"SELECT '{1}'">]
+	>().toEqualTypeOf<[true, false]>();
+	// $n with several digits, in the fragment and in the query
+	expectTypeOf<
+		Splice<"SELECT $1 {a}", { a: { text: "x = $12" } }>
+	>().toEqualTypeOf<"SELECT $1 x = $13">();
+	expectTypeOf<
+		[MaxParamStr<"SELECT $12, 1">, MaxParamStr<"SELECT $2, 'x">]
+	>().toEqualTypeOf<[12, 2]>();
+	expectTypeOf<[Take<[1, 2, 3], 2>, Take<[1], 2>]>().toEqualTypeOf<
+		[[1, 2], [1]]
+	>();
+	expectTypeOf<QuotedIdent<string[]>>().toEqualTypeOf<string>();
+	expectTypeOf<
+		[JoinedText<[], ",">, JoinedText<{ text: "a" }[], ",">]
+	>().toEqualTypeOf<["", string]>();
 	expectTypeOf<QuotedIdent<["a"]>>().toEqualTypeOf<'"a"'>();
 	expectTypeOf<QuotedIdent<["s", 'we"ird']>>().toEqualTypeOf<'"s"."we""ird"'>();
 	expectTypeOf<

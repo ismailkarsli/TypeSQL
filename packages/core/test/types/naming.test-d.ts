@@ -41,6 +41,12 @@ test("function calls are named after the function; special-syntax functions use 
 		position: number;
 		overlay: string;
 	}>();
+	expectTypeOf<Row<"SELECT nums[1:2] FROM things">>().toEqualTypeOf<{
+		nums: number[];
+	}>();
+	expectTypeOf<
+		Row<"SELECT trim(leading 'x' FROM 'xa'), trim(trailing 'x' FROM 'ax')">
+	>().toEqualTypeOf<{ ltrim: string; rtrim: string }>();
 	expectTypeOf<
 		Row<"SELECT count(*) FILTER (WHERE true), string_agg(email, ','), array_agg(DISTINCT id), percentile_cont(0.5) WITHIN GROUP (ORDER BY id), mode() WITHIN GROUP (ORDER BY id) FROM users">
 	>().toEqualTypeOf<{

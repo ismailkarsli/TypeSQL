@@ -1,6 +1,6 @@
 import { expectTypeOf, test } from "vitest";
 import type { Analyze, NormalizeTypeName } from "../../src/engine/index.js";
-import type { SqlError } from "../../src/index.js";
+import type { Col, SqlError } from "../../src/index.js";
 import type { DB, Interval, Row, V } from "./_schema.js";
 
 /** Postgres type of each column (the default type map gives timestamp and timestamptz one TS type). */
@@ -329,6 +329,37 @@ test("arrays, subscripts, slices, ARRAY / ROW constructors", () => {
 	expectTypeOf<
 		Err<"SELECT label[1][1] FROM things">
 	>().toEqualTypeOf<"cannot subscript type text because it does not support subscripting">();
+	// an index can be out of range (NULL); a slice out of range is an empty array, so a slice (and a
+	// chain with one) is NULL only through a NULL array or operand
+	expectTypeOf<
+		Row<"SELECT nums[1:2] AS a, nums[:2] AS b, nums[n_id:2] AS c, nums[1:(n_id)] AS d, nums[NULL:2] AS e, n_nums[1:2] AS f, nums[1][2] AS g, nums[1][1:2] AS h, nums[1:1][2] AS i, nums[n_id][1:2] AS j, nums[1:1][n_id] AS k, n_nums[1][1:2] AS l, nums[1][2:(n_id)] AS m FROM things">
+	>().toEqualTypeOf<{
+		a: number[];
+		b: number[];
+		c: number[] | null;
+		d: number[] | null;
+		e: number[] | null;
+		f: number[] | null;
+		g: number | null;
+		h: number[];
+		i: number[];
+		j: number[] | null;
+		k: number[] | null;
+		l: number[] | null;
+		m: number[] | null;
+	}>();
+	// an enum takes no subscript; a type the engine does not know may (a domain over an array)
+	expectTypeOf<
+		[Err<"SELECT mood[1] FROM things">, Err<"SELECT n_mood[1:2] FROM things">]
+	>().toEqualTypeOf<
+		[
+			"cannot subscript type mood because it does not support subscripting",
+			"cannot subscript type mood because it does not support subscripting",
+		]
+	>();
+	expectTypeOf<
+		Analyze<{ t: { d: Col<"intarr"> } }, "SELECT d[1] FROM t">["cols"][0]["t"]
+	>().toEqualTypeOf<{ readonly type: "unknown"; readonly nullable: true }>();
 	// errors inside a bound, a ROW or an ARRAY item
 	expectTypeOf<
 		[

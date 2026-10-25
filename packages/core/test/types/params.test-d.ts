@@ -1,5 +1,6 @@
 import { expectTypeOf, test } from "vitest";
 import type {
+	Analyze,
 	ArgsOf,
 	NamesOf,
 	NonArrayOrSqlJson,
@@ -13,6 +14,15 @@ import {
 import type { BigIn, DateIn, DB, Interval, Params, Row } from "./_schema.js";
 
 const sql = createSql<DB>();
+/** Raw `{ [n]: ColInfo }` map before the type map is applied (Postgres types). */
+type Raw<Q extends string> =
+	Analyze<DB, Q> extends { readonly params: infer P }
+		? { -readonly [K in keyof P]: P[K] }
+		: never;
+type T<Ty extends string, N extends boolean = true> = {
+	readonly type: Ty;
+	readonly nullable: N;
+};
 
 test("comparisons give the column type, nullable; arithmetic keeps the column's nullability", () => {
 	expectTypeOf<
@@ -362,4 +372,265 @@ test("an unused $n is unknown; an invalid statement has no parameters", () => {
 	>().toEqualTypeOf<
 		[NonArrayOrSqlJson<unknown>, NonArrayOrSqlJson<unknown>, string]
 	>();
+});
+
+// Each expectation below was checked against PostgreSQL 18 with PREPARE (pg_prepared_statements).
+test("every comparison and pattern operator gives the other operand's type, nullable", () => {
+	expectTypeOf<
+		Params<"SELECT id FROM things WHERE id <= $1 AND id >= $2 AND id != $3 AND label ~ $4 AND label ~* $5 AND label !~ $6 AND label !~* $7 AND label ~~ $8 AND label ~~* $9 AND label !~~ $10 AND label !~~* $11">
+	>().toEqualTypeOf<
+		[
+			number | null,
+			number | null,
+			number | null,
+			string | null,
+			string | null,
+			string | null,
+			string | null,
+			string | null,
+			string | null,
+			string | null,
+			string | null,
+		]
+	>();
+});
+
+test("operators with a parameter on both sides or a cast parameter", () => {
+	// AND / OR type both parameters bool; other operators leave them untyped
+	expectTypeOf<Raw<"SELECT 1 WHERE $1 AND $2">>().toEqualTypeOf<{
+		1: T<"bool">;
+		2: T<"bool">;
+	}>();
+	expectTypeOf<Raw<"SELECT 1 WHERE $1 OR $2">>().toEqualTypeOf<{
+		1: T<"bool">;
+		2: T<"bool">;
+	}>();
+	expectTypeOf<Raw<"SELECT $3::int4 WHERE $1 = $2">>().toEqualTypeOf<{
+		3: T<"int4", false>;
+	}>();
+	// a cast parameter takes the operator's nullability: nullable in a comparison, the other
+	// operand's in arithmetic
+	expectTypeOf<Raw<"SELECT 1 WHERE $1 = $2::int4">>().toEqualTypeOf<{
+		1: T<"int4">;
+		2: T<"int4">;
+	}>();
+	expectTypeOf<Raw<"SELECT $1::int4 + id FROM things">>().toEqualTypeOf<{
+		1: T<"int4", false>;
+	}>();
+	// json paths and key lists are text[]; @? takes a jsonpath (text), @@ the other text search type
+	expectTypeOf<
+		Raw<"SELECT data #> $1, data #>> $2, data ?| $3, data ?& $4, data @? $5, tsv @@ $6, to_tsquery('a') @@ $7 FROM things">
+	>().toEqualTypeOf<{
+		1: T<"text[]">;
+		2: T<"text[]">;
+		3: T<"text[]">;
+		4: T<"text[]">;
+		5: T<"text">;
+		6: T<"tsquery">;
+		7: T<"tsvector">;
+	}>();
+});
+
+test("parameters under NOT, a prefix operator, ROW, COLLATE, a field, named and VARIADIC arguments", () => {
+	expectTypeOf<
+		Params<"SELECT id FROM things WHERE NOT (id = $1)">
+	>().toEqualTypeOf<[number | null]>();
+	expectTypeOf<Params<"SELECT -(id + $1) FROM things">>().toEqualTypeOf<
+		[number]
+	>();
+	// a prefix operator other than NOT leaves its parameter untyped, and the others as they are
+	expectTypeOf<Params<"SELECT $1::int4, |/ $2">>().toEqualTypeOf<
+		[number, unknown]
+	>();
+	expectTypeOf<Params<"SELECT ROW(id = $1) FROM things">>().toEqualTypeOf<
+		[number | null]
+	>();
+	// a parameter directly in ROW has no type (a cast one has its own)
+	expectTypeOf<Raw<"SELECT $1::int4, ROW($2), ROW($3::int4)">>().toEqualTypeOf<{
+		1: T<"int4", false>;
+		3: T<"int4", false>;
+	}>();
+	expectTypeOf<
+		Raw<'SELECT (label || $1) COLLATE "C" FROM things'>
+	>().toEqualTypeOf<{ 1: T<"text", false> }>();
+	expectTypeOf<
+		Params<"SELECT (SELECT t FROM things t WHERE id = $1).label">
+	>().toEqualTypeOf<[number | null]>();
+	expectTypeOf<
+		Raw<"SELECT make_interval(days => id + $1), format('%s', VARIADIC ARRAY[label || $2]), JSON_OBJECT('a': (label || $3) FORMAT JSON) FROM things">
+	>().toEqualTypeOf<{
+		1: T<"int4", false>;
+		2: T<"text", false>;
+		3: T<"text", false>;
+	}>();
+});
+
+test("$1 BETWEEN a AND b takes a's type, as Postgres resolves $1 >= a first", () => {
+	expectTypeOf<
+		[
+			Raw<"SELECT 1 WHERE $1 BETWEEN 1 AND 2.5">,
+			Raw<"SELECT 1 FROM things WHERE $1 BETWEEN id AND big">,
+			Raw<"SELECT 1 FROM things WHERE $1 BETWEEN SYMMETRIC big AND id">,
+			Raw<"SELECT 1 FROM things WHERE id BETWEEN $1 AND $2">,
+		]
+	>().toEqualTypeOf<
+		[
+			{ 1: T<"int4"> },
+			{ 1: T<"int4"> },
+			{ 1: T<"int8"> },
+			{ 1: T<"int4">; 2: T<"int4"> },
+		]
+	>();
+});
+
+test("a parameter tested with IS NULL besides a typed use; IN (NULL)", () => {
+	expectTypeOf<
+		Params<"SELECT id FROM things WHERE id + $1 > 0 OR $1 IS NULL">
+	>().toEqualTypeOf<[number | null]>();
+	expectTypeOf<
+		[Raw<"SELECT 1 WHERE $1 IN (NULL)">, Raw<"SELECT 1 WHERE $1 IN (NULL, 1)">]
+	>().toEqualTypeOf<[{ 1: T<"unknown"> }, { 1: T<"int4"> }]>();
+});
+
+test("SUBSTRING / OVERLAY / AT TIME ZONE positions", () => {
+	// bit strings have only the integer form; FROM $n takes FOR's type (FOR 2: int4), FROM $n FOR $m
+	// is the regex form, and FROM a smallint makes FOR $n int4
+	expectTypeOf<
+		Raw<"SELECT substring(B'101'::bit(3) FROM $1), substring(B'101'::varbit FROM $2), substring(label FROM $3 FOR 2), substring(label FROM $4 FOR $5), substring(label FROM 1::int2 FOR $6) FROM things">
+	>().toEqualTypeOf<{
+		1: T<"int4">;
+		2: T<"int4">;
+		3: T<"int4">;
+		4: T<"text">;
+		5: T<"text">;
+		6: T<"int4">;
+	}>();
+	expectTypeOf<
+		Params<"SELECT overlay($1 PLACING 'x' FROM 1), at AT TIME ZONE $2 FROM things">
+	>().toEqualTypeOf<[string | null, string | null]>();
+});
+
+test("operators: date/time, jsonb, interval, || and the rest", () => {
+	expectTypeOf<
+		Raw<"SELECT at - $1, day - $2, clock::timetz - $3, data - $4, at + $5, dur * $6, dur / $7, id || $8, id % $9, label @@ $10 FROM things">
+	>().toEqualTypeOf<{
+		1: T<"timestamptz", false>;
+		2: T<"date", false>;
+		3: T<"interval", false>;
+		4: T<"text", false>;
+		5: T<"interval", false>;
+		6: T<"float8", false>;
+		7: T<"float8", false>;
+		8: T<"text", false>;
+		9: T<"int4", false>;
+		10: T<"text", false>;
+	}>();
+	// || keeps the type of a jsonb, bytea, text search or array operand
+	expectTypeOf<
+		Raw<"SELECT data || $1, bin || $2, tsv || $3, nums || $4 FROM things">
+	>().toEqualTypeOf<{
+		1: T<"jsonb", false>;
+		2: T<"bytea", false>;
+		3: T<"tsvector", false>;
+		4: T<"int4[]", false>;
+	}>();
+	expectTypeOf<
+		Params<"SELECT trim(both $1 FROM label) FROM things">
+	>().toEqualTypeOf<[string | null]>();
+	expectTypeOf<Raw<"SELECT $1 AT TIME ZONE 'UTC'">>().toEqualTypeOf<{
+		1: T<"timestamptz">;
+	}>();
+});
+
+test("ANY / ALL, ARRAY(SELECT), subscripts", () => {
+	expectTypeOf<
+		Params<"SELECT $1::int4 FROM things WHERE id = ANY(nums)">
+	>().toEqualTypeOf<[number]>();
+	// a parameter left of ANY (subquery) stays untyped; the subquery's are typed
+	expectTypeOf<
+		Params<"SELECT 1 FROM things WHERE $1 = ANY(SELECT id FROM things WHERE id = $2)">
+	>().toEqualTypeOf<[unknown, number | null]>();
+	expectTypeOf<
+		Params<"SELECT 1 FROM things WHERE id = ANY(SELECT id FROM things WHERE id = $1)">
+	>().toEqualTypeOf<[number | null]>();
+	expectTypeOf<
+		Raw<"SELECT 1 FROM things WHERE id = ANY(ARRAY[id + $1])">
+	>().toEqualTypeOf<{ 1: T<"int4", false> }>();
+	expectTypeOf<
+		Params<"SELECT ARRAY(SELECT id FROM things WHERE id = $1)">
+	>().toEqualTypeOf<[number | null]>();
+	expectTypeOf<Raw<"SELECT nums[$1:$2] FROM things">>().toEqualTypeOf<{
+		1: T<"int4", false>;
+		2: T<"int4", false>;
+	}>();
+});
+
+test("function arguments: polymorphic and category patterns", () => {
+	// an unknown in a category takes its preferred type: float8, timestamptz, text (the text
+	// forms of to_tsvector / ts_headline before the json ones)
+	expectTypeOf<
+		Raw<"SELECT age($1, at), abs($2), width_bucket($3, 0, 10, 5), to_tsvector($4), ts_headline($5, to_tsquery('a')) FROM things">
+	>().toEqualTypeOf<{
+		1: T<"timestamptz">;
+		2: T<"float8">;
+		3: T<"float8">;
+		4: T<"text">;
+		5: T<"text">;
+	}>();
+	// a range parameter has no type (Postgres cannot choose between range and multirange)
+	expectTypeOf<Raw<"SELECT isempty($1)">>().toEqualTypeOf<{
+		1: T<"unknown">;
+	}>();
+	// anyarray next to a known element; without one (Postgres cannot type these either)
+	expectTypeOf<
+		Raw<"SELECT array_positions($1, 1), array_length($2, 1), array_fill($3, ARRAY[2])">
+	>().toEqualTypeOf<{
+		1: T<"int4[]">;
+		2: T<"unknown">;
+		3: T<"unknown">;
+	}>();
+	// NULL does not type a polymorphic sibling
+	expectTypeOf<
+		Raw<"SELECT coalesce($1, NULL), coalesce($2, id) FROM things">
+	>().toEqualTypeOf<{ 1: T<"unknown">; 2: T<"int4"> }>();
+	expectTypeOf<
+		Params<"SELECT CASE WHEN flag THEN $1 WHEN n_flag THEN id END FROM things">
+	>().toEqualTypeOf<[number | null]>();
+});
+
+test("parameters in joins, TABLESAMPLE, set operations, VALUES, GROUP BY and HAVING", () => {
+	expectTypeOf<
+		Params<"SELECT 1 FROM things a JOIN things b ON a.id = $1">
+	>().toEqualTypeOf<[number | null]>();
+	// system_rows / system_time are the tsm_system_rows / tsm_system_time extensions
+	expectTypeOf<
+		[
+			Raw<"SELECT 1 FROM things TABLESAMPLE system_rows($1)">,
+			Raw<"SELECT 1 FROM things TABLESAMPLE system_time($1)">,
+			Raw<"SELECT 1 FROM things TABLESAMPLE bernoulli($1)">,
+		]
+	>().toEqualTypeOf<
+		[
+			{ 1: T<"int8", false> },
+			{ 1: T<"float8", false> },
+			{ 1: T<"float4", false> },
+		]
+	>();
+	expectTypeOf<
+		Params<"SELECT id FROM things WHERE id = $1 UNION SELECT id FROM things WHERE id = $2">
+	>().toEqualTypeOf<[number | null, number | null]>();
+	expectTypeOf<Params<"(SELECT id FROM things WHERE id = $1)">>().toEqualTypeOf<
+		[number | null]
+	>();
+	expectTypeOf<Params<"VALUES (1 + $1)">>().toEqualTypeOf<[number]>();
+	expectTypeOf<Params<"SELECT 1 FROM things GROUP BY id + $1">>().toEqualTypeOf<
+		[number]
+	>();
+	// sum() is NULL over no rows unless grouped
+	expectTypeOf<
+		[
+			Raw<"SELECT 1 FROM things HAVING sum(id) + $1 > 0">,
+			Raw<"SELECT 1 FROM things GROUP BY id HAVING sum(id) + $1 > 0">,
+		]
+	>().toEqualTypeOf<[{ 1: T<"int8"> }, { 1: T<"int8", false> }]>();
 });

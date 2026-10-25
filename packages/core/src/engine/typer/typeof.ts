@@ -589,15 +589,22 @@ type ArrayTypeOf<T extends string> = T extends `${string}[]`
 	: T extends "unknown" | "null"
 		? "text[]"
 		: `${T}[]`;
-/** `e[i]`: element (or json for json subscripting), always nullable (out of range → NULL). */
+/**
+ * `e[i]`: element (or json for json subscripting), always nullable (out of range → NULL); after a
+ * slice of an array (`a[1:2][3]`) the array, nullable only through a NULL operand.
+ */
 type TypeIdx<E extends Expr, I extends Expr, C extends Ctx> =
 	TypeOf<E, C> extends infer A
 		? A extends ColInfo
 			? TypeOf<I, C> extends infer B
 				? B extends ColInfo
-					? ChainOverArray<E, C> extends infer R extends string
-						? Info<ChainSliced<E> extends true ? R : ElemType<R>, true>
-						: BaseOf<A["type"]> extends NoSubscript
+					? ChainOverArray<E, C> extends `${infer El}[]`
+						? ChainSliced<E> extends true
+							? ChainNullable<E, C> extends infer N extends boolean
+								? Info<`${El}[]`, Or<B["nullable"], N>>
+								: never
+							: Info<El, true>
+						: BaseOf<A["type"]> extends NoSubscript | EnumName<C["db"]>
 							? NoSubscriptErr<A["type"]>
 							: JsonArrow<"->", A, I, B> extends infer J extends ColInfo
 								? J
@@ -627,19 +634,39 @@ type ChainOverArray<E extends Expr, C extends Ctx> = E extends {
 		? T
 		: null
 	: null;
+/** The array under the indexes (a slice of an array has its type, so the walk can stop at one). */
 type ChainRoot<E extends Expr> = E extends {
-	readonly t: "idx" | "slice";
+	readonly t: "idx";
 	readonly e: infer X extends Expr;
 }
 	? ChainRoot<X>
 	: E;
+/**
+ * Is a subscript chain over an array NULL only through a NULL operand (a slice out of range is an
+ * empty array, and a slice makes every subscript of the chain one)? The indexes, then the slice
+ * under them, which is typed so (or the array).
+ */
+type ChainNullable<E extends Expr, C extends Ctx> = E extends {
+	readonly t: "idx";
+	readonly e: infer X extends Expr;
+	readonly i: infer I extends Expr;
+}
+	? TypeOf<I, C> extends infer T
+		? NullableOpt<T> extends true // type-mutate: equivalent never-true – a never nullability reads as nullable
+			? true
+			: ChainNullable<X, C>
+		: never
+	: TypeOf<E, C> extends infer T
+		? NullableOpt<T>
+		: never;
+/** Enums (`DB["$types"]`) take no subscript. */
+type EnumName<DB> = DB extends { readonly $types: infer T } ? keyof T : never;
 /** Is any subscript of the chain a slice? Then the result is an array. */
 type ChainSliced<E> = E extends { readonly t: "slice" }
 	? true
 	: E extends { readonly t: "idx"; readonly e: infer X }
 		? ChainSliced<X>
 		: false;
-type ElemType<T extends string> = T extends `${infer El}[]` ? El : T;
 /** Element type of the built-in types other than arrays that take a subscript (`pg_type.typsubscript`). */
 type SubscriptElem = {
 	jsonb: "jsonb";
@@ -654,7 +681,7 @@ type NoSubscriptErr<T extends string> = SqlError<
 	`cannot subscript type ${TypeDisplay<T>} because it does not support subscripting`,
 	null
 >;
-/** `e[lo:hi]`: same array type, nullable if the array is. */
+/** `e[lo:hi]`: same array type, nullable if the array or a bound is (out of range → empty array). */
 type TypeSlice<
 	E extends Expr,
 	Lo extends Expr | null,
@@ -668,12 +695,17 @@ type TypeSlice<
 					? TypeOpt<Hi, C> extends infer D
 						? D extends ColInfo | null
 							? ChainOverArray<E, C> extends infer R extends string
-								? Info<R, true>
-								: BaseOf<A["type"]> extends NoSubscript
+								? ChainNullable<E, C> extends infer N extends boolean
+									? Info<R, Or<Or<NullableOpt<B>, NullableOpt<D>>, N>>
+									: never
+								: BaseOf<A["type"]> extends NoSubscript | EnumName<C["db"]>
 									? NoSubscriptErr<A["type"]>
 									: BaseOf<A["type"]> extends "jsonb"
 										? SqlError<"jsonb subscript does not support slices", null>
-										: Info<A["type"], A["nullable"]>
+										: Info<
+												A["type"],
+												Or<A["nullable"], Or<NullableOpt<B>, NullableOpt<D>>>
+											>
 							: D
 						: never
 					: B
