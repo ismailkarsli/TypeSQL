@@ -1,9 +1,10 @@
 /**
- * Postgres keyword categories (from `src/include/parser/kwlist.h`), reduced to what the
- * parser needs to decide whether a word token is an identifier.
+ * Postgres keyword categories (from `src/include/parser/kwlist.h`, as `pg_get_keywords()`
+ * lists them), reduced to what the parser needs to decide whether a word token is an
+ * identifier. A keyword in none of them is unreserved: usable as any name.
  */
 
-/** Fully reserved: never an identifier, alias, or function name. */
+/** Reserved (catcode R): a label after `AS` or `.` and a bare column label, never a name. */
 export type ReservedKeyword =
 	| "all"
 	| "analyse"
@@ -84,7 +85,7 @@ export type ReservedKeyword =
 	| "window"
 	| "with";
 
-/** Can be column names but not function/type names, and not *bare* table aliases issues. */
+/** Column-name keywords (catcode C): table and column names, not function or type names. */
 export type ColNameKeyword =
 	| "between"
 	| "bigint"
@@ -150,7 +151,7 @@ export type ColNameKeyword =
 	| "xmlserialize"
 	| "xmltable";
 
-/** Can be function/type names, but not *bare* table aliases (`FROM t left` is a join). */
+/** Type/function-name keywords (catcode T): function and type names, not table or column names (`FROM t left` is a join). */
 export type TypeFuncNameKeyword =
 	| "authorization"
 	| "binary"
@@ -176,44 +177,52 @@ export type TypeFuncNameKeyword =
 	| "tablesample"
 	| "verbose";
 
-/** Words that cannot be a bare column label (`SELECT a b`) without `AS`. */
+/**
+ * Words that are not a bare column label (`SELECT 1 b`, without `AS`): the keywords whose
+ * `barelabel` is false in `pg_get_keywords()`, but `as`, which starts the label itself. Every
+ * other keyword is one, reserved ones too (`SELECT 1 all`, `SELECT 1 and, 2`).
+ */
 export type NotBareLabel =
-	| ReservedKeyword
+	| "array"
 	| "char"
 	| "character"
+	| "create"
 	| "day"
+	| "except"
+	| "fetch"
 	| "filter"
+	| "for"
+	| "from"
+	| "grant"
+	| "group"
+	| "having"
 	| "hour"
+	| "intersect"
+	| "into"
+	| "isnull"
+	| "limit"
 	| "minute"
 	| "month"
+	| "notnull"
+	| "offset"
+	| "on"
+	| "order"
 	| "over"
+	| "overlaps"
 	| "precision"
+	| "returning"
 	| "second"
+	| "to"
+	| "union"
 	| "varying"
+	| "where"
+	| "window"
+	| "with"
 	| "within"
 	| "without"
-	| "year"
-	| "isnull"
-	| "notnull"
-	| "overlaps";
+	| "year";
 
-/** `ColId`: identifier or unreserved/col-name keyword. Usable as table/column name and bare table alias. */
-export type IsColId<W extends string> = W extends
-	| ReservedKeyword
-	| TypeFuncNameKeyword
-	? false
-	: true;
-/** Usable as a plain column/table name (after `AS`, or in `t.col`). */
-export type IsColLabel<W extends string> = W extends ReservedKeyword
-	? false
-	: true;
-/** Usable as a bare column alias in a target list. */
-export type IsBareLabel<W extends string> = W extends NotBareLabel
-	? false
-	: true;
-/** Usable as a function or type name. */
-export type IsFuncName<W extends string> = W extends
-	| ReservedKeyword
-	| ColNameKeyword
-	? false
-	: true;
+/** Words that are not a `ColId` (a table, column or alias name): reserved and type/function-name keywords. */
+export type NotColId = ReservedKeyword | TypeFuncNameKeyword;
+/** Words that are not a `type_function_name` (a function, type or parameter name): reserved and column-name keywords. */
+export type NotTypeFuncName = ReservedKeyword | ColNameKeyword;

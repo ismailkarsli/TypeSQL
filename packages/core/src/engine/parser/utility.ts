@@ -3,10 +3,10 @@ import type { NumTok, OpTok, Toks, WordTok } from "../lexer/tokens.js";
 import type { ParseSelectStmt } from "./select.js";
 import type {
 	AtEnd,
-	ColIdIdent,
 	EatWord,
 	Expected,
 	Fail,
+	Ident,
 	Nx,
 	Nx2,
 	Ok,
@@ -34,7 +34,7 @@ export type ParseCursorStmt<T extends Toks, I extends number> =
 // ─── DECLARE ───
 
 type ParseDeclare<T extends Toks, I extends number> =
-	ColIdIdent<T, I> extends [infer N, infer J extends number]
+	Ident<T, I> extends [infer N, infer J extends number]
 		? CursorOptions<T, J, never> extends infer K
 			? K extends number
 				? EatWord<T, K, "cursor"> extends never
@@ -87,7 +87,7 @@ type SkipHold<T extends Toks, I extends number> =
  * (`FETCH next` fetches from a cursor named `next`, as in Postgres).
  */
 type ParseFetch<T extends Toks, I extends number, K extends "fetch" | "move"> =
-	ColIdIdent<T, I> extends [infer N, infer J extends number]
+	Ident<T, I> extends [infer N, infer J extends number]
 		? AtEnd<T, J> extends true
 			? Ok<{ t: K; cursor: N }, J>
 			: T[J] extends OpTok<";">
@@ -99,7 +99,7 @@ type ParseFetch<T extends Toks, I extends number, K extends "fetch" | "move"> =
 type FetchFrom<T extends Toks, D, K extends "fetch" | "move"> = D extends number
 	? (T[D] extends WordTok<"from" | "in"> ? Nx<D> : D) extends infer J extends
 			number
-		? ColIdIdent<T, J> extends [infer N, infer J2 extends number]
+		? Ident<T, J> extends [infer N, infer J2 extends number]
 			? Ok<{ t: K; cursor: N }, J2>
 			: Expected<"cursor name", T, J>
 		: never
@@ -140,6 +140,6 @@ type SignedInt<T extends Toks, I extends number> = T[I] extends NumTok
 type ParseClose<T extends Toks, I extends number> =
 	T[I] extends WordTok<"all">
 		? Ok<{ t: "close_cursor"; cursor: null }, Nx<I>>
-		: ColIdIdent<T, I> extends [infer N, infer J extends number]
+		: Ident<T, I> extends [infer N, infer J extends number]
 			? Ok<{ t: "close_cursor"; cursor: N }, J>
 			: Expected<"cursor name or ALL", T, I>;

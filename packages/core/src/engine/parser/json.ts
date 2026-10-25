@@ -10,12 +10,12 @@ import type { ParseSelectStmt } from "./select.js";
 import type { ParseTypeName } from "./typename.js";
 import type {
 	AnyLabel,
-	ColIdIdent,
 	EatOp,
 	EatWord,
 	EatWords,
 	Expected,
 	Fail,
+	Ident,
 	Nx,
 	Ok,
 	SkipWord,
@@ -643,7 +643,7 @@ export type ParseJsonTable<T extends Toks, I extends number> =
 type PathName<T extends Toks, I extends number> =
 	EatWord<T, I, "as"> extends never
 		? [[], I]
-		: ColIdIdent<T, EatWord<T, I, "as">> extends [
+		: Ident<T, EatWord<T, I, "as">> extends [
 					infer N extends string,
 					infer J extends number,
 				]
@@ -708,7 +708,7 @@ type ParseColumn<
 	Defs extends readonly unknown[],
 	Ord extends boolean,
 > =
-	ColIdIdent<T, I> extends [infer N extends string, infer J extends number]
+	Ident<T, I> extends [infer N extends string, infer J extends number]
 		? EatWords<T, J, ["for", "ordinality"]> extends never
 			? ParseTypeName<T, J> extends infer X
 				? X extends Ok<infer Ty extends string, infer J2 extends number>

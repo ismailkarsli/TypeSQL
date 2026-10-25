@@ -10,7 +10,7 @@ import type {
 	Toks,
 	WordTok,
 } from "../lexer/tokens.js";
-import type { IsColId, IsColLabel } from "./keywords.js";
+import type { NotColId, TypeFuncNameKeyword } from "./keywords.js";
 
 /**
  * Parser combinator conventions (index-based).
@@ -122,7 +122,8 @@ export type SkipWords<
 // ─── Identifiers ───
 
 /**
- * Identifier usable as a column/table *name* (excludes reserved words): `[name, next]` or `null`.
+ * `ColId`: an identifier, or a keyword usable as a table, column or alias name (not reserved,
+ * not a type/function-name keyword like `left`, `join`, `is`): `[name, next]` or `null`.
  *
  * NOTE: helpers tested with `X extends [infer A, infer B]` must fail with `null`, never
  * with `never`: `never extends [infer A, infer B]` takes the *true* branch.
@@ -131,22 +132,12 @@ export type Ident<T extends Toks, I extends number> =
 	T[I] extends IdTok<infer V>
 		? [V, Nx<I>]
 		: T[I] extends WordTok<infer V>
-			? IsColLabel<V> extends true
-				? [V, Nx<I>]
-				: null
+			? V extends NotColId
+				? null
+				: [V, Nx<I>]
 			: null;
 
-/** Identifier usable as a bare table alias (also excludes `left`, `join`, `is`, ...): `[name, next]` or `null`. */
-export type ColIdIdent<T extends Toks, I extends number> =
-	T[I] extends IdTok<infer V>
-		? [V, Nx<I>]
-		: T[I] extends WordTok<infer V>
-			? IsColId<V> extends true
-				? [V, Nx<I>]
-				: null
-			: null;
-
-/** Any word or quoted identifier (after `AS`, Postgres accepts every keyword): `[name, next]` or `null`. */
+/** `ColLabel`: any word or quoted identifier (after `AS` or `.`, Postgres accepts every keyword): `[name, next]` or `null`. */
 export type AnyLabel<T extends Toks, I extends number> =
 	T[I] extends IdTok<infer V>
 		? [V, Nx<I>]
@@ -160,18 +151,21 @@ export type ExpectIdent<T extends Toks, I extends number> =
 		? Ok<N, J>
 		: Expected<"identifier", T, I>;
 
-/** Qualified name `a`, `a.b`, `a.b.c` → `[parts, next]` (max 3 parts) or `null`. */
+/**
+ * Qualified name `a`, `a.b`, `a.b.c` → `[parts, next]` (max 3 parts) or `null`: a `ColId`, then
+ * labels (`t.from`, `public.select`).
+ */
 export type QualName<T extends Toks, I extends number> =
 	Ident<T, I> extends [infer A extends string, infer I1 extends number]
 		? EatOp<T, I1, "."> extends never
 			? [[A], I1]
-			: Ident<T, EatOp<T, I1, ".">> extends [
+			: AnyLabel<T, EatOp<T, I1, ".">> extends [
 						infer B extends string,
 						infer I2 extends number,
 					]
 				? EatOp<T, I2, "."> extends never
 					? [[A, B], I2]
-					: Ident<T, EatOp<T, I2, ".">> extends [
+					: AnyLabel<T, EatOp<T, I2, ".">> extends [
 								infer C extends string,
 								infer I3 extends number,
 							]
@@ -179,6 +173,17 @@ export type QualName<T extends Toks, I extends number> =
 						: [[A, B], I2]
 				: [[A], I1]
 		: null;
+
+/**
+ * The name of a call at `I` (`func_name`): a qualified name, or a type/function-name keyword
+ * followed by `(` (`left(s, 2)`; `left` alone is no name) → `[parts, next]` or `null`.
+ */
+export type FuncName<T extends Toks, I extends number> =
+	T[I] extends WordTok<infer V extends TypeFuncNameKeyword>
+		? T[Nx<I>] extends OpTok<"(">
+			? [[V], Nx<I>]
+			: null
+		: QualName<T, I>;
 
 /** `(a, b, c)` → `Ok<names, next>` or error. Token `I` must be `(`. */
 export type ParenIdentList<T extends Toks, I extends number> =

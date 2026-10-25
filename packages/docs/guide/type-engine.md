@@ -48,7 +48,7 @@ An entry is used only when its dependencies compare equal (`Same`): mutual assig
 
 ## Pitfalls (each one cost real debugging time)
 
-1. **`never` in `extends [infer A, infer B]` takes the TRUE branch** and binds `A`/`B` to their constraints. Helpers that can fail must return `null` (or an `SqlError`), never `never`. `Ident`, `QualName`, `ColIdIdent`, `ParseJoinKind` return `null`. `EatWord`/`EatOp` return `never` but are only ever tested with `extends never`.
+1. **`never` in `extends [infer A, infer B]` takes the TRUE branch** and binds `A`/`B` to their constraints. Helpers that can fail must return `null` (or an `SqlError`), never `never`. `Ident`, `QualName`, `FuncName`, `ParseJoinKind` return `null`. `EatWord`/`EatOp` return `never` but are only ever tested with `extends never`.
 2. **A union-constrained `infer` in a template literal matches ONE character.** `` S extends `${infer O extends "::" | "->"}${infer R}` `` never matches `::`. Build candidates explicitly (see `LexOp` in the lexer).
 3. **A union in a template-literal delimiter position yields a union of all splits**, not the shortest. Scan words char by char with `${infer C}${infer R}` + `C extends IdChar`.
 4. **Conditional type narrowing does not satisfy structural constraints.** In `B extends { t: "simple" } ? F<B>`, `B` is `B & { t: "simple" }`, which TS will not accept where `SimpleSelect` is required. Use `F<Extract<B, SimpleSelect>>`.

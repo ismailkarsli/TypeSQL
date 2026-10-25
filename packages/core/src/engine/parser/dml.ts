@@ -25,7 +25,6 @@ import type {
 } from "./select.js";
 import type {
 	AnyLabel,
-	ColIdIdent,
 	EatOp,
 	EatWord,
 	EatWords,
@@ -236,7 +235,7 @@ type ParseIndexParams<T extends Toks, I extends number> =
 type SkipOpClass<T extends Toks, I extends number> =
 	T[I] extends WordTok<"nulls">
 		? I
-		: ColIdIdent<T, I> extends [string, infer J]
+		: Ident<T, I> extends [string, infer J]
 			? J
 			: I;
 
@@ -551,7 +550,7 @@ type ParseDmlAlias<T extends Toks, I extends number, Stop extends string> =
 		? Ident<T, Nx<I>> extends [infer A, infer J extends number]
 			? Ok<A, J>
 			: Expected<"alias", T, Nx<I>>
-		: ColIdIdent<T, I> extends [infer A, infer J extends number]
+		: Ident<T, I> extends [infer A, infer J extends number]
 			? A extends Stop
 				? Ok<null, I>
 				: Ok<A, J>
@@ -561,7 +560,7 @@ type ParseDmlAlias<T extends Toks, I extends number, Stop extends string> =
 type ParseDmlWhere<T extends Toks, I extends number> =
 	EatWords<T, I, ["where", "current", "of"]> extends never
 		? ParseWhereOpt<T, I>
-		: ColIdIdent<T, EatWords<T, I, ["where", "current", "of"]>> extends [
+		: Ident<T, EatWords<T, I, ["where", "current", "of"]>> extends [
 					string,
 					infer J extends number,
 				]
@@ -606,7 +605,7 @@ type ParseReturningOpts<
 	T[I] extends WordTok<infer K extends "old" | "new">
 		? EatWord<T, Nx<I>, "as"> extends never
 			? Expected<"AS", T, Nx<I>>
-			: ColIdIdent<T, EatWord<T, Nx<I>, "as">> extends [
+			: Ident<T, EatWord<T, Nx<I>, "as">> extends [
 						infer A extends string,
 						infer J extends number,
 					]

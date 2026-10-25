@@ -5,12 +5,12 @@ import type { ParseAliasChecked } from "./select.js";
 import type { ParseTypeName } from "./typename.js";
 import type {
 	AnyLabel,
-	ColIdIdent,
 	EatOp,
 	EatWord,
 	EatWords,
 	Expected,
 	Fail,
+	Ident,
 	Nx,
 	Ok,
 	SyntaxErrorAt,
@@ -441,7 +441,7 @@ type ParseXmlCols<
 	I extends number,
 	Acc extends readonly unknown[],
 > =
-	ColIdIdent<T, I> extends [infer N extends string, infer J extends number]
+	Ident<T, I> extends [infer N extends string, infer J extends number]
 		? EatWords<T, J, ["for", "ordinality"]> extends never
 			? ParseTypeName<T, J> extends infer X
 				? X extends Ok<infer Ty extends string, infer J2 extends number>

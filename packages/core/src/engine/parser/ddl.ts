@@ -12,7 +12,6 @@ import type { ParseSelectStmt, RefOf } from "./select.js";
 import type { ParseTypeName } from "./typename.js";
 import type {
 	AnyLabel,
-	ColIdIdent,
 	EatOp,
 	EatWord,
 	EatWords,
@@ -627,7 +626,7 @@ type ParseTableTail<
 				: never
 			: EatWords<T, I, ["partition", "by"]> extends infer J extends number
 				? // any word: an unknown strategy is a semantic error in Postgres ("unrecognized partitioning strategy")
-					ColIdIdent<T, J> extends [string, infer J1 extends number]
+					Ident<T, J> extends [string, infer J1 extends number]
 					? T[J1] extends OpTok<"(">
 						? SkipToCloseParen<T, Nx<J1>> extends infer K extends number
 							? ParseTableTail<T, K, Inh>
@@ -720,7 +719,7 @@ type ElementNext<
 /** `[CONSTRAINT name] PRIMARY KEY (cols) ... | UNIQUE ... | CHECK ... | FOREIGN KEY ... | EXCLUDE ...` */
 type ParseTableConstraint<T extends Toks, I extends number> =
 	T[I] extends WordTok<"constraint">
-		? AnyLabel<T, Nx<I>> extends [string, infer J extends number]
+		? Ident<T, Nx<I>> extends [string, infer J extends number]
 			? ParseTableConstraintBody<T, J>
 			: Expected<"constraint name", T, Nx<I>>
 		: ParseTableConstraintBody<T, I>;
@@ -902,7 +901,7 @@ type ParseColConstraints<
 > =
 	T[I] extends WordTok<infer W>
 		? W extends "constraint"
-			? AnyLabel<T, Nx<I>> extends [string, infer J extends number]
+			? Ident<T, Nx<I>> extends [string, infer J extends number]
 				? ParseColConstraints<T, J, TN, Name, Ty, NN, HD, PK, Nul>
 				: Expected<"constraint name", T, Nx<I>>
 			: W extends "not"
@@ -1867,7 +1866,7 @@ type ParseAlterAction<T extends Toks, I extends number, TN extends string> =
 /** After `ADD`: a table constraint or `[COLUMN] [IF NOT EXISTS] column_def`. */
 type ParseAlterAdd<T extends Toks, I extends number, TN extends string> =
 	T[I] extends WordTok<"constraint">
-		? AnyLabel<T, Nx<I>> extends [string, infer J extends number]
+		? Ident<T, Nx<I>> extends [string, infer J extends number]
 			? ParseAddConstraintBody<T, J>
 			: Expected<"constraint name", T, Nx<I>>
 		: T[I] extends WordTok<"primary" | "not">
@@ -1934,10 +1933,10 @@ type ParseAlterRename<T extends Toks, I extends number> =
 			? Ok<{ t: "rename_table"; to: To }, J>
 			: Expected<"new name", T, Nx<I>>
 		: T[I] extends WordTok<"constraint">
-			? AnyLabel<T, Nx<I>> extends [string, infer J extends number]
+			? Ident<T, Nx<I>> extends [string, infer J extends number]
 				? EatWord<T, J, "to"> extends never
 					? Expected<"TO", T, J>
-					: AnyLabel<T, EatWord<T, J, "to">> extends [
+					: Ident<T, EatWord<T, J, "to">> extends [
 								string,
 								infer J2 extends number,
 							]

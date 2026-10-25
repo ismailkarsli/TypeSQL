@@ -1,12 +1,13 @@
 import type { NormalizeTypeName } from "../../schema/normalize.js";
 import type { IdTok, NumTok, OpTok, Toks, WordTok } from "../lexer/tokens.js";
 import type { ParseExprList } from "./expr.js";
+import type { NotTypeFuncName } from "./keywords.js";
 import type {
+	AnyLabel,
 	EatOp,
 	EatWord,
 	EatWords,
 	Expected,
-	Ident,
 	Nx,
 	Nx2,
 	Nx3,
@@ -62,8 +63,10 @@ type ParseBaseType<T extends Toks, I extends number> =
 											? FloatPrecision<T, Nx<I>>
 											: W extends "setof"
 												? ParseBaseType<T, Nx<I>>
-												: W extends ReservedTypeWord
-													? Expected<"type name", T, I>
+												: W extends NotTypeFuncName
+													? W extends ColNameTypeWord
+														? Ok<W, Nx<I>>
+														: Expected<"type name", T, I>
 													: QualifiedTail<T, W, Nx<I>>
 			: Expected<"type name", T, I>;
 
@@ -104,28 +107,28 @@ type SmallFloat<P extends string> = P extends
 	? true
 	: false;
 
-type ReservedTypeWord =
-	| "select"
-	| "from"
-	| "where"
-	| "and"
-	| "or"
-	| "not"
-	| "as"
-	| "null"
-	| "true"
-	| "false"
-	| "case"
-	| "when"
-	| "then"
-	| "else"
-	| "end";
+/**
+ * Column-name keywords that are type names by themselves (`SimpleTypename`); the others
+ * (`between`, `values`, …) are no type name, nor are reserved keywords.
+ */
+type ColNameTypeWord =
+	| "bigint"
+	| "boolean"
+	| "dec"
+	| "decimal"
+	| "int"
+	| "integer"
+	| "json"
+	| "numeric"
+	| "real"
+	| "smallint"
+	| "varchar";
 
 /** `schema.name` → name (drops the qualifier). */
 type QualifiedTail<T extends Toks, First extends string, I extends number> =
 	EatOp<T, I, "."> extends never
 		? Ok<First, I>
-		: Ident<T, EatOp<T, I, ".">> extends [infer N, infer J extends number]
+		: AnyLabel<T, EatOp<T, I, ".">> extends [infer N, infer J extends number]
 			? Ok<N, J>
 			: Expected<"type name", T, EatOp<T, I, ".">>;
 

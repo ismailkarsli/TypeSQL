@@ -14,17 +14,17 @@ import type {
 	ParseWindowSpec,
 } from "./expr.js";
 import type { ParseJsonTable } from "./json.js";
-import type { IsBareLabel } from "./keywords.js";
+import type { NotBareLabel } from "./keywords.js";
 import type { ParseStatement } from "./stmt.js";
 import type { ParseTypeName } from "./typename.js";
 import type {
 	AnyLabel,
-	ColIdIdent,
 	EatOp,
 	EatWord,
 	EatWords,
 	Expected,
 	Fail,
+	FuncName,
 	Ident,
 	Nx,
 	Ok,
@@ -168,17 +168,22 @@ type SkipFetchTail<T extends Toks, I extends number> =
 		? SkipWords<T, I, ["with", "ties"]>
 		: EatWord<T, I, "only">;
 
-/** `FOR UPDATE | NO KEY UPDATE | SHARE | KEY SHARE [OF t, ...] [NOWAIT | SKIP LOCKED]` — repeated. */
+/**
+ * `FOR UPDATE | NO KEY UPDATE | SHARE | KEY SHARE [OF t, ...] [NOWAIT | SKIP LOCKED]` — repeated.
+ * A FOR without a lock strength is left to fail (`SELECT 1 for`).
+ */
 type SkipLocking<T extends Toks, I extends number> =
 	EatWord<T, I, "for"> extends never
 		? I
-		: SkipLocking<
-				T,
-				SkipLockWait<
+		: SkipLockStrength<T, Nx<I>> extends Nx<I>
+			? I
+			: SkipLocking<
 					T,
-					SkipLockOf<T, SkipLockStrength<T, EatWord<T, I, "for">>>
-				>
-			>;
+					SkipLockWait<
+						T,
+						SkipLockOf<T, SkipLockStrength<T, EatWord<T, I, "for">>>
+					>
+				>;
 type SkipLockStrength<T extends Toks, I extends number> =
 	EatWord<T, I, "update" | "share"> extends never
 		? EatWords<T, I, ["no", "key", "update"]> extends never
@@ -326,7 +331,7 @@ type ParseSimpleSelect<T extends Toks, I extends number> =
 		? D extends Ok<infer Distinct, infer I1>
 			? (
 					Distinct extends false
-						? EmptyTargetList<T, I1> extends true
+						? EndsTargetList<T, I1> extends true
 							? Ok<[], I1>
 							: ParseTargetList<T, I1, []>
 						: ParseTargetList<T, I1, []>
@@ -448,8 +453,11 @@ type ParseDistinct<T extends Toks, I extends number> =
 						: never
 		: Ok<false, EatWord<T, I, "all">>;
 
-/** `SELECT FROM t`, `EXISTS (SELECT FROM ...)`: Postgres accepts an empty target list (a zero-column row), but not after DISTINCT. */
-type EmptyTargetList<T extends Toks, I extends number> =
+/**
+ * Whether the token at `I` ends a target list. Right after SELECT it is an empty one: `SELECT FROM
+ * t`, `EXISTS (SELECT FROM ...)` (a zero-column row; not after DISTINCT).
+ */
+export type EndsTargetList<T extends Toks, I extends number> =
 	T[I] extends WordTok<
 		| "from"
 		| "into"
@@ -480,7 +488,7 @@ export type ParseTargetList<
 	I extends number,
 	Acc extends readonly unknown[],
 > =
-	ParseExpr<T, I, 0> extends infer X
+	ParseExpr<T, I, "target"> extends infer X
 		? X extends Ok<infer E, infer J extends number>
 			? ParseTargetAlias<T, J> extends [infer A, infer J2 extends number]
 				? EatOp<T, J2, ","> extends never
@@ -492,7 +500,7 @@ export type ParseTargetList<
 
 /**
  * `[AS] alias` → `[alias | null, next]`, or an error for `AS` without a label. After AS any
- * keyword is accepted; bare aliases exclude `NotBareLabel` words.
+ * keyword is accepted; a bare alias is any keyword but the `NotBareLabel` ones.
  */
 type ParseTargetAlias<T extends Toks, I extends number> =
 	T[I] extends WordTok<"as">
@@ -505,9 +513,9 @@ type ParseTargetAlias<T extends Toks, I extends number> =
 		: T[I] extends IdTok<infer V>
 			? [V, Nx<I>]
 			: T[I] extends WordTok<infer V>
-				? IsBareLabel<V> extends true
-					? [V, Nx<I>]
-					: [null, I]
+				? V extends NotBareLabel
+					? [null, I]
+					: [V, Nx<I>]
 				: [null, I];
 
 // ───────────────────────────── FROM ─────────────────────────────
@@ -602,7 +610,7 @@ type ParseNamedFromItem<
 	I extends number,
 	Lateral extends boolean,
 > =
-	QualName<T, I> extends [
+	FuncName<T, I> extends [
 		infer Parts extends readonly string[],
 		infer J extends number,
 	]
@@ -705,7 +713,7 @@ type WindowlessError<T extends Toks, K extends number> = T[Nx<K>] extends
 
 /** After `TABLESAMPLE`: `method (args) [REPEATABLE (seed)]`. */
 type ParseTableSample<T extends Toks, Tbl, I extends number> =
-	QualName<T, I> extends [
+	FuncName<T, I> extends [
 		infer M extends readonly string[],
 		infer J extends number,
 	]
@@ -791,7 +799,7 @@ type ParseRowsFromItems<
 	I extends number,
 	Acc extends readonly unknown[],
 > =
-	QualName<T, I> extends [unknown, infer J extends number]
+	FuncName<T, I> extends [unknown, infer J extends number]
 		? T[J] extends OpTok<"(">
 			? ParseFromCall<T, I, J> extends infer X
 				? X extends Ok<infer Call, infer J2 extends number>
@@ -991,19 +999,16 @@ type ParseColDefs<
  */
 export type ParseAlias<T extends Toks, I extends number> =
 	T[I] extends WordTok<"as">
-		? ColIdIdent<T, Nx<I>> extends [
-				infer A extends string,
-				infer J extends number,
-			]
+		? Ident<T, Nx<I>> extends [infer A extends string, infer J extends number]
 			? ParseColAliases<T, A, J>
 			: [null, null, I]
-		: ColIdIdent<T, I> extends [infer A extends string, infer J extends number]
+		: Ident<T, I> extends [infer A extends string, infer J extends number]
 			? ParseColAliases<T, A, J>
 			: [null, null, I];
 /** `ParseAlias`, but `AS` followed by something that cannot be a table alias (`AS order`) is a syntax error there. */
 export type ParseAliasChecked<T extends Toks, I extends number> =
 	T[I] extends WordTok<"as">
-		? ColIdIdent<T, Nx<I>> extends [string, number]
+		? Ident<T, Nx<I>> extends [string, number]
 			? ParseAlias<T, I>
 			: SyntaxErrorAt<T, Nx<I>>
 		: ParseAlias<T, I>;
@@ -1241,7 +1246,7 @@ type ParseWindowDefs<
 	I extends number,
 	Acc extends readonly unknown[],
 > =
-	ColIdIdent<T, I> extends [infer Name extends string, infer J extends number]
+	Ident<T, I> extends [infer Name, infer J extends number]
 		? EatWord<T, J, "as"> extends never
 			? Expected<"AS", T, J>
 			: EatOp<T, EatWord<T, J, "as">, "("> extends never
@@ -1422,7 +1427,7 @@ type ParseCteCycle<T extends Toks, I extends number> =
 type ParseCycleUsing<T extends Toks, I extends number, Cols, Mark, To, Def> =
 	EatWord<T, I, "using"> extends never
 		? Expected<"USING", T, I>
-		: ColIdIdent<T, EatWord<T, I, "using">> extends [
+		: Ident<T, EatWord<T, I, "using">> extends [
 					infer P extends string,
 					infer J extends number,
 				]
@@ -1440,7 +1445,7 @@ type ParseCycleConst<T extends Toks, I extends number> =
 type ParseSetCol<T extends Toks, I extends number> =
 	EatWord<T, I, "set"> extends never
 		? Expected<"SET", T, I>
-		: ColIdIdent<T, EatWord<T, I, "set">> extends [
+		: Ident<T, EatWord<T, I, "set">> extends [
 					infer N extends string,
 					infer J extends number,
 				]
@@ -1452,7 +1457,7 @@ type ParseColIdList<
 	I extends number,
 	Acc extends readonly string[],
 > =
-	ColIdIdent<T, I> extends [infer N extends string, infer J extends number]
+	Ident<T, I> extends [infer N extends string, infer J extends number]
 		? EatOp<T, J, ","> extends never
 			? Ok<[...Acc, N], J>
 			: ParseColIdList<T, EatOp<T, J, ",">, [...Acc, N]>
