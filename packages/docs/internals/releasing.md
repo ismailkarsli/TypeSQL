@@ -104,9 +104,9 @@ GitHub issues to the `publish` job (hence `id-token: write`) instead of an npm t
 is no npm token in the repository secrets, and npm attaches a
 [provenance](https://docs.npmjs.com/generating-provenance-statements) statement to every version
 because the repository is public. npm trusts one workflow per package: the file
-`release.yml` in `ismailkarsli/typesql`, running in the GitHub environment `npm`, which only
-deploys from `main`. The workflow file name is part of that trust: renaming `release.yml` means
-configuring every package again.
+`release.yml` in `ismailkarsli/TypeSQL` (npm compares the name case-sensitively), running in
+the GitHub environment `npm`, which only deploys from `main`. The workflow file name is part of
+that trust: renaming `release.yml` means configuring every package again.
 
 Setup, done once for this repository:
 
@@ -115,7 +115,7 @@ Setup, done once for this repository:
 
    ```sh
    for p in core pg postgres kysely drizzle prisma language-server; do
-     npm trust github @typesql/$p --file release.yml --repo ismailkarsli/typesql --env npm --allow-publish --yes
+     npm trust github @typesql/$p --file release.yml --repo ismailkarsli/TypeSQL --env npm --allow-publish --allow-stage-publish --yes
      sleep 2
    done
    npm trust list @typesql/core
