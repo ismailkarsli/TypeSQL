@@ -15,7 +15,15 @@ const runtimeOnly = { typecheck: { enabled: false } };
 export default defineConfig({
 	test: {
 		projects: [
-			...["core", "pg", "postgres", "kysely", "drizzle", "prisma"].map((p) => ({
+			...[
+				"core",
+				"pg",
+				"postgres",
+				"kysely",
+				"drizzle",
+				"prisma",
+				"language-server",
+			].map((p) => ({
 				extends: `./packages/${p}/vitest.config.ts`,
 				root: `./packages/${p}`,
 				test: runtimeOnly,
