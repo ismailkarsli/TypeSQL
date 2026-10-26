@@ -45,6 +45,7 @@ import {
 	type CARRIED,
 	type Executor,
 	type Fragment,
+	isSlottable,
 	makeFragment,
 	makeQuery,
 	type Query,
@@ -754,14 +755,10 @@ export interface Sql<DB, TM, Keys extends RowKeys = "preserve"> {
 
 function isSlotMap(v: unknown): v is SlotMap {
 	if (v === null || typeof v !== "object" || Array.isArray(v)) return false;
-	for (const x of Object.values(v as Record<string, unknown>)) {
-		if (
-			x === null ||
-			typeof x !== "object" ||
-			typeof (x as Spliceable).text !== "string" ||
-			!Array.isArray((x as Spliceable).values)
-		)
-			return false;
+	const values = Object.values(v as Record<string, unknown>);
+	if (values.length === 0) return false;
+	for (const x of values) {
+		if (!isSlottable(x)) return false;
 	}
 	return true;
 }

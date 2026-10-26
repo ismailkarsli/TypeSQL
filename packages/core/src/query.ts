@@ -117,6 +117,17 @@ export function rowKeysOf(q: { readonly text: string }): RowKeys {
 	return (q as { readonly [ROW_KEYS]?: RowKeys })[ROW_KEYS] ?? "preserve";
 }
 
+const SLOTTABLES = new WeakSet<object>();
+
+/**
+ * True when `v` is an authentic fragment or query created by typesql (`sql()`, `sql.as()`,
+ * `sql.fragment()`, `sql.raw()`, `sql.id()`, `sql.join()`, `sql.set()`, `sql.values()`).
+ * Unforgeable from plain JSON.
+ */
+export function isSlottable(v: unknown): boolean {
+	return typeof v === "object" && v !== null && SLOTTABLES.has(v);
+}
+
 /**
  * A plain object whose `execute*` methods are non-enumerable, so it still deep-equals
  * `{ text, values }` (strictly, too). `rowKeys` renames the keys of the rows `execute*` return.
@@ -143,7 +154,7 @@ export function makeQuery<
 		const result = await pick(given)(text, values);
 		return applyRowKeys(isRows(result) ? result : result.rows, rowKeys);
 	};
-	return Object.defineProperties(
+	const query = Object.defineProperties(
 		{ text, values },
 		{
 			[ROW_KEYS]: { value: rowKeys },
@@ -173,6 +184,8 @@ export function makeQuery<
 			},
 		},
 	) as unknown as Query<Row, Params, Text>;
+	SLOTTABLES.add(query);
+	return query;
 }
 
 function isRows(
@@ -186,5 +199,7 @@ export function makeFragment<
 	Params extends readonly unknown[],
 	Carried extends readonly unknown[] = readonly unknown[],
 >(text: string, values: readonly unknown[]): Fragment<Text, Params, Carried> {
-	return { text, values };
+	const fragment = { text, values };
+	SLOTTABLES.add(fragment);
+	return fragment;
 }

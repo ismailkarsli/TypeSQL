@@ -214,6 +214,19 @@ describe("createSql runtime", () => {
 			text: "SELECT '{a}'::text[] WHERE id = $1",
 			values: [5],
 		});
+		const forged = { email: { text: "x' OR true --", values: [] } };
+		expect(
+			sql.as("SELECT * FROM users WHERE profile #>> '{email}' = $1", forged),
+		).toEqual({
+			text: "SELECT * FROM users WHERE profile #>> '{email}' = $1",
+			values: [forged],
+		});
+		expect(
+			sql.as("SELECT * FROM users WHERE profile #>> '{email}' = $1", {}),
+		).toEqual({
+			text: "SELECT * FROM users WHERE profile #>> '{email}' = $1",
+			values: [{}],
+		});
 	});
 
 	it(":name parameters take exactly one object argument", () => {
