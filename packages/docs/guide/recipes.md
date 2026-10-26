@@ -16,6 +16,8 @@ Map each allowed choice to a fragment. The statement is checked once for each ch
 
 <<< @/snippets/recipes.ts#sort
 
+Mapping user choices through an allowlist dictionary or validating sort keys with a strict enum schema guarantees that users cannot choose sensitive columns (such as `password_hash` or internal tokens) or supply invalid column names that would trigger database errors.
+
 To sort by several user-picked keys, use [`sql.join` over an array](./dynamic-sql#lists-from-runtime-arrays).
 
 ## Nested results in one query
@@ -33,6 +35,10 @@ Inside JSON, `int8` is a `number`, because that is how Postgres writes it. See [
 <<< @/snippets/recipes.ts#patch
 
 `sql.set` throws when no key is defined. Check for an empty body first. See [Partial updates](./writing-data#partial-updates-sql-set).
+
+::: warning Mass assignment
+At runtime, `sql.set` writes every key present on the input object. When taking updates from an untrusted request body (such as `req.body`), validate the input using a schema validation library with strict parsing enabled (e.g. Zod's `.strict()` or Valibot's `v.strictObject()`) to actively reject unexpected properties like `is_admin`, or pick allowed fields explicitly.
+:::
 
 ## Bulk insert
 

@@ -37,6 +37,14 @@ Both keep their text as a literal type, so the statement is still fully typed:
 
 <<< @/snippets/fragments.ts#helpers
 
+::: warning Allowlisting identifier inputs
+`sql.id(…)` double-quotes strings to prevent SQL syntax injection, but does not perform application-level authorization or column filtering. Passing untrusted user input directly to `sql.id()` allows callers to specify sensitive columns (such as `password_hash` in an `ORDER BY` or `SELECT`) or query internal tables. Always validate dynamic identifier names against an allowlist before passing them to `sql.id()`.
+:::
+
+::: danger Dynamic join separators
+The `separator` argument in `sql.join()` is inserted into the query as **raw SQL text**. Never pass untrusted user input as the separator. Use constant delimiters such as `", "`, `" AND "`, or `" OR "`.
+:::
+
 ### A name from a union
 
 If the name's type is a union of literals, the fragment's text is a union too. The statement is checked once for each member, and the row type is the union of their rows:

@@ -79,8 +79,8 @@ const q = sql("SELECT u.id FROM users u {where}", { where });
 
 - Only `{identifier}` is a slot. Braces inside string literals are left alone.
 - A fragment's `$n` are renumbered after the outer parameters, and its values are checked once spliced. Whole queries can be spliced too.
-- `sql.id` over a union of names is checked once per member; the row type is the union. A generic name constrained to `RelationName<DB>` is widened to every table and view. Any other non-literal name is dynamic.
-- `sql.join` over an array checks the statement once, with each distinct element once ([Lists from runtime arrays](../guide/dynamic-sql#lists-from-runtime-arrays)).
+- `sql.id` over a union of names is checked once per member; the row type is the union. A generic name constrained to `RelationName<DB>` is widened to every table and view. Any other non-literal name is dynamic. Quoting prevents SQL syntax injection, but does not enforce authorization: dynamic names derived from untrusted user input must come from an explicit allowlist (e.g. to prevent selecting or sorting by sensitive fields like `password_hash`).
+- `sql.join` over an array checks the statement once, with each distinct element once ([Lists from runtime arrays](../guide/dynamic-sql#lists-from-runtime-arrays)). The `separator` parameter is raw SQL text: never pass untrusted user input as the separator.
 - A dynamic fragment is rejected by `sql()`. Use `sql.as<Row>()`.
 
 See [Dynamic SQL](../guide/dynamic-sql).
@@ -92,7 +92,7 @@ See [Dynamic SQL](../guide/dynamic-sql).
 | `sql.set(table, values)` | `"a" = $1, "b" = $2` for the defined values; throws when none is defined | `SetInput<DB, TM, table>` |
 | `sql.values(table, rows)` | `("a", "b") VALUES ($1, $2), ($3, DEFAULT)`; throws on an empty array | `InsertInput<DB, TM, table>` |
 
-`table` is a `TableName<DB>`: a top-level table, or `"schema.table"`. JSON columns take `sql.json(value)` or a raw non-array value. See [Inserting and updating](../guide/writing-data).
+`table` is a `TableName<DB>`: a top-level table, or `"schema.table"`. It is used only for compile-time type checking. At runtime, every enumerable key on `values` or row objects becomes a column assignment or insert value. When handling untrusted inputs (such as `req.body`), pick allowed fields explicitly to prevent mass assignment. JSON columns take `sql.json(value)` or a raw non-array value. See [Inserting and updating](../guide/writing-data).
 
 ## `sql.as<Row>(text, ...params)`
 

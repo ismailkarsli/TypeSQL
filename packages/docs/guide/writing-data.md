@@ -57,6 +57,14 @@ Narrow the value first, or pass `maybeEmail ?? null` to send `NULL`. `sql.fragme
 If no value is defined at runtime, `sql.set` throws, because Postgres needs at least one assignment. Skip the `UPDATE` (or `SELECT` the row) when the input is empty.
 :::
 
+::: warning Mass assignment protection
+The `table` argument is used only at compile time by TypeScript to verify known columns and value types. TypeSQL carries no schema metadata at runtime; `sql.set` iterates over all enumerable properties of `values` and converts each key into a column assignment.
+
+If `values` comes from an untrusted source (such as `req.body`) and is typed as `any` or retains excess properties, every property on the object—including sensitive fields like `is_admin`, `role`, or `password_hash`—will be written to the database.
+
+When accepting user input, validate payloads using a schema validation library with strict parsing enabled (such as Zod's `.strict()` or Valibot's `v.strictObject()`) to actively reject unexpected properties at the request boundary, or explicitly pick permitted fields via destructuring.
+:::
+
 ## Bulk inserts: `sql.values`
 
 `sql.values(table, rows)` builds the column list and the `VALUES` rows from an array of objects:
@@ -68,6 +76,10 @@ If no value is defined at runtime, `sql.set` throws, because Postgres needs at l
 - A single row with no values becomes `DEFAULT VALUES`. An empty array throws, and so do several rows with no values.
 
 The table name is only used for typing. Write tables in other schemas as `"schema.table"`: `sql.values("auth.sessions", rows)`.
+
+::: warning Mass assignment in bulk inserts
+Like `sql.set`, `sql.values` checks column types at compile time, but at runtime it reflects every key present across all row objects into the `INSERT` column list. If row objects contain unvalidated user input, unexpected columns will be inserted. Validate input rows using a strict schema parser or explicitly pick allowed properties before passing objects to `sql.values`.
+:::
 
 ### JSON columns
 

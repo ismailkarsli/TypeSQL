@@ -160,7 +160,13 @@ sql.id(...parts: [string, ...string[]]): Fragment
 
 Creates a safely quoted PostgreSQL identifier fragment. Each argument is quoted in double quotes and joined by periods (`"part1"."part2"`).
 
-Use `sql.id` to safely parameterize table names, column names, or schema-qualified relations without risking SQL injection.
+::: warning Identifier allowlisting
+`sql.id()` prevents SQL syntax injection by double-quoting identifiers and escaping embedded quotes. However, it does **not** restrict which columns or tables can be accessed.
+
+Passing untrusted user input directly to `sql.id()` allows callers to specify any column or table name. In an `ORDER BY` or `SELECT` clause, an attacker could supply sensitive column names (such as `password_hash`, `ssn`, or private tokens) to exfiltrate values or infer them through sorting order. Supplying non-existent column names will also cause PostgreSQL to throw an error (`undefined_column`), aborting transactions.
+
+Always validate dynamic identifier names against an explicit allowlist or a strict schema enum before calling `sql.id()`.
+:::
 
 ### Parameters
 
@@ -188,10 +194,14 @@ Joins an array or tuple of fragments or subqueries with a delimiter into a singl
 - When given a tuple (`[a, b]`), literal SQL text is preserved.
 - When given a dynamic runtime array (`Slottable[]`), TypeSQL validates a representative statement where each distinct element type is checked once. This keeps dynamic clauses (like dynamic `ORDER BY`, `AND` filters, or `IN (...)` lists) fully type-safe.
 
+::: danger Caution: SQL Injection
+The `separator` argument is concatenated directly into the statement as **raw SQL text**. Never pass untrusted user input as the separator. Use constant SQL delimiters such as `", "`, `" AND "`, `" OR "`, or `"\n"`.
+:::
+
 ### Parameters
 
 - `items` (`readonly Slottable[]`): A non-empty array or tuple of fragments (`Fragment`) or subqueries (`Query`). Throws at runtime if empty.
-- `separator` (`string`, *optional*): The delimiter string placed between elements. Defaults to `", "`.
+- `separator` (`string`, *optional*): The delimiter string placed between elements. Defaults to `", "`. Must be a trusted SQL delimiter.
 
 ### Example
 
@@ -210,6 +220,14 @@ sql.set<T>(table: T, values: SetInput<DB, TM, T>): Fragment
 Generates a type-checked `SET "col1" = $1, "col2" = $2` fragment for `UPDATE` statements from a JavaScript object.
 
 Keys must match column names of `table`, and values must match their corresponding column types. Properties with `undefined` values are automatically omitted, allowing partial updates without manually constructing dynamic SQL.
+
+::: warning Mass assignment protection
+The `table` argument is used for compile-time type checking. At runtime, TypeSQL does not retain schema metadata; `sql.set` iterates every enumerable property on `values` and emits a column assignment for it.
+
+If `values` comes from an untrusted source (such as `req.body`) and is typed as `any` or contains unstripped properties, unexpected fields (such as `is_admin` or `role`) will be written to the database.
+
+**Best practice**: Validate request payloads using a schema validation library with strict parsing enabled (e.g. Zod's `z.object(...).strict()` or Valibot's `v.strictObject(...)`) to actively reject unexpected properties at the API boundary, or explicitly pick permitted fields via destructuring.
+:::
 
 ### Parameters
 
@@ -233,6 +251,10 @@ sql.values<T>(table: T, rows: readonly InsertInput<DB, TM, T>[]): Fragment
 Generates a type-checked column list and multi-row `("col1", "col2") VALUES ($1, $2), ($3, DEFAULT)` fragment for bulk `INSERT` statements from an array of objects.
 
 NOT NULL columns without defaults are required on every row. Optional or defaultable columns that are missing or set to `undefined` emit `DEFAULT`.
+
+::: warning Mass assignment in bulk inserts
+The `table` argument is checked at compile time. At runtime, `sql.values` collects every key present across all row objects into the `INSERT` column list. If row objects contain unvalidated user input, unexpected columns will be inserted. Validate input rows using a strict schema parser (e.g. `z.array(RowSchema.strict())`) or explicitly pick allowed properties to prevent inserting unauthorized columns.
+:::
 
 ### Parameters
 
@@ -258,7 +280,7 @@ Creates an untyped, unsanitized SQL text fragment.
 Because raw fragments bypass compile-time syntax and schema analysis, queries containing them cannot be inferred and must use [`sql.as<Row>()`](#sql-as-row-query-params).
 
 ::: danger Caution: SQL Injection
-Never pass untrusted user input to `sql.raw()`. Use `$n`, `:name`, `${sql.param()}`, or `sql.id()` instead.
+Never pass untrusted user input to `sql.raw()`. Use `$n`, `:name`, or `${sql.param()}` for values. For identifiers like column or table names, validate user input against an explicit allowlist before passing to `sql.id()`.
 :::
 
 ### Parameters
