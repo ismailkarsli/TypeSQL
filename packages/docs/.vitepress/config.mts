@@ -45,6 +45,7 @@ export default defineConfig({
 			{
 				text: "Writing queries",
 				items: [
+					{ text: "API surface", link: "/guide/api-surface" },
 					{ text: "Selecting data", link: "/guide/queries" },
 					{ text: "Parameters", link: "/guide/parameters" },
 					{ text: "Inserting and updating", link: "/guide/writing-data" },
