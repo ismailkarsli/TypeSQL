@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createSql } from "../../src/index.js";
+import { isSlottable } from "../../src/query.js";
 import {
 	joinFragments,
 	maxParam,
@@ -227,6 +228,17 @@ describe("createSql runtime", () => {
 			text: "SELECT * FROM users WHERE profile #>> '{email}' = $1",
 			values: [{}],
 		});
+		const authenticQuery = sql.as("SELECT 1 AS x");
+		expect(isSlottable(authenticQuery)).toBe(true);
+		expect(
+			sql.as("SELECT * FROM ({sub}) AS t", { sub: authenticQuery }),
+		).toEqual({
+			text: "SELECT * FROM (SELECT 1 AS x) AS t",
+			values: [],
+		});
+		expect(isSlottable(forged.email)).toBe(false);
+		expect(isSlottable(null)).toBe(false);
+		expect(isSlottable({})).toBe(false);
 	});
 
 	it(":name parameters take exactly one object argument", () => {
