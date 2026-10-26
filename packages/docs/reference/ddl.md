@@ -14,75 +14,22 @@ The DDL statements TypeSQL understands, how their columns are typed, the errors 
 
 ## Supported statements
 
-Statements with a schema effect are parsed completely, including their trailing clauses. Syntax TypeSQL does not know is an error, not silently ignored.
+These statements change the schema type. They are parsed completely, so syntax TypeSQL does not know is an error, not silently ignored.
 
-### Tables
-
-| Statement | Effect |
+| Object | Statements |
 |---|---|
-| `CREATE [TEMP \| UNLOGGED] TABLE [IF NOT EXISTS] [schema.]name (...)` | column definitions, table constraints (`PRIMARY KEY (..., c WITHOUT OVERLAPS)`, `NOT NULL c`), `LIKE src [INCLUDING ... \| EXCLUDING ...]`; trailing `INHERITS (...)`, `PARTITION BY ...`, `USING`, `WITH (...)`, `ON COMMIT`, `TABLESPACE`, in this order |
-| `CREATE TABLE name PARTITION OF parent FOR VALUES ... \| DEFAULT` | the parent's columns |
-| `CREATE TABLE [IF NOT EXISTS] name [(cols)] AS query [WITH [NO] DATA]` | columns from the query |
-| `CREATE TABLE name AS EXECUTE stmt(...)` | parses, but is rejected: the prepared statement's columns are unknown |
-| `CREATE TABLE name OF type [(c WITH OPTIONS ..., ...)]` | parses, but is rejected: the columns of composite types are not tracked |
-| `SELECT ... INTO new_table` | creates the table like `CREATE TABLE new_table AS SELECT ...` |
-| `ALTER TABLE [IF EXISTS] [ONLY] name action, ...` | see the actions below |
-| `ALTER TABLE name RENAME [COLUMN] a TO b`, `RENAME TO new`, `SET SCHEMA s` | standalone, as in Postgres (cannot be combined with other actions) |
-| `DROP TABLE [IF EXISTS] a, b [CASCADE \| RESTRICT]` | |
+| Tables | `CREATE TABLE` (with `LIKE`, `INHERITS`, `PARTITION OF` or `AS query`), `SELECT … INTO`, `ALTER TABLE`, `DROP TABLE` |
+| Views | `CREATE [MATERIALIZED] VIEW` (also `RECURSIVE`), `ALTER [MATERIALIZED] VIEW`, `DROP [MATERIALIZED] VIEW` |
+| Enums | `CREATE TYPE … AS ENUM`, `ALTER TYPE` (`ADD VALUE`, `RENAME VALUE`, `RENAME TO`), `DROP TYPE` |
+| Schemas | `CREATE SCHEMA` (also with embedded `CREATE TABLE` / `CREATE VIEW`), `ALTER SCHEMA … RENAME TO`, `DROP SCHEMA` |
+| Functions | `CREATE FUNCTION`: its return type goes into `$functions` (`record` for `RETURNS TABLE`); arguments are not checked |
 
-`ALTER TABLE` actions with a schema effect:
-
-- `ADD [COLUMN] [IF NOT EXISTS]`
-- `DROP [COLUMN] [IF EXISTS] ... [CASCADE]`
-- `ALTER [COLUMN] c [SET DATA] TYPE t [USING e]`
-- `SET NOT NULL`, `DROP NOT NULL`
-- `SET DEFAULT`, `DROP DEFAULT`
-- `ADD GENERATED ... AS IDENTITY`, `DROP IDENTITY`, `DROP EXPRESSION`
-- `ADD [CONSTRAINT n] PRIMARY KEY (cols)`
-- `ADD [CONSTRAINT n] NOT NULL c` (no effect with `NOT VALID`)
-
-Other actions (constraints, triggers, row-level security, owner, storage, ...) have no schema effect.
-
-### Views
-
-| Statement | Effect |
-|---|---|
-| `CREATE [OR REPLACE] [TEMP] VIEW name [(cols)] [WITH (...)] AS query [WITH CHECK OPTION]` | a read-only relation |
-| `CREATE [OR REPLACE] [TEMP] RECURSIVE VIEW name (cols) AS query` | as in Postgres: `CREATE VIEW name AS WITH RECURSIVE name (cols) AS (query) SELECT cols FROM name` |
-| `CREATE MATERIALIZED VIEW [IF NOT EXISTS] name [(cols)] ... AS query [WITH [NO] DATA]` | a read-only relation |
-| `ALTER VIEW`, `ALTER MATERIALIZED VIEW` | the `ALTER TABLE` grammar; views accept renames and defaults only |
-| `DROP [MATERIALIZED] VIEW [IF EXISTS] a, b [CASCADE]` | |
-
-### Types, schemas and functions
-
-| Statement | Effect |
-|---|---|
-| `CREATE TYPE name AS ENUM ('a', ...)` | `$types[name]` |
-| `ALTER TYPE name ADD VALUE [IF NOT EXISTS] 'v' [BEFORE \| AFTER 'w']`, `RENAME VALUE 'a' TO 'b'`, `RENAME TO new` | renaming the type also retypes every column that uses it |
-| `DROP TYPE [IF EXISTS] a, b [CASCADE]` | `CASCADE` drops the columns (and views) that use the type |
-| `CREATE SCHEMA [IF NOT EXISTS] name [AUTHORIZATION role]`, `CREATE SCHEMA AUTHORIZATION role` | an empty nested schema |
-| `CREATE SCHEMA name [AUTHORIZATION role] CREATE TABLE ... CREATE VIEW ... CREATE INDEX ... CREATE SEQUENCE ... CREATE TRIGGER ... GRANT ...` | the schema with its tables and views; as in Postgres, tables are created before views, and unqualified names in the elements find the new schema's relations first |
-| `ALTER SCHEMA name RENAME TO new` | |
-| `DROP SCHEMA [IF EXISTS] a, b [CASCADE]` | |
-| `CREATE [OR REPLACE] FUNCTION name(…) RETURNS [SETOF] type`, `RETURNS TABLE (…)` | `$functions[name]` with the return type (`record` for `TABLE`); arguments are not checked |
-
-### Queries
-
-`SELECT`, `INSERT`, `UPDATE`, `DELETE` (seed data) and `DECLARE name CURSOR FOR query` are checked against the schema at that point. They have no schema effect.
-
-### Statements without a schema effect
-
-These are accepted and skipped to the next `;`:
-
-- `CREATE / ALTER / DROP INDEX`, `SEQUENCE`
-- `ALTER / DROP FUNCTION`, `PROCEDURE` (`$$` bodies and `BEGIN ATOMIC ... END` bodies included)
-- `TRIGGER`, `EXTENSION`, `POLICY`, `DOMAIN`, `RULE`, composite and range types
-- `COMMENT ON`, `GRANT`, `REVOKE`, `TRUNCATE`
-- `BEGIN` / `COMMIT` / `ROLLBACK` / `END` / `ABORT`, `SET`, `DO`
-- `ANALYZE`, `VACUUM`, `REFRESH MATERIALIZED VIEW`, `REASSIGN OWNED`, `ALTER TABLE ALL IN TABLESPACE`
-- the other utility statements
-
-`FETCH`, `MOVE` and `CLOSE` are parsed and have no schema effect either.
+- `ALTER TABLE` changes the schema when it renames the table or moves it to another schema, adds, drops, renames or retypes a column, sets or drops `NOT NULL`, a default, an identity or a generation expression, or adds a primary key or a `NOT NULL` constraint. Its other actions are accepted without a schema effect.
+- `ALTER TABLE` sub-commands run in Postgres's passes, not left to right, so `DROP COLUMN x, ADD COLUMN x int` works and `ADD COLUMN x int, DROP COLUMN x` is an error.
+- Renaming an enum type retypes every column that uses it. `DROP TYPE … CASCADE` drops those columns and the views that use them.
+- `CREATE TABLE … OF type` and `CREATE TABLE … AS EXECUTE` parse, but are rejected: their columns are unknown.
+- `SELECT`, `INSERT`, `UPDATE`, `DELETE` (seed data) and `DECLARE … CURSOR` are checked against the schema at that point, without a schema effect.
+- Every other statement (indexes, sequences, triggers, extensions, grants, `$$` function bodies, transaction control, …) is accepted and skipped to the next `;`.
 
 ## How columns map to `Col` / `Nullable` / `Generated`
 
@@ -114,18 +61,6 @@ These follow Postgres (verified against Postgres 17):
 - `CREATE TABLE AS` keeps names and types only: every column is nullable, without a default.
 - Views keep the nullability the query infers (`count(*)` is `Col<"int8">`). This is more precise than Postgres's catalog, which reports every view column as nullable.
 - A column-name list (`CREATE VIEW v (a, b) AS ...`) renames columns by position. Extra query columns keep their names.
-
-### `ALTER TABLE` order
-
-`ALTER TABLE` sub-commands run in Postgres's passes, not left to right:
-
-1. drops
-2. `ALTER TYPE`
-3. `ADD COLUMN`
-4. `SET NOT NULL`, identity, primary key
-5. `SET DEFAULT`
-
-So `DROP COLUMN x, ADD COLUMN x int` works, and `ADD COLUMN x int, DROP COLUMN x` is `column "x" of relation "t" does not exist`, as in Postgres.
 
 ## Views, enums and schemas
 

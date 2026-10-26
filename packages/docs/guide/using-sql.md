@@ -220,7 +220,7 @@ Keys must match column names of `table`, and values must match their correspondi
 
 <<< @/snippets/using-sql.ts#sql-set
 
-See [Updating with sql.set](./writing-data#updating-with-sql-set).
+See [Updating with sql.set](./writing-data#partial-updates-sql-set).
 
 ---
 
@@ -243,7 +243,7 @@ NOT NULL columns without defaults are required on every row. Optional or default
 
 <<< @/snippets/using-sql.ts#sql-values
 
-See [Bulk insert with sql.values](./writing-data#bulk-insert-with-sql-values).
+See [Bulk insert with sql.values](./writing-data#bulk-inserts-sql-values).
 
 ---
 

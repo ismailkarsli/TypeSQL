@@ -13,7 +13,7 @@ TypeSQL is written in TypeScript's type system. When you call `sql("…")` with 
 - **Row types.** Column names and types follow Postgres, including nullability from outer joins, aggregates, `COALESCE` and `WHERE … IS NOT NULL`.
 - **Parameter types.** `$1`, `:name` and inline `${sql.param(value)}` each take their type from where they are used.
 - **Compile errors.** An unknown column, a missing `NOT NULL` value or a syntax error shows up on the string, worded like the Postgres error.
-- **The whole statement language.** From joins and CTEs to `MERGE` and SQL/JSON. See [Supported SQL](../reference/sql).
+- **The whole statement language.** From joins and CTEs to `MERGE` and SQL/JSON. See [Postgres compatibility](./postgres-compatibility).
 - **A thin runtime.** `@typesql/core` has no dependencies. Adapters run queries on node-postgres, postgres.js, Kysely, Drizzle or Prisma.
 - **Editor support.** The optional editor support for [VS Code](./vscode) and [Neovim](./neovim) completes table and column names and highlights the SQL.
 

@@ -1,77 +1,29 @@
 # Inserting and updating
 
-`INSERT`, `UPDATE`, `DELETE` and `MERGE` are checked against your schema like queries. This page shows each one, plus helpers for optional values, partial updates and bulk inserts.
-
-With `RETURNING`, a statement has a row type. Without it, the row type is `never`, and the adapters' `execute()` returns the number of affected rows.
-
-## INSERT
-
-Each value takes the column's type, with `| null` for nullable columns:
+`INSERT`, `UPDATE`, `DELETE` and `MERGE` are checked against your schema like queries, and parameters take the types of the columns they are assigned to. This page covers what is checked, plus helpers for optional values, partial updates and bulk inserts.
 
 <<< @/snippets/writing-data.ts#insert
 
-Every `NOT NULL` column without a default must be listed:
-
-```ts
-sql("INSERT INTO users (display_name) VALUES ($1)", "Ada");
-// … SqlError<"null value in column \"email\" of relation \"users\" violates not-null constraint", 2>
-```
-
-Multi-row `VALUES`, `DEFAULT VALUES` and `INSERT … SELECT` work too; see [Supported SQL](../reference/sql#insert-update-delete-and-merge). `DEFAULT` is only allowed as a whole `VALUES` item or `SET` value, and not for a `NOT NULL` column without a default, because it would store `NULL`.
-
-## UPDATE
-
-`SET` columns must exist, and their values take the column types. `UPDATE … FROM` joins more tables, and `RETURNING` can use all of them:
+With `RETURNING`, a statement has a row type. Without it, the row type is `never`, and the adapters' `execute()` returns the number of affected rows:
 
 <<< @/snippets/writing-data.ts#update
 
-You can also assign an array element, a `jsonb` key or a field of a composite column (`SET tags[1] = $1`, `SET data['k'] = $1`). The value takes that element's or field's type.
+## What is checked
 
-## DELETE
+- Target columns must exist, and values must fit their types, `null` only for nullable columns.
+- Every `NOT NULL` column without a default must be set:
 
-<<< @/snippets/writing-data.ts#delete
+  ```ts
+  sql("INSERT INTO users (display_name) VALUES ($1)", "Ada");
+  // … SqlError<"null value in column \"email\" of relation \"users\" violates not-null constraint", 2>
+  ```
 
-`RETURNING *` expands to the target table's columns, or to every table in `FROM` / `USING`, as in Postgres.
-
-## Upserts
-
-`ON CONFLICT … DO NOTHING` and `DO UPDATE SET … WHERE …` are supported. `EXCLUDED` is the row that was proposed for insertion:
-
-<<< @/snippets/writing-data.ts#upsert
-
-## RETURNING old and new values
-
-As in PostgreSQL 18, `RETURNING` can read the row before (`old`) and after (`new`) the change:
-
-```ts
-sql("UPDATE users SET email = $1 WHERE id = $2 RETURNING old.email AS was, new.email AS now", "a@b.c", 1);
-// Row: { was: string; now: string }
-```
-
-- Rename them with `RETURNING WITH (OLD AS o, NEW AS n)`.
-- `old` columns are nullable in an `INSERT`, because there is no old row.
-- `new` columns are nullable in a `DELETE`.
-
-## MERGE
-
-`MERGE` is checked like the statements its actions look like. `UPDATE SET` and `INSERT` columns and values are checked, required columns must be set, and parameters take their columns' types:
-
-```ts
-sql(`MERGE INTO accounts a USING deltas d ON a.id = d.sid
-     WHEN MATCHED THEN UPDATE SET balance = a.balance + d.delta
-     WHEN NOT MATCHED THEN INSERT (id, balance) VALUES (d.sid, d.delta)
-     RETURNING merge_action() AS action, a.id, new.balance`);
-// Row: { action: string; id: number; balance: string }
-```
-
-- Each `WHEN` clause sees what Postgres lets it see: `NOT MATCHED` sees only the source, `NOT MATCHED BY SOURCE` only the target.
-- `RETURNING` can use both tables, `merge_action()`, `old` and `new`. Source columns are nullable when a `NOT MATCHED BY SOURCE` action returns rows.
-
-## Data-modifying CTEs
-
-A statement with `RETURNING`, `MERGE` included, can feed a `WITH` clause:
-
-<<< @/snippets/writing-data.ts#cte
+- `DEFAULT` is only allowed as a whole `VALUES` item or `SET` value, and not for a `NOT NULL` column without a default.
+- Assigning to an array element, a `jsonb` key or a composite field (`SET tags[1] = $1`) takes that element's or field's type.
+- Writing to a view is an error: `cannot insert into view "v"`.
+- `RETURNING *` expands as in Postgres: to the target table, or to every table in `FROM` / `USING`.
+- `RETURNING old.*` and `new.*` (PostgreSQL 18): `old` columns are nullable in an `INSERT`, `new` columns in a `DELETE`.
+- In `MERGE`, each `WHEN` clause sees only the tables Postgres lets it see, and its actions are checked like an `UPDATE` or `INSERT`. Source columns in `RETURNING` are nullable when a `NOT MATCHED BY SOURCE` action returns rows.
 
 ## Optional values
 

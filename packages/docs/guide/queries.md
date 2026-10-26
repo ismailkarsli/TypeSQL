@@ -1,6 +1,6 @@
 # Selecting data
 
-This page shows what TypeSQL infers from a `SELECT`: column names, column types and when a column can be `NULL`. The comments in the examples show the row type the compiler reports. For the full list of supported syntax, see [Supported SQL](../reference/sql).
+This page shows what TypeSQL infers from a `SELECT`: column names, column types and when a column can be `NULL`. The comments in the examples show the row type the compiler reports.
 
 ## Joins and nullability
 
@@ -30,11 +30,17 @@ A column you don't alias gets the name Postgres gives it:
 
 <<< @/snippets/queries.ts#naming
 
-- A column keeps its name.
-- A function call is named after the function.
-- A cast keeps the name of what it casts.
-- `CASE` is named `case`.
-- Anything else is `?column?`.
+| Expression | Name |
+|---|---|
+| a column | its name |
+| a function call | the function's name (`lower`, `count`, `coalesce`) |
+| special-syntax functions | Postgres's internal name (`trim(…)` is `btrim`, `EXTRACT(…)` is `extract`) |
+| a special value | its keyword (`current_date`, `current_user`) |
+| a cast | the name of what it casts (`id::text` is `id`), or the type's name for a literal (`1::int` is `int4`) |
+| a typed literal | the type's name (`interval '1 day'` is `interval`) |
+| `CASE` | the `ELSE` branch's name when it is a real name, else `case` |
+| `EXISTS (…)`, `ARRAY[…]` | `exists`, `array` |
+| anything else | `?column?` |
 
 When two columns have the same name, the last one wins. The drivers build their row objects the same way.
 
@@ -82,8 +88,8 @@ Window functions work the same way. `row_number()`, `rank()` and similar functio
 - `EXISTS` is a non-null boolean.
 - A CTE, including `WITH RECURSIVE`, works like a table for the rest of the statement.
 - In `UNION`, `INTERSECT` and `EXCEPT`, column names come from the first branch. A column is nullable if any branch can return `NULL` there.
-
-Derived tables, `LATERAL`, `VALUES`, set-returning functions in `FROM`, cursors and more are covered in [Supported SQL](../reference/sql).
+- `ROWS FROM (f(…), g(…))` zips its functions, so every column is nullable.
+- `DECLARE c CURSOR FOR query` checks the query, but `FETCH` has no row type, because the cursor's query is another statement. Assert one with `sql.as<Row>("FETCH 10 FROM c")`.
 
 ## JSON
 
@@ -91,7 +97,12 @@ JSON you build in SQL is typed. Nested `json_agg` subqueries can replace a secon
 
 <<< @/snippets/queries.ts#json
 
-`json_build_object` with literal keys is an object, `json_build_array` a tuple, and `json_agg(x)` an array of `x`. In `CASE`, `COALESCE` and `UNION` the branches' shapes are combined (`{ a: number } | { b: string }`). The SQL/JSON standard syntax (`JSON_OBJECT`, `JSON_TABLE`, …) is typed too; see [Supported SQL](../reference/sql#json-and-sql-json).
+`json_build_object` with literal keys is an object, `json_build_array` a tuple, and `json_agg(x)` an array of `x`. In `CASE`, `COALESCE` and `UNION` the branches' shapes are combined (`{ a: number } | { b: string }`). The SQL/JSON standard syntax is typed too:
+
+- `JSON_OBJECT` and `JSON_ARRAY` are typed like `json_build_object` and `json_build_array`, but are never `NULL`.
+- `JSON_ARRAYAGG` and `JSON_OBJECTAGG` are typed like `json_agg` and `json_object_agg`.
+- `JSON_VALUE` is `text` or its `RETURNING` type, `JSON_QUERY` is `jsonb`, and `JSON_EXISTS` and `IS JSON` are `bool`.
+- `JSON_TABLE` columns are nullable, except a top-level `FOR ORDINALITY`. Likewise, `XMLTABLE` columns are nullable unless they are `NOT NULL`, `FOR ORDINALITY` or have a non-null `DEFAULT`.
 
 Values inside JSON are typed the way Postgres writes them as JSON, not by the type map:
 
@@ -133,7 +144,7 @@ A table alias used as a value is the whole row: `to_json(t)`, `json_agg(t)`, `ro
 
 Operators follow Postgres's rules. For example, `int4 + int8` is `int8`, `timestamptz - timestamptz` is an `interval`, and `->>` is `text`.
 
-About 450 built-in functions are typed with their argument types, return types and null handling, and every other `pg_catalog` function by its return type. See [Supported SQL](../reference/sql#functions) for what's covered.
+About 450 built-in functions are typed with their argument types, return types and null handling, including those of `pgcrypto`, `uuid-ossp`, `unaccent`, `pg_trgm` and `fuzzystrmatch`. Every other `pg_catalog` function is known by its return type, without checking its arguments.
 
 A function Postgres would not find is an error. A close known name gives a hint:
 

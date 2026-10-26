@@ -106,7 +106,6 @@ export default defineConfig({
 				text: "Reference",
 				items: [
 					{ text: "API", link: "/reference/api" },
-					{ text: "Supported SQL", link: "/reference/sql" },
 					{ text: "DDL support", link: "/reference/ddl" },
 					{ text: "Type mapping", link: "/reference/type-mapping" },
 				],

@@ -2,37 +2,6 @@ import type { ParamsType, RowType } from "@typesql/core";
 import { check, type Equal } from "./_check.js";
 import { sql } from "./schema.js";
 
-// #region offset
-const page = 3;
-const pageSize = 20;
-const listing = sql(
-	"SELECT id, title FROM posts ORDER BY id LIMIT $1 OFFSET $2",
-	pageSize,
-	(page - 1) * pageSize,
-);
-// row:    { id: string; title: string }
-// params: [number | null, number | null]
-// #endregion offset
-check<Equal<RowType<typeof listing>, { id: string; title: string }>>();
-check<Equal<ParamsType<typeof listing>, [number | null, number | null]>>();
-
-declare const lastSeenId: string;
-// #region keyset
-// the id of the last row of the previous page
-const nextPage = sql(
-	"SELECT id, title FROM posts WHERE id > $1 ORDER BY id LIMIT $2",
-	lastSeenId,
-	20,
-);
-// params: [string | number | bigint | null, number | null]
-// #endregion keyset
-check<
-	Equal<
-		ParamsType<typeof nextPage>,
-		[string | number | bigint | null, number | null]
-	>
->();
-
 declare const filters: { email: string | null; minId: number | null };
 // #region optional-filters
 const found = sql(
@@ -45,22 +14,6 @@ const found = sql(
 // #endregion optional-filters
 check<Equal<ParamsType<typeof found>, [string | null, number | null]>>();
 check<Equal<RowType<typeof found>, { id: number; email: string }>>();
-
-declare const term: string;
-// #region search
-const matches = sql(
-	"SELECT id, email FROM users WHERE email ILIKE '%' || $1 || '%'",
-	term,
-);
-// #endregion search
-check<Equal<RowType<typeof matches>, { id: number; email: string }>>();
-
-declare const ids: number[];
-// #region any
-const some = sql("SELECT id, email FROM users WHERE id = ANY($1)", ids);
-// params: [(number | null)[] | null]
-// #endregion any
-check<Equal<ParamsType<typeof some>, [(number | null)[] | null]>>();
 
 declare const sort: "newest" | "oldest" | "email";
 // #region sort
@@ -129,29 +82,3 @@ check<Equal<RowType<typeof createdMany>, { id: string }>>();
 check<
 	Equal<ParamsType<typeof createdMany>, [(number | null)[], (string | null)[]]>
 >();
-
-// #region upsert
-const saved = sql(
-	`INSERT INTO users (email, display_name) VALUES ($1, $2)
-   ON CONFLICT (email) DO UPDATE SET display_name = EXCLUDED.display_name
-   RETURNING id`,
-	"ada@example.com",
-	"Ada",
-);
-// #endregion upsert
-check<Equal<RowType<typeof saved>, { id: number }>>();
-
-// #region count
-const counted = sql(
-	"SELECT count(*)::int4 AS n FROM posts WHERE author_id = $1",
-	7,
-);
-// { n: number }: count(*) is int8, a string under node-postgres; the cast makes it a number
-const taken = sql(
-	"SELECT EXISTS (SELECT 1 FROM users WHERE email = $1) AS taken",
-	"ada@example.com",
-);
-// { taken: boolean }
-// #endregion count
-check<Equal<RowType<typeof counted>, { n: number }>>();
-check<Equal<RowType<typeof taken>, { taken: boolean }>>();
