@@ -120,6 +120,40 @@
     - vast-wasps-remember
     - wild-dragons-cheat
     - wise-jars-cry
+"@typesql/core@0.6.1":
+  dir: packages/core
+  intents:
+    - angry-queens-rush
+    - bright-onions-study
+    - chilly-falcons-look
+    - clean-falcons-behave
+    - curly-kids-beg
+    - curvy-olives-beg
+    - fast-birds-hope
+    - fluffy-kids-explain
+    - friendly-bats-beam
+    - friendly-rice-rule
+    - gentle-beds-fetch
+    - good-emus-deliver
+    - good-pears-kneel
+    - good-tables-chew
+    - happy-pots-sort
+    - large-moons-wave
+    - lucky-ducks-beam
+    - orange-boats-rest
+    - pretty-planes-promise
+    - quiet-kings-smell
+    - shaggy-olives-sip
+    - shiny-wolves-fry
+    - silent-poets-swim
+    - sour-keys-shake
+    - spicy-lemons-taste
+    - sweet-mangos-deny
+    - tame-birds-bathe
+    - tidy-dolphins-press
+    - tough-geckos-promise
+    - tough-kings-study
+    - vast-wolves-grin
 "@typesql/drizzle@0.0.2":
   dir: packages/drizzle
   intents:
@@ -144,6 +178,10 @@
   dir: packages/drizzle
   intents:
     - little-buses-sleep
+"@typesql/drizzle@0.2.2":
+  dir: packages/drizzle
+  intents:
+    - tough-geckos-promise
 "@typesql/kysely@0.0.2":
   dir: packages/kysely
   intents:
@@ -181,10 +219,21 @@
   dir: packages/kysely
   intents:
     - little-buses-sleep
+"@typesql/kysely@0.2.2":
+  dir: packages/kysely
+  intents:
+    - tough-geckos-promise
 "@typesql/language-server@0.0.1":
   dir: packages/language-server
   intents:
     - shaggy-cows-win
+"@typesql/language-server@0.0.2":
+  dir: packages/language-server
+  intents:
+    - breezy-rats-bathe
+    - fair-chairs-scream
+    - great-queens-sleep
+    - tough-geckos-promise
 "@typesql/pg@0.0.2":
   dir: packages/pg
   intents:
@@ -222,6 +271,11 @@
   dir: packages/pg
   intents:
     - little-buses-sleep
+"@typesql/pg@0.2.2":
+  dir: packages/pg
+  intents:
+    - tidy-doors-ring
+    - tough-geckos-promise
 "@typesql/postgres@0.0.2":
   dir: packages/postgres
   intents:
@@ -257,6 +311,10 @@
   dir: packages/postgres
   intents:
     - little-buses-sleep
+"@typesql/postgres@0.2.2":
+  dir: packages/postgres
+  intents:
+    - tough-geckos-promise
 "@typesql/prisma@0.0.2":
   dir: packages/prisma
   intents:
@@ -288,6 +346,11 @@
   dir: packages/prisma
   intents:
     - little-buses-sleep
+"@typesql/prisma@0.2.2":
+  dir: packages/prisma
+  intents:
+    - happy-mails-shop
+    - tough-geckos-promise
 typesql@0.0.1:
   dir: packages/vscode
   intents:
@@ -305,3 +368,8 @@ typesql@0.0.4:
   intents:
     - fresh-kids-exist
     - friendly-cherries-drum
+typesql@0.0.5:
+  dir: packages/vscode
+  intents:
+    - olive-waves-kick
+    - wise-spoons-play
