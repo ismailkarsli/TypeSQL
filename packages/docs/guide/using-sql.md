@@ -1,4 +1,4 @@
-# API surface
+# Using `sql`
 
 TypeSQL centers on the `sql` function returned by `createSql<DB>()` (from `@typesql/core` or your driver adapter package). It compiles and type-checks your SQL statements against your schema at compile time, and provides helper functions on `sql.*` for parameter binding, dynamic SQL, fragments, bulk writes, and transactions.
 
@@ -49,11 +49,11 @@ Invalid statements cause compile errors directly on the SQL string.
 
 ### Examples
 
-<<< @/snippets/api-surface.ts#sql-query
+<<< @/snippets/using-sql.ts#sql-query
 
-<<< @/snippets/api-surface.ts#sql-named
+<<< @/snippets/using-sql.ts#sql-named
 
-<<< @/snippets/api-surface.ts#sql-slots
+<<< @/snippets/using-sql.ts#sql-slots
 
 See [Selecting data](./queries) and [Parameters](./parameters).
 
@@ -77,7 +77,7 @@ An escape hatch that skips TypeSQL's compile-time type inference and explicitly 
 
 ### Example
 
-<<< @/snippets/api-surface.ts#sql-as
+<<< @/snippets/using-sql.ts#sql-as
 
 See [Errors and troubleshooting](./errors#sql-as-row).
 
@@ -99,7 +99,7 @@ At runtime, the value is rewritten to a positional `$n` parameter—it is never 
 
 ### Example
 
-<<< @/snippets/api-surface.ts#sql-param
+<<< @/snippets/using-sql.ts#sql-param
 
 See [Inline parameters](./parameters#inline-sql-param-value).
 
@@ -121,7 +121,7 @@ At runtime, the value is serialized to JSON text and sent with driver-safe forma
 
 ### Example
 
-<<< @/snippets/api-surface.ts#sql-json
+<<< @/snippets/using-sql.ts#sql-json
 
 See [JSON values](./parameters#json-values).
 
@@ -146,7 +146,7 @@ Fragments preserve their parameter types and carried values. When spliced into a
 
 ### Example
 
-<<< @/snippets/api-surface.ts#sql-fragment
+<<< @/snippets/using-sql.ts#sql-fragment
 
 See [Dynamic SQL](./dynamic-sql).
 
@@ -171,7 +171,7 @@ Use `sql.id` to safely parameterize table names, column names, or schema-qualifi
 
 ### Example
 
-<<< @/snippets/api-surface.ts#sql-id
+<<< @/snippets/using-sql.ts#sql-id
 
 See [Identifiers and lists](./dynamic-sql#identifiers-and-lists).
 
@@ -195,7 +195,7 @@ Joins an array or tuple of fragments or subqueries with a delimiter into a singl
 
 ### Example
 
-<<< @/snippets/api-surface.ts#sql-join
+<<< @/snippets/using-sql.ts#sql-join
 
 See [Lists from runtime arrays](./dynamic-sql#lists-from-runtime-arrays).
 
@@ -218,7 +218,7 @@ Keys must match column names of `table`, and values must match their correspondi
 
 ### Example
 
-<<< @/snippets/api-surface.ts#sql-set
+<<< @/snippets/using-sql.ts#sql-set
 
 See [Updating with sql.set](./writing-data#updating-with-sql-set).
 
@@ -241,7 +241,7 @@ NOT NULL columns without defaults are required on every row. Optional or default
 
 ### Example
 
-<<< @/snippets/api-surface.ts#sql-values
+<<< @/snippets/using-sql.ts#sql-values
 
 See [Bulk insert with sql.values](./writing-data#bulk-insert-with-sql-values).
 
@@ -267,7 +267,7 @@ Never pass untrusted user input to `sql.raw()`. Use `$n`, `:name`, `${sql.param(
 
 ### Example
 
-<<< @/snippets/api-surface.ts#sql-raw
+<<< @/snippets/using-sql.ts#sql-raw
 
 See [Fully dynamic SQL](./dynamic-sql#fully-dynamic-sql).
 
@@ -291,7 +291,7 @@ Runs an async callback inside a database transaction. Available on `sql` instanc
 
 ### Example
 
-<<< @/snippets/api-surface.ts#sql-transaction
+<<< @/snippets/using-sql.ts#sql-transaction
 
 See [Transactions](./transactions).
 
@@ -301,7 +301,7 @@ See [Transactions](./transactions).
 
 Calling `sql(...)` or `sql.as(...)` returns a `Query<Row, Params, Text>` object:
 
-<<< @/snippets/api-surface.ts#query-methods
+<<< @/snippets/using-sql.ts#query-methods
 
 ### Properties
 

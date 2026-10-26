@@ -7,6 +7,25 @@ export default defineConfig({
 	description:
 		"Write Postgres SQL in TypeScript and get exact types for rows and parameters. No codegen, no database connection, no build step.",
 	cleanUrls: true,
+	head: [
+		[
+			"style",
+			{},
+			`.VPSidebarItem code, .VPNavBarMenuLink code {
+  font-family: var(--vp-font-family-mono);
+  font-size: 0.85em;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background-color: var(--vp-code-bg);
+  color: var(--vp-code-color);
+  font-weight: 500;
+}
+.VPSidebarItem.is-active code,
+.VPSidebarItem .link:hover code {
+  color: var(--vp-c-brand-1);
+}`,
+		],
+	],
 	// Contributor docs are read on GitHub, next to the code they describe.
 	srcExclude: ["internals/**"],
 	themeConfig: {
@@ -45,7 +64,7 @@ export default defineConfig({
 			{
 				text: "Writing queries",
 				items: [
-					{ text: "API surface", link: "/guide/api-surface" },
+					{ text: "Using <code>sql</code>", link: "/guide/using-sql" },
 					{ text: "Selecting data", link: "/guide/queries" },
 					{ text: "Parameters", link: "/guide/parameters" },
 					{ text: "Inserting and updating", link: "/guide/writing-data" },
