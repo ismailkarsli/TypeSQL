@@ -12,7 +12,7 @@ TypeSQL centers on the `sql` function returned by `createSql<DB>()` (from `@type
 | [`sql.json(value)`](#sql-json-value) | Binds a value as inline JSON text, checked against `json`/`jsonb`/`Json<T>` columns. | `value: T` (`null` / `undefined` becomes SQL `NULL`) |
 | [`sql.fragment(text, ...params)`](#sql-fragment-text-params) | Creates a reusable SQL fragment to splice into query `{slot}` placeholders. | `text: string` (literal), `slots?`, `...params` |
 | [`sql.id(...parts)`](#sql-id-parts) | Creates a safely quoted identifier fragment (`"col"` or `"schema"."table"`). | `...parts: string[]` (column, table, schema names) |
-| [`sql.join(items, separator?)`](#sql-join-items-separator) | Joins an array or tuple of fragments or queries with a separator string. | `items: Slottable[]`, `separator?: string` (default `", "`) |
+| [`sql.combine(items, options?)`](#sql-combine-items-options) | Combines an array or tuple of fragments or queries with a separator. | `items: Slottable[]`, `options?: { separator?: string }` (default `", "`) |
 | [`sql.set(table, values)`](#sql-set-table-values) | Generates a type-checked `SET "col" = $n` fragment for `UPDATE`, omitting `undefined`. | `table: TableName<DB>`, `values: SetInput<DB, TM, table>` |
 | [`sql.values(table, rows)`](#sql-values-table-rows) | Generates a type-checked `("col") VALUES (...)` fragment for `INSERT`. | `table: TableName<DB>`, `rows: InsertInput<DB, TM, table>[]` |
 | [`sql.raw(text)`](#sql-raw-text) | Creates an untyped, raw SQL text fragment (requires `sql.as<Row>()`). | `text: string` |
@@ -42,7 +42,7 @@ Invalid statements cause compile errors directly on the SQL string.
   - Inline expressions: `${sql.param(val)}`, `${sql.json(val)}`
   - Fragment slots: `{slotName}`
   *(Tagged templates like `` sql`…` `` are not supported because TypeScript erases their string literal types).*
-- `slots` (`Record<string, Fragment | Query>`, *optional*): An object mapping slot names to fragments (`sql.fragment`, `sql.id`, `sql.join`, etc.) or subqueries (`Query`). Required when `{slotName}` tokens appear in `query`.
+- `slots` (`Record<string, Fragment | Query>`, *optional*): An object mapping slot names to fragments (`sql.fragment`, `sql.id`, `sql.combine`, etc.) or subqueries (`Query`). Required when `{slotName}` tokens appear in `query`.
 - `...params` (*optional*):
   - When using `$n`: Positional argument values matching the inferred types in `$1`, `$2`, … order.
   - When using `:name`: Exactly one object whose keys match the named placeholders `{ [name]: value }`.
@@ -183,29 +183,29 @@ See [Identifiers and lists](./dynamic-sql#identifiers-and-lists).
 
 ---
 
-## `sql.join(items, separator?)`
+## `sql.combine(items, options?)`
 
 ```ts
-sql.join(items: readonly Slottable[], separator: string = ", "): Fragment
+sql.combine(items: readonly Slottable[], options?: { separator?: string }): Fragment
 ```
 
-Joins an array or tuple of fragments or subqueries with a delimiter into a single fragment.
+Combines an array or tuple of fragments or subqueries with a delimiter into a single fragment.
 
 - When given a tuple (`[a, b]`), literal SQL text is preserved.
 - When given a dynamic runtime array (`Slottable[]`), TypeSQL validates a representative statement where each distinct element type is checked once. This keeps dynamic clauses (like dynamic `ORDER BY`, `AND` filters, or `IN (...)` lists) fully type-safe.
 
 ::: danger Caution: SQL Injection
-The `separator` argument is concatenated directly into the statement as **raw SQL text**. Never pass untrusted user input as the separator. Use constant SQL delimiters such as `", "`, `" AND "`, `" OR "`, or `"\n"`.
+The `options.separator` value is concatenated directly into the statement as **raw SQL text**. Never pass untrusted user input as the separator. Use constant SQL delimiters such as `", "`, `" AND "`, `" OR "`, or `"\n"`.
 :::
 
 ### Parameters
 
 - `items` (`readonly Slottable[]`): A non-empty array or tuple of fragments (`Fragment`) or subqueries (`Query`). Throws at runtime if empty.
-- `separator` (`string`, *optional*): The delimiter string placed between elements. Defaults to `", "`. Must be a trusted SQL delimiter.
+- `options.separator` (`string`, *optional*): The delimiter string placed between elements. Defaults to `", "`. Editors suggest `", "`, `" AND "`, and `" OR "`; other strings are accepted. Must be a trusted SQL delimiter.
 
 ### Example
 
-<<< @/snippets/using-sql.ts#sql-join
+<<< @/snippets/using-sql.ts#sql-combine
 
 See [Lists from runtime arrays](./dynamic-sql#lists-from-runtime-arrays).
 

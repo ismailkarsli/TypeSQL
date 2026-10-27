@@ -74,13 +74,13 @@ const q = sql("SELECT u.id FROM users u {where}", { where });
 |---|---|
 | `sql.fragment(text, ...params)` | a piece of SQL to splice into a `{name}` slot |
 | `sql.id("col")`, `sql.id("schema", "table")` | a quoted identifier: `"col"`, `"schema"."table"` |
-| `sql.join(items, separator = ", ")` | the fragments joined: a tuple keeps its literal text, a runtime array of fragments with literal texts is checked as a list; throws when empty |
+| `sql.combine(items, options?)` | the fragments combined with `", "` by default: a tuple keeps its literal text, a runtime array of fragments with literal texts is checked as a list; throws when empty |
 | `sql.raw(text)` | dynamic text, sent as is |
 
 - Only `{identifier}` is a slot. Braces inside string literals are left alone.
 - A fragment's `$n` are renumbered after the outer parameters, and its values are checked once spliced. Whole queries can be spliced too.
 - `sql.id` over a union of names is checked once per member; the row type is the union. A generic name constrained to `RelationName<DB>` is widened to every table and view. Any other non-literal name is dynamic. Quoting prevents SQL syntax injection, but does not enforce authorization: dynamic names derived from untrusted user input must come from an explicit allowlist (e.g. to prevent selecting or sorting by sensitive fields like `password_hash`).
-- `sql.join` over an array checks the statement once, with each distinct element once ([Lists from runtime arrays](../guide/dynamic-sql#lists-from-runtime-arrays)). The `separator` parameter is raw SQL text: never pass untrusted user input as the separator.
+- `sql.combine` over an array checks the statement once, with each distinct element once ([Lists from runtime arrays](../guide/dynamic-sql#lists-from-runtime-arrays)). The `options.separator` value is raw SQL text: never pass untrusted user input as the separator.
 - A dynamic fragment is rejected by `sql()`. Use `sql.as<Row>()`.
 
 See [Dynamic SQL](../guide/dynamic-sql).
@@ -185,7 +185,7 @@ What adapters and custom executors build on.
 
 ### `@typesql/core/engine`
 
-The engine's other types are exported from `@typesql/core/engine`, so that a declaration file or the [type cache](../guide/performance#type-cache) can name them: the markers `sql.param()` and `sql.json()` return, the representative texts of `sql.join`, `sql.set` and `sql.values`, `Analyze` and `Analysis`, `ArgsOf`, `CamelCaseKeys`, the lexer, parser and type cache types, and so on. They change with the engine and are not a stable API.
+The engine's other types are exported from `@typesql/core/engine`, so that a declaration file or the [type cache](../guide/performance#type-cache) can name them: the markers `sql.param()` and `sql.json()` return, the representative texts of `sql.combine`, `sql.set` and `sql.values`, `Analyze` and `Analysis`, `ArgsOf`, `CamelCaseKeys`, the lexer, parser and type cache types, and so on. They change with the engine and are not a stable API.
 
 ## Schema types
 

@@ -51,12 +51,12 @@ check<Equal<RowType<typeof prolific>, { email: string }>>();
 
 // #region helpers
 const column = sql.id("display_name"); // "display_name", quoted
-const both = sql.join(
+const both = sql.combine(
 	[
 		sql.fragment("u.id > $1", 10),
 		sql.fragment(`u.email LIKE ${sql.param("%@example.com")}`),
 	],
-	" AND ",
+	{ separator: " AND " },
 );
 const listed = sql("SELECT {column} FROM users u WHERE {both}", {
 	column,
@@ -101,7 +101,7 @@ const SORT = {
 	},
 } as const;
 declare const sortBy: { field: keyof typeof SORT; dir: "asc" | "desc" }[]; // chosen by the user
-const order = sql.join([
+const order = sql.combine([
 	...sortBy.map(({ field, dir }) => SORT[field][dir]),
 	sql.fragment("p.id"),
 ]);

@@ -96,17 +96,17 @@ const customSelect = sql("SELECT {col} FROM {fqTable}", { col, fqTable });
 // customSelect.text: 'SELECT "email" FROM "public"."users"'
 // #endregion sql-id
 
-// #region sql-join
-// Joining fragments
+// #region sql-combine
+// Combining fragments
 const filters = [
 	sql.fragment("role = $1", "admin"),
 	sql.fragment("id > $1", 5),
 ];
-const joinedWhere = sql.join(filters, " AND ");
-const queryJoined = sql("SELECT id FROM users WHERE {where}", {
-	where: joinedWhere,
+const combinedWhere = sql.combine(filters, { separator: " AND " });
+const queryCombined = sql("SELECT id FROM users WHERE {where}", {
+	where: combinedWhere,
 });
-// #endregion sql-join
+// #endregion sql-combine
 
 // #region sql-set
 // SET helper for UPDATE
@@ -190,7 +190,7 @@ void byId;
 void updateSettings;
 void countAdmins;
 void customSelect;
-void queryJoined;
+void queryCombined;
 void updateQuery;
 void insertQuery;
 void sorted;

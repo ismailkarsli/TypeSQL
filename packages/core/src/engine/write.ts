@@ -6,7 +6,7 @@ import type { JoinedText, QuotedIdent, UnionList } from "./splice.js";
 /**
  * Types of the write helpers `sql.set(table, values)` and `sql.values(table, rows)`.
  *
- * Their runtime text depends on which keys are defined, so, like `sql.join` over an array, they
+ * Their runtime text depends on which keys are defined, so, like `sql.combine` over an array, they
  * are typed with a representative text: every key of the input type once (`"a" = $1, "b" = $2`
  * / `("a", "b") VALUES ($1, $2)`), carrying the encoded value types. The statement they are
  * spliced into is checked with that text, so the columns are checked again in context.

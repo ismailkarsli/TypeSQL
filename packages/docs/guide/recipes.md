@@ -18,7 +18,7 @@ Map each allowed choice to a fragment. The statement is checked once for each ch
 
 Mapping user choices through an allowlist dictionary or validating sort keys with a strict enum schema guarantees that users cannot choose sensitive columns (such as `password_hash` or internal tokens) or supply invalid column names that would trigger database errors.
 
-To sort by several user-picked keys, use [`sql.join` over an array](./dynamic-sql#lists-from-runtime-arrays).
+To sort by several user-picked keys, use [`sql.combine` over an array](./dynamic-sql#lists-from-runtime-arrays).
 
 ## Nested results in one query
 

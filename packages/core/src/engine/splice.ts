@@ -7,7 +7,7 @@ import type { Opaque, SplitFirst } from "./inline.js";
  * follow the parameters already present (outer `$n` first, then fragments in order).
  *
  * Only `{identifier}` is a slot; `'{1,2}'` or `'{"a":1}'` inside literals are left alone.
- * A fragment whose text is not a literal (`sql.raw`, `sql.join` over a non-tuple array)
+ * A fragment whose text is not a literal (`sql.raw`, `sql.combine` over a non-tuple array)
  * makes the result `string`, which `Validate` reports as a dynamic fragment.
  */
 export type Splice<Q extends string, S> = string extends Q // type-mutate: equivalent cond-false – a shortcut: string matches no slot, so SpliceLoop gives string too
@@ -274,7 +274,7 @@ export type UnionList<U, Acc extends readonly unknown[] = []> = [U] extends [
 		? UnionList<Exclude<U, L>, [L, ...Acc]>
 		: never;
 
-/** Text of `sql.join([f1, f2], sep)` for tuple inputs; `string` for arrays. */
+/** Text of `sql.combine([f1, f2], sep)` for tuple inputs; `string` for arrays. */
 export type JoinedText<
 	Items extends readonly { readonly text: string }[],
 	Sep extends string,
