@@ -602,20 +602,11 @@ instantiations of one hit (q500c − q50c over 450, at most 250) and a stale cac
 time per query, queries per second of check time, and instantiations per query. That is the
 number to watch for an app with hundreds of typed queries.
 
-Current numbers (`tsc` from TypeScript 7.1.0-beta and tsrs 0.18.0):
-
-| File | Instantiations | Check time, `tsc` | Check time, tsrs |
-|---|---|---|---|
-| q1 | ~149K (mostly checking core's sources) | ~0.22 s | ~0.08 s |
-| q50 | ~0.65M | ~0.50 s | ~0.27 s |
-| q500 | ~4.7M | ~2.8 s | ~1.2 s |
-| mixed50 | ~0.42M | ~0.43 s | ~0.14 s |
-| maxlen (all probes pass, up to 8 KB) | ~6.6M | ~0.95 s | ~0.31 s |
-| per query (q500 − q1) | ~9.2K | ~5 ms, ~190 queries/s | ~2.2 ms, ~450 queries/s |
-| q1d / q50d / q500d | ~18K / ~0.52M / ~4.6M | ~0.04 / ~0.31 / ~2.6 s | ~0.02 / ~0.14 / ~1.1 s |
-| q50c / q500c (type cache) | ~20K / ~0.12M | ~0.02 / ~0.13 s | ~0.006 / ~0.02 s |
-| per cache hit (q500c − q50c) | ~230 | | |
-| q500s (stale cache) | ~4.7M (1.01x q500d) | ~2.6 s | ~1.3 s |
+Current measurements are in [Performance](https://typesql.karsli.net/guide/performance).
+The release workflow updates `.vitepress/benchmarks.json` from the compile-time and runtime CI
+benchmarks; the guide imports it and embeds values with Vue interpolation. The README's timing
+summary and release chart are generated from the same measurements for GitHub. To refresh locally,
+run the benchmarks above, `node packages/bench/runtime.ts`, then `node scripts/performance-history.ts`.
 
 Where a typical query's cost goes (q50, instantiations above loading the library): lexing
 ~30%, parsing ~35%, binding and typing ~13%, building the row and parameter types ~17%, the

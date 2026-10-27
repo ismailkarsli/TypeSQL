@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { writeFileSync } from "node:fs";
 // Runtime cost of building a query: `sql(...)` turns the call into `{ text, values }` (named and
 // inline parameters rewritten to $n, fragments spliced). Nothing is parsed at runtime. Imports the
 // built package, so run `pnpm build` first.
@@ -26,12 +27,18 @@ const cases = {
 };
 
 const N = 1_000_000;
+const results: Record<string, number> = {};
 let sink: { readonly text: string } | undefined;
 for (const [name, build] of Object.entries(cases)) {
 	for (let i = 0; i < N / 10; i++) sink = build(); // warm up
 	const started = performance.now();
 	for (let i = 0; i < N; i++) sink = build();
 	const ns = ((performance.now() - started) * 1e6) / N;
+	results[name] = Number((ns / 1000).toFixed(2));
 	console.log(`${name.padEnd(18)} ${(ns / 1000).toFixed(2)} µs per call`);
 }
 if (!sink!.text) throw new Error("unreachable");
+writeFileSync(
+	new URL("./runtime-results.json", import.meta.url),
+	`${JSON.stringify(results, null, "\t")}\n`,
+);

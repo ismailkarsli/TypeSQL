@@ -1,3 +1,7 @@
+<script setup>
+import bench from "../.vitepress/benchmarks.json";
+</script>
+
 # Installation
 
 ## Requirements
@@ -67,7 +71,7 @@ yarn add -D typescript@7.1.0-beta
 
 :::
 
-Your editor should check the project with TypeScript 7.1 as well. [VS Code extension](./vscode#setup) shows how to point VS Code at it. You can also use [tsrs](https://github.com/oxc-project/tsrs), a Rust port of TypeScript 7.1 that type-checks ~2.3× faster (about 2.2 ms per query vs 5 ms with `tsc`; see [Performance](./performance)).
+Your editor should check the project with TypeScript 7.1 as well. [VS Code extension](./vscode#setup) shows how to point VS Code at it. You can also use [tsrs](https://github.com/oxc-project/tsrs), a Rust port of TypeScript 7.1 that type-checks ~{{ bench.speedup }}× faster in our benchmark (about {{ bench.throughput.tsrs.checkMsPerQuery }} ms per query vs {{ bench.throughput.tsc.checkMsPerQuery }} ms with `tsc`; see [Performance](./performance)).
 
 ## Using Kysely, Drizzle or Prisma
 

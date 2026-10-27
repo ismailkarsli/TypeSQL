@@ -249,8 +249,11 @@ jobs:
       # the cached variants run the content mapper and job from the built package
       - run: pnpm --filter @typesql/core build
       - run: node packages/bench/run.ts
+      - run: node packages/bench/runtime.ts
       - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: bench-results
-          path: packages/bench/results.json
+          path: |
+            packages/bench/results.json
+            packages/bench/runtime-results.json

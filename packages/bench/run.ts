@@ -21,6 +21,7 @@ import {
 	unlinkSync,
 	writeFileSync,
 } from "node:fs";
+import { cpus } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import type * as Job from "../core/src/cache/job.ts";
@@ -340,6 +341,27 @@ writeFileSync(
 	JSON.stringify(
 		{
 			measuredAt: new Date().toISOString(),
+			environment: {
+				node: process.version,
+				cpu: cpus()[0]?.model,
+				cpus: cpus().length,
+			},
+			compilerVersions: Object.fromEntries(
+				compilers.map((c) => [
+					c,
+					JSON.parse(
+						readFileSync(
+							join(
+								here,
+								"../../node_modules",
+								c === "tsc" ? "typescript" : "tsrs",
+								"package.json",
+							),
+							"utf8",
+						),
+					).version,
+				]),
+			),
 			compiler: onlyCompiler ?? compilers,
 			throughput: onlyCompiler ? perQuery : throughputByCompiler,
 			cache,

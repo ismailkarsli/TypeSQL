@@ -12,7 +12,7 @@ When you hit a limit, [`sql.as<Row>()`](./errors#when-typesql-can-t-type-a-state
 
 ## Statement size
 
-- A statement can have up to 4096 tokens (a generated table in the [engine](./type-engine) sets this). 8 KB statements check in about a second.
+- A statement can have up to 4096 tokens (a generated table in the [engine](./type-engine) sets this). The [benchmark](./performance#compile-time) checks statements up to 8 KB.
 - A chain of about 100 `||` or `+` operators hits TypeScript's depth limit. `AND` and `OR` chains are fine at 200+ terms, because the parser balances them.
 - In `migrations()`, keep one migration per `.add()`: one text is limited to about 4000 tokens.
 

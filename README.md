@@ -128,14 +128,36 @@ The parser is checked against the regression tests PostgreSQL runs on itself, ab
 
 ## Compile time
 
-A query costs about 5 ms of check time with `tsc` and about 2 ms with [tsrs](https://github.com/oxc-project/tsrs), a Rust port of TypeScript 7. A file of 500 queries:
+<!-- performance-summary:start -->
+A query costs about 6.22 ms of check time with `tsc` and about 4.23 ms with [tsrs](https://github.com/oxc-project/tsrs), a Rust port of TypeScript 7. A file of 500 queries:
 
 | | `tsc` | tsrs |
 |---|---|---|
-| 500 queries | 2.6 s | 1.1 s |
-| with the [type cache](https://typesql.karsli.net/guide/performance#type-cache) | 0.13 s | 0.02 s |
+| 500 queries | 3.106 s | 1.27 s |
+| with the [type cache](https://typesql.karsli.net/guide/performance#type-cache) | 0.065 s | 0.013 s |
+<!-- performance-summary:end -->
 
 See [Performance](https://typesql.karsli.net/guide/performance) for how this is measured.
+
+### Performance by release
+
+Uncached tsrs check time for [50](packages/bench/src/q50.ts) and [500 queries](packages/bench/src/q500.ts) by `@typesql/core` version. Lower is faster. Historical results were measured against published packages locally; new releases append the release CI benchmark results.
+
+<!-- performance-history:start -->
+Lines: 🟢 50 queries · 🔴 500 queries.
+
+```mermaid
+%%{init: {"themeVariables": {"xyChart": {"plotColorPalette": "#16a34a,#dc2626"}}}}%%
+xychart-beta
+    title "Uncached tsrs - 50 and 500 queries"
+    x-axis "Core version" ["0.0.1", "0.0.2", "0.0.3", "0.0.4", "0.1.0", "0.1.1", "0.1.2", "0.2.0", "0.3.0", "0.4.0", "0.5.0", "0.6.0", "0.6.1", "0.7.0"]
+    y-axis "Check time (seconds, lower is faster)" 0 --> 5.3
+    line [0.128, 0.128, 0.128, 0.122, 0.122, 0.122, 0.123, 0.132, 0.154, 0.159, 0.157, 0.144, 0.18, 0.165]
+    line [3.497, 3.823, 3.75, 4.75, 3.873, 3.673, 3.438, 2.798, 3.176, 1.876, 1.301, 1.341, 1.633, 1.398]
+```
+<!-- performance-history:end -->
+
+[Measurement history](packages/bench/history.json).
 
 ## Documentation
 
