@@ -1,1 +1,9 @@
-{}
+{
+	"0.7.1": {
+		"case1": {
+			"statements": 379,
+			"checkTimeSec": 2.166,
+			"cachedCheckTimeSec": 0.756
+		}
+	}
+}
