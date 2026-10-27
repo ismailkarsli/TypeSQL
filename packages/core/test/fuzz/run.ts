@@ -19,6 +19,7 @@ import { Connection } from "../oracle/replay.js";
 import {
 	type Db,
 	dbTypeText,
+	EXTENSIONS,
 	type Relation,
 	schemaDdl,
 	seedRows,
@@ -248,6 +249,11 @@ export class Fuzzer {
 				statementTimeoutMs: 5_000,
 			});
 			try {
+				// Match the type oracle's environment; keep public for the candidate's schema.
+				for (const e of EXTENSIONS)
+					await conn.exec(
+						`CREATE EXTENSION IF NOT EXISTS "${e}" SCHEMA pg_catalog`,
+					);
 				const created: Relation[] = [];
 				for (const st of schemaDdl(db))
 					if (!(await conn.tryExec(st.sql)) && st.relation)

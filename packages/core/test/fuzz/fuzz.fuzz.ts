@@ -20,8 +20,9 @@ import {
 	jobSummary,
 } from "../oracle/job-summary.js";
 import { NEEDS_ISSUE } from "../oracle/kinds.js";
+import { readDb } from "../oracle/schema.js";
 import { acquireOracleServer } from "../oracle/server.js";
-import { fuzz, type Property } from "./run.js";
+import { Fuzzer, fuzz, type Property } from "./run.js";
 
 const CI_SEED = 1;
 const CI_RUNS = 2000;
@@ -44,6 +45,28 @@ afterAll(async () => {
 
 const kindOf = (p: Property): string =>
 	p === "nulls" || p === "types" ? "unsound" : p;
+
+test("fuzz: view-oracle candidates can use contrib types and TABLESAMPLE methods", async (ctx) => {
+	if (!server) return ctx.skip("TYPESQL_ORACLE=skip");
+	const db = readDb({
+		t: { table: { value: { t: "citext", n: false, d: false } } },
+	});
+	const sqls = [
+		"SELECT value FROM t",
+		"SELECT value FROM t TABLESAMPLE SYSTEM_ROWS(1)",
+		"SELECT value FROM t TABLESAMPLE SYSTEM_TIME(1)",
+	];
+	const fuzzer = new Fuzzer(server.url);
+	try {
+		const results = await fuzzer.checkCandidates(
+			sqls.map((sql) => ({ sql, source: "extensions", db })),
+			() => {},
+		);
+		expect(results.map((r) => r.checked.failures)).toEqual([[], [], []]);
+	} finally {
+		await fuzzer.close();
+	}
+});
 
 test("fuzz: generated statements against Postgres", async (ctx) => {
 	if (!server) return ctx.skip("TYPESQL_ORACLE=skip");

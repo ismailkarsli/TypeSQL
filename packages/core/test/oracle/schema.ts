@@ -40,6 +40,9 @@ const SERIAL: { readonly [t: string]: string } = {
 /** Namespaces that exist on every server: `PgCatalog` slices are the real catalogs. */
 const SYSTEM = new Set(["pg_catalog", "information_schema"]);
 
+/** Contrib types and TABLESAMPLE methods used by the type tests and their fuzz candidates. */
+export const EXTENSIONS = ["citext", "tsm_system_rows", "tsm_system_time"];
+
 export function readDb(v: TypeValue): Db {
 	const db = asRecord(v);
 	if (!db) throw new Error("not a DB");
