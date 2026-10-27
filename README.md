@@ -144,10 +144,10 @@ See [Performance](https://typesql.karsli.net/guide/performance) for how this is 
 Uncached tsrs check time for [50](packages/bench/src/q50.ts) and [500 queries](packages/bench/src/q500.ts) by `@typesql/core` version. Lower is faster. Historical results were measured against published packages locally; new releases append the release CI benchmark results.
 
 <!-- performance-history:start -->
-Lines: 🟢 50 queries · 🔴 500 queries.
+Lines: 🔵 50 queries · 🟢 500 queries.
 
 ```mermaid
-%%{init: {"themeVariables": {"xyChart": {"plotColorPalette": "#16a34a,#dc2626"}}}}%%
+%%{init: {"themeVariables": {"xyChart": {"plotColorPalette": "#2563eb,#16a34a"}}}}%%
 xychart-beta
     title "Uncached tsrs - 50 and 500 queries"
     x-axis "Core version" ["0.0.1", "0.0.2", "0.0.3", "0.0.4", "0.1.0", "0.1.1", "0.1.2", "0.2.0", "0.3.0", "0.4.0", "0.5.0", "0.6.0", "0.6.1", "0.7.0"]

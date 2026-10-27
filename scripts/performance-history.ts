@@ -90,10 +90,10 @@ const releases = Object.entries(history).sort(([a], [b]) =>
 );
 const chart = [
 	"<!-- performance-history:start -->",
-	"Lines: 🟢 50 queries · 🔴 500 queries.",
+	"Lines: 🔵 50 queries · 🟢 500 queries.",
 	"",
 	"```mermaid",
-	'%%{init: {"themeVariables": {"xyChart": {"plotColorPalette": "#16a34a,#dc2626"}}}}%%',
+	'%%{init: {"themeVariables": {"xyChart": {"plotColorPalette": "#2563eb,#16a34a"}}}}%%',
 	"xychart-beta",
 	'    title "Uncached tsrs - 50 and 500 queries"',
 	`    x-axis "Core version" [${releases.map(([v]) => JSON.stringify(v)).join(", ")}]`,
