@@ -2,8 +2,7 @@
 
 ## Requirements
 
-- **TypeScript 7.1 or later.** This is the native compiler; `7.1.0-beta` works. Older versions are not supported.
-- **Node.js 26 or later.**
+- **TypeScript 7.1 or later.** This is the native compiler; `7.1.0-beta` works. You can also use [tsrs](https://github.com/oxc-project/tsrs) (a Rust port of TypeScript 7.1). Older versions are not supported.
 - **PostgreSQL.** TypeSQL follows Postgres rules only. SQLite and MySQL support is planned.
 
 ## Install TypeSQL
@@ -68,7 +67,7 @@ yarn add -D typescript@7.1.0-beta
 
 :::
 
-Your editor should check the project with TypeScript 7.1 as well. [VS Code extension](./vscode#setup) shows how to point VS Code at it.
+Your editor should check the project with TypeScript 7.1 as well. [VS Code extension](./vscode#setup) shows how to point VS Code at it. You can also use [tsrs](https://github.com/oxc-project/tsrs), a Rust port of TypeScript 7.1 that type-checks ~2.3× faster (about 2.2 ms per query vs 5 ms with `tsc`; see [Performance](./performance)).
 
 ## Using Kysely, Drizzle or Prisma
 

@@ -6,7 +6,7 @@ When you hit a limit, [`sql.as<Row>()`](./errors#when-typesql-can-t-type-a-state
 
 ## Toolchain
 
-- TypeSQL needs TypeScript 7.1 or later (the native compiler; `7.1.0-beta` works) and Node.js 26 or later.
+- TypeSQL needs TypeScript 7.1 or later (the native compiler; `7.1.0-beta` works).
 - It models PostgreSQL only.
 - The [type cache](./performance#type-cache) and the editor completions ([VS Code](./vscode), [Neovim](./neovim)) use APIs that are new in TypeScript 7.1 and may still change before 7.1 is final.
 

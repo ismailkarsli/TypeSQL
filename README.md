@@ -19,7 +19,7 @@ npm install @typesql/core @typesql/pg pg              # node-postgres
 npm install @typesql/core @typesql/postgres postgres  # or postgres.js
 ```
 
-Requires TypeScript 7.1 or later and Node.js 26 or later.
+Requires TypeScript 7.1 or later.
 
 ## Quick start
 

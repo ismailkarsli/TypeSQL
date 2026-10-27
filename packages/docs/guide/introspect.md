@@ -75,7 +75,7 @@ Rows read the column as `T`, and you write values with [`sql.json()`](./paramete
 <<< @/snippets/introspect.ts#use
 
 - `imports` adds lines after the generated import, for the types `columnTypes` uses.
-- The config file can be `.mjs`, or `.ts` with Node.js 26.
+- The config file can be `.mjs`, or `.ts`.
 - `columnTypes` can also be a function of the column, for example to read the type from the column comment.
 - A key that names no column is an error. So is a column that is not `json` or `jsonb` (`json[]` included).
 - `column` replaces a whole column descriptor, for any column. Return the TypeScript source to use (any helper of your own), or `undefined` to keep the default.

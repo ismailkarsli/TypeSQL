@@ -8,7 +8,7 @@ Write Postgres SQL in TypeScript and get exact types for rows and parameters. Ty
 npm install @typesql/core
 ```
 
-Requires TypeScript 7.1 or later and Node.js 26 or later.
+Requires TypeScript 7.1 or later.
 
 ## Usage
 
