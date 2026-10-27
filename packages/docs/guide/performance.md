@@ -8,39 +8,40 @@ TypeSQL parses your SQL in the type checker, so its cost is paid at compile time
 
 ## Compile time
 
-Each query costs about {{ bench.instantiationsPerQuery }} type instantiations, or about {{ bench.throughput.tsc.checkMsPerQuery }} ms of check time with `tsc` (about {{ bench.throughput.tsc.queriesPerSec }} queries per second) and about {{ bench.throughput.tsrs.checkMsPerQuery }} ms with [tsrs](https://github.com/oxc-project/tsrs), a Rust port of TypeScript 7 (about {{ bench.throughput.tsrs.queriesPerSec }} queries per second).
+The [real-world application fixture](https://github.com/ismailkarsli/TypeSQL/blob/main/packages/bench/src/case1.ts) contains 379 statements, their schema, and reusable SQL fragments. Every benchmark uses this fixture unchanged.
 
-The [bench](https://github.com/ismailkarsli/TypeSQL/tree/main/packages/bench) type-checks files of distinct, realistic queries (joins, aggregates, parameters) against the built package, as an application is compiled. These measurements were taken on {{ bench.date }} with `tsc` {{ bench.compilers.tsc }} and tsrs {{ bench.compilers.tsrs }} on {{ bench.environment.cpus }} logical CPUs ({{ bench.environment.cpu }}). Instantiation counts below are from tsrs; both compilers report no errors:
+<div v-if="bench">
 
-| File | Instantiations | Check time, `tsc` | Check time, tsrs | With the [type cache](#type-cache), `tsc` / tsrs |
-|---|---|---|---|---|
-| 1 query | {{ bench.rows.q1d.instantiations }} | {{ bench.rows.q1d.tsc }} s | {{ bench.rows.q1d.tsrs }} s | |
-| 50 queries | {{ bench.rows.q50d.instantiations }} | {{ bench.rows.q50d.tsc }} s | {{ bench.rows.q50d.tsrs }} s | {{ bench.rows.q50c.instantiations }}, {{ bench.rows.q50c.tsc }} s / {{ bench.rows.q50c.tsrs }} s |
-| 500 queries | {{ bench.rows.q500d.instantiations }} | {{ bench.rows.q500d.tsc }} s | {{ bench.rows.q500d.tsrs }} s | {{ bench.rows.q500c.instantiations }}, {{ bench.rows.q500c.tsc }} s / {{ bench.rows.q500c.tsrs }} s |
+Average checking cost per statement is {{ bench.instantiationsPerQuery }} type instantiations, or {{ bench.throughput.tsc.checkMsPerQuery }} ms with `tsc` and {{ bench.throughput.tsrs.checkMsPerQuery }} ms with [tsrs](https://github.com/oxc-project/tsrs). These are whole-application averages, including schema and fragment checking.
 
-TypeScript keeps a result only for the life of one program, so the editor computes it again after every edit, and `tsc` on every run. The [type cache](#type-cache) keeps the results in a file instead.
+Measurements were taken on {{ bench.date }} with `tsc` {{ bench.compilers.tsc }} and tsrs {{ bench.compilers.tsrs }} on {{ bench.environment.cpus }} logical CPUs ({{ bench.environment.cpu }}). Instantiation counts below are from tsrs; both compilers report no errors:
 
-The bench also checks the other call forms and long statements against TypeSQL's own sources, which `skipLibCheck` does not skip:
-
-| File | Instantiations | Check time, `tsc` | Check time, tsrs |
+| Application workload | Instantiations | Check time, `tsc` | Check time, tsrs |
 |---|---|---|---|
-| 1 query (mostly checking TypeSQL's sources) | {{ bench.rows.q1.instantiations }} | {{ bench.rows.q1.tsc }} s | {{ bench.rows.q1.tsrs }} s |
-| 500 queries | {{ bench.rows.q500.instantiations }} | {{ bench.rows.q500.tsc }} s | {{ bench.rows.q500.tsrs }} s |
-| 50 queries with `:name` and inline parameters and a shared fragment | {{ bench.rows.mixed50.instantiations }} | {{ bench.rows.mixed50.tsc }} s | {{ bench.rows.mixed50.tsrs }} s |
-| one statement each of 0.5, 1, 2, 4 and 8 KB | {{ bench.rows.maxlen.instantiations }} | {{ bench.rows.maxlen.tsc }} s | {{ bench.rows.maxlen.tsrs }} s |
+| Built package | {{ bench.rows.case1d.instantiations }} | {{ bench.rows.case1d.tsc }} s | {{ bench.rows.case1d.tsrs }} s |
+| With the [type cache](#type-cache) | {{ bench.rows.case1c.instantiations }} | {{ bench.rows.case1c.tsc }} s | {{ bench.rows.case1c.tsrs }} s |
+| With a stale cache | {{ bench.rows.case1s.instantiations }} | {{ bench.rows.case1s.tsc }} s | {{ bench.rows.case1s.tsrs }} s |
+| Against TypeSQL's sources | {{ bench.rows.case1.instantiations }} | {{ bench.rows.case1.tsc }} s | {{ bench.rows.case1.tsrs }} s |
 
-CI measures with `tsrs` and `tsc` and fails a change that takes a bench file over its instantiation or check-time budget, or a cache hit over 250 instantiations (`packages/bench/thresholds.json`).
+TypeScript keeps a result only for the life of one program, so the editor computes it again after every edit, and `tsc` on every run. The [type cache](#type-cache) keeps the results in a file instead. A warm cache uses {{ bench.cache.cachedRatio }}× the instantiations of the uncached application; a stale cache uses {{ bench.cache.staleRatio }}×.
+
+</div>
+
+<p v-else>GitHub Actions measurements for this workload will appear after the next release.</p>
+
+CI measures with both compilers and fails a change that exceeds the instantiation, check-time, error or cache-ratio budgets in `packages/bench/thresholds.json`.
 
 ## Runtime
 
-Building a query (Node {{ bench.environment.node }}, same machine):
+<div v-if="bench">
 
-| Call | Time |
-|---|---|
-| `sql("… WHERE id = $1", 7)` | {{ bench.runtime.positional }} µs |
-| `:name` parameters | {{ bench.runtime.named }} µs |
-| inline `${sql.param(…)}` values | {{ bench.runtime.inline }} µs |
-| a `{slot}` fragment | {{ bench.runtime.fragment }} µs |
+On Node {{ bench.environment.node }}, building the same {{ bench.workload.statements }} statements costs **{{ bench.runtime.microsecondsPerQuery }} µs per statement** on average, or **{{ bench.runtime.millisecondsPerWorkload }} ms for the application workload**.
+
+</div>
+
+<p v-else>GitHub Actions runtime measurements will appear after the next release.</p>
+
+The runner supplies deterministic populated runtime inputs and reuses the fixture's setup fragments; setup is outside the timed loop. SQL text and statement expressions come directly from the fixture.
 
 `@typesql/core` has no dependencies and is 10 KB minified, 4.0 KB gzipped.
 
@@ -49,13 +50,14 @@ Building a query (Node {{ bench.environment.node }}, same machine):
 From a clone of the repository:
 
 ```sh
-node packages/bench/gen.ts && pnpm --filter @typesql/core build && node packages/bench/run.ts   # compile time (tsrs and tsc)
-pnpm build && node packages/bench/runtime.ts                                                    # runtime
+pnpm --filter @typesql/core build
+pnpm bench                          # compile time (tsrs and tsc)
+node packages/bench/runtime.ts       # runtime, same fixture
 ```
 
 ## Type cache
 
-The type cache is an optional file in your project that holds results the checker would otherwise compute again. A cached query costs about {{ bench.cache.instantiationsPerHit }} instantiations instead of about {{ bench.instantiationsPerQuery }}. It needs TypeScript 7.1, whose content mappers let `@typesql/core` serve the file to the checker: no CLI, no editor extension, no code in your app.
+The type cache is an optional file in your project that holds results the checker would otherwise compute again. It needs TypeScript 7.1, whose content mappers let `@typesql/core` serve the file to the checker: no CLI, no editor extension, no code in your app.
 
 ### Setup
 

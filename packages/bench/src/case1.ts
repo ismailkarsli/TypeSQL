@@ -3,7 +3,7 @@
 // Application words use API-generated replacements with the same lengths and underscores.
 // Runtime inputs are declared locally so only the schema and SQL are benchmarked.
 // Measure alone against the built core package (use tsc for the other compiler):
-// pnpm exec tsrs --ignoreConfig --noEmit --strict --skipLibCheck --target es2024 --module esnext --moduleResolution bundler --extendedDiagnostics packages/bench/src/real-world/case1.ts
+// pnpm exec tsrs --ignoreConfig --noEmit --strict --skipLibCheck --target es2024 --module esnext --moduleResolution bundler --extendedDiagnostics packages/bench/src/case1.ts
 import {
 	createSql,
 	type Col,

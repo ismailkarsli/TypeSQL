@@ -8,6 +8,5 @@
 			"@typesql/core": ["../core/src/index.ts"]
 		}
 	},
-	"include": ["src", "*.ts"],
-	"exclude": ["src/maxlen.ts"]
+	"include": ["src", "*.ts"]
 }

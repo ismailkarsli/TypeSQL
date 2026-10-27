@@ -245,7 +245,6 @@ jobs:
           node-version: 26
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: node packages/bench/gen.ts
       # the cached variants run the content mapper and job from the built package
       - run: pnpm --filter @typesql/core build
       - run: node packages/bench/run.ts

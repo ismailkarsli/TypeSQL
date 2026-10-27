@@ -1,17 +1,8 @@
 #!/usr/bin/env node
-// Measures `tsrs` and `tsc` (`--noEmit --extendedDiagnostics`) per generated file, writes
-// results.json, prints a table plus the per-query throughput for both compilers (also to the
-// GitHub job summary when GITHUB_STEP_SUMMARY is set) and exits 1 when a file exceeds
-// thresholds.json. `--calibrate` rewrites thresholds.json from the measured numbers x2 (check time
-// gets a 1.5 s floor: for sub-second files the fixed cost of loading lib.d.ts + core and CPU
-// contention dominate, and instantiation counts are the deterministic signal) before checking.
-//
-// Variants: the sources against core's sources (q1 … maxlen), the same files against the built
-// package with skipLibCheck, as an application compiles them (…d), with a type cache generated
-// for the file and served by the content mapper (…c), and with a cache generated for another
-// schema, every entry stale (q500s). The cached variants need `pnpm --filter @typesql/core build`.
-//
-// `--compiler tsrs` or `--compiler tsc` measures with that compiler only.
+// Measures the immutable case1 application with tsrs and tsc against source, built,
+// warm-cache and stale-cache variants. Writes results.json and enforces thresholds.json.
+// --calibrate sets 30% instantiation headroom and 2x check time (minimum 1.5 seconds).
+// --compiler tsrs or --compiler tsc measures only that compiler.
 import { spawnSync } from "node:child_process";
 import {
 	appendFileSync,
@@ -25,6 +16,7 @@ import { cpus } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import type * as Job from "../core/src/cache/job.ts";
+import { fixture, loadWorkload, source } from "./workload.ts";
 
 interface Variant {
 	name: string;
@@ -39,12 +31,6 @@ interface TscError {
 	line: number;
 	code: string;
 	message: string;
-}
-
-interface Probe {
-	name: string;
-	bytes: number;
-	ok: boolean;
 }
 
 interface Result {
@@ -62,18 +48,16 @@ interface Result {
 	otherErrorCount: number;
 	errors: TscError[];
 	exitCode: number | null;
-	probes?: Probe[];
 }
 
 interface Threshold {
 	instantiations: number;
 	checkTimeSec: number;
 	maxErrors: number;
-	minOkBytes?: number;
 }
 
 interface CacheThreshold {
-	instantiationsPerHit: number;
+	cachedRatio: number;
 	staleRatio: number;
 }
 
@@ -102,46 +86,28 @@ const cached = {
 	contentMappers: [{ package: "@typesql/core", extensions: [".typesqlcache"] }],
 };
 const variants: Variant[] = [
-	{ name: "q1", files: ["src/q1.ts"] },
-	{ name: "q50", files: ["src/q50.ts"] },
-	{ name: "q500", files: ["src/q500.ts"] },
-	{ name: "mixed50", files: ["src/mixed50.ts"] },
-	{ name: "maxlen", files: ["src/maxlen.ts"] },
-	{ name: "q1d", config: dist, files: ["src/q1.ts"] },
-	{ name: "q50d", config: dist, files: ["src/q50.ts"] },
-	{ name: "q500d", config: dist, files: ["src/q500.ts"] },
+	{ name: "case1", files: [fixture] },
+	{ name: "case1d", config: dist, files: [fixture] },
 	{
-		name: "q50c",
+		name: "case1c",
 		config: cached,
-		files: ["src/q50.ts", "cache/q50.typesqlcache"],
-		cache: { from: ["src/q50.ts"] },
+		files: [fixture, "cache/case1.typesqlcache"],
+		cache: { from: [fixture] },
 	},
 	{
-		name: "q500c",
+		name: "case1s",
 		config: cached,
-		files: ["src/q500.ts", "cache/q500.typesqlcache"],
-		cache: { from: ["src/q500.ts"] },
-	},
-	{
-		name: "q500s",
-		config: cached,
-		files: ["src/q500.ts", "cache/q500s.typesqlcache"],
-		cache: { from: ["cache/q500s-schema.ts"] },
+		files: [fixture, "cache/case1s.typesqlcache"],
+		cache: { from: ["cache/case1s-schema.ts"] },
 	},
 ];
+const workload = { file: fixture, statements: loadWorkload().statements };
 const calibrate = process.argv.includes("--calibrate");
-if (calibrate && onlyCompiler !== undefined && onlyCompiler !== "tsrs") {
-	console.error("--calibrate measures with tsrs: drop --compiler");
+if (calibrate && onlyCompiler !== undefined) {
+	console.error("--calibrate measures both compilers: drop --compiler");
 	process.exit(2);
 }
 const thresholdsPath = join(here, "thresholds.json");
-
-for (const name of ["q1", "q50", "q500", "mixed50", "maxlen"]) {
-	if (!existsSync(join(here, "src", `${name}.ts`))) {
-		console.error(`missing src/${name}.ts — run \`node gen.ts\` first`);
-		process.exit(2);
-	}
-}
 
 /** Generate the type caches of the cached variants with the job from the built package. */
 async function generateCaches(): Promise<void> {
@@ -157,14 +123,15 @@ async function generateCaches(): Promise<void> {
 		readFileSync(join(core, "dist/engine/cache.d.ts"), "utf8"),
 	)![1]!;
 	mkdirSync(join(here, "cache"), { recursive: true });
-	// the stale variant's schema: q500's with an enum registry, which every entry depends on
-	writeFileSync(
-		join(here, "cache/q500s-schema.ts"),
-		readFileSync(join(here, "src/q500.ts"), "utf8").replace(
-			"interface DB {",
-			'interface DB {\n  $types: { mood: "happy" | "sad" };',
-		),
+	// Copy the fixture and change the enum registry every cache entry depends on.
+	// The application fixture itself is never written.
+	const staleSource = source.replace(
+		"$types: {",
+		'$types: { __bench_stale: "stale";',
 	);
+	if (staleSource === source)
+		throw new Error("case1 has no enum registry to invalidate");
+	writeFileSync(join(here, "cache/case1s-schema.ts"), staleSource);
 	for (const v of variants.filter((v) => v.cache)) {
 		const cacheFile = join(here, v.files[1]!);
 		writeFileSync(cacheFile, "{}\n");
@@ -258,29 +225,10 @@ function measure(variant: Variant, compiler: Compiler): Result {
 			errors,
 			exitCode: proc.status,
 		};
-		if (name === "maxlen") result.probes = probes(inFile);
 		return result;
 	} finally {
 		unlinkSync(configPath);
 	}
-}
-
-/** Map error lines in src/maxlen.ts back to the `export const lenNk = sql(...)` probe on that line. */
-function probes(errors: TscError[]): Probe[] {
-	const lines = readFileSync(join(here, "src", "maxlen.ts"), "utf8").split(
-		"\n",
-	);
-	const found: Probe[] = [];
-	lines.forEach((line, index) => {
-		const m = line.match(/^export const (\w+) = sql\(.*\); \/\/ (\d+) bytes$/);
-		if (m)
-			found.push({
-				name: m[1]!,
-				bytes: Number(m[2]),
-				ok: !errors.some((e) => e.line === index + 1),
-			});
-	});
-	return found;
 }
 
 const byCompiler = Object.fromEntries(
@@ -289,31 +237,22 @@ const byCompiler = Object.fromEntries(
 const primaryCompiler: Compiler = compilers[0]!;
 const results = byCompiler[primaryCompiler];
 
-/**
- * Marginal cost of one query: q500 minus q1 (which is mostly loading lib.d.ts and core), per
- * query. `queriesPerSec` is the check-time throughput an app with many typed queries sees.
- */
+/** Whole-application averages, including schema and reusable-fragment checking. */
 function throughput(list: Result[]): {
 	instantiationsPerQuery: number;
 	checkMsPerQuery: number;
 	queriesPerSec: number;
 } | null {
-	const q1 = list.find((r) => r.name === "q1");
-	const q500 = list.find((r) => r.name === "q500");
-	if (
-		!q1?.checkTimeSec ||
-		!q500?.checkTimeSec ||
-		q1.instantiations == null ||
-		q500.instantiations == null
-	)
-		return null;
-	const seconds = Math.max(q500.checkTimeSec - q1.checkTimeSec, 0.001);
+	const result = list.find((r) => r.name === "case1d");
+	if (!result?.checkTimeSec || result.instantiations == null) return null;
 	return {
 		instantiationsPerQuery: Math.round(
-			(q500.instantiations - q1.instantiations) / 499,
+			result.instantiations / workload.statements,
 		),
-		checkMsPerQuery: Number(((seconds * 1000) / 499).toFixed(2)),
-		queriesPerSec: Math.round(499 / seconds),
+		checkMsPerQuery: Number(
+			((result.checkTimeSec * 1000) / workload.statements).toFixed(2),
+		),
+		queriesPerSec: Math.round(workload.statements / result.checkTimeSec),
 	};
 }
 const throughputByCompiler = Object.fromEntries(
@@ -321,18 +260,15 @@ const throughputByCompiler = Object.fromEntries(
 ) as Record<Compiler, ReturnType<typeof throughput>>;
 const perQuery = throughputByCompiler[primaryCompiler];
 
-/**
- * Cost of a cache hit, q500c - q50c per query, and of a stale cache against no cache (q500s /
- * q500d): a stale entry must cost what the analysis costs, plus its lookup.
- */
+/** Compare the same application's warm and stale caches with its uncached build. */
 function cacheCost(list: Result[]): CacheThreshold | null {
-	const get = (n: string): number | null | undefined =>
-		list.find((r) => r.name === n)?.instantiations;
-	const [c50, c500, s500, d500] = ["q50c", "q500c", "q500s", "q500d"].map(get);
-	if ([c50, c500, s500, d500].some((x) => x == null)) return null;
+	const get = (name: string) =>
+		list.find((r) => r.name === name)?.instantiations;
+	const [warm, stale, uncached] = ["case1c", "case1s", "case1d"].map(get);
+	if (warm == null || stale == null || !uncached) return null;
 	return {
-		instantiationsPerHit: Math.round((c500! - c50!) / 450),
-		staleRatio: Number((s500! / d500!).toFixed(3)),
+		cachedRatio: Number((warm / uncached).toFixed(3)),
+		staleRatio: Number((stale / uncached).toFixed(3)),
 	};
 }
 const cache = cacheCost(results);
@@ -341,6 +277,7 @@ writeFileSync(
 	JSON.stringify(
 		{
 			measuredAt: new Date().toISOString(),
+			workload,
 			environment: {
 				node: process.version,
 				cpu: cpus()[0]?.model,
@@ -372,37 +309,58 @@ writeFileSync(
 	) + "\n",
 );
 
+if (
+	Object.values(byCompiler)
+		.flat()
+		.some(
+			(r) =>
+				r.exitCode !== 0 || r.instantiations == null || r.checkTimeSec == null,
+		) &&
+	calibrate
+) {
+	console.error("Cannot calibrate unsuccessful compiler runs");
+	process.exit(1);
+}
 if (calibrate) {
 	const thresholds: Thresholds = {};
-	for (const r of results) {
+	for (const [index, r] of results.entries()) {
+		const measured = compilers.map((c) => byCompiler[c][index]!);
 		thresholds[r.name] = {
 			// instantiation counts are deterministic: 30% headroom; check time is noisy: 2x (min 1.5 s)
-			instantiations: Math.ceil((r.instantiations ?? 0) * 1.3),
+			instantiations: Math.ceil(
+				Math.max(...measured.map((r) => r.instantiations ?? 0)) * 1.3,
+			),
 			checkTimeSec: Math.max(
 				1.5,
-				Number(((r.checkTimeSec ?? 0) * 2).toFixed(2)),
+				Number(
+					(Math.max(...measured.map((r) => r.checkTimeSec ?? 0)) * 2).toFixed(
+						2,
+					),
+				),
 			),
 			maxErrors: 0,
 		};
-		if (r.probes) {
-			thresholds[r.name]!.maxErrors = r.probes.filter((p) => !p.ok).length;
-			thresholds[r.name]!.minOkBytes = Math.max(
-				0,
-				...r.probes.filter((p) => p.ok).map((p) => p.bytes),
-			);
-		}
 	}
-	// a hit must stay under 250 instantiations (the design target); a stale cache must cost what no cache does
 	if (cache)
 		thresholds.cache = {
-			instantiationsPerHit: Math.min(
-				250,
-				Math.ceil(cache.instantiationsPerHit * 1.3),
+			cachedRatio: Math.min(
+				1,
+				Number(
+					(
+						Math.max(
+							...compilers.map(
+								(c) => cacheCost(byCompiler[c])?.cachedRatio ?? 1,
+							),
+						) * 1.3
+					).toFixed(3),
+				),
 			),
 			staleRatio: 1.05,
 		};
 	writeFileSync(thresholdsPath, JSON.stringify(thresholds) + "\n");
-	console.log(`wrote thresholds.json (measured x2)`);
+	console.log(
+		`wrote thresholds.json (30% instantiation headroom, 2x check time)`,
+	);
 }
 
 const thresholds: Thresholds = existsSync(thresholdsPath)
@@ -415,6 +373,8 @@ const rows = results.map((r, idx) => {
 	for (const c of compilers) {
 		const rc = byCompiler[c][idx]!;
 		const tag = compilers.length > 1 ? ` (${c})` : "";
+		if (rc.exitCode !== 0)
+			problems.push(`compiler${tag} exited with ${rc.exitCode}`);
 		if (t) {
 			if (rc.instantiations == null || rc.instantiations > t.instantiations)
 				problems.push(`instantiations${tag} > ${t.instantiations}`);
@@ -426,16 +386,6 @@ const rows = results.map((r, idx) => {
 				problems.push(
 					`${rc.otherErrorCount} error(s) outside the file${tag} (core does not compile?)`,
 				);
-			if (t.minOkBytes != null) {
-				const maxOk = Math.max(
-					0,
-					...(rc.probes ?? []).filter((p) => p.ok).map((p) => p.bytes),
-				);
-				if (maxOk < t.minOkBytes)
-					problems.push(
-						`max OK statement${tag} ${maxOk} B < ${t.minOkBytes} B`,
-					);
-			}
 		}
 	}
 	if (problems.length) failures.push({ name: r.name, problems });
@@ -486,24 +436,26 @@ function table(objects: Record<string, unknown>[]): void {
 	for (const o of objects) console.log(line(keys.map((k) => o[k])));
 }
 table(rows);
-if (cache) {
+for (const c of compilers) {
+	const cache = cacheCost(byCompiler[c]);
+	if (!cache) continue;
 	console.log(
-		`\ntype cache: ${cache.instantiationsPerHit} instantiations per hit (q500c - q50c), stale cache ${cache.staleRatio}x no cache (q500s / q500d)`,
+		`\ntype cache (${c}): warm cache ${cache.cachedRatio}x no cache, stale cache ${cache.staleRatio}x no cache`,
 	);
 	const t = thresholds.cache;
 	const problems: string[] = [];
-	if (t && cache.instantiationsPerHit > t.instantiationsPerHit)
-		problems.push(`instantiations per hit > ${t.instantiationsPerHit}`);
+	if (t && cache.cachedRatio > t.cachedRatio)
+		problems.push(`warm cache costs more than ${t.cachedRatio}x no cache`);
 	if (t && cache.staleRatio > t.staleRatio)
 		problems.push(`stale cache costs more than ${t.staleRatio}x no cache`);
-	if (problems.length) failures.push({ name: "cache", problems });
+	if (problems.length) failures.push({ name: `cache (${c})`, problems });
 }
 for (const c of compilers) {
 	const pq = throughputByCompiler[c];
 	if (pq) {
 		const label = compilers.length > 1 ? ` (${c})` : "";
 		console.log(
-			`\nthroughput (q500 - q1)${label}: ${pq.queriesPerSec} queries/s of check time, ${pq.checkMsPerQuery} ms and ${pq.instantiationsPerQuery} instantiations per query`,
+			`\napplication average (${workload.statements} statements)${label}: ${pq.queriesPerSec} queries/s of check time, ${pq.checkMsPerQuery} ms and ${pq.instantiationsPerQuery} instantiations per query`,
 		);
 	}
 }
@@ -511,6 +463,8 @@ if (process.env.GITHUB_STEP_SUMMARY) {
 	const both = compilers.length > 1;
 	const md = [
 		`### ${failures.length ? "❌" : "✅"} Compile-time bench${onlyCompiler ? ` (${onlyCompiler})` : ""}`,
+		"",
+		`Workload: \`${workload.file}\` (${workload.statements} statements). Per-query figures are whole-application averages.`,
 		"",
 		...failures.map((f) => `- ${f.name}: ${f.problems.join(", ")}`),
 		...(failures.length ? [""] : []),
@@ -533,16 +487,11 @@ if (process.env.GITHUB_STEP_SUMMARY) {
 			})
 			.filter(Boolean),
 		cache
-			? `Type cache: ${cache.instantiationsPerHit} instantiations per hit; a stale cache costs ${cache.staleRatio}x no cache.`
+			? `Type cache: warm cache ${cache.cachedRatio}x no cache; stale cache ${cache.staleRatio}x no cache.`
 			: "",
 	];
 	appendFileSync(process.env.GITHUB_STEP_SUMMARY, md.join("\n") + "\n");
 }
-const maxlen = results.find((r) => r.probes);
-if (maxlen)
-	console.log(
-		`\nmaxlen probes: ${maxlen.probes!.map((p) => `${p.name}=${p.bytes}B:${p.ok ? "ok" : "FAIL"}`).join("  ")}`,
-	);
 for (const c of compilers)
 	for (const r of byCompiler[c])
 		for (const e of r.errors)

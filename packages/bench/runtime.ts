@@ -1,43 +1,30 @@
 #!/usr/bin/env node
+// Build every statement from case1 with deterministic inputs and reusable setup fragments.
+// Imports the built package; run `pnpm --filter @typesql/core build` first.
 import { writeFileSync } from "node:fs";
-// Runtime cost of building a query: `sql(...)` turns the call into `{ text, values }` (named and
-// inline parameters rewritten to $n, fragments spliced). Nothing is parsed at runtime. Imports the
-// built package, so run `pnpm build` first.
-import { type Col, createSql, type Generated } from "@typesql/core";
+import { fixture, loadWorkload } from "./workload.ts";
 
-interface DB {
-	users: { id: Generated<"int4">; email: Col<"text"> };
+const { statements, build } = loadWorkload();
+const iterations = 3_000;
+let sink: ReturnType<typeof build> = [];
+for (let i = 0; i < iterations / 10; i++) sink = build();
+const started = performance.now();
+for (let i = 0; i < iterations; i++) sink = build();
+const totalMs = performance.now() - started;
+if (sink.length !== statements || sink.some((q) => !q.text)) {
+	throw new Error("case1 did not build every statement");
 }
-
-const sql = createSql<DB>();
-const where = sql.fragment("WHERE u.id > $1", 100);
-const cases = {
-	"positional $1": () => sql("SELECT id, email FROM users WHERE id = $1", 7),
-	"named :email": () =>
-		sql("SELECT id FROM users WHERE email = :email AND id > :min", {
-			email: "a@b.c",
-			min: 10,
-		}),
-	"inline sql.param": () =>
-		sql(
-			`SELECT id FROM users WHERE email = ${sql.param("a@b.c")} AND id > ${sql.param(10)}`,
-		),
-	"fragment {slot}": () =>
-		sql("SELECT u.id FROM users u {where} AND u.email = $1", { where }, "x"),
+const results = {
+	workload: { file: fixture, statements },
+	iterations,
+	microsecondsPerQuery: Number(
+		((totalMs * 1000) / iterations / statements).toFixed(2),
+	),
+	millisecondsPerWorkload: Number((totalMs / iterations).toFixed(2)),
 };
-
-const N = 1_000_000;
-const results: Record<string, number> = {};
-let sink: { readonly text: string } | undefined;
-for (const [name, build] of Object.entries(cases)) {
-	for (let i = 0; i < N / 10; i++) sink = build(); // warm up
-	const started = performance.now();
-	for (let i = 0; i < N; i++) sink = build();
-	const ns = ((performance.now() - started) * 1e6) / N;
-	results[name] = Number((ns / 1000).toFixed(2));
-	console.log(`${name.padEnd(18)} ${(ns / 1000).toFixed(2)} µs per call`);
-}
-if (!sink!.text) throw new Error("unreachable");
+console.log(
+	`${fixture}: ${results.microsecondsPerQuery} µs per query, ${results.millisecondsPerWorkload} ms for ${statements} statements`,
+);
 writeFileSync(
 	new URL("./runtime-results.json", import.meta.url),
 	`${JSON.stringify(results, null, "\t")}\n`,

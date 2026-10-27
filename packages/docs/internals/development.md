@@ -574,46 +574,40 @@ argument, a slot or an inline value) and inside a call, where it pins where the 
 
 ## Compile-time bench
 
-`packages/bench` measures what the engine costs the compiler:
+`packages/bench` uses the immutable `src/case1.ts` application fixture for every benchmark: 379 statements, their schema, and reusable SQL fragments. Do not edit the fixture to improve results.
 
 ```sh
-node packages/bench/gen.ts               # writes src/q1.ts, q50.ts, q500.ts, mixed50.ts, maxlen.ts
-pnpm --filter @typesql/core build         # the …d and …c variants use the built package
-node packages/bench/run.ts               # tsrs and tsc --extendedDiagnostics per variant; exit 1 on a threshold breach
-node packages/bench/run.ts --compiler tsrs # measure with tsrs only (or --compiler tsc for tsc only)
-node packages/bench/run.ts --calibrate   # rewrite thresholds.json from the measured numbers
+pnpm --filter @typesql/core build          # built-package and cache variants
+pnpm bench                               # tsrs and tsc; exit 1 on a threshold breach
+pnpm bench --compiler tsrs                # tsrs only (or --compiler tsc)
+pnpm bench --calibrate                    # rewrite thresholds from successful measurements
+node packages/bench/runtime.ts            # build the same application statements at runtime
 ```
 
-`qN.ts` holds N distinct realistic SELECTs; `mixed50.ts` holds 50 statements that use inline
-`${sql.param()}` values, `:name` parameters, one `{slot}` fragment shared by many statements
-and `sql.id`; `maxlen.ts` holds one statement per size probe (0.5, 1, 2, 4 and 8 KB).
-Each file is measured in up to three ways: against core's TypeScript sources (`q1` … `maxlen`),
-against the built package with `skipLibCheck`, as an application compiles (`q1d`, `q50d`,
-`q500d`), and with a [type cache](../guide/performance.md) generated for the file and served by the
-content mapper (`q50c`, `q500c`). `q500s` uses a cache generated for another schema, so every
-entry is stale and must cost what no cache costs.
+The compile-time variants use the same fixture against core's sources (`case1`), the built
+package with `skipLibCheck` (`case1d`), a generated [type cache](../guide/performance.md)
+(`case1c`), and a cache generated from a copy with a changed enum registry (`case1s`). The
+stale copy lives under the ignored `cache/` directory; the fixture is never changed.
 
-`thresholds.json` caps instantiations (30% headroom: they are deterministic), check time (2x:
-it is noisy), errors, and the largest statement that must still infer; for the cache, the
-instantiations of one hit (q500c − q50c over 450, at most 250) and a stale cache against no cache
-(at most 1.05x). CI runs the bench as a separate job and writes the table to the job summary.
+`thresholds.json` caps instantiations (30% headroom), check time (2x, with a 1.5-second floor),
+and errors. It also caps the warm-cache instantiation ratio against the uncached build and
+requires a stale cache to stay within 1.05x uncached instantiations. CI measures both compilers
+and writes a table to the job summary. Per-statement throughput is the whole built-package
+check divided by the fixture's statement count, including schema and fragment checking.
+It is an application average, not a marginal query cost or an isolated cache-hit cost.
 
-`run.ts` also prints the marginal cost of one query, q500 minus q1 divided by 499: check
-time per query, queries per second of check time, and instantiations per query. That is the
-number to watch for an app with hundreds of typed queries.
+The runtime runner reads the same fixture, supplies deterministic populated values for its
+declared inputs, and builds every statement with the original SQL and fragment expressions.
+It warms up before timing and reports both microseconds per statement and milliseconds per
+application workload. Input generation and reusable-fragment setup are outside the timed loop.
 
 Current measurements are in [Performance](https://typesql.karsli.net/guide/performance).
 The release workflow updates `.vitepress/benchmarks.json` from the compile-time and runtime CI
-benchmarks; the guide imports it and embeds values with Vue interpolation. The README's timing
-summary and release chart are generated from the same measurements for GitHub. To refresh locally,
-run the benchmarks above, `node packages/bench/runtime.ts`, then `node scripts/performance-history.ts`.
-
-Where a typical query's cost goes (q50, instantiations above loading the library): lexing
-~30%, parsing ~35%, binding and typing ~13%, building the row and parameter types ~17%, the
-call signature (`:name` / inline rewriting, checks) ~4%. Each statement is analysed on its own:
-TypeScript caches type instantiations by their arguments, and two statements that share a
-fragment or a subquery still differ in their text and token tuple, so nothing is reused
-between them.
+benchmarks. The README's timing summary and release chart use the same measurements, generated
+by `node scripts/performance-history.ts` in the release workflow. Local benchmark outputs stay
+in ignored files. History records
+cached and uncached tsrs timings of `case1` on the same line chart; older synthetic results have
+been removed because they used a different workload.
 
 ## Function catalog review
 
