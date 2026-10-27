@@ -101,25 +101,50 @@ function say(line: string) {
 	summary.push(line);
 }
 
-function create(title: string, body: string, labels: string[]) {
+let labelsEnsured = false;
+function ensureLabels() {
+	if (labelsEnsured || flags.dryRun) return;
+	labelsEnsured = true;
+	labels();
+}
+
+function create(title: string, body: string, labelsList: string[]) {
 	if (flags.dryRun) {
-		say(`would open: ${title} [${labels.join(", ")}]`);
+		say(`would open: ${title} [${labelsList.join(", ")}]`);
 		console.log(`${body}\n${"─".repeat(72)}`);
 		return null;
 	}
-	const url = gh(
-		[
-			"issue",
-			"create",
-			"--title",
-			title,
-			"--label",
-			labels.join(","),
-			"--body-file",
-			"-",
-		],
-		body,
-	).trim();
+	let url: string;
+	try {
+		url = gh(
+			[
+				"issue",
+				"create",
+				"--title",
+				title,
+				"--label",
+				labelsList.join(","),
+				"--body-file",
+				"-",
+			],
+			body,
+		).trim();
+	} catch (err) {
+		ensureLabels();
+		url = gh(
+			[
+				"issue",
+				"create",
+				"--title",
+				title,
+				"--label",
+				labelsList.join(","),
+				"--body-file",
+				"-",
+			],
+			body,
+		).trim();
+	}
 	say(`opened ${url}: ${title}`);
 	return Number(/\/(\d+)$/.exec(url)?.[1]);
 }
