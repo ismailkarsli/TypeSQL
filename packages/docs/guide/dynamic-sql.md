@@ -31,7 +31,7 @@ You can splice a whole query too, for example into `IN (…)`:
 ## Identifiers and lists
 
 - `sql.id(…)` quotes an identifier. `sql.id("schema", "table")` gives `"schema"."table"`.
-- `sql.join([…], separator)` joins fragments and renumbers their parameters in order.
+- `sql.combine([…], { separator })` combines fragments and renumbers their parameters in order.
 
 Both keep their text as a literal type, so the statement is still fully typed:
 
@@ -41,8 +41,8 @@ Both keep their text as a literal type, so the statement is still fully typed:
 `sql.id(…)` double-quotes strings to prevent SQL syntax injection, but does not perform application-level authorization or column filtering. Passing untrusted user input directly to `sql.id()` allows callers to specify sensitive columns (such as `password_hash` in an `ORDER BY` or `SELECT`) or query internal tables. Always validate dynamic identifier names against an allowlist before passing them to `sql.id()`.
 :::
 
-::: danger Dynamic join separators
-The `separator` argument in `sql.join()` is inserted into the query as **raw SQL text**. Never pass untrusted user input as the separator. Use constant delimiters such as `", "`, `" AND "`, or `" OR "`.
+::: danger Dynamic separators
+The `options.separator` value in `sql.combine()` is inserted into the query as **raw SQL text**. Never pass untrusted user input as the separator. Use constant delimiters such as `", "`, `" AND "`, or `" OR "`.
 :::
 
 ### A name from a union
@@ -57,11 +57,11 @@ Inside a generic function, the name isn't known until the call:
 - Any other generic or `string` name gives a dynamic fragment, which needs [`sql.as`](#fully-dynamic-sql).
 - To check against a smaller set, narrow the name yourself: `sql.id(name as "users" | "posts")`.
 
-`sql.join(items, separator = ", ")` keeps the literal text for a tuple written in place. An array built at runtime is checked as a list, below.
+`sql.combine(items, { separator: " AND " })` keeps the literal text for a tuple written in place. The separator defaults to `", "` when options are omitted. An array built at runtime is checked as a list, below.
 
 ## Lists from runtime arrays
 
-`sql.join` also joins an array whose length and order are only known at runtime, such as sort keys a user picked. Each element's text must be known at compile time (fragments from a constant table, or `sql.id` over a union of names), so the statement stays checked:
+`sql.combine` also combines an array whose length and order are only known at runtime, such as sort keys a user picked. Each element's text must be known at compile time (fragments from a constant table, or `sql.id` over a union of names), so the statement stays checked:
 
 <<< @/snippets/fragments.ts#list
 
@@ -77,7 +77,7 @@ An empty array throws at runtime. Always include a fixed element, like the `p.id
 
 ## Fully dynamic SQL
 
-Sometimes the shape of a statement is only known at runtime: `sql.raw(text)`, or `sql.join` over an array of fragments whose texts aren't known. TypeSQL can't infer anything then, and splicing such a fragment into `sql(…)` is a compile error.
+Sometimes the shape of a statement is only known at runtime: `sql.raw(text)`, or `sql.combine` over an array of fragments whose texts aren't known. TypeSQL can't infer anything then, and splicing such a fragment into `sql(…)` is a compile error.
 
 Use `sql.as<Row>(…)` instead. It takes the same arguments, skips inference, and lets you state the row type:
 

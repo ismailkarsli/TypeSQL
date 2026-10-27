@@ -192,7 +192,9 @@ describe("createSql runtime", () => {
 	it("id, join, raw, as", () => {
 		expect(sql.id("a", "b")).toEqual({ text: '"a"."b"', values: [] });
 		expect(
-			sql.join([sql.fragment("x = $1", 1), sql.fragment("y = $1", 2)], " OR "),
+			sql.combine([sql.fragment("x = $1", 1), sql.fragment("y = $1", 2)], {
+				separator: " OR ",
+			}),
 		).toEqual({ text: "x = $1 OR y = $2", values: [1, 2] });
 		expect(sql.raw("WHERE 1=1")).toEqual({ text: "WHERE 1=1", values: [] });
 		expect(
@@ -251,7 +253,7 @@ describe("createSql runtime", () => {
 	});
 });
 
-describe("sql.join over an array", () => {
+describe("sql.combine over an array", () => {
 	interface DB {
 		users: {
 			id: { type: "int4"; nullable: false; hasDefault: true };
@@ -266,7 +268,7 @@ describe("sql.join over an array", () => {
 	} as const;
 	it("joins a runtime array, repeating and renumbering elements", () => {
 		const keys: (keyof typeof SORT)[] = ["near", "email", "near"];
-		const order = sql.join(keys.map((k) => SORT[k]));
+		const order = sql.combine(keys.map((k) => SORT[k]));
 		expect(order).toEqual({
 			text: "abs(id - $1), email, abs(id - $2)",
 			values: [5, 5],
@@ -280,12 +282,17 @@ describe("sql.join over an array", () => {
 			text: "SELECT id FROM users WHERE id > $1 ORDER BY abs(id - $2), email, abs(id - $3)",
 			values: [0, 5, 5],
 		});
-		expect(sql.join([SORT.id, SORT.email], " AND ").text).toBe(
-			"id DESC AND email",
+		expect(
+			sql.combine([SORT.id, SORT.email], { separator: " AND " }).text,
+		).toBe("id DESC AND email");
+		expect(sql.combine([SORT.id, SORT.email], { separator: " / " }).text).toBe(
+			"id DESC / email",
 		);
 	});
 	it("throws on an empty array", () => {
-		expect(() => sql.join([])).toThrow(/sql.join\(\) needs at least one item/);
+		expect(() => sql.combine([])).toThrow(
+			/sql.combine\(\) needs at least one item/,
+		);
 	});
 });
 

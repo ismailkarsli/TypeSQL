@@ -174,14 +174,14 @@ test("fragments carry their values' types; they are checked once spliced", () =>
 	sql("SELECT id FROM users WHERE true {wrongInline}", { wrongInline });
 
 	// joined fragments carry all their values, in order
-	const both = sql.join(
+	const both = sql.combine(
 		[sql.fragment("age > $1", 1), sql.fragment(`email = ${sql.param(email)}`)],
-		" AND ",
+		{ separator: " AND " },
 	);
 	sql("SELECT id FROM users WHERE {both}", { both });
-	const bothWrong = sql.join(
+	const bothWrong = sql.combine(
 		[sql.fragment("age > $1", 1), sql.fragment(`email = ${sql.param(userId)}`)],
-		" AND ",
+		{ separator: " AND " },
 	);
 	// @ts-expect-error the second fragment's value is a number for a text parameter
 	sql("SELECT id FROM users WHERE {bothWrong}", { bothWrong });

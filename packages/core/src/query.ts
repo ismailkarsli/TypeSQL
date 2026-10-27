@@ -121,7 +121,7 @@ const SLOTTABLES = new WeakSet<object>();
 
 /**
  * True when `v` is an authentic fragment or query created by typesql (`sql()`, `sql.as()`,
- * `sql.fragment()`, `sql.raw()`, `sql.id()`, `sql.join()`, `sql.set()`, `sql.values()`).
+ * `sql.fragment()`, `sql.raw()`, `sql.id()`, `sql.combine()`, `sql.set()`, `sql.values()`).
  * Unforgeable from plain JSON.
  */
 export function isSlottable(v: unknown): boolean {

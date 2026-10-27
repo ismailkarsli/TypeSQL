@@ -145,9 +145,9 @@ test("fragments are spliced before inference", () => {
 			'SELECT "display_name" FROM users'
 		>
 	>();
-	const conds = sql.join(
+	const conds = sql.combine(
 		[sql.fragment("age > $1", 1), sql.fragment("email = $1", "e")],
-		" AND ",
+		{ separator: " AND " },
 	);
 	const q5 = sql("SELECT id FROM users WHERE {conds}", { conds });
 	expectTypeOf(q5).toEqualTypeOf<
@@ -157,6 +157,18 @@ test("fragments are spliced before inference", () => {
 			"SELECT id FROM users WHERE age > $1 AND email = $2"
 		>
 	>();
+	const custom = sql.combine([sql.fragment("id"), sql.fragment("email")], {
+		separator: " / ",
+	});
+	expectTypeOf<TextType<typeof custom>>().toEqualTypeOf<"id / email">();
+	const dynamicSeparator: string = "; ";
+	expectTypeOf(
+		sql.combine([sql.fragment("id"), sql.fragment("email")], {
+			separator: dynamicSeparator,
+		}),
+	).toEqualTypeOf<Fragment<string, readonly unknown[], []>>();
+	// @ts-expect-error separator must be passed as an option
+	sql.combine([sql.fragment("id")], " AND ");
 
 	// errors inside spliced text are reported
 	// @ts-expect-error unknown column inside the fragment
@@ -182,15 +194,15 @@ test("dynamic fragments fall back to sql.as", () => {
 	expectTypeOf(ok).toEqualTypeOf<Query<{ id: number }, readonly unknown[]>>();
 	// joining an array of fragments whose texts are not known
 	const arr: Fragment[] = [];
-	const joined = sql.join(arr);
+	const joined = sql.combine(arr);
 	expectTypeOf(joined).toEqualTypeOf<
 		Fragment<string, readonly unknown[], []>
 	>();
 });
 
-test("sql.join over an array: dynamic count, typed elements", () => {
+test("sql.combine over an array: dynamic count, typed elements", () => {
 	const same: Fragment<"u.id = 1", []>[] = [];
-	expectTypeOf(sql.join(same, " OR ")).toEqualTypeOf<
+	expectTypeOf(sql.combine(same, { separator: " OR " })).toEqualTypeOf<
 		Fragment<"u.id = 1", readonly unknown[], []>
 	>();
 	const SORT = {
@@ -201,7 +213,7 @@ test("sql.join over an array: dynamic count, typed elements", () => {
 		},
 	} as const;
 	const sort: { field: "email" | "age"; dir: "asc" | "desc" }[] = [];
-	const order = sql.join([
+	const order = sql.combine([
 		...sort.map(({ field, dir }) => SORT[field][dir]),
 		sql.fragment("u.id"),
 	]);
@@ -213,7 +225,7 @@ test("sql.join over an array: dynamic count, typed elements", () => {
 	expectTypeOf<RowType<typeof q>>().toEqualTypeOf<{ id: number }>();
 
 	// every element is checked against the statement's scope
-	const typo = sql.join(
+	const typo = sql.combine(
 		sort.map(({ field }) =>
 			field === "email" ? sql.fragment("u.emial") : SORT.age.asc,
 		),
@@ -228,7 +240,7 @@ test("sql.join over an array: dynamic count, typed elements", () => {
 		sql.fragment("u.age > $1", 18),
 		sql.fragment(`u.email = ${sql.param("e")}`),
 	];
-	const where = sql.join(conds, " AND ");
+	const where = sql.combine(conds, { separator: " AND " });
 	const q2 = sql(
 		"SELECT u.id FROM users u WHERE u.id > $1 AND {where}",
 		{ where },
@@ -237,16 +249,16 @@ test("sql.join over an array: dynamic count, typed elements", () => {
 	expectTypeOf<ParamsType<typeof q2>>().toEqualTypeOf<
 		[number | null, number | null, string | null]
 	>();
-	const wrong = sql.join(
+	const wrong = sql.combine(
 		[sql.fragment("u.age > $1", "x"), sql.fragment("u.email = $1", "e")],
-		" AND ",
+		{ separator: " AND " },
 	);
 	// @ts-expect-error parameter $1: a string value cannot be used as int4
 	sql("SELECT u.id FROM users u WHERE {wrong}", { wrong });
 
 	// a union-typed element (sql.id over a union) contributes each member once
 	const picked: ("email" | "display_name")[] = [];
-	const cols = sql.join(picked.map((c) => sql.id(c)));
+	const cols = sql.combine(picked.map((c) => sql.id(c)));
 	expectTypeOf<
 		TextType<typeof cols>
 	>().toEqualTypeOf<'"display_name", "email"'>();
@@ -258,7 +270,7 @@ test("sql.join over an array: dynamic count, typed elements", () => {
 	}>();
 
 	// dynamic elements keep the list dynamic
-	const dyn = sql.join([sql.raw("x"), sql.fragment("u.id")]);
+	const dyn = sql.combine([sql.raw("x"), sql.fragment("u.id")]);
 	expectTypeOf(dyn).toEqualTypeOf<Fragment<string, readonly unknown[], []>>();
 	// @ts-expect-error dynamic SQL fragment
 	sql("SELECT u.id FROM users u ORDER BY {dyn}", { dyn });

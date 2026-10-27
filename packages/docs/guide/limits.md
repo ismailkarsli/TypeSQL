@@ -25,11 +25,11 @@ When you hit a limit, [`sql.as<Row>()`](./errors#when-typesql-can-t-type-a-state
 
 ## Fragments and lists
 
-- [`sql.join` over an array](./dynamic-sql#lists-from-runtime-arrays) checks the statement once, with every distinct element once. Its cost grows with the number of distinct elements, not with the number of combinations (80 distinct sort elements cost about 0.2M instantiations).
+- [`sql.combine` over an array](./dynamic-sql#lists-from-runtime-arrays) checks the statement once, with every distinct element once. Its cost grows with the number of distinct elements, not with the number of combinations (80 distinct sort elements cost about 0.2M instantiations).
 - In a select list (`SELECT {cols}`), such a list counts every element as selected.
-- A fragment whose text is a union (`sql.id(name)` with `name: "a" | "b"`) is checked once per member. So two such slots in one statement cost `n × m` checks. A generic `sql.id` over `RelationName<DB>` checks the statement against every table and view. For lists, use `sql.join` over an array, which costs one check.
-- `sql.set` and `sql.values` are checked like `sql.join` over an array, with every key of the input type once.
-- Some calls throw at runtime because Postgres would reject the SQL: `sql.join` with no items, `sql.set` with no defined value, and `sql.values` with an empty array or several rows without values. A `sql.param()` value also throws when it is used in a second statement; wrap a reused value in a fragment.
+- A fragment whose text is a union (`sql.id(name)` with `name: "a" | "b"`) is checked once per member. So two such slots in one statement cost `n × m` checks. A generic `sql.id` over `RelationName<DB>` checks the statement against every table and view. For lists, use `sql.combine` over an array, which costs one check.
+- `sql.set` and `sql.values` are checked like `sql.combine` over an array, with every key of the input type once.
+- Some calls throw at runtime because Postgres would reject the SQL: `sql.combine` with no items, `sql.set` with no defined value, and `sql.values` with an empty array or several rows without values. A `sql.param()` value also throws when it is used in a second statement; wrap a reused value in a fragment.
 
 ## Defaults and generated columns
 

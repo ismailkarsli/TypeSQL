@@ -449,7 +449,7 @@ type PairTexts<Ps extends readonly unknown[]> = {
 };
 
 /**
- * The representative statement piece of `sql.join(items, sep)` over an array: every distinct
+ * The representative statement piece of `sql.combine(items, { separator: sep })` over an array: every distinct
  * element once, joined with `Sep` and renumbered, plus the values those elements carry. A
  * statement that is valid with each element present once is valid for any count and order of
  * them in a list position (ORDER BY, SET, VALUES rows, AND chains, …), so one analysis covers
@@ -470,28 +470,33 @@ export type ListRep<E, Sep extends string> = [E] extends [never]
 		: never;
 
 /**
- * `sql.join(items, sep)`: a tuple keeps the literal text (and the values in order), an array is
+ * `sql.combine(items, { separator: sep })`: a tuple keeps the literal text (and the values in order), an array is
  * typed by its representative piece (`ListRep`).
  */
-type JoinOf<
+type CombineOf<
 	Items extends readonly Slottable[],
 	Sep extends string,
-> = number extends Items["length"]
-	? Fragment<
-			ListRep<Items[number], Sep>["text"],
-			readonly unknown[],
-			ListRep<Items[number], Sep>["carried"]
-		>
-	: Fragment<
-			JoinedText<
-				SlotTexts<Items> extends readonly { readonly text: string }[]
-					? SlotTexts<Items>
-					: never,
-				Sep
-			>,
-			readonly unknown[],
-			JoinedCarried<Items>
-		>;
+> = string extends Sep
+	? Fragment<string, readonly unknown[], []>
+	: number extends Items["length"]
+		? Fragment<
+				ListRep<Items[number], Sep>["text"],
+				readonly unknown[],
+				ListRep<Items[number], Sep>["carried"]
+			>
+		: Fragment<
+				JoinedText<
+					SlotTexts<Items> extends readonly { readonly text: string }[]
+						? SlotTexts<Items>
+						: never,
+					Sep
+				>,
+				readonly unknown[],
+				JoinedCarried<Items>
+			>;
+
+/** Suggested separators in editors; other strings still retain their literal type. */
+type CombineSeparator = ", " | " AND " | " OR " | (string & {});
 
 type GateCallCheck<DB, TM, Keys, Q extends string> = [DB, TM, Q] extends [
 	infer D,
@@ -709,16 +714,19 @@ export interface Sql<DB, TM, Keys extends RowKeys = "preserve"> {
 	id(...parts: readonly [string, ...string[]]): Fragment<string, [], []>;
 
 	/**
-	 * Join fragments with a separator: `sql.join([a, b], " AND ")`, or a runtime array of
-	 * fragments whose texts are known, `sql.join(keys.map((k) => SORT[k]))`. A tuple keeps the
+	 * Combine fragments with a separator: `sql.combine([a, b], { separator: " AND " })`, or a runtime array of
+	 * fragments whose texts are known, `sql.combine(keys.map((k) => SORT[k]))`. A tuple keeps the
 	 * literal text. For an array the count and order are dynamic, but every element type is a
 	 * literal, so the statement is still checked: it is validated once with each distinct element
 	 * present (see `ListRep`). Throws at runtime when there are no items.
 	 */
-	join<
+	combine<
 		const Items extends readonly Slottable[],
-		const Sep extends string = ", ",
-	>(items: Items, separator?: Sep): JoinOf<Items, Sep>;
+		const Sep extends CombineSeparator = ", ",
+	>(
+		items: Items,
+		options?: { readonly separator?: Sep },
+	): CombineOf<Items, Sep>;
 
 	/**
 	 * `SET` list from an object: `sql("UPDATE users SET {set} WHERE id = $1", { set: sql.set("users", input) }, id)`.
@@ -847,12 +855,15 @@ export function createSql<DB, TM = DefaultTypeMap>(
 			return makeFragment(r.text, r.values);
 		},
 		id: (...parts: readonly string[]) => makeFragment(quoteIdent(...parts), []),
-		join: (items: readonly Spliceable[], separator: string = ", ") => {
+		combine: (
+			items: readonly Spliceable[],
+			options?: { readonly separator?: string },
+		) => {
 			if (items.length === 0)
 				throw new Error(
-					"typesql: sql.join() needs at least one item; put a fixed element first (`[base, ...rest]`) or skip the clause",
+					"typesql: sql.combine() needs at least one item; put a fixed element first (`[base, ...rest]`) or skip the clause",
 				);
-			const r = joinFragments(items, separator);
+			const r = joinFragments(items, options?.separator ?? ", ");
 			return makeFragment(r.text, r.values);
 		},
 		set: (_table: string, values: Readonly<Record<string, unknown>>) => {
