@@ -49,8 +49,9 @@ export function readCache(path: string, engine: string): CacheFile {
 
 /**
  * `file` with `owner`'s entries replaced by `mine`. Entries of other owners stay, with the
- * word and pair snapshots they depend on (a snapshot `mine` recomputed replaces the old one:
- * an entry of another project that depended on the old one is stale until its job runs).
+ * word and pair snapshots they depend on. When a snapshot changes, discard the old group's
+ * entries and ownership before installing the new snapshot: retained calls must never be
+ * presented as results computed against a newer schema. Other projects regenerate their entries.
  */
 export function merge(
 	file: CacheFile,
@@ -100,6 +101,23 @@ export function merge(
 			entries: {},
 		};
 		const target = groups[g];
+		if (
+			target.t !== group.t ||
+			target.h !== group.h ||
+			(["w", "q"] as const).some((k) =>
+				Object.entries(group[k]).some(
+					([key, value]) =>
+						Object.hasOwn(target[k], key) &&
+						JSON.stringify(target[k][key]) !== JSON.stringify(value),
+				),
+			)
+		) {
+			for (const key of Object.keys(target.entries))
+				delete owners[groupEntryId(g, key)];
+			target.entries = {};
+			target.w = {};
+			target.q = {};
+		}
 		target.t = group.t;
 		target.h = group.h;
 		Object.assign(target.w, group.w);

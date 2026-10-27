@@ -1,11 +1,8 @@
 import type {
+	CacheSnapshots,
 	CallEntry,
-	FreshVariants,
 	IsUnion,
-	OneOf,
-	QueryCacheKeys,
-	Same,
-	Second,
+	ReadyCallTable,
 } from "./engine/cache.js";
 import type { AnyErr, SqlError } from "./engine/errors.js";
 import type { ArgsOf, ParamsOf, RowOf, Validate } from "./engine/infer.js";
@@ -498,20 +495,18 @@ type CombineOf<
 /** Suggested separators in editors; other strings still retain their literal type. */
 type CombineSeparator = ", " | " AND " | " OR " | (string & {});
 
-type GateCallCheck<DB, TM, Keys, Q extends string> = [DB, TM, Q] extends [
+type GateCallCheck<DB, TM, Keys, Q extends string> =
+	CallCached<DB, TM, Keys, Q> extends infer C extends CallEntry
+		? [C] extends [never]
+			? InferredCheck<DB, TM, Q>
+			: C["g"]
+		: never;
+type InferredCheck<DB, TM, Q extends string> = [DB, TM, Q] extends [
 	infer D,
 	infer M,
 	infer Q2 extends string,
 ]
-	? [Q2] extends [keyof QueryCacheKeys]
-		? CallCached<D, M, Keys, Q2> extends infer C
-			? [C] extends [never]
-				? Surface<CallCheck<D, M, Q2>>
-				: C extends CallEntry
-					? C["g"]
-					: never
-			: never
-		: Surface<CallCheck<D, M, Q2>>
+	? Surface<CallCheck<D, M, Q2>>
 	: never;
 type GateSlottedCheck<DB, TM, Q extends string, S> = [DB, TM, Q, S] extends [
 	infer D,
@@ -529,15 +524,12 @@ type GateFragCheck<Text extends string, Slotted extends boolean> = [
 	: never;
 type BoxCallArgs<DB, TM, Keys, Q extends string> = Extract<
 	{
-		[K in Q as `${K}`]: [K] extends [keyof QueryCacheKeys]
-			? CallCached<DB, TM, Keys, K> extends infer C
-				? [C] extends [never]
-					? CallArgs<DB, TM, K>
-					: C extends CallEntry
-						? C["p"]
-						: never
-				: never
-			: CallArgs<DB, TM, K>;
+		[K in Q as `${K}`]: CallCached<DB, TM, Keys, K> extends infer C extends
+			CallEntry
+			? [C] extends [never]
+				? CallArgs<DB, TM, K>
+				: C["p"]
+			: never;
 	}[`${Q}`],
 	readonly unknown[]
 >;
@@ -557,25 +549,16 @@ type BoxFragArgs<Text extends string> = Extract<
  * replaces the check, the arguments and the return type below with what they were when the
  * entry was computed, so the call skips the text rewrites and the row and parameter builders.
  */
-/** The cached call (`never` on a miss), for a key of `QueryCacheKeys`. Exported for tests. */
-export type CallCached<DB, TM, Keys, Q extends string> =
-	IsUnion<Q> extends true
+/** The cached call (`never` on a miss), from the shared call index. Exported for tests. */
+export type CallCached<DB, TM, Keys, Q extends string> = [
+	keyof CacheSnapshots,
+] extends [never]
+	? never
+	: IsUnion<Q> extends true
 		? never
-		: Second<
-				OneOf<
-					FreshVariants<DB, Q> extends infer V
-						? V extends [infer G, { readonly c: infer C extends CallEntry }]
-							? C extends unknown
-								? [Keys] extends [C["k"]]
-									? Same<TM, C["m"]> extends true
-										? [G, C]
-										: never
-									: never
-								: never
-							: never
-						: never
-				>
-			>;
+		: [Q] extends [keyof ReadyCallTable<DB, TM, Keys>]
+			? ReadyCallTable<DB, TM, Keys>[Q]
+			: never;
 /**
  * What the type cache stores for the plain call `sql(Q, …)` (engine/cache.ts `CallEntry`): the
  * query argument's check, the arguments after it and the return type. The cache job's probe file
@@ -593,24 +576,18 @@ export type CallTypes<DB, TM, Keys extends RowKeys, Q extends string> = {
  * did before.
  */
 type CallRet<DB, TM, Keys extends RowKeys, Q extends string> = [Q] extends [
-	keyof QueryCacheKeys,
+	infer Q extends string,
 ]
-	? CallCached<DB, TM, Keys, Q> extends infer C
+	? CallCached<DB, TM, Keys, Q> extends infer C extends CallEntry
 		? [C] extends [never]
 			? Query<
 					KeyedRow<RowOf<DB, TM, PText<Q>>, Keys>,
 					ParamsOf<DB, TM, PText<Q>>,
 					PText<Q>
 				>
-			: C extends CallEntry
-				? C["q"]
-				: never
+			: C["q"]
 		: never
-	: Query<
-			KeyedRow<RowOf<DB, TM, PText<Q>>, Keys>,
-			ParamsOf<DB, TM, PText<Q>>,
-			PText<Q>
-		>;
+	: never;
 
 /**
  * The typed SQL function returned by `createSql<DB, TypeMap>()`.

@@ -9,6 +9,7 @@ import {
 import { scanNames, touchesAllTables } from "../../src/cache/scan.js";
 
 const HEAD = 'import type * as __T from "@typesql/core/engine";\nexport {};\n';
+const call = { k: '"preserve"', g: "unknown", p: "[]", q: "{}" };
 const sample: CacheFile = {
 	...emptyCache("v1"),
 	groups: {
@@ -26,6 +27,8 @@ const sample: CacheFile = {
 			},
 			q: {},
 			entries: {
+				S: { r: [], c: ["m1", "m2"].map((m) => ({ m, ...call })) },
+				T: { r: [], c: ["m1", "m2"].map((m) => ({ m, ...call })) },
 				"SELECT id FROM users": {
 					r: ["select", "id", "from", "users", "*"],
 					a: '{ readonly kind: "select" }',
@@ -55,6 +58,10 @@ describe("cache file", () => {
 
 	test("entries render into the augmentation, grouped by file id and snapshot", () => {
 		const text = render(sample, "f00d", "v1");
+		for (const m of ["m1", "m2"])
+			expect(text).toContain(
+				`${JSON.stringify(`f00d#g1#${m}#"preserve"`)}: D_g1 & { m: M_${m}; k: "preserve"; c: {"S": { m: M_${m}; k: "preserve"; g: unknown; p: []; q: {} }; "T": { m: M_${m}; k: "preserve"; g: unknown; p: []; q: {} }; } }`,
+			);
 		expect(text).toContain('declare module "@typesql/core/engine"');
 		expect(text).toContain('"SELECT id FROM users": true;');
 		expect(text).toContain('"f00d#g1": D_g1;');

@@ -12,6 +12,7 @@ import type {
 	Missing,
 	OneOf,
 	Plain,
+	ReadyCallTable,
 	Same,
 	Second,
 	Stale,
@@ -318,4 +319,19 @@ test("CacheAnalysis stores Analyze without the statement; Plain writes aliases o
 			1,
 		]
 	>();
+});
+
+test("call groups share compatibility checks and merge overlapping indexes", () => {
+	type C = { m: 1; k: "preserve"; g: unknown; p: []; q: 1 };
+	type S = Snap & { m: 1; k: "preserve"; c: { a: C } };
+	type R<
+		D = DB,
+		M = 1,
+		K = "preserve",
+		G = { a: S; b: S & { c: { b: C } }; bad: Omit<S, "c"> & { c: 1 } },
+	> = ReadyCallTable<D, M, K, G>;
+	expectTypeOf<{ [K in keyof R]: R[K] }>().toEqualTypeOf<{ a: C; b: C }>();
+	expectTypeOf<
+		[R<DB, 2>, R<DB, 1, "camelCase">, R<{}, 1>, R<DB, 1, "preserve", {}>]
+	>().toEqualTypeOf<[{}, {}, {}, {}]>();
 });

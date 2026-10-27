@@ -155,6 +155,14 @@ export function render(
 	for (const [g, group] of Object.entries(file.groups)) {
 		const entries = Object.entries(group.entries);
 		if (!entries.length) continue;
+		const calls = Object.groupBy(
+			entries.flatMap(([text, e]) => (e.c ?? []).map((c) => ({ text, ...c }))),
+			(c) => `${c.m}#${c.k}`,
+		);
+		for (const [key, cs] of Object.entries(calls))
+			snapshots.push(
+				`    ${lit(`${id}#${g}#${key}`)}: D_${g} & { m: M_${cs![0]!.m}; k: ${cs![0]!.k}; c: {${cs!.map((c) => `${lit(c.text)}: { m: M_${c.m}; k: ${c.k}; g: ${c.g}; p: ${c.p}; q: ${c.q} };`).join(" ")} } };`,
+			);
 		out.push(
 			`type D_${g} = { v: ${lit(file.engine)}; t: ${group.t}; w: ${words(group.w)}; q: ${pairs(group.q)}; h: ${group.h} };\n`,
 		);

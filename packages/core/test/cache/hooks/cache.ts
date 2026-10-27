@@ -47,6 +47,13 @@ declare module "../../../src/engine/index.js" {
 	interface CacheSnapshots {
 		"hooks#0": D0;
 		"hooks#1": D1;
+		"hooks#calls": D0 & {
+			m: T.DefaultTypeMap;
+			k: "preserve";
+			c: {
+				"SELECT id FROM users WHERE id = $1": T.QueryCache["hooks#0"]["SELECT id FROM users WHERE id = $1"]["c"];
+			};
+		};
 	}
 	interface QueryCache {
 		"hooks#0": {

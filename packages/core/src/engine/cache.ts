@@ -54,7 +54,7 @@ export interface DdlCacheKeys {}
  * Version of the engine's output. An entry computed by another version is never used. It is a
  * hash of the type-level sources, kept up to date by `node scripts/cache-version.ts`.
  */
-export type CacheVersion = "92b455a56368";
+export type CacheVersion = "0bcf710b83e8";
 
 /** A relation, function or catalog entry that did not exist when the entry was computed. */
 export interface Missing {
@@ -231,6 +231,31 @@ type GroupStale<DB, G, Snaps> = G extends keyof Snaps
 		? Stale<DB, D>
 		: "*"
 	: "*";
+
+/** Select compatible call groups once per schema, type map and row-key mode. */
+export type ReadyCallTable<DB, TM, Keys, Snaps = CacheSnapshots> = [
+	DB,
+	TM,
+	Keys,
+] extends [infer D, infer M, infer K]
+	? MergeCalls<ReadyCalls<D, M, K, Snaps>>
+	: never;
+type MergeCalls<T> = [T] extends [never] ? {} : UnionToIntersection<T>;
+type ReadyCalls<DB, TM, Keys, Snaps> = {
+	[G in keyof Snaps]: Snaps[G] extends {
+		m: infer M;
+		k: infer K;
+		c: infer Q extends Record<string, CallEntry>;
+	}
+		? [Keys] extends [K]
+			? Same<TM, M> extends true
+				? [GroupStale<DB, G, Snaps>] extends [never]
+					? Q
+					: never
+				: never
+			: never
+		: never;
+}[keyof Snaps];
 
 /** The entry of `Q` in group `G` when its dependencies are unchanged in `DB`. */
 type FreshIn<DB, G, E, Snaps> =

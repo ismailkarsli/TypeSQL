@@ -81,7 +81,8 @@ test("call variants of other projects for the same statement are kept", () => {
 		groups: {
 			g: {
 				...group([], ["s"]),
-				entries: { S: { r: ["s", "*"], a: "{}", c: [call(k)] } },
+				q: { "s.id": "old" },
+				entries: { S: { r: ["s", "s.id", "*"], a: "{}", c: [call(k)] } },
 			},
 		},
 		maps: { m1: "{}" },
@@ -95,6 +96,20 @@ test("call variants of other projects for the same statement are kept", () => {
 	]);
 	file = merge(file, withCall('"preserve"'), "app");
 	expect(file.groups.g!.entries.S!.c).toHaveLength(2);
+	for (const key of ["t", "h", "w", "q"] as const) {
+		const next = withCall('"preserve"');
+		Object.assign(next.groups.g!, {
+			[key]:
+				key === "w"
+					? { s: [M, M, M, "changed"] }
+					: key === "q"
+						? { "s.id": "changed" }
+						: "changed",
+		});
+		const changed = merge(file, next, "app");
+		expect(changed.groups.g!.entries.S!.c).toEqual(next.groups.g!.entries.S!.c);
+		expect(changed.owners[groupEntryId("g", "S")]).toEqual(["app"]);
+	}
 });
 
 describe("writing", () => {

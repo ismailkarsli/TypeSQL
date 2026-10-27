@@ -29,6 +29,7 @@ type Hit<D, K extends string> = [CachedAnalysis<D, K>] extends [never]
 type With<Patch> = Omit<DB, keyof Patch> & Patch;
 type Users = DB["users"];
 
+// The catalog augmentation invalidates the shared call group; analysis remains per-query.
 test("the schema the cache was generated for: entries are used", () => {
 	expectTypeOf<Hit<DB, typeof Q.select>>().toEqualTypeOf<true>();
 	expectTypeOf<Hit<DB, typeof Q.alias>>().toEqualTypeOf<true>();
@@ -43,7 +44,7 @@ test("the schema the cache was generated for: entries are used", () => {
 		[CallCached<DB, TM, "preserve", typeof Q.param>] extends [never]
 			? false
 			: true
-	>().toEqualTypeOf<true>();
+	>().toEqualTypeOf<false>();
 	expectTypeOf<
 		[CachedDdl<DB, "ALTER TABLE users ADD COLUMN bio text">] extends [never]
 			? false
@@ -169,7 +170,7 @@ test("another type map or rowKeys: call entries of the generating program are no
 		] extends [never]
 			? false
 			: true
-	>().toEqualTypeOf<true>();
+	>().toEqualTypeOf<false>();
 });
 
 test("column order is not a dependency: INSERT without a column list relies on the count only", () => {
