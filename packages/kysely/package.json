@@ -1,6 +1,6 @@
 {
 	"name": "@typesql/kysely",
-	"version": "0.2.2",
+	"version": "0.2.3",
 	"description": "Use Kysely database interfaces (kysely-codegen, prisma-kysely) as a TypeSQL schema.",
 	"license": "MIT",
 	"repository": {

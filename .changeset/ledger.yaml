@@ -154,6 +154,11 @@
     - tough-geckos-promise
     - tough-kings-study
     - vast-wolves-grin
+"@typesql/core@0.7.0":
+  dir: packages/core
+  intents:
+    - calm-kings-think
+    - shaggy-jobs-repair
 "@typesql/drizzle@0.0.2":
   dir: packages/drizzle
   intents:
