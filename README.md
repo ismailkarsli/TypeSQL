@@ -129,12 +129,12 @@ The parser is checked against the regression tests PostgreSQL runs on itself, ab
 ## Compile time
 
 <!-- performance-summary:start -->
-The [real-world application workload](packages/bench/src/case1.ts) contains 379 statements and reusable SQL fragments. Average check time per statement, including schema and fragment checking: 4.73 ms with `tsc` and 1.37 ms with [tsrs](https://github.com/oxc-project/tsrs).
+The [real-world application workload](packages/bench/src/case1.ts) contains 379 statements and reusable SQL fragments. Average check time per statement, including schema and fragment checking: 5.47 ms with `tsc` and 1.55 ms with [tsrs](https://github.com/oxc-project/tsrs).
 
 | Application workload | `tsc` | tsrs |
 |---|---|---|
-| 379 statements | 1.794 s | 0.518 s |
-| with the [type cache](https://typesql.karsli.net/guide/performance#type-cache) | 0.646 s | 0.178 s |
+| 379 statements | 2.075 s | 0.588 s |
+| with the [type cache](https://typesql.karsli.net/guide/performance#type-cache) | 0.687 s | 0.205 s |
 <!-- performance-summary:end -->
 
 See [Performance](https://typesql.karsli.net/guide/performance) for how this is measured.
@@ -150,10 +150,10 @@ Lines: 🔵 Uncached · 🟢 Cached. tsrs check time for the case1 application w
 %%{init: {"themeVariables": {"xyChart": {"plotColorPalette": "#2563eb,#16a34a"}}}}%%
 xychart-beta
     title "tsrs - real-world case1"
-    x-axis "Core version" ["0.7.1", "0.7.2", "0.7.3"]
+    x-axis "Core version" ["0.7.1", "0.7.2", "0.7.3", "0.7.4"]
     y-axis "Check time (seconds, lower is faster)" 0 --> 2.4
-    line [2.166, 0.82, 0.518]
-    line [0.756, 0.292, 0.178]
+    line [2.166, 0.82, 0.518, 0.588]
+    line [0.756, 0.292, 0.178, 0.205]
 ```
 <!-- performance-history:end -->
 
