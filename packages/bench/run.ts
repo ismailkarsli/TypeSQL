@@ -89,11 +89,13 @@ const cached = {
 	compilerOptions: { paths: {} },
 	contentMappers: [{ package: "@typesql/core", extensions: [".typesqlcache"] }],
 };
-// The fixture stays intact. Each generated module contains the same shared setup and one
-// third of its SQL calls; together they check every call exactly once without a type cache.
-const shardFiles = shardWorkload(3).map((text, index) => {
+// The fixture stays intact. A shared setup module and three query modules check every
+// SQL call exactly once without a type cache.
+const sharded = shardWorkload(3);
+mkdirSync(join(here, "cache"), { recursive: true });
+writeFileSync(join(here, "cache/case1-common.ts"), sharded.common);
+const shardFiles = sharded.shards.map((text, index) => {
 	const file = `cache/case1-shard-${index}.ts`;
-	mkdirSync(join(here, "cache"), { recursive: true });
 	writeFileSync(join(here, file), text);
 	return file;
 });
@@ -103,10 +105,14 @@ const variants: Variant[] = [
 		name: "case1p",
 		config: {
 			extends: "./tsconfig.json",
-			// Shared inputs are intentionally present in every generated module.
-			compilerOptions: { noUnusedLocals: false },
+			// Imports may be unused in a shard; declaration serialization is irrelevant to --noEmit.
+			compilerOptions: {
+				noUnusedLocals: false,
+				declaration: false,
+				declarationMap: false,
+			},
 		},
-		files: shardFiles,
+		files: [...shardFiles, "cache/case1-common.ts"],
 	},
 	{ name: "case1d", config: dist, files: [fixture] },
 	{
@@ -423,7 +429,7 @@ const rows = results.map((r, idx) => {
 	if (compilers.length === 1) {
 		return {
 			variant: r.name,
-			file: r.name === "case1p" ? "3 generated modules" : r.file,
+			file: r.name === "case1p" ? "3 query modules + setup" : r.file,
 			instantiations: r.instantiations ?? "?",
 			types: r.types ?? "?",
 			"check s": r.checkTimeSec ?? "?",
@@ -439,7 +445,7 @@ const rows = results.map((r, idx) => {
 	const tscRes = byCompiler.tsc[idx]!;
 	return {
 		variant: r.name,
-		file: r.name === "case1p" ? "3 generated modules" : r.file,
+		file: r.name === "case1p" ? "3 query modules + setup" : r.file,
 		instantiations: tsrsRes.instantiations ?? "?",
 		types: tsrsRes.types ?? "?",
 		"tsrs check s": tsrsRes.checkTimeSec ?? "?",

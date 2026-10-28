@@ -26,20 +26,25 @@ export const fixture = "src/case1.ts";
 export const source = readFileSync(new URL(fixture, import.meta.url), "utf8");
 
 /** Keep every SQL call while placing independent calls in separate checker units. */
-export function shardWorkload(count: number): string[] {
+export function shardWorkload(count: number): {
+	common: string;
+	shards: string[];
+} {
 	const api = new API();
 	const lease = api.createSourceFile(
 		new URL(fixture, import.meta.url).pathname,
 		source,
 	);
 	try {
-		const calls: { start: number; end: number }[] = [];
+		const calls: { start: number; end: number; text: string }[] = [];
+		const exportPositions: number[] = [];
+		const importedNames: string[] = [];
 		for (const statement of lease.sourceFile.statements) {
 			if (!isVariableStatement(statement)) continue;
-			if (
-				!statement.modifiers?.some((m) => m.kind === SyntaxKind.ExportKeyword)
-			)
-				continue;
+			const exported = statement.modifiers?.some(
+				(m) => m.kind === SyntaxKind.ExportKeyword,
+			);
+			let sqlCall = false;
 			for (const declaration of statement.declarationList.declarations) {
 				const call = declaration.initializer;
 				if (!call || !isCallExpression(call)) continue;
@@ -47,25 +52,48 @@ export function shardWorkload(count: number): string[] {
 				if (
 					(isIdentifier(callee) && callee.text === "sql") ||
 					(isPropertyAccessExpression(callee) && callee.getText() === "sql.as")
-				) {
-					calls.push({ start: statement.getStart(), end: statement.end });
-				}
+				)
+					sqlCall = true;
 			}
+			if (sqlCall) {
+				if (!exported) throw new Error("case1 has an unexported SQL call");
+				calls.push({
+					start: statement.getStart(),
+					end: statement.end,
+					text: source.slice(statement.getStart(), statement.end),
+				});
+				continue;
+			}
+			for (const declaration of statement.declarationList.declarations) {
+				if (isIdentifier(declaration.name))
+					importedNames.push(declaration.name.getText());
+			}
+			if (!exported) exportPositions.push(statement.getStart());
 		}
 		if (calls.length !== 379)
 			throw new Error(`case1 SQL call count changed: ${calls.length}`);
-		return Array.from({ length: count }, (_, shard) => {
-			let text = source;
-			for (let i = calls.length - 1; i >= 0; i--) {
-				if (i % count === shard) continue;
-				const { start, end } = calls[i]!;
-				text =
-					text.slice(0, start) +
-					text.slice(start, end).replace(/[^\n]/g, " ") +
-					text.slice(end);
-			}
-			return text;
-		});
+		let common = source;
+		const edits = [
+			...calls.map(({ start, end }) => ({
+				start,
+				end,
+				text: source.slice(start, end).replace(/[^\n]/g, " "),
+			})),
+			...exportPositions.map((start) => ({
+				start,
+				end: start,
+				text: "export ",
+			})),
+		];
+		for (const { start, end, text } of edits.sort((a, b) => b.start - a.start))
+			common = common.slice(0, start) + text + common.slice(end);
+		const shards = Array.from({ length: count }, (_, shard) =>
+			[
+				`import { ${importedNames.join(", ")} } from "./case1-common.js";`,
+				...calls.filter((_, i) => i % count === shard).map((c) => c.text),
+			].join("\n"),
+		);
+		return { common, shards };
 	} finally {
 		lease.dispose();
 		api.close();

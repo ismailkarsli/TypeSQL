@@ -213,8 +213,9 @@ while the Playground uses published packages and its own TypeScript version.
 
 The immutable `packages/bench/src/case1.ts` application fixture is shared by source, built,
 cached, stale-cache and runtime benchmarks. **Do not edit it to improve results.**
-The `case1p` row generates three modules from the same fixture, checks each of its 379 SQL
-calls exactly once without a type cache, and measures tsrs running those modules in parallel.
+The `case1p` row generates one shared setup module and three query modules from the same
+fixture, checks each of its 379 SQL calls exactly once without a type cache, and measures tsrs
+running those query modules in parallel.
 The `case1` row continues to measure the original single file.
 
 ```sh
