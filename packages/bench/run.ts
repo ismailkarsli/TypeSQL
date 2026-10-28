@@ -4,6 +4,7 @@
 // Writes results.json and enforces thresholds.json.
 // --calibrate sets 30% instantiation headroom and 2x check time (minimum 1.5 seconds).
 // --compiler tsrs or --compiler tsc measures only that compiler.
+// --target-500ms enforces the workspace-machine goal for the parallel uncached variant.
 import { spawnSync } from "node:child_process";
 import {
 	appendFileSync,
@@ -80,6 +81,7 @@ if (
 	process.exit(2);
 }
 const compilers: Compiler[] = onlyCompiler ? [onlyCompiler] : ["tsrs", "tsc"];
+const target500ms = process.argv.includes("--target-500ms");
 const core = join(here, "../core");
 const dist = { extends: "./tsconfig.json", compilerOptions: { paths: {} } };
 const cached = {
@@ -398,6 +400,7 @@ const rows = results.map((r, idx) => {
 		if (rc.exitCode !== 0)
 			problems.push(`compiler${tag} exited with ${rc.exitCode}`);
 		if (
+			target500ms &&
 			r.name === "case1p" &&
 			c === "tsrs" &&
 			(rc.checkTimeSec == null || rc.checkTimeSec >= 0.5)
@@ -429,11 +432,7 @@ const rows = results.map((r, idx) => {
 			errors: r.otherErrorCount
 				? `${r.errorCount}+${r.otherErrorCount}`
 				: r.errorCount,
-			status: problems.length
-				? "FAIL"
-				: t || (r.name === "case1p" && compilers.includes("tsrs"))
-					? "ok"
-					: "no threshold",
+			status: problems.length ? "FAIL" : t ? "ok" : "no threshold",
 		};
 	}
 	const tsrsRes = byCompiler.tsrs[idx]!;
@@ -452,11 +451,7 @@ const rows = results.map((r, idx) => {
 		errors: tsrsRes.otherErrorCount
 			? `${tsrsRes.errorCount}+${tsrsRes.otherErrorCount}`
 			: tsrsRes.errorCount,
-		status: problems.length
-			? "FAIL"
-			: t || r.name === "case1p"
-				? "ok"
-				: "no threshold",
+		status: problems.length ? "FAIL" : t ? "ok" : "no threshold",
 	};
 });
 

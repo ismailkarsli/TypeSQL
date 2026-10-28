@@ -221,6 +221,7 @@ The `case1` row continues to measure the original single file.
 pnpm --filter @typesql/core build
 pnpm bench                       # tsrs and tsc; fails on threshold breaches
 pnpm bench --compiler tsrs       # or tsc
+pnpm bench --compiler tsrs --target-500ms  # enforce the local case1p target
 pnpm bench --calibrate           # rewrite thresholds after reviewing measurements
 node packages/bench/runtime.ts
 ```
