@@ -16,13 +16,16 @@ import { QUOTED } from "./splice.js";
  */
 const PREFIX = randomHex(8);
 const MARK = `\u0000typesql${PREFIX}`;
+// Both readers validate MARK before looking up the short id, avoiding hashing
+// and flattening the full token string when param() records a value.
 const pending = new Map<string, unknown>();
 let counter = 0;
 
 /** Bind `value` as a parameter at this position of a template literal (`DEFAULT` when it is `undefined`). */
 export function param<const T>(value: T): InlineMarker<T> {
-	const token = `${MARK}${(counter++).toString(36)}\u0000`;
-	pending.set(token, value);
+	const id = (counter++).toString(36);
+	const token = `${MARK}${id}\u0000`;
+	pending.set(id, value);
 	return token as InlineMarker<T>;
 }
 
@@ -37,12 +40,13 @@ const INLINE = new RegExp(`${QUOTED.source}|${MARK}([0-9a-z]+)\u0000`, "g");
  */
 export function takeValue(value: unknown): unknown {
 	if (typeof value !== "string" || !EXACT.test(value)) return value;
-	if (!pending.has(value))
+	const id = value.slice(MARK.length, -1);
+	if (!pending.has(id))
 		throw new Error(
 			"typesql: this sql.json() / sql.param() value was already used by another statement; call it once per statement",
 		);
-	const v = pending.get(value);
-	pending.delete(value);
+	const v = pending.get(id);
+	pending.delete(id);
 	return v;
 }
 
@@ -82,12 +86,12 @@ export function resolveInline(
 				`typesql: sql.param() cannot be used inside ${where}; remove the surrounding quotes or comment`,
 			);
 		}
-		if (!pending.has(m))
+		if (!pending.has(id))
 			throw new Error(
 				"typesql: this sql.param() value was already used by another statement; call sql.param() once per statement",
 			);
-		const value = pending.get(m);
-		used.add(m);
+		const value = pending.get(id);
+		used.add(id);
 		if (value === undefined) return "DEFAULT";
 		values.push(value);
 		return `$${++k}`;

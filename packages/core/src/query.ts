@@ -156,38 +156,36 @@ export function makeQuery<
 		const result = await pick(given)(text, values);
 		return applyRowKeys(isRows(result) ? result : result.rows, rowKeys);
 	};
-	const query = Object.defineProperties(
-		{ text, values },
-		{
-			[ROW_KEYS]: { value: rowKeys },
-			execute: { value: execute },
-			executeCount: {
-				value: async (given?: Executor) => {
-					const exec = pick(given);
-					if (exec.count) return exec.count(text, values);
-					const result = await exec(text, values);
-					if (isRows(result) || result.rowCount === undefined) {
-						throw new Error(
-							"typesql: the executor did not report a row count: resolve to { rows, rowCount } (the adapters' executor() do)",
-						);
-					}
-					return result.rowCount ?? 0;
-				},
-			},
-			executeTakeFirst: {
-				value: async (given?: Executor) => (await execute(given))[0],
-			},
-			executeTakeFirstOrThrow: {
-				value: async (given?: Executor) => {
-					const rows = await execute(given);
-					if (rows.length === 0) throw new NoResultError(text);
-					return rows[0];
-				},
-			},
+	// Define fixed keys directly: defineProperties also enumerates and validates a
+	// descriptor map for every query built.
+	const query = { text, values };
+	Object.defineProperty(query, ROW_KEYS, { value: rowKeys });
+	Object.defineProperty(query, "execute", { value: execute });
+	Object.defineProperty(query, "executeCount", {
+		value: async (given?: Executor) => {
+			const exec = pick(given);
+			if (exec.count) return exec.count(text, values);
+			const result = await exec(text, values);
+			if (isRows(result) || result.rowCount === undefined) {
+				throw new Error(
+					"typesql: the executor did not report a row count: resolve to { rows, rowCount } (the adapters' executor() do)",
+				);
+			}
+			return result.rowCount ?? 0;
 		},
-	) as unknown as Query<Row, Params, Text>;
+	});
+	Object.defineProperty(query, "executeTakeFirst", {
+		value: async (given?: Executor) => (await execute(given))[0],
+	});
+	Object.defineProperty(query, "executeTakeFirstOrThrow", {
+		value: async (given?: Executor) => {
+			const rows = await execute(given);
+			if (rows.length === 0) throw new NoResultError(text);
+			return rows[0];
+		},
+	});
 	SLOTTABLES.add(query);
-	return query;
+	return query as unknown as Query<Row, Params, Text>;
 }
 
 function isRows(

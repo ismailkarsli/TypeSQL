@@ -64,10 +64,41 @@ describe("execute", () => {
 
 	it("stays a plain { text, values } object", () => {
 		const sql = createSql<DB>(fakeExecutor([]).executor);
-		expect(sql("SELECT id FROM users WHERE id = $1", 7)).toStrictEqual({
+		const q = sql("SELECT id FROM users WHERE id = $1", 7);
+		expect(q).toStrictEqual({
 			text: "SELECT id FROM users WHERE id = $1",
 			values: [7],
 		});
+		for (const key of [
+			"execute",
+			"executeCount",
+			"executeTakeFirst",
+			"executeTakeFirstOrThrow",
+			Symbol.for("typesql.rowKeys"),
+		]) {
+			expect(Object.getOwnPropertyDescriptor(q, key)).toMatchObject({
+				enumerable: false,
+				writable: false,
+				configurable: false,
+			});
+		}
+	});
+
+	it("keeps detached execution methods bound to their own query", async () => {
+		const calls: unknown[] = [];
+		const sql = createSql<DB>(async (text, values) => {
+			calls.push({ text, values });
+			return { rows: [rowA], rowCount: 3 };
+		});
+		const q = sql("SELECT id, email FROM users WHERE id = $1", 7);
+		const { execute, executeCount, executeTakeFirst, executeTakeFirstOrThrow } =
+			q;
+		sql("SELECT id, email FROM users WHERE id = $1", 8);
+		expect(await execute()).toEqual([rowA]);
+		expect(await executeCount()).toBe(3);
+		expect(await executeTakeFirst()).toEqual(rowA);
+		expect(await executeTakeFirstOrThrow()).toEqual(rowA);
+		expect(calls).toEqual(Array(4).fill({ text: q.text, values: [7] }));
 	});
 });
 

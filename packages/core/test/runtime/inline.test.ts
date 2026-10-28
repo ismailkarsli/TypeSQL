@@ -163,10 +163,34 @@ describe("inline parameters", () => {
 		expect(pendingParams()).toBe(before);
 	});
 
+	it("leaves tokens with trailing text or a final newline as ordinary strings", () => {
+		const before = pendingParams();
+		const token: string = param(4);
+		expect(takeValue(`${token}tail`)).toBe(`${token}tail`);
+		for (const ending of ["\n", "\r", "\r\n", "\u2028", "\u2029"]) {
+			expect(takeValue(`${token}${ending}`)).toBe(`${token}${ending}`);
+		}
+		expect(pendingParams()).toBe(before + 1);
+		expect(takeValue(token)).toBe(4);
+		expect(pendingParams()).toBe(before);
+	});
+
 	it("leave nothing pending after use", () => {
 		const before = pendingParams();
 		sql(`SELECT id FROM users WHERE id = ${sql.param(1)}`);
 		sql.fragment(`AND id = ${sql.param(2)}`);
+		expect(pendingParams()).toBe(before);
+	});
+
+	it("checks the full token prefix before looking up a pending value by id", () => {
+		const before = pendingParams();
+		const token: string = param(4);
+		// Keep the id and token shape, but change the first digit of the random prefix.
+		const foreign = `${token.slice(0, 8)}${token[8] === "0" ? "1" : "0"}${token.slice(9)}`;
+		expect(takeValue(foreign)).toBe(foreign);
+		expect(() => sql.as(`SELECT ${foreign}`)).toThrow(/NUL character/);
+		expect(pendingParams()).toBe(before + 1);
+		expect(sql.as(`SELECT ${token}`).values).toEqual([4]);
 		expect(pendingParams()).toBe(before);
 	});
 });
