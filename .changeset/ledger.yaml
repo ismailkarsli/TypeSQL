@@ -164,6 +164,10 @@
   intents:
     - ancient-rocks-notice
     - nice-seals-begin
+"@typesql/core@0.7.2":
+  dir: packages/core
+  intents:
+    - lucky-beans-wash
 "@typesql/drizzle@0.0.2":
   dir: packages/drizzle
   intents:

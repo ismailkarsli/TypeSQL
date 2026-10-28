@@ -5,5 +5,12 @@
 			"checkTimeSec": 2.166,
 			"cachedCheckTimeSec": 0.756
 		}
+	},
+	"0.7.2": {
+		"case1": {
+			"statements": 379,
+			"checkTimeSec": 0.82,
+			"cachedCheckTimeSec": 0.292
+		}
 	}
 }
