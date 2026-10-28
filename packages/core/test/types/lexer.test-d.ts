@@ -770,3 +770,65 @@ test("long statements are lexed in chunks (4 KB, > 1000 tokens)", () => {
 	type Big = `${Q64}${Q64}${Q64}${Q64}${Q64}${Q64}`;
 	expectTypeOf<Lex<Big>["length"]>().toEqualTypeOf<1248>();
 });
+
+test("line token sharing keeps multiline tokens and lexical lookahead intact", () => {
+	expectTypeOf<Vals<"SELECT -- ignored, comma\n1">>().toEqualTypeOf<
+		["select", "1"]
+	>();
+	expectTypeOf<
+		Vals<"SELECT\n 1, -- ignored, also skipped\n 2 /* outer\n /* nested */ done */\n">
+	>().toEqualTypeOf<["select", "1", ",", "2"]>();
+	expectTypeOf<
+		Vals<"SELECT 'first\nsecond', \"multi\nline\", $tag$body\ntext$tag$">
+	>().toEqualTypeOf<
+		["select", "first\nsecond", ",", "multi\nline", ",", "body\ntext"]
+	>();
+	expectTypeOf<Vals<"SELECT 'a'\n \t'b', E'c'\n'd'">>().toEqualTypeOf<
+		["select", "ab", ",", "cd"]
+	>();
+	expectTypeOf<Vals<"SELECT U&\"d!0061t\"\n UESCAPE '!'">>().toEqualTypeOf<
+		["select", "dat"]
+	>();
+	expectTypeOf<Vals<"SELECT u&'!0061'\n uescape '!'">>().toEqualTypeOf<
+		["select", "!0061"]
+	>();
+	expectTypeOf<Vals<"SELECT U&'!0061'\n UESCAPE '!'">>().toEqualTypeOf<
+		["select", "!0061"]
+	>();
+	expectTypeOf<Lex<"SELECT\n 1, 'unterminated\n rest">>().toEqualTypeOf<
+		SqlError<'unterminated quoted string at or near "\'unterminated\n rest"', 3>
+	>();
+});
+
+test("line sharing bounds its own recursion before using the chunked scanner", () => {
+	type W100 =
+		"abcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghij";
+	type W1000 =
+		`${W100}${W100}${W100}${W100}${W100}${W100}${W100}${W100}${W100}${W100}`;
+	type LongWord = `${W1000}${W100}${W100}`;
+	expectTypeOf<Lex<`SELECT ${LongWord}`>>().toEqualTypeOf<
+		[WordTok<"select">, WordTok<LongWord>]
+	>();
+	type S10 = "          ";
+	type S100 = `${S10}${S10}${S10}${S10}${S10}${S10}${S10}${S10}${S10}${S10}`;
+	type S1000 =
+		`${S100}${S100}${S100}${S100}${S100}${S100}${S100}${S100}${S100}${S100}`;
+	expectTypeOf<Vals<`SELECT 'a'\n${S1000}${S1000} + 1`>>().toEqualTypeOf<
+		["select", "a", "+", "1"]
+	>();
+	type C10 = ",,,,,,,,,,";
+	type C100 = `${C10}${C10}${C10}${C10}${C10}${C10}${C10}${C10}${C10}${C10}`;
+	type C1000 =
+		`${C100}${C100}${C100}${C100}${C100}${C100}${C100}${C100}${C100}${C100}`;
+	expectTypeOf<Lex<`${C1000}${C1000}`>["length"]>().toEqualTypeOf<2000>();
+	type L10 = "\n\n\n\n\n\n\n\n\n\n";
+	type L100 = `${L10}${L10}${L10}${L10}${L10}${L10}${L10}${L10}${L10}${L10}`;
+	type L1000 =
+		`${L100}${L100}${L100}${L100}${L100}${L100}${L100}${L100}${L100}${L100}`;
+	expectTypeOf<Vals<`SELECT${L1000}${L1000}1`>>().toEqualTypeOf<
+		["select", "1"]
+	>();
+	expectTypeOf<Vals<`SELECT 'a'${L100}${L100}${L100}'b'`>>().toEqualTypeOf<
+		["select", "ab"]
+	>();
+});

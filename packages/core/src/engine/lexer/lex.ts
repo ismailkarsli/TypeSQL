@@ -44,25 +44,83 @@ type Nx<I extends number> = Next[I];
  * Helpers that can fail (`TakeQuoted`, `SkipBlock`) return `null`, never
  * `never`: `never extends [infer A, infer B]` takes the true branch.
  */
-export type Lex<Q extends string> = LexAll<Q, []>;
+export type Lex<Q extends string> = LexLines<Q, []>;
+
+/**
+ * Lex complete lines independently so statements and fragment alternatives share tokens for
+ * identical lines. A line that fails may open a multiline token: retry its full remaining
+ * text, retaining the original token index and error snippet. The budget bounds this extra
+ * recursion; the original chunked scanner handles the remaining input after it runs out.
+ */
+type LexLines<
+	S extends string,
+	Acc extends readonly unknown[],
+	B extends number = 0,
+> = B extends ChunkSize // type-mutate: equivalent cond-swap cond-true – disabling line segmentation delegates unchanged text to the full scanner
+	? LexCommas<S, Acc>
+	: S extends `${infer Line}\n${infer Rest}` // type-mutate: equivalent cond-false – disabling line segmentation delegates unchanged text to the full scanner
+		? CanSplitLine<Line, Rest> extends false // type-mutate: equivalent cond-true – always using the full-tail scanner preserves tokens and errors
+			? LexCommas<S, Acc>
+			: LexCommas<Line, []> extends infer R
+				? R extends readonly unknown[] // type-mutate: equivalent cond-false – always using the full-tail scanner preserves tokens and errors
+					? LexLines<Rest, [...Acc, ...R], Nx<B>>
+					: LexCommas<S, Acc>
+				: never
+		: LexCommas<S, Acc>;
+
+/** A comma is a lexical boundary unless it lies in an unfinished quote or comment. */
+type LexCommas<
+	S extends string,
+	Acc extends readonly unknown[],
+	B extends number = 0,
+> = B extends ChunkSize // type-mutate: equivalent cond-swap cond-true – disabling comma segmentation delegates unchanged text to the full scanner
+	? LexAll<S, Acc>
+	: S extends `${infer Part},${infer Rest}` // type-mutate: equivalent cond-false – disabling comma segmentation delegates unchanged text to the full scanner
+		? Part extends `${string}--${string}` // type-mutate: equivalent cond-true – always using the full-tail scanner preserves tokens and errors
+			? LexAll<S, Acc>
+			: LexAll<Part, []> extends infer R
+				? R extends readonly unknown[] // type-mutate: equivalent cond-false – always using the full-tail scanner preserves tokens and errors
+					? LexCommas<Rest, [...Acc, ...R, OpTok<",">], Nx<B>>
+					: LexAll<S, Acc>
+				: never
+		: LexAll<S, Acc>;
+
+/** Unicode UESCAPE and adjacent quoted-string continuations can consume the next line. */
+type CanSplitLine<
+	Line extends string,
+	Rest extends string,
+> = Line extends `${string}${"U&" | "u&"}${string}` // type-mutate: equivalent cond-true never-true never-false – false and never select the full-tail scanner; extra fallback preserves lexical output
+	? false
+	: Line extends `${string}'${string}` // type-mutate: equivalent cond-true never-true – checking extra lines or returning never can only select the full-tail scanner
+		? NextLineQuote<Rest> extends true // type-mutate: equivalent cond-true never-true – false and never select the full-tail scanner, preserving lexical output
+			? false
+			: true // type-mutate: equivalent never-false – never selects the full-tail scanner instead of segmented scanning
+		: true; // type-mutate: equivalent never-false bool-flip – false and never select the full-tail scanner, preserving lexical output
+type NextLineQuote<S extends string, B extends number = 0> = B extends ChunkSize // type-mutate: equivalent cond-swap cond-true never-true never-false – true and never pass the caller's extends true gate; extra fallback preserves lexical output
+	? true
+	: S extends `${Ws}${infer R}` // type-mutate: equivalent never-true never-false – never passes the caller's extends true gate and selects the full-tail scanner
+		? NextLineQuote<R, Nx<B>>
+		: S extends `'${string}` // type-mutate: equivalent cond-true never-true – true and never pass the caller's extends true gate and select the full-tail scanner
+			? true
+			: false; // type-mutate: equivalent never-false – never passes the caller's extends true gate and selects the full-tail scanner
 
 /** Iterations per chunk: restart the loop before the 1000-iteration tail-recursion cap. */
 type ChunkSize = 250;
 
-type LexAll<S extends string, Acc extends readonly Tok[]> =
+type LexAll<S extends string, Acc extends readonly unknown[]> =
 	LexChunk<S, [], 0> extends infer R
-		? R extends ["done", infer T extends readonly Tok[]]
+		? R extends ["done", infer T extends readonly unknown[]]
 			? [...Acc, ...T]
 			: R extends [
 						"more",
-						infer T extends readonly Tok[],
+						infer T extends readonly unknown[],
 						infer Rest extends string,
 					]
 				? LexAll<Rest, [...Acc, ...T]>
 				: R extends [
 							"err",
 							infer M extends string,
-							infer T extends readonly Tok[],
+							infer T extends readonly unknown[],
 						]
 					? SqlError<M, [...Acc, ...T]["length"]> // type-mutate: equivalent tuple-swap – the length is the same either way
 					: never
@@ -354,8 +412,11 @@ type LexWord<
 	Acc extends readonly Tok[],
 	B extends number,
 > =
-	TakeWord<R, C> extends [infer V extends string, infer R2 extends string]
-		? LexChunk<R2, [...Acc, WordTok<FoldAscii<V, "">>], B>
+	TakeWord<R, C extends Upper ? Lowercase<C> : C> extends [
+		infer V extends string,
+		infer R2 extends string,
+	]
+		? LexChunk<R2, [...Acc, WordTok<V>], B>
 		: never;
 
 /**
@@ -516,19 +577,26 @@ type AllWs<W extends string> = W extends `${infer C}${infer R}`
 type TakeWord<
 	S extends string,
 	Acc extends string,
-> = S extends `${infer C}${infer R}`
-	? C extends NonIdAscii
+> = S extends `${infer A}${infer B}${infer C}${infer D}${infer R}`
+	? A extends NonIdAscii
 		? [Acc, S]
-		: TakeWord<R, `${Acc}${C}`>
-	: [Acc, S];
+		: B extends NonIdAscii
+			? [`${Acc}${FoldChar<A>}`, `${B}${C}${D}${R}`]
+			: C extends NonIdAscii
+				? [`${Acc}${FoldChar<A>}${FoldChar<B>}`, `${C}${D}${R}`]
+				: D extends NonIdAscii
+					? [`${Acc}${FoldChar<A>}${FoldChar<B>}${FoldChar<C>}`, `${D}${R}`]
+					: TakeWord<
+							R,
+							`${Acc}${FoldChar<A>}${FoldChar<B>}${FoldChar<C>}${FoldChar<D>}`
+						>
+	: S extends `${infer C}${infer R}`
+		? C extends NonIdAscii
+			? [Acc, S]
+			: TakeWord<R, `${Acc}${FoldChar<C>}`>
+		: [Acc, S];
 
-/** Lowercase ASCII letters only (Postgres folding in UTF-8 databases). */
-type FoldAscii<
-	S extends string,
-	Acc extends string,
-> = S extends `${infer C}${infer R}`
-	? FoldAscii<R, `${Acc}${C extends Upper ? Lowercase<C> : C}`>
-	: Acc;
+type FoldChar<C extends string> = C extends Upper ? Lowercase<C> : C;
 
 type TakeDigits<
 	S extends string,

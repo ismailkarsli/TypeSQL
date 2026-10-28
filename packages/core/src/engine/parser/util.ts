@@ -76,9 +76,9 @@ export type AtEnd<T extends Toks, I extends number> = T[I] extends Tok
 // ─── Consuming (result: next index, or `never`; only test with `extends never`) ───
 
 export type EatWord<T extends Toks, I extends number, W extends string> =
-	T[I] extends WordTok<infer V> ? (V extends W ? Nx<I> : never) : never;
+	T[I] extends WordTok<W> ? Nx<I> : never;
 export type EatOp<T extends Toks, I extends number, O extends string> =
-	T[I] extends OpTok<infer V> ? (V extends O ? Nx<I> : never) : never;
+	T[I] extends OpTok<O> ? Nx<I> : never;
 /** Consume a run of words: `EatWords<T, I, ["with", "time", "zone"]>` → index after, or never. */
 export type EatWords<
 	T extends Toks,
@@ -111,21 +111,22 @@ export type SkipWords<
  * with `never`: `never extends [infer A, infer B]` takes the *true* branch.
  */
 export type Ident<T extends Toks, I extends number> =
-	T[I] extends IdTok<infer V>
-		? [V, Nx<I>]
-		: T[I] extends WordTok<infer V>
+	IdentName<T[I]> extends infer V extends string ? [V, Nx<I>] : null;
+
+/** Classify a token independently of the query tuple and position. */
+type IdentName<H> =
+	H extends IdTok<infer V>
+		? V
+		: H extends WordTok<infer V>
 			? V extends NotColId
 				? null
-				: [V, Nx<I>]
+				: V
 			: null;
 
 /** `ColLabel`: any word or quoted identifier (after `AS` or `.`, Postgres accepts every keyword): `[name, next]` or `null`. */
 export type AnyLabel<T extends Toks, I extends number> =
-	T[I] extends IdTok<infer V>
-		? [V, Nx<I>]
-		: T[I] extends WordTok<infer V>
-			? [V, Nx<I>]
-			: null;
+	LabelName<T[I]> extends infer V extends string ? [V, Nx<I>] : null;
+type LabelName<H> = H extends IdTok<infer V> | WordTok<infer V> ? V : null;
 
 /**
  * Qualified name `a`, `a.b`, `a.b.c` → `[parts, next]` (max 3 parts) or `null`: a `ColId`, then
@@ -157,11 +158,13 @@ type QualParts<
  * followed by `(` (`left(s, 2)`; `left` alone is no name) → `[parts, next]` or `null`.
  */
 export type FuncName<T extends Toks, I extends number> =
-	T[I] extends WordTok<infer V extends TypeFuncNameKeyword>
+	FuncKeyword<T[I]> extends infer V extends string
 		? T[Nx<I>] extends OpTok<"(">
 			? [[V], Nx<I>]
 			: null
 		: QualName<T, I>;
+type FuncKeyword<H> =
+	H extends WordTok<infer V extends TypeFuncNameKeyword> ? V : null;
 
 /** `(a, b, c)` → `Ok<names, next>` or error. Token `I` must be `(`. */
 export type ParenIdentList<T extends Toks, I extends number> =

@@ -12,6 +12,7 @@ import type { JsonValue } from "./inline.js";
 import type { Lex } from "./lexer/lex.js";
 import type { IdTok, Toks, WordTok } from "./lexer/tokens.js";
 import type { NamedParams, RewriteNamed } from "./named.js";
+import type { FastSelect } from "./parser/fast.js";
 import type { IntoName } from "./parser/select.js";
 import type { ParseProgram } from "./parser/stmt.js";
 import type { Nx } from "./parser/util.js";
@@ -22,7 +23,6 @@ import type { IntLitValue } from "./typer/operators.js";
 import type {
 	MaxParam,
 	NullTest,
-	ParamMap,
 	ParamsOfSelect,
 	ParamsToMap,
 } from "./typer/params.js";
@@ -38,30 +38,56 @@ import type { Cols, ColsToMap, Simplify } from "./types.js";
 export type Analyze<DB, Q extends string> =
 	RewriteNamed<Q> extends infer RN
 		? RN extends [infer Q1 extends string, infer Names]
-			? Lex<Q1> extends infer T
-				? T extends Toks
-					? ParseProgram<T> extends infer S
-						? S extends Stmt
-							? ProjectStmt<S, DB, [], {}> extends infer C
-								? C extends Cols | null
-									? {
-											readonly kind: S["t"];
-											readonly cols: C;
-											// the parameter pass re-types expressions; skip it when there are no `$n`
-											readonly params: MaxParam<T> extends 0 // type-mutate: equivalent cond-false, never-true – a shortcut: a statement without parameters maps to {} (or never) either way, read as no parameters
-												? {}
-												: ParamsToMap<ParamsOfStmt<S, DB>>;
-											readonly max: MaxParam<T>;
-											readonly names: Names;
-											readonly stmt: S;
-										}
-									: Reposition<C, T, DB>
-								: never
-							: Reposition<S, T, DB>
-						: never
-					: T
+			? FastSelect<Q1> extends infer F
+				? [F] extends [never] // type-mutate: equivalent cond-true – always using the general pipeline only disables the fast path
+					? AnalyzeGeneral<DB, Q1, Names>
+					: F extends {
+								// type-mutate: equivalent cond-false – rejecting a fast parse uses the equivalent general pipeline
+								stmt: infer S extends Stmt;
+								max: infer M extends number; // type-mutate: equivalent infer-bare – FastSelect's max is already a number
+							}
+						? ProjectStmt<S, DB, [], {}> extends infer C
+							? C extends Cols | null // type-mutate: equivalent cond-false – always retrying the general pipeline preserves results and diagnostics
+								? {
+										readonly kind: S["t"];
+										readonly cols: C;
+										readonly params: M extends 0 // type-mutate: equivalent cond-false – a statement without parameters builds the same empty map
+											? {}
+											: ParamsToMap<ParamsOfStmt<S, DB>>;
+										readonly max: M;
+										readonly names: Names;
+										readonly stmt: S;
+									}
+								: AnalyzeGeneral<DB, Q1, Names>
+							: never
+						: AnalyzeGeneral<DB, Q1, Names> // type-mutate: equivalent never-false – FastSelect only produces a valid statement/max pair or never, handled above
 				: never
 			: RN
+		: never;
+
+type AnalyzeGeneral<DB, Q1 extends string, Names> =
+	Lex<Q1> extends infer T
+		? T extends Toks
+			? ParseProgram<T> extends infer S
+				? S extends Stmt
+					? ProjectStmt<S, DB, [], {}> extends infer C
+						? C extends Cols | null
+							? {
+									readonly kind: S["t"];
+									readonly cols: C;
+									// the parameter pass re-types expressions; skip it when there are no `$n`
+									readonly params: MaxParam<T> extends 0 // type-mutate: equivalent cond-false, never-true – a shortcut: a statement without parameters maps to {} (or never) either way, read as no parameters
+										? {}
+										: ParamsToMap<ParamsOfStmt<S, DB>>;
+									readonly max: MaxParam<T>;
+									readonly names: Names;
+									readonly stmt: S;
+								}
+							: Reposition<C, T, DB>
+						: never
+					: Reposition<S, T, DB>
+				: never
+			: T
 		: never;
 
 /**
@@ -226,12 +252,12 @@ type FindNumFrom<
 			: FindNumFrom<T, Nx<I>, N, null>
 	: 0;
 /** Row type of a statement (`never` for DML without RETURNING and for DDL). */
-export type RowOf<DB, TM, Q extends string> =
-	Analysis<DB, Q> extends { readonly cols: infer C }
-		? C extends Cols
-			? BuildRow<ColsToMap<C>, TM, DB>
-			: never
-		: never;
+export type RowOf<DB, TM, Q extends string> = Analysis<DB, Q>["cols" &
+	keyof Analysis<DB, Q>] extends infer C
+	? C extends Cols
+		? BuildRow<ColsToMap<C>, TM, DB>
+		: never
+	: never;
 
 export type BuildRow<
 	M extends {
@@ -241,17 +267,25 @@ export type BuildRow<
 	DB,
 > = Simplify<{ -readonly [K in keyof M]: TsOf<TM, DB, M[K]> }>;
 
-/** Parameter tuple of a statement. Untyped params are `unknown`. */
+/**
+ * Parameter tuple of a statement. Untyped params are `unknown`.
+ * Read the parameter map by indexed access: inferring or constraining the whole map forces
+ * every nested parameter pass to resolve while relating union analyses from SQL fragments.
+ */
 export type ParamsOf<DB, TM, Q extends string> =
-	Analysis<DB, Q> extends {
-		readonly params: infer P extends ParamMap;
-		readonly max: infer N extends number;
-	}
-		? BuildParams<P, N, TM, DB, 1, []>
+	Analysis<DB, Q> extends { readonly max: infer N extends number }
+		? BuildParams<
+				Analysis<DB, Q>["params" & keyof Analysis<DB, Q>],
+				N,
+				TM,
+				DB,
+				1,
+				[]
+			>
 		: [];
 
 type BuildParams<
-	P extends ParamMap,
+	P,
 	N extends number,
 	TM,
 	DB,
@@ -298,10 +332,10 @@ type Inc<I extends number> = Nx<I>;
  * node-postgres sends a JS array as a Postgres array literal, so a json / jsonb parameter takes
  * no raw array, but a `sql.json(value)` (sent as JSON text by every driver) or any other value.
  */
-export type ArgsOf<DB, TM, Q extends string> =
-	Analysis<DB, Q> extends { readonly params: infer P }
-		? JsonArgs<ParamsOf<DB, TM, Q>, P>
-		: [];
+export type ArgsOf<DB, TM, Q extends string> = JsonArgs<
+	ParamsOf<DB, TM, Q>,
+	Analysis<DB, Q>["params" & keyof Analysis<DB, Q>]
+>;
 type JsonArgs<Ps, P> = {
 	[I in keyof Ps]: I extends `${infer N extends number}`
 		? Nx<N> extends keyof P

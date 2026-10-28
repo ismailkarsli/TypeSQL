@@ -5,6 +5,8 @@ import type {
 	NamesOf,
 	NonArrayOrSqlJson,
 } from "../../src/engine/index.js";
+import type { Lex } from "../../src/engine/lexer/lex.js";
+import type { MaxParam } from "../../src/engine/typer/params.js";
 import {
 	createSql,
 	type DefaultParamTypeMap,
@@ -633,4 +635,30 @@ test("parameters in joins, TABLESAMPLE, set operations, VALUES, GROUP BY and HAV
 			Raw<"SELECT 1 FROM things GROUP BY id HAVING sum(id) + $1 > 0">,
 		]
 	>().toEqualTypeOf<[{ 1: T<"int8"> }, { 1: T<"int8", false> }]>();
+});
+
+test("parameter maxima use only parameter tokens, independent of order and duplicates", () => {
+	expectTypeOf<MaxParam<[]>>().toEqualTypeOf<0>();
+	expectTypeOf<
+		MaxParam<Lex<"SELECT 99, '$88', \"$77\" /* $66 */ -- $55\n">>
+	>().toEqualTypeOf<0>();
+	expectTypeOf<
+		MaxParam<Lex<"SELECT $2, $12, $1, $12, $3">>
+	>().toEqualTypeOf<12>();
+	expectTypeOf<MaxParam<Lex<"SELECT $12, $2, $1">>>().toEqualTypeOf<12>();
+	expectTypeOf<MaxParam<Lex<"SELECT $0">>>().toEqualTypeOf<0>();
+});
+
+test("union statement projections keep shared parameter constraints and invalid branches", () => {
+	type Texts = "SELECT $1::int4 AS value" | "SELECT $1::text AS value";
+	expectTypeOf<Params<Texts>>().toEqualTypeOf<[never]>();
+	expectTypeOf<ArgsOf<DB, DefaultTypeMap, Texts>>().toEqualTypeOf<[never]>();
+	expectTypeOf<Row<Texts>>().toEqualTypeOf<
+		{ value: number } | { value: string }
+	>();
+
+	type Invalid = "SELECT $1::int4 AS value" | "SELECT nope FROM users";
+	expectTypeOf<Params<Invalid>>().toEqualTypeOf<[]>();
+	expectTypeOf<ArgsOf<DB, DefaultTypeMap, Invalid>>().toEqualTypeOf<[]>();
+	expectTypeOf<Row<Invalid>>().toEqualTypeOf<never>();
 });

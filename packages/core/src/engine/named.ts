@@ -55,9 +55,21 @@ export type NamedParams<
  * itself (needed before fragment splicing).
  */
 export type RewriteNamedStr<Text extends string> =
-	Text extends `${string}:${string}` // type-mutate: equivalent cond-true – a shortcut: a text without a colon has no name, and the loop copies it
+	HasSingleColon<Text> extends true // type-mutate: equivalent cond-true – a shortcut: text with only cast colons has no name, and the loop copies it
 		? NamedLoop<Text, "", []>
 		: [Text, []];
+
+/** Cast pairs never start a named parameter. Bound the shortcut: opaque text may contain many. */
+type HasSingleColon<
+	S extends string,
+	Budget extends unknown[] = [],
+> = Budget["length"] extends 128 // type-mutate: equivalent cond-swap cond-true never-true never-false – true and never choose the complete rewrite; an early fallback preserves its result
+	? true // type-mutate: equivalent never-true – never also chooses the complete rewrite
+	: S extends `${string}:${infer R}` // type-mutate: equivalent never-true – never passes the caller's extends true gate and only runs the full rewrite for cast-only text
+		? R extends `:${infer Rest}` // type-mutate: equivalent cond-false never-true – treating a cast as a possible name only runs the full, cast-aware rewrite
+			? HasSingleColon<Rest, [...Budget, 0]>
+			: true // type-mutate: equivalent never-false – never and true both pass the caller's extends true gate
+		: false; // type-mutate: equivalent never-false bool-flip – running the full rewrite without a colon copies the text unchanged
 
 type NamedLoop<T extends string, Acc extends string, Names extends string[]> =
 	SplitFirst<T> extends [

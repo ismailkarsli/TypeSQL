@@ -8,7 +8,6 @@ import type {
 	Target,
 } from "../ast.js";
 import type { BindFrom } from "../binder/from.js";
-import type { Next } from "../lexer/next.js";
 import type { Toks } from "../lexer/tokens.js";
 import type { BindWith } from "../project/select.js";
 import type {
@@ -71,62 +70,29 @@ export type ParamEntry<N extends number = number, T = ColInfo> = {
  */
 export type AddParam<M, N extends number, T> = M | ParamEntry<N, T>;
 
-export type ParamsToMap<U> = { readonly [K in EntryN<U>]: EntryT<U, K> };
-type EntryN<U> = U extends { readonly n: infer N extends number } ? N : never;
-type EntryT<U, K> = U extends { readonly n: K; readonly t: infer T }
-	? T
-	: never;
-
-/** Highest `$n` in the token stream (0 if none). Index-based scan (see ENGINE.md). */
-export type MaxParam<
-	T extends Toks,
-	Max extends number = 0,
-	I extends number = 0,
-> = T[I] extends undefined
-	? Max
-	: // eight tokens per iteration: 4096-token statements stay far below the 1000-iteration cap
-		Max8<T, I, Max> extends infer M extends number
-		? MaxParam<T, M, Next[Next[Next[Next[Next[Next[Next[Next[I]]]]]]]]>
-		: never;
-type Max8<T extends Toks, I extends number, Max extends number> =
-	MaxAt<T, I, Max> extends infer M1 extends number
-		? MaxAt<T, Next[I], M1> extends infer M2 extends number
-			? MaxAt<T, Next[Next[I]], M2> extends infer M3 extends number
-				? MaxAt<T, Next[Next[Next[I]]], M3> extends infer M4 extends number
-					? MaxAt<T, Next[Next[Next[Next[I]]]], M4> extends infer M5 extends
-							number
-						? MaxAt<
-								T,
-								Next[Next[Next[Next[Next[I]]]]],
-								M5
-							> extends infer M6 extends number
-							? MaxAt<
-									T,
-									Next[Next[Next[Next[Next[Next[I]]]]]],
-									M6
-								> extends infer M7 extends number
-								? MaxAt<T, Next[Next[Next[Next[Next[Next[Next[I]]]]]]], M7>
-								: never
-							: never
-						: never
-					: never
-				: never
-			: never
-		: never;
-type MaxAt<
-	T extends Toks,
-	I extends number,
-	Max extends number,
-> = T[I] extends { readonly k: "$"; readonly v: infer N extends number }
-	? Gt<N, Max> extends true
+export type ParamsToMap<U> = {
+	readonly [E in U as E extends { readonly n: infer N extends number }
 		? N
-		: Max
-	: Max;
-type Gt<A extends number, B extends number> =
-	Tup<B> extends [...Tup<A>, ...unknown[]] ? false : true; // type-mutate: equivalent tuple-swap never-false – the tuples hold only 0s; a never result reads as true
-type Tup<N extends number, A extends unknown[] = []> = A["length"] extends N
-	? A
-	: Tup<N, [...A, 0]>;
+		: never]: E extends { readonly t: infer T } ? T : never;
+};
+
+/**
+ * Highest `$n` in the token stream (0 if none). Extract parameters from the token
+ * union first: most tokens are not parameters, and need no per-token instantiation.
+ */
+export type MaxParam<T extends Toks> = HighestParam<
+	Extract<T[number], { readonly k: "$" }>["v"] | 0
+>;
+
+/** Only the largest candidate has no larger member outside its preceding integers. */
+type HighestParam<N extends number, All extends number = N> = N extends number // type-mutate: equivalent cond-true – N is constrained to number; this conditional distributes its members, and its false branch is unreachable
+	? Exclude<All, Before<N>> extends N
+		? N
+		: never
+	: never;
+type Before<N extends number, A extends number[] = []> = A["length"] extends N
+	? A[number]
+	: Before<N, [...A, A["length"]]>;
 
 /** Marks a `$n` that the statement tests with `IS [NOT] NULL`: the caller may pass null. */
 export type NullTest = {

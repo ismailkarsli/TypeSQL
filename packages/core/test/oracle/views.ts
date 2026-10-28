@@ -116,6 +116,9 @@ export function compareView(
 				detail: `column ${i + 1} ${name}: nullable in ours, the view analysis proves NOT NULL`,
 			});
 		if (!notNull[i] && !c.nullable) {
+			// window.sql:1747 (logging_agg_nonstrict) and :1790 (logging_agg_strict) are
+			// conservative candidates: non-null VALUES keys concatenated with COALESCE
+			// guarantee non-null labels, although the view analyzer cannot prove that.
 			if (mayNarrow(text)) narrowed++;
 			else
 				out.push({
