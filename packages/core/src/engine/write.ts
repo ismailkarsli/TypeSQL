@@ -1,7 +1,8 @@
 import type { ColDesc, Table, View } from "../schema/column.js";
 import type { TsParamTypeOf } from "../type-map/index.js";
 import type { JsonValue, ValueEnc } from "./inline.js";
-import type { JoinedText, QuotedIdent, UnionList } from "./splice.js";
+import type { Next } from "./lexer/next.js";
+import type { QuotedIdent, UnionList } from "./splice.js";
 
 /**
  * Types of the write helpers `sql.set(table, values)` and `sql.values(table, rows)`.
@@ -126,21 +127,41 @@ type CarriedOfKeys<
 		>
 	: Acc;
 
-type Assignments<Ks extends readonly unknown[]> = {
-	[I in keyof Ks]: { readonly text: `${QuotedIdent<[Ks[I] & string]>} = $1` };
-};
-type Placeholders<Ks extends readonly unknown[]> = {
-	[I in keyof Ks]: { readonly text: "$1" };
-};
-type Names<Ks extends readonly unknown[]> = {
-	[I in keyof Ks]: { readonly text: QuotedIdent<[Ks[I] & string]> };
-};
+type JoinAssignments<
+	Ks extends readonly unknown[],
+	N extends number = 1,
+	Acc extends string = "",
+> = Ks extends readonly [infer K extends string, ...infer Rest]
+	? JoinAssignments<
+			Rest,
+			Next[N],
+			Acc extends ""
+				? `${QuotedIdent<[K]>} = $${N}`
+				: `${Acc}, ${QuotedIdent<[K]>} = $${N}`
+		>
+	: Acc;
+type JoinNames<
+	Ks extends readonly unknown[],
+	Acc extends string = "",
+> = Ks extends readonly [infer K extends string, ...infer Rest]
+	? JoinNames<
+			Rest,
+			Acc extends "" ? QuotedIdent<[K]> : `${Acc}, ${QuotedIdent<[K]>}`
+		>
+	: Acc;
+type JoinPlaceholders<
+	Ks extends readonly unknown[],
+	N extends number = 1,
+	Acc extends string = "",
+> = Ks extends readonly [string, ...infer Rest]
+	? JoinPlaceholders<Rest, Next[N], Acc extends "" ? `$${N}` : `${Acc}, $${N}`>
+	: Acc;
 
 /** Representative of `sql.set(table, values)`: `"a" = $1, "b" = $2` over the keys of `P`. */
 export type SetRep<P> =
 	UnionList<KeysOf<P>> extends infer Ks extends readonly unknown[]
 		? {
-				readonly text: JoinedText<Assignments<Ks>, ", ">;
+				readonly text: JoinAssignments<Ks>;
 				readonly carried: CarriedOfKeys<P, Ks>;
 			}
 		: never;
@@ -154,7 +175,7 @@ export type ValuesRep<R> =
 		? Ks extends readonly []
 			? { readonly text: "DEFAULT VALUES"; readonly carried: [] }
 			: {
-					readonly text: `(${JoinedText<Names<Ks>, ", ">}) VALUES (${JoinedText<Placeholders<Ks>, ", ">})`;
+					readonly text: `(${JoinNames<Ks>}) VALUES (${JoinPlaceholders<Ks>})`;
 					readonly carried: CarriedOfKeys<R, Ks>;
 				}
 		: never;
