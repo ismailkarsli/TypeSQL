@@ -30,8 +30,8 @@
 	"0.7.5": {
 		"case1": {
 			"statements": 379,
-			"checkTimeSec": 0.787,
-			"cachedCheckTimeSec": 0.246
+			"checkTimeSec": 0.685,
+			"cachedCheckTimeSec": 0.226
 		}
 	}
 }

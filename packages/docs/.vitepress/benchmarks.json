@@ -17,13 +17,13 @@
 	"throughput": {
 		"tsrs": {
 			"instantiationsPerQuery": 8919,
-			"checkMsPerQuery": 2.08,
-			"queriesPerSec": 482
+			"checkMsPerQuery": 1.81,
+			"queriesPerSec": 553
 		},
 		"tsc": {
 			"instantiationsPerQuery": 8919,
-			"checkMsPerQuery": 7.53,
-			"queriesPerSec": 133
+			"checkMsPerQuery": 6.74,
+			"queriesPerSec": 148
 		}
 	},
 	"cache": {
@@ -31,31 +31,31 @@
 		"staleRatio": 1.043
 	},
 	"instantiationsPerQuery": "8.92K",
-	"speedup": 3.6,
+	"speedup": 3.7,
 	"rows": {
 		"case1": {
 			"instantiations": "3.53M",
-			"tsrs": 0.874,
-			"tsc": 3.047
+			"tsrs": 0.731,
+			"tsc": 2.773
 		},
 		"case1d": {
 			"instantiations": "3.38M",
-			"tsrs": 0.787,
-			"tsc": 2.854
+			"tsrs": 0.685,
+			"tsc": 2.554
 		},
 		"case1c": {
 			"instantiations": "994K",
-			"tsrs": 0.246,
-			"tsc": 0.9
+			"tsrs": 0.226,
+			"tsc": 0.903
 		},
 		"case1s": {
 			"instantiations": "3.53M",
-			"tsrs": 0.848,
-			"tsc": 2.906
+			"tsrs": 0.735,
+			"tsc": 2.708
 		}
 	},
 	"runtime": {
-		"microsecondsPerQuery": "4.99",
-		"millisecondsPerWorkload": "1.89"
+		"microsecondsPerQuery": "4.77",
+		"millisecondsPerWorkload": "1.81"
 	}
 }
