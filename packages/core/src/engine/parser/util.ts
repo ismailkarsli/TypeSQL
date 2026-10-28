@@ -31,8 +31,6 @@ export type Ok<N, J extends number> = readonly [N, J];
 export type Nx<I extends number> = Next[I];
 export type Nx2<I extends number> = Nx<Nx<I>>;
 export type Nx3<I extends number> = Nx<Nx2<I>>;
-export type Nx4<I extends number> = Nx<Nx3<I>>;
-export type Nx5<I extends number> = Nx<Nx4<I>>;
 
 /** Error positioned at token index `I`. */
 export type Fail<Message extends string, I extends number> = SqlError<

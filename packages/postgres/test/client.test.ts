@@ -79,7 +79,6 @@ function fakeSql(rows: unknown[], count: number | null = rows.length) {
 }
 
 const rowA = { id: 7, email: "a@example.com", display_name: null };
-const rowB = { id: 8, email: "b@example.com", display_name: "B" };
 
 describe("createSql", () => {
 	test("build { text, values }", () => {

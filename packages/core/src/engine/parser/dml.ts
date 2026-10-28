@@ -1,13 +1,7 @@
 import type {
 	Expr,
-	FromItem,
-	InsertSource,
-	OnConflict,
 	ReturningOpt,
-	SelectStmt,
 	SetItem,
-	TableRef,
-	Target,
 	TargetInd,
 	WithClause,
 } from "../ast.js";

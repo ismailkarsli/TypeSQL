@@ -3,7 +3,7 @@
  * plain object types, including `interval` (no `PgInterval` reference), so packages that
  * re-export them do not need `@typesql/pg` as a dependency (TS2883).
  */
-import type { Col, Generated, Nullable } from "@typesql/core";
+import type { Generated, Nullable } from "@typesql/core";
 import { createSql } from "../../src/index.js";
 
 interface DB {

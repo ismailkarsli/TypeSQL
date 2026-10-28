@@ -165,9 +165,6 @@ export function serverError(e: unknown): ServerError {
 	};
 }
 
-export const isSemanticError = (e: ServerError): boolean =>
-	e.code.startsWith("42") || e.code === "0A000";
-
 /** A describe error is a rejection also outside class 42 (3F000); resource and system errors are not. `compare.ts` skips class 22 before asking. */
 export const isRejection = (e: ServerError): boolean =>
 	!/^(53|54|57|58|XX)/.test(e.code);

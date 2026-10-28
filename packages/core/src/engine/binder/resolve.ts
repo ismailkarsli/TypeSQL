@@ -268,6 +268,3 @@ type LastWith<Maps extends readonly ColMap[], K> = Maps extends readonly [
 		? M[K]
 		: LastWith<R, K>
 	: never;
-
-/** Names visible as output-column aliases (ORDER BY alias, GROUP BY alias). */
-export type { ColMap, Scope, ScopeItem, ScopeLevel };

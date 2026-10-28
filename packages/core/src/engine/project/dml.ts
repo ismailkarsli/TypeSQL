@@ -17,7 +17,7 @@ import type {
 	UpdateStmt,
 	WithClause,
 } from "../ast.js";
-import type { HasStar, TypeDisplay } from "../binder/clauses.js";
+import type { HasStar } from "../binder/clauses.js";
 import type { BindFrom } from "../binder/from.js";
 import type { ResolveWritableTable, TableCols } from "../binder/resolve.js";
 import type { AnyErr, SqlError } from "../errors.js";

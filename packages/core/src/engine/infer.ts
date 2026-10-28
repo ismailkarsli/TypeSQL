@@ -7,7 +7,7 @@ import type {
 	QueryCacheKeys,
 } from "./cache.js";
 import type { ApplyDdlAll } from "./ddl/apply.js";
-import type { AnyErr, ErrAt, ErrMsg, SqlError } from "./errors.js";
+import type { AnyErr, SqlError } from "./errors.js";
 import type { JsonValue } from "./inline.js";
 import type { Lex } from "./lexer/lex.js";
 import type { IdTok, Toks, WordTok } from "./lexer/tokens.js";
@@ -413,5 +413,3 @@ export type ApplyDdl<DB, Q extends string> = [Q] extends [keyof DdlCacheKeys]
 			: C
 		: never
 	: ApplyDdlAll<DB, Q>;
-
-export type { AnyErr, ErrAt, ErrMsg, SqlError };

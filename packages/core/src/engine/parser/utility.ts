@@ -1,16 +1,7 @@
 import type { SqlError } from "../errors.js";
 import type { NumTok, OpTok, Toks, WordTok } from "../lexer/tokens.js";
 import type { ParseSelectStmt } from "./select.js";
-import type {
-	AtEnd,
-	EatWord,
-	Expected,
-	Fail,
-	Ident,
-	Nx,
-	Nx2,
-	Ok,
-} from "./util.js";
+import type { AtEnd, EatWord, Expected, Ident, Nx, Nx2, Ok } from "./util.js";
 
 /**
  * Cursor statements (index-based, see util.ts). `I` is the index of the first word.

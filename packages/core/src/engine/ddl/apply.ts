@@ -28,7 +28,7 @@ import type { ColInfo, Cols, ColsToMap } from "../types.js";
  * Apply DDL to a schema type.
  *
  *   ApplyDdlAll<DB, Q>      lex + parse `Q`, apply every `;`-separated statement in order
- *   ApplyDdlStmt<DB, Stmt>  one parsed DDL statement → new DB (or `SqlError<msg, null>`)
+ *   ApplyDdlNode<DB, Stmt>  one parsed DDL statement → new DB (or `SqlError<msg, null>`)
  *
  * Schema layout (see schema/column.ts): tables and views live at the top level of `DB`
  * (`public`), other schemas are nested objects (`DB["auth"]["users"]`), views are
@@ -45,9 +45,7 @@ import type { ColInfo, Cols, ColsToMap } from "../types.js";
  * of the message in the statement's tokens (the second occurrence for "specified more
  * than once").
  */
-export type ApplyDdlStmt<DB, S extends DdlStmt> = ApplyDdlNode<DB, S>;
-
-/** Same as `ApplyDdlStmt` without the constraint (pitfall 12: dispatch on `t` only). */
+/** Dispatch on `t` only, without a structural constraint on the statement. */
 export type ApplyDdlNode<DB, S> = S extends {
 	readonly t: "noop" | "fetch" | "move" | "close_cursor";
 }
@@ -98,13 +96,12 @@ export type ApplyDdlNode<DB, S> = S extends {
 						: S extends {
 									readonly t: "create_view";
 									readonly orReplace: infer OrR;
-									readonly materialized: infer Mat;
 									readonly ifNotExists: infer Ine;
 									readonly view: infer Ref extends TableRef;
 									readonly cols: infer Names;
 									readonly q: infer Q;
 								}
-							? ApplyCreateView<DB, OrR, Mat, Ine, Ref, Names, Q>
+							? ApplyCreateView<DB, OrR, Ine, Ref, Names, Q>
 							: S extends {
 										readonly t: "drop_view";
 										readonly ifExists: infer Ife;
@@ -1037,16 +1034,7 @@ type ModifyCol<
 
 // ───────────────────────────── views ─────────────────────────────
 
-type ApplyCreateView<
-	DB,
-	OrR,
-	Mat,
-	Ine,
-	Ref extends TableRef,
-	Names,
-	Q,
-	QDB = DB,
-> =
+type ApplyCreateView<DB, OrR, Ine, Ref extends TableRef, Names, Q, QDB = DB> =
 	GetRel<DB, Ref> extends infer Rel
 		? Rel extends null
 			? CanCreate<DB, Ref> extends infer E
@@ -1319,7 +1307,6 @@ type ApplyElement<DB, S extends string, E> = E extends {
 	: E extends {
 				readonly t: "create_view";
 				readonly orReplace: infer OrR;
-				readonly materialized: infer Mat;
 				readonly ifNotExists: infer Ine;
 				readonly view: infer Ref extends TableRef;
 				readonly cols: infer Names;
@@ -1328,7 +1315,6 @@ type ApplyElement<DB, S extends string, E> = E extends {
 		? ApplyCreateView<
 				DB,
 				OrR,
-				Mat,
 				Ine,
 				Ref,
 				Names,

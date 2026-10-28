@@ -2,7 +2,7 @@ import type { EnumsOf } from "../type-map/index.js";
 import type { Expr } from "./ast.js";
 import type { SqlError } from "./errors.js";
 import type { Nx } from "./parser/util.js";
-import type { AnyShaped, BaseOf, ObjShape, Shaped } from "./shape.js";
+import type { AnyShaped, BaseOf, Shaped } from "./shape.js";
 import type {
 	DateTimeT,
 	IntT,
@@ -11,7 +11,7 @@ import type {
 	RangeT,
 	StrT,
 } from "./typer/operators.js";
-import type { ColInfo, ColMap, Info } from "./types.js";
+import type { ColInfo, Info } from "./types.js";
 
 /**
  * Typed JSON. A `json` / `jsonb` value whose structure is known carries it as a shape (see
@@ -37,14 +37,6 @@ import type { ColInfo, ColMap, Info } from "./types.js";
  *   val  an SQL value            to_json(x): x serialized
  *   ts   a TypeScript type       Json<T> columns, simple JSON literals ('[]'), steps into a `ts`
  */
-export type JsonShape =
-	| ObjShape<ColMap>
-	| { readonly k: "arr"; readonly e: ColInfo }
-	| { readonly k: "tup"; readonly es: readonly ColInfo[] }
-	| { readonly k: "rec"; readonly v: ColInfo }
-	| { readonly k: "val"; readonly c: ColInfo }
-	| { readonly k: "ts"; readonly v: unknown };
-
 type ArrShape<E> = { readonly k: "arr"; readonly e: E };
 type ValShape<C> = { readonly k: "val"; readonly c: C };
 /** A JSON value of TS type `T` (`Json<T>` columns). */

@@ -1,4 +1,4 @@
-import type { Stmt, WithClause } from "../ast.js";
+import type { WithClause } from "../ast.js";
 import type { OpTok, Toks, WordTok } from "../lexer/tokens.js";
 import type { ParseDdl } from "./ddl.js";
 import type { ParseDelete, ParseInsert, ParseUpdate } from "./dml.js";

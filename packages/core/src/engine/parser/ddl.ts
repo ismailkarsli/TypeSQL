@@ -1612,7 +1612,6 @@ type SchemaElement<
 												readonly table: infer Ref extends TableRef;
 											}
 										? InSchema<
-												T,
 												J,
 												S,
 												Known,
@@ -1625,7 +1624,6 @@ type SchemaElement<
 													readonly view: infer Ref extends TableRef;
 												}
 											? InSchema<
-													T,
 													J,
 													S,
 													Known,
@@ -1645,7 +1643,6 @@ type SchemaElement<
 									T,
 									J,
 									InSchema<
-										T,
 										SkipElement<T, Nx<I>, I>,
 										S,
 										Known,
@@ -1667,7 +1664,6 @@ type SchemaElement<
 													T,
 													K2,
 													InSchema<
-														T,
 														J,
 														S,
 														Known,
@@ -1730,7 +1726,6 @@ type NoDanglingDot<T extends Toks, J extends number, Then> =
 
 /** An element may name its own schema only: `Ok<E, J>`, or Postgres's error at the name (token `At`). */
 type InSchema<
-	T extends Toks,
 	J extends number,
 	S extends string,
 	Known extends boolean,

@@ -1,11 +1,4 @@
-import type {
-	Cte,
-	Expr,
-	FromItem,
-	JoinKind,
-	SelectBody,
-	Target,
-} from "../ast.js";
+import type { Expr, JoinKind } from "../ast.js";
 import type { IdTok, OpTok, StrTok, Toks, WordTok } from "../lexer/tokens.js";
 import type {
 	ColNode,
@@ -1692,5 +1685,3 @@ type ParseColIdList<
 			? Ok<[...Acc, N], J>
 			: ParseColIdList<T, EatOp<T, J, ",">, [...Acc, N]>
 		: Expected<"column name", T, I>;
-
-export type { Cte, Expr, FromItem, SelectBody, Target };

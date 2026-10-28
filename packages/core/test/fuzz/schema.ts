@@ -144,9 +144,6 @@ export const TABLES: readonly FuzzTable[] = SPECS.map((s) => ({
 	rows: rows(s),
 }));
 
-export const tableOf = (name: string): FuzzTable =>
-	TABLES.find((t) => t.name === name)!;
-
 export function fuzzSetup(): string[] {
 	const out = [`CREATE TYPE mood AS ENUM (${MOOD.map(literal).join(", ")})`];
 	for (const t of TABLES) {

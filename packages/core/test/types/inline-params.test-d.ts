@@ -2,7 +2,6 @@ import { expectTypeOf, test } from "vitest";
 import {
 	type Col,
 	createSql,
-	type Enum,
 	type Generated,
 	type Nullable,
 	type ParamsType,

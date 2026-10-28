@@ -406,7 +406,7 @@ function structure(toks: readonly Tok[]): { at: At[]; used: RelRef[] } {
 					endOutput();
 					return { level: first, i };
 				}
-				const p = parens.pop()!;
+				parens.pop();
 				if (parens.length === 0) {
 					if (out) out.push(t);
 					// `FROM f(x) AS y`: the alias may follow a function call

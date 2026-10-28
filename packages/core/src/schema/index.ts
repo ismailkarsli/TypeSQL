@@ -14,11 +14,7 @@ export type {
 	TypeRegistry,
 	View,
 } from "./column.js";
-export type {
-	NormalizeTypeName,
-	SerialTypeName,
-	TypeAliases,
-} from "./normalize.js";
+export type { NormalizeTypeName } from "./normalize.js";
 export type {
 	InformationSchemaNamespace,
 	PgCatalog,

@@ -32,7 +32,6 @@ const sql = createSql<DB>();
 test("plain columns", () => {
 	const q = sql("SELECT id, email, display_name FROM users");
 	expectTypeOf(q.text).toEqualTypeOf<string>();
-	type Row = typeof q extends { [k: symbol]: unknown } ? never : never;
 	expectTypeOf<
 		RowOf<DB, DefaultTM, "SELECT id, email, display_name FROM users">
 	>().toEqualTypeOf<{

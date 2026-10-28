@@ -6,7 +6,6 @@ import {
 	type DefaultTypeMap,
 	type Generated,
 	type Nullable,
-	type NullableGenerated,
 	type ParamsOf,
 	type RowOf,
 	type RowType,

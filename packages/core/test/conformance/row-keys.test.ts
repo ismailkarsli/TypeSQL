@@ -2,7 +2,6 @@ import { Pool } from "pg";
 import postgres from "postgres";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import {
-	type Col,
 	createSql,
 	type Executor,
 	type Generated,
@@ -28,7 +27,7 @@ type Equal<A, B> =
 	(<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2
 		? true
 		: false;
-const check = <T extends true>() => {};
+const check = <_T extends true>() => {};
 
 const db = await acquireDatabase();
 const pool = db ? new Pool({ connectionString: db.url, max: 2 }) : null;

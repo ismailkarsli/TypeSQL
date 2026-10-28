@@ -1,6 +1,6 @@
 import type { JsonTs } from "../engine/json.js";
 import type { AnyShaped, BaseOf, Shaped } from "../engine/shape.js";
-import type { Schema, TypeRegistry } from "../schema/column.js";
+import type { TypeRegistry } from "../schema/column.js";
 
 /**
  * A type map converts canonical Postgres type names into TS types at the projection
@@ -178,5 +178,3 @@ type ParamTsOf<TM, PM, DB, T extends string> = T extends AnyShaped
 			: T extends keyof EnumsOf<DB>
 				? EnumsOf<DB>[T]
 				: unknown;
-
-export type { Schema };

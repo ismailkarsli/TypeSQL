@@ -14,7 +14,6 @@ import {
 	PROBE_HEAD,
 	ProbeSession,
 	parseTypeText,
-	readAnalysis,
 } from "../../src/cache/evaluate.js";
 import { scanNames } from "../../src/cache/scan.js";
 import { classify } from "../pg-regress/psql.js";
@@ -24,7 +23,6 @@ import {
 	compareStatement,
 	normalizeOurs,
 	type Observed,
-	type Ours,
 	type Server,
 } from "./compare.js";
 import { comparisonSkip } from "./comparison-skips.js";

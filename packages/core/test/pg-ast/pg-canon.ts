@@ -1000,7 +1000,3 @@ const SQL_VALUE_FUNCTIONS: { readonly [k: string]: string } = {
 	SVFOP_CURRENT_CATALOG: "current_catalog",
 	SVFOP_CURRENT_SCHEMA: "current_schema",
 };
-
-export function pgCanon(stmt: Json, sql: string): string {
-	return new PgCanon(sql).stmt(stmt);
-}

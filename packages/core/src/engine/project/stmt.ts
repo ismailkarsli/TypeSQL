@@ -1,6 +1,6 @@
 import type { DmlStmt, Stmt } from "../ast.js";
 import type { AnyErr } from "../errors.js";
-import type { Cols, CteMap, Scope } from "../types.js";
+import type { CteMap, Scope } from "../types.js";
 import type { ProjectDml } from "./dml.js";
 import type { ProjectSelectParts } from "./select.js";
 
@@ -34,5 +34,3 @@ export type ProjectStmt<
 					: null
 				: never
 			: null;
-
-export type { Cols };

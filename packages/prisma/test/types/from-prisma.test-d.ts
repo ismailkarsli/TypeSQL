@@ -188,11 +188,13 @@ test("overrides are checked against the models", () => {
 		// @ts-expect-error unknown field, next to a valid one
 		{ User: { email: "varchar"; emial: "varchar" } }
 	>;
+	expectTypeOf<_C>();
 	type _D = FromPrisma<
 		Prisma.TypeMap,
 		// @ts-expect-error unknown model, next to a valid one
 		{ User: { $table: "users" }; Usr: { $table: "x" } }
 	>;
+	expectTypeOf<_D>();
 	// @ts-expect-error misspelled model option
 	type _E = FromPrisma<Prisma.TypeMap, { User: { $tabel: "users" } }>;
 });

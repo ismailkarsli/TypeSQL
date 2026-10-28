@@ -1,14 +1,4 @@
-import type {
-	Expr,
-	MergeAction,
-	MergeWhen,
-	ReturningOpt,
-	SetItem,
-	TableRef,
-	Target,
-	TargetInd,
-	WithClause,
-} from "../ast.js";
+import type { Expr, MergeWhen, WithClause } from "../ast.js";
 import type { OpTok, Toks, WordTok } from "../lexer/tokens.js";
 import type {
 	ParenTargetList,
