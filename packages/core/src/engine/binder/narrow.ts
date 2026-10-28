@@ -153,18 +153,22 @@ type AnyHit<
 	Keys,
 	I extends number,
 > = L[I] extends ScopeItem
-	? true extends ItemHits<
-			L[I]["cols"],
-			L[I]["alias"],
-			L[I]["skip"][number],
-			Keys
-		>
+	? true extends KeyHits<L[I], Keys>
 		? true
 		: AnyHit<L, Keys, Nx<I>>
 	: false;
-type ItemHits<M extends ColMap, A, Skip, Keys> = {
-	[K in keyof M]: M[K]["nullable"] extends true ? Hit<A, K, Skip, Keys> : never;
-}[keyof M];
+type KeyHits<It extends ScopeItem, Keys> = Keys extends readonly [
+	unknown,
+	infer K extends string,
+]
+	? string extends K
+		? true
+		: K extends keyof It["cols"]
+			? It["cols"][K]["nullable"] extends true
+				? Hit<It["alias"], K, It["skip"][number], Keys>
+				: false
+			: false
+	: false;
 
 type NarrowItem<It extends ScopeItem, Keys> = {
 	readonly alias: It["alias"];
