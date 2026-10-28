@@ -2,36 +2,36 @@
 	"0.7.1": {
 		"case1": {
 			"statements": 379,
-			"checkTimeSec": 2.166,
-			"cachedCheckTimeSec": 0.756
+			"checkTimeSec": 1.687,
+			"cachedCheckTimeSec": 0.586
 		}
 	},
 	"0.7.2": {
 		"case1": {
 			"statements": 379,
-			"checkTimeSec": 0.82,
-			"cachedCheckTimeSec": 0.292
+			"checkTimeSec": 0.682,
+			"cachedCheckTimeSec": 0.233
 		}
 	},
 	"0.7.3": {
 		"case1": {
 			"statements": 379,
-			"checkTimeSec": 0.518,
-			"cachedCheckTimeSec": 0.178
+			"checkTimeSec": 0.669,
+			"cachedCheckTimeSec": 0.231
 		}
 	},
 	"0.7.4": {
 		"case1": {
 			"statements": 379,
-			"checkTimeSec": 0.588,
-			"cachedCheckTimeSec": 0.205
+			"checkTimeSec": 0.665,
+			"cachedCheckTimeSec": 0.228
 		}
 	},
 	"0.7.5": {
 		"case1": {
 			"statements": 379,
-			"checkTimeSec": 0.685,
-			"cachedCheckTimeSec": 0.226
+			"checkTimeSec": 0.54,
+			"cachedCheckTimeSec": 0.178
 		}
 	}
 }

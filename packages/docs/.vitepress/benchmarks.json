@@ -7,7 +7,7 @@
 	},
 	"environment": {
 		"node": "v26.12.1",
-		"cpu": "AMD EPYC 7763 64-Core Processor",
+		"cpu": "AMD EPYC 9V74 80-Core Processor",
 		"cpus": 4
 	},
 	"compilers": {
@@ -17,13 +17,13 @@
 	"throughput": {
 		"tsrs": {
 			"instantiationsPerQuery": 8919,
-			"checkMsPerQuery": 1.81,
-			"queriesPerSec": 553
+			"checkMsPerQuery": 1.42,
+			"queriesPerSec": 702
 		},
 		"tsc": {
 			"instantiationsPerQuery": 8919,
-			"checkMsPerQuery": 6.74,
-			"queriesPerSec": 148
+			"checkMsPerQuery": 5.05,
+			"queriesPerSec": 198
 		}
 	},
 	"cache": {
@@ -31,31 +31,31 @@
 		"staleRatio": 1.043
 	},
 	"instantiationsPerQuery": "8.92K",
-	"speedup": 3.7,
+	"speedup": 3.6,
 	"rows": {
 		"case1": {
 			"instantiations": "3.53M",
-			"tsrs": 0.731,
-			"tsc": 2.773
+			"tsrs": 0.564,
+			"tsc": 2.083
 		},
 		"case1d": {
 			"instantiations": "3.38M",
-			"tsrs": 0.685,
-			"tsc": 2.554
+			"tsrs": 0.54,
+			"tsc": 1.914
 		},
 		"case1c": {
 			"instantiations": "994K",
-			"tsrs": 0.226,
-			"tsc": 0.903
+			"tsrs": 0.178,
+			"tsc": 0.638
 		},
 		"case1s": {
 			"instantiations": "3.53M",
-			"tsrs": 0.735,
-			"tsc": 2.708
+			"tsrs": 0.563,
+			"tsc": 2.037
 		}
 	},
 	"runtime": {
-		"microsecondsPerQuery": "4.77",
-		"millisecondsPerWorkload": "1.81"
+		"microsecondsPerQuery": "3.64",
+		"millisecondsPerWorkload": "1.38"
 	}
 }
