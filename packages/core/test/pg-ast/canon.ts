@@ -852,10 +852,13 @@ type TableConstraints<
 		>
 	: Acc;
 type Likes<L, Acc extends readonly string[] = []> = L extends readonly [
-	{ readonly ref: infer Rf; readonly defaults: infer D },
+	{ readonly ref: infer Rf; readonly options: infer O },
 	...infer R,
 ]
-	? Likes<R, [...Acc, `LIKE ${Ref<Rf>}${D extends true ? " DEFAULTS" : ""}`]>
+	? Likes<
+			R,
+			[...Acc, `LIKE ${Ref<Rf>}${[O] extends [never] ? "" : " DEFAULTS"}`]
+		>
 	: Acc;
 
 type CreateTable<S> = S extends {

@@ -231,3 +231,38 @@ describe("helpers", () => {
 		).toEqual(["…ECT ((a OR b) A…", "…ECT (a OR (b AN…"]);
 	});
 });
+
+test("regression fixes retain PostgreSQL parse trees", () => {
+	expect(
+		canon(
+			"SELECT 'a'::\"char\", 'a'::char, 'a'::pg_catalog.\"char\", 'a'::\"char\"[]",
+		),
+	).toBe("SELECT ('a'::char), ('a'::bpchar), ('a'::char), ('a'::char[])");
+	expect(
+		canon(
+			"CREATE FUNCTION f() RETURNS TABLE (a int) AS 'SELECT 1' LANGUAGE sql",
+		),
+	).toBe("CREATE FUNCTION f RETURNS SETOF int4");
+	expect(
+		canon(
+			"CREATE FUNCTION f() RETURNS TABLE (a int, b text) AS 'SELECT 1, 2' LANGUAGE sql",
+		),
+	).toBe("CREATE FUNCTION f RETURNS SETOF record");
+	expect(
+		canon(
+			"CREATE FUNCTION f() RETURNS SETOF public.t.a%TYPE AS 'SELECT 1' LANGUAGE sql",
+		),
+	).toBe("CREATE FUNCTION f RETURNS SETOF a%type");
+	expect(
+		canon("CREATE TABLE t (LIKE src INCLUDING ALL EXCLUDING DEFAULTS)"),
+	).toBe("CREATE TABLE t (LIKE src DEFAULTS)");
+	expect(
+		canon("CREATE TABLE t (LIKE src INCLUDING DEFAULTS EXCLUDING DEFAULTS)"),
+	).toBe("CREATE TABLE t (LIKE src)");
+	expect(
+		canon("CREATE TABLE t (LIKE src INCLUDING IDENTITY EXCLUDING GENERATED)"),
+	).toBe("CREATE TABLE t (LIKE src DEFAULTS)");
+	expect(canon("CREATE TABLE t (LIKE src INCLUDING ALL EXCLUDING ALL)")).toBe(
+		"CREATE TABLE t (LIKE src)",
+	);
+});

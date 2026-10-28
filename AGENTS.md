@@ -39,7 +39,9 @@ pass: exact type tests (with a negative case for every nullability rule), no new
 the type oracles (`pnpm test:oracle`, with `--regress --views` for engine changes) or the fuzzer
 (`pnpm fuzz`), changed-lines mutation testing (`pnpm mutate:types --changed`,
 `pnpm mutate:runtime --changed`), coverage thresholds, and the change intent and `CacheVersion`.
-Engine bugs the oracles find are baselined with an issue; fix them in their own commits.
+Record unrelated engine findings in the reviewed baseline and fix them in separate commits.
+Do not create GitHub issues or post issue comments automatically. Create issues or comments
+only when the user explicitly requests them.
 
 ## Releases
 

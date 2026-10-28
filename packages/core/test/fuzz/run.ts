@@ -32,7 +32,7 @@ import {
 	oursOf,
 	withDatabase,
 } from "../oracle/types.js";
-import { kinds, type Node, statement } from "./gen.js";
+import { kinds, type Node, parserStatements, statement } from "./gen.js";
 import { fuzzDbType, fuzzSetup, MOOD, TABLES } from "./schema.js";
 
 export type Property = "rejects" | "types" | "nulls" | "accepts" | "crash";
@@ -305,7 +305,13 @@ export async function fuzz(url: string, o: FuzzOptions): Promise<FuzzReport> {
 		const arb = statement();
 		const generated =
 			o.runs > 0 ? fc.sample(arb, { seed: o.seed, numRuns: o.runs }) : [];
-		const seeds = corpus();
+		const seeds = [
+			...corpus(),
+			...parserStatements().map((sql, i) => ({
+				sql,
+				key: `corpus/parser-${i}`,
+			})),
+		];
 		const items = [
 			...seeds.map((c) => ({
 				sql: c.sql,

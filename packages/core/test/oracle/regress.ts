@@ -27,6 +27,7 @@ import {
 	type Ours,
 	type Server,
 } from "./compare.js";
+import { comparisonSkip } from "./comparison-skips.js";
 import type { Disagreement } from "./kinds.js";
 import {
 	Connection,
@@ -1076,6 +1077,8 @@ function compareDdl(c: Checked): Verdict {
 	const words = scanWords(c.text);
 	if (c.shadowed?.some((n) => words.has(n)))
 		return { skip: "schema-unrepresentable" };
+	const skip = comparisonSkip("ddl", c.test, hashOf(c.text));
+	if (skip) return { skip };
 	return {
 		disagreements: diffDbs(ours, theirs, words, new Set(c.pathSchemas ?? [])),
 	};

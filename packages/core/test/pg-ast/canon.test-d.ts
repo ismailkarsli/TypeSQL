@@ -107,3 +107,60 @@ describe("the canonical form of our parse tree", () => {
 		>().toEqualTypeOf<"!syntax error at end of input">();
 	});
 });
+
+test("regression fixes retain PostgreSQL parse trees", () => {
+	expectTypeOf<
+		Canon<"CREATE FUNCTION f() RETURNS t.a%foo">
+	>().toEqualTypeOf<"!syntax error at or near foo">();
+	expectTypeOf<
+		Canon<"CREATE FUNCTION f() RETURNS TABLE a int">
+	>().toEqualTypeOf<'!syntax error: expected "(" at or near a'>();
+	expectTypeOf<
+		Canon<"CREATE FUNCTION f() RETURNS TABLE ()">
+	>().toEqualTypeOf<"!syntax error: expected column name at or near )">();
+	expectTypeOf<
+		Canon<"CREATE FUNCTION f() RETURNS TABLE (a)">
+	>().toEqualTypeOf<"!syntax error: expected type name at or near )">();
+	expectTypeOf<
+		Canon<"CREATE TABLE t (LIKE src INCLUDING GENERATED)">
+	>().toEqualTypeOf<"CREATE TABLE t (LIKE src DEFAULTS)">();
+	expectTypeOf<
+		Canon<"CREATE TABLE t (LIKE src INCLUDING IDENTITY EXCLUDING IDENTITY)">
+	>().toEqualTypeOf<"CREATE TABLE t (LIKE src)">();
+	expectTypeOf<
+		Canon<"CREATE TABLE t (LIKE src INCLUDING ALL EXCLUDING DEFAULTS EXCLUDING GENERATED)">
+	>().toEqualTypeOf<"CREATE TABLE t (LIKE src DEFAULTS)">();
+	expectTypeOf<
+		Canon<"CREATE TABLE t (LIKE src INCLUDING ALL EXCLUDING DEFAULTS EXCLUDING IDENTITY)">
+	>().toEqualTypeOf<"CREATE TABLE t (LIKE src DEFAULTS)">();
+	expectTypeOf<
+		Canon<"CREATE TABLE t (LIKE src INCLUDING COMMENTS)">
+	>().toEqualTypeOf<"CREATE TABLE t (LIKE src)">();
+	expectTypeOf<
+		Canon<"CREATE TABLE t (LIKE src INCLUDING DEFAULTS EXCLUDING COMMENTS)">
+	>().toEqualTypeOf<"CREATE TABLE t (LIKE src DEFAULTS)">();
+	expectTypeOf<
+		Canon<"SELECT 'a'::\"char\", 'a'::char, 'a'::pg_catalog.\"char\", 'a'::\"char\"[]">
+	>().toEqualTypeOf<"SELECT ('a'::char), ('a'::bpchar), ('a'::char), ('a'::char[])">();
+	expectTypeOf<
+		Canon<"CREATE FUNCTION f() RETURNS TABLE (a int) AS 'SELECT 1' LANGUAGE sql">
+	>().toEqualTypeOf<"CREATE FUNCTION f RETURNS SETOF int4">();
+	expectTypeOf<
+		Canon<"CREATE FUNCTION f() RETURNS TABLE (a int, b text) AS 'SELECT 1, 2' LANGUAGE sql">
+	>().toEqualTypeOf<"CREATE FUNCTION f RETURNS SETOF record">();
+	expectTypeOf<
+		Canon<"CREATE FUNCTION f() RETURNS SETOF public.t.a%TYPE AS 'SELECT 1' LANGUAGE sql">
+	>().toEqualTypeOf<"CREATE FUNCTION f RETURNS SETOF a%type">();
+	expectTypeOf<
+		Canon<"CREATE TABLE t (LIKE src INCLUDING ALL EXCLUDING DEFAULTS)">
+	>().toEqualTypeOf<"CREATE TABLE t (LIKE src DEFAULTS)">();
+	expectTypeOf<
+		Canon<"CREATE TABLE t (LIKE src INCLUDING DEFAULTS EXCLUDING DEFAULTS)">
+	>().toEqualTypeOf<"CREATE TABLE t (LIKE src)">();
+	expectTypeOf<
+		Canon<"CREATE TABLE t (LIKE src INCLUDING IDENTITY EXCLUDING GENERATED)">
+	>().toEqualTypeOf<"CREATE TABLE t (LIKE src DEFAULTS)">();
+	expectTypeOf<
+		Canon<"CREATE TABLE t (LIKE src INCLUDING ALL EXCLUDING ALL)">
+	>().toEqualTypeOf<"CREATE TABLE t (LIKE src)">();
+});

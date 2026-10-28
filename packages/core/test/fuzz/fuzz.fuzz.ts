@@ -6,20 +6,12 @@ import {
 	compareBaseline,
 	type Entries,
 	hashOf,
-	missingIssues,
 	preview,
 	readBaseline,
 	showEntries,
-	withIssues,
 	writeBaseline,
 } from "../oracle/baseline.js";
-import {
-	baselineProblems,
-	counts,
-	groups,
-	jobSummary,
-} from "../oracle/job-summary.js";
-import { NEEDS_ISSUE } from "../oracle/kinds.js";
+import { baselineProblems, counts, jobSummary } from "../oracle/job-summary.js";
 import { readDb } from "../oracle/schema.js";
 import { acquireOracleServer } from "../oracle/server.js";
 import { Fuzzer, fuzz, type Property } from "./run.js";
@@ -134,9 +126,8 @@ test("fuzz: generated statements against Postgres", async (ctx) => {
 		return;
 	}
 	const baseline = readBaseline(baselinePath, "failing");
-	const current = withIssues(entries, baseline?.entries ?? {}, NEEDS_ISSUE);
 	if (process.env["TYPESQL_FUZZ_UPDATE"] === "1") {
-		writeBaseline(baselinePath, { seed, runs }, "failing", current);
+		writeBaseline(baselinePath, { seed, runs }, "failing", entries);
 		console.log(`Wrote ${relative(root, baselinePath)}`);
 		jobSummary("fuzz", line);
 		return;
@@ -149,7 +140,7 @@ test("fuzz: generated statements against Postgres", async (ctx) => {
 			`No baseline. Run \`pnpm fuzz --update\` to create ${relative(root, baselinePath)}.`,
 		);
 	} else {
-		const { added, fixed } = compareBaseline(current, baseline.entries);
+		const { added, fixed } = compareBaseline(entries, baseline.entries);
 		problems.push(
 			...baselineProblems(
 				added,
@@ -172,15 +163,6 @@ test("fuzz: generated statements against Postgres", async (ctx) => {
 			failures.push(
 				`${fixed.length} statement(s) in the baseline no longer fail (nice). Run \`pnpm fuzz --update\`:\n${show(fixed)}`,
 			);
-		const noIssue = missingIssues(baseline.entries, NEEDS_ISSUE);
-		if (noIssue.length) {
-			problems.push(
-				`${noIssue.length} unsound in the baseline without an issue: ${groups(noIssue)}`,
-			);
-			failures.push(
-				`${noIssue.length} unsound entr(y/ies) without an issue:\n${show(noIssue)}`,
-			);
-		}
 	}
 	jobSummary("fuzz", line, problems);
 	expect(failures.join("\n\n")).toBe("");

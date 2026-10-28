@@ -1075,3 +1075,8 @@ export function kinds(s: Node): string[] {
 	walk(s);
 	return [...out].sort();
 }
+
+/** Deterministic lexical edge cases supplement the seeded grammar without changing its sequence. */
+export function parserStatements(): string[] {
+	return [`SELECT 'x'::"char" AS internal, 'x'::char AS standard`];
+}

@@ -5,17 +5,14 @@ import type { Database } from "../conformance/db.js";
 import {
 	compareBaseline,
 	type Entries,
-	missingIssues,
 	readBaseline,
 	scoped,
 	showEntries,
 	sortedEntries,
-	withIssues,
 	writeBaseline,
 } from "./baseline.js";
 import { functionsOracle } from "./functions.js";
-import { baselineProblems, counts, groups, jobSummary } from "./job-summary.js";
-import { NEEDS_ISSUE } from "./kinds.js";
+import { baselineProblems, counts, jobSummary } from "./job-summary.js";
 import { checkedTests, regressOracle, schedule } from "./regress.js";
 import { Connection } from "./replay.js";
 import type { OracleResult } from "./result.js";
@@ -63,7 +60,7 @@ function settle(
 	const path = join(import.meta.dirname, "baselines", `${part}.json`);
 	const baseline = readBaseline(path, "disagreements");
 	const previous = baseline?.entries ?? {};
-	const current = withIssues(r.entries, previous, NEEDS_ISSUE);
+	const current = r.entries;
 	const { added, fixed } = compareBaseline(current, scoped(previous, keep));
 	const tally = Object.entries(r.tally)
 		.sort(([a], [b]) => a.localeCompare(b))
@@ -130,15 +127,6 @@ function settle(
 		failures.push(
 			`${fixed.length} ${part} disagreement(s) in the baseline no longer occur (nice). Run \`${cmd}\` to remove them:\n${show(fixed)}`,
 		);
-	const noIssue = missingIssues(previous, NEEDS_ISSUE);
-	if (noIssue.length) {
-		problems.push(
-			`${noIssue.length} unsound in the baseline without an issue: ${groups(noIssue)}`,
-		);
-		failures.push(
-			`${noIssue.length} unsound entr(y/ies) in ${relative(root, path)} without an issue:\n${show(noIssue)}`,
-		);
-	}
 	jobSummary(title, counts(r.tally), problems);
 	return failures;
 }

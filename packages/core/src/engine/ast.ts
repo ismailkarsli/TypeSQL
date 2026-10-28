@@ -676,7 +676,12 @@ export type TableConstraint =
 	| { readonly t: "other" };
 
 /** `LIKE other_table [INCLUDING ...]`. `defaults` is true with INCLUDING DEFAULTS | IDENTITY | GENERATED | ALL. */
-export type LikeClause = { readonly ref: TableRef; readonly defaults: boolean };
+export type LikeClause = {
+	readonly ref: TableRef;
+	readonly defaults: boolean;
+	/** Independent parser flags; schema inference combines all default-producing kinds. */
+	readonly options?: "defaults" | "identity" | "generated";
+};
 
 export type CreateTable = {
 	readonly t: "create_table";

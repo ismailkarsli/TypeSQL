@@ -5,7 +5,6 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 export interface BaselineEntry {
 	readonly kind: string;
 	readonly hash: string;
-	readonly issue?: number | "pending";
 	readonly [field: string]: unknown;
 }
 
@@ -71,48 +70,6 @@ export function scoped(
 	keep: (group: string) => boolean,
 ): Entries {
 	return Object.fromEntries(Object.entries(entries).filter(([g]) => keep(g)));
-}
-
-export function missingIssues(
-	entries: Entries,
-	kinds: ReadonlySet<string>,
-): Located[] {
-	const out: Located[] = [];
-	for (const [group, list] of Object.entries(entries)) {
-		for (const e of list)
-			if (
-				kinds.has(e.kind) &&
-				!(typeof e.issue === "number" || e.issue === "pending")
-			)
-				out.push({ group, ...e });
-	}
-	return out;
-}
-
-export function withIssues(
-	current: Entries,
-	previous: Entries,
-	kinds: ReadonlySet<string>,
-): Entries {
-	const issues = new Map<string, (number | "pending")[]>();
-	for (const [group, list] of Object.entries(previous)) {
-		for (const e of list)
-			if (e.issue !== undefined)
-				(
-					issues.get(keyOf(group, e)) ??
-					issues.set(keyOf(group, e), []).get(keyOf(group, e))!
-				).push(e.issue);
-	}
-	const out: Entries = {};
-	for (const [group, list] of Object.entries(current)) {
-		out[group] = list.map((e) => {
-			if (!kinds.has(e.kind)) return e;
-			const issue =
-				issues.get(keyOf(group, e))?.shift() ?? e.issue ?? "pending";
-			return { ...e, issue };
-		});
-	}
-	return out;
 }
 
 export function sortedEntries(entries: Entries): Entries {

@@ -424,11 +424,11 @@ test("string literals: continuation across newlines, E'' backslash parity, U&'' 
 	expectTypeOf<Row<'SELECT 1 AS U&"\\00E4"'>>().toEqualTypeOf<{
 		"\u00e4": number;
 	}>();
-	// a doubled escape character is the character; beyond Latin-1 the escape is kept as written
-	expectTypeOf<Row<'SELECT 1 AS U&"a\\\\b", 2 AS U&"\\01E4"'>>().toEqualTypeOf<{
+	// A doubled escape is decoded; escapes outside Latin-1 stay raw in the lexer.
+	expectTypeOf<Row<'SELECT 1 AS U&"a\\\\b"'>>().toEqualTypeOf<{
 		"a\\b": number;
-		"\\01E4": number;
 	}>();
+	expectTypeOf<Vals<'U&"\\01E4"'>>().toEqualTypeOf<["\\01E4"]>();
 });
 
 test("Unicode escapes are validated like Postgres", () => {

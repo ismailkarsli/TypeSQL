@@ -422,6 +422,7 @@ test("CREATE FUNCTION registers the function's result type in $functions", () =>
     CREATE FUNCTION add(a int, b int) RETURNS int LANGUAGE sql IMMUTABLE BEGIN ATOMIC SELECT a + b; END;
     CREATE FUNCTION public.slugs(t text) RETURNS SETOF varchar(80) AS 'SELECT 1' LANGUAGE sql;
     CREATE FUNCTION pairs() RETURNS TABLE (a int, b text) AS 'SELECT 1, 2' LANGUAGE sql;
+    CREATE FUNCTION single() RETURNS TABLE (a int) AS 'SELECT 1' LANGUAGE sql;
     CREATE FUNCTION outs(OUT a int) AS 'SELECT 1' LANGUAGE sql;
   `>;
 	expectTypeOf<S["$functions"]>().toEqualTypeOf<{
@@ -429,6 +430,7 @@ test("CREATE FUNCTION registers the function's result type in $functions", () =>
 		add: Sig<["..."], "int4">;
 		slugs: Sig<["..."], "varchar", { srf: true }>;
 		pairs: Sig<["..."], "record", { srf: true }>;
+		single: Sig<["..."], "int4", { srf: true }>;
 		outs: Sig<["..."], "unknown">;
 	}>();
 	expectTypeOf<Omit<S, "$functions">>().toEqualTypeOf<DB>();

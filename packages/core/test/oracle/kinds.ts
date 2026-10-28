@@ -9,11 +9,6 @@ export const KINDS = [
 ] as const;
 export type Kind = (typeof KINDS)[number];
 
-export const NEEDS_ISSUE: ReadonlySet<string> = new Set<Kind>([
-	"unsound",
-	"unsound-candidate",
-]);
-
 export interface Disagreement {
 	readonly kind: Kind;
 	readonly detail: string;

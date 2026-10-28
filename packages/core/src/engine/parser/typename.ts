@@ -32,7 +32,12 @@ import type {
 export type ParseTypeName<T extends Toks, I extends number> =
 	ParseBaseType<T, I> extends infer R
 		? R extends Ok<infer Base extends string, infer J>
-			? ParseArraySuffix<T, J, NormalizeTypeName<Base>>
+			? ParseArraySuffix<
+					T,
+					J,
+					// The keyword CHAR already became bpchar; a remaining char is the named internal type.
+					Base extends "char" ? Base : NormalizeTypeName<Base>
+				>
 			: R
 		: never;
 

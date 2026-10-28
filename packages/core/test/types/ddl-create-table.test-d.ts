@@ -14,6 +14,17 @@ import type {
 /** Apply DDL to an empty database. */
 type D<Q extends string> = ApplyDdl<{}, Q>;
 
+test('quoted "char" is the internal type; unquoted char is bpchar', () => {
+	expectTypeOf<
+		D<'CREATE TABLE t (a "char", b char, c pg_catalog."char"[], d char[])'>["t"]
+	>().toEqualTypeOf<{
+		a: Nullable<"char">;
+		b: Nullable<"bpchar">;
+		c: Nullable<"char[]">;
+		d: Nullable<"bpchar[]">;
+	}>();
+});
+
 test("NOT NULL, NULL, DEFAULT, PRIMARY KEY", () => {
 	expectTypeOf<
 		D<`CREATE TABLE users (

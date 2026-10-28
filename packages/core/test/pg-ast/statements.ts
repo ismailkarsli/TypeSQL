@@ -4,6 +4,8 @@ import { pathToFileURL } from "node:url";
 import { loadModule, parseSync } from "libpg-query";
 import { discover } from "../../src/cache/discover.js";
 import { PROBE_HEAD, type ProbeSession } from "../../src/cache/evaluate.js";
+import { hashOf } from "../oracle/baseline.js";
+import { comparisonSkip } from "../oracle/comparison-skips.js";
 import { isCorePath, positional } from "../oracle/types.js";
 import { OUT, PgCanon } from "./pg-canon.js";
 
@@ -113,7 +115,12 @@ function add(
 		count("skip: empty");
 		return;
 	}
-	for (const [text, canon] of pg)
+	for (const [text, canon] of pg) {
+		const skip = comparisonSkip("pg-ast", group, hashOf(text));
+		if (skip) {
+			count(`skip: ${skip}`);
+			continue;
+		}
 		out.push({
 			group,
 			line,
@@ -124,6 +131,7 @@ function add(
 				? { outcome: expected.pg, pgError: expected.pgError }
 				: {}),
 		});
+	}
 }
 
 export async function typeTestStatements(

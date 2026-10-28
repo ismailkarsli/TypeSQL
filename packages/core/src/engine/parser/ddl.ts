@@ -316,17 +316,43 @@ type ParseCreateFunction<T extends Toks, I extends number> =
 type FnReturns<T extends Toks, I extends number> =
 	T[I] extends WordTok<"returns">
 		? T[Nx<I>] extends WordTok<"table">
-			? ["record", true, Nx<I>]
+			? FnTableReturn<T, Nx2<I>>
 			: T[Nx<I>] extends WordTok<"setof">
 				? FnRetType<T, Nx2<I>, true>
 				: FnRetType<T, Nx<I>, false>
 		: ["unknown", false, I];
 type FnRetType<T extends Toks, I extends number, Srf extends boolean> =
+	QualName<T, I> extends [infer Parts, infer J extends number]
+		? T[J] extends OpTok<"%">
+			? T[Nx<J>] extends WordTok<"type">
+				? [
+						`${Parts extends readonly [...unknown[], infer Last extends string] ? Last : never}%type`, // type-mutate: equivalent never-false – QualName returns a nonempty tuple of names
+						Srf,
+						Nx2<J>,
+					]
+				: SyntaxErrorAt<T, Nx<J>>
+			: FnPlainRetType<T, I, Srf>
+		: FnPlainRetType<T, I, Srf>;
+type FnPlainRetType<T extends Toks, I extends number, Srf extends boolean> =
 	ParseTypeName<T, I> extends infer R
 		? R extends Ok<infer Ty, infer J>
 			? [Ty, Srf, J]
 			: R
 		: never;
+
+/** One TABLE output column returns its type; multiple columns return record. */
+type FnTableReturn<T extends Toks, I extends number> =
+	T[I] extends OpTok<"(">
+		? Ident<T, Nx<I>> extends [string, infer J extends number]
+			? FnRetType<T, J, true> extends infer R
+				? R extends [infer Ty, true, infer K extends number]
+					? T[K] extends OpTok<")">
+						? [Ty, true, Nx<K>]
+						: ["record", true, I]
+					: R
+				: never
+			: Expected<"column name", T, Nx<I>>
+		: Expected<'"("', T, I>;
 
 // ─── CREATE TABLE ───
 
@@ -860,23 +886,47 @@ type ParseLike<T extends Toks, I extends number> =
 		infer Parts extends readonly string[],
 		infer J extends number,
 	]
-		? ParseLikeOptions<T, J, false> extends infer O
-			? O extends [infer Def, infer J2 extends number]
-				? Ok<{ ref: RefOf<Parts>; defaults: Def }, J2>
+		? ParseLikeOptions<T, J, never, false> extends infer O
+			? O extends [infer Def, infer J2 extends number, infer Copies]
+				? Ok<
+						{
+							ref: RefOf<Parts>;
+							defaults: Copies;
+							options: Def;
+						},
+						J2
+					>
 				: O
 			: never
 		: Expected<"table name after LIKE", T, I>;
-type DefaultLikeOption = "defaults" | "identity" | "generated" | "all";
-type ParseLikeOptions<T extends Toks, I extends number, Def extends boolean> =
+type DefaultLikeOption = "defaults" | "identity" | "generated";
+type ParseLikeOptions<
+	T extends Toks,
+	I extends number,
+	Def extends DefaultLikeOption,
+	Copies extends boolean,
+> =
 	T[I] extends WordTok<"including">
 		? T[Nx<I>] extends WordTok<infer O>
-			? ParseLikeOptions<T, Nx2<I>, O extends DefaultLikeOption ? true : Def>
+			? ParseLikeOptions<
+					T,
+					Nx2<I>,
+					O extends "all"
+						? DefaultLikeOption
+						: Def | Extract<O, DefaultLikeOption>,
+					O extends DefaultLikeOption | "all" ? true : Copies
+				>
 			: Expected<"LIKE option", T, Nx<I>>
 		: T[I] extends WordTok<"excluding">
 			? T[Nx<I>] extends WordTok<infer O>
-				? ParseLikeOptions<T, Nx2<I>, O extends DefaultLikeOption ? false : Def>
+				? ParseLikeOptions<
+						T,
+						Nx2<I>,
+						O extends "all" ? never : Exclude<Def, O>,
+						O extends DefaultLikeOption | "all" ? false : Copies
+					>
 				: Expected<"LIKE option", T, Nx<I>>
-			: [Def, I];
+			: [Def, I, Copies];
 
 // ─── column definitions ───
 

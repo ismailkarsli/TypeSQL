@@ -32,7 +32,7 @@ For engine changes and new features:
    a call. Run `pnpm check:expect-error`.
 2. Run `pnpm test:oracle` (`--regress --views` for engine changes) and `pnpm fuzz` with no new
    disagreements. Extend `packages/core/test/fuzz/gen.ts` to emit new syntax. Remove fixed
-   baseline entries with `--update`; unrelated engine bugs need a baseline entry with an issue
+   baseline entries with `--update`; unrelated engine bugs need a reviewed baseline entry
    and a fix in a separate commit.
 3. Run `pnpm mutate:types --changed` for type-level code and `pnpm mutate:runtime --changed`
    for runtime code. Surviving mutants need tests or an equivalent-mutant comment with a reason.
@@ -122,6 +122,10 @@ with `--update`. Baselines track resolved entries and PostgreSQL versions; they 
 current errors. The GitHub summary is marked as failed whenever an error is found.
 Set `TYPESQL_PG_AST_DEBUG=<file>` to log both forms in full.
 
+User-approved exclusions live in `packages/core/test/oracle/comparison-skips.ts`, matched by
+comparison suite, regression group and exact statement hash. They count as skipped with a
+reason; changes to the statement require another review. All other disagreements still fail.
+
 ## Type oracles
 
 `packages/core/test/oracle/` compares inferred column names, column and parameter types, and
@@ -139,9 +143,9 @@ pnpm test:oracle --update                    # reconcile reviewed baselines
 
 Disagreements are `unsound` (wrong names/types or NULL in a non-null column), `rejects`,
 `accepts` or `crash`. The view pass also reports `imprecise` and `unsound-candidate`; the latter
-needs an issue, with WHERE/ON narrowing excluded from that comparison. Baselines in
-`test/oracle/baselines/` fail on new or resolved entries; `unsound` entries require an issue
-number (or `"pending"` until opened). Follow the definition of done before updating them.
+is tracked separately, with WHERE/ON narrowing excluded from that comparison. Baselines in
+`test/oracle/baselines/` fail on new or resolved entries. Follow the definition of done before
+updating them.
 
 Skips are reported with reasons, including replay outcomes that differ from official output
 (`replay-diverged`). Set `TYPESQL_ORACLE_DEBUG=1` for disagreement/skip details and
@@ -160,8 +164,7 @@ pnpm fuzz --replay statement.sql   # also accepts a JSON array of { sql, key }
 pnpm fuzz --update                # remove resolved baseline entries
 ```
 
-New failures need a fix or, for unrelated bugs, an issue and baseline entry as described above.
-Use `node scripts/issues.ts fuzz --report out.json --dry-run` to preview issue reports.
+New failures need a fix or, for unrelated bugs, a reviewed baseline entry as described above.
 
 ## Type-level mutation testing
 
