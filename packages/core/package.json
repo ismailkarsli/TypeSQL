@@ -45,8 +45,7 @@
 	},
 	"scripts": {
 		"build": "tsrs -p tsconfig.build.json",
-		"typecheck": "tsrs -p tsconfig.json --noEmit && tsrs -p test/cache/tsconfig.check.json --noEmit",
-		"test": "vitest run"
+		"typecheck": "tsrs -p tsconfig.json --noEmit"
 	},
 	"peerDependencies": {
 		"typescript": ">=7.0.0-0"

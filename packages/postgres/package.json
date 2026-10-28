@@ -29,8 +29,7 @@
 	},
 	"scripts": {
 		"build": "tsrs -p tsconfig.build.json",
-		"typecheck": "tsrs -p tsconfig.json --noEmit",
-		"test": "vitest run"
+		"typecheck": "tsrs -p tsconfig.json --noEmit"
 	},
 	"dependencies": {
 		"@typesql/core": "workspace:*"
@@ -41,8 +40,7 @@
 	"devDependencies": {
 		"postgres": "^3.4.9",
 		"tsrs": "0.18.0-ts7.1.0-dev.20260929",
-		"typescript": "7.1.0-beta",
-		"vitest": "^5.0.4"
+		"typescript": "7.1.0-beta"
 	},
 	"homepage": "https://typesql.karsli.net/adapters/postgres",
 	"bugs": {

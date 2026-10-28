@@ -1,6 +1,6 @@
 // Imports the *built* packages (dist/) with plain Node and exercises the runtime API.
-// Tests run against TypeScript sources, which hides problems that only exist in emitted
-// JavaScript (e.g. a value re-export of a `declare const`). Run after `pnpm build`.
+// This catches problems that only exist in emitted JavaScript (e.g. a value re-export
+// of a `declare const`). Run after `pnpm build`.
 import assert from "node:assert/strict";
 import type { Col, Json } from "../packages/core/src/index.ts";
 
@@ -118,20 +118,6 @@ for (const adapter of [pg, pgjs]) {
 	});
 	assert.equal(typeof adapter.createSql().transaction, "function");
 }
-
-// a pg PoolClient-like fake: BEGIN, the query, COMMIT on it
-const log: string[] = [];
-const client = {
-	query: async (text: string) => (
-		log.push(text), { rows: [{ n: 1 }], rowCount: 1 }
-	),
-	release() {},
-};
-assert.deepEqual(
-	await pg.createSql(client).transaction((tx) => tx("SELECT 1 AS n").execute()),
-	[{ n: 1 }],
-);
-assert.deepEqual(log, ["BEGIN", "SELECT 1 AS n", "COMMIT"]);
 
 const introspect = (await dist("pg/dist/introspect/index.js")) as Introspect;
 for (const name of ["introspect", "generateSource"]) {

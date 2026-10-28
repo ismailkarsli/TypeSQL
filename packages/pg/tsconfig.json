@@ -9,5 +9,5 @@
 			"@typesql/core": ["../core/src/index.ts"]
 		}
 	},
-	"include": ["src", "test"]
+	"include": ["src"]
 }

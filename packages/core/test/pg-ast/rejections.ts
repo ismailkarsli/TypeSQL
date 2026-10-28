@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { maxParam } from "../../src/runtime/splice.js";
-import { type Database, startDockerPostgres } from "../conformance/db.js";
+import { type Database, startDockerPostgres } from "../oracle/db.js";
 import { Connection, type ServerError } from "../oracle/replay.js";
 import type { Statement } from "./statements.js";
 

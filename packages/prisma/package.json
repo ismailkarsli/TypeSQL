@@ -36,9 +36,7 @@
 	},
 	"scripts": {
 		"build": "tsrs -p tsconfig.build.json",
-		"fixtures": "prisma generate --schema test/fixtures/schema.prisma --generator client --no-hints",
-		"typecheck": "pnpm run fixtures && tsrs -p tsconfig.json --noEmit",
-		"test": "vitest run"
+		"typecheck": "tsrs -p tsconfig.json --noEmit"
 	},
 	"dependencies": {
 		"@typesql/core": "workspace:*"
@@ -48,10 +46,8 @@
 	},
 	"devDependencies": {
 		"@prisma/client": "^7.10.0",
-		"prisma": "^7.10.0",
 		"tsrs": "0.18.0-ts7.1.0-dev.20260929",
-		"typescript": "7.1.0-beta",
-		"vitest": "^5.0.4"
+		"typescript": "7.1.0-beta"
 	},
 	"homepage": "https://typesql.karsli.net/adapters/prisma",
 	"bugs": {

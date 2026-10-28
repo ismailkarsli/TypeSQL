@@ -33,9 +33,13 @@ PostgreSQL release; a new disagreement is a parser regression to fix.
 ## Definition of done
 
 A change to the engine or a new feature is done when these checks pass:
-exact type tests (with a negative case for every nullability rule), no new disagreement in
-the type oracles (`pnpm test:oracle`, with `--regress --views` for engine changes) or the fuzzer
-(`pnpm fuzz`), coverage thresholds, and the change intent and `CacheVersion`.
+the PostgreSQL regression parser and parse-tree checks (`pnpm test:pg-regress` and
+`pnpm test:pg-ast`), the type oracles (`pnpm test:oracle --regress --views`), the fuzzer
+(`pnpm fuzz`), and the built-package smoke checks (`pnpm build && pnpm smoke:dist`).
+Add query/schema inputs to `packages/core/test/oracle/corpus.json`, including nullable and
+non-nullable cases for nullability rules; derive expected behavior from PostgreSQL. Do not
+add unit/integration suites, static type assertion suites, or coverage gates. Include the
+change intent and `CacheVersion` when required above.
 Record unrelated engine findings in the reviewed baseline and fix them in separate commits.
 Do not create GitHub issues or post issue comments automatically. Create issues or comments
 only when the user explicitly requests them.

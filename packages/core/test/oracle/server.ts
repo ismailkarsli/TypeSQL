@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { chmodSync, existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative, resolve, sep } from "node:path";
-import { type Database, startDockerPostgres } from "../conformance/db.js";
+import { type Database, startDockerPostgres } from "./db.js";
 import { Connection } from "./replay.js";
 
 /** What `abs_srcdir` points at: the regression tests' directory, mounted for server-side COPY. */

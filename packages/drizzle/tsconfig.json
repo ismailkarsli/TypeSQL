@@ -12,5 +12,5 @@
 			"@typesql/pg": ["../pg/src/index.ts"]
 		}
 	},
-	"include": ["src", "test", "examples"]
+	"include": ["src", "examples"]
 }

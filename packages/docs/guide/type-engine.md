@@ -68,12 +68,18 @@ An entry is used only when its dependencies compare equal (`Same`): mutual assig
 
 ## Adding grammar
 
-- New expression syntax: add an AST node in `ast.ts`, parse it in `parser/expr.ts` (prefix or infix), type it in `typer/typeof.ts`, name it in `project/naming.ts`, and handle params in `typer/params.ts`. Add tests in `test/types/<area>/<feature>.test-d.ts`.
+- New expression syntax: add an AST node in `ast.ts`, parse it in `parser/expr.ts` (prefix or infix), type it in `typer/typeof.ts`, name it in `project/naming.ts`, and handle params in `typer/params.ts`. Add SQL and schema inputs to `packages/core/test/oracle/corpus.json` so PostgreSQL determines the expected behavior.
 - New function: add a `Sig` to `FunctionCatalog` in `typer/catalog.ts`, then regenerate `typer/pg-functions.ts` (the uncurated pg_catalog rest) with `TYPESQL_PG_URL=… node scripts/gen-pg-functions.ts`.
 - New statement: add to `ast.ts`, parse in `parser/<kind>.ts`, dispatch in `parser/stmt.ts`, project in `project/stmt.ts`.
 
-## Testing
+## Checking behavior
 
-- `pnpm test:types` runs vitest in typecheck mode over `test/types/**/*.test-d.ts`. Use `expectTypeOf<Row<"…">>().toEqualTypeOf<{…}>()` and `// @ts-expect-error`.
-- The `core-types-cached` project runs the same files again against a type cache generated from them: an engine change that the cache would serve differently fails there. `test/cache/` has the cache's own tests.
+Correctness checks compare TypeSQL with PostgreSQL. The repository has no hand-written unit/integration suites, static type assertion suites, or coverage gates.
+
+- Run `pnpm pg-regress:setup` once to check out the pinned PostgreSQL regression corpus. Never edit `vendor/postgres`.
+- `pnpm test` builds the packages, exercises their emitted JavaScript, and runs all PostgreSQL differential checks and fuzzing. The live checks need Docker or `TYPESQL_ORACLE_URL` pointing to PostgreSQL 18. Regression replay needs the corpus data mounted at `/regress` on that server; Docker startup handles this automatically.
+- `pnpm test:pg-regress` compares parser acceptance with PostgreSQL's recorded regression outcomes. `pnpm test:pg-ast` compares parse trees with PostgreSQL's parser over the official regression corpus and the standalone query corpus.
+- `pnpm test:oracle --regress --views` compares inferred columns, parameter types, nullability and DDL behavior with a live server, using the query corpus, function catalog and official regression replay. `pnpm fuzz` generates additional statements and checks their behavior against that server.
+- Add query inputs in `packages/core/test/oracle/corpus.json`. `schemas` maps stable IDs to TypeScript DB types using the probe's `__T` import. Each `statements` entry has a `schema` ID, `source` label, `sql` text with positional parameters, and a `ddl` flag. A null schema limits an entry to parser comparison. The original source labels remain stable for baseline identity; they do not refer to files that must exist. For duplicate SQL over the same schema, the first entry owns the type-oracle source label, so preserve its position. `catalog.d.ts` supplies custom function declarations used by the corpus. Inputs contain no expected TypeSQL results. Include nullable and non-nullable inputs when changing nullability rules.
+- Baselines record reviewed disagreements. New disagreements are regressions to fix; update baselines only after reviewing findings that went away or an intentional PostgreSQL version change.
 - Quick iteration: `./node_modules/.bin/tsc --noEmit --strict --target es2024 --moduleResolution bundler --module esnext --skipLibCheck <file>` on a scratch file under `scratchpad/`. Add `--extendedDiagnostics` to see instantiation counts.

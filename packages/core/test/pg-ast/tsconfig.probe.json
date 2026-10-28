@@ -1,6 +1,5 @@
 {
-	// The parse-tree oracle's probe program (pg-ast.oracle.ts): canon.ts, the type tests (whose
-	// statements are discovered) and the in-memory probe file in .probe/.
+	// The parse-tree oracle's canonicalizer and in-memory probe files.
 	"extends": "../../../../tsconfig.base.json",
 	"compilerOptions": {
 		"noEmit": true,
@@ -12,5 +11,5 @@
 			"@typesql/core": ["../../src/index.ts"]
 		}
 	},
-	"include": ["canon.ts", "../types", ".probe/*.ts"]
+	"include": ["canon.ts", ".probe/*.ts"]
 }

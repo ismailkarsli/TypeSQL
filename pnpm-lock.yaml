@@ -172,9 +172,6 @@ importers:
       '@types/node':
         specifier: ^26.6.5
         version: 26.6.5
-      '@vitest/coverage-v8':
-        specifier: 5.0.4
-        version: 5.0.4(vitest@5.0.4)
       fast-check:
         specifier: ^4.10.2
         version: 4.10.2
@@ -292,18 +289,12 @@ importers:
       pg:
         specifier: ^8.23.1
         version: 8.23.1
-      postgres:
-        specifier: ^3.4.9
-        version: 3.4.9
       tsrs:
         specifier: 0.18.0-ts7.1.0-dev.20260929
         version: 0.18.0-ts7.1.0-dev.20260929
       typescript:
         specifier: 7.1.0-beta
         version: 7.1.0-beta
-      vitest:
-        specifier: ^5.0.4
-        version: 5.0.4(@types/node@26.6.5)(@vitest/coverage-v8@5.0.4)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0))
 
   packages/kysely:
     dependencies:
@@ -311,24 +302,15 @@ importers:
         specifier: workspace:*
         version: link:../core
     devDependencies:
-      '@types/pg':
-        specifier: ^8.23.1
-        version: 8.23.1
       kysely:
         specifier: ^0.29.6
         version: 0.29.6
-      pg:
-        specifier: ^8.23.1
-        version: 8.23.1
       tsrs:
         specifier: 0.18.0-ts7.1.0-dev.20260929
         version: 0.18.0-ts7.1.0-dev.20260929
       typescript:
         specifier: 7.1.0-beta
         version: 7.1.0-beta
-      vitest:
-        specifier: ^5.0.4
-        version: 5.0.4(@types/node@26.6.5)(@vitest/coverage-v8@5.0.4)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0))
 
   packages/language-server:
     devDependencies:
@@ -344,9 +326,6 @@ importers:
       typescript:
         specifier: 7.1.0-beta
         version: 7.1.0-beta
-      vitest:
-        specifier: ^5.0.4
-        version: 5.0.4(@types/node@26.6.5)(@vitest/coverage-v8@5.0.4)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0))
 
   packages/pg:
     dependencies:
@@ -366,9 +345,6 @@ importers:
       typescript:
         specifier: 7.1.0-beta
         version: 7.1.0-beta
-      vitest:
-        specifier: ^5.0.4
-        version: 5.0.4(@types/node@26.6.5)(@vitest/coverage-v8@5.0.4)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0))
 
   packages/postgres:
     dependencies:
@@ -385,9 +361,6 @@ importers:
       typescript:
         specifier: 7.1.0-beta
         version: 7.1.0-beta
-      vitest:
-        specifier: ^5.0.4
-        version: 5.0.4(@types/node@26.6.5)(@vitest/coverage-v8@5.0.4)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0))
 
   packages/prisma:
     dependencies:
@@ -398,18 +371,12 @@ importers:
       '@prisma/client':
         specifier: ^7.10.0
         version: 7.10.0(prisma@7.10.0(@types/react@19.3.0)(magicast@0.5.5)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@7.1.0-beta))(typescript@7.1.0-beta)
-      prisma:
-        specifier: ^7.10.0
-        version: 7.10.0(@types/react@19.3.0)(magicast@0.5.5)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@7.1.0-beta)
       tsrs:
         specifier: 0.18.0-ts7.1.0-dev.20260929
         version: 0.18.0-ts7.1.0-dev.20260929
       typescript:
         specifier: 7.1.0-beta
         version: 7.1.0-beta
-      vitest:
-        specifier: ^5.0.4
-        version: 5.0.4(@types/node@26.6.5)(@vitest/coverage-v8@5.0.4)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0))
 
   packages/vscode:
     devDependencies:
@@ -431,24 +398,12 @@ importers:
       ovsx:
         specifier: ^1.3.0
         version: 1.3.0(@types/node@26.6.5)(supports-color@10.2.2)
-      tm-grammars:
-        specifier: ^1.32.22
-        version: 1.32.22
       tsrs:
         specifier: 0.18.0-ts7.1.0-dev.20260929
         version: 0.18.0-ts7.1.0-dev.20260929
       typescript:
         specifier: 7.1.0-beta
         version: 7.1.0-beta
-      vitest:
-        specifier: ^5.0.4
-        version: 5.0.4(@types/node@26.6.5)(@vitest/coverage-v8@5.0.4)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0))
-      vscode-oniguruma:
-        specifier: ^2.0.1
-        version: 2.0.1
-      vscode-textmate:
-        specifier: ^9.3.2
-        version: 9.3.2
 
 packages:
 
@@ -3907,9 +3862,6 @@ packages:
     resolution: {integrity: sha512-LgO3D9yZJjApUiuUfl9iFAwrtaX4+lok3wJIqttGoKCHlWUqHqbQpnxCf82L8FjgKsh4iGo78hqJwgL8F6To2A==}
     engines: {node: '>=14.0.0'}
 
-  tm-grammars@1.32.22:
-    resolution: {integrity: sha512-VKWL+UiqlGqbGHonRbrBc0kkqDIHUUiVO/A2rBTBz5LBXKA8Fe2f34O1YiBI7ED37tTUlT3MGmLf9+0F/H4/Ww==}
-
   trim-lines@3.0.1:
     resolution: {integrity: sha512-kRj8B+YHZCc9kQYdWfJB2/oUl9rA99qbowYYBtr4ui4mZyAQ2JpvVBd/6U2YloATfqBhBTSMhTpgBHtU0Mf3Rg==}
 
@@ -4108,12 +4060,6 @@ packages:
         optional: true
       jsdom:
         optional: true
-
-  vscode-oniguruma@2.0.1:
-    resolution: {integrity: sha512-poJU8iHIWnC3vgphJnrLZyI3YdqRlR27xzqDmpPXYzA93R4Gk8z7T6oqDzDoHjoikA2aS82crdXFkjELCdJsjQ==}
-
-  vscode-textmate@9.3.2:
-    resolution: {integrity: sha512-n2uGbUcrjhUEBH16uGA0TvUfhWwliFZ1e3+pTjrkim1Mt7ydB41lV08aUvsi70OlzDWp6X7Bx3w/x3fAXIsN0Q==}
 
   vue@3.5.44:
     resolution: {integrity: sha512-dvvmaOCG7lAMkJTPqPwWeGMsPS6DIsFsfZDUgBp9V6mHf9b3+/wyVwYR4Es+WV6uJC0FKRxp81Obcq0ZwUcGFQ==}
@@ -4437,7 +4383,8 @@ snapshots:
       '@babel/helper-string-parser': 7.29.7
       '@babel/helper-validator-identifier': 7.29.7
 
-  '@bcoe/v8-coverage@1.0.2': {}
+  '@bcoe/v8-coverage@1.0.2':
+    optional: true
 
   '@biomejs/biome@2.6.2':
     optionalDependencies:
@@ -4586,12 +4533,15 @@ snapshots:
   '@electric-sql/pglite-socket@0.1.3(@electric-sql/pglite@0.4.3)':
     dependencies:
       '@electric-sql/pglite': 0.4.3
+    optional: true
 
   '@electric-sql/pglite-tools@0.3.3(@electric-sql/pglite@0.4.3)':
     dependencies:
       '@electric-sql/pglite': 0.4.3
+    optional: true
 
-  '@electric-sql/pglite@0.4.3': {}
+  '@electric-sql/pglite@0.4.3':
+    optional: true
 
   '@emnapi/runtime@1.11.3':
     dependencies:
@@ -5242,10 +5192,13 @@ snapshots:
       empathic: 2.0.0
     transitivePeerDependencies:
       - magicast
+    optional: true
 
-  '@prisma/debug@7.10.0': {}
+  '@prisma/debug@7.10.0':
+    optional: true
 
-  '@prisma/debug@7.2.0': {}
+  '@prisma/debug@7.2.0':
+    optional: true
 
   '@prisma/dev@0.24.17(typescript@7.1.0-beta)':
     dependencies:
@@ -5266,8 +5219,10 @@ snapshots:
       zeptomatch: 2.1.0
     transitivePeerDependencies:
       - typescript
+    optional: true
 
-  '@prisma/engines-version@7.10.0-4.0edf323efd1d98336f3f0a68684b56f689b900d3': {}
+  '@prisma/engines-version@7.10.0-4.0edf323efd1d98336f3f0a68684b56f689b900d3':
+    optional: true
 
   '@prisma/engines@7.10.0':
     dependencies:
@@ -5275,22 +5230,27 @@ snapshots:
       '@prisma/engines-version': 7.10.0-4.0edf323efd1d98336f3f0a68684b56f689b900d3
       '@prisma/fetch-engine': 7.10.0
       '@prisma/get-platform': 7.10.0
+    optional: true
 
   '@prisma/fetch-engine@7.10.0':
     dependencies:
       '@prisma/debug': 7.10.0
       '@prisma/engines-version': 7.10.0-4.0edf323efd1d98336f3f0a68684b56f689b900d3
       '@prisma/get-platform': 7.10.0
+    optional: true
 
   '@prisma/get-platform@7.10.0':
     dependencies:
       '@prisma/debug': 7.10.0
+    optional: true
 
   '@prisma/get-platform@7.2.0':
     dependencies:
       '@prisma/debug': 7.2.0
+    optional: true
 
-  '@prisma/query-plan-executor@7.2.0': {}
+  '@prisma/query-plan-executor@7.2.0':
+    optional: true
 
   '@prisma/streams-local@0.1.11':
     dependencies:
@@ -5298,6 +5258,7 @@ snapshots:
       better-result: 2.10.0
       env-paths: 3.0.0
       proper-lockfile: 4.1.2
+    optional: true
 
   '@prisma/studio-core@0.33.0(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
     dependencies:
@@ -5317,14 +5278,17 @@ snapshots:
       react-dom: 19.3.0(react@19.3.0)
     transitivePeerDependencies:
       - '@types/react-dom'
+    optional: true
 
-  '@radix-ui/primitive@1.1.3': {}
+  '@radix-ui/primitive@1.1.3':
+    optional: true
 
   '@radix-ui/react-compose-refs@1.1.2(@types/react@19.3.0)(react@19.3.0)':
     dependencies:
       react: 19.3.0
     optionalDependencies:
       '@types/react': 19.3.0
+    optional: true
 
   '@radix-ui/react-primitive@2.1.3(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
     dependencies:
@@ -5333,6 +5297,7 @@ snapshots:
       react-dom: 19.3.0(react@19.3.0)
     optionalDependencies:
       '@types/react': 19.3.0
+    optional: true
 
   '@radix-ui/react-slot@1.2.3(@types/react@19.3.0)(react@19.3.0)':
     dependencies:
@@ -5340,6 +5305,7 @@ snapshots:
       react: 19.3.0
     optionalDependencies:
       '@types/react': 19.3.0
+    optional: true
 
   '@radix-ui/react-toggle@1.1.10(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
     dependencies:
@@ -5350,6 +5316,7 @@ snapshots:
       react-dom: 19.3.0(react@19.3.0)
     optionalDependencies:
       '@types/react': 19.3.0
+    optional: true
 
   '@radix-ui/react-use-controllable-state@1.2.2(@types/react@19.3.0)(react@19.3.0)':
     dependencies:
@@ -5358,6 +5325,7 @@ snapshots:
       react: 19.3.0
     optionalDependencies:
       '@types/react': 19.3.0
+    optional: true
 
   '@radix-ui/react-use-effect-event@0.0.2(@types/react@19.3.0)(react@19.3.0)':
     dependencies:
@@ -5365,12 +5333,14 @@ snapshots:
       react: 19.3.0
     optionalDependencies:
       '@types/react': 19.3.0
+    optional: true
 
   '@radix-ui/react-use-layout-effect@1.1.1(@types/react@19.3.0)(react@19.3.0)':
     dependencies:
       react: 19.3.0
     optionalDependencies:
       '@types/react': 19.3.0
+    optional: true
 
   '@rolldown/binding-android-arm-eabi@1.2.13':
     optional: true
@@ -5562,7 +5532,8 @@ snapshots:
 
   '@speed-highlight/core@1.2.24': {}
 
-  '@standard-schema/spec@1.1.0': {}
+  '@standard-schema/spec@1.1.0':
+    optional: true
 
   '@tsrs/darwin-arm64@0.18.0-ts7.1.0-dev.20260929':
     optional: true
@@ -5584,41 +5555,53 @@ snapshots:
       '@types/deep-eql': 4.0.2
       assertion-error: 2.0.1
 
-  '@types/d3-array@3.0.3': {}
+  '@types/d3-array@3.0.3':
+    optional: true
 
-  '@types/d3-color@3.1.0': {}
+  '@types/d3-color@3.1.0':
+    optional: true
 
-  '@types/d3-delaunay@6.0.1': {}
+  '@types/d3-delaunay@6.0.1':
+    optional: true
 
-  '@types/d3-format@3.0.1': {}
+  '@types/d3-format@3.0.1':
+    optional: true
 
   '@types/d3-geo@3.1.0':
     dependencies:
       '@types/geojson': 7946.0.16
+    optional: true
 
   '@types/d3-interpolate@3.0.1':
     dependencies:
       '@types/d3-color': 3.1.0
+    optional: true
 
-  '@types/d3-path@3.1.1': {}
+  '@types/d3-path@3.1.1':
+    optional: true
 
   '@types/d3-scale@4.0.2':
     dependencies:
       '@types/d3-time': 3.0.0
+    optional: true
 
   '@types/d3-shape@3.1.7':
     dependencies:
       '@types/d3-path': 3.1.1
+    optional: true
 
-  '@types/d3-time-format@2.1.0': {}
+  '@types/d3-time-format@2.1.0':
+    optional: true
 
-  '@types/d3-time@3.0.0': {}
+  '@types/d3-time@3.0.0':
+    optional: true
 
   '@types/deep-eql@4.0.2': {}
 
   '@types/estree@1.0.9': {}
 
-  '@types/geojson@7946.0.16': {}
+  '@types/geojson@7946.0.16':
+    optional: true
 
   '@types/hast@3.0.5':
     dependencies:
@@ -5626,7 +5609,8 @@ snapshots:
 
   '@types/linkify-it@5.0.0': {}
 
-  '@types/lodash@4.17.26': {}
+  '@types/lodash@4.17.26':
+    optional: true
 
   '@types/markdown-it@14.2.0':
     dependencies:
@@ -5652,6 +5636,7 @@ snapshots:
   '@types/react@19.3.0':
     dependencies:
       csstype: 3.2.3
+    optional: true
 
   '@types/unist@3.0.3': {}
 
@@ -5735,11 +5720,13 @@ snapshots:
   '@visx/curve@4.0.1-alpha.0':
     dependencies:
       '@visx/vendor': 4.0.0-alpha.0
+    optional: true
 
   '@visx/event@4.0.1-alpha.0':
     dependencies:
       '@types/react': 19.3.0
       '@visx/point': 4.0.1-alpha.0
+    optional: true
 
   '@visx/grid@4.0.1-alpha.0(react@19.3.0)':
     dependencies:
@@ -5751,14 +5738,17 @@ snapshots:
       '@visx/shape': 4.0.1-alpha.0(react@19.3.0)
       classnames: 2.5.1
       react: 19.3.0
+    optional: true
 
   '@visx/group@4.0.1-alpha.0(react@19.3.0)':
     dependencies:
       '@types/react': 19.3.0
       classnames: 2.5.1
       react: 19.3.0
+    optional: true
 
-  '@visx/point@4.0.1-alpha.0': {}
+  '@visx/point@4.0.1-alpha.0':
+    optional: true
 
   '@visx/responsive@4.0.1-alpha.0(react@19.3.0)':
     dependencies:
@@ -5766,10 +5756,12 @@ snapshots:
       '@types/react': 19.3.0
       lodash: 4.18.1
       react: 19.3.0
+    optional: true
 
   '@visx/scale@4.0.1-alpha.0':
     dependencies:
       '@visx/vendor': 4.0.0-alpha.0
+    optional: true
 
   '@visx/shape@4.0.1-alpha.0(react@19.3.0)':
     dependencies:
@@ -5782,6 +5774,7 @@ snapshots:
       classnames: 2.5.1
       lodash: 4.18.1
       react: 19.3.0
+    optional: true
 
   '@visx/vendor@4.0.0-alpha.0':
     dependencies:
@@ -5808,6 +5801,7 @@ snapshots:
       d3-time: 3.1.0
       d3-time-format: 4.1.0
       internmap: 2.0.3
+    optional: true
 
   '@vitejs/plugin-vue@5.2.4(vite@5.4.21(@types/node@26.6.5)(lightningcss@1.33.0))(vue@3.5.44(typescript@7.1.0-beta))':
     dependencies:
@@ -5825,12 +5819,15 @@ snapshots:
       std-env: 4.3.0
       tinyrainbow: 3.2.0
       vitest: 5.0.4(@types/node@26.6.5)(@vitest/coverage-v8@5.0.4)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0))
+    optional: true
 
-  '@vitest/istanbul-lib-coverage@1.0.2': {}
+  '@vitest/istanbul-lib-coverage@1.0.2':
+    optional: true
 
   '@vitest/istanbul-lib-report@1.0.2':
     dependencies:
       '@vitest/istanbul-lib-coverage': 1.0.2
+    optional: true
 
   '@vitest/mocker@5.0.4(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0))':
     dependencies:
@@ -6020,6 +6017,7 @@ snapshots:
       fast-uri: 3.1.8
       json-schema-traverse: 1.0.0
       require-from-string: 2.0.2
+    optional: true
 
   algoliasearch@5.60.0:
     dependencies:
@@ -6051,8 +6049,10 @@ snapshots:
       '@jridgewell/trace-mapping': 0.3.31
       estree-walker: 3.0.3
       js-tokens: 10.0.0
+    optional: true
 
-  aws-ssl-profiles@1.1.2: {}
+  aws-ssl-profiles@1.1.2:
+    optional: true
 
   azure-devops-node-api@12.5.0:
     dependencies:
@@ -6061,7 +6061,8 @@ snapshots:
 
   balanced-match@4.0.4: {}
 
-  better-result@2.10.0: {}
+  better-result@2.10.0:
+    optional: true
 
   binaryextensions@6.11.0:
     dependencies:
@@ -6101,6 +6102,7 @@ snapshots:
       rc9: 3.1.0
     optionalDependencies:
       magicast: 0.5.5
+    optional: true
 
   call-bind-apply-helpers@1.0.2:
     dependencies:
@@ -6139,10 +6141,12 @@ snapshots:
   chokidar@5.0.0:
     dependencies:
       readdirp: 5.1.1
+    optional: true
 
   ci-info@2.0.0: {}
 
-  classnames@2.5.1: {}
+  classnames@2.5.1:
+    optional: true
 
   cli-width@4.1.0: {}
 
@@ -6160,9 +6164,11 @@ snapshots:
 
   commander@14.0.3: {}
 
-  confbox@0.2.4: {}
+  confbox@0.2.4:
+    optional: true
 
-  confbox@0.3.1: {}
+  confbox@0.3.1:
+    optional: true
 
   cookie@1.1.1: {}
 
@@ -6182,34 +6188,43 @@ snapshots:
       path-key: 3.1.1
       shebang-command: 2.0.0
       which: 2.0.2
+    optional: true
 
   csstype@3.2.3: {}
 
   d3-array@3.2.1:
     dependencies:
       internmap: 2.0.3
+    optional: true
 
   d3-array@3.2.4:
     dependencies:
       internmap: 2.0.3
+    optional: true
 
-  d3-color@3.1.0: {}
+  d3-color@3.1.0:
+    optional: true
 
   d3-delaunay@6.0.2:
     dependencies:
       delaunator: 5.1.0
+    optional: true
 
-  d3-format@3.1.0: {}
+  d3-format@3.1.0:
+    optional: true
 
   d3-geo@3.1.0:
     dependencies:
       d3-array: 3.2.4
+    optional: true
 
   d3-interpolate@3.0.1:
     dependencies:
       d3-color: 3.1.0
+    optional: true
 
-  d3-path@3.1.0: {}
+  d3-path@3.1.0:
+    optional: true
 
   d3-scale@4.0.2:
     dependencies:
@@ -6218,18 +6233,22 @@ snapshots:
       d3-interpolate: 3.0.1
       d3-time: 3.1.0
       d3-time-format: 4.1.0
+    optional: true
 
   d3-shape@3.2.0:
     dependencies:
       d3-path: 3.1.0
+    optional: true
 
   d3-time-format@4.1.0:
     dependencies:
       d3-time: 3.1.0
+    optional: true
 
   d3-time@3.1.0:
     dependencies:
       d3-array: 3.2.4
+    optional: true
 
   debug@4.4.3(supports-color@10.2.2):
     dependencies:
@@ -6237,7 +6256,8 @@ snapshots:
     optionalDependencies:
       supports-color: 10.2.2
 
-  deepmerge-ts@7.1.5: {}
+  deepmerge-ts@7.1.5:
+    optional: true
 
   default-browser-id@5.0.1: {}
 
@@ -6260,17 +6280,21 @@ snapshots:
       has-property-descriptors: 1.0.2
       object-keys: 1.1.1
 
-  defu@6.1.7: {}
+  defu@6.1.7:
+    optional: true
 
   delaunator@5.1.0:
     dependencies:
       robust-predicates: 3.0.3
+    optional: true
 
-  denque@2.1.0: {}
+  denque@2.1.0:
+    optional: true
 
   dequal@2.0.3: {}
 
-  destr@2.0.5: {}
+  destr@2.0.5:
+    optional: true
 
   detect-libc@2.1.2: {}
 
@@ -6278,7 +6302,8 @@ snapshots:
     dependencies:
       dequal: 2.0.3
 
-  dotenv@17.4.2: {}
+  dotenv@17.4.2:
+    optional: true
 
   drizzle-orm@0.45.4(@electric-sql/pglite@0.4.3)(@prisma/client@7.10.0(prisma@7.10.0(@types/react@19.3.0)(magicast@0.5.5)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@7.1.0-beta))(typescript@7.1.0-beta))(@types/pg@8.23.1)(kysely@0.29.6)(mysql2@3.15.3)(pg@8.23.1)(postgres@3.4.9)(prisma@7.10.0(@types/react@19.3.0)(magicast@0.5.5)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@7.1.0-beta)):
     optionalDependencies:
@@ -6309,20 +6334,24 @@ snapshots:
     dependencies:
       '@standard-schema/spec': 1.1.0
       fast-check: 3.23.2
+    optional: true
 
-  elkjs@0.11.1: {}
+  elkjs@0.11.1:
+    optional: true
 
   emoji-regex-xs@1.0.0: {}
 
   emoji-regex@8.0.0: {}
 
-  empathic@2.0.0: {}
+  empathic@2.0.0:
+    optional: true
 
   entities@7.0.1: {}
 
   entities@8.1.0: {}
 
-  env-paths@3.0.0: {}
+  env-paths@3.0.0:
+    optional: true
 
   error-stack-parser-es@1.0.5: {}
 
@@ -6399,25 +6428,31 @@ snapshots:
 
   expect-type@1.4.0: {}
 
-  exsolve@1.1.3: {}
+  exsolve@1.1.3:
+    optional: true
 
   fast-check@3.23.2:
     dependencies:
       pure-rand: 6.1.0
+    optional: true
 
   fast-check@4.10.2:
     dependencies:
       pure-rand: 8.4.2
 
-  fast-decode-uri-component@1.0.1: {}
+  fast-decode-uri-component@1.0.1:
+    optional: true
 
-  fast-deep-equal@3.1.3: {}
+  fast-deep-equal@3.1.3:
+    optional: true
 
   fast-querystring@1.1.2:
     dependencies:
       fast-decode-uri-component: 1.0.1
+    optional: true
 
-  fast-uri@3.1.8: {}
+  fast-uri@3.1.8:
+    optional: true
 
   fdir@6.5.0(picomatch@4.0.7):
     optionalDependencies:
@@ -6428,6 +6463,7 @@ snapshots:
       fast-deep-equal: 3.1.3
       fast-querystring: 1.1.2
       safe-regex2: 5.1.2
+    optional: true
 
   focus-trap@7.8.0:
     dependencies:
@@ -6437,6 +6473,7 @@ snapshots:
     dependencies:
       cross-spawn: 7.0.6
       signal-exit: 4.1.0
+    optional: true
 
   fsevents@2.3.3:
     optional: true
@@ -6446,6 +6483,7 @@ snapshots:
   generate-function@2.3.1:
     dependencies:
       is-property: 1.0.2
+    optional: true
 
   get-intrinsic@1.3.0:
     dependencies:
@@ -6460,14 +6498,16 @@ snapshots:
       hasown: 2.0.4
       math-intrinsics: 1.1.0
 
-  get-port-please@3.2.0: {}
+  get-port-please@3.2.0:
+    optional: true
 
   get-proto@1.0.1:
     dependencies:
       dunder-proto: 1.0.1
       es-object-atoms: 1.1.2
 
-  giget@3.3.1: {}
+  giget@3.3.1:
+    optional: true
 
   globalthis@1.0.4:
     dependencies:
@@ -6478,9 +6518,11 @@ snapshots:
 
   graceful-fs@4.2.11: {}
 
-  grammex@3.1.13: {}
+  grammex@3.1.13:
+    optional: true
 
-  graphmatch@1.1.1: {}
+  graphmatch@1.1.1:
+    optional: true
 
   has-property-descriptors@1.0.2:
     dependencies:
@@ -6536,7 +6578,8 @@ snapshots:
     dependencies:
       safer-buffer: 2.1.2
 
-  internmap@2.0.3: {}
+  internmap@2.0.3:
+    optional: true
 
   is-ci@2.0.0:
     dependencies:
@@ -6556,13 +6599,15 @@ snapshots:
     dependencies:
       globalthis: 1.0.4
 
-  is-property@1.0.2: {}
+  is-property@1.0.2:
+    optional: true
 
   is-wsl@3.1.1:
     dependencies:
       is-inside-container: 1.0.0
 
-  isexe@2.0.0: {}
+  isexe@2.0.0:
+    optional: true
 
   istextorbinary@9.5.0:
     dependencies:
@@ -6570,11 +6615,14 @@ snapshots:
       editions: 6.22.0
       textextensions: 6.11.0
 
-  jiti@2.7.0: {}
+  jiti@2.7.0:
+    optional: true
 
-  js-tokens@10.0.0: {}
+  js-tokens@10.0.0:
+    optional: true
 
-  json-schema-traverse@1.0.0: {}
+  json-schema-traverse@1.0.0:
+    optional: true
 
   jsonc-parser@3.3.1: {}
 
@@ -6673,15 +6721,18 @@ snapshots:
 
   lodash.once@4.1.1: {}
 
-  lodash@4.18.1: {}
+  lodash@4.18.1:
+    optional: true
 
-  long@5.3.2: {}
+  long@5.3.2:
+    optional: true
 
   lru-cache@6.0.0:
     dependencies:
       yallist: 4.0.0
 
-  lru.min@1.1.5: {}
+  lru.min@1.1.5:
+    optional: true
 
   lz-string@1.5.0: {}
 
@@ -6698,6 +6749,7 @@ snapshots:
       '@babel/parser': 7.29.9
       '@babel/types': 7.29.8
       source-map-js: 1.2.2
+    optional: true
 
   mark.js@8.11.1: {}
 
@@ -6802,10 +6854,12 @@ snapshots:
       named-placeholders: 1.1.6
       seq-queue: 0.0.5
       sqlstring: 2.3.3
+    optional: true
 
   named-placeholders@1.1.6:
     dependencies:
       lru.min: 1.1.5
+    optional: true
 
   nanoid@3.3.20: {}
 
@@ -6815,7 +6869,8 @@ snapshots:
 
   obug@3.0.0: {}
 
-  ohash@2.0.12: {}
+  ohash@2.0.12:
+    optional: true
 
   oniguruma-to-es@3.1.1:
     dependencies:
@@ -6849,7 +6904,8 @@ snapshots:
     dependencies:
       entities: 8.1.0
 
-  path-key@3.1.1: {}
+  path-key@3.1.1:
+    optional: true
 
   path-to-regexp@6.3.0: {}
 
@@ -6859,7 +6915,8 @@ snapshots:
 
   perfect-debounce@1.0.0: {}
 
-  perfect-debounce@2.1.0: {}
+  perfect-debounce@2.1.0:
+    optional: true
 
   pg-cloudflare@1.4.1:
     optional: true
@@ -6905,6 +6962,7 @@ snapshots:
       confbox: 0.3.1
       exsolve: 1.1.3
       pathe: 2.0.3
+    optional: true
 
   postcss@8.5.30:
     dependencies:
@@ -6922,7 +6980,8 @@ snapshots:
     dependencies:
       xtend: 4.0.2
 
-  postgres@3.4.7: {}
+  postgres@3.4.7:
+    optional: true
 
   postgres@3.4.9: {}
 
@@ -6946,6 +7005,7 @@ snapshots:
       - magicast
       - react
       - react-dom
+    optional: true
 
   proper-lockfile@4.1.2:
     dependencies:
@@ -6955,7 +7015,8 @@ snapshots:
 
   property-information@7.2.0: {}
 
-  pure-rand@6.1.0: {}
+  pure-rand@6.1.0:
+    optional: true
 
   pure-rand@8.4.2: {}
 
@@ -6968,19 +7029,23 @@ snapshots:
     dependencies:
       defu: 6.1.7
       destr: 2.0.5
+    optional: true
 
   react-dom@19.3.0(react@19.3.0):
     dependencies:
       react: 19.3.0
       scheduler: 0.28.0
+    optional: true
 
-  react@19.3.0: {}
+  react@19.3.0:
+    optional: true
 
   read@1.0.7:
     dependencies:
       mute-stream: 0.0.8
 
-  readdirp@5.1.1: {}
+  readdirp@5.1.1:
+    optional: true
 
   regex-recursion@6.0.2:
     dependencies:
@@ -6992,17 +7057,21 @@ snapshots:
     dependencies:
       regex-utilities: 2.3.0
 
-  remeda@2.33.4: {}
+  remeda@2.33.4:
+    optional: true
 
-  require-from-string@2.0.2: {}
+  require-from-string@2.0.2:
+    optional: true
 
-  ret@0.5.0: {}
+  ret@0.5.0:
+    optional: true
 
   retry@0.12.0: {}
 
   rfdc@1.4.1: {}
 
-  robust-predicates@3.0.3: {}
+  robust-predicates@3.0.3:
+    optional: true
 
   rolldown@1.2.13:
     dependencies:
@@ -7064,18 +7133,21 @@ snapshots:
   safe-regex2@5.1.2:
     dependencies:
       ret: 0.5.0
+    optional: true
 
   safer-buffer@2.1.2: {}
 
   sax@1.6.1: {}
 
-  scheduler@0.28.0: {}
+  scheduler@0.28.0:
+    optional: true
 
   search-insights@2.17.3: {}
 
   semver@7.8.5: {}
 
-  seq-queue@0.0.5: {}
+  seq-queue@0.0.5:
+    optional: true
 
   sharp@0.35.4(@types/node@26.6.5):
     dependencies:
@@ -7146,8 +7218,10 @@ snapshots:
   shebang-command@2.0.0:
     dependencies:
       shebang-regex: 3.0.0
+    optional: true
 
-  shebang-regex@3.0.0: {}
+  shebang-regex@3.0.0:
+    optional: true
 
   shiki@2.5.0:
     dependencies:
@@ -7202,9 +7276,11 @@ snapshots:
 
   split2@4.2.0: {}
 
-  sqlstring@2.3.3: {}
+  sqlstring@2.3.3:
+    optional: true
 
-  std-env@3.10.0: {}
+  std-env@3.10.0:
+    optional: true
 
   std-env@4.3.0: {}
 
@@ -7248,9 +7324,8 @@ snapshots:
       fdir: 6.5.0(picomatch@4.0.7)
       picomatch: 4.0.7
 
-  tinyrainbow@3.2.0: {}
-
-  tm-grammars@1.32.22: {}
+  tinyrainbow@3.2.0:
+    optional: true
 
   trim-lines@3.0.1: {}
 
@@ -7334,6 +7409,7 @@ snapshots:
   valibot@1.4.2(typescript@7.1.0-beta):
     optionalDependencies:
       typescript: 7.1.0-beta
+    optional: true
 
   version-range@4.15.0: {}
 
@@ -7442,10 +7518,6 @@ snapshots:
     transitivePeerDependencies:
       - msw
 
-  vscode-oniguruma@2.0.1: {}
-
-  vscode-textmate@9.3.2: {}
-
   vue@3.5.44(typescript@7.1.0-beta):
     dependencies:
       '@vue/compiler-dom': 3.5.44
@@ -7459,6 +7531,7 @@ snapshots:
   which@2.0.2:
     dependencies:
       isexe: 2.0.0
+    optional: true
 
   why-is-node-running@3.2.1: {}
 
@@ -7560,6 +7633,7 @@ snapshots:
     dependencies:
       grammex: 3.1.13
       graphmatch: 1.1.1
+    optional: true
 
   zod@4.4.3: {}
 

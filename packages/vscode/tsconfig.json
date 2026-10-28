@@ -10,5 +10,5 @@
 			"@typesql/language-server": ["../language-server/src/index.ts"]
 		}
 	},
-	"include": ["src", "test"]
+	"include": ["src"]
 }

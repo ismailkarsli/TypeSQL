@@ -1,12 +1,10 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { basename, join, sep } from "node:path";
+import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { loadModule, parseSync } from "libpg-query";
-import { discover } from "../../src/cache/discover.js";
-import { PROBE_HEAD, type ProbeSession } from "../../src/cache/evaluate.js";
 import { hashOf } from "../oracle/baseline.js";
 import { comparisonSkip } from "../oracle/comparison-skips.js";
-import { isCorePath, positional } from "../oracle/types.js";
+import { readCorpus } from "../oracle/corpus.js";
 import { OUT, PgCanon } from "./pg-canon.js";
 
 export const root = join(import.meta.dirname, "../../../..");
@@ -134,41 +132,26 @@ function add(
 	}
 }
 
-export async function typeTestStatements(
-	session: ProbeSession,
+export async function corpusStatements(
 	only: readonly string[],
 	tally: Tally,
 ): Promise<Statement[]> {
 	await loadParser();
-	const count = (k: string): void => {
-		tally[k] = (tally[k] ?? 0) + 1;
+	const count = (k: string, n = 1): void => {
+		tally[k] = (tally[k] ?? 0) + n;
 	};
-	const { program, checker } = await session.withProbe(PROBE_HEAD);
-	const kinds = (await session.typescript()).kinds;
-	const sites = await discover(
-		program,
-		checker,
-		kinds,
-		isCorePath,
-		(f) => f.includes(`${sep}test${sep}types${sep}`) && !f.endsWith(".d.ts"),
-	);
+	const corpus = readCorpus();
 	const seen = new Set<string>();
 	const out: Statement[] = [];
-	const each = (site: { key: string; file: string }, ddl: boolean): void => {
-		const group = basename(site.file);
-		if (only.length && !only.includes(group)) return;
-		const text = ddl ? site.key : positional(site.key);
-		if (seen.has(`${group}\0${text}`)) return;
+	for (const statement of corpus.statements) {
+		const { source: group, sql: text } = statement;
+		if (only.length && !only.includes(group)) continue;
+		if (seen.has(`${group}\0${text}`)) continue;
 		seen.add(`${group}\0${text}`);
 		add(out, group, null, text, count);
-	};
-	for (const s of sites.sql) {
-		if (only.length && !only.includes(basename(s.file))) continue;
-		if (s.slots) count("skip: slots");
-		else each(s, false);
 	}
-	for (const s of sites.types) each(s, false);
-	for (const s of sites.ddl) each(s, true);
+	for (const [source, n] of Object.entries(corpus.skippedSlots))
+		if (!only.length || only.includes(source)) count("skip: slots", n);
 	return out;
 }
 

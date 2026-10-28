@@ -20,6 +20,7 @@ import { evaluateCanon, probeSession } from "./ours.js";
 import { OUT } from "./pg-canon.js";
 import { RejectionAudit } from "./rejections.js";
 import {
+	corpusStatements,
 	diffWindow,
 	regressionStatements,
 	regressionTests,
@@ -27,7 +28,6 @@ import {
 	type Statement,
 	stringLiteral,
 	type Tally,
-	typeTestStatements,
 } from "./statements.js";
 
 const here = import.meta.dirname;
@@ -74,7 +74,7 @@ test("parse trees against PostgreSQL's parser", async () => {
 	try {
 		const statements: Statement[] = [
 			...(await regressionStatements(tests, tally)),
-			...(await typeTestStatements(sessions[0]!, only, tally)),
+			...(await corpusStatements(only, tally)),
 		];
 		total =
 			statements.length + Object.values(tally).reduce((sum, n) => sum + n, 0);

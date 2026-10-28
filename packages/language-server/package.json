@@ -28,15 +28,13 @@
 	},
 	"scripts": {
 		"build": "tsrs -p tsconfig.build.json",
-		"typecheck": "tsrs -p tsconfig.json --noEmit",
-		"test": "vitest run"
+		"typecheck": "tsrs -p tsconfig.json --noEmit"
 	},
 	"devDependencies": {
 		"@types/node": "^26.6.5",
 		"@typesql/core": "workspace:*",
 		"tsrs": "0.18.0-ts7.1.0-dev.20260929",
-		"typescript": "7.1.0-beta",
-		"vitest": "^5.0.4"
+		"typescript": "7.1.0-beta"
 	},
 	"keywords": [
 		"sql",

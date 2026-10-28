@@ -107,7 +107,7 @@ A few statements are never cached: those whose types name one of your types the 
 
 ### Opting out
 
-Remove the `contentMappers` entry, or set `"contentMappers": null` in a `tsconfig` that extends the main one. Do this for CI steps and tools that can't pass `--runExternalCode` (such as `vitest --typecheck`). A leftover cache file is then ignored.
+Remove the `contentMappers` entry, or set `"contentMappers": null` in a `tsconfig` that extends the main one. Do this for CI steps and tools that can't pass `--runExternalCode`. A leftover cache file is then ignored.
 
 ### TypeScript's own caching
 

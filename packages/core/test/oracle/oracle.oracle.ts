@@ -1,7 +1,6 @@
 import { writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { afterAll, beforeAll, expect, test } from "vitest";
-import type { Database } from "../conformance/db.js";
 import {
 	compareBaseline,
 	type Entries,
@@ -11,6 +10,7 @@ import {
 	sortedEntries,
 	writeBaseline,
 } from "./baseline.js";
+import type { Database } from "./db.js";
 import { functionsOracle } from "./functions.js";
 import { baselineProblems, counts, jobSummary } from "./job-summary.js";
 import { checkedTests, regressOracle, schedule } from "./regress.js";
@@ -132,7 +132,7 @@ function settle(
 }
 
 test.runIf(parts.includes("types"))(
-	"4a (and part 3 over them): the type tests' statements against Postgres",
+	"4a (and part 3 over them): the query corpus against Postgres",
 	async (ctx) => {
 		if (!server) return ctx.skip("TYPESQL_ORACLE=skip");
 		const r = await typesOracle(server.url, log, {

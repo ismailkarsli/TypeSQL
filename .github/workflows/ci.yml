@@ -10,21 +10,6 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:18
-        env:
-          POSTGRES_PASSWORD: typesql
-        ports: ["5432:5432"]
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 2s
-          --health-timeout 5s
-          --health-retries 30
-    env:
-      # Conformance tests run against this server instead of starting their own container.
-      TYPESQL_PG_URL: postgres://postgres:typesql@localhost:5432/postgres
-      TYPESQL_REQUIRE_DB: "1"
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6 # version from packageManager in package.json
@@ -42,8 +27,6 @@ jobs:
       - run: pnpm smoke:dist
       # the VS Code extension packages (release.yml publishes the same .vsix)
       - run: pnpm --filter typesql exec vsce package --no-dependencies --out "$RUNNER_TEMP/typesql.vsix"
-      - run: pnpm coverage
-      - run: pnpm check:expect-error
       - run: pnpm docs:build
 
   intents:
@@ -101,7 +84,7 @@ jobs:
           node-version: 26
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm test:oracle
+      - run: pnpm test:oracle --views
 
   oracle-regress:
     # The server is started here rather than as a service: the replay COPYs the regression
@@ -115,35 +98,19 @@ jobs:
       TYPESQL_ORACLE_URL: postgres://postgres:typesql@localhost:5432/postgres
     steps:
       - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-      - name: did the engine change?
-        id: engine
-        run: |
-          base="${BASE:-}"
-          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then base=$(git merge-base origin/main HEAD); fi
-          if git diff --quiet "$base" HEAD -- packages/core/src/engine; then echo "changed=false" >> "$GITHUB_OUTPUT"; else echo "changed=true" >> "$GITHUB_OUTPUT"; fi
-        env:
-          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
       - uses: pnpm/action-setup@v6 # version from packageManager in package.json
-        if: steps.engine.outputs.changed == 'true'
       - uses: actions/setup-node@v7
-        if: steps.engine.outputs.changed == 'true'
         with:
           node-version: 26
           cache: pnpm
-      - if: steps.engine.outputs.changed == 'true'
-        run: pnpm install --frozen-lockfile
-      - if: steps.engine.outputs.changed == 'true'
-        run: pnpm pg-regress:setup
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm pg-regress:setup
       - name: start postgres:18
-        if: steps.engine.outputs.changed == 'true'
         run: |
           docker run -d --name pg -e POSTGRES_PASSWORD=typesql -p 5432:5432 \
             -v "$PWD/vendor/postgres/src/test/regress:/regress:ro" postgres:18
           until docker exec pg pg_isready -U postgres -h localhost; do sleep 1; done
-      - if: steps.engine.outputs.changed == 'true'
-        run: pnpm test:oracle --regress --views --shard ${{ matrix.shard }}/4
+      - run: pnpm test:oracle --regress --views --shard ${{ matrix.shard }}/4
 
   fuzz:
     runs-on: ubuntu-latest

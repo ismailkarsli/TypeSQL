@@ -9,6 +9,5 @@
 			"@typesql/core": ["./src/index.ts"]
 		}
 	},
-	"include": ["src", "test", "examples"],
-	"exclude": ["test/errors/fixtures", "test/cache"]
+	"include": ["src", "test", "examples"]
 }

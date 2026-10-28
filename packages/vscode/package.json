@@ -73,7 +73,6 @@
 	"scripts": {
 		"build": "esbuild src/extension.ts --bundle --platform=node --target=node22 --format=cjs --external:vscode --sourcemap --outfile=dist/extension.js",
 		"typecheck": "tsrs -p tsconfig.json --noEmit",
-		"test": "vitest run",
 		"package": "pnpm run build && vsce package --no-dependencies --out typesql.vsix"
 	},
 	"devDependencies": {
@@ -83,11 +82,7 @@
 		"@vscode/vsce": "^4.0.0",
 		"esbuild": "^0.28.2",
 		"ovsx": "^1.3.0",
-		"tm-grammars": "^1.32.22",
 		"tsrs": "0.18.0-ts7.1.0-dev.20260929",
-		"typescript": "7.1.0-beta",
-		"vitest": "^5.0.4",
-		"vscode-oniguruma": "^2.0.1",
-		"vscode-textmate": "^9.3.2"
+		"typescript": "7.1.0-beta"
 	}
 }

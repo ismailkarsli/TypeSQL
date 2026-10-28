@@ -1,7 +1,6 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { afterAll, beforeAll, expect, test } from "vitest";
-import type { Database } from "../conformance/db.js";
 import {
 	compareBaseline,
 	type Entries,
@@ -11,6 +10,7 @@ import {
 	showEntries,
 	writeBaseline,
 } from "../oracle/baseline.js";
+import type { Database } from "../oracle/db.js";
 import { baselineProblems, counts, jobSummary } from "../oracle/job-summary.js";
 import { readDb } from "../oracle/schema.js";
 import { acquireOracleServer } from "../oracle/server.js";

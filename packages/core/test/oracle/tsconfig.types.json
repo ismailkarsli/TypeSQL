@@ -10,5 +10,5 @@
 			"@typesql/core": ["../../src/index.ts"]
 		}
 	},
-	"include": ["../types", ".probe/*.ts"]
+	"include": ["catalog.d.ts", ".probe/*.ts"]
 }

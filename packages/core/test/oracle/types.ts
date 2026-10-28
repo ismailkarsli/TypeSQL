@@ -1,6 +1,5 @@
 import { mkdirSync } from "node:fs";
-import { basename, join, resolve, sep } from "node:path";
-import { discover } from "../../src/cache/discover.js";
+import { join, resolve, sep } from "node:path";
 import {
 	type Evaluated,
 	evaluateTypes,
@@ -9,15 +8,14 @@ import {
 	parseTypeText,
 	readAnalysis,
 } from "../../src/cache/evaluate.js";
-import { coreNames, Printer } from "../../src/cache/print.js";
-import { maxParam, rewriteNamed } from "../../src/runtime/splice.js";
-import { hashOf, preview } from "./baseline.js";
+import { preview } from "./baseline.js";
 import {
 	compareStatement,
 	type Observed,
 	type Ours,
 	type Server,
 } from "./compare.js";
+import { readCorpus } from "./corpus.js";
 import type { Disagreement } from "./kinds.js";
 import {
 	Connection,
@@ -54,14 +52,6 @@ export interface Candidate {
 	readonly sql: string;
 	readonly source: string;
 	readonly db: Db;
-}
-
-/** `:name` parameters and inline markers as `$n`, the way a call's text is sent: names first, markers numbered after them. */
-export function positional(text: string): string {
-	const named = rewriteNamed(text).text;
-	let k = maxParam(named);
-	// biome-ignore lint/suspicious/noControlCharactersInRegex: NUL delimits the rewritten placeholders
-	return named.replace(/\u0000[PD][^\u0000]*\u0000/g, () => `$${++k}`);
 }
 
 interface Group {
@@ -105,53 +95,33 @@ export async function typesOracle(
 	const notes = result.notes;
 	const skip = (reason: string): void => count(result, `skip: ${reason}`);
 	try {
-		const { program, checker, sf } = await session.withProbe(PROBE_HEAD);
-		const kinds = (await session.typescript()).kinds;
-		const sites = await discover(
-			program,
-			checker,
-			kinds,
-			isCorePath,
-			(f) => f.includes(`${sep}test${sep}types${sep}`) && !f.endsWith(".d.ts"),
+		const corpus = readCorpus();
+		const groups = new Map<string, Group>(
+			Object.entries(corpus.schemas).map(([id, snapshot]) => [
+				id,
+				{ id, snapshot },
+			]),
 		);
-		const printer = new Printer(checker, sf, isCorePath);
-		const groups = new Map<string, Group>();
-		const groupOf = new Map<number, Group | null>();
-		const groupFor = async (db: { id: number }): Promise<Group | null> => {
-			if (!groupOf.has(db.id)) {
-				const snap = await printer.snapshot(db as never);
-				if (snap === null) groupOf.set(db.id, null);
-				else {
-					const text = coreNames(snap);
-					const id = hashOf(text).slice(0, 12);
-					const g = groups.get(id) ?? { id, snapshot: text };
-					groups.set(id, g);
-					groupOf.set(db.id, g);
-				}
-			}
-			return groupOf.get(db.id)!;
-		};
+		count(
+			result,
+			"skip: slots",
+			Object.values(corpus.skippedSlots).reduce((a, b) => a + b, 0),
+		);
 		const items = new Map<string, Item>();
-		const add = async (
-			site: { key: string; db: unknown; file: string },
-			ddl: boolean,
-		): Promise<void> => {
-			const g = await groupFor(site.db as { id: number });
-			if (!g) return skip("schema-unrepresentable");
-			const text = ddl ? site.key : positional(site.key);
-			const k = `${g.id}\0${ddl}\0${text}`;
-			if (!items.has(k))
-				items.set(k, { group: g, text, file: basename(site.file), ddl });
-		};
-		for (const s of sites.sql) {
-			if (s.slots) skip("slots");
-			else await add(s, false);
+		for (const statement of corpus.statements) {
+			if (statement.schema === null) {
+				skip("schema-unrepresentable");
+				continue;
+			}
+			const group = groups.get(statement.schema)!;
+			const { sql: text, ddl, source: file } = statement;
+			const key = `${group.id}\0${ddl}\0${text}`;
+			// The first source owns this input's baseline identity, including duplicates.
+			if (!items.has(key)) items.set(key, { group, text, file, ddl });
 		}
-		for (const s of sites.types) await add(s, false);
-		for (const s of sites.ddl) await add(s, true);
 		const list = [...items.values()];
 		log(
-			`types oracle: ${sites.sql.length + sites.types.length + sites.ddl.length} sites, ${list.length} distinct statements over ${groups.size} schemas`,
+			`types oracle: ${list.length} distinct statements over ${groups.size} schemas`,
 		);
 
 		let base = PROBE_HEAD + NORM_PRELUDE;

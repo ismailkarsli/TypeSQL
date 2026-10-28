@@ -140,7 +140,6 @@ Measured with TypeScript 7.1.0-beta (`tsc --extendedDiagnostics`):
 | the same chain plus one query on the result | 186K total | 0.17 s |
 | 50 statements | 297K | 0.22 s |
 | 200 statements and four queries | 1.15M | 0.53 s |
-| `test/types/writes/ddl-views-types.test-d.ts` (≈60 assertions) | 474K | 0.38 s |
 
 Each statement rebuilds only the table it changes, so long migration histories stay within TypeScript's limits ([Type engine](../guide/type-engine)).
 

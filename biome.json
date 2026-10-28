@@ -16,16 +16,12 @@
 			"!packages/core/src/schema/pg-catalog.ts",
 			"!packages/bench/src",
 			"!packages/bench/thresholds.json",
-			"!packages/pg/test/introspect/schema.generated.ts",
-			"!packages/prisma/test/fixtures/typesql.ts",
-			"!packages/kysely/test/fixtures/kysely-codegen.ts",
 			"!packages/core/test/oracle/baselines",
 			"!packages/core/test/fuzz/baseline.json",
 			"!packages/core/test/fuzz/corpus/candidates.json",
 			"!packages/core/test/pg-ast/baseline.json",
 			"!packages/core/test/pg-ast/rejections.json",
 			"!packages/core/test/pg-regress/baseline.json",
-			"!coverage-thresholds.json",
 			"!pnpm-lock.yaml",
 			"!**/CHANGELOG.md"
 		]

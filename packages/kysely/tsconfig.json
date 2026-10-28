@@ -11,5 +11,5 @@
 			"@typesql/kysely": ["./src/index.ts"]
 		}
 	},
-	"include": ["src", "test", "examples"]
+	"include": ["src", "examples"]
 }
