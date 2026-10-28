@@ -6,6 +6,7 @@ scratchpad/
 coverage/
 packages/bench/results.json
 packages/bench/runtime-results.json
+packages/bench/history-results.json
 packages/bench/cache/
 pnpm-publish-summary.json
 .vitepress/cache/

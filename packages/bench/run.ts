@@ -3,6 +3,7 @@
 // warm-cache and stale-cache variants. Writes results.json and enforces thresholds.json.
 // --calibrate sets 30% instantiation headroom and 2x check time (minimum 1.5 seconds).
 // --compiler tsrs or --compiler tsc measures only that compiler.
+// --runs N selects the median of N checks per variant; --no-thresholds measures old releases.
 import { spawnSync } from "node:child_process";
 import {
 	appendFileSync,
@@ -48,6 +49,8 @@ interface Result {
 	otherErrorCount: number;
 	errors: TscError[];
 	exitCode: number | null;
+	/** Raw repetitions; the outer result is the median check (or a failed repetition). */
+	samples?: Result[];
 }
 
 interface Threshold {
@@ -78,6 +81,11 @@ if (
 	process.exit(2);
 }
 const compilers: Compiler[] = onlyCompiler ? [onlyCompiler] : ["tsrs", "tsc"];
+const runsArg = process.argv.indexOf("--runs");
+const runs = runsArg === -1 ? 1 : Number(process.argv[runsArg + 1]);
+if (!Number.isSafeInteger(runs) || runs < 1) {
+	throw new Error("--runs must be a positive integer");
+}
 const core = join(here, "../core");
 const dist = { extends: "./tsconfig.json", compilerOptions: { paths: {} } };
 const cached = {
@@ -232,7 +240,23 @@ function measure(variant: Variant, compiler: Compiler): Result {
 }
 
 const byCompiler = Object.fromEntries(
-	compilers.map((c) => [c, variants.map((v) => measure(v, c))]),
+	compilers.map((c) => [
+		c,
+		variants.map((v): Result => {
+			const samples = Array.from({ length: runs }, () => measure(v, c));
+			// Keep failed checks visible even if most repetitions succeeded.
+			const failed = samples.find(
+				(r) =>
+					r.exitCode !== 0 ||
+					r.checkTimeSec == null ||
+					r.instantiations == null,
+			);
+			const sorted = [...samples].sort(
+				(a, b) => (a.checkTimeSec ?? 0) - (b.checkTimeSec ?? 0),
+			);
+			return { ...(failed ?? sorted[Math.floor(runs / 2)]!), samples };
+		}),
+	]),
 ) as Record<Compiler, Result[]>;
 const primaryCompiler: Compiler = compilers[0]!;
 const results = byCompiler[primaryCompiler];
@@ -277,6 +301,7 @@ writeFileSync(
 	JSON.stringify(
 		{
 			measuredAt: new Date().toISOString(),
+			runs,
 			workload,
 			environment: {
 				node: process.version,
@@ -363,9 +388,10 @@ if (calibrate) {
 	);
 }
 
-const thresholds: Thresholds = existsSync(thresholdsPath)
-	? (JSON.parse(readFileSync(thresholdsPath, "utf8")) as Thresholds)
-	: {};
+const thresholds: Thresholds =
+	!process.argv.includes("--no-thresholds") && existsSync(thresholdsPath)
+		? (JSON.parse(readFileSync(thresholdsPath, "utf8")) as Thresholds)
+		: {};
 const failures: { name: string; problems: string[] }[] = [];
 const rows = results.map((r, idx) => {
 	const t = thresholds[r.name];

@@ -56,10 +56,17 @@ node packages/bench/runtime.ts       # runtime, same fixture
 ```
 
 To refresh the published numbers, run the **benchmark** workflow on `main` in GitHub Actions,
-or use `gh workflow run benchmark.yml --ref main`. It checks the existing thresholds, commits
-updated README, docs and current-version history numbers, then deploys the docs. Raw results
-are available in the `bench-results` artifact. If `main` moves during the run, start it again.
-Runner CPUs can differ between runs, so release timings are not a controlled comparison.
+or use `gh workflow run benchmark.yml --ref main`. Every release from 0.7.1 and the current
+sources run sequentially in one job, using the same fixture, installed compilers and checking
+options. Check times are medians of three runs per variant. Version 0.7.1 is the first release
+containing this fixture; older versions are excluded. Current sources must pass the existing
+thresholds; older releases must compile successfully but are allowed to exceed today's budgets.
+
+The workflow commits updated README, docs and complete history numbers, then deploys the docs.
+The `bench-results` artifact includes every release's revision, raw samples, compiler versions
+and runner details. If `main` moves during the run, start it again. Release workflows also
+remeasure the complete history so each published chart compares versions on the same runner.
+To run this comparison locally, use `node packages/bench/history.ts` with full release tags fetched.
 
 ## Type cache
 

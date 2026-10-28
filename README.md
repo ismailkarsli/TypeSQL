@@ -141,7 +141,7 @@ See [Performance](https://typesql.karsli.net/guide/performance) for how this is 
 
 ### Performance by release
 
-Cached and uncached tsrs check time for the [real-world application](packages/bench/src/case1.ts) by `@typesql/core` version. Lower is faster. Releases append CI measurements of the same fixture.
+Cached and uncached tsrs check time for the [real-world application](packages/bench/src/case1.ts) by `@typesql/core` version. Lower is faster. Every refresh remeasures all releases from 0.7.1 in one CI job with the same compilers, using the median of three checks per variant.
 
 <!-- performance-history:start -->
 Lines: 🔵 Uncached · 🟢 Cached. tsrs check time for the case1 application workload.

@@ -1,5 +1,6 @@
 // Save CI measurements for VitePress and render GitHub's README from the same data.
 // --refresh replaces the current version's history entry when rerunning benchmarks on demand.
+// --refresh-all replaces the entire history with releases measured together by bench/history.ts.
 import { readFileSync, writeFileSync } from "node:fs";
 
 const historyPath = "packages/bench/history.json";
@@ -10,11 +11,14 @@ interface HistoryEntry {
 		cachedCheckTimeSec: number;
 	};
 }
-const history: Record<string, HistoryEntry> = JSON.parse(
+let history: Record<string, HistoryEntry> = JSON.parse(
 	readFileSync(historyPath, "utf8"),
 );
 const { version } = JSON.parse(
 	readFileSync("packages/core/package.json", "utf8"),
+);
+const measurements = JSON.parse(
+	readFileSync("packages/bench/results.json", "utf8"),
 );
 const {
 	results,
@@ -24,38 +28,98 @@ const {
 	measuredAt,
 	environment,
 	compilerVersions,
-} = JSON.parse(readFileSync("packages/bench/results.json", "utf8"));
-if (workload?.file !== "src/case1.ts" || !(workload.statements > 0)) {
-	throw new Error("Missing case1 application benchmark metadata");
+} = measurements;
+
+interface HistoryBenchmark {
+	workload: { file: string; statements: number };
+	results: Record<
+		string,
+		{
+			name: string;
+			exitCode: number | null;
+			checkTimeSec: number | null;
+			instantiations: number | null;
+			errorCount: number;
+			otherErrorCount: number;
+		}[]
+	>;
 }
-for (const compiler of ["tsrs", "tsc"]) {
-	for (const name of ["case1", "case1d", "case1c", "case1s"]) {
-		const result = results[compiler]?.find(
-			(r: { name: string }) => r.name === name,
-		);
-		if (
-			result?.exitCode !== 0 ||
-			!Number.isFinite(result.checkTimeSec) ||
-			result.checkTimeSec <= 0
-		) {
+function entryFor(data: HistoryBenchmark): HistoryEntry {
+	if (
+		data.workload?.file !== "src/case1.ts" ||
+		!(data.workload.statements > 0)
+	) {
+		throw new Error("Missing case1 application benchmark metadata");
+	}
+	for (const compiler of ["tsrs", "tsc"]) {
+		for (const name of ["case1", "case1d", "case1c", "case1s"]) {
+			const result = data.results[compiler]?.find((r) => r.name === name);
+			if (
+				result?.exitCode !== 0 ||
+				result.checkTimeSec == null ||
+				result.checkTimeSec <= 0 ||
+				!Number.isFinite(result.checkTimeSec) ||
+				result.instantiations == null ||
+				result.instantiations <= 0 ||
+				!Number.isFinite(result.instantiations) ||
+				result.errorCount !== 0 ||
+				result.otherErrorCount !== 0
+			) {
+				throw new Error(
+					`Missing successful ${compiler} ${name} benchmark result`,
+				);
+			}
+		}
+	}
+	const get = (name: string) => {
+		const time = data.results.tsrs?.find((r) => r.name === name)?.checkTimeSec;
+		if (time == null) throw new Error(`Missing tsrs ${name} check time`);
+		return time;
+	};
+	return {
+		case1: {
+			statements: data.workload.statements,
+			checkTimeSec: get("case1d"),
+			cachedCheckTimeSec: get("case1c"),
+		},
+	};
+}
+const entry = entryFor(measurements);
+if (process.argv.includes("--refresh-all")) {
+	const all = JSON.parse(
+		readFileSync("packages/bench/history-results.json", "utf8"),
+	);
+	for (const key of [
+		"measuredAt",
+		"environment",
+		"compilerVersions",
+		"workload",
+		"runs",
+	]) {
+		if (JSON.stringify(all[key]) !== JSON.stringify(measurements[key])) {
 			throw new Error(
-				`Missing successful ${compiler} ${name} benchmark result`,
+				`History and current benchmarks must come from the same run (${key})`,
 			);
 		}
 	}
-}
-const timings = results.tsrs.find((r: { name: string }) => r.name === "case1d");
-const cachedTimings = results.tsrs.find(
-	(r: { name: string }) => r.name === "case1c",
-);
-const entry: HistoryEntry = {
-	case1: {
-		statements: workload.statements,
-		checkTimeSec: timings.checkTimeSec,
-		cachedCheckTimeSec: cachedTimings.checkTimeSec,
-	},
-};
-if (process.argv.includes("--refresh")) history[version] = entry;
+	if (!Array.isArray(all.releases) || all.releases.length === 0) {
+		throw new Error("Missing historical benchmark results");
+	}
+	history = {};
+	for (const release of all.releases) {
+		for (const key of ["environment", "compilerVersions", "workload", "runs"]) {
+			if (JSON.stringify(release.benchmark[key]) !== JSON.stringify(all[key])) {
+				throw new Error(
+					`Incompatible history benchmark for ${release.version} (${key})`,
+				);
+			}
+		}
+		if (history[release.version])
+			throw new Error(`Duplicate history version ${release.version}`);
+		history[release.version] = entryFor(release.benchmark);
+	}
+	history[version] = entry;
+} else if (process.argv.includes("--refresh")) history[version] = entry;
 else history[version] ??= entry;
 
 const runtime = JSON.parse(
@@ -122,7 +186,7 @@ const releases = Object.entries(history).sort(([a], [b]) =>
 );
 const chart = [
 	"<!-- performance-history:start -->",
-	"Lines: 🔵 Uncached · 🟢 Cached. tsrs check time for the case1 application workload.",
+	"Lines: 🔵 Uncached · 🟢 Cached. tsrs check time for the case1 application workload, remeasured for all versions in one CI job.",
 	"",
 	"```mermaid",
 	'%%{init: {"themeVariables": {"xyChart": {"plotColorPalette": "#2563eb,#16a34a"}}}}%%',

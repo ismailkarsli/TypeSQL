@@ -79,7 +79,7 @@ jobs:
           fi
           # Committed through the API, which signs it (main requires signed commits), and rejected,
           # so nothing is published, when main moved past the commit the checks ran on.
-          node scripts/performance-history.ts
+          node scripts/performance-history.ts --refresh-all
           git add -A
           message="chore: release $versions"
           [ -n "$versions" ] || message="chore: prune changelog sections of published versions"
