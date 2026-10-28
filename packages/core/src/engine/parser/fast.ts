@@ -15,6 +15,10 @@ import type { Ok } from "./util.js";
  * Anything uncertain returns never, leaving the original pipeline to handle it and its errors.
  */
 export type FastSelect<Q extends string> =
+	Q extends `${string}${"SELECT" | "select"}${string}`
+		? FastSelectStart<Q>
+		: never;
+type FastSelectStart<Q extends string> =
 	TrimStart<Q> extends `${"SELECT" | "select"}${Ws}${infer Rest}`
 		? SplitFrom<TrimStart<Rest>>
 		: never;

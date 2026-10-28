@@ -114,6 +114,23 @@ export type ResolveColumn<
 	S extends Scope,
 	Tbl extends string | null,
 	Name extends string,
+> = S extends readonly [readonly [infer I extends ScopeItem], ...Scope]
+	? Tbl extends string
+		? I["alias"] extends Tbl
+			? Name extends keyof I["cols"]
+				? I["cols"][Name]
+				: SqlError<`column ${Tbl}.${Name} does not exist`, null>
+			: ResolveColumnGeneral<S, Tbl, Name>
+		: Name extends keyof I["cols"]
+			? Name extends I["skip"][number]
+				? ResolveColumnGeneral<S, Tbl, Name>
+				: I["cols"][Name]
+			: ResolveColumnGeneral<S, Tbl, Name>
+	: ResolveColumnGeneral<S, Tbl, Name>;
+type ResolveColumnGeneral<
+	S extends Scope,
+	Tbl extends string | null,
+	Name extends string,
 > = Tbl extends string
 	? ResolveQualified<S, Tbl, Name>
 	: ResolveBare<S, Name, S>;
