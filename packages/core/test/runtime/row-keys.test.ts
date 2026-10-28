@@ -7,7 +7,7 @@ import {
 	type Generated,
 	type Nullable,
 } from "../../src/index.js";
-import { camelCases } from "./camel-cases.js";
+import { camelCases } from "../fixtures/camel-cases.js";
 
 interface DB {
 	users: {

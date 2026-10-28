@@ -11,7 +11,7 @@ import {
 	type QueryResult,
 } from "kysely";
 import { describe, expect, test } from "vitest";
-import { camelCases } from "../../core/test/runtime/camel-cases.js";
+import { camelCases } from "../../core/test/fixtures/camel-cases.js";
 import { createSql, executor } from "../src/index.js";
 import type { DB } from "./fixtures/kysely-codegen.js";
 

@@ -68,12 +68,12 @@ An entry is used only when its dependencies compare equal (`Same`): mutual assig
 
 ## Adding grammar
 
-- New expression syntax: add an AST node in `ast.ts`, parse it in `parser/expr.ts` (prefix or infix), type it in `typer/typeof.ts`, name it in `project/naming.ts`, and handle params in `typer/params.ts`. Add tests in `test/types/<feature>.test-d.ts`.
+- New expression syntax: add an AST node in `ast.ts`, parse it in `parser/expr.ts` (prefix or infix), type it in `typer/typeof.ts`, name it in `project/naming.ts`, and handle params in `typer/params.ts`. Add tests in `test/types/<area>/<feature>.test-d.ts`.
 - New function: add a `Sig` to `FunctionCatalog` in `typer/catalog.ts`, then regenerate `typer/pg-functions.ts` (the uncurated pg_catalog rest) with `TYPESQL_PG_URL=… node scripts/gen-pg-functions.ts`.
 - New statement: add to `ast.ts`, parse in `parser/<kind>.ts`, dispatch in `parser/stmt.ts`, project in `project/stmt.ts`.
 
 ## Testing
 
-- `pnpm test:types` runs vitest in typecheck mode over `test/types/*.test-d.ts`. Use `expectTypeOf<Row<"…">>().toEqualTypeOf<{…}>()` and `// @ts-expect-error`.
+- `pnpm test:types` runs vitest in typecheck mode over `test/types/**/*.test-d.ts`. Use `expectTypeOf<Row<"…">>().toEqualTypeOf<{…}>()` and `// @ts-expect-error`.
 - The `core-types-cached` project runs the same files again against a type cache generated from them: an engine change that the cache would serve differently fails there. `test/cache/` has the cache's own tests.
 - Quick iteration: `./node_modules/.bin/tsc --noEmit --strict --target es2024 --moduleResolution bundler --module esnext --skipLibCheck <file>` on a scratch file under `scratchpad/`. Add `--extendedDiagnostics` to see instantiation counts.
