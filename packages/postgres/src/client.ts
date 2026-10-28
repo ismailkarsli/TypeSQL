@@ -14,7 +14,11 @@ export type PostgresJsRows = readonly unknown[] & {
  * a `TransactionSql` inside `begin`, a `ReservedSql`, or a fake in tests.
  */
 export interface PostgresJsQueryable {
-	unsafe(query: string, parameters?: unknown[]): PromiseLike<PostgresJsRows>;
+	unsafe(
+		query: string,
+		parameters?: unknown[],
+		options?: { readonly prepare: boolean; readonly simple: boolean },
+	): PromiseLike<PostgresJsRows>;
 }
 
 /** Anything with postgres.js' `begin(fn)`: the `Sql` instance or a `ReservedSql`. */
@@ -36,10 +40,19 @@ interface PostgresJsSavepointable {
  * `{ rows, rowCount }` (postgres.js' `.count`, so `q.executeCount()` works).
  */
 export function executor(sql: PostgresJsQueryable): Executor {
-	return async (text, values) => {
+	const run: Executor = async (text, values) => {
 		const result = await sql.unsafe(text, Array.from(values));
 		return { rows: Array.from(result), rowCount: result.count ?? null };
 	};
+	return Object.assign(run, {
+		prepare: (): Executor => async (text, values) => {
+			const result = await sql.unsafe(text, Array.from(values), {
+				prepare: true,
+				simple: false,
+			});
+			return { rows: Array.from(result), rowCount: result.count ?? null };
+		},
+	});
 }
 
 /**

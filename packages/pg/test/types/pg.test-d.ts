@@ -224,6 +224,18 @@ test("rowKeys: camelCase renames the row keys, in transactions too", () => {
 	createSql<DB>(pool, { rowKeys: "snake" });
 });
 
+test("prepared statements preserve the adapter type map", () => {
+	const bind = sql.prepare(
+		"SELECT count(*) AS n, max(created_at) AS latest FROM users WHERE id > $1",
+	);
+	expectTypeOf(bind).parameters.toEqualTypeOf<[number | null]>();
+	expectTypeOf(bind(0).execute()).toEqualTypeOf<
+		Promise<{ n: string; latest: Date | null }[]>
+	>();
+	// @ts-expect-error bindings use the inferred driver parameter type
+	bind("0");
+});
+
 test("PgCatalog columns under PgTypeMap: unparsed system arrays are raw text", () => {
 	const sql = createSql<DB & PgCatalog>();
 	const q = sql("SELECT relacl, relkind, reloptions FROM pg_class");

@@ -9,6 +9,7 @@ export {
 	migrate,
 	type PgPoolLike,
 	type PgQueryable,
+	type PgQueryConfig,
 	type PgResult,
 	type PgTransactionClient,
 } from "./client.js";

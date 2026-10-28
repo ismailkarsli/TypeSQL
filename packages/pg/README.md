@@ -46,6 +46,15 @@ npx typesql introspect --url postgres://localhost/app --out src/db/schema.ts
 - [From a live database](https://typesql.karsli.net/guide/introspect): `typesql introspect` options
 - [Type mapping](https://typesql.karsli.net/reference/type-mapping#node-postgres): the TypeScript type of every Postgres type
 
+## Prepared statements
+
+```ts
+const findUser = sql.prepare("SELECT id, email FROM users WHERE id = $1");
+const user = await findUser(7).executeTakeFirst();
+```
+
+Reuse `findUser` with new values. TypeSQL assembles the SQL once and node-postgres caches a named statement per connection; the name is derived from the final SQL text. All `execute*` methods work. Named parameters and fixed fragments are supported too. Inside a transaction, use `tx.prepare(...)` to bind it to that transaction.
+
 ## License
 
 [MIT](LICENSE)

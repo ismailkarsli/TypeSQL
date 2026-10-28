@@ -220,6 +220,18 @@ test("DML: executeCount returns the row count; RETURNING rows follow the type ma
 	>();
 });
 
+test("prepared statements preserve ordinary and bigint type maps", () => {
+	const text = "SELECT count(*) AS n FROM users WHERE id > $1";
+	const bind = sql.prepare(text);
+	expectTypeOf(bind).parameters.toEqualTypeOf<[number | null]>();
+	expectTypeOf(bind(0).execute()).toEqualTypeOf<Promise<{ n: string }[]>>();
+	expectTypeOf(big.prepare(text)(0).execute()).toEqualTypeOf<
+		Promise<{ n: bigint }[]>
+	>();
+	// @ts-expect-error bindings use the inferred driver parameter type
+	bind("0");
+});
+
 test("rowKeys: camelCase renames the row keys", () => {
 	const camel = createSql<DB>(db, { rowKeys: "camelCase" });
 	const cq = camel("SELECT id, display_name FROM users WHERE id = $1", 1);

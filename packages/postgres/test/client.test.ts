@@ -187,6 +187,47 @@ describe("migrate", () => {
 });
 
 describe("executor", () => {
+	test("prepared queries opt into extended protocol, including queries without parameters", async () => {
+		const calls: unknown[] = [];
+		const client: PostgresJsQueryable = {
+			async unsafe(text, values, options) {
+				calls.push({ text, values, options });
+				return rowList([rowA], 4);
+			},
+		};
+		const bound = createSql<DB>(client);
+		const bind = bound.prepare("SELECT id FROM users WHERE id = $1");
+		expect(calls).toEqual([]);
+		expect(await bind(7).executeTakeFirstOrThrow()).toEqual(rowA);
+		expect(await bind(8).executeCount()).toBe(4);
+		await bound.prepare("SELECT id FROM users")().execute();
+		expect(calls).toEqual([
+			{
+				text: "SELECT id FROM users WHERE id = $1",
+				values: [7],
+				options: { prepare: true, simple: false },
+			},
+			{
+				text: "SELECT id FROM users WHERE id = $1",
+				values: [8],
+				options: { prepare: true, simple: false },
+			},
+			{
+				text: "SELECT id FROM users",
+				values: [],
+				options: { prepare: true, simple: false },
+			},
+		]);
+		const empty: PostgresJsQueryable = {
+			unsafe: async () => rowList([], null),
+		};
+		expect(
+			await createSql<DB>(empty)
+				.prepare("CREATE TABLE t (x int)")()
+				.executeCount(),
+		).toBe(0);
+	});
+
 	test("runs the queries' execute methods through unsafe with a mutable copy of the values, and strips result metadata", async () => {
 		const { client, calls } = fakeSql([{ id: 7 }]);
 		const bound = createSql<DB>(client);

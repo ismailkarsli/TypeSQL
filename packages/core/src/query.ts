@@ -30,6 +30,8 @@ export type Executor = ((
 	text: string,
 	values: readonly unknown[],
 ) => PromiseLike<readonly unknown[] | ExecutorResult>) & {
+	/** Build an executor that reuses a server-side statement for this text. Must not run SQL yet. */
+	readonly prepare?: (text: string) => Executor;
 	/** Runs the statement for its row count; `executeCount` uses it when present (Prisma's `$executeRaw`). */
 	readonly count?: (
 		text: string,

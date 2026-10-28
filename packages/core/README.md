@@ -59,6 +59,17 @@ sql("SELECT emial FROM users");
 | [`@typesql/drizzle`](https://www.npmjs.com/package/@typesql/drizzle) | Drizzle, with its schema |
 | [`@typesql/prisma`](https://www.npmjs.com/package/@typesql/prisma) | Prisma Client, with its schema |
 
+## Reusable queries
+
+Compile a query once and bind different values with the same inferred types:
+
+```ts
+const findUser = sql.prepare("SELECT id, email FROM users WHERE id = $1");
+const query = findUser(7); // normal Query, with execute* methods
+```
+
+Named parameters and fixed fragments work too. The `pg` and `postgres` adapters also request server-side preparation when these queries execute. See the [prepared query API](https://typesql.karsli.net/reference/api#sql-prepare-text-slots).
+
 ## Documentation
 
 The full guide is at **[typesql.karsli.net](https://typesql.karsli.net)**. It covers the [schema](https://typesql.karsli.net/guide/schema), [parameters](https://typesql.karsli.net/guide/parameters), [writing data](https://typesql.karsli.net/guide/writing-data), [dynamic SQL](https://typesql.karsli.net/guide/dynamic-sql), [migrations](https://typesql.karsli.net/guide/migrations), the [type cache](https://typesql.karsli.net/guide/performance) and [known limits](https://typesql.karsli.net/guide/limits).

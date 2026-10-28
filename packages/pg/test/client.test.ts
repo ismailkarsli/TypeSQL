@@ -11,6 +11,7 @@ import {
 	migrate,
 	type PgPoolLike,
 	type PgQueryable,
+	type PgQueryConfig,
 	type PgTransactionClient,
 } from "../src/index.js";
 
@@ -26,7 +27,7 @@ const sql = createSql<DB>();
 const q = sql("SELECT id, email, display_name FROM users WHERE id = $1", 7);
 
 interface Call {
-	text: string;
+	text: string | PgQueryConfig;
 	values: unknown[] | undefined;
 }
 
@@ -56,6 +57,37 @@ describe("createSql", () => {
 });
 
 describe("executor", () => {
+	test("prepared bindings send a stable named query config with fresh values", async () => {
+		const { client, calls } = fakeClient([rowA], 4);
+		const bound = createSql<DB>(client, { rowKeys: "camelCase" });
+		const bind = bound.prepare(
+			"SELECT id, display_name FROM users WHERE id = :id",
+		);
+		expect(calls).toEqual([]);
+		expect(await bind({ id: 7 }).executeTakeFirstOrThrow()).toEqual({
+			id: 7,
+			email: rowA.email,
+			displayName: null,
+		});
+		expect(await bind({ id: 8 }).executeCount()).toBe(4);
+		const first = calls[0]!.text as PgQueryConfig;
+		expect(first).toEqual({
+			name: expect.stringMatching(/^typesql_[a-f0-9]{48}$/),
+			text: "SELECT id, display_name FROM users WHERE id = $1",
+			values: [7],
+		});
+		expect(calls[1]).toEqual({
+			text: { ...first, values: [8] },
+			values: undefined,
+		});
+		await bound
+			.prepare("SELECT id, display_name FROM users WHERE id = $1")(9)
+			.execute();
+		expect((calls[2]!.text as PgQueryConfig).name).toBe(first.name);
+		await bound.prepare("SELECT id FROM users WHERE id = $1")(9).execute();
+		expect((calls[3]!.text as PgQueryConfig).name).not.toBe(first.name);
+	});
+
 	test("runs the queries' execute methods on the bound client", async () => {
 		const { client, calls } = fakeClient([rowA, rowB]);
 		const bound = createSql<DB>(client);
@@ -102,7 +134,7 @@ describe("transaction", () => {
 		let connects = 0;
 		const client: PgTransactionClient = {
 			async query(text) {
-				log.push(text);
+				log.push(typeof text === "string" ? text : text.text);
 				if (text === opts.failOn) throw new Error(`${text} failed`);
 				return { rows: opts.rows ?? [], rowCount: 0 };
 			},
@@ -244,7 +276,7 @@ describe("migrate", () => {
 		const releases: unknown[] = [];
 		const client: PgTransactionClient = {
 			async query(text) {
-				log.push(text);
+				log.push(typeof text === "string" ? text : text.text);
 				if (text === failOn) throw new Error(`${text} failed`);
 				return { rows: [], rowCount: 0 };
 			},

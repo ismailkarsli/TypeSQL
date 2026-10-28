@@ -26,6 +26,46 @@ describe.skipIf(!db)("row counts against Postgres (postgres.js)", () => {
 		await db?.close();
 	});
 
+	test("reuses server statements across values and factories on one connection", async () => {
+		const client = await pgjs!.reserve();
+		try {
+			const bound = createSql<DB>(client);
+			const text = "SELECT $1::int4 AS prepared_value";
+			const bind = bound.prepare(text);
+			expect(await bind(7).executeTakeFirstOrThrow()).toEqual({
+				prepared_value: 7,
+			});
+			expect(await bind(8).executeTakeFirstOrThrow()).toEqual({
+				prepared_value: 8,
+			});
+			expect(await bound.prepare(text)(9).executeCount()).toBe(1);
+			const rows = await client.unsafe(
+				"SELECT generic_plans + custom_plans AS executions FROM pg_prepared_statements WHERE statement = $1",
+				[text],
+			);
+			expect(Array.from(rows)).toEqual([{ executions: "3" }]);
+			const constant = "SELECT 42::int4 AS prepared_constant";
+			expect(await bound.prepare(constant)().executeTakeFirstOrThrow()).toEqual(
+				{ prepared_constant: 42 },
+			);
+			expect(
+				(
+					await client.unsafe(
+						"SELECT name FROM pg_prepared_statements WHERE statement = $1",
+						[constant],
+					)
+				).length,
+			).toBe(1);
+			expect(
+				await sql.transaction(async (tx) =>
+					tx.prepare(text)(10).executeTakeFirstOrThrow(),
+				),
+			).toEqual({ prepared_value: 10 });
+		} finally {
+			client.release();
+		}
+	});
+
 	test("executeCount reports the command tag's count", async () => {
 		expect(
 			await sql("INSERT INTO count_pgjs (n) VALUES (1), (2)").executeCount(),

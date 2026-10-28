@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type { Executor } from "@typesql/core";
 import { runTransaction, type SqlDriver } from "@typesql/core/adapter";
 
@@ -9,10 +10,17 @@ export interface PgResult {
 
 /**
  * Anything with node-postgres' `query(text, values)` method: `Pool`, `Client`, `PoolClient`,
- * or a fake in tests. Only the `(text, values?) → Promise<{ rows, rowCount }>` form is used.
+ * or a fake in tests. Prepared queries use the named query config form.
  */
 export interface PgQueryable {
-	query(text: string, values?: unknown[]): Promise<PgResult>;
+	query(text: string | PgQueryConfig, values?: unknown[]): Promise<PgResult>;
+}
+
+/** A named node-postgres statement. Names are derived from the final SQL text. */
+export interface PgQueryConfig {
+	readonly name: string;
+	readonly text: string;
+	readonly values: unknown[];
 }
 
 /** A client checked out of a pool (`pg.PoolClient`): queryable and releasable. */
@@ -32,11 +40,27 @@ export interface PgPoolLike<
  * `{ rows, rowCount }` (pg's `rowCount`, so `q.executeCount()` works).
  */
 export function executor(client: PgQueryable): Executor {
-	return async (text, values) => {
-		// `pg` requires a mutable array (`QueryConfigValues<I>` matches `Array<U>` only).
-		const { rows, rowCount } = await client.query(text, Array.from(values));
-		return { rows, rowCount };
-	};
+	return Object.assign(
+		async (text: string, values: readonly unknown[]) => {
+			// `pg` requires a mutable array (`QueryConfigValues<I>` matches `Array<U>` only).
+			const { rows, rowCount } = await client.query(text, Array.from(values));
+			return { rows, rowCount };
+		},
+		{
+			prepare: (text: string): Executor => {
+				// Keep names stable across factories and connections, within PostgreSQL's 63-byte limit.
+				const name = `typesql_${createHash("sha256").update(text).digest("hex").slice(0, 48)}`;
+				return async (text, values) => {
+					const { rows, rowCount } = await client.query({
+						name,
+						text,
+						values: Array.from(values),
+					});
+					return { rows, rowCount };
+				};
+			},
+		},
+	);
 }
 
 function isPool(client: PgQueryable): client is PgQueryable & PgPoolLike {

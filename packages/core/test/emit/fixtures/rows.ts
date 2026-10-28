@@ -29,6 +29,9 @@ const sql = createSql<DB>(async () => []);
 export const rows = async () => sql("SELECT * FROM users").execute();
 export const first = async (id: number) =>
 	sql("SELECT id, email, mood FROM users WHERE id = $1", id).executeTakeFirst();
+const prepared = sql.prepare("SELECT id, email, mood FROM users WHERE id = $1");
+export const preparedFirst = async (id: number) =>
+	prepared(id).executeTakeFirst();
 export const counts = async () =>
 	sql(
 		"SELECT mood, count(*) AS n, max(created_at) AS latest FROM users GROUP BY mood",

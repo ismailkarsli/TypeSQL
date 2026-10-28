@@ -608,6 +608,20 @@ export interface Sql<DB, TM, Keys extends RowKeys = "preserve"> {
 		query: GateCallCheck<DB, TM, Keys, Q> & Q,
 		...params: BoxCallArgs<DB, TM, Keys, Q>
 	): CallRet<DB, TM, Keys, Q>;
+	/** Compile once, then bind fresh parameters on each call. Adapters may also prepare on the server. */
+	prepare<const Q extends string>(
+		query: GateCallCheck<DB, TM, Keys, Q> & Q,
+	): (...params: BoxCallArgs<DB, TM, Keys, Q>) => CallRet<DB, TM, Keys, Q>;
+	prepare<const Q extends string, const S extends SlotMap>(
+		query: GateSlottedCheck<DB, TM, Q, S> & Q,
+		slots: S & SlotsFor<Q, S>,
+	): (
+		...params: BoxSlottedArgs<DB, TM, Q, S>
+	) => Query<
+		KeyedRow<RowOf<DB, TM, SplicedOr<Q, S>>, Keys>,
+		ParamsOf<DB, TM, SplicedOr<Q, S>>,
+		SplicedOr<Q, S>
+	>;
 	<const Q extends string, const S extends SlotMap>(
 		query: GateSlottedCheck<DB, TM, Q, S> & Q,
 		slots: S & SlotsFor<Q, S>,
@@ -751,6 +765,24 @@ function isSlotMap(v: unknown): v is SlotMap {
 const SLOT_RE = /\{[A-Za-z_][A-Za-z0-9_]*\}/;
 const NAMED_RE = /(^|[^:]):[A-Za-z_]/;
 
+function namedValues(
+	names: readonly string[],
+	args: readonly unknown[],
+): unknown[] {
+	const obj = args[0];
+	if (args.length !== 1 || obj === null || typeof obj !== "object") {
+		throw new Error(
+			"typesql: a statement with :name parameters takes exactly one object argument",
+		);
+	}
+	const record = obj as Record<string, unknown>;
+	return names.map((name) => {
+		if (!(name in record))
+			throw new Error(`typesql: missing named parameter :${name}`);
+		return takeValue(record[name]);
+	});
+}
+
 /**
  * Same order as the types: `:name` → `$1..$k`, inline params → `$k+1…`, then fragments are
  * spliced with their parameters renumbered after those.
@@ -770,18 +802,7 @@ function build(
 	if (NAMED_RE.test(text)) {
 		const rn = rewriteNamedOnce(text);
 		if (rn.names.length > 0) {
-			const obj = outer[0];
-			if (outer.length !== 1 || obj === null || typeof obj !== "object") {
-				throw new Error(
-					"typesql: a statement with :name parameters takes exactly one object argument",
-				);
-			}
-			const record = obj as Record<string, unknown>;
-			values = rn.names.map((n) => {
-				if (!(n in record))
-					throw new Error(`typesql: missing named parameter :${n}`);
-				return takeValue(record[n]);
-			});
+			values = namedValues(rn.names, outer);
 			positional = rn.text;
 		}
 	}
@@ -821,6 +842,31 @@ export function createSql<DB, TM = DefaultTypeMap>(
 		return makeQuery(text, values, executor, rowKeys);
 	};
 	const api = Object.assign(call, {
+		prepare: (query: string, slots: SlotMap = {}) => {
+			const rn = rewriteNamedOnce(query);
+			const count = maxParam(rn.text);
+			const initial = new Array<unknown>(count).fill(undefined);
+			const base = build(rn.text, initial);
+			const compiled = splice(base.text, slots, base.values);
+			const fixed = compiled.values.slice(count);
+			const prepared = executor?.prepare?.(compiled.text) ?? executor;
+			return (...args: readonly unknown[]) => {
+				const values =
+					rn.names.length > 0
+						? namedValues(rn.names, args)
+						: args.map(takeValue);
+				if (values.length !== count)
+					throw new Error(
+						`typesql: prepared query expects ${count} parameters, got ${values.length}`,
+					);
+				return makeQuery(
+					compiled.text,
+					[...values, ...fixed],
+					prepared,
+					rowKeys,
+				);
+			};
+		},
 		as: (query: string, ...rest: readonly unknown[]) => {
 			const { text, values } = build(query, rest);
 			return makeQuery(text, values, executor, rowKeys);

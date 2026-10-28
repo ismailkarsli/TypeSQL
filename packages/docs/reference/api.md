@@ -47,6 +47,27 @@ sql("SELECT id FROM users WHERE id = :id AND email = :email", { id: 1, email: "x
 - `::` casts, `:=` and colons inside string literals are not parameters.
 - Mixing `:name` and `$n` in one statement is an error.
 
+## `sql.prepare(text, slots?)`
+
+Compile a reusable query, then call it with the same parameter arguments that `sql(text, ...params)` accepts:
+
+```ts
+const findUser = sql.prepare("SELECT id, email FROM users WHERE id = $1");
+const first = await findUser(1).executeTakeFirst();
+const second = await findUser(2).executeTakeFirst();
+
+const byEmail = sql.prepare("SELECT id FROM users WHERE email = :email");
+await byEmail({ email: "a@example.com" }).execute();
+```
+
+Preparation resolves named parameters, inline values and fragment slots once. The returned function checks each binding's parameter types and returns a normal `Query` with all four `execute*` methods. Every binding gets a fresh values array. Inline and fragment values are captured at preparation; pass changing values as positional or named parameters. Captured objects retain their references.
+
+With `@typesql/pg`, execution uses a server-side statement whose name is derived from the final SQL text. With `@typesql/postgres`, execution enables postgres.js preparation and extended protocol, including for queries without parameters; the client's global `prepare: false` setting still takes precedence. Server statements are cached per connection by the driver. Preparation itself sends no SQL.
+
+Other adapters and custom executors reuse TypeSQL's compiled query without requesting server preparation, unless their executor implements `prepare(text)`. The prepared query stays bound to the client or transaction that created it. Create it through `tx.prepare(...)` to execute in a transaction. An executor passed to `execute*` overrides that binding and runs through the supplied executor as usual.
+
+Reuse the returned function across calls to save TypeSQL's runtime SQL assembly. Server preparation can also save repeated parsing, but performance depends on the query and workload; measure your application's repeated queries.
+
 ## Inline values
 
 | Function | Sends |
@@ -131,6 +152,7 @@ type ExecutorResult = { rows: readonly unknown[]; rowCount: number | null };
 - Each adapter exports `executor(client)`.
 - `rowCount: null` means no count, read as 0.
 - An executor that returns only rows works for everything but `executeCount`, unless it has a `count(text, values)` method.
+- An optional `prepare(text): Executor` creates an executor for server preparation. It must defer database work until execution. `sql.prepare` calls it once with the final SQL text and binds all resulting queries to that executor, including its `count` method.
 
 See [Custom executor](../adapters/custom-executor).
 
