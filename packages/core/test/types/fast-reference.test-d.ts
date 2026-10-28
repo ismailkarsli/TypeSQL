@@ -36,6 +36,10 @@ test("recognized SELECT parses agree with the independent complete parser", () =
 		| "SELECT * FROM items"
 		| "SELECT i.* FROM public.items i"
 		| "SELECT i.id AS key, i.note label FROM items AS i WHERE i.id = $1 ORDER BY i.note DESC NULLS FIRST LIMIT $2 OFFSET $3"
+		| "SELECT i.id FROM (SELECT id FROM items ORDER BY id LIMIT 1) i ORDER BY i.id DESC LIMIT $1"
+		| "SELECT i.id FROM (SELECT id FROM items ORDER BY id) i ORDER BY i.id ASC"
+		| "SELECT note FROM items ORDER BY 'order by x'"
+		| "SELECT id FROM items -- ORDER BY note\nORDER BY id"
 		| "SELECT id AS duplicate, note AS duplicate FROM items"
 		| "SELECT note AS duplicate, id AS duplicate FROM items"
 		| 'SELECT "a""b" AS "x""y" FROM "some""table"'

@@ -139,6 +139,20 @@ type Mk<T, N extends boolean> = { readonly type: T; readonly nullable: N };
 
 /** Collect params from an expression. Errors in sibling typing are ignored (they are reported by the main pass). */
 export type ParamsOfExpr<E extends Expr, C extends Ctx, M> = E extends {
+	readonly t:
+		| "col"
+		| "star"
+		| "num"
+		| "str"
+		| "bool"
+		| "null"
+		| "typed"
+		| "default";
+}
+	? M
+	: ParamsOfExprComplex<E, C, M>;
+
+type ParamsOfExprComplex<E extends Expr, C extends Ctx, M> = E extends {
 	readonly t: "param";
 }
 	? M

@@ -18,6 +18,7 @@ import type { ParseProgram } from "./parser/stmt.js";
 import type { Nx } from "./parser/util.js";
 import type { ParamsOfDml } from "./project/dml.js";
 import type { ProjectStmt } from "./project/stmt.js";
+import type { UnknownTuple } from "./splice.js";
 import type { WithHint } from "./suggest.js";
 import type { IntLitValue } from "./typer/operators.js";
 import type {
@@ -273,33 +274,17 @@ export type BuildRow<
  */
 export type ParamsOf<DB, TM, Q extends string> =
 	Analysis<DB, Q> extends { readonly max: infer N extends number }
-		? BuildParams<
-				Analysis<DB, Q>["params" & keyof Analysis<DB, Q>],
-				N,
-				TM,
-				DB,
-				1,
-				[]
-			>
+		? BuildParams<Analysis<DB, Q>["params" & keyof Analysis<DB, Q>], N, TM, DB>
 		: [];
 
-type BuildParams<
-	P,
-	N extends number,
-	TM,
-	DB,
-	I extends number,
-	Acc extends unknown[],
-> = Acc["length"] extends N
-	? Acc
-	: BuildParams<
-			P,
-			N,
-			TM,
-			DB,
-			Inc<I>,
-			[...Acc, ParamTs<P[I & keyof P], TM, DB>]
-		>;
+type BuildParams<P, N extends number, TM, DB> =
+	UnknownTuple<N> extends infer T extends unknown[]
+		? {
+				[K in keyof T]: K extends `${infer I extends number}`
+					? ParamTs<P[Nx<I> & keyof P], TM, DB>
+					: never;
+			}
+		: never;
 /**
  * A parameter used in several places has a union of `ColInfo`s; its TS type is the
  * intersection of each use's TS type (without null), plus `| null` when every use accepts
@@ -324,8 +309,6 @@ type IntersectUses<U, TM, DB> = (
 ) extends (u: infer X) => void
 	? X
 	: never;
-type Inc<I extends number> = Nx<I>;
-
 /**
  * What a call site passes for each parameter (`ParamsOf`, except for json / jsonb parameters):
  * node-postgres sends a JS array as a Postgres array literal, so a json / jsonb parameter takes

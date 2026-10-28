@@ -74,16 +74,35 @@ type LexCommas<
 	Acc extends readonly unknown[],
 	B extends number = 0,
 > = B extends ChunkSize
-	? LexAll<S, Acc>
+	? LexSpaces<S, Acc>
 	: S extends `${infer Part},${infer Rest}`
 		? Part extends `${string}--${string}`
-			? LexAll<S, Acc>
-			: LexAll<Part, []> extends infer R
+			? LexSpaces<S, Acc>
+			: LexSpaces<Part, []> extends infer R
 				? R extends readonly unknown[]
 					? LexCommas<Rest, [...Acc, ...R, OpTok<",">], Nx<B>>
-					: LexAll<S, Acc>
+					: LexSpaces<S, Acc>
 				: never
-		: LexAll<S, Acc>;
+		: LexSpaces<S, Acc>;
+
+/** Isolated space-delimited chunks reuse the lexer across related statements. */
+type LexSpaces<
+	S extends string,
+	Acc extends readonly unknown[],
+	B extends number = 0,
+> = B extends ChunkSize
+	? LexAll<S, Acc>
+	: S extends `${string}\n${string}`
+		? LexAll<S, Acc>
+		: S extends `${infer Part} ${infer Rest}`
+			? Part extends `${string}${"--" | "U&" | "u&"}${string}`
+				? LexAll<S, Acc>
+				: LexAll<Part, []> extends infer R
+					? R extends readonly unknown[]
+						? LexSpaces<Rest, [...Acc, ...R], Nx<B>>
+						: LexAll<S, Acc>
+					: never
+			: LexAll<S, Acc>;
 
 /** Unicode UESCAPE and adjacent quoted-string continuations can consume the next line. */
 type CanSplitLine<

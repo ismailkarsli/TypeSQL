@@ -520,7 +520,11 @@ type CheckInsertSource<
 	readonly t: "values";
 	readonly rows: infer Rows extends readonly (readonly Expr[])[];
 }
-	? CheckRows<Rows, Cs, AssignTargets<Cs, Ind>, Tbl, Name, C>
+	? Ind extends null
+		? Rows[number][number] extends { readonly t: "param" }
+			? true
+			: CheckRows<Rows, Cs, AssignTargets<Cs, Ind>, Tbl, Name, C>
+		: CheckRows<Rows, Cs, AssignTargets<Cs, Ind>, Tbl, Name, C>
 	: CheckTargets<Cs, AssignTargets<Cs, Ind>, [], Tbl, Name, C>;
 
 /** Type each row (`CheckValueItems`), then check what it stores in the targets (`CheckTargets`). */
@@ -550,15 +554,21 @@ export type CheckRows<
 export type CheckValueItems<
 	Es extends readonly Expr[],
 	C extends Ctx,
+> = Es[number] extends { readonly t: "param" | "default" }
+	? true
+	: CheckValueItemsWalk<Es, C>;
+type CheckValueItemsWalk<
+	Es extends readonly Expr[],
+	C extends Ctx,
 > = Es extends readonly [
 	infer E extends Expr,
 	...infer R extends readonly Expr[],
 ]
 	? E extends { readonly t: "default" }
-		? CheckValueItems<R, C>
+		? CheckValueItemsWalk<R, C>
 		: TypeOf<E, C> extends infer T
 			? T extends ColInfo
-				? CheckValueItems<R, C>
+				? CheckValueItemsWalk<R, C>
 				: T
 			: never
 	: true;
@@ -702,6 +712,15 @@ export type CheckSet<
 type CheckSetValues<
 	Set extends readonly SetItem[],
 	C extends Ctx,
+> = Set[number] extends {
+	readonly t: "set";
+	readonly e: { readonly t: "param" };
+}
+	? true
+	: CheckSetValuesWalk<Set, C>;
+type CheckSetValuesWalk<
+	Set extends readonly SetItem[],
+	C extends Ctx,
 > = Set extends readonly [
 	infer S extends SetItem,
 	...infer R extends readonly SetItem[],
@@ -716,7 +735,7 @@ type CheckSetValues<
 		) extends infer X
 		? X extends AnyErr
 			? X
-			: CheckSetValues<R, C>
+			: CheckSetValuesWalk<R, C>
 		: never
 	: true;
 /** The columns a SET list assigns, in order, their `AssignTargets` and the values (`null` from a sub-SELECT). */
@@ -1165,14 +1184,17 @@ export type ParamsOfRowInfos<
 	Infos extends readonly ColInfo[],
 	C extends Ctx,
 	M,
-> = Es extends readonly [
-	infer E extends Expr,
-	...infer ER extends readonly Expr[],
-]
-	? Infos extends readonly [infer CI, ...infer IR extends readonly ColInfo[]]
-		? ParamsOfRowInfos<ER, IR, C, ParamsOfOpt<E, C, M, CI>>
-		: ParamsOfRowInfos<ER, [], C, ParamsOfExpr<E, C, M>>
-	: M;
+> = Es extends infer ET extends readonly Expr[]
+	?
+			| M
+			| {
+					[K in keyof ET]: K extends `${number}`
+						? K extends keyof Infos
+							? ParamsOfOpt<ET[K] & Expr, C, never, Infos[K]>
+							: ParamsOfExpr<ET[K] & Expr, C, never>
+						: never;
+			  }[number]
+	: never;
 type ParamsOfInfoTargets<
 	Ts extends readonly Target[],
 	Infos extends readonly ColInfo[],

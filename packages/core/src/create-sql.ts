@@ -163,9 +163,11 @@ type ArgsFor<
 	Encs extends readonly unknown[],
 	M extends number,
 > = Names extends []
-	? Encs extends readonly []
-		? ArgsOf<DB, TM, X>
-		: Take<ArgsOf<DB, TM, X>, M>
+	? M extends 0
+		? []
+		: Encs extends readonly []
+			? ArgsOf<DB, TM, X>
+			: Take<ArgsOf<DB, TM, X>, M>
 	: [params: NamedParams<Names, Take<ArgsOf<DB, TM, X>, Names["length"]>>];
 
 /** `true` when the call is valid; otherwise the SqlError (so it lands on the query literal). */
@@ -317,7 +319,9 @@ type SlottedArgs<DB, TM, Q extends string, S> =
 					: Validate<DB, X> extends AnyErr
 						? readonly unknown[]
 						: Names extends []
-							? Take<ArgsOf<DB, TM, X>, M>
+							? M extends 0
+								? []
+								: Take<ArgsOf<DB, TM, X>, M>
 							: [
 									params: NamedParams<
 										Names,
