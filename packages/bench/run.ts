@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Measures the immutable case1 application with tsrs and tsc against source, built,
-// warm-cache and stale-cache variants. Writes results.json and enforces thresholds.json.
+// warm-cache and stale-cache variants, plus an uncached parallel-source variant.
+// Writes results.json and enforces thresholds.json.
 // --calibrate sets 30% instantiation headroom and 2x check time (minimum 1.5 seconds).
 // --compiler tsrs or --compiler tsc measures only that compiler.
 import { spawnSync } from "node:child_process";
@@ -16,12 +17,12 @@ import { cpus } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import type * as Job from "../core/src/cache/job.ts";
-import { fixture, loadWorkload, source } from "./workload.ts";
+import { fixture, loadWorkload, shardWorkload, source } from "./workload.ts";
 
 interface Variant {
 	name: string;
 	files: string[];
-	config?: typeof dist | typeof cached;
+	config?: Record<string, unknown>;
 	/** Generate a type cache for the variant from these files (`files[1]` is the cache file). */
 	cache?: { from: string[] };
 }
@@ -36,6 +37,7 @@ interface TscError {
 interface Result {
 	name: string;
 	file: string;
+	files: string[];
 	instantiations: number | null;
 	types: number | null;
 	checkTimeSec: number | null;
@@ -85,8 +87,25 @@ const cached = {
 	compilerOptions: { paths: {} },
 	contentMappers: [{ package: "@typesql/core", extensions: [".typesqlcache"] }],
 };
+// The fixture stays intact. Each generated module contains the same shared setup and one
+// third of its SQL calls; together they check every call exactly once without a type cache.
+const shardFiles = shardWorkload(3).map((text, index) => {
+	const file = `cache/case1-shard-${index}.ts`;
+	mkdirSync(join(here, "cache"), { recursive: true });
+	writeFileSync(join(here, file), text);
+	return file;
+});
 const variants: Variant[] = [
 	{ name: "case1", files: [fixture] },
+	{
+		name: "case1p",
+		config: {
+			extends: "./tsconfig.json",
+			// Shared inputs are intentionally present in every generated module.
+			compilerOptions: { noUnusedLocals: false },
+		},
+		files: shardFiles,
+	},
 	{ name: "case1d", config: dist, files: [fixture] },
 	{
 		name: "case1c",
@@ -209,11 +228,14 @@ function measure(variant: Variant, compiler: Compiler): Result {
 		);
 		const file = variant.files[0]!;
 		const inFile = errors.filter((e) =>
-			e.file.replaceAll("\\", "/").endsWith(file),
+			variant.files.some((entry) =>
+				e.file.replaceAll("\\", "/").endsWith(entry),
+			),
 		);
 		const result: Result = {
 			name,
 			file,
+			files: variant.files,
 			instantiations: num("Instantiations"),
 			types: num("Types"),
 			checkTimeSec: num("Check time"),
@@ -375,6 +397,12 @@ const rows = results.map((r, idx) => {
 		const tag = compilers.length > 1 ? ` (${c})` : "";
 		if (rc.exitCode !== 0)
 			problems.push(`compiler${tag} exited with ${rc.exitCode}`);
+		if (
+			r.name === "case1p" &&
+			c === "tsrs" &&
+			(rc.checkTimeSec == null || rc.checkTimeSec >= 0.5)
+		)
+			problems.push(`uncached parallel check time${tag} must be < 0.5s`);
 		if (t) {
 			if (rc.instantiations == null || rc.instantiations > t.instantiations)
 				problems.push(`instantiations${tag} > ${t.instantiations}`);
@@ -392,7 +420,7 @@ const rows = results.map((r, idx) => {
 	if (compilers.length === 1) {
 		return {
 			variant: r.name,
-			file: r.file,
+			file: r.name === "case1p" ? "3 generated modules" : r.file,
 			instantiations: r.instantiations ?? "?",
 			types: r.types ?? "?",
 			"check s": r.checkTimeSec ?? "?",
@@ -401,14 +429,18 @@ const rows = results.map((r, idx) => {
 			errors: r.otherErrorCount
 				? `${r.errorCount}+${r.otherErrorCount}`
 				: r.errorCount,
-			status: problems.length ? "FAIL" : t ? "ok" : "no threshold",
+			status: problems.length
+				? "FAIL"
+				: t || (r.name === "case1p" && compilers.includes("tsrs"))
+					? "ok"
+					: "no threshold",
 		};
 	}
 	const tsrsRes = byCompiler.tsrs[idx]!;
 	const tscRes = byCompiler.tsc[idx]!;
 	return {
 		variant: r.name,
-		file: r.file,
+		file: r.name === "case1p" ? "3 generated modules" : r.file,
 		instantiations: tsrsRes.instantiations ?? "?",
 		types: tsrsRes.types ?? "?",
 		"tsrs check s": tsrsRes.checkTimeSec ?? "?",
@@ -420,7 +452,11 @@ const rows = results.map((r, idx) => {
 		errors: tsrsRes.otherErrorCount
 			? `${tsrsRes.errorCount}+${tsrsRes.otherErrorCount}`
 			: tsrsRes.errorCount,
-		status: problems.length ? "FAIL" : t ? "ok" : "no threshold",
+		status: problems.length
+			? "FAIL"
+			: t || r.name === "case1p"
+				? "ok"
+				: "no threshold",
 	};
 });
 

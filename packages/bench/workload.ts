@@ -25,6 +25,53 @@ import { API } from "tsrs/unstable/sync";
 export const fixture = "src/case1.ts";
 export const source = readFileSync(new URL(fixture, import.meta.url), "utf8");
 
+/** Keep every SQL call while placing independent calls in separate checker units. */
+export function shardWorkload(count: number): string[] {
+	const api = new API();
+	const lease = api.createSourceFile(
+		new URL(fixture, import.meta.url).pathname,
+		source,
+	);
+	try {
+		const calls: { start: number; end: number }[] = [];
+		for (const statement of lease.sourceFile.statements) {
+			if (!isVariableStatement(statement)) continue;
+			if (
+				!statement.modifiers?.some((m) => m.kind === SyntaxKind.ExportKeyword)
+			)
+				continue;
+			for (const declaration of statement.declarationList.declarations) {
+				const call = declaration.initializer;
+				if (!call || !isCallExpression(call)) continue;
+				const callee = call.expression;
+				if (
+					(isIdentifier(callee) && callee.text === "sql") ||
+					(isPropertyAccessExpression(callee) && callee.getText() === "sql.as")
+				) {
+					calls.push({ start: statement.getStart(), end: statement.end });
+				}
+			}
+		}
+		if (calls.length !== 379)
+			throw new Error(`case1 SQL call count changed: ${calls.length}`);
+		return Array.from({ length: count }, (_, shard) => {
+			let text = source;
+			for (let i = calls.length - 1; i >= 0; i--) {
+				if (i % count === shard) continue;
+				const { start, end } = calls[i]!;
+				text =
+					text.slice(0, start) +
+					text.slice(start, end).replace(/[^\n]/g, " ") +
+					text.slice(end);
+			}
+			return text;
+		});
+	} finally {
+		lease.dispose();
+		api.close();
+	}
+}
+
 /** Deterministic, populated inputs; SQL text and fragment expressions always come from case1. */
 function sample(type: TypeNode): string {
 	if (isUnionTypeNode(type)) {
