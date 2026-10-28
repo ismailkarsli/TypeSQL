@@ -55,4 +55,4 @@ pnpm pg-regress:setup     # check out PostgreSQL's regression tests (a submodule
 pnpm test:pg-regress      # check every statement, about a minute
 ```
 
-How statements are split, and how Postgres's outcome is read from the expected output, is described in [Development](https://github.com/ismailkarsli/TypeSQL/blob/main/packages/docs/internals/development.md#postgresql-regression-tests).
+The [regression test runner](https://github.com/ismailkarsli/TypeSQL/blob/main/packages/core/test/pg-regress/run.ts) splits the statements and reads Postgres's outcome from the expected output.

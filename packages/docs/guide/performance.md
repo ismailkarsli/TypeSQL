@@ -55,6 +55,12 @@ pnpm bench                          # compile time (tsrs and tsc)
 node packages/bench/runtime.ts       # runtime, same fixture
 ```
 
+To refresh the published numbers, run the **benchmark** workflow on `main` in GitHub Actions,
+or use `gh workflow run benchmark.yml --ref main`. It checks the existing thresholds, commits
+updated README, docs and current-version history numbers, then deploys the docs. Raw results
+are available in the `bench-results` artifact. If `main` moves during the run, start it again.
+Runner CPUs can differ between runs, so release timings are not a controlled comparison.
+
 ## Type cache
 
 The type cache is an optional file in your project that holds results the checker would otherwise compute again. It needs TypeScript 7.1, whose content mappers let `@typesql/core` serve the file to the checker: no CLI, no editor extension, no code in your app.

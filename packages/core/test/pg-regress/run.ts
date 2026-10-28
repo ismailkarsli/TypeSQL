@@ -8,7 +8,6 @@
 //   node run.ts [--update] [test …]
 //
 // `--update` rewrites baseline.json (only the named tests' entries when tests are named).
-// See packages/docs/internals/development.md.
 import { spawnSync } from "node:child_process";
 import {
 	existsSync,

@@ -1,0 +1,62 @@
+name: benchmark
+
+# Refresh the published measurements without making a release.
+on:
+  workflow_dispatch:
+
+# Serialize with releases, which also update these files on main.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write # signed commit of the generated performance numbers
+    outputs:
+      sha: ${{ steps.update.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6 # version from packageManager in package.json
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @typesql/core build
+      - run: node packages/bench/run.ts
+      - run: node packages/bench/runtime.ts
+      - name: Update performance numbers
+        id: update
+        run: |
+          node scripts/performance-history.ts --refresh
+          git add README.md packages/bench/history.json packages/docs/.vitepress/benchmarks.json
+          if git diff --cached --quiet; then
+            sha=$(git rev-parse HEAD)
+          else
+            sha=$(node scripts/github-commit.ts main "chore: update performance numbers")
+          fi
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: bench-results
+          path: |
+            packages/bench/results.json
+            packages/bench/runtime-results.json
+
+  # Commits made with GITHUB_TOKEN do not trigger the docs push workflow.
+  docs:
+    needs: benchmark
+    uses: ./.github/workflows/docs.yml
+    with:
+      ref: ${{ needs.benchmark.outputs.sha }}
+    secrets: inherit

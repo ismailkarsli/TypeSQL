@@ -1,4 +1,5 @@
-// Save the release CI measurements for VitePress and render GitHub's README from the same data.
+// Save CI measurements for VitePress and render GitHub's README from the same data.
+// --refresh replaces the current version's history entry when rerunning benchmarks on demand.
 import { readFileSync, writeFileSync } from "node:fs";
 
 const historyPath = "packages/bench/history.json";
@@ -47,13 +48,15 @@ const timings = results.tsrs.find((r: { name: string }) => r.name === "case1d");
 const cachedTimings = results.tsrs.find(
 	(r: { name: string }) => r.name === "case1c",
 );
-history[version] ??= {
+const entry: HistoryEntry = {
 	case1: {
 		statements: workload.statements,
 		checkTimeSec: timings.checkTimeSec,
 		cachedCheckTimeSec: cachedTimings.checkTimeSec,
 	},
 };
+if (process.argv.includes("--refresh")) history[version] = entry;
+else history[version] ??= entry;
 
 const runtime = JSON.parse(
 	readFileSync("packages/bench/runtime-results.json", "utf8"),

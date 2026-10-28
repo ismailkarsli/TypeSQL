@@ -28,14 +28,12 @@ After changing `packages/core/src` (except `src/cache/` and `src/runtime/`), run
 gold source: never modify, reformat, add or delete files in it, and never edit them to make a
 test pass. Record disagreements in `packages/core/test/pg-regress/baseline.json` with
 `pnpm test:pg-regress --update`, and only when one went away or after moving to a new
-PostgreSQL release; a new disagreement is a parser regression to fix. See
-[packages/docs/internals/development.md](packages/docs/internals/development.md).
+PostgreSQL release; a new disagreement is a parser regression to fix.
 
 ## Definition of done
 
-A change to the engine or a new feature is done when the checks in
-[packages/docs/internals/development.md](packages/docs/internals/development.md#definition-of-done)
-pass: exact type tests (with a negative case for every nullability rule), no new disagreement in
+A change to the engine or a new feature is done when these checks pass:
+exact type tests (with a negative case for every nullability rule), no new disagreement in
 the type oracles (`pnpm test:oracle`, with `--regress --views` for engine changes) or the fuzzer
 (`pnpm fuzz`), coverage thresholds, and the change intent and `CacheVersion`.
 Record unrelated engine findings in the reviewed baseline and fix them in separate commits.
