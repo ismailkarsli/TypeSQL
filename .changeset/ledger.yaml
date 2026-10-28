@@ -179,6 +179,10 @@
   intents:
     - big-boats-obey
     - wet-monkeys-juggle
+"@typesql/core@0.7.5":
+  dir: packages/core
+  intents:
+    - clean-geckos-press
 "@typesql/drizzle@0.0.2":
   dir: packages/drizzle
   intents:
