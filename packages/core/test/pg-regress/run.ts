@@ -281,39 +281,53 @@ const { added, fixed } = compareBaseline(
 	scoped(baseline?.entries ?? {}, (t) => tests.includes(t)),
 );
 
+const skipped =
+	tally.psqlVariables + tally.nonstandardStrings + tally.pgUnknown;
+const errors = tally.rejects + tally.accepts + tally.position + tally.crash;
+const disagreements = [
+	["parser rejects", tally.rejects],
+	["parser accepts", tally.accepts],
+	["syntax error elsewhere", tally.position],
+	["compiler crash", tally.crash],
+]
+	.filter(([, n]) => n)
+	.map(([kind, n]) => `${kind} ${n}`);
+
 const summary = [
 	`PostgreSQL ${version} regression tests (${commit.slice(0, 10)}), ${tests.length} files, tsc ${seconds.toFixed(1)} s`,
 	"",
-	`| Statements | Agree | Parser rejects | Parser accepts | Syntax error elsewhere | Compiler crash | Postgres outcome unknown | Not checked: psql variables | Not checked: standard_conforming_strings off |`,
-	`|---|---|---|---|---|---|---|---|---|`,
-	`| ${tally.statements} | ${tally.agree} | ${tally.rejects} | ${tally.accepts} | ${tally.position} | ${tally.crash} | ${tally.pgUnknown} | ${tally.psqlVariables} | ${tally.nonstandardStrings} |`,
+	`| Statements | Agree | Error | Skipped |`,
+	`|---|---|---|---|`,
+	`| ${tally.statements} | ${tally.agree} | ${errors} | ${skipped} |`,
+	...(disagreements.length ? ["", disagreements.join(" · ")] : []),
 	"",
 	`${tally.skipped} statements are utility statements the parser skips to the next \`;\` without validating them (counted as agreeing unless Postgres reports a syntax error).`,
 ].join("\n");
 console.log(summary);
 const title = "PostgreSQL regression tests";
-const nonzero = (pairs: [string, number][]): string[] =>
-	pairs.filter(([, n]) => n).map(([k, n]) => `${k} ${n}`);
-const notChecked = tally.psqlVariables + tally.nonstandardStrings;
 const line = [
 	`PostgreSQL ${version}, ${tests.length} files: ${tally.statements} statements`,
 	`agree ${tally.agree}`,
-	...nonzero([
-		["parser rejects", tally.rejects],
-		["parser accepts", tally.accepts],
-		["syntax error elsewhere", tally.position],
-		["compiler crash", tally.crash],
-		["Postgres outcome unknown", tally.pgUnknown],
-	]),
-	...(notChecked
-		? [
-				`not checked ${notChecked} (${nonzero([
-					["psql variables", tally.psqlVariables],
-					["standard_conforming_strings off", tally.nonstandardStrings],
-				]).join(", ")})`,
-			]
-		: []),
+	`error ${errors}`,
+	`skipped ${skipped}`,
 ].join(" · ");
+
+const show = (list: readonly Located[]): void =>
+	console.error(
+		showEntries(
+			list,
+			(m) =>
+				`  ${m.group}.sql:${m.line}  [${m.kind}]  ${m.sql}\n      postgres: ${m.pg}\n      parser:   ${m.parser}`,
+		),
+	);
+if (errors) {
+	jobSummary(title, line, [
+		`${errors} error(s), including baselined disagreements: ${disagreements.join(", ")}`,
+	]);
+	console.error(`\n${errors} error(s) comparing the parser with Postgres:`);
+	show(compareBaseline(current, {}).added);
+	process.exit(1);
+}
 
 if (update) {
 	const mismatches = only.length
@@ -352,14 +366,6 @@ if (baseline.pins.commit !== commit) {
 	);
 	failed = true;
 }
-const show = (list: readonly Located[]): void =>
-	console.error(
-		showEntries(
-			list,
-			(m) =>
-				`  ${m.group}.sql:${m.line}  [${m.kind}]  ${m.sql}\n      postgres: ${m.pg}\n      parser:   ${m.parser}`,
-		),
-	);
 if (added.length) {
 	failed = true;
 	console.error(`\n${added.length} new disagreement(s) with Postgres:`);

@@ -15,6 +15,9 @@ export interface Statement {
 	readonly line: number | null;
 	readonly sql: string;
 	readonly pg: string;
+	/** Official server outcome, read from the regression test's expected output. */
+	readonly outcome?: string;
+	readonly pgError?: string;
 }
 
 export type Tally = { [outcome: string]: number };
@@ -24,6 +27,8 @@ interface PsqlStatement {
 	readonly line: number;
 	readonly psqlVars: boolean;
 	readonly nonstandardStrings: boolean;
+	readonly pg?: string;
+	readonly pgError?: string;
 }
 type Classify = (sqlText: string, outText: string) => PsqlStatement[];
 
@@ -85,7 +90,7 @@ export async function regressionStatements(
 		for (const s of stmts) {
 			if (s.psqlVars) count("skip: psql-variable");
 			else if (s.nonstandardStrings) count("skip: nonstandard-strings");
-			else add(out, test, s.line, s.sql, count);
+			else add(out, test, s.line, s.sql, count, s);
 		}
 	}
 	return out;
@@ -97,6 +102,7 @@ function add(
 	line: number | null,
 	sql: string,
 	count: (k: string) => void,
+	expected?: PsqlStatement,
 ): void {
 	const pg = pgStatements(sql);
 	if (!pg) {
@@ -108,7 +114,16 @@ function add(
 		return;
 	}
 	for (const [text, canon] of pg)
-		out.push({ group, line, sql: text, pg: canon });
+		out.push({
+			group,
+			line,
+			sql: text,
+			pg: canon,
+			// A split query's combined outcome cannot establish which part failed.
+			...(pg.length === 1 && expected
+				? { outcome: expected.pg, pgError: expected.pgError }
+				: {}),
+		});
 }
 
 export async function typeTestStatements(

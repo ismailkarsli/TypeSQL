@@ -201,9 +201,9 @@ A disagreement is one of:
 
 `baseline.json` lists every current disagreement by file, kind and a hash of the statement text
 (there are none today: see [Postgres compatibility](../guide/postgres-compatibility.md)),
-with its line, a preview, Postgres's error and ours for reading. The run fails when a
-disagreement is not listed (a regression: fix the parser) and when a listed one no longer occurs
-(an improvement: run `--update` so the list only shrinks). It also fails when the baseline was
+with its line, a preview, Postgres's error and ours for reading. Every disagreement and compiler
+crash fails, including baselined entries and runs with `--update`. A resolved baseline entry
+also fails (run `--update` so the list only shrinks). It also fails when the baseline was
 written for a different commit of `vendor/postgres`. Generated JSON (every baseline,
 `coverage-thresholds.json`, the bench's `thresholds.json`, the fuzzer's `corpus/candidates.json`,
 the reports) is written on one line: read it with `jq`, and review an `--update` by what the run
@@ -244,19 +244,31 @@ pnpm test:pg-ast --update              # rewrite baseline.json (only the named o
   aliases), set operations with their ORDER BY / LIMIT, target lists, GROUP BY, windows, WITH,
   INSERT/UPDATE/DELETE/MERGE, cursors, and the DDL our AST keeps (CREATE TABLE columns and
   constraints, ALTER TABLE actions, DROP, views, enums, schemas, CREATE FUNCTION's result type).
-  Everything else prints `…` on both sides and is counted as out of scope. `canon.ts` describes
+  Everything else prints `…` on both sides and is included in the skipped total. `canon.ts` describes
   the form.
 - What our AST deliberately drops or rewrites (sort directions, window frames, the ON CONFLICT
   target, SYMMETRIC, `x AT TIME ZONE z` as `timezone(z, x)`, …) is dropped or rewritten the same
   way on Postgres's side, each with a comment naming our parser rule.
 
 A disagreement is `parse` (the forms differ) or `crash` (the compiler gave up on our form).
-Statements our parser rejects are skipped (`pnpm test:pg-regress` covers acceptance), like those
-with psql variables. `baseline.json` works like pg-regress's: keyed by regression test or type
-test file, kind and statement hash, with both forms around the first difference; the run fails
-on a new disagreement and on a listed one that went away, and when it was written for another
-`vendor/postgres` commit. `TYPESQL_PG_AST_DEBUG=<file>` appends every disagreement with both
-forms in full.
+
+TypeSQL rejections require evidence: official regression output must confirm a server rejection;
+type-test rejections need reviewed fixtures in `packages/core/test/pg-ast/rejections.json` with
+SQL, the exact TypeSQL error, minimal schema, and PostgreSQL SQLSTATE and message. The audit
+runs fixtures in rolled-back transactions on an isolated Docker server whose pinned version
+matches `vendor/postgres`.
+
+Missing evidence, changed diagnostics, server acceptance, unexpected server errors and stale
+fixtures fail even with `--update`, which never generates rejection evidence. Verify the setup
+and server error before changing a fixture. The summary reports total, agreed and skipped
+counts. Agreed includes verified rejections. Statements outside the AST comparison's scope,
+unresolved psql variables, nonstandard strings, PostgreSQL raw-parser rejections and dynamic
+template slots count as skipped. Nonzero tree differences and compiler crashes remain visible.
+
+Every tree difference and compiler crash fails the run, including baselined entries and runs
+with `--update`. Baselines track resolved entries and PostgreSQL versions; they do not exempt
+current errors. The GitHub summary is marked as failed whenever an error is found.
+Set `TYPESQL_PG_AST_DEBUG=<file>` to log both forms in full.
 
 ## Type oracles
 

@@ -23,6 +23,7 @@
 			"!packages/core/test/fuzz/baseline.json",
 			"!packages/core/test/fuzz/corpus/candidates.json",
 			"!packages/core/test/pg-ast/baseline.json",
+			"!packages/core/test/pg-ast/rejections.json",
 			"!packages/core/test/pg-regress/baseline.json",
 			"!coverage-thresholds.json",
 			"!pnpm-lock.yaml",

@@ -18,6 +18,7 @@ import {
 import { baselineProblems, counts, jobSummary } from "../oracle/job-summary.js";
 import { evaluateCanon, probeSession } from "./ours.js";
 import { OUT } from "./pg-canon.js";
+import { RejectionAudit } from "./rejections.js";
 import {
 	diffWindow,
 	regressionStatements,
@@ -65,17 +66,22 @@ test("parse trees against PostgreSQL's parser", async () => {
 	mkdirSync(join(here, ".probe"), { recursive: true });
 	const sessions: ProbeSession[] = [probeSession("0")];
 	const entries: Entries = {};
+	const audit = new RejectionAudit(version);
+	const rejectionFailures: string[] = [];
 	const groups = new Set<string>(tests);
+	let total = 0;
 	let evalSeconds = 0;
 	try {
 		const statements: Statement[] = [
 			...(await regressionStatements(tests, tally)),
 			...(await typeTestStatements(sessions[0]!, only, tally)),
 		];
+		total =
+			statements.length + Object.values(tally).reduce((sum, n) => sum + n, 0);
 		for (const s of statements) groups.add(s.group);
 		const inScope = statements.filter((s) => s.pg !== OUT);
-		count("out of scope", statements.length - inScope.length);
-		log(`pg-ast: ${statements.length} statements, ${inScope.length} in scope`);
+		count("skip: out-of-scope", statements.length - inScope.length);
+		log(`pg-ast: ${inScope.length} statements to compare`);
 
 		const texts = [...new Set(inScope.map((s) => s.sql))];
 		const t0 = performance.now();
@@ -103,7 +109,13 @@ test("parse trees against PostgreSQL's parser", async () => {
 				const text = stringLiteral(r.text) ?? r.text;
 				// our parser's error (a template literal type when the message has a token in it)
 				if (/^`?!/.test(text)) {
-					count("skip: ours-rejects");
+					const rejection = text.replace(/^`?!/, "");
+					const problem = await audit.verify(s, rejection);
+					if (problem)
+						rejectionFailures.push(
+							`${s.group}${s.line === null ? "" : `.sql:${s.line}`}: ${s.sql}\n      TypeSQL: ${rejection}\n      ${problem}`,
+						);
+					else count("agree");
 					if (debug)
 						appendFileSync(
 							debug,
@@ -130,8 +142,9 @@ test("parse trees against PostgreSQL's parser", async () => {
 				sql: preview(s.sql),
 			});
 		}
+		rejectionFailures.push(...audit.stale(only));
 	} finally {
-		await Promise.all(sessions.map((s) => s.dispose()));
+		await Promise.all([audit.close(), ...sessions.map((s) => s.dispose())]);
 	}
 
 	const baseline = readBaseline(baselinePath, "disagreements");
@@ -140,22 +153,48 @@ test("parse trees against PostgreSQL's parser", async () => {
 		entries,
 		scoped(baseline?.entries ?? {}, keep),
 	);
-	const order = ["agree", "parse", "crash", "out of scope"];
-	const summary = `Parse trees against PostgreSQL ${version} (${commit.slice(0, 10)}): ${Object.entries(
-		tally,
-	)
-		.sort(
-			([a], [b]) =>
-				(order.indexOf(a) + 1 || 99) - (order.indexOf(b) + 1 || 99) ||
-				a.localeCompare(b),
-		)
-		.map(([k, n]) => `${k}: ${n}`)
-		.join(
-			", ",
-		)}; evaluated in ${evalSeconds.toFixed(0)} s, ${((performance.now() - started) / 1000).toFixed(0)} s in all`;
+	const results = {
+		total,
+		agreed: tally.agree ?? 0,
+		skipped: Object.entries(tally)
+			.filter(([k]) => k.startsWith("skip: "))
+			.reduce((sum, [, n]) => sum + n, 0),
+		...(tally.parse ? { parse: tally.parse } : {}),
+		...(tally.crash ? { crash: tally.crash } : {}),
+	};
+	const order = ["total", "agreed", "parse", "skipped", "crash"];
+	const summary = `Parse trees against PostgreSQL ${version} (${commit.slice(0, 10)}): ${counts(results, order)}; evaluated in ${evalSeconds.toFixed(0)} s, ${((performance.now() - started) / 1000).toFixed(0)} s in all`;
 	log(summary);
 	const title = "Parse trees (pg-ast)";
-	const line = `PostgreSQL ${version}: ${counts(tally, order)}`;
+	const line = `PostgreSQL ${version}: ${counts(results, order)}`;
+	const show = (list: Parameters<typeof showEntries>[0]) =>
+		showEntries(
+			list,
+			(e) =>
+				`  ${e.group}${e["line"] === undefined ? "" : `.sql:${String(e["line"])}`}  [${e.kind}]  ${String(e["sql"])}\n${e.kind === "crash" ? `      ${String(e["detail"])}` : `      ours: ${String(e["ours"])}\n      pg:   ${String(e["pg"])}`}`,
+		);
+	const errors = compareBaseline(entries, {}).added;
+	const explicitProblems = [
+		...rejectionFailures,
+		...(errors.length
+			? [`${errors.length} parser error(s), including baselined disagreements`]
+			: []),
+	];
+	if (explicitProblems.length) {
+		jobSummary(title, line, explicitProblems);
+		throw new Error(
+			[
+				...(rejectionFailures.length
+					? [
+							`Unverified TypeSQL rejection(s):\n${rejectionFailures.join("\n\n")}`,
+						]
+					: []),
+				...(errors.length
+					? [`${errors.length} parser error(s):\n${show(errors)}`]
+					: []),
+			].join("\n\n"),
+		);
+	}
 
 	if (update) {
 		const merged: Entries = only.length
@@ -195,12 +234,6 @@ test("parse trees against PostgreSQL's parser", async () => {
 				`baseline.json is for PostgreSQL ${String(baseline.pins["postgres"])} (${String(baseline.pins["commit"]).slice(0, 10)}), vendor/postgres is ${version} (${commit.slice(0, 10)}). Run \`pnpm test:pg-ast --update\` and review the diff.`,
 			);
 		}
-		const show = (list: Parameters<typeof showEntries>[0]) =>
-			showEntries(
-				list,
-				(e) =>
-					`  ${e.group}${e["line"] === undefined ? "" : `.sql:${String(e["line"])}`}  [${e.kind}]  ${String(e["sql"])}\n${e.kind === "crash" ? `      ${String(e["detail"])}` : `      ours: ${String(e["ours"])}\n      pg:   ${String(e["pg"])}`}`,
-			);
 		if (added.length)
 			failures.push(
 				`${added.length} new disagreement(s) with PostgreSQL's parser:\n${show(added)}`,
