@@ -37,8 +37,7 @@ A change to the engine or a new feature is done when the checks in
 [packages/docs/internals/development.md](packages/docs/internals/development.md#definition-of-done)
 pass: exact type tests (with a negative case for every nullability rule), no new disagreement in
 the type oracles (`pnpm test:oracle`, with `--regress --views` for engine changes) or the fuzzer
-(`pnpm fuzz`), changed-lines mutation testing (`pnpm mutate:types --changed`,
-`pnpm mutate:runtime --changed`), coverage thresholds, and the change intent and `CacheVersion`.
+(`pnpm fuzz`), coverage thresholds, and the change intent and `CacheVersion`.
 Record unrelated engine findings in the reviewed baseline and fix them in separate commits.
 Do not create GitHub issues or post issue comments automatically. Create issues or comments
 only when the user explicitly requests them.

@@ -144,7 +144,7 @@ type HiddenNames<
 	M extends MergeWhen["match"],
 	Item extends ScopeItem,
 	L extends ScopeLevel,
-> = M extends "matched" // type-mutate: equivalent cond-false – a matched clause sees both names, so no error names a hidden one
+> = M extends "matched"
 	? never
 	: M extends "source"
 		? L[number]["alias"]
@@ -200,7 +200,7 @@ type CheckWhens<
 						W["cond"] extends null ? Done | W["match"] : Done
 					>
 			: never
-	: true; // type-mutate: equivalent bool-flip – ProjectMerge only looks for an error
+	: true;
 
 type CheckWhen<
 	W extends MergeWhen,
@@ -223,7 +223,7 @@ type CheckWhen<
 							readonly values: infer Vals extends readonly Expr[] | null;
 						}
 					? CheckMergeInsert<Cols, Ind, Vals, Tbl, Name, C>
-					: true // type-mutate: equivalent bool-flip – CheckWhens only looks for an error
+					: true
 		: never;
 
 /** `INSERT [(cols)] VALUES (…)` / `INSERT DEFAULT VALUES` (`Vals` null): the checks of INSERT. */
@@ -305,16 +305,16 @@ export type ParamsOfMerge<S extends MergeStmt, DB, Ctes extends CteMap, M> =
 									DmlCtx<DB, [Item, ...L], [], Ctes>,
 									ParamsOfFromItems<
 										[S["source"]],
-										MkCtx<DB, [], Ctes, false>, // type-mutate: equivalent bool-flip – no aggregate can be directly in a FROM item
+										MkCtx<DB, [], Ctes, false>,
 										M
 									>,
 									Info<"bool">
 								>
 							>
 						>
-					: M // type-mutate: equivalent never-false – only reached for statements ProjectMerge accepted, whose source binds
+					: M
 				: never
-			: M // type-mutate: equivalent never-false – only reached for statements ProjectMerge accepted, whose target resolves
+			: M
 		: never;
 
 type ParamsOfWhens<

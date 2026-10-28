@@ -544,7 +544,6 @@ export class Session {
 			analyses.forEach((a, i) => {
 				const r = results[i]!;
 				if (!("text" in r)) return;
-				// Stryker disable next-line Regex: an analysis is an SqlError or an object type, which never holds one
 				const isErr = /^__T\.SqlError</.test(r.text);
 				// function-name typos hint from the whole catalog, which no dependency covers
 				if (isErr && /function .* does not exist/.test(r.text)) return;

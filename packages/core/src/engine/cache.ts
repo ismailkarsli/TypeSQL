@@ -54,18 +54,18 @@ export interface DdlCacheKeys {}
  * Version of the engine's output. An entry computed by another version is never used. It is a
  * hash of the type-level sources, kept up to date by `node scripts/cache-version.ts`.
  */
-export type CacheVersion = "d87110ee3cda";
+export type CacheVersion = "10385882b6c3";
 
 /** A relation, function or catalog entry that did not exist when the entry was computed. */
 export interface Missing {
-	readonly "typesql.missing": true; // type-mutate: equivalent bool-flip – a brand: the key tells it apart, not the value
+	readonly "typesql.missing": true;
 }
 /**
  * `FunctionCatalog[name]` is one of TypeSQL's built-in entries (which an augmentation cannot
  * change, and which `CacheVersion` covers).
  */
 export interface Builtin {
-	readonly "typesql.builtin": true; // type-mutate: equivalent bool-flip – a brand: the key tells it apart, not the value
+	readonly "typesql.builtin": true;
 }
 
 /**
@@ -145,9 +145,9 @@ type Mutual<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
  */
 type Expand<T> = T extends (...args: never) => unknown
 	? T
-	: T extends { readonly k: "ts"; readonly v: unknown } // type-mutate: equivalent cond-false – stops at a TS type, which may be recursive; an expanded copy compares the same
+	: T extends { readonly k: "ts"; readonly v: unknown }
 		? T
-		: T extends object // type-mutate: equivalent cond-true – a mapped type over a primitive is the primitive
+		: T extends object
 			? { [K in keyof T]: Expand<T[K]> }
 			: T;
 
@@ -158,7 +158,7 @@ type WordFresh<DB, W extends string, S extends readonly unknown[]> =
 			? false
 			: Same<SchemaFn<DB, W>, S[2]> extends false
 				? false
-				: S[3] extends Builtin // type-mutate: equivalent never-true – read with extends true, never counts as true
+				: S[3] extends Builtin
 					? true
 					: Same<
 							W extends keyof FunctionCatalog ? FunctionCatalog[W] : Missing,
@@ -190,7 +190,7 @@ type PairOf<DB, P extends string> = P extends `${infer A}.${infer B}`
  * `relation.column`. A misspelled-name error depends on these, not only on what it mentions.
  */
 export type HintIndex<DB> = {
-	[K in keyof DB & string]: K extends "$types" | "$functions" // type-mutate: equivalent cond-false union-drop – a shortcut: neither holds relations
+	[K in keyof DB & string]: K extends "$types" | "$functions"
 		? never
 		: IsRelation<DB[K]> extends true
 			? K | `${K}.${RelCols<DB[K]>}`
@@ -260,7 +260,7 @@ type ReadyCalls<DB, TM, Keys, Snaps> = {
 /** The entry of `Q` in group `G` when its dependencies are unchanged in `DB`. */
 type FreshIn<DB, G, E, Snaps> =
 	GroupStale<DB, G, Snaps> extends infer S
-		? [S] extends [never] // type-mutate: equivalent cond-false – a shortcut: nothing stale intersects no dependency
+		? [S] extends [never]
 			? E
 			: E extends { readonly r: infer R }
 				? [Extract<S, R>] extends [never]
@@ -293,7 +293,7 @@ export type FreshVariants<
  * One member of a union (the last, in TypeScript's order); itself for a non-union. Several fresh
  * entries for one key (from several cache files) are equivalent; this keeps one.
  */
-export type OneOf<U> = IsUnion<U> extends false ? U : LastOf<U>; // type-mutate: equivalent cond-false – a shortcut: LastOf of one type is that type, of never never
+export type OneOf<U> = IsUnion<U> extends false ? U : LastOf<U>;
 type LastOf<U> =
 	UnionToIntersection<U extends unknown ? (x: U) => void : never> extends (
 		x: infer L,
@@ -378,10 +378,10 @@ export type CacheAnalysis<DB, Q extends string> =
 export type Plain<T> = T extends { readonly k: "ts"; readonly v: infer V }
 	? { readonly k: "ts"; readonly v: V }
 	: T extends string
-		? T extends AnyShaped // type-mutate: equivalent cond-false – the same type without the alias: only printing tells them apart
+		? T extends AnyShaped
 			? BaseOf<T> & { readonly shape: Plain<T["shape"]> }
 			: T
-		: T extends object // type-mutate: equivalent cond-true – a mapped type over a primitive is the primitive
+		: T extends object
 			? { [K in keyof T]: Plain<T[K]> }
 			: T;
 

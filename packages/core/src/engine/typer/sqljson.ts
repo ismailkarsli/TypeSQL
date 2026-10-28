@@ -166,14 +166,14 @@ type CheckKeys<
 	? As[I]["type"] extends "json" | "jsonb" | "record" | `${string}[]`
 		? SqlError<"key value must be scalar, not array, composite, or json", null>
 		: CheckKeys<As, Nx<Nx<I>>>
-	: true; // type-mutate: equivalent bool-flip – no error: the caller reads only an error
+	: true;
 /** Is a value (odd position) nullable? */
 type NullableValue<
 	As extends readonly ColInfo[],
 	I extends number,
 > = As[I] extends ColInfo
 	? As[I]["nullable"] extends true
-		? true // type-mutate: equivalent never-true – read with `extends true`, where never counts as true
+		? true
 		: NullableValue<As, Nx<Nx<I>>>
 	: false;
 
@@ -204,7 +204,7 @@ type TypeObject<
 		: never;
 
 type AnyNull<As extends readonly ColInfo[]> =
-	As[number]["nullable"] extends false ? false : true; // type-mutate: equivalent never-false – read with `extends true`, where never counts as true
+	As[number]["nullable"] extends false ? false : true;
 type TypeArray<
 	R extends string,
 	As extends readonly ColInfo[],
@@ -241,9 +241,9 @@ export type ParamsOfSqlJson<E extends Expr, C extends Ctx, M> = E extends {
 				Info<"bool", true>
 			>
 		: ParamsOfList<
-				[...E["args"], ...E["passing"], ...E["defaults"]], // type-mutate: equivalent tuple-swap – parameters collect into a union: order does not matter
+				[...E["args"], ...E["passing"], ...E["defaults"]],
 				C,
-				E["q"] extends SelectStmt // type-mutate: equivalent cond-true – ParamsOfSelect finds no parameters in no query
+				E["q"] extends SelectStmt
 					? ParamsOfSelect<E["q"], C["db"], C["scope"], C["ctes"], M>
 					: M,
 				Info<"text", true>
@@ -271,7 +271,7 @@ export type BindJsonTable<
 			? SqlError<`duplicate JSON_TABLE column or path name: ${D}`, null>
 			: TypeList<
 						[J["ctx"], ...J["passing"], ...J["defs"]],
-						MkCtx<DB, [Sofar, ...Outer], Ctes, false>, // type-mutate: equivalent bool-flip – FROM items take no aggregates
+						MkCtx<DB, [Sofar, ...Outer], Ctes, false>,
 						[]
 					> extends infer Ts
 				? Ts extends readonly ColInfo[]
@@ -320,7 +320,7 @@ export type ParamsOfJsonTable<
 	C extends Ctx,
 	M,
 > = ParamsOfList<
-	[J["ctx"], ...J["passing"], ...J["defs"]], // type-mutate: equivalent tuple-swap – parameters collect into a union: order does not matter
+	[J["ctx"], ...J["passing"], ...J["defs"]],
 	C,
 	M,
 	Info<"text", true>

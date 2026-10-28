@@ -251,14 +251,14 @@ type CheckCteColList<
 			? SqlError<`${What} column "${H}" specified more than once`, null>
 			: CheckCteColList<R, M, What, Seen | H>
 		: SqlError<`${What} column "${H}" not in WITH query column list`, null>
-	: true; // type-mutate: equivalent bool-flip – the callers only look for an error
+	: true;
 /** The columns SEARCH and CYCLE add (`{}` without them), or an error. `M`: the CTE's columns. */
 type SearchCycleCols<S, Y, M extends ColMap> =
 	SearchCols<S, M> extends infer SC
 		? SC extends AnyErr
 			? SC
 			: CycleCols<Y, S, M> extends infer YC
-				? YC extends AnyErr // type-mutate: equivalent cond-false – merged with the search columns, the error keeps its message and position, all an error is read for
+				? YC extends AnyErr
 					? YC
 					: SC & YC extends infer All
 						? { readonly [K in keyof All]: All[K] }
@@ -370,13 +370,10 @@ type NoEquality =
 	| "xml";
 type ConstType<E extends Expr> = E extends { readonly t: "str" }
 	? "lit"
-	: TypeOf<
-				E,
-				MkCtx<unknown, [], {}, false> // type-mutate: equivalent bool-flip – a constant has no aggregate, the only thing grouped changes
-			> extends infer T
+	: TypeOf<E, MkCtx<unknown, [], {}, false>> extends infer T
 		? T extends ColInfo
 			? T["type"]
-			: "unknown" // type-mutate: equivalent never-false – TypeOf of a constant is a type
+			: "unknown"
 		: never;
 
 /** `WITH a(x, y) AS (...)`: rename positionally; more names than columns is an error. */
@@ -485,7 +482,7 @@ type RecursiveFix<
 										X
 									>
 						: never
-					: F2 // type-mutate: equivalent never-false – the names fit the non-recursive term, renamed first
+					: F2
 				: never
 			: Full
 		: never;
@@ -567,7 +564,7 @@ type ProjectBody<
 								Lit
 							>
 						: SqlError<"multiple ORDER BY clauses not allowed", null>
-				: SqlError<"unsupported query body", null>; // type-mutate: equivalent never-false – a body is one of these four
+				: SqlError<"unsupported query body", null>;
 
 // ─── set operations ───
 
@@ -671,19 +668,9 @@ type ProjectValues<
 	Ctes extends CteMap,
 	Order extends readonly Expr[],
 > =
-	OperandRow<
-		Rows[0],
-		MkCtx<DB, Outer, Ctes, false>, // type-mutate: equivalent bool-flip – aggregates are not allowed in VALUES, so no valid statement depends on it
-		[],
-		0
-	> extends infer T0
+	OperandRow<Rows[0], MkCtx<DB, Outer, Ctes, false>, [], 0> extends infer T0
 		? T0 extends readonly ColInfo[]
-			? MergeRows<
-					Rows,
-					T0,
-					MkCtx<DB, Outer, Ctes, false>, // type-mutate: equivalent bool-flip – aggregates are not allowed in VALUES, so no valid statement depends on it
-					1
-				> extends infer Ts
+			? MergeRows<Rows, T0, MkCtx<DB, Outer, Ctes, false>, 1> extends infer Ts
 				? Ts extends readonly ColInfo[]
 					? ValuesCols<Ts, 1, []> extends infer Cs extends Cols
 						? ResolveSortKeys<
@@ -704,7 +691,7 @@ type ProjectValues<
 										...Outer,
 									],
 									Ctes,
-									false // type-mutate: equivalent bool-flip – the keys are only checked for errors, and grouped changes only nullability
+									false
 								>
 							> extends infer K
 							? K extends AnyErr
@@ -807,7 +794,7 @@ type ValuesTargets<Cs extends Cols> = {
 		readonly e: {
 			readonly t: "col";
 			readonly tbl: null;
-			readonly name: Cs[K] extends { readonly n: infer N } ? N : never; // type-mutate: equivalent cond-false – the keys are only checked for errors, and VALUES column names are distinct, so none is ambiguous
+			readonly name: Cs[K] extends { readonly n: infer N } ? N : never;
 		};
 		readonly alias: null;
 	};
@@ -877,9 +864,9 @@ type ProjectSimple<
  */
 type Grouped<GroupBy, Sets> = Sets extends false
 	? GroupBy extends null
-		? false // type-mutate: equivalent never-true – read with extends false, never counts as not grouped
+		? false
 		: true
-	: false; // type-mutate: equivalent never-false – read with extends false, never counts as not grouped
+	: false;
 
 /**
  * Grouping sets: a column that a set leaves out is NULL in that set's rows. `Sets`: the ROLLUP /
@@ -968,7 +955,7 @@ type CheckDistinct<
 		: never
 	: Distinct extends true
 		? CheckDistinctOrder<OKeys, Ts, Cs>
-		: true; // type-mutate: equivalent bool-flip – the callers only look for an error
+		: true;
 
 type CheckWindows<
 	Ws extends readonly NamedWindow[],
@@ -1042,7 +1029,7 @@ export type ProjectTargets<
 									Nx<I>,
 									Lit
 								>
-							: N // type-mutate: equivalent never-false – ColumnName is always a name
+							: N
 						: never
 					: Ty
 				: never;

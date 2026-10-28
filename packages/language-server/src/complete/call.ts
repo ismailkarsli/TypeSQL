@@ -104,12 +104,7 @@ function callAt(
 ): CallExpression | null {
 	let found: CallExpression | null = null;
 	const visit = (n: Node): void => {
-		if (
-			// Stryker disable next-line EqualityOperator: a node whose leading trivia starts at `offset` holds no literal that contains it (a literal does only after its opening quote)
-			offset < n.pos ||
-			offset > n.end
-		)
-			return;
+		if (offset < n.pos || offset > n.end) return;
 		if (n.kind === kinds.CallExpression) {
 			const arg = (n as CallExpression).arguments[0];
 			if (

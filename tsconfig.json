@@ -6,6 +6,5 @@
 		"allowImportingTsExtensions": true,
 		"types": ["node"]
 	},
-	"include": ["*.ts", "scripts"],
-	"exclude": ["scripts/type-mutate/fixture"]
+	"include": ["*.ts", "scripts"]
 }

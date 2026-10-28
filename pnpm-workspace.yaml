@@ -8,11 +8,3 @@ allowBuilds:
   prisma: false
   # vsce's postinstall fetches a signing tool; `vsce package` does not sign.
   "@vscode/vsce-sign": false
-# StrykerJS 10.1.1 is the first release that filters tests under vitest 5 (its " > " test
-# names); drop these once it is older than the minimum release age.
-minimumReleaseAgeExclude:
-  - "@stryker-mutator/api@10.1.1"
-  - "@stryker-mutator/core@10.1.1"
-  - "@stryker-mutator/instrumenter@10.1.1"
-  - "@stryker-mutator/util@10.1.1"
-  - "@stryker-mutator/vitest-runner@10.1.1"

@@ -13,9 +13,7 @@ import type { JoinedText, QuotedIdent, UnionList } from "./splice.js";
  */
 
 /** A table (a view is `{ $view: … }`, never a `Table`; nor is `$types` or a namespace). */
-type IsTable<X> = X extends Table
-	? true // type-mutate: equivalent never-true – read with `extends true`, where never counts as true
-	: false;
+type IsTable<X> = X extends Table ? true : false;
 
 /**
  * Writable tables of a schema: top-level tables, and `"schema.table"` for tables in a
@@ -26,7 +24,7 @@ export type TableName<DB> =
 			[K in keyof DB & string]: IsTable<DB[K]> extends true ? K : never;
 	  }[keyof DB & string]
 	| {
-			[NS in keyof DB & string]: IsTable<DB[NS]> extends true // type-mutate: equivalent cond-false – a table's columns are not tables, so it adds no names
+			[NS in keyof DB & string]: IsTable<DB[NS]> extends true
 				? never
 				: DB[NS] extends View<Table>
 					? never
@@ -64,7 +62,7 @@ export type TableOf<DB, T extends string> = T extends keyof DB
  * TS type a column accepts when written (the type map's parameter type, `| null` when nullable).
  * A json / jsonb column also takes a `sql.json(value)` (an array has to be one: see `CheckValue`).
  */
-export type ColIn<TM, DB, D extends ColDesc> = D["type"] extends "null" // type-mutate: equivalent cond-false never-true – no column has type null (CREATE TABLE AS and views store an untyped NULL as text)
+export type ColIn<TM, DB, D extends ColDesc> = D["type"] extends "null"
 	? null
 	:
 			| (D["nullable"] extends true

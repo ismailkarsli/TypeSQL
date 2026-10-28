@@ -145,7 +145,7 @@ type WindowNode<N, Spec> = { name: N; spec: Spec };
 /** True if token `I` starts a SELECT-like statement (possibly parenthesized). */
 export type IsSelectStart<T extends Toks, I extends number> =
 	T[I] extends WordTok<"select" | "with" | "values" | "table">
-		? true // type-mutate: equivalent never-true – read with `extends true`, where never counts as true
+		? true
 		: T[I] extends OpTok<"(">
 			? IsSelectStart<T, Nx<I>>
 			: false;
@@ -249,7 +249,7 @@ type SetOpLocking<Body, Locks1, Locks2, J extends number, J2 extends number> =
 		: never;
 /** Whether a query body is a set operation, in parentheses or not. */
 type IsSetOp<Body> = Body extends { readonly t: "setop" }
-	? true // type-mutate: equivalent never-true – read with `extends true`, where never counts as true
+	? true
 	: Body extends { readonly t: "paren"; readonly q: { readonly body: infer B } }
 		? IsSetOp<B>
 		: false;
@@ -261,7 +261,7 @@ type HasOrderBy<Order, Body> = Order extends readonly []
 		}
 		? HasOrderBy<O, B>
 		: false
-	: true; // type-mutate: equivalent never-false – read with `extends true`, where never counts as true
+	: true;
 
 export type ParseOrderByOpt<T extends Toks, I extends number> =
 	EatWords<T, I, ["order", "by"]> extends never
@@ -472,7 +472,7 @@ type ParseTableShorthand<T extends Toks, I extends number> =
 	]
 		? Ok<
 				SimpleNode<
-					false, // type-mutate: equivalent bool-flip – TABLE is SELECT *: DISTINCT changes no type, and its ORDER BY rule is not checked after a star
+					false,
 					[TargetNode<StarNode<null>, null>],
 					[FromTableNode<RefOf<Parts>, null, null>],
 					null,
@@ -651,7 +651,7 @@ type IntoRef<T extends Toks, I extends number> =
 		number,
 	]
 		? RefOf<Parts>
-		: null; // type-mutate: equivalent never-false – FromAfterInto rejects an INTO without a name first
+		: null;
 /**
  * Past `TEMPORARY | TEMP | UNLOGGED | LOCAL TEMP… | GLOBAL TEMP…` at `I`. Not followed by TABLE
  * or a name, TEMPORARY, TEMP and UNLOGGED are the table's name (`SELECT 1 INTO temp`).
@@ -714,7 +714,7 @@ export type EndsTargetList<T extends Toks, I extends number> = T[I] extends
 	  >
 	| OpTok<")" | ";">
 	| undefined
-	? true // type-mutate: equivalent never-true – read with `extends true`, where never counts as true
+	? true
 	: false;
 
 /** Target list: `expr [AS alias | bare_alias] , ...` */
@@ -724,54 +724,54 @@ export type ParseTargetList<
 	Acc extends readonly unknown[],
 > =
 	TryColumnTarget<T, I> extends infer P
-		? P extends Ok<infer E, infer J> // type-mutate: equivalent cond-false – declining the shortcut uses the identical general target parser
+		? P extends Ok<infer E, infer J>
 			? ContinueTargets<T, E, J, Acc>
 			: ParseTargetSlow<T, I, Acc>
 		: never;
 
 /** Ordinary column targets can bypass expression precedence and call parsing. */
 type TryColumnTarget<T extends Toks, I extends number> =
-	Ident<T, I> extends [infer Name, infer J extends number] // type-mutate: equivalent cond-false tuple-swap – Ident returns [string, number]; a failed match uses the general target parser
-		? T[J] extends OpTok<"."> // type-mutate: equivalent cond-false – a qualified name then fails TryTargetTail and uses the general target parser
-			? AnyLabel<T, Nx<J>> extends [infer Col, infer K extends number] // type-mutate: equivalent cond-false tuple-swap – labels return [string, number]; a failed match uses the general target parser
+	Ident<T, I> extends [infer Name, infer J extends number]
+		? T[J] extends OpTok<".">
+			? AnyLabel<T, Nx<J>> extends [infer Col, infer K extends number]
 				? TryTargetTail<T, ColNode<Name, Col>, K>
-				: T[Nx<J>] extends OpTok<"*"> // type-mutate: equivalent cond-false – declining a star shortcut uses the general target parser
+				: T[Nx<J>] extends OpTok<"*">
 					? TryTargetTail<T, StarNode<Name>, Nx<Nx<J>>>
 					: null
-			: T[J] extends OpTok<"("> | StrTok // type-mutate: equivalent cond-swap cond-true cond-false – TryTargetTail also declines call and literal suffixes; misses use the general target parser
+			: T[J] extends OpTok<"("> | StrTok
 				? null
 				: TryTargetTail<T, ColNode<null, Name>, J>
 		: null;
 
 type TryTargetTail<T extends Toks, E, I extends number> =
-	IsTargetEnd<T[I]> extends true // type-mutate: equivalent cond-false – ParseTargetAlias returns [null, I] at these same boundaries
+	IsTargetEnd<T[I]> extends true
 		? Ok<TargetNode<E, null>, I>
-		: ParseTargetAlias<T, I> extends [infer A, infer J extends number] // type-mutate: equivalent cond-false tuple-swap – aliases return [string or null, number]; a failed match uses the general target parser
-			? IsTargetEnd<T[J]> extends true // type-mutate: equivalent cond-false – declining an alias shortcut uses the general target parser
+		: ParseTargetAlias<T, I> extends [infer A, infer J extends number]
+			? IsTargetEnd<T[J]> extends true
 				? Ok<TargetNode<E, A>, J>
 				: null
 			: null;
-type IsTargetEnd<H> = H extends // type-mutate: equivalent cond-false never-true – false declines the shortcut; a never result is read with extends true
-	| OpTok<"," | ")" | ";"> // type-mutate: equivalent union-drop – missing a boundary only declines the shortcut and uses the general target parser
+type IsTargetEnd<H> = H extends
+	| OpTok<"," | ")" | ";">
 	| WordTok<
-			| "from" // type-mutate: equivalent union-drop – a missed boundary uses the general target parser
-			| "into" // type-mutate: equivalent union-drop – a missed boundary uses the general target parser
-			| "where" // type-mutate: equivalent union-drop – a missed boundary uses the general target parser
-			| "group" // type-mutate: equivalent union-drop – a missed boundary uses the general target parser
-			| "having" // type-mutate: equivalent union-drop – a missed boundary uses the general target parser
-			| "window" // type-mutate: equivalent union-drop – a missed boundary uses the general target parser
-			| "order" // type-mutate: equivalent union-drop – a missed boundary uses the general target parser
-			| "limit" // type-mutate: equivalent union-drop – a missed boundary uses the general target parser
-			| "offset" // type-mutate: equivalent union-drop – a missed boundary uses the general target parser
-			| "fetch" // type-mutate: equivalent union-drop – a missed boundary uses the general target parser
-			| "for" // type-mutate: equivalent union-drop – a missed boundary uses the general target parser
-			| "union" // type-mutate: equivalent union-drop – a missed boundary uses the general target parser
-			| "intersect" // type-mutate: equivalent union-drop – a missed boundary uses the general target parser
-			| "except" // type-mutate: equivalent union-drop – a missed boundary uses the general target parser
-			| "returning" // type-mutate: equivalent union-drop – a missed boundary uses the general target parser
+			| "from"
+			| "into"
+			| "where"
+			| "group"
+			| "having"
+			| "window"
+			| "order"
+			| "limit"
+			| "offset"
+			| "fetch"
+			| "for"
+			| "union"
+			| "intersect"
+			| "except"
+			| "returning"
 	  >
 	| undefined
-	? true // type-mutate: equivalent bool-flip – a false boundary only declines the shortcut and uses the general target parser
+	? true
 	: false;
 
 type ContinueTargets<
@@ -1448,7 +1448,7 @@ type ParseGroupItems<
 								[...Acc, ...Items],
 								Sets extends true
 									? true
-									: [...(Sets extends readonly unknown[] ? Sets : []), ...Items] // type-mutate: equivalent tuple-swap – the items are read as a set of names
+									: [...(Sets extends readonly unknown[] ? Sets : []), ...Items]
 							>
 					: X
 				: never

@@ -118,7 +118,7 @@ export type TypeOf<E extends Expr, C extends Ctx> = E extends {
 																					? TypeQuant<
 																							E["op"],
 																							TypeOf<E["l"], C>,
-																							E["r"] extends Expr // type-mutate: equivalent cond-true – the right side is a subquery (above) or an expression
+																							E["r"] extends Expr
 																								? TypeOf<E["r"], C>
 																								: never,
 																							E["r"] extends {
@@ -340,16 +340,16 @@ export type TypeOf<E extends Expr, C extends Ctx> = E extends {
 // ─── helpers ───
 
 export type Or<A extends boolean, B extends boolean> = A extends true
-	? true // type-mutate: equivalent never-true – a never nullability is read with `extends true`, as nullable
+	? true
 	: B extends true
-		? true // type-mutate: equivalent never-true – a never nullability is read with `extends true`, as nullable
+		? true
 		: false;
 export type AnyNullable<As extends readonly ColInfo[]> = As extends readonly [
 	infer A extends ColInfo,
 	...infer R extends readonly ColInfo[],
 ]
 	? A["nullable"] extends true
-		? true // type-mutate: equivalent never-true – a never nullability is read with `extends true`, as nullable
+		? true
 		: AnyNullable<R>
 	: false;
 /** Literal-aware common type of a list (may be `lit`; see `CommonLit`). */
@@ -394,7 +394,7 @@ type ExtractNull<T, F> = T extends "timestamp" | "timestamptz" | "date"
 			| "isoyear"
 			| "epoch"
 		? false
-		: true // type-mutate: equivalent never-false – a never nullability is read with `extends true`, as nullable
+		: true
 	: T extends "interval"
 		? F extends
 				| "year"
@@ -405,7 +405,7 @@ type ExtractNull<T, F> = T extends "timestamp" | "timestamptz" | "date"
 				| "day"
 				| "hour"
 			? false
-			: true // type-mutate: equivalent never-false – a never nullability is read with `extends true`, as nullable
+			: true
 		: false;
 type MakeNullable<A> = A extends ColInfo ? Info<A["type"], true> : A;
 type ArrayOf<A> = A extends ColInfo
@@ -503,7 +503,7 @@ type StringResult<A, B, D> = A extends ColInfo
  * NULL when the pattern does not match (an untyped `$n` picks this form too).
  */
 type RegexNull<R, From> = R extends ColInfo
-	? R["type"] extends "text" // type-mutate: equivalent cond-true – only text can take a text pattern (bytea / bit SUBSTRING takes integers)
+	? R["type"] extends "text"
 		? From extends { readonly type: StrT | "unknown" }
 			? Info<"text", true>
 			: R
@@ -550,9 +550,7 @@ type SubCompare<
 						? X extends true
 							? Info<
 									"bool",
-									Row extends true
-										? true // type-mutate: equivalent never-true – a never nullability is read with `extends true`, as nullable
-										: Or<A["nullable"], B["nullable"]>
+									Row extends true ? true : Or<A["nullable"], B["nullable"]>
 								>
 							: X
 						: never
@@ -609,7 +607,7 @@ type TypeBinOperands<
 /** Unary; `-<numeric literal>` is folded like Postgres does (`-2147483648` is int4). */
 type TypeUn<Op extends string, E extends Expr, C extends Ctx> = Op extends
 	| "-"
-	| "+" // type-mutate: equivalent union-drop – unary plus of a literal types like the literal (UnOpType) either way
+	| "+"
 	? E extends { readonly t: "num"; readonly v: infer V extends string }
 		? Info<NumLitType<Op extends "-" ? `-${V}` : V>>
 		: TypeOf<E, C> extends infer T
@@ -779,7 +777,7 @@ type ChainNullable<E extends Expr, C extends Ctx> = E extends {
 	readonly i: infer I extends Expr;
 }
 	? TypeOf<I, C> extends infer T
-		? NullableOpt<T> extends true // type-mutate: equivalent never-true – a never nullability reads as nullable
+		? NullableOpt<T> extends true
 			? true
 			: ChainNullable<X, C>
 		: never
@@ -790,7 +788,7 @@ type ChainNullable<E extends Expr, C extends Ctx> = E extends {
 type EnumName<DB> = DB extends { readonly $types: infer T } ? keyof T : never;
 /** Is any subscript of the chain a slice? Then the result is an array. */
 type ChainSliced<E> = E extends { readonly t: "slice" }
-	? true // type-mutate: equivalent never-true – read with `extends true`, where never counts as true
+	? true
 	: E extends { readonly t: "idx"; readonly e: infer X }
 		? ChainSliced<X>
 		: false;
@@ -937,7 +935,7 @@ type HasStarEntry<R extends Cols> = R extends readonly [
 	...infer Rest extends Cols,
 ]
 	? H extends { readonly star: unknown }
-		? true // type-mutate: equivalent never-true – read with `extends true`, where never counts as true
+		? true
 		: HasStarEntry<Rest>
 	: false;
 type IsLonger<
@@ -946,7 +944,7 @@ type IsLonger<
 > = A extends readonly [unknown, ...infer AR]
 	? B extends readonly [unknown, ...infer BR]
 		? IsLonger<AR, BR>
-		: true // type-mutate: equivalent never-false – a never result reads as true (`IsLonger<…> extends true`), the same answer
+		: true
 	: false;
 
 /**
@@ -974,7 +972,7 @@ type StarCol<M extends ColMap, TooMany extends string> = [keyof M] extends [
 	: IsUnion<keyof M> extends true
 		? SqlError<TooMany, null>
 		: M[keyof M];
-type IsUnion<U> = [U] extends [UnionToIntersection<U>] ? false : true; // type-mutate: equivalent never-false – read with `extends true`, where never counts as true
+type IsUnion<U> = [U] extends [UnionToIntersection<U>] ? false : true;
 type UnionToIntersection<U> = (
 	U extends unknown
 		? (u: U) => void
@@ -1093,19 +1091,15 @@ type TypeCall<E extends Call, C extends Ctx> =
 											{
 												readonly grouped: C["grouped"];
 												readonly over: E["over"];
-												readonly filter: F extends ColInfo
-													? true // type-mutate: equivalent never-true – read with `extends true`, where never counts as true
-													: false;
+												readonly filter: F extends ColInfo ? true : false;
 												readonly distinct: E["distinct"];
 												readonly hasStar: E["args"] extends readonly [
 													{ readonly t: "star"; readonly tbl: null },
 												]
-													? true // type-mutate: equivalent never-true – read with `extends true`, where never counts as true
+													? true
 													: false;
-												readonly withinGroup: W extends ColInfo
-													? true // type-mutate: equivalent never-true – read with `extends true`, where never counts as true
-													: false;
-												readonly wg: W extends ColInfo ? W["type"] : "unknown"; // type-mutate: equivalent never-false – read by the WITHIN GROUP signatures only, which CallMisuse rejects without one
+												readonly withinGroup: W extends ColInfo ? true : false;
+												readonly wg: W extends ColInfo ? W["type"] : "unknown";
 											},
 											C["db"]
 										>

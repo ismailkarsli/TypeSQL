@@ -28,7 +28,7 @@ export type CheckEscapes<S extends string> = S extends `${string}\\${infer R}`
 				: "invalid Unicode escape"
 			: R extends `${string}${infer R2}`
 				? CheckEscapes<R2> // `\\`, `\'`, `\n`, ...: skip the escaped character
-				: null // type-mutate: equivalent never-false – a body cannot end in a lone backslash (\' would escape the closing quote)
+				: null
 	: null;
 
 /** Error message for the first invalid escape of a `U&'...'` body or identifier with escape character `E`, or `null`. */
@@ -223,10 +223,10 @@ export type DecodeU<
 		: R extends `+${infer R2}`
 			? Hex6<R2> extends [infer H extends string, infer R3 extends string]
 				? DecodeU<R3, E, `${Acc}${Pre}${CharOf<H, `${E}+${H}`>}`>
-				: `${Acc}${S}` // type-mutate: equivalent never-false – the escapes were validated before decoding
+				: `${Acc}${S}`
 			: Hex4<R> extends [infer H extends string, infer R3 extends string]
 				? DecodeU<R3, E, `${Acc}${Pre}${CharOf<H, `${E}${H}`>}`>
-				: `${Acc}${S}` // type-mutate: equivalent never-false – the escapes were validated before decoding
+				: `${Acc}${S}`
 	: `${Acc}${S}`;
 type CharOf<H extends string, Raw extends string> =
 	Lowercase<H> extends infer L

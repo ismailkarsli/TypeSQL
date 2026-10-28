@@ -60,7 +60,7 @@ type Fig<E extends Expr, C extends Ctx> = E extends { readonly t: "col" }
 					? null
 					: Weak<E["type"]>
 				: E extends { readonly t: "case" }
-					? E["else"] extends Expr // type-mutate: equivalent cond-true – without ELSE, Fig<null> is null, which names it case too
+					? E["else"] extends Expr
 						? Fig<E["else"], C> extends infer N
 							? N extends string
 								? N
@@ -102,7 +102,6 @@ type Fig<E extends Expr, C extends Ctx> = E extends { readonly t: "col" }
 																			? null
 																			: `xml${E["op"]}`
 																		: E extends {
-																					// type-mutate: equivalent cond-true – the other nodes have no fn: unknown names ?column? as null does
 																					readonly t: "jsonfn" | "jsonagg";
 																				}
 																			? E["fn"]
@@ -115,5 +114,5 @@ type SubName<Q extends SelectStmt, C extends Ctx> =
 	ProjectSelect<Q, C["db"], C["scope"], C["ctes"]> extends infer R
 		? R extends readonly [{ readonly n: infer N }, ...unknown[]]
 			? N
-			: "?column?" // type-mutate: equivalent never-false – an error or a subquery without columns is reported before the name is read
+			: "?column?"
 		: never;

@@ -56,13 +56,13 @@ type LexLines<
 	S extends string,
 	Acc extends readonly unknown[],
 	B extends number = 0,
-> = B extends ChunkSize // type-mutate: equivalent cond-swap cond-true – disabling line segmentation delegates unchanged text to the full scanner
+> = B extends ChunkSize
 	? LexCommas<S, Acc>
-	: S extends `${infer Line}\n${infer Rest}` // type-mutate: equivalent cond-false – disabling line segmentation delegates unchanged text to the full scanner
-		? CanSplitLine<Line, Rest> extends false // type-mutate: equivalent cond-true – always using the full-tail scanner preserves tokens and errors
+	: S extends `${infer Line}\n${infer Rest}`
+		? CanSplitLine<Line, Rest> extends false
 			? LexCommas<S, Acc>
 			: LexCommas<Line, []> extends infer R
-				? R extends readonly unknown[] // type-mutate: equivalent cond-false – always using the full-tail scanner preserves tokens and errors
+				? R extends readonly unknown[]
 					? LexLines<Rest, [...Acc, ...R], Nx<B>>
 					: LexCommas<S, Acc>
 				: never
@@ -73,13 +73,13 @@ type LexCommas<
 	S extends string,
 	Acc extends readonly unknown[],
 	B extends number = 0,
-> = B extends ChunkSize // type-mutate: equivalent cond-swap cond-true – disabling comma segmentation delegates unchanged text to the full scanner
+> = B extends ChunkSize
 	? LexAll<S, Acc>
-	: S extends `${infer Part},${infer Rest}` // type-mutate: equivalent cond-false – disabling comma segmentation delegates unchanged text to the full scanner
-		? Part extends `${string}--${string}` // type-mutate: equivalent cond-true – always using the full-tail scanner preserves tokens and errors
+	: S extends `${infer Part},${infer Rest}`
+		? Part extends `${string}--${string}`
 			? LexAll<S, Acc>
 			: LexAll<Part, []> extends infer R
-				? R extends readonly unknown[] // type-mutate: equivalent cond-false – always using the full-tail scanner preserves tokens and errors
+				? R extends readonly unknown[]
 					? LexCommas<Rest, [...Acc, ...R, OpTok<",">], Nx<B>>
 					: LexAll<S, Acc>
 				: never
@@ -89,20 +89,20 @@ type LexCommas<
 type CanSplitLine<
 	Line extends string,
 	Rest extends string,
-> = Line extends `${string}${"U&" | "u&"}${string}` // type-mutate: equivalent cond-true never-true never-false – false and never select the full-tail scanner; extra fallback preserves lexical output
+> = Line extends `${string}${"U&" | "u&"}${string}`
 	? false
-	: Line extends `${string}'${string}` // type-mutate: equivalent cond-true never-true – checking extra lines or returning never can only select the full-tail scanner
-		? NextLineQuote<Rest> extends true // type-mutate: equivalent cond-true never-true – false and never select the full-tail scanner, preserving lexical output
+	: Line extends `${string}'${string}`
+		? NextLineQuote<Rest> extends true
 			? false
-			: true // type-mutate: equivalent never-false – never selects the full-tail scanner instead of segmented scanning
-		: true; // type-mutate: equivalent never-false bool-flip – false and never select the full-tail scanner, preserving lexical output
-type NextLineQuote<S extends string, B extends number = 0> = B extends ChunkSize // type-mutate: equivalent cond-swap cond-true never-true never-false – true and never pass the caller's extends true gate; extra fallback preserves lexical output
+			: true
+		: true;
+type NextLineQuote<S extends string, B extends number = 0> = B extends ChunkSize
 	? true
-	: S extends `${Ws}${infer R}` // type-mutate: equivalent never-true never-false – never passes the caller's extends true gate and selects the full-tail scanner
+	: S extends `${Ws}${infer R}`
 		? NextLineQuote<R, Nx<B>>
-		: S extends `'${string}` // type-mutate: equivalent cond-true never-true – true and never pass the caller's extends true gate and select the full-tail scanner
+		: S extends `'${string}`
 			? true
-			: false; // type-mutate: equivalent never-false – never passes the caller's extends true gate and selects the full-tail scanner
+			: false;
 
 /** Iterations per chunk: restart the loop before the 1000-iteration tail-recursion cap. */
 type ChunkSize = 250;
@@ -122,7 +122,7 @@ type LexAll<S extends string, Acc extends readonly unknown[]> =
 							infer M extends string,
 							infer T extends readonly unknown[],
 						]
-					? SqlError<M, [...Acc, ...T]["length"]> // type-mutate: equivalent tuple-swap – the length is the same either way
+					? SqlError<M, [...Acc, ...T]["length"]>
 					: never
 		: never;
 
@@ -361,13 +361,13 @@ type LexShortInt<
 	B extends number,
 	K extends readonly unknown[],
 > = R extends `${infer N}${infer R2}`
-	? N extends Digit // type-mutate: equivalent cond-false – a fast path: LexNumber lexes the same token
-		? K extends readonly [0, 0, 0] // type-mutate: equivalent cond-swap cond-true cond-false – a fast path: LexNumber lexes the same token
+	? N extends Digit
+		? K extends readonly [0, 0, 0]
 			? LexNumber<S0, Acc, B>
 			: LexShortInt<S0, R2, `${V}${N}`, Acc, B, [...K, 0]>
-		: N extends "." // type-mutate: equivalent cond-true – a fast path: LexNumber lexes the same token
+		: N extends "."
 			? LexNumber<S0, Acc, B>
-			: N extends NonIdAscii // type-mutate: equivalent cond-false – a fast path: LexNumber lexes the same token
+			: N extends NonIdAscii
 				? LexChunk<R, [...Acc, NumTok<V>], B>
 				: LexNumber<S0, Acc, B>
 	: LexChunk<R, [...Acc, NumTok<V>], B>;
@@ -432,7 +432,7 @@ type LexOperator<
 	Acc extends readonly Tok[],
 	B extends number,
 > = R extends `${infer N}${infer R1}`
-	? N extends OpChar // type-mutate: equivalent cond-true – a fast path: LexOpRun lexes the same one-character operator
+	? N extends OpChar
 		? C extends "-"
 			? N extends "-"
 				? LexChunk<SkipLine<R1>, Acc, B>
@@ -537,7 +537,7 @@ type TakeEscaped<
 type OddBackslashes<S extends string> = S extends `${infer P}\\`
 	? OddBackslashes<P> extends true
 		? false
-		: true // type-mutate: equivalent never-false – read with extends true, never counts as true
+		: true
 	: false;
 
 /**
@@ -571,7 +571,7 @@ type AllWs<W extends string> = W extends `${infer C}${infer R}`
 	? C extends Ws
 		? AllWs<R>
 		: false
-	: true; // type-mutate: equivalent never-false – read with extends true, never counts as true
+	: true;
 
 /** The identifier characters (all but `NonIdAscii`) at the start of `S`, after `Acc`: `[word, rest]`. */
 type TakeWord<

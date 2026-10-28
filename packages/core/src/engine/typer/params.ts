@@ -85,7 +85,7 @@ export type MaxParam<T extends Toks> = HighestParam<
 >;
 
 /** Only the largest candidate has no larger member outside its preceding integers. */
-type HighestParam<N extends number, All extends number = N> = N extends number // type-mutate: equivalent cond-true – N is constrained to number; this conditional distributes its members, and its false branch is unreachable
+type HighestParam<N extends number, All extends number = N> = N extends number
 	? Exclude<All, Before<N>> extends N
 		? N
 		: never
@@ -97,8 +97,8 @@ type Before<N extends number, A extends number[] = []> = A["length"] extends N
 /** Marks a `$n` that the statement tests with `IS [NOT] NULL`: the caller may pass null. */
 export type NullTest = {
 	readonly type: "unknown";
-	readonly nullable: true; // type-mutate: equivalent bool-flip – a tag: producers and consumers match NullTest itself
-	readonly nullTest: true; // type-mutate: equivalent bool-flip – a tag: producers and consumers match NullTest itself
+	readonly nullable: true;
+	readonly nullTest: true;
 };
 type NullTested<E extends Expr, M> = E extends {
 	readonly t: "param";
@@ -113,7 +113,7 @@ type NullTested<E extends Expr, M> = E extends {
 		: M;
 
 /** Comparison and pattern operators: the other operand's type, nullable (`WHERE id = $1` → `number | null`). */
-type IsComparison<Op extends string> = Op extends // type-mutate: equivalent never-true – read with extends true, never counts as true
+type IsComparison<Op extends string> = Op extends
 	| "="
 	| "<"
 	| ">"
@@ -133,13 +133,12 @@ type IsComparison<Op extends string> = Op extends // type-mutate: equivalent nev
 	: false;
 type NullableOf<T> = T extends ColInfo
 	? Mk<T["type"], true>
-	: Mk<"unknown", true>; // type-mutate: equivalent bool-flip never-false – an operand with an error: the main pass rejects the statement
+	: Mk<"unknown", true>;
 /** Unconstrained `Info` for computed type names (avoids constraint resolution of recursive aliases). */
 type Mk<T, N extends boolean> = { readonly type: T; readonly nullable: N };
 
 /** Collect params from an expression. Errors in sibling typing are ignored (they are reported by the main pass). */
 export type ParamsOfExpr<E extends Expr, C extends Ctx, M> = E extends {
-	// type-mutate: equivalent cond-false – a bare parameter reaches the last branch, which returns M too
 	readonly t: "param";
 }
 	? M
@@ -184,13 +183,13 @@ export type ParamsOfExpr<E extends Expr, C extends Ctx, M> = E extends {
 											readonly n: infer N extends number;
 										}
 										? ParamsOfList<
-												[E["lo"], E["hi"]], // type-mutate: equivalent tuple-swap – every item gets the same type
+												[E["lo"], E["hi"]],
 												C,
 												AddParam<M, N, Mk<CommonOfExprs<[E["lo"]], C>, true>>,
 												null
 											>
 										: ParamsOfList<
-												[E["lo"], E["hi"]], // type-mutate: equivalent tuple-swap – every item gets the same type
+												[E["lo"], E["hi"]],
 												C,
 												ParamsOfExpr<E["e"], C, M>,
 												NullableOf<TypeOf<E["e"], C>>
@@ -222,7 +221,7 @@ export type ParamsOfExpr<E extends Expr, C extends Ctx, M> = E extends {
 												>
 											: E extends { readonly t: "like" }
 												? ParamsOfList<
-														[E["e"], E["pat"]], // type-mutate: equivalent tuple-swap – every item gets the same type
+														[E["e"], E["pat"]],
 														C,
 														M,
 														Info<"text", true>
@@ -295,7 +294,7 @@ export type ParamsOfExpr<E extends Expr, C extends Ctx, M> = E extends {
 																						>
 																					: E extends { readonly t: "position" }
 																						? ParamsOfList<
-																								[E["sub"], E["in"]], // type-mutate: equivalent tuple-swap – every item gets the same type
+																								[E["sub"], E["in"]],
 																								C,
 																								M,
 																								Info<"text", true>
@@ -515,7 +514,7 @@ type CommonOfExprs<Es extends readonly Expr[], C extends Ctx> =
 	TypeList<NonParams<Es, []>, C, []> extends infer Ts
 		? Ts extends readonly ColInfo[]
 			? CommonOfInfos<Ts, "unknown">
-			: "unknown" // type-mutate: equivalent never-false – an item with an error: the main pass rejects the statement
+			: "unknown"
 		: never;
 type NonParams<
 	Es extends readonly Expr[],
@@ -606,7 +605,7 @@ type BinNullable<Op extends string, Other extends Expr, C extends Ctx> =
 		readonly nullable: infer Nl extends boolean;
 	}
 		? Nl
-		: true; // type-mutate: equivalent never-false bool-flip – BinParamType always has a boolean nullability
+		: true;
 
 /**
  * Type of a `$n` operand given the operator and the other operand's (possibly erroneous)
@@ -659,7 +658,7 @@ type BinParamType<Op extends string, Other> = Other extends {
 										? Other
 										: Mk<"text", Other["nullable"]>
 									: Other
-	: Mk<"unknown", true>; // type-mutate: equivalent never-false bool-flip – an operand with an error: the main pass rejects the statement
+	: Mk<"unknown", true>;
 
 type ParamsOfQuant<
 	L extends Expr,
@@ -673,7 +672,7 @@ type ParamsOfQuant<
 			TypeOf<L, C> extends infer LT
 				? LT extends ColInfo
 					? Mk<`${LT["type"]}[]`, true>
-					: Mk<"unknown", true> // type-mutate: equivalent never-false bool-flip – an operand with an error: the main pass rejects the statement
+					: Mk<"unknown", true>
 				: never
 		>
 	: R extends {
@@ -692,10 +691,10 @@ type ParamsOfQuant<
 							TypeOf<R, C> extends infer RT
 								? RT extends { readonly type: `${infer El}[]` }
 									? Mk<El, true>
-									: Mk<"unknown", true> // type-mutate: equivalent never-false bool-flip – ANY of a non-array: the main pass rejects the statement
+									: Mk<"unknown", true>
 								: never
 						>
-					: M // type-mutate: equivalent never-false – R is a SelectStmt or an Expr
+					: M
 			: R extends SelectStmt
 				? ParamsOfSelect<
 						R,
@@ -706,7 +705,7 @@ type ParamsOfQuant<
 					>
 				: R extends Expr
 					? ParamsOfExpr<R, C, ParamsOfExpr<L, C, M>>
-					: M; // type-mutate: equivalent never-false – R is a SelectStmt or an Expr
+					: M;
 
 // ─── CASE ───
 
@@ -769,7 +768,7 @@ type ParamsOfWhens<
  */
 type ParamsOfCall<E extends Call, C extends Ctx, M> =
 	LookupFn<C["db"], E["name"]> extends infer O
-		? O extends null // type-mutate: equivalent cond-false never-true – an unknown function: the main pass rejects the statement
+		? O extends null
 			? ParamsOfCallRest<E, C, ParamsOfList<E["args"], C, M, null>>
 			: TypeList<NonStarArgs<E["args"]>, C, []> extends infer As
 				? As extends readonly ColInfo[]
@@ -786,13 +785,12 @@ type ParamsOfCall<E extends Call, C extends Ctx, M> =
 										PolyOf<E["args"], S["args"], C, "unknown">
 									>
 								>
-							: ParamsOfCallRest<E, C, ParamsOfList<E["args"], C, M, null>> // type-mutate: equivalent never-false – no signature matches: the main pass rejects the statement
+							: ParamsOfCallRest<E, C, ParamsOfList<E["args"], C, M, null>>
 						: never
-					: ParamsOfCallRest<E, C, ParamsOfList<E["args"], C, M, null>> // type-mutate: equivalent never-false – an argument with an error: the main pass rejects the statement
+					: ParamsOfCallRest<E, C, ParamsOfList<E["args"], C, M, null>>
 				: never
 		: never;
 type NonStarArgs<Args extends readonly Expr[]> = Args extends readonly [
-	// type-mutate: equivalent cond-false – count(*) has no parameter either way
 	{ readonly t: "star"; readonly tbl: null },
 ]
 	? []
@@ -829,7 +827,7 @@ type PolyOf<
 				C,
 				A extends { readonly t: "null" } ? Acc : PolyStep<P, TypeOf<A, C>, Acc>
 			>
-		: Acc // type-mutate: equivalent never-false – the signature takes every argument
+		: Acc
 	: Acc;
 type PolyStep<P extends string, T, Acc extends string> = T extends {
 	readonly type: infer AT extends string;
@@ -841,7 +839,7 @@ type PolyStep<P extends string, T, Acc extends string> = T extends {
 				? CommonType<Acc, El>
 				: Acc
 			: Acc
-	: Acc; // type-mutate: equivalent never-false – an argument with an error: the main pass rejects the statement
+	: Acc;
 
 /** `Poly` is unconstrained: it is a recursive alias result (ENGINE.md pitfall 9). */
 type ParamsOfArgs<
@@ -860,12 +858,12 @@ type ParamsOfArgs<
 		]
 		? ParamsOfArgs<
 				AR,
-				P extends "..." ? Ps : PR, // type-mutate: equivalent cond-false – past the last pattern an argument gets Poly, as "..." gives
+				P extends "..." ? Ps : PR,
 				C,
 				ParamsOfOpt<A, C, M, PatternType<P, Poly>>,
 				Poly
 			>
-		: ParamsOfArgs<AR, [], C, ParamsOfOpt<A, C, M, Mk<Poly, true>>, Poly> // type-mutate: equivalent never-false bool-flip – a variadic signature keeps its "...", the others match the arity
+		: ParamsOfArgs<AR, [], C, ParamsOfOpt<A, C, M, Mk<Poly, true>>, Poly>
 	: M;
 type PatternType<P extends string, Poly> = P extends "any" | "..."
 	? Mk<Poly, true>
@@ -873,11 +871,11 @@ type PatternType<P extends string, Poly> = P extends "any" | "..."
 		? Mk<
 				Poly extends "unknown"
 					? "unknown"
-					: Poly extends `${string}[]` // type-mutate: equivalent never-true cond-false – an array in a polymorphic position next to anyarray: Postgres rejects it (could not find array type)
+					: Poly extends `${string}[]`
 						? Poly
 						: Poly extends string
 							? `${Poly}[]`
-							: "unknown", // type-mutate: equivalent never-false – Poly is a type name
+							: "unknown",
 				true
 			>
 		: P extends "anystring" | "jsonpath"
@@ -977,7 +975,7 @@ export type ParamsOfSelect<
 					Q["offset"],
 					ParamsOfLimit<Q["limit"], ParamsOfBody<Q["body"], DB, Outer, C2, M>>
 				>
-			: M // type-mutate: equivalent never-false – a WITH clause with an error: the main pass rejects the statement
+			: M
 		: never;
 /** `LIMIT NULL` / `OFFSET NULL` mean no limit / no offset. */
 type ParamsOfLimit<E extends Expr | null, M> = E extends {
@@ -1010,7 +1008,7 @@ type ParamsOfBody<
 	: B extends { readonly t: "paren" }
 		? ParamsOfSelect<B["q"], DB, Outer, Ctes, M>
 		: B extends { readonly t: "values" }
-			? ParamsOfRows<B["rows"], MkCtx<DB, Outer, Ctes, false>, M> // type-mutate: equivalent bool-flip – VALUES has no aggregates
+			? ParamsOfRows<B["rows"], MkCtx<DB, Outer, Ctes, false>, M>
 			: B extends { readonly t: "simple" }
 				? BindFrom<B["from"], DB, Outer, Ctes> extends infer L
 					? L extends ScopeLevel
@@ -1020,18 +1018,17 @@ type ParamsOfBody<
 									DB,
 									[L, ...Outer],
 									Ctes,
-									B["groupBy"] extends null ? false : true // type-mutate: equivalent never-true – read with extends false, never counts as not grouped
+									B["groupBy"] extends null ? false : true
 								>,
 								M
 							>
 						: ParamsOfSimple<
-								// type-mutate: equivalent never-false – a FROM clause with an error: the main pass rejects the statement
 								Extract<B, SimpleSelect>,
-								MkCtx<DB, Outer, Ctes, false>, // type-mutate: equivalent bool-flip – a FROM clause with an error: the main pass rejects the statement
+								MkCtx<DB, Outer, Ctes, false>,
 								M
 							>
 					: never
-				: M; // type-mutate: equivalent never-false – every body is one of these
+				: M;
 type ParamsOfRows<
 	Rows extends readonly (readonly Expr[])[],
 	C extends Ctx,
@@ -1065,4 +1062,4 @@ type ParamsOfSimple<B extends SimpleSelect, C extends Ctx, M> = B extends {
 			>,
 			Info<"bool">
 		>
-	: M; // type-mutate: equivalent never-false – every simple SELECT has these fields
+	: M;

@@ -151,7 +151,6 @@ function lex(text: string, offset: number): { toks: Tok[]; inside: boolean } {
 			continue;
 		}
 		if (value()) {
-			// Stryker disable next-line StringLiteral: a value token is only told apart from words, quoted names, slots and operators, as a token of any other kind name would be
 			push("v", s);
 			continue;
 		}
@@ -291,7 +290,6 @@ interface At {
 }
 
 function structure(toks: readonly Tok[]): { at: At[]; used: RelRef[] } {
-	// Stryker disable next-line ArrayDeclaration: `level` writes `at[i]` before anything reads it, so no initial element is ever seen
 	const at: At[] = [];
 	const used: RelRef[] = [];
 	const word = (i: number): string | null =>

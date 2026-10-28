@@ -57,7 +57,6 @@ export function pendingParams(): number {
 
 /** Can `text` hold a token? (`resolveInline` leaves a text without a NUL as it is.) */
 export function hasInline(text: string): boolean {
-	// Stryker disable next-line StringLiteral: a shortcut: resolveInline returns a text without a NUL unchanged, with no values
 	return text.includes("\u0000");
 }
 

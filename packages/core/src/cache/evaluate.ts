@@ -97,19 +97,15 @@ export class ProbeSession {
 		if (this.disposed) throw new Error("typesql: the job was stopped");
 		const ts = await this.typescript();
 		const fileSystem = ts.createFileSystemLayer([[this.probe, text]]) as never;
-		// Stryker disable next-line LogicalOperator: api and snapshot are set and cleared together
 		if (!this.api || !this.snapshot) {
-			// Stryker disable next-line ObjectLiteral: every path given to the API is absolute
 			this.api = new ts.API({ cwd: dirname(this.configFile) });
 			this.snapshot = await this.api.createSnapshot({
 				openProjects: [this.configFile],
 				fileSystem,
 			});
-			// Stryker disable next-line CallExpression: telling a new session that files changed is harmless
 			this.changed.clear();
 		} else {
 			const changed = [...this.changed, this.probe];
-			// Stryker disable next-line CallExpression: telling the session again that files changed is harmless
 			this.changed.clear();
 			const previous = this.snapshot;
 			this.snapshot = await previous.update({
@@ -155,7 +151,6 @@ export async function evaluateTypes(
 			if (error !== undefined) return { error };
 			const t = types.get(name);
 			if (!t) return { error: "no declaration" };
-			// Stryker disable next-line ArrayDeclaration,StringLiteral: the printer names core's types through the probe's `__T` import; this only catches a spelled-out import("@typesql/core/engine")
 			return { text: coreNames(await printer.print(t)) };
 		}),
 	);
@@ -184,7 +179,6 @@ export function declarations(
 	for (const st of sf.statements) {
 		if (st.kind !== kinds.VariableStatement) continue;
 		const d = (st as VariableStatement).declarationList.declarations[0];
-		// Stryker disable next-line ConditionalExpression,LogicalOperator: a parsed declaration statement has a declaration; a name without text (a binding pattern) would only add an entry nobody reads
 		if (d && "text" in d.name)
 			out.set((d.name as { text: string }).text, d.name);
 	}
@@ -198,7 +192,6 @@ export async function declTypes(
 ): Promise<Map<string, Type>> {
 	const decls = declarations(sf, kinds);
 	const names = [...decls.keys()];
-	// Stryker disable next-line ArrayDeclaration: PROBE_HEAD declares __v and __fc, so names is never empty
 	const types = names.length
 		? await checker.getTypeAtLocation(names.map((n) => decls.get(n)!))
 		: [];
@@ -210,13 +203,11 @@ export async function badDeclarations(
 	program: Program,
 	sf: SourceFile,
 ): Promise<Map<string, string>> {
-	// Stryker disable next-line ConditionalExpression,MethodExpression: a probe's semantic diagnostics are all errors (category 1); the filter only guards against others
 	const errors = (await program.getSemanticDiagnostics(sf.fileName)).filter(
 		(d) => d.category === 1,
 	);
 	const badLines = new Map<number, string>();
 	for (const d of errors) {
-		// Stryker disable next-line LogicalOperator,OptionalChaining: the API gives startPosition, and lineOf gives the same line
 		const line = d.startPosition?.line ?? lineOf(sf.text, d.pos);
 		if (!badLines.has(line)) badLines.set(line, `TS${d.code}: ${d.text}`);
 	}
@@ -557,7 +548,6 @@ function typeOf(v: TypeValue | undefined): AnalysisType {
 	if (typeof ty === "string") return { type: ty, nullable };
 	if (ty === null) return { type: "null", nullable };
 	// an array of a shaped type prints as a template literal: `${Shaped<"json", …>}[]`
-	// Stryker disable next-line ConditionalExpression: without a ref there is nothing for the pattern to match
 	if (typeof ty === "object" && "ref" in ty) {
 		const m = /^`\$\{.*?\bShaped<"(\w+)",.*\}((?:\[\])+)`$/s.exec(
 			ty.ref as string,

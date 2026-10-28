@@ -106,7 +106,6 @@ type Nullable = { nullable: true };
 type Srf = { srf: true };
 type SrfNullable = { srf: true; nullable: true };
 
-// type-mutate: table – each signature, flag and overload pick is compared with pg_proc and with Postgres's own resolution by the functions oracle (test/oracle/functions.ts)
 export interface FunctionCatalog {
 	// ───────────── aggregates ─────────────
 	count: Sig<["..."], "int8", AggNN>;
@@ -1092,7 +1091,7 @@ type ToList<S> = S extends readonly AnySig[]
 	? S
 	: S extends AnySig
 		? readonly [S]
-		: readonly []; // type-mutate: equivalent never-false – a catalog entry is a signature or a list of them
+		: readonly [];
 
 /**
  * How well does actual type `A` satisfy parameter pattern `P`?
@@ -1220,12 +1219,12 @@ type ArgsMatch<
 					? ArgsMatch<PR, AR, [...Score, 0]>
 					: K extends "c"
 						? ArgsMatch<PR, AR, Score>
-						: false // type-mutate: equivalent bool-flip – BestSig reads only a tuple score: true and false both mean no match
+						: false
 				: never
-			: false // type-mutate: equivalent bool-flip – BestSig reads only a tuple score: true and false both mean no match
+			: false
 		: As extends readonly []
 			? Score
-			: false; // type-mutate: equivalent bool-flip – BestSig reads only a tuple score: true and false both mean no match
+			: false;
 
 /** Best-scoring overload (ties → earlier), or null. */
 type BestSig<
@@ -1264,11 +1263,11 @@ type ArityOk<
 	Ps extends readonly string[],
 	As extends readonly ColInfo[],
 > = Ps extends readonly [...infer Fixed, "..."]
-	? As extends readonly [...{ [K in keyof Fixed]: unknown }, ...unknown[]] // type-mutate: equivalent tuple-swap – the elements are all unknown: at least that many either way
-		? true // type-mutate: equivalent never-true – ArityFallback reads it with `extends true`, where never counts as true
+	? As extends readonly [...{ [K in keyof Fixed]: unknown }, ...unknown[]]
+		? true
 		: false
 	: Ps["length"] extends As["length"]
-		? true // type-mutate: equivalent never-true – ArityFallback reads it with `extends true`, where never counts as true
+		? true
 		: false;
 
 /** Resolve a catalog entry against argument types: the chosen `Sig`, or null. */
@@ -1347,7 +1346,7 @@ type Ret<
 	R extends string,
 	As extends readonly ColInfo[],
 	C extends { readonly wg: string },
-> = R extends `$${string}` // type-mutate: equivalent cond-true – a shortcut: a return type without "$" falls through to itself
+> = R extends `$${string}`
 	? R extends "$1"
 		? TypeAt<As, 0>
 		: R extends "$2"
@@ -1380,7 +1379,7 @@ type Ret<
 															: "float8[]"
 														: R extends `$j${infer P}`
 															? JsonRet<P, As>
-															: R // type-mutate: equivalent never-false – no signature returns another "$" form
+															: R
 	: R;
 
 // ───────────────────────────── nullability ─────────────────────────────
@@ -1411,7 +1410,7 @@ type AnyNullableAt<
 	...infer R extends readonly number[],
 ]
 	? As[Prev[I]] extends { readonly nullable: true }
-		? true // type-mutate: equivalent never-true – a never nullability is read with `extends true`, as nullable
+		? true
 		: AnyNullableAt<As, R>
 	: false;
 
@@ -1432,13 +1431,13 @@ type CallNullable<
 		? true
 		: S["agg"] extends true
 			? C["filter"] extends true
-				? true // type-mutate: equivalent never-true – a never nullability is read with `extends true`, as nullable
+				? true
 				: C["over"] extends true
 					? S["strict"] extends false
 						? false
 						: AnyNullable<As>
 					: C["grouped"] extends false
-						? true // type-mutate: equivalent never-true – a never nullability is read with `extends true`, as nullable
+						? true
 						: S["strict"] extends false
 							? false
 							: AnyNullable<As>
@@ -1579,9 +1578,7 @@ export type SrfType<
 		? S extends AnySig & { readonly srf: true }
 			? Info<
 					Ret<S["ret"], As, { readonly wg: "unknown" }>,
-					S["nullable"] extends true
-						? true // type-mutate: equivalent never-true – a never nullability is read with `extends true`, as nullable
-						: AnyNullable<As>
+					S["nullable"] extends true ? true : AnyNullable<As>
 				>
 			: null
 		: never;

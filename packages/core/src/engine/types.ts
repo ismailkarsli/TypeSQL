@@ -68,15 +68,15 @@ export type NullableMap<M extends ColMap> = {
  * accumulator). Mixed star/plain projections fall back to the accumulator.
  */
 export type ColsToMap<C extends Cols> = C extends readonly [
-	{ readonly star: infer M extends ColMap }, // type-mutate: equivalent cond-false infer-bare – the lone-star fast path gives the map SlowMap would, and a star of Cols is a ColMap
+	{ readonly star: infer M extends ColMap },
 ]
 	? M
-	: C[number] extends { readonly n: string } // type-mutate: equivalent cond-false – PlainMap is a fast path: SlowMap gives the same map
+	: C[number] extends { readonly n: string }
 		? PlainMap<C>
 		: SlowMap<C, {}>;
 
 type PlainMap<C extends Cols> = {
-	[E in C[number] as E extends { readonly n: infer N extends string } // type-mutate: equivalent infer-bare – an entry's n of Cols is a string
+	[E in C[number] as E extends { readonly n: infer N extends string }
 		? N
 		: never]: E extends { readonly n: infer N extends string }
 		? LastT<C, N>
@@ -104,7 +104,7 @@ type SlowMap<C extends Cols, Acc> = C extends readonly [
 				}
 			? SlowMap<
 					R,
-					N extends keyof Acc // type-mutate: equivalent cond-true – Omit of a key Acc does not have leaves Acc as it is
+					N extends keyof Acc
 						? Omit<Acc, N> & { readonly [K in N]: T }
 						: Acc & { readonly [K in N]: T }
 				>

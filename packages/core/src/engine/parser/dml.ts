@@ -196,7 +196,7 @@ type ParseConflictTarget<T extends Toks, I extends number> =
 				? EatWord<T, J, "where"> extends never
 					? Ok<null, J>
 					: ParseExpr<T, EatWord<T, J, "where">, 0> extends infer P
-						? P extends Ok<unknown, infer J2> // type-mutate: equivalent cond-false – the caller reads only the index of an Ok
+						? P extends Ok<unknown, infer J2>
 							? Ok<null, J2>
 							: P
 						: never
@@ -434,7 +434,7 @@ export type ParenTargetList<T extends Toks, I extends number> = TargetListLoop<
 	Nx<I>,
 	[],
 	[],
-	false // type-mutate: equivalent bool-flip – a list of null indirections reads like null
+	false
 >;
 type TargetListLoop<
 	T extends Toks,
@@ -454,9 +454,9 @@ type TargetListLoop<
 					: Ok<
 							[
 								[...Cols, N],
-								Any extends true // type-mutate: equivalent cond-true – a list of null indirections reads like null
+								Any extends true
 									? [...Inds, Ind]
-									: Ind extends null // type-mutate: equivalent cond-false – a list of null indirections reads like null
+									: Ind extends null
 										? null
 										: [...Inds, Ind],
 							],
@@ -467,7 +467,7 @@ type TargetListLoop<
 						EatOp<T, J, ",">,
 						[...Cols, N],
 						[...Inds, Ind],
-						Ind extends null ? Any : true // type-mutate: equivalent never-false, cond-false – Any is read with `extends true` (never counts as true), and a list of null indirections reads like null
+						Ind extends null ? Any : true
 					>
 			: X
 		: never;

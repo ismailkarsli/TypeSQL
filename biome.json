@@ -68,12 +68,6 @@
 					}
 				}
 			}
-		},
-		{
-			"includes": ["scripts/type-mutate/fixture/src/logic.ts"],
-			"formatter": {
-				"enabled": false
-			}
 		}
 	]
 }

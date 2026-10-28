@@ -142,7 +142,6 @@ export async function discover(
 					const key = args[wrapped.param]
 						? literalOf(args[wrapped.param]!, kinds)
 						: null;
-					// Stryker disable next-line ConditionalExpression: a null key (the alias given a non-literal) gives no entry either way; this skips evaluating it
 					if (key !== null)
 						(wrapped.ddl ? ddl : types).push({
 							key,
@@ -185,7 +184,6 @@ export async function discover(
 					)
 						return;
 					const [db] = await checker.getTypeArguments(r as never);
-					// Stryker disable next-line ConditionalExpression: a Migrations<DB> receiver has its type argument
 					if (db) ddl.push({ key: a.value, db, file: fileName });
 				}),
 			);

@@ -174,7 +174,7 @@ type Geq = {
 	13: 13;
 };
 type Binds<Bp extends Prec, Min extends MinPrec> = Bp extends Geq[Min]
-	? true // type-mutate: equivalent never-true – read with `extends true`, where never counts as true
+	? true
 	: false;
 type NextPrec = {
 	0: 1;
@@ -376,10 +376,10 @@ type PrecAt<T extends Toks, J extends number> =
 			? W extends "is" | "isnull" | "notnull"
 				? 4
 				: W extends Prec6Word
-					? 6 // type-mutate: equivalent never-true – only a LIKE or BETWEEN operand ends at such a word (a lower operator's operand takes it), and never counts as 6
+					? 6
 					: W extends "not"
 						? T[Nx<J>] extends WordTok<Prec6Word>
-							? 6 // type-mutate: equivalent never-true – only a LIKE or BETWEEN operand ends at NOT LIKE … (a lower operator's operand takes it), and never counts as 6
+							? 6
 							: 0
 						: 0
 			: 0;
@@ -900,7 +900,7 @@ type ParsePrefix<T extends Toks, I extends number> =
 					: T[I] extends IdTok
 						? ParseNameExpr<T, I>
 						: T[I] extends WordTok<infer W>
-							? W extends PrefixKeyword // type-mutate: equivalent cond-true – ordinary words reach the same ParseNameExpr at the end of this dispatch
+							? W extends PrefixKeyword
 								? W extends "null"
 									? Ok<{ t: "null" }, Nx<I>>
 									: W extends "true"
@@ -994,13 +994,12 @@ type ParsePrefix<T extends Toks, I extends number> =
 																																T,
 																																I
 																															>
-																													: W extends ReservedKeyword // type-mutate: equivalent cond-true – all non-reserved PrefixKeyword members were dispatched above
+																													: W extends ReservedKeyword
 																														? SyntaxErrorAt<
 																																T,
 																																I
 																															>
 																														: ParseNameExpr<
-																																// type-mutate: equivalent never-false – only reserved words reach this final dispatch, so this branch is unreachable
 																																T,
 																																I
 																															>
@@ -1179,23 +1178,23 @@ type ParseParenField<T extends Toks, E, I extends number> =
 
 /** Identifier-led expression: column ref, `t.*`, function call, or typed literal. */
 /** Recognize ordinary columns independently of the statement and token index. */
-type ColumnPrefix<H, A, B, C> = H extends IdTok<infer N> | WordTok<infer N> // type-mutate: equivalent cond-false – declining the column shortcut uses the identical general name parser
-	? H extends WordTok<NotColId> // type-mutate: equivalent cond-true – declining the column shortcut uses the general name parser
+type ColumnPrefix<H, A, B, C> = H extends IdTok<infer N> | WordTok<infer N>
+	? H extends WordTok<NotColId>
 		? null
 		: A extends OpTok<".">
-			? B extends IdTok<infer Name> | WordTok<infer Name> // type-mutate: equivalent cond-false – declining the qualified-column shortcut uses the general name parser
-				? C extends OpTok<"." | "("> | StrTok // type-mutate: equivalent cond-true – declining the qualified-column shortcut uses the general name parser
+			? B extends IdTok<infer Name> | WordTok<infer Name>
+				? C extends OpTok<"." | "("> | StrTok
 					? null
 					: [ColNode<N, Name>, 3]
 				: null
-			: A extends OpTok<"("> | StrTok // type-mutate: equivalent cond-true – declining the column shortcut uses the general name parser
+			: A extends OpTok<"("> | StrTok
 				? null
 				: [ColNode<null, N>, 1]
-	: null; // type-mutate: equivalent never-false – ParseNameExpr is entered only for word and identifier tokens
+	: null;
 
 type ParseNameExpr<T extends Toks, I extends number> =
 	ColumnPrefix<T[I], T[Nx<I>], T[Nx2<I>], T[Nx3<I>]> extends infer R
-		? R extends [infer E, infer N] // type-mutate: equivalent cond-false – declining the column shortcut uses the general name parser
+		? R extends [infer E, infer N]
 			? Ok<E, N extends 1 ? Nx<I> : Nx3<I>>
 			: ParseNameExprSlow<T, I>
 		: never;
@@ -1231,9 +1230,9 @@ type LastOf<Parts extends readonly string[]> = Parts extends readonly [
 type ColRefOf<Parts extends readonly string[]> = Parts extends readonly [
 	infer C,
 ]
-	? ColNode<null, C> // type-mutate: equivalent never-true – one-part columns were already recognized by ColumnPrefix before this fallback
+	? ColNode<null, C>
 	: Parts extends readonly [infer Tb, infer C]
-		? ColNode<Tb, C> // type-mutate: equivalent never-true – two-part columns were already recognized by ColumnPrefix before this fallback
+		? ColNode<Tb, C>
 		: Parts extends readonly [string, infer Tb, infer C]
 			? ColNode<Tb, C>
 			: never;
@@ -1351,7 +1350,7 @@ type ParseCallSuffix<
 	Distinct extends boolean,
 	I extends number,
 > =
-	T[I] extends WordTok<"within" | "filter" | "over"> // type-mutate: equivalent cond-true – the general decoration parser returns the same empty decorations when none are present
+	T[I] extends WordTok<"within" | "filter" | "over">
 		? ParseCallDecorations<T, Name, Args, Distinct, I>
 		: Ok<CallNode<Name, Args, Distinct, null, false, null, null>, I>;
 
@@ -1374,7 +1373,7 @@ type ParseCallDecorations<
 										Args,
 										Distinct,
 										Flt,
-										Ov extends null ? false : true, // type-mutate: equivalent never-false – read with extends true, where never counts as true
+										Ov extends null ? false : true,
 										Ov,
 										WG
 									>,

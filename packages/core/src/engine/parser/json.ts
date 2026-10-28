@@ -75,11 +75,11 @@ type Fn<
 	F extends string,
 	Args,
 	Ret,
-	Absent = false, // type-mutate: equivalent bool-flip – read only for JSON_OBJECT / JSON_ARRAY values, which pass their own
+	Absent = false,
 	Passing = [],
 	Defaults = [],
 	Q = null,
-	Unknown = false, // type-mutate: equivalent bool-flip – read only for JSON_EXISTS, which passes its own
+	Unknown = false,
 > = {
 	t: "jsonfn";
 	fn: F;
@@ -433,19 +433,7 @@ type ParseArrayCtor<T extends Toks, I extends number> =
 					? X extends Ok<infer S, infer J>
 						? ParseReturning<T, SkipFormat<T, J>> extends infer R
 							? R extends Ok<infer Ret, infer J2>
-								? Close<
-										T,
-										J2,
-										Fn<
-											"json_array",
-											[],
-											Ret,
-											true, // type-mutate: equivalent bool-flip – JSON_ARRAY(query) skips NULLs itself; absent is not read
-											[],
-											[],
-											S
-										>
-									>
+								? Close<T, J2, Fn<"json_array", [], Ret, true, [], [], S>>
 								: R
 							: never
 						: X
@@ -568,7 +556,7 @@ type AggSuffix<
 									args: Args;
 									distinct: false;
 									filter: Flt;
-									over: Ov extends null ? false : true; // type-mutate: equivalent never-false – read with `extends true`, where never counts as true
+									over: Ov extends null ? false : true;
 									win: Ov;
 									withinGroup: null;
 								};
@@ -641,11 +629,11 @@ type QueryTail<
 						W,
 						Args,
 						Ret,
-						false, // type-mutate: equivalent bool-flip – absent is read only for JSON_OBJECT / JSON_ARRAY
+						false,
 						Passing,
 						DefaultsOf<Bs>,
 						null,
-						Bs[1] extends { k: "unknown" } ? true : false // type-mutate: equivalent never-true – read through Or, where never counts as true
+						Bs[1] extends { k: "unknown" } ? true : false
 					>
 				>
 			: B
@@ -869,7 +857,7 @@ type ParseColumn<
 						T,
 						EatWords<T, J, ["for", "ordinality"]>,
 						Top,
-						[...Own, Col<N, "int4", Top extends true ? false : true>], // type-mutate: equivalent never-false – a never nullability is read with `extends true`, as nullable
+						[...Own, Col<N, "int4", Top extends true ? false : true>],
 						Nest,
 						[...Names, N],
 						Defs,

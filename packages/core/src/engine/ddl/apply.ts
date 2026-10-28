@@ -173,7 +173,7 @@ export type ApplyDdlNode<DB, S> = S extends {
 																	readonly srf: infer Srf;
 																}
 															? ApplyCreateFunction<DB, Name, Ret, Srf>
-															: SqlError<"unsupported DDL statement", null>; // type-mutate: equivalent never-false – the parser makes no other DDL statement
+															: SqlError<"unsupported DDL statement", null>;
 
 // ───────────────────────────── scripts ─────────────────────────────
 
@@ -217,10 +217,10 @@ type ApplyOne<DB, S> = S extends { readonly t: DdlKind }
 				? C
 				: DB
 			: never
-		: SqlError<"unsupported statement", null>; // type-mutate: equivalent never-false – the parser makes no other statement
+		: SqlError<"unsupported statement", null>;
 
 /** Re-spell an error as `SqlError<message, position>` (hovers show the message, not the helper that built it). */
-type Plain<E> = E extends SqlError<infer M, infer At> ? SqlError<M, At> : E; // type-mutate: equivalent cond-false never-false – the same type, written plainly; only errors reach it
+type Plain<E> = E extends SqlError<infer M, infer At> ? SqlError<M, At> : E;
 
 /**
  * Semantic errors (positioned `null`: the projection reports no token) name the offending
@@ -229,7 +229,7 @@ type Plain<E> = E extends SqlError<infer M, infer At> ? SqlError<M, At> : E; // 
 type RepositionFrom<E, T extends Toks, Start extends number> =
 	E extends SqlError<infer M, unknown>
 		? SqlError<M, LocateFrom<M, T, Start>>
-		: E; // type-mutate: equivalent never-false – only errors reach it
+		: E;
 type LocateFrom<
 	M extends string,
 	T extends Toks,
@@ -239,11 +239,11 @@ type LocateFrom<
 	: M extends `${string}"${infer Name}"${string}`
 		? FindTok<T, LastPart<Name>, Start, Start> extends infer F extends number
 			? M extends `${string} specified more than once`
-				? F extends Start // type-mutate: equivalent cond-false – F is Start only when the name is not there, and then the search from Nx<F> finds nothing either
+				? F extends Start
 					? F
 					: FindTok<T, LastPart<Name>, Nx<F>, F>
 				: F
-			: Start // type-mutate: equivalent never-false – FindTok gives a number
+			: Start
 		: M extends `cannot drop ${string} ${infer Name} because ${string}`
 			? FindTok<T, Name, Start, Start>
 			: Start;
@@ -291,13 +291,13 @@ type U2I<U> = (U extends unknown ? (x: U) => void : never) extends (
 	? I
 	: never;
 type Flat<T> = { [K in keyof T]: T[K] } & {};
-type Build<U> = [U] extends [never] ? {} : Flat<U2I<U>>; // type-mutate: equivalent cond-false – a shortcut: no parts flatten to {} too
+type Build<U> = [U] extends [never] ? {} : Flat<U2I<U>>;
 /** A history-free copy of `O` (an intersection, or a mapped type over an older object). */
 type Rebuild<O> = Build<{ [K in keyof O]: Single<K & string, O[K]> }[keyof O]>;
 /** Replace an existing key in place, or append a new one. */
 type SetKey<O, K extends string, V> = Build<
 	| { [P in keyof O]: Single<P & string, P extends K ? V : O[P]> }[keyof O]
-	| (K extends keyof O ? never : Single<K, V>) // type-mutate: equivalent cond-false – the key is set to V above too
+	| (K extends keyof O ? never : Single<K, V>)
 >;
 type DelKey<O, K> = Build<
 	{ [P in keyof O]: P extends K ? never : Single<P & string, O[P]> }[keyof O]
@@ -328,7 +328,7 @@ type PickOne<U> = (U extends unknown ? (x: () => U) => void : never) extends (
 
 // ───────────────────────────── relations ─────────────────────────────
 
-type IsTop<S> = S extends null | "public" ? true : false; // type-mutate: equivalent never-true – read with extends true, never counts as true
+type IsTop<S> = S extends null | "public" ? true : false;
 /** The name as written (`t`, `public.t`, `s.t`), as Postgres spells it in "relation ... does not exist". */
 type Written<Ref extends TableRef> = Ref["schema"] extends string
 	? `${Ref["schema"]}.${Ref["name"]}`
@@ -337,11 +337,11 @@ type Written<Ref extends TableRef> = Ref["schema"] extends string
 type MissingRel<DB, Ref extends TableRef, E> =
 	SchemaExists<DB, Ref["schema"]> extends false ? NoSchema<Ref["schema"]> : E;
 
-type IsViewVal<X> = X extends { readonly $view: unknown } ? true : false; // type-mutate: equivalent never-true – read with extends true, never counts as true
+type IsViewVal<X> = X extends { readonly $view: unknown } ? true : false;
 /** A namespace (nested schema) maps names to tables/views; a table maps names to column descriptors. */
 type IsNamespace<X> = X extends { readonly $view: unknown }
 	? false
-	: [keyof X] extends [never] // type-mutate: equivalent cond-false – an empty object's X[keyof X] is never, which is no column either
+	: [keyof X] extends [never]
 		? false
 		: X[keyof X] extends { readonly type: string }
 			? false
@@ -349,7 +349,7 @@ type IsNamespace<X> = X extends { readonly $view: unknown }
 /** Top-level key holding a schema (an empty object counts: it may be an empty schema). */
 type IsSchemaKey<DB, K extends string> = K extends keyof DB
 	? K extends MetaKey
-		? false // type-mutate: equivalent never-true – read with extends false, never counts as false
+		? false
 		: [keyof DB[K]] extends [never]
 			? true
 			: IsNamespace<DB[K]>
@@ -359,7 +359,7 @@ type IsSchemaKey<DB, K extends string> = K extends keyof DB
 type GetRel<DB, Ref extends TableRef> =
 	IsTop<Ref["schema"]> extends true
 		? Ref["name"] extends keyof DB
-			? Ref["name"] extends MetaKey // type-mutate: equivalent cond-false – a shortcut: a registry reads as a namespace below, which gives null too
+			? Ref["name"] extends MetaKey
 				? null
 				: IsNamespace<DB[Ref["name"]]> extends true
 					? null
@@ -399,7 +399,7 @@ type PutRel<DB, Ref extends TableRef, V> =
 					Ref["schema"] & string,
 					SetKey<DB[Ref["schema"]], Ref["name"], V>
 				>
-			: NoSchema<Ref["schema"]>; // type-mutate: equivalent never-false – the callers check the schema first
+			: NoSchema<Ref["schema"]>;
 type DelRel<DB, Ref extends TableRef> =
 	IsTop<Ref["schema"]> extends true
 		? DelKey<DB, Ref["name"]>
@@ -409,7 +409,7 @@ type DelRel<DB, Ref extends TableRef> =
 					Ref["schema"] & string,
 					DelKey<DB[Ref["schema"]], Ref["name"]>
 				>
-			: DB; // type-mutate: equivalent never-false – the callers found the relation first
+			: DB;
 type RenameRel<DB, Ref extends TableRef, To extends string> =
 	IsTop<Ref["schema"]> extends true
 		? RenameKey<DB, Ref["name"], To>
@@ -419,12 +419,12 @@ type RenameRel<DB, Ref extends TableRef, To extends string> =
 					Ref["schema"] & string,
 					RenameKey<DB[Ref["schema"]], Ref["name"], To>
 				>
-			: DB; // type-mutate: equivalent never-false – the callers found the relation first
+			: DB;
 
 /** Column map of a table or view value. */
 type ColsOf<Rel> = Rel extends { readonly $view: infer C } ? C : Rel;
 type Rewrap<Rel, C> = IsViewVal<Rel> extends true ? AsView<C> : C;
-type AsView<C> = C extends Table ? View<C> : { readonly $view: C }; // type-mutate: equivalent cond-false never-false – View<C> is { readonly $view: C }
+type AsView<C> = C extends Table ? View<C> : { readonly $view: C };
 
 // ───────────────────────────── columns ─────────────────────────────
 
@@ -444,8 +444,8 @@ type DescOf<D extends ColumnDef> = MkCol<
 type TypeOfCol<C> = C extends { readonly type: infer Ty extends string }
 	? Ty
 	: never;
-type NullOf<C> = C extends { readonly nullable: infer N } ? N : true; // type-mutate: equivalent never-false bool-flip – a column descriptor has its flags
-type DefOf<C> = C extends { readonly hasDefault: infer H } ? H : false; // type-mutate: equivalent never-false bool-flip – a column descriptor has its flags
+type NullOf<C> = C extends { readonly nullable: infer N } ? N : true;
+type DefOf<C> = C extends { readonly hasDefault: infer H } ? H : false;
 type WithNullable<C, N> = MkCol<TypeOfCol<C>, N, DefOf<C>>;
 type WithDefault<C, H> = MkCol<TypeOfCol<C>, NullOf<C>, H>;
 type WithType<C, Ty extends string> = MkCol<Ty, NullOf<C>, DefOf<C>>;
@@ -503,7 +503,7 @@ type ApplyCreateTable<DB, Ine, Ref extends TableRef, Defs, Cons, Likes, Inh> =
 /** Inherited columns, then LIKE columns, then local definitions; then NOT NULL for the primary key and table-level NOT NULL constraints. */
 type BuildTable<DB, TN extends string, Defs, Cons, Likes, Inh> =
 	AddInherits<Inh, DB, {}> extends infer A0
-		? A0 extends AnyErr // type-mutate: equivalent cond-false – the error flows through the later steps and is rebuilt plainly at the end
+		? A0 extends AnyErr
 			? A0
 			: AddLikes<Likes, DB, A0, never> extends infer A1
 				? A1 extends readonly [infer Acc1, infer Seen1]
@@ -559,8 +559,8 @@ type AddInherits<Ps, DB, Acc> = Ps extends readonly [
 		: never
 	: Acc;
 type TypeConflict<A, B> = {
-	[K in keyof A & keyof B]: TypeOfCol<A[K]> extends TypeOfCol<B[K]> // type-mutate: equivalent cond-true never-true – DDL column types are plain names: one extends the other only when they are the same
-		? TypeOfCol<B[K]> extends TypeOfCol<A[K]> // type-mutate: equivalent cond-true – DDL column types are plain names: one extends the other only when they are the same
+	[K in keyof A & keyof B]: TypeOfCol<A[K]> extends TypeOfCol<B[K]>
+		? TypeOfCol<B[K]> extends TypeOfCol<A[K]>
 			? never
 			: K
 		: K;
@@ -686,7 +686,7 @@ type QueryProjection<DB, Q> = Q extends SelectStmt
 				`CREATE TABLE ... AS EXECUTE ${N} is not supported: the columns of a prepared statement are unknown`,
 				null
 			>
-		: SqlError<"unsupported query", null>; // type-mutate: equivalent never-false – the parser makes no other query here
+		: SqlError<"unsupported query", null>;
 
 /** Project the query, apply the column-name list, reject duplicate names → column map or error. */
 type QueryCols<DB, Q, Names, TooMany extends string> =
@@ -719,7 +719,7 @@ type NameCols<
 					null
 				>
 		: SqlError<TooMany, null>
-	: [...Acc, ...C]; // type-mutate: equivalent tuple-swap – names are checked for duplicates, in any order
+	: [...Acc, ...C];
 
 /** First duplicate output name, or null. */
 type DupCol<C extends Cols, Seen> = C extends readonly [
@@ -734,7 +734,7 @@ type DupCol<C extends Cols, Seen> = C extends readonly [
 			? [N] extends [Seen]
 				? N
 				: DupCol<R, Seen | N>
-			: null // type-mutate: equivalent never-false – a projected column is named or a star
+			: null
 	: null;
 
 type ApplyCreateTableAs<DB, Ine, Ref extends TableRef, Names, Q> =
@@ -789,9 +789,9 @@ type ApplyDropRels<
 						IsViewVal<Rel> extends true
 							? Kind extends "table"
 								? false
-								: true // type-mutate: equivalent never-false – read with extends true, never counts as true
+								: true
 							: Kind extends "table"
-								? true // type-mutate: equivalent never-true – read with extends true, never counts as true
+								? true
 								: false
 					) extends true
 				? ApplyDropRels<DelRel<DB, R>, Rest, Ife, Kind>
@@ -858,7 +858,7 @@ type RenameTable<DB, Ref extends TableRef, To extends string> =
 		: SqlError<`relation "${To}" already exists`, null>;
 
 type SetSchema<DB, Ref extends TableRef, S extends string, Rel> =
-	SchemaExists<DB, S> extends false // type-mutate: equivalent cond-false – PutRel reports the missing schema too
+	SchemaExists<DB, S> extends false
 		? NoSchema<S>
 		: GetRel<DB, { schema: S; name: Ref["name"] }> extends null
 			? SchemaClash<DB, { schema: S; name: Ref["name"] }> extends infer E
@@ -921,7 +921,7 @@ type RunPasses<Tbl, As, TN extends string> =
 		TN,
 		"drop_column" | "drop_not_null" | "drop_default"
 	> extends infer T1
-		? T1 extends AnyErr // type-mutate: equivalent cond-false – the error flows through the later passes and is rebuilt plainly at the end
+		? T1 extends AnyErr
 			? T1
 			: RunPass<T1, As, TN, "alter_type"> extends infer T2
 				? T2 extends AnyErr
@@ -949,7 +949,7 @@ type RunPass<Tbl, As, TN extends string, K> = As extends readonly [
 ]
 	? A extends { readonly t: K }
 		? ColAction<Tbl, A, TN> extends infer T2
-			? T2 extends AnyErr // type-mutate: equivalent cond-false – the error flows through the later actions and is rebuilt plainly at the end
+			? T2 extends AnyErr
 				? T2
 				: RunPass<T2, R, TN, K>
 			: never
@@ -994,7 +994,7 @@ type ColAction<Tbl, A, TN extends string> = A extends {
 								? WithNullable<Tbl[K], false>
 								: Tbl[K];
 						}>
-					: Tbl // type-mutate: equivalent never-false – the parser gives a list of names
+					: Tbl
 			: A extends {
 						readonly t: infer Kind;
 						readonly name: infer C extends string;
@@ -1006,7 +1006,7 @@ type ColAction<Tbl, A, TN extends string> = A extends {
 							: SetKey<Tbl, C, D2>
 						: never
 					: NoColumn<C, TN>
-				: Tbl; // type-mutate: equivalent never-false – every other action names a column
+				: Tbl;
 
 type ModifyCol<
 	D,
@@ -1017,7 +1017,7 @@ type ModifyCol<
 > = Kind extends "alter_type"
 	? A extends { readonly type: infer Ty extends string }
 		? WithType<D, Ty>
-		: D // type-mutate: equivalent never-false – ALTER TYPE has a type
+		: D
 	: Kind extends "set_not_null"
 		? WithNullable<D, false>
 		: Kind extends "drop_not_null"
@@ -1026,14 +1026,14 @@ type ModifyCol<
 				? WithDefault<D, true>
 				: Kind extends "drop_default"
 					? WithDefault<D, false>
-					: Kind extends "add_identity" // type-mutate: equivalent cond-true – no other kind reaches it
+					: Kind extends "add_identity"
 						? NullOf<D> extends true
 							? SqlError<
 									`column "${C}" of relation "${TN}" must be declared NOT NULL before identity can be added`,
 									null
 								>
 							: WithDefault<D, true>
-						: D; // type-mutate: equivalent never-false – no other kind reaches it
+						: D;
 
 // ───────────────────────────── views ─────────────────────────────
 
@@ -1083,7 +1083,7 @@ type BuildView<DB, Ref extends TableRef, Names, Q, Old, QDB = DB> =
 		: never;
 
 /** Nothing to check for a new view (`Old` null). */
-type ReplaceCheck<Old, V> = Old extends null ? null : CheckReplace<Old, V>; // type-mutate: equivalent cond-false – a new view has no old columns to conflict with
+type ReplaceCheck<Old, V> = Old extends null ? null : CheckReplace<Old, V>;
 /** CREATE OR REPLACE VIEW may add columns, but not drop columns or change their types. */
 type CheckReplace<Old, New> = [Exclude<keyof Old, keyof New>] extends [never]
 	? PickOne<TypeConflict<Old, New>> extends infer K
@@ -1094,7 +1094,7 @@ type CheckReplace<Old, New> = [Exclude<keyof Old, keyof New>] extends [never]
 						`cannot change data type of view column "${K & string}" from ${DisplayType<TypeOfCol<Old[K]>>} to ${DisplayType<TypeOfCol<New[K]>>}`,
 						null
 					>
-				: null // type-mutate: equivalent never-false – the key comes from both
+				: null
 		: never
 	: SqlError<"cannot drop columns from view", null>;
 
@@ -1220,8 +1220,7 @@ type TblUses<Tbl, N extends string> = true extends {
 	? true
 	: false;
 type UsesType<DB, N extends string> = true extends {
-	// type-mutate: equivalent never-true – read with extends true, never counts as true
-	[K in keyof DB]: K extends MetaKey // type-mutate: equivalent cond-false never-true – a registry holds no column of the type either
+	[K in keyof DB]: K extends MetaKey
 		? false
 		: IsNamespace<DB[K]> extends true
 			? NsUses<DB[K], N>
@@ -1233,11 +1232,11 @@ type NsUses<NS, N extends string> = true extends {
 	[K in keyof NS]: TblUses<ColsOf<NS[K]>, N>;
 }[keyof NS]
 	? true
-	: false; // type-mutate: equivalent never-false – a never entry drops out of the union, leaving false
+	: false;
 
 /** `DROP TYPE ... CASCADE`: drop the registry entry, dependent table columns, and dependent views. */
 type DropTypeCols<DB, N extends string> = Rebuild<{
-	[K in keyof DB as K extends MetaKey // type-mutate: equivalent cond-false – a registry is not a view: kept either way
+	[K in keyof DB as K extends MetaKey
 		? K
 		: IsViewVal<DB[K]> extends true
 			? TblUses<ColsOf<DB[K]>, N> extends true
@@ -1334,9 +1333,9 @@ type ApplyElement<DB, S extends string, E> = E extends {
 				Ref,
 				Names,
 				Q,
-				S extends keyof DB ? ApplyPatch<DB, DB[S], never> : DB // type-mutate: equivalent never-false – the schema is created before its elements
+				S extends keyof DB ? ApplyPatch<DB, DB[S], never> : DB
 			>
-		: DB; // type-mutate: equivalent never-false – the parser makes tables and views only
+		: DB;
 /** Unqualified relation names (TableRef or LIKE clause entries) that exist in schema `S`, qualified with `S`. */
 type InSearchPath<DB, S extends string, Items> = {
 	[K in keyof Items]: Items[K] extends {
@@ -1347,7 +1346,7 @@ type InSearchPath<DB, S extends string, Items> = {
 			? N extends keyof DB[S]
 				? { schema: S; name: N }
 				: Items[K]
-			: Items[K] // type-mutate: equivalent never-false – the schema is created before its elements
+			: Items[K]
 		: Items[K] extends {
 					readonly ref: { readonly schema: null; readonly name: infer N };
 					readonly defaults: infer D;
@@ -1356,7 +1355,7 @@ type InSearchPath<DB, S extends string, Items> = {
 				? N extends keyof DB[S]
 					? { ref: { schema: S; name: N }; defaults: D }
 					: Items[K]
-				: Items[K] // type-mutate: equivalent never-false – the schema is created before its elements
+				: Items[K]
 			: Items[K];
 };
 

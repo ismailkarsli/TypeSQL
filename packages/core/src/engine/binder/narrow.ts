@@ -119,20 +119,20 @@ type ColKey<E> = E extends {
 		: never;
 
 /** Keys for `USING (a, b)` / NATURAL join columns (bare names). */
-export type UsingKeys<U extends string> = U extends string // type-mutate: equivalent cond-true – distributes over the names either way
+export type UsingKeys<U extends string> = U extends string
 	? readonly [null, U]
 	: never;
 
 /** Mark the columns named by `Keys` non-null in a scope level (unchanged level when nothing nullable is hit). */
 // the shortcuts return `L` itself, which keeps cached `TypeOf` results shared; narrowing a level
 // without a hit gives an equal type
-export type NarrowLevel<L extends ScopeLevel, Keys> = [Keys] extends [never] // type-mutate: equivalent cond-false – a shortcut (an equal type)
+export type NarrowLevel<L extends ScopeLevel, Keys> = [Keys] extends [never]
 	? L
-	: AnyHit<L, Keys, 0> extends true // type-mutate: equivalent cond-true – a shortcut (an equal type)
+	: AnyHit<L, Keys, 0> extends true
 		? {
-				readonly [I in keyof L]: L[I] extends ScopeItem // type-mutate: equivalent cond-true – a level holds scope items only
+				readonly [I in keyof L]: L[I] extends ScopeItem
 					? NarrowItem<L[I], Keys>
-					: L[I]; // type-mutate: equivalent never-false – a level holds scope items only
+					: L[I];
 			}
 		: L;
 
@@ -152,19 +152,18 @@ type AnyHit<
 	L extends ScopeLevel,
 	Keys,
 	I extends number,
-> = L[I] extends ScopeItem // type-mutate: equivalent never-true – only the shortcut reads it
+> = L[I] extends ScopeItem
 	? true extends ItemHits<
-			// type-mutate: equivalent never-true cond-true – only the shortcut reads it
 			L[I]["cols"],
 			L[I]["alias"],
 			L[I]["skip"][number],
 			Keys
 		>
 		? true
-		: AnyHit<L, Keys, Nx<I>> // type-mutate: equivalent never-false – only the shortcut reads it
-	: false; // type-mutate: equivalent never-false bool-flip – only the shortcut reads it
+		: AnyHit<L, Keys, Nx<I>>
+	: false;
 type ItemHits<M extends ColMap, A, Skip, Keys> = {
-	[K in keyof M]: M[K]["nullable"] extends true ? Hit<A, K, Skip, Keys> : never; // type-mutate: equivalent cond-true – only the shortcut reads it
+	[K in keyof M]: M[K]["nullable"] extends true ? Hit<A, K, Skip, Keys> : never;
 }[keyof M];
 
 type NarrowItem<It extends ScopeItem, Keys> = {
@@ -173,7 +172,7 @@ type NarrowItem<It extends ScopeItem, Keys> = {
 	readonly skip: It["skip"];
 };
 type NarrowCols<M extends ColMap, A, Skip, Keys> = {
-	readonly [K in keyof M]: M[K]["nullable"] extends true // type-mutate: equivalent cond-true – a non-null column written as non-null is the same column
+	readonly [K in keyof M]: M[K]["nullable"] extends true
 		? Hit<A, K, Skip, Keys> extends true
 			? { readonly type: M[K]["type"]; readonly nullable: false }
 			: M[K]

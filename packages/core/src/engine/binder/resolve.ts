@@ -58,7 +58,7 @@ type LookupTable<
 type InPgCatalog<DB, Name extends string> = DB extends {
 	readonly pg_catalog: infer PC;
 }
-	? Name extends keyof PC // type-mutate: equivalent never-true – a never passes the callers' `InPgCatalog<…> extends true` too
+	? Name extends keyof PC
 		? true
 		: false
 	: false;
@@ -227,7 +227,6 @@ export type ExpandStar<
 		: L extends readonly []
 			? SqlError<"SELECT * with no tables specified is not valid", null>
 			: L extends readonly [
-						// type-mutate: equivalent cond-false – a fast path: ExpandAll gives the same map for one item without skips
 						{
 							readonly cols: infer M;
 							readonly skip: readonly [];
@@ -254,13 +253,13 @@ type ExpandAll<
 			R,
 			[
 				...Maps,
-				I["skip"] extends readonly [] // type-mutate: equivalent cond-false – a fast path: Omit of no names gives the same columns
+				I["skip"] extends readonly []
 					? I["cols"]
 					: Omit<I["cols"], I["skip"][number]>,
 			]
 		>
 	: { readonly [K in AllKeys<Maps[number]>]: LastWith<Maps, K> };
-type AllKeys<M> = M extends ColMap ? keyof M : never; // type-mutate: equivalent cond-true – M is a ColMap: the test only distributes over a union
+type AllKeys<M> = M extends ColMap ? keyof M : never;
 type LastWith<Maps extends readonly ColMap[], K> = Maps extends readonly [
 	...infer R extends readonly ColMap[],
 	infer M,

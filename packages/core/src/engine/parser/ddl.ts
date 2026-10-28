@@ -58,7 +58,7 @@ export type ParseDdl<T extends Toks, I extends number> =
 				: W extends "drop"
 					? ParseDrop<T, Nx<I>>
 					: Noop<T, I, W>
-		: SyntaxErrorAt<T, I>; // type-mutate: equivalent – ParseStatement calls it only on a DDL keyword
+		: SyntaxErrorAt<T, I>;
 
 type Noop<T extends Toks, I extends number, What extends string> = Ok<
 	{ t: "noop"; what: What },
@@ -326,7 +326,7 @@ type FnRetType<T extends Toks, I extends number, Srf extends boolean> =
 		? T[J] extends OpTok<"%">
 			? T[Nx<J>] extends WordTok<"type">
 				? [
-						`${Parts extends readonly [...unknown[], infer Last extends string] ? Last : never}%type`, // type-mutate: equivalent never-false – QualName returns a nonempty tuple of names
+						`${Parts extends readonly [...unknown[], infer Last extends string] ? Last : never}%type`,
 						Srf,
 						Nx2<J>,
 					]
@@ -453,7 +453,7 @@ type ParseTypedElements<T extends Toks, I extends number, TN extends string> = (
 					Name,
 					"unknown",
 					false,
-					false, // type-mutate: equivalent bool-flip – the element's column is dropped (a typed table's columns are unknown), and only its hasDefault reads the flag
+					false,
 					false,
 					false
 				>
@@ -471,7 +471,7 @@ type ParseTypedElements<T extends Toks, I extends number, TN extends string> = (
 /** `( a, b ) AS` — a bare identifier followed by `,` or `)` cannot start a column definition. */
 type IsCtasColList<T extends Toks, I extends number> =
 	Ident<T, I> extends [string, infer J extends number]
-		? T[J] extends OpTok<"," | ")"> // type-mutate: equivalent never-true – read with `extends true`, where never counts as true
+		? T[J] extends OpTok<"," | ")">
 			? true
 			: false
 		: false;
@@ -749,10 +749,10 @@ type ConstraintStart =
 	| "foreign"
 	| "not";
 type IsConstraintStart<T extends Toks, I extends number> =
-	T[I] extends WordTok<ConstraintStart> // type-mutate: equivalent never-true – read with `extends true`, where never counts as true
+	T[I] extends WordTok<ConstraintStart>
 		? true
 		: T[I] extends WordTok<"exclude">
-			? T[Nx<I>] extends WordTok<"using"> | OpTok<"("> // type-mutate: equivalent never-true – read with `extends true`, where never counts as true
+			? T[Nx<I>] extends WordTok<"using"> | OpTok<"(">
 				? true
 				: false
 			: false;
@@ -1425,7 +1425,7 @@ type RecursiveViewQuery<
 		];
 		where: null;
 		groupBy: null;
-		groupingSets: false; // type-mutate: equivalent bool-flip – read only with a GROUP BY, which the query has not
+		groupingSets: false;
 		having: null;
 		windows: [];
 	};
@@ -1633,7 +1633,7 @@ type SchemaElement<
 													Requalify<E, S>,
 													W extends "view" ? Nx<I> : Nx2<I>
 												>
-											: R // type-mutate: equivalent never-false – the three parsers make only these nodes
+											: R
 								: R
 							: never
 					: W extends "sequence"
@@ -1722,7 +1722,7 @@ type Requalify<E, S extends string> = E extends {
 				cols: D;
 				q: Q;
 			}
-		: E; // type-mutate: equivalent never-false – SchemaElement requalifies tables and views only
+		: E;
 
 /** `Then`, or a syntax error at the token after a `.` that QualName stopped before: a dangling dot (`a.b.`), as in Postgres, or a fourth part. */
 type NoDanglingDot<T extends Toks, J extends number, Then> =
@@ -1889,10 +1889,10 @@ type ParseAlterTable<T extends Toks, I extends number> =
 			: never;
 
 type IsStandalone<T extends Toks, I extends number> =
-	T[I] extends WordTok<"rename"> // type-mutate: equivalent never-true – read with `extends true`, where never counts as true
+	T[I] extends WordTok<"rename">
 		? true
 		: T[I] extends WordTok<"set">
-			? T[Nx<I>] extends WordTok<"schema"> // type-mutate: equivalent never-true – read with `extends true`, where never counts as true
+			? T[Nx<I>] extends WordTok<"schema">
 				? true
 				: false
 			: false;

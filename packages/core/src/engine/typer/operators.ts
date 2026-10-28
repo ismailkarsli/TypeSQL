@@ -812,10 +812,10 @@ type MulAdd<
 	Carry extends unknown[],
 	Out extends string,
 > = Rev extends `${infer D extends Digit}${infer Rest}`
-	? DivMod10<
-			[...Times<DigitRank[D], R, []>, ...Carry], // type-mutate: equivalent tuple-swap – only the length counts
-			[]
-		> extends [infer Q extends unknown[], infer M extends number]
+	? DivMod10<[...Times<DigitRank[D], R, []>, ...Carry], []> extends [
+			infer Q extends unknown[],
+			infer M extends number,
+		]
 		? MulAdd<Rest, R, Q, `${Out}${M}`>
 		: never
 	: Carry extends []
@@ -825,12 +825,10 @@ type Times<
 	N extends unknown[],
 	R extends unknown[],
 	Acc extends unknown[],
-> = N extends [unknown, ...infer NR]
-	? Times<NR, R, [...Acc, ...R]> // type-mutate: equivalent tuple-swap – only the length counts
-	: Acc;
+> = N extends [unknown, ...infer NR] ? Times<NR, R, [...Acc, ...R]> : Acc;
 /** A tuple's length `n` → `[n / 10 as a tuple, n % 10]`. */
 type DivMod10<T extends unknown[], Q extends unknown[]> = T extends [
-	...Ten, // type-mutate: equivalent tuple-swap – only the length counts
+	...Ten,
 	...infer Rest,
 ]
 	? DivMod10<Rest, [...Q, 0]>

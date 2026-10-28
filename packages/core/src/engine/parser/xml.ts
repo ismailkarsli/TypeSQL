@@ -53,7 +53,7 @@ type XmlNode<Op extends string, Args, Named, To> = {
 };
 
 /** `l IS [NOT] DOCUMENT`. */
-export type XmlIsDocument<L, Not extends boolean> = Not extends true // type-mutate: equivalent – IS NOT DOCUMENT types as IS DOCUMENT does (bool, the operand's nullability, ?column?) and nothing narrows on either
+export type XmlIsDocument<L, Not extends boolean> = Not extends true
 	? { t: "un"; op: "not"; e: XmlNode<"document", [L], [], null> }
 	: XmlNode<"document", [L], [], null>;
 
@@ -527,7 +527,7 @@ type ColDone<
 			type: Ty;
 			path: Path;
 			def: Def;
-			notNull: NN extends true ? true : false; // type-mutate: equivalent never-true – a never notNull is read with `extends true`, as NOT NULL
+			notNull: NN extends true ? true : false;
 			ordinality: false;
 		},
 	]

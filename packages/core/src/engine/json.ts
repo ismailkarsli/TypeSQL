@@ -101,10 +101,10 @@ export type MergeShapes<A, B> = [B] extends [TsShape<[]>]
 			? B
 			: A | B
 		: A | B;
-type ArrayLike<S> = [S] extends [ArrShape<unknown>] // type-mutate: equivalent never-true – a never passes the callers' `ArrayLike<…> extends true` too
+type ArrayLike<S> = [S] extends [ArrShape<unknown>]
 	? true
 	: [S] extends [TsShape<infer T>]
-		? [] extends T // type-mutate: equivalent never-true – a never passes the callers' `ArrayLike<…> extends true` too
+		? [] extends T
 			? true
 			: false
 		: false;
@@ -155,7 +155,7 @@ export type JsonRet<
 									}
 								>
 							: StepOf<As[0]["type"], B, "idx", number> // elem
-	: "unknown"; // type-mutate: equivalent never-false – every pattern of the catalog is kind:base
+	: "unknown";
 
 /**
  * `json_build_object(k1, v1, …)` with literal keys: an object shape (a repeated key keeps its
@@ -188,7 +188,7 @@ export type BuildObject<
 					>
 				: Info<B>;
 /** `Acc` without key `K` (a repeated key keeps its last value). */
-type Without<Acc, K extends string> = K extends keyof Acc ? Omit<Acc, K> : Acc; // type-mutate: equivalent cond-true – Omit of a key Acc does not have leaves Acc as it is
+type Without<Acc, K extends string> = K extends keyof Acc ? Omit<Acc, K> : Acc;
 type KeyOf<E> = E extends {
 	readonly t: "str" | "num";
 	readonly v: infer V;
@@ -247,8 +247,8 @@ type StepOf<
 /** A step result: `unknown` (no shape left) is the plain type; a step that only misses has no value (NULL). */
 type Reshape<B extends string, S> = [S] extends [never]
 	? Shaped<B, TsShape<never>>
-	: [S] extends [TsShape<infer T>] // type-mutate: equivalent cond-false – a ts shape of unknown reads as plain JSON wherever it goes
-		? unknown extends T // type-mutate: equivalent cond-false – a ts shape of unknown reads as plain JSON wherever it goes
+	: [S] extends [TsShape<infer T>]
+		? unknown extends T
 			? B
 			: Shaped<B, S>
 		: Shaped<B, S>;
@@ -311,9 +311,9 @@ type Step<
 type IndexOk<Kind extends string, K> = Kind extends "key"
 	? false
 	: K extends number
-		? true // type-mutate: equivalent never-true – a never passes the callers' `IndexOk<…> extends true` too
+		? true
 		: K extends `${number}`
-			? true // type-mutate: equivalent never-true – a never passes the callers' `IndexOk<…> extends true` too
+			? true
 			: false;
 
 /** Step into a serialized SQL value: shaped JSON and rows have shapes; arrays index; scalars give NULL. */
@@ -408,10 +408,10 @@ export type JsonTs<S, DB> = S extends { readonly k: "obj"; readonly m: infer M }
 					? JsonValueTs<C, DB>
 					: S extends { readonly k: "ts"; readonly v: infer T }
 						? T
-						: unknown; // type-mutate: equivalent never-false – every kind of shape is handled above
+						: unknown;
 
 /** TS type of an SQL value inside JSON (distributes over a union of infos). */
-type JsonValueTs<C extends ColInfo, DB> = C extends ColInfo // type-mutate: equivalent cond-true – C is a ColInfo: the test only distributes over a union
+type JsonValueTs<C extends ColInfo, DB> = C extends ColInfo
 	? C["nullable"] extends true
 		? JsonOfType<C["type"], DB> | null
 		: JsonOfType<C["type"], DB>
@@ -452,7 +452,7 @@ type JsonStringT =
 
 type JsonOfType<T extends string, DB> = T extends AnyShaped
 	? ShapeOfType<T> extends infer S
-		? S extends null // type-mutate: equivalent cond-false, never-true – a shaped type always has a shape (ShapeOfType); JsonTs of none would be unknown too
+		? S extends null
 			? unknown
 			: JsonTs<S, DB>
 		: never

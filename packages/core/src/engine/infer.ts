@@ -39,19 +39,18 @@ export type Analyze<DB, Q extends string> =
 	RewriteNamed<Q> extends infer RN
 		? RN extends [infer Q1 extends string, infer Names]
 			? FastSelect<Q1> extends infer F
-				? [F] extends [never] // type-mutate: equivalent cond-true – always using the general pipeline only disables the fast path
+				? [F] extends [never]
 					? AnalyzeGeneral<DB, Q1, Names>
 					: F extends {
-								// type-mutate: equivalent cond-false – rejecting a fast parse uses the equivalent general pipeline
 								stmt: infer S extends Stmt;
-								max: infer M extends number; // type-mutate: equivalent infer-bare – FastSelect's max is already a number
+								max: infer M extends number;
 							}
 						? ProjectStmt<S, DB, [], {}> extends infer C
-							? C extends Cols | null // type-mutate: equivalent cond-false – always retrying the general pipeline preserves results and diagnostics
+							? C extends Cols | null
 								? {
 										readonly kind: S["t"];
 										readonly cols: C;
-										readonly params: M extends 0 // type-mutate: equivalent cond-false – a statement without parameters builds the same empty map
+										readonly params: M extends 0
 											? {}
 											: ParamsToMap<ParamsOfStmt<S, DB>>;
 										readonly max: M;
@@ -60,7 +59,7 @@ export type Analyze<DB, Q extends string> =
 									}
 								: AnalyzeGeneral<DB, Q1, Names>
 							: never
-						: AnalyzeGeneral<DB, Q1, Names> // type-mutate: equivalent never-false – FastSelect only produces a valid statement/max pair or never, handled above
+						: AnalyzeGeneral<DB, Q1, Names>
 				: never
 			: RN
 		: never;
@@ -76,7 +75,7 @@ type AnalyzeGeneral<DB, Q1 extends string, Names> =
 									readonly kind: S["t"];
 									readonly cols: C;
 									// the parameter pass re-types expressions; skip it when there are no `$n`
-									readonly params: MaxParam<T> extends 0 // type-mutate: equivalent cond-false, never-true – a shortcut: a statement without parameters maps to {} (or never) either way, read as no parameters
+									readonly params: MaxParam<T> extends 0
 										? {}
 										: ParamsToMap<ParamsOfStmt<S, DB>>;
 									readonly max: MaxParam<T>;
@@ -94,11 +93,11 @@ type AnalyzeGeneral<DB, Q1 extends string, Names> =
  * `Analyze` without `stmt`, from the type cache when it has a fresh entry for `(DB, Q)` (see
  * cache.ts). What the projections below read; `Analyze` itself is never cached.
  */
-export type Analysis<DB, Q extends string> = [Q] extends [keyof QueryCacheKeys] // type-mutate: equivalent – the type tests run without a cache; test/cache checks hits in its own project
-	? CachedAnalysis<DB, Q> extends infer C // type-mutate: equivalent – reached with a cache only (test/cache)
-		? [C] extends [never] // type-mutate: equivalent – reached with a cache only (test/cache)
+export type Analysis<DB, Q extends string> = [Q] extends [keyof QueryCacheKeys]
+	? CachedAnalysis<DB, Q> extends infer C
+		? [C] extends [never]
 			? Analyze<DB, Q>
-			: C // type-mutate: equivalent never-false – reached with a cache only (test/cache)
+			: C
 		: never
 	: Analyze<DB, Q>;
 
@@ -125,7 +124,7 @@ type Reposition<E, T extends Toks, DB = never> =
 		? At extends null
 			? SqlError<WithHint<M, T, DB>, LocateIdent<M, T>>
 			: SqlError<M, At>
-		: E; // type-mutate: equivalent never-false – only errors are repositioned
+		: E;
 
 /**
  * Token index for a semantic error: the function of `function f(…) does not exist` and of a
@@ -194,7 +193,7 @@ type FindOr<T extends Toks, P, Else extends number> =
 		? I extends -1
 			? Else
 			: I
-		: Else; // type-mutate: equivalent never-false – FindTok always gives a number
+		: Else;
 /** Index of the first token from `I` on that is a `P`, or -1. */
 type FindTok<T extends Toks, P, I extends number> = T[I] extends {
 	readonly k: string;
@@ -341,7 +340,7 @@ type JsonArgs<Ps, P> = {
 		? Nx<N> extends keyof P
 			? JsonArg<Ps[I], P[Nx<N>]>
 			: Ps[I]
-		: Ps[I]; // type-mutate: equivalent never-false – a tuple's mapped keys are its indexes
+		: Ps[I];
 };
 type JsonArg<X, U> = [Extract<U, { readonly type: "json" | "jsonb" }>] extends [
 	never,
@@ -407,11 +406,11 @@ export type KindOf<DB, Q extends string> =
  * or `SqlError<message, tokenIndex>`. See engine/ddl/apply.ts. From the type cache (`DdlCache`)
  * when it has a fresh entry for the step.
  */
-export type ApplyDdl<DB, Q extends string> = [Q] extends [keyof DdlCacheKeys] // type-mutate: equivalent – the type tests run without a cache; test/cache checks hits in its own project
-	? CachedDdl<DB, Q> extends infer C // type-mutate: equivalent – reached with a cache only (test/cache)
-		? [C] extends [never] // type-mutate: equivalent – reached with a cache only (test/cache)
+export type ApplyDdl<DB, Q extends string> = [Q] extends [keyof DdlCacheKeys]
+	? CachedDdl<DB, Q> extends infer C
+		? [C] extends [never]
 			? ApplyDdlAll<DB, Q>
-			: C // type-mutate: equivalent never-false – reached with a cache only (test/cache)
+			: C
 		: never
 	: ApplyDdlAll<DB, Q>;
 

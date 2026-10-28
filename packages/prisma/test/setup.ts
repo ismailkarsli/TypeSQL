@@ -28,7 +28,7 @@ const env = { ...process.env, CHECKPOINT_DISABLE: "1" };
 /**
  * Generates the Prisma Client fixture (`test/fixtures/client`, gitignored) the type tests import,
  * and records the requests `prisma generate` sends the typesql generator, so test/bin.test.ts
- * can replay them to src/bin.ts in the test process (where coverage and mutants are seen).
+ * can replay them to src/bin.ts in the test process (where coverage is collected).
  */
 export default function setup(project: TestProject): () => void {
 	execFileSync(

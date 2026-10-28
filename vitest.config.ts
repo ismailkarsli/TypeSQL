@@ -17,7 +17,7 @@ const uncovered: Record<
 ).uncovered;
 const ratchet = process.env.TYPESQL_COVERAGE_RATCHET === "1";
 
-export const reporters: NonNullable<InlineConfig["reporters"]> =
+const reporters: NonNullable<InlineConfig["reporters"]> =
 	process.env.GITHUB_ACTIONS === "true"
 		? [
 				"default",

@@ -19,7 +19,6 @@ cross-checks, with no automatic fallback:
 ```sh
 pnpm exec tsc -p packages/core/tsconfig.json --noEmit
 pnpm test:types -- --typecheck.checker=tsc
-pnpm mutate:types --changed --compiler typescript
 ```
 
 ## Definition of done
@@ -34,10 +33,8 @@ For engine changes and new features:
    disagreements. Extend `packages/core/test/fuzz/gen.ts` to emit new syntax. Remove fixed
    baseline entries with `--update`; unrelated engine bugs need a reviewed baseline entry
    and a fix in a separate commit.
-3. Run `pnpm mutate:types --changed` for type-level code and `pnpm mutate:runtime --changed`
-   for runtime code. Surviving mutants need tests or an equivalent-mutant comment with a reason.
-4. Run `pnpm coverage`; thresholds must not drop. `pnpm coverage:ratchet` tightens them.
-5. Follow `AGENTS.md`: add a change intent for each affected published package (including
+3. Run `pnpm coverage`; thresholds must not drop. `pnpm coverage:ratchet` tightens them.
+4. Follow `AGENTS.md`: add a change intent for each affected published package (including
    user-facing VS Code changes), and run `pnpm check:intents`. After changing
    `packages/core/src` except `src/cache/` and `src/runtime/`, run `pnpm cache-version` and
    include the updated `CacheVersion`; CI checks it.
@@ -166,47 +163,17 @@ pnpm fuzz --update                # remove resolved baseline entries
 
 New failures need a fix or, for unrelated bugs, a reviewed baseline entry as described above.
 
-## Type-level mutation testing
-
-`scripts/type-mutate.ts` mutates conditional types and other type expressions in core's
-`engine`, `schema` and `type-map`, then checks that a type test fails. Generated/catalog tables
-covered by the oracles are excluded. `--changed` includes uncommitted and untracked changes,
-using `$BASE` or the merge base with `main`.
-
-```sh
-pnpm mutate:types --changed
-pnpm mutate:types --files narrow.ts        # file glob or path suffix
-pnpm mutate:types --sites narrow.ts:60-70  # selected lines
-pnpm mutate:types --list --sites expr.ts:71
-pnpm mutate:types --shard 3/16 --report r.json --summary r.md
-```
-
-Survivors fail; mutants that make source files fail to compile are invalid. Only when no test
-can distinguish a mutant, annotate its line with `// type-mutate: equivalent – <reason>`
-(optionally name a mutator after `equivalent`). `--check-equivalent` checks those annotations;
-`--profile` identifies slow checks. See `scripts/type-mutate/` for mutators and report handling.
-
-## Coverage and mutation testing
+## Coverage
 
 `coverage-thresholds.json` limits uncovered lines, branches, functions and statements per
-runtime file; unlisted files require full coverage. Type-only engine code uses mutation testing.
+runtime file; unlisted files require full coverage.
 
 ```sh
 pnpm coverage
-pnpm coverage:ratchet                       # tighten allowances; never loosen them
-TYPESQL_PG_URL=… pnpm mutate:runtime --changed # optional --base <rev>
-TYPESQL_PG_URL=… pnpm mutate:runtime [files…]  # full or selected-file run
+pnpm coverage:ratchet # tighten allowances; never loosen them
 ```
 
 Use `/* v8 ignore next */` only for unreachable defensive code, with a reason.
-Runtime mutation testing uses StrykerJS and fails on surviving or uncovered changed-line
-mutants. Equivalent mutants need `// Stryker disable next-line <mutator>: <reason>` above the
-line. Reports are in `reports/mutation/`.
-
-Stryker mutates sources in place: **do not edit while it runs**. Interrupted runs restore from
-`.stryker-tmp/`. Workers use separate databases on `TYPESQL_PG_URL`. Full runs can be sharded
-(`--shard i/n`) and reused with `--incremental`; use `--incremental --force` after dependency
-or indirect code changes that incremental mode cannot detect.
 
 For exact SQL errors, follow this pattern (`pnpm check:expect-error` enforces it):
 

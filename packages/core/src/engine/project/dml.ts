@@ -144,7 +144,7 @@ export type DmlCtx<
 	Level extends ScopeLevel,
 	Outer extends Scope,
 	Ctes extends CteMap,
-> = MkCtx<DB, [Level, ...Outer], Ctes, false>; // type-mutate: equivalent bool-flip – aggregates are not allowed directly in data statements, so no valid statement depends on it
+> = MkCtx<DB, [Level, ...Outer], Ctes, false>;
 
 /** `{ type, nullable }` of a table column (without `hasDefault`); the callers pass existing columns (checked first, or a statement already validated). */
 export type ColInfoOf<Tbl extends Table, Col extends string> = {
@@ -176,7 +176,7 @@ type IndCtx<Tbl extends Table, Col extends string, C extends Ctx> = MkCtx<
 		...C["scope"],
 	],
 	C["ctes"],
-	false // type-mutate: equivalent bool-flip – aggregates are not allowed directly in data statements, so no valid statement depends on it
+	false
 >;
 
 /**
@@ -330,7 +330,7 @@ type ProjectInsert<
 							S["colInd"],
 							Tbl,
 							S["table"]["name"],
-							MkCtx<DB, Outer, Ctes, false> // type-mutate: equivalent bool-flip – aggregates are not allowed in VALUES nor in an assignment target, so no valid statement depends on it
+							MkCtx<DB, Outer, Ctes, false>
 						> extends infer Chk
 						? Chk extends AnyErr
 							? Chk
@@ -457,9 +457,9 @@ type SameLength<
 	...infer Rest extends readonly (readonly unknown[])[],
 ]
 	? WidthCheck<R, Ref> extends "eq"
-		? SameLength<Rest, Ref> // type-mutate: equivalent never-true – a never passes the caller's `SameLength<…> extends true` too
+		? SameLength<Rest, Ref>
 		: false
-	: true; // type-mutate: equivalent never-false – a never passes the caller's `SameLength<…> extends true` too
+	: true;
 
 /** Compare two widths: `"eq"`, `"more"` (A longer), `"fewer"` (B longer). */
 export type WidthCheck<
@@ -499,7 +499,7 @@ export type CheckAssignedCols<
 				? AssignedTwice<C, Kind>
 				: CheckAssignedCols<Cs, Tgs, Tbl, Name, Kind, Whole | C, Part, Nx<I>>
 		: SqlError<`column "${C}" of relation "${Name}" does not exist`, null>
-	: true; // type-mutate: equivalent bool-flip – the callers only look for an error
+	: true;
 type AssignedTwice<C extends string, Kind> = Kind extends "insert"
 	? SqlError<`column "${C}" specified more than once`, null>
 	: SqlError<`multiple assignments to same column "${C}"`, null>;
@@ -544,7 +544,7 @@ export type CheckRows<
 				: never
 			: Ts
 		: never
-	: true; // type-mutate: equivalent bool-flip – the callers only look for an error
+	: true;
 
 /** Type each item of a VALUES row or multi-column SET source; a bare `DEFAULT` is allowed there and skipped. */
 export type CheckValueItems<
@@ -601,7 +601,7 @@ export type CheckTargets<
 						: CheckTargets<Cs, Tgs, Es, Tbl, Name, C, Nx<I>>
 					: CheckTargets<Cs, Tgs, Es, Tbl, Name, C, Nx<I>>
 		: SqlError<`column "${Col}" of relation "${Name}" does not exist`, null>
-	: true; // type-mutate: equivalent bool-flip – the callers only look for an error
+	: true;
 
 type NullViolation<Col extends string, Name extends string> = SqlError<
 	`null value in column "${Col}" of relation "${Name}" violates not-null constraint`,
@@ -624,12 +624,12 @@ export type CheckRequired<
 	Name extends string,
 > = Cs extends readonly string[]
 	? [MissingRequired<Tbl, Cs[number]>] extends [never]
-		? true // type-mutate: equivalent bool-flip – the callers only look for an error
+		? true
 		: SqlError<
 				`null value in column "${FirstOf<MissingRequired<Tbl, Cs[number]>> & string}" of relation "${Name}" violates not-null constraint`,
 				null
 			>
-	: true; // type-mutate: equivalent bool-flip – the callers only look for an error
+	: true;
 
 type MissingRequired<Tbl extends Table, Given extends string> = {
 	[K in keyof Tbl]: K extends Given
@@ -664,13 +664,13 @@ type CheckOnConflict<
 			Set,
 			Tbl,
 			Name,
-			DmlCtx<DB, [Item, ExcludedItem<Tbl>], Outer, Ctes> // type-mutate: equivalent tuple-swap – a name in both is ambiguous either way (FindAlias)
+			DmlCtx<DB, [Item, ExcludedItem<Tbl>], Outer, Ctes>
 		> extends infer R
 		? R extends AnyErr
 			? R
-			: CheckOptExpr<Where, DmlCtx<DB, [Item, ExcludedItem<Tbl>], Outer, Ctes>> // type-mutate: equivalent tuple-swap – a name in both is ambiguous either way (FindAlias)
+			: CheckOptExpr<Where, DmlCtx<DB, [Item, ExcludedItem<Tbl>], Outer, Ctes>>
 		: never
-	: true; // type-mutate: equivalent bool-flip – the callers only look for an error
+	: true;
 
 // ───────────────────────────── SET ─────────────────────────────
 
@@ -718,7 +718,7 @@ type CheckSetValues<
 			? X
 			: CheckSetValues<R, C>
 		: never
-	: true; // type-mutate: equivalent bool-flip – CheckSet only looks for an error
+	: true;
 /** The columns a SET list assigns, in order, their `AssignTargets` and the values (`null` from a sub-SELECT). */
 type SetTargets<
 	Set extends readonly SetItem[],
@@ -769,9 +769,9 @@ export type CheckMultiSource<
 	? ProjectSelect<Q, C["db"], C["scope"], C["ctes"]> extends infer R
 		? R extends Cols
 			? HasStar<R> extends true
-				? true // type-mutate: equivalent bool-flip – the callers only look for an error
+				? true
 				: WidthCheck<R, Cols_> extends "eq"
-					? true // type-mutate: equivalent bool-flip – the callers only look for an error
+					? true
 					: SqlError<"number of columns does not match number of values", null>
 			: R
 		: never
@@ -791,7 +791,7 @@ export type CheckMultiSource<
 export type CheckExpr<E extends Expr, C extends Ctx> = TypeOf<E, C>;
 export type CheckOptExpr<E extends Expr | null, C extends Ctx> = E extends Expr
 	? CheckExpr<E, C>
-	: true; // type-mutate: equivalent bool-flip – the callers only look for an error
+	: true;
 
 // ───────────────────────────── UPDATE / DELETE ─────────────────────────────
 
@@ -907,7 +907,7 @@ export type ProjectReturning<
 			[]
 		> extends infer ON
 		? ON extends ScopeLevel
-			? ProjectTargets<Ret, MkCtx<DB, [Level, ON, ...Outer], Ctes, false>, []> // type-mutate: equivalent bool-flip – aggregates are not allowed in RETURNING (the engine does not reject them), so no valid statement depends on it
+			? ProjectTargets<Ret, MkCtx<DB, [Level, ON, ...Outer], Ctes, false>, []>
 			: ON
 		: never
 	: null;
@@ -1033,7 +1033,7 @@ export type ParamsOfDml<S extends DmlStmt, DB, Ctes extends CteMap, M> =
 							? ParamsOfDelete<Extract<S, DeleteStmt>, DB, C2, M1>
 							: ParamsOfMerge<Extract<S, MergeStmt>, DB, C2, M1>
 				: never
-			: M // type-mutate: equivalent never-false – only reached for statements ProjectDml accepted, whose WITH binds
+			: M
 		: never;
 
 /** Parameters inside the bodies of a WITH clause (SELECT and DML CTEs). */
@@ -1080,8 +1080,8 @@ type ParamsOfInsert<S extends InsertStmt, DB, Ctes extends CteMap, M> =
 						S["retOpts"],
 						[Item],
 						TableCols<Tbl>,
-						true, // type-mutate: equivalent bool-flip – parameters in RETURNING are typed nullable either way
-						false, // type-mutate: equivalent bool-flip – parameters in RETURNING are typed nullable either way
+						true,
+						false,
 						DB,
 						Ctes,
 						ParamsOfOnConflict<
@@ -1096,13 +1096,13 @@ type ParamsOfInsert<S extends InsertStmt, DB, Ctes extends CteMap, M> =
 								S["colInd"],
 								Tbl,
 								DB,
-								MkCtx<DB, [], Ctes, false>, // type-mutate: equivalent bool-flip – aggregates are not allowed in VALUES nor in an assignment target, so no valid statement depends on it
+								MkCtx<DB, [], Ctes, false>,
 								M
 							>
 						>
 					>
 				: never
-			: M // type-mutate: equivalent never-false – only reached for statements ProjectDml accepted, whose target resolves
+			: M
 		: never;
 
 /**
@@ -1209,8 +1209,8 @@ type ParamsOfOnConflict<
 }
 	? ParamsOfOpt<
 			Where,
-			DmlCtx<DB, [Item, ExcludedItem<Tbl>], [], Ctes>, // type-mutate: equivalent tuple-swap – a name in both is ambiguous either way (FindAlias)
-			ParamsOfSet<Set, Tbl, DmlCtx<DB, [Item, ExcludedItem<Tbl>], [], Ctes>, M>, // type-mutate: equivalent tuple-swap – a name in both is ambiguous either way (FindAlias)
+			DmlCtx<DB, [Item, ExcludedItem<Tbl>], [], Ctes>,
+			ParamsOfSet<Set, Tbl, DmlCtx<DB, [Item, ExcludedItem<Tbl>], [], Ctes>, M>,
 			Info<"bool">
 		>
 	: M;
@@ -1260,7 +1260,7 @@ export type ParamsOfSet<
 									ParamsOfInds<Cols_, Ind, Tbl, C, M>
 								>
 							: ParamsOfExpr<E, C, ParamsOfInds<Cols_, Ind, Tbl, C, M>>
-						: M // type-mutate: equivalent never-false – a SET item is one of the three kinds above
+						: M
 		>
 	: M;
 
@@ -1286,20 +1286,8 @@ export type ParamsOfReturning<
 			[]
 		> extends infer ON
 		? ON extends ScopeLevel
-			? ParamsOfTargets<
-					Ret,
-					MkCtx<
-						DB,
-						[
-							Level, // type-mutate: equivalent tuple-swap – old / new are reached qualified only, by names Level does not have; only `*`, which holds no parameter, reads the first level
-							ON,
-						],
-						Ctes,
-						false // type-mutate: equivalent bool-flip – aggregates are not allowed in RETURNING, so no valid statement depends on it
-					>,
-					M
-				>
-			: M // type-mutate: equivalent never-false – OLD / NEW were validated with the statement
+			? ParamsOfTargets<Ret, MkCtx<DB, [Level, ON], Ctes, false>, M>
+			: M
 		: never
 	: M;
 
@@ -1313,8 +1301,8 @@ type ParamsOfUpdate<S extends UpdateStmt, DB, Ctes extends CteMap, M> =
 							S["retOpts"],
 							[Item, ...L],
 							TableCols<Tbl>,
-							false, // type-mutate: equivalent bool-flip – parameters in RETURNING are typed nullable either way
-							false, // type-mutate: equivalent bool-flip – parameters in RETURNING are typed nullable either way
+							false,
+							false,
 							DB,
 							Ctes,
 							ParamsOfOpt<
@@ -1333,9 +1321,9 @@ type ParamsOfUpdate<S extends UpdateStmt, DB, Ctes extends CteMap, M> =
 								Info<"bool">
 							>
 						>
-					: M // type-mutate: equivalent never-false – only reached for statements ProjectDml accepted
+					: M
 				: never
-			: M // type-mutate: equivalent never-false – only reached for statements ProjectDml accepted
+			: M
 		: never;
 
 type ParamsOfDelete<S extends DeleteStmt, DB, Ctes extends CteMap, M> =
@@ -1348,8 +1336,8 @@ type ParamsOfDelete<S extends DeleteStmt, DB, Ctes extends CteMap, M> =
 							S["retOpts"],
 							[Item, ...L],
 							TableCols<Tbl>,
-							false, // type-mutate: equivalent bool-flip – parameters in RETURNING are typed nullable either way
-							true, // type-mutate: equivalent bool-flip – parameters in RETURNING are typed nullable either way
+							false,
+							true,
 							DB,
 							Ctes,
 							ParamsOfOpt<
@@ -1363,7 +1351,7 @@ type ParamsOfDelete<S extends DeleteStmt, DB, Ctes extends CteMap, M> =
 								Info<"bool">
 							>
 						>
-					: M // type-mutate: equivalent never-false – only reached for statements ProjectDml accepted
+					: M
 				: never
-			: M // type-mutate: equivalent never-false – only reached for statements ProjectDml accepted
+			: M
 		: never;

@@ -135,7 +135,7 @@ export type BindFromItem<
 										Ctes,
 										Sofar
 									>
-								: SqlError<"unsupported FROM item", null>; // type-mutate: equivalent never-false – the parser makes no other FROM item
+								: SqlError<"unsupported FROM item", null>;
 
 /**
  * `XMLTABLE(...) [alias [(cols)]]`: always lateral, named `xmltable` without an alias; a bare
@@ -155,7 +155,7 @@ type BindXmlTable<
 		? A extends string
 			? XmlTableCols<
 					F,
-					MkCtx<DB, [Sofar, ...Outer], Ctes, false> // type-mutate: equivalent bool-flip – FROM items take no aggregates
+					MkCtx<DB, [Sofar, ...Outer], Ctes, false>
 				> extends infer Base
 				? Base extends Cols
 					? (
@@ -248,8 +248,8 @@ type BindSample<
 			? LateralHint<
 					SampleArgs<
 						[...Args, ...(Rep extends Expr ? [Rep] : [])],
-						[SampleMethods[Method], ...(Rep extends Expr ? ["float8"] : [])], // type-mutate: equivalent cond-true – a type past the last argument is not read
-						MkCtx<DB, Outer, Ctes, false>, // type-mutate: equivalent bool-flip – FROM items take no aggregates
+						[SampleMethods[Method], ...(Rep extends Expr ? ["float8"] : [])],
+						MkCtx<DB, Outer, Ctes, false>,
 						0
 					>,
 					Sofar,
@@ -303,7 +303,7 @@ type SampleArgs<
 							>
 				: A
 			: never
-	: true; // type-mutate: equivalent bool-flip – the caller only tells an error from the rest
+	: true;
 
 type BindSub<
 	Q extends SelectStmt,
@@ -330,7 +330,7 @@ type BindSub<
 									C,
 									ColAliases,
 									[],
-									`table "${Alias extends string ? Alias : "unnamed_subquery"}"` // type-mutate: equivalent cond-true never-false – the grammar takes a column alias list only after an alias
+									`table "${Alias extends string ? Alias : "unnamed_subquery"}"`
 								>
 							: C
 					) extends infer C2
@@ -344,7 +344,7 @@ type BindSub<
 							]
 						: C2
 					: never
-				: Lateral extends true // type-mutate: equivalent cond-false – a LATERAL subquery sees the items before it, so it has no such error
+				: Lateral extends true
 					? C
 					: LateralHint<C, Sofar, "">
 			: never
@@ -387,7 +387,7 @@ export type RenameCols<
 					null
 				>
 		: SqlError<
-				`${Who} has ${Acc["length"]} columns available but ${[...Acc, ...Names]["length"] & number} columns specified`, // type-mutate: equivalent tuple-swap – the length is the same
+				`${Who} has ${Acc["length"]} columns available but ${[...Acc, ...Names]["length"] & number} columns specified`,
 				null
 			>
 	: [...Acc, ...C];
@@ -480,7 +480,7 @@ type BindFunc<
 				: never
 			: A
 		: never
-	: Call extends { readonly t: "cast" } // type-mutate: equivalent cond-true – the parser makes a call or a cast
+	: Call extends { readonly t: "cast" }
 		? BindCastFunc<
 				Call,
 				Alias,
@@ -489,7 +489,7 @@ type BindFunc<
 				MkCtx<DB, [Sofar, ...Outer], Ctes, false>,
 				Sofar
 			>
-		: SqlError<"unsupported function call in FROM", null>; // type-mutate: equivalent never-false – the parser makes a call or a cast
+		: SqlError<"unsupported function call in FROM", null>;
 
 /** `FROM CAST(e AS T) [AS] a`: one row, one column named like the expression (`T`) or the alias. */
 type BindCastFunc<
@@ -608,7 +608,7 @@ type MultiUnnest<
 				{
 					readonly n: "unnest";
 					readonly t: Info<
-						A["type"] extends `${infer E}[]` ? E : "unknown", // type-mutate: equivalent never-false – unnest takes arrays only (no signature matches otherwise)
+						A["type"] extends `${infer E}[]` ? E : "unknown",
 						true
 					>;
 				},
@@ -674,7 +674,7 @@ type BindRowsFrom<
 						? Alias
 						: Fs[0]["call"] extends { readonly name: infer N extends string }
 							? N
-							: "rows", // type-mutate: equivalent never-false – the parser takes only function calls in ROWS FROM
+							: "rows",
 					Sofar
 				> extends infer A
 			? A extends string
@@ -720,7 +720,7 @@ type RowsFromCols<
 	infer F extends RowsFromFunc,
 	...infer R extends readonly RowsFromFunc[],
 ]
-	? F["call"] extends { readonly t: "call" } // type-mutate: equivalent cond-true – the parser takes only function calls in ROWS FROM
+	? F["call"] extends { readonly t: "call" }
 		? FuncBaseCols<
 				F["call"]["name"],
 				F["call"]["args"],
@@ -732,7 +732,7 @@ type RowsFromCols<
 				? RowsFromCols<R, C, [...Acc, ...NullableCols<B>]>
 				: B
 			: never
-		: SqlError<"unsupported function call in FROM", null> // type-mutate: equivalent never-false – the parser takes only function calls in ROWS FROM
+		: SqlError<"unsupported function call in FROM", null>
 	: Acc;
 type NullableCols<B extends Cols> = {
 	readonly [K in keyof B]: B[K] extends {
@@ -740,7 +740,7 @@ type NullableCols<B extends Cols> = {
 		readonly t: infer T extends ColInfo;
 	}
 		? { readonly n: N; readonly t: Info<T["type"], true> }
-		: B[K]; // type-mutate: equivalent never-false – a function's columns are named
+		: B[K];
 };
 
 /**
@@ -766,7 +766,7 @@ type RenameFirst<
 	Alias extends string,
 > = Base extends readonly [{ readonly t: infer T }, ...infer R]
 	? [{ readonly n: Alias; readonly t: T }, ...R]
-	: Base; // type-mutate: equivalent never-false – a function has a named first column
+	: Base;
 
 // ─── joins ───
 
@@ -794,23 +794,14 @@ type BindJoin<
 			? (
 					K extends "right" | "full"
 						? LateralHint<BindFromItem<R, DB, Outer, Ctes, Sofar>, LL, "">
-						: BindFromItem<
-								R,
-								DB,
-								Outer,
-								Ctes,
-								[
-									...Sofar, // type-mutate: equivalent tuple-swap – visibility, not order (an alias is in one item only)
-									...LL,
-								]
-							>
+						: BindFromItem<R, DB, Outer, Ctes, [...Sofar, ...LL]>
 				) extends infer RL
 				? RL extends ScopeLevel
 					? LateralHint<
 							CheckCondition<
 								"JOIN/ON",
 								On,
-								MkCtx<DB, [[...LL, ...RL], ...Outer], Ctes, false> // type-mutate: equivalent tuple-swap bool-flip – a name in both sides is ambiguous in either order; ON takes no aggregates
+								MkCtx<DB, [[...LL, ...RL], ...Outer], Ctes, false>
 							>,
 							Sofar,
 							""
@@ -855,13 +846,13 @@ type ApplyNullability<
 				: L
 			: L;
 type NullableLevel<L extends ScopeLevel> = {
-	readonly [I in keyof L]: L[I] extends ScopeItem // type-mutate: equivalent cond-true – a level holds scope items only
+	readonly [I in keyof L]: L[I] extends ScopeItem
 		? {
 				readonly alias: L[I]["alias"];
 				readonly cols: NullableMap<L[I]["cols"]>;
 				readonly skip: L[I]["skip"];
 			}
-		: L[I]; // type-mutate: equivalent never-false – a level holds scope items only
+		: L[I];
 };
 
 /** Column names present on both sides (NATURAL JOIN). */
@@ -933,7 +924,7 @@ type CheckUsing<
 				`column "${U}" specified in USING clause does not exist in left table`,
 				null
 			>
-	: true; // type-mutate: equivalent bool-flip – the caller only tells an error from the rest
+	: true;
 
 type FindInLevel<
 	L extends ScopeLevel,
@@ -942,7 +933,7 @@ type FindInLevel<
 	infer I extends ScopeItem,
 	...infer R extends ScopeLevel,
 ]
-	? Name extends I["skip"][number] // type-mutate: equivalent never-true cond-false – a merged USING item comes before the items it hides
+	? Name extends I["skip"][number]
 		? FindInLevel<R, Name>
 		: Name extends keyof I["cols"]
 			? I["cols"][Name]
@@ -973,19 +964,19 @@ type UsingCol<K extends JoinKind, LI, RI> = LI extends ColInfo
 						? RI["nullable"]
 						: K extends "full"
 							? LI["nullable"] extends true
-								? true // type-mutate: equivalent never-true – a never nullability reads as nullable
+								? true
 								: RI["nullable"]
 							: false
 			>
-		: Info<"unknown", true> // type-mutate: equivalent never-false bool-flip – CheckUsing reported a missing column before
-	: Info<"unknown", true>; // type-mutate: equivalent never-false bool-flip – CheckUsing reported a missing column before
+		: Info<"unknown", true>
+	: Info<"unknown", true>;
 
 type HideCols<L extends ScopeLevel, U extends string> = {
-	readonly [I in keyof L]: L[I] extends ScopeItem // type-mutate: equivalent cond-true – a level holds scope items only
+	readonly [I in keyof L]: L[I] extends ScopeItem
 		? {
 				readonly alias: L[I]["alias"];
 				readonly cols: L[I]["cols"];
 				readonly skip: [...L[I]["skip"], U];
 			}
-		: L[I]; // type-mutate: equivalent never-false – a level holds scope items only
+		: L[I];
 };

@@ -58,13 +58,13 @@ export type CheckCondition<
 	E extends Expr | null,
 	C extends Ctx,
 > = E extends null
-	? true // type-mutate: equivalent bool-flip – the callers only look for an error
+	? true
 	: TypeOf<NonNullable<E>, C> extends infer T
 		? T extends ColInfo
 			? T["type"] extends "bool" | "unknown" | "null"
-				? true // type-mutate: equivalent bool-flip – the callers only look for an error
+				? true
 				: E extends { readonly t: "str" }
-					? true // type-mutate: equivalent bool-flip – the callers only look for an error
+					? true
 					: SqlError<
 							`argument of ${Clause} must be type boolean, not type ${TypeDisplay<T["type"]>}`,
 							null
@@ -116,23 +116,23 @@ type SameExpr<A, B> = A extends {
 		}
 		? [AN] extends [BN]
 			? AT extends null
-				? true // type-mutate: equivalent never-true – read with `extends true`, where never counts as true
+				? true
 				: BT extends null
-					? true // type-mutate: equivalent never-true – read with `extends true`, where never counts as true
+					? true
 					: [AT] extends [BT]
-						? true // type-mutate: equivalent never-true – read with `extends true`, where never counts as true
+						? true
 						: false
 			: false
 		: false
 	: [A, B] extends [B, A]
-		? true // type-mutate: equivalent never-true – read with `extends true`, where never counts as true
+		? true
 		: false;
 type InList<X, L extends readonly unknown[]> = L extends readonly [
 	infer H,
 	...infer R,
 ]
 	? SameExpr<X, H> extends true
-		? true // type-mutate: equivalent never-true – read with `extends true`, where never counts as true
+		? true
 		: InList<X, R>
 	: false;
 type AllSame<L extends readonly unknown[]> = L extends readonly [
@@ -142,7 +142,7 @@ type AllSame<L extends readonly unknown[]> = L extends readonly [
 	? InList<H, R> extends true
 		? AllSame<R>
 		: false
-	: true; // type-mutate: equivalent never-false – read with `extends true`, where never counts as true
+	: true;
 
 /**
  * A numeric constant as Postgres's grammar folds it: a literal under unary minuses (`-1`,
@@ -246,7 +246,7 @@ type ResolveGroupKey<
 						readonly name: infer N extends string;
 					}
 				? TypeOf<E, C> extends infer T
-					? T extends ColInfo // type-mutate: equivalent cond-false – CheckGroupBy only looks for an error, and the output lookup gives none for a typed column
+					? T extends ColInfo
 						? E
 						: ErrMsg<T> extends `column "${string}" does not exist`
 							? OutputExprs<Ts, Cs, N, [], 0> extends infer Ms extends
@@ -287,13 +287,13 @@ export type CheckGroupBy<
 	I extends number = 0,
 > = Items extends readonly Expr[]
 	? Items[I] extends undefined
-		? true // type-mutate: equivalent bool-flip – the callers only look for an error
+		? true
 		: ResolveGroupKey<Items[I], Ts, Cs, C> extends infer K
 			? K extends AnyErr
 				? K
 				: CheckGroupBy<Items, Ts, Cs, C, Nx<I>>
 			: never
-	: true; // type-mutate: equivalent bool-flip – the callers only look for an error
+	: true;
 
 /**
  * `SELECT DISTINCT ON (d...) ... ORDER BY o...`: the ORDER BY must start with DISTINCT ON
@@ -304,7 +304,7 @@ export type CheckDistinctOnOrder<
 	D extends readonly unknown[],
 	O extends readonly unknown[],
 > = null extends D[number] | O[number]
-	? true // type-mutate: equivalent bool-flip – the callers only look for an error
+	? true
 	: DistinctWalk<D, O, false, [], 0>;
 type DistinctWalk<
 	D extends readonly unknown[],
@@ -315,9 +315,9 @@ type DistinctWalk<
 > = O[I] extends undefined
 	? Skipped extends true
 		? AllIn<D, Seen> extends true
-			? true // type-mutate: equivalent bool-flip – the callers only look for an error
+			? true
 			: DistinctOnErr
-		: true // type-mutate: equivalent bool-flip – the callers only look for an error
+		: true
 	: InList<O[I], D> extends true
 		? Skipped extends true
 			? DistinctOnErr
@@ -330,7 +330,7 @@ type AllIn<
 	? InList<H, Seen> extends true
 		? AllIn<R, Seen>
 		: false
-	: true; // type-mutate: equivalent never-false – a never passes the caller's `AllIn<…> extends true` too
+	: true;
 type DistinctOnErr = SqlError<
 	"SELECT DISTINCT ON expressions must match initial ORDER BY expressions",
 	null
@@ -358,7 +358,7 @@ type DistinctOrderWalk<
 	Star extends boolean,
 	I extends number,
 > = O[I] extends undefined
-	? true // type-mutate: equivalent bool-flip – the callers only look for an error
+	? true
 	: O[I] extends null
 		? DistinctOrderWalk<O, Es, Star, Nx<I>>
 		: InList<O[I], Es> extends true
@@ -376,7 +376,7 @@ export type CheckOutputOrder<
 	Cs extends Cols,
 	I extends number = 0,
 > = Items[I] extends undefined
-	? true // type-mutate: equivalent bool-flip – the caller only looks for an error
+	? true
 	: OutputOrderItem<Items[I], Cs> extends infer R
 		? R extends AnyErr
 			? R
@@ -402,7 +402,7 @@ type OutputOrderItem<E extends Expr, Cs extends Cols> =
 						? K extends readonly []
 							? SqlError<`column "${N}" does not exist`, null>
 							: K extends readonly [unknown]
-								? true // type-mutate: equivalent bool-flip – the caller only looks for an error
+								? true
 								: SqlError<`ORDER BY "${N}" is ambiguous`, null>
 						: never
 				: SqlError<"invalid UNION/INTERSECT/EXCEPT ORDER BY clause", null>;
@@ -495,7 +495,7 @@ export type CheckWindowRefs<
 	C extends Ctx,
 	I extends number = 0,
 > = Es[I] extends undefined
-	? true // type-mutate: equivalent bool-flip – the callers only look for an error
+	? true
 	: CheckSpecs<Wins<Es[I], []>, Defs, C> extends infer R
 		? R extends AnyErr
 			? R
@@ -512,7 +512,7 @@ type CheckSpecs<
 			? CheckSpecs<R, Defs, C>
 			: X
 		: never
-	: true; // type-mutate: equivalent bool-flip – the callers only look for an error
+	: true;
 
 /**
  * `Acc` and then the window specifications of the calls in an expression, in the order Postgres
