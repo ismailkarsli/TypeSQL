@@ -60,7 +60,74 @@ type AllTargets<S extends string> =
 					: null
 		: null;
 
-type GeneralTail<Ts, Rest extends string> =
+type GeneralTail<
+	Ts,
+	Rest extends string,
+> = Rest extends `${string}${"--" | "/*"}${string}`
+	? WholeTail<Ts, Rest>
+	: LastOrder<Rest> extends [
+				infer Body extends string,
+				infer Order extends string,
+			]
+		? SplitOrder<Ts, Body, Order> extends infer S
+			? [S] extends [never]
+				? WholeTail<Ts, Rest>
+				: S
+			: never
+		: WholeTail<Ts, Rest>;
+
+/** Split at the final ORDER BY, leaving nested query ordering in the body. */
+type LastOrder<S extends string> = [OrderTail<S>] extends [never]
+	? never
+	: OrderTail<S> extends infer Tail extends string
+		? S extends `${infer Body}ORDER BY${Tail}`
+			? [Body, Tail]
+			: S extends `${infer Body}order by${Tail}`
+				? [Body, Tail]
+				: never
+		: never;
+type OrderTail<S extends string> =
+	S extends `${infer Before}ORDER BY${infer After}`
+		? Before extends `${string}${Ws}`
+			? After extends `${Ws}${string}`
+				? [OrderTail<After>] extends [never]
+					? After
+					: OrderTail<After>
+				: never
+			: never
+		: S extends `${infer Before}order by${infer After}`
+			? Before extends `${string}${Ws}`
+				? After extends `${Ws}${string}`
+					? [OrderTail<After>] extends [never]
+						? After
+						: OrderTail<After>
+					: never
+				: never
+			: never;
+
+type SplitOrder<Ts, Body extends string, Order extends string> =
+	Lex<`FROM ${Body}`> extends infer BT
+		? BT extends Toks
+			? ParseSimpleAfterTargets<BT, 0, false, Ts> extends Ok<infer B, infer J>
+				? BT[J] extends undefined
+					? Lex<`ORDER BY${Order}`> extends infer OT
+						? OT extends Toks
+							? ParseSelectTail<OT, B, null, 0> extends Ok<
+									infer Stmt,
+									infer End
+								>
+								? OT[End] extends undefined
+									? { stmt: Stmt; max: MaxParam<[...BT, ...OT]> }
+									: never
+								: never
+							: never
+						: never
+					: never
+				: never
+			: never
+		: never;
+
+type WholeTail<Ts, Rest extends string> =
 	Lex<`FROM ${Rest}`> extends infer T
 		? T extends Toks
 			? ParseSimpleAfterTargets<T, 0, false, Ts> extends Ok<infer Body, infer J>
