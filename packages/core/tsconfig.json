@@ -4,8 +4,11 @@
 		"rootDir": ".",
 		"noEmit": true,
 		"allowImportingTsExtensions": true,
-		"types": ["node"]
+		"types": ["node"],
+		"paths": {
+			"@typesql/core": ["./src/index.ts"]
+		}
 	},
-	"include": ["src", "test"],
+	"include": ["src", "test", "examples"],
 	"exclude": ["test/errors/fixtures", "test/cache"]
 }

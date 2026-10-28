@@ -1,6 +1,6 @@
 /**
- * TypeSQL examples. Type-check this file with `tsc --noEmit -p examples/tsconfig.json` and hover
- * the results in your editor; nothing here needs a database.
+ * TypeSQL examples. Type-checked by this package's `pnpm typecheck`; hover the results in your
+ * editor. Nothing here needs a database.
  */
 import {
 	type ApplyDdl,
