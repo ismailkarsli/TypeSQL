@@ -1,5 +1,7 @@
 import { readFileSync } from "node:fs";
 import { defineConfig } from "vitest/config";
+import type { InlineConfig } from "vitest/node";
+import { projects as coreProjects } from "./packages/core/vitest.config.ts";
 import {
 	coverageExclude,
 	coverageFiles,
@@ -15,14 +17,22 @@ const uncovered: Record<
 ).uncovered;
 const ratchet = process.env.TYPESQL_COVERAGE_RATCHET === "1";
 
+export const reporters: NonNullable<InlineConfig["reporters"]> =
+	process.env.GITHUB_ACTIONS === "true"
+		? [
+				"default",
+				"./packages/core/test/conformance/skip-reporter.ts",
+				["github-actions", { jobSummary: { enabled: false } }],
+			]
+		: ["default", "./packages/core/test/conformance/skip-reporter.ts"];
+
 export default defineConfig({
 	test: {
-		reporters: ["default", "./packages/core/test/conformance/skip-reporter.ts"],
+		reporters,
 		projects: [
-			"packages/*/vitest.config.ts",
+			...coreProjects,
+			"packages/!(core)/vitest.config.ts",
 			"packages/vscode/vitest.config.mts",
-			"packages/core/vitest.cache.config.ts",
-			"packages/core/vitest.types-cached.config.ts",
 			"scripts/vitest.config.ts",
 		],
 		coverage: {

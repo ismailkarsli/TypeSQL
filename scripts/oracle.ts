@@ -32,7 +32,9 @@ const r = spawnSync(
 	[
 		"run",
 		"--config",
-		"packages/core/vitest.oracle.config.ts",
+		"packages/core/vitest.config.ts",
+		"--mode",
+		"oracle",
 		"--silent=false",
 	],
 	{

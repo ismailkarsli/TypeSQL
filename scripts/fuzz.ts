@@ -28,7 +28,14 @@ for (let i = 0; i < args.length; i++) {
 }
 const r = spawnSync(
 	join(root, "node_modules/.bin/vitest"),
-	["run", "--config", "packages/core/vitest.fuzz.config.ts", "--silent=false"],
+	[
+		"run",
+		"--config",
+		"packages/core/vitest.config.ts",
+		"--mode",
+		"fuzz",
+		"--silent=false",
+	],
 	{ cwd: root, stdio: "inherit", env: { ...process.env, ...env } },
 );
 process.exit(r.status ?? 1);

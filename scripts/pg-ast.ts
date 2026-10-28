@@ -20,7 +20,9 @@ const r = spawnSync(
 	[
 		"run",
 		"--config",
-		"packages/core/vitest.pg-ast.config.ts",
+		"packages/core/vitest.config.ts",
+		"--mode",
+		"pg-ast",
 		"--silent=false",
 	],
 	{

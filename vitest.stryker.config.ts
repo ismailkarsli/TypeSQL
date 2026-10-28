@@ -1,4 +1,6 @@
 import { defineConfig } from "vitest/config";
+import { projects as coreProjects } from "./packages/core/vitest.config.ts";
+import { reporters } from "./vitest.config.ts";
 
 // Every Stryker worker runs its own vitest; the DB suites drop and recreate their tables, so each
 // worker gets its own database (created by scripts/mutate-runtime.ts).
@@ -14,9 +16,15 @@ const runtimeOnly = { typecheck: { enabled: false } };
 
 export default defineConfig({
 	test: {
+		reporters,
 		projects: [
+			...coreProjects
+				.filter(({ test }) => test.name !== "core-types-cached")
+				.map((project) => ({
+					...project,
+					test: { ...project.test, ...runtimeOnly },
+				})),
 			...[
-				"core",
 				"pg",
 				"postgres",
 				"kysely",
@@ -31,11 +39,6 @@ export default defineConfig({
 			{
 				extends: "./packages/vscode/vitest.config.mts",
 				root: "./packages/vscode",
-			},
-			{
-				extends: "./packages/core/vitest.cache.config.ts",
-				root: "./packages/core",
-				test: runtimeOnly,
 			},
 		],
 	},
