@@ -52,7 +52,12 @@ function entryFor(data: HistoryBenchmark): HistoryEntry {
 		throw new Error("Missing case1 application benchmark metadata");
 	}
 	for (const compiler of ["tsrs", "tsc"]) {
-		for (const name of ["case1", "case1d", "case1c", "case1s"]) {
+		for (const name of [
+			"case1",
+			"case1 cached",
+			"case1 stale",
+			"case1 source",
+		]) {
 			const result = data.results[compiler]?.find((r) => r.name === name);
 			if (
 				result?.exitCode !== 0 ||
@@ -79,8 +84,8 @@ function entryFor(data: HistoryBenchmark): HistoryEntry {
 	return {
 		case1: {
 			statements: data.workload.statements,
-			checkTimeSec: get("case1d"),
-			cachedCheckTimeSec: get("case1c"),
+			checkTimeSec: get("case1"),
+			cachedCheckTimeSec: get("case1 cached"),
 		},
 	};
 }
@@ -177,8 +182,8 @@ const summary = [
 	"",
 	"| Application workload | `tsc` | tsrs |",
 	"|---|---|---|",
-	`| ${workload.statements} statements | ${bench.rows.case1d.tsc} s | ${bench.rows.case1d.tsrs} s |`,
-	`| with the [type cache](https://typesql.karsli.net/guide/performance#type-cache) | ${bench.rows.case1c.tsc} s | ${bench.rows.case1c.tsrs} s |`,
+	`| \`case1\` | ${bench.rows.case1.tsc} s | ${bench.rows.case1.tsrs} s |`,
+	`| [\`case1 cached\`](https://typesql.karsli.net/guide/performance#type-cache) | ${bench.rows["case1 cached"].tsc} s | ${bench.rows["case1 cached"].tsrs} s |`,
 	"<!-- performance-summary:end -->",
 ].join("\n");
 const releases = Object.entries(history).sort(([a], [b]) =>

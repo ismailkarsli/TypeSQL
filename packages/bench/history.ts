@@ -97,14 +97,7 @@ function measure(version: string, ref?: string) {
 			join(directory, "tsconfig.base.json"),
 			JSON.stringify(config),
 		);
-		for (const file of [
-			"src",
-			"run.ts",
-			"runtime.ts",
-			"workload.ts",
-			"tsconfig.json",
-			"thresholds.json",
-		]) {
+		for (const file of ["src", "run.ts", "tsconfig.json", "thresholds.json"]) {
 			cpSync(join(bench, file), join(target, file), { recursive: true });
 		}
 		symlinkSync(
@@ -129,7 +122,6 @@ function measure(version: string, ref?: string) {
 			String(runs),
 			...(ref ? ["--no-thresholds"] : []),
 		]);
-		run(process.execPath, [join(target, "runtime.ts")]);
 		return {
 			version,
 			ref: ref ?? "HEAD",

@@ -133,8 +133,8 @@ The [real-world application workload](packages/bench/src/case1.ts) contains 379 
 
 | Application workload | `tsc` | tsrs |
 |---|---|---|
-| 379 statements | 1.914 s | 0.54 s |
-| with the [type cache](https://typesql.karsli.net/guide/performance#type-cache) | 0.638 s | 0.178 s |
+| `case1` | 1.914 s | 0.54 s |
+| [`case1 cached`](https://typesql.karsli.net/guide/performance#type-cache) | 0.638 s | 0.178 s |
 <!-- performance-summary:end -->
 
 See [Performance](https://typesql.karsli.net/guide/performance) for how this is measured.

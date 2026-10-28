@@ -34,24 +34,24 @@
 	"speedup": 3.6,
 	"rows": {
 		"case1": {
-			"instantiations": "3.53M",
-			"tsrs": 0.564,
-			"tsc": 2.083
-		},
-		"case1d": {
 			"instantiations": "3.38M",
 			"tsrs": 0.54,
 			"tsc": 1.914
 		},
-		"case1c": {
+		"case1 cached": {
 			"instantiations": "994K",
 			"tsrs": 0.178,
 			"tsc": 0.638
 		},
-		"case1s": {
+		"case1 stale": {
 			"instantiations": "3.53M",
 			"tsrs": 0.563,
 			"tsc": 2.037
+		},
+		"case1 source": {
+			"instantiations": "3.53M",
+			"tsrs": 0.564,
+			"tsc": 2.083
 		}
 	},
 	"runtime": {

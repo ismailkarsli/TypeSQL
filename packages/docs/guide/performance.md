@@ -18,10 +18,10 @@ Measurements were taken on {{ bench.date }} with `tsc` {{ bench.compilers.tsc }}
 
 | Application workload | Instantiations | Check time, `tsc` | Check time, tsrs |
 |---|---|---|---|
-| Built package | {{ bench.rows.case1d.instantiations }} | {{ bench.rows.case1d.tsc }} s | {{ bench.rows.case1d.tsrs }} s |
-| With the [type cache](#type-cache) | {{ bench.rows.case1c.instantiations }} | {{ bench.rows.case1c.tsc }} s | {{ bench.rows.case1c.tsrs }} s |
-| With a stale cache | {{ bench.rows.case1s.instantiations }} | {{ bench.rows.case1s.tsc }} s | {{ bench.rows.case1s.tsrs }} s |
-| Against TypeSQL's sources | {{ bench.rows.case1.instantiations }} | {{ bench.rows.case1.tsc }} s | {{ bench.rows.case1.tsrs }} s |
+| `case1` (built package) | {{ bench.rows.case1.instantiations }} | {{ bench.rows.case1.tsc }} s | {{ bench.rows.case1.tsrs }} s |
+| [`case1 cached`](#type-cache) | {{ bench.rows["case1 cached"].instantiations }} | {{ bench.rows["case1 cached"].tsc }} s | {{ bench.rows["case1 cached"].tsrs }} s |
+| `case1 stale` | {{ bench.rows["case1 stale"].instantiations }} | {{ bench.rows["case1 stale"].tsc }} s | {{ bench.rows["case1 stale"].tsrs }} s |
+| `case1 source` | {{ bench.rows["case1 source"].instantiations }} | {{ bench.rows["case1 source"].tsc }} s | {{ bench.rows["case1 source"].tsrs }} s |
 
 TypeScript keeps a result only for the life of one program, so the editor computes it again after every edit, and `tsc` on every run. The [type cache](#type-cache) keeps the results in a file instead. A warm cache uses {{ bench.cache.cachedRatio }}× the instantiations of the uncached application; a stale cache uses {{ bench.cache.staleRatio }}×.
 
@@ -51,8 +51,7 @@ From a clone of the repository:
 
 ```sh
 pnpm --filter @typesql/core build
-pnpm bench                          # compile time (tsrs and tsc)
-node packages/bench/runtime.ts       # runtime, same fixture
+pnpm bench                          # compile time (tsrs and tsc) and runtime
 ```
 
 To refresh the published numbers, run the **benchmark** workflow on `main` in GitHub Actions,
