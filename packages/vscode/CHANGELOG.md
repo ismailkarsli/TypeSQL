@@ -1,5 +1,11 @@
 # typesql
 
+## 0.0.7
+
+### Patch Changes
+
+- The README says completions show each column's SQL type, without tying the wording to PostgreSQL.
+
 ## 0.0.6
 
 ### Patch Changes

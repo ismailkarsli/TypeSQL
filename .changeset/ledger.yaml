@@ -188,6 +188,11 @@
   intents:
     - breezy-emus-scream
     - wide-tables-design
+"@typesql/core@0.8.0":
+  dir: packages/core
+  intents:
+    - polite-icons-complain
+    - vast-onions-heal
 "@typesql/drizzle@0.0.2":
   dir: packages/drizzle
   intents:
@@ -221,6 +226,10 @@
   intents:
     - breezy-emus-scream
     - wide-tables-design
+"@typesql/drizzle@0.3.0":
+  dir: packages/drizzle
+  intents:
+    - polite-icons-complain
 "@typesql/kysely@0.0.2":
   dir: packages/kysely
   intents:
@@ -267,6 +276,10 @@
   intents:
     - breezy-emus-scream
     - wide-tables-design
+"@typesql/kysely@0.3.0":
+  dir: packages/kysely
+  intents:
+    - polite-icons-complain
 "@typesql/language-server@0.0.1":
   dir: packages/language-server
   intents:
@@ -325,6 +338,10 @@
   dir: packages/pg
   intents:
     - little-buses-sleep
+"@typesql/pg@0.2.10":
+  dir: packages/pg
+  intents:
+    - polite-icons-complain
 "@typesql/pg@0.2.2":
   dir: packages/pg
   intents:
@@ -374,6 +391,10 @@
   dir: packages/postgres
   intents:
     - little-buses-sleep
+"@typesql/postgres@0.2.10":
+  dir: packages/postgres
+  intents:
+    - polite-icons-complain
 "@typesql/postgres@0.2.2":
   dir: packages/postgres
   intents:
@@ -432,6 +453,10 @@
   intents:
     - breezy-emus-scream
     - wide-tables-design
+"@typesql/prisma@0.3.0":
+  dir: packages/prisma
+  intents:
+    - polite-icons-complain
 typesql@0.0.1:
   dir: packages/vscode
   intents:
@@ -458,3 +483,7 @@ typesql@0.0.6:
   dir: packages/vscode
   intents:
     - wide-tables-design
+typesql@0.0.7:
+  dir: packages/vscode
+  intents:
+    - angry-stars-hang
