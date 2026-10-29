@@ -1,6 +1,6 @@
 {
 	"name": "@typesql/cli",
-	"version": "0.0.0",
+	"version": "0.0.1",
 	"description": "The typesql command: `typesql introspect` generates a TypeSQL schema from a PostgreSQL or SQLite database.",
 	"license": "MIT",
 	"repository": {

@@ -8,7 +8,8 @@ the `release` workflow through npm trusted publishing, publishes. Two scripts fi
 releases. See pnpm's [release management](https://pnpm.io/versioning) docs for the full model.
 
 The published packages are `@typesql/core`, `@typesql/pg`, `@typesql/postgres`,
-`@typesql/kysely`, `@typesql/drizzle`, `@typesql/prisma` and `@typesql/language-server`. `@typesql/bench` and
+`@typesql/kysely`, `@typesql/drizzle`, `@typesql/prisma`, `@typesql/sqlite`, `@typesql/cli`
+and `@typesql/language-server`. `@typesql/bench` and
 `@typesql/docs` are private: they are never published, but they still get a version and a
 committed `CHANGELOG.md` whenever a package they depend on is released. The VS Code extension
 (`packages/vscode`, package name `typesql`) is private on npm too, and is published to the
@@ -85,16 +86,23 @@ changelogs.
 
 `pnpm publish -r` publishes every public package whose manifest version is not on the registry
 yet and skips the rest. A run without pending intents therefore versions nothing and publishes
-nothing. When a public package's current version is not on npm (an earlier run failed to
-publish, or a release commit was pushed by hand), the run skips `pnpm version -r` and only
-publishes what is missing (see [Pitfalls](#pitfalls)); run it once more to release the intents
-added since. Cutting the release commit by hand still works: `pnpm version -r` on a clean,
-up-to-date `main`, a signed commit, push, then `pnpm release`.
+nothing. When a public package's current version is not on npm and already has a changelog (an
+earlier run failed to publish, or a release commit was pushed by hand), the run skips
+`pnpm version -r` and only publishes what is missing (see [Pitfalls](#pitfalls)); run it once more
+to release the intents added since. A new package without a changelog is versioned first, using
+its manifest version for its first release. Cutting the release commit by hand still works:
+`pnpm version -r` on a clean, up-to-date `main`, a signed commit, push, then `pnpm release`.
+
+For a new npm package, the workflow publishes established packages first, creates their GitHub
+releases, then stops with the new package names. Publish each new package once from that release
+commit using an npm account with write access and 2FA, configure its trusted publisher, and run
+the release workflow again. The second run publishes any remaining versions and creates the new
+packages' GitHub releases.
 
 After a run, check that every bumped version is live:
 
 ```sh
-for p in core pg postgres kysely drizzle prisma language-server; do pnpm view @typesql/$p version; done
+for p in core pg postgres kysely drizzle prisma language-server sqlite cli; do pnpm view @typesql/$p version; done
 ```
 
 ## Trusted publishing
@@ -114,7 +122,7 @@ Setup, done once for this repository:
    the trust for every published package, in a terminal:
 
    ```sh
-   for p in core pg postgres kysely drizzle prisma language-server; do
+   for p in core pg postgres kysely drizzle prisma language-server sqlite cli; do
      npm trust github @typesql/$p --file release.yml --repo ismailkarsli/TypeSQL --env npm --allow-publish --allow-stage-publish --yes
      sleep 2
    done
@@ -134,8 +142,12 @@ Setup, done once for this repository:
    revoke any npm tokens that can publish.
 
 A new package is the one exception: npm only configures trust for a package that already
-exists, so its first version has to be published by hand (`pnpm publish` from its directory,
-with 2FA) before step 1 can include it.
+exists. After the workflow has committed the release and published its established dependencies,
+check out the release commit, run `pnpm install --frozen-lockfile && pnpm build && pnpm smoke:dist`,
+then run `pnpm publish --no-git-checks` from each new package's directory with 2FA. Use the
+release commit, not the preceding source commit, so workspace dependencies resolve to the
+versions the workflow just published. Run the `npm trust github` command in step 1 for each new
+package, then rerun the workflow.
 
 The `repository.url` in each package's `package.json` must keep pointing at this repository: npm
 checks it against the workflow's repository.
@@ -154,12 +166,12 @@ it creates a release on the repository's Releases tab:
 - `@typesql/core` marked "Latest", the others not, and versions with a prerelease suffix (from a
   [lane](https://pnpm.io/versioning)) marked as prereleases.
 
-The workflow creates releases only for the versions it just published (from the
-`pnpm publish -r --report-summary` output, so a registry that still reports the previous
-versions does not matter). Its `GITHUB_TOKEN` was refused (HTTP 403) tags on the 0.0.2 and 0.0.3
-release commits, whose workflow files differ from `main`'s, so older versions are backfilled by
-a maintainer instead: from a checkout
-with `gh` logged in, `node scripts/github-releases.ts --dry-run` lists every published version
+The workflow creates releases only for current package versions that are on npm (including
+packages first published by hand); the `pnpm publish -r --report-summary` output confirms versions
+that may not yet appear in the registry. Its `GITHUB_TOKEN` was refused (HTTP 403) tags on the
+0.0.2 and 0.0.3 release commits, whose workflow files differ from `main`'s, so older versions
+are backfilled by a maintainer instead: from a checkout with `gh` logged in,
+`node scripts/github-releases.ts --dry-run` lists every published version
 without a release, and the same command without `--dry-run` creates them. That only touches
 GitHub; nothing is published to npm.
 

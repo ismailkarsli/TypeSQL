@@ -48,8 +48,13 @@ jobs:
           before=$(public)
           for pkg in $before; do
             if ! pnpm view "$pkg" version >/dev/null 2>&1; then
-              echo "::notice::$pkg is not on npm yet; publishing without versioning"
-              exit 0
+              name=${pkg%@*}
+              dir="packages/${name##*/}"
+              if [ -f "$dir/CHANGELOG.md" ]; then
+                echo "::notice::$pkg has an unpublished release; publishing without versioning"
+                exit 0
+              fi
+              echo "::notice::$pkg is a first release; versioning its pending intents"
             fi
           done
           pnpm change status
@@ -75,10 +80,30 @@ jobs:
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - run: pnpm build
       - run: pnpm smoke:dist
-      - run: pnpm publish -r --no-git-checks --report-summary
-      - run: node scripts/github-releases.ts --summary pnpm-publish-summary.json
+      - name: Publish packages with trusted publishing
+        run: |
+          mapfile -t packages < <(pnpm -r ls --depth -1 --json | node -e '
+            for (const p of JSON.parse(require("fs").readFileSync(0)))
+              if (!p.private) console.log(p.name)')
+          filters=()
+          new=()
+          for pkg in "${packages[@]}"; do
+            if ! pnpm view "$pkg" version >/dev/null 2>&1; then
+              filters+=(--filter "!$pkg")
+              new+=("$pkg")
+            fi
+          done
+          printf '%s\n' "${new[@]}" > .new-packages
+          pnpm publish -r --no-git-checks --report-summary "${filters[@]}"
+      - run: node scripts/github-releases.ts --summary pnpm-publish-summary.json --current
         env:
           GH_TOKEN: ${{ github.token }}
+      - name: Check first-time npm packages
+        run: |
+          if [ -s .new-packages ]; then
+            echo "::error::Publish these packages once with npm login from this release commit, configure their trusted publishers, then run release again: $(paste -sd, .new-packages)"
+            exit 1
+          fi
 
   docs:
     needs: publish
