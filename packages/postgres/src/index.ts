@@ -1,5 +1,10 @@
-import type { RowKeys, SqlOptions, TransactionalSql } from "@typesql/core";
+import type { RowKeys, SqlOptions } from "@typesql/core";
 import { createTransactionalSql } from "@typesql/core/adapter";
+import {
+	type Postgres,
+	postgres,
+	type TransactionalSql,
+} from "@typesql/core/postgres";
 import { driver, type PostgresJsQueryable } from "./client.js";
 import type { PostgresJsBigIntTypeMap, PostgresJsTypeMap } from "./type-map.js";
 
@@ -47,9 +52,10 @@ export function createSql<DB>(
 	sql?: PostgresJsQueryable,
 	options?: PostgresJsSqlOptions,
 ): PostgresJsSql<DB, RowKeys, PostgresJsTypeMap | PostgresJsBigIntTypeMap> {
-	return createTransactionalSql<DB, PostgresJsTypeMap, PostgresJsQueryable>(
-		sql,
-		driver,
-		options,
-	);
+	return createTransactionalSql<
+		Postgres,
+		DB,
+		PostgresJsTypeMap,
+		PostgresJsQueryable
+	>(postgres, sql, driver, options);
 }

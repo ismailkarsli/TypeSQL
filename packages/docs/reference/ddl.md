@@ -5,7 +5,8 @@ The DDL statements TypeSQL understands, how their columns are typed, the errors 
 ## Overview
 
 ```ts
-import { createSql, migrations, type SchemaOf } from "@typesql/core";
+import { createSql, type SchemaOf } from "@typesql/core";
+import { migrations, postgres } from "@typesql/core/postgres";
 
 export const m = migrations()
 	.add("CREATE TYPE mood AS ENUM ('happy', 'sad')")
@@ -17,7 +18,7 @@ export const m = migrations()
 
 type DB = SchemaOf<typeof m>;
 
-const sql = createSql<DB>();
+const sql = createSql<DB>(postgres);
 const q = sql("SELECT id, mood FROM users WHERE email = $1", "a@b.c");
 ```
 

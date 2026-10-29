@@ -1,10 +1,11 @@
 import type { ParamsType, RowType } from "@typesql/core";
+import { postgres } from "@typesql/core/postgres";
 import { createSql } from "@typesql/drizzle";
 import type { PgTypeMap } from "@typesql/pg";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type * as schema from "./schema.js";
 
-const sql = createSql<typeof schema>();
+const sql = createSql<typeof schema>(postgres);
 
 export const q1 = sql(
 	`SELECT u.email, u.display_name, p.title, p.tags
@@ -41,7 +42,7 @@ export const q5 = sql(
 export type Q5Row = RowType<typeof q5>;
 
 declare const db: NodePgDatabase<typeof schema>;
-const dbSql = createSql<typeof schema, PgTypeMap>(db);
+const dbSql = createSql<typeof schema, PgTypeMap>(postgres, db);
 
 export async function postsByMood(m: "happy" | "sad") {
 	return dbSql(

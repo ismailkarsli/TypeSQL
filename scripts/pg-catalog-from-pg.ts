@@ -217,7 +217,7 @@ export async function generatePgCatalog(client: PgClient): Promise<string> {
 }
 
 export const OUTPUT = new URL(
-	"../packages/core/src/schema/pg-catalog.ts",
+	"../packages/core/src/postgres/schema/pg-catalog.ts",
 	import.meta.url,
 );
 

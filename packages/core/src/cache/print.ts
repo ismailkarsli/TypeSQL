@@ -178,16 +178,11 @@ export function names(text: string): string[] {
 	return out;
 }
 
-export const CORE_SPECIFIERS: readonly string[] = [
-	"@typesql/core/engine",
-	"@typesql/core",
-];
-
 export const coreNames = (
 	text: string,
-	coreSpecifiers: readonly string[] = CORE_SPECIFIERS,
+	specifiers: readonly string[],
 ): string =>
-	coreSpecifiers.reduce(
+	specifiers.reduce(
 		(t, spec) => t.replaceAll(`import(${JSON.stringify(spec)}).`, "__T."),
 		text,
 	);

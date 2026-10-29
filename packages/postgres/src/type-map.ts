@@ -1,4 +1,7 @@
-import type { DefaultParamTypeMap, DefaultTypeMap } from "@typesql/core";
+import type {
+	DefaultParamTypeMap,
+	DefaultTypeMap,
+} from "@typesql/core/postgres";
 
 export interface PostgresJsTypeMap
 	extends Omit<

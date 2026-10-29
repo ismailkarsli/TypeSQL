@@ -1,4 +1,4 @@
-import { memo } from "./runtime/splice.js";
+import { memo } from "./memo.js";
 
 export type RowKeys = "preserve" | "camelCase";
 

@@ -1,13 +1,13 @@
-import type { AnyErr, SqlError } from "../engine/errors.js";
-import type { HasDefaultable, ValueEnc } from "../engine/inline.js";
+import type { AnyErr, SqlError } from "../errors.js";
+import type { Fragment, TextType } from "../query.js";
+import type { HasDefaultable, ValueEnc } from "./inline.js";
+import type { CarriedOf, SlotTexts, Slottable } from "./slots.js";
 import type {
 	HasSlots,
 	JoinedText,
 	UnionList,
 	UnknownTuple,
-} from "../engine/splice.js";
-import type { Fragment, TextType } from "../query.js";
-import type { CarriedOf, SlotTexts, Slottable } from "./slots.js";
+} from "./splice.js";
 import type {
 	IsLiteral,
 	NotLiteralMessage,

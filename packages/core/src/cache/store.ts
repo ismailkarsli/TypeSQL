@@ -27,15 +27,21 @@ export const groupEntryId = (group: string, key: string): string =>
 	`${group}\0${key}`;
 export const ddlEntryId = (key: string): string => `ddl\0${key}`;
 
-export function readCache(path: string, engine: string): CacheFile {
+export function readCache(
+	path: string,
+	dialect: string,
+	engine: string,
+): CacheFile {
 	let text: string;
 	try {
 		text = readFileSync(path, "utf8");
 	} catch {
-		return emptyCache(engine);
+		return emptyCache(dialect, engine);
 	}
 	const file = parseCache(text);
-	return file && file.engine === engine ? file : emptyCache(engine);
+	return file && file.dialect === dialect && file.engine === engine
+		? file
+		: emptyCache(dialect, engine);
 }
 
 export function merge(
@@ -153,6 +159,7 @@ export function merge(
 		if (usedMaps.has(m)) maps[m] = text;
 	return {
 		typesqlcache: file.typesqlcache,
+		dialect: file.dialect,
 		engine: file.engine,
 		groups,
 		maps,

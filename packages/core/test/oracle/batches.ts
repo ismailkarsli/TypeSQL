@@ -3,6 +3,7 @@ import {
 	evaluateTypes,
 	type ProbeSession,
 } from "../../src/cache/evaluate.js";
+import { postgresCache } from "../../src/postgres/cache-dialect.js";
 
 export const orderDependent = (r: Evaluated): boolean =>
 	"error" in r || /^__T\.SqlError<any\b/.test(r.text);
@@ -35,6 +36,7 @@ export async function evaluateInBatches(
 					base(indices),
 					indices.map((i) => exprs[i]!),
 					isCorePath,
+					postgresCache,
 				),
 				limit,
 			);

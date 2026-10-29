@@ -1,4 +1,4 @@
-import type { InlineMarker } from "../engine/inline.js";
+import type { InlineMarker } from "../sql/inline.js";
 import { QUOTED } from "./splice.js";
 
 const PREFIX = randomHex(8);

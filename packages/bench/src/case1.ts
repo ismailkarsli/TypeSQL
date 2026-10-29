@@ -1,16 +1,16 @@
+import { createSql, type Fragment } from "@typesql/core";
 import {
-	createSql,
 	type Col,
 	type Generated,
 	type Json,
 	type Nullable,
 	type NullableGenerated,
 	type View,
-	type Fragment,
 	type DefaultTypeMap,
 	type PgCatalog,
+	postgres,
 	type Sig,
-} from "@typesql/core";
+} from "@typesql/core/postgres";
 
 export interface DB {
 	pulsate: {
@@ -978,7 +978,7 @@ type ZitherFactorizedGien = {
 	igg: number | null;
 };
 
-declare module "@typesql/core" {
+declare module "@typesql/core/postgres" {
 	interface FunctionCatalog {
 		playacted_clumsily: Sig<["text"], "text">;
 	}
@@ -990,7 +990,7 @@ interface TypeMap
 	timestamp: string;
 	timestamptz: string;
 }
-const sql = createSql<DB & PgCatalog, TypeMap>(undefined, {
+const sql = createSql<DB & PgCatalog, TypeMap>(postgres, undefined, {
 	rowKeys: "camelCase",
 });
 

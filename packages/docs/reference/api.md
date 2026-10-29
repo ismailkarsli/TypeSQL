@@ -1,16 +1,22 @@
 # API
 
-Everything `@typesql/core` exports, plus `@typesql/core/adapter` and the extra exports of the adapter and ORM packages. Each entry links to the guide page that explains it.
+Everything `@typesql/core` exports, plus `@typesql/core/postgres`, `@typesql/core/adapter` and the extra exports of the adapter and ORM packages. Each entry links to the guide page that explains it.
+
+`@typesql/core` holds what every SQL dialect shares: `createSql`, queries, fragments, executors, row keys, transactions, migrations, the schema markers, the type cache and the [dialect contract](#dialects). Everything PostgreSQL-specific is in `@typesql/core/postgres`: the `postgres` dialect, the type engine, `Json` and `PgCatalog`, the type maps and the function catalog.
 
 ## `createSql`
 
 ```ts
-createSql<DB, TypeMap = DefaultTypeMap>(executor?, options?): Sql<DB, TypeMap, Keys>
+import { createSql } from "@typesql/core";
+import { postgres } from "@typesql/core/postgres";
+
+createSql<DB, TypeMap = DefaultTypeMap>(postgres, executor?, options?): Sql<DB, TypeMap, Keys>
 ```
 
-Returns the typed `sql` function for a schema.
+Returns the typed `sql` function for a schema in a [dialect](#dialects).
 
-- `DB` is your [schema](../guide/schema). `TypeMap` turns Postgres types into TypeScript types ([Type mapping](./type-mapping)).
+- The dialect is the first argument: `postgres` from `@typesql/core/postgres`. Each dialect adds its own `createSql` signature, so the type arguments start with `DB`.
+- `DB` is your [schema](../guide/schema). `TypeMap` turns Postgres types into TypeScript types ([Type mapping](./type-mapping)); it defaults to the dialect's map.
 - `executor` is what `execute*` runs on. Without one, `sql` only builds queries.
 - `options.rowKeys` is `"preserve"` (the default) or `"camelCase"`. See [camelCase row keys](../guide/queries#camelcase-row-keys).
 
@@ -163,7 +169,7 @@ What adapters and custom executors build on.
 | `mapRows(q, rows)` | applies the query's `rowKeys` option to the driver's rows, for code that runs `q.text` itself |
 | `rowKeysOf(q)` | returns the query's `rowKeys` option |
 | `camelCase(key)` | the camelCase key mapping |
-| `createTransactionalSql(client, driver, options?)` | core's `createSql` bound to a driver's client, with `sql.transaction(fn)` |
+| `createTransactionalSql(dialect, client, driver, options?)` | the dialect's `sql` bound to a driver's client, with `sql.transaction(fn)`; the PostgreSQL adapters pass `postgres` from `@typesql/core/postgres` |
 | `SqlDriver<C>` | how a driver runs statements and transactions on its client `C` |
 | `runTransaction(run, fn, options?)` | `BEGIN` / `COMMIT` / `ROLLBACK` (or a savepoint) around `fn`, for drivers without a transaction API |
 | `JsonParam<T>` | the runtime value `sql.json()` binds: `{ value }` with `toPostgres()`, `toJSON()`, `toString()` |
@@ -203,9 +209,9 @@ What adapters and custom executors build on.
 | `ApplyDdl<DB, Q>` | the schema after a DDL statement or a `;`-separated script |
 | `SqlError<Message, At>` | the compile-time error carrier; `At` is the index of the offending token |
 
-### `@typesql/core/engine`
+### `@typesql/core/postgres/engine`
 
-The engine's other types are exported from `@typesql/core/engine`, so that a declaration file or the [type cache](../guide/performance#type-cache) can name them: the markers `sql.param()` and `sql.json()` return, the representative texts of `sql.combine`, `sql.set` and `sql.values`, `Analyze` and `Analysis`, `ArgsOf`, `CamelCaseKeys`, the lexer, parser and type cache types, and so on. They change with the engine and are not a stable API.
+The engine's other types are exported from `@typesql/core/postgres/engine`, so that a declaration file or the [type cache](../guide/performance#type-cache) can name them: the markers `sql.param()` and `sql.json()` return, the representative texts of `sql.combine`, `sql.set` and `sql.values`, `Analyze` and `Analysis`, `ArgsOf`, `CamelCaseKeys`, the lexer, parser and type cache types, and so on. They change with the engine and are not a stable API.
 
 ## Schema types
 
@@ -222,13 +228,15 @@ interface DB { users: {...}; auth: { sessions: {...} }; $types: { mood: "a" | "b
 type WithCatalog = DB & PgCatalog;
 ```
 
+`Col`, `Nullable`, `Generated`, `NullableGenerated`, `Arr`, `Enum` and `View` are defined in `@typesql/core` and re-exported from `@typesql/core/postgres`, which adds `Json` and `PgCatalog`. A dialect lists its type names by augmenting `ColumnTypes`, so the editor completes them in `Col<"…">`.
+
 `PgCatalog` is `{ pg_catalog: PgCatalogNamespace; information_schema: InformationSchemaNamespace }`. See [Declaring tables](../guide/schema) for type names and [System catalogs](../guide/schema#system-catalogs).
 
 ## Type maps
 
 | Export | Meaning |
 |---|---|
-| `DefaultTypeMap` | node-postgres defaults; what core's `createSql` uses |
+| `DefaultTypeMap` | node-postgres defaults; what core's `createSql` uses with `postgres` |
 | `DefaultParamTypeMap` | what parameters accept when a map has no `$params` |
 | `PgTypeMap`, `PgParamTypeMap` | `@typesql/pg` |
 | `PostgresJsTypeMap`, `PostgresJsBigIntTypeMap`, `PostgresJsParamTypeMap` | `@typesql/postgres` |
@@ -254,7 +262,7 @@ interface DB {
   $functions: { immutable_unaccent: Sig<["text"], "text"> };
 }
 
-declare module "@typesql/core" {
+declare module "@typesql/core/postgres" {
   interface FunctionCatalog {
     my_count: Sig<["any"], "int8", { agg: true; nullable: false }>;
   }
@@ -276,22 +284,38 @@ An entry is one `Sig<Params, Return, Flags>` or a tuple of overloads.
 
 | Export | Meaning |
 |---|---|
-| `migrations<DB = {}>()` | a builder of DDL statements whose type tracks the schema |
+| `migrations<DB = {}>()` | a builder of DDL statements whose type tracks the schema (`@typesql/core/postgres`); a `PgMigrations<DB>` |
+| `Migrations<T, DB>` | the builder class for dialect `T` (`@typesql/core`) |
 | `SchemaOf<M>` | the schema of a builder |
 | `runMigrations(client, m)` | runs `m.statements` in one transaction (`@typesql/core`) |
 | `migrate(db, m)` | the same, from `@typesql/pg` and `@typesql/postgres` |
 
 See [DDL support](./ddl#migrations) and [From migrations](../guide/migrations).
 
+## Dialects
+
+A dialect pairs the runtime that builds its `sql` function with that function's types. PostgreSQL is the only one so far: the `postgres` value (a `PostgresDialect`) and its `Postgres` types from `@typesql/core/postgres`.
+
+| Export of `@typesql/core` | Meaning |
+|---|---|
+| `Dialect<T>` | the runtime side, what `createSql` takes: `{ name }`. Statements are built with `$n` parameters and sent as written |
+| `DialectTypes` | the type side: its default `typeMap`, and given `db`, `tm`, `keys` and `ddl`, the `sql`, `transactionalSql`, `validateDdl` and `applyDdl` types |
+| `SqlOf<T, DB, TM, Keys>`, `TransactionalSqlOf<T, DB, TM, Keys>` | the `sql` function of dialect `T`, without or with `transaction(fn)` |
+| `ValidateDdlOf<T, DB, Q>`, `ApplyDdlOf<T, DB, Q>` | DDL checking and the schema after `Q`, in dialect `T` |
+| `Transactional<Self>` | the `transaction(fn)` method an adapter's `sql` adds |
+| `CreateSql` | the type of `createSql`. A dialect adds its call signatures by augmenting it, so `createSql<DB>(postgres)` picks PostgreSQL's from the `postgres` argument. A dialect without its own signatures uses the generic one: `createSql<T, DB>(dialect)` |
+
+`SqlOf<Postgres, DB, TM>` is `Sql<DB, TM>`, and `TransactionalSqlOf<Postgres, DB, TM>` is `TransactionalSql<DB, TM>`.
+
 ## ORM packages
 
-Each package wraps core's `createSql` with the schema converted from the ORM's types. See [From Kysely, Drizzle or Prisma](../guide/orms).
+Each package wraps core's `createSql` with the schema converted from the ORM's types, and takes the dialect the same way. See [From Kysely, Drizzle or Prisma](../guide/orms).
 
 | Package | `createSql` | Schema type | Runs queries |
 |---|---|---|---|
-| `@typesql/kysely` | `createSql<DB, TM = DefaultTypeMap, Overrides = {}, Options = {}>(db?, { rowKeys? })` | `FromKysely<DB, Overrides, Options>` | on a `Kysely` or `Transaction`, plugins bypassed |
-| `@typesql/drizzle` | `createSql<Schema, TM = DefaultTypeMap, Options = {}>(db?)` | `FromDrizzle<Schema, Options>`; `pgType(column, "type")` pins a column | on the driver client under a node-postgres or postgres.js Drizzle database |
-| `@typesql/prisma` | `createSql<S, TM = PrismaTypeMap>(prisma?)`; `S` is a generated `DB` or a `Prisma.TypeMap` | `FromPrisma<Prisma.TypeMap, Overrides>`; the `typesql-prisma` generator | `$queryRawUnsafe` / `$executeRawUnsafe` on Prisma Client |
+| `@typesql/kysely` | `createSql(postgres, db, { rowKeys? })` with `DB` from `Kysely<DB>`, or `createSql<DB, TM = DefaultTypeMap, Overrides = {}, Options = {}>(postgres, db?, { rowKeys? })` | `FromKysely<DB, Overrides, Options>` | on a `Kysely` or `Transaction`, plugins bypassed |
+| `@typesql/drizzle` | `createSql(postgres, db)` with the schema from `db`, or `createSql<Schema, TM = DefaultTypeMap, Options = {}>(postgres, db?)` | `FromDrizzle<Schema, Options>`; `pgType(column, "type")` pins a column | on the driver client under a node-postgres or postgres.js Drizzle database |
+| `@typesql/prisma` | `createSql(postgres, prisma)` with the client's `Prisma.TypeMap`, or `createSql<S, TM = PrismaTypeMap>(postgres, prisma?)`; `S` is a generated `DB` or a `Prisma.TypeMap` | `FromPrisma<Prisma.TypeMap, Overrides>`; the `typesql-prisma` generator | `$queryRawUnsafe` / `$executeRawUnsafe` on Prisma Client |
 
 | Option type | Fields |
 |---|---|
@@ -308,7 +332,7 @@ Each package wraps core's `createSql` with the schema converted from the ORM's t
 
 ```sh
 typesql introspect [--url <url>] [--out <file>] [--schema <name>]… [--exclude <pattern>]… [--type-name DB]
-                   [--import-from @typesql/core] [--config <file>] [--no-comments]
+                   [--import-from @typesql/core/postgres] [--config <file>] [--no-comments]
 ```
 
 | Export of `@typesql/pg/introspect` | Meaning |

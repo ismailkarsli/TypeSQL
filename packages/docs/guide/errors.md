@@ -90,6 +90,7 @@ Any of these fixes it:
   ```ts
   export const sql = createSql<DB>(executor);
   export type * from "@typesql/core";
+  export type * from "@typesql/core/postgres";
   ```
 - Add `@typesql/core` to the exporting package's `dependencies`.
 - Export the rows (`execute*` results) instead of the query, or annotate the return type.

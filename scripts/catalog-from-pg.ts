@@ -34,7 +34,10 @@ if (!url) {
 }
 
 const catalogSrc = readFileSync(
-	new URL("../packages/core/src/engine/typer/catalog.ts", import.meta.url),
+	new URL(
+		"../packages/core/src/postgres/engine/typer/catalog.ts",
+		import.meta.url,
+	),
 	"utf8",
 );
 const body = catalogSrc.slice(

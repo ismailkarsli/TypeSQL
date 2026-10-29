@@ -30,7 +30,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "../../../..");
 const vendor = join(root, "vendor/postgres");
 const regress = join(vendor, "src/test/regress");
-const engine = join(root, "packages/core/src/engine");
+const engine = join(root, "packages/core/src/postgres/engine");
 const cache = join(root, "node_modules/.cache/typesql-pg-regress");
 const tsc = join(root, "node_modules/.bin/tsrs");
 const baselinePath = join(here, "baseline.json");
@@ -67,7 +67,7 @@ const HEADER = [
 	`import type { Lex } from "${relative(cache, join(engine, "lexer/lex.js"))}";`,
 	`import type { Toks } from "${relative(cache, join(engine, "lexer/tokens.js"))}";`,
 	`import type { ParseProgram } from "${relative(cache, join(engine, "parser/stmt.js"))}";`,
-	`import type { SqlError } from "${relative(cache, join(engine, "errors.js"))}";`,
+	`import type { SqlError } from "${relative(cache, join(engine, "../../errors.js"))}";`,
 	`/** "ok", "${SKIPPED}" for a statement the parser skips without validating it, or the lexer's or parser's error message. */`,
 	`type R<Q extends string> = Lex<Q> extends infer T`,
 	`  ? T extends SqlError<infer M, any> ? M`,

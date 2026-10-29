@@ -1,4 +1,4 @@
-import type { Col, Generated, Nullable } from "@typesql/core";
+import type { Col, Generated, Nullable } from "@typesql/core/postgres";
 import { createSql } from "@typesql/postgres";
 import type { Sql } from "postgres";
 

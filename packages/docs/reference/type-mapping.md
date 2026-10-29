@@ -2,7 +2,7 @@
 
 Your schema uses Postgres type names (`int8`, `timestamptz`). A **type map** says which TypeScript type each one becomes. This page lists the maps for each driver, what parameters accept, and how to write your own map.
 
-Each adapter's `createSql` picks the map that matches its driver. `createSql` from `@typesql/core` uses `DefaultTypeMap`, which matches node-postgres.
+Each adapter's `createSql` picks the map that matches its driver. `createSql` from `@typesql/core` with the `postgres` dialect uses `DefaultTypeMap`, which matches node-postgres.
 
 ## At a glance
 
@@ -130,7 +130,7 @@ So a map that types rows with a custom parser keeps the driver's input types. Wi
 To change what parameters accept, set `$params`. It replaces the default, so extend `DefaultParamTypeMap` (or the adapter's map) to keep the rest:
 
 ```ts
-import type { DefaultParamTypeMap } from "@typesql/core";
+import type { DefaultParamTypeMap } from "@typesql/core/postgres";
 
 declare class Instant {
 	toPostgres(): string;
@@ -142,7 +142,7 @@ interface AppMap extends Omit<DefaultTypeMap, "timestamptz"> {
 	timestamptz: string;
 	$params: AppParams;
 }
-const app = createSql<DB, AppMap>();
+const app = createSql<DB, AppMap>(postgres);
 const recent = app(
 	"SELECT id, created_at FROM users WHERE created_at > $1",
 	new Date(),
@@ -151,16 +151,17 @@ const recent = app(
 
 ## Custom type maps
 
-A type map is any object type from Postgres type names to TypeScript types. Pass it as the second type argument of `createSql`:
+A type map is any object type from Postgres type names to TypeScript types. Pass it as the second type argument of an adapter's `createSql`, or the third of core's:
 
 ```ts
-import { createSql, type DefaultTypeMap } from "@typesql/core";
+import { createSql } from "@typesql/core";
+import { type DefaultTypeMap, postgres } from "@typesql/core/postgres";
 
 interface MyMap extends Omit<DefaultTypeMap, "int8"> {
 	int8: number;
 	"int8[]": number[];
 }
-const sql = createSql<DB, MyMap>();
+const sql = createSql<DB, MyMap>(postgres);
 const counts = sql(
 	"SELECT author_id, count(*) AS n FROM posts GROUP BY author_id",
 );

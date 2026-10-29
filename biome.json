@@ -11,9 +11,9 @@
 			"**",
 			"!!vendor",
 			"!!.changeset",
-			"!packages/core/src/engine/lexer/next.ts",
-			"!packages/core/src/engine/typer/pg-functions.ts",
-			"!packages/core/src/schema/pg-catalog.ts",
+			"!packages/core/src/postgres/engine/lexer/next.ts",
+			"!packages/core/src/postgres/engine/typer/pg-functions.ts",
+			"!packages/core/src/postgres/schema/pg-catalog.ts",
 			"!packages/bench/src",
 			"!packages/bench/thresholds.json",
 			"!packages/core/test/oracle/baselines",
@@ -56,7 +56,10 @@
 	},
 	"overrides": [
 		{
-			"includes": ["packages/core/src/engine/cache.ts"],
+			"includes": [
+				"packages/core/src/postgres/engine/cache.ts",
+				"packages/core/src/schema.ts"
+			],
 			"linter": {
 				"rules": {
 					"suspicious": {

@@ -1,6 +1,6 @@
-import type { Skip } from "../engine/inline.js";
-import type { MaxParamStr, SlotNames } from "../engine/splice.js";
 import type { CARRIED, Fragment, Query, TextType } from "../query.js";
+import type { Skip } from "./inline.js";
+import type { MaxParamStr, SlotNames } from "./splice.js";
 
 export type Slottable =
 	| Fragment<string, readonly unknown[], readonly unknown[]>

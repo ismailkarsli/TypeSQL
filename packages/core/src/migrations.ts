@@ -1,25 +1,13 @@
-import type { AnyErr, SqlError } from "./engine/errors.js";
-import type { ApplyDdl } from "./engine/infer.js";
+import type { ApplyDdlOf, DialectTypes, ValidateDdlOf } from "./dialect.js";
 
-export type ValidateDdl<DB, Q extends string> = string extends Q
-	? SqlError<
-			"migrations need a string literal; use .raw() for SQL the type checker cannot see",
-			null
-		>
-	: ApplyDdl<DB, Q> extends infer R
-		? R extends AnyErr
-			? R
-			: Q
-		: never;
-
-type GateValidateDdl<DB, Q extends string> = [DB, Q] extends [
-	infer D,
-	infer Q2 extends string,
-]
-	? ValidateDdl<D, Q2>
+type GateValidateDdl<T extends DialectTypes, DB, Q extends string> = [
+	DB,
+	Q,
+] extends [infer D, infer Q2 extends string]
+	? ValidateDdlOf<T, D, Q2>
 	: never;
 
-export class Migrations<DB = {}> {
+export class Migrations<T extends DialectTypes, DB = {}> {
 	declare readonly schema: DB;
 	readonly statements: readonly string[];
 
@@ -29,18 +17,14 @@ export class Migrations<DB = {}> {
 	}
 
 	add<const Q extends string>(
-		ddl: GateValidateDdl<DB, Q> & Q,
-	): Migrations<ApplyDdl<DB, Q>> {
+		ddl: GateValidateDdl<T, DB, Q> & Q,
+	): Migrations<T, ApplyDdlOf<T, DB, Q>> {
 		return new Migrations([...this.statements, ddl]);
 	}
 
-	raw<After = DB>(sql: string): Migrations<After> {
-		return new Migrations<After>([...this.statements, sql]);
+	raw<After = DB>(sql: string): Migrations<T, After> {
+		return new Migrations<T, After>([...this.statements, sql]);
 	}
-}
-
-export function migrations<Base = {}>(): Migrations<Base> {
-	return new Migrations<Base>();
 }
 
 export type SchemaOf<M extends { readonly schema: unknown }> = M["schema"];

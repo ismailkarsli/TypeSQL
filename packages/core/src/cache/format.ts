@@ -1,9 +1,11 @@
 import { createHash } from "node:crypto";
+import type { CacheDialect } from "./dialect.js";
 
-export const FORMAT = 1;
+export const FORMAT = 2;
 
 export interface CacheFile {
 	readonly typesqlcache: typeof FORMAT;
+	readonly dialect: string;
 	readonly engine: string;
 	readonly groups: { readonly [group: string]: Group };
 	readonly maps: { readonly [map: string]: string };
@@ -47,8 +49,9 @@ export interface DdlEntry {
 	readonly e?: string;
 }
 
-export const emptyCache = (engine: string): CacheFile => ({
+export const emptyCache = (dialect: string, engine: string): CacheFile => ({
 	typesqlcache: FORMAT,
+	dialect,
 	engine,
 	groups: {},
 	maps: {},
@@ -65,9 +68,15 @@ export function parseCache(text: string): CacheFile | null {
 	}
 	if (typeof data !== "object" || data === null) return null;
 	const f = data as Partial<CacheFile>;
-	if (f.typesqlcache !== FORMAT || typeof f.engine !== "string") return null;
+	if (
+		f.typesqlcache !== FORMAT ||
+		typeof f.dialect !== "string" ||
+		typeof f.engine !== "string"
+	)
+		return null;
 	return {
 		typesqlcache: FORMAT,
+		dialect: f.dialect,
 		engine: f.engine,
 		groups: f.groups ?? {},
 		maps: f.maps ?? {},
@@ -110,10 +119,12 @@ const pairs = (q: Snapshot["q"]): string =>
 export function render(
 	file: CacheFile | null,
 	id: string,
+	dialect: CacheDialect,
 	engine: string,
 ): string {
-	const head = `// Generated from a TypeSQL type cache; see https://typesql.karsli.net/guide/caching\nimport type * as __T from "@typesql/core/engine";\nexport {};\n`;
-	if (!file || file.engine !== engine) return head;
+	const head = `// Generated from a TypeSQL type cache; see https://typesql.karsli.net/guide/caching\nimport type * as __T from ${lit(dialect.engine)};\nexport {};\n`;
+	if (!file || file.dialect !== dialect.name || file.engine !== engine)
+		return head;
 	const out: string[] = [head];
 	const keys = new Set<string>();
 	const snapshots: string[] = [];
@@ -152,7 +163,7 @@ export function render(
 		});
 		return `      ${lit(key)}: ${variants.join(" | ")};`;
 	});
-	out.push(`declare module "@typesql/core/engine" {\n`);
+	out.push(`declare module ${lit(dialect.engine)} {\n`);
 	if (keys.size) {
 		out.push(
 			`  interface QueryCacheKeys {\n${[...keys].map((k) => `    ${lit(k)}: true;`).join("\n")}\n  }\n`,

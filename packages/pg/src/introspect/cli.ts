@@ -21,7 +21,7 @@ Options:
   --schema <name>      schema to read; repeat or comma-separate (default: all but system schemas)
   --exclude <pattern>  relation to leave out (name or schema.name, * wildcard); repeat or comma-separate
   --type-name <name>   name of the schema interface (default: DB)
-  --import-from <mod>  module the column helpers come from (default: @typesql/core)
+  --import-from <mod>  module the column helpers come from (default: @typesql/core/postgres)
   --config <file>      module whose default export holds these options and more
                        (columnTypes for JSON columns, imports, column(...) hook)
   --no-comments        omit JSDoc from comments, domains and generated columns

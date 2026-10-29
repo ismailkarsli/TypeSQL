@@ -1,3 +1,4 @@
+import type { Dialect, DialectTypes, SqlOf } from "./dialect.js";
 import type { Executor } from "./query.js";
 import { makeFragment, makeQuery } from "./query.js";
 import type { RowKeys, SqlOptions } from "./row-keys.js";
@@ -14,21 +15,27 @@ import {
 } from "./runtime/splice.js";
 import { buildSet, buildValues } from "./runtime/write.js";
 import type { SlotMap } from "./sql/slots.js";
-import type { Sql } from "./sql/types.js";
-import type { DefaultTypeMap } from "./type-map/index.js";
 
-export function createSql<DB, TM = DefaultTypeMap>(
-	executor: Executor | undefined,
-	options: SqlOptions & { readonly rowKeys: "camelCase" },
-): Sql<DB, TM, "camelCase">;
-export function createSql<DB, TM = DefaultTypeMap>(
-	executor?: Executor,
-	options?: SqlOptions & { readonly rowKeys?: "preserve" },
-): Sql<DB, TM>;
-export function createSql<DB, TM = DefaultTypeMap>(
+export interface CreateSql {
+	<T extends DialectTypes, DB, TM = T["typeMap"]>(
+		dialect: Dialect<T>,
+		executor: Executor | undefined,
+		options: SqlOptions & { readonly rowKeys: "camelCase" },
+	): SqlOf<T, DB, TM, "camelCase">;
+	<T extends DialectTypes, DB, TM = T["typeMap"]>(
+		dialect: Dialect<T>,
+		executor?: Executor,
+		options?: SqlOptions & { readonly rowKeys?: "preserve" },
+	): SqlOf<T, DB, TM>;
+}
+
+export const createSql = createDialectSql as CreateSql;
+
+export function createDialectSql<T extends DialectTypes, DB, TM = T["typeMap"]>(
+	_dialect: Dialect<T>,
 	executor?: Executor,
 	options?: SqlOptions,
-): Sql<DB, TM, RowKeys> {
+): SqlOf<T, DB, TM, RowKeys> {
 	const rowKeys = options?.rowKeys ?? "preserve";
 	const call = (query: string, ...rest: readonly unknown[]) => {
 		const { text, values } = build(query, rest);
@@ -98,7 +105,5 @@ export function createSql<DB, TM = DefaultTypeMap>(
 			return makeFragment(r.text, r.values);
 		},
 	});
-	return api as unknown as Sql<DB, TM, RowKeys>;
+	return api as unknown as SqlOf<T, DB, TM, RowKeys>;
 }
-
-export type { Sql } from "./sql/types.js";

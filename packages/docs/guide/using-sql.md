@@ -1,6 +1,6 @@
 # Using `sql`
 
-TypeSQL centers on the `sql` function returned by `createSql<DB>()` (from `@typesql/core` or your driver adapter package). It compiles and type-checks your SQL statements against your schema at compile time, and provides helper functions on `sql.*` for parameter binding, dynamic SQL, fragments, bulk writes, and transactions.
+TypeSQL centers on the `sql` function returned by your driver adapter's `createSql<DB>()` (or core's `createSql<DB>(postgres)`). It compiles and type-checks your SQL statements against your schema at compile time, and provides helper functions on `sql.*` for parameter binding, dynamic SQL, fragments, bulk writes, and transactions.
 
 **`sql(...)` is all you need to write queries. Every other `sql.*` function is a helper for specific use cases.**
 

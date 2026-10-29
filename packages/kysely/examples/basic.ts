@@ -1,4 +1,5 @@
-import type { DefaultTypeMap, ParamsType, RowType } from "@typesql/core";
+import type { ParamsType, RowType } from "@typesql/core";
+import { type DefaultTypeMap, postgres } from "@typesql/core/postgres";
 import { createSql } from "@typesql/kysely";
 import type { ColumnType, Generated, GeneratedAlways, Kysely } from "kysely";
 
@@ -36,7 +37,7 @@ interface DB {
 }
 
 declare const db: Kysely<DB>;
-const sql = createSql<DB>(db);
+const sql = createSql(postgres, db);
 
 export const q1 = sql(
 	`SELECT u.id, u.email, u.balance, p.id AS post_id, p.title
@@ -68,7 +69,7 @@ const sqlx = createSql<
 	DB,
 	DefaultTypeMap,
 	{ posts: { score: "float8" }; $types: { mood: Mood } }
->();
+>(postgres);
 export const q5a = sql(
 	`SELECT author_id, avg(score) FROM posts GROUP BY author_id`,
 );
@@ -85,7 +86,9 @@ interface CamelDB {
 		createdAt: Generated<Timestamp>;
 	};
 }
-const camel = createSql<CamelDB, DefaultTypeMap, {}, { camelCase: true }>();
+const camel = createSql<CamelDB, DefaultTypeMap, {}, { camelCase: true }>(
+	postgres,
+);
 export const q6 = camel(
 	`SELECT author_id, created_at FROM blog_posts WHERE id = $1`,
 	1,

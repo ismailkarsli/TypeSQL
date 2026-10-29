@@ -1,3 +1,4 @@
+import { postgres } from "@typesql/core/postgres";
 import { createSql } from "@typesql/kysely";
 import {
 	type ColumnType,
@@ -33,7 +34,7 @@ interface DB {
 const db = new Kysely<DB>({
 	dialect: new PostgresDialect({ pool: new Pool() }),
 });
-const sql = createSql<DB>(db);
+const sql = createSql(postgres, db);
 
 const drafts = await db
 	.selectFrom("posts")
@@ -57,7 +58,7 @@ await db.transaction().execute(async (trx) => {
 		.set({ published: true })
 		.where("author_id", "=", 1)
 		.execute();
-	await createSql<DB>(trx)(
+	await createSql(postgres, trx)(
 		`DELETE FROM posts WHERE author_id = $1 AND NOT published`,
 		1,
 	).execute();

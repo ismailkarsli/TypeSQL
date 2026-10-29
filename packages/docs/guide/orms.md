@@ -10,6 +10,8 @@ If Kysely, Drizzle or Prisma already describes your database, you don't need to 
 
 An ORM's types say less than the database does, so each conversion has a few gaps, which you can fill with overrides.
 
+Each package's `createSql` takes the SQL [dialect](../reference/api#dialects) as its first argument, with `postgres` from `@typesql/core/postgres`. The schema comes from the ORM's database type, so `createSql(postgres, db)` needs no type argument; pass one (`createSql<DB>(postgres, db)`) to add overrides, pick a type map or build queries without a client. The type map defaults to the dialect's (`DefaultTypeMap`); `@typesql/prisma` defaults to `PrismaTypeMap`.
+
 ::: tip
 For the exact Postgres types without overrides, [generate the schema from the database](./introspect) instead, and keep the ORM for the queries it builds.
 :::
@@ -20,7 +22,7 @@ For the exact Postgres types without overrides, [generate the schema from the da
 npm install @typesql/core @typesql/kysely kysely
 ```
 
-[Open an example in the TypeScript Playground](https://www.typescriptlang.org/play/#code/JYWwDg9gTgLgBAbzgYygUwIYzQZQI4A2cAvnAGZQQhwBEAAjAJ5hoDOhA9ANaOtoGMaAbgBQoSLEQiAkExZwAwhAIBXEADsAKszQAaGXLRwA4mnVooWNABN90gNK9+jOwAUIrGAHN0rACLAGARoyDD6pBRUtDx8AsJi4NDwSO7KJOSU1DRgXvEihnAAkuowABxwALyKympaOgA8Mp5QwOpedgBGwF6t8AA+cOpqHRZwA82t7TJdPSVjg8Oj4zAtbSIAfKIFmqBsMBjgldWqGtos9X5WunCX2PMTbde3RsurXpv5OnAAshAQ1kcaAALDBgMCCeY0VgYax5XoWMgYZBGPwAISk0hUfCgrAAXBjpMBrPjTOZLNhrPUhiARlAPtJpGgQBhgAR8Q8vKIGSA-sSfrz5kMCAQudJUJgKQB9LAkswWKyUnYgPYHMD04hcyCePEEomyskK+rFMr06QYFQwIHQSV6hY0iyimDAGDBdkrSaisAqDoEYCsIE2fXyin1Dp-YIYdTq0TEEQiZAQdSeODWDpHcwAdzgjlijAuqPWAAoEDJrIFgqF8Zm4O5PD42AEgiEYMW4JBlFW0FnUgRCwBKEh98J90QJpPwdhEKriqz4Aj5oupkdxsfJ6yWMgwVhHDAZlnwVMyAB0sWbADFMoXsh4tzQ+8fT6FCwBtGhEmjXGhOl1oGgAXXvaQjwzAN0CvL0fT9ANYU-CoP3III+EAo80AADxCC00H7UR40TZMI2sCwwwwKAASqSdCxkAADHAAFEABlaIUTQ4BUFDmVZa42J5f5rgTFQSkLMAjyJAcAEEcDbG9WH0OA5PkhTFKU5T5MsdQuH7OAAHkADVaIAJTgQstP0vwDLgVEAE0UAgASW2E0SblonAFHEySwAIJE0BEFTfOUs99K075WOxbcVDgRizxYgApLTCgAOSk7U220xLhPNS1rSJI42OysT4r8Nsjwg31-RsHy-MquSAHUAAkDNo1ijx4si4AAEgARgqqq-OMQKAFVXAs6zcusKi7GBUFwQ-ERl1XeA1K4Gwdz3Z04AIoiIBI6wUPQ5BMOwuNd33FMOiPFZI2hUJgETftdow7BCwwVhGHUZAjJWVCBwqdYMWOtbPpkICVDAawrE0DAfSw69tTvIGTzQFskBKqDAzgFYVCMYhAKAkCLGhjKrSgG0YNoODrg6nH7v2x7lzNVb4BnbA5wXQtPr7SiGSoszGM0RqAqCpKtzgOqGrgQmstazq4Hywr4q0liUbKsa7GkDq7D7amDuXbGcIomiGKYljsoF4KsQsbdRf0xqWqOTrxtoSMfEEZcgA) <span data-playground="kysely"></span>.
+[Open an example in the TypeScript Playground](https://www.typescriptlang.org/play/#code/JYWwDg9gTgLgBAbzpAzjA5lApiuBfOAMyghDgCIABGATzBwEcAbAegGNosXUNsVyA3AChQkWIjhtsAQxhYAys3xESZKrXopmLANY0UWJjUEjw0eAiEBIDVjgBhCEwCuIAHYAVOlgA0123AA4lhuWFCyWAAmflYA0vqGNDEAChBomDgAIsDSTFhsMH4ExKQUegZGJqLmEqlOyiVqYOgmQgEAkm4wABxwALwOTq6e3gA81mhQwG7oMQBGwOjT8AA+cG6uc2Fwa5PTs9YLS10765vbuzBTM0IAfMIBHqA4MNLg-YMu7l70o5kRPjg-zkpz2M0BwLsl2u6HubW8cAAshAIJEPuQABbSMBgYyncgoaSRVrLMKEaRsOyZABCiGszgMUBQAC46VYrMBIqzgqFwnJIqMNiAtlA4eysCBpMAmKywehhOyQCiuUjlacNkwmAqrFIsBFIgB9WTckJhfWjJ4gF5vMBivAKngstkclU8s380adHpiqzSZwwDHQA2c1lCkXamDAGB5WVXfbasDOOZMYAoDFRE2881zFF5aRuO3CPBCIQcNxoOCROYfUIAdzg8QqND+1NuAApLFZIjk8gVQ1h66l0nxsrl8jAO8hc-3B7m2wBKfDzorz4RlitaJgfXURRRMNs8DIoQFV1cl9fwSLhQgwXADaS1qWXubWAB0FXHADFVG3yI7yPOb4fgUbYANrkJy5CAuQkbRlg5AALqAVYr61um2C-omyapumxLQX0UFELkBjIa+WAAB75P6WALsIpYQOW8B5pEYQ5tIUBogMm5ttYAAG8gAKIADICfYHhwM4ZGStKgKSUqqKAhwzhdAer6couACC8hTmgx5CHABmGUZxkmaZhnhG4OgLnAADyABqAkAEpwG2NmOZkTlwNSACakgQMpE5gGpkSLh58j2Jp2lgEwFJYPpZkJSZn6OTZiISYyuDOHAImfuJABSNntAAcjpt7ILZJVBX6AZBpyHySXVGlFZkyCvlhKZplE8WJT1cAAOoABJOQJEmvvJnFwAAJAAjN1vUJYEKUAKrJF5vkNZEvExJi2K4lBQhnhecAWToUQfA+T5wMxrEQOxkRkZRbDUbRJYXVGlZzK+Vz5oSBTAAxC4PVRchttIKA0G4bAuVc5GLn0txsm98Aw9YKHOGAkQRB40jJjRf5pLeAGo++WATkg7U4RmcBXM4dh4MhKFoWEePVYGUDBnhFAEYC00M0DT0g2evqPu9O5yHuB4E0egIw-OPHsrxHkiR4I3JalpW4INw1wKztUTTNcBNS1RU2eJFOdZtMRWNNMTzvzz1nvTdHcfxwmieJdVq2lDJhJrQ2OSN40fDNW0UPmmDGGeQA) <span data-playground="kysely"></span>.
 
 Pass the same `DB` interface you give to `new Kysely<DB>()`. The conversion happens in the type checker: no code generation, no database connection.
 
@@ -61,8 +63,9 @@ export interface DB {
 
 ```ts
 import { createSql } from "@typesql/kysely";
+import { postgres } from "@typesql/core/postgres";
 
-const sql = createSql<DB>(db);
+const sql = createSql(postgres, db);
 
 const q = sql(
 	`SELECT u.email, u.mood, p.id, p.title
@@ -115,14 +118,14 @@ await db.transaction().execute(async (trx) => {
 		.set({ published: false })
 		.where("author_id", "=", 1)
 		.execute();
-	await createSql<DB>(trx)(
+	await createSql(postgres, trx)(
 		"DELETE FROM posts WHERE author_id = $1 AND NOT published",
 		1,
 	).execute();
 });
 ```
 
-Queries run through `db.withoutPlugins()`, so logging, the dialect and the pool apply, but result transformers such as `CamelCasePlugin` don't. Kysely's `PostgresDialect` runs on `pg`: for the exact `pg` types (`Buffer` for `bytea`, interval objects), use `createSql<DB, PgTypeMap>(db)`.
+Queries run through `db.withoutPlugins()`, so logging, the dialect and the pool apply, but result transformers such as `CamelCasePlugin` don't. Kysely's `PostgresDialect` runs on `pg`: for the exact `pg` types (`Buffer` for `bytea`, interval objects), use `createSql<DB, PgTypeMap>(postgres, db)`.
 
 ### Overrides
 
@@ -136,7 +139,7 @@ const sqlx = createSql<
 		posts: { score: "float8" };
 		$types: { mood: Mood };
 	}
->(db);
+>(postgres, db);
 
 sql("SELECT avg(score) FROM posts");
 sqlx("SELECT avg(score) FROM posts");
@@ -159,16 +162,25 @@ interface CamelDB {
 	};
 }
 
-const camel = createSql<CamelDB, DefaultTypeMap, {}, { camelCase: true }>(
-	camelDb,
-);
+const camel = createSql<
+	CamelDB,
+	DefaultTypeMap,
+	{},
+	{ camelCase: true }
+>(postgres, camelDb);
 camel("SELECT author_id, created_at FROM blog_posts WHERE id = $1", 1);
 ```
 
 For camelCase rows, as `CamelCasePlugin` would return them, also pass `{ rowKeys: "camelCase" }`. Only top-level keys are renamed, not keys inside JSON values. See [camelCase row keys](./queries#camelcase-row-keys).
 
 ```ts
-const camelRows = createSql<CamelDB, DefaultTypeMap, {}, { camelCase: true }>(
+const camelRows = createSql<
+	CamelDB,
+	DefaultTypeMap,
+	{},
+	{ camelCase: true }
+>(
+	postgres,
 	camelDb,
 	{ rowKeys: "camelCase" },
 );
@@ -241,9 +253,10 @@ export const usersRelations = relations(users, ({ many }) => ({
 
 ```ts
 import { createSql } from "@typesql/drizzle";
+import { postgres } from "@typesql/core/postgres";
 import type * as schema from "./orm-drizzle-schema.js";
 
-const sql = createSql<typeof schema>(db);
+const sql = createSql(postgres, db);
 
 const q = sql(
 	`SELECT u.email, u.display_name, p.title
@@ -277,12 +290,12 @@ The Postgres type comes from the column kind: `integer` is `int4`, `doublePrecis
 
 ### Running queries
 
-`createSql<typeof schema>(db)` runs queries on the driver client under `db`: the `Pool`, `Client` or postgres.js `sql` you passed to `drizzle()`, or the transaction's connection inside `db.transaction(fn)`. Pass the driver's type map as the second type argument:
+`createSql(postgres, db)` reads the schema from `db`'s type (the `schema` you passed to `drizzle()`) and runs queries on the driver client under `db`: the `Pool`, `Client` or postgres.js `sql` you passed to `drizzle()`, or the transaction's connection inside `db.transaction(fn)`. Pass the driver's type map as the second type argument:
 
 ```ts
 import type { PgTypeMap } from "@typesql/pg";
 
-const pgSql = createSql<typeof schema, PgTypeMap>(db);
+const pgSql = createSql<typeof schema, PgTypeMap>(postgres, db);
 const rows = await pgSql(
 	"SELECT id, title FROM posts WHERE author_id = $1",
 	1,
@@ -296,7 +309,7 @@ await pgSql.transaction(async (tx) => {
 });
 
 await db.transaction(async (tx) => {
-	await createSql<typeof schema, PgTypeMap>(tx)(
+	await createSql<typeof schema, PgTypeMap>(postgres, tx)(
 		"DELETE FROM posts WHERE author_id = $1",
 		1,
 	).execute();
@@ -331,7 +344,7 @@ createSql<
 		casing: "snake_case";
 		timestamp: "timestamptz";
 	}
->(db);
+>(postgres, db);
 ```
 
 Enums are found by matching an exported `pgEnum`. Name the export after the SQL type (`export const mood = pgEnum("mood", …)`) so casts like `'happy'::mood` resolve. A column whose enum isn't exported is `text`.
@@ -344,7 +357,7 @@ The other gaps (generated-always columns, `$onUpdate`, `.$type<T>()`, `text({ en
 npm install @typesql/core @typesql/prisma
 ```
 
-`@prisma/client` 7 or later is a peer dependency. Only the `postgresql` provider is supported. [Open an example in the TypeScript Playground](https://www.typescriptlang.org/play/#code/JYWwDg9gTgLgBDAnmApnA3nAwhANgGjgHEUA7FKAQxhQBNCA5AV110oCNc0BfOAMygQQcAEQABJKgDOAR1wB6AMbQUIgNwAoUJFgY4iqCmooAynMKS0ABSjApISgCVKAdyy5gZeLwFDRE5BRZBTBbe0p1DS1SGig+SkU0ABEAIQwNAEgmKQopAC50jIzgWgKScioaWgAeEWAYgBYRAD5NIpQHYFwCnFxagDdKKEUACyGWtozaOzA2RAB9UkoQFALmVg4uWpoADxgJzIzBLjKyCmMakUc8VVbDpjBaC4BBGB68bdAgmGWwA4zuG1IFIYPlCsVStgPiImEwSv8MpQmDARtB5iV3n06o0ETBgDATlCsbt9nciv1PC4weVzlVavUYAAOf6AzIAEksYPQh2uhJEzySAFkAJIMERwAA+ogAqiYAKKOSIAzTcKK0FCKNiGfQQUgguChOwOAo2I1OVzuTwxTTKPXwYJwAC8+kMxjMfVSzQAFIbwgBKTQaW36yi0ED1KROuCuSj4uDBL2ZAAG8oAMnKsAAVOAlQjTKSzSgLJYrQgwx4vfZwABijgA8oK4NlcnAAOoACQVcrgxzQzrZAEYk-hMvyhaKRCO-QA6FA7DXIlBegNRYP2n6gqMxuMJ5NpjPZpEotG5nVMGJegBUfrgzxMBogIKkhCkTBAXopKCpN7vcE-VJretG2BTciHraUrDgFIAE1o2RVEoHRWhhw0Gc5wXGhl0DNc4HVLgqi3FxY3tORpxgKg9QSPFdS9L0YB2G9HWaTJ6K9JMkjldNM27WsGwfJ8207RxuyPBCkKjQdhzgAc0PnRRFxwc8YGXKdAwTJNRXlRxs1FTM634zcvVEk96AQfEuBvAA1Z5U2lOV7y9QdCDZAAmP0pIHMt2xQVgIBEFcgA) <span data-playground="prisma"></span>.
+`@prisma/client` 7 or later is a peer dependency. Only the `postgresql` provider is supported. [Open an example in the TypeScript Playground](https://www.typescriptlang.org/play/#code/JYWwDg9gTgLgBAbwFAEgYE8wFM4GEIA2ANKhtnAOJYB2WUAhjFgCYlqY4ByArgQfQCMCWNpADOMAOZQsYkgF84AMygQQcAEQABMrICOBAPQBjaFkPipMsRoDcSUJFiI4xmYywBlA0Ti64AApQwGIg9ABK9ADuuATANPCKKmqaOhxiBhbBofR2SA7UTFBK9MY4ACIAQoio3GJ0YgBcNSgowMzNVLQMTMwAPBrAhQAsGgB89q1YYcAEzfgEAwBu9FDGABar45MozCFg-OgA+tT0IFjNPHyCwgNMAB4w26goqsKdNHQe-RrhhFjPVrcMDMb4AQRg80Id1AshgZzAgPkk0sTRabQ6eGhGm43HagJQ9G4MHW0CO7Shi0GIwJMGAMHeWKpDyeExeS3iUTRXS+vQGQxgAA4kZMACS6NHIVp-RkaMHlACyAElOBo4AAfTQAVU8AFFwnkUMikPJ8swsMZ+DJXBBqBI4GBsmFmkEQmFIjE4gl7KY7fAMgQ4ABeVzuJjeRZVMYACks0lkvkdbvoAEp7Ehffb6MwQEMxMG4NF6PS4AHo6gAAZ6gAyutwABU4O1fHsxAd6MdTudfDiQeCnnAAGLhADyCrgdQacAA6gAJfW6uBvHAh0UARgrbDlipVGhIKYAdFh7hbiVho2n8pn-fCYPmQ0WS2XKzW642iSSyc2bdxCtGAFQpnAYKeA6EASHIpbcCA0YclgXJASBcBwVyQ6juOqKUKOWoBHAlQAJqFsSpJQOSzCbkgh7HqeTAXum15wOawi9AWj7+gYB4wAwdqlHStrRtGMD3EBQZjKQ9zRhW5S6rW9aLsOY5gRBM7zuEi4fiRZEFuum5wGuVEnsYZ74L+MAXvu6ZlhWKp6uEjYqvWI5KXecDRhpX6sH49LCEBABqYLVlquqgdG66+KKABMKa6WuPazlgfAQBol5AA) <span data-playground="prisma"></span>.
 
 Prisma Client's types leave out the database names and native types, so `@typesql/prisma` has a generator that writes the exact schema. Add it to `schema.prisma`:
 
@@ -358,7 +371,7 @@ generator typesql {
 Every `prisma generate` then writes a `DB` interface with the database's own names (`@map`, `@@map`), native types (`@db.*`), database defaults, enums and `@@schema` namespaces:
 
 ```ts
-import type { Col, Nullable, Generated } from "@typesql/core";
+import type { Col, Nullable, Generated } from "@typesql/core/postgres";
 
 export interface DB {
 	users: {
@@ -382,8 +395,9 @@ export interface DB {
 
 ```ts
 import { createSql } from "@typesql/prisma";
+import { postgres } from "@typesql/core/postgres";
 
-const sql = createSql<DB>(prisma);
+const sql = createSql<DB>(postgres, prisma);
 
 const q = sql(
 	`SELECT id, display_name, "updatedAt" FROM users WHERE role = $1`,
@@ -405,23 +419,24 @@ Only database defaults (`autoincrement()`, `now()`, `dbgenerated()`, literals) m
 |---|---|---|
 | `output` | required | a `.ts` file, or a directory (writes `index.ts`) |
 | `typeName` | `"DB"` | name of the exported interface |
-| `importFrom` | `"@typesql/core"` | module the `Col` / `Nullable` / … helpers are imported from |
+| `importFrom` | `"@typesql/core/postgres"` | module the `Col` / `Nullable` / … helpers are imported from |
 
 ### Running queries
 
-`createSql<DB>(prisma)` takes a `PrismaClient`, an extended client or a transaction client. Queries run with `$queryRawUnsafe` and `$executeRawUnsafe`; despite the names, values are always sent as bind parameters. `sql.transaction(fn)` runs in an interactive `prisma.$transaction(fn)`.
+`createSql<DB>(postgres, prisma)` takes a `PrismaClient`, an extended client or a transaction client. Queries run with `$queryRawUnsafe` and `$executeRawUnsafe`; despite the names, values are always sent as bind parameters. `sql.transaction(fn)` runs in an interactive `prisma.$transaction(fn)`.
 
 Rows are typed with what `$queryRaw` returns: `int8` (so `count(*)`) is `bigint`, `numeric` is `Decimal`, and dates are `Date` (full table in [Type mapping](../reference/type-mapping#prisma)). Prisma rejects some types (`interval`, geometric types, ranges), so cast them in SQL (`duration::text`). To run queries on another driver, use that driver's `createSql<DB>(client)` with the generated `DB`.
 
 ### Without the generator: `FromPrisma`
 
-`createSql<Prisma.TypeMap>()` converts the client Prisma already generates. Its types don't record database names or native types, so tables and columns are the model and field names (quote them in SQL, since Postgres folds unquoted names to lower case), and types are the connector's defaults (`DateTime` is `timestamp`). Supply what's missing as overrides:
+`createSql(postgres, prisma)` without a type argument, or `createSql<Prisma.TypeMap>(postgres)` without a client, converts the client Prisma already generates. Its types don't record database names or native types, so tables and columns are the model and field names (quote them in SQL, since Postgres folds unquoted names to lower case), and types are the connector's defaults (`DateTime` is `timestamp`). Supply what's missing as overrides:
 
 ```ts
 import { createSql, type FromPrisma } from "@typesql/prisma";
+import { postgres } from "@typesql/core/postgres";
 import type { Prisma } from "./generated/prisma/client";
 
-const sql = createSql<Prisma.TypeMap>();
+const sql = createSql(postgres, prisma);
 sql('SELECT id, "createdAt" FROM "User" WHERE role = $1', "ADMIN");
 
 type DB = FromPrisma<Prisma.TypeMap, {

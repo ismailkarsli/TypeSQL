@@ -3,7 +3,7 @@
 This page takes you from an empty project to a typed query in a few minutes.
 
 ::: tip Try it first
-[Open the example in the TypeScript Playground](https://www.typescriptlang.org/play/#code/JYWwDg9gTgLgBAbwFAEgYE8wFM4GEIA2ANKgMZRYCGMWAygI7GobZwDiWAdllNVgCYk0mHADkArgQKUARgSxCWOAAqVeIAM4AVEYpFwAShADuO7CQC+cAGZQIIOACIAAko2MA9KWhZHAbiQkYE4aKGtKUhwAEQAhRFRxDR4NAC54lBRgfjSObl4afgAeR2CYABZHAD4AjKwQSmACNPwCYpoADxgqmpR+YA0waXQAfU5KECw0iSlZeTasTu7UFHIqAuHqHK4ePiLHGFAsDRhxsBgALyWUCxrIY9T0zOz2bfyBYtKADiuUSnEYAAW0GGWWahA+IQq1WWBxg8jBrX2Cy60IyMgg-HQU0k0jkWHmi1RNyQFkC3k4xzg7gIcAAvHBVnwGK1YpUABQASgCSHJlPodKpjDZqAABrQAKIAGXFuC0cHEADoskR5Qq6g1iHAwArYfIkHADYajcaAGIGADyAFl5UkoBp5XBpSa5QApc0ASVEWog9y1cHNXu1f0BwKyAsVWX1xujhoA6gAJcUGcWqsP0gAkAEYRUIAOwkLlIJSGEwCoymESFJQQaxwejQ4uqdT2+lN8baSvV2v17m8+DHagtwUEYUoMVSmVy4NAqAgwQMiDiEJsgBUHJV9XabN1WA5cAAgrQ4NIaJSzVbvb62BaAKrKOAxACacGnof4OaQheLtBOMCH5bMfEuypX8NGhHkIApeB1UaAVHEofhKGcBZTnkBVvBAfwIKghkKF2AVqVHEVPQlAw5U9LRzRtZI4DZGCCD3AA1fdJRvcUjzZdMEGpBUwDUcY6PqRoOQsPdky0G8DFET02DgZVcLWAQNhgD8v30XA8IKMsTEAqsRBrBTdnAwjx2lWU4E4CY4HPa1EmSEVCxMkik3I0RKMvP9aJ3JiWLYjisw5HMnHjLApAgRxCyAA) <span data-playground="core"></span> to edit the SQL and hover the types, with nothing to install. The Playground runs TypeScript 6, which TypeSQL does not support, so treat it as a demo.
+[Open the example in the TypeScript Playground](https://www.typescriptlang.org/play/#code/JYWwDg9gTgLgBAbzgYygUwIYzQZQI4A2ANHDAJ5hpwAKGUGIAzgCoVonmVwBKEA7qy4BfOADMoEEHABEAAU5pGhAPTJoaaQG4AUKEixE2gJAK4AYQjFjpgOJoAdmnrYAJkWts4AOQCuBAhgARgTsxpCMMADm6IzuIuKSMvJsSgSq6srhUTFa2rr22FCiGMhUACIAQoZGPoxOjABc1UbALk12js5oLgA80sAFACzSAHw6RkZoIBjABE0WBH3YAB4wo+NGLsCMYAFkAPr2DGhNvv5BIUtoq+vGRqiYrvtY7Q5OWN1LoIowDGAwAC9bkYhOMso1mq1Xp0Pr1+gUABzAowYHwwAAW0H2UPMlj6AxgwzGdxgwBgIXmeOkKzWxImgQgLjIpz8AWCaCuNzpoO0QjyansETgqTgAF4UOgPvhFpURgAKLLRRQASh02gFQrwYuFhDlxgABjgAKIAGSNZmYcB8ADpWiQbVMZsQ4GBraTyWhtHBvT7fX6AGLcADyAFkrXUoIwrXAzf7LQApIMASS8LogESjYDgQdTrtRGKxrW1NtaXr95Z9AHUABJG7hGq22lzagAkAEZ9e4jAB2dyq7SmXh8bVDwQchQQURwPDE0y0ehMbXzhgsNg9CdTmdqjXwCJYKPi1J6oyG03my35zFQbFuFAQHwFOUAKmVJGmyzl7pCyrgAEEcHAATYEKgahmmGZwDYwYAKrUHAFQAJpwJehYuJ22j9qYOC-DAB48PwY7rmwk7CjhjDEuqECCvAjqzNq0gYC4GCyNcfwhNaaggLkO4So83TakeBopsa3CWimzBBuG9RwHKtEED+ABqv4mtBRoAXKLYIKk1pgHQDCydMszKkIP71sw0HcF4KY2HAdq8bCzwwOhmGeGYkquCOBFrhu9muBRR6nmaFpwPYIBUKBYa1PU+r9gFwl1mJXgSeBuEyV+aCKcpqnqe2yqdjI1ZoP4EDSP2QA) <span data-playground="core"></span> to edit the SQL and hover the types, with nothing to install. The Playground runs TypeScript 6, which TypeSQL does not support, so treat it as a demo.
 :::
 
 ## 1. Install
@@ -20,7 +20,7 @@ npm install -D typescript@7.1.0-beta
 A schema is a TypeScript interface. Each key is a table, and each column has a Postgres type name.
 
 ```ts
-import type { Col, Generated, Nullable } from "@typesql/core";
+import type { Col, Generated, Nullable } from "@typesql/core/postgres";
 
 export interface DB {
 	users: {

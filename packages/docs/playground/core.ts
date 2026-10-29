@@ -1,11 +1,10 @@
+import { createSql, type ParamsType, type RowType } from "@typesql/core";
 import {
 	type Col,
-	createSql,
 	type Generated,
 	type Nullable,
-	type ParamsType,
-	type RowType,
-} from "@typesql/core";
+	postgres,
+} from "@typesql/core/postgres";
 
 interface DB {
 	users: {
@@ -22,7 +21,7 @@ interface DB {
 	};
 }
 
-const sql = createSql<DB>();
+const sql = createSql<DB>(postgres);
 
 const q = sql(
 	`SELECT u.id, u.email, p.title

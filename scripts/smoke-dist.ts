@@ -1,8 +1,13 @@
 import assert from "node:assert/strict";
-import type { Col, Json } from "../packages/core/src/index.ts";
+import type {
+	Col,
+	Json,
+	Postgres,
+} from "../packages/core/src/postgres/index.ts";
 
 type Core = typeof import("../packages/core/src/index.ts");
 type CoreAdapter = typeof import("../packages/core/src/adapter.ts");
+type CorePostgres = typeof import("../packages/core/src/postgres/index.ts");
 interface AdapterSql {
 	(text: string): unknown;
 	param(value: unknown): string;
@@ -23,6 +28,7 @@ const dist = (path: string): Promise<unknown> =>
 
 const core = (await dist("core/dist/index.js")) as Core;
 const coreAdapter = (await dist("core/dist/adapter.js")) as CoreAdapter;
+const corePg = (await dist("core/dist/postgres/index.js")) as CorePostgres;
 const pg = (await dist("pg/dist/index.js")) as Adapter;
 const pgjs = (await dist("postgres/dist/index.js")) as Adapter;
 
@@ -35,7 +41,7 @@ interface DB {
 	};
 	docs: { items: Json<number[]> };
 }
-const sql = core.createSql<DB>();
+const sql = core.createSql<DB>(corePg.postgres);
 assert.deepEqual(sql("SELECT id FROM users WHERE id = $1", 7), {
 	text: "SELECT id FROM users WHERE id = $1",
 	values: [7],
@@ -75,7 +81,7 @@ assert.ok(doc.values[0] instanceof coreAdapter.JsonParam);
 assert.equal(doc.values[0].toPostgres(), "[1,2]");
 assert.equal(JSON.stringify(doc.values[0]), "[1,2]");
 
-const m = core
+const m = corePg
 	.migrations()
 	.add("CREATE TABLE t (id int)")
 	.add("ALTER TABLE t ADD COLUMN x text");
@@ -97,6 +103,46 @@ for (const name of [
 		`@typesql/core/adapter export ${name}`,
 	);
 }
+
+for (const name of [
+	"createSql",
+	"Migrations",
+	"NoResultError",
+	"runMigrations",
+] as const) {
+	assert.equal(typeof core[name], "function", `@typesql/core export ${name}`);
+}
+assert.ok(
+	!("createSql" in corePg),
+	"@typesql/core/postgres exports a dialect, not createSql",
+);
+assert.equal(corePg.postgres.name, "postgres");
+const custom = core.createSql<Postgres, DB>({ name: "custom" });
+const inner = custom("SELECT id FROM users WHERE id = $1", 1);
+assert.deepEqual(inner, {
+	text: "SELECT id FROM users WHERE id = $1",
+	values: [1],
+});
+assert.deepEqual(
+	custom(
+		"SELECT id FROM users WHERE age > $1 AND id IN ({inner})",
+		{ inner },
+		2,
+	),
+	{
+		text: "SELECT id FROM users WHERE age > $1 AND id IN (SELECT id FROM users WHERE id = $2)",
+		values: [2, 1],
+	},
+);
+const tx = coreAdapter.createTransactionalSql(corePg.postgres, undefined, {
+	executor: () => async () => [],
+	transaction: (_client, _depth, fn) => fn(undefined),
+}) as AdapterSql;
+assert.deepEqual(tx(`SELECT ${tx.param(1)}`), {
+	text: "SELECT $1",
+	values: [1],
+});
+assert.equal(typeof tx.transaction, "function");
 
 for (const adapter of [pg, pgjs]) {
 	assert.deepEqual(

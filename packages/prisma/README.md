@@ -25,9 +25,10 @@ Every `prisma generate` then writes a `DB` type with the database's own table an
 
 ```ts
 import { createSql } from "@typesql/prisma";
+import { postgres } from "@typesql/core/postgres";
 import type { DB } from "./db/typesql";
 
-const sql = createSql<DB>(prisma);
+const sql = createSql<DB>(postgres, prisma);
 
 const users = await sql("SELECT id, display_name FROM users WHERE email = $1", email).execute();
 
@@ -36,13 +37,13 @@ await sql.transaction(async (tx) => {
 });
 ```
 
-[Open an example in the TypeScript Playground](https://www.typescriptlang.org/play/#code/JYWwDg9gTgLgBDAnmApnA3nAwhANgGjgHEUA7FKAQxhQBNCA5AV110oCNc0BfOAMygQQcAEQABJKgDOAR1wB6AMbQUIgNwAoUJFgY4iqCmooAynMKS0ABSjApISgCVKAdyy5gZeLwFDRE5BRZBTBbe0p1DS1SGig+SkU0ABEAIQwNAEgmKQopAC50jIzgWgKScioaWgAeEWAYgBYRAD5NIpQHYFwCnFxagDdKKEUACyGWtozaOzA2RAB9UkoQFALmVg4uWpoADxgJzIzBLjKyCmMakUc8VVbDpjBaC4BBGB68bdAgmGWwA4zuG1IFIYPlCsVStgPiImEwSv8MpQmDARtB5iV3n06o0ETBgDATlCsbt9nciv1PC4weVzlVavUYAAOf6AzIAEksYPQh2uhJEzySAFkAJIMERwAA+ogAqiYAKKOSIAzTcKK0FCKNiGfQQUgguChOwOAo2I1OVzuTwxTTKPXwYJwAC8+kMxjMfVSzQAFIbwgBKTQaW36yi0ED1KROuCuSj4uDBL2ZAAG8oAMnKsAAVOAlQjTKSzSgLJYrQgwx4vfZwABijgA8oK4NlcnAAOoACQVcrgxzQzrZAEYk-hMvyhaKRCO-QA6FA7DXIlBegNRYP2n6gqMxuMJ5NpjPZpEotG5nVMGJegBUfrgzxMBogIKkhCkTBAXopKCpN7vcE-VJretG2BTciHraUrDgFIAE1o2RVEoHRWhhw0Gc5wXGhl0DNc4HVLgqi3FxY3tORpxgKg9QSPFdS9L0YB2G9HWaTJ6K9JMkjldNM27WsGwfJ8207RxuyPBCkKjQdhzgAc0PnRRFxwc8YGXKdAwTJNRXlRxs1FTM634zcvVEk96AQfEuBvAA1Z5U2lOV7y9QdCDZAAmP0pIHMt2xQVgIBEFcgA) <span data-playground="prisma"></span> to hover the types and edit the SQL, with nothing to install.
+[Open an example in the TypeScript Playground](https://www.typescriptlang.org/play/#code/JYWwDg9gTgLgBAbwFAEgYE8wFM4GEIA2ANKhtnAOJYB2WUAhjFgCYlqY4ByArgQfQCMCWNpADOMAOZQsYkgF84AMygQQcAEQABMrICOBAPQBjaFkPipMsRoDcSUJFiI4xmYywBlA0Ti64AApQwGIg9ABK9ADuuATANPCKKmqaOhxiBhbBofR2SA7UTFBK9MY4ACIAQoio3GJ0YgBcNSgowMzNVLQMTMwAPBrAhQAsGgB89q1YYcAEzfgEAwBu9FDGABar45MozCFg-OgA+tT0IFjNPHyCwgNMAB4w26goqsKdNHQe-RrhhFjPVrcMDMb4AQRg80Id1AshgZzAgPkk0sTRabQ6eGhGm43HagJQ9G4MHW0CO7Shi0GIwJMGAMHeWKpDyeExeS3iUTRXS+vQGQxgAA4kZMACS6NHIVp-RkaMHlACyAElOBo4AAfTQAVU8AFFwnkUMikPJ8swsMZ+DJXBBqBI4GBsmFmkEQmFIjE4gl7KY7fAMgQ4ABeVzuJjeRZVMYACks0lkvkdbvoAEp7Ehffb6MwQEMxMG4NF6PS4AHo6gAAZ6gAyutwABU4O1fHsxAd6MdTudfDiQeCnnAAGLhADyCrgdQacAA6gAJfW6uBvHAh0UARgrbDlipVGhIKYAdFh7hbiVho2n8pn-fCYPmQ0WS2XKzW642iSSyc2bdxCtGAFQpnAYKeA6EASHIpbcCA0YclgXJASBcBwVyQ6juOqKUKOWoBHAlQAJqFsSpJQOSzCbkgh7HqeTAXum15wOawi9AWj7+gYB4wAwdqlHStrRtGMD3EBQZjKQ9zRhW5S6rW9aLsOY5gRBM7zuEi4fiRZEFuum5wGuVEnsYZ74L+MAXvu6ZlhWKp6uEjYqvWI5KXecDRhpX6sH49LCEBABqYLVlquqgdG66+KKABMKa6WuPazlgfAQBol5AA) <span data-playground="prisma"></span> to hover the types and edit the SQL, with nothing to install.
 
 Good to know:
 
 - Rows are typed the way Prisma's raw queries return them: `int8` (so `count(*)`) is `bigint`, `numeric` is `Decimal`.
 - `uuid()`, `cuid()`, `nanoid()`, `ulid()` and `@updatedAt` are filled in by Prisma Client, not the database, so a SQL `INSERT` must set them.
-- Without the generator, `createSql<Prisma.TypeMap>(prisma)` reads the types Prisma Client already generates. They don't record `@map` names or native types, so you may need overrides.
+- Without the generator, `createSql(postgres, prisma)` reads the types Prisma Client already generates. They don't record `@map` names or native types, so you may need overrides.
 
 ## Documentation
 

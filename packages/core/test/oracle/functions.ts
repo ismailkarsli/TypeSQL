@@ -3,10 +3,11 @@ import { join } from "node:path";
 import {
 	type Evaluated,
 	evaluateTypes,
-	PROBE_HEAD,
 	ProbeSession,
+	probeHead,
 	readAnalysis,
 } from "../../src/cache/evaluate.js";
+import { postgresCache } from "../../src/postgres/cache-dialect.js";
 import {
 	type BaselineEntry,
 	type Entries,
@@ -51,9 +52,9 @@ const EXTENSIONS = [
 const BATCH = 1500;
 const DB_TYPE = `{ $types: { ${ENUM.name}: ${ENUM.labels.map((l) => JSON.stringify(l)).join(" | ")} } }`;
 
-const PRELUDE = `import type { PgFunctions } from "../../../src/engine/typer/pg-functions.js";
-import type { LookupFn, MatchKind, PickSig } from "../../../src/engine/typer/catalog.js";
-import type { ColInfo } from "../../../src/engine/types.js";
+const PRELUDE = `import type { PgFunctions } from "../../../src/postgres/engine/typer/pg-functions.js";
+import type { LookupFn, MatchKind, PickSig } from "../../../src/postgres/engine/typer/catalog.js";
+import type { ColInfo } from "../../../src/postgres/engine/types.js";
 type DB = ${DB_TYPE};
 type __F<S> = S extends { readonly args: infer A; readonly ret: infer R } ? { args: A; ret: R; strict: S extends { readonly strict: infer X } ? X : "-"; nullable: S extends { readonly nullable: infer X } ? X : "-"; agg: S extends { readonly agg: true } ? true : false; window: S extends { readonly window: true } ? true : false; srf: S extends { readonly srf: true } ? true : false } : null;
 type __L<E> = E extends readonly unknown[] ? { -readonly [K in keyof E]: __F<E[K]> } : [__F<E>];
@@ -97,9 +98,10 @@ export async function functionsOracle(
 			out.push(
 				...(await evaluateTypes(
 					session,
-					PROBE_HEAD + PRELUDE,
+					probeHead(postgresCache) + PRELUDE,
 					exprs.slice(i, i + BATCH),
 					isCorePath,
+					postgresCache,
 				)),
 			);
 		return out;

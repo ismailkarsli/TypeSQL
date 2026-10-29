@@ -1,10 +1,10 @@
-import type {
-	Col,
-	Generated,
-	Nullable,
-	ParamsType,
-	RowType,
-} from "@typesql/core";
+import type { ParamsType, RowType } from "@typesql/core";
+import {
+	type Col,
+	type Generated,
+	type Nullable,
+	postgres,
+} from "@typesql/core/postgres";
 import { createSql, type PrismaRawClient } from "@typesql/prisma";
 
 interface DB {
@@ -29,7 +29,7 @@ interface DB {
 }
 
 declare const prisma: PrismaRawClient;
-const sql = createSql<DB>(prisma);
+const sql = createSql<DB>(postgres, prisma);
 
 export const q1 = sql(
 	`SELECT id, display_name, role FROM users WHERE role = $1`,

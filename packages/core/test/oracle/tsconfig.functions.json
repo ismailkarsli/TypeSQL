@@ -5,7 +5,8 @@
 		"types": ["node"],
 		"rootDir": "../..",
 		"paths": {
-			"@typesql/core/engine": ["../../src/engine/index.ts"],
+			"@typesql/core/postgres/engine": ["../../src/postgres/engine/index.ts"],
+			"@typesql/core/postgres": ["../../src/postgres/index.ts"],
 			"@typesql/core/adapter": ["../../src/adapter.ts"],
 			"@typesql/core": ["../../src/index.ts"]
 		}

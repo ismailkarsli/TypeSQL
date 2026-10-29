@@ -21,9 +21,13 @@
 			"types": "./dist/adapter.d.ts",
 			"default": "./dist/adapter.js"
 		},
-		"./engine": {
-			"types": "./dist/engine/index.d.ts",
-			"default": "./dist/engine/index.js"
+		"./postgres": {
+			"types": "./dist/postgres/index.d.ts",
+			"default": "./dist/postgres/index.js"
+		},
+		"./postgres/engine": {
+			"types": "./dist/postgres/engine/index.d.ts",
+			"default": "./dist/postgres/engine/index.js"
 		}
 	},
 	"files": [

@@ -6,6 +6,8 @@
 		"allowImportingTsExtensions": true,
 		"types": ["node"],
 		"paths": {
+			"@typesql/core/postgres/engine": ["./src/postgres/engine/index.ts"],
+			"@typesql/core/postgres": ["./src/postgres/index.ts"],
 			"@typesql/core": ["./src/index.ts"]
 		}
 	},

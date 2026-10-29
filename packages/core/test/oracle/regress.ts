@@ -11,11 +11,12 @@ import { join } from "node:path";
 import { createInterface } from "node:readline";
 import {
 	type Evaluated,
-	PROBE_HEAD,
 	ProbeSession,
 	parseTypeText,
+	probeHead,
 } from "../../src/cache/evaluate.js";
 import { scanNames } from "../../src/cache/scan.js";
+import { postgresCache } from "../../src/postgres/cache-dialect.js";
 import { classify } from "../pg-regress/psql.js";
 import { hashOf } from "./baseline.js";
 import { evaluateInBatches, orderDependent } from "./batches.js";
@@ -834,7 +835,7 @@ export async function regressOracle(
 		for (let k = before; k < exprs.length; k++) fileOf.push(c.test);
 	}
 	const base = (indices: readonly number[]): string => {
-		let text = PROBE_HEAD + PRELUDE;
+		let text = probeHead(postgresCache) + PRELUDE;
 		const seen = new Set<string>();
 		for (const i of indices)
 			for (const db of dbsOf[i]!)
@@ -854,7 +855,7 @@ export async function regressOracle(
 		return text;
 	};
 	const evalKey = hashOf(
-		`${readFileSync(join(import.meta.dirname, "../../src/engine/cache.ts"), "utf8").match(/CacheVersion = "[^"]*"/)?.[0]}\0${exprs.join("\0")}`,
+		`${readFileSync(join(import.meta.dirname, "../../src/postgres/engine/cache.ts"), "utf8").match(/CacheVersion = "[^"]*"/)?.[0]}\0${exprs.join("\0")}`,
 	);
 	const evalCache = cachePath ? `${cachePath}.eval.json` : null;
 	const cachedResults =

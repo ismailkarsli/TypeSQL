@@ -1,4 +1,4 @@
-import type { JsonMarker } from "../engine/inline.js";
+import type { JsonMarker } from "../sql/inline.js";
 import { param } from "./inline.js";
 
 export class JsonParam<T = unknown> {

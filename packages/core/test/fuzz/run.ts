@@ -4,9 +4,10 @@ import fc from "fast-check";
 import {
 	type Evaluated,
 	evaluateTypes,
-	PROBE_HEAD,
 	ProbeSession,
+	probeHead,
 } from "../../src/cache/evaluate.js";
+import { postgresCache } from "../../src/postgres/cache-dialect.js";
 import { hashOf } from "../oracle/baseline.js";
 import { evaluateInBatches, orderDependent } from "../oracle/batches.js";
 import { compareStatement, type Server } from "../oracle/compare.js";
@@ -87,7 +88,7 @@ export interface FuzzOptions {
 
 const here = import.meta.dirname;
 const DATABASE = "typesql_fuzz";
-const BASE = `${PROBE_HEAD}type FDB = ${fuzzDbType()};\n`;
+const BASE = `${probeHead(postgresCache)}type FDB = ${fuzzDbType()};\n`;
 const FUZZ_DB: Db = {
 	namespaces: [],
 	relations: [],
@@ -171,7 +172,13 @@ export class Fuzzer {
 			(s) => `__T.CacheAnalysis<FDB, ${JSON.stringify(s)}>`,
 		);
 		if (exprs.length === 1)
-			return evaluateTypes(this.session, BASE, exprs, isCorePath);
+			return evaluateTypes(
+				this.session,
+				BASE,
+				exprs,
+				isCorePath,
+				postgresCache,
+			);
 		return evaluateInBatches(this.session, () => BASE, exprs, isCorePath, {
 			size: 500,
 			timeoutMs: 300_000,
@@ -233,9 +240,10 @@ export class Fuzzer {
 			const db = cs[0]!.db;
 			const ours = await evaluateTypes(
 				this.session,
-				`${PROBE_HEAD}type C = ${dbTypeText(db)};\n`,
+				`${probeHead(postgresCache)}type C = ${dbTypeText(db)};\n`,
 				cs.map((c) => `__T.CacheAnalysis<C, ${JSON.stringify(c.sql)}>`),
 				isCorePath,
+				postgresCache,
 			);
 			const name = `typesql_fuzz_c${id}`;
 			const admin = new Connection(this.url);

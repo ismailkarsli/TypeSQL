@@ -3,7 +3,7 @@ import type {
 	Generated,
 	Nullable,
 	NullableGenerated,
-} from "@typesql/core";
+} from "@typesql/core/postgres";
 import type { ToCamelCase, ToSnakeCase } from "./casing.js";
 
 export interface FromDrizzleOptions {

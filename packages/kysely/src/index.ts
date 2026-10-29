@@ -1,10 +1,11 @@
+import type { RowKeys, SqlOptions } from "@typesql/core";
+import { createTransactionalSql } from "@typesql/core/adapter";
 import type {
 	DefaultTypeMap,
-	RowKeys,
-	SqlOptions,
+	PostgresDialect,
 	TransactionalSql,
-} from "@typesql/core";
-import { createTransactionalSql } from "@typesql/core/adapter";
+} from "@typesql/core/postgres";
+import type { ControlledTransaction, Kysely, Transaction } from "kysely";
 import { driver, type KyselyExecutor } from "./client.js";
 import type {
 	FromKysely,
@@ -31,12 +32,32 @@ export type KyselySql<
 	Keys extends RowKeys = "preserve",
 > = TransactionalSql<FromKysely<DB, Overrides, Options>, TM, Keys>;
 
+export type KyselyDB<K> =
+	K extends ControlledTransaction<infer DB, any>
+		? DB
+		: K extends Transaction<infer DB>
+			? DB
+			: K extends Kysely<infer DB>
+				? DB
+				: never;
+
+export function createSql<K extends KyselyExecutor & Kysely<any>>(
+	dialect: PostgresDialect,
+	db: K,
+	options: { readonly rowKeys: "camelCase" },
+): KyselySql<KyselyDB<K>, DefaultTypeMap, {}, {}, "camelCase">;
+export function createSql<K extends KyselyExecutor & Kysely<any>>(
+	dialect: PostgresDialect,
+	db: K,
+	options?: { readonly rowKeys?: "preserve" },
+): KyselySql<KyselyDB<K>>;
 export function createSql<
 	DB,
 	TM = DefaultTypeMap,
 	Overrides extends KyselyOverrides = {},
 	Options extends KyselyOptions = {},
 >(
+	dialect: PostgresDialect,
 	db: KyselyExecutor | undefined,
 	options: { readonly rowKeys: "camelCase" },
 ): KyselySql<DB, TM, Overrides, Options, "camelCase">;
@@ -46,21 +67,14 @@ export function createSql<
 	Overrides extends KyselyOverrides = {},
 	Options extends KyselyOptions = {},
 >(
+	dialect: PostgresDialect,
 	db?: KyselyExecutor,
 	options?: { readonly rowKeys?: "preserve" },
 ): KyselySql<DB, TM, Overrides, Options>;
-export function createSql<
-	DB,
-	TM = DefaultTypeMap,
-	Overrides extends KyselyOverrides = {},
-	Options extends KyselyOptions = {},
->(
+export function createSql(
+	dialect: PostgresDialect,
 	db?: KyselyExecutor,
 	options?: SqlOptions,
-): KyselySql<DB, TM, Overrides, Options, RowKeys> {
-	return createTransactionalSql<
-		FromKysely<DB, Overrides, Options>,
-		TM,
-		KyselyExecutor
-	>(db, driver, options);
+): unknown {
+	return createTransactionalSql(dialect, db, driver, options);
 }

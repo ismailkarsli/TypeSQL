@@ -15,6 +15,7 @@ import type {
 	Symbol as TsSymbol,
 	Type,
 } from "typescript/async";
+import type { CacheDialect } from "./dialect.js";
 
 export interface Kinds {
 	readonly CallExpression: number;
@@ -47,31 +48,15 @@ export interface DdlSite {
 }
 
 const SLOT = /\{[A-Za-z_][A-Za-z0-9_]*\}/;
-const QUERY_ALIASES: { readonly [name: string]: number } = {
-	RowOf: 2,
-	ParamsOf: 2,
-	ArgsOf: 2,
-	ParamsArgs: 2,
-	Validate: 1,
-	KindOf: 1,
-	NamesOf: 1,
-	Analysis: 1,
-};
-const DDL_ALIASES: { readonly [name: string]: number } = {
-	ApplyDdl: 1,
-	ValidateDdl: 1,
-};
-const LOOKS_LIKE_QUERY =
-	/^\s*(\(\s*)*(select|with|insert|update|delete|values|table)\b/i;
-const LOOKS_LIKE_DDL = /^\s*(create|alter|drop|comment)\b/i;
-
 export async function discover(
 	program: Program,
 	checker: Checker,
 	kinds: Kinds,
 	isCorePath: (path: string) => boolean,
 	include: (fileName: string) => boolean,
+	dialect: CacheDialect,
 ): Promise<{ sql: SqlSite[]; types: TypeSite[]; ddl: DdlSite[] }> {
+	const { queryAliases, ddlAliases, looksLikeQuery, looksLikeDdl } = dialect;
 	const sql: SqlSite[] = [];
 	const types: TypeSite[] = [];
 	const ddl: DdlSite[] = [];
@@ -97,14 +82,14 @@ export async function discover(
 				const isCore =
 					!!sym && sym.declarations.some((d) => isCorePath(d.path));
 				const qAt = isCore
-					? (QUERY_ALIASES[sym!.name] ?? DDL_ALIASES[sym!.name])
+					? (queryAliases[sym!.name] ?? ddlAliases[sym!.name])
 					: undefined;
 				if (qAt !== undefined && args[0] && args[qAt]) {
 					const db = await checker.getTypeFromTypeNode(args[0]);
 					fileDbs.set(db.id, db);
 					const key = literalOf(args[qAt]!, kinds);
 					if (key === null) return;
-					(sym!.name in DDL_ALIASES ? ddl : types).push({
+					(sym!.name in ddlAliases ? ddl : types).push({
 						key,
 						db,
 						file: fileName,
@@ -120,6 +105,7 @@ export async function discover(
 								kinds,
 								isCorePath,
 								aliasMemo,
+								dialect,
 							)
 						: null;
 				if (wrapped) {
@@ -137,7 +123,7 @@ export async function discover(
 						const key = literalOf(a, kinds);
 						if (
 							key !== null &&
-							(LOOKS_LIKE_QUERY.test(key) || LOOKS_LIKE_DDL.test(key))
+							(looksLikeQuery.test(key) || looksLikeDdl.test(key))
 						)
 							loose.push(key);
 					}
@@ -166,7 +152,7 @@ export async function discover(
 						!(await isCoreRef(r, ["Migrations"], isCorePath))
 					)
 						return;
-					const [db] = await checker.getTypeArguments(r as never);
+					const [, db] = await checker.getTypeArguments(r as never);
 					if (db) ddl.push({ key: a.value, db, file: fileName });
 				}),
 			);
@@ -179,8 +165,8 @@ export async function discover(
 		const hits = (
 			await Promise.all(
 				others.map((_, i) =>
-					isCoreRef(callees[i]!, ["Sql", "TransactionalSql"], isCorePath).then(
-						(ok) => (ok ? i : -1),
+					isCoreRef(callees[i]!, dialect.sqlTypes, isCorePath).then((ok) =>
+						ok ? i : -1,
 					),
 				),
 			)
@@ -210,7 +196,7 @@ export async function discover(
 
 		for (const key of loose)
 			for (const db of fileDbs.values())
-				(LOOKS_LIKE_DDL.test(key) ? ddl : types).push({
+				(looksLikeDdl.test(key) ? ddl : types).push({
 					key,
 					db,
 					file: fileName,
@@ -232,6 +218,7 @@ function wrappedCoreAlias(
 	kinds: Kinds,
 	isCorePath: (path: string) => boolean,
 	memo: Map<number, Promise<Wrapped | null>>,
+	{ queryAliases, ddlAliases }: CacheDialect,
 ): Promise<Wrapped | null> {
 	let found = memo.get(sym.id);
 	if (!found) {
@@ -249,7 +236,7 @@ function wrappedCoreAlias(
 				target = await checker.getAliasedSymbol(target);
 			if (!target || !target.declarations.some((d) => isCorePath(d.path)))
 				return null;
-			const qAt = QUERY_ALIASES[target.name] ?? DDL_ALIASES[target.name];
+			const qAt = queryAliases[target.name] ?? ddlAliases[target.name];
 			const qArg = qAt === undefined ? undefined : ref.typeArguments?.[qAt];
 			const dbArg = ref.typeArguments?.[0];
 			if (!qArg || !dbArg || qArg.kind !== kinds.TypeReference) return null;
@@ -261,7 +248,7 @@ function wrappedCoreAlias(
 			return {
 				param,
 				db: await checker.getTypeFromTypeNode(dbArg),
-				ddl: target.name in DDL_ALIASES,
+				ddl: target.name in ddlAliases,
 			};
 		})();
 		memo.set(sym.id, found);

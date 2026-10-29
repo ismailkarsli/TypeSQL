@@ -1,11 +1,11 @@
+import { createSql, type RowType } from "@typesql/core";
 import {
 	type ApplyDdl,
 	type Col,
-	createSql,
 	type Generated,
 	type Nullable,
-	type RowType,
-} from "@typesql/core";
+	postgres,
+} from "@typesql/core/postgres";
 
 interface DB {
 	users: {
@@ -23,7 +23,7 @@ interface DB {
 	};
 }
 
-const sql = createSql<DB>();
+const sql = createSql<DB>(postgres);
 
 export const q1 = sql(
 	`SELECT u.id, u.email, p.title
@@ -66,7 +66,7 @@ export type DB2 = ApplyDdl<
 	DB,
 	`ALTER TABLE users ADD COLUMN age int NOT NULL DEFAULT 0`
 >;
-const sql2 = createSql<DB2>();
+const sql2 = createSql<DB2>(postgres);
 export const q6 = sql2(`SELECT age FROM users`);
 
 export const q8 = sql.as<{ n: number }>(

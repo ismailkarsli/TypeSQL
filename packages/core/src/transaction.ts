@@ -1,12 +1,10 @@
-import { createSql, type Sql } from "./create-sql.js";
+import { createDialectSql } from "./create-sql.js";
+import type { Dialect, DialectTypes, TransactionalSqlOf } from "./dialect.js";
 import type { Executor } from "./query.js";
 import type { RowKeys, SqlOptions } from "./row-keys.js";
 
-export interface TransactionalSql<DB, TM, Keys extends RowKeys = "preserve">
-	extends Sql<DB, TM, Keys> {
-	transaction<T>(
-		fn: (tx: TransactionalSql<DB, TM, Keys>) => Promise<T>,
-	): Promise<T>;
+export interface Transactional<Self> {
+	transaction<T>(fn: (tx: Self) => Promise<T>): Promise<T>;
 }
 
 export interface SqlDriver<C> {
@@ -18,29 +16,39 @@ export interface SqlDriver<C> {
 	): Promise<T>;
 }
 
-export function createTransactionalSql<DB, TM, C>(
+export function createTransactionalSql<T extends DialectTypes, DB, TM, C>(
+	dialect: Dialect<T>,
 	client: C | undefined,
 	driver: SqlDriver<C>,
 	options?: SqlOptions,
 	depth = 0,
-): TransactionalSql<DB, TM, RowKeys> {
-	const sql = createSql<DB, TM>(
+): TransactionalSqlOf<T, DB, TM, RowKeys> {
+	const sql = createDialectSql<T, DB, TM>(
+		dialect,
 		client === undefined ? undefined : driver.executor(client),
 		options as { readonly rowKeys: "camelCase" },
-	);
+	) as object;
 	return Object.assign(sql, {
-		transaction: async <T>(
-			fn: (tx: TransactionalSql<DB, TM, RowKeys>) => Promise<T>,
-		): Promise<T> => {
+		transaction: async <R>(
+			fn: (tx: TransactionalSqlOf<T, DB, TM, RowKeys>) => Promise<R>,
+		): Promise<R> => {
 			if (client === undefined)
 				throw new Error(
 					"typesql: no client: pass one to createSql(client) to use sql.transaction()",
 				);
 			return driver.transaction(client, depth, (tx) =>
-				fn(createTransactionalSql<DB, TM, C>(tx, driver, options, depth + 1)),
+				fn(
+					createTransactionalSql<T, DB, TM, C>(
+						dialect,
+						tx,
+						driver,
+						options,
+						depth + 1,
+					),
+				),
 			);
 		},
-	}) as unknown as TransactionalSql<DB, TM, RowKeys>;
+	}) as TransactionalSqlOf<T, DB, TM, RowKeys>;
 }
 
 export async function runTransaction<T>(

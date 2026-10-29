@@ -32,10 +32,11 @@ export const posts = pgTable("posts", {
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { createSql } from "@typesql/drizzle";
+import { postgres } from "@typesql/core/postgres";
 import * as schema from "./schema";
 
 const db = drizzle(new Pool(), { schema });
-const sql = createSql<typeof schema>(db);
+const sql = createSql(postgres, db);
 
 const rows = await sql(
   `SELECT u.email, u.display_name, p.title

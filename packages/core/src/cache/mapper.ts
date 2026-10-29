@@ -1,6 +1,8 @@
 import { appendFileSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, join, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import type { CacheDialect } from "./dialect.js";
+import { dialectNamed } from "./dialects.js";
 import { fileId, parseCache, render } from "./format.js";
 import { Job } from "./job.js";
 import { type Handlers, InvalidParams, RpcError, serve } from "./rpc.js";
@@ -11,10 +13,10 @@ const isCorePath = (path: string): boolean =>
 	path.startsWith(join(root, "dist") + sep) ||
 	path.startsWith(join(root, "src") + sep);
 
-export function engineVersion(): string {
+export function engineVersion(dialect: CacheDialect): string {
 	const file = here.endsWith(join("dist", "cache"))
-		? join(root, "dist/engine/cache.d.ts")
-		: join(root, "src/engine/cache.ts");
+		? join(root, "dist", `${dialect.versionFile}.d.ts`)
+		: join(root, "src", `${dialect.versionFile}.ts`);
 	try {
 		return (
 			/export type CacheVersion = "([^"]*)"/.exec(
@@ -29,13 +31,14 @@ export function engineVersion(): string {
 export interface MapperOptions {
 	readonly generation: boolean;
 	readonly startDelayMs: number;
-	readonly engine: string;
+	readonly engine: (dialect: CacheDialect) => string;
 	readonly log: (message: string) => void;
 }
 
 interface ProjectState {
 	readonly configFile: string;
 	readonly files: Set<string>;
+	dialect?: CacheDialect;
 	job?: Job;
 	timer?: NodeJS.Timeout;
 }
@@ -56,11 +59,13 @@ export function createMapper(o: MapperOptions): {
 		if (!p || p.job || !o.generation || !p.configFile) return;
 		const cacheFile = [...p.files].sort()[0];
 		if (!cacheFile) return;
-		o.log(`job for ${p.configFile} → ${cacheFile}`);
+		const dialect = p.dialect ?? dialectNamed(undefined);
+		o.log(`job for ${p.configFile} → ${cacheFile} (${dialect.name})`);
 		p.job = new Job({
 			configFile: p.configFile,
 			cacheFile,
-			engine: o.engine,
+			dialect,
+			engine: o.engine(dialect),
 			isCorePath,
 			log: o.log,
 		});
@@ -71,9 +76,7 @@ export function createMapper(o: MapperOptions): {
 			const encodings = object(params, "initialize").positionEncodings;
 			if (!Array.isArray(encodings) || !encodings.length)
 				throw new RpcError(InvalidParams, "initialize: no positionEncodings");
-			o.log(
-				`initialize (engine ${o.engine}, generation ${o.generation ? "on" : "off"})`,
-			);
+			o.log(`initialize (generation ${o.generation ? "on" : "off"})`);
 			return {
 				positionEncoding: encodings.includes("utf-16")
 					? "utf-16"
@@ -100,11 +103,10 @@ export function createMapper(o: MapperOptions): {
 				if (o.generation && !project.job && !project.timer)
 					project.timer = setTimeout(() => startJob(handle), o.startDelayMs);
 			}
-			const text = render(
-				parseCache(String(p.content ?? "")),
-				fileId(fileName),
-				o.engine,
-			);
+			const file = parseCache(String(p.content ?? ""));
+			const dialect = dialectNamed(file?.dialect);
+			if (project) project.dialect ??= dialect;
+			const text = render(file, fileId(fileName), dialect, o.engine(dialect));
 			o.log(`transform ${fileName} (${text.length} characters)`);
 			return { text, extension: ".ts" };
 		},
@@ -129,10 +131,18 @@ export function createMapper(o: MapperOptions): {
 
 export async function main(): Promise<void> {
 	const logFile = process.env.TYPESQL_CACHE_LOG;
+	const versions = new Map<CacheDialect, string>();
 	const { handlers, stop } = createMapper({
 		generation: !process.env.CI && process.env.TYPESQL_CACHE !== "off",
 		startDelayMs: Number(process.env.TYPESQL_CACHE_DELAY ?? 1500),
-		engine: engineVersion(),
+		engine: (d) => {
+			let v = versions.get(d);
+			if (v === undefined) {
+				v = engineVersion(d);
+				versions.set(d, v);
+			}
+			return v;
+		},
 		log: (m) => {
 			if (logFile)
 				appendFileSync(

@@ -34,7 +34,7 @@ The file has the real Postgres types: `timestamptz`, `date` and `timestamp` stay
 | `--schema <name>` | schema to read; repeat it or comma-separate (`--schema public,auth`). Default: every schema except `pg_catalog`, `information_schema` and `pg_*` |
 | `--exclude <pattern>` | relation to leave out: a name or `schema.name`, where `*` matches anything (`--exclude 'kysely_migration*'`); repeat it or comma-separate |
 | `--type-name <name>` | name of the interface; default `DB` |
-| `--import-from <module>` | where `Col`, `View`, … are imported from; default `@typesql/core` |
+| `--import-from <module>` | where `Col`, `View`, … are imported from; default `@typesql/core/postgres` |
 | `--config <file>` | a module whose default export holds these options and the ones below |
 | `--no-comments` | leave out the JSDoc (comments, domains, generated columns) |
 

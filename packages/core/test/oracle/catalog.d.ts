@@ -1,6 +1,6 @@
-import type { Sig } from "../../src/index.js";
+import type { Sig } from "../../src/postgres/index.js";
 
-declare module "../../src/index.js" {
+declare module "../../src/postgres/index.js" {
 	interface FunctionCatalog {
 		aug_len: Sig<["text"], "int8">;
 		aug_sum: Sig<["anynumeric"], "numeric", { agg: true }>;

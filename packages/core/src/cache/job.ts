@@ -1,6 +1,7 @@
 import { type FSWatcher, watch } from "node:fs";
 import { dirname, join, relative, sep } from "node:path";
 import type { Checker, Type } from "typescript/async";
+import type { CacheDialect } from "./dialect.js";
 import { discover } from "./discover.js";
 import {
 	badDeclarations,
@@ -8,8 +9,8 @@ import {
 	declTypes,
 	evaluateAnalyses,
 	lineOf,
-	PROBE_HEAD,
 	ProbeSession,
+	probeHead,
 } from "./evaluate.js";
 import {
 	type CacheFile,
@@ -23,7 +24,7 @@ import {
 	render,
 } from "./format.js";
 import { coreNames, names, Printer } from "./print.js";
-import { scanNames, touchesAllTables } from "./scan.js";
+import { scanNames } from "./scan.js";
 import {
 	type Contribution,
 	ddlEntryId,
@@ -37,6 +38,7 @@ import {
 export interface JobOptions {
 	readonly configFile: string;
 	readonly cacheFile: string;
+	readonly dialect: CacheDialect;
 	readonly engine: string;
 	readonly isCorePath: (path: string) => boolean;
 	readonly log?: (message: string) => void;
@@ -97,13 +99,13 @@ export class Session {
 		const owner = relative(dirname(o.cacheFile), o.configFile)
 			.split(sep)
 			.join("/");
-		const existing = readCache(o.cacheFile, o.engine);
+		const existing = readCache(o.cacheFile, o.dialect.name, o.engine);
 		const kinds = (await this.session.typescript()).kinds;
 
-		let { program, checker, sf } = await this.withProbe(PROBE_HEAD);
+		let { program, checker, sf } = await this.withProbe(probeHead(o.dialect));
 		let printer = new Printer(checker, sf, o.isCorePath);
 		const print = async (t: Type): Promise<string> =>
-			coreNames(await printer.print(t));
+			coreNames(await printer.print(t), o.dialect.specifiers);
 		const include = (f: string): boolean =>
 			f !== this.probe &&
 			!f.endsWith(".d.ts") &&
@@ -115,6 +117,7 @@ export class Session {
 			kinds,
 			o.isCorePath,
 			include,
+			o.dialect,
 		);
 		const decl = declarations(sf, kinds);
 		const fc = await checker.getTypeAtLocation(decl.get("__fc")!);
@@ -133,7 +136,11 @@ export class Session {
 		};
 		const snap = async (t: Type | undefined): Promise<string | null> =>
 			t
-				? printer.snapshot(t).then((s) => (s === null ? null : coreNames(s)))
+				? printer
+						.snapshot(t)
+						.then((s) =>
+							s === null ? null : coreNames(s, o.dialect.specifiers),
+						)
 				: MISSING;
 		const prop = async (
 			t: Type | undefined,
@@ -273,7 +280,7 @@ export class Session {
 			if (!maps.has(s.tm.id)) {
 				const [p, sn] = await Promise.all([
 					probeText(s.tm),
-					snapshotTypeMap(checker, printer, s.tm),
+					snapshotTypeMap(checker, printer, s.tm, o.dialect.specifiers),
 				]);
 				maps.set(
 					s.tm.id,
@@ -319,7 +326,7 @@ export class Session {
 				[...dep.w.values(), ...dep.q.values()].some((v) => v === null)
 			)
 				continue;
-			const all = touchesAllTables(s.key);
+			const all = o.dialect.touchesAllTables(s.key);
 			steps.push({
 				key: s.key,
 				db: full,
@@ -380,7 +387,7 @@ export class Session {
 			} else needCall.push(site);
 		}
 
-		let probe = PROBE_HEAD;
+		let probe = probeHead(o.dialect);
 		for (const g of groups.values())
 			probe += `type DB_${g.id} = ${g.text};\nexport declare const __h_${g.id}: __T.HintIndex<DB_${g.id}> & string;\n`;
 		const mapIds = new Map<string, string>();
@@ -502,6 +509,7 @@ export class Session {
 				probe,
 				analyses.map((a) => ({ db: `DB_${a.g.id}`, text: a.text })),
 				o.isCorePath,
+				o.dialect,
 			);
 			analyses.forEach((a, i) => {
 				const r = results[i]!;
@@ -564,9 +572,13 @@ export class Session {
 		};
 		let dropped = 0;
 		const written = await withLock(o.cacheFile, async () => {
-			let file = merge(readCache(o.cacheFile, o.engine), contribution(), owner);
+			let file = merge(
+				readCache(o.cacheFile, o.dialect.name, o.engine),
+				contribution(),
+				owner,
+			);
 			for (let round = 0; ; round++) {
-				const { text, lines } = renderWithLines(file);
+				const { text, lines } = renderWithLines(file, o.dialect);
 				const v = await this.withProbe(text);
 				const errors = (
 					await v.program.getSemanticDiagnostics(this.probe)
@@ -705,13 +717,14 @@ async function snapshotTypeMap(
 	checker: Checker,
 	printer: Printer,
 	tm: Type,
+	specifiers: readonly string[],
 ): Promise<string | null> {
 	const parts: string[] = [];
 	for (const p of await checker.getPropertiesOfType(tm)) {
 		const t = await checker.getTypeOfSymbol(p);
 		const v = await printer.snapshot(t);
 		if (v === null) return null;
-		parts.push(`${lit(p.name)}: ${coreNames(v)}`);
+		parts.push(`${lit(p.name)}: ${coreNames(v, specifiers)}`);
 	}
 	return `{ ${parts.join("; ")} }`;
 }
@@ -741,11 +754,14 @@ const sameTuple = (
 ): boolean =>
 	!!a && !!b && a.length === b.length && a.every((x, i) => x === b[i]);
 
-function renderWithLines(file: CacheFile): {
+function renderWithLines(
+	file: CacheFile,
+	dialect: CacheDialect,
+): {
 	text: string;
 	lines: Map<number, string>;
 } {
-	const text = render(file, "probe", file.engine);
+	const text = render(file, "probe", dialect, file.engine);
 	const lines = new Map<number, string>();
 	const all = text.split("\n");
 	let group: string | undefined;

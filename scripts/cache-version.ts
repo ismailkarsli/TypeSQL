@@ -3,7 +3,7 @@ import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 
 const root = join(import.meta.dirname, "../packages/core/src");
-const target = join(root, "engine/cache.ts");
+const target = join(root, "postgres/engine/cache.ts");
 const line = /^export type CacheVersion = "[^"]*";$/m;
 
 function files(dir: string): string[] {

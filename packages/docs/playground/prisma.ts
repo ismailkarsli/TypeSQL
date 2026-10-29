@@ -1,4 +1,9 @@
-import type { Col, Generated, Nullable } from "@typesql/core";
+import {
+	type Col,
+	type Generated,
+	type Nullable,
+	postgres,
+} from "@typesql/core/postgres";
 import { createSql, type PrismaRawClient } from "@typesql/prisma";
 
 interface DB {
@@ -21,7 +26,7 @@ interface DB {
 }
 
 declare const prisma: PrismaRawClient;
-const sql = createSql<DB>(prisma);
+const sql = createSql<DB>(postgres, prisma);
 
 const admins = await sql(
 	`SELECT id, display_name, "updatedAt" FROM users WHERE role = $1`,

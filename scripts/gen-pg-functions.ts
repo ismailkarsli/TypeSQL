@@ -22,7 +22,10 @@ if (!url) {
 }
 
 const catalogSrc = readFileSync(
-	new URL("../packages/core/src/engine/typer/catalog.ts", import.meta.url),
+	new URL(
+		"../packages/core/src/postgres/engine/typer/catalog.ts",
+		import.meta.url,
+	),
 	"utf8",
 );
 const start = catalogSrc.indexOf("export interface FunctionCatalog");
@@ -108,7 +111,10 @@ for (const [name, f] of fns) {
 }
 out += "}\n";
 writeFileSync(
-	new URL("../packages/core/src/engine/typer/pg-functions.ts", import.meta.url),
+	new URL(
+		"../packages/core/src/postgres/engine/typer/pg-functions.ts",
+		import.meta.url,
+	),
 	out,
 );
 console.log(

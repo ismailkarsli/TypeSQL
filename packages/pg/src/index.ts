@@ -1,5 +1,10 @@
-import type { RowKeys, SqlOptions, TransactionalSql } from "@typesql/core";
+import type { RowKeys, SqlOptions } from "@typesql/core";
 import { createTransactionalSql } from "@typesql/core/adapter";
+import {
+	type Postgres,
+	postgres,
+	type TransactionalSql,
+} from "@typesql/core/postgres";
 import { driver, type PgQueryable } from "./client.js";
 import type { PgTypeMap } from "./type-map.js";
 
@@ -33,7 +38,8 @@ export function createSql<DB>(
 	client?: PgQueryable,
 	options?: SqlOptions,
 ): PgSql<DB, RowKeys> {
-	return createTransactionalSql<DB, PgTypeMap, PgQueryable>(
+	return createTransactionalSql<Postgres, DB, PgTypeMap, PgQueryable>(
+		postgres,
 		client,
 		driver,
 		options,

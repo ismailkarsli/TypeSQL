@@ -2,28 +2,30 @@
 
 This page explains how TypeSQL's type engine works: the pipeline from SQL text to row types, and the rules it follows to stay within the compiler's limits. It is written for contributors and for readers who want to look under the hood; you don't need it to use TypeSQL.
 
-Everything under `packages/core/src/engine/**` is type-level code that runs in the TypeScript checker. These conventions are the result of measurements on TypeScript 7.0 and 7.1 (`tsc`, the native compiler). Read this before touching the engine.
+Everything under `packages/core/src/postgres/engine/**` is type-level code that runs in the TypeScript checker. These conventions are the result of measurements on TypeScript 7.0 and 7.1 (`tsc`, the native compiler). Read this before touching the engine.
 
 ## Source organization
 
-Core separates the SQL API, the checker, runtime execution, and the Node-based type cache:
+Core separates what every dialect shares from the PostgreSQL dialect under `postgres/`:
 
 | Location under `packages/core/src/` | Responsibility |
 |---|---|
-| `index.ts`, `adapter.ts`, `engine/index.ts` | Package export surfaces. Internal modules import their dependencies directly, rather than through these entry points. |
-| `create-sql.ts` | Construct the SQL API and connect its operations to an executor. |
-| `sql/types.ts` | Public `Sql` overloads and method documentation. |
-| `sql/call.ts` | Call validation, arguments, return types, and call-cache lookup. |
-| `sql/text.ts`, `sql/slots.ts`, `sql/fragment.ts` | Type-level text preparation, slot contracts, and fragment/combine inference. |
+| `index.ts`, `adapter.ts`, `postgres/index.ts`, `postgres/engine/index.ts` | Package export surfaces. Internal modules import their dependencies directly, rather than through these entry points. |
+| `dialect.ts` | The dialect contract: `DialectTypes` (the type side) and `Dialect` (the runtime side, `{ name }`). |
+| `create-sql.ts` | Construct the SQL API for a dialect and connect its operations to an executor. Statements are built with `$n` parameters and sent as written. |
+| `sql/` | Type-level text preparation (`text.ts`, `named.ts`, `inline.ts`, `splice.ts`), slot contracts, fragment/combine inference and the `sql.set` / `sql.values` texts. |
 | `runtime/` | Runtime parameter encoding, statement building, splicing, JSON, and writes. `build.ts` applies named parameters, inline parameters, then slots in that order. |
+| `schema.ts` | The schema markers (`Col`, `View`, …) and the `ColumnTypes` registry a dialect augments with its type names. |
 | `query.ts`, `transaction.ts`, `migrations.ts`, `row-keys.ts` | Query execution, transaction and migration APIs, and row-key mapping. |
-| `schema/`, `type-map/` | Schema descriptors and PostgreSQL-to-TypeScript type mappings. |
-| `engine/` | SQL analysis: lexing, parsing, binding, expression typing, projection, DDL, and cache lookup. `infer.ts` coordinates analysis and public projections; `diagnostics.ts` locates semantic errors and adds hints. |
-| `cache/` | The Node content mapper and background job that compute and persist type-cache entries. This is separate from checker-only `engine/cache.ts`. |
+| `cache/` | The Node content mapper and background job that compute and persist type-cache entries, driven by a dialect's `CacheDialect` descriptor. This is separate from checker-only `postgres/engine/cache.ts`. |
+| `postgres/dialect.ts`, `postgres/cache-dialect.ts` | The `postgres` dialect and its cache descriptor. |
+| `postgres/sql/` | The public `Sql` overloads (`types.ts`) and call validation, arguments, return types and call-cache lookup (`call.ts`). |
+| `postgres/schema/`, `postgres/type-map/` | PostgreSQL schema types (`Json`, `PgCatalog`, functions) and PostgreSQL-to-TypeScript type mappings. |
+| `postgres/engine/` | SQL analysis: lexing, parsing, binding, expression typing, projection, DDL, and cache lookup. `infer.ts` coordinates analysis and public projections; `diagnostics.ts` locates semantic errors and adds hints; `carried.ts` checks inline and spliced values against their parameters. |
 
 DDL starts at `engine/ddl/script.ts`, which parses and applies statements in sequence. `apply.ts` dispatches parsed DDL to `create-table.ts`, `alter-table.ts`, `view.ts`, `registry.ts` (enums and functions), and `schema.ts`. Those handlers share `object.ts` for schema rebuilding, `relation.ts` for relation lookup and mutation, `column.ts` for column descriptors, and `query.ts` for columns derived from a query. Shared helpers do not import the dispatch or script layers.
 
-Keep SQL behavior in the module that owns it. Call-site inference belongs in `sql/`, runtime rewrites in `runtime/`, and PostgreSQL semantics in the appropriate engine stage. When changing a rewrite, check both its type-level and runtime implementations: they must produce the same text and parameter order.
+Keep SQL behavior in the module that owns it. Text-level inference belongs in `sql/`, call-site inference in `postgres/sql/`, runtime rewrites in `runtime/`, and PostgreSQL semantics in the appropriate engine stage. When changing a rewrite, check both its type-level and runtime implementations: they must produce the same text and parameter order.
 
 ## Measured limits (TS 7.0.2, unchanged in 7.1.0-beta)
 
@@ -50,10 +52,10 @@ RowOf / ParamsOf / Validate                 public projections of Analysis
 
 ## Type cache
 
-`engine/cache.ts` holds the type-level side of the [type cache](./performance#type-cache), whose content mapper and job live in `src/cache/`. Three lookups test `keyof QueryCacheKeys` (or `DdlCacheKeys`) first, so a program without a cache pays one conditional each:
+`engine/cache.ts` holds the type-level side of the [type cache](./performance#type-cache), whose content mapper and job live in `src/cache/` and find the engine through the dialect descriptor in `src/postgres/cache-dialect.ts`. Three lookups test `keyof QueryCacheKeys` (or `DdlCacheKeys`) first, so a program without a cache pays one conditional each:
 
 - `Analysis<DB, Q>` (what the projections read; `Analyze` itself is never cached),
-- the plain `sql()` call (`GateCallCheck`, `BoxCallArgs`, `CallRet` in `sql/call.ts`),
+- the plain `sql()` call (`GateCallCheck`, `BoxCallArgs`, `CallRet` in `postgres/sql/call.ts`),
 - `ApplyDdl<DB, Q>`, whose cached result is the step's effect applied to `DB`.
 
 An entry is used only when its dependencies compare equal (`Same`): mutual assignability of *expanded* copies, because relating two instantiations of one alias goes by its measured variances, and `Col`'s flags only appear in conditionals. Freshness is decided per group of entries (`GroupStale`, once per program), so a lookup is an indexed access plus a few conditionals. Run `pnpm cache-version` after changing anything under `src/` (except `cache/` and `runtime/`): an entry computed by other sources is never used.

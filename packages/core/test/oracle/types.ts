@@ -3,11 +3,12 @@ import { join, resolve, sep } from "node:path";
 import {
 	type Evaluated,
 	evaluateTypes,
-	PROBE_HEAD,
 	ProbeSession,
 	parseTypeText,
+	probeHead,
 	readAnalysis,
 } from "../../src/cache/evaluate.js";
+import { postgresCache } from "../../src/postgres/cache-dialect.js";
 import { preview } from "./baseline.js";
 import {
 	compareStatement,
@@ -121,7 +122,7 @@ export async function typesOracle(
 			`types oracle: ${list.length} distinct statements over ${groups.size} schemas`,
 		);
 
-		let base = PROBE_HEAD + NORM_PRELUDE;
+		let base = probeHead(postgresCache) + NORM_PRELUDE;
 		for (const g of groups.values())
 			base += `type DB_${g.id} = ${g.snapshot};\n`;
 		const gl = [...groups.values()];
@@ -134,7 +135,13 @@ export async function typesOracle(
 			),
 		];
 		const t0 = performance.now();
-		const results = await evaluateTypes(session, base, exprs, isCorePath);
+		const results = await evaluateTypes(
+			session,
+			base,
+			exprs,
+			isCorePath,
+			postgresCache,
+		);
 		log(
 			`types oracle: evaluated in ${((performance.now() - t0) / 1000).toFixed(1)} s`,
 		);

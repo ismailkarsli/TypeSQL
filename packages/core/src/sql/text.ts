@@ -1,7 +1,7 @@
-import type { AnyErr, SqlError } from "../engine/errors.js";
-import type { RewriteInlineStr } from "../engine/inline.js";
-import type { RewriteNamedStr } from "../engine/named.js";
-import type { MaxParamStr } from "../engine/splice.js";
+import type { AnyErr, SqlError } from "../errors.js";
+import type { RewriteInlineStr } from "./inline.js";
+import type { RewriteNamedStr } from "./named.js";
+import type { MaxParamStr } from "./splice.js";
 
 export type IsLiteral<Q extends string> = string extends Q
 	? false

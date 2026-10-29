@@ -9,6 +9,7 @@ import type {
 	Snapshot,
 	Type,
 } from "typescript/async";
+import type { CacheDialect } from "./dialect.js";
 import type { Kinds } from "./discover.js";
 import { coreNames, Printer } from "./print.js";
 
@@ -48,7 +49,8 @@ export async function loadTypeScript(configFile: string): Promise<TypeScript> {
 	};
 }
 
-export const PROBE_HEAD = `import type * as __T from "@typesql/core/engine";\nexport declare const __v: __T.CacheVersion;\nexport declare const __fc: __T.FunctionCatalog;\n`;
+export const probeHead = (dialect: CacheDialect): string =>
+	`import type * as __T from ${JSON.stringify(dialect.engine)};\nexport declare const __v: __T.CacheVersion;\nexport declare const __fc: __T.FunctionCatalog;\n`;
 
 export interface ProbeProgram {
 	readonly program: Program;
@@ -132,6 +134,7 @@ export async function evaluateTypes(
 	base: string,
 	exprs: readonly string[],
 	isCorePath: (path: string) => boolean,
+	dialect: CacheDialect,
 ): Promise<Evaluated[]> {
 	let probe = base;
 	exprs.forEach((e, i) => {
@@ -149,7 +152,7 @@ export async function evaluateTypes(
 			if (error !== undefined) return { error };
 			const t = types.get(name);
 			if (!t) return { error: "no declaration" };
-			return { text: coreNames(await printer.print(t)) };
+			return { text: coreNames(await printer.print(t), dialect.specifiers) };
 		}),
 	);
 }
@@ -159,12 +162,14 @@ export function evaluateAnalyses(
 	base: string,
 	items: readonly { readonly db: string; readonly text: string }[],
 	isCorePath: (path: string) => boolean,
+	dialect: CacheDialect,
 ): Promise<Evaluated[]> {
 	return evaluateTypes(
 		session,
 		base,
 		items.map((a) => `__T.CacheAnalysis<${a.db}, ${JSON.stringify(a.text)}>`),
 		isCorePath,
+		dialect,
 	);
 }
 

@@ -1,5 +1,5 @@
-import type { View } from "@typesql/core";
-import type { ColDesc, PgScalarName } from "@typesql/core/engine";
+import type { View } from "@typesql/core/postgres";
+import type { ColDesc, PgScalarName } from "@typesql/core/postgres/engine";
 
 export type ColumnOverride = string | Partial<ColDesc>;
 
