@@ -26,7 +26,7 @@ export interface CacheSnapshots {}
 export interface DdlCache {}
 export interface DdlCacheKeys {}
 
-export type CacheVersion = "ef02ee71df40";
+export type CacheVersion = "2d89fa38d8f5";
 
 export type Stale<DB, D extends DbSnapshot> =
 	| (D["v"] extends CacheVersion ? never : "*")
