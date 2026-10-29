@@ -93,7 +93,10 @@ jobs:
               new+=("$pkg")
             fi
           done
-          printf '%s\n' "${new[@]}" > .new-packages
+          : > .new-packages
+          if ((${#new[@]})); then
+            printf '%s\n' "${new[@]}" > .new-packages
+          fi
           pnpm publish -r --no-git-checks --report-summary "${filters[@]}"
       - run: node scripts/github-releases.ts --summary pnpm-publish-summary.json --current
         env:
