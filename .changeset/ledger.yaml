@@ -183,6 +183,11 @@
   dir: packages/core
   intents:
     - clean-geckos-press
+"@typesql/core@0.7.6":
+  dir: packages/core
+  intents:
+    - breezy-emus-scream
+    - wide-tables-design
 "@typesql/drizzle@0.0.2":
   dir: packages/drizzle
   intents:
@@ -211,6 +216,11 @@
   dir: packages/drizzle
   intents:
     - tough-geckos-promise
+"@typesql/drizzle@0.2.9":
+  dir: packages/drizzle
+  intents:
+    - breezy-emus-scream
+    - wide-tables-design
 "@typesql/kysely@0.0.2":
   dir: packages/kysely
   intents:
@@ -252,6 +262,11 @@
   dir: packages/kysely
   intents:
     - tough-geckos-promise
+"@typesql/kysely@0.2.9":
+  dir: packages/kysely
+  intents:
+    - breezy-emus-scream
+    - wide-tables-design
 "@typesql/language-server@0.0.1":
   dir: packages/language-server
   intents:
@@ -268,6 +283,11 @@
   intents:
     - tame-jars-wait
     - wet-monkeys-juggle
+"@typesql/language-server@0.0.4":
+  dir: packages/language-server
+  intents:
+    - breezy-emus-scream
+    - wide-tables-design
 "@typesql/pg@0.0.2":
   dir: packages/pg
   intents:
@@ -314,6 +334,11 @@
   dir: packages/pg
   intents:
     - lucky-ducks-double
+"@typesql/pg@0.2.9":
+  dir: packages/pg
+  intents:
+    - breezy-emus-scream
+    - wide-tables-design
 "@typesql/postgres@0.0.2":
   dir: packages/postgres
   intents:
@@ -357,6 +382,11 @@
   dir: packages/postgres
   intents:
     - thick-kings-change
+"@typesql/postgres@0.2.9":
+  dir: packages/postgres
+  intents:
+    - breezy-emus-scream
+    - wide-tables-design
 "@typesql/prisma@0.0.2":
   dir: packages/prisma
   intents:
@@ -397,6 +427,11 @@
   dir: packages/prisma
   intents:
     - wet-monkeys-juggle
+"@typesql/prisma@0.2.9":
+  dir: packages/prisma
+  intents:
+    - breezy-emus-scream
+    - wide-tables-design
 typesql@0.0.1:
   dir: packages/vscode
   intents:
@@ -419,3 +454,7 @@ typesql@0.0.5:
   intents:
     - olive-waves-kick
     - wise-spoons-play
+typesql@0.0.6:
+  dir: packages/vscode
+  intents:
+    - wide-tables-design

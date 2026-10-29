@@ -1,5 +1,11 @@
 # typesql
 
+## 0.0.6
+
+### Patch Changes
+
+- Reorganize core internals and remove source comments and inline API documentation without changing SQL behavior.
+
 ## 0.0.5
 
 ### Patch Changes

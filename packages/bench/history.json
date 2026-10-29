@@ -2,36 +2,43 @@
 	"0.7.1": {
 		"case1": {
 			"statements": 379,
-			"checkTimeSec": 1.687,
-			"cachedCheckTimeSec": 0.586
+			"checkTimeSec": 2.348,
+			"cachedCheckTimeSec": 0.791
 		}
 	},
 	"0.7.2": {
 		"case1": {
 			"statements": 379,
-			"checkTimeSec": 0.682,
-			"cachedCheckTimeSec": 0.233
+			"checkTimeSec": 0.928,
+			"cachedCheckTimeSec": 0.326
 		}
 	},
 	"0.7.3": {
 		"case1": {
 			"statements": 379,
-			"checkTimeSec": 0.669,
-			"cachedCheckTimeSec": 0.231
+			"checkTimeSec": 0.861,
+			"cachedCheckTimeSec": 0.302
 		}
 	},
 	"0.7.4": {
 		"case1": {
 			"statements": 379,
-			"checkTimeSec": 0.665,
-			"cachedCheckTimeSec": 0.228
+			"checkTimeSec": 0.937,
+			"cachedCheckTimeSec": 0.318
 		}
 	},
 	"0.7.5": {
 		"case1": {
 			"statements": 379,
-			"checkTimeSec": 0.54,
-			"cachedCheckTimeSec": 0.178
+			"checkTimeSec": 0.762,
+			"cachedCheckTimeSec": 0.231
+		}
+	},
+	"0.7.6": {
+		"case1": {
+			"statements": 379,
+			"checkTimeSec": 0.726,
+			"cachedCheckTimeSec": 0.237
 		}
 	}
 }
