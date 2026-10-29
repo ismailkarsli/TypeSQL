@@ -36,7 +36,6 @@ type Cls<C extends string> = C extends Lower
 			? "u"
 			: "o";
 
-/** A new word starts at `C` (class `K`) after a char of class `P`, `R` being the rest of the input. */
 type Starts<P, K, R extends string> = K extends "u"
 	? P extends "l" | "d"
 		? true
@@ -53,10 +52,6 @@ type Starts<P, K, R extends string> = K extends "u"
 
 type Push<A extends string[], W extends string> = W extends "" ? A : [...A, W];
 
-/**
- * Words of an identifier, as Drizzle's `casing` splits them
- * (`/[\da-z]+|[A-Z]+(?![a-z])|[A-Z][\da-z]+/g`): `"userID2fa"` → `["user", "ID", "2fa"]`.
- */
 export type Words<
 	S extends string,
 	W extends string = "",
@@ -83,7 +78,5 @@ type Camel<Ws extends string[], Acc extends string = ""> = Ws extends [
 	? Camel<R, Acc extends "" ? Lowercase<W> : `${Acc}${Capitalize<W>}`>
 	: Acc;
 
-/** Drizzle's `toSnakeCase`: `"displayName"` → `"display_name"`. */
 export type ToSnakeCase<S extends string> = Snake<Words<S>>;
-/** Drizzle's `toCamelCase`: `"display_name"` → `"displayName"`. */
 export type ToCamelCase<S extends string> = Camel<Words<S>>;

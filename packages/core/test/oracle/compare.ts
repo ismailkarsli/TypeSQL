@@ -34,7 +34,6 @@ export function normalizeOurs(type: string): string {
 	return t;
 }
 
-/** Server errors that mean the statement needs state it does not create (a cursor, a prepared statement, a portal). */
 const NEEDS_CONTEXT = new Set(["34000", "26000", "3D000", "42P03", "25P01"]);
 
 export function compareStatement(ours: Ours, server: Server): Verdict {
@@ -49,7 +48,6 @@ export function compareStatement(ours: Ours, server: Server): Verdict {
 			)
 		)
 			return { skip: "multi-statement" };
-		// a constant that is not valid input for its type (`int4 '0x'`): the data, not the statement's meaning
 		if (server.error.code.startsWith("22")) return { skip: "invalid-input" };
 		if (isRejection(server.error))
 			return {
@@ -63,9 +61,7 @@ export function compareStatement(ours: Ours, server: Server): Verdict {
 		return { skip: "server-error" };
 	}
 	if ("error" in ours) {
-		// rejected when it runs over the seeded rows (a NOT NULL column left out, a JSON key that is NULL): both reject it
 		if (server.observed.runErrors.length) return { disagreements: [] };
-		// a NOT NULL violation the seeded rows never reach (a MERGE whose rows all match)
 		if (/violates not-null constraint/.test(ours.error))
 			return { skip: "data-dependent" };
 		return {
@@ -137,7 +133,6 @@ export function compareShapes(a: Analysis, o: Observed): Disagreement[] {
 
 const typeName = (t: AnalysisType): string => normalizeOurs(t.type);
 
-/** An object type's key order is not the statement's: compare by name, duplicates collapsed as the drivers do (the last column wins). */
 function compareByName(a: Analysis, o: Observed): Disagreement[] {
 	const out: Disagreement[] = [];
 	const ours = new Map(a.cols.map((c) => [c.name, c]));

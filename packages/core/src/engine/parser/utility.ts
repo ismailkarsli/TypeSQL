@@ -3,16 +3,6 @@ import type { NumTok, OpTok, Toks, WordTok } from "../lexer/tokens.js";
 import type { ParseSelectStmt } from "./select.js";
 import type { AtEnd, EatWord, Expected, Ident, Nx, Nx2, Ok } from "./util.js";
 
-/**
- * Cursor statements (index-based, see util.ts). `I` is the index of the first word.
- *
- *   DECLARE name [BINARY] [ASENSITIVE | INSENSITIVE] [[NO] SCROLL] CURSOR [{WITH | WITHOUT} HOLD] FOR query
- *   FETCH | MOVE [direction] [FROM | IN] name
- *   CLOSE name | ALL
- *
- * DECLARE keeps its query, which is checked like a SELECT (the statement itself returns no
- * rows). FETCH's rows come from a query declared in another statement, so it has no row type.
- */
 export type ParseCursorStmt<T extends Toks, I extends number> =
 	T[I] extends WordTok<infer W>
 		? W extends "declare"
@@ -21,8 +11,6 @@ export type ParseCursorStmt<T extends Toks, I extends number> =
 				? ParseFetch<T, Nx<I>, W>
 				: ParseClose<T, Nx<I>>
 		: never;
-
-// ─── DECLARE ───
 
 type ParseDeclare<T extends Toks, I extends number> =
 	Ident<T, I> extends [infer N, infer J extends number]
@@ -45,10 +33,6 @@ type ParseDeclare<T extends Toks, I extends number> =
 			: never
 		: Expected<"cursor name", T, I>;
 
-/**
- * `BINARY`, `ASENSITIVE`, `INSENSITIVE`, `SCROLL`, `NO SCROLL`, in any order → index after
- * them, or an error: Postgres rejects a contradictory pair. `Seen`: the options so far.
- */
 type CursorOptions<T extends Toks, I extends number, Seen extends string> =
 	T[I] extends WordTok<
 		infer W extends "binary" | "asensitive" | "insensitive" | "scroll"
@@ -71,12 +55,6 @@ type SkipHold<T extends Toks, I extends number> =
 			: Expected<"HOLD", T, Nx<I>>
 		: I;
 
-// ─── FETCH / MOVE ───
-
-/**
- * After FETCH / MOVE. A lone name is the cursor, even when it spells a direction
- * (`FETCH next` fetches from a cursor named `next`, as in Postgres).
- */
 type ParseFetch<T extends Toks, I extends number, K extends "fetch" | "move"> =
 	Ident<T, I> extends [infer N, infer J extends number]
 		? AtEnd<T, J> extends true
@@ -86,7 +64,6 @@ type ParseFetch<T extends Toks, I extends number, K extends "fetch" | "move"> =
 				: FetchFrom<T, FetchDirection<T, I>, K>
 		: FetchFrom<T, FetchDirection<T, I>, K>;
 
-/** `[FROM | IN] name` after the direction. */
 type FetchFrom<T extends Toks, D, K extends "fetch" | "move"> = D extends number
 	? (T[D] extends WordTok<"from" | "in"> ? Nx<D> : D) extends infer J extends
 			number
@@ -96,10 +73,6 @@ type FetchFrom<T extends Toks, D, K extends "fetch" | "move"> = D extends number
 		: never
 	: D;
 
-/**
- * `NEXT | PRIOR | FIRST | LAST | ABSOLUTE n | RELATIVE n | n | ALL | FORWARD [n | ALL] | BACKWARD [n | ALL]`
- * (n a signed integer) → index after it (`I` without a direction), or an error.
- */
 type FetchDirection<T extends Toks, I extends number> =
 	T[I] extends WordTok<infer W>
 		? W extends "next" | "prior" | "first" | "last" | "all"
@@ -117,7 +90,6 @@ type FetchDirection<T extends Toks, I extends number> =
 					: I
 		: SignedInt<T, I>;
 
-/** `[+ | -] integer` → index after it, `I` when there is none, or an error for a lone sign. */
 type SignedInt<T extends Toks, I extends number> = T[I] extends NumTok
 	? Nx<I>
 	: T[I] extends OpTok<"+" | "-">
@@ -125,8 +97,6 @@ type SignedInt<T extends Toks, I extends number> = T[I] extends NumTok
 			? Nx2<I>
 			: Expected<"integer", T, Nx<I>>
 		: I;
-
-// ─── CLOSE ───
 
 type ParseClose<T extends Toks, I extends number> =
 	T[I] extends WordTok<"all">

@@ -21,7 +21,6 @@ if (unknown.length) {
 	);
 	process.exit(2);
 }
-// A replay shard leaves the standalone query corpus and function catalog to another job.
 const parts = shard ? [] : ["types", "functions"];
 if (flags.has("--regress")) parts.push("regress", "ddl");
 if (flags.has("--views")) parts.push("views");

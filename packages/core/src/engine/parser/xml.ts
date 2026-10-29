@@ -16,24 +16,6 @@ import type {
 	SyntaxErrorAt,
 } from "./util.js";
 
-/**
- * SQL/XML syntax (Postgres's `func_expr_common_subexpr` XML rules, `IS [NOT] DOCUMENT` and
- * `XMLTABLE` in FROM). The expression parser dispatches here only on the `xml*` keywords
- * followed by `(`, so ordinary queries pay one keyword test.
- *
- *   XMLCONCAT(expr, ...)
- *   XMLELEMENT(NAME n [, XMLATTRIBUTES(expr [AS n], ...)] [, expr, ...])
- *   XMLFOREST(expr [AS n], ...)
- *   XMLPI(NAME n [, expr])
- *   XMLROOT(expr, VERSION expr | VERSION NO VALUE [, STANDALONE YES | NO | NO VALUE])
- *   XMLPARSE(DOCUMENT | CONTENT expr [PRESERVE | STRIP WHITESPACE])
- *   XMLSERIALIZE(DOCUMENT | CONTENT expr AS type [[NO] INDENT])
- *   XMLEXISTS(c_expr PASSING [BY REF | BY VALUE] c_expr [BY REF | BY VALUE])
- *
- * Names after NAME / AS are any word or quoted identifier (`name xml`, `AS name`). As in
- * Postgres's parse analysis, an XMLATTRIBUTES / XMLFOREST value without `AS` must be a
- * column reference, and XMLELEMENT's attribute names must be distinct.
- */
 export type XmlFuncKeyword =
 	| "xmlconcat"
 	| "xmlelement"
@@ -52,12 +34,10 @@ type XmlNode<Op extends string, Args, Named, To> = {
 	to: To;
 };
 
-/** `l IS [NOT] DOCUMENT`. */
 export type XmlIsDocument<L, Not extends boolean> = Not extends true
 	? { t: "un"; op: "not"; e: XmlNode<"document", [L], [], null> }
 	: XmlNode<"document", [L], [], null>;
 
-/** `I` is just after `W (`. */
 export type ParseXmlFunc<
 	T extends Toks,
 	W extends XmlFuncKeyword,
@@ -91,15 +71,12 @@ type Close<T extends Toks, J extends number, N> =
 		? Expected<'")"', T, J>
 		: Ok<N, EatOp<T, J, ")">>;
 
-/** `NAME label` → `[label, next]` or an error. */
 type XmlName<T extends Toks, I extends number> =
 	EatWord<T, I, "name"> extends never
 		? Expected<"NAME", T, I>
 		: AnyLabel<T, EatWord<T, I, "name">> extends [infer N, infer J]
 			? [N, J]
 			: Expected<"name", T, EatWord<T, I, "name">>;
-
-// ─── XMLELEMENT / XMLFOREST ───
 
 type ParseXmlElement<T extends Toks, I extends number> =
 	XmlName<T, I> extends infer R
@@ -130,10 +107,6 @@ type ParseElementContent<T extends Toks, I extends number, Named> =
 			: X
 		: never;
 
-/**
- * `expr [AS label], ... )` (XMLATTRIBUTES / XMLFOREST, `I` just after `(`) → `Ok<values, after ")">`.
- * `Attr`: XMLATTRIBUTES (its own messages; names must be distinct).
- */
 type ParseNamedList<
 	T extends Toks,
 	I extends number,
@@ -183,8 +156,6 @@ type NamedNext<
 			? Ok<Vals, Nx<J>>
 			: Expected<'"," or ")"', T, J>;
 
-// ─── XMLPI / XMLROOT / XMLPARSE / XMLSERIALIZE / XMLEXISTS ───
-
 type ParseXmlPi<T extends Toks, I extends number> =
 	XmlName<T, I> extends infer R
 		? R extends [string, infer J extends number]
@@ -230,12 +201,10 @@ type ParseXmlRoot<T extends Toks, I extends number> =
 						: never
 			: X
 		: never;
-/** `NO VALUE` → `Ok<null, next>`, else the version expression. */
 type RootVersion<T extends Toks, I extends number> =
 	EatWords<T, I, ["no", "value"]> extends never
 		? ParseExpr<T, I, 0>
 		: Ok<null, EatWords<T, I, ["no", "value"]>>;
-/** `[, STANDALONE YES | NO | NO VALUE]` → next index or an error. */
 type RootStandalone<T extends Toks, I extends number> =
 	EatOp<T, I, ","> extends never
 		? I
@@ -257,7 +226,6 @@ type ParseXmlParse<T extends Toks, I extends number> =
 				? Close<T, SkipWhitespaceOption<T, J>, XmlNode<"parse", [E], [], null>>
 				: X
 			: never;
-/** `[PRESERVE | STRIP] WHITESPACE` → next index (`EatWord` at a `never` index is `never`). */
 type SkipWhitespaceOption<T extends Toks, I extends number> =
 	EatWord<T, EatWord<T, I, "preserve" | "strip">, "whitespace"> extends never
 		? I
@@ -284,7 +252,6 @@ type SkipIndent<T extends Toks, I extends number> =
 			: EatWords<T, I, ["no", "indent"]>
 		: EatWord<T, I, "indent">;
 
-/** `XMLEXISTS(x PASSING d)` is Postgres's function `xmlexists(text, xml)`; both operands are `c_expr`s. */
 type ParseXmlExists<T extends Toks, I extends number> =
 	ParseExpr<T, I, 13> extends infer X
 		? X extends Ok<infer Path, infer J>
@@ -314,18 +281,11 @@ type ParseXmlExists<T extends Toks, I extends number> =
 					: never
 			: X
 		: never;
-/** `BY REF` / `BY VALUE` (no effect; `EatWord` at a `never` index is `never`). */
 type SkipMech<T extends Toks, I extends number> =
 	EatWord<T, EatWord<T, I, "by">, "ref" | "value"> extends never
 		? I
 		: EatWord<T, EatWord<T, I, "by">, "ref" | "value">;
 
-// ─── XMLTABLE ───
-
-/**
- * `XMLTABLE(` … `) [alias [(cols)]]` in FROM; `I` is just after `(`. Namespace URIs, PATH
- * and DEFAULT are `b_expr`s, the row and document expressions `c_expr`s.
- */
 export type ParseXmlTable<T extends Toks, I extends number> = (
 	T[I] extends WordTok<"xmlnamespaces">
 		? T[Nx<I>] extends OpTok<"(">
@@ -380,10 +340,6 @@ export type ParseXmlTable<T extends Toks, I extends number> = (
 		: NS
 	: never;
 
-/**
- * `uri AS name | DEFAULT uri, ... ) ,` (`I` just after `(`) → `Ok<[uris, has DEFAULT], after the ",">`.
- * Postgres parses a DEFAULT namespace and rejects it in parse analysis (the binder does too).
- */
 type ParseNamespaces<
 	T extends Toks,
 	I extends number,
@@ -422,7 +378,6 @@ type NamespacesNext<
 				: Ok<[Acc, Dflt], EatOp<T, Nx<J>, ",">>
 			: Expected<'"," or ")"', T, J>;
 
-/** `name type [options] | name FOR ORDINALITY`, comma-separated → `Ok<columns, next>`. */
 type ParseXmlCols<
 	T extends Toks,
 	I extends number,
@@ -457,7 +412,6 @@ type XmlColsNext<
 	Acc extends readonly unknown[],
 > = T[I] extends OpTok<","> ? ParseXmlCols<T, Nx<I>, Acc> : Ok<Acc, I>;
 
-/** `PATH p | DEFAULT d | NOT NULL | NULL` in any order, each at most once (Postgres's messages). */
 type ParseColOptions<
 	T extends Toks,
 	I extends number,
@@ -507,7 +461,6 @@ type ParseColOptions<
 		: T[I] extends IdTok<infer W>
 			? UnknownColOption<T, I, W>
 			: ColDone<T, I, N, Ty, Path, Def, NN, Acc>;
-/** The column's options end at `I`: add it and go on. */
 type ColDone<
 	T extends Toks,
 	I extends number,
@@ -532,7 +485,6 @@ type ColDone<
 		},
 	]
 >;
-/** `IDENT b_expr`: Postgres parses any option name, then rejects the unknown ones. */
 type UnknownColOption<T extends Toks, I extends number, W extends string> =
 	ParseExpr<T, Nx<I>, 5> extends infer X
 		? X extends Ok<unknown, number>

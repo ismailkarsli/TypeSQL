@@ -122,7 +122,6 @@ function rows(spec: (typeof SPECS)[number]): string[][] {
 		out.push(
 			spec.columns.map((c, ci) => {
 				if (c.name === "id") return String(r);
-				// t2 rows point at t1 rows, some at none (99) or NULL: outer joins have rows without partners
 				if (c.name === "t1_id")
 					return ["0", "1", "1", "99", "NULL", "2", "5", "0"][r]!;
 				if (c.nullable && (r + ci) % 3 === 0) return "NULL";
@@ -153,7 +152,6 @@ export function fuzzSetup(): string[] {
 		);
 		out.push(`CREATE TABLE ${ident(t.name)} (${cols.join(", ")})`);
 	}
-	// t2.t1_id = 99 has no partner: the foreign key is NOT VALID and added after the rows
 	for (const t of TABLES)
 		for (const r of t.rows)
 			out.push(

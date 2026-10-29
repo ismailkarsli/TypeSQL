@@ -1,6 +1,3 @@
-// Save CI measurements for VitePress and render GitHub's README from the same data.
-// --refresh replaces the current version's history entry when rerunning benchmarks on demand.
-// --refresh-all replaces the entire history with releases measured together by bench/history.ts.
 import { readFileSync, writeFileSync } from "node:fs";
 
 const historyPath = "packages/bench/history.json";
@@ -177,24 +174,29 @@ const bench = {
 	},
 };
 const summary = [
-	"<!-- performance-summary:start -->",
+	'<span id="performance-summary-start"></span>',
 	`The [real-world application workload](packages/bench/src/case1.ts) contains ${workload.statements} statements and reusable SQL fragments. Average check time per statement, including schema and fragment checking: ${throughput.tsc.checkMsPerQuery} ms with \`tsc\` and ${throughput.tsrs.checkMsPerQuery} ms with [tsrs](https://github.com/oxc-project/tsrs).`,
 	"",
 	"| Application workload | `tsc` | tsrs |",
 	"|---|---|---|",
 	`| \`case1\` | ${bench.rows.case1.tsc} s | ${bench.rows.case1.tsrs} s |`,
 	`| [\`case1 cached\`](https://typesql.karsli.net/guide/performance#type-cache) | ${bench.rows["case1 cached"].tsc} s | ${bench.rows["case1 cached"].tsrs} s |`,
-	"<!-- performance-summary:end -->",
+	'<span id="performance-summary-end"></span>',
 ].join("\n");
 const releases = Object.entries(history).sort(([a], [b]) =>
 	a.localeCompare(b, "en", { numeric: true }),
 );
 const chart = [
-	"<!-- performance-history:start -->",
+	'<span id="performance-history-start"></span>',
 	"Lines: 🔵 Uncached · 🟢 Cached. tsrs check time for the case1 application workload, remeasured for all versions in one CI job.",
 	"",
 	"```mermaid",
-	'%%{init: {"themeVariables": {"xyChart": {"plotColorPalette": "#2563eb,#16a34a"}}}}%%',
+	"---",
+	"config:",
+	"  themeVariables:",
+	"    xyChart:",
+	'      plotColorPalette: "#2563eb,#16a34a"',
+	"---",
 	"xychart-beta",
 	'    title "tsrs - real-world case1"',
 	`    x-axis "Core version" [${releases.map(([v]) => JSON.stringify(v)).join(", ")}]`,
@@ -202,15 +204,15 @@ const chart = [
 	`    line [${releases.map(([, times]) => times.case1.checkTimeSec).join(", ")}]`,
 	`    line [${releases.map(([, times]) => times.case1.cachedCheckTimeSec).join(", ")}]`,
 	"```",
-	"<!-- performance-history:end -->",
+	'<span id="performance-history-end"></span>',
 ].join("\n");
 const readme = readFileSync("README.md", "utf8")
 	.replace(
-		/<!-- performance-summary:start -->[\s\S]*?<!-- performance-summary:end -->/,
+		/<span id="performance-summary-start"><\/span>[\s\S]*?<span id="performance-summary-end"><\/span>/,
 		summary,
 	)
 	.replace(
-		/<!-- performance-history:start -->[\s\S]*?<!-- performance-history:end -->/,
+		/<span id="performance-history-start"><\/span>[\s\S]*?<span id="performance-history-end"><\/span>/,
 		chart,
 	);
 writeFileSync(historyPath, `${JSON.stringify(history, null, "\t")}\n`);

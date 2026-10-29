@@ -4,6 +4,27 @@ This page explains how TypeSQL's type engine works: the pipeline from SQL text t
 
 Everything under `packages/core/src/engine/**` is type-level code that runs in the TypeScript checker. These conventions are the result of measurements on TypeScript 7.0 and 7.1 (`tsc`, the native compiler). Read this before touching the engine.
 
+## Source organization
+
+Core separates the SQL API, the checker, runtime execution, and the Node-based type cache:
+
+| Location under `packages/core/src/` | Responsibility |
+|---|---|
+| `index.ts`, `adapter.ts`, `engine/index.ts` | Package export surfaces. Internal modules import their dependencies directly, rather than through these entry points. |
+| `create-sql.ts` | Construct the SQL API and connect its operations to an executor. |
+| `sql/types.ts` | Public `Sql` overloads and method documentation. |
+| `sql/call.ts` | Call validation, arguments, return types, and call-cache lookup. |
+| `sql/text.ts`, `sql/slots.ts`, `sql/fragment.ts` | Type-level text preparation, slot contracts, and fragment/combine inference. |
+| `runtime/` | Runtime parameter encoding, statement building, splicing, JSON, and writes. `build.ts` applies named parameters, inline parameters, then slots in that order. |
+| `query.ts`, `transaction.ts`, `migrations.ts`, `row-keys.ts` | Query execution, transaction and migration APIs, and row-key mapping. |
+| `schema/`, `type-map/` | Schema descriptors and PostgreSQL-to-TypeScript type mappings. |
+| `engine/` | SQL analysis: lexing, parsing, binding, expression typing, projection, DDL, and cache lookup. `infer.ts` coordinates analysis and public projections; `diagnostics.ts` locates semantic errors and adds hints. |
+| `cache/` | The Node content mapper and background job that compute and persist type-cache entries. This is separate from checker-only `engine/cache.ts`. |
+
+DDL starts at `engine/ddl/script.ts`, which parses and applies statements in sequence. `apply.ts` dispatches parsed DDL to `create-table.ts`, `alter-table.ts`, `view.ts`, `registry.ts` (enums and functions), and `schema.ts`. Those handlers share `object.ts` for schema rebuilding, `relation.ts` for relation lookup and mutation, `column.ts` for column descriptors, and `query.ts` for columns derived from a query. Shared helpers do not import the dispatch or script layers.
+
+Keep SQL behavior in the module that owns it. Call-site inference belongs in `sql/`, runtime rewrites in `runtime/`, and PostgreSQL semantics in the appropriate engine stage. When changing a rewrite, check both its type-level and runtime implementations: they must produce the same text and parameter order.
+
 ## Measured limits (TS 7.0.2, unchanged in 7.1.0-beta)
 
 | Limit | Value | Consequence |
@@ -17,6 +38,7 @@ Everything under `packages/core/src/engine/**` is type-level code that runs in t
 ## Pipeline
 
 ```
+
 Lex<Q> → Toks            engine/lexer
 ParseProgram<Toks> → Stmt engine/parser   (recursive descent + Pratt)
 ProjectStmt<Stmt, DB, Outer, Ctes> → Cols | null   engine/project (+ binder, typer)
@@ -31,7 +53,7 @@ RowOf / ParamsOf / Validate                 public projections of Analysis
 `engine/cache.ts` holds the type-level side of the [type cache](./performance#type-cache), whose content mapper and job live in `src/cache/`. Three lookups test `keyof QueryCacheKeys` (or `DdlCacheKeys`) first, so a program without a cache pays one conditional each:
 
 - `Analysis<DB, Q>` (what the projections read; `Analyze` itself is never cached),
-- the plain `sql()` call (`GateCallCheck`, `BoxCallArgs`, `CallRet` in `create-sql.ts`),
+- the plain `sql()` call (`GateCallCheck`, `BoxCallArgs`, `CallRet` in `sql/call.ts`),
 - `ApplyDdl<DB, Q>`, whose cached result is the step's effect applied to `DB`.
 
 An entry is used only when its dependencies compare equal (`Same`): mutual assignability of *expanded* copies, because relating two instantiations of one alias goes by its measured variances, and `Col`'s flags only appear in conditionals. Freshness is decided per group of entries (`GroupStale`, once per program), so a lookup is an indexed access plus a few conditionals. Run `pnpm cache-version` after changing anything under `src/` (except `cache/` and `runtime/`): an entry computed by other sources is never used.
@@ -59,7 +81,7 @@ An entry is used only when its dependencies compare equal (`Same`): mutual assig
 9. **Never pass a recursive conditional result into a constrained type parameter.** `F<ParamsOfExpr<…>>` with `F<M extends ParamMap>` forces TS to compute the constraint of the whole mutually recursive alias graph at declaration time ("excessively deep", or minutes of compile time). Accumulator parameters are unconstrained; use `infer X extends …` to check shapes instead.
 10. **Nested `Nx<Nx<I>>` is fine only because `Next` has a numeric index signature.** A conditional (`I extends keyof Next ? …`) in that position made every nested use a 4096-member union comparison at declaration time.
 12. **AST constraint types must be shallow.** Comparing a concrete AST subtree against a recursive union (`infer L extends Expr` with `Expr` = the precise node union) walks the whole subtree; a left-nested `a OR b OR …` of ~50 terms hit "Excessive stack depth comparing types". Generic-interface nodes do not help in TS 7. `Expr` is therefore `{ readonly t: ExprTag; readonly [field: string]: any }` (the precise union is `ExprNode`): checks look at one level, and `E["l"]` on a narrowed node is `any`, which satisfies any constraint. 200-term `OR` chains now type-check. Keep other recursive AST types (`FromItem`, `SelectBody`) shallow in practice: joins and set operations rarely nest deeply.
-14. **Evolved types must not reference their previous versions.** `ApplyDdl` first built each new schema as `Omit<Prev, K> & { … }`, so a schema after N statements held a chain of N earlier schemas, and every conditional that inspected it walked the chain ("excessively deep" after ~45 statements, also breaking queries against that schema). `ddl/apply.ts` rebuilds every stored table and namespace from single-key pieces (`Build`), so each version stands alone.
+14. **Evolved types must not reference their previous versions.** `ApplyDdl` first built each new schema as `Omit<Prev, K> & { … }`, so a schema after N statements held a chain of N earlier schemas, and every conditional that inspected it walked the chain ("excessively deep" after ~45 statements, also breaking queries against that schema). `ddl/object.ts` rebuilds every stored table and namespace from single-key pieces (`Build`), so each version stands alone.
 15. **Don't round-trip an index cursor through a tuple.** Storing `I` in a tuple and reading it back with `infer I extends number` keeps the unevaluated `Nx<Nx<…>>` chain and hits the instantiation-depth limit. Pass indexes as direct type arguments.
 16. **Tail-recursive walks that push AST subtrees onto a tuple stack are quadratic.** Plain recursion over indexed access, iterating only along the left spine, is linear.
 17. **The parser balances `AND`/`OR` chains.** `a OR b OR c …` becomes a balanced tree (depth log n), so a 200-term chain costs ~60K instantiations instead of 3.4M. Other left-associative operators (`||`, `+`) are not balanced (types may depend on order); chains of ~100 such terms are the practical limit.

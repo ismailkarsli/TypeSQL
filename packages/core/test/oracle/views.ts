@@ -16,7 +16,7 @@ const nullabilityPath = join(
 );
 let loaded: Promise<ViewNullabilityClass> | undefined;
 const viewNullability = (): Promise<ViewNullabilityClass> =>
-	(loaded ??= import(/* @vite-ignore */ nullabilityPath).then(
+	(loaded ??= import(nullabilityPath).then(
 		(m: { ViewNullability: ViewNullabilityClass }) => m.ViewNullability,
 	));
 
@@ -36,13 +36,12 @@ async function inBlock(conn: Connection): Promise<boolean | null> {
 		);
 		return r!.b;
 	} catch {
-		return null; // an aborted transaction block: nothing runs
+		return null;
 	}
 }
 
 export function viewableText(text: string): boolean {
 	if (/^\s*(\(\s*)*(insert|update|delete|merge)\b/i.test(text)) return false;
-	// a data-modifying CTE or a locking clause cannot be in a view
 	if (
 		/\b(insert\s+into|update\s+\S+\s+set|delete\s+from|merge\s+into)\b|\bfor\s+(no\s+key\s+)?(update|share|key\s+share)\b/i.test(
 			text,
@@ -61,7 +60,6 @@ export function viewable(text: string, ours: Analysis): boolean {
 	);
 }
 
-/** A WHERE or ON condition our narrowing may use: the view analysis does not narrow. */
 export function mayNarrow(text: string): boolean {
 	const bare = text
 		.replace(/'(?:[^']|'')*'/g, "''")
@@ -116,9 +114,6 @@ export function compareView(
 				detail: `column ${i + 1} ${name}: nullable in ours, the view analysis proves NOT NULL`,
 			});
 		if (!notNull[i] && !c.nullable) {
-			// window.sql:1747 (logging_agg_nonstrict) and :1790 (logging_agg_strict) are
-			// conservative candidates: non-null VALUES keys concatenated with COALESCE
-			// guarantee non-null labels, although the view analyzer cannot prove that.
 			if (mayNarrow(text)) narrowed++;
 			else
 				out.push({

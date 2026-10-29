@@ -1,9 +1,3 @@
-// Copied from an anonymized real-life project. This fixture must never be modified.
-// Compile-time application workload: 379 statements and their reusable SQL fragments.
-// Application words use API-generated replacements with the same lengths and underscores.
-// Runtime inputs are declared locally so only the schema and SQL are benchmarked.
-// Measure alone against the built core package (use tsc for the other compiler):
-// pnpm exec tsrs --ignoreConfig --noEmit --strict --skipLibCheck --target es2024 --module esnext --moduleResolution bundler --extendedDiagnostics packages/bench/src/case1.ts
 import {
 	createSql,
 	type Col,
@@ -211,7 +205,6 @@ export interface DB {
 		jerk: Col<"date">;
 		liaised: Json<CredsLiaised>;
 	};
-	/** View. */
 	creds_hollas: View<{
 		creds_ad: Col<"text">;
 		banked_cytons: Col<"text">;

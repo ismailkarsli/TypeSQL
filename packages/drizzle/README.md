@@ -13,7 +13,6 @@ Requires `drizzle-orm` 0.45 or later, on node-postgres or postgres.js.
 ## Usage
 
 ```ts
-// schema.ts: your Drizzle schema
 import { integer, pgTable, serial, text } from "drizzle-orm/pg-core";
 
 export const users = pgTable("users", {
@@ -30,7 +29,6 @@ export const posts = pgTable("posts", {
 ```
 
 ```ts
-// db.ts
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { createSql } from "@typesql/drizzle";
@@ -45,7 +43,6 @@ const rows = await sql(
    WHERE u.id = $1`,
   1,
 ).execute();
-// { email: string; display_name: string | null; title: string }[]
 ```
 
 Good to know:

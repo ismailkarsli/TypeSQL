@@ -1,64 +1,16 @@
 import type { View } from "@typesql/core";
 import type { ColDesc, PgScalarName } from "@typesql/core/engine";
 
-/**
- * Converting a Kysely `DB` interface (kysely-codegen, prisma-kysely or hand-written) into a
- * TypeSQL schema. Kysely describes columns with TS types, TypeSQL with Postgres type names, so
- * the conversion reads the TS shape back into a type name. That is lossy (`number` may be
- * `int4` or `float8`); `Overrides` pins the exact type per column.
- *
- * Every alias here is flat: one mapped type per table and a fixed number of conditionals per
- * column, with no recursion over the schema (only `SnakeCase` recurses, per identifier, when
- * `camelCase` is on).
- */
-
-// ───────────────────────────── public types ─────────────────────────────
-
-/**
- * Per-column override: a Postgres type name (`"int8"`, `"uuid"`, `"mood"`, `"text[]"`), or a
- * partial descriptor (`{ type?: "float8"; nullable?: false; hasDefault?: true }`). Unset
- * fields keep the inferred value.
- */
 export type ColumnOverride = string | Partial<ColDesc>;
 
-/** Overrides for one table: column key → `ColumnOverride`, plus `$view: true` for a view. */
 export type TableOverride = {
 	readonly [column: string]: ColumnOverride | boolean;
 };
 
-/**
- * Overrides for `FromKysely`, keyed by the `DB` interface's own table keys (`"auth.users"`,
- * `users`) and column keys (as spelled in the interface, before any `camelCase` mapping).
- *
- *   {
- *     users: { id: "int8"; score: "float8"; created_at: { type: "timestamp"; hasDefault: false } };
- *     active_users: { $view: true };
- *     $types: { mood: Mood; "auth.role": AuthRole };
- *   }
- *
- * `$view: true` declares a table key as a view (read-only). `$types` names enums: a column whose
- * values are exactly one entry's union gets that entry's name (so the same enum is one type
- * across tables, as in Postgres).
- */
 export type KyselyOverrides = { readonly [table: string]: TableOverride };
 
-/**
- * Options for `FromKysely`.
- * - `camelCase: true`: the interface was generated with `kysely-codegen --camel-case` (or is used
- *   with `CamelCasePlugin`); keys are mapped back to snake_case the way `CamelCasePlugin` does by
- *   default (`createdAt` → `created_at`, `userID` → `user_id`). SQL text uses the real names.
- */
 export type KyselyOptions = { readonly camelCase?: boolean };
 
-/**
- * A TypeSQL schema from a Kysely `DB` interface.
- *
- *   type Schema = FromKysely<DB, { users: { id: "int8" } }>;
- *   const sql = createSql<Schema>();            // TypeSQL's createSql
- *
- * `"auth.users"` becomes `Schema["auth"]["users"]`; `"public.users"` becomes `Schema["users"]`.
- * String-literal unions become enums registered in `Schema["$types"]` (see `KyselyOverrides`).
- */
 export type FromKysely<
 	DB,
 	Overrides extends KyselyOverrides = {},
@@ -76,7 +28,6 @@ export type FromKysely<
 				: TableOf<DB, K, Overrides, Options>;
 };
 
-/** Kysely's default snake_case mapping (`CamelCasePlugin`'s `createSnakeCaseMapper()`), at the type level. */
 export type SnakeCase<S extends string> =
 	S extends Lowercase<S>
 		? S
@@ -84,10 +35,6 @@ export type SnakeCase<S extends string> =
 			? SnakeRest<R, IsUpper<H>, Lowercase<H>>
 			: S;
 
-/**
- * Postgres type name, nullability and default inferred from one Kysely column type (no
- * overrides; string-literal unions are reported as `"enum"`, or `"enum[]"`).
- */
 export type InferColumn<T> = {
 	readonly type: PgTypeOf<
 		NonNullable<Sel<T>>,
@@ -97,8 +44,6 @@ export type InferColumn<T> = {
 	readonly nullable: null extends Sel<T> ? true : false;
 	readonly hasDefault: HasDefault<T>;
 };
-
-// ───────────────────────────── keys and namespaces ─────────────────────────────
 
 type Sn<S extends string, Opt> = Opt extends { readonly camelCase: true }
 	? SnakeCase<S>
@@ -117,7 +62,6 @@ type SnakeRest<
 		>
 	: Acc;
 
-/** Top-level key of a `DB` key: `"auth.users"` → `auth`, `"public.users"` → `users`. */
 type OuterKey<K extends string, Opt> = K extends "$types"
 	? K
 	: K extends `public.${infer T}`
@@ -126,7 +70,6 @@ type OuterKey<K extends string, Opt> = K extends "$types"
 			? Sn<S, Opt>
 			: Sn<K, Opt>;
 
-/** SQL name of a table key, schema-qualified unless `public`: used to name derived enums. */
 type SqlTableName<K extends string, Opt> = K extends `public.${infer T}`
 	? Sn<T, Opt>
 	: Sn<K, Opt>;
@@ -140,7 +83,6 @@ type NamespaceOf<DB, S extends string, O, Opt> = {
 type TableOverrides<O, K> = K extends keyof O ? O[K] : undefined;
 type ColumnOverrideOf<TO, C> = C extends keyof TO ? TO[C] : undefined;
 
-/** User enum registry (`Overrides["$types"]`), or `{}`. */
 type Registry<O> = O extends { readonly $types: infer R } ? R : {};
 
 type TableOf<DB, K extends string, O, Opt> = K extends keyof DB
@@ -172,12 +114,8 @@ type Columns<Tbl, TO, TName extends string, Reg, Opt> = {
 	>;
 };
 
-// ───────────────────────────── columns ─────────────────────────────
-
-/** Select type of a column: `ColumnType<S, …>` → S (one nested `ColumnType` is unwrapped, e.g. `GeneratedAlways<Int8>`). */
 type Sel<T> = T extends { readonly __select__: infer S } ? InnerSel<S> : T;
 type InnerSel<S> = S extends { readonly __select__: infer S2 } ? S2 : S;
-/** Insert type of the innermost `ColumnType`: tells `Int8`/`Numeric` apart from plain strings. */
 type Hint<T> = T extends {
 	readonly __select__: infer S;
 	readonly __insert__: infer I;
@@ -185,7 +123,6 @@ type Hint<T> = T extends {
 	? InnerIns<S, I>
 	: T;
 type InnerIns<S, I> = S extends { readonly __insert__: infer I2 } ? I2 : I;
-/** Outer insert type: `undefined` in it (`Generated`) or `never` (`GeneratedAlways`) means a default. */
 type Ins<T> = T extends { readonly __insert__: infer I } ? I : T;
 
 type HasDefault<T> = [Extract<T, { readonly __insert__: unknown }>] extends [
@@ -198,7 +135,6 @@ type HasDefault<T> = [Extract<T, { readonly __insert__: unknown }>] extends [
 			? true
 			: false;
 
-/** The string-literal union of an enum column (or of its array elements), else never. */
 type LiteralUnion<S> = [S] extends [string]
 	? string extends S
 		? never
@@ -211,11 +147,6 @@ type LiteralUnion<S> = [S] extends [string]
 			: never
 		: never;
 
-/**
- * Postgres type name from a non-null select type `S` and insert hint `H`. `E` is the name to
- * use for a string-literal union (an enum). An array select type is a Postgres array unless
- * the insert type has no array in it: `JSONColumnType<string[]>` inserts as `string`.
- */
 type PgTypeOf<S, H, E extends string> = unknown extends S
 	? "jsonb"
 	: [S] extends [never]
@@ -226,14 +157,12 @@ type PgTypeOf<S, H, E extends string> = unknown extends S
 				: `${ScalarOf<ArrayElem<NonNullable<El>>, ArrayElem<ArrayElem<H>>, E>}[]`
 			: ScalarOf<S, H, E>;
 
-/** Insert type with no array in it (`string`, `RawBuilder`); `never` (`GeneratedAlways`) tells nothing. */
 type IsJsonInsert<H> = [H] extends [never]
 	? false
 	: [Extract<H, readonly unknown[]>] extends [never]
 		? true
 		: false;
 
-/** Element type of an array (one more level for multi-dimensional arrays: Postgres types them alike). */
 type ArrayElem<T> = T extends readonly (infer E)[] ? E : T;
 
 type ScalarOf<S, H, E extends string> = unknown extends S
@@ -256,9 +185,8 @@ type ScalarOf<S, H, E extends string> = unknown extends S
 								? "jsonb"
 								: [S] extends [object]
 									? ObjectKind<S>
-									: "jsonb"; // mixed unions such as kysely-codegen's `JsonValue`
+									: "jsonb";
 
-/** kysely-codegen selects `int8` and `numeric` as `string`; the insert type tells them apart. */
 type StringKind<H> = [H] extends [never]
 	? "text"
 	: bigint extends H
@@ -267,7 +195,6 @@ type StringKind<H> = [H] extends [never]
 			? "numeric"
 			: "text";
 
-/** Index signatures (`Record<string, …>`) are jsonb: their `keyof` is `string`, which every key check would match. */
 type ObjectKind<S> = string extends keyof S
 	? "jsonb"
 	: "days" extends keyof S
@@ -278,7 +205,6 @@ type ObjectKind<S> = string extends keyof S
 				? "point"
 				: "jsonb";
 
-/** Name of a `$types` entry whose union is exactly `U` (when exactly one matches), else `Default`. */
 type EnumName<U, Reg, Default extends string> =
 	RegistryMatch<U, Reg> extends infer N extends string
 		? [N] extends [never]
@@ -306,7 +232,6 @@ type OverrideType<V> = V extends string
 		? X
 		: never;
 
-/** Final type name of a column: the override's, else the inferred one. */
 type ColumnTypeName<T, V, Reg, Default extends string> = [
 	OverrideType<V>,
 ] extends [never]
@@ -333,11 +258,8 @@ type Column<T, V, Reg, Default extends string> = {
 		: HasDefault<T>;
 };
 
-// ───────────────────────────── enums ─────────────────────────────
-
 type BaseName<T extends string> = T extends `${infer B}[]` ? B : T;
 
-/** `[name, values]` when a column's type is an enum (not a built-in type) and its values are a literal union. */
 type EnumEntry<T, V, Reg, Default extends string> = [
 	LiteralUnion<NonNullable<Sel<T>>>,
 ] extends [never]

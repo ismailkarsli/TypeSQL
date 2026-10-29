@@ -9,9 +9,7 @@ export const orderDependent = (r: Evaluated): boolean =>
 
 export interface BatchOptions {
 	readonly size: number;
-	/** TypeScript's circularity checks give up depending on the order types are met (TS5115, an `any`): these results are evaluated again on their own. */
 	readonly isolate?: (r: Evaluated) => boolean;
-	/** Groups never share a program, so a run over some groups gives the results of a run over all. */
 	readonly group?: (i: number) => string;
 	readonly timeoutMs: number;
 	readonly log?: (m: string) => void;
@@ -76,7 +74,6 @@ export async function evaluateInBatches(
 		done += batch.length;
 		if (b % 10 === 9 || b === batches.length - 1)
 			o.log?.(`evaluated ${done}/${exprs.length}`);
-		// a fresh TypeScript process per batch: bounded memory, and no batch sees another's types
 		if (b < batches.length - 1)
 			await withTimeout(session.close(), 10_000).catch(() => undefined);
 	}

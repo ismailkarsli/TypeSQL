@@ -6,11 +6,32 @@ TypeSQL checks every query against a schema: a TypeScript interface that lists y
 
 Each key of the interface is a table, and each column is declared with a helper:
 
-<<< @/snippets/schema.ts#schema
+```ts
+export interface DB {
+	users: {
+		id: Generated<"int4">;
+		email: Col<"text">;
+		display_name: Nullable<"text">;
+		mood: Enum<"mood", { hasDefault: true }>;
+		created_at: Generated<"timestamptz">;
+	};
+	posts: {
+		id: Generated<"int8">;
+		author_id: Col<"int4">;
+		title: Col<"text">;
+		body: Nullable<"text">;
+		tags: Generated<"text[]">;
+	};
+	user_stats: View<{ user_id: Col<"int4">; posts: Col<"int8"> }>;
+	$types: { mood: "happy" | "neutral" | "sad" };
+}
+```
 
 Then create `sql` from it:
 
-<<< @/snippets/schema.ts#create
+```ts
+export const sql = createSql<DB>();
+```
 
 ## Column helpers
 
@@ -37,17 +58,37 @@ The driver decides which TypeScript type each Postgres type becomes (node-postgr
 
 A `jsonb` column is `unknown` by default. `Json<T>` says what it holds:
 
-<<< @/snippets/json.ts#schema
+```ts
+type HistoryItem = { at: string; state: { value: number; note?: string } };
+
+interface DB {
+	portfolio: {
+		id: Generated<"int4">;
+		name: Col<"text">;
+		history: Json<HistoryItem[], { hasDefault: true }>;
+		settings: Json<{ theme: "dark" | "light" }, { nullable: true }>;
+	};
+}
+const sql = createSql<DB>();
+```
 
 `Json<T>` takes the same flags as `Col` as its second argument (`{ nullable: true }`, `{ hasDefault: true }`). Pass `"json"` as the third argument for a `json` column.
 
 Rows read the column as `T`, and `->`, `#>` and subscripts look inside it (see [JSON in queries](./queries#json)):
 
-<<< @/snippets/json.ts#read
+```ts
+const latest = sql(
+	`SELECT id, history -> -1 -> 'state' AS state, settings ->> 'theme' AS theme FROM portfolio`,
+);
+```
 
 Write values with [`sql.json()`](./parameters#json-values), which checks them against `T`:
 
-<<< @/snippets/json.ts#write
+```ts
+const save = sql(
+	`UPDATE portfolio SET history = ${sql.json(history)} WHERE id = ${sql.param(1)}`,
+);
+```
 
 The column is still `jsonb` to Postgres, so JSON operators and functions work as usual. `T` is trusted, not checked against the database.
 
@@ -55,7 +96,9 @@ The column is still `jsonb` to Postgres, so JSON operators and functions work as
 
 List each enum's values under `$types`. A column declared as `Enum<"mood">` then has the type `"happy" | "neutral" | "sad"`, in rows and in parameters:
 
-<<< @/snippets/queries.ts#enum
+```ts
+const moods = sql(`SELECT mood, count(*) AS n FROM users GROUP BY mood`);
+```
 
 ## Functions
 
@@ -76,9 +119,9 @@ Tables in a Postgres schema other than `public` go in a nested object:
 
 ```ts
 interface DB {
-  users: { … }; // public.users, or just users
+  users: { … };
   auth: {
-    sessions: { token: Col<"uuid">; user_id: Col<"int4"> }; // auth.sessions
+    sessions: { token: Col<"uuid">; user_id: Col<"int4"> };
   };
 }
 ```
@@ -87,7 +130,24 @@ interface DB {
 
 `pg_catalog` and `information_schema` are not part of your schema by default. To query them, add `PgCatalog` to your schema:
 
-<<< @/snippets/schema.ts#pg-catalog
+```ts
+const admin = createSql<DB & PgCatalog>();
+
+const connections = admin(`
+  SELECT state, count(*)::int AS total
+  FROM pg_stat_activity
+  WHERE datname = current_database()
+  GROUP BY state`);
+
+const columns = admin(
+	`
+  SELECT column_name, data_type, is_nullable
+  FROM information_schema.columns
+  WHERE table_schema = 'public' AND table_name = $1
+  ORDER BY ordinal_position`,
+	"users",
+);
+```
 
 `pg_catalog` relations work with or without the prefix (`FROM pg_stat_activity`), and a table of your own with the same name wins. `information_schema` relations need the prefix (`FROM information_schema.columns`). The catalogs are read-only. Column types are the ones Postgres reports, and a view column is `NOT NULL` only when its definition proves it: `pg_tables.tablename` is `string`, but `pg_tables.schemaname` is `string | null`.
 

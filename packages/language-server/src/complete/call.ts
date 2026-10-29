@@ -1,9 +1,3 @@
-/**
- * The statement literal under the cursor: the first argument of a `sql(…)` / `tx(…)` call (the
- * callee is core's `Sql` or `TransactionalSql`), or of `sql.fragment(…)` / `sql.as(…)`, and the
- * call's `DB` type. Only the callee is typed, never the call.
- */
-
 import type {
 	CallExpression,
 	LineAndCharacter,
@@ -19,7 +13,6 @@ import type {
 	Type,
 } from "typescript/async";
 
-/** SyntaxKind values (typescript/ast), passed in so this module loads nothing at runtime. */
 export interface EditorKinds {
 	readonly CallExpression: number;
 	readonly PropertyAccessExpression: number;
@@ -30,23 +23,15 @@ export interface EditorKinds {
 
 export interface SqlCall {
 	readonly file: SourceFile;
-	/** The cursor's offset in the file. */
 	readonly offset: number;
-	/** Offsets of the literal's text (inside the quotes) in the file. */
 	readonly start: number;
 	readonly end: number;
-	/**
-	 * The literal's text as written, as long as the source range: each `${…}` becomes `$0` padded
-	 * with spaces and each escape sequence keeps its length, so an offset in the text is
-	 * `start` plus an offset in the file.
-	 */
 	readonly text: string;
 	readonly db: Type;
 }
 
 const METHODS = new Set(["fragment", "as"]);
 
-/** The statement literal of a core `sql` call that contains the cursor (an offset or an LSP position), or null. */
 export async function sqlCallAt(
 	program: Program,
 	checker: Checker,
@@ -93,10 +78,6 @@ export async function sqlCallAt(
 		: null;
 }
 
-/**
- * The innermost call around `offset` whose first argument is a string or template literal. The
- * literal itself may not contain `offset`; then no literal does, but in a `${…}` of an outer one.
- */
 function callAt(
 	file: SourceFile,
 	offset: number,
@@ -122,7 +103,6 @@ function callAt(
 	return found;
 }
 
-/** The literal's text range, its text (see `SqlCall.text`) and its `${…}` ranges. */
 function textOf(
 	file: SourceFile,
 	literal: Node,
@@ -137,7 +117,6 @@ function textOf(
 	const open = literal.getStart(file);
 	const quote = src[open];
 	const start = open + 1;
-	// an unterminated literal (still being typed) has no closing quote
 	let end = literal.end;
 	if (end - 1 > open && src[end - 1] === quote && !escaped(src, end - 1)) end--;
 	const holes: [number, number][] = [];
@@ -145,7 +124,6 @@ function textOf(
 		const t = literal as TemplateExpression;
 		let prev: Node = t.head;
 		for (const span of t.templateSpans) {
-			// from `${` to `}`
 			holes.push([prev.end - 2, span.literal.getStart(file) + 1]);
 			prev = span.literal;
 		}
@@ -160,20 +138,17 @@ function textOf(
 	return { start, end, text, holes };
 }
 
-/** Whether the character at `i` is escaped: after an odd number of backslashes. */
 function escaped(s: string, i: number): boolean {
 	let n = 0;
 	while (s[i - n - 1] === "\\") n++;
 	return n % 2 === 1;
 }
 
-/** Escape sequences replaced by text of the same length: `\"` → ` "`, `\n` → two spaces. */
 const escapes = (s: string): string =>
 	s.replace(/\\(.)/gs, (_, c: string) =>
 		c === '"' || c === "'" || c === "`" ? ` ${c}` : "  ",
 	);
 
-/** Whether `type` is a reference to one of core's `names` (`Sql`, `TransactionalSql`). */
 async function isCoreRef(
 	type: Type,
 	names: readonly string[],

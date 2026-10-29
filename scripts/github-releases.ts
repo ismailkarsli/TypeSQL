@@ -1,18 +1,3 @@
-// Creates a GitHub release (and its tag, `<name>@<version>`) for every package version that is
-// published on npm and has no release yet. The notes are the changelog section `pnpm version -r`
-// wrote to `.changeset/changelogs/<scope>!<name>@<version>.md`, read from git history, so
-// versions whose section a later `pnpm version -r` has already pruned still get one. The tag
-// points at the release commit that added the section, which must be pushed. Idempotent: run
-// it after every `pnpm publish -r`; a rerun only creates what is missing.
-//
-//   node scripts/github-releases.ts [--dry-run] [--summary pnpm-publish-summary.json]
-//
-// With --summary (the release workflow), only the versions listed in that
-// `pnpm publish -r --report-summary` file are released, without asking the registry, which can
-// report the previous versions for a few minutes after a publish. Older versions are left
-// alone: the workflow's GITHUB_TOKEN was refused (HTTP 403) tags on old release commits,
-// whose workflow files differ from main's. Without --summary it backfills every published version that has no release,
-// which needs a `gh` login allowed to do that (a maintainer's).
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 
@@ -29,12 +14,10 @@ const justPublished = new Set(
 );
 const LATEST = "@typesql/core";
 
-/** The part of `pnpm publish -r --report-summary`'s file read here. */
 interface PublishSummary {
 	publishedPackages: { name: string; version: string }[];
 }
 
-/** A changelog section file: one package version. */
 interface Section {
 	path: string;
 	name: string;
@@ -58,7 +41,6 @@ const succeeds = (cmd: string, args: string[]) => {
 	}
 };
 
-// Every section file ever added, oldest release first.
 const sections = new Map<string, Section>();
 let commit: string | undefined, time: string | undefined;
 for (const line of git(
@@ -103,10 +85,6 @@ async function published(name: string, version: string): Promise<boolean> {
 	return version in packuments.get(name)!.versions;
 }
 
-/**
- * `gh release create`, retried on a GitHub server error. GitHub can answer 5xx and still create
- * the release, so after an error the release counts as created if it exists.
- */
 async function create(tag: string, args: string[]): Promise<string> {
 	for (let attempt = 1; ; attempt++) {
 		try {
@@ -146,8 +124,6 @@ for (const section of sections.values()) {
 	pending.push({ ...section, tag });
 }
 
-// Oldest first so the Releases tab lists them in order; core last within a release commit so
-// it is the one marked "Latest".
 pending.sort(
 	(a, b) =>
 		a.time - b.time || Number(a.name === LATEST) - Number(b.name === LATEST),
@@ -155,7 +131,6 @@ pending.sort(
 const latest = newestCore(pending);
 
 for (const release of pending) {
-	// The section repeats the version as its first heading; the release title already has it.
 	const lastCommit = git(
 		"log",
 		"-1",

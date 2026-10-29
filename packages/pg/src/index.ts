@@ -15,19 +15,12 @@ export {
 } from "./client.js";
 export type { PgInterval, PgParamTypeMap, PgTypeMap } from "./type-map.js";
 
-/** What `createSql<DB>(client)` returns: core's `Sql` under `PgTypeMap`, with `transaction(fn)`. */
 export type PgSql<DB, Keys extends RowKeys = "preserve"> = TransactionalSql<
 	DB,
 	PgTypeMap,
 	Keys
 >;
 
-/**
- * `createSql<DB>()` from core, pre-bound to `PgTypeMap` (`count(*)` is `string`, `int8` is `string`, dates are `Date`).
- * The queries' `execute*` methods run on `client` (a `Pool`, `Client` or `PoolClient`), and
- * `sql.transaction(fn)` runs `fn` with a `sql` bound to one transaction.
- * `{ rowKeys: "camelCase" }` camelCases the rows' keys, in the types and at runtime.
- */
 export function createSql<DB>(
 	client: PgQueryable | undefined,
 	options: { readonly rowKeys: "camelCase" },

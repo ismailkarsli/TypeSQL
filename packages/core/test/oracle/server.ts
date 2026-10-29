@@ -5,7 +5,6 @@ import { join, relative, resolve, sep } from "node:path";
 import { type Database, startDockerPostgres } from "./db.js";
 import { Connection } from "./replay.js";
 
-/** What `abs_srcdir` points at: the regression tests' directory, mounted for server-side COPY. */
 export const REGRESS_MOUNT = "/regress";
 export const regressDir = resolve(
 	import.meta.dirname,
@@ -17,7 +16,6 @@ interface RegressionFixture {
 	close(): void;
 }
 
-/** Restore a sparse checkout's tracked data into a temporary mount, keeping vendor untouched. */
 export function regressionFixture(directory: string): RegressionFixture | null {
 	if (!existsSync(join(directory, "sql"))) return null;
 	if (existsSync(join(directory, "data")))
@@ -25,7 +23,6 @@ export function regressionFixture(directory: string): RegressionFixture | null {
 	const temporary = mkdtempSync(join(tmpdir(), "typesql-pg-regress-"));
 	const close = () => rmSync(temporary, { recursive: true, force: true });
 	try {
-		// PostgreSQL runs under a different UID inside Docker and must traverse the mount root.
 		chmodSync(temporary, 0o755);
 		const root = execFileSync(
 			"git",
@@ -54,7 +51,6 @@ export function regressionFixture(directory: string): RegressionFixture | null {
 	}
 }
 
-/** Exercise server-side COPY as the database user before trusting a regression replay. */
 export async function verifyRegressionData(url: string): Promise<void> {
 	const connection = new Connection(url);
 	try {

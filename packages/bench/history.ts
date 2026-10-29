@@ -1,6 +1,4 @@
 #!/usr/bin/env node
-// Remeasure every release using today's immutable fixture, compilers and benchmark runner.
-// Each isolated copy resolves @typesql/core (including its cache mapper) to that release.
 import { execFileSync } from "node:child_process";
 import {
 	appendFileSync,
@@ -17,7 +15,6 @@ import { join } from "node:path";
 
 const root = join(import.meta.dirname, "../..");
 const bench = join(root, "packages/bench");
-// 0.7.1 is the first release containing the current application fixture and cache API.
 const firstVersion = "0.7.1";
 const { version: currentVersion } = JSON.parse(
 	readFileSync(join(root, "packages/core/package.json"), "utf8"),
@@ -89,8 +86,6 @@ function measure(version: string, ref?: string) {
 		const config = JSON.parse(
 			readFileSync(join(root, "tsconfig.base.json"), "utf8"),
 		);
-		// Older sources predate the unused-code cleanup. Use identical checking options for all
-		// versions without changing their sources or the application fixture.
 		config.compilerOptions.noUnusedLocals = false;
 		config.compilerOptions.noUnusedParameters = false;
 		writeFileSync(
@@ -136,12 +131,10 @@ function measure(version: string, ref?: string) {
 	}
 }
 
-// Run sequentially: all versions use this job's CPU and the same installed dependencies.
 const releases = versions.map((v) => measure(v, `@typesql/core@${v}`));
 const current = measure(currentVersion);
 const write = (file: string, value: unknown) =>
 	writeFileSync(join(bench, file), `${JSON.stringify(value, null, "\t")}\n`);
-// Only replace output files once every version passed. Never reuse results from an older run.
 write("results.json", current.benchmark);
 write("runtime-results.json", current.runtime);
 write("history-results.json", {

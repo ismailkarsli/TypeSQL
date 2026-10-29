@@ -1,16 +1,3 @@
-/// <reference types="node" />
-/**
- * TypeScript 7.1 content mapper for `.typesqlcache` files, started by TypeScript (the language
- * server, or `tsc --runExternalCode`) for projects whose tsconfig lists it:
- *
- *   "contentMappers": [{ "package": "@typesql/core", "extensions": [".typesqlcache"] }]
- *
- * `transform` turns the file's JSON into the module augmentation the checker reads
- * (format.ts `render`). For each project it also runs the job (job.ts) that keeps the file up
- * to date, unless `CI` is set or `TYPESQL_CACHE=off`. The job starts a moment after the project
- * opens, so a short `tsc` run, which closes the project as soon as it has checked it, does not
- * start one. Set `TYPESQL_CACHE_LOG=<file>` to log what it does.
- */
 import { appendFileSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, join, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -19,13 +6,11 @@ import { Job } from "./job.js";
 import { type Handlers, InvalidParams, RpcError, serve } from "./rpc.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
-/** The package root (dist/cache/ or src/cache/ → the directory with package.json). */
 const root = join(here, "..", "..");
 const isCorePath = (path: string): boolean =>
 	path.startsWith(join(root, "dist") + sep) ||
 	path.startsWith(join(root, "src") + sep);
 
-/** `CacheVersion` of this copy of `@typesql/core` (of the build this file is part of). */
 export function engineVersion(): string {
 	const file = here.endsWith(join("dist", "cache"))
 		? join(root, "dist/engine/cache.d.ts")
@@ -42,9 +27,7 @@ export function engineVersion(): string {
 }
 
 export interface MapperOptions {
-	/** Start a job per project (off under `CI` or with `TYPESQL_CACHE=off`). */
 	readonly generation: boolean;
-	/** Milliseconds between a project's first transform and its job's start. */
 	readonly startDelayMs: number;
 	readonly engine: string;
 	readonly log: (message: string) => void;
@@ -52,7 +35,6 @@ export interface MapperOptions {
 
 interface ProjectState {
 	readonly configFile: string;
-	/** Cache files of the project seen in `transform`; the job writes the first by path. */
 	readonly files: Set<string>;
 	job?: Job;
 	timer?: NodeJS.Timeout;
@@ -64,7 +46,6 @@ const object = (v: unknown, what: string): Record<string, unknown> => {
 	return v as Record<string, unknown>;
 };
 
-/** The protocol handlers, and `stop()` for the jobs they started. */
 export function createMapper(o: MapperOptions): {
 	handlers: Handlers;
 	stop: () => Promise<void>;
@@ -93,7 +74,6 @@ export function createMapper(o: MapperOptions): {
 			o.log(
 				`initialize (engine ${o.engine}, generation ${o.generation ? "on" : "off"})`,
 			);
-			// the virtual file has no mappings, so the encoding does not matter
 			return {
 				positionEncoding: encodings.includes("utf-16")
 					? "utf-16"
@@ -147,7 +127,6 @@ export function createMapper(o: MapperOptions): {
 	return { handlers, stop };
 }
 
-/** Run as the content mapper process (TypeScript starts `node dist/cache/mapper.js`). */
 export async function main(): Promise<void> {
 	const logFile = process.env.TYPESQL_CACHE_LOG;
 	const { handlers, stop } = createMapper({

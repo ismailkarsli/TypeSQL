@@ -1,0 +1,18 @@
+{
+	"playground/core.ts": [
+		"sql(`SELECT nme FROM users`);",
+		"sql(`INSERT INTO posts (title) VALUES ($1)`, \"Hello\");"
+	],
+	"playground/kysely.ts": [
+		"sql(`SELECT id FROM users WHERE mood = $1`, \"angry\");"
+	],
+	"playground/pg.ts": [
+		"await sql(`DELETE FROM posts WHERE author_id = $1`, \"7\").execute();"
+	],
+	"playground/postgres.ts": [
+		"sql(`SELECT id FROM posts WHERE tags @> $1`, \"sql\");"
+	],
+	"playground/prisma.ts": [
+		"sql(`INSERT INTO posts (author_id, title) VALUES ($1, $2)`, 1, \"Hello\");"
+	]
+}

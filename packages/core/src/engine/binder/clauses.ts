@@ -6,23 +6,6 @@ import type { IntLitValue, NumLitType } from "../typer/operators.js";
 import type { TypeList, TypeOf } from "../typer/typeof.js";
 import type { ColInfo, Cols, Ctx } from "../types.js";
 
-/**
- * Validation of the clauses that refer to a query level's output: ORDER BY, GROUP BY,
- * DISTINCT ON, the WINDOW clause and window references, and boolean conditions.
- * Every check returns `true` (or the resolved keys) or an `SqlError`. Messages follow
- * PostgreSQL 18.
- *
- * Name resolution (Postgres `findTargetlistEntrySQL92`):
- *   - an integer literal is a 1-based output position;
- *   - ORDER BY / DISTINCT ON: a bare name matching an output column refers to it (more than
- *     one output column of that name with different expressions is ambiguous), otherwise it
- *     is an input column;
- *   - GROUP BY: a bare name is an input column first, an output column otherwise;
- *   - anything else is an expression over the input columns (output aliases are not visible).
- */
-
-// ─── display names ───
-
 type DisplayNames = {
 	int2: "smallint";
 	int4: "integer";
@@ -41,7 +24,6 @@ type DisplayNames = {
 	lit: "text";
 	null: "unknown";
 };
-/** Postgres's display name of a canonical type (`format_type`), for messages. */
 export type TypeDisplay<T extends string> = T extends AnyShaped
 	? BaseOf<T>
 	: T extends `${infer E}[]`
@@ -50,9 +32,6 @@ export type TypeDisplay<T extends string> = T extends AnyShaped
 			? DisplayNames[T]
 			: T;
 
-// ─── conditions ───
-
-/** `WHERE` / `HAVING` / `JOIN/ON` condition: typed, and boolean (or NULL / an untyped literal or param). */
 export type CheckCondition<
 	Clause extends string,
 	E extends Expr | null,
@@ -72,12 +51,9 @@ export type CheckCondition<
 			: T
 		: never;
 
-// ─── output references ───
-
 export type HasStar<C extends Cols> =
 	Extract<C[number], { readonly star: unknown }> extends never ? false : true;
 
-/** Expressions of the output columns named `N` (a `*` entry containing `N` contributes a bare column reference). */
 type OutputExprs<
 	Ts extends readonly Target[],
 	Cs extends Cols,
@@ -100,10 +76,6 @@ type OutputExprs<
 				: OutputExprs<Ts, Cs, N, Acc, Nx<I>>
 			: OutputExprs<Ts, Cs, N, Acc, Nx<I>>;
 
-/**
- * Do two (resolved) expressions denote the same value? Column references compare by name,
- * and by qualifier when both are qualified; anything else structurally.
- */
 type SameExpr<A, B> = A extends {
 	readonly t: "col";
 	readonly tbl: infer AT;
@@ -144,10 +116,6 @@ type AllSame<L extends readonly unknown[]> = L extends readonly [
 		: false
 	: true;
 
-/**
- * A numeric constant as Postgres's grammar folds it: a literal under unary minuses (`-1`,
- * `- -2`, `-(3)`) → `[negated, literal]`, anything else → null.
- */
 type SignedNum<E, Neg extends boolean> = E extends {
 	readonly t: "num";
 	readonly v: infer V;
@@ -157,10 +125,6 @@ type SignedNum<E, Neg extends boolean> = E extends {
 		? SignedNum<X, Neg extends true ? false : true>
 		: null;
 
-/**
- * `ORDER BY 2`, `GROUP BY -1`: an integer constant (within int4, as Postgres reads one) is a
- * 1-based position in `L` → that item, `null` when unknown (a `*` precedes it), or an error.
- */
 type Ordinal<
 	Neg extends boolean,
 	V extends string,
@@ -170,7 +134,7 @@ type Ordinal<
 > =
 	NumLitType<V> extends "int4"
 		? Position<Signed<Neg, IntLitValue<V> & string>, Clause, L, Star>
-		: SqlError<`non-integer constant in ${Clause}`, null>; // a numeric literal, or an integer past int4
+		: SqlError<`non-integer constant in ${Clause}`, null>;
 type Signed<Neg extends boolean, D extends string> = Neg extends true
 	? D extends "0"
 		? D
@@ -196,7 +160,6 @@ type Position<
 type CheckExpr<E extends Expr, C extends Ctx> =
 	TypeOf<E, C> extends infer T ? (T extends ColInfo ? E : T) : never;
 
-/** Resolve one ORDER BY / DISTINCT ON item (SQL92 rules: output names first). */
 type ResolveSortKey<
 	E extends Expr,
 	Clause extends string,
@@ -226,7 +189,6 @@ type ResolveSortKey<
 					: never
 				: CheckExpr<E, C>;
 
-/** Resolve one GROUP BY item (input columns first, then output names). */
 type ResolveGroupKey<
 	E extends Expr,
 	Ts extends readonly Target[],
@@ -261,7 +223,6 @@ type ResolveGroupKey<
 					: never
 				: CheckExpr<E, C>;
 
-/** ORDER BY / DISTINCT ON items → resolved keys (target expressions or input expressions; `null` = unknown) or an error. */
 export type ResolveSortKeys<
 	Items extends readonly Expr[],
 	Clause extends string,
@@ -278,7 +239,6 @@ export type ResolveSortKeys<
 			: ResolveSortKeys<Items, Clause, Ts, Cs, C, [...Acc, K], Nx<I>>
 		: never;
 
-/** GROUP BY items → `true` or an error. */
 export type CheckGroupBy<
 	Items extends readonly Expr[] | null,
 	Ts extends readonly Target[],
@@ -295,11 +255,6 @@ export type CheckGroupBy<
 			: never
 	: true;
 
-/**
- * `SELECT DISTINCT ON (d...) ... ORDER BY o...`: the ORDER BY must start with DISTINCT ON
- * expressions only, and if it goes on with others, all DISTINCT ON expressions must have
- * been listed first (Postgres `transformDistinctOnClause`). Unknown keys skip the check.
- */
 export type CheckDistinctOnOrder<
 	D extends readonly unknown[],
 	O extends readonly unknown[],
@@ -336,10 +291,6 @@ type DistinctOnErr = SqlError<
 	null
 >;
 
-/**
- * `SELECT DISTINCT ... ORDER BY o`: every ORDER BY expression must be one of the targets. With a
- * `*` target a column reference is taken to be one of its columns.
- */
 export type CheckDistinctOrder<
 	O extends readonly unknown[],
 	Ts extends readonly Target[],
@@ -370,7 +321,6 @@ type DistinctOrderWalk<
 						null
 					>;
 
-/** ORDER BY of a set operation: output names and positions only. */
 export type CheckOutputOrder<
 	Items extends readonly Expr[],
 	Cs extends Cols,
@@ -382,7 +332,6 @@ export type CheckOutputOrder<
 			? R
 			: CheckOutputOrder<Items, Cs, Nx<I>>
 		: never;
-/** One ORDER BY item of a set operation → an output column (`true`, or `null` when unknown) or an error. */
 type OutputOrderItem<E extends Expr, Cs extends Cols> =
 	SignedNum<E, false> extends [
 		infer Neg extends boolean,
@@ -419,15 +368,8 @@ type OutputNameCount<
 			? OutputNameCount<Cs, N, N extends keyof M ? [...Acc, 0] : Acc, Nx<I>>
 			: OutputNameCount<Cs, N, Acc, Nx<I>>;
 
-// ─── windows ───
-
-/** Window definitions visible in a query level: name → whether the window has an ORDER BY. */
 export type WindowDefs = { readonly [name: string]: boolean };
 
-/**
- * `WINDOW w AS (...), ...` in order: names are unique, a definition may build on an
- * earlier one, and expressions are typed against the input columns. → `WindowDefs` or error.
- */
 export type CheckWindowClause<
 	Ws extends readonly NamedWindow[],
 	C extends Ctx,
@@ -448,11 +390,6 @@ export type CheckWindowClause<
 				: R
 			: never;
 
-/**
- * One window specification (`OVER (...)`, `OVER w`, a WINDOW clause entry) → whether it
- * has an ORDER BY, or an error. A referenced window must exist; its PARTITION BY cannot be
- * overridden, nor its ORDER BY when it has one.
- */
 export type CheckWindowSpec<
 	S extends WindowSpec,
 	Defs extends WindowDefs,
@@ -488,7 +425,6 @@ export type CheckWindowSpec<
 			: P
 		: never;
 
-/** Check the window references (`OVER ...`) in a list of expressions. → `true` or error. */
 export type CheckWindowRefs<
 	Es extends readonly Expr[],
 	Defs extends WindowDefs,
@@ -501,7 +437,6 @@ export type CheckWindowRefs<
 			? R
 			: CheckWindowRefs<Es, Defs, C, Nx<I>>
 		: never;
-/** Check window specifications in order: `true` or the first error. */
 type CheckSpecs<
 	Ss,
 	Defs extends WindowDefs,
@@ -514,13 +449,6 @@ type CheckSpecs<
 		: never
 	: true;
 
-/**
- * `Acc` and then the window specifications of the calls in an expression, in the order Postgres
- * meets them (a call's arguments before its own `OVER`). Subqueries are not entered (they are their
- * own query level), nor leaves: neither has an operand. Plain recursion over indexed accesses: each
- * node is visited once (an explicit stack of AST subtrees in a tail-recursive loop measured
- * quadratic).
- */
 type Wins<E, Acc> = E extends {
 	readonly t: "call";
 	readonly args: readonly unknown[];
@@ -536,7 +464,7 @@ type Wins<E, Acc> = E extends {
 				readonly l: unknown;
 				readonly r: unknown;
 			}
-		? Wins<E["r"], Wins<E["l"], Acc>> // the subquery of ANY / ALL has no operand either
+		? Wins<E["r"], Wins<E["l"], Acc>>
 		: E extends {
 					readonly t: "array" | "row";
 					readonly items: readonly unknown[];

@@ -12,33 +12,17 @@ import type {
 } from "../lexer/tokens.js";
 import type { NotColId, TypeFuncNameKeyword } from "./keywords.js";
 
-/**
- * Parser combinator conventions (index-based).
- *
- * The token tuple `T` is never sliced; every parse function takes the current index
- * `I` and returns `Ok<Node, J>` (J = index after the node) or an `SqlError` whose
- * position is the token index where parsing failed:
- *
- *   ParseX<T, I> extends infer R ? R extends Ok<infer N, infer J extends number> ? … : R : never
- *
- * `T[I]` is `undefined` past the end of the statement.
- * Index arithmetic uses the generated successor table (`Nx<I>` = I + 1).
- */
-
 export type Ok<N, J extends number> = readonly [N, J];
 
-/** I + 1 via the generated lookup table (plain indexed access: no conditional, no `keyof` check). */
 export type Nx<I extends number> = Next[I];
 export type Nx2<I extends number> = Nx<Nx<I>>;
 export type Nx3<I extends number> = Nx<Nx2<I>>;
 
-/** Error positioned at token index `I`. */
 export type Fail<Message extends string, I extends number> = SqlError<
 	Message,
 	I
 >;
 
-/** Human-readable spelling of token `I`, for "at or near" messages. */
 export type Near<T extends Toks, I extends number> = T[I] extends infer H
 	? H extends WordTok<infer V>
 		? V
@@ -65,19 +49,14 @@ export type Expected<
 	I extends number,
 > = Fail<`syntax error: expected ${What} at or near ${Near<T, I>}`, I>;
 
-// ─── Peeking ───
-
 export type AtEnd<T extends Toks, I extends number> = T[I] extends Tok
 	? false
 	: true;
-
-// ─── Consuming (result: next index, or `never`; only test with `extends never`) ───
 
 export type EatWord<T extends Toks, I extends number, W extends string> =
 	T[I] extends WordTok<W> ? Nx<I> : never;
 export type EatOp<T extends Toks, I extends number, O extends string> =
 	T[I] extends OpTok<O> ? Nx<I> : never;
-/** Consume a run of words: `EatWords<T, I, ["with", "time", "zone"]>` → index after, or never. */
 export type EatWords<
 	T extends Toks,
 	I extends number,
@@ -90,7 +69,6 @@ export type EatWords<
 		? never
 		: EatWords<T, EatWord<T, I, W>, R>
 	: I;
-/** Skip word `W` if present (always succeeds). */
 export type SkipWord<T extends Toks, I extends number, W extends string> =
 	EatWord<T, I, W> extends never ? I : EatWord<T, I, W>;
 export type SkipWords<
@@ -99,19 +77,9 @@ export type SkipWords<
 	Ws extends readonly string[],
 > = EatWords<T, I, Ws> extends never ? I : EatWords<T, I, Ws>;
 
-// ─── Identifiers ───
-
-/**
- * `ColId`: an identifier, or a keyword usable as a table, column or alias name (not reserved,
- * not a type/function-name keyword like `left`, `join`, `is`): `[name, next]` or `null`.
- *
- * NOTE: helpers tested with `X extends [infer A, infer B]` must fail with `null`, never
- * with `never`: `never extends [infer A, infer B]` takes the *true* branch.
- */
 export type Ident<T extends Toks, I extends number> =
 	IdentName<T[I]> extends infer V extends string ? [V, Nx<I>] : null;
 
-/** Classify a token independently of the query tuple and position. */
 type IdentName<H> =
 	H extends IdTok<infer V>
 		? V
@@ -121,20 +89,14 @@ type IdentName<H> =
 				: V
 			: null;
 
-/** `ColLabel`: any word or quoted identifier (after `AS` or `.`, Postgres accepts every keyword): `[name, next]` or `null`. */
 export type AnyLabel<T extends Toks, I extends number> =
 	LabelName<T[I]> extends infer V extends string ? [V, Nx<I>] : null;
 type LabelName<H> = H extends IdTok<infer V> | WordTok<infer V> ? V : null;
 
-/**
- * Qualified name `a`, `a.b`, `a.b.c` → `[parts, next]` (max 3 parts) or `null`: a `ColId`, then
- * labels (`t.from`, `public.select`).
- */
 export type QualName<T extends Toks, I extends number> =
 	Ident<T, I> extends [infer A extends string, infer I1 extends number]
 		? QualParts<T, I1, [A]>
 		: null;
-/** The `.label`s after the first part: a `.` without a label after it is not consumed. */
 type QualParts<
 	T extends Toks,
 	I extends number,
@@ -151,10 +113,6 @@ type QualParts<
 				: QualParts<T, J, [...Acc, B]>
 			: [Acc, I];
 
-/**
- * The name of a call at `I` (`func_name`): a qualified name, or a type/function-name keyword
- * followed by `(` (`left(s, 2)`; `left` alone is no name) → `[parts, next]` or `null`.
- */
 export type FuncName<T extends Toks, I extends number> =
 	FuncKeyword<T[I]> extends infer V extends string
 		? T[Nx<I>] extends OpTok<"(">
@@ -164,7 +122,6 @@ export type FuncName<T extends Toks, I extends number> =
 type FuncKeyword<H> =
 	H extends WordTok<infer V extends TypeFuncNameKeyword> ? V : null;
 
-/** `(a, b, c)` → `Ok<names, next>` or error. Token `I` must be `(`. */
 export type ParenIdentList<T extends Toks, I extends number> =
 	EatOp<T, I, "("> extends never
 		? Expected<'"("', T, I>
@@ -182,10 +139,6 @@ type IdentListLoop<
 			: IdentListLoop<T, EatOp<T, J, ",">, [...Acc, N]>
 		: Expected<"identifier", T, I>;
 
-/**
- * Skip tokens up to and including the `)` matching an already-consumed `(` → the index after
- * it. Without one, a syntax error at the end of input.
- */
 export type SkipToCloseParen<
 	T extends Toks,
 	I extends number,

@@ -13,7 +13,6 @@ pnpm-publish-summary.json
 .wrangler/
 .cloudflare/
 
-# packages/docs is part of the repo (overrides a global "docs" ignore rule).
 !docs/
 *.vsix
 reports/

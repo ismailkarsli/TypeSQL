@@ -2,53 +2,39 @@ import { createHash } from "node:crypto";
 import type { Executor } from "@typesql/core";
 import { runTransaction, type SqlDriver } from "@typesql/core/adapter";
 
-/** The subset of a `pg` query result the adapter relies on. */
 export interface PgResult {
 	readonly rows: unknown[];
 	readonly rowCount: number | null;
 }
 
-/**
- * Anything with node-postgres' `query(text, values)` method: `Pool`, `Client`, `PoolClient`,
- * or a fake in tests. Prepared queries use the named query config form.
- */
 export interface PgQueryable {
 	query(text: string | PgQueryConfig, values?: unknown[]): Promise<PgResult>;
 }
 
-/** A named node-postgres statement. Names are derived from the final SQL text. */
 export interface PgQueryConfig {
 	readonly name: string;
 	readonly text: string;
 	readonly values: unknown[];
 }
 
-/** A client checked out of a pool (`pg.PoolClient`): queryable and releasable. */
 export interface PgTransactionClient extends PgQueryable {
 	release(err?: Error | boolean): void;
 }
 
-/** Anything with `pg.Pool`'s `connect()`. */
 export interface PgPoolLike<
 	C extends PgTransactionClient = PgTransactionClient,
 > {
 	connect(): Promise<C>;
 }
 
-/**
- * An `Executor` for core's `q.execute()`: runs queries on `client` and resolves to
- * `{ rows, rowCount }` (pg's `rowCount`, so `q.executeCount()` works).
- */
 export function executor(client: PgQueryable): Executor {
 	return Object.assign(
 		async (text: string, values: readonly unknown[]) => {
-			// `pg` requires a mutable array (`QueryConfigValues<I>` matches `Array<U>` only).
 			const { rows, rowCount } = await client.query(text, Array.from(values));
 			return { rows, rowCount };
 		},
 		{
 			prepare: (text: string): Executor => {
-				// Keep names stable across factories and connections, within PostgreSQL's 63-byte limit.
 				const name = `typesql_${createHash("sha256").update(text).digest("hex").slice(0, 48)}`;
 				return async (text, values) => {
 					const { rows, rowCount } = await client.query({
@@ -64,7 +50,6 @@ export function executor(client: PgQueryable): Executor {
 }
 
 function isPool(client: PgQueryable): client is PgQueryable & PgPoolLike {
-	// `pg.Client` has `connect()` too (it opens the socket), and `processID`; a `PoolClient` has `release()`.
 	return (
 		typeof (client as Partial<PgPoolLike>).connect === "function" &&
 		!("release" in client) &&
@@ -78,10 +63,6 @@ function isConnection(client: PgQueryable): boolean {
 
 const on = (c: PgQueryable) => (statement: string) => c.query(statement);
 
-/**
- * Check out a client, run `fn` with it between `BEGIN` and `COMMIT`, and release it, with the
- * error when `ROLLBACK` fails so the pool discards the connection instead of reusing it.
- */
 async function inPoolTransaction<C extends PgTransactionClient, T>(
 	pool: PgPoolLike<C>,
 	fn: (conn: C) => Promise<T>,
@@ -99,11 +80,6 @@ async function inPoolTransaction<C extends PgTransactionClient, T>(
 	}
 }
 
-/**
- * Run `fn` inside a transaction: on a pool, on a client checked out of it; on a `Client` or
- * `PoolClient`, on that connection. With `depth > 0` the client is already in a transaction,
- * and `fn` runs in a savepoint.
- */
 function transaction<T>(
 	client: PgQueryable,
 	depth: number,
@@ -124,19 +100,12 @@ function transaction<T>(
 	return runTransaction(on(client), () => fn(client));
 }
 
-/** How `createSql(client)` runs queries and transactions. */
 export const driver: SqlDriver<PgQueryable> = { executor, transaction };
 
-/** Anything carrying an ordered list of DDL statements, e.g. a `migrations()` builder from core. */
 export interface MigrationSource {
 	readonly statements: readonly string[];
 }
 
-/**
- * Run a migration's statements in order on one connection, inside a single transaction
- * (all or nothing). Statements are sent as simple queries without parameters, so scripts
- * with `$$`-quoted function bodies work.
- */
 export async function migrate<C extends PgTransactionClient>(
 	pool: PgPoolLike<C>,
 	m: MigrationSource,

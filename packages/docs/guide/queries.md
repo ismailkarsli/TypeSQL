@@ -10,7 +10,13 @@ A column is nullable when the schema says so. It is also nullable when an outer 
 - the left side of a `RIGHT JOIN`
 - both sides of a `FULL JOIN`
 
-<<< @/snippets/queries.ts#joins
+```ts
+const joined = sql(`
+  SELECT u.email, p.title, s.posts
+  FROM users u
+  LEFT JOIN posts p ON p.author_id = u.id
+  JOIN user_stats s ON s.user_id = u.id`);
+```
 
 Views are read like tables. `posts` is a `string` here because `count(*)`-style `int8` values are strings under node-postgres. See [Type mapping](../reference/type-mapping).
 
@@ -18,7 +24,12 @@ Views are read like tables. `posts` is a `string` here because `count(*)`-style 
 
 A condition that rules out `NULL` makes the column non-null in the result. This works in `WHERE` and in an inner join's `ON`.
 
-<<< @/snippets/queries.ts#narrowing
+```ts
+const withTitles = sql(`
+  SELECT u.email, p.title
+  FROM users u LEFT JOIN posts p ON p.author_id = u.id
+  WHERE p.title IS NOT NULL`);
+```
 
 These conditions narrow: `IS NOT NULL`, comparisons such as `= $1` or `> 0`, `LIKE`, `IN` and `BETWEEN`.
 
@@ -28,7 +39,13 @@ Narrowing only goes through a top-level `AND`. `OR` and `NOT` never narrow.
 
 A column you don't alias gets the name Postgres gives it:
 
-<<< @/snippets/queries.ts#naming
+```ts
+const named = sql(`
+  SELECT id + 1, lower(email), id::text, count(*) OVER (),
+         CASE WHEN id > 10 THEN 'big' END,
+         coalesce(display_name, email) AS name
+  FROM users`);
+```
 
 | Expression | Name |
 |---|---|
@@ -48,7 +65,13 @@ When two columns have the same name, the last one wins. The drivers build their 
 
 Pass `{ rowKeys: "camelCase" }` to `createSql` to get camelCase keys. The row types and the rows `execute*` returns both change. The SQL keeps the database's names.
 
-<<< @/snippets/queries.ts#row-keys
+```ts
+const camel = createSql<DB>(executor, { rowKeys: "camelCase" });
+
+const rows = await camel(
+	"SELECT id, display_name, created_at, count(*) OVER () AS total_count FROM users",
+).execute();
+```
 
 The mapping is the default of Kysely's `CamelCasePlugin`: the first character stays, every later `_` is dropped, and the character after a `_` becomes upper case.
 
@@ -74,7 +97,12 @@ Things to know:
 
 `count` is never null. Other aggregates are nullable when their argument is nullable. Without a `GROUP BY` they are always nullable, because an aggregate over zero rows returns `NULL`.
 
-<<< @/snippets/queries.ts#aggregates
+```ts
+const totals = sql(
+	`SELECT author_id, count(*) AS n, max(title) AS last FROM posts GROUP BY author_id`,
+);
+const overall = sql(`SELECT count(*) AS n, max(title) AS last FROM posts`);
+```
 
 Result types follow Postgres: `sum` of integers is `int8` (`numeric` for `int8` input), and `avg` is `numeric`.
 
@@ -82,7 +110,18 @@ Window functions work the same way. `row_number()`, `rank()` and similar functio
 
 ## Subqueries, CTEs and set operations
 
-<<< @/snippets/queries.ts#structure
+```ts
+const structured = sql(`
+  WITH active AS (
+    SELECT author_id, count(*) AS n FROM posts GROUP BY author_id
+  )
+  SELECT u.email,
+         (SELECT max(p.title) FROM posts p WHERE p.author_id = u.id) AS latest,
+         EXISTS (SELECT 1 FROM active a WHERE a.author_id = u.id) AS has_posts
+  FROM users u
+  UNION ALL
+  SELECT 'nobody', NULL, false`);
+```
 
 - A scalar subquery is always nullable, because it can return no row.
 - `EXISTS` is a non-null boolean.
@@ -95,7 +134,13 @@ Window functions work the same way. `row_number()`, `rank()` and similar functio
 
 JSON you build in SQL is typed. Nested `json_agg` subqueries can replace a second round trip:
 
-<<< @/snippets/queries.ts#json
+```ts
+const profiles = sql(`
+  SELECT u.id,
+         json_build_object('email', u.email, 'since', u.created_at) AS profile,
+         coalesce((SELECT json_agg(p ORDER BY p.id) FROM posts p WHERE p.author_id = u.id), '[]') AS posts
+  FROM users u`);
+```
 
 `json_build_object` with literal keys is an object, `json_build_array` a tuple, and `json_agg(x)` an array of `x`. In `CASE`, `COALESCE` and `UNION` the branches' shapes are combined (`{ a: number } | { b: string }`). The SQL/JSON standard syntax is typed too:
 
@@ -120,7 +165,11 @@ Values inside JSON are typed the way Postgres writes them as JSON, not by the ty
 
 `->`, `#>` and jsonb subscripts follow a known shape:
 
-<<< @/snippets/queries.ts#jsonread
+```ts
+const firstTags = sql(`
+  SELECT j -> 'tags' -> 0 AS first_tag, j ->> 'title' AS title
+  FROM (SELECT json_build_object('title', title, 'tags', tags) AS j FROM posts) s`);
+```
 
 - A literal key or index (`-> 'tags' -> 0`, `#> '{tags,0}'`, `['tags'][0]`) gives that member.
 - A missing key, or an index past the end, gives `null`.
@@ -133,7 +182,11 @@ A `json` or `jsonb` column with no declared shape stays `unknown`. Declare it as
 
 A table alias used as a value is the whole row: `to_json(t)`, `json_agg(t)`, `row_to_json(t.*)`, `t IS NULL`.
 
-<<< @/snippets/queries.ts#wholerow
+```ts
+const withPosts = sql(`
+  SELECT u.email, (p).title, p IS NULL AS no_posts
+  FROM users u LEFT JOIN posts p ON p.author_id = u.id`);
+```
 
 - `(t).col` reads one column, and `(t).*` expands to all of them.
 - As in Postgres, a column with the alias's name wins over the alias.
@@ -148,11 +201,24 @@ About 450 built-in functions are typed with their argument types, return types a
 
 A function Postgres would not find is an error. A close known name gives a hint:
 
-<<< @/snippets/queries.ts#unknown-function
+```ts
+sql(`SELECT slugify(email) AS slug FROM users`);
+```
 
 Declare your own functions and extension functions next to the tables, under `$functions`. The signatures use the notation of the [function catalog](../reference/api#function-catalog):
 
-<<< @/snippets/queries.ts#functions
+```ts
+interface AppDB extends DB {
+	$functions: {
+		slugify: Sig<["text"], "text">;
+		rank_in: Sig<["int4", "..."], "int8", { nullable: false }>;
+	};
+}
+const appSql = createSql<AppDB>();
+const slugs = appSql(
+	`SELECT slugify(email) AS slug, slugify(display_name) AS alt, rank_in(id, 1, 2) AS r FROM users`,
+);
+```
 
 You can also:
 

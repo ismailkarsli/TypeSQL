@@ -1,11 +1,3 @@
-/**
- * Adds TypeSQL's items to the language server's completion response for a statement literal.
- *
- * Inside the literal, TypeScript offers string literal completions for the query parameter: the
- * statement itself, with an edit that replaces the whole literal (several lines for a template
- * literal). Those are dropped; every other item is kept.
- */
-
 import type {
 	CompletionItem,
 	CompletionItemKind,
@@ -20,12 +12,12 @@ import type {
 type Result = CompletionItem[] | CompletionList | null;
 
 const KINDS: { readonly [K in SqlItem["kind"]]: CompletionItemKind } = {
-	table: 22, // Struct
-	view: 8, // Interface
+	table: 22,
+	view: 8,
 	cte: 22,
-	namespace: 9, // Module
-	column: 5, // Field
-	alias: 6, // Variable
+	namespace: 9,
+	column: 5,
+	alias: 6,
 };
 
 export function merge(result: Result, c: Completions | null): Result {

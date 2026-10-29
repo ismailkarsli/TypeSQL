@@ -5,8 +5,8 @@ strings, through an API session on TypeScript 7's language server (`tsc --lsp --
 [Neovim](https://typesql.karsli.net/guide/neovim) and the [VS Code extension](https://typesql.karsli.net/guide/vscode).
 
 ```ts
-sql("SELECT * FROM |");          // users, posts, auth, …
-sql("SELECT u.| FROM users u");  // id: int4, email: text, display_name: text | null
+sql("SELECT * FROM |");
+sql("SELECT u.| FROM users u");
 ```
 
 ```sh

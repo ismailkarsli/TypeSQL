@@ -64,15 +64,47 @@ Enums are global in TypeSQL, so two enums with the same name in different schema
 
 A `jsonb` column is `unknown` by default. To give `json` and `jsonb` columns TypeScript types, list them under `columnTypes` in a config file:
 
-<<< @/snippets/introspect.ts#config
+```ts
+export default {
+	out: "src/db/schema.ts",
+	schemas: ["public", "auth"],
+	imports: ['import type { HistoryItem } from "../models/history.js";'],
+	columnTypes: {
+		"portfolio.history": "HistoryItem[]",
+		"auth.users.settings": "{ theme: string }",
+	},
+} satisfies IntrospectConfig;
+```
 
 Each listed column becomes a [`Json<T>` column](./schema#typed-json-columns) of that type, with the column's flags (and `"json"` for a `json` column):
 
-<<< @/snippets/introspect.ts#generated
+```ts
+export interface DB {
+	portfolio: {
+		id: Generated<"uuid">;
+		name: Col<"text">;
+		created_at: Generated<"timestamptz">;
+		history: Json<HistoryItem[], { hasDefault: true }>;
+	};
+}
+```
 
 Rows read the column as `T`, and you write values with [`sql.json()`](./parameters#json-values):
 
-<<< @/snippets/introspect.ts#use
+```ts
+const sql = createSql<DB, PgTypeMap>();
+
+const recent = sql(`
+  SELECT name, history, history -> -1 -> 'value' AS last, created_at::date AS day
+  FROM portfolio
+  WHERE created_at > now() - interval '7 days'`);
+
+declare const history: HistoryItem[];
+const save = sql(
+	`UPDATE portfolio SET history = ${sql.json(history)} WHERE name = $1`,
+	"a",
+);
+```
 
 - `imports` adds lines after the generated import, for the types `columnTypes` uses.
 - The config file can be `.mjs`, or `.ts`.
@@ -87,7 +119,19 @@ Rows read the column as `T`, and you write values with [`sql.json()`](./paramete
 - `introspect(client, options)` reads the database through any `pg` client. It returns plain data: relations, columns with their types, defaults, identity and generated expressions, comments and enums.
 - `generateSource(data, options)` writes the file's source.
 
-<<< @/snippets/introspect.ts#api
+```ts
+const client = new Client({ connectionString: process.env["DATABASE_URL"] });
+await client.connect();
+const schema = await introspect(client, { schemas: ["public"] });
+await client.end();
+await writeFile(
+	"src/db/schema.ts",
+	generateSource(schema, {
+		columnTypes: (column) => /^@type (.+)$/.exec(column.comment ?? "")?.[1],
+		imports: ['import type { HistoryItem } from "../models/history.js";'],
+	}),
+);
+```
 
 ## View columns
 

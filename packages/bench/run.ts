@@ -1,10 +1,4 @@
 #!/usr/bin/env node
-// Measures the immutable case1 application at compile time and runtime.
-// Checks source, built, warm-cache and stale-cache variants with tsrs and tsc,
-// enforces thresholds.json and writes compile-time and runtime results.
-// --calibrate sets 30% instantiation headroom and 2x check time (minimum 1.5 seconds).
-// --compiler tsrs or --compiler tsc measures only that compiler.
-// --runs N selects the median of N checks per variant; --no-thresholds measures old releases.
 import { spawnSync } from "node:child_process";
 import {
 	appendFileSync,
@@ -44,7 +38,6 @@ interface Variant {
 	name: string;
 	files: string[];
 	config?: typeof dist | typeof cached;
-	/** Generate a type cache for the variant from these files (`files[1]` is the cache file). */
 	cache?: { from: string[] };
 }
 
@@ -64,13 +57,10 @@ interface Result {
 	totalTimeSec: number | null;
 	wallTimeSec: number;
 	memoryMB: number;
-	/** Errors reported in the measured file itself (a probe or query that failed to infer). */
 	errorCount: number;
-	/** Errors anywhere else in the program, e.g. TypeSQL itself not compiling. */
 	otherErrorCount: number;
 	errors: TscError[];
 	exitCode: number | null;
-	/** Raw repetitions; the outer result is the median check (or a failed repetition). */
 	samples?: Result[];
 }
 
@@ -85,7 +75,6 @@ interface CacheThreshold {
 	staleRatio: number;
 }
 
-/** thresholds.json: one entry per variant, and `cache` for the type cache's costs. */
 type Thresholds = { [variant: string]: Threshold } & { cache?: CacheThreshold };
 
 type Compiler = "tsrs" | "tsc";
@@ -93,14 +82,12 @@ const here = dirname(fileURLToPath(import.meta.url));
 const fixture = "src/case1.ts";
 const source = readFileSync(new URL(fixture, import.meta.url), "utf8");
 
-/** Deterministic, populated inputs; SQL text and fragment expressions always come from case1. */
 function sample(type: TypeNode): string {
 	if (isUnionTypeNode(type)) {
 		const defined = type.types.find(
 			(t) => t.kind !== SyntaxKind.UndefinedKeyword && t.getText() !== "null",
 		);
 		if (!defined) return "null";
-		// These are type-level JSON markers, not reusable runtime parameter tokens.
 		if (defined.getText().includes("\\0PJ")) return "undefined";
 		return sample(defined);
 	}
@@ -140,7 +127,6 @@ function sample(type: TypeNode): string {
 
 interface Workload {
 	statements: number;
-	/** Build every application statement once, reusing the fixture's setup fragments. */
 	build: () => { readonly text: string }[];
 }
 
@@ -271,7 +257,6 @@ if (calibrate && onlyCompiler !== undefined) {
 }
 const thresholdsPath = join(here, "thresholds.json");
 
-/** Generate the type caches of the cached variants with the job from the built package. */
 async function generateCaches(): Promise<void> {
 	const job = join(core, "dist/cache/job.js");
 	if (!existsSync(job)) {
@@ -285,8 +270,6 @@ async function generateCaches(): Promise<void> {
 		readFileSync(join(core, "dist/engine/cache.d.ts"), "utf8"),
 	)![1]!;
 	mkdirSync(join(here, "cache"), { recursive: true });
-	// Copy the fixture and change the enum registry every cache entry depends on.
-	// The application fixture itself is never written.
 	const staleSource = source.replace(
 		"$types: {",
 		'$types: { __bench_stale: "stale";',
@@ -401,7 +384,6 @@ const byCompiler = Object.fromEntries(
 		c,
 		variants.map((v): Result => {
 			const samples = Array.from({ length: runs }, () => measure(v, c));
-			// Keep failed checks visible even if most repetitions succeeded.
 			const failed = samples.find(
 				(r) =>
 					r.exitCode !== 0 ||
@@ -418,7 +400,6 @@ const byCompiler = Object.fromEntries(
 const primaryCompiler: Compiler = compilers[0]!;
 const results = byCompiler[primaryCompiler];
 
-/** Whole-application averages, including schema and reusable-fragment checking. */
 function throughput(list: Result[]): {
 	instantiationsPerQuery: number;
 	checkMsPerQuery: number;
@@ -441,7 +422,6 @@ const throughputByCompiler = Object.fromEntries(
 ) as Record<Compiler, ReturnType<typeof throughput>>;
 const perQuery = throughputByCompiler[primaryCompiler];
 
-/** Compare the same application's warm and stale caches with its uncached build. */
 function cacheCost(list: Result[]): CacheThreshold | null {
 	const get = (name: string) =>
 		list.find((r) => r.name === name)?.instantiations;
@@ -510,7 +490,6 @@ if (calibrate) {
 	for (const [index, r] of results.entries()) {
 		const measured = compilers.map((c) => byCompiler[c][index]!);
 		thresholds[r.name] = {
-			// instantiation counts are deterministic: 30% headroom; check time is noisy: 2x (min 1.5 s)
 			instantiations: Math.ceil(
 				Math.max(...measured.map((r) => r.instantiations ?? 0)) * 1.3,
 			),
@@ -692,7 +671,6 @@ if (failures.length) {
 }
 console.log("\nall files within thresholds");
 
-/** Build every statement with populated inputs; fixture setup is outside the timed loop. */
 function measureRuntime(): void {
 	const { statements, build } = application;
 	const iterations = 3_000;

@@ -1,13 +1,5 @@
 name: release
 
-# Started by hand only (`pnpm release`, or "Run workflow" on the Actions tab), never by a push.
-# Runs the ci.yml checks on main, applies the pending change intents (`pnpm version -r`) and
-# commits the release through the API (signed), then publishes every package version that is not
-# on npm yet through npm trusted publishing (OIDC, no token), and creates their GitHub releases.
-# npm trusts this workflow file (release.yml) in the `npm` environment, which only deploys from
-# main. The `extension` job then publishes the VS Code extension to the Visual Studio Marketplace
-# (Microsoft Entra ID) and Open VSX (trusted publishing) when its version is not there yet, from
-# the `vscode` environment. See packages/docs/internals/releasing.md.
 on:
   workflow_dispatch:
 
@@ -30,13 +22,13 @@ jobs:
     outputs:
       sha: ${{ steps.release.outputs.sha }}
     permissions:
-      contents: write # the release commit, gh release create
-      id-token: write # npm trusted publishing
+      contents: write
+      id-token: write
     steps:
       - uses: actions/checkout@v7
         with:
-          fetch-depth: 0 # github-releases.ts reads changelog sections from history
-      - uses: pnpm/action-setup@v6 # version from packageManager in package.json
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:
           node-version: 26
@@ -48,15 +40,11 @@ jobs:
           path: packages/bench
       - name: Version pending change intents
         run: |
-          # `name@version` of every public package, one per line.
           public() {
             pnpm -r ls --depth -1 --json | node -e '
               for (const p of JSON.parse(require("fs").readFileSync(0)))
                 if (!p.private) console.log(`${p.name}@${p.version}`)'
           }
-          # A version that was bumped but never published (an earlier run failed) is published
-          # first: `pnpm version -r` would fold new intents into it and rebuild its changelog
-          # section without the earlier entries. The next run versions the new intents.
           before=$(public)
           for pkg in $before; do
             if ! pnpm view "$pkg" version >/dev/null 2>&1; then
@@ -69,16 +57,11 @@ jobs:
           if [ -z "$(git status --porcelain)" ]; then
             exit 0
           fi
-          # "chore: release 0.0.4", or "chore: release 0.0.4, 0.1.0" when versions diverge.
           versions=$(comm -13 <(sort <<<"$before") <(public | sort) | sed 's/.*@//' | sort -uV | paste -sd, - | sed 's/,/, /g')
-          # a release of the VS Code extension alone (a private package) bumps no public version;
-          # with no version bumped at all, pnpm only pruned changelog sections npm now confirms
           extension=$(node -p 'require("./packages/vscode/package.json").version')
           if [ -z "$versions" ] && [ "$extension" != "$(git show HEAD:packages/vscode/package.json | node -p 'JSON.parse(require("fs").readFileSync(0)).version')" ]; then
             versions="VS Code extension $extension"
           fi
-          # Committed through the API, which signs it (main requires signed commits), and rejected,
-          # so nothing is published, when main moved past the commit the checks ran on.
           node scripts/performance-history.ts --refresh-all
           git add -A
           message="chore: release $versions"
@@ -92,7 +75,6 @@ jobs:
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - run: pnpm build
       - run: pnpm smoke:dist
-      # The workflow only gets here on main, which is what publish's git checks verify.
       - run: pnpm publish -r --no-git-checks --report-summary
       - run: node scripts/github-releases.ts --summary pnpm-publish-summary.json
         env:
@@ -107,16 +89,12 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
   extension:
-    # The VS Code extension (packages/vscode, private on npm), from the commit `publish` released.
-    # Each registry gets the version unless it has it already (--skip-duplicate), so a run after a
-    # failed one publishes what is missing. A registry is skipped until its variable
-    # (VSCODE_MARKETPLACE, OPEN_VSX, on the vscode environment) is true, once its setup is done.
     needs: publish
     runs-on: ubuntu-latest
     environment: vscode
     permissions:
       contents: read
-      id-token: write # azure/login (Marketplace) and Open VSX trusted publishing
+      id-token: write
     defaults:
       run:
         working-directory: packages/vscode
@@ -130,7 +108,6 @@ jobs:
           node-version: 26
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      # the extension bundles @typesql/language-server's sources
       - run: pnpm --filter "typesql..." run build
       - run: pnpm exec vsce package --no-dependencies --out typesql.vsix
       - uses: azure/login@v2
@@ -138,9 +115,7 @@ jobs:
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
-          # the identity only publishes to the Marketplace: it has no Azure subscription or role
           allow-no-subscriptions: true
-      # The identity's Marketplace id, which is added to the publisher once (see releasing.md).
       - name: Marketplace identity
         if: vars.VSCODE_MARKETPLACE == 'true'
         run: az rest -u https://app.vssps.visualstudio.com/_apis/profile/profiles/me --resource 499b84ac-1321-427f-aa17-267ca6975798 --query id -o tsv

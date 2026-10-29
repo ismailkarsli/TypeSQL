@@ -1,5 +1,4 @@
 {
-	"//": "Standalone (not extending tsconfig.base.json): Vite's bundled esbuild warns on the base's es2024 target. kysely and drizzle-orm resolve from the adapter packages: as docs dependencies, drizzle-orm's optional peers pull React 19 into VitePress' tree.",
 	"compilerOptions": {
 		"target": "es2022",
 		"lib": ["es2024"],
@@ -29,5 +28,5 @@
 			"drizzle-orm/*": ["../drizzle/node_modules/drizzle-orm/*"]
 		}
 	},
-	"include": ["snippets"]
+	"include": [".vitepress/*.ts", ".vitepress/*.mts"]
 }

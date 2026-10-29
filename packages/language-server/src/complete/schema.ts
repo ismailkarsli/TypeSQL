@@ -1,17 +1,7 @@
-/**
- * The relations and columns of a `DB` type, read with the checker for editor completions. The
- * same rules as the engine (`IsRelation` / `RelCols` in engine/suggest.ts, `ResolveTable` in
- * engine/binder/resolve.ts): a property is a view (`$view`), a table (its properties have a
- * `type`) or a namespace of those; `$types` and `$functions` are not relations.
- *
- * Only the top level is read up front. A namespace's relations and a relation's columns are read
- * when asked for, so a large schema (or the `PgCatalog` slice) costs nothing until it is used.
- */
 import type { Checker, Symbol as TsSymbol, Type } from "typescript/async";
 import type { RelRef } from "./scan.js";
 
 export interface Relation {
-	/** The namespace (`auth`), or null at the top level. */
 	readonly schema: string | null;
 	readonly name: string;
 	readonly view: boolean;
@@ -19,20 +9,13 @@ export interface Relation {
 
 export interface Column {
 	readonly name: string;
-	/** The Postgres type name (`int4`, `text[]`, `jsonb`, an enum's name). */
 	readonly type: string;
 	readonly nullable: boolean;
 }
 
 export interface Schema {
-	/** Top-level relations, or those of a namespace (`public` is the top level). */
 	relations(schema: string | null): Promise<readonly Relation[]>;
-	/** Namespace names (`auth`, `pg_catalog`). */
 	readonly namespaces: readonly string[];
-	/**
-	 * Columns of a relation as written: an unqualified name is looked up at the top level, then in
-	 * `pg_catalog`. Null when there is no such relation.
-	 */
 	columns(ref: RelRef): Promise<readonly Column[] | null>;
 }
 
@@ -45,7 +28,6 @@ interface Entry {
 
 const memo = new WeakMap<Checker, Map<number, Promise<Schema>>>();
 
-/** The schema of `db`; memoized per checker (one per program snapshot) and type. */
 export function schemaOf(checker: Checker, db: Type): Promise<Schema> {
 	let byType = memo.get(checker);
 	if (!byType) {
@@ -69,7 +51,6 @@ async function read(checker: Checker, db: Type): Promise<Schema> {
 		const types = await checker.getTypeOfSymbol(props as TsSymbol[]);
 		return props.map((p, i) => ({ name: p.name, type: types[i]! }));
 	};
-	/** `relation` (`view` or not) or `namespace` (or neither). */
 	const classify = async (
 		t: Type,
 	): Promise<"view" | "table" | "namespace" | null> => {
@@ -111,7 +92,6 @@ async function read(checker: Checker, db: Type): Promise<Schema> {
 				const rels: Relation[] = [];
 				const types = new Map<string, Type>();
 				if (!t) return { relations: rels, types };
-				// every member of a namespace is a relation; only views need telling apart
 				const es = await entries(t);
 				const views = await Promise.all(
 					es.map((e) => checker.getPropertyOfType(e.type, "$view")),
@@ -176,7 +156,6 @@ async function read(checker: Checker, db: Type): Promise<Schema> {
 	};
 }
 
-/** `"int4"` → `int4`; a JSON column's branded name (`"jsonb" & { shape }`) → `jsonb`. */
 async function typeName(checker: Checker, t: Type): Promise<string> {
 	if (t.isStringLiteralType()) return t.value;
 	if (t.isIntersectionType()) {

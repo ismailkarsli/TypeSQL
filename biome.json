@@ -56,11 +56,11 @@
 	},
 	"overrides": [
 		{
-			"includes": ["packages/docs/snippets/**"],
-			"assist": {
-				"actions": {
-					"source": {
-						"organizeImports": "off"
+			"includes": ["packages/core/src/engine/cache.ts"],
+			"linter": {
+				"rules": {
+					"suspicious": {
+						"noEmptyInterface": "off"
 					}
 				}
 			}

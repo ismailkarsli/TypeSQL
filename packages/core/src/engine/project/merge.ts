@@ -36,28 +36,6 @@ import type {
 	WidthCheck,
 } from "./dml.js";
 
-/**
- * MERGE projection and validation (`ProjectDml` dispatches here).
- *
- * `ProjectMerge<S, DB, Outer, Ctes>` → `Cols` (RETURNING), `null` (no RETURNING) or `SqlError`.
- *
- * Scopes, as in Postgres's transformMergeStmt:
- *   - the source (`USING …`) sees neither the target nor itself (a reference to the target
- *     from inside it is `invalid reference to FROM-clause entry for table "t"`);
- *   - the join condition and `WHEN MATCHED` (condition, UPDATE SET) see target and source;
- *   - `WHEN NOT MATCHED BY SOURCE` sees only the target, `WHEN NOT MATCHED [BY TARGET]` (condition,
- *     INSERT values) only the source; the other side is `invalid reference to FROM-clause entry`;
- *   - RETURNING sees both, plus `old` / `new` and `merge_action()`.
- *
- * Checks: the target is a table (`cannot merge into view "v"`), the target and source names
- * differ (`name "t" specified more than once`), SET and INSERT columns exist, INSERT width and
- * required columns (as for INSERT), and no WHEN clause of a kind follows an unconditional one of
- * the same kind (`unreachable WHEN clause specified after unconditional WHEN clause`).
- *
- * RETURNING nullability: the source's columns are NULL for rows from a `NOT MATCHED BY SOURCE`
- * action, `old.*` for rows inserted, `new.*` for rows deleted. The target's columns are never
- * NULL-extended (the row inserted, updated or deleted).
- */
 export type ProjectMerge<
 	S extends MergeStmt,
 	DB,
@@ -107,7 +85,6 @@ export type ProjectMerge<
 			: Tg
 		: never;
 
-/** The source as RETURNING sees it: NULL-extended when a NOT MATCHED BY SOURCE action returns rows. */
 type ReturningSource<Ws extends readonly MergeWhen[], L extends ScopeLevel> = [
 	Extract<
 		Ws[number],
@@ -127,14 +104,12 @@ type NullableLevel<L extends ScopeLevel> = {
 	};
 };
 
-/** Some WHEN clause has this action. */
 type HasAction<Ws extends readonly MergeWhen[], A extends string> = [
 	Extract<Ws[number]["action"], { readonly t: A }>,
 ] extends [never]
 	? false
 	: true;
 
-/** The level a WHEN clause sees (see above) and the names it must not reference. */
 type WhenLevel<
 	M extends MergeWhen["match"],
 	Item extends ScopeItem,
@@ -150,7 +125,6 @@ type HiddenNames<
 		? L[number]["alias"]
 		: Item["alias"];
 
-/** `missing FROM-clause entry for table "x"` for a name that is there but not visible here: Postgres's wording. */
 type InvalidRef<E, Hidden> =
 	E extends SqlError<`missing FROM-clause entry for table "${infer A}"`, null>
 		? A extends Hidden
@@ -226,7 +200,6 @@ type CheckWhen<
 					: true
 		: never;
 
-/** `INSERT [(cols)] VALUES (…)` / `INSERT DEFAULT VALUES` (`Vals` null): the checks of INSERT. */
 type CheckMergeInsert<
 	Cols extends readonly string[] | null,
 	Ind extends readonly TargetInd[] | null,
@@ -272,13 +245,6 @@ type CheckMergeInsert<
 			: CheckValueItems<Vals, C>
 	: CheckRequired<Tbl, [], Name>;
 
-// ───────────────────────────── parameters ─────────────────────────────
-
-/**
- * Parameters of a MERGE: the source, the join condition and WHEN conditions (bool), UPDATE SET
- * and INSERT values like UPDATE and INSERT (a bare `$n` takes its target column's type), and
- * RETURNING. Only reached for statements that passed `ProjectMerge`.
- */
 export type ParamsOfMerge<S extends MergeStmt, DB, Ctes extends CteMap, M> =
 	ResolveTarget<DB, S["table"], S["alias"], "merge into"> extends infer Tg
 		? Tg extends Target_<infer Tbl, infer Item>
@@ -369,7 +335,6 @@ type ParamsOfWhen<W extends MergeWhen, Tbl extends Table, C extends Ctx, M> =
 				: M1
 		: never;
 
-/** INSERT values: those in the targets' subscripts, then a bare `$n` takes what its target stores (`TargetInfos`). */
 type ParamsOfMergeInsert<
 	Vals extends readonly Expr[],
 	Cs extends readonly string[],

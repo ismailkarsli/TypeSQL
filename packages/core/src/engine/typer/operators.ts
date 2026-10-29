@@ -2,21 +2,6 @@ import type { LitCommon } from "../json.js";
 import type { BaseOf, ShapedCommon } from "../shape.js";
 import type { ColInfo, Info } from "../types.js";
 
-/**
- * Operator typing. `BinOpType<Op, L, R>` → ColInfo, `UnOpType<Op, E>` → ColInfo.
- *
- * Every rule here was checked against PostgreSQL 18 (`select pg_typeof(...)`), see the
- * comments on the individual tables. Strict operators are nullable when either side is
- * nullable; JSON extraction operators are always nullable (missing key → NULL). Unknown
- * combinations yield `unknown` (nullable), which a cast fixes.
- *
- * Pseudo-types: `unknown` (untyped `$n`, unresolvable), `null` (the NULL literal), `lit` (an
- * untyped string literal in operand position, see `TypeOperand` in typeof.ts). Like
- * Postgres's `unknown` literal, `lit` takes the type of the other operand / branch and
- * defaults to `text`; it never leaves the typer (`LitToText`). A real `text` value does not
- * coerce: `jsonb || text` is `text`, `CASE ... 1 ELSE 'x'::text` has no common type.
- */
-
 export type IntT = "int2" | "int4" | "int8";
 export type FloatT = "float4" | "float8";
 export type NumT = IntT | FloatT | "numeric";
@@ -26,13 +11,9 @@ export type TsT = "timestamp" | "timestamptz";
 export type TimeT = "time" | "timetz";
 export type DateTimeT = "date" | TimeT | TsT;
 export type BitT = "bit" | "varbit";
-/** Range or multirange type name (`int4range`, `tstzmultirange`, ...). */
 export type RangeT = `${string}range`;
-/** Pseudo-types that take the type of the other operand: NULL literal, untyped param. */
 export type UnknownT = "unknown" | "null";
-/** Untyped string literal (operand position only). */
 export type LitT = "lit";
-/** Resolve a leftover string-literal pseudo-type to `text` (Postgres's default for `unknown`). */
 export type LitToText<T extends string> = T extends LitT ? "text" : T;
 
 type Either<L extends boolean, R extends boolean> = L extends true
@@ -41,12 +22,6 @@ type Either<L extends boolean, R extends boolean> = L extends true
 		? true
 		: false;
 
-/**
- * Numeric promotion for arithmetic operators. Operator resolution prefers `float8`
- * (the numeric category's preferred type), so `numeric + float4` is `float8`:
- *   int2+int2 → int2, int2+int4 → int4, int4+int8 → int8, int4+numeric → numeric,
- *   int4+float4 → float8, float4*float4 → float4, numeric+float8 → float8.
- */
 export type NumPromote<L extends string, R extends string> = "float8" extends
 	| L
 	| R
@@ -65,12 +40,6 @@ export type NumPromote<L extends string, R extends string> = "float8" extends
 					? "int4"
 					: "int2";
 
-/**
- * Common type of two different numeric types for CASE / COALESCE / UNION / ARRAY (implicit
- * cast chain int2 → int4 → int8 → numeric → float4 → float8): `coalesce(1::float4, 2)` is
- * `float4`, `coalesce(1, 2.5)` is `numeric`. (Two different integer types without int8 are
- * int2 and int4.)
- */
 export type NumCommon<L extends string, R extends string> = "float8" extends
 	| L
 	| R
@@ -83,7 +52,6 @@ export type NumCommon<L extends string, R extends string> = "float8" extends
 				? "int8"
 				: "int4";
 
-/** NULL and untyped string literals resolve like an untyped operand. */
 type Norm<A extends string> = A extends "null" | LitT ? "unknown" : A;
 
 export type BinOpType<
@@ -95,7 +63,6 @@ export type BinOpType<
 	BinOpNullable<Op, L, R>
 >;
 
-/** JSON extraction yields NULL for a missing key; `jsonb @@ jsonpath` yields NULL for a non-boolean result. */
 type BinOpNullable<
 	Op extends string,
 	L extends ColInfo,
@@ -141,8 +108,7 @@ type BinOpResult<
 											| "-|-"
 											| "~="
 									? "bool"
-									: // geometric position tests (PG `box`, `point`, `polygon`, `circle`, `lseg`, `line` operators)
-										Op extends
+									: Op extends
 												| "<<|"
 												| "|>>"
 												| "&<|"
@@ -172,7 +138,6 @@ type BinOpResult<
 																? Shift<L, R>
 																: "unknown";
 
-/** `&&` / `<->` of two tsqueries (the left one may be untyped) is a tsquery; otherwise `Else` (ranges, arrays, geometry). */
 type TsQueryOr<
 	L extends string,
 	R extends string,
@@ -185,10 +150,6 @@ type TsQueryOr<
 			: Else
 		: Else;
 
-/**
- * `^` exists for float8 and numeric: numeric when one side is numeric and neither is a float
- * (an untyped side takes the other's type). `2^3` → float8, `2.0^3` → numeric, `$1 ^ 2` → float8.
- */
 type Pow<L extends string, R extends string> = L | R extends NumT | "unknown"
 	? L | R extends IntT | "numeric" | "unknown"
 		? "numeric" extends L | R
@@ -197,7 +158,6 @@ type Pow<L extends string, R extends string> = L | R extends NumT | "unknown"
 		: "float8"
 	: "unknown";
 
-/** `& | #`: integer promotion; bit strings give `bit` (the operators are `bit`'s, a varbit casts to it); inet. */
 type BitOp<L extends string, R extends string> = L extends IntT
 	? R extends IntT
 		? NumPromote<L, R>
@@ -218,10 +178,6 @@ type BitOp<L extends string, R extends string> = L extends IntT
 							: "unknown"
 				: "unknown";
 
-/**
- * `<< >>`: integer and bit-string shifts (by an int4: `$1 << 2` is `int4 << int4`, a bit
- * string's shift is `bit`); "strictly left/right of" (bool) for ranges, inet, geometry.
- */
 type Shift<L extends string, R extends string> = L extends IntT
 	? L
 	: L extends BitT
@@ -232,13 +188,6 @@ type Shift<L extends string, R extends string> = L extends IntT
 				: "bool"
 			: "bool";
 
-/**
- * Arithmetic (`+ - * / %`). Table verified against PG 18; rows not listed are errors in
- * Postgres and yield `unknown`. `unknown` operands resolve like an untyped literal: to the
- * only candidate operator for the other side (`ts + '1 day'` → ts) or `unknown` when
- * Postgres itself would report an ambiguity (`date + '1'`). A `time` with no operator of its
- * own casts implicitly to `interval`: `ts - clock` → timestamp, `clock * 2` → interval.
- */
 type Arith<Op extends string, L extends string, R extends string> =
 	ArithOf<Op, L, R> extends infer T extends string
 		? T extends "unknown"
@@ -397,13 +346,6 @@ type ArithOf<
 														: "unknown"
 													: "unknown";
 
-/**
- * One side is an untyped literal / param. Postgres first assumes it has the other side's
- * type; if that operator exists it wins (`day - '2020-01-01'` → int4, `at - $1` → interval,
- * `price_money / $1` → float8, and so `at - '1 day'` is a Postgres error), otherwise the
- * unique remaining candidate (`at + '1 day'` → timestamptz) or `unknown` when ambiguous
- * (`day + '1'`, `clock_tz + '1'`) or when there is none (`$1 / dur`, `ratio % $1`).
- */
 type ArithUnknown<
 	Op extends string,
 	K extends string,
@@ -466,18 +408,11 @@ type ArithUnknown<
 												: "unknown"
 										: "unknown";
 
-/**
- * `||`: arrays concatenate with arrays and elements of a common element type (`int4[] || int8`
- * → `int8[]`); `jsonb`, `bytea`, `tsvector`, `tsquery` and bit strings (`varbit`) concatenate
- * within their type (the other side of it or untyped); otherwise `anynonarray || text`, which
- * needs a string (or untyped) side: `jsonb || text` is `text`, `int4 || int4` an error.
- */
 type Concat<L extends string, R extends string> = L extends `${string}[]`
 	? CommonLit<L, R extends `${string}[]` ? R : `${R}[]`>
 	: R extends `${string}[]`
 		? CommonLit<`${L}[]`, R>
 		: SelfConcat<ConcatBase<L>, ConcatBase<R>>;
-/** Bit strings concatenate as `varbit`; a structured value as its plain type. */
 type ConcatBase<T extends string> = T extends BitT ? "varbit" : BaseOf<T>;
 type SelfConcat<L extends string, R extends string> = L extends
 	| "jsonb"
@@ -499,12 +434,6 @@ type TextConcat<L extends string, R extends string> = L extends StrT | "unknown"
 		? "text"
 		: "unknown";
 
-/**
- * Prefix operators: `-` negates numbers and intervals (a time as an interval), `+` only numbers (an untyped `+ $1` is
- * float8, numeric's preferred type; `- $1` is ambiguous with interval), `~` complements
- * integers, bit strings (`bit`) and inet, `@` is abs, `|/ ||/` roots, `!!` tsquery negation,
- * and the geometric `@-@ @@ # ?- ?|`.
- */
 export type UnOpType<Op extends string, E extends ColInfo> = Op extends "not"
 	? Info<"bool", E["nullable"]>
 	: Op extends "-"
@@ -557,15 +486,6 @@ export type UnOpType<Op extends string, E extends ColInfo> = Op extends "not"
 									? Info<"bool", E["nullable"]>
 									: Info<"unknown", true>;
 
-/**
- * Common type of two branch types (CASE, COALESCE, GREATEST, ARRAY, ...), following
- * Postgres's UNION/CASE resolution: `unknown`/`null`/`lit` yield to the other side;
- * numerics follow the implicit cast chain (`NumCommon`); date < timestamp < timestamptz;
- * string types as `StrCommon`; bit strings keep the first one; anything else that differs
- * (int4 vs text, json vs jsonb, time vs interval) has no common type → `unknown`.
- * Structured values (shape.ts) of the same base type merge their shapes.
- * The result may be `lit` (all branches string literals): resolve it with `LitToText`.
- */
 export type CommonLit<A extends string, B extends string> = A extends B
 	? ShapedCommon<A, B>
 	: A extends UnknownT
@@ -629,12 +549,6 @@ export type CommonLit<A extends string, B extends string> = A extends B
 																	: "unknown"
 																: ShapedCommon<A, B>;
 
-/**
- * Two different string types: Postgres keeps the first unless only it casts implicitly to the
- * second (verified on PG 18): `coalesce(vc, label)` → varchar, `coalesce(vc, nm)` → name,
- * `coalesce(ci, label)` → text. `"char"` has no common type with the others, citext none with
- * bpchar and name.
- */
 type StrCommon<A extends string, B extends string> = A extends "char"
 	? "unknown"
 	: B extends "char"
@@ -653,29 +567,17 @@ type StrCommon<A extends string, B extends string> = A extends "char"
 						: "name"
 					: A;
 
-/**
- * `CommonLit` for callers that type string literals as plain `text` (set operations,
- * VALUES, parameter siblings): `text` is treated as a literal and yields to the other side.
- */
 export type CommonType<A extends string, B extends string> = LitToText<
 	CommonLit<A extends "text" ? LitT : A, B extends "text" ? LitT : B>
 >;
 
-/**
- * Numeric literal type, as Postgres assigns it: a decimal point or exponent → numeric;
- * otherwise the smallest of int4 / int8 / numeric that holds the value (`2147483647` → int4,
- * `2147483648` → int8, `9223372036854775808` → numeric, `0x80000000` → int8, `007` → int4).
- * A leading `-` is accepted so the typer can fold `-2147483648` to int4 like Postgres does.
- */
 export type NumLitType<V extends string> = V extends `-${infer D}`
 	? UnsignedLitType<NoUnderscores<D>, 1>
 	: UnsignedLitType<NoUnderscores<V>, 0>;
-/** `1_000_000` → `1000000` (digit separators do not count). */
 type NoUnderscores<V extends string> = V extends `${infer A}_${infer B}`
 	? NoUnderscores<`${A}${B}`>
 	: V;
 
-/** `Sign` 1: the literal is negated, and so reaches one further (-2^31, -2^63). */
 type UnsignedLitType<D extends string, Sign extends 0 | 1> = D extends
 	| `0x${infer H}`
 	| `0X${infer H}`
@@ -691,7 +593,6 @@ type UnsignedLitType<D extends string, Sign extends 0 | 1> = D extends
 				? "numeric"
 				: IntLitType<D, IntBounds["dec"][Sign]>;
 
-/** The largest int4 and int8 magnitudes in each radix, positive and negated. */
 type IntBounds = {
 	dec: [
 		["2147483647", "9223372036854775807"],
@@ -724,9 +625,7 @@ type IntLitType<D extends string, Max extends [string, string]> =
 				: never
 			: "int4"
 		: never;
-/** Leading zeros do not count: `007` is 7. */
 type NoZeros<D extends string> = D extends `0${infer R}` ? NoZeros<R> : D;
-/** Compare two digit strings without leading zeros by value (`V` can be thousands of digits long). */
 type ValueCmp<V extends string, Max extends string> =
 	LengthCmp<V, Max> extends infer L
 		? L extends "eq"
@@ -743,7 +642,6 @@ type LengthCmp<
 	: B extends ""
 		? "eq"
 		: "lt";
-/** Compare two digit strings of equal length. */
 type DigitsCmp<A extends string, B extends string> = [A, B] extends [
 	`${infer AC}${infer AR}`,
 	`${infer BC}${infer BR}`,
@@ -777,10 +675,6 @@ type DigitRank = {
 	f: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 };
 
-/**
- * The value of an integer literal in decimal, as Postgres prints it (`0x1F` → `31`, `0b101` → `5`,
- * `1_000` → `1000`, `007` → `7`); `null` for a literal that is not an integer (`1.5`, `1e3`).
- */
 export type IntLitValue<V extends string> =
 	Lowercase<
 		NoUnderscores<V>
@@ -794,7 +688,6 @@ type Radix = {
 	o: DigitRank["8"];
 	b: DigitRank["2"];
 };
-/** Horner's rule over the digits `Ds` (of `Dg`) in radix `R`, on the decimal digits of the value so far, least significant first (`Rev`). */
 type FromRadix<
 	Ds extends string,
 	R extends unknown[],
@@ -805,7 +698,6 @@ type FromRadix<
 	: Ds extends ""
 		? Reverse<Rev, "">
 		: null;
-/** `Rev` × `R` + `Carry`, on decimal digits least significant first. */
 type MulAdd<
 	Rev extends string,
 	R extends unknown[],
@@ -826,7 +718,6 @@ type Times<
 	R extends unknown[],
 	Acc extends unknown[],
 > = N extends [unknown, ...infer NR] ? Times<NR, R, [...Acc, ...R]> : Acc;
-/** A tuple's length `n` → `[n / 10 as a tuple, n % 10]`. */
 type DivMod10<T extends unknown[], Q extends unknown[]> = T extends [
 	...Ten,
 	...infer Rest,

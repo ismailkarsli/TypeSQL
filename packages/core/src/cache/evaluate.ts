@@ -12,7 +12,6 @@ import type {
 import type { Kinds } from "./discover.js";
 import { coreNames, Printer } from "./print.js";
 
-/** The project's `typescript` package: its async API, fs helpers and syntax kinds. */
 export interface TypeScript {
 	readonly API: typeof AsyncAPI;
 	readonly createFileSystemLayer: (
@@ -87,7 +86,6 @@ export class ProbeSession {
 		await api?.close();
 	}
 
-	/** Close for good: a request in progress fails at its next program instead of reopening. */
 	async dispose(): Promise<void> {
 		this.disposed = true;
 		await this.close();
@@ -170,7 +168,6 @@ export function evaluateAnalyses(
 	);
 }
 
-/** `export declare const name: …` declarations of the probe, by name. */
 export function declarations(
 	sf: SourceFile,
 	kinds: TypeScript["kinds"],
@@ -198,7 +195,6 @@ export async function declTypes(
 	return new Map(names.map((n, i) => [n, types[i]!]));
 }
 
-/** Probe declarations whose line has a compile error (an alias the probe could not resolve, …), with the first message. */
 export async function badDeclarations(
 	program: Program,
 	sf: SourceFile,
@@ -211,7 +207,6 @@ export async function badDeclarations(
 		const line = d.startPosition?.line ?? lineOf(sf.text, d.pos);
 		if (!badLines.has(line)) badLines.set(line, `TS${d.code}: ${d.text}`);
 	}
-	// an alias line (`type X = …`) poisons the declarations that use it: drop by alias name
 	const lines = sf.text.split("\n");
 	const badAliases = new Map<string, string>();
 	lines.forEach((l, i) => {
@@ -258,7 +253,7 @@ export type TypeRecord = { readonly [key: string]: TypeValue };
 
 export function parseTypeText(text: string): TypeValue {
 	const p = new TypeTextParser(text);
-	const v = p.type(); // ends after any whitespace (its last eat("|") skips it)
+	const v = p.type();
 	if (p.i !== text.length)
 		throw new Error(
 			`unexpected ${JSON.stringify(text.slice(p.i, p.i + 20))} at ${p.i} in printed type`,
@@ -386,7 +381,6 @@ class TypeTextParser {
 				continue;
 			}
 			if (c === open) depth++;
-			// the `>` of `=>` (a function type in type arguments) does not close; in a printed type no other closing bracket follows `=`
 			else if (c === close && this.s[this.i - 1] !== "=") depth--;
 			this.i++;
 		} while (depth > 0 && this.i < this.s.length);
@@ -406,7 +400,6 @@ class TypeTextParser {
 				) as string);
 	}
 	private key(): string {
-		// object() peeked past any whitespace
 		const c = this.s[this.i];
 		if (c === '"' || c === "'") return this.string();
 		if (c === "[") {
@@ -462,12 +455,10 @@ export interface AnalysisType {
 
 export interface Analysis {
 	readonly kind: string;
-	/** Columns of a `*` expansion are marked `star`: their order is the object type's, not the statement's. */
 	readonly cols: readonly ({
 		readonly name: string;
 		readonly star?: true;
 	} & AnalysisType)[];
-	/** By parameter number (1-based). */
 	readonly params: { readonly [n: number]: AnalysisType };
 	readonly max: number;
 	readonly names: readonly string[];
@@ -484,9 +475,7 @@ export function readAnalysis(text: string): Analysis | AnalysisError {
 		let error = err[1]!;
 		try {
 			error = JSON.parse(error) as string;
-		} catch {
-			// not a plain literal
-		}
+		} catch {}
 		return {
 			error,
 			pos: err[2] === "null" || err[2] === "number" ? null : Number(err[2]),
@@ -532,7 +521,6 @@ export const asRecord = (v: TypeValue | undefined): TypeRecord | null =>
 		: null;
 
 function typeOf(v: TypeValue | undefined): AnalysisType {
-	// a parameter used in several places is a union; a use that gives no type (`$1 IS NULL`) is `unknown`
 	if (typeof v === "object" && v !== null && "union" in v) {
 		const all = (v.union as readonly TypeValue[]).map(typeOf);
 		const typed = all.filter((x) => x.type !== "unknown");
@@ -547,7 +535,6 @@ function typeOf(v: TypeValue | undefined): AnalysisType {
 	const ty = t.type;
 	if (typeof ty === "string") return { type: ty, nullable };
 	if (ty === null) return { type: "null", nullable };
-	// an array of a shaped type prints as a template literal: `${Shaped<"json", …>}[]`
 	if (typeof ty === "object" && "ref" in ty) {
 		const m = /^`\$\{.*?\bShaped<"(\w+)",.*\}((?:\[\])+)`$/s.exec(
 			ty.ref as string,

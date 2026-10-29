@@ -1,11 +1,3 @@
-// Keeps `CacheVersion` (packages/core/src/engine/cache.ts) equal to a hash of the sources that
-// decide what the type checker computes, so a type cache entry made by another version of the
-// engine is never used. `--check` (CI) fails instead of writing when it is out of date.
-//
-//   node scripts/cache-version.ts [--check]
-//
-// Hashed: every .ts file under packages/core/src except src/cache/ (the content mapper and its
-// job, which run in Node) and src/runtime/ (runtime code), with the CacheVersion line blanked.
 import { createHash } from "node:crypto";
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";

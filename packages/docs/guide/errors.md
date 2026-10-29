@@ -6,9 +6,6 @@ When a statement is wrong, TypeSQL reports a compile error on the SQL string. Th
 
 ```ts
 sql("SELECT emial FROM users");
-// Argument of type '"SELECT emial FROM users"' is not assignable to parameter of type
-//   'SqlError<"column \"emial\" does not exist. Perhaps you meant the column
-//    \"email\"?", 1> & "SELECT emial FROM users"'.
 ```
 
 The error has two parts:
@@ -42,7 +39,6 @@ A wrong positional argument is an ordinary TypeScript error on that argument:
 
 ```ts
 sql("SELECT id FROM users WHERE id = $1", "7");
-// Argument of type 'string' is not assignable to parameter of type 'number'.
 ```
 
 A raw array passed to a JSON parameter fails with `… parameter of type 'NonArrayOrSqlJson<Item[]>'`. Pass `sql.json(value)` instead; see [JSON values](./parameters#json-values).
@@ -54,6 +50,7 @@ A statement that does not validate accepts any arguments, so its `SqlError` is t
 TypeScript shortens long types in error messages (a `…` after a few hundred characters), which can cut off the SQL text. The `SqlError` comes first so it stays visible, and the second line of the error repeats it:
 
 ```
+
 Argument of type 'string' is not assignable to parameter of type 'SqlError<"parameter $6: a
   string[] value cannot be used as timestamptz[] NOT NULL", 63> & "INSERT INTO …'.
   Type 'string' is not assignable to type 'SqlError<"parameter $6: …", 63>'.
@@ -69,7 +66,9 @@ Set `"noErrorTruncation": true` in `tsconfig.json` to see the whole statement.
 
 Use `sql.as<Row>(text, …)`. It skips inference and takes the row type you give it:
 
-<<< @/snippets/errors.ts#as
+```ts
+const page = sql.as<{ id: number; email: string }>("FETCH 10 FROM user_cursor");
+```
 
 Use it for SQL that TypeSQL does not support or cannot type (here, a `FETCH` from a cursor declared in another statement), and for SQL it cannot see at compile time ([dynamic SQL](./dynamic-sql)). It accepts slots, `:name` and inline parameters, like `sql()`. With `rowKeys: "camelCase"`, write the row with camelCase keys.
 
@@ -80,6 +79,7 @@ Unsupported syntax is always a compile error, never a silent `any`. See [Limits]
 With `declaration` output, TypeScript 7.1 checks that every inferred type can be named from the package that exports it. Rows are plain object types, but a `Query`, `Fragment` or `Migrations` value is a TypeSQL type. A package that exports one without depending on `@typesql/core` itself fails:
 
 ```
+
 error TS2883: The inferred type of 'userQuery' cannot be named without a reference to 'Query'
   from '../../shared/node_modules/@typesql/core/dist'. This is likely not portable.
 ```

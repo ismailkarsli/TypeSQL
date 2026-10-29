@@ -1,22 +1,5 @@
 import type { HexDigit, NonIdAscii, Ws } from "./chars.js";
 
-/**
- * Unicode escapes in string literals and quoted identifiers (Postgres `scan.l` and `parser.c`).
- *
- *   E'\u0061 \U00000061'          `\uXXXX` / `\UXXXXXXXX` (other backslash escapes are kept raw)
- *   U&'\0061 \+000061'             `\XXXX` / `\+XXXXXX`, `\\` for a backslash
- *   U&'!0061' UESCAPE '!'           another escape character
- *   U&"d\0061t"                     a quoted identifier, decoded (`data`)
- *
- * A code point must be in 1..10FFFF; a high surrogate (D800-DBFF) must be followed by a low one
- * (DC00-DFFF), which may not stand alone. Errors use Postgres's messages.
- *
- * Values stay raw (escapes included): only identifiers are decoded, since their text is a column
- * name. Decoding covers the ASCII and Latin-1 code points (`Latin1`); any other escape is kept as
- * written.
- */
-
-/** Error message for the first invalid `\u` / `\U` escape of an `E'...'` body, or `null`. */
 export type CheckEscapes<S extends string> = S extends `${string}\\${infer R}`
 	? R extends `u${infer R2}`
 		? Hex4<R2> extends [infer H extends string, infer R3 extends string]
@@ -27,11 +10,10 @@ export type CheckEscapes<S extends string> = S extends `${string}\\${infer R}`
 				? CheckCodePoint<H, R3, "e">
 				: "invalid Unicode escape"
 			: R extends `${string}${infer R2}`
-				? CheckEscapes<R2> // `\\`, `\'`, `\n`, ...: skip the escaped character
+				? CheckEscapes<R2>
 				: null
 	: null;
 
-/** Error message for the first invalid escape of a `U&'...'` body or identifier with escape character `E`, or `null`. */
 export type CheckUEscapes<
 	S extends string,
 	E extends string,
@@ -47,10 +29,6 @@ export type CheckUEscapes<
 				: "invalid Unicode escape"
 	: null;
 
-/**
- * Validate code point `H` (hex digits) whose escape ends before `R`; continue with the rest.
- * `E` is the escape character, or `"e"` for `E'...'` strings.
- */
 type CheckCodePoint<H extends string, R extends string, E extends string> =
 	CodePoint<H> extends infer K
 		? K extends "high"
@@ -65,7 +43,6 @@ type CheckCodePoint<H extends string, R extends string, E extends string> =
 					? AtEscape<"invalid Unicode escape value", H, E>
 					: Continue<R, E>
 		: never;
-/** In an `E'...'` string Postgres's message points at the escape `\uXXXX` / `\UXXXXXXXX` of `H`. */
 type AtEscape<
 	M extends string,
 	H extends string,
@@ -73,10 +50,6 @@ type AtEscape<
 > = E extends "e"
 	? `${M} at or near "${H extends `${string}${string}${string}${string}${infer _5}${string}` ? "\\U" : "\\u"}${H}"`
 	: M;
-/**
- * What follows a high surrogate in an `E'...'` string, when it is not a low surrogate: Postgres
- * points at the next escape, or at the next character (the closing quote at the end).
- */
 type NotLowSurrogate<R extends string> = R extends `\\u${infer R2}`
 	? Hex4<R2> extends [infer H extends string, string]
 		? `invalid Unicode surrogate pair at or near "\\u${H}"`
@@ -92,7 +65,6 @@ type Continue<R extends string, E extends string> = E extends "e"
 	? CheckEscapes<R>
 	: CheckUEscapes<R, E>;
 
-/** `[rest]` after a low-surrogate escape at the start of `R`, or `null`. */
 type LowSurrogateNext<R extends string, E extends string> = E extends "e"
 	? R extends `\\u${infer R2}`
 		? IfLow<Hex4<R2>>
@@ -104,19 +76,12 @@ type LowSurrogateNext<R extends string, E extends string> = E extends "e"
 		: R extends `${E}${infer R2}`
 			? IfLow<Hex4<R2>>
 			: null;
-/** `[rest]` when the escape's digits `[digits, rest]` are a low surrogate, else `null`. */
 type IfLow<X> = X extends [infer H extends string, infer R]
 	? CodePoint<H> extends "low"
 		? [R]
 		: null
 	: null;
 
-/**
- * `"high"` / `"low"` surrogate, `"invalid"` (0 or above 10FFFF), or `"ok"`. `H` has 4, 6 or 8 hex
- * digits; leading `00` pairs are dropped, so 0, 2, 4, 6 or 8 digits remain. Lengths are tested
- * with `infer` placeholders, each but the last matching one character (adjacent `${string}`
- * placeholders would merge into one).
- */
 type CodePoint<H extends string> =
 	Lowercase<H> extends infer L
 		? L extends `00${infer Rest}`
@@ -124,7 +89,7 @@ type CodePoint<H extends string> =
 			: L extends ""
 				? "invalid"
 				: L extends `${infer _1}${infer _2}${infer _3}${infer _4}${infer _5}${infer _6}${infer _7}${infer _8}`
-					? "invalid" // 8 digits, not 00…
+					? "invalid"
 					: L extends `${infer P}${infer Q}${infer _3}${infer _4}${infer _5}${infer _6}`
 						? `${P}${Q}` extends
 								| "01"
@@ -144,7 +109,7 @@ type CodePoint<H extends string> =
 								| "0f"
 								| "10"
 							? "ok"
-							: "invalid" // 6 digits
+							: "invalid"
 						: L extends `d${infer S}${infer _3}${infer _4}`
 							? S extends "8" | "9" | "a" | "b"
 								? "high"
@@ -154,11 +119,6 @@ type CodePoint<H extends string> =
 							: "ok"
 		: never;
 
-/**
- * Four / six / eight hex digits at the start of `S` → `[digits, rest]` or `null`. The characters are
- * inferred unconstrained and tested afterwards: a template built from `infer X extends HexDigit`
- * parts is a 22^4-member union when TypeScript checks the declaration (TS2590).
- */
 type Hex4<S extends string> =
 	S extends `${infer A}${infer B}${infer C}${infer D}${infer R}`
 		? [A | B | C | D] extends [HexDigit]
@@ -180,16 +140,11 @@ type Hex8<S extends string> = S extends `${infer A}${infer B}${infer R}`
 		: null
 	: null;
 
-/**
- * After the closing quote of a `U&` literal: `UESCAPE 'c'` → `[escape, rest]`, no UESCAPE →
- * `["\", R]`, or an error message. The escape character cannot be a hex digit, `+`, a quote or
- * whitespace.
- */
 export type UEscape<R extends string> =
 	SkipWsOnly<R> extends `${infer A}${infer B}${infer C}${infer D}${infer E}${infer F}${infer G}${infer Rest}`
 		? Lowercase<`${A}${B}${C}${D}${E}${F}${G}`> extends "uescape"
 			? Rest extends `${infer N}${string}`
-				? N extends NonIdAscii // else `uescape` starts a longer identifier (`uescapes`, `uescapeé`)
+				? N extends NonIdAscii
 					? EscapeChar<SkipWsOnly<Rest>>
 					: ["\\", R]
 				: EscapeChar<Rest>
@@ -212,7 +167,6 @@ type SkipWsOnly<S extends string> = S extends `${infer C}${infer R}`
 		: S
 	: S;
 
-/** Decode the escapes of a `U&"..."` identifier with escape character `E` (see `Latin1`). */
 export type DecodeU<
 	S extends string,
 	E extends string,
@@ -243,7 +197,6 @@ type CharOf<H extends string, Raw extends string> =
 			: never
 		: never;
 
-/** Printable ASCII and Latin-1 code points (4 lowercase hex digits) → character. */
 interface Latin1 {
 	"0020": " ";
 	"0021": "!";

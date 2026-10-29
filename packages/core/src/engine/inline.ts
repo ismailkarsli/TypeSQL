@@ -7,50 +7,17 @@ import type { StripShape } from "./shape.js";
 import type { MaxParamStr } from "./splice.js";
 import type { NullTest } from "./typer/params.js";
 
-/**
- * Inline parameters: `` sql(`… WHERE id = ${sql.param(userId)}`) ``.
- *
- * `sql.param(v)` has the literal type `InlineMarker<T>`: NUL, "P", an encoding of the
- * value's TS type, NUL (or a `DefaultMarker` when the value can be `undefined`). (NUL never
- * occurs in valid SQL text, so markers cannot collide with anything the user wrote.) At the
- * call site the markers are rewritten to `$k` (numbered after the statement's own `$n` /
- * `:name` parameters), and each encoded value type is checked against the type the
- * statement's context gives that parameter.
- *
- * At runtime `sql.param(v)` returns an unforgeable token that `sql()` replaces the same way.
- * An `any` or `unknown` value is not checked, so it gets the plain marker.
- */
 export type InlineMarker<T> = unknown extends T
 	? PlainMarker<T>
 	: undefined extends T
 		? DefaultMarker<T>
 		: PlainMarker<T>;
 type PlainMarker<T> = `\u0000P${Enc<T>}\u0000`;
-/** Marker of `sql.json(value)`: an inline parameter flagged as JSON (`J`) before the value's encoding. */
 export type JsonMarker<T> = `\u0000PJ${Enc<T>}\u0000`;
-/**
- * Any `sql.json()` value. Where a value is passed rather than spliced into the text (`sql.set`
- * and `sql.values` values, positional and named arguments), a json / jsonb parameter accepts
- * one; it carries its value's encoding (`ValueEnc`), which is checked like an inline one.
- */
 export type JsonValue = `\u0000PJ${string}\u0000`;
 
-/**
- * `sql.param(v)` with a value that can be `undefined`, which sends `DEFAULT` instead of a
- * parameter. NUL, "Du", the encoding of the value without `undefined`, NUL. (Two letters, so
- * that a plain marker's closing NUL followed by a "D" in the text is not read as one; no ":",
- * which `:name` rewriting would see.) The statement is typed with `$k` in its place, and
- * checked a second time with `DEFAULT` there (`WithDefaults`).
- */
 export type DefaultMarker<T> = `\u0000Du${Enc<Exclude<T, undefined>>}\u0000`;
 
-// ───────────────────────────── value type encoding ─────────────────────────────
-
-/**
- * Encoding of a value's TS type as flags: s string, n number, b boolean, i bigint,
- * 0 null, u undefined, d Date, y Uint8Array (Buffer), o other object, [e] array of e,
- * * any/unknown. Literal types widen (`42` → `n`).
- */
 export type Enc<T> = 0 extends 1 & T
 	? "*"
 	: unknown extends T
@@ -66,11 +33,6 @@ type ObjFlag<T> = [
 	? ""
 	: "o";
 
-/**
- * Can a value of encoded type `E` be used where the TS type `P` is expected? Each flag needs
- * an overlapping member in `P` (so `string` is accepted for an enum's literal union, any object
- * for a JSON / interval / point column), and `null`/`undefined` need `null` in `P`.
- */
 export type CheckEnc<E extends string, P> = unknown extends P
 	? true
 	: E extends ""
@@ -115,7 +77,6 @@ type FlagOk<C extends string, P> = C extends "s"
 								: true;
 type Has<P, U> = [Extract<P, U>] extends [never] ? false : true;
 
-/** `"n0"` → `"number | null"`, `"[s]"` → `"string[]"`. */
 export type DescribeEnc<E extends string> = JoinBar<DescParts<E, []>>;
 type DescParts<E extends string, Acc extends string[]> = E extends ""
 	? Acc
@@ -162,7 +123,6 @@ type JoinBar<Parts extends string[]> = Parts extends [infer A]
 		? `${A} | ${JoinBar<R>}`
 		: "never";
 
-/** Split `inner]rest` at the matching `]`: `[inner, rest]`. */
 type SplitBracket<
 	S extends string,
 	Acc extends string,
@@ -177,17 +137,8 @@ type SplitBracket<
 			: SplitBracket<R, `${Acc}${C}`, Depth>
 	: null;
 
-// ───────────────────────────── text segmentation ─────────────────────────────
-
-/** Openers other than `'` (SplitFirst splits at the first `'` before looking for them). */
 type Openers = '"' | "--" | "/*";
 
-/**
- * `[code, opener, rest]`: the code before the first quote or comment opener ("" when none).
- * Split at the first `'` (the usual opener) and keep it when no other opener comes before;
- * a text without `'` is tested for any opener once. Trying each opener in turn cost 79
- * instantiations on a text without openers and 34 with one `'` (now 16 and 17).
- */
 export type SplitFirst<T extends string> = T extends `${infer A}'${infer B}`
 	? A extends `${string}${Openers}${string}`
 		? Earlier<A, "'", B>
@@ -201,7 +152,6 @@ export type SplitFirst<T extends string> = T extends `${infer A}'${infer B}`
 					? Earlier<A, "/*", B>
 					: [T, "", ""]
 		: [T, "", ""];
-/** `[A, O, B]` split at opener `O`, or at an opener inside `A` (which comes earlier). */
 type Earlier<
 	A extends string,
 	O extends string,
@@ -216,7 +166,6 @@ type Earlier<
 				? Earlier<A2, "'", `${M}${O}${B}`>
 				: [A, O, B];
 
-/** The opaque segment after opener `O`, verbatim including its closer: `[segment, rest]`. */
 export type Opaque<O extends string, S extends string> = O extends "'" | '"'
 	? CloseQuote<S, O, "">
 	: O extends "--"
@@ -242,13 +191,6 @@ type HasMarker<S extends string> = S extends `${string}\u0000${string}`
 	? true
 	: false;
 
-// ───────────────────────────── marker rewriting ─────────────────────────────
-
-/**
- * Rewrite inline markers to `$k`, numbering from `Start + 1` in order of appearance.
- * Result: `[text, encodings]`, or an SqlError when a marker sits inside a quoted string or a
- * comment (the runtime refuses those too).
- */
 export type RewriteInlineStr<T extends string, Start extends number> =
 	HasMarker<T> extends false ? [T, []] : InlineLoop<T, "", [], Next[Start]>;
 
@@ -292,7 +234,6 @@ type InlineCode<
 > = S extends `${infer Pre}\u0000${infer Body}\u0000${infer Rest}`
 	? InlineCode<Rest, `${Acc}${Pre}$${K}`, [...Encs, MarkerEnc<Body>], Next[K]>
 	: [`${Acc}${S}`, Encs, K];
-/** Encoded value type of a marker body: `P<enc>`, or `Du<enc>` for a value that can be `undefined`. */
 type MarkerEnc<B extends string> = B extends `P${infer E}`
 	? E
 	: B extends `Du${infer E}`
@@ -300,12 +241,6 @@ type MarkerEnc<B extends string> = B extends `P${infer E}`
 		: "*";
 
 type AnyMarker = `\u0000${string}\u0000`;
-/**
- * Encoding of a value passed as a value (a `sql.set` / `sql.values` value, a fragment argument):
- * `Enc<V>`, except that a marker (`sql.json()`, `sql.param()`) stands
- * for the value it wraps, which the runtime unwraps. A union with markers gives a union of
- * encodings, each checked.
- */
 export type ValueEnc<V> = 0 extends 1 & V
 	? "*"
 	: [Extract<V, AnyMarker>] extends [never]
@@ -317,11 +252,9 @@ export type ValueEnc<V> = 0 extends 1 & V
 						: Enc<Exclude<V, AnyMarker>>);
 type MarkerEncs<M> = M extends `\u0000${infer B}\u0000` ? MarkerEnc<B> : never;
 
-/** Does the text hold a `sql.param()` whose value can be `undefined`? */
 export type HasDefaultable<S extends string> =
 	S extends `${string}\u0000Du${string}` ? true : false;
 
-/** The text with every `sql.param()` that can be `undefined` replaced by `DEFAULT`. */
 export type WithDefaults<
 	S extends string,
 	Acc extends string = "",
@@ -329,13 +262,6 @@ export type WithDefaults<
 	? WithDefaults<Rest, `${Acc}${Pre}DEFAULT`>
 	: `${Acc}${S}`;
 
-// ───────────────────────────── value checks ─────────────────────────────
-
-/**
- * Check carried value types against a statement's parameter types. `K[i]` is the encoding of
- * the value bound to `$i+1`, or `null` when that value is passed as a call argument (checked by
- * the call signature). Result: `true` or an SqlError naming the parameter.
- */
 export type CheckCarried<
 	DB,
 	TM,
@@ -366,12 +292,6 @@ type CarriedLoop<
 			: CarriedLoop<DB, X, K, P, Next[I]>
 		: CarriedLoop<DB, X, K, P, Next[I]>;
 
-/**
- * `true`, or what is wrong with the value of encoding `E` for parameter `N` (TS type `P`):
- *   - a `sql.json()` value (`J…`) needs a json / jsonb parameter (or one with no context);
- *   - a `sql.param()` array for a json / jsonb parameter is refused: node-postgres would send a
- *     Postgres array literal, so JSON goes through `sql.json()`.
- */
 type CheckValue<
 	DB,
 	X extends string,
@@ -392,7 +312,6 @@ type CheckValue<
 			: true
 		: `a ${DescribeEnc<E>} value cannot be used as ${Expected<DB, X, N>}`;
 
-/** The `ColInfo`s the statement's uses give parameter `N` (never when it has none). */
 type ParamUses<DB, X extends string, N extends number> =
 	Analysis<DB, X> extends { readonly params: infer M }
 		? N extends keyof M
@@ -404,7 +323,6 @@ type IsJsonParam<U> = [
 ] extends [never]
 	? false
 	: true;
-/** A json / jsonb use, or no typed use at all. */
 type JsonContext<U> = [U] extends [never]
 	? true
 	: [Extract<U, { readonly type: "json" | "jsonb" | "unknown" }>] extends [
@@ -413,7 +331,6 @@ type JsonContext<U> = [U] extends [never]
 		? false
 		: true;
 
-/** `"text NOT NULL"` / `"int4"` for parameter `N` of statement `X`. */
 type Expected<DB, X extends string, N extends number> =
 	Analysis<DB, X> extends { readonly params: infer M }
 		? N extends keyof M
@@ -441,7 +358,6 @@ type FindParam<T, N extends number, I extends number> = T extends Toks
 			: 0
 	: 0;
 
-/** `null` × N: positions whose values are call arguments. */
 export type Skip<
 	N extends number,
 	Acc extends null[] = [],

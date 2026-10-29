@@ -1,4 +1,3 @@
-/** test/pg-regress/run.ts loads this file through Node's type stripping: erasable syntax and Node built-ins only. */
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 
@@ -81,7 +80,6 @@ export function sortedEntries(entries: Entries): Entries {
 	);
 }
 
-/** On one line: the file is generated (read it with `jq`). */
 export function writeBaseline(
 	path: string,
 	pins: { readonly [key: string]: unknown },

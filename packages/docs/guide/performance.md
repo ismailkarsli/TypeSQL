@@ -51,7 +51,7 @@ From a clone of the repository:
 
 ```sh
 pnpm --filter @typesql/core build
-pnpm bench                          # compile time (tsrs and tsc) and runtime
+pnpm bench
 ```
 
 To refresh the published numbers, run the **benchmark** workflow on `main` in GitHub Actions,

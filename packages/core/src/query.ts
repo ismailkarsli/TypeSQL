@@ -1,7 +1,3 @@
-/**
- * Runtime query object: `{ text, values }` plus phantom row/param/text types, and `execute*`
- * methods that run it. A `Fragment` is a piece of SQL that can be spliced into a query via `{slot}`.
- */
 import { applyRowKeys, type RowKeys } from "./row-keys.js";
 
 export declare const ROW: unique symbol;
@@ -9,37 +5,22 @@ export declare const PARAMS: unique symbol;
 export declare const TEXT: unique symbol;
 export declare const CARRIED: unique symbol;
 
-/**
- * What an `Executor` resolves to when it knows the statement's row count, as Postgres reports it
- * in the command tag: rows affected by `INSERT`, `UPDATE`, `DELETE` or `MERGE` (with or without
- * `RETURNING`), rows returned by `SELECT`. `null` means the statement has no count (DDL,
- * `BEGIN`…), which `executeCount` reads as 0.
- */
 export interface ExecutorResult {
 	readonly rows: readonly unknown[];
 	readonly rowCount: number | null;
 }
 
-/**
- * Runs a statement and resolves to its rows, or to `{ rows, rowCount }`. Adapters build one from a
- * driver client (`executor(pool)` in `@typesql/pg`, which reports `rowCount`); pass it to
- * `createSql(executor)` or to `q.execute(executor)`. An executor that resolves to the rows alone
- * works for everything except `executeCount`, unless it also has a `count` method.
- */
 export type Executor = ((
 	text: string,
 	values: readonly unknown[],
 ) => PromiseLike<readonly unknown[] | ExecutorResult>) & {
-	/** Build an executor that reuses a server-side statement for this text. Must not run SQL yet. */
 	readonly prepare?: (text: string) => Executor;
-	/** Runs the statement for its row count; `executeCount` uses it when present (Prisma's `$executeRaw`). */
 	readonly count?: (
 		text: string,
 		values: readonly unknown[],
 	) => PromiseLike<number>;
 };
 
-/** Thrown by `executeTakeFirstOrThrow` when the query returns no rows. */
 export class NoResultError extends Error {
 	override readonly name = "NoResultError";
 	readonly text: string;
@@ -59,25 +40,12 @@ export interface Query<
 	readonly [ROW]?: Row;
 	readonly [PARAMS]?: Params;
 	readonly [TEXT]?: Text;
-	/** Run the query and return all rows. Uses `executor` if given, else the one bound by `createSql(executor)`. */
 	execute(executor?: Executor): Promise<Row[]>;
-	/** The first row, or `undefined` when there are none. */
 	executeTakeFirst(executor?: Executor): Promise<Row | undefined>;
-	/** The first row; throws `NoResultError` when there are none. */
 	executeTakeFirstOrThrow(executor?: Executor): Promise<Row>;
-	/**
-	 * Run the statement and return its row count: rows affected by `INSERT`/`UPDATE`/`DELETE`/`MERGE`
-	 * (with or without `RETURNING`), rows returned by `SELECT`, 0 for statements without a count.
-	 * Rejects when the executor resolves to rows alone, since it cannot tell the count.
-	 */
 	executeCount(executor?: Executor): Promise<number>;
 }
 
-/**
- * A spliceable piece of SQL. `Text` is the literal when known, `string` when dynamic.
- * `Carried` records the TS types of the values the fragment carries (encoded, one per `$n`),
- * so they can be checked against the parameter types once the fragment is spliced.
- */
 export interface Fragment<
 	Text extends string = string,
 	Params extends readonly unknown[] = readonly unknown[],
@@ -99,14 +67,8 @@ export type TextType<Q> = Q extends { readonly [TEXT]?: infer T extends string }
 	? T
 	: string;
 
-/** Where a query keeps its `rowKeys` (non-enumerable); `Symbol.for` so copies of core agree. */
 const ROW_KEYS = Symbol.for("typesql.rowKeys");
 
-/**
- * Turn rows a driver returned for `q` into the rows `q`'s type describes: a fresh array, with
- * the keys renamed when `q` comes from `createSql(executor, { rowKeys: "camelCase" })`. For
- * helpers that run `q.text` themselves instead of through an `Executor`.
- */
 export function mapRows<Q extends { readonly text: string }>(
 	q: Q,
 	rows: readonly unknown[],
@@ -114,26 +76,16 @@ export function mapRows<Q extends { readonly text: string }>(
 	return applyRowKeys(rows, rowKeysOf(q)) as RowType<Q>[];
 }
 
-/** The `rowKeys` option of the `createSql` that built `q` (`"preserve"` for anything else). */
 export function rowKeysOf(q: { readonly text: string }): RowKeys {
 	return (q as { readonly [ROW_KEYS]?: RowKeys })[ROW_KEYS] ?? "preserve";
 }
 
 const SLOTTABLES = new WeakSet<object>();
 
-/**
- * True when `v` is an authentic fragment or query created by typesql (`sql()`, `sql.as()`,
- * `sql.fragment()`, `sql.raw()`, `sql.id()`, `sql.combine()`, `sql.set()`, `sql.values()`).
- * Unforgeable from plain JSON.
- */
 export function isSlottable(v: unknown): boolean {
 	return typeof v === "object" && v !== null && SLOTTABLES.has(v);
 }
 
-/**
- * A plain object whose `execute*` methods are non-enumerable, so it still deep-equals
- * `{ text, values }` (strictly, too). `rowKeys` renames the keys of the rows `execute*` return.
- */
 export function makeQuery<
 	Row,
 	Params extends readonly unknown[],
@@ -156,8 +108,6 @@ export function makeQuery<
 		const result = await pick(given)(text, values);
 		return applyRowKeys(isRows(result) ? result : result.rows, rowKeys);
 	};
-	// Define fixed keys directly: defineProperties also enumerates and validates a
-	// descriptor map for every query built.
 	const query = { text, values };
 	Object.defineProperty(query, ROW_KEYS, { value: rowKeys });
 	Object.defineProperty(query, "execute", { value: execute });

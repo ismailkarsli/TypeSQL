@@ -1,6 +1,3 @@
-// TypeSQL with Kysely (@typesql/kysely). Your Kysely DB interface (kysely-codegen output or
-// hand-written) is the schema, and raw SQL runs on your Kysely instance. Hover the results.
-
 import { createSql } from "@typesql/kysely";
 import {
 	type ColumnType,
@@ -10,7 +7,6 @@ import {
 } from "kysely";
 import { Pool } from "pg";
 
-// kysely-codegen output, trimmed
 type Int8 = ColumnType<
 	string,
 	bigint | number | string,
@@ -39,7 +35,6 @@ const db = new Kysely<DB>({
 });
 const sql = createSql<DB>(db);
 
-// The query builder for what it does well, SQL for the rest, checked against the same tables.
 const drafts = await db
 	.selectFrom("posts")
 	.select(["id", "title"])
@@ -55,9 +50,7 @@ const leaderboard = sql(
 	"happy",
 );
 const ranked = await leaderboard.execute();
-//    ^?
 
-// Inside a Kysely transaction, bind a sql to it to mix builder and SQL queries.
 await db.transaction().execute(async (trx) => {
 	await trx
 		.updateTable("posts")
@@ -70,4 +63,4 @@ await db.transaction().execute(async (trx) => {
 	).execute();
 });
 
-sql(`SELECT id FROM users WHERE mood = $1`, "angry"); // error: not a value of the mood enum
+sql(`SELECT id FROM users WHERE mood = $1`, "angry");

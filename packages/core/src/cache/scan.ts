@@ -1,10 +1,3 @@
-/**
- * The names a statement could resolve, for a cache entry's dependencies (engine/cache.ts
- * `DbSnapshot`): every word (unquoted identifiers folded like the engine's lexer, quoted ones
- * as written) and every `a.b` pair. Strings, comments and dollar-quoted bodies are skipped the
- * way the lexer skips them; anything else can only add names, which costs nothing but a
- * dependency.
- */
 export interface Names {
 	readonly words: Set<string>;
 	readonly pairs: Set<string>;
@@ -14,7 +7,6 @@ const isIdStart = (c: string): boolean =>
 	/[A-Za-z_]/.test(c) || c.charCodeAt(0) >= 0x80;
 const isIdChar = (c: string): boolean =>
 	/[A-Za-z0-9_$]/.test(c) || c.charCodeAt(0) >= 0x80;
-/** The lexer lowercases ASCII letters only. */
 const fold = (word: string): string =>
 	word.replace(/[A-Z]+/g, (m) => m.toLowerCase());
 
@@ -24,7 +16,6 @@ export function scanNames(text: string): Names {
 	const toks: Tok[] = [];
 	const n = text.length;
 	let i = 0;
-	/** Index after the closing quote `q` (doubled quotes escape it; backslashes too when `escapes`). */
 	const skipQuoted = (from: number, q: string, escapes: boolean): number => {
 		let j = from;
 		while (j < n) {
@@ -104,6 +95,5 @@ export function scanNames(text: string): Names {
 	return { words, pairs };
 }
 
-/** `DROP TYPE` / `ALTER TYPE` rewrite columns of any table: such a step depends on the whole schema. */
 export const touchesAllTables = (text: string): boolean =>
 	/\b(drop|alter)\s+type\b/i.test(text);

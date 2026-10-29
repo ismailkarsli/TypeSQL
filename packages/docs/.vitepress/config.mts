@@ -26,7 +26,6 @@ export default defineConfig({
 }`,
 		],
 	],
-	// Contributor docs are read on GitHub, next to the code they describe.
 	srcExclude: ["internals/**"],
 	themeConfig: {
 		nav: [

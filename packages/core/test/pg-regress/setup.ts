@@ -1,14 +1,4 @@
 #!/usr/bin/env node
-// Checks out the vendor/postgres submodule with only what the regression runs read:
-// src/test/regress/{sql,expected,data} (and the top-level files, which hold the version; `data`
-// is what the type oracle's replay COPYs). The clone is shallow and fetches file contents only
-// for those paths, ~25 MB instead of the whole tree.
-//
-//   node setup.ts          check out the commit the repository pins
-//   node setup.ts <ref>    move the submodule to another tag or commit, e.g. REL_18_7, then
-//                           run `pnpm test:pg-regress --update` and commit both
-//
-// A plain `git submodule update --init vendor/postgres` also works; it checks out the whole tree.
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -25,7 +15,6 @@ const sparse = [
 ];
 const ref = process.argv[2];
 
-// `git ls-files -s` prints `160000 <sha> 0\t<path>` for a submodule.
 const pinned = git(root, "ls-files", "-s", "--", path).split(/\s+/)[1];
 if (!pinned) fail(`${path} is not a submodule of this repository`);
 
@@ -34,7 +23,6 @@ const modules = resolve(
 	git(root, "rev-parse", "--git-path", `modules/${path}`),
 );
 if (!existsSync(join(vendor, ".git")) && existsSync(modules)) {
-	// Checked out before and deinitialized since: reuse that repository and its sparse settings.
 	git(root, "submodule", "update", "--init", "--", path);
 } else if (!existsSync(join(vendor, ".git"))) {
 	git(root, "submodule", "init", "--", path);
@@ -52,7 +40,6 @@ if (!existsSync(join(vendor, ".git")) && existsSync(modules)) {
 		pinned,
 	);
 	git(vendor, "-c", "advice.detachedHead=false", "checkout", "-q", pinned);
-	// Move the repository into .git/modules like `git submodule update` does.
 	git(root, "submodule", "absorbgitdirs", "--", path);
 } else if (
 	spawnSync("git", ["-C", vendor, "config", "--bool", "core.sparseCheckout"], {
@@ -61,7 +48,6 @@ if (!existsSync(join(vendor, ".git")) && existsSync(modules)) {
 ) {
 	console.log(`${path} is a full checkout; leaving it as is.`);
 } else {
-	// A sparse checkout from before a path was added to `sparse`.
 	const listed = git(vendor, "sparse-checkout", "list").split("\n");
 	if (sparse.some((p) => !listed.includes(p)))
 		git(vendor, "sparse-checkout", "set", ...sparse);
@@ -74,7 +60,6 @@ if (git(vendor, "rev-parse", "HEAD") !== target) {
 		fail(
 			`${path} has local changes. The official tests must never be modified:\n${dirty}`,
 		);
-	// A tag is fetched as itself so `git describe` and the checkout below can name it.
 	const spec =
 		ref && !/^[0-9a-f]{40}$/.test(ref)
 			? `+refs/tags/${ref}:refs/tags/${ref}`

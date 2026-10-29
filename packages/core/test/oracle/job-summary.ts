@@ -1,8 +1,6 @@
-/** The GitHub job summary of the oracles. test/pg-regress/run.ts loads this file through Node's type stripping: erasable syntax and Node built-ins only. */
 import { appendFileSync } from "node:fs";
 import type { Located } from "./baseline.ts";
 
-/** `agree 12 · rejects 3 · skipped 40`: `first` in that order, the rest by name, every `skip: …` reason in one total. */
 export function counts(
 	tally: { readonly [outcome: string]: number },
 	first: readonly string[] = ["agree"],
@@ -21,7 +19,6 @@ export function counts(
 	].join(" · ");
 }
 
-/** `` `boolean` (2), `strings` (1) ``: the groups (test files) of the entries, most first, at most `limit`. */
 export function groups(list: readonly Located[], limit = 20): string {
 	const n = new Map<string, number>();
 	for (const e of list) n.set(e.group, (n.get(e.group) ?? 0) + 1);
@@ -32,7 +29,6 @@ export function groups(list: readonly Located[], limit = 20): string {
 	].join(", ");
 }
 
-/** What a run that compares against a baseline reports when it does not match; `cmd` updates the baseline. */
 export function baselineProblems(
 	added: readonly Located[],
 	fixed: readonly Located[],
@@ -49,7 +45,6 @@ export function baselineProblems(
 	];
 }
 
-/** Appends `### ✅ title`, the counts and the problems (❌ when there are any) to the job summary. */
 export function jobSummary(
 	title: string,
 	line: string,

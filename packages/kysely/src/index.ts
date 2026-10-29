@@ -23,7 +23,6 @@ export type {
 	TableOverride,
 } from "./from-kysely.js";
 
-/** What `createSql<DB>(db)` returns: core's `Sql` over `FromKysely<DB, ...>`, with `transaction(fn)`. */
 export type KyselySql<
 	DB,
 	TM = DefaultTypeMap,
@@ -32,21 +31,6 @@ export type KyselySql<
 	Keys extends RowKeys = "preserve",
 > = TransactionalSql<FromKysely<DB, Overrides, Options>, TM, Keys>;
 
-/**
- * `createSql` from core with a Kysely `DB` interface as the schema:
- * `createSql<DB>(db)` is `createSql<FromKysely<DB>, DefaultTypeMap>()` bound to `db`.
- *
- *   const sql = createSql<DB>(db);
- *   const sql = createSql<DB, PgTypeMap, { users: { id: "int8" } }>(db);
- *   const sql = createSql<DB, DefaultTypeMap, {}, { camelCase: true }>(db);
- *
- * The queries' `execute*` methods run on `db` (a `Kysely` instance or transaction), bypassing
- * its plugins, and `sql.transaction(fn)` runs `fn` with a `sql` bound to one transaction.
- * `{ rowKeys: "camelCase" }` camelCases the rows' top-level keys as `CamelCasePlugin` does, in
- * the types and at runtime, without touching JSON values:
- *
- *   const sql = createSql<DB, DefaultTypeMap, {}, { camelCase: true }>(db, { rowKeys: "camelCase" });
- */
 export function createSql<
 	DB,
 	TM = DefaultTypeMap,

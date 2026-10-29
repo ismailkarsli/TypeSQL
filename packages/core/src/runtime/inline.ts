@@ -1,27 +1,11 @@
 import type { InlineMarker } from "../engine/inline.js";
 import { QUOTED } from "./splice.js";
 
-/**
- * Runtime side of inline parameters.
- *
- * `param(value)` returns a token string (NUL-delimited, with a per-process random prefix, so it
- * cannot be forged by user input and never collides with SQL text) and remembers the value.
- * `resolveInline(text, start)` replaces the tokens with `$start+1`, `$start+2`, … and returns
- * the values in that order; a token whose value is `undefined` becomes `DEFAULT` and takes no
- * number. Each token is consumed by the statement that uses it; a fragment resolves its tokens
- * when it is created, so fragments can be reused.
- *
- * The declared return type is the type-level marker (`InlineMarker<T>`), which encodes the
- * value's TS type for the compile-time checks; the runtime string differs on purpose.
- */
 const PREFIX = randomHex(8);
 const MARK = `\u0000typesql${PREFIX}`;
-// Both readers validate MARK before looking up the short id, avoiding hashing
-// and flattening the full token string when param() records a value.
 const pending = new Map<string, unknown>();
 let counter = 0;
 
-/** Bind `value` as a parameter at this position of a template literal (`DEFAULT` when it is `undefined`). */
 export function param<const T>(value: T): InlineMarker<T> {
 	const id = (counter++).toString(36);
 	const token = `${MARK}${id}\u0000`;
@@ -30,14 +14,8 @@ export function param<const T>(value: T): InlineMarker<T> {
 }
 
 const EXACT = new RegExp(`^${MARK}[0-9a-z]+\u0000$`);
-/** A quoted string, quoted identifier or comment, or (group 1: its id) a token. */
 const INLINE = new RegExp(`${QUOTED.source}|${MARK}([0-9a-z]+)\u0000`, "g");
 
-/**
- * A value passed as a value rather than in the SQL text (a `sql.set` / `sql.values` value, a
- * positional or named argument): a `sql.json()` or `sql.param()` token is replaced by the value
- * it holds (a `JsonParam` for `sql.json()`), and consumed. Anything else is returned as it is.
- */
 export function takeValue(value: unknown): unknown {
 	if (typeof value !== "string" || !EXACT.test(value)) return value;
 	const id = value.slice(MARK.length, -1);
@@ -50,21 +28,14 @@ export function takeValue(value: unknown): unknown {
 	return v;
 }
 
-/** Number of tokens created but not yet used (for leak diagnostics in tests). */
 export function pendingParams(): number {
 	return pending.size;
 }
 
-/** Can `text` hold a token? (`resolveInline` leaves a text without a NUL as it is.) */
 export function hasInline(text: string): boolean {
 	return text.includes("\u0000");
 }
 
-/**
- * Replace inline tokens with `$k` (k = start + 1, …) outside quotes and comments (a token whose
- * value is `undefined` with `DEFAULT`, taking no number); tokens inside a quoted string, quoted
- * identifier or comment are an error (the type checker rejects them too).
- */
 export function resolveInline(
 	text: string,
 	start: number,

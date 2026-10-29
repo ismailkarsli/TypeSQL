@@ -4,13 +4,6 @@ import type { CteMap, Scope } from "../types.js";
 import type { ProjectDml } from "./dml.js";
 import type { ProjectSelectParts } from "./select.js";
 
-/**
- * Project any statement:
- *   SELECT / VALUES → `Cols`
- *   DML (INSERT / UPDATE / DELETE / MERGE) with RETURNING → `Cols`; without → `null`
- *   DDL (every other statement) → `null`; DECLARE … CURSOR checks its query, then `null` (it returns no rows)
- * or `SqlError`. SELECT is recognized by its tag only (no structural comparison of the tree).
- */
 export type ProjectStmt<
 	S extends Stmt,
 	DB,

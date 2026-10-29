@@ -1,8 +1,3 @@
-/**
- * The Drizzle schema used by basic.ts: an ordinary Drizzle schema module. The only TypeSQL
- * addition is `pgType`, which pins a type Drizzle's column types do not record.
- */
-
 import { pgType } from "@typesql/drizzle";
 import { relations, sql } from "drizzle-orm";
 import {
@@ -25,7 +20,6 @@ export const users = pgTable("users", {
 	email: text().notNull().unique(),
 	displayName: text("display_name"),
 	mood: mood(),
-	// `withTimezone` is not in Drizzle's types: without pgType this would be `timestamp`.
 	createdAt: pgType(
 		timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 		"timestamptz",
@@ -39,7 +33,6 @@ export const posts = pgTable("posts", {
 		.references(() => users.id),
 	title: text().notNull(),
 	tags: text().array().notNull().default(sql`'{}'`),
-	// Filled in by Drizzle, not by Postgres: raw INSERTs must supply it.
 	slug: text()
 		.notNull()
 		.$defaultFn(() => crypto.randomUUID()),

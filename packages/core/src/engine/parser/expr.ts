@@ -44,7 +44,6 @@ import type {
 } from "./util.js";
 import type { ParseXmlFunc, XmlFuncKeyword, XmlIsDocument } from "./xml.js";
 
-// Canonical node constructors let equal expressions share subsequent inference across statements.
 export type ColNode<Tbl, Name> = { t: "col"; tbl: Tbl; name: Name };
 type NumNode<V> = { t: "num"; v: V };
 type StrNode<V> = { t: "str"; v: V };
@@ -126,16 +125,6 @@ type CallNode<Name, Args, Distinct, Filter, Over, Win, WithinGroup> = {
 	withinGroup: WithinGroup;
 };
 
-/**
- * Pratt expression parser with Postgres precedence (index-based token access).
- *
- *   1 OR | 2 AND | 3 NOT (prefix) | 4 IS ISNULL NOTNULL | 5 < > = <= >= <> |
- *   6 BETWEEN IN LIKE ILIKE SIMILAR | 7 other operators | 8 + - | 9 * / % | 10 ^ |
- *   11 unary + -, AT TIME ZONE, COLLATE | 12 :: [ ] .
- *
- * `ParseExpr<T, I, Min>` parses an expression starting at token `I` whose operators all
- * bind at least as tightly as `Min`. Result: `Ok<Expr, next>` or `SqlError`.
- */
 export type ParseExpr<
 	T extends Toks,
 	I extends number,
@@ -148,14 +137,7 @@ export type ParseExpr<
 		: never;
 
 export type Prec = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13;
-/**
- * `Min` of a target-list expression (`SELECT e [AS] label`): precedence 0, and a keyword that
- * can be a bare label ends the expression when the token after it ends the target. Postgres's
- * LR(1) parser decides on that token: `SELECT 1 and, 2` is the column "and", `SELECT true and
- * false` an AND, and `SELECT NOT a is, 2` an error (the IS binds inside the NOT).
- */
 type MinPrec = Prec | "target";
-/** `Geq[M]` is the set of precedences ≥ M. */
 type Geq = {
 	target: Prec;
 	0: Prec;
@@ -194,12 +176,6 @@ type NextPrec = {
 };
 
 type ComparisonOp = "=" | "<" | ">" | "<=" | ">=" | "<>" | "!=";
-/**
- * Operators that cannot be prefix operators (Postgres's MathOp tokens, `=>` and punctuation;
- * a leading `*` is a star). Any other operator can: `-x`, `+x` bind tightest; `@ x`, `@@ box`,
- * `|/ x`, user-defined `@#@ x` bind looser than the arithmetic operators (`%prec Op`: `@ a + b`
- * is `@ (a + b)`).
- */
 type NotPrefixOp =
 	| "/"
 	| "%"
@@ -222,13 +198,6 @@ type NotPrefixOp =
 	| ":=";
 type Terminator = "(" | ")" | "," | ";" | "]" | ":";
 
-// ───────────────────────────── infix loop ─────────────────────────────
-
-/**
- * The infix loop after operand `L`, at token `I`. In a target list (`Min` is `"target"`) a word
- * that can be a bare label is the target's label when the token after it ends the target (`,`,
- * FROM, `)`, the end, …).
- */
 type ParseInfix<
 	T extends Toks,
 	L,
@@ -245,7 +214,6 @@ type ParseInfix<
 					: ParseInfixAt<T, L, I, Min>
 		: ParseInfixAt<T, L, I, Min>
 	: ParseInfixAt<T, L, I, Min>;
-/** The infix loop at token `I`. */
 type ParseInfixAt<T extends Toks, L, I extends number, Min extends MinPrec> =
 	T[I] extends OpTok<infer O>
 		? O extends Terminator
@@ -308,8 +276,7 @@ type ParseInfixAt<T extends Toks, L, I extends number, Min extends MinPrec> =
 											? Binds<6, Min> extends true
 												? ParseLike<T, L, Nx<I>, Min, W, false>
 												: Ok<L, I>
-											: // without TO, SIMILAR ends the operand (`SUBSTRING(e SIMILAR p ESCAPE c)`)
-												W extends "similar"
+											: W extends "similar"
 												? Binds<6, Min> extends true
 													? EatWord<T, Nx<I>, "to"> extends never
 														? Ok<L, I>
@@ -347,20 +314,8 @@ type ParseInfixAt<T extends Toks, L, I extends number, Min extends MinPrec> =
 																	: Ok<L, I>
 			: Ok<L, I>;
 
-/**
- * What a subscript or a field selection may follow (Postgres's `indirection`, at any
- * precedence): a column or a parameter (subscript only), a subquery, another indirection, or a
- * parenthesized expression (`(e)[i]`, `(e).f`, read by ParseParen). `f(x)[1]`, `ARRAY[1][1]`,
- * `'a'[1]` and `ROW(1, 2).f1` are syntax errors.
- */
 type Indirectable = { readonly t: "sub" | "field" | "idx" | "slice" };
 
-/**
- * Comparisons, IS DISTINCT FROM, LIKE / ILIKE / SIMILAR TO and BETWEEN are `%nonassoc`: an
- * operator of the same precedence right after the right operand is a syntax error (`a = b = c`,
- * `a IS DISTINCT FROM b IS NULL`, `a LIKE b IN (c)`), even one that could be a label. Otherwise
- * the infix loop goes on with `L`.
- */
 type NonAssoc<
 	T extends Toks,
 	L,
@@ -368,7 +323,6 @@ type NonAssoc<
 	Min extends MinPrec,
 	P extends 4 | 5 | 6,
 > = PrecAt<T, J> extends P ? SyntaxErrorAt<T, J> : ParseInfix<T, L, J, Min>;
-/** The precedence (4, 5 or 6) of the non-associative operator at `J`, else 0. */
 type PrecAt<T extends Toks, J extends number> =
 	T[J] extends OpTok<ComparisonOp>
 		? 5
@@ -392,14 +346,6 @@ type IsTest_<E, What extends IsTest["what"], Not extends boolean> = {
 	not: Not;
 };
 
-/**
- * `a AND b AND c ...` / `a OR b OR c ...`: the operands are collected and folded into a
- * *balanced* tree instead of the usual left-nested one. Both operators are associative
- * (same type and three-valued nullability for any grouping), and a balanced tree keeps
- * the AST depth at log2(n): left-nested chains of ~90 terms exceed TypeScript's
- * instantiation depth whenever the tree is matched or compared (ENGINE.md pitfall 12).
- * `P` is the operand precedence (one above the operator's).
- */
 type ParseChain<
 	T extends Toks,
 	Op extends "and" | "or",
@@ -421,7 +367,6 @@ type ParseChain<
 				: ParseInfix<T, Balance<[...Items, E], Op>, J, Min>
 			: X
 		: never;
-/** Fold operands pairwise (`[a, b, c, d, e]` → `[ab, cd, e]` → `[abcd, e]` → `abcde`). */
 type Balance<
 	Items extends readonly unknown[],
 	Op extends string,
@@ -436,11 +381,6 @@ type PairUp<
 	? PairUp<Rest, Op, [...Acc, BinNode<Op, A, B>]>
 	: [...Acc, ...Items];
 
-/**
- * Generic binary operator at token `I0`, its right operand at `I`: parse the operand at
- * `NextPrec[Bp]` (left-assoc), then continue. `l op ANY|SOME|ALL (…)` works with every operator
- * (Postgres checks later that it yields boolean).
- */
 type BinRhs<
 	T extends Toks,
 	L,
@@ -462,7 +402,6 @@ type BinRhs<
 				: never
 		: Ok<L, I0>;
 
-/** `l <cmp> rhs` where rhs may be `ANY|SOME|ALL (subquery | array)`. `I` is after the operator. */
 type ParseComparisonRhs<
 	T extends Toks,
 	L,
@@ -487,10 +426,6 @@ type ParseComparisonRhs<
 				: X
 			: never;
 
-/**
- * `I` is just inside the paren. What does not read as a subquery ending at the paren is an
- * expression: `= ANY (arr)`, `= ANY ((SELECT …)::int[])`.
- */
 type ParseQuantified<
 	T extends Toks,
 	L,
@@ -527,7 +462,6 @@ type ParseCastSuffix<T extends Toks, L, I extends number, Min extends MinPrec> =
 			: X
 		: never;
 
-/** After `[`: `e[i]` or `e[lo:hi]`, `e[:hi]`, `e[lo:]`. */
 type ParseSubscript<T extends Toks, L, I extends number, Min extends MinPrec> =
 	EatOp<T, I, ":"> extends never
 		? ParseExpr<T, I, 0> extends infer X
@@ -557,7 +491,6 @@ type ParseSliceHi<
 			: never
 		: ParseInfix<T, SliceNode<L, Lo, null>, EatOp<T, I, "]">, Min>;
 
-/** `(e).name` or `(e).*` (name `"*"`). */
 type ParseFieldAccess<
 	T extends Toks,
 	L,
@@ -570,7 +503,6 @@ type ParseFieldAccess<
 			? ParseInfix<T, FieldNode<L, N>, J, Min>
 			: Expected<"field name", T, I>;
 
-/** After `IS`. */
 type ParseIs<T extends Toks, L, I extends number, Min extends MinPrec> =
 	EatWord<T, I, "not"> extends never
 		? ParseIsBody<T, L, I, Min, false>
@@ -587,8 +519,7 @@ type ParseIsBody<
 			? ParseInfix<T, IsTest_<L, W, Not>, Nx<I>, Min>
 			: W extends "document"
 				? ParseInfix<T, XmlIsDocument<L, Not>, Nx<I>, Min>
-				: // `IS [NOT] JSON [VALUE | SCALAR | ARRAY | OBJECT] [WITH | WITHOUT UNIQUE [KEYS]]` (parser/json.ts)
-					W extends "json"
+				: W extends "json"
 					? ParseInfix<
 							T,
 							IsJsonNode<L, Not>,
@@ -631,10 +562,8 @@ type ParseIsBody<
 										I
 									>
 		: Expected<"NULL, TRUE, FALSE, UNKNOWN, DISTINCT FROM or NORMALIZED", T, I>;
-/** `IS NOT NORMALIZED` is `NOT is_normalized(…)` (so it is named `?column?`). */
 type NotIf<E, Not extends boolean> = Not extends true ? UnNode<"not", E> : E;
 
-/** After `NOT` in infix position: `NOT IN`, `NOT LIKE`, `NOT ILIKE`, `NOT SIMILAR TO`, `NOT BETWEEN`. `I0` is the index of NOT. */
 type ParseNegated<
 	T extends Toks,
 	L,
@@ -656,10 +585,6 @@ type ParseNegated<
 						: Ok<L, I0>
 		: Ok<L, I0>;
 
-/**
- * After `IN`: `(subquery)` or `(list)`. A parenthesized subquery that does not end at the paren
- * starts the list: `IN ((SELECT 1), 2)`.
- */
 type ParseIn<
 	T extends Toks,
 	L,
@@ -680,7 +605,6 @@ type ParseIn<
 					: X
 				: never
 			: ParseInList<T, L, EatOp<T, I, "(">, Min, Not>;
-/** `IN (` list `)`, `I` after the paren. */
 type ParseInList<
 	T extends Toks,
 	L,
@@ -729,7 +653,6 @@ type ParseLike<
 				: X
 			: never;
 
-/** `x [NOT] LIKE|ILIKE ANY|ALL (…)` is the quantified form of the `~~` operator family. */
 type LikeOp<Kind extends string, Not extends boolean> = Kind extends "ilike"
 	? Not extends true
 		? "!~~*"
@@ -757,7 +680,6 @@ type ParseBetween<
 			: X
 		: never;
 
-/** `e AT TIME ZONE z`, or `e AT LOCAL`, which is `timezone(e)` (named `timezone` like the other form). */
 type ParseAtTimeZone<T extends Toks, L, I extends number, Min extends MinPrec> =
 	T[I] extends WordTok<"local">
 		? ParseInfix<T, CallOf<"timezone", [L]>, Nx<I>, Min>
@@ -777,10 +699,6 @@ type ParseCollate<T extends Toks, L, I extends number, Min extends MinPrec> =
 		? ParseInfix<T, CollateNode<L, LastOf<Parts>>, J, Min>
 		: Expected<"collation name", T, I>;
 
-/**
- * After `row OVERLAPS`: the right operand is a row too (`(c, d)` or `ROW(c, d)`); both have two
- * items. Postgres calls `overlaps(a, b, c, d)`.
- */
 type ParseOverlaps<
 	T extends Toks,
 	Ls extends readonly unknown[],
@@ -803,7 +721,6 @@ type ParseOverlaps<
 			: X
 		: never
 	: Fail<"wrong number of parameters on left side of OVERLAPS expression", I>;
-/** A plain call node for syntax that Postgres turns into a function call. */
 type CallOf<Name extends string, Args> = CallNode<
 	Name,
 	Args,
@@ -814,10 +731,6 @@ type CallOf<Name extends string, Args> = CallNode<
 	null
 >;
 
-/**
- * `OPERATOR(schema.op)`: the operator `op`, at Op precedence (7) whatever its symbol. `I` is after
- * OPERATOR, `I0` at it; without a paren the word ends the operand (a label).
- */
 type ParseOperatorSyntax<
 	T extends Toks,
 	L,
@@ -830,10 +743,6 @@ type ParseOperatorSyntax<
 			? BinRhs<T, L, O, 7, I0, J, Min>
 			: SyntaxErrorAt<T, Extract<QualOp<T, Nx<I>>, number>>
 		: Ok<L, I0>;
-/**
- * `name.name.op)` of `OPERATOR(…)` from `I`: `[op, index after the paren]`, or the index of the
- * token that does not fit.
- */
 type QualOp<T extends Toks, I extends number> =
 	T[I] extends OpTok<infer O>
 		? T[Nx<I>] extends OpTok<")">
@@ -842,7 +751,6 @@ type QualOp<T extends Toks, I extends number> =
 		: T[Nx<I>] extends OpTok<".">
 			? QualOp<T, Nx2<I>>
 			: Nx<I>;
-/** `OPERATOR(schema.op) e`: a prefix operator at Op precedence, whatever its symbol (`I` is after the paren). */
 type ParseQualPrefix<T extends Toks, I extends number> =
 	QualOp<T, I> extends [infer O, infer J extends number]
 		? ParseExpr<T, J, 8> extends infer X
@@ -851,8 +759,6 @@ type ParseQualPrefix<T extends Toks, I extends number> =
 				: X
 			: never
 		: SyntaxErrorAt<T, Extract<QualOp<T, I>, number>>;
-
-// ───────────────────────────── prefix ─────────────────────────────
 
 type PrefixKeyword =
 	| ReservedKeyword
@@ -1006,11 +912,6 @@ type ParsePrefix<T extends Toks, I extends number> =
 								: ParseNameExpr<T, I>
 							: Fail<"syntax error at end of input", I>;
 
-/**
- * Type names written with keywords (`ConstTypename`): `timestamp(3) with time zone '…'`,
- * `char(20) '…'`, `double precision '…'`, `interval(2) '…'`, `numeric(10, 2) '…'`. Without a
- * string after the type, the word is a column or function name (`time`, `char(65)`).
- */
 type ConstTypeWord =
 	| "timestamp"
 	| "time"
@@ -1030,18 +931,13 @@ type ParseConstTypeLit<T extends Toks, I extends number> =
 	ParseTypeName<T, I> extends Ok<infer Ty, infer J>
 		? T[J] extends StrTok<infer V>
 			? Ty extends `${string}[]`
-				? ParseNameExpr<T, I> // a `ConstTypename` has no array bounds: `numeric[] '{1}'` subscripts a column
+				? ParseNameExpr<T, I>
 				: Ty extends "interval"
 					? ParseIntervalLit<T, I, V, J>
 					: Ok<TypedNode<Ty, V>, Nx<J>>
 			: ParseNameExpr<T, I>
 		: ParseNameExpr<T, I>;
 
-/**
- * `INTERVAL '…' [fields]` or `INTERVAL (p) '…'` (`ConstInterval`), the string at `J`: the
- * fields come after the string, and not after a precision (`interval day '1'` and
- * `interval(2) '1' day` are syntax errors).
- */
 type ParseIntervalLit<T extends Toks, I extends number, V, J extends number> =
 	T[Nx<I>] extends OpTok<"(">
 		? Ok<TypedNode<"interval", V>, Nx<J>>
@@ -1053,7 +949,6 @@ type ParseIntervalLit<T extends Toks, I extends number, V, J extends number> =
 				: never
 			: SyntaxErrorAt<T, Nx<I>>;
 
-/** After `COLLATION FOR`: `(e)`, which Postgres calls as `pg_collation_for(e)`. */
 type ParseCollationFor<T extends Toks, I extends number> =
 	EatOp<T, I, "("> extends never
 		? Expected<'"("', T, I>
@@ -1065,7 +960,6 @@ type ParseCollationFor<T extends Toks, I extends number> =
 				: X
 			: never;
 
-/** After `NORMALIZE(`: `e [, NFC | NFD | NFKC | NFKD])`; the form is a keyword, passed as a string. */
 type ParseNormalize<T extends Toks, I extends number> =
 	ParseExpr<T, I, 0> extends infer X
 		? X extends Ok<infer E, infer J>
@@ -1097,18 +991,12 @@ type SpecialValueFunction =
 	| "user"
 	| "system_user";
 
-/** The special value functions that take a precision: `current_time(3)`. */
 type PrecisionValueFunction =
 	| "current_timestamp"
 	| "current_time"
 	| "localtime"
 	| "localtimestamp";
 
-/**
- * A special value function at `I`. `current_schema()` with parens is a regular call; the
- * others take no parentheses, or only a precision, and Postgres fails at the first token
- * that does not fit.
- */
 type ParseSpecialValue<T extends Toks, W extends string, I extends number> =
 	T[Nx<I>] extends OpTok<"(">
 		? W extends "current_schema"
@@ -1122,7 +1010,6 @@ type ParseSpecialValue<T extends Toks, W extends string, I extends number> =
 				: SyntaxErrorAt<T, Nx<I>>
 		: SpecialValue<W, Nx<I>>;
 
-/** `current_date`, `current_time(3)`, ...: a zero-argument call named after the keyword, ending before `J`. */
 type SpecialValue<W extends string, J extends number> = Ok<
 	CallNode<W, [], false, null, false, null, null>,
 	J
@@ -1139,7 +1026,6 @@ type ParseUnary<T extends Toks, O extends string, I extends number> =
 			: X
 		: never;
 
-/** After `(`: subquery, parenthesized expression, or row constructor. */
 type ParseParen<T extends Toks, I extends number> =
 	IsSelectStart<T, I> extends true
 		? ParseSelectStmt<T, I> extends infer X
@@ -1168,7 +1054,6 @@ type ParseParen<T extends Toks, I extends number> =
 							: Ok<E, EatOp<T, J, ")">>
 				: X
 			: never;
-/** `(e).name` / `(e).*` after a parenthesized expression (the infix loop continues with the result). */
 type ParseParenField<T extends Toks, E, I extends number> =
 	T[I] extends OpTok<"*">
 		? Ok<FieldNode<E, "*">, Nx<I>>
@@ -1176,8 +1061,6 @@ type ParseParenField<T extends Toks, E, I extends number> =
 			? Ok<FieldNode<E, N>, J>
 			: Expected<"field name", T, I>;
 
-/** Identifier-led expression: column ref, `t.*`, function call, or typed literal. */
-/** Recognize ordinary columns independently of the statement and token index. */
 type ColumnPrefix<H, A, B, C> = H extends IdTok<infer N> | WordTok<infer N>
 	? H extends WordTok<NotColId>
 		? null
@@ -1219,7 +1102,7 @@ type ParseNameExprSlow<T extends Toks, I extends number> =
 						? Ok<TypedNode<NormalizeTypeName<LastOf<Parts>>, V>, Nx<J>>
 						: SyntaxErrorAt<T, J>
 					: Ok<ColRefOf<Parts>, J>
-		: SyntaxErrorAt<T, Nx<I>>; // a type/function-name keyword not followed by `(` (`SELECT left FROM t`)
+		: SyntaxErrorAt<T, Nx<I>>;
 
 type LastOf<Parts extends readonly string[]> = Parts extends readonly [
 	...string[],
@@ -1237,7 +1120,6 @@ type ColRefOf<Parts extends readonly string[]> = Parts extends readonly [
 			? ColNode<Tb, C>
 			: never;
 
-/** After `name(`. */
 export type ParseCall<T extends Toks, Name extends string, I extends number> =
 	T[I] extends OpTok<")">
 		? ParseCallSuffix<T, Name, [], false, Nx<I>>
@@ -1267,10 +1149,6 @@ type ParseCallArgs<
 			: X
 		: never;
 
-/**
- * Call arguments: `e`, `name => e` / `name := e` (after the positional ones), and `VARIADIC arg`
- * as the last one. `Names` is the union of the names used so far.
- */
 type ParseArgList<
 	T extends Toks,
 	I extends number,
@@ -1301,7 +1179,6 @@ type ParseArgList<
 						>
 				: X
 			: never;
-/** One argument; Postgres's checks on argument names (parse_func.c) are done here. */
 type ParseArg<T extends Toks, I extends number, Names extends string> =
 	T[Nx<I>] extends OpTok<"=>" | ":=">
 		? ArgName<T, I> extends infer N extends string
@@ -1322,7 +1199,6 @@ type ParseArg<T extends Toks, I extends number, Names extends string> =
 					? Fail<"positional argument cannot follow named argument", I>
 					: X
 				: never;
-/** A parameter name (`type_function_name`): an identifier or a keyword usable as a function name. */
 type ArgName<T extends Toks, I extends number> =
 	T[I] extends IdTok<infer V>
 		? V
@@ -1332,7 +1208,6 @@ type ArgName<T extends Toks, I extends number> =
 				: V
 			: null;
 
-/** `ORDER BY ...` inside an aggregate call: parsed and discarded. Returns next index or error. */
 type SkipAggOrderBy<T extends Toks, I extends number> =
 	EatWords<T, I, ["order", "by"]> extends never
 		? I
@@ -1342,7 +1217,6 @@ type SkipAggOrderBy<T extends Toks, I extends number> =
 				: X
 			: never;
 
-/** `WITHIN GROUP (ORDER BY e)`, `FILTER (WHERE e)`, `OVER (...)` / `OVER name`. */
 type ParseCallSuffix<
 	T extends Toks,
 	Name extends string,
@@ -1386,7 +1260,6 @@ type ParseCallDecorations<
 			: W
 		: never;
 
-/** `WITHIN GROUP (ORDER BY e, …)` → the first sort key (its type is the result of `mode`, `percentile_disc`). */
 type ParseWithinGroup<T extends Toks, I extends number> =
 	EatWords<T, I, ["within", "group"]> extends never
 		? Ok<null, I>
@@ -1413,8 +1286,7 @@ type ParseWithinGroup<T extends Toks, I extends number> =
 					? X extends Ok<infer Es, infer J>
 						? EatOp<T, J, ")"> extends never
 							? Expected<'")"', T, J>
-							: // several sort keys (hypothetical-set aggregates: `rank(1, 2) WITHIN GROUP (ORDER BY a, b)`) are kept as a row
-								Ok<
+							: Ok<
 									Es extends readonly [infer E] ? E : RowNode<Es>,
 									EatOp<T, J, ")">
 								>
@@ -1444,7 +1316,6 @@ export type ParseFilter<T extends Toks, I extends number> =
 						: X
 					: never;
 
-/** `OVER (spec)` or `OVER name` → `Ok<WindowSpec | null, next>`. */
 export type ParseOver<T extends Toks, I extends number> =
 	EatWord<T, I, "over"> extends never
 		? Ok<null, I>
@@ -1454,10 +1325,6 @@ export type ParseOver<T extends Toks, I extends number> =
 				? Ok<{ name: W; partition: []; order: [] }, Nx<EatWord<T, I, "over">>>
 				: Expected<"window specification", T, EatWord<T, I, "over">>;
 
-/**
- * Window specification after `(`: `[existing_window] [PARTITION BY exprs] [ORDER BY items] [frame] )`.
- * The frame clause (`ROWS | RANGE | GROUPS ... [EXCLUDE ...]`) is checked and discarded.
- */
 export type ParseWindowSpec<T extends Toks, I extends number> =
 	WindowBaseName<T, I> extends [infer Name, infer I1 extends number]
 		? ParseWindowPartition<T, I1> extends infer P
@@ -1502,11 +1369,6 @@ type ParseWindowOrder<T extends Toks, I extends number> =
 	EatWords<T, I, ["order", "by"]> extends never
 		? Ok<[], I>
 		: ParseOrderList<T, EatWords<T, I, ["order", "by"]>>;
-/**
- * `[ROWS | RANGE | GROUPS] (BETWEEN bound AND bound | bound) [EXCLUDE ...]` → `Ok<kinds of
- * the bounds, next>` or error. The bounds are checked as Postgres's grammar checks them; a
- * single bound ends at the current row.
- */
 type ParseFrame<T extends Toks, I extends number> =
 	EatWord<T, I, "rows" | "range" | "groups"> extends never
 		? Ok<never, I>
@@ -1536,17 +1398,12 @@ type ParseFrame<T extends Toks, I extends number> =
 							: never
 					: B
 				: never;
-/** `[EXCLUDE ...]` after the bounds → `Ok<Kinds, next>` or error. */
 type FrameExclusion<T extends Toks, Kinds, I extends number> =
 	SkipExclude<T, I> extends infer J
 		? J extends number
 			? Ok<Kinds, J>
 			: J
 		: never;
-/**
- * Postgres's checks of a frame (mode token `Mode`, bound kinds `Kinds`) against the window's
- * own ORDER BY; a window built on a named one may take that one's ORDER BY.
- */
 type FrameOrderError<Mode, Kinds, Name, Ord> = [Name, Ord] extends [
 	null,
 	readonly [],
@@ -1559,7 +1416,6 @@ type FrameOrderError<Mode, Kinds, Name, Ord> = [Name, Ord] extends [
 				: "RANGE with offset PRECEDING/FOLLOWING requires exactly one ORDER BY column"
 			: null
 	: null;
-/** The error of a `BETWEEN S AND E` frame, or null. */
 type FrameError<S, E> = S extends "unbounded following"
 	? "frame start cannot be UNBOUNDED FOLLOWING"
 	: E extends "unbounded preceding"
@@ -1573,10 +1429,6 @@ type FrameError<S, E> = S extends "unbounded following"
 					? "frame starting from following row cannot have preceding rows"
 					: null
 				: null;
-/**
- * `UNBOUNDED PRECEDING | UNBOUNDED FOLLOWING | CURRENT ROW | expr PRECEDING | expr FOLLOWING`
- * → `[kind, next]` (`"preceding"` / `"following"` for an offset) or error.
- */
 type ParseFrameBound<T extends Toks, I extends number> =
 	EatWords<T, I, ["unbounded", "preceding"]> extends never
 		? EatWords<T, I, ["unbounded", "following"]> extends never
@@ -1661,7 +1513,6 @@ type ParseCast<T extends Toks, I extends number> =
 				: X
 			: never;
 
-/** After `EXISTS (` (without the paren `exists` is a column name). */
 type ParseExists<T extends Toks, I extends number> =
 	ParseSelectStmt<T, I> extends infer X
 		? X extends Ok<infer S, infer J>
@@ -1671,7 +1522,6 @@ type ParseExists<T extends Toks, I extends number> =
 			: X
 		: never;
 
-/** After `ARRAY`: `[...]` or `(subquery)`. */
 type ParseArray<T extends Toks, I extends number> =
 	EatOp<T, I, "["> extends never
 		? EatOp<T, I, "("> extends never
@@ -1684,7 +1534,6 @@ type ParseArray<T extends Toks, I extends number> =
 					: X
 				: never
 		: ParseArrayLiteral<T, EatOp<T, I, "[">>;
-/** After `[`. */
 type ParseArrayLiteral<T extends Toks, I extends number> =
 	EatOp<T, I, "]"> extends never
 		? ParseExprList<T, I, []> extends infer X
@@ -1696,7 +1545,6 @@ type ParseArrayLiteral<T extends Toks, I extends number> =
 			: never
 		: Ok<ArrayNode<[]>, EatOp<T, I, "]">>;
 
-/** After `ROW(`. */
 type ParseRow<T extends Toks, I extends number> =
 	EatOp<T, I, ")"> extends never
 		? ParseExprList<T, I, []> extends infer X
@@ -1708,7 +1556,6 @@ type ParseRow<T extends Toks, I extends number> =
 			: never
 		: Ok<RowNode<[]>, EatOp<T, I, ")">>;
 
-/** After `EXTRACT(`. */
 type ParseExtract<T extends Toks, I extends number> = T[I] extends
 	| WordTok<infer F>
 	| StrTok<infer F>
@@ -1723,7 +1570,6 @@ type ParseExtract<T extends Toks, I extends number> = T[I] extends
 			: never
 	: Expected<"field FROM expression", T, I>;
 
-/** After `POSITION(`: `sub IN str`. The first operand stops before `IN`. */
 type ParsePosition<T extends Toks, I extends number> =
 	ParseExpr<T, I, 7> extends infer X
 		? X extends Ok<infer Sub, infer J>
@@ -1739,10 +1585,6 @@ type ParsePosition<T extends Toks, I extends number> =
 			: X
 		: never;
 
-/**
- * After `SUBSTRING(`: `e FROM a [FOR b]`, `e FOR b [FROM a]`, `e SIMILAR p ESCAPE c`, or
- * `e, a[, b]`.
- */
 type ParseSubstring<T extends Toks, I extends number> =
 	ParseExpr<T, I, 0> extends infer X
 		? X extends Ok<infer E, infer J>
@@ -1761,7 +1603,6 @@ type ParseSubstring<T extends Toks, I extends number> =
 					: never
 			: X
 		: never;
-/** After `SUBSTRING(e`. */
 type ParseSubstringFromFor<T extends Toks, E, I extends number> =
 	EatWord<T, I, "from"> extends never
 		? EatWord<T, I, "for"> extends never
@@ -1788,7 +1629,6 @@ type ParseSubstringFromFor<T extends Toks, E, I extends number> =
 				? CloseSubstring<T, E, From, For, J>
 				: X
 			: never;
-/** `a [W b]` → `Ok<{ a; b }, next>` (`b` is null without `W`). */
 type SubstringOperands<T extends Toks, I extends number, W extends string> =
 	ParseExpr<T, I, 0> extends infer X
 		? X extends Ok<infer A, infer J>
@@ -1806,7 +1646,6 @@ type CloseSubstring<T extends Toks, E, From, For, I extends number> =
 		? Expected<'")"', T, I>
 		: Ok<SubstringNode<E, From, For>, EatOp<T, I, ")">>;
 
-/** After `TRIM(`: `[BOTH|LEADING|TRAILING] [chars FROM] e` or `(e)` / `(e, chars)`. */
 type ParseTrim<T extends Toks, I extends number> =
 	T[I] extends WordTok<infer Side extends "both" | "leading" | "trailing">
 		? ParseTrimBody<T, Nx<I>, Side>
@@ -1844,7 +1683,6 @@ type ParseTrimBody<T extends Toks, I extends number, Side extends string> =
 				: X
 			: never;
 
-/** After `OVERLAY(`: `e PLACING p FROM a [FOR b]`. */
 type ParseOverlay<T extends Toks, I extends number> =
 	ParseExpr<T, I, 0> extends infer X
 		? X extends Ok<infer E, infer J>
@@ -1874,9 +1712,6 @@ type CloseOverlay<T extends Toks, E, P, From, For, I extends number> =
 		? Expected<'")"', T, I>
 		: Ok<OverlayNode<E, P, From, For>, EatOp<T, I, ")">>;
 
-// ───────────────────────────── lists ─────────────────────────────
-
-/** Comma-separated expressions: `Ok<exprs, next>`. Stops before the first non-comma token. */
 export type ParseExprList<
 	T extends Toks,
 	I extends number,
@@ -1890,7 +1725,6 @@ export type ParseExprList<
 			: X
 		: never;
 
-/** `ORDER BY` items (after `ORDER BY`): expressions only; direction and NULLS ordering are discarded. */
 export type ParseOrderList<
 	T extends Toks,
 	I extends number,
@@ -1903,7 +1737,6 @@ export type ParseOrderList<
 				: ParseOrderList<T, EatOp<T, SkipOrderTail<T, J>, ",">, [...Acc, E]>
 			: X
 		: never;
-/** `[ASC | DESC | USING op] [NULLS FIRST | LAST]` → next index. */
 export type SkipOrderTail<T extends Toks, I extends number> = SkipNulls<
 	T,
 	EatWord<T, I, "asc" | "desc"> extends never

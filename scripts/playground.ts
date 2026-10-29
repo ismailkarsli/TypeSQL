@@ -1,16 +1,8 @@
-// TypeScript Playground links for the files in packages/docs/playground/. A Markdown line that
-// links to the Playground carries a `playground:<name>` marker (an HTML comment, or a YAML comment
-// in frontmatter), and its link opens packages/docs/playground/<name>.ts.
-//
-//   node scripts/playground.ts          rewrite the links from the current sources
-//   node scripts/playground.ts --check  fail when a link is stale, or when a source compiles
-//                                        differently than it says: lines ending in `// error …`
-//                                        must fail, every other line must compile
-import { spawnSync } from "node:child_process";
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import lz from "lz-string";
+import { checkExamples } from "./check-examples.ts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const sourceDir = join(root, "packages/docs/playground");
@@ -22,7 +14,6 @@ const sources = new Map(
 		.map((f) => [basename(f, ".ts"), readFileSync(join(sourceDir, f), "utf8")]),
 );
 
-/** The Playground's latest stable TypeScript; types come from the published packages on npm. */
 const playgroundUrl = (code: string): string =>
 	`https://www.typescriptlang.org/play/#code/${lz.compressToEncodedURIComponent(code)}`;
 
@@ -43,7 +34,7 @@ const docs = [
 ].filter((f) => !f.endsWith("CHANGELOG.md"));
 
 const LINK = /https:\/\/www\.typescriptlang\.org\/play\/[^\s)"'<>]*/g;
-const MARKER = /playground:([\w-]+)/;
+const MARKER = /data-playground="([\w-]+)"/;
 const problems: string[] = [];
 const used = new Set<string>();
 
@@ -51,8 +42,12 @@ for (const file of docs) {
 	const before = readFileSync(file, "utf8");
 	const after = before
 		.split("\n")
-		.map((line, i) => {
-			const name = line.match(MARKER)?.[1];
+		.map((line, i, lines) => {
+			const name =
+				line.match(MARKER)?.[1] ??
+				(/^\s*link:/.test(line)
+					? lines[i + 1]?.match(/^\s*playground: ([\w-]+)/)?.[1]
+					: undefined);
 			if (!name) return line;
 			const where = `${relative(root, file)}:${i + 1}`;
 			const code = sources.get(name);
@@ -85,40 +80,7 @@ for (const name of sources.keys()) {
 		);
 }
 
-if (check) {
-	const tsc = spawnSync(
-		join(root, "node_modules/.bin/tsrs"),
-		["-p", join(sourceDir, "tsconfig.json"), "--pretty", "false"],
-		{
-			cwd: root,
-			encoding: "utf8",
-		},
-	);
-	const failing = new Set<string>();
-	for (const m of tsc.stdout.matchAll(
-		/^(.+?)\((\d+),\d+\): error (TS\d+: .*)$/gm,
-	)) {
-		const [, path, line, message] = m;
-		const name = basename(path!, ".ts");
-		failing.add(`${name}:${line}`);
-		if (
-			!/\/\/ error\b/.test(
-				sources.get(name)?.split("\n")[Number(line) - 1] ?? "",
-			)
-		) {
-			problems.push(`${path}:${line}: unexpected ${message}`);
-		}
-	}
-	for (const [name, code] of sources) {
-		code.split("\n").forEach((line, i) => {
-			if (/\/\/ error\b/.test(line) && !failing.has(`${name}:${i + 1}`)) {
-				problems.push(
-					`packages/docs/playground/${name}.ts:${i + 1}: marked \`// error\` but compiles`,
-				);
-			}
-		});
-	}
-}
+if (check) problems.push(...checkExamples());
 
 if (problems.length) {
 	for (const p of problems) console.error(p);

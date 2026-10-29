@@ -20,10 +20,10 @@ A commit or pull request that changes the behaviour of a published package adds 
 in the same commit:
 
 ```sh
-pnpm change                                                # interactive; packages changed since main are preselected
-pnpm change @typesql/kysely --bump patch --summary "…"     # non-interactive, for scripts and agents
-pnpm change @typesql/core --bump none --summary "…"        # an explicit "no release needed"
-pnpm change status                                         # pending intents and the release plan they produce
+pnpm change
+pnpm change @typesql/kysely --bump patch --summary "…"
+pnpm change @typesql/core --bump none --summary "…"
+pnpm change status
 ```
 
 The interactive form needs a terminal; anywhere else pass the package names, `--bump` and
@@ -56,8 +56,8 @@ private packages need no intent. When a change needs no release (a refactor, a R
 record that with `--bump none`. Run it before pushing:
 
 ```sh
-pnpm check:intents             # against origin/main, uncommitted intents included
-pnpm check:intents HEAD~3      # against another base
+pnpm check:intents
+pnpm check:intents HEAD~3
 ```
 
 ## Cutting a release
@@ -67,8 +67,8 @@ Packages are versioned and published only by the `release` workflow
 local machine. With the intents to release pushed to `main`:
 
 ```sh
-pnpm change status                 # check the plan: every bump and why
-pnpm release                       # gh workflow run release.yml --ref main
+pnpm change status
+pnpm release
 ```
 
 The workflow runs only when started by hand on `main`, with `pnpm release` or **Run workflow** on

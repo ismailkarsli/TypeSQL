@@ -1,4 +1,3 @@
-/** Rows are kept as arrays: duplicate column names stay apart. */
 import postgres from "postgres";
 
 export const ROW_CAP = 1000;
@@ -40,7 +39,6 @@ export class Connection {
 			fetch_types: true,
 			idle_timeout: 0,
 			onnotice: () => undefined,
-			// JSON as text: a JSON `null` must not read as SQL NULL
 			types: {
 				json: {
 					to: 114,
@@ -61,7 +59,6 @@ export class Connection {
 		return this.sql.end({ timeout: 5 });
 	}
 
-	/** The COPY sub-protocol is not used (postgres.js loses errors in it): COPY goes through a program on the server. */
 	async runScript(text: string, copyData?: string): Promise<Ran> {
 		const rows: unknown[][] = [];
 		let count = 0;
@@ -125,7 +122,6 @@ export class Connection {
 		}
 	}
 
-	/** As `compare.ts` compares types: arrays as `elem[]`, domains as their base type. An unknown OID reloads the map. */
 	async typeName(oid: number): Promise<string> {
 		if (!this.names.has(oid)) await this.loadTypeNames();
 		return this.names.get(oid) ?? `oid:${oid}`;
@@ -165,11 +161,9 @@ export function serverError(e: unknown): ServerError {
 	};
 }
 
-/** A describe error is a rejection also outside class 42 (3F000); resource and system errors are not. `compare.ts` skips class 22 before asking. */
 export const isRejection = (e: ServerError): boolean =>
 	!/^(53|54|57|58|XX)/.test(e.code);
 
-/** A statement that fails to describe is still run (utility statements cannot be described). */
 export async function replay(
 	conn: Connection,
 	statements: readonly string[],
@@ -186,7 +180,6 @@ export async function replay(
 	return out;
 }
 
-/** Needs a superuser, as the oracle server's is. psql also takes `FROM STDOUT` for `FROM STDIN`. */
 export function copyViaProgram(text: string, copyData = ""): string {
 	if (!/^\s*copy\b/i.test(text)) return text;
 	const from = /\bfrom\s+(stdin|stdout)\b/i;

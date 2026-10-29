@@ -1,5 +1,4 @@
 {
-	// The parse-tree oracle's canonicalizer and in-memory probe files.
 	"extends": "../../../../tsconfig.base.json",
 	"compilerOptions": {
 		"noEmit": true,

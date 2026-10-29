@@ -11,12 +11,6 @@ import type {
 	ScopeLevel,
 } from "../types.js";
 
-/**
- * Resolve a table reference to its column map.
- * Order: CTEs (unqualified only) → `DB[name]` (unqualified or `public.`) → `DB["pg_catalog"][name]`
- * (unqualified only: Postgres always searches `pg_catalog`) → `DB[schema][name]`.
- * Views (`{ $view: cols }`) unwrap to their columns.
- */
 export type ResolveTable<
 	DB,
 	Ref extends TableRef,
@@ -54,7 +48,6 @@ type LookupTable<
 			: SqlError<`"${Display}" is not a table`, null>
 	: SqlError<`relation "${Display}" does not exist`, null>;
 
-/** Is `Name` a relation of the schema's `pg_catalog` namespace (see `PgCatalog`)? */
 type InPgCatalog<DB, Name extends string> = DB extends {
 	readonly pg_catalog: infer PC;
 }
@@ -63,7 +56,6 @@ type InPgCatalog<DB, Name extends string> = DB extends {
 		: false
 	: false;
 
-/** Strip `hasDefault` so column infos are plain `{ type, nullable }`. */
 export type TableCols<T extends Table> = {
 	readonly [K in keyof T]: {
 		readonly type: T[K]["type"];
@@ -71,7 +63,6 @@ export type TableCols<T extends Table> = {
 	};
 };
 
-/** Is the table (not view) writable? Used by DML. */
 export type ResolveWritableTable<
 	DB,
 	Ref extends TableRef,
@@ -103,13 +94,6 @@ export type ResolveWritableTable<
 				null
 			>;
 
-// ───────────────────────────── column resolution ─────────────────────────────
-
-/**
- * Resolve `tbl.name` or bare `name` against the scope. Innermost level first; a bare
- * name must be unambiguous within the level where it is found. A bare name that is no column
- * at any level but names a FROM item is a whole-row reference (Postgres tries columns first).
- */
 export type ResolveColumn<
 	S extends Scope,
 	Tbl extends string | null,
@@ -154,10 +138,6 @@ type ResolveQualified<
 		: never
 	: SqlError<`missing FROM-clause entry for table "${Tbl}"`, null>;
 
-/**
- * The item of a level named `Tbl`, `null`, or an error when two are (only `excluded` can be:
- * `INSERT INTO t AS excluded … ON CONFLICT DO UPDATE`; FROM rejects a repeated name first).
- */
 type FindAlias<L extends ScopeLevel, Tbl extends string> = L extends readonly [
 	infer I extends ScopeItem,
 	...infer R extends ScopeLevel,
@@ -186,10 +166,6 @@ type ResolveBare<
 		: never
 	: WholeRow<All, Name, `column "${Name}" does not exist`>;
 
-/**
- * Whole-row reference to the FROM item `Name` (`to_json(t)`, `t.*` as a value, `t IS NULL`):
- * a `record` shaped like the item's columns (see shape.ts), or the error `Missing`.
- */
 export type WholeRow<
 	S extends Scope,
 	Name extends string,
@@ -207,7 +183,6 @@ export type WholeRow<
 		: never
 	: SqlError<Missing, null>;
 
-/** Search a level for an unqualified name: info, `"ambiguous"`, or null. */
 type FindBare<
 	L extends ScopeLevel,
 	Name extends string,
@@ -225,7 +200,6 @@ type FindBare<
 			: FindBare<R, Name, Found>
 	: Found;
 
-/** Expand `*` (all items, in order, honoring `skip`) or `t.*` into a column map. */
 export type ExpandStar<
 	S extends Scope,
 	Tbl extends string | null,
@@ -251,14 +225,8 @@ export type ExpandStar<
 					]
 				? M
 				: ExpandAll<L, []>
-	: // only `t.*` gets past the outermost level: a SELECT's scope always has one
-		SqlError<`missing FROM-clause entry for table "${Tbl}"`, null>;
+	: SqlError<`missing FROM-clause entry for table "${Tbl}"`, null>;
 
-/**
- * All visible columns of a level in FROM order. Duplicate names collapse like the row
- * object the drivers build: the last column of a name wins (`SELECT * FROM a, b` with an
- * `id` in both gives `b.id`).
- */
 type ExpandAll<
 	L extends ScopeLevel,
 	Maps extends readonly ColMap[],

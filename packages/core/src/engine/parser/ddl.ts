@@ -30,25 +30,6 @@ import type {
 	SyntaxErrorAt,
 } from "./util.js";
 
-/**
- * DDL / utility statement parser (index-based, see util.ts).
- *
- * `ParseDdl<T, I>` receives the whole token tuple and the index of the first word
- * (CREATE / ALTER / DROP / ...) and returns `Ok<DdlStmt, next>` or an `SqlError`. The
- * caller checks that `next` is the end of input or a `;`.
- *
- * Statements with a schema effect are parsed structurally, including their trailing
- * clauses, so unsupported syntax is an error rather than silently ignored:
- *   CREATE TABLE (column defs, table constraints, LIKE, INHERITS, PARTITION OF / BY, OF type,
- *   storage options, `AS select | AS EXECUTE [WITH [NO] DATA]`), ALTER TABLE / VIEW / MATERIALIZED VIEW,
- *   DROP TABLE / VIEW, CREATE [OR REPLACE] [MATERIALIZED | RECURSIVE] VIEW, CREATE TYPE ... AS ENUM,
- *   ALTER TYPE, DROP TYPE, CREATE SCHEMA (with its elements), ALTER / DROP SCHEMA.
- *
- * Everything else (indexes, functions, triggers, sequences, grants, transaction control,
- * SET, COMMENT, composite types, domains, ...) is a `NoopStmt`: tokens are skipped up to
- * the next top-level `;` (or end of input), so the statement has no schema effect.
- * Function bodies written as `BEGIN ATOMIC ... END` are skipped as a unit.
- */
 export type ParseDdl<T extends Toks, I extends number> =
 	T[I] extends WordTok<infer W>
 		? W extends "create"
@@ -65,12 +46,6 @@ type Noop<T extends Toks, I extends number, What extends string> = Ok<
 	SkipToStmtEnd<T, I>
 >;
 
-// ───────────────────────────── skipping ─────────────────────────────
-
-/**
- * Advance to the first depth-0 operator in `Stop` (not consumed), or to the end of
- * input. Parentheses are balanced so `,` / `;` inside them are not terminators.
- */
 export type SkipUntil<
 	T extends Toks,
 	I extends number,
@@ -93,37 +68,28 @@ export type SkipUntil<
 			? SkipUntil<T, Nx<I>, Stop, D>
 			: I;
 
-/** Index of the next top-level `;`, or the end of input. */
 export type SkipToStmtEnd<T extends Toks, I extends number> = SkipUntil<
 	T,
 	I,
 	";"
 >;
-/** Index of the `,` / `)` ending a CREATE TABLE element. */
 type SkipToElementEnd<T extends Toks, I extends number> = SkipUntil<
 	T,
 	I,
 	"," | ")"
 >;
-/** Index of the `,` / `;` ending an ALTER TABLE action. */
 type SkipToActionEnd<T extends Toks, I extends number> = SkipUntil<
 	T,
 	I,
 	"," | ";"
 >;
 
-/**
- * Skip a routine definition (CREATE FUNCTION / PROCEDURE) to its terminating `;`. A
- * SQL-standard body `BEGIN ATOMIC stmt; ... END` contains `;`, so it is skipped up to
- * its `END` (CASE ... END pairs inside are counted), which ends the routine; without its `END`, a
- * syntax error at the end.
- */
 type SkipRoutine<T extends Toks, I extends number> =
 	T[I] extends OpTok<";">
 		? I
 		: T[I] extends WordTok<"begin">
 			? T[Nx<I>] extends WordTok<"atomic">
-				? SkipAtomic<T, Nx2<I>, []> // the body comes last
+				? SkipAtomic<T, Nx2<I>, []>
 				: SkipRoutine<T, Nx<I>>
 			: T[I] extends OpTok<"(">
 				? SkipToCloseParen<T, Nx<I>> extends infer J
@@ -149,7 +115,6 @@ type SkipAtomic<
 				? SkipAtomic<T, Nx<I>, D>
 				: SyntaxErrorAt<T, I>;
 
-/** `Ok<Node, index of the routine's ;>`, or SkipRoutine's error. */
 type RoutineEnd<T extends Toks, I extends number, Node> =
 	SkipRoutine<T, I> extends infer J
 		? J extends number
@@ -157,22 +122,18 @@ type RoutineEnd<T extends Toks, I extends number, Node> =
 			: J
 		: never;
 
-/** Skip `( ... )` if token `I` is `(`. */
 type SkipParenOpt<T extends Toks, I extends number> =
 	T[I] extends OpTok<"("> ? SkipToCloseParen<T, Nx<I>> : I;
 
-/** `[IF EXISTS]` → `[flag, next]`. */
 type IfExists<T extends Toks, I extends number> =
 	EatWords<T, I, ["if", "exists"]> extends never
 		? [false, I]
 		: [true, EatWords<T, I, ["if", "exists"]>];
-/** `[IF NOT EXISTS]` → `[flag, next]`. */
 type IfNotExists<T extends Toks, I extends number> =
 	EatWords<T, I, ["if", "not", "exists"]> extends never
 		? [false, I]
 		: [true, EatWords<T, I, ["if", "not", "exists"]>];
 
-/** `name [, name ...]` → `Ok<TableRef[], next>`. */
 type ParseNameList<
 	T extends Toks,
 	I extends number,
@@ -187,15 +148,12 @@ type ParseNameList<
 			: ParseNameList<T, EatOp<T, J, ",">, [...Acc, RefOf<Parts>]>
 		: Expected<"name", T, I>;
 
-/** `[CASCADE | RESTRICT]` → `[cascade, next]`. */
 type Cascade<T extends Toks, I extends number> =
 	T[I] extends WordTok<"cascade">
 		? [true, Nx<I>]
 		: T[I] extends WordTok<"restrict">
 			? [false, Nx<I>]
 			: [false, I];
-
-// ───────────────────────────── CREATE ─────────────────────────────
 
 type NoopCreateObject =
 	| "index"
@@ -231,7 +189,6 @@ type NoopCreateObject =
 	| "trusted"
 	| "procedural";
 
-/** After `CREATE`. Modifiers (`OR REPLACE`, `TEMP`, `UNLOGGED`, ...) are skipped. */
 type ParseCreate<T extends Toks, I extends number, OrReplace extends boolean> =
 	T[I] extends WordTok<infer W>
 		? W extends "or"
@@ -280,12 +237,6 @@ type ParseCreate<T extends Toks, I extends number, OrReplace extends boolean> =
 														>
 		: Expected<"object type after CREATE", T, I>;
 
-// ─── CREATE FUNCTION ───
-
-/**
- * After `FUNCTION`: `name (args) [RETURNS [SETOF] type | RETURNS TABLE (…)] …`. Only the name
- * and the result type are kept (arguments are not checked); the options and the body are skipped.
- */
 type ParseCreateFunction<T extends Toks, I extends number> =
 	QualName<T, I> extends [
 		infer Parts extends readonly string[],
@@ -312,7 +263,6 @@ type ParseCreateFunction<T extends Toks, I extends number> =
 				: never
 			: Expected<'"("', T, J>
 		: Expected<"function name", T, I>;
-/** `[ret, setReturning, next]`; without RETURNS (OUT parameters) the result is unknown. */
 type FnReturns<T extends Toks, I extends number> =
 	T[I] extends WordTok<"returns">
 		? T[Nx<I>] extends WordTok<"table">
@@ -340,7 +290,6 @@ type FnPlainRetType<T extends Toks, I extends number, Srf extends boolean> =
 			: R
 		: never;
 
-/** One TABLE output column returns its type; multiple columns return record. */
 type FnTableReturn<T extends Toks, I extends number> =
 	T[I] extends OpTok<"(">
 		? Ident<T, Nx<I>> extends [string, infer J extends number]
@@ -354,9 +303,6 @@ type FnTableReturn<T extends Toks, I extends number> =
 			: Expected<"column name", T, Nx<I>>
 		: Expected<'"("', T, I>;
 
-// ─── CREATE TABLE ───
-
-/** After `TABLE`. */
 type ParseCreateTable<T extends Toks, I extends number> =
 	IfNotExists<T, I> extends [infer Ine extends boolean, infer I1 extends number]
 		? QualName<T, I1> extends [
@@ -400,10 +346,6 @@ type ParseCreateTable<T extends Toks, I extends number> =
 			: Expected<"table name", T, I1>
 		: never;
 
-/**
- * After `OF`: `type [( { column WITH OPTIONS constraints | table_constraint } [, ...] )] [table options]`.
- * The columns come from the composite type, which is not tracked: only the type is kept.
- */
 type ParseTypedTable<
 	T extends Toks,
 	I extends number,
@@ -441,7 +383,6 @@ type ParseTypedTable<
 			: never
 		: Expected<"type name", T, I>;
 
-/** Elements of a typed table, after `(` → index after `)`, or an error. */
 type ParseTypedElements<T extends Toks, I extends number, TN extends string> = (
 	IsConstraintStart<T, I> extends true
 		? ParseTableConstraint<T, I>
@@ -468,7 +409,6 @@ type ParseTypedElements<T extends Toks, I extends number, TN extends string> = (
 		: R
 	: never;
 
-/** `( a, b ) AS` — a bare identifier followed by `,` or `)` cannot start a column definition. */
 type IsCtasColList<T extends Toks, I extends number> =
 	Ident<T, I> extends [string, infer J extends number]
 		? T[J] extends OpTok<"," | ")">
@@ -488,7 +428,6 @@ type ParseCtasCols<
 			: R
 		: never;
 
-/** `[USING m] [WITH (...)] [ON COMMIT ...] [TABLESPACE ts] AS query [WITH [NO] DATA]` */
 type ParseCtasAfterCols<
 	T extends Toks,
 	I extends number,
@@ -519,7 +458,6 @@ type ParseCtasAfterCols<
 			: I1
 		: never;
 
-/** After `AS EXECUTE`: `name [(args)] [WITH [NO] DATA]`. */
 type ParseCtasExecute<
 	T extends Toks,
 	I extends number,
@@ -558,13 +496,11 @@ type ParseCtasExecute<
 			: never
 		: Expected<"prepared statement name", T, I>;
 
-/** `[WITH [NO] DATA]` */
 type SkipWithData<T extends Toks, I extends number> =
 	EatWords<T, I, ["with", "data"]> extends never
 		? SkipWords<T, I, ["with", "no", "data"]>
 		: EatWords<T, I, ["with", "data"]>;
 
-/** After `PARTITION OF`: `parent [(column options)] { FOR VALUES spec | DEFAULT } [table options]`. Column options are skipped. */
 type ParsePartitionOf<
 	T extends Toks,
 	I extends number,
@@ -602,7 +538,6 @@ type ParsePartitionOf<
 			: never
 		: Expected<"parent table name", T, I>;
 
-/** `FOR VALUES IN (...) | FROM (...) TO (...) | WITH (...)` or `DEFAULT` → next index or error. */
 type SkipPartitionBound<T extends Toks, I extends number> =
 	T[I] extends WordTok<"default">
 		? Nx<I>
@@ -630,7 +565,6 @@ type SkipPartitionBound<T extends Toks, I extends number> =
 						: Expected<"IN, FROM or WITH", T, J>
 				: never;
 
-/** After the column list: `[INHERITS (parents)]`, then PartitionTail → `[inherits, next]` or an error. */
 type ParseTableTail<T extends Toks, I extends number> =
 	T[I] extends WordTok<"inherits">
 		? EatOp<T, Nx<I>, "("> extends never
@@ -645,13 +579,11 @@ type ParseTableTail<T extends Toks, I extends number> =
 		: WithInherits<[], PartitionTail<T, I>>;
 type WithInherits<Ps, J> = J extends number ? [Ps, J] : J;
 
-/** `[PARTITION BY strategy (...)]`, then the storage clauses → the index after them, or an error. */
 type PartitionTail<T extends Toks, I extends number> =
 	EatWords<T, I, ["partition", "by"]> extends never
 		? SkipStorage<T, I, false>
 		: EatWords<T, I, ["partition", "by"]> extends infer J extends number
-			? // any word: an unknown strategy is a semantic error in Postgres ("unrecognized partitioning strategy")
-				Ident<T, J> extends [string, infer J1 extends number]
+			? Ident<T, J> extends [string, infer J1 extends number]
 				? T[J1] extends OpTok<"(">
 					? SkipToCloseParen<T, Nx<J1>> extends infer J2
 						? J2 extends number
@@ -662,11 +594,6 @@ type PartitionTail<T extends Toks, I extends number> =
 				: Expected<"RANGE, LIST or HASH", T, J>
 			: never;
 
-/**
- * Storage clauses, in Postgres's order: a table's `[USING method] [WITH (options) | WITHOUT OIDS]
- * [ON COMMIT ...] [TABLESPACE name]`, a materialized view's (`Mat`) `[USING method]
- * [WITH (options)] [TABLESPACE name]` → the index after them, or an error.
- */
 type SkipStorage<T extends Toks, I extends number, Mat extends boolean> =
 	SkipReloptions<
 		T,
@@ -683,7 +610,6 @@ type SkipStorage<T extends Toks, I extends number, Mat extends boolean> =
 					: never
 			: J
 		: never;
-/** `[WITH (options)]`, or for a table `[WITHOUT OIDS]` (`WITH` takes only a parenthesized list). */
 type SkipReloptions<T extends Toks, I extends number, Mat extends boolean> =
 	T[I] extends WordTok<"with">
 		? T[Nx<I>] extends OpTok<"(">
@@ -692,7 +618,6 @@ type SkipReloptions<T extends Toks, I extends number, Mat extends boolean> =
 		: Mat extends true
 			? I
 			: SkipWords<T, I, ["without", "oids"]>;
-/** `[ON COMMIT {DROP | DELETE ROWS | PRESERVE ROWS}]` */
 type SkipOnCommit<T extends Toks, I extends number> =
 	EatWords<T, I, ["on", "commit"]> extends never
 		? I
@@ -708,13 +633,11 @@ type OnCommitAction<T extends Toks, I extends number> =
 type SkipTablespace<T extends Toks, I extends number> =
 	T[I] extends WordTok<"tablespace"> ? Nx2<I> : I;
 
-/** After `(`: an empty list or the elements. */
 type ParseTableBody<T extends Toks, I extends number, TN extends string> =
 	T[I] extends OpTok<")">
 		? Ok<[[], [], []], Nx<I>>
 		: ParseTableElements<T, I, TN, [], [], []>;
 
-/** Elements between the parentheses: column definitions, table constraints, LIKE clauses (no trailing comma). */
 type ParseTableElements<
 	T extends Toks,
 	I extends number,
@@ -771,7 +694,6 @@ type ElementNext<
 			? Ok<[Cols, Cons, Like], Nx<I>>
 			: Expected<'"," or ")"', T, I>;
 
-/** `[CONSTRAINT name] PRIMARY KEY (cols) ... | UNIQUE ... | CHECK ... | FOREIGN KEY ... | EXCLUDE ...` */
 type ParseTableConstraint<T extends Toks, I extends number> =
 	T[I] extends WordTok<"constraint">
 		? Ident<T, Nx<I>> extends [string, infer J extends number]
@@ -798,7 +720,6 @@ type ParseTableConstraintBody<T extends Toks, I extends number> =
 				: never
 			: Expected<'"("', T, EatWords<T, I, ["primary", "key"]>>;
 
-/** Key columns after `(`: `a, b [WITHOUT OVERLAPS] )` (WITHOUT OVERLAPS on the last one) → `Ok<names, next>`. */
 type KeyColumns<
 	T extends Toks,
 	I extends number,
@@ -818,10 +739,6 @@ type KeyColumns<
 				: never
 		: Expected<"column name", T, I>;
 
-/**
- * After `NOT` (table constraint): `NULL col [NO INHERIT | NOT VALID | ...]` → `Ok<constraint, next>`.
- * A NOT VALID constraint does not make the column NOT NULL: existing rows may hold nulls.
- */
 type ParseNotNullConstraint<T extends Toks, I extends number> =
 	EatWord<T, I, "null"> extends never
 		? Expected<"NULL", T, I>
@@ -838,12 +755,6 @@ type ParseNotNullConstraint<T extends Toks, I extends number> =
 				: never
 			: Expected<"column name", T, EatWord<T, I, "null">>;
 
-/**
- * A NOT NULL constraint's attributes: `NO INHERIT`, `NOT VALID` and the defaults `NOT DEFERRABLE`,
- * `INITIALLY IMMEDIATE` → `[notValid, next]`. `DEFERRABLE`, `INITIALLY DEFERRED` and `[NOT] ENFORCED`
- * are an error at the first attribute (`At`), as in Postgres (which names the first by DEFERRABLE,
- * NOT ENFORCED, ENFORCED; TypeSQL names the first written).
- */
 type ConstraintAttrs<
 	T extends Toks,
 	I extends number,
@@ -880,7 +791,6 @@ type NotMarked<What extends string, At extends number> = Fail<
 	At
 >;
 
-/** After `LIKE`: `source [INCLUDING | EXCLUDING option ...]`. */
 type ParseLike<T extends Toks, I extends number> =
 	QualName<T, I> extends [
 		infer Parts extends readonly string[],
@@ -928,13 +838,6 @@ type ParseLikeOptions<
 				: Expected<"LIKE option", T, Nx<I>>
 			: [Def, I, Copies];
 
-// ─── column definitions ───
-
-/**
- * `name type [column_constraint ...]` → `Ok<ColumnDef, next>`. `TN` is the table name
- * (for the NULL / NOT NULL conflict message). Serial spellings are detected on the raw
- * word token before the type is normalized.
- */
 export type ParseColumnDef<
 	T extends Toks,
 	I extends number,
@@ -958,7 +861,6 @@ export type ParseColumnDef<
 			: never
 		: Expected<"column name", T, I>;
 
-/** `[STORAGE mode] [COMPRESSION method]`, right after the type. */
 type SkipColumnStorage<T extends Toks, I extends number> =
 	T[I] extends WordTok<"storage">
 		? SkipCompression<T, Nx2<I>>
@@ -978,10 +880,6 @@ type NullConflict<
 	I
 >;
 
-/**
- * Column constraints loop. `NN` = NOT NULL (also serial / identity), `HD` = has a
- * default / identity / generation expression, `PK` = PRIMARY KEY, `Nul` = explicit NULL.
- */
 type ParseColConstraints<
 	T extends Toks,
 	I extends number,
@@ -1181,11 +1079,6 @@ type ParseColConstraints<
 				I
 			>;
 
-/**
- * A column DEFAULT is a `b_expr` in Postgres's grammar: operators and comparisons, but no
- * AND / OR / NOT / IN / LIKE / BETWEEN / IS NULL at the top level (`DEFAULT 1 IN (1, 2)` is a
- * syntax error; parenthesize). Comparisons and IS [NOT] DISTINCT FROM do not chain.
- */
 type ParseBExpr<T extends Toks, I extends number> =
 	ParseExpr<T, I, 7> extends infer R
 		? R extends Ok<unknown, infer J>
@@ -1201,7 +1094,6 @@ type ParseBExpr<T extends Toks, I extends number> =
 			: R
 		: never;
 
-/** `[WITH (...)] [USING INDEX TABLESPACE name]` after a column's PRIMARY KEY / UNIQUE (INCLUDE is for table constraints). */
 type SkipIndexParams<T extends Toks, I extends number> =
 	T[I] extends WordTok<"with">
 		? T[Nx<I>] extends OpTok<"(">
@@ -1217,7 +1109,6 @@ type SkipIndexTablespace<T extends Toks, I extends number> =
 		? I
 		: Nx<EatWords<T, I, ["using", "index", "tablespace"]>>;
 
-/** `[NULLS [NOT] DISTINCT]` */
 type SkipNullsDistinct<T extends Toks, I extends number> =
 	EatWords<T, I, ["nulls", "distinct"]> extends never
 		? EatWords<T, I, ["nulls", "not", "distinct"]> extends never
@@ -1225,7 +1116,6 @@ type SkipNullsDistinct<T extends Toks, I extends number> =
 			: EatWords<T, I, ["nulls", "not", "distinct"]>
 		: EatWords<T, I, ["nulls", "distinct"]>;
 
-/** `[MATCH kind] [ON DELETE action] [ON UPDATE action] ...` after REFERENCES t [(cols)]. */
 type SkipRefActions<T extends Toks, I extends number> =
 	T[I] extends WordTok<"match">
 		? SkipRefActions<T, Nx2<I>>
@@ -1243,15 +1133,10 @@ type SkipRefActions<T extends Toks, I extends number> =
 				: I
 			: I;
 
-/**
- * After `GENERATED`: `ALWAYS AS IDENTITY [(opts)]` | `BY DEFAULT AS IDENTITY [(opts)]` |
- * `ALWAYS AS (expr) [STORED | VIRTUAL]` → `[isIdentity, next]`, or an error.
- */
 type ParseGenerated<T extends Toks, I extends number> =
 	EatWords<T, I, ["always", "as", "identity"]> extends never
 		? EatWords<T, I, ["by", "default", "as", "identity"]> extends never
-			? // `BY DEFAULT AS (expr)` parses; Postgres then requires GENERATED ALWAYS
-				(
+			? (
 					EatWords<T, I, ["always", "as"]> extends never
 						? EatWords<T, I, ["by", "default", "as"]>
 						: EatWords<T, I, ["always", "as"]>
@@ -1272,15 +1157,8 @@ type ParseGenerated<T extends Toks, I extends number> =
 		: IdentityNext<
 				SkipParenOpt<T, EatWords<T, I, ["always", "as", "identity"]>>
 			>;
-/** `[true, next]` after an identity column's options, or their error. */
 type IdentityNext<J> = J extends number ? [true, J] : J;
 
-// ─── CREATE VIEW ───
-
-/**
- * After `VIEW`: `name [(cols)] [WITH (...)] AS select [WITH [CASCADED | LOCAL] CHECK OPTION]`;
- * materialized: `name [(cols)] [USING m] [WITH (...)] [TABLESPACE ts] AS select [WITH [NO] DATA]`.
- */
 type ParseCreateView<
 	T extends Toks,
 	I extends number,
@@ -1309,7 +1187,6 @@ type ParseCreateView<
 				: never
 		: Expected<"view name", T, I>;
 
-/** A plain view takes only `WITH (options)`; USING and TABLESPACE are for materialized views. */
 type SkipViewStorage<
 	T extends Toks,
 	I extends number,
@@ -1350,10 +1227,6 @@ type ParseViewAs<
 				: R
 			: never;
 
-/**
- * After `RECURSIVE VIEW`: `name (cols) [WITH (...)] AS query [WITH CHECK OPTION]`. Postgres rewrites it to
- * `CREATE VIEW name AS WITH RECURSIVE name (cols) AS (query) SELECT cols FROM name`; so does this.
- */
 type ParseRecursiveView<
 	T extends Toks,
 	I extends number,
@@ -1434,7 +1307,6 @@ type RecursiveViewQuery<
 	offset: null;
 };
 
-/** `[WITH [CASCADED | LOCAL] CHECK OPTION]` */
 type SkipCheckOption<T extends Toks, I extends number> =
 	T[I] extends WordTok<"with">
 		? CheckOptionEnd<
@@ -1446,14 +1318,10 @@ type SkipCheckOption<T extends Toks, I extends number> =
 				I
 			>
 		: I;
-/** The index after `CHECK OPTION` (`J`), or the index of `WITH` (`I`) without one. */
 type CheckOptionEnd<J extends number, I extends number> = [J] extends [never]
 	? I
 	: J;
 
-// ─── CREATE TYPE / SCHEMA ───
-
-/** After `TYPE`: only `name AS ENUM (...)` has a schema effect; composite, range, base and shell types are noops. */
 type ParseCreateType<T extends Toks, I extends number> =
 	QualName<T, I> extends [
 		infer Parts extends readonly string[],
@@ -1470,7 +1338,6 @@ type ParseCreateType<T extends Toks, I extends number> =
 				: Expected<'"("', T, EatWords<T, J, ["as", "enum"]>>
 		: Expected<"type name", T, I>;
 
-/** After `(`: `)`, or labels `'a', 'b' )` → `Ok<labels, next>` or an error. */
 type ParseEnumValues<T extends Toks, I extends number> =
 	T[I] extends OpTok<")"> ? Ok<[], Nx<I>> : EnumLabels<T, I, []>;
 type EnumLabels<
@@ -1486,10 +1353,6 @@ type EnumLabels<
 				: Expected<'"," or ")"', T, Nx<I>>
 		: Expected<"enum label", T, I>;
 
-/**
- * After `SCHEMA`: `[IF NOT EXISTS] name [AUTHORIZATION role] [element ...]` | `[IF NOT EXISTS] AUTHORIZATION role [element ...]`.
- * Without a name the schema is named after the role (unknown for CURRENT_ROLE / CURRENT_USER / SESSION_USER).
- */
 type ParseCreateSchema<T extends Toks, I extends number> =
 	IfNotExists<T, I> extends [infer Ine extends boolean, infer I1 extends number]
 		? T[I1] extends WordTok<"authorization">
@@ -1520,11 +1383,6 @@ type ParseCreateSchema<T extends Toks, I extends number> =
 				: Expected<"schema name", T, I1>
 		: never;
 
-/**
- * Schema elements: CREATE TABLE / VIEW / INDEX / SEQUENCE / TRIGGER and GRANT, without `;` between them.
- * Tables and views are kept (`Tbls`, `Views`: Postgres creates the tables first), named in schema `S`;
- * the others have no schema effect and are skipped. `Known`: `S` is known (not CURRENT_ROLE).
- */
 type SchemaElements<
 	T extends Toks,
 	I extends number,
@@ -1566,7 +1424,6 @@ type SchemaElements<
 				I
 			>;
 
-/** One element after `CREATE` → `Ok<create_table | create_view | null, next>` or error. */
 type SchemaElement<
 	T extends Toks,
 	I extends number,
@@ -1679,7 +1536,6 @@ type SchemaElement<
 							: Expected<"TABLE, VIEW, INDEX, SEQUENCE or TRIGGER", T, I>
 		: Expected<"TABLE, VIEW, INDEX, SEQUENCE or TRIGGER", T, I>;
 
-/** The element's relation, created in schema `S`. */
 type Requalify<E, S extends string> = E extends {
 	readonly t: "create_table";
 	readonly ifNotExists: infer A;
@@ -1720,11 +1576,9 @@ type Requalify<E, S extends string> = E extends {
 			}
 		: E;
 
-/** `Then`, or a syntax error at the token after a `.` that QualName stopped before: a dangling dot (`a.b.`), as in Postgres, or a fourth part. */
 type NoDanglingDot<T extends Toks, J extends number, Then> =
 	T[J] extends OpTok<"."> ? SyntaxErrorAt<T, Nx<J>> : Then;
 
-/** An element may name its own schema only: `Ok<E, J>`, or Postgres's error at the name (token `At`). */
 type InSchema<
 	J extends number,
 	S extends string,
@@ -1743,7 +1597,6 @@ type InSchema<
 		: Ok<E, J>
 	: Ok<E, J>;
 
-/** Index after the first `ON` between `I` and `End` (the relation of an index or trigger), or a syntax error where it is missing. */
 type ElementOn<
 	T extends Toks,
 	I extends number,
@@ -1756,12 +1609,6 @@ type ElementOn<
 			? SyntaxErrorAt<T, I>
 			: ElementOn<T, Nx<I>, End>;
 
-/**
- * Skip a schema element without a schema effect: up to the next `CREATE` that starts an element, or
- * the end of the statement. Right after `GRANT` or `,` (token `P`, the one before `I`), `CREATE` is a
- * privilege (`GRANT CREATE ON ...`, `GRANT USAGE, CREATE ON ...`). A `GRANT` element is skipped as
- * part of the one before it, all the same.
- */
 type SkipElement<T extends Toks, I extends number, P extends number> =
 	T[I] extends OpTok<";">
 		? I
@@ -1772,8 +1619,6 @@ type SkipElement<T extends Toks, I extends number, P extends number> =
 			: T[I] extends Tok
 				? SkipElement<T, Nx<I>, I>
 				: I;
-
-// ───────────────────────────── ALTER ─────────────────────────────
 
 type NoopAlterObject =
 	| "sequence"
@@ -1824,7 +1669,6 @@ type ParseAlter<T extends Toks, I extends number> =
 							: Expected<"TABLE, VIEW, TYPE, SCHEMA, ... after ALTER", T, I>
 		: Expected<"object type after ALTER", T, I>;
 
-/** `ALTER SCHEMA name RENAME TO new` (other forms are noops). */
 type ParseAlterSchema<T extends Toks, I extends number> =
 	Ident<T, I> extends [infer From, infer J extends number]
 		? EatWords<T, J, ["rename", "to"]> extends never
@@ -1837,12 +1681,7 @@ type ParseAlterSchema<T extends Toks, I extends number> =
 				: Expected<"new schema name", T, EatWords<T, J, ["rename", "to"]>>
 		: Expected<"schema name", T, I>;
 
-/**
- * After `TABLE` / `VIEW`: `[IF EXISTS] [ONLY] name [*] action [, action ...]`.
- * `RENAME ...` and `SET SCHEMA` form a statement of their own (as in Postgres's grammar).
- */
 type ParseAlterTable<T extends Toks, I extends number> =
-	// ALL IN TABLESPACE ts [OWNED BY roles] SET TABLESPACE ts2 [NOWAIT]: moves storage only
 	T[I] extends WordTok<"all">
 		? EatWords<T, Nx<I>, ["in", "tablespace"]> extends never
 			? Expected<"IN TABLESPACE", T, Nx<I>>
@@ -1938,7 +1777,7 @@ type ParseAlterAction<T extends Toks, I extends number, TN extends string> =
 					: W extends "set"
 						? T[Nx<I>] extends WordTok<"with">
 							? SyntaxErrorAt<T, Nx<I>>
-							: NoopAction<T, I> // SET WITH OIDS is gone
+							: NoopAction<T, I>
 						: W extends
 									| "owner"
 									| "enable"
@@ -1959,7 +1798,6 @@ type ParseAlterAction<T extends Toks, I extends number, TN extends string> =
 							: Expected<"ALTER TABLE action", T, I>
 		: Expected<"ALTER TABLE action", T, I>;
 
-/** After `ADD`: a table constraint or `[COLUMN] [IF NOT EXISTS] column_def`. */
 type ParseAlterAdd<T extends Toks, I extends number, TN extends string> =
 	T[I] extends WordTok<"constraint">
 		? Ident<T, Nx<I>> extends [string, infer J extends number]
@@ -2001,10 +1839,9 @@ type ParseAddConstraintBody<T extends Toks, I extends number> =
 							? Ok<{ t: "add_pk"; cols: Cols }, SkipToActionEnd<T, J>>
 							: R
 						: never
-					: NoopAction<T, I> // PRIMARY KEY USING INDEX name
-			: NoopAction<T, I>; // UNIQUE, CHECK, FOREIGN KEY, EXCLUDE
+					: NoopAction<T, I>
+			: NoopAction<T, I>;
 
-/** After `DROP`: `CONSTRAINT ...` (noop) | `[COLUMN] [IF EXISTS] name [CASCADE | RESTRICT]`. */
 type ParseAlterDrop<T extends Toks, I extends number> =
 	T[I] extends WordTok<"constraint">
 		? NoopAction<T, I>
@@ -2017,7 +1854,6 @@ type ParseAlterDrop<T extends Toks, I extends number> =
 				: Expected<"column name", T, I1>
 			: never;
 
-/** After `RENAME`: `TO new` | `CONSTRAINT a TO b` (noop) | `[COLUMN] a TO b`. */
 type ParseAlterRename<T extends Toks, I extends number> =
 	T[I] extends WordTok<"to">
 		? Ident<T, Nx<I>> extends [infer To, infer J extends number]
@@ -2048,7 +1884,6 @@ type ParseAlterRename<T extends Toks, I extends number> =
 						: Expected<"new column name", T, EatWord<T, J, "to">>
 				: Expected<"column name", T, SkipWord<T, I, "column">>;
 
-/** After `ALTER`: `CONSTRAINT ...` (noop) | `[COLUMN] name { TYPE | SET ... | DROP ... | ADD GENERATED ... | RESTART | RESET }`. */
 type ParseAlterColumn<T extends Toks, I extends number> =
 	T[I] extends WordTok<"constraint">
 		? NoopAction<T, I>
@@ -2074,7 +1909,7 @@ type ParseAlterColumn<T extends Toks, I extends number> =
 											? Ok<{ t: "set_default"; name: C }, J2>
 											: R
 										: never
-									: NoopAction<T, J> // SET STATISTICS / STORAGE / COMPRESSION / GENERATED / EXPRESSION / ( options )
+									: NoopAction<T, J>
 						: W extends "drop"
 							? T[Nx<J>] extends WordTok<"not">
 								? EatWord<T, Nx2<J>, "null"> extends never
@@ -2108,7 +1943,6 @@ type ParseAlterColumn<T extends Toks, I extends number> =
 				: Expected<"ALTER COLUMN action", T, J>
 			: Expected<"column name", T, SkipWord<T, I, "column">>;
 
-/** After `TYPE`: `typename [COLLATE c] [USING expr]`. */
 type ParseAlterColType<T extends Toks, I extends number, C extends string> =
 	ParseTypeName<T, I> extends infer R
 		? R extends Ok<infer Ty, infer J>
@@ -2130,7 +1964,6 @@ type SkipCollate<T extends Toks, I extends number> =
 			: Nx<I>
 		: I;
 
-/** After `ALTER TYPE`: `name ADD VALUE ... | RENAME VALUE ... | RENAME TO ... | other (noop)`. */
 type ParseAlterType<T extends Toks, I extends number> =
 	QualName<T, I> extends [
 		infer Parts extends readonly string[],
@@ -2141,7 +1974,7 @@ type ParseAlterType<T extends Toks, I extends number> =
 				? Ok<
 						{ t: "alter_enum"; name: RefOf<Parts>; action: { t: "noop" } },
 						SkipToStmtEnd<T, J>
-					> // ADD ATTRIBUTE
+					>
 				: IfNotExists<T, Nx2<J>> extends [infer Ine, infer I1 extends number]
 					? T[I1] extends StrTok<infer V>
 						? Ok<
@@ -2184,7 +2017,7 @@ type ParseAlterType<T extends Toks, I extends number> =
 						: Ok<
 								{ t: "alter_enum"; name: RefOf<Parts>; action: { t: "noop" } },
 								SkipToStmtEnd<T, J>
-							> // RENAME ATTRIBUTE
+							>
 				: T[J] extends WordTok<"owner" | "set" | "drop" | "alter">
 					? Ok<
 							{ t: "alter_enum"; name: RefOf<Parts>; action: { t: "noop" } },
@@ -2198,8 +2031,6 @@ type SkipBeforeAfter<T extends Toks, I extends number> =
 			? Nx2<I>
 			: I
 		: I;
-
-// ───────────────────────────── DROP ─────────────────────────────
 
 type NoopDropObject =
 	| "index"
@@ -2257,7 +2088,6 @@ type ParseDrop<T extends Toks, I extends number> =
 									>
 		: Expected<"object type after DROP", T, I>;
 
-/** `[IF EXISTS] name [, ...] [CASCADE | RESTRICT]` */
 type ParseDropList<T extends Toks, I extends number, K extends string> =
 	IfExists<T, I> extends [infer Ife extends boolean, infer I1 extends number]
 		? ParseNameList<T, I1, []> extends infer R

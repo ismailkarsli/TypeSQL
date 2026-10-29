@@ -23216,6 +23216,30 @@
 			"source": "dml-targets.test-d.ts",
 			"sql": "SELECT 1 AS a INTO LOCAL TEMP t1; SELECT 1 AS b INTO GLOBAL TEMPORARY TABLE t2",
 			"ddl": true
+		},
+		{
+			"schema": "1348cfed1eea",
+			"source": "core-organization",
+			"sql": "SELECT u.id AS user_id, u.email, u.display_name FROM users AS u WHERE u.id = $1",
+			"ddl": false
+		},
+		{
+			"schema": "1348cfed1eea",
+			"source": "core-organization",
+			"sql": "SELECT u.id AS user_id, u.email, u.display_name FROM users AS u WHERE u.display_name = $1",
+			"ddl": false
+		},
+		{
+			"schema": "44136fa355b3",
+			"source": "core-organization",
+			"sql": "CREATE SCHEMA workspace CREATE TABLE items (id integer PRIMARY KEY, label text NOT NULL, note text) CREATE VIEW item_labels AS SELECT id, label, note FROM items; ALTER TABLE workspace.items ADD COLUMN enabled boolean NOT NULL DEFAULT true; CREATE TABLE item_copy AS SELECT id, label, note FROM workspace.items; ALTER TABLE item_copy RENAME COLUMN label TO title;",
+			"ddl": true
+		},
+		{
+			"schema": "44136fa355b3",
+			"source": "core-organization",
+			"sql": "CREATE TYPE task_state AS ENUM ('open', 'closed'); CREATE TABLE tasks (id integer PRIMARY KEY, state task_state NOT NULL, previous_state task_state); ALTER TYPE task_state RENAME TO status; ALTER TABLE tasks ALTER COLUMN previous_state SET DEFAULT 'open'; CREATE VIEW task_status AS SELECT id, state, previous_state FROM tasks;",
+			"ddl": true
 		}
 	],
 	"skippedSlots": {

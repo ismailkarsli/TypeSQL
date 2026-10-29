@@ -20,7 +20,6 @@ interface RejectionFixtures {
 const keyOf = (s: { readonly group: string; readonly sql: string }): string =>
 	`${s.group}\0${s.sql}`;
 
-/** A server failure only verifies the fixture when its SQLSTATE and message match. */
 function fixtureProblem(
 	expected: ServerError,
 	actual: ServerError | null,
@@ -31,7 +30,6 @@ function fixtureProblem(
 	return `expected PostgreSQL ${expected.code} ${expected.message}; got ${actual.code} ${actual.message}`;
 }
 
-/** Rejections are checked evidence, never an AST disagreement that --update can baseline. */
 export class RejectionAudit {
 	private readonly version: string;
 	private readonly fixtures: RejectionFixtures;
@@ -81,7 +79,6 @@ export class RejectionAudit {
 		}
 		await this.conn.exec("BEGIN");
 		try {
-			// Each case gets the same clean fixture; its writes and roles are rolled back.
 			for (const sql of this.fixtures.setup) await this.conn.exec(sql);
 			const n = maxParam(s.sql);
 			const result = n

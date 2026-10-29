@@ -1,11 +1,7 @@
-// TypeSQL with node-postgres (@typesql/pg). Queries run on your Pool, and rows are typed by what
-// pg's default parsers return: int8 and numeric as strings, timestamps as Date. Hover the results.
-
 import type { Col, Generated, Nullable } from "@typesql/core";
 import { createSql } from "@typesql/pg";
 import { Pool } from "pg";
 
-// Write this by hand, or generate it from your database: `typesql introspect --url … --out schema.ts`
 interface DB {
 	users: {
 		id: Generated<"int4">;
@@ -32,22 +28,17 @@ const byAuthor = sql(
 	7,
 );
 const posts = await byAuthor.execute();
-//    ^?
 
 const user = await sql(
 	`SELECT id, balance, created_at FROM users WHERE email = $1`,
 	"ada@example.com",
 ).executeTakeFirstOrThrow();
-//    ^?
 
 const counts = await sql(
 	`SELECT author_id, count(*) AS n FROM posts GROUP BY author_id`,
 ).execute();
-//    ^?
 
-// tx is sql bound to one transaction: COMMIT when the function resolves, ROLLBACK when it throws.
 const postId = await sql.transaction(async (tx) => {
-	//  ^?
 	const { id } = await tx(
 		`INSERT INTO users (email, balance) VALUES ($1, $2) RETURNING id`,
 		"grace@example.com",
@@ -61,5 +52,4 @@ const postId = await sql.transaction(async (tx) => {
 	return post.id;
 });
 
-// Parameters are checked against their column: author_id is int4.
-await sql(`DELETE FROM posts WHERE author_id = $1`, "7").execute(); // error: a string is not an int4
+await sql(`DELETE FROM posts WHERE author_id = $1`, "7").execute();

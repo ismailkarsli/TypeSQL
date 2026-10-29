@@ -2,16 +2,6 @@ import type { SqlError } from "./errors.js";
 import type { Opaque, SplitFirst } from "./inline.js";
 import type { MaxParamStr } from "./splice.js";
 
-/**
- * Named parameter sugar: `:name` is rewritten to `$k` where `k` is the position of the
- * name's first appearance. Done on the text, as the runtime does (`rewriteNamed` in
- * runtime/splice.ts), so the statement checked is the one sent: `::` casts, `:=`, a colon
- * followed by a space (`JSON_OBJECT('k': v)`, `a[1: n]`) and colons inside quoted strings,
- * quoted identifiers, comments and dollar-quoted strings are never touched.
- *
- * `RewriteNamed<Q>` → `[text, names]` (`names` is `[]` when the statement uses `$n`).
- * Mixing `:name` and `$n` is an error.
- */
 export type RewriteNamed<Q extends string> =
 	RewriteNamedStr<Q> extends [infer T, infer Names]
 		? Names extends []
@@ -21,7 +11,6 @@ export type RewriteNamed<Q extends string> =
 				: SqlError<"cannot mix named (:name) and positional ($n) parameters", 0>
 		: never;
 
-/** 1-based position of `Name` in `Names`, or `Names["length"] + 1` when absent. */
 type IndexOf<
 	Names extends string[],
 	Name extends string,
@@ -32,12 +21,6 @@ type IndexOf<
 		: IndexOf<R, Name, [...Acc, 0]>
 	: [...Acc, 0]["length"];
 
-/**
- * Object type for named parameters given the positional tuple (`names[i]` ↔ `params[i]`).
- * A name the rewrite took for code that PostgreSQL reads inside a literal or a comment
- * (`E'\':a'`, or after the inner closer of a nested block comment; the runtime reads them
- * alike) has no parameter: `never`, as no value sent for it would be accepted.
- */
 export type NamedParams<
 	Names extends readonly string[],
 	Params extends readonly unknown[],
@@ -45,19 +28,12 @@ export type NamedParams<
 	-readonly [I in keyof Names & `${number}` as Names[I]]: Params[I &
 		keyof Params];
 } extends infer O
-	? { [K in keyof O]: O[K] } // spelled out, not shown as `NamedParams<…>`
+	? { [K in keyof O]: O[K] }
 	: never;
 
-// ───────────────────────────── text rewrite ─────────────────────────────
-
-/**
- * `RewriteNamedStr<Text>` → `[text with :name → $k, names]`, operating on the literal
- * itself (needed before fragment splicing).
- */
 export type RewriteNamedStr<Text extends string> =
 	HasSingleColon<Text> extends true ? NamedLoop<Text, "", []> : [Text, []];
 
-/** Cast pairs never start a named parameter. Bound the shortcut: opaque text may contain many. */
 type HasSingleColon<
 	S extends string,
 	Budget extends unknown[] = [],
@@ -106,10 +82,6 @@ type NamedLoop<T extends string, Acc extends string, Names extends string[]> =
 				: never
 		: never;
 
-/**
- * `[code before, opener, code after]` at the first dollar-quote opener (`$$`, `$tag$`) in a
- * code segment, else `null`. The runtime's rule: a `$` followed by an optional name and a `$`.
- */
 type DollarOpen<
 	S extends string,
 	Acc extends string,
@@ -122,7 +94,6 @@ type DollarOpen<
 				: DollarOpen<B, `${Acc}${A}$`>
 			: DollarOpen<B, `${Acc}${A}$`>
 	: null;
-/** A dollar-quoted body up to and including its closer: `[segment, rest]` (unclosed: the rest of the text). */
 type DollarBody<
 	S extends string,
 	Tag extends string,
@@ -184,10 +155,6 @@ type NStart =
 	| "_";
 type NChar = NStart | "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9";
 
-/**
- * Rewrite `:name` occurrences in a quote-free code segment: a `:` directly followed by a
- * name start, not part of `::`.
- */
 type RewriteCode<
 	S extends string,
 	Acc extends string,

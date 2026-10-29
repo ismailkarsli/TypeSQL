@@ -1,4 +1,3 @@
-/** What the VS Code extension bundles: completions through an API session, and the LSP glue around them. */
 export type {
 	CompletionItem,
 	Completions,

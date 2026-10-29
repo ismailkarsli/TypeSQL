@@ -1,11 +1,3 @@
-/// <reference types="node" />
-/**
- * Reading, merging and writing a cache file. Several projects (tsconfigs) can share one file:
- * each owns the entries it uses (`CacheFile.owners`), a pass replaces only its own, and an entry
- * goes when no project uses it any more. Writes go to a temporary file renamed over the cache
- * file, under a lock file next to it, so a reader never sees a partial file and two editors on
- * one project take turns.
- */
 import {
 	closeSync,
 	openSync,
@@ -25,7 +17,6 @@ import {
 	stringifyCache,
 } from "./format.js";
 
-/** What one pass computed for one project. */
 export interface Contribution {
 	readonly groups: { readonly [group: string]: Group };
 	readonly maps: { readonly [map: string]: string };
@@ -47,12 +38,6 @@ export function readCache(path: string, engine: string): CacheFile {
 	return file && file.engine === engine ? file : emptyCache(engine);
 }
 
-/**
- * `file` with `owner`'s entries replaced by `mine`. Entries of other owners stay, with the
- * word and pair snapshots they depend on. When a snapshot changes, discard the old group's
- * entries and ownership before installing the new snapshot: retained calls must never be
- * presented as results computed against a newer schema. Other projects regenerate their entries.
- */
 export function merge(
 	file: CacheFile,
 	mine: Contribution,
@@ -123,7 +108,6 @@ export function merge(
 		Object.assign(target.w, group.w);
 		Object.assign(target.q, group.q);
 		for (const [key, entry] of Object.entries(group.entries)) {
-			// keep the call variants (type maps, rowKeys) other projects computed for this key
 			const theirs = (target.entries[key]?.c ?? []).filter(
 				(c) => !entry.c?.some((m) => m.m === c.m && m.k === c.k),
 			);
@@ -132,7 +116,6 @@ export function merge(
 			own(groupEntryId(g, key));
 		}
 	}
-	// drop snapshots no entry depends on any more, and empty groups
 	for (const [g, group] of Object.entries(groups)) {
 		const used = new Set(Object.values(group.entries).flatMap((e) => e.r));
 		if (!used.size) {
@@ -178,7 +161,6 @@ export function merge(
 	};
 }
 
-/** Run `fn` holding `<path>.lock`; a lock older than `staleMs` is taken over (its holder died). */
 export async function withLock<T>(
 	path: string,
 	fn: () => Promise<T>,
@@ -192,9 +174,7 @@ export async function withLock<T>(
 		} catch {
 			try {
 				if (Date.now() - statSync(lock).mtimeMs > staleMs) unlinkSync(lock);
-			} catch {
-				// gone in the meantime
-			}
+			} catch {}
 			if (attempt > 600) throw new Error(`typesql: could not lock ${path}`);
 			await new Promise((r) => setTimeout(r, 100));
 		}
@@ -204,20 +184,15 @@ export async function withLock<T>(
 	} finally {
 		try {
 			unlinkSync(lock);
-		} catch {
-			// already gone
-		}
+		} catch {}
 	}
 }
 
-/** Write `file` to `path` through a temporary file; returns false when the content is unchanged. */
 export function writeCache(path: string, file: CacheFile): boolean {
 	const text = stringifyCache(file);
 	try {
 		if (readFileSync(path, "utf8") === text) return false;
-	} catch {
-		// new file
-	}
+	} catch {}
 	const tmp = `${path}.${process.pid}.tmp`;
 	writeFileSync(tmp, text);
 	renameSync(tmp, path);

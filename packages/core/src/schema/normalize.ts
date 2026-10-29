@@ -1,10 +1,3 @@
-/**
- * Normalization of SQL type-name spellings to canonical names.
- *
- * Multi-word spellings are joined with a single space and lowercased by the parser
- * before reaching `NormalizeTypeName`: "double precision", "timestamp with time zone",
- * "character varying". Type modifiers `(n)`, `(p, s)` are stripped by the parser.
- */
 export type TypeAliases = {
 	int: "int4";
 	integer: "int4";
@@ -84,14 +77,12 @@ export type TypeAliases = {
 	unknown: "unknown";
 };
 
-/** Normalize a lowercased type spelling. Unknown names pass through (user enums). */
 export type NormalizeTypeName<S extends string> = S extends `${infer E}[]`
 	? `${NormalizeTypeName<E>}[]`
 	: S extends keyof TypeAliases
 		? TypeAliases[S]
 		: S;
 
-/** Spellings that imply `hasDefault: true` in DDL. */
 export type SerialTypeName =
 	| "serial"
 	| "serial4"

@@ -9,7 +9,7 @@
 		"build": "vitepress build",
 		"preview": "vitepress preview",
 		"deploy": "vitepress build && cf deploy",
-		"typecheck": "tsrs -p tsconfig.json --noEmit"
+		"typecheck": "tsrs -p tsconfig.json"
 	},
 	"dependencies": {
 		"@typesql/core": "workspace:*",

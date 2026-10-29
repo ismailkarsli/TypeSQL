@@ -1,10 +1,3 @@
-// Commits the staged changes to a branch through GitHub's createCommitOnBranch API instead of
-// `git push`, so GitHub signs the commit and it passes the ruleset's required signatures. The
-// commit is rejected, like a non-fast-forward push, when the branch moved past HEAD.
-//
-//   git add -A && node scripts/github-commit.ts <branch> <message> [--dry-run]
-//
-// Needs GH_TOKEN (contents: write) and GITHUB_REPOSITORY (owner/name). Prints the new commit's SHA.
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 
@@ -27,7 +20,6 @@ const changes = git("diff", "--cached", "--name-status", "--no-renames", "-z")
 const additions: { path: string; contents: string }[] = [];
 const deletions: { path: string }[] = [];
 for (let i = 0; i < changes.length; i += 2) {
-	// `-z --name-status` pairs every status with its path
 	const [status, path] = [changes[i], changes[i + 1]!];
 	if (status === "D") deletions.push({ path });
 	else

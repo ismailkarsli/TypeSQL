@@ -6,11 +6,8 @@ import type { PgQueryable } from "../client.js";
 import { type GenerateOptions, generateSource } from "./emit.js";
 import { type IntrospectOptions, introspect } from "./introspect.js";
 
-/** What a `--config` module exports as its default: CLI settings plus every generator option. */
 export interface IntrospectConfig extends GenerateOptions, IntrospectOptions {
-	/** Connection string. Default: `--url`, then `$DATABASE_URL`. */
 	readonly url?: string;
-	/** Output file, relative to the working directory. Default: stdout. */
 	readonly out?: string;
 }
 
@@ -36,7 +33,6 @@ interface Io {
 	readonly stderr: (s: string) => void;
 	readonly env: Readonly<Record<string, string | undefined>>;
 	readonly cwd: string;
-	/** Opens a client for a connection string; default: a `pg.Client`. */
 	readonly connect?: (
 		url: string,
 	) => Promise<PgQueryable & { end(): Promise<void> }>;
@@ -80,7 +76,6 @@ const parse = (argv: readonly string[]) =>
 		},
 	});
 
-/** Runs the `typesql` CLI with `argv` (without `node` and the script). Returns the exit code. */
 export async function main(
 	argv: readonly string[],
 	io: Io = defaultIo(),

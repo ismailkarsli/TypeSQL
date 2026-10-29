@@ -36,7 +36,6 @@ const update = process.env["TYPESQL_PG_AST_UPDATE"] === "1";
 const only = (process.env["TYPESQL_PG_AST_TESTS"] ?? "")
 	.split(",")
 	.filter(Boolean);
-/** Bounds a TypeScript session's memory (at 2000, up to ~2.7 GB). */
 const BATCH = Number(process.env["TYPESQL_PG_AST_BATCH"] ?? 2000);
 const JOBS = Number(process.env["TYPESQL_PG_AST_JOBS"] ?? 2);
 const log = (m: string): void => console.log(m);
@@ -107,7 +106,6 @@ test("parse trees against PostgreSQL's parser", async () => {
 				};
 			else {
 				const text = stringLiteral(r.text) ?? r.text;
-				// our parser's error (a template literal type when the message has a token in it)
 				if (/^`?!/.test(text)) {
 					const rejection = text.replace(/^`?!/, "");
 					const problem = await audit.verify(s, rejection);

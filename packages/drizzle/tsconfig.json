@@ -1,5 +1,4 @@
 {
-	"//": "examples/ import the package by name, as user code does.",
 	"extends": "../../tsconfig.base.json",
 	"compilerOptions": {
 		"noEmit": true,

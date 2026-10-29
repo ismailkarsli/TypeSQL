@@ -1,6 +1,5 @@
 import type { Sig } from "../../src/index.js";
 
-// Custom function signatures used by corpus.json.
 declare module "../../src/index.js" {
 	interface FunctionCatalog {
 		aug_len: Sig<["text"], "int8">;

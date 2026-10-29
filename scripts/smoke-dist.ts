@@ -1,12 +1,6 @@
-// Imports the *built* packages (dist/) with plain Node and exercises the runtime API.
-// This catches problems that only exist in emitted JavaScript (e.g. a value re-export
-// of a `declare const`). Run after `pnpm build`.
 import assert from "node:assert/strict";
 import type { Col, Json } from "../packages/core/src/index.ts";
 
-// dist/ only exists after a build and typechecking runs before one, so the imports are typed
-// from the sources: core's exactly, the adapters loosely (their sources import `@typesql/core`,
-// which resolves to core's dist/).
 type Core = typeof import("../packages/core/src/index.ts");
 type CoreAdapter = typeof import("../packages/core/src/adapter.ts");
 interface AdapterSql {

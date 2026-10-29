@@ -4,7 +4,22 @@ The DDL statements TypeSQL understands, how their columns are typed, the errors 
 
 ## Overview
 
-<<< @/snippets/ddl.ts#overview
+```ts
+import { createSql, migrations, type SchemaOf } from "@typesql/core";
+
+export const m = migrations()
+	.add("CREATE TYPE mood AS ENUM ('happy', 'sad')")
+	.add(
+		"CREATE TABLE users (id serial PRIMARY KEY, email text NOT NULL UNIQUE, mood mood)",
+	)
+	.add("ALTER TABLE users ADD COLUMN display_name text")
+	.add("CREATE VIEW user_emails AS SELECT id, email FROM users");
+
+type DB = SchemaOf<typeof m>;
+
+const sql = createSql<DB>();
+const q = sql("SELECT id, mood FROM users WHERE email = $1", "a@b.c");
+```
 
 | Piece | What it does |
 |---|---|
@@ -85,15 +100,15 @@ The message is Postgres's where there is one. The position is the token index in
 ## `migrations()`
 
 ```ts
-const m = migrations()                         // Migrations<{}>
-const m2 = migrations<ExistingDB>()            // start from a hand-written schema
+const m = migrations()
+const m2 = migrations<ExistingDB>()
   .add("ALTER TABLE users ADD COLUMN bio text")
-  .add(`CREATE TABLE a (...); CREATE INDEX ON a (x);`) // one entry may hold several statements
-  .raw("SELECT pg_advisory_lock(1)");         // unchecked; schema type unchanged
-const m3 = m2.raw<NewDB>("...");               // unchecked; you state the resulting schema
+  .add(`CREATE TABLE a (...); CREATE INDEX ON a (x);`)
+  .raw("SELECT pg_advisory_lock(1)");
+const m3 = m2.raw<NewDB>("...");
 
-m2.statements   // readonly string[]: the texts in order (frozen)
-m2.schema       // phantom: the schema type; undefined at runtime
+m2.statements
+m2.schema
 SchemaOf<typeof m2>
 ```
 
@@ -115,11 +130,9 @@ runMigrations(client: MigrationClient, m: { readonly statements: readonly string
 - The client must be a single connection, because `BEGIN` and `COMMIT` have to reach the same session:
 
 ```ts
-// node-postgres
 const client = await pool.connect();
 try { await runMigrations(client, m); } finally { client.release(); }
 
-// postgres.js
 const reserved = await sql.reserve();
 try { await runMigrations({ query: (text) => reserved.unsafe(text) }, m); } finally { reserved.release(); }
 ```

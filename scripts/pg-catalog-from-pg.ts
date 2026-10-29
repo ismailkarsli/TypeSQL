@@ -1,30 +1,8 @@
-// Generator for the opt-in system catalog slice (packages/core/src/schema/pg-catalog.ts).
-//
-// Connects to Postgres (TYPESQL_PG_URL) and writes the `PgCatalog` declaration for the relations
-// listed in RELATIONS below:
-//
-//   TYPESQL_PG_URL=postgres://… node scripts/pg-catalog-from-pg.ts           # rewrite the file
-//   TYPESQL_PG_URL=postgres://… node scripts/pg-catalog-from-pg.ts --check   # exit 1 if it differs
-//
-// Column types come from pg_attribute (domains such as information_schema.sql_identifier are
-// replaced by their base type, which is also the type OID Postgres reports to drivers). Table
-// columns are NOT NULL when attnotnull is set. Postgres records no nullability for view
-// columns, so the generator derives it from the view's query tree (pg_rewrite.ev_action): a
-// column is NOT NULL only when its expression provably cannot be NULL (a NOT NULL table column
-// that no outer join nulls, a non-null constant, a CASE whose every branch is NOT NULL, ...).
-// The analysis lives in packages/pg/src/introspect/nullability.ts (also used by `typesql
-// introspect`). Columns of set-returning functions (pg_stat_get_activity(), pg_lock_status(),
-// ...) are nullable unless listed in FUNCTION_COLUMNS_NOT_NULL, checked against the C source.
-//
-// The output targets the Postgres major version it was generated from (18).
-// Regenerate it against that major version when updating the catalog.
 import { readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
-// Shared with `typesql introspect` (@typesql/pg); loaded through Node's type stripping.
 import { ViewNullability } from "../packages/pg/src/introspect/nullability.ts";
 
-/** The part of a `pg` Client the generator uses; `R` is the type of the result rows. */
 export interface PgClient {
 	query<R extends readonly unknown[] = Record<string, unknown>[]>(
 		text: string,
@@ -32,13 +10,11 @@ export interface PgClient {
 	): Promise<{ rows: R }>;
 }
 
-/** Relations in the slice: [schema, name, one-line description]. */
 export const RELATIONS: readonly (readonly [
 	schema: string,
 	name: string,
 	description: string,
 ])[] = [
-	// catalog tables
 	["pg_catalog", "pg_am", "Access methods."],
 	["pg_catalog", "pg_attrdef", "Column default expressions."],
 	["pg_catalog", "pg_attribute", "Table columns."],
@@ -64,7 +40,6 @@ export const RELATIONS: readonly (readonly [
 	["pg_catalog", "pg_sequence", "Sequence parameters."],
 	["pg_catalog", "pg_trigger", "Triggers."],
 	["pg_catalog", "pg_type", "Data types."],
-	// system views
 	[
 		"pg_catalog",
 		"pg_available_extensions",
@@ -103,7 +78,6 @@ export const RELATIONS: readonly (readonly [
 	],
 	["pg_catalog", "pg_tables", "Ordinary and partitioned tables."],
 	["pg_catalog", "pg_views", "Views, with their definitions."],
-	// information_schema
 	["information_schema", "check_constraints", "Check constraints."],
 	["information_schema", "columns", "Columns of tables and views."],
 	[
@@ -132,10 +106,6 @@ export const RELATIONS: readonly (readonly [
 	["information_schema", "views", "Views."],
 ];
 
-/**
- * Columns produced by set-returning functions that are never NULL (checked against
- * src/backend/utils/adt/pgstatfuncs.c, lockfuncs.c, guc_funcs.c, slotfuncs.c, extension.c).
- */
 export const FUNCTION_COLUMNS_NOT_NULL = new Set([
 	"pg_stat_activity.pid",
 	"pg_stat_replication.pid",
@@ -159,7 +129,6 @@ export const FUNCTION_COLUMNS_NOT_NULL = new Set([
 	"pg_available_extensions.name",
 ]);
 
-/** Column types of a relation (domains replaced by their base type), in column order. */
 async function columnsOf(
 	client: PgClient,
 	relid: string,
@@ -187,13 +156,10 @@ async function columnsOf(
 	}));
 }
 
-// ───────────────────────────── emit ─────────────────────────────
-
 const IDENT = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
 const key = (name: string): string =>
 	IDENT.test(name) ? name : JSON.stringify(name);
 
-/** Source of packages/core/src/schema/pg-catalog.ts for the connected server. */
 export async function generatePgCatalog(client: PgClient): Promise<string> {
 	const views = new ViewNullability(
 		(text, values) => client.query(text, values),
@@ -207,9 +173,9 @@ export async function generatePgCatalog(client: PgClient): Promise<string> {
 	} = await client.query<[{ version: string }]>(
 		`SELECT current_setting('server_version') AS version`,
 	);
-	const major = version.split(/[.\s]/)[0];
+
 	const namespaces = new Map<string, string[]>();
-	for (const [schema, name, description] of RELATIONS) {
+	for (const [schema, name] of RELATIONS) {
 		const { rows } = await client.query<{ oid: string; relkind: string }[]>(
 			`SELECT c.oid::int8::text AS oid, c.relkind FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
         WHERE n.nspname = $1 AND c.relname = $2`,
@@ -227,47 +193,21 @@ export async function generatePgCatalog(client: PgClient): Promise<string> {
 			(c, i) =>
 				`    ${key(c.name)}: ${notnull[i] ? "Col" : "Nullable"}<${JSON.stringify(c.type)}>;`,
 		);
-		const kind = relkind === "v" ? "View" : "Table";
-		const lines = [
-			`  /** ${kind} \`${schema}.${name}\`: ${description} */`,
-			`  ${key(name)}: View<{`,
-			...body,
-			"  }>;",
-		];
+
+		const lines = [`  ${key(name)}: View<{`, ...body, "  }>;"];
 		namespaces.set(schema, [...(namespaces.get(schema) ?? []), ...lines]);
 	}
 	return [
-		`// Generated by scripts/pg-catalog-from-pg.ts from PostgreSQL ${major}. Do not edit.`,
 		`import type { Col, Nullable, View } from "./column.js";`,
 		"",
-		"/**",
-		" * Relations of `pg_catalog` in the {@link PgCatalog} slice. Catalog tables are declared as",
-		" * views too: TypeSQL treats the whole slice as read-only.",
-		" */",
 		"export interface PgCatalogNamespace {",
 		...namespaces.get("pg_catalog")!,
 		"}",
 		"",
-		"/** Views of `information_schema` in the {@link PgCatalog} slice. */",
 		"export interface InformationSchemaNamespace {",
 		...namespaces.get("information_schema")!,
 		"}",
 		"",
-		"/**",
-		` * An opt-in slice of the PostgreSQL ${major} system catalogs: common \`pg_catalog\` tables, the`,
-		" * statistics and catalog views (`pg_stat_activity`, `pg_stat_database`, `pg_tables`, ...) and",
-		" * `information_schema` (`tables`, `columns`, ...). Add it to a schema with an intersection:",
-		" *",
-		" * ```ts",
-		" * const sql = createSql<DB & PgCatalog>();",
-		' * sql("SELECT datname, state FROM pg_stat_activity");',
-		" * ```",
-		" *",
-		" * `pg_catalog` relations resolve unqualified (as in Postgres, where `pg_catalog` is always on",
-		" * the search path) after the schema's own relations; `information_schema` relations need the",
-		" * schema prefix. Column types are the types Postgres reports (domains replaced by their base",
-		" * type: `sql_identifier` is `name`, `cardinal_number` is `int4`, `yes_or_no` is `varchar`).",
-		" */",
 		"export interface PgCatalog {",
 		"  pg_catalog: PgCatalogNamespace;",
 		"  information_schema: InformationSchemaNamespace;",

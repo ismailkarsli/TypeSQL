@@ -1,8 +1,3 @@
-/**
- * Completion items for a statement literal: what the scanner expects at the cursor (scan.ts),
- * filled from the `DB` type of the call (schema.ts). Names only, inserted at the cursor.
- */
-
 import type { LineAndCharacter } from "typescript/ast";
 import type { Checker, DocumentIdentifier, Program } from "typescript/async";
 import { type EditorKinds, sqlCallAt } from "./call.js";
@@ -10,20 +5,15 @@ import { type Context, contextAt, type RelRef } from "./scan.js";
 import { type Schema, schemaOf } from "./schema.js";
 
 export interface CompletionItem {
-	/** The name. */
 	readonly label: string;
 	readonly kind: "table" | "view" | "namespace" | "cte" | "column" | "alias";
-	/** A column's type (`int4`, `text | null`), a relation's kind, an alias's relation. */
 	readonly detail: string;
-	/** The name, quoted when Postgres would fold it or read it as a keyword. */
 	readonly insertText: string;
 	readonly sortText: string;
 }
 
-/** At most this many items per request. */
 const MAX_ITEMS = 1000;
 
-/** Items for `ctx` (from `contextAt`) against `schema`. */
 export async function completions(
 	schema: Schema,
 	ctx: Context,
@@ -113,18 +103,12 @@ export interface Range<T> {
 
 export interface Completions {
 	readonly items: readonly CompletionItem[];
-	/** What the items replace (the name typed so far): file offsets, and the LSP range. */
 	readonly replace: Range<number>;
 	readonly replaceRange: Range<LineAndCharacter>;
-	/** The statement literal's text (inside the quotes): file offsets, and the LSP range. */
 	readonly literal: Range<number>;
 	readonly literalRange: Range<LineAndCharacter>;
 }
 
-/**
- * Completions at the cursor (a file offset or an LSP position), or null when it is not inside
- * the statement literal of a core `sql` call. `items` is empty where the scanner expects nothing.
- */
 export async function completionsAt(
 	program: Program,
 	checker: Checker,
@@ -169,7 +153,6 @@ function dedupe(items: CompletionItem[]): CompletionItem[] {
 	return items.filter((i) => !seen.has(i.label) && !!seen.add(i.label));
 }
 
-/** Reserved words (Postgres's `reserved` and `type_func_name` keywords): names spelled like them need quotes. */
 const RESERVED = new Set([
 	"all",
 	"analyse",
@@ -274,7 +257,6 @@ const RESERVED = new Set([
 	"with",
 ]);
 
-/** `name` as SQL: bare when Postgres reads it back unchanged, else in double quotes. */
 export function quoteIdent(name: string): string {
 	return /^[a-z_][a-z0-9_$]*$/.test(name) && !RESERVED.has(name)
 		? name

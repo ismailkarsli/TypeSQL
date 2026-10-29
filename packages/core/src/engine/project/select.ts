@@ -47,13 +47,6 @@ import type {
 import type { ColumnName } from "./naming.js";
 import type { ProjectStmt } from "./stmt.js";
 
-/**
- * Project a SELECT statement to its ordered output columns.
- * `ProjectSelect<Q, DB, Outer, Ctes>` → `Cols` or `SqlError`.
- *
- * Nodes are discriminated on `t` and passed on field by field (never compared against the
- * recursive AST types, ENGINE.md pitfall 12).
- */
 export type ProjectSelect<
 	Q extends SelectStmt,
 	DB,
@@ -69,10 +62,6 @@ export type ProjectSelect<
 	false
 >;
 
-/**
- * `[WITH ...] body [ORDER BY ...]`. `Lit`: type untyped string-literal targets as `lit`
- * (operands of a set operation, where they take the type of the other branches).
- */
 export type ProjectSelectParts<
 	W extends WithClause | null,
 	B extends SelectBody,
@@ -88,13 +77,6 @@ export type ProjectSelectParts<
 			: C2
 		: never;
 
-// ───────────────────────────── WITH ─────────────────────────────
-
-/**
- * Add the CTEs of a WITH clause to the CTE map. Each CTE sees the previous ones (and
- * shadows an outer CTE or table of the same name); a RECURSIVE CTE also sees itself.
- * Without a WITH clause the list of CTEs is `never`, which binds none.
- */
 export type BindWith<
 	W extends WithClause | null,
 	DB,
@@ -139,7 +121,6 @@ type BindCtes<
 				: M
 			: never;
 
-/** Add (or replace: an inner WITH shadows an outer CTE of the same name) the CTE `N`. */
 type AddCte<Ctes extends CteMap, N extends string, M extends ColMap> = Omit<
 	Ctes,
 	N
@@ -196,24 +177,12 @@ type ProjectCteBody<
 				: R
 		: never;
 
-// ─── SEARCH / CYCLE ───
-
-/**
- * `SEARCH ... SET seq` and `CYCLE ... SET mark [TO v DEFAULT d] USING path` add columns to a
- * recursive CTE (also visible to its recursive term): `seq` is `record[]` (DEPTH FIRST) or
- * `record` (BREADTH FIRST), `mark` is `bool` or the common type of `v` and `d`, `path` is
- * `record[]`; none is ever NULL. They need a recursive CTE whose two terms are plain SELECTs.
- */
 type NotRecursive<C extends Cte, R> = C extends {
 	readonly search: null;
 	readonly cycle: null;
 }
 	? R
 	: SqlError<"WITH query is not recursive", null>;
-/**
- * `R`, the recursive CTE `C` with the UNION `B`; with SEARCH or CYCLE, the recursive term and the
- * non-recursive term must both be plain SELECTs (not set operations).
- */
 type CheckExpandable<C extends Cte, B extends SetOp, R> = C extends {
 	readonly search: null;
 	readonly cycle: null;
@@ -230,7 +199,6 @@ type CheckExpandable<C extends Cte, B extends SetOp, R> = C extends {
 					null
 				>
 			: R;
-/** A set operation, parenthesized or not. */
 type SetOperand =
 	| { readonly t: "setop" }
 	| {
@@ -252,7 +220,6 @@ type CheckCteColList<
 			: CheckCteColList<R, M, What, Seen | H>
 		: SqlError<`${What} column "${H}" not in WITH query column list`, null>
 	: true;
-/** The columns SEARCH and CYCLE add (`{}` without them), or an error. `M`: the CTE's columns. */
 type SearchCycleCols<S, Y, M extends ColMap> =
 	SearchCols<S, M> extends infer SC
 		? SC extends AnyErr
@@ -319,11 +286,6 @@ type CycleCols<Y, S, M extends ColMap> = Y extends CteCycle
 									: never
 		: never
 	: {};
-/**
- * `TO v DEFAULT d`: their common type (string literals yield; two of them are text; with a value
- * of type `unknown`, which yields to anything but `unknown` and NULL, it is text too), which
- * needs an equality and an inequality operator.
- */
 type CycleMarkType<To, Def> = [To, Def] extends [
 	infer V extends Expr,
 	infer D extends Expr,
@@ -353,7 +315,6 @@ type CycleMarkType<To, Def> = [To, Def] extends [
 			: never
 		: never
 	: "bool";
-/** The types a constant can have that have no default btree or hash operator class (pg_opclass, PostgreSQL 18). */
 type NoEquality =
 	| "box"
 	| "circle"
@@ -376,7 +337,6 @@ type ConstType<E extends Expr> = E extends { readonly t: "str" }
 			: "unknown"
 		: never;
 
-/** `WITH a(x, y) AS (...)`: rename positionally; more names than columns is an error. */
 type ApplyCteCols<
 	C extends Cols,
 	Names extends readonly string[] | null,
@@ -385,11 +345,6 @@ type ApplyCteCols<
 	? RenameCols<C, Names, [], `WITH query "${Name}"`>
 	: C;
 
-/**
- * `WITH RECURSIVE t AS (non_recursive UNION [ALL] recursive)`: column types come from the
- * non-recursive term (as in Postgres); nullability is the union over both terms, iterated
- * to a fixpoint (a recursive term can feed a nullable column back into another one).
- */
 type RecursiveCte<
 	Name extends string,
 	Names extends readonly string[] | null,
@@ -432,11 +387,6 @@ type RecursiveCte<
 				: never
 			: C2
 		: never;
-/**
- * One step of the fixpoint: the whole UNION with the self reference typed `M`. Each step can
- * only make columns nullable, so it ends; after four steps every column is typed nullable.
- * `X`: the SEARCH / CYCLE columns (`{}` without them), added to the self reference and the result.
- */
 type RecursiveFix<
 	Name extends string,
 	Names extends readonly string[] | null,
@@ -489,21 +439,17 @@ type RecursiveFix<
 type WithExtra<M extends ColMap, X extends ColMap> = M & X extends infer All
 	? { readonly [K in keyof All]: All[K] }
 	: never;
-/** The non-recursive term's types; the whole UNION's nullability (which includes that term's). */
 type FixStep<M0 extends ColMap, Full extends ColMap> = {
 	readonly [K in keyof M0]: {
 		readonly type: M0[K]["type"];
 		readonly nullable: Full[K & string]["nullable"];
 	};
 };
-/** The columns whose nullability differs between two steps. */
 type Changed<A extends ColMap, B extends ColMap> = {
 	[K in keyof A]: [A[K]["nullable"]] extends [B[K & string]["nullable"]]
 		? never
 		: K;
 }[keyof A];
-
-// ───────────────────────────── bodies ─────────────────────────────
 
 type ProjectBody<
 	B extends SelectBody,
@@ -566,8 +512,6 @@ type ProjectBody<
 						: SqlError<"multiple ORDER BY clauses not allowed", null>
 				: SqlError<"unsupported query body", null>;
 
-// ─── set operations ───
-
 type ProjectSetOp<
 	L extends SelectBody,
 	R extends SelectBody,
@@ -586,14 +530,6 @@ type ProjectSetOp<
 			: LC
 		: never;
 
-/**
- * Names come from the left branch; per position the type is the common type (untyped
- * string literals yield to the other branch, Postgres's `select_common_type`; no common
- * type is an error) and nullability is the union. Alignment stops at the first `*` entry
- * (its width is unknown). `unknown` (a type we do not know) yields to every type but itself:
- * `CommonLit` is `unknown` with an `unknown` right side only when the left is `unknown` or NULL,
- * and so is the column.
- */
 type AlignSetOp<
 	L extends Cols,
 	R extends Cols,
@@ -654,13 +590,6 @@ type RestFrom<
 	Acc extends Cols,
 > = C[I] extends undefined ? Acc : RestFrom<C, Nx<I>, [...Acc, C[I]]>;
 
-// ─── VALUES ───
-
-/**
- * `VALUES (...), ...` (the parser takes one row or more): columns `column1`, `column2`, ...;
- * per column the common type over the rows (string literals yield, like in set operations) and
- * nullable if any row is. ORDER BY sees the columns (by name, position or in expressions).
- */
 type ProjectValues<
 	Rows extends readonly (readonly Expr[])[],
 	DB,
@@ -704,7 +633,6 @@ type ProjectValues<
 			: T0
 		: never;
 
-/** Type a row in operand position (string literals are `lit`). */
 type OperandRow<
 	Row extends readonly Expr[],
 	C extends Ctx,
@@ -741,7 +669,6 @@ type MergeRows<
 		: never
 	: Acc;
 
-/** Per column the common type of two rows of the same length (`unknown` as in `AlignSetOp`). */
 type ZipCommon<
 	A extends readonly ColInfo[],
 	B extends readonly ColInfo[],
@@ -788,7 +715,6 @@ type ValuesCols<
 			]
 		>
 	: Acc;
-/** The columns as a target list, for ORDER BY positions and names. */
 type ValuesTargets<Cs extends Cols> = {
 	readonly [K in keyof Cs]: {
 		readonly e: {
@@ -800,13 +726,6 @@ type ValuesTargets<Cs extends Cols> = {
 	};
 };
 
-// ─── simple select ───
-
-/**
- * FROM → scope; WHERE narrows nullability (binder/narrow.ts); grouping sets make the columns
- * they may leave out nullable; targets are projected in that scope; then WHERE / HAVING /
- * ORDER BY / GROUP BY / DISTINCT [ON] / WINDOW are validated (binder/clauses.ts).
- */
 type ProjectSimple<
 	Distinct,
 	Ts extends readonly Target[],
@@ -858,25 +777,15 @@ type ProjectSimple<
 			: L
 		: never;
 
-/**
- * A GROUP BY without grouping sets: aggregates then see no empty input. The empty grouping set
- * (`()`, and in ROLLUP and CUBE) yields a row even for no input rows, as no GROUP BY does.
- */
 type Grouped<GroupBy, Sets> = Sets extends false
 	? GroupBy extends null
 		? false
 		: true
 	: false;
 
-/**
- * Grouping sets: a column that a set leaves out is NULL in that set's rows. `Sets`: the ROLLUP /
- * CUBE items (columns of this level, or anything else: then every column), or `true` (GROUPING
- * SETS, `()`: every column).
- */
 type SetsLevel<L extends ScopeLevel, Sets> = Sets extends false
 	? L
 	: NullLevel<L, Sets extends readonly unknown[] ? LeftOut<L, Sets> : string>;
-/** The names of the items `Is`, if all are columns of the level `L`; else `string` (all of them). */
 type LeftOut<
 	L extends ScopeLevel,
 	Is extends readonly unknown[],
@@ -890,7 +799,6 @@ type LeftOut<
 type LevelNames<L extends ScopeLevel> = {
 	[I in keyof L]: keyof L[I]["cols"];
 }[number];
-/** Mark the columns `Names` of every item of a level nullable. */
 type NullLevel<L extends ScopeLevel, Names> = {
 	readonly [I in keyof L]: {
 		readonly alias: L[I]["alias"];
@@ -976,7 +884,6 @@ type TargetExprs<Ts extends readonly Target[]> = {
 	readonly [K in keyof Ts]: Ts[K]["e"];
 };
 
-/** `(t).*` in a target list: the columns of a whole-row value (all nullable when the row is). */
 type FieldStar<A> = A extends ColInfo
 	? A["type"] extends Shaped<"record", ObjShape<infer M>>
 		? A["nullable"] extends true
@@ -985,10 +892,6 @@ type FieldStar<A> = A extends ColInfo
 		: SqlError<"(e).* needs a whole-row value such as (t).*", null>
 	: A;
 
-/**
- * Targets → ordered columns, applying Postgres column naming. A `*` / `t.*` target is one
- * `{ star }` entry. `Lit`: an untyped string-literal target is typed `lit` (set operations).
- */
 export type ProjectTargets<
 	Ts extends readonly Target[],
 	C extends Ctx,

@@ -15,22 +15,13 @@ export type {
 } from "./from-prisma.js";
 export type { PrismaTypeMap } from "./type-map.js";
 
-/** A TypeSQL schema as is, or a generated `Prisma.TypeMap` converted with `FromPrisma`. */
 export type PrismaSchema<S> = S extends PrismaTypeMapLike ? FromPrisma<S> : S;
 
-/** What `createSql<S>(prisma)` returns: core's `Sql` under `PrismaTypeMap`, with `transaction(fn)`. */
 export type PrismaSql<S, TM = PrismaTypeMap> = TransactionalSql<
 	PrismaSchema<S>,
 	TM
 >;
 
-/**
- * `createSql` from core with `PrismaTypeMap` (what `$queryRaw` returns: `int8` is `bigint`,
- * `numeric` is `Decimal`). `S` is a generated `Prisma.TypeMap`, a `FromPrisma<...>` with
- * overrides, or the `DB` interface written by the `typesql-prisma` generator. The queries'
- * `execute*` methods run on `prisma` (a client or a transaction client), and `sql.transaction(fn)`
- * runs `fn` with a `sql` bound to an interactive transaction.
- */
 export function createSql<S, TM = PrismaTypeMap>(
 	prisma?: PrismaRawClient,
 ): PrismaSql<S, TM> {

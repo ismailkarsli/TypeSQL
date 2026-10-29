@@ -1,15 +1,11 @@
 import type { DmmfDatamodel, DmmfEnum, DmmfField, DmmfModel } from "./dmmf.js";
 
 export interface EmitOptions {
-	/** Module the column helpers are imported from. Default `"@typesql/core"`. */
 	readonly importFrom?: string | undefined;
-	/** Name of the exported interface. Default `"DB"`. */
 	readonly typeName?: string | undefined;
-	/** Names of models declared with `view` (they become `View<...>`). See `viewNames`. */
 	readonly views?: readonly string[];
 }
 
-/** Prisma scalar → Postgres type used by the PostgreSQL connector when no `@db.*` is given. */
 export const SCALAR_TYPES: Readonly<Record<string, string>> = {
 	Int: "int4",
 	BigInt: "int8",
@@ -22,7 +18,6 @@ export const SCALAR_TYPES: Readonly<Record<string, string>> = {
 	Bytes: "bytea",
 };
 
-/** `@db.*` native type (PostgreSQL connector) → canonical Postgres type name. */
 export const NATIVE_TYPES: Readonly<Record<string, string>> = {
 	Text: "text",
 	Char: "bpchar",
@@ -52,20 +47,14 @@ export const NATIVE_TYPES: Readonly<Record<string, string>> = {
 	ByteA: "bytea",
 };
 
-/**
- * `@default(fn())` functions that become a database DEFAULT on PostgreSQL (`sequence()` is
- * CockroachDB's: Prisma rejects it for the postgresql provider).
- */
 const DB_DEFAULT_FUNCTIONS = new Set(["autoincrement", "now", "dbgenerated"]);
 
-/** Names of the `view` blocks in a Prisma schema text (views appear as models in the DMMF). */
 export function viewNames(schema: string): string[] {
 	return [
 		...schema.matchAll(/^[ \t]*view[ \t]+([A-Za-z_][A-Za-z0-9_]*)[ \t]*\{/gm),
 	].map((m) => m[1]!);
 }
 
-/** Postgres type of a field (element type for lists), from `@db.*` or the scalar default. */
 export function pgTypeOf(
 	field: DmmfField,
 	enumNames: ReadonlyMap<string, string>,
@@ -76,10 +65,6 @@ export function pgTypeOf(
 	return SCALAR_TYPES[field.type] ?? field.type.toLowerCase();
 }
 
-/**
- * Whether the column has a database DEFAULT. Client-side defaults (`uuid()`, `cuid()`,
- * `nanoid()`, `ulid()`) and `@updatedAt` are filled in by Prisma Client and have none.
- */
 export function hasDbDefault(field: DmmfField): boolean {
 	if (!field.hasDefaultValue) return false;
 	const d = field.default;
@@ -117,12 +102,6 @@ function enumKeys(enums: readonly DmmfEnum[]): Map<string, string> {
 	return new Map(enums.map((e) => [e.name, e.dbName ?? e.name]));
 }
 
-/**
- * TypeScript source declaring the TypeSQL schema of a Prisma datamodel (DMMF): database table,
- * column and enum names, native types, nullability (scalar lists are nullable: Prisma creates
- * them without NOT NULL) and database defaults. Models in a non-public `@@schema` are nested
- * under `DB[schema]`. Relation fields are skipped; `Unsupported(...)` fields are not in the DMMF.
- */
 export function generateSource(
 	datamodel: DmmfDatamodel,
 	options: EmitOptions = {},

@@ -1,15 +1,8 @@
 import { takeValue } from "./inline.js";
 import { quoteIdent } from "./splice.js";
 
-/**
- * Runtime side of `sql.set` and `sql.values`. Keys are quoted as identifiers; values become
- * `$n` parameters (never text). A `sql.json(v)` value is sent as JSON text (`takeValue`). The
- * table name is only used by the types.
- */
-
 const own = (o: object, k: string) => Object.hasOwn(o, k);
 
-/** `"a" = $1, "b" = $2` for the defined values (`undefined` is skipped). Throws when none are. */
 export function buildSet(values: Readonly<Record<string, unknown>>): {
 	text: string;
 	values: unknown[];
@@ -31,11 +24,6 @@ export function buildSet(values: Readonly<Record<string, unknown>>): {
 	return { text: parts.join(", "), values: out };
 }
 
-/**
- * `("a", "b") VALUES ($1, $2), ($3, DEFAULT)`: the columns are the keys with a defined value in
- * any row, in order of first appearance; a missing or `undefined` value is `DEFAULT`. One row
- * without any value is `DEFAULT VALUES`. Throws on an empty array.
- */
 export function buildValues(
 	rows: readonly Readonly<Record<string, unknown>>[],
 ): { text: string; values: unknown[] } {

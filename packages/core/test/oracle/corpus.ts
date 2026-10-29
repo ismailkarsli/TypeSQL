@@ -2,14 +2,12 @@ import { readFileSync } from "node:fs";
 
 export interface CorpusStatement {
 	readonly schema: string | null;
-	/** Stable provenance label, retained so existing baselines keep their identity. */
 	readonly source: string;
 	readonly sql: string;
 	readonly ddl: boolean;
 }
 
 interface Corpus {
-	/** TypeScript DB types using the probe's __T import; these describe inputs, not expected results. */
 	readonly schemas: Readonly<Record<string, string>>;
 	readonly statements: readonly CorpusStatement[];
 	readonly skippedSlots: Readonly<Record<string, number>>;

@@ -6,17 +6,12 @@ import type {
 } from "@typesql/core";
 import type { ToCamelCase, ToSnakeCase } from "./casing.js";
 
-/** Settings of your Drizzle setup that the column types do not record. */
 export interface FromDrizzleOptions {
-	/** The `casing` passed to `drizzle()`: applied to column names, as Drizzle does at runtime. */
 	readonly casing?: "snake_case" | "camelCase" | undefined;
-	/** Type of `timestamp()` columns not marked with `pgType` (Drizzle's types drop `withTimezone`). Default `"timestamp"`. */
 	readonly timestamp?: "timestamp" | "timestamptz" | undefined;
-	/** Type of `time()` columns not marked with `pgType`. Default `"time"`. */
 	readonly time?: "time" | "timetz" | undefined;
 }
 
-/** Postgres type of each pg-core `columnType` with a fixed SQL type. */
 export interface DrizzleColumnTypes {
 	PgSmallInt: "int2";
 	PgInteger: "int4";
@@ -90,7 +85,6 @@ type ColumnConfig = {
 	readonly baseColumn: unknown;
 };
 
-/** Values of an exported `pgEnum` (array or object form). */
 type EnumValues<X> = X extends {
 	readonly enumValues: readonly [string, ...string[]];
 }
@@ -99,7 +93,6 @@ type EnumValues<X> = X extends {
 		? D
 		: never;
 
-/** `$types` registry: exported enums by export name. */
 type Enums<S> = {
 	-readonly [K in keyof S as S[K] extends EnumLike ? K : never]: EnumValues<
 		S[K]
@@ -114,7 +107,6 @@ type LastOf<U> = (U extends unknown ? (x: () => U) => void : never) extends (
 		: never
 	: never;
 
-/** Name of the exported enum whose values are exactly `V` (any one when several match), else `text`. */
 type EnumName<V, E> = {
 	[K in keyof E]: [E[K]] extends [V] ? ([V] extends [E[K]] ? K : never) : never;
 }[keyof E] extends infer N
@@ -129,7 +121,6 @@ type Opt<Opts, K extends keyof FromDrizzleOptions, D> = Opts extends {
 	? V
 	: D;
 
-/** Postgres type of a column config. */
 type PgTypeOf<D extends ColumnConfig, Opts = {}, E = {}> = D extends {
 	readonly typesqlType: infer T extends string;
 }
@@ -150,7 +141,6 @@ type PgTypeOf<D extends ColumnConfig, Opts = {}, E = {}> = D extends {
 							? EnumName<D["data"], E>
 							: "unknown";
 
-/** The descriptor as the matching core helper (`Col`, `Nullable`, `Generated`, `NullableGenerated`). */
 type Desc<T extends string, N, H> = N extends true
 	? H extends true
 		? NullableGenerated<T>
@@ -204,7 +194,6 @@ type Relation<X, Opts, E> = X extends TableLike
 		? { readonly $view: ViewColumns<X["_"]["selectedFields"], Opts, E> }
 		: never;
 
-/** Postgres schema of a table outside `public`. */
 type SchemaOf<X> = X extends TableLike
 	? Exclude<X["_"]["schema"], undefined | "public">
 	: never;
@@ -231,14 +220,6 @@ type Build<S, Opts, E = Enums<S>> = {
 
 type Flat<T> = { [K in keyof T]: T[K] } & {};
 
-/**
- * A TypeSQL schema from Drizzle `pg-core` definitions: `FromDrizzle<typeof schema>` with
- * `import * as schema from "./schema"`. Also accepts a record of tables or a single table.
- *
- * Keys are SQL names (tables, columns, `pgSchema` namespaces); views become `View<…>`;
- * exported `pgEnum`s are registered under `$types` by export name. Anything else exported
- * (relations, sequences, helpers) is ignored.
- */
 export type FromDrizzle<
 	Schema,
 	Opts extends FromDrizzleOptions = {},

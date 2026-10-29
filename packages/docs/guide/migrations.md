@@ -6,7 +6,26 @@ If you already write DDL to create your database, TypeSQL can read the schema fr
 
 `migrations()` collects your DDL statements, checks each one as you add it, and carries the resulting schema as a type:
 
-<<< @/snippets/migrations.ts#builder
+```ts
+const m = migrations()
+	.add(`CREATE TYPE mood AS ENUM ('happy', 'neutral', 'sad')`)
+	.add(`CREATE TABLE users (
+          id serial PRIMARY KEY,
+          email text NOT NULL UNIQUE,
+          display_name text,
+          mood mood NOT NULL DEFAULT 'neutral'
+        )`)
+	.add(
+		`CREATE VIEW named_users AS SELECT id, display_name FROM users WHERE display_name IS NOT NULL`,
+	);
+
+type DB = SchemaOf<typeof m>;
+const sql = createSql<DB>();
+const q = sql(
+	"SELECT id, display_name, mood FROM users WHERE email = $1",
+	"a@b.c",
+);
+```
 
 - `SchemaOf<typeof m>` is the schema. Pass it to `createSql`.
 - `m.statements` is the list of statements at runtime, in order.
@@ -21,7 +40,7 @@ If you already write DDL to create your database, TypeSQL can read the schema fr
 ```ts [node-postgres]
 import { createSql, migrate } from "@typesql/pg";
 
-await migrate(pool, m); // a Pool is fine: it runs on one client from the pool
+await migrate(pool, m);
 const sql = createSql<SchemaOf<typeof m>>(pool);
 ```
 
@@ -44,7 +63,15 @@ Statements are sent without parameters, so `$$`-quoted function bodies and multi
 
 `ApplyDdl<DB, "…">` is the type behind the builder. It returns the schema after one DDL statement, or after a `;`-separated script:
 
-<<< @/snippets/migrations.ts#applyddl
+```ts
+interface Before {
+	users: { id: Generated<"int4">; email: Col<"text"> };
+}
+type After = ApplyDdl<
+	Before,
+	"ALTER TABLE users ADD COLUMN age int NOT NULL DEFAULT 0; ALTER TABLE users RENAME COLUMN email TO login"
+>;
+```
 
 ## What is supported
 

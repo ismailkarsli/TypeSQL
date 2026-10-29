@@ -51,8 +51,8 @@ Agreeing on syntax means TypeSQL accepts what Postgres accepts. Types are checke
 From a clone of the repository:
 
 ```sh
-pnpm pg-regress:setup     # check out PostgreSQL's regression tests (a submodule, ~20 MB)
-pnpm test:pg-regress      # check every statement, about a minute
+pnpm pg-regress:setup
+pnpm test:pg-regress
 ```
 
 The [regression test runner](https://github.com/ismailkarsli/TypeSQL/blob/main/packages/core/test/pg-regress/run.ts) splits the statements and reads Postgres's outcome from the expected output.

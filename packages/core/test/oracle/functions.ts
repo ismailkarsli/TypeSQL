@@ -431,7 +431,6 @@ async function readProcs(
 	conn: Connection,
 	names: readonly string[],
 ): Promise<Proc[]> {
-	// arrays as `elem[]`, as compare.ts spells them
 	const typeName =
 		"CASE WHEN t.typcategory = 'A' AND e.oid IS NOT NULL AND t.typname LIKE '\\_%' THEN e.typname || '[]' ELSE t.typname END";
 	const rows = await conn.sql.unsafe<
@@ -469,7 +468,6 @@ async function readProcs(
 			outCols: r.outcols,
 		}),
 	);
-	// pg_catalog wins a tie: it is searched first
 	const seen = new Set<string>();
 	return procs
 		.sort(
@@ -549,7 +547,6 @@ async function checkItem(conn: Connection, it: Item): Promise<Checked> {
 	for (const i of it.strictNulls ?? [])
 		if (i < columns.length)
 			rows.push(columns.map((_, j) => (j === i ? null : undefined)));
-	// a statement we reject agrees with a server that accepts it but fails every run of it
 	const v = compareStatement(ours, {
 		observed: {
 			columns,

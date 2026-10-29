@@ -40,7 +40,6 @@ Parses the statement at compile time and returns `Query<Row, Params, Text>`: `{ 
 
 ```ts
 sql("SELECT id FROM users WHERE id = :id AND email = :email", { id: 1, email: "x" });
-// text: "SELECT id FROM users WHERE id = $1 AND email = $2", values: [1, "x"]
 ```
 
 - `:name` becomes `$n` in order of first appearance, and the call takes one object. A name used twice is one parameter.
@@ -86,9 +85,8 @@ See [Parameters](../guide/parameters), [JSON values](../guide/parameters#json-va
 ## Fragments
 
 ```ts
-const where = sql.fragment("WHERE u.id = $1", 7); // Fragment<"WHERE u.id = $1", [unknown]>
+const where = sql.fragment("WHERE u.id = $1", 7);
 const q = sql("SELECT u.id FROM users u {where}", { where });
-// Query<{ id: number }, [number], "SELECT u.id FROM users u WHERE u.id = $1">
 ```
 
 | Function | Result |
@@ -212,16 +210,16 @@ The engine's other types are exported from `@typesql/core/engine`, so that a dec
 ## Schema types
 
 ```ts
-Col<"text">                  // NOT NULL, no default
-Nullable<"text">             // nullable
-Generated<"int4">            // has a default / identity / serial: optional on INSERT
-NullableGenerated<"text">    // both
-Arr<"int4">                  // int4[]
-Enum<"mood">                 // values in DB["$types"]["mood"]
-Json<Item[]>                 // jsonb holding Item[]; Json<T, { nullable: true }, "json"> for json
-View<{ ...columns }>         // read-only relation
+Col<"text">
+Nullable<"text">
+Generated<"int4">
+NullableGenerated<"text">
+Arr<"int4">
+Enum<"mood">
+Json<Item[]>
+View<{ ...columns }>
 interface DB { users: {...}; auth: { sessions: {...} }; $types: { mood: "a" | "b" } }
-type WithCatalog = DB & PgCatalog;  // opt-in pg_catalog / information_schema slice
+type WithCatalog = DB & PgCatalog;
 ```
 
 `PgCatalog` is `{ pg_catalog: PgCatalogNamespace; information_schema: InformationSchemaNamespace }`. See [Declaring tables](../guide/schema) for type names and [System catalogs](../guide/schema#system-catalogs).
@@ -253,12 +251,12 @@ Schema qualification is ignored (`public.f(x)` is `f`). Any other name is an err
 ```ts
 interface DB {
   users: { … };
-  $functions: { immutable_unaccent: Sig<["text"], "text"> }; // this schema only
+  $functions: { immutable_unaccent: Sig<["text"], "text"> };
 }
 
 declare module "@typesql/core" {
   interface FunctionCatalog {
-    my_count: Sig<["any"], "int8", { agg: true; nullable: false }>; // every schema
+    my_count: Sig<["any"], "int8", { agg: true; nullable: false }>;
   }
 }
 ```

@@ -4,7 +4,6 @@ on:
   push:
     branches: [main]
   pull_request:
-  # release.yml runs these checks before it publishes.
   workflow_call:
 
 jobs:
@@ -12,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6 # version from packageManager in package.json
+      - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:
           node-version: 26
@@ -25,13 +24,10 @@ jobs:
       - run: pnpm playground --check
       - run: pnpm build
       - run: pnpm smoke:dist
-      # the VS Code extension packages (release.yml publishes the same .vsix)
       - run: pnpm --filter typesql exec vsce package --no-dependencies --out "$RUNNER_TEMP/typesql.vsix"
       - run: pnpm docs:build
 
   intents:
-    # A change to a published package's shipped files must come with a change intent
-    # (`pnpm change`); see packages/docs/internals/releasing.md.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -45,13 +41,10 @@ jobs:
           BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
 
   pg-regress:
-    # The parser against PostgreSQL's own regression tests (vendor/postgres). Fails on a
-    # disagreement with Postgres that is not in packages/core/test/pg-regress/baseline.json,
-    # and on a listed one that went away.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6 # version from packageManager in package.json
+      - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:
           node-version: 26
@@ -78,7 +71,7 @@ jobs:
       TYPESQL_ORACLE_URL: postgres://postgres:typesql@localhost:5432/postgres
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6 # version from packageManager in package.json
+      - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:
           node-version: 26
@@ -87,8 +80,6 @@ jobs:
       - run: pnpm test:oracle --views
 
   oracle-regress:
-    # The server is started here rather than as a service: the replay COPYs the regression
-    # tests' data files, mounted from the checkout.
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -98,7 +89,7 @@ jobs:
       TYPESQL_ORACLE_URL: postgres://postgres:typesql@localhost:5432/postgres
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6 # version from packageManager in package.json
+      - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:
           node-version: 26
@@ -129,7 +120,7 @@ jobs:
       TYPESQL_ORACLE_URL: postgres://postgres:typesql@localhost:5432/postgres
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6 # version from packageManager in package.json
+      - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:
           node-version: 26
@@ -138,14 +129,12 @@ jobs:
       - run: pnpm fuzz
 
   bench:
-    # Compile-time budget gate: fails when instantiation counts or check time exceed
-    # packages/bench/thresholds.json.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
         with:
-          fetch-depth: 0 # remeasure every core release on this runner
-      - uses: pnpm/action-setup@v6 # version from packageManager in package.json
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:
           node-version: 26

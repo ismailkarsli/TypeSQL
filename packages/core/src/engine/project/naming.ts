@@ -2,33 +2,6 @@ import type { Expr, SelectStmt } from "../ast.js";
 import type { Ctx } from "../types.js";
 import type { ProjectSelect } from "./select.js";
 
-/**
- * Postgres output column naming (`FigureColnameInternal`), verified against PostgreSQL 18.
- *
- * Postgres ranks a candidate name by strength: 2 for a "real" name, 1 for a fallback that
- * an enclosing cast or CASE may replace, 0 for none (`?column?`). Here `Fig<E>` returns a
- * string for strength 2, `{ weak: name }` for strength 1 and `null` for 0.
- *
- *   strength 2: t.col, col → col | f(...) → f (incl. count(*), current_date, coalesce,
- *     nullif, greatest, least) | EXISTS → exists | ARRAY[...] / ARRAY(SELECT) → array |
- *     ROW(...) / (a, b) → row | (SELECT c ...) → c, or ?column? when that column is unnamed
- *     | EXTRACT → extract | POSITION → position | SUBSTRING → substring | TRIM → btrim / ltrim / rtrim (by side) |
- *     OVERLAY → overlay | AT TIME ZONE → timezone | (e).f, e[i].f → f | XMLELEMENT → xmlelement (and
- *     xmlconcat, xmlforest, xmlpi, xmlroot, xmlparse, xmlserialize; XMLEXISTS is a call) | SQL/JSON functions
- *     (JSON_OBJECT(…), JSON_VALUE(…), JSON_ARRAYAGG(…), …) → their lowercase name
- *     | syntax parsed as a call:
- *     COLLATION FOR → pg_collation_for, AT LOCAL → timezone, OVERLAPS → overlaps,
- *     IS [form] NORMALIZED → is_normalized (IS NOT … NORMALIZED is a NOT: ?column?)
- *   e[i], e[lo:hi], e COLLATE c → name of e (any strength)
- *   e::T / CAST(e AS T) → name of e if strong, else T's canonical name with any array
- *     suffix stripped, weak (`1::int4::int8` → int8, `now()::date::text` → now)
- *   typed literal `T 'x'` → T, weak (it is a cast of a constant: `interval '1 day'::text` → text)
- *     (not a bit string: `B'1'` → ?column?)
- *   CASE → the ELSE branch's name if strong (`CASE ... ELSE id END` → id), else case, weak
- *     (`(CASE WHEN x THEN 1 END)::text` → text)
- *   literals, params, operators (incl. -1, NOT x, x IS NULL, x IN (...)) → ?column?
- *
- */
 export type ColumnName<
 	E extends Expr,
 	Alias extends string | null,
@@ -109,7 +82,6 @@ type Fig<E extends Expr, C extends Ctx> = E extends { readonly t: "col" }
 
 type StripArray<T extends string> = T extends `${infer B}[]` ? B : T;
 
-/** A scalar subquery is named after its single column, which is `?column?` when unnamed (still strong). */
 type SubName<Q extends SelectStmt, C extends Ctx> =
 	ProjectSelect<Q, C["db"], C["scope"], C["ctes"]> extends infer R
 		? R extends readonly [{ readonly n: infer N }, ...unknown[]]

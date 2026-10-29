@@ -129,13 +129,42 @@ So a map that types rows with a custom parser keeps the driver's input types. Wi
 
 To change what parameters accept, set `$params`. It replaces the default, so extend `DefaultParamTypeMap` (or the adapter's map) to keep the rest:
 
-<<< @/snippets/type-maps.ts#params
+```ts
+import type { DefaultParamTypeMap } from "@typesql/core";
+
+declare class Instant {
+	toPostgres(): string;
+}
+interface AppParams extends Omit<DefaultParamTypeMap, "timestamptz"> {
+	timestamptz: Date | string | Instant;
+}
+interface AppMap extends Omit<DefaultTypeMap, "timestamptz"> {
+	timestamptz: string;
+	$params: AppParams;
+}
+const app = createSql<DB, AppMap>();
+const recent = app(
+	"SELECT id, created_at FROM users WHERE created_at > $1",
+	new Date(),
+);
+```
 
 ## Custom type maps
 
 A type map is any object type from Postgres type names to TypeScript types. Pass it as the second type argument of `createSql`:
 
-<<< @/snippets/type-maps.ts#custom
+```ts
+import { createSql, type DefaultTypeMap } from "@typesql/core";
+
+interface MyMap extends Omit<DefaultTypeMap, "int8"> {
+	int8: number;
+	"int8[]": number[];
+}
+const sql = createSql<DB, MyMap>();
+const counts = sql(
+	"SELECT author_id, count(*) AS n FROM posts GROUP BY author_id",
+);
+```
 
 A type is resolved in this order:
 

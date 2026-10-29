@@ -1,15 +1,6 @@
 import type { SqlError } from "./errors.js";
 import type { Opaque, SplitFirst } from "./inline.js";
 
-/**
- * Type-level fragment splicing. `Splice<Q, S>` substitutes every `{name}` slot in the
- * query literal `Q` with the text of `S[name]`, renumbering the fragment's `$n` to
- * follow the parameters already present (outer `$n` first, then fragments in order).
- *
- * Only `{identifier}` is a slot; `'{1,2}'` or `'{"a":1}'` inside literals are left alone.
- * A fragment whose text is not a literal (`sql.raw`, `sql.combine` over a non-tuple array)
- * makes the result `string`, which `Validate` reports as a dynamic fragment.
- */
 export type Splice<Q extends string, S> = string extends Q
 	? string
 	: SpliceLoop<Q, S, MaxParamStr<Q>, "">;
@@ -36,10 +27,6 @@ type SpliceLoop<
 		: SpliceLoop<Post, S, Off, `${Acc}${Pre}{${Name}}`>
 	: `${Acc}${Q}`;
 
-/**
- * Carried value encodings of the slots, concatenated in the order `Splice` renumbers them
- * (each occurrence of a slot carries its fragment's values again). `C` maps slot name → tuple.
- */
 export type SpliceCarried<
 	Q extends string,
 	C,
@@ -122,7 +109,6 @@ type AllIdChars<S extends string> = S extends ""
 			: false
 		: false;
 
-/** Slot names present in a query literal. */
 export type SlotNames<Q extends string> =
 	Q extends `${string}{${infer Name}}${infer Post}`
 		? IsSlotName<Name> extends true
@@ -134,11 +120,6 @@ export type HasSlots<Q extends string> = [SlotNames<Q>] extends [never]
 	? false
 	: true;
 
-/**
- * Renumber `$n` placeholders in a fragment by `Off`: `[newText, highestNumberSeen]`.
- * (`$$`-quoted bodies and literals are not special-cased at the type level; fragments
- * with `$1` inside string literals are rare and the runtime handles them correctly.)
- */
 type Renumber<
 	T extends string,
 	Off extends number,
@@ -173,10 +154,6 @@ type ToNum<S extends string> = S extends `${infer N extends number}`
 	? N
 	: never;
 
-/**
- * Highest `$n` in a literal (0 if none), outside quoted strings, quoted identifiers and
- * comments (like the runtime's `maxParam`).
- */
 export type MaxParamStr<
 	T extends string,
 	Max extends number = 0,
@@ -218,13 +195,11 @@ type Add<A extends number, B extends number> = [
 type Gt<A extends number, B extends number> =
 	Tup<B> extends [...Tup<A>, ...unknown[]] ? false : true;
 
-/** Tuple of `N` `unknown`s (untyped fragment parameters). */
 export type UnknownTuple<
 	N extends number,
 	Acc extends unknown[] = [],
 > = Acc["length"] extends N ? Acc : UnknownTuple<N, [...Acc, unknown]>;
 
-/** First `N` elements of a tuple. */
 export type Take<
 	T extends readonly unknown[],
 	N extends number,
@@ -235,7 +210,6 @@ export type Take<
 		? Take<R, N, [...Acc, H]>
 		: Acc;
 
-/** Quoted identifier text for `sql.id(...)`: `"a"."b"` with embedded quotes doubled. */
 export type QuotedIdent<Parts extends readonly string[]> =
 	Parts extends readonly [infer P extends string]
 		? `"${Dq<P>}"`
@@ -262,10 +236,6 @@ type LastOf<U> =
 	) => void
 		? L
 		: never;
-/**
- * Union → tuple, in TypeScript's internal member order (stable for a given program). Tail
- * recursive; O(n²) in the union size, so only for unions of list elements or columns.
- */
 export type UnionList<U, Acc extends readonly unknown[] = []> = [U] extends [
 	never,
 ]
@@ -274,7 +244,6 @@ export type UnionList<U, Acc extends readonly unknown[] = []> = [U] extends [
 		? UnionList<Exclude<U, L>, [L, ...Acc]>
 		: never;
 
-/** Text of `sql.combine([f1, f2], sep)` for tuple inputs; `string` for arrays. */
 export type JoinedText<
 	Items extends readonly { readonly text: string }[],
 	Sep extends string,

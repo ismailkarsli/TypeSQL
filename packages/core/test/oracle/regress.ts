@@ -45,7 +45,6 @@ import { REGRESS_MOUNT, regressDir } from "./server.js";
 import { isCorePath, oursOf, withDatabase } from "./types.js";
 import { compareView, viewable, viewableText, viewNotNull } from "./views.js";
 
-/** packages/pg's introspection, loaded at run time: it is outside this package's sources. */
 interface IntrospectedRelation {
 	readonly schema: string;
 	readonly name: string;
@@ -79,7 +78,7 @@ const introspectPath = join(
 );
 let introspectFn: Promise<Introspect> | undefined;
 const introspect: Introspect = async (client, options) => {
-	introspectFn ??= import(/* @vite-ignore */ introspectPath).then(
+	introspectFn ??= import(introspectPath).then(
 		(m: { introspect: Introspect }) => m.introspect,
 	);
 	return (await introspectFn)(client, options);
@@ -97,13 +96,11 @@ interface Statement {
 }
 
 const DATABASE = "regression";
-/** What pg_regress sets (pg_regress.c): the outcome of date and time statements depends on them. */
 const SETTINGS = {
 	TimeZone: "America/Los_Angeles",
 	DateStyle: "Postgres, MDY",
 	IntervalStyle: "postgres_verbose",
 };
-/** psql's `\getenv` values for test_setup: the data files at the mount, regress.so where it is not. */
 const ENV = {
 	PG_ABS_SRCDIR: REGRESS_MOUNT,
 	PG_LIBDIR: "/usr/lib/postgresql/18/lib",
@@ -112,12 +109,10 @@ const ENV = {
 const BATCH = 1000;
 
 export interface Shard {
-	/** 1-based. */
 	readonly index: number;
 	readonly count: number;
 }
 
-/** Every shard still replays the schedule up to its last test, unchecked, so the database is in the state its tests expect. */
 export function checkedTests(
 	tests: readonly string[],
 	shard: Shard | undefined,
@@ -337,7 +332,6 @@ class Snapshots {
 		return dbText(db, state, functions);
 	}
 
-	/** Nullable: their results are not ours to judge. */
 	private async functions(words: ReadonlySet<string>): Promise<string> {
 		const rows = await this.conn.sql.unsafe<
 			{
@@ -483,12 +477,10 @@ interface Checked {
 				| { readonly columns: C; readonly params: readonly string[] }
 				| { readonly error: ServerError }
 		: never;
-	/** The checked text is the statement that ran (not a DECLARE's query or a PREPARE's body): its rows count. */
 	readonly ran?: boolean;
 	readonly unrepresentable?: readonly string[];
 	readonly after?: string;
 	readonly pathSchemas?: readonly string[];
-	/** 4d: names one relation hides another of (a temp table over a public one): a `DB` cannot say that. */
 	readonly shadowed?: readonly string[];
 	readonly live: Ran;
 	result?: Evaluated;
@@ -540,7 +532,6 @@ export async function regressOracle(
 	const ddl = emptyResult();
 	const views = emptyResult();
 	const viewed = new Map<Checked, boolean[] | null>();
-	/** Restarted after a ROLLBACK: the server dropped the steps. */
 	const chains: { [id: string]: Chain } = {};
 
 	const checked: Checked[] = [];
@@ -607,7 +598,6 @@ export async function regressOracle(
 				log(`regress oracle: replaying ${test}`);
 			try {
 				for (const [at, s] of stmts.entries()) {
-					// a statement the client never finishes (the server waits for it) aborts the file
 					let timer: NodeJS.Timeout | undefined;
 					const aborted = await Promise.race([
 						step(s).then(() => false),
@@ -633,7 +623,6 @@ export async function regressOracle(
 					if (checking(test)) count(regress, "skip: psql-variable");
 					return;
 				}
-				// sent, not checked: our parser follows standard_conforming_strings' default
 				const mine = checking(test) && !s.nonstandardStrings;
 				if (checking(test) && s.nonstandardStrings)
 					count(regress, "skip: nonstandard-strings");
@@ -650,7 +639,6 @@ export async function regressOracle(
 						? null
 						: scanWords(kind.t === "query" ? kind.text : s.sql);
 				if (mine && words) {
-					// the catalog cannot be read in a transaction the test left aborted
 					try {
 						const st = await look();
 						before = {
@@ -713,7 +701,6 @@ export async function regressOracle(
 					kind.t === "ddl" && chain
 						? { id: chain.id, prev: chain.chain.steps.length }
 						: undefined;
-				// only whether a value is NULL matters (and NaN would not survive the replay cache's JSON)
 				const live = nullsOnly(await conn.runScript(s.sql, s.copyData));
 				if (kind.t !== "query") state = null;
 				if (chain && kind.t === "ddl" && !("error" in live))
@@ -811,7 +798,6 @@ export async function regressOracle(
 	const exprs: string[] = [];
 	const dbsOf: string[][] = [];
 	const chainOf: ({ id: string; upTo: number } | null)[] = [];
-	/** Files never share a program, so a shard's results are the full run's. */
 	const fileOf: string[] = [];
 	for (const c of checked) {
 		const before = exprs.length;
@@ -942,7 +928,6 @@ function nullsOnly(r: Ran): Ran {
 		: r;
 }
 
-/** One JSON value per line: a single JSON text of all of them can exceed V8's string length. */
 function writeJsonLines(path: string, values: readonly unknown[]): void {
 	const fd = openSync(path, "w");
 	try {
@@ -969,7 +954,6 @@ function scanWords(text: string): Set<string> {
 	return words;
 }
 
-/** Roles, tablespaces and databases a previous replay left behind (they outlive the database). */
 async function cleanGlobals(admin: Connection): Promise<void> {
 	for (const { name } of await admin.sql.unsafe<{ name: string }[]>(
 		`SELECT datname::text AS name FROM pg_database WHERE datname LIKE 'regression%' OR datname LIKE 'regress\\_%'`,
@@ -1018,7 +1002,6 @@ function compareQuery(c: Checked): Verdict {
 }
 
 function compareDdl(c: Checked): Verdict {
-	// a statement our parser skips without validating it: ApplyDdl neither accepts nor applies it
 	if (c.noop && "text" in c.noop && c.noop.text === '"noop"')
 		return { skip: "not-applied" };
 	const r = c.result;
@@ -1091,7 +1074,6 @@ export function diffDbs(
 	const out: Disagreement[] = [];
 	const key = (r: { schema: string | null; name: string }): string =>
 		`${r.schema ?? "public"}.${r.name}`;
-	// a schema on the search path has its relations at the top level too: compare those
 	const compared = (r: { schema: string | null; name: string }): boolean =>
 		words.has(r.name) && !(r.schema !== null && pathSchemas.has(r.schema));
 	const mine = new Map(ours.relations.filter(compared).map((r) => [key(r), r]));
@@ -1109,7 +1091,6 @@ export function diffDbs(
 				kind: "unsound",
 				detail: `${k}: ${o.view ? "view" : "table"} in ours, ${r.view ? "view" : "table"} on the server`,
 			});
-		// by name: an object type has no column order
 		const names = (x: typeof r): string =>
 			x.columns
 				.map((c) => c.name)
@@ -1129,7 +1110,6 @@ export function diffDbs(
 					kind: "unsound",
 					detail: `${k}.${c.name}: type ${oc.type}, server ${c.type}`,
 				});
-			// a view's NOT NULL on the server side is packages/pg's view analysis, which does not narrow: a candidate only
 			if (!oc.nullable && c.nullable)
 				out.push({
 					kind: r.view ? "unsound-candidate" : "unsound",

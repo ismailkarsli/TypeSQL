@@ -1,13 +1,4 @@
-/**
- * A cheap test, on the editor's text, of whether the cursor may be inside a string literal that is
- * the first argument of a call (`sql("…`, `` tx(`… ``, `sql.as<Row>("…`). It runs on every
- * completion request, before the language server is asked anything; a false positive costs one
- * lookup, a false negative (a literal containing `f("…")` before the cursor) a missed list.
- */
-
-/** A call's name, type arguments, `(` and the opening quote of its first argument. */
 const CALL = /[A-Za-z_$][\w$]*(?:<[^()]*>)?\(\s*(["'`])/g;
-/** How far back to look for the call. */
 const WINDOW = 20_000;
 
 export function mayBeInSqlLiteral(text: string, offset: number): boolean {
@@ -18,7 +9,6 @@ export function mayBeInSqlLiteral(text: string, offset: number): boolean {
 	return open;
 }
 
-/** Whether the literal opened with `quote` before `from` ends before the end of `s`. */
 function closes(s: string, from: number, quote: string): boolean {
 	let escaped = false;
 	for (const c of s.slice(from)) {

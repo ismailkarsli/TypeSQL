@@ -7,11 +7,6 @@ import type { ParseSelectAfterWith, ParseWith } from "./select.js";
 import type { AtEnd, EatOp, Expected, Fail, Near, Nx, Ok } from "./util.js";
 import type { ParseCursorStmt } from "./utility.js";
 
-/**
- * Parse one complete statement. An optional trailing `;` is allowed; any other
- * leftover tokens are a syntax error (no silent acceptance of unsupported syntax).
- * Result: `Stmt` or `SqlError<message, tokenIndex>`.
- */
 export type ParseProgram<T extends Toks> =
 	ParseStatement<T, 0> extends infer X
 		? X extends Ok<infer S, infer J>
@@ -28,7 +23,6 @@ export type ParseProgram<T extends Toks> =
 			: X
 		: never;
 
-/** First words that start a DDL / utility statement. */
 export type DdlKeyword =
 	| "create"
 	| "alter"
@@ -71,10 +65,6 @@ export type DdlKeyword =
 	| "abort"
 	| "reassign";
 
-/**
- * Dispatch on the first token. `Ok<Stmt, next>` or error. `Into`: a top-level statement, where
- * `SELECT … INTO` creates a table; elsewhere (a WITH query) the INTO stays and is rejected.
- */
 export type ParseStatement<
 	T extends Toks,
 	I extends number,
@@ -102,11 +92,6 @@ export type ParseStatement<
 			? SelectInto<ParseSelectAfterWith<T, I, null>, Into>
 			: Expected<"a SQL statement", T, I>;
 
-/**
- * `SELECT … INTO [TEMP | UNLOGGED | TABLE] name FROM …` creates a table, like CREATE TABLE AS
- * (which is what Postgres turns it into): the statement becomes `create_table_as`. Anywhere but
- * the top-level SELECT, the INTO clause is rejected when the query is projected.
- */
 type SelectInto<R, Into extends boolean> = Into extends false
 	? R
 	: R extends Ok<

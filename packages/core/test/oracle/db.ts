@@ -47,7 +47,6 @@ export async function startDockerPostgres(
 	return { url, source: "docker", close };
 }
 
-/** The entrypoint first runs a socket-only bootstrap server, so poll over TCP until a real connection works. */
 async function waitUntilReady(url: string, timeoutMs: number): Promise<void> {
 	const deadline = Date.now() + timeoutMs;
 	let lastError: unknown;

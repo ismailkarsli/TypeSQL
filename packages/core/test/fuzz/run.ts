@@ -1,7 +1,3 @@
-/**
- * Properties are named after our failure: `rejects` = Postgres accepts it and we error,
- * `accepts` = Postgres rejects it and we do not.
- */
 import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import fc from "fast-check";
@@ -249,7 +245,6 @@ export class Fuzzer {
 				statementTimeoutMs: 5_000,
 			});
 			try {
-				// Match the type oracle's environment; keep public for the candidate's schema.
 				for (const e of EXTENSIONS)
 					await conn.exec(
 						`CREATE EXTENSION IF NOT EXISTS "${e}" SCHEMA pg_catalog`,

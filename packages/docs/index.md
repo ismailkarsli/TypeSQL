@@ -11,7 +11,8 @@ hero:
       link: /guide/quick-start
     - theme: alt
       text: "Try it in the Playground"
-      link: https://www.typescriptlang.org/play/#code/PTAEBUE8AcFMGUCKAZAXKACgewM4BcBzAJ1h1CWQBpRoBDInWAE1ACNIIYEBjIgS2h4A5GTxdQOSPlgBbAHSgAokz55QeABaxyKULQB2LDVgBusIuq3quOVACgQoIlgDuZAyzpFaM2HnNkAGZYADYhrtQeoDJ8+LQA1qR6JKDcWDLQfCHa5s4MoFj6ltr4-PoEcnZ8GVhEagDedgCQYnCgAMKhlM28sLT+8ACOId0t4gDisPrm-cyjrdoAcgCuYbSs2fPiGPQ+OFBwW20ASq4HsN0AvqCBzjKgAEQAAgs4w8BpJA8A3HZV+v4iIFaNxtAARABCoEaTWWjAY6BhTT4THQk2m3n8TAAPA8+ACACwPAB831Ajg0tHcoCYsGBqzw6Cwgj4hVoIQKRQAkot4IpjuBmk1ZLQsuhOiFcf4AB54Em-JpNFQ4aAhWiQAD6+h8sHQKzWG1gUtgsvlQt6syYGv6aKmMyxUuqpDwPkEAC8zU1LgroLg8LZoUKUbaMZbcfi8AAOT1NWjLTS1DXBjqhcOEmN4VTZcWph4yuWkoWsLBMSB61Zqw3G02Fr2-S5-NL6fASYagAC8qRIsyGkshxIAFABKX4OMDIRQAMXAoAAUgB5HnRBJJTTafgEDRqHAo7T6CvrbJkgAkAEZ1CuyKpROJbulQMs5CjKk2W4MO62QgPmgADPkT9oZ0fFFqEfEUsmoaA5EzPBsjsUAEMQpDkMnY55wAWQfeEyGWUAJ2nOdF0WGg-TIaBQHnYioLjBMiCTFhO2Aph4OQ1jEIAdQACX5RQHyfBjQDPH9RgAdm6Ec7AWUBThcD8ZPObEFiwQJQEGQtHAQgA9AB+STtl2GQyE7HZvEMhSlJUtTfg00AdL+RwAEECGIWACFmdxDFSUJlhkIptV8IJQnCWTsHwFyAzSZYAQHAAqIdQFiBKAUjSIJDwMoCAfQxzFAfQS1gABaX0wpIHAX0KFs4n9D83i-X9-0UQC9HjYw6JAryorwWKh2oGRaGlAcYOyeKHPgUA1X8FtUIwkj8DIcY0IAVQwUAIQATWa2j6OEuwJKk+AXWqzt5K4RSuGUtL+hwdSwC03Sx1ALl9BCfFtBMdlliSegSimNQqUEoovB1QEPJYbgtG4RIWFoNz8RbFwtBSNcOG+rDmHK5s1HAjlOweWgmFoJ4TVdbI5DSGQfjsV81AtLEauGb8mh-Hk+QFR7FnAec0fyAdsfigA1BzkEWxQxoHY96lquQgZkXm+qyIdLni45FHARbjkWHlxgSphqFp5hrTwHa9vEdpuzp46zlOiyuz6LEbsQuyHvQ2IXUSdwUnJzJslAXJajIQpih0ZA0oyhRJz4aVihkexaoHP9FAAmd9F8UBpswuEAh-EdyTAP2iHQNIQh8ooHhT2AHhpLAkjyrHpVduw4+Z3l+RnHlOdm6rBqzWABaFkWxbPIdhMeTjYDCLAHhzxx8-QGjWvohKyEWecZ0WRbkBDqJKTIPKaTpOMQjwOwgA # playground:core
+      link: https://www.typescriptlang.org/play/#code/JYWwDg9gTgLgBAbwFAEgYE8wFM4GEIA2ANKgMZRYCGMWAygI7GobZwDiWAdllNVgCYk0mHADkArgQKUARgSxCWOAAqVeIAM4AVEYpFwAShADuO7CQC+cAGZQIIOACIAAko2MA9KWhZHAbiQkYE4aKGtKUhwAEQAhRFRxDR4NAC54lBRgfjSObl4afgAeR2CYABZHAD4AjKwQSmACNPwCYpoADxgqmpR+YA0waXQAfU5KECw0iSlZeTasTu7UFHIqAuHqHK4ePiLHGFAsDRhxsBgALyWUCxrIY9T0zOz2bfyBYtKADiuUSnEYAAW0GGWWahA+IQq1WWBxg8jBrX2Cy60IyMgg-HQU0k0jkWHmi1RNyQFkC3k4xzg7gIcAAvHBVnwGK1YpUABQASgCSHJlPodKpjDZqAABrQAKIAGXFuC0cHEADoskR5Qq6g1iHAwArYfIkHADYajcaAGIGADyAFl5UkoBp5XBpSa5QApc0ASVEWog9y1cHNXu1f0BwKyAsVWX1xujhoA6gAJcUGcWqsP0gAkAEYRUIAOwkLlIJSGEwCoymESFJQQaxwejQ4uqdT2+lN8baSvV2v17m8+DHagtwUEYUoMVSmVy4NAqAgwQMiDiEJsgBUHJV9XabN1WA5cAAgrQ4NIaJSzVbvb62BaAKrKOAxACacGnof4OaQheLtBOMCH5bMfEuypX8NGhHkIApeB1UaAVHEofhKGcBZTnkBVvBAfwIKghkKF2AVqVHEVPQlAw5U9LRzRtZI4DZGCCD3AA1fdJRvcUjzZdMEGpBUwDUcY6PqRoOQsPdky0G8DFET02DgZVcLWAQNhgD8v30XA8IKMsTEAqsRBrBTdnAwjx2lWU4E4CY4HPa1EmSEVCxMkik3I0RKMvP9aJ3JiWLYjisw5HMnHjLApAgRxCyAA
+      playground: core
     - theme: alt
       text: "View on GitHub"
       link: https://github.com/ismailkarsli/TypeSQL
@@ -29,4 +30,21 @@ features:
     linkText: "Set it up"
 ---
 
-<<< @/snippets/getting-started.ts#query
+```ts
+import { Pool } from "pg";
+import { createSql } from "@typesql/pg";
+import type { DB } from "./schema.js";
+
+const pool = new Pool({ connectionString: process.env["DATABASE_URL"] });
+const sql = createSql<DB>(pool);
+
+const recent = sql(
+	`SELECT u.id, u.email, p.title
+   FROM users u
+   LEFT JOIN posts p ON p.author_id = u.id
+   WHERE u.created_at > $1`,
+	new Date("2026-01-01"),
+);
+
+const rows = await recent.execute();
+```

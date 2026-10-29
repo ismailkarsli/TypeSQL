@@ -5,33 +5,19 @@ import type {
 } from "./introspect.js";
 
 export interface GenerateOptions {
-	/** Name of the exported schema interface. Default `"DB"`. */
 	readonly typeName?: string;
-	/** Module the column helpers are imported from. Default `"@typesql/core"`. */
 	readonly importFrom?: string;
-	/** Extra lines after the helper import, e.g. `import type { HistoryItem } from "./json.js";`. */
 	readonly imports?: readonly string[];
-	/**
-	 * TypeScript types of `json` / `jsonb` columns: a map keyed `"table.column"` (public) or
-	 * `"schema.table.column"`, or a function returning the TS type source for a column (or
-	 * `undefined`). Such a column is declared as `Json<T>`: still jsonb to the SQL, read as `T`,
-	 * written with `sql.json(value)`. Other columns are an error (use `column` for those).
-	 */
 	readonly columnTypes?:
 		| Readonly<Record<string, string>>
 		| ((
 				column: IntrospectedColumn,
 				relation: IntrospectedRelation,
 		  ) => string | undefined);
-	/**
-	 * Full control over one column: return the TypeScript source of its descriptor
-	 * (`Col<"jsonb">`, a helper of your own, ...) or `undefined` to keep the default.
-	 */
 	readonly column?: (
 		column: IntrospectedColumn,
 		relation: IntrospectedRelation,
 	) => string | undefined;
-	/** Emit table and column comments and notes as JSDoc. Default `true`. */
 	readonly comments?: boolean;
 }
 
@@ -76,11 +62,6 @@ function columnNotes(c: IntrospectedColumn): string[] {
 	return notes;
 }
 
-/**
- * TypeScript source declaring the TypeSQL schema of an introspected database: `public`
- * relations at the top level, other schemas nested (`DB["auth"]["sessions"]`), views and
- * materialized views as `View<…>`, enums under `$types`.
- */
 export function generateSource(
 	db: IntrospectedDatabase,
 	options: GenerateOptions = {},
@@ -91,7 +72,6 @@ export function generateSource(
 	const used = new Set<string>();
 	const usedKeys = new Set<string>();
 
-	/** The TS type `columnTypes` gives a column, if any. */
 	const customType = (
 		rel: IntrospectedRelation,
 		col: IntrospectedColumn,
@@ -101,7 +81,6 @@ export function generateSource(
 		let ts: string | undefined;
 		if (typeof columnTypes === "function") ts = columnTypes(col, rel);
 		else {
-			// The keys contain a dot, so no key is a property every object has.
 			const k =
 				rel.schema === "public" && !(qualified in columnTypes)
 					? short
@@ -117,7 +96,6 @@ export function generateSource(
 		return ts;
 	};
 
-	/** `Json<T>`, `Json<T, { nullable: true }>`, `Json<T, {}, "json">`, … */
 	const jsonDescriptor = (col: IntrospectedColumn, ts: string): string => {
 		const flags = [
 			...(col.nullable ? ["nullable: true"] : []),
@@ -185,8 +163,6 @@ export function generateSource(
 	}
 
 	if (db.enums.length > 0) {
-		// TypeSQL's enum registry is flat (`Col<"mood">`, schema qualifiers are dropped), so enums
-		// of the same name in different schemas share an entry.
 		const byName = new Map<
 			string,
 			{ values: Set<string>; schemas: string[] }
@@ -237,7 +213,6 @@ export function generateSource(
 		"}",
 		"",
 	];
-	// A function has no keys of its own.
 	const unknownKeys = Object.keys(columnTypes).filter((k) => !usedKeys.has(k));
 	if (unknownKeys.length > 0 && options.column === undefined) {
 		throw new Error(

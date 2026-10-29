@@ -1,8 +1,3 @@
-/**
- * Finds the `@typesql/core` a file's project uses: resolved from the file, or through an adapter
- * (`@typesql/pg`, …) when core is only its dependency. Completions recognize `sql()` calls by
- * their callee's declaration in that package.
- */
 import { createRequire } from "node:module";
 import { dirname, join, sep } from "node:path";
 
@@ -14,31 +9,25 @@ const ADAPTERS = [
 	"@typesql/prisma",
 ];
 
-/** The directory of the `@typesql/core` package `fileName` uses, or null. */
 export function corePackage(fileName: string): string | null {
 	const req = createRequire(fileName);
 	for (const via of [null, ...ADAPTERS]) {
 		try {
-			// every version's main module is dist/index.js
 			const main = (
 				via === null ? req : createRequire(req.resolve(via))
 			).resolve("@typesql/core");
 			return dirname(dirname(main));
-		} catch {
-			// not installed
-		}
+		} catch {}
 	}
 	return null;
 }
 
-/** Whether a declaration is in `dir`'s `dist` or `src`. */
 export const isCorePathIn =
 	(dir: string) =>
 	(path: string): boolean =>
 		path.startsWith(join(dir, "dist") + sep) ||
 		path.startsWith(join(dir, "src") + sep);
 
-/** `isCorePath` for each file's project, looked up once per directory. */
 export class CorePaths {
 	private readonly byDir = new Map<
 		string,
@@ -51,7 +40,6 @@ export class CorePaths {
 		this.log = log;
 	}
 
-	/** `isCorePath` for `fileName`'s project, or null (logged) without `@typesql/core`. */
 	for(fileName: string): ((path: string) => boolean) | null {
 		const dir = dirname(fileName);
 		let found = this.byDir.get(dir);

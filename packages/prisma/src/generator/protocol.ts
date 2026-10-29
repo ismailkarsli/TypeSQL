@@ -1,18 +1,6 @@
 import { createInterface } from "node:readline";
 import type { Readable, Writable } from "node:stream";
 
-/**
- * Prisma's generator protocol (as implemented by the Prisma 7 CLI): Prisma spawns the
- * `provider` command and writes one JSON-RPC 2.0 request per line to its stdin; the generator
- * answers with one JSON line per request on **stderr** (stdout is passed through to the
- * terminal, and non-JSON stderr lines are shown if the generator fails). Methods:
- *
- *   getManifest(config)  → { manifest: GeneratorManifest }
- *   generate(options)    → anything (null)
- *
- * Prisma stops the process (SIGTERM) after `generate`.
- */
-
 export interface GeneratorManifest {
 	readonly prettyName?: string;
 	readonly defaultOutput?: string;
@@ -20,7 +8,6 @@ export interface GeneratorManifest {
 	readonly version?: string;
 }
 
-/** The parts of a generator config block the generator reads. */
 export interface GeneratorConfig {
 	readonly name: string;
 	readonly output: { readonly value: string | null } | null;
@@ -29,10 +16,8 @@ export interface GeneratorConfig {
 	>;
 }
 
-/** The parts of the `generate` request the generator reads. */
 export interface GeneratorOptions {
 	readonly generator: GeneratorConfig;
-	/** The datamodel as Prisma schema text. */
 	readonly datamodel: string;
 	readonly dmmf: { readonly datamodel: unknown };
 	readonly schemaPath: string;
@@ -56,7 +41,6 @@ interface Request {
 	readonly params: unknown;
 }
 
-/** JSON-RPC error codes: method not found, and the server-error code used for failures. */
 const METHOD_NOT_FOUND = -32601;
 const SERVER_ERROR = -32000;
 
@@ -101,10 +85,6 @@ async function respond(
 	}
 }
 
-/**
- * Serve the generator protocol: read requests from `input` (stdin), write responses to
- * `output` (stderr). Resolves when `input` ends.
- */
 export function serveGenerator(
 	handler: GeneratorHandler,
 	input: Readable = process.stdin,

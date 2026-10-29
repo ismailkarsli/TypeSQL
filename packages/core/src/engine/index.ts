@@ -1,18 +1,3 @@
-/**
- * `@typesql/core/engine`: every type of the engine, under names that printed types can refer
- * to. The type cache imports it as `__T` and writes its entries with these names, and a
- * declaration file that has to spell out an unresolved engine type imports it from here. Not a
- * stable API: these types change with the engine.
- */
-
-export type {
-	CallTypes,
-	ListRep,
-	SlotMap,
-	SlotsFor,
-	Slottable,
-	SplicedText,
-} from "../create-sql.js";
 export type * from "../index.js";
 export type { ValidateDdl } from "../migrations.js";
 export type { CARRIED, PARAMS, ROW, TEXT } from "../query.js";
@@ -30,6 +15,9 @@ export type {
 	Table,
 	TypeRegistry,
 } from "../schema/index.js";
+export type { CallTypes, SplicedText } from "../sql/call.js";
+export type { ListRep } from "../sql/fragment.js";
+export type { SlotMap, SlotsFor, Slottable } from "../sql/slots.js";
 export type { SqlDriver } from "../transaction.js";
 export type { EnumsOf, TsOf, TsTypeOf } from "../type-map/index.js";
 export type * as Ast from "./ast.js";

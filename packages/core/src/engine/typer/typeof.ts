@@ -27,24 +27,6 @@ import type {
 import type { TypeSqlJson } from "./sqljson.js";
 import type { TypeXml } from "./xml.js";
 
-/**
- * `TypeOf<E, Ctx>` → `{ type, nullable }` or `SqlError`.
- * Every rule evaluates its operands first and propagates the first error.
- *
- * Nullability rules (verified against PostgreSQL 18):
- *   IS [NOT] NULL/TRUE/FALSE/DISTINCT FROM, EXISTS, ARRAY[...], ROW(...) → never null
- *   scalar subquery, array subscript, NULLIF, JSON extraction → always nullable
- *   AND/OR/NOT, comparisons, LIKE, BETWEEN, IN, = ANY → nullable if any operand is
- *   CASE → nullable if any branch is or there is no ELSE
- *   COALESCE/GREATEST/LEAST → nullable only if all arguments are
- *   aggregates → see catalog.ts (`CallNullable`)
- *   `$n::T` → never null (the parameter itself is typed non-null `T`)
- *
- * String literals are `text` here, but in operand positions (operators, CASE branches,
- * ARRAY items, function arguments) they are typed `lit` (`TypeOperand`), Postgres's
- * untyped literal that takes the other side's type (`id + '1'` → int4, `data || '{}'` →
- * jsonb) while a real `text` value does not (`data || label` → text).
- */
 export type TypeOf<E extends Expr, C extends Ctx> = E extends {
 	readonly t: "col";
 }
@@ -326,9 +308,7 @@ export type TypeOf<E extends Expr, C extends Ctx> = E extends {
 																																									E,
 																																									C
 																																								>
-																																							: // the last kinds, call arguments `name => e` and `VARIADIC e`: the type of `e` (overloads are
-																																								// picked by the argument types in order, as named arguments mostly come)
-																																								TypeOf<
+																																							: TypeOf<
 																																									Extract<
 																																										E,
 																																										| NamedArg
@@ -336,8 +316,6 @@ export type TypeOf<E extends Expr, C extends Ctx> = E extends {
 																																									>["e"],
 																																									C
 																																								>;
-
-// ─── helpers ───
 
 export type Or<A extends boolean, B extends boolean> = A extends true
 	? true
@@ -352,7 +330,6 @@ export type AnyNullable<As extends readonly ColInfo[]> = As extends readonly [
 		? true
 		: AnyNullable<R>
 	: false;
-/** Literal-aware common type of a list (may be `lit`; see `CommonLit`). */
 export type CommonOf<
 	As extends readonly ColInfo[],
 	Acc extends string,
@@ -363,7 +340,6 @@ export type CommonOf<
 	? CommonOf<R, CommonLit<Acc, A["type"]>>
 	: Acc;
 
-/** If `A` is a valid info, result is `R`; else propagate `A`. */
 type Check<A, R> = A extends ColInfo ? R : A;
 type Check2<A, B, R> = A extends ColInfo ? (B extends ColInfo ? R : B) : A;
 type StrictBool<A, B> = A extends ColInfo
@@ -376,11 +352,6 @@ type StrictOf<A, B, T extends string> = A extends ColInfo
 		? Info<T, Or<A["nullable"], B["nullable"]>>
 		: B
 	: A;
-/**
- * `EXTRACT(field FROM e)`: numeric, and NULL for an infinite timestamp, date or interval in
- * the fields that do not grow with time (`day`, `month`, `second`, …; `year`, `epoch`, … are
- * ±Infinity).
- */
 type TypeExtract<A, F extends string> = A extends ColInfo
 	? Info<"numeric", Or<A["nullable"], ExtractNull<A["type"], F>>>
 	: A;
@@ -411,10 +382,6 @@ type MakeNullable<A> = A extends ColInfo ? Info<A["type"], true> : A;
 type ArrayOf<A> = A extends ColInfo
 	? Info<A["type"] extends `${string}[]` ? A["type"] : `${A["type"]}[]`>
 	: A;
-/**
- * `(e).f`: a column of a whole-row value (nullable when the row or the column is); `unknown`
- * for other composite values. `(e).*` expands only in a target list.
- */
 type TypeField<A, N extends string> = A extends ColInfo
 	? N extends "*"
 		? SqlError<"(e).* is only supported in a target list", null>
@@ -424,16 +391,11 @@ type TypeField<A, N extends string> = A extends ColInfo
 				: SqlError<`column "${N}" not found in data type record`, null>
 			: Info<"unknown", true>
 	: A;
-/** Type an optional sub-expression: info, null when absent, or an error. */
 type TypeOpt<E extends Expr | null, C extends Ctx> = E extends Expr
 	? TypeOf<E, C>
 	: null;
 type NullableOpt<X> = X extends ColInfo ? X["nullable"] : false;
 
-/**
- * `l op ANY|ALL (r)`: bool. Postgres requires an array on the right of the array form and an
- * operator that yields boolean (`33 * ANY (…)`); both are checked where the types are known.
- */
 type TypeQuant<
 	Op extends string,
 	A,
@@ -455,7 +417,6 @@ type QuantOp<
 > = Op extends NonBoolOp
 	? SqlError<"op ANY/ALL (array) requires operator to yield boolean", null>
 	: Info<"bool", Or<A["nullable"], B["nullable"]>>;
-/** Built-in types that are certainly not arrays. */
 type ScalarType =
 	| "int2"
 	| "int4"
@@ -479,10 +440,6 @@ type ScalarType =
 	| "jsonb";
 type NonBoolOp = "+" | "-" | "*" | "/" | "%" | "^" | "||";
 
-/**
- * SUBSTRING / TRIM / OVERLAY: text, or bytea / bit for those inputs (Postgres has only the
- * `bit` forms, which take a `varbit` too); strict over all operands.
- */
 type StringResult<A, B, D> = A extends ColInfo
 	? B extends ColInfo | null
 		? D extends ColInfo | null
@@ -498,10 +455,6 @@ type StringResult<A, B, D> = A extends ColInfo
 		: B
 	: A;
 
-/**
- * `SUBSTRING(t FROM 'pattern')`, `SUBSTRING(t SIMILAR p ESCAPE c)`: the text pattern forms are
- * NULL when the pattern does not match (an untyped `$n` picks this form too).
- */
 type RegexNull<R, From> = R extends ColInfo
 	? R["type"] extends "text"
 		? From extends { readonly type: StrT | "unknown" }
@@ -520,11 +473,6 @@ type TypeBin<
 		? SubCompare<Op, L, Q, C, true>
 		: TypeBinOperands<Op, L, R, C>
 	: TypeBinOperands<Op, L, R, C>;
-/**
- * `l op ANY|ALL (SELECT …)`, and `(a, b) op (SELECT x, y …)` with any operator (Postgres's
- * ROWCOMPARE sublink, which no row makes NULL: `Row`): bool. The widths must match, and the
- * operands are compared pairwise (`make_row_comparison_op`).
- */
 type SubCompare<
 	Op extends string,
 	L extends Expr,
@@ -559,10 +507,6 @@ type SubCompare<
 			: A
 		: never;
 type RowCompareOp = "=" | "<>" | "!=" | "<" | ">" | "<=" | ">=";
-/**
- * Each pair's operator must yield boolean (operators the types do not tell are taken to), and a
- * row of several columns needs a comparison operator; `true` or the error. `I`: pairs so far.
- */
 type PairwiseOp<
 	Op extends string,
 	Ls,
@@ -576,7 +520,7 @@ type PairwiseOp<
 					`row comparison operator must yield type boolean, not type ${TypeDisplay<BinOpType<Op, L, R>["type"]>}`,
 					null
 				>
-		: true // after a `*` entry the columns are not known in order
+		: true
 	: I extends 0 | 1
 		? true
 		: Op extends RowCompareOp
@@ -604,7 +548,6 @@ type TypeBinOperands<
 				: never
 			: LT
 		: never;
-/** Unary; `-<numeric literal>` is folded like Postgres does (`-2147483648` is int4). */
 type TypeUn<Op extends string, E extends Expr, C extends Ctx> = Op extends
 	| "-"
 	| "+"
@@ -620,10 +563,6 @@ type TypeUn<Op extends string, E extends Expr, C extends Ctx> = Op extends
 			? UnOpType<Op, T>
 			: T
 		: never;
-/**
- * A cast between json and jsonb keeps the value's shape. An `ARRAY[…]` cast to an array type takes
- * that type, the arrays inside it too (`ARRAY[]::int4[]`, `ARRAY[ARRAY[], ARRAY[1]]::int4[]`).
- */
 type TypeCast<To extends string, E extends Expr, C extends Ctx> = E extends {
 	readonly t: "array";
 	readonly items: infer Items;
@@ -636,7 +575,6 @@ type TypeCast<To extends string, E extends Expr, C extends Ctx> = E extends {
 			: never
 		: TypeOfCast<To, E, C>
 	: TypeOfCast<To, E, C>;
-/** The items of an `ARRAY[…]` under a cast to an array type: `true` or the first error. */
 type CastItems<Items, C extends Ctx> = Items extends readonly [
 	infer H extends Expr,
 	...infer R,
@@ -664,7 +602,6 @@ type TypeOfCast<To extends string, E extends Expr, C extends Ctx> =
 				>
 			: T
 		: never;
-/** `'…'::T` / `T '…'`: a simple JSON literal cast to json(b) keeps its value (json.ts). */
 type LitCast<To extends string, V extends string> = To extends "json" | "jsonb"
 	? JsonLitCast<To, V> extends infer J extends string
 		? J
@@ -702,7 +639,6 @@ type TypeIn<E extends Expr, List extends readonly Expr[], C extends Ctx> =
 				: never
 			: A
 		: never;
-/** `ARRAY[...]`: array of the common element type (`ARRAY[1, 2.5]` → numeric[]; nested arrays stay one level). */
 type TypeArrayCtor<
 	Items extends readonly Expr[],
 	C extends Ctx,
@@ -719,10 +655,6 @@ type ArrayTypeOf<T extends string> = T extends `${string}[]`
 	: T extends "unknown" | "null"
 		? "text[]"
 		: `${T}[]`;
-/**
- * `e[i]`: element (or json for json subscripting), always nullable (out of range → NULL); after a
- * slice of an array (`a[1:2][3]`) the array, nullable only through a NULL operand.
- */
 type TypeIdx<E extends Expr, I extends Expr, C extends Ctx> =
 	TypeOf<E, C> extends infer A
 		? A extends ColInfo
@@ -748,29 +680,18 @@ type TypeIdx<E extends Expr, I extends Expr, C extends Ctx> =
 				: never
 			: A
 		: never;
-/**
- * `a[i]`, `a[i][j]`, `a[i:j][k]`: the subscripts after an array apply to that array together, as in
- * Postgres (one per dimension; the types do not count dimensions): the type of the array under
- * the subscripts of `E` (`E` itself when it is none), or null when that is not an array.
- */
 type ChainOverArray<E extends Expr, C extends Ctx> =
 	TypeOf<ChainRoot<E>, C> extends {
 		readonly type: infer T extends `${string}[]`;
 	}
 		? T
 		: null;
-/** The array under the indexes (a slice of an array has its type, so the walk can stop at one). */
 type ChainRoot<E extends Expr> = E extends {
 	readonly t: "idx";
 	readonly e: infer X extends Expr;
 }
 	? ChainRoot<X>
 	: E;
-/**
- * Is a subscript chain over an array NULL only through a NULL operand (a slice out of range is an
- * empty array, and a slice makes every subscript of the chain one)? The indexes, then the slice
- * under them, which is typed so (or the array).
- */
 type ChainNullable<E extends Expr, C extends Ctx> = E extends {
 	readonly t: "idx";
 	readonly e: infer X extends Expr;
@@ -784,15 +705,12 @@ type ChainNullable<E extends Expr, C extends Ctx> = E extends {
 	: TypeOf<E, C> extends infer T
 		? NullableOpt<T>
 		: never;
-/** Enums (`DB["$types"]`) take no subscript. */
 type EnumName<DB> = DB extends { readonly $types: infer T } ? keyof T : never;
-/** Is any subscript of the chain a slice? Then the result is an array. */
 type ChainSliced<E> = E extends { readonly t: "slice" }
 	? true
 	: E extends { readonly t: "idx"; readonly e: infer X }
 		? ChainSliced<X>
 		: false;
-/** Element type of the built-in types other than arrays that take a subscript (`pg_type.typsubscript`). */
 type SubscriptElem = {
 	jsonb: "jsonb";
 	point: "float8";
@@ -801,12 +719,10 @@ type SubscriptElem = {
 	box: "point";
 	name: "char";
 };
-/** Postgres's error for subscripting a type that has none (`json`, `text`, …). */
 type NoSubscriptErr<T extends string> = SqlError<
 	`cannot subscript type ${TypeDisplay<T>} because it does not support subscripting`,
 	null
 >;
-/** `e[lo:hi]`: same array type, nullable if the array or a bound is (out of range → empty array). */
 type TypeSlice<
 	E extends Expr,
 	Lo extends Expr | null,
@@ -842,7 +758,6 @@ type TypeSlice<
 				: never
 			: A
 		: never;
-/** AT TIME ZONE flips timestamp ↔ timestamptz; time → timetz; timetz stays; date (→ timestamptz) → timestamp. */
 type TypeAtTz<A, B> = A extends ColInfo
 	? B extends ColInfo
 		? Info<
@@ -850,13 +765,12 @@ type TypeAtTz<A, B> = A extends ColInfo
 					? "timestamptz"
 					: A["type"] extends "time" | "timetz"
 						? "timetz"
-						: "timestamp", // timestamptz, and date (as timestamptz)
+						: "timestamp",
 				Or<A["nullable"], B["nullable"]>
 			>
 		: B
 	: A;
 
-/** Type a list of expressions: `readonly ColInfo[]` or the first error. */
 export type TypeList<
 	Es extends readonly Expr[],
 	C extends Ctx,
@@ -872,13 +786,11 @@ export type TypeList<
 		: never
 	: Acc;
 
-/** An expression in operand position: a string literal is the untyped `lit` (see `CommonLit`). */
 type TypeOperand<E extends Expr, C extends Ctx> = E extends {
 	readonly t: "str";
 }
 	? Info<LitType<E["v"]>>
 	: TypeOf<E, C>;
-/** `TypeList` with operand typing (internal: the result may contain `lit`). */
 type OperandList<
 	Es extends readonly Expr[],
 	C extends Ctx,
@@ -894,7 +806,6 @@ type OperandList<
 		: never
 	: Acc;
 
-/** First projected column of a subquery (scalar subqueries, `IN (SELECT ...)`, `ARRAY(SELECT ...)`). */
 export type FirstColOf<
 	Q extends SelectStmt,
 	C extends Ctx,
@@ -906,10 +817,6 @@ export type FirstColOf<
 			: R
 		: never;
 
-/**
- * Right side of `x IN (SELECT …)` / `x op ANY|ALL (SELECT …)`. A row constructor on the left
- * (`(a, b) IN (SELECT x, y …)`) needs a subquery of the same width; otherwise one column.
- */
 type SubqueryOperand<
 	L extends Expr,
 	Q extends SelectStmt,
@@ -947,11 +854,6 @@ type IsLonger<
 		: true
 	: false;
 
-/**
- * The single column of a subquery. Postgres: scalar and ARRAY subqueries with ≠ 1 column fail
- * with "subquery must return only one column"; IN / ANY / ALL with "subquery has too many
- * columns" or "subquery has too few columns".
- */
 type OnlyCol<R extends Cols, TooMany extends string> = R extends readonly [
 	infer H,
 ]
@@ -981,13 +883,6 @@ type UnionToIntersection<U> = (
 	? I
 	: never;
 
-// ─── CASE ───
-
-/**
- * Common type of the branches (Postgres considers ELSE first, which matters for string
- * types: `CASE WHEN x THEN vc ELSE label END` → text); nullable if a branch is or there is
- * no ELSE.
- */
 type TypeCase<
 	Operand extends Expr | null,
 	Whens extends readonly CaseWhen[],
@@ -1030,9 +925,6 @@ type TypeWhens<
 		: never
 	: readonly [T, N];
 
-// ─── calls ───
-
-/** `WITHIN GROUP (ORDER BY …)`: every key is typed; the first one gives the ordered-set result type (`mode`, `percentile_disc`). */
 type TypeWithinGroup<W extends Expr | null, C extends Ctx> = W extends {
 	readonly t: "row";
 	readonly items: infer Items extends readonly Expr[];
@@ -1050,10 +942,6 @@ type NonStarArgs<Args extends readonly Expr[]> = Args extends readonly [
 	? []
 	: Args;
 
-/**
- * `concat(VARIADIC a)` / `concat_ws(sep, VARIADIC a)` are NULL when the array is (they are
- * otherwise never NULL); `format(f, VARIADIC NULL)` treats it as no arguments.
- */
 type VariadicNull<
 	E extends Call,
 	As extends readonly ColInfo[],
@@ -1068,7 +956,6 @@ type VariadicNull<
 		: R
 	: R;
 
-/** Type the arguments, then FILTER and WITHIN GROUP expressions (for errors and the ordered-set result type), then resolve. */
 type TypeCall<E extends Call, C extends Ctx> =
 	OperandList<NonStarArgs<E["args"]>, C, []> extends infer As
 		? As extends readonly ColInfo[]

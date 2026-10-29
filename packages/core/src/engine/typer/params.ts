@@ -25,49 +25,13 @@ import type { ParamsOfJsonTable, ParamsOfSqlJson } from "./sqljson.js";
 import type { TypeList, TypeOf } from "./typeof.js";
 import type { ParamsOfXml, ParamsOfXmlTable } from "./xml.js";
 
-/**
- * Parameter typing: a second pass over the AST that infers `$n` types from context.
- * `ParamMap` is `{ [n]: ColInfo | ColInfo | ... }` (a union when `$n` is used several
- * times; the TS types are intersected at the boundary).
- *
- * Rules (PLAN §6.7; parameter types verified with PREPARE on PostgreSQL 18):
- *   col <cmp> $1, $1 <cmp> col         → column type, nullable (comparisons, LIKE, regex,
- *                                        IS DISTINCT FROM; `col = NULL` is legal, it matches nothing)
- *   col <arith> $1, col || $1          → column type (text for `||`), nullable iff the column is;
- *                                        date/time - $1 → same type (Postgres tries the
- *                                        same-type operator first), + $1 → interval;
- *                                        interval * $1 → float8
- *   json -> $1 / ->> $1 / ? $1         → text;  #> #>> ?| ?& → text[] (nullable)
- *   $1 AND/OR x, NOT $1, CASE WHEN $1  → bool
- *   col IN ($1, $2) / $1 IN (a, b)     → element type / common type of the list
- *   col = ANY($1) / $1 = ANY(arr)      → array of the column type / element type
- *   $1 BETWEEN a AND b                 → a's type (Postgres resolves `$1 >= a` first)
- *   CASE branches, COALESCE siblings, ARRAY[...] → common type of the siblings
- *   f($1) with a catalog signature     → the parameter's type (nullable); polymorphic `any`/`...`
- *                                        → common type of the other polymorphic arguments,
- *                                        array arguments contributing their element type
- *                                        (`array_append(nums, $1)` → int4)
- *   SUBSTRING(x FROM $1)               → text (Postgres picks the regex form); FROM 1 FOR $1 → int4
- *   $1::T                              → T (cast beats context), nullable iff the context's type
- *                                        is (`coalesce($1::text, 'x')` accepts null, `VALUES ($1::text)`
- *                                        for a NOT NULL column does not); non-null without context
- *   $1 IS [NOT] NULL, $1::T IS NULL    → adds `| null` to the intersection of the other uses
- *   LIMIT $1, OFFSET $1                → int4 (number), nullable (`LIMIT NULL` = no limit)
- *   no context                         → unknown
- */
 export type ParamMap = { readonly [n: number]: ColInfo };
 
-/** One `$n` occurrence and the type its context gives it. */
 export type ParamEntry<N extends number = number, T = ColInfo> = {
 	readonly n: N;
 	readonly t: T;
 };
 
-/**
- * The pass accumulates a flat union of `ParamEntry`s (start with `never`). A nested mapped
- * type per occurrence capped statements at ~48 `$n` uses; a union has no nesting.
- * `ParamsToMap` collapses it into `{ [n]: ColInfo | … }` once, at the end.
- */
 export type AddParam<M, N extends number, T> = M | ParamEntry<N, T>;
 
 export type ParamsToMap<U> = {
@@ -76,15 +40,10 @@ export type ParamsToMap<U> = {
 		: never]: E extends { readonly t: infer T } ? T : never;
 };
 
-/**
- * Highest `$n` in the token stream (0 if none). Extract parameters from the token
- * union first: most tokens are not parameters, and need no per-token instantiation.
- */
 export type MaxParam<T extends Toks> = HighestParam<
 	Extract<T[number], { readonly k: "$" }>["v"] | 0
 >;
 
-/** Only the largest candidate has no larger member outside its preceding integers. */
 type HighestParam<N extends number, All extends number = N> = N extends number
 	? Exclude<All, Before<N>> extends N
 		? N
@@ -94,7 +53,6 @@ type Before<N extends number, A extends number[] = []> = A["length"] extends N
 	? A[number]
 	: Before<N, [...A, A["length"]]>;
 
-/** Marks a `$n` that the statement tests with `IS [NOT] NULL`: the caller may pass null. */
 export type NullTest = {
 	readonly type: "unknown";
 	readonly nullable: true;
@@ -112,7 +70,6 @@ type NullTested<E extends Expr, M> = E extends {
 		? AddParam<M, N, NullTest>
 		: M;
 
-/** Comparison and pattern operators: the other operand's type, nullable (`WHERE id = $1` → `number | null`). */
 type IsComparison<Op extends string> = Op extends
 	| "="
 	| "<"
@@ -134,10 +91,8 @@ type IsComparison<Op extends string> = Op extends
 type NullableOf<T> = T extends ColInfo
 	? Mk<T["type"], true>
 	: Mk<"unknown", true>;
-/** Unconstrained `Info` for computed type names (avoids constraint resolution of recursive aliases). */
 type Mk<T, N extends boolean> = { readonly type: T; readonly nullable: N };
 
-/** Collect params from an expression. Errors in sibling typing are ignored (they are reported by the main pass). */
 export type ParamsOfExpr<E extends Expr, C extends Ctx, M> = E extends {
 	readonly t:
 		| "col"
@@ -424,8 +379,7 @@ type ParamsOfExprComplex<E extends Expr, C extends Ctx, M> = E extends {
 																																C,
 																																M
 																															>
-																														: // `f(name => $1)`: the parameter's position is unknown (the catalog has no names), so it stays untyped
-																															E extends {
+																														: E extends {
 																																	readonly t:
 																																		| "named"
 																																		| "variadic";
@@ -437,13 +391,6 @@ type ParamsOfExprComplex<E extends Expr, C extends Ctx, M> = E extends {
 																																>
 																															: M;
 
-/**
- * Type of a `$n` in SUBSTRING's FROM / FOR. With an unknown argument Postgres prefers the
- * string category, i.e. the regex form `substring(text, text [, text])`, unless the other
- * position is an integer (`FROM 1 FOR $1` → int4; there is no form for a bigint or numeric),
- * or there is no FROM (`FOR $1` is `FROM 1 FOR $1`).
- * bytea / bit strings only have the integer form.
- */
 type SubstrPosType<
 	S extends Expr,
 	From extends Expr | null,
@@ -453,7 +400,7 @@ type SubstrPosType<
 	TypeOf<S, C> extends { readonly type: "bytea" | "bit" | "varbit" }
 		? Info<"int4", true>
 		: From extends null
-			? Info<"int4", true> // `FOR n` alone is `substring(s, 1, n)`
+			? Info<"int4", true>
 			: (From extends { readonly t: "param" } ? For : From) extends infer Sib
 				? Sib extends Expr
 					? TypeOf<Sib, C> extends { readonly type: "int2" | "int4" }
@@ -462,10 +409,6 @@ type SubstrPosType<
 					: Info<"text", true>
 				: never;
 
-/**
- * A param in `E` gets type `T` (when `T` is not null); a cast param `$n::X` gets `X` with
- * `T`'s nullability; otherwise recurse.
- */
 export type ParamsOfOpt<
 	E extends Expr | null,
 	C extends Ctx,
@@ -498,9 +441,7 @@ export type ParamsOfList<
 	? ParamsOfList<R, C, ParamsOfOpt<E, C, M, T>, T>
 	: M;
 
-/** An `ARRAY[…]` of parameters (and NULLs) only is text[], as in Postgres. */
 type UntypedText<T> = T extends "unknown" ? "text" : T;
-/** `ARRAY[…]::T[]`: the parameters in it, in arrays inside it too, are `T`. */
 type CastArrayParams<
 	Items extends readonly Expr[],
 	C extends Ctx,
@@ -523,7 +464,6 @@ type CastArrayParams<
 		>
 	: M;
 
-/** Common type of the non-NULL expressions of a list ("unknown" if none or on error; a parameter is unknown too). */
 type CommonOfExprs<Es extends readonly Expr[], C extends Ctx> =
 	TypeList<NonParams<Es, []>, C, []> extends infer Ts
 		? Ts extends readonly ColInfo[]
@@ -551,8 +491,6 @@ type CommonOfInfos<
 	? CommonOfInfos<R, CommonType<Acc, T["type"]>>
 	: Acc;
 
-// ─── binary operators ───
-
 type ParamsOfBin<
 	Op extends string,
 	L extends Expr,
@@ -575,9 +513,7 @@ type ParamsOfBin<
 				N,
 				BinParamType<Op, TypeOf<L, C>>
 			>
-		: // a cast param operand (`col = $1::uuid`) gets its cast type with the operator's nullability;
-			// inline here (not through ParamsOfOperand) so operator chains do not nest one more alias per term
-			L extends {
+		: L extends {
 					readonly t: "cast";
 					readonly to: infer T;
 					readonly e: {
@@ -613,7 +549,6 @@ type ParamsOfOperand<
 }
 	? AddParam<M, N, Mk<T, BinNullable<Op, Other, C>>>
 	: ParamsOfExpr<X, C, M>;
-/** Nullability `BinParamType` gives a param operand next to `Other`. */
 type BinNullable<Op extends string, Other extends Expr, C extends Ctx> =
 	BinParamType<Op, TypeOf<Other, C>> extends {
 		readonly nullable: infer Nl extends boolean;
@@ -621,10 +556,6 @@ type BinNullable<Op extends string, Other extends Expr, C extends Ctx> =
 		? Nl
 		: true;
 
-/**
- * Type of a `$n` operand given the operator and the other operand's (possibly erroneous)
- * type. `Other` is deliberately unconstrained (ENGINE.md pitfall 9).
- */
 type BinParamType<Op extends string, Other> = Other extends {
 	readonly type: infer OT;
 	readonly nullable: boolean;
@@ -721,8 +652,6 @@ type ParamsOfQuant<
 					? ParamsOfExpr<R, C, ParamsOfExpr<L, C, M>>
 					: M;
 
-// ─── CASE ───
-
 type ParamsOfCase<
 	Operand extends Expr | null,
 	Whens extends readonly { when: Expr; then: Expr }[],
@@ -772,14 +701,6 @@ type ParamsOfWhens<
 		>
 	: M;
 
-// ─── calls ───
-
-/**
- * Function arguments: the overload is resolved from the non-param argument types (params
- * match anything), then each `$n` takes the type of its parameter pattern. Polymorphic
- * parameters (`any`, `...`) use the common type of the other arguments; `anyarray` stays
- * unknown. Unknown functions give no type.
- */
 type ParamsOfCall<E extends Call, C extends Ctx, M> =
 	LookupFn<C["db"], E["name"]> extends infer O
 		? O extends null
@@ -809,7 +730,6 @@ type NonStarArgs<Args extends readonly Expr[]> = Args extends readonly [
 ]
 	? []
 	: Args;
-/** FILTER (WHERE $1) → bool; WITHIN GROUP (ORDER BY $1) → unknown. */
 type ParamsOfCallRest<E extends Call, C extends Ctx, M> = ParamsOfOpt<
 	E["withinGroup"],
 	C,
@@ -817,11 +737,6 @@ type ParamsOfCallRest<E extends Call, C extends Ctx, M> = ParamsOfOpt<
 	null
 >;
 
-/**
- * Common type of the non-param arguments in polymorphic positions (`any`, `...`), with
- * arguments in `anyarray` positions contributing their element type — Postgres's
- * `anycompatible` unification. "unknown" when nothing is known.
- */
 type PolyOf<
 	Args extends readonly Expr[],
 	Ps extends readonly string[],
@@ -855,7 +770,6 @@ type PolyStep<P extends string, T, Acc extends string> = T extends {
 			: Acc
 	: Acc;
 
-/** `Poly` is unconstrained: it is a recursive alias result (ENGINE.md pitfall 9). */
 type ParamsOfArgs<
 	Args extends readonly Expr[],
 	Ps extends readonly string[],
@@ -894,17 +808,13 @@ type PatternType<P extends string, Poly> = P extends "any" | "..."
 			>
 		: P extends "anystring" | "jsonpath"
 			? Info<"text", true>
-			: // the preferred type of the category, as Postgres resolves an unknown (an anyjson
-				// parameter has an anystring twin listed first)
-				P extends "anynumeric"
+			: P extends "anynumeric"
 				? Info<"float8", true>
 				: P extends "anydatetime"
 					? Info<"timestamptz", true>
 					: P extends "anyrange"
 						? Info<"unknown", true>
 						: Mk<P, true>;
-
-// ─── statements ───
 
 export type ParamsOfTargets<
 	Ts extends readonly Target[],
@@ -991,7 +901,6 @@ export type ParamsOfSelect<
 				>
 			: M
 		: never;
-/** `LIMIT NULL` / `OFFSET NULL` mean no limit / no offset. */
 type ParamsOfLimit<E extends Expr | null, M> = E extends {
 	readonly t: "param";
 	readonly n: infer N extends number;

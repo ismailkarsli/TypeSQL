@@ -69,10 +69,8 @@ interface Item {
 	result?: Evaluated;
 }
 
-/** Statements that end or change the transaction the runs happen in: described, not run. */
 const NOT_RUN =
 	/^\s*(begin|commit|end|rollback|abort|start\s+transaction|savepoint|release|prepare\s+transaction|vacuum|checkpoint|set\s+(session\s+)?characteristics|discard|reindex\s+database|create\s+database|drop\s+database|alter\s+system)\b/i;
-/** Server errors a DDL step meets because our `DB` has no constraints (foreign keys, ON CONFLICT targets). */
 const MISSING_CONSTRAINTS = new Set(["42830", "42P10"]);
 export async function typesOracle(
 	url: string,
@@ -116,7 +114,6 @@ export async function typesOracle(
 			const group = groups.get(statement.schema)!;
 			const { sql: text, ddl, source: file } = statement;
 			const key = `${group.id}\0${ddl}\0${text}`;
-			// The first source owns this input's baseline identity, including duplicates.
 			if (!items.has(key)) items.set(key, { group, text, file, ddl });
 		}
 		const list = [...items.values()];
@@ -238,7 +235,6 @@ export async function typesOracle(
 	}
 }
 
-/** A statement over a schema the generator could only partly write: an unknown relation, type or function is not a finding. */
 function unrepresentable(v: {
 	readonly disagreements: readonly Disagreement[];
 }): Verdict {
@@ -252,7 +248,6 @@ function unrepresentable(v: {
 	return v;
 }
 
-/** Server errors about what a `DB` type cannot say: a function the test declares, a role or tablespace, a named constraint. */
 async function outsideTheSchema(
 	conn: Connection,
 	v: Verdict,
@@ -268,7 +263,6 @@ async function outsideTheSchema(
 		return { skip: "schema-unrepresentable" };
 	if (/^server: 42704 constraint /.test(detail))
 		return { skip: "schema-constraints" };
-	// partitioning and materialized views: a `DB` type has neither
 	if (
 		/^server: (42P17 .* is not partitioned|42809 .* is not a materialized view)/.test(
 			detail,
@@ -357,7 +351,6 @@ export async function observe(
 	return { observed };
 }
 
-/** A parameter we type non-null is never bound to NULL: the caller cannot pass one. */
 export async function runVariants(
 	conn: Connection,
 	db: Db,
@@ -393,7 +386,6 @@ export async function runVariants(
 	return out;
 }
 
-/** Runs over the emptied tables: a schema change, not the seeded rows (a NULL in a column made NOT NULL), is what it is about. */
 async function checkDdl(
 	conn: Connection,
 	tables: readonly string[],

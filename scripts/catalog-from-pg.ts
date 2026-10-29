@@ -1,23 +1,9 @@
-// Review tool for the function catalog (packages/core/src/engine/typer/catalog.ts).
-//
-// Connects to Postgres (TYPESQL_PG_URL, e.g. postgres://postgres:x@localhost:5432/postgres) and
-// prints every pg_proc overload of each function named in `FunctionCatalog`, in the catalog's
-// `Sig` notation, with strictness, set-returning and aggregate/window flags. It also lists
-// catalog names that do not exist in pg_proc (typos, extension functions).
-//
-//   TYPESQL_PG_URL=postgres://… node scripts/catalog-from-pg.ts            # all catalog functions
-//   TYPESQL_PG_URL=postgres://… node scripts/catalog-from-pg.ts lower sum  # selected functions
-//
-// The output is meant for a human diff against catalog.ts after a Postgres upgrade; it does
-// not rewrite the catalog (overload choice and nullability rules are deliberate). The other
-// pg_catalog functions are generated into pg-functions.ts by scripts/gen-pg-functions.ts.
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 
 const require = createRequire(
 	new URL("../packages/core/package.json", import.meta.url),
 );
-/** The part of a `pg` Client this script uses; `R` is the type of the result rows. */
 interface PgClient {
 	connect(): Promise<void>;
 	query<R extends readonly unknown[]>(

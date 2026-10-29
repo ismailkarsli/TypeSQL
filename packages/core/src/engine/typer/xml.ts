@@ -5,21 +5,6 @@ import type { ColInfo, Cols, Ctx, Info } from "../types.js";
 import type { ParamsOfList, ParamsOfOpt } from "./params.js";
 import type { TypeList, TypeOf } from "./typeof.js";
 
-/**
- * SQL/XML typing (verified against PostgreSQL 18, `transformXmlExpr` / `ExecEvalXmlExpr`):
- *
- *   XMLELEMENT                → xml, never null (NULL content and attributes are skipped)
- *   XMLFOREST, XMLCONCAT      → xml, null only when every value is (NULLs are skipped)
- *   XMLPI(NAME n, arg)        → xml, null when arg is
- *   XMLROOT(x, VERSION v ...) → xml, null when x is (a NULL version means NO VALUE)
- *   XMLPARSE(... arg)         → xml, null when arg is
- *   XMLSERIALIZE(... AS T)    → T, null when the value is
- *   x IS [NOT] DOCUMENT       → bool, null when x is
- *   XMLEXISTS                 → the function xmlexists(text, xml) (catalog)
- *
- * Operands are coerced like Postgres's `coerce_to_specific_type` (see `Coerce`): a non-xml
- * value where xml is required is `argument of XMLCONCAT must be type xml, not type integer`.
- */
 export type TypeXml<E extends Expr, C extends Ctx> = E["op"] extends "element"
 	? TypeList<E["named"], C, []> extends infer Ls
 		? Ls extends readonly ColInfo[]
@@ -87,11 +72,6 @@ type AllNullable<As extends readonly ColInfo[]> = As extends readonly [
 		: false
 	: true;
 
-/**
- * `coerce_to_specific_type` (assignment coercion): the operand as `Target` (same
- * nullability), or Postgres's error. Every type has an assignment cast to text (I/O
- * conversion); only xml (or an untyped literal, NULL or `$n`) becomes xml.
- */
 export type Coerce<
 	A extends Expr,
 	C extends Ctx,
@@ -129,14 +109,6 @@ type CoerceList<
 		: never
 	: Acc;
 
-// ─── XMLTABLE ───
-
-/**
- * Columns of an XMLTABLE, after checking its expressions (namespace URIs, row and column
- * paths are text, the document xml). A column is NULL when its path matches nothing: it is
- * nullable unless declared NOT NULL (Postgres raises an error instead) or given a DEFAULT,
- * which then decides. FOR ORDINALITY is a non-null int4.
- */
 export type XmlTableCols<F, C extends Ctx> = F extends {
 	readonly ns: infer Ns extends readonly Expr[];
 	readonly row: infer Row extends Expr;
@@ -175,7 +147,6 @@ type XmlCols<
 				: XmlCol<D, R, C, Acc, true>
 			: XmlCol<D, R, C, Acc, Ord>
 	: Acc;
-/** One column (FOR ORDINALITY is a NOT NULL int4 without PATH or DEFAULT), then the rest. */
 type XmlCol<
 	D extends XmlTableCol,
 	R extends readonly XmlTableCol[],
@@ -219,9 +190,6 @@ type ColNames<Acc extends Cols> = Acc[number] extends infer E
 		: never
 	: never;
 
-// ─── parameters ───
-
-/** `$n` in XML forms: the type each operand is coerced to; XMLELEMENT / XMLFOREST values stay untyped. */
 export type ParamsOfXml<
 	E extends Expr,
 	C extends Ctx,
@@ -246,7 +214,6 @@ export type ParamsOfXml<
 					: never
 				: ParamsOfList<E["args"], C, M, Info<"xml", true>>;
 
-/** XMLTABLE: URIs, row and column paths text, the document xml, a DEFAULT the column's type. */
 export type ParamsOfXmlTable<F, C extends Ctx, M> = F extends {
 	readonly ns: infer Ns extends readonly Expr[];
 	readonly row: infer Row extends Expr;

@@ -1,10 +1,3 @@
-/**
- * A completion server for editors that hook into a running TypeScript 7.1 language server, such
- * as Neovim: connects to its API session (session.ts) at `pipe` and adds TypeSQL's items to its
- * completion responses inside statement literals.
- *
- * `start(pipe)` runs it on stdin and stdout. `serve` is the part without a process.
- */
 import type { Readable, Writable } from "node:stream";
 import { mayBeInSqlLiteral } from "./literal.js";
 import { merge } from "./merge.js";
@@ -15,10 +8,8 @@ import {
 	typescriptModules,
 } from "./session.js";
 
-/** Milliseconds our items may add to a completion response; later ones add nothing. */
 const BUDGET_MS = 150;
 
-/** A peer's end of a connection: what it sends, and where to send it messages. */
 export interface Peer {
 	readonly readable: Readable;
 	readonly writable: Writable;
@@ -38,7 +29,6 @@ interface Message {
 	readonly params: CompletionParams;
 }
 
-/** Serves completion requests on stdin and stdout, reading the program at `pipe`. */
 export function start(pipe: string): void {
 	serve(
 		{ readable: process.stdin, writable: process.stdout },
@@ -50,10 +40,6 @@ export function start(pipe: string): void {
 	);
 }
 
-/**
- * Answers `client`'s completion requests with `result` merged with our items from `connector`,
- * within `budget` milliseconds.
- */
 export function serve(
 	client: Peer,
 	connector: Connector,
@@ -97,7 +83,6 @@ export function serve(
 	});
 }
 
-/** Calls `onMessage` with each message on `stream`. */
 function read(stream: Readable, onMessage: (m: Message) => void): void {
 	let buffer = Buffer.alloc(0);
 	stream.on("data", (d: Buffer) => {

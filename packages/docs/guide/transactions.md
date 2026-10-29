@@ -2,7 +2,25 @@
 
 `sql.transaction(fn)` runs several statements in one transaction. It works the same way with every adapter.
 
-<<< @/snippets/transactions.ts#basic
+```ts
+import { Pool } from "pg";
+import { createSql } from "@typesql/pg";
+
+const sql = createSql<DB>(new Pool());
+
+const userId = await sql.transaction(async (tx) => {
+	const { id } = await tx(
+		"INSERT INTO users (email) VALUES ($1) RETURNING id",
+		"ada@example.com",
+	).executeTakeFirstOrThrow();
+	await tx(
+		"INSERT INTO posts (author_id, title) VALUES ($1, $2)",
+		id,
+		"Hello",
+	).execute();
+	return id;
+});
+```
 
 `fn` receives `tx`, the same `sql` bound to the transaction. It has the same types and helpers as `sql`.
 
@@ -15,7 +33,25 @@
 
 `tx.transaction(fn)` nests with a savepoint. When the inner `fn` throws, only what ran inside it is rolled back:
 
-<<< @/snippets/adapters.ts#transaction
+```ts
+const postId = await sql.transaction(async (tx) => {
+	const { id } = await tx(
+		"INSERT INTO posts (author_id, title) VALUES ($1, $2) RETURNING id",
+		7,
+		"Draft",
+	).executeTakeFirstOrThrow();
+	try {
+		await tx.transaction(async (inner) => {
+			await inner(
+				"UPDATE users SET display_name = $1 WHERE id = $2",
+				"Author",
+				7,
+			).execute();
+		});
+	} catch {}
+	return id;
+});
+```
 
 A `sql` bound to a client that is already in a transaction also uses a savepoint. That covers a postgres.js `TransactionSql`, a Kysely `Transaction`, a Prisma transaction client and a Drizzle `tx`.
 
@@ -25,7 +61,20 @@ A `sql` bound to a client that is already in a transaction also uses a savepoint
 Statements in one transaction share one connection. Run them one after another, not with `Promise.all`.
 :::
 
-<<< @/snippets/transactions.ts#sequential
+```ts
+await sql.transaction(async (tx) => {
+	await tx(
+		"UPDATE users SET display_name = $1 WHERE id = $2",
+		"Ada",
+		1,
+	).execute();
+	await tx(
+		"UPDATE users SET display_name = $1 WHERE id = $2",
+		"Grace",
+		2,
+	).execute();
+});
+```
 
 ## How each adapter runs it
 

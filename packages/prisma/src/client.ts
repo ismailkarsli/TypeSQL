@@ -2,10 +2,6 @@ import type { PrismaPromise } from "@prisma/client/runtime/client";
 import type { Executor } from "@typesql/core";
 import { runTransaction, type SqlDriver } from "@typesql/core/adapter";
 
-/**
- * Anything with Prisma Client's raw methods: a `PrismaClient`, an extended client or a transaction
- * client. `$transaction` is there on the first two only.
- */
 export interface PrismaRawClient {
 	$queryRawUnsafe<T = unknown>(
 		query: string,
@@ -15,11 +11,6 @@ export interface PrismaRawClient {
 	$transaction?<R>(fn: (tx: PrismaRawClient) => Promise<R>): Promise<R>;
 }
 
-/**
- * An `Executor` for core's `q.execute()`: runs queries through `prisma.$queryRawUnsafe(text, ...values)`,
- * and `q.executeCount()` through `prisma.$executeRawUnsafe(text, ...values)`. Values are always
- * sent as bind parameters (`$n`), never interpolated.
- */
 export function executor(prisma: PrismaRawClient): Executor {
 	return Object.assign(
 		(text: string, values: readonly unknown[]) =>
@@ -31,10 +22,6 @@ export function executor(prisma: PrismaRawClient): Executor {
 	);
 }
 
-/**
- * Run `fn` inside an interactive `prisma.$transaction(fn)`. A transaction client cannot start
- * another one, so inside one `fn` runs in a savepoint.
- */
 function transaction<T>(
 	prisma: PrismaRawClient,
 	depth: number,
@@ -48,5 +35,4 @@ function transaction<T>(
 	);
 }
 
-/** How `createSql(prisma)` runs queries and transactions. */
 export const driver: SqlDriver<PrismaRawClient> = { executor, transaction };

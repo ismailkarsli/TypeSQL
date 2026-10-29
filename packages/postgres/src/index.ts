@@ -17,26 +17,16 @@ export type {
 	PostgresJsTypeMap,
 } from "./type-map.js";
 
-/** What `createSql<DB>(sql)` returns: core's `Sql` under `PostgresJsTypeMap` (or `TM`), with `transaction(fn)`. */
 export type PostgresJsSql<
 	DB,
 	Keys extends RowKeys = "preserve",
 	TM = PostgresJsTypeMap,
 > = TransactionalSql<DB, TM, Keys>;
 
-/** `createSql`'s options: core's `rowKeys`, and `bigint: true` for a connection that parses `int8` as `bigint`. */
 interface PostgresJsSqlOptions extends SqlOptions {
 	readonly bigint?: boolean;
 }
 
-/**
- * `createSql<DB>()` from core, pre-bound to `PostgresJsTypeMap` (default parsers: `int8` and `count(*)` are `string`).
- * The queries' `execute*` methods run on the postgres.js `sql` instance (or a `TransactionSql`,
- * `ReservedSql`), and `sql.transaction(fn)` runs `fn` with a `sql` bound to one transaction.
- * `{ rowKeys: "camelCase" }` camelCases the rows' keys, in the types and at runtime.
- * `{ bigint: true }` is for `postgres({ types: { bigint: postgres.BigInt } })` connections:
- * `int8` and `count(*)` are `bigint` (`PostgresJsBigIntTypeMap`).
- */
 export function createSql<DB>(
 	sql: PostgresJsQueryable | undefined,
 	options: { readonly rowKeys: "camelCase"; readonly bigint: true },

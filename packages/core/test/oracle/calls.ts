@@ -104,7 +104,6 @@ const MORE_SAMPLES: { readonly [t: string]: readonly string[] } = {
 	refcursor: ["c"],
 	char: ["a"],
 	bit: ["1", "0"],
-	// small values only: an argument is often a count or a length
 	int2: ["0", "1"],
 	int4: ["0", "1"],
 	int8: ["0", "1"],
@@ -121,7 +120,6 @@ export function samplesOf(type: string): readonly string[] {
 	return (MORE_SAMPLES[type] ?? sampleTexts(type)).slice(0, 2);
 }
 
-/** `"char"` is the one-byte type; `char` alone is `bpchar`. */
 export function typeSql(t: string): string {
 	const m = /^(.*?)((\[\])*)$/.exec(t)!;
 	return `${m[1] === "char" ? '"char"' : m[1]}${m[2]}`;
@@ -136,7 +134,6 @@ export interface Arg {
 	readonly nul: string;
 }
 
-/** Small backend numbers name whichever sessions are connected: use numbers no backend has. */
 const LIVE_BACKENDS = /^pg_stat_get_backend_/;
 const NO_BACKEND: readonly string[] = ["-1", "2147483647"];
 
@@ -167,7 +164,6 @@ export interface Call {
 	readonly args: readonly Arg[];
 	readonly pickArgs: readonly string[];
 	readonly outCols: boolean;
-	/** `record` result without OUT columns: `SELECT * FROM f()` needs a column definition list. */
 	readonly anonymousRecord: boolean;
 }
 
@@ -207,7 +203,6 @@ export function callsOf(p: Proc): Calls {
 			if (seen.has(key)) continue;
 			seen.add(key);
 			let direct = p.aggkind === "o" ? p.direct : 0;
-			// hypothetical-set: as many direct arguments as ordering ones (`rank(1) WITHIN GROUP (ORDER BY x)`)
 			let args = concrete;
 			if (p.aggkind === "h") {
 				direct = concrete.length;
@@ -251,7 +246,6 @@ export function callsOfSig(
 	const variadic = s.args.at(-1) === "...";
 	const fixed = variadic ? s.args.slice(0, -1) : s.args;
 	const rest = variadic ? [1, 2] : [0];
-	// the name's pg_proc overloads are its calls
 	if (variadic && !fixed.length && inPgProc)
 		return { skip: "arguments not checked" };
 	const calls: Call[] = [];
@@ -303,7 +297,6 @@ export const KEYWORD_FORMS: ReadonlySet<string> = new Set([
 	"system_user",
 ]);
 
-/** Names whose plain call is a syntax error on the server (special syntax, or read as a type with a typmod): called schema-qualified. */
 export const QUALIFIED: ReadonlySet<string> = new Set([
 	"extract",
 	"position",
@@ -379,7 +372,6 @@ export function statementsOf(c: Call): Statement[] {
 					tail: "",
 				},
 			];
-		// one variant per statement: set-returning functions side by side in a select list are padded with NULLs to the longest
 		const out: Statement[] = [];
 		for (const col of columns) {
 			out.push({
@@ -463,7 +455,6 @@ export function statementsOf(c: Call): Statement[] {
 	return out;
 }
 
-/** Strict NULLs only when no overload of the same name and arity is non-strict: the server might pick that one. */
 export function strictNulls(
 	c: Call,
 	s: Statement,
@@ -511,7 +502,6 @@ export function flagDifferences(p: Proc, s: OurSig): string[] {
 	return out;
 }
 
-/** Volatile functions that are safe to run in a rolled-back transaction (no effect outside it, quick). */
 export const RUN_VOLATILE: ReadonlySet<string> = new Set([
 	"random",
 	"random_normal",

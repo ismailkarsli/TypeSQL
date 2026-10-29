@@ -2,16 +2,6 @@ import type { Toks } from "./lexer/tokens.js";
 import type { Nx } from "./parser/util.js";
 import type { FunctionCatalog } from "./typer/catalog.js";
 
-/**
- * "Did you mean" hints for unknown columns, relations and functions. Runs only on the error path.
- *
- * Candidates come from the relations the statement mentions (word tokens that are keys
- * of `DB`, including nested namespaces and views) for column errors, from all
- * relations for relation errors, and from `FunctionCatalog` and `DB["$functions"]` for
- * function errors. The closest candidate within edit distance 2 (and less
- * than the name's length) is suggested, mirroring Postgres's
- * `HINT: Perhaps you meant to reference the column "users.name".`
- */
 export type WithHint<
 	M extends string,
 	T extends Toks,
@@ -42,10 +32,6 @@ export type WithHint<
 type FnNames<DB> =
 	| (keyof FunctionCatalog & string)
 	| (DB extends { readonly $functions: infer F } ? keyof F & string : never);
-/**
- * Candidates sharing the name's first character. The catalog has ~450 names, and ranking all of
- * them cost ~1M instantiations per error; a typo in the first character gets no hint.
- */
 type SameStart<Name extends string, Cands> = Name extends `${infer C}${string}`
 	? Extract<Cands, `${C}${string}`>
 	: never;
@@ -54,9 +40,6 @@ type Hinted<M extends string, S, What extends string> = S extends string
 	? `${M}. Perhaps you meant the ${What} "${S}"?`
 	: M;
 
-// ─── candidates ───
-
-/** Word / quoted-identifier tokens of the statement that name a relation in `DB`. Unrolled ×2. */
 type MentionedRels<T extends Toks, DB, I extends number, Acc> = T[I] extends {
 	readonly k: string;
 }
@@ -71,7 +54,6 @@ type RelAt<T extends Toks, I extends number, DB> = T[I] extends {
 		: never
 	: never;
 
-/** Relation names: top-level tables/views and tables inside namespaces. */
 type RelNames<DB> = {
 	[K in keyof DB & string]: K extends "$types" | "$functions"
 		? never
@@ -95,7 +77,6 @@ export type RelCols<X> = X extends { readonly $view: infer C }
 	? keyof C & string
 	: keyof X & string;
 
-/** Column names of the given relations (looked up at top level and in every namespace). */
 type ColumnsOf<DB, Rels> = {
 	[K in keyof DB & string]: K extends Rels
 		? IsRelation<DB[K]> extends true
@@ -110,9 +91,6 @@ type ColumnsOf<DB, Rels> = {
 				}[keyof DB[K] & string];
 }[keyof DB & string];
 
-// ─── closest candidate ───
-
-/** The candidate with the smallest edit distance ≤ 2 (and < the name's length), or null. */
 type Best<Name extends string, Cands> = Pick2<
 	Name,
 	UnionToTuple<Cands>,
@@ -151,15 +129,12 @@ type LastOf<U> = (
 	? R
 	: never;
 
-// ─── bounded Levenshtein distance (0, 1, 2 or 3 meaning "more than 2") ───
-
 type Chars<
 	S extends string,
 	Acc extends string[] = [],
 > = S extends `${infer C}${infer R}` ? Chars<R, [...Acc, C]> : Acc;
 type Len<S extends string> = Chars<S>["length"];
 
-/** Edit distance capped at 3. Prunes on the length difference first. */
 type Dist<A extends string, B extends string> =
 	Abs<Len<A>, Len<B>> extends infer D extends number
 		? Lt<2, D> extends true

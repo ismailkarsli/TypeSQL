@@ -1,11 +1,3 @@
-/// <reference types="node" />
-/**
- * JSON-RPC 2.0 over a byte stream with `Content-Length` framing (the base protocol of LSP and of
- * TypeScript's content mappers), enough for a server: requests get a result or an error,
- * notifications are dispatched without a reply, unknown methods get MethodNotFound. Written
- * here rather than taken from `vscode-jsonrpc` so that `@typesql/core` keeps no dependencies.
- */
-
 export type Handler = (params: unknown) => unknown;
 export type Handlers = { readonly [method: string]: Handler };
 
@@ -28,7 +20,6 @@ interface Message {
 	readonly params?: unknown;
 }
 
-/** Serve `handlers` until `input` ends; resolves then. */
 export function serve(
 	handlers: Handlers,
 	input: NodeJS.ReadableStream,

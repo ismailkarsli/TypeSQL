@@ -9,11 +9,6 @@ import type {
 } from "./select.js";
 import type { Ok } from "./util.js";
 
-/**
- * Parse the projection separately from the FROM tail so repeated headers share their work.
- * Simple column targets bypass tokenization; computed targets use the expression parser.
- * Anything uncertain returns never, leaving the original pipeline to handle it and its errors.
- */
 export type FastSelect<Q extends string> =
 	Q extends `${string}${"SELECT" | "select"}${string}`
 		? FastSelectStart<Q>
@@ -32,7 +27,6 @@ type SplitFrom<S extends string> = S extends `${infer Cs}FROM${Ws}${infer Rest}`
 			? SelectFrom<Cs, TrimStart<Rest>>
 			: never
 		: never;
-// A textual FROM inside a line comment is not a clause; let the full lexer locate it.
 type SelectFrom<
 	Cs extends string,
 	Rest extends string,
@@ -73,7 +67,6 @@ type GeneralTail<
 			: never
 		: WholeTail<Ts, Rest>;
 
-/** Split at the final ORDER BY, leaving nested query ordering in the body. */
 type LastOrder<S extends string> = [OrderTail<S>] extends [never]
 	? never
 	: OrderTail<S> extends infer Tail extends string

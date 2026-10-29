@@ -1,17 +1,3 @@
-/**
- * TypeSQL for VS Code: completions inside `sql()` strings.
- *
- * Items come from `@typesql/language-server` (bundled) through an API session on the
- * TypeScript 7 extension's language server, so they read the server's program without a second
- * process. Two ways in, depending on that extension's API:
- *
- *  - With `registerLspMiddleware` (TypeScript 7.1's extension API): a middleware adds our items
- *    to the server's completion response and drops TypeScript's item that echoes the statement.
- *  - Without it (the TypeScript 7 extension 1.0): a completion provider of our own, next to
- *    TypeScript's. VS Code merges the two lists, so TypeScript's echo item stays.
- *
- * Anything that fails or takes longer than the budget adds nothing.
- */
 import * as path from "node:path";
 import {
 	type Completions,
@@ -28,10 +14,8 @@ import * as vscode from "vscode";
 
 const TYPESCRIPT_EXTENSION = "TypeScriptTeam.native-preview";
 const NIGHTLY_EXTENSION = "TypeScriptTeam.vscode-typescript-nightly";
-/** Logged when the language server runs TypeScript 7.0. */
 const UPGRADE =
 	'Install the "TypeScript 7 Nightly" extension, or set "js/ts.tsdk.path" to a TypeScript 7.1 package and allow it.';
-/** Milliseconds a request may take before it adds nothing. */
 const BUDGET_MS = 150;
 const LANGUAGES = [
 	"typescript",
@@ -40,7 +24,6 @@ const LANGUAGES = [
 	"javascriptreact",
 ];
 
-/** The TypeScript 7 extension 1.0's API: no SDK, no middleware. */
 interface LegacyAPI {
 	onLanguageServerInitialized(listener: () => unknown): vscode.Disposable;
 	initializeAPIConnection(pipe?: string): Promise<string>;
@@ -93,7 +76,6 @@ export async function activate(
 	};
 	context.subscriptions.push({ dispose: () => void session?.close() });
 
-	/** Our completions, or null when there are none, the request failed or it was late. */
 	const complete = async (
 		uri: string,
 		position: { line: number; character: number },
@@ -129,7 +111,6 @@ export async function activate(
 				log.info(`TypeScript ${sdk.version} language server initialized`);
 				restart({
 					pipe: () => sdk.initializeAPIConnection(),
-					// the server's own installation
 					modules: () => [
 						async (): Promise<TypeScriptModules> => {
 							const [async, ast] = await Promise.all([
@@ -165,7 +146,6 @@ export async function activate(
 		return;
 	}
 
-	// the TypeScript 7 extension 1.0: a provider of our own
 	const legacy = api as LegacyAPI;
 	log.info(
 		`${TYPESCRIPT_EXTENSION} ${String(ts.packageJSON.version)} has no LSP middleware: completions come from a separate provider, and TypeScript's item with the statement text stays in the list`,
@@ -202,11 +182,6 @@ export async function activate(
 
 export function deactivate(): void {}
 
-/**
- * API packages that may match the server of a TypeScript 7 extension 1.0, which does not say
- * which one it started: the `js/ts.tsdk.path` package, the project's `typescript`, the nightly
- * extension's. The session keeps the first the server understands.
- */
 function legacyCandidates(
 	fileName: string,
 	nightlyPath: string | undefined,

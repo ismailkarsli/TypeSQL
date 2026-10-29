@@ -1,11 +1,3 @@
-// Fails when a published package's shipped files changed since <base> but no change intent
-// (`.changeset/*.md`, written by `pnpm change`) added in the same range names the package.
-// A `--bump none` intent counts: it records that the change needs no release.
-//
-//   node scripts/check-intents.ts [base]   # base defaults to origin/main
-//
-// "Shipped files" are the package's `files` entries plus package.json; a package.json change
-// that only touches "version" (a `pnpm version -r` release commit) does not count.
 import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -93,7 +85,6 @@ function shippedChange(pkg: Package): string | undefined {
 	}
 }
 
-// Front matter keys of an intent: package names, or `./dir` for ambiguous names.
 function intentTargets(text: string): string[] {
 	const match = /^---\r?\n([\s\S]*?)\r?\n---/.exec(text);
 	if (!match) return [];
@@ -107,8 +98,6 @@ function intentTargets(text: string): string[] {
 const isIntent = (file: string): boolean =>
 	/^\.changeset\/[^/]+\.md$/.test(file) && file !== ".changeset/README.md";
 
-// Intents added in the range, including ones a release commit in the range has since consumed
-// and deleted (read from the commit that added them), plus uncommitted ones.
 const intentTexts: string[] = [];
 let commit: string | undefined;
 for (const line of git(

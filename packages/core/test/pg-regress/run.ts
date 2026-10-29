@@ -1,13 +1,4 @@
 #!/usr/bin/env node
-// Runs the type-level parser (`ParseProgram<Lex<sql>>`) over every statement of PostgreSQL's
-// regression tests in vendor/postgres and compares the outcome with what Postgres did, read
-// from the tests' expected output: whether the statement parses and, for a syntax error, the
-// token it is at. Disagreements known today are listed in baseline.json; the
-// run fails on a new one and on a listed one that went away.
-//
-//   node run.ts [--update] [test …]
-//
-// `--update` rewrites baseline.json (only the named tests' entries when tests are named).
 import { spawnSync } from "node:child_process";
 import {
 	existsSync,
@@ -48,8 +39,6 @@ const args = process.argv.slice(2);
 const update = args.includes("--update");
 const only = args.filter((a) => !a.startsWith("--"));
 
-// ───────────────────────────── the official tests ─────────────────────────────
-
 if (!existsSync(join(regress, "sql"))) {
 	fail("vendor/postgres is not checked out. Run `pnpm pg-regress:setup`.");
 }
@@ -73,9 +62,6 @@ const tests = readdirSync(join(regress, "sql"))
 const unknownNames = only.filter((t) => !tests.includes(t));
 if (unknownNames.length) fail(`no such test: ${unknownNames.join(", ")}`);
 
-// ───────────────────────────── generate and check ─────────────────────────────
-
-/** Result of a statement the parser skips to the next `;` (utility statements without a schema effect). */
 const SKIPPED = "<skipped>";
 const HEADER = [
 	`import type { Lex } from "${relative(cache, join(engine, "lexer/lex.js"))}";`,
@@ -92,7 +78,6 @@ const HEADER = [
 
 rmSync(cache, { recursive: true, force: true });
 mkdirSync(cache, { recursive: true });
-/** Statements per tsc run: one run over all of them needs ~3 GB; batches keep the peak low. */
 const BATCH = 6000;
 const tsconfig = (files: string[]): string =>
 	JSON.stringify(
@@ -111,7 +96,6 @@ const tsconfig = (files: string[]): string =>
 		null,
 		2,
 	);
-/** Test files per tsc run. */
 const batches: string[][] = [[]];
 let batchSize = 0;
 
@@ -122,7 +106,6 @@ interface Checked {
 	crash?: string;
 }
 const checked: Checked[] = [];
-/** `${test}.ts:${line}` → entry in `checked` */
 const byLine = new Map<string, Checked>();
 let skippedVars = 0;
 let skippedStrings = 0;
@@ -173,7 +156,6 @@ for (const [n, files] of batches.entries()) {
 		fail(
 			`tsc was killed (${proc.signal}) checking ${files.join(", ")}; out of memory?`,
 		);
-	// A diagnostic is one line; elaborations of it are indented lines that follow.
 	let found = 0;
 	for (const m of output.matchAll(
 		/^(.*?)\((\d+),\d+\): error (TS\d+): (.*)$/gm,
@@ -197,18 +179,6 @@ for (const [n, files] of batches.entries()) {
 }
 const seconds = (performance.now() - started) / 1000;
 
-// ───────────────────────────── compare ─────────────────────────────
-
-/**
- * - `rejects`: Postgres parsed the statement (it ran, or failed after parsing); we report an
- *   error. When Postgres failed after parsing and ours is a semantic error too (not a syntax
- *   error, an unsupported feature or a lexical error), both reject it: agreement.
- * - `accepts`: Postgres reported a syntax error; we parse the statement. A statement the parser
- *   skips without validating (`SKIPPED`) is not counted.
- * - `position`: both report a syntax error, at different tokens (Postgres's `at or near "…"` /
- *   `at end of input` against ours).
- * - `crash`: the compiler gave up (e.g. TS2589, instantiation too deep), whatever Postgres did.
- */
 function kindOf(
 	e: Checked,
 ): "crash" | "accepts" | "rejects" | "position" | null {
@@ -224,11 +194,6 @@ function kindOf(
 	if (e.stmt.pg === "error" && isSemantic(e.ours)) return null;
 	return "rejects";
 }
-/**
- * The token a syntax error points at, lowercased, or `""` for the end of input; `null` when the
- * message names no token. Postgres and our lexer quote it (`at or near "ANY"`); our parser does
- * not and may add a note after it (`at or near create: only one statement is allowed`).
- */
 function nearOf(message: string, postgres: boolean): string | null {
 	if (/ at end of input( at character \d+)?$/.test(message)) return "";
 	const parser = postgres
@@ -388,8 +353,6 @@ jobSummary(title, line, [
 if (failed) process.exit(1);
 console.log("\nMatches baseline.json.");
 
-// ───────────────────────────── helpers ─────────────────────────────
-
 function git(cwd: string, ...argv: string[]): string {
 	const r = spawnSync("git", ["-C", cwd, ...argv], { encoding: "utf8" });
 	if (r.status !== 0)
@@ -399,7 +362,6 @@ function git(cwd: string, ...argv: string[]): string {
 	return r.stdout.trim();
 }
 
-/** The text of a string literal type as tsc prints it; other types as printed. */
 function unquote(type: string): string {
 	try {
 		return /^".*"$/.test(type) ? (JSON.parse(type) as string) : type;

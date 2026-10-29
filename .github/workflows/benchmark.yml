@@ -1,10 +1,8 @@
 name: benchmark
 
-# Refresh the published measurements without making a release.
 on:
   workflow_dispatch:
 
-# Serialize with releases, which also update these files on main.
 concurrency:
   group: release
   cancel-in-progress: false
@@ -18,14 +16,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
-      contents: write # signed commit of the generated performance numbers
+      contents: write
     outputs:
       sha: ${{ steps.update.outputs.sha }}
     steps:
       - uses: actions/checkout@v7
         with:
-          fetch-depth: 0 # all core release tags are benchmarked in this job
-      - uses: pnpm/action-setup@v6 # version from packageManager in package.json
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:
           node-version: 26
@@ -54,7 +52,6 @@ jobs:
             packages/bench/runtime-results.json
             packages/bench/history-results.json
 
-  # Commits made with GITHUB_TOKEN do not trigger the docs push workflow.
   docs:
     needs: benchmark
     uses: ./.github/workflows/docs.yml

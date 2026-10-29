@@ -47,50 +47,6 @@ import type {
 import type { ParamsOfMerge, ProjectMerge } from "./merge.js";
 import type { BindWith, ProjectSelect, ProjectTargets } from "./select.js";
 
-/**
- * DML projection and validation.
- *
- * `ProjectDml<S, DB, Outer, Ctes>` → `Cols` (RETURNING), `null` (no RETURNING) or `SqlError`.
- *
- * Checks performed (messages follow Postgres):
- *   - the target is a writable table (`relation "x" does not exist`, `cannot insert into view "v"`);
- *     CTE names are not DML targets, exactly as in Postgres;
- *   - INSERT column list: columns exist and are listed once (`column "c" specified more than
- *     once`, unless only elements or fields of it are assigned), VALUES rows / SELECT width
- *     match the column count (`INSERT has more expressions than target columns` / `... more
- *     target columns than expressions`, `VALUES lists must all be the same length`);
- *   - every NOT NULL column without a default is assigned
- *     (`null value in column "c" of relation "t" violates not-null constraint`), also for a
- *     literal `NULL` assigned to a NOT NULL column and `DEFAULT` assigned to one without a
- *     default; `DEFAULT` anywhere but a VALUES item or a SET value is
- *     `DEFAULT is not allowed in this context`, and through an indirection `cannot set an
- *     array element to DEFAULT` / `cannot set a subfield to DEFAULT`;
- *   - SET, in Postgres's order: the values are typed (multi-column sources have the right
- *     width), then the columns exist (`column "c" of relation "t" does not exist`) and take
- *     what is assigned, then none is assigned twice (`multiple assignments to same column "c"`);
- *   - UPDATE's FROM and DELETE's USING do not reuse the target's name
- *     (`table name "t" specified more than once`);
- *   - every expression (VALUES, SET, WHERE, ON CONFLICT, RETURNING) is typed and the first
- *     error propagates.
- *
- * Scopes: VALUES sees only the outer scope; UPDATE SET / WHERE / RETURNING see the target
- * (by alias or name) plus the FROM items; DELETE likewise with USING; ON CONFLICT DO UPDATE
- * sees the target plus `excluded` (so an unqualified column present in both is ambiguous,
- * as in Postgres). `RETURNING *` expands every item of the level (target + FROM/USING).
- * RETURNING also sees the `old` and `new` rows of the target (PostgreSQL 18; renamed with
- * `RETURNING WITH (OLD AS o, NEW AS n)`), qualified only: `old.*` is NULL for an INSERT,
- * `new.*` for a DELETE, so their columns are nullable there. MERGE is in merge.ts.
- *
- * Assignment targets with indirection (`SET a[1] = …`, `INSERT INTO t (c.f, a[1:2])`) take the
- * type of the element, slice or field (`unknown` for a field of a composite type the schema
- * does not describe), always nullable; the column itself must exist.
- *
- * Without a column list, `INSERT INTO t VALUES (...)` assigns the first N columns *in
- * declaration order*. That order is not observable at the type level (TypeScript 7
- * orders `keyof` unions alphabetically), so in that case the width check is still done
- * but positional typing is skipped: `$n` is `unknown` and the required-column check is
- * not performed.
- */
 export type ProjectDml<
 	S extends DmlStmt,
 	DB,
@@ -109,15 +65,11 @@ export type ProjectDml<
 			: C2
 		: never;
 
-// ───────────────────────────── target table ─────────────────────────────
-
-/** Resolved DML target: the raw table (with `hasDefault`) and its scope item. */
 export type Target_<Tbl extends Table, Item extends ScopeItem> = {
 	readonly tbl: Tbl;
 	readonly item: Item;
 };
 
-/** `Target_` or `SqlError`. `Verb` rewrites the generic view error into Postgres wording. */
 export type ResolveTarget<
 	DB,
 	Ref extends TableRef,
@@ -146,18 +98,11 @@ export type DmlCtx<
 	Ctes extends CteMap,
 > = MkCtx<DB, [Level, ...Outer], Ctes, false>;
 
-/** `{ type, nullable }` of a table column (without `hasDefault`); the callers pass existing columns (checked first, or a statement already validated). */
 export type ColInfoOf<Tbl extends Table, Col extends string> = {
 	readonly type: Tbl[Col & keyof Tbl]["type"];
 	readonly nullable: Tbl[Col & keyof Tbl]["nullable"];
 };
 
-// ───────────────────────────── indirection ─────────────────────────────
-
-/**
- * Typing context for an indirection (`a[i].f`): the bare column `Col` resolves to the target
- * column (an innermost level of its own), anything else (subscripts) to `C`'s scope.
- */
 type IndCtx<Tbl extends Table, Col extends string, C extends Ctx> = MkCtx<
 	C["db"],
 	[
@@ -179,11 +124,6 @@ type IndCtx<Tbl extends Table, Col extends string, C extends Ctx> = MkCtx<
 	false
 >;
 
-/**
- * What an assignment to the existing column `Col` with indirection `Ind` stores: the column's
- * info without indirection; with it, the element / slice / field type, nullable (a NULL element
- * or field is fine in a NOT NULL column). `SqlError` when the indirection does not type-check.
- */
 export type AssignInfo<
 	Tbl extends Table,
 	Col extends string,
@@ -197,7 +137,6 @@ export type AssignInfo<
 		: never
 	: ColInfoOf<Tbl, Col>;
 
-/** Built-in types without subscripting (arrays, `jsonb`, `point`, `name`, … have it; unknown types may be domains over arrays). */
 export type NoSubscript =
 	| "bool"
 	| "int2"
@@ -242,7 +181,6 @@ export type NoSubscript =
 	| "tsrange"
 	| "tstzrange"
 	| "daterange";
-/** `AssignInfo` for the parameter pass, of a statement already validated (so never an error). */
 type AssignParamInfo<
 	Tbl extends Table,
 	Col extends string,
@@ -250,7 +188,6 @@ type AssignParamInfo<
 	C extends Ctx,
 > = Extract<AssignInfo<Tbl, Col, Ind, C>, ColInfo>;
 
-/** The indirection of each target of `Cs`, `null` for a whole column (`Ind` is null when no target has any, else it has an entry for every target). */
 export type AssignTargets<
 	Cs extends readonly string[],
 	Ind extends readonly TargetInd[] | null,
@@ -260,7 +197,6 @@ export type AssignTargets<
 		: null;
 };
 
-/** Infos of the targets (`AssignParamInfo` of each), for typing `$n` by position. */
 export type TargetInfos<
 	Cs extends readonly string[],
 	Ind extends readonly TargetInd[] | null,
@@ -275,7 +211,6 @@ export type TargetInfos<
 	>;
 };
 
-/** Parameters in the subscripts of the targets' indirection. */
 export type ParamsOfInds<
 	Cs extends readonly string[],
 	Ind extends readonly TargetInd[] | null,
@@ -302,8 +237,6 @@ type ParamsOfIndsLoop<
 			Nx<I>
 		>
 	: M;
-
-// ───────────────────────────── INSERT ─────────────────────────────
 
 type ProjectInsert<
 	S extends InsertStmt,
@@ -367,11 +300,6 @@ type ProjectInsert<
 			: Tg
 		: never;
 
-/**
- * The assigned columns: the explicit list (validated and width-checked against the
- * source), `[]` for `DEFAULT VALUES`, `null` when there is no list (positional order
- * unknown; only "more expressions than columns" is checked), or `SqlError`.
- */
 type InsertTargetCols<
 	Columns extends readonly string[] | null,
 	Ind extends readonly TargetInd[] | null,
@@ -417,10 +345,6 @@ type WidthResult<R, Ok_> = R extends "eq"
 		? SqlError<"INSERT has more expressions than target columns", null>
 		: SqlError<"INSERT has more target columns than expressions", null>;
 
-/**
- * Width of the source as a tuple (the first VALUES row, the SELECT's columns, `[]` for
- * DEFAULT VALUES), `null` when unknown (a `*` in the SELECT), or `SqlError`.
- */
 type SourceWidth<
 	Source extends InsertSource,
 	DB,
@@ -447,7 +371,7 @@ type SourceWidth<
 					: C
 				: C
 			: never
-		: []; // DEFAULT VALUES
+		: [];
 
 type SameLength<
 	Rows extends readonly (readonly unknown[])[],
@@ -461,7 +385,6 @@ type SameLength<
 		: false
 	: true;
 
-/** Compare two widths: `"eq"`, `"more"` (A longer), `"fewer"` (B longer). */
 export type WidthCheck<
 	A extends readonly unknown[],
 	B extends readonly unknown[],
@@ -473,13 +396,6 @@ export type WidthCheck<
 		? "fewer"
 		: "eq";
 
-/**
- * Postgres's checks of the assigned columns `Cs`, in order: each exists, and a column assigned
- * whole is assigned only once, while its elements or fields may be assigned several times
- * (`Tgs`: `AssignTargets` of `Cs`, `null` for a whole assignment). INSERT's column list says
- * `column "c" specified more than once`; UPDATE's rewriter, after the statement is analyzed,
- * `multiple assignments to same column "c"`.
- */
 export type CheckAssignedCols<
 	Cs extends readonly string[],
 	Tgs extends readonly TargetInd[],
@@ -504,11 +420,6 @@ type AssignedTwice<C extends string, Kind> = Kind extends "insert"
 	? SqlError<`column "${C}" specified more than once`, null>
 	: SqlError<`multiple assignments to same column "${C}"`, null>;
 
-/**
- * An INSERT's source against its targets `Cs` (with indirection `Ind`; `[]` without a column
- * list): each VALUES row is typed (outer scope only), then checked against the targets; a
- * query's targets are checked without values (`CheckTargets`).
- */
 type CheckInsertSource<
 	Source extends InsertSource,
 	Cs extends readonly string[],
@@ -527,7 +438,6 @@ type CheckInsertSource<
 		: CheckRows<Rows, Cs, AssignTargets<Cs, Ind>, Tbl, Name, C>
 	: CheckTargets<Cs, AssignTargets<Cs, Ind>, [], Tbl, Name, C>;
 
-/** Type each row (`CheckValueItems`), then check what it stores in the targets (`CheckTargets`). */
 export type CheckRows<
 	Rows extends readonly (readonly Expr[])[],
 	Cs extends readonly string[],
@@ -550,7 +460,6 @@ export type CheckRows<
 		: never
 	: true;
 
-/** Type each item of a VALUES row or multi-column SET source; a bare `DEFAULT` is allowed there and skipped. */
 export type CheckValueItems<
 	Es extends readonly Expr[],
 	C extends Ctx,
@@ -573,13 +482,6 @@ type CheckValueItemsWalk<
 			: never
 	: true;
 
-/**
- * What each assignment stores, in order (Postgres's transformAssignedExpr, after the values are
- * typed): the column exists; `DEFAULT` cannot be stored in an element or a field (a NULL can),
- * and the indirection is typed (`AssignInfo`); a literal `NULL`, or a `DEFAULT` where there is
- * no default, in a NOT NULL column is a NOT NULL violation. `Cs`: the columns, `Tgs`: their
- * `AssignTargets`, `Es`: the values (`null`, or none, for the columns of a query).
- */
 export type CheckTargets<
 	Cs extends readonly string[],
 	Tgs extends readonly TargetInd[],
@@ -618,7 +520,6 @@ type NullViolation<Col extends string, Name extends string> = SqlError<
 	null
 >;
 
-/** `DEFAULT` assigned through an indirection: Postgres names its first step (on the bare column). */
 type DefaultIntoInd<Ind> = Ind extends { readonly e: infer In }
 	? In extends { readonly t: "col" }
 		? Ind extends { readonly t: "field" }
@@ -627,7 +528,6 @@ type DefaultIntoInd<Ind> = Ind extends { readonly e: infer In }
 		: DefaultIntoInd<In>
 	: never;
 
-/** Every NOT NULL column without a default must be in `Cs` (skipped when `Cs` is unknown). */
 export type CheckRequired<
 	Tbl extends Table,
 	Cs extends readonly string[] | null,
@@ -648,8 +548,6 @@ type MissingRequired<Tbl extends Table, Given extends string> = {
 			? K
 			: never;
 }[keyof Tbl];
-
-// ─── ON CONFLICT ───
 
 type ExcludedItem<Tbl extends Table> = {
 	readonly alias: "excluded";
@@ -682,12 +580,6 @@ type CheckOnConflict<
 		: never
 	: true;
 
-// ───────────────────────────── SET ─────────────────────────────
-
-/**
- * A SET list, in Postgres's order: every value is typed (`CheckSetValues`), then each target is
- * checked (`CheckTargets`), then the rewriter rejects a column assigned twice (`CheckAssignedCols`).
- */
 export type CheckSet<
 	Set extends readonly SetItem[],
 	Tbl extends Table,
@@ -738,7 +630,6 @@ type CheckSetValuesWalk<
 			: CheckSetValuesWalk<R, C>
 		: never
 	: true;
-/** The columns a SET list assigns, in order, their `AssignTargets` and the values (`null` from a sub-SELECT). */
 type SetTargets<
 	Set extends readonly SetItem[],
 	Cs extends readonly string[],
@@ -779,7 +670,6 @@ type SetTargets<
 	: [Cs, Tgs, Es];
 type Nulls<Cs extends readonly string[]> = { readonly [K in keyof Cs]: null };
 
-/** `(a, b) = (e1, e2)` / `= ROW(…)` / `= (SELECT ...)`: width must match, expressions typed; any other source is an error. */
 export type CheckMultiSource<
 	E extends Expr,
 	Cols_ extends readonly string[],
@@ -806,13 +696,10 @@ export type CheckMultiSource<
 				null
 			>;
 
-/** `ColInfo` or `SqlError`: the callers only look for an error. */
 export type CheckExpr<E extends Expr, C extends Ctx> = TypeOf<E, C>;
 export type CheckOptExpr<E extends Expr | null, C extends Ctx> = E extends Expr
 	? CheckExpr<E, C>
 	: true;
-
-// ───────────────────────────── UPDATE / DELETE ─────────────────────────────
 
 type ProjectUpdate<
 	S extends UpdateStmt,
@@ -899,11 +786,6 @@ type ProjectDelete<
 			: Tg
 		: never;
 
-/**
- * RETURNING: `Cols` or `SqlError`, `null` without RETURNING. `Level` is the statement's level
- * (target + FROM / USING items); `Row` the target's columns, from which the `old` / `new` rows
- * are built (nullable when the statement can produce no such row: `OldNull`, `NewNull`).
- */
 export type ProjectReturning<
 	Ret extends readonly Target[] | null,
 	Opts extends readonly ReturningOpt[],
@@ -931,14 +813,6 @@ export type ProjectReturning<
 		: never
 	: null;
 
-/**
- * The `old` / `new` rows as a scope level of their own, just outside the statement's level:
- * reachable qualified (`old.x`, `new.*`, `old` as a whole row, also from sub-queries), never
- * unqualified nor by `*` (their columns are all in `skip`). Postgres's rules: an explicit
- * `WITH (OLD AS o)` must not repeat its kind (`OLD cannot be specified multiple times`) nor
- * reuse a name of the level (`table name "o" specified more than once`); without one, `old` /
- * `new` are added unless a FROM item (or the target alias) already has that name.
- */
 type OldNewLevel<
 	Opts extends readonly ReturningOpt[],
 	Level extends ScopeLevel,
@@ -1007,8 +881,6 @@ type RowItem<A extends string, Row extends ColMap, Null extends boolean> = {
 	readonly skip: string[];
 };
 
-// ───────────────────────────── helpers ─────────────────────────────
-
 type UnionToIntersection<U> = (
 	U extends unknown
 		? (u: U) => void
@@ -1016,30 +888,18 @@ type UnionToIntersection<U> = (
 ) extends (u: infer I) => void
 	? I
 	: never;
-/** One member of a union (the last in TypeScript's internal order). */
 type FirstOf<U> =
 	UnionToIntersection<U extends unknown ? (x: U) => void : never> extends (
 		x: infer L,
 	) => void
 		? L
 		: never;
-/** Union → tuple (order is TypeScript's, i.e. alphabetical for string literals; only the length is relied upon). */
 export type UnionToTuple<U, Acc extends readonly unknown[] = []> = [U] extends [
 	never,
 ]
 	? Acc
 	: UnionToTuple<Exclude<U, FirstOf<U>>, [FirstOf<U>, ...Acc]>;
 
-// ───────────────────────────── parameters ─────────────────────────────
-
-/**
- * Parameter typing for DML. `VALUES ($1)` and `SET c = $1` give the column's type with the
- * column's nullability (so `null` is accepted only for nullable columns); bare `$n` targets
- * of an `INSERT ... SELECT` are typed positionally from the target columns; everything else
- * (WHERE, FROM/USING, ON CONFLICT, RETURNING, sub-selects) goes through the expression pass
- * with a scope that contains the target table. Parameters inside WITH bodies are collected
- * too. Only reached for statements that already passed `ProjectDml`.
- */
 export type ParamsOfDml<S extends DmlStmt, DB, Ctes extends CteMap, M> =
 	BindWith<S["with"], DB, [], Ctes> extends infer C2
 		? C2 extends CteMap
@@ -1055,7 +915,6 @@ export type ParamsOfDml<S extends DmlStmt, DB, Ctes extends CteMap, M> =
 			: M
 		: never;
 
-/** Parameters inside the bodies of a WITH clause (SELECT and DML CTEs). */
 export type ParamsOfWith<
 	W extends WithClause | null,
 	DB,
@@ -1077,7 +936,7 @@ type ParamsOfCteList<
 			Ctes,
 			Q extends SelectStmt
 				? ParamsOfSelect<Q, DB, [], Ctes, M>
-				: ParamsOfDml<Extract<Q, DmlStmt>, DB, Ctes, M> // a CTE ProjectDml accepted is a query or a data statement
+				: ParamsOfDml<Extract<Q, DmlStmt>, DB, Ctes, M>
 		>
 	: M;
 
@@ -1124,12 +983,6 @@ type ParamsOfInsert<S extends InsertStmt, DB, Ctes extends CteMap, M> =
 			: M
 		: never;
 
-/**
- * Parameters of an INSERT into the targets `Cs` (with indirection `Ind`): those in the targets'
- * subscripts, then the source's. A bare `$n` (or `$n::T`) of a VALUES row or of a plain SELECT's
- * targets takes the type of what its target stores (`TargetInfos`; nothing past the targets, as
- * without a column list); everything else goes through the expression pass. `C`: the outer scope.
- */
 type ParamsOfInsertSource<
 	Source extends InsertSource,
 	Cs extends readonly string[],
@@ -1166,7 +1019,7 @@ type ParamsOfInsertSource<
 				? ParamsOfInfoTargets<Ts, TargetInfos<Cs, Ind, Tbl, C>, M1>
 				: M1
 			: never
-		: ParamsOfInds<Cs, Ind, Tbl, C, M>; // DEFAULT VALUES
+		: ParamsOfInds<Cs, Ind, Tbl, C, M>;
 type ParamsOfInfoRows<
 	Rows extends readonly (readonly Expr[])[],
 	Infos extends readonly ColInfo[],
@@ -1178,7 +1031,6 @@ type ParamsOfInfoRows<
 ]
 	? ParamsOfInfoRows<Rest, Infos, C, ParamsOfRowInfos<R, Infos, C, M>>
 	: M;
-/** Zip expressions with target infos: a bare `$n` (or `$n::T`) takes the info, anything else recurses. */
 export type ParamsOfRowInfos<
 	Es extends readonly Expr[],
 	Infos extends readonly ColInfo[],

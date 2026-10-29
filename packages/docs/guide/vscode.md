@@ -3,8 +3,8 @@
 The TypeSQL extension for VS Code completes table and column names inside your SQL strings, and highlights the SQL.
 
 ```ts
-sql("SELECT * FROM |");          // users, posts, active_users, auth, …
-sql("SELECT u.| FROM users u");  // id: int4, email: text, display_name: text | null
+sql("SELECT * FROM |");
+sql("SELECT u.| FROM users u");
 ```
 
 The names come from the `DB` type of the `sql` you call, so they follow your schema as you edit it, unsaved changes included.

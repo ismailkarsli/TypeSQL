@@ -15,7 +15,6 @@ export interface Statement {
 	readonly line: number | null;
 	readonly sql: string;
 	readonly pg: string;
-	/** Official server outcome, read from the regression test's expected output. */
 	readonly outcome?: string;
 	readonly pgError?: string;
 }
@@ -64,7 +63,6 @@ export function pgStatements(sql: string): [string, string][] | null {
 			.subarray(start, s.stmt_len ? start + s.stmt_len : undefined)
 			.toString("utf8")
 			.trim();
-		// canonical form from a parse of the statement alone, so locations are its own
 		const own = parseSync(text).stmts?.[0];
 		return [text, own ? new PgCanon(text).stmt(own.stmt as never) : OUT];
 	});
@@ -124,7 +122,6 @@ function add(
 			line,
 			sql: text,
 			pg: canon,
-			// A split query's combined outcome cannot establish which part failed.
 			...(pg.length === 1 && expected
 				? { outcome: expected.pg, pgError: expected.pgError }
 				: {}),

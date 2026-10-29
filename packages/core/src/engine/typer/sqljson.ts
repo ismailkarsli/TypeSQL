@@ -20,29 +20,6 @@ import type { DateTimeT, NumT } from "./operators.js";
 import type { ParamsOfList, ParamsOfOpt, ParamsOfSelect } from "./params.js";
 import type { FirstColOf, Or, TypeList, TypeOf } from "./typeof.js";
 
-/**
- * Typing of the SQL/JSON syntax (parser/json.ts), verified against PostgreSQL 18:
- *
- *   JSON(v)                    json, nullable iff v is (a JSON-looking literal keeps its value)
- *   JSON_SCALAR(v)             json holding v serialized (like to_json), nullable iff v is
- *   JSON_SERIALIZE(v)          text or the RETURNING type (a string type or bytea), nullable iff v is
- *   JSON_OBJECT(k : v, …)      json or the RETURNING type, never NULL; json / jsonb with literal keys
- *                              is an object shape like json_build_object (plain JSON when a nullable
- *                              value can be left out by ABSENT ON NULL)
- *   JSON_ARRAY(v, …)           json or the RETURNING type, never NULL; a tuple shape like
- *                              json_build_array unless a nullable value can be skipped (the default)
- *   JSON_ARRAY(query)          the query's single column as an array (NULLs skipped); NULL for no rows
- *   JSON_ARRAYAGG / OBJECTAGG  json_agg[_strict] / json_object_agg[_strict] (jsonb_… for RETURNING
- *                              jsonb), so shapes and aggregate nullability follow those
- *   JSON_EXISTS                bool, nullable when the context item or path is, or UNKNOWN ON ERROR
- *   JSON_VALUE                 text or the RETURNING type, nullable (no item → NULL by default)
- *   JSON_QUERY                 jsonb or the RETURNING type, nullable
- *   v IS [NOT] JSON …          bool, nullable iff v is
- *   v FORMAT JSON              v as json (json / jsonb values keep their type)
- *
- * Inputs follow Postgres's checks: non-string types are rejected by IS JSON, JSON(),
- * FORMAT JSON and JSON_SERIALIZE's RETURNING; objects reject NULL and non-scalar keys.
- */
 export type TypeSqlJson<E extends Expr, C extends Ctx> = E extends {
 	readonly t: "jsonfmt";
 }
@@ -53,7 +30,6 @@ export type TypeSqlJson<E extends Expr, C extends Ctx> = E extends {
 			? AggResult<TypeOf<E["e"], C>, E["ret"]>
 			: TypeFn<E, C>;
 
-/** Built-in types Postgres does not read JSON text from (it reports them; other types are string-like or unknown here). */
 type NonString =
 	| NumT
 	| "bool"
@@ -86,7 +62,6 @@ type TypeIsJson<A> = A extends ColInfo
 		: Info<"bool", A["nullable"]>
 	: A;
 
-/** A RETURNING type other than json / jsonb is a cast of the aggregate's value. */
 type AggResult<A, Ret> = A extends ColInfo
 	? Ret extends string
 		? Ret extends "json" | "jsonb"
@@ -97,7 +72,6 @@ type AggResult<A, Ret> = A extends ColInfo
 
 type RetOr<R, D extends string> = R extends string ? R : D;
 
-/** Type the arguments, PASSING values and DEFAULT expressions (errors), then the function. */
 type TypeFn<E extends Expr, C extends Ctx> =
 	TypeList<E["args"], C, []> extends infer As
 		? As extends readonly ColInfo[]
@@ -134,7 +108,6 @@ type FnResult<
 								? TypeArrayQuery<RetOr<E["ret"], "json">, FirstColOf<E["q"], C>>
 								: TypeArray<RetOr<E["ret"], "json">, As, E["absent"]>;
 
-/** `JSON(v)`: text / bytea / json input; a JSON literal keeps its value (`JSON('[]')`). */
 type TypeParse<V, A extends ColInfo> = A["type"] extends NonString
 	? SqlError<`cannot cast type ${TypeDisplay<A["type"]>} to json`, null>
 	: (
@@ -158,7 +131,6 @@ type TypeSerialize<R extends string, A extends ColInfo> = R extends
 		>
 	: Info<R, A["nullable"]>;
 
-/** Object keys must be non-NULL scalars (`BuildObject` reports NULL literals). */
 type CheckKeys<
 	As extends readonly ColInfo[],
 	I extends number,
@@ -167,7 +139,6 @@ type CheckKeys<
 		? SqlError<"key value must be scalar, not array, composite, or json", null>
 		: CheckKeys<As, Nx<Nx<I>>>
 	: true;
-/** Is a value (odd position) nullable? */
 type NullableValue<
 	As extends readonly ColInfo[],
 	I extends number,
@@ -217,18 +188,10 @@ type TypeArray<
 		: Info<JsonRet<`tup:${R}`, As>>
 	: Info<R>;
 
-/** `JSON_ARRAY(query)` is `(SELECT JSON_ARRAYAGG(col) FROM (query) q(col))`: NULL for no rows. */
 type TypeArrayQuery<R extends string, A> = A extends ColInfo
 	? Info<R extends "json" | "jsonb" ? JsonRet<`arrnn:${R}`, [A]> : R, true>
 	: A;
 
-// ───────────────────────────── parameters ─────────────────────────────
-
-/**
- * `$n` in SQL/JSON syntax: values, keys, context items, paths and PASSING values are text
- * (Postgres coerces an unknown value to text); `FILTER (WHERE $n)` is bool. A DEFAULT … ON
- * EMPTY / ON ERROR is never a bare parameter (the parser rejects one, as Postgres does).
- */
 export type ParamsOfSqlJson<E extends Expr, C extends Ctx, M> = E extends {
 	readonly t: "jsonfmt" | "isjson";
 }
@@ -249,14 +212,6 @@ export type ParamsOfSqlJson<E extends Expr, C extends Ctx, M> = E extends {
 				Info<"text", true>
 			>;
 
-// ───────────────────────────── JSON_TABLE ─────────────────────────────
-
-/**
- * Bind `JSON_TABLE(…) [alias [(cols)]]` (always lateral: it sees the FROM items before it).
- * The default alias is `json_table`. Column types come from the declarations (parser/json.ts).
- * Errors come in Postgres's order: a path that is not a string constant, a repeated name, the
- * context item, PASSING values and DEFAULTs, then the alias.
- */
 export type BindJsonTable<
 	J extends FromJsonTable["jt"],
 	Alias extends string | null,
@@ -304,7 +259,6 @@ export type BindJsonTable<
 			"only string constants are supported in JSON_TABLE path specification",
 			null
 		>;
-/** The first name that repeats an earlier one, or null. */
 type DuplicateName<Ns extends readonly string[], Seen> = Ns extends readonly [
 	infer N,
 	...infer R extends readonly string[],
@@ -314,7 +268,6 @@ type DuplicateName<Ns extends readonly string[], Seen> = Ns extends readonly [
 		: DuplicateName<R, Seen | N>
 	: null;
 
-/** Parameters of a JSON_TABLE: the context item and PASSING values are text (the path is a string constant). */
 export type ParamsOfJsonTable<
 	J extends FromJsonTable["jt"],
 	C extends Ctx,

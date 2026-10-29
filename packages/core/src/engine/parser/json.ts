@@ -23,21 +23,6 @@ import type {
 	SyntaxErrorAt,
 } from "./util.js";
 
-/**
- * SQL/JSON syntax (PostgreSQL 16–18): the constructors `JSON`, `JSON_SCALAR`, `JSON_SERIALIZE`,
- * `JSON_OBJECT`, `JSON_ARRAY`, the aggregates `JSON_OBJECTAGG` / `JSON_ARRAYAGG`, the query
- * functions `JSON_EXISTS` / `JSON_VALUE` / `JSON_QUERY` and `JSON_TABLE` in FROM.
- *
- * The keywords are col-name keywords: never ordinary function names, so a `json_*(` call is
- * always one of these forms (`expr.ts` dispatches here only for a keyword followed by `(`).
- * Nodes (ast.ts):
- *   jsonfn   constructors and query functions; `fn` is Postgres's output column name
- *   jsonagg  JSON_OBJECTAGG / JSON_ARRAYAGG as the `json[b]_[object_]agg[_strict]` call they mean
- *   jsonfmt  `value FORMAT JSON`: a text / bytea value embedded as JSON
- * Options that do not change the result type (ENCODING, WITH UNIQUE KEYS, WRAPPER, QUOTES,
- * ERROR / NULL / EMPTY … ON EMPTY / ON ERROR) are parsed and dropped; DEFAULT expressions are
- * kept for typing and parameters.
- */
 export type JsonFuncWord =
 	| "json"
 	| "json_scalar"
@@ -51,7 +36,6 @@ export type JsonFuncWord =
 	| "json_query"
 	| "json_table";
 
-/** `I0` is the index of the keyword; `(` follows it. */
 export type ParseJsonFunc<
 	T extends Toks,
 	W extends string,
@@ -68,8 +52,7 @@ export type ParseJsonFunc<
 					? ParseArrayAgg<T, Nx<Nx<I0>>>
 					: W extends "json" | "json_scalar" | "json_serialize"
 						? ParseUnaryFn<T, W, Nx<Nx<I0>>>
-						: // JSON_TABLE is only allowed in FROM
-							SyntaxErrorAt<T, Nx<I0>>;
+						: SyntaxErrorAt<T, Nx<I0>>;
 
 type Fn<
 	F extends string,
@@ -97,9 +80,6 @@ type Close<T extends Toks, I extends number, N> =
 		? Expected<'")"', T, I>
 		: Ok<N, EatOp<T, I, ")">>;
 
-// ───────────────────────────── clauses ─────────────────────────────
-
-/** `FORMAT JSON [ENCODING name]` → next index, or `never` (SkipEncoding keeps a `never`). */
 type EatFormat<T extends Toks, I extends number> = SkipEncoding<
 	T,
 	EatWords<T, I, ["format", "json"]>
@@ -113,7 +93,6 @@ type SkipEncoding<T extends Toks, I extends number> =
 type SkipFormat<T extends Toks, I extends number> =
 	EatFormat<T, I> extends never ? I : EatFormat<T, I>;
 
-/** `a_expr [FORMAT JSON [ENCODING name]]`: the expression, wrapped in `jsonfmt` when formatted. */
 type ParseJsonValue<T extends Toks, I extends number> =
 	ParseExpr<T, I, 0> extends infer X
 		? X extends Ok<infer E, infer J>
@@ -123,7 +102,6 @@ type ParseJsonValue<T extends Toks, I extends number> =
 			: X
 		: never;
 
-/** `[RETURNING type [FORMAT JSON [ENCODING name]]]` → `Ok<type | null, next>`. */
 type ParseReturning<T extends Toks, I extends number> =
 	EatWord<T, I, "returning"> extends never
 		? Ok<null, I>
@@ -133,7 +111,6 @@ type ParseReturning<T extends Toks, I extends number> =
 				: X
 			: never;
 
-/** `WITH | WITHOUT UNIQUE [KEYS]` (constructors, `IS JSON`) → next index. */
 export type SkipUniqueKeys<T extends Toks, I extends number> =
 	T[I] extends WordTok<"with" | "without">
 		? T[Nx<I>] extends WordTok<"unique">
@@ -141,7 +118,6 @@ export type SkipUniqueKeys<T extends Toks, I extends number> =
 			: I
 		: I;
 
-/** `NULL ON NULL | ABSENT ON NULL` → `[absent, next]`. */
 type NullClause<T extends Toks, I extends number, Default extends boolean> =
 	EatWords<T, I, ["null", "on", "null"]> extends never
 		? EatWords<T, I, ["absent", "on", "null"]> extends never
@@ -149,7 +125,6 @@ type NullClause<T extends Toks, I extends number, Default extends boolean> =
 			: [true, EatWords<T, I, ["absent", "on", "null"]>]
 		: [false, EatWords<T, I, ["null", "on", "null"]>];
 
-/** `WITHOUT [ARRAY] WRAPPER | WITH [CONDITIONAL | UNCONDITIONAL] [ARRAY] WRAPPER` → next index. */
 type SkipWrapper<T extends Toks, I extends number> =
 	T[I] extends WordTok<"with" | "without">
 		? EatWord<
@@ -172,7 +147,6 @@ type SkipWrapper<T extends Toks, I extends number> =
 					"wrapper"
 				>
 		: I;
-/** `KEEP | OMIT QUOTES [ON SCALAR STRING]` → next index. */
 type SkipQuotes<T extends Toks, I extends number> =
 	T[I] extends WordTok<"keep" | "omit">
 		? T[Nx<I>] extends WordTok<"quotes">
@@ -182,7 +156,6 @@ type SkipQuotes<T extends Toks, I extends number> =
 			: I
 		: I;
 
-/** `PASSING value AS name, …` → `Ok<values, next>`. */
 type ParsePassing<T extends Toks, I extends number> =
 	EatWord<T, I, "passing"> extends never
 		? Ok<[], I>
@@ -207,10 +180,6 @@ type ParsePassingList<
 			: X
 		: never;
 
-/**
- * One behavior: `DEFAULT expr | ERROR | NULL | TRUE | FALSE | UNKNOWN | EMPTY [ARRAY | OBJECT]`
- * → `Ok<{ k, at }, next>` (`at`: its first token), or `null` when there is none.
- */
 type ParseBehavior<T extends Toks, I extends number> =
 	T[I] extends WordTok<infer W>
 		? W extends "default"
@@ -228,17 +197,11 @@ type ParseBehavior<T extends Toks, I extends number> =
 					: null
 		: null;
 
-/** The behaviors each context allows (`empty` is EMPTY [ARRAY]). */
-type ValueBehavior = "error" | "null" | "default"; // JSON_VALUE, scalar columns
-type QueryBehavior = ValueBehavior | "empty" | "emptyobj"; // JSON_QUERY, formatted columns
-type ExistsBehavior = "error" | "true" | "false" | "unknown"; // JSON_EXISTS, EXISTS columns
-type TableBehavior = "error" | "empty"; // the JSON_TABLE level
+type ValueBehavior = "error" | "null" | "default";
+type QueryBehavior = ValueBehavior | "empty" | "emptyobj";
+type ExistsBehavior = "error" | "true" | "false" | "unknown";
+type TableBehavior = "error" | "empty";
 
-/**
- * `[behavior ON EMPTY] [behavior ON ERROR]` → `Ok<[onEmpty | null, onError | null], next>`.
- * `Empty` false: only `ON ERROR` is allowed (JSON_EXISTS, EXISTS columns, the JSON_TABLE level).
- * Each behavior must be one of `Allowed`; `Of` names the column in the message.
- */
 type ParseBehaviors<
 	T extends Toks,
 	I extends number,
@@ -290,10 +253,6 @@ type ParseOnError<
 				: B
 		: never;
 
-/**
- * Postgres checks the kinds first (ON EMPTY, then ON ERROR), then that each DEFAULT is a
- * constant, function or operator expression (not a parameter, column or subquery).
- */
 type CheckBehaviors<
 	Bs extends readonly [unknown, unknown],
 	J extends number,
@@ -323,7 +282,6 @@ type CheckKind<
 		? R
 		: Fail<Message, At>
 	: R;
-/** A DEFAULT Postgres rejects: a bare parameter (cast or not), column or subquery. */
 type NotDefault =
 	| { readonly t: "param" | "col" | "sub" }
 	| { readonly t: "cast"; readonly e: { readonly t: "param" } };
@@ -338,14 +296,11 @@ type CheckDefault<B, R> = B extends {
 		>
 	: R;
 
-/** DEFAULT expressions of a behavior pair. */
 type DefaultsOf<Bs extends readonly [unknown, unknown]> = [
 	...DefaultOf<Bs[0]>,
 	...DefaultOf<Bs[1]>,
 ];
 type DefaultOf<B> = B extends { k: "default"; e: infer E } ? [E] : [];
-
-// ───────────────────────────── JSON(), JSON_SCALAR(), JSON_SERIALIZE() ─────────────────────────────
 
 type ParseUnaryFn<
 	T extends Toks,
@@ -369,9 +324,6 @@ type ParseUnaryFn<
 			: X
 		: never;
 
-// ───────────────────────────── JSON_OBJECT ─────────────────────────────
-
-/** After `JSON_OBJECT(`: `key : value | key VALUE value, …` with options, only options, or a plain `json_object(text[] …)` call. */
 type ParseObject<T extends Toks, I extends number> =
 	T[I] extends OpTok<")">
 		? Ok<Fn<"json_object", [], null>, Nx<I>>
@@ -384,7 +336,6 @@ type ParseObject<T extends Toks, I extends number> =
 						: ParseCall<T, "json_object", I>
 					: X
 				: never;
-/** At a key. */
 type ParsePairs<
 	T extends Toks,
 	Acc extends readonly unknown[],
@@ -397,7 +348,6 @@ type ParsePairs<
 				: Expected<'":" or VALUE', T, J>
 			: X
 		: never;
-/** At a value. */
 type ParsePairValue<
 	T extends Toks,
 	Acc extends readonly unknown[],
@@ -410,7 +360,6 @@ type ParsePairValue<
 				: ParsePairs<T, [...Acc, V], EatOp<T, J, ",">>
 			: X
 		: never;
-/** `[NULL | ABSENT ON NULL] [WITH | WITHOUT UNIQUE [KEYS]] [RETURNING …] )` */
 type ObjectOptions<T extends Toks, I extends number, Args> =
 	NullClause<T, I, false> extends [infer Absent, infer I1 extends number]
 		? ParseReturning<T, SkipUniqueKeys<T, I1>> extends infer R
@@ -420,9 +369,6 @@ type ObjectOptions<T extends Toks, I extends number, Args> =
 			: never
 		: never;
 
-// ───────────────────────────── JSON_ARRAY ─────────────────────────────
-
-/** After `JSON_ARRAY(`: values, a query, or only options. Arrays skip NULLs unless `NULL ON NULL`. */
 type ParseArrayCtor<T extends Toks, I extends number> =
 	T[I] extends OpTok<")">
 		? Ok<Fn<"json_array", [], null>, Nx<I>>
@@ -460,9 +406,6 @@ type ArrayOptions<T extends Toks, I extends number, Args> =
 			: never
 		: never;
 
-// ───────────────────────────── aggregates ─────────────────────────────
-
-/** `JSON_OBJECTAGG(key : value [NULL | ABSENT ON NULL] [WITH | WITHOUT UNIQUE [KEYS]] [RETURNING …]) [FILTER …] [OVER …]` */
 type ParseObjectAgg<T extends Toks, I extends number> =
 	ParseExpr<T, I, 0> extends infer X
 		? X extends Ok<infer K, infer J>
@@ -494,7 +437,6 @@ type ParseObjectAgg<T extends Toks, I extends number> =
 			: X
 		: never;
 
-/** `JSON_ARRAYAGG(value [ORDER BY …] [NULL | ABSENT ON NULL] [RETURNING …]) [FILTER …] [OVER …]`; NULLs are skipped by default. */
 type ParseArrayAgg<T extends Toks, I extends number> =
 	ParseJsonValue<T, I> extends infer X
 		? X extends Ok<infer V, infer J>
@@ -531,7 +473,6 @@ type SkipOrderBy<T extends Toks, I extends number> =
 				? J
 				: X
 			: never;
-/** The aggregate behind the syntax: `jsonb_…` for `RETURNING jsonb`, else `json_…` (other RETURNING types are casts of it). */
 type AggBase<Ret> = Ret extends "jsonb" ? "jsonb" : "json";
 type AggSuffix<
 	T extends Toks,
@@ -568,9 +509,6 @@ type AggSuffix<
 			: X
 		: never;
 
-// ───────────────────────────── JSON_EXISTS, JSON_VALUE, JSON_QUERY ─────────────────────────────
-
-/** After `(`: `context [FORMAT JSON], path [PASSING …]` and the function's options. */
 type ParseQueryFn<T extends Toks, W extends string, I extends number> =
 	ParseJsonValue<T, I> extends infer X
 		? X extends Ok<infer Cx, infer J>
@@ -639,18 +577,6 @@ type QueryTail<
 			: B
 		: never;
 
-// ───────────────────────────── JSON_TABLE ─────────────────────────────
-
-/**
- * After `JSON_TABLE(`, in FROM: `context, path [AS name] [PASSING …] COLUMNS (…) [behavior ON ERROR] )`
- * → `Ok<{ ctx, path, passing, cols, names, defs }, next>`.
- *
- * `cols` are the output columns in Postgres's order (a level's own columns, then its NESTED
- * paths' columns, depth first), each `{ n, t: { type, nullable } }`: the declared type, nullable
- * (no item, or a sibling NESTED path's row), except a top-level FOR ORDINALITY column (int4).
- * `names` lists the column and path names in declaration order (they must be distinct);
- * `defs` the DEFAULT expressions.
- */
 export type ParseJsonTable<T extends Toks, I extends number> =
 	ParseJsonValue<T, I> extends infer X
 		? X extends Ok<infer Cx, infer J>
@@ -717,7 +643,6 @@ export type ParseJsonTable<T extends Toks, I extends number> =
 					: never
 			: X
 		: never;
-/** `[AS name]` after a path → `[names, next]`. */
 type PathName<T extends Toks, I extends number> =
 	T[I] extends WordTok<"as">
 		? Ident<T, Nx<I>> extends [infer N, infer J]
@@ -725,10 +650,6 @@ type PathName<T extends Toks, I extends number> =
 			: [[], I]
 		: [[], I];
 
-/**
- * Column definitions up to `)`. `Own`: this level's columns; `Nest`: its nested paths' columns;
- * `Ord`: a FOR ORDINALITY column was seen at this level (only one is allowed).
- */
 type ParseColumns<
 	T extends Toks,
 	I extends number,
@@ -753,7 +674,6 @@ type ParseColumns<
 				>
 			: ParseColumn<T, I, Top, Own, Nest, Names, Defs, Ord>
 		: ParseColumn<T, I, Top, Own, Nest, Names, Defs, Ord>;
-/** After a column: `,` and the next one, or `)`. */
 type ColumnsNext<
 	T extends Toks,
 	I extends number,
@@ -788,8 +708,7 @@ type ParseColumn<
 			? ParseTypeName<T, J> extends infer X
 				? X extends Ok<infer Ty extends string, infer J2>
 					? T[J2] extends WordTok<"exists">
-						? // name type EXISTS [PATH '…'] [behavior ON ERROR] (never a DEFAULT)
-							ParsePathOpt<T, Nx<J2>> extends infer P
+						? ParsePathOpt<T, Nx<J2>> extends infer P
 							? P extends number
 								? ParseBehaviors<
 										T,
@@ -813,8 +732,7 @@ type ParseColumn<
 									: never
 								: P
 							: never
-						: // name type [FORMAT JSON] [PATH '…'] [wrapper] [quotes] [behaviors]
-							ParsePathOpt<T, SkipFormat<T, J2>> extends infer P
+						: ParsePathOpt<T, SkipFormat<T, J2>> extends infer P
 							? P extends number
 								? ParseBehaviors<
 										T,
@@ -868,11 +786,6 @@ type Col<N extends string, Ty extends string, Nullable extends boolean> = {
 	n: N;
 	t: { type: Ty; nullable: Nullable };
 };
-/**
- * Behaviors of a regular column: a formatted one (FORMAT JSON, a wrapper or quotes clause, or a
- * type other than a built-in scalar) is read like JSON_QUERY, a scalar one like JSON_VALUE.
- * Enums and domains count as formatted here: their columns accept JSON_QUERY's behaviors.
- */
 type ColumnBehavior<
 	Ty extends string,
 	Formatted extends boolean,
@@ -885,7 +798,6 @@ type ScalarType = Exclude<
 	PgScalarName,
 	"json" | "jsonb" | "record" | "void" | "unknown" | `any${string}`
 >;
-/** `[PATH 'string']` → next index or error. */
 type ParsePathOpt<T extends Toks, I extends number> =
 	EatWord<T, I, "path"> extends never
 		? I
@@ -893,7 +805,6 @@ type ParsePathOpt<T extends Toks, I extends number> =
 			? Nx<EatWord<T, I, "path">>
 			: Expected<"path string", T, EatWord<T, I, "path">>;
 
-/** After `NESTED [PATH]`: `'path' [AS name] COLUMNS (…)`. */
 type ParseNested<
 	T extends Toks,
 	I extends number,

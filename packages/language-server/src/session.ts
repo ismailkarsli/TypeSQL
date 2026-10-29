@@ -1,8 +1,3 @@
-/**
- * An API session on the TypeScript 7 language server, and completions through it. Editor
- * independent: the VS Code extension and the completion server (server.ts) pass in how to reach
- * the server.
- */
 import { realpathSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname } from "node:path";
@@ -16,30 +11,19 @@ import {
 } from "./complete/index.js";
 import { CorePaths } from "./core.js";
 
-/** The parts of TypeScript's API package a session uses. */
 export interface TypeScriptModules {
 	readonly API: typeof API;
 	readonly SyntaxKind: Readonly<Record<string, number>>;
-	/** The package's directory and version, for logs. */
 	readonly dir: string;
 	readonly version: string;
 }
 
-/** How to reach a language server: an API pipe, and the API package to talk to it with. */
 export interface Connector {
-	/** Opens a new API pipe on the server. */
 	pipe(): Promise<string>;
-	/**
-	 * API packages that may match the server, most likely first; `fileName` is the file of the
-	 * first request. The client must be the server's version: the first one that can read the
-	 * server's snapshot is used.
-	 */
 	modules(fileName: string): readonly (() => Promise<TypeScriptModules>)[];
-	/** How to get TypeScript 7.1 in this editor, logged when the server runs 7.0. */
 	readonly upgrade?: string;
 }
 
-/** Loads `typescript/async` and `typescript/ast` of the `typescript` package resolved from `from` (a file). */
 export async function typescriptModules(
 	from: string,
 ): Promise<TypeScriptModules> {
@@ -72,7 +56,6 @@ interface Connection {
 	readonly kinds: EditorKinds;
 }
 
-/** The server is TypeScript 7.0: its API has no language server snapshots. */
 const IS_7_0 = /unknown API method "getCurrentLanguageServerSnapshot"/;
 
 export class Session {
@@ -87,7 +70,6 @@ export class Session {
 		this.cores = new CorePaths(log);
 	}
 
-	/** A session with an API client the server understands, or null (logged once) when there is none. */
 	private connect(uri: string, fileName: string): Promise<Connection | null> {
 		this.connection ??= this.open(uri, fileName).catch((e: unknown) => {
 			this.connection = undefined;
@@ -107,7 +89,7 @@ export class Session {
 			try {
 				ts = await candidate();
 			} catch {
-				continue; // not installed there, or a TypeScript without the API package
+				continue;
 			}
 			if (tried.has(ts.dir)) continue;
 			tried.add(ts.dir);
@@ -117,7 +99,6 @@ export class Session {
 			try {
 				const snapshot = await api.getCurrentLanguageServerSnapshot();
 				try {
-					// a client of another version fails at the first request about a project
 					const project = await snapshot.getDefaultProjectForFile({ uri });
 					if (project)
 						await Promise.all([
@@ -150,11 +131,6 @@ export class Session {
 		return null;
 	}
 
-	/**
-	 * Our completions at `position`, or null outside a statement literal. `text` is the editor's
-	 * text of the document: when the server has not applied the latest edit yet, the request reads
-	 * it from a snapshot with that text instead.
-	 */
 	async complete(
 		uri: string,
 		position: Position,
@@ -206,9 +182,7 @@ export class Session {
 	async close(): Promise<void> {
 		const c = this.connection;
 		this.connection = undefined;
-		// none yet, one that failed to open, or no client matched
 		const connection = await c?.catch(() => undefined);
-		// the server may be gone already
 		await connection?.api.close().catch(() => {});
 	}
 }

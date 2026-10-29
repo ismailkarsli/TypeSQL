@@ -28,15 +28,11 @@ async function evaluateBatch(
 	const kinds = (await session.typescript()).kinds;
 	const types = await declTypes(checker, sf, kinds);
 	const printed = await Promise.all(
-		texts.map((_, i) =>
-			checker.typeToString(types.get(`__x_${i}`)!, sf, 1 /* NoTruncation */),
-		),
+		texts.map((_, i) => checker.typeToString(types.get(`__x_${i}`)!, sf, 1)),
 	);
-	// a string literal, or our parser's error (a template literal type when its message names a token)
 	const plain = (p: string): boolean =>
 		/^"(?:[^"\\]|\\.)*"$/s.test(p) ||
 		(p.startsWith("`!") && !p.includes("${any}"));
-	// diagnostics check the whole probe again, doubling a batch's time: read them only when needed
 	if (printed.every(plain)) return printed.map((text) => ({ text }));
 	const bad = await badDeclarations(program, sf);
 	return printed.map((text, i) => {
@@ -73,7 +69,6 @@ export async function evaluateCanon(
 				done += batch.length;
 				opts.progress(done);
 			}
-			// the next run's first program is a new one: free this session's memory now
 			await session.close();
 		}),
 	);

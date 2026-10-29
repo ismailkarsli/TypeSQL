@@ -8,14 +8,12 @@ const configString = (
 	v: string | readonly string[] | undefined,
 ): string | undefined => (typeof v === "string" ? v : undefined);
 
-/** File the generator writes: `output` itself when it names a `.ts` (`.mts`, `.cts`) file, else `<output>/index.ts`. */
 export function outputFile(output: string): string {
 	return [".ts", ".mts", ".cts"].includes(extname(output))
 		? output
 		: join(output, "index.ts");
 }
 
-/** Source for a `generate` request (config keys: `importFrom`, `typeName`). */
 export function sourceFor(options: GeneratorOptions): string {
 	const provider =
 		options.datasources[0]?.activeProvider ?? options.datasources[0]?.provider;
@@ -36,7 +34,6 @@ export function sourceFor(options: GeneratorOptions): string {
 	});
 }
 
-/** The `typesql-prisma` generator: writes the schema file to the configured `output`. */
 export const generator: GeneratorHandler = {
 	onManifest: () => ({ prettyName: "TypeSQL schema", requiresEngines: [] }),
 	async onGenerate(options) {

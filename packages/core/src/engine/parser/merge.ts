@@ -19,23 +19,6 @@ import type {
 	SyntaxErrorAt,
 } from "./util.js";
 
-/**
- * MERGE (PostgreSQL 15+, with PostgreSQL 17's BY SOURCE / BY TARGET and RETURNING). `I` is the
- * index after `MERGE`; `W` the already-parsed WITH clause or null.
- *
- *   MERGE INTO [ONLY] target [*] [[AS] alias]
- *     USING from_item ON cond
- *     when_clause [...]
- *     [RETURNING [WITH ({OLD | NEW} AS alias, ...)] target_list]
- *
- *   when_clause =
- *       WHEN MATCHED [AND cond] THEN { UPDATE SET ... | DELETE | DO NOTHING }
- *     | WHEN NOT MATCHED BY SOURCE [AND cond] THEN { UPDATE SET ... | DELETE | DO NOTHING }
- *     | WHEN NOT MATCHED [BY TARGET] [AND cond] THEN
- *         { INSERT [(target, ...)] [OVERRIDING {SYSTEM | USER} VALUE] VALUES (expr, ...) | INSERT DEFAULT VALUES | DO NOTHING }
- *
- * `from_item` is any FROM item, joins included (`USING a JOIN b ON … ON cond`).
- */
 export type ParseMerge<
 	T extends Toks,
 	I extends number,
@@ -84,7 +67,6 @@ export type ParseMerge<
 				: Tg
 			: never;
 
-/** `WHEN ... THEN action` repeated while the next token is `WHEN`. */
 type ParseWhens<
 	T extends Toks,
 	I extends number,
@@ -98,7 +80,6 @@ type ParseWhens<
 			: never
 		: Ok<Acc, I>;
 
-/** After `WHEN`. */
 type ParseWhen<T extends Toks, I extends number> =
 	EatWord<T, I, "matched"> extends never
 		? EatWords<T, I, ["not", "matched"]> extends never
@@ -124,7 +105,6 @@ type SkipByTarget<T extends Toks, I extends number> =
 		? I
 		: EatWords<T, I, ["by", "target"]>;
 
-/** `[AND cond] THEN action` */
 type ParseWhenCond<
 	T extends Toks,
 	I extends number,
@@ -152,7 +132,6 @@ type ParseThen<
 				: X
 			: never;
 
-/** UPDATE / DELETE for MATCHED and NOT MATCHED BY SOURCE, INSERT for NOT MATCHED [BY TARGET], DO NOTHING for all. */
 type ParseAction<
 	T extends Toks,
 	I extends number,
@@ -182,7 +161,6 @@ type ParseAction<
 				: Ok<{ t: "delete" }, EatWord<T, I, "delete">>
 		: Ok<{ t: "nothing" }, EatWords<T, I, ["do", "nothing"]>>;
 
-/** After `INSERT`: `DEFAULT VALUES` | `[(targets)] [OVERRIDING … VALUE] VALUES (exprs)`. */
 type ParseMergeInsert<T extends Toks, I extends number> =
 	EatWords<T, I, ["default", "values"]> extends never
 		? (

@@ -1,10 +1,3 @@
-/**
- * Finds the statements of a program: `sql(…)` calls (the callee is core's `Sql` or
- * `TransactionalSql`, whatever it is named locally) and `migrations().add(…)` steps. Only the
- * callee, the receiver and the first arguments are typed, not the call: discovering 500
- * queries takes milliseconds and analyses none of them.
- */
-
 import type {
 	CallExpression,
 	LiteralTypeNode,
@@ -23,7 +16,6 @@ import type {
 	Type,
 } from "typescript/async";
 
-/** SyntaxKind values (typescript/ast), passed in so this module loads nothing at runtime. */
 export interface Kinds {
 	readonly CallExpression: number;
 	readonly PropertyAccessExpression: number;
@@ -34,17 +26,14 @@ export interface Kinds {
 }
 
 export interface SqlSite {
-	/** The query literal (with `:name` and `${sql.param()}` markers as written). */
 	readonly key: string;
 	readonly file: string;
 	readonly db: Type;
 	readonly tm: Type;
 	readonly keys: Type;
-	/** The slot object's type for `sql("… {slot} …", { slot })`, else null. */
 	readonly slots: Type | null;
 }
 
-/** A statement written as a type: `RowOf<DB, TM, "SELECT …">`, or a literal argument of the project's own alias. */
 export interface TypeSite {
 	readonly key: string;
 	readonly file: string;
@@ -54,12 +43,10 @@ export interface TypeSite {
 export interface DdlSite {
 	readonly key: string;
 	readonly file: string;
-	/** The schema before the step (`Migrations<DB>`'s `DB`). */
 	readonly db: Type;
 }
 
 const SLOT = /\{[A-Za-z_][A-Za-z0-9_]*\}/;
-/** Core aliases taking `(DB, …, Q)`: the index of `Q`. */
 const QUERY_ALIASES: { readonly [name: string]: number } = {
 	RowOf: 2,
 	ParamsOf: 2,
@@ -95,18 +82,16 @@ export async function discover(
 		if (!sf) continue;
 		const { calls, refs } = nodesIn(sf, kinds);
 		if (!calls.length && !refs.length) continue;
-		/** `DB` types this file uses, for literals passed to the project's own aliases. */
 		const fileDbs = new Map<number, Type>();
 		const loose: string[] = [];
 
-		// statements written as types
 		const syms = refs.length
 			? await checker.getSymbolAtLocation(refs.map((r) => r.typeName))
 			: [];
 		await Promise.all(
 			refs.map(async (r, i) => {
 				let sym = syms[i];
-				if (sym && sym.flags & 2097152 /* SymbolFlags.Alias */)
+				if (sym && sym.flags & 2097152)
 					sym = await checker.getAliasedSymbol(sym);
 				const args = r.typeArguments ?? [];
 				const isCore =
@@ -126,7 +111,6 @@ export async function discover(
 					});
 					return;
 				}
-				// the project's own alias of a core one: `type Row<Q extends string> = RowOf<DB, TM, Q>`
 				const wrapped =
 					sym && !isCore
 						? await wrappedCoreAlias(
@@ -161,7 +145,6 @@ export async function discover(
 			}),
 		);
 
-		// migration steps: the receiver is core's Migrations<DB>
 		const adds = calls.filter(
 			(c) =>
 				c.expression.kind === kinds.PropertyAccessExpression &&
@@ -189,7 +172,6 @@ export async function discover(
 			);
 		}
 
-		// sql(…) calls: the callee is core's Sql or TransactionalSql
 		const others = calls.filter((c) => !adds.includes(c));
 		const callees = others.length
 			? await checker.getTypeAtLocation(others.map((c) => c.expression))
@@ -238,13 +220,11 @@ export async function discover(
 }
 
 interface Wrapped {
-	/** Index of the alias's type parameter that is the statement text. */
 	readonly param: number;
 	readonly db: Type;
 	readonly ddl: boolean;
 }
 
-/** For `type R<Q> = RowOf<DB, TM, Q>` (or `ApplyDdl<DB, Q>`, …): which parameter is the text, and the `DB`. */
 function wrappedCoreAlias(
 	sym: TsSymbol,
 	program: Program,
@@ -320,7 +300,6 @@ function nodesIn(
 	return { calls, refs };
 }
 
-/** Whether `type` is a reference to one of core's `names` (`Sql`, `Migrations`, …). */
 export async function isCoreRef(
 	type: Type,
 	names: readonly string[],

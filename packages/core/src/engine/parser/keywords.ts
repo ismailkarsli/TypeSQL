@@ -1,10 +1,3 @@
-/**
- * Postgres keyword categories (from `src/include/parser/kwlist.h`, as `pg_get_keywords()`
- * lists them), reduced to what the parser needs to decide whether a word token is an
- * identifier. A keyword in none of them is unreserved: usable as any name.
- */
-
-/** Reserved (catcode R): a label after `AS` or `.` and a bare column label, never a name. */
 export type ReservedKeyword =
 	| "all"
 	| "analyse"
@@ -85,7 +78,6 @@ export type ReservedKeyword =
 	| "window"
 	| "with";
 
-/** Column-name keywords (catcode C): table and column names, not function or type names. */
 export type ColNameKeyword =
 	| "between"
 	| "bigint"
@@ -151,7 +143,6 @@ export type ColNameKeyword =
 	| "xmlserialize"
 	| "xmltable";
 
-/** Type/function-name keywords (catcode T): function and type names, not table or column names (`FROM t left` is a join). */
 export type TypeFuncNameKeyword =
 	| "authorization"
 	| "binary"
@@ -177,11 +168,6 @@ export type TypeFuncNameKeyword =
 	| "tablesample"
 	| "verbose";
 
-/**
- * Words that are not a bare column label (`SELECT 1 b`, without `AS`): the keywords whose
- * `barelabel` is false in `pg_get_keywords()`, but `as`, which starts the label itself. Every
- * other keyword is one, reserved ones too (`SELECT 1 all`, `SELECT 1 and, 2`).
- */
 export type NotBareLabel =
 	| "array"
 	| "char"
@@ -222,7 +208,5 @@ export type NotBareLabel =
 	| "without"
 	| "year";
 
-/** Words that are not a `ColId` (a table, column or alias name): reserved and type/function-name keywords. */
 export type NotColId = ReservedKeyword | TypeFuncNameKeyword;
-/** Words that are not a `type_function_name` (a function, type or parameter name): reserved and column-name keywords. */
 export type NotTypeFuncName = ReservedKeyword | ColNameKeyword;

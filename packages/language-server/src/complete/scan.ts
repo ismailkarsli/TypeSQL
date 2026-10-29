@@ -1,23 +1,11 @@
-/**
- * What may come at a cursor in a statement's text, for editor completions: a relation, a
- * column (and of which FROM items), or nothing. A rough scan, not the parser: it reads
- * keywords, FROM items, aliases and CTEs around the cursor and never fails on incomplete
- * text. A wrong guess only makes the list less useful; it never changes a type.
- */
-
-/** A relation as written: `users` (schema null), `auth.sessions`. Unquoted names are folded. */
 export interface RelRef {
 	readonly schema: string | null;
 	readonly name: string;
 }
 
-/** A FROM item (or DML target) visible at the cursor. */
 export interface ScopeItem {
-	/** The alias, or the relation's name without one. */
 	readonly name: string;
-	/** The relation it reads; null for a subquery, CTE, function or `{slot}`. */
 	readonly rel: RelRef | null;
-	/** Output column names of a subquery or CTE, when the scan can tell. */
 	readonly columns: readonly string[] | null;
 }
 
@@ -28,17 +16,12 @@ export interface Cte {
 
 export type Expect =
 	| { readonly kind: "none" }
-	/** A relation, CTE or namespace name; `schema` for `auth.|`. `used`: relations the statement names. */
 	| {
 			readonly kind: "relation";
 			readonly schema: string | null;
 			readonly ctes: readonly Cte[];
 			readonly used: readonly RelRef[];
 	  }
-	/**
-	 * A column of `sources` (innermost FROM items first). `aliases` are FROM item names to offer
-	 * too (for a bare name; empty after `alias.` and in a column list).
-	 */
 	| {
 			readonly kind: "column";
 			readonly sources: readonly ScopeItem[];
@@ -47,20 +30,12 @@ export type Expect =
 
 export interface Context {
 	readonly expect: Expect;
-	/** Start of the name being typed; the completion replaces `[from, offset)`. */
 	readonly from: number;
 }
 
 const NONE: Context["expect"] = { kind: "none" };
 
-// ───────────────────────────── lexer ─────────────────────────────
-
-/**
- * `w` unquoted word (folded), `q` quoted identifier, `s` string, `n` number (or `$1`), `p`
- * named parameter (`:name`), `x` `{slot}`, `o` operator or punctuation.
- */
 interface Tok {
-	/** word, quoted name, value (string, number or parameter), slot, operator */
 	readonly k: "w" | "q" | "v" | "x" | "o";
 	readonly v: string;
 	readonly s: number;
@@ -68,39 +43,28 @@ interface Tok {
 }
 
 const WORD = /[A-Za-z_\u0080-￿][A-Za-z0-9_$\u0080-￿]*/y;
-/** To the end of the line. */
 const LINE_COMMENT = /--[^\n\r]*/y;
-/** The delimiters of (nested) block comments. */
 const COMMENT_MARK = /\/\*|\*\//g;
-/** A string's prefix and opening quote; group 1 for `E'…'`, where backslashes escape. */
 const STRING = /(?:([eE])|[bBxXnN]|[uU]&)?'/y;
-/** The rest of a string. `'a''b'` reads as two strings, which the scan cannot tell apart from one. */
 const STRING_REST = /[^']*'?/y;
 const ESCAPE_STRING_REST = /(?:[^'\\]|\\.|'')*'?/sy;
-/** Group 1: the name, `""` for each `"`. */
 const QUOTED = /(?:[uU]&)?"((?:[^"]|"")*)"?/y;
 const DOLLAR_TAG = /\$(?:[A-Za-z_\u0080-￿][A-Za-z0-9_\u0080-￿]*)?\$/y;
-/** With trailing letters (`0x1F`, `1_000`, `1abc`), like PostgreSQL. */
 const NUMBER =
 	/(?:[0-9]|[.$][0-9])[0-9._]*(?:[eE][-+])?[A-Za-z0-9_$\u0080-￿]*/y;
 const NAMED_PARAM = /:[A-Za-z_][A-Za-z0-9_$\u0080-￿]*/y;
 const SLOT = /\{[A-Za-z_][A-Za-z0-9_]*\}/y;
-/** Any other character, or `::`. */
 const PUNCTUATION = /::|./sy;
-/** Operator characters, up to a comment. */
 const OPERATOR = /(?:(?!--|\/\*)[+\-*/<>=~!@#%^&|`?])+/y;
 
-/** Postgres folds unquoted names to lower case. */
 export const fold = (s: string): string =>
 	s.replace(/[A-Z]/g, (m) => m.toLowerCase());
 
-/** Tokens, and whether `offset` is inside a comment. */
 function lex(text: string, offset: number): { toks: Tok[]; inside: boolean } {
 	const toks: Tok[] = [];
 	let inside = false;
 	const n = text.length;
 	let i = 0;
-	/** The match of the sticky `re` at `i`; `i` moves past it. */
 	const take = (re: RegExp): RegExpExecArray | null => {
 		re.lastIndex = i;
 		const m = re.exec(text);
@@ -110,7 +74,6 @@ function lex(text: string, offset: number): { toks: Tok[]; inside: boolean } {
 	const push = (k: Tok["k"], s: number, v = text.slice(s, i)): void => {
 		toks.push({ k, v, s, e: i });
 	};
-	/** A string, dollar-quoted string, number or parameter at `i`: `i` moves past it. */
 	const value = (): boolean => {
 		const string = take(STRING);
 		if (string) {
@@ -125,7 +88,6 @@ function lex(text: string, offset: number): { toks: Tok[]; inside: boolean } {
 		}
 		return !!(take(NUMBER) || take(NAMED_PARAM));
 	};
-	/** A comment ran from `s` to `i`; `open`: the cursor at `i` is in it too. */
 	const comment = (s: number, open: boolean): void => {
 		if (s < offset && (offset < i || (open && offset === i))) inside = true;
 	};
@@ -169,9 +131,6 @@ function lex(text: string, offset: number): { toks: Tok[]; inside: boolean } {
 	return { toks, inside };
 }
 
-// ───────────────────────────── structure ─────────────────────────────
-
-/** Words that start a query (or a data-modifying statement) inside parentheses. */
 const QUERY_START: ReadonlySet<string | null> = new Set([
 	"select",
 	"with",
@@ -182,7 +141,6 @@ const QUERY_START: ReadonlySet<string | null> = new Set([
 	"delete",
 	"merge",
 ]);
-/** Words that cannot be an alias right after a FROM item (keywords that end it). */
 const NOT_ALIAS = new Set([
 	"as",
 	"on",
@@ -227,7 +185,6 @@ const NOT_ALIAS = new Set([
 	"only",
 	"table",
 ]);
-/** After these, an expression (and so a column) may follow. */
 const BEFORE_EXPR = new Set([
 	"select",
 	"where",
@@ -254,13 +211,7 @@ const BEFORE_EXPR = new Set([
 	"array",
 ]);
 
-type ParenKind =
-	/** A column list of the DML target: `INSERT INTO t (…)`, `ON CONFLICT (…)`. */
-	| "target"
-	/** Column names of a CTE or alias: `WITH c(a, b)`, `AS x(a, b)`. */
-	| "names"
-	| "values"
-	| "expr";
+type ParenKind = "target" | "names" | "values" | "expr";
 
 interface Item {
 	name: string;
@@ -272,20 +223,15 @@ interface Level {
 	readonly parent: Level | null;
 	readonly items: Item[];
 	readonly ctes: Item[];
-	/** Output names of the select list (or RETURNING); null until one is read. */
 	outputs: string[] | null;
-	/** The INSERT / UPDATE / DELETE / MERGE target. */
 	target: Item | null;
 }
 
-/** The state at a token, before it is read. */
 interface At {
 	readonly level: Level;
 	readonly clause: string;
 	readonly paren: ParenKind | null;
-	/** For `(`: the kind of parenthesis it opens (none for a subquery). */
 	opens?: ParenKind;
-	/** A relation name may follow this token. */
 	relNext?: boolean;
 }
 
@@ -299,7 +245,6 @@ function structure(toks: readonly Tok[]): { at: At[]; used: RelRef[] } {
 	const named = (t: Tok | undefined): boolean =>
 		!!t && (t.k === "q" || (t.k === "w" && !NOT_ALIAS.has(t.v)));
 
-	/** Reads one query level from `i` up to its closing `)` (not consumed) or the end. */
 	const level = (
 		i: number,
 		parent: Level | null,
@@ -315,16 +260,11 @@ function structure(toks: readonly Tok[]): { at: At[]; used: RelRef[] } {
 		let clause = "";
 		const parens: { kind: ParenKind; item: Item | null }[] = [];
 		let expectRel = false;
-		/** The next relation read becomes the DML target. */
 		let targetNext = false;
-		/** The last FROM item, while its alias may follow. */
 		let after: Item | null = null;
-		/** Whether `after` has its alias; set with `after`. */
 		let aliased: boolean | undefined;
-		/** In `WITH`: the next word names a CTE; set by `WITH`. */
 		let cteNext: boolean | undefined;
 		let cte: Item | null = null;
-		/** Depth-0 tokens of the current select-list item. */
 		let out: Tok[] | null = null;
 
 		const endOutput = (): void => {
@@ -371,7 +311,6 @@ function structure(toks: readonly Tok[]): { at: At[]; used: RelRef[] } {
 						cte = null;
 					} else after = null;
 					i = inner.i;
-					// the `)`, or the `(` again when the subquery is not closed
 					if (out && depth0) out.push(t, toks[i] ?? t);
 					continue;
 				}
@@ -379,13 +318,10 @@ function structure(toks: readonly Tok[]): { at: At[]; used: RelRef[] } {
 				let kind: ParenKind = "expr";
 				let item: Item | null = null;
 				if (depth0 && after) {
-					kind =
-						// `INSERT INTO t AS u (…)`: the target's column list
-						after === lv.target && clause === "into" ? "target" : "names";
+					kind = after === lv.target && clause === "into" ? "target" : "names";
 					item = after;
 					after = null;
 				} else if (cte) {
-					// `WITH c(a, b)`: the names list; the body's columns no longer matter
 					kind = "names";
 					item = cte;
 					cte = null;
@@ -409,7 +345,6 @@ function structure(toks: readonly Tok[]): { at: At[]; used: RelRef[] } {
 				parens.pop();
 				if (parens.length === 0) {
 					if (out) out.push(t);
-					// `FROM f(x) AS y`: the alias may follow a function call
 					if (clause === "from-call") {
 						clause = "from";
 						after = lv.items.at(-1)!;
@@ -425,7 +360,6 @@ function structure(toks: readonly Tok[]): { at: At[]; used: RelRef[] } {
 				continue;
 			}
 
-			// ── depth 0 of this level ──
 			if (after) {
 				if (w === "as") continue;
 				if (!aliased && named(t) && !is(i + 1, ".")) {
@@ -458,7 +392,6 @@ function structure(toks: readonly Tok[]): { at: At[]; used: RelRef[] } {
 					i += 2;
 				}
 				if (is(i + 1, "(") && clause !== "into") {
-					// a set-returning function
 					addItem({ name: ref.name, rel: null, columns: null });
 					after = null;
 					clause = "from-call";
@@ -477,12 +410,10 @@ function structure(toks: readonly Tok[]): { at: At[]; used: RelRef[] } {
 			if (t.k === "o" && t.v === ",") {
 				if (out) endOutput(), (out = []);
 				if (clause === "from") here.relNext = expectRel = true;
-				// the next word names a CTE (read only in WITH)
 				else cteNext = true;
 				continue;
 			}
 			if (t.k === "o" && t.v === ";") {
-				// a statement's own output names are never read
 				out = null;
 				lv = { parent, items: [], ctes: [], outputs: null, target: null };
 				clause = "";
@@ -498,7 +429,6 @@ function structure(toks: readonly Tok[]): { at: At[]; used: RelRef[] } {
 			}
 			switch (w) {
 				case "with":
-					// not `WITH ORDINALITY`, `WITH TIME ZONE`, `WITH TIES`
 					if (clause === "") {
 						clause = "with";
 						cteNext = true;
@@ -506,7 +436,6 @@ function structure(toks: readonly Tok[]): { at: At[]; used: RelRef[] } {
 					break;
 				case "select":
 				case "returning":
-					// the level's output names, as the last select list or RETURNING reads them
 					clause = w;
 					lv.outputs = [];
 					out = [];
@@ -528,7 +457,6 @@ function structure(toks: readonly Tok[]): { at: At[]; used: RelRef[] } {
 					here.relNext = expectRel = true;
 					break;
 				case "update":
-					// `ON CONFLICT DO UPDATE` and MERGE update the target; `FOR [NO KEY] UPDATE` locks rows
 					if (lv.target || word(i - 1) === "for" || word(i - 1) === "key")
 						break;
 					targetNext = true;
@@ -542,15 +470,12 @@ function structure(toks: readonly Tok[]): { at: At[]; used: RelRef[] } {
 						clause === "into" ||
 						(clause === "from" && lv.target !== null && lv.items.length === 1)
 					) {
-						// DELETE FROM t USING …, MERGE INTO t USING …
 						clause = "from";
 						here.relNext = expectRel = true;
 					}
-					// else `JOIN … USING (…)` or `ORDER BY … USING <`
 					break;
 				case "conflict":
 					clause = w;
-					// `excluded` names the row proposed for insertion
 					if (lv.target?.rel)
 						lv.items.push({
 							name: "excluded",
@@ -562,7 +487,6 @@ function structure(toks: readonly Tok[]): { at: At[]; used: RelRef[] } {
 				case "intersect":
 				case "except": {
 					endOutput();
-					// the next branch has its own FROM items; the first branch's outputs name the columns
 					lv = { ...lv, items: [] };
 					break;
 				}
@@ -589,33 +513,25 @@ function structure(toks: readonly Tok[]): { at: At[]; used: RelRef[] } {
 		return { level: first, i };
 	};
 
-	// a stray `)` at the top (it has no `At`): keep reading after it in a new level
 	for (let i = 0; toks[i]; ) i = level(i, null).i + 1;
 	return { at, used };
 }
 
-/** The column name Postgres gives a select-list item, when the scan can tell. */
 function outputName(toks: readonly Tok[]): string | null {
 	const last = toks.at(-1);
 	if (!last) return null;
 	if (last.k === "q" || (last.k === "w" && !NOT_ALIAS.has(last.v))) {
-		// `name`, `t.name`, `expr alias`, `expr AS alias`
 		const before = toks.at(-2);
 		if (!before || before.k !== "o" || before.v === ")" || before.v === ".")
 			return last.v;
 	}
-	// `f(…)`: the arguments are not in `toks`, so the third token is the `)`
 	const head = toks[0]!;
 	if (toks.length === 3 && head.k === "w" && toks[1]!.v === "(") return head.v;
 	return null;
 }
 
-// ───────────────────────────── the cursor ─────────────────────────────
-
-/** What may be typed at `offset` of `text`. */
 export function contextAt(text: string, offset: number): Context {
 	const { toks, inside } = lex(text, offset);
-	// the name being typed ends at the cursor
 	let from = offset;
 	let j = toks.length - 1;
 	while (j >= 0 && toks[j]!.s >= offset) j--;
@@ -671,7 +587,6 @@ function expectAfter(
 		used,
 	});
 
-	// `alias.` / `schema.` / `schema.table.`
 	if (t.v === ".") {
 		const q: string[] = [];
 		let k = j;
@@ -724,7 +639,6 @@ function expectAfter(
 	return NONE;
 }
 
-/** Columns after `q.`: the FROM item named `q` (innermost first), else the relation `q`. */
 function qualified(level: Level, q: readonly string[]): Expect {
 	if (q.length === 1) {
 		for (let l: Level | null = level; l; l = l.parent) {

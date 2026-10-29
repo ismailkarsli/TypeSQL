@@ -1,6 +1,5 @@
 import { asRecord, type TypeValue } from "../../src/cache/evaluate.js";
 
-/** An empty object is an empty namespace, as the engine reads it. */
 export const NORM_PRELUDE = `type __B<T> = T extends "jsonb" ? "jsonb" : T extends "json" ? "json" : T;
 type __C<C> = C extends { readonly type: infer T; readonly nullable: infer N; readonly hasDefault: infer D } ? { t: __B<T>; n: N; d: D } : "?";
 type __Cols<R> = R extends unknown ? { [K in keyof R]: __C<R[K]> } : never;
@@ -37,10 +36,8 @@ const SERIAL: { readonly [t: string]: string } = {
 	int8: "bigserial",
 };
 
-/** Namespaces that exist on every server: `PgCatalog` slices are the real catalogs. */
 const SYSTEM = new Set(["pg_catalog", "information_schema"]);
 
-/** Contrib types and TABLESAMPLE methods used by the type tests and their fuzz candidates. */
 export const EXTENSIONS = ["citext", "tsm_system_rows", "tsm_system_time"];
 
 export function readDb(v: TypeValue): Db {
@@ -96,13 +93,11 @@ function literals(v: TypeValue): string[] {
 
 export const ident = (s: string): string => `"${s.replace(/"/g, '""')}"`;
 export const literal = (s: string): string => `'${s.replace(/'/g, "''")}'`;
-/** A relation's name, always schema-qualified (an unqualified `pg_views` would be the catalog's). */
 export const qualified = (r: {
 	readonly schema: string | null;
 	readonly name: string;
 }): string => `${ident(r.schema ?? "public")}.${ident(r.name)}`;
 
-/** A type name as SQL: quoted (so `char` is the one-byte type, as in our catalog), arrays outside the quotes. */
 export function typeSql(type: string): string {
 	const m = /^(.*?)((\[\])*)$/.exec(type)!;
 	const base = m[1]!;
@@ -126,7 +121,6 @@ export function schemaDdl(
 		out.push({ sql: `CREATE SCHEMA IF NOT EXISTS ${ident(s)}` });
 	for (const r of db.relations) {
 		const cols = r.columns.map((c) => {
-			// a generated integer is a serial (a sequence default, which ALTER … DROP DEFAULT can drop)
 			const serial = c.hasDefault ? SERIAL[c.type] : undefined;
 			if (serial)
 				return `${ident(c.name)} ${serial}${c.nullable ? "" : " NOT NULL"}`;
@@ -140,7 +134,6 @@ export function schemaDdl(
 			});
 		else {
 			const base = { schema: r.schema, name: `${r.name}__base` };
-			// UNION ALL: a view Postgres cannot update, like TypeSQL's read-only views
 			out.push({
 				sql: `CREATE TABLE ${qualified(base)} (${cols.join(", ")}); CREATE VIEW ${qualified(r)} AS SELECT * FROM ${qualified(base)} UNION ALL SELECT * FROM ${qualified(base)} WHERE false`,
 				relation: r,
@@ -285,7 +278,6 @@ const SAMPLES: { readonly [t: string]: readonly string[] } = {
 	pg_lsn: ["0/0"],
 };
 
-/** The zero value first: it is a column's default and a non-null parameter's binding. */
 export function sampleTexts(
 	type: string,
 	enums: { readonly [name: string]: readonly string[] } = {},
@@ -295,7 +287,6 @@ export function sampleTexts(
 		if (!elem.length) return ["{}"];
 		const q = (s: string): string =>
 			`"${s.replace(/["\\]/g, (c) => `\\${c}`)}"`;
-		// no NULL elements: a `T[]` column's elements are non-null in TypeSQL's types
 		return ["{}", `{${elem.slice(0, 2).map(q).join(",")}}`];
 	}
 	const own =

@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/** `typesql-prisma`: a Prisma generator; Prisma runs it during `prisma generate`. */
 import { generator } from "./generator/index.js";
 import { serveGenerator } from "./generator/protocol.js";
 

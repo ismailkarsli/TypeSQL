@@ -4,7 +4,6 @@ import {
 } from "vitest/config";
 import type { InlineConfig } from "vitest/node";
 
-// Only checks whose expected behavior comes from PostgreSQL run here.
 const projects = ["oracle", "fuzz", "pg-ast"].map((name) => ({
 	root: import.meta.dirname,
 	test: {
@@ -20,7 +19,6 @@ const reporters: NonNullable<InlineConfig["reporters"]> =
 		? ["default", ["github-actions", { jobSummary: { enabled: false } }]]
 		: ["default"];
 
-// batches.ts retries when its TypeScript process dies during a batch.
 const onUnhandledError: NonNullable<InlineConfig["onUnhandledError"]> = (
 	error,
 ) =>

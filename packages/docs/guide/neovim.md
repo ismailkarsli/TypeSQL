@@ -3,8 +3,8 @@
 `@typesql/language-server` completes table and column names inside your SQL strings in Neovim, like the [VS Code extension](./vscode).
 
 ```ts
-sql("SELECT * FROM |");          // users, posts, active_users, auth, …
-sql("SELECT u.| FROM users u");  // id: int4, email: text, display_name: text | null
+sql("SELECT * FROM |");
+sql("SELECT u.| FROM users u");
 ```
 
 It hooks into TypeScript 7's language server (`tsc --lsp --stdio`) and reads its program through an API session, so there is no second TypeScript process. Errors, hovers and row types come from TypeScript as before.
@@ -74,10 +74,7 @@ To use the [type cache](./performance#type-cache), allow the content mapper with
 [nvim-treesitter](https://github.com/nvim-treesitter/nvim-treesitter) already highlights SQL in `` sql(`…`) `` template literals once the `sql` parser is installed (`:TSInstall sql`). To also highlight `sql("…")`, `tx(…)`, `sql.fragment(…)` and `sql.as<Row>(…)`, save this as `~/.config/nvim/queries/typescript/injections.scm`, and as the same file under `queries/tsx/` and `queries/javascript/`:
 
 ```scheme
-; extends
 
-; TypeSQL: the first argument of sql("…") and tx("…") (also as a method, db.sql("…")), and of
-; sql.fragment(…) and sql.as<Row>(…) (also on tx). nvim-treesitter injects sql(`…`) itself.
 (call_expression
   function: [
     (identifier) @_fn

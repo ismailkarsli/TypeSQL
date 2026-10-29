@@ -51,11 +51,28 @@ Invalid statements cause compile errors directly on the SQL string.
 
 ### Examples
 
-<<< @/snippets/using-sql.ts#sql-query
+```ts
+const byRole = sql(
+	"SELECT id, email FROM users WHERE role = $1 ORDER BY id",
+	"admin",
+);
+```
 
-<<< @/snippets/using-sql.ts#sql-named
+```ts
+const byEmail = sql(
+	"SELECT id, role FROM users WHERE email = :email AND role = :role",
+	{ email: "user@example.com", role: "member" },
+);
+```
 
-<<< @/snippets/using-sql.ts#sql-slots
+```ts
+const activeOnly = sql.fragment("AND role = $1", "active");
+const filtered = sql(
+	"SELECT id, email FROM users WHERE id > $1 {filter}",
+	{ filter: activeOnly },
+	10,
+);
+```
 
 See [Selecting data](./queries) and [Parameters](./parameters).
 
@@ -79,7 +96,12 @@ An escape hatch that skips TypeSQL's compile-time type inference and explicitly 
 
 ### Example
 
-<<< @/snippets/using-sql.ts#sql-as
+```ts
+type Summary = { count: number; role: string };
+const summary = sql.as<Summary>(
+	"SELECT count(*)::int AS count, role FROM users GROUP BY role",
+);
+```
 
 See [Errors and troubleshooting](./errors#sql-as-row).
 
@@ -101,7 +123,10 @@ At runtime, the value is rewritten to a positional `$n` parameter—it is never 
 
 ### Example
 
-<<< @/snippets/using-sql.ts#sql-param
+```ts
+const userId = 42;
+const byId = sql(`SELECT email FROM users WHERE id = ${sql.param(userId)}`);
+```
 
 See [Inline parameters](./parameters#inline-sql-param-value).
 
@@ -123,7 +148,12 @@ At runtime, the value is serialized to JSON text and sent with driver-safe forma
 
 ### Example
 
-<<< @/snippets/using-sql.ts#sql-json
+```ts
+const settings = { theme: "dark" as const };
+const updateSettings = sql(`
+  UPDATE users SET metadata = ${sql.json(settings)} WHERE id = ${sql.param(1)}
+`);
+```
 
 See [JSON values](./parameters#json-values).
 
@@ -148,7 +178,12 @@ Fragments preserve their parameter types and carried values. When spliced into a
 
 ### Example
 
-<<< @/snippets/using-sql.ts#sql-fragment
+```ts
+const whereRole = sql.fragment("WHERE role = $1", "admin");
+const countAdmins = sql("SELECT count(*) FROM users {whereRole}", {
+	whereRole,
+});
+```
 
 See [Dynamic SQL](./dynamic-sql).
 
@@ -179,7 +214,11 @@ Always validate dynamic identifier names against an explicit allowlist or a stri
 
 ### Example
 
-<<< @/snippets/using-sql.ts#sql-id
+```ts
+const col = sql.id("email");
+const fqTable = sql.id("public", "users");
+const customSelect = sql("SELECT {col} FROM {fqTable}", { col, fqTable });
+```
 
 See [Identifiers and lists](./dynamic-sql#identifiers-and-lists).
 
@@ -207,7 +246,16 @@ The `options.separator` value is concatenated directly into the statement as **r
 
 ### Example
 
-<<< @/snippets/using-sql.ts#sql-combine
+```ts
+const filters = [
+	sql.fragment("role = $1", "admin"),
+	sql.fragment("id > $1", 5),
+];
+const combinedWhere = sql.combine(filters, { separator: " AND " });
+const queryCombined = sql("SELECT id FROM users WHERE {where}", {
+	where: combinedWhere,
+});
+```
 
 See [Lists from runtime arrays](./dynamic-sql#lists-from-runtime-arrays).
 
@@ -238,7 +286,15 @@ If `values` comes from an untrusted source (such as `req.body`) and is typed as 
 
 ### Example
 
-<<< @/snippets/using-sql.ts#sql-set
+```ts
+const changes = { display_name: "Ada", role: undefined };
+const setClause = sql.set("users", changes);
+const updateQuery = sql(
+	"UPDATE users SET {setClause} WHERE id = $1 RETURNING id",
+	{ setClause },
+	1,
+);
+```
 
 See [Updating with sql.set](./writing-data#partial-updates-sql-set).
 
@@ -265,7 +321,17 @@ The `table` argument is checked at compile time. At runtime, `sql.values` collec
 
 ### Example
 
-<<< @/snippets/using-sql.ts#sql-values
+```ts
+const newUsers = [
+	{ email: "ada@example.com", role: "admin" },
+	{ email: "grace@example.com", role: "member", display_name: "Grace" },
+];
+const insertValues = sql.values("users", newUsers);
+const insertQuery = sql(
+	"INSERT INTO users {insertValues} RETURNING id, email",
+	{ insertValues },
+);
+```
 
 See [Bulk insert with sql.values](./writing-data#bulk-inserts-sql-values).
 
@@ -291,7 +357,12 @@ Never pass untrusted user input to `sql.raw()`. Use `$n`, `:name`, or `${sql.par
 
 ### Example
 
-<<< @/snippets/using-sql.ts#sql-raw
+```ts
+const rawSnippet = sql.raw("ORDER BY id DESC");
+const sorted = sql.as<{ id: number }>("SELECT id FROM users {order}", {
+	order: rawSnippet,
+});
+```
 
 See [Fully dynamic SQL](./dynamic-sql#fully-dynamic-sql).
 
@@ -315,7 +386,22 @@ Runs an async callback inside a database transaction. Available on `sql` instanc
 
 ### Example
 
-<<< @/snippets/using-sql.ts#sql-transaction
+```ts
+const pgSql = createPgSql<DB>(new Pool());
+const createdId = await pgSql.transaction(async (tx) => {
+	const user = await tx(
+		"INSERT INTO users (email, role) VALUES ($1, $2) RETURNING id",
+		"dev@example.com",
+		"engineer",
+	).executeTakeFirstOrThrow();
+	await tx(
+		"INSERT INTO posts (author_id, title) VALUES ($1, $2)",
+		user.id,
+		"Getting Started",
+	).execute();
+	return user.id;
+});
+```
 
 See [Transactions](./transactions).
 
@@ -325,7 +411,18 @@ See [Transactions](./transactions).
 
 Calling `sql(...)` or `sql.as(...)` returns a `Query<Row, Params, Text>` object:
 
-<<< @/snippets/using-sql.ts#query-methods
+```ts
+const q = sql("SELECT id, email FROM users WHERE id = $1", 1);
+
+const text = q.text;
+const values = q.values;
+
+declare const runner: typeof q;
+const allRows = await runner.execute();
+const first = await runner.executeTakeFirst();
+const single = await runner.executeTakeFirstOrThrow();
+const count = await runner.executeCount();
+```
 
 ### Properties
 

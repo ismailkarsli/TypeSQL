@@ -3,8 +3,8 @@
 Completions and syntax highlighting for the SQL inside [TypeSQL](https://typesql.karsli.net)'s `sql()` strings.
 
 ```ts
-sql("SELECT * FROM |");          // users, posts, auth, …
-sql("SELECT u.| FROM users u");  // id: int4, email: text, display_name: text | null
+sql("SELECT * FROM |");
+sql("SELECT u.| FROM users u");
 ```
 
 - **Completions** for tables, views and schemas after `FROM`, `JOIN`, `INTO` and `UPDATE`, and for columns with their Postgres types after `alias.` and in expressions. They come from your `DB` type and follow it as you edit, unsaved changes included.

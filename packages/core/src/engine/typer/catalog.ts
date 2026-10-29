@@ -14,65 +14,6 @@ import type {
 } from "./operators.js";
 import type { PgFunctions } from "./pg-functions.js";
 
-/**
- * Function catalog, verified against PostgreSQL 18 (`pg_proc` + `pg_typeof`).
- *
- * Users extend it via module augmentation. In an application:
- *
- *   declare module "@typesql/core" {
- *     interface FunctionCatalog { my_func: Sig<["text", "int4"], "bool"> }
- *   }
- *
- * (Augmenting the re-exporting module works because `FunctionCatalog` is an exported
- * interface alias; augmenting `@typesql/core/.../typer/catalog` directly works too.)
- *
- * A schema can also declare its own functions next to its tables, under `$functions`:
- *
- *   interface DB { users: { … }; $functions: { my_func: Sig<["text", "int4"], "bool"> } }
- *
- * Lookup order: `FunctionCatalog`, then `DB["$functions"]`, then `PgFunctions` (every other
- * pg_catalog function, return type only). Any other name is an error, as in Postgres.
- *
- * An entry is one `Sig` or a tuple of `Sig`s (overloads). Overload resolution mimics
- * Postgres: the candidate whose parameters match the most argument types exactly wins;
- * ties go to the earlier overload (list the preferred type — float8, timestamptz — first).
- * If nothing matches by type, the first overload with a compatible arity is used.
- *
- * Parameter patterns:
- *   exact canonical type name (implicit casts accepted: int4 → int8/numeric/float8,
- *   date → timestamp(tz), time → timetz, varchar → text, ...)
- *   "any"          anything (polymorphic, never an exact match)
- *   "anynumeric"   int2 int4 int8 numeric float4 float8
- *   "anystring"    text varchar bpchar char name citext
- *   "anyarray"     any `T[]`
- *   "anyjson"      json jsonb
- *   "anydatetime"  date time timetz timestamp timestamptz
- *   "anyrange"     any range or multirange type
- *   "..."          (last) any number of further arguments
- *   NULL, untyped `$n` and string literals match every pattern (a string literal counts as
- *   an exact match for string parameters: Postgres prefers the string category for
- *   `unknown` arguments, so `substr('abc', 1)` is the text overload).
- *
- * Return patterns:
- *   exact type | "$1".."$4" (type of argument n) | "$elem1" (element type of array /
- *   range type of multirange arg 1) | "$arr1" (array of arg 1) | "$common" (common type
- *   of all args) | "$rangeelem1" (subtype of range arg 1) | "$multirange1" (multirange of
- *   range arg 1) | "$wg" / "$wgarr" (type of the WITHIN GROUP (ORDER BY e) expression /
- *   array of it) | "$pct" / "$pctarr" (percentile_cont: interval for interval input, else
- *   float8) | "$jval:json" … (typed JSON built from the arguments; see `JsonRet` in json.ts).
- *
- * Flags (`SigFlags`):
- *   strict: true (default)  nullable if any argument is nullable
- *   strict: false           nullable only if all arguments are nullable (COALESCE, GREATEST)
- *   strict: [i, j]          nullable if argument i or j (1-based) is nullable; other args may be NULL
- *   nullable: true | false  always / never nullable (overrides everything else)
- *   agg: true               aggregate: nullable when FILTERed, when the query is not grouped
- *                           (empty input → NULL), or when an argument is nullable (with
- *                           `strict: false`, as for json_agg, which collects NULLs:
- *                           only when FILTERed or not grouped)
- *   window: true            window-only function
- *   srf: true               set-returning (usable in FROM; `SrfType`)
- */
 export type Sig<
 	Args extends readonly string[],
 	Ret extends string,
@@ -92,11 +33,9 @@ export type AnySig = {
 	readonly args: readonly string[];
 	readonly ret: string;
 } & SigFlags;
-/** A catalog entry: one signature or an ordered list of overloads. */
 export type Overloads = AnySig | readonly AnySig[];
 
 type Agg = { agg: true };
-/** A JSON aggregate collects NULL inputs (or skips them) instead of returning NULL: non-null for a non-empty group. */
 type AggCollect = { agg: true; strict: false };
 type AggNN = { agg: true; nullable: false };
 type Win = { window: true; nullable: false };
@@ -107,7 +46,6 @@ type Srf = { srf: true };
 type SrfNullable = { srf: true; nullable: true };
 
 export interface FunctionCatalog {
-	// ───────────── aggregates ─────────────
 	count: Sig<["..."], "int8", AggNN>;
 	sum: [
 		Sig<["int2"], "int8", Agg>,
@@ -162,7 +100,6 @@ export interface FunctionCatalog {
 	bit_and: Sig<["any"], "$1", Agg>;
 	bit_or: Sig<["any"], "$1", Agg>;
 	bit_xor: Sig<["any"], "$1", Agg>;
-	/** stddev/variance family: numeric for exact inputs, float8 for float inputs. */
 	stddev: [
 		Sig<["float4"], "float8", Agg>,
 		Sig<["float8"], "float8", Agg>,
@@ -205,7 +142,6 @@ export interface FunctionCatalog {
 	regr_sxx: Sig<["float8", "float8"], "float8", Agg>;
 	regr_sxy: Sig<["float8", "float8"], "float8", Agg>;
 	regr_syy: Sig<["float8", "float8"], "float8", Agg>;
-	/** Ordered-set aggregates: the result type comes from `WITHIN GROUP (ORDER BY e)`. */
 	percentile_cont: [
 		Sig<["float8[]"], "$pctarr", Agg>,
 		Sig<["float8"], "$pct", Agg>,
@@ -219,9 +155,7 @@ export interface FunctionCatalog {
 	range_intersect_agg: Sig<["anyrange"], "$1", Agg>;
 	xmlagg: Sig<["xml"], "xml", Agg>;
 
-	// ───────────── window ─────────────
 	row_number: Sig<[], "int8", Win>;
-	/** `rank()`/`dense_rank()` etc. are window functions; with arguments they are hypothetical-set aggregates. */
 	rank: [Sig<[], "int8", Win>, Sig<["any", "..."], "int8", AggNN>];
 	dense_rank: [Sig<[], "int8", Win>, Sig<["any", "..."], "int8", AggNN>];
 	percent_rank: [Sig<[], "float8", Win>, Sig<["any", "..."], "float8", AggNN>];
@@ -241,15 +175,12 @@ export interface FunctionCatalog {
 	last_value: Sig<["any"], "$1", WinNullable>;
 	nth_value: Sig<["any", "int4"], "$1", WinNullable>;
 
-	// ───────────── conditional ─────────────
 	coalesce: Sig<["..."], "$common", { strict: false }>;
 	nullif: Sig<["any", "any"], "$common", Nullable>;
-	/** GREATEST/LEAST ignore NULLs: NULL only when every argument is NULL. */
 	greatest: Sig<["any", "..."], "$common", { strict: false }>;
 	least: Sig<["any", "..."], "$common", { strict: false }>;
 	grouping: Sig<["..."], "int4", NN>;
 
-	// ───────────── string ─────────────
 	lower: [
 		Sig<["anystring"], "text">,
 		Sig<["anyrange"], "$rangeelem1", Nullable>,
@@ -286,7 +217,6 @@ export interface FunctionCatalog {
 		Sig<["bit"], "int8">,
 		Sig<["varbit"], "int8">,
 	];
-	/** `concat` skips NULLs and never returns NULL; `concat_ws`/`format` are NULL only for a NULL separator/format. */
 	concat: Sig<["any", "..."], "text", NN>;
 	concat_ws: Sig<["anystring", "..."], "text", { strict: [1] }>;
 	format: Sig<["anystring", "..."], "text", { strict: [1] }>;
@@ -428,12 +358,10 @@ export interface FunctionCatalog {
 		Sig<["anystring"], "text">,
 		Sig<["anystring", "anystring"], "text">,
 	];
-	/** `e IS [NFC | NFD | NFKC | NFKD] NORMALIZED` */
 	is_normalized: [
 		Sig<["anystring"], "bool">,
 		Sig<["anystring", "anystring"], "bool">,
 	];
-	/** `COLLATION FOR (e)`: the collation's name (Postgres errors for a type without collations). */
 	pg_collation_for: Sig<["any"], "text", NN>;
 	convert_from: Sig<["bytea", "anystring"], "text">;
 	convert_to: Sig<["anystring", "anystring"], "bytea">;
@@ -459,9 +387,7 @@ export interface FunctionCatalog {
 	encode: Sig<["bytea", "anystring"], "text">;
 	decode: Sig<["anystring", "anystring"], "bytea">;
 
-	// ───────────── numeric ─────────────
 	abs: Sig<["anynumeric"], "$1">;
-	/** Integer inputs resolve to the float8 overload (`round(1)` → float8), numeric stays numeric. */
 	ceil: [Sig<["float8"], "float8">, Sig<["numeric"], "numeric">];
 	ceiling: [Sig<["float8"], "float8">, Sig<["numeric"], "numeric">];
 	floor: [Sig<["float8"], "float8">, Sig<["numeric"], "numeric">];
@@ -553,7 +479,6 @@ export interface FunctionCatalog {
 	erf: Sig<["float8"], "float8">;
 	erfc: Sig<["float8"], "float8">;
 
-	// ───────────── date / time ─────────────
 	now: Sig<[], "timestamptz", NN>;
 	clock_timestamp: Sig<[], "timestamptz", NN>;
 	statement_timestamp: Sig<[], "timestamptz", NN>;
@@ -569,7 +494,6 @@ export interface FunctionCatalog {
 		Sig<["anydatetime", "anydatetime"], "interval">,
 	];
 	date_part: Sig<["anystring", "any"], "float8">;
-	/** `date_trunc('day', date)` → timestamptz (date is cast to the preferred timestamptz). */
 	date_trunc: [
 		Sig<["anystring", "timestamptz"], "timestamptz">,
 		Sig<["anystring", "timestamp"], "timestamp">,
@@ -606,10 +530,8 @@ export interface FunctionCatalog {
 	justify_hours: Sig<["interval"], "interval">;
 	justify_interval: Sig<["interval"], "interval">;
 	isfinite: Sig<["any"], "bool">;
-	/** `(start, end | interval) OVERLAPS (start, end | interval)` */
 	overlaps: Sig<["any", "any", "any", "any"], "bool">;
 	extract: Sig<["anystring", "any"], "numeric">;
-	/** `timezone(zone, timestamptz)` → timestamp and vice versa (the function form of AT TIME ZONE). */
 	timezone: [
 		Sig<["any", "timestamptz"], "timestamp">,
 		Sig<["any", "timestamp"], "timestamptz">,
@@ -638,7 +560,6 @@ export interface FunctionCatalog {
 		Sig<["anyarray", "int4", "bool"], "int4", Srf>,
 	];
 
-	// ───────────── session / system ─────────────
 	current_user: Sig<[], "name", NN>;
 	current_role: Sig<[], "name", NN>;
 	session_user: Sig<[], "name", NN>;
@@ -658,7 +579,6 @@ export interface FunctionCatalog {
 	pg_cancel_backend: Sig<["int4"], "bool">;
 	pg_terminate_backend: [Sig<["int4"], "bool">, Sig<["int4", "int8"], "bool">];
 	version: Sig<[], "text", NN>;
-	/** `INSERT` / `UPDATE` / `DELETE`: the action of a MERGE row (meant for MERGE's RETURNING list; not checked elsewhere). */
 	merge_action: Sig<[], "text", NN>;
 	pg_typeof: Sig<["any"], "regtype", NN>;
 	pg_column_size: Sig<["any"], "int4">;
@@ -692,13 +612,11 @@ export interface FunctionCatalog {
 	num_nulls: Sig<["..."], "int4", NN>;
 	num_nonnulls: Sig<["..."], "int4", NN>;
 
-	// ───────────── sequences ─────────────
 	nextval: Sig<["any"], "int8">;
 	currval: Sig<["any"], "int8">;
 	setval: [Sig<["any", "int8"], "int8">, Sig<["any", "int8", "bool"], "int8">];
 	lastval: Sig<[], "int8", NN>;
 
-	// ───────────── uuid / crypto (pgcrypto, uuid-ossp) ─────────────
 	gen_random_uuid: Sig<[], "uuid", NN>;
 	uuid_generate_v1: Sig<[], "uuid", NN>;
 	uuid_generate_v1mc: Sig<[], "uuid", NN>;
@@ -720,7 +638,6 @@ export interface FunctionCatalog {
 	crypt: Sig<["anystring", "anystring"], "text">;
 	gen_salt: [Sig<["anystring"], "text">, Sig<["anystring", "int4"], "text">];
 
-	// ───────────── text matching extensions (unaccent, pg_trgm, fuzzystrmatch) ─────────────
 	unaccent: [Sig<["anystring"], "text">, Sig<["any", "anystring"], "text">];
 	similarity: Sig<["anystring", "anystring"], "float4">;
 	word_similarity: Sig<["anystring", "anystring"], "float4">;
@@ -740,9 +657,7 @@ export interface FunctionCatalog {
 	dmetaphone: Sig<["anystring"], "text">;
 	dmetaphone_alt: Sig<["anystring"], "text">;
 
-	// ───────────── arrays ─────────────
 	unnest: [Sig<["anyarray"], "$elem1", Srf>, Sig<["anyrange"], "$elem1", Srf>];
-	/** `array_length('{}', 1)` is NULL, as are the bounds/dims of an empty array. */
 	array_length: Sig<["anyarray", "int4"], "int4", Nullable>;
 	cardinality: Sig<["anyarray"], "int4">;
 	array_append: Sig<["anyarray", "any"], "$1", { strict: [1] }>;
@@ -775,7 +690,6 @@ export interface FunctionCatalog {
 	array_shuffle: Sig<["anyarray"], "$1">;
 	trim_array: Sig<["anyarray", "int4"], "$1">;
 
-	// ───────────── JSON ─────────────
 	to_json: Sig<["any"], "$jval:json">;
 	to_jsonb: Sig<["any"], "$jval:jsonb">;
 	json_build_object: Sig<["..."], "json", NN>;
@@ -786,7 +700,6 @@ export interface FunctionCatalog {
 	jsonb_object: [Sig<["text[]"], "jsonb">, Sig<["text[]", "text[]"], "jsonb">];
 	json_array_length: Sig<["json"], "int4">;
 	jsonb_array_length: Sig<["jsonb"], "int4">;
-	/** Path extraction yields NULL for a missing path. */
 	json_extract_path: Sig<["json", "..."], "json", Nullable>;
 	jsonb_extract_path: Sig<["jsonb", "..."], "jsonb", Nullable>;
 	json_extract_path_text: Sig<["json", "..."], "text", Nullable>;
@@ -865,13 +778,11 @@ export interface FunctionCatalog {
 	];
 	json_array_elements: Sig<["json"], "$jelem:json", Srf>;
 	jsonb_array_elements: Sig<["jsonb"], "$jelem:jsonb", Srf>;
-	/** A JSON null element becomes SQL NULL in the `_text` variants. */
 	json_array_elements_text: Sig<["json"], "text", SrfNullable>;
 	jsonb_array_elements_text: Sig<["jsonb"], "text", SrfNullable>;
 	json_object_keys: Sig<["json"], "text", Srf>;
 	jsonb_object_keys: Sig<["jsonb"], "text", Srf>;
 	row_to_json: [Sig<["any"], "$jval:json">, Sig<["any", "bool"], "$jval:json">];
-	/** `json_populate_record(null::t, j)` has the type of its first argument. */
 	json_populate_record: [
 		Sig<["any", "json"], "$1">,
 		Sig<["any", "json", "bool"], "$1">,
@@ -900,7 +811,6 @@ export interface FunctionCatalog {
 	jsonb_delete_path: Sig<["jsonb", "text[]"], "jsonb">;
 	json_scalar: Sig<["any"], "json">;
 
-	// ───────────── network ─────────────
 	host: Sig<["inet"], "text">;
 	masklen: Sig<["inet"], "int4">;
 	network: Sig<["inet"], "cidr">;
@@ -913,8 +823,6 @@ export interface FunctionCatalog {
 	inet_same_family: Sig<["inet", "inet"], "bool">;
 	inet_merge: Sig<["inet", "inet"], "cidr">;
 
-	// ───────────── text search ─────────────
-	// the text forms first: a parameter (which matches both) is text, as in Postgres
 	to_tsvector: [
 		Sig<["anystring"], "tsvector">,
 		Sig<["anyjson"], "tsvector">,
@@ -984,7 +892,6 @@ export interface FunctionCatalog {
 	get_current_ts_config: Sig<[], "regconfig", NN>;
 	ts_lexize: Sig<["any", "anystring"], "text[]", Nullable>;
 
-	// ───────────── ranges ─────────────
 	isempty: Sig<["anyrange"], "bool">;
 	lower_inc: Sig<["anyrange"], "bool">;
 	upper_inc: Sig<["anyrange"], "bool">;
@@ -994,7 +901,6 @@ export interface FunctionCatalog {
 		Sig<["anyrange", "anyrange"], "$1">,
 		Sig<["anyrange"], "$elem1">,
 	];
-	/** Range constructors accept NULL bounds (unbounded) and never return NULL. */
 	int4range: [
 		Sig<["int4", "int4"], "int4range", NN>,
 		Sig<["int4", "int4", "anystring"], "int4range", NN>,
@@ -1027,13 +933,10 @@ export interface FunctionCatalog {
 	datemultirange: Sig<["..."], "datemultirange", NN>;
 	multirange: Sig<["anyrange"], "$multirange1">;
 
-	// ───────────── enums ─────────────
 	enum_first: Sig<["any"], "$1", NN>;
 	enum_last: Sig<["any"], "$1", NN>;
 	enum_range: [Sig<["any"], "$arr1", NN>, Sig<["any", "any"], "$arr1", NN>];
 
-	// ───────────── XML (XMLELEMENT, XMLPARSE, ... are special forms: typer/xml.ts) ─────────────
-	/** `XMLEXISTS(x PASSING d)` is parsed as this call. */
 	xmlexists: Sig<["text", "xml"], "bool">;
 	xpath: [
 		Sig<["text", "xml"], "xml[]">,
@@ -1049,7 +952,6 @@ export interface FunctionCatalog {
 	xml_is_well_formed_document: Sig<["text"], "bool">;
 	xml_is_well_formed_content: Sig<["text"], "bool">;
 
-	// ───────────── function-style casts: `date(ts)`, `int8(x)`, `timestamp(d, t)` ─────────────
 	bool: Sig<["..."], "bool">;
 	int2: Sig<["..."], "int2">;
 	int4: Sig<["..."], "int4">;
@@ -1085,20 +987,12 @@ export interface FunctionCatalog {
 	circle: Sig<["..."], "circle">;
 }
 
-// ───────────────────────────── overload resolution ─────────────────────────────
-
 type ToList<S> = S extends readonly AnySig[]
 	? S
 	: S extends AnySig
 		? readonly [S]
 		: readonly [];
 
-/**
- * How well does actual type `A` satisfy parameter pattern `P`?
- *   "x"   exact match (counts towards the overload score)
- *   "c"   accepted through an implicit cast / polymorphic parameter / untyped literal
- *   false not accepted
- */
 export type MatchKind<P extends string, A extends string> = A extends
 	| "unknown"
 	| "null"
@@ -1135,8 +1029,7 @@ export type MatchKind<P extends string, A extends string> = A extends
 										: false
 									: A extends P
 										? "x"
-										: // callers outside the typer (FROM-clause SRFs, parameter typing) see string literals as text
-											A extends "text"
+										: A extends "text"
 											? "c"
 											: P extends `${infer PE}[]`
 												? A extends `${infer AE}[]`
@@ -1199,7 +1092,6 @@ export type MatchKind<P extends string, A extends string> = A extends
 																									: false
 																								: false;
 
-/** Score of a signature against the arguments (tuple whose length is the number of exact matches), or false. */
 type ArgsMatch<
 	Ps extends readonly string[],
 	As extends readonly ColInfo[],
@@ -1226,7 +1118,6 @@ type ArgsMatch<
 			? Score
 			: false;
 
-/** Best-scoring overload (ties → earlier), or null. */
 type BestSig<
 	Sigs extends readonly AnySig[],
 	As extends readonly ColInfo[],
@@ -1247,7 +1138,6 @@ type BestSig<
 		: never
 	: Best;
 
-/** First overload whose arity fits (used when no overload matches by type). */
 type ArityFallback<
 	Sigs extends readonly AnySig[],
 	As extends readonly ColInfo[],
@@ -1270,7 +1160,6 @@ type ArityOk<
 		? true
 		: false;
 
-/** Resolve a catalog entry against argument types: the chosen `Sig`, or null. */
 export type PickSig<Sigs, As extends readonly ColInfo[]> =
 	BestSig<ToList<Sigs>, As, null, []> extends infer S
 		? S extends AnySig
@@ -1278,9 +1167,6 @@ export type PickSig<Sigs, As extends readonly ColInfo[]> =
 			: ArityFallback<ToList<Sigs>, As>
 		: never;
 
-// ───────────────────────────── return types ─────────────────────────────
-
-/** Type of argument `I` (a string literal resolves to text). */
 type TypeAt<
 	As extends readonly ColInfo[],
 	I extends number,
@@ -1295,13 +1181,11 @@ type CommonOf<
 	? CommonOf<R, CommonLit<Acc, A["type"]>>
 	: LitToText<Acc>;
 
-/** Element type of an array, or the range type of a multirange. */
 type ElemOf<T extends string> = T extends `${infer E}[]`
 	? E
 	: T extends `${infer X}multirange`
 		? `${X}range`
 		: "unknown";
-/** Array of `T`; Postgres has no arrays of arrays, so `T[]` stays `T[]`. */
 type ArrOf<T extends string> = T extends `${string}[]`
 	? T
 	: T extends "null"
@@ -1330,7 +1214,6 @@ type MultirangeOf<T extends string> = T extends `${string}multirange`
 		? `${X}multirange`
 		: "unknown";
 
-/** Call context needed for return type and nullability. */
 export type CallCtx = {
 	readonly grouped: boolean;
 	readonly over: boolean;
@@ -1338,7 +1221,6 @@ export type CallCtx = {
 	readonly distinct: boolean;
 	readonly hasStar: boolean;
 	readonly withinGroup: boolean;
-	/** Type of the `WITHIN GROUP (ORDER BY e)` expression, or "unknown". */
 	readonly wg: string;
 };
 
@@ -1382,8 +1264,6 @@ type Ret<
 															: R
 	: R;
 
-// ───────────────────────────── nullability ─────────────────────────────
-
 type AnyNullable<As extends readonly ColInfo[]> = As extends readonly [
 	infer A extends ColInfo,
 	...infer R extends readonly ColInfo[],
@@ -1401,7 +1281,6 @@ type AllNullable<As extends readonly ColInfo[]> = As extends readonly [
 		: false
 	: true;
 type Prev = { 1: 0; 2: 1; 3: 2; 4: 3; 5: 4; 6: 5; 7: 6; 8: 7 };
-/** Any of the 1-based argument positions `Idx` nullable? */
 type AnyNullableAt<
 	As extends readonly ColInfo[],
 	Idx extends readonly number[],
@@ -1414,13 +1293,6 @@ type AnyNullableAt<
 		: AnyNullableAt<As, R>
 	: false;
 
-/**
- * Nullability of a resolved call:
- *   nullable: false/true → as flagged
- *   aggregate → FILTER makes it nullable; as a window function only its arguments do;
- *               ungrouped (empty input → NULL) → nullable; else its arguments
- *   strict: true → any argument nullable; false → all arguments nullable; [i, j] → those arguments
- */
 type CallNullable<
 	S extends AnySig,
 	As extends readonly ColInfo[],
@@ -1447,14 +1319,8 @@ type CallNullable<
 					? AnyNullableAt<As, S["strict"]>
 					: AnyNullable<As>;
 
-/** Functions a schema declares under `$functions` (`{}` when none). */
 type SchemaFunctions<DB> = DB extends { readonly $functions: infer F } ? F : {};
 
-/**
- * Catalog entry of a function name, or null when Postgres would not know it:
- * `FunctionCatalog` (built-ins and augmentations), then the schema's `$functions`, then the
- * generated `PgFunctions`. Schema qualification is dropped by the parser (`public.f` → `f`).
- */
 export type LookupFn<
 	DB,
 	Name extends string,
@@ -1466,10 +1332,6 @@ export type LookupFn<
 			? PgFunctions[Name]
 			: null;
 
-/**
- * `function f(text, int4) does not exist`, worded like Postgres (untyped literals show as
- * `unknown`). `Reposition` adds a "Perhaps you meant" hint (suggest.ts).
- */
 export type UnknownFunction<
 	Name extends string,
 	As extends readonly ColInfo[],
@@ -1477,7 +1339,6 @@ export type UnknownFunction<
 	`function ${Name}(${ArgList<As, "", false>}) does not exist. Declare it in the schema's $functions or in FunctionCatalog`,
 	null
 >;
-/** The argument types of a call, for a message: canonical names, or Postgres's (`Shown`). */
 type ArgList<
 	As extends readonly ColInfo[],
 	Acc extends string,
@@ -1493,10 +1354,6 @@ type ArgList<
 		>
 	: Acc;
 
-/**
- * Type a function call. A name that resolves but whose overloads do not fit the arguments →
- * `{ unknown, nullable }` (a cast fixes it); an unknown name is an error.
- */
 export type CallType<
 	Name extends string,
 	As extends readonly ColInfo[],
@@ -1515,13 +1372,6 @@ export type CallType<
 				: never
 		: never;
 
-/**
- * A call decoration the resolved function does not take, worded like Postgres
- * (ParseFuncOrColumn), or null: `*`, DISTINCT, FILTER and OVER need an aggregate (OVER also
- * takes a window function), a window function needs OVER, an aggregate without arguments
- * is written `f(*)`, and an ordered-set aggregate needs WITHIN GROUP (without it Postgres finds
- * no function of the direct arguments alone; a hypothetical-set one takes any arguments).
- */
 type CallMisuse<
 	Name extends string,
 	S extends AnySig,
@@ -1568,7 +1418,6 @@ type AggMisuse<
 			: null
 		: null;
 
-/** Set-returning function result element type for FROM, or null if not an SRF. */
 export type SrfType<
 	Name extends string,
 	As extends readonly ColInfo[],

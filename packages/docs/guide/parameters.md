@@ -12,20 +12,31 @@ Values are always sent as parameters, never pasted into the SQL. You can write t
 
 The SQL is sent as written, and the values follow it as arguments:
 
-<<< @/snippets/parameters.ts#positional
+```ts
+const byId = sql(
+	"SELECT id, email FROM users WHERE id = $1 AND created_at > $2",
+	7,
+	new Date(),
+);
+```
 
 A wrong argument is a normal TypeScript error:
 
 ```ts
 sql("SELECT id FROM users WHERE id = $1", "7");
-// Argument of type 'string' is not assignable to parameter of type 'number'.
 ```
 
 ## Named: `:name`
 
 The call takes one object. TypeSQL rewrites the names to `$1`, `$2`, … in order of first use. A name used twice is one parameter.
 
-<<< @/snippets/parameters.ts#named
+```ts
+const byEmail = sql(
+	"SELECT id FROM users WHERE email = :email OR display_name = :email",
+	{ email: "a@b.c" },
+);
+byEmail.text;
+```
 
 Only a colon directly followed by a name is one: `::` casts, `:=`, `: v` and colons inside strings, comments and dollar-quoted strings are not parameters. You can't mix `:name` and `$n` in one statement.
 
@@ -33,16 +44,20 @@ Only a colon directly followed by a name is one: `::` casts, `:=`, `: v` and col
 
 Write the value where it is used. `sql.param()` turns it into a `$n` parameter. The value never becomes part of the SQL text, so hostile input stays harmless.
 
-<<< @/snippets/parameters.ts#inline
+```ts
+const inline = sql(
+	`SELECT id, email FROM users WHERE id = ${sql.param(userId)} AND email <> ${sql.param(email)}`,
+);
+inline.text;
+inline.values;
+```
 
 The value's TypeScript type is checked against the parameter's type. A mismatch is a compile error that names the parameter:
 
 ```ts
 sql(`SELECT id FROM users WHERE id = ${sql.param("7")}`);
-// … SqlError<"parameter $1: a string value cannot be used as int4", 7>
 
-sql(`INSERT INTO users (email) VALUES (${sql.param(maybeEmail /* string | null */)})`);
-// … SqlError<"parameter $1: a string | null value cannot be used as text NOT NULL", 8>
+sql(`INSERT INTO users (email) VALUES (${sql.param(maybeEmail  )})`);
 ```
 
 Strings are accepted for enum columns, and any object for JSON and other object-typed columns (arrays for JSON go through [`sql.json()`](#json-values)). With no context (`SELECT ${sql.param(x)}`), anything is accepted. `sql.param()` inside quotes or a comment is an error.
@@ -61,13 +76,23 @@ Each `${sql.param(x)}` is its own `$n`, even for the same `x`. The value is sent
 
 To send a value once and use it in several places, write it as a `:name` (or a `$n`). It is then one parameter, and its type must fit every use:
 
-<<< @/snippets/parameters.ts#repeated
+```ts
+const optional = sql(
+	"SELECT id FROM users WHERE (:name::text IS NULL OR display_name = :name)",
+	{ name },
+);
+optional.text;
+```
 
 ## JSON values
 
 Use `${sql.json(value)}` for `json` and `jsonb` values. It sends the same JSON text with both drivers, and sends `null` or `undefined` as SQL `NULL`.
 
-<<< @/snippets/json.ts#write
+```ts
+const save = sql(
+	`UPDATE portfolio SET history = ${sql.json(history)} WHERE id = ${sql.param(1)}`,
+);
+```
 
 Why not a raw value? node-postgres sends a JS array as a Postgres array literal, which Postgres rejects as JSON, and postgres.js runs `JSON.stringify` on every value, so a string you already stringified is stored as a JSON string.
 
@@ -75,11 +100,8 @@ Why not a raw value? node-postgres sends a JS array as a Postgres array literal,
 
 ```ts
 sql(`UPDATE portfolio SET name = ${sql.json({ a: 1 })}`);
-// … SqlError<"parameter $1: a sql.json() value cannot be used as text NOT NULL", 5>
 
 sql(`UPDATE portfolio SET history = ${sql.param(items)}`);
-// … SqlError<"parameter $1: an array for jsonb NOT NULL must be passed as sql.json(value)
-//    (node-postgres sends a JS array as a Postgres array)", 5>
 ```
 
 Positional and named JSON parameters don't take a raw array either. Pass `sql.json(value)` as the argument. Objects and other values work as they are:
@@ -89,7 +111,6 @@ sql("UPDATE portfolio SET history = $1 WHERE id = $2", sql.json(items), 1);
 sql("UPDATE portfolio SET history = :history WHERE id = :id", { history: sql.json(items), id: 1 });
 
 sql("UPDATE portfolio SET history = $1", items);
-// Argument of type 'HistoryItem[]' is not assignable to parameter of type 'NonArrayOrSqlJson<HistoryItem[]>'.
 ```
 
 As an argument, `sql.json(value)` is only checked to be JSON, not against `T`; see [Limits](./limits).
@@ -110,7 +131,20 @@ As an argument, `sql.json(value)` is only checked to be JSON, not against `T`; s
 | `$1 IS NULL`, `$1::T IS NOT NULL` | adds `\| null` to the type the other uses give |
 | anywhere else | `unknown` |
 
-<<< @/snippets/parameters.ts#contexts
+```ts
+sql("SELECT id FROM users WHERE id = ANY($1)", ids);
+sql("SELECT id FROM users LIMIT $1 OFFSET $2", 10, 20);
+sql(
+	"INSERT INTO users (email, display_name, mood) VALUES ($1, $2, $3)",
+	"a@b.c",
+	null,
+	"happy",
+);
+sql("SELECT lower($1) AS l", "ABC");
+sql("SELECT $1::int4 + 1 AS n", 41);
+sql("SELECT $1 AS anything", { any: "value" });
+sql("SELECT v FROM unnest($1::text[]) AS t(v)", ["a", null]);
+```
 
 ### When `null` is allowed
 
@@ -122,7 +156,11 @@ Array elements always accept `null`: an `int4[]` parameter takes `(number | null
 
 A parameter accepts the TypeScript type of a result column of its type, plus whatever the driver can send for that type. Under node-postgres, `int8` rows are strings, but `int8` parameters also take a `number` or `bigint`:
 
-<<< @/snippets/parameters.ts#inputs
+```ts
+const post = sql("SELECT id FROM posts WHERE id = $1", 42);
+sql("SELECT author_id FROM posts GROUP BY author_id HAVING count(*) >= $1", 3n);
+sql("SELECT id FROM users WHERE created_at > $1", "2024-01-01T00:00:00Z");
+```
 
 The full list for each driver is in [Type mapping](../reference/type-mapping#parameter-types).
 
@@ -130,15 +168,17 @@ The full list for each driver is in [Type mapping](../reference/type-mapping#par
 
 The SQL must be a string literal, or a template literal whose `${…}` parts are compile-time constants. TypeScript folds those into the literal:
 
-<<< @/snippets/parameters.ts#constants
+```ts
+const table = "users";
+const limit = 10;
+const fromConsts = sql(`SELECT id FROM ${table} LIMIT ${limit}`);
+fromConsts.text;
+```
 
 Anything else is rejected, so a value can't end up in the SQL text by accident:
 
 ```ts
 sql(`SELECT id FROM users WHERE email = '${userInput}'`);
-// … SqlError<"the SQL text is not a string literal: pass values as parameters ($1, :name or
-//    ${sql.param(value)}), identifiers with sql.id(), reusable pieces as {slot} fragments,
-//    or use sql.as<Row>() for dynamic SQL", 0>
 ```
 
 Tagged templates (`` sql`…` ``) are not supported. TypeScript doesn't give the type system the text of a tagged template, so nothing could be inferred from it.

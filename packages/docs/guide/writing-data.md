@@ -2,11 +2,29 @@
 
 `INSERT`, `UPDATE`, `DELETE` and `MERGE` are checked against your schema like queries, and parameters take the types of the columns they are assigned to. This page covers what is checked, plus helpers for optional values, partial updates and bulk inserts.
 
-<<< @/snippets/writing-data.ts#insert
+```ts
+const created = sql(
+	"INSERT INTO users (email, display_name, mood) VALUES ($1, $2, $3) RETURNING id, created_at",
+	"a@b.c",
+	null,
+	"happy",
+);
+```
 
 With `RETURNING`, a statement has a row type. Without it, the row type is `never`, and the adapters' `execute()` returns the number of affected rows:
 
-<<< @/snippets/writing-data.ts#update
+```ts
+const renamed = sql(
+	"UPDATE users SET display_name = $1 WHERE id = $2",
+	"Ada",
+	7,
+);
+const touched = sql(`
+  UPDATE posts p SET title = upper(p.title)
+  FROM users u
+  WHERE u.id = p.author_id AND u.mood = 'sad'
+  RETURNING p.id, u.email`);
+```
 
 ## What is checked
 
@@ -15,7 +33,6 @@ With `RETURNING`, a statement has a row type. Without it, the row type is `never
 
   ```ts
   sql("INSERT INTO users (display_name) VALUES ($1)", "Ada");
-  // … SqlError<"null value in column \"email\" of relation \"users\" violates not-null constraint", 2>
   ```
 
 - `DEFAULT` is only allowed as a whole `VALUES` item or `SET` value, and not for a `NOT NULL` column without a default.
@@ -29,16 +46,20 @@ With `RETURNING`, a statement has a row type. Without it, the row type is `never
 
 A `sql.param(value)` whose value is `undefined` sends `DEFAULT` instead of a parameter. The column's default stays in the database, so you don't copy it into a `coalesce(…)`:
 
-<<< @/snippets/writing-data.ts#optional-values
+```ts
+declare const mood: "happy" | "neutral" | "sad" | undefined;
+const signup = sql(`
+  INSERT INTO users (email, mood)
+  VALUES (${sql.param("a@b.c")}, ${sql.param(mood)})
+  RETURNING id, mood`);
+signup.text;
+```
 
 The value is checked like any parameter, without `undefined`. When it can be `undefined`, the statement is checked a second time with `DEFAULT` in its place. So such a value for a `NOT NULL` column without a default is an error, and so is one outside a `VALUES` item or `SET` value:
 
 ```ts
 sql(`INSERT INTO users (email) VALUES (${sql.param(maybeEmail)})`);
-// … SqlError<"null value in column \"email\" of relation \"users\" violates not-null constraint
-//            (sql.param() sends DEFAULT for undefined)", 4>
 sql(`SELECT id FROM users WHERE email = ${sql.param(maybeEmail)}`);
-// … SqlError<"DEFAULT is not allowed in this context (sql.param() sends DEFAULT for undefined)", 7>
 ```
 
 Narrow the value first, or pass `maybeEmail ?? null` to send `NULL`. `sql.fragment(…)` refuses a value that can be `undefined`: a fragment is checked where it is spliced, with `$n` for its values, so a `DEFAULT` there couldn't be checked. `any` and `unknown` values are not checked.
@@ -47,7 +68,19 @@ Narrow the value first, or pass `maybeEmail ?? null` to send `NULL`. `sql.fragme
 
 `sql.set(table, values)` builds a `SET` list from an object, such as a PATCH request body with optional keys. `undefined` values are skipped:
 
-<<< @/snippets/writing-data.ts#set
+```ts
+declare const patch: {
+	display_name?: string | null;
+	mood?: "happy" | "neutral" | "sad";
+};
+const set = sql.set("users", patch);
+const patched = sql(
+	"UPDATE users SET {set} WHERE id = $1 RETURNING id, display_name, mood",
+	{ set },
+	7,
+);
+patched.text;
+```
 
 - Keys must be columns of the table, and values must fit them: `null` only for nullable columns, enum values for enums.
 - Keys that are not columns are errors, even on a variable whose type has extra keys, because they would be sent.
@@ -69,7 +102,15 @@ When accepting user input, validate payloads using a schema validation library w
 
 `sql.values(table, rows)` builds the column list and the `VALUES` rows from an array of objects:
 
-<<< @/snippets/writing-data.ts#values
+```ts
+declare const imported: { email: string; display_name?: string | null }[];
+const rows = sql.values("users", imported);
+const inserted = sql(
+	"INSERT INTO users {rows} ON CONFLICT (email) DO NOTHING RETURNING id",
+	{ rows },
+);
+inserted.text;
+```
 
 - `NOT NULL` columns without a default are required in every row. The others are optional.
 - The columns are the keys that have a value in any row, in order of first use. A missing or `undefined` value is sent as `DEFAULT`, so rows with different keys can be mixed.
@@ -85,7 +126,19 @@ Like `sql.set`, `sql.values` checks column types at compile time, but at runtime
 
 `sql.set` and `sql.values` send their values as parameters, so JSON values go through `sql.json(value)` there too. It is sent as JSON text by both drivers and checked against a [`Json<T>`](./schema#typed-json-columns) column:
 
-<<< @/snippets/json.ts#write-helpers
+```ts
+const patch = sql.set("portfolio", {
+	history: sql.json(history),
+	settings: { theme: "dark" },
+});
+const patched = sql("UPDATE portfolio SET {patch} WHERE id = $1", { patch }, 1);
+
+const rows = sql.values("portfolio", [
+	{ name: "a", history: sql.json(history) },
+	{ name: "b" },
+]);
+const created = sql("INSERT INTO portfolio {rows} RETURNING id", { rows });
+```
 
 A plain object also works as it is. An array without `sql.json()` is an error, because node-postgres would send it as a Postgres array.
 

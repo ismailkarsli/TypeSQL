@@ -31,33 +31,6 @@ import type {
 	SkipWord,
 } from "./util.js";
 
-/**
- * DML parsers (index-based, see util.ts). Each receives the token tuple, the index
- * *after* the leading keyword (`INSERT` / `UPDATE` / `DELETE`) and the already-parsed
- * WITH clause (or null). Result: `Ok<InsertStmt | UpdateStmt | DeleteStmt, next>` or an
- * `SqlError` positioned at the offending token.
- *
- * Grammar covered:
- *
- *   INSERT INTO [ONLY] table [AS alias] [(target, ...)] [OVERRIDING {SYSTEM|USER} VALUE]
- *     { VALUES (...), ... | select | DEFAULT VALUES }
- *     [ON CONFLICT [(index_params) [WHERE pred] | ON CONSTRAINT name] DO { NOTHING | UPDATE SET ... [WHERE ...] }]
- *     [returning]
- *   UPDATE [ONLY] table [*] [AS alias] SET { target = expr | target = DEFAULT | (target, ...) = (e1, ...) | (target, ...) = (select) } [, ...]
- *     [FROM from_list] [WHERE cond | WHERE CURRENT OF cursor] [returning]
- *   DELETE FROM [ONLY] table [*] [AS alias] [USING from_list] [WHERE cond | WHERE CURRENT OF cursor] [returning]
- *
- *   target    = col [ [i] | [lo:hi] | .field ]...    (indirection: `TargetInd` in ast.ts)
- *   returning = RETURNING [WITH ({OLD | NEW} AS alias, ...)] target_list
- *
- * `DEFAULT VALUES` together with a column list is a syntax error. `WHERE CURRENT OF cursor`
- * is parsed as no WHERE clause (the cursor's row is not known at the type level).
- * The ON CONFLICT conflict target (index columns, predicate, constraint name) is parsed
- * for syntax and discarded: the AST carries no field for it.
- */
-
-// ───────────────────────────── INSERT ─────────────────────────────
-
 export type ParseInsert<
 	T extends Toks,
 	I extends number,
@@ -114,7 +87,6 @@ export type ParseInsert<
 				: Tg
 			: never;
 
-/** `(target, ...)` unless the parenthesis opens a sub-select (`INSERT INTO t (SELECT ...)`). */
 type ParseInsertColumns<T extends Toks, I extends number> =
 	T[I] extends OpTok<"(">
 		? IsSelectStart<T, Nx<I>> extends true
@@ -122,7 +94,6 @@ type ParseInsertColumns<T extends Toks, I extends number> =
 			: ParenTargetList<T, I>
 		: Ok<[null, null], I>;
 
-/** `OVERRIDING {SYSTEM | USER} VALUE` (accepted and ignored). */
 export type ParseOverriding<T extends Toks, I extends number> =
 	EatWord<T, I, "overriding"> extends never
 		? Ok<null, I>
@@ -171,8 +142,6 @@ type ParseInsertSource<
 					: never
 				: Expected<"VALUES, SELECT or DEFAULT VALUES", T, I>;
 
-// ─── ON CONFLICT ───
-
 type ParseOnConflictOpt<T extends Toks, I extends number> =
 	EatWords<T, I, ["on", "conflict"]> extends never
 		? Ok<null, I>
@@ -182,7 +151,6 @@ type ParseOnConflictOpt<T extends Toks, I extends number> =
 				: X
 			: never;
 
-/** `(index_params) [WHERE predicate]` | `ON CONSTRAINT name` | nothing. Parsed and discarded. */
 type ParseConflictTarget<T extends Toks, I extends number> =
 	T[I] extends OpTok<"(">
 		? ParseIndexParams<T, Nx<I>> extends infer X
@@ -205,10 +173,6 @@ type ParseConflictTarget<T extends Toks, I extends number> =
 				? Ok<null, J>
 				: Expected<"constraint name", T, EatWords<T, I, ["on", "constraint"]>>;
 
-/**
- * `expr [opclass], ...)` — `I` is just inside the paren. A sort order (`ASC`, `NULLS FIRST`)
- * parses but is rejected, as Postgres does for an ON CONFLICT target.
- */
 type ParseIndexParams<T extends Toks, I extends number> =
 	ParseExpr<T, I, 0> extends infer X
 		? X extends Ok<unknown, infer J>
@@ -225,7 +189,6 @@ type ParseIndexParams<T extends Toks, I extends number> =
 				: never
 			: X
 		: never;
-/** An operator class name, if any (`NULLS` is the only following word that is not reserved). */
 type SkipOpClass<T extends Toks, I extends number> =
 	T[I] extends WordTok<"nulls">
 		? I
@@ -253,8 +216,6 @@ type ParseConflictAction<T extends Toks, I extends number> =
 						: X
 					: never
 			: Ok<{ t: "nothing" }, EatWord<T, EatWord<T, I, "do">, "nothing">>;
-
-// ───────────────────────────── UPDATE ─────────────────────────────
 
 export type ParseUpdate<
 	T extends Toks,
@@ -298,7 +259,6 @@ export type ParseUpdate<
 			: Tg
 		: never;
 
-/** `item [, item ...]` after `SET`. */
 export type ParseSetList<
 	T extends Toks,
 	I extends number,
@@ -312,7 +272,6 @@ export type ParseSetList<
 			: X
 		: never;
 
-/** `target = expr` (expr may be `DEFAULT`) or `(target, ...) = (e1, ...) | (select)`. */
 type ParseSetItem<T extends Toks, I extends number> =
 	T[I] extends OpTok<"(">
 		? ParenTargetList<T, I> extends infer L
@@ -343,13 +302,6 @@ type ParseSetItem<T extends Toks, I extends number> =
 				: Tg
 			: never;
 
-// ─── assignment targets ───
-
-/**
- * `col [indirection]` (`set_target` / `insert_column_item`) → `Ok<[col, TargetInd], next>`.
- * Indirection is `[i]`, `[lo:hi]` (either bound optional) and `.field`, repeated; it becomes an
- * expression over the bare column (`a[1].f` → field(idx(col a, 1), f)).
- */
 export type ParseAssignTarget<T extends Toks, I extends number> =
 	Ident<T, I> extends [infer Col extends string, infer J extends number]
 		? T[J] extends OpTok<"[" | ".">
@@ -357,7 +309,6 @@ export type ParseAssignTarget<T extends Toks, I extends number> =
 			: Ok<[Col, null], J>
 		: Expected<"column name", T, I>;
 
-/** `Tg`: the target column and its token. */
 type ParseIndirection<
 	T extends Toks,
 	I extends number,
@@ -374,7 +325,6 @@ type ParseIndirection<
 					: Expected<"field name", T, Nx<I>>
 			: Ok<[Tg[0], E], I>;
 
-/** After `[`: `i]`, `lo:hi]`, `:hi]`, `lo:]`, `:]`. */
 type ParseIndSubscript<
 	T extends Toks,
 	I extends number,
@@ -419,10 +369,6 @@ type ParseIndSliceHi<
 				{ t: "slice"; e: E; lo: Lo; hi: null }
 			>;
 
-/**
- * `(target, ...)` → `Ok<[cols, ind], next>`: the column names, and the indirection of each
- * (`null` when no target has any, the common case). Token `I` must be `(`.
- */
 export type ParenTargetList<T extends Toks, I extends number> = TargetListLoop<
 	T,
 	Nx<I>,
@@ -466,8 +412,6 @@ type TargetListLoop<
 			: X
 		: never;
 
-// ───────────────────────────── DELETE ─────────────────────────────
-
 export type ParseDelete<
 	T extends Toks,
 	I extends number,
@@ -510,14 +454,6 @@ type ParseUsingOpt<T extends Toks, I extends number> =
 		? Ok<[], I>
 		: ParseFromList<T, EatWord<T, I, "using">, []>;
 
-// ───────────────────────────── shared ─────────────────────────────
-
-/**
- * `[ONLY] qualified_name [*] [AS alias | alias]` → `Ok<[ref, alias], next>` (the inheritance
- * `*` only where `Star` is true: UPDATE, DELETE and MERGE, not INSERT).
- * `Stop` lists unreserved words that follow the table name in this statement and must
- * not be taken as a bare alias (`UPDATE t SET`, `INSERT INTO t VALUES`).
- */
 export type ParseDmlTarget<
 	T extends Toks,
 	I extends number,
@@ -550,7 +486,6 @@ type ParseDmlAlias<T extends Toks, I extends number, Stop extends string> =
 				: Ok<A, J>
 			: Ok<null, I>;
 
-/** `WHERE cond` or `WHERE CURRENT OF cursor` (no condition the types can use: `null`). */
 type ParseDmlWhere<T extends Toks, I extends number> =
 	EatWords<T, I, ["where", "current", "of"]> extends never
 		? ParseWhereOpt<T, I>
@@ -561,7 +496,6 @@ type ParseDmlWhere<T extends Toks, I extends number> =
 			? Ok<null, J>
 			: Expected<"cursor name", T, EatWords<T, I, ["where", "current", "of"]>>;
 
-/** `[RETURNING [WITH ({OLD | NEW} AS alias, ...)] target_list]` → `Ok<[targets | null, options], next>`. */
 export type ParseReturningOpt<T extends Toks, I extends number> =
 	EatWord<T, I, "returning"> extends never
 		? Ok<[null, []], I>
@@ -590,7 +524,6 @@ type ReturningTargets<
 			: X
 		: never;
 
-/** `{OLD | NEW} AS alias [, ...] )`, then the target list. */
 type ParseReturningOpts<
 	T extends Toks,
 	I extends number,

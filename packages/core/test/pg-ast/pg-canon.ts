@@ -1,8 +1,3 @@
-/**
- * Must print libpg_query's parse tree exactly as canon.ts prints our AST: change both together.
- * Our parser's deliberate rewrites and omissions are mirrored here, each naming the parser rule.
- */
-
 export const OUT = "…";
 
 type Json = { readonly [k: string]: any };
@@ -13,11 +8,6 @@ function unwrap(node: Json): [string, Json] {
 	return [k, node[k] as Json];
 }
 
-/**
- * Our parser's aliases (schema/normalize.ts `TypeAliases`) for names Postgres keeps as written
- * (it resolves keyword spellings itself). `"char"` is deliberately unmapped: our parser reading
- * it as `bpchar` is a real difference.
- */
 const TYPE_ALIASES: { readonly [k: string]: string } = {
 	int: "int4",
 	integer: "int4",
@@ -54,7 +44,6 @@ export class PgCanon {
 		const [k, n] = unwrap(node);
 		switch (k) {
 			case "SelectStmt":
-				// SELECT … INTO t: our parser makes it CREATE TABLE AS (parser/stmt.ts `SelectInto`)
 				if (n.intoClause && (n.op ?? "SETOP_NONE") === "SETOP_NONE")
 					return `CREATE TABLE ${this.rangeVarName(n.intoClause.rel)} AS ${this.select({ ...n, intoClause: undefined })}`;
 				return this.select(n);
@@ -74,7 +63,6 @@ export class PgCanon {
 				const what =
 					n.objtype === "OBJECT_MATVIEW" ? "MATERIALIZED VIEW" : "TABLE";
 				const [qk, q] = unwrap(n.query);
-				// `AS EXECUTE name(…)`: our AST keeps the name only (ast.ts `ExecuteSource`)
 				const body =
 					qk === "ExecuteStmt" ? `EXECUTE ${q.name}` : this.selectNode(n.query);
 				return `CREATE ${what} ${this.rangeVarName(n.into.rel)}${this.nameList(n.into.colNames)} AS ${body}`;
@@ -105,14 +93,12 @@ export class PgCanon {
 				return this.createSchema(n);
 			case "CreateFunctionStmt": {
 				if (n.is_procedure) return OUT;
-				// without RETURNS (OUT parameters) our parser does not know the result (parser/ddl.ts `FnReturns`)
 				const ret = n.returnType
 					? `${n.returnType.setof ? "SETOF " : ""}${this.typeName(n.returnType)}`
 					: "unknown";
 				return `CREATE FUNCTION ${this.qualified(n.funcname)} RETURNS ${ret}`;
 			}
 			case "FetchStmt":
-				// the direction is skipped by our parser (parser/utility.ts `FetchDirection`)
 				return `${n.ismove ? "MOVE" : "FETCH"} ${n.portalname}`;
 			case "ClosePortalStmt":
 				return `CLOSE ${n.portalname ?? "ALL"}`;
@@ -121,13 +107,11 @@ export class PgCanon {
 		}
 	}
 
-	/** Our `TableRef` keeps the last two parts. */
 	private qualified(list: Json[]): string {
 		const parts = this.names(list);
 		return parts.length >= 2 ? `${parts.at(-2)}.${parts.at(-1)}` : parts[0]!;
 	}
 
-	/** As parser/ddl.ts `ParseCreateTable` keeps it: a typed table or a partition has no elements. */
 	private createTable(n: Json, schema?: string): string {
 		const name =
 			schema === undefined
@@ -145,7 +129,6 @@ export class PgCanon {
 			const [k, x] = unwrap(e);
 			if (k === "ColumnDef") cols.push(this.columnDef(x));
 			else if (k === "Constraint") cons.push(this.tableConstraint(x));
-			// 56: CREATE_TABLE_LIKE_DEFAULTS | GENERATED | IDENTITY, the options our parser copies defaults for
 			else if (k === "TableLikeClause")
 				likes.push(
 					`LIKE ${this.rangeVarName(x.relation)}${(x.options ?? 0) & 56 ? " DEFAULTS" : ""}`,
@@ -164,7 +147,6 @@ export class PgCanon {
 				(x) => unwrap(x)[1].contype as string,
 			),
 		);
-		// a serial type is spelled as an unquoted word (our parser looks at the word token)
 		const serial = /^(?:serial[248]?|smallserial|bigserial)$/i.test(
 			/^\w+/.exec(this.at(c.typeName?.location, 16))?.[0] ?? "",
 		);
@@ -182,7 +164,6 @@ export class PgCanon {
 		return `${c.colname} ${this.typeName(c.typeName)}${notNull ? " NOT NULL" : ""}${hasDefault ? " DEFAULT" : ""}${pk ? " PRIMARY KEY" : ""}`;
 	}
 
-	/** NOT NULL … NOT VALID is not kept (parser/ddl.ts `ParseNotNullConstraint`). */
 	private tableConstraint(c: Json): string {
 		if (c.contype === "CONSTR_PRIMARY" && c.keys)
 			return `PRIMARY KEY (${this.names(c.keys).join(", ")})`;
@@ -206,7 +187,6 @@ export class PgCanon {
 				return `${col} DROP NOT NULL`;
 			case "AT_ColumnDefault":
 				return `${col} ${c.def ? "SET" : "DROP"} DEFAULT`;
-			// DROP IDENTITY / DROP EXPRESSION remove the default (parser/ddl.ts `ParseAlterColumn`)
 			case "AT_DropIdentity":
 			case "AT_DropExpression":
 				return `${col} DROP DEFAULT`;
@@ -214,7 +194,6 @@ export class PgCanon {
 				return `${col} ADD IDENTITY`;
 			case "AT_AddConstraint": {
 				const k = unwrap(c.def)[1];
-				// ADD [CONSTRAINT n] NOT NULL c is SET NOT NULL (parser/ddl.ts `ParseAddConstraintBody`); PRIMARY KEY USING INDEX is not kept
 				if (k.contype === "CONSTR_PRIMARY" && k.keys && !k.indexname)
 					return `ADD PRIMARY KEY (${this.names(k.keys).join(", ")})`;
 				if (k.contype === "CONSTR_NOTNULL" && k.keys && !k.skip_validation)
@@ -273,7 +252,6 @@ export class PgCanon {
 		}
 	}
 
-	/** As parser/ddl.ts `ParseCreateSchema` keeps it: its tables, then its views, both created in it. */
 	private createSchema(n: Json): string {
 		const role = n.authrole as Json | undefined;
 		const name: string =
@@ -311,7 +289,6 @@ export class PgCanon {
 			const cy = cte.cycle_clause;
 			if (cy) {
 				s += ` CYCLE ${this.names(cy.cycle_col_list).join(", ")} SET ${cy.cycle_mark_column}`;
-				// without TO … DEFAULT the grammar fills in true / false (no location); our AST keeps null
 				const [vk, v] = cy.cycle_mark_value
 					? unwrap(cy.cycle_mark_value)
 					: ["", {}];
@@ -324,7 +301,6 @@ export class PgCanon {
 		return `WITH ${w.recursive ? "RECURSIVE " : ""}${ctes.join(", ")} `;
 	}
 
-	/** `LIMIT ALL` is a NULL constant at the ALL keyword; our parser keeps no limit (select.ts `ParseLimitOffset`). */
 	private limitOf(n: Json): Json | undefined {
 		const l = n.limitCount;
 		if (!l) return undefined;
@@ -352,7 +328,6 @@ export class PgCanon {
 		);
 	}
 
-	/** `larg` / `rarg` are SelectStmt structs, not wrapped nodes. */
 	private operand(n: Json): string {
 		return this.hasClauses(n) ? `(${this.select(n)})` : this.body(n);
 	}
@@ -395,10 +370,6 @@ export class PgCanon {
 		return `VALUES ${lists.map((l) => `(${this.exprs(unwrap(l)[1].items ?? [])})`).join(", ")}`;
 	}
 
-	/**
-	 * Our AST keeps a flat list and a grouping-sets flag (select.ts `ParseGroupItems`): ROLLUP /
-	 * CUBE contribute their items, GROUPING SETS (…) and `()` nothing.
-	 */
 	private groupBy(items: Json[]): string {
 		let sets = false;
 		const flat: Json[] = [];
@@ -454,7 +425,6 @@ export class PgCanon {
 			s += ` (${(n.cols as Json[]).map((c) => this.assignTarget(unwrap(c)[1])).join(", ")})`;
 		s += n.selectStmt ? ` ${this.selectNode(n.selectStmt)}` : " DEFAULT VALUES";
 		const oc = n.onConflictClause;
-		// the conflict target is parsed and discarded by our parser (dml.ts `ParseConflictTarget`)
 		if (oc)
 			s +=
 				oc.action === "ONCONFLICT_UPDATE"
@@ -463,7 +433,6 @@ export class PgCanon {
 		return s + this.returning(n.returningClause);
 	}
 
-	/** Postgres splits `(a, b) = e` into one target per column (`MultiAssignRef`); they are joined back. */
 	private setList(list: Json[]): string {
 		const out: string[] = [];
 		for (let i = 0; i < list.length; i++) {
@@ -480,7 +449,6 @@ export class PgCanon {
 		return out.join(", ");
 	}
 
-	/** `WHERE CURRENT OF cursor` is no condition in our AST (dml.ts `ParseDmlWhere`). */
 	private where(w: Json | undefined): string {
 		if (!w || unwrap(w)[0] === "CurrentOfExpr") return "";
 		return ` WHERE ${this.expr(w)}`;
@@ -568,7 +536,6 @@ export class PgCanon {
 		const [k, n] = unwrap(node);
 		switch (k) {
 			case "RangeVar":
-				// ONLY and the inheritance `*` are accepted and dropped (select.ts `SkipInheritanceStar`)
 				return `${this.rangeVarName(n)}${this.alias(n.alias)}`;
 			case "RangeSubselect":
 				return `${n.lateral ? "LATERAL " : ""}(${this.selectNode(n.subquery)})${this.alias(n.alias)}`;
@@ -588,8 +555,6 @@ export class PgCanon {
 			}
 			case "JoinExpr": {
 				const j = this.join(n);
-				// an alias on a parenthesized join: our parser makes it `(SELECT * FROM join) alias`,
-				// LATERAL (select.ts `ParseParenJoinAlias`); `USING (…) AS name` is dropped (`SkipUsingAlias`)
 				return n.alias
 					? `LATERAL (SELECT * FROM ${j})${this.alias(n.alias)}`
 					: j;
@@ -632,7 +597,6 @@ export class PgCanon {
 		switch (k) {
 			case "ColumnRef": {
 				const f = this.names(n.fields);
-				// our parser keeps the last two parts (parser/expr.ts `ColRefOf`, `star`)
 				return f.length >= 2 ? `${f.at(-2)}.${f.at(-1)}` : f[0]!;
 			}
 			case "A_Const":
@@ -696,7 +660,6 @@ export class PgCanon {
 			case "NamedArgExpr":
 				return `${n.name} => ${this.expr(n.arg)}`;
 			case "SortBy":
-				// ASC / DESC / USING op and NULLS FIRST / LAST are discarded by our parser (expr.ts `SkipOrderTail`)
 				return this.expr(n.node);
 			case "XmlExpr":
 			case "XmlSerialize":
@@ -718,7 +681,6 @@ export class PgCanon {
 		}
 	}
 
-	/** Our parser builds a balanced AND / OR tree (expr.ts `ParseChain`), Postgres a left-flattened one. */
 	private flatten(op: string, args: Json[]): Json[] {
 		return args.flatMap((a) => {
 			const [k, n] = unwrap(a);
@@ -748,19 +710,14 @@ export class PgCanon {
 		if (n.boolval) return n.boolval.boolval ? "true" : "false";
 		if (n.ival || n.fval) return this.number(n);
 		if (n.sval) return `'${this.stringValue(n.sval.sval ?? "", n.location)}'`;
-		// B'…' / X'…': our lexer keeps the digits without the prefix
 		if (n.bsval) return `'${String(n.bsval.bsval ?? "").slice(1)}'`;
 		return "?const";
 	}
 
-	/**
-	 * Postgres folds a unary minus into the constant (gram.y `doNegate`), our parser keeps `-` as
-	 * an operator: the minus signs before the literal are put back as `(- …)`.
-	 */
 	private number(n: Json): string {
 		const value = n.ival ? String(n.ival.ival ?? 0) : String(n.fval.fval);
 		const text = this.at(n.location, 1 << 16);
-		if (!text) return value; // made by the grammar (FETCH FIRST ROW ONLY, …)
+		if (!text) return value;
 		let i = 0;
 		let minus = 0;
 		for (;;) {
@@ -784,10 +741,6 @@ export class PgCanon {
 		return s;
 	}
 
-	/**
-	 * Our lexer keeps E'' and U&'' escapes raw (lexer/tokens.ts); Postgres gives the decoded value,
-	 * so their raw text is read back from the source.
-	 */
 	private stringValue(value: string, loc: number | undefined): string {
 		const text = this.at(loc, 1 << 20);
 		const m = /^(?:[eE]|[uU]&)'/.exec(text);
@@ -814,7 +767,6 @@ export class PgCanon {
 			out += c;
 			i++;
 		}
-		// adjacent literals separated by a newline continue the string; then the decoded value is used
 		const rest = text.slice(i + 1);
 		return /^[ \t\r\f]*\n\s*'/.test(rest) ? value : out;
 	}
@@ -824,7 +776,6 @@ export class PgCanon {
 		const op = name.at(-1)!;
 		switch (n.kind) {
 			case "AEXPR_OP": {
-				// `OPERATOR(schema.op)` is the operator `op`, as our parser reads it (expr.ts `ParseOperatorSyntax`)
 				return n.lexpr
 					? `(${this.expr(n.lexpr)} ${op} ${this.expr(n.rexpr)})`
 					: `(${op} ${this.expr(n.rexpr)})`;
@@ -850,7 +801,6 @@ export class PgCanon {
 			case "AEXPR_NOT_BETWEEN":
 			case "AEXPR_BETWEEN_SYM":
 			case "AEXPR_NOT_BETWEEN_SYM": {
-				// SYMMETRIC / ASYMMETRIC are skipped by our parser (expr.ts `ParseBetween`)
 				const [lo, hi] = unwrap(n.rexpr)[1].items as Json[];
 				return `(${this.expr(n.lexpr)} ${n.kind.includes("NOT") ? "NOT BETWEEN" : "BETWEEN"} ${this.expr(lo!)} AND ${this.expr(hi!)})`;
 			}
@@ -859,10 +809,6 @@ export class PgCanon {
 		}
 	}
 
-	/**
-	 * `p ESCAPE e` / `SIMILAR TO p`: the grammar wraps the pattern in `pg_catalog.like_escape` /
-	 * `similar_to_escape`; our parser keeps the pattern and drops the escape (expr.ts `ParseLike`).
-	 */
 	private unescape(node: Json, fn: string): Json {
 		const [k, n] = unwrap(node);
 		if (k !== "FuncCall") return node;
@@ -875,10 +821,8 @@ export class PgCanon {
 	private call(n: Json): string {
 		const name = this.names(n.funcname).at(-1)!;
 		const args = (n.args ?? []) as Json[];
-		// `OVERLAY(e PLACING p FROM a [FOR b])`: our AST keeps the first operand only (ast.ts `Overlay`)
 		if (name === "overlay" && n.funcformat === "COERCE_SQL_SYNTAX")
 			return `overlay(${this.expr(args[0]!)}, ${OUT})`;
-		// `SUBSTRING(e FOR n)`: the grammar passes `1` and `n::int4` (gram.y `substr_list`); our AST keeps `n`
 		if (
 			name === "substring" &&
 			n.funcformat === "COERCE_SQL_SYNTAX" &&
@@ -903,7 +847,6 @@ export class PgCanon {
 			list = (n.agg_distinct ? "DISTINCT " : "") + parts.join(", ");
 		}
 		let s = `${name}(${list})`;
-		// ORDER BY inside the call is discarded by our parser (expr.ts `SkipAggOrderBy`); WITHIN GROUP's keys are kept
 		if (n.agg_within_group) {
 			const keys = n.agg_order as Json[];
 			s += ` WITHIN GROUP (${keys.length === 1 ? this.expr(keys[0]!) : `ROW(${this.exprs(keys)})`})`;
@@ -913,13 +856,8 @@ export class PgCanon {
 		return s;
 	}
 
-	/**
-	 * `OVER w` and `OVER (w …)` both keep the name (expr.ts `ParseOver`); the frame clause and sort
-	 * directions are discarded (`SkipFrame`, `SkipOrderTail`).
-	 */
 	private windowSpec(w: Json, clause = false): string {
 		const parts: string[] = [];
-		// in a WINDOW clause `name` is the window being defined; in OVER it is `OVER name`
 		const base = w.refname ?? (clause ? undefined : w.name);
 		if (base !== undefined) parts.push(base);
 		if (w.partitionClause?.length)
@@ -949,7 +887,6 @@ export class PgCanon {
 		}
 	}
 
-	/** As parser/typename.ts canonicalizes it: last name part, aliases, `[]`, no modifiers. */
 	typeName(t: Json): string {
 		const parts = this.names(t.names);
 		let name = parts.at(-1)!;
@@ -960,7 +897,6 @@ export class PgCanon {
 	}
 }
 
-/** Our parser reads ALTER TABLE / VIEW / MATERIALIZED VIEW all as ALTER TABLE. */
 const RELATIONS: ReadonlySet<string> = new Set([
 	"OBJECT_TABLE",
 	"OBJECT_VIEW",
@@ -982,7 +918,6 @@ const BOOL_TESTS: { readonly [k: string]: readonly [boolean, string] } = {
 	IS_NOT_UNKNOWN: [true, "UNKNOWN"],
 };
 
-/** `current_date`, `localtimestamp(3)`, …: our parser makes them zero-argument calls (expr.ts `SpecialValue`). */
 const SQL_VALUE_FUNCTIONS: { readonly [k: string]: string } = {
 	SVFOP_CURRENT_DATE: "current_date",
 	SVFOP_CURRENT_TIME: "current_time",

@@ -1,22 +1,3 @@
-/// <reference types="node" />
-/**
- * The background job: computes a project's cache entries with the TypeScript API and writes
- * them to the cache file. One pass:
- *
- *  1. Discover the statements (discover.ts) and, in the same program snapshot, print what
- *     entries depend on: each `DB` type the program uses, the snapshots of the words and pairs
- *     of every statement (print.ts `snapshot`), type maps and slot objects.
- *  2. Evaluate the call types (`CallTypes`), spliced texts, hint indexes and DDL steps in a
- *     probe file next to the cache file (an in-memory overlay of the program).
- *  3. Evaluate the analyses (`CacheAnalysis`) of the positional texts that need one.
- *  4. Merge with what other projects keep in the file (store.ts), render the result into the
- *     probe and drop every entry that does not compile there, then write.
- *
- * An entry whose dependencies print as they did is kept without being computed again, so after
- * an edit only the statements it touched, or that depend on what it changed, are evaluated.
- * The session runs without `runExternalCode`: it never sees a cache, so every entry is
- * computed cold.
- */
 import { type FSWatcher, watch } from "node:fs";
 import { dirname, join, relative, sep } from "node:path";
 import type { Checker, Type } from "typescript/async";
@@ -54,13 +35,9 @@ import {
 } from "./store.js";
 
 export interface JobOptions {
-	/** Absolute tsconfig path. */
 	readonly configFile: string;
-	/** Absolute path of the cache file to write. */
 	readonly cacheFile: string;
-	/** `CacheVersion` of the `@typesql/core` this job belongs to. */
 	readonly engine: string;
-	/** Whether a declaration path belongs to `@typesql/core` (its src or dist). */
 	readonly isCorePath: (path: string) => boolean;
 	readonly log?: (message: string) => void;
 }
@@ -77,7 +54,6 @@ export interface PassResult {
 const MISSING = "__T.Missing";
 const lit = (s: string): string => JSON.stringify(s);
 
-/** One TypeScript session on one project; `pass()` brings the cache file up to date. */
 export class Session {
 	private readonly session: ProbeSession;
 	readonly probe: string;
@@ -89,17 +65,14 @@ export class Session {
 		this.session = new ProbeSession(o.configFile, this.probe);
 	}
 
-	/** Files changed on disk since the last pass (the next pass tells TypeScript). */
 	markChanged(files: Iterable<string>): void {
 		this.session.markChanged(files);
 	}
 
-	/** Close the TypeScript session; the next pass opens a new one. */
 	close(): Promise<void> {
 		return this.session.close();
 	}
 
-	/** Close for good: a pass in progress fails at its next request instead of reopening. */
 	dispose(): Promise<void> {
 		return this.session.dispose();
 	}
@@ -108,7 +81,6 @@ export class Session {
 		this.o.log?.(m);
 	}
 
-	/** A program snapshot with `probe` as the probe file's content. */
 	private withProbe(probe: string) {
 		return this.session.withProbe(probe).catch((e: Error) => {
 			if (/is not in a directory the project includes/.test(e.message))
@@ -128,7 +100,6 @@ export class Session {
 		const existing = readCache(o.cacheFile, o.engine);
 		const kinds = (await this.session.typescript()).kinds;
 
-		// ── 1. discover, and print everything that comes from the project's types ──
 		let { program, checker, sf } = await this.withProbe(PROBE_HEAD);
 		let printer = new Printer(checker, sf, o.isCorePath);
 		const print = async (t: Type): Promise<string> =>
@@ -148,7 +119,6 @@ export class Session {
 		const decl = declarations(sf, kinds);
 		const fc = await checker.getTypeAtLocation(decl.get("__fc")!);
 
-		/** A type the probe can name: printed, or written out one level when it names something the probe cannot see. */
 		const probeText = async (t: Type): Promise<string | null> => {
 			const text = await print(t);
 			const bare = names(text).filter((n) => !n.startsWith("import:"));
@@ -190,7 +160,6 @@ export class Session {
 			}
 			return v;
 		};
-		/** Snapshots of `words` and `pairs` against `db`; a dependency that cannot be written is left out (`null`). */
 		const depSnapshot = async (
 			db: Type,
 			ws: Iterable<string>,
@@ -235,7 +204,6 @@ export class Session {
 			return { t: types ? await snap(types) : "{}", w, q };
 		};
 
-		// groups: one per DB type text
 		interface G {
 			id: string;
 			db: Type;
@@ -330,7 +298,6 @@ export class Session {
 		for (const g of groups.values())
 			g.dep = await depSnapshot(g.db, g.words, g.pairs);
 
-		// DDL steps: the schema before each step, written out, and its dependency snapshot
 		interface D {
 			key: string;
 			db: string;
@@ -366,8 +333,6 @@ export class Session {
 			});
 		}
 
-		// ── what can be kept from the file ──
-		/** The file's snapshots of `deps` print as they do now (errors are always recomputed: hints are not known yet). */
 		const fresh = (g: G, deps: readonly string[]): boolean => {
 			const old = existing.groups[g.id];
 			if (!old || !g.dep || old.t !== g.dep.t || deps.includes("!h"))
@@ -396,7 +361,7 @@ export class Session {
 		};
 		let reused = 0;
 		const ddlKept: { [key: string]: DdlEntry[] } = {};
-		const texts = new Map<Site, string>(); // site → positional text (the analysis key)
+		const texts = new Map<Site, string>();
 		for (const s of typeSites) texts.set(s, s.key);
 		const needCall: Site[] = [];
 		for (const site of calls) {
@@ -415,7 +380,6 @@ export class Session {
 			} else needCall.push(site);
 		}
 
-		// ── 2. call types, spliced texts, hint indexes, DDL steps ──
 		let probe = PROBE_HEAD;
 		for (const g of groups.values())
 			probe += `type DB_${g.id} = ${g.text};\nexport declare const __h_${g.id}: __T.HintIndex<DB_${g.id}> & string;\n`;
@@ -478,7 +442,7 @@ export class Session {
 				const text = qArgs[2]?.isStringLiteralType() ? qArgs[2].value : null;
 				if (text === null) return;
 				texts.set(s, text);
-				const isErr = !(g.flags & 2); // TypeFlags.Unknown: a valid call's check is `unknown`
+				const isErr = !(g.flags & 2);
 				const e = entryFor(s.g, s.key, depsOf([s.key, ...s.extraWords], isErr));
 				if (text !== s.key) e.t = text;
 				const call: CallEntry = {
@@ -488,7 +452,6 @@ export class Session {
 					p: await print(p),
 					q: await print(q),
 				};
-				// two call sites with the same text: one variant (identical variants would show as a union)
 				if (e.c.some((c: CallEntry) => c.m === call.m && c.k === call.k))
 					return;
 				e.c.push(call);
@@ -520,7 +483,6 @@ export class Session {
 			}),
 		);
 
-		// ── 3. analyses of the positional texts ──
 		const analyses: { g: G; text: string; site: Site }[] = [];
 		const seen = new Set<string>();
 		for (const [site, text] of texts) {
@@ -545,7 +507,6 @@ export class Session {
 				const r = results[i]!;
 				if (!("text" in r)) return;
 				const isErr = /^__T\.SqlError</.test(r.text);
-				// function-name typos hint from the whole catalog, which no dependency covers
 				if (isErr && /function .* does not exist/.test(r.text)) return;
 				const e = entryFor(
 					a.g,
@@ -557,7 +518,6 @@ export class Session {
 			});
 		}
 
-		// ── 4. merge, validate, write ──
 		const contribution = (): Contribution => {
 			const gs: Record<string, Group> = {};
 			for (const [gid, es] of entries) {
@@ -644,7 +604,6 @@ export class Session {
 	}
 }
 
-/** An entry's dependencies: the words and pairs of its texts, `"*"`, and `"!h"` for an error. */
 function depsOf(texts: readonly string[], isErr: boolean): string[] {
 	const ws = new Set<string>();
 	for (const t of texts) {
@@ -655,7 +614,6 @@ function depsOf(texts: readonly string[], isErr: boolean): string[] {
 	return [...ws, "*", ...(isErr ? ["!h"] : [])];
 }
 
-/** One pass on a fresh session (tests, the bench): open, pass, close. */
 export async function generate(options: JobOptions): Promise<PassResult> {
 	const session = new Session(options);
 	try {
@@ -665,11 +623,6 @@ export async function generate(options: JobOptions): Promise<PassResult> {
 	}
 }
 
-/**
- * The long-lived job of one project in the content mapper: a pass now, then one after source
- * files change (debounced), until stopped. The TypeScript session closes after `idleMs` without
- * a pass and reopens on the next change.
- */
 export class Job {
 	private readonly session: Session;
 	private watcher: FSWatcher | undefined;
@@ -739,11 +692,6 @@ export class Job {
 			);
 	}
 
-	/**
-	 * Stop now: a pass in progress is abandoned (its TypeScript session is closed under it, and it
-	 * writes nothing, so the file keeps its previous content). `tsc` waits for `closeProject`, so
-	 * this must not wait for the pass.
-	 */
 	async stop(): Promise<void> {
 		this.stopped = true;
 		clearTimeout(this.timer);
@@ -753,9 +701,6 @@ export class Job {
 	}
 }
 
-// ───────────────────────────── helpers ─────────────────────────────
-
-/** A type map written out: its entries, and `$params`' entries, with only core and global names. */
 async function snapshotTypeMap(
 	checker: Checker,
 	printer: Printer,
@@ -771,7 +716,6 @@ async function snapshotTypeMap(
 	return `{ ${parts.join("; ")} }`;
 }
 
-/** Whether any of `names` is not visible from the probe as a global (it may be the project's own). */
 async function anyLocal(
 	printer: Printer,
 	bare: readonly string[],
@@ -780,16 +724,13 @@ async function anyLocal(
 	return false;
 }
 
-/** String literal contents in printed type text (a slot object's fragment texts). */
 function stringLiterals(text: string): string[] {
 	const out: string[] = [];
 	const re = /"((?:[^"\\]|\\.)*)"/g;
 	for (let m = re.exec(text); m; m = re.exec(text)) {
 		try {
 			out.push(JSON.parse(`"${m[1]}"`) as string);
-		} catch {
-			// not a plain literal
-		}
+		} catch {}
 	}
 	return out;
 }
@@ -800,7 +741,6 @@ const sameTuple = (
 ): boolean =>
 	!!a && !!b && a.length === b.length && a.every((x, i) => x === b[i]);
 
-/** The rendered file with each line mapped to the entry (`CacheFile.owners` id) it belongs to. */
 function renderWithLines(file: CacheFile): {
 	text: string;
 	lines: Map<number, string>;
@@ -830,7 +770,6 @@ function renderWithLines(file: CacheFile): {
 	return { text, lines };
 }
 
-/** `file` without the entries `ids` (a group snapshot that fails takes its group). */
 function without(file: CacheFile, ids: ReadonlySet<string>): CacheFile {
 	const groups: Record<string, Group> = {};
 	for (const [g, group] of Object.entries(file.groups)) {

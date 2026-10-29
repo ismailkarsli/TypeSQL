@@ -1,4 +1,3 @@
-/** User-approved comparison exclusions. Exact fingerprints keep other statements checked. */
 const SKIPS = [
 	{
 		check: "pg-ast",

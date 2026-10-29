@@ -16,7 +16,6 @@ interface Ref {
 
 interface Ctx {
 	readonly cols: readonly Ref[];
-	/** Grouped: plain column references must be group keys; aggregates over `cols`. */
 	readonly keys: readonly Ref[] | null;
 	readonly depth: number;
 	readonly aggs: boolean;
@@ -83,7 +82,6 @@ function leaf(t: SqlType, ctx: Ctx): fc.Arbitrary<Node> {
 export function expr(t: SqlType, ctx: Ctx): fc.Arbitrary<Node> {
 	if (ctx.depth <= 0) return leaf(t, ctx);
 	const d: Ctx = { ...ctx, depth: ctx.depth - 1 };
-	// an aggregate's arguments see every column of the group
 	const plain: Ctx = { ...d, keys: null, aggs: false, windows: false };
 	const options: fc.WeightedArbitrary<Node>[] = [
 		{ arbitrary: leaf(t, ctx), weight: 6 },
@@ -717,7 +715,6 @@ function join(
 			),
 		),
 	];
-	// with one item on the left, merged USING columns are bare names; with more, they could be ambiguous
 	if (shared.length && left.items.length === 1) {
 		options.push(
 			fc.subarray(shared, { minLength: 1 }).map((us) =>
@@ -1076,7 +1073,6 @@ export function kinds(s: Node): string[] {
 	return [...out].sort();
 }
 
-/** Deterministic lexical edge cases supplement the seeded grammar without changing its sequence. */
 export function parserStatements(): string[] {
 	return [`SELECT 'x'::"char" AS internal, 'x'::char AS standard`];
 }

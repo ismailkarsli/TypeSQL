@@ -34,12 +34,6 @@ import type { CheckCondition, TypeDisplay } from "./clauses.js";
 import type { NarrowKeys, NarrowLevel, UsingKeys } from "./narrow.js";
 import type { ResolveTable } from "./resolve.js";
 
-/**
- * Build the scope level for a FROM clause. Items are bound left to right; LATERAL items
- * (and function calls, which are implicitly lateral) can see the items bound so far.
- *
- * `BindFrom<Items, DB, Outer, Ctes>` → `ScopeLevel` or `SqlError`.
- */
 export type BindFrom<
 	Items extends readonly FromItem[],
 	DB,
@@ -55,7 +49,6 @@ export type BindFrom<
 			: L
 		: never;
 
-/** Bind one FROM item into the scope items it contributes. `Sofar`: items already bound in this level. */
 export type BindFromItem<
 	F extends FromItem,
 	DB,
@@ -137,10 +130,6 @@ export type BindFromItem<
 									>
 								: SqlError<"unsupported FROM item", null>;
 
-/**
- * `XMLTABLE(...) [alias [(cols)]]`: always lateral, named `xmltable` without an alias; a bare
- * alias does not rename its columns, a column alias list does (positionally).
- */
 type BindXmlTable<
 	F,
 	Alias extends string | null,
@@ -178,7 +167,6 @@ type BindXmlTable<
 			: A
 		: never;
 
-/** `table name "u" specified more than once` when the alias is already used in this level. */
 export type CheckAlias<
 	A extends string,
 	Sofar extends ScopeLevel,
@@ -211,12 +199,6 @@ type BindTable<
 			: A
 		: never;
 
-// ─── TABLESAMPLE ───
-
-/**
- * Sampling methods and the type their argument is coerced to: `system` and `bernoulli` are
- * built in, `system_rows` and `system_time` come with the contrib modules of the same name.
- */
 type SampleMethods = {
 	system: "float4";
 	bernoulli: "float4";
@@ -224,11 +206,6 @@ type SampleMethods = {
 	system_time: "float8";
 };
 
-/**
- * `t TABLESAMPLE method (args) [REPEATABLE (seed)]`: the arguments see the outer query
- * levels only (not the other items of this FROM clause). A CTE cannot be sampled; a view
- * cannot either, but schemas do not tell views from materialized views, so that is not checked.
- */
 type BindSample<
 	Tbl extends FromTable,
 	Method extends string,
@@ -271,7 +248,6 @@ type BindSample<
 					null
 				>
 		: SqlError<`tablesample method ${Method} does not exist`, null>;
-/** Each argument must be coercible to its type (numbers are; NULL is rejected when the scan starts). */
 type SampleArgs<
 	Args extends readonly Expr[],
 	Ts extends readonly string[],
@@ -297,7 +273,6 @@ type SampleArgs<
 					: Args[I] extends { readonly t: "str" }
 						? SampleArgs<Args, Ts, C, Nx<I>>
 						: SqlError<
-								// an expression of the NULL type (`CASE … THEN NULL END`) resolves to text
 								`argument of ${I extends 0 ? "TABLESAMPLE" : "REPEATABLE"} must be type ${TypeDisplay<Ts[I]>}, not type ${TypeDisplay<A["type"] extends "null" ? "text" : A["type"]>}`,
 								null
 							>
@@ -350,11 +325,6 @@ type BindSub<
 			: never
 	: never;
 
-/**
- * A reference to a FROM item of the same level that is not visible from here: Postgres
- * reports "invalid reference" (the subquery is not LATERAL, or the join type does not
- * allow a LATERAL reference) rather than "missing FROM-clause entry".
- */
 type LateralHint<E, Sofar extends ScopeLevel, Extra extends string> =
 	E extends SqlError<
 		`missing FROM-clause entry for table "${infer X}"`,
@@ -365,11 +335,6 @@ type LateralHint<E, Sofar extends ScopeLevel, Extra extends string> =
 			: E
 		: E;
 
-/**
- * Positionally rename plain entries (`AS t(a, b)`). More names than columns is an error
- * (`<who> has N columns available but M columns specified`); renaming across a `*` entry
- * is not supported.
- */
 export type RenameCols<
 	C extends Cols,
 	Names extends readonly string[],
@@ -392,9 +357,6 @@ export type RenameCols<
 			>
 	: [...Acc, ...C];
 
-// ─── functions in FROM ───
-
-/** Multi-column set-returning functions (ordered). */
 type RecordSrf = {
 	json_each: [
 		{ readonly n: "key"; readonly t: Info<"text"> },
@@ -413,13 +375,11 @@ type RecordSrf = {
 		{ readonly n: "value"; readonly t: Info<"text", true> },
 	];
 };
-/** Functions returning `record`: a column definition list is required. */
 type RecordFunc =
 	| "json_to_record"
 	| "jsonb_to_record"
 	| "json_to_recordset"
 	| "jsonb_to_recordset";
-/** Set-returning functions whose single output column is named `value` (declared with an OUT parameter). */
 type ValueNamed =
 	| "json_array_elements"
 	| "jsonb_array_elements"
@@ -491,7 +451,6 @@ type BindFunc<
 			>
 		: SqlError<"unsupported function call in FROM", null>;
 
-/** `FROM CAST(e AS T) [AS] a`: one row, one column named like the expression (`T`) or the alias. */
 type BindCastFunc<
 	E extends Expr,
 	Alias extends string | null,
@@ -533,12 +492,6 @@ type BindCastFunc<
 			: never
 		: never;
 
-/**
- * Natural (pre-alias) columns of a function in FROM, as ordered entries. A set-returning
- * function produces no row for NULL input, so its column is nullable only when the
- * function itself can return NULL elements (`jsonb_array_elements_text`, multi-array
- * `unnest`); a plain function in FROM is one row holding the function's value.
- */
 type FuncBaseCols<
 	Name extends string,
 	Args extends readonly Expr[],
@@ -593,7 +546,6 @@ type SrfOrScalar<
 				: never
 		: never;
 
-/** `unnest(a, b, ...)`: one column per array (all named `unnest`); shorter arrays are padded with NULLs. */
 type MultiUnnest<
 	As extends readonly ColInfo[],
 	Acc extends Cols,
@@ -629,19 +581,11 @@ type ColDefsCols<
 		>
 	: Acc;
 
-// ─── ROWS FROM ───
-
 type RowsFromFunc = {
 	readonly call: Expr;
 	readonly colDefs: readonly ColDef[] | null;
 };
 
-/**
- * `ROWS FROM (f(...), g(...)) [WITH ORDINALITY] [AS t(cols)]`: the columns of each function
- * in order (a multi-argument `unnest` contributes one per array), then `ordinality` (int8).
- * The functions are zipped and shorter results padded with NULLs, so with more than one
- * function every column is nullable. One function behaves like the function alone.
- */
 type BindRowsFrom<
 	Fs extends readonly RowsFromFunc[],
 	Alias extends string | null,
@@ -743,11 +687,6 @@ type NullableCols<B extends Cols> = {
 		: B[K];
 };
 
-/**
- * Column naming of a function table: `AS t(a, b)` renames positionally (including the
- * ordinality column); a bare alias renames the single column of a scalar/SRF function
- * but not the columns of a record-returning one.
- */
 type FuncRename<
 	Base extends Cols,
 	Alias extends string | null,
@@ -768,15 +707,6 @@ type RenameFirst<
 	? [{ readonly n: Alias; readonly t: T }, ...R]
 	: Base;
 
-// ─── joins ───
-
-/**
- * `l <kind> JOIN r ON ... | USING (...) | NATURAL`. The right side of a RIGHT/FULL join
- * cannot reference the left side (no LATERAL). The ON condition sees the two sides only
- * (not the other items of the FROM clause). An INNER join's ON condition narrows the
- * columns it proves non-null (see narrow.ts); USING / NATURAL columns of an inner join are
- * non-null on both sides.
- */
 type BindJoin<
 	K extends JoinKind,
 	L extends FromItem,
@@ -855,7 +785,6 @@ type NullableLevel<L extends ScopeLevel> = {
 		: L[I];
 };
 
-/** Column names present on both sides (NATURAL JOIN). */
 type CommonNames<L extends ScopeLevel, R extends ScopeLevel> = Extract<
 	LevelKeys<L>,
 	LevelKeys<R>
@@ -866,12 +795,6 @@ type LevelKeys<L extends ScopeLevel> = L[number] extends infer I
 		: never
 	: never;
 
-/**
- * Combine the two sides of a USING / NATURAL join: the merged columns become a synthetic
- * first item (alias null) and are hidden (`skip`) on both sides for unqualified lookup
- * and `*` (Postgres lists the merged columns first, then the other columns of each side).
- * `t.c` still reaches the original columns.
- */
 type MergeUsing<
 	K extends JoinKind,
 	L extends ScopeLevel,
@@ -940,12 +863,6 @@ type FindInLevel<
 			: FindInLevel<R, Name>
 	: null;
 
-/**
- * Merged USING column: the common type of both sides. Nullability: an INNER join's
- * equality can never match NULLs; LEFT keeps the left column, RIGHT the right one;
- * FULL is `COALESCE(l.c, r.c)`, which is NULL for a row of either side whose column is (the
- * other side has no match for it).
- */
 type UsingCols<
 	U extends string,
 	K extends JoinKind,

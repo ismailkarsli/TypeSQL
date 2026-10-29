@@ -6,13 +6,38 @@
 npm install @typesql/core @typesql/postgres postgres
 ```
 
-[Open an example in the TypeScript Playground](https://www.typescriptlang.org/play/#code/PTAEBUE8AcFMGUCKAZUB3AlgFwBamgPYDOWA5gE6xEB0AVkaABQACWMVAjgDbCEkVUAlNVCIArrHIYqocmIB26bHiLdqCogEMAZrEZZYADywAaUADdNXCUUFnN8gCayCaIgCgQoTZVBs4zgBGkOg4mlj4xGSUNPT4PkRUAFygGPJYABypDJqgJFLypGYE5N6ggRikaRGYuKAAQpUAkunx5ERppKAE8tTu7hgAtoTkEf6woADeoADCBFxmAOKw8pLhsI5mAHJiXFyagVwTAL6g2uQEg6AARKzsqjwAxiWw1wDcA8MlEdOPlOvwbigU7nS43O5wB68KICIjvT4jMbsKagQFcYFnC5Xa58aJUeEDdKSbSaR4TAAi9Sm7gAkGJEu0UpNaTSMI4UstVuR1o4ADzXaoAFmuAD4PjSabBBpoMFwUnMuPyDMZReKaY4MERoPtIAB9eSaQawFI7PYHI5KoxYVUsv6wHm68IclZrAx865YIZULCG6BYABeNppx3FuKITJZbOdXJ5-OqGSDNM0YlwJV1Udm8zj6WFYpZnqwR3lWY9VsTPtI4czitLxgA2gBdIMh9zHfqOWCPfa+Z7yEigRyBFJot6gLy42GMHEwmJJEBcAiPKw4KLATTQaDXQTuXv9h6gAC8oDtAO4vMpIsYg8EHx3PX7YcP3jQMoiD0YtIABvAAKLIH8zOAqSbH42BHGYFYMAAYgASgA8gAspEJAMAA6gAEj+ME-qAAAkACMT4AIJbAAmkwkGCJ+Ji0tcDzXDRwhGJ2KZ6DenhgKAXEAHoAPz9F4cGKLkvarI8no9EodSfuMVbTBUVTpCkE4xNQjSkC0ETHNRqTpFkDjOM8ChYIwABUgjHpcEyBKSADW3gMAp1R9B2XY+BMu4RIO6nDme8mVNUKROa0xx5p55SVE+J4GGi571Je3mVGY-mKVgKRYHIJzseFRnpAwR6aC+2ARaQH40t+f4AUByapuQ6YgblJnmaARHwKAiiwYhyFYAwizwQAqgACg05E1SudVstR7hMYYLEGIw7FeFxoB8QJYAPNQGUOFo4kYJJmp5GogSwIpo5YIYm3cn2pISYoB25Fo5iwIQznuIVr6HVwl3bTde3yIwmhEJA8iPBRhgWQeIrUkmRVjIYZXlUN5JEeAOGPr+QEFkcT5iBukj6GBsAWRhWE4WNaZsk+BFTRKADsNE0jNc1seK4WKAVsN+PDLKfuSlWo6AnVIY+JPYcePgagaXDYJA+iaJWEOgAADDTTOPKxczGQt4pLTx-HHOx7jvhV-6AcBgvwcLURoZhYuQaAzBQ9TZh0dwW6jl4kgXOQ6Xywwjt+JotkyLkypYI27hAA) <!-- playground:postgres --> to hover the types and edit the SQL, with nothing to install.
+[Open an example in the TypeScript Playground](https://www.typescriptlang.org/play/#code/JYWwDg9gTgLgBDAnmApnA3nAwhANgGjgHEUA7FKAQxhQBNCA5AV110oCNc0BfOAMygQQcAEQABJKgDOAR1wB6AMbQUIgNwAoUJFgY4iqCmooAynLi8BQ0ROQpZCyFJgBzQ1PVbw0eJLSYzXAt+QWERJ1d3Ty1SGig+SkU0ABEAIQwNAEgmKQopAC4MzMzgWkKScioaWgAeEWBYgBYRAD5NYpQQSmBcQpxcOpoADxhW9szaYCkwNkQAfVJKEBRC5lYOLkGUEbGszIMjarnqcrIKY1qRGFB7GCWwGAAvXczudoiCopKy4jOqujqDRgAA4XplKEwYAALaBzUp9PCAppg64wLgIgZXbajNp7O4uT79LYjADaAF0Xm8NNwNBpaChFGxDPoIKRnHBaOxCoFNMo2fAHHAALz6QzGQI1NItAAUnIAlJoNHz2R9hXBKAB3boCuTSrIAAxMAFEADJGrAAFTgpUIqK4tsoBLgADEAEoAeQAsnBVQB1AASRtdRrgABIAIxqgCCDAAmnBpfipHL9fgsiIHCI03KAHTbBmQlDShW0+mMyjM5XwTmpYAublyGqYdh1oGFFsuIEWXFVuAdtUHcWNqWy9i1lyEZut2KFGBQJg8Eu95RMWJSNWa7V9ut6zKG03mq0Q6Gwm0s1cwaUAKjlcCjJjgpBdHu9qqIHoAqgAFOCpePHmEoDhWhUw0XN80UQti0VTdgB1XAcznSg2USa5WWlSgpEQUhFATGAhlvIUWiKWDfCGXc92-ZIowtENVWNK07TQEUmDAVAoETOCuFvAMgxDADT1oNUI1A4oAHY00ycChgLGhoKyXsnxFUiEHIvZ9WSA9aOfL0fQgZx1144N9ArSZFlwODEETR1kzVAAGUTpNklAcAveTuBLDQHGlfczUta0hLdXS-UDYykzgMRiJEwgMzkEQSyAA) <span data-playground="postgres"></span> to hover the types and edit the SQL, with nothing to install.
 
 ## Create `sql`
 
 Pass your postgres.js connection to `createSql`. If the connection parses `int8` to `bigint`, pass `{ bigint: true }`:
 
-<<< @/snippets/adapters.ts#postgresjs
+```ts
+import postgres from "postgres";
+import * as pgjs from "@typesql/postgres";
+
+const db = postgres(process.env["DATABASE_URL"]!);
+const sqlJs = pgjs.createSql<DB>(db);
+const posts = await sqlJs(
+	"SELECT id, title FROM posts WHERE author_id = $1",
+	1,
+).execute();
+
+const dbBig = postgres(process.env["DATABASE_URL"]!, {
+	types: { bigint: postgres.BigInt },
+});
+const big = pgjs.createSql<DB>(dbBig, { bigint: true });
+const counts = await big(
+	"SELECT author_id, count(*) AS n FROM posts GROUP BY author_id",
+).execute();
+
+await sqlJs.transaction(async (tx) => {
+	await tx(
+		"UPDATE posts SET title = upper(title) WHERE author_id = $1",
+		1,
+	).execute();
+});
+```
 
 It takes the `Sql` instance, the `TransactionSql` that `begin` passes, or a `ReservedSql`. Queries run with `unsafe(text, values)`, so the text reaches the server as written.
 

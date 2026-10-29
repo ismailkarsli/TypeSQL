@@ -1,8 +1,3 @@
-/**
- * Must print exactly what pg-canon.ts prints from PostgreSQL's parse tree of the same statement:
- * change both together.
- */
-
 import type { Lex, ParseProgram } from "../../src/engine/index.js";
 import type { Toks } from "../../src/engine/lexer/tokens.js";
 import type { SqlError } from "../../src/index.js";
@@ -49,10 +44,6 @@ type Ref<R> = R extends {
 		: "?ref";
 type NormOp<O> = O extends "!=" ? "<>" : O extends string ? O : "?op";
 
-/**
- * Everything but `Ex` itself reads it through this: a direct reference to `Ex` in a template
- * literal hole or a type argument triggers TS5114 ("appear infinitely circular", engine.md pitfall 9).
- */
 type ExS<E> = Ex<E> extends infer S extends string ? S : never;
 
 export type Ex<E> = E extends {
@@ -304,7 +295,6 @@ export type Ex<E> = E extends {
 																																										? `?${T}`
 																																										: "?";
 
-/** Walks the left spine without nesting the instantiation: `a + b + … + z` can have hundreds of terms. */
 type Spine<E, Ops extends readonly unknown[]> = E extends {
 	readonly t: "bin";
 	readonly op: infer Op;
@@ -381,7 +371,6 @@ type Spaced<L, Acc extends string = ""> = L extends readonly [
 	? Spaced<R, H extends "" ? Acc : Acc extends "" ? H : `${Acc} ${H}`>
 	: Acc;
 
-/** Postgres has no node for a parenthesized SELECT: the inner one's clauses merge into the outer. */
 type Merged<S> = S extends {
 	readonly body: { readonly t: "paren"; readonly q: infer Q };
 }

@@ -1,5 +1,4 @@
 {
-	"//": "The repository's own scripts and root configs, run by Node's type stripping.",
 	"extends": "./tsconfig.base.json",
 	"compilerOptions": {
 		"noEmit": true,
