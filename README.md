@@ -1,15 +1,17 @@
 # TypeSQL
 
-Write Postgres SQL in TypeScript and get exact types for rows and parameters. TypeSQL parses your SQL inside the type checker: no codegen, no database connection, no build step.
+Write SQL in TypeScript and get exact types for rows and parameters. TypeSQL parses your SQL inside the type checker: no codegen, no database connection, no build step.
+
+TypeSQL supports PostgreSQL today. MySQL and SQLite are planned.
 
 ![TypeSQL demo: highlighted SQL with table and column completions inside a query, hovering a query shows its inferred row type, and a misspelled column is a compile error](assets/demo.gif)
 
 ## Why TypeSQL
 
-- **Plain SQL.** You write the SQL Postgres runs, not a query builder's version of it.
+- **Plain SQL.** You write the SQL your database runs, not a query builder's version of it.
 - **No codegen.** Types update as you type. There is no generate step to rerun and no database to keep running for it.
-- **Mistakes are compile errors.** A misspelled column, an unknown table or a wrong parameter type is caught in your editor, worded like the error Postgres would give.
-- **Real Postgres rules.** A `LEFT JOIN` makes columns nullable, `WHERE x IS NOT NULL` makes them non-null, and `count(*)` is never null.
+- **Mistakes are compile errors.** A misspelled column, an unknown table or a wrong parameter type is caught in your editor, worded like the error your database would give.
+- **Real database rules.** A `LEFT JOIN` makes columns nullable, `WHERE x IS NOT NULL` makes them non-null, and `count(*)` is never null.
 - **Editor support.** SQL inside `sql()` strings gets completions and syntax highlighting, like code in a `.sql` file.
 
 ## Install
@@ -23,7 +25,7 @@ Requires TypeScript 7.1 or later.
 
 ## Quick start
 
-Describe your tables with Postgres type names, then write queries:
+Describe your tables with your database's type names, then write queries:
 
 ```ts
 import { createSql } from "@typesql/core";
@@ -64,7 +66,7 @@ Already have a schema in one of them? `@typesql/kysely`, `@typesql/drizzle` and 
 
 Every TypeScript editor shows a query's row type on hover and underlines mistakes in the SQL. Install the TypeSQL extension for VS Code ([Marketplace](https://marketplace.visualstudio.com/items?itemName=typesql.typesql), [Open VSX](https://open-vsx.org/extension/typesql/typesql)) to also get:
 
-- **Completions** for tables, views and schemas after `FROM`, `JOIN`, `INTO` and `UPDATE`, and for columns with their Postgres types after `alias.` and in expressions.
+- **Completions** for tables, views and schemas after `FROM`, `JOIN`, `INTO` and `UPDATE`, and for columns with their SQL types after `alias.` and in expressions.
 - **Syntax highlighting** for keywords, types, functions, strings, `$1` parameters and more inside `sql()` strings.
 
 ```ts
@@ -120,9 +122,9 @@ const m = migrations()
 type DB = SchemaOf<typeof m>;
 ```
 
-## Tested against PostgreSQL's own tests
+## Tested against the database's own tests
 
-The parser is checked against the regression tests PostgreSQL runs on itself, about 50,000 statements. TypeSQL agrees with Postgres on every one that can be checked statically: it parses what Postgres parses and rejects what Postgres rejects. CI fails on a single disagreement. See [Postgres compatibility](https://typesql.karsli.net/guide/postgres-compatibility).
+The parser is checked against the regression tests the database runs on itself. For PostgreSQL that is about 50,000 statements, and TypeSQL agrees with Postgres on every one that can be checked statically: it parses what Postgres parses and rejects what Postgres rejects. CI fails on a single disagreement. See [Postgres compatibility](https://typesql.karsli.net/guide/postgres-compatibility).
 
 ## Compile time
 
@@ -142,7 +144,7 @@ See [Performance](https://typesql.karsli.net/guide/performance) for how this is 
 Cached and uncached tsrs check time for the [real-world application](packages/bench/src/case1.ts) by `@typesql/core` version. Lower is faster. Every refresh remeasures all releases from 0.7.1 in one CI job with the same compilers, using the median of three checks per variant.
 
 <span id="performance-history-start"></span>
-Lines: 🔵 Uncached · 🟢 Cached. tsrs check time for the case1 application workload, remeasured for all versions in one CI job.
+Lines: 🔵 Uncached · 🟢 Cached.
 
 ```mermaid
 ---

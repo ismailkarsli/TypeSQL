@@ -17,7 +17,7 @@ npm install -D typescript@7.1.0-beta
 
 ## 2. Describe your tables
 
-A schema is a TypeScript interface. Each key is a table, and each column has a Postgres type name.
+A schema is a TypeScript interface. Each key is a table, and each column has a type name from your database.
 
 ```ts
 import type { Col, Generated, Nullable } from "@typesql/core/postgres";
@@ -82,7 +82,7 @@ const user = await sql(
 
 `executeTakeFirstOrThrow()` throws a `NoResultError` when there is no row. [node-postgres](../adapters/pg) lists all the `execute*` methods.
 
-The text goes to Postgres as you wrote it, and the values go as parameters:
+The text goes to the database as you wrote it, and the values go as parameters:
 
 ```ts
 recent.text;
@@ -91,7 +91,7 @@ recent.values;
 
 ## 6. Mistakes are compile errors
 
-When the SQL is wrong, the error appears on the string, worded like the Postgres error:
+When the SQL is wrong, the error appears on the string, worded like the database's error:
 
 ```ts
 sql("SELECT emial FROM users");

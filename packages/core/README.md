@@ -1,6 +1,6 @@
 # @typesql/core
 
-Write Postgres SQL in TypeScript and get exact types for rows and parameters. TypeSQL parses your SQL inside the type checker: no codegen, no database connection, no build step.
+Write SQL in TypeScript and get exact types for rows and parameters. TypeSQL parses your SQL inside the type checker: no codegen, no database connection, no build step.
 
 ## Install
 
@@ -12,7 +12,7 @@ Requires TypeScript 7.1 or later.
 
 ## Usage
 
-Describe your tables with Postgres type names, then write queries:
+Describe your tables with your database's type names, then write queries:
 
 ```ts
 import { createSql } from "@typesql/core";

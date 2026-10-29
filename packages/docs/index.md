@@ -3,7 +3,7 @@ layout: home
 
 hero:
   name: "TypeSQL"
-  text: "Typed Postgres SQL for TypeScript"
+  text: "Typed SQL for TypeScript"
   tagline: "Write plain SQL and get exact types for rows and parameters. No codegen, no database connection, no build step."
   actions:
     - theme: brand
@@ -19,11 +19,11 @@ hero:
 
 features:
   - title: "Plain SQL, exact types"
-    details: "Write the SQL Postgres runs. Row and parameter types follow Postgres's rules, including nullability from joins."
+    details: "Write the SQL your database runs. Row and parameter types follow its rules, including nullability from joins. PostgreSQL today; MySQL and SQLite are planned."
   - title: "No codegen"
     details: "The TypeScript compiler reads your SQL. There is no generate step and no database to connect to."
   - title: "Mistakes are compile errors"
-    details: "A misspelled column, an unknown table or a wrong parameter is caught in your editor, worded like Postgres."
+    details: "A misspelled column, an unknown table or a wrong parameter is caught in your editor, worded like your database's errors."
   - title: "Editor support"
     details: "VS Code and Neovim complete tables and columns and highlight the SQL inside your strings."
     link: /guide/vscode

@@ -1,6 +1,6 @@
 # Type mapping
 
-Your schema uses Postgres type names (`int8`, `timestamptz`). A **type map** says which TypeScript type each one becomes. This page lists the maps for each driver, what parameters accept, and how to write your own map.
+Your schema uses the database's type names (in PostgreSQL, `int8`, `timestamptz`). A **type map** says which TypeScript type each one becomes. This page lists the maps for each driver, what parameters accept, and how to write your own map.
 
 Each adapter's `createSql` picks the map that matches its driver. `createSql` from `@typesql/core` with the `postgres` dialect uses `DefaultTypeMap`, which matches node-postgres.
 

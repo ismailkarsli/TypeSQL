@@ -56,7 +56,7 @@ To turn suggestions off, set `"typesql.completions.enable": false`.
 
 - Aliases follow scope: a subquery sees its own FROM items first, then the outer query's.
 - Subqueries and CTEs offer the names of their output columns.
-- Names that Postgres would fold to lower case or read as a keyword are inserted in double quotes (`"UserAccounts"`, `"order"`).
+- Names that the database would fold to lower case or read as a keyword are inserted in double quotes (`"UserAccounts"`, `"order"`).
 - Suggestions work in `sql()`, in `tx()` inside `sql.transaction()`, in `sql.fragment()` and `sql.as()`, in template literals across lines, and between `${sql.param()}` values.
 - There are none inside string literals, comments and quoted identifiers.
 

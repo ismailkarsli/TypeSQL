@@ -1,6 +1,6 @@
 # Introduction
 
-TypeSQL gives you exact TypeScript types for the Postgres SQL you write. You describe your tables once, write SQL as a string, and the compiler tells you what comes back:
+TypeSQL gives you exact TypeScript types for the SQL you write. You describe your tables once, write SQL as a string, and the compiler tells you what comes back:
 
 ```ts
 import { Pool } from "pg";
@@ -23,20 +23,24 @@ const rows = await recent.execute();
 
 ## How it works
 
-TypeSQL is written in TypeScript's type system. When you call `sql("…")` with a string literal, the compiler parses the SQL and looks up its tables and columns in your schema type, in your editor and in `tsc`. There is no generated file and no build step. At runtime, `sql("…")` only builds `{ text, values }`, and your driver sends it to Postgres unchanged.
+TypeSQL is written in TypeScript's type system. When you call `sql("…")` with a string literal, the compiler parses the SQL and looks up its tables and columns in your schema type, in your editor and in `tsc`. There is no generated file and no build step. At runtime, `sql("…")` only builds `{ text, values }`, and your driver sends it to the database unchanged.
 
 ## What you get
 
-- **Row types.** Column names and types follow Postgres, including nullability from outer joins, aggregates, `COALESCE` and `WHERE … IS NOT NULL`.
+- **Row types.** Column names and types follow your database, including nullability from outer joins, aggregates, `COALESCE` and `WHERE … IS NOT NULL`.
 - **Parameter types.** `$1`, `:name` and inline `${sql.param(value)}` each take their type from where they are used.
-- **Compile errors.** An unknown column, a missing `NOT NULL` value or a syntax error shows up on the string, worded like the Postgres error.
-- **The whole statement language.** From joins and CTEs to `MERGE` and SQL/JSON. See [Postgres compatibility](./postgres-compatibility).
+- **Compile errors.** An unknown column, a missing `NOT NULL` value or a syntax error shows up on the string, worded like the database's error.
+- **The whole statement language.** From joins and CTEs to `MERGE` and SQL/JSON.
 - **A thin runtime.** `@typesql/core` has no dependencies. Adapters run queries on node-postgres, postgres.js, Kysely, Drizzle or Prisma.
 - **Editor support.** The optional editor support for [VS Code](./vscode) and [Neovim](./neovim) completes table and column names and highlights the SQL.
 
-## Tested against Postgres itself
+## Dialects
 
-The parser is checked against PostgreSQL 18's own regression tests, about 50,000 statements. It accepts what Postgres accepts and rejects what Postgres rejects, on every statement that can be checked without running it. See [Postgres compatibility](./postgres-compatibility).
+The core is dialect-neutral: each SQL dialect brings its own parser, type rules and type names. PostgreSQL is supported today. MySQL and SQLite are planned.
+
+## Tested against the database itself
+
+The PostgreSQL parser is checked against PostgreSQL 18's own regression tests, about 50,000 statements. It accepts what Postgres accepts and rejects what Postgres rejects, on every statement that can be checked without running it. See [Postgres compatibility](./postgres-compatibility).
 
 ## Next
 

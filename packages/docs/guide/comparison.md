@@ -16,9 +16,9 @@ There are several good ways to get typed database access in TypeScript. This pag
 
 ## Code generators that ask the database
 
-pgtyped and Prisma TypedSQL send your queries to a running Postgres and generate types from what it returns. SafeQL does the same check from an ESLint rule. Because the database answers, anything it knows (extensions, custom functions, domains) is covered.
+pgtyped and Prisma TypedSQL send your queries to a running database and generate types from what it returns. SafeQL does the same check from an ESLint rule. Because the database answers, anything it knows (extensions, custom functions, domains) is covered.
 
-TypeSQL needs no database while you write code, and there is no generator to rerun. It also works out nullability from the SQL (a `LEFT JOIN`, a `WHERE x IS NOT NULL`), which Postgres doesn't report for result columns. It still needs a schema type, which you can [generate once per migration](./introspect).
+TypeSQL needs no database while you write code, and there is no generator to rerun. It also works out nullability from the SQL (a `LEFT JOIN`, a `WHERE x IS NOT NULL`), which the database doesn't report for result columns. It still needs a schema type, which you can [generate once per migration](./introspect).
 
 ## Query builders and ORMs
 

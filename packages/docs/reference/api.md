@@ -16,7 +16,7 @@ createSql<DB, TypeMap = DefaultTypeMap>(postgres, executor?, options?): Sql<DB, 
 Returns the typed `sql` function for a schema in a [dialect](#dialects).
 
 - The dialect is the first argument: `postgres` from `@typesql/core/postgres`. Each dialect adds its own `createSql` signature, so the type arguments start with `DB`.
-- `DB` is your [schema](../guide/schema). `TypeMap` turns Postgres types into TypeScript types ([Type mapping](./type-mapping)); it defaults to the dialect's map.
+- `DB` is your [schema](../guide/schema). `TypeMap` turns the dialect's column types into TypeScript types ([Type mapping](./type-mapping)); it defaults to the dialect's map.
 - `executor` is what `execute*` runs on. Without one, `sql` only builds queries.
 - `options.rowKeys` is `"preserve"` (the default) or `"camelCase"`. See [camelCase row keys](../guide/queries#camelcase-row-keys).
 

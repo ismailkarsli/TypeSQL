@@ -87,7 +87,7 @@ patched.text;
 - Splice it into `UPDATE … SET {set}` or `ON CONFLICT … DO UPDATE SET {set}`. Other assignments can follow: `SET {set}, updated_at = now()`, for columns that are not keys of the input type (Postgres rejects a second assignment: `multiple assignments to same column "updated_at"`).
 
 ::: warning Empty input
-If no value is defined at runtime, `sql.set` throws, because Postgres needs at least one assignment. Skip the `UPDATE` (or `SELECT` the row) when the input is empty.
+If no value is defined at runtime, `sql.set` throws, because SQL needs at least one assignment. Skip the `UPDATE` (or `SELECT` the row) when the input is empty.
 :::
 
 ::: warning Mass assignment protection

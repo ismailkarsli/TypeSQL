@@ -29,7 +29,7 @@ const q = sql(
 
 - `SchemaOf<typeof m>` is the schema. Pass it to `createSql`.
 - `m.statements` is the list of statements at runtime, in order.
-- A wrong statement is a compile error on its string, worded like Postgres: `relation "users" already exists`, `column "age" of relation "users" does not exist`, and so on.
+- A wrong statement is a compile error on its string, worded like the database's error: `relation "users" already exists`, `column "age" of relation "users" does not exist`, and so on.
 
 ## Running migrations
 

@@ -5,7 +5,7 @@ const github = "https://github.com/ismailkarsli/TypeSQL";
 export default defineConfig({
 	title: "TypeSQL",
 	description:
-		"Write Postgres SQL in TypeScript and get exact types for rows and parameters. No codegen, no database connection, no build step.",
+		"Write SQL in TypeScript and get exact types for rows and parameters. No codegen, no database connection, no build step.",
 	cleanUrls: true,
 	head: [
 		[

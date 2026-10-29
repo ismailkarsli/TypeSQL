@@ -48,11 +48,11 @@ export const sql = createSql<DB>();
 
 ## Type names
 
-Columns use Postgres type names, not TypeScript types. This lets TypeSQL type expressions the way Postgres does: `int4 + int8` is `int8`, and `timestamptz - timestamptz` is an `interval`.
+Columns use the database's type names, not TypeScript types. This lets TypeSQL type expressions the way the database does. In PostgreSQL, `int4 + int8` is `int8`, and `timestamptz - timestamptz` is an `interval`.
 
 Common spellings mean the same thing: `integer`, `int` and `int4`; `bigint` and `int8`; `boolean` and `bool`; `character varying` and `varchar`; `double precision` and `float8`; `timestamp with time zone` and `timestamptz`. A name TypeSQL doesn't know, such as an extension type or a domain, is kept as it is. It maps to `unknown` unless the type map or `$types` gives it a type.
 
-The driver decides which TypeScript type each Postgres type becomes (node-postgres returns `int8` as a `string`, for example). This is the driver's **type map**, and you pick it by importing `createSql` from the driver's package. See [Type mapping](../reference/type-mapping).
+The driver decides which TypeScript type each database type becomes (node-postgres returns `int8` as a `string`, for example). This is the driver's **type map**, and you pick it by importing `createSql` from the driver's package. See [Type mapping](../reference/type-mapping).
 
 ## Typed JSON columns
 
@@ -102,7 +102,7 @@ const moods = sql(`SELECT mood, count(*) AS n FROM users GROUP BY mood`);
 
 ## Functions
 
-Built-in Postgres functions are already known. Declare your own functions, and extension functions TypeSQL doesn't know, under `$functions`:
+Built-in functions are already known. Declare your own functions, and extension functions TypeSQL doesn't know, under `$functions`:
 
 ```ts
 interface DB {

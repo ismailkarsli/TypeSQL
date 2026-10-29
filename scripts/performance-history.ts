@@ -188,7 +188,7 @@ const releases = Object.entries(history).sort(([a], [b]) =>
 );
 const chart = [
 	'<span id="performance-history-start"></span>',
-	"Lines: 🔵 Uncached · 🟢 Cached. tsrs check time for the case1 application workload, remeasured for all versions in one CI job.",
+	"Lines: 🔵 Uncached · 🟢 Cached.",
 	"",
 	"```mermaid",
 	"---",

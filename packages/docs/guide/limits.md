@@ -7,7 +7,7 @@ When you hit a limit, [`sql.as<Row>()`](./errors#when-typesql-can-t-type-a-state
 ## Toolchain
 
 - TypeSQL needs TypeScript 7.1 or later (the native compiler; `7.1.0-beta` works).
-- It models PostgreSQL only.
+- It models PostgreSQL only. MySQL and SQLite are planned.
 - The [type cache](./performance#type-cache) and the editor completions ([VS Code](./vscode), [Neovim](./neovim)) use APIs that are new in TypeScript 7.1 and may still change before 7.1 is final.
 
 ## Statement size
@@ -29,7 +29,7 @@ When you hit a limit, [`sql.as<Row>()`](./errors#when-typesql-can-t-type-a-state
 - In a select list (`SELECT {cols}`), such a list counts every element as selected.
 - A fragment whose text is a union (`sql.id(name)` with `name: "a" | "b"`) is checked once per member. So two such slots in one statement cost `n × m` checks. A generic `sql.id` over `RelationName<DB>` checks the statement against every table and view. For lists, use `sql.combine` over an array, which costs one check.
 - `sql.set` and `sql.values` are checked like `sql.combine` over an array, with every key of the input type once.
-- Some calls throw at runtime because Postgres would reject the SQL: `sql.combine` with no items, `sql.set` with no defined value, and `sql.values` with an empty array or several rows without values. A `sql.param()` value also throws when it is used in a second statement; wrap a reused value in a fragment.
+- Some calls throw at runtime because the database would reject the SQL: `sql.combine` with no items, `sql.set` with no defined value, and `sql.values` with an empty array or several rows without values. A `sql.param()` value also throws when it is used in a second statement; wrap a reused value in a fragment.
 
 ## Defaults and generated columns
 

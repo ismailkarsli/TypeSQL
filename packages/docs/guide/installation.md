@@ -3,7 +3,7 @@
 ## Requirements
 
 - **TypeScript 7.1 or later.** This is the native compiler; `7.1.0-beta` works. You can also use [tsrs](https://github.com/oxc-project/tsrs) (a Rust port of TypeScript 7.1). Older versions are not supported.
-- **PostgreSQL.** TypeSQL follows Postgres rules only. SQLite and MySQL support is planned.
+- **A supported database.** TypeSQL supports PostgreSQL today. MySQL and SQLite support is planned.
 
 ## Install TypeSQL
 

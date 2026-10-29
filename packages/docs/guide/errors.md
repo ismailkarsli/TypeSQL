@@ -10,7 +10,7 @@ sql("SELECT emial FROM users");
 
 The error has two parts:
 
-- **The message** uses Postgres's wording, so it reads like the error you would get at runtime.
+- **The message** uses the database's wording, so it reads like the error you would get at runtime.
 - **The position** (`1`) is the index of the offending token, counting words, operators and literals from 0. Here, `emial` is token 1.
 
 ## Common messages

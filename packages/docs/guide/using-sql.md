@@ -1,6 +1,6 @@
 # Using `sql`
 
-TypeSQL centers on the `sql` function returned by your driver adapter's `createSql<DB>()` (or core's `createSql<DB>(postgres)`). It compiles and type-checks your SQL statements against your schema at compile time, and provides helper functions on `sql.*` for parameter binding, dynamic SQL, fragments, bulk writes, and transactions.
+TypeSQL centers on the `sql` function returned by your driver adapter's `createSql<DB>()` (or core's `createSql<DB>(dialect)`, such as `createSql<DB>(postgres)`). It compiles and type-checks your SQL statements against your schema at compile time, and provides helper functions on `sql.*` for parameter binding, dynamic SQL, fragments, bulk writes, and transactions.
 
 **`sql(...)` is all you need to write queries. Every other `sql.*` function is a helper for specific use cases.**
 
@@ -32,7 +32,7 @@ sql<Q, S>(query: Q, slots: S, ...params: Params): Query<Row, Params, Text>
 The core function for writing typed queries. TypeSQL's type engine parses the SQL string literal at compile time, checks syntax and relation/column references against `DB`, and infers:
 - **`Row`**: The resulting row shape (column names, types, and nullability).
 - **`Params`**: The expected parameter types (or named parameter object).
-- **`Text`**: The normalized SQL text sent to Postgres.
+- **`Text`**: The normalized SQL text sent to the database.
 
 Invalid statements cause compile errors directly on the SQL string.
 
@@ -85,7 +85,7 @@ sql.as<Row>(query: string, ...params: unknown[]): Query<Row, readonly unknown[]>
 sql.as<Row>(query: string, slots: SlotMap, ...params: unknown[]): Query<Row, readonly unknown[]>
 ```
 
-An escape hatch that skips TypeSQL's compile-time type inference and explicitly asserts the row type `Row`. Use it for dynamic SQL where the statement text is not known at compile time, unsupported PostgreSQL features, or statements containing `sql.raw()`.
+An escape hatch that skips TypeSQL's compile-time type inference and explicitly asserts the row type `Row`. Use it for dynamic SQL where the statement text is not known at compile time, unsupported SQL features, or statements containing `sql.raw()`.
 
 ### Parameters
 
@@ -195,12 +195,12 @@ See [Dynamic SQL](./dynamic-sql).
 sql.id(...parts: [string, ...string[]]): Fragment
 ```
 
-Creates a safely quoted PostgreSQL identifier fragment. Each argument is quoted in double quotes and joined by periods (`"part1"."part2"`).
+Creates a safely quoted identifier fragment. Each argument is quoted in double quotes and joined by periods (`"part1"."part2"`).
 
 ::: warning Identifier allowlisting
 `sql.id()` prevents SQL syntax injection by double-quoting identifiers and escaping embedded quotes. However, it does **not** restrict which columns or tables can be accessed.
 
-Passing untrusted user input directly to `sql.id()` allows callers to specify any column or table name. In an `ORDER BY` or `SELECT` clause, an attacker could supply sensitive column names (such as `password_hash`, `ssn`, or private tokens) to exfiltrate values or infer them through sorting order. Supplying non-existent column names will also cause PostgreSQL to throw an error (`undefined_column`), aborting transactions.
+Passing untrusted user input directly to `sql.id()` allows callers to specify any column or table name. In an `ORDER BY` or `SELECT` clause, an attacker could supply sensitive column names (such as `password_hash`, `ssn`, or private tokens) to exfiltrate values or infer them through sorting order. Supplying non-existent column names will also make the database throw an error (`undefined_column` in PostgreSQL), aborting transactions.
 
 Always validate dynamic identifier names against an explicit allowlist or a strict schema enum before calling `sql.id()`.
 :::
@@ -429,7 +429,7 @@ const count = await runner.executeCount();
 | Property | Type | Description |
 |---|---|---|
 | `q.text` | `string` | The finalized SQL statement with positional `$1, $2, …` parameters and spliced fragments. |
-| `q.values` | `unknown[]` | The array of parameter values sent to Postgres in `$n` order. |
+| `q.values` | `unknown[]` | The array of parameter values sent to the database in `$n` order. |
 
 ### Execution methods
 
