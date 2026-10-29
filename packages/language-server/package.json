@@ -1,6 +1,6 @@
 {
 	"name": "@typesql/language-server",
-	"version": "0.0.4",
+	"version": "0.0.5",
 	"description": "Completions for tables and columns inside TypeSQL's sql() strings, through an API session on TypeScript 7's language server.",
 	"license": "MIT",
 	"repository": {

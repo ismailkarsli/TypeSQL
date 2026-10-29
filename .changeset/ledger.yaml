@@ -1,3 +1,7 @@
+"@typesql/cli@0.0.1":
+  dir: packages/cli
+  intents:
+    - wet-ducks-trade
 "@typesql/core@0.0.2":
   dir: packages/core
   intents:
@@ -193,6 +197,11 @@
   intents:
     - polite-icons-complain
     - vast-onions-heal
+"@typesql/core@0.8.1":
+  dir: packages/core
+  intents:
+    - little-shoes-bet
+    - wet-ducks-trade
 "@typesql/drizzle@0.0.2":
   dir: packages/drizzle
   intents:
@@ -230,6 +239,10 @@
   dir: packages/drizzle
   intents:
     - polite-icons-complain
+"@typesql/drizzle@0.3.1":
+  dir: packages/drizzle
+  intents:
+    - wet-ducks-trade
 "@typesql/kysely@0.0.2":
   dir: packages/kysely
   intents:
@@ -280,6 +293,10 @@
   dir: packages/kysely
   intents:
     - polite-icons-complain
+"@typesql/kysely@0.3.1":
+  dir: packages/kysely
+  intents:
+    - wet-ducks-trade
 "@typesql/language-server@0.0.1":
   dir: packages/language-server
   intents:
@@ -301,6 +318,10 @@
   intents:
     - breezy-emus-scream
     - wide-tables-design
+"@typesql/language-server@0.0.5":
+  dir: packages/language-server
+  intents:
+    - wet-ducks-trade
 "@typesql/pg@0.0.2":
   dir: packages/pg
   intents:
@@ -356,6 +377,10 @@
   intents:
     - breezy-emus-scream
     - wide-tables-design
+"@typesql/pg@0.3.0":
+  dir: packages/pg
+  intents:
+    - wet-ducks-trade
 "@typesql/postgres@0.0.2":
   dir: packages/postgres
   intents:
@@ -457,6 +482,14 @@
   dir: packages/prisma
   intents:
     - polite-icons-complain
+"@typesql/prisma@0.3.1":
+  dir: packages/prisma
+  intents:
+    - wet-ducks-trade
+"@typesql/sqlite@0.0.1":
+  dir: packages/sqlite
+  intents:
+    - wet-ducks-trade
 typesql@0.0.1:
   dir: packages/vscode
   intents:
@@ -487,3 +520,7 @@ typesql@0.0.7:
   dir: packages/vscode
   intents:
     - angry-stars-hang
+typesql@0.0.8:
+  dir: packages/vscode
+  intents:
+    - wet-ducks-trade
