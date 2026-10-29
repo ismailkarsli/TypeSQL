@@ -10,7 +10,8 @@
 			"@typesql/core/sqlite/engine": ["./src/sqlite/engine/index.ts"],
 			"@typesql/core/sqlite": ["./src/sqlite/index.ts"],
 			"@typesql/core/postgres": ["./src/postgres/index.ts"],
-			"@typesql/core": ["./src/index.ts"]
+			"@typesql/core": ["./src/index.ts"],
+			"@typesql/core/migration": ["./src/migration/index.ts"]
 		}
 	},
 	"include": ["src", "test", "examples"]

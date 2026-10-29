@@ -203,6 +203,9 @@ importers:
 
   packages/cli:
     dependencies:
+      '@typesql/core':
+        specifier: workspace:*
+        version: link:../core
       '@typesql/pg':
         specifier: workspace:*
         version: link:../pg
@@ -213,6 +216,9 @@ importers:
         specifier: '>=8'
         version: 8.23.1
     devDependencies:
+      '@types/pg':
+        specifier: ^8.23.1
+        version: 8.23.1
       tsrs:
         specifier: 0.18.0-ts7.1.0-dev.20260929
         version: 0.18.0-ts7.1.0-dev.20260929

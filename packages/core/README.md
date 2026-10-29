@@ -71,6 +71,43 @@ const query = findUser(7);
 
 Named parameters and fixed fragments work too. The `pg` and `postgres` adapters also request server-side preparation when these queries execute. See the [prepared query API](https://typesql.karsli.net/reference/api#sql-prepare-text-slots).
 
+## Tracked migrations
+
+The separate `@typesql/core/migration` entry point loads TypeScript migration files and runs them against PostgreSQL or SQLite on Node 26. Each file exports `up` and `down`:
+
+```ts
+import type { PostgresMigration } from "@typesql/core/migration";
+
+export async function up(db: PostgresMigration) {
+  const next = await db.add("CREATE TABLE users (id int PRIMARY KEY, name text NOT NULL)");
+  await next("INSERT INTO users (id, name) VALUES ($1, $2)", 1, "Ada").execute();
+  return next;
+}
+
+export async function down(db: PostgresMigration) {
+  await db.raw("DROP TABLE users");
+}
+```
+
+Use `SqliteMigration` for SQLite. Later files can declare their starting schema as
+`PostgresMigration<MigrationSchema<typeof previousUp>>` by importing the previous
+`up` as a type. Await `.add()` or `.raw<NewSchema>()` into a new constant to retain
+the updated schema; return that context from `up`, including for a no-op migration.
+`down` may return nothing.
+
+`migrateUp`, `migrateDown`, and `migrateLatest` accept `{ dialect, migrationsDir,
+execute, migrationTable? }`. `execute` is a TypeSQL executor bound to one dedicated
+database connection for the entire call. Files run in filename order, each in its
+own transaction, with SHA-256 history checks and concurrency protection. A failed
+file rolls back while earlier committed files remain applied. Migration code must
+await every database operation and leave transaction management to the runner.
+The default tracking table is `schema_migrations`. Hashes cover each migration
+file's runtime code; imported runtime helpers are not tracked.
+
+For configuration, file generation, and command-line execution, install
+`@typesql/cli` and use `typesql migrate make <name>`, `up`, `down`, or `latest`.
+See the [migration guide](https://typesql.karsli.net/guide/migrations).
+
 ## Documentation
 
 The full guide is at **[typesql.karsli.net](https://typesql.karsli.net)**. It covers the [schema](https://typesql.karsli.net/guide/schema), [parameters](https://typesql.karsli.net/guide/parameters), [writing data](https://typesql.karsli.net/guide/writing-data), [dynamic SQL](https://typesql.karsli.net/guide/dynamic-sql), [migrations](https://typesql.karsli.net/guide/migrations), the [type cache](https://typesql.karsli.net/guide/performance) and [known limits](https://typesql.karsli.net/guide/limits).

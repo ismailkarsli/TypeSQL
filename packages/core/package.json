@@ -36,6 +36,10 @@
 		"./sqlite/engine": {
 			"types": "./dist/sqlite/engine/index.d.ts",
 			"default": "./dist/sqlite/engine/index.js"
+		},
+		"./migration": {
+			"types": "./dist/migration/index.d.ts",
+			"default": "./dist/migration/index.js"
 		}
 	},
 	"files": [

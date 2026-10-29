@@ -369,7 +369,7 @@ const cli = (...args: string[]): string =>
 	execFileSync(process.execPath, [cliBin, ...args], { encoding: "utf8" });
 assert.match(
 	cli("--help"),
-	/^Usage: typesql introspect \[--dialect postgres\|sqlite\]/,
+	/^Usage: typesql migrate <up\|down\|latest\|make name>/,
 );
 assert.match(
 	cli("introspect", "--dialect", "postgres", "--help"),
@@ -394,6 +394,478 @@ assert.match(
 			/name: Col<"text", \{ position: 1 \}>;/,
 		);
 	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
+}
+
+// Exercise the published migration entry point against an actual SQLite database.
+{
+	const migration = (await dist(
+		"core/dist/migration/index.js",
+	)) as typeof import("../packages/core/src/migration/index.ts");
+	const {
+		mkdirSync,
+		mkdtempSync,
+		readFileSync,
+		renameSync,
+		rmSync,
+		writeFileSync,
+	} = await import("node:fs");
+	const { tmpdir } = await import("node:os");
+	const { join } = await import("node:path");
+	const dir = mkdtempSync(join(tmpdir(), "typesql-migrations-"));
+	const migrationsDir = join(dir, "migrations");
+	writeFileSync(join(dir, "package.json"), '{"type":"module"}\n');
+	mkdirSync(migrationsDir);
+	const migrationDb = new DatabaseSync(":memory:");
+	const options = {
+		dialect: "sqlite" as const,
+		migrationsDir,
+		migrationTable: 'tracked"migrations',
+		execute: Object.assign(
+			async (text: string, values: readonly unknown[]) => {
+				const query = positional(text, values);
+				return migrationDb
+					.prepare(query.text)
+					.all(...(query.values as import("node:sqlite").SQLInputValue[]));
+			},
+			{
+				count: async (text: string, values: readonly unknown[]) => {
+					const query = positional(text, values);
+					return Number(
+						migrationDb
+							.prepare(query.text)
+							.run(...(query.values as import("node:sqlite").SQLInputValue[]))
+							.changes,
+					);
+				},
+			},
+		),
+	};
+	const history = () =>
+		migrationDb
+			.prepare('SELECT name FROM "tracked""migrations" ORDER BY name')
+			.all()
+			.map((row) => row.name);
+	const first = `import type { SqliteMigration } from '@typesql/core/migration';
+export async function up(db: SqliteMigration) {
+  const next = await db.add('CREATE TABLE accounts (id INTEGER PRIMARY KEY, email TEXT NOT NULL, note TEXT)');
+  const inserted = await next('INSERT INTO accounts (email, note) VALUES ($1, $2)', 'a@b.c', null).executeCount();
+  if (inserted !== 1) throw new Error('Migration executor lost its count callback');
+  await next.raw('SAVEPOINT nested');
+  await next('INSERT INTO accounts (email) VALUES ($1)', 'rolled-back').execute();
+  await next.raw('ROLLBACK TRANSACTION TO SAVEPOINT nested');
+  await next.raw('RELEASE SAVEPOINT nested');
+  return next;
+}
+export async function down(db: SqliteMigration) { return db.add('DROP TABLE accounts'); }
+`;
+	const second = `export async function up(db: unknown) { return db; }
+export async function down() {}
+`;
+	try {
+		assert.deepEqual((await migration.migrateDown(options)).migrations, []);
+		assert.equal(
+			migrationDb
+				.prepare("SELECT name FROM sqlite_master WHERE name = ?")
+				.get(options.migrationTable),
+			undefined,
+			"an empty command does not create its tracking table",
+		);
+		writeFileSync(
+			join(migrationsDir, "alpha.ts"),
+			"export async function up() {}",
+		);
+		await assert.rejects(migration.migrateUp(options), /up and down/);
+		writeFileSync(join(migrationsDir, "alpha.ts"), first);
+		writeFileSync(join(migrationsDir, "beta.ts"), second);
+		assert.deepEqual((await migration.migrateUp(options)).migrations, [
+			"alpha.ts",
+		]);
+		assert.equal(
+			migrationDb.prepare("SELECT count(*) AS n FROM accounts").get()?.n,
+			1,
+		);
+		assert.deepEqual(history(), ["alpha.ts"]);
+
+		writeFileSync(
+			join(migrationsDir, "alpha.ts"),
+			first.replace("a@b.c", "changed"),
+		);
+		await assert.rejects(
+			migration.migrateLatest(options),
+			/hash|changed|modified/i,
+		);
+		writeFileSync(join(migrationsDir, "alpha.ts"), first);
+		renameSync(join(migrationsDir, "alpha.ts"), join(dir, "missing.ts"));
+		await assert.rejects(migration.migrateLatest(options), /missing/i);
+		renameSync(join(dir, "missing.ts"), join(migrationsDir, "alpha.ts"));
+		writeFileSync(join(migrationsDir, "000_earlier.ts"), second);
+		await assert.rejects(migration.migrateLatest(options), /before|order/i);
+		rmSync(join(migrationsDir, "000_earlier.ts"));
+
+		// Type annotations, comments and formatting do not invalidate applied code.
+		writeFileSync(
+			join(migrationsDir, "alpha.ts"),
+			first
+				.replaceAll("db: SqliteMigration", "db: SqliteMigration<{}>")
+				.replace("const next", "/* formatting */ const   next"),
+		);
+		writeFileSync(
+			join(migrationsDir, "gamma.ts"),
+			`export async function up(db) { await db.raw('CREATE TABLE rolled_back (id INTEGER)'); throw new Error('migration failure'); } export async function down() {}`,
+		);
+		await assert.rejects(migration.migrateLatest(options), /migration failure/);
+		assert.deepEqual(history(), ["alpha.ts", "beta.ts"]);
+		assert.equal(
+			migrationDb
+				.prepare("SELECT name FROM sqlite_master WHERE name = 'rolled_back'")
+				.get(),
+			undefined,
+		);
+		writeFileSync(
+			join(migrationsDir, "gamma.ts"),
+			`export async function up(db) { return db.raw('CREATE TABLE escaped_transaction (id INTEGER); /* end */ COMMIT'); } export async function down() {}`,
+		);
+		await assert.rejects(migration.migrateLatest(options), /transaction/i);
+		assert.equal(
+			migrationDb
+				.prepare(
+					"SELECT name FROM sqlite_master WHERE name = 'escaped_transaction'",
+				)
+				.get(),
+			undefined,
+		);
+		assert.deepEqual(history(), ["alpha.ts", "beta.ts"]);
+		writeFileSync(
+			join(migrationsDir, "gamma.ts"),
+			`export async function up(db) { await db('CREATE TABLE escaped_count (id INTEGER); COMMIT').executeCount(); return db; } export async function down() {}`,
+		);
+		await assert.rejects(migration.migrateLatest(options), /transaction/i);
+		assert.equal(
+			migrationDb
+				.prepare("SELECT name FROM sqlite_master WHERE name = 'escaped_count'")
+				.get(),
+			undefined,
+		);
+		assert.deepEqual(history(), ["alpha.ts", "beta.ts"]);
+		rmSync(join(migrationsDir, "gamma.ts"));
+		assert.deepEqual((await migration.migrateLatest(options)).migrations, []);
+		assert.deepEqual((await migration.migrateDown(options)).migrations, [
+			"beta.ts",
+		]);
+		assert.deepEqual(
+			history(),
+			["alpha.ts"],
+			"empty down removes its tracking record",
+		);
+		assert.deepEqual((await migration.migrateDown(options)).migrations, [
+			"alpha.ts",
+		]);
+		assert.deepEqual((await migration.migrateDown(options)).migrations, []);
+		assert.equal(
+			migrationDb
+				.prepare("SELECT name FROM sqlite_master WHERE name = 'accounts'")
+				.get(),
+			undefined,
+		);
+
+		const hash = migration.migrationHash;
+		assert.equal(
+			hash("export const x: number = 1; // comment"),
+			hash("export const x = 1;"),
+		);
+		assert.notEqual(
+			hash("export const x = 'a';"),
+			hash('export const x = "a";'),
+		);
+		assert.notEqual(
+			hash("export function x() { return\n1; }"),
+			hash("export function x() { return 1; }"),
+		);
+		assert.notEqual(
+			hash("export const x = /a b/;"),
+			hash("export const x = /ab/;"),
+		);
+		assert.notEqual(
+			hash("export const x = `a b`;"),
+			hash("export const x = `ab`;"),
+		);
+		assert.equal(
+			hash("/** @returns a number */ export function x() { return 1; }"),
+			hash("export function x() { return 1; }"),
+		);
+		assert.equal(
+			hash(`export const x = \`a\${1 + 2}b\`;`),
+			hash(`export const x = \`a\${1+/* comment */2}b\`;`),
+		);
+		assert.notEqual(
+			hash("export function x() { return/*\n*/1; }"),
+			hash("export function x() { return 1; }"),
+		);
+
+		// Config paths are relative to the config, while explicit flags use cwd.
+		const configDir = join(dir, "project");
+		mkdirSync(configDir);
+		const config = join(configDir, "typesql.config.ts");
+		writeFileSync(
+			config,
+			`export default { dialect: 'sqlite', db: './app.db', migrationsDir: '../migrations', migrationTable: 'cli_migrations' } as const;`,
+		);
+		const run = (...args: string[]) =>
+			cli("migrate", ...args, "--config", config);
+		assert.match(run("up"), /applied alpha.ts/);
+		assert.match(run("latest"), /applied beta.ts/);
+		assert.match(run("up"), /no pending migrations/);
+		assert.match(run("down"), /reverted beta.ts/);
+		assert.match(run("down"), /reverted alpha.ts/);
+		assert.match(run("down"), /no applied migrations/);
+
+		const generatedDir = join(dir, "generated");
+		const make = (...args: string[]) =>
+			cli(
+				"migrate",
+				"make",
+				...args,
+				"--dialect",
+				"sqlite",
+				"--dir",
+				generatedDir,
+			);
+		const created = make("create accounts")
+			.trim()
+			.replace(/^typesql migrate: created /, "");
+		assert.match(created, /\d+_create-accounts\.ts$/);
+		assert.match(readFileSync(created, "utf8"), /SqliteMigration/);
+		const next = make("z add profile")
+			.trim()
+			.replace(/^typesql migrate: created /, "");
+		assert.match(
+			readFileSync(next, "utf8"),
+			/MigrationSchema<typeof previousUp>/,
+		);
+		assert.match(
+			readFileSync(next, "utf8"),
+			/import type \{ up as previousUp \}/,
+		);
+		const { spawnSync, execFile } = await import("node:child_process");
+		const { promisify } = await import("node:util");
+		const fail = (status: number, ...args: string[]) => {
+			const result = spawnSync(process.execPath, [cliBin, "migrate", ...args], {
+				encoding: "utf8",
+			});
+			assert.equal(result.status, status, result.stdout + result.stderr);
+			return result.stderr;
+		};
+		assert.match(
+			fail(2, "make", "--dialect", "sqlite", "--dir", generatedDir),
+			/name/i,
+		);
+		assert.match(
+			fail(
+				1,
+				"make",
+				"../escape",
+				"--dialect",
+				"sqlite",
+				"--dir",
+				generatedDir,
+			),
+			/name|separator/i,
+		);
+		writeFileSync(join(generatedDir, "9999999999_future.ts"), second);
+		assert.match(
+			fail(1, "make", "earlier", "--dialect", "sqlite", "--dir", generatedDir),
+			/sort|before/i,
+		);
+
+		const concurrentDir = join(dir, "concurrent");
+		mkdirSync(concurrentDir);
+		writeFileSync(
+			join(concurrentDir, "one.ts"),
+			`export async function up(db) { await new Promise(r => setTimeout(r, 50)); return db.add('CREATE TABLE once_only (id INTEGER)'); } export async function down(db) { return db.add('DROP TABLE once_only'); }`,
+		);
+		writeFileSync(
+			join(concurrentDir, "two.ts"),
+			`export async function up(db) { await db('INSERT INTO once_only VALUES (1)').execute(); return db; } export async function down() {}`,
+		);
+		const concurrentDb = join(dir, "concurrent.db");
+		const invoke = promisify(execFile);
+		const parallelArgs = [
+			cliBin,
+			"migrate",
+			"latest",
+			"--dialect",
+			"sqlite",
+			"--db",
+			concurrentDb,
+			"--dir",
+			concurrentDir,
+		];
+		await Promise.all([
+			invoke(process.execPath, parallelArgs),
+			invoke(process.execPath, parallelArgs),
+		]);
+		const concurrent = new DatabaseSync(concurrentDb);
+		try {
+			assert.equal(
+				concurrent.prepare("SELECT count(*) AS n FROM once_only").get()?.n,
+				1,
+			);
+			assert.equal(
+				concurrent.prepare("SELECT count(*) AS n FROM schema_migrations").get()
+					?.n,
+				2,
+			);
+		} finally {
+			concurrent.close();
+		}
+	} finally {
+		migrationDb.close();
+		rmSync(dir, { recursive: true, force: true });
+	}
+}
+
+// Opt into the same built-package smoke on a disposable PostgreSQL database.
+// Two sessions must serialize the whole command, including pending-file discovery.
+if (process.env.TYPESQL_MIGRATION_POSTGRES_URL) {
+	const migration = (await dist(
+		"core/dist/migration/index.js",
+	)) as typeof import("../packages/core/src/migration/index.ts");
+	const { createRequire } = await import("node:module");
+	const { mkdtempSync, rmSync, writeFileSync } = await import("node:fs");
+	const { tmpdir } = await import("node:os");
+	const { join } = await import("node:path");
+	const require = createRequire(
+		new URL("../packages/core/package.json", import.meta.url),
+	);
+	interface PgConnection {
+		connect(): Promise<void>;
+		end(): Promise<void>;
+		query(
+			text: string,
+			values?: readonly unknown[],
+		): Promise<{ rows: Record<string, unknown>[]; rowCount: number | null }>;
+	}
+	const { Client } = require("pg") as {
+		Client: new (options: { connectionString: string }) => PgConnection;
+	};
+	const client = new Client({
+		connectionString: process.env.TYPESQL_MIGRATION_POSTGRES_URL,
+	});
+	const other = new Client({
+		connectionString: process.env.TYPESQL_MIGRATION_POSTGRES_URL,
+	});
+	const dir = mkdtempSync(join(tmpdir(), "typesql-pg-migrations-"));
+	writeFileSync(join(dir, "package.json"), '{"type":"module"}\n');
+	const schema = `typesql_migration_smoke_${process.pid}`;
+	await client.connect();
+	await other.connect();
+	try {
+		await client.query(`CREATE SCHEMA "${schema}"`);
+		await client.query(`SET search_path TO "${schema}"`);
+		await other.query(`SET search_path TO "${schema}"`);
+		writeFileSync(
+			join(dir, "alpha.ts"),
+			`export async function up(db) { await db('SELECT pg_sleep(0.05)').execute(); return db.add('CREATE TABLE once_only (id integer PRIMARY KEY, note text)'); } export async function down(db) { return db.add('DROP TABLE once_only'); }`,
+		);
+		writeFileSync(
+			join(dir, "beta.ts"),
+			`export async function up(db) { await db('INSERT INTO once_only (id, note) VALUES ($1, $2)', 1, null).execute(); await db.raw('SAVEPOINT nested'); await db('INSERT INTO once_only (id) VALUES (2)').execute(); await db.raw('ROLLBACK WORK TO SAVEPOINT nested'); await db.raw('RELEASE SAVEPOINT nested'); return db; } export async function down(db) { await db('DELETE FROM once_only').execute(); }`,
+		);
+		const options = (connection: PgConnection) => ({
+			dialect: "postgres" as const,
+			migrationsDir: dir,
+			execute: (text: string, values: readonly unknown[]) =>
+				connection.query(text, values),
+		});
+		await assert.rejects(
+			migration.migrateLatest({
+				...options(client),
+				migrationTable: "é".repeat(64),
+			}),
+			/identifier limit/,
+		);
+		const results = await Promise.all([
+			migration.migrateLatest(options(client)),
+			migration.migrateLatest(options(other)),
+		]);
+		assert.deepEqual(
+			results.map((result) => result.migrations.length).sort(),
+			[0, 2],
+		);
+		assert.equal(
+			(await client.query("SELECT count(*)::integer AS n FROM once_only"))
+				.rows[0]?.n,
+			1,
+		);
+		assert.equal(
+			(
+				await client.query(
+					`SELECT count(*)::integer AS n FROM "${schema}".schema_migrations`,
+				)
+			).rows[0]?.n,
+			2,
+		);
+		writeFileSync(
+			join(dir, "gamma.ts"),
+			`export async function up(db) { await db.raw('CREATE TABLE rolled_back (id integer)'); return db.raw('CREATE INDEX CONCURRENTLY bad_index ON once_only (id)'); } export async function down() {}`,
+		);
+		await assert.rejects(
+			migration.migrateLatest(options(client)),
+			/transaction|concurrently/i,
+		);
+		assert.equal(
+			(await client.query("SELECT to_regclass('rolled_back') AS name")).rows[0]
+				?.name,
+			null,
+		);
+		assert.equal(
+			(
+				await client.query(
+					"SELECT count(*)::integer AS n FROM schema_migrations",
+				)
+			).rows[0]?.n,
+			2,
+		);
+		writeFileSync(
+			join(dir, "gamma.ts"),
+			`export async function up(db) { return db.raw('CREATE TABLE escaped_transaction (id integer); /* end */ COMMIT'); } export async function down() {}`,
+		);
+		await assert.rejects(
+			migration.migrateLatest(options(client)),
+			/transaction/i,
+		);
+		assert.equal(
+			(await client.query("SELECT to_regclass('escaped_transaction') AS name"))
+				.rows[0]?.name,
+			null,
+		);
+		assert.equal(
+			(
+				await client.query(
+					"SELECT count(*)::integer AS n FROM schema_migrations",
+				)
+			).rows[0]?.n,
+			2,
+		);
+		rmSync(join(dir, "gamma.ts"));
+		assert.deepEqual((await migration.migrateDown(options(other))).migrations, [
+			"beta.ts",
+		]);
+		assert.deepEqual(
+			(await migration.migrateDown(options(client))).migrations,
+			["alpha.ts"],
+		);
+		assert.deepEqual(
+			(await migration.migrateDown(options(client))).migrations,
+			[],
+		);
+	} finally {
+		await client
+			.query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`)
+			.catch(() => undefined);
+		await Promise.all([client.end(), other.end()]);
 		rmSync(dir, { recursive: true, force: true });
 	}
 }

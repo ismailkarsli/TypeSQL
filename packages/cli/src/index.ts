@@ -1,15 +1,19 @@
 import { main as postgres } from "@typesql/pg/introspect";
 import { main as sqlite } from "@typesql/sqlite/introspect";
 
+export type { MigrationConfig } from "./migrate.js";
+
 export type Dialect = "postgres" | "sqlite";
 
 const DIALECTS: Readonly<
 	Record<Dialect, (argv: readonly string[]) => Promise<number>>
 > = { postgres, sqlite };
 
-const USAGE = `Usage: typesql introspect [--dialect postgres|sqlite] [options]
+const USAGE = `Usage: typesql migrate <up|down|latest|make name> [options]
+       typesql introspect [--dialect postgres|sqlite] [options]
 
-Reads a database and writes its TypeSQL schema.
+Manage tracked schema migrations, or read a database and write its TypeSQL schema.
+Run \`typesql migrate --help\` for migration options.
 
   --dialect postgres  a live PostgreSQL database (--url); the default
   --dialect sqlite    a SQLite database file (--db); the default when --db is given
@@ -33,6 +37,10 @@ export async function main(
 	argv: readonly string[],
 	io: Io = defaultIo(),
 ): Promise<number> {
+	if (argv[0] === "migrate") {
+		const { main: migrate } = await import("./migrate.js");
+		return migrate(argv.slice(1), io);
+	}
 	const rest: string[] = [];
 	let dialect: string | undefined;
 	for (let i = 0; i < argv.length; i++) {

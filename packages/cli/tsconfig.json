@@ -11,7 +11,8 @@
 			"@typesql/core/sqlite": ["../core/src/sqlite/index.ts"],
 			"@typesql/core": ["../core/src/index.ts"],
 			"@typesql/pg/introspect": ["../pg/src/introspect/index.ts"],
-			"@typesql/sqlite/introspect": ["../sqlite/src/introspect/index.ts"]
+			"@typesql/sqlite/introspect": ["../sqlite/src/introspect/index.ts"],
+			"@typesql/core/migration": ["../core/src/migration/index.ts"]
 		}
 	},
 	"include": ["src"]

@@ -66,7 +66,8 @@
 		"e3dd1b518ff6": "{ app: {}; }",
 		"7461feb1aa50": "{ t: { id: __T.Col<\"int4\">; }; }",
 		"fcdbc2e86b8f": "{ abc: { z: __T.Col<\"text\">; }; }",
-		"7aa4b96f2e1f": "{ \"users\": { id: __T.Generated<\"int4\">; email: __T.Col<\"text\">; name: __T.Nullable<\"text\">; mood: __T.Nullable<\"mood\">; }; \"posts\": { id: __T.Generated<\"int8\">; author_id: __T.Col<\"int4\">; title: __T.Col<\"text\">; }; \"$types\": { mood: \"happy\" | \"sad\"; } }"
+		"7aa4b96f2e1f": "{ \"users\": { id: __T.Generated<\"int4\">; email: __T.Col<\"text\">; name: __T.Nullable<\"text\">; mood: __T.Nullable<\"mood\">; }; \"posts\": { id: __T.Generated<\"int8\">; author_id: __T.Col<\"int4\">; title: __T.Col<\"text\">; }; \"$types\": { mood: \"happy\" | \"sad\"; } }",
+		"316b73dbdb65": "{ migration_accounts: { id: __T.Col<\"int4\">; email: __T.Col<\"text\">; display_name: __T.Nullable<\"text\">; enabled: __T.Generated<\"bool\">; }; }"
 	},
 	"statements": [
 		{
@@ -23239,6 +23240,48 @@
 			"schema": "44136fa355b3",
 			"source": "core-organization",
 			"sql": "CREATE TYPE task_state AS ENUM ('open', 'closed'); CREATE TABLE tasks (id integer PRIMARY KEY, state task_state NOT NULL, previous_state task_state); ALTER TYPE task_state RENAME TO status; ALTER TABLE tasks ALTER COLUMN previous_state SET DEFAULT 'open'; CREATE VIEW task_status AS SELECT id, state, previous_state FROM tasks;",
+			"ddl": true
+		},
+		{
+			"schema": "44136fa355b3",
+			"source": "tracked-migrations",
+			"sql": "CREATE TABLE migration_accounts (id integer PRIMARY KEY, email text NOT NULL, display_name text); ALTER TABLE migration_accounts ADD COLUMN enabled boolean NOT NULL DEFAULT true",
+			"ddl": true
+		},
+		{
+			"schema": "316b73dbdb65",
+			"source": "tracked-migrations",
+			"sql": "INSERT INTO migration_accounts (id, email, display_name) VALUES ($1, $2, $3) RETURNING id, email, display_name, enabled",
+			"ddl": false
+		},
+		{
+			"schema": "316b73dbdb65",
+			"source": "tracked-migrations",
+			"sql": "SELECT id, email, display_name, enabled FROM migration_accounts WHERE id = $1",
+			"ddl": false
+		},
+		{
+			"schema": "316b73dbdb65",
+			"source": "tracked-migrations",
+			"sql": "SELECT id, display_name FROM migration_accounts WHERE display_name IS NOT NULL",
+			"ddl": false
+		},
+		{
+			"schema": "316b73dbdb65",
+			"source": "tracked-migrations",
+			"sql": "UPDATE migration_accounts SET display_name = email WHERE display_name IS NULL RETURNING id, email, display_name",
+			"ddl": false
+		},
+		{
+			"schema": "316b73dbdb65",
+			"source": "tracked-migrations",
+			"sql": "ALTER TABLE migration_accounts ALTER COLUMN display_name SET NOT NULL; ALTER TABLE migration_accounts DROP COLUMN enabled",
+			"ddl": true
+		},
+		{
+			"schema": "316b73dbdb65",
+			"source": "tracked-migrations",
+			"sql": "DROP TABLE migration_accounts",
 			"ddl": true
 		}
 	],
