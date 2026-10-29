@@ -32,7 +32,7 @@ export interface CreateSql {
 export const createSql = createDialectSql as CreateSql;
 
 export function createDialectSql<T extends DialectTypes, DB, TM = T["typeMap"]>(
-	_dialect: Dialect<T>,
+	dialect: Dialect<T>,
 	executor?: Executor,
 	options?: SqlOptions,
 ): SqlOf<T, DB, TM, RowKeys> {
@@ -97,7 +97,7 @@ export function createDialectSql<T extends DialectTypes, DB, TM = T["typeMap"]>(
 			_table: string,
 			rows: readonly Readonly<Record<string, unknown>>[],
 		) => {
-			const r = buildValues(rows);
+			const r = buildValues(rows, dialect.valuesDefault !== false);
 			return makeFragment(r.text, r.values);
 		},
 		raw: (text: string) => {

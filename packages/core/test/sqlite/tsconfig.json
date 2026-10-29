@@ -1,0 +1,10 @@
+{
+	"extends": "../../../../tsconfig.base.json",
+	"compilerOptions": {
+		"noEmit": true,
+		"types": ["node"],
+		"rootDir": "../..",
+		"noUnusedLocals": false
+	},
+	"include": ["view.ts", ".probe/*.ts"]
+}

@@ -1,6 +1,11 @@
 import type { EditorKinds } from "./call.js";
 
-export { type EditorKinds, type SqlCall, sqlCallAt } from "./call.js";
+export {
+	type Dialect,
+	type EditorKinds,
+	type SqlCall,
+	sqlCallAt,
+} from "./call.js";
 export {
 	type CompletionItem,
 	type Completions,

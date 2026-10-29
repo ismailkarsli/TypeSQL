@@ -4,6 +4,7 @@ import { dirname, join, sep } from "node:path";
 const ADAPTERS = [
 	"@typesql/pg",
 	"@typesql/postgres",
+	"@typesql/sqlite",
 	"@typesql/kysely",
 	"@typesql/drizzle",
 	"@typesql/prisma",

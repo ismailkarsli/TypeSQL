@@ -51,6 +51,7 @@
 		"sql",
 		"postgres",
 		"postgresql",
+		"sqlite",
 		"typescript",
 		"type-safe",
 		"type-level",

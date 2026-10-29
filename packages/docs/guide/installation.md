@@ -3,47 +3,17 @@
 ## Requirements
 
 - **TypeScript 7.1 or later.** This is the native compiler; `7.1.0-beta` works. You can also use [tsrs](https://github.com/oxc-project/tsrs) (a Rust port of TypeScript 7.1). Older versions are not supported.
-- **A supported database.** TypeSQL supports PostgreSQL today. MySQL and SQLite support is planned.
+- **A supported database.** TypeSQL supports PostgreSQL and SQLite. MySQL support is planned.
 
 ## Install TypeSQL
 
-Install the core package, the adapter for your driver, and the driver itself.
+Install `@typesql/core` and the adapter for your driver:
 
-### node-postgres
-
-::: code-group
-
-```sh [npm]
-npm install @typesql/core @typesql/pg pg
-```
-
-```sh [pnpm]
-pnpm add @typesql/core @typesql/pg pg
-```
-
-```sh [yarn]
-yarn add @typesql/core @typesql/pg pg
-```
-
-:::
-
-### postgres.js
-
-::: code-group
-
-```sh [npm]
-npm install @typesql/core @typesql/postgres postgres
-```
-
-```sh [pnpm]
-pnpm add @typesql/core @typesql/postgres postgres
-```
-
-```sh [yarn]
-yarn add @typesql/core @typesql/postgres postgres
-```
-
-:::
+| Package | Runs queries on |
+|---|---|
+| [`@typesql/pg`](../adapters/pg) | node-postgres (`pg`) |
+| [`@typesql/postgres`](../adapters/postgres) | postgres.js (`postgres`) |
+| [`@typesql/sqlite`](../adapters/sqlite) | node:sqlite, bun:sqlite or better-sqlite3 |
 
 `@typesql/core` has no runtime dependencies. The adapter types rows the way your driver returns them and runs queries on your client.
 
@@ -80,6 +50,10 @@ If your schema is already described for one of them, install its TypeSQL package
 | `@typesql/prisma` | `@prisma/client` 7 or later |
 
 See [From Kysely, Drizzle or Prisma](./orms).
+
+## The `typesql` command (optional)
+
+`@typesql/cli` provides `typesql introspect`, which writes your schema from a PostgreSQL or SQLite database. See [From a live database](./introspect).
 
 ## Editor extension (optional)
 

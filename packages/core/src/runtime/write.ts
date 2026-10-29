@@ -26,6 +26,7 @@ export function buildSet(values: Readonly<Record<string, unknown>>): {
 
 export function buildValues(
 	rows: readonly Readonly<Record<string, unknown>>[],
+	valuesDefault = true,
 ): { text: string; values: unknown[] } {
 	if (!Array.isArray(rows))
 		throw new Error("typesql: sql.values() takes an array of rows");
@@ -61,7 +62,12 @@ export function buildValues(
 	const tuples = taken.map((row) => {
 		const items = columns.map((c) => {
 			const v = own(row, c) ? row[c] : undefined;
-			if (v === undefined) return "DEFAULT";
+			if (v === undefined) {
+				if (valuesDefault) return "DEFAULT";
+				throw new Error(
+					`typesql: this dialect has no DEFAULT in VALUES: give every row a value for "${c}", or insert those rows separately`,
+				);
+			}
 			out.push(v);
 			return `$${out.length}`;
 		});

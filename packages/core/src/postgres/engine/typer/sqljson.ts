@@ -1,10 +1,3 @@
-import type { AnyErr, SqlError } from "../../../errors.js";
-import type { Expr, FromJsonTable, SelectStmt } from "../ast.js";
-import type { TypeDisplay } from "../binder/clauses.js";
-import type { CheckAlias, RenameCols } from "../binder/from.js";
-import type { BuildObject, JsonLitCast, JsonRet } from "../json.js";
-import type { Nx } from "../parser/util.js";
-import type { BaseOf } from "../shape.js";
 import type {
 	ColInfo,
 	Cols,
@@ -15,7 +8,14 @@ import type {
 	MkCtx,
 	Scope,
 	ScopeLevel,
-} from "../types.js";
+} from "../../../engine/types.js";
+import type { AnyErr, SqlError } from "../../../errors.js";
+import type { Expr, FromJsonTable, SelectStmt } from "../ast.js";
+import type { TypeDisplay } from "../binder/clauses.js";
+import type { CheckAlias, RenameCols } from "../binder/from.js";
+import type { BuildObject, JsonLitCast, JsonRet } from "../json.js";
+import type { Nx } from "../parser/util.js";
+import type { BaseOf } from "../shape.js";
 import type { DateTimeT, NumT } from "./operators.js";
 import type { ParamsOfList, ParamsOfOpt, ParamsOfSelect } from "./params.js";
 import type { FirstColOf, Or, TypeList, TypeOf } from "./typeof.js";

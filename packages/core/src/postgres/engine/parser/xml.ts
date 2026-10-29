@@ -1,4 +1,4 @@
-import type { IdTok, OpTok, Toks, WordTok } from "../lexer/tokens.js";
+import type { IdTok, OpTok, Toks, WordTok } from "../../../engine/tokens.js";
 import type { ParseExpr, ParseExprList } from "./expr.js";
 import type { ReservedKeyword } from "./keywords.js";
 import type { ParseAliasChecked } from "./select.js";

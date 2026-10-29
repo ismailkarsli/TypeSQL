@@ -1,3 +1,24 @@
+export type { NonArrayOrSqlJson } from "../../engine/infer.js";
+export type {
+	IdTok,
+	NumTok,
+	OpTok,
+	ParamTok,
+	StrTok,
+	Tok,
+	Toks,
+	WordTok,
+} from "../../engine/tokens.js";
+export type {
+	ColInfo,
+	ColMap,
+	Cols,
+	CteMap,
+	Ctx,
+	Scope,
+	ScopeItem,
+	ScopeLevel,
+} from "../../engine/types.js";
 export type * from "../../index.js";
 export type { ListRep } from "../../sql/fragment.js";
 export type {
@@ -57,6 +78,7 @@ export type {
 	QueryCache,
 	QueryCacheKeys,
 } from "./cache.js";
+export type { PgEngine } from "./engine.js";
 export type {
 	Analysis,
 	Analyze,
@@ -64,29 +86,8 @@ export type {
 	BuildRow,
 	KindOf,
 	NamesOf,
-	NonArrayOrSqlJson,
 	ParamsArgs,
 } from "./infer.js";
 export type { Lex } from "./lexer/lex.js";
-export type {
-	IdTok,
-	NumTok,
-	OpTok,
-	ParamTok,
-	StrTok,
-	Tok,
-	Toks,
-	WordTok,
-} from "./lexer/tokens.js";
 export type { ParseProgram, ParseStatement } from "./parser/stmt.js";
 export type { SigFlags } from "./typer/catalog.js";
-export type {
-	ColInfo,
-	ColMap,
-	Cols,
-	CteMap,
-	Ctx,
-	Scope,
-	ScopeItem,
-	ScopeLevel,
-} from "./types.js";

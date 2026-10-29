@@ -5,13 +5,19 @@ import type {
 	PostgresDialect,
 	TransactionalSql,
 } from "@typesql/core/postgres";
+import type {
+	SqliteDialect,
+	TransactionalSql as SqliteTransactionalSql,
+	DefaultTypeMap as SqliteTypeMap,
+} from "@typesql/core/sqlite";
 import type { ControlledTransaction, Kysely, Transaction } from "kysely";
-import { driver, type KyselyExecutor } from "./client.js";
+import { driver, type KyselyExecutor, sqliteDriver } from "./client.js";
 import type {
 	FromKysely,
 	KyselyOptions,
 	KyselyOverrides,
 } from "./from-kysely.js";
+import type { FromKyselySqlite } from "./from-kysely-sqlite.js";
 
 export { executor, type KyselyExecutor } from "./client.js";
 export type {
@@ -23,6 +29,7 @@ export type {
 	SnakeCase,
 	TableOverride,
 } from "./from-kysely.js";
+export type { FromKyselySqlite } from "./from-kysely-sqlite.js";
 
 export type KyselySql<
 	DB,
@@ -31,6 +38,14 @@ export type KyselySql<
 	Options extends KyselyOptions = {},
 	Keys extends RowKeys = "preserve",
 > = TransactionalSql<FromKysely<DB, Overrides, Options>, TM, Keys>;
+
+export type KyselySqliteSql<
+	DB,
+	TM = SqliteTypeMap,
+	Overrides extends KyselyOverrides = {},
+	Options extends KyselyOptions = {},
+	Keys extends RowKeys = "preserve",
+> = SqliteTransactionalSql<FromKyselySqlite<DB, Overrides, Options>, TM, Keys>;
 
 export type KyselyDB<K> =
 	K extends ControlledTransaction<infer DB, any>
@@ -41,6 +56,36 @@ export type KyselyDB<K> =
 				? DB
 				: never;
 
+export function createSql<K extends KyselyExecutor & Kysely<any>>(
+	dialect: SqliteDialect,
+	db: K,
+	options: { readonly rowKeys: "camelCase" },
+): KyselySqliteSql<KyselyDB<K>, SqliteTypeMap, {}, {}, "camelCase">;
+export function createSql<K extends KyselyExecutor & Kysely<any>>(
+	dialect: SqliteDialect,
+	db: K,
+	options?: { readonly rowKeys?: "preserve" },
+): KyselySqliteSql<KyselyDB<K>>;
+export function createSql<
+	DB,
+	TM = SqliteTypeMap,
+	Overrides extends KyselyOverrides = {},
+	Options extends KyselyOptions = {},
+>(
+	dialect: SqliteDialect,
+	db: KyselyExecutor | undefined,
+	options: { readonly rowKeys: "camelCase" },
+): KyselySqliteSql<DB, TM, Overrides, Options, "camelCase">;
+export function createSql<
+	DB,
+	TM = SqliteTypeMap,
+	Overrides extends KyselyOverrides = {},
+	Options extends KyselyOptions = {},
+>(
+	dialect: SqliteDialect,
+	db?: KyselyExecutor,
+	options?: { readonly rowKeys?: "preserve" },
+): KyselySqliteSql<DB, TM, Overrides, Options>;
 export function createSql<K extends KyselyExecutor & Kysely<any>>(
 	dialect: PostgresDialect,
 	db: K,
@@ -72,9 +117,11 @@ export function createSql<
 	options?: { readonly rowKeys?: "preserve" },
 ): KyselySql<DB, TM, Overrides, Options>;
 export function createSql(
-	dialect: PostgresDialect,
+	dialect: PostgresDialect | SqliteDialect,
 	db?: KyselyExecutor,
 	options?: SqlOptions,
 ): unknown {
-	return createTransactionalSql(dialect, db, driver, options);
+	return dialect.name === "sqlite"
+		? createTransactionalSql(dialect, db, sqliteDriver, options)
+		: createTransactionalSql(dialect, db, driver, options);
 }

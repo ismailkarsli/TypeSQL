@@ -20,14 +20,16 @@ export function sourceFor(options: GeneratorOptions): string {
 	if (
 		provider !== undefined &&
 		provider !== "postgresql" &&
-		provider !== "postgres"
+		provider !== "postgres" &&
+		provider !== "sqlite"
 	) {
 		throw new Error(
-			`typesql-prisma: only the postgresql provider is supported (got "${provider}")`,
+			`typesql-prisma: only the postgresql and sqlite providers are supported (got "${provider}")`,
 		);
 	}
 	const { importFrom, typeName } = options.generator.config;
 	return generateSource(options.dmmf.datamodel as DmmfDatamodel, {
+		dialect: provider === "sqlite" ? "sqlite" : "postgres",
 		importFrom: configString(importFrom),
 		typeName: configString(typeName),
 		views: viewNames(options.datamodel),

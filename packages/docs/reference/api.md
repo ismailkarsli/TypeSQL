@@ -173,6 +173,10 @@ What adapters and custom executors build on.
 | `SqlDriver<C>` | how a driver runs statements and transactions on its client `C` |
 | `runTransaction(run, fn, options?)` | `BEGIN` / `COMMIT` / `ROLLBACK` (or a savepoint) around `fn`, for drivers without a transaction API |
 | `JsonParam<T>` | the runtime value `sql.json()` binds: `{ value }` with `toPostgres()`, `toJSON()`, `toString()` |
+| `positional(text, values, map?)` | rewrites `$n` parameters (outside strings, quoted names and comments) to `?` and returns the values in order, mapped by `map` (default `sqliteValue`), for SQLite drivers that bind positional parameters |
+| `splitParams(text, values, map?)` | the statement split at its `$n` parameters: `{ parts, values }` |
+| `paramNumbers(text)` | the parameter numbers a statement uses, in order of first use |
+| `sqliteValue(value)` | a value as SQLite binds it: `sql.json()` values as JSON text, booleans as `1` / `0`; throws for a `Date` |
 
 ## Public types
 
@@ -288,24 +292,26 @@ An entry is one `Sig<Params, Return, Flags>` or a tuple of overloads.
 | `Migrations<T, DB>` | the builder class for dialect `T` (`@typesql/core`) |
 | `SchemaOf<M>` | the schema of a builder |
 | `runMigrations(client, m)` | runs `m.statements` in one transaction (`@typesql/core`) |
-| `migrate(db, m)` | the same, from `@typesql/pg` and `@typesql/postgres` |
+| `migrate(db, m)` | the same, from `@typesql/pg`, `@typesql/postgres` and `@typesql/sqlite` |
 
 See [DDL support](./ddl#migrations) and [From migrations](../guide/migrations).
 
 ## Dialects
 
-A dialect pairs the runtime that builds its `sql` function with that function's types. PostgreSQL is the only one so far: the `postgres` value (a `PostgresDialect`) and its `Postgres` types from `@typesql/core/postgres`.
+A dialect pairs the runtime that builds its `sql` function with that function's types: the `postgres` value (a `PostgresDialect`) and its `Postgres` types from `@typesql/core/postgres`, and the `sqlite` value (a `SqliteDialect`) and its `Sqlite` types from `@typesql/core/sqlite`.
 
 | Export of `@typesql/core` | Meaning |
 |---|---|
-| `Dialect<T>` | the runtime side, what `createSql` takes: `{ name }`. Statements are built with `$n` parameters and sent as written |
+| `Dialect<T>` | the runtime side, what `createSql` takes: `{ name, valuesDefault? }`. Statements are built with `$n` parameters and sent as written. `valuesDefault: false` makes `sql.values()` throw instead of writing `DEFAULT` for a missing column |
 | `DialectTypes` | the type side: its default `typeMap`, and given `db`, `tm`, `keys` and `ddl`, the `sql`, `transactionalSql`, `validateDdl` and `applyDdl` types |
 | `SqlOf<T, DB, TM, Keys>`, `TransactionalSqlOf<T, DB, TM, Keys>` | the `sql` function of dialect `T`, without or with `transaction(fn)` |
 | `ValidateDdlOf<T, DB, Q>`, `ApplyDdlOf<T, DB, Q>` | DDL checking and the schema after `Q`, in dialect `T` |
 | `Transactional<Self>` | the `transaction(fn)` method an adapter's `sql` adds |
 | `CreateSql` | the type of `createSql`. A dialect adds its call signatures by augmenting it, so `createSql<DB>(postgres)` picks PostgreSQL's from the `postgres` argument. A dialect without its own signatures uses the generic one: `createSql<T, DB>(dialect)` |
 
-`SqlOf<Postgres, DB, TM>` is `Sql<DB, TM>`, and `TransactionalSqlOf<Postgres, DB, TM>` is `TransactionalSql<DB, TM>`.
+`SqlOf<Postgres, DB, TM>` is `Sql<DB, TM>`, and `TransactionalSqlOf<Postgres, DB, TM>` is `TransactionalSql<DB, TM>`; the same holds for `Sqlite` and the `Sql` and `TransactionalSql` of `@typesql/core/sqlite`.
+
+`@typesql/core/sqlite` exports the same kinds of names as `@typesql/core/postgres`: `sqlite`, `Sql`, `TransactionalSql`, `RowOf`, `ParamsOf`, `Validate`, `ApplyDdl`, `migrations()` and `SqliteMigrations`, the write-helper types, the schema markers (`Col`, `Generated`, `Nullable`, `NullableGenerated`, `View`), and the type maps `DefaultTypeMap`, `BigIntTypeMap` and `DefaultParamTypeMap`. It also exports `ColFlags` (the [column flags](../guide/sqlite#column-flags)), `Json<T, Flags>` and `Typed<Type, T>` ([typed values](../guide/sqlite#typed-values)), and `Sig`, `SigFlags`, `FunctionRegistry` and the augmentable `FunctionCatalog` ([functions](../guide/sqlite#functions)). Its engine types are under `@typesql/core/sqlite/engine`. See [SQLite](../guide/sqlite).
 
 ## ORM packages
 
@@ -313,9 +319,11 @@ Each package wraps core's `createSql` with the schema converted from the ORM's t
 
 | Package | `createSql` | Schema type | Runs queries |
 |---|---|---|---|
-| `@typesql/kysely` | `createSql(postgres, db, { rowKeys? })` with `DB` from `Kysely<DB>`, or `createSql<DB, TM = DefaultTypeMap, Overrides = {}, Options = {}>(postgres, db?, { rowKeys? })` | `FromKysely<DB, Overrides, Options>` | on a `Kysely` or `Transaction`, plugins bypassed |
-| `@typesql/drizzle` | `createSql(postgres, db)` with the schema from `db`, or `createSql<Schema, TM = DefaultTypeMap, Options = {}>(postgres, db?)` | `FromDrizzle<Schema, Options>`; `pgType(column, "type")` pins a column | on the driver client under a node-postgres or postgres.js Drizzle database |
-| `@typesql/prisma` | `createSql(postgres, prisma)` with the client's `Prisma.TypeMap`, or `createSql<S, TM = PrismaTypeMap>(postgres, prisma?)`; `S` is a generated `DB` or a `Prisma.TypeMap` | `FromPrisma<Prisma.TypeMap, Overrides>`; the `typesql-prisma` generator | `$queryRawUnsafe` / `$executeRawUnsafe` on Prisma Client |
+| `@typesql/kysely` | `createSql(postgres, db, { rowKeys? })` with `DB` from `Kysely<DB>`, or `createSql<DB, TM = DefaultTypeMap, Overrides = {}, Options = {}>(postgres, db?, { rowKeys? })` | `FromKysely<DB, Overrides, Options>`; with `sqlite`, `FromKyselySqlite` | on a `Kysely` or `Transaction`, plugins bypassed |
+| `@typesql/drizzle` | `createSql(postgres, db)` with the schema from `db`, or `createSql<Schema, TM = DefaultTypeMap, Options = {}>(postgres, db?)` | `FromDrizzle<Schema, Options>`; `pgType(column, "type")` pins a column. With `sqlite`, `FromDrizzleSqlite` and `sqliteType` | PostgreSQL: on the driver client under a node-postgres or postgres.js Drizzle database. SQLite: on the Drizzle database (`db.all` / `db.run`), any driver |
+| `@typesql/prisma` | `createSql(postgres, prisma)` with the client's `Prisma.TypeMap`, or `createSql<S, TM = PrismaTypeMap>(postgres, prisma?)`; `S` is a generated `DB` or a `Prisma.TypeMap` | `FromPrisma<Prisma.TypeMap, Overrides>`; with `sqlite`, `FromPrismaSqlite` and `PrismaSqliteTypeMap`; the `typesql-prisma` generator | `$queryRawUnsafe` / `$executeRawUnsafe` on Prisma Client |
+
+Each `createSql` has the same overloads with `sqlite` first; the type map then defaults to `DefaultTypeMap` of `@typesql/core/sqlite` (`PrismaSqliteTypeMap` for Prisma), and the SQL types are `KyselySqliteSql`, `DrizzleSqliteSql` and `PrismaSqliteSql`. See [SQLite](../guide/orms#sqlite).
 
 | Option type | Fields |
 |---|---|
@@ -324,14 +332,14 @@ Each package wraps core's `createSql` with the schema converted from the ORM's t
 | `FromDrizzleOptions` | `casing`, `timestamp`, `time` |
 | `PrismaOverrides` | `$table`, `$schema`, per field `{ column, type, nullable, default }` |
 
-`@typesql/prisma/generator` exports `generateSource(datamodel, options?)`, the source the `typesql-prisma` generator writes.
+`@typesql/prisma/generator` exports `generateSource(datamodel, options?)`, the source the `typesql-prisma` generator writes; `{ dialect: "sqlite" }` writes a SQLite schema.
 
 ## Introspection
 
-`typesql introspect` (the bin of `@typesql/pg`) writes the schema of a live database. See [From a live database](../guide/introspect) for the options.
+`typesql introspect` (the bin of `@typesql/cli`) writes the schema of a live database. `--dialect postgres` (the default) reads PostgreSQL through `@typesql/pg`; `--dialect sqlite` (the default when `--db` is given) reads a SQLite file through `@typesql/sqlite`. See [From a live database](../guide/introspect) for the options. `@typesql/cli` also exports `main(argv)`, the command itself.
 
 ```sh
-typesql introspect [--url <url>] [--out <file>] [--schema <name>]… [--exclude <pattern>]… [--type-name DB]
+typesql introspect [--dialect postgres] [--url <url>] [--out <file>] [--schema <name>]… [--exclude <pattern>]… [--type-name DB]
                    [--import-from @typesql/core/postgres] [--config <file>] [--no-comments]
 ```
 
@@ -340,3 +348,14 @@ typesql introspect [--url <url>] [--out <file>] [--schema <name>]… [--exclude 
 | `introspect(client, { schemas?, exclude?, viewNotNull? })` | `Promise<IntrospectedDatabase>`: `{ version, schemas, relations, enums }` |
 | `generateSource(db, options?)` | the schema file's source; options `typeName`, `importFrom`, `imports`, `columnTypes`, `column`, `comments` |
 | `IntrospectConfig` | the default export of a `--config` module: `url`, `out` and every option above |
+
+`typesql introspect --dialect sqlite` writes the schema of a SQLite database file. See [Generate the schema](../adapters/sqlite#generate-the-schema).
+
+```sh
+typesql introspect --dialect sqlite --db <file> [--out <file>] [--exclude <pattern>]… [--type-name DB] [--import-from @typesql/core/sqlite]
+```
+
+| Export of `@typesql/sqlite/introspect` | Meaning |
+|---|---|
+| `introspect(db, { exclude? })` | `IntrospectedDatabase`: `{ version, relations }`, read from a node:sqlite, better-sqlite3 or bun:sqlite database |
+| `generateSource(db, options?)` | the schema file's source; options `typeName`, `importFrom` |

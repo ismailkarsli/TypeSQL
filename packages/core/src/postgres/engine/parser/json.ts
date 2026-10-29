@@ -1,5 +1,11 @@
+import type {
+	IdTok,
+	OpTok,
+	StrTok,
+	Toks,
+	WordTok,
+} from "../../../engine/tokens.js";
 import type { PgScalarName } from "../../schema/pg-types.js";
-import type { IdTok, OpTok, StrTok, Toks, WordTok } from "../lexer/tokens.js";
 import type {
 	ParseCall,
 	ParseExpr,

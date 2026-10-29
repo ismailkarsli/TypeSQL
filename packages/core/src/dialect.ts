@@ -43,4 +43,5 @@ export type ApplyDdlOf<T extends DialectTypes, DB, Q extends string> = (T &
 export interface Dialect<T extends DialectTypes = DialectTypes> {
 	readonly name: string;
 	readonly types?: T;
+	readonly valuesDefault?: boolean;
 }

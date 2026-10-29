@@ -1,3 +1,17 @@
+import type { NarrowKeys, NarrowLevel } from "../../../engine/narrow.js";
+import type {
+	ColInfo,
+	ColMap,
+	Cols,
+	ColsToMap,
+	CteMap,
+	Ctx,
+	Info,
+	MkCtx,
+	NullableMap,
+	Scope,
+	ScopeLevel,
+} from "../../../engine/types.js";
 import type { AnyErr, SqlError } from "../../../errors.js";
 import type {
 	Cte,
@@ -25,25 +39,11 @@ import type {
 	WindowDefs,
 } from "../binder/clauses.js";
 import type { BindFrom, RenameCols } from "../binder/from.js";
-import type { NarrowKeys, NarrowLevel } from "../binder/narrow.js";
 import type { ExpandStar } from "../binder/resolve.js";
 import type { Nx } from "../parser/util.js";
 import type { ObjShape, Shaped } from "../shape.js";
 import type { CommonLit, LitToText } from "../typer/operators.js";
 import type { TypeOf } from "../typer/typeof.js";
-import type {
-	ColInfo,
-	ColMap,
-	Cols,
-	ColsToMap,
-	CteMap,
-	Ctx,
-	Info,
-	MkCtx,
-	NullableMap,
-	Scope,
-	ScopeLevel,
-} from "../types.js";
 import type { ColumnName } from "./naming.js";
 import type { ProjectStmt } from "./stmt.js";
 

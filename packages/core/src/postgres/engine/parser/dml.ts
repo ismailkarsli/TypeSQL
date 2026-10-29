@@ -1,3 +1,4 @@
+import type { OpTok, Toks, WordTok } from "../../../engine/tokens.js";
 import type {
 	Expr,
 	ReturningOpt,
@@ -5,7 +6,6 @@ import type {
 	TargetInd,
 	WithClause,
 } from "../ast.js";
-import type { OpTok, Toks, WordTok } from "../lexer/tokens.js";
 import type { ParseExpr } from "./expr.js";
 import type {
 	IsSelectStart,

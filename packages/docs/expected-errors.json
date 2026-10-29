@@ -14,5 +14,6 @@
 	],
 	"playground/prisma.ts": [
 		"sql(`INSERT INTO posts (author_id, title) VALUES ($1, $2)`, 1, \"Hello\");"
-	]
+	],
+	"playground/sqlite.ts": ["sql(`SELECT title FROM posts WHERE id = ?`);"]
 }

@@ -1,3 +1,17 @@
+import type { AddParam } from "../../../engine/params.js";
+import type {
+	ColInfo,
+	ColMap,
+	Cols,
+	CteMap,
+	Ctx,
+	Info,
+	MkCtx,
+	NullableMap,
+	Scope,
+	ScopeItem,
+	ScopeLevel,
+} from "../../../engine/types.js";
 import type { AnyErr, SqlError } from "../../../errors.js";
 import type { Table } from "../../../schema.js";
 import type {
@@ -23,7 +37,6 @@ import type { BindFrom } from "../binder/from.js";
 import type { ResolveWritableTable, TableCols } from "../binder/resolve.js";
 import type { Nx } from "../parser/util.js";
 import type {
-	AddParam,
 	ParamsOfExpr,
 	ParamsOfFromItems,
 	ParamsOfOpt,
@@ -31,19 +44,6 @@ import type {
 	ParamsOfTargets,
 } from "../typer/params.js";
 import type { TypeOf } from "../typer/typeof.js";
-import type {
-	ColInfo,
-	ColMap,
-	Cols,
-	CteMap,
-	Ctx,
-	Info,
-	MkCtx,
-	NullableMap,
-	Scope,
-	ScopeItem,
-	ScopeLevel,
-} from "../types.js";
 import type { ParamsOfMerge, ProjectMerge } from "./merge.js";
 import type { BindWith, ProjectSelect, ProjectTargets } from "./select.js";
 

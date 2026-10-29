@@ -1,6 +1,6 @@
+import type { ColMap } from "../../engine/types.js";
 import type { Shaped } from "../../schema.js";
 import type { MergeShapes } from "./json.js";
-import type { ColMap } from "./types.js";
 
 export type { Shaped };
 export type AnyShaped = { readonly shape: unknown };

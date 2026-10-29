@@ -1,5 +1,3 @@
-import type { SqlError } from "../../../errors.js";
-import type { Next } from "../../../sql/next.js";
 import type {
 	Digit,
 	HexDigit,
@@ -7,7 +5,7 @@ import type {
 	NonIdAscii,
 	Upper,
 	Ws,
-} from "./chars.js";
+} from "../../../engine/chars.js";
 import type {
 	BitTok,
 	IdTok,
@@ -17,7 +15,9 @@ import type {
 	StrTok,
 	Tok,
 	WordTok,
-} from "./tokens.js";
+} from "../../../engine/tokens.js";
+import type { SqlError } from "../../../errors.js";
+import type { Next } from "../../../sql/next.js";
 import type {
 	CheckEscapes,
 	CheckUEscapes,

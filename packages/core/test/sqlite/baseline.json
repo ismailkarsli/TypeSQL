@@ -1,0 +1,71 @@
+{
+	"sqlite": "3.53.4",
+	"disagreements": {
+		"ddl": [
+			{
+				"kind": "rejects",
+				"hash": "9335ead03befe4cc",
+				"sql": "CREATE VIEW v (a, b) AS SELECT 1",
+				"detail": "ours: expected 2 columns for 'v' but got 1"
+			}
+		],
+		"insert": [
+			{
+				"kind": "rejects",
+				"hash": "ff1ff1348317b0dc",
+				"sql": "INSERT INTO users (name) VALUES ('a')",
+				"detail": "ours: NOT NULL constraint failed: users.email"
+			},
+			{
+				"kind": "rejects",
+				"hash": "b90ffd6a3a574954",
+				"sql": "INSERT INTO users DEFAULT VALUES",
+				"detail": "ours: NOT NULL constraint failed: users.email"
+			},
+			{
+				"kind": "rejects",
+				"hash": "980bfb9f3555501e",
+				"sql": "INSERT INTO posts DEFAULT VALUES",
+				"detail": "ours: NOT NULL constraint failed: posts.title"
+			}
+		],
+		"syntax": [
+			{
+				"kind": "rejects",
+				"hash": "53b68090e2fe995f",
+				"sql": "SELECT 1; SELECT 2",
+				"detail": "ours: only one statement is allowed"
+			},
+			{
+				"kind": "rejects",
+				"hash": "77a9e7517242e175",
+				"sql": "SELECT ?",
+				"detail": "ours: TypeSQL parameters are written $1 or :name, not \"?\""
+			},
+			{
+				"kind": "rejects",
+				"hash": "d42412b6c65ca33e",
+				"sql": "SELECT ?1",
+				"detail": "ours: TypeSQL parameters are written $1 or :name, not \"?1\""
+			},
+			{
+				"kind": "rejects",
+				"hash": "b6c6e2c69b3ceff6",
+				"sql": "SELECT @x",
+				"detail": "ours: TypeSQL parameters are written $1 or :name, not \"@x\""
+			},
+			{
+				"kind": "rejects",
+				"hash": "90f4e45b66d76d71",
+				"sql": "SELECT $x",
+				"detail": "ours: TypeSQL parameters are written $1 or :name, not \"$x\""
+			},
+			{
+				"kind": "names",
+				"hash": "8e636d9fdfb3fef0",
+				"sql": "SELECT 1 /* open",
+				"detail": "ours: [\"1\"] | SQLite: [\"1 /* open\"]"
+			}
+		]
+	}
+}

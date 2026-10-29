@@ -28,21 +28,27 @@ interface Entry {
 
 const memo = new WeakMap<Checker, Map<number, Promise<Schema>>>();
 
-export function schemaOf(checker: Checker, db: Type): Promise<Schema> {
+export function schemaOf(
+	checker: Checker,
+	db: Type,
+	caseInsensitive = false,
+): Promise<Schema> {
 	let byType = memo.get(checker);
 	if (!byType) {
 		byType = new Map();
 		memo.set(checker, byType);
 	}
-	let s = byType.get(db.id);
+	const key = caseInsensitive ? -db.id - 1 : db.id;
+	let s = byType.get(key);
 	if (!s) {
-		s = read(checker, db);
-		byType.set(db.id, s);
+		s = read(checker, db, caseInsensitive);
+		byType.set(key, s);
 	}
 	return s;
 }
 
-async function read(checker: Checker, db: Type): Promise<Schema> {
+async function read(checker: Checker, db: Type, ci: boolean): Promise<Schema> {
+	const norm = (name: string): string => (ci ? name.toLowerCase() : name);
 	const entries = async (t: Type): Promise<Entry[]> => {
 		const props = (await checker.getPropertiesOfType(t)).filter(
 			(p) => !NOT_RELATIONS.has(p.name),
@@ -74,8 +80,8 @@ async function read(checker: Checker, db: Type): Promise<Schema> {
 		const k = kinds[i];
 		if (k === "view" || k === "table") {
 			relations.push({ schema: null, name: e.name, view: k === "view" });
-			relTypes.set(e.name, e.type);
-		} else if (k === "namespace") namespaces.set(e.name, e.type);
+			relTypes.set(norm(e.name), e.type);
+		} else if (k === "namespace") namespaces.set(norm(e.name), e.type);
 	});
 
 	const inNs = new Map<
@@ -98,7 +104,7 @@ async function read(checker: Checker, db: Type): Promise<Schema> {
 				);
 				es.forEach((e, i) => {
 					rels.push({ schema: ns, name: e.name, view: !!views[i] });
-					types.set(e.name, e.type);
+					types.set(norm(e.name), e.type);
 				});
 				return { relations: rels, types };
 			})();
@@ -138,19 +144,23 @@ async function read(checker: Checker, db: Type): Promise<Schema> {
 	return {
 		namespaces: [...namespaces.keys()],
 		async relations(schema) {
-			if (schema === null || schema === "public") return relations;
-			return (await namespace(schema)).relations;
+			if (schema === null || (!ci && schema === "public")) return relations;
+			return (await namespace(norm(schema))).relations;
 		},
 		async columns(ref) {
-			if (ref.schema === null || ref.schema === "public") {
+			const name = norm(ref.name);
+			if (
+				ref.schema === null ||
+				(ci ? ["main", "temp"] : ["public"]).includes(norm(ref.schema))
+			) {
 				const t =
-					relTypes.get(ref.name) ??
-					(ref.schema === null
-						? (await namespace("pg_catalog")).types.get(ref.name)
+					relTypes.get(name) ??
+					(ref.schema === null && !ci
+						? (await namespace("pg_catalog")).types.get(name)
 						: undefined);
 				return t ? columnsOf(t) : null;
 			}
-			const t = (await namespace(ref.schema)).types.get(ref.name);
+			const t = (await namespace(norm(ref.schema))).types.get(name);
 			return t ? columnsOf(t) : null;
 		},
 	};

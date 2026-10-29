@@ -7,7 +7,7 @@ When you hit a limit, [`sql.as<Row>()`](./errors#when-typesql-can-t-type-a-state
 ## Toolchain
 
 - TypeSQL needs TypeScript 7.1 or later (the native compiler; `7.1.0-beta` works).
-- It models PostgreSQL only. MySQL and SQLite are planned.
+- It models PostgreSQL and SQLite. MySQL is planned. SQLite's own limits are listed in [SQLite](./sqlite#limits).
 - The [type cache](./performance#type-cache) and the editor completions ([VS Code](./vscode), [Neovim](./neovim)) use APIs that are new in TypeScript 7.1 and may still change before 7.1 is final.
 
 ## Statement size
@@ -63,6 +63,8 @@ The Kysely and Prisma limits are on their sections of [From Kysely, Drizzle or P
 - `$onUpdate` columns look like they have a default, so `INSERT` doesn't require them.
 - `.$type<T>()` is ignored; rows use the type map (`jsonb().$type<T>()` is `unknown`).
 - `text({ enum: [...] })` is plain `text`: in Drizzle, those values are only a TypeScript constraint.
+
+On SQLite, `text({ enum })` and `text({ mode: "json" }).$type<T>()` keep their types, because SQLite has no enum or JSON type to tell apart. With Prisma on SQLite, a computed column (`max(created_at)`) has no declared type, so Prisma returns SQLite's raw value (a string) where TypeSQL says `Date`; cast or convert it.
 
 ## Unsupported syntax
 

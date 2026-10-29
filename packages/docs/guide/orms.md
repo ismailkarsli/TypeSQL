@@ -5,12 +5,12 @@ If Kysely, Drizzle or Prisma already describes your database, you don't need to 
 | Package | Schema from | Runs queries on |
 |---|---|---|
 | [`@typesql/kysely`](#kysely) | your Kysely `DB` interface (kysely-codegen, prisma-kysely or hand-written) | a `Kysely` instance or transaction |
-| [`@typesql/drizzle`](#drizzle) | your Drizzle schema module (`pgTable`, `pgView`, `pgEnum`, `pgSchema`) | the driver client under your Drizzle database |
+| [`@typesql/drizzle`](#drizzle) | your Drizzle schema module (`pgTable`, `pgView`, `pgEnum`, `pgSchema`, or `sqliteTable`, `sqliteView`) | the driver client under your Drizzle database (SQLite: the database itself) |
 | [`@typesql/prisma`](#prisma) | the `typesql-prisma` generator, or Prisma Client's `Prisma.TypeMap` | Prisma Client or a transaction client |
 
 An ORM's types say less than the database does, so each conversion has a few gaps, which you can fill with overrides.
 
-Each package's `createSql` takes the SQL [dialect](../reference/api#dialects) as its first argument, with `postgres` from `@typesql/core/postgres`. The schema comes from the ORM's database type, so `createSql(postgres, db)` needs no type argument; pass one (`createSql<DB>(postgres, db)`) to add overrides, pick a type map or build queries without a client. The type map defaults to the dialect's (`DefaultTypeMap`); `@typesql/prisma` defaults to `PrismaTypeMap`.
+Each package's `createSql` takes the SQL [dialect](../reference/api#dialects) as its first argument: `postgres` from `@typesql/core/postgres`, or `sqlite` from `@typesql/core/sqlite` (see [SQLite](#sqlite)). The schema comes from the ORM's database type, so `createSql(postgres, db)` needs no type argument; pass one (`createSql<DB>(postgres, db)`) to add overrides, pick a type map or build queries without a client. The type map defaults to the dialect's (`DefaultTypeMap`); `@typesql/prisma` defaults to `PrismaTypeMap`.
 
 ::: tip
 For the exact Postgres types without overrides, [generate the schema from the database](./introspect) instead, and keep the ORM for the queries it builds.
@@ -357,7 +357,7 @@ The other gaps (generated-always columns, `$onUpdate`, `.$type<T>()`, `text({ en
 npm install @typesql/core @typesql/prisma
 ```
 
-`@prisma/client` 7 or later is a peer dependency. Only the `postgresql` provider is supported. [Open an example in the TypeScript Playground](https://www.typescriptlang.org/play/#code/JYWwDg9gTgLgBAbwFAEgYE8wFM4GEIA2ANKhtnAOJYB2WUAhjFgCYlqY4ByArgQfQCMCWNpADOMAOZQsYkgF84AMygQQcAEQABMrICOBAPQBjaFkPipMsRoDcSUJFiI4xmYywBlA0Ti64AApQwGIg9ABK9ADuuATANPCKKmqaOhxiBhbBofR2SA7UTFBK9MY4ACIAQoio3GJ0YgBcNSgowMzNVLQMTMwAPBrAhQAsGgB89q1YYcAEzfgEAwBu9FDGABar45MozCFg-OgA+tT0IFjNPHyCwgNMAB4w26goqsKdNHQe-RrhhFjPVrcMDMb4AQRg80Id1AshgZzAgPkk0sTRabQ6eGhGm43HagJQ9G4MHW0CO7Shi0GIwJMGAMHeWKpDyeExeS3iUTRXS+vQGQxgAA4kZMACS6NHIVp-RkaMHlACyAElOBo4AAfTQAVU8AFFwnkUMikPJ8swsMZ+DJXBBqBI4GBsmFmkEQmFIjE4gl7KY7fAMgQ4ABeVzuJjeRZVMYACks0lkvkdbvoAEp7Ehffb6MwQEMxMG4NF6PS4AHo6gAAZ6gAyutwABU4O1fHsxAd6MdTudfDiQeCnnAAGLhADyCrgdQacAA6gAJfW6uBvHAh0UARgrbDlipVGhIKYAdFh7hbiVho2n8pn-fCYPmQ0WS2XKzW642iSSyc2bdxCtGAFQpnAYKeA6EASHIpbcCA0YclgXJASBcBwVyQ6juOqKUKOWoBHAlQAJqFsSpJQOSzCbkgh7HqeTAXum15wOawi9AWj7+gYB4wAwdqlHStrRtGMD3EBQZjKQ9zRhW5S6rW9aLsOY5gRBM7zuEi4fiRZEFuum5wGuVEnsYZ74L+MAXvu6ZlhWKp6uEjYqvWI5KXecDRhpX6sH49LCEBABqYLVlquqgdG66+KKABMKa6WuPazlgfAQBol5AA) <span data-playground="prisma"></span>.
+`@prisma/client` 7 or later is a peer dependency. The `postgresql` and `sqlite` providers are supported; this section uses PostgreSQL, and [SQLite](#sqlite) covers the differences. [Open an example in the TypeScript Playground](https://www.typescriptlang.org/play/#code/JYWwDg9gTgLgBAbwFAEgYE8wFM4GEIA2ANKhtnAOJYB2WUAhjFgCYlqY4ByArgQfQCMCWNpADOMAOZQsYkgF84AMygQQcAEQABMrICOBAPQBjaFkPipMsRoDcSUJFiI4xmYywBlA0Ti64AApQwGIg9ABK9ADuuATANPCKKmqaOhxiBhbBofR2SA7UTFBK9MY4ACIAQoio3GJ0YgBcNSgowMzNVLQMTMwAPBrAhQAsGgB89q1YYcAEzfgEAwBu9FDGABar45MozCFg-OgA+tT0IFjNPHyCwgNMAB4w26goqsKdNHQe-RrhhFjPVrcMDMb4AQRg80Id1AshgZzAgPkk0sTRabQ6eGhGm43HagJQ9G4MHW0CO7Shi0GIwJMGAMHeWKpDyeExeS3iUTRXS+vQGQxgAA4kZMACS6NHIVp-RkaMHlACyAElOBo4AAfTQAVU8AFFwnkUMikPJ8swsMZ+DJXBBqBI4GBsmFmkEQmFIjE4gl7KY7fAMgQ4ABeVzuJjeRZVMYACks0lkvkdbvoAEp7Ehffb6MwQEMxMG4NF6PS4AHo6gAAZ6gAyutwABU4O1fHsxAd6MdTudfDiQeCnnAAGLhADyCrgdQacAA6gAJfW6uBvHAh0UARgrbDlipVGhIKYAdFh7hbiVho2n8pn-fCYPmQ0WS2XKzW642iSSyc2bdxCtGAFQpnAYKeA6EASHIpbcCA0YclgXJASBcBwVyQ6juOqKUKOWoBHAlQAJqFsSpJQOSzCbkgh7HqeTAXum15wOawi9AWj7+gYB4wAwdqlHStrRtGMD3EBQZjKQ9zRhW5S6rW9aLsOY5gRBM7zuEi4fiRZEFuum5wGuVEnsYZ74L+MAXvu6ZlhWKp6uEjYqvWI5KXecDRhpX6sH49LCEBABqYLVlquqgdG66+KKABMKa6WuPazlgfAQBol5AA) <span data-playground="prisma"></span>.
 
 Prisma Client's types leave out the database names and native types, so `@typesql/prisma` has a generator that writes the exact schema. Add it to `schema.prisma`:
 
@@ -451,3 +451,37 @@ type DB = FromPrisma<Prisma.TypeMap, {
 ```
 
 `FromPrisma` treats every field that is optional in Prisma's create input as having a default, client-side defaults and `@updatedAt` included. Mark those `{ default: false }`, or use the generator.
+
+## SQLite
+
+All three packages also convert SQLite schemas. Pass `sqlite` instead of `postgres`, and the schema is typed with SQLite's type names and the [SQLite dialect](./sqlite)'s rules:
+
+```ts
+import { sqlite } from "@typesql/core/sqlite";
+import { createSql } from "@typesql/kysely"; // or @typesql/drizzle, @typesql/prisma
+
+const sql = createSql(sqlite, db);
+const rows = await sql("SELECT id, title FROM posts WHERE author_id = $1", 1).execute();
+```
+
+Statements are sent through the ORM as for PostgreSQL. Since some SQLite drivers only bind positional parameters, `$1`, `$2`, … are rewritten to `?` with the values in order. `sql.json(value)` is bound as JSON text.
+
+| Kysely | Drizzle (`sqlite-core`) | Prisma | SQLite type |
+|---|---|---|---|
+| `number` | `numeric` | | `numeric` |
+| `bigint` | `integer` (every `mode`) | `Int` | `integer` |
+| | | `BigInt` | `bigint` |
+| | `real` | `Float` | `real` |
+| | | `Decimal` | `decimal` |
+| `string` | `text` | `String` | `text` |
+| a union of string literals | `text({ enum })` | an enum | `Typed<"text", …>`, typed as the literals |
+| `boolean` | | `Boolean` | `boolean` |
+| `Date` | | `DateTime` | `datetime` |
+| `Uint8Array`, `Buffer` | `blob` (every `mode`) | `Bytes` | `blob` |
+| objects, arrays | `text({ mode: "json" })` | | `Typed<"json", T>`, with typed JSON paths |
+| | | `Json` | `jsonb` |
+| `unknown` | `customType` | | `any` |
+
+- **Kysely**: `number` can't say whether a column is `INTEGER` or `REAL`, so it is `numeric`; rows are `number` either way. Pin a column with an override (`{ posts: { id: "integer" } }`), as for PostgreSQL. `KyselySqliteSql` and `FromKyselySqlite` are the SQLite counterparts of `KyselySql` and `FromKysely`.
+- **Drizzle**: rows are what the driver returns, so an `integer({ mode: "boolean" })` column is `0` or `1` and a `timestamp` column is a number. `generatedAlwaysAs()` columns can't be written; `$defaultFn()` columns have no database default. `createSql(sqlite, db)` works with every Drizzle SQLite driver; on better-sqlite3 and bun:sqlite, `sql.transaction(fn)` runs `BEGIN` / `COMMIT` itself, since their Drizzle transactions can't await, and on the async drivers it uses `db.transaction(fn)`. With `drizzle-orm/sqlite-proxy`, return rows as objects for `all`, since TypeSQL reads columns by name. Pin a type with `sqliteType(builder, "text")`.
+- **Prisma**: the `typesql-prisma` generator writes a SQLite schema when the datasource provider is `sqlite`, importing from `@typesql/core/sqlite`. Rows are typed with `PrismaSqliteTypeMap`, which follows what Prisma's SQLite adapters return from `$queryRaw`: `DATETIME` columns are `Date`, `BIGINT` is `bigint`, `DECIMAL` is `Decimal`, `BOOLEAN` is `boolean` and `Json` columns are parsed. A computed column has no declared type, so Prisma returns its raw value: `max(created_at)` is a string, not a `Date`. `FromPrismaSqlite` converts `Prisma.TypeMap` without the generator.

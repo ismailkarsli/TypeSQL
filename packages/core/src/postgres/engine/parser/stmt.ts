@@ -1,5 +1,5 @@
+import type { OpTok, Toks, WordTok } from "../../../engine/tokens.js";
 import type { WithClause } from "../ast.js";
-import type { OpTok, Toks, WordTok } from "../lexer/tokens.js";
 import type { ParseDdl } from "./ddl.js";
 import type { ParseDelete, ParseInsert, ParseUpdate } from "./dml.js";
 import type { ParseMerge } from "./merge.js";

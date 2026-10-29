@@ -16,7 +16,7 @@ export interface CacheFile {
 export interface Snapshot {
 	readonly t: string;
 	readonly w: {
-		readonly [word: string]: readonly [string, string, string, string];
+		readonly [word: string]: readonly string[];
 	};
 	readonly q: { readonly [pair: string]: string };
 }

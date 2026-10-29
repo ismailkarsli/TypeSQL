@@ -1,7 +1,7 @@
+import type { DelKey, RenameKey, SetKey } from "../../../engine/object.js";
 import type { SqlError } from "../../../errors.js";
 import type { Table, View } from "../../../schema.js";
 import type { TableRef } from "../ast.js";
-import type { DelKey, RenameKey, SetKey } from "./object.js";
 
 type IsTop<S> = S extends null | "public" ? true : false;
 

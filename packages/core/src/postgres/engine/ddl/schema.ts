@@ -1,7 +1,12 @@
+import type {
+	ApplyPatch,
+	DelKey,
+	RenameKey,
+	SetKey,
+} from "../../../engine/object.js";
 import type { AnyErr, SqlError } from "../../../errors.js";
 import type { TableRef } from "../ast.js";
 import type { ApplyCreateTable, ApplyTypedTable } from "./create-table.js";
-import type { ApplyPatch, DelKey, RenameKey, SetKey } from "./object.js";
 import type { IsSchemaKey } from "./relation.js";
 import type { ApplyCreateView } from "./view.js";
 

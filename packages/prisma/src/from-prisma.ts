@@ -49,15 +49,19 @@ export type PrismaOverrides<
 		keyof TM["model"] | "$types"
 	>;
 
-type Models<TM extends PrismaTypeMapLike> = TM["model"];
-type Scalars<M> = M extends { payload: { scalars: infer S } } ? S : never;
-type Fields<M> = M extends { fields: infer F } ? F : never;
-type TypeName<R> = R extends { readonly typeName: infer T extends string }
+export type Models<TM extends PrismaTypeMapLike> = TM["model"];
+export type Scalars<M> = M extends { payload: { scalars: infer S } }
+	? S
+	: never;
+export type Fields<M> = M extends { fields: infer F } ? F : never;
+export type TypeName<R> = R extends {
+	readonly typeName: infer T extends string;
+}
 	? T
 	: never;
-type Get<O, K> = K extends keyof O ? O[K] : undefined;
+export type Get<O, K> = K extends keyof O ? O[K] : undefined;
 
-type OptionalCreateKeys<M> = M extends {
+export type OptionalCreateKeys<M> = M extends {
 	operations: { createMany: { args: { data: infer D } } };
 }
 	? Exclude<D, readonly unknown[]> extends infer I
@@ -65,7 +69,7 @@ type OptionalCreateKeys<M> = M extends {
 		: never
 	: never;
 
-type NullableKeys<M> = M extends {
+export type NullableKeys<M> = M extends {
 	operations: { findMany: { args: { orderBy?: infer O } } };
 }
 	? Exclude<O, readonly unknown[] | undefined> extends infer I
@@ -79,7 +83,9 @@ type PgOf<T extends string> = T extends keyof PrismaScalarToPg
 type ElemName<T extends string> = T extends `${infer E}[]` ? E : T;
 type IsList<T extends string> = T extends `${string}[]` ? true : false;
 
-type ColumnName<F, O> = O extends { readonly column: infer C extends string }
+export type ColumnName<F, O> = O extends {
+	readonly column: infer C extends string;
+}
 	? C
 	: F;
 type ColumnType<T extends string, O> = O extends string
@@ -136,7 +142,9 @@ type TableOf<M, MO> = M extends { operations: { createMany: unknown } }
 	? ModelColumns<M, MO>
 	: { readonly $view: ModelColumns<M, MO> };
 
-type TableName<N, MO> = MO extends { readonly $table: infer T extends string }
+export type TableName<N, MO> = MO extends {
+	readonly $table: infer T extends string;
+}
 	? T
 	: N & string;
 type SchemaName<MO> = MO extends { readonly $schema: infer S extends string }

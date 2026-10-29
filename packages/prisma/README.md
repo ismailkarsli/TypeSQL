@@ -8,7 +8,7 @@ Write [TypeSQL](https://www.npmjs.com/package/@typesql/core) queries against you
 npm install @typesql/core @typesql/prisma
 ```
 
-Requires `@prisma/client` 7 or later, with the `postgresql` provider.
+Requires `@prisma/client` 7 or later, with the `postgresql` or `sqlite` provider.
 
 ## Usage
 
@@ -44,6 +44,10 @@ Good to know:
 - Rows are typed the way Prisma's raw queries return them: `int8` (so `count(*)`) is `bigint`, `numeric` is `Decimal`.
 - `uuid()`, `cuid()`, `nanoid()`, `ulid()` and `@updatedAt` are filled in by Prisma Client, not the database, so a SQL `INSERT` must set them.
 - Without the generator, `createSql(postgres, prisma)` reads the types Prisma Client already generates. They don't record `@map` names or native types, so you may need overrides.
+
+## SQLite
+
+For a SQLite database, pass `sqlite` from `@typesql/core/sqlite` instead: `createSql(sqlite, db)`. The schema is converted to SQLite types; see [SQLite](https://typesql.karsli.net/guide/orms#sqlite).
 
 ## Documentation
 

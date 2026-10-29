@@ -1,6 +1,6 @@
 import type { LineAndCharacter } from "typescript/ast";
 import type { Checker, DocumentIdentifier, Program } from "typescript/async";
-import { type EditorKinds, sqlCallAt } from "./call.js";
+import { type Dialect, type EditorKinds, sqlCallAt } from "./call.js";
 import { type Context, contextAt, type RelRef } from "./scan.js";
 import { type Schema, schemaOf } from "./schema.js";
 
@@ -17,7 +17,10 @@ const MAX_ITEMS = 1000;
 export async function completions(
 	schema: Schema,
 	ctx: Context,
+	dialect: Dialect = "postgres",
 ): Promise<CompletionItem[]> {
+	const same = (name: string): string =>
+		dialect === "sqlite" ? name.toLowerCase() : name;
 	const e = ctx.expect;
 	const items: CompletionItem[] = [];
 	const add = (
@@ -31,7 +34,7 @@ export async function completions(
 				label,
 				kind,
 				detail,
-				insertText: quoteIdent(label),
+				insertText: quoteIdent(label, dialect),
 				sortText: sort,
 			});
 	};
@@ -46,7 +49,7 @@ export async function completions(
 						(r.schema ?? null) === e.schema ||
 						(e.schema === "public" && r.schema === null),
 				)
-				.map((r) => r.name),
+				.map((r) => same(r.name)),
 		);
 		const rels = await schema.relations(e.schema);
 		rels.forEach((r, i) => {
@@ -54,7 +57,7 @@ export async function completions(
 				r.name,
 				r.view ? "view" : "table",
 				r.view ? "view" : "table",
-				`${used.has(r.name) ? 1 : 2}${pad(i)}`,
+				`${used.has(same(r.name)) ? 1 : 2}${pad(i)}`,
 			);
 		});
 		if (e.schema === null)
@@ -139,7 +142,11 @@ export async function completionsAt(
 	};
 	if (ctx.expect.kind === "none") return { items: [], ...ranges };
 	return {
-		items: await completions(await schemaOf(checker, call.db), ctx),
+		items: await completions(
+			await schemaOf(checker, call.db, call.dialect === "sqlite"),
+			ctx,
+			call.dialect,
+		),
 		...ranges,
 	};
 }
@@ -257,8 +264,20 @@ const RESERVED = new Set([
 	"with",
 ]);
 
-export function quoteIdent(name: string): string {
-	return /^[a-z_][a-z0-9_$]*$/.test(name) && !RESERVED.has(name)
-		? name
-		: `"${name.replaceAll('"', '""')}"`;
+export function quoteIdent(
+	name: string,
+	dialect: Dialect = "postgres",
+): string {
+	const bare =
+		dialect === "sqlite"
+			? /^[A-Za-z_][A-Za-z0-9_$]*$/.test(name) &&
+				!SQLITE_RESERVED.has(name.toLowerCase())
+			: /^[a-z_][a-z0-9_$]*$/.test(name) && !RESERVED.has(name);
+	return bare ? name : `"${name.replaceAll('"', '""')}"`;
 }
+
+const SQLITE_RESERVED = new Set(
+	"add all alter and as autoincrement between case check collate commit constraint create default deferrable delete distinct drop else escape except exists foreign from group having in index insert intersect into is isnull join limit not nothing notnull null on or order primary references returning select set table then to transaction union unique update using values when where cross full inner left natural outer right".split(
+		" ",
+	),
+);

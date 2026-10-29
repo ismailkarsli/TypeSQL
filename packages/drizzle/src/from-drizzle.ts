@@ -53,7 +53,7 @@ export interface DrizzleColumnTypes {
 	PgCustomColumn: "unknown";
 }
 
-type TableLike = {
+export type TableLike = {
 	readonly _: {
 		readonly brand: "Table";
 		readonly name: string;
@@ -61,7 +61,7 @@ type TableLike = {
 		readonly columns: object;
 	};
 };
-type ViewLike = {
+export type ViewLike = {
 	readonly _: {
 		readonly brand: "View";
 		readonly name: string;
@@ -72,8 +72,8 @@ type EnumLike = {
 	readonly enumName: string;
 	readonly enumValues: readonly string[];
 };
-type ColumnLike = { readonly _: ColumnConfig };
-type ColumnConfig = {
+export type ColumnLike = { readonly _: ColumnConfig };
+export type ColumnConfig = {
 	readonly brand: "Column";
 	readonly name: string;
 	readonly columnType: string;
@@ -159,7 +159,7 @@ type ColOf<D extends ColumnConfig, Opts, E> = Desc<
 		: false
 >;
 
-type Cased<N extends string, Opts> = Opts extends {
+export type Cased<N extends string, Opts> = Opts extends {
 	readonly casing: "snake_case";
 }
 	? ToSnakeCase<N>
@@ -173,7 +173,7 @@ type Columns<C, Opts, E> = {
 		: never]: C[K] extends ColumnLike ? ColOf<C[K]["_"], Opts, E> : never;
 };
 
-type Aliased = { readonly _: { readonly brand: "SQL.Aliased" } };
+export type Aliased = { readonly _: { readonly brand: "SQL.Aliased" } };
 type ViewColumns<F, Opts, E> = {
 	-readonly [K in keyof F as F[K] extends ColumnLike
 		? Cased<F[K]["_"]["name"], Opts>
@@ -218,7 +218,7 @@ type Build<S, Opts, E = Enums<S>> = {
 	};
 } & (keyof E extends never ? {} : { $types: E });
 
-type Flat<T> = { [K in keyof T]: T[K] } & {};
+export type Flat<T> = { [K in keyof T]: T[K] } & {};
 
 export type FromDrizzle<
 	Schema,

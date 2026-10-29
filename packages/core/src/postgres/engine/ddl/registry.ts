@@ -1,8 +1,13 @@
+import type {
+	DelKey,
+	Rebuild,
+	RenameKey,
+	SetKey,
+} from "../../../engine/object.js";
 import type { SqlError } from "../../../errors.js";
 import type { TableRef } from "../ast.js";
 import type { Sig } from "../typer/catalog.js";
 import type { TypeOfCol, WithType } from "./column.js";
-import type { DelKey, Rebuild, RenameKey, SetKey } from "./object.js";
 import type {
 	AsView,
 	ColsOf,

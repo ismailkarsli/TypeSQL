@@ -1,3 +1,10 @@
+import type {
+	ColInfo,
+	ColMap,
+	Cols,
+	Ctx,
+	Info,
+} from "../../../engine/types.js";
 import type { SqlError } from "../../../errors.js";
 import type {
 	Call,
@@ -14,7 +21,6 @@ import type { Nx } from "../parser/util.js";
 import type { NoSubscript } from "../project/dml.js";
 import type { ProjectSelect } from "../project/select.js";
 import type { BaseOf, ObjShape, Shaped } from "../shape.js";
-import type { ColInfo, ColMap, Cols, Ctx, Info } from "../types.js";
 import type { CallType } from "./catalog.js";
 import type {
 	BinOpType,

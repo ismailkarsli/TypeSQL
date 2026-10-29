@@ -5,3 +5,5 @@ export function pgType<B, const T extends string>(
 	void type;
 	return builder as B & { readonly _: { readonly typesqlType: T } };
 }
+
+export const sqliteType: typeof pgType = pgType;

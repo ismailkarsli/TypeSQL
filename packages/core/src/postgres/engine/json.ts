@@ -1,3 +1,4 @@
+import type { ColInfo, Info } from "../../engine/types.js";
 import type { SqlError } from "../../errors.js";
 import type { TsShape } from "../../schema.js";
 import type { EnumsOf } from "../type-map/index.js";
@@ -12,7 +13,6 @@ import type {
 	RangeT,
 	StrT,
 } from "./typer/operators.js";
-import type { ColInfo, Info } from "./types.js";
 
 type ArrShape<E> = { readonly k: "arr"; readonly e: E };
 type ValShape<C> = { readonly k: "val"; readonly c: C };

@@ -1,13 +1,13 @@
 # From a live database
 
-`typesql introspect` reads your Postgres database and writes its schema to a TypeScript file. You get every table, view, materialized view and enum, with the exact Postgres type of each column.
+`typesql introspect` reads your Postgres database and writes its schema to a TypeScript file. You get every table, view, materialized view and enum, with the exact Postgres type of each column. For a SQLite database file, see [SQLite](../adapters/sqlite#generate-the-schema).
 
 ## Generate the schema
 
-The command ships with `@typesql/pg` and connects with `pg`:
+The command ships with `@typesql/cli` and connects with `pg`:
 
 ```sh
-npm install -D @typesql/pg pg
+npm install -D @typesql/cli pg
 npx typesql introspect --url postgres://localhost/app --out src/db/schema.ts
 ```
 
@@ -29,6 +29,7 @@ The file has the real Postgres types: `timestamptz`, `date` and `timestamp` stay
 
 | Option | What it does |
 |---|---|
+| `--dialect <name>` | `postgres`, the default; `sqlite` reads a [database file](../adapters/sqlite#generate-the-schema) instead |
 | `--url <url>` | connection string; default `$DATABASE_URL` |
 | `--out <file>` | output file; default stdout |
 | `--schema <name>` | schema to read; repeat it or comma-separate (`--schema public,auth`). Default: every schema except `pg_catalog`, `information_schema` and `pg_*` |

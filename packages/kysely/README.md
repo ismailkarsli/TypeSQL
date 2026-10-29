@@ -43,6 +43,10 @@ const sql = createSql<DB, DefaultTypeMap, { posts: { score: "float8" } }>(postgr
 
 For an interface generated with `kysely-codegen --camel-case`, pass `{ camelCase: true }` as the fourth type argument.
 
+## SQLite
+
+For a SQLite database, pass `sqlite` from `@typesql/core/sqlite` instead: `createSql(sqlite, db)`. The schema is converted to SQLite types; see [SQLite](https://typesql.karsli.net/guide/orms#sqlite).
+
 ## Documentation
 
 See [From Kysely, Drizzle or Prisma](https://typesql.karsli.net/guide/orms#kysely) for how columns are converted, overrides, enums and camelCase, and [Limits](https://typesql.karsli.net/guide/limits#orm-schemas) for what the conversion can't tell.

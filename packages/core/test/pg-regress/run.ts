@@ -65,7 +65,7 @@ if (unknownNames.length) fail(`no such test: ${unknownNames.join(", ")}`);
 const SKIPPED = "<skipped>";
 const HEADER = [
 	`import type { Lex } from "${relative(cache, join(engine, "lexer/lex.js"))}";`,
-	`import type { Toks } from "${relative(cache, join(engine, "lexer/tokens.js"))}";`,
+	`import type { Toks } from "${relative(cache, join(engine, "../../engine/tokens.js"))}";`,
 	`import type { ParseProgram } from "${relative(cache, join(engine, "parser/stmt.js"))}";`,
 	`import type { SqlError } from "${relative(cache, join(engine, "../../errors.js"))}";`,
 	`/** "ok", "${SKIPPED}" for a statement the parser skips without validating it, or the lexer's or parser's error message. */`,

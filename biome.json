@@ -18,6 +18,8 @@
 			"!packages/bench/thresholds.json",
 			"!packages/core/test/oracle/baselines",
 			"!packages/core/test/fuzz/baseline.json",
+			"!packages/core/test/fuzz/sqlite-baseline.json",
+			"!packages/core/test/sqlite/baseline.json",
 			"!packages/core/test/fuzz/corpus/candidates.json",
 			"!packages/core/test/pg-ast/baseline.json",
 			"!packages/core/test/pg-ast/rejections.json",
@@ -58,6 +60,8 @@
 		{
 			"includes": [
 				"packages/core/src/postgres/engine/cache.ts",
+				"packages/core/src/sqlite/engine/cache.ts",
+				"packages/core/src/sqlite/engine/typer/functions.ts",
 				"packages/core/src/schema.ts"
 			],
 			"linter": {

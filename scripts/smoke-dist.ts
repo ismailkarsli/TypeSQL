@@ -8,6 +8,7 @@ import type {
 type Core = typeof import("../packages/core/src/index.ts");
 type CoreAdapter = typeof import("../packages/core/src/adapter.ts");
 type CorePostgres = typeof import("../packages/core/src/postgres/index.ts");
+type CoreSqlite = typeof import("../packages/core/src/sqlite/index.ts");
 interface AdapterSql {
 	(text: string): unknown;
 	param(value: unknown): string;
@@ -31,6 +32,8 @@ const coreAdapter = (await dist("core/dist/adapter.js")) as CoreAdapter;
 const corePg = (await dist("core/dist/postgres/index.js")) as CorePostgres;
 const pg = (await dist("pg/dist/index.js")) as Adapter;
 const pgjs = (await dist("postgres/dist/index.js")) as Adapter;
+const coreSqlite = (await dist("core/dist/sqlite/index.js")) as CoreSqlite;
+const sqliteAdapter = (await dist("sqlite/dist/index.js")) as Adapter;
 
 interface DB {
 	users: {
@@ -159,6 +162,130 @@ for (const adapter of [pg, pgjs]) {
 	assert.equal(typeof adapter.createSql().transaction, "function");
 }
 
+assert.equal(coreSqlite.sqlite.name, "sqlite");
+assert.ok(
+	!("createSql" in coreSqlite),
+	"@typesql/core/sqlite exports a dialect, not createSql",
+);
+const lite = core.createSql<{ t: { a: Col<"integer">; b: Col<"text"> } }>(
+	coreSqlite.sqlite,
+);
+assert.deepEqual(lite.values("t", [{ a: 1, b: "x" }]), {
+	text: '("a", "b") VALUES ($1, $2)',
+	values: [1, "x"],
+});
+assert.throws(
+	() => lite.values("t", [{ a: 1, b: "x" }, { a: 2 }] as never),
+	/no DEFAULT in VALUES/,
+);
+assert.deepEqual(
+	[
+		...coreSqlite.migrations().add("CREATE TABLE t (id INTEGER PRIMARY KEY)")
+			.statements,
+	],
+	["CREATE TABLE t (id INTEGER PRIMARY KEY)"],
+);
+
+const { DatabaseSync } = await import("node:sqlite");
+const db = new DatabaseSync(":memory:");
+for (const name of ["createSql", "executor", "migrate"])
+	assert.equal(
+		typeof sqliteAdapter[name],
+		"function",
+		`@typesql/sqlite export ${name}`,
+	);
+await (sqliteAdapter.migrate as (db: unknown, m: unknown) => Promise<void>)(
+	db,
+	{
+		statements: [
+			"CREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT NOT NULL, meta TEXT)",
+		],
+	},
+);
+interface LiteQuery {
+	execute(): Promise<unknown[]>;
+	executeCount(): Promise<number>;
+}
+const lsql = sqliteAdapter.createSql(db) as unknown as {
+	(text: string, ...values: unknown[]): LiteQuery;
+	transaction<T>(
+		fn: (tx: (text: string) => LiteQuery) => Promise<T>,
+	): Promise<T>;
+	json(value: unknown): string;
+};
+const inserted = await lsql(
+	"INSERT INTO users (email, meta) VALUES ($1, $2) RETURNING id, email",
+	"a@b.c",
+	lsql.json({ x: [1] }),
+).execute();
+assert.deepEqual(
+	inserted.map((r) => ({ ...(r as object) })),
+	[{ id: 1, email: "a@b.c" }],
+);
+assert.equal(
+	await lsql(
+		"UPDATE users SET email = $2 WHERE id = $1",
+		1,
+		"z@b.c",
+	).executeCount(),
+	1,
+);
+const selected = await lsql(
+	"SELECT $1 || email AS e, json_extract(meta, '$.x[0]') AS x FROM users WHERE id = $2",
+	"<",
+	1,
+).execute();
+assert.deepEqual(
+	selected.map((r) => ({ ...(r as object) })),
+	[{ e: "<z@b.c", x: 1 }],
+);
+await assert.rejects(
+	lsql.transaction(async (t) => {
+		await t("INSERT INTO users (email) VALUES ('rolled back')").execute();
+		throw new Error("boom");
+	}),
+	/boom/,
+);
+assert.equal(
+	(
+		(await lsql("SELECT count(*) AS n FROM users").execute()) as {
+			n: number;
+		}[]
+	)[0]?.n,
+	1,
+);
+const liteIntrospect = (await dist("sqlite/dist/introspect/index.js")) as {
+	introspect(db: unknown): unknown;
+	generateSource(db: unknown): string;
+};
+assert.match(
+	liteIntrospect.generateSource(liteIntrospect.introspect(db)),
+	/id: Col<"integer", \{ hasDefault: true; position: 0; rowid: true \}>;/,
+);
+db.close();
+
+const positional = (
+	coreAdapter as unknown as {
+		positional(
+			text: string,
+			values: readonly unknown[],
+		): { text: string; values: unknown[] };
+	}
+).positional;
+assert.deepEqual(positional("SELECT $2, '$1', \"$1\", $1 -- $3", ["a", true]), {
+	text: "SELECT ?, '$1', \"$1\", ? -- $3",
+	values: [1, "a"],
+});
+for (const name of ["kysely", "drizzle", "prisma"]) {
+	const orm = (await dist(`${name}/dist/index.js`)) as {
+		createSql(dialect: unknown): (text: string, ...v: unknown[]) => unknown;
+	};
+	assert.deepEqual(orm.createSql(coreSqlite.sqlite)("SELECT $1", 1), {
+		text: "SELECT $1",
+		values: [1],
+	});
+}
+
 const introspect = (await dist("pg/dist/introspect/index.js")) as Introspect;
 for (const name of ["introspect", "generateSource"]) {
 	assert.equal(
@@ -204,13 +331,71 @@ assert.deepEqual(
 	["generateSource"],
 	"@typesql/prisma/generator exports",
 );
+assert.match(
+	(
+		prismaGenerator.generateSource as (
+			dm: unknown,
+			o: { dialect: "sqlite" },
+		) => string
+	)(
+		{
+			models: [
+				{
+					name: "User",
+					dbName: null,
+					fields: [
+						{
+							name: "id",
+							kind: "scalar",
+							type: "Int",
+							isList: false,
+							isRequired: true,
+							hasDefaultValue: true,
+							default: { name: "autoincrement", args: [] },
+						},
+					],
+				},
+			],
+			enums: [],
+		},
+		{ dialect: "sqlite" },
+	),
+	/from "@typesql\/core\/sqlite";[\s\S]*id: Generated<"integer">;/,
+);
 
 const { execFileSync } = await import("node:child_process");
-const help = execFileSync(
-	process.execPath,
-	[new URL("../packages/pg/dist/bin.js", import.meta.url).pathname, "--help"],
-	{ encoding: "utf8" },
+const cliBin = new URL("../packages/cli/dist/bin.js", import.meta.url).pathname;
+const cli = (...args: string[]): string =>
+	execFileSync(process.execPath, [cliBin, ...args], { encoding: "utf8" });
+assert.match(
+	cli("--help"),
+	/^Usage: typesql introspect \[--dialect postgres\|sqlite\]/,
 );
-assert.match(help, /^Usage: typesql introspect/);
+assert.match(
+	cli("introspect", "--dialect", "postgres", "--help"),
+	/^Usage: typesql introspect \[--dialect postgres\]/,
+);
+assert.match(
+	cli("introspect", "--dialect=sqlite", "--help"),
+	/^Usage: typesql introspect --dialect sqlite/,
+);
+{
+	const { mkdtempSync, rmSync } = await import("node:fs");
+	const { tmpdir } = await import("node:os");
+	const { join } = await import("node:path");
+	const dir = mkdtempSync(join(tmpdir(), "typesql-cli-"));
+	try {
+		const file = join(dir, "app.db");
+		const lite = new DatabaseSync(file);
+		lite.exec("CREATE TABLE t (id INTEGER PRIMARY KEY, name TEXT NOT NULL)");
+		lite.close();
+		assert.match(
+			cli("introspect", "--db", file),
+			/name: Col<"text", \{ position: 1 \}>;/,
+		);
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
+}
 
 console.log("dist smoke test: ok");

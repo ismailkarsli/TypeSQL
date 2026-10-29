@@ -1,7 +1,7 @@
-import type { Ws } from "../lexer/chars.js";
+import type { Ws } from "../../../engine/chars.js";
+import type { MaxParam } from "../../../engine/params.js";
+import type { Toks } from "../../../engine/tokens.js";
 import type { Lex } from "../lexer/lex.js";
-import type { Toks } from "../lexer/tokens.js";
-import type { MaxParam } from "../typer/params.js";
 import type {
 	ParseSelectTail,
 	ParseSimpleAfterTargets,

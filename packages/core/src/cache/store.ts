@@ -64,7 +64,7 @@ export function merge(
 		{
 			t: string;
 			h: string;
-			w: Record<string, readonly [string, string, string, string]>;
+			w: Record<string, readonly string[]>;
 			q: Record<string, string>;
 			entries: Record<string, Entry>;
 		}

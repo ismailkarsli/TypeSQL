@@ -1,4 +1,4 @@
-export type { IntrospectConfig } from "./cli.js";
+export { type IntrospectConfig, main } from "./cli.js";
 export { type GenerateOptions, generateSource } from "./emit.js";
 export {
 	type IntrospectedColumn,

@@ -33,9 +33,10 @@ await sql.transaction(async (tx) => {
 
 ## Generate your schema
 
-This package also ships the `typesql` command, which writes the `DB` type from a live database:
+The `typesql` command of [`@typesql/cli`](https://www.npmjs.com/package/@typesql/cli) writes the `DB` type from a live database, using this package's introspection:
 
 ```sh
+npm install -D @typesql/cli
 npx typesql introspect --url postgres://localhost/app --out src/db/schema.ts
 ```
 

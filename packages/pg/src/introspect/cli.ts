@@ -11,7 +11,7 @@ export interface IntrospectConfig extends GenerateOptions, IntrospectOptions {
 	readonly out?: string;
 }
 
-const USAGE = `Usage: typesql introspect [options]
+const USAGE = `Usage: typesql introspect [--dialect postgres] [options]
 
 Reads a live Postgres database and writes its TypeSQL schema (tables, views, enums).
 

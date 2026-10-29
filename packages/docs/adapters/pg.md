@@ -71,4 +71,4 @@ Rows are typed with `PgTypeMap`, which matches what `pg` returns by default. `in
 
 `migrate(pool, m)` runs a [`migrations()`](../guide/migrations) builder's statements in one transaction, on one client from the pool. See [From migrations](../guide/migrations#running-migrations).
 
-`@typesql/pg` also ships the `typesql introspect` command; see [From a live database](../guide/introspect).
+The `typesql introspect` command of `@typesql/cli` reads a database through this package; see [From a live database](../guide/introspect).

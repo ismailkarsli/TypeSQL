@@ -1,3 +1,10 @@
+import type {
+	OpTok,
+	StrTok,
+	Tok,
+	Toks,
+	WordTok,
+} from "../../../engine/tokens.js";
 import type { SerialTypeName } from "../../schema/normalize.js";
 import type {
 	AlterAction,
@@ -6,7 +13,6 @@ import type {
 	TableConstraint,
 	TableRef,
 } from "../ast.js";
-import type { OpTok, StrTok, Tok, Toks, WordTok } from "../lexer/tokens.js";
 import type { ParseExpr, ParseExprList } from "./expr.js";
 import type { ParseSelectStmt, RefOf } from "./select.js";
 import type { ParseTypeName } from "./typename.js";

@@ -4,7 +4,7 @@ import {
 } from "vitest/config";
 import type { InlineConfig } from "vitest/node";
 
-const projects = ["oracle", "fuzz", "pg-ast"].map((name) => ({
+const projects = ["oracle", "fuzz", "pg-ast", "sqlite"].map((name) => ({
 	root: import.meta.dirname,
 	test: {
 		name,

@@ -1,3 +1,4 @@
+import type { PickOne, Rebuild } from "../../../engine/object.js";
 import type { AnyErr, SqlError } from "../../../errors.js";
 import type { ColumnDef, LikeClause, TableRef } from "../ast.js";
 import type {
@@ -11,7 +12,6 @@ import type {
 	WithDefault,
 	WithNullable,
 } from "./column.js";
-import type { PickOne, Rebuild } from "./object.js";
 import type { QueryCols, StoredType } from "./query.js";
 import type {
 	CanCreate,

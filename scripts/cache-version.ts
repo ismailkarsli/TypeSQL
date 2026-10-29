@@ -3,7 +3,9 @@ import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 
 const root = join(import.meta.dirname, "../packages/core/src");
-const target = join(root, "postgres/engine/cache.ts");
+const targets = ["postgres/engine/cache.ts", "sqlite/engine/cache.ts"].map(
+	(f) => join(root, f),
+);
 const line = /^export type CacheVersion = "[^"]*";$/m;
 
 function files(dir: string): string[] {
@@ -26,18 +28,21 @@ for (const f of files(root).sort()) {
 }
 const version = hash.digest("hex").slice(0, 12);
 
-const text = readFileSync(target, "utf8");
-const current = line.exec(text)?.[0];
-if (!current) throw new Error(`no CacheVersion line in ${target}`);
-const wanted = `export type CacheVersion = "${version}";`;
-if (current === wanted) {
-	console.log(`cache-version: ${version} (up to date)`);
-} else if (process.argv.includes("--check")) {
+let stale = false;
+for (const target of targets) {
+	const text = readFileSync(target, "utf8");
+	const current = line.exec(text)?.[0];
+	if (!current) throw new Error(`no CacheVersion line in ${target}`);
+	const wanted = `export type CacheVersion = "${version}";`;
+	if (current === wanted) continue;
+	stale = true;
+	if (!process.argv.includes("--check"))
+		writeFileSync(target, text.replace(line, wanted));
+}
+if (!stale) console.log(`cache-version: ${version} (up to date)`);
+else if (process.argv.includes("--check")) {
 	console.error(
 		`cache-version: CacheVersion is out of date; run \`pnpm cache-version\` (want ${version})`,
 	);
 	process.exit(1);
-} else {
-	writeFileSync(target, text.replace(line, wanted));
-	console.log(`cache-version: wrote ${version}`);
-}
+} else console.log(`cache-version: wrote ${version}`);

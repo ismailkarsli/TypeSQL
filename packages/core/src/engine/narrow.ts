@@ -1,5 +1,5 @@
-import type { Nx } from "../parser/util.js";
-import type { ColMap, ScopeItem, ScopeLevel } from "../types.js";
+import type { Nx } from "./parse.js";
+import type { ColMap, ScopeItem, ScopeLevel } from "./types.js";
 
 export type NarrowKeys<E> = AndKeys<E, never>;
 
@@ -14,6 +14,7 @@ type AndKeys<E, Acc> = E extends {
 
 type StrictBoolOp =
 	| "="
+	| "=="
 	| "<"
 	| ">"
 	| "<="
@@ -140,14 +141,17 @@ type KeyHits<It extends ScopeItem, Keys> = Keys extends readonly [
 	: false;
 
 type NarrowItem<It extends ScopeItem, Keys> = {
-	readonly alias: It["alias"];
-	readonly cols: NarrowCols<It["cols"], It["alias"], It["skip"][number], Keys>;
-	readonly skip: It["skip"];
+	readonly [P in keyof It]: P extends "cols"
+		? NarrowCols<It["cols"], It["alias"], It["skip"][number], Keys>
+		: It[P];
 };
 type NarrowCols<M extends ColMap, A, Skip, Keys> = {
 	readonly [K in keyof M]: M[K]["nullable"] extends true
 		? Hit<A, K, Skip, Keys> extends true
-			? { readonly type: M[K]["type"]; readonly nullable: false }
+			? NotNull<M[K]>
 			: M[K]
 		: M[K];
+};
+type NotNull<C> = {
+	readonly [P in keyof C]: P extends "nullable" ? false : C[P];
 };

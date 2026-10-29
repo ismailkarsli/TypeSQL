@@ -1,7 +1,7 @@
+import type { ColInfo, Info } from "../../../engine/types.js";
 import type { SqlError } from "../../../errors.js";
 import type { TypeDisplay } from "../binder/clauses.js";
 import type { JsonRet } from "../json.js";
-import type { ColInfo, Info } from "../types.js";
 import type {
 	CommonLit,
 	DateTimeT,

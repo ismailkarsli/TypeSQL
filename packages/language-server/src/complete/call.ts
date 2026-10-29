@@ -28,7 +28,10 @@ export interface SqlCall {
 	readonly end: number;
 	readonly text: string;
 	readonly db: Type;
+	readonly dialect: Dialect;
 }
+
+export type Dialect = "postgres" | "sqlite";
 
 const METHODS = new Set(["fragment", "as"]);
 
@@ -59,6 +62,7 @@ export async function sqlCallAt(
 
 	const callee = call.expression;
 	let db: Type | undefined;
+	let sqlType: Type | undefined;
 	if (
 		callee.kind === kinds.PropertyAccessExpression &&
 		METHODS.has((callee as PropertyAccessExpression).name.text)
@@ -66,16 +70,33 @@ export async function sqlCallAt(
 		const receiver = await checker.getTypeAtLocation(
 			(callee as PropertyAccessExpression).expression,
 		);
-		if (await isCoreRef(receiver, ["Sql", "TransactionalSql"], isCorePath))
+		if (await isCoreRef(receiver, ["Sql", "TransactionalSql"], isCorePath)) {
 			db = (await checker.getTypeArguments(receiver as never))[0];
+			sqlType = receiver;
+		}
 	} else {
 		const t = await checker.getTypeAtLocation(callee);
-		if (await isCoreRef(t, ["Sql", "TransactionalSql"], isCorePath))
+		if (await isCoreRef(t, ["Sql", "TransactionalSql"], isCorePath)) {
 			db = (await checker.getTypeArguments(t as never))[0];
+			sqlType = t;
+		}
 	}
-	return db
-		? { file, offset, start: parts.start, end: parts.end, text: parts.text, db }
-		: null;
+	if (!db || !sqlType) return null;
+	const sym = await sqlType.getSymbol();
+	const dialect: Dialect = sym?.declarations.some((d) =>
+		/[\\/]sqlite[\\/]/.test(d.path),
+	)
+		? "sqlite"
+		: "postgres";
+	return {
+		file,
+		offset,
+		start: parts.start,
+		end: parts.end,
+		text: parts.text,
+		db,
+		dialect,
+	};
 }
 
 function callAt(

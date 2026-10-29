@@ -2,7 +2,7 @@ import { appendFileSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, join, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import type { CacheDialect } from "./dialect.js";
-import { dialectNamed } from "./dialects.js";
+import { DIALECTS, dialectNamed } from "./dialects.js";
 import { fileId, parseCache, render } from "./format.js";
 import { Job } from "./job.js";
 import { type Handlers, InvalidParams, RpcError, serve } from "./rpc.js";
@@ -60,12 +60,17 @@ export function createMapper(o: MapperOptions): {
 		const cacheFile = [...p.files].sort()[0];
 		if (!cacheFile) return;
 		const dialect = p.dialect ?? dialectNamed(undefined);
-		o.log(`job for ${p.configFile} → ${cacheFile} (${dialect.name})`);
+		o.log(
+			`job for ${p.configFile} → ${cacheFile} (${p.dialect ? dialect.name : "dialect from the project"})`,
+		);
 		p.job = new Job({
 			configFile: p.configFile,
 			cacheFile,
 			dialect,
 			engine: o.engine(dialect),
+			...(p.dialect
+				? {}
+				: { detect: { dialects: DIALECTS, engine: o.engine } }),
 			isCorePath,
 			log: o.log,
 		});
@@ -105,7 +110,7 @@ export function createMapper(o: MapperOptions): {
 			}
 			const file = parseCache(String(p.content ?? ""));
 			const dialect = dialectNamed(file?.dialect);
-			if (project) project.dialect ??= dialect;
+			if (project && file) project.dialect ??= dialect;
 			const text = render(file, fileId(fileName), dialect, o.engine(dialect));
 			o.log(`transform ${fileName} (${text.length} characters)`);
 			return { text, extension: ".ts" };

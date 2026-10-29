@@ -201,6 +201,25 @@ importers:
         specifier: 7.1.0-beta
         version: 7.1.0-beta
 
+  packages/cli:
+    dependencies:
+      '@typesql/pg':
+        specifier: workspace:*
+        version: link:../pg
+      '@typesql/sqlite':
+        specifier: workspace:*
+        version: link:../sqlite
+      pg:
+        specifier: '>=8'
+        version: 8.23.1
+    devDependencies:
+      tsrs:
+        specifier: 0.18.0-ts7.1.0-dev.20260929
+        version: 0.18.0-ts7.1.0-dev.20260929
+      typescript:
+        specifier: 7.1.0-beta
+        version: 7.1.0-beta
+
   packages/core:
     devDependencies:
       '@types/pg':
@@ -242,6 +261,9 @@ importers:
       '@typesql/prisma':
         specifier: workspace:*
         version: link:../prisma
+      '@typesql/sqlite':
+        specifier: workspace:*
+        version: link:../sqlite
     devDependencies:
       '@types/node':
         specifier: ^26.6.5
@@ -371,6 +393,19 @@ importers:
       '@prisma/client':
         specifier: ^7.10.0
         version: 7.10.0(prisma@7.10.0(@types/react@19.3.0)(magicast@0.5.5)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@7.1.0-beta))(typescript@7.1.0-beta)
+      tsrs:
+        specifier: 0.18.0-ts7.1.0-dev.20260929
+        version: 0.18.0-ts7.1.0-dev.20260929
+      typescript:
+        specifier: 7.1.0-beta
+        version: 7.1.0-beta
+
+  packages/sqlite:
+    dependencies:
+      '@typesql/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
       tsrs:
         specifier: 0.18.0-ts7.1.0-dev.20260929
         version: 0.18.0-ts7.1.0-dev.20260929

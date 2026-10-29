@@ -1,7 +1,3 @@
-import type { SqlError } from "../../../errors.js";
-import type { Table, View } from "../../../schema.js";
-import type { TableRef } from "../ast.js";
-import type { RowInfo } from "../shape.js";
 import type {
 	ColInfo,
 	ColMap,
@@ -9,7 +5,11 @@ import type {
 	Scope,
 	ScopeItem,
 	ScopeLevel,
-} from "../types.js";
+} from "../../../engine/types.js";
+import type { SqlError } from "../../../errors.js";
+import type { Table, View } from "../../../schema.js";
+import type { TableRef } from "../ast.js";
+import type { RowInfo } from "../shape.js";
 
 export type ResolveTable<
 	DB,

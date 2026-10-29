@@ -1,5 +1,5 @@
+import type { OpTok, Toks, WordTok } from "../../../engine/tokens.js";
 import type { Expr, MergeWhen, WithClause } from "../ast.js";
-import type { OpTok, Toks, WordTok } from "../lexer/tokens.js";
 import type {
 	ParenTargetList,
 	ParseDmlTarget,

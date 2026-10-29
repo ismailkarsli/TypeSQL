@@ -1,6 +1,6 @@
+import type { Toks } from "../../src/engine/tokens.js";
 import type { SqlError } from "../../src/index.js";
 import type { Lex, ParseProgram } from "../../src/postgres/engine/index.js";
-import type { Toks } from "../../src/postgres/engine/lexer/tokens.js";
 
 export type Out = "…";
 

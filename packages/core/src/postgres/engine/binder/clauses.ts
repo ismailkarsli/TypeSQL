@@ -1,10 +1,10 @@
+import type { ColInfo, Cols, Ctx } from "../../../engine/types.js";
 import type { AnyErr, ErrMsg, SqlError } from "../../../errors.js";
 import type { Expr, NamedWindow, Target, WindowSpec } from "../ast.js";
 import type { Nx } from "../parser/util.js";
 import type { AnyShaped, BaseOf } from "../shape.js";
 import type { IntLitValue, NumLitType } from "../typer/operators.js";
 import type { TypeList, TypeOf } from "../typer/typeof.js";
-import type { ColInfo, Cols, Ctx } from "../types.js";
 
 type DisplayNames = {
 	int2: "smallint";

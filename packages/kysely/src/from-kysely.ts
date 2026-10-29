@@ -45,7 +45,7 @@ export type InferColumn<T> = {
 	readonly hasDefault: HasDefault<T>;
 };
 
-type Sn<S extends string, Opt> = Opt extends { readonly camelCase: true }
+export type Sn<S extends string, Opt> = Opt extends { readonly camelCase: true }
 	? SnakeCase<S>
 	: S;
 
@@ -80,8 +80,8 @@ type NamespaceOf<DB, S extends string, O, Opt> = {
 		: never]-?: TableOf<DB, K, O, Opt>;
 };
 
-type TableOverrides<O, K> = K extends keyof O ? O[K] : undefined;
-type ColumnOverrideOf<TO, C> = C extends keyof TO ? TO[C] : undefined;
+export type TableOverrides<O, K> = K extends keyof O ? O[K] : undefined;
+export type ColumnOverrideOf<TO, C> = C extends keyof TO ? TO[C] : undefined;
 
 type Registry<O> = O extends { readonly $types: infer R } ? R : {};
 
@@ -114,9 +114,11 @@ type Columns<Tbl, TO, TName extends string, Reg, Opt> = {
 	>;
 };
 
-type Sel<T> = T extends { readonly __select__: infer S } ? InnerSel<S> : T;
+export type Sel<T> = T extends { readonly __select__: infer S }
+	? InnerSel<S>
+	: T;
 type InnerSel<S> = S extends { readonly __select__: infer S2 } ? S2 : S;
-type Hint<T> = T extends {
+export type Hint<T> = T extends {
 	readonly __select__: infer S;
 	readonly __insert__: infer I;
 }
@@ -125,9 +127,9 @@ type Hint<T> = T extends {
 type InnerIns<S, I> = S extends { readonly __insert__: infer I2 } ? I2 : I;
 type Ins<T> = T extends { readonly __insert__: infer I } ? I : T;
 
-type HasDefault<T> = [Extract<T, { readonly __insert__: unknown }>] extends [
-	never,
-]
+export type HasDefault<T> = [
+	Extract<T, { readonly __insert__: unknown }>,
+] extends [never]
 	? false
 	: undefined extends Ins<T>
 		? true
@@ -135,7 +137,7 @@ type HasDefault<T> = [Extract<T, { readonly __insert__: unknown }>] extends [
 			? true
 			: false;
 
-type LiteralUnion<S> = [S] extends [string]
+export type LiteralUnion<S> = [S] extends [string]
 	? string extends S
 		? never
 		: S
@@ -226,7 +228,7 @@ type IsSingle<N, All = N> = N extends unknown
 		: false
 	: never;
 
-type OverrideType<V> = V extends string
+export type OverrideType<V> = V extends string
 	? V
 	: V extends { readonly type: infer X extends string }
 		? X

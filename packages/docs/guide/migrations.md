@@ -31,9 +31,11 @@ const q = sql(
 - `m.statements` is the list of statements at runtime, in order.
 - A wrong statement is a compile error on its string, worded like the database's error: `relation "users" already exists`, `column "age" of relation "users" does not exist`, and so on.
 
+`migrations` comes from your dialect: `@typesql/core/postgres` for PostgreSQL DDL, `@typesql/core/sqlite` for [SQLite](./sqlite#schema).
+
 ## Running migrations
 
-`@typesql/pg` and `@typesql/postgres` both export `migrate(db, m)`. It runs `m.statements` in order inside one transaction, so either all of them apply or none:
+`@typesql/pg`, `@typesql/postgres` and `@typesql/sqlite` export `migrate(db, m)`. It runs `m.statements` in order inside one transaction, so either all of them apply or none:
 
 ::: code-group
 
@@ -46,6 +48,13 @@ const sql = createSql<SchemaOf<typeof m>>(pool);
 
 ```ts [postgres.js]
 import { createSql, migrate } from "@typesql/postgres";
+
+await migrate(db, m);
+const sql = createSql<SchemaOf<typeof m>>(db);
+```
+
+```ts [SQLite]
+import { createSql, migrate } from "@typesql/sqlite";
 
 await migrate(db, m);
 const sql = createSql<SchemaOf<typeof m>>(db);

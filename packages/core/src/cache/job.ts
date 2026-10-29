@@ -1,7 +1,7 @@
-import { type FSWatcher, watch } from "node:fs";
+import { type FSWatcher, readFileSync, watch } from "node:fs";
 import { dirname, join, relative, sep } from "node:path";
 import type { Checker, Type } from "typescript/async";
-import type { CacheDialect } from "./dialect.js";
+import type { CacheDialect, WordSlot } from "./dialect.js";
 import { discover } from "./discover.js";
 import {
 	badDeclarations,
@@ -21,10 +21,10 @@ import {
 	type Entry,
 	type Group,
 	hash,
+	parseCache,
 	render,
 } from "./format.js";
 import { coreNames, names, Printer } from "./print.js";
-import { scanNames } from "./scan.js";
 import {
 	type Contribution,
 	ddlEntryId,
@@ -40,6 +40,10 @@ export interface JobOptions {
 	readonly cacheFile: string;
 	readonly dialect: CacheDialect;
 	readonly engine: string;
+	readonly detect?: {
+		readonly dialects: readonly CacheDialect[];
+		readonly engine: (dialect: CacheDialect) => string;
+	};
 	readonly isCorePath: (path: string) => boolean;
 	readonly log?: (message: string) => void;
 }
@@ -54,12 +58,20 @@ export interface PassResult {
 }
 
 const MISSING = "__T.Missing";
+
+function existingCache(path: string): CacheFile | null {
+	try {
+		return parseCache(readFileSync(path, "utf8"));
+	} catch {
+		return null;
+	}
+}
 const lit = (s: string): string => JSON.stringify(s);
 
 export class Session {
 	private readonly session: ProbeSession;
 	readonly probe: string;
-	private readonly o: JobOptions;
+	private o: JobOptions;
 
 	constructor(o: JobOptions) {
 		this.o = o;
@@ -93,8 +105,45 @@ export class Session {
 		});
 	}
 
+	private async detectDialect(): Promise<JobOptions> {
+		const { detect, ...o } = this.o;
+		if (!detect) return o;
+		const current = existingCache(o.cacheFile);
+		if (current) {
+			const dialect =
+				detect.dialects.find((d) => d.name === current.dialect) ?? o.dialect;
+			return { ...o, dialect, engine: detect.engine(dialect) };
+		}
+		const kinds = (await this.session.typescript()).kinds;
+		const { program, checker } = await this.withProbe(probeHead(o.dialect));
+		const include = (f: string): boolean =>
+			f !== this.probe &&
+			!f.endsWith(".d.ts") &&
+			!/[\\/]node_modules[\\/]/.test(f) &&
+			!o.isCorePath(f);
+		for (const dialect of [
+			o.dialect,
+			...detect.dialects.filter((d) => d !== o.dialect),
+		]) {
+			const sites = await discover(
+				program,
+				checker,
+				kinds,
+				o.isCorePath,
+				include,
+				dialect,
+			);
+			if (sites.sql.length + sites.types.length + sites.ddl.length) {
+				this.log(`dialect: ${dialect.name}`);
+				return { ...o, dialect, engine: detect.engine(dialect) };
+			}
+		}
+		return { ...this.o };
+	}
+
 	async pass(): Promise<PassResult> {
 		const started = performance.now();
+		if (this.o.detect) this.o = await this.detectDialect();
 		const o = this.o;
 		const owner = relative(dirname(o.cacheFile), o.configFile)
 			.split(sep)
@@ -167,13 +216,27 @@ export class Session {
 			}
 			return v;
 		};
+		const relci = async (
+			t: Type | undefined,
+			word: string,
+		): Promise<string | null> => {
+			if (!t) return "{}";
+			const members: string[] = [];
+			for (const p of await checker.getPropertiesOfType(t)) {
+				if (p.name.startsWith("$") || p.name.toLowerCase() !== word) continue;
+				const v = await snap(await checker.getTypeOfSymbol(p));
+				if (v === null) return null;
+				members.push(`${lit(p.name)}: ${v}`);
+			}
+			return `{ ${members.join("; ")} }`;
+		};
 		const depSnapshot = async (
 			db: Type,
 			ws: Iterable<string>,
 			ps: Iterable<string>,
 		): Promise<{
 			t: string | null;
-			w: Map<string, readonly [string, string, string, string] | null>;
+			w: Map<string, readonly string[] | null>;
 			q: Map<string, string | null>;
 		}> => {
 			const [pg, fns, types] = await Promise.all([
@@ -181,23 +244,33 @@ export class Session {
 				prop(db, "$functions"),
 				prop(db, "$types"),
 			]);
-			const w = new Map<
-				string,
-				readonly [string, string, string, string] | null
-			>();
+			const slot = (kind: WordSlot, word: string): Promise<string | null> => {
+				switch (kind) {
+					case "rel":
+						return prop(db, word).then(snap);
+					case "relci":
+						return relci(db, word);
+					case "pg":
+						return prop(pg, word).then(snap);
+					case "fn":
+						return prop(fns, word).then(snap);
+					case "fnci":
+						return relci(fns, word);
+					case "cat":
+						return catalog(word);
+					case "catci":
+						return relci(fc, word);
+				}
+			};
+			const w = new Map<string, readonly string[] | null>();
 			await Promise.all(
 				[...ws].map(async (word) => {
-					const parts = await Promise.all([
-						prop(db, word).then(snap),
-						prop(pg, word).then(snap),
-						prop(fns, word).then(snap),
-						catalog(word),
-					]);
+					const parts = await Promise.all(
+						o.dialect.wordSlots.map((kind) => slot(kind, word)),
+					);
 					w.set(
 						word,
-						parts.every((p): p is string => p !== null)
-							? (parts as unknown as readonly [string, string, string, string])
-							: null,
+						parts.every((p): p is string => p !== null) ? parts : null,
 					);
 				}),
 			);
@@ -256,7 +329,7 @@ export class Session {
 		};
 		const addWords = (g: G, texts: readonly string[]): void => {
 			for (const text of texts) {
-				const n = scanNames(text);
+				const n = o.dialect.scanNames(text);
 				for (const x of n.words) g.words.add(x);
 				for (const x of n.pairs) g.pairs.add(x);
 			}
@@ -319,7 +392,7 @@ export class Session {
 			const id = `${s.key}\0${full}`;
 			if (seenSteps.has(id)) continue;
 			seenSteps.add(id);
-			const n = scanNames(s.key);
+			const n = o.dialect.scanNames(s.key);
 			const dep = await depSnapshot(s.db, n.words, n.pairs);
 			if (
 				dep.t === null ||
@@ -450,7 +523,11 @@ export class Session {
 				if (text === null) return;
 				texts.set(s, text);
 				const isErr = !(g.flags & 2);
-				const e = entryFor(s.g, s.key, depsOf([s.key, ...s.extraWords], isErr));
+				const e = entryFor(
+					s.g,
+					s.key,
+					depsOf(o.dialect, [s.key, ...s.extraWords], isErr),
+				);
 				if (text !== s.key) e.t = text;
 				const call: CallEntry = {
 					m: s.map.id,
@@ -519,7 +596,7 @@ export class Session {
 				const e = entryFor(
 					a.g,
 					a.text,
-					depsOf([a.text, ...a.site.extraWords], isErr),
+					depsOf(o.dialect, [a.text, ...a.site.extraWords], isErr),
 				);
 				e.a = r.text;
 				computed++;
@@ -532,7 +609,7 @@ export class Session {
 				const g = groups.get(gid)!;
 				const h = hints.get(gid);
 				if (!g.dep || g.dep.t === null || h === undefined) continue;
-				const w: Record<string, readonly [string, string, string, string]> = {};
+				const w: Record<string, readonly string[]> = {};
 				const q: Record<string, string> = {};
 				const out: Record<string, Entry> = {};
 				for (const [key, e] of es) {
@@ -616,10 +693,14 @@ export class Session {
 	}
 }
 
-function depsOf(texts: readonly string[], isErr: boolean): string[] {
+function depsOf(
+	dialect: CacheDialect,
+	texts: readonly string[],
+	isErr: boolean,
+): string[] {
 	const ws = new Set<string>();
 	for (const t of texts) {
-		const n = scanNames(t);
+		const n = dialect.scanNames(t);
 		for (const x of n.words) ws.add(x);
 		for (const x of n.pairs) ws.add(x);
 	}

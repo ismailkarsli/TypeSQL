@@ -1,3 +1,22 @@
+import type {
+	NarrowKeys,
+	NarrowLevel,
+	UsingKeys,
+} from "../../../engine/narrow.js";
+import type {
+	ColInfo,
+	ColMap,
+	Cols,
+	ColsToMap,
+	CteMap,
+	Ctx,
+	Info,
+	MkCtx,
+	NullableMap,
+	Scope,
+	ScopeItem,
+	ScopeLevel,
+} from "../../../engine/types.js";
 import type { AnyErr, SqlError } from "../../../errors.js";
 import type {
 	ColDef,
@@ -16,22 +35,7 @@ import type { CommonType } from "../typer/operators.js";
 import type { BindJsonTable } from "../typer/sqljson.js";
 import type { TypeList, TypeOf } from "../typer/typeof.js";
 import type { XmlTableCols } from "../typer/xml.js";
-import type {
-	ColInfo,
-	ColMap,
-	Cols,
-	ColsToMap,
-	CteMap,
-	Ctx,
-	Info,
-	MkCtx,
-	NullableMap,
-	Scope,
-	ScopeItem,
-	ScopeLevel,
-} from "../types.js";
 import type { CheckCondition, TypeDisplay } from "./clauses.js";
-import type { NarrowKeys, NarrowLevel, UsingKeys } from "./narrow.js";
 import type { ResolveTable } from "./resolve.js";
 
 export type BindFrom<

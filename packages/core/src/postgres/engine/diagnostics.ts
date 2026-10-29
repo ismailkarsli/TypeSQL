@@ -1,5 +1,5 @@
+import type { IdTok, Toks, WordTok } from "../../engine/tokens.js";
 import type { SqlError } from "../../errors.js";
-import type { IdTok, Toks, WordTok } from "./lexer/tokens.js";
 import type { IntoName } from "./parser/select.js";
 import type { Nx } from "./parser/util.js";
 import type { WithHint } from "./suggest.js";

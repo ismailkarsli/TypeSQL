@@ -1,3 +1,13 @@
+import type { AddParam, NullTest } from "../../../engine/params.js";
+import type {
+	ColInfo,
+	CteMap,
+	Ctx,
+	Info,
+	MkCtx,
+	Scope,
+	ScopeLevel,
+} from "../../../engine/types.js";
 import type {
 	Call,
 	Expr,
@@ -8,56 +18,13 @@ import type {
 	Target,
 } from "../ast.js";
 import type { BindFrom } from "../binder/from.js";
-import type { Toks } from "../lexer/tokens.js";
 import type { BindWith } from "../project/select.js";
-import type {
-	ColInfo,
-	CteMap,
-	Ctx,
-	Info,
-	MkCtx,
-	Scope,
-	ScopeLevel,
-} from "../types.js";
 import type { AnySig, LookupFn, PickSig } from "./catalog.js";
 import type { CommonType, DateTimeT } from "./operators.js";
 import type { ParamsOfJsonTable, ParamsOfSqlJson } from "./sqljson.js";
 import type { TypeList, TypeOf } from "./typeof.js";
 import type { ParamsOfXml, ParamsOfXmlTable } from "./xml.js";
 
-export type ParamMap = { readonly [n: number]: ColInfo };
-
-export type ParamEntry<N extends number = number, T = ColInfo> = {
-	readonly n: N;
-	readonly t: T;
-};
-
-export type AddParam<M, N extends number, T> = M | ParamEntry<N, T>;
-
-export type ParamsToMap<U> = {
-	readonly [E in U as E extends { readonly n: infer N extends number }
-		? N
-		: never]: E extends { readonly t: infer T } ? T : never;
-};
-
-export type MaxParam<T extends Toks> = HighestParam<
-	Extract<T[number], { readonly k: "$" }>["v"] | 0
->;
-
-type HighestParam<N extends number, All extends number = N> = N extends number
-	? Exclude<All, Before<N>> extends N
-		? N
-		: never
-	: never;
-type Before<N extends number, A extends number[] = []> = A["length"] extends N
-	? A[number]
-	: Before<N, [...A, A["length"]]>;
-
-export type NullTest = {
-	readonly type: "unknown";
-	readonly nullable: true;
-	readonly nullTest: true;
-};
 type NullTested<E extends Expr, M> = E extends {
 	readonly t: "param";
 	readonly n: infer N extends number;

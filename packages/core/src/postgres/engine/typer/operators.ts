@@ -1,6 +1,6 @@
+import type { ColInfo, Info } from "../../../engine/types.js";
 import type { LitCommon } from "../json.js";
 import type { BaseOf, ShapedCommon } from "../shape.js";
-import type { ColInfo, Info } from "../types.js";
 
 export type IntT = "int2" | "int4" | "int8";
 export type FloatT = "float4" | "float8";

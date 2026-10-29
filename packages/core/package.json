@@ -1,7 +1,7 @@
 {
 	"name": "@typesql/core",
 	"version": "0.8.0",
-	"description": "Type-level Postgres SQL inference for TypeScript, tested against PostgreSQL 18's regression suite. Zero runtime dependencies.",
+	"description": "Type-level SQL inference for TypeScript: PostgreSQL (tested against PostgreSQL 18's regression suite) and SQLite. Zero runtime dependencies.",
 	"license": "MIT",
 	"repository": {
 		"type": "git",
@@ -28,6 +28,14 @@
 		"./postgres/engine": {
 			"types": "./dist/postgres/engine/index.d.ts",
 			"default": "./dist/postgres/engine/index.js"
+		},
+		"./sqlite": {
+			"types": "./dist/sqlite/index.d.ts",
+			"default": "./dist/sqlite/index.js"
+		},
+		"./sqlite/engine": {
+			"types": "./dist/sqlite/engine/index.d.ts",
+			"default": "./dist/sqlite/engine/index.js"
 		}
 	},
 	"files": [
@@ -72,6 +80,7 @@
 		"sql",
 		"postgres",
 		"postgresql",
+		"sqlite",
 		"typescript",
 		"type-safe",
 		"type-level",

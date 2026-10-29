@@ -1,7 +1,7 @@
+import type { OpTok, Tok, Toks } from "../../../engine/tokens.js";
 import type { AnyErr, SqlError } from "../../../errors.js";
 import type { DdlStmt, Stmt } from "../ast.js";
 import type { Lex } from "../lexer/lex.js";
-import type { OpTok, Tok, Toks } from "../lexer/tokens.js";
 import type { ParseStatement } from "../parser/stmt.js";
 import type { AtEnd, Nx, Ok, SyntaxErrorAt } from "../parser/util.js";
 import type { ProjectStmt } from "../project/stmt.js";

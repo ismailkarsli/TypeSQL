@@ -2,7 +2,7 @@
 
 Write SQL in TypeScript and get exact types for rows and parameters. TypeSQL parses your SQL inside the type checker: no codegen, no database connection, no build step.
 
-TypeSQL supports PostgreSQL today. MySQL and SQLite are planned.
+TypeSQL supports PostgreSQL and SQLite. MySQL is planned.
 
 ![TypeSQL demo: highlighted SQL with table and column completions inside a query, hovering a query shows its inferred row type, and a misspelled column is a compile error](assets/demo.gif)
 
@@ -19,6 +19,7 @@ TypeSQL supports PostgreSQL today. MySQL and SQLite are planned.
 ```sh
 npm install @typesql/core @typesql/pg pg
 npm install @typesql/core @typesql/postgres postgres
+npm install @typesql/core @typesql/sqlite
 ```
 
 Requires TypeScript 7.1 or later.
@@ -99,14 +100,15 @@ await sql.transaction(async (tx) => {
 });
 ```
 
-`@typesql/postgres` works the same way with postgres.js.
+`@typesql/postgres` works the same way with postgres.js, and `@typesql/sqlite` with node:sqlite, better-sqlite3 and bun:sqlite. For SQLite, describe tables with SQLite's type names and the `sqlite` dialect from `@typesql/core/sqlite`; see [SQLite](https://typesql.karsli.net/guide/sqlite).
 
 ## Get your schema
 
-Generate it from a live database:
+Generate it from a live database with [`@typesql/cli`](https://www.npmjs.com/package/@typesql/cli):
 
 ```sh
 npx typesql introspect --url postgres://localhost/app --out src/db/schema.ts
+npx typesql introspect --dialect sqlite --db app.db --out src/db/schema.ts
 ```
 
 Or derive it from your migrations:
@@ -124,7 +126,7 @@ type DB = SchemaOf<typeof m>;
 
 ## Tested against the database's own tests
 
-The parser is checked against the regression tests the database runs on itself. For PostgreSQL that is about 50,000 statements, and TypeSQL agrees with Postgres on every one that can be checked statically: it parses what Postgres parses and rejects what Postgres rejects. CI fails on a single disagreement. See [Postgres compatibility](https://typesql.karsli.net/guide/postgres-compatibility).
+The parser is checked against the regression tests the database runs on itself. For PostgreSQL that is about 50,000 statements, and TypeSQL agrees with Postgres on every one that can be checked statically: it parses what Postgres parses and rejects what Postgres rejects. CI fails on a single disagreement. See [Postgres compatibility](https://typesql.karsli.net/guide/postgres-compatibility). SQLite statements are compared with the SQLite that ships with Node: outcome, error message, column names and the values each column returns.
 
 ## Compile time
 

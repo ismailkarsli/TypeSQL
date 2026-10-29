@@ -1,5 +1,5 @@
+import type { Ctx } from "../../../engine/types.js";
 import type { Expr, SelectStmt } from "../ast.js";
-import type { Ctx } from "../types.js";
 import type { ProjectSelect } from "./select.js";
 
 export type ColumnName<

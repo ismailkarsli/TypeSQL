@@ -1,0 +1,14 @@
+{
+	"extends": "../../tsconfig.base.json",
+	"compilerOptions": {
+		"noEmit": true,
+		"types": ["node"],
+		"paths": {
+			"@typesql/core/adapter": ["../core/src/adapter.ts"],
+			"@typesql/core/sqlite/engine": ["../core/src/sqlite/engine/index.ts"],
+			"@typesql/core/sqlite": ["../core/src/sqlite/index.ts"],
+			"@typesql/core": ["../core/src/index.ts"]
+		}
+	},
+	"include": ["src"]
+}

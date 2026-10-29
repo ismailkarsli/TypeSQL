@@ -89,13 +89,13 @@ The type cache is an optional file in your project that holds results the checke
    - Other editors must send `initializationOptions.runExternalCode: true` to the TypeScript language server.
    - `tsc` needs `--runExternalCode` on the command line (it can't be set in `tsconfig.json`). Without it, `tsc` stops with TS18068.
 
-A background job fills the file once the editor has the project open. You can commit the file to share a warm cache, or ignore it in git.
+A background job fills the file once the editor has the project open. It works for PostgreSQL and [SQLite](./sqlite) statements: for a new file it picks the dialect from the statements it finds, and records it in the file. You can commit the file to share a warm cache, or ignore it in git.
 
 ### How it works
 
 While the project is open in the editor, a job opens its own TypeScript session on it, finds the statements (`sql()` calls, `migrations().add()` steps, and statement types such as `RowOf<DB, TypeMap, "SELECT …">`), computes their results and writes the file. After an edit it computes only what the edit affects, and it stops after five idle minutes. `tsc` reads the file but runs no job, and no job runs when `CI` is set or with `TYPESQL_CACHE=off`.
 
-Each entry records what it was computed from: the TypeSQL version, everything the statement could name in `DB` (relations, functions, enums), and the type map and `rowKeys` option. When any of it differs, the statement is analysed as usual and the job replaces the entry. So the cache never changes a type or an error; a stale, empty or damaged file only means slower checks.
+Each entry records what it was computed from: the TypeSQL version, everything the statement could name in `DB` (relations, functions, enums; for SQLite, every relation whose name matches regardless of case), and the type map and `rowKeys` option. When any of it differs, the statement is analysed as usual and the job replaces the entry. So the cache never changes a type or an error; a stale, empty or damaged file only means slower checks.
 
 A few statements are never cached: those whose types name one of your types the cache file can't import (an unexported interface inside `Json<T>`), those with a misspelled function name, and non-literal statement texts.
 

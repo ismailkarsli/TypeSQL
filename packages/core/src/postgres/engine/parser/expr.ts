@@ -1,5 +1,3 @@
-import type { NormalizeTypeName } from "../../schema/normalize.js";
-import type { IsTest } from "../ast.js";
 import type {
 	IdTok,
 	NumTok,
@@ -8,7 +6,9 @@ import type {
 	StrTok,
 	Toks,
 	WordTok,
-} from "../lexer/tokens.js";
+} from "../../../engine/tokens.js";
+import type { NormalizeTypeName } from "../../schema/normalize.js";
+import type { IsTest } from "../ast.js";
 import type { JsonFuncWord, ParseJsonFunc, SkipUniqueKeys } from "./json.js";
 import type {
 	NotBareLabel,

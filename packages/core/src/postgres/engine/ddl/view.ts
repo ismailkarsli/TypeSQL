@@ -1,7 +1,7 @@
+import type { PickOne } from "../../../engine/object.js";
 import type { AnyErr, SqlError } from "../../../errors.js";
 import type { TableRef } from "../ast.js";
 import type { DisplayType, TypeConflict, TypeOfCol } from "./column.js";
-import type { PickOne } from "./object.js";
 import type { QueryCols, ViewTable } from "./query.js";
 import type {
 	AsView,

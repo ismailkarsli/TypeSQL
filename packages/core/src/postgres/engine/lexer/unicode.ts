@@ -1,4 +1,4 @@
-import type { HexDigit, NonIdAscii, Ws } from "./chars.js";
+import type { HexDigit, NonIdAscii, Ws } from "../../../engine/chars.js";
 
 export type CheckEscapes<S extends string> = S extends `${string}\\${infer R}`
 	? R extends `u${infer R2}`

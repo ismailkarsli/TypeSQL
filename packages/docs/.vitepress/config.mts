@@ -77,6 +77,7 @@ export default defineConfig({
 				items: [
 					{ text: "node-postgres", link: "/adapters/pg" },
 					{ text: "postgres.js", link: "/adapters/postgres" },
+					{ text: "SQLite", link: "/adapters/sqlite" },
 					{ text: "Custom executor", link: "/adapters/custom-executor" },
 				],
 			},
@@ -97,6 +98,7 @@ export default defineConfig({
 						text: "Postgres compatibility",
 						link: "/guide/postgres-compatibility",
 					},
+					{ text: "SQLite", link: "/guide/sqlite" },
 					{ text: "Type engine", link: "/guide/type-engine" },
 					{ text: "FAQ", link: "/guide/faq" },
 				],

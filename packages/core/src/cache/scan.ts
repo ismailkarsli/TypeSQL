@@ -12,7 +12,12 @@ const fold = (word: string): string =>
 
 type Tok = { readonly name: string } | "." | null;
 
-export function scanNames(text: string): Names {
+export interface ScanOptions {
+	readonly caseInsensitive?: boolean;
+}
+
+export function scanNames(text: string, options: ScanOptions = {}): Names {
+	const ci = options.caseInsensitive === true;
 	const toks: Tok[] = [];
 	const n = text.length;
 	let i = 0;
@@ -44,12 +49,19 @@ export function scanNames(text: string): Names {
 		} else if (c === "'") {
 			i = skipQuoted(i + 1, "'", false);
 			toks.push(null);
-		} else if (c === '"') {
-			const end = skipQuoted(i + 1, '"', false);
-			toks.push({
-				name: text.slice(i + 1, Math.max(i + 1, end - 1)).replaceAll('""', '"'),
-			});
+		} else if (c === '"' || (ci && c === "`")) {
+			const end = skipQuoted(i + 1, c, false);
+			const name = text
+				.slice(i + 1, Math.max(i + 1, end - 1))
+				.replaceAll(`${c}${c}`, c);
+			toks.push({ name: ci ? name.toLowerCase() : name });
 			i = end;
+		} else if (ci && c === "[") {
+			const end = text.indexOf("]", i + 1);
+			toks.push({
+				name: text.slice(i + 1, end < 0 ? n : end).toLowerCase(),
+			});
+			i = end < 0 ? n : end + 1;
 		} else if (c === "$") {
 			const m = /^\$([A-Za-z_\u0080-￿][A-Za-z0-9_\u0080-￿]*)?\$/.exec(
 				text.slice(i),
@@ -71,7 +83,9 @@ export function scanNames(text: string): Names {
 			}
 			let j = i + 1;
 			while (j < n && isIdChar(text[j]!)) j++;
-			toks.push({ name: fold(text.slice(i, j)) });
+			toks.push({
+				name: ci ? text.slice(i, j).toLowerCase() : fold(text.slice(i, j)),
+			});
 			i = j;
 		} else if (c === ".") {
 			toks.push(".");

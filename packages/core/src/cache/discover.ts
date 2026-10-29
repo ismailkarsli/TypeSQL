@@ -1,3 +1,4 @@
+import { sep } from "node:path";
 import type {
 	CallExpression,
 	LiteralTypeNode,
@@ -57,6 +58,16 @@ export async function discover(
 	dialect: CacheDialect,
 ): Promise<{ sql: SqlSite[]; types: TypeSite[]; ddl: DdlSite[] }> {
 	const { queryAliases, ddlAliases, looksLikeQuery, looksLikeDdl } = dialect;
+	const isDialectPath = (path: string): boolean => {
+		if (!isCorePath(path)) return false;
+		const root = Math.max(
+			path.lastIndexOf(`${sep}dist${sep}`),
+			path.lastIndexOf(`${sep}src${sep}`),
+		);
+		return path
+			.slice(path.indexOf(sep, root + 1) + 1)
+			.startsWith(`${dialect.dir}${sep}`);
+	};
 	const sql: SqlSite[] = [];
 	const types: TypeSite[] = [];
 	const ddl: DdlSite[] = [];
@@ -81,7 +92,10 @@ export async function discover(
 				const args = r.typeArguments ?? [];
 				const isCore =
 					!!sym && sym.declarations.some((d) => isCorePath(d.path));
-				const qAt = isCore
+				const isOurs =
+					!!sym && sym.declarations.some((d) => isDialectPath(d.path));
+				if (isCore && !isOurs) return;
+				const qAt = isOurs
 					? (queryAliases[sym!.name] ?? ddlAliases[sym!.name])
 					: undefined;
 				if (qAt !== undefined && args[0] && args[qAt]) {
@@ -152,7 +166,8 @@ export async function discover(
 						!(await isCoreRef(r, ["Migrations"], isCorePath))
 					)
 						return;
-					const [, db] = await checker.getTypeArguments(r as never);
+					const [types, db] = await checker.getTypeArguments(r as never);
+					if ((await types?.getSymbol())?.name !== dialect.typesName) return;
 					if (db) ddl.push({ key: a.value, db, file: fileName });
 				}),
 			);
@@ -165,7 +180,7 @@ export async function discover(
 		const hits = (
 			await Promise.all(
 				others.map((_, i) =>
-					isCoreRef(callees[i]!, dialect.sqlTypes, isCorePath).then((ok) =>
+					isCoreRef(callees[i]!, dialect.sqlTypes, isDialectPath).then((ok) =>
 						ok ? i : -1,
 					),
 				),

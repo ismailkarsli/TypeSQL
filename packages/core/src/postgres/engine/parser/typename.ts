@@ -1,5 +1,11 @@
+import type {
+	IdTok,
+	NumTok,
+	OpTok,
+	Toks,
+	WordTok,
+} from "../../../engine/tokens.js";
 import type { NormalizeTypeName } from "../../schema/normalize.js";
-import type { IdTok, NumTok, OpTok, Toks, WordTok } from "../lexer/tokens.js";
 import type { ParseExprList } from "./expr.js";
 import type { NotTypeFuncName } from "./keywords.js";
 import type {

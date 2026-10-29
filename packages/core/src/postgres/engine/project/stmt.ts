@@ -1,6 +1,6 @@
+import type { CteMap, Scope } from "../../../engine/types.js";
 import type { AnyErr } from "../../../errors.js";
 import type { DmlStmt, Stmt } from "../ast.js";
-import type { CteMap, Scope } from "../types.js";
 import type { ProjectDml } from "./dml.js";
 import type { ProjectSelectParts } from "./select.js";
 

@@ -112,6 +112,41 @@ postgres.js fetches `pg_type` on connect (`fetch_types: true`, the default) and 
 
 Prisma throws "Unsupported column type" for other types (`interval`, geometric types, ranges). They are `unknown` here, so cast them in SQL (`duration::text`).
 
+## SQLite
+
+`DefaultTypeMap` of `@typesql/core/sqlite`, used by `@typesql/sqlite` and by `createSql(sqlite)`. node:sqlite, better-sqlite3 and bun:sqlite return the same JavaScript values (better-sqlite3 returns blobs as `Buffer`, a subclass of `Uint8Array`):
+
+| SQLite type | TypeScript |
+|---|---|
+| integer affinity (`integer`, `int`, `bigint`, …) | `number` |
+| `real`, `float`, `double` | `number` |
+| numeric affinity (`numeric`, `decimal`, `boolean`, …) | `number` |
+| text affinity (`text`, `varchar`, `clob`, …) | `string` |
+| `date`, `datetime`, `time`, `timestamp`, `json`, `uuid` | `string` |
+| `blob` | `Uint8Array` |
+| no type, `any` | `unknown` |
+
+A type name is looked up in the map first, then its [affinity](../guide/sqlite#types) (`integer`, `real`, `numeric`, `text`, `blob` or `any`). `BigIntTypeMap` reads integers as `bigint`, for `createSql(db, { bigint: true })`.
+
+Parameters accept the map's type and, through `DefaultParamTypeMap`, `bigint` for integer, real and numeric columns. A parameter without a type accepts `string | number | bigint | Uint8Array | null`.
+
+### Prisma on SQLite
+
+`PrismaSqliteTypeMap`, the map of `@typesql/prisma` with `sqlite`. It describes what `$queryRaw` returns through Prisma's SQLite adapters, which convert by declared column type:
+
+| SQLite type | TypeScript |
+|---|---|
+| `integer`, `int`, `real`, `numeric` | `number` |
+| `bigint`, `int8` | `bigint` |
+| `decimal` | `Decimal` |
+| `boolean` | `boolean` |
+| `datetime`, `timestamp`, `date`, `time` | `Date` |
+| `jsonb` (Prisma's `Json`) | `JsonValue` |
+| `text`, `json` | `string` |
+| `blob` | `Uint8Array` |
+
+Parameters also accept `number` for `bigint`, `number | string` for `decimal`, `number` for `boolean`, and `string` for the date types.
+
 ## Parameter types
 
 A parameter accepts its type's row type, plus the entry for that type in the map's `$params` key: what the driver can serialize for it. A map without `$params` gets `DefaultParamTypeMap`.

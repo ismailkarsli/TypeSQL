@@ -1,9 +1,3 @@
-import type { AnyErr, SqlError } from "../../../errors.js";
-import type { Table } from "../../../schema.js";
-import type { Expr, MergeStmt, MergeWhen, SetItem, TargetInd } from "../ast.js";
-import type { BindFrom } from "../binder/from.js";
-import type { TableCols } from "../binder/resolve.js";
-import type { ParamsOfFromItems, ParamsOfOpt } from "../typer/params.js";
 import type {
 	CteMap,
 	Ctx,
@@ -13,7 +7,13 @@ import type {
 	Scope,
 	ScopeItem,
 	ScopeLevel,
-} from "../types.js";
+} from "../../../engine/types.js";
+import type { AnyErr, SqlError } from "../../../errors.js";
+import type { Table } from "../../../schema.js";
+import type { Expr, MergeStmt, MergeWhen, SetItem, TargetInd } from "../ast.js";
+import type { BindFrom } from "../binder/from.js";
+import type { TableCols } from "../binder/resolve.js";
+import type { ParamsOfFromItems, ParamsOfOpt } from "../typer/params.js";
 import type {
 	AssignTargets,
 	CheckAssignedCols,

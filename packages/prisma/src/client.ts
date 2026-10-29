@@ -1,6 +1,11 @@
 import type { PrismaPromise } from "@prisma/client/runtime/client";
 import type { Executor } from "@typesql/core";
-import { runTransaction, type SqlDriver } from "@typesql/core/adapter";
+import {
+	JsonParam,
+	positional,
+	runTransaction,
+	type SqlDriver,
+} from "@typesql/core/adapter";
 
 export interface PrismaRawClient {
 	$queryRawUnsafe<T = unknown>(
@@ -11,13 +16,33 @@ export interface PrismaRawClient {
 	$transaction?<R>(fn: (tx: PrismaRawClient) => Promise<R>): Promise<R>;
 }
 
-export function executor(prisma: PrismaRawClient): Executor {
+type Compile = (
+	text: string,
+	values: readonly unknown[],
+) => { readonly text: string; readonly values: readonly unknown[] };
+
+const numbered: Compile = (text, values) => ({ text, values });
+
+const jsonText = (value: unknown): unknown =>
+	value instanceof JsonParam ? JSON.stringify(value.value) : value;
+
+const sqlite: Compile = (text, values) => positional(text, values, jsonText);
+
+export function executor(
+	prisma: PrismaRawClient,
+	options: { readonly dialect?: "postgres" | "sqlite" } = {},
+): Executor {
+	const compile = options.dialect === "sqlite" ? sqlite : numbered;
 	return Object.assign(
-		(text: string, values: readonly unknown[]) =>
-			prisma.$queryRawUnsafe<unknown[]>(text, ...values),
+		(text: string, values: readonly unknown[]) => {
+			const q = compile(text, values);
+			return prisma.$queryRawUnsafe<unknown[]>(q.text, ...q.values);
+		},
 		{
-			count: (text: string, values: readonly unknown[]) =>
-				prisma.$executeRawUnsafe(text, ...values),
+			count: (text: string, values: readonly unknown[]) => {
+				const q = compile(text, values);
+				return prisma.$executeRawUnsafe(q.text, ...q.values);
+			},
 		},
 	);
 }
@@ -35,4 +60,12 @@ function transaction<T>(
 	);
 }
 
-export const driver: SqlDriver<PrismaRawClient> = { executor, transaction };
+export const driver: SqlDriver<PrismaRawClient> = {
+	executor: (prisma) => executor(prisma),
+	transaction,
+};
+
+export const sqliteDriver: SqlDriver<PrismaRawClient> = {
+	executor: (prisma) => executor(prisma, { dialect: "sqlite" }),
+	transaction,
+};

@@ -1,7 +1,10 @@
 import type { CacheDialect } from "../cache/dialect.js";
+import { scanNames } from "../cache/scan.js";
 
 export const postgresCache: CacheDialect = {
 	name: "postgres",
+	dir: "postgres",
+	typesName: "Postgres",
 	engine: "@typesql/core/postgres/engine",
 	specifiers: [
 		"@typesql/core/postgres/engine",
@@ -24,5 +27,7 @@ export const postgresCache: CacheDialect = {
 	looksLikeQuery:
 		/^\s*(\(\s*)*(select|with|insert|update|delete|values|table)\b/i,
 	looksLikeDdl: /^\s*(create|alter|drop|comment)\b/i,
+	wordSlots: ["rel", "pg", "fn", "cat"],
+	scanNames: (text) => scanNames(text),
 	touchesAllTables: (text) => /\b(drop|alter)\s+type\b/i.test(text),
 };
