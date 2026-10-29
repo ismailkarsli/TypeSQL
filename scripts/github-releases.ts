@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 
 const dryRun = process.argv.includes("--dry-run");
+const currentOnly = process.argv.includes("--current");
 const summaryIndex = process.argv.indexOf("--summary");
 const justPublished = new Set(
 	summaryIndex === -1
@@ -101,13 +102,23 @@ for (const { path, commit, time } of changedFiles("A", [
 }
 
 const changelogs = new Map<string, string>();
+const currentVersions = new Set<string>();
 for (const dir of readdirSync("packages")) {
 	const manifest = `packages/${dir}/package.json`;
 	if (!existsSync(manifest)) continue;
-	const { name, private: isPrivate } = JSON.parse(
-		readFileSync(manifest, "utf8"),
-	) as { name: string; private?: boolean };
-	if (!isPrivate) changelogs.set(`packages/${dir}/CHANGELOG.md`, name);
+	const {
+		name,
+		version,
+		private: isPrivate,
+	} = JSON.parse(readFileSync(manifest, "utf8")) as {
+		name: string;
+		version: string;
+		private?: boolean;
+	};
+	if (!isPrivate) {
+		changelogs.set(`packages/${dir}/CHANGELOG.md`, name);
+		currentVersions.add(`${name}@${version}`);
+	}
 }
 for (const { path, commit, time } of changedFiles("AM", [
 	...changelogs.keys(),
@@ -169,7 +180,8 @@ type Release = Section & { tag: string };
 const pending: Release[] = [];
 for (const section of sections.values()) {
 	const tag = `${section.name}@${section.version}`;
-	if (summaryIndex !== -1 && !justPublished.has(tag)) continue;
+	if (currentOnly && !currentVersions.has(tag)) continue;
+	if (summaryIndex !== -1 && !currentOnly && !justPublished.has(tag)) continue;
 	if (succeeds("gh", ["release", "view", tag])) continue;
 	if (!(await published(section.name, section.version))) {
 		console.log(`skip ${tag}: not on npm yet`);
