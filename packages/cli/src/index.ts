@@ -1,3 +1,4 @@
+import { parseArgs } from "node:util";
 import { main as postgres } from "@typesql/pg/introspect";
 import { main as sqlite } from "@typesql/sqlite/introspect";
 
@@ -31,7 +32,21 @@ const defaultIo = (): Io => ({
 	stderr: (s) => process.stderr.write(s),
 });
 
-const isDialect = (s: string): s is Dialect => s in DIALECTS;
+const isDialect = (s: string): s is Dialect => Object.hasOwn(DIALECTS, s);
+
+const parse = (argv: readonly string[]) =>
+	parseArgs({
+		args: [...argv],
+		allowPositionals: true,
+		// Each dialect's command parser validates the forwarded options.
+		strict: false,
+		tokens: true,
+		options: {
+			dialect: { type: "string" },
+			db: { type: "string" },
+			help: { type: "boolean", short: "h" },
+		},
+	});
 
 export async function main(
 	argv: readonly string[],
@@ -41,30 +56,35 @@ export async function main(
 		const { main: migrate } = await import("./migrate.js");
 		return migrate(argv.slice(1), io);
 	}
-	const rest: string[] = [];
-	let dialect: string | undefined;
-	for (let i = 0; i < argv.length; i++) {
-		const a = argv[i]!;
-		if (a === "--dialect") {
-			dialect = argv[++i];
-			if (dialect === undefined) {
-				io.stderr(`option '--dialect <name>' argument missing\n\n${USAGE}`);
-				return 2;
-			}
-		} else if (a.startsWith("--dialect=")) dialect = a.slice(10);
-		else rest.push(a);
+	let parsed: ReturnType<typeof parse>;
+	try {
+		parsed = parse(argv);
+	} catch (error) {
+		io.stderr(`${(error as Error).message}\n\n${USAGE}`);
+		return 2;
 	}
+	const { values, tokens } = parsed;
+	const help = values.help === true;
+	const consumed = new Set<number>();
+	for (const token of tokens) {
+		if (token.kind !== "option" || token.name !== "dialect") continue;
+		if (token.value === undefined) {
+			io.stderr(`option '--dialect <name>' argument missing\n\n${USAGE}`);
+			return 2;
+		}
+		consumed.add(token.index);
+		if (!token.inlineValue) consumed.add(token.index + 1);
+	}
+	const rest = argv.filter((_, index) => !consumed.has(index));
+	let dialect = values.dialect;
 	if (dialect === undefined) {
-		const help = rest.some((a) => a === "--help" || a === "-h");
 		if (help || rest.length === 0) {
 			(help ? io.stdout : io.stderr)(USAGE);
 			return help ? 0 : 2;
 		}
-		dialect = rest.some((a) => a === "--db" || a.startsWith("--db="))
-			? "sqlite"
-			: "postgres";
+		dialect = values.db === undefined ? "postgres" : "sqlite";
 	}
-	if (!isDialect(dialect)) {
+	if (typeof dialect !== "string" || !isDialect(dialect)) {
 		io.stderr(
 			`unknown dialect: ${dialect} (expected postgres or sqlite)\n\n${USAGE}`,
 		);
