@@ -41,6 +41,20 @@ if (versions[0] !== firstVersion) {
 	);
 }
 
+function withoutDialect(source: string): string {
+	const edits: [RegExp | string, string][] = [
+		[/^\tpostgres,\n/m, ""],
+		[/"@typesql\/core\/postgres"/g, '"@typesql/core"'],
+		["(postgres, undefined, {", "(undefined, {"],
+	];
+	return edits.reduce((text, [from, to]) => {
+		const next = text.replace(from, to);
+		if (next === text)
+			throw new Error(`case1.ts no longer contains ${String(from)}`);
+		return next;
+	}, source);
+}
+
 function measure(version: string, ref?: string) {
 	const directory = mkdtempSync(join(tmpdir(), "typesql-bench-"));
 	try {
@@ -94,6 +108,10 @@ function measure(version: string, ref?: string) {
 		);
 		for (const file of ["src", "run.ts", "tsconfig.json", "thresholds.json"]) {
 			cpSync(join(bench, file), join(target, file), { recursive: true });
+		}
+		if (!manifest.exports?.["./postgres"]) {
+			const fixture = join(target, "src/case1.ts");
+			writeFileSync(fixture, withoutDialect(readFileSync(fixture, "utf8")));
 		}
 		symlinkSync(
 			join(root, "node_modules"),

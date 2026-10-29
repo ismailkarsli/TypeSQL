@@ -14,7 +14,6 @@ import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { compileFunction } from "node:vm";
 import { createSql } from "@typesql/core";
-import { postgres } from "@typesql/core/postgres";
 import {
 	isArrayTypeNode,
 	isCallExpression,
@@ -35,6 +34,11 @@ import {
 import { API } from "tsrs/unstable/sync";
 import type * as Dialects from "../core/src/cache/dialects.ts";
 import type * as Job from "../core/src/cache/job.ts";
+
+const postgres = await import("@typesql/core/postgres").then(
+	(m) => m.postgres,
+	() => undefined,
+);
 
 interface Variant {
 	name: string;
@@ -268,11 +272,20 @@ async function generateCaches(): Promise<void> {
 		process.exit(2);
 	}
 	const { generate } = (await import(pathToFileURL(job).href)) as typeof Job;
-	const { dialectNamed } = (await import(
-		pathToFileURL(join(core, "dist/cache/dialects.js")).href
-	)) as typeof Dialects;
+	const dialects = join(core, "dist/cache/dialects.js");
+	const dialect = existsSync(dialects)
+		? (
+				(await import(pathToFileURL(dialects).href)) as typeof Dialects
+			).dialectNamed("postgres")
+		: undefined;
+	const versionFile = [
+		"dist/postgres/engine/cache.d.ts",
+		"dist/engine/cache.d.ts",
+	]
+		.map((f) => join(core, f))
+		.find((f) => existsSync(f))!;
 	const engine = /export type CacheVersion = "([^"]*)"/.exec(
-		readFileSync(join(core, "dist/postgres/engine/cache.d.ts"), "utf8"),
+		readFileSync(versionFile, "utf8"),
 	)![1]!;
 	mkdirSync(join(here, "cache"), { recursive: true });
 	const staleSource = source.replace(
@@ -301,10 +314,10 @@ async function generateCaches(): Promise<void> {
 			const r = await generate({
 				configFile,
 				cacheFile,
-				dialect: dialectNamed("postgres"),
 				engine,
 				isCorePath: (p) => p.startsWith(join(core, "dist") + "/"),
-			});
+				...(dialect && { dialect }),
+			} as Parameters<typeof generate>[0]);
 			console.log(
 				`cache for ${v.name}: ${r.computed} entries in ${(r.ms / 1000).toFixed(1)} s`,
 			);
