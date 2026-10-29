@@ -65,7 +65,7 @@ jobs:
           node scripts/performance-history.ts --refresh-all
           git add -A
           message="chore: release $versions"
-          [ -n "$versions" ] || message="chore: prune changelog sections of published versions"
+          [ -n "$versions" ] || message="chore: update release metadata"
           node scripts/github-commit.ts main "$message"
           git fetch origin main
           git reset --hard origin/main

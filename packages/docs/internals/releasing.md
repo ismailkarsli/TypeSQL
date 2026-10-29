@@ -148,8 +148,9 @@ it creates a release on the repository's Releases tab:
 
 - tag and title `<name>@<version>` (`@typesql/core@0.0.3`), with the tag on the release commit
   that added the version's changelog section;
-- notes taken from that section in `.changeset/changelogs/`, read from git history so they
-  survive pruning, plus a link to the version on npm;
+- notes taken from that section of the package's committed `CHANGELOG.md` (for releases made
+  before the switch to `repository` storage, from `.changeset/changelogs/` in git history), plus
+  a link to the version on npm;
 - `@typesql/core` marked "Latest", the others not, and versions with a prerelease suffix (from a
   [lane](https://pnpm.io/versioning)) marked as prereleases.
 
@@ -240,16 +241,19 @@ be the same on both registries.
 
 | Path | What it is |
 |---|---|
-| `.changeset/<name>.md` | A pending change intent. Deleted by a later `pnpm version -r` once every package it names has been released and the registry has the version. |
+| `.changeset/<name>.md` | A pending change intent. Deleted by the `pnpm version -r` that applies it. |
 | `.changeset/ledger.yaml` | Append-only record, keyed by `name@version`, of which intents each release consumed. It is what stops an intent from being applied twice (after a cherry-pick, say). Never edit it by hand. |
-| `.changeset/changelogs/<scope>!<name>@<version>.md` | The changelog section of a release that is not yet confirmed on the registry. Removed once it is. |
-| `packages/bench/CHANGELOG.md`, `packages/docs/CHANGELOG.md` | Changelogs of the private packages, which are always committed. |
+| `packages/<name>/CHANGELOG.md` | The package's changelog, written by `pnpm version -r` and committed with the release. |
+| `.changeset/changelogs/<scope>!<name>@<version>.md` | Changelog sections from before the switch to `repository` storage. pnpm no longer writes or prunes them. |
 
-Published packages have no committed `CHANGELOG.md`: changelog storage is pnpm's default
-`registry` mode, so `pnpm publish` composes the package's `CHANGELOG.md` from the new section plus
-the changelog of the previously published version and packs it into the tarball. Versioning
-settings (fixed groups, ignored packages, lanes, `changelog.storage`) would go under a
-`versioning:` key in `pnpm-workspace.yaml`; the repository uses the defaults.
+Changelogs are not published to npm. pnpm's default `registry` changelog storage packs a
+`CHANGELOG.md` into every tarball, whatever `files` says, so `pnpm-workspace.yaml` sets
+`versioning.changelog.storage: repository`: `pnpm version -r` writes each package's
+`CHANGELOG.md` into the repository instead, and since no `files` field lists it, `pnpm publish`
+leaves it out. Keep it out of `files`. The changelogs start at the first release made in this
+mode; earlier entries are in the GitHub releases. Other versioning settings (fixed groups,
+ignored packages, lanes) would go under the same `versioning:` key; the repository uses the
+defaults.
 
 CI runs `pnpm change check`, which fails when an intent names a package that does not exist or
 the committed versions break a configured versioning rule.

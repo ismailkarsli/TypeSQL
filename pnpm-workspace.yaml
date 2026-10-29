@@ -6,3 +6,6 @@ allowBuilds:
   "@prisma/engines": false
   prisma: false
   "@vscode/vsce-sign": false
+versioning:
+  changelog:
+    storage: repository

@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 
 const dryRun = process.argv.includes("--dry-run");
 const summaryIndex = process.argv.indexOf("--summary");
@@ -19,11 +19,11 @@ interface PublishSummary {
 }
 
 interface Section {
-	path: string;
 	name: string;
 	version: string;
 	commit: string;
 	time: number;
+	notes: () => string;
 }
 
 const run = (cmd: string, args: string[]) =>
@@ -41,29 +41,89 @@ const succeeds = (cmd: string, args: string[]) => {
 	}
 };
 
-const sections = new Map<string, Section>();
-let commit: string | undefined, time: string | undefined;
-for (const line of git(
-	"log",
-	"--reverse",
-	"--format=%x00%H %ct",
-	"--name-only",
-	"--diff-filter=A",
-	"--",
-	".changeset/changelogs",
-).split("\n")) {
-	if (line.startsWith("\0")) {
-		[commit, time] = line.slice(1).split(" ");
-		continue;
+function* changedFiles(filter: string, paths: string[]) {
+	let commit: string | undefined, time: string | undefined;
+	for (const line of git(
+		"log",
+		"--reverse",
+		"--format=%x00%H %ct",
+		"--name-only",
+		`--diff-filter=${filter}`,
+		"--",
+		...paths,
+	).split("\n")) {
+		if (line.startsWith("\0")) [commit, time] = line.slice(1).split(" ");
+		else if (line) yield { path: line, commit: commit!, time: Number(time) };
 	}
-	const match = /^\.changeset\/changelogs\/(.+)!(.+)@([^@]+)\.md$/.exec(line);
-	if (match && !sections.has(line)) {
-		sections.set(line, {
-			path: line,
-			name: `${match[1]}/${match[2]}`,
-			version: match[3]!,
-			commit: commit!,
-			time: Number(time),
+}
+
+const sectionOf = (changelog: string, version: string) => {
+	const lines = changelog.split(/\r?\n/);
+	const start = lines.indexOf(`## ${version}`);
+	if (start === -1) return undefined;
+	const end = lines.findIndex((l, i) => i > start && l.startsWith("## "));
+	return lines
+		.slice(start + 1, end === -1 ? undefined : end)
+		.join("\n")
+		.trim();
+};
+
+const sections = new Map<string, Section>();
+const add = (section: Section) => {
+	const tag = `${section.name}@${section.version}`;
+	if (!sections.has(tag)) sections.set(tag, section);
+};
+
+for (const { path, commit, time } of changedFiles("A", [
+	".changeset/changelogs",
+])) {
+	const match = /^\.changeset\/changelogs\/(.+)!(.+)@([^@]+)\.md$/.exec(path);
+	if (!match) continue;
+	add({
+		name: `${match[1]}/${match[2]}`,
+		version: match[3]!,
+		commit,
+		time,
+		notes: () => {
+			const lastCommit = git(
+				"log",
+				"-1",
+				"--format=%H",
+				"--diff-filter=AM",
+				"--",
+				path,
+			).trim();
+			return git("show", `${lastCommit}:${path}`)
+				.replace(/^## .*\r?\n+/, "")
+				.trim();
+		},
+	});
+}
+
+const changelogs = new Map<string, string>();
+for (const dir of readdirSync("packages")) {
+	const manifest = `packages/${dir}/package.json`;
+	if (!existsSync(manifest)) continue;
+	const { name, private: isPrivate } = JSON.parse(
+		readFileSync(manifest, "utf8"),
+	) as { name: string; private?: boolean };
+	if (!isPrivate) changelogs.set(`packages/${dir}/CHANGELOG.md`, name);
+}
+for (const { path, commit, time } of changedFiles("AM", [
+	...changelogs.keys(),
+])) {
+	const name = changelogs.get(path);
+	if (!name) continue;
+	const atCommit = git("show", `${commit}:${path}`);
+	for (const [, version] of atCommit.matchAll(/^## (\S+)\s*$/gm)) {
+		add({
+			name,
+			version: version!,
+			commit,
+			time,
+			notes: () =>
+				sectionOf(git("show", `HEAD:${path}`), version!) ??
+				sectionOf(atCommit, version!)!,
 		});
 	}
 }
@@ -131,18 +191,7 @@ pending.sort(
 const latest = newestCore(pending);
 
 for (const release of pending) {
-	const lastCommit = git(
-		"log",
-		"-1",
-		"--format=%H",
-		"--diff-filter=AM",
-		"--",
-		release.path,
-	).trim();
-	const section = git("show", `${lastCommit}:${release.path}`)
-		.replace(/^## .*\r?\n+/, "")
-		.trim();
-	const notes = `${section}\n\nnpm: https://www.npmjs.com/package/${release.name}/v/${release.version}\n`;
+	const notes = `${release.notes()}\n\nnpm: https://www.npmjs.com/package/${release.name}/v/${release.version}\n`;
 	const args = [
 		"release",
 		"create",
