@@ -61,6 +61,8 @@ A `sql` bound to a client that is already in a transaction also uses a savepoint
 Statements in one transaction share one connection. Run them one after another, not with `Promise.all`.
 :::
 
+Once the callback's promise settles, `tx` (and everything built from it, such as `tx.withPlugin(…)` and `tx.prepare(…)`) rejects new queries with "this transaction has ended". Otherwise a query that was not awaited could run outside the transaction, on a connection the pool has already handed to someone else.
+
 ```ts
 await sql.transaction(async (tx) => {
 	await tx(
