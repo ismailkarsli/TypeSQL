@@ -28,7 +28,7 @@ import type {
 	LitToText,
 	NumLitType,
 	StrT,
-	UnknownT,
+	Unmatchable,
 	UnOpType,
 } from "./operators.js";
 import type { TypeSqlJson } from "./sqljson.js";
@@ -889,15 +889,11 @@ type TypeWhens<
 		? WT extends ColInfo
 			? TypeOperand<W["then"], C> extends infer TT
 				? TT extends ColInfo
-					? CommonLit<T, TT["type"]> extends "unknown"
-						? T extends UnknownT
-							? TypeWhens<R, C, "unknown", Or<N, TT["nullable"]>>
-							: TT["type"] extends UnknownT
-								? TypeWhens<R, C, T, true>
-								: SqlError<
-										`CASE types ${TypeDisplay<T>} and ${TypeDisplay<TT["type"]>} cannot be matched`,
-										null
-									>
+					? Unmatchable<T, TT["type"]> extends true
+						? SqlError<
+								`CASE types ${TypeDisplay<T>} and ${TypeDisplay<TT["type"]>} cannot be matched`,
+								null
+							>
 						: TypeWhens<R, C, CommonLit<T, TT["type"]>, Or<N, TT["nullable"]>>
 					: TT
 				: never

@@ -820,7 +820,12 @@ type CheckSimple<
 	C0 extends Ctx,
 	C extends Ctx,
 > =
-	CallPlacement<Where, Ts, C0["db"]> extends infer P extends AnyErr
+	CallPlacement<
+		Where,
+		Ts,
+		C0["db"],
+		C0["scope"] extends readonly [unknown] ? true : false
+	> extends infer P extends AnyErr
 		? P
 		: CheckCondition<"WHERE", Where, C0> extends infer W
 			? W extends AnyErr

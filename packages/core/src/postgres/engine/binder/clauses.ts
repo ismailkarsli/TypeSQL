@@ -569,67 +569,65 @@ type IsAggName<DB, N extends string> =
 			: false
 		: false;
 
-/** `"agg"` and `"win"` for the aggregate and window calls in E, outside subqueries. */
-type CallKinds<E, DB> = E extends { readonly t: "select" }
-	? never
-	: E extends {
-				readonly t: "call";
-				readonly name: infer N extends string;
-				readonly over: infer O;
-			}
-		?
-				| (O extends true
-						? "win"
-						: IsAggName<DB, N> extends true
-							? "agg"
-							: never)
-				| KindsIn<E, DB>
-		: E extends readonly unknown[]
-			? CallKinds<E[number], DB>
-			: E extends object
-				? KindsIn<E, DB>
-				: never;
-type KindsIn<E, DB> = { [K in keyof E]: CallKinds<E[K], DB> }[keyof E];
+// The walks below go breadth-first over a union of AST nodes, one level per
+// step, so their depth is the AST's depth (tail-recursive), not a multiple of it.
+type Children<U> = U extends readonly unknown[]
+	? U[number]
+	: U extends { readonly t: "select" }
+		? never
+		: U extends object
+			? U[keyof U]
+			: never;
+type AggCall<U, DB> = U extends {
+	readonly t: "call";
+	readonly name: infer N extends string;
+	readonly over: false;
+}
+	? IsAggName<DB, N> extends true
+		? U
+		: never
+	: never;
+type Kind<U, DB> = U extends { readonly t: "call"; readonly over: true }
+	? "win"
+	: [AggCall<U, DB>] extends [never]
+		? never
+		: "agg";
 
-/** PostgreSQL's errors for aggregate and window calls where they can't be. */
-export type CallPlacement<Where, Targets, DB> =
+/** `"agg"` and `"win"` for the aggregate and window calls in E, outside subqueries. */
+type CallKinds<U, DB, Acc = never> = [U] extends [never]
+	? Acc
+	: CallKinds<Children<U>, DB, Acc | Kind<U, DB>>;
+/** The aggregate calls in E, outside subqueries. */
+type AggCalls<U, DB, Acc = never> = [U] extends [never]
+	? Acc
+	: AggCalls<Children<U>, DB, Acc | AggCall<U, DB>>;
+
+/**
+ * PostgreSQL's errors for aggregate and window calls where they can't be. An
+ * aggregate in a subquery's WHERE may belong to the outer query, so only a
+ * top-level WHERE is checked for aggregates.
+ */
+export type CallPlacement<Where, Targets, DB, TopLevel extends boolean> =
 	CallKinds<Where, DB> extends infer K
-		? "agg" extends K
-			? SqlError<"aggregate functions are not allowed in WHERE", null>
-			: "win" extends K
-				? SqlError<"window functions are not allowed in WHERE", null>
-				: NestedAgg<Targets, DB>
-		: never;
-type NestedAgg<E, DB> = E extends { readonly t: "select" }
-	? true
-	: E extends {
-				readonly t: "call";
-				readonly name: infer N extends string;
-				readonly over: false;
-				readonly args: infer A;
-				readonly filter: infer F;
-			}
-		? IsAggName<DB, N> extends true
-			? CallKinds<[A, F], DB> extends infer K
+		? "win" extends K
+			? SqlError<"window functions are not allowed in WHERE", null>
+			: TopLevel extends true
 				? "agg" extends K
-					? SqlError<"aggregate function calls cannot be nested", null>
-					: "win" extends K
-						? SqlError<
-								"aggregate function calls cannot contain window function calls",
-								null
-							>
-						: true
-				: never
-			: NestedIn<E, DB>
-		: E extends readonly unknown[]
-			? NestedList<E, DB>
-			: E extends object
-				? NestedIn<E, DB>
-				: true;
-type NestedIn<E, DB> = NestedList<{ [K in keyof E]: E[K] }[keyof E][], DB>;
-type NestedList<L extends readonly unknown[], DB> =
-	Extract<NestedAgg<L[number], DB>, AnyErr> extends infer X
-		? [X] extends [never]
-			? true
-			: X
+					? SqlError<"aggregate functions are not allowed in WHERE", null>
+					: NestedAgg<AggCalls<Targets, DB>, DB>
+				: NestedAgg<AggCalls<Targets, DB>, DB>
 		: never;
+type NestedAgg<Calls, DB> = (
+	Calls extends { readonly args: infer A; readonly filter: infer F }
+		? CallKinds<[A, F], DB>
+		: never
+) extends infer K
+	? "agg" extends K
+		? SqlError<"aggregate function calls cannot be nested", null>
+		: "win" extends K
+			? SqlError<
+					"aggregate function calls cannot contain window function calls",
+					null
+				>
+			: true
+	: never;

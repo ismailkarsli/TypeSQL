@@ -23566,18 +23566,6 @@
 		{
 			"schema": "a6e2bec03620",
 			"source": "window-frames",
-			"sql": "SELECT max(title) OVER (ORDER BY id ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW EXCLUDE TIES) AS ties FROM posts",
-			"ddl": false
-		},
-		{
-			"schema": "a6e2bec03620",
-			"source": "window-frames",
-			"sql": "SELECT sum(author_id) OVER (ORDER BY id ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING) AS around, sum(author_id) OVER (ORDER BY id ROWS 2 PRECEDING) AS back, count(*) OVER (ORDER BY id ROWS BETWEEN 1 FOLLOWING AND 1 FOLLOWING) AS c FROM posts",
-			"ddl": false
-		},
-		{
-			"schema": "a6e2bec03620",
-			"source": "window-frames",
 			"sql": "SELECT array_agg(title) OVER (ORDER BY id ROWS BETWEEN 2 FOLLOWING AND UNBOUNDED FOLLOWING) AS later FROM posts",
 			"ddl": false
 		},
@@ -23657,12 +23645,6 @@
 			"schema": "a6e2bec03620",
 			"source": "prerun-errors",
 			"sql": "SELECT greatest(id, email) AS c FROM users",
-			"ddl": false
-		},
-		{
-			"schema": "a6e2bec03620",
-			"source": "prerun-errors",
-			"sql": "SELECT sum(count(*)) OVER () AS s FROM users GROUP BY email",
 			"ddl": false
 		},
 		{

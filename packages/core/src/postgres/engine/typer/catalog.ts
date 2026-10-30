@@ -11,7 +11,7 @@ import type {
 	NumT,
 	RangeT,
 	StrT,
-	UnknownT,
+	Unmatchable,
 } from "./operators.js";
 import type { PgFunctions } from "./pg-functions.js";
 
@@ -1391,12 +1391,8 @@ type CommonMismatch<
 			infer A extends ColInfo,
 			...infer R extends readonly ColInfo[],
 		]
-		? CommonLit<Acc, A["type"]> extends "unknown"
-			? Acc extends UnknownT
-				? CommonMismatch<Name, R, "unknown">
-				: A["type"] extends UnknownT
-					? CommonMismatch<Name, R, Acc>
-					: `${Uppercase<Name>} types ${TypeDisplay<Acc>} and ${TypeDisplay<A["type"]>} cannot be matched`
+		? Unmatchable<Acc, A["type"]> extends true
+			? `${Uppercase<Name>} types ${TypeDisplay<Acc>} and ${TypeDisplay<A["type"]>} cannot be matched`
 			: CommonMismatch<Name, R, CommonLit<Acc, A["type"]>>
 		: null
 	: null;

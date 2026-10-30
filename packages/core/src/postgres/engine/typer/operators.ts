@@ -13,6 +13,33 @@ export type DateTimeT = "date" | TimeT | TsT;
 export type BitT = "bit" | "varbit";
 export type RangeT = `${string}range`;
 export type UnknownT = "unknown" | "null";
+
+/**
+ * Categories that never share a common type with another category, so CASE,
+ * COALESCE, GREATEST and LEAST over two of them fail in PostgreSQL. Other types
+ * (oid and reg*, domains, enums, arrays, …) may convert, so they never count.
+ */
+type MatchCategory<T> = T extends NumT
+	? "numeric"
+	: T extends StrT
+		? "string"
+		: T extends "bool"
+			? "boolean"
+			: T extends DateTimeT
+				? "datetime"
+				: T extends "interval"
+					? "timespan"
+					: T extends "bytea" | "uuid"
+						? T
+						: null;
+export type Unmatchable<A extends string, B extends string> =
+	MatchCategory<A> extends infer CA extends string
+		? MatchCategory<B> extends infer CB extends string
+			? CA extends CB
+				? false
+				: true
+			: false
+		: false;
 export type LitT = "lit";
 export type LitToText<T extends string> = T extends LitT ? "text" : T;
 
