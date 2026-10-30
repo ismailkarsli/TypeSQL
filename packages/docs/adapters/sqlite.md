@@ -29,6 +29,8 @@ The same call takes a better-sqlite3 `Database` or a bun:sqlite `Database`. The 
 
 Values are bound as the driver expects: `sql.json(value)` as JSON text, `true` / `false` as `1` / `0`. A `Date` throws, because SQLite has no date type; pass `date.toISOString()` or a number.
 
+The drivers bind a JavaScript number differently: node:sqlite and better-sqlite3 bind it as REAL, bun:sqlite binds an integral one as INTEGER. Column affinity hides this when you store values, but not in expressions: `7 / $1` with `2` is `3.5` on the first two and `3` on bun. Pass a `bigint` (or `CAST($1 AS INTEGER)`) where integer arithmetic matters.
+
 ## Run queries
 
 The `execute*` methods work as with every adapter. `executeCount()` returns the number of changed rows for `INSERT`, `UPDATE` and `DELETE`, or the number of rows for statements that return rows.
