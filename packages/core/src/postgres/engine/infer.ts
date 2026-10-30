@@ -1,7 +1,7 @@
 import type * as Shared from "../../engine/infer.js";
 import type { MaxParam, ParamsToMap } from "../../engine/params.js";
 import type { Toks } from "../../engine/tokens.js";
-import type { Cols } from "../../engine/types.js";
+import type { Cols, Simplify } from "../../engine/types.js";
 import type { RewriteNamed } from "../../sql/named.js";
 import type { TsOf } from "../type-map/index.js";
 import type { DmlStmt, SelectStmt, Stmt } from "./ast.js";
@@ -95,13 +95,14 @@ export type BuildRow<
 	DB,
 > = RowFrom<M, TM, DB>;
 
-export type RowFrom<M, TM, DB> = {
+// Normalize the row before Query inference to keep RowType within the depth limit.
+export type RowFrom<M, TM, DB> = Simplify<{
 	-readonly [K in keyof M]: TsOf<
 		TM,
 		DB,
 		M[K] & { type: string; nullable: boolean }
 	>;
-};
+}>;
 
 export type ParamsOf<DB, TM, Q extends string> = Shared.ParamsOf<
 	PgEngine,
