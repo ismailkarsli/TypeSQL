@@ -539,7 +539,66 @@ type AggModeOf<
 					: "bad-having"
 				: "none";
 
+/** Names of windows referenced as `OVER name`, outside subqueries. */
+type WindowRefs<E> = E extends { readonly t: string }
+	? E extends { readonly t: "sub" | "exists" | "insub" }
+		? E extends { readonly t: "insub"; readonly e: infer X }
+			? WindowRefs<X>
+			: never
+		:
+				| (E extends {
+						readonly t: "call";
+						readonly over: { readonly name: infer N extends string };
+				  }
+						? N
+						: never)
+				| WindowRefsIn<E>
+	: never;
+type WindowRefsIn<E> = {
+	[K in keyof E]: E[K] extends readonly unknown[]
+		? WindowRefsList<E[K]>
+		: E[K] extends { readonly t: string }
+			? WindowRefs<E[K]>
+			: E[K] extends { readonly when: infer W; readonly then: infer V }
+				? WindowRefs<W> | WindowRefs<V>
+				: never;
+}[keyof E];
+type WindowRefsList<L extends readonly unknown[]> = L[number] extends infer X
+	? X extends { readonly when: infer W; readonly then: infer V }
+		? WindowRefs<W> | WindowRefs<V>
+		: X extends { readonly t: "expr"; readonly e: infer T }
+			? WindowRefs<T>
+			: WindowRefs<X>
+	: never;
+
+type MissingWindow<S extends SimpleSelect, OrderBy extends readonly Expr[]> =
+	| WindowRefsList<S["targets"]>
+	| WindowRefsList<OrderBy> extends infer R
+	? Exclude<R, S["windows"][number]["name"]> extends infer M extends string
+		? [M] extends [never]
+			? null
+			: SqlError<`no such window: ${FirstName<M>}`, null>
+		: null
+	: null;
+type FirstName<U extends string> =
+	import("../../../sql/splice.js").UnionList<U> extends readonly [
+		infer F extends string,
+		...unknown[],
+	]
+		? F
+		: U;
+
 type ProjectSimple<
+	S extends SimpleSelect,
+	DB,
+	Outer extends Scope,
+	Ctes extends SqCteMap,
+	OrderBy extends readonly Expr[],
+> =
+	MissingWindow<S, OrderBy> extends infer W extends AnyErr
+		? W
+		: ProjectSimpleChecked<S, DB, Outer, Ctes, OrderBy>;
+type ProjectSimpleChecked<
 	S extends SimpleSelect,
 	DB,
 	Outer extends Scope,

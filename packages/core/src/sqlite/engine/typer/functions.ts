@@ -30,6 +30,11 @@ type Many = 1000;
 
 export interface Functions {
 	abs: F<1, 1, "abs", "args">;
+	// FTS5 auxiliary functions; the first argument is the FTS5 table.
+	bm25: F<1, Many, "real", "never">;
+	highlight: F<4, 4, "text", "always">;
+	snippet: F<6, 6, "text", "always">;
+	unistr: F<1, 1, "text", "args">;
 	changes: F<0, 0, "integer", "never">;
 	char: F<0, Many, "text", "never">;
 	coalesce: F<2, Many, "common", "all">;
@@ -123,6 +128,7 @@ export interface Functions {
 	json_extract: F<2, Many, "jsonext", "always">;
 	jsonb_extract: F<2, Many, "any", "always">;
 	json_insert: F<1, Many, "text", "arg0">;
+	json_array_insert: F<1, Many, "text", "arg0">;
 	jsonb_insert: F<1, Many, "blob", "arg0">;
 	json_object: F<0, Many, "text", "never">;
 	jsonb_object: F<0, Many, "blob", "never">;
@@ -140,6 +146,10 @@ export interface Functions {
 	json_valid: F<1, 2, "integer", "arg0">;
 
 	avg: F<1, 1, "real", "agg", "agg">;
+	median: F<1, 1, "real", "agg", "agg">;
+	percentile: F<2, 2, "real", "agg", "agg">;
+	percentile_cont: F<2, 2, "real", "agg", "agg">;
+	percentile_disc: F<2, 2, "real", "agg", "agg">;
 	count: F<0, 1, "integer", "never", "agg">;
 	group_concat: F<1, 2, "text", "agg", "agg">;
 	string_agg: F<2, 2, "text", "agg", "agg">;

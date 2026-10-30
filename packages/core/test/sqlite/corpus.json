@@ -11588,6 +11588,31 @@
 			"schema": "types",
 			"source": "op %",
 			"sql": "SELECT i % -2 AS v, i / -2 AS w FROM t"
+		},
+		{
+			"schema": "app",
+			"source": "upsert",
+			"sql": "INSERT INTO users (email, name) VALUES ('a', 'b') ON CONFLICT (email) DO UPDATE SET name = excluded.name WHERE excluded.name IS NOT NULL"
+		},
+		{
+			"schema": "app",
+			"source": "window",
+			"sql": "SELECT sum(id) OVER w AS s FROM users"
+		},
+		{
+			"schema": "app",
+			"source": "window",
+			"sql": "SELECT sum(id) OVER w AS s FROM users WINDOW w AS (ORDER BY id)"
+		},
+		{
+			"schema": "app",
+			"source": "aggregate",
+			"sql": "SELECT median(score) AS m, percentile(score, 50) AS p, percentile_cont(score, 0.5) AS pc, percentile_disc(score, 0.5) AS pd FROM users"
+		},
+		{
+			"schema": "app",
+			"source": "functions",
+			"sql": "SELECT unistr('a') AS u, json_array_insert('[1,2]', '$[1]', 9) AS j"
 		}
 	]
 }

@@ -329,21 +329,27 @@ type UpsertLoop<
 				[
 					...(U["target"] extends readonly Expr[] ? U["target"] : []),
 					...(U["where"] extends Expr ? [U["where"]] : []),
-					...(U["setWhere"] extends Expr ? [U["setWhere"]] : []),
 				],
 				Ctx<DB, [[It]], Ctes>
 			> extends infer X
 			? X extends AnyErr
 				? X
-				: (
-							U["set"] extends readonly SetItem[]
-								? CheckSet<U["set"], It, C, Rel>
+				: // DO UPDATE … WHERE sees excluded.*, like SET.
+					(
+							U["setWhere"] extends Expr
+								? TypeList<[U["setWhere"]], C>
 								: true
-						) extends infer Y
-					? Y extends AnyErr
-						? Y
-						: UpsertLoop<Us, Rel, It, DB, Ctes, Nx<I>>
-					: never
+						) extends infer W extends AnyErr
+					? W
+					: (
+								U["set"] extends readonly SetItem[]
+									? CheckSet<U["set"], It, C, Rel>
+									: true
+							) extends infer Y
+						? Y extends AnyErr
+							? Y
+							: UpsertLoop<Us, Rel, It, DB, Ctes, Nx<I>>
+						: never
 			: never
 		: never
 	: true;
