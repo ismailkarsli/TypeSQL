@@ -44,25 +44,25 @@ const touched = sql(`
 
 ## Optional values
 
-A `sql.param(value)` whose value is `undefined` sends `DEFAULT` instead of a parameter. The column's default stays in the database, so you don't copy it into a `coalesce(…)`:
+`sql.param(sql.empty)` sends `DEFAULT` instead of a parameter. Use `sql.param(value ?? sql.empty)` or `sql.param(sql.empty(value))` to explicitly request a default for a nullish value. `sql.param(undefined)` is rejected. The column's default stays in the database, so you don't copy it into a `coalesce(…)`:
 
 ```ts
 declare const mood: "happy" | "neutral" | "sad" | undefined;
 const signup = sql(`
   INSERT INTO users (email, mood)
-  VALUES (${sql.param("a@b.c")}, ${sql.param(mood)})
+  VALUES (${sql.param("a@b.c")}, ${sql.param(mood ?? sql.empty)})
   RETURNING id, mood`);
 signup.text;
 ```
 
-The value is checked like any parameter, without `undefined`. When it can be `undefined`, the statement is checked a second time with `DEFAULT` in its place. So such a value for a `NOT NULL` column without a default is an error, and so is one outside a `VALUES` item or `SET` value:
+The value is checked like any parameter, without the `sql.empty` sentinel. When it can be `sql.empty`, the statement is checked a second time with `DEFAULT` in its place. So such a value for a `NOT NULL` column without a default is an error, and so is one outside a `VALUES` item or `SET` value:
 
 ```ts
-sql(`INSERT INTO users (email) VALUES (${sql.param(maybeEmail)})`);
-sql(`SELECT id FROM users WHERE email = ${sql.param(maybeEmail)}`);
+sql(`INSERT INTO users (email) VALUES (${sql.param(maybeEmail ?? sql.empty)})`);
+sql(`SELECT id FROM users WHERE email = ${sql.param(maybeEmail ?? sql.empty)}`);
 ```
 
-Narrow the value first, or pass `maybeEmail ?? null` to send `NULL`. `sql.fragment(…)` refuses a value that can be `undefined`: a fragment is checked where it is spliced, with `$n` for its values, so a `DEFAULT` there couldn't be checked. `any` and `unknown` values are not checked.
+Narrow the value first, or pass `maybeEmail ?? null` to send `NULL`. To preserve explicit `null` while using a default only for `undefined`, pass `maybeEmail === undefined ? sql.empty : maybeEmail`. `sql.fragment(…)` refuses a value that can be `sql.empty`: a fragment is checked where it is spliced, with `$n` for its values, so a `DEFAULT` there couldn't be checked. `any` and `unknown` values are not checked.
 
 ## Partial updates: `sql.set`
 

@@ -1,5 +1,14 @@
 # @typesql/cli
 
+## 0.1.2
+
+### Patch Changes
+
+- Updated dependencies:
+  - @typesql/core@0.9.2
+  - @typesql/pg@0.3.3
+  - @typesql/sqlite@0.0.4
+
 ## 0.1.1
 
 ### Patch Changes

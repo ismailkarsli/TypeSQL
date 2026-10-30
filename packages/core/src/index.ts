@@ -7,6 +7,7 @@ export type {
 	TransactionalSqlOf,
 	ValidateDdlOf,
 } from "./dialect.js";
+export type { Empty } from "./empty.js";
 export type { AnyErr, ErrAt, ErrMsg, IsErr, SqlError } from "./errors.js";
 export {
 	type MigrationClient,

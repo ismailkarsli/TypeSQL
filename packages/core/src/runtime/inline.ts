@@ -1,3 +1,4 @@
+import { isEmpty } from "../empty.js";
 import type { InlineMarker } from "../sql/inline.js";
 import { QUOTED } from "./splice.js";
 
@@ -7,6 +8,10 @@ const pending = new Map<string, unknown>();
 let counter = 0;
 
 export function param<const T>(value: T): InlineMarker<T> {
+	if (value === undefined)
+		throw new Error(
+			"typesql: sql.param() does not accept undefined; use sql.empty for DEFAULT or null for SQL NULL",
+		);
 	const id = (counter++).toString(36);
 	const token = `${MARK}${id}\u0000`;
 	pending.set(id, value);
@@ -17,6 +22,10 @@ const EXACT = new RegExp(`^${MARK}[0-9a-z]+\u0000$`);
 const INLINE = new RegExp(`${QUOTED.source}|${MARK}([0-9a-z]+)\u0000`, "g");
 
 export function takeValue(value: unknown): unknown {
+	if (isEmpty(value))
+		throw new Error(
+			"typesql: sql.empty cannot be a bound parameter; use an inline sql.param(sql.empty) for DEFAULT",
+		);
 	if (typeof value !== "string" || !EXACT.test(value)) return value;
 	const id = value.slice(MARK.length, -1);
 	if (!pending.has(id))
@@ -25,6 +34,10 @@ export function takeValue(value: unknown): unknown {
 		);
 	const v = pending.get(id);
 	pending.delete(id);
+	if (isEmpty(v))
+		throw new Error(
+			"typesql: sql.param(sql.empty) must be interpolated inline to emit DEFAULT",
+		);
 	return v;
 }
 
@@ -72,7 +85,7 @@ export function resolveInline(
 		const value = pending.get(id);
 		used.push(id);
 		out += text.slice(last, match.index);
-		if (value === undefined) out += "DEFAULT";
+		if (isEmpty(value)) out += "DEFAULT";
 		else {
 			values.push(value);
 			out += `$${++k}`;

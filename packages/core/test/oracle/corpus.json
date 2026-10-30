@@ -69,7 +69,8 @@
 		"7aa4b96f2e1f": "{ \"users\": { id: __T.Generated<\"int4\">; email: __T.Col<\"text\">; name: __T.Nullable<\"text\">; mood: __T.Nullable<\"mood\">; }; \"posts\": { id: __T.Generated<\"int8\">; author_id: __T.Col<\"int4\">; title: __T.Col<\"text\">; }; \"$types\": { mood: \"happy\" | \"sad\"; } }",
 		"316b73dbdb65": "{ migration_accounts: { id: __T.Col<\"int4\">; email: __T.Col<\"text\">; display_name: __T.Nullable<\"text\">; enabled: __T.Generated<\"bool\">; }; }",
 		"caa5507dd1f5": "{ direct_inference: { id: __T.Col<\"int4\">; value: __T.Col<\"text\">; }; }",
-		"5b0e76d775a7": "{ direct_inference: { id: __T.Col<\"int4\">; value: __T.Nullable<\"text\">; }; }"
+		"5b0e76d775a7": "{ direct_inference: { id: __T.Col<\"int4\">; value: __T.Nullable<\"text\">; }; }",
+		"9698a3d3e03a": "{ preferences: { email: __T.Col<\"text\">; retries: __T.Col<\"int4\", { hasDefault: true }>; note: __T.Nullable<\"text\">; }; }"
 	},
 	"statements": [
 		{
@@ -23500,6 +23501,42 @@
 			"schema": "a6e2bec03620",
 			"source": "plugins",
 			"sql": "UPDATE users SET display_name = $1 WHERE id = $2 RETURNING id AS user_id, display_name",
+			"ddl": false
+		},
+		{
+			"schema": "a747d3b517b0",
+			"source": "sql-empty",
+			"sql": "SELECT id, email, display_name FROM users WHERE id > $1 AND age > $2",
+			"ddl": false
+		},
+		{
+			"schema": "a747d3b517b0",
+			"source": "sql-empty",
+			"sql": "SELECT id, email, display_name FROM users WHERE id > $1 AND email = $2 AND age > $3",
+			"ddl": false
+		},
+		{
+			"schema": "9698a3d3e03a",
+			"source": "sql-empty",
+			"sql": "INSERT INTO preferences (email, retries, note) VALUES ($1, DEFAULT, DEFAULT) RETURNING retries, note",
+			"ddl": false
+		},
+		{
+			"schema": "9698a3d3e03a",
+			"source": "sql-empty",
+			"sql": "INSERT INTO preferences (email, retries, note) VALUES ($1, $2, $3) RETURNING retries, note",
+			"ddl": false
+		},
+		{
+			"schema": "9698a3d3e03a",
+			"source": "sql-empty",
+			"sql": "UPDATE preferences SET retries = DEFAULT, note = DEFAULT WHERE email = $1 RETURNING retries, note",
+			"ddl": false
+		},
+		{
+			"schema": "9698a3d3e03a",
+			"source": "sql-empty",
+			"sql": "UPDATE preferences SET retries = $1, note = $2 WHERE email = $3 RETURNING retries, note",
 			"ddl": false
 		}
 	],

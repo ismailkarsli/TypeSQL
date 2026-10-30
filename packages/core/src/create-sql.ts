@@ -1,4 +1,5 @@
 import type { Dialect, DialectTypes, SqlOf } from "./dialect.js";
+import { type Empty, empty, isEmpty } from "./empty.js";
 import { encodeInput, encodeParameters, type SqlPlugin } from "./plugin.js";
 import type { Executor } from "./query.js";
 import { makeFragment, makeQuery } from "./query.js";
@@ -81,7 +82,12 @@ export function createDialectSql<T extends DialectTypes, DB, TM = T["typeMap"]>(
 			plugins.length === 0
 				? param
 				: (value: unknown) =>
-						param(encodeInput(value, plugins, { kind: "value" })),
+						param(
+							isEmpty(value)
+								? value
+								: encodeInput(value, plugins, { kind: "value" }),
+						),
+		empty,
 		json,
 		fragment: (text: string, ...rest: readonly unknown[]) => {
 			const r = buildInput(text, rest);
@@ -89,14 +95,23 @@ export function createDialectSql<T extends DialectTypes, DB, TM = T["typeMap"]>(
 		},
 		id: (...parts: readonly string[]) => makeFragment(quoteIdent(...parts), []),
 		combine: (
-			items: readonly Spliceable[],
+			items: readonly (Spliceable | Empty)[],
 			options?: { readonly separator?: string },
 		) => {
-			if (items.length === 0)
+			const defined: Spliceable[] = [];
+			for (const item of items) {
+				if (isEmpty(item)) continue;
+				if (item === null || item === undefined)
+					throw new Error(
+						"typesql: sql.combine() does not accept null or undefined; use sql.empty or sql.empty(value) to omit an item",
+					);
+				defined.push(item);
+			}
+			if (defined.length === 0)
 				throw new Error(
 					"typesql: sql.combine() needs at least one item; put a fixed element first (`[base, ...rest]`) or skip the clause",
 				);
-			const r = joinFragments(items, options?.separator ?? ", ");
+			const r = joinFragments(defined, options?.separator ?? ", ");
 			return makeFragment(r.text, r.values);
 		},
 		set: (table: string, values: Readonly<Record<string, unknown>>) => {

@@ -1,5 +1,13 @@
 # @typesql/core
 
+## 0.9.2
+
+### Patch Changes
+
+- Speeds up PostgreSQL query type checking and runtime query construction without caching.
+
+- Fix excessive type instantiation when extracting PostgreSQL query row types.
+
 ## 0.9.1
 
 ### Patch Changes

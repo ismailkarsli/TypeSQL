@@ -1,17 +1,27 @@
+import type { Empty } from "../empty.js";
 import type { SqlError } from "../errors.js";
 import type { Next } from "./next.js";
 import type { MaxParamStr } from "./splice.js";
 
+export type ParamInput<T> = unknown extends T
+	? unknown
+	: undefined extends T
+		? SqlError<
+				"sql.param() does not accept undefined; use sql.empty for DEFAULT or null for SQL NULL",
+				null
+			>
+		: unknown;
+
 export type InlineMarker<T> = unknown extends T
 	? PlainMarker<T>
-	: undefined extends T
-		? DefaultMarker<T>
-		: PlainMarker<T>;
+	: [Extract<T, Empty>] extends [never]
+		? PlainMarker<T>
+		: DefaultMarker<T>;
 type PlainMarker<T> = `\u0000P${Enc<T>}\u0000`;
 export type JsonMarker<T> = `\u0000PJ${Enc<T>}\u0000`;
 export type JsonValue = `\u0000PJ${string}\u0000`;
 
-export type DefaultMarker<T> = `\u0000Du${Enc<Exclude<T, undefined>>}\u0000`;
+export type DefaultMarker<T> = `\u0000Du${Enc<Exclude<T, Empty>>}\u0000`;
 
 export type Enc<T> = 0 extends 1 & T
 	? "*"

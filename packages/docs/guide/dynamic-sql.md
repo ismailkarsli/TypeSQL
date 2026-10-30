@@ -128,10 +128,11 @@ const sorted = sql("SELECT p.id, p.title FROM posts p ORDER BY {order}", {
 TypeSQL doesn't try every combination. It checks the statement once, with each distinct element present once. In a list position (`ORDER BY`, `GROUP BY`, `SET`, `VALUES` rows, `IN (…)`, an `AND` chain) each element is checked on its own. So if that one statement is valid, every count and order of the elements is valid too.
 
 ::: warning Empty arrays
-An empty array throws at runtime. Always include a fixed element, like the `p.id` tiebreaker above, or start an `AND` chain with `sql.fragment("true")`.
+`sql.empty` items are ignored; use `sql.empty(maybeFragment)` or `maybeFragment ?? sql.empty` to explicitly omit a nullish fragment. Plain `null` and `undefined` entries are rejected. An empty array, or one containing only `sql.empty`, throws at runtime. Always include a fixed element, like the `p.id` tiebreaker above. For authorization-sensitive queries, keep required tenant or ownership predicates unconditional; an optional filter must never replace them.
 :::
 
 - The query's text type (`TextType`) is that one-of-each statement, not the text sent at runtime. At runtime, elements are repeated and renumbered as given.
+- Conditional fragments are checked as present, including in tuples. Do not rely on optional predicates to guarantee non-null results.
 - In a select list (`SELECT {cols}`), the row type counts every element as selected, even if only some are at runtime.
 - An element whose text is dynamic (`sql.raw`) makes the whole list dynamic.
 
