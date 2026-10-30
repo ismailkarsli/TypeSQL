@@ -1,5 +1,16 @@
 # @typesql/kysely
 
+## 0.4.0
+
+### Minor Changes
+
+- Replace rowKeys options with typed plugins on SQL instances.
+
+### Patch Changes
+
+- Updated dependencies:
+  - @typesql/core@0.10.0
+
 ## 0.3.4
 
 ### Patch Changes

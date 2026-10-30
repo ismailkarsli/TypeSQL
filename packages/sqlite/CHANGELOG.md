@@ -1,5 +1,16 @@
 # @typesql/sqlite
 
+## 0.1.0
+
+### Minor Changes
+
+- Replace rowKeys options with CasePlugin while retaining bigint configuration.
+
+### Patch Changes
+
+- Updated dependencies:
+  - @typesql/core@0.10.0
+
 ## 0.0.4
 
 ### Patch Changes

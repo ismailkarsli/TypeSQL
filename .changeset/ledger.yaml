@@ -47,6 +47,14 @@
   intents:
     - modern-mails-smash
     - real-houses-heal
+"@typesql/core@0.10.0":
+  dir: packages/core
+  intents:
+    - cool-frogs-stay
+    - gentle-walls-flash
+    - great-lemons-dance
+    - itchy-teeth-occur
+    - nice-knives-travel
 "@typesql/core@0.2.0":
   dir: packages/core
   intents:
@@ -315,6 +323,10 @@
   dir: packages/kysely
   intents:
     - wet-ducks-trade
+"@typesql/kysely@0.4.0":
+  dir: packages/kysely
+  intents:
+    - quiet-jars-smell
 "@typesql/language-server@0.0.1":
   dir: packages/language-server
   intents:
@@ -407,6 +419,10 @@
   dir: packages/pg
   intents:
     - quick-tips-whisper
+"@typesql/pg@0.4.0":
+  dir: packages/pg
+  intents:
+    - wet-cats-chew
 "@typesql/postgres@0.0.2":
   dir: packages/postgres
   intents:
@@ -459,6 +475,10 @@
   intents:
     - breezy-emus-scream
     - wide-tables-design
+"@typesql/postgres@0.3.0":
+  dir: packages/postgres
+  intents:
+    - short-jeans-pull
 "@typesql/prisma@0.0.2":
   dir: packages/prisma
   intents:
@@ -520,6 +540,10 @@
   dir: packages/sqlite
   intents:
     - quick-pots-poke
+"@typesql/sqlite@0.1.0":
+  dir: packages/sqlite
+  intents:
+    - spicy-icons-relate
 typesql@0.0.1:
   dir: packages/vscode
   intents:

@@ -1,6 +1,6 @@
 {
 	"name": "@typesql/docs",
-	"version": "0.0.25",
+	"version": "0.0.26",
 	"private": true,
 	"type": "module",
 	"description": "Documentation site for TypeSQL (VitePress).",

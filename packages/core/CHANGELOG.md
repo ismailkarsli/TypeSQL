@@ -1,5 +1,21 @@
 # @typesql/core
 
+## 0.10.0
+
+### Minor Changes
+
+- Replace rowKeys options and casing helpers with typed input and output plugins and CasePlugin.
+
+### Patch Changes
+
+- Convert camelCase write objects through CasePlugin in sql.values and sql.set.
+
+- Add sql.empty as a callable sentinel for optional fragments and DEFAULT parameters; sql.param now rejects undefined.
+
+- Build camelCase writes and single-row inserts faster without changing generated SQL.
+
+- Reject unsupported migration dialects instead of treating them as SQLite.
+
 ## 0.9.2
 
 ### Patch Changes

@@ -1,5 +1,16 @@
 # @typesql/postgres
 
+## 0.3.0
+
+### Minor Changes
+
+- Replace rowKeys options with CasePlugin while retaining bigint configuration.
+
+### Patch Changes
+
+- Updated dependencies:
+  - @typesql/core@0.10.0
+
 ## 0.2.14
 
 ### Patch Changes
