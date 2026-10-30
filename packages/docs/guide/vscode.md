@@ -13,7 +13,7 @@ The extension is optional: errors, hovers and row types come from TypeScript, wi
 
 ## Setup
 
-1. Install the TypeSQL extension from the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=typesql.typesql) or [Open VSX](https://open-vsx.org/extension/typesql/typesql). Install the [TypeScript 7 extension](https://marketplace.visualstudio.com/items?itemName=TypeScriptTeam.native-preview) (`TypeScriptTeam.native-preview`) too.
+1. Install the TypeSQL extension from the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=typesql.typesql) or [Open VSX](https://open-vsx.org/extension/typesql/typesql). Install the [TypeScript 7 extension](https://marketplace.visualstudio.com/items?itemName=TypeScriptTeam.native-preview) (`TypeScriptTeam.native-preview`) too. The TypeScript 7 extension is published only on the Visual Studio Marketplace, not on Open VSX, so in VSCodium and other Open VSX editors you get SQL highlighting but no completions unless you install it from a `.vsix`.
 2. Have `@typesql/core` 0.4.0 or later in the project, directly or through an adapter (`@typesql/pg`, `@typesql/postgres`, `@typesql/kysely`, `@typesql/drizzle`, `@typesql/prisma`).
 3. Run the language server on TypeScript 7.1 or later, as below.
 
