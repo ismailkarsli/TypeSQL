@@ -1,10 +1,16 @@
 import { createHash } from "node:crypto";
 import type { Executor } from "@typesql/core";
-import { runTransaction, type SqlDriver } from "@typesql/core/adapter";
+import {
+	type PgField,
+	parsePgUserArrays,
+	runTransaction,
+	type SqlDriver,
+} from "@typesql/core/adapter";
 
 export interface PgResult {
 	readonly rows: unknown[];
 	readonly rowCount: number | null;
+	readonly fields?: readonly PgField[];
 }
 
 export interface PgQueryable {
@@ -32,23 +38,33 @@ export interface PgPoolLike<
 	connect(): Promise<C>;
 }
 
+// A pool's checked-out clients share the pool's cache of user-defined array types.
+const pools = new WeakMap<PgQueryable, object>();
+
+function rowsOf(
+	client: PgQueryable,
+	{ rows, rowCount, fields }: PgResult,
+): Promise<{ rows: unknown[]; rowCount: number | null }> {
+	return parsePgUserArrays(
+		pools.get(client) ?? client,
+		(text, values) => client.query(text, values),
+		fields,
+		rows,
+	).then((rows) => ({ rows, rowCount }));
+}
+
 export function executor(client: PgQueryable): Executor {
 	return Object.assign(
-		async (text: string, values: readonly unknown[]) => {
-			const { rows, rowCount } = await client.query(text, Array.from(values));
-			return { rows, rowCount };
-		},
+		async (text: string, values: readonly unknown[]) =>
+			rowsOf(client, await client.query(text, Array.from(values))),
 		{
 			prepare: (text: string): Executor => {
 				const name = `typesql_${createHash("sha256").update(text).digest("hex").slice(0, 48)}`;
-				return async (text, values) => {
-					const { rows, rowCount } = await client.query({
-						name,
-						text,
-						values: Array.from(values),
-					});
-					return { rows, rowCount };
-				};
+				return async (text, values) =>
+					rowsOf(
+						client,
+						await client.query({ name, text, values: Array.from(values) }),
+					);
 			},
 		},
 	);
@@ -83,6 +99,7 @@ async function inPoolTransaction<C extends PgTransactionClient, T>(
 	};
 	const events = conn as ErrorEvents;
 	events.on?.("error", onError);
+	pools.set(conn, pool);
 	try {
 		return await runTransaction(on(conn), () => fn(conn), {
 			onRollbackError: (err) => {

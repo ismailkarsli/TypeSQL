@@ -1,5 +1,9 @@
 import type { Executor } from "@typesql/core";
-import type { SqlDriver } from "@typesql/core/adapter";
+import {
+	type PgField,
+	parsePgUserArrays,
+	type SqlDriver,
+} from "@typesql/core/adapter";
 
 export interface DrizzleDatabase {
 	readonly _: { readonly session: object };
@@ -90,11 +94,19 @@ export function executor(db: DrizzleDatabase): Executor {
 			)) as PostgresJsResult;
 			return { rows: postgresJsRows(result), rowCount: result.count ?? null };
 		}
-		const result = (await client.query!(text, Array.from(values))) as {
+		const query = client.query!.bind(client);
+		const result = (await query(text, Array.from(values))) as {
 			rows: unknown[];
 			rowCount?: number | null;
+			fields?: readonly PgField[];
 		};
-		return { rows: result.rows, rowCount: result.rowCount ?? null };
+		const rows = await parsePgUserArrays(
+			client,
+			async (text, values) => (await query(text, values)) as { rows: [] },
+			result.fields,
+			result.rows,
+		);
+		return { rows, rowCount: result.rowCount ?? null };
 	};
 }
 

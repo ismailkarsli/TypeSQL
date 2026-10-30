@@ -55,6 +55,8 @@ Arrays are mapped element by element (`T[]` becomes the element's type `[]`), wh
 - `numeric[]` is parsed with `parseFloat`, so it is `number[]` at runtime but typed `string[]`.
 - Array types without a registered parser come back as the raw `{…}` string: `name[]`, `"char"[]`, `xml[]`, `bit[]`, `varbit[]`, `tsvector[]`, `tsquery[]`, `circle[]`, `line[]`, `lseg[]`, `box[]`, `path[]`, `polygon[]`, `int4range[]`, `int8range[]`, `tsrange[]`, `tstzrange[]`, `daterange[]`, `macaddr8[]`, `regclass[]`, `record[]`.
 
+Arrays of user-defined and extension types (enums, domains, `citext`) have no parser in `pg-types` either. `@typesql/pg`, and `@typesql/drizzle` on node-postgres, parse them: the first time a result has such a column, they look up in `pg_type` which of its types are arrays (once per pool or client), then parse the `{…}` text with the element's base type (numbers for `int2`/`int4`/`oid`/`float4`/`float8` domains, booleans for `bool`, strings otherwise). Kysely and Prisma on node-postgres don't expose the result's column types, so there these arrays stay raw `{…}` strings, although they are typed as arrays; cast them in SQL (`moods::text[]`) to get an array.
+
 `PgTypeMap` declares the two that [`PgCatalog`](../guide/schema#system-catalogs) columns use, `aclitem[]` and `"char"[]`, as `string`.
 
 If you depend on one of these, register a parser with `pg.types.setTypeParser` and use a [custom type map](#custom-type-maps), or cast in SQL.
