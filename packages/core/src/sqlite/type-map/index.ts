@@ -16,8 +16,12 @@ export interface DefaultTypeMap {
 	unknown: unknown;
 }
 
-export interface BigIntTypeMap extends Omit<DefaultTypeMap, "integer"> {
+export interface BigIntTypeMap
+	extends Omit<DefaultTypeMap, "integer" | "numeric"> {
 	integer: bigint;
+	// NUMERIC affinity (numeric, decimal, boolean, …) stores integral values as
+	// INTEGER, which bigint mode reads as bigint; other values stay REAL.
+	numeric: number | bigint;
 }
 
 export type TypeMap = { readonly [sqliteType: string]: unknown };

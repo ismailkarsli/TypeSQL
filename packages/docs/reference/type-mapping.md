@@ -133,7 +133,7 @@ Prisma throws "Unsupported column type" for other types (`interval`, geometric t
 | `blob` | `Uint8Array` |
 | no type, `any` | `unknown` |
 
-A type name is looked up in the map first, then its [affinity](../guide/sqlite#types) (`integer`, `real`, `numeric`, `text`, `blob` or `any`). `BigIntTypeMap` reads integers as `bigint`, for `createSql(db, { bigint: true })`.
+A type name is looked up in the map first, then its [affinity](../guide/sqlite#types) (`integer`, `real`, `numeric`, `text`, `blob` or `any`). `BigIntTypeMap` reads integers as `bigint`, for `createSql(db, { bigint: true })`. SQLite stores integral values in NUMERIC-affinity columns (`numeric`, `decimal`, `boolean`, …) as integers, so there those columns are `number | bigint`.
 
 Parameters accept the map's type and, through `DefaultParamTypeMap`, `bigint` for integer, real and numeric columns. A parameter without a type accepts `string | number | bigint | Uint8Array | null`.
 
