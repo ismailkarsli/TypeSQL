@@ -71,6 +71,14 @@ assert.deepEqual(
 	sql("SELECT {col} FROM users", { col: sql.id("display_name") }),
 	{ text: 'SELECT "display_name" FROM users', values: [] },
 );
+assert.deepEqual(sql.id('quoted"name'), {
+	text: '"quoted""name"',
+	values: [],
+});
+assert.deepEqual(sql.id('quoted"schema', 'quoted"name'), {
+	text: '"quoted""schema"."quoted""name"',
+	values: [],
+});
 
 const camelWrites = core
 	.createSql<{
@@ -106,6 +114,31 @@ assert.equal(
 assert.deepEqual(camelInserted.values.slice(0, 2), ["Ada", null]);
 assert.equal(JSON.stringify(camelInserted.values[2]), '{"innerKey":"kept"}');
 assert.equal(JSON.stringify(camelInserted.values[4]), '{"innerKey":"kept"}');
+const singleRow = {
+	displayName: "Ada",
+	optionalName: undefined,
+	jsonData: camelWrites.json(writeModel.jsonData),
+};
+assert.deepEqual(camelWrites.values("write_rows", [singleRow]), {
+	text: '("display_name", "json_data") VALUES ($1, $2)',
+	values: ["Ada", camelInserted.values[2]],
+});
+assert.deepEqual(Object.keys(singleRow), [
+	"displayName",
+	"optionalName",
+	"jsonData",
+]);
+assert.throws(
+	() => camelWrites.values("write_rows", [singleRow]),
+	/already used/,
+);
+const defaults = core.createSql<{
+	defaults: { id: Col<"int4", { hasDefault: true }> };
+}>(corePg.postgres);
+assert.deepEqual(defaults.values("defaults", [{ id: undefined }]), {
+	text: "DEFAULT VALUES",
+	values: [],
+});
 const camelUpdated = camelWrites(
 	"UPDATE write_rows SET {changes} RETURNING display_name",
 	{
@@ -134,6 +167,13 @@ assert.deepEqual(
 
 // Plugins share the same pipeline in execution, preparation, fragments and transactions.
 const casePlugin = new core.CasePlugin();
+assert.deepEqual(
+	casePlugin.transformInput(
+		{ displayName: 1, HTTPStatus: 2, already_snake: 3, "": 4, ÄName: 5 },
+		{ kind: "set", table: "unused" },
+	),
+	{ display_name: 1, _h_t_t_p_status: 2, already_snake: 3, "": 4, Ä_name: 5 },
+);
 const cased = sql.withPlugin(casePlugin);
 const encodedWrite = cased(
 	"UPDATE users SET {changes} RETURNING display_name",

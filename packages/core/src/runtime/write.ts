@@ -34,6 +34,31 @@ export function buildValues(
 		throw new Error(
 			"typesql: sql.values() needs at least one row; skip the INSERT when there is nothing to insert",
 		);
+	if (rows.length === 1) {
+		if (!(0 in rows)) return { text: "DEFAULT VALUES", values: [] };
+		const row = rows[0];
+		if (row === null || typeof row !== "object" || Array.isArray(row))
+			throw new Error(
+				"typesql: sql.values() rows must be objects of column values",
+			);
+		const columns: string[] = [];
+		const values: unknown[] = [];
+		const items: string[] = [];
+		for (const key of Object.keys(row)) {
+			const value = takeValue(row[key]);
+			if (value === undefined) continue;
+			columns.push(quoteIdent(key));
+			values.push(value);
+			items.push(`$${values.length}`);
+		}
+		return {
+			text:
+				columns.length === 0
+					? "DEFAULT VALUES"
+					: `(${columns.join(", ")}) VALUES (${items.join(", ")})`,
+			values,
+		};
+	}
 	const columns: string[] = [];
 	const seen = new Set<string>();
 	const taken = rows.map((row) => {
@@ -53,7 +78,6 @@ export function buildValues(
 		return out;
 	});
 	if (columns.length === 0) {
-		if (rows.length === 1) return { text: "DEFAULT VALUES", values: [] };
 		throw new Error(
 			"typesql: sql.values() rows have no values; Postgres cannot insert several all-default rows with VALUES",
 		);

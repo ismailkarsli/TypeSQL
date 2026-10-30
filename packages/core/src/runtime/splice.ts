@@ -73,6 +73,7 @@ export function rewriteNamed(text: string): { text: string; names: string[] } {
 }
 
 export function quoteIdent(...parts: readonly string[]): string {
+	if (parts.length === 1 && !parts[0]!.includes('"')) return `"${parts[0]}"`;
 	return parts.map((p) => `"${p.replace(/"/g, '""')}"`).join(".");
 }
 
