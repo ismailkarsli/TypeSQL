@@ -107,7 +107,7 @@ export async function down(db: PostgresMigration<MigrationSchema<typeof up>>) {
 }
 ```
 
-Use `SqliteMigration` for SQLite. The migration parameter declares its dialect at compile time; config selects the runtime connection. `up` must return its final context; a no-op `up` returns `db`. `down` is mandatory, may be empty, and need not restore the previous schema type. The first migration may accept an existing starting schema. For subsequent migrations the generated signature is:
+Use `SqliteMigration` for SQLite. The migration parameter declares its dialect at compile time; config selects the runtime connection. `up` must return its final context; a no-op `up` returns `db`. If it doesn't, the next migration's queries and `.add()` calls fail to compile with "the previous migration's up() does not return its migration context", instead of going unchecked. `down` is mandatory, may be empty, and need not restore the previous schema type. The first migration may accept an existing starting schema. For subsequent migrations the generated signature is:
 
 ```ts
 import type { PostgresMigration, MigrationSchema } from "@typesql/core/migration";

@@ -2,6 +2,7 @@ import { createDialectSql } from "../create-sql.js";
 import type { ApplyDdlOf, DialectTypes, ValidateDdlOf } from "../dialect.js";
 import type { EngineTypes } from "../engine/contract.js";
 import type { ParamsOf, RowOf } from "../engine/infer.js";
+import type { SqlError } from "../errors.js";
 import { type Postgres, postgres } from "../postgres/dialect.js";
 import type { PgEngine } from "../postgres/engine/engine.js";
 import type { Executor, Query } from "../query.js";
@@ -35,11 +36,17 @@ export interface MigrationContext<
 	/** Type-only schema marker; no database introspection is performed. */
 	readonly schema: DB;
 	<const Q extends string>(
-		query: GateCallCheck<E, DB, TM, Q> & Q,
+		query: (DB extends MissingSchema
+			? MissingSchemaError
+			: GateCallCheck<E, DB, TM, Q>) &
+			Q,
 		...params: BoxCallArgs<E, DB, TM, Q>
 	): CallRet<E, DB, TM, Q>;
 	<const Q extends string, const S extends SlotMap>(
-		query: GateSlottedCheck<E, DB, TM, Q, S> & Q,
+		query: (DB extends MissingSchema
+			? MissingSchemaError
+			: GateSlottedCheck<E, DB, TM, Q, S>) &
+			Q,
 		slots: S & SlotsFor<Q, S>,
 		...params: BoxSlottedArgs<E, DB, TM, Q, S>
 	): Query<
@@ -48,7 +55,8 @@ export interface MigrationContext<
 		SplicedOr<Q, S>
 	>;
 	add<const Q extends string>(
-		ddl: GateDdl<T, DB, Q> & Q,
+		ddl: (DB extends MissingSchema ? MissingSchemaError : GateDdl<T, DB, Q>) &
+			Q,
 	): Promise<MigrationContext<E, T, ApplyDdlOf<T, DB, Q>, TM>>;
 	/** Execute SQL the checker cannot see, explicitly asserting its resulting schema. */
 	raw<NewSchema = DB>(
@@ -71,7 +79,15 @@ export type SqliteMigration<Base = {}> = MigrationContext<
 export type MigrationSchema<Up extends (...args: never[]) => unknown> =
 	Awaited<ReturnType<Up>> extends { readonly schema: infer Schema }
 		? Schema
-		: never;
+		: MissingSchema;
+
+declare const MISSING_SCHEMA: unique symbol;
+/** The schema of a migration whose `up` doesn't return its context. */
+export type MissingSchema = { readonly [MISSING_SCHEMA]: true };
+type MissingSchemaError = SqlError<
+	"the previous migration's up() does not return its migration context, so its schema is unknown; end it with `return db`",
+	0
+>;
 
 /** Internal factory: execution is bound to the runner's active transaction. */
 export function createMigrationContext(
