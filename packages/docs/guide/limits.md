@@ -41,7 +41,7 @@ The schema does not tell identity `GENERATED ALWAYS` columns apart from other co
 - Only the string literals `'[]'`, `'{}'`, `'null'`, `'true'` and `'false'` keep their value when they meet typed JSON (`coalesce(json_agg(x), '[]')`). Any other literal makes the result `unknown`.
 - Functions that rewrite JSON (`jsonb_set`, `||`, `jsonb_strip_nulls`, `json_populate_record`, `jsonb_path_query`, `json_each`) return plain JSON. So does `row_to_json(ROW(…))`.
 - A [`Json<T>` column](./schema#typed-json-columns)'s `T` is trusted, not checked against the database. Positional and named parameters for it are typed `T` but passed to the driver as they are; only `sql.json()` makes arrays work with node-postgres.
-- A `sql.json(value)` passed as a positional or named argument is only checked to be JSON, not against the column's `T`. It is checked against `T` when written inline, in `sql.set` / `sql.values`, or as a `sql.fragment` argument.
+- A `sql.json(value)` value is checked for its JSON kind (object, array, string, number, boolean or null), not against a `Json<T>` column's `T`, wherever it is used: inline, as an argument, in `sql.set` / `sql.values` or in a fragment. A raw object passed as a positional or named argument is checked against `T`. Likewise `sql.param(value)` is checked by kind only: any string is accepted for an enum column and any object for a typed JSON column.
 - A plain `jsonb` parameter (typed `unknown`) refuses objects with a `length` key. Wrap those in `sql.json()`.
 - Inside JSON, `int8` and `numeric` are numbers. `JSON.parse` rounds integers beyond 2^53, and a `float8` / `numeric` that is `NaN` or `Infinity` is serialized as a string.
 - Elements of Postgres arrays are typed non-null, as for array columns.

@@ -96,7 +96,7 @@ const save = sql(
 
 Why not a raw value? node-postgres sends a JS array as a Postgres array literal, which Postgres rejects as JSON, and postgres.js runs `JSON.stringify` on every value, so a string you already stringified is stored as a JSON string.
 
-`sql.json()` is accepted only where a `json` or `jsonb` value is expected, or with no context (`SELECT ${sql.json(v)}::jsonb`). For a [`Json<T>` column](./schema#typed-json-columns), the value is checked against `T`. Passing a raw array with `sql.param()` is an error:
+`sql.json()` is accepted only where a `json` or `jsonb` value is expected, or with no context (`SELECT ${sql.json(v)}::jsonb`). For a [`Json<T>` column](./schema#typed-json-columns), only the value's JSON kind is checked (an object, an array, a string, …), not its shape against `T`. Passing a raw array with `sql.param()` is an error:
 
 ```ts
 sql(`UPDATE portfolio SET name = ${sql.json({ a: 1 })}`);
@@ -113,7 +113,7 @@ sql("UPDATE portfolio SET history = :history WHERE id = :id", { history: sql.jso
 sql("UPDATE portfolio SET history = $1", items);
 ```
 
-As an argument, `sql.json(value)` is only checked to be JSON, not against `T`; see [Limits](./limits).
+As an argument too, `sql.json(value)` is only checked to be JSON of the right kind, not against `T`; see [Limits](./limits). Pass a raw object as a positional or named argument to have it checked against `T`.
 
 ## How parameters get their types
 
