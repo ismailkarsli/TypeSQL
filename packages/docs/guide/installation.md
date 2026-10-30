@@ -2,7 +2,7 @@
 
 ## Requirements
 
-- **TypeScript 7.1 or later.** This is the native compiler; `7.1.0-beta` works. You can also use [tsrs](https://github.com/oxc-project/tsrs) (a Rust port of TypeScript 7.1). Older versions are not supported.
+- **TypeScript 7.1 or later.** This is the native compiler; `7.1.0-beta` works. You can also use [tsrs](https://github.com/oxc-project/tsrs) (a Rust port of TypeScript 7.1). Older versions are not supported: TypeScript 7.0, 6 and 5.9 may still type-check queries, but they are not tested and the peer dependency rejects them. TypeScript 6 and 5.9 are several times slower, and editor completions need 7.1.
 - **A supported database.** TypeSQL supports PostgreSQL and SQLite. MySQL support is planned.
 
 ## Install TypeSQL
@@ -15,7 +15,7 @@ Install `@typesql/core` and the adapter for your driver:
 | [`@typesql/postgres`](../adapters/postgres) | postgres.js (`postgres`) |
 | [`@typesql/sqlite`](../adapters/sqlite) | node:sqlite, bun:sqlite or better-sqlite3 |
 
-`@typesql/core` has no runtime dependencies. The adapter types rows the way your driver returns them and runs queries on your client.
+`@typesql/core` has no runtime dependencies (only `typesql migrate` needs `typescript` at runtime; see [tracked migration files](./migrations#tracked-migration-files)). The packages are ESM-only. `import` and Node's `require()` of ES modules both work, but TypeScript rejects imports from `.cts` files under `node16`/`nodenext` resolution (TS1479). The adapter types rows the way your driver returns them and runs queries on your client.
 
 ## Install TypeScript 7.1
 

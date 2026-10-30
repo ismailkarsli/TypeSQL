@@ -1,10 +1,10 @@
 import { createHash } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
-import { stripTypeScriptTypes } from "node:module";
+import { createRequire, stripTypeScriptTypes } from "node:module";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { formatSyntaxKind, type Node } from "typescript/ast";
-import { API } from "typescript/sync";
+import type { formatSyntaxKind, Node } from "typescript/ast";
+import type { API } from "typescript/sync";
 
 /** A discovered TypeScript migration. Loading uses Node's native TypeScript support. */
 export interface MigrationFile {
@@ -26,6 +26,7 @@ export interface MigrationModule {
  */
 export function migrationHash(source: string): string {
 	const javascript = stripTypeScriptTypes(source);
+	const { API, formatSyntaxKind } = typescript();
 	const api = new API();
 	try {
 		const lease = api.createSourceFile("migration.js", javascript);
@@ -45,6 +46,28 @@ export function migrationHash(source: string): string {
 	} finally {
 		api.close();
 	}
+}
+
+let loaded:
+	| { API: typeof API; formatSyntaxKind: typeof formatSyntaxKind }
+	| undefined;
+
+/** TypeScript's parser hashes migrations; load it only when a migration is read. */
+function typescript(): NonNullable<typeof loaded> {
+	if (loaded) return loaded;
+	const require = createRequire(import.meta.url);
+	try {
+		loaded = {
+			API: require("typescript/sync").API,
+			formatSyntaxKind: require("typescript/ast").formatSyntaxKind,
+		};
+	} catch (cause) {
+		throw new Error(
+			"typesql: migrations need the typescript package (7.1 or later) at runtime; install it as a dependency",
+			{ cause },
+		);
+	}
+	return loaded;
 }
 
 export async function discoverMigrations(

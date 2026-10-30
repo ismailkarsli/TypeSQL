@@ -68,7 +68,7 @@ The adapter `migrate` helper executes an untracked batch. For versioned migratio
 
 ## Tracked migration files
 
-Install `@typesql/cli` and use Node.js 26 or newer. PostgreSQL also requires `pg`.
+Install `@typesql/cli` and use Node.js 26 or newer. PostgreSQL also requires `pg`. Running migration files needs `typescript` 7.1 or later wherever `typesql migrate` runs, because it hashes each file with TypeScript's parser. Keep `typescript` as a regular dependency if you run migrations from a production install (`npm install --omit=dev`).
 
 ```ts
 // typesql.config.ts

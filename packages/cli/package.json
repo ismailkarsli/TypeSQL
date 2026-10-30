@@ -40,10 +40,14 @@
 		"@typesql/sqlite": "workspace:*"
 	},
 	"peerDependencies": {
-		"pg": ">=8"
+		"pg": ">=8",
+		"typescript": ">=7.1.0-0"
 	},
 	"peerDependenciesMeta": {
 		"pg": {
+			"optional": true
+		},
+		"typescript": {
 			"optional": true
 		}
 	},
