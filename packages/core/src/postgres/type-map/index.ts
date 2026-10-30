@@ -135,7 +135,7 @@ type ParamTsOf<TM, PM, DB, T extends string> = T extends AnyShaped
 	: T extends keyof TM
 		? TM[T] | (T extends keyof PM ? PM[T] : never)
 		: T extends `${infer E}[]`
-			? (ParamTsOf<TM, PM, DB, E> | null)[]
+			? readonly (ParamTsOf<TM, PM, DB, E> | null)[]
 			: T extends keyof EnumsOf<DB>
 				? EnumsOf<DB>[T]
 				: unknown;
