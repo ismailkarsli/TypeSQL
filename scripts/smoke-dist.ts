@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { EnvelopePlugin } from "../packages/core/examples/plugins.ts";
 import type {
 	Col,
 	Json,
@@ -30,6 +31,10 @@ const dist = (path: string): Promise<unknown> =>
 const core = (await dist("core/dist/index.js")) as Core;
 const coreAdapter = (await dist("core/dist/adapter.js")) as CoreAdapter;
 const corePg = (await dist("core/dist/postgres/index.js")) as CorePostgres;
+for (const name of ["rowKeysOf", "camelCase", "snakeCase"]) {
+	assert.equal(name in core, false, `Removed core export ${name}`);
+	assert.equal(name in coreAdapter, false, `Removed adapter export ${name}`);
+}
 const pg = (await dist("pg/dist/index.js")) as Adapter;
 const pgjs = (await dist("postgres/dist/index.js")) as Adapter;
 const coreSqlite = (await dist("core/dist/sqlite/index.js")) as CoreSqlite;
@@ -65,6 +70,275 @@ assert.deepEqual(
 assert.deepEqual(
 	sql("SELECT {col} FROM users", { col: sql.id("display_name") }),
 	{ text: 'SELECT "display_name" FROM users', values: [] },
+);
+
+const camelWrites = core
+	.createSql<{
+		write_rows: {
+			display_name: Col<"text">;
+			optional_name: Col<"text", { nullable: true; hasDefault: true }>;
+			json_data: Json<{ innerKey: string }>;
+		};
+	}>(corePg.postgres)
+	.withPlugin(new core.CasePlugin());
+const writeModel = {
+	displayName: "Ada",
+	optionalName: null,
+	jsonData: { innerKey: "kept" },
+};
+const camelInserted = camelWrites(
+	"INSERT INTO write_rows {rows} RETURNING display_name, optional_name",
+	{
+		rows: camelWrites.values("write_rows", [
+			{ ...writeModel, jsonData: camelWrites.json(writeModel.jsonData) },
+			{
+				...writeModel,
+				optionalName: undefined,
+				jsonData: camelWrites.json(writeModel.jsonData),
+			},
+		]),
+	},
+);
+assert.equal(
+	camelInserted.text,
+	'INSERT INTO write_rows ("display_name", "optional_name", "json_data") VALUES ($1, $2, $3), ($4, DEFAULT, $5) RETURNING display_name, optional_name',
+);
+assert.deepEqual(camelInserted.values.slice(0, 2), ["Ada", null]);
+assert.equal(JSON.stringify(camelInserted.values[2]), '{"innerKey":"kept"}');
+assert.equal(JSON.stringify(camelInserted.values[4]), '{"innerKey":"kept"}');
+const camelUpdated = camelWrites(
+	"UPDATE write_rows SET {changes} RETURNING display_name",
+	{
+		changes: camelWrites.set("write_rows", {
+			...writeModel,
+			optionalName: undefined,
+			jsonData: camelWrites.json(writeModel.jsonData),
+		}),
+	},
+);
+assert.equal(
+	camelUpdated.text,
+	'UPDATE write_rows SET "display_name" = $1, "json_data" = $2 RETURNING display_name',
+);
+assert.equal(camelUpdated.values[0], "Ada");
+assert.equal(JSON.stringify(camelUpdated.values[1]), '{"innerKey":"kept"}');
+assert.deepEqual(
+	sql("UPDATE users SET {changes}", {
+		changes: sql.set("users", { display_name: "Ada" }),
+	}),
+	{
+		text: 'UPDATE users SET "display_name" = $1',
+		values: ["Ada"],
+	},
+);
+
+// Plugins share the same pipeline in execution, preparation, fragments and transactions.
+const casePlugin = new core.CasePlugin();
+const cased = sql.withPlugin(casePlugin);
+const encodedWrite = cased(
+	"UPDATE users SET {changes} RETURNING display_name",
+	{
+		changes: cased.set("users", { displayName: "Ada" }),
+	},
+);
+assert.equal(
+	encodedWrite.text,
+	'UPDATE users SET "display_name" = $1 RETURNING display_name',
+);
+assert.deepEqual(encodedWrite.values, ["Ada"]);
+const databaseRows = [
+	{ display_name: "Ada", json_data: { inner_key: "kept" } },
+];
+const outputRows = [{ displayName: "Ada", jsonData: { inner_key: "kept" } }];
+const resultQuery = cased("SELECT display_name FROM users");
+assert.deepEqual(core.mapRows(resultQuery, databaseRows), outputRows);
+assert.deepEqual(
+	await resultQuery.execute(async () => databaseRows),
+	outputRows,
+);
+assert.deepEqual(
+	await resultQuery.executeTakeFirst(async () => databaseRows),
+	outputRows[0],
+);
+assert.deepEqual(
+	await resultQuery.executeTakeFirstOrThrow(async () => databaseRows),
+	outputRows[0],
+);
+assert.equal(await resultQuery.executeTakeFirst(async () => []), undefined);
+await assert.rejects(
+	resultQuery.executeTakeFirstOrThrow(async () => []),
+	core.NoResultError,
+);
+assert.equal(
+	await resultQuery.executeCount(async () => ({
+		rows: databaseRows,
+		rowCount: 9,
+	})),
+	9,
+);
+assert.deepEqual(
+	core.mapRows(sql("SELECT display_name FROM users"), databaseRows),
+	databaseRows,
+);
+assert.deepEqual(databaseRows, [
+	{ display_name: "Ada", json_data: { inner_key: "kept" } },
+]);
+assert.ok(Object.isFrozen(core.pluginsOf(resultQuery)));
+const specialRow = core.mapRows(resultQuery, [
+	JSON.parse('{"__proto__":"safe","user_id":1}'),
+])[0] as unknown as Record<string, unknown>;
+assert.equal(specialRow["_Proto"], "safe");
+assert.equal(Object.getPrototypeOf(specialRow), Object.prototype);
+
+const enveloped = cased.withPlugin(new EnvelopePlugin());
+const envelopeQuery = enveloped(
+	"SELECT display_name FROM users WHERE id = $1",
+	[7],
+);
+assert.deepEqual(envelopeQuery.values, [7]);
+assert.deepEqual(
+	await envelopeQuery.execute(async () => databaseRows),
+	outputRows.map((data) => ({ data })),
+);
+assert.deepEqual(
+	core.mapRows(envelopeQuery, databaseRows),
+	outputRows.map((data) => ({ data })),
+);
+assert.deepEqual(
+	enveloped.prepare("SELECT display_name FROM users WHERE id = :id")([
+		{ id: 8 },
+	]).values,
+	[8],
+);
+assert.deepEqual(
+	enveloped("SELECT display_name FROM users WHERE id = :id", [{ id: 9 }])
+		.values,
+	[9],
+);
+assert.deepEqual(
+	enveloped(
+		`SELECT display_name FROM users WHERE id = ${enveloped.param({ data: 10 })}`,
+		[],
+	).values,
+	[10],
+);
+const envelopedWhere = enveloped.fragment("AND age > $1", [18]);
+assert.deepEqual(
+	enveloped(
+		"SELECT display_name FROM users WHERE id = $1 {where}",
+		{ where: envelopedWhere },
+		[7],
+	).values,
+	[7, 18],
+);
+assert.deepEqual(
+	enveloped.prepare("SELECT display_name FROM users WHERE id = $1 {where}", {
+		where: envelopedWhere,
+	})([8]).values,
+	[8, 18],
+);
+assert.deepEqual(
+	enveloped(
+		"UPDATE users SET {changes} WHERE id = $1",
+		{
+			changes: enveloped.set("users", { data: { displayName: "Grace" } }),
+		},
+		[9],
+	).values,
+	[9, "Grace"],
+);
+const envelopeInsert = enveloped(
+	"INSERT INTO users {rows}",
+	{
+		rows: enveloped.values("users", [
+			{ data: { id: 1, email: "a@b.c", age: 18, displayName: "Ada" } },
+		]),
+	},
+	[],
+);
+assert.match(envelopeInsert.text, /"display_name"/);
+assert.deepEqual(envelopeInsert.values, [1, "a@b.c", 18, "Ada"]);
+assert.equal(
+	(
+		await envelopeQuery.executeTakeFirstOrThrow(async () => databaseRows)
+	).data.displayName.toUpperCase(),
+	"ADA",
+);
+
+const preparedCalls: unknown[] = [];
+const prepareExecutor = Object.assign(async () => databaseRows, {
+	prepare: (text: string) => {
+		preparedCalls.push(text);
+		return async (_text: string, values: readonly unknown[]) => {
+			preparedCalls.push(values);
+			return databaseRows;
+		};
+	},
+});
+const preparedSql = core
+	.createSql<DB>(corePg.postgres, prepareExecutor)
+	.withPlugin(casePlugin)
+	.withPlugin(new EnvelopePlugin());
+const preparedPluginQuery = preparedSql.prepare(
+	"SELECT display_name FROM users WHERE id = $1",
+);
+assert.deepEqual(
+	await preparedPluginQuery([11]).execute(),
+	outputRows.map((data) => ({ data })),
+);
+assert.deepEqual(preparedCalls, [
+	"SELECT display_name FROM users WHERE id = $1",
+	[11],
+]);
+
+const transactionalPlugins = coreAdapter
+	.createTransactionalSql<
+		Postgres,
+		DB,
+		import("../packages/core/src/postgres/index.ts").DefaultTypeMap,
+		object
+	>(
+		corePg.postgres,
+		{},
+		{
+			executor: () => async () => databaseRows,
+			transaction: (client, _depth, fn) => fn(client),
+		},
+	)
+	.withPlugin(casePlugin)
+	.withPlugin(new EnvelopePlugin());
+await transactionalPlugins.transaction(async (tx) => {
+	const query = tx("SELECT display_name FROM users WHERE id = $1", [1]);
+	assert.deepEqual(
+		await query.execute(),
+		outputRows.map((data) => ({ data })),
+	);
+	await tx.transaction(async (nested) => {
+		assert.equal(
+			(
+				await nested(
+					"SELECT display_name FROM users",
+					[],
+				).executeTakeFirstOrThrow()
+			).data.displayName,
+			"Ada",
+		);
+	});
+	await tx.withPlugin(new EnvelopePlugin()).transaction(async (nested) => {
+		assert.equal(
+			(
+				await nested("SELECT display_name FROM users", [
+					[],
+				]).executeTakeFirstOrThrow()
+			).data.data.displayName,
+			"Ada",
+		);
+	});
+});
+const reversed = sql.withPlugin(new EnvelopePlugin()).withPlugin(casePlugin);
+assert.deepEqual(
+	core.mapRows(reversed("SELECT display_name FROM users", []), databaseRows),
+	databaseRows.map((data) => ({ data })),
 );
 
 const evil = "x'; DROP TABLE users; --";
@@ -133,8 +407,6 @@ for (const name of [
 	"createTransactionalSql",
 	"runTransaction",
 	"mapRows",
-	"rowKeysOf",
-	"camelCase",
 ] as const) {
 	assert.equal(
 		typeof coreAdapter[name],
@@ -223,6 +495,67 @@ assert.deepEqual(
 );
 
 const { DatabaseSync } = await import("node:sqlite");
+const pluginDb = new DatabaseSync(":memory:");
+try {
+	pluginDb.exec(
+		"CREATE TABLE plugin_rows (user_id INTEGER PRIMARY KEY, display_name TEXT, json_data TEXT NOT NULL)",
+	);
+	const adapter =
+		sqliteAdapter as unknown as typeof import("../packages/sqlite/src/index.ts");
+	const sqlitePlugins = adapter
+		.createSql<{
+			plugin_rows: {
+				user_id: Col<"integer">;
+				display_name: Col<"text", { nullable: true }>;
+				json_data: Col<"text">;
+			};
+		}>(pluginDb)
+		.withPlugin(new core.CasePlugin())
+		.withPlugin(new EnvelopePlugin());
+	const sqlitePluginQuery = sqlitePlugins(
+		"INSERT INTO plugin_rows {rows} RETURNING user_id, display_name, json_data",
+		{
+			rows: sqlitePlugins.values("plugin_rows", [
+				{
+					data: {
+						userId: 1,
+						displayName: null,
+						jsonData: '{"inner_key":"kept"}',
+					},
+				},
+			]),
+		},
+		[],
+	);
+	assert.equal(
+		sqlitePluginQuery.text,
+		'INSERT INTO plugin_rows ("user_id", "display_name", "json_data") VALUES ($1, $2, $3) RETURNING user_id, display_name, json_data',
+	);
+	assert.deepEqual(await sqlitePluginQuery.execute(), [
+		{
+			data: { userId: 1, displayName: null, jsonData: '{"inner_key":"kept"}' },
+		},
+	]);
+	await sqlitePlugins.transaction(async (tx) => {
+		await tx(
+			"UPDATE plugin_rows SET {changes} WHERE user_id = $1",
+			{
+				changes: tx.set("plugin_rows", { data: { displayName: "Ada" } }),
+			},
+			[1],
+		).execute();
+		const read = tx.prepare(
+			"SELECT display_name FROM plugin_rows WHERE user_id = :id",
+		);
+		assert.equal(
+			(await read([{ id: 1 }]).executeTakeFirstOrThrow()).data.displayName,
+			"Ada",
+		);
+	});
+} finally {
+	pluginDb.close();
+}
+
 const db = new DatabaseSync(":memory:");
 for (const name of ["createSql", "executor", "migrate"])
 	assert.equal(

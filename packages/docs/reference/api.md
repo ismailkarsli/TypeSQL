@@ -2,7 +2,7 @@
 
 Everything `@typesql/core` exports, plus `@typesql/core/postgres`, `@typesql/core/adapter` and the extra exports of the adapter and ORM packages. Each entry links to the guide page that explains it.
 
-`@typesql/core` holds what every SQL dialect shares: `createSql`, queries, fragments, executors, row keys, transactions, migrations, the schema markers and the [dialect contract](#dialects). Everything PostgreSQL-specific is in `@typesql/core/postgres`: the `postgres` dialect, the type engine, `Json` and `PgCatalog`, the type maps and the function catalog.
+`@typesql/core` holds what every SQL dialect shares: `createSql`, queries, fragments, executors, plugins, transactions, migrations, the schema markers and the [dialect contract](#dialects). Everything PostgreSQL-specific is in `@typesql/core/postgres`: the `postgres` dialect, the type engine, `Json` and `PgCatalog`, the type maps and the function catalog.
 
 ## `createSql`
 
@@ -10,7 +10,7 @@ Everything `@typesql/core` exports, plus `@typesql/core/postgres`, `@typesql/cor
 import { createSql } from "@typesql/core";
 import { postgres } from "@typesql/core/postgres";
 
-createSql<DB, TypeMap = DefaultTypeMap>(postgres, executor?, options?): Sql<DB, TypeMap, Keys>
+createSql<DB, TypeMap = DefaultTypeMap>(postgres, executor?): Sql<DB, TypeMap>
 ```
 
 Returns the typed `sql` function for a schema in a [dialect](#dialects).
@@ -18,13 +18,13 @@ Returns the typed `sql` function for a schema in a [dialect](#dialects).
 - The dialect is the first argument: `postgres` from `@typesql/core/postgres`. Each dialect adds its own `createSql` signature, so the type arguments start with `DB`.
 - `DB` is your [schema](../guide/schema). `TypeMap` turns the dialect's column types into TypeScript types ([Type mapping](./type-mapping)); it defaults to the dialect's map.
 - `executor` is what `execute*` runs on. Without one, `sql` only builds queries.
-- `options.rowKeys` is `"preserve"` (the default) or `"camelCase"`. See [camelCase row keys](../guide/queries#camelcase-row-keys).
+- Use `.withPlugin(new CasePlugin())` for camelCase input and output keys, or attach a custom typed plugin. See [plugins](../guide/queries#plugins).
 
 The adapters export their own `createSql`, which takes the driver client and adds [`sql.transaction(fn)`](#sql-transaction-fn):
 
 | Package | `createSql` |
 |---|---|
-| `@typesql/pg` | `createSql<DB>(pool, options?)`, with `PgTypeMap` |
+| `@typesql/pg` | `createSql<DB>(pool)`, with `PgTypeMap` |
 | `@typesql/postgres` | `createSql<DB>(sql, options?)` with `PostgresJsTypeMap`, or `PostgresJsBigIntTypeMap` with `{ bigint: true }` |
 | `@typesql/kysely`, `@typesql/drizzle`, `@typesql/prisma` | see [ORM packages](#orm-packages) |
 
@@ -121,7 +121,7 @@ See [Dynamic SQL](../guide/dynamic-sql).
 
 ## `sql.as<Row>(text, ...params)`
 
-Skips inference and uses the row type you give. It accepts slots, `:name` and inline values like `sql()`. With `rowKeys: "camelCase"`, write `Row` with camelCase keys. Use it for SQL TypeSQL can't type ([Errors](../guide/errors)).
+Skips inference and uses the row type you give. It accepts slots, `:name` and inline values like `sql()`. With `CasePlugin`, write `Row` with camelCase keys. Use it for SQL TypeSQL can't type ([Errors](../guide/errors)).
 
 ## `sql.transaction(fn)`
 
@@ -166,10 +166,9 @@ What adapters and custom executors build on.
 
 | Export | Does |
 |---|---|
-| `mapRows(q, rows)` | applies the query's `rowKeys` option to the driver's rows, for code that runs `q.text` itself |
-| `rowKeysOf(q)` | returns the query's `rowKeys` option |
-| `camelCase(key)` | the camelCase key mapping |
-| `createTransactionalSql(dialect, client, driver, options?)` | the dialect's `sql` bound to a driver's client, with `sql.transaction(fn)`; the PostgreSQL adapters pass `postgres` from `@typesql/core/postgres` |
+| `mapRows(q, rows)` | applies the query's output plugins to driver rows, for code that runs `q.text` itself |
+| `pluginsOf(q)` | returns the query's immutable plugin list |
+| `createTransactionalSql(dialect, client, driver, depth?)` | the dialect's `sql` bound to a driver's client, with `sql.transaction(fn)`; the PostgreSQL adapters pass `postgres` from `@typesql/core/postgres` |
 | `SqlDriver<C>` | how a driver runs statements and transactions on its client `C` |
 | `runTransaction(run, fn, options?)` | `BEGIN` / `COMMIT` / `ROLLBACK` (or a savepoint) around `fn`, for drivers without a transaction API |
 | `JsonParam<T>` | the runtime value `sql.json()` binds: `{ value }` with `toPostgres()`, `toJSON()`, `toString()` |
@@ -185,9 +184,11 @@ What adapters and custom executors build on.
 | Type | Meaning |
 |---|---|
 | `Query<Row, Params, Text>` | the runtime query object, with phantom types and `execute*` methods |
-| `Sql<DB, TM, Keys = "preserve">` | the `sql` function; `Keys` is the `rowKeys` option |
-| `TransactionalSql<DB, TM, Keys = "preserve">` | an adapter's `sql`: `Sql` plus `transaction(fn)` |
-| `SqlOptions`, `RowKeys` | `createSql`'s options; `"preserve" \| "camelCase"` |
+| `Sql<DB, TM, Plugins = []>` | the `sql` function with its ordered plugin tuple |
+| `TransactionalSql<DB, TM, Plugins = []>` | an adapter's `sql`: `Sql` plus `transaction(fn)` |
+| `SqlPlugin`, `PluginTypes`, `IdentityPluginTypes`, `InputContext` | runtime hooks and type functions for custom plugins |
+| `PluginInput`, `PluginEncoded`, `PluginOutput` | apply a plugin tuple to a type |
+| `CasePlugin` | camelCase row/write keys and snake_case database write keys |
 | `Executor` | what `execute*` runs on |
 | `ExecutorResult` | `{ rows, rowCount: number \| null }` |
 | `NoResultError` | thrown by `executeTakeFirstOrThrow` on 0 rows; carries `text` |
@@ -215,7 +216,7 @@ What adapters and custom executors build on.
 
 ### `@typesql/core/postgres/engine`
 
-The engine's other types are exported from `@typesql/core/postgres/engine`, so that a declaration file can name them: the markers `sql.param()` and `sql.json()` return, the representative texts of `sql.combine`, `sql.set` and `sql.values`, `Analyze` and `Analysis`, `ArgsOf`, `CamelCaseKeys`, the lexer and parser types, and so on. They change with the engine and are not a stable API.
+The engine's other types are exported from `@typesql/core/postgres/engine`, so that a declaration file can name them: the markers `sql.param()` and `sql.json()` return, the representative texts of `sql.combine`, `sql.set` and `sql.values`, `Analyze` and `Analysis`, `ArgsOf`, the lexer and parser types, and so on. They change with the engine and are not a stable API.
 
 ## Schema types
 
@@ -319,7 +320,7 @@ Each package wraps core's `createSql` with the schema converted from the ORM's t
 
 | Package | `createSql` | Schema type | Runs queries |
 |---|---|---|---|
-| `@typesql/kysely` | `createSql(postgres, db, { rowKeys? })` with `DB` from `Kysely<DB>`, or `createSql<DB, TM = DefaultTypeMap, Overrides = {}, Options = {}>(postgres, db?, { rowKeys? })` | `FromKysely<DB, Overrides, Options>`; with `sqlite`, `FromKyselySqlite` | on a `Kysely` or `Transaction`, plugins bypassed |
+| `@typesql/kysely` | `createSql(postgres, db)` with `DB` from `Kysely<DB>`, or `createSql<DB, TM = DefaultTypeMap, Overrides = {}, Options = {}>(postgres, db?)` | `FromKysely<DB, Overrides, Options>`; with `sqlite`, `FromKyselySqlite` | on a `Kysely` or `Transaction`, plugins bypassed |
 | `@typesql/drizzle` | `createSql(postgres, db)` with the schema from `db`, or `createSql<Schema, TM = DefaultTypeMap, Options = {}>(postgres, db?)` | `FromDrizzle<Schema, Options>`; `pgType(column, "type")` pins a column. With `sqlite`, `FromDrizzleSqlite` and `sqliteType` | PostgreSQL: on the driver client under a node-postgres or postgres.js Drizzle database. SQLite: on the Drizzle database (`db.all` / `db.run`), any driver |
 | `@typesql/prisma` | `createSql(postgres, prisma)` with the client's `Prisma.TypeMap`, or `createSql<S, TM = PrismaTypeMap>(postgres, prisma?)`; `S` is a generated `DB` or a `Prisma.TypeMap` | `FromPrisma<Prisma.TypeMap, Overrides>`; with `sqlite`, `FromPrismaSqlite` and `PrismaSqliteTypeMap`; the `typesql-prisma` generator | `$queryRawUnsafe` / `$executeRawUnsafe` on Prisma Client |
 

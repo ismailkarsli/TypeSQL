@@ -2,8 +2,8 @@ import type { CheckCarried } from "../engine/carried.js";
 import type { EngineTypes } from "../engine/contract.js";
 import type { ArgsOf, ParamsOf, RowOf, Validate } from "../engine/infer.js";
 import type { AnyErr, SqlError } from "../errors.js";
+import type { PluginInput, PluginOutput, SqlPlugin } from "../plugin.js";
 import type { Query } from "../query.js";
-import type { KeyedRow, RowKeys } from "../row-keys.js";
 import type { HasDefaultable, Skip, WithDefaults } from "./inline.js";
 import type { NamedParams } from "./named.js";
 import type { SlotCarried, SlotTexts } from "./slots.js";
@@ -224,12 +224,19 @@ export type CallRet<
 	E extends EngineTypes,
 	DB,
 	TM,
-	Keys extends RowKeys,
 	Q extends string,
+	Plugins extends readonly SqlPlugin[] = [],
 > = [Q] extends [infer Q extends string]
 	? Query<
-			KeyedRow<RowOf<E, DB, TM, PText<Q>>, Keys>,
-			ParamsOf<E, DB, TM, PText<Q>>,
+			PluginOutput<RowOf<E, DB, TM, PText<Q>>, Plugins>,
+			Extract<
+				PluginInput<
+					ParamsOf<E, DB, TM, PText<Q>>,
+					Plugins,
+					{ readonly kind: "parameters"; readonly query: string }
+				>,
+				readonly unknown[]
+			>,
 			PText<Q>
 		>
 	: never;

@@ -14,6 +14,19 @@ export {
 	runMigrations,
 	type SchemaOf,
 } from "./migrations.js";
+export type {
+	IdentityPluginTypes,
+	InputContext,
+	PluginEncoded,
+	PluginInput,
+	PluginOutput,
+	PluginTypes,
+	SqlPlugin,
+} from "./plugin.js";
+export {
+	CasePlugin,
+	type CasePluginTypes,
+} from "./plugins/case.js";
 export {
 	type CARRIED,
 	type Executor,
@@ -23,21 +36,14 @@ export {
 	NoResultError,
 	type PARAMS,
 	type ParamsType,
+	pluginsOf,
 	type Query,
 	type ROW,
 	type RowType,
-	rowKeysOf,
 	type TEXT,
 	type TextType,
 } from "./query.js";
-export {
-	type CamelCase,
-	type CamelCaseKeys,
-	camelCase,
-	type KeyedRow,
-	type RowKeys,
-	type SqlOptions,
-} from "./row-keys.js";
+
 export type {
 	Arr,
 	Col,

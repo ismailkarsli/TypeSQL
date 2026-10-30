@@ -33,7 +33,7 @@ Values are bound as the driver expects: `sql.json(value)` as JSON text, `true` /
 
 The `execute*` methods work as with every adapter. `executeCount()` returns the number of changed rows for `INSERT`, `UPDATE` and `DELETE`, or the number of rows for statements that return rows.
 
-Pass `{ rowKeys: "camelCase" }` as the second argument for [camelCase row keys](../guide/queries#camelcase-row-keys).
+Attach `.withPlugin(new CasePlugin())` (imported from `@typesql/core`) for [camelCase row keys](../guide/queries#camelcase-row-keys).
 
 ## Integers as `bigint`
 

@@ -37,7 +37,7 @@ export interface MigrationContext<
 	<const Q extends string>(
 		query: GateCallCheck<E, DB, TM, Q> & Q,
 		...params: BoxCallArgs<E, DB, TM, Q>
-	): CallRet<E, DB, TM, "preserve", Q>;
+	): CallRet<E, DB, TM, Q>;
 	<const Q extends string, const S extends SlotMap>(
 		query: GateSlottedCheck<E, DB, TM, Q, S> & Q,
 		slots: S & SlotsFor<Q, S>,
@@ -78,10 +78,11 @@ export function createMigrationContext(
 	dialect: "postgres" | "sqlite",
 	execute: Executor,
 ): PostgresMigration | SqliteMigration {
-	const sql =
-		dialect === "postgres"
-			? createDialectSql(postgres, execute)
-			: createDialectSql(sqlite, execute);
+	// Avoid comparing the two recursive SQL APIs when choosing a runtime dialect.
+	let sql: object;
+	if (dialect === "postgres") sql = createDialectSql(postgres, execute);
+	else if (dialect === "sqlite") sql = createDialectSql(sqlite, execute);
+	else throw new Error(`typesql: unsupported migration dialect: ${dialect}`);
 	const next = async (statement: string) => {
 		await execute(statement, []);
 		return createMigrationContext(dialect, execute);

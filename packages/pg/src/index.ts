@@ -1,4 +1,4 @@
-import type { RowKeys, SqlOptions } from "@typesql/core";
+import type { SqlPlugin } from "@typesql/core";
 import { createTransactionalSql } from "@typesql/core/adapter";
 import {
 	type Postgres,
@@ -20,28 +20,15 @@ export {
 } from "./client.js";
 export type { PgInterval, PgParamTypeMap, PgTypeMap } from "./type-map.js";
 
-export type PgSql<DB, Keys extends RowKeys = "preserve"> = TransactionalSql<
+export type PgSql<
 	DB,
-	PgTypeMap,
-	Keys
->;
+	Plugins extends readonly SqlPlugin[] = [],
+> = TransactionalSql<DB, PgTypeMap, Plugins>;
 
-export function createSql<DB>(
-	client: PgQueryable | undefined,
-	options: { readonly rowKeys: "camelCase" },
-): PgSql<DB, "camelCase">;
-export function createSql<DB>(
-	client?: PgQueryable,
-	options?: { readonly rowKeys?: "preserve" },
-): PgSql<DB>;
-export function createSql<DB>(
-	client?: PgQueryable,
-	options?: SqlOptions,
-): PgSql<DB, RowKeys> {
+export function createSql<DB>(client?: PgQueryable): PgSql<DB> {
 	return createTransactionalSql<Postgres, DB, PgTypeMap, PgQueryable>(
 		postgres,
 		client,
 		driver,
-		options,
 	);
 }

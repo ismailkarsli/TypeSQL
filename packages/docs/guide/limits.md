@@ -52,7 +52,7 @@ The schema does not tell identity `GENERATED ALWAYS` columns apart from other co
 - Editor hovers list a row's keys in alphabetical order, because TypeScript 7 orders the keys of computed object types. The rows the driver returns keep the `SELECT` order.
 - A whole-row reference (`to_json(t)`, `(t).*`) is nullable when all of the row's columns are, since that is how the outer side of a join looks. So a table whose columns are all nullable is typed as a nullable row, even when it is not joined.
 - Some results can't be known statically: rows of `FETCH` (the cursor is declared in another statement) and results of user-defined operators (`unknown`).
-- With [`rowKeys: "camelCase"`](./queries#camelcase-row-keys), two columns that map to the same key (`user_id` and `"userId"`) are typed as the union of both; at runtime the later one wins. Alias one of them to keep both.
+- With [`CasePlugin`](./queries#camelcase-row-keys), two columns that map to the same key (`user_id` and `"userId"`) are typed as the union of both; at runtime the later one wins. Alias one of them to keep both.
 - Some driver types differ from their row type at runtime, such as `numeric[]` under node-postgres. See [Type mapping](../reference/type-mapping#node-postgres).
 
 ## ORM schemas

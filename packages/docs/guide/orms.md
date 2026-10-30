@@ -171,7 +171,7 @@ const camel = createSql<
 camel("SELECT author_id, created_at FROM blog_posts WHERE id = $1", 1);
 ```
 
-For camelCase rows, as `CamelCasePlugin` would return them, also pass `{ rowKeys: "camelCase" }`. Only top-level keys are renamed, not keys inside JSON values. See [camelCase row keys](./queries#camelcase-row-keys).
+For camelCase rows, as `CamelCasePlugin` would return them, attach `.withPlugin(new CasePlugin())`, importing `CasePlugin` from `@typesql/core`. Only top-level keys are renamed, not keys inside JSON values. See [camelCase row keys](./queries#camelcase-row-keys).
 
 ```ts
 const camelRows = createSql<
@@ -179,11 +179,7 @@ const camelRows = createSql<
 	DefaultTypeMap,
 	{},
 	{ camelCase: true }
->(
-	postgres,
-	camelDb,
-	{ rowKeys: "camelCase" },
-);
+>(postgres, camelDb).withPlugin(new CasePlugin());
 const post = await camelRows(
 	"SELECT author_id, created_at FROM blog_posts WHERE id = $1",
 	1,

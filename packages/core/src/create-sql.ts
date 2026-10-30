@@ -1,7 +1,7 @@
 import type { Dialect, DialectTypes, SqlOf } from "./dialect.js";
+import { encodeInput, encodeParameters, type SqlPlugin } from "./plugin.js";
 import type { Executor } from "./query.js";
 import { makeFragment, makeQuery } from "./query.js";
-import type { RowKeys, SqlOptions } from "./row-keys.js";
 import { build, namedValues } from "./runtime/build.js";
 import { param, takeValue } from "./runtime/inline.js";
 import { json } from "./runtime/json.js";
@@ -17,15 +17,10 @@ import { buildSet, buildValues } from "./runtime/write.js";
 import type { SlotMap } from "./sql/slots.js";
 
 export interface CreateSql {
-	<T extends DialectTypes, DB, TM = T["typeMap"]>(
-		dialect: Dialect<T>,
-		executor: Executor | undefined,
-		options: SqlOptions & { readonly rowKeys: "camelCase" },
-	): SqlOf<T, DB, TM, "camelCase">;
+	// biome-ignore lint/style/useShorthandFunctionType: Dialects merge signatures into this interface.
 	<T extends DialectTypes, DB, TM = T["typeMap"]>(
 		dialect: Dialect<T>,
 		executor?: Executor,
-		options?: SqlOptions & { readonly rowKeys?: "preserve" },
 	): SqlOf<T, DB, TM>;
 }
 
@@ -34,14 +29,21 @@ export const createSql = createDialectSql as CreateSql;
 export function createDialectSql<T extends DialectTypes, DB, TM = T["typeMap"]>(
 	dialect: Dialect<T>,
 	executor?: Executor,
-	options?: SqlOptions,
-): SqlOf<T, DB, TM, RowKeys> {
-	const rowKeys = options?.rowKeys ?? "preserve";
+	plugins: readonly SqlPlugin[] = [],
+): SqlOf<T, DB, TM> {
+	const pipeline = Object.freeze([...plugins]);
+	const buildInput =
+		plugins.length === 0
+			? build
+			: (query: string, rest: readonly unknown[]) =>
+					build(query, rest, (args) => encodeParameters(args, plugins, query));
 	const call = (query: string, ...rest: readonly unknown[]) => {
-		const { text, values } = build(query, rest);
-		return makeQuery(text, values, executor, rowKeys);
+		const { text, values } = buildInput(query, rest);
+		return makeQuery(text, values, executor, pipeline);
 	};
 	const api = Object.assign(call, {
+		withPlugin: (plugin: SqlPlugin) =>
+			createDialectSql(dialect, executor, [...plugins, plugin]),
 		prepare: (query: string, slots: SlotMap = {}) => {
 			const rn = rewriteNamed(query);
 			const count = maxParam(rn.text);
@@ -50,7 +52,11 @@ export function createDialectSql<T extends DialectTypes, DB, TM = T["typeMap"]>(
 			const compiled = splice(base.text, slots, base.values);
 			const fixed = compiled.values.slice(count);
 			const prepared = executor?.prepare?.(compiled.text) ?? executor;
-			return (...args: readonly unknown[]) => {
+			return (...input: readonly unknown[]) => {
+				const args =
+					plugins.length === 0
+						? input
+						: encodeParameters(input, plugins, query);
 				const values =
 					rn.names.length > 0
 						? namedValues(rn.names, args)
@@ -63,18 +69,22 @@ export function createDialectSql<T extends DialectTypes, DB, TM = T["typeMap"]>(
 					compiled.text,
 					[...values, ...fixed],
 					prepared,
-					rowKeys,
+					pipeline,
 				);
 			};
 		},
 		as: (query: string, ...rest: readonly unknown[]) => {
-			const { text, values } = build(query, rest);
-			return makeQuery(text, values, executor, rowKeys);
+			const { text, values } = buildInput(query, rest);
+			return makeQuery(text, values, executor, pipeline);
 		},
-		param,
+		param:
+			plugins.length === 0
+				? param
+				: (value: unknown) =>
+						param(encodeInput(value, plugins, { kind: "value" })),
 		json,
 		fragment: (text: string, ...rest: readonly unknown[]) => {
-			const r = build(text, rest);
+			const r = buildInput(text, rest);
 			return makeFragment(r.text, r.values);
 		},
 		id: (...parts: readonly string[]) => makeFragment(quoteIdent(...parts), []),
@@ -89,15 +99,29 @@ export function createDialectSql<T extends DialectTypes, DB, TM = T["typeMap"]>(
 			const r = joinFragments(items, options?.separator ?? ", ");
 			return makeFragment(r.text, r.values);
 		},
-		set: (_table: string, values: Readonly<Record<string, unknown>>) => {
-			const r = buildSet(values);
+		set: (table: string, values: Readonly<Record<string, unknown>>) => {
+			const r = buildSet(
+				encodeInput(values, pipeline, { kind: "set", table }) as Readonly<
+					Record<string, unknown>
+				>,
+			);
 			return makeFragment(r.text, r.values);
 		},
 		values: (
-			_table: string,
+			table: string,
 			rows: readonly Readonly<Record<string, unknown>>[],
 		) => {
-			const r = buildValues(rows, dialect.valuesDefault !== false);
+			const encoded =
+				pipeline.length === 0 || !Array.isArray(rows)
+					? rows
+					: rows.map(
+							(row) =>
+								encodeInput(row, pipeline, {
+									kind: "values",
+									table,
+								}) as Readonly<Record<string, unknown>>,
+						);
+			const r = buildValues(encoded, dialect.valuesDefault !== false);
 			return makeFragment(r.text, r.values);
 		},
 		raw: (text: string) => {
@@ -105,5 +129,5 @@ export function createDialectSql<T extends DialectTypes, DB, TM = T["typeMap"]>(
 			return makeFragment(r.text, r.values);
 		},
 	});
-	return api as unknown as SqlOf<T, DB, TM, RowKeys>;
+	return api as unknown as SqlOf<T, DB, TM>;
 }

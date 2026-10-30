@@ -1,4 +1,4 @@
-import type { RowKeys, SqlOptions } from "@typesql/core";
+import type { SqlPlugin } from "@typesql/core";
 import { createTransactionalSql } from "@typesql/core/adapter";
 import {
 	type BigIntTypeMap,
@@ -20,34 +20,25 @@ export {
 
 export type SqliteSql<
 	DB,
-	Keys extends RowKeys = "preserve",
 	TM = DefaultTypeMap,
-> = TransactionalSql<DB, TM, Keys>;
+	Plugins extends readonly SqlPlugin[] = [],
+> = TransactionalSql<DB, TM, Plugins>;
 
 export function createSql<DB>(
-	db: SqliteDatabase | undefined,
-	options: { readonly rowKeys: "camelCase"; readonly bigint: true },
-): SqliteSql<DB, "camelCase", BigIntTypeMap>;
+	client: SqliteDatabase | undefined,
+	options: { readonly bigint: true },
+): SqliteSql<DB, BigIntTypeMap>;
 export function createSql<DB>(
-	db: SqliteDatabase | undefined,
-	options: { readonly rowKeys?: "preserve"; readonly bigint: true },
-): SqliteSql<DB, "preserve", BigIntTypeMap>;
-export function createSql<DB>(
-	db: SqliteDatabase | undefined,
-	options: { readonly rowKeys: "camelCase"; readonly bigint?: false },
-): SqliteSql<DB, "camelCase">;
-export function createSql<DB>(
-	db?: SqliteDatabase,
-	options?: { readonly rowKeys?: "preserve"; readonly bigint?: false },
+	client?: SqliteDatabase,
+	options?: { readonly bigint?: false },
 ): SqliteSql<DB>;
 export function createSql<DB>(
-	db?: SqliteDatabase,
-	options?: SqlOptions & { readonly bigint?: boolean },
-): SqliteSql<DB, RowKeys, DefaultTypeMap | BigIntTypeMap> {
+	client?: SqliteDatabase,
+	options?: { readonly bigint?: boolean },
+): SqliteSql<DB, DefaultTypeMap | BigIntTypeMap> {
 	return createTransactionalSql<Sqlite, DB, DefaultTypeMap, SqliteDatabase>(
 		sqlite,
-		db,
+		client,
 		driver({ bigint: options?.bigint === true }),
-		options,
 	);
 }

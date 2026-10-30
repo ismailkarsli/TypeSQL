@@ -1,4 +1,4 @@
-import { applyRowKeys, type RowKeys } from "./row-keys.js";
+import { applyPlugins, type SqlPlugin } from "./plugin.js";
 
 export declare const ROW: unique symbol;
 export declare const PARAMS: unique symbol;
@@ -67,17 +67,17 @@ export type TextType<Q> = Q extends { readonly [TEXT]?: infer T extends string }
 	? T
 	: string;
 
-const ROW_KEYS = Symbol.for("typesql.rowKeys");
+const PLUGINS = Symbol.for("typesql.plugins");
 
 export function mapRows<Q extends { readonly text: string }>(
 	q: Q,
 	rows: readonly unknown[],
 ): RowType<Q>[] {
-	return applyRowKeys(rows, rowKeysOf(q)) as RowType<Q>[];
+	return applyPlugins(rows, pluginsOf(q)) as RowType<Q>[];
 }
 
-export function rowKeysOf(q: { readonly text: string }): RowKeys {
-	return (q as { readonly [ROW_KEYS]?: RowKeys })[ROW_KEYS] ?? "preserve";
+export function pluginsOf(q: { readonly text: string }): readonly SqlPlugin[] {
+	return (q as { readonly [PLUGINS]?: readonly SqlPlugin[] })[PLUGINS] ?? [];
 }
 
 const SLOTTABLES = new WeakSet<object>();
@@ -94,7 +94,7 @@ export function makeQuery<
 	text: string,
 	values: readonly unknown[],
 	executor: Executor | undefined,
-	rowKeys: RowKeys,
+	plugins: readonly SqlPlugin[] = [],
 ): Query<Row, Params, Text> {
 	const pick = (given?: Executor): Executor => {
 		const exec = given ?? executor;
@@ -106,10 +106,13 @@ export function makeQuery<
 	};
 	const execute = async (given?: Executor): Promise<unknown[]> => {
 		const result = await pick(given)(text, values);
-		return applyRowKeys(isRows(result) ? result : result.rows, rowKeys);
+		return applyPlugins(isRows(result) ? result : result.rows, plugins);
 	};
 	const query = { text, values };
-	Object.defineProperty(query, ROW_KEYS, { value: rowKeys });
+	if (plugins.length > 0)
+		Object.defineProperty(query, PLUGINS, {
+			value: plugins,
+		});
 	Object.defineProperty(query, "execute", { value: execute });
 	Object.defineProperty(query, "executeCount", {
 		value: async (given?: Executor) => {

@@ -17,7 +17,7 @@ Core separates what every dialect shares from the dialects under `postgres/` and
 | `engine/` | Engine pieces every dialect shares. `contract.ts` is `EngineTypes`, the type-level contract a dialect's engine implements: one small interface per operation (analysis, tokens, row and parameter mapping, type display), applied as `(E["analysis"] & { db; q })["out"]`. `infer.ts` builds `RowOf`, `ParamsOf`, `ArgsOf` and `Validate` on it, `carried.ts` checks inline and spliced values, `write.ts` types `sql.set` and `sql.values`. The rest are shared building blocks: tokens and character classes, parser combinators (`parse.ts`), scopes and columns (`types.ts`), parameter maps (`params.ts`), `WHERE`-based nullability narrowing (`narrow.ts`) and schema rebuilding (`object.ts`). |
 | `runtime/` | Runtime parameter encoding, statement building, splicing, JSON, and writes. `build.ts` applies named parameters, inline parameters, then slots in that order. |
 | `schema.ts` | The schema markers (`Col`, `View`, …) and the `ColumnTypes` registry a dialect augments with its type names. |
-| `query.ts`, `transaction.ts`, `migrations.ts`, `row-keys.ts` | Query execution, transaction and migration APIs, and row-key mapping. |
+| `query.ts`, `transaction.ts`, `migrations.ts`, `plugin.ts`, `plugins/case.ts` | Query execution, transaction and migration APIs, and typed input/output plugins. |
 | `postgres/dialect.ts` | The `postgres` dialect. |
 | `postgres/sql/`, `postgres/engine/engine.ts` | PostgreSQL's `Sql` (the shared `SqlApi` bound to `PgEngine`) and the `PgEngine` binding of the engine contract. |
 | `postgres/schema/`, `postgres/type-map/` | PostgreSQL schema types (`Json`, `PgCatalog`, functions) and PostgreSQL-to-TypeScript type mappings. |

@@ -70,7 +70,7 @@ Use `sql.as<Row>(text, …)`. It skips inference and takes the row type you give
 const page = sql.as<{ id: number; email: string }>("FETCH 10 FROM user_cursor");
 ```
 
-Use it for SQL that TypeSQL does not support or cannot type (here, a `FETCH` from a cursor declared in another statement), and for SQL it cannot see at compile time ([dynamic SQL](./dynamic-sql)). It accepts slots, `:name` and inline parameters, like `sql()`. With `rowKeys: "camelCase"`, write the row with camelCase keys.
+Use it for SQL that TypeSQL does not support or cannot type (here, a `FETCH` from a cursor declared in another statement), and for SQL it cannot see at compile time ([dynamic SQL](./dynamic-sql)). It accepts slots, `:name` and inline parameters, like `sql()`. With `CasePlugin`, write the row with camelCase keys.
 
 Unsupported syntax is always a compile error, never a silent `any`. See [Limits](./limits).
 

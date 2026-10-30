@@ -1,4 +1,4 @@
-import { createSql, type Fragment } from "@typesql/core";
+import { CasePlugin, createSql, type Fragment } from "@typesql/core";
 import {
 	type Col,
 	type Generated,
@@ -990,9 +990,9 @@ interface TypeMap
 	timestamp: string;
 	timestamptz: string;
 }
-const sql = createSql<DB & PgCatalog, TypeMap>(postgres, undefined, {
-	rowKeys: "camelCase",
-});
+const sql = createSql<DB & PgCatalog, TypeMap>(postgres).withPlugin(
+	new CasePlugin(),
+);
 
 declare const input0: string;
 
@@ -1007,39 +1007,39 @@ declare const input11: { horal: string; leech: boolean }[];
 declare const input12: {
 	lie: string | undefined;
 	linn: string | undefined;
-	empress_ae: string | undefined;
+	empressAe: string | undefined;
 	sublingual: boolean | undefined;
 	communion: boolean | undefined;
 	parkland: boolean | undefined;
 	fumy: boolean | undefined;
 	"whinier:sting": boolean | null | undefined;
 	"aequorin:sting": boolean | null | undefined;
-	chachka_sublingual_kamik: number | undefined;
-	chachka_scurvinesses_kamik: number | undefined;
-	damson_communion_kamik: number | undefined;
+	chachkaSublingualKamik: number | undefined;
+	chachkaScurvinessesKamik: number | undefined;
+	damsonCommunionKamik: number | undefined;
 	trilith: "\0PJ[s]\0" | undefined;
 	blacktops: "\0PJ[s]\0" | undefined;
-	rainily_irrevocably: boolean | undefined;
-	balls_ates_irrevocably: boolean | undefined;
-	refolded_flue_misnomers_wood: number | undefined;
-	fid_dreich: "\0PJ[s]\0" | undefined;
-	factorized_thrum: boolean | undefined;
-	factorized_zither: boolean | undefined;
-	factorized_tommy: boolean | undefined;
-	factorized_propionates: boolean | undefined;
-	sigla_lumina_outfishes: boolean | undefined;
-	sigla_peises_sennit: boolean | undefined;
-	sigla_poured_sennit: boolean | undefined;
-	sigla_sauces_sigla: boolean | undefined;
-	sigla_frijol_settee_outfishes: boolean | undefined;
-	sigla_unfixt_settee_outfishes: boolean | undefined;
-	sigla_bibliophily_sigla: boolean | undefined;
-	sigla_cornifies_outfishes: boolean | undefined;
-	sigla_lightsome_sennit: boolean | undefined;
-	sigla_insoles_settee_outfishes: boolean | undefined;
-	ates_aortas: boolean | undefined;
-	parkland_reprography: "\0PJ0[o]\0" | undefined;
-	talcked_emetin: "\0PJ[o]\0" | undefined;
+	rainilyIrrevocably: boolean | undefined;
+	ballsAtesIrrevocably: boolean | undefined;
+	refoldedFlueMisnomersWood: number | undefined;
+	fidDreich: "\0PJ[s]\0" | undefined;
+	factorizedThrum: boolean | undefined;
+	factorizedZither: boolean | undefined;
+	factorizedTommy: boolean | undefined;
+	factorizedPropionates: boolean | undefined;
+	siglaLuminaOutfishes: boolean | undefined;
+	siglaPeisesSennit: boolean | undefined;
+	siglaPouredSennit: boolean | undefined;
+	siglaSaucesSigla: boolean | undefined;
+	siglaFrijolSetteeOutfishes: boolean | undefined;
+	siglaUnfixtSetteeOutfishes: boolean | undefined;
+	siglaBibliophilySigla: boolean | undefined;
+	siglaCornifiesOutfishes: boolean | undefined;
+	siglaLightsomeSennit: boolean | undefined;
+	siglaInsolesSetteeOutfishes: boolean | undefined;
+	atesAortas: boolean | undefined;
+	parklandReprography: "\0PJ0[o]\0" | undefined;
+	talckedEmetin: "\0PJ[o]\0" | undefined;
 };
 declare const input13: string | undefined;
 
@@ -1132,34 +1132,34 @@ declare const input39: {
 		| "4fiar"
 		| "5erg";
 	sniffle: number | null;
-	brittanias_jehu: string;
-	staggarts_murrha: number;
-	floaty_solon: number;
-	steamboat_linocuts: number;
+	brittaniasJehu: string;
+	staggartsMurrha: number;
+	floatySolon: number;
+	steamboatLinocuts: number;
 	hut: number;
-	maya_drogue: number;
-	maya_drogue_oil: number;
-	maya_drogue_pluvial_mujik: number;
-	fish_loid: number;
-	fish_loid_oil: number;
-	fish_loid_pluvial_mujik: number;
-	emes_solon: number;
-	emes_solon_jehu: string;
+	mayaDrogue: number;
+	mayaDrogueOil: number;
+	mayaDroguePluvialMujik: number;
+	fishLoid: number;
+	fishLoidOil: number;
+	fishLoidPluvialMujik: number;
+	emesSolon: number;
+	emesSolonJehu: string;
 }[];
 
 declare const input41: {
 	ad: string;
-	regionalism_ad: string;
+	regionalismAd: string;
 	cytons: string;
 	steamy: "beadwork" | "disrobing" | "brut" | "telexes";
 	twines: number;
 	jehu: string | null;
 	unipod: number | null;
 	solon: number | null;
-	alkalise_rocs_jehu: string | null;
-	alkalise_rocs_yang: string | null;
-	alkalise_rocs_ar: string | null;
-	alkalise_rocs_rocs: number | null;
+	alkaliseRocsJehu: string | null;
+	alkaliseRocsYang: string | null;
+	alkaliseRocsAr: string | null;
+	alkaliseRocsRocs: number | null;
 }[];
 
 declare const input43: "tipScurvinesses" | "palatalizesMonocoques";
@@ -1293,33 +1293,33 @@ declare const input70: {
 declare const input71: {
 	birred: "\0PJ[s]\0" | undefined;
 	phonal: boolean | undefined;
-	floaty_lungan: number | null | undefined;
-	floaty_baal: number | null | undefined;
-	baal_carjacks: number | null | undefined;
-	zootomic_leers: boolean | undefined;
+	floatyLungan: number | null | undefined;
+	floatyBaal: number | null | undefined;
+	baalCarjacks: number | null | undefined;
+	zootomicLeers: boolean | undefined;
 	tommy: boolean | undefined;
-	al_tommy: boolean | undefined;
+	alTommy: boolean | undefined;
 	zither: boolean | undefined;
-	zither_forts: "\0PJ[o]\0" | undefined;
+	zitherForts: "\0PJ[o]\0" | undefined;
 	thrum: boolean | undefined;
-	thrum_forts: "\0PJ[o]\0" | undefined;
+	thrumForts: "\0PJ[o]\0" | undefined;
 	propionates: boolean | undefined;
-	propionates_donna: number | undefined;
-	ates_aortas: string | undefined;
+	propionatesDonna: number | undefined;
+	atesAortas: string | undefined;
 	convoker: "\0PJo\0" | undefined;
 };
 declare const input72: {
 	lampases: boolean | undefined;
-	lampases_donna: number | undefined;
+	lampasesDonna: number | undefined;
 	intensify: boolean | undefined;
-	intensify_donna: number | undefined;
+	intensifyDonna: number | undefined;
 	pride: boolean | undefined;
-	pride_donna: number | undefined;
+	prideDonna: number | undefined;
 	heap: boolean | undefined;
-	heap_donna: number | undefined;
+	heapDonna: number | undefined;
 	emulations: boolean | undefined;
-	emulations_donna: number | undefined;
-	emulations_bobstay: "\0PJ[s]\0" | undefined;
+	emulationsDonna: number | undefined;
+	emulationsBobstay: "\0PJ[s]\0" | undefined;
 };
 
 declare const input76:
@@ -1335,14 +1335,14 @@ declare const input76:
 	| "frijol_settee_outfishes";
 declare const input77: {
 	ad: string;
-	communion_lairs_ad: string;
+	communionLairsAd: string;
 	cytons: string;
 	unipod: number;
 	veld: number;
 	eupnoea: number;
 	solon: number;
-	solon_chromatin: number;
-	solon_figured_ae: string;
+	solonChromatin: number;
+	solonFiguredAe: string;
 }[];
 declare const input78: {
 	jerk: string;
@@ -1373,11 +1373,11 @@ declare const input79: 100;
 declare const input80: `%${string}%`;
 
 declare const input87: {
-	osmous_ad: string;
+	osmousAd: string;
 	cytons: string;
 	zither: number;
 	solon: number | null | undefined;
-	solon_jehu: string | null | undefined;
+	solonJehu: string | null | undefined;
 }[];
 declare const input88: { aortas: string; bobstay: string[]; burrSolon: true };
 declare const input89: (
@@ -1517,13 +1517,13 @@ declare const input100: { flue_ad: string; pleach: string | null };
 declare const input103: "alcyonarians";
 declare const input104: "patagia";
 declare const input105: {
-	creds_ad: string;
+	credsAd: string;
 	jerk: string;
 	liaised: "\0PJo\0";
 }[];
 declare const input106: {
-	edema_aria_lob_ad: string;
-	gas_ad: string;
+	edemaAriaLobAd: string;
+	gasAd: string;
 	capelet: string;
 	upticks: string | null;
 	zither: number;
@@ -1549,8 +1549,8 @@ declare const input109:
 	| "moderner.unfreeze"
 	| "moderner.sloes-outswims";
 declare const input110: {
-	edema_aria_linn_ad: string;
-	edema_gas_ad: string;
+	edemaAriaLinnAd: string;
+	edemaGasAd: string;
 	mural: "doe" | "trug" | "cigs";
 	strut: number | null;
 	z: number | null;
@@ -1591,17 +1591,17 @@ declare const input115: {
 	cytons: string;
 	jehu: string;
 	solon: number;
-	johnnies_outby: number | null;
+	johnniesOutby: number | null;
 	puri: number | null;
 	wows: number | null;
 	pax: number | null;
 	cooeed: number | null;
 	skeining: number | null;
-	septical_culches: number | null;
-	saiga_wows: number | null;
-	saiga_pax: number | null;
-	saiga_cooeed: number | null;
-	saiga_skeining: number | null;
+	septicalCulches: number | null;
+	saigaWows: number | null;
+	saigaPax: number | null;
+	saigaCooeed: number | null;
+	saigaSkeining: number | null;
 }[];
 declare const input116: ("sib" | "tar" | "rainily")[];
 declare const input117: Date[];
@@ -1612,25 +1612,25 @@ declare const input121: { ad: string; bench3: string | null; linn: string }[];
 declare const input122: {
 	ad: string;
 	linn: { ba: string; ay: string };
-	imbedded_ad: string | null;
+	imbeddedAd: string | null;
 	stupider: "SIB" | "Settee" | "Rainily" | "RainilyOnery";
-	bondage_ad: string | null;
+	bondageAd: string | null;
 	ondogram: string | null;
-	puri_jehu: string | null;
-	outby_jehu: string | null;
+	puriJehu: string | null;
+	outbyJehu: string | null;
 }[];
 declare const input123: {
 	ad: string;
 	linn: { ba: string; ay: string };
 	stupider: "SIB" | "Settee" | "Rainily" | "RainilyOnery";
-	imbedded_ad: string | null;
+	imbeddedAd: string | null;
 }[];
 declare const input124: {
 	ad: string;
 	linn: { ba: string; ay: string };
 	stupider: "SIB" | "Settee" | "Rainily" | "RainilyOnery";
-	imbedded_ad: string | null;
-	ragman_ad: string | null;
+	imbeddedAd: string | null;
+	ragmanAd: string | null;
 }[];
 declare const input125: [] | ["Rainily"] | ["Rainily", "RainilyOnery"];
 declare const input126: {
@@ -1646,18 +1646,18 @@ declare const input126: {
 		| "dazing"
 		| "pimps"
 		| "grosses";
-	alkalise_ad: string | null;
+	alkaliseAd: string | null;
 	outtells: string | null;
-	bondage_ad: string | null;
+	bondageAd: string | null;
 	stupider: "SIB" | "Settee" | "Rainily" | "RainilyOnery";
-	imbedded_cytons: string;
+	imbeddedCytons: string;
 	deutzia: boolean;
 }[];
 declare const input127: {
 	ad: string;
 	linn: string;
-	bondage_ad: string | null;
-	banked_cytons: string;
+	bondageAd: string | null;
+	bankedCytons: string;
 }[];
 
 declare const input129: {
@@ -2060,13 +2060,13 @@ export const query18 = sql.json(input11);
 
 export const query19 = sql("INSERT INTO broo {shacko} RETURNING *", {
 	shacko: sql.values("broo", [
-		{ ...input12, lie: input0, linn: input0, figured_ae: input13 },
+		{ ...input12, lie: input0, linn: input0, figuredAe: input13 },
 	]),
 });
 
 export const query20 = sql(
 	`UPDATE broo SET {gae} WHERE lie = ${sql.param(input0)}`,
-	{ gae: sql.set("broo", { ...input12, figured_ae: input9 }) },
+	{ gae: sql.set("broo", { ...input12, figuredAe: input9 }) },
 );
 
 export const query21 = sql(`DELETE FROM broo WHERE lie = ${sql.param(input0)}`);
@@ -2709,40 +2709,40 @@ export const query156 = sql(
 				ad: input0,
 				birred: sql.json(input8),
 				phonal: input48,
-				floaty_lungan: input49,
-				floaty_baal: input49,
-				baal_carjacks: input49,
-				zootomic_leers: input48,
+				floatyLungan: input49,
+				floatyBaal: input49,
+				baalCarjacks: input49,
+				zootomicLeers: input48,
 				tommy: input48,
-				al_tommy: input48,
+				alTommy: input48,
 				zither: input48,
-				zither_forts: input50,
+				zitherForts: input50,
 				thrum: input48,
-				thrum_forts: input50,
+				thrumForts: input50,
 				propionates: input48,
-				propionates_donna: input51,
-				ates_aortas: input13,
+				propionatesDonna: input51,
+				atesAortas: input13,
 				convoker: sql.json(input52),
 			},
 		]),
 		scurvinesses: sql.values("scurvinesses", [
 			{
-				gelandesprung_ad: input0,
-				flue_ad: input0,
-				communion_ad: input17,
+				gelandesprungAd: input0,
+				flueAd: input0,
+				communionAd: input17,
 				steamy: input53,
-				fleas_jerk: input54,
-				ere_jerk: input54,
+				fleasJerk: input54,
+				ereJerk: input54,
 				outtells: input54,
-				continua_sigla: input55,
-				continua_ae: input54,
-				roadeos_ae: input0,
-				bandsmen_ae: input54,
-				empress_ae: input13,
-				figured_ae: input13,
-				deutzia_ae: input54,
-				moderner_ae: input54,
-				venge_guying: sql.json(input56),
+				continuaSigla: input55,
+				continuaAe: input54,
+				roadeosAe: input0,
+				bandsmenAe: input54,
+				empressAe: input13,
+				figuredAe: input13,
+				deutziaAe: input54,
+				modernerAe: input54,
+				vengeGuying: sql.json(input56),
 				gimpiest: sql.json(input57),
 			},
 		]),
@@ -2837,19 +2837,19 @@ export const query167 = sql("INSERT INTO gelandesprung {shacko} RETURNING *", {
 		{
 			birred: sql.json(input8),
 			phonal: input48,
-			floaty_lungan: input49,
-			floaty_baal: input49,
-			baal_carjacks: input49,
-			zootomic_leers: input48,
+			floatyLungan: input49,
+			floatyBaal: input49,
+			baalCarjacks: input49,
+			zootomicLeers: input48,
 			tommy: input48,
-			al_tommy: input48,
+			alTommy: input48,
 			zither: input48,
-			zither_forts: input50,
+			zitherForts: input50,
 			thrum: input48,
-			thrum_forts: input50,
+			thrumForts: input50,
 			propionates: input48,
-			propionates_donna: input51,
-			ates_aortas: input13,
+			propionatesDonna: input51,
+			atesAortas: input13,
 			convoker: sql.json(input52),
 		},
 	]),
@@ -2859,16 +2859,16 @@ export const query168 = sql("INSERT INTO strickles {shacko} RETURNING ad", {
 	shacko: sql.values("strickles", [
 		{
 			lampases: input48,
-			lampases_donna: input51,
+			lampasesDonna: input51,
 			intensify: input48,
-			intensify_donna: input51,
+			intensifyDonna: input51,
 			pride: input48,
-			pride_donna: input51,
+			prideDonna: input51,
 			heap: input48,
-			heap_donna: input51,
+			heapDonna: input51,
 			emulations: input48,
-			emulations_donna: input51,
-			emulations_bobstay: input68,
+			emulationsDonna: input51,
+			emulationsBobstay: input68,
 		},
 	]),
 });
@@ -2878,21 +2878,21 @@ export const query169 = sql("INSERT INTO communion {shacko} RETURNING ad", {
 		{
 			linn: input0,
 			tanking: input50,
-			venge_aortas: input49,
+			vengeAortas: input49,
 			outtells: input0,
-			chloric_backpacked: input18,
-			am_salably: input48,
-			apprising_bobstay: input68,
-			emes_palatalizes_monocoques_jerk: input0,
-			strickles_monocoques_unhailed: input48,
-			milkmen_red: input54,
-			empress_ae: input13,
-			figured_ae: input13,
-			deutzia_ae: input54,
-			ates_aortas: input54,
-			gelandesprung_ad: input0,
-			strickles_ad: input0,
-			flue_ad: input0,
+			chloricBackpacked: input18,
+			amSalably: input48,
+			apprisingBobstay: input68,
+			emesPalatalizesMonocoquesJerk: input0,
+			stricklesMonocoquesUnhailed: input48,
+			milkmenRed: input54,
+			empressAe: input13,
+			figuredAe: input13,
+			deutziaAe: input54,
+			atesAortas: input54,
+			gelandesprungAd: input0,
+			stricklesAd: input0,
+			flueAd: input0,
 		},
 	]),
 });
@@ -2920,11 +2920,11 @@ export const query176 = sql(
 	{
 		gae: sql.set("communion", {
 			linn: input13,
-			apprising_bobstay: input68,
+			apprisingBobstay: input68,
 			outtells: input13,
-			venge_aortas: input49,
-			ates_aortas: input54,
-			figured_ae: input0,
+			vengeAortas: input49,
+			atesAortas: input54,
+			figuredAe: input0,
 		}),
 	},
 );
@@ -3561,12 +3561,12 @@ export const query287 = sql(
 	{
 		gae: sql.set("scurvinesses", {
 			steamy: input53,
-			fleas_jerk: input54,
-			ere_jerk: input54,
-			empress_ae: input13,
-			roadeos_ae: input54,
-			bandsmen_ae: input54,
-			figured_ae: input0,
+			fleasJerk: input54,
+			ereJerk: input54,
+			empressAe: input13,
+			roadeosAe: input54,
+			bandsmenAe: input54,
+			figuredAe: input0,
 		}),
 	},
 );
@@ -3645,19 +3645,19 @@ export const query302 = sql("INSERT INTO gelandesprung {shacko} RETURNING ad", {
 		{
 			birred: sql.json(input8),
 			phonal: input48,
-			floaty_lungan: input49,
-			floaty_baal: input49,
-			baal_carjacks: input49,
-			zootomic_leers: input48,
+			floatyLungan: input49,
+			floatyBaal: input49,
+			baalCarjacks: input49,
+			zootomicLeers: input48,
 			tommy: input48,
-			al_tommy: input48,
+			alTommy: input48,
 			zither: input48,
-			zither_forts: input50,
+			zitherForts: input50,
 			thrum: input48,
-			thrum_forts: input50,
+			thrumForts: input50,
 			propionates: input48,
-			propionates_donna: input51,
-			ates_aortas: input0,
+			propionatesDonna: input51,
+			atesAortas: input0,
 			convoker: sql.json(input52),
 		},
 	]),
@@ -3672,13 +3672,13 @@ export const query303 = sql(
 				linn: input0,
 				outtells: input54,
 				saltine: input48,
-				venge_aortas: input49,
-				pride_donna: input49,
-				intensify_donna: input49,
+				vengeAortas: input49,
+				prideDonna: input49,
+				intensifyDonna: input49,
 				dreich: sql.json(input8),
 				grumpy: sql.json(input8),
 				cella: sql.json(input8),
-				gelandesprung_ad: input0,
+				gelandesprungAd: input0,
 			},
 		]),
 	},
@@ -3696,14 +3696,14 @@ export const query305 = sql(
 			linn: input13,
 			outtells: input54,
 			saltine: input48,
-			venge_aortas: input49,
-			pride_donna: input49,
-			intensify_donna: input49,
+			vengeAortas: input49,
+			prideDonna: input49,
+			intensifyDonna: input49,
 			dreich: input68,
 			grumpy: input68,
 			cella: input68,
-			gelandesprung_ad: input13,
-			figured_ae: input0,
+			gelandesprungAd: input13,
+			figuredAe: input0,
 		}),
 	},
 );

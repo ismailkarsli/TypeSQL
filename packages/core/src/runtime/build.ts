@@ -38,6 +38,7 @@ export function namedValues(
 export function build(
 	text: string,
 	rest: readonly unknown[],
+	transformParameters?: (args: readonly unknown[]) => readonly unknown[],
 ): { text: string; values: unknown[] } {
 	let slots: SlotMap | null = null;
 	let outer: readonly unknown[] = rest;
@@ -45,6 +46,7 @@ export function build(
 		slots = rest[0];
 		outer = rest.slice(1);
 	}
+	if (transformParameters) outer = transformParameters(outer);
 	let positional = text;
 	let values: unknown[] = outer.length === 0 ? [] : outer.map(takeValue);
 	if (text.includes(":") && NAMED_RE.test(text)) {

@@ -46,4 +46,4 @@ Yes. `@typesql/kysely`, `@typesql/drizzle` and `@typesql/prisma` take the schema
 
 ## Can I get camelCase row keys?
 
-Yes. Pass `{ rowKeys: "camelCase" }` to `createSql`. See [camelCase row keys](./queries#camelcase-row-keys).
+Yes. Use `createSql(...).withPlugin(new CasePlugin())`, importing `CasePlugin` from `@typesql/core`. See [camelCase row keys](./queries#camelcase-row-keys).

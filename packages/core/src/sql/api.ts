@@ -6,8 +6,13 @@ import type {
 	SetInput,
 	TableName,
 } from "../engine/write.js";
+import type {
+	PluginEncoded,
+	PluginInput,
+	PluginOutput,
+	SqlPlugin,
+} from "../plugin.js";
 import type { Fragment, Query } from "../query.js";
-import type { KeyedRow, RowKeys } from "../row-keys.js";
 import type {
 	BoxCallArgs,
 	BoxSlottedArgs,
@@ -31,36 +36,70 @@ import type { QuotedIdent, SpliceCarried, UnknownTuple } from "./splice.js";
 import type { PText } from "./text.js";
 import type { NoExtraKeys, SetRep, ValuesRep } from "./write.js";
 
+type Parameters<Input, P extends readonly SqlPlugin[]> = Extract<
+	PluginInput<
+		Input,
+		P,
+		{ readonly kind: "parameters"; readonly query: string }
+	>,
+	readonly unknown[]
+>;
+type EncodedParameters<Input, P extends readonly SqlPlugin[]> = Extract<
+	PluginEncoded<
+		Input,
+		P,
+		{ readonly kind: "parameters"; readonly query: string }
+	>,
+	readonly unknown[]
+>;
+type WriteInput<
+	Input,
+	P extends readonly SqlPlugin[],
+	Kind extends "set" | "values",
+	T extends string,
+> = PluginInput<Input, P, { readonly kind: Kind; readonly table: T }>;
+type WriteEncoded<
+	Input,
+	P extends readonly SqlPlugin[],
+	Kind extends "set" | "values",
+	T extends string,
+> = PluginEncoded<Input, P, { readonly kind: Kind; readonly table: T }>;
+
 export interface SqlApi<
 	E extends EngineTypes,
 	DB,
 	TM,
-	Keys extends RowKeys = "preserve",
+	Plugins extends readonly SqlPlugin[] = [],
 > {
+	withPlugin<const P extends SqlPlugin>(
+		plugin: P,
+	): SqlApi<E, DB, TM, [...Plugins, P]>;
 	<const Q extends string>(
 		query: GateCallCheck<E, DB, TM, Q> & Q,
-		...params: BoxCallArgs<E, DB, TM, Q>
-	): CallRet<E, DB, TM, Keys, Q>;
+		...params: Parameters<BoxCallArgs<E, DB, TM, Q>, Plugins>
+	): CallRet<E, DB, TM, Q, Plugins>;
 	prepare<const Q extends string>(
 		query: GateCallCheck<E, DB, TM, Q> & Q,
-	): (...params: BoxCallArgs<E, DB, TM, Q>) => CallRet<E, DB, TM, Keys, Q>;
+	): (
+		...params: Parameters<BoxCallArgs<E, DB, TM, Q>, Plugins>
+	) => CallRet<E, DB, TM, Q, Plugins>;
 	prepare<const Q extends string, const S extends SlotMap>(
 		query: GateSlottedCheck<E, DB, TM, Q, S> & Q,
 		slots: S & SlotsFor<Q, S>,
 	): (
-		...params: BoxSlottedArgs<E, DB, TM, Q, S>
+		...params: Parameters<BoxSlottedArgs<E, DB, TM, Q, S>, Plugins>
 	) => Query<
-		KeyedRow<RowOf<E, DB, TM, SplicedOr<Q, S>>, Keys>,
-		ParamsOf<E, DB, TM, SplicedOr<Q, S>>,
+		PluginOutput<RowOf<E, DB, TM, SplicedOr<Q, S>>, Plugins>,
+		Parameters<ParamsOf<E, DB, TM, SplicedOr<Q, S>>, Plugins>,
 		SplicedOr<Q, S>
 	>;
 	<const Q extends string, const S extends SlotMap>(
 		query: GateSlottedCheck<E, DB, TM, Q, S> & Q,
 		slots: S & SlotsFor<Q, S>,
-		...params: BoxSlottedArgs<E, DB, TM, Q, S>
+		...params: Parameters<BoxSlottedArgs<E, DB, TM, Q, S>, Plugins>
 	): Query<
-		KeyedRow<RowOf<E, DB, TM, SplicedOr<Q, S>>, Keys>,
-		ParamsOf<E, DB, TM, SplicedOr<Q, S>>,
+		PluginOutput<RowOf<E, DB, TM, SplicedOr<Q, S>>, Plugins>,
+		Parameters<ParamsOf<E, DB, TM, SplicedOr<Q, S>>, Plugins>,
 		SplicedOr<Q, S>
 	>;
 
@@ -74,14 +113,20 @@ export interface SqlApi<
 		...params: readonly unknown[]
 	): Query<Row, readonly unknown[]>;
 
-	param<const T>(value: T): InlineMarker<T>;
+	param<const T>(
+		value: T,
+	): InlineMarker<PluginEncoded<T, Plugins, { readonly kind: "value" }>>;
 
 	json<const T>(value: T): JsonMarker<T>;
 
 	fragment<const Text extends string, const A extends readonly unknown[]>(
 		text: GateFragCheck<Text, false> & Text,
-		...params: A & BoxFragArgs<Text>
-	): Fragment<PText<Text>, UnknownTuple<FragCount<Text>>, FragCarried<Text, A>>;
+		...params: A & Parameters<BoxFragArgs<Text>, Plugins>
+	): Fragment<
+		PText<Text>,
+		UnknownTuple<FragCount<Text>>,
+		FragCarried<Text, EncodedParameters<A, Plugins>>
+	>;
 	fragment<
 		const Text extends string,
 		const S extends SlotMap,
@@ -89,11 +134,14 @@ export interface SqlApi<
 	>(
 		text: GateFragCheck<Text, true> & Text,
 		slots: S & SlotsFor<Text, S>,
-		...params: A & BoxFragArgs<Text>
+		...params: A & Parameters<BoxFragArgs<Text>, Plugins>
 	): Fragment<
 		SplicedOr<Text, S>,
 		readonly unknown[],
-		[...FragCarried<Text, A>, ...SpliceCarried<PText<Text>, SlotCarried<S>>]
+		[
+			...FragCarried<Text, EncodedParameters<A, Plugins>>,
+			...SpliceCarried<PText<Text>, SlotCarried<S>>,
+		]
 	>;
 
 	id<const Parts extends readonly [string, ...string[]]>(
@@ -110,23 +158,37 @@ export interface SqlApi<
 		options?: { readonly separator?: Sep },
 	): CombineOf<Items, Sep>;
 
-	set<const T extends TableName<DB>, const P extends SetInput<E, DB, TM, T>>(
+	set<const T extends TableName<DB>, const P>(
 		table: T,
-		values: NoExtraKeys<P, SetInput<E, DB, TM, T>>,
-	): Fragment<SetRep<P>["text"], readonly unknown[], SetRep<P>["carried"]>;
+		values: P &
+			(P extends WriteInput<SetInput<E, DB, TM, T>, Plugins, "set", T>
+				? NoExtraKeys<P, WriteInput<SetInput<E, DB, TM, T>, Plugins, "set", T>>
+				: never),
+	): Fragment<
+		SetRep<WriteEncoded<P, Plugins, "set", T>>["text"],
+		readonly unknown[],
+		SetRep<WriteEncoded<P, Plugins, "set", T>>["carried"]
+	>;
 
-	values<
-		const T extends TableName<DB>,
-		const R extends readonly InsertInput<E, DB, TM, T>[],
-	>(
+	values<const T extends TableName<DB>, const R extends readonly unknown[]>(
 		table: T,
 		rows: R & {
-			readonly [I in keyof R]: NoExtraKeys<R[I], InsertInput<E, DB, TM, T>>;
+			readonly [I in keyof R]: R[I] extends WriteInput<
+				InsertInput<E, DB, TM, T>,
+				Plugins,
+				"values",
+				T
+			>
+				? NoExtraKeys<
+						R[I],
+						WriteInput<InsertInput<E, DB, TM, T>, Plugins, "values", T>
+					>
+				: never;
 		},
 	): Fragment<
-		ValuesRep<R[number]>["text"],
+		ValuesRep<WriteEncoded<R[number], Plugins, "values", T>>["text"],
 		readonly unknown[],
-		ValuesRep<R[number]>["carried"]
+		ValuesRep<WriteEncoded<R[number], Plugins, "values", T>>["carried"]
 	>;
 
 	raw(text: string): Fragment<string, [], []>;

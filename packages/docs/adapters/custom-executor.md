@@ -21,7 +21,7 @@ const result = await pool.query(q.text, [...q.values]);
 const rows = mapRows(q, result.rows);
 ```
 
-`mapRows(q, rows)`, from `@typesql/core/adapter`, types the driver's rows as the query's rows and applies its [`rowKeys`](../guide/queries#camelcase-row-keys) option. The `execute*` methods of such a query reject unless you pass them an executor, and so does `sql.transaction`.
+`mapRows(q, rows)`, from `@typesql/core/adapter`, types the driver's rows as the query's rows and applies its [output plugins](../guide/queries#plugins). The `execute*` methods of such a query reject unless you pass them an executor, and so does `sql.transaction`.
 
 ## Run on another client
 
@@ -89,11 +89,11 @@ const sqlLogged = createCoreSql<Postgres, DB, PgTypeMap>(postgres, logged);
 
 ## Change the rows
 
-The row types describe what the driver returns, and `execute*` returns the executor's rows as they are (apart from `rowKeys`). So an executor that reshapes rows, for example one that keeps Kysely plugins or post-processes values, makes the types wrong.
+The row types describe what the driver returns, and `execute*` returns the executor's rows as they are (before applying TypeSQL plugins). So an executor that reshapes rows, for example one that keeps Kysely plugins or post-processes values, makes the types wrong.
 
 Pick the narrowest fix:
 
-1. **camelCase keys.** Use `rowKeys: "camelCase"` and keep the executor plain. With Kysely, use `@typesql/kysely`'s `createSql(postgres, db, { rowKeys: "camelCase" })` or `executor(db)`, which bypass plugins, instead of an executor that runs `CamelCasePlugin`.
+1. **camelCase keys.** Use `.withPlugin(new CasePlugin())` and keep the executor plain. With Kysely, use `@typesql/kysely`'s `createSql(postgres, db).withPlugin(new CasePlugin())` or `executor(db)`, which bypass plugins, instead of an executor that runs `CamelCasePlugin`.
 2. **Different value types** from your driver's parsers (say, `timestamptz` parsed to a string). Use a [type map](../reference/type-mapping#custom-type-maps) that says so: `createSql<DB, MyTypeMap>(postgres, executor)`.
 3. **Anything else.** Keep the executor plain and transform the rows in a typed helper built on `RowType<Q>`:
 

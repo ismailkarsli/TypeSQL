@@ -115,3 +115,17 @@ The full guide is at **[typesql.karsli.net](https://typesql.karsli.net)**. It co
 ## License
 
 [MIT](LICENSE)
+
+Use `sql.withPlugin(new CasePlugin())` to accept camelCase write keys and return camelCase rows. Import `CasePlugin` from `@typesql/core`. The inferred input and output types follow the runtime conversion; JSON keys stay unchanged. SQL text and `sql.id()` use database identifiers. Use the original SQL instance for snake_case write objects.
+
+```ts
+import { CasePlugin } from "@typesql/core";
+
+const appSql = sql.withPlugin(new CasePlugin());
+const query = appSql("UPDATE users SET {changes} RETURNING display_name", {
+  changes: appSql.set("users", { displayName: "Ada" }),
+});
+// query.execute() returns rows with displayName.
+```
+
+`withPlugin()` returns a new SQL instance and preserves transactions. Custom plugins implement `SqlPlugin<Types>` with `transformInput(value, context)` and/or `transformOutput(row)`. Their `PluginTypes` describe the accepted input, encoded database input, and returned row using `this["value"]`. Inputs encode in reverse registration order; outputs transform in registration order. Positional and named arguments, prepared queries, write helpers, and `mapRows()` use the same pipeline. See [plugins](https://typesql.karsli.net/guide/queries#plugins) and the [custom plugin example](./examples/plugins.ts).

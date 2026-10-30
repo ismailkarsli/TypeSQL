@@ -2,9 +2,11 @@ import type { ValueEnc } from "./inline.js";
 import type { Next } from "./next.js";
 import type { QuotedIdent, UnionList } from "./splice.js";
 
-export type NoExtraKeys<P, Allowed> = P & {
-	readonly [K in Exclude<keyof P, keyof Allowed>]: never;
-};
+export type NoExtraKeys<P, Allowed> = Allowed extends unknown
+	? P & {
+			readonly [K in Exclude<keyof P, keyof Allowed>]: never;
+		}
+	: never;
 
 type KeysOf<R> = R extends unknown ? keyof R & string : never;
 type ValueAt<R, K extends string> = R extends unknown

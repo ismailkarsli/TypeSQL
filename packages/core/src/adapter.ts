@@ -1,5 +1,4 @@
-export { mapRows, rowKeysOf } from "./query.js";
-export { camelCase } from "./row-keys.js";
+export { mapRows, pluginsOf } from "./query.js";
 export { JsonParam } from "./runtime/json.js";
 export {
 	paramNumbers,

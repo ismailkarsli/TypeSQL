@@ -12,7 +12,7 @@ import { cpus } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { compileFunction } from "node:vm";
-import { createSql } from "@typesql/core";
+import { CasePlugin, createSql } from "@typesql/core";
 import {
 	isArrayTypeNode,
 	isCallExpression,
@@ -196,8 +196,8 @@ function loadWorkload(): Workload {
 		const code = stripTypeScriptTypes(executable);
 		const build = compileFunction(
 			`${code}\nreturn () => [${queries.map((q) => `${q}()`).join(",")}];`,
-			["createSql", "postgres"],
-		)(createSql, postgres) as Workload["build"];
+			["createSql", "postgres", "CasePlugin"],
+		)(createSql, postgres, CasePlugin) as Workload["build"];
 		return { statements: queries.length, build };
 	} finally {
 		lease.dispose();

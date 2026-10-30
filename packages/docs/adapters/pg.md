@@ -57,7 +57,7 @@ It takes a `Pool`, a `Client` or a `PoolClient`: anything with `query(text, valu
 | `q.executeTakeFirstOrThrow()` | `Promise<Row>`, or rejects with `NoResultError` when there is no row |
 | `q.executeCount()` | `Promise<number>`: the rows changed or returned, 0 for DDL |
 
-Pass `{ rowKeys: "camelCase" }` as the second argument for [camelCase row keys](../guide/queries#camelcase-row-keys). To run a query on another client, see [Custom executor](./custom-executor).
+Attach `.withPlugin(new CasePlugin())` (imported from `@typesql/core`) for [camelCase row keys](../guide/queries#camelcase-row-keys). To run a query on another client, see [Custom executor](./custom-executor).
 
 ## Transactions
 

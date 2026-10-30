@@ -89,7 +89,7 @@ An escape hatch that skips TypeSQL's compile-time type inference and explicitly 
 
 ### Parameters
 
-- `<Row>` (*type parameter*): The expected TypeScript type of the returned rows. When using `{ rowKeys: "camelCase" }`, write `Row` with camelCase property names.
+- `<Row>` (*type parameter*): The expected TypeScript type of the returned rows. When using `CasePlugin`, write `Row` with camelCase property names.
 - `query` (`string`): The SQL query string. Does not need to be a compile-time string literal.
 - `slots` (`Record<string, Fragment | Query>`, *optional*): An object mapping `{slotName}` tokens to fragments or subqueries.
 - `...params` (*optional*): Values passed as positional parameters or as a single named parameter object.

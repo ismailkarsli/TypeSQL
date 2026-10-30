@@ -63,10 +63,12 @@ When two columns have the same name, the last one wins. The drivers build their 
 
 ### camelCase row keys
 
-Pass `{ rowKeys: "camelCase" }` to `createSql` to get camelCase keys. The row types and the rows `execute*` returns both change. The SQL keeps the database's names.
+Attach `CasePlugin` to get camelCase row keys and write input keys. The inferred types and runtime values change together. SQL text and `sql.id()` keep the database's names.
 
 ```ts
-const camel = createSql<DB>(executor, { rowKeys: "camelCase" });
+import { CasePlugin } from "@typesql/core";
+
+const camel = createSql<DB>(executor).withPlugin(new CasePlugin());
 
 const rows = await camel(
 	"SELECT id, display_name, created_at, count(*) OVER () AS total_count FROM users",
@@ -86,12 +88,56 @@ The mapping is the default of Kysely's `CamelCasePlugin`: the first character st
 
 Things to know:
 
-- Only top-level keys are renamed. Keys inside `json` and `jsonb` values stay as stored.
+- Only top-level result and write-object keys are renamed. Named parameter names and keys inside `json` and `jsonb` values stay unchanged.
 - If two columns map to the same key (`user_id` and `"userId"`), the later one wins at runtime and the type is the union of both. Alias one of them to keep both.
 - `sql.as<Row>()` takes the row as returned, so give it camelCase keys.
 - `RowOf<DB, TM, Q>` still uses the database's names. `RowType<typeof q>` is the renamed row.
-- The adapters' `createSql(client, { rowKeys: "camelCase" })` take the option too, and `tx` inside `sql.transaction(fn)` keeps it.
+- All adapters support `.withPlugin(new CasePlugin())`, and transactions retain the plugins, including nested transactions.
+- `sql.set()` and `sql.values()` accept camelCase objects and encode conventional snake_case column names. Use the original SQL instance for snake_case write objects or quoted mixed-case database columns.
 - Turn off renaming in the driver, such as postgres.js' `transform: postgres.camel`. The types assume the driver returns the database's names. `@typesql/kysely` already bypasses Kysely plugins such as `CamelCasePlugin`.
+
+### Plugins
+
+`sql.withPlugin(plugin)` returns a new SQL instance; the original is unchanged. Plugins can change input and output structures and types. Register them in the order you want database rows transformed. Inputs travel through the inverse order: `sql.withPlugin(a).withPlugin(b)` decodes rows through `a` then `b`, and encodes application inputs through `b` then `a`.
+
+A plugin implements `SqlPlugin<Types>` from `@typesql/core`. Its optional runtime hooks are synchronous:
+
+- `transformInput(value, context)`: converts application input to database input. `context.kind` is `"set"` or `"values"` for each write object (`context.table` identifies the destination), `"parameters"` for the entire argument array (`context.query` is the original SQL), or `"value"` for `sql.param(value)`.
+- `transformOutput(row)`: converts one database row to the application result. It runs for `execute()`, `executeTakeFirst()`, `executeTakeFirstOrThrow()` and `mapRows()`. Counts and missing rows are unaffected.
+
+Parameter input includes positional arguments or a single named-parameter object. It excludes fragment slots. The encoded result must be an array; named SQL still expects a single object in that array. A write object's encoded result must be a column-value object. Fragments and write helpers encode their values when created; placing them in another query does not encode those values again. `sql.json()` remains an explicit JSON marker; plugins should leave markers and nested JSON intact unless their contract intentionally converts them.
+
+`Types` extends `PluginTypes` (or `IdentityPluginTypes` for identity defaults) and uses `this["value"]` and `this["context"]` to define three type functions:
+
+| Property | Direction |
+|---|---|
+| `input` | Expected database input → accepted application input |
+| `encoded` | Actual application input → actual database input |
+| `output` | Inferred database row → returned application row |
+
+Declare `readonly types?: Types` with `declare` in a class; it has no runtime value. Type functions must describe the runtime hooks accurately. For example, an output wrapper can be defined as:
+
+```ts
+import type { IdentityPluginTypes, SqlPlugin } from "@typesql/core";
+
+type Wrapped<T> = { data: T };
+interface WrappedTypes extends IdentityPluginTypes {
+  readonly output: Wrapped<this["value"]>;
+}
+class WrappedPlugin implements SqlPlugin<WrappedTypes> {
+  declare readonly types?: WrappedTypes;
+  transformOutput(row: unknown): unknown {
+    return { data: row };
+  }
+}
+
+const wrapped = camel.withPlugin(new WrappedPlugin());
+const row = await wrapped("SELECT display_name FROM users")
+  .executeTakeFirstOrThrow();
+// row.data.displayName is string | null.
+```
+
+For an example that transforms writes, parameter tuples and results together, see [`examples/plugins.ts`](https://github.com/ismailkarsli/TypeSQL/blob/main/packages/core/examples/plugins.ts). `sql.as<Row>()` continues to assert the **final** application row type. `RowType<typeof query>` reflects plugins; the engine's `RowOf` remains the database row type.
 
 ## Aggregates
 

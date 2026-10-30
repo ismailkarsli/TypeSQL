@@ -1,4 +1,4 @@
-import type { RowKeys, SqlOptions } from "@typesql/core";
+import type { SqlPlugin } from "@typesql/core";
 import { createTransactionalSql } from "@typesql/core/adapter";
 import {
 	type Postgres,
@@ -24,38 +24,26 @@ export type {
 
 export type PostgresJsSql<
 	DB,
-	Keys extends RowKeys = "preserve",
 	TM = PostgresJsTypeMap,
-> = TransactionalSql<DB, TM, Keys>;
-
-interface PostgresJsSqlOptions extends SqlOptions {
-	readonly bigint?: boolean;
-}
+	Plugins extends readonly SqlPlugin[] = [],
+> = TransactionalSql<DB, TM, Plugins>;
 
 export function createSql<DB>(
-	sql: PostgresJsQueryable | undefined,
-	options: { readonly rowKeys: "camelCase"; readonly bigint: true },
-): PostgresJsSql<DB, "camelCase", PostgresJsBigIntTypeMap>;
+	client: PostgresJsQueryable | undefined,
+	options: { readonly bigint: true },
+): PostgresJsSql<DB, PostgresJsBigIntTypeMap>;
 export function createSql<DB>(
-	sql: PostgresJsQueryable | undefined,
-	options: { readonly rowKeys?: "preserve"; readonly bigint: true },
-): PostgresJsSql<DB, "preserve", PostgresJsBigIntTypeMap>;
-export function createSql<DB>(
-	sql: PostgresJsQueryable | undefined,
-	options: { readonly rowKeys: "camelCase"; readonly bigint?: false },
-): PostgresJsSql<DB, "camelCase">;
-export function createSql<DB>(
-	sql?: PostgresJsQueryable,
-	options?: { readonly rowKeys?: "preserve"; readonly bigint?: false },
+	client?: PostgresJsQueryable,
+	options?: { readonly bigint?: false },
 ): PostgresJsSql<DB>;
 export function createSql<DB>(
-	sql?: PostgresJsQueryable,
-	options?: PostgresJsSqlOptions,
-): PostgresJsSql<DB, RowKeys, PostgresJsTypeMap | PostgresJsBigIntTypeMap> {
+	client?: PostgresJsQueryable,
+	_options?: { readonly bigint?: boolean },
+): PostgresJsSql<DB, PostgresJsTypeMap | PostgresJsBigIntTypeMap> {
 	return createTransactionalSql<
 		Postgres,
 		DB,
 		PostgresJsTypeMap,
 		PostgresJsQueryable
-	>(postgres, sql, driver, options);
+	>(postgres, client, driver);
 }
