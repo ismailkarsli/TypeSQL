@@ -12,9 +12,19 @@ When you hit a limit, [`sql.as<Row>()`](./errors#when-typesql-can-t-type-a-state
 
 ## Statement size
 
-- A statement can have up to 4096 tokens (a generated table in the [engine](./type-engine) sets this). The [benchmark](./performance#compile-time) checks statements up to 8 KB.
-- A chain of about 100 `||` or `+` operators hits TypeScript's depth limit. `AND` and `OR` chains are fine at 200+ terms, because the parser balances them.
-- In `migrations()`, keep one migration per `.add()`: one text is limited to about 4000 tokens.
+- The lexer handles up to 4096 tokens per statement (a generated table in the [engine](./type-engine) sets this), but some shapes hit TypeScript's own depth limits well before that. Measured with TypeScript 7.1 (tsrs gives the same results):
+
+  | Construct | Largest that compiles |
+  |---|---|
+  | `a \|\| a \|\| …`, `a + a + …` | about 85 terms |
+  | select list of `id + n AS cn` | about 300 columns (~1800 tokens) |
+  | nested derived tables (`FROM (SELECT … FROM (…))`) | 11 levels |
+  | `UNION ALL` branches | 42 |
+  | `IN (1, 2, …)` items, multi-row `VALUES` rows | about 1000 |
+
+  `AND`/`OR` chains (the parser balances them), 20 joins, 20 CTEs and a `CASE` with 150 branches are fine. The [benchmark](./performance#compile-time) checks statements up to 8 KB.
+- Past these sizes the compiler reports its own error instead of a SQL error: TS2589 ("Type instantiation is excessively deep and possibly infinite"), TS5114 or TS5115. Split the statement, or give its row type with [`sql.as<Row>()`](./dynamic-sql), which skips the analysis.
+- In `migrations()`, keep one migration per `.add()`: one text is limited to about 4000 tokens, and past that the error is a raw TS2589.
 
 ## SQL text
 
