@@ -89,6 +89,13 @@ export function introspect(
 		let visible = 0;
 		const pk = info.filter((c) => Number(c.pk) > 0);
 		const view = row.type === "view";
+		// An INTEGER PRIMARY KEY that isn't the rowid (`INTEGER PRIMARY KEY DESC`
+		// in a column definition) gets an automatic index; the rowid alias doesn't.
+		const pkIndex =
+			!view &&
+			db
+				.prepare("SELECT name FROM pragma_index_list(?) WHERE origin = 'pk'")
+				.all(row.name).length > 0;
 		const columns = info.map((c): IntrospectedColumn => {
 			const hidden = Number(c.hidden) === 1;
 			const position = hidden ? -1 : visible++;
@@ -98,6 +105,7 @@ export function introspect(
 				!withoutRowid &&
 				isPk &&
 				pk.length === 1 &&
+				!pkIndex &&
 				c.type.toLowerCase() === "integer";
 			const generated = Number(c.hidden) === 2 || Number(c.hidden) === 3;
 			const notNull =
