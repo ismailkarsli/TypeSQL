@@ -12,7 +12,11 @@ const q = sql("SELECT p.id, p.title FROM posts p {byAuthor7} ORDER BY p.id", {
 q.text;
 ```
 
-Only `{identifier}` is a slot. Braces inside string literals, such as `'{1,2}'`, are left alone.
+Only `{identifier}` is a slot. Braces inside string literals, quoted identifiers, comments and dollar quotes, such as `'{1,2}'` or `'{k}'`, are left alone.
+
+A fragment's text is spliced in as it is, without parentheses, so operator precedence applies across the boundary. The fragment `u.email = :e OR u.display_name = :e` in `WHERE {f} AND u.id > :min` becomes `WHERE u.email = $2 OR u.display_name = $2 AND u.id > $1`, where `AND` binds tighter than `OR`. Put parentheses in the fragment (or around the slot) when it holds `OR`: `sql.fragment("(u.email = :e OR u.display_name = :e)", { e })`.
+
+A slot can hold a union of fragments, such as `flag ? sql.fragment("AND id = $1", 1) : sql.fragment("AND true")`; each member is checked with its own parameters.
 
 A fragment's parameters are renumbered to follow the statement's. Arguments after the slot object belong to the outer statement:
 
