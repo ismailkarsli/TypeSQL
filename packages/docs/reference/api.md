@@ -262,7 +262,7 @@ A function call is looked up in this order:
 2. `DB["$functions"]`: functions declared on the schema, or by `CREATE FUNCTION` in migrations.
 3. The other `pg_catalog` functions: return type only, arguments not checked.
 
-Schema qualification is ignored (`public.f(x)` is `f`). Any other name is an error. A known name whose overloads don't fit the arguments is `unknown` (nullable); a cast fixes it. How to declare your own functions is in [Expressions and functions](../guide/queries#expressions-and-functions).
+Schema qualification is ignored (`public.f(x)` is `f`). Any other name is an error. Overloads are chosen by the number of arguments; argument types are not checked (see [Expressions and functions](../guide/queries#expressions-and-functions)). When the chosen signature can't derive a return type from the arguments, the result is `unknown` (nullable); a cast fixes it. How to declare your own functions is in [Expressions and functions](../guide/queries#expressions-and-functions).
 
 ```ts
 interface DB {

@@ -243,7 +243,7 @@ const withPosts = sql(`
 
 Operators follow Postgres's rules. For example, `int4 + int8` is `int8`, `timestamptz - timestamptz` is an `interval`, and `->>` is `text`.
 
-About 450 built-in functions are typed with their argument types, return types and null handling, including those of `pgcrypto`, `uuid-ossp`, `unaccent`, `pg_trgm` and `fuzzystrmatch`. Every other `pg_catalog` function is known by its return type, without checking its arguments.
+About 450 built-in functions have signatures with return types and null handling, including those of `pgcrypto`, `uuid-ossp`, `unaccent`, `pg_trgm` and `fuzzystrmatch`. A signature picks the overload and the return type, but argument types are not checked against it: `lower(id)` on an `int4` column compiles as `string`, while PostgreSQL rejects it. Operators likewise aren't checked for their operand types (`email = 1` compiles). Every other `pg_catalog` function is known by its return type only.
 
 A function Postgres would not find is an error. A close known name gives a hint:
 
