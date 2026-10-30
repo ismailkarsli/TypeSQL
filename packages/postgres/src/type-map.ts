@@ -17,12 +17,7 @@ export interface PostgresJsTypeMap
 	void: string;
 }
 
-export interface PostgresJsParamTypeMap
-	extends Omit<DefaultParamTypeMap, "date" | "timestamp" | "timestamptz"> {
-	date: Date | string | number;
-	timestamp: Date | string | number;
-	timestamptz: Date | string | number;
-}
+export interface PostgresJsParamTypeMap extends DefaultParamTypeMap {}
 
 export interface PostgresJsBigIntTypeMap
 	extends Omit<PostgresJsTypeMap, "int8"> {

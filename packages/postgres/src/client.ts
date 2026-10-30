@@ -1,5 +1,5 @@
 import type { Executor } from "@typesql/core";
-import type { SqlDriver } from "@typesql/core/adapter";
+import { runTransaction, type SqlDriver } from "@typesql/core/adapter";
 
 export type PostgresJsRows = readonly unknown[] & {
 	readonly count: number | null;
@@ -17,6 +17,10 @@ export interface PostgresJsTransactable<
 	Tx extends PostgresJsQueryable = PostgresJsQueryable,
 > {
 	begin(fn: (tx: Tx) => Promise<unknown>): Promise<unknown>;
+}
+
+interface PostgresJsReserved {
+	release(): void;
 }
 
 interface PostgresJsSavepointable {
@@ -43,16 +47,23 @@ export function executor(sql: PostgresJsQueryable): Executor {
 
 async function transaction<T>(
 	sql: PostgresJsQueryable,
-	_depth: number,
+	depth: number,
 	fn: (tx: PostgresJsQueryable) => Promise<T>,
 ): Promise<T> {
-	const { savepoint, begin } = sql as Partial<
-		PostgresJsSavepointable & PostgresJsTransactable
+	const { savepoint, begin, release } = sql as Partial<
+		PostgresJsSavepointable & PostgresJsTransactable & PostgresJsReserved
 	>;
 	if (savepoint) return (await savepoint.call(sql, fn)) as T;
 	if (begin) return (await begin.call(sql, fn)) as T;
+	// A ReservedSql is one connection without begin or savepoint.
+	if (release)
+		return runTransaction(
+			(statement) => sql.unsafe(statement),
+			() => fn(sql),
+			depth > 0 ? { savepoint: `typesql_${depth}` } : {},
+		);
 	throw new Error(
-		"typesql: sql.transaction() needs a postgres.js Sql, ReservedSql or TransactionSql (with begin or savepoint)",
+		"typesql: sql.transaction() needs a postgres.js Sql, ReservedSql or TransactionSql (with begin, savepoint or release)",
 	);
 }
 

@@ -1,6 +1,6 @@
 # postgres.js
 
-`@typesql/postgres` runs your queries on postgres.js (`postgres` 3.x).
+`@typesql/postgres` runs your queries on postgres.js (`postgres` 3.x or 4.x). The two versions parse a few date values differently; see [Type mapping](../reference/type-mapping#dates).
 
 ```sh
 npm install @typesql/core @typesql/postgres postgres
@@ -49,7 +49,7 @@ Attach `.withPlugin(new CasePlugin())` (imported from `@typesql/core`) for [came
 
 ## Transactions
 
-`sql.transaction(fn)` is postgres.js' `begin(fn)`, and on a `TransactionSql` it is `savepoint(fn)`. See [Transactions](../guide/transactions).
+`sql.transaction(fn)` is postgres.js' `begin(fn)`, and on a `TransactionSql` it is `savepoint(fn)`. A `ReservedSql` has neither, so there it sends `BEGIN`/`COMMIT` (and `SAVEPOINT` when nested) on the reserved connection. See [Transactions](../guide/transactions).
 
 ## Types
 

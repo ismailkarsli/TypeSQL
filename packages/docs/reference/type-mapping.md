@@ -26,7 +26,7 @@ The common types under each driver's default parsers:
 
 `int8` and `numeric` are strings under node-postgres because a JavaScript number cannot hold every value.
 
-Kysely and Drizzle run on one of these two drivers. With Kysely's `PostgresDialect` (node-postgres), pass `PgTypeMap` for the exact `pg` types. With `drizzle-orm/postgres-js`, dates and intervals come back as strings. See [From Kysely, Drizzle or Prisma](../guide/orms).
+Kysely and Drizzle run on one of these two drivers. With Kysely's `PostgresDialect` (node-postgres), pass `PgTypeMap` for the exact `pg` types. With `drizzle-orm/postgres-js`, pass `PostgresJsTypeMap` (`interval` is a string there); `@typesql/drizzle` parses dates back to `Date` on that driver. See [From Kysely, Drizzle or Prisma](../guide/orms).
 
 A `json` / `jsonb` value with a known shape ([`Json<T>` columns](../guide/schema#typed-json-columns), JSON built in SQL) is typed from that shape, unless the map reads the type as a `string`.
 
@@ -65,7 +65,7 @@ If you depend on one of these, register a parser with `pg.types.setTypeParser` a
 
 ## postgres.js
 
-`PostgresJsTypeMap`, the map of `@typesql/postgres`. Verified against `postgres@3.4.9/src/types.js`. The default parsers are only these:
+`PostgresJsTypeMap`, the map of `@typesql/postgres`. Verified against `postgres@3.4.9` and `postgres@4.0.0` (`src/types.js`). The default parsers are only these:
 
 | OIDs | Postgres | TypeScript |
 |---|---|---|
@@ -89,12 +89,17 @@ postgres.js fetches `pg_type` on connect (`fetch_types: true`, the default) and 
 
 `PostgresJsParamTypeMap` lists what parameters accept besides the row type ([table](#parameter-types)). postgres.js serializes each value with the serializer of the parameter type the server reports (`Bind` in `src/connection.js`), and with `'' + x` for types without one.
 
-- Dates are sent as `new Date(x).toISOString()`, so a string must be one JS `Date` can parse, and a number is epoch milliseconds.
+- Dates are sent as ISO strings, so a string must be one JS `Date` can parse. Epoch-millisecond numbers work on postgres.js 3 but fail on 4 (`22008 date/time field value out of range`), so `PostgresJsParamTypeMap` accepts only `Date` and `string`.
 - `bool` parameters take only booleans: the serializer sends `'f'` for anything but `true`.
 
 ### Dates
 
 `date`, `timestamp` and `timestamptz` are all `Date` by default (`types.date.from` is `[1082, 1114, 1184]`), the same as under `pg`. Only the parsing differs: postgres.js runs `new Date("1815-12-10")`, which is UTC midnight, while `pg`'s `postgres-date` gives local midnight for a `date`. Both maps say `Date`.
+
+postgres.js 3 and 4 differ in two more places:
+
+- A `timestamp` (without time zone) is local time on 3 and UTC on 4.
+- `'infinity'` and `'-infinity'` are an `Invalid Date` on 3 and the numbers `Infinity` and `-Infinity` on 4, although the map says `Date`. Cast them in SQL, or filter them out, if your data has them.
 
 ## Prisma
 
@@ -154,7 +159,7 @@ A parameter accepts its type's row type, plus the entry for that type in the map
 | Postgres type | Also accepted (`DefaultParamTypeMap`, `PgParamTypeMap`) | `PostgresJsParamTypeMap` |
 |---|---|---|
 | `int8`, `numeric`, `money` | `number \| bigint \| string` | the same |
-| `date`, `timestamp`, `timestamptz` | `Date \| string` | `Date \| string \| number` |
+| `date`, `timestamp`, `timestamptz` | `Date \| string` | the same |
 | `interval` | `string` | the same |
 | `bytea` | `Uint8Array` | the same |
 
