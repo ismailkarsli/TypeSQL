@@ -79,16 +79,30 @@ export function executor(
 	options: ExecutorOptions = {},
 ): Executor {
 	const bigint = options.bigint === true;
-	return async (text, values) => {
-		const p = prepared(db, text, bigint);
-		const args = bind(p, values);
-		if (p.reader) {
-			const rows = p.stmt.all(...args);
-			return { rows, rowCount: rows.length };
-		}
-		const { changes } = p.stmt.run(...args);
-		return { rows: [], rowCount: Number(changes) };
-	};
+	return Object.assign(
+		async (text: string, values: readonly unknown[]) =>
+			run(prepared(db, text, bigint), values),
+		{
+			// sql.prepare(): prepare the statement once and reuse it.
+			prepare: (text: string): Executor => {
+				let p: Prepared | undefined;
+				return async (_text, values) => {
+					p ??= prepared(db, text, bigint);
+					return run(p, values);
+				};
+			},
+		},
+	);
+}
+
+function run(p: Prepared, values: readonly unknown[]) {
+	const args = bind(p, values);
+	if (p.reader) {
+		const rows = p.stmt.all(...args);
+		return { rows, rowCount: rows.length };
+	}
+	const { changes } = p.stmt.run(...args);
+	return { rows: [], rowCount: Number(changes) };
 }
 
 const queues = new WeakMap<SqliteDatabase, Promise<unknown>>();

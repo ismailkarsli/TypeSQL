@@ -25,7 +25,7 @@ const posts = await sql(
 ).execute();
 ```
 
-The same call takes a better-sqlite3 `Database` or a bun:sqlite `Database`. The statement text is sent as written: the adapter prepares it once (keeping up to 500 prepared statements per database) and binds `$1`, `$2`, … by name, so result column names match what TypeSQL infers.
+The same call takes a better-sqlite3 `Database` or a bun:sqlite `Database`. The statement text is sent as written: the adapter prepares it on each execution and binds `$1`, `$2`, … by name, so result column names match what TypeSQL infers. A query from [`sql.prepare`](../reference/api#sql-prepare-text-slots) is prepared once, on its first execution, and reused.
 
 Values are bound as the driver expects: `sql.json(value)` as JSON text, `true` / `false` as `1` / `0`. A `Date` throws, because SQLite has no date type; pass `date.toISOString()` or a number.
 
@@ -37,7 +37,9 @@ Attach `.withPlugin(new CasePlugin())` (imported from `@typesql/core`) for [came
 
 ## Integers as `bigint`
 
-Pass `{ bigint: true }` to read integers as `bigint` (node:sqlite's `setReadBigInts`, better-sqlite3's `safeIntegers`). Rows are then typed with `BigIntTypeMap`. For bun:sqlite, open the database with `{ safeIntegers: true }` and pass `BigIntTypeMap` yourself.
+Pass `{ bigint: true }` to read integers as `bigint` (node:sqlite's `setReadBigInts`, better-sqlite3's and bun:sqlite's `safeIntegers`). Rows are then typed with `BigIntTypeMap`. This works the same on all three drivers.
+
+Without it, integers beyond `Number.MAX_SAFE_INTEGER` differ by driver: node:sqlite throws, while better-sqlite3 and bun:sqlite silently lose precision. Use `{ bigint: true }` if your data can hold such values (`random()` usually does).
 
 ## Transactions
 

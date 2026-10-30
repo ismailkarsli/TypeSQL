@@ -69,7 +69,7 @@ Preparation resolves named parameters, inline values and fragment slots once. Th
 
 With `@typesql/pg`, execution uses a server-side statement whose name is derived from the final SQL text. With `@typesql/postgres`, execution enables postgres.js preparation and extended protocol, including for queries without parameters; the client's global `prepare: false` setting still takes precedence. Preparation itself sends no SQL.
 
-Other adapters and custom executors reuse TypeSQL's compiled query without requesting server preparation, unless their executor implements `prepare(text)`. The prepared query stays bound to the client or transaction that created it. Create it through `tx.prepare(...)` to execute in a transaction. An executor passed to `execute*` overrides that binding and runs through the supplied executor as usual.
+With `@typesql/sqlite`, the statement is prepared on its first execution and reused. Other adapters and custom executors reuse TypeSQL's compiled query without requesting server preparation, unless their executor implements `prepare(text)`. The prepared query stays bound to the client or transaction that created it. Create it through `tx.prepare(...)` to execute in a transaction. An executor passed to `execute*` overrides that binding and runs through the supplied executor as usual.
 
 Reuse the returned function across calls to save TypeSQL's runtime SQL assembly. Server preparation can also save repeated parsing, but performance depends on the query and workload; measure your application's repeated queries.
 
@@ -197,6 +197,8 @@ What adapters and custom executors build on.
 | `Fragment<Text, Params>` | a spliceable SQL piece |
 
 ### Tables and write helpers
+
+These come from the dialect module, `@typesql/core/postgres` or `@typesql/core/sqlite`, not from `@typesql/core`.
 
 | Type | Meaning |
 |---|---|

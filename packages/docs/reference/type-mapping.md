@@ -121,7 +121,7 @@ Prisma throws "Unsupported column type" for other types (`interval`, geometric t
 
 ## SQLite
 
-`DefaultTypeMap` of `@typesql/core/sqlite`, used by `@typesql/sqlite` and by `createSql(sqlite)`. node:sqlite, better-sqlite3 and bun:sqlite return the same JavaScript values (better-sqlite3 returns blobs as `Buffer`, a subclass of `Uint8Array`):
+`DefaultTypeMap` of `@typesql/core/sqlite`, used by `@typesql/sqlite` and by `createSql(sqlite)`. node:sqlite, better-sqlite3 and bun:sqlite return the same JavaScript values for values that fit (better-sqlite3 returns blobs as `Buffer`, a subclass of `Uint8Array`). Integers beyond `Number.MAX_SAFE_INTEGER` make node:sqlite throw and lose precision on the other two, unless you read them as `bigint`:
 
 | SQLite type | TypeScript |
 |---|---|
