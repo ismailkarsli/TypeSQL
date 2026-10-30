@@ -3,6 +3,7 @@ import { execFileSync } from "node:child_process";
 import {
 	appendFileSync,
 	cpSync,
+	existsSync,
 	mkdirSync,
 	mkdtempSync,
 	readFileSync,
@@ -16,6 +17,8 @@ import { join } from "node:path";
 const root = join(import.meta.dirname, "../..");
 const bench = join(root, "packages/bench");
 const firstVersion = "0.7.1";
+// The last case1.ts that releases without plugins and sql.empty can check.
+const legacyFixture = "bf6c929";
 const { version: currentVersion } = JSON.parse(
 	readFileSync(join(root, "packages/core/package.json"), "utf8"),
 ) as { version: string };
@@ -109,10 +112,14 @@ function measure(version: string, ref?: string) {
 		for (const file of ["src", "run.ts", "tsconfig.json", "thresholds.json"]) {
 			cpSync(join(bench, file), join(target, file), { recursive: true });
 		}
-		if (!manifest.exports?.["./postgres"]) {
-			const fixture = join(target, "src/case1.ts");
+		const fixture = join(target, "src/case1.ts");
+		if (!existsSync(join(core, "src/empty.ts")))
+			writeFileSync(
+				fixture,
+				`${git("show", `${legacyFixture}:packages/bench/src/case1.ts`)}\n`,
+			);
+		if (!manifest.exports?.["./postgres"])
 			writeFileSync(fixture, withoutDialect(readFileSync(fixture, "utf8")));
-		}
 		symlinkSync(
 			join(root, "node_modules"),
 			join(directory, "node_modules"),
