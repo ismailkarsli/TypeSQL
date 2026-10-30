@@ -104,7 +104,7 @@ sql(`UPDATE portfolio SET name = ${sql.json({ a: 1 })}`);
 sql(`UPDATE portfolio SET history = ${sql.param(items)}`);
 ```
 
-Positional and named JSON parameters don't take a raw array either. Pass `sql.json(value)` as the argument. Objects and other values work as they are:
+Positional and named JSON parameters don't take a raw array either. Pass `sql.json(value)` as the argument. Objects work as they are on PostgreSQL. A plain string goes to the driver unchanged: node-postgres sends it as JSON text, so `"hello"` fails as invalid JSON, while postgres.js stores it as a JSON string. Wrap strings in `sql.json()` to get a JSON string on every driver:
 
 ```ts
 sql("UPDATE portfolio SET history = $1 WHERE id = $2", sql.json(items), 1);

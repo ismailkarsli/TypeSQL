@@ -32,7 +32,7 @@ You don't have to choose. `@typesql/kysely`, `@typesql/drizzle` and `@typesql/pr
 
 ## When another tool fits better
 
-- **You use MySQL or SQLite.** TypeSQL supports only PostgreSQL today. Support for both is planned.
+- **You use MySQL.** TypeSQL supports PostgreSQL and SQLite today. MySQL support is planned.
 - **You can't use TypeScript 7.1 yet.** TypeSQL runs inside the native compiler and needs 7.1 or later.
 - **You prefer building queries in TypeScript** over writing SQL. A query builder is a better match.
 - **Most of your SQL is built at runtime.** TypeSQL types SQL it can see at compile time. For text only known at runtime it falls back to `sql.as<Row>()`, where you state the row type yourself.

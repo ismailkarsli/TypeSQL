@@ -27,10 +27,13 @@ export interface DB {
 }
 ```
 
-Then create `sql` from it:
+Then create `sql` from it with the dialect, or with your adapter's `createSql<DB>(client)`:
 
 ```ts
-export const sql = createSql<DB>();
+import { createSql } from "@typesql/core";
+import { postgres } from "@typesql/core/postgres";
+
+export const sql = createSql<DB>(postgres);
 ```
 
 ## Column helpers
@@ -69,7 +72,7 @@ interface DB {
 		settings: Json<{ theme: "dark" | "light" }, { nullable: true }>;
 	};
 }
-const sql = createSql<DB>();
+const sql = createSql<DB>(postgres);
 ```
 
 `Json<T>` takes the same flags as `Col` as its second argument (`{ nullable: true }`, `{ hasDefault: true }`). Pass `"json"` as the third argument for a `json` column.

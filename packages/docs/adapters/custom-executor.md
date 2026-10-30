@@ -10,7 +10,9 @@ An executor is the function a query runs on. The adapters build one from your dr
 import { createSql } from "@typesql/core";
 import { mapRows } from "@typesql/core/adapter";
 import { postgres } from "@typesql/core/postgres";
+import pg from "pg";
 
+const pool = new pg.Pool();
 const sql = createSql<DB>(postgres);
 
 const q = sql("SELECT id, email FROM users WHERE id = $1", 7);
@@ -28,7 +30,7 @@ const rows = mapRows(q, result.rows);
 Every `execute*` method takes an executor, which wins over the bound one. Each adapter exports `executor(client)` to build one from any client its `createSql` accepts. You can also bind a new `sql` to that client:
 
 ```ts
-import { executor } from "@typesql/pg";
+import { createSql, executor } from "@typesql/pg";
 
 const client = await pool.connect();
 try {
@@ -73,7 +75,7 @@ A wrapper around an adapter's executor can return its result unchanged, so the c
 ```ts
 import { createSql as createCoreSql, type Executor } from "@typesql/core";
 import { postgres } from "@typesql/core/postgres";
-import type { PgTypeMap } from "@typesql/pg";
+import { executor, type PgTypeMap } from "@typesql/pg";
 
 const onPool = executor(pool);
 const logged: Executor = async (text, values) => {
@@ -84,7 +86,7 @@ const logged: Executor = async (text, values) => {
 		console.debug(`${Math.round(performance.now() - started)} ms`, text);
 	}
 };
-const sqlLogged = createCoreSql<Postgres, DB, PgTypeMap>(postgres, logged);
+const sqlLogged = createCoreSql<DB, PgTypeMap>(postgres, logged);
 ```
 
 ## Change the rows
@@ -98,9 +100,10 @@ Pick the narrowest fix:
 3. **Anything else.** Keep the executor plain and transform the rows in a typed helper built on `RowType<Q>`:
 
 ```ts
-import type { Query } from "@typesql/core";
+import type { Query, RowType } from "@typesql/core";
 
-type Wire<Row> = { [K in keyof Row]: Row[K] extends Date ? string : Row[K] };
+type WireValue<V> = V extends Date ? string : V;
+type Wire<Row> = { [K in keyof Row]: WireValue<Row[K]> };
 const toWire = (row: object) =>
 	Object.fromEntries(
 		Object.entries(row).map(([k, v]) => [
@@ -122,7 +125,7 @@ const payload = await wire(sql("SELECT id, created_at FROM users"));
 You can also augment `Query` to change what `execute*` returns for every query in the program:
 
 ```ts
-declare module "@typesql/core/postgres" {
+declare module "@typesql/core" {
   interface Query<Row, Params extends readonly unknown[] = readonly unknown[], Text extends string = string> {
     execute(executor?: Executor): Promise<Wire<Row>[]>;
     executeTakeFirst(executor?: Executor): Promise<Wire<Row> | undefined>;

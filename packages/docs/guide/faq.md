@@ -38,7 +38,7 @@ A typical query costs a few milliseconds of check time. See [Performance](./perf
 
 ## Does it support MySQL or SQLite?
 
-Not yet. TypeSQL supports only PostgreSQL today. MySQL and SQLite support is planned.
+SQLite, yes: see [the SQLite adapter](../adapters/sqlite). MySQL not yet; support is planned.
 
 ## Can I use it with my ORM?
 

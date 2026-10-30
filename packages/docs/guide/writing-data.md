@@ -11,7 +11,7 @@ const created = sql(
 );
 ```
 
-With `RETURNING`, a statement has a row type. Without it, the row type is `never`, and the adapters' `execute()` returns the number of affected rows:
+With `RETURNING`, a statement has a row type. Without it, the row type is `never`: `execute()` resolves to `[]`, and `executeCount()` returns the number of affected rows. `executeTakeFirstOrThrow()` on such a statement always throws `NoResultError`:
 
 ```ts
 const renamed = sql(
@@ -140,6 +140,6 @@ const rows = sql.values("portfolio", [
 const created = sql("INSERT INTO portfolio {rows} RETURNING id", { rows });
 ```
 
-A plain object also works as it is. An array without `sql.json()` is an error, because node-postgres would send it as a Postgres array.
+On PostgreSQL a plain object also works as it is. SQLite drivers can't bind objects, so use `sql.json()` there. An array without `sql.json()` is an error, because node-postgres would send it as a Postgres array.
 
 For identity columns and other limits of these helpers, see [Limits](./limits).
