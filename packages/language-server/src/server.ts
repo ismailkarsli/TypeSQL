@@ -21,7 +21,7 @@ interface CompletionParams {
 	readonly uri: string;
 	readonly position: Position;
 	readonly text: string;
-	readonly result: Result;
+	readonly result?: Result;
 }
 
 interface Message {
@@ -51,7 +51,8 @@ export function serve(
 		uri,
 		position,
 		text,
-		result,
+		// Lua clients drop a nil `result`; a missing one is TypeScript's null.
+		result = null,
 	}: CompletionParams): Promise<Result> => {
 		if (!mayBeInSqlLiteral(text, offsetOf(text, position))) return result;
 		try {

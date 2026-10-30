@@ -19,11 +19,11 @@ It hooks into TypeScript 7's language server (`tsc --lsp --stdio`) and reads its
 
 2. Have `@typesql/core` 0.4.0 or later in the project, directly or through an adapter, and `typescript` 7.1 or later (`npm install -D typescript@7.1.0-beta`).
 
-3. With Neovim 0.11 or later, add `~/.config/nvim/lsp/tsgo.lua`:
+3. With Neovim 0.11 or later, add `~/.config/nvim/lsp/tsgo.lua` (or `~/.config/nvim/after/lsp/tsgo.lua` if you use nvim-lspconfig; see below):
 
    ```lua
    return {
-     cmd = { "npx", "tsc", "--lsp", "--stdio" },
+     cmd = { "npx", "--no", "tsc", "--lsp", "--stdio" },
      filetypes = { "javascript", "javascriptreact", "typescript", "typescriptreact" },
      root_markers = { "pnpm-lock.yaml", "package-lock.json", "yarn.lock", "bun.lock", ".git" },
      capabilities = { general = { positionEncodings = { "utf-16" } } },
@@ -48,7 +48,7 @@ It hooks into TypeScript 7's language server (`tsc --lsp --stdio`) and reads its
                uri = params.textDocument.uri,
                position = params.position,
                text = table.concat(lines, "\n"),
-               result = result,
+               result = result == nil and vim.NIL or result,
              }, function(e, merged)
                h(nil, e and result or merged, ctx, config)
              end)
@@ -65,13 +65,16 @@ It hooks into TypeScript 7's language server (`tsc --lsp --stdio`) and reads its
    vim.lsp.enable("tsgo")
    ```
 
-If you already configure `tsgo` with `nvim-lspconfig`, you can leave out `filetypes` and `root_markers`: Neovim merges `~/.config/nvim/lsp/tsgo.lua` into it.
+`npx --no` runs the project's own `tsc` and fails instead of downloading the unrelated `tsc` package when the project has no TypeScript. `vim.NIL` keeps TypeScript's `null` answer (usual inside SQL strings), which Lua would otherwise drop from the request.
+
+If you use [nvim-lspconfig](https://github.com/neovim/nvim-lspconfig), save the file as `~/.config/nvim/after/lsp/tsgo.lua` instead. nvim-lspconfig ships its own `lsp/tsgo.lua`, which comes later in the runtime path than `~/.config/nvim/lsp/tsgo.lua` and replaces its `cmd` and `on_init`; files under `after/lsp/` are merged last. You can leave out `filetypes` and `root_markers` there.
 
 ## Syntax highlighting
 
 [nvim-treesitter](https://github.com/nvim-treesitter/nvim-treesitter) already highlights SQL in `` sql(`…`) `` template literals once the `sql` parser is installed (`:TSInstall sql`). To also highlight `sql("…")`, `tx(…)`, `sql.fragment(…)` and `sql.as<Row>(…)`, save this as `~/.config/nvim/queries/typescript/injections.scm`, and as the same file under `queries/tsx/` and `queries/javascript/`:
 
 ```scheme
+; extends
 
 (call_expression
   function: [
