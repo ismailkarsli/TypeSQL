@@ -17,6 +17,8 @@ export interface IntrospectedColumn {
 	readonly hasDefault: boolean;
 	readonly identity: "always" | "by default" | null;
 	readonly generated: string | null;
+	/** A PostgreSQL 18 `VIRTUAL` generated column (otherwise `STORED`). */
+	readonly virtual?: boolean;
 	readonly default: string | null;
 	readonly comment: string | null;
 }
@@ -237,6 +239,7 @@ export async function introspect(
 					hasDefault: !isView && (c.default !== null || identity !== null),
 					identity,
 					generated,
+					...(c.generated === "v" && { virtual: true }),
 					default: generated === null ? c.default : null,
 					comment: c.comment,
 				};

@@ -223,9 +223,7 @@ export class ViewNullability {
 			const notNull = query["setOperations"]
 				? await this.queryColumn(query, out.length + 1)
 				: await this.expr(entry["expr"], query);
-			out.push(
-				notNull || (this.options.notNull?.(row.relname, name) ?? false),
-			);
+			out.push(notNull || (this.options.notNull?.(row.relname, name) ?? false));
 		}
 		return out;
 	}

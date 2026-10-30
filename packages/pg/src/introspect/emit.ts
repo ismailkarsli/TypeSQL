@@ -53,7 +53,7 @@ function columnNotes(c: IntrospectedColumn): string[] {
 		notes.push("`citext`: typed as `text`.");
 	if (c.generated !== null)
 		notes.push(
-			`\`GENERATED ALWAYS AS (${c.generated}) STORED\`: cannot be written.`,
+			`\`GENERATED ALWAYS AS (${c.generated}) ${c.virtual ? "VIRTUAL" : "STORED"}\`: cannot be written.`,
 		);
 	if (c.identity === "always")
 		notes.push(
@@ -140,6 +140,14 @@ export function generateSource(
 	const topLevel = new Set(
 		db.relations.filter((r) => r.schema === "public").map((r) => r.name),
 	);
+	for (const reserved of ["$types", "$functions"])
+		if (
+			topLevel.has(reserved) ||
+			db.relations.some((r) => r.schema === reserved)
+		)
+			throw new Error(
+				`"${reserved}" is a relation or schema name, but TypeSQL's schema uses the key ${reserved}; leave it out with --exclude '${reserved}'`,
+			);
 	const lines: string[] = [];
 	const namespaces = new Map<string, IntrospectedRelation[]>();
 	for (const rel of db.relations) {
