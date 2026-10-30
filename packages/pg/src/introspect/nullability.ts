@@ -219,9 +219,12 @@ export class ViewNullability {
 			const entry = node(te);
 			if (!entry || entry["resjunk"] === "true") continue;
 			const name = str(entry["resname"]) ?? "";
+			// A set operation's targets refer to its first branch only; check all.
+			const notNull = query["setOperations"]
+				? await this.queryColumn(query, out.length + 1)
+				: await this.expr(entry["expr"], query);
 			out.push(
-				(await this.expr(entry["expr"], query)) ||
-					(this.options.notNull?.(row.relname, name) ?? false),
+				notNull || (this.options.notNull?.(row.relname, name) ?? false),
 			);
 		}
 		return out;
