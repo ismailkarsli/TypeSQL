@@ -21,6 +21,11 @@ export interface PgTransactionClient extends PgQueryable {
 	release(err?: Error | boolean): void;
 }
 
+interface ErrorEvents {
+	on?(event: "error", listener: (err: unknown) => void): unknown;
+	off?(event: "error", listener: (err: unknown) => void): unknown;
+}
+
 export interface PgPoolLike<
 	C extends PgTransactionClient = PgTransactionClient,
 > {
@@ -69,13 +74,23 @@ async function inPoolTransaction<C extends PgTransactionClient, T>(
 ): Promise<T> {
 	const conn = await pool.connect();
 	let releaseWith: Error | undefined;
+	const toError = (err: unknown) =>
+		err instanceof Error ? err : new Error(String(err));
+	// A checked-out pg client has no pool listener, so an unhandled 'error'
+	// (a dropped connection) would crash the process. The pending query rejects.
+	const onError = (err: unknown) => {
+		releaseWith ??= toError(err);
+	};
+	const events = conn as ErrorEvents;
+	events.on?.("error", onError);
 	try {
 		return await runTransaction(on(conn), () => fn(conn), {
 			onRollbackError: (err) => {
-				releaseWith = err instanceof Error ? err : new Error(String(err));
+				releaseWith = toError(err);
 			},
 		});
 	} finally {
+		events.off?.("error", onError);
 		conn.release(releaseWith);
 	}
 }
