@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, extname, join } from "node:path";
 import type { DmmfDatamodel } from "./dmmf.js";
-import { generateSource, viewNames } from "./emit.js";
+import { generateSource, schemaFields, viewNames } from "./emit.js";
 import type { GeneratorHandler, GeneratorOptions } from "./protocol.js";
 
 const configString = (
@@ -33,6 +33,7 @@ export function sourceFor(options: GeneratorOptions): string {
 		importFrom: configString(importFrom),
 		typeName: configString(typeName),
 		views: viewNames(options.datamodel),
+		fields: schemaFields(options.datamodel),
 	});
 }
 

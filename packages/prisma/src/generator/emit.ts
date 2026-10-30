@@ -5,6 +5,19 @@ export interface EmitOptions {
 	readonly importFrom?: string | undefined;
 	readonly typeName?: string | undefined;
 	readonly views?: readonly string[];
+	/** Field order and `Unsupported(...)` fields per model, from `schemaFields`. */
+	readonly fields?: ReadonlyMap<string, readonly SchemaField[]>;
+}
+
+/** A field as written in the schema text; DMMF leaves out `Unsupported` ones. */
+export interface SchemaField {
+	readonly name: string;
+	readonly unsupported?: {
+		readonly type: string;
+		readonly nullable: boolean;
+		readonly dbName: string | undefined;
+		readonly hasDefault: boolean;
+	};
 }
 
 export const SCALAR_TYPES: Readonly<Record<string, string>> = {
@@ -66,6 +79,41 @@ export function viewNames(schema: string): string[] {
 	return [
 		...schema.matchAll(/^[ \t]*view[ \t]+([A-Za-z_][A-Za-z0-9_]*)[ \t]*\{/gm),
 	].map((m) => m[1]!);
+}
+
+const BLOCK =
+	/^[ \t]*(?:model|view)[ \t]+([A-Za-z_][A-Za-z0-9_]*)[ \t]*\{([^]*?)^[ \t]*\}/gm;
+const FIELD =
+	/^[ \t]*([A-Za-z_][A-Za-z0-9_]*)[ \t]+(Unsupported\("(?:[^"\\]|\\.)*"\)(?:\[\])?\??|\S+)(.*)$/;
+const UNSUPPORTED = /^Unsupported\("((?:[^"\\]|\\.)*)"\)(\[\])?(\?)?$/;
+
+export function schemaFields(schema: string): Map<string, SchemaField[]> {
+	const models = new Map<string, SchemaField[]>();
+	for (const [, model, body] of schema.matchAll(BLOCK)) {
+		const fields: SchemaField[] = [];
+		for (const line of body!.split("\n")) {
+			const m = FIELD.exec(line.replace(/\/\/.*$/, ""));
+			if (!m || m[1]!.startsWith("@")) continue;
+			const [, name, type, rest = ""] = m;
+			const u = UNSUPPORTED.exec(type!);
+			if (!u) {
+				fields.push({ name: name! });
+				continue;
+			}
+			const base = u[1]!.replace(/\(.*$/, "").trim().toLowerCase();
+			fields.push({
+				name: name!,
+				unsupported: {
+					type: `${base}${u[2] ?? ""}`,
+					nullable: u[3] !== undefined || u[2] !== undefined,
+					dbName: /@map\(\s*"((?:[^"\\]|\\.)*)"/.exec(rest)?.[1],
+					hasDefault: /@default\(/.test(rest),
+				},
+			});
+		}
+		models.set(model!, fields);
+	}
+	return models;
 }
 
 export function pgTypeOf(
@@ -137,7 +185,30 @@ export function generateSource(
 	const table = (model: DmmfModel, indent: string): string => {
 		const isView = views.has(model.name);
 		const cols: string[] = [];
-		for (const f of model.fields) {
+		const unsupported = (field: SchemaField): void => {
+			const u = field.unsupported;
+			if (!u || sqlite) return;
+			const helper = columnHelper(u.nullable, !isView && u.hasDefault);
+			used.add(helper);
+			cols.push(
+				`${doc(u.dbName ? [`Prisma field \`${field.name}\`: Unsupported.`] : ["Prisma `Unsupported` field."], indent + "  ")}${indent}  ${key(u.dbName ?? field.name)}: ${helper}<${str(u.type)}>;`,
+			);
+		};
+		const written = options.fields?.get(model.name) ?? [];
+		const byName = new Map(model.fields.map((f) => [f.name, f]));
+		const ordered: (DmmfField | SchemaField)[] = [
+			...written.flatMap((w): (DmmfField | SchemaField)[] => {
+				const f = byName.get(w.name);
+				return f ? [f] : w.unsupported ? [w] : [];
+			}),
+			...model.fields.filter((f) => !written.some((w) => w.name === f.name)),
+		];
+		for (const item of ordered) {
+			if (!("kind" in item)) {
+				unsupported(item);
+				continue;
+			}
+			const f = item;
 			if (f.kind !== "scalar" && f.kind !== "enum") continue;
 			const nullable = f.isList || !f.isRequired;
 			const helper = columnHelper(nullable, !isView && hasDbDefault(f));

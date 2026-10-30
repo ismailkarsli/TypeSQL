@@ -334,7 +334,7 @@ Each `createSql` has the same overloads with `sqlite` first; the type map then d
 | `KyselyOverrides` | per table and column: a type name or `{ type?, nullable?, hasDefault? }`; `$view: true` |
 | `KyselyOptions` | `camelCase` |
 | `FromDrizzleOptions` | `casing`, `timestamp`, `time` |
-| `PrismaOverrides` | `$table`, `$schema`, per field `{ column, type, nullable, default }` |
+| `PrismaOverrides` | `$table`, `$schema`, per field `{ column, type, nullable, default }`, and top-level `$types` (enum values by Prisma enum name) |
 
 `@typesql/prisma/generator` exports `generateSource(datamodel, options?)`, the source the `typesql-prisma` generator writes; `{ dialect: "sqlite" }` writes a SQLite schema.
 

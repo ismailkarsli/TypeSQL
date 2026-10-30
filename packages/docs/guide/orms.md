@@ -448,6 +448,10 @@ type DB = FromPrisma<Prisma.TypeMap, {
 
 `FromPrisma` treats every field that is optional in Prisma's create input as having a default, client-side defaults and `@updatedAt` included. Mark those `{ default: false }`, or use the generator.
 
+Prisma Client's types don't record `@map` on enum values or `@@map` on an enum either. So `FromPrisma` names an enum type after the Prisma enum and types it with the Prisma value names, while `$queryRaw` returns the database values. With mapped values, list the database values under `$types`, keyed by the Prisma enum name (`$types: { Role: "ADMIN" | "super_user" }`), or use the generator, which reads both from the schema. A cast to the mapped enum name (`'x'::role_kind`) needs the generator.
+
+The generator also keeps `Unsupported("…")` fields, which Prisma Client leaves out, as columns of that type (`Unsupported("tsvector")` is `tsvector`).
+
 ## SQLite
 
 All three packages also convert SQLite schemas. Pass `sqlite` instead of `postgres`, and the schema is typed with SQLite's type names and the [SQLite dialect](./sqlite)'s rules:
