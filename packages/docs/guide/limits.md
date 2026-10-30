@@ -55,6 +55,7 @@ The schema does not tell identity `GENERATED ALWAYS` columns apart from other co
 - A plain `jsonb` parameter (typed `unknown`) refuses objects with a `length` key. Wrap those in `sql.json()`.
 - Inside JSON, `int8` and `numeric` are numbers. `JSON.parse` rounds integers beyond 2^53, and a `float8` / `numeric` that is `NaN` or `Infinity` is serialized as a string.
 - Elements of Postgres arrays are typed non-null, as for array columns.
+- Arrays are typed one-dimensional. PostgreSQL doesn't record dimensions in a type (`int[][]` is the same type as `int[]`), so a multi-dimensional value such as `'{{1,2},{3,4}}'::int[][]` is typed `number[]` but comes back nested (`[[1, 2], [3, 4]]`). Assert the row type with `sql.as<Row>()` where you store such values.
 - In `JSON_OBJECT`, write pairs as `k VALUE v` or `k: v`. In `k:v`, the `:v` is read as a [named parameter](./parameters#named-name) when `v` is a name.
 
 ## Types and hovers
