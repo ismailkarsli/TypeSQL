@@ -42,6 +42,8 @@ export type WindowSpec = {
 	readonly name: string | null;
 	readonly partition: readonly Expr[];
 	readonly order: readonly Expr[];
+	/** The frame may hold no rows (see ParseFrame). */
+	readonly emptyFrame?: boolean;
 };
 export type CaseWhen = { readonly when: Expr; readonly then: Expr };
 export type CaseExpr = {

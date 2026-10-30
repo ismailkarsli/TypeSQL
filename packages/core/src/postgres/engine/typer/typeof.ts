@@ -948,6 +948,11 @@ type TypeCall<E extends Call, C extends Ctx> =
 											{
 												readonly grouped: C["grouped"];
 												readonly over: E["over"];
+												readonly emptyFrame: E["win"] extends {
+													readonly emptyFrame: true;
+												}
+													? true
+													: false;
 												readonly filter: F extends ColInfo ? true : false;
 												readonly distinct: E["distinct"];
 												readonly hasStar: E["args"] extends readonly [

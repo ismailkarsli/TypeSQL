@@ -1217,6 +1217,7 @@ type MultirangeOf<T extends string> = T extends `${string}multirange`
 export type CallCtx = {
 	readonly grouped: boolean;
 	readonly over: boolean;
+	readonly emptyFrame?: boolean;
 	readonly filter: boolean;
 	readonly distinct: boolean;
 	readonly hasStar: boolean;
@@ -1305,9 +1306,11 @@ type CallNullable<
 			? C["filter"] extends true
 				? true
 				: C["over"] extends true
-					? S["strict"] extends false
-						? false
-						: AnyNullable<As>
+					? C["emptyFrame"] extends true
+						? true
+						: S["strict"] extends false
+							? false
+							: AnyNullable<As>
 					: C["grouped"] extends false
 						? true
 						: S["strict"] extends false

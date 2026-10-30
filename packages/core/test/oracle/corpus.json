@@ -23538,6 +23538,66 @@
 			"source": "sql-empty",
 			"sql": "UPDATE preferences SET retries = $1, note = $2 WHERE email = $3 RETURNING retries, note",
 			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "window-frames",
+			"sql": "SELECT max(title) OVER (ORDER BY id ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING) AS prev_max FROM posts",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "window-frames",
+			"sql": "SELECT sum(author_id) OVER (ORDER BY id ROWS BETWEEN 1 FOLLOWING AND 1 FOLLOWING) AS next_sum FROM posts",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "window-frames",
+			"sql": "SELECT max(title) OVER (ORDER BY id ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW EXCLUDE CURRENT ROW) AS ex FROM posts",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "window-frames",
+			"sql": "SELECT max(title) OVER (ORDER BY id GROUPS BETWEEN CURRENT ROW AND CURRENT ROW EXCLUDE GROUP) AS gr FROM posts",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "window-frames",
+			"sql": "SELECT max(title) OVER (ORDER BY id ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW EXCLUDE TIES) AS ties FROM posts",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "window-frames",
+			"sql": "SELECT sum(author_id) OVER (ORDER BY id ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING) AS around, sum(author_id) OVER (ORDER BY id ROWS 2 PRECEDING) AS back, count(*) OVER (ORDER BY id ROWS BETWEEN 1 FOLLOWING AND 1 FOLLOWING) AS c FROM posts",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "window-frames",
+			"sql": "SELECT array_agg(title) OVER (ORDER BY id ROWS BETWEEN 2 FOLLOWING AND UNBOUNDED FOLLOWING) AS later FROM posts",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "cte-params",
+			"sql": "WITH x AS (SELECT id FROM users WHERE id = $1) SELECT id FROM x",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "cte-params",
+			"sql": "WITH RECURSIVE r(n) AS (SELECT $1::int UNION ALL SELECT n + 1 FROM r WHERE n < $2) SELECT n FROM r",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "string-braces",
+			"sql": "SELECT '{k}'::text[] AS a, meta #> '{k}' AS j FROM posts WHERE tags @> '{news}'",
+			"ddl": false
 		}
 	],
 	"skippedSlots": {

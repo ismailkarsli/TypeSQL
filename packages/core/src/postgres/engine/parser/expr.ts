@@ -1401,10 +1401,10 @@ export type ParseWindowSpec<T extends Toks, I extends number> =
 				? ParseWindowOrder<T, I2> extends infer O
 					? O extends Ok<infer Ord, infer I3>
 						? ParseFrame<T, I3> extends infer F
-							? F extends Ok<infer Kinds, infer I4>
+							? F extends Ok<infer Frame extends FrameInfo, infer I4>
 								? FrameOrderError<
 										T[I3],
-										Kinds,
+										Frame["kinds"],
 										Name,
 										Ord
 									> extends infer M extends string
@@ -1412,7 +1412,12 @@ export type ParseWindowSpec<T extends Toks, I extends number> =
 									: EatOp<T, I4, ")"> extends never
 										? Expected<'")"', T, I4>
 										: Ok<
-												{ name: Name; partition: Part; order: Ord },
+												{
+													name: Name;
+													partition: Part;
+													order: Ord;
+													emptyFrame: Frame["empty"];
+												},
 												EatOp<T, I4, ")">
 											>
 								: F
@@ -1438,9 +1443,14 @@ type ParseWindowOrder<T extends Toks, I extends number> =
 	EatWords<T, I, ["order", "by"]> extends never
 		? Ok<[], I>
 		: ParseOrderList<T, EatWords<T, I, ["order", "by"]>>;
+/**
+ * `empty`: the frame may hold no rows, because both bounds lie on one side of
+ * the current row or EXCLUDE CURRENT ROW / GROUP removes it.
+ */
+type FrameInfo = { readonly kinds: unknown; readonly empty: boolean };
 type ParseFrame<T extends Toks, I extends number> =
 	EatWord<T, I, "rows" | "range" | "groups"> extends never
-		? Ok<never, I>
+		? Ok<{ kinds: never; empty: false }, I>
 		: EatWord<T, Nx<I>, "between"> extends never
 			? ParseFrameBound<T, Nx<I>> extends infer B
 				? B extends readonly [infer S, infer J extends number]
@@ -1451,7 +1461,7 @@ type ParseFrame<T extends Toks, I extends number> =
 									"frame starting from following row cannot end with current row",
 									I
 								>
-							: FrameExclusion<T, S, J>
+							: FrameExclusion<T, S, false, J>
 					: B
 				: never
 			: ParseFrameBound<T, Nx2<I>> extends infer B
@@ -1462,15 +1472,47 @@ type ParseFrame<T extends Toks, I extends number> =
 							? B2 extends readonly [infer E, infer J2 extends number]
 								? FrameError<S, E> extends infer M extends string
 									? Fail<M, I>
-									: FrameExclusion<T, S | E, J2>
+									: FrameExclusion<
+											T,
+											S | E,
+											S extends "following"
+												? true
+												: E extends "preceding"
+													? true
+													: false,
+											J2
+										>
 								: B2
 							: never
 					: B
 				: never;
-type FrameExclusion<T extends Toks, Kinds, I extends number> =
+type FrameExclusion<
+	T extends Toks,
+	Kinds,
+	Empty extends boolean,
+	I extends number,
+> =
 	SkipExclude<T, I> extends infer J
 		? J extends number
-			? Ok<Kinds, J>
+			? Ok<
+					{
+						kinds: Kinds;
+						empty: Empty extends true
+							? true
+							: EatWord<T, I, "exclude"> extends never
+								? false
+								: EatWords<
+											T,
+											EatWord<T, I, "exclude">,
+											["current", "row"]
+										> extends never
+									? EatWord<T, EatWord<T, I, "exclude">, "group"> extends never
+										? false
+										: true
+									: true;
+					},
+					J
+				>
 			: J
 		: never;
 type FrameOrderError<Mode, Kinds, Name, Ord> = [Name, Ord] extends [
