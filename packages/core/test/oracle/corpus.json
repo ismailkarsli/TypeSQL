@@ -23321,6 +23321,12 @@
 			"source": "direct-inference",
 			"sql": "ALTER TABLE direct_inference ADD COLUMN label text NOT NULL DEFAULT 'new'",
 			"ddl": true
+		},
+		{
+			"schema": "a747d3b517b0",
+			"source": "limit-offset-params",
+			"sql": "SELECT email FROM users LIMIT $1 OFFSET $2",
+			"ddl": false
 		}
 	],
 	"skippedSlots": {
