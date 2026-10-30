@@ -23,7 +23,7 @@ When you hit a limit, [`sql.as<Row>()`](./errors#when-typesql-can-t-type-a-state
   | `IN (1, 2, …)` items, multi-row `VALUES` rows | about 1000 |
 
   `AND`/`OR` chains (the parser balances them), 20 joins, 20 CTEs and a `CASE` with 150 branches are fine. The [benchmark](./performance#compile-time) checks statements up to 8 KB.
-- Past these sizes the compiler reports its own error instead of a SQL error: TS2589 ("Type instantiation is excessively deep and possibly infinite"), TS5114 or TS5115. Split the statement, or give its row type with [`sql.as<Row>()`](./dynamic-sql), which skips the analysis.
+- Past these sizes the compiler reports its own error instead of a SQL error: TS2589 ("Type instantiation is excessively deep and possibly infinite"), TS5114 or TS5115. Split the statement, or give its row type with [`sql.as<Row>()`](./dynamic-sql#fully-dynamic-sql), which skips the analysis.
 - In `migrations()`, keep one migration per `.add()`: one text is limited to about 4000 tokens, and past that the error is a raw TS2589.
 
 ## SQL text
