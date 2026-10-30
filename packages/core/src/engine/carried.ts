@@ -55,7 +55,11 @@ type CheckValue<
 		? `a sql.json() value cannot be used as ${Expected<E, U>}`
 		: CheckEnc<R, P> extends true
 			? true
-			: `a sql.json() ${DescribeEnc<R>} value cannot be used as ${Expected<E, U>}`
+			: // sql.json() binds JSON text, which a parameter taking text accepts
+				// (SQLite's json columns, or a type map that reads JSON as a string).
+				[Exclude<P, null | undefined>] extends [string]
+				? true
+				: `a sql.json() ${DescribeEnc<R>} value cannot be used as ${Expected<E, U>}`
 	: CheckEnc<V, P> extends true
 		? V extends `${string}[${string}`
 			? IsJsonParam<E, Exclude<U, NullTest>> extends true
