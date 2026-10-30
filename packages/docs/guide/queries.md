@@ -93,7 +93,7 @@ Things to know:
 - `sql.as<Row>()` takes the row as returned, so give it camelCase keys.
 - `RowOf<DB, TM, Q>` still uses the database's names. `RowType<typeof q>` is the renamed row.
 - All adapters support `.withPlugin(new CasePlugin())`, and transactions retain the plugins, including nested transactions.
-- `sql.set()` and `sql.values()` accept camelCase objects and encode conventional snake_case column names. Use the original SQL instance for snake_case write objects or quoted mixed-case database columns.
+- `sql.set()` and `sql.values()` accept camelCase objects and encode conventional snake_case column names. A column whose camelCase name wouldn't convert back to it, such as `address_line_1` (`addressLine1` would become `address_line1`), takes its own snake_case name as the key. Use the original SQL instance for other snake_case write objects or quoted mixed-case database columns.
 - Turn off renaming in the driver, such as postgres.js' `transform: postgres.camel`. The types assume the driver returns the database's names. `@typesql/kysely` already bypasses Kysely plugins such as `CamelCasePlugin`.
 
 ### Plugins

@@ -59,9 +59,20 @@ export type SnakeCaseKeys<Row> = Row extends object
 	? { [K in keyof Row as K extends string ? SnakeCase<K> : K]: Row[K] }
 	: Row;
 
+/**
+ * Write keys: the camelCase key when it converts back to the column, else the
+ * column name itself (`address_line_1`, whose camelCase `addressLine1` would
+ * convert to `address_line1`). Keys without capitals are written unchanged.
+ */
+type InputKey<K extends string> =
+	SnakeCase<CamelCase<K>> extends K ? CamelCase<K> : K;
+export type CamelCaseInputKeys<Row> = Row extends object
+	? { [K in keyof Row as K extends string ? InputKey<K> : K]: Row[K] }
+	: Row;
+
 export interface CasePluginTypes extends IdentityPluginTypes {
 	readonly input: this["context"]["kind"] extends "set" | "values"
-		? CamelCaseKeys<this["value"]>
+		? CamelCaseInputKeys<this["value"]>
 		: this["value"];
 	readonly encoded: this["context"]["kind"] extends "set" | "values"
 		? SnakeCaseKeys<this["value"]>
