@@ -531,7 +531,58 @@ type ProjectSetOp<
 			: LC
 		: never;
 
+type HasStarEntry<C extends Cols> = [
+	Extract<C[number], { readonly star: unknown }>,
+] extends [never]
+	? false
+	: true;
+
+/**
+ * A `*` branch keeps its columns as a map, without positions. Merge the other
+ * branch's nullability by name when both have the same columns; otherwise any
+ * nullable column on the right makes every column nullable.
+ */
+type StarSetOp<L extends Cols, R extends Cols> =
+	ColsToMap<L> extends infer LM extends ColMap
+		? ColsToMap<R> extends infer RM extends ColMap
+			? [
+					{
+						readonly star: {
+							readonly [K in keyof LM]: {
+								readonly type: LM[K]["type"];
+								readonly nullable: LM[K]["nullable"] extends true
+									? true
+									: [keyof LM] extends [keyof RM]
+										? [keyof RM] extends [keyof LM]
+											? K extends keyof RM
+												? RM[K]["nullable"]
+												: true
+											: AnyNullableMap<RM>
+										: AnyNullableMap<RM>;
+							};
+						};
+					},
+				]
+			: never
+		: never;
+type AnyNullableMap<M extends ColMap> = true extends M[keyof M]["nullable"]
+	? true
+	: false;
+
 type AlignSetOp<
+	L extends Cols,
+	R extends Cols,
+	Op extends string,
+	Acc extends Cols,
+	I extends number,
+> = I extends 0
+	? HasStarEntry<L> extends true
+		? StarSetOp<L, R>
+		: HasStarEntry<R> extends true
+			? StarSetOp<L, R>
+			: AlignCols<L, R, Op, Acc, I>
+	: AlignCols<L, R, Op, Acc, I>;
+type AlignCols<
 	L extends Cols,
 	R extends Cols,
 	Op extends string,
