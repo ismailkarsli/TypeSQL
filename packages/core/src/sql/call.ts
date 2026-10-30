@@ -6,7 +6,7 @@ import type { PluginInput, PluginOutput, SqlPlugin } from "../plugin.js";
 import type { Query } from "../query.js";
 import type { HasDefaultable, Skip, WithDefaults } from "./inline.js";
 import type { NamedParams } from "./named.js";
-import type { SlotCarried, SlotTexts } from "./slots.js";
+import type { SlotCarried, SlotTexts, SlotVariants } from "./slots.js";
 import type { HasSlots, Splice, SpliceCarried, Take } from "./splice.js";
 import type {
 	IsLiteral,
@@ -194,7 +194,13 @@ export type GateSlottedCheck<
 	Q extends string,
 	S,
 > = [DB, TM, Q, S] extends [infer D, infer M, infer Q2 extends string, infer S2]
-	? Surface<SlottedCheck<E, D, M, Q2, S2>>
+	? Surface<
+			SlotVariants<S2> extends infer V
+				? V extends unknown
+					? SlottedCheck<E, D, M, Q2, V>
+					: never
+				: never
+		>
 	: never;
 
 export type BoxCallArgs<
