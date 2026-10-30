@@ -27,6 +27,8 @@ export interface SqlCall {
 	readonly start: number;
 	readonly end: number;
 	readonly text: string;
+	/** The TypeScript literal's delimiter: `"`, `'` or a backtick. */
+	readonly quote: string;
 	readonly db: Type;
 	readonly dialect: Dialect;
 }
@@ -61,42 +63,48 @@ export async function sqlCallAt(
 		return null;
 
 	const callee = call.expression;
-	let db: Type | undefined;
-	let sqlType: Type | undefined;
-	if (
+	const sqlType =
 		callee.kind === kinds.PropertyAccessExpression &&
 		METHODS.has((callee as PropertyAccessExpression).name.text)
-	) {
-		const receiver = await checker.getTypeAtLocation(
-			(callee as PropertyAccessExpression).expression,
-		);
-		if (await isCoreRef(receiver, ["Sql", "TransactionalSql"], isCorePath)) {
-			db = (await checker.getTypeArguments(receiver as never))[0];
-			sqlType = receiver;
-		}
-	} else {
-		const t = await checker.getTypeAtLocation(callee);
-		if (await isCoreRef(t, ["Sql", "TransactionalSql"], isCorePath)) {
-			db = (await checker.getTypeArguments(t as never))[0];
-			sqlType = t;
-		}
-	}
-	if (!db || !sqlType) return null;
-	const sym = await sqlType.getSymbol();
-	const dialect: Dialect = sym?.declarations.some((d) =>
-		/[\\/]sqlite[\\/]/.test(d.path),
-	)
-		? "sqlite"
-		: "postgres";
+			? await checker.getTypeAtLocation(
+					(callee as PropertyAccessExpression).expression,
+				)
+			: await checker.getTypeAtLocation(callee);
+	const target = await sqlTarget(checker, sqlType, isCorePath);
+	if (!target) return null;
 	return {
 		file,
 		offset,
 		start: parts.start,
 		end: parts.end,
 		text: parts.text,
-		db,
-		dialect,
+		quote: file.text[literal.getStart(file)]!,
+		...target,
 	};
+}
+
+async function sqlTarget(
+	checker: Checker,
+	t: Type,
+	isCorePath: (path: string) => boolean,
+): Promise<{ db: Type; dialect: Dialect } | null> {
+	if (await isCoreRef(t, ["Sql", "TransactionalSql"], isCorePath)) {
+		const db = (await checker.getTypeArguments(t as never))[0];
+		const sym = await t.getSymbol();
+		const sqlite = sym?.declarations.some((d) =>
+			/[\\/]sqlite[\\/]/.test(d.path),
+		);
+		return db ? { db, dialect: sqlite ? "sqlite" : "postgres" } : null;
+	}
+	// core's createSql(dialect).withPlugin(…) returns SqlApi<Engine, DB, …>.
+	if (await isCoreRef(t, ["SqlApi"], isCorePath)) {
+		const [engine, db] = await checker.getTypeArguments(t as never);
+		const name = engine ? (await engine.getSymbol())?.name : undefined;
+		return db
+			? { db, dialect: name === "SqliteEngine" ? "sqlite" : "postgres" }
+			: null;
+	}
+	return null;
 }
 
 function callAt(
@@ -165,10 +173,18 @@ function escaped(s: string, i: number): boolean {
 	return n % 2 === 1;
 }
 
-const escapes = (s: string): string =>
-	s.replace(/\\(.)/gs, (_, c: string) =>
-		c === '"' || c === "'" || c === "`" ? ` ${c}` : "  ",
-	);
+// Replace each escape with two characters to keep offsets. An escaped quote
+// keeps its quote and gets a space outside the SQL quote it opens or closes,
+// so `\"Users\"` reads as ` "Users" `, not ` "Users "`.
+const escapes = (s: string): string => {
+	const open = new Set<string>();
+	return s.replace(/\\(.)/gs, (_, c: string) => {
+		if (c !== '"' && c !== "'" && c !== "`") return "  ";
+		if (open.delete(c)) return `${c} `;
+		open.add(c);
+		return ` ${c}`;
+	});
+};
 
 async function isCoreRef(
 	type: Type,

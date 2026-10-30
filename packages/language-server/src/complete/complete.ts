@@ -132,7 +132,10 @@ export async function completionsAt(
 	const ctx = contextAt(call.text, call.offset - call.start);
 	const lc = (o: number): LineAndCharacter =>
 		call.file.getLineAndCharacterOfPosition(o);
-	const replace = { start: call.start + ctx.from, end: call.offset };
+	let from = call.start + ctx.from;
+	// A quoted name typed in a "…" string starts with its escaping backslash.
+	if (from > call.start && call.file.text[from - 1] === "\\") from--;
+	const replace = { start: from, end: call.offset };
 	const literal = { start: call.start, end: call.end };
 	const ranges = {
 		replace,
@@ -141,14 +144,25 @@ export async function completionsAt(
 		literalRange: { start: lc(literal.start), end: lc(literal.end) },
 	};
 	if (ctx.expect.kind === "none") return { items: [], ...ranges };
+	const items = await completions(
+		await schemaOf(checker, call.db, call.dialect === "sqlite"),
+		ctx,
+		call.dialect,
+	);
 	return {
-		items: await completions(
-			await schemaOf(checker, call.db, call.dialect === "sqlite"),
-			ctx,
-			call.dialect,
-		),
+		items: items.map((i) => ({
+			...i,
+			insertText: escapeFor(call.quote, i.insertText),
+		})),
 		...ranges,
 	};
+}
+
+/** Escape inserted SQL for the TypeScript string literal it goes into. */
+export function escapeFor(quote: string, text: string): string {
+	const s = text.replaceAll("\\", "\\\\");
+	if (quote === "`") return s.replaceAll("`", "\\`").replaceAll("${", "\\${");
+	return s.replaceAll(quote, `\\${quote}`);
 }
 
 const pad = (n: number): string => String(n).padStart(4, "0");
