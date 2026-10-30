@@ -211,6 +211,10 @@
   dir: packages/core
   intents:
     - light-cats-hunt
+"@typesql/core@0.9.1":
+  dir: packages/core
+  intents:
+    - giant-tips-relate
 "@typesql/drizzle@0.0.2":
   dir: packages/drizzle
   intents:
@@ -331,6 +335,10 @@
   dir: packages/language-server
   intents:
     - wet-ducks-trade
+"@typesql/language-server@0.0.6":
+  dir: packages/language-server
+  intents:
+    - nice-dodos-fly
 "@typesql/pg@0.0.2":
   dir: packages/pg
   intents:
@@ -390,6 +398,10 @@
   dir: packages/pg
   intents:
     - wet-ducks-trade
+"@typesql/pg@0.3.2":
+  dir: packages/pg
+  intents:
+    - quick-tips-whisper
 "@typesql/postgres@0.0.2":
   dir: packages/postgres
   intents:
@@ -499,6 +511,10 @@
   dir: packages/sqlite
   intents:
     - wet-ducks-trade
+"@typesql/sqlite@0.0.3":
+  dir: packages/sqlite
+  intents:
+    - quick-pots-poke
 typesql@0.0.1:
   dir: packages/vscode
   intents:
@@ -533,3 +549,7 @@ typesql@0.0.8:
   dir: packages/vscode
   intents:
     - wet-ducks-trade
+typesql@0.0.9:
+  dir: packages/vscode
+  intents:
+    - cool-moons-pretend

@@ -1,5 +1,11 @@
 # @typesql/language-server
 
+## 0.0.6
+
+### Patch Changes
+
+- Resolves packages and completion schemas afresh without caching their results.
+
 ## 0.0.5
 
 ### Patch Changes

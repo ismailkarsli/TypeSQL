@@ -1,5 +1,11 @@
 # @typesql/core
 
+## 0.9.1
+
+### Patch Changes
+
+- Removes the type cache and runtime memoization so queries and migrations are always inferred directly.
+
 ## 0.9.0
 
 ### Minor Changes

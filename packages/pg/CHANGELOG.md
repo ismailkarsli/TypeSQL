@@ -1,5 +1,14 @@
 # @typesql/pg
 
+## 0.3.2
+
+### Patch Changes
+
+- Reads current catalog metadata for view nullability without retaining introspection results.
+
+- Updated dependencies:
+  - @typesql/core@0.9.1
+
 ## 0.3.1
 
 ### Patch Changes

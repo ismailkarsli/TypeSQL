@@ -1,5 +1,11 @@
 # typesql
 
+## 0.0.9
+
+### Patch Changes
+
+- Reads current schemas for SQL completions without caching their results.
+
 ## 0.0.8
 
 ### Patch Changes

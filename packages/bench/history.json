@@ -2,55 +2,61 @@
 	"0.7.1": {
 		"case1": {
 			"statements": 379,
-			"checkTimeSec": 2.158
+			"checkTimeSec": 2.021
 		}
 	},
 	"0.7.2": {
 		"case1": {
 			"statements": 379,
-			"checkTimeSec": 0.898
+			"checkTimeSec": 0.817
 		}
 	},
 	"0.7.3": {
 		"case1": {
 			"statements": 379,
-			"checkTimeSec": 0.872
+			"checkTimeSec": 0.809
 		}
 	},
 	"0.7.4": {
 		"case1": {
 			"statements": 379,
-			"checkTimeSec": 0.863
+			"checkTimeSec": 0.82
 		}
 	},
 	"0.7.5": {
 		"case1": {
 			"statements": 379,
-			"checkTimeSec": 0.693
+			"checkTimeSec": 0.659
 		}
 	},
 	"0.7.6": {
 		"case1": {
 			"statements": 379,
-			"checkTimeSec": 0.698
+			"checkTimeSec": 0.661
 		}
 	},
 	"0.8.0": {
 		"case1": {
 			"statements": 379,
-			"checkTimeSec": 0.689
+			"checkTimeSec": 0.667
 		}
 	},
 	"0.8.1": {
 		"case1": {
 			"statements": 379,
-			"checkTimeSec": 0.727
+			"checkTimeSec": 0.675
 		}
 	},
 	"0.9.0": {
 		"case1": {
 			"statements": 379,
-			"checkTimeSec": 0.707
+			"checkTimeSec": 0.671
+		}
+	},
+	"0.9.1": {
+		"case1": {
+			"statements": 379,
+			"checkTimeSec": 0.674
 		}
 	}
 }

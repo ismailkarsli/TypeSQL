@@ -1,5 +1,14 @@
 # @typesql/sqlite
 
+## 0.0.3
+
+### Patch Changes
+
+- Prepares each execution directly without retaining a statement cache.
+
+- Updated dependencies:
+  - @typesql/core@0.9.1
+
 ## 0.0.2
 
 ### Patch Changes
