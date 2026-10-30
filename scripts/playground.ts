@@ -15,7 +15,7 @@ const sources = new Map(
 );
 
 const playgroundUrl = (code: string): string =>
-	`https://www.typescriptlang.org/play/#code/${lz.compressToEncodedURIComponent(code)}`;
+	`https://www.typescriptlang.org/play/?moduleResolution=100#code/${lz.compressToEncodedURIComponent(code)}`;
 
 function markdownFiles(dir: string): string[] {
 	return readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
