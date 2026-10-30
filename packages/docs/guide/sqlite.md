@@ -144,7 +144,7 @@ Nullability follows SQLite, which returns `NULL` in more places than PostgreSQL:
 
 Row keys are the column names SQLite reports:
 
-- A column reference is named as the column is declared: `SELECT ID FROM users` gives `id` if the table says `id`. `rowid`, `oid` and `_rowid_` are named `rowid` (or the table's `INTEGER PRIMARY KEY` column, for schemas from migrations).
+- A column reference is named as the column is declared: `SELECT ID FROM users` gives `id` if the table says `id`. `rowid`, `oid` and `_rowid_` are named `rowid`, or after the table's `INTEGER PRIMARY KEY` column when the schema marks it with `rowid: true` (introspection and migrations do). SQLite itself always names them after that column, so in a hand-written schema declare it as `Col<"integer", { rowid: true; hasDefault: true }>` rather than `Generated<"integer">` if you select `rowid`.
 - An expression without `AS` is named by its text, exactly as written: `SELECT count(*), 1 + 1` gives the keys `count(*)` and `1 + 1`.
 - Duplicate names in a subquery, CTE or view get SQLite's suffixes (`id`, `id:1`).
 - Unnamed `VALUES` columns are `column1`, `column2`, ….
