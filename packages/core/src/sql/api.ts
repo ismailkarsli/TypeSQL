@@ -1,3 +1,4 @@
+import type { Empty } from "../empty.js";
 import type { EngineTypes } from "../engine/contract.js";
 import type { ParamsOf, RowOf } from "../engine/infer.js";
 import type {
@@ -25,7 +26,7 @@ import type {
 	GateFragCheck,
 	LiteralParts,
 } from "./fragment.js";
-import type { InlineMarker, JsonMarker } from "./inline.js";
+import type { InlineMarker, JsonMarker, ParamInput } from "./inline.js";
 import type { SlotCarried, SlotMap, SlotsFor, Slottable } from "./slots.js";
 import type { QuotedIdent, SpliceCarried, UnknownTuple } from "./splice.js";
 import type { PText } from "./text.js";
@@ -74,7 +75,9 @@ export interface SqlApi<
 		...params: readonly unknown[]
 	): Query<Row, readonly unknown[]>;
 
-	param<const T>(value: T): InlineMarker<T>;
+	readonly empty: Empty;
+
+	param<const T>(value: T & ParamInput<T>): InlineMarker<T>;
 
 	json<const T>(value: T): JsonMarker<T>;
 
@@ -103,7 +106,7 @@ export interface SqlApi<
 	id(...parts: readonly [string, ...string[]]): Fragment<string, [], []>;
 
 	combine<
-		const Items extends readonly Slottable[],
+		const Items extends readonly (Slottable | Empty)[],
 		const Sep extends CombineSeparator = ", ",
 	>(
 		items: Items,

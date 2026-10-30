@@ -77,14 +77,15 @@ Reuse the returned function across calls to save TypeSQL's runtime SQL assembly.
 
 | Function | Sends |
 |---|---|
-| `sql.param(value)` | the value as a `$n` parameter, or `DEFAULT` when it is `undefined` |
+| `sql.param(value)` | the value as a `$n` parameter, or `DEFAULT` when it is `sql.empty`; rejects `undefined` |
+| `sql.empty` / `sql.empty(value)` | an explicit sentinel, or a helper that replaces `null` and `undefined` with it; omitted in `combine`, emitted as `DEFAULT` in inline `param` |
 | `sql.json(value)` | the value as JSON text; `null` and `undefined` as SQL `NULL` |
 
 - The value's type is checked against the parameter's type. Strings are accepted for enums, objects for JSON and other object-typed columns, and anything when there is no context.
 - Inline values are numbered after the statement's `$n` / `:name` parameters. Values carried by spliced fragments come last.
 - Each `sql.param()` belongs to one statement. Inside quotes or a comment it is an error.
 - `sql.json()` is an error unless the parameter is `json` / `jsonb` or has no context. A `Json<T>` column checks the value against `T`. A raw array for a JSON parameter is an error with `sql.param()` and as a call argument (`NonArrayOrSqlJson<T>`).
-- A `sql.param()` value that can be `undefined` makes the statement be checked a second time with `DEFAULT` in its place, so it only fits a `VALUES` item or a `SET` value. `sql.fragment()` refuses such a value. `any` and `unknown` values are not checked.
+- A `sql.param()` value that can be `sql.empty` makes the statement be checked a second time with `DEFAULT` in its place, so it only fits a `VALUES` item or a `SET` value. `sql.fragment()` refuses such a value. `any` and `unknown` values are not checked.
 
 See [Parameters](../guide/parameters), [JSON values](../guide/parameters#json-values) and [Optional values](../guide/writing-data#optional-values).
 
@@ -99,7 +100,7 @@ const q = sql("SELECT u.id FROM users u {where}", { where });
 |---|---|
 | `sql.fragment(text, ...params)` | a piece of SQL to splice into a `{name}` slot |
 | `sql.id("col")`, `sql.id("schema", "table")` | a quoted identifier: `"col"`, `"schema"."table"` |
-| `sql.combine(items, options?)` | the fragments combined with `", "` by default: a tuple keeps its literal text, a runtime array of fragments with literal texts is checked as a list; throws when empty |
+| `sql.combine(items, options?)` | the fragments combined with `", "` by default: a tuple keeps its literal text, a runtime array of fragments with literal texts is checked as a list; ignores `sql.empty` items and throws if none remain |
 | `sql.raw(text)` | dynamic text, sent as is |
 
 - Only `{identifier}` is a slot. Braces inside string literals are left alone.

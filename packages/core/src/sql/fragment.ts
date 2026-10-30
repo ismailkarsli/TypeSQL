@@ -1,3 +1,4 @@
+import type { Empty } from "../empty.js";
 import type { AnyErr, SqlError } from "../errors.js";
 import type { Fragment, TextType } from "../query.js";
 import type { HasDefaultable, ValueEnc } from "./inline.js";
@@ -32,7 +33,7 @@ type FragCheck<Text extends string, Slotted extends boolean> =
 					? P
 					: HasDefaultable<Text> extends true
 						? SqlError<
-								"a sql.param() value that can be undefined is sent as DEFAULT, which a fragment cannot check; narrow it, or pass value ?? null",
+								"a sql.param() value that can be sql.empty is sent as DEFAULT, which a fragment cannot check; narrow it, or use null for SQL NULL",
 								null
 							>
 						: true
@@ -143,7 +144,38 @@ export type ListRep<E, Sep extends string> = [E] extends [never]
 				: never
 		: never;
 
+// Match runtime filtering for sql.empty entries. Conditional entries are
+// checked as present, like elements of a runtime list's representative statement.
+type PresentItems<
+	Items extends readonly (Slottable | Empty)[],
+	Acc extends readonly Slottable[] = [],
+> = number extends Items["length"]
+	? [...Acc, ...Exclude<Items[number], Empty>[]]
+	: Items extends readonly []
+		? Acc
+		: Items extends readonly [
+					Slottable | Empty,
+					...infer R extends readonly (Slottable | Empty)[],
+				]
+			? PresentItems<
+					R,
+					[Exclude<Items[0], Empty>] extends [never]
+						? Acc
+						: [...Acc, Exclude<Items[0], Empty>]
+				>
+			: Acc;
+
 export type CombineOf<
+	Items extends readonly (Slottable | Empty)[],
+	Sep extends string,
+> = CombinePresent<
+	number extends Items["length"]
+		? readonly Exclude<Items[number], Empty>[]
+		: PresentItems<Items>,
+	Sep
+>;
+
+type CombinePresent<
 	Items extends readonly Slottable[],
 	Sep extends string,
 > = string extends Sep

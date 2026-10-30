@@ -2160,7 +2160,7 @@ export const query40 = sql(`
 						${sql.param(input0)},
 						${sql.param(input0)},
 						${sql.param(input18)},
-						${sql.param(input13)},
+						${sql.param(input13 === undefined ? sql.empty : input13)},
 						${sql.param(input0)}
 					)
 					RETURNING *
@@ -2221,7 +2221,7 @@ export const query50 = sql(
 export const query51 = sql(
 	`
 						INSERT INTO "flue" (linn, goopy, imbedded_ad, goopy_flexures)
-						VALUES ('Rainily Houseboater', ${sql.param(input21)}, ${sql.param(input13)}, TRUE)
+						VALUES ('Rainily Houseboater', ${sql.param(input21)}, ${sql.param(input13 === undefined ? sql.empty : input13)}, TRUE)
 						RETURNING {drosses}
 					`,
 	{ drosses: input20 },
@@ -2630,8 +2630,8 @@ export const query138 = sql(`
 				${sql.param(input17)},
 				${sql.param(input17)},
 				${sql.json<unknown>(input44)},
-				${sql.param(input13)},
-				${sql.param(input13)}
+				${sql.param(input13 === undefined ? sql.empty : input13)},
+				${sql.param(input13 === undefined ? sql.empty : input13)}
 			)
 			RETURNING *
 		`);
@@ -3576,7 +3576,7 @@ export const query288 = sql(`DELETE FROM scurvinesses_osmous
 
 export const query289 =
 	sql(`INSERT INTO scurvinesses_osmous (sigla, chutes, scurvinesses_ad)
-				VALUES (${sql.param(input76)}, ${sql.param(input48)}, ${sql.param(input0)})
+				VALUES (${sql.param(input76)}, ${sql.param(input48 === undefined ? sql.empty : input48)}, ${sql.param(input0)})
 				RETURNING ad`);
 
 export const query290 = sql("INSERT INTO scurvinesses_osmous_zither {shacko}", {
@@ -3932,20 +3932,20 @@ export const query345 = sql(`INSERT INTO gelandesprung (
 					zither, zither_forts, "thrum", thrum_forts, propionates, propionates_donna, ates_aortas, convoker
 				) VALUES (
 					${sql.json(input8)},
-					${sql.param(input48)},
-					${sql.param(input49)},
-					${sql.param(input49)},
-					${sql.param(input49)},
-					${sql.param(input48)},
-					${sql.param(input48)},
-					${sql.param(input48)},
-					${sql.param(input48)},
+					${sql.param(input48 === undefined ? sql.empty : input48)},
+					${sql.param(input49 === undefined ? sql.empty : input49)},
+					${sql.param(input49 === undefined ? sql.empty : input49)},
+					${sql.param(input49 === undefined ? sql.empty : input49)},
+					${sql.param(input48 === undefined ? sql.empty : input48)},
+					${sql.param(input48 === undefined ? sql.empty : input48)},
+					${sql.param(input48 === undefined ? sql.empty : input48)},
+					${sql.param(input48 === undefined ? sql.empty : input48)},
 					${sql.json(input69)},
-					${sql.param(input48)},
+					${sql.param(input48 === undefined ? sql.empty : input48)},
 					${sql.json(input70)},
-					${sql.param(input48)},
-					${sql.param(input51)},
-					${sql.param(input13)},
+					${sql.param(input48 === undefined ? sql.empty : input48)},
+					${sql.param(input51 === undefined ? sql.empty : input51)},
+					${sql.param(input13 === undefined ? sql.empty : input13)},
 					${sql.json(input52)}
 				) RETURNING ad, birred`);
 
@@ -3953,16 +3953,16 @@ export const query346 = sql(`INSERT INTO strickles (
 					lampases, lampases_donna, intensify, intensify_donna, pride, pride_donna,
 					heap, heap_donna, emulations, emulations_donna, emulations_bobstay
 				) VALUES (
-					${sql.param(input48)},
-					${sql.param(input51)},
-					${sql.param(input48)},
-					${sql.param(input51)},
-					${sql.param(input48)},
-					${sql.param(input51)},
-					${sql.param(input48)},
-					${sql.param(input51)},
-					${sql.param(input48)},
-					${sql.param(input51)},
+					${sql.param(input48 === undefined ? sql.empty : input48)},
+					${sql.param(input51 === undefined ? sql.empty : input51)},
+					${sql.param(input48 === undefined ? sql.empty : input48)},
+					${sql.param(input51 === undefined ? sql.empty : input51)},
+					${sql.param(input48 === undefined ? sql.empty : input48)},
+					${sql.param(input51 === undefined ? sql.empty : input51)},
+					${sql.param(input48 === undefined ? sql.empty : input48)},
+					${sql.param(input51 === undefined ? sql.empty : input51)},
+					${sql.param(input48 === undefined ? sql.empty : input48)},
+					${sql.param(input51 === undefined ? sql.empty : input51)},
 					${sql.json(input8)}
 				) RETURNING ad`);
 
@@ -3973,19 +3973,19 @@ export const query347 = sql(`INSERT INTO sublingual (
 				) VALUES (
 					${sql.param(input0)},
 					'telexes',
-					${sql.param(input54)},
+					${sql.param(input54 === undefined ? sql.empty : input54)},
 					${sql.param(input0)},
 					${sql.param(input0)},
 					${sql.param(input18)},
 					${sql.param(input0)},
-					${sql.param(input96)},
-					${sql.param(input54)},
-					${sql.param(input54)},
-					${sql.param(input54)},
-					${sql.param(input13)},
-					${sql.param(input13)},
-					${sql.param(input54)},
-					${sql.param(input54)},
+					${sql.param(input96 === undefined ? sql.empty : input96)},
+					${sql.param(input54 === undefined ? sql.empty : input54)},
+					${sql.param(input54 === undefined ? sql.empty : input54)},
+					${sql.param(input54 === undefined ? sql.empty : input54)},
+					${sql.param(input13 === undefined ? sql.empty : input13)},
+					${sql.param(input13 === undefined ? sql.empty : input13)},
+					${sql.param(input54 === undefined ? sql.empty : input54)},
+					${sql.param(input54 === undefined ? sql.empty : input54)},
 					${sql.param(input0)},
 					${sql.param(input0)},
 					${sql.param(input0)},

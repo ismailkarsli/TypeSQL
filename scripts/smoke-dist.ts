@@ -43,6 +43,11 @@ interface DB {
 		display_name: Col<"text">;
 	};
 	docs: { items: Json<number[]> };
+	preferences: {
+		email: Col<"text">;
+		retries: Col<"int4", { hasDefault: true }>;
+		note: Col<"text", { nullable: true }>;
+	};
 }
 const sql = core.createSql<DB>(corePg.postgres);
 assert.deepEqual(sql("SELECT id FROM users WHERE id = $1", 7), {
@@ -68,6 +73,96 @@ assert.deepEqual(
 );
 
 const evil = "x'; DROP TABLE users; --";
+for (const includeEmail of [false, true]) {
+	const filters = sql.combine(
+		[
+			sql.empty,
+			sql.fragment("id > $1", 5),
+			sql.empty(includeEmail ? sql.fragment("email = $1", evil) : null),
+			sql.empty,
+			sql.fragment("age > $1", 18),
+			sql.empty,
+		],
+		{ separator: " AND " },
+	);
+	assert.deepEqual(sql("SELECT id FROM users WHERE {filters}", { filters }), {
+		text: includeEmail
+			? "SELECT id FROM users WHERE id > $1 AND email = $2 AND age > $3"
+			: "SELECT id FROM users WHERE id > $1 AND age > $2",
+		values: includeEmail ? [5, evil, 18] : [5, 18],
+	});
+	const items = [sql.empty, sql.fragment("$1", evil), sql.empty];
+	assert.deepEqual(sql.combine(items), { text: "$1", values: [evil] });
+}
+assert.deepEqual(
+	sql.combine([sql.empty, sql.id("id"), sql.empty, sql.id("email")]),
+	{
+		text: '"id", "email"',
+		values: [],
+	},
+);
+assert.throws(() => sql.combine([]), /needs at least one item/);
+assert.throws(
+	() => sql.combine([sql.empty, sql.empty]),
+	/needs at least one item/,
+);
+assert.throws(() => {
+	// @ts-expect-error undefined must be made explicit with sql.empty.
+	sql.combine([undefined]);
+}, /does not accept null or undefined/);
+assert.throws(() => {
+	// @ts-expect-error null is not a fragment or the omission sentinel.
+	sql.combine([null]);
+}, /does not accept null or undefined/);
+assert.throws(() => {
+	// @ts-expect-error undefined no longer implicitly requests DEFAULT.
+	sql.param(undefined);
+}, /does not accept undefined/);
+
+assert.equal(sql.empty(null), sql.empty);
+assert.equal(sql.empty(undefined), sql.empty);
+assert.equal(sql.empty(sql.empty), sql.empty);
+const required = sql.fragment("id > $1", 5);
+assert.equal(sql.empty(required), required);
+assert.throws(() => sql.combine(new Array<typeof required>(1)), /undefined/);
+for (const value of [0, false, "", null] as const) {
+	assert.deepEqual(sql(`SELECT ${sql.param(value)}`), {
+		text: "SELECT $1",
+		values: [value],
+	});
+	if (value !== null) {
+		assert.equal(sql.empty(value), value);
+		assert.deepEqual(sql(`SELECT ${sql.param(sql.empty(value))}`), {
+			text: "SELECT $1",
+			values: [value],
+		});
+	}
+}
+for (const value of [0, 7, null, undefined]) {
+	for (const optional of [value ?? sql.empty, sql.empty(value)]) {
+		assert.deepEqual(
+			sql(
+				`UPDATE preferences SET retries = ${sql.param(optional)} WHERE email = ${sql.param(evil)}`,
+			),
+			{
+				text:
+					value === null || value === undefined
+						? "UPDATE preferences SET retries = DEFAULT WHERE email = $1"
+						: "UPDATE preferences SET retries = $1 WHERE email = $2",
+				values: value === null || value === undefined ? [evil] : [value, evil],
+			},
+		);
+	}
+}
+assert.throws(
+	() => sql.as("SELECT $1", sql.empty),
+	/cannot be a bound parameter/,
+);
+assert.throws(
+	() => sql.as("SELECT $1", sql.param(sql.empty)),
+	/must be interpolated inline/,
+);
+
 assert.deepEqual(
 	sql(
 		`SELECT id FROM users WHERE email = ${sql.param(evil)} AND id > ${sql.param(3)}`,
@@ -88,7 +183,7 @@ assert.equal(JSON.stringify(doc.values[0]), "[1,2]");
 const repeated = sql.param("repeat");
 assert.deepEqual(
 	sql.as(
-		`SELECT $2, ${repeated}, ${repeated}, ${sql.param(undefined)}, '$99', "$88" -- $77\n`,
+		`SELECT $2, ${repeated}, ${repeated}, ${sql.param(sql.empty)}, '$99', "$88" -- $77\n`,
 		1,
 		2,
 	),
