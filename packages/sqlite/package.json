@@ -1,6 +1,6 @@
 {
 	"name": "@typesql/sqlite",
-	"version": "0.0.3",
+	"version": "0.0.4",
 	"description": "SQLite adapter for TypeSQL: node:sqlite, better-sqlite3 and bun:sqlite, with the introspection behind `typesql introspect --dialect sqlite` (@typesql/cli).",
 	"license": "MIT",
 	"repository": {

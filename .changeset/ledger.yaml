@@ -215,6 +215,11 @@
   dir: packages/core
   intents:
     - giant-tips-relate
+"@typesql/core@0.9.2":
+  dir: packages/core
+  intents:
+    - lazy-donkeys-unite
+    - tame-snails-join
 "@typesql/drizzle@0.0.2":
   dir: packages/drizzle
   intents:
