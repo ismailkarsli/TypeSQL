@@ -47,13 +47,25 @@ const NO_DATA = /does not return data/;
 const noData = (e: unknown): boolean =>
 	e instanceof Error && (NO_DATA.test(e.message) || noData(e.cause));
 
+// libsql returns BLOBs as ArrayBuffer; rows are typed with Uint8Array.
+function blobs(row: unknown): unknown {
+	if (row === null || typeof row !== "object") return row;
+	const values = row as Record<string, unknown>;
+	for (const key in values) {
+		const value = values[key];
+		if (value instanceof ArrayBuffer) values[key] = new Uint8Array(value);
+	}
+	return row;
+}
+
 async function all(
 	db: DrizzleSqliteDatabase,
 	text: string,
 	values: readonly unknown[],
 ): Promise<unknown[]> {
 	try {
-		return (await runner(db).all(statement(text, values))) as unknown[];
+		const rows = (await runner(db).all(statement(text, values))) as unknown[];
+		return isAsync(db) ? rows.map(blobs) : rows;
 	} catch (e) {
 		if (!noData(e)) throw e;
 		await runner(db).run(statement(text, values));
