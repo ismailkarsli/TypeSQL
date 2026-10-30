@@ -1,5 +1,20 @@
 # @typesql/cli
 
+## 0.1.0
+
+### Minor Changes
+
+- Create and run tracked TypeScript migrations with migrate make, up, down, and latest commands and project configuration.
+
+### Patch Changes
+
+- Parse CLI routing options with Node's standard argument parser and respect option terminators.
+
+- Updated dependencies:
+  - @typesql/core@0.9.0
+  - @typesql/pg@0.3.1
+  - @typesql/sqlite@0.0.2
+
 ## 0.0.1
 
 ### Patch Changes

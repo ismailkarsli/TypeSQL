@@ -1,6 +1,6 @@
 {
-	"date": "2026-10-29",
-	"version": "0.8.1",
+	"date": "2026-10-30",
+	"version": "0.9.0",
 	"workload": {
 		"file": "src/case1.ts",
 		"statements": 379
@@ -17,13 +17,13 @@
 	"throughput": {
 		"tsrs": {
 			"instantiationsPerQuery": 9046,
-			"checkMsPerQuery": 1.92,
-			"queriesPerSec": 521
+			"checkMsPerQuery": 1.87,
+			"queriesPerSec": 536
 		},
 		"tsc": {
 			"instantiationsPerQuery": 9046,
-			"checkMsPerQuery": 6.93,
-			"queriesPerSec": 144
+			"checkMsPerQuery": 6.72,
+			"queriesPerSec": 149
 		}
 	},
 	"cache": {
@@ -35,27 +35,27 @@
 	"rows": {
 		"case1": {
 			"instantiations": "3.43M",
-			"tsrs": 0.727,
-			"tsc": 2.626
+			"tsrs": 0.707,
+			"tsc": 2.546
 		},
 		"case1 cached": {
 			"instantiations": "1.02M",
-			"tsrs": 0.238,
-			"tsc": 0.902
+			"tsrs": 0.242,
+			"tsc": 0.887
 		},
 		"case1 stale": {
 			"instantiations": "3.57M",
-			"tsrs": 0.743,
-			"tsc": 2.751
+			"tsrs": 0.741,
+			"tsc": 2.717
 		},
 		"case1 source": {
 			"instantiations": "3.58M",
-			"tsrs": 0.757,
-			"tsc": 2.978
+			"tsrs": 0.742,
+			"tsc": 2.827
 		}
 	},
 	"runtime": {
-		"microsecondsPerQuery": "4.82",
-		"millisecondsPerWorkload": "1.83"
+		"microsecondsPerQuery": "4.65",
+		"millisecondsPerWorkload": "1.76"
 	}
 }

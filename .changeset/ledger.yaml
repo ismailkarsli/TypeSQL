@@ -2,6 +2,11 @@
   dir: packages/cli
   intents:
     - wet-ducks-trade
+"@typesql/cli@0.1.0":
+  dir: packages/cli
+  intents:
+    - breezy-hairs-remain
+    - hungry-cows-shine
 "@typesql/core@0.0.2":
   dir: packages/core
   intents:
@@ -202,6 +207,10 @@
   intents:
     - little-shoes-bet
     - wet-ducks-trade
+"@typesql/core@0.9.0":
+  dir: packages/core
+  intents:
+    - light-cats-hunt
 "@typesql/drizzle@0.0.2":
   dir: packages/drizzle
   intents:

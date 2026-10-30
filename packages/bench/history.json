@@ -2,57 +2,64 @@
 	"0.7.1": {
 		"case1": {
 			"statements": 379,
-			"checkTimeSec": 2.211,
-			"cachedCheckTimeSec": 0.782
+			"checkTimeSec": 2.158,
+			"cachedCheckTimeSec": 0.75
 		}
 	},
 	"0.7.2": {
 		"case1": {
 			"statements": 379,
-			"checkTimeSec": 0.847,
-			"cachedCheckTimeSec": 0.298
+			"checkTimeSec": 0.898,
+			"cachedCheckTimeSec": 0.307
 		}
 	},
 	"0.7.3": {
 		"case1": {
 			"statements": 379,
-			"checkTimeSec": 0.86,
-			"cachedCheckTimeSec": 0.3
+			"checkTimeSec": 0.872,
+			"cachedCheckTimeSec": 0.315
 		}
 	},
 	"0.7.4": {
 		"case1": {
 			"statements": 379,
-			"checkTimeSec": 0.861,
-			"cachedCheckTimeSec": 0.303
+			"checkTimeSec": 0.863,
+			"cachedCheckTimeSec": 0.311
 		}
 	},
 	"0.7.5": {
 		"case1": {
 			"statements": 379,
-			"checkTimeSec": 0.692,
-			"cachedCheckTimeSec": 0.225
+			"checkTimeSec": 0.693,
+			"cachedCheckTimeSec": 0.237
 		}
 	},
 	"0.7.6": {
 		"case1": {
 			"statements": 379,
-			"checkTimeSec": 0.711,
-			"cachedCheckTimeSec": 0.233
+			"checkTimeSec": 0.698,
+			"cachedCheckTimeSec": 0.227
 		}
 	},
 	"0.8.0": {
 		"case1": {
 			"statements": 379,
-			"checkTimeSec": 0.702,
-			"cachedCheckTimeSec": 0.229
+			"checkTimeSec": 0.689,
+			"cachedCheckTimeSec": 0.237
 		}
 	},
 	"0.8.1": {
 		"case1": {
 			"statements": 379,
 			"checkTimeSec": 0.727,
-			"cachedCheckTimeSec": 0.238
+			"cachedCheckTimeSec": 0.244
+		}
+	},
+	"0.9.0": {
+		"case1": {
+			"statements": 379,
+			"checkTimeSec": 0.707,
+			"cachedCheckTimeSec": 0.242
 		}
 	}
 }

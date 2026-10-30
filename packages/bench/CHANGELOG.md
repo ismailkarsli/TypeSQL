@@ -1,5 +1,12 @@
 # @typesql/bench
 
+## 0.0.23
+
+### Patch Changes
+
+- Updated dependencies:
+  - @typesql/core@0.9.0
+
 ## 0.0.22
 
 ### Patch Changes

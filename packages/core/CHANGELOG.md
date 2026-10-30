@@ -1,5 +1,11 @@
 # @typesql/core
 
+## 0.9.0
+
+### Minor Changes
+
+- Run tracked PostgreSQL and SQLite migrations with typed schema evolution, transactional execution, and runtime-code integrity checks.
+
 ## 0.8.1
 
 ### Patch Changes

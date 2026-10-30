@@ -1,6 +1,6 @@
 {
 	"name": "@typesql/cli",
-	"version": "0.0.1",
+	"version": "0.1.0",
 	"description": "The typesql command: tracked schema migrations and schema introspection for PostgreSQL and SQLite.",
 	"license": "MIT",
 	"repository": {
@@ -35,9 +35,9 @@
 		"typecheck": "tsrs -p tsconfig.json --noEmit"
 	},
 	"dependencies": {
+		"@typesql/core": "workspace:*",
 		"@typesql/pg": "workspace:*",
-		"@typesql/sqlite": "workspace:*",
-		"@typesql/core": "workspace:*"
+		"@typesql/sqlite": "workspace:*"
 	},
 	"peerDependencies": {
 		"pg": ">=8"
@@ -48,9 +48,9 @@
 		}
 	},
 	"devDependencies": {
+		"@types/pg": "^8.23.1",
 		"tsrs": "0.18.0-ts7.1.0-dev.20260929",
-		"typescript": "7.1.0-beta",
-		"@types/pg": "^8.23.1"
+		"typescript": "7.1.0-beta"
 	},
 	"homepage": "https://typesql.karsli.net/guide/introspect",
 	"bugs": {
