@@ -26,10 +26,6 @@
 			"queriesPerSec": 149
 		}
 	},
-	"cache": {
-		"cachedRatio": 0.297,
-		"staleRatio": 1.041
-	},
 	"instantiationsPerQuery": "9.05K",
 	"speedup": 3.6,
 	"rows": {
@@ -37,16 +33,6 @@
 			"instantiations": "3.43M",
 			"tsrs": 0.707,
 			"tsc": 2.546
-		},
-		"case1 cached": {
-			"instantiations": "1.02M",
-			"tsrs": 0.242,
-			"tsc": 0.887
-		},
-		"case1 stale": {
-			"instantiations": "3.57M",
-			"tsrs": 0.741,
-			"tsc": 2.717
 		},
 		"case1 source": {
 			"instantiations": "3.58M",

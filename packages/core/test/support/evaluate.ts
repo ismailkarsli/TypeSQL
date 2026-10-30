@@ -1,5 +1,5 @@
 import { createRequire } from "node:module";
-import { dirname, relative } from "node:path";
+import { dirname, join, relative } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { Node, SourceFile, VariableStatement } from "typescript/ast";
 import type {
@@ -9,16 +9,14 @@ import type {
 	Snapshot,
 	Type,
 } from "typescript/async";
-import type { CacheDialect } from "./dialect.js";
-import type { Kinds } from "./discover.js";
-import { coreNames, Printer } from "./print.js";
+import type { ProbeDialect } from "./dialect.js";
 
 export interface TypeScript {
 	readonly API: typeof AsyncAPI;
 	readonly createFileSystemLayer: (
 		files: readonly (readonly [string, string])[],
 	) => unknown;
-	readonly kinds: Kinds & { readonly VariableStatement: number };
+	readonly kinds: { readonly VariableStatement: number };
 }
 
 export async function loadTypeScript(configFile: string): Promise<TypeScript> {
@@ -38,19 +36,13 @@ export async function loadTypeScript(configFile: string): Promise<TypeScript> {
 		createFileSystemLayer:
 			fs.createFileSystemLayer as TypeScript["createFileSystemLayer"],
 		kinds: {
-			CallExpression: SyntaxKind.CallExpression!,
-			PropertyAccessExpression: SyntaxKind.PropertyAccessExpression!,
-			TypeReference: SyntaxKind.TypeReference!,
-			LiteralType: SyntaxKind.LiteralType!,
-			StringLiteral: SyntaxKind.StringLiteral!,
-			TypeAliasDeclaration: SyntaxKind.TypeAliasDeclaration!,
 			VariableStatement: SyntaxKind.VariableStatement!,
 		},
 	};
 }
 
-export const probeHead = (dialect: CacheDialect): string =>
-	`import type * as __T from ${JSON.stringify(dialect.engine)};\nexport declare const __v: __T.CacheVersion;\nexport declare const __fc: __T.FunctionCatalog;\n`;
+export const probeHead = (dialect: ProbeDialect): string =>
+	`import type * as __T from ${JSON.stringify(dialect.engine)};\nexport declare const __fc: __T.FunctionCatalog;\nimport type { OracleAnalysis as __Analysis } from ${JSON.stringify(join(import.meta.dirname, "analysis.js"))};\n`;
 
 export interface ProbeProgram {
 	readonly program: Program;
@@ -62,7 +54,6 @@ export class ProbeSession {
 	private ts: TypeScript | undefined;
 	private api: AsyncAPI | undefined;
 	private snapshot: Snapshot | undefined;
-	private changed = new Set<string>();
 	private disposed = false;
 	private readonly configFile: string;
 	readonly probe: string;
@@ -75,10 +66,6 @@ export class ProbeSession {
 	async typescript(): Promise<TypeScript> {
 		this.ts ??= await loadTypeScript(this.configFile);
 		return this.ts;
-	}
-
-	markChanged(files: Iterable<string>): void {
-		for (const f of files) this.changed.add(f);
 	}
 
 	async close(): Promise<void> {
@@ -94,7 +81,8 @@ export class ProbeSession {
 	}
 
 	async withProbe(text: string): Promise<ProbeProgram> {
-		if (this.disposed) throw new Error("typesql: the job was stopped");
+		if (this.disposed)
+			throw new Error("typesql: the probe session was disposed");
 		const ts = await this.typescript();
 		const fileSystem = ts.createFileSystemLayer([[this.probe, text]]) as never;
 		if (!this.api || !this.snapshot) {
@@ -103,10 +91,8 @@ export class ProbeSession {
 				openProjects: [this.configFile],
 				fileSystem,
 			});
-			this.changed.clear();
 		} else {
-			const changed = [...this.changed, this.probe];
-			this.changed.clear();
+			const changed = [this.probe];
 			const previous = this.snapshot;
 			this.snapshot = await previous.update({
 				fileSystem,
@@ -133,8 +119,7 @@ export async function evaluateTypes(
 	session: ProbeSession,
 	base: string,
 	exprs: readonly string[],
-	isCorePath: (path: string) => boolean,
-	dialect: CacheDialect,
+	dialect: ProbeDialect,
 ): Promise<Evaluated[]> {
 	let probe = base;
 	exprs.forEach((e, i) => {
@@ -142,7 +127,7 @@ export async function evaluateTypes(
 	});
 	const { program, checker, sf } = await session.withProbe(probe);
 	const kinds = (await session.typescript()).kinds;
-	const printer = new Printer(checker, sf, isCorePath);
+
 	const types = await declTypes(checker, sf, kinds);
 	const bad = await badDeclarations(program, sf);
 	return Promise.all(
@@ -152,24 +137,14 @@ export async function evaluateTypes(
 			if (error !== undefined) return { error };
 			const t = types.get(name);
 			if (!t) return { error: "no declaration" };
-			return { text: coreNames(await printer.print(t), dialect.specifiers) };
+			return {
+				text: dialect.specifiers.reduce(
+					(text, spec) =>
+						text.replaceAll(`import(${JSON.stringify(spec)}).`, "__T."),
+					await checker.typeToString(t, sf, 1),
+				),
+			};
 		}),
-	);
-}
-
-export function evaluateAnalyses(
-	session: ProbeSession,
-	base: string,
-	items: readonly { readonly db: string; readonly text: string }[],
-	isCorePath: (path: string) => boolean,
-	dialect: CacheDialect,
-): Promise<Evaluated[]> {
-	return evaluateTypes(
-		session,
-		base,
-		items.map((a) => `__T.CacheAnalysis<${a.db}, ${JSON.stringify(a.text)}>`),
-		isCorePath,
-		dialect,
 	);
 }
 

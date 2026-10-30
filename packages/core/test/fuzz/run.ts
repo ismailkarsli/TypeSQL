@@ -1,13 +1,6 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import fc from "fast-check";
-import {
-	type Evaluated,
-	evaluateTypes,
-	ProbeSession,
-	probeHead,
-} from "../../src/cache/evaluate.js";
-import { postgresCache } from "../../src/postgres/cache-dialect.js";
 import { hashOf } from "../oracle/baseline.js";
 import { evaluateInBatches, orderDependent } from "../oracle/batches.js";
 import { compareStatement, type Server } from "../oracle/compare.js";
@@ -24,11 +17,17 @@ import {
 } from "../oracle/schema.js";
 import {
 	type Candidate,
-	isCorePath,
 	observe,
 	oursOf,
 	withDatabase,
 } from "../oracle/types.js";
+import { postgresProbe } from "../support/dialect.js";
+import {
+	type Evaluated,
+	evaluateTypes,
+	ProbeSession,
+	probeHead,
+} from "../support/evaluate.js";
 import { kinds, type Node, parserStatements, statement } from "./gen.js";
 import { fuzzDbType, fuzzSetup, MOOD, TABLES } from "./schema.js";
 
@@ -88,7 +87,7 @@ export interface FuzzOptions {
 
 const here = import.meta.dirname;
 const DATABASE = "typesql_fuzz";
-const BASE = `${probeHead(postgresCache)}type FDB = ${fuzzDbType()};\n`;
+const BASE = `${probeHead(postgresProbe)}type FDB = ${fuzzDbType()};\n`;
 const FUZZ_DB: Db = {
 	namespaces: [],
 	relations: [],
@@ -168,18 +167,10 @@ export class Fuzzer {
 		sqls: readonly string[],
 		log?: (m: string) => void,
 	): Promise<Evaluated[]> {
-		const exprs = sqls.map(
-			(s) => `__T.CacheAnalysis<FDB, ${JSON.stringify(s)}>`,
-		);
+		const exprs = sqls.map((s) => `__Analysis<FDB, ${JSON.stringify(s)}>`);
 		if (exprs.length === 1)
-			return evaluateTypes(
-				this.session,
-				BASE,
-				exprs,
-				isCorePath,
-				postgresCache,
-			);
-		return evaluateInBatches(this.session, () => BASE, exprs, isCorePath, {
+			return evaluateTypes(this.session, BASE, exprs, postgresProbe);
+		return evaluateInBatches(this.session, () => BASE, exprs, {
 			size: 500,
 			timeoutMs: 300_000,
 			isolate: orderDependent,
@@ -240,10 +231,9 @@ export class Fuzzer {
 			const db = cs[0]!.db;
 			const ours = await evaluateTypes(
 				this.session,
-				`${probeHead(postgresCache)}type C = ${dbTypeText(db)};\n`,
-				cs.map((c) => `__T.CacheAnalysis<C, ${JSON.stringify(c.sql)}>`),
-				isCorePath,
-				postgresCache,
+				`${probeHead(postgresProbe)}type C = ${dbTypeText(db)};\n`,
+				cs.map((c) => `__Analysis<C, ${JSON.stringify(c.sql)}>`),
+				postgresProbe,
 			);
 			const name = `typesql_fuzz_c${id}`;
 			const admin = new Connection(this.url);

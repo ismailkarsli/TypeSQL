@@ -21,7 +21,6 @@
 		"bench": "pnpm --filter @typesql/bench run bench",
 		"smoke:dist": "node scripts/smoke-dist.ts",
 		"check:intents": "node scripts/check-intents.ts",
-		"cache-version": "node scripts/cache-version.ts",
 		"release": "gh workflow run release.yml --ref main && echo \"Release started: https://github.com/ismailkarsli/typesql/actions/workflows/release.yml\"",
 		"docs:dev": "pnpm --filter @typesql/docs run dev",
 		"docs:build": "pnpm --filter @typesql/docs run build",

@@ -67,8 +67,6 @@ It hooks into TypeScript 7's language server (`tsc --lsp --stdio`) and reads its
 
 If you already configure `tsgo` with `nvim-lspconfig`, you can leave out `filetypes` and `root_markers`: Neovim merges `~/.config/nvim/lsp/tsgo.lua` into it.
 
-To use the [type cache](./performance#type-cache), allow the content mapper with `init_options = { runExternalCode = true }` in the same table.
-
 ## Syntax highlighting
 
 [nvim-treesitter](https://github.com/nvim-treesitter/nvim-treesitter) already highlights SQL in `` sql(`…`) `` template literals once the `sql` parser is installed (`:TSInstall sql`). To also highlight `sql("…")`, `tx(…)`, `sql.fragment(…)` and `sql.as<Row>(…)`, save this as `~/.config/nvim/queries/typescript/injections.scm`, and as the same file under `queries/tsx/` and `queries/javascript/`:

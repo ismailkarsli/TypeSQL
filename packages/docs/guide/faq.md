@@ -34,7 +34,7 @@ No. Types, hovers and errors come from TypeScript in any editor. The editor supp
 
 ## Does it slow down my editor or `tsc`?
 
-A typical query costs a few milliseconds of check time. With hundreds of queries in a project, the optional type cache keeps results between runs. See [Performance and type cache](./performance).
+A typical query costs a few milliseconds of check time. See [Performance](./performance) for whole-application measurements.
 
 ## Does it support MySQL or SQLite?
 

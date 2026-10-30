@@ -24,7 +24,6 @@ export interface Replayed {
 
 export class Connection {
 	readonly sql: postgres.Sql;
-	private names = new Map<number, string>();
 
 	constructor(
 		url: string,
@@ -122,15 +121,10 @@ export class Connection {
 		}
 	}
 
-	async typeName(oid: number): Promise<string> {
-		if (!this.names.has(oid)) await this.loadTypeNames();
-		return this.names.get(oid) ?? `oid:${oid}`;
-	}
-
-	private async loadTypeNames(): Promise<void> {
-		const rows = await this.sql.unsafe<
+	async typeName(oid: number, depth = 0): Promise<string> {
+		if (depth > 5) return `oid:${oid}`;
+		const [t] = await this.sql.unsafe<
 			{
-				oid: number;
 				typname: string;
 				typtype: string;
 				typcategory: string;
@@ -138,18 +132,14 @@ export class Connection {
 				typbasetype: number;
 			}[]
 		>(
-			"SELECT oid::int4 AS oid, typname::text AS typname, typtype::text AS typtype, typcategory::text AS typcategory, typelem::int4 AS typelem, typbasetype::int4 AS typbasetype FROM pg_type",
+			"SELECT typname::text AS typname, typtype::text AS typtype, typcategory::text AS typcategory, typelem::int4 AS typelem, typbasetype::int4 AS typbasetype FROM pg_type WHERE oid = $1",
+			[oid],
 		);
-		const byOid = new Map(rows.map((r) => [r.oid, r]));
-		const nameOf = (oid: number, depth = 0): string => {
-			const t = byOid.get(oid);
-			if (!t || depth > 5) return `oid:${oid}`;
-			if (t.typtype === "d") return nameOf(t.typbasetype, depth + 1);
-			if (t.typcategory === "A" && t.typelem !== 0 && t.typname.startsWith("_"))
-				return `${nameOf(t.typelem, depth + 1)}[]`;
-			return t.typname;
-		};
-		this.names = new Map(rows.map((r) => [r.oid, nameOf(r.oid)]));
+		if (!t) return `oid:${oid}`;
+		if (t.typtype === "d") return this.typeName(t.typbasetype, depth + 1);
+		if (t.typcategory === "A" && t.typelem !== 0 && t.typname.startsWith("_"))
+			return `${await this.typeName(t.typelem, depth + 1)}[]`;
+		return t.typname;
 	}
 }
 

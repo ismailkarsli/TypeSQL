@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import type { Analysis } from "../../src/cache/evaluate.js";
+import type { Analysis } from "../support/evaluate.js";
 import type { Disagreement, SkipReason } from "./kinds.js";
 import type { Connection } from "./replay.js";
 

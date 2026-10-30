@@ -1,5 +1,3 @@
-import { memo } from "./memo.js";
-
 export type RowKeys = "preserve" | "camelCase";
 
 export interface SqlOptions {
@@ -28,14 +26,14 @@ export type KeyedRow<Row, K extends RowKeys> = K extends "camelCase"
 	? CamelCaseKeys<Row>
 	: Row;
 
-const camelCased = memo((key: string) => {
+function camelCased(key: string): string {
 	let mapped = key[0]!;
 	for (let i = 1; i < key.length; i++) {
 		const c = key[i]!;
 		if (c !== "_") mapped += key[i - 1] === "_" ? c.toUpperCase() : c;
 	}
 	return mapped;
-});
+}
 
 export function camelCase(key: string): string {
 	return key.includes("_") ? camelCased(key) : key;

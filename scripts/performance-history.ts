@@ -5,7 +5,6 @@ interface HistoryEntry {
 	case1: {
 		statements: number;
 		checkTimeSec: number;
-		cachedCheckTimeSec: number;
 	};
 }
 let history: Record<string, HistoryEntry> = JSON.parse(
@@ -20,7 +19,6 @@ const measurements = JSON.parse(
 const {
 	results,
 	throughput,
-	cache,
 	workload,
 	measuredAt,
 	environment,
@@ -49,12 +47,7 @@ function entryFor(data: HistoryBenchmark): HistoryEntry {
 		throw new Error("Missing case1 application benchmark metadata");
 	}
 	for (const compiler of ["tsrs", "tsc"]) {
-		for (const name of [
-			"case1",
-			"case1 cached",
-			"case1 stale",
-			"case1 source",
-		]) {
+		for (const name of ["case1", "case1 source"]) {
 			const result = data.results[compiler]?.find((r) => r.name === name);
 			if (
 				result?.exitCode !== 0 ||
@@ -82,7 +75,6 @@ function entryFor(data: HistoryBenchmark): HistoryEntry {
 		case1: {
 			statements: data.workload.statements,
 			checkTimeSec: get("case1"),
-			cachedCheckTimeSec: get("case1 cached"),
 		},
 	};
 }
@@ -146,7 +138,6 @@ const bench = {
 	environment,
 	compilers: compilerVersions,
 	throughput,
-	cache,
 	instantiationsPerQuery: compact.format(
 		throughput.tsrs.instantiationsPerQuery,
 	),
@@ -180,7 +171,6 @@ const summary = [
 	"| Application workload | `tsc` | tsrs |",
 	"|---|---|---|",
 	`| \`case1\` | ${bench.rows.case1.tsc} s | ${bench.rows.case1.tsrs} s |`,
-	`| [\`case1 cached\`](https://typesql.karsli.net/guide/performance#type-cache) | ${bench.rows["case1 cached"].tsc} s | ${bench.rows["case1 cached"].tsrs} s |`,
 	'<span id="performance-summary-end"></span>',
 ].join("\n");
 const releases = Object.entries(history).sort(([a], [b]) =>
@@ -188,21 +178,19 @@ const releases = Object.entries(history).sort(([a], [b]) =>
 );
 const chart = [
 	'<span id="performance-history-start"></span>',
-	"Lines: 🔵 Uncached · 🟢 Cached.",
 	"",
 	"```mermaid",
 	"---",
 	"config:",
 	"  themeVariables:",
 	"    xyChart:",
-	'      plotColorPalette: "#2563eb,#16a34a"',
+	'      plotColorPalette: "#2563eb"',
 	"---",
 	"xychart-beta",
 	'    title "tsrs - real-world case1"',
 	`    x-axis "Core version" [${releases.map(([v]) => JSON.stringify(v)).join(", ")}]`,
-	`    y-axis "Check time (seconds, lower is faster)" 0 --> ${Math.ceil(Math.max(...releases.flatMap(([, times]) => [times.case1.checkTimeSec, times.case1.cachedCheckTimeSec])) * 11) / 10}`,
+	`    y-axis "Check time (seconds, lower is faster)" 0 --> ${Math.ceil(Math.max(...releases.map(([, times]) => times.case1.checkTimeSec)) * 11) / 10}`,
 	`    line [${releases.map(([, times]) => times.case1.checkTimeSec).join(", ")}]`,
-	`    line [${releases.map(([, times]) => times.case1.cachedCheckTimeSec).join(", ")}]`,
 	"```",
 	'<span id="performance-history-end"></span>',
 ].join("\n");

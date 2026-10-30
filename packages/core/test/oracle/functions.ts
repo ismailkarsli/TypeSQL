@@ -1,13 +1,13 @@
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
+import { postgresProbe } from "../support/dialect.js";
 import {
 	type Evaluated,
 	evaluateTypes,
 	ProbeSession,
 	probeHead,
 	readAnalysis,
-} from "../../src/cache/evaluate.js";
-import { postgresCache } from "../../src/postgres/cache-dialect.js";
+} from "../support/evaluate.js";
 import {
 	type BaselineEntry,
 	type Entries,
@@ -38,7 +38,7 @@ import { compareStatement, type Ours } from "./compare.js";
 import type { Disagreement } from "./kinds.js";
 import { Connection, type ServerError } from "./replay.js";
 import type { OracleResult } from "./result.js";
-import { isCorePath, withDatabase } from "./types.js";
+import { withDatabase } from "./types.js";
 
 const here = import.meta.dirname;
 
@@ -98,10 +98,9 @@ export async function functionsOracle(
 			out.push(
 				...(await evaluateTypes(
 					session,
-					probeHead(postgresCache) + PRELUDE,
+					probeHead(postgresProbe) + PRELUDE,
 					exprs.slice(i, i + BATCH),
-					isCorePath,
-					postgresCache,
+					postgresProbe,
 				)),
 			);
 		return out;
@@ -427,7 +426,7 @@ export async function functionsOracle(
 }
 
 const analysisOf = (it: Item): string =>
-	`__T.CacheAnalysis<DB, ${JSON.stringify(it.st.text)}>`;
+	`__Analysis<DB, ${JSON.stringify(it.st.text)}>`;
 
 async function readProcs(
 	conn: Connection,

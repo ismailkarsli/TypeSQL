@@ -110,7 +110,7 @@ See the [migration guide](https://typesql.karsli.net/guide/migrations).
 
 ## Documentation
 
-The full guide is at **[typesql.karsli.net](https://typesql.karsli.net)**. It covers the [schema](https://typesql.karsli.net/guide/schema), [parameters](https://typesql.karsli.net/guide/parameters), [writing data](https://typesql.karsli.net/guide/writing-data), [dynamic SQL](https://typesql.karsli.net/guide/dynamic-sql), [migrations](https://typesql.karsli.net/guide/migrations), the [type cache](https://typesql.karsli.net/guide/performance) and [known limits](https://typesql.karsli.net/guide/limits).
+The full guide is at **[typesql.karsli.net](https://typesql.karsli.net)**. It covers the [schema](https://typesql.karsli.net/guide/schema), [parameters](https://typesql.karsli.net/guide/parameters), [writing data](https://typesql.karsli.net/guide/writing-data), [dynamic SQL](https://typesql.karsli.net/guide/dynamic-sql), [migrations](https://typesql.karsli.net/guide/migrations), [performance](https://typesql.karsli.net/guide/performance) and [known limits](https://typesql.karsli.net/guide/limits).
 
 ## License
 

@@ -2,7 +2,6 @@ import { spawnSync } from "node:child_process";
 import { appendFileSync, mkdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { expect, test } from "vitest";
-import type { ProbeSession } from "../../src/cache/evaluate.js";
 import {
 	type BaselineEntry,
 	compareBaseline,
@@ -16,6 +15,7 @@ import {
 	writeBaseline,
 } from "../oracle/baseline.js";
 import { baselineProblems, counts, jobSummary } from "../oracle/job-summary.js";
+import type { ProbeSession } from "../support/evaluate.js";
 import { evaluateCanon, probeSession } from "./ours.js";
 import { OUT } from "./pg-canon.js";
 import { RejectionAudit } from "./rejections.js";

@@ -1,9 +1,9 @@
+import { postgresProbe } from "../support/dialect.js";
 import {
 	type Evaluated,
 	evaluateTypes,
 	type ProbeSession,
-} from "../../src/cache/evaluate.js";
-import { postgresCache } from "../../src/postgres/cache-dialect.js";
+} from "../support/evaluate.js";
 
 export const orderDependent = (r: Evaluated): boolean =>
 	"error" in r || /^__T\.SqlError<any\b/.test(r.text);
@@ -20,7 +20,6 @@ export async function evaluateInBatches(
 	session: ProbeSession,
 	base: (indices: readonly number[]) => string,
 	exprs: readonly string[],
-	isCorePath: (path: string) => boolean,
 	o: BatchOptions,
 ): Promise<Evaluated[]> {
 	const out: Evaluated[] = new Array(exprs.length);
@@ -35,8 +34,7 @@ export async function evaluateInBatches(
 					session,
 					base(indices),
 					indices.map((i) => exprs[i]!),
-					isCorePath,
-					postgresCache,
+					postgresProbe,
 				),
 				limit,
 			);

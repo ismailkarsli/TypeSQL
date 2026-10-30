@@ -30,10 +30,6 @@ export const isCorePathIn =
 		path.startsWith(join(dir, "src") + sep);
 
 export class CorePaths {
-	private readonly byDir = new Map<
-		string,
-		((path: string) => boolean) | null
-	>();
 	private readonly logged = new Set<string>();
 	private readonly log: (message: string) => void;
 
@@ -42,18 +38,13 @@ export class CorePaths {
 	}
 
 	for(fileName: string): ((path: string) => boolean) | null {
-		const dir = dirname(fileName);
-		let found = this.byDir.get(dir);
-		if (found === undefined) {
-			const core = corePackage(fileName);
-			if (core === null) this.log(`no @typesql/core found from ${dir}`);
-			else if (!this.logged.has(core)) {
-				this.logged.add(core);
-				this.log(`using @typesql/core at ${core}`);
-			}
-			found = core === null ? null : isCorePathIn(core);
-			this.byDir.set(dir, found);
+		const core = corePackage(fileName);
+		if (core === null)
+			this.log(`no @typesql/core found from ${dirname(fileName)}`);
+		else if (!this.logged.has(core)) {
+			this.logged.add(core);
+			this.log(`using @typesql/core at ${core}`);
 		}
-		return found;
+		return core === null ? null : isCorePathIn(core);
 	}
 }

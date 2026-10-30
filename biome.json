@@ -59,8 +59,6 @@
 	"overrides": [
 		{
 			"includes": [
-				"packages/core/src/postgres/engine/cache.ts",
-				"packages/core/src/sqlite/engine/cache.ts",
 				"packages/core/src/sqlite/engine/typer/functions.ts",
 				"packages/core/src/schema.ts"
 			],

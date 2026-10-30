@@ -14,15 +14,14 @@ Core separates what every dialect shares from the dialects under `postgres/` and
 | `dialect.ts` | The dialect contract: `DialectTypes` (the type side) and `Dialect` (the runtime side, `{ name, valuesDefault? }`). |
 | `create-sql.ts` | Construct the SQL API for a dialect and connect its operations to an executor. Statements are built with `$n` parameters and sent as written. |
 | `sql/` | Type-level text preparation (`text.ts`, `named.ts`, `inline.ts`, `splice.ts`), slot contracts, fragment/combine inference, the `sql.set` / `sql.values` texts, and the `sql` function every dialect shares: its overloads (`api.ts`) and call validation, arguments and return types (`call.ts`). |
-| `engine/` | Engine pieces every dialect shares, including the type-level side of the type cache (`cache.ts`). `contract.ts` is `EngineTypes`, the type-level contract a dialect's engine implements: one small interface per operation (analysis, tokens, row and parameter mapping, type display, call cache), applied as `(E["analysis"] & { db; q })["out"]`. `infer.ts` builds `RowOf`, `ParamsOf`, `ArgsOf` and `Validate` on it, `carried.ts` checks inline and spliced values, `write.ts` types `sql.set` and `sql.values`. The rest are shared building blocks: tokens and character classes, parser combinators (`parse.ts`), scopes and columns (`types.ts`), parameter maps (`params.ts`), `WHERE`-based nullability narrowing (`narrow.ts`) and schema rebuilding (`object.ts`). |
+| `engine/` | Engine pieces every dialect shares. `contract.ts` is `EngineTypes`, the type-level contract a dialect's engine implements: one small interface per operation (analysis, tokens, row and parameter mapping, type display), applied as `(E["analysis"] & { db; q })["out"]`. `infer.ts` builds `RowOf`, `ParamsOf`, `ArgsOf` and `Validate` on it, `carried.ts` checks inline and spliced values, `write.ts` types `sql.set` and `sql.values`. The rest are shared building blocks: tokens and character classes, parser combinators (`parse.ts`), scopes and columns (`types.ts`), parameter maps (`params.ts`), `WHERE`-based nullability narrowing (`narrow.ts`) and schema rebuilding (`object.ts`). |
 | `runtime/` | Runtime parameter encoding, statement building, splicing, JSON, and writes. `build.ts` applies named parameters, inline parameters, then slots in that order. |
 | `schema.ts` | The schema markers (`Col`, `View`, …) and the `ColumnTypes` registry a dialect augments with its type names. |
 | `query.ts`, `transaction.ts`, `migrations.ts`, `row-keys.ts` | Query execution, transaction and migration APIs, and row-key mapping. |
-| `cache/` | The Node content mapper and background job that compute and persist type-cache entries, driven by a dialect's `CacheDialect` descriptor. This is separate from the checker-only type-level side, `engine/cache.ts` and each dialect's `engine/cache.ts`. A descriptor says how to scan a statement for the names it depends on and which snapshots to take for each name. |
-| `postgres/dialect.ts`, `postgres/cache-dialect.ts` | The `postgres` dialect and its cache descriptor. |
+| `postgres/dialect.ts` | The `postgres` dialect. |
 | `postgres/sql/`, `postgres/engine/engine.ts` | PostgreSQL's `Sql` (the shared `SqlApi` bound to `PgEngine`) and the `PgEngine` binding of the engine contract. |
 | `postgres/schema/`, `postgres/type-map/` | PostgreSQL schema types (`Json`, `PgCatalog`, functions) and PostgreSQL-to-TypeScript type mappings. |
-| `postgres/engine/` | SQL analysis: lexing, parsing, binding, expression typing, projection, DDL, and cache lookup. `infer.ts` coordinates analysis and binds the shared projections; `diagnostics.ts` locates semantic errors and adds hints. |
+| `postgres/engine/` | SQL analysis: lexing, parsing, binding, expression typing, projection, and DDL. `infer.ts` coordinates analysis and binds the shared projections; `diagnostics.ts` locates semantic errors and adds hints. |
 | `sqlite/` | The SQLite dialect: `dialect.ts`, `migrations.ts`, `type-map/` (affinity-based), `sql/types.ts`, and `engine/` with its own lexer (tokens keep their raw text and preceding whitespace, for SQLite's result column names), parser, `binder/scope.ts` (case-insensitive name resolution, joins, `USING`), `typer/` (expressions, the function catalog, parameters), `project/` (`SELECT`, DML) and `ddl/apply.ts`. `engine.ts` binds it to the engine contract. |
 
 DDL starts at `engine/ddl/script.ts`, which parses and applies statements in sequence. `apply.ts` dispatches parsed DDL to `create-table.ts`, `alter-table.ts`, `view.ts`, `registry.ts` (enums and functions), and `schema.ts`. Those handlers share `object.ts` for schema rebuilding, `relation.ts` for relation lookup and mutation, `column.ts` for column descriptors, and `query.ts` for columns derived from a query. Shared helpers do not import the dispatch or script layers.
@@ -48,19 +47,9 @@ ParseProgram<Toks> → Stmt engine/parser   (recursive descent + Pratt)
 ProjectStmt<Stmt, DB, Outer, Ctes> → Cols | null   engine/project (+ binder, typer)
 ParamsOfStmt<Stmt, DB> → ParamMap          engine/typer/params
 Analyze<DB, Q> → { kind, cols, params, max, stmt } | SqlError      engine/infer
-Analysis<DB, Q> → Analyze without stmt, or a type cache entry      engine/infer, engine/cache
+Analysis<DB, Q> → Analyze<DB, Q>                                 engine/infer
 RowOf / ParamsOf / Validate                 public projections of Analysis
 ```
-
-## Type cache
-
-The type-level side of the [type cache](./performance#type-cache) is shared: `src/engine/cache.ts` matches entries against the program (freshness of a group, call tables, cached analyses and DDL effects), given the dialect's rule for when a snapshot is stale. Each dialect's `engine/cache.ts` declares the interfaces its cache file augments, its `CacheVersion` and that rule; PostgreSQL compares relations, `pg_catalog`, schema functions, the function catalog and enums per name, SQLite compares every relation whose name matches the word case-insensitively. The content mapper and job live in `src/cache/` and find each engine through the descriptors in `src/postgres/cache-dialect.ts` and `src/sqlite/cache-dialect.ts`. Three lookups test `keyof QueryCacheKeys` (or `DdlCacheKeys`) first, so a program without a cache pays one conditional each:
-
-- `Analysis<DB, Q>` (what the projections read; `Analyze` itself is never cached),
-- the plain `sql()` call (`GateCallCheck`, `BoxCallArgs`, `CallRet` in `postgres/sql/call.ts`),
-- `ApplyDdl<DB, Q>`, whose cached result is the step's effect applied to `DB`.
-
-An entry is used only when its dependencies compare equal (`Same`): mutual assignability of *expanded* copies, because relating two instantiations of one alias goes by its measured variances, and `Col`'s flags only appear in conditionals. Freshness is decided per group of entries (`GroupStale`, once per program), so a lookup is an indexed access plus a few conditionals. Run `pnpm cache-version` after changing anything under `src/` (except `cache/` and `runtime/`): an entry computed by other sources is never used.
 
 ## Result conventions
 

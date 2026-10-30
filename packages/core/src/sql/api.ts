@@ -38,14 +38,12 @@ export interface SqlApi<
 	Keys extends RowKeys = "preserve",
 > {
 	<const Q extends string>(
-		query: GateCallCheck<E, DB, TM, Keys, Q> & Q,
-		...params: BoxCallArgs<E, DB, TM, Keys, Q>
+		query: GateCallCheck<E, DB, TM, Q> & Q,
+		...params: BoxCallArgs<E, DB, TM, Q>
 	): CallRet<E, DB, TM, Keys, Q>;
 	prepare<const Q extends string>(
-		query: GateCallCheck<E, DB, TM, Keys, Q> & Q,
-	): (
-		...params: BoxCallArgs<E, DB, TM, Keys, Q>
-	) => CallRet<E, DB, TM, Keys, Q>;
+		query: GateCallCheck<E, DB, TM, Q> & Q,
+	): (...params: BoxCallArgs<E, DB, TM, Q>) => CallRet<E, DB, TM, Keys, Q>;
 	prepare<const Q extends string, const S extends SlotMap>(
 		query: GateSlottedCheck<E, DB, TM, Q, S> & Q,
 		slots: S & SlotsFor<Q, S>,

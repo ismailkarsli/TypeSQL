@@ -136,31 +136,28 @@ The [real-world application workload](packages/bench/src/case1.ts) contains 379 
 | Application workload | `tsc` | tsrs |
 |---|---|---|
 | `case1` | 2.546 s | 0.707 s |
-| [`case1 cached`](https://typesql.karsli.net/guide/performance#type-cache) | 0.887 s | 0.242 s |
 <span id="performance-summary-end"></span>
 
 See [Performance](https://typesql.karsli.net/guide/performance) for how this is measured.
 
 ### Performance by release
 
-Cached and uncached tsrs check time for the [real-world application](packages/bench/src/case1.ts) by `@typesql/core` version. Lower is faster. Every refresh remeasures all releases from 0.7.1 in one CI job with the same compilers, using the median of three checks per variant.
+tsrs check time for the [real-world application](packages/bench/src/case1.ts) by `@typesql/core` version. Lower is faster. Every refresh remeasures all releases from 0.7.1 in one CI job with the same compilers, using the median of three checks per variant.
 
 <span id="performance-history-start"></span>
-Lines: 🔵 Uncached · 🟢 Cached.
 
 ```mermaid
 ---
 config:
   themeVariables:
     xyChart:
-      plotColorPalette: "#2563eb,#16a34a"
+      plotColorPalette: "#2563eb"
 ---
 xychart-beta
     title "tsrs - real-world case1"
     x-axis "Core version" ["0.7.1", "0.7.2", "0.7.3", "0.7.4", "0.7.5", "0.7.6", "0.8.0", "0.8.1", "0.9.0"]
     y-axis "Check time (seconds, lower is faster)" 0 --> 2.4
     line [2.158, 0.898, 0.872, 0.863, 0.693, 0.698, 0.689, 0.727, 0.707]
-    line [0.75, 0.307, 0.315, 0.311, 0.237, 0.227, 0.237, 0.244, 0.242]
 ```
 <span id="performance-history-end"></span>
 
@@ -168,7 +165,7 @@ xychart-beta
 
 ## Documentation
 
-The full guide is at **[typesql.karsli.net](https://typesql.karsli.net)**. It covers the SQL TypeSQL supports, parameters and fragments, writing data, performance and the type cache, and known limits.
+The full guide is at **[typesql.karsli.net](https://typesql.karsli.net)**. It covers the SQL TypeSQL supports, parameters and fragments, writing data, performance, and known limits.
 
 ## License
 

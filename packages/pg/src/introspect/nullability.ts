@@ -190,11 +190,7 @@ interface Att {
 export class ViewNullability {
 	private readonly query: QueryFn;
 	private readonly options: NullabilityOptions;
-	private readonly views = new Map<string, Promise<boolean[]>>();
 	private readonly analyzing = new Set<string>();
-	private readonly atts = new Map<string, Promise<Att[]>>();
-	private procs: Promise<Map<string, Proc>> | null = null;
-	private operators: Promise<Map<string, Proc>> | null = null;
 
 	constructor(query: QueryFn, options: NullabilityOptions = {}) {
 		this.query = query;
@@ -204,13 +200,8 @@ export class ViewNullability {
 	notNull(relid: string | number): Promise<boolean[]> {
 		const key = String(relid);
 		if (this.analyzing.has(key)) return Promise.resolve([]);
-		let cached = this.views.get(key);
-		if (!cached) {
-			this.analyzing.add(key);
-			cached = this.analyze(key).finally(() => this.analyzing.delete(key));
-			this.views.set(key, cached);
-		}
-		return cached;
+		this.analyzing.add(key);
+		return this.analyze(key).finally(() => this.analyzing.delete(key));
 	}
 
 	private async analyze(relid: string): Promise<boolean[]> {
@@ -236,38 +227,28 @@ export class ViewNullability {
 		return out;
 	}
 
-	private loadProcs(): Promise<Map<string, Proc>> {
-		this.procs ??= this.query(
-			`SELECT p.oid::int8::text AS oid, p.proname AS name, t.typname AS ret, p.pronamespace = 'pg_catalog'::regnamespace AS system
-         FROM pg_proc p JOIN pg_type t ON t.oid = p.prorettype`,
-		).then(
-			({ rows }) =>
-				new Map((rows as (Proc & { oid: string })[]).map((r) => [r.oid, r])),
+	private async proc(oid: string): Promise<Proc | undefined> {
+		const { rows } = await this.query(
+			`SELECT p.proname AS name, t.typname AS ret, p.pronamespace = 'pg_catalog'::regnamespace AS system
+    FROM pg_proc p JOIN pg_type t ON t.oid = p.prorettype WHERE p.oid = $1`,
+			[oid],
 		);
-		return this.procs;
-	}
-
-	private loadOperators(): Promise<Map<string, Proc>> {
-		this.operators ??= this.query(
-			`SELECT o.oid::int8::text AS oid, o.oprname AS name, '' AS ret, o.oprnamespace = 'pg_catalog'::regnamespace AS system
-         FROM pg_operator o`,
-		).then(
-			({ rows }) =>
-				new Map((rows as (Proc & { oid: string })[]).map((r) => [r.oid, r])),
-		);
-		return this.operators;
+		return rows[0] as Proc | undefined;
 	}
 
 	private async strictOperator(e: Node): Promise<boolean> {
-		const op = (await this.loadOperators()).get(String(e["opno"]));
+		const { rows } = await this.query(
+			`SELECT o.oprname AS name, o.oprnamespace = 'pg_catalog'::regnamespace AS system
+    FROM pg_operator o WHERE o.oid = $1`,
+			[String(e["opno"])],
+		);
+		const op = rows[0] as Pick<Proc, "name" | "system"> | undefined;
 		return op?.system === true && !NULLABLE_OPERATORS.has(op.name);
 	}
 
 	private columns(relid: string): Promise<Att[]> {
-		let cached = this.atts.get(relid);
-		if (!cached) {
-			cached = this.query(
-				`SELECT a.attnum, c.relkind,
+		return this.query(
+			`SELECT a.attnum, c.relkind,
                 a.attnotnull OR coalesce((
                   WITH RECURSIVE chain(oid, nn) AS (
                     SELECT t.oid, t.typnotnull FROM pg_type t WHERE t.oid = a.atttypid AND t.typtype = 'd'
@@ -277,11 +258,8 @@ export class ViewNullability {
                   SELECT bool_or(nn) FROM chain), false) AS notnull
            FROM pg_attribute a JOIN pg_class c ON c.oid = a.attrelid
           WHERE a.attrelid = $1 AND a.attnum > 0 AND NOT a.attisdropped`,
-				[relid],
-			).then(({ rows }) => rows as Att[]);
-			this.atts.set(relid, cached);
-		}
-		return cached;
+			[relid],
+		).then(({ rows }) => rows as Att[]);
 	}
 
 	private async queryColumn(
@@ -292,8 +270,7 @@ export class ViewNullability {
 		if (!query) return false;
 		if (query["setOperations"]) {
 			for (const r of list(query["rtable"]))
-				if (!(await this.queryColumn(node(r)?.["subquery"], attno)))
-					return false;
+				if (!(await this.queryColumn(node(r)?.subquery, attno))) return false;
 			return true;
 		}
 		const entries = list(query["targetList"])
@@ -339,7 +316,7 @@ export class ViewNullability {
 		if (rte["funcordinality"] === "true" && attno === count + 1) return true;
 		const call = node(only["funcexpr"]);
 		if (call?._ !== "FUNCEXPR") return false;
-		const proc = (await this.loadProcs()).get(String(call["funcid"]));
+		const proc = await this.proc(String(call["funcid"]));
 		return (
 			proc?.system === true &&
 			(NON_NULL_SRF_COLUMNS[proc.name]?.includes(attno) ?? false)
@@ -373,7 +350,7 @@ export class ViewNullability {
 				return this.expr(e["arg"], query);
 			case "FUNCEXPR": {
 				if (e["funcretset"] !== "false") return false;
-				const proc = (await this.loadProcs()).get(String(e["funcid"]));
+				const proc = await this.proc(String(e["funcid"]));
 				if (proc?.system && proc.name === "format_type")
 					return this.expr(list(e["args"])[0], query);
 				const castLike = e["funcformat"] === "1" || e["funcformat"] === "2";
@@ -415,11 +392,11 @@ export class ViewNullability {
 			case "SUBLINK":
 				return e["subLinkType"] === "0" || e["subLinkType"] === "6";
 			case "AGGREF": {
-				const proc = (await this.loadProcs()).get(String(e["aggfnoid"]));
+				const proc = await this.proc(String(e["aggfnoid"]));
 				return proc?.system === true && NON_NULL_AGGREGATES.has(proc.name);
 			}
 			case "WINDOWFUNC": {
-				const proc = (await this.loadProcs()).get(String(e["winfnoid"]));
+				const proc = await this.proc(String(e["winfnoid"]));
 				return (
 					proc?.system === true && NON_NULL_WINDOW_FUNCTIONS.has(proc.name)
 				);

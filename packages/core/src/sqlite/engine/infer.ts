@@ -6,12 +6,6 @@ import type { AnyErr } from "../../errors.js";
 import type { RewriteNamed } from "../../sql/named.js";
 import type { TsOf } from "../type-map/index.js";
 import type { DmlStmt, SelectStmt, Stmt } from "./ast.js";
-import type {
-	CachedAnalysis,
-	CachedDdl,
-	DdlCacheKeys,
-	QueryCacheKeys,
-} from "./cache.js";
 import type { ApplyDdlAll } from "./ddl/apply.js";
 import type { Reposition } from "./diagnostics.js";
 import type { SqliteEngine } from "./engine.js";
@@ -48,13 +42,7 @@ export type Analyze<DB, Q extends string> =
 			: RN
 		: never;
 
-export type Analysis<DB, Q extends string> = [Q] extends [keyof QueryCacheKeys]
-	? CachedAnalysis<DB, Q> extends infer C
-		? [C] extends [never]
-			? Analyze<DB, Q>
-			: C
-		: never
-	: Analyze<DB, Q>;
+export type Analysis<DB, Q extends string> = Analyze<DB, Q>;
 
 type ProjectStmt<S extends Stmt, DB> = S extends { readonly t: "select" }
 	? ProjectSelect<Extract<S, SelectStmt>, DB, [], {}>
@@ -131,10 +119,4 @@ export type Validate<DB, Q extends string> = Shared.Validate<
 
 export type KindOf<DB, Q extends string> = Shared.KindOf<SqliteEngine, DB, Q>;
 
-export type ApplyDdl<DB, Q extends string> = [Q] extends [keyof DdlCacheKeys]
-	? CachedDdl<DB, Q> extends infer C
-		? [C] extends [never]
-			? ApplyDdlAll<DB, Q>
-			: C
-		: never
-	: ApplyDdlAll<DB, Q>;
+export type ApplyDdl<DB, Q extends string> = ApplyDdlAll<DB, Q>;

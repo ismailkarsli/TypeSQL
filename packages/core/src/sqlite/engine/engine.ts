@@ -1,6 +1,5 @@
 import type {
 	AnalysisFn,
-	CallFn,
 	DisplayFn,
 	EngineTypes,
 	ParamFn,
@@ -8,7 +7,6 @@ import type {
 	TokensFn,
 } from "../../engine/contract.js";
 import type { TsParamTypeOf } from "../type-map/index.js";
-import type { CallCached } from "./cache.js";
 import type { Analysis, RowFrom } from "./infer.js";
 import type { Lex } from "./lexer.js";
 
@@ -19,7 +17,6 @@ export interface SqliteEngine extends EngineTypes {
 	readonly param: SqliteParam;
 	readonly display: SqliteDisplay;
 	readonly json: "json";
-	readonly call: SqliteCall;
 }
 
 interface SqliteAnalysis extends AnalysisFn {
@@ -36,7 +33,4 @@ interface SqliteParam extends ParamFn {
 }
 interface SqliteDisplay extends DisplayFn {
 	readonly out: this["t"];
-}
-interface SqliteCall extends CallFn {
-	readonly out: CallCached<this["db"], this["tm"], this["keys"], this["q"]>;
 }

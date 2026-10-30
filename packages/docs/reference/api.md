@@ -2,7 +2,7 @@
 
 Everything `@typesql/core` exports, plus `@typesql/core/postgres`, `@typesql/core/adapter` and the extra exports of the adapter and ORM packages. Each entry links to the guide page that explains it.
 
-`@typesql/core` holds what every SQL dialect shares: `createSql`, queries, fragments, executors, row keys, transactions, migrations, the schema markers, the type cache and the [dialect contract](#dialects). Everything PostgreSQL-specific is in `@typesql/core/postgres`: the `postgres` dialect, the type engine, `Json` and `PgCatalog`, the type maps and the function catalog.
+`@typesql/core` holds what every SQL dialect shares: `createSql`, queries, fragments, executors, row keys, transactions, migrations, the schema markers and the [dialect contract](#dialects). Everything PostgreSQL-specific is in `@typesql/core/postgres`: the `postgres` dialect, the type engine, `Json` and `PgCatalog`, the type maps and the function catalog.
 
 ## `createSql`
 
@@ -67,7 +67,7 @@ await byEmail({ email: "a@example.com" }).execute();
 
 Preparation resolves named parameters, inline values and fragment slots once. The returned function checks each binding's parameter types and returns a normal `Query` with all four `execute*` methods. Every binding gets a fresh values array. Inline and fragment values are captured at preparation; pass changing values as positional or named parameters. Captured objects retain their references.
 
-With `@typesql/pg`, execution uses a server-side statement whose name is derived from the final SQL text. With `@typesql/postgres`, execution enables postgres.js preparation and extended protocol, including for queries without parameters; the client's global `prepare: false` setting still takes precedence. Server statements are cached per connection by the driver. Preparation itself sends no SQL.
+With `@typesql/pg`, execution uses a server-side statement whose name is derived from the final SQL text. With `@typesql/postgres`, execution enables postgres.js preparation and extended protocol, including for queries without parameters; the client's global `prepare: false` setting still takes precedence. Preparation itself sends no SQL.
 
 Other adapters and custom executors reuse TypeSQL's compiled query without requesting server preparation, unless their executor implements `prepare(text)`. The prepared query stays bound to the client or transaction that created it. Create it through `tx.prepare(...)` to execute in a transaction. An executor passed to `execute*` overrides that binding and runs through the supplied executor as usual.
 
@@ -215,7 +215,7 @@ What adapters and custom executors build on.
 
 ### `@typesql/core/postgres/engine`
 
-The engine's other types are exported from `@typesql/core/postgres/engine`, so that a declaration file or the [type cache](../guide/performance#type-cache) can name them: the markers `sql.param()` and `sql.json()` return, the representative texts of `sql.combine`, `sql.set` and `sql.values`, `Analyze` and `Analysis`, `ArgsOf`, `CamelCaseKeys`, the lexer, parser and type cache types, and so on. They change with the engine and are not a stable API.
+The engine's other types are exported from `@typesql/core/postgres/engine`, so that a declaration file can name them: the markers `sql.param()` and `sql.json()` return, the representative texts of `sql.combine`, `sql.set` and `sql.values`, `Analyze` and `Analysis`, `ArgsOf`, `CamelCaseKeys`, the lexer and parser types, and so on. They change with the engine and are not a stable API.
 
 ## Schema types
 

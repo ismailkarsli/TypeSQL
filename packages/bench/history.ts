@@ -123,7 +123,6 @@ function measure(version: string, ref?: string) {
 			execFileSync(command, args, {
 				cwd: directory,
 				stdio: "inherit",
-				env: { ...process.env, TYPESQL_CACHE: "off" },
 			});
 		run(join(root, "node_modules/.bin/tsrs"), [
 			"-p",

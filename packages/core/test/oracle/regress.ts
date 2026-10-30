@@ -1,23 +1,14 @@
-import {
-	closeSync,
-	createReadStream,
-	existsSync,
-	openSync,
-	readFileSync,
-	writeFileSync,
-	writeSync,
-} from "node:fs";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { createInterface } from "node:readline";
+import { classify } from "../pg-regress/psql.js";
+import { postgresProbe } from "../support/dialect.js";
 import {
 	type Evaluated,
 	ProbeSession,
 	parseTypeText,
 	probeHead,
-} from "../../src/cache/evaluate.js";
-import { scanNames } from "../../src/cache/scan.js";
-import { postgresCache } from "../../src/postgres/cache-dialect.js";
-import { classify } from "../pg-regress/psql.js";
+} from "../support/evaluate.js";
+import { scanNames } from "../support/scan.js";
 import { hashOf } from "./baseline.js";
 import { evaluateInBatches, orderDependent } from "./batches.js";
 import {
@@ -43,7 +34,7 @@ import {
 } from "./result.js";
 import { type Db, NORM_PRELUDE, readDb } from "./schema.js";
 import { REGRESS_MOUNT, regressDir } from "./server.js";
-import { isCorePath, oursOf, withDatabase } from "./types.js";
+import { oursOf, withDatabase } from "./types.js";
 import { compareView, viewable, viewableText, viewNotNull } from "./views.js";
 
 interface IntrospectedRelation {
@@ -230,33 +221,22 @@ function typedParams(body: string, types: readonly string[]): string {
 }
 
 interface State {
-	readonly key: string;
 	readonly path: readonly string[];
 	readonly temp: string | null;
 }
 
 async function stateOf(conn: Connection): Promise<State> {
-	const [r] = await conn.sql.unsafe<
-		{ f: string; path: string[]; temp: string | null }[]
-	>(
-		`SELECT md5(concat_ws('|',
-              (SELECT string_agg(xmin::text || ':' || oid::text, ',' ORDER BY oid) FROM pg_class),
-              (SELECT string_agg(xmin::text, ',' ORDER BY attrelid, attnum) FROM pg_attribute WHERE attrelid >= 16384),
-              (SELECT string_agg(xmin::text || ':' || oid::text, ',' ORDER BY oid) FROM pg_type),
-              (SELECT string_agg(xmin::text || ':' || oid::text, ',' ORDER BY oid) FROM pg_namespace),
-              (SELECT string_agg(xmin::text || ':' || oid::text, ',' ORDER BY oid) FROM pg_proc WHERE oid >= 16384))) AS f,
-            current_schemas(false)::text[] AS path,
+	const [r] = await conn.sql.unsafe<{ path: string[]; temp: string | null }[]>(
+		`SELECT current_schemas(false)::text[] AS path,
             CASE WHEN pg_my_temp_schema() <> 0 THEN pg_my_temp_schema()::regnamespace::text END AS temp`,
 	);
 	return {
-		key: `${r!.f}|${r!.path.join(",")}|${r!.temp}`,
 		path: r!.path,
 		temp: r!.temp,
 	};
 }
 
 class Snapshots {
-	private readonly cache = new Map<string, string>();
 	private readonly conn: Connection;
 	constructor(conn: Connection) {
 		this.conn = conn;
@@ -264,28 +244,11 @@ class Snapshots {
 
 	skipped: string[] = [];
 	shadowed: string[] = [];
-	private readonly skippedBy = new Map<
-		string,
-		{ skipped: string[]; shadowed: string[] }
-	>();
 
 	async db(state: State, words: ReadonlySet<string>): Promise<string> {
-		const names = [...words].sort();
-		const key = `${state.key}|${names.join(",")}`;
-		const hit = this.cache.get(key);
-		if (hit !== undefined) {
-			({ skipped: this.skipped, shadowed: this.shadowed } = this.skippedBy.get(
-				key,
-			) ?? { skipped: [], shadowed: [] });
-			return hit;
-		}
 		this.skipped = [];
 		this.shadowed = [];
-		const text = await this.build(state, words);
-		if (this.cache.size > 5000) this.cache.clear(), this.skippedBy.clear();
-		this.cache.set(key, text);
-		this.skippedBy.set(key, { skipped: this.skipped, shadowed: this.shadowed });
-		return text;
+		return this.build(state, words);
 	}
 
 	private async build(
@@ -494,15 +457,6 @@ interface Chain {
 	readonly steps: string[];
 }
 
-interface ReplayCache {
-	readonly key: string;
-	readonly checked: Checked[];
-	readonly chains: { [id: string]: Chain };
-	readonly viewed: [number, boolean[] | null][];
-	readonly regress: OracleResult["tally"];
-	readonly ddl: OracleResult["tally"];
-}
-
 export interface RegressResults {
 	readonly regress: OracleResult;
 	readonly ddl: OracleResult;
@@ -536,24 +490,7 @@ export async function regressOracle(
 	const chains: { [id: string]: Chain } = {};
 
 	const checked: Checked[] = [];
-	const cachePath = process.env["TYPESQL_ORACLE_REPLAY_CACHE"];
-	const cacheKey = JSON.stringify({
-		tests,
-		only,
-		views: options.views ?? false,
-	});
-	const cached =
-		cachePath && existsSync(cachePath)
-			? (JSON.parse(readFileSync(cachePath, "utf8")) as ReplayCache)
-			: null;
-	if (cached?.key === cacheKey) {
-		checked.push(...cached.checked);
-		for (const [i, nn] of cached.viewed) viewed.set(checked[i]!, nn);
-		Object.assign(regress.tally, cached.regress);
-		Object.assign(ddl.tally, cached.ddl);
-		Object.assign(chains, cached.chains);
-		log(`regress oracle: the replay from ${cachePath}`);
-	} else {
+	{
 		const admin = new Connection(url);
 		try {
 			await admin.exec(`DROP DATABASE IF EXISTS ${DATABASE} WITH (FORCE)`);
@@ -593,8 +530,7 @@ export async function regressOracle(
 				settings: SETTINGS,
 			});
 			const snapshots = new Snapshots(conn);
-			let state: State | null = null;
-			const look = async (): Promise<State> => (state ??= await stateOf(conn));
+			const look = (): Promise<State> => stateOf(conn);
 			if (process.env["TYPESQL_ORACLE_DEBUG"])
 				log(`regress oracle: replaying ${test}`);
 			try {
@@ -667,7 +603,6 @@ export async function regressOracle(
 						}
 					} catch {
 						before = null;
-						state = null;
 						count(
 							kind.t === "ddl" ? ddl : regress,
 							"skip: aborted-transaction",
@@ -703,7 +638,6 @@ export async function regressOracle(
 						? { id: chain.id, prev: chain.chain.steps.length }
 						: undefined;
 				const live = nullsOnly(await conn.runScript(s.sql, s.copyData));
-				if (kind.t !== "query") state = null;
 				if (chain && kind.t === "ddl" && !("error" in live))
 					chain.chain.steps.push(s.sql.replace(/;\s*$/, ""));
 				if (/^\s*(rollback|abort)\b/i.test(s.sql)) chain = null;
@@ -744,7 +678,6 @@ export async function regressOracle(
 								? undefined
 								: await snapshots.db(afterState, words);
 					} catch {
-						state = null;
 						count(ddl, "skip: aborted-transaction");
 						return;
 					}
@@ -772,18 +705,6 @@ export async function regressOracle(
 				}
 			}
 		}
-		if (cachePath) {
-			const index = new Map(checked.map((c, i) => [c, i]));
-			const data: ReplayCache = {
-				key: cacheKey,
-				checked,
-				chains,
-				viewed: [...viewed].map(([c, nn]) => [index.get(c)!, nn]),
-				regress: regress.tally,
-				ddl: ddl.tally,
-			};
-			writeFileSync(cachePath, JSON.stringify(data));
-		}
 	}
 	log(
 		`regress oracle: replayed ${tests.length} tests in ${((performance.now() - started) / 1000).toFixed(0)} s; ${checked.filter((c) => !c.ddl).length} queries and ${checked.filter((c) => c.ddl).length} DDL steps to check`,
@@ -803,9 +724,7 @@ export async function regressOracle(
 	for (const c of checked) {
 		const before = exprs.length;
 		if (!c.ddl) {
-			exprs.push(
-				`__T.CacheAnalysis<${alias(c.db)}, ${JSON.stringify(c.text)}>`,
-			);
+			exprs.push(`__Analysis<${alias(c.db)}, ${JSON.stringify(c.text)}>`);
 			dbsOf.push([c.db]);
 			chainOf.push(null);
 		} else {
@@ -835,7 +754,7 @@ export async function regressOracle(
 		for (let k = before; k < exprs.length; k++) fileOf.push(c.test);
 	}
 	const base = (indices: readonly number[]): string => {
-		let text = probeHead(postgresCache) + PRELUDE;
+		let text = probeHead(postgresProbe) + PRELUDE;
 		const seen = new Set<string>();
 		for (const i of indices)
 			for (const db of dbsOf[i]!)
@@ -854,31 +773,21 @@ export async function regressOracle(
 		}
 		return text;
 	};
-	const evalKey = hashOf(
-		`${readFileSync(join(import.meta.dirname, "../../src/postgres/engine/cache.ts"), "utf8").match(/CacheVersion = "[^"]*"/)?.[0]}\0${exprs.join("\0")}`,
-	);
-	const evalCache = cachePath ? `${cachePath}.eval.json` : null;
-	const cachedResults =
-		evalCache && existsSync(evalCache) ? await readJsonLines(evalCache) : null;
 	let results: Evaluated[];
-	if (cachedResults?.[0] === evalKey)
-		results = cachedResults.slice(1) as Evaluated[];
-	else
-		try {
-			results = await evaluateInBatches(session, base, exprs, isCorePath, {
-				size: BATCH,
-				timeoutMs: 300_000,
-				isolate: orderDependent,
-				group: (i) => fileOf[i]!,
-				log: (m) =>
-					log(
-						`regress oracle: ${m} (${((performance.now() - t0) / 1000).toFixed(0)} s)`,
-					),
-			});
-			if (evalCache) writeJsonLines(evalCache, [evalKey, ...results]);
-		} finally {
-			await session.dispose().catch(() => undefined);
-		}
+	try {
+		results = await evaluateInBatches(session, base, exprs, {
+			size: BATCH,
+			timeoutMs: 300_000,
+			isolate: orderDependent,
+			group: (i) => fileOf[i]!,
+			log: (m) =>
+				log(
+					`regress oracle: ${m} (${((performance.now() - t0) / 1000).toFixed(0)} s)`,
+				),
+		});
+	} finally {
+		await session.dispose().catch(() => undefined);
+	}
 	let k = 0;
 	for (const c of checked) {
 		c.result = results[k++]!;
@@ -927,25 +836,6 @@ function nullsOnly(r: Ran): Ran {
 				count: r.count,
 			}
 		: r;
-}
-
-function writeJsonLines(path: string, values: readonly unknown[]): void {
-	const fd = openSync(path, "w");
-	try {
-		for (const v of values) writeSync(fd, `${JSON.stringify(v)}\n`);
-	} finally {
-		closeSync(fd);
-	}
-}
-
-async function readJsonLines(path: string): Promise<unknown[]> {
-	const out: unknown[] = [];
-	for await (const line of createInterface({
-		input: createReadStream(path),
-		crlfDelay: Infinity,
-	}))
-		if (line) out.push(JSON.parse(line));
-	return out;
 }
 
 function scanWords(text: string): Set<string> {

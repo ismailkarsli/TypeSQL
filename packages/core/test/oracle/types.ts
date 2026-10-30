@@ -1,5 +1,6 @@
 import { mkdirSync } from "node:fs";
-import { join, resolve, sep } from "node:path";
+import { join } from "node:path";
+import { postgresProbe } from "../support/dialect.js";
 import {
 	type Evaluated,
 	evaluateTypes,
@@ -7,8 +8,7 @@ import {
 	parseTypeText,
 	probeHead,
 	readAnalysis,
-} from "../../src/cache/evaluate.js";
-import { postgresCache } from "../../src/postgres/cache-dialect.js";
+} from "../support/evaluate.js";
 import { preview } from "./baseline.js";
 import {
 	compareStatement,
@@ -45,9 +45,6 @@ import {
 import { viewable, viewCheck } from "./views.js";
 
 const here = import.meta.dirname;
-const core = resolve(here, "../..");
-export const isCorePath = (p: string): boolean =>
-	p.startsWith(join(core, "src") + sep);
 
 export interface Candidate {
 	readonly sql: string;
@@ -122,7 +119,7 @@ export async function typesOracle(
 			`types oracle: ${list.length} distinct statements over ${groups.size} schemas`,
 		);
 
-		let base = probeHead(postgresCache) + NORM_PRELUDE;
+		let base = probeHead(postgresProbe) + NORM_PRELUDE;
 		for (const g of groups.values())
 			base += `type DB_${g.id} = ${g.snapshot};\n`;
 		const gl = [...groups.values()];
@@ -131,17 +128,11 @@ export async function typesOracle(
 			...list.map((it) =>
 				it.ddl
 					? `__T.ApplyDdl<DB_${it.group.id}, ${JSON.stringify(it.text)}>`
-					: `__T.CacheAnalysis<DB_${it.group.id}, ${JSON.stringify(it.text)}>`,
+					: `__Analysis<DB_${it.group.id}, ${JSON.stringify(it.text)}>`,
 			),
 		];
 		const t0 = performance.now();
-		const results = await evaluateTypes(
-			session,
-			base,
-			exprs,
-			isCorePath,
-			postgresCache,
-		);
+		const results = await evaluateTypes(session, base, exprs, postgresProbe);
 		log(
 			`types oracle: evaluated in ${((performance.now() - t0) / 1000).toFixed(1)} s`,
 		);

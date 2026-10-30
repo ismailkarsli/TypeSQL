@@ -1,5 +1,3 @@
-import { memo } from "../memo.js";
-
 export interface Spliceable {
 	readonly text: string;
 	readonly values: readonly unknown[];
@@ -54,16 +52,14 @@ export function splice(
 		const frag = slots[name];
 		if (frag === undefined)
 			throw new Error(`typesql: unknown fragment slot {${name}}`);
-		out +=
-			(offset === 0 ? frag.text : renumbered(`${offset}\0${frag.text}`)) +
-			plan.parts[i + 1]!;
+		out += renumberParams(frag.text, offset) + plan.parts[i + 1]!;
 		offset += frag.values.length;
 		allValues.push(...frag.values);
 	});
 	return { text: out, values: allValues };
 }
 
-const splicePlan = memo((text: string) => {
+function splicePlan(text: string) {
 	const parts: string[] = [];
 	const names: string[] = [];
 	let last = 0;
@@ -74,17 +70,7 @@ const splicePlan = memo((text: string) => {
 	}
 	parts.push(text.slice(last));
 	return { parts, names, max: maxParam(text) };
-});
-
-const renumbered = memo((key: string) => {
-	const at = key.indexOf("\0");
-	return renumberParams(key.slice(at + 1), Number(key.slice(0, at)));
-});
-
-export const rewriteNamedOnce: (text: string) => {
-	readonly text: string;
-	readonly names: readonly string[];
-} = memo(rewriteNamed);
+}
 
 export function rewriteNamed(text: string): { text: string; names: string[] } {
 	const names: string[] = [];

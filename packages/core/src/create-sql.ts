@@ -10,7 +10,7 @@ import {
 	joinFragments,
 	maxParam,
 	quoteIdent,
-	rewriteNamedOnce,
+	rewriteNamed,
 	splice,
 } from "./runtime/splice.js";
 import { buildSet, buildValues } from "./runtime/write.js";
@@ -43,7 +43,7 @@ export function createDialectSql<T extends DialectTypes, DB, TM = T["typeMap"]>(
 	};
 	const api = Object.assign(call, {
 		prepare: (query: string, slots: SlotMap = {}) => {
-			const rn = rewriteNamedOnce(query);
+			const rn = rewriteNamed(query);
 			const count = maxParam(rn.text);
 			const initial = new Array<unknown>(count).fill(undefined);
 			const base = build(rn.text, initial);

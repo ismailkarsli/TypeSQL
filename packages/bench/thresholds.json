@@ -1,1 +1,12 @@
-{"case1":{"instantiations":5726719,"checkTimeSec":4.64,"maxErrors":0},"case1 cached":{"instantiations":1891032,"checkTimeSec":1.65,"maxErrors":0},"case1 stale":{"instantiations":5916763,"checkTimeSec":4.89,"maxErrors":0},"case1 source":{"instantiations":5925692,"checkTimeSec":5.16,"maxErrors":0},"cache":{"cachedRatio":0.429,"staleRatio":1.05}}
+{
+	"case1": {
+		"instantiations": 5726719,
+		"checkTimeSec": 4.64,
+		"maxErrors": 0
+	},
+	"case1 source": {
+		"instantiations": 5925692,
+		"checkTimeSec": 5.16,
+		"maxErrors": 0
+	}
+}

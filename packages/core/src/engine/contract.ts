@@ -23,13 +23,6 @@ export interface DisplayFn {
 	readonly t: string;
 	readonly out: string;
 }
-export interface CallFn {
-	readonly db: unknown;
-	readonly tm: unknown;
-	readonly keys: unknown;
-	readonly q: string;
-	readonly out: unknown;
-}
 
 export interface EngineTypes {
 	readonly analysis: AnalysisFn;
@@ -38,7 +31,6 @@ export interface EngineTypes {
 	readonly param: ParamFn;
 	readonly display: DisplayFn;
 	readonly json: string;
-	readonly call: CallFn;
 }
 
 export type AnalysisOf<
@@ -73,24 +65,3 @@ export type TypeDisplayOf<
 > = (E["display"] & {
 	readonly t: T;
 })["out"];
-
-export type CallOf<
-	E extends EngineTypes,
-	DB,
-	TM,
-	Keys,
-	Q extends string,
-> = (E["call"] & {
-	readonly db: DB;
-	readonly tm: TM;
-	readonly keys: Keys;
-	readonly q: Q;
-})["out"];
-
-export type CallEntry = {
-	readonly m: unknown;
-	readonly k: string;
-	readonly g: unknown;
-	readonly p: readonly unknown[];
-	readonly q: unknown;
-};

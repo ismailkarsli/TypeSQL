@@ -2,7 +2,7 @@ import {
 	type Evaluated,
 	parseTypeText,
 	type TypeValue,
-} from "../../src/cache/evaluate.js";
+} from "../support/evaluate.js";
 import { sampleTexts } from "./schema.js";
 
 export interface Proc {

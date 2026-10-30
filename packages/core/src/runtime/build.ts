@@ -1,7 +1,7 @@
 import { isSlottable } from "../query.js";
 import type { SlotMap } from "../sql/slots.js";
 import { hasInline, resolveInline, takeValue } from "./inline.js";
-import { maxParam, rewriteNamedOnce, splice } from "./splice.js";
+import { maxParam, rewriteNamed, splice } from "./splice.js";
 
 function isSlotMap(v: unknown): v is SlotMap {
 	if (v === null || typeof v !== "object" || Array.isArray(v)) return false;
@@ -48,7 +48,7 @@ export function build(
 	let positional = text;
 	let values: unknown[] = outer.map(takeValue);
 	if (NAMED_RE.test(text)) {
-		const rn = rewriteNamedOnce(text);
+		const rn = rewriteNamed(text);
 		if (rn.names.length > 0) {
 			values = namedValues(rn.names, outer);
 			positional = rn.text;

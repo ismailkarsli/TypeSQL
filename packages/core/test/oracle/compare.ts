@@ -1,4 +1,4 @@
-import type { Analysis, AnalysisType } from "../../src/cache/evaluate.js";
+import type { Analysis, AnalysisType } from "../support/evaluate.js";
 import type { Disagreement, SkipReason } from "./kinds.js";
 import { isRejection, type ServerError } from "./replay.js";
 

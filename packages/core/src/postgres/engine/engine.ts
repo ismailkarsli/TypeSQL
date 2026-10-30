@@ -1,6 +1,5 @@
 import type {
 	AnalysisFn,
-	CallFn,
 	DisplayFn,
 	EngineTypes,
 	ParamFn,
@@ -8,7 +7,6 @@ import type {
 	TokensFn,
 } from "../../engine/contract.js";
 import type { TsParamTypeOf } from "../type-map/index.js";
-import type { CallCached } from "./cache.js";
 import type { Analysis, RowFrom } from "./infer.js";
 import type { Lex } from "./lexer/lex.js";
 import type { StripShape } from "./shape.js";
@@ -20,7 +18,6 @@ export interface PgEngine extends EngineTypes {
 	readonly param: PgParam;
 	readonly display: PgDisplay;
 	readonly json: "json" | "jsonb";
-	readonly call: PgCall;
 }
 
 interface PgAnalysis extends AnalysisFn {
@@ -37,7 +34,4 @@ interface PgParam extends ParamFn {
 }
 interface PgDisplay extends DisplayFn {
 	readonly out: StripShape<this["t"]>;
-}
-interface PgCall extends CallFn {
-	readonly out: CallCached<this["db"], this["tm"], this["keys"], this["q"]>;
 }

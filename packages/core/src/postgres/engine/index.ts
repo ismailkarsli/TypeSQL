@@ -20,6 +20,7 @@ export type {
 	ScopeLevel,
 } from "../../engine/types.js";
 export type * from "../../index.js";
+export type { SplicedText } from "../../sql/call.js";
 export type { ListRep } from "../../sql/fragment.js";
 export type {
 	CheckEnc,
@@ -59,25 +60,8 @@ export type {
 	Table,
 	TypeRegistry,
 } from "../schema/index.js";
-export type { CallTypes, SplicedText } from "../sql/call.js";
 export type { EnumsOf, TsOf, TsTypeOf } from "../type-map/index.js";
 export type * as Ast from "./ast.js";
-export type {
-	Builtin,
-	CacheAnalysis,
-	CacheEntry,
-	CacheSnapshots,
-	CacheVersion,
-	CallEntry,
-	DbSnapshot,
-	DdlCache,
-	DdlCacheKeys,
-	DdlEffect,
-	HintIndex,
-	Missing,
-	QueryCache,
-	QueryCacheKeys,
-} from "./cache.js";
 export type { PgEngine } from "./engine.js";
 export type {
 	Analysis,

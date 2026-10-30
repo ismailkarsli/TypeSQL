@@ -38,9 +38,6 @@ const isBetterSqlite3 = (stmt: SqliteStatement): boolean =>
 	typeof (stmt as { readonly reader?: unknown }).reader === "boolean" &&
 	typeof (stmt as { readonly pluck?: unknown }).pluck === "function";
 
-const caches = new WeakMap<SqliteDatabase, Map<string, Prepared>>();
-const CACHE_LIMIT = 500;
-
 function readBigInts(stmt: SqliteStatement): void {
 	const s = stmt as {
 		setReadBigInts?(on: boolean): void;
@@ -55,26 +52,14 @@ function readBigInts(stmt: SqliteStatement): void {
 }
 
 function prepared(db: SqliteDatabase, text: string, bigint: boolean): Prepared {
-	let cache = caches.get(db);
-	if (!cache) {
-		cache = new Map();
-		caches.set(db, cache);
-	}
-	const key = `${bigint ? "b" : "n"}${text}`;
-	let p = cache.get(key);
-	if (!p) {
-		const stmt = db.prepare(text);
-		if (bigint) readBigInts(stmt);
-		p = {
-			stmt,
-			reader: isReader(stmt),
-			names: paramNumbers(text),
-			bare: isBetterSqlite3(stmt),
-		};
-		if (cache.size >= CACHE_LIMIT) cache.clear();
-		cache.set(key, p);
-	}
-	return p;
+	const stmt = db.prepare(text);
+	if (bigint) readBigInts(stmt);
+	return {
+		stmt,
+		reader: isReader(stmt),
+		names: paramNumbers(text),
+		bare: isBetterSqlite3(stmt),
+	};
 }
 
 function bind(p: Prepared, values: readonly unknown[]): unknown[] {

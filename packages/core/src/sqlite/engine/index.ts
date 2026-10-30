@@ -7,24 +7,7 @@ export type {
 	Nullable,
 	NullableGenerated,
 } from "../schema/index.js";
-export type { CallTypes } from "../sql/call.js";
 export type * as Ast from "./ast.js";
-export type {
-	Builtin,
-	CacheAnalysis,
-	CacheEntry,
-	CacheSnapshots,
-	CacheVersion,
-	CallEntry,
-	DbSnapshot,
-	DdlCache,
-	DdlCacheKeys,
-	DdlEffect,
-	HintIndex,
-	Missing,
-	QueryCache,
-	QueryCacheKeys,
-} from "./cache.js";
 export type { SqliteEngine } from "./engine.js";
 export type {
 	Analysis,

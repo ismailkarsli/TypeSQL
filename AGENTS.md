@@ -17,11 +17,6 @@ pnpm check:intents
 - Use `patch` for fixes. Ask before `minor`, `major` or `none`.
 - Write the summary like the existing `.changeset/*.md` files.
 
-## Type cache version
-
-After changing `packages/core/src` (except `src/cache/` and `src/runtime/`), run
-`pnpm cache-version` and commit the updated `CacheVersion`. CI checks it.
-
 ## PostgreSQL regression tests
 
 `vendor/postgres` holds PostgreSQL's official regression tests (a git submodule). They are the
@@ -39,7 +34,7 @@ the PostgreSQL regression parser and parse-tree checks (`pnpm test:pg-regress` a
 Add query/schema inputs to `packages/core/test/oracle/corpus.json`, including nullable and
 non-nullable cases for nullability rules; derive expected behavior from PostgreSQL. Do not
 add unit/integration suites, static type assertion suites, or coverage gates. Include the
-change intent and `CacheVersion` when required above.
+change intent when required above.
 Record unrelated engine findings in the reviewed baseline and fix them in separate commits.
 Do not create GitHub issues or post issue comments automatically. Create issues or comments
 only when the user explicitly requests them.

@@ -35,8 +35,8 @@ export interface MigrationContext<
 	/** Type-only schema marker; no database introspection is performed. */
 	readonly schema: DB;
 	<const Q extends string>(
-		query: GateCallCheck<E, DB, TM, "preserve", Q> & Q,
-		...params: BoxCallArgs<E, DB, TM, "preserve", Q>
+		query: GateCallCheck<E, DB, TM, Q> & Q,
+		...params: BoxCallArgs<E, DB, TM, Q>
 	): CallRet<E, DB, TM, "preserve", Q>;
 	<const Q extends string, const S extends SlotMap>(
 		query: GateSlottedCheck<E, DB, TM, Q, S> & Q,

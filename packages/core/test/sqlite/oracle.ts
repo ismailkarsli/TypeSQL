@@ -2,16 +2,16 @@ import { mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { DatabaseSync, type StatementSync } from "node:sqlite";
 import {
-	badDeclarations,
-	declarations,
-	ProbeSession,
-} from "../../src/cache/evaluate.js";
-import {
 	type BaselineEntry,
 	type Entries,
 	hashOf,
 	preview,
 } from "../oracle/baseline.js";
+import {
+	badDeclarations,
+	declarations,
+	ProbeSession,
+} from "../support/evaluate.js";
 
 const here = import.meta.dirname;
 

@@ -1,5 +1,5 @@
 import type { CheckCarried } from "../engine/carried.js";
-import type { CallEntry, CallOf, EngineTypes } from "../engine/contract.js";
+import type { EngineTypes } from "../engine/contract.js";
 import type { ArgsOf, ParamsOf, RowOf, Validate } from "../engine/infer.js";
 import type { AnyErr, SqlError } from "../errors.js";
 import type { Query } from "../query.js";
@@ -176,14 +176,8 @@ export type GateCallCheck<
 	E extends EngineTypes,
 	DB,
 	TM,
-	Keys,
 	Q extends string,
-> =
-	CallOf<E, DB, TM, Keys, Q> extends infer C extends CallEntry
-		? [C] extends [never]
-			? InferredCheck<E, DB, TM, Q>
-			: C["g"]
-		: never;
+> = InferredCheck<E, DB, TM, Q>;
 
 type InferredCheck<E extends EngineTypes, DB, TM, Q extends string> = [
 	DB,
@@ -207,16 +201,10 @@ export type BoxCallArgs<
 	E extends EngineTypes,
 	DB,
 	TM,
-	Keys,
 	Q extends string,
 > = Extract<
 	{
-		[K in Q as `${K}`]: CallOf<E, DB, TM, Keys, K> extends infer C extends
-			CallEntry
-			? [C] extends [never]
-				? CallArgs<E, DB, TM, K>
-				: C["p"]
-			: never;
+		[K in Q as `${K}`]: CallArgs<E, DB, TM, K>;
 	}[`${Q}`],
 	readonly unknown[]
 >;
@@ -232,18 +220,6 @@ export type BoxSlottedArgs<
 	readonly unknown[]
 >;
 
-export type CallTypes<
-	E extends EngineTypes,
-	DB,
-	TM,
-	Keys extends RowKeys,
-	Q extends string,
-> = {
-	readonly g: GateCallCheck<E, DB, TM, Keys, Q>;
-	readonly p: BoxCallArgs<E, DB, TM, Keys, Q>;
-	readonly q: CallRet<E, DB, TM, Keys, Q>;
-};
-
 export type CallRet<
 	E extends EngineTypes,
 	DB,
@@ -251,13 +227,9 @@ export type CallRet<
 	Keys extends RowKeys,
 	Q extends string,
 > = [Q] extends [infer Q extends string]
-	? CallOf<E, DB, TM, Keys, Q> extends infer C extends CallEntry
-		? [C] extends [never]
-			? Query<
-					KeyedRow<RowOf<E, DB, TM, PText<Q>>, Keys>,
-					ParamsOf<E, DB, TM, PText<Q>>,
-					PText<Q>
-				>
-			: C["q"]
-		: never
+	? Query<
+			KeyedRow<RowOf<E, DB, TM, PText<Q>>, Keys>,
+			ParamsOf<E, DB, TM, PText<Q>>,
+			PText<Q>
+		>
 	: never;

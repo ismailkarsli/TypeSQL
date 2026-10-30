@@ -5,12 +5,6 @@ import type { Cols, Simplify } from "../../engine/types.js";
 import type { RewriteNamed } from "../../sql/named.js";
 import type { TsOf } from "../type-map/index.js";
 import type { DmlStmt, SelectStmt, Stmt } from "./ast.js";
-import type {
-	CachedAnalysis,
-	CachedDdl,
-	DdlCacheKeys,
-	QueryCacheKeys,
-} from "./cache.js";
 import type { ApplyDdlAll } from "./ddl/script.js";
 import type { Reposition } from "./diagnostics.js";
 import type { PgEngine } from "./engine.js";
@@ -74,13 +68,7 @@ type AnalyzeGeneral<DB, Q1 extends string, Names> =
 			: T
 		: never;
 
-export type Analysis<DB, Q extends string> = [Q] extends [keyof QueryCacheKeys]
-	? CachedAnalysis<DB, Q> extends infer C
-		? [C] extends [never]
-			? Analyze<DB, Q>
-			: C
-		: never
-	: Analyze<DB, Q>;
+export type Analysis<DB, Q extends string> = Analyze<DB, Q>;
 
 type ParamsOfStmt<S extends Stmt, DB> = S extends SelectStmt
 	? ParamsOfSelect<S, DB, [], {}, never>
@@ -138,10 +126,4 @@ export type Validate<DB, Q extends string> = Shared.Validate<PgEngine, DB, Q>;
 
 export type KindOf<DB, Q extends string> = Shared.KindOf<PgEngine, DB, Q>;
 
-export type ApplyDdl<DB, Q extends string> = [Q] extends [keyof DdlCacheKeys]
-	? CachedDdl<DB, Q> extends infer C
-		? [C] extends [never]
-			? ApplyDdlAll<DB, Q>
-			: C
-		: never
-	: ApplyDdlAll<DB, Q>;
+export type ApplyDdl<DB, Q extends string> = ApplyDdlAll<DB, Q>;

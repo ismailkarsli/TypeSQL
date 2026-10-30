@@ -1,4 +1,4 @@
-import { asRecord, type TypeValue } from "../../src/cache/evaluate.js";
+import { asRecord, type TypeValue } from "../support/evaluate.js";
 
 export const NORM_PRELUDE = `type __B<T> = T extends "jsonb" ? "jsonb" : T extends "json" ? "json" : T;
 type __C<C> = C extends { readonly type: infer T; readonly nullable: infer N; readonly hasDefault: infer D } ? { t: __B<T>; n: N; d: D } : "?";

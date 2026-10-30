@@ -48,14 +48,6 @@
 		"README.md",
 		"LICENSE"
 	],
-	"typescript": {
-		"contentMapper": {
-			"exec": [
-				"node",
-				"dist/cache/mapper.js"
-			]
-		}
-	},
 	"publishConfig": {
 		"access": "public"
 	},

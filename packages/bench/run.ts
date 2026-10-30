@@ -3,7 +3,6 @@ import { spawnSync } from "node:child_process";
 import {
 	appendFileSync,
 	existsSync,
-	mkdirSync,
 	readFileSync,
 	unlinkSync,
 	writeFileSync,
@@ -11,7 +10,7 @@ import {
 import { stripTypeScriptTypes } from "node:module";
 import { cpus } from "node:os";
 import { dirname, join } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import { compileFunction } from "node:vm";
 import { createSql } from "@typesql/core";
 import {
@@ -32,8 +31,6 @@ import {
 	type TypeNode,
 } from "tsrs/unstable/ast";
 import { API } from "tsrs/unstable/sync";
-import type * as Dialects from "../core/src/cache/dialects.ts";
-import type * as Job from "../core/src/cache/job.ts";
 
 const postgres = await import("@typesql/core/postgres").then(
 	(m) => m.postgres,
@@ -43,8 +40,7 @@ const postgres = await import("@typesql/core/postgres").then(
 interface Variant {
 	name: string;
 	files: string[];
-	config?: typeof dist | typeof cached;
-	cache?: { from: string[] };
+	config?: typeof dist;
 }
 
 interface TscError {
@@ -76,12 +72,7 @@ interface Threshold {
 	maxErrors: number;
 }
 
-interface CacheThreshold {
-	cachedRatio: number;
-	staleRatio: number;
-}
-
-type Thresholds = { [variant: string]: Threshold } & { cache?: CacheThreshold };
+type Thresholds = { [variant: string]: Threshold };
 
 type Compiler = "tsrs" | "tsc";
 const here = dirname(fileURLToPath(import.meta.url));
@@ -231,27 +222,9 @@ const runs = runsArg === -1 ? 1 : Number(process.argv[runsArg + 1]);
 if (!Number.isSafeInteger(runs) || runs < 1) {
 	throw new Error("--runs must be a positive integer");
 }
-const core = join(here, "../core");
 const dist = { extends: "./tsconfig.json", compilerOptions: { paths: {} } };
-const cached = {
-	extends: "./tsconfig.json",
-	compilerOptions: { paths: {} },
-	contentMappers: [{ package: "@typesql/core", extensions: [".typesqlcache"] }],
-};
 const variants: Variant[] = [
 	{ name: "case1", config: dist, files: [fixture] },
-	{
-		name: "case1 cached",
-		config: cached,
-		files: [fixture, "cache/case1.typesqlcache"],
-		cache: { from: [fixture] },
-	},
-	{
-		name: "case1 stale",
-		config: cached,
-		files: [fixture, "cache/case1-stale.typesqlcache"],
-		cache: { from: ["cache/case1-stale-schema.ts"] },
-	},
 	{ name: "case1 source", files: [fixture] },
 ];
 const application = loadWorkload();
@@ -262,71 +235,6 @@ if (calibrate && onlyCompiler !== undefined) {
 	process.exit(2);
 }
 const thresholdsPath = join(here, "thresholds.json");
-
-async function generateCaches(): Promise<void> {
-	const job = join(core, "dist/cache/job.js");
-	if (!existsSync(job)) {
-		console.error(
-			"the cached variants need the built package: run `pnpm --filter @typesql/core build` first",
-		);
-		process.exit(2);
-	}
-	const { generate } = (await import(pathToFileURL(job).href)) as typeof Job;
-	const dialects = join(core, "dist/cache/dialects.js");
-	const dialect = existsSync(dialects)
-		? (
-				(await import(pathToFileURL(dialects).href)) as typeof Dialects
-			).dialectNamed("postgres")
-		: undefined;
-	const versionFile = [
-		"dist/postgres/engine/cache.d.ts",
-		"dist/engine/cache.d.ts",
-	]
-		.map((f) => join(core, f))
-		.find((f) => existsSync(f))!;
-	const engine = /export type CacheVersion = "([^"]*)"/.exec(
-		readFileSync(versionFile, "utf8"),
-	)![1]!;
-	mkdirSync(join(here, "cache"), { recursive: true });
-	const staleSource = source.replace(
-		"$types: {",
-		'$types: { __bench_stale: "stale";',
-	);
-	if (staleSource === source)
-		throw new Error("case1 has no enum registry to invalidate");
-	writeFileSync(join(here, "cache/case1-stale-schema.ts"), staleSource);
-	for (const v of variants.filter((v) => v.cache)) {
-		const cacheFile = join(here, v.files[1]!);
-		writeFileSync(cacheFile, "{}\n");
-		const configFile = join(
-			here,
-			`tsconfig.gen-${v.name.replaceAll(" ", "-")}.json`,
-		);
-		writeFileSync(
-			configFile,
-			JSON.stringify({
-				...dist,
-				include: [],
-				files: [...v.cache!.from, "cache/__typesql_probe__.ts"],
-			}),
-		);
-		try {
-			const r = await generate({
-				configFile,
-				cacheFile,
-				engine,
-				isCorePath: (p) => p.startsWith(join(core, "dist") + "/"),
-				...(dialect && { dialect }),
-			} as Parameters<typeof generate>[0]);
-			console.log(
-				`cache for ${v.name}: ${r.computed} entries in ${(r.ms / 1000).toFixed(1)} s`,
-			);
-		} finally {
-			unlinkSync(configFile);
-		}
-	}
-}
-await generateCaches();
 
 function measure(variant: Variant, compiler: Compiler): Result {
 	const { name } = variant;
@@ -346,17 +254,10 @@ function measure(variant: Variant, compiler: Compiler): Result {
 	);
 	try {
 		const started = performance.now();
-		const args = [
-			"--noEmit",
-			"--extendedDiagnostics",
-			"-p",
-			configPath,
-			...(variant.cache ? ["--runExternalCode"] : []),
-		];
+		const args = ["--noEmit", "--extendedDiagnostics", "-p", configPath];
 		const proc = spawnSync(bin, args, {
 			cwd: here,
 			encoding: "utf8",
-			env: { ...process.env, TYPESQL_CACHE: "off" },
 		});
 		const wallTimeSec = (performance.now() - started) / 1000;
 		const out = `${proc.stdout ?? ""}${proc.stderr ?? ""}`;
@@ -441,22 +342,9 @@ const throughputByCompiler = Object.fromEntries(
 ) as Record<Compiler, ReturnType<typeof throughput>>;
 const perQuery = throughputByCompiler[primaryCompiler];
 
-function cacheCost(list: Result[]): CacheThreshold | null {
-	const get = (name: string) =>
-		list.find((r) => r.name === name)?.instantiations;
-	const [warm, stale, uncached] = ["case1 cached", "case1 stale", "case1"].map(
-		get,
-	);
-	if (warm == null || stale == null || !uncached) return null;
-	return {
-		cachedRatio: Number((warm / uncached).toFixed(3)),
-		staleRatio: Number((stale / uncached).toFixed(3)),
-	};
-}
-const cache = cacheCost(results);
 writeFileSync(
 	join(here, "results.json"),
-	JSON.stringify(
+	`${JSON.stringify(
 		{
 			measuredAt: new Date().toISOString(),
 			runs,
@@ -484,12 +372,11 @@ writeFileSync(
 			),
 			compiler: onlyCompiler ?? compilers,
 			throughput: onlyCompiler ? perQuery : throughputByCompiler,
-			cache,
 			results: onlyCompiler ? results : byCompiler,
 		},
 		null,
 		2,
-	) + "\n",
+	)}\n`,
 );
 
 if (
@@ -523,23 +410,7 @@ if (calibrate) {
 			maxErrors: 0,
 		};
 	}
-	if (cache)
-		thresholds.cache = {
-			cachedRatio: Math.min(
-				1,
-				Number(
-					(
-						Math.max(
-							...compilers.map(
-								(c) => cacheCost(byCompiler[c])?.cachedRatio ?? 1,
-							),
-						) * 1.3
-					).toFixed(3),
-				),
-			),
-			staleRatio: 1.05,
-		};
-	writeFileSync(thresholdsPath, JSON.stringify(thresholds) + "\n");
+	writeFileSync(thresholdsPath, `${JSON.stringify(thresholds)}\n`);
 	console.log(
 		`wrote thresholds.json (30% instantiation headroom, 2x check time)`,
 	);
@@ -620,20 +491,6 @@ function table(objects: Record<string, unknown>[]): void {
 }
 table(rows);
 for (const c of compilers) {
-	const cache = cacheCost(byCompiler[c]);
-	if (!cache) continue;
-	console.log(
-		`\ntype cache (${c}): warm cache ${cache.cachedRatio}x no cache, stale cache ${cache.staleRatio}x no cache`,
-	);
-	const t = thresholds.cache;
-	const problems: string[] = [];
-	if (t && cache.cachedRatio > t.cachedRatio)
-		problems.push(`warm cache costs more than ${t.cachedRatio}x no cache`);
-	if (t && cache.staleRatio > t.staleRatio)
-		problems.push(`stale cache costs more than ${t.staleRatio}x no cache`);
-	if (problems.length) failures.push({ name: `cache (${c})`, problems });
-}
-for (const c of compilers) {
 	const pq = throughputByCompiler[c];
 	if (pq) {
 		const label = compilers.length > 1 ? ` (${c})` : "";
@@ -669,11 +526,8 @@ if (process.env.GITHUB_STEP_SUMMARY) {
 				return `Throughput${label}: **${pq.queriesPerSec} queries/s** of check time (${pq.checkMsPerQuery} ms, ${pq.instantiationsPerQuery} instantiations per query).`;
 			})
 			.filter(Boolean),
-		cache
-			? `Type cache: warm cache ${cache.cachedRatio}x no cache; stale cache ${cache.staleRatio}x no cache.`
-			: "",
 	];
-	appendFileSync(process.env.GITHUB_STEP_SUMMARY, md.join("\n") + "\n");
+	appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${md.join("\n")}\n`);
 }
 for (const c of compilers)
 	for (const r of byCompiler[c])

@@ -4,7 +4,7 @@ import {
 	declTypes,
 	type Evaluated,
 	ProbeSession,
-} from "../../src/cache/evaluate.js";
+} from "../support/evaluate.js";
 
 export const here = import.meta.dirname;
 const HEAD = `import type { Canon } from "../canon.js";\n`;
