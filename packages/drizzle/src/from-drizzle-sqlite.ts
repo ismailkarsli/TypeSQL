@@ -59,9 +59,12 @@ type ColOf<D extends ColumnConfig> = Col<
 	}
 >;
 
+// See from-drizzle.ts: casing renames only columns whose name is their key.
 type Columns<C, Opts> = {
 	-readonly [K in keyof C as C[K] extends ColumnLike
-		? Cased<C[K]["_"]["name"], Opts>
+		? C[K]["_"]["name"] extends K
+			? Cased<C[K]["_"]["name"], Opts>
+			: C[K]["_"]["name"]
 		: never]: C[K] extends ColumnLike ? ColOf<C[K]["_"]> : never;
 };
 

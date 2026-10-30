@@ -167,9 +167,13 @@ export type Cased<N extends string, Opts> = Opts extends {
 		? ToCamelCase<N>
 		: N;
 
+// Drizzle types an unnamed column's name as its key. Its casing setting renames
+// only those; an explicit name that differs from the key is kept as written.
 type Columns<C, Opts, E> = {
 	-readonly [K in keyof C as C[K] extends ColumnLike
-		? Cased<C[K]["_"]["name"], Opts>
+		? C[K]["_"]["name"] extends K
+			? Cased<C[K]["_"]["name"], Opts>
+			: C[K]["_"]["name"]
 		: never]: C[K] extends ColumnLike ? ColOf<C[K]["_"], Opts, E> : never;
 };
 

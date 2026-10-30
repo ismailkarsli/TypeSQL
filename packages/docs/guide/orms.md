@@ -341,6 +341,8 @@ createSql<
 >(postgres, db);
 ```
 
+Drizzle's types don't record `drizzle(…, { casing })`, so pass `casing` here; `createSql(postgres, db)` without type arguments can't see it. Like Drizzle, casing renames only columns declared without a name. An explicit name (`legacy: text("legacyName")`) is kept. The one case the types can't tell apart is an explicit name equal to the key (`legacyName: text("legacyName")`), which is renamed like an unnamed column; give such a column a different key.
+
 Enums are found by matching an exported `pgEnum`. Name the export after the SQL type (`export const mood = pgEnum("mood", …)`) so casts like `'happy'::mood` resolve. A column whose enum isn't exported is `text`.
 
 The other gaps (generated-always columns, `$onUpdate`, `.$type<T>()`, `text({ enum })`) are listed in [Limits](./limits#orm-schemas).
