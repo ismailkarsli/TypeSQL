@@ -3,7 +3,20 @@
 	"compilerOptions": {
 		"noEmit": true,
 		"allowImportingTsExtensions": true,
-		"types": ["node"]
+		"types": ["node"],
+		"paths": {
+			"@typesql/core/adapter": ["./packages/core/src/adapter.ts"],
+			"@typesql/core/postgres/engine": [
+				"./packages/core/src/postgres/engine/index.ts"
+			],
+			"@typesql/core/postgres": ["./packages/core/src/postgres/index.ts"],
+			"@typesql/core/sqlite/engine": [
+				"./packages/core/src/sqlite/engine/index.ts"
+			],
+			"@typesql/core/sqlite": ["./packages/core/src/sqlite/index.ts"],
+			"@typesql/core/migration": ["./packages/core/src/migration/index.ts"],
+			"@typesql/core": ["./packages/core/src/index.ts"]
+		}
 	},
 	"include": ["*.ts", "scripts"]
 }
