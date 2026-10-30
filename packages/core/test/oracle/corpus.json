@@ -23598,6 +23598,78 @@
 			"source": "string-braces",
 			"sql": "SELECT '{k}'::text[] AS a, meta #> '{k}' AS j FROM posts WHERE tags @> '{news}'",
 			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "prerun-errors",
+			"sql": "SELECT id FROM users WHERE count(*) > 1",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "prerun-errors",
+			"sql": "SELECT id FROM users WHERE row_number() OVER () > 1",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "prerun-errors",
+			"sql": "SELECT max(count(*)) FROM users",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "prerun-errors",
+			"sql": "SELECT sum(row_number() OVER ()) FROM users",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "prerun-errors",
+			"sql": "SELECT count(*) FROM users GROUP BY true",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "prerun-errors",
+			"sql": "SELECT id FROM users ORDER BY NULL",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "prerun-errors",
+			"sql": "SELECT CASE WHEN id > 1 THEN 1 ELSE 'x'::text END AS c FROM users",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "prerun-errors",
+			"sql": "SELECT CASE WHEN id > 1 THEN 1 WHEN id > 2 THEN 'x'::text END AS c FROM users",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "prerun-errors",
+			"sql": "SELECT coalesce(id, email) AS c FROM users",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "prerun-errors",
+			"sql": "SELECT greatest(id, email) AS c FROM users",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "prerun-errors",
+			"sql": "SELECT sum(count(*)) OVER () AS s FROM users GROUP BY email",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "prerun-errors",
+			"sql": "SELECT CASE WHEN id > 1 THEN 1 WHEN id > 2 THEN 2.5 ELSE NULL END AS c, coalesce(id, 0, 1.5) AS d, CASE WHEN id > 1 THEN 'a' ELSE email END AS e, coalesce(display_name, email, 'x') AS f, greatest(created_at, now()) AS g FROM users",
+			"ddl": false
 		}
 	],
 	"skippedSlots": {

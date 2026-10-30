@@ -11,6 +11,7 @@ import type {
 	NumT,
 	RangeT,
 	StrT,
+	UnknownT,
 } from "./operators.js";
 import type { PgFunctions } from "./pg-functions.js";
 
@@ -1370,10 +1371,35 @@ export type CallType<
 				? S extends AnySig
 					? CallMisuse<Name, S, As, C> extends infer M extends string
 						? SqlError<M, null>
-						: Info<Ret<S["ret"], As, C>, CallNullable<S, As, C>>
+						: S["ret"] extends "$common"
+							? CommonMismatch<Name, As, "unknown"> extends infer M extends
+									string
+								? SqlError<M, null>
+								: Info<Ret<S["ret"], As, C>, CallNullable<S, As, C>>
+							: Info<Ret<S["ret"], As, C>, CallNullable<S, As, C>>
 					: Info<"unknown", true>
 				: never
 		: never;
+
+/** PostgreSQL's select_common_type error for coalesce, greatest and least. */
+type CommonMismatch<
+	Name extends string,
+	As extends readonly ColInfo[],
+	Acc extends string,
+> = Name extends "coalesce" | "greatest" | "least"
+	? As extends readonly [
+			infer A extends ColInfo,
+			...infer R extends readonly ColInfo[],
+		]
+		? CommonLit<Acc, A["type"]> extends "unknown"
+			? Acc extends UnknownT
+				? CommonMismatch<Name, R, "unknown">
+				: A["type"] extends UnknownT
+					? CommonMismatch<Name, R, Acc>
+					: `${Uppercase<Name>} types ${TypeDisplay<Acc>} and ${TypeDisplay<A["type"]>} cannot be matched`
+			: CommonMismatch<Name, R, CommonLit<Acc, A["type"]>>
+		: null
+	: null;
 
 type CallMisuse<
 	Name extends string,

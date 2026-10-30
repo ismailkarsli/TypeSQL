@@ -244,7 +244,9 @@ type LexStep<
 																`trailing junk after parameter at or near "$${V}${J}"`,
 																Acc
 															>
-														: LexChunk<R2, [...Acc, ParamTok<ToNum<V>>], B>
+														: ToNum<V> extends 0
+															? Err<"there is no parameter $0", Acc>
+															: LexChunk<R2, [...Acc, ParamTok<ToNum<V>>], B>
 													: never
 												: R extends `${infer Tag}$${infer R1}`
 													? Tag extends `${IdStart}${string}` | ""

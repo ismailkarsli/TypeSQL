@@ -27,6 +27,7 @@ import type {
 	WithClause,
 } from "../ast.js";
 import type {
+	CallPlacement,
 	CheckCondition,
 	CheckDistinctOnOrder,
 	CheckDistinctOrder,
@@ -819,29 +820,31 @@ type CheckSimple<
 	C0 extends Ctx,
 	C extends Ctx,
 > =
-	CheckCondition<"WHERE", Where, C0> extends infer W
-		? W extends AnyErr
-			? W
-			: CheckCondition<"HAVING", Having, C> extends infer H
-				? H extends AnyErr
-					? H
-					: ResolveSortKeys<Order, "ORDER BY", Ts, Cs, C> extends infer OK
-						? OK extends AnyErr
-							? OK
-							: OK extends readonly unknown[]
-								? CheckGroupBy<GroupBy, Ts, Cs, C> extends infer G
-									? G extends AnyErr
-										? G
-										: CheckDistinct<Distinct, OK, Ts, Cs, C> extends infer D
-											? D extends AnyErr
-												? D
-												: CheckWindows<Ws, Ts, Order, C>
-											: never
+	CallPlacement<Where, Ts, C0["db"]> extends infer P extends AnyErr
+		? P
+		: CheckCondition<"WHERE", Where, C0> extends infer W
+			? W extends AnyErr
+				? W
+				: CheckCondition<"HAVING", Having, C> extends infer H
+					? H extends AnyErr
+						? H
+						: ResolveSortKeys<Order, "ORDER BY", Ts, Cs, C> extends infer OK
+							? OK extends AnyErr
+								? OK
+								: OK extends readonly unknown[]
+									? CheckGroupBy<GroupBy, Ts, Cs, C> extends infer G
+										? G extends AnyErr
+											? G
+											: CheckDistinct<Distinct, OK, Ts, Cs, C> extends infer D
+												? D extends AnyErr
+													? D
+													: CheckWindows<Ws, Ts, Order, C>
+												: never
+										: never
 									: never
-								: never
-						: never
-				: never
-		: never;
+							: never
+					: never
+			: never;
 
 type CheckDistinct<
 	Distinct,

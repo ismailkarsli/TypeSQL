@@ -3,6 +3,7 @@ import type { AnyErr, ErrMsg, SqlError } from "../../../errors.js";
 import type { Expr, NamedWindow, Target, WindowSpec } from "../ast.js";
 import type { Nx } from "../parser/util.js";
 import type { AnyShaped, BaseOf } from "../shape.js";
+import type { LookupFn } from "../typer/catalog.js";
 import type { IntLitValue, NumLitType } from "../typer/operators.js";
 import type { TypeList, TypeOf } from "../typer/typeof.js";
 
@@ -172,7 +173,7 @@ type ResolveSortKey<
 		infer V extends string,
 	]
 		? Ordinal<Neg, V, Clause, TargetExprs<Ts, [], 0>, HasStar<Cs>>
-		: E extends TagStr
+		: E extends TagConst
 			? SqlError<`non-integer constant in ${Clause}`, null>
 			: E extends {
 						readonly t: "col";
@@ -200,7 +201,7 @@ type ResolveGroupKey<
 		infer V extends string,
 	]
 		? Ordinal<Neg, V, "GROUP BY", TargetExprs<Ts, [], 0>, HasStar<Cs>>
-		: E extends TagStr
+		: E extends TagConst
 			? SqlError<"non-integer constant in GROUP BY", null>
 			: E extends {
 						readonly t: "col";
@@ -338,7 +339,7 @@ type OutputOrderItem<E extends Expr, Cs extends Cols> =
 		infer V extends string,
 	]
 		? Ordinal<Neg, V, "ORDER BY", Cs, HasStar<Cs>>
-		: E extends TagStr
+		: E extends TagConst
 			? SqlError<"non-integer constant in ORDER BY", null>
 			: E extends {
 						readonly t: "col";
@@ -551,4 +552,84 @@ type WhenWins<
 	: WhenWins<L, Wins<L[I]["then"], Wins<L[I]["when"], Acc>>, Nx<I>>;
 
 type TagStr = { readonly t: "str" };
+/** A bare constant other than an integer: a string, `true`/`false` or `NULL`. */
+type TagConst = { readonly t: "str" | "bool" | "null" };
 type TagCol = { readonly t: "col" };
+
+type IsAggName<DB, N extends string> =
+	LookupFn<DB, N> extends infer O
+		? true extends (
+				(O extends readonly unknown[] ? O[number] : O) extends {
+					readonly agg: true;
+				}
+					? true
+					: false
+			)
+			? true
+			: false
+		: false;
+
+/** `"agg"` and `"win"` for the aggregate and window calls in E, outside subqueries. */
+type CallKinds<E, DB> = E extends { readonly t: "select" }
+	? never
+	: E extends {
+				readonly t: "call";
+				readonly name: infer N extends string;
+				readonly over: infer O;
+			}
+		?
+				| (O extends true
+						? "win"
+						: IsAggName<DB, N> extends true
+							? "agg"
+							: never)
+				| KindsIn<E, DB>
+		: E extends readonly unknown[]
+			? CallKinds<E[number], DB>
+			: E extends object
+				? KindsIn<E, DB>
+				: never;
+type KindsIn<E, DB> = { [K in keyof E]: CallKinds<E[K], DB> }[keyof E];
+
+/** PostgreSQL's errors for aggregate and window calls where they can't be. */
+export type CallPlacement<Where, Targets, DB> =
+	CallKinds<Where, DB> extends infer K
+		? "agg" extends K
+			? SqlError<"aggregate functions are not allowed in WHERE", null>
+			: "win" extends K
+				? SqlError<"window functions are not allowed in WHERE", null>
+				: NestedAgg<Targets, DB>
+		: never;
+type NestedAgg<E, DB> = E extends { readonly t: "select" }
+	? true
+	: E extends {
+				readonly t: "call";
+				readonly name: infer N extends string;
+				readonly over: false;
+				readonly args: infer A;
+				readonly filter: infer F;
+			}
+		? IsAggName<DB, N> extends true
+			? CallKinds<[A, F], DB> extends infer K
+				? "agg" extends K
+					? SqlError<"aggregate function calls cannot be nested", null>
+					: "win" extends K
+						? SqlError<
+								"aggregate function calls cannot contain window function calls",
+								null
+							>
+						: true
+				: never
+			: NestedIn<E, DB>
+		: E extends readonly unknown[]
+			? NestedList<E, DB>
+			: E extends object
+				? NestedIn<E, DB>
+				: true;
+type NestedIn<E, DB> = NestedList<{ [K in keyof E]: E[K] }[keyof E][], DB>;
+type NestedList<L extends readonly unknown[], DB> =
+	Extract<NestedAgg<L[number], DB>, AnyErr> extends infer X
+		? [X] extends [never]
+			? true
+			: X
+		: never;
