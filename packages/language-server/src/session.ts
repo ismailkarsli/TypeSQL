@@ -29,15 +29,21 @@ export async function typescriptModules(
 ): Promise<TypeScriptModules> {
 	const req = createRequire(from);
 	const manifest = req.resolve("typescript/package.json");
-	const load = (spec: string): Promise<Record<string, unknown>> =>
-		import(pathToFileURL(req.resolve(spec)).href) as Promise<
-			Record<string, unknown>
+	const load = async (spec: string): Promise<Record<string, unknown>> =>
+		(await import(pathToFileURL(req.resolve(spec)).href)) as Record<
+			string,
+			unknown
 		>;
-	const [api, ast, pkg] = await Promise.all([
+	const pkg = req(manifest) as { version?: string };
+	const [api, ast] = await Promise.all([
 		load("typescript/async"),
 		load("typescript/ast"),
-		Promise.resolve(req(manifest) as { version?: string }),
-	]);
+	]).catch((e: unknown) => {
+		throw new Error(
+			`typescript ${pkg.version ?? "unknown"} at ${realpathSync(dirname(manifest))} has no API client (completions need TypeScript 7.1)`,
+			{ cause: e },
+		);
+	});
 	return {
 		API: api.API as typeof API,
 		SyntaxKind: ast.SyntaxKind as Record<string, number>,
@@ -88,7 +94,10 @@ export class Session {
 			let ts: TypeScriptModules;
 			try {
 				ts = await candidate();
-			} catch {
+			} catch (e) {
+				// A TypeScript package found but too old to load is worth reporting.
+				const cause = e instanceof Error ? e.message : "";
+				if (cause.includes("has no API client")) failures.push(cause);
 				continue;
 			}
 			if (tried.has(ts.dir)) continue;
