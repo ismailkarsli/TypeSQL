@@ -91,11 +91,11 @@ Kysely describes columns with TypeScript types, so TypeSQL reads the Postgres ty
 | codegen's `Int8` / `Numeric` | `int8` / `numeric` |
 | `Buffer`, `Uint8Array` | `bytea` |
 | `Interval`, `Point`, `Circle` | `interval`, `point`, `circle` |
-| `Json`, `JSONColumnType<T>`, other objects | `jsonb` (always nullable, because codegen's `JsonValue` includes `null`) |
+| `Json`, `JSONColumnType<T>`, other objects | `jsonb`, nullable when the select type includes `null` (codegen's `JsonValue` does). Rows read it as `unknown`, not `T`; give the column a type in SQL or assert the row with `sql.as<Row>()` |
 | `T[]`, `ArrayType<T>` | element type `[]` |
 | a union of string literals (codegen enums) | an enum, registered in `$types` |
 | `T \| null` | nullable |
-| `Generated<T>`, `GeneratedAlways<T>` | has a default: optional in `INSERT` (no other column has one) |
+| `Generated<T>`, `GeneratedAlways<T>` | has a default: optional in `INSERT` (no other column has one). `GeneratedAlways` columns are not rejected in `INSERT` or `UPDATE`; PostgreSQL rejects writing them at runtime |
 | `"auth.users"` key | `auth.users` |
 
 ### Running queries
@@ -147,7 +147,8 @@ sqlx("SELECT avg(score) FROM posts");
 
 - An override is a type name (`"float8"`) or a partial descriptor: `{ type?, nullable?, hasDefault? }`. Use `{ nullable: false }` for a JSON column `INSERT` must set, and `{ hasDefault: true }` for a column with a database default that isn't `Generated`.
 - `{ $view: true }` marks a table as a view, so writes to it are rejected.
-- Without `$types`, each enum column gets its own name (`users.mood`), so a `UNION` of two such columns is an error.
+- Without `$types`, each enum column gets its own name (`users.mood`), so a `UNION` of two such columns is an error, and a cast to the SQL enum type (`'happy'::mood`) is `unknown`. Declare the enum under `$types` (as above) for casts to resolve; the same applies to Drizzle enums that aren't exported.
+- Overrides aren't validated against the schema: a misspelled table or column name is ignored, and a misspelled type becomes `unknown`. Hover a query's row type to check them.
 
 ### camelCase
 
@@ -170,6 +171,8 @@ const camel = createSql<
 >(postgres, camelDb);
 camel("SELECT author_id, created_at FROM blog_posts WHERE id = $1", 1);
 ```
+
+Names are converted back to snake_case word by word, so a codegen name that dropped an underscore before a digit or single letter doesn't round-trip: `--camel-case` maps `a_b_c` to `aBC`, which reads back as `a_bc` (Kysely's own `CamelCasePlugin` does the same). Rename such columns, or leave `camelCase` off.
 
 For camelCase rows, as `CamelCasePlugin` would return them, attach `.withPlugin(new CasePlugin())`, importing `CasePlugin` from `@typesql/core`. Only top-level keys are renamed, not keys inside JSON values. See [camelCase row keys](./queries#camelcase-row-keys).
 
@@ -286,7 +289,7 @@ The Postgres type comes from the column kind: `integer` is `int4`, `doublePrecis
 
 ### Running queries
 
-`createSql(postgres, db)` reads the schema from `db`'s type (the `schema` you passed to `drizzle()`) and runs queries on the driver client under `db`: the `Pool`, `Client` or postgres.js `sql` you passed to `drizzle()`, or the transaction's connection inside `db.transaction(fn)`. Pass the driver's type map as the second type argument:
+`createSql(postgres, db)` reads the schema from `db`'s type (the `schema` you passed to `drizzle()`; without one, every query fails with `relation "…" does not exist`) and runs queries on the driver client under `db`: the `Pool`, `Client` or postgres.js `sql` you passed to `drizzle()`, or the transaction's connection inside `db.transaction(fn)`. Pass the driver's type map as the second type argument:
 
 ```ts
 import type { PgTypeMap } from "@typesql/pg";
@@ -353,7 +356,7 @@ The other gaps (generated-always columns, `$onUpdate`, `.$type<T>()`, `text({ en
 npm install @typesql/core @typesql/prisma
 ```
 
-`@prisma/client` 7 or later is a peer dependency. The `postgresql` and `sqlite` providers are supported; this section uses PostgreSQL, and [SQLite](#sqlite) covers the differences. [Open an example in the TypeScript Playground](https://www.typescriptlang.org/play/?moduleResolution=100#code/JYWwDg9gTgLgBAbwFAEgYE8wFM4GEIA2ANKhtnAOJYB2WUAhjFgCYlqY4ByArgQfQCMCWNpADOMAOZQsYkgF84AMygQQcAEQABMrICOBAPQBjaFkPipMsRoDcSUJFiI4xmYywBlA0Ti64AApQwGIg9ABK9ADuuATANPCKKmqaOhxiBhbBofR2SA7UTFBK9MY4ACIAQoio3GJ0YgBcNSgowMzNVLQMTMwAPBrAhQAsGgB89q1YYcAEzfgEAwBu9FDGABar45MozCFg-OgA+tT0IFjNPHyCwgNMAB4w26goqsKdNHQe-RrhhFjPVrcMDMb4AQRg80Id1AshgZzAgPkk0sTRabQ6eGhGm43HagJQ9G4MHW0CO7Shi0GIwJMGAMHeWKpDyeExeS3iUTRXS+vQGQxgAA4kZMACS6NHIVp-RkaMHlACyAElOBo4AAfTQAVU8AFFwnkUMikPJ8swsMZ+DJXBBqBI4GBsmFmkEQmFIjE4gl7KY7fAMgQ4ABeVzuJjeRZVMYACks0lkvkdbvoAEp7Ehffb6MwQEMxMG4NF6PS4AHo6gAAZ6gAyutwABU4O1fHsxAd6MdTudfDiQeCnnAAGLhADyCrgdQacAA6gAJfW6uBvHAh0UARgrbDlipVGhIKYAdFh7hbiVho2n8pn-fCYPmQ0WS2XKzW642iSSyc2bdxCtGAFQpnAYKeA6EASHIpbcCA0YclgXJASBcBwVyQ6juOqKUKOWoBHAlQAJqFsSpJQOSzCbkgh7HqeTAXum15wOawi9AWj7+gYB4wAwdqlHStrRtGMD3EBQZjKQ9zRhW5S6rW9aLsOY5gRBM7zuEi4fiRZEFuum5wGuVEnsYZ74L+MAXvu6ZlhWKp6uEjYqvWI5KXecDRhpX6sH49LCEBABqYLVlquqgdG66+KKABMKa6WuPazlgfAQBol5AA) <span data-playground="prisma"></span>.
+`@prisma/client` 7 or later is a peer dependency. Install the `prisma` CLI of the same major version (`npm install -D prisma@7`); a bare `npm install -D prisma` can pick up a prerelease of the next major whose CLI has no `generate` command. The `postgresql` and `sqlite` providers are supported; this section uses PostgreSQL, and [SQLite](#sqlite) covers the differences. [Open an example in the TypeScript Playground](https://www.typescriptlang.org/play/?moduleResolution=100#code/JYWwDg9gTgLgBAbwFAEgYE8wFM4GEIA2ANKhtnAOJYB2WUAhjFgCYlqY4ByArgQfQCMCWNpADOMAOZQsYkgF84AMygQQcAEQABMrICOBAPQBjaFkPipMsRoDcSUJFiI4xmYywBlA0Ti64AApQwGIg9ABK9ADuuATANPCKKmqaOhxiBhbBofR2SA7UTFBK9MY4ACIAQoio3GJ0YgBcNSgowMzNVLQMTMwAPBrAhQAsGgB89q1YYcAEzfgEAwBu9FDGABar45MozCFg-OgA+tT0IFjNPHyCwgNMAB4w26goqsKdNHQe-RrhhFjPVrcMDMb4AQRg80Id1AshgZzAgPkk0sTRabQ6eGhGm43HagJQ9G4MHW0CO7Shi0GIwJMGAMHeWKpDyeExeS3iUTRXS+vQGQxgAA4kZMACS6NHIVp-RkaMHlACyAElOBo4AAfTQAVU8AFFwnkUMikPJ8swsMZ+DJXBBqBI4GBsmFmkEQmFIjE4gl7KY7fAMgQ4ABeVzuJjeRZVMYACks0lkvkdbvoAEp7Ehffb6MwQEMxMG4NF6PS4AHo6gAAZ6gAyutwABU4O1fHsxAd6MdTudfDiQeCnnAAGLhADyCrgdQacAA6gAJfW6uBvHAh0UARgrbDlipVGhIKYAdFh7hbiVho2n8pn-fCYPmQ0WS2XKzW642iSSyc2bdxCtGAFQpnAYKeA6EASHIpbcCA0YclgXJASBcBwVyQ6juOqKUKOWoBHAlQAJqFsSpJQOSzCbkgh7HqeTAXum15wOawi9AWj7+gYB4wAwdqlHStrRtGMD3EBQZjKQ9zRhW5S6rW9aLsOY5gRBM7zuEi4fiRZEFuum5wGuVEnsYZ74L+MAXvu6ZlhWKp6uEjYqvWI5KXecDRhpX6sH49LCEBABqYLVlquqgdG66+KKABMKa6WuPazlgfAQBol5AA) <span data-playground="prisma"></span>.
 
 Prisma Client's types leave out the database names and native types, so `@typesql/prisma` has a generator that writes the exact schema. Add it to `schema.prisma`:
 
@@ -480,7 +483,7 @@ Statements are sent through the ORM as for PostgreSQL. Since some SQLite drivers
 | `Uint8Array`, `Buffer` | `blob` (every `mode`) | `Bytes` | `blob` |
 | objects, arrays | `text({ mode: "json" })` | | `Typed<"json", T>`, with typed JSON paths |
 | | | `Json` | `jsonb` |
-| `unknown` | `customType` | | `any` |
+| `unknown` | `customType` | | `any` (Kysely's `unknown`: `Typed<"json", {}>`) |
 
 - **Kysely**: `number` can't say whether a column is `INTEGER` or `REAL`, so it is `numeric`; rows are `number` either way. Pin a column with an override (`{ posts: { id: "integer" } }`), as for PostgreSQL. `KyselySqliteSql` and `FromKyselySqlite` are the SQLite counterparts of `KyselySql` and `FromKysely`.
 - **Drizzle**: rows are what the driver returns, so an `integer({ mode: "boolean" })` column is `0` or `1` and a `timestamp` column is a number. `generatedAlwaysAs()` columns can't be written; `$defaultFn()` columns have no database default. `createSql(sqlite, db)` works with every Drizzle SQLite driver; on better-sqlite3 and bun:sqlite, `sql.transaction(fn)` runs `BEGIN` / `COMMIT` itself, since their Drizzle transactions can't await, and on the async drivers it uses `db.transaction(fn)`. With `drizzle-orm/sqlite-proxy`, return rows as objects for `all`, since TypeSQL reads columns by name. Pin a type with `sqliteType(builder, "text")`.

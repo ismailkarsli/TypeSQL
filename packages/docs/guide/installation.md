@@ -46,7 +46,7 @@ If your schema is already described for one of them, install its TypeSQL package
 | Package | Peer dependency |
 |---|---|
 | `@typesql/kysely` | `kysely` 0.28 or later |
-| `@typesql/drizzle` | `drizzle-orm` 0.45 or later |
+| `@typesql/drizzle` | `drizzle-orm` 0.45 or later, before 1.0 |
 | `@typesql/prisma` | `@prisma/client` 7 or later |
 
 See [From Kysely, Drizzle or Prisma](./orms).
