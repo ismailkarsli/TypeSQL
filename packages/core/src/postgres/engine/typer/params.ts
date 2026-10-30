@@ -18,6 +18,7 @@ import type {
 	Target,
 } from "../ast.js";
 import type { BindFrom } from "../binder/from.js";
+import type { ParamsOfWith } from "../project/dml.js";
 import type { BindWith } from "../project/select.js";
 import type { AnySig, LookupFn, PickSig } from "./catalog.js";
 import type { CommonType, DateTimeT } from "./operators.js";
@@ -855,7 +856,14 @@ export type ParamsOfSelect<
 					Q["offset"],
 					ParamsOfLimit<
 						Q["limit"],
-						ParamsOfBody<Q["body"], DB, Outer, C2, M, SkipTargets>
+						ParamsOfBody<
+							Q["body"],
+							DB,
+							Outer,
+							C2,
+							ParamsOfWith<Q["with"], DB, C2, M>,
+							SkipTargets
+						>
 					>
 				>
 			: M
