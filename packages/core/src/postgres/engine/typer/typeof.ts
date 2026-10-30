@@ -33,59 +33,57 @@ import type {
 import type { TypeSqlJson } from "./sqljson.js";
 import type { TypeXml } from "./xml.js";
 
-export type TypeOf<E extends Expr, C extends Ctx> = E extends {
-	readonly t: "col";
-}
+export type TypeOf<E extends Expr, C extends Ctx> = E extends TagCol
 	? ResolveColumn<C["scope"], E["tbl"], E["name"]>
-	: E extends { readonly t: "num" }
-		? Info<NumLitType<E["v"]>>
-		: E extends { readonly t: "str" }
-			? Info<"text">
-			: E extends { readonly t: "bool" }
-				? Info<"bool">
-				: E extends { readonly t: "null" }
-					? Info<"null", true>
-					: E extends { readonly t: "param" }
-						? Info<"unknown", true>
-						: E extends { readonly t: "default" }
-							? SqlError<"DEFAULT is not allowed in this context", null>
-							: E extends { readonly t: "typed" }
-								? Info<LitCast<E["type"], E["v"]>>
-								: E extends { readonly t: "bin" }
-									? TypeBin<E["op"], E["l"], E["r"], C>
-									: E extends { readonly t: "un" }
-										? TypeUn<E["op"], E["e"], C>
-										: E extends { readonly t: "cast" }
-											? E["e"] extends { readonly t: "param" }
-												? Info<E["to"]>
-												: E["e"] extends {
-															readonly t: "str";
-															readonly v: infer V extends string;
-														}
-													? Info<LitCast<E["to"], V>>
-													: TypeCast<E["to"], E["e"], C>
-											: E extends { readonly t: "call" }
-												? TypeCall<Extract<E, Call>, C>
-												: E extends { readonly t: "case" }
+	: E extends TagBin
+		? TypeBin<E["op"], E["l"], E["r"], C>
+		: E extends TagCall
+			? TypeCall<Extract<E, Call>, C>
+			: E extends TagNum
+				? Info<NumLitType<E["v"]>>
+				: E extends TagStr
+					? Info<"text">
+					: E extends TagBool
+						? Info<"bool">
+						: E extends TagNull
+							? Info<"null", true>
+							: E extends TagParam
+								? Info<"unknown", true>
+								: E extends TagDefault
+									? SqlError<"DEFAULT is not allowed in this context", null>
+									: E extends TagTyped
+										? Info<LitCast<E["type"], E["v"]>>
+										: E extends TagUn
+											? TypeUn<E["op"], E["e"], C>
+											: E extends TagCast
+												? E["e"] extends TagParam
+													? Info<E["to"]>
+													: E["e"] extends {
+																readonly t: "str";
+																readonly v: infer V extends string;
+															}
+														? Info<LitCast<E["to"], V>>
+														: TypeCast<E["to"], E["e"], C>
+												: E extends TagCase
 													? TypeCase<E["operand"], E["whens"], E["else"], C>
-													: E extends { readonly t: "is" }
+													: E extends TagIs
 														? Check<TypeOf<E["e"], C>, Info<"bool">>
-														: E extends { readonly t: "isdistinct" }
+														: E extends TagIsdistinct
 															? Check2<
 																	TypeOf<E["l"], C>,
 																	TypeOf<E["r"], C>,
 																	Info<"bool">
 																>
-															: E extends { readonly t: "between" }
+															: E extends TagBetween
 																? TypeBetween<E["e"], E["lo"], E["hi"], C>
-																: E extends { readonly t: "in" }
+																: E extends TagIn
 																	? TypeIn<E["e"], E["list"], C>
-																	: E extends { readonly t: "insub" }
+																	: E extends TagInsub
 																		? StrictBool<
 																				TypeOf<E["e"], C>,
 																				SubqueryOperand<E["e"], E["q"], C>
 																			>
-																		: E extends { readonly t: "like" }
+																		: E extends TagLike
 																			? StrictBool<
 																					TypeOf<E["e"], C>,
 																					TypeOf<E["pat"], C>
@@ -102,24 +100,22 @@ export type TypeOf<E extends Expr, C extends Ctx> = E extends {
 																						C,
 																						false
 																					>
-																				: E extends { readonly t: "quant" }
+																				: E extends TagQuant
 																					? TypeQuant<
 																							E["op"],
 																							TypeOf<E["l"], C>,
 																							E["r"] extends Expr
 																								? TypeOf<E["r"], C>
 																								: never,
-																							E["r"] extends {
-																								readonly t: "str";
-																							}
+																							E["r"] extends TagStr
 																								? "lit"
 																								: "expr"
 																						>
-																					: E extends { readonly t: "sub" }
+																					: E extends TagSub
 																						? MakeNullable<
 																								FirstColOf<E["q"], C>
 																							>
-																						: E extends { readonly t: "exists" }
+																						: E extends TagExists
 																							? ProjectSelect<
 																									E["q"],
 																									C["db"],
@@ -130,19 +126,13 @@ export type TypeOf<E extends Expr, C extends Ctx> = E extends {
 																									? Info<"bool">
 																									: R
 																								: never
-																							: E extends {
-																										readonly t: "array";
-																									}
+																							: E extends TagArray
 																								? TypeArrayCtor<E["items"], C>
-																								: E extends {
-																											readonly t: "arraysub";
-																										}
+																								: E extends TagArraysub
 																									? ArrayOf<
 																											FirstColOf<E["q"], C>
 																										>
-																									: E extends {
-																												readonly t: "row";
-																											}
+																									: E extends TagRow
 																										? TypeList<
 																												E["items"],
 																												C,
@@ -152,35 +142,27 @@ export type TypeOf<E extends Expr, C extends Ctx> = E extends {
 																												? Info<"record">
 																												: Ls
 																											: never
-																										: E extends {
-																													readonly t: "idx";
-																												}
+																										: E extends TagIdx
 																											? TypeIdx<
 																													E["e"],
 																													E["i"],
 																													C
 																												>
-																											: E extends {
-																														readonly t: "slice";
-																													}
+																											: E extends TagSlice
 																												? TypeSlice<
 																														E["e"],
 																														E["lo"],
 																														E["hi"],
 																														C
 																													>
-																												: E extends {
-																															readonly t: "extract";
-																														}
+																												: E extends TagExtract
 																													? TypeExtract<
 																															TypeOf<E["e"], C>,
 																															Lowercase<
 																																E["field"]
 																															>
 																														>
-																													: E extends {
-																																readonly t: "position";
-																															}
+																													: E extends TagPosition
 																														? StrictOf<
 																																TypeOf<
 																																	E["sub"],
@@ -192,9 +174,7 @@ export type TypeOf<E extends Expr, C extends Ctx> = E extends {
 																																>,
 																																"int4"
 																															>
-																														: E extends {
-																																	readonly t: "substring";
-																																}
+																														: E extends TagSubstring
 																															? RegexNull<
 																																	StringResult<
 																																		TypeOf<
@@ -215,9 +195,7 @@ export type TypeOf<E extends Expr, C extends Ctx> = E extends {
 																																		C
 																																	>
 																																>
-																															: E extends {
-																																		readonly t: "trim";
-																																	}
+																															: E extends TagTrim
 																																? StringResult<
 																																		TypeOf<
 																																			E["e"],
@@ -229,9 +207,7 @@ export type TypeOf<E extends Expr, C extends Ctx> = E extends {
 																																		>,
 																																		null
 																																	>
-																																: E extends {
-																																			readonly t: "overlay";
-																																		}
+																																: E extends TagOverlay
 																																	? StringResult<
 																																			StringResult<
 																																				TypeOf<
@@ -253,9 +229,7 @@ export type TypeOf<E extends Expr, C extends Ctx> = E extends {
 																																			>,
 																																			null
 																																		>
-																																	: E extends {
-																																				readonly t: "attz";
-																																			}
+																																	: E extends TagAttz
 																																		? TypeAtTz<
 																																				TypeOf<
 																																					E["e"],
@@ -266,16 +240,12 @@ export type TypeOf<E extends Expr, C extends Ctx> = E extends {
 																																					C
 																																				>
 																																			>
-																																		: E extends {
-																																					readonly t: "collate";
-																																				}
+																																		: E extends TagCollate
 																																			? TypeOf<
 																																					E["e"],
 																																					C
 																																				>
-																																			: E extends {
-																																						readonly t: "field";
-																																					}
+																																			: E extends TagField
 																																				? TypeField<
 																																						TypeOf<
 																																							E["e"],
@@ -294,9 +264,7 @@ export type TypeOf<E extends Expr, C extends Ctx> = E extends {
 																																							E,
 																																							C
 																																						>
-																																					: E extends {
-																																								readonly t: "star";
-																																							}
+																																					: E extends TagStar
 																																						? E["tbl"] extends string
 																																							? WholeRow<
 																																									C["scope"],
@@ -307,9 +275,7 @@ export type TypeOf<E extends Expr, C extends Ctx> = E extends {
 																																									"* is only allowed in a target list or count(*)",
 																																									null
 																																								>
-																																						: E extends {
-																																									readonly t: "xml";
-																																								}
+																																						: E extends TagXml
 																																							? TypeXml<
 																																									E,
 																																									C
@@ -474,7 +440,7 @@ type TypeBin<
 	L extends Expr,
 	R extends Expr,
 	C extends Ctx,
-> = L extends { readonly t: "row" }
+> = L extends TagRow
 	? R extends { readonly t: "sub"; readonly q: infer Q extends SelectStmt }
 		? SubCompare<Op, L, Q, C, true>
 		: TypeBinOperands<Op, L, R, C>
@@ -712,7 +678,7 @@ type ChainNullable<E extends Expr, C extends Ctx> = E extends {
 		? NullableOpt<T>
 		: never;
 type EnumName<DB> = DB extends { readonly $types: infer T } ? keyof T : never;
-type ChainSliced<E> = E extends { readonly t: "slice" }
+type ChainSliced<E> = E extends TagSlice
 	? true
 	: E extends { readonly t: "idx"; readonly e: infer X }
 		? ChainSliced<X>
@@ -792,9 +758,7 @@ export type TypeList<
 		: never
 	: Acc;
 
-type TypeOperand<E extends Expr, C extends Ctx> = E extends {
-	readonly t: "str";
-}
+type TypeOperand<E extends Expr, C extends Ctx> = E extends TagStr
 	? Info<LitType<E["v"]>>
 	: TypeOf<E, C>;
 type OperandList<
@@ -954,7 +918,7 @@ type VariadicNull<
 	R,
 > = E["name"] extends "concat" | "concat_ws"
 	? R extends ColInfo
-		? E["args"] extends readonly [...unknown[], { readonly t: "variadic" }]
+		? E["args"] extends readonly [...unknown[], TagVariadic]
 			? As extends readonly [...unknown[], { readonly nullable: true }]
 				? Info<R["type"], true>
 				: R
@@ -1003,3 +967,43 @@ type TypeCall<E extends Call, C extends Ctx> =
 					: never
 			: As
 		: never;
+
+// Closed patterns avoid rebuilding the same structural check for every node.
+type TagCol = { readonly t: "col" };
+type TagNum = { readonly t: "num" };
+type TagStr = { readonly t: "str" };
+type TagBool = { readonly t: "bool" };
+type TagNull = { readonly t: "null" };
+type TagParam = { readonly t: "param" };
+type TagDefault = { readonly t: "default" };
+type TagTyped = { readonly t: "typed" };
+type TagBin = { readonly t: "bin" };
+type TagUn = { readonly t: "un" };
+type TagCast = { readonly t: "cast" };
+type TagCall = { readonly t: "call" };
+type TagCase = { readonly t: "case" };
+type TagIs = { readonly t: "is" };
+type TagIsdistinct = { readonly t: "isdistinct" };
+type TagBetween = { readonly t: "between" };
+type TagIn = { readonly t: "in" };
+type TagInsub = { readonly t: "insub" };
+type TagLike = { readonly t: "like" };
+type TagQuant = { readonly t: "quant" };
+type TagSub = { readonly t: "sub" };
+type TagExists = { readonly t: "exists" };
+type TagArray = { readonly t: "array" };
+type TagArraysub = { readonly t: "arraysub" };
+type TagRow = { readonly t: "row" };
+type TagIdx = { readonly t: "idx" };
+type TagSlice = { readonly t: "slice" };
+type TagExtract = { readonly t: "extract" };
+type TagPosition = { readonly t: "position" };
+type TagSubstring = { readonly t: "substring" };
+type TagTrim = { readonly t: "trim" };
+type TagOverlay = { readonly t: "overlay" };
+type TagAttz = { readonly t: "attz" };
+type TagCollate = { readonly t: "collate" };
+type TagField = { readonly t: "field" };
+type TagStar = { readonly t: "star" };
+type TagXml = { readonly t: "xml" };
+type TagVariadic = { readonly t: "variadic" };

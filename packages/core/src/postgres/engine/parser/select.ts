@@ -164,6 +164,11 @@ export type ParseSelectTail<T extends Toks, Body, W, I extends number> =
 		: never;
 
 type ParseOrderedTail<T extends Toks, Body, W, Order, J extends number> =
+	T[J] extends WordTok<"for" | "limit" | "offset" | "fetch">
+		? ParseOrderedClauses<T, Body, W, Order, J>
+		: Ok<SelectNode<W, Body, Order, null, null>, J>;
+
+type ParseOrderedClauses<T extends Toks, Body, W, Order, J extends number> =
 	LockingClause<T, J> extends infer K
 		? K extends [infer K1 extends number, infer Locks1]
 			? ParseLockedTail<T, Body, W, Order, J, K1, Locks1>
@@ -228,7 +233,7 @@ type SetOpLocking<Body, Locks1, Locks2, J extends number, J2 extends number> =
 				? Fail<"FOR UPDATE is not allowed with UNION/INTERSECT/EXCEPT", J2>
 				: never
 		: never;
-type IsSetOp<Body> = Body extends { readonly t: "setop" }
+type IsSetOp<Body> = Body extends TagSetop
 	? true
 	: Body extends { readonly t: "paren"; readonly q: { readonly body: infer B } }
 		? IsSetOp<B>
@@ -502,22 +507,53 @@ type ParseSimpleAfterFrom<
 > =
 	ParseWhereOpt<T, I3> extends infer Wh
 		? Wh extends Ok<infer Where, infer I4>
-			? ParseGroupByOpt<T, I4> extends infer G
-				? G extends Ok<[infer Group, infer Sets], infer I5>
-					? ParseSimpleAfterGroup<
-							T,
-							I2,
-							Distinct,
-							Targets,
-							From,
-							Where,
-							Group,
-							Sets,
-							I5
+			? T[I4] extends WordTok<"group" | "having" | "window">
+				? ParseSimpleClauses<T, I2, Distinct, Targets, From, Where, I4>
+				: T[I2] extends WordTok<"into">
+					? Ok<
+							SimpleIntoNode<
+								Distinct,
+								Targets,
+								From,
+								Where,
+								null,
+								false,
+								null,
+								[],
+								IntoRef<T, I2>
+							>,
+							I4
 						>
-					: G
-				: never
+					: Ok<
+							SimpleNode<Distinct, Targets, From, Where, null, false, null, []>,
+							I4
+						>
 			: Wh
+		: never;
+
+type ParseSimpleClauses<
+	T extends Toks,
+	I2 extends number,
+	Distinct,
+	Targets,
+	From,
+	Where,
+	I4 extends number,
+> =
+	ParseGroupByOpt<T, I4> extends infer G
+		? G extends Ok<[infer Group, infer Sets], infer I5>
+			? ParseSimpleAfterGroup<
+					T,
+					I2,
+					Distinct,
+					Targets,
+					From,
+					Where,
+					Group,
+					Sets,
+					I5
+				>
+			: G
 		: never;
 
 type ParseSimpleAfterGroup<
@@ -918,7 +954,7 @@ type ParseParenJoin<T extends Toks, I extends number> =
 		? X extends Ok<infer F, infer J>
 			? EatOp<T, J, ")"> extends never
 				? Expected<'")"', T, J>
-				: F extends { readonly t: "join" }
+				: F extends TagJoin
 					? ParseParenJoinAlias<T, F, EatOp<T, J, ")">>
 					: SyntaxErrorAt<T, J>
 			: X
@@ -1519,7 +1555,7 @@ type ParseCycleConst<T extends Toks, I extends number> =
 		? SyntaxErrorAt<T, I>
 		: ParseExpr<T, I, 13> extends infer X
 			? X extends Ok<infer E, infer J>
-				? E extends { readonly t: "num" | "str" | "bool" | "null" | "typed" }
+				? E extends TagNumStrBoolNullTyped
 					? X
 					: FuncName<T, I> extends null
 						? SyntaxErrorAt<T, I>
@@ -1542,3 +1578,9 @@ type ParseColIdList<
 			? Ok<[...Acc, N], J>
 			: ParseColIdList<T, EatOp<T, J, ",">, [...Acc, N]>
 		: Expected<"column name", T, I>;
+
+type TagSetop = { readonly t: "setop" };
+type TagJoin = { readonly t: "join" };
+type TagNumStrBoolNullTyped = {
+	readonly t: "num" | "str" | "bool" | "null" | "typed";
+};

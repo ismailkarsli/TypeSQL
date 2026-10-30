@@ -9,11 +9,11 @@ export type ProjectStmt<
 	DB,
 	Outer extends Scope,
 	Ctes extends CteMap,
-> = S extends { readonly t: "select" }
+> = S extends TagSelect
 	? ProjectSelectParts<S["with"], S["body"], S["orderBy"], DB, Outer, Ctes>
 	: S extends DmlStmt
 		? ProjectDml<S, DB, Outer, Ctes>
-		: S extends { readonly t: "declare_cursor" }
+		: S extends TagDeclareCursor
 			? ProjectSelectParts<
 					S["q"]["with"],
 					S["q"]["body"],
@@ -27,3 +27,6 @@ export type ProjectStmt<
 					: null
 				: never
 			: null;
+
+type TagSelect = { readonly t: "select" };
+type TagDeclareCursor = { readonly t: "declare_cursor" };

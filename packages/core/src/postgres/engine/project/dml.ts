@@ -13,7 +13,7 @@ import type {
 	ScopeLevel,
 } from "../../../engine/types.js";
 import type { AnyErr, SqlError } from "../../../errors.js";
-import type { Table } from "../../../schema.js";
+import type { ColDesc, Table } from "../../../schema.js";
 import type {
 	Cte,
 	DeleteStmt,
@@ -55,11 +55,11 @@ export type ProjectDml<
 > =
 	BindWith<S["with"], DB, Outer, Ctes> extends infer C2
 		? C2 extends CteMap
-			? S extends { readonly t: "insert" }
+			? S extends TagInsert
 				? ProjectInsert<Extract<S, InsertStmt>, DB, Outer, C2>
-				: S extends { readonly t: "update" }
+				: S extends TagUpdate
 					? ProjectUpdate<Extract<S, UpdateStmt>, DB, Outer, C2>
-					: S extends { readonly t: "delete" }
+					: S extends TagDelete
 						? ProjectDelete<Extract<S, DeleteStmt>, DB, Outer, C2>
 						: ProjectMerge<Extract<S, MergeStmt>, DB, Outer, C2>
 			: C2
@@ -98,10 +98,9 @@ export type DmlCtx<
 	Ctes extends CteMap,
 > = MkCtx<DB, [Level, ...Outer], Ctes, false>;
 
-export type ColInfoOf<Tbl extends Table, Col extends string> = {
-	readonly type: Tbl[Col & keyof Tbl]["type"];
-	readonly nullable: Tbl[Col & keyof Tbl]["nullable"];
-};
+// Preserve column identity instead of rebuilding type/nullability for each use.
+export type ColInfoOf<Tbl extends Table, Col extends string> = Tbl[Col &
+	keyof Tbl];
 
 type IndCtx<Tbl extends Table, Col extends string, C extends Ctx> = MkCtx<
 	C["db"],
@@ -203,12 +202,9 @@ export type TargetInfos<
 	Tbl extends Table,
 	C extends Ctx,
 > = {
-	readonly [K in keyof Cs]: AssignParamInfo<
-		Tbl,
-		Cs[K],
-		AssignTargets<Cs, Ind>[K],
-		C
-	>;
+	readonly [K in keyof Cs]: Ind extends null
+		? ColInfoOf<Tbl, Cs[K]>
+		: AssignParamInfo<Tbl, Cs[K], AssignTargets<Cs, Ind>[K], C>;
 };
 
 export type ParamsOfInds<
@@ -385,12 +381,28 @@ type SameLength<
 		: false
 	: true;
 
+// Equal finite widths need no suffix tuples. Keep the recursive comparison
+// for unequal widths and arrays whose lengths are not fixed.
 export type WidthCheck<
+	A extends readonly unknown[],
+	B extends readonly unknown[],
+> = A extends unknown
+	? B extends unknown
+		? number extends A["length"] | B["length"]
+			? WidthCheckWalk<A, B>
+			: A["length"] extends B["length"]
+				? B["length"] extends A["length"]
+					? "eq"
+					: WidthCheckWalk<A, B>
+				: WidthCheckWalk<A, B>
+		: never
+	: never;
+type WidthCheckWalk<
 	A extends readonly unknown[],
 	B extends readonly unknown[],
 > = A extends readonly [unknown, ...infer AR]
 	? B extends readonly [unknown, ...infer BR]
-		? WidthCheck<AR, BR>
+		? WidthCheckWalk<AR, BR>
 		: "more"
 	: B extends readonly [unknown, ...unknown[]]
 		? "fewer"
@@ -432,7 +444,7 @@ type CheckInsertSource<
 	readonly rows: infer Rows extends readonly (readonly Expr[])[];
 }
 	? Ind extends null
-		? Rows[number][number] extends { readonly t: "param" }
+		? Rows[number][number] extends TagParam
 			? true
 			: CheckRows<Rows, Cs, AssignTargets<Cs, Ind>, Tbl, Name, C>
 		: CheckRows<Rows, Cs, AssignTargets<Cs, Ind>, Tbl, Name, C>
@@ -463,9 +475,7 @@ export type CheckRows<
 export type CheckValueItems<
 	Es extends readonly Expr[],
 	C extends Ctx,
-> = Es[number] extends { readonly t: "param" | "default" }
-	? true
-	: CheckValueItemsWalk<Es, C>;
+> = Es[number] extends TagParamDefault ? true : CheckValueItemsWalk<Es, C>;
 type CheckValueItemsWalk<
 	Es extends readonly Expr[],
 	C extends Ctx,
@@ -473,7 +483,7 @@ type CheckValueItemsWalk<
 	infer E extends Expr,
 	...infer R extends readonly Expr[],
 ]
-	? E extends { readonly t: "default" }
+	? E extends TagDefault
 		? CheckValueItemsWalk<R, C>
 		: TypeOf<E, C> extends infer T
 			? T extends ColInfo
@@ -493,18 +503,18 @@ export type CheckTargets<
 > = Cs[I] extends infer Col extends string
 	? Col extends keyof Tbl
 		? Tgs[I] extends Expr
-			? Es[I] extends { readonly t: "default" }
+			? Es[I] extends TagDefault
 				? DefaultIntoInd<Tgs[I]>
 				: AssignInfo<Tbl, Col, Tgs[I], C> extends infer X
 					? X extends AnyErr
 						? X
 						: CheckTargets<Cs, Tgs, Es, Tbl, Name, C, Nx<I>>
 					: never
-			: Es[I] extends { readonly t: "null" }
+			: Es[I] extends TagNull
 				? Tbl[Col]["nullable"] extends false
 					? NullViolation<Col, Name>
 					: CheckTargets<Cs, Tgs, Es, Tbl, Name, C, Nx<I>>
-				: Es[I] extends { readonly t: "default" }
+				: Es[I] extends TagDefault
 					? Tbl[Col] extends {
 							readonly nullable: false;
 							readonly hasDefault: false;
@@ -521,8 +531,8 @@ type NullViolation<Col extends string, Name extends string> = SqlError<
 >;
 
 type DefaultIntoInd<Ind> = Ind extends { readonly e: infer In }
-	? In extends { readonly t: "col" }
-		? Ind extends { readonly t: "field" }
+	? In extends TagCol
+		? Ind extends TagField
 			? SqlError<"cannot set a subfield to DEFAULT", null>
 			: SqlError<"cannot set an array element to DEFAULT", null>
 		: DefaultIntoInd<In>
@@ -541,12 +551,17 @@ export type CheckRequired<
 			>
 	: true;
 
-type MissingRequired<Tbl extends Table, Given extends string> = {
-	[K in keyof Tbl]: K extends Given
-		? never
-		: Tbl[K] extends { readonly nullable: false; readonly hasDefault: false }
-			? K
-			: never;
+type MissingRequired<Tbl extends Table, Given extends string> = Exclude<
+	RequiredCols<Tbl>,
+	Given
+>;
+type RequiredCols<Tbl extends Table> = {
+	[K in keyof Tbl]: Tbl[K] extends {
+		readonly nullable: false;
+		readonly hasDefault: false;
+	}
+		? K
+		: never;
 }[keyof Tbl];
 
 type ExcludedItem<Tbl extends Table> = {
@@ -589,24 +604,83 @@ export type CheckSet<
 	CheckSetValues<Set, C> extends infer X
 		? X extends AnyErr
 			? X
-			: SetTargets<Set, [], [], []> extends [
-						infer Cs extends readonly string[],
-						infer Tgs extends readonly TargetInd[],
-						infer Es extends readonly (Expr | null)[],
-					]
-				? CheckTargets<Cs, Tgs, Es, Tbl, Name, C> extends infer Y
-					? Y extends AnyErr
-						? Y
-						: CheckAssignedCols<Cs, Tgs, Tbl, Name, "update">
+			: Set[number] extends TagSet
+				? CheckPlainSet<Set, Tbl, Name, 0, never, never>
+				: SetTargets<Set, [], [], []> extends [
+							infer Cs extends readonly string[],
+							infer Tgs extends readonly TargetInd[],
+							infer Es extends readonly (Expr | null)[],
+						]
+					? CheckTargets<Cs, Tgs, Es, Tbl, Name, C> extends infer Y
+						? Y extends AnyErr
+							? Y
+							: CheckAssignedCols<Cs, Tgs, Tbl, Name, "update">
+						: never
 					: never
-				: never
 		: never;
+// Ordinary assignments already contain all target metadata. Keep the first
+// duplicate until target validation finishes, preserving diagnostic priority.
+type CheckPlainSet<
+	Set extends readonly SetItem[],
+	Tbl extends Table,
+	Name extends string,
+	I extends number,
+	Seen extends string,
+	Duplicate extends string,
+> = Set extends unknown
+	? CheckPlainSetAt<Set, Tbl, Name, I, Seen, Duplicate>
+	: never;
+type CheckPlainSetAt<
+	Set extends readonly SetItem[],
+	Tbl extends Table,
+	Name extends string,
+	I extends number,
+	Seen extends string,
+	Duplicate extends string,
+> = I extends Set["length"]
+	? [Duplicate] extends [never]
+		? true
+		: AssignedTwice<Duplicate, "update">
+	: Set[I] extends { readonly t: "set"; readonly col: infer Col extends string }
+		? Col extends keyof Tbl
+			? PlainSetValue<Set[I]["e"], Tbl[Col], Col, Name> extends infer V
+				? V extends AnyErr
+					? V
+					: CheckPlainSetAt<
+							Set,
+							Tbl,
+							Name,
+							Nx<I>,
+							Seen | Col,
+							[Duplicate] extends [never]
+								? Col extends Seen
+									? Col
+									: never
+								: Duplicate
+						>
+				: never
+			: SqlError<`column "${Col}" of relation "${Name}" does not exist`, null>
+		: never;
+type PlainSetValue<
+	E extends Expr,
+	T extends ColDesc,
+	Col extends string,
+	Name extends string,
+> = E extends TagNull
+	? T["nullable"] extends false
+		? NullViolation<Col, Name>
+		: true
+	: E extends TagDefault
+		? T extends { readonly nullable: false; readonly hasDefault: false }
+			? NullViolation<Col, Name>
+			: true
+		: true;
 type CheckSetValues<
 	Set extends readonly SetItem[],
 	C extends Ctx,
 > = Set[number] extends {
 	readonly t: "set";
-	readonly e: { readonly t: "param" };
+	readonly e: TagParam;
 }
 	? true
 	: CheckSetValuesWalk<Set, C>;
@@ -649,12 +723,12 @@ type SetTargets<
 			? SetTargets<R, [...Cs, Col], [...Tgs, Ind], [...Es, S["e"]]>
 			: SetTargets<
 					R,
-					[...Cs, ...Extract<S, { readonly t: "setmulti" }>["cols"]],
+					[...Cs, ...Extract<S, TagSetmulti>["cols"]],
 					[
 						...Tgs,
 						...AssignTargets<
-							Extract<S, { readonly t: "setmulti" }>["cols"],
-							Extract<S, { readonly t: "setmulti" }>["ind"]
+							Extract<S, TagSetmulti>["cols"],
+							Extract<S, TagSetmulti>["ind"]
 						>,
 					],
 					[
@@ -664,7 +738,7 @@ type SetTargets<
 							readonly items: infer Items extends readonly Expr[];
 						}
 							? Items
-							: Nulls<Extract<S, { readonly t: "setmulti" }>["cols"]>),
+							: Nulls<Extract<S, TagSetmulti>["cols"]>),
 					]
 				>
 	: [Cs, Tgs, Es];
@@ -904,11 +978,11 @@ export type ParamsOfDml<S extends DmlStmt, DB, Ctes extends CteMap, M> =
 	BindWith<S["with"], DB, [], Ctes> extends infer C2
 		? C2 extends CteMap
 			? ParamsOfWith<S["with"], DB, C2, M> extends infer M1
-				? S extends { readonly t: "insert" }
+				? S extends TagInsert
 					? ParamsOfInsert<Extract<S, InsertStmt>, DB, C2, M1>
-					: S extends { readonly t: "update" }
+					: S extends TagUpdate
 						? ParamsOfUpdate<Extract<S, UpdateStmt>, DB, C2, M1>
-						: S extends { readonly t: "delete" }
+						: S extends TagDelete
 							? ParamsOfDelete<Extract<S, DeleteStmt>, DB, C2, M1>
 							: ParamsOfMerge<Extract<S, MergeStmt>, DB, C2, M1>
 				: never
@@ -1094,8 +1168,26 @@ export type ParamsOfSet<
 	Tbl extends Table,
 	C extends Ctx,
 	M,
+> = Set[number] extends PlainParamSet
+	? M | PlainSetParams<Set[number], Tbl>
+	: ParamsOfSetWalk<Set, Tbl, C, M>;
+type PlainParamSet = {
+	readonly t: "set";
+	readonly col: string;
+	readonly e: { readonly t: "param"; readonly n: number };
+};
+type PlainSetParams<S, Tbl extends Table> = S extends PlainParamSet
+	? ColInfoOf<Tbl, S["col"]> extends infer T extends ColInfo
+		? AddParam<never, S["e"]["n"], T>
+		: never
+	: never;
+type ParamsOfSetWalk<
+	Set extends readonly SetItem[],
+	Tbl extends Table,
+	C extends Ctx,
+	M,
 > = Set extends readonly [infer S, ...infer R extends readonly SetItem[]]
-	? ParamsOfSet<
+	? ParamsOfSetWalk<
 			R,
 			Tbl,
 			C,
@@ -1229,3 +1321,16 @@ type ParamsOfDelete<S extends DeleteStmt, DB, Ctes extends CteMap, M> =
 				: never
 			: M
 		: never;
+
+type TagInsert = { readonly t: "insert" };
+type TagUpdate = { readonly t: "update" };
+type TagDelete = { readonly t: "delete" };
+type TagParam = { readonly t: "param" };
+type TagParamDefault = { readonly t: "param" | "default" };
+type TagDefault = { readonly t: "default" };
+type TagNull = { readonly t: "null" };
+type TagCol = { readonly t: "col" };
+type TagField = { readonly t: "field" };
+type TagSetmulti = { readonly t: "setmulti" };
+
+type TagSet = { readonly t: "set" };

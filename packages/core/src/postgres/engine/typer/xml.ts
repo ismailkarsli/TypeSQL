@@ -82,7 +82,7 @@ export type Coerce<
 		? T extends ColInfo
 			? Target extends "text"
 				? Info<Target, T["nullable"]>
-				: A extends { readonly t: "str" }
+				: A extends TagStr
 					? Info<Target, T["nullable"]>
 					: T["type"] extends Target | "unknown" | "null"
 						? Info<Target, T["nullable"]>
@@ -255,3 +255,5 @@ type ParamsOfXmlCols<
 			>
 		>
 	: M;
+
+type TagStr = { readonly t: "str" };

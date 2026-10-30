@@ -20,16 +20,16 @@ const NAMED = new RegExp(
 );
 
 export function maxParam(text: string): number {
+	if (!text.includes("$")) return 0;
 	let max = 0;
-	scan(text, (n) => {
-		if (n > max) max = n;
-		return null;
-	});
+	for (const match of text.matchAll(PARAMS)) {
+		if (match[2] !== undefined) max = Math.max(max, Number(match[2]));
+	}
 	return max;
 }
 
 export function renumberParams(text: string, offset: number): string {
-	if (offset === 0) return text;
+	if (offset === 0 || !text.includes("$")) return text;
 	return scan(text, (n) => `$${n + offset}`);
 }
 
@@ -44,32 +44,18 @@ export function splice(
 	slots: SlotValues,
 	values: readonly unknown[],
 ): { text: string; values: unknown[] } {
-	const plan = splicePlan(text);
-	let offset = Math.max(plan.max, values.length);
+	let offset = Math.max(maxParam(text), values.length);
 	const allValues: unknown[] = [...values];
-	let out = plan.parts[0]!;
-	plan.names.forEach((name, i) => {
+	const out = text.replace(SLOT, (_match, name: string) => {
 		const frag = slots[name];
 		if (frag === undefined)
 			throw new Error(`typesql: unknown fragment slot {${name}}`);
-		out += renumberParams(frag.text, offset) + plan.parts[i + 1]!;
+		const fragmentText = renumberParams(frag.text, offset);
 		offset += frag.values.length;
 		allValues.push(...frag.values);
+		return fragmentText;
 	});
 	return { text: out, values: allValues };
-}
-
-function splicePlan(text: string) {
-	const parts: string[] = [];
-	const names: string[] = [];
-	let last = 0;
-	for (const m of text.matchAll(SLOT)) {
-		parts.push(text.slice(last, m.index));
-		names.push(m[1]!);
-		last = m.index + m[0].length;
-	}
-	parts.push(text.slice(last));
-	return { parts, names, max: maxParam(text) };
 }
 
 export function rewriteNamed(text: string): { text: string; names: string[] } {

@@ -22,9 +22,15 @@ export type RowOf<E extends EngineTypes, DB, TM, Q extends string> = AnalysisOf<
 		: never
 	: never;
 
-export type ParamsOf<E extends EngineTypes, DB, TM, Q extends string> =
+// Share parameter uses and conversions across arguments, carried values and results.
+export interface ParamData {
+	readonly type: unknown;
+	readonly arg: unknown;
+	readonly uses: unknown;
+}
+export type ParamDataOf<E extends EngineTypes, DB, TM, Q extends string> =
 	AnalysisOf<E, DB, Q> extends { readonly max: infer N extends number }
-		? BuildParams<
+		? BuildParamData<
 				E,
 				AnalysisOf<E, DB, Q>["params" & keyof AnalysisOf<E, DB, Q>],
 				N,
@@ -32,15 +38,28 @@ export type ParamsOf<E extends EngineTypes, DB, TM, Q extends string> =
 				DB
 			>
 		: [];
-
-type BuildParams<E extends EngineTypes, P, N extends number, TM, DB> =
+type BuildParamData<E extends EngineTypes, P, N extends number, TM, DB> =
 	UnknownTuple<N> extends infer T extends unknown[]
 		? {
 				[K in keyof T]: K extends `${infer I extends number}`
-					? ParamTs<E, P[Nx<I> & keyof P], TM, DB>
+					? DataFor<E, P[Nx<I> & keyof P], TM, DB>
 					: never;
 			}
 		: never;
+type DataFor<E extends EngineTypes, U, TM, DB> = {
+	readonly type: ParamTs<E, U, TM, DB>;
+	readonly uses: U;
+	readonly arg: JsonArg<E, ParamTs<E, U, TM, DB>, U>;
+};
+export type ParamsOf<
+	E extends EngineTypes,
+	DB,
+	TM,
+	Q extends string,
+> = ParamTypes<ParamDataOf<E, DB, TM, Q>>;
+type ParamTypes<P extends readonly ParamData[]> = {
+	[K in keyof P]: P[K]["type"];
+};
 
 type ParamTs<E extends EngineTypes, U, TM, DB> =
 	IntersectUses<E, Exclude<U, NullTest>, TM, DB> extends infer X
@@ -61,18 +80,11 @@ type IntersectUses<E extends EngineTypes, U, TM, DB> = (
 	? X
 	: never;
 
-export type ArgsOf<E extends EngineTypes, DB, TM, Q extends string> = JsonArgs<
-	E,
-	ParamsOf<E, DB, TM, Q>,
-	AnalysisOf<E, DB, Q>["params" & keyof AnalysisOf<E, DB, Q>]
+export type ArgsOf<E extends EngineTypes, DB, TM, Q extends string> = ParamArgs<
+	ParamDataOf<E, DB, TM, Q>
 >;
-
-type JsonArgs<E extends EngineTypes, Ps, P> = {
-	[I in keyof Ps]: I extends `${infer N extends number}`
-		? Nx<N> extends keyof P
-			? JsonArg<E, Ps[I], P[Nx<N>]>
-			: Ps[I]
-		: Ps[I];
+type ParamArgs<P extends readonly ParamData[]> = {
+	[K in keyof P]: P[K]["arg"];
 };
 
 type JsonArg<E extends EngineTypes, X, U> = [

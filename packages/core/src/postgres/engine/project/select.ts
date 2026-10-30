@@ -135,7 +135,7 @@ type BindCte<
 > = Rec extends true
 	? C["q"] extends {
 			readonly t: "select";
-			readonly body: { readonly t: "setop" };
+			readonly body: TagSetop;
 		}
 		? CheckExpandable<
 				C,
@@ -200,10 +200,10 @@ type CheckExpandable<C extends Cte, B extends SetOp, R> = C extends {
 				>
 			: R;
 type SetOperand =
-	| { readonly t: "setop" }
+	| TagSetop
 	| {
 			readonly t: "paren";
-			readonly q: { readonly body: { readonly t: "setop" } };
+			readonly q: { readonly body: TagSetop };
 	  };
 type CheckCteColList<
 	Cols extends readonly string[],
@@ -329,7 +329,7 @@ type NoEquality =
 	| "refcursor"
 	| "txid_snapshot"
 	| "xml";
-type ConstType<E extends Expr> = E extends { readonly t: "str" }
+type ConstType<E extends Expr> = E extends TagStr
 	? "lit"
 	: TypeOf<E, MkCtx<unknown, [], {}, false>> extends infer T
 		? T extends ColInfo
@@ -458,7 +458,7 @@ type ProjectBody<
 	Ctes extends CteMap,
 	Order extends readonly Expr[],
 	Lit extends boolean,
-> = B extends { readonly t: "simple" }
+> = B extends TagSimple
 	? B extends { readonly into: unknown }
 		? SqlError<"SELECT ... INTO is not allowed here", null>
 		: ProjectSimple<
@@ -476,7 +476,7 @@ type ProjectBody<
 				Ctes,
 				Lit
 			>
-	: B extends { readonly t: "setop" }
+	: B extends TagSetop
 		? ProjectSetOp<B["l"], B["r"], B["op"], DB, Outer, Ctes> extends infer C
 			? C extends Cols
 				? CheckOutputOrder<Order, C> extends infer O
@@ -486,9 +486,9 @@ type ProjectBody<
 					: never
 				: C
 			: never
-		: B extends { readonly t: "values" }
+		: B extends TagValues
 			? ProjectValues<B["rows"], DB, Outer, Ctes, Order>
-			: B extends { readonly t: "paren" }
+			: B extends TagParen
 				? Order extends readonly []
 					? ProjectSelectParts<
 							B["q"]["with"],
@@ -640,11 +640,7 @@ type OperandRow<
 	I extends number,
 > = Row[I] extends undefined
 	? Acc
-	: (
-				Row[I] extends { readonly t: "str" }
-					? Info<"lit">
-					: TypeOf<Row[I], C>
-			) extends infer T
+	: (Row[I] extends TagStr ? Info<"lit"> : TypeOf<Row[I], C>) extends infer T
 		? T extends ColInfo
 			? OperandRow<Row, C, [...Acc, T], Nx<I>>
 			: T
@@ -917,7 +913,7 @@ export type ProjectTargets<
 				: never
 			: (
 						Lit extends true
-							? Ts[I]["e"] extends { readonly t: "str" }
+							? Ts[I]["e"] extends TagStr
 								? Info<"lit">
 								: TypeOf<Ts[I]["e"], C>
 							: TypeOf<Ts[I]["e"], C>
@@ -936,3 +932,9 @@ export type ProjectTargets<
 						: never
 					: Ty
 				: never;
+
+type TagSetop = { readonly t: "setop" };
+type TagStr = { readonly t: "str" };
+type TagSimple = { readonly t: "simple" };
+type TagValues = { readonly t: "values" };
+type TagParen = { readonly t: "paren" };

@@ -1,7 +1,7 @@
 import type * as Shared from "../../engine/infer.js";
 import type { MaxParam, ParamsToMap } from "../../engine/params.js";
 import type { Toks } from "../../engine/tokens.js";
-import type { Cols, Simplify } from "../../engine/types.js";
+import type { Cols } from "../../engine/types.js";
 import type { RewriteNamed } from "../../sql/named.js";
 import type { TsOf } from "../type-map/index.js";
 import type { DmlStmt, SelectStmt, Stmt } from "./ast.js";
@@ -32,7 +32,7 @@ export type Analyze<DB, Q extends string> =
 										readonly cols: C;
 										readonly params: M extends 0
 											? {}
-											: ParamsToMap<ParamsOfStmt<S, DB>>;
+											: ParamsToMap<ParamsOfStmt<S, DB, true>>;
 										readonly max: M;
 										readonly names: Names;
 										readonly stmt: S;
@@ -70,8 +70,12 @@ type AnalyzeGeneral<DB, Q1 extends string, Names> =
 
 export type Analysis<DB, Q extends string> = Analyze<DB, Q>;
 
-type ParamsOfStmt<S extends Stmt, DB> = S extends SelectStmt
-	? ParamsOfSelect<S, DB, [], {}, never>
+type ParamsOfStmt<
+	S extends Stmt,
+	DB,
+	SkipTargets extends boolean = false,
+> = S extends SelectStmt
+	? ParamsOfSelect<S, DB, [], {}, never, SkipTargets>
 	: S extends DmlStmt
 		? ParamsOfDml<S, DB, {}, never>
 		: S extends {
@@ -91,13 +95,13 @@ export type BuildRow<
 	DB,
 > = RowFrom<M, TM, DB>;
 
-export type RowFrom<M, TM, DB> = Simplify<{
+export type RowFrom<M, TM, DB> = {
 	-readonly [K in keyof M]: TsOf<
 		TM,
 		DB,
 		M[K] & { type: string; nullable: boolean }
 	>;
-}>;
+};
 
 export type ParamsOf<DB, TM, Q extends string> = Shared.ParamsOf<
 	PgEngine,

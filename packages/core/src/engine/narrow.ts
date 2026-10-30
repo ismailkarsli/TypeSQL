@@ -105,7 +105,9 @@ export type NarrowLevel<L extends ScopeLevel, Keys> = [Keys] extends [never]
 	: AnyHit<L, Keys, 0> extends true
 		? {
 				readonly [I in keyof L]: L[I] extends ScopeItem
-					? NarrowItem<L[I], Keys>
+					? true extends KeyHits<L[I], Keys>
+						? NarrowItem<L[I], Keys>
+						: L[I]
 					: L[I];
 			}
 		: L;

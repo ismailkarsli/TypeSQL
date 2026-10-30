@@ -38,12 +38,11 @@ type LexLines<
 	: S extends `${infer Line}\n${infer Rest}`
 		? CanSplitLine<Line, Rest> extends false
 			? LexCommas<S, Acc>
-			: LexCommas<Line, []> extends infer R
-				? R extends readonly unknown[]
-					? LexLines<Rest, [...Acc, ...R], Nx<B>>
-					: LexCommas<S, Acc>
-				: never
-		: LexCommas<S, Acc>;
+			: LexCommas<TrimIndent<Line>, []> extends infer R extends
+						readonly unknown[]
+				? LexLines<Rest, [...Acc, ...R], Nx<B>>
+				: LexCommas<S, Acc>
+		: LexCommas<TrimIndent<S>, Acc>;
 
 type LexCommas<
 	S extends string,
@@ -54,14 +53,31 @@ type LexCommas<
 	: S extends `${infer Part},${infer Rest}`
 		? Part extends `${string}--${string}`
 			? LexSpaces<S, Acc>
-			: LexSpaces<Part, []> extends infer R
-				? R extends readonly unknown[]
-					? LexCommas<Rest, [...Acc, ...R, OpTok<",">], Nx<B>>
-					: LexSpaces<S, Acc>
-				: never
+			: LexSpaces<Part, []> extends infer R extends readonly unknown[]
+				? LexCommas<Rest, [...Acc, ...R, OpTok<",">], Nx<B>>
+				: LexSpaces<S, Acc>
 		: LexSpaces<S, Acc>;
 
 type LexSpaces<
+	S extends string,
+	Acc extends readonly unknown[],
+> = S extends `${string}\n${string}`
+	? LexAll<S, Acc>
+	: S extends `${string}${"--" | "U&" | "u&"}${string}`
+		? LexSpacesSlow<S, Acc>
+		: LexSpaceLoop<S, Acc>;
+type LexSpaceLoop<
+	S extends string,
+	Acc extends readonly unknown[],
+	B extends number = 0,
+> = B extends ChunkSize
+	? LexAll<S, Acc>
+	: S extends `${infer Part} ${infer Rest}`
+		? LexAll<Part, []> extends infer R extends readonly unknown[]
+			? LexSpaceLoop<Rest, [...Acc, ...R], Nx<B>>
+			: LexAll<S, Acc>
+		: LexAll<S, Acc>;
+type LexSpacesSlow<
 	S extends string,
 	Acc extends readonly unknown[],
 	B extends number = 0,
@@ -74,7 +90,7 @@ type LexSpaces<
 				? LexAll<S, Acc>
 				: LexAll<Part, []> extends infer R
 					? R extends readonly unknown[]
-						? LexSpaces<Rest, [...Acc, ...R], Nx<B>>
+						? LexSpacesSlow<Rest, [...Acc, ...R], Nx<B>>
 						: LexAll<S, Acc>
 					: never
 			: LexAll<S, Acc>;
@@ -631,3 +647,11 @@ type TakeExponent<
 type ToNum<S extends string> = S extends `${infer N extends number}`
 	? N
 	: never;
+
+type TrimIndent<S extends string, B extends number = 0> = B extends 128
+	? S
+	: S extends `\t${infer R}`
+		? TrimIndent<R, Nx<B>>
+		: S extends ` ${infer R}`
+			? TrimIndent<R, Nx<B>>
+			: S;

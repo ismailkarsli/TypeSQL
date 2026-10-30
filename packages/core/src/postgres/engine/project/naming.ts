@@ -18,67 +18,65 @@ export type ColumnName<
 
 type Weak<N extends string> = { readonly weak: N };
 
-type Fig<E extends Expr, C extends Ctx> = E extends { readonly t: "col" }
+type Fig<E extends Expr, C extends Ctx> = E extends TagCol
 	? E["name"]
-	: E extends { readonly t: "call" }
-		? E["name"]
-		: E extends { readonly t: "cast" }
-			? Fig<E["e"], C> extends infer N
-				? N extends string
-					? N
-					: Weak<StripArray<E["to"]>>
-				: never
-			: E extends { readonly t: "typed" }
-				? E extends { readonly bits: true }
-					? null
-					: Weak<E["type"]>
-				: E extends { readonly t: "case" }
-					? E["else"] extends Expr
-						? Fig<E["else"], C> extends infer N
-							? N extends string
-								? N
-								: Weak<"case">
-							: never
-						: Weak<"case">
-					: E extends { readonly t: "exists" }
-						? "exists"
-						: E extends { readonly t: "array" | "arraysub" }
-							? "array"
-							: E extends { readonly t: "row" }
-								? "row"
-								: E extends { readonly t: "sub" }
-									? SubName<E["q"], C>
-									: E extends { readonly t: "extract" }
-										? "extract"
-										: E extends { readonly t: "position" }
-											? "position"
-											: E extends { readonly t: "substring" }
-												? "substring"
-												: E extends { readonly t: "trim" }
-													? E["side"] extends "leading"
-														? "ltrim"
-														: E["side"] extends "trailing"
-															? "rtrim"
-															: "btrim"
-													: E extends { readonly t: "overlay" }
-														? "overlay"
-														: E extends { readonly t: "attz" }
-															? "timezone"
-															: E extends {
-																		readonly t: "idx" | "slice" | "collate";
-																	}
-																? Fig<E["e"], C>
-																: E extends { readonly t: "field" }
-																	? E["name"]
-																	: E extends { readonly t: "xml" }
-																		? E["op"] extends "document"
-																			? null
-																			: `xml${E["op"]}`
-																		: E extends {
-																					readonly t: "jsonfn" | "jsonagg";
-																				}
-																			? E["fn"]
-																			: null;
+	: E extends Unnamed
+		? null
+		: E extends TagCall
+			? E["name"]
+			: E extends TagCast
+				? Fig<E["e"], C> extends infer N
+					? N extends string
+						? N
+						: Weak<StripArray<E["to"]>>
+					: never
+				: E extends TagTyped
+					? E extends { readonly bits: true }
+						? null
+						: Weak<E["type"]>
+					: E extends TagCase
+						? E["else"] extends Expr
+							? Fig<E["else"], C> extends infer N
+								? N extends string
+									? N
+									: Weak<"case">
+								: never
+							: Weak<"case">
+						: E extends TagExists
+							? "exists"
+							: E extends TagArrayArraysub
+								? "array"
+								: E extends TagRow
+									? "row"
+									: E extends TagSub
+										? SubName<E["q"], C>
+										: E extends TagExtract
+											? "extract"
+											: E extends TagPosition
+												? "position"
+												: E extends TagSubstring
+													? "substring"
+													: E extends TagTrim
+														? E["side"] extends "leading"
+															? "ltrim"
+															: E["side"] extends "trailing"
+																? "rtrim"
+																: "btrim"
+														: E extends TagOverlay
+															? "overlay"
+															: E extends TagAttz
+																? "timezone"
+																: E extends TagIdxSliceCollate
+																	? Fig<E["e"], C>
+																	: E extends TagField
+																		? E["name"]
+																		: E extends TagXml
+																			? E["op"] extends "document"
+																				? null
+																				: `xml${E["op"]}`
+																			: E extends TagJsonfnJsonagg
+																				? E["fn"]
+																				: null;
 
 type StripArray<T extends string> = T extends `${infer B}[]` ? B : T;
 
@@ -88,3 +86,35 @@ type SubName<Q extends SelectStmt, C extends Ctx> =
 			? N
 			: "?column?"
 		: never;
+
+type TagCol = { readonly t: "col" };
+type TagCall = { readonly t: "call" };
+type TagCast = { readonly t: "cast" };
+type TagTyped = { readonly t: "typed" };
+type TagCase = { readonly t: "case" };
+type TagExists = { readonly t: "exists" };
+type TagArrayArraysub = { readonly t: "array" | "arraysub" };
+type TagRow = { readonly t: "row" };
+type TagSub = { readonly t: "sub" };
+type TagExtract = { readonly t: "extract" };
+type TagPosition = { readonly t: "position" };
+type TagSubstring = { readonly t: "substring" };
+type TagTrim = { readonly t: "trim" };
+type TagOverlay = { readonly t: "overlay" };
+type TagAttz = { readonly t: "attz" };
+type TagIdxSliceCollate = { readonly t: "idx" | "slice" | "collate" };
+type TagField = { readonly t: "field" };
+type TagXml = { readonly t: "xml" };
+type TagJsonfnJsonagg = { readonly t: "jsonfn" | "jsonagg" };
+
+type Unnamed = {
+	readonly t:
+		| "bin"
+		| "param"
+		| "num"
+		| "str"
+		| "bool"
+		| "null"
+		| "is"
+		| "quant";
+};

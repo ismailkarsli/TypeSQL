@@ -84,6 +84,42 @@ assert.ok(doc.values[0] instanceof coreAdapter.JsonParam);
 assert.equal(doc.values[0].toPostgres(), "[1,2]");
 assert.equal(JSON.stringify(doc.values[0]), "[1,2]");
 
+// Inline rewriting keeps explicit offsets, repeated tokens and DEFAULT values.
+const repeated = sql.param("repeat");
+assert.deepEqual(
+	sql.as(
+		`SELECT $2, ${repeated}, ${repeated}, ${sql.param(undefined)}, '$99', "$88" -- $77\n`,
+		1,
+		2,
+	),
+	{
+		text: `SELECT $2, $3, $4, DEFAULT, '$99', "$88" -- $77\n`,
+		values: [1, 2, "repeat", "repeat"],
+	},
+);
+assert.throws(() => sql.as(`SELECT ${repeated}`), /already used/);
+for (const [open, close] of [
+	["'", "'"],
+	['"', '"'],
+	["/*", "*/"],
+	["--", "\n"],
+]) {
+	const token = sql.param(42);
+	assert.throws(
+		() => sql.as(`SELECT ${open}${token}${close}`),
+		/cannot be used inside/,
+	);
+	assert.deepEqual(sql.as(`SELECT ${token}`), {
+		text: "SELECT $1",
+		values: [42],
+	});
+}
+const piece = sql.fragment("$1, '$99', $$ $88 $$", 3);
+assert.deepEqual(sql.as("SELECT $2, {piece}, {piece}", { piece }, 1, 2), {
+	text: "SELECT $2, $3, '$99', $$ $88 $$, $4, '$99', $$ $88 $$",
+	values: [1, 2, 3, 3],
+});
+
 const m = corePg
 	.migrations()
 	.add("CREATE TABLE t (id int)")

@@ -1,3 +1,4 @@
+import type { Next } from "../sql/next.js";
 export type ColInfo = { readonly type: string; readonly nullable: boolean };
 
 export type ColMap = { readonly [name: string]: ColInfo };
@@ -41,9 +42,26 @@ export type ColsToMap<C extends Cols> = C extends readonly [
 ]
 	? M
 	: C[number] extends { readonly n: string }
-		? PlainMap<C>
+		? HasDuplicateNames<C, 0, never> extends false
+			? UniqueMap<C>
+			: PlainMap<C>
 		: SlowMap<C, {}>;
 
+// Unique names can be mapped directly; duplicates still use the last column.
+type HasDuplicateNames<
+	C extends Cols,
+	I extends number,
+	Seen extends string,
+> = C[I] extends { readonly n: infer N extends string }
+	? N extends Seen
+		? true
+		: HasDuplicateNames<C, Next[I], Seen | N>
+	: false;
+type UniqueMap<C extends Cols> = {
+	[E in C[number] as E extends { readonly n: infer N extends string }
+		? N
+		: never]: E extends { readonly t: infer T } ? T : never;
+};
 type PlainMap<C extends Cols> = {
 	[E in C[number] as E extends { readonly n: infer N extends string }
 		? N

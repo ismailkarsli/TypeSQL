@@ -288,9 +288,7 @@ type CheckKind<
 		? R
 		: Fail<Message, At>
 	: R;
-type NotDefault =
-	| { readonly t: "param" | "col" | "sub" }
-	| { readonly t: "cast"; readonly e: { readonly t: "param" } };
+type NotDefault = TagParamColSub | { readonly t: "cast"; readonly e: TagParam };
 type CheckDefault<B, R> = B extends {
 	k: "default";
 	e: NotDefault;
@@ -852,3 +850,6 @@ type ParseNested<
 					: never
 		: never
 	: Expected<"path string", T, I>;
+
+type TagParamColSub = { readonly t: "param" | "col" | "sub" };
+type TagParam = { readonly t: "param" };

@@ -22,9 +22,7 @@ import type {
 } from "./schema.js";
 import type { ApplyCreateView } from "./view.js";
 
-export type ApplyDdlNode<DB, S> = S extends {
-	readonly t: "noop" | "fetch" | "move" | "close_cursor";
-}
+export type ApplyDdlNode<DB, S> = S extends TagNoopFetchMoveCloseCursor
 	? DB
 	: S extends {
 				readonly t: "declare_cursor";
@@ -147,3 +145,7 @@ export type ApplyDdlNode<DB, S> = S extends {
 																}
 															? ApplyCreateFunction<DB, Name, Ret, Srf>
 															: SqlError<"unsupported DDL statement", null>;
+
+type TagNoopFetchMoveCloseCursor = {
+	readonly t: "noop" | "fetch" | "move" | "close_cursor";
+};

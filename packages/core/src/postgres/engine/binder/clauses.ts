@@ -42,7 +42,7 @@ export type CheckCondition<
 		? T extends ColInfo
 			? T["type"] extends "bool" | "unknown" | "null"
 				? true
-				: E extends { readonly t: "str" }
+				: E extends TagStr
 					? true
 					: SqlError<
 							`argument of ${Clause} must be type boolean, not type ${TypeDisplay<T["type"]>}`,
@@ -172,7 +172,7 @@ type ResolveSortKey<
 		infer V extends string,
 	]
 		? Ordinal<Neg, V, Clause, TargetExprs<Ts, [], 0>, HasStar<Cs>>
-		: E extends { readonly t: "str" }
+		: E extends TagStr
 			? SqlError<`non-integer constant in ${Clause}`, null>
 			: E extends {
 						readonly t: "col";
@@ -200,7 +200,7 @@ type ResolveGroupKey<
 		infer V extends string,
 	]
 		? Ordinal<Neg, V, "GROUP BY", TargetExprs<Ts, [], 0>, HasStar<Cs>>
-		: E extends { readonly t: "str" }
+		: E extends TagStr
 			? SqlError<"non-integer constant in GROUP BY", null>
 			: E extends {
 						readonly t: "col";
@@ -314,7 +314,7 @@ type DistinctOrderWalk<
 		? DistinctOrderWalk<O, Es, Star, Nx<I>>
 		: InList<O[I], Es> extends true
 			? DistinctOrderWalk<O, Es, Star, Nx<I>>
-			: [Star, O[I]] extends [true, { readonly t: "col" }]
+			: [Star, O[I]] extends [true, TagCol]
 				? DistinctOrderWalk<O, Es, Star, Nx<I>>
 				: SqlError<
 						"for SELECT DISTINCT, ORDER BY expressions must appear in select list",
@@ -338,7 +338,7 @@ type OutputOrderItem<E extends Expr, Cs extends Cols> =
 		infer V extends string,
 	]
 		? Ordinal<Neg, V, "ORDER BY", Cs, HasStar<Cs>>
-		: E extends { readonly t: "str" }
+		: E extends TagStr
 			? SqlError<"non-integer constant in ORDER BY", null>
 			: E extends {
 						readonly t: "col";
@@ -430,12 +430,21 @@ export type CheckWindowRefs<
 	Defs extends WindowDefs,
 	C extends Ctx,
 	I extends number = 0,
+> =
+	Wins<Es[number], []> extends readonly []
+		? true
+		: CheckWindowRefsAt<Es, Defs, C, I>;
+type CheckWindowRefsAt<
+	Es extends readonly Expr[],
+	Defs extends WindowDefs,
+	C extends Ctx,
+	I extends number,
 > = Es[I] extends undefined
 	? true
 	: CheckSpecs<Wins<Es[I], []>, Defs, C> extends infer R
 		? R extends AnyErr
 			? R
-			: CheckWindowRefs<Es, Defs, C, Nx<I>>
+			: CheckWindowRefsAt<Es, Defs, C, Nx<I>>
 		: never;
 type CheckSpecs<
 	Ss,
@@ -449,71 +458,85 @@ type CheckSpecs<
 		: never
 	: true;
 
-type Wins<E, Acc> = E extends {
-	readonly t: "call";
-	readonly args: readonly unknown[];
-	readonly win: unknown;
-}
-	? WinsOf<E["args"], Acc, 0> extends infer A extends readonly unknown[]
-		? E["win"] extends WindowSpec
-			? [...A, E["win"]]
-			: A
-		: never
+type WindowLeaf = {
+	readonly t:
+		| "col"
+		| "star"
+		| "param"
+		| "num"
+		| "str"
+		| "bool"
+		| "null"
+		| "typed"
+		| "default";
+};
+type Wins<E, Acc> = E extends WindowLeaf
+	? Acc
 	: E extends {
-				readonly t: "bin" | "isdistinct" | "quant";
-				readonly l: unknown;
-				readonly r: unknown;
+				readonly t: "call";
+				readonly args: readonly unknown[];
+				readonly win: unknown;
 			}
-		? Wins<E["r"], Wins<E["l"], Acc>>
+		? WinsOf<E["args"], Acc, 0> extends infer A extends readonly unknown[]
+			? E["win"] extends WindowSpec
+				? [...A, E["win"]]
+				: A
+			: never
 		: E extends {
-					readonly t: "array" | "row";
-					readonly items: readonly unknown[];
+					readonly t: "bin" | "isdistinct" | "quant";
+					readonly l: unknown;
+					readonly r: unknown;
 				}
-			? WinsOf<E["items"], Acc, 0>
+			? Wins<E["r"], Wins<E["l"], Acc>>
 			: E extends {
-						readonly t: "case";
-						readonly operand: unknown;
-						readonly whens: readonly {
-							readonly when: unknown;
-							readonly then: unknown;
-						}[];
-						readonly else: unknown;
+						readonly t: "array" | "row";
+						readonly items: readonly unknown[];
 					}
-				? Wins<E["else"], WhenWins<E["whens"], Wins<E["operand"], Acc>, 0>>
+				? WinsOf<E["items"], Acc, 0>
 				: E extends {
-							readonly t: "between";
-							readonly e: unknown;
-							readonly lo: unknown;
-							readonly hi: unknown;
+							readonly t: "case";
+							readonly operand: unknown;
+							readonly whens: readonly {
+								readonly when: unknown;
+								readonly then: unknown;
+							}[];
+							readonly else: unknown;
 						}
-					? Wins<E["hi"], Wins<E["lo"], Wins<E["e"], Acc>>>
+					? Wins<E["else"], WhenWins<E["whens"], Wins<E["operand"], Acc>, 0>>
 					: E extends {
-								readonly t: "in";
+								readonly t: "between";
 								readonly e: unknown;
-								readonly list: readonly unknown[];
+								readonly lo: unknown;
+								readonly hi: unknown;
 							}
-						? WinsOf<E["list"], Wins<E["e"], Acc>, 0>
+						? Wins<E["hi"], Wins<E["lo"], Wins<E["e"], Acc>>>
 						: E extends {
-									readonly t: "like";
+									readonly t: "in";
 									readonly e: unknown;
-									readonly pat: unknown;
+									readonly list: readonly unknown[];
 								}
-							? Wins<E["pat"], Wins<E["e"], Acc>>
+							? WinsOf<E["list"], Wins<E["e"], Acc>, 0>
 							: E extends {
-										readonly t: "idx";
+										readonly t: "like";
 										readonly e: unknown;
-										readonly i: unknown;
+										readonly pat: unknown;
 									}
-								? Wins<E["i"], Wins<E["e"], Acc>>
+								? Wins<E["pat"], Wins<E["e"], Acc>>
 								: E extends {
-											readonly t: "attz";
+											readonly t: "idx";
 											readonly e: unknown;
-											readonly zone: unknown;
+											readonly i: unknown;
 										}
-									? Wins<E["zone"], Wins<E["e"], Acc>>
-									: E extends { readonly e: unknown }
-										? Wins<E["e"], Acc>
-										: Acc;
+									? Wins<E["i"], Wins<E["e"], Acc>>
+									: E extends {
+												readonly t: "attz";
+												readonly e: unknown;
+												readonly zone: unknown;
+											}
+										? Wins<E["zone"], Wins<E["e"], Acc>>
+										: E extends { readonly e: unknown }
+											? Wins<E["e"], Acc>
+											: Acc;
 type WinsOf<
 	L extends readonly unknown[],
 	Acc,
@@ -526,3 +549,6 @@ type WhenWins<
 > = L[I] extends undefined
 	? Acc
 	: WhenWins<L, Wins<L[I]["then"], Wins<L[I]["when"], Acc>>, Nx<I>>;
+
+type TagStr = { readonly t: "str" };
+type TagCol = { readonly t: "col" };

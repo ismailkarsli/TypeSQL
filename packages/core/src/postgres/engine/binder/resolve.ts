@@ -9,6 +9,7 @@ import type {
 import type { SqlError } from "../../../errors.js";
 import type { Table, View } from "../../../schema.js";
 import type { TableRef } from "../ast.js";
+import type { Nx } from "../parser/util.js";
 import type { RowInfo } from "../shape.js";
 
 export type ResolveTable<
@@ -56,12 +57,7 @@ type InPgCatalog<DB, Name extends string> = DB extends {
 		: false
 	: false;
 
-export type TableCols<T extends Table> = {
-	readonly [K in keyof T]: {
-		readonly type: T[K]["type"];
-		readonly nullable: T[K]["nullable"];
-	};
-};
+export type TableCols<T extends Table> = T;
 
 export type ResolveWritableTable<
 	DB,
@@ -98,19 +94,21 @@ export type ResolveColumn<
 	S extends Scope,
 	Tbl extends string | null,
 	Name extends string,
-> = S extends readonly [readonly [infer I extends ScopeItem], ...Scope]
-	? Tbl extends string
-		? I["alias"] extends Tbl
-			? Name extends keyof I["cols"]
-				? I["cols"][Name]
-				: SqlError<`column ${Tbl}.${Name} does not exist`, null>
-			: ResolveColumnGeneral<S, Tbl, Name>
-		: Name extends keyof I["cols"]
-			? Name extends I["skip"][number]
-				? ResolveColumnGeneral<S, Tbl, Name>
-				: I["cols"][Name]
-			: ResolveColumnGeneral<S, Tbl, Name>
-	: ResolveColumnGeneral<S, Tbl, Name>;
+> = S extends readonly []
+	? ResolveColumnGeneral<S, Tbl, Name>
+	: S[0]["length"] extends 1
+		? Tbl extends string
+			? S[0][0]["alias"] extends Tbl
+				? Name extends keyof S[0][0]["cols"]
+					? S[0][0]["cols"][Name]
+					: SqlError<`column ${Tbl}.${Name} does not exist`, null>
+				: ResolveColumnGeneral<S, Tbl, Name>
+			: Name extends keyof S[0][0]["cols"]
+				? Name extends S[0][0]["skip"][number]
+					? ResolveColumnGeneral<S, Tbl, Name>
+					: S[0][0]["cols"][Name]
+				: ResolveColumnGeneral<S, Tbl, Name>
+		: ResolveColumnGeneral<S, Tbl, Name>;
 type ResolveColumnGeneral<
 	S extends Scope,
 	Tbl extends string | null,
@@ -123,82 +121,105 @@ type ResolveQualified<
 	S extends Scope,
 	Tbl extends string,
 	Name extends string,
-> = S extends readonly [
-	infer L extends ScopeLevel,
-	...infer Outer extends Scope,
-]
-	? FindAlias<L, Tbl> extends infer Item
-		? Item extends ScopeItem
-			? Name extends keyof Item["cols"]
-				? Item["cols"][Name]
-				: SqlError<`column ${Tbl}.${Name} does not exist`, null>
-			: Item extends null
-				? ResolveQualified<Outer, Tbl, Name>
-				: Item
-		: never
-	: SqlError<`missing FROM-clause entry for table "${Tbl}"`, null>;
+	Depth extends number = 0,
+> = S extends unknown ? ResolveQualifiedAt<S, Tbl, Name, Depth> : never;
+type ResolveQualifiedAt<
+	S extends Scope,
+	Tbl extends string,
+	Name extends string,
+	Depth extends number = 0,
+	L extends ScopeLevel = S[Depth],
+> = Depth extends S["length"]
+	? SqlError<`missing FROM-clause entry for table "${Tbl}"`, null>
+	: L extends unknown
+		? FindAliasAt<L, Tbl> extends infer Item
+			? Item extends number
+				? Name extends keyof L[Item]["cols"]
+					? L[Item]["cols"][Name]
+					: SqlError<`column ${Tbl}.${Name} does not exist`, null>
+				: Item extends null
+					? ResolveQualifiedAt<S, Tbl, Name, Nx<Depth>>
+					: Item
+			: never
+		: never;
 
-type FindAlias<L extends ScopeLevel, Tbl extends string> = L extends readonly [
-	infer I extends ScopeItem,
-	...infer R extends ScopeLevel,
-]
-	? I["alias"] extends Tbl
-		? FindAlias<R, Tbl> extends null
-			? I
-			: SqlError<`table reference "${Tbl}" is ambiguous`, null>
-		: FindAlias<R, Tbl>
-	: null;
+type FindAliasAt<
+	L extends ScopeLevel,
+	Tbl extends string,
+	I extends number = 0,
+	Found extends number | null = null,
+> = I extends L["length"]
+	? Found
+	: L[I]["alias"] extends Tbl
+		? Found extends number
+			? SqlError<`table reference "${Tbl}" is ambiguous`, null>
+			: FindAliasAt<L, Tbl, Nx<I>, I>
+		: FindAliasAt<L, Tbl, Nx<I>, Found>;
 
 type ResolveBare<
 	S extends Scope,
 	Name extends string,
 	All extends Scope,
-> = S extends readonly [
-	infer L extends ScopeLevel,
-	...infer Outer extends Scope,
-]
-	? FindBare<L, Name, null> extends infer R
+	Depth extends number = 0,
+> = S extends unknown ? ResolveBareAt<S, Name, All, Depth> : never;
+type ResolveBareAt<
+	S extends Scope,
+	Name extends string,
+	All extends Scope,
+	Depth extends number = 0,
+> = Depth extends S["length"]
+	? WholeRow<All, Name, `column "${Name}" does not exist`>
+	: FindBare<S[Depth], Name, null> extends infer R
 		? R extends ColInfo
 			? R
 			: R extends "ambiguous"
 				? SqlError<`column reference "${Name}" is ambiguous`, null>
-				: ResolveBare<Outer, Name, All>
-		: never
-	: WholeRow<All, Name, `column "${Name}" does not exist`>;
-
+				: ResolveBareAt<S, Name, All, Nx<Depth>>
+		: never;
 export type WholeRow<
 	S extends Scope,
 	Name extends string,
 	Missing extends string,
-> = S extends readonly [
-	infer L extends ScopeLevel,
-	...infer Outer extends Scope,
-]
-	? FindAlias<L, Name> extends infer Item
-		? Item extends ScopeItem
-			? RowInfo<Item["cols"]>
-			: Item extends null
-				? WholeRow<Outer, Name, Missing>
-				: Item
-		: never
-	: SqlError<Missing, null>;
+	Depth extends number = 0,
+> = S extends unknown ? WholeRowAt<S, Name, Missing, Depth> : never;
+type WholeRowAt<
+	S extends Scope,
+	Name extends string,
+	Missing extends string,
+	Depth extends number = 0,
+	L extends ScopeLevel = S[Depth],
+> = Depth extends S["length"]
+	? SqlError<Missing, null>
+	: L extends unknown
+		? FindAliasAt<L, Name> extends infer Item
+			? Item extends number
+				? RowInfo<L[Item]["cols"]>
+				: Item extends null
+					? WholeRowAt<S, Name, Missing, Nx<Depth>>
+					: Item
+			: never
+		: never;
 
 type FindBare<
 	L extends ScopeLevel,
 	Name extends string,
 	Found extends ColInfo | null,
-> = L extends readonly [
-	infer I extends ScopeItem,
-	...infer R extends ScopeLevel,
-]
-	? Name extends I["skip"][number]
-		? FindBare<R, Name, Found>
-		: Name extends keyof I["cols"]
+	I extends number = 0,
+> = L extends unknown ? FindBareAt<L, Name, Found, I> : never;
+type FindBareAt<
+	L extends ScopeLevel,
+	Name extends string,
+	Found extends ColInfo | null,
+	I extends number = 0,
+> = I extends L["length"]
+	? Found
+	: Name extends L[I]["skip"][number]
+		? FindBareAt<L, Name, Found, Nx<I>>
+		: Name extends keyof L[I]["cols"]
 			? Found extends ColInfo
 				? "ambiguous"
-				: FindBare<R, Name, I["cols"][Name]>
-			: FindBare<R, Name, Found>
-	: Found;
+				: FindBareAt<L, Name, L[I]["cols"][Name], Nx<I>>
+			: FindBareAt<L, Name, Found, Nx<I>>;
 
 export type ExpandStar<
 	S extends Scope,
@@ -208,12 +229,14 @@ export type ExpandStar<
 	...infer Outer extends Scope,
 ]
 	? Tbl extends string
-		? FindAlias<L, Tbl> extends infer Item
-			? Item extends ScopeItem
-				? Item["cols"]
-				: Item extends null
-					? ExpandStar<Outer, Tbl>
-					: Item
+		? L extends unknown
+			? FindAliasAt<L, Tbl> extends infer Item
+				? Item extends number
+					? L[Item]["cols"]
+					: Item extends null
+						? ExpandStar<Outer, Tbl>
+						: Item
+				: never
 			: never
 		: L extends readonly []
 			? SqlError<"SELECT * with no tables specified is not valid", null>

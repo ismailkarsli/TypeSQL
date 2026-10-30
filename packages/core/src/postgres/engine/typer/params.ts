@@ -74,13 +74,11 @@ export type ParamsOfExpr<E extends Expr, C extends Ctx, M> = E extends {
 	? M
 	: ParamsOfExprComplex<E, C, M>;
 
-type ParamsOfExprComplex<E extends Expr, C extends Ctx, M> = E extends {
-	readonly t: "param";
-}
+type ParamsOfExprComplex<E extends Expr, C extends Ctx, M> = E extends TagParam
 	? M
-	: E extends { readonly t: "bin" }
+	: E extends TagBin
 		? ParamsOfBin<E["op"], E["l"], E["r"], C, M>
-		: E extends { readonly t: "un" }
+		: E extends TagUn
 			? E["e"] extends {
 					readonly t: "param";
 					readonly n: infer N extends number;
@@ -89,7 +87,7 @@ type ParamsOfExprComplex<E extends Expr, C extends Ctx, M> = E extends {
 					? AddParam<M, N, Info<"bool", true>>
 					: M
 				: ParamsOfExpr<E["e"], C, M>
-			: E extends { readonly t: "cast" }
+			: E extends TagCast
 				? E["e"] extends {
 						readonly t: "param";
 						readonly n: infer N extends number;
@@ -103,17 +101,17 @@ type ParamsOfExprComplex<E extends Expr, C extends Ctx, M> = E extends {
 							? CastArrayParams<Items, C, M, El>
 							: ParamsOfExpr<E["e"], C, M>
 						: ParamsOfExpr<E["e"], C, M>
-				: E extends { readonly t: "call" }
+				: E extends TagCall
 					? ParamsOfCall<Extract<E, Call>, C, M>
-					: E extends { readonly t: "case" }
+					: E extends TagCase
 						? ParamsOfCase<E["operand"], E["whens"], E["else"], C, M>
-						: E extends { readonly t: "is" }
+						: E extends TagIs
 							? E["what"] extends "null"
 								? NullTested<E["e"], ParamsOfExpr<E["e"], C, M>>
 								: ParamsOfExpr<E["e"], C, M>
-							: E extends { readonly t: "isdistinct" }
+							: E extends TagIsdistinct
 								? ParamsOfBin<"=", E["l"], E["r"], C, M>
-								: E extends { readonly t: "between" }
+								: E extends TagBetween
 									? E["e"] extends {
 											readonly t: "param";
 											readonly n: infer N extends number;
@@ -130,7 +128,7 @@ type ParamsOfExprComplex<E extends Expr, C extends Ctx, M> = E extends {
 												ParamsOfExpr<E["e"], C, M>,
 												NullableOf<TypeOf<E["e"], C>>
 											>
-									: E extends { readonly t: "in" }
+									: E extends TagIn
 										? E["e"] extends {
 												readonly t: "param";
 												readonly n: infer N extends number;
@@ -147,7 +145,7 @@ type ParamsOfExprComplex<E extends Expr, C extends Ctx, M> = E extends {
 													ParamsOfExpr<E["e"], C, M>,
 													NullableOf<TypeOf<E["e"], C>>
 												>
-										: E extends { readonly t: "insub" }
+										: E extends TagInsub
 											? ParamsOfSelect<
 													E["q"],
 													C["db"],
@@ -155,16 +153,16 @@ type ParamsOfExprComplex<E extends Expr, C extends Ctx, M> = E extends {
 													C["ctes"],
 													ParamsOfExpr<E["e"], C, M>
 												>
-											: E extends { readonly t: "like" }
+											: E extends TagLike
 												? ParamsOfList<
 														[E["e"], E["pat"]],
 														C,
 														M,
 														Info<"text", true>
 													>
-												: E extends { readonly t: "quant" }
+												: E extends TagQuant
 													? ParamsOfQuant<E["l"], E["r"], C, M>
-													: E extends { readonly t: "sub" }
+													: E extends TagSub
 														? ParamsOfSelect<
 																E["q"],
 																C["db"],
@@ -172,7 +170,7 @@ type ParamsOfExprComplex<E extends Expr, C extends Ctx, M> = E extends {
 																C["ctes"],
 																M
 															>
-														: E extends { readonly t: "exists" }
+														: E extends TagExists
 															? ParamsOfSelect<
 																	E["q"],
 																	C["db"],
@@ -180,7 +178,7 @@ type ParamsOfExprComplex<E extends Expr, C extends Ctx, M> = E extends {
 																	C["ctes"],
 																	M
 																>
-															: E extends { readonly t: "arraysub" }
+															: E extends TagArraysub
 																? ParamsOfSelect<
 																		E["q"],
 																		C["db"],
@@ -188,7 +186,7 @@ type ParamsOfExprComplex<E extends Expr, C extends Ctx, M> = E extends {
 																		C["ctes"],
 																		M
 																	>
-																: E extends { readonly t: "array" }
+																: E extends TagArray
 																	? ParamsOfList<
 																			E["items"],
 																			C,
@@ -200,16 +198,16 @@ type ParamsOfExprComplex<E extends Expr, C extends Ctx, M> = E extends {
 																				true
 																			>
 																		>
-																	: E extends { readonly t: "row" }
+																	: E extends TagRow
 																		? ParamsOfList<E["items"], C, M, null>
-																		: E extends { readonly t: "idx" }
+																		: E extends TagIdx
 																			? ParamsOfList<
 																					[E["i"]],
 																					C,
 																					ParamsOfExpr<E["e"], C, M>,
 																					Info<"int4">
 																				>
-																			: E extends { readonly t: "slice" }
+																			: E extends TagSlice
 																				? ParamsOfOpt<
 																						E["hi"],
 																						C,
@@ -221,23 +219,21 @@ type ParamsOfExprComplex<E extends Expr, C extends Ctx, M> = E extends {
 																						>,
 																						Info<"int4">
 																					>
-																				: E extends { readonly t: "extract" }
+																				: E extends TagExtract
 																					? ParamsOfOpt<
 																							E["e"],
 																							C,
 																							M,
 																							Info<"timestamptz", true>
 																						>
-																					: E extends { readonly t: "position" }
+																					: E extends TagPosition
 																						? ParamsOfList<
 																								[E["sub"], E["in"]],
 																								C,
 																								M,
 																								Info<"text", true>
 																							>
-																						: E extends {
-																									readonly t: "substring";
-																								}
+																						: E extends TagSubstring
 																							? SubstrPosType<
 																									E["e"],
 																									E["from"],
@@ -261,7 +257,7 @@ type ParamsOfExprComplex<E extends Expr, C extends Ctx, M> = E extends {
 																										PT
 																									>
 																								: never
-																							: E extends { readonly t: "trim" }
+																							: E extends TagTrim
 																								? ParamsOfOpt<
 																										E["chars"],
 																										C,
@@ -273,9 +269,7 @@ type ParamsOfExprComplex<E extends Expr, C extends Ctx, M> = E extends {
 																										>,
 																										Info<"text", true>
 																									>
-																								: E extends {
-																											readonly t: "overlay";
-																										}
+																								: E extends TagOverlay
 																									? ParamsOfOpt<
 																											E["for"],
 																											C,
@@ -297,9 +291,7 @@ type ParamsOfExprComplex<E extends Expr, C extends Ctx, M> = E extends {
 																											>,
 																											Info<"int4", true>
 																										>
-																									: E extends {
-																												readonly t: "attz";
-																											}
+																									: E extends TagAttz
 																										? ParamsOfOpt<
 																												E["zone"],
 																												C,
@@ -314,25 +306,19 @@ type ParamsOfExprComplex<E extends Expr, C extends Ctx, M> = E extends {
 																												>,
 																												Info<"text", true>
 																											>
-																										: E extends {
-																													readonly t: "collate";
-																												}
+																										: E extends TagCollate
 																											? ParamsOfExpr<
 																													E["e"],
 																													C,
 																													M
 																												>
-																											: E extends {
-																														readonly t: "field";
-																													}
+																											: E extends TagField
 																												? ParamsOfExpr<
 																														E["e"],
 																														C,
 																														M
 																													>
-																												: E extends {
-																															readonly t: "xml";
-																														}
+																												: E extends TagXml
 																													? ParamsOfXml<E, C, M>
 																													: E extends {
 																																readonly t:
@@ -368,7 +354,7 @@ type SubstrPosType<
 		? Info<"int4", true>
 		: From extends null
 			? Info<"int4", true>
-			: (From extends { readonly t: "param" } ? For : From) extends infer Sib
+			: (From extends TagParam ? For : From) extends infer Sib
 				? Sib extends Expr
 					? TypeOf<Sib, C> extends { readonly type: "int2" | "int4" }
 						? Info<"int4", true>
@@ -444,7 +430,7 @@ type NonParams<
 	infer E extends Expr,
 	...infer R extends readonly Expr[],
 ]
-	? E extends { readonly t: "null" }
+	? E extends TagNull
 		? NonParams<R, Acc>
 		: NonParams<R, [...Acc, E]>
 	: Acc;
@@ -465,7 +451,7 @@ type ParamsOfBin<
 	C extends Ctx,
 	M,
 > = L extends { readonly t: "param"; readonly n: infer N extends number }
-	? R extends { readonly t: "param" }
+	? R extends TagParam
 		? Op extends "and" | "or"
 			? AddParam<AddParam<M, N, Info<"bool", true>>, R["n"], Info<"bool", true>>
 			: M
@@ -721,7 +707,11 @@ type PolyOf<
 				AR,
 				P extends "..." ? Ps : PR,
 				C,
-				A extends { readonly t: "null" } ? Acc : PolyStep<P, TypeOf<A, C>, Acc>
+				P extends "any" | "..." | "anyarray"
+					? A extends TagNull
+						? Acc
+						: PolyStep<P, TypeOf<A, C>, Acc>
+					: Acc
 			>
 		: Acc
 	: Acc;
@@ -804,24 +794,22 @@ export type ParamsOfFromItems<
 ]
 	? ParamsOfFromItems<R, C, ParamsOfFromItem<F, C, M>>
 	: M;
-type ParamsOfFromItem<F extends FromItem, C extends Ctx, M> = F extends {
-	readonly t: "join";
-}
+type ParamsOfFromItem<F extends FromItem, C extends Ctx, M> = F extends TagJoin
 	? ParamsOfOpt<
 			F["on"],
 			C,
 			ParamsOfFromItem<F["r"], C, ParamsOfFromItem<F["l"], C, M>>,
 			Info<"bool">
 		>
-	: F extends { readonly t: "sub" }
+	: F extends TagSub
 		? ParamsOfSelect<F["q"], C["db"], C["scope"], C["ctes"], M>
-		: F extends { readonly t: "func" }
+		: F extends TagFunc
 			? ParamsOfExpr<F["call"], C, M>
-			: F extends { readonly t: "xmltable" }
+			: F extends TagXmltable
 				? ParamsOfXmlTable<F, C, M>
-				: F extends { readonly t: "jsontable" }
+				: F extends TagJsontable
 					? ParamsOfJsonTable<F["jt"], C, M>
-					: F extends { readonly t: "sample" }
+					: F extends TagSample
 						? ParamsOfOpt<
 								F["repeatable"],
 								C,
@@ -839,7 +827,7 @@ type ParamsOfFromItem<F extends FromItem, C extends Ctx, M> = F extends {
 								>,
 								Info<"float8">
 							>
-						: F extends { readonly t: "rowsfrom" }
+						: F extends TagRowsfrom
 							? ParamsOfRowsFrom<F["funcs"], C, M>
 							: M;
 type ParamsOfRowsFrom<
@@ -859,12 +847,16 @@ export type ParamsOfSelect<
 	Outer extends Scope,
 	Ctes extends CteMap,
 	M,
+	SkipTargets extends boolean = false,
 > =
 	BindWith<Q["with"], DB, Outer, Ctes> extends infer C2
 		? C2 extends CteMap
 			? ParamsOfLimit<
 					Q["offset"],
-					ParamsOfLimit<Q["limit"], ParamsOfBody<Q["body"], DB, Outer, C2, M>>
+					ParamsOfLimit<
+						Q["limit"],
+						ParamsOfBody<Q["body"], DB, Outer, C2, M, SkipTargets>
+					>
 				>
 			: M
 		: never;
@@ -887,7 +879,8 @@ type ParamsOfBody<
 	Outer extends Scope,
 	Ctes extends CteMap,
 	M,
-> = B extends { readonly t: "setop" }
+	SkipTargets extends boolean = false,
+> = B extends TagSetop
 	? ParamsOfBody<
 			B["r"],
 			DB,
@@ -895,11 +888,11 @@ type ParamsOfBody<
 			Ctes,
 			ParamsOfBody<B["l"], DB, Outer, Ctes, M>
 		>
-	: B extends { readonly t: "paren" }
+	: B extends TagParen
 		? ParamsOfSelect<B["q"], DB, Outer, Ctes, M>
-		: B extends { readonly t: "values" }
+		: B extends TagValues
 			? ParamsOfRows<B["rows"], MkCtx<DB, Outer, Ctes, false>, M>
-			: B extends { readonly t: "simple" }
+			: B extends TagSimple
 				? BindFrom<B["from"], DB, Outer, Ctes> extends infer L
 					? L extends ScopeLevel
 						? ParamsOfSimple<
@@ -910,12 +903,14 @@ type ParamsOfBody<
 									Ctes,
 									B["groupBy"] extends null ? false : true
 								>,
-								M
+								M,
+								SkipTargets
 							>
 						: ParamsOfSimple<
 								Extract<B, SimpleSelect>,
 								MkCtx<DB, Outer, Ctes, false>,
-								M
+								M,
+								SkipTargets
 							>
 					: never
 				: M;
@@ -929,7 +924,12 @@ type ParamsOfRows<
 ]
 	? ParamsOfRows<Rest, C, ParamsOfList<R, C, M, null>>
 	: M;
-type ParamsOfSimple<B extends SimpleSelect, C extends Ctx, M> = B extends {
+type ParamsOfSimple<
+	B extends SimpleSelect,
+	C extends Ctx,
+	M,
+	SkipTargets extends boolean = false,
+> = B extends {
 	readonly targets: infer Ts extends readonly Target[];
 	readonly from: infer Fs extends readonly FromItem[];
 	readonly where: infer W extends Expr | null;
@@ -945,7 +945,9 @@ type ParamsOfSimple<B extends SimpleSelect, C extends Ctx, M> = B extends {
 				ParamsOfOpt<
 					W,
 					C,
-					ParamsOfTargets<Ts, C, ParamsOfFromItems<Fs, C, M>>,
+					SkipTargets extends true
+						? ParamsOfFromItems<Fs, C, M>
+						: ParamsOfTargets<Ts, C, ParamsOfFromItems<Fs, C, M>>,
 					Info<"bool">
 				>,
 				null
@@ -953,3 +955,44 @@ type ParamsOfSimple<B extends SimpleSelect, C extends Ctx, M> = B extends {
 			Info<"bool">
 		>
 	: M;
+
+type TagParam = { readonly t: "param" };
+type TagBin = { readonly t: "bin" };
+type TagUn = { readonly t: "un" };
+type TagCast = { readonly t: "cast" };
+type TagCall = { readonly t: "call" };
+type TagCase = { readonly t: "case" };
+type TagIs = { readonly t: "is" };
+type TagIsdistinct = { readonly t: "isdistinct" };
+type TagBetween = { readonly t: "between" };
+type TagIn = { readonly t: "in" };
+type TagInsub = { readonly t: "insub" };
+type TagLike = { readonly t: "like" };
+type TagQuant = { readonly t: "quant" };
+type TagSub = { readonly t: "sub" };
+type TagExists = { readonly t: "exists" };
+type TagArraysub = { readonly t: "arraysub" };
+type TagArray = { readonly t: "array" };
+type TagRow = { readonly t: "row" };
+type TagIdx = { readonly t: "idx" };
+type TagSlice = { readonly t: "slice" };
+type TagExtract = { readonly t: "extract" };
+type TagPosition = { readonly t: "position" };
+type TagSubstring = { readonly t: "substring" };
+type TagTrim = { readonly t: "trim" };
+type TagOverlay = { readonly t: "overlay" };
+type TagAttz = { readonly t: "attz" };
+type TagCollate = { readonly t: "collate" };
+type TagField = { readonly t: "field" };
+type TagXml = { readonly t: "xml" };
+type TagNull = { readonly t: "null" };
+type TagJoin = { readonly t: "join" };
+type TagFunc = { readonly t: "func" };
+type TagXmltable = { readonly t: "xmltable" };
+type TagJsontable = { readonly t: "jsontable" };
+type TagSample = { readonly t: "sample" };
+type TagRowsfrom = { readonly t: "rowsfrom" };
+type TagSetop = { readonly t: "setop" };
+type TagParen = { readonly t: "paren" };
+type TagValues = { readonly t: "values" };
+type TagSimple = { readonly t: "simple" };

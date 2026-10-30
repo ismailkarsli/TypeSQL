@@ -130,6 +130,21 @@ export type ParseExpr<
 	I extends number,
 	Min extends MinPrec = 0,
 > =
+	T[I] extends ParamTok<infer N>
+		? T[Nx<I>] extends OpTok<Terminator> | undefined
+			? Ok<ParamNode<N>, Nx<I>>
+			: ParseInfix<T, ParamNode<N>, Nx<I>, Min>
+		: T[I] extends WordTok | IdTok
+			? T[I] extends WordTok<PrefixKeyword>
+				? ParseExprSlow<T, I, Min>
+				: ColumnPrefix<T[I], T[Nx<I>], T[Nx2<I>], T[Nx3<I>]> extends infer P
+					? P extends [infer L, infer N]
+						? ParseInfix<T, L, N extends 1 ? Nx<I> : Nx3<I>, Min>
+						: ParseExprSlow<T, I, Min>
+					: never
+			: ParseExprSlow<T, I, Min>;
+
+type ParseExprSlow<T extends Toks, I extends number, Min extends MinPrec> =
 	ParsePrefix<T, I> extends infer R
 		? R extends Ok<infer L, infer J>
 			? ParseInfix<T, L, J, Min>
@@ -214,107 +229,161 @@ type ParseInfix<
 					: ParseInfixAt<T, L, I, Min>
 		: ParseInfixAt<T, L, I, Min>
 	: ParseInfixAt<T, L, I, Min>;
-type ParseInfixAt<T extends Toks, L, I extends number, Min extends MinPrec> =
-	T[I] extends OpTok<infer O>
-		? O extends Terminator
-			? Ok<L, I>
+// Classify a token independently of its enclosing stream and left expression.
+type InfixAction<H, Min extends MinPrec> =
+	H extends OpTok<infer O>
+		? O extends Terminator | "=>" | ":="
+			? "done"
 			: O extends "::"
 				? Binds<12, Min> extends true
-					? ParseCastSuffix<T, L, Nx<I>, Min>
-					: Ok<L, I>
+					? "cast"
+					: "done"
 				: O extends "["
-					? L extends Indirectable | { readonly t: "col" | "param" }
-						? ParseSubscript<T, L, Nx<I>, Min>
-						: Ok<L, I>
+					? "subscript"
 					: O extends "."
-						? L extends Indirectable
-							? ParseFieldAccess<T, L, Nx<I>, Min>
-							: Ok<L, I>
+						? "field"
 						: O extends ComparisonOp
 							? Binds<5, Min> extends true
-								? ParseComparisonRhs<T, L, O, Nx<I>, Min>
-								: Ok<L, I>
+								? "comparison"
+								: "done"
 							: O extends "+" | "-"
-								? BinRhs<T, L, O, 8, I, Nx<I>, Min>
+								? "add"
 								: O extends "*" | "/" | "%"
-									? BinRhs<T, L, O, 9, I, Nx<I>, Min>
+									? "multiply"
 									: O extends "^"
-										? BinRhs<T, L, O, 10, I, Nx<I>, Min>
-										: O extends "=>" | ":="
-											? Ok<L, I>
-											: BinRhs<T, L, O, 7, I, Nx<I>, Min>
-		: T[I] extends WordTok<infer W>
+										? "power"
+										: "binary"
+		: H extends WordTok<infer W>
 			? W extends "and"
 				? Binds<2, Min> extends true
-					? ParseChain<T, "and", 3, [L], Nx<I>, Min>
-					: Ok<L, I>
+					? "and"
+					: "done"
 				: W extends "or"
 					? Binds<1, Min> extends true
-						? ParseChain<T, "or", 2, [L], Nx<I>, Min>
-						: Ok<L, I>
-					: W extends "is"
+						? "or"
+						: "done"
+					: W extends "is" | "isnull" | "notnull"
 						? Binds<4, Min> extends true
-							? ParseIs<T, L, Nx<I>, Min>
-							: Ok<L, I>
-						: W extends "isnull"
-							? Binds<4, Min> extends true
-								? ParseInfix<T, IsTest_<L, "null", false>, Nx<I>, Min>
-								: Ok<L, I>
-							: W extends "notnull"
-								? Binds<4, Min> extends true
-									? ParseInfix<T, IsTest_<L, "null", true>, Nx<I>, Min>
-									: Ok<L, I>
-								: W extends "not"
-									? Binds<6, Min> extends true
-										? ParseNegated<T, L, Nx<I>, Min, I>
-										: Ok<L, I>
-									: W extends "in"
-										? Binds<6, Min> extends true
-											? ParseIn<T, L, Nx<I>, Min, false>
-											: Ok<L, I>
-										: W extends "like" | "ilike"
-											? Binds<6, Min> extends true
-												? ParseLike<T, L, Nx<I>, Min, W, false>
-												: Ok<L, I>
-											: W extends "similar"
-												? Binds<6, Min> extends true
-													? EatWord<T, Nx<I>, "to"> extends never
-														? Ok<L, I>
-														: ParseLike<
-																T,
-																L,
-																EatWord<T, Nx<I>, "to">,
-																Min,
-																"similar",
-																false
-															>
-													: Ok<L, I>
-												: W extends "between"
-													? Binds<6, Min> extends true
-														? ParseBetween<T, L, Nx<I>, Min, false>
-														: Ok<L, I>
-													: W extends "at"
-														? Binds<11, Min> extends true
-															? ParseAtTimeZone<T, L, Nx<I>, Min>
-															: Ok<L, I>
-														: W extends "collate"
-															? Binds<11, Min> extends true
-																? ParseCollate<T, L, Nx<I>, Min>
-																: Ok<L, I>
-															: W extends "operator"
-																? ParseOperatorSyntax<T, L, Nx<I>, Min, I>
-																: W extends "overlaps"
-																	? L extends {
-																			readonly t: "row";
-																			readonly items: infer Ls extends
-																				readonly unknown[];
-																		}
-																		? ParseOverlaps<T, Ls, Nx<I>, Min>
-																		: Ok<L, I>
-																	: Ok<L, I>
-			: Ok<L, I>;
+							? W
+							: "done"
+						: W extends "not" | "in" | "like" | "ilike" | "similar" | "between"
+							? Binds<6, Min> extends true
+								? W
+								: "done"
+							: W extends "at" | "collate"
+								? Binds<11, Min> extends true
+									? W
+									: "done"
+								: W extends "operator" | "overlaps"
+									? W
+									: "done"
+			: "done";
 
-type Indirectable = { readonly t: "sub" | "field" | "idx" | "slice" };
+type ParseInfixAt<
+	T extends Toks,
+	L,
+	I extends number,
+	Min extends MinPrec,
+> = ExecuteInfix<InfixAction<T[I], Min>, T, L, I, Min>;
+type ExecuteInfix<
+	K,
+	T extends Toks,
+	L,
+	I extends number,
+	Min extends MinPrec,
+> = K extends "done"
+	? Ok<L, I>
+	: K extends "cast"
+		? ParseCastSuffix<T, L, Nx<I>, Min>
+		: K extends "subscript"
+			? L extends Indirectable | TagColParam
+				? ParseSubscript<T, L, Nx<I>, Min>
+				: Ok<L, I>
+			: K extends "field"
+				? L extends Indirectable
+					? ParseFieldAccess<T, L, Nx<I>, Min>
+					: Ok<L, I>
+				: K extends "comparison"
+					? ParseComparisonRhs<T, L, T[I]["v"] & string, Nx<I>, Min>
+					: K extends "add"
+						? BinRhs<T, L, T[I]["v"] & string, 8, I, Nx<I>, Min>
+						: K extends "multiply"
+							? BinRhs<T, L, T[I]["v"] & string, 9, I, Nx<I>, Min>
+							: K extends "power"
+								? BinRhs<T, L, T[I]["v"] & string, 10, I, Nx<I>, Min>
+								: K extends "binary"
+									? BinRhs<T, L, T[I]["v"] & string, 7, I, Nx<I>, Min>
+									: K extends "and"
+										? ParseChain<T, "and", 3, [L], Nx<I>, Min>
+										: K extends "or"
+											? ParseChain<T, "or", 2, [L], Nx<I>, Min>
+											: K extends "is"
+												? ParseIs<T, L, Nx<I>, Min>
+												: K extends "isnull"
+													? ParseInfix<T, IsTest_<L, "null", false>, Nx<I>, Min>
+													: K extends "notnull"
+														? ParseInfix<
+																T,
+																IsTest_<L, "null", true>,
+																Nx<I>,
+																Min
+															>
+														: K extends "not"
+															? ParseNegated<T, L, Nx<I>, Min, I>
+															: K extends "in"
+																? ParseIn<T, L, Nx<I>, Min, false>
+																: K extends "like"
+																	? ParseLike<T, L, Nx<I>, Min, "like", false>
+																	: K extends "ilike"
+																		? ParseLike<
+																				T,
+																				L,
+																				Nx<I>,
+																				Min,
+																				"ilike",
+																				false
+																			>
+																		: K extends "similar"
+																			? EatWord<T, Nx<I>, "to"> extends never
+																				? Ok<L, I>
+																				: ParseLike<
+																						T,
+																						L,
+																						EatWord<T, Nx<I>, "to">,
+																						Min,
+																						"similar",
+																						false
+																					>
+																			: K extends "between"
+																				? ParseBetween<T, L, Nx<I>, Min, false>
+																				: K extends "at"
+																					? ParseAtTimeZone<T, L, Nx<I>, Min>
+																					: K extends "collate"
+																						? ParseCollate<T, L, Nx<I>, Min>
+																						: K extends "operator"
+																							? ParseOperatorSyntax<
+																									T,
+																									L,
+																									Nx<I>,
+																									Min,
+																									I
+																								>
+																							: K extends "overlaps"
+																								? L extends {
+																										readonly t: "row";
+																										readonly items: infer Ls extends
+																											readonly unknown[];
+																									}
+																									? ParseOverlaps<
+																											T,
+																											Ls,
+																											Nx<I>,
+																											Min
+																										>
+																									: Ok<L, I>
+																								: never;
+
+type Indirectable = TagSubFieldIdxSlice;
 
 type NonAssoc<
 	T extends Toks,
@@ -712,7 +781,7 @@ type ParseOverlaps<
 					readonly items: readonly [infer C, infer D];
 				}
 				? ParseInfix<T, CallOf<"overlaps", [A, B, C, D]>, J, Min>
-				: R extends { readonly t: "row" }
+				: R extends TagRow
 					? Fail<
 							"wrong number of parameters on right side of OVERLAPS expression",
 							I
@@ -1753,3 +1822,7 @@ type SkipNulls<T extends Toks, I extends number> =
 			? I
 			: EatWords<T, I, ["nulls", "last"]>
 		: EatWords<T, I, ["nulls", "first"]>;
+
+type TagColParam = { readonly t: "col" | "param" };
+type TagSubFieldIdxSlice = { readonly t: "sub" | "field" | "idx" | "slice" };
+type TagRow = { readonly t: "row" };

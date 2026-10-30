@@ -20,13 +20,11 @@ import type { DateTimeT, NumT } from "./operators.js";
 import type { ParamsOfList, ParamsOfOpt, ParamsOfSelect } from "./params.js";
 import type { FirstColOf, Or, TypeList, TypeOf } from "./typeof.js";
 
-export type TypeSqlJson<E extends Expr, C extends Ctx> = E extends {
-	readonly t: "jsonfmt";
-}
+export type TypeSqlJson<E extends Expr, C extends Ctx> = E extends TagJsonfmt
 	? TypeFormat<TypeOf<E["e"], C>>
-	: E extends { readonly t: "isjson" }
+	: E extends TagIsjson
 		? TypeIsJson<TypeOf<E["e"], C>>
-		: E extends { readonly t: "jsonagg" }
+		: E extends TagJsonagg
 			? AggResult<TypeOf<E["e"], C>, E["ret"]>
 			: TypeFn<E, C>;
 
@@ -192,11 +190,13 @@ type TypeArrayQuery<R extends string, A> = A extends ColInfo
 	? Info<R extends "json" | "jsonb" ? JsonRet<`arrnn:${R}`, [A]> : R, true>
 	: A;
 
-export type ParamsOfSqlJson<E extends Expr, C extends Ctx, M> = E extends {
-	readonly t: "jsonfmt" | "isjson";
-}
+export type ParamsOfSqlJson<
+	E extends Expr,
+	C extends Ctx,
+	M,
+> = E extends TagJsonfmtIsjson
 	? ParamsOfOpt<E["e"], C, M, Info<"text", true>>
-	: E extends { readonly t: "jsonagg" }
+	: E extends TagJsonagg
 		? ParamsOfOpt<
 				E["e"]["filter"],
 				C,
@@ -220,7 +220,7 @@ export type BindJsonTable<
 	Outer extends Scope,
 	Ctes extends CteMap,
 	Sofar extends ScopeLevel,
-> = J["path"] extends { readonly t: "str" }
+> = J["path"] extends TagStr
 	? DuplicateName<J["names"], never> extends infer D
 		? D extends string
 			? SqlError<`duplicate JSON_TABLE column or path name: ${D}`, null>
@@ -278,3 +278,9 @@ export type ParamsOfJsonTable<
 	M,
 	Info<"text", true>
 >;
+
+type TagJsonfmt = { readonly t: "jsonfmt" };
+type TagIsjson = { readonly t: "isjson" };
+type TagJsonagg = { readonly t: "jsonagg" };
+type TagJsonfmtIsjson = { readonly t: "jsonfmt" | "isjson" };
+type TagStr = { readonly t: "str" };

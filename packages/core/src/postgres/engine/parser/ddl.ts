@@ -1413,9 +1413,9 @@ type SchemaElements<
 					>
 				: SchemaElement<T, Nx<I>, S, Known, false, false> extends infer R
 					? R extends Ok<infer E, infer J>
-						? E extends { readonly t: "create_table" }
+						? E extends TagCreateTable
 							? SchemaElements<T, J, Ine, S, Known, [...Tbls, E], Views>
-							: E extends { readonly t: "create_view" }
+							: E extends TagCreateView
 								? SchemaElements<T, J, Ine, S, Known, Tbls, [...Views, E]>
 								: SchemaElements<T, J, Ine, S, Known, Tbls, Views>
 						: R
@@ -1468,7 +1468,7 @@ type SchemaElement<
 												: ParseRecursiveView<T, Nx2<I>, OrR>
 								) extends infer R
 							? R extends Ok<infer E, infer J>
-								? E extends { readonly t: "create_table_as" }
+								? E extends TagCreateTableAs
 									? SyntaxErrorAt<T, I>
 									: E extends {
 												readonly t: "create_table";
@@ -2131,3 +2131,7 @@ type DropNode<
 						};
 						cascade: C;
 					};
+
+type TagCreateTable = { readonly t: "create_table" };
+type TagCreateView = { readonly t: "create_view" };
+type TagCreateTableAs = { readonly t: "create_table_as" };

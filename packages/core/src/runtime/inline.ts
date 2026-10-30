@@ -41,11 +41,20 @@ export function resolveInline(
 	start: number,
 ): { text: string; values: unknown[] } {
 	const values: unknown[] = [];
-	const used = new Set<string>();
+	const used: string[] = [];
 	let k = start;
-	const out = text.replace(INLINE, (m: string, id?: string) => {
+	let out = "";
+	let last = 0;
+	INLINE.lastIndex = 0;
+	for (
+		let match = INLINE.exec(text);
+		match !== null;
+		match = INLINE.exec(text)
+	) {
+		const m = match[0];
+		const id = match[1];
 		if (id === undefined) {
-			if (!m.includes(MARK)) return m;
+			if (!m.includes(MARK)) continue;
 			const where =
 				m[0] === "'"
 					? "a quoted string"
@@ -61,11 +70,16 @@ export function resolveInline(
 				"typesql: this sql.param() value was already used by another statement; call sql.param() once per statement",
 			);
 		const value = pending.get(id);
-		used.add(id);
-		if (value === undefined) return "DEFAULT";
-		values.push(value);
-		return `$${++k}`;
-	});
+		used.push(id);
+		out += text.slice(last, match.index);
+		if (value === undefined) out += "DEFAULT";
+		else {
+			values.push(value);
+			out += `$${++k}`;
+		}
+		last = match.index + m.length;
+	}
+	out += text.slice(last);
 	for (const t of used) pending.delete(t);
 	if (out.includes("\u0000"))
 		throw new Error(

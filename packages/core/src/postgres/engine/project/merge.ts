@@ -90,7 +90,7 @@ type ReturningSource<Ws extends readonly MergeWhen[], L extends ScopeLevel> = [
 		Ws[number],
 		{
 			readonly match: "source";
-			readonly action: { readonly t: "update" | "delete" };
+			readonly action: TagUpdateDelete;
 		}
 	>,
 ] extends [never]
@@ -348,3 +348,5 @@ type ParamsOfMergeInsert<
 	C,
 	ParamsOfInds<Cs, Ind, Tbl, C, M>
 >;
+
+type TagUpdateDelete = { readonly t: "update" | "delete" };

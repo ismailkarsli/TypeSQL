@@ -59,9 +59,9 @@ export type BindFromItem<
 	Outer extends Scope,
 	Ctes extends CteMap,
 	Sofar extends ScopeLevel,
-> = F extends { readonly t: "table" }
+> = F extends TagTable
 	? BindTable<F["ref"], F["alias"], F["colAliases"], DB, Ctes, Sofar>
-	: F extends { readonly t: "sub" }
+	: F extends TagSub
 		? BindSub<
 				F["q"],
 				F["alias"],
@@ -72,7 +72,7 @@ export type BindFromItem<
 				Ctes,
 				Sofar
 			>
-		: F extends { readonly t: "func" }
+		: F extends TagFunc
 			? BindFunc<
 					F["call"],
 					F["alias"],
@@ -84,7 +84,7 @@ export type BindFromItem<
 					Ctes,
 					Sofar
 				>
-			: F extends { readonly t: "join" }
+			: F extends TagJoin
 				? BindJoin<
 						F["kind"],
 						F["l"],
@@ -97,9 +97,9 @@ export type BindFromItem<
 						Ctes,
 						Sofar
 					>
-				: F extends { readonly t: "xmltable" }
+				: F extends TagXmltable
 					? BindXmlTable<F, F["alias"], F["colAliases"], DB, Outer, Ctes, Sofar>
-					: F extends { readonly t: "jsontable" }
+					: F extends TagJsontable
 						? BindJsonTable<
 								F["jt"],
 								F["alias"],
@@ -109,7 +109,7 @@ export type BindFromItem<
 								Ctes,
 								Sofar
 							>
-						: F extends { readonly t: "sample" }
+						: F extends TagSample
 							? BindSample<
 									F["table"],
 									F["method"],
@@ -120,7 +120,7 @@ export type BindFromItem<
 									Ctes,
 									Sofar
 								>
-							: F extends { readonly t: "rowsfrom" }
+							: F extends TagRowsfrom
 								? BindRowsFrom<
 										F["funcs"],
 										F["alias"],
@@ -258,7 +258,7 @@ type SampleArgs<
 	C extends Ctx,
 	I extends number,
 > = Args[I] extends Expr
-	? Args[I] extends { readonly t: "null" }
+	? Args[I] extends TagNull
 		? SqlError<
 				`TABLESAMPLE ${I extends 0 ? "" : "REPEATABLE "}parameter cannot be null`,
 				null
@@ -274,7 +274,7 @@ type SampleArgs<
 						| "float8"
 						| "unknown"
 					? SampleArgs<Args, Ts, C, Nx<I>>
-					: Args[I] extends { readonly t: "str" }
+					: Args[I] extends TagStr
 						? SampleArgs<Args, Ts, C, Nx<I>>
 						: SqlError<
 								`argument of ${I extends 0 ? "TABLESAMPLE" : "REPEATABLE"} must be type ${TypeDisplay<Ts[I]>}, not type ${TypeDisplay<A["type"] extends "null" ? "text" : A["type"]>}`,
@@ -400,7 +400,7 @@ type BindFunc<
 	Outer extends Scope,
 	Ctes extends CteMap,
 	Sofar extends ScopeLevel,
-> = Call extends { readonly t: "call" }
+> = Call extends TagCall
 	? CheckAlias<
 			Alias extends string ? Alias : Call["name"],
 			Sofar
@@ -444,7 +444,7 @@ type BindFunc<
 				: never
 			: A
 		: never
-	: Call extends { readonly t: "cast" }
+	: Call extends TagCast
 		? BindCastFunc<
 				Call,
 				Alias,
@@ -668,7 +668,7 @@ type RowsFromCols<
 	infer F extends RowsFromFunc,
 	...infer R extends readonly RowsFromFunc[],
 ]
-	? F["call"] extends { readonly t: "call" }
+	? F["call"] extends TagCall
 		? FuncBaseCols<
 				F["call"]["name"],
 				F["call"]["args"],
@@ -901,3 +901,16 @@ type HideCols<L extends ScopeLevel, U extends string> = {
 			}
 		: L[I];
 };
+
+type TagTable = { readonly t: "table" };
+type TagSub = { readonly t: "sub" };
+type TagFunc = { readonly t: "func" };
+type TagJoin = { readonly t: "join" };
+type TagXmltable = { readonly t: "xmltable" };
+type TagJsontable = { readonly t: "jsontable" };
+type TagSample = { readonly t: "sample" };
+type TagRowsfrom = { readonly t: "rowsfrom" };
+type TagNull = { readonly t: "null" };
+type TagStr = { readonly t: "str" };
+type TagCall = { readonly t: "call" };
+type TagCast = { readonly t: "cast" };

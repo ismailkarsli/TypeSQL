@@ -23324,8 +23324,152 @@
 		},
 		{
 			"schema": "a747d3b517b0",
+			"source": "postgres-performance",
+			"sql": "UPDATE users SET email = $1, display_name = $2 WHERE id = $3 RETURNING email, display_name",
+			"ddl": false
+		},
+		{
+			"schema": "a747d3b517b0",
+			"source": "postgres-performance",
+			"sql": "UPDATE users SET display_name = NULL RETURNING display_name",
+			"ddl": false
+		},
+		{
+			"schema": "a747d3b517b0",
+			"source": "postgres-performance",
+			"sql": "UPDATE users SET email = NULL RETURNING email",
+			"ddl": false
+		},
+		{
+			"schema": "a747d3b517b0",
+			"source": "postgres-performance",
+			"sql": "UPDATE users SET id = DEFAULT, display_name = DEFAULT RETURNING id, display_name",
+			"ddl": false
+		},
+		{
+			"schema": "a747d3b517b0",
+			"source": "postgres-performance",
+			"sql": "UPDATE users SET email = DEFAULT RETURNING email",
+			"ddl": false
+		},
+		{
+			"schema": "a747d3b517b0",
+			"source": "postgres-performance",
+			"sql": "UPDATE users SET email = 'a', email = 'b'",
+			"ddl": false
+		},
+		{
+			"schema": "a747d3b517b0",
+			"source": "postgres-performance",
+			"sql": "UPDATE users SET email = 'a', email = 'b', missing_column = 'c'",
+			"ddl": false
+		},
+		{
+			"schema": "a747d3b517b0",
+			"source": "postgres-performance",
+			"sql": "UPDATE users SET email = 'a', email = NULL",
+			"ddl": false
+		},
+		{
+			"schema": "a747d3b517b0",
+			"source": "postgres-performance",
+			"sql": "UPDATE users SET email = 'a', email = missing_column",
+			"ddl": false
+		},
+		{
+			"schema": "a747d3b517b0",
+			"source": "postgres-performance",
+			"sql": "UPDATE users SET email = 'a', display_name = missing_column, missing_column = 'c'",
+			"ddl": false
+		},
+		{
+			"schema": "a747d3b517b0",
+			"source": "postgres-performance",
+			"sql": "UPDATE users SET email = 'a', tags[1] = 'b' RETURNING email, tags",
+			"ddl": false
+		},
+		{
+			"schema": "a747d3b517b0",
+			"source": "postgres-performance",
+			"sql": "INSERT INTO users (email, tags) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET email = excluded.email, display_name = $3 RETURNING email, display_name",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "postgres-performance",
+			"sql": "SELECT u.email, p.title FROM users u LEFT JOIN posts p ON p.author_id = u.id WHERE u.id = $1 ORDER BY u.email",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "postgres-performance",
+			"sql": "SELECT u.email, p.title FROM users u LEFT JOIN posts p ON p.author_id = u.id WHERE p.title IS NOT NULL ORDER BY u.email",
+			"ddl": false
+		},
+		{
+			"schema": "a747d3b517b0",
+			"source": "postgres-performance",
+			"sql": "SELECT u.id, (SELECT u.email FROM users x WHERE x.id = u.id) FROM users u WHERE u.id = $1",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "postgres-performance",
+			"sql": "SELECT u.id FROM users u, posts u",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "postgres-performance",
+			"sql": "SELECT id FROM users u JOIN posts p ON p.author_id = u.id",
+			"ddl": false
+		},
+		{
+			"schema": "a747d3b517b0",
+			"source": "postgres-performance",
+			"sql": "SELECT id FROM users WHERE id = $1 OR id = $2 AND email = $3",
+			"ddl": false
+		},
+		{
+			"schema": "a747d3b517b0",
+			"source": "postgres-performance",
+			"sql": "SELECT email || email || email FROM users WHERE id = $1",
+			"ddl": false
+		},
+		{
+			"schema": "a747d3b517b0",
 			"source": "limit-offset-params",
 			"sql": "SELECT email FROM users LIMIT $1 OFFSET $2",
+			"ddl": false
+		},
+		{
+			"schema": "a747d3b517b0",
+			"source": "postgres-performance",
+			"sql": "SELECT count(*) FROM users GROUP BY display_name HAVING count(*) > $1",
+			"ddl": false
+		},
+		{
+			"schema": "a747d3b517b0",
+			"source": "postgres-performance",
+			"sql": "SELECT email, row_number() OVER w FROM users WINDOW w AS (ORDER BY id)",
+			"ddl": false
+		},
+		{
+			"schema": "a747d3b517b0",
+			"source": "postgres-performance",
+			"sql": "SELECT\n\t\temail,\n\t\tdisplay_name FROM users WHERE id = $1",
+			"ddl": false
+		},
+		{
+			"schema": "a747d3b517b0",
+			"source": "postgres-performance",
+			"sql": "SELECT 'first\n\t second' AS content FROM users WHERE id = $1",
+			"ddl": false
+		},
+		{
+			"schema": "a747d3b517b0",
+			"source": "postgres-performance",
+			"sql": "SELECT $3::int4 AS n, $1::text AS t, $2::boolean AS b, $3::int4 AS again WHERE $2::boolean",
 			"ddl": false
 		},
 		{

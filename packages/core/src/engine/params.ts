@@ -1,3 +1,4 @@
+import type { Next } from "../sql/next.js";
 import type { Toks } from "./tokens.js";
 import type { ColInfo } from "./types.js";
 
@@ -17,13 +18,24 @@ export type ParamsToMap<U> = {
 };
 
 export type MaxParam<T extends Toks> = HighestParam<
-	Extract<T[number], { readonly k: "$" }>["v"] | 0
+	MaxCandidates<Extract<T[number], { readonly k: "$" }>["v"] | 0>
 >;
 
-type HighestParam<N extends number, All extends number = N> = N extends number
-	? Exclude<All, Before<N>> extends N
+// A number with a successor present cannot be the maximum. Dense parameter
+// lists then have only one candidate and need no pairwise comparisons.
+type MaxCandidates<N extends number, All extends number = N> = N extends number
+	? number extends N
 		? N
-		: never
+		: Next[N] extends All
+			? never
+			: N
+	: never;
+type HighestParam<N extends number, All extends number = N> = N extends number
+	? [All] extends [N]
+		? N
+		: Exclude<All, Before<N>> extends N
+			? N
+			: never
 	: never;
 type Before<N extends number, A extends number[] = []> = A["length"] extends N
 	? A[number]

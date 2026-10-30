@@ -41,13 +41,13 @@ export function build(
 ): { text: string; values: unknown[] } {
 	let slots: SlotMap | null = null;
 	let outer: readonly unknown[] = rest;
-	if (SLOT_RE.test(text) && rest.length > 0 && isSlotMap(rest[0])) {
+	if (rest.length > 0 && SLOT_RE.test(text) && isSlotMap(rest[0])) {
 		slots = rest[0];
 		outer = rest.slice(1);
 	}
 	let positional = text;
-	let values: unknown[] = outer.map(takeValue);
-	if (NAMED_RE.test(text)) {
+	let values: unknown[] = outer.length === 0 ? [] : outer.map(takeValue);
+	if (text.includes(":") && NAMED_RE.test(text)) {
 		const rn = rewriteNamed(text);
 		if (rn.names.length > 0) {
 			values = namedValues(rn.names, outer);
@@ -60,7 +60,7 @@ export function build(
 			Math.max(maxParam(positional), values.length),
 		);
 		positional = r.text;
-		values = [...values, ...r.values];
+		values = values.length === 0 ? r.values : [...values, ...r.values];
 	}
 	return slots
 		? splice(positional, slots, values)
