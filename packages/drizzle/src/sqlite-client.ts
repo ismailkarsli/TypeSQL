@@ -41,10 +41,29 @@ function changes(result: unknown): number {
 	return Number(r.changes ?? r.rowsAffected ?? 0);
 }
 
+// better-sqlite3 refuses `all()` for statements without rows before running
+// them; such statements run with `run()` instead. Drizzle may wrap the error.
+const NO_DATA = /does not return data/;
+const noData = (e: unknown): boolean =>
+	e instanceof Error && (NO_DATA.test(e.message) || noData(e.cause));
+
+async function all(
+	db: DrizzleSqliteDatabase,
+	text: string,
+	values: readonly unknown[],
+): Promise<unknown[]> {
+	try {
+		return (await runner(db).all(statement(text, values))) as unknown[];
+	} catch (e) {
+		if (!noData(e)) throw e;
+		await runner(db).run(statement(text, values));
+		return [];
+	}
+}
+
 export function sqliteExecutor(db: DrizzleSqliteDatabase): Executor {
 	return Object.assign(
-		async (text: string, values: readonly unknown[]) =>
-			(await runner(db).all(statement(text, values))) as unknown[],
+		(text: string, values: readonly unknown[]) => all(db, text, values),
 		{
 			count: async (text: string, values: readonly unknown[]) =>
 				changes(await runner(db).run(statement(text, values))),
