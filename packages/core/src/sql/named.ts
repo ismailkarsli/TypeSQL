@@ -46,6 +46,27 @@ type HasSingleColon<
 		: false;
 
 type NamedLoop<T extends string, Acc extends string, Names extends string[]> =
+	NextOpaque<T> extends [
+		infer Code extends string,
+		infer Seg extends string,
+		infer After extends string,
+	]
+		? RewriteCode<Code, "", Names> extends [
+				infer C extends string,
+				infer N2 extends string[],
+			]
+			? Seg extends ""
+				? [`${Acc}${C}`, N2]
+				: NamedLoop<After, `${Acc}${C}${Seg}`, N2>
+			: never
+		: never;
+
+/**
+ * Splits `T` at its first string, E-string, quoted identifier, comment or
+ * dollar quote: `[code before it, the whole quoted segment, text after it]`.
+ * The segment is `""` when `T` is all code.
+ */
+export type NextOpaque<T extends string> =
 	SplitFirst<T> extends [
 		infer Code extends string,
 		infer O extends string,
@@ -56,31 +77,43 @@ type NamedLoop<T extends string, Acc extends string, Names extends string[]> =
 				infer Tag extends string,
 				infer InCode extends string,
 			]
-			? RewriteCode<Pre, "", Names> extends [
-					infer C extends string,
-					infer N2 extends string[],
+			? DollarBody<`${InCode}${O}${Rest}`, Tag> extends [
+					infer Seg extends string,
+					infer After extends string,
 				]
-				? DollarBody<`${InCode}${O}${Rest}`, Tag> extends [
-						infer Seg extends string,
-						infer After extends string,
-					]
-					? NamedLoop<After, `${Acc}${C}${Tag}${Seg}`, N2>
+				? [Pre, `${Tag}${Seg}`, After]
+				: never
+			: O extends ""
+				? [Code, "", ""]
+				: (
+							O extends "'"
+								? IsEString<Code> extends true
+									? EClose<Rest, "">
+									: Opaque<O, Rest>
+								: Opaque<O, Rest>
+						) extends [infer Seg extends string, infer After extends string]
+					? [Code, `${O}${Seg}`, After]
 					: never
-				: never
-			: RewriteCode<Code, "", Names> extends [
-						infer C extends string,
-						infer N2 extends string[],
-					]
-				? O extends ""
-					? [`${Acc}${C}`, N2]
-					: Opaque<O, Rest> extends [
-								infer Seg extends string,
-								infer After extends string,
-							]
-						? NamedLoop<After, `${Acc}${C}${O}${Seg}`, N2>
-						: never
-				: never
 		: never;
+
+/** `E'…'` strings escape quotes with backslashes. */
+type IsEString<Code extends string> = Code extends `${infer C0}${"E" | "e"}`
+	? C0 extends `${string}${NChar}`
+		? false
+		: true
+	: false;
+type EClose<
+	S extends string,
+	Acc extends string,
+> = S extends `${infer In}'${infer R}`
+	? In extends `${infer A}\\${infer B}`
+		? B extends `${infer C}${infer B2}`
+			? EClose<`${B2}'${R}`, `${Acc}${A}\\${C}`>
+			: EClose<R, `${Acc}${A}\\'`>
+		: R extends `'${infer R2}`
+			? EClose<R2, `${Acc}${In}''`>
+			: [`${Acc}${In}'`, R]
+	: [`${Acc}${S}`, ""];
 
 type DollarOpen<
 	S extends string,

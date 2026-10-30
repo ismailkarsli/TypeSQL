@@ -1,11 +1,33 @@
 import type { SqlError } from "../errors.js";
 import type { Opaque, SplitFirst } from "./inline.js";
+import type { NextOpaque } from "./named.js";
 
 export type Splice<Q extends string, S> = string extends Q
 	? string
 	: SpliceLoop<Q, S, MaxParamStr<Q>, "">;
 
 type SpliceLoop<
+	Q extends string,
+	S,
+	Off extends number,
+	Acc extends string,
+> = Q extends `${string}{${string}}${string}`
+	? NextOpaque<Q> extends [
+			infer Code extends string,
+			infer Seg extends string,
+			infer After extends string,
+		]
+		? SpliceCode<Code, S, Off, ""> extends infer R
+			? R extends [infer T extends string, infer NewOff extends number]
+				? Seg extends ""
+					? `${Acc}${T}`
+					: SpliceLoop<After, S, NewOff, `${Acc}${T}${Seg}`>
+				: R
+			: never
+		: never
+	: `${Acc}${Q}`;
+
+type SpliceCode<
 	Q extends string,
 	S,
 	Off extends number,
@@ -20,25 +42,42 @@ type SpliceLoop<
 								infer NT extends string,
 								infer NewOff extends number,
 							]
-						? SpliceLoop<Post, S, NewOff, `${Acc}${Pre}${NT}`>
+						? SpliceCode<Post, S, NewOff, `${Acc}${Pre}${NT}`>
 						: never
 				: string
 			: SqlError<`unknown fragment slot {${Name}}`, null>
-		: SpliceLoop<Post, S, Off, `${Acc}${Pre}{${Name}}`>
-	: `${Acc}${Q}`;
+		: SpliceCode<Post, S, Off, `${Acc}${Pre}{${Name}}`>
+	: [`${Acc}${Q}`, Off];
 
-export type SpliceCarried<
+/** The SQL outside strings, quoted identifiers, comments and dollar quotes. */
+type CodeOnly<
+	Q extends string,
+	Acc extends string = "",
+> = Q extends `${string}{${string}}${string}`
+	? NextOpaque<Q> extends [
+			infer Code extends string,
+			infer Seg extends string,
+			infer After extends string,
+		]
+		? Seg extends ""
+			? `${Acc}${Code}`
+			: CodeOnly<After, `${Acc}${Code} `>
+		: never
+	: Acc;
+
+export type SpliceCarried<Q extends string, C> = CarriedIn<CodeOnly<Q>, C, []>;
+type CarriedIn<
 	Q extends string,
 	C,
-	Acc extends readonly unknown[] = [],
+	Acc extends readonly unknown[],
 > = Q extends `${string}{${infer Name}}${infer Post}`
 	? IsSlotName<Name> extends true
 		? Name extends keyof C
 			? C[Name] extends infer T extends readonly unknown[]
-				? SpliceCarried<Post, C, [...Acc, ...T]>
-				: SpliceCarried<Post, C, Acc>
+				? CarriedIn<Post, C, [...Acc, ...T]>
+				: CarriedIn<Post, C, Acc>
 			: Acc
-		: SpliceCarried<Post, C, Acc>
+		: CarriedIn<Post, C, Acc>
 	: Acc;
 
 type Digit = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9";
@@ -109,11 +148,12 @@ type AllIdChars<S extends string> = S extends ""
 			: false
 		: false;
 
-export type SlotNames<Q extends string> =
+export type SlotNames<Q extends string> = SlotNamesIn<CodeOnly<Q>>;
+type SlotNamesIn<Q extends string> =
 	Q extends `${string}{${infer Name}}${infer Post}`
 		? IsSlotName<Name> extends true
-			? Name | SlotNames<Post>
-			: SlotNames<Post>
+			? Name | SlotNamesIn<Post>
+			: SlotNamesIn<Post>
 		: never;
 
 export type HasSlots<Q extends string> = [SlotNames<Q>] extends [never]
