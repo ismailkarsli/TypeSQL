@@ -66,6 +66,8 @@ Enums are global in TypeSQL, so two enums with the same name in different schema
 A `jsonb` column is `unknown` by default. To give `json` and `jsonb` columns TypeScript types, list them under `columnTypes` in a config file:
 
 ```ts
+import type { IntrospectConfig } from "@typesql/pg/introspect";
+
 export default {
 	out: "src/db/schema.ts",
 	schemas: ["public", "auth"],
@@ -108,7 +110,8 @@ const save = sql(
 ```
 
 - `imports` adds lines after the generated import, for the types `columnTypes` uses.
-- The config file can be `.mjs`, or `.ts`.
+- The config file can be `.mjs`, or `.ts`. It must default-export the options; an unknown option is an error.
+- `out` in the config file is relative to the config file. `--out` on the command line is relative to the current directory.
 - `columnTypes` can also be a function of the column, for example to read the type from the column comment.
 - A key that names no column is an error. So is a column that is not `json` or `jsonb` (`json[]` included).
 - `column` replaces a whole column descriptor, for any column. Return the TypeScript source to use (any helper of your own), or `undefined` to keep the default.

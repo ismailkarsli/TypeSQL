@@ -45,9 +45,37 @@ const defaultIo = (): Io => ({
 	cwd: process.cwd(),
 });
 
+// pg rejects a refused `localhost` connection (IPv4 and IPv6) with an
+// AggregateError whose own message is empty.
+const message = (err: unknown): string => {
+	if (!(err instanceof Error)) return String(err);
+	if (err.message) return err.message;
+	if (err instanceof AggregateError && err.errors.length > 0)
+		return [...new Set(err.errors.map(message))].join("; ");
+	return (err as { code?: string }).code ?? err.name;
+};
+
+const CONFIG_KEYS = new Set([
+	"url",
+	"out",
+	"schemas",
+	"exclude",
+	"viewNotNull",
+	"typeName",
+	"importFrom",
+	"imports",
+	"columnTypes",
+	"column",
+	"comments",
+]);
+
 async function pgConnect(
 	url: string,
 ): Promise<PgQueryable & { end(): Promise<void> }> {
+	if (!URL.canParse(url) && !url.startsWith("/"))
+		throw new Error(
+			`invalid connection URL ${JSON.stringify(url)} (expected postgres://user:password@host:port/database)`,
+		);
 	let Client: typeof import("pg").Client;
 	try {
 		({ Client } = (await import("pg")).default);
@@ -99,11 +127,29 @@ export async function main(
 
 	try {
 		let config: IntrospectConfig = {};
+		let configDir = io.cwd;
 		if (values.config) {
-			const mod = (await import(
-				pathToFileURL(resolve(io.cwd, values.config)).href
-			)) as { default?: IntrospectConfig };
-			config = mod.default ?? {};
+			const file = resolve(io.cwd, values.config);
+			const mod = (await import(pathToFileURL(file).href)) as {
+				default?: unknown;
+			};
+			if (
+				mod.default === null ||
+				typeof mod.default !== "object" ||
+				Array.isArray(mod.default)
+			)
+				throw new Error(
+					`${values.config} must default-export a configuration object`,
+				);
+			const unknown = Object.keys(mod.default).filter(
+				(key) => !CONFIG_KEYS.has(key),
+			);
+			if (unknown.length > 0)
+				throw new Error(
+					`${values.config}: unknown option${unknown.length > 1 ? "s" : ""} ${unknown.join(", ")}`,
+				);
+			config = mod.default as IntrospectConfig;
+			configDir = dirname(file);
 		}
 		const url = values.url ?? config.url ?? io.env["DATABASE_URL"];
 		if (!url) {
@@ -136,18 +182,19 @@ export async function main(
 		} finally {
 			await client.end();
 		}
+		// A config file's `out` is relative to the config file, like migrate's paths.
 		const out = values.out ?? config.out;
 		if (out === undefined) {
 			io.stdout(source);
 		} else {
-			const file = resolve(io.cwd, out);
+			const file = resolve(values.out === undefined ? configDir : io.cwd, out);
 			await mkdir(dirname(file), { recursive: true });
 			await writeFile(file, source);
 			io.stderr(`typesql introspect: wrote ${out}\n`);
 		}
 		return 0;
 	} catch (err) {
-		io.stderr(`typesql introspect: ${(err as Error).message}\n`);
+		io.stderr(`typesql introspect: ${message(err)}\n`);
 		return 1;
 	}
 }

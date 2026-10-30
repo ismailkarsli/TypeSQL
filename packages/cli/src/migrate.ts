@@ -130,7 +130,21 @@ async function makeMigration(
 	return file;
 }
 
+// pg rejects a refused `localhost` connection (IPv4 and IPv6) with an
+// AggregateError whose own message is empty.
+const message = (err: unknown): string => {
+	if (!(err instanceof Error)) return String(err);
+	if (err.message) return err.message;
+	if (err instanceof AggregateError && err.errors.length > 0)
+		return [...new Set(err.errors.map(message))].join("; ");
+	return (err as { code?: string }).code ?? err.name;
+};
+
 async function connectPostgres(url: string) {
+	if (!URL.canParse(url) && !url.startsWith("/"))
+		throw new Error(
+			`invalid connection URL ${JSON.stringify(url)} (expected postgres://user:password@host:port/database)`,
+		);
 	let Client: typeof import("pg").Client;
 	try {
 		({ Client } = (await import("pg")).default);
@@ -291,7 +305,7 @@ export async function main(argv: readonly string[], io: Io): Promise<number> {
 		}
 		return 0;
 	} catch (error) {
-		io.stderr(`typesql migrate: ${(error as Error).message}\n`);
+		io.stderr(`typesql migrate: ${message(error)}\n`);
 		return 1;
 	}
 }

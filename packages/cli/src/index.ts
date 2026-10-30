@@ -1,3 +1,4 @@
+import { createRequire } from "node:module";
 import { parseArgs } from "node:util";
 import { main as postgres } from "@typesql/pg/introspect";
 import { main as sqlite } from "@typesql/sqlite/introspect";
@@ -12,6 +13,7 @@ const DIALECTS: Readonly<
 
 const USAGE = `Usage: typesql migrate <up|down|latest|make name> [options]
        typesql introspect [--dialect postgres|sqlite] [options]
+       typesql --version
 
 Manage tracked schema migrations, or read a database and write its TypeSQL schema.
 Run \`typesql migrate --help\` for migration options.
@@ -45,6 +47,7 @@ const parse = (argv: readonly string[]) =>
 			dialect: { type: "string" },
 			db: { type: "string" },
 			help: { type: "boolean", short: "h" },
+			version: { type: "boolean", short: "v" },
 		},
 	});
 
@@ -63,7 +66,14 @@ export async function main(
 		io.stderr(`${(error as Error).message}\n\n${USAGE}`);
 		return 2;
 	}
-	const { values, tokens } = parsed;
+	const { values, tokens, positionals } = parsed;
+	if (values.version === true && positionals.length === 0) {
+		const pkg = createRequire(import.meta.url)("../package.json") as {
+			version: string;
+		};
+		io.stdout(`${pkg.version}\n`);
+		return 0;
+	}
 	const help = values.help === true;
 	const consumed = new Set<number>();
 	for (const token of tokens) {
@@ -78,9 +88,14 @@ export async function main(
 	const rest = argv.filter((_, index) => !consumed.has(index));
 	let dialect = values.dialect;
 	if (dialect === undefined) {
-		if (help || rest.length === 0) {
-			(help ? io.stdout : io.stderr)(USAGE);
-			return help ? 0 : 2;
+		if (rest.length === 0) {
+			io.stderr(`missing command: expected migrate or introspect\n\n${USAGE}`);
+			return 2;
+		}
+		// `typesql introspect --help` shows the default dialect's options.
+		if (help && positionals[0] !== "introspect") {
+			io.stdout(USAGE);
+			return 0;
 		}
 		dialect = values.db === undefined ? "postgres" : "sqlite";
 	}
