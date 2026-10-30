@@ -538,33 +538,54 @@ type HasStarEntry<C extends Cols> = [
 	: true;
 
 /**
- * A `*` branch keeps its columns as a map, without positions. Merge the other
- * branch's nullability by name when both have the same columns; otherwise any
- * nullable column on the right makes every column nullable.
+ * A `*` branch keeps its columns as a map, without positions. Keep the left
+ * branch's columns (and positions) and add the other branch's nullability: by
+ * name when both sides have the same columns, otherwise any nullable column on
+ * the right makes every column nullable.
  */
 type StarSetOp<L extends Cols, R extends Cols> =
 	ColsToMap<L> extends infer LM extends ColMap
 		? ColsToMap<R> extends infer RM extends ColMap
-			? [
-					{
-						readonly star: {
-							readonly [K in keyof LM]: {
-								readonly type: LM[K]["type"];
-								readonly nullable: LM[K]["nullable"] extends true
-									? true
-									: [keyof LM] extends [keyof RM]
-										? [keyof RM] extends [keyof LM]
-											? K extends keyof RM
-												? RM[K]["nullable"]
-												: true
-											: AnyNullableMap<RM>
-										: AnyNullableMap<RM>;
-							};
-						};
-					},
-				]
+			? [keyof LM] extends [keyof RM]
+				? [keyof RM] extends [keyof LM]
+					? MergeStar<L, RM, null>
+					: MergeStar<L, RM, AnyNullableMap<RM>>
+				: MergeStar<L, RM, AnyNullableMap<RM>>
 			: never
 		: never;
+type MergeStar<
+	L extends Cols,
+	RM extends ColMap,
+	Any extends boolean | null,
+> = {
+	readonly [I in keyof L]: L[I] extends {
+		readonly n: infer N extends string;
+		readonly t: infer T extends ColInfo;
+	}
+		? { readonly n: N; readonly t: MergeNull<T, N, RM, Any> }
+		: L[I] extends { readonly star: infer M extends ColMap }
+			? {
+					readonly star: {
+						readonly [K in keyof M]: MergeNull<M[K], K, RM, Any>;
+					};
+				}
+			: L[I];
+};
+type MergeNull<
+	T extends ColInfo,
+	N,
+	RM extends ColMap,
+	Any extends boolean | null,
+> = Info<
+	T["type"],
+	T["nullable"] extends true
+		? true
+		: Any extends boolean
+			? Any
+			: N extends keyof RM
+				? RM[N]["nullable"]
+				: true
+>;
 type AnyNullableMap<M extends ColMap> = true extends M[keyof M]["nullable"]
 	? true
 	: false;
