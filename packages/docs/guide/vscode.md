@@ -68,9 +68,12 @@ The extension colors the SQL inside the string: keywords, types, functions, stri
 |---|---|
 | a call of `sql`, `tx`, or a name ending in `Sql`, `SQL` or `_sql`, also as a member | `sql("…")`, `tx('…')`, `` db.sql(`…`) ``, `pgSql("…")` |
 | `.fragment()` and `.as()` on those | `sql.fragment("…")`, `sql.as<Row>("…")` |
+| `.add()` and `.raw()`, when the string starts like a SQL statement | `` db.add(`CREATE TABLE …`) ``, `db.raw<Next>("…")`, `migrations().add("…")` |
 | any string after a `/* sql */` comment | `camel(/* sql */ "…")`, `const text = /* sql */ "…"` |
 
 Only the first argument is SQL, and only when it is a string or template literal.
+
+`.add()` and `.raw()` cover [migration files](./migrations) and the `migrations()` builder. Because other objects have an `add` method too, their string is SQL only when it starts with a statement keyword followed by a space, `;` or `(` (`CREATE TABLE`, `alter table`, `DO $$`), with a `(`, or with a comment. A template literal whose first line is empty also counts. `set.add("name")` stays a plain string. The query functions that `.add()` returns, such as `users("INSERT …")`, have names of your choosing: put `/* sql */` before their string.
 
 Highlighting reads the text, not the types. It needs neither the TypeScript 7 extension nor `@typesql/core`, and it also colors calls of other `sql` functions. If your `sql` has another name, such as `camel` or `admin`, put `/* sql */` before the string.
 

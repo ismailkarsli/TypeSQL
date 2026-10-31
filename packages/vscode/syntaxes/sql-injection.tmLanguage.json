@@ -1,19 +1,24 @@
 {
-	"$comment": "SQL highlighting inside sql(), tx(), sql.fragment(), sql.as<Row>() and /* sql */ string literals. Injected into TypeScript and JavaScript. Every rule inside a literal stops at the literal's closing quote, so an unterminated SQL string or comment never runs past it, and takes escapes first, so an escaped quote never closes it. In \"…\" and '…', a line ends a rule unless it ends in a backslash (a line continuation).",
+	"$comment": "SQL highlighting inside sql(), tx(), sql.fragment(), sql.as<Row>(), a migration's .add() and .raw() and /* sql */ string literals. Injected into TypeScript and JavaScript. Every rule inside a literal stops at the literal's closing quote, so an unterminated SQL string or comment never runs past it, and takes escapes first, so an escaped quote never closes it. In \"…\" and '…', a line ends a rule unless it ends in a backslash (a line continuation).",
 	"scopeName": "inline.typesql",
 	"injectionSelector": "L:source.ts -comment -string, L:source.tsx -comment -string, L:source.js -comment -string, L:source.js.jsx -comment -string",
-	"patterns": [{ "include": "#call" }, { "include": "#marked" }],
+	"patterns": [
+		{ "include": "#call" },
+		{ "include": "#migration-call" },
+		{ "include": "#marked" }
+	],
 	"repository": {
 		"call": {
-			"$comment": "sql(…), tx(…), any name ending in Sql, SQL or _sql (also as a member: a leading `.` is matched too, because TypeScript's grammar would take `.sql` as one property token), and their .fragment(…) and .as<Row>(…), when a quote, a comment or the line's end follows the `(`, so `sql(text: string)` method declarations stay TypeScript's. The call is consumed up to its `)`; arguments after the first are TypeScript.",
-			"begin": "(?:(\\??\\.)\\s*|(?<![\\w$]))(?:((?:sql|tx|[A-Za-z_$][\\w$]*(?:Sql|SQL|_sql))(?![\\w$]))\\s*(\\??\\.)\\s*(fragment|as)|((?:sql|tx|[A-Za-z_$][\\w$]*(?:Sql|SQL|_sql))(?![\\w$])))(?:\\s*(<[^()]*>))?(?=\\s*\\(\\s*(?:[`\"'/]|$))",
+			"$comment": "sql(…), tx(…), any name ending in Sql, SQL or _sql (also as a member: the receiver, such as `db.` or `this.db.`, is matched too, because TypeScript's grammar would otherwise open a callee rule at it that only ends before a `(` and so would stay open past the call; after a `)` the leading `.` is enough), and their .fragment(…) and .as<Row>(…), when a quote, a comment or the line's end follows the `(`, so `sql(text: string)` method declarations stay TypeScript's. The call is consumed up to its `)`; arguments after the first are TypeScript.",
+			"begin": "(?:(?<![\\w$.#])((?:#?[A-Za-z_$][\\w$]*\\s*\\??\\.\\s*)+)|(\\??\\.)\\s*|(?<![\\w$]))(?:((?:sql|tx|[A-Za-z_$][\\w$]*(?:Sql|SQL|_sql))(?![\\w$]))\\s*(\\??\\.)\\s*(fragment|as)|((?:sql|tx|[A-Za-z_$][\\w$]*(?:Sql|SQL|_sql))(?![\\w$])))(?:\\s*(<[^()]*>))?(?=\\s*\\(\\s*(?:[`\"'/]|$))",
 			"beginCaptures": {
-				"1": { "name": "punctuation.accessor.ts" },
-				"2": { "name": "variable.other.object.ts" },
-				"3": { "name": "punctuation.accessor.ts" },
-				"4": { "name": "entity.name.function.ts" },
+				"1": { "patterns": [{ "include": "#receiver" }] },
+				"2": { "name": "punctuation.accessor.ts" },
+				"3": { "name": "variable.other.object.ts" },
+				"4": { "name": "punctuation.accessor.ts" },
 				"5": { "name": "entity.name.function.ts" },
-				"6": { "patterns": [{ "include": "source.ts#type-arguments" }] }
+				"6": { "name": "entity.name.function.ts" },
+				"7": { "patterns": [{ "include": "source.ts#type-arguments" }] }
 			},
 			"end": "\\)",
 			"endCaptures": { "0": { "name": "meta.brace.round.ts" } },
@@ -23,10 +28,45 @@
 				{ "include": "source.ts#punctuation-comma" }
 			]
 		},
+		"receiver": {
+			"patterns": [
+				{ "match": "\\bthis\\b", "name": "variable.language.this.ts" },
+				{
+					"match": "(?<=\\.)\\s*#?[A-Za-z_$][\\w$]*",
+					"name": "variable.other.object.property.ts"
+				},
+				{ "match": "#?[A-Za-z_$][\\w$]*", "name": "variable.other.object.ts" },
+				{ "match": "\\?\\.", "name": "punctuation.accessor.optional.ts" },
+				{ "match": "\\.", "name": "punctuation.accessor.ts" }
+			]
+		},
 		"first-argument": {
 			"begin": "\\G\\s*(\\()",
 			"beginCaptures": { "1": { "name": "meta.brace.round.ts" } },
 			"end": "(?<=[`\"'])|(?=[^\\s`\"'])",
+			"patterns": [{ "include": "#literal" }]
+		},
+		"migration-call": {
+			"$comment": "A migration's .add(…) and .raw(…) or .raw<Schema>(…), when the first argument starts like a SQL statement: a statement keyword followed by a space, `;` or `(`, a `(`, or a comment. A template literal whose first line is empty counts too, since a rule sees one line at a time. Any other first argument, such as set.add(\"x\"), stays TypeScript's.",
+			"begin": "(?:(?<![\\w$.#])((?:#?[A-Za-z_$][\\w$]*\\s*\\??\\.\\s*)+)|(\\??\\.)\\s*)(add|raw)(?![\\w$])(?:\\s*(<[^()]*>))?(?=\\s*\\(\\s*(?:[`\"'/]|$))",
+			"beginCaptures": {
+				"1": { "patterns": [{ "include": "#receiver" }] },
+				"2": { "name": "punctuation.accessor.ts" },
+				"3": { "name": "entity.name.function.ts" },
+				"4": { "patterns": [{ "include": "source.ts#type-arguments" }] }
+			},
+			"end": "\\)",
+			"endCaptures": { "0": { "name": "meta.brace.round.ts" } },
+			"patterns": [
+				{ "include": "#statement-argument" },
+				{ "include": "source.ts#expression" },
+				{ "include": "source.ts#punctuation-comma" }
+			]
+		},
+		"statement-argument": {
+			"begin": "\\G\\s*(\\()",
+			"beginCaptures": { "1": { "name": "meta.brace.round.ts" } },
+			"end": "(?<=[`\"'])|(?=[^\\s`\"'])|(?=[\"'](?!\\s*(?:--|/\\*|\\(|(?i:alter|analyze|attach|begin|call|cluster|comment|commit|copy|create|delete|detach|do|drop|explain|grant|import|insert|listen|lock|merge|notify|pragma|reassign|refresh|reindex|release|replace|reset|revoke|rollback|savepoint|security|select|set|table|truncate|unlisten|update|vacuum|values|with)(?=[\\s;(]|$))))|(?=`(?!\\s*(?:--|/\\*|\\(|(?i:alter|analyze|attach|begin|call|cluster|comment|commit|copy|create|delete|detach|do|drop|explain|grant|import|insert|listen|lock|merge|notify|pragma|reassign|refresh|reindex|release|replace|reset|revoke|rollback|savepoint|security|select|set|table|truncate|unlisten|update|vacuum|values|with)(?=[\\s;(]|$))|\\s*$))",
 			"patterns": [{ "include": "#literal" }]
 		},
 		"marked": {
