@@ -530,6 +530,64 @@ assert.ok(doc.values[0] instanceof coreAdapter.JsonParam);
 assert.equal(doc.values[0].toPostgres(), "[1,2]");
 assert.equal(JSON.stringify(doc.values[0]), "[1,2]");
 
+// Inline values are checked against a Json<T> column's T and an enum's values.
+const prefs = core.createSql<{
+	$types: { mood: "happy" | "sad" };
+	prefs: {
+		mood: Col<"mood">;
+		theme: Json<
+			{ mode: "dark" | "light"; size?: number },
+			{ hasDefault: true }
+		>;
+	};
+}>(corePg.postgres);
+assert.equal(
+	prefs(
+		`UPDATE prefs SET theme = ${prefs.json({ mode: "dark" })}, mood = ${prefs.param("happy")}`,
+	).text,
+	"UPDATE prefs SET theme = $1, mood = $2",
+);
+// @ts-expect-error "blue" is not a mode.
+prefs(`UPDATE prefs SET theme = ${prefs.json({ mode: "blue" })}`);
+// @ts-expect-error size is a number.
+prefs(`UPDATE prefs SET theme = ${prefs.param({ mode: "dark", size: "1" })}`);
+// @ts-expect-error "angry" is not a mood.
+prefs(`UPDATE prefs SET mood = ${prefs.param("angry")}`);
+
+// sql.json(undefined) sends DEFAULT; sql.json(null) binds SQL NULL.
+const noTheme: { mode: "dark" } | undefined = undefined;
+assert.deepEqual(
+	prefs(
+		`INSERT INTO prefs (mood, theme) VALUES ('sad', ${prefs.json(noTheme)})`,
+	),
+	{
+		text: "INSERT INTO prefs (mood, theme) VALUES ('sad', DEFAULT)",
+		values: [],
+	},
+);
+assert.deepEqual(prefs.as(`SELECT ${prefs.json(null)}::jsonb AS j`).values, [
+	null,
+]);
+assert.deepEqual(
+	prefs("INSERT INTO prefs {rows}", {
+		rows: prefs.values("prefs", [
+			{ mood: "sad", theme: prefs.json(noTheme) },
+			{ mood: "happy", theme: prefs.json({ mode: "dark" }) },
+		]),
+	}).text,
+	'INSERT INTO prefs ("mood", "theme") VALUES ($1, DEFAULT), ($2, $3)',
+);
+assert.equal(
+	prefs("UPDATE prefs SET {patch}", {
+		patch: prefs.set("prefs", { mood: "sad", theme: prefs.json(noTheme) }),
+	}).text,
+	'UPDATE prefs SET "mood" = $1',
+);
+assert.throws(
+	() => prefs.as("SELECT $1", prefs.json(undefined)),
+	/must be interpolated inline/,
+);
+
 // Inline rewriting keeps explicit offsets, repeated tokens and DEFAULT values.
 const repeated = sql.param("repeat");
 assert.deepEqual(

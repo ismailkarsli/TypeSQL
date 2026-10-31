@@ -22,6 +22,21 @@ const EXACT = new RegExp(`^${MARK}[0-9a-z]+\u0000$`);
 const INLINE = new RegExp(`${QUOTED.source}|${MARK}([0-9a-z]+)\u0000`, "g");
 
 export function takeValue(value: unknown): unknown {
+	const v = take(value);
+	if (isEmpty(v))
+		throw new Error(
+			"typesql: sql.param(sql.empty) and sql.json(undefined) must be interpolated inline to emit DEFAULT",
+		);
+	return v;
+}
+
+/** A column value for sql.set / sql.values: a DEFAULT token leaves the column out, as `undefined` does. */
+export function takeColumnValue(value: unknown): unknown {
+	const v = take(value);
+	return isEmpty(v) ? undefined : v;
+}
+
+function take(value: unknown): unknown {
 	if (isEmpty(value))
 		throw new Error(
 			"typesql: sql.empty cannot be a bound parameter; use an inline sql.param(sql.empty) for DEFAULT",
@@ -34,10 +49,6 @@ export function takeValue(value: unknown): unknown {
 		);
 	const v = pending.get(id);
 	pending.delete(id);
-	if (isEmpty(v))
-		throw new Error(
-			"typesql: sql.param(sql.empty) must be interpolated inline to emit DEFAULT",
-		);
 	return v;
 }
 

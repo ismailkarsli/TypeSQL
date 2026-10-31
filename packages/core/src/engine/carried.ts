@@ -1,5 +1,5 @@
 import type { SqlError } from "../errors.js";
-import type { CheckEnc, DescribeEnc } from "../sql/inline.js";
+import type { CheckEnc, DescribeEnc, Enc } from "../sql/inline.js";
 import type { Next } from "../sql/next.js";
 import type { EngineTypes, TokensOf, TypeDisplayOf } from "./contract.js";
 import type { ParamData, ParamDataOf } from "./infer.js";
@@ -59,14 +59,26 @@ type CheckValue<
 				// (SQLite's json columns, or a type map that reads JSON as a string).
 				[Exclude<P, null | undefined>] extends [string]
 				? true
-				: `a sql.json() ${DescribeEnc<R>} value cannot be used as ${Expected<E, U>}`
+				: `a sql.json() ${DescribeEnc<R>} value cannot be used as ${Expected<E, U>}${Hint<E, U, P>}`
 	: CheckEnc<V, P> extends true
-		? V extends `${string}[${string}`
+		? V extends `${string}[0${string}`
 			? IsJsonParam<E, Exclude<U, NullTest>> extends true
 				? `an array for ${Expected<E, U>} must be passed as sql.json(value) (node-postgres sends a JS array as a Postgres array)`
 				: true
 			: true
-		: `a ${DescribeEnc<V>} value cannot be used as ${Expected<E, U>}`;
+		: `a ${DescribeEnc<V>} value cannot be used as ${Expected<E, U>}${Hint<E, U, P>}`;
+
+// The database type alone doesn't say what a typed JSON, enum or object
+// parameter takes.
+type Hint<E extends EngineTypes, U, P> = unknown extends P
+	? ""
+	: Enc<P> extends infer X extends string
+		? IsJsonParam<E, Exclude<U, NullTest>> extends true
+			? ` (expected ${DescribeEnc<X>})`
+			: X extends `${string}${"q" | "m" | "<"}${string}`
+				? ` (expected ${DescribeEnc<X>})`
+				: ""
+		: "";
 
 type IsJsonParam<E extends EngineTypes, U> = [
 	Extract<U, { readonly type: E["json"] }>,

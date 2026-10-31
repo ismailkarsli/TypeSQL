@@ -12,7 +12,7 @@ TypeSQL centers on the `sql` function returned by your driver adapter's `createS
 | [`sql.as<Row>(query, ...params)`](#sql-as-row-query-params) | Escape hatch: bypasses compile-time inference and asserts the row type directly. | `<Row>`, `query: string`, `slots?`, `...params: unknown[]` |
 | [`sql.param(value)`](#sql-param-value) | Binds a value inline inside a template string as a positional `$n` parameter. | `value: T` (`sql.empty` becomes `DEFAULT`; `undefined` is rejected) |
 | [`sql.empty` / `sql.empty(value)`](#sql-empty-sql-empty-value) | Explicit omission or SQL `DEFAULT`; normalizes nullish values. | `value: T` |
-| [`sql.json(value)`](#sql-json-value) | Binds a value as inline JSON text, checked against `json`/`jsonb`/`Json<T>` columns. | `value: T` (`null` / `undefined` becomes SQL `NULL`) |
+| [`sql.json(value)`](#sql-json-value) | Binds a value as inline JSON text, checked against `json`/`jsonb`/`Json<T>` columns. | `value: T` (`null` becomes SQL `NULL`, `undefined` becomes `DEFAULT`) |
 | [`sql.fragment(text, ...params)`](#sql-fragment-text-params) | Creates a reusable SQL fragment to splice into query `{slot}` placeholders. | `text: string` (literal), `slots?`, `...params` |
 | [`sql.id(...parts)`](#sql-id-parts) | Creates a safely quoted identifier fragment (`"col"` or `"schema"."table"`). | `...parts: string[]` (column, table, schema names) |
 | [`sql.combine(items, options?)`](#sql-combine-items-options) | Combines an array or tuple of fragments or queries with a separator. | `items: (Slottable \| Empty)[]`, `options?: { separator?: string }` (default `", "`) |
@@ -172,7 +172,7 @@ At runtime, the value is serialized to JSON text and sent with driver-safe forma
 
 ### Parameters
 
-- `value` (`T`): The object, array, or primitive to serialize as JSON. Passing `null` or `undefined` sends SQL `NULL`.
+- `value` (`T`): The object, array, or primitive to serialize as JSON. Passing `null` sends SQL `NULL`. Passing `undefined` sends `DEFAULT`, so a value that can be `undefined` is only accepted where `DEFAULT` is (a `VALUES` item or a `SET` value). In `sql.set` and `sql.values` it leaves the column out.
 
 ### Example
 

@@ -1014,12 +1014,12 @@ declare const input12: {
 	chachkaSublingualKamik: number | undefined;
 	chachkaScurvinessesKamik: number | undefined;
 	damsonCommunionKamik: number | undefined;
-	trilith: "\0PJ[s]\0" | undefined;
-	blacktops: "\0PJ[s]\0" | undefined;
+	trilith: "\0PJ[0s]0\0" | undefined;
+	blacktops: "\0PJ[0s]0\0" | undefined;
 	rainilyIrrevocably: boolean | undefined;
 	ballsAtesIrrevocably: boolean | undefined;
 	refoldedFlueMisnomersWood: number | undefined;
-	fidDreich: "\0PJ[s]\0" | undefined;
+	fidDreich: "\0PJ[0s]0\0" | undefined;
 	factorizedThrum: boolean | undefined;
 	factorizedZither: boolean | undefined;
 	factorizedTommy: boolean | undefined;
@@ -1035,8 +1035,8 @@ declare const input12: {
 	siglaLightsomeSennit: boolean | undefined;
 	siglaInsolesSetteeOutfishes: boolean | undefined;
 	atesAortas: boolean | undefined;
-	parklandReprography: "\0PJ0[o]\0" | undefined;
-	talckedEmetin: "\0PJ[o]\0" | undefined;
+	parklandReprography: "\0PJ[0o]00\0" | undefined;
+	talckedEmetin: "\0PJ[0o]0\0" | undefined;
 };
 declare const input13: string | undefined;
 
@@ -1164,7 +1164,7 @@ declare const input44: Record<string, unknown>;
 
 declare const input48: boolean | undefined;
 declare const input49: number | null | undefined;
-declare const input50: "\0PJ[o]\0" | undefined;
+declare const input50: "\0PJ[0o]0\0" | undefined;
 declare const input51: number | undefined;
 declare const input52: {
 	bobstay?: string[] | undefined;
@@ -1275,7 +1275,7 @@ declare const input64: (number | null)[];
 declare const input65: (string | null)[];
 
 declare const input67: { flueAd: string; celibate: boolean };
-declare const input68: "\0PJ[s]\0" | undefined;
+declare const input68: "\0PJ[0s]0\0" | undefined;
 declare const input69: {
 	cytons: string;
 	erg: number | null;
@@ -1288,7 +1288,7 @@ declare const input70: {
 	igg: number;
 }[];
 declare const input71: {
-	birred: "\0PJ[s]\0" | undefined;
+	birred: "\0PJ[0s]0\0" | undefined;
 	phonal: boolean | undefined;
 	floatyLungan: number | null | undefined;
 	floatyBaal: number | null | undefined;
@@ -1297,9 +1297,9 @@ declare const input71: {
 	tommy: boolean | undefined;
 	alTommy: boolean | undefined;
 	zither: boolean | undefined;
-	zitherForts: "\0PJ[o]\0" | undefined;
+	zitherForts: "\0PJ[0o]0\0" | undefined;
 	thrum: boolean | undefined;
-	thrumForts: "\0PJ[o]\0" | undefined;
+	thrumForts: "\0PJ[0o]0\0" | undefined;
 	propionates: boolean | undefined;
 	propionatesDonna: number | undefined;
 	atesAortas: string | undefined;
@@ -1316,7 +1316,7 @@ declare const input72: {
 	heapDonna: number | undefined;
 	emulations: boolean | undefined;
 	emulationsDonna: number | undefined;
-	emulationsBobstay: "\0PJ[s]\0" | undefined;
+	emulationsBobstay: "\0PJ[0s]0\0" | undefined;
 };
 
 declare const input76:

@@ -1,5 +1,5 @@
 import type { ColDesc, Table, View } from "../schema.js";
-import type { JsonValue } from "../sql/inline.js";
+import type { JsonDefaultValue, JsonValue } from "../sql/inline.js";
 import type { EngineTypes, TsParamTypeOf } from "./contract.js";
 
 type IsTable<X> = X extends Table ? true : false;
@@ -52,7 +52,7 @@ export type ColIn<
 			| (D["nullable"] extends true
 					? TsParamTypeOf<E, TM, DB, D["type"]> | null
 					: TsParamTypeOf<E, TM, DB, D["type"]>)
-			| (D["type"] extends E["json"] ? JsonValue : never);
+			| (D["type"] extends E["json"] ? JsonValue | JsonDefaultValue : never);
 
 export type SetInput<E extends EngineTypes, DB, TM, T extends string> =
 	TableOf<DB, T> extends infer Tbl extends Table

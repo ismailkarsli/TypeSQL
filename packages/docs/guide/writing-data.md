@@ -64,6 +64,8 @@ sql(`SELECT id FROM users WHERE email = ${sql.param(maybeEmail ?? sql.empty)}`);
 
 Narrow the value first, or pass `maybeEmail ?? null` to send `NULL`. To preserve explicit `null` while using a default only for `undefined`, pass `maybeEmail === undefined ? sql.empty : maybeEmail`. `sql.fragment(…)` refuses a value that can be `sql.empty`: a fragment is checked where it is spliced, with `$n` for its values, so a `DEFAULT` there couldn't be checked. `any` and `unknown` values are not checked.
 
+`sql.json(value)` does the same for `undefined`: `sql.json(settings)` sends `DEFAULT` when `settings` is `undefined` and `NULL` when it is `null`, and is checked the same way.
+
 ## Partial updates: `sql.set`
 
 `sql.set(table, values)` builds a `SET` list from an object, such as a PATCH request body with optional keys. `undefined` values are skipped:
@@ -124,7 +126,7 @@ Like `sql.set`, `sql.values` checks column types at compile time, but at runtime
 
 ### JSON columns
 
-`sql.set` and `sql.values` send their values as parameters, so JSON values go through `sql.json(value)` there too. It is sent as JSON text by both drivers. Against a [`Json<T>`](./schema#typed-json-columns) column only its JSON kind is checked, not its shape (see [Limits](./limits)):
+`sql.set` and `sql.values` send their values as parameters, so JSON values go through `sql.json(value)` there too. It is sent as JSON text by both drivers. Against a [`Json<T>`](./schema#typed-json-columns) column it is checked against `T` (see [Limits](./limits)):
 
 ```ts
 const patch = sql.set("portfolio", {

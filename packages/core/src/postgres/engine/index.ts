@@ -28,6 +28,7 @@ export type {
 	DescribeEnc,
 	Enc,
 	InlineMarker,
+	JsonDefaultValue,
 	JsonMarker,
 	JsonValue,
 	RewriteInlineStr,

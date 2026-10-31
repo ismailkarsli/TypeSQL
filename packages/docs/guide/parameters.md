@@ -60,7 +60,7 @@ sql(`SELECT id FROM users WHERE id = ${sql.param("7")}`);
 sql(`INSERT INTO users (email) VALUES (${sql.param(maybeEmail  )})`);
 ```
 
-Strings are accepted for enum columns, and any object for JSON and other object-typed columns (arrays for JSON go through [`sql.json()`](#json-values)). With no context (`SELECT ${sql.param(x)}`), anything is accepted. `sql.param()` inside quotes or a comment is an error.
+Literals and objects are checked exactly: `sql.param("angry")` is an error for an enum without that value, and an object for a [`Json<T>` column](./schema#typed-json-columns) must fit `T`. A value typed as plain `string`, `number` or `boolean` is only checked for its kind, so any `string` is accepted for an enum column, and an object with an index signature (`Record<string, unknown>`) is not checked for missing keys. Arrays for JSON go through [`sql.json()`](#json-values). With no context (`SELECT ${sql.param(x)}`), anything is accepted. `sql.param()` inside quotes or a comment is an error.
 
 `sql.param(undefined)` is rejected. Use `sql.param(value ?? sql.empty)` or `sql.param(sql.empty(value))` to request `DEFAULT` for a nullish value. Such a value is only accepted where `DEFAULT` is. Pass `null` directly to bind SQL `NULL`. See [Inserting and updating](./writing-data#optional-values).
 
@@ -86,7 +86,7 @@ optional.text;
 
 ## JSON values
 
-Use `${sql.json(value)}` for `json` and `jsonb` values. It sends the same JSON text with both drivers, and sends `null` or `undefined` as SQL `NULL`.
+Use `${sql.json(value)}` for `json` and `jsonb` values. It sends the same JSON text with both drivers, and sends `null` as SQL `NULL`. `undefined` sends `DEFAULT`, like [`sql.param(sql.empty)`](./writing-data#optional-values): a value that can be `undefined` is only accepted where `DEFAULT` is, and can't be a positional or named argument. In `sql.set` and `sql.values` it leaves the column out, as `undefined` does.
 
 ```ts
 const save = sql(
@@ -96,10 +96,12 @@ const save = sql(
 
 Why not a raw value? node-postgres sends a JS array as a Postgres array literal, which Postgres rejects as JSON, and postgres.js runs `JSON.stringify` on every value, so a string you already stringified is stored as a JSON string.
 
-`sql.json()` is accepted only where a `json` or `jsonb` value is expected, or with no context (`SELECT ${sql.json(v)}::jsonb`). For a [`Json<T>` column](./schema#typed-json-columns), only the value's JSON kind is checked (an object, an array, a string, …), not its shape against `T`. Passing a raw array with `sql.param()` is an error:
+`sql.json()` is accepted only where a `json` or `jsonb` value is expected, or with no context (`SELECT ${sql.json(v)}::jsonb`). For a [`Json<T>` column](./schema#typed-json-columns), the value is checked against `T` like a `sql.param()` value. Passing a raw array with `sql.param()` is an error:
 
 ```ts
 sql(`UPDATE portfolio SET name = ${sql.json({ a: 1 })}`);
+
+sql(`UPDATE portfolio SET settings = ${sql.json({ theme: "blue" })}`);
 
 sql(`UPDATE portfolio SET history = ${sql.param(items)}`);
 ```
@@ -113,7 +115,7 @@ sql("UPDATE portfolio SET history = :history WHERE id = :id", { history: sql.jso
 sql("UPDATE portfolio SET history = $1", items);
 ```
 
-As an argument too, `sql.json(value)` is only checked to be JSON of the right kind, not against `T`; see [Limits](./limits). Pass a raw object as a positional or named argument to have it checked against `T`.
+As a positional or named argument, `sql.json(value)` is not checked: a JSON parameter takes any `sql.json()` value there; see [Limits](./limits). Write it inline, or pass a raw object as the argument, to have it checked against `T`.
 
 ## How parameters get their types
 

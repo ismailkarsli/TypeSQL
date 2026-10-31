@@ -33,7 +33,7 @@ type FragCheck<Text extends string, Slotted extends boolean> =
 					? P
 					: HasDefaultable<Text> extends true
 						? SqlError<
-								"a sql.param() value that can be sql.empty is sent as DEFAULT, which a fragment cannot check; narrow it, or use null for SQL NULL",
+								"a sql.param() value that can be sql.empty, or a sql.json() value that can be undefined, is sent as DEFAULT, which a fragment cannot check; narrow it, or use null for SQL NULL",
 								null
 							>
 						: true

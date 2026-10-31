@@ -1,3 +1,4 @@
+import { empty } from "../empty.js";
 import type { JsonMarker } from "../sql/inline.js";
 import { param } from "./inline.js";
 
@@ -20,6 +21,6 @@ export class JsonParam<T = unknown> {
 
 export function json<const T>(value: T): JsonMarker<T> {
 	return param(
-		value === null || value === undefined ? null : new JsonParam(value),
+		value === undefined ? empty : value === null ? null : new JsonParam(value),
 	) as unknown as JsonMarker<T>;
 }

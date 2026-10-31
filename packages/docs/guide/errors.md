@@ -29,6 +29,7 @@ The error has two parts:
 | a column assigned twice | `multiple assignments to same column "email"` (`UPDATE`), `column "email" specified more than once` (`INSERT`) |
 | set operation width | `each UNION query must have the same number of columns` |
 | wrong inline value | `parameter $1: a string value cannot be used as int4` |
+| inline value of the wrong shape | `parameter $1: a { theme: "blue" } value cannot be used as jsonb (expected { theme: "dark" \| "light" } \| null)` |
 | JSON value outside JSON | `parameter $1: a sql.json() value cannot be used as text NOT NULL` |
 | raw array for JSON | `parameter $1: an array for jsonb NOT NULL must be passed as sql.json(value) …` |
 | non-literal SQL | `the SQL text is not a string literal: …` |

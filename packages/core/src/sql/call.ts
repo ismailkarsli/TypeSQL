@@ -96,7 +96,10 @@ type DefaultsCheck<E extends EngineTypes, DB, Q extends string, S> =
 
 type DefaultErr<Err> =
 	Err extends SqlError<infer Msg extends string, infer At>
-		? SqlError<`${Msg} (sql.param() sends DEFAULT for sql.empty)`, At>
+		? SqlError<
+				`${Msg} (sql.param(sql.empty) and sql.json(undefined) send DEFAULT)`,
+				At
+			>
 		: Err;
 
 export type SplicedText<Q extends string, S> = Splice<PText<Q>, SlotTexts<S>>;

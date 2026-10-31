@@ -1,4 +1,4 @@
-import { takeValue } from "./inline.js";
+import { takeColumnValue } from "./inline.js";
 import { quoteIdent } from "./splice.js";
 
 const own = (o: object, k: string) => Object.hasOwn(o, k);
@@ -12,7 +12,7 @@ export function buildSet(values: Readonly<Record<string, unknown>>): {
 	const parts: string[] = [];
 	const out: unknown[] = [];
 	for (const key of Object.keys(values)) {
-		const v = takeValue(values[key]);
+		const v = takeColumnValue(values[key]);
 		if (v === undefined) continue;
 		out.push(v);
 		parts.push(`${quoteIdent(key)} = $${out.length}`);
@@ -45,7 +45,7 @@ export function buildValues(
 		const values: unknown[] = [];
 		const items: string[] = [];
 		for (const key of Object.keys(row)) {
-			const value = takeValue(row[key]);
+			const value = takeColumnValue(row[key]);
 			if (value === undefined) continue;
 			columns.push(quoteIdent(key));
 			values.push(value);
@@ -68,7 +68,7 @@ export function buildValues(
 			);
 		const out = Object.create(null) as Record<string, unknown>;
 		for (const key of Object.keys(row)) {
-			const v = takeValue(row[key]);
+			const v = takeColumnValue(row[key]);
 			out[key] = v;
 			if (!seen.has(key) && v !== undefined) {
 				seen.add(key);
