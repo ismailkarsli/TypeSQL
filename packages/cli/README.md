@@ -38,6 +38,7 @@ npx typesql migrate make "create users"
 npx typesql migrate up       # one pending migration
 npx typesql migrate latest   # every pending migration
 npx typesql migrate down     # one applied migration
+npx typesql migrate generate # write db.ts from the migrations
 ```
 
 `make` writes `<unix-seconds>_<name>.ts`, converting spaces to dashes and linking the new file's schema type to the previous `up` export. It refuses duplicate filenames and names that sort before existing files. Every `.ts` file is read in filename order, including manually named files.
@@ -67,6 +68,8 @@ npx typesql migrate latest --dialect sqlite --db app.db --dir migrations
 Applied filenames, normalized runtime-code SHA-256 hashes, and timestamps are recorded in `schema_migrations`; set `migrationTable` in config to change its name. Changing runtime code in an applied file, deleting one, or inserting a file before an applied migration causes an error. Comments, formatting, and erased TypeScript types do not change hashes; runtime token spelling does.
 
 Each migration and its history update run in their own transaction. Earlier successful migrations remain committed if `latest` later fails. PostgreSQL holds a session advisory lock for the command; SQLite uses `BEGIN IMMEDIATE` and checks history again in each transaction. SQL that cannot run in a transaction fails. An empty `down` still removes its history record.
+
+`up`, `down`, and `latest` then write the schema of the last applied migration to `db.ts` beside the config, as `export interface DB` with `Col` and `View` types. `npx typesql migrate generate` writes the schema of the last migration file without connecting. The schema is read from the migrations' types with TypeScript, so each `up` must be typed and return its context. Set `schemaFile` or pass `--out` to change the path; set `generate: false` or pass `--no-generate` to skip writing after a migration.
 
 Successful and empty operations exit with code 0, configuration or execution failures with 1, and invalid command syntax with 2. Progress is written to stdout and errors to stderr.
 

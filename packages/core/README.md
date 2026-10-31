@@ -105,7 +105,7 @@ The default tracking table is `schema_migrations`. Hashes cover each migration
 file's runtime code; imported runtime helpers are not tracked.
 
 For configuration, file generation, and command-line execution, install
-`@typesql/cli` and use `typesql migrate make <name>`, `up`, `down`, or `latest`.
+`@typesql/cli` and use `typesql migrate make <name>`, `up`, `down`, `latest`, or `generate`.
 See the [migration guide](https://typesql.karsli.net/guide/migrations).
 
 ## Documentation

@@ -11,7 +11,7 @@ const DIALECTS: Readonly<
 	Record<Dialect, (argv: readonly string[]) => Promise<number>>
 > = { postgres, sqlite };
 
-const USAGE = `Usage: typesql migrate <up|down|latest|make name> [options]
+const USAGE = `Usage: typesql migrate <up|down|latest|make name|generate> [options]
        typesql introspect [--dialect postgres|sqlite] [options]
        typesql --version
 

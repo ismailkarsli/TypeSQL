@@ -10,6 +10,11 @@ import {
 	migrateLatest,
 	migrateUp,
 } from "@typesql/core/migration";
+import {
+	generateSchema,
+	migrationFiles,
+	type SchemaPoint,
+} from "./generate.js";
 
 /** Default export of typesql.config.ts. Relative paths are resolved beside it. */
 export interface MigrationConfig {
@@ -18,6 +23,10 @@ export interface MigrationConfig {
 	readonly db?: string;
 	readonly migrationsDir?: string;
 	readonly migrationTable?: string;
+	/** Where `typesql migrate generate` writes the schema (default: db.ts). */
+	readonly schemaFile?: string;
+	/** Regenerate the schema file after up, down and latest (default: true). */
+	readonly generate?: boolean;
 }
 
 interface Io {
@@ -27,12 +36,13 @@ interface Io {
 	readonly env?: Readonly<Record<string, string | undefined>>;
 }
 
-const USAGE = `Usage: typesql migrate <up|down|latest|make name> [options]
+const USAGE = `Usage: typesql migrate <up|down|latest|make name|generate> [options]
 
   up                  apply the next migration
   down                revert the last applied migration
   latest              apply every pending migration
   make <name>         create a TypeScript migration linked to its predecessor
+  generate            write the schema of the last migration to a DB file
 
 Options:
   --config <file>     config module (default: ./typesql.config.ts)
@@ -40,22 +50,29 @@ Options:
   --url <url>         PostgreSQL URL (default: config.url or $DATABASE_URL)
   --db <file>         SQLite database file; overrides config
   --dir <directory>   migrations directory; overrides config
+  --out <file>        schema file to write (default: config.schemaFile or db.ts)
+  --no-generate       don't write the schema file after up, down or latest
   -h, --help          show this help
 
 Config defaults to migrations/ beside the config file, or the working directory.
-Each migration must export up and down functions. Requires Node.js 26 or newer.
+up, down and latest then write the schema of the last applied migration, unless
+config.generate is false. Each migration must export up and down functions.
+Requires Node.js 26 or newer.
 `;
 
 const parse = (argv: readonly string[]) =>
 	parseArgs({
 		args: [...argv],
 		allowPositionals: true,
+		allowNegative: true,
 		options: {
 			config: { type: "string" },
 			dialect: { type: "string" },
 			url: { type: "string" },
 			db: { type: "string" },
 			dir: { type: "string" },
+			out: { type: "string" },
+			generate: { type: "boolean" },
 			help: { type: "boolean", short: "h" },
 		},
 	});
@@ -82,11 +99,16 @@ async function configuration(file: string, explicit: boolean) {
 		"db",
 		"migrationsDir",
 		"migrationTable",
+		"schemaFile",
 	]) {
 		const value = (config as Record<string, unknown>)[key];
 		if (value !== undefined && (typeof value !== "string" || !value)) {
 			throw new Error(`config.${key} must be a non-empty string`);
 		}
+	}
+	const generate = (config as Record<string, unknown>).generate;
+	if (generate !== undefined && typeof generate !== "boolean") {
+		throw new Error("config.generate must be a boolean");
 	}
 	return config as Partial<MigrationConfig>;
 }
@@ -211,6 +233,28 @@ async function connectSqlite(file: string) {
 	};
 }
 
+/**
+ * The schema the database has after a command. Applied migrations are always a
+ * prefix of the sorted files, so the command's result locates the last one.
+ */
+function appliedPoint(
+	files: readonly string[],
+	command: string,
+	changed: readonly string[],
+): SchemaPoint {
+	const first = files[0];
+	if (first === undefined) return { empty: true };
+	if (command === "down") {
+		const reverted = changed[0];
+		const index = reverted === undefined ? 0 : files.indexOf(reverted);
+		const previous = files[index - 1];
+		return previous === undefined ? { before: first } : { after: previous };
+	}
+	const applied =
+		command === "up" ? (changed[0] ?? files.at(-1)) : files.at(-1);
+	return { after: applied ?? first };
+}
+
 export async function main(argv: readonly string[], io: Io): Promise<number> {
 	let parsed: ReturnType<typeof parse>;
 	try {
@@ -227,11 +271,11 @@ export async function main(argv: readonly string[], io: Io): Promise<number> {
 	const command = positionals[0];
 	if (
 		!command ||
-		!["up", "down", "latest", "make"].includes(command) ||
+		!["up", "down", "latest", "make", "generate"].includes(command) ||
 		positionals.length !== (command === "make" ? 2 : 1)
 	) {
 		io.stderr(
-			`typesql migrate: expected up, down, latest, or make <name>\n\n${USAGE}`,
+			`typesql migrate: expected up, down, latest, make <name>, or generate\n\n${USAGE}`,
 		);
 		return 2;
 	}
@@ -256,6 +300,21 @@ export async function main(argv: readonly string[], io: Io): Promise<number> {
 			);
 			return 0;
 		}
+		const generate = async (point: SchemaPoint) => {
+			const out =
+				values.out === undefined
+					? resolve(base, config.schemaFile ?? "db.ts")
+					: resolve(cwd, values.out);
+			const source = generateSchema({ migrationsDir, point, dialect });
+			await mkdir(dirname(out), { recursive: true });
+			await writeFile(out, source);
+			io.stdout(`typesql migrate: generated ${out}\n`);
+		};
+		if (command === "generate") {
+			const last = (await migrationFiles(migrationsDir)).at(-1);
+			await generate(last === undefined ? { empty: true } : { after: last });
+			return 0;
+		}
 		const url =
 			values.url ?? config.url ?? (io.env ?? process.env).DATABASE_URL;
 		const db = values.db ?? config.db;
@@ -274,6 +333,7 @@ export async function main(argv: readonly string[], io: Io): Promise<number> {
 					: resolve(values.db === undefined ? base : cwd, db),
 			);
 		}
+		let changed: readonly string[];
 		try {
 			const run =
 				command === "up"
@@ -300,8 +360,14 @@ export async function main(argv: readonly string[], io: Io): Promise<number> {
 					);
 				}
 			}
+			changed = result.migrations;
 		} finally {
 			await connection.close();
+		}
+		if (values.generate ?? config.generate ?? true) {
+			await generate(
+				appliedPoint(await migrationFiles(migrationsDir), command, changed),
+			);
 		}
 		return 0;
 	} catch (error) {

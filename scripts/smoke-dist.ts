@@ -873,7 +873,7 @@ const cli = (...args: string[]): string =>
 	execFileSync(process.execPath, [cliBin, ...args], { encoding: "utf8" });
 assert.match(
 	cli("--help"),
-	/^Usage: typesql migrate <up\|down\|latest\|make name>/,
+	/^Usage: typesql migrate <up\|down\|latest\|make name\|generate>/,
 );
 assert.match(
 	cli("introspect", "--dialect", "postgres", "--help"),
@@ -908,6 +908,7 @@ assert.match(
 		"core/dist/migration/index.js",
 	)) as typeof import("../packages/core/src/migration/index.ts");
 	const {
+		existsSync,
 		mkdirSync,
 		mkdtempSync,
 		readFileSync,
@@ -1114,7 +1115,7 @@ export async function down() {}
 		const config = join(configDir, "typesql.config.ts");
 		writeFileSync(
 			config,
-			`export default { dialect: 'sqlite', db: './app.db', migrationsDir: '../migrations', migrationTable: 'cli_migrations' } as const;`,
+			`export default { dialect: 'sqlite', db: './app.db', migrationsDir: '../migrations', migrationTable: 'cli_migrations', generate: false } as const;`,
 		);
 		const run = (...args: string[]) =>
 			cli("migrate", ...args, "--config", config);
@@ -1124,6 +1125,81 @@ export async function down() {}
 		assert.match(run("down"), /reverted beta.ts/);
 		assert.match(run("down"), /reverted alpha.ts/);
 		assert.match(run("down"), /no applied migrations/);
+
+		// generate reads each migration's schema type; up, down and latest
+		// rewrite db.ts beside the config with the last applied one.
+		const schemaDir = join(dir, "schema");
+		mkdirSync(join(schemaDir, "migrations"), { recursive: true });
+		writeFileSync(
+			join(schemaDir, "tsconfig.json"),
+			JSON.stringify({
+				compilerOptions: {
+					strict: true,
+					module: "nodenext",
+					noEmit: true,
+					allowImportingTsExtensions: true,
+					paths: {
+						"@typesql/core/migration": [
+							new URL(
+								"../packages/core/dist/migration/index.d.ts",
+								import.meta.url,
+							).pathname,
+						],
+					},
+				},
+			}),
+		);
+		writeFileSync(
+			join(schemaDir, "typesql.config.ts"),
+			`export default { dialect: 'sqlite', db: './schema.db' } as const;`,
+		);
+		writeFileSync(
+			join(schemaDir, "migrations", "1_posts.ts"),
+			`import type { MigrationSchema, SqliteMigration } from '@typesql/core/migration';
+export async function up(db: SqliteMigration) {
+  return db.add('CREATE TABLE posts (id INTEGER PRIMARY KEY, title TEXT NOT NULL, body TEXT)');
+}
+export async function down(db: SqliteMigration<MigrationSchema<typeof up>>) { await db.add('DROP TABLE posts'); }
+`,
+		);
+		writeFileSync(
+			join(schemaDir, "migrations", "2_views.ts"),
+			`import type { MigrationSchema, SqliteMigration } from '@typesql/core/migration';
+import type { up as previousUp } from './1_posts.ts';
+export async function up(db: SqliteMigration<MigrationSchema<typeof previousUp>>) {
+  return db.add('ALTER TABLE posts ADD COLUMN views INTEGER NOT NULL DEFAULT 0');
+}
+export async function down(db: SqliteMigration<MigrationSchema<typeof up>>) { await db.add('ALTER TABLE posts DROP COLUMN views'); }
+`,
+		);
+		const schemaFile = join(schemaDir, "db.ts");
+		const schemaRun = (...args: string[]) =>
+			cli("migrate", ...args, "--config", join(schemaDir, "typesql.config.ts"));
+		assert.match(
+			schemaRun("generate"),
+			new RegExp(`^typesql migrate: generated ${schemaFile}$`, "m"),
+		);
+		const full = readFileSync(schemaFile, "utf8");
+		assert.match(full, /from 2_views\.ts/);
+		assert.match(full, /import type \{ Col \} from "@typesql\/core\/sqlite";/);
+		assert.match(
+			full,
+			/id: Col<"integer", \{ hasDefault: true; position: 0; rowid: true \}>;[\s\S]*body: Col<"text", \{ nullable: true; position: 2 \}>;[\s\S]*views: Col<"integer", \{ hasDefault: true; position: 3 \}>;/,
+		);
+		assert.match(schemaRun("up"), /applied 1_posts.ts[\s\S]*generated/);
+		assert.doesNotMatch(readFileSync(schemaFile, "utf8"), /views/);
+		schemaRun("latest");
+		assert.equal(readFileSync(schemaFile, "utf8"), full);
+		schemaRun("down");
+		assert.match(readFileSync(schemaFile, "utf8"), /from 1_posts\.ts/);
+		schemaRun("down");
+		assert.match(readFileSync(schemaFile, "utf8"), /export interface DB \{\}/);
+		rmSync(schemaFile);
+		assert.doesNotMatch(schemaRun("latest", "--no-generate"), /generated/);
+		assert.equal(existsSync(schemaFile), false);
+		const out = join(schemaDir, "out", "schema.ts");
+		schemaRun("generate", "--out", out);
+		assert.equal(readFileSync(out, "utf8"), full);
 
 		const generatedDir = join(dir, "generated");
 		const make = (...args: string[]) =>
@@ -1177,6 +1253,19 @@ export async function down() {}
 			),
 			/name|separator/i,
 		);
+		assert.match(
+			fail(
+				1,
+				"generate",
+				"--dialect",
+				"sqlite",
+				"--dir",
+				migrationsDir,
+				"--out",
+				join(dir, "never.ts"),
+			),
+			/cannot read the schema of beta\.ts/,
+		);
 		writeFileSync(join(generatedDir, "9999999999_future.ts"), second);
 		assert.match(
 			fail(1, "make", "earlier", "--dialect", "sqlite", "--dir", generatedDir),
@@ -1205,6 +1294,7 @@ export async function down() {}
 			concurrentDb,
 			"--dir",
 			concurrentDir,
+			"--no-generate",
 		];
 		await Promise.all([
 			invoke(process.execPath, parallelArgs),
