@@ -7,6 +7,11 @@
   intents:
     - breezy-hairs-remain
     - hungry-cows-shine
+"@typesql/cli@0.1.4":
+  dir: packages/cli
+  intents:
+    - early-beds-hear
+    - old-ravens-deny
 "@typesql/core@0.0.2":
   dir: packages/core
   intents:
@@ -55,6 +60,27 @@
     - great-lemons-dance
     - itchy-teeth-occur
     - nice-knives-travel
+"@typesql/core@0.10.1":
+  dir: packages/core
+  intents:
+    - brave-flies-add
+    - calm-grapes-explode
+    - chilly-ravens-jog
+    - clean-moose-reflect
+    - fluffy-deers-shave
+    - gentle-stars-share
+    - happy-camels-doubt
+    - happy-geese-fry
+    - mean-mice-flow
+    - mean-sheep-call
+    - old-ravens-deny
+    - olive-bears-know
+    - orange-ants-beam
+    - short-swans-teach
+    - small-geese-mix
+    - sweet-lemons-melt
+    - weak-clouds-agree
+    - young-seals-think
 "@typesql/core@0.2.0":
   dir: packages/core
   intents:
@@ -269,6 +295,14 @@
   dir: packages/drizzle
   intents:
     - wet-ducks-trade
+"@typesql/drizzle@0.3.6":
+  dir: packages/drizzle
+  intents:
+    - famous-dogs-pump
+    - happy-geese-fry
+    - silent-apes-add
+    - slow-maps-dance
+    - tall-foxes-camp
 "@typesql/kysely@0.0.2":
   dir: packages/kysely
   intents:
@@ -327,6 +361,11 @@
   dir: packages/kysely
   intents:
     - quiet-jars-smell
+"@typesql/kysely@0.4.1":
+  dir: packages/kysely
+  intents:
+    - little-onions-sell
+    - olive-bears-know
 "@typesql/language-server@0.0.1":
   dir: packages/language-server
   intents:
@@ -356,6 +395,12 @@
   dir: packages/language-server
   intents:
     - nice-dodos-fly
+"@typesql/language-server@0.0.7":
+  dir: packages/language-server
+  intents:
+    - vast-cups-float
+    - wet-jokes-count
+    - wise-icons-drop
 "@typesql/pg@0.0.2":
   dir: packages/pg
   intents:
@@ -423,6 +468,15 @@
   dir: packages/pg
   intents:
     - wet-cats-chew
+"@typesql/pg@0.4.1":
+  dir: packages/pg
+  intents:
+    - early-beds-hear
+    - happy-geese-fry
+    - lucky-eels-care
+    - olive-bears-know
+    - purple-queens-ask
+    - wicked-carrots-run
 "@typesql/postgres@0.0.2":
   dir: packages/postgres
   intents:
@@ -479,6 +533,11 @@
   dir: packages/postgres
   intents:
     - short-jeans-pull
+"@typesql/postgres@0.3.1":
+  dir: packages/postgres
+  intents:
+    - heavy-queens-pretend
+    - olive-bears-know
 "@typesql/prisma@0.0.2":
   dir: packages/prisma
   intents:
@@ -532,6 +591,11 @@
   dir: packages/prisma
   intents:
     - wet-ducks-trade
+"@typesql/prisma@0.3.6":
+  dir: packages/prisma
+  intents:
+    - bright-grapes-retire
+    - olive-bears-know
 "@typesql/sqlite@0.0.1":
   dir: packages/sqlite
   intents:
@@ -544,10 +608,20 @@
   dir: packages/sqlite
   intents:
     - spicy-icons-relate
+"@typesql/sqlite@0.1.1":
+  dir: packages/sqlite
+  intents:
+    - lucky-suns-film
+    - nice-cooks-cough
+    - olive-bears-know
 typesql@0.0.1:
   dir: packages/vscode
   intents:
     - clean-owls-kiss
+typesql@0.0.10:
+  dir: packages/vscode
+  intents:
+    - lucky-buses-sing
 typesql@0.0.2:
   dir: packages/vscode
   intents:

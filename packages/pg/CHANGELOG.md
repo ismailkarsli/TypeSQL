@@ -1,5 +1,24 @@
 # @typesql/pg
 
+## 0.4.1
+
+### Patch Changes
+
+- Improve typesql CLI errors: show the causes of a refused localhost connection instead of an empty message, reject a malformed --url, add --version, show introspect options for typesql introspect --help, resolve a config file's out against the config file, reject config files with unknown options or no default export, and silence the stripTypeScriptTypes experimental warning.
+
+- Parse node-postgres arrays of enums, domains and extension types such as citext, which pg returns as raw {…} strings, so they match their array types.
+
+- Mark an introspected UNION/INTERSECT/EXCEPT view column NOT NULL only when every branch is, instead of looking at the first branch alone.
+
+- Fix the README Playground links, which opened with module resolution that ignores package exports and showed no TypeSQL errors or types.
+
+- Label PostgreSQL 18 VIRTUAL generated columns as VIRTUAL in introspected JSDoc, and fail with a clear message instead of writing an invalid file when a relation or schema is named $types or $functions.
+
+- Stop a dropped connection inside sql.transaction() on a Pool from crashing the process with an unhandled 'error' event; the transaction now rejects and the pool discards the client.
+
+- Updated dependencies:
+  - @typesql/core@0.10.1
+
 ## 0.4.0
 
 ### Minor Changes

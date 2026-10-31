@@ -1,5 +1,18 @@
 # @typesql/sqlite
 
+## 0.1.1
+
+### Patch Changes
+
+- Stop introspection from marking an INTEGER PRIMARY KEY DESC column as the rowid alias, which SQLite doesn't make it.
+
+- Prepare a sql.prepare() query once, on its first execution, and reuse the statement instead of preparing it on every call.
+
+- Fix the README Playground links, which opened with module resolution that ignores package exports and showed no TypeSQL errors or types.
+
+- Updated dependencies:
+  - @typesql/core@0.10.1
+
 ## 0.1.0
 
 ### Minor Changes
