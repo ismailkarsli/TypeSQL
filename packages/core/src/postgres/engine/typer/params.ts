@@ -701,7 +701,7 @@ type ParamsOfWin<
 	C extends Ctx,
 	M,
 > = W extends WindowSpec
-	? ParamsOfList<W["order"], C, ParamsOfList<W["partition"], C, M, null>, null>
+	? ParamsOfOrder<W["order"], C, ParamsOfOrder<W["partition"], C, M>>
 	: M;
 type ParamsOfWins<
 	Ws extends readonly NamedWindow[],
@@ -713,6 +713,17 @@ type ParamsOfWins<
 ]
 	? ParamsOfWins<R, C, ParamsOfWin<W["spec"], C, M>>
 	: M;
+// Sort and partition keys never reach a result column, so their parameters
+// accept null, as PostgreSQL does: ORDER BY c - $1::timestamptz sorts NULL last.
+type ParamsOfOrder<Es extends readonly Expr[], C extends Ctx, M> =
+	| M
+	| AcceptNull<Exclude<ParamsOfList<Es, C, M, null>, M>>;
+type AcceptNull<E> = E extends {
+	readonly n: infer N extends number;
+	readonly t: Info<infer T, false>;
+}
+	? AddParam<never, N, Info<T, true>>
+	: E;
 
 type PolyOf<
 	Args extends readonly Expr[],
@@ -914,7 +925,7 @@ type ParamsOfBody<
 	SkipTargets extends boolean = false,
 	Order extends readonly Expr[] = [],
 > = B extends TagSetop
-	? ParamsOfList<
+	? ParamsOfOrder<
 			Order,
 			MkCtx<DB, Outer, Ctes, false>,
 			ParamsOfBody<
@@ -923,22 +934,19 @@ type ParamsOfBody<
 				Outer,
 				Ctes,
 				ParamsOfBody<B["l"], DB, Outer, Ctes, M>
-			>,
-			null
+			>
 		>
 	: B extends TagParen
-		? ParamsOfList<
+		? ParamsOfOrder<
 				Order,
 				MkCtx<DB, Outer, Ctes, false>,
-				ParamsOfSelect<B["q"], DB, Outer, Ctes, M>,
-				null
+				ParamsOfSelect<B["q"], DB, Outer, Ctes, M>
 			>
 		: B extends TagValues
-			? ParamsOfList<
+			? ParamsOfOrder<
 					Order,
 					MkCtx<DB, Outer, Ctes, false>,
-					ParamsOfRows<B["rows"], MkCtx<DB, Outer, Ctes, false>, M>,
-					null
+					ParamsOfRows<B["rows"], MkCtx<DB, Outer, Ctes, false>, M>
 				>
 			: B extends TagSimple
 				? BindFrom<B["from"], DB, Outer, Ctes> extends infer L
@@ -992,10 +1000,10 @@ type ParamsOfSimple<
 	? ParamsOfWins<
 			Ws,
 			C,
-			ParamsOfList<
+			ParamsOfOrder<
 				D extends readonly Expr[] ? D : [],
 				C,
-				ParamsOfList<
+				ParamsOfOrder<
 					Order,
 					C,
 					ParamsOfOpt<
@@ -1015,10 +1023,8 @@ type ParamsOfSimple<
 							null
 						>,
 						Info<"bool">
-					>,
-					null
-				>,
-				null
+					>
+				>
 			>
 		>
 	: M;

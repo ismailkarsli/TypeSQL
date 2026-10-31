@@ -128,6 +128,7 @@ As a positional or named argument, `sql.json(value)` is not checked: a JSON para
 | `col IN ($1, $2)`, `$1 BETWEEN a AND b` | the column's type for each, `\| null` |
 | `col = ANY($1)` | an array of the column's type, `\| null` |
 | `LIMIT $1`, `OFFSET $1` | `number \| null` |
+| `ORDER BY`, `DISTINCT ON`, window `PARTITION BY` and `ORDER BY` | the type its expression gives, `\| null` |
 | a function argument | the function's parameter type, `\| null` |
 | `$1::T` | `T` (a cast wins over context), nullable as the context is; non-null without context |
 | `$1 IS NULL`, `$1::T IS NOT NULL` | adds `\| null` to the type the other uses give |

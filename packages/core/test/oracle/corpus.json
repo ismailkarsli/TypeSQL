@@ -23784,6 +23784,30 @@
 			"source": "window-param-nullability",
 			"sql": "SELECT collation for (label) AS a, collation for (n_text) AS b, collation for (NULL) AS c, collation for ('x') AS d FROM things",
 			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "order-param-nullability",
+			"sql": "SELECT id FROM things ORDER BY abs(extract(epoch from at - $1::timestamptz)), id + $2::int4 DESC",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "order-param-nullability",
+			"sql": "SELECT at - $1::timestamptz AS d FROM things ORDER BY at - $1::timestamptz",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "order-param-nullability",
+			"sql": "SELECT DISTINCT ON (id + $1::int4) id, row_number() OVER (PARTITION BY day - $2::int4 ORDER BY at - $3::timestamptz) AS r FROM things ORDER BY id + $1::int4",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "order-param-nullability",
+			"sql": "SELECT id FROM users ORDER BY display_name || $1::text, created_at - $2::timestamptz",
+			"ddl": false
 		}
 	],
 	"skippedSlots": {
