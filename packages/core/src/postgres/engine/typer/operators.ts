@@ -3,16 +3,16 @@ import type { LitCommon } from "../json.js";
 import type { BaseOf, ShapedCommon } from "../shape.js";
 
 export type IntT = "int2" | "int4" | "int8";
-export type FloatT = "float4" | "float8";
+type FloatT = "float4" | "float8";
 export type NumT = IntT | FloatT | "numeric";
 export type StrT = "text" | "varchar" | "bpchar" | "char" | "name" | "citext";
 export type JsonT = "json" | "jsonb";
-export type TsT = "timestamp" | "timestamptz";
-export type TimeT = "time" | "timetz";
+type TsT = "timestamp" | "timestamptz";
+type TimeT = "time" | "timetz";
 export type DateTimeT = "date" | TimeT | TsT;
-export type BitT = "bit" | "varbit";
+type BitT = "bit" | "varbit";
 export type RangeT = `${string}range`;
-export type UnknownT = "unknown" | "null";
+type UnknownT = "unknown" | "null";
 
 /**
  * Categories that never share a common type with another category, so CASE,
@@ -40,7 +40,7 @@ export type Unmatchable<A extends string, B extends string> =
 				: true
 			: false
 		: false;
-export type LitT = "lit";
+type LitT = "lit";
 export type LitToText<T extends string> = T extends LitT ? "text" : T;
 
 type Either<L extends boolean, R extends boolean> = L extends true
@@ -49,9 +49,7 @@ type Either<L extends boolean, R extends boolean> = L extends true
 		? true
 		: false;
 
-export type NumPromote<L extends string, R extends string> = "float8" extends
-	| L
-	| R
+type NumPromote<L extends string, R extends string> = "float8" extends L | R
 	? "float8"
 	: "float4" extends L | R
 		? L extends "float4"
@@ -67,9 +65,7 @@ export type NumPromote<L extends string, R extends string> = "float8" extends
 					? "int4"
 					: "int2";
 
-export type NumCommon<L extends string, R extends string> = "float8" extends
-	| L
-	| R
+type NumCommon<L extends string, R extends string> = "float8" extends L | R
 	? "float8"
 	: "float4" extends L | R
 		? "float4"

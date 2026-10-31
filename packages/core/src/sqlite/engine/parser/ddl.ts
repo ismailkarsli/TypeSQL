@@ -161,7 +161,7 @@ type ColumnDefs<
 			: C
 		: never;
 
-export type ParseColumnDef<T extends Toks, I extends number> =
+type ParseColumnDef<T extends Toks, I extends number> =
 	Ident<T, I> extends infer N extends Name
 		? ParseTypeName<T, Nx<I>> extends infer TN
 			? TN extends Ok<infer Ty extends string, infer J extends number>

@@ -58,7 +58,7 @@ export type Reserved =
 	| "when"
 	| "where";
 
-export type JoinKeyword =
+type JoinKeyword =
 	| "cross"
 	| "full"
 	| "inner"

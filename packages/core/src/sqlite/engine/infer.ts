@@ -6,7 +6,7 @@ import type { AnyErr } from "../../errors.js";
 import type { RewriteNamed } from "../../sql/named.js";
 import type { TsOf } from "../type-map/index.js";
 import type { DmlStmt, SelectStmt, Stmt } from "./ast.js";
-import type { ApplyDdlAll } from "./ddl/apply.js";
+import type { ApplyDdlAll, ApplyOne } from "./ddl/apply.js";
 import type { Reposition } from "./diagnostics.js";
 import type { SqliteEngine } from "./engine.js";
 import type { Lex } from "./lexer.js";
@@ -50,14 +50,8 @@ type ProjectStmt<S extends Stmt, DB> = S extends { readonly t: "select" }
 		? ProjectDml<Extract<S, DmlStmt>, DB, {}>
 		: ApplyStmt<S, DB>;
 
-type ApplyStmt<S extends Stmt, DB> = import("./ddl/apply.js").ApplyOne<
-	DB,
-	S
-> extends infer R
-	? R extends AnyErr
-		? R
-		: null
-	: never;
+type ApplyStmt<S extends Stmt, DB> =
+	ApplyOne<DB, S> extends infer R ? (R extends AnyErr ? R : null) : never;
 
 type ParamsOfStmt<S extends Stmt, DB> = S extends { readonly t: "select" }
 	? ParamsOfSelect<Extract<S, SelectStmt>, DB, [], {}, never>

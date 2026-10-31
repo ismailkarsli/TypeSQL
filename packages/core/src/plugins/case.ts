@@ -4,7 +4,7 @@ import type {
 	SqlPlugin,
 } from "../plugin.js";
 
-export type CamelCase<S extends string> = S extends `${string}_${string}`
+type CamelCase<S extends string> = S extends `${string}_${string}`
 	? S extends `${infer H}${infer R}`
 		? `${H}${CamelRest<R, H extends "_" ? true : false>}`
 		: S
@@ -18,7 +18,7 @@ type CamelRest<
 		? Capitalize<S>
 		: S;
 
-export type CamelCaseKeys<Row> = Row extends object
+type CamelCaseKeys<Row> = Row extends object
 	? { [K in keyof Row as K extends string ? CamelCase<K> : K]: Row[K] }
 	: Row;
 
@@ -31,11 +31,11 @@ function camelCased(key: string): string {
 	return mapped;
 }
 
-export function camelCase(key: string): string {
+function camelCase(key: string): string {
 	return key.includes("_") ? camelCased(key) : key;
 }
 
-export type SnakeCase<S extends string> = string extends S
+type SnakeCase<S extends string> = string extends S
 	? string
 	: S extends Lowercase<S>
 		? S
@@ -43,7 +43,7 @@ export type SnakeCase<S extends string> = string extends S
 			? `${Head extends Lowercase<Head> ? Head : `_${Lowercase<Head>}`}${SnakeCase<Tail>}`
 			: S;
 
-export function snakeCase(key: string): string {
+function snakeCase(key: string): string {
 	let result = "";
 	let start = 0;
 	for (let i = 0; i < key.length; i++) {
@@ -55,7 +55,7 @@ export function snakeCase(key: string): string {
 	return start === 0 ? key : result + key.slice(start);
 }
 
-export type SnakeCaseKeys<Row> = Row extends object
+type SnakeCaseKeys<Row> = Row extends object
 	? { [K in keyof Row as K extends string ? SnakeCase<K> : K]: Row[K] }
 	: Row;
 
@@ -66,7 +66,7 @@ export type SnakeCaseKeys<Row> = Row extends object
  */
 type InputKey<K extends string> =
 	SnakeCase<CamelCase<K>> extends K ? CamelCase<K> : K;
-export type CamelCaseInputKeys<Row> = Row extends object
+type CamelCaseInputKeys<Row> = Row extends object
 	? { [K in keyof Row as K extends string ? InputKey<K> : K]: Row[K] }
 	: Row;
 

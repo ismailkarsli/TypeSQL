@@ -2,9 +2,7 @@ import type { Next } from "../sql/next.js";
 import type { Toks } from "./tokens.js";
 import type { ColInfo } from "./types.js";
 
-export type ParamMap = { readonly [n: number]: ColInfo };
-
-export type ParamEntry<N extends number = number, T = ColInfo> = {
+type ParamEntry<N extends number = number, T = ColInfo> = {
 	readonly n: N;
 	readonly t: T;
 };

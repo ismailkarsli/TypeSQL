@@ -147,7 +147,7 @@ type Kind =
 	| { readonly t: "ddl" }
 	| { readonly t: "other" };
 
-export function kindOf(sql: string): Kind {
+function kindOf(sql: string): Kind {
 	const s = sql
 		.replace(/^(\s|--[^\n]*\n|\/\*[\s\S]*?\*\/)*/, "")
 		.replace(/;\s*$/, "");
@@ -956,7 +956,7 @@ function compareDdl(c: Checked): Verdict {
 	};
 }
 
-export function diffDbs(
+function diffDbs(
 	ours: Db,
 	theirs: Db,
 	words: ReadonlySet<string>,
@@ -1029,7 +1029,7 @@ export function diffDbs(
 	return out;
 }
 
-export function causeOf(detail: string): string {
+function causeOf(detail: string): string {
 	const m = detail.replace(/^ours: /, "");
 	if (/^function .* does not exist/.test(m)) return "unknown function";
 	if (/^type .* does not exist|unknown type/.test(m)) return "unknown type";

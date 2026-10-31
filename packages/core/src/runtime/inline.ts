@@ -60,10 +60,6 @@ function take(value: unknown): unknown {
 	return v;
 }
 
-export function pendingParams(): number {
-	return pending.size;
-}
-
 export function hasInline(text: string): boolean {
 	return text.includes("\u0000");
 }

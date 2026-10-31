@@ -242,7 +242,7 @@ type CastType<To extends string, From extends string> = From extends "null"
 					? "real"
 					: "numeric";
 
-export type Arith<A extends string, B extends string> = A extends "null"
+type Arith<A extends string, B extends string> = A extends "null"
 	? "null"
 	: B extends "null"
 		? "null"

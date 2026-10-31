@@ -12,7 +12,7 @@ type F<
 	readonly kind: Kind;
 };
 
-export type NullRule =
+type NullRule =
 	| "never"
 	| "args"
 	| "arg0"

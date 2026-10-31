@@ -79,7 +79,7 @@ function leaf(t: SqlType, ctx: Ctx): fc.Arbitrary<Node> {
 	return fc.oneof(...options);
 }
 
-export function expr(t: SqlType, ctx: Ctx): fc.Arbitrary<Node> {
+function expr(t: SqlType, ctx: Ctx): fc.Arbitrary<Node> {
 	if (ctx.depth <= 0) return leaf(t, ctx);
 	const d: Ctx = { ...ctx, depth: ctx.depth - 1 };
 	const plain: Ctx = { ...d, keys: null, aggs: false, windows: false };
@@ -394,7 +394,7 @@ function windowed(f: Node, ctx: Ctx, frame = false): fc.Arbitrary<Node> {
 const anyOrderable = (ctx: Ctx): fc.Arbitrary<Node> =>
 	pick(ORDERABLE).chain((t) => expr(t, ctx));
 
-export function cond(ctx: Ctx): fc.Arbitrary<Node> {
+function cond(ctx: Ctx): fc.Arbitrary<Node> {
 	const d: Ctx = {
 		...ctx,
 		depth: Math.max(0, ctx.depth - 1),
@@ -745,7 +745,7 @@ function join(
 	return fc.oneof(...options);
 }
 
-export function subquery(
+function subquery(
 	ctx: Ctx,
 	shape: readonly SqlType[] | null,
 ): fc.Arbitrary<Node> {
@@ -1058,7 +1058,7 @@ export function statement(depth = 3): fc.Arbitrary<Node> {
 		.map(numberParams);
 }
 
-export function numberParams(s: Node): Node {
+function numberParams(s: Node): Node {
 	let k = 0;
 	return { ...s, sql: s.sql.replace(/\$\?/g, () => `$${++k}`) };
 }

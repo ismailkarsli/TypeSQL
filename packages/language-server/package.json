@@ -32,7 +32,6 @@
 	},
 	"devDependencies": {
 		"@types/node": "^26.6.5",
-		"@typesql/core": "workspace:*",
 		"tsrs": "0.18.0-ts7.1.0-dev.20260929",
 		"typescript": "7.1.0-beta"
 	},

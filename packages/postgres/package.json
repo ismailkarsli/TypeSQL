@@ -38,7 +38,6 @@
 		"postgres": ">=3"
 	},
 	"devDependencies": {
-		"postgres": "^3.4.9",
 		"tsrs": "0.18.0-ts7.1.0-dev.20260929",
 		"typescript": "7.1.0-beta"
 	},

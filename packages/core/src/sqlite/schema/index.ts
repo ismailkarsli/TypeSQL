@@ -1,11 +1,6 @@
 import type { Shaped, TsShape, TypeName } from "../../schema.js";
 
-export type {
-	ColDesc,
-	Namespace,
-	Table,
-	View,
-} from "../../schema.js";
+export type { View } from "../../schema.js";
 
 export type SqliteTypeName =
 	| "integer"

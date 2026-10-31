@@ -1223,7 +1223,7 @@ type MultirangeOf<T extends string> = T extends `${string}multirange`
 		? `${X}multirange`
 		: "unknown";
 
-export type CallCtx = {
+type CallCtx = {
 	readonly grouped: boolean;
 	readonly over: boolean;
 	readonly emptyFrame?: boolean;
@@ -1358,7 +1358,7 @@ export type LookupFn<
 			? PgFunctions[Name]
 			: null;
 
-export type UnknownFunction<
+type UnknownFunction<
 	Name extends string,
 	As extends readonly ColInfo[],
 > = SqlError<

@@ -37,7 +37,7 @@ import type {
 } from "./util.js";
 import type { ParseXmlTable } from "./xml.js";
 
-export type SelectNode<W, Body, Order, Lim, Off> = {
+type SelectNode<W, Body, Order, Lim, Off> = {
 	t: "select";
 	with: W;
 	body: Body;
@@ -45,7 +45,7 @@ export type SelectNode<W, Body, Order, Lim, Off> = {
 	limit: Lim;
 	offset: Off;
 };
-export type SimpleNode<D, Ts, Fs, W, G, Sets, H, Wins> = {
+type SimpleNode<D, Ts, Fs, W, G, Sets, H, Wins> = {
 	t: "simple";
 	distinct: D;
 	targets: Ts;
@@ -68,9 +68,9 @@ type SimpleIntoNode<D, Ts, Fs, W, G, Sets, H, Wins, Into> = {
 	windows: Wins;
 	into: Into;
 };
-export type TargetNode<E, A> = { e: E; alias: A };
-export type StarNode<Tbl> = { t: "star"; tbl: Tbl };
-export type FromTableNode<Ref, A, CA> = {
+type TargetNode<E, A> = { e: E; alias: A };
+type StarNode<Tbl> = { t: "star"; tbl: Tbl };
+type FromTableNode<Ref, A, CA> = {
 	t: "table";
 	ref: Ref;
 	alias: A;
@@ -92,7 +92,7 @@ type JoinNode<K, L, R, On, U, N> = {
 	using: U;
 	natural: N;
 };
-export type RefNode<S, N> = { schema: S; name: N };
+type RefNode<S, N> = { schema: S; name: N };
 
 type SetNode<Op, All, L, R> = { t: "setop"; op: Op; all: All; l: L; r: R };
 type ParenNode<Q> = { t: "paren"; q: Q };
@@ -247,7 +247,7 @@ type HasOrderBy<Order, Body> = Order extends readonly []
 		: false
 	: true;
 
-export type ParseOrderByOpt<T extends Toks, I extends number> =
+type ParseOrderByOpt<T extends Toks, I extends number> =
 	EatWords<T, I, ["order", "by"]> extends never
 		? Ok<[], I>
 		: ParseOrderList<T, EatWords<T, I, ["order", "by"]>>;
@@ -803,7 +803,7 @@ export type ParseFromItem<T extends Toks, I extends number> =
 			: X
 		: never;
 
-export type ParseFromPrimary<T extends Toks, I extends number> =
+type ParseFromPrimary<T extends Toks, I extends number> =
 	T[I] extends WordTok<"lateral">
 		? ParseFromPrimaryLateral<T, Nx<I>, true>
 		: T[I] extends WordTok<"only">
@@ -1223,7 +1223,7 @@ type ParenAliases<T extends Toks, A extends string, I extends number> =
 			: R
 		: never;
 
-export type ParseJoins<T extends Toks, L, I extends number> =
+type ParseJoins<T extends Toks, L, I extends number> =
 	T[I] extends WordTok<"cross">
 		? T[Nx<I>] extends WordTok<"join">
 			? ParseJoinRhs<T, L, "cross", false, Nx<Nx<I>>>

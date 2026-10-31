@@ -99,8 +99,7 @@ export type DmlCtx<
 > = MkCtx<DB, [Level, ...Outer], Ctes, false>;
 
 // Preserve column identity instead of rebuilding type/nullability for each use.
-export type ColInfoOf<Tbl extends Table, Col extends string> = Tbl[Col &
-	keyof Tbl];
+type ColInfoOf<Tbl extends Table, Col extends string> = Tbl[Col & keyof Tbl];
 
 type IndCtx<Tbl extends Table, Col extends string, C extends Ctx> = MkCtx<
 	C["db"],
@@ -123,7 +122,7 @@ type IndCtx<Tbl extends Table, Col extends string, C extends Ctx> = MkCtx<
 	false
 >;
 
-export type AssignInfo<
+type AssignInfo<
 	Tbl extends Table,
 	Col extends string,
 	Ind,
@@ -492,7 +491,7 @@ type CheckValueItemsWalk<
 			: never
 	: true;
 
-export type CheckTargets<
+type CheckTargets<
 	Cs extends readonly string[],
 	Tgs extends readonly TargetInd[],
 	Es extends readonly (Expr | null)[],
@@ -744,7 +743,7 @@ type SetTargets<
 	: [Cs, Tgs, Es];
 type Nulls<Cs extends readonly string[]> = { readonly [K in keyof Cs]: null };
 
-export type CheckMultiSource<
+type CheckMultiSource<
 	E extends Expr,
 	Cols_ extends readonly string[],
 	C extends Ctx,

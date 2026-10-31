@@ -52,7 +52,7 @@ type Starts<P, K, R extends string> = K extends "u"
 
 type Push<A extends string[], W extends string> = W extends "" ? A : [...A, W];
 
-export type Words<
+type Words<
 	S extends string,
 	W extends string = "",
 	Acc extends string[] = [],

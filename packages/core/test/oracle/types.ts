@@ -349,7 +349,7 @@ export async function observe(
 	return { observed };
 }
 
-export async function runVariants(
+async function runVariants(
 	conn: Connection,
 	db: Db,
 	tables: readonly string[],

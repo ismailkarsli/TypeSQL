@@ -391,7 +391,7 @@ export type CheckWindowClause<
 				: R
 			: never;
 
-export type CheckWindowSpec<
+type CheckWindowSpec<
 	S extends WindowSpec,
 	Defs extends WindowDefs,
 	C extends Ctx,

@@ -1,13 +1,13 @@
 import type { Checker, Symbol as TsSymbol, Type } from "typescript/async";
 import type { RelRef } from "./scan.js";
 
-export interface Relation {
+interface Relation {
 	readonly schema: string | null;
 	readonly name: string;
 	readonly view: boolean;
 }
 
-export interface Column {
+interface Column {
 	readonly name: string;
 	readonly type: string;
 	readonly nullable: boolean;

@@ -108,6 +108,3 @@ export function scanNames(text: string, options: ScanOptions = {}): Names {
 	});
 	return { words, pairs };
 }
-
-export const touchesAllTables = (text: string): boolean =>
-	/\b(drop|alter)\s+type\b/i.test(text);

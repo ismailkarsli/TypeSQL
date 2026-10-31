@@ -54,7 +54,7 @@ function tokenize(s: string): Token[] {
 	return out;
 }
 
-export function parseNodeTree(text: string): NodeValue {
+function parseNodeTree(text: string): NodeValue {
 	const toks = tokenize(text);
 	let p = 0;
 	const isLabel = (t: Token | undefined): boolean =>

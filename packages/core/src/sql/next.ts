@@ -4097,5 +4097,3 @@ export interface Next {
 	readonly 4094: 4095;
 	readonly 4095: 4096;
 }
-
-export type MaxTokens = 4096;

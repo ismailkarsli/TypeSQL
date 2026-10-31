@@ -1,4 +1,4 @@
-export type TypeAliases = {
+type TypeAliases = {
 	int: "int4";
 	integer: "int4";
 	int4: "int4";

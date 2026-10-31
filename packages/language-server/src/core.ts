@@ -10,7 +10,7 @@ const ADAPTERS = [
 	"@typesql/prisma",
 ];
 
-export function corePackage(fileName: string): string | null {
+function corePackage(fileName: string): string | null {
 	const req = createRequire(fileName);
 	for (const via of [null, ...ADAPTERS]) {
 		try {
@@ -23,7 +23,7 @@ export function corePackage(fileName: string): string | null {
 	return null;
 }
 
-export const isCorePathIn =
+const isCorePathIn =
 	(dir: string) =>
 	(path: string): boolean =>
 		path.startsWith(join(dir, "dist") + sep) ||

@@ -151,7 +151,7 @@ type ParseExprSlow<T extends Toks, I extends number, Min extends MinPrec> =
 			: R
 		: never;
 
-export type Prec = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13;
+type Prec = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13;
 type MinPrec = Prec | "target";
 type Geq = {
 	target: Prec;
@@ -1853,7 +1853,7 @@ export type ParseOrderList<
 				: ParseOrderList<T, EatOp<T, SkipOrderTail<T, J>, ",">, [...Acc, E]>
 			: X
 		: never;
-export type SkipOrderTail<T extends Toks, I extends number> = SkipNulls<
+type SkipOrderTail<T extends Toks, I extends number> = SkipNulls<
 	T,
 	EatWord<T, I, "asc" | "desc"> extends never
 		? T[I] extends WordTok<"using">

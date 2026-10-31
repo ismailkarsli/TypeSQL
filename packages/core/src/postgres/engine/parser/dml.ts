@@ -302,7 +302,7 @@ type ParseSetItem<T extends Toks, I extends number> =
 				: Tg
 			: never;
 
-export type ParseAssignTarget<T extends Toks, I extends number> =
+type ParseAssignTarget<T extends Toks, I extends number> =
 	Ident<T, I> extends [infer Col extends string, infer J extends number]
 		? T[J] extends OpTok<"[" | ".">
 			? ParseIndirection<T, J, [Col, I], { t: "col"; tbl: null; name: Col }>

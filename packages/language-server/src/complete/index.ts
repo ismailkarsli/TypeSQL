@@ -1,31 +1,11 @@
 import type { EditorKinds } from "./call.js";
 
-export {
-	type Dialect,
-	type EditorKinds,
-	isCoreRef,
-	type SqlCall,
-	sqlCallAt,
-	textOf,
-} from "./call.js";
+export { type EditorKinds } from "./call.js";
 export {
 	type CompletionItem,
 	type Completions,
-	completions,
 	completionsAt,
-	quoteIdent,
-	type Range,
 } from "./complete.js";
-export {
-	type Context,
-	type Cte,
-	contextAt,
-	type Expect,
-	fold,
-	type RelRef,
-	type ScopeItem,
-} from "./scan.js";
-export { type Column, type Relation, type Schema, schemaOf } from "./schema.js";
 
 export function editorKinds(
 	syntaxKind: Readonly<Record<string, number | string>>,

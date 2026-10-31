@@ -19,7 +19,7 @@ export interface TypeScript {
 	readonly kinds: { readonly VariableStatement: number };
 }
 
-export async function loadTypeScript(configFile: string): Promise<TypeScript> {
+async function loadTypeScript(configFile: string): Promise<TypeScript> {
 	const req = createRequire(configFile);
 	const load = (spec: string): Promise<Record<string, unknown>> =>
 		import(pathToFileURL(req.resolve(spec)).href) as Promise<
@@ -211,7 +211,7 @@ export async function badDeclarations(
 	return out;
 }
 
-export const lineOf = (text: string, offset: number): number => {
+const lineOf = (text: string, offset: number): number => {
 	let line = 0;
 	const end = Math.min(offset, text.length);
 	for (let i = 0; i < end; i++) if (text.charCodeAt(i) === 10) line++;

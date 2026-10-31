@@ -52,7 +52,7 @@ type Noop<T extends Toks, I extends number, What extends string> = Ok<
 	SkipToStmtEnd<T, I>
 >;
 
-export type SkipUntil<
+type SkipUntil<
 	T extends Toks,
 	I extends number,
 	Stop extends string,
@@ -74,11 +74,7 @@ export type SkipUntil<
 			? SkipUntil<T, Nx<I>, Stop, D>
 			: I;
 
-export type SkipToStmtEnd<T extends Toks, I extends number> = SkipUntil<
-	T,
-	I,
-	";"
->;
+type SkipToStmtEnd<T extends Toks, I extends number> = SkipUntil<T, I, ";">;
 type SkipToElementEnd<T extends Toks, I extends number> = SkipUntil<
 	T,
 	I,
@@ -844,11 +840,7 @@ type ParseLikeOptions<
 				: Expected<"LIKE option", T, Nx<I>>
 			: [Def, I, Copies];
 
-export type ParseColumnDef<
-	T extends Toks,
-	I extends number,
-	TN extends string,
-> =
+type ParseColumnDef<T extends Toks, I extends number, TN extends string> =
 	Ident<T, I> extends [infer Name extends string, infer J extends number]
 		? ParseTypeName<T, J> extends infer R
 			? R extends Ok<infer Ty extends string, infer J2>

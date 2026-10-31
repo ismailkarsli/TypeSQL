@@ -294,7 +294,7 @@ export type Or<A extends boolean, B extends boolean> = A extends true
 	: B extends true
 		? true
 		: false;
-export type AnyNullable<As extends readonly ColInfo[]> = As extends readonly [
+type AnyNullable<As extends readonly ColInfo[]> = As extends readonly [
 	infer A extends ColInfo,
 	...infer R extends readonly ColInfo[],
 ]
@@ -302,7 +302,7 @@ export type AnyNullable<As extends readonly ColInfo[]> = As extends readonly [
 		? true
 		: AnyNullable<R>
 	: false;
-export type CommonOf<
+type CommonOf<
 	As extends readonly ColInfo[],
 	Acc extends string,
 > = As extends readonly [

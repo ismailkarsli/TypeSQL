@@ -9,7 +9,7 @@ type __Ns<N> = N extends unknown ? { [T in keyof N]: __Rel<N[T]> } : never;
 type NormDb<DB> = DB extends unknown ? { [K in keyof DB]: K extends "$types" ? { types: DB[K] } : K extends "$functions" ? { functions: DB[K] } : __IsRel<DB[K]> extends true ? __Rel<DB[K]> : { ns: __Ns<DB[K]> } } : never;
 `;
 
-export interface Column {
+interface Column {
 	readonly name: string;
 	readonly type: string;
 	readonly nullable: boolean;
@@ -93,7 +93,7 @@ function literals(v: TypeValue): string[] {
 
 export const ident = (s: string): string => `"${s.replace(/"/g, '""')}"`;
 export const literal = (s: string): string => `'${s.replace(/'/g, "''")}'`;
-export const qualified = (r: {
+const qualified = (r: {
 	readonly schema: string | null;
 	readonly name: string;
 }): string => `${ident(r.schema ?? "public")}.${ident(r.name)}`;

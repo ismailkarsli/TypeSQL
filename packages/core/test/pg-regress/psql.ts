@@ -56,7 +56,7 @@ export interface SplitOptions {
 	env?: Record<string, string>;
 }
 
-export function splitPsql(
+function splitPsql(
 	text: string,
 	options: SplitOptions = {},
 ): Statement[] & { dataLines: Set<number> } {

@@ -13,7 +13,7 @@ export type SqlType =
 	| "mood"
 	| "int4[]";
 
-export interface FuzzColumn {
+interface FuzzColumn {
 	readonly name: string;
 	readonly type: SqlType;
 	readonly nullable: boolean;

@@ -8,13 +8,13 @@ const configString = (
 	v: string | readonly string[] | undefined,
 ): string | undefined => (typeof v === "string" ? v : undefined);
 
-export function outputFile(output: string): string {
+function outputFile(output: string): string {
 	return [".ts", ".mts", ".cts"].includes(extname(output))
 		? output
 		: join(output, "index.ts");
 }
 
-export function sourceFor(options: GeneratorOptions): string {
+function sourceFor(options: GeneratorOptions): string {
 	const provider =
 		options.datasources[0]?.activeProvider ?? options.datasources[0]?.provider;
 	if (

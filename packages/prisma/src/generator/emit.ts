@@ -20,7 +20,7 @@ export interface SchemaField {
 	};
 }
 
-export const SCALAR_TYPES: Readonly<Record<string, string>> = {
+const SCALAR_TYPES: Readonly<Record<string, string>> = {
 	Int: "int4",
 	BigInt: "int8",
 	Float: "float8",
@@ -32,7 +32,7 @@ export const SCALAR_TYPES: Readonly<Record<string, string>> = {
 	Bytes: "bytea",
 };
 
-export const SQLITE_SCALAR_TYPES: Readonly<Record<string, string>> = {
+const SQLITE_SCALAR_TYPES: Readonly<Record<string, string>> = {
 	Int: "integer",
 	BigInt: "bigint",
 	Float: "real",
@@ -44,7 +44,7 @@ export const SQLITE_SCALAR_TYPES: Readonly<Record<string, string>> = {
 	Bytes: "blob",
 };
 
-export const NATIVE_TYPES: Readonly<Record<string, string>> = {
+const NATIVE_TYPES: Readonly<Record<string, string>> = {
 	Text: "text",
 	Char: "bpchar",
 	VarChar: "varchar",
@@ -116,7 +116,7 @@ export function schemaFields(schema: string): Map<string, SchemaField[]> {
 	return models;
 }
 
-export function pgTypeOf(
+function pgTypeOf(
 	field: DmmfField,
 	enumNames: ReadonlyMap<string, string>,
 ): string {
@@ -126,7 +126,7 @@ export function pgTypeOf(
 	return SCALAR_TYPES[field.type] ?? field.type.toLowerCase();
 }
 
-export function hasDbDefault(field: DmmfField): boolean {
+function hasDbDefault(field: DmmfField): boolean {
 	if (!field.hasDefaultValue) return false;
 	const d = field.default;
 	if (d !== null && typeof d === "object" && !Array.isArray(d))

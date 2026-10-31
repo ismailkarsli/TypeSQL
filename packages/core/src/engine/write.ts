@@ -41,7 +41,7 @@ export type TableOf<DB, T extends string> = T extends keyof DB
 			: never
 		: never;
 
-export type ColIn<
+type ColIn<
 	E extends EngineTypes,
 	TM,
 	DB,

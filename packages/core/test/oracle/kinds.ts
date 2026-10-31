@@ -1,4 +1,4 @@
-export const KINDS = [
+const KINDS = [
 	"unsound",
 	"rejects",
 	"accepts",
@@ -7,7 +7,7 @@ export const KINDS = [
 	"parse",
 	"crash",
 ] as const;
-export type Kind = (typeof KINDS)[number];
+type Kind = (typeof KINDS)[number];
 
 export interface Disagreement {
 	readonly kind: Kind;

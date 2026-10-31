@@ -1,5 +1,4 @@
 declare const ERR: unique symbol;
-export type ERR = typeof ERR;
 
 export type SqlError<Message extends string, At = unknown> = {
 	readonly [ERR]: Message;

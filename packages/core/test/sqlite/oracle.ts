@@ -239,7 +239,7 @@ function runSqlite(db: DatabaseSync, text: string, ours: Ours): Theirs {
 const normType = (t: string): string =>
 	t.toLowerCase().replace(/\(.*$/, "").replace(/\s+/g, " ").trim() || "any";
 
-export interface Disagreement {
+interface Disagreement {
 	readonly kind:
 		| "accepts"
 		| "rejects"

@@ -1,4 +1,4 @@
-export interface DmmfFieldDefault {
+interface DmmfFieldDefault {
 	readonly name: string;
 	readonly args: readonly unknown[];
 }

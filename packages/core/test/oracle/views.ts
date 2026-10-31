@@ -60,7 +60,7 @@ export function viewable(text: string, ours: Analysis): boolean {
 	);
 }
 
-export function mayNarrow(text: string): boolean {
+function mayNarrow(text: string): boolean {
 	const bare = text
 		.replace(/'(?:[^']|'')*'/g, "''")
 		.replace(/"(?:[^"]|"")*"/g, '""')

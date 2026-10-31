@@ -1,0 +1,85 @@
+{
+	"$schema": "https://unpkg.com/knip@6/schema.json",
+	"ignoreBinaries": ["change", "vsce", "ovsx"],
+	"ignoreIssues": {
+		"packages/cli/package.json": ["optionalPeerDependencies"],
+		"packages/drizzle/src/pg-type.ts": ["duplicates"]
+	},
+	"workspaces": {
+		".": {
+			"entry": ["scripts/*.ts"],
+			"project": ["*.ts", "scripts/**/*.ts"],
+			"ignoreDependencies": ["pg", "vitest"]
+		},
+		"packages/core": {
+			"entry": [
+				"src/index.ts!",
+				"src/adapter.ts!",
+				"src/postgres/index.ts!",
+				"src/postgres/engine/index.ts!",
+				"src/sqlite/index.ts!",
+				"src/sqlite/engine/index.ts!",
+				"src/migration/index.ts!",
+				"examples/*.ts",
+				"test/pg-ast/canon.ts",
+				"test/sqlite/view.ts",
+				"test/support/analysis.ts"
+			],
+			"project": ["src/**/*.ts!", "examples/**/*.ts", "test/**/*.ts"]
+		},
+		"packages/cli": {
+			"entry": ["src/index.ts!", "src/bin.ts!"],
+			"project": ["src/**/*.ts!"]
+		},
+		"packages/drizzle": {
+			"entry": ["src/index.ts!", "examples/*.ts"],
+			"project": ["src/**/*.ts!", "examples/**/*.ts"]
+		},
+		"packages/kysely": {
+			"entry": ["src/index.ts!", "examples/*.ts"],
+			"project": ["src/**/*.ts!", "examples/**/*.ts"]
+		},
+		"packages/pg": {
+			"entry": ["src/index.ts!", "src/introspect/index.ts!"],
+			"project": ["src/**/*.ts!"]
+		},
+		"packages/postgres": {
+			"entry": ["src/index.ts!"],
+			"project": ["src/**/*.ts!"]
+		},
+		"packages/prisma": {
+			"entry": [
+				"src/index.ts!",
+				"src/bin.ts!",
+				"src/generator/api.ts!",
+				"examples/*.ts"
+			],
+			"project": ["src/**/*.ts!", "examples/**/*.ts"]
+		},
+		"packages/sqlite": {
+			"entry": ["src/index.ts!", "src/introspect/index.ts!"],
+			"project": ["src/**/*.ts!"]
+		},
+		"packages/language-server": {
+			"entry": ["src/bin.ts!"],
+			"project": ["src/**/*.ts!"]
+		},
+		"packages/vscode": {
+			"project": ["src/**/*.ts!"],
+			"ignoreDependencies": ["ovsx"]
+		},
+		"packages/bench": {
+			"entry": ["src/case1.ts!"],
+			"project": ["*.ts", "src/**/*.ts!"]
+		},
+		"packages/docs": {
+			"entry": [
+				"playground/*.ts",
+				"cloudflare.config.ts",
+				"wrangler.config.ts"
+			],
+			"project": ["*.ts", "playground/**/*.ts", ".vitepress/**/*.{ts,mts}"],
+			"ignoreDependencies": ["@typesql/drizzle"]
+		}
+	}
+}

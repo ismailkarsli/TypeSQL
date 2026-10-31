@@ -31,7 +31,7 @@ export function maxParam(text: string): number {
 	return max;
 }
 
-export function renumberParams(text: string, offset: number): string {
+function renumberParams(text: string, offset: number): string {
 	if (offset === 0 || !text.includes("$")) return text;
 	return scan(text, (n) => `$${n + offset}`);
 }

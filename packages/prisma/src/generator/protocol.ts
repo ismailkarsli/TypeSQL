@@ -1,14 +1,14 @@
 import { createInterface } from "node:readline";
 import type { Readable, Writable } from "node:stream";
 
-export interface GeneratorManifest {
+interface GeneratorManifest {
 	readonly prettyName?: string;
 	readonly defaultOutput?: string;
 	readonly requiresEngines?: readonly string[];
 	readonly version?: string;
 }
 
-export interface GeneratorConfig {
+interface GeneratorConfig {
 	readonly name: string;
 	readonly output: { readonly value: string | null } | null;
 	readonly config: Readonly<

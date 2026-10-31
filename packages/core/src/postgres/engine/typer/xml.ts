@@ -72,7 +72,7 @@ type AllNullable<As extends readonly ColInfo[]> = As extends readonly [
 		: false
 	: true;
 
-export type Coerce<
+type Coerce<
 	A extends Expr,
 	C extends Ctx,
 	Target extends string,

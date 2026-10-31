@@ -59,7 +59,7 @@ type FragArgs<Text extends string> =
 			: [params: { readonly [K in Names[number]]: unknown }]
 		: readonly unknown[];
 
-export type FragCount<Text extends string> =
+type FragCount<Text extends string> =
 	Prepared<Text> extends [
 		string,
 		string[],
@@ -69,7 +69,7 @@ export type FragCount<Text extends string> =
 		? [...UnknownTuple<M>, ...Encs]["length"]
 		: 0;
 
-export type FragCarried<Text extends string, A extends readonly unknown[]> =
+type FragCarried<Text extends string, A extends readonly unknown[]> =
 	Prepared<Text> extends [
 		string,
 		infer Names extends string[],
@@ -112,7 +112,7 @@ type ElemPairs<F, Wrap extends boolean> = F extends unknown
 
 declare const GROUPED: unique symbol;
 /** A sql.and / sql.or result: already one parenthesized condition. */
-export type Grouped = { readonly [GROUPED]: true };
+type Grouped = { readonly [GROUPED]: true };
 
 type Parened<F, T extends string> = string extends T
 	? T

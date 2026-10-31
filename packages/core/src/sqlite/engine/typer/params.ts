@@ -13,7 +13,7 @@ import type { BindFrom } from "../binder/scope.js";
 import type { BindWith } from "../project/select.js";
 import type { Affinity, SqCteMap, SqCtx, SqLevel } from "../types.js";
 import type { DeclaredFn, PickSig, SigArgType } from "./functions.js";
-import type { Common, Info, TypeOf } from "./typeof.js";
+import type { Common, Info, SubqueryCol, TypeOf } from "./typeof.js";
 
 type Ctx<DB, S extends Scope, Ctes extends SqCteMap> = {
 	readonly db: DB;
@@ -324,7 +324,7 @@ type InSubParams<
 		: AddParam<
 				M,
 				ParamN<L>,
-				import("./typeof.js").SubqueryCol<Q, C> extends infer S extends ColInfo
+				SubqueryCol<Q, C> extends infer S extends ColInfo
 					? Info<S["type"], false>
 					: Info<"unknown", false>
 			>
@@ -825,4 +825,4 @@ export type ParamsOfOpt<E, C extends SqCtx, M> = E extends Expr
 		: AddParam<M, ParamN<E>, Info<"integer", true>>
 	: M;
 
-export type { ParamN, Sib, Use };
+export type { ParamN };

@@ -8,7 +8,7 @@ import { readCorpus } from "../oracle/corpus.js";
 import { OUT, PgCanon } from "./pg-canon.js";
 
 export const root = join(import.meta.dirname, "../../../..");
-export const regress = join(root, "vendor/postgres/src/test/regress");
+const regress = join(root, "vendor/postgres/src/test/regress");
 
 export interface Statement {
 	readonly group: string;
@@ -44,9 +44,9 @@ export function regressionTests(only: readonly string[]): string[] {
 }
 
 let loaded: Promise<void> | undefined;
-export const loadParser = (): Promise<void> => (loaded ??= loadModule());
+const loadParser = (): Promise<void> => (loaded ??= loadModule());
 
-export function pgStatements(sql: string): [string, string][] | null {
+function pgStatements(sql: string): [string, string][] | null {
 	let parsed: ReturnType<typeof parseSync>;
 	try {
 		parsed = parseSync(sql);

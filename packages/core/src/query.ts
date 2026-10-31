@@ -103,12 +103,6 @@ export function pluginsOf(q: { readonly text: string }): readonly SqlPlugin[] {
 	return (q as { readonly [PLUGINS]?: readonly SqlPlugin[] })[PLUGINS] ?? [];
 }
 
-const SLOTTABLES = new WeakSet<object>();
-
-export function isSlottable(v: unknown): boolean {
-	return typeof v === "object" && v !== null && SLOTTABLES.has(v);
-}
-
 export function makeQuery<
 	Row,
 	Params extends readonly unknown[],
@@ -160,7 +154,7 @@ export function makeQuery<
 			return rows[0];
 		},
 	});
-	SLOTTABLES.add(inlineable(query));
+	inlineable(query);
 	return query as unknown as Query<Row, Params, Text>;
 }
 
@@ -175,7 +169,5 @@ export function makeFragment<
 	Params extends readonly unknown[],
 	Carried extends readonly unknown[] = readonly unknown[],
 >(text: string, values: readonly unknown[]): Fragment<Text, Params, Carried> {
-	const fragment = inlineable({ text, values });
-	SLOTTABLES.add(fragment);
-	return fragment as Fragment<Text, Params, Carried>;
+	return inlineable({ text, values }) as Fragment<Text, Params, Carried>;
 }

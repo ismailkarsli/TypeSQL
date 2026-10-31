@@ -40,7 +40,7 @@ export type ParamTypeMapOf<TM> = TM extends { readonly $params: infer P }
 	? P
 	: DefaultParamTypeMap;
 
-export type TsTypeOf<TM, T extends string> = T extends {
+type TsTypeOf<TM, T extends string> = T extends {
 	readonly shape: { readonly k: "ts"; readonly v: infer V };
 }
 	? T extends "json"

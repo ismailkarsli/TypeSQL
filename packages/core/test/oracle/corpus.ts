@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 
-export interface CorpusStatement {
+interface CorpusStatement {
 	readonly schema: string | null;
 	readonly source: string;
 	readonly sql: string;

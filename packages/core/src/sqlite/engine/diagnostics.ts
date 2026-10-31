@@ -66,12 +66,6 @@ type FnNames<DB> =
 	| (keyof FunctionCatalog & string)
 	| (DB extends { readonly $functions: infer F } ? keyof F & string : never);
 
-export type HintIndex<DB> =
-	| {
-			[K in RelNames<DB>]: K | `${K}.${RelCols<DB[K]>}`;
-	  }[RelNames<DB>]
-	| (DB extends { readonly $functions: infer F } ? keyof F & string : never);
-
 type Locate<M extends string, T extends Toks> = M extends
 	| `no such column: ${infer Name}`
 	| `ambiguous column name: ${infer Name}`

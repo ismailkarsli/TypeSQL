@@ -44,11 +44,7 @@ export type ParseExpr<T extends Toks, I extends number> = ParseExprPrec<
 	0
 >;
 
-export type ParseExprPrec<
-	T extends Toks,
-	I extends number,
-	Min extends number,
-> =
+type ParseExprPrec<T extends Toks, I extends number, Min extends number> =
 	ParsePrefix<T, I> extends infer L
 		? L extends Ok<infer E extends Expr, infer J extends number>
 			? ParseInfix<T, J, E, Min>
@@ -454,7 +450,7 @@ type MkCall<Name, Args, Star, Distinct, Ord, Filter, Over> = {
 	over: Over;
 };
 
-export type ParseOver<T extends Toks, I extends number> =
+type ParseOver<T extends Toks, I extends number> =
 	Ident<T, I> extends infer N extends Name
 		? Ok<{ name: N["v"]; partition: []; order: [] }, Nx<I>>
 		: IsOp<T, I, "("> extends true

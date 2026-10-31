@@ -78,7 +78,7 @@ export type ReservedKeyword =
 	| "window"
 	| "with";
 
-export type ColNameKeyword =
+type ColNameKeyword =
 	| "between"
 	| "bigint"
 	| "bit"

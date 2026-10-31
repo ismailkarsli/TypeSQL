@@ -17,8 +17,6 @@ import type {
 type ArrShape<E> = { readonly k: "arr"; readonly e: E };
 type ValShape<C> = { readonly k: "val"; readonly c: C };
 
-export type { TsShape };
-
 export type LitType<V extends string> = V extends
 	| "[]"
 	| "{}"

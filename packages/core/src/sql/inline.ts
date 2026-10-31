@@ -2,7 +2,6 @@ import type { Empty } from "../empty.js";
 import type { SqlError } from "../errors.js";
 import type { InlineFragment } from "../query.js";
 import type { Next } from "./next.js";
-import type { MaxParamStr } from "./splice.js";
 
 export type ParamInput<T> = unknown extends T
 	? unknown
@@ -583,5 +582,3 @@ export type Skip<
 	N extends number,
 	Acc extends null[] = [],
 > = Acc["length"] extends N ? Acc : Skip<N, [...Acc, null]>;
-
-export type { MaxParamStr };

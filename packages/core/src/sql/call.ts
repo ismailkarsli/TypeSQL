@@ -181,7 +181,7 @@ type SpliceArgs<E extends EngineTypes, DB, TM, Q extends string, S> =
 				: readonly unknown[]
 			: readonly unknown[];
 
-export type SplicedOr<Q extends string> =
+type SplicedOr<Q extends string> =
 	SplicedText<Q> extends infer X extends string ? X : string;
 
 // Boxed like InferredCheck, so relating two instantiations of the call

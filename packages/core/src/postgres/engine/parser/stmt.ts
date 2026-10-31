@@ -23,7 +23,7 @@ export type ParseProgram<T extends Toks> =
 			: X
 		: never;
 
-export type DdlKeyword =
+type DdlKeyword =
 	| "create"
 	| "alter"
 	| "drop"

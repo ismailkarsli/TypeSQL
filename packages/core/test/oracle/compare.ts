@@ -71,7 +71,7 @@ export function compareStatement(ours: Ours, server: Server): Verdict {
 	return { disagreements: compareShapes(ours.analysis, server.observed) };
 }
 
-export function compareShapes(a: Analysis, o: Observed): Disagreement[] {
+function compareShapes(a: Analysis, o: Observed): Disagreement[] {
 	const out: Disagreement[] = [];
 	const ourCols = a.cols;
 	const theirs = o.columns;

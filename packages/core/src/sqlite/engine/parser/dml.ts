@@ -242,7 +242,7 @@ type UpsertLoop<
 			: SyntaxErr<T, Nx<I>>
 		: Ok<Acc, I>;
 
-export type ParseSet<
+type ParseSet<
 	T extends Toks,
 	I extends number,
 	Acc extends readonly unknown[],

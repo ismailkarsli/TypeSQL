@@ -36,12 +36,12 @@ export const procId = (p: {
 	readonly args: readonly string[];
 }): string => `${p.name}(${p.args.join(", ")})`;
 
-export interface Inst {
+interface Inst {
 	readonly elem: string;
 	readonly range: string | null;
 	readonly multirange: string | null;
 }
-export const INSTS: readonly Inst[] = [
+const INSTS: readonly Inst[] = [
 	{ elem: "int4", range: "int4range", multirange: "int4multirange" },
 	{ elem: "text", range: null, multirange: null },
 	{ elem: "jsonb", range: null, multirange: null },
@@ -60,10 +60,10 @@ const ARRAY = new Set(["anyarray", "anycompatiblearray"]);
 const RANGE = new Set(["anyrange", "anycompatiblerange"]);
 const MULTIRANGE = new Set(["anymultirange", "anycompatiblemultirange"]);
 
-export const isPolymorphic = (t: string): boolean =>
+const isPolymorphic = (t: string): boolean =>
 	ELEMENT.has(t) || ARRAY.has(t) || RANGE.has(t) || MULTIRANGE.has(t);
 
-export function unusable(t: string): string | null {
+function unusable(t: string): string | null {
 	if (isPolymorphic(t) || t === "anyenum" || t === "record") return null;
 	if (
 		/^(internal|cstring|trigger|event_trigger|language_handler|fdw_handler|index_am_handler|table_am_handler|tsm_handler|void|unknown|opaque|pg_ddl_command|anycompatiblenonarray)$/.test(
@@ -74,7 +74,7 @@ export function unusable(t: string): string | null {
 	return null;
 }
 
-export function instantiate(t: string, inst: Inst): string | null {
+function instantiate(t: string, inst: Inst): string | null {
 	if (ELEMENT.has(t)) return inst.elem;
 	if (ARRAY.has(t)) return `${inst.elem}[]`;
 	if (RANGE.has(t)) return inst.range;
@@ -109,7 +109,7 @@ const MORE_SAMPLES: { readonly [t: string]: readonly string[] } = {
 	int8: ["0", "1"],
 };
 
-export function samplesOf(type: string): readonly string[] {
+function samplesOf(type: string): readonly string[] {
 	if (type.endsWith("[]")) {
 		const elem = samplesOf(type.slice(0, -2));
 		if (!elem.length) return ["{}"];
@@ -120,14 +120,14 @@ export function samplesOf(type: string): readonly string[] {
 	return (MORE_SAMPLES[type] ?? sampleTexts(type)).slice(0, 2);
 }
 
-export function typeSql(t: string): string {
+function typeSql(t: string): string {
 	const m = /^(.*?)((\[\])*)$/.exec(t)!;
 	return `${m[1] === "char" ? '"char"' : m[1]}${m[2]}`;
 }
 
-export const literal = (s: string): string => `'${s.replace(/'/g, "''")}'`;
+const literal = (s: string): string => `'${s.replace(/'/g, "''")}'`;
 
-export interface Arg {
+interface Arg {
 	readonly type: string;
 	readonly s0: string;
 	readonly s1: string;
@@ -137,7 +137,7 @@ export interface Arg {
 const LIVE_BACKENDS = /^pg_stat_get_backend_/;
 const NO_BACKEND: readonly string[] = ["-1", "2147483647"];
 
-export function argOf(type: string, name = ""): Arg {
+function argOf(type: string, name = ""): Arg {
 	const nul = type === "record" ? "NULL::record" : `NULL::${typeSql(type)}`;
 	if (type === "record")
 		return {
@@ -171,7 +171,7 @@ export type Calls =
 	| { readonly calls: readonly Call[] }
 	| { readonly skip: string };
 
-export function arities(p: Proc): (readonly string[])[] {
+function arities(p: Proc): (readonly string[])[] {
 	if (p.variadic) {
 		const fixed = p.args.slice(0, -1);
 		return [
@@ -283,7 +283,7 @@ export function callsOfSig(
 	return calls.length ? { calls } : { skip: "no instantiation" };
 }
 
-export const KEYWORD_FORMS: ReadonlySet<string> = new Set([
+const KEYWORD_FORMS: ReadonlySet<string> = new Set([
 	"current_date",
 	"current_time",
 	"current_timestamp",
@@ -297,7 +297,7 @@ export const KEYWORD_FORMS: ReadonlySet<string> = new Set([
 	"system_user",
 ]);
 
-export const QUALIFIED: ReadonlySet<string> = new Set([
+const QUALIFIED: ReadonlySet<string> = new Set([
 	"extract",
 	"position",
 	"normalize",
@@ -315,7 +315,7 @@ export const NEEDS_CONTEXT: { readonly [name: string]: string } = {
 	merge_action: "needs-context: MERGE … RETURNING",
 };
 
-export interface Column {
+interface Column {
 	readonly expr: string;
 	readonly variant: string;
 }
@@ -327,7 +327,7 @@ export interface Statement {
 	readonly tail: string;
 }
 
-export function variants(
+function variants(
 	args: readonly Arg[],
 ): { readonly variant: string; readonly values: readonly string[] }[] {
 	const out = [{ variant: "s0", values: args.map((a) => a.s0) }];
@@ -342,7 +342,7 @@ export function variants(
 	return out;
 }
 
-export function callSql(
+function callSql(
 	c: Pick<Call, "name" | "proc">,
 	args: readonly string[],
 ): string {
@@ -474,7 +474,7 @@ export function strictNulls(
 	return out;
 }
 
-export function takes(q: Proc, n: number): boolean {
+function takes(q: Proc, n: number): boolean {
 	if (q.variadic) return n >= q.args.length;
 	return n >= q.args.length - q.defaults && n <= q.args.length;
 }
@@ -502,7 +502,7 @@ export function flagDifferences(p: Proc, s: OurSig): string[] {
 	return out;
 }
 
-export const RUN_VOLATILE: ReadonlySet<string> = new Set([
+const RUN_VOLATILE: ReadonlySet<string> = new Set([
 	"random",
 	"random_normal",
 	"setseed",
@@ -564,7 +564,7 @@ export function literalUnion(r: Evaluated): string[] {
 	return list.filter((x): x is string => typeof x === "string").sort();
 }
 
-export function sigOf(v: TypeValue): OurSig | null {
+function sigOf(v: TypeValue): OurSig | null {
 	if (
 		!v ||
 		typeof v !== "object" ||

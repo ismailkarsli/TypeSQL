@@ -44,7 +44,7 @@ export interface Checked {
 	readonly ours: Evaluated;
 }
 
-export interface Failure {
+interface Failure {
 	readonly property: Property;
 	readonly detail: string;
 	readonly signature: string;
@@ -103,7 +103,7 @@ function propertyOf(d: Disagreement): Property {
 	return /typed non-null/.test(d.detail) ? "nulls" : "types";
 }
 
-export function corpus(): { sql: string; key: string }[] {
+function corpus(): { sql: string; key: string }[] {
 	const dir = join(here, "corpus");
 	if (!existsSync(dir)) return [];
 	return readdirSync(dir)
@@ -118,7 +118,7 @@ export function corpus(): { sql: string; key: string }[] {
 		}));
 }
 
-export function candidates(): Candidate[] {
+function candidates(): Candidate[] {
 	const path = join(here, "corpus/candidates.json");
 	return existsSync(path)
 		? (JSON.parse(readFileSync(path, "utf8")) as Candidate[])

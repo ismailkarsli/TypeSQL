@@ -3,7 +3,7 @@ export type ColInfo = { readonly type: string; readonly nullable: boolean };
 
 export type ColMap = { readonly [name: string]: ColInfo };
 
-export type ColEntry =
+type ColEntry =
 	| { readonly n: string; readonly t: ColInfo }
 	| { readonly star: ColMap };
 export type Cols = readonly ColEntry[];

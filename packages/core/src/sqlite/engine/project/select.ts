@@ -17,7 +17,6 @@ import type {
 	CteEntry,
 	NullLevel,
 	StarCells,
-	UniqueCells,
 } from "../binder/scope.js";
 import type { IsAggCall } from "../typer/functions.js";
 import type { Common, Info, TypeList, TypeOf } from "../typer/typeof.js";
@@ -164,7 +163,7 @@ type Renamed<
 			>
 	: R;
 
-export type ProjectBody<
+type ProjectBody<
 	B extends SelectBody,
 	DB,
 	Outer extends Scope,
@@ -466,7 +465,7 @@ type ValuesRows<
 		: never
 	: Acc;
 
-export type HasAgg<E, DB> = E extends { readonly t: string }
+type HasAgg<E, DB> = E extends { readonly t: string }
 	? IsAggCall<E, DB> extends true
 		? true
 		: E extends { readonly t: "sub" | "exists" | "insub" }
@@ -890,5 +889,3 @@ type OrderTerms<
 				: OrderTerms<O, C, N, Nx<I>>
 			: never
 	: true;
-
-export type { UniqueCells };

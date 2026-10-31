@@ -16,7 +16,7 @@ interface RegressionFixture {
 	close(): void;
 }
 
-export function regressionFixture(directory: string): RegressionFixture | null {
+function regressionFixture(directory: string): RegressionFixture | null {
 	if (!existsSync(join(directory, "sql"))) return null;
 	if (existsSync(join(directory, "data")))
 		return { directory, close: () => {} };
@@ -51,7 +51,7 @@ export function regressionFixture(directory: string): RegressionFixture | null {
 	}
 }
 
-export async function verifyRegressionData(url: string): Promise<void> {
+async function verifyRegressionData(url: string): Promise<void> {
 	const connection = new Connection(url);
 	try {
 		const columns = Array.from({ length: 16 }, (_, i) => `c${i} text`).join(

@@ -14,7 +14,7 @@ export type HexDigit =
 	| "D"
 	| "E"
 	| "F";
-export type Lower =
+type Lower =
 	| "a"
 	| "b"
 	| "c"

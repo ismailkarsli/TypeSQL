@@ -14,7 +14,7 @@ export interface CompletionItem {
 
 const MAX_ITEMS = 1000;
 
-export async function completions(
+async function completions(
 	schema: Schema,
 	ctx: Context,
 	dialect: Dialect = "postgres",
@@ -99,7 +99,7 @@ export async function completions(
 	return items;
 }
 
-export interface Range<T> {
+interface Range<T> {
 	readonly start: T;
 	readonly end: T;
 }
@@ -159,7 +159,7 @@ export async function completionsAt(
 }
 
 /** Escape inserted SQL for the TypeScript string literal it goes into. */
-export function escapeFor(quote: string, text: string): string {
+function escapeFor(quote: string, text: string): string {
 	const s = text.replaceAll("\\", "\\\\");
 	if (quote === "`") return s.replaceAll("`", "\\`").replaceAll("${", "\\${");
 	return s.replaceAll(quote, `\\${quote}`);
@@ -278,10 +278,7 @@ const RESERVED = new Set([
 	"with",
 ]);
 
-export function quoteIdent(
-	name: string,
-	dialect: Dialect = "postgres",
-): string {
+function quoteIdent(name: string, dialect: Dialect = "postgres"): string {
 	const bare =
 		dialect === "sqlite"
 			? /^[A-Za-z_][A-Za-z0-9_$]*$/.test(name) &&

@@ -16,7 +16,7 @@ export interface Baseline {
 
 export type Located = BaselineEntry & { readonly group: string };
 
-export const keyOf = (group: string, e: BaselineEntry): string =>
+const keyOf = (group: string, e: BaselineEntry): string =>
 	`${group} ${e.kind} ${e.hash}`;
 
 export const hashOf = (text: string): string =>
@@ -40,7 +40,7 @@ export function readBaseline(
 	return { pins, entries: (json[entriesKey] ?? {}) as Entries };
 }
 
-export function minus(a: Entries, b: Entries): Located[] {
+function minus(a: Entries, b: Entries): Located[] {
 	const counts = new Map<string, number>();
 	for (const [group, list] of Object.entries(b))
 		for (const e of list)

@@ -19,7 +19,7 @@ export function counts(
 	].join(" · ");
 }
 
-export function groups(list: readonly Located[], limit = 20): string {
+function groups(list: readonly Located[], limit = 20): string {
 	const n = new Map<string, number>();
 	for (const e of list) n.set(e.group, (n.get(e.group) ?? 0) + 1);
 	const sorted = [...n].sort(([a, x], [b, y]) => y - x || a.localeCompare(b));

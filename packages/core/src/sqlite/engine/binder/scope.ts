@@ -3,7 +3,7 @@ import type { Scope } from "../../../engine/types.js";
 import type { AnyErr, SqlError } from "../../../errors.js";
 import type { Table, View } from "../../../schema.js";
 import type { UnionList } from "../../../sql/splice.js";
-import type { Expr, FromItem, FromJoin, SelectStmt, TableRef } from "../ast.js";
+import type { Expr, FromItem, FromJoin, TableRef } from "../ast.js";
 import type { ProjectSelect } from "../project/select.js";
 import type { CheckBool, TypeOf } from "../typer/typeof.js";
 import type {
@@ -52,7 +52,7 @@ export type RefDisplay<Ref extends TableRef> = Ref["schema"] extends string
 	? `${Ref["schema"]}.${Ref["name"]}`
 	: Ref["name"];
 
-export type TableCols<Tbl> = {
+type TableCols<Tbl> = {
 	readonly [K in keyof Tbl & string as Lowercase<K>]: {
 		readonly type: Tbl[K] extends { readonly type: infer T } ? T : "any";
 		readonly nullable: Tbl[K] extends { readonly nullable: infer N } ? N : true;
@@ -60,7 +60,7 @@ export type TableCols<Tbl> = {
 	};
 };
 
-export type TableOrder<Tbl> =
+type TableOrder<Tbl> =
 	VisibleKeys<Tbl> extends infer V extends string
 		? [V] extends [never]
 			? []
@@ -131,7 +131,7 @@ export type RelationItem<Rel, Alias extends string> =
 				}
 			: null;
 
-export type BindTable<
+type BindTable<
 	DB,
 	Ref extends TableRef,
 	Alias extends string | null,
@@ -160,7 +160,7 @@ type BindDbTable<DB, Ref extends TableRef, Alias extends string | null> =
 			: SqlError<`no such table: ${RefDisplay<Ref>}`, null>
 		: SqlError<`no such table: ${RefDisplay<Ref>}`, null>;
 
-export type CellsItem<C extends readonly Cell[], Alias extends string | null> =
+type CellsItem<C extends readonly Cell[], Alias extends string | null> =
 	UniqueCells<C> extends infer U extends readonly Cell[]
 		? {
 				readonly alias: Alias;
@@ -171,7 +171,7 @@ export type CellsItem<C extends readonly Cell[], Alias extends string | null> =
 			}
 		: never;
 
-export type CellsMap<C extends readonly Cell[]> = {
+type CellsMap<C extends readonly Cell[]> = {
 	readonly [E in C[number] as Lowercase<E["n"]>]: {
 		readonly type: E["t"]["type"];
 		readonly nullable: E["t"]["nullable"];
@@ -629,7 +629,7 @@ type ResolveQualified<
 		: never
 	: SqlError<`no such column: ${Disp}`, null>;
 
-export type IsUnion<T, U = T> = T extends unknown
+type IsUnion<T, U = T> = T extends unknown
 	? [U] extends [T]
 		? false
 		: true
@@ -734,5 +734,3 @@ type ItemCells<
 				]
 			>
 	: Acc;
-
-export type { SelectStmt };

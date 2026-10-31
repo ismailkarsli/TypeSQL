@@ -4,7 +4,7 @@ import type { SqlError } from "../../../errors.js";
 import type { NameOf, RawOf } from "../tokens.js";
 import type { NotBareAlias, NotTableAlias, Reserved } from "./keywords.js";
 
-export type { AtEnd, EatOp, EatWord, Nx, Ok } from "../../../engine/parse.js";
+export type { AtEnd, Nx, Ok } from "../../../engine/parse.js";
 
 export type { Toks };
 
@@ -19,7 +19,7 @@ export type SyntaxErr<T extends Toks, I extends number> = SqlError<
 
 export type Name = { readonly v: string; readonly n: string };
 
-export type IdentAt<T extends Toks, I extends number, Not> = T[I] extends {
+type IdentAt<T extends Toks, I extends number, Not> = T[I] extends {
 	readonly k: "id";
 }
 	? Name & { readonly v: T[I]["v" & keyof T[I]]; readonly n: NameOf<T[I]> }

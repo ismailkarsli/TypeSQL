@@ -1,6 +1,6 @@
 import postgres from "postgres";
 
-export const ROW_CAP = 1000;
+const ROW_CAP = 1000;
 
 export interface Described {
 	readonly columns: readonly { readonly name: string; readonly type: number }[];
@@ -15,12 +15,6 @@ export interface ServerError {
 export type Ran =
 	| { readonly rows: readonly (readonly unknown[])[]; readonly count: number }
 	| { readonly error: ServerError };
-
-export interface Replayed {
-	readonly text: string;
-	readonly describe: Described | { readonly error: ServerError };
-	readonly run: Ran;
-}
 
 export class Connection {
 	readonly sql: postgres.Sql;
@@ -143,7 +137,7 @@ export class Connection {
 	}
 }
 
-export function serverError(e: unknown): ServerError {
+function serverError(e: unknown): ServerError {
 	const err = e as { code?: string; message?: string };
 	return {
 		code: typeof err.code === "string" ? err.code : "?????",
@@ -154,23 +148,7 @@ export function serverError(e: unknown): ServerError {
 export const isRejection = (e: ServerError): boolean =>
 	!/^(53|54|57|58|XX)/.test(e.code);
 
-export async function replay(
-	conn: Connection,
-	statements: readonly string[],
-	onEach?: (r: Replayed, i: number) => void | Promise<void>,
-): Promise<Replayed[]> {
-	const out: Replayed[] = [];
-	for (const [i, text] of statements.entries()) {
-		const describe = await conn.describe(text);
-		const run = await conn.run(text);
-		const r: Replayed = { text, describe, run };
-		out.push(r);
-		await onEach?.(r, i);
-	}
-	return out;
-}
-
-export function copyViaProgram(text: string, copyData = ""): string {
+function copyViaProgram(text: string, copyData = ""): string {
 	if (!/^\s*copy\b/i.test(text)) return text;
 	const from = /\bfrom\s+(stdin|stdout)\b/i;
 	if (from.test(text))

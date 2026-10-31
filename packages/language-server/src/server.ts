@@ -10,7 +10,7 @@ import {
 
 const BUDGET_MS = 150;
 
-export interface Peer {
+interface Peer {
 	readonly readable: Readable;
 	readonly writable: Writable;
 }
@@ -40,7 +40,7 @@ export function start(pipe: string): void {
 	);
 }
 
-export function serve(
+function serve(
 	client: Peer,
 	connector: Connector,
 	log: (message: string) => void,

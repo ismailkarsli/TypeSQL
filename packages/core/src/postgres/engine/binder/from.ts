@@ -53,7 +53,7 @@ export type BindFrom<
 			: L
 		: never;
 
-export type BindFromItem<
+type BindFromItem<
 	F extends FromItem,
 	DB,
 	Outer extends Scope,

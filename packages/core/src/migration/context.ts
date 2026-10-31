@@ -62,7 +62,7 @@ export type MigrationSchema<Up extends (...args: never[]) => unknown> =
 
 declare const MISSING_SCHEMA: unique symbol;
 /** The schema of a migration whose `up` doesn't return its context. */
-export type MissingSchema = { readonly [MISSING_SCHEMA]: true };
+type MissingSchema = { readonly [MISSING_SCHEMA]: true };
 type MissingSchemaError = SqlError<
 	"the previous migration's up() does not return its migration context, so its schema is unknown; end it with `return db`",
 	0

@@ -6,7 +6,7 @@ import {
 	ProbeSession,
 } from "../support/evaluate.js";
 
-export const here = import.meta.dirname;
+const here = import.meta.dirname;
 const HEAD = `import type { Canon } from "../canon.js";\n`;
 
 export function probeSession(name: string): ProbeSession {

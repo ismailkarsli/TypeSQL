@@ -3,18 +3,18 @@ export interface RelRef {
 	readonly name: string;
 }
 
-export interface ScopeItem {
+interface ScopeItem {
 	readonly name: string;
 	readonly rel: RelRef | null;
 	readonly columns: readonly string[] | null;
 }
 
-export interface Cte {
+interface Cte {
 	readonly name: string;
 	readonly columns: readonly string[] | null;
 }
 
-export type Expect =
+type Expect =
 	| { readonly kind: "none" }
 	| {
 			readonly kind: "relation";
@@ -58,8 +58,7 @@ const HOLE = /\$0(?![0-9])/y;
 const PUNCTUATION = /::|./sy;
 const OPERATOR = /(?:(?!--|\/\*)[+\-*/<>=~!@#%^&|`?])+/y;
 
-export const fold = (s: string): string =>
-	s.replace(/[A-Z]/g, (m) => m.toLowerCase());
+const fold = (s: string): string => s.replace(/[A-Z]/g, (m) => m.toLowerCase());
 
 function lex(text: string, offset: number): { toks: Tok[]; inside: boolean } {
 	const toks: Tok[] = [];

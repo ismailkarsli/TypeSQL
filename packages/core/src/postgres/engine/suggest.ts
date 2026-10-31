@@ -79,5 +79,3 @@ type ColumnsOf<DB, Rels> = {
 						: never;
 				}[keyof DB[K] & string];
 }[keyof DB & string];
-
-export type { IsRelation, RelCols };
