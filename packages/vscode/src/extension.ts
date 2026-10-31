@@ -4,12 +4,18 @@ import {
 	type Connector,
 	mayBeInSqlLiteral,
 	merge,
+	mergeTokens,
 	Session,
 	type CompletionItem as SqlItem,
 	type TypeScriptModules,
 	typescriptModules,
 } from "@typesql/language-server";
-import type { ExtensionAPI, TypeScriptSDK } from "typescript/vscode";
+import type {
+	ExtensionAPI,
+	Range,
+	SemanticTokens,
+	TypeScriptSDK,
+} from "typescript/vscode";
 import * as vscode from "vscode";
 
 const TYPESCRIPT_EXTENSION = "TypeScriptTeam.native-preview";
@@ -17,6 +23,7 @@ const NIGHTLY_EXTENSION = "TypeScriptTeam.vscode-typescript-nightly";
 const UPGRADE =
 	'Install the "TypeScript 7 Nightly" extension, or set "js/ts.tsdk.path" to a TypeScript 7.1 package and allow it.';
 const BUDGET_MS = 150;
+const HIGHLIGHT_BUDGET_MS = 500;
 const LANGUAGES = [
 	"typescript",
 	"typescriptreact",
@@ -61,6 +68,10 @@ export async function activate(
 		vscode.workspace
 			.getConfiguration("typesql")
 			.get<boolean>("completions.enable", true);
+	const highlighting = (): boolean =>
+		vscode.workspace
+			.getConfiguration("typesql")
+			.get<boolean>("semanticHighlighting.enable", true);
 	const textOf = (uri: string): string | undefined =>
 		vscode.workspace.textDocuments
 			.find((d) => d.uri.toString() === uri)
@@ -90,7 +101,7 @@ export async function activate(
 			return null;
 		try {
 			const started = Date.now();
-			const ours = await withBudget(s.complete(uri, position, text));
+			const ours = await withBudget(s.complete(uri, position, text), BUDGET_MS);
 			if (ours === "late") {
 				log.warn(`completions took longer than ${BUDGET_MS} ms; skipped`);
 				return null;
@@ -104,11 +115,58 @@ export async function activate(
 		}
 	};
 
+	// TypeScript's token types, read from VS Code once per server start; a
+	// failed read is retried on the next request.
+	let legend: Promise<readonly string[] | null> | undefined;
+	const legendFor = (uri: string): Promise<readonly string[] | null> => {
+		legend ??= Promise.resolve(
+			vscode.commands.executeCommand<vscode.SemanticTokensLegend | undefined>(
+				"vscode.provideDocumentSemanticTokensLegend",
+				vscode.Uri.parse(uri),
+			),
+		).then(
+			(l) => l?.tokenTypes ?? null,
+			() => null,
+		);
+		return legend.then((types) => {
+			if (!types) legend = undefined;
+			return types;
+		});
+	};
+	const highlight = async (
+		result: SemanticTokens | null,
+		uri: string,
+		range?: Range,
+	): Promise<SemanticTokens | null> => {
+		const s = session;
+		if (!s || !highlighting()) return result;
+		try {
+			const started = Date.now();
+			const [ours, types] = await Promise.all([
+				withBudget(s.highlight(uri), HIGHLIGHT_BUDGET_MS),
+				legendFor(uri),
+			]);
+			if (ours === "late") {
+				log.warn(
+					`SQL highlighting took longer than ${HIGHLIGHT_BUDGET_MS} ms; skipped`,
+				);
+				return result;
+			}
+			if (!ours || !types) return result;
+			log.trace(`${ours.length} SQL highlights in ${Date.now() - started} ms`);
+			return mergeTokens(result, ours, types, range);
+		} catch (e) {
+			log.error(e instanceof Error ? e : String(e));
+			return result;
+		}
+	};
+
 	if (hasMiddleware) {
 		const full = api as ExtensionAPI;
 		context.subscriptions.push(
 			full.onLanguageServerInitialized((sdk: TypeScriptSDK) => {
 				log.info(`TypeScript ${sdk.version} language server initialized`);
+				legend = undefined;
 				restart({
 					pipe: () => sdk.initializeAPIConnection(),
 					modules: () => [
@@ -130,6 +188,15 @@ export async function activate(
 					],
 				});
 			}),
+			full.registerLspMiddleware(
+				"textDocument/semanticTokens/full",
+				(result, { params }) => highlight(result, params.textDocument.uri),
+			),
+			full.registerLspMiddleware(
+				"textDocument/semanticTokens/range",
+				(result, { params }) =>
+					highlight(result, params.textDocument.uri, params.range),
+			),
 			full.registerLspMiddleware(
 				"textDocument/completion",
 				async (result, { params }) =>
@@ -244,10 +311,10 @@ function offsetOf(
 	return offset + p.character;
 }
 
-function withBudget<T>(p: Promise<T>): Promise<T | "late"> {
+function withBudget<T>(p: Promise<T>, ms: number): Promise<T | "late"> {
 	let timer: NodeJS.Timeout | undefined;
 	const late = new Promise<"late">(
-		(resolve) => (timer = setTimeout(() => resolve("late"), BUDGET_MS)),
+		(resolve) => (timer = setTimeout(() => resolve("late"), ms)),
 	);
 	return Promise.race([p, late]).finally(() => clearTimeout(timer));
 }

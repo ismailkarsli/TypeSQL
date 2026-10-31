@@ -39,11 +39,13 @@ export class CorePaths {
 
 	for(fileName: string): ((path: string) => boolean) | null {
 		const core = corePackage(fileName);
-		if (core === null)
-			this.log(`no @typesql/core found from ${dirname(fileName)}`);
-		else if (!this.logged.has(core)) {
-			this.logged.add(core);
-			this.log(`using @typesql/core at ${core}`);
+		const message =
+			core === null
+				? `no @typesql/core found from ${dirname(fileName)}`
+				: `using @typesql/core at ${core}`;
+		if (!this.logged.has(message)) {
+			this.logged.add(message);
+			this.log(message);
 		}
 		return core === null ? null : isCorePathIn(core);
 	}

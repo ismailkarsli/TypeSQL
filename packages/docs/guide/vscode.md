@@ -73,13 +73,21 @@ The extension colors the SQL inside the string: keywords, types, functions, stri
 
 Only the first argument is SQL, and only when it is a string or template literal.
 
-`.add()` and `.raw()` cover [migration files](./migrations) and the `migrations()` builder. Because other objects have an `add` method too, their string is SQL only when it starts with a statement keyword followed by a space, `;` or `(` (`CREATE TABLE`, `alter table`, `DO $$`), with a `(`, or with a comment. A template literal whose first line is empty also counts. `set.add("name")` stays a plain string. The query functions that `.add()` returns, such as `users("INSERT …")`, have names of your choosing: put `/* sql */` before their string.
+These rules read the text, so they color as soon as you type and need neither the TypeScript 7 extension nor `@typesql/core`. `.add()` and `.raw()` cover [migration files](./migrations) and the `migrations()` builder. Because other objects have an `add` method too, their string counts only when it starts with a statement keyword followed by a space, `;` or `(` (`CREATE TABLE`, `alter table`, `DO $$`), with a `(`, or with a comment. A template literal whose first line is empty also counts.
 
-Highlighting reads the text, not the types. It needs neither the TypeScript 7 extension nor `@typesql/core`, and it also colors calls of other `sql` functions. If your `sql` has another name, such as `camel` or `admin`, put `/* sql */` before the string.
+### By type
+
+With the TypeScript 7 extension and `@typesql/core` in the project, the extension then checks each call's type and corrects the colors, so in the end only TypeSQL's functions are SQL:
+
+- A call is SQL when its function comes from TypeSQL, whatever its name: `const camel = createSql<DB>(postgres)` makes `camel("…")` SQL, and in a migration so does `users("INSERT …")` on the context that `db.add()` returns. Their `.fragment()`, `.as()`, `.prepare()` and `.raw()` are SQL too, and so is `.add()` on a migration context or `migrations()`.
+- A call that the rules above color but that isn't TypeSQL's, such as your own `sql()` function or `set.add("drop it")`, goes back to a plain string.
+- Strings after `/* sql */` stay SQL either way.
+
+The corrections are [semantic tokens](https://code.visualstudio.com/api/language-extensions/semantic-highlight-guide): they appear a moment after an edit, and need a theme with semantic highlighting (Dark+, Light+ and most popular themes have it; `"editor.semanticHighlighting.enabled": true` turns it on for others). In a string that the rules didn't color, table and column names take your theme's variable color. Set `"typesql.semanticHighlighting.enable": false` to keep only the text rules.
 
 ## How it works
 
-The extension asks the TypeScript language server that is already running (no second TypeScript process) for the `DB` type of the `sql()` call at the cursor, and scans the text before the cursor for keywords, FROM items, aliases and CTEs. It never evaluates the statement's types, so a request usually takes 10 to 30 ms. A request that fails or takes longer than 150 ms adds nothing.
+The extension asks the TypeScript language server that is already running (no second TypeScript process) for the `DB` type of the `sql()` call at the cursor, and scans the text before the cursor for keywords, FROM items, aliases and CTEs. It never evaluates the statement's types, so a request usually takes 10 to 30 ms. A request that fails or takes longer than 150 ms adds nothing. For highlighting, it reads the types of every call with a string argument in one request each time TypeScript sends the file's semantic tokens, and adds its tokens to them. That usually takes under 50 ms; a request that takes longer than 500 ms keeps TypeScript's tokens as they are.
 
 ## Troubleshooting
 

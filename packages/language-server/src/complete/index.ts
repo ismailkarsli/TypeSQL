@@ -3,8 +3,10 @@ import type { EditorKinds } from "./call.js";
 export {
 	type Dialect,
 	type EditorKinds,
+	isCoreRef,
 	type SqlCall,
 	sqlCallAt,
+	textOf,
 } from "./call.js";
 export {
 	type CompletionItem,
@@ -35,6 +37,7 @@ export function editorKinds(
 		return v;
 	};
 	return {
+		Identifier: k("Identifier"),
 		CallExpression: k("CallExpression"),
 		PropertyAccessExpression: k("PropertyAccessExpression"),
 		StringLiteral: k("StringLiteral"),

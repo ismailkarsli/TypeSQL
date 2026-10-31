@@ -66,6 +66,11 @@
 					"type": "boolean",
 					"default": true,
 					"description": "Suggest tables, views, schemas and columns inside sql() strings."
+				},
+				"typesql.semanticHighlighting.enable": {
+					"type": "boolean",
+					"default": true,
+					"description": "Use types to color SQL: highlight the strings of TypeSQL's sql functions under any name, and show other functions' strings as plain strings. Needs the TypeScript 7 extension and a theme with semantic highlighting."
 				}
 			}
 		}

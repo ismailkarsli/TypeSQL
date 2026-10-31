@@ -14,6 +14,7 @@ import type {
 } from "typescript/async";
 
 export interface EditorKinds {
+	readonly Identifier: number;
 	readonly CallExpression: number;
 	readonly PropertyAccessExpression: number;
 	readonly StringLiteral: number;
@@ -132,7 +133,7 @@ function callAt(
 	return found;
 }
 
-function textOf(
+export function textOf(
 	file: SourceFile,
 	literal: Node,
 	kinds: EditorKinds,
@@ -186,7 +187,7 @@ const escapes = (s: string): string => {
 	});
 };
 
-async function isCoreRef(
+export async function isCoreRef(
 	type: Type,
 	names: readonly string[],
 	isCorePath: (path: string) => boolean,

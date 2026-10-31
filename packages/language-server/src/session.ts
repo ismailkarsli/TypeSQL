@@ -10,6 +10,7 @@ import {
 	editorKinds,
 } from "./complete/index.js";
 import { CorePaths } from "./core.js";
+import { type Highlight, highlightsIn } from "./highlight/index.js";
 
 export interface TypeScriptModules {
 	readonly API: typeof API;
@@ -183,6 +184,33 @@ export class Session {
 				}
 			}
 			return await run(snapshot);
+		} finally {
+			void snapshot.dispose();
+		}
+	}
+
+	/**
+	 * SQL highlights for `uri` as the language server sees it, or null when the
+	 * file can't reach @typesql/core or has no project.
+	 */
+	async highlight(uri: string): Promise<Highlight[] | null> {
+		if (!uri.startsWith("file:")) return null;
+		const fileName = fileURLToPath(uri);
+		const isCorePath = this.cores.for(fileName);
+		if (!isCorePath) return null;
+		const connection = await this.connect(uri, fileName);
+		if (!connection) return null;
+		const snapshot = await connection.api.getCurrentLanguageServerSnapshot();
+		try {
+			const project = await snapshot.getDefaultProjectForFile({ uri });
+			if (!project) return null;
+			return await highlightsIn(
+				project.program,
+				project.checker,
+				connection.kinds,
+				{ uri },
+				isCorePath,
+			);
 		} finally {
 			void snapshot.dispose();
 		}
