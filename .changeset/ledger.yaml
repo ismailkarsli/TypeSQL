@@ -452,6 +452,10 @@
   dir: packages/language-server
   intents:
     - warm-spoons-sleep
+"@typesql/language-server@0.0.9":
+  dir: packages/language-server
+  intents:
+    - curvy-dogs-camp
 "@typesql/pg@0.0.2":
   dir: packages/pg
   intents:
@@ -751,3 +755,7 @@ typesql@0.1.0:
   dir: packages/vscode
   intents:
     - smooth-walls-hammer
+typesql@0.1.1:
+  dir: packages/vscode
+  intents:
+    - clever-jokes-judge
