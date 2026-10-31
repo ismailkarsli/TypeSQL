@@ -263,6 +263,11 @@
   intents:
     - vast-teeth-smile
     - wild-eels-walk
+"@typesql/core@1.0.1":
+  dir: packages/core
+  intents:
+    - mighty-spiders-explain
+    - wide-bats-play
 "@typesql/drizzle@0.0.2":
   dir: packages/drizzle
   intents:

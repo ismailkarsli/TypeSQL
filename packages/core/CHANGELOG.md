@@ -1,5 +1,13 @@
 # @typesql/core
 
+## 1.0.1
+
+### Patch Changes
+
+- Accept `sql.json()` over a recursive JSON type such as zod's `z.core.util.JSONType`, which failed with TS5115 ("Instantiations of the following types appear infinitely circular").
+
+- Copy a `$` that is not followed by digits, as in the regex `'[0-9]+$'` or a `$body$` dollar quote, through unchanged when a fragment is spliced into a query, and leave `$n` inside strings, quoted identifiers, comments and dollar quotes alone when counting and renumbering parameters, instead of failing with TS2589 or an "unterminated quoted string" error.
+
 ## 1.0.0
 
 ### Major Changes

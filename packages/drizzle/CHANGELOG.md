@@ -1,5 +1,12 @@
 # @typesql/drizzle
 
+## 0.3.8
+
+### Patch Changes
+
+- Updated dependencies:
+  - @typesql/core@1.0.1
+
 ## 0.3.7
 
 ### Patch Changes
