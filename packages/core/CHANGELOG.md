@@ -1,5 +1,15 @@
 # @typesql/core
 
+## 1.0.0
+
+### Major Changes
+
+- Remove the Arr, Nullable, Generated and NullableGenerated schema helpers: write Col<"int4[]">, Col<"text", { nullable: true }>, Col<"int4", { hasDefault: true }> and Col<"text", { nullable: true; hasDefault: true }> instead.
+
+### Patch Changes
+
+- Update the README Playground examples to write columns with Col options instead of the removed Nullable and Generated helpers.
+
 ## 0.10.1
 
 ### Patch Changes

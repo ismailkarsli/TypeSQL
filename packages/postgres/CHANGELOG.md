@@ -1,5 +1,14 @@
 # @typesql/postgres
 
+## 0.3.2
+
+### Patch Changes
+
+- Update the README Playground examples to write columns with Col options instead of the removed Nullable and Generated helpers.
+
+- Updated dependencies:
+  - @typesql/core@1.0.0
+
 ## 0.3.1
 
 ### Patch Changes

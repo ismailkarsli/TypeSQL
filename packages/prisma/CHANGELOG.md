@@ -1,5 +1,16 @@
 # @typesql/prisma
 
+## 0.3.7
+
+### Patch Changes
+
+- Write generated schema columns as Col<type, { nullable: true; hasDefault: true }> instead of the removed Nullable, Generated and NullableGenerated helpers.
+
+- Update the README Playground examples to write columns with Col options instead of the removed Nullable and Generated helpers.
+
+- Updated dependencies:
+  - @typesql/core@1.0.0
+
 ## 0.3.6
 
 ### Patch Changes

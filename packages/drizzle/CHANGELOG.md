@@ -1,5 +1,14 @@
 # @typesql/drizzle
 
+## 0.3.7
+
+### Patch Changes
+
+- Use Col flags instead of the removed Nullable and Generated helpers in schema types and examples.
+
+- Updated dependencies:
+  - @typesql/core@1.0.0
+
 ## 0.3.6
 
 ### Patch Changes

@@ -1,5 +1,18 @@
 # @typesql/cli
 
+## 0.2.0
+
+### Minor Changes
+
+- Add typesql migrate generate, which writes the schema of the last migration to db.ts, and write it after migrate up, down and latest unless --no-generate or generate: false is set; schemaFile and --out change the path.
+
+### Patch Changes
+
+- Updated dependencies:
+  - @typesql/core@1.0.0
+  - @typesql/pg@0.4.2
+  - @typesql/sqlite@0.1.2
+
 ## 0.1.4
 
 ### Patch Changes

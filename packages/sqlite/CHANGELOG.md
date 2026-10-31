@@ -1,5 +1,16 @@
 # @typesql/sqlite
 
+## 0.1.2
+
+### Patch Changes
+
+- Use Col flags instead of the removed Nullable and Generated helpers in schema types and examples.
+
+- Update the README Playground examples to write columns with Col options instead of the removed Nullable and Generated helpers.
+
+- Updated dependencies:
+  - @typesql/core@1.0.0
+
 ## 0.1.1
 
 ### Patch Changes

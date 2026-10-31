@@ -1,5 +1,16 @@
 # @typesql/pg
 
+## 0.4.2
+
+### Patch Changes
+
+- Write generated schema columns as Col<type, { nullable: true; hasDefault: true }> instead of the removed Nullable, Generated and NullableGenerated helpers.
+
+- Update the README Playground examples to write columns with Col options instead of the removed Nullable and Generated helpers.
+
+- Updated dependencies:
+  - @typesql/core@1.0.0
+
 ## 0.4.1
 
 ### Patch Changes

@@ -12,6 +12,10 @@
   intents:
     - early-beds-hear
     - old-ravens-deny
+"@typesql/cli@0.2.0":
+  dir: packages/cli
+  intents:
+    - empty-jars-push
 "@typesql/core@0.0.2":
   dir: packages/core
   intents:
@@ -254,6 +258,11 @@
   intents:
     - lazy-donkeys-unite
     - tame-snails-join
+"@typesql/core@1.0.0":
+  dir: packages/core
+  intents:
+    - vast-teeth-smile
+    - wild-eels-walk
 "@typesql/drizzle@0.0.2":
   dir: packages/drizzle
   intents:
@@ -303,6 +312,10 @@
     - silent-apes-add
     - slow-maps-dance
     - tall-foxes-camp
+"@typesql/drizzle@0.3.7":
+  dir: packages/drizzle
+  intents:
+    - quick-crabs-itch
 "@typesql/kysely@0.0.2":
   dir: packages/kysely
   intents:
@@ -477,6 +490,11 @@
     - olive-bears-know
     - purple-queens-ask
     - wicked-carrots-run
+"@typesql/pg@0.4.2":
+  dir: packages/pg
+  intents:
+    - fair-rats-rule
+    - wild-eels-walk
 "@typesql/postgres@0.0.2":
   dir: packages/postgres
   intents:
@@ -538,6 +556,10 @@
   intents:
     - heavy-queens-pretend
     - olive-bears-know
+"@typesql/postgres@0.3.2":
+  dir: packages/postgres
+  intents:
+    - wild-eels-walk
 "@typesql/prisma@0.0.2":
   dir: packages/prisma
   intents:
@@ -596,6 +618,11 @@
   intents:
     - bright-grapes-retire
     - olive-bears-know
+"@typesql/prisma@0.3.7":
+  dir: packages/prisma
+  intents:
+    - fair-rats-rule
+    - wild-eels-walk
 "@typesql/sqlite@0.0.1":
   dir: packages/sqlite
   intents:
@@ -614,6 +641,11 @@
     - lucky-suns-film
     - nice-cooks-cough
     - olive-bears-know
+"@typesql/sqlite@0.1.2":
+  dir: packages/sqlite
+  intents:
+    - quick-crabs-itch
+    - wild-eels-walk
 typesql@0.0.1:
   dir: packages/vscode
   intents:
