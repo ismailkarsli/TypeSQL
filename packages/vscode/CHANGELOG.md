@@ -1,5 +1,13 @@
 # typesql
 
+## 0.0.11
+
+### Patch Changes
+
+- With the TypeScript 7 extension, types decide what is SQL: strings of TypeSQL calls are highlighted under any name, such as camel("…") from createSql or users("INSERT …") in a migration, and other functions' strings that look like SQL, such as your own sql("…"), stay plain; set typesql.semanticHighlighting.enable to false to keep highlighting by name only.
+
+- Highlight SQL in migration files: db.add(…), db.raw<Schema>(…) and migrations().add(…) strings that start like a SQL statement, and stop TypeScript colors after a member call such as db.mySql("…") from leaking into the following lines.
+
 ## 0.0.10
 
 ### Patch Changes

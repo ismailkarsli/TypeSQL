@@ -1,5 +1,11 @@
 # @typesql/language-server
 
+## 0.0.8
+
+### Patch Changes
+
+- Add Session.highlight, which returns SQL highlights for the strings of TypeSQL calls in a file by their type, and mergeTokens, which adds them to a semantic tokens response.
+
 ## 0.0.7
 
 ### Patch Changes

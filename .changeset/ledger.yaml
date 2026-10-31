@@ -414,6 +414,10 @@
     - vast-cups-float
     - wet-jokes-count
     - wise-icons-drop
+"@typesql/language-server@0.0.8":
+  dir: packages/language-server
+  intents:
+    - warm-spoons-sleep
 "@typesql/pg@0.0.2":
   dir: packages/pg
   intents:
@@ -654,6 +658,11 @@ typesql@0.0.10:
   dir: packages/vscode
   intents:
     - lucky-buses-sing
+typesql@0.0.11:
+  dir: packages/vscode
+  intents:
+    - neat-sheep-look
+    - spicy-buses-smell
 typesql@0.0.2:
   dir: packages/vscode
   intents:

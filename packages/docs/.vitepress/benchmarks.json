@@ -7,7 +7,7 @@
 	},
 	"environment": {
 		"node": "v26.13.0",
-		"cpu": "INTEL(R) XEON(R) PLATINUM 8573C",
+		"cpu": "AMD EPYC 7763 64-Core Processor",
 		"cpus": 4
 	},
 	"compilers": {
@@ -17,31 +17,31 @@
 	"throughput": {
 		"tsrs": {
 			"instantiationsPerQuery": 7991,
-			"checkMsPerQuery": 1.92,
-			"queriesPerSec": 521
+			"checkMsPerQuery": 1.91,
+			"queriesPerSec": 523
 		},
 		"tsc": {
 			"instantiationsPerQuery": 7991,
-			"checkMsPerQuery": 6.07,
-			"queriesPerSec": 165
+			"checkMsPerQuery": 6.33,
+			"queriesPerSec": 158
 		}
 	},
 	"instantiationsPerQuery": "7.99K",
-	"speedup": 3.2,
+	"speedup": 3.3,
 	"rows": {
 		"case1": {
 			"instantiations": "3.03M",
-			"tsrs": 0.727,
-			"tsc": 2.299
+			"tsrs": 0.725,
+			"tsc": 2.4
 		},
 		"case1 source": {
 			"instantiations": "3.2M",
-			"tsrs": 0.752,
-			"tsc": 2.561
+			"tsrs": 0.717,
+			"tsc": 2.685
 		}
 	},
 	"runtime": {
-		"microsecondsPerQuery": "4.77",
-		"millisecondsPerWorkload": "1.81"
+		"microsecondsPerQuery": "4.74",
+		"millisecondsPerWorkload": "1.79"
 	}
 }
