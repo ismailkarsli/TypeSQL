@@ -82,7 +82,7 @@ export function viewNames(schema: string): string[] {
 }
 
 const BLOCK =
-	/^[ \t]*(?:model|view)[ \t]+([A-Za-z_][A-Za-z0-9_]*)[ \t]*\{([^]*?)^[ \t]*\}/gm;
+	/^[ \t]*(?:model|view)[ \t]+([A-Za-z_][A-Za-z0-9_]*)[ \t]*\{([\s\S]*?)^[ \t]*\}/gm;
 const FIELD =
 	/^[ \t]*([A-Za-z_][A-Za-z0-9_]*)[ \t]+(Unsupported\("(?:[^"\\]|\\.)*"\)(?:\[\])?\??|\S+)(.*)$/;
 const UNSUPPORTED = /^Unsupported\("((?:[^"\\]|\\.)*)"\)(\[\])?(\?)?$/;

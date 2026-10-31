@@ -1,6 +1,7 @@
 // A call whose first argument is a string, optionally after comments such as
 // the `/* sql */` marker.
-const CALL = /[A-Za-z_$][\w$]*(?:<[^()]*>)?\(\s*(?:\/\*[^]*?\*\/\s*)*(["'`])/g;
+const CALL =
+	/[A-Za-z_$][\w$]*(?:<[^()]*>)?\(\s*(?:\/\*[\s\S]*?\*\/\s*)*(["'`])/g;
 const WINDOW = 20_000;
 
 /**
