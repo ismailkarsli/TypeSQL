@@ -9,7 +9,11 @@ releases. See pnpm's [release management](https://pnpm.io/versioning) docs for t
 
 The published packages are `@typesql/core`, `@typesql/pg`, `@typesql/postgres`,
 `@typesql/kysely`, `@typesql/drizzle`, `@typesql/prisma`, `@typesql/sqlite`, `@typesql/cli`
-and `@typesql/language-server`. `@typesql/bench` and
+and `@typesql/language-server`. All but `@typesql/language-server` form a fixed group
+(`versioning.fixed` in `pnpm-workspace.yaml`): they always share one version, and a release of
+any of them releases all of them, at the highest bump among their intents. Users install them
+at the same version. `@typesql/language-server` loads the user's own `@typesql/core` at runtime,
+so it keeps its own version, as does the VS Code extension. `@typesql/bench` and
 `@typesql/docs` are private: they are never published, but they still get a version and a
 committed `CHANGELOG.md` whenever a package they depend on is released. The VS Code extension
 (`packages/vscode`, package name `typesql`) is private on npm too, and is published to the
@@ -41,7 +45,8 @@ A parameter tested with `IS NULL` or `IS NOT NULL`, as in `($1::text IS NULL OR 
 - The summary becomes the changelog entry word for word. Write one sentence on the behaviour a
   user now sees, with identifiers in backticks; leave out the implementation.
 - Name only the packages whose code changed. Packages that depend on them through
-  `workspace:*` are bumped automatically and get an "Updated dependencies" entry.
+  `workspace:*` are bumped automatically and get an "Updated dependencies" entry, and the rest
+  of the fixed group moves to the same version.
 - One change, one intent. A change that spans packages lists all of them in one file (as
   `.changeset/wise-snails-clean.md` does for the five integration packages).
 - To fix a summary before it is released, edit the intent file.
@@ -263,12 +268,13 @@ Changelogs are not published to npm. pnpm's default `registry` changelog storage
 `versioning.changelog.storage: repository`: `pnpm version -r` writes each package's
 `CHANGELOG.md` into the repository instead, and since no `files` field lists it, `pnpm publish`
 leaves it out. Keep it out of `files`. The changelogs start at the first release made in this
-mode; earlier entries are in the GitHub releases. Other versioning settings (fixed groups,
-ignored packages, lanes) would go under the same `versioning:` key; the repository uses the
-defaults.
+mode; earlier entries are in the GitHub releases. The fixed group sits under the same
+`versioning:` key; other versioning settings (ignored packages, lanes) would go there too, and the
+repository uses their defaults.
 
 CI runs `pnpm change check`, which fails when an intent names a package that does not exist or
-the committed versions break a configured versioning rule.
+the committed versions break a configured versioning rule, such as fixed-group packages
+with different versions.
 
 ## Pitfalls
 

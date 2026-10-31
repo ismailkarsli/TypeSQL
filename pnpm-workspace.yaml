@@ -9,3 +9,12 @@ allowBuilds:
 versioning:
   changelog:
     storage: repository
+  fixed:
+    - - "@typesql/core"
+      - "@typesql/pg"
+      - "@typesql/postgres"
+      - "@typesql/kysely"
+      - "@typesql/drizzle"
+      - "@typesql/prisma"
+      - "@typesql/sqlite"
+      - "@typesql/cli"
