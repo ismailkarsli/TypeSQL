@@ -1,27 +1,22 @@
 import type { ParamsType, RowType } from "@typesql/core";
-import {
-	type Col,
-	type Generated,
-	type Nullable,
-	postgres,
-} from "@typesql/core/postgres";
+import { type Col, postgres } from "@typesql/core/postgres";
 import { createSql, type PrismaRawClient } from "@typesql/prisma";
 
 interface DB {
 	users: {
-		id: Generated<"int4">;
+		id: Col<"int4", { hasDefault: true }>;
 		email: Col<"varchar">;
-		display_name: Nullable<"text">;
-		role: Generated<"Role">;
-		balance: Generated<"numeric">;
-		created_at: Generated<"timestamptz">;
+		display_name: Col<"text", { nullable: true }>;
+		role: Col<"Role", { hasDefault: true }>;
+		balance: Col<"numeric", { hasDefault: true }>;
+		created_at: Col<"timestamptz", { hasDefault: true }>;
 		updatedAt: Col<"timestamp">;
 	};
 	posts: {
 		id: Col<"uuid">;
 		author_id: Col<"int4">;
 		title: Col<"text">;
-		views: Generated<"int8">;
+		views: Col<"int8", { hasDefault: true }>;
 	};
 	$types: {
 		Role: "ADMIN" | "USER" | "guest";

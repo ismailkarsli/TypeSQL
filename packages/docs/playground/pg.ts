@@ -1,20 +1,20 @@
-import type { Col, Generated, Nullable } from "@typesql/core/postgres";
+import type { Col } from "@typesql/core/postgres";
 import { createSql } from "@typesql/pg";
 import { Pool } from "pg";
 
 interface DB {
 	users: {
-		id: Generated<"int4">;
+		id: Col<"int4", { hasDefault: true }>;
 		email: Col<"text">;
-		display_name: Nullable<"text">;
+		display_name: Col<"text", { nullable: true }>;
 		balance: Col<"numeric">;
-		created_at: Generated<"timestamptz">;
+		created_at: Col<"timestamptz", { hasDefault: true }>;
 	};
 	posts: {
-		id: Generated<"int8">;
+		id: Col<"int8", { hasDefault: true }>;
 		author_id: Col<"int4">;
 		title: Col<"text">;
-		published_at: Nullable<"timestamptz">;
+		published_at: Col<"timestamptz", { nullable: true }>;
 	};
 }
 

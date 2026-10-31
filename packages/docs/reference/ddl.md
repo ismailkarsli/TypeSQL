@@ -47,19 +47,19 @@ These statements change the schema type. They are parsed completely, so syntax T
 - `SELECT`, `INSERT`, `UPDATE`, `DELETE` (seed data) and `DECLARE … CURSOR` are checked against the schema at that point, without a schema effect.
 - Every other statement (indexes, sequences, triggers, extensions, grants, `$$` function bodies, transaction control, …) is accepted and skipped to the next `;`.
 
-## How columns map to `Col` / `Nullable` / `Generated`
+## How columns map to `Col`
 
 | Definition | Column |
 |---|---|
 | `email text NOT NULL` | `Col<"text">` |
-| `name text` / `name text NULL` | `Nullable<"text">` |
+| `name text` / `name text NULL` | `Col<"text", { nullable: true }>` |
 | `id int PRIMARY KEY` | `Col<"int4">` |
-| `id serial` (`serial4`, `bigserial` / `serial8`, `smallserial` / `serial2`) | `Generated<"int4">` (`int8`, `int2`) |
-| `id bigint GENERATED ALWAYS AS IDENTITY` / `BY DEFAULT AS IDENTITY` | `Generated<"int8">` |
-| `n int NOT NULL DEFAULT 0` | `Generated<"int4">` |
-| `nick text DEFAULT 'x'` | `NullableGenerated<"text">` |
-| `full text GENERATED ALWAYS AS (a \|\| b) STORED` | `NullableGenerated<"text">` (`Generated` with `NOT NULL`) |
-| `tags text[]`, `m mood` (an enum) | `Nullable<"text[]">`, `Nullable<"mood">` (so `"happy" \| "sad" \| null`) |
+| `id serial` (`serial4`, `bigserial` / `serial8`, `smallserial` / `serial2`) | `Col<"int4", { hasDefault: true }>` (`int8`, `int2`) |
+| `id bigint GENERATED ALWAYS AS IDENTITY` / `BY DEFAULT AS IDENTITY` | `Col<"int8", { hasDefault: true }>` |
+| `n int NOT NULL DEFAULT 0` | `Col<"int4", { hasDefault: true }>` |
+| `nick text DEFAULT 'x'` | `Col<"text", { nullable: true; hasDefault: true }>` |
+| `full text GENERATED ALWAYS AS (a \|\| b) STORED` | `Col<"text", { nullable: true; hasDefault: true }>` (`{ hasDefault: true }` with `NOT NULL`) |
+| `tags text[]`, `m mood` (an enum) | `Col<"text[]", { nullable: true }>`, `Col<"mood", { nullable: true }>` (so `"happy" \| "sad" \| null`) |
 
 The rules:
 

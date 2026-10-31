@@ -46,15 +46,11 @@ export {
 } from "./query.js";
 
 export type {
-	Arr,
 	Col,
 	ColDesc,
 	ColumnTypes,
 	Enum,
-	Generated,
 	Namespace,
-	Nullable,
-	NullableGenerated,
 	Table,
 	TypeName,
 	TypeRegistry,

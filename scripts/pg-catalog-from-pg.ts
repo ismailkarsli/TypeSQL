@@ -191,14 +191,14 @@ export async function generatePgCatalog(client: PgClient): Promise<string> {
 			relkind === "v" ? await views.notNull(oid) : cols.map((c) => c.notnull);
 		const body = cols.map(
 			(c, i) =>
-				`    ${key(c.name)}: ${notnull[i] ? "Col" : "Nullable"}<${JSON.stringify(c.type)}>;`,
+				`    ${key(c.name)}: Col<${JSON.stringify(c.type)}${notnull[i] ? "" : ", { nullable: true }"}>;`,
 		);
 
 		const lines = [`  ${key(name)}: View<{`, ...body, "  }>;"];
 		namespaces.set(schema, [...(namespaces.get(schema) ?? []), ...lines]);
 	}
 	return [
-		`import type { Col, Nullable, View } from "./column.js";`,
+		`import type { Col, View } from "../../schema.js";`,
 		"",
 		"export interface PgCatalogNamespace {",
 		...namespaces.get("pg_catalog")!,

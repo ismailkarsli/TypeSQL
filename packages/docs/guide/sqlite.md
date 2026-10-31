@@ -4,13 +4,13 @@ TypeSQL types SQLite statements with the `sqlite` dialect from `@typesql/core/sq
 
 ```ts
 import { createSql } from "@typesql/core";
-import { type Col, type Generated, type Nullable, sqlite } from "@typesql/core/sqlite";
+import { type Col, sqlite } from "@typesql/core/sqlite";
 
 interface DB {
   users: {
-    id: Generated<"integer">;
+    id: Col<"integer", { hasDefault: true }>;
     email: Col<"text">;
-    display_name: Nullable<"text">;
+    display_name: Col<"text", { nullable: true }>;
   };
 }
 
@@ -22,7 +22,7 @@ To run queries, use [`@typesql/sqlite`](../adapters/sqlite) (node:sqlite, better
 
 ## Schema
 
-Columns use SQLite's declared type names, as you would write them in `CREATE TABLE`: `Col<"integer">`, `Col<"varchar">`, `Nullable<"datetime">`. Names are case-insensitive and length arguments are dropped, so `VARCHAR(255)` is `"varchar"`. A column without a declared type is `"any"`.
+Columns use SQLite's declared type names, as you would write them in `CREATE TABLE`: `Col<"integer">`, `Col<"varchar">`, `Col<"datetime", { nullable: true }>`. Names are case-insensitive and length arguments are dropped, so `VARCHAR(255)` is `"varchar"`. A column without a declared type is `"any"`.
 
 A schema derived [from migrations](./migrations) follows SQLite's rules:
 
@@ -58,7 +58,7 @@ interface DB {
 
 | Flag | Effect |
 |---|---|
-| `nullable`, `hasDefault` | as in `Nullable<…>` and `Generated<…>` |
+| `nullable`, `hasDefault` | `NULL` allowed; has a default, so `INSERT` can leave it out |
 | `position` | the column's place in the table, from 0. With positions, `SELECT *` lists the columns in table order and `INSERT INTO t VALUES (…)` types each value against the right column. |
 | `rowid` | the column is the `INTEGER PRIMARY KEY`, so `rowid`, `oid` and `_rowid_` resolve to it |
 | `generated` | a `GENERATED ALWAYS AS` column: readable, but `INSERT` and `UPDATE` reject it, `sql.set` and `sql.values` don't accept it, and `INSERT INTO t VALUES (…)` skips it |
@@ -144,7 +144,7 @@ Nullability follows SQLite, which returns `NULL` in more places than PostgreSQL:
 
 Row keys are the column names SQLite reports:
 
-- A column reference is named as the column is declared: `SELECT ID FROM users` gives `id` if the table says `id`. `rowid`, `oid` and `_rowid_` are named `rowid`, or after the table's `INTEGER PRIMARY KEY` column when the schema marks it with `rowid: true` (introspection and migrations do). SQLite itself always names them after that column, so in a hand-written schema declare it as `Col<"integer", { rowid: true; hasDefault: true }>` rather than `Generated<"integer">` if you select `rowid`.
+- A column reference is named as the column is declared: `SELECT ID FROM users` gives `id` if the table says `id`. `rowid`, `oid` and `_rowid_` are named `rowid`, or after the table's `INTEGER PRIMARY KEY` column when the schema marks it with `rowid: true` (introspection and migrations do). SQLite itself always names them after that column, so in a hand-written schema declare it as `Col<"integer", { rowid: true; hasDefault: true }>` rather than `Col<"integer", { hasDefault: true }>` if you select `rowid`.
 - An expression without `AS` is named by its text, exactly as written: `SELECT count(*), 1 + 1` gives the keys `count(*)` and `1 + 1`.
 - Duplicate names in a subquery, CTE or view get SQLite's suffixes (`id`, `id:1`).
 - Unnamed `VALUES` columns are `column1`, `column2`, ….

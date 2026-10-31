@@ -154,7 +154,7 @@ The runtime entry point is separate from the type-only schema and builder APIs. 
 
 ```ts
 interface Before {
-	users: { id: Generated<"int4">; email: Col<"text"> };
+	users: { id: Col<"int4", { hasDefault: true }>; email: Col<"text"> };
 }
 type After = ApplyDdl<
 	Before,
@@ -164,4 +164,4 @@ type After = ApplyDdl<
 
 ## What is supported
 
-Tables, views, enums, schemas and `CREATE FUNCTION` change the schema. Indexes, triggers, grants and similar statements are accepted and leave it as it is. The [DDL reference](../reference/ddl) has the full list, how each column definition maps to `Col`, `Nullable` and `Generated`, and the known gaps.
+Tables, views, enums, schemas and `CREATE FUNCTION` change the schema. Indexes, triggers, grants and similar statements are accepted and leave it as it is. The [DDL reference](../reference/ddl) has the full list, how each column definition maps to `Col` and its flags, and the known gaps.

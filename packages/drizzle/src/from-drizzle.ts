@@ -1,9 +1,4 @@
-import type {
-	Col,
-	Generated,
-	Nullable,
-	NullableGenerated,
-} from "@typesql/core/postgres";
+import type { Col } from "@typesql/core/postgres";
 import type { ToCamelCase, ToSnakeCase } from "./casing.js";
 
 export interface FromDrizzleOptions {
@@ -143,10 +138,10 @@ type PgTypeOf<D extends ColumnConfig, Opts = {}, E = {}> = D extends {
 
 type Desc<T extends string, N, H> = N extends true
 	? H extends true
-		? NullableGenerated<T>
-		: Nullable<T>
+		? Col<T, { nullable: true; hasDefault: true }>
+		: Col<T, { nullable: true }>
 	: H extends true
-		? Generated<T>
+		? Col<T, { hasDefault: true }>
 		: Col<T>;
 
 type ColOf<D extends ColumnConfig, Opts, E> = Desc<
@@ -189,7 +184,7 @@ type ViewColumns<F, Opts, E> = {
 				F[K]["_"]["notNull"] extends true ? false : true,
 				false
 			>
-		: Nullable<"unknown">;
+		: Col<"unknown", { nullable: true }>;
 };
 
 type Relation<X, Opts, E> = X extends TableLike

@@ -166,7 +166,7 @@ export function fuzzSetup(): string[] {
 export function fuzzDbType(): string {
 	const rels = TABLES.map(
 		(t) =>
-			`${t.name}: { ${t.columns.map((c) => `${c.name}: __T.${c.nullable ? "Nullable" : "Col"}<${JSON.stringify(c.type)}>`).join("; ")} }`,
+			`${t.name}: { ${t.columns.map((c) => `${c.name}: __T.Col<${JSON.stringify(c.type)}${c.nullable ? ", { nullable: true }" : ""}>`).join("; ")} }`,
 	);
 	return `{ ${rels.join("; ")}; $types: { mood: ${MOOD.map((m) => JSON.stringify(m)).join(" | ")} } }`;
 }

@@ -12,15 +12,15 @@ npm install @typesql/core @typesql/sqlite
 
 ```ts
 import { DatabaseSync } from "node:sqlite";
-import type { Col, Generated, Nullable } from "@typesql/core/sqlite";
+import type { Col } from "@typesql/core/sqlite";
 import { createSql } from "@typesql/sqlite";
 
 interface DB {
   posts: {
-    id: Generated<"integer">;
+    id: Col<"integer", { hasDefault: true }>;
     author_id: Col<"integer">;
     title: Col<"text">;
-    body: Nullable<"text">;
+    body: Col<"text", { nullable: true }>;
   };
 }
 

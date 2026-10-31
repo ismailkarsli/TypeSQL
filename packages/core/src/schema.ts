@@ -17,16 +17,6 @@ export type Col<T extends TypeName, Flags extends Partial<ColDesc> = {}> = {
 	readonly hasDefault: Flags extends { hasDefault: true } ? true : false;
 };
 
-export type Nullable<T extends TypeName> = Col<T, { nullable: true }>;
-export type Generated<T extends TypeName> = Col<T, { hasDefault: true }>;
-export type NullableGenerated<T extends TypeName> = Col<
-	T,
-	{ nullable: true; hasDefault: true }
->;
-export type Arr<T extends TypeName, Flags extends Partial<ColDesc> = {}> = Col<
-	`${T}[]`,
-	Flags
->;
 export type Enum<
 	Name extends string,
 	Flags extends Partial<ColDesc> = {},

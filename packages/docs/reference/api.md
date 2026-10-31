@@ -225,10 +225,10 @@ The engine's other types are exported from `@typesql/core/postgres/engine`, so t
 
 ```ts
 Col<"text">
-Nullable<"text">
-Generated<"int4">
-NullableGenerated<"text">
-Arr<"int4">
+Col<"text", { nullable: true }>
+Col<"int4", { hasDefault: true }>
+Col<"text", { nullable: true; hasDefault: true }>
+Col<"int4[]">
 Enum<"mood">
 Json<Item[]>
 View<{ ...columns }>
@@ -236,7 +236,7 @@ interface DB { users: {...}; auth: { sessions: {...} }; $types: { mood: "a" | "b
 type WithCatalog = DB & PgCatalog;
 ```
 
-`Col`, `Nullable`, `Generated`, `NullableGenerated`, `Arr`, `Enum` and `View` are defined in `@typesql/core` and re-exported from `@typesql/core/postgres`, which adds `Json` and `PgCatalog`. A dialect lists its type names by augmenting `ColumnTypes`, so the editor completes them in `Col<"…">`.
+`Col`, `Enum` and `View` are defined in `@typesql/core` and re-exported from `@typesql/core/postgres`, which adds `Json` and `PgCatalog`. A dialect lists its type names by augmenting `ColumnTypes`, so the editor completes them in `Col<"…">`.
 
 `PgCatalog` is `{ pg_catalog: PgCatalogNamespace; information_schema: InformationSchemaNamespace }`. See [Declaring tables](../guide/schema) for type names and [System catalogs](../guide/schema#system-catalogs).
 
@@ -315,7 +315,7 @@ A dialect pairs the runtime that builds its `sql` function with that function's 
 
 `SqlOf<Postgres, DB, TM>` is `Sql<DB, TM>`, and `TransactionalSqlOf<Postgres, DB, TM>` is `TransactionalSql<DB, TM>`; the same holds for `Sqlite` and the `Sql` and `TransactionalSql` of `@typesql/core/sqlite`.
 
-`@typesql/core/sqlite` exports the same kinds of names as `@typesql/core/postgres`: `sqlite`, `Sql`, `TransactionalSql`, `RowOf`, `ParamsOf`, `Validate`, `ApplyDdl`, `migrations()` and `SqliteMigrations`, the write-helper types, the schema markers (`Col`, `Generated`, `Nullable`, `NullableGenerated`, `View`), and the type maps `DefaultTypeMap`, `BigIntTypeMap` and `DefaultParamTypeMap`. It also exports `ColFlags` (the [column flags](../guide/sqlite#column-flags)), `Json<T, Flags>` and `Typed<Type, T>` ([typed values](../guide/sqlite#typed-values)), and `Sig`, `SigFlags`, `FunctionRegistry` and the augmentable `FunctionCatalog` ([functions](../guide/sqlite#functions)). Its engine types are under `@typesql/core/sqlite/engine`. See [SQLite](../guide/sqlite).
+`@typesql/core/sqlite` exports the same kinds of names as `@typesql/core/postgres`: `sqlite`, `Sql`, `TransactionalSql`, `RowOf`, `ParamsOf`, `Validate`, `ApplyDdl`, `migrations()` and `SqliteMigrations`, the write-helper types, the schema markers (`Col`, `View`), and the type maps `DefaultTypeMap`, `BigIntTypeMap` and `DefaultParamTypeMap`. It also exports `ColFlags` (the [column flags](../guide/sqlite#column-flags)), `Json<T, Flags>` and `Typed<Type, T>` ([typed values](../guide/sqlite#typed-values)), and `Sig`, `SigFlags`, `FunctionRegistry` and the augmentable `FunctionCatalog` ([functions](../guide/sqlite#functions)). Its engine types are under `@typesql/core/sqlite/engine`. See [SQLite](../guide/sqlite).
 
 ## ORM packages
 

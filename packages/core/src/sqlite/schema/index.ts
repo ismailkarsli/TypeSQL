@@ -41,13 +41,6 @@ export type Col<T extends TypeName, F extends ColFlags = {}> = {
 	(F extends { readonly generated: true } ? { readonly generated: true } : {}) &
 	(F extends { readonly hidden: true } ? { readonly hidden: true } : {});
 
-export type Nullable<T extends TypeName> = Col<T, { nullable: true }>;
-export type Generated<T extends TypeName> = Col<T, { hasDefault: true }>;
-export type NullableGenerated<T extends TypeName> = Col<
-	T,
-	{ nullable: true; hasDefault: true }
->;
-
 export type Typed<Base extends string, T> = Shaped<Base, TsShape<T>>;
 
 export type Json<T, F extends ColFlags = {}> = Col<Typed<"json", T>, F>;

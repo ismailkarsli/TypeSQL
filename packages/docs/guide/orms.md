@@ -370,21 +370,21 @@ generator typesql {
 Every `prisma generate` then writes a `DB` interface with the database's own names (`@map`, `@@map`), native types (`@db.*`), database defaults, enums and `@@schema` namespaces:
 
 ```ts
-import type { Col, Nullable, Generated } from "@typesql/core/postgres";
+import type { Col } from "@typesql/core/postgres";
 
 export interface DB {
 	users: {
-		id: Generated<"int4">;
+		id: Col<"int4", { hasDefault: true }>;
 		email: Col<"varchar">;
-		display_name: Nullable<"text">;
-		role: Generated<"Role">;
+		display_name: Col<"text", { nullable: true }>;
+		role: Col<"Role", { hasDefault: true }>;
 		updatedAt: Col<"timestamp">;
 	};
 	posts: {
 		id: Col<"uuid">;
 		author_id: Col<"int4">;
 		title: Col<"text">;
-		views: Generated<"int8">;
+		views: Col<"int8", { hasDefault: true }>;
 	};
 	$types: {
 		Role: "ADMIN" | "USER" | "guest";
@@ -418,7 +418,7 @@ Only database defaults (`autoincrement()`, `now()`, `dbgenerated()`, literals) m
 |---|---|---|
 | `output` | required | a `.ts` file, or a directory (writes `index.ts`) |
 | `typeName` | `"DB"` | name of the exported interface |
-| `importFrom` | `"@typesql/core/postgres"` | module the `Col` / `Nullable` / … helpers are imported from |
+| `importFrom` | `"@typesql/core/postgres"` | module `Col`, `View` and `Typed` are imported from |
 
 ### Running queries
 

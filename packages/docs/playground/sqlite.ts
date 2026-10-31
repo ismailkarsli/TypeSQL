@@ -1,19 +1,19 @@
 import { DatabaseSync } from "node:sqlite";
-import type { Col, Generated, Nullable } from "@typesql/core/sqlite";
+import type { Col } from "@typesql/core/sqlite";
 import { createSql } from "@typesql/sqlite";
 
 interface DB {
 	users: {
-		id: Generated<"integer">;
+		id: Col<"integer", { hasDefault: true }>;
 		email: Col<"text">;
-		display_name: Nullable<"text">;
-		created_at: Generated<"datetime">;
+		display_name: Col<"text", { nullable: true }>;
+		created_at: Col<"datetime", { hasDefault: true }>;
 	};
 	posts: {
-		id: Generated<"integer">;
+		id: Col<"integer", { hasDefault: true }>;
 		author_id: Col<"integer">;
 		title: Col<"text">;
-		body: Nullable<"text">;
+		body: Col<"text", { nullable: true }>;
 	};
 }
 

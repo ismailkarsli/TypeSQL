@@ -825,7 +825,7 @@ const generated = introspect.generateSource({
 	],
 	enums: [],
 });
-assert.match(generated, /id: Generated<"int4">;/);
+assert.match(generated, /id: Col<"int4", \{ hasDefault: true \}>;/);
 
 const prismaGenerator = (await dist("prisma/dist/generator/api.js")) as {
 	readonly [name: string]: unknown;
@@ -864,7 +864,7 @@ assert.match(
 		},
 		{ dialect: "sqlite" },
 	),
-	/from "@typesql\/core\/sqlite";[\s\S]*id: Generated<"integer">;/,
+	/from "@typesql\/core\/sqlite";[\s\S]*id: Col<"integer", \{ hasDefault: true \}>;/,
 );
 
 const { execFileSync } = await import("node:child_process");

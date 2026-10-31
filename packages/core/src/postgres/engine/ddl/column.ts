@@ -1,17 +1,12 @@
-import type {
-	Col,
-	Generated,
-	Nullable,
-	NullableGenerated,
-} from "../../../schema.js";
+import type { Col } from "../../../schema.js";
 import type { ColumnDef } from "../ast.js";
 
 export type MkCol<Ty extends string, N, H> = N extends true
 	? H extends true
-		? NullableGenerated<Ty>
-		: Nullable<Ty>
+		? Col<Ty, { nullable: true; hasDefault: true }>
+		: Col<Ty, { nullable: true }>
 	: H extends true
-		? Generated<Ty>
+		? Col<Ty, { hasDefault: true }>
 		: Col<Ty>;
 
 export type DescOf<D extends ColumnDef> = MkCol<

@@ -1,12 +1,8 @@
 export type {
-	Arr,
 	Col,
 	ColDesc,
 	Enum,
-	Generated,
 	Namespace,
-	Nullable,
-	NullableGenerated,
 	Table,
 	TypeRegistry,
 	View,

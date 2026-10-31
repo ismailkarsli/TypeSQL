@@ -1,12 +1,7 @@
 export type * from "../../index.js";
 export type { SplicedText } from "../../sql/call.js";
 export type * from "../index.js";
-export type {
-	Col,
-	Generated,
-	Nullable,
-	NullableGenerated,
-} from "../schema/index.js";
+export type { Col } from "../schema/index.js";
 export type * as Ast from "./ast.js";
 export type { SqliteEngine } from "./engine.js";
 export type {

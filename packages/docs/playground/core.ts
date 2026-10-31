@@ -1,23 +1,18 @@
 import { createSql, type ParamsType, type RowType } from "@typesql/core";
-import {
-	type Col,
-	type Generated,
-	type Nullable,
-	postgres,
-} from "@typesql/core/postgres";
+import { type Col, postgres } from "@typesql/core/postgres";
 
 interface DB {
 	users: {
-		id: Generated<"int4">;
+		id: Col<"int4", { hasDefault: true }>;
 		email: Col<"text">;
-		display_name: Nullable<"text">;
-		created_at: Generated<"timestamptz">;
+		display_name: Col<"text", { nullable: true }>;
+		created_at: Col<"timestamptz", { hasDefault: true }>;
 	};
 	posts: {
-		id: Generated<"int8">;
+		id: Col<"int8", { hasDefault: true }>;
 		author_id: Col<"int4">;
 		title: Col<"text">;
-		body: Nullable<"text">;
+		body: Col<"text", { nullable: true }>;
 	};
 }
 

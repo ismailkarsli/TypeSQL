@@ -9,18 +9,18 @@ Each key of the interface is a table, and each column is declared with a helper:
 ```ts
 export interface DB {
 	users: {
-		id: Generated<"int4">;
+		id: Col<"int4", { hasDefault: true }>;
 		email: Col<"text">;
-		display_name: Nullable<"text">;
+		display_name: Col<"text", { nullable: true }>;
 		mood: Enum<"mood", { hasDefault: true }>;
-		created_at: Generated<"timestamptz">;
+		created_at: Col<"timestamptz", { hasDefault: true }>;
 	};
 	posts: {
-		id: Generated<"int8">;
+		id: Col<"int8", { hasDefault: true }>;
 		author_id: Col<"int4">;
 		title: Col<"text">;
-		body: Nullable<"text">;
-		tags: Generated<"text[]">;
+		body: Col<"text", { nullable: true }>;
+		tags: Col<"text[]", { hasDefault: true }>;
 	};
 	user_stats: View<{ user_id: Col<"int4">; posts: Col<"int8"> }>;
 	$types: { mood: "happy" | "neutral" | "sad" };
@@ -41,10 +41,10 @@ export const sql = createSql<DB>(postgres);
 | Helper | Meaning |
 |---|---|
 | `Col<"text">` | `NOT NULL`, no default |
-| `Nullable<"text">` | `NULL` allowed |
-| `Generated<"int4">` | has a default (serial, identity, `DEFAULT …`), so it is optional in `INSERT` |
-| `NullableGenerated<"text">` | both: `NULL` allowed and has a default |
-| `Arr<"int4">` | an array column, `int4[]` (same as `Col<"int4[]">`) |
+| `Col<"text", { nullable: true }>` | `NULL` allowed |
+| `Col<"int4", { hasDefault: true }>` | has a default (serial, identity, `DEFAULT …`), so it is optional in `INSERT` |
+| `Col<"text", { nullable: true; hasDefault: true }>` | both: `NULL` allowed and has a default |
+| `Col<"int4[]">` | an array column; the flags work as for any column |
 | `Enum<"mood">` | a column of an enum type, with its values listed under `$types` |
 | `Json<T>` | a `jsonb` column holding `T`; see [typed JSON columns](#typed-json-columns) |
 | `View<{ … }>` | a view: you can read from it, but `INSERT`, `UPDATE` and `DELETE` on it are errors |
@@ -66,7 +66,7 @@ type HistoryItem = { at: string; state: { value: number; note?: string } };
 
 interface DB {
 	portfolio: {
-		id: Generated<"int4">;
+		id: Col<"int4", { hasDefault: true }>;
 		name: Col<"text">;
 		history: Json<HistoryItem[], { hasDefault: true }>;
 		settings: Json<{ theme: "dark" | "light" }, { nullable: true }>;

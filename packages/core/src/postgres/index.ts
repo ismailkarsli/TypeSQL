@@ -19,13 +19,9 @@ export {
 	type ValidateDdl,
 } from "./migrations.js";
 export type {
-	Arr,
 	Col,
 	Enum,
-	Generated,
 	Json,
-	Nullable,
-	NullableGenerated,
 	PgCatalog,
 	View,
 } from "./schema/index.js";

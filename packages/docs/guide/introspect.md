@@ -48,7 +48,7 @@ The file has the real Postgres types: `timestamptz`, `date` and `timestamp` stay
 | view, materialized view | `View<{ … }>` (read-only) |
 | partitioned table, partition, foreign table | a table |
 | `NOT NULL` column, or a domain with `NOT NULL` | `Col` |
-| `DEFAULT`, `serial`, identity, `GENERATED ALWAYS AS (…) STORED` | `Generated`: optional in `INSERT` |
+| `DEFAULT`, `serial`, identity, `GENERATED ALWAYS AS (…) STORED` | `{ hasDefault: true }`: optional in `INSERT` |
 | `int4`, `timestamptz`, `uuid`, `numeric(12,2)`, `varchar(40)`, … | `"int4"`, `"timestamptz"`, `"uuid"`, `"numeric"`, `"varchar"` |
 | array column | `"int4[]"`, `"mood[]"` |
 | domain | its base type, also through domains over domains |
@@ -84,9 +84,9 @@ Each listed column becomes a [`Json<T>` column](./schema#typed-json-columns) of 
 ```ts
 export interface DB {
 	portfolio: {
-		id: Generated<"uuid">;
+		id: Col<"uuid", { hasDefault: true }>;
 		name: Col<"text">;
-		created_at: Generated<"timestamptz">;
+		created_at: Col<"timestamptz", { hasDefault: true }>;
 		history: Json<HistoryItem[], { hasDefault: true }>;
 	};
 }

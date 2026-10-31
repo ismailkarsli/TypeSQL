@@ -146,17 +146,14 @@ function doc(lines: readonly string[], indent: string): string {
 	return `${indent}/**\n${lines.map((l) => `${indent} * ${docText(l)}`).join("\n")}\n${indent} */\n`;
 }
 
-function columnHelper(
-	nullable: boolean,
-	hasDefault: boolean,
-): "Col" | "Nullable" | "Generated" | "NullableGenerated" {
-	return nullable
-		? hasDefault
-			? "NullableGenerated"
-			: "Nullable"
-		: hasDefault
-			? "Generated"
-			: "Col";
+function column(type: string, nullable: boolean, hasDefault: boolean): string {
+	const flags = [
+		...(nullable ? ["nullable: true"] : []),
+		...(hasDefault ? ["hasDefault: true"] : []),
+	];
+	return flags.length > 0
+		? `Col<${type}, { ${flags.join("; ")} }>`
+		: `Col<${type}>`;
 }
 
 function enumKeys(enums: readonly DmmfEnum[]): Map<string, string> {
@@ -188,10 +185,9 @@ export function generateSource(
 		const unsupported = (field: SchemaField): void => {
 			const u = field.unsupported;
 			if (!u || sqlite) return;
-			const helper = columnHelper(u.nullable, !isView && u.hasDefault);
-			used.add(helper);
+			used.add("Col");
 			cols.push(
-				`${doc(u.dbName ? [`Prisma field \`${field.name}\`: Unsupported.`] : ["Prisma `Unsupported` field."], indent + "  ")}${indent}  ${key(u.dbName ?? field.name)}: ${helper}<${str(u.type)}>;`,
+				`${doc(u.dbName ? [`Prisma field \`${field.name}\`: Unsupported.`] : ["Prisma `Unsupported` field."], indent + "  ")}${indent}  ${key(u.dbName ?? field.name)}: ${column(str(u.type), u.nullable, !isView && u.hasDefault)};`,
 			);
 		};
 		const written = options.fields?.get(model.name) ?? [];
@@ -211,8 +207,7 @@ export function generateSource(
 			const f = item;
 			if (f.kind !== "scalar" && f.kind !== "enum") continue;
 			const nullable = f.isList || !f.isRequired;
-			const helper = columnHelper(nullable, !isView && hasDbDefault(f));
-			used.add(helper);
+			used.add("Col");
 			const type = sqlite
 				? sqliteTypeOf(f, datamodel.enums)
 				: str(pgTypeOf(f, enums) + (f.isList ? "[]" : ""));
@@ -227,7 +222,7 @@ export function generateSource(
 				...(f.documentation ? f.documentation.split("\n") : []),
 			];
 			cols.push(
-				`${doc(notes, indent + "  ")}${indent}  ${key(f.dbName ?? f.name)}: ${helper}<${type}>;`,
+				`${doc(notes, indent + "  ")}${indent}  ${key(f.dbName ?? f.name)}: ${column(type, nullable, !isView && hasDbDefault(f))};`,
 			);
 		}
 		const body = `{\n${cols.join("\n")}\n${indent}}`;
@@ -272,14 +267,7 @@ export function generateSource(
 		lines.push(`  $types: {\n${entries.join("\n")}\n  };`);
 	}
 
-	const imports = [
-		"Col",
-		"Nullable",
-		"Generated",
-		"NullableGenerated",
-		"Typed",
-		"View",
-	].filter((h) => used.has(h));
+	const imports = ["Col", "Typed", "View"].filter((h) => used.has(h));
 	const from =
 		options.importFrom ??
 		(sqlite ? "@typesql/core/sqlite" : "@typesql/core/postgres");

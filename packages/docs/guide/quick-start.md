@@ -20,17 +20,17 @@ npm install -D typescript@7.1.0-beta
 A schema is a TypeScript interface. Each key is a table, and each column has a type name from your database.
 
 ```ts
-import type { Col, Generated, Nullable } from "@typesql/core/postgres";
+import type { Col } from "@typesql/core/postgres";
 
 export interface DB {
 	users: {
-		id: Generated<"int4">;
+		id: Col<"int4", { hasDefault: true }>;
 		email: Col<"text">;
-		display_name: Nullable<"text">;
-		created_at: Generated<"timestamptz">;
+		display_name: Col<"text", { nullable: true }>;
+		created_at: Col<"timestamptz", { hasDefault: true }>;
 	};
 	posts: {
-		id: Generated<"int8">;
+		id: Col<"int8", { hasDefault: true }>;
 		author_id: Col<"int4">;
 		title: Col<"text">;
 	};
@@ -38,8 +38,8 @@ export interface DB {
 ```
 
 - `Col` is a `NOT NULL` column.
-- `Nullable` allows `NULL`.
-- `Generated` has a default (`serial`, identity, `DEFAULT …`), so `INSERT` can leave it out.
+- `{ nullable: true }` allows `NULL`.
+- `{ hasDefault: true }` means it has a default (`serial`, identity, `DEFAULT …`), so `INSERT` can leave it out.
 
 You can also generate it [from a live database](./introspect), derive it [from your migrations](./migrations), or take it [from Kysely, Drizzle or Prisma](./orms). [Declaring tables](./schema) lists every column helper.
 
