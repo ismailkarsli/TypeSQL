@@ -23652,6 +23652,72 @@
 			"source": "prerun-errors",
 			"sql": "SELECT CASE WHEN id > 1 THEN 1 WHEN id > 2 THEN 2.5 ELSE NULL END AS c, coalesce(id, 0, 1.5) AS d, CASE WHEN id > 1 THEN 'a' ELSE email END AS e, coalesce(display_name, email, 'x') AS f, greatest(created_at, now()) AS g FROM users",
 			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "sql-and-or",
+			"sql": "SELECT display_name FROM users WHERE ((display_name IS NOT NULL) AND (id > $1))",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "sql-and-or",
+			"sql": "SELECT display_name FROM users WHERE ((display_name IS NOT NULL) OR (id > $1))",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "sql-and-or",
+			"sql": "SELECT display_name FROM users WHERE (display_name IS NOT NULL)",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "sql-and-or",
+			"sql": "SELECT display_name FROM users WHERE true",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "sql-and-or",
+			"sql": "SELECT display_name FROM users WHERE false",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "sql-and-or",
+			"sql": "SELECT n_text FROM things WHERE ((n_text IS NOT NULL) AND ((n_id > $1) OR (n_flag)))",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "sql-and-or",
+			"sql": "SELECT n_text, n_id FROM things WHERE ((n_text IS NOT NULL) OR ((n_id IS NOT NULL) AND (n_flag)))",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "sql-and-or",
+			"sql": "SELECT id FROM users WHERE NOT ((id > $2) OR (email = $3 OR email = $4)) AND id > $1",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "sql-and-or",
+			"sql": "SELECT display_name, count(*) AS n FROM users GROUP BY display_name HAVING ((count(*) > $1) AND (display_name IS NOT NULL))",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "sql-and-or",
+			"sql": "UPDATE users SET display_name = $1 WHERE ((id = $2) AND (email = $3)) RETURNING display_name",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "sql-and-or",
+			"sql": "DELETE FROM users WHERE false RETURNING display_name",
+			"ddl": false
 		}
 	],
 	"skippedSlots": {

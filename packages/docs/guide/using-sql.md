@@ -16,6 +16,7 @@ TypeSQL centers on the `sql` function returned by your driver adapter's `createS
 | [`sql.fragment(text, ...params)`](#sql-fragment-text-params) | Creates a reusable SQL fragment to splice into query `{slot}` placeholders. | `text: string` (literal), `slots?`, `...params` |
 | [`sql.id(...parts)`](#sql-id-parts) | Creates a safely quoted identifier fragment (`"col"` or `"schema"."table"`). | `...parts: string[]` (column, table, schema names) |
 | [`sql.combine(items, options?)`](#sql-combine-items-options) | Combines an array or tuple of fragments or queries with a separator. | `items: (Slottable \| Empty)[]`, `options?: { separator?: string }` (default `", "`) |
+| [`sql.and(items)` / `sql.or(items)`](#sql-and-items-sql-or-items) | Combines conditions with `AND` or `OR`, in parentheses. No items gives `true` or `false`. | `items: (Slottable \| Empty)[]` |
 | [`sql.set(table, values)`](#sql-set-table-values) | Generates a type-checked `SET "col" = $n` fragment for `UPDATE`, omitting `undefined`. | `table: TableName<DB>`, `values: SetInput<DB, TM, table>` |
 | [`sql.values(table, rows)`](#sql-values-table-rows) | Generates a type-checked `("col") VALUES (...)` fragment for `INSERT`. | `table: TableName<DB>`, `rows: InsertInput<DB, TM, table>[]` |
 | [`sql.raw(text)`](#sql-raw-text) | Creates an untyped, raw SQL text fragment (requires `sql.as<Row>()`). | `text: string` |
@@ -143,16 +144,14 @@ const fallback = sql.param(retries ?? sql.empty);
 const normalized = sql.param(sql.empty(retries));
 ```
 
-Inside an interpolated `sql.param(...)`, the sentinel emits SQL `DEFAULT` without consuming a parameter number. The statement must allow `DEFAULT` in that position. In `sql.combine(...)`, it omits an item without adding a separator or parameters:
+Inside an interpolated `sql.param(...)`, the sentinel emits SQL `DEFAULT` without consuming a parameter number. The statement must allow `DEFAULT` in that position. In `sql.combine(...)`, `sql.and(...)` and `sql.or(...)`, it omits an item without adding a separator or parameters:
 
 ```ts
 declare const minId: number | undefined;
 const optionalFilter = minId === undefined
 	? undefined
 	: sql.fragment("id > $1", minId);
-const filters = sql.combine([requiredFilter, sql.empty(optionalFilter)], {
-	separator: " AND ",
-});
+const filters = sql.and([requiredFilter, sql.empty(optionalFilter)]);
 ```
 
 `sql.param(null)` still binds SQL `NULL`. Use `sql.param(value === undefined ? sql.empty : value)` when only `undefined` should request a default and an explicit `null` should stay SQL `NULL`.
@@ -264,7 +263,9 @@ Combines an array or tuple of fragments or subqueries with a delimiter into a si
 `sql.empty` items are ignored, without adding delimiters or parameters. Plain `null` and `undefined` entries are rejected. If no items remain, it throws.
 
 - When given a tuple (`[a, b]`), literal SQL text is preserved after removing known `sql.empty` entries. Conditional fragments are checked as present, like elements of a runtime array.
-- When given a dynamic runtime array (`Slottable[]`), TypeSQL validates a representative statement where each distinct element type is checked once. This keeps dynamic clauses (like dynamic `ORDER BY`, `AND` filters, or `IN (...)` lists) fully type-safe.
+- When given a dynamic runtime array (`Slottable[]`), TypeSQL validates a representative statement where each distinct element type is checked once. This keeps dynamic clauses (like dynamic `ORDER BY` or `IN (...)` lists) fully type-safe.
+
+To combine conditions, use [`sql.and` or `sql.or`](#sql-and-items-sql-or-items): they add the parentheses that operator precedence needs.
 
 ::: danger Caution: SQL Injection
 The `options.separator` value is concatenated directly into the statement as **raw SQL text**. Never pass untrusted user input as the separator. Use constant SQL delimiters such as `", "`, `" AND "`, `" OR "`, or `"\n"`.
@@ -273,25 +274,67 @@ The `options.separator` value is concatenated directly into the statement as **r
 ### Parameters
 
 - `items` (`readonly (Slottable | Empty)[]`): An array or tuple of fragments (`Fragment`), subqueries (`Query`), or `sql.empty`. Throws at runtime if empty after ignoring `sql.empty`.
-- `options.separator` (`string`, *optional*): The delimiter string placed between elements. Defaults to `", "`. Editors suggest `", "`, `" AND "`, and `" OR "`; other strings are accepted. Must be a trusted SQL delimiter.
+- `options.separator` (`string`, *optional*): The delimiter string placed between elements. Defaults to `", "`. Other strings, such as `" "` or `" UNION ALL "`, are accepted. Must be a trusted SQL delimiter.
+
+### Example
+
+```ts
+declare const byEmail: boolean;
+const order = sql.combine([
+	byEmail ? sql.fragment("email") : sql.empty,
+	sql.fragment("id DESC"),
+]);
+const sorted = sql("SELECT id FROM users ORDER BY {order}", { order });
+```
+
+See [Lists from runtime arrays](./dynamic-sql#lists-from-runtime-arrays).
+
+---
+
+## `sql.and(items)` / `sql.or(items)`
+
+```ts
+sql.and(items: readonly (Slottable | Empty)[]): Fragment
+sql.or(items: readonly (Slottable | Empty)[]): Fragment
+```
+
+Combines conditions with `AND` or `OR`. Each condition is wrapped in parentheses, and so is the result when it has more than one condition, so `a OR b` stays one condition and `NOT {filters}` negates all of them:
+
+| Items | `sql.and` | `sql.or` |
+|---|---|---|
+| `[a, b]` | `((a) AND (b))` | `((a) OR (b))` |
+| `[a]` | `(a)` | `(a)` |
+| `[]` | `true` | `false` |
+
+`sql.empty` items are ignored, as in [`sql.combine`](#sql-combine-items-options). Plain `null` and `undefined` entries are rejected. Tuples and runtime arrays are checked the same way as in `sql.combine`, with every condition present: a conditional `display_name IS NOT NULL` still makes `display_name` non-null in the row type.
+
+::: danger An empty `sql.and` matches every row
+With no conditions left, `sql.and` gives `true`, so `DELETE FROM posts WHERE {filters}` deletes every row. Keep required authorization filters (such as tenant or ownership checks) in the statement or as a fixed first item, and make only optional search filters conditional. To throw on an empty list instead, use `sql.combine(items, { separator: " AND " })`.
+:::
+
+### Parameters
+
+- `items` (`readonly (Slottable | Empty)[]`): An array or tuple of conditions as fragments (`Fragment`), subqueries (`Query`), or `sql.empty`.
 
 ### Example
 
 ```ts
 declare const minId: number | undefined;
-const filters = [
+declare const search: string | undefined;
+const filters = sql.and([
 	sql.fragment("role = $1", "admin"),
 	minId === undefined ? sql.empty : sql.fragment("id > $1", minId),
-];
-const combinedWhere = sql.combine(filters, { separator: " AND " });
-const queryCombined = sql("SELECT id FROM users WHERE {where}", {
-	where: combinedWhere,
-});
+	search === undefined
+		? sql.empty
+		: sql.or([
+				sql.fragment("email ILIKE $1", search),
+				sql.fragment("display_name ILIKE $1", search),
+			]),
+]);
+const filtered = sql("SELECT id FROM users WHERE {filters}", { filters });
 ```
 
-See [Lists from runtime arrays](./dynamic-sql#lists-from-runtime-arrays).
-
-Skipping an item does not change parameter binding, but it can broaden the query. Always include required authorization filters (such as tenant or ownership checks); only make optional search filters conditional. The empty-list error cannot detect a missing authorization filter when other fragments remain.
+See [Identifiers and lists](./dynamic-sql#identifiers-and-lists).
 
 ---
 

@@ -98,15 +98,7 @@ export function createDialectSql<T extends DialectTypes, DB, TM = T["typeMap"]>(
 			items: readonly (Spliceable | Empty)[],
 			options?: { readonly separator?: string },
 		) => {
-			const defined: Spliceable[] = [];
-			for (const item of items) {
-				if (isEmpty(item)) continue;
-				if (item === null || item === undefined)
-					throw new Error(
-						"typesql: sql.combine() does not accept null or undefined; use sql.empty or sql.empty(value) to omit an item",
-					);
-				defined.push(item);
-			}
+			const defined = present(items, "combine");
 			if (defined.length === 0)
 				throw new Error(
 					"typesql: sql.combine() needs at least one item; put a fixed element first (`[base, ...rest]`) or skip the clause",
@@ -114,6 +106,10 @@ export function createDialectSql<T extends DialectTypes, DB, TM = T["typeMap"]>(
 			const r = joinFragments(defined, options?.separator ?? ", ");
 			return makeFragment(r.text, r.values);
 		},
+		and: (items: readonly (Spliceable | Empty)[]) =>
+			bool(present(items, "and"), "AND"),
+		or: (items: readonly (Spliceable | Empty)[]) =>
+			bool(present(items, "or"), "OR"),
 		set: (table: string, values: Readonly<Record<string, unknown>>) => {
 			const r = buildSet(
 				encodeInput(values, pipeline, { kind: "set", table }) as Readonly<
@@ -145,4 +141,44 @@ export function createDialectSql<T extends DialectTypes, DB, TM = T["typeMap"]>(
 		},
 	});
 	return api as unknown as SqlOf<T, DB, TM>;
+}
+
+function present(
+	items: readonly (Spliceable | Empty)[],
+	name: string,
+): Spliceable[] {
+	const defined: Spliceable[] = [];
+	for (const item of items) {
+		if (isEmpty(item)) continue;
+		if (item === null || item === undefined)
+			throw new Error(
+				`typesql: sql.${name}() does not accept null or undefined; use sql.empty or sql.empty(value) to omit an item`,
+			);
+		defined.push(item);
+	}
+	return defined;
+}
+
+// sql.and / sql.or results are one condition already; nesting them adds no
+// parentheses.
+const GROUPED = new WeakSet<Spliceable>();
+
+function bool(items: readonly Spliceable[], op: "AND" | "OR") {
+	const r = joinFragments(
+		items.map((f) =>
+			GROUPED.has(f) ? f : { text: `(${f.text})`, values: f.values },
+		),
+		` ${op} `,
+	);
+	const text =
+		items.length === 0
+			? op === "AND"
+				? "true"
+				: "false"
+			: items.length === 1
+				? r.text
+				: `(${r.text})`;
+	const fragment = makeFragment(text, r.values);
+	GROUPED.add(fragment);
+	return fragment;
 }

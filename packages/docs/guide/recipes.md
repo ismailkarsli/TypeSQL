@@ -17,6 +17,16 @@ const found = sql(
 
 The cast (`::text`, `::int4`) types the `IS NULL` check. Each name is one parameter, sent once.
 
+To leave a filter out of the statement instead, combine fragments with [`sql.and`](./using-sql#sql-and-items-sql-or-items):
+
+```ts
+const where = sql.and([
+	filters.email === null ? sql.empty : sql.fragment("email = $1", filters.email),
+	filters.minId === null ? sql.empty : sql.fragment("id >= $1", filters.minId),
+]);
+const filtered = sql("SELECT id, email FROM users WHERE {where}", { where });
+```
+
 ## A sort order the user picks
 
 Map each allowed choice to a fragment. The statement is checked once for each choice:

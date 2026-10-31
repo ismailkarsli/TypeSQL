@@ -1,6 +1,6 @@
 declare const EMPTY: unique symbol;
 
-/** An explicit omission in sql.combine, or DEFAULT in an inline sql.param. */
+/** An explicit omission in sql.combine/and/or, or DEFAULT in an inline sql.param. */
 export interface Empty {
 	readonly [EMPTY]: true;
 	<const T>(value: T): T extends null | undefined ? Empty : T;

@@ -101,12 +101,13 @@ const q = sql("SELECT u.id FROM users u {where}", { where });
 | `sql.fragment(text, ...params)` | a piece of SQL to splice into a `{name}` slot |
 | `sql.id("col")`, `sql.id("schema", "table")` | a quoted identifier: `"col"`, `"schema"."table"` |
 | `sql.combine(items, options?)` | the fragments combined with `", "` by default: a tuple keeps its literal text, a runtime array of fragments with literal texts is checked as a list; ignores `sql.empty` items and throws if none remain |
+| `sql.and(items)`, `sql.or(items)` | the conditions combined with `AND` or `OR`: `((a) AND (b))`, `(a)` for one, `true` or `false` for none; ignores `sql.empty` items |
 | `sql.raw(text)` | dynamic text, sent as is |
 
 - Only `{identifier}` is a slot. Braces inside string literals are left alone.
 - A fragment's `$n` are renumbered after the outer parameters, and its values are checked once spliced. Whole queries can be spliced too.
 - `sql.id` over a union of names is checked once per member; the row type is the union. A generic name constrained to `RelationName<DB>` is widened to every table and view. Any other non-literal name is dynamic. Quoting prevents SQL syntax injection, but does not enforce authorization: dynamic names derived from untrusted user input must come from an explicit allowlist (e.g. to prevent selecting or sorting by sensitive fields like `password_hash`).
-- `sql.combine` over an array checks the statement once, with each distinct element once ([Lists from runtime arrays](../guide/dynamic-sql#lists-from-runtime-arrays)). The `options.separator` value is raw SQL text: never pass untrusted user input as the separator.
+- `sql.combine`, `sql.and` and `sql.or` over an array check the statement once, with each distinct element once ([Lists from runtime arrays](../guide/dynamic-sql#lists-from-runtime-arrays)). The `options.separator` value is raw SQL text: never pass untrusted user input as the separator.
 - A dynamic fragment is rejected by `sql()`. Use `sql.as<Row>()`.
 
 See [Dynamic SQL](../guide/dynamic-sql).

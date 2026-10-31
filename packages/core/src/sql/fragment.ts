@@ -95,13 +95,23 @@ type JoinedCarried<
 		>
 	: Acc;
 
-type ElemPairs<F> = F extends unknown
+type ElemPairs<F, Wrap extends boolean> = F extends unknown
 	? TextType<F> extends infer T extends string
 		? T extends unknown
-			? readonly [T, CarriedOf<F>]
+			? readonly [Wrap extends true ? Parened<F, T> : T, CarriedOf<F>]
 			: never
 		: never
 	: never;
+
+declare const GROUPED: unique symbol;
+/** A sql.and / sql.or result: already one parenthesized condition. */
+export type Grouped = { readonly [GROUPED]: true };
+
+type Parened<F, T extends string> = string extends T
+	? T
+	: F extends Grouped
+		? T
+		: `(${T})`;
 
 type AnyDynamic<P> = true extends (
 	P extends readonly [infer T extends string, unknown]
@@ -131,15 +141,18 @@ type PairTexts<Ps extends readonly unknown[]> = {
 	};
 };
 
-export type ListRep<E, Sep extends string> = [E] extends [never]
-	? { readonly text: string; readonly carried: [] }
-	: ElemPairs<E> extends infer P
+export type ListRep<E, Sep extends string, Wrap extends boolean = false> = [
+	E,
+] extends [never]
+	? { readonly text: string; readonly carried: []; readonly count: number }
+	: ElemPairs<E, Wrap> extends infer P
 		? AnyDynamic<P> extends true
-			? { readonly text: string; readonly carried: [] }
+			? { readonly text: string; readonly carried: []; readonly count: number }
 			: UnionList<P> extends infer Ps extends readonly unknown[]
 				? {
 						readonly text: JoinedText<PairTexts<Ps>, Sep>;
 						readonly carried: PairCarried<Ps>;
+						readonly count: Ps["length"];
 					}
 				: never
 		: never;
@@ -197,7 +210,53 @@ type CombinePresent<
 				JoinedCarried<Items>
 			>;
 
-export type CombineSeparator = ", " | " AND " | " OR " | (string & {});
+export type CombineSeparator = ", " | (string & {});
+
+// sql.and / sql.or: each item and, for several items, the whole result is
+// parenthesized. No items gives the operator's identity (true or false).
+export type BoolOf<
+	Items extends readonly (Slottable | Empty)[],
+	Op extends "AND" | "OR",
+> = BoolPresent<
+	number extends Items["length"]
+		? readonly Exclude<Items[number], Empty>[]
+		: PresentItems<Items>,
+	Op
+>;
+
+type BoolPresent<
+	Items extends readonly Slottable[],
+	Op extends "AND" | "OR",
+> = number extends Items["length"]
+	? ListRep<Items[number], ` ${Op} `, true> extends {
+			readonly text: infer T extends string;
+			readonly carried: infer C extends readonly unknown[];
+			readonly count: infer N;
+		}
+		? Fragment<Group<T, N>, readonly unknown[], C> & Grouped
+		: never
+	: Items extends readonly []
+		? Fragment<Op extends "AND" ? "true" : "false", [], []> & Grouped
+		: Fragment<
+				Group<JoinedText<Parens<Items>, ` ${Op} `>, Items["length"]>,
+				readonly unknown[],
+				JoinedCarried<Items>
+			> &
+				Grouped;
+
+type Parens<Items extends readonly unknown[]> = {
+	[I in keyof Items]: {
+		readonly text: TextType<Items[I]> extends infer T extends string
+			? Parened<Items[I], T>
+			: string;
+	};
+};
+
+type Group<Text extends string, N> = string extends Text
+	? string
+	: N extends 1
+		? Text
+		: `(${Text})`;
 
 export type GateFragCheck<Text extends string, Slotted extends boolean> = [
 	Text,

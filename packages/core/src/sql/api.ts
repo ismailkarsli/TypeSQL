@@ -23,6 +23,7 @@ import type {
 	SplicedOr,
 } from "./call.js";
 import type {
+	BoolOf,
 	BoxFragArgs,
 	CombineOf,
 	CombineSeparator,
@@ -163,6 +164,14 @@ export interface SqlApi<
 		items: Items,
 		options?: { readonly separator?: Sep },
 	): CombineOf<Items, Sep>;
+
+	and<const Items extends readonly (Slottable | Empty)[]>(
+		items: Items,
+	): BoolOf<Items, "AND">;
+
+	or<const Items extends readonly (Slottable | Empty)[]>(
+		items: Items,
+	): BoolOf<Items, "OR">;
 
 	set<const T extends TableName<DB>, const P>(
 		table: T,

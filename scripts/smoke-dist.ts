@@ -415,6 +415,43 @@ assert.deepEqual(
 		values: [],
 	},
 );
+for (const includeEmail of [false, true]) {
+	const filters = sql.and([
+		sql.empty,
+		sql.fragment("id > $1", 5),
+		sql.empty(includeEmail ? sql.fragment("email = $1", evil) : null),
+		sql.or([sql.fragment("age > $1", 18), sql.fragment("age < $1", 3)]),
+	]);
+	assert.deepEqual(
+		sql("SELECT id FROM users WHERE id <> $1 AND {filters}", { filters }, 0),
+		{
+			text: includeEmail
+				? "SELECT id FROM users WHERE id <> $1 AND ((id > $2) AND (email = $3) AND ((age > $4) OR (age < $5)))"
+				: "SELECT id FROM users WHERE id <> $1 AND ((id > $2) AND ((age > $3) OR (age < $4)))",
+			values: includeEmail ? [0, 5, evil, 18, 3] : [0, 5, 18, 3],
+		},
+	);
+}
+assert.deepEqual(sql.and([sql.fragment("id = $1 OR id = $2", 1, 2)]), {
+	text: "(id = $1 OR id = $2)",
+	values: [1, 2],
+});
+assert.deepEqual(sql.and([]), { text: "true", values: [] });
+assert.deepEqual(sql.and([sql.empty]), { text: "true", values: [] });
+assert.deepEqual(sql.or([]), { text: "false", values: [] });
+assert.deepEqual(sql.or([sql.empty, sql.empty]), { text: "false", values: [] });
+assert.deepEqual(sql.and([sql.fragment("id = 1"), sql.or([])]), {
+	text: "((id = 1) AND false)",
+	values: [],
+});
+assert.throws(() => {
+	// @ts-expect-error undefined must be made explicit with sql.empty.
+	sql.and([undefined]);
+}, /sql\.and\(\) does not accept null or undefined/);
+assert.throws(() => {
+	// @ts-expect-error null is not a fragment or the omission sentinel.
+	sql.or([null]);
+}, /sql\.or\(\) does not accept null or undefined/);
 assert.throws(() => sql.combine([]), /needs at least one item/);
 assert.throws(
 	() => sql.combine([sql.empty, sql.empty]),

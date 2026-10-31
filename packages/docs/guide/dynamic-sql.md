@@ -57,18 +57,16 @@ const prolific = sql("SELECT email FROM users WHERE id IN ({authors})", {
 
 - `sql.id(…)` quotes an identifier. `sql.id("schema", "table")` gives `"schema"."table"`.
 - `sql.combine([…], { separator })` combines fragments and renumbers their parameters in order.
+- `sql.and([…])` and `sql.or([…])` combine conditions in parentheses: `((a) AND (b))`. With no conditions, they give `true` and `false`.
 
-Both keep their text as a literal type, so the statement is still fully typed:
+All of them keep their text as a literal type, so the statement is still fully typed:
 
 ```ts
 const column = sql.id("display_name");
-const both = sql.combine(
-	[
-		sql.fragment("u.id > $1", 10),
-		sql.fragment(`u.email LIKE ${sql.param("%@example.com")}`),
-	],
-	{ separator: " AND " },
-);
+const both = sql.and([
+	sql.fragment("u.id > $1", 10),
+	sql.fragment(`u.email LIKE ${sql.param("%@example.com")}`),
+]);
 const listed = sql("SELECT {column} FROM users u WHERE {both}", {
 	column,
 	both,
@@ -81,7 +79,7 @@ listed.text;
 :::
 
 ::: danger Dynamic separators
-The `options.separator` value in `sql.combine()` is inserted into the query as **raw SQL text**. Never pass untrusted user input as the separator. Use constant delimiters such as `", "`, `" AND "`, or `" OR "`.
+The `options.separator` value in `sql.combine()` is inserted into the query as **raw SQL text**. Never pass untrusted user input as the separator. Use constant delimiters such as `", "` or `" UNION ALL "`, and `sql.and` or `sql.or` for conditions.
 :::
 
 ### A name from a union
@@ -105,11 +103,11 @@ Inside a generic function, the name isn't known until the call:
 - Any other generic or `string` name gives a dynamic fragment, which needs [`sql.as`](#fully-dynamic-sql).
 - To check against a smaller set, narrow the name yourself: `sql.id(name as "users" | "posts")`.
 
-`sql.combine(items, { separator: " AND " })` keeps the literal text for a tuple written in place. The separator defaults to `", "` when options are omitted. An array built at runtime is checked as a list, below.
+`sql.combine(items)`, `sql.and(items)` and `sql.or(items)` keep the literal text for a tuple written in place. The separator of `sql.combine` defaults to `", "` when options are omitted. An array built at runtime is checked as a list, below.
 
 ## Lists from runtime arrays
 
-`sql.combine` also combines an array whose length and order are only known at runtime, such as sort keys a user picked. Each element's text must be known at compile time (fragments from a constant table, or `sql.id` over a union of names), so the statement stays checked:
+`sql.combine`, `sql.and` and `sql.or` also combine an array whose length and order are only known at runtime, such as sort keys a user picked. Each element's text must be known at compile time (fragments from a constant table, or `sql.id` over a union of names), so the statement stays checked:
 
 ```ts
 const SORT = {
@@ -129,10 +127,10 @@ const sorted = sql("SELECT p.id, p.title FROM posts p ORDER BY {order}", {
 });
 ```
 
-TypeSQL doesn't try every combination. It checks the statement once, with each distinct element present once. In a list position (`ORDER BY`, `GROUP BY`, `SET`, `VALUES` rows, `IN (…)`, an `AND` chain) each element is checked on its own. So if that one statement is valid, every count and order of the elements is valid too.
+TypeSQL doesn't try every combination. It checks the statement once, with each distinct element present once. In a list position (`ORDER BY`, `GROUP BY`, `SET`, `VALUES` rows, `IN (…)`, an `AND` or `OR` chain) each element is checked on its own. So if that one statement is valid, every count and order of the elements is valid too.
 
 ::: warning Empty arrays
-`sql.empty` items are ignored; use `sql.empty(maybeFragment)` or `maybeFragment ?? sql.empty` to explicitly omit a nullish fragment. Plain `null` and `undefined` entries are rejected. An empty array, or one containing only `sql.empty`, throws at runtime. Always include a fixed element, like the `p.id` tiebreaker above. For authorization-sensitive queries, keep required tenant or ownership predicates unconditional; an optional filter must never replace them.
+`sql.empty` items are ignored; use `sql.empty(maybeFragment)` or `maybeFragment ?? sql.empty` to explicitly omit a nullish fragment. Plain `null` and `undefined` entries are rejected. In `sql.combine`, an empty array, or one containing only `sql.empty`, throws at runtime. Always include a fixed element, like the `p.id` tiebreaker above. `sql.and` gives `true` and `sql.or` gives `false` instead, so an empty `sql.and` filter matches every row. For authorization-sensitive queries, keep required tenant or ownership predicates unconditional; an optional filter must never replace them.
 :::
 
 - The query's text type (`TextType`) is that one-of-each statement, not the text sent at runtime. At runtime, elements are repeated and renumbered as given.
