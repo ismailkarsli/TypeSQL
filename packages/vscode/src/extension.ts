@@ -7,6 +7,8 @@ import {
 	mergeTokens,
 	Session,
 	type CompletionItem as SqlItem,
+	type TokenLegend,
+	type TokenNames,
 	type TypeScriptModules,
 	typescriptModules,
 } from "@typesql/language-server";
@@ -30,6 +32,23 @@ const LANGUAGES = [
 	"javascript",
 	"javascriptreact",
 ];
+// SQL tokens carry the definition modifier, which TypeScript never sets, and
+// package.json's semanticTokenScopes map each of these to the grammar's scope,
+// so they take the same colors as the grammar's SQL. Strings and comments stay
+// plain, as in the grammar.
+const SQL_TOKENS: TokenNames = {
+	keyword: "keyword.definition",
+	constant: "enumMember.definition",
+	type: "type.definition",
+	function: "function.definition",
+	number: "number.definition",
+	escape: "regexp.definition",
+	operator: "operator.definition",
+	parameter: "parameter.definition",
+	slot: "macro.definition",
+	variable: "variable.definition",
+	punctuation: "string.definition",
+};
 
 interface LegacyAPI {
 	onLanguageServerInitialized(listener: () => unknown): vscode.Disposable;
@@ -115,22 +134,22 @@ export async function activate(
 		}
 	};
 
-	// TypeScript's token types, read from VS Code once per server start; a
+	// TypeScript's token legend, read from VS Code once per server start; a
 	// failed read is retried on the next request.
-	let legend: Promise<readonly string[] | null> | undefined;
-	const legendFor = (uri: string): Promise<readonly string[] | null> => {
+	let legend: Promise<TokenLegend | null> | undefined;
+	const legendFor = (uri: string): Promise<TokenLegend | null> => {
 		legend ??= Promise.resolve(
 			vscode.commands.executeCommand<vscode.SemanticTokensLegend | undefined>(
 				"vscode.provideDocumentSemanticTokensLegend",
 				vscode.Uri.parse(uri),
 			),
 		).then(
-			(l) => l?.tokenTypes ?? null,
+			(l) => l ?? null,
 			() => null,
 		);
-		return legend.then((types) => {
-			if (!types) legend = undefined;
-			return types;
+		return legend.then((l) => {
+			if (!l) legend = undefined;
+			return l;
 		});
 	};
 	const highlight = async (
@@ -142,7 +161,7 @@ export async function activate(
 		if (!s || !highlighting()) return result;
 		try {
 			const started = Date.now();
-			const [ours, types] = await Promise.all([
+			const [ours, l] = await Promise.all([
 				withBudget(s.highlight(uri), HIGHLIGHT_BUDGET_MS),
 				legendFor(uri),
 			]);
@@ -152,9 +171,9 @@ export async function activate(
 				);
 				return result;
 			}
-			if (!ours || !types) return result;
+			if (!ours || !l) return result;
 			log.trace(`${ours.length} SQL highlights in ${Date.now() - started} ms`);
-			return mergeTokens(result, ours, types, range);
+			return mergeTokens(result, ours, l, range, SQL_TOKENS);
 		} catch (e) {
 			log.error(e instanceof Error ? e : String(e));
 			return result;

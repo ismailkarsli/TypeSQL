@@ -1,5 +1,17 @@
 import type { Range, SemanticTokens } from "typescript/vscode";
-import type { Highlight } from "./highlight/index.js";
+import type { Highlight, TokenKind } from "./highlight/index.js";
+
+export interface TokenLegend {
+	readonly tokenTypes: readonly string[];
+	readonly tokenModifiers: readonly string[];
+}
+
+/**
+ * The token each kind is written as: a token type, then any modifiers, joined
+ * by dots, such as "keyword.definition". A kind left out is written as the
+ * token type of its name, without modifiers.
+ */
+export type TokenNames = Readonly<Partial<Record<TokenKind, string>>>;
 
 interface Abs {
 	line: number;
@@ -10,24 +22,39 @@ interface Abs {
 }
 
 /**
- * Adds `highlights` to a semantic tokens response encoded with `legend`'s token
- * types, dropping the response's tokens they overlap. A kind missing from the
- * legend is skipped. With `range`, only highlights on its lines are added.
- * The result has no resultId, so the client never asks for a delta of it.
+ * Adds `highlights` to a semantic tokens response encoded with `legend`,
+ * dropping the response's tokens they overlap. Each kind is written as its
+ * entry in `names`; a kind whose type or modifiers are missing from the legend
+ * is skipped. With `range`, only highlights on its lines are added. The result
+ * has no resultId, so the client never asks for a delta of it.
  */
 export function mergeTokens(
 	result: SemanticTokens | null,
 	highlights: readonly Highlight[],
-	legend: readonly string[],
+	legend: TokenLegend,
 	range?: Range,
+	names: TokenNames = {},
 ): SemanticTokens | null {
+	const tokens = new Map<TokenKind, [number, number] | null>();
+	const tokenOf = (kind: TokenKind): [number, number] | null => {
+		if (tokens.has(kind)) return tokens.get(kind)!;
+		const [name, ...mods] = (names[kind] ?? kind).split(".");
+		const type = legend.tokenTypes.indexOf(name!);
+		const bits = mods.map((m) => legend.tokenModifiers.indexOf(m));
+		const e: [number, number] | null =
+			type < 0 || bits.some((b) => b < 0)
+				? null
+				: [type, bits.reduce((sum, b) => sum | (1 << b), 0)];
+		tokens.set(kind, e);
+		return e;
+	};
 	const ours: Abs[] = [];
 	for (const h of highlights) {
-		const type = legend.indexOf(h.kind);
-		if (type < 0) continue;
+		const e = tokenOf(h.kind);
+		if (!e) continue;
 		if (range && (h.line < range.start.line || h.line > range.end.line))
 			continue;
-		ours.push({ ...h, type, modifiers: 0 });
+		ours.push({ ...h, type: e[0], modifiers: e[1] });
 	}
 	if (!ours.length) return result;
 	const theirs = decode(result?.data ?? []).filter(

@@ -83,7 +83,7 @@ With the TypeScript 7 extension and `@typesql/core` in the project, the extensio
 - A call that the rules above color but that isn't TypeSQL's, such as your own `sql()` function or `set.add("drop it")`, goes back to a plain string.
 - Strings after `/* sql */` stay SQL either way.
 
-The corrections are [semantic tokens](https://code.visualstudio.com/api/language-extensions/semantic-highlight-guide): they appear a moment after an edit, and need a theme with semantic highlighting (Dark+, Light+ and most popular themes have it; `"editor.semanticHighlighting.enabled": true` turns it on for others). In a string that the rules didn't color, table and column names take your theme's variable color. Set `"typesql.semanticHighlighting.enable": false` to keep only the text rules.
+The corrections are [semantic tokens](https://code.visualstudio.com/api/language-extensions/semantic-highlight-guide): they appear a moment after an edit, and need a theme with semantic highlighting (Dark+, Light+ and most popular themes have it; `"editor.semanticHighlighting.enabled": true` turns it on for others). Set `"typesql.semanticHighlighting.enable": false` to keep only the text rules.
 
 ### Colors
 
@@ -102,7 +102,7 @@ Strings and comments keep your theme's colors, and so does TypeScript inside `${
 
 The colors are a default value of `editor.tokenColorCustomizations` under the keys `[*Dark*][Default High Contrast]` and `[*Light*]`, so they apply to the themes whose ID (the value of `workbench.colorTheme`) contains `Dark` or `Light`, with that case: Dark Modern, Dark+, Light Modern, Light+, Solarized Light, One Dark Pro and others. Dark High Contrast (ID `Default High Contrast`) gets the dark shades and Light High Contrast (ID `Default High Contrast Light`) the light ones. Themes with neither word in their ID, such as Monokai, Abyss and Dracula, keep their own colors.
 
-Strings that only type checking colors, such as `camel("…")` from `createSql`, get their colors from semantic tokens, which use your theme's keyword, function and type colors, so they are not orange.
+Strings that only type checking colors, such as `camel("…")` from `createSql`, get the same colors. Their semantic tokens carry the `definition` modifier, which TypeScript doesn't use, and the extension maps each one to the scope in the table, such as `keyword.definition` to `keyword.other.sql`, so the rules above and your changes to them apply. A theme with its own semantic color for a token type, such as `keyword` or `function` under `semanticTokenColors`, colors these tokens with it instead.
 
 #### Change or turn off the colors
 

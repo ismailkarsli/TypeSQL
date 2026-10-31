@@ -12,4 +12,4 @@ export {
 	type TypeScriptModules,
 	typescriptModules,
 } from "./session.js";
-export { mergeTokens } from "./tokens.js";
+export { mergeTokens, type TokenLegend, type TokenNames } from "./tokens.js";

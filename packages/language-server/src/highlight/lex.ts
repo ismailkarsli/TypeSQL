@@ -1,13 +1,17 @@
 export type TokenKind =
 	| "keyword"
+	| "constant"
 	| "type"
 	| "function"
 	| "number"
 	| "string"
+	| "escape"
 	| "comment"
 	| "operator"
 	| "parameter"
-	| "variable";
+	| "slot"
+	| "variable"
+	| "punctuation";
 
 export interface Token {
 	readonly start: number;
@@ -275,10 +279,9 @@ const KEYWORDS = new Set([
 	"within",
 	"without",
 	"zone",
-	"true",
-	"false",
-	"null",
 ]);
+
+const CONSTANTS = new Set(["true", "false", "null"]);
 
 const WORD = /[A-Za-z_][\w$]*/y;
 const NUMBER =
@@ -295,11 +298,15 @@ const at = (re: RegExp, s: string, i: number): string | null => {
 	return re.exec(s)?.[0] ?? null;
 };
 
-/** Splits SQL text into the tokens worth coloring; punctuation is left out. */
+/** Splits SQL text into tokens; whitespace is left out. */
 export function lex(s: string): Token[] {
-	const out: Token[] = [];
+	const out: { start: number; end: number; kind: TokenKind }[] = [];
 	const push = (start: number, end: number, kind: TokenKind): void => {
-		out.push({ start, end, kind });
+		if (end <= start) return;
+		const last = out[out.length - 1];
+		if (kind === "punctuation" && last?.kind === kind && last.end === start)
+			last.end = end;
+		else out.push({ start, end, kind });
 	};
 	let i = 0;
 	let afterCast = false;
@@ -337,7 +344,15 @@ export function lex(s: string): Token[] {
 		const prefix = at(STRING_PREFIX, s, i);
 		if (c === "'" || prefix) {
 			const end = quoted(s, i + (prefix ? prefix.length : 1), "'");
-			push(i, end, "string");
+			// A quote before the end is the first of a doubled quote.
+			let from = i;
+			for (let j = i + (prefix ? prefix.length : 1); j < end - 1; j++)
+				if (s[j] === "'") {
+					push(from, j, "string");
+					push(j, j + 2, "escape");
+					from = ++j + 1;
+				}
+			push(from, end, "string");
 			i = end;
 			continue;
 		}
@@ -380,7 +395,9 @@ export function lex(s: string): Token[] {
 		if (c === "{") {
 			const slot = at(SLOT, s, i);
 			if (slot) {
-				push(i, i + slot.length, "variable");
+				push(i, i + 1, "punctuation");
+				push(i + 1, i + slot.length - 1, "slot");
+				push(i + slot.length - 1, i + slot.length, "punctuation");
 				i += slot.length;
 				continue;
 			}
@@ -402,11 +419,13 @@ export function lex(s: string): Token[] {
 				end,
 				cast || TYPES.has(lower)
 					? "type"
-					: KEYWORDS.has(lower)
-						? "keyword"
-						: s[end] === "("
-							? "function"
-							: "variable",
+					: CONSTANTS.has(lower)
+						? "constant"
+						: KEYWORDS.has(lower)
+							? "keyword"
+							: s[end] === "("
+								? "function"
+								: "variable",
 			);
 			i = end;
 			continue;
@@ -417,6 +436,7 @@ export function lex(s: string): Token[] {
 			i += op.length;
 			continue;
 		}
+		push(i, i + 1, "punctuation");
 		i++;
 	}
 	return out;

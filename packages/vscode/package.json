@@ -59,6 +59,160 @@
 				}
 			}
 		],
+		"semanticTokenScopes": [
+			{
+				"language": "typescript",
+				"scopes": {
+					"keyword.definition": [
+						"keyword.other.sql"
+					],
+					"enumMember.definition": [
+						"constant.language.sql"
+					],
+					"type.definition": [
+						"storage.type.sql"
+					],
+					"function.definition": [
+						"entity.name.function.sql"
+					],
+					"number.definition": [
+						"constant.numeric.sql"
+					],
+					"regexp.definition": [
+						"constant.character.escape.sql"
+					],
+					"operator.definition": [
+						"keyword.operator.sql"
+					],
+					"parameter.definition": [
+						"variable.parameter.positional.sql"
+					],
+					"macro.definition": [
+						"variable.other.slot.sql"
+					],
+					"variable.definition": [
+						"meta.embedded.line.sql"
+					],
+					"string.definition": [
+						"meta.embedded.line.sql"
+					]
+				}
+			},
+			{
+				"language": "typescriptreact",
+				"scopes": {
+					"keyword.definition": [
+						"keyword.other.sql"
+					],
+					"enumMember.definition": [
+						"constant.language.sql"
+					],
+					"type.definition": [
+						"storage.type.sql"
+					],
+					"function.definition": [
+						"entity.name.function.sql"
+					],
+					"number.definition": [
+						"constant.numeric.sql"
+					],
+					"regexp.definition": [
+						"constant.character.escape.sql"
+					],
+					"operator.definition": [
+						"keyword.operator.sql"
+					],
+					"parameter.definition": [
+						"variable.parameter.positional.sql"
+					],
+					"macro.definition": [
+						"variable.other.slot.sql"
+					],
+					"variable.definition": [
+						"meta.embedded.line.sql"
+					],
+					"string.definition": [
+						"meta.embedded.line.sql"
+					]
+				}
+			},
+			{
+				"language": "javascript",
+				"scopes": {
+					"keyword.definition": [
+						"keyword.other.sql"
+					],
+					"enumMember.definition": [
+						"constant.language.sql"
+					],
+					"type.definition": [
+						"storage.type.sql"
+					],
+					"function.definition": [
+						"entity.name.function.sql"
+					],
+					"number.definition": [
+						"constant.numeric.sql"
+					],
+					"regexp.definition": [
+						"constant.character.escape.sql"
+					],
+					"operator.definition": [
+						"keyword.operator.sql"
+					],
+					"parameter.definition": [
+						"variable.parameter.positional.sql"
+					],
+					"macro.definition": [
+						"variable.other.slot.sql"
+					],
+					"variable.definition": [
+						"meta.embedded.line.sql"
+					],
+					"string.definition": [
+						"meta.embedded.line.sql"
+					]
+				}
+			},
+			{
+				"language": "javascriptreact",
+				"scopes": {
+					"keyword.definition": [
+						"keyword.other.sql"
+					],
+					"enumMember.definition": [
+						"constant.language.sql"
+					],
+					"type.definition": [
+						"storage.type.sql"
+					],
+					"function.definition": [
+						"entity.name.function.sql"
+					],
+					"number.definition": [
+						"constant.numeric.sql"
+					],
+					"regexp.definition": [
+						"constant.character.escape.sql"
+					],
+					"operator.definition": [
+						"keyword.operator.sql"
+					],
+					"parameter.definition": [
+						"variable.parameter.positional.sql"
+					],
+					"macro.definition": [
+						"variable.other.slot.sql"
+					],
+					"variable.definition": [
+						"meta.embedded.line.sql"
+					],
+					"string.definition": [
+						"meta.embedded.line.sql"
+					]
+				}
+			}
+		],
 		"configuration": {
 			"title": "TypeSQL",
 			"properties": {
