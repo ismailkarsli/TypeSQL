@@ -102,10 +102,10 @@ Things to know:
 
 A plugin implements `SqlPlugin<Types>` from `@typesql/core`. Its optional runtime hooks are synchronous:
 
-- `transformInput(value, context)`: converts application input to database input. `context.kind` is `"set"` or `"values"` for each write object (`context.table` identifies the destination), `"parameters"` for the entire argument array (`context.query` is the original SQL), or `"value"` for `sql.param(value)`.
+- `transformInput(value, context)`: converts application input to database input. `context.kind` is `"set"` or `"values"` for each write object (`context.table` identifies the destination, or is `null` for `sql.set(values)` and `sql.values(rows)`), `"parameters"` for the entire argument array (`context.query` is the original SQL), or `"value"` for `sql.param(value)`.
 - `transformOutput(row)`: converts one database row to the application result. It runs for `execute()`, `executeTakeFirst()`, `executeTakeFirstOrThrow()` and `mapRows()`. Counts and missing rows are unaffected.
 
-Parameter input includes positional arguments or a single named-parameter object. It excludes fragment slots. The encoded result must be an array; named SQL still expects a single object in that array. A write object's encoded result must be a column-value object. Fragments and write helpers encode their values when created; placing them in another query does not encode those values again. `sql.json()` remains an explicit JSON marker; plugins should leave markers and nested JSON intact unless their contract intentionally converts them.
+Parameter input includes positional arguments or a single named-parameter object. It excludes interpolated fragments. The encoded result must be an array; named SQL still expects a single object in that array. A write object's encoded result must be a column-value object. Fragments and write helpers encode their values when created; placing them in another query does not encode those values again. `sql.json()` remains an explicit JSON marker; plugins should leave markers and nested JSON intact unless their contract intentionally converts them.
 
 `Types` extends `PluginTypes` (or `IdentityPluginTypes` for identity defaults) and uses `this["value"]` and `this["context"]` to define three type functions:
 

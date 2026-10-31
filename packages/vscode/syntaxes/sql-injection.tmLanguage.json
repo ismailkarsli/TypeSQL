@@ -325,14 +325,6 @@
 					"name": "variable.parameter.named.sql"
 				},
 				{
-					"match": "(\\{)([A-Za-z_][\\w$]*)(\\})",
-					"captures": {
-						"1": { "name": "punctuation.definition.slot.begin.sql" },
-						"2": { "name": "variable.other.slot.sql" },
-						"3": { "name": "punctuation.definition.slot.end.sql" }
-					}
-				},
-				{
 					"match": "(::)\\s*([A-Za-z_][\\w$]*)",
 					"captures": {
 						"1": { "name": "keyword.operator.cast.sql" },

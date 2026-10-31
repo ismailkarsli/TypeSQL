@@ -45,7 +45,6 @@ const SQL_TOKENS: TokenNames = {
 	escape: "regexp.definition",
 	operator: "operator.definition",
 	parameter: "parameter.definition",
-	slot: "macro.definition",
 	variable: "variable.definition",
 	punctuation: "string.definition",
 };

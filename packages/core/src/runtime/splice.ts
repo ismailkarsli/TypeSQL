@@ -7,7 +7,8 @@ export type SlotValues = { readonly [name: string]: Spliceable };
 
 export const QUOTED =
 	/(?<![A-Za-z0-9_$])[Ee]'(?:[^'\\]|\\[\s\S]|'')*'?|'(?:[^']|'')*'?|"(?:[^"]|"")*"?|--[^\n]*|\/\*[\s\S]*?(?:\*\/|$)/;
-const DOLLAR_QUOTED = /(\$(?:[A-Za-z_][A-Za-z0-9_]*)?\$)[\s\S]*?(?:\1|$)/;
+export const DOLLAR_QUOTED =
+	/(\$(?:[A-Za-z_][A-Za-z0-9_]*)?\$)[\s\S]*?(?:\1|$)/;
 const SLOT = new RegExp(
 	`${QUOTED.source}|${DOLLAR_QUOTED.source}|\\{([A-Za-z_][A-Za-z0-9_]*)\\}`,
 	"g",
@@ -53,8 +54,7 @@ export function splice(
 		(match: string, _open?: string, name?: string) => {
 			if (name === undefined) return match;
 			const frag = slots[name];
-			if (frag === undefined)
-				throw new Error(`typesql: unknown fragment slot {${name}}`);
+			if (frag === undefined) return match;
 			const fragmentText = renumberParams(frag.text, offset);
 			offset += frag.values.length;
 			allValues.push(...frag.values);

@@ -73,3 +73,19 @@ export type ValuesRep<R> =
 					readonly carried: CarriedOfKeys<R, Ks>;
 				}
 		: never;
+
+/** A value `sql.values` leaves out of its row: `undefined`, or a DEFAULT marker. */
+type MayOmit = undefined | `\u0000Du${string}\u0000`;
+/** Keys every row has, with a value that is always sent. */
+type AlwaysSent<R> = {
+	[K in KeysOf<R>]: [R] extends [{ readonly [P in K]: unknown }]
+		? [Extract<ValueAt<R, K>, MayOmit>] extends [never]
+			? K
+			: never
+		: never;
+}[KeysOf<R>];
+type PickEach<R, K> = R extends unknown
+	? { readonly [P in K & keyof R]: R[P] }
+	: never;
+/** The rows with only the columns `sql.values` always sends. */
+export type SentRows<R> = PickEach<R, AlwaysSent<R>>;

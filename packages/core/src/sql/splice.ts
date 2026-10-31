@@ -80,72 +80,10 @@ type CarriedIn<
 	: Acc;
 
 type Digit = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9";
-type IdStart =
-	| "a"
-	| "b"
-	| "c"
-	| "d"
-	| "e"
-	| "f"
-	| "g"
-	| "h"
-	| "i"
-	| "j"
-	| "k"
-	| "l"
-	| "m"
-	| "n"
-	| "o"
-	| "p"
-	| "q"
-	| "r"
-	| "s"
-	| "t"
-	| "u"
-	| "v"
-	| "w"
-	| "x"
-	| "y"
-	| "z"
-	| "A"
-	| "B"
-	| "C"
-	| "D"
-	| "E"
-	| "F"
-	| "G"
-	| "H"
-	| "I"
-	| "J"
-	| "K"
-	| "L"
-	| "M"
-	| "N"
-	| "O"
-	| "P"
-	| "Q"
-	| "R"
-	| "S"
-	| "T"
-	| "U"
-	| "V"
-	| "W"
-	| "X"
-	| "Y"
-	| "Z"
-	| "_";
-type IdChar = IdStart | Digit;
-
-type IsSlotName<N extends string> = N extends `${IdStart}${infer R}`
-	? AllIdChars<R>
-	: false;
-type AllIdChars<S extends string> = S extends ""
+/** Only the internal slots that interpolated fragments become; any other `{…}` is SQL text. */
+type IsSlotName<N extends string> = N extends `__typesql_inline${number}`
 	? true
-	: S extends `${infer C}${infer R}`
-		? C extends IdChar
-			? AllIdChars<R>
-			: false
-		: false;
+	: false;
 
 export type SlotNames<Q extends string> = SlotNamesIn<CodeOnly<Q>>;
 type SlotNamesIn<Q extends string> =
@@ -154,10 +92,6 @@ type SlotNamesIn<Q extends string> =
 			? Name | SlotNamesIn<Post>
 			: SlotNamesIn<Post>
 		: never;
-
-export type HasSlots<Q extends string> = [SlotNames<Q>] extends [never]
-	? false
-	: true;
 
 type Renumber<
 	T extends string,

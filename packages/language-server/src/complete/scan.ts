@@ -53,7 +53,8 @@ const DOLLAR_TAG = /\$(?:[A-Za-z_\u0080-￿][A-Za-z0-9_\u0080-￿]*)?\$/y;
 const NUMBER =
 	/(?:[0-9]|[.$][0-9])[0-9._]*(?:[eE][-+])?[A-Za-z0-9_$\u0080-￿]*/y;
 const NAMED_PARAM = /:[A-Za-z_][A-Za-z0-9_$\u0080-￿]*/y;
-const SLOT = /\{[A-Za-z_][A-Za-z0-9_]*\}/y;
+/** A `${…}` hole, which the call text pads as `$0`: a value or an interpolated fragment. */
+const HOLE = /\$0(?![0-9])/y;
 const PUNCTUATION = /::|./sy;
 const OPERATOR = /(?:(?!--|\/\*)[+\-*/<>=~!@#%^&|`?])+/y;
 
@@ -112,6 +113,10 @@ function lex(text: string, offset: number): { toks: Tok[]; inside: boolean } {
 			comment(s, depth > 0);
 			continue;
 		}
+		if (take(HOLE)) {
+			push("x", s);
+			continue;
+		}
 		if (value()) {
 			push("v", s);
 			continue;
@@ -121,8 +126,7 @@ function lex(text: string, offset: number): { toks: Tok[]; inside: boolean } {
 			push("q", s, quoted[1]!.replaceAll('""', '"'));
 			continue;
 		}
-		if (take(SLOT)) push("x", s);
-		else if (take(WORD)) push("w", s, fold(text.slice(s, i)));
+		if (take(WORD)) push("w", s, fold(text.slice(s, i)));
 		else {
 			if (!take(OPERATOR)) take(PUNCTUATION);
 			push("o", s);

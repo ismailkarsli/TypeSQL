@@ -23808,6 +23808,150 @@
 			"source": "order-param-nullability",
 			"sql": "SELECT id FROM users ORDER BY display_name || $1::text, created_at - $2::timestamptz",
 			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "comparison-operators",
+			"sql": "SELECT id FROM things WHERE id = label",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "comparison-operators",
+			"sql": "SELECT id FROM things WHERE n_id = n_text",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "comparison-operators",
+			"sql": "SELECT id FROM things WHERE flag = id",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "comparison-operators",
+			"sql": "SELECT id FROM things WHERE day > small",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "comparison-operators",
+			"sql": "SELECT id FROM things WHERE at > dur",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "comparison-operators",
+			"sql": "SELECT id FROM things WHERE uid = label",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "comparison-operators",
+			"sql": "SELECT id FROM things WHERE bin = label",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "comparison-operators",
+			"sql": "SELECT id FROM things WHERE id != label",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "comparison-operators",
+			"sql": "SELECT id FROM things WHERE id IN (1, label)",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "comparison-operators",
+			"sql": "SELECT id FROM things WHERE id IN (SELECT label FROM things)",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "comparison-operators",
+			"sql": "SELECT id FROM things WHERE n_id IN (SELECT n_text FROM things)",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "comparison-operators",
+			"sql": "SELECT id FROM things WHERE (id, label) IN (SELECT label, id FROM things)",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "comparison-operators",
+			"sql": "SELECT id FROM things WHERE id IS DISTINCT FROM label",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "comparison-operators",
+			"sql": "SELECT id FROM things WHERE id = ANY (SELECT label FROM things)",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "comparison-operators",
+			"sql": "SELECT id FROM things WHERE (id, label) = (label, id)",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "comparison-operators",
+			"sql": "SELECT id = big AS a, id < price AS b, ratio >= id AS c, label = vc AS d, day < ts AS e, ts <= at AS f FROM things",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "comparison-operators",
+			"sql": "SELECT id = '1' AS a, day > '2024-01-01' AS b, uid = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11' AS c, flag = 'true' AS d, dur > '1 day' AS e FROM things",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "comparison-operators",
+			"sql": "SELECT id IN (SELECT big FROM things) AS a, n_id IN (SELECT id FROM things) AS b, id IN (SELECT n_id FROM things) AS c, (id, label) IN (SELECT id, vc FROM things) AS d FROM things",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "comparison-operators",
+			"sql": "SELECT id IN (1, n_id) AS a, label IN ('a', vc) AS b, n_text IN ('a') AS c FROM things",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "comparison-operators",
+			"sql": "SELECT n_id IS DISTINCT FROM id AS a, label IS NOT DISTINCT FROM 'x' AS b, n_flag IS DISTINCT FROM NULL AS c FROM things",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "comparison-operators",
+			"sql": "SELECT id = ANY (SELECT price FROM things) AS a, n_text <> ALL (SELECT label FROM things) AS b, id::text = label AS c, label::int4 = n_id AS d FROM things",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "nested-limit-params",
+			"sql": "SELECT x4.id, x4.email FROM (SELECT x3.id, x3.email FROM (SELECT x2.id, x2.email FROM (SELECT x1.id, x1.email FROM (SELECT x0.id, x0.email FROM (SELECT u.id, u.email FROM users u WHERE u.id > 0 LIMIT $1) x0 JOIN posts p0 ON p0.author_id = x0.id WHERE p0.title <> 'a' LIMIT $2) x1 JOIN posts p1 ON p1.author_id = x1.id WHERE p1.title <> 'a' LIMIT $3) x2 JOIN posts p2 ON p2.author_id = x2.id WHERE p2.title <> 'a' LIMIT $4) x3 JOIN posts p3 ON p3.author_id = x3.id WHERE p3.title <> 'a' LIMIT $5) x4 JOIN posts p4 ON p4.author_id = x4.id WHERE p4.title <> 'a' LIMIT $6",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "nested-limit-params",
+			"sql": "SELECT (SELECT (SELECT (SELECT (SELECT u0.email FROM users u0 WHERE u0.id > 0 LIMIT $1) AS e1 FROM users u1 WHERE u1.id > 0 LIMIT $2) AS e2 FROM users u2 WHERE u2.id > 0 LIMIT $3) AS e3 FROM users u3 WHERE u3.id > 0 LIMIT $4) AS e4 FROM users u4 WHERE u4.id > 0 LIMIT $5",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "nested-limit-params",
+			"sql": "SELECT u.id, u.email FROM (SELECT * FROM users WHERE id > 0) u WHERE u.id IN (SELECT p0.author_id FROM posts p0 JOIN users w0 ON w0.id = p0.author_id WHERE p0.title <> 'x' LIMIT $1) AND u.id IN (SELECT p1.author_id FROM posts p1 JOIN users w1 ON w1.id = p1.author_id WHERE p1.title <> 'x' LIMIT $2) AND u.id IN (SELECT p2.author_id FROM posts p2 JOIN users w2 ON w2.id = p2.author_id WHERE p2.title <> 'x' LIMIT $3) AND u.id IN (SELECT p3.author_id FROM posts p3 JOIN users w3 ON w3.id = p3.author_id WHERE p3.title <> 'x' LIMIT $4) ORDER BY u.email OFFSET $5",
+			"ddl": false
 		}
 	],
 	"skippedSlots": {

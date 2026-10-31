@@ -69,7 +69,7 @@ const findUser = sql.prepare("SELECT id, email FROM users WHERE id = $1");
 const query = findUser(7);
 ```
 
-Named parameters and fixed fragments work too. The `pg` and `postgres` adapters also request server-side preparation when these queries execute. See the [prepared query API](https://typesql.karsli.net/reference/api#sql-prepare-text-slots).
+Named parameters and fixed fragments work too. The `pg` and `postgres` adapters also request server-side preparation when these queries execute. See the [prepared query API](https://typesql.karsli.net/reference/api#sql-prepare-text).
 
 ## Tracked migrations
 
@@ -122,9 +122,8 @@ Use `sql.withPlugin(new CasePlugin())` to accept camelCase write keys and return
 import { CasePlugin } from "@typesql/core";
 
 const appSql = sql.withPlugin(new CasePlugin());
-const query = appSql("UPDATE users SET {changes} RETURNING display_name", {
-  changes: appSql.set("users", { displayName: "Ada" }),
-});
+const changes = appSql.set("users", { displayName: "Ada" });
+const query = appSql(`UPDATE users SET ${changes} RETURNING display_name`);
 // query.execute() returns rows with displayName.
 ```
 

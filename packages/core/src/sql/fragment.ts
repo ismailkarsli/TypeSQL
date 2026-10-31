@@ -2,10 +2,18 @@ import type { Empty } from "../empty.js";
 import type { AnyErr, SqlError } from "../errors.js";
 import type { Fragment, TextType } from "../query.js";
 import type { HasDefaultable, ValueEnc } from "./inline.js";
-import type { CarriedOf, SlotTexts, Slottable } from "./slots.js";
+import type { Inlined, InlinedSlots, InlinedText } from "./inline-fragment.js";
 import type {
-	HasSlots,
+	CarriedOf,
+	SlotCarried,
+	SlotTexts,
+	Slottable,
+	SlotVariants,
+} from "./slots.js";
+import type {
 	JoinedText,
+	Splice,
+	SpliceCarried,
 	UnionList,
 	UnknownTuple,
 } from "./splice.js";
@@ -13,6 +21,7 @@ import type {
 	IsLiteral,
 	NotLiteralMessage,
 	Prepared,
+	PText,
 	Surface,
 } from "./text.js";
 
@@ -24,20 +33,18 @@ export type LiteralParts<Parts extends readonly string[]> = {
 			: Parts[I];
 };
 
-type FragCheck<Text extends string, Slotted extends boolean> =
+type FragCheck<Text extends string> =
 	IsLiteral<Text> extends false
 		? SqlError<NotLiteralMessage, 0>
-		: HasSlots<Text> extends Slotted
-			? Prepared<Text> extends infer P
-				? P extends AnyErr
-					? P
-					: HasDefaultable<Text> extends true
-						? SqlError<
-								"a sql.param() value that can be sql.empty, or a sql.json() value that can be undefined, is sent as DEFAULT, which a fragment cannot check; narrow it, or use null for SQL NULL",
-								null
-							>
-						: true
-				: never
+		: Prepared<Text> extends infer P
+			? P extends AnyErr
+				? P
+				: HasDefaultable<Text> extends true
+					? SqlError<
+							"a sql.param(sql.optional(…)) value, or a sql.json() value that can be undefined, is sent as DEFAULT, which a fragment cannot check; narrow it, or use null for SQL NULL",
+							null
+						>
+					: true
 			: never;
 
 type FragArgs<Text extends string> =
@@ -157,7 +164,7 @@ export type ListRep<E, Sep extends string, Wrap extends boolean = false> = [
 				: never
 		: never;
 
-// Match runtime filtering for sql.empty entries. Conditional entries are
+// Match runtime filtering for sql.optional(…) omissions. Conditional entries are
 // checked as present, like elements of a runtime list's representative statement.
 type PresentItems<
 	Items extends readonly (Slottable | Empty)[],
@@ -258,14 +265,38 @@ type Group<Text extends string, N> = string extends Text
 		? Text
 		: `(${Text})`;
 
-export type GateFragCheck<Text extends string, Slotted extends boolean> = [
-	Text,
-	Slotted,
-] extends [infer T2 extends string, infer B extends boolean]
-	? Surface<FragCheck<T2, B>>
+export type GateFragCheck<Text extends string> =
+	Inlined<Text> extends infer I extends AnyErr
+		? I
+		: [InlinedText<Text>] extends [infer T2 extends string]
+			? Surface<FragCheck<T2>>
+			: never;
+
+export type BoxFragArgs<Text extends string> = [InlinedText<Text>] extends [
+	infer T2 extends string,
+]
+	? Extract<{ [K in T2 as `${K}`]: FragArgs<K> }[`${T2}`], readonly unknown[]>
 	: never;
 
-export type BoxFragArgs<Text extends string> = Extract<
-	{ [K in Text as `${K}`]: FragArgs<K> }[`${Text}`],
-	readonly unknown[]
->;
+/** `sql.fragment(text, ...params)`; its `${fragment}` interpolations are slots. */
+export type PlainFragment<Text extends string, A extends readonly unknown[]> =
+	Inlined<Text> extends null
+		? Fragment<PText<Text>, UnknownTuple<FragCount<Text>>, FragCarried<Text, A>>
+		: InlinedFragment<Text, A>;
+
+/** One fragment for each combination of union fragments, so each text keeps its own values. */
+type InlinedFragment<Text extends string, A extends readonly unknown[]> = [
+	InlinedText<Text>,
+] extends [infer T2 extends string]
+	? SlotVariants<InlinedSlots<Text>> extends infer V
+		? V extends unknown
+			? Splice<PText<T2>, SlotTexts<V>> extends infer X extends string
+				? Fragment<
+						X,
+						readonly unknown[],
+						[...FragCarried<T2, A>, ...SpliceCarried<PText<T2>, SlotCarried<V>>]
+					>
+				: never
+			: never
+		: never
+	: never;

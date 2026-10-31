@@ -9,7 +9,6 @@ export type TokenKind =
 	| "comment"
 	| "operator"
 	| "parameter"
-	| "slot"
 	| "variable"
 	| "punctuation";
 
@@ -290,7 +289,6 @@ const OPERATOR = /[-+*/<>=~!@#%^&|?]+/y;
 const DOLLAR_TAG = /\$([A-Za-z_]\w*)?\$/y;
 const PARAM = /\$\d+/y;
 const NAMED = /:[A-Za-z_][\w$]*/y;
-const SLOT = /\{[A-Za-z_][\w$]*\}/y;
 const STRING_PREFIX = /(?:[eEbBxXnN]|[uU]&)'/y;
 
 const at = (re: RegExp, s: string, i: number): string | null => {
@@ -389,16 +387,6 @@ export function lex(s: string): Token[] {
 			if (named) {
 				push(i, i + named.length, "parameter");
 				i += named.length;
-				continue;
-			}
-		}
-		if (c === "{") {
-			const slot = at(SLOT, s, i);
-			if (slot) {
-				push(i, i + 1, "punctuation");
-				push(i + 1, i + slot.length - 1, "slot");
-				push(i + slot.length - 1, i + slot.length, "punctuation");
-				i += slot.length;
 				continue;
 			}
 		}

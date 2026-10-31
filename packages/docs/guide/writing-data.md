@@ -44,25 +44,25 @@ const touched = sql(`
 
 ## Optional values
 
-`sql.param(sql.empty)` sends `DEFAULT` instead of a parameter. Use `sql.param(value ?? sql.empty)` or `sql.param(sql.empty(value))` to explicitly request a default for a nullish value. `sql.param(undefined)` is rejected. The column's default stays in the database, so you don't copy it into a `coalesce(…)`:
+`sql.param(sql.optional(value))` sends `DEFAULT` instead of a parameter when the value is `undefined`, and `NULL` when it is `null`, as `sql.set` and `sql.values` do. `sql.param(undefined)` is rejected. The column's default stays in the database, so you don't copy it into a `coalesce(…)`:
 
 ```ts
 declare const mood: "happy" | "neutral" | "sad" | undefined;
 const signup = sql(`
   INSERT INTO users (email, mood)
-  VALUES (${sql.param("a@b.c")}, ${sql.param(mood ?? sql.empty)})
+  VALUES (${sql.param("a@b.c")}, ${sql.param(sql.optional(mood))})
   RETURNING id, mood`);
 signup.text;
 ```
 
-The value is checked like any parameter, without the `sql.empty` sentinel. When it can be `sql.empty`, the statement is checked a second time with `DEFAULT` in its place. So such a value for a `NOT NULL` column without a default is an error, and so is one outside a `VALUES` item or `SET` value:
+The value is checked like any parameter, without the omission. When it can be omitted, the statement is checked a second time with `DEFAULT` in its place. So such a value for a `NOT NULL` column without a default is an error, and so is one outside a `VALUES` item or `SET` value:
 
 ```ts
-sql(`INSERT INTO users (email) VALUES (${sql.param(maybeEmail ?? sql.empty)})`);
-sql(`SELECT id FROM users WHERE email = ${sql.param(maybeEmail ?? sql.empty)}`);
+sql(`INSERT INTO users (email) VALUES (${sql.param(sql.optional(maybeEmail))})`);
+sql(`SELECT id FROM users WHERE email = ${sql.param(sql.optional(maybeEmail))}`);
 ```
 
-Narrow the value first, or pass `maybeEmail ?? null` to send `NULL`. To preserve explicit `null` while using a default only for `undefined`, pass `maybeEmail === undefined ? sql.empty : maybeEmail`. `sql.fragment(…)` refuses a value that can be `sql.empty`: a fragment is checked where it is spliced, with `$n` for its values, so a `DEFAULT` there couldn't be checked. `any` and `unknown` values are not checked.
+Narrow the value first, or pass `maybeEmail ?? null` to send `NULL`. To send `DEFAULT` for `null` as well, pass `sql.optional(maybeEmail ?? undefined)`. `sql.fragment(…)` refuses a value that can be omitted: a fragment is checked where it is spliced, with `$n` for its values, so a `DEFAULT` there couldn't be checked. `any` and `unknown` values are not checked.
 
 `sql.json(value)` does the same for `undefined`: `sql.json(settings)` sends `DEFAULT` when `settings` is `undefined` and `NULL` when it is `null`, and is checked the same way.
 
@@ -77,8 +77,7 @@ declare const patch: {
 };
 const set = sql.set("users", patch);
 const patched = sql(
-	"UPDATE users SET {set} WHERE id = $1 RETURNING id, display_name, mood",
-	{ set },
+	`UPDATE users SET ${set} WHERE id = $1 RETURNING id, display_name, mood`,
 	7,
 );
 patched.text;
@@ -86,7 +85,8 @@ patched.text;
 
 - Keys must be columns of the table, and values must fit them: `null` only for nullable columns, enum values for enums.
 - Keys that are not columns are errors, even on a variable whose type has extra keys, because they would be sent.
-- Splice it into `UPDATE … SET {set}` or `ON CONFLICT … DO UPDATE SET {set}`. Other assignments can follow: `SET {set}, updated_at = now()`, for columns that are not keys of the input type (Postgres rejects a second assignment: `multiple assignments to same column "updated_at"`).
+- Interpolate it into ``UPDATE … SET ${set}`` or ``ON CONFLICT … DO UPDATE SET ${set}``. Other assignments can follow: ``SET ${set}, updated_at = now()``, for columns that are not keys of the input type (Postgres rejects a second assignment: `multiple assignments to same column "updated_at"`).
+- The table can be left out: ``UPDATE users SET ${sql.set(patch)} WHERE id = $1`` is checked against `users`, as if every key were set. A mistake is then reported on the statement instead of on the object's key.
 
 ::: warning Empty input
 If no value is defined at runtime, `sql.set` throws, because SQL needs at least one assignment. Skip the `UPDATE` (or `SELECT` the row) when the input is empty.
@@ -108,8 +108,7 @@ When accepting user input, validate payloads using a schema validation library w
 declare const imported: { email: string; display_name?: string | null }[];
 const rows = sql.values("users", imported);
 const inserted = sql(
-	"INSERT INTO users {rows} ON CONFLICT (email) DO NOTHING RETURNING id",
-	{ rows },
+	`INSERT INTO users ${rows} ON CONFLICT (email) DO NOTHING RETURNING id`,
 );
 inserted.text;
 ```
@@ -119,6 +118,15 @@ inserted.text;
 - A single row with no values becomes `DEFAULT VALUES`. An empty array throws, and so do several rows with no values.
 
 The table name is only used for typing. Write tables in other schemas as `"schema.table"`: `sql.values("auth.sessions", rows)`.
+
+The table can be left out, and the rows are then checked against the table of the `INSERT` they are interpolated into, as strictly. The statement is checked with every key, and again with only the keys every row always sends (not optional, not `undefined`, not `DEFAULT`), so a required column a row can leave out is still an error:
+
+```ts
+declare const form: { email?: string; display_name?: string | null };
+sql(`INSERT INTO users ${sql.values([form])} RETURNING id`);
+```
+
+Here `email` is `NOT NULL` without a default but optional in `form`, so the check without it fails: `null value in column "email" of relation "users" violates not-null constraint`. Mistakes are reported on the statement instead of on the row's keys.
 
 ::: warning Mass assignment in bulk inserts
 Like `sql.set`, `sql.values` checks column types at compile time, but at runtime it reflects every key present across all row objects into the `INSERT` column list. If row objects contain unvalidated user input, unexpected columns will be inserted. Validate input rows using a strict schema parser or explicitly pick allowed properties before passing objects to `sql.values`.
@@ -133,13 +141,13 @@ const patch = sql.set("portfolio", {
 	history: sql.json(history),
 	settings: { theme: "dark" },
 });
-const patched = sql("UPDATE portfolio SET {patch} WHERE id = $1", { patch }, 1);
+const patched = sql(`UPDATE portfolio SET ${patch} WHERE id = $1`, 1);
 
 const rows = sql.values("portfolio", [
 	{ name: "a", history: sql.json(history) },
 	{ name: "b" },
 ]);
-const created = sql("INSERT INTO portfolio {rows} RETURNING id", { rows });
+const created = sql(`INSERT INTO portfolio ${rows} RETURNING id`);
 ```
 
 On PostgreSQL a plain object also works as it is. SQLite drivers can't bind objects, so use `sql.json()` there. An array without `sql.json()` is an error, because node-postgres would send it as a Postgres array.

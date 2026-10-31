@@ -62,17 +62,11 @@ export const prepared = sql.prepare(
 );
 export const named = prepared([{ id: 7 }]);
 export const inserted = sql(
-	"INSERT INTO users {rows} RETURNING display_name",
-	{
-		rows: sql.values("users", [{ data: { id: 7, displayName: null } }]),
-	},
+	`INSERT INTO users ${sql.values("users", [{ data: { id: 7, displayName: null } }])} RETURNING display_name`,
 	[],
 );
 export const updated = sql(
-	"UPDATE users SET {changes} WHERE id = $1 RETURNING display_name",
-	{
-		changes: sql.set("users", { data: { displayName: "Ada" } }),
-	},
+	`UPDATE users SET ${sql.set("users", { data: { displayName: "Ada" } })} WHERE id = $1 RETURNING display_name`,
 	[7],
 );
 

@@ -62,20 +62,18 @@ assert.deepEqual(sql("SELECT id FROM users WHERE id = $1", 7), {
 
 const where = sql.fragment("AND age > :min", { min: 18 });
 assert.deepEqual(
-	sql(
-		"SELECT id FROM users WHERE email = :email {where}",
-		{ where },
-		{ email: "a@b.c" },
-	),
+	sql(`SELECT id FROM users WHERE email = :email ${where}`, {
+		email: "a@b.c",
+	}),
 	{
 		text: "SELECT id FROM users WHERE email = $1 AND age > $2",
 		values: ["a@b.c", 18],
 	},
 );
-assert.deepEqual(
-	sql("SELECT {col} FROM users", { col: sql.id("display_name") }),
-	{ text: 'SELECT "display_name" FROM users', values: [] },
-);
+assert.deepEqual(sql(`SELECT ${sql.id("display_name")} FROM users`), {
+	text: 'SELECT "display_name" FROM users',
+	values: [],
+});
 assert.deepEqual(sql.id('quoted"name'), {
 	text: '"quoted""name"',
 	values: [],
@@ -100,17 +98,14 @@ const writeModel = {
 	jsonData: { innerKey: "kept" },
 };
 const camelInserted = camelWrites(
-	"INSERT INTO write_rows {rows} RETURNING display_name, optional_name",
-	{
-		rows: camelWrites.values("write_rows", [
-			{ ...writeModel, jsonData: camelWrites.json(writeModel.jsonData) },
-			{
-				...writeModel,
-				optionalName: undefined,
-				jsonData: camelWrites.json(writeModel.jsonData),
-			},
-		]),
-	},
+	`INSERT INTO write_rows ${camelWrites.values("write_rows", [
+		{ ...writeModel, jsonData: camelWrites.json(writeModel.jsonData) },
+		{
+			...writeModel,
+			optionalName: undefined,
+			jsonData: camelWrites.json(writeModel.jsonData),
+		},
+	])} RETURNING display_name, optional_name`,
 );
 assert.equal(
 	camelInserted.text,
@@ -145,14 +140,11 @@ assert.deepEqual(defaults.values("defaults", [{ id: undefined }]), {
 	values: [],
 });
 const camelUpdated = camelWrites(
-	"UPDATE write_rows SET {changes} RETURNING display_name",
-	{
-		changes: camelWrites.set("write_rows", {
-			...writeModel,
-			optionalName: undefined,
-			jsonData: camelWrites.json(writeModel.jsonData),
-		}),
-	},
+	`UPDATE write_rows SET ${camelWrites.set("write_rows", {
+		...writeModel,
+		optionalName: undefined,
+		jsonData: camelWrites.json(writeModel.jsonData),
+	})} RETURNING display_name`,
 );
 assert.equal(
 	camelUpdated.text,
@@ -161,9 +153,7 @@ assert.equal(
 assert.equal(camelUpdated.values[0], "Ada");
 assert.equal(JSON.stringify(camelUpdated.values[1]), '{"innerKey":"kept"}');
 assert.deepEqual(
-	sql("UPDATE users SET {changes}", {
-		changes: sql.set("users", { display_name: "Ada" }),
-	}),
+	sql(`UPDATE users SET ${sql.set("users", { display_name: "Ada" })}`),
 	{
 		text: 'UPDATE users SET "display_name" = $1',
 		values: ["Ada"],
@@ -181,10 +171,7 @@ assert.deepEqual(
 );
 const cased = sql.withPlugin(casePlugin);
 const encodedWrite = cased(
-	"UPDATE users SET {changes} RETURNING display_name",
-	{
-		changes: cased.set("users", { displayName: "Ada" }),
-	},
+	`UPDATE users SET ${cased.set("users", { displayName: "Ada" })} RETURNING display_name`,
 );
 assert.equal(
 	encodedWrite.text,
@@ -270,35 +257,28 @@ assert.deepEqual(
 const envelopedWhere = enveloped.fragment("AND age > $1", [18]);
 assert.deepEqual(
 	enveloped(
-		"SELECT display_name FROM users WHERE id = $1 {where}",
-		{ where: envelopedWhere },
+		`SELECT display_name FROM users WHERE id = $1 ${envelopedWhere}`,
 		[7],
 	).values,
 	[7, 18],
 );
 assert.deepEqual(
-	enveloped.prepare("SELECT display_name FROM users WHERE id = $1 {where}", {
-		where: envelopedWhere,
-	})([8]).values,
+	enveloped.prepare(
+		`SELECT display_name FROM users WHERE id = $1 ${envelopedWhere}`,
+	)([8]).values,
 	[8, 18],
 );
 assert.deepEqual(
 	enveloped(
-		"UPDATE users SET {changes} WHERE id = $1",
-		{
-			changes: enveloped.set("users", { data: { displayName: "Grace" } }),
-		},
+		`UPDATE users SET ${enveloped.set("users", { data: { displayName: "Grace" } })} WHERE id = $1`,
 		[9],
 	).values,
 	[9, "Grace"],
 );
 const envelopeInsert = enveloped(
-	"INSERT INTO users {rows}",
-	{
-		rows: enveloped.values("users", [
-			{ data: { id: 1, email: "a@b.c", age: 18, displayName: "Ada" } },
-		]),
-	},
+	`INSERT INTO users ${enveloped.values("users", [
+		{ data: { id: 1, email: "a@b.c", age: 18, displayName: "Ada" } },
+	])}`,
 	[],
 );
 assert.match(envelopeInsert.text, /"display_name"/);
@@ -390,26 +370,35 @@ const evil = "x'; DROP TABLE users; --";
 for (const includeEmail of [false, true]) {
 	const filters = sql.combine(
 		[
-			sql.empty,
+			sql.optional(undefined),
 			sql.fragment("id > $1", 5),
-			sql.empty(includeEmail ? sql.fragment("email = $1", evil) : null),
-			sql.empty,
+			sql.optional(includeEmail ? sql.fragment("email = $1", evil) : undefined),
+			sql.optional(undefined),
 			sql.fragment("age > $1", 18),
-			sql.empty,
+			sql.optional(undefined),
 		],
 		{ separator: " AND " },
 	);
-	assert.deepEqual(sql("SELECT id FROM users WHERE {filters}", { filters }), {
+	assert.deepEqual(sql(`SELECT id FROM users WHERE ${filters}`), {
 		text: includeEmail
 			? "SELECT id FROM users WHERE id > $1 AND email = $2 AND age > $3"
 			: "SELECT id FROM users WHERE id > $1 AND age > $2",
 		values: includeEmail ? [5, evil, 18] : [5, 18],
 	});
-	const items = [sql.empty, sql.fragment("$1", evil), sql.empty];
+	const items = [
+		sql.optional(undefined),
+		sql.fragment("$1", evil),
+		sql.optional(undefined),
+	];
 	assert.deepEqual(sql.combine(items), { text: "$1", values: [evil] });
 }
 assert.deepEqual(
-	sql.combine([sql.empty, sql.id("id"), sql.empty, sql.id("email")]),
+	sql.combine([
+		sql.optional(undefined),
+		sql.id("id"),
+		sql.optional(undefined),
+		sql.id("email"),
+	]),
 	{
 		text: '"id", "email"',
 		values: [],
@@ -417,13 +406,13 @@ assert.deepEqual(
 );
 for (const includeEmail of [false, true]) {
 	const filters = sql.and([
-		sql.empty,
+		sql.optional(undefined),
 		sql.fragment("id > $1", 5),
-		sql.empty(includeEmail ? sql.fragment("email = $1", evil) : null),
+		sql.optional(includeEmail ? sql.fragment("email = $1", evil) : undefined),
 		sql.or([sql.fragment("age > $1", 18), sql.fragment("age < $1", 3)]),
 	]);
 	assert.deepEqual(
-		sql("SELECT id FROM users WHERE id <> $1 AND {filters}", { filters }, 0),
+		sql(`SELECT id FROM users WHERE id <> $1 AND ${filters}`, 0),
 		{
 			text: includeEmail
 				? "SELECT id FROM users WHERE id <> $1 AND ((id > $2) AND (email = $3) AND ((age > $4) OR (age < $5)))"
@@ -437,15 +426,21 @@ assert.deepEqual(sql.and([sql.fragment("id = $1 OR id = $2", 1, 2)]), {
 	values: [1, 2],
 });
 assert.deepEqual(sql.and([]), { text: "true", values: [] });
-assert.deepEqual(sql.and([sql.empty]), { text: "true", values: [] });
+assert.deepEqual(sql.and([sql.optional(undefined)]), {
+	text: "true",
+	values: [],
+});
 assert.deepEqual(sql.or([]), { text: "false", values: [] });
-assert.deepEqual(sql.or([sql.empty, sql.empty]), { text: "false", values: [] });
+assert.deepEqual(sql.or([sql.optional(undefined), sql.optional(undefined)]), {
+	text: "false",
+	values: [],
+});
 assert.deepEqual(sql.and([sql.fragment("id = 1"), sql.or([])]), {
 	text: "((id = 1) AND false)",
 	values: [],
 });
 assert.throws(() => {
-	// @ts-expect-error undefined must be made explicit with sql.empty.
+	// @ts-expect-error undefined must be made explicit with sql.optional().
 	sql.and([undefined]);
 }, /sql\.and\(\) does not accept null or undefined/);
 assert.throws(() => {
@@ -454,11 +449,11 @@ assert.throws(() => {
 }, /sql\.or\(\) does not accept null or undefined/);
 assert.throws(() => sql.combine([]), /needs at least one item/);
 assert.throws(
-	() => sql.combine([sql.empty, sql.empty]),
+	() => sql.combine([sql.optional(undefined), sql.optional(undefined)]),
 	/needs at least one item/,
 );
 assert.throws(() => {
-	// @ts-expect-error undefined must be made explicit with sql.empty.
+	// @ts-expect-error undefined must be made explicit with sql.optional().
 	sql.combine([undefined]);
 }, /does not accept null or undefined/);
 assert.throws(() => {
@@ -470,27 +465,29 @@ assert.throws(() => {
 	sql.param(undefined);
 }, /does not accept undefined/);
 
-assert.equal(sql.empty(null), sql.empty);
-assert.equal(sql.empty(undefined), sql.empty);
-assert.equal(sql.empty(sql.empty), sql.empty);
+// undefined is the omission; null stays SQL NULL.
+assert.equal(sql.optional(null), null);
+assert.equal(sql.optional(sql.optional(undefined)), sql.optional(undefined));
 const required = sql.fragment("id > $1", 5);
-assert.equal(sql.empty(required), required);
+assert.equal(sql.optional(required), required);
 assert.throws(() => sql.combine(new Array<typeof required>(1)), /undefined/);
 for (const value of [0, false, "", null] as const) {
 	assert.deepEqual(sql(`SELECT ${sql.param(value)}`), {
 		text: "SELECT $1",
 		values: [value],
 	});
-	if (value !== null) {
-		assert.equal(sql.empty(value), value);
-		assert.deepEqual(sql(`SELECT ${sql.param(sql.empty(value))}`), {
-			text: "SELECT $1",
-			values: [value],
-		});
-	}
+	assert.equal(sql.optional(value), value);
+	assert.deepEqual(sql(`SELECT ${sql.param(sql.optional(value))}`), {
+		text: "SELECT $1",
+		values: [value],
+	});
 }
 for (const value of [0, 7, null, undefined]) {
-	for (const optional of [value ?? sql.empty, sql.empty(value)]) {
+	const optionals =
+		value === null
+			? [value ?? sql.optional(undefined)]
+			: [value ?? sql.optional(undefined), sql.optional(value)];
+	for (const optional of optionals) {
 		assert.deepEqual(
 			sql(
 				`UPDATE preferences SET retries = ${sql.param(optional)} WHERE email = ${sql.param(evil)}`,
@@ -505,12 +502,20 @@ for (const value of [0, 7, null, undefined]) {
 		);
 	}
 }
+for (const note of ["n", null, undefined] as const) {
+	assert.deepEqual(
+		sql(`UPDATE preferences SET note = ${sql.param(sql.optional(note))}`),
+		note === undefined
+			? { text: "UPDATE preferences SET note = DEFAULT", values: [] }
+			: { text: "UPDATE preferences SET note = $1", values: [note] },
+	);
+}
 assert.throws(
-	() => sql.as("SELECT $1", sql.empty),
+	() => sql.as("SELECT $1", sql.optional(undefined)),
 	/cannot be a bound parameter/,
 );
 assert.throws(
-	() => sql.as("SELECT $1", sql.param(sql.empty)),
+	() => sql.as("SELECT $1", sql.param(sql.optional(undefined))),
 	/must be interpolated inline/,
 );
 
@@ -569,18 +574,18 @@ assert.deepEqual(prefs.as(`SELECT ${prefs.json(null)}::jsonb AS j`).values, [
 	null,
 ]);
 assert.deepEqual(
-	prefs("INSERT INTO prefs {rows}", {
-		rows: prefs.values("prefs", [
+	prefs(
+		`INSERT INTO prefs ${prefs.values("prefs", [
 			{ mood: "sad", theme: prefs.json(noTheme) },
 			{ mood: "happy", theme: prefs.json({ mode: "dark" }) },
-		]),
-	}).text,
+		])}`,
+	).text,
 	'INSERT INTO prefs ("mood", "theme") VALUES ($1, DEFAULT), ($2, $3)',
 );
 assert.equal(
-	prefs("UPDATE prefs SET {patch}", {
-		patch: prefs.set("prefs", { mood: "sad", theme: prefs.json(noTheme) }),
-	}).text,
+	prefs(
+		`UPDATE prefs SET ${prefs.set("prefs", { mood: "sad", theme: prefs.json(noTheme) })}`,
+	).text,
 	'UPDATE prefs SET "mood" = $1',
 );
 assert.throws(
@@ -592,7 +597,7 @@ assert.throws(
 const repeated = sql.param("repeat");
 assert.deepEqual(
 	sql.as(
-		`SELECT $2, ${repeated}, ${repeated}, ${sql.param(sql.empty)}, '$99', "$88" -- $77\n`,
+		`SELECT $2, ${repeated}, ${repeated}, ${sql.param(sql.optional(undefined))}, '$99', "$88" -- $77\n`,
 		1,
 		2,
 	),
@@ -619,7 +624,7 @@ for (const [open, close] of [
 	});
 }
 const piece = sql.fragment("$1, '$99', $$ $88 $$", 3);
-assert.deepEqual(sql.as("SELECT $2, {piece}, {piece}", { piece }, 1, 2), {
+assert.deepEqual(sql.as(`SELECT $2, ${piece}, ${piece}`, 1, 2), {
 	text: "SELECT $2, $3, '$99', $$ $88 $$, $4, '$99', $$ $88 $$",
 	values: [1, 2, 3, 3],
 });
@@ -629,14 +634,131 @@ const anchored = sql.fragment(
 	30,
 );
 assert.deepEqual(
-	sql(`SELECT {anchored} FROM users WHERE id = ${sql.param(7)}`, {
-		anchored,
-	}),
+	sql(`SELECT ${anchored} FROM users WHERE id = ${sql.param(7)}`),
 	{
 		text: "SELECT (SELECT u.id FROM users u WHERE u.email ~ '^a$' AND u.age = $2 AND u.display_name <> $tag$ $1 $tag$ ORDER BY substring(u.display_name FROM '[0-9]+$')::int LIMIT 1) AS x FROM users WHERE id = $1",
 		values: [7, 30],
 	},
 );
+
+// Interpolated fragments splice in place, after the statement's own values.
+const shown = sql.id("email");
+const adult = sql.fragment("age > $1", 18);
+assert.deepEqual(
+	sql(
+		`SELECT ${shown} FROM users WHERE ${sql.and([adult, sql.fragment("id < $1", 9)])} ${sql.fragment("AND id > $1", 1)} AND email <> :e AND id <> ${sql.param(3)}`,
+		{ e: "x" },
+	),
+	{
+		text: 'SELECT "email" FROM users WHERE ((age > $3) AND (id < $4)) AND id > $5 AND email <> $1 AND id <> $2',
+		values: ["x", 3, 18, 9, 1],
+	},
+);
+const nested = sql.fragment(`AND ${shown} = $1`, "a@b.c");
+assert.deepEqual(sql(`SELECT id FROM users WHERE ${adult} ${nested}`), {
+	text: 'SELECT id FROM users WHERE age > $1 AND "email" = $2',
+	values: [18, "a@b.c"],
+});
+const findShown = sql.prepare(`SELECT ${shown} FROM users WHERE id = $1`);
+assert.deepEqual(findShown(4), {
+	text: 'SELECT "email" FROM users WHERE id = $1',
+	values: [4],
+});
+for (const [open, close] of [
+	["'", "'"],
+	['"', '"'],
+	["$$", "$$"],
+	["/*", "*/"],
+	["--", "\n"],
+]) {
+	assert.throws(
+		() => sql.as(`SELECT ${open}${shown}${close}`),
+		/cannot be interpolated inside/,
+	);
+}
+const adults = sql(`SELECT id FROM users WHERE ${adult}`);
+const adultEmails = sql(`SELECT ${shown} FROM users WHERE id IN (${adults})`);
+assert.deepEqual(
+	sql(
+		`SELECT id FROM users WHERE email IN (${adultEmails}) AND id <> $1 ${sql.fragment("")}`,
+		2,
+	),
+	{
+		text: 'SELECT id FROM users WHERE email IN (SELECT "email" FROM users WHERE id IN (SELECT id FROM users WHERE age > $2)) AND id <> $1 ',
+		values: [2, 18],
+	},
+);
+assert.throws(
+	() => sql.as("SELECT id FROM users WHERE id = $1", adults),
+	/not a parameter value/,
+);
+// Without a table, sql.set and sql.values take the target of the statement.
+assert.deepEqual(
+	sql(
+		`INSERT INTO preferences ${sql.values([{ email: "a@b.c" }, { email: "d@e.f", retries: 2 }])} RETURNING email`,
+	),
+	{
+		text: 'INSERT INTO preferences ("email", "retries") VALUES ($1, DEFAULT), ($2, $3) RETURNING email',
+		values: ["a@b.c", "d@e.f", 2],
+	},
+);
+assert.deepEqual(
+	sql(
+		`UPDATE preferences SET ${sql.set({ note: null, retries: undefined })} WHERE email = $1`,
+		"a@b.c",
+	),
+	{
+		text: 'UPDATE preferences SET "note" = $2 WHERE email = $1',
+		values: ["a@b.c", null],
+	},
+);
+// An omitted optional fragment splices nothing.
+for (const more of [sql.fragment("AND id > $1", 1), undefined]) {
+	assert.deepEqual(
+		sql(`SELECT id FROM users WHERE id < $1 ${sql.optional(more)}`, 9),
+		more
+			? {
+					text: "SELECT id FROM users WHERE id < $1 AND id > $2",
+					values: [9, 1],
+				}
+			: { text: "SELECT id FROM users WHERE id < $1 ", values: [9] },
+	);
+}
+// sql.if gives the fragment for a truthy value, and the omission otherwise.
+for (const search of ["a%", "", undefined] as const) {
+	assert.deepEqual(
+		sql(
+			`SELECT id FROM users WHERE id < $1 ${sql.if(search, (s) => sql.fragment(`AND email LIKE ${sql.param(s)}`))}`,
+			9,
+		),
+		search
+			? {
+					text: "SELECT id FROM users WHERE id < $1 AND email LIKE $2",
+					values: [9, search],
+				}
+			: { text: "SELECT id FROM users WHERE id < $1 ", values: [9] },
+	);
+}
+assert.deepEqual(
+	sql.and([
+		sql.if(0, () => sql.fragment("false")),
+		sql.if(7, (n) => sql.fragment("id = $1", n)),
+	]),
+	{ text: "(id = $1)", values: [7] },
+);
+// A {name} in the SQL is plain text now, not a slot.
+assert.deepEqual(sql.as("SELECT '{a}', {b}"), {
+	text: "SELECT '{a}', {b}",
+	values: [],
+});
+const once = `SELECT ${shown} FROM users`;
+sql.as(once);
+assert.throws(() => sql.as(once), /already used/);
+assert.throws(
+	() => sql.as("SELECT id FROM users WHERE email = $1", shown),
+	/not a parameter value/,
+);
+assert.throws(() => sql.param(shown as never), /not a fragment/);
 
 // sql.json() accepts recursive JSON types such as zod's `JSONType`.
 type JsonTree =
@@ -655,9 +777,9 @@ const notes = core.createSql<{
 const note: { extra_data?: JsonTree | null } = {
 	extra_data: { tags: ["a", ["b"]] },
 };
-const noteInsert = notes(`INSERT INTO notes {v} RETURNING *`, {
-	v: notes.values("notes", [{ extra_data: notes.json(note.extra_data) }]),
-});
+const noteInsert = notes(
+	`INSERT INTO notes ${notes.values("notes", [{ extra_data: notes.json(note.extra_data) }])} RETURNING *`,
+);
 assert.equal(
 	noteInsert.text,
 	'INSERT INTO notes ("extra_data") VALUES ($1) RETURNING *',
@@ -705,11 +827,7 @@ assert.deepEqual(inner, {
 	values: [1],
 });
 assert.deepEqual(
-	custom(
-		"SELECT id FROM users WHERE age > $1 AND id IN ({inner})",
-		{ inner },
-		2,
-	),
+	custom(`SELECT id FROM users WHERE age > $1 AND id IN (${inner})`, 2),
 	{
 		text: "SELECT id FROM users WHERE age > $1 AND id IN (SELECT id FROM users WHERE id = $2)",
 		values: [2, 1],
@@ -783,18 +901,15 @@ try {
 		.withPlugin(new core.CasePlugin())
 		.withPlugin(new EnvelopePlugin());
 	const sqlitePluginQuery = sqlitePlugins(
-		"INSERT INTO plugin_rows {rows} RETURNING user_id, display_name, json_data",
-		{
-			rows: sqlitePlugins.values("plugin_rows", [
-				{
-					data: {
-						userId: 1,
-						displayName: null,
-						jsonData: '{"inner_key":"kept"}',
-					},
+		`INSERT INTO plugin_rows ${sqlitePlugins.values("plugin_rows", [
+			{
+				data: {
+					userId: 1,
+					displayName: null,
+					jsonData: '{"inner_key":"kept"}',
 				},
-			]),
-		},
+			},
+		])} RETURNING user_id, display_name, json_data`,
 		[],
 	);
 	assert.equal(
@@ -808,10 +923,7 @@ try {
 	]);
 	await sqlitePlugins.transaction(async (tx) => {
 		await tx(
-			"UPDATE plugin_rows SET {changes} WHERE user_id = $1",
-			{
-				changes: tx.set("plugin_rows", { data: { displayName: "Ada" } }),
-			},
+			`UPDATE plugin_rows SET ${tx.set("plugin_rows", { data: { displayName: "Ada" } })} WHERE user_id = $1`,
 			[1],
 		).execute();
 		const read = tx.prepare(

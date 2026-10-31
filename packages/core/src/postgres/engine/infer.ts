@@ -13,7 +13,7 @@ import type { FastSelect } from "./parser/fast.js";
 import type { ParseProgram } from "./parser/stmt.js";
 import type { ParamsOfDml } from "./project/dml.js";
 import type { ProjectStmt } from "./project/stmt.js";
-import type { ParamsOfSelect } from "./typer/params.js";
+import type { ParamsOfSelect, SettleSortKeys } from "./typer/params.js";
 
 export type Analyze<DB, Q extends string> =
 	RewriteNamed<Q> extends infer RN
@@ -98,16 +98,18 @@ type ParamsOfStmt<
 	S extends Stmt,
 	DB,
 	SkipTargets extends boolean = false,
-> = S extends SelectStmt
-	? ParamsOfSelect<S, DB, [], {}, never, SkipTargets>
-	: S extends DmlStmt
-		? ParamsOfDml<S, DB, {}, never>
-		: S extends {
-					readonly t: "declare_cursor";
-					readonly q: infer Q extends SelectStmt;
-				}
-			? ParamsOfSelect<Q, DB, [], {}, never>
-			: never;
+> = SettleSortKeys<
+	S extends SelectStmt
+		? ParamsOfSelect<S, DB, [], {}, never, SkipTargets>
+		: S extends DmlStmt
+			? ParamsOfDml<S, DB, {}, never>
+			: S extends {
+						readonly t: "declare_cursor";
+						readonly q: infer Q extends SelectStmt;
+					}
+				? ParamsOfSelect<Q, DB, [], {}, never>
+				: never
+>;
 
 export type RowOf<DB, TM, Q extends string> = Shared.RowOf<PgEngine, DB, TM, Q>;
 

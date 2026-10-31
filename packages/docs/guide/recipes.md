@@ -21,11 +21,15 @@ To leave a filter out of the statement instead, combine fragments with [`sql.and
 
 ```ts
 const where = sql.and([
-	filters.email === null ? sql.empty : sql.fragment("email = $1", filters.email),
-	filters.minId === null ? sql.empty : sql.fragment("id >= $1", filters.minId),
+	sql.if(filters.email, (email) => sql.fragment("email = $1", email)),
+	sql.optional(
+		filters.minId === null ? undefined : sql.fragment("id >= $1", filters.minId),
+	),
 ]);
-const filtered = sql("SELECT id, email FROM users WHERE {where}", { where });
+const filtered = sql(`SELECT id, email FROM users WHERE ${where}`);
 ```
+
+`sql.if` builds a filter only for a truthy value, so an empty `email` is skipped too. `minId` goes through `sql.optional` instead, because `0` is a valid minimum.
 
 ## A sort order the user picks
 
@@ -38,9 +42,9 @@ const ORDER = {
 	email: sql.fragment("email"),
 } as const;
 
-const sortedUsers = sql("SELECT id, email FROM users ORDER BY {order}, id", {
-	order: ORDER[sort],
-});
+const sortedUsers = sql(
+	`SELECT id, email FROM users ORDER BY ${ORDER[sort]}, id`,
+);
 ```
 
 Mapping user choices through an allowlist dictionary or validating sort keys with a strict enum schema guarantees that users cannot choose sensitive columns (such as `password_hash` or internal tokens) or supply invalid column names that would trigger database errors.
@@ -76,7 +80,7 @@ type UserPatch = {
 
 function updateUser(id: number, patch: UserPatch) {
 	const set = sql.set("users", patch);
-	return sql("UPDATE users SET {set} WHERE id = $1 RETURNING id", { set }, id);
+	return sql(`UPDATE users SET ${set} WHERE id = $1 RETURNING id`, id);
 }
 ```
 
@@ -92,7 +96,7 @@ At runtime, `sql.set` writes every key present on the input object. When taking 
 
 ```ts
 const rows = sql.values("posts", newPosts);
-const created = sql("INSERT INTO posts {rows} RETURNING id", { rows });
+const created = sql(`INSERT INTO posts ${rows} RETURNING id`);
 ```
 
 For very large batches, send one array per column and `unnest` them. The statement text then stays the same size, whatever the number of rows, and array elements accept `null`:

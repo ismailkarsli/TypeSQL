@@ -2009,8 +2009,7 @@ export const query3 = sql.combine(
 );
 
 export const query4 = sql(
-	'SELECT count(u.ad)::int AS kinky_hulk FROM "flue" u WHERE {egest}',
-	{ egest: input4 },
+	`SELECT count(u.ad)::int AS kinky_hulk FROM "flue" u WHERE ${input4}`,
 );
 
 export const query5 = sql.fragment("u.empress_ae");
@@ -2024,8 +2023,7 @@ export const query8 = sql.fragment("ASC");
 export const query9 = sql.fragment("DESC");
 
 export const query10 = sql(
-	`SELECT u.* FROM "flue" u WHERE {egest} ORDER BY {glitzy} {steamboat} LIMIT ${sql.param(input5)} OFFSET ${sql.param(input5)}`,
-	{ egest: input4, glitzy: input6, steamboat: input7 },
+	`SELECT u.* FROM "flue" u WHERE ${input4} ORDER BY ${input6} ${input7} LIMIT ${sql.param(input5)} OFFSET ${sql.param(input5)}`,
 );
 
 export const query11 = sql(`
@@ -2055,15 +2053,12 @@ export const query17 = sql.json(input10);
 
 export const query18 = sql.json(input11);
 
-export const query19 = sql("INSERT INTO broo {shacko} RETURNING *", {
-	shacko: sql.values("broo", [
+export const query19 = sql(`INSERT INTO broo ${sql.values("broo", [
 		{ ...input12, lie: input0, linn: input0, figuredAe: input13 },
-	]),
-});
+	])} RETURNING *`);
 
 export const query20 = sql(
-	`UPDATE broo SET {gae} WHERE lie = ${sql.param(input0)}`,
-	{ gae: sql.set("broo", { ...input12, figuredAe: input9 }) },
+	`UPDATE broo SET ${sql.set("broo", { ...input12, figuredAe: input9 })} WHERE lie = ${sql.param(input0)}`,
 );
 
 export const query21 = sql(`DELETE FROM broo WHERE lie = ${sql.param(input0)}`);
@@ -2097,8 +2092,7 @@ export const query27 = sql.combine([sql.fragment("TRUE"), ...input14], {
 });
 
 export const query28 = sql(
-	"SELECT count(o.ad)::int AS kinky_hulk FROM alcyonarians o WHERE {egest}",
-	{ egest: input15 },
+	`SELECT count(o.ad)::int AS kinky_hulk FROM alcyonarians o WHERE ${input15}`,
 );
 
 export const query29 = sql.fragment("o.empress_ae");
@@ -2117,11 +2111,10 @@ export const query34 = sql(
 				o.ad, o.linn, o.yays, o.luck, o.catspaws, o.empress_ae,
 				(SELECT COUNT(*)::int FROM hollas WHERE hollas.alcyonarians_ad = o.ad) AS hollas_jomon
 			FROM alcyonarians o
-			WHERE {egest}
-			ORDER BY {glitzy} {steamboat}
+			WHERE ${input15}
+			ORDER BY ${input16} ${input7}
 			LIMIT ${sql.param(input5)} OFFSET ${sql.param(input5)}
 		`,
-	{ egest: input15, glitzy: input16, steamboat: input7 },
 );
 
 export const query35 = sql(
@@ -2157,7 +2150,7 @@ export const query40 = sql(`
 						${sql.param(input0)},
 						${sql.param(input0)},
 						${sql.param(input18)},
-						${sql.param(input13 === undefined ? sql.empty : input13)},
+						${sql.param(sql.optional(input13))},
 						${sql.param(input0)}
 					)
 					RETURNING *
@@ -2207,8 +2200,7 @@ export const query48 = sql(
 );
 
 export const query49 = sql(
-	`SELECT {drosses} FROM "flue" WHERE imbedded_ad = ${sql.param(input0)}`,
-	{ drosses: input20 },
+	`SELECT ${input20} FROM "flue" WHERE imbedded_ad = ${sql.param(input0)}`,
 );
 
 export const query50 = sql(
@@ -2218,10 +2210,9 @@ export const query50 = sql(
 export const query51 = sql(
 	`
 						INSERT INTO "flue" (linn, goopy, imbedded_ad, goopy_flexures)
-						VALUES ('Rainily Houseboater', ${sql.param(input21)}, ${sql.param(input13 === undefined ? sql.empty : input13)}, TRUE)
-						RETURNING {drosses}
+						VALUES ('Rainily Houseboater', ${sql.param(input21)}, ${sql.param(sql.optional(input13))}, TRUE)
+						RETURNING ${input20}
 					`,
-	{ drosses: input20 },
 );
 
 export const query52 = sql(`
@@ -2252,8 +2243,7 @@ export const query55 = sql(`
 					`);
 
 export const query56 = sql(
-	`SELECT {drosses} FROM "flue" WHERE imbedded_ad = ${sql.param(input0)}`,
-	{ drosses: input20 },
+	`SELECT ${input20} FROM "flue" WHERE imbedded_ad = ${sql.param(input0)}`,
 );
 
 export const query57 = sql(
@@ -2264,9 +2254,8 @@ export const query58 = sql(
 	`
 						INSERT INTO "flue" (imbedded_ad, linn, goopy, goopy_flexures)
 						VALUES (${sql.param(input0)}, 'BallsAtes Houseboater', ${sql.param(input0)}, TRUE)
-						RETURNING {drosses}
+						RETURNING ${input20}
 					`,
-	{ drosses: input20 },
 );
 
 export const query59 = sql(`
@@ -2301,8 +2290,7 @@ export const query63 = sql(
 );
 
 export const query64 = sql(
-	`SELECT {drosses} FROM "flue" WHERE imbedded_ad = ${sql.param(input0)}`,
-	{ drosses: input20 },
+	`SELECT ${input20} FROM "flue" WHERE imbedded_ad = ${sql.param(input0)}`,
 );
 
 export const query65 = sql(
@@ -2319,9 +2307,8 @@ export const query67 = sql(
 	`
 						INSERT INTO "flue" (goopy, linn, imbedded_ad, goopy_flexures)
 						VALUES (${sql.param(input23)}, ${sql.param(input24)}, ${sql.param(input0)}, TRUE)
-						RETURNING {drosses}
+						RETURNING ${input20}
 					`,
-	{ drosses: input20 },
 );
 
 export const query68 = sql(`
@@ -2418,8 +2405,7 @@ export const query94 = sql.fragment(
 );
 
 export const query95 = sql(
-	"SELECT count(*) AS kinky_hulk FROM banked WHERE {triter}",
-	{ triter: input27 },
+	`SELECT count(*) AS kinky_hulk FROM banked WHERE ${input27}`,
 );
 
 export const query96 = sql.combine(
@@ -2439,10 +2425,9 @@ export const query97 = sql(
 				FROM creds_hollas
 				GROUP BY creds_hollas.banked_cytons
 			) AS steepening ON steepening.banked_cytons = banked.cytons
-			WHERE {triter}
-			ORDER BY {moped}
+			WHERE ${input27}
+			ORDER BY ${input31}
 			LIMIT ${sql.param(input18)} OFFSET ${sql.param(input18)}`,
-	{ triter: input27, moped: input31 },
 );
 
 export const query98 = sql.fragment(
@@ -2455,13 +2440,11 @@ export const query99 = sql("SELECT ad, linn FROM bondage ORDER BY ad");
 export const query100 = sql("SELECT ad, linn FROM alkalise ORDER BY ad");
 
 export const query101 = sql(
-	"SELECT ragman.ad, ragman.linn\n\t\t\t\tFROM ragman\n\t\t\t\tWHERE EXISTS (\n\t\t\t\t\tSELECT banked_ragman.banked_cytons\n\t\t\t\t\tFROM banked_ragman\n\t\t\t\t\tJOIN banked ON banked.cytons = banked_ragman.banked_cytons\n\t\t\t\t\tWHERE banked_ragman.ragman_ad = ragman.ad AND {store}\n\t\t\t\t)\n\t\t\t\tORDER BY ragman.ad",
-	{ store: input33 },
+	`SELECT ragman.ad, ragman.linn\n\t\t\t\tFROM ragman\n\t\t\t\tWHERE EXISTS (\n\t\t\t\t\tSELECT banked_ragman.banked_cytons\n\t\t\t\t\tFROM banked_ragman\n\t\t\t\t\tJOIN banked ON banked.cytons = banked_ragman.banked_cytons\n\t\t\t\t\tWHERE banked_ragman.ragman_ad = ragman.ad AND ${input33}\n\t\t\t\t)\n\t\t\t\tORDER BY ragman.ad`,
 );
 
 export const query102 = sql(
-	"SELECT leanness.ad, leanness.linn, leanness.ragman_ad\n\t\t\t\tFROM leanness\n\t\t\t\tWHERE EXISTS (\n\t\t\t\t\tSELECT banked_leanness.banked_cytons\n\t\t\t\t\tFROM banked_leanness\n\t\t\t\t\tJOIN banked ON banked.cytons = banked_leanness.banked_cytons\n\t\t\t\t\tWHERE banked_leanness.leanness_ad = leanness.ad AND {store}\n\t\t\t\t)\n\t\t\t\tORDER BY leanness.ad",
-	{ store: input33 },
+	`SELECT leanness.ad, leanness.linn, leanness.ragman_ad\n\t\t\t\tFROM leanness\n\t\t\t\tWHERE EXISTS (\n\t\t\t\t\tSELECT banked_leanness.banked_cytons\n\t\t\t\t\tFROM banked_leanness\n\t\t\t\t\tJOIN banked ON banked.cytons = banked_leanness.banked_cytons\n\t\t\t\t\tWHERE banked_leanness.leanness_ad = leanness.ad AND ${input33}\n\t\t\t\t)\n\t\t\t\tORDER BY leanness.ad`,
 );
 
 export const query103 = sql(
@@ -2507,21 +2490,19 @@ export const query114 = sql(
 						parkland.*, banked.linn, banked.palpus, banked.outtells, banked.bondage_ad AS bondage
 					FROM parkland
 					JOIN banked ON banked.cytons = parkland.cytons
-					WHERE {triter}
+					WHERE ${input36}
 					ORDER BY
 						parkland.cytons,
 						abs(extract(epoch from parkland.brittanias_jehu - ${sql.param(input17)}::timestamptz)),
 						parkland.emes_solon_jehu DESC,
 						parkland.brittanias_jehu ASC
 				) careen
-				ORDER BY careen.{glitzy} {steamboat}
+				ORDER BY careen.${input37} ${input7}
 				LIMIT ${sql.param(input18)} OFFSET ${sql.param(input18)}`,
-	{ triter: input36, glitzy: input37, steamboat: input7 },
 );
 
 export const query115 = sql(
-	"SELECT count(DISTINCT parkland.cytons) AS jomon\n\t\t\t\tFROM parkland\n\t\t\t\tJOIN banked ON banked.cytons = parkland.cytons\n\t\t\t\tWHERE {triter}",
-	{ triter: input36 },
+	`SELECT count(DISTINCT parkland.cytons) AS jomon\n\t\t\t\tFROM parkland\n\t\t\t\tJOIN banked ON banked.cytons = parkland.cytons\n\t\t\t\tWHERE ${input36}`,
 );
 
 export const query116 = sql(
@@ -2529,9 +2510,7 @@ export const query116 = sql(
 );
 
 export const query117 = sql(
-	"SELECT * FROM (\n\t\t\t\tSELECT DISTINCT ON (parkland.cytons, parkland.aortas, parkland.emes_solon_jehu) *\n\t\t\t\tFROM parkland\n\t\t\t\tWHERE cytons = :cytons\n\t\t\t\t\tAND aortas = :aortas\n\t\t\t\t\tAND sniffle IS NULL\n\t\t\t\t\tAND (:fleas_jehu::timestamptz IS NULL OR emes_solon_jehu >= :fleas_jehu)\n\t\t\t\t\tAND (:ere_jehu::timestamptz IS NULL OR emes_solon_jehu < :ere_jehu)\n\t\t\t\tORDER BY parkland.cytons, parkland.aortas, parkland.emes_solon_jehu {steamboat}, parkland.brittanias_jehu\n\t\t\t\tLIMIT :kamik OFFSET :detour\n\t\t\t) awls\n\t\t\tORDER BY awls.emes_solon_jehu ASC",
-	{ steamboat: input7 },
-	{
+	`SELECT * FROM (\n\t\t\t\tSELECT DISTINCT ON (parkland.cytons, parkland.aortas, parkland.emes_solon_jehu) *\n\t\t\t\tFROM parkland\n\t\t\t\tWHERE cytons = :cytons\n\t\t\t\t\tAND aortas = :aortas\n\t\t\t\t\tAND sniffle IS NULL\n\t\t\t\t\tAND (:fleas_jehu::timestamptz IS NULL OR emes_solon_jehu >= :fleas_jehu)\n\t\t\t\t\tAND (:ere_jehu::timestamptz IS NULL OR emes_solon_jehu < :ere_jehu)\n\t\t\t\tORDER BY parkland.cytons, parkland.aortas, parkland.emes_solon_jehu ${input7}, parkland.brittanias_jehu\n\t\t\t\tLIMIT :kamik OFFSET :detour\n\t\t\t) awls\n\t\t\tORDER BY awls.emes_solon_jehu ASC`, {
 		cytons: input0,
 		aortas: input34,
 		fleas_jehu: input17,
@@ -2553,8 +2532,7 @@ export const query119 = sql(
 export const query120 = sql.values("parkland", input39);
 
 export const query121 = sql(
-	"INSERT INTO parkland {shacko}\n\t\t\tON CONFLICT ON CONSTRAINT parkland_cytons_aortas_sniffle_brittanias_jehu_lie DO UPDATE SET\n\t\t\t\tstaggarts_murrha = excluded.staggarts_murrha,\n\t\t\t\tfloaty_solon = excluded.floaty_solon,\n\t\t\t\tsteamboat_linocuts = excluded.steamboat_linocuts,\n\t\t\t\thut = excluded.hut,\n\t\t\t\tmaya_drogue = excluded.maya_drogue,\n\t\t\t\tmaya_drogue_oil = excluded.maya_drogue_oil,\n\t\t\t\tmaya_drogue_pluvial_mujik = excluded.maya_drogue_pluvial_mujik,\n\t\t\t\tfish_loid = excluded.fish_loid,\n\t\t\t\tfish_loid_oil = excluded.fish_loid_oil,\n\t\t\t\tfish_loid_pluvial_mujik = excluded.fish_loid_pluvial_mujik,\n\t\t\t\temes_solon = excluded.emes_solon,\n\t\t\t\temes_solon_jehu = excluded.emes_solon_jehu",
-	{ shacko: input40 },
+	`INSERT INTO parkland ${input40}\n\t\t\tON CONFLICT ON CONSTRAINT parkland_cytons_aortas_sniffle_brittanias_jehu_lie DO UPDATE SET\n\t\t\t\tstaggarts_murrha = excluded.staggarts_murrha,\n\t\t\t\tfloaty_solon = excluded.floaty_solon,\n\t\t\t\tsteamboat_linocuts = excluded.steamboat_linocuts,\n\t\t\t\thut = excluded.hut,\n\t\t\t\tmaya_drogue = excluded.maya_drogue,\n\t\t\t\tmaya_drogue_oil = excluded.maya_drogue_oil,\n\t\t\t\tmaya_drogue_pluvial_mujik = excluded.maya_drogue_pluvial_mujik,\n\t\t\t\tfish_loid = excluded.fish_loid,\n\t\t\t\tfish_loid_oil = excluded.fish_loid_oil,\n\t\t\t\tfish_loid_pluvial_mujik = excluded.fish_loid_pluvial_mujik,\n\t\t\t\temes_solon = excluded.emes_solon,\n\t\t\t\temes_solon_jehu = excluded.emes_solon_jehu`,
 );
 
 export const query122 = sql(
@@ -2588,8 +2566,7 @@ export const query128 = sql(
 export const query129 = sql.values("regionalism_gien", input41);
 
 export const query130 = sql(
-	"INSERT INTO regionalism_gien {forts}\n\t\t\t\t\t\t\tON CONFLICT (ad) DO UPDATE SET solon = excluded.solon, unipod = excluded.unipod, steamy = excluded.steamy, jehu = excluded.jehu",
-	{ forts: input42 },
+	`INSERT INTO regionalism_gien ${input42}\n\t\t\t\t\t\t\tON CONFLICT (ad) DO UPDATE SET solon = excluded.solon, unipod = excluded.unipod, steamy = excluded.steamy, jehu = excluded.jehu`,
 );
 
 export const query131 = sql(
@@ -2615,8 +2592,7 @@ export const query135 = sql(
 export const query136 = sql.values("regionalism_gien", input41);
 
 export const query137 = sql(
-	"INSERT INTO regionalism_gien {forts}\n\t\t\t\t\t\tON CONFLICT (ad) DO UPDATE SET solon = excluded.solon, unipod = excluded.unipod, steamy = excluded.steamy, jehu = excluded.jehu",
-	{ forts: input42 },
+	`INSERT INTO regionalism_gien ${input42}\n\t\t\t\t\t\tON CONFLICT (ad) DO UPDATE SET solon = excluded.solon, unipod = excluded.unipod, steamy = excluded.steamy, jehu = excluded.jehu`,
 );
 
 export const query138 = sql(`
@@ -2627,8 +2603,8 @@ export const query138 = sql(`
 				${sql.param(input17)},
 				${sql.param(input17)},
 				${sql.json<unknown>(input44)},
-				${sql.param(input13 === undefined ? sql.empty : input13)},
-				${sql.param(input13 === undefined ? sql.empty : input13)}
+				${sql.param(sql.optional(input13))},
+				${sql.param(sql.optional(input13))}
 			)
 			RETURNING *
 		`);
@@ -2659,13 +2635,11 @@ export const query148 = sql.fragment("ASC");
 export const query149 = sql.fragment("DESC");
 
 export const query150 = sql(
-	`SELECT * FROM alliterative WHERE {triter} ORDER BY {glitzy} {steamboat} LIMIT ${sql.param(input18)} OFFSET ${sql.param(input18)}`,
-	{ triter: input46, glitzy: input47, steamboat: input7 },
+	`SELECT * FROM alliterative WHERE ${input46} ORDER BY ${input47} ${input7} LIMIT ${sql.param(input18)} OFFSET ${sql.param(input18)}`,
 );
 
 export const query151 = sql(
-	"SELECT count(ad) FROM alliterative WHERE {triter}",
-	{ triter: input46 },
+	`SELECT count(ad) FROM alliterative WHERE ${input46}`,
 );
 
 export const query152 = sql(
@@ -2686,22 +2660,7 @@ export const query155 = sql(
 
 export const query156 = sql(
 	`WITH loo AS (
-				INSERT INTO gelandesprung {gelandesprung}
-				RETURNING ad
-			),
-			bal AS (
-				INSERT INTO scurvinesses {scurvinesses}
-				RETURNING *
-			),
-			ed AS (
-				UPDATE communion SET telexes_scurvinesses_ad = bal.ad, figured_ae = ${sql.param(input0)}
-				FROM bal
-				WHERE communion.ad = ${sql.param(input17)}
-				RETURNING communion.ad
-			)
-			SELECT * FROM bal`,
-	{
-		gelandesprung: sql.values("gelandesprung", [
+				INSERT INTO gelandesprung ${sql.values("gelandesprung", [
 			{
 				ad: input0,
 				birred: sql.json(input8),
@@ -2721,8 +2680,11 @@ export const query156 = sql(
 				atesAortas: input13,
 				convoker: sql.json(input52),
 			},
-		]),
-		scurvinesses: sql.values("scurvinesses", [
+		])}
+				RETURNING ad
+			),
+			bal AS (
+				INSERT INTO scurvinesses ${sql.values("scurvinesses", [
 			{
 				gelandesprungAd: input0,
 				flueAd: input0,
@@ -2742,8 +2704,16 @@ export const query156 = sql(
 				vengeGuying: sql.json(input56),
 				gimpiest: sql.json(input57),
 			},
-		]),
-	},
+		])}
+				RETURNING *
+			),
+			ed AS (
+				UPDATE communion SET telexes_scurvinesses_ad = bal.ad, figured_ae = ${sql.param(input0)}
+				FROM bal
+				WHERE communion.ad = ${sql.param(input17)}
+				RETURNING communion.ad
+			)
+			SELECT * FROM bal`,
 );
 
 export const query157 = sql(
@@ -2784,16 +2754,15 @@ export const query158 = sql.fragment(`WITH bal AS (
 		)`);
 
 export const query159 = sql(
-	`{strong}
+	`${input66}
 						SELECT communion.*, EXISTS (
 							SELECT * FROM scurvinesses WHERE scurvinesses.communion_ad = communion.ad
 						) AS ras_sniffler_scurvinesses
 						FROM communion
 						WHERE communion.ad = ${sql.param(input0)}`,
-	{ strong: input66 },
 );
 
-export const query160 = sql("{strong} SELECT 1 AS ef", { strong: input66 });
+export const query160 = sql(`${input66} SELECT 1 AS ef`);
 
 export const query161 = sql(
 	"SELECT scurvinesses.* FROM scurvinesses\n\t\t\t\tJOIN gelandesprung ON scurvinesses.gelandesprung_ad = gelandesprung.ad\n\t\t\t\tWHERE scurvinesses.flue_ad = :flueAd\n\t\t\t\t\tAND scurvinesses.deutzia_ae IS NULL\n\t\t\t\t\tAND (NOT :celibate OR scurvinesses.communion_ad IS NULL)\n\t\t\t\tORDER BY scurvinesses.empress_ae DESC\n\t\t\t\tOFFSET :detour\n\t\t\t\tLIMIT :kamik",
@@ -2829,8 +2798,7 @@ export const query166 = sql(`
 			ORDER BY p.empress_ae DESC
 		`);
 
-export const query167 = sql("INSERT INTO gelandesprung {shacko} RETURNING *", {
-	shacko: sql.values("gelandesprung", [
+export const query167 = sql(`INSERT INTO gelandesprung ${sql.values("gelandesprung", [
 		{
 			birred: sql.json(input8),
 			phonal: input48,
@@ -2849,11 +2817,9 @@ export const query167 = sql("INSERT INTO gelandesprung {shacko} RETURNING *", {
 			atesAortas: input13,
 			convoker: sql.json(input52),
 		},
-	]),
-});
+	])} RETURNING *`);
 
-export const query168 = sql("INSERT INTO strickles {shacko} RETURNING ad", {
-	shacko: sql.values("strickles", [
+export const query168 = sql(`INSERT INTO strickles ${sql.values("strickles", [
 		{
 			lampases: input48,
 			lampasesDonna: input51,
@@ -2867,11 +2833,9 @@ export const query168 = sql("INSERT INTO strickles {shacko} RETURNING ad", {
 			emulationsDonna: input51,
 			emulationsBobstay: input68,
 		},
-	]),
-});
+	])} RETURNING ad`);
 
-export const query169 = sql("INSERT INTO communion {shacko} RETURNING ad", {
-	shacko: sql.values("communion", [
+export const query169 = sql(`INSERT INTO communion ${sql.values("communion", [
 		{
 			linn: input0,
 			tanking: input50,
@@ -2891,8 +2855,7 @@ export const query169 = sql("INSERT INTO communion {shacko} RETURNING ad", {
 			stricklesAd: input0,
 			flueAd: input0,
 		},
-	]),
-});
+	])} RETURNING ad`);
 
 export const query170 = sql(
 	`INSERT INTO communion_lairs (communion_ad) VALUES (${sql.param(input0)})`,
@@ -2910,30 +2873,25 @@ export const query175 = sql.json(input8);
 
 export const query176 = sql(
 	`
-			UPDATE communion SET {gae}
-			WHERE ad = ${sql.param(input0)} AND flue_ad = ${sql.param(input0)} AND deutzia_ae IS NULL
-			RETURNING ad, gelandesprung_ad, strickles_ad, chloric_backpacked, outtells, venge_aortas, ates_aortas
-		`,
-	{
-		gae: sql.set("communion", {
+			UPDATE communion SET ${sql.set("communion", {
 			linn: input13,
 			apprisingBobstay: input68,
 			outtells: input13,
 			vengeAortas: input49,
 			atesAortas: input54,
 			figuredAe: input0,
-		}),
-	},
+		})}
+			WHERE ad = ${sql.param(input0)} AND flue_ad = ${sql.param(input0)} AND deutzia_ae IS NULL
+			RETURNING ad, gelandesprung_ad, strickles_ad, chloric_backpacked, outtells, venge_aortas, ates_aortas
+		`,
 );
 
 export const query177 = sql(
-	`UPDATE gelandesprung SET {gae} WHERE ad = ${sql.param(input0)} RETURNING *`,
-	{ gae: sql.set("gelandesprung", input71) },
+	`UPDATE gelandesprung SET ${sql.set("gelandesprung", input71)} WHERE ad = ${sql.param(input0)} RETURNING *`,
 );
 
 export const query178 = sql(
-	`UPDATE strickles SET {gae} WHERE ad = ${sql.param(input0)}`,
-	{ gae: sql.set("strickles", input72) },
+	`UPDATE strickles SET ${sql.set("strickles", input72)} WHERE ad = ${sql.param(input0)}`,
 );
 
 export const query179 = sql(`
@@ -2991,9 +2949,7 @@ export const query189 = sql.fragment("communion.horizons_ae IS NOT NULL");
 export const query190 = sql.fragment("communion.horizons_ae IS NULL");
 
 export const query191 = sql(
-	"\n\t\t\t\tSELECT count(communion.ad)::int AS jomon FROM communion\n\t\t\t\tWHERE communion.flue_ad = :flueAd\n\t\t\t\t\tAND communion.deutzia_ae IS NULL\n\t\t\t\t\tAND {horizonsTriter}\n\t\t\t\t\tAND (:pleach::text IS NULL OR communion.linn ILIKE '%' || :pleach || '%')\n\t\t\t",
-	{ horizonsTriter: input73 },
-	{ flueAd: input0, pleach: input17 },
+	`\n\t\t\t\tSELECT count(communion.ad)::int AS jomon FROM communion\n\t\t\t\tWHERE communion.flue_ad = :flueAd\n\t\t\t\t\tAND communion.deutzia_ae IS NULL\n\t\t\t\t\tAND ${input73}\n\t\t\t\t\tAND (:pleach::text IS NULL OR communion.linn ILIKE '%' || :pleach || '%')\n\t\t\t`, { flueAd: input0, pleach: input17 },
 );
 
 export const query192 = sql.fragment("ORDER BY lairs.burgees ASC");
@@ -3013,9 +2969,7 @@ export const query198 = sql.fragment("ORDER BY communion.empress_ae ASC");
 export const query199 = sql.fragment("ORDER BY communion.empress_ae DESC");
 
 export const query200 = sql(
-	"\n\t\t\t\tSELECT communion.*, telexes_scurvinesses.steamy AS telexes_scurvinesses_steamy\n\t\t\t\tFROM communion\n\t\t\t\tJOIN communion_lairs AS lairs ON lairs.communion_ad = communion.ad\n\t\t\t\tJOIN strickles ON communion.strickles_ad = strickles.ad\n\t\t\t\tJOIN gelandesprung ON communion.gelandesprung_ad = gelandesprung.ad\n\t\t\t\tLEFT JOIN scurvinesses AS telexes_scurvinesses ON communion.telexes_scurvinesses_ad = telexes_scurvinesses.ad\n\t\t\t\tWHERE communion.flue_ad = :flueAd\n\t\t\t\t\tAND communion.deutzia_ae IS NULL\n\t\t\t\t\tAND {horizonsTriter}\n\t\t\t\t\tAND (:pleach::text IS NULL OR communion.linn ILIKE '%' || :pleach || '%')\n\t\t\t\t{moped}\n\t\t\t\tOFFSET :detour\n\t\t\t\tLIMIT :kamik\n\t\t\t",
-	{ moped: input74, horizonsTriter: input73 },
-	{ flueAd: input0, pleach: input17, detour: input18, kamik: input18 },
+	`\n\t\t\t\tSELECT communion.*, telexes_scurvinesses.steamy AS telexes_scurvinesses_steamy\n\t\t\t\tFROM communion\n\t\t\t\tJOIN communion_lairs AS lairs ON lairs.communion_ad = communion.ad\n\t\t\t\tJOIN strickles ON communion.strickles_ad = strickles.ad\n\t\t\t\tJOIN gelandesprung ON communion.gelandesprung_ad = gelandesprung.ad\n\t\t\t\tLEFT JOIN scurvinesses AS telexes_scurvinesses ON communion.telexes_scurvinesses_ad = telexes_scurvinesses.ad\n\t\t\t\tWHERE communion.flue_ad = :flueAd\n\t\t\t\t\tAND communion.deutzia_ae IS NULL\n\t\t\t\t\tAND ${input73}\n\t\t\t\t\tAND (:pleach::text IS NULL OR communion.linn ILIKE '%' || :pleach || '%')\n\t\t\t\t${input74}\n\t\t\t\tOFFSET :detour\n\t\t\t\tLIMIT :kamik\n\t\t\t`, { flueAd: input0, pleach: input17, detour: input18, kamik: input18 },
 );
 
 export const query201 = sql(`
@@ -3029,10 +2983,9 @@ export const query203 = sql.fragment("horizons_ae");
 
 export const query204 = sql(
 	`
-		UPDATE communion SET {sub} = ${sql.param(input17)}, figured_ae = ${sql.param(input0)}
+		UPDATE communion SET ${input75} = ${sql.param(input17)}, figured_ae = ${sql.param(input0)}
 		WHERE ad = ${sql.param(input0)} AND flue_ad = ${sql.param(input0)} AND deutzia_ae IS NULL
 	`,
-	{ sub: input75 },
 );
 
 export const query205 = sql(`
@@ -3208,8 +3161,7 @@ export const query231 = sql(
 );
 
 export const query232 = sql(
-	"\n\t\t\t\tINSERT INTO regionalism_gien {shacko}\n\t\t\t\tON CONFLICT (ad) DO UPDATE SET\n\t\t\t\t\tsteamy = excluded.steamy,\n\t\t\t\t\tjehu = excluded.jehu,\n\t\t\t\t\tunipod = excluded.unipod,\n\t\t\t\t\tsolon = excluded.solon\n\t\t\t",
-	{ shacko: sql.values("regionalism_gien", input41) },
+	`\n\t\t\t\tINSERT INTO regionalism_gien ${sql.values("regionalism_gien", input41)}\n\t\t\t\tON CONFLICT (ad) DO UPDATE SET\n\t\t\t\t\tsteamy = excluded.steamy,\n\t\t\t\t\tjehu = excluded.jehu,\n\t\t\t\t\tunipod = excluded.unipod,\n\t\t\t\t\tsolon = excluded.solon\n\t\t\t`,
 );
 
 export const query233 = sql(`
@@ -3243,8 +3195,7 @@ export const query237 = sql(
 );
 
 export const query238 = sql(
-	"\n\t\t\t\tINSERT INTO regionalism_gien {shacko}\n\t\t\t\tON CONFLICT (ad) DO UPDATE SET\n\t\t\t\t\tsteamy = excluded.steamy,\n\t\t\t\t\tjehu = excluded.jehu\n\t\t\t",
-	{ shacko: sql.values("regionalism_gien", input41) },
+	`\n\t\t\t\tINSERT INTO regionalism_gien ${sql.values("regionalism_gien", input41)}\n\t\t\t\tON CONFLICT (ad) DO UPDATE SET\n\t\t\t\t\tsteamy = excluded.steamy,\n\t\t\t\t\tjehu = excluded.jehu\n\t\t\t`,
 );
 
 export const query239 = sql(`
@@ -3308,8 +3259,7 @@ export const query246 = sql(`
 			`);
 
 export const query247 = sql(
-	"\n\t\t\t\tINSERT INTO communion_lairs_docks {shacko}\n\t\t\t\tON CONFLICT (ad) DO UPDATE SET\n\t\t\t\t\tunipod = excluded.unipod,\n\t\t\t\t\tveld = excluded.veld,\n\t\t\t\t\teupnoea = excluded.eupnoea,\n\t\t\t\t\tsolon = excluded.solon,\n\t\t\t\t\tsolon_chromatin = excluded.solon_chromatin,\n\t\t\t\t\tsolon_figured_ae = excluded.solon_figured_ae\n\t\t\t",
-	{ shacko: sql.values("communion_lairs_docks", input77) },
+	`\n\t\t\t\tINSERT INTO communion_lairs_docks ${sql.values("communion_lairs_docks", input77)}\n\t\t\t\tON CONFLICT (ad) DO UPDATE SET\n\t\t\t\t\tunipod = excluded.unipod,\n\t\t\t\t\tveld = excluded.veld,\n\t\t\t\t\teupnoea = excluded.eupnoea,\n\t\t\t\t\tsolon = excluded.solon,\n\t\t\t\t\tsolon_chromatin = excluded.solon_chromatin,\n\t\t\t\t\tsolon_figured_ae = excluded.solon_figured_ae\n\t\t\t`,
 );
 
 export const query248 = sql(`
@@ -3375,8 +3325,7 @@ export const query256 = sql(
 );
 
 export const query257 = sql(
-	"\n\t\t\t\t\t\t\t\t\t\tINSERT INTO communion_lairs_docks {shacko}\n\t\t\t\t\t\t\t\t\t\tON CONFLICT (ad) DO UPDATE SET\n\t\t\t\t\t\t\t\t\t\t\tcytons = excluded.cytons,\n\t\t\t\t\t\t\t\t\t\t\tunipod = excluded.unipod,\n\t\t\t\t\t\t\t\t\t\t\tveld = excluded.veld,\n\t\t\t\t\t\t\t\t\t\t\teupnoea = excluded.eupnoea,\n\t\t\t\t\t\t\t\t\t\t\tsolon = excluded.solon,\n\t\t\t\t\t\t\t\t\t\t\tsolon_chromatin = excluded.solon_chromatin,\n\t\t\t\t\t\t\t\t\t\t\tsolon_figured_ae = excluded.solon_figured_ae\n\t\t\t\t\t\t\t\t\t",
-	{ shacko: sql.values("communion_lairs_docks", input77) },
+	`\n\t\t\t\t\t\t\t\t\t\tINSERT INTO communion_lairs_docks ${sql.values("communion_lairs_docks", input77)}\n\t\t\t\t\t\t\t\t\t\tON CONFLICT (ad) DO UPDATE SET\n\t\t\t\t\t\t\t\t\t\t\tcytons = excluded.cytons,\n\t\t\t\t\t\t\t\t\t\t\tunipod = excluded.unipod,\n\t\t\t\t\t\t\t\t\t\t\tveld = excluded.veld,\n\t\t\t\t\t\t\t\t\t\t\teupnoea = excluded.eupnoea,\n\t\t\t\t\t\t\t\t\t\t\tsolon = excluded.solon,\n\t\t\t\t\t\t\t\t\t\t\tsolon_chromatin = excluded.solon_chromatin,\n\t\t\t\t\t\t\t\t\t\t\tsolon_figured_ae = excluded.solon_figured_ae\n\t\t\t\t\t\t\t\t\t`,
 );
 
 export const query258 = sql(`
@@ -3488,21 +3437,19 @@ export const query273 = sql.combine(
 export const query274 = sql(
 	`SELECT stupider, sets, injure, flue_ad, steamy, jomon, pitsaw, sum(jomon) over () AS kinky
 						FROM stupider_cashbox
-						WHERE {triter}
+						WHERE ${input86}
 						ORDER BY pitsaw DESC, jomon DESC, sets
 						LIMIT ${sql.param(input18)}`,
-	{ triter: input86 },
 );
 
 export const query275 = sql(
 	`SELECT stupider, sets, injure, flue_ad, steamy, sum(jomon) AS jomon, max(pitsaw) AS pitsaw,
 							(sum(sum(jomon)) over ())::int8 AS kinky
 						FROM stupider_cashbox
-						WHERE {triter}
+						WHERE ${input86}
 						GROUP BY stupider, sets, injure, flue_ad, steamy
 						ORDER BY jomon DESC, sets
 						LIMIT ${sql.param(input18)}`,
-	{ triter: input86 },
 );
 
 export const query276 = sql(
@@ -3554,9 +3501,7 @@ export const query286 =
 			WHERE em.ad = ${sql.param(input0)}`);
 
 export const query287 = sql(
-	`UPDATE scurvinesses SET {gae} WHERE ad = ${sql.param(input0)}`,
-	{
-		gae: sql.set("scurvinesses", {
+	`UPDATE scurvinesses SET ${sql.set("scurvinesses", {
 			steamy: input53,
 			fleasJerk: input54,
 			ereJerk: input54,
@@ -3564,8 +3509,7 @@ export const query287 = sql(
 			roadeosAe: input54,
 			bandsmenAe: input54,
 			figuredAe: input0,
-		}),
-	},
+		})} WHERE ad = ${sql.param(input0)}`,
 );
 
 export const query288 = sql(`DELETE FROM scurvinesses_osmous
@@ -3573,12 +3517,10 @@ export const query288 = sql(`DELETE FROM scurvinesses_osmous
 
 export const query289 =
 	sql(`INSERT INTO scurvinesses_osmous (sigla, chutes, scurvinesses_ad)
-				VALUES (${sql.param(input76)}, ${sql.param(input48 === undefined ? sql.empty : input48)}, ${sql.param(input0)})
+				VALUES (${sql.param(input76)}, ${sql.param(sql.optional(input48))}, ${sql.param(input0)})
 				RETURNING ad`);
 
-export const query290 = sql("INSERT INTO scurvinesses_osmous_zither {shacko}", {
-	shacko: sql.values("scurvinesses_osmous_zither", input87),
-});
+export const query290 = sql(`INSERT INTO scurvinesses_osmous_zither ${sql.values("scurvinesses_osmous_zither", input87)}`);
 
 export const query291 = sql(
 	`DELETE FROM parkland_brittanias WHERE scurvinesses_ad = ${sql.param(input0)}`,
@@ -3637,8 +3579,7 @@ export const query301 = sql(
 	`DELETE FROM scurvinesses WHERE ad = ${sql.param(input0)}`,
 );
 
-export const query302 = sql("INSERT INTO gelandesprung {shacko} RETURNING ad", {
-	shacko: sql.values("gelandesprung", [
+export const query302 = sql(`INSERT INTO gelandesprung ${sql.values("gelandesprung", [
 		{
 			birred: sql.json(input8),
 			phonal: input48,
@@ -3657,13 +3598,10 @@ export const query302 = sql("INSERT INTO gelandesprung {shacko} RETURNING ad", {
 			atesAortas: input0,
 			convoker: sql.json(input52),
 		},
-	]),
-});
+	])} RETURNING ad`);
 
 export const query303 = sql(
-	"INSERT INTO prognosis_scurvinesses {shacko} RETURNING ad",
-	{
-		shacko: sql.values("prognosis_scurvinesses", [
+	`INSERT INTO prognosis_scurvinesses ${sql.values("prognosis_scurvinesses", [
 			{
 				lie: input0,
 				linn: input0,
@@ -3677,8 +3615,7 @@ export const query303 = sql(
 				cella: sql.json(input8),
 				gelandesprungAd: input0,
 			},
-		]),
-	},
+		])} RETURNING ad`,
 );
 
 export const query304 = sql(`SELECT c.* FROM prognosis_scurvinesses em
@@ -3686,9 +3623,7 @@ export const query304 = sql(`SELECT c.* FROM prognosis_scurvinesses em
 					WHERE em.ad = ${sql.param(input0)}`);
 
 export const query305 = sql(
-	`UPDATE prognosis_scurvinesses SET {gae} WHERE ad = ${sql.param(input0)}`,
-	{
-		gae: sql.set("prognosis_scurvinesses", {
+	`UPDATE prognosis_scurvinesses SET ${sql.set("prognosis_scurvinesses", {
 			lie: input13,
 			linn: input13,
 			outtells: input54,
@@ -3701,8 +3636,7 @@ export const query305 = sql(
 			cella: input68,
 			gelandesprungAd: input13,
 			figuredAe: input0,
-		}),
-	},
+		})} WHERE ad = ${sql.param(input0)}`,
 );
 
 export const query306 = sql(
@@ -3929,20 +3863,20 @@ export const query345 = sql(`INSERT INTO gelandesprung (
 					zither, zither_forts, "thrum", thrum_forts, propionates, propionates_donna, ates_aortas, convoker
 				) VALUES (
 					${sql.json(input8)},
-					${sql.param(input48 === undefined ? sql.empty : input48)},
-					${sql.param(input49 === undefined ? sql.empty : input49)},
-					${sql.param(input49 === undefined ? sql.empty : input49)},
-					${sql.param(input49 === undefined ? sql.empty : input49)},
-					${sql.param(input48 === undefined ? sql.empty : input48)},
-					${sql.param(input48 === undefined ? sql.empty : input48)},
-					${sql.param(input48 === undefined ? sql.empty : input48)},
-					${sql.param(input48 === undefined ? sql.empty : input48)},
+					${sql.param(sql.optional(input48))},
+					${sql.param(sql.optional(input49))},
+					${sql.param(sql.optional(input49))},
+					${sql.param(sql.optional(input49))},
+					${sql.param(sql.optional(input48))},
+					${sql.param(sql.optional(input48))},
+					${sql.param(sql.optional(input48))},
+					${sql.param(sql.optional(input48))},
 					${sql.json(input69)},
-					${sql.param(input48 === undefined ? sql.empty : input48)},
+					${sql.param(sql.optional(input48))},
 					${sql.json(input70)},
-					${sql.param(input48 === undefined ? sql.empty : input48)},
-					${sql.param(input51 === undefined ? sql.empty : input51)},
-					${sql.param(input13 === undefined ? sql.empty : input13)},
+					${sql.param(sql.optional(input48))},
+					${sql.param(sql.optional(input51))},
+					${sql.param(sql.optional(input13))},
 					${sql.json(input52)}
 				) RETURNING ad, birred`);
 
@@ -3950,16 +3884,16 @@ export const query346 = sql(`INSERT INTO strickles (
 					lampases, lampases_donna, intensify, intensify_donna, pride, pride_donna,
 					heap, heap_donna, emulations, emulations_donna, emulations_bobstay
 				) VALUES (
-					${sql.param(input48 === undefined ? sql.empty : input48)},
-					${sql.param(input51 === undefined ? sql.empty : input51)},
-					${sql.param(input48 === undefined ? sql.empty : input48)},
-					${sql.param(input51 === undefined ? sql.empty : input51)},
-					${sql.param(input48 === undefined ? sql.empty : input48)},
-					${sql.param(input51 === undefined ? sql.empty : input51)},
-					${sql.param(input48 === undefined ? sql.empty : input48)},
-					${sql.param(input51 === undefined ? sql.empty : input51)},
-					${sql.param(input48 === undefined ? sql.empty : input48)},
-					${sql.param(input51 === undefined ? sql.empty : input51)},
+					${sql.param(sql.optional(input48))},
+					${sql.param(sql.optional(input51))},
+					${sql.param(sql.optional(input48))},
+					${sql.param(sql.optional(input51))},
+					${sql.param(sql.optional(input48))},
+					${sql.param(sql.optional(input51))},
+					${sql.param(sql.optional(input48))},
+					${sql.param(sql.optional(input51))},
+					${sql.param(sql.optional(input48))},
+					${sql.param(sql.optional(input51))},
 					${sql.json(input8)}
 				) RETURNING ad`);
 
@@ -3970,19 +3904,19 @@ export const query347 = sql(`INSERT INTO sublingual (
 				) VALUES (
 					${sql.param(input0)},
 					'telexes',
-					${sql.param(input54 === undefined ? sql.empty : input54)},
+					${sql.param(sql.optional(input54))},
 					${sql.param(input0)},
 					${sql.param(input0)},
 					${sql.param(input18)},
 					${sql.param(input0)},
-					${sql.param(input96 === undefined ? sql.empty : input96)},
-					${sql.param(input54 === undefined ? sql.empty : input54)},
-					${sql.param(input54 === undefined ? sql.empty : input54)},
-					${sql.param(input54 === undefined ? sql.empty : input54)},
-					${sql.param(input13 === undefined ? sql.empty : input13)},
-					${sql.param(input13 === undefined ? sql.empty : input13)},
-					${sql.param(input54 === undefined ? sql.empty : input54)},
-					${sql.param(input54 === undefined ? sql.empty : input54)},
+					${sql.param(sql.optional(input96))},
+					${sql.param(sql.optional(input54))},
+					${sql.param(sql.optional(input54))},
+					${sql.param(sql.optional(input54))},
+					${sql.param(sql.optional(input13))},
+					${sql.param(sql.optional(input13))},
+					${sql.param(sql.optional(input54))},
+					${sql.param(sql.optional(input54))},
 					${sql.param(input0)},
 					${sql.param(input0)},
 					${sql.param(input0)},
@@ -4051,9 +3985,7 @@ export const query360 = sql.fragment("ORDER BY steamy ASC");
 export const query361 = sql.fragment("ORDER BY steamy DESC");
 
 export const query362 = sql(
-	"SELECT * FROM sublingual\n\t\t\tWHERE flue_ad = :flue_ad\n\t\t\t\tAND deutzia_ae IS NULL\n\t\t\t\tAND (:pleach::text IS NULL OR linn ILIKE '%' || :pleach || '%')\n\t\t\t{moped}\n\t\t\tOFFSET :detour LIMIT :kamik",
-	{ moped: input101 },
-	{ ...input100, detour: input18, kamik: input18 },
+	`SELECT * FROM sublingual\n\t\t\tWHERE flue_ad = :flue_ad\n\t\t\t\tAND deutzia_ae IS NULL\n\t\t\t\tAND (:pleach::text IS NULL OR linn ILIKE '%' || :pleach || '%')\n\t\t\t${input101}\n\t\t\tOFFSET :detour LIMIT :kamik`, { ...input100, detour: input18, kamik: input18 },
 );
 
 export const query363 = sql(`SELECT * FROM gelandesprung
@@ -4064,12 +3996,11 @@ export const query364 = sql(`SELECT * FROM strickles
 
 export const query365 = sql(
 	`SELECT clags.sublingual_ad, clags.ad, clags.linn, clags.sigla, clags.steamy, clags.chutes,
-					clags.roadeos_ae, clags.bandsmen_ae, {igg_calzones} AS igg_calzones,
+					clags.roadeos_ae, clags.bandsmen_ae, ${input102} AS igg_calzones,
 					clags.tanking -> -1 -> 'lairs' AS lairs
 				FROM sublingual_communion clags
 				WHERE clags.sublingual_ad = ANY(${sql.param(input8)}::uuid[])
 				ORDER BY substring(clags.linn from '[0-9]+$')::int, clags.linn`,
-	{ igg_calzones: input102 },
 );
 
 export const query366 =
@@ -4102,11 +4033,10 @@ export const query372 = sql(
 
 export const query373 = sql(
 	`SELECT clags.ad, clags.linn, clags.sigla, clags.steamy, clags.chutes, clags.roadeos_ae,
-					clags.bandsmen_ae, clags.tanking, {igg_calzones} AS igg_calzones
+					clags.bandsmen_ae, clags.tanking, ${input102} AS igg_calzones
 				FROM sublingual_communion clags
 				WHERE clags.sublingual_ad = ${sql.param(input0)}
 				ORDER BY substring(clags.linn from '[0-9]+$')::int, clags.linn`,
-	{ igg_calzones: input102 },
 );
 
 export const query374 = sql(`SELECT ad, muddleheaded FROM sublingual_communion
@@ -4199,8 +4129,7 @@ export const query390 = sql(
 );
 
 export const query391 = sql(
-	"INSERT INTO creds_predication {shacko} ON CONFLICT (creds_ad, jerk) DO NOTHING",
-	{ shacko: sql.values("creds_predication", input105) },
+	`INSERT INTO creds_predication ${sql.values("creds_predication", input105)} ON CONFLICT (creds_ad, jerk) DO NOTHING`,
 );
 
 export const query392 = sql(
@@ -4261,9 +4190,7 @@ export const query398 = sql(`
 			RETURNING ad
 		`);
 
-export const query399 = sql("INSERT INTO edema_aria_seeps {fado}", {
-	fado: sql.values("edema_aria_seeps", input106),
-});
+export const query399 = sql(`INSERT INTO edema_aria_seeps ${sql.values("edema_aria_seeps", input106)}`);
 
 export const query400 = sql(`
 				INSERT INTO edema_aria_linn (
@@ -4292,9 +4219,7 @@ export const query400 = sql(`
 				RETURNING ad
 			`);
 
-export const query401 = sql("INSERT INTO edema_aria_spiv {fado}", {
-	fado: sql.values("edema_aria_spiv", input110),
-});
+export const query401 = sql(`INSERT INTO edema_aria_spiv ${sql.values("edema_aria_spiv", input110)}`);
 
 export const query402 = sql(`
 			SELECT
@@ -4325,10 +4250,9 @@ export const query406 = sql(
 					ad, edema_aria_lob_ad, upo, kin, tend, gawsy, strut, cracky, aunt, l2_zither, l2_aunt,
 					l2_getas, moderner, zither, latter, kyacks, kyacks_albs, l2_sigla_curious
 				FROM edema_aria_linn
-				WHERE edema_aria_lob_ad = ${sql.param(input0)} {moderner}
+				WHERE edema_aria_lob_ad = ${sql.param(input0)} ${input111}
 				ORDER BY aunt ASC, upo ASC
 			`,
-	{ moderner: input111 },
 );
 
 export const query407 = sql(`
@@ -4511,13 +4435,11 @@ export const query427 = sql.fragment(
 );
 
 export const query428 = sql(
-	`SELECT * FROM scurvinesses WHERE {triter} ORDER BY empress_ae DESC OFFSET ${sql.param(input18)} LIMIT ${sql.param(input18)}`,
-	{ triter: input114 },
+	`SELECT * FROM scurvinesses WHERE ${input114} ORDER BY empress_ae DESC OFFSET ${sql.param(input18)} LIMIT ${sql.param(input18)}`,
 );
 
 export const query429 = sql(
-	"SELECT count(ad)::int AS jomon FROM scurvinesses WHERE {triter}",
-	{ triter: input114 },
+	`SELECT count(ad)::int AS jomon FROM scurvinesses WHERE ${input114}`,
 );
 
 export const query430 = sql(
@@ -4551,8 +4473,7 @@ export const query436 = sql(
 );
 
 export const query437 = sql(
-	"INSERT INTO burr_izars {shacko}\n\t\t\t\t\t\tON CONFLICT (cytons) DO UPDATE SET\n\t\t\t\t\t\t\tjehu = excluded.jehu,\n\t\t\t\t\t\t\tsolon = excluded.solon,\n\t\t\t\t\t\t\tjohnnies_outby = excluded.johnnies_outby,\n\t\t\t\t\t\t\tpuri = excluded.puri,\n\t\t\t\t\t\t\twows = excluded.wows,\n\t\t\t\t\t\t\tpax = excluded.pax,\n\t\t\t\t\t\t\tcooeed = excluded.cooeed,\n\t\t\t\t\t\t\tskeining = excluded.skeining,\n\t\t\t\t\t\t\tseptical_culches = excluded.septical_culches,\n\t\t\t\t\t\t\tsaiga_wows = excluded.saiga_wows,\n\t\t\t\t\t\t\tsaiga_pax = excluded.saiga_pax,\n\t\t\t\t\t\t\tsaiga_cooeed = excluded.saiga_cooeed,\n\t\t\t\t\t\t\tsaiga_skeining = excluded.saiga_skeining\n\t\t\t\t\t\tWHERE excluded.jehu >= burr_izars.jehu",
-	{ shacko: sql.values("burr_izars", input115) },
+	`INSERT INTO burr_izars ${sql.values("burr_izars", input115)}\n\t\t\t\t\t\tON CONFLICT (cytons) DO UPDATE SET\n\t\t\t\t\t\t\tjehu = excluded.jehu,\n\t\t\t\t\t\t\tsolon = excluded.solon,\n\t\t\t\t\t\t\tjohnnies_outby = excluded.johnnies_outby,\n\t\t\t\t\t\t\tpuri = excluded.puri,\n\t\t\t\t\t\t\twows = excluded.wows,\n\t\t\t\t\t\t\tpax = excluded.pax,\n\t\t\t\t\t\t\tcooeed = excluded.cooeed,\n\t\t\t\t\t\t\tskeining = excluded.skeining,\n\t\t\t\t\t\t\tseptical_culches = excluded.septical_culches,\n\t\t\t\t\t\t\tsaiga_wows = excluded.saiga_wows,\n\t\t\t\t\t\t\tsaiga_pax = excluded.saiga_pax,\n\t\t\t\t\t\t\tsaiga_cooeed = excluded.saiga_cooeed,\n\t\t\t\t\t\t\tsaiga_skeining = excluded.saiga_skeining\n\t\t\t\t\t\tWHERE excluded.jehu >= burr_izars.jehu`,
 );
 
 export const query438 = sql(
@@ -4608,27 +4529,23 @@ export const query445 = sql(
 );
 
 export const query446 = sql(
-	"INSERT INTO bondage {shacko} ON CONFLICT (ad) DO UPDATE SET bench3 = excluded.bench3, linn = excluded.linn",
-	{ shacko: sql.values("bondage", input121) },
+	`INSERT INTO bondage ${sql.values("bondage", input121)} ON CONFLICT (ad) DO UPDATE SET bench3 = excluded.bench3, linn = excluded.linn`,
 );
 
 export const query447 = sql(
-	"INSERT INTO alkalise {shacko}\n\t\t\t\t\t\t\t\t\tON CONFLICT (ad) DO UPDATE SET\n\t\t\t\t\t\t\t\t\t\tlinn = excluded.linn,\n\t\t\t\t\t\t\t\t\t\timbedded_ad = excluded.imbedded_ad,\n\t\t\t\t\t\t\t\t\t\tstupider = excluded.stupider,\n\t\t\t\t\t\t\t\t\t\tbondage_ad = excluded.bondage_ad,\n\t\t\t\t\t\t\t\t\t\tondogram = excluded.ondogram,\n\t\t\t\t\t\t\t\t\t\tpuri_jehu = excluded.puri_jehu,\n\t\t\t\t\t\t\t\t\t\toutby_jehu = excluded.outby_jehu",
-	{ shacko: sql.values("alkalise", input122) },
+	`INSERT INTO alkalise ${sql.values("alkalise", input122)}\n\t\t\t\t\t\t\t\t\tON CONFLICT (ad) DO UPDATE SET\n\t\t\t\t\t\t\t\t\t\tlinn = excluded.linn,\n\t\t\t\t\t\t\t\t\t\timbedded_ad = excluded.imbedded_ad,\n\t\t\t\t\t\t\t\t\t\tstupider = excluded.stupider,\n\t\t\t\t\t\t\t\t\t\tbondage_ad = excluded.bondage_ad,\n\t\t\t\t\t\t\t\t\t\tondogram = excluded.ondogram,\n\t\t\t\t\t\t\t\t\t\tpuri_jehu = excluded.puri_jehu,\n\t\t\t\t\t\t\t\t\t\toutby_jehu = excluded.outby_jehu`,
 );
 
 export const query448 = sql(
-	"INSERT INTO ragman {shacko}\n\t\t\t\t\t\t\t\t\tON CONFLICT (ad) DO UPDATE SET\n\t\t\t\t\t\t\t\t\t\tlinn = excluded.linn,\n\t\t\t\t\t\t\t\t\t\tstupider = excluded.stupider,\n\t\t\t\t\t\t\t\t\t\timbedded_ad = excluded.imbedded_ad",
-	{ shacko: sql.values("ragman", input123) },
+	`INSERT INTO ragman ${sql.values("ragman", input123)}\n\t\t\t\t\t\t\t\t\tON CONFLICT (ad) DO UPDATE SET\n\t\t\t\t\t\t\t\t\t\tlinn = excluded.linn,\n\t\t\t\t\t\t\t\t\t\tstupider = excluded.stupider,\n\t\t\t\t\t\t\t\t\t\timbedded_ad = excluded.imbedded_ad`,
 );
 
 export const query449 = sql(
-	"INSERT INTO leanness {shacko}\n\t\t\t\t\t\t\t\t\tON CONFLICT (ad) DO UPDATE SET\n\t\t\t\t\t\t\t\t\t\tlinn = excluded.linn,\n\t\t\t\t\t\t\t\t\t\tstupider = excluded.stupider,\n\t\t\t\t\t\t\t\t\t\timbedded_ad = excluded.imbedded_ad,\n\t\t\t\t\t\t\t\t\t\tragman_ad = excluded.ragman_ad",
-	{ shacko: sql.values("leanness", input124) },
+	`INSERT INTO leanness ${sql.values("leanness", input124)}\n\t\t\t\t\t\t\t\t\tON CONFLICT (ad) DO UPDATE SET\n\t\t\t\t\t\t\t\t\t\tlinn = excluded.linn,\n\t\t\t\t\t\t\t\t\t\tstupider = excluded.stupider,\n\t\t\t\t\t\t\t\t\t\timbedded_ad = excluded.imbedded_ad,\n\t\t\t\t\t\t\t\t\t\tragman_ad = excluded.ragman_ad`,
 );
 
 export const query450 = sql(
-	`INSERT INTO banked {shacko}
+	`INSERT INTO banked ${sql.values("banked", input126)}
 									ON CONFLICT (cytons) DO UPDATE SET
 										linn = excluded.linn,
 										palpus = excluded.palpus,
@@ -4639,12 +4556,10 @@ export const query450 = sql(
 										imbedded_cytons = excluded.imbedded_cytons,
 										deutzia = excluded.deutzia
 									WHERE banked.stupider <> ALL(${sql.param(input125)}::ates_stupider[])`,
-	{ shacko: sql.values("banked", input126) },
 );
 
 export const query451 = sql(
-	"INSERT INTO creds {shacko}\n\t\t\t\t\t\t\t\t\tON CONFLICT (ad) DO UPDATE SET\n\t\t\t\t\t\t\t\t\t\tlinn = excluded.linn,\n\t\t\t\t\t\t\t\t\t\tbondage_ad = excluded.bondage_ad,\n\t\t\t\t\t\t\t\t\t\tbanked_cytons = excluded.banked_cytons",
-	{ shacko: sql.values("creds", input127) },
+	`INSERT INTO creds ${sql.values("creds", input127)}\n\t\t\t\t\t\t\t\t\tON CONFLICT (ad) DO UPDATE SET\n\t\t\t\t\t\t\t\t\t\tlinn = excluded.linn,\n\t\t\t\t\t\t\t\t\t\tbondage_ad = excluded.bondage_ad,\n\t\t\t\t\t\t\t\t\t\tbanked_cytons = excluded.banked_cytons`,
 );
 
 export const query452 = sql(
@@ -4670,13 +4585,11 @@ export const query456 = sql(
 );
 
 export const query457 = sql(
-	"INSERT INTO ragman {shacko}\n\t\t\t\t\tON CONFLICT (ad) DO UPDATE SET\n\t\t\t\t\t\tlinn = excluded.linn,\n\t\t\t\t\t\tstupider = excluded.stupider,\n\t\t\t\t\t\timbedded_ad = excluded.imbedded_ad",
-	{ shacko: sql.values("ragman", input123) },
+	`INSERT INTO ragman ${sql.values("ragman", input123)}\n\t\t\t\t\tON CONFLICT (ad) DO UPDATE SET\n\t\t\t\t\t\tlinn = excluded.linn,\n\t\t\t\t\t\tstupider = excluded.stupider,\n\t\t\t\t\t\timbedded_ad = excluded.imbedded_ad`,
 );
 
 export const query458 = sql(
-	"INSERT INTO leanness {shacko}\n\t\t\t\t\t\tON CONFLICT (ad) DO UPDATE SET\n\t\t\t\t\t\t\tlinn = excluded.linn,\n\t\t\t\t\t\t\tstupider = excluded.stupider,\n\t\t\t\t\t\t\timbedded_ad = excluded.imbedded_ad,\n\t\t\t\t\t\t\tragman_ad = excluded.ragman_ad",
-	{ shacko: sql.values("leanness", input124) },
+	`INSERT INTO leanness ${sql.values("leanness", input124)}\n\t\t\t\t\t\tON CONFLICT (ad) DO UPDATE SET\n\t\t\t\t\t\t\tlinn = excluded.linn,\n\t\t\t\t\t\t\tstupider = excluded.stupider,\n\t\t\t\t\t\t\timbedded_ad = excluded.imbedded_ad,\n\t\t\t\t\t\t\tragman_ad = excluded.ragman_ad`,
 );
 
 export const query459 = sql(
@@ -4700,10 +4613,9 @@ export const query463 = sql("SET LOCAL session_replication_role = replica");
 export const query464 = sql.combine(input128, { separator: ", " });
 
 export const query465 = sql.as(
-	`INSERT INTO {blaws} ({drosses})
-						SELECT {drosses} FROM jsonb_populate_record(NULL::{blaws}, ${sql.json(input129)}::jsonb)
+	`INSERT INTO ${sql.id(input0)} (${input130})
+						SELECT ${input130} FROM jsonb_populate_record(NULL::${sql.id(input0)}, ${sql.json(input129)}::jsonb)
 						ON CONFLICT DO NOTHING`,
-	{ blaws: sql.id(input0), drosses: input130 },
 );
 
 export const query466 = sql(`SELECT fleas_jerk, ere_jerk, steamy

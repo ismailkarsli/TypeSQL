@@ -62,7 +62,7 @@ To turn suggestions off, set `"typesql.completions.enable": false`.
 
 ## Syntax highlighting
 
-The extension colors the SQL inside the string: keywords, types, functions, strings, comments, numbers, `$1` and `:name` parameters and `{slot}` fragments. The rest of the call stays TypeScript, and so does `${sql.param(…)}` inside a template literal.
+The extension colors the SQL inside the string: keywords, types, functions, strings, comments, numbers, and `$1` and `:name` parameters. The rest of the call stays TypeScript, and so does every `${…}` inside a template literal, such as `${sql.param(…)}` or an interpolated fragment.
 
 | Highlighted | Example |
 |---|---|
@@ -95,7 +95,7 @@ The SQL is colored in shades of orange, so it stands out from the TypeScript aro
 | types | `int4`, `text` | `storage.type.sql` | `#FFB86C` | `#B45309` |
 | functions | `count(…)` | `entity.name.function.sql` | `#FFC777` | `#9A3412` |
 | numbers and constants | `42`, `true`, `null` | `constant.numeric.sql`, `constant.language.sql` | `#FFD3A1` | `#A16207` |
-| parameters and slots, in bold | `$1`, `:name`, `{slot}` | `variable.parameter.positional.sql`, `variable.parameter.named.sql`, `variable.other.slot.sql` | `#FF7A45` | `#C2380C` |
+| parameters, in bold | `$1`, `:name` | `variable.parameter.positional.sql`, `variable.parameter.named.sql` | `#FF7A45` | `#C2380C` |
 | table and column names, punctuation | `users`, `u.id` | `meta.embedded.line.sql`, `meta.embedded.block.sql` | `#F5D0A9` | `#7C2D12` |
 
 Strings and comments keep your theme's colors, and so does TypeScript inside `${…}`.

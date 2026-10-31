@@ -25,7 +25,7 @@ const posts = await sql(
 ).execute();
 ```
 
-The same call takes a better-sqlite3 `Database` or a bun:sqlite `Database`. The statement text is sent as written: the adapter prepares it on each execution and binds `$1`, `$2`, … by name, so result column names match what TypeSQL infers. A query from [`sql.prepare`](../reference/api#sql-prepare-text-slots) is prepared once, on its first execution, and reused.
+The same call takes a better-sqlite3 `Database` or a bun:sqlite `Database`. The statement text is sent as written: the adapter prepares it on each execution and binds `$1`, `$2`, … by name, so result column names match what TypeSQL infers. A query from [`sql.prepare`](../reference/api#sql-prepare-text) is prepared once, on its first execution, and reused.
 
 Values are bound as the driver expects: `sql.json(value)` as JSON text, `true` / `false` as `1` / `0`. A `Date` throws, because SQLite has no date type; pass `date.toISOString()` or a number.
 

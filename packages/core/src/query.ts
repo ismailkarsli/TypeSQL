@@ -1,4 +1,5 @@
 import { applyPlugins, type SqlPlugin } from "./plugin.js";
+import { inlineable } from "./runtime/inline.js";
 
 export declare const ROW: unique symbol;
 export declare const PARAMS: unique symbol;
@@ -30,10 +31,11 @@ export class NoResultError extends Error {
 	}
 }
 
-export interface Query<
+/** The object part of a `Query`: what a query is besides its string brand. */
+export interface QueryObject<
 	Row,
-	Params extends readonly unknown[] = readonly unknown[],
-	Text extends string = string,
+	Params extends readonly unknown[],
+	Text extends string,
 > {
 	readonly text: string;
 	readonly values: readonly unknown[];
@@ -46,10 +48,11 @@ export interface Query<
 	executeCount(executor?: Executor): Promise<number>;
 }
 
-export interface Fragment<
-	Text extends string = string,
-	Params extends readonly unknown[] = readonly unknown[],
-	Carried extends readonly unknown[] = readonly unknown[],
+/** The object part of a `Fragment`: what a fragment is besides its string brand. */
+export interface FragmentObject<
+	Text extends string,
+	Params extends readonly unknown[],
+	Carried extends readonly unknown[],
 > {
 	readonly text: string;
 	readonly values: readonly unknown[];
@@ -57,6 +60,26 @@ export interface Fragment<
 	readonly [PARAMS]?: Params;
 	readonly [CARRIED]?: Carried;
 }
+
+/**
+ * The string part types `${fragment}`, `${query}` and an omitted
+ * `${sql.optional(…)}` in a template literal: TypeScript keeps their type as a
+ * placeholder there, and `sql()` reads it back.
+ */
+export type InlineFragment = "\u0000typesql-fragment\u0000";
+
+/** A statement; `${query}` splices it in place as a subquery. */
+export type Query<
+	Row,
+	Params extends readonly unknown[] = readonly unknown[],
+	Text extends string = string,
+> = QueryObject<Row, Params, Text> & InlineFragment;
+
+export type Fragment<
+	Text extends string = string,
+	Params extends readonly unknown[] = readonly unknown[],
+	Carried extends readonly unknown[] = readonly unknown[],
+> = FragmentObject<Text, Params, Carried> & InlineFragment;
 
 export type RowType<Q> =
 	Q extends Query<infer R, readonly unknown[], string> ? R : never;
@@ -137,7 +160,7 @@ export function makeQuery<
 			return rows[0];
 		},
 	});
-	SLOTTABLES.add(query);
+	SLOTTABLES.add(inlineable(query));
 	return query as unknown as Query<Row, Params, Text>;
 }
 
@@ -152,7 +175,7 @@ export function makeFragment<
 	Params extends readonly unknown[],
 	Carried extends readonly unknown[] = readonly unknown[],
 >(text: string, values: readonly unknown[]): Fragment<Text, Params, Carried> {
-	const fragment = { text, values };
+	const fragment = inlineable({ text, values });
 	SLOTTABLES.add(fragment);
-	return fragment;
+	return fragment as Fragment<Text, Params, Carried>;
 }

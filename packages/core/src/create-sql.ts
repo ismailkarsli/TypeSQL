@@ -1,5 +1,5 @@
 import type { Dialect, DialectTypes, SqlOf } from "./dialect.js";
-import { type Empty, empty, isEmpty } from "./empty.js";
+import { type Empty, empty, isEmpty, optional } from "./empty.js";
 import { encodeInput, encodeParameters, type SqlPlugin } from "./plugin.js";
 import type { Executor } from "./query.js";
 import { makeFragment, makeQuery } from "./query.js";
@@ -12,10 +12,8 @@ import {
 	maxParam,
 	quoteIdent,
 	rewriteNamed,
-	splice,
 } from "./runtime/splice.js";
 import { buildSet, buildValues } from "./runtime/write.js";
-import type { SlotMap } from "./sql/slots.js";
 
 export interface CreateSql {
 	// biome-ignore lint/style/useShorthandFunctionType: Dialects merge signatures into this interface.
@@ -45,12 +43,11 @@ export function createDialectSql<T extends DialectTypes, DB, TM = T["typeMap"]>(
 	const api = Object.assign(call, {
 		withPlugin: (plugin: SqlPlugin) =>
 			createDialectSql(dialect, executor, [...plugins, plugin]),
-		prepare: (query: string, slots: SlotMap = {}) => {
+		prepare: (query: string) => {
 			const rn = rewriteNamed(query);
 			const count = maxParam(rn.text);
 			const initial = new Array<unknown>(count).fill(undefined);
-			const base = build(rn.text, initial);
-			const compiled = splice(base.text, slots, base.values);
+			const compiled = build(rn.text, initial);
 			const fixed = compiled.values.slice(count);
 			const prepared = executor?.prepare?.(compiled.text) ?? executor;
 			return (...input: readonly unknown[]) => {
@@ -87,13 +84,19 @@ export function createDialectSql<T extends DialectTypes, DB, TM = T["typeMap"]>(
 								? value
 								: encodeInput(value, plugins, { kind: "value" }),
 						),
-		empty,
+		optional,
+		if: (value: unknown, then: (value: unknown) => unknown) =>
+			value ? then(value) : empty,
 		json,
 		fragment: (text: string, ...rest: readonly unknown[]) => {
 			const r = buildInput(text, rest);
 			return makeFragment(r.text, r.values);
 		},
-		id: (...parts: readonly string[]) => makeFragment(quoteIdent(...parts), []),
+		id: (...parts: readonly string[]) => {
+			if (parts.some((p) => typeof p !== "string"))
+				throw new Error("typesql: sql.id() takes names as strings");
+			return makeFragment(quoteIdent(...parts), []);
+		},
 		combine: (
 			items: readonly (Spliceable | Empty)[],
 			options?: { readonly separator?: string },
@@ -110,7 +113,10 @@ export function createDialectSql<T extends DialectTypes, DB, TM = T["typeMap"]>(
 			bool(present(items, "and"), "AND"),
 		or: (items: readonly (Spliceable | Empty)[]) =>
 			bool(present(items, "or"), "OR"),
-		set: (table: string, values: Readonly<Record<string, unknown>>) => {
+		set: (...args: readonly unknown[]) => {
+			const [table, values] = (
+				typeof args[0] === "string" ? args : [null, args[0]]
+			) as [string | null, Readonly<Record<string, unknown>>];
 			const r = buildSet(
 				encodeInput(values, pipeline, { kind: "set", table }) as Readonly<
 					Record<string, unknown>
@@ -118,19 +124,19 @@ export function createDialectSql<T extends DialectTypes, DB, TM = T["typeMap"]>(
 			);
 			return makeFragment(r.text, r.values);
 		},
-		values: (
-			table: string,
-			rows: readonly Readonly<Record<string, unknown>>[],
-		) => {
+		values: (...args: readonly unknown[]) => {
+			const [table, rows] = (
+				typeof args[0] === "string" ? args : [null, args[0]]
+			) as [string | null, readonly Readonly<Record<string, unknown>>[]];
+			const context = { kind: "values", table } as const;
 			const encoded =
 				pipeline.length === 0 || !Array.isArray(rows)
 					? rows
 					: rows.map(
 							(row) =>
-								encodeInput(row, pipeline, {
-									kind: "values",
-									table,
-								}) as Readonly<Record<string, unknown>>,
+								encodeInput(row, pipeline, context) as Readonly<
+									Record<string, unknown>
+								>,
 						);
 			const r = buildValues(encoded, dialect.valuesDefault !== false);
 			return makeFragment(r.text, r.values);
@@ -152,7 +158,7 @@ function present(
 		if (isEmpty(item)) continue;
 		if (item === null || item === undefined)
 			throw new Error(
-				`typesql: sql.${name}() does not accept null or undefined; use sql.empty or sql.empty(value) to omit an item`,
+				`typesql: sql.${name}() does not accept null or undefined; wrap an optional item in sql.optional(), which omits it when it is undefined`,
 			);
 		defined.push(item);
 	}

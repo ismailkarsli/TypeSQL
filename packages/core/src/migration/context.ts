@@ -1,21 +1,12 @@
 import { createDialectSql } from "../create-sql.js";
 import type { ApplyDdlOf, DialectTypes, ValidateDdlOf } from "../dialect.js";
 import type { EngineTypes } from "../engine/contract.js";
-import type { ParamsOf, RowOf } from "../engine/infer.js";
 import type { SqlError } from "../errors.js";
 import { type Postgres, postgres } from "../postgres/dialect.js";
 import type { PgEngine } from "../postgres/engine/engine.js";
-import type { Executor, Query } from "../query.js";
+import type { Executor } from "../query.js";
 import type { SqlApi } from "../sql/api.js";
-import type {
-	BoxCallArgs,
-	BoxSlottedArgs,
-	CallRet,
-	GateCallCheck,
-	GateSlottedCheck,
-	SplicedOr,
-} from "../sql/call.js";
-import type { SlotMap, SlotsFor } from "../sql/slots.js";
+import type { BoxCallArgs, CallRet, GateCallCheck } from "../sql/call.js";
 import { type Sqlite, sqlite } from "../sqlite/dialect.js";
 import type { SqliteEngine } from "../sqlite/engine/engine.js";
 
@@ -42,18 +33,6 @@ export interface MigrationContext<
 			Q,
 		...params: BoxCallArgs<E, DB, TM, Q>
 	): CallRet<E, DB, TM, Q>;
-	<const Q extends string, const S extends SlotMap>(
-		query: (DB extends MissingSchema
-			? MissingSchemaError
-			: GateSlottedCheck<E, DB, TM, Q, S>) &
-			Q,
-		slots: S & SlotsFor<Q, S>,
-		...params: BoxSlottedArgs<E, DB, TM, Q, S>
-	): Query<
-		RowOf<E, DB, TM, SplicedOr<Q, S>>,
-		ParamsOf<E, DB, TM, SplicedOr<Q, S>>,
-		SplicedOr<Q, S>
-	>;
 	add<const Q extends string>(
 		ddl: (DB extends MissingSchema ? MissingSchemaError : GateDdl<T, DB, Q>) &
 			Q,

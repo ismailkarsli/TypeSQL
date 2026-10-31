@@ -1,6 +1,7 @@
 /** The boundary at which an application value is converted to database input. */
 export type InputContext =
-	| { readonly kind: "set" | "values"; readonly table: string }
+	/** `table` is `null` for `sql.set(values)` and `sql.values(rows)`. */
+	| { readonly kind: "set" | "values"; readonly table: string | null }
 	| { readonly kind: "parameters"; readonly query: string }
 	| { readonly kind: "value" };
 

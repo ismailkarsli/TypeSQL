@@ -87,9 +87,6 @@
 					"parameter.definition": [
 						"variable.parameter.positional.sql"
 					],
-					"macro.definition": [
-						"variable.other.slot.sql"
-					],
 					"variable.definition": [
 						"meta.embedded.line.sql"
 					],
@@ -124,9 +121,6 @@
 					],
 					"parameter.definition": [
 						"variable.parameter.positional.sql"
-					],
-					"macro.definition": [
-						"variable.other.slot.sql"
 					],
 					"variable.definition": [
 						"meta.embedded.line.sql"
@@ -163,9 +157,6 @@
 					"parameter.definition": [
 						"variable.parameter.positional.sql"
 					],
-					"macro.definition": [
-						"variable.other.slot.sql"
-					],
 					"variable.definition": [
 						"meta.embedded.line.sql"
 					],
@@ -200,9 +191,6 @@
 					],
 					"parameter.definition": [
 						"variable.parameter.positional.sql"
-					],
-					"macro.definition": [
-						"variable.other.slot.sql"
 					],
 					"variable.definition": [
 						"meta.embedded.line.sql"
@@ -275,8 +263,7 @@
 						{
 							"scope": [
 								"variable.parameter.positional.sql",
-								"variable.parameter.named.sql",
-								"variable.other.slot.sql"
+								"variable.parameter.named.sql"
 							],
 							"settings": {
 								"foreground": "#FF7A45",
@@ -330,8 +317,7 @@
 						{
 							"scope": [
 								"variable.parameter.positional.sql",
-								"variable.parameter.named.sql",
-								"variable.other.slot.sql"
+								"variable.parameter.named.sql"
 							],
 							"settings": {
 								"foreground": "#C2380C",

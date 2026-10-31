@@ -715,9 +715,33 @@ type ParamsOfWins<
 	: M;
 // Sort and partition keys never reach a result column, so their parameters
 // accept null, as PostgreSQL does: ORDER BY c - $1::timestamptz sorts NULL last.
-type ParamsOfOrder<Es extends readonly Expr[], C extends Ctx, M> =
-	| M
-	| AcceptNull<Exclude<ParamsOfList<Es, C, M, null>, M>>;
+// The keys' entries are collected on their own and added to M marked as sort
+// keys; SettleSortKeys makes them nullable once every use is known. Collecting
+// into M itself would nest everything gathered so far into each level of a
+// query (TS5115 on nested subqueries).
+type ParamsOfOrder<
+	Es extends readonly Expr[],
+	C extends Ctx,
+	M,
+> = Es extends readonly [] ? M : M | SortKeys<ParamsOfList<Es, C, never, null>>;
+type SortKeys<E> = E extends unknown ? { readonly sortKey: E } : never;
+/**
+ * A sort key's entry is dropped when another use already has the same entry,
+ * and accepts null otherwise.
+ */
+export type SettleSortKeys<U> =
+	| Exclude<U, { readonly sortKey: unknown }>
+	| AcceptNull<
+			SortKeyEntries<
+				Extract<U, { readonly sortKey: unknown }>,
+				Exclude<U, { readonly sortKey: unknown }>
+			>
+	  >;
+type SortKeyEntries<S, Uses> = S extends { readonly sortKey: infer E }
+	? E extends Uses
+		? never
+		: E
+	: never;
 type AcceptNull<E> = E extends {
 	readonly n: infer N extends number;
 	readonly t: Info<infer T, false>;
@@ -886,35 +910,35 @@ export type ParamsOfSelect<
 > =
 	BindWith<Q["with"], DB, Outer, Ctes> extends infer C2
 		? C2 extends CteMap
-			? ParamsOfLimit<
-					Q["offset"],
-					ParamsOfLimit<
-						Q["limit"],
-						ParamsOfBody<
-							Q["body"],
-							DB,
-							Outer,
-							C2,
-							ParamsOfWith<Q["with"], DB, C2, M>,
-							SkipTargets,
-							Q["orderBy"]
-						>
-					>
+			? ParamsOfBody<
+					Q["body"],
+					DB,
+					Outer,
+					C2,
+					| ParamsOfWith<Q["with"], DB, C2, M>
+					| LimitParam<Q["limit"]>
+					| LimitParam<Q["offset"]>,
+					SkipTargets,
+					Q["orderBy"]
 				>
 			: M
 		: never;
-type ParamsOfLimit<E extends Expr | null, M> = E extends {
+/**
+ * A LIMIT or OFFSET parameter's entry, added to the accumulator before the
+ * body is walked, so the walk stays a tail call through nested queries.
+ */
+type LimitParam<E extends Expr | null> = E extends {
 	readonly t: "param";
 	readonly n: infer N extends number;
 }
-	? AddParam<M, N, Info<"int4", true>>
+	? AddParam<never, N, Info<"int4", true>>
 	: E extends {
 				readonly t: "cast";
 				readonly to: infer T;
 				readonly e: { readonly t: "param"; readonly n: infer N extends number };
 			}
-		? AddParam<M, N, Mk<T, true>>
-		: M;
+		? AddParam<never, N, Mk<T, true>>
+		: never;
 
 type ParamsOfBody<
 	B extends SelectBody,
@@ -925,28 +949,32 @@ type ParamsOfBody<
 	SkipTargets extends boolean = false,
 	Order extends readonly Expr[] = [],
 > = B extends TagSetop
-	? ParamsOfOrder<
-			Order,
-			MkCtx<DB, Outer, Ctes, false>,
+	? ParamsOfBody<
+			B["r"],
+			DB,
+			Outer,
+			Ctes,
 			ParamsOfBody<
-				B["r"],
+				B["l"],
 				DB,
 				Outer,
 				Ctes,
-				ParamsOfBody<B["l"], DB, Outer, Ctes, M>
+				ParamsOfOrder<Order, MkCtx<DB, Outer, Ctes, false>, M>
 			>
 		>
 	: B extends TagParen
-		? ParamsOfOrder<
-				Order,
-				MkCtx<DB, Outer, Ctes, false>,
-				ParamsOfSelect<B["q"], DB, Outer, Ctes, M>
+		? ParamsOfSelect<
+				B["q"],
+				DB,
+				Outer,
+				Ctes,
+				ParamsOfOrder<Order, MkCtx<DB, Outer, Ctes, false>, M>
 			>
 		: B extends TagValues
-			? ParamsOfOrder<
-					Order,
+			? ParamsOfRows<
+					B["rows"],
 					MkCtx<DB, Outer, Ctes, false>,
-					ParamsOfRows<B["rows"], MkCtx<DB, Outer, Ctes, false>, M>
+					ParamsOfOrder<Order, MkCtx<DB, Outer, Ctes, false>, M>
 				>
 			: B extends TagSimple
 				? BindFrom<B["from"], DB, Outer, Ctes> extends infer L
@@ -997,37 +1025,62 @@ type ParamsOfSimple<
 	readonly distinct: infer D;
 	readonly windows: infer Ws extends readonly NamedWindow[];
 }
-	? ParamsOfWins<
-			Ws,
+	? SimpleParts<
+			[
+				["sort", SortParams<Ws, D, Order>],
+				["from", Fs],
+				SkipTargets extends true ? ["skip", null] : ["targets", Ts],
+				["cond", W],
+				["list", G extends readonly Expr[] ? G : []],
+				["cond", H],
+			],
 			C,
-			ParamsOfOrder<
-				D extends readonly Expr[] ? D : [],
-				C,
-				ParamsOfOrder<
-					Order,
-					C,
-					ParamsOfOpt<
-						H,
-						C,
-						ParamsOfList<
-							G extends readonly Expr[] ? G : [],
-							C,
-							ParamsOfOpt<
-								W,
-								C,
-								SkipTargets extends true
-									? ParamsOfFromItems<Fs, C, M>
-									: ParamsOfTargets<Ts, C, ParamsOfFromItems<Fs, C, M>>,
-								Info<"bool">
-							>,
-							null
-						>,
-						Info<"bool">
-					>
-				>
-			>
+			M
 		>
 	: M;
+type SortParams<
+	Ws extends readonly NamedWindow[],
+	D,
+	Order extends readonly Expr[],
+> = {
+	readonly ws: Ws;
+	readonly d: D extends readonly Expr[] ? D : [];
+	readonly order: Order;
+};
+
+/**
+ * A select's parts walked one after another by a tail-recursive loop, so each
+ * part, and the nested queries in it, costs one level of nesting however many
+ * parts come before it. Entries only accumulate, so the order is free.
+ */
+type SimpleParts<
+	Ps extends readonly unknown[],
+	C extends Ctx,
+	M,
+> = Ps extends readonly [infer P, ...infer R]
+	? SimpleParts<R, C, SimplePart<P, C, M>>
+	: M;
+type SimplePart<P, C extends Ctx, M> = P extends readonly [
+	"from",
+	infer Fs extends readonly FromItem[],
+]
+	? ParamsOfFromItems<Fs, C, M>
+	: P extends readonly ["targets", infer Ts extends readonly Target[]]
+		? ParamsOfTargets<Ts, C, M>
+		: P extends readonly ["cond", infer E extends Expr | null]
+			? ParamsOfOpt<E, C, M, Info<"bool">>
+			: P extends readonly ["list", infer Es extends readonly Expr[]]
+				? ParamsOfList<Es, C, M, null>
+				: P extends readonly [
+							"sort",
+							{
+								readonly ws: infer Ws extends readonly NamedWindow[];
+								readonly d: infer D extends readonly Expr[];
+								readonly order: infer O extends readonly Expr[];
+							},
+						]
+					? ParamsOfWins<Ws, C, ParamsOfOrder<D, C, ParamsOfOrder<O, C, M>>>
+					: M;
 
 type TagParam = { readonly t: "param" };
 type TagBin = { readonly t: "bin" };

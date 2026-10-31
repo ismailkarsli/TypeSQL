@@ -7,7 +7,7 @@ export type {
 	TransactionalSqlOf,
 	ValidateDdlOf,
 } from "./dialect.js";
-export type { Empty } from "./empty.js";
+export type { Empty, EmptyFragment, Optional } from "./empty.js";
 export type { AnyErr, ErrAt, ErrMsg, IsErr, SqlError } from "./errors.js";
 export {
 	type MigrationClient,
@@ -33,12 +33,15 @@ export {
 	type Executor,
 	type ExecutorResult,
 	type Fragment,
+	type FragmentObject,
+	type InlineFragment,
 	mapRows,
 	NoResultError,
 	type PARAMS,
 	type ParamsType,
 	pluginsOf,
 	type Query,
+	type QueryObject,
 	type ROW,
 	type RowType,
 	type TEXT,

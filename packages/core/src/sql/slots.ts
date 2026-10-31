@@ -1,16 +1,11 @@
 import type { CARRIED, Fragment, Query, TextType } from "../query.js";
 import type { Skip } from "./inline.js";
-import type { MaxParamStr, SlotNames, UnionList } from "./splice.js";
+import type { MaxParamStr, UnionList } from "./splice.js";
 
+/** A value that can be interpolated into SQL text, and an item of sql.combine/and/or. */
 export type Slottable =
 	| Fragment<string, readonly unknown[], readonly unknown[]>
 	| Query<unknown, readonly unknown[], string>;
-
-export type SlotMap = { readonly [name: string]: Slottable };
-
-export type SlotsFor<Q extends string, S> = {
-	readonly [K in SlotNames<Q>]: K extends keyof S ? S[K] : Slottable;
-};
 
 export type SlotTexts<S> = {
 	readonly [K in keyof S]: { readonly text: TextType<S[K]> };

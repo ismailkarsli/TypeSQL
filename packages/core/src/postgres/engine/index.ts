@@ -35,13 +35,11 @@ export type {
 	ValueEnc,
 } from "../../sql/inline.js";
 export type { NamedParams, RewriteNamed } from "../../sql/named.js";
-export type { SlotMap, SlotsFor, Slottable } from "../../sql/slots.js";
+export type { Slottable } from "../../sql/slots.js";
 export type {
-	HasSlots,
 	JoinedText,
 	MaxParamStr,
 	QuotedIdent,
-	SlotNames,
 	Splice,
 	Take,
 	UnknownTuple,

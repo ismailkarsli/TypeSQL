@@ -52,7 +52,7 @@ sql("SELECT id FROM users WHERE id = :id AND email = :email", { id: 1, email: "x
 - `::` casts, `:=` and colons inside string literals are not parameters.
 - Mixing `:name` and `$n` in one statement is an error.
 
-## `sql.prepare(text, slots?)`
+## `sql.prepare(text)`
 
 Compile a reusable query, then call it with the same parameter arguments that `sql(text, ...params)` accepts:
 
@@ -65,7 +65,7 @@ const byEmail = sql.prepare("SELECT id FROM users WHERE email = :email");
 await byEmail({ email: "a@example.com" }).execute();
 ```
 
-Preparation resolves named parameters, inline values and fragment slots once. The returned function checks each binding's parameter types and returns a normal `Query` with all four `execute*` methods. Every binding gets a fresh values array. Inline and fragment values are captured at preparation; pass changing values as positional or named parameters. Captured objects retain their references.
+Preparation resolves named parameters, inline values and interpolated fragments once. The returned function checks each binding's parameter types and returns a normal `Query` with all four `execute*` methods. Every binding gets a fresh values array. Inline and fragment values are captured at preparation; pass changing values as positional or named parameters. Captured objects retain their references.
 
 With `@typesql/pg`, execution uses a server-side statement whose name is derived from the final SQL text. PostgreSQL fixes such a statement's result columns when it is first prepared on a connection, so after an `ALTER TABLE` a prepared `SELECT *` fails with `cached plan must not change result type` on connections that already prepared it; list the columns, or reconnect after schema changes. With `@typesql/postgres`, execution enables postgres.js preparation and extended protocol, including for queries without parameters; the client's global `prepare: false` setting still takes precedence. Preparation itself sends no SQL.
 
@@ -77,15 +77,16 @@ Reuse the returned function across calls to save TypeSQL's runtime SQL assembly.
 
 | Function | Sends |
 |---|---|
-| `sql.param(value)` | the value as a `$n` parameter, or `DEFAULT` when it is `sql.empty`; rejects `undefined` |
-| `sql.empty` / `sql.empty(value)` | an explicit sentinel, or a helper that replaces `null` and `undefined` with it; omitted in `combine`, emitted as `DEFAULT` in inline `param` |
-| `sql.json(value)` | the value as JSON text; `null` as SQL `NULL`; `undefined` as `DEFAULT`, like `sql.param(sql.empty)` |
+| `sql.param(value)` | the value as a `$n` parameter, or `DEFAULT` for an omission from `sql.optional`; rejects `undefined` |
+| `sql.optional(value)` | the value, or an omission for `undefined` (`null` stays SQL `NULL`; a fragment that can be `null` is an error): `DEFAULT` in inline `param`, a skipped item in `combine`/`and`/`or`, nothing as an interpolated fragment |
+| `sql.if(value, then)` | `then(value)`, a fragment or query, when `value` is truthy; otherwise the omission of `sql.optional(undefined)`. `then` gets `value` without its falsy members |
+| `sql.json(value)` | the value as JSON text; `null` as SQL `NULL`; `undefined` as `DEFAULT`, like `sql.param(sql.optional(undefined))` |
 
 - The value's type is checked against the parameter's type: literals and objects exactly, a plain `string`, `number` or `boolean` by kind only (so any `string` fits an enum), and anything when there is no context.
-- Inline values are numbered after the statement's `$n` / `:name` parameters. Values carried by spliced fragments come last.
+- Inline values are numbered after the statement's `$n` / `:name` parameters. Values carried by interpolated fragments come last.
 - Each `sql.param()` belongs to one statement. Inside quotes or a comment it is an error.
 - `sql.json()` is an error unless the parameter is `json` / `jsonb` or has no context. For a `Json<T>` column the value is checked against `T`, except as a positional or named argument. A raw array for a JSON parameter is an error with `sql.param()` and as a call argument (`NonArrayOrSqlJson<T>`).
-- A `sql.param()` value that can be `sql.empty` makes the statement be checked a second time with `DEFAULT` in its place, so it only fits a `VALUES` item or a `SET` value. `sql.fragment()` refuses such a value. `any` and `unknown` values are not checked.
+- A `sql.param()` value that can be an omission makes the statement be checked a second time with `DEFAULT` in its place, so it only fits a `VALUES` item or a `SET` value. `sql.fragment()` refuses such a value. `any` and `unknown` values are not checked.
 
 See [Parameters](../guide/parameters), [JSON values](../guide/parameters#json-values) and [Optional values](../guide/writing-data#optional-values).
 
@@ -93,19 +94,19 @@ See [Parameters](../guide/parameters), [JSON values](../guide/parameters#json-va
 
 ```ts
 const where = sql.fragment("WHERE u.id = $1", 7);
-const q = sql("SELECT u.id FROM users u {where}", { where });
+const q = sql(`SELECT u.id FROM users u ${where}`);
 ```
 
 | Function | Result |
 |---|---|
-| `sql.fragment(text, ...params)` | a piece of SQL to splice into a `{name}` slot |
+| `sql.fragment(text, ...params)` | a piece of SQL to interpolate as `${fragment}` |
 | `sql.id("col")`, `sql.id("schema", "table")` | a quoted identifier: `"col"`, `"schema"."table"` |
-| `sql.combine(items, options?)` | the fragments combined with `", "` by default: a tuple keeps its literal text, a runtime array of fragments with literal texts is checked as a list; ignores `sql.empty` items and throws if none remain |
-| `sql.and(items)`, `sql.or(items)` | the conditions combined with `AND` or `OR`: `((a) AND (b))`, `(a)` for one, `true` or `false` for none; ignores `sql.empty` items |
+| `sql.combine(items, options?)` | the fragments combined with `", "` by default: a tuple keeps its literal text, a runtime array of fragments with literal texts is checked as a list; ignores omitted items and throws if none remain |
+| `sql.and(items)`, `sql.or(items)` | the conditions combined with `AND` or `OR`: `((a) AND (b))`, `(a)` for one, `true` or `false` for none; ignores omitted items |
 | `sql.raw(text)` | dynamic text, sent as is |
 
-- Only `{identifier}` is a slot. Braces inside string literals are left alone.
-- A fragment's `$n` are renumbered after the outer parameters, and its values are checked once spliced. Whole queries can be spliced too.
+- Every result above and a whole query can be interpolated (`${fragment}`) into `sql()`, `sql.prepare()`, `sql.as()` and `sql.fragment()`. Inside quotes or a comment it is an error. The interpolated string belongs to one statement; the fragment can be interpolated again.
+- A fragment's `$n` are renumbered after the outer parameters, and its values are checked once spliced. `${flag ? a : b}` is checked once per member.
 - `sql.id` over a union of names is checked once per member; the row type is the union. A generic name constrained to `RelationName<DB>` is widened to every table and view. Any other non-literal name is dynamic. Quoting prevents SQL syntax injection, but does not enforce authorization: dynamic names derived from untrusted user input must come from an explicit allowlist (e.g. to prevent selecting or sorting by sensitive fields like `password_hash`).
 - `sql.combine`, `sql.and` and `sql.or` over an array check the statement once, with each distinct element once ([Lists from runtime arrays](../guide/dynamic-sql#lists-from-runtime-arrays)). The `options.separator` value is raw SQL text: never pass untrusted user input as the separator.
 - A dynamic fragment is rejected by `sql()`. Use `sql.as<Row>()`.
@@ -116,14 +117,14 @@ See [Dynamic SQL](../guide/dynamic-sql).
 
 | Function | Builds | Input type |
 |---|---|---|
-| `sql.set(table, values)` | `"a" = $1, "b" = $2` for the defined values; throws when none is defined | `SetInput<DB, TM, table>` |
-| `sql.values(table, rows)` | `("a", "b") VALUES ($1, $2), ($3, DEFAULT)`; throws on an empty array | `InsertInput<DB, TM, table>` |
+| `sql.set(table, values)`, `sql.set(values)` | `"a" = $1, "b" = $2` for the defined values; throws when none is defined | `SetInput<DB, TM, table>` |
+| `sql.values(table, rows)`, `sql.values(rows)` | `("a", "b") VALUES ($1, $2), ($3, DEFAULT)`; throws on an empty array | `InsertInput<DB, TM, table>` |
 
-`table` is a `TableName<DB>`: a top-level table, or `"schema.table"`. It is used only for compile-time type checking. At runtime, every enumerable key on `values` or row objects becomes a column assignment or insert value. When handling untrusted inputs (such as `req.body`), pick allowed fields explicitly to prevent mass assignment. JSON columns take `sql.json(value)` or a raw non-array value. See [Inserting and updating](../guide/writing-data).
+`table` is a `TableName<DB>`: a top-level table, or `"schema.table"`. It is used only for compile-time type checking. Without it, the fragment is checked against the target of the `UPDATE` or `INSERT` it is interpolated into: `sql.set` with every key present, `sql.values` once with every key and once with only the keys every row always sends, so a required column a row can leave out is still an error. Errors are then reported on the statement. At runtime, every enumerable key on `values` or row objects becomes a column assignment or insert value. When handling untrusted inputs (such as `req.body`), pick allowed fields explicitly to prevent mass assignment. JSON columns take `sql.json(value)` or a raw non-array value. See [Inserting and updating](../guide/writing-data).
 
 ## `sql.as<Row>(text, ...params)`
 
-Skips inference and uses the row type you give. It accepts slots, `:name` and inline values like `sql()`. With `CasePlugin`, write `Row` with camelCase keys. Use it for SQL TypeSQL can't type ([Errors](../guide/errors)).
+Skips inference and uses the row type you give. It accepts interpolated fragments, `:name` and inline values like `sql()`. With `CasePlugin`, write `Row` with camelCase keys. Use it for SQL TypeSQL can't type ([Errors](../guide/errors)).
 
 ## `sql.transaction(fn)`
 

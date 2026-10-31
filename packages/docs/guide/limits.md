@@ -36,10 +36,11 @@ When you hit a limit, [`sql.as<Row>()`](./errors#when-typesql-can-t-type-a-state
 ## Fragments and lists
 
 - [`sql.combine` over an array](./dynamic-sql#lists-from-runtime-arrays) checks the statement once, with every distinct element once. Its cost grows with the number of distinct elements, not with the number of combinations (80 distinct sort elements cost about 0.2M instantiations).
-- In a select list (`SELECT {cols}`), such a list counts every element as selected.
-- A fragment whose text is a union (`sql.id(name)` with `name: "a" | "b"`) is checked once per member. So two such slots in one statement cost `n × m` checks. A generic `sql.id` over `RelationName<DB>` checks the statement against every table and view. For lists, use `sql.combine` over an array, which costs one check.
+- In a select list (``SELECT ${cols}``), such a list counts every element as selected.
+- A fragment whose text is a union (`sql.id(name)` with `name: "a" | "b"`) is checked once per member. So two such fragments in one statement cost `n × m` checks. A generic `sql.id` over `RelationName<DB>` checks the statement against every table and view. For lists, use `sql.combine` over an array, which costs one check.
 - `sql.set` and `sql.values` are checked like `sql.combine` over an array, with every key of the input type once.
 - Some calls throw at runtime because the database would reject the SQL: `sql.combine` with no items, `sql.set` with no defined value, and `sql.values` with an empty array or several rows without values. A `sql.param()` value also throws when it is used in a second statement; wrap a reused value in a fragment.
+- The types of fragments and queries are also string types, so TypeScript can keep `${fragment}` in a template's type. As a result, TypeScript accepts one where a `string` is expected, such as a `$n` argument for a `text` parameter. Passing a fragment or query as a parameter value, to `sql.param()` or to `sql.id()` throws at runtime.
 
 ## Defaults and generated columns
 

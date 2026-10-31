@@ -1,19 +1,10 @@
-import { isSlottable } from "../query.js";
-import type { SlotMap } from "../sql/slots.js";
-import { hasInline, resolveInline, takeValue } from "./inline.js";
-import { maxParam, rewriteNamed, splice } from "./splice.js";
-
-function isSlotMap(v: unknown): v is SlotMap {
-	if (v === null || typeof v !== "object" || Array.isArray(v)) return false;
-	const values = Object.values(v as Record<string, unknown>);
-	if (values.length === 0) return false;
-	for (const x of values) {
-		if (!isSlottable(x)) return false;
-	}
-	return true;
-}
-
-const SLOT_RE = /\{[A-Za-z_][A-Za-z0-9_]*\}/;
+import {
+	hasInline,
+	resolveFragments,
+	resolveInline,
+	takeValue,
+} from "./inline.js";
+import { maxParam, rewriteNamed, type SlotValues, splice } from "./splice.js";
 
 const NAMED_RE = /(^|[^:]):[A-Za-z_]/;
 
@@ -40,17 +31,13 @@ export function build(
 	rest: readonly unknown[],
 	transformParameters?: (args: readonly unknown[]) => readonly unknown[],
 ): { text: string; values: unknown[] } {
-	let slots: SlotMap | null = null;
-	let outer: readonly unknown[] = rest;
-	if (rest.length > 0 && SLOT_RE.test(text) && isSlotMap(rest[0])) {
-		slots = rest[0];
-		outer = rest.slice(1);
-	}
-	if (transformParameters) outer = transformParameters(outer);
-	let positional = text;
+	const inlined = hasInline(text) ? resolveFragments(text) : null;
+	const slots: SlotValues | null = inlined ? inlined.slots : null;
+	const outer = transformParameters ? transformParameters(rest) : rest;
+	let positional = inlined ? inlined.text : text;
 	let values: unknown[] = outer.length === 0 ? [] : outer.map(takeValue);
-	if (text.includes(":") && NAMED_RE.test(text)) {
-		const rn = rewriteNamed(text);
+	if (positional.includes(":") && NAMED_RE.test(positional)) {
+		const rn = rewriteNamed(positional);
 		if (rn.names.length > 0) {
 			values = namedValues(rn.names, outer);
 			positional = rn.text;

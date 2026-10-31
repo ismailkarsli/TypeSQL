@@ -1,5 +1,6 @@
 import type { Empty } from "../empty.js";
 import type { SqlError } from "../errors.js";
+import type { InlineFragment } from "../query.js";
 import type { Next } from "./next.js";
 import type { MaxParamStr } from "./splice.js";
 
@@ -7,10 +8,15 @@ export type ParamInput<T> = unknown extends T
 	? unknown
 	: undefined extends T
 		? SqlError<
-				"sql.param() does not accept undefined; use sql.empty for DEFAULT or null for SQL NULL",
+				"sql.param() does not accept undefined; use sql.optional(value) for DEFAULT or null for SQL NULL",
 				null
 			>
-		: unknown;
+		: [Extract<Exclude<T, Empty>, InlineFragment>] extends [never]
+			? unknown
+			: SqlError<
+					"sql.param() takes a value, not a fragment or query; interpolate it itself: ${fragment}",
+					null
+				>;
 
 export type InlineMarker<T> = unknown extends T
 	? PlainMarker<T>
@@ -18,7 +24,7 @@ export type InlineMarker<T> = unknown extends T
 		? PlainMarker<T>
 		: DefaultMarker<T>;
 type PlainMarker<T> = `\u0000P${Enc<T>}\u0000`;
-/** `sql.json(undefined)` sends DEFAULT, so a value that can be `undefined` is checked as `sql.param(sql.empty(value))` is. */
+/** `sql.json(undefined)` sends DEFAULT, so a value that can be `undefined` is checked as `sql.param(sql.optional(value))` is. */
 export type JsonMarker<T> = unknown extends T
 	? `\u0000PJ${Enc<T>}\u0000`
 	: [Extract<T, undefined>] extends [never]

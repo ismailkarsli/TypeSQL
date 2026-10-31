@@ -5,7 +5,7 @@ import type {
 	Ctx,
 	Info,
 } from "../../../engine/types.js";
-import type { SqlError } from "../../../errors.js";
+import type { AnyErr, SqlError } from "../../../errors.js";
 import type {
 	Call,
 	CaseWhen,
@@ -73,20 +73,16 @@ export type TypeOf<E extends Expr, C extends Ctx> = E extends TagCol
 													: E extends TagIs
 														? Check<TypeOf<E["e"], C>, Info<"bool">>
 														: E extends TagIsdistinct
-															? Check2<
-																	TypeOf<E["l"], C>,
-																	TypeOf<E["r"], C>,
-																	Info<"bool">
+															? Comparable<
+																	TypeOperand<E["l"], C>,
+																	TypeOperand<E["r"], C>
 																>
 															: E extends TagBetween
 																? TypeBetween<E["e"], E["lo"], E["hi"], C>
 																: E extends TagIn
 																	? TypeIn<E["e"], E["list"], C>
 																	: E extends TagInsub
-																		? StrictBool<
-																				TypeOf<E["e"], C>,
-																				SubqueryOperand<E["e"], E["q"], C>
-																			>
+																		? SubCompare<"=", E["e"], E["q"], C, false>
 																		: E extends TagLike
 																			? StrictBool<
 																					TypeOf<E["e"], C>,
@@ -317,7 +313,6 @@ export type CommonOf<
 	: Acc;
 
 type Check<A, R> = A extends ColInfo ? R : A;
-type Check2<A, B, R> = A extends ColInfo ? (B extends ColInfo ? R : B) : A;
 type StrictBool<A, B> = A extends ColInfo
 	? B extends ColInfo
 		? Info<"bool", Or<A["nullable"], B["nullable"]>>
@@ -447,8 +442,41 @@ type TypeBin<
 > = L extends TagRow
 	? R extends { readonly t: "sub"; readonly q: infer Q extends SelectStmt }
 		? SubCompare<Op, L, Q, C, true>
-		: TypeBinOperands<Op, L, R, C>
+		: R extends TagRow
+			? RowPairs<Op, L["items"], R["items"], C> extends infer Err extends AnyErr
+				? Err
+				: TypeBinOperands<Op, L, R, C>
+			: TypeBinOperands<Op, L, R, C>
 	: TypeBinOperands<Op, L, R, C>;
+/** `(a, b) = (c, d)` compares each pair with the operator. */
+type RowPairs<
+	Op extends string,
+	Ls extends readonly Expr[],
+	Rs extends readonly Expr[],
+	C extends Ctx,
+> =
+	OperandList<Ls, C, []> extends infer A extends readonly ColInfo[]
+		? OperandList<Rs, C, []> extends infer B extends readonly ColInfo[]
+			? NoComparePairs<Op, A, B>
+			: null
+		: null;
+type NoComparePairs<
+	Op extends string,
+	A extends readonly ColInfo[],
+	B extends readonly ColInfo[],
+> = A extends readonly [
+	infer L extends ColInfo,
+	...infer AR extends readonly ColInfo[],
+]
+	? B extends readonly [
+			infer R extends ColInfo,
+			...infer BR extends readonly ColInfo[],
+		]
+		? NoCompare<Op, L["type"], R["type"]> extends infer Err extends AnyErr
+			? Err
+			: NoComparePairs<Op, AR, BR>
+		: null
+	: null;
 type SubCompare<
 	Op extends string,
 	L extends Expr,
@@ -490,12 +518,14 @@ type PairwiseOp<
 	I extends number,
 > = Ls extends readonly [infer L extends ColInfo, ...infer LR]
 	? Rs extends readonly [{ readonly t: infer R extends ColInfo }, ...infer RR]
-		? BinOpType<Op, L, R>["type"] extends "bool" | "unknown"
-			? PairwiseOp<Op, LR, RR, Nx<I>>
-			: SqlError<
-					`row comparison operator must yield type boolean, not type ${TypeDisplay<BinOpType<Op, L, R>["type"]>}`,
-					null
-				>
+		? NoCompare<Op, L["type"], R["type"]> extends infer Err extends AnyErr
+			? Err
+			: BinOpType<Op, L, R>["type"] extends "bool" | "unknown"
+				? PairwiseOp<Op, LR, RR, Nx<I>>
+				: SqlError<
+						`row comparison operator must yield type boolean, not type ${TypeDisplay<BinOpType<Op, L, R>["type"]>}`,
+						null
+					>
 		: true
 	: I extends 0 | 1
 		? true
@@ -505,6 +535,42 @@ type PairwiseOp<
 					`could not determine interpretation of row comparison operator ${Op}`,
 					null
 				>;
+type CompareOp = "=" | "<>" | "!=" | "<" | ">" | "<=" | ">=";
+/**
+ * PostgreSQL has no comparison operator between two of the categories that
+ * never share a common type, and casts neither side to the other implicitly.
+ */
+type NoCompare<
+	Op extends string,
+	L extends string,
+	R extends string,
+> = Op extends CompareOp
+	? Unmatchable<L, R> extends true
+		? SqlError<
+				`operator does not exist: ${TypeDisplay<L>} ${Op extends "!=" ? "<>" : Op} ${TypeDisplay<R>}`,
+				null
+			>
+		: null
+	: null;
+/** `IS DISTINCT FROM` compares with `=`, and is never NULL. */
+type Comparable<A, B> = A extends ColInfo
+	? B extends ColInfo
+		? NoCompare<"=", A["type"], B["type"]> extends infer Err extends AnyErr
+			? Err
+			: Info<"bool">
+		: B
+	: A;
+type NoCompareList<
+	L extends string,
+	Rs extends readonly ColInfo[],
+> = Rs extends readonly [
+	infer R extends ColInfo,
+	...infer Rest extends readonly ColInfo[],
+]
+	? NoCompare<"=", L, R["type"]> extends infer Err extends AnyErr
+		? Err
+		: NoCompareList<L, Rest>
+	: null;
 type TypeBinOperands<
 	Op extends string,
 	L extends Expr,
@@ -515,11 +581,14 @@ type TypeBinOperands<
 		? LT extends ColInfo
 			? TypeOperand<R, C> extends infer RT
 				? RT extends ColInfo
-					? Op extends "->" | "#>"
-						? JsonArrow<Op, LT, R, RT> extends infer J extends ColInfo
-							? J
+					? NoCompare<Op, LT["type"], RT["type"]> extends infer Err extends
+							AnyErr
+						? Err
+						: Op extends "->" | "#>"
+							? JsonArrow<Op, LT, R, RT> extends infer J extends ColInfo
+								? J
+								: BinOpType<Op, LT, RT>
 							: BinOpType<Op, LT, RT>
-						: BinOpType<Op, LT, RT>
 					: RT
 				: never
 			: LT
@@ -606,11 +675,13 @@ type TypeBetween<
 			: A
 		: never;
 type TypeIn<E extends Expr, List extends readonly Expr[], C extends Ctx> =
-	TypeOf<E, C> extends infer A
+	TypeOperand<E, C> extends infer A
 		? A extends ColInfo
-			? TypeList<List, C, []> extends infer Ls
+			? OperandList<List, C, []> extends infer Ls
 				? Ls extends readonly ColInfo[]
-					? Info<"bool", Or<A["nullable"], AnyNullable<Ls>>>
+					? NoCompareList<A["type"], Ls> extends infer Err extends AnyErr
+						? Err
+						: Info<"bool", Or<A["nullable"], AnyNullable<Ls>>>
 					: Ls
 				: never
 			: A

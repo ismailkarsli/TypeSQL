@@ -8,17 +8,18 @@ TypeSQL centers on the `sql` function returned by your driver adapter's `createS
 
 | Method | Summary | Expected parameters |
 |---|---|---|
-| [`sql(query, ...params)`](#sql-query-params) | Parses and type-checks a SQL statement literal, inferring row and parameter types. | `query: string` (literal), `slots?`, `...params: T[]` or `{ [name]: T }` |
-| [`sql.as<Row>(query, ...params)`](#sql-as-row-query-params) | Escape hatch: bypasses compile-time inference and asserts the row type directly. | `<Row>`, `query: string`, `slots?`, `...params: unknown[]` |
-| [`sql.param(value)`](#sql-param-value) | Binds a value inline inside a template string as a positional `$n` parameter. | `value: T` (`sql.empty` becomes `DEFAULT`; `undefined` is rejected) |
-| [`sql.empty` / `sql.empty(value)`](#sql-empty-sql-empty-value) | Explicit omission or SQL `DEFAULT`; normalizes nullish values. | `value: T` |
+| [`sql(query, ...params)`](#sql-query-params) | Parses and type-checks a SQL statement literal, inferring row and parameter types. | `query: string` (literal), `...params: T[]` or `{ [name]: T }` |
+| [`sql.as<Row>(query, ...params)`](#sql-as-row-query-params) | Escape hatch: bypasses compile-time inference and asserts the row type directly. | `<Row>`, `query: string`, `...params: unknown[]` |
+| [`sql.param(value)`](#sql-param-value) | Binds a value inline inside a template string as a positional `$n` parameter. | `value: T` (`sql.optional(undefined)` becomes `DEFAULT`; `undefined` is rejected) |
+| [`sql.optional(value)`](#sql-optional-value) | Turns `undefined` into an omission: SQL `DEFAULT`, a skipped item, or nothing. `null` stays SQL `NULL`. | `value: T` |
+| [`sql.if(value, then)`](#sql-if-value-then) | The fragment `then(value)` builds when `value` is truthy, otherwise an omission. | `value: V`, `then: (value) => Fragment \| Query` |
 | [`sql.json(value)`](#sql-json-value) | Binds a value as inline JSON text, checked against `json`/`jsonb`/`Json<T>` columns. | `value: T` (`null` becomes SQL `NULL`, `undefined` becomes `DEFAULT`) |
-| [`sql.fragment(text, ...params)`](#sql-fragment-text-params) | Creates a reusable SQL fragment to splice into query `{slot}` placeholders. | `text: string` (literal), `slots?`, `...params` |
+| [`sql.fragment(text, ...params)`](#sql-fragment-text-params) | Creates a reusable SQL fragment to interpolate as `${fragment}`. | `text: string` (literal), `...params` |
 | [`sql.id(...parts)`](#sql-id-parts) | Creates a safely quoted identifier fragment (`"col"` or `"schema"."table"`). | `...parts: string[]` (column, table, schema names) |
 | [`sql.combine(items, options?)`](#sql-combine-items-options) | Combines an array or tuple of fragments or queries with a separator. | `items: (Slottable \| Empty)[]`, `options?: { separator?: string }` (default `", "`) |
 | [`sql.and(items)` / `sql.or(items)`](#sql-and-items-sql-or-items) | Combines conditions with `AND` or `OR`, in parentheses. No items gives `true` or `false`. | `items: (Slottable \| Empty)[]` |
-| [`sql.set(table, values)`](#sql-set-table-values) | Generates a type-checked `SET "col" = $n` fragment for `UPDATE`, omitting `undefined`. | `table: TableName<DB>`, `values: SetInput<DB, TM, table>` |
-| [`sql.values(table, rows)`](#sql-values-table-rows) | Generates a type-checked `("col") VALUES (...)` fragment for `INSERT`. | `table: TableName<DB>`, `rows: InsertInput<DB, TM, table>[]` |
+| [`sql.set(table, values)`](#sql-set-table-values) | Generates a type-checked `SET "col" = $n` fragment for `UPDATE`, omitting `undefined`. | `table?: TableName<DB>`, `values: SetInput<DB, TM, table>` |
+| [`sql.values(table, rows)`](#sql-values-table-rows) | Generates a type-checked `("col") VALUES (...)` fragment for `INSERT`. | `table?: TableName<DB>`, `rows: InsertInput<DB, TM, table>[]` |
 | [`sql.raw(text)`](#sql-raw-text) | Creates an untyped, raw SQL text fragment (requires `sql.as<Row>()`). | `text: string` |
 | [`sql.transaction(fn)`](#sql-transaction-fn) | Runs an async callback in a database transaction with commit, rollback, and savepoints. | `fn: (tx: TransactionalSql) => Promise<T>` |
 
@@ -28,7 +29,6 @@ TypeSQL centers on the `sql` function returned by your driver adapter's `createS
 
 ```ts
 sql<Q>(query: Q, ...params: Params): Query<Row, Params, Text>
-sql<Q, S>(query: Q, slots: S, ...params: Params): Query<Row, Params, Text>
 ```
 
 The core function for writing typed queries. TypeSQL's type engine parses the SQL string literal at compile time, checks syntax and relation/column references against `DB`, and infers:
@@ -44,9 +44,8 @@ Invalid statements cause compile errors directly on the SQL string.
   - Positional placeholders: `$1`, `$2`, …
   - Named placeholders: `:name`
   - Inline expressions: `${sql.param(val)}`, `${sql.json(val)}`
-  - Fragment slots: `{slotName}`
+  - Fragments and subqueries: `${sql.id("col")}`, `${fragment}`, `${query}`
   *(Tagged templates like `` sql`…` `` are not supported because TypeScript erases their string literal types).*
-- `slots` (`Record<string, Fragment | Query>`, *optional*): An object mapping slot names to fragments (`sql.fragment`, `sql.id`, `sql.combine`, etc.) or subqueries (`Query`). Required when `{slotName}` tokens appear in `query`.
 - `...params` (*optional*):
   - When using `$n`: Positional argument values matching the inferred types in `$1`, `$2`, … order.
   - When using `:name`: Exactly one object whose keys match the named placeholders `{ [name]: value }`.
@@ -70,8 +69,7 @@ const byEmail = sql(
 ```ts
 const activeOnly = sql.fragment("AND role = $1", "active");
 const filtered = sql(
-	"SELECT id, email FROM users WHERE id > $1 {filter}",
-	{ filter: activeOnly },
+	`SELECT id, email FROM users WHERE id > $1 ${activeOnly}`,
 	10,
 );
 ```
@@ -84,7 +82,6 @@ See [Selecting data](./queries) and [Parameters](./parameters).
 
 ```ts
 sql.as<Row>(query: string, ...params: unknown[]): Query<Row, readonly unknown[]>
-sql.as<Row>(query: string, slots: SlotMap, ...params: unknown[]): Query<Row, readonly unknown[]>
 ```
 
 An escape hatch that skips TypeSQL's compile-time type inference and explicitly asserts the row type `Row`. Use it for dynamic SQL where the statement text is not known at compile time, unsupported SQL features, or statements containing `sql.raw()`.
@@ -93,7 +90,6 @@ An escape hatch that skips TypeSQL's compile-time type inference and explicitly 
 
 - `<Row>` (*type parameter*): The expected TypeScript type of the returned rows. When using `CasePlugin`, write `Row` with camelCase property names.
 - `query` (`string`): The SQL query string. Does not need to be a compile-time string literal.
-- `slots` (`Record<string, Fragment | Query>`, *optional*): An object mapping `{slotName}` tokens to fragments or subqueries.
 - `...params` (*optional*): Values passed as positional parameters or as a single named parameter object.
 
 ### Example
@@ -121,7 +117,7 @@ At runtime, the value is rewritten to a positional `$n` parameter—it is never 
 
 ### Parameters
 
-- `value` (`T`): The value to bind to the parameter. `undefined` is rejected. Use `sql.empty` to send SQL `DEFAULT`, or `null` to bind SQL `NULL`. When a value can be `sql.empty`, the statement must allow `DEFAULT` in that position (such as in an `INSERT … VALUES` or `UPDATE … SET` clause).
+- `value` (`T`): The value to bind to the parameter. `undefined` is rejected. Use `sql.optional(value)` to send SQL `DEFAULT` when the value is `undefined`, or `null` to bind SQL `NULL`. When a value can be omitted that way, the statement must allow `DEFAULT` in that position (such as in an `INSERT … VALUES` or `UPDATE … SET` clause).
 
 ### Example
 
@@ -134,30 +130,67 @@ See [Inline parameters](./parameters#inline-sql-param-value).
 
 ---
 
-## `sql.empty` / `sql.empty(value)`
-
-Use `sql.empty` as an explicit sentinel, or call it to convert `null` and `undefined` to that same sentinel. Other values are returned unchanged, including `0`, `false`, and `""`.
+## `sql.optional(value)`
 
 ```ts
-declare const retries: number | null | undefined;
-const fallback = sql.param(retries ?? sql.empty);
-const normalized = sql.param(sql.empty(retries));
+sql.optional<T>(value: T): Optional<T>
 ```
 
-Inside an interpolated `sql.param(...)`, the sentinel emits SQL `DEFAULT` without consuming a parameter number. The statement must allow `DEFAULT` in that position. In `sql.combine(...)`, `sql.and(...)` and `sql.or(...)`, it omits an item without adding a separator or parameters:
+Turns `undefined` into an omission and returns other values unchanged, including `null`, `0`, `false` and `""`. The argument is required; `sql.optional(undefined)` is an explicit omission. As in `sql.set`, `sql.values` and `sql.json`, `undefined` means "leave it out" and `null` means SQL `NULL`, so a missing key and an explicit `null` in a request body stay different:
+
+```ts
+declare const body: { display_name?: string | null };
+const insert = sql(
+	`INSERT INTO users (email, display_name) VALUES ($1, ${sql.param(sql.optional(body.display_name))})`,
+	"a@b.c",
+);
+```
+
+A missing `display_name` sends `DEFAULT`, and `null` sends `NULL`. To send `DEFAULT` for `null` too, write `sql.optional(value ?? undefined)`.
+
+Inside an interpolated `sql.param(...)`, an omission emits SQL `DEFAULT` without consuming a parameter number. The statement must allow `DEFAULT` in that position. In `sql.combine(...)`, `sql.and(...)` and `sql.or(...)`, it omits an item without adding a separator or parameters. Interpolated as `${…}`, an omitted fragment or query splices nothing:
 
 ```ts
 declare const minId: number | undefined;
-const optionalFilter = minId === undefined
-	? undefined
-	: sql.fragment("id > $1", minId);
-const filters = sql.and([requiredFilter, sql.empty(optionalFilter)]);
+const optionalFilter =
+	minId === undefined ? undefined : sql.fragment("id > $1", minId);
+const filters = sql.and([requiredFilter, sql.optional(optionalFilter)]);
+const more = sql(
+	`SELECT id FROM users WHERE role = $1 ${sql.optional(minId === undefined ? undefined : sql.fragment("AND id > $1", minId))}`,
+	"admin",
+);
 ```
 
-`sql.param(null)` still binds SQL `NULL`. Use `sql.param(value === undefined ? sql.empty : value)` when only `undefined` should request a default and an explicit `null` should stay SQL `NULL`.
+A fragment or query that can be `null` is an error: interpolated, `null` would be the SQL text `null`. Turn it into `undefined` first, as in `sql.optional(maybeFragment ?? undefined)`.
 
-**Migration:** `sql.param(undefined)` now throws. Replace implicit defaults with `value ?? sql.empty`, `sql.empty(value)`, or the explicit `undefined` check above. A sentinel must be interpolated through `sql.param`; it cannot be sent as a bound `$n` or `:name` argument.
+See also [`sql.if`](#sql-if-value-then), which builds the fragment only when a value is present.
 
+**Migration:** `sql.empty` is replaced by `sql.optional`: write `sql.optional(value ?? undefined)` for `sql.empty(value)` and `value ?? sql.empty`, which also omitted `null`; `sql.optional(value)` when `null` should stay SQL `NULL`; and `sql.optional(undefined)` for a bare `sql.empty`. An omission must be interpolated through `sql.param`; it cannot be sent as a bound `$n` or `:name` argument.
+
+
+---
+
+## `sql.if(value, then)`
+
+```ts
+sql.if<V, R>(value: V, then: (value: Truthy<V>) => R): R | EmptyFragment
+```
+
+Calls `then` with `value` when `value` is truthy and returns the fragment or query it builds. Otherwise it returns the same omission as `sql.optional(undefined)`, so the item is skipped in `sql.combine`, `sql.and` and `sql.or`, and splices nothing as `${…}`. `then` receives `value` without `null`, `undefined`, `false`, `0`, `0n` and `""` in its type.
+
+```ts
+declare const search: string | undefined;
+declare const minAge: number | null;
+const filters = sql.and([
+	sql.fragment("id > $1", 0),
+	sql.if(search, (s) => sql.fragment(`email ILIKE ${sql.param(s)}`)),
+]);
+const adults = sql(
+	`SELECT id FROM users WHERE true ${sql.if(minAge, (n) => sql.fragment("AND age >= $1", n))}`,
+);
+```
+
+Interpolated, the statement is checked both with and without the fragment, as with `sql.optional`. Like any condition on a value, an empty string or `0` counts as absent: use `sql.optional` with a fragment built from `value !== undefined` when they should count.
 ---
 
 ## `sql.json(value)`
@@ -191,26 +224,22 @@ See [JSON values](./parameters#json-values).
 
 ```ts
 sql.fragment<Text>(text: Text, ...params: Params): Fragment<Text, Params>
-sql.fragment<Text, S>(text: Text, slots: S, ...params: Params): Fragment<Text, Params>
 ```
 
-Creates a reusable, spliceable piece of SQL to insert into `{slotName}` placeholders in queries or other fragments.
+Creates a reusable piece of SQL to interpolate as `${fragment}` into queries or other fragments.
 
 Fragments preserve their parameter types and carried values. When spliced into a parent query, their parameters are automatically renumbered after the parent statement's parameters and type-checked against the outer query context.
 
 ### Parameters
 
-- `text` (`string`): A compile-time string literal containing SQL. May include `$n`, `:name`, inline `${sql.param()}` calls, or nested `{slotName}` placeholders.
-- `slots` (`Record<string, Fragment | Query>`, *optional*): An object mapping nested slot names to other fragments or subqueries.
+- `text` (`string`): A compile-time string literal containing SQL. May include `$n`, `:name`, inline `${sql.param()}` calls, and interpolated `${fragment}`s.
 - `...params` (*optional*): Positional argument values or one named parameter object matching parameters defined inside `text`.
 
 ### Example
 
 ```ts
 const whereRole = sql.fragment("WHERE role = $1", "admin");
-const countAdmins = sql("SELECT count(*) FROM users {whereRole}", {
-	whereRole,
-});
+const countAdmins = sql(`SELECT count(*) FROM users ${whereRole}`);
 ```
 
 See [Dynamic SQL](./dynamic-sql).
@@ -245,7 +274,7 @@ Always validate dynamic identifier names against an explicit allowlist or a stri
 ```ts
 const col = sql.id("email");
 const fqTable = sql.id("public", "users");
-const customSelect = sql("SELECT {col} FROM {fqTable}", { col, fqTable });
+const customSelect = sql(`SELECT ${col} FROM ${fqTable}`);
 ```
 
 See [Identifiers and lists](./dynamic-sql#identifiers-and-lists).
@@ -260,9 +289,9 @@ sql.combine(items: readonly (Slottable | Empty)[], options?: { separator?: strin
 
 Combines an array or tuple of fragments or subqueries with a delimiter into a single fragment.
 
-`sql.empty` items are ignored, without adding delimiters or parameters. Plain `null` and `undefined` entries are rejected. If no items remain, it throws.
+Omitted items (`sql.optional(…)` of `undefined`) are ignored, without adding delimiters or parameters. Plain `null` and `undefined` entries are rejected. If no items remain, it throws.
 
-- When given a tuple (`[a, b]`), literal SQL text is preserved after removing known `sql.empty` entries. Conditional fragments are checked as present, like elements of a runtime array.
+- When given a tuple (`[a, b]`), literal SQL text is preserved after removing known omitted entries. Conditional fragments are checked as present, like elements of a runtime array.
 - When given a dynamic runtime array (`Slottable[]`), TypeSQL validates a representative statement where each distinct element type is checked once. This keeps dynamic clauses (like dynamic `ORDER BY` or `IN (...)` lists) fully type-safe.
 
 To combine conditions, use [`sql.and` or `sql.or`](#sql-and-items-sql-or-items): they add the parentheses that operator precedence needs.
@@ -273,7 +302,7 @@ The `options.separator` value is concatenated directly into the statement as **r
 
 ### Parameters
 
-- `items` (`readonly (Slottable | Empty)[]`): An array or tuple of fragments (`Fragment`), subqueries (`Query`), or `sql.empty`. Throws at runtime if empty after ignoring `sql.empty`.
+- `items` (`readonly (Slottable | Empty)[]`): An array or tuple of fragments (`Fragment`), subqueries (`Query`), or omissions from `sql.optional`. Throws at runtime if empty after ignoring omissions.
 - `options.separator` (`string`, *optional*): The delimiter string placed between elements. Defaults to `", "`. Other strings, such as `" "` or `" UNION ALL "`, are accepted. Must be a trusted SQL delimiter.
 
 ### Example
@@ -281,10 +310,10 @@ The `options.separator` value is concatenated directly into the statement as **r
 ```ts
 declare const byEmail: boolean;
 const order = sql.combine([
-	byEmail ? sql.fragment("email") : sql.empty,
+	sql.optional(byEmail ? sql.fragment("email") : undefined),
 	sql.fragment("id DESC"),
 ]);
-const sorted = sql("SELECT id FROM users ORDER BY {order}", { order });
+const sorted = sql(`SELECT id FROM users ORDER BY ${order}`);
 ```
 
 See [Lists from runtime arrays](./dynamic-sql#lists-from-runtime-arrays).
@@ -298,7 +327,7 @@ sql.and(items: readonly (Slottable | Empty)[]): Fragment
 sql.or(items: readonly (Slottable | Empty)[]): Fragment
 ```
 
-Combines conditions with `AND` or `OR`. Each condition is wrapped in parentheses, and so is the result when it has more than one condition, so `a OR b` stays one condition and `NOT {filters}` negates all of them:
+Combines conditions with `AND` or `OR`. Each condition is wrapped in parentheses, and so is the result when it has more than one condition, so `a OR b` stays one condition and ``NOT ${filters}`` negates all of them:
 
 | Items | `sql.and` | `sql.or` |
 |---|---|---|
@@ -306,15 +335,15 @@ Combines conditions with `AND` or `OR`. Each condition is wrapped in parentheses
 | `[a]` | `(a)` | `(a)` |
 | `[]` | `true` | `false` |
 
-`sql.empty` items are ignored, as in [`sql.combine`](#sql-combine-items-options). Plain `null` and `undefined` entries are rejected. Tuples and runtime arrays are checked the same way as in `sql.combine`, with every condition present: a conditional `display_name IS NOT NULL` still makes `display_name` non-null in the row type.
+Omitted items are ignored, as in [`sql.combine`](#sql-combine-items-options). Plain `null` and `undefined` entries are rejected. Tuples and runtime arrays are checked the same way as in `sql.combine`, with every condition present: a conditional `display_name IS NOT NULL` still makes `display_name` non-null in the row type.
 
 ::: danger An empty `sql.and` matches every row
-With no conditions left, `sql.and` gives `true`, so `DELETE FROM posts WHERE {filters}` deletes every row. Keep required authorization filters (such as tenant or ownership checks) in the statement or as a fixed first item, and make only optional search filters conditional. To throw on an empty list instead, use `sql.combine(items, { separator: " AND " })`.
+With no conditions left, `sql.and` gives `true`, so ``DELETE FROM posts WHERE ${filters}`` deletes every row. Keep required authorization filters (such as tenant or ownership checks) in the statement or as a fixed first item, and make only optional search filters conditional. To throw on an empty list instead, use `sql.combine(items, { separator: " AND " })`.
 :::
 
 ### Parameters
 
-- `items` (`readonly (Slottable | Empty)[]`): An array or tuple of conditions as fragments (`Fragment`), subqueries (`Query`), or `sql.empty`.
+- `items` (`readonly (Slottable | Empty)[]`): An array or tuple of conditions as fragments (`Fragment`), subqueries (`Query`), or omissions from `sql.optional`.
 
 ### Example
 
@@ -323,15 +352,17 @@ declare const minId: number | undefined;
 declare const search: string | undefined;
 const filters = sql.and([
 	sql.fragment("role = $1", "admin"),
-	minId === undefined ? sql.empty : sql.fragment("id > $1", minId),
-	search === undefined
-		? sql.empty
-		: sql.or([
-				sql.fragment("email ILIKE $1", search),
-				sql.fragment("display_name ILIKE $1", search),
-			]),
+	sql.optional(minId === undefined ? undefined : sql.fragment("id > $1", minId)),
+	sql.optional(
+		search === undefined
+			? undefined
+			: sql.or([
+					sql.fragment("email ILIKE $1", search),
+					sql.fragment("display_name ILIKE $1", search),
+				]),
+	),
 ]);
-const filtered = sql("SELECT id FROM users WHERE {filters}", { filters });
+const filtered = sql(`SELECT id FROM users WHERE ${filters}`);
 ```
 
 See [Identifiers and lists](./dynamic-sql#identifiers-and-lists).
@@ -342,11 +373,14 @@ See [Identifiers and lists](./dynamic-sql#identifiers-and-lists).
 
 ```ts
 sql.set<T>(table: T, values: SetInput<DB, TM, T>): Fragment
+sql.set(values: object): Fragment
 ```
 
 Generates a type-checked `SET "col1" = $1, "col2" = $2` fragment for `UPDATE` statements from a JavaScript object.
 
 Keys must match column names of `table`, and values must match their corresponding column types. Properties with `undefined` values are automatically omitted, allowing partial updates without manually constructing dynamic SQL.
+
+Without `table`, the fragment is checked against the table of the `UPDATE` it is interpolated into, with every key present. Errors are then reported on the statement instead of on the object's keys.
 
 ::: warning Mass assignment protection
 The `table` argument is used for compile-time type checking. At runtime, TypeSQL does not retain schema metadata; `sql.set` iterates every enumerable property on `values` and emits a column assignment for it.
@@ -367,8 +401,7 @@ If `values` comes from an untrusted source (such as `req.body`) and is typed as 
 const changes = { display_name: "Ada", role: undefined };
 const setClause = sql.set("users", changes);
 const updateQuery = sql(
-	"UPDATE users SET {setClause} WHERE id = $1 RETURNING id",
-	{ setClause },
+	`UPDATE users SET ${setClause} WHERE id = $1 RETURNING id`,
 	1,
 );
 ```
@@ -381,11 +414,19 @@ See [Updating with sql.set](./writing-data#partial-updates-sql-set).
 
 ```ts
 sql.values<T>(table: T, rows: readonly InsertInput<DB, TM, T>[]): Fragment
+sql.values(rows: readonly object[]): Fragment
 ```
 
 Generates a type-checked column list and multi-row `("col1", "col2") VALUES ($1, $2), ($3, DEFAULT)` fragment for bulk `INSERT` statements from an array of objects.
 
 NOT NULL columns without defaults are required on every row. Optional or defaultable columns that are missing or set to `undefined` emit `DEFAULT`.
+
+Without `table`, the rows are checked against the table of the `INSERT` they are interpolated into, as strictly: the statement is checked once with every key, and once with only the keys every row always sends, so a required column that a row can leave out is an error. Errors are reported on the statement instead of on the rows.
+
+```ts
+declare const form: { email?: string; display_name?: string | null };
+sql(`INSERT INTO users ${sql.values([form])}`);
+```
 
 ::: warning Mass assignment in bulk inserts
 The `table` argument is checked at compile time. At runtime, `sql.values` collects every key present across all row objects into the `INSERT` column list. If row objects contain unvalidated user input, unexpected columns will be inserted. Validate input rows using a strict schema parser (e.g. `z.array(RowSchema.strict())`) or explicitly pick allowed properties to prevent inserting unauthorized columns.
@@ -404,10 +445,7 @@ const newUsers = [
 	{ email: "grace@example.com", role: "member", display_name: "Grace" },
 ];
 const insertValues = sql.values("users", newUsers);
-const insertQuery = sql(
-	"INSERT INTO users {insertValues} RETURNING id, email",
-	{ insertValues },
-);
+const insertQuery = sql(`INSERT INTO users ${insertValues} RETURNING id, email`);
 ```
 
 See [Bulk insert with sql.values](./writing-data#bulk-inserts-sql-values).
@@ -436,9 +474,7 @@ Never pass untrusted user input to `sql.raw()`. Use `$n`, `:name`, or `${sql.par
 
 ```ts
 const rawSnippet = sql.raw("ORDER BY id DESC");
-const sorted = sql.as<{ id: number }>("SELECT id FROM users {order}", {
-	order: rawSnippet,
-});
+const sorted = sql.as<{ id: number }>(`SELECT id FROM users ${rawSnippet}`);
 ```
 
 See [Fully dynamic SQL](./dynamic-sql#fully-dynamic-sql).

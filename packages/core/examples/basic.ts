@@ -52,8 +52,7 @@ const where = sql.fragment(
 	100,
 );
 export const q5 = sql(
-	`SELECT u.id, u.display_name FROM users u {where} ORDER BY u.id`,
-	{ where },
+	`SELECT u.id, u.display_name FROM users u ${where} ORDER BY u.id`,
 );
 
 export type DB2 = ApplyDdl<

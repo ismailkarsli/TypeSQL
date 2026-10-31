@@ -10,7 +10,7 @@ export type IsLiteral<Q extends string> = string extends Q
 		: true;
 
 export type NotLiteralMessage =
-	"the SQL text is not a string literal: pass values as parameters ($1, :name or ${sql.param(value)}), identifiers with sql.id(), reusable pieces as {slot} fragments, or use sql.as<Row>() for dynamic SQL";
+	"the SQL text is not a string literal: pass values as parameters ($1, :name or ${sql.param(value)}), identifiers with sql.id(), reusable pieces as ${fragment}, or use sql.as<Row>() for dynamic SQL";
 
 export type Prepared<Q extends string> =
 	RewriteNamedStr<Q> extends [
