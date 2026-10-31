@@ -1,5 +1,15 @@
 # @typesql/language-server
 
+## 0.0.7
+
+### Patch Changes
+
+- Treat a completion request without a result as TypeScript's null instead of failing, so Neovim configs that drop a nil result still get TypeSQL completions.
+
+- Log which TypeScript version was found when the project's TypeScript is too old for completions, instead of "no TypeScript 7.1 package found".
+
+- Complete SQL in core's createSql(dialect).withPlugin(…), after ${sql.param("x")} and after a /* sql */ marker; escape quoted names inserted into "…" and '…' strings; and complete columns after an escaped \"Quoted\" table.
+
 ## 0.0.6
 
 ### Patch Changes

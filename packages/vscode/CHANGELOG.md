@@ -1,5 +1,11 @@
 # typesql
 
+## 0.0.10
+
+### Patch Changes
+
+- Highlight SQL in member calls such as db.sql.fragment("…") and this.db.sql.as<Row>("…").
+
 ## 0.0.9
 
 ### Patch Changes

@@ -1,5 +1,22 @@
 # @typesql/drizzle
 
+## 0.3.6
+
+### Patch Changes
+
+- Return libsql BLOB values as Uint8Array, as typed, instead of ArrayBuffer.
+
+- Parse node-postgres arrays of enums, domains and extension types such as citext, which pg returns as raw {…} strings, so they match their array types.
+
+- Keep explicitly named Drizzle columns as written under the casing option, as Drizzle does, instead of renaming them.
+
+- Limit the drizzle-orm peer range to versions before 1.0, whose prereleases break the schema types.
+
+- On drizzle-orm/postgres-js, serialize sql.json(), object and Date parameters and parse date, timestamp and timestamptz columns back to Date, since Drizzle turns off postgres.js' own serializers and parsers; on better-sqlite3, execute() on INSERT, UPDATE and DELETE without RETURNING no longer throws.
+
+- Updated dependencies:
+  - @typesql/core@0.10.1
+
 ## 0.3.5
 
 ### Patch Changes

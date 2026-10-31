@@ -1,5 +1,45 @@
 # @typesql/core
 
+## 0.10.1
+
+### Patch Changes
+
+- Accept readonly arrays for PostgreSQL array parameters, so inline array literals work in sql.set and sql.values and as const arrays work as arguments.
+
+- Type a UNION, INTERSECT or EXCEPT column as nullable when a SELECT * branch has a nullable column, which was ignored.
+
+- Reject more SQL that PostgreSQL rejects before running: aggregate and window functions in WHERE, nested aggregates, window calls inside aggregates, true/false/NULL in GROUP BY and ORDER BY, $0, and CASE, COALESCE, GREATEST and LEAST branches whose types cannot be matched.
+
+- Accept SQL spellings such as Col<"integer">, "bigint", "boolean", "character varying" and "timestamp with time zone" in hand-written PostgreSQL schemas, which were typed unknown.
+
+- Accept a slot holding a union of fragments with different parameter counts, such as flag ? sql.fragment("AND id = $1", 1) : sql.fragment("AND true"), by checking each fragment with its own parameters.
+
+- Report an error in the next migration when a migration's up() doesn't return its context, instead of silently turning off checking.
+
+- Leave {name} inside string literals, quoted identifiers, comments and dollar quotes alone instead of treating it as a fragment slot, so '{k}'::text[] and jsonb paths like '{k}' compile, and stop E'…' strings with escaped quotes from breaking :name parameters.
+
+- Parse node-postgres arrays of enums, domains and extension types such as citext, which pg returns as raw {…} strings, so they match their array types.
+
+- Let CasePlugin writes use a column's own snake_case name when its camelCase name wouldn't convert back to it, so columns like address_line_1 can be written.
+
+- Allow an outer query's aggregate in a subquery's WHERE, keep CASE and COALESCE over oid, reg* and domain types compiling, and avoid excessive-depth errors on long || chains from the new aggregate checks.
+
+- Accept TypeScript 7.1 prereleases such as 7.1.0-beta in the peer range, and load TypeScript only when typesql migrate hashes a migration file, so --help works without it.
+
+- Fix the README Playground links, which opened with module resolution that ignores package exports and showed no TypeSQL errors or types.
+
+- Type window aggregates as nullable when their frame can be empty (both bounds before or after the current row, or EXCLUDE CURRENT ROW / GROUP), which returned NULL while typed non-null.
+
+- SQLite: accept excluded.* in an upsert's DO UPDATE … WHERE, reject OVER name without a matching WINDOW definition, and know FTS5's bm25, highlight and snippet plus median, percentile, percentile_cont, percentile_disc, unistr and json_array_insert.
+
+- Type NUMERIC-affinity SQLite columns (numeric, decimal, boolean) as number | bigint under BigIntTypeMap, since bigint mode returns their integral values as bigint.
+
+- Accept sql.json() values in sql.set, sql.values and inline for SQLite json columns, which were rejected because those columns read as JSON text.
+
+- Reject queries on a transaction's tx after its callback has settled, instead of running them outside the transaction on a released connection.
+
+- Type $n parameters inside a SELECT's WITH queries, which accepted any value.
+
 ## 0.10.0
 
 ### Minor Changes

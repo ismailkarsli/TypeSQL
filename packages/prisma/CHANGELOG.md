@@ -1,5 +1,16 @@
 # @typesql/prisma
 
+## 0.3.6
+
+### Patch Changes
+
+- Keep Unsupported(...) fields, such as tsvector columns, in the generated schema instead of dropping them.
+
+- Fix the README Playground links, which opened with module resolution that ignores package exports and showed no TypeSQL errors or types.
+
+- Updated dependencies:
+  - @typesql/core@0.10.1
+
 ## 0.3.5
 
 ### Patch Changes

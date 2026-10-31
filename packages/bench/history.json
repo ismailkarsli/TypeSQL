@@ -2,73 +2,79 @@
 	"0.7.1": {
 		"case1": {
 			"statements": 379,
-			"checkTimeSec": 2.159
+			"checkTimeSec": 2.078
 		}
 	},
 	"0.7.2": {
 		"case1": {
 			"statements": 379,
-			"checkTimeSec": 0.937
+			"checkTimeSec": 0.863
 		}
 	},
 	"0.7.3": {
 		"case1": {
 			"statements": 379,
-			"checkTimeSec": 0.934
+			"checkTimeSec": 0.879
 		}
 	},
 	"0.7.4": {
 		"case1": {
 			"statements": 379,
-			"checkTimeSec": 0.933
+			"checkTimeSec": 0.861
 		}
 	},
 	"0.7.5": {
 		"case1": {
 			"statements": 379,
-			"checkTimeSec": 0.793
+			"checkTimeSec": 0.694
 		}
 	},
 	"0.7.6": {
 		"case1": {
 			"statements": 379,
-			"checkTimeSec": 0.737
+			"checkTimeSec": 0.687
 		}
 	},
 	"0.8.0": {
 		"case1": {
 			"statements": 379,
-			"checkTimeSec": 0.736
+			"checkTimeSec": 0.69
 		}
 	},
 	"0.8.1": {
 		"case1": {
 			"statements": 379,
-			"checkTimeSec": 0.765
+			"checkTimeSec": 0.704
 		}
 	},
 	"0.9.0": {
 		"case1": {
 			"statements": 379,
-			"checkTimeSec": 0.747
+			"checkTimeSec": 0.703
 		}
 	},
 	"0.9.1": {
 		"case1": {
 			"statements": 379,
-			"checkTimeSec": 0.713
+			"checkTimeSec": 0.702
 		}
 	},
 	"0.9.2": {
 		"case1": {
 			"statements": 379,
-			"checkTimeSec": 0.621
+			"checkTimeSec": 0.62
 		}
 	},
 	"0.10.0": {
 		"case1": {
 			"statements": 379,
-			"checkTimeSec": 0.659
+			"checkTimeSec": 0.634
+		}
+	},
+	"0.10.1": {
+		"case1": {
+			"statements": 379,
+			"checkTimeSec": 0.671
 		}
 	}
 }

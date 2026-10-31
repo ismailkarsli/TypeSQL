@@ -1,5 +1,16 @@
 # @typesql/kysely
 
+## 0.4.1
+
+### Patch Changes
+
+- Require kysely 0.28 or later in the peer range; kysely 0.27 lacks ControlledTransaction and left every table unknown.
+
+- Fix the README Playground links, which opened with module resolution that ignores package exports and showed no TypeSQL errors or types.
+
+- Updated dependencies:
+  - @typesql/core@0.10.1
+
 ## 0.4.0
 
 ### Minor Changes

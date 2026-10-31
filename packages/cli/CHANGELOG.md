@@ -1,5 +1,18 @@
 # @typesql/cli
 
+## 0.1.4
+
+### Patch Changes
+
+- Improve typesql CLI errors: show the causes of a refused localhost connection instead of an empty message, reject a malformed --url, add --version, show introspect options for typesql introspect --help, resolve a config file's out against the config file, reject config files with unknown options or no default export, and silence the stripTypeScriptTypes experimental warning.
+
+- Accept TypeScript 7.1 prereleases such as 7.1.0-beta in the peer range, and load TypeScript only when typesql migrate hashes a migration file, so --help works without it.
+
+- Updated dependencies:
+  - @typesql/core@0.10.1
+  - @typesql/pg@0.4.1
+  - @typesql/sqlite@0.1.1
+
 ## 0.1.3
 
 ### Patch Changes
