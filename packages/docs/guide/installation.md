@@ -37,7 +37,7 @@ yarn add -D typescript@7.1.0-beta
 
 :::
 
-Your editor should check the project with TypeScript 7.1 as well. [VS Code extension](./vscode#setup) shows how to point VS Code at it. You can also use [tsrs](https://github.com/oxc-project/tsrs), a Rust port of TypeScript 7.1. See [Performance](./performance) for benchmark results.
+Your editor should check the project with TypeScript 7.1 as well. [VS Code extension](./vscode#setup) shows how to point VS Code at it. You can also use [tsrs](https://github.com/oxc-project/tsrs), a Rust port of TypeScript 7.1.
 
 ## Using Kysely, Drizzle or Prisma
 

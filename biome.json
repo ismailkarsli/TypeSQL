@@ -15,7 +15,6 @@
 			"!packages/core/src/postgres/engine/typer/pg-functions.ts",
 			"!packages/core/src/postgres/schema/pg-catalog.ts",
 			"!packages/bench/src",
-			"!packages/bench/thresholds.json",
 			"!packages/core/test/oracle/baselines",
 			"!packages/core/test/fuzz/baseline.json",
 			"!packages/core/test/fuzz/sqlite-baseline.json",

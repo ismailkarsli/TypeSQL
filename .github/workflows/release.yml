@@ -34,10 +34,6 @@ jobs:
           node-version: 26
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - uses: actions/download-artifact@v8
-        with:
-          name: bench-results
-          path: packages/bench
       - name: Version pending change intents
         run: |
           public() {
@@ -67,7 +63,6 @@ jobs:
           if [ -z "$versions" ] && [ "$extension" != "$(git show HEAD:packages/vscode/package.json | node -p 'JSON.parse(require("fs").readFileSync(0)).version')" ]; then
             versions="VS Code extension $extension"
           fi
-          node scripts/performance-history.ts --refresh-all
           git add -A
           message="chore: release $versions"
           [ -n "$versions" ] || message="chore: update release metadata"

@@ -92,7 +92,6 @@ export default defineConfig({
 				text: "Going further",
 				items: [
 					{ text: "Errors and troubleshooting", link: "/guide/errors" },
-					{ text: "Performance", link: "/guide/performance" },
 					{ text: "Limits", link: "/guide/limits" },
 					{
 						text: "Postgres compatibility",

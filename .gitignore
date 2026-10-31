@@ -4,9 +4,6 @@ dist/
 scratchpad/
 .vitest/
 coverage/
-packages/bench/results.json
-packages/bench/runtime-results.json
-packages/bench/history-results.json
 pnpm-publish-summary.json
 .vitepress/cache/
 .wrangler/

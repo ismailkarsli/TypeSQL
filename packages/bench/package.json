@@ -5,7 +5,7 @@
 	"type": "module",
 	"scripts": {
 		"typecheck": "tsrs -p tsconfig.json --noEmit",
-		"bench": "node ./run.ts"
+		"bench": "pnpm --filter @typesql/core build && node ./run.ts"
 	},
 	"dependencies": {
 		"@typesql/core": "workspace:*"

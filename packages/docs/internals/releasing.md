@@ -78,8 +78,8 @@ pnpm release
 ```
 
 The workflow runs only when started by hand on `main`, with `pnpm release` or **Run workflow** on
-the Actions tab; pushing publishes nothing. It runs the `ci.yml` checks (`test`, `intents`,
-`bench`) on the current `main`. Once they pass, its `publish` job runs `pnpm version -r` (bump
+the Actions tab; pushing publishes nothing. It runs the `ci.yml` checks
+on the current `main`. Once they pass, its `publish` job runs `pnpm version -r` (bump
 versions, write changelog sections, update the ledger) and commits the result to `main` as
 `chore: release <version>` from `github-actions[bot]`, then builds and smoke-tests the
 packages, runs `pnpm publish -r`, and creates the GitHub releases. `main` requires signed
