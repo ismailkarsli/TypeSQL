@@ -1100,29 +1100,34 @@ type ParseParen<T extends Toks, I extends number> =
 		? ParseSelectStmt<T, I> extends infer X
 			? X extends Ok<infer S, infer J>
 				? EatOp<T, J, ")"> extends never
-					? Expected<'")"', T, J>
+					? // ((SELECT 1) - 1): a parenthesized subquery inside an expression.
+						T[I] extends OpTok<"(">
+						? ParseParenExpr<T, I>
+						: Expected<'")"', T, J>
 					: Ok<SubNode<S>, EatOp<T, J, ")">>
 				: X
 			: never
-		: ParseExpr<T, I, 0> extends infer X
-			? X extends Ok<infer E, infer J>
-				? EatOp<T, J, ")"> extends never
-					? EatOp<T, J, ","> extends never
-						? Expected<'")"', T, J>
-						: ParseExprList<T, EatOp<T, J, ",">, [E]> extends infer Y
-							? Y extends Ok<infer Items, infer J2>
-								? EatOp<T, J2, ")"> extends never
-									? Expected<'")"', T, J2>
-									: Ok<RowNode<Items>, EatOp<T, J2, ")">>
-								: Y
-							: never
-					: T[EatOp<T, J, ")">] extends OpTok<".">
-						? ParseParenField<T, E, Nx<EatOp<T, J, ")">>>
-						: T[EatOp<T, J, ")">] extends OpTok<"[">
-							? ParseSubscript<T, E, Nx<EatOp<T, J, ")">>, 13>
-							: Ok<E, EatOp<T, J, ")">>
-				: X
-			: never;
+		: ParseParenExpr<T, I>;
+type ParseParenExpr<T extends Toks, I extends number> =
+	ParseExpr<T, I, 0> extends infer X
+		? X extends Ok<infer E, infer J>
+			? EatOp<T, J, ")"> extends never
+				? EatOp<T, J, ","> extends never
+					? Expected<'")"', T, J>
+					: ParseExprList<T, EatOp<T, J, ",">, [E]> extends infer Y
+						? Y extends Ok<infer Items, infer J2>
+							? EatOp<T, J2, ")"> extends never
+								? Expected<'")"', T, J2>
+								: Ok<RowNode<Items>, EatOp<T, J2, ")">>
+							: Y
+						: never
+				: T[EatOp<T, J, ")">] extends OpTok<".">
+					? ParseParenField<T, E, Nx<EatOp<T, J, ")">>>
+					: T[EatOp<T, J, ")">] extends OpTok<"[">
+						? ParseSubscript<T, E, Nx<EatOp<T, J, ")">>, 13>
+						: Ok<E, EatOp<T, J, ")">>
+			: X
+		: never;
 type ParseParenField<T extends Toks, E, I extends number> =
 	T[I] extends OpTok<"*">
 		? Ok<FieldNode<E, "*">, Nx<I>>

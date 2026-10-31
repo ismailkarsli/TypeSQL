@@ -57,8 +57,11 @@ export type TypeOf<E extends Expr, C extends Ctx> = E extends TagCol
 										: E extends TagUn
 											? TypeUn<E["op"], E["e"], C>
 											: E extends TagCast
-												? E["e"] extends TagParam
-													? Info<E["to"]>
+												? E["e"] extends {
+														readonly t: "param";
+														readonly n: infer N;
+													}
+													? Info<E["to"], ParamNullable<C["db"], N>>
 													: E["e"] extends {
 																readonly t: "str";
 																readonly v: infer V extends string;
@@ -968,6 +971,12 @@ type TypeCall<E extends Call, C extends Ctx> =
 													: false;
 												readonly withinGroup: W extends ColInfo ? true : false;
 												readonly wg: W extends ColInfo ? W["type"] : "unknown";
+												readonly untypedFirst: E["args"] extends readonly [
+													{ readonly t: "str" | "null" },
+													...unknown[],
+												]
+													? true
+													: false;
 											},
 											C["db"]
 										>
@@ -986,6 +995,11 @@ type TagStr = { readonly t: "str" };
 type TagBool = { readonly t: "bool" };
 type TagNull = { readonly t: "null" };
 type TagParam = { readonly t: "param" };
+type ParamNullable<DB, N> = DB extends { readonly $nullParams: infer P }
+	? N extends P
+		? true
+		: false
+	: false;
 type TagDefault = { readonly t: "default" };
 type TagTyped = { readonly t: "typed" };
 type TagBin = { readonly t: "bin" };

@@ -12,10 +12,12 @@ import type {
 	Call,
 	Expr,
 	FromItem,
+	NamedWindow,
 	SelectBody,
 	SelectStmt,
 	SimpleSelect,
 	Target,
+	WindowSpec,
 } from "../ast.js";
 import type { BindFrom } from "../binder/from.js";
 import type { ParamsOfWith } from "../project/dml.js";
@@ -684,12 +686,33 @@ type NonStarArgs<Args extends readonly Expr[]> = Args extends readonly [
 ]
 	? []
 	: Args;
-type ParamsOfCallRest<E extends Call, C extends Ctx, M> = ParamsOfOpt<
-	E["withinGroup"],
+type ParamsOfCallRest<E extends Call, C extends Ctx, M> = ParamsOfWin<
+	E["win"],
 	C,
-	ParamsOfOpt<E["filter"], C, M, Info<"bool", true>>,
-	null
+	ParamsOfOpt<
+		E["withinGroup"],
+		C,
+		ParamsOfOpt<E["filter"], C, M, Info<"bool", true>>,
+		null
+	>
 >;
+type ParamsOfWin<
+	W extends WindowSpec | null,
+	C extends Ctx,
+	M,
+> = W extends WindowSpec
+	? ParamsOfList<W["order"], C, ParamsOfList<W["partition"], C, M, null>, null>
+	: M;
+type ParamsOfWins<
+	Ws extends readonly NamedWindow[],
+	C extends Ctx,
+	M,
+> = Ws extends readonly [
+	infer W extends NamedWindow,
+	...infer R extends readonly NamedWindow[],
+]
+	? ParamsOfWins<R, C, ParamsOfWin<W["spec"], C, M>>
+	: M;
 
 type PolyOf<
 	Args extends readonly Expr[],
@@ -862,7 +885,8 @@ export type ParamsOfSelect<
 							Outer,
 							C2,
 							ParamsOfWith<Q["with"], DB, C2, M>,
-							SkipTargets
+							SkipTargets,
+							Q["orderBy"]
 						>
 					>
 				>
@@ -888,18 +912,34 @@ type ParamsOfBody<
 	Ctes extends CteMap,
 	M,
 	SkipTargets extends boolean = false,
+	Order extends readonly Expr[] = [],
 > = B extends TagSetop
-	? ParamsOfBody<
-			B["r"],
-			DB,
-			Outer,
-			Ctes,
-			ParamsOfBody<B["l"], DB, Outer, Ctes, M>
+	? ParamsOfList<
+			Order,
+			MkCtx<DB, Outer, Ctes, false>,
+			ParamsOfBody<
+				B["r"],
+				DB,
+				Outer,
+				Ctes,
+				ParamsOfBody<B["l"], DB, Outer, Ctes, M>
+			>,
+			null
 		>
 	: B extends TagParen
-		? ParamsOfSelect<B["q"], DB, Outer, Ctes, M>
+		? ParamsOfList<
+				Order,
+				MkCtx<DB, Outer, Ctes, false>,
+				ParamsOfSelect<B["q"], DB, Outer, Ctes, M>,
+				null
+			>
 		: B extends TagValues
-			? ParamsOfRows<B["rows"], MkCtx<DB, Outer, Ctes, false>, M>
+			? ParamsOfList<
+					Order,
+					MkCtx<DB, Outer, Ctes, false>,
+					ParamsOfRows<B["rows"], MkCtx<DB, Outer, Ctes, false>, M>,
+					null
+				>
 			: B extends TagSimple
 				? BindFrom<B["from"], DB, Outer, Ctes> extends infer L
 					? L extends ScopeLevel
@@ -912,13 +952,15 @@ type ParamsOfBody<
 									B["groupBy"] extends null ? false : true
 								>,
 								M,
-								SkipTargets
+								SkipTargets,
+								Order
 							>
 						: ParamsOfSimple<
 								Extract<B, SimpleSelect>,
 								MkCtx<DB, Outer, Ctes, false>,
 								M,
-								SkipTargets
+								SkipTargets,
+								Order
 							>
 					: never
 				: M;
@@ -937,30 +979,47 @@ type ParamsOfSimple<
 	C extends Ctx,
 	M,
 	SkipTargets extends boolean = false,
+	Order extends readonly Expr[] = [],
 > = B extends {
 	readonly targets: infer Ts extends readonly Target[];
 	readonly from: infer Fs extends readonly FromItem[];
 	readonly where: infer W extends Expr | null;
 	readonly having: infer H extends Expr | null;
 	readonly groupBy: infer G;
+	readonly distinct: infer D;
+	readonly windows: infer Ws extends readonly NamedWindow[];
 }
-	? ParamsOfOpt<
-			H,
+	? ParamsOfWins<
+			Ws,
 			C,
 			ParamsOfList<
-				G extends readonly Expr[] ? G : [],
+				D extends readonly Expr[] ? D : [],
 				C,
-				ParamsOfOpt<
-					W,
+				ParamsOfList<
+					Order,
 					C,
-					SkipTargets extends true
-						? ParamsOfFromItems<Fs, C, M>
-						: ParamsOfTargets<Ts, C, ParamsOfFromItems<Fs, C, M>>,
-					Info<"bool">
+					ParamsOfOpt<
+						H,
+						C,
+						ParamsOfList<
+							G extends readonly Expr[] ? G : [],
+							C,
+							ParamsOfOpt<
+								W,
+								C,
+								SkipTargets extends true
+									? ParamsOfFromItems<Fs, C, M>
+									: ParamsOfTargets<Ts, C, ParamsOfFromItems<Fs, C, M>>,
+								Info<"bool">
+							>,
+							null
+						>,
+						Info<"bool">
+					>,
+					null
 				>,
 				null
-			>,
-			Info<"bool">
+			>
 		>
 	: M;
 

@@ -152,6 +152,8 @@ sql("SELECT v FROM unnest($1::text[]) AS t(v)", ["a", null]);
 
 `null` is accepted wherever Postgres accepts it: `col = NULL` is legal and matches no row, and `LIMIT NULL` means no limit. It is rejected only when assigned to a `NOT NULL` column (`VALUES`, `SET`). A parameter used in several places accepts `null` only if every use does, so `UPDATE t SET label = $1 WHERE label <> $1` rejects `null` for a `NOT NULL` `label`.
 
+A result column that uses a parameter which accepts `null` can be `NULL`: `SELECT upper($1::text) AS u` types `u` as `string | null`, while `SELECT $1::int4 + 1 AS n` keeps `n` non-null because `$1` takes the non-null type of `1`.
+
 Array elements always accept `null`: an `int4[]` parameter takes `(number | null)[]`, so `unnest($1::float8[])` works for bulk inserts with nullable values.
 
 ### What a parameter accepts

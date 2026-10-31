@@ -1,5 +1,5 @@
 import type * as Shared from "../../engine/infer.js";
-import type { MaxParam, ParamsToMap } from "../../engine/params.js";
+import type { MaxParam, NullTest, ParamsToMap } from "../../engine/params.js";
 import type { Toks } from "../../engine/tokens.js";
 import type { Cols, Simplify } from "../../engine/types.js";
 import type { RewriteNamed } from "../../sql/named.js";
@@ -49,24 +49,48 @@ type AnalyzeGeneral<DB, Q1 extends string, Names> =
 		? T extends Toks
 			? ParseProgram<T> extends infer S
 				? S extends Stmt
-					? ProjectStmt<S, DB, [], {}> extends infer C
-						? C extends Cols | null
-							? {
-									readonly kind: S["t"];
-									readonly cols: C;
-									readonly params: MaxParam<T> extends 0
-										? {}
-										: ParamsToMap<ParamsOfStmt<S, DB>>;
-									readonly max: MaxParam<T>;
-									readonly names: Names;
-									readonly stmt: S;
-								}
-							: Reposition<C, T, DB>
+					? (
+							MaxParam<T> extends 0
+								? {}
+								: ParamsToMap<ParamsOfStmt<S, DB>>
+						) extends infer P
+						? ProjectStmt<
+								S,
+								WithNullParams<DB, NullParams<P>>,
+								[],
+								{}
+							> extends infer C
+							? C extends Cols | null
+								? {
+										readonly kind: S["t"];
+										readonly cols: C;
+										readonly params: P;
+										readonly max: MaxParam<T>;
+										readonly names: Names;
+										readonly stmt: S;
+									}
+								: Reposition<C, T, DB>
+							: never
 						: never
 					: Reposition<S, T, DB>
 				: never
 			: T
 		: never;
+
+/** Parameters that accept null, with the same rule the parameter types use. */
+type NullParams<P> = {
+	[K in keyof P]: [
+		Extract<P[K], NullTest | { readonly nullable: false }>,
+	] extends [never]
+		? K
+		: [Extract<P[K], NullTest>] extends [never]
+			? never
+			: K;
+}[keyof P];
+// A cast parameter types as its cast; one that accepts null makes it nullable.
+type WithNullParams<DB, N> = [N] extends [never]
+	? DB
+	: DB & { readonly $nullParams: N };
 
 export type Analysis<DB, Q extends string> = Analyze<DB, Q>;
 

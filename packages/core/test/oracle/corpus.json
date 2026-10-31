@@ -23718,6 +23718,72 @@
 			"source": "sql-and-or",
 			"sql": "DELETE FROM users WHERE false RETURNING display_name",
 			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "window-param-nullability",
+			"sql": "SELECT DISTINCT ON ($1::int4) id, lag(id) OVER (PARTITION BY $2::text ORDER BY $3::date) AS l, sum(id) OVER w AS s FROM things WINDOW w AS (PARTITION BY $4::int8) ORDER BY $1::int4, $5::text",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "window-param-nullability",
+			"sql": "SELECT label FROM things UNION SELECT label FROM things ORDER BY $1::int4",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "window-param-nullability",
+			"sql": "SELECT upper($1::text) AS a, $2::int4 + 1 AS b, $3::date AS c, coalesce($4::text, label) AS d, $5::float8 NOT IN ($6::float8) AS e FROM things",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "window-param-nullability",
+			"sql": "SELECT $1::text IS NULL AS a, upper($1::text) AS b, $2::int4 AS c FROM things",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "window-param-nullability",
+			"sql": "SELECT ((SELECT max(id) FROM things) - 1) AS a, ((SELECT n_data FROM things LIMIT 1) -> 'a') AS b, ((SELECT 1) UNION (SELECT 2)) AS c",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "window-param-nullability",
+			"sql": "SELECT first_value('a') OVER () AS a FROM things",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "window-param-nullability",
+			"sql": "SELECT lag(NULL, 1) OVER () AS a FROM things",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "window-param-nullability",
+			"sql": "SELECT lag('a', 1, 'b') OVER () AS a, first_value(v) OVER () AS b, any_value(v) OVER () AS c FROM (VALUES (NULL)) AS t (v)",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "window-param-nullability",
+			"sql": "SELECT stddev_pop(ratio) AS a, var_pop(price) AS b, covar_pop(ratio, ratio) AS c, regr_sxx(ratio, ratio) AS d, stddev_samp(ratio) AS e, var_samp(price) AS f, covar_samp(ratio, ratio) AS g, regr_r2(ratio, ratio) AS h FROM things GROUP BY id",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "window-param-nullability",
+			"sql": "SELECT to_char(price, '9') AS a, to_char(id, '9') AS b, to_char(day, 'YYYY') AS c, to_char(ts, 'YYYY') AS d, to_char(dur, 'HH') AS e FROM things",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "window-param-nullability",
+			"sql": "SELECT collation for (label) AS a, collation for (n_text) AS b, collation for (NULL) AS c, collation for ('x') AS d FROM things",
+			"ddl": false
 		}
 	],
 	"skippedSlots": {

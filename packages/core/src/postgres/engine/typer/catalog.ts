@@ -39,6 +39,8 @@ export type Overloads = AnySig | readonly AnySig[];
 type Agg = { agg: true };
 type AggCollect = { agg: true; strict: false };
 type AggNN = { agg: true; nullable: false };
+/** NULL even over non-null input, e.g. for a single row or zero variance. */
+type AggNullable = { agg: true; nullable: true };
 type Win = { window: true; nullable: false };
 type WinNullable = { window: true; nullable: true };
 type NN = { nullable: false };
@@ -102,9 +104,9 @@ export interface FunctionCatalog {
 	bit_or: Sig<["any"], "$1", Agg>;
 	bit_xor: Sig<["any"], "$1", Agg>;
 	stddev: [
-		Sig<["float4"], "float8", Agg>,
-		Sig<["float8"], "float8", Agg>,
-		Sig<["anynumeric"], "numeric", Agg>,
+		Sig<["float4"], "float8", AggNullable>,
+		Sig<["float8"], "float8", AggNullable>,
+		Sig<["anynumeric"], "numeric", AggNullable>,
 	];
 	stddev_pop: [
 		Sig<["float4"], "float8", Agg>,
@@ -112,14 +114,14 @@ export interface FunctionCatalog {
 		Sig<["anynumeric"], "numeric", Agg>,
 	];
 	stddev_samp: [
-		Sig<["float4"], "float8", Agg>,
-		Sig<["float8"], "float8", Agg>,
-		Sig<["anynumeric"], "numeric", Agg>,
+		Sig<["float4"], "float8", AggNullable>,
+		Sig<["float8"], "float8", AggNullable>,
+		Sig<["anynumeric"], "numeric", AggNullable>,
 	];
 	variance: [
-		Sig<["float4"], "float8", Agg>,
-		Sig<["float8"], "float8", Agg>,
-		Sig<["anynumeric"], "numeric", Agg>,
+		Sig<["float4"], "float8", AggNullable>,
+		Sig<["float8"], "float8", AggNullable>,
+		Sig<["anynumeric"], "numeric", AggNullable>,
 	];
 	var_pop: [
 		Sig<["float4"], "float8", Agg>,
@@ -127,19 +129,19 @@ export interface FunctionCatalog {
 		Sig<["anynumeric"], "numeric", Agg>,
 	];
 	var_samp: [
-		Sig<["float4"], "float8", Agg>,
-		Sig<["float8"], "float8", Agg>,
-		Sig<["anynumeric"], "numeric", Agg>,
+		Sig<["float4"], "float8", AggNullable>,
+		Sig<["float8"], "float8", AggNullable>,
+		Sig<["anynumeric"], "numeric", AggNullable>,
 	];
-	corr: Sig<["float8", "float8"], "float8", Agg>;
+	corr: Sig<["float8", "float8"], "float8", AggNullable>;
 	covar_pop: Sig<["float8", "float8"], "float8", Agg>;
-	covar_samp: Sig<["float8", "float8"], "float8", Agg>;
+	covar_samp: Sig<["float8", "float8"], "float8", AggNullable>;
 	regr_avgx: Sig<["float8", "float8"], "float8", Agg>;
 	regr_avgy: Sig<["float8", "float8"], "float8", Agg>;
 	regr_count: Sig<["float8", "float8"], "int8", AggNN>;
-	regr_intercept: Sig<["float8", "float8"], "float8", Agg>;
-	regr_r2: Sig<["float8", "float8"], "float8", Agg>;
-	regr_slope: Sig<["float8", "float8"], "float8", Agg>;
+	regr_intercept: Sig<["float8", "float8"], "float8", AggNullable>;
+	regr_r2: Sig<["float8", "float8"], "float8", AggNullable>;
+	regr_slope: Sig<["float8", "float8"], "float8", AggNullable>;
 	regr_sxx: Sig<["float8", "float8"], "float8", Agg>;
 	regr_sxy: Sig<["float8", "float8"], "float8", Agg>;
 	regr_syy: Sig<["float8", "float8"], "float8", Agg>;
@@ -343,7 +345,13 @@ export interface FunctionCatalog {
 	to_hex: Sig<["anynumeric"], "text">;
 	to_bin: Sig<["anynumeric"], "text">;
 	to_oct: Sig<["anynumeric"], "text">;
-	to_char: Sig<["any", "anystring"], "text">;
+	to_char: [
+		Sig<["timestamptz", "anystring"], "text", Nullable>,
+		Sig<["timestamp", "anystring"], "text", Nullable>,
+		Sig<["date", "anystring"], "text", Nullable>,
+		Sig<["interval", "anystring"], "text", Nullable>,
+		Sig<["any", "anystring"], "text">,
+	];
 	to_number: Sig<["anystring", "anystring"], "numeric">;
 	to_date: Sig<["anystring", "anystring"], "date">;
 	to_timestamp: [
@@ -1224,6 +1232,8 @@ export type CallCtx = {
 	readonly hasStar: boolean;
 	readonly withinGroup: boolean;
 	readonly wg: string;
+	/** The first argument is a string literal or NULL written in the call. */
+	readonly untypedFirst?: boolean;
 };
 
 type Ret<
@@ -1323,6 +1333,18 @@ type CallNullable<
 					? AnyNullableAt<As, S["strict"]>
 					: AnyNullable<As>;
 
+/** COLLATION FOR returns NULL for an argument of type unknown. */
+type NullableCall<
+	Name extends string,
+	S extends AnySig,
+	As extends readonly ColInfo[],
+	C extends CallCtx,
+> = Name extends "pg_collation_for"
+	? As extends readonly [{ readonly type: "lit" | "null" | "unknown" }]
+		? true
+		: CallNullable<S, As, C>
+	: CallNullable<S, As, C>;
+
 type SchemaFunctions<DB> = DB extends { readonly $functions: infer F } ? F : {};
 
 export type LookupFn<
@@ -1371,15 +1393,41 @@ export type CallType<
 				? S extends AnySig
 					? CallMisuse<Name, S, As, C> extends infer M extends string
 						? SqlError<M, null>
-						: S["ret"] extends "$common"
-							? CommonMismatch<Name, As, "unknown"> extends infer M extends
-									string
-								? SqlError<M, null>
-								: Info<Ret<S["ret"], As, C>, CallNullable<S, As, C>>
-							: Info<Ret<S["ret"], As, C>, CallNullable<S, As, C>>
+						: UnknownPolymorphic<Name, As, C> extends true
+							? SqlError<
+									"could not determine polymorphic type because input has type unknown",
+									null
+								>
+							: S["ret"] extends "$common"
+								? CommonMismatch<Name, As, "unknown"> extends infer M extends
+										string
+									? SqlError<M, null>
+									: Info<Ret<S["ret"], As, C>, NullableCall<Name, S, As, C>>
+								: Info<Ret<S["ret"], As, C>, NullableCall<Name, S, As, C>>
 					: Info<"unknown", true>
 				: never
 		: never;
+
+/** An anyelement argument that only an untyped literal or NULL fills. */
+type UnknownPolymorphic<
+	Name extends string,
+	As extends readonly ColInfo[],
+	C extends CallCtx,
+> = C["untypedFirst"] extends true ? PolymorphicArity<Name, As> : false;
+type PolymorphicArity<
+	Name extends string,
+	As extends readonly ColInfo[],
+> = Name extends
+	| "first_value"
+	| "last_value"
+	| "nth_value"
+	| "any_value"
+	| "lag"
+	| "lead"
+	? As["length"] extends 1 | 2
+		? true
+		: false
+	: false;
 
 /** PostgreSQL's select_common_type error for coalesce, greatest and least. */
 type CommonMismatch<

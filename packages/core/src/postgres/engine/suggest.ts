@@ -56,7 +56,7 @@ type RelAt<T extends Toks, I extends number, DB> = T[I] extends {
 	: never;
 
 type RelNames<DB> = {
-	[K in keyof DB & string]: K extends "$types" | "$functions"
+	[K in keyof DB & string]: K extends "$types" | "$functions" | "$nullParams"
 		? never
 		: IsRelation<DB[K]> extends true
 			? K

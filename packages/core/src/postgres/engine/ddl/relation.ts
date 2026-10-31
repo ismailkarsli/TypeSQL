@@ -136,4 +136,4 @@ export type ApplyDropRels<
 		: never
 	: DB;
 
-export type MetaKey = "$types" | "$functions";
+export type MetaKey = "$types" | "$functions" | "$nullParams";
