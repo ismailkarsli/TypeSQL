@@ -1,5 +1,15 @@
 # @typesql/core
 
+## 1.1.0
+
+### Minor Changes
+
+- Add `sql.and([...])` and `sql.or([...])`, which combine conditions with `AND` or `OR` in parentheses, skip `sql.empty` items, give `true` or `false` when no condition is left, and keep the statement type-checked like `sql.combine`; editors no longer suggest `" AND "` and `" OR "` as `sql.combine` separators.
+
+### Patch Changes
+
+- `@typesql/core`, `@typesql/pg`, `@typesql/postgres`, `@typesql/kysely`, `@typesql/drizzle`, `@typesql/prisma`, `@typesql/sqlite` and `@typesql/cli` now share one version number and are released together: install them all at the same version.
+
 ## 1.0.1
 
 ### Patch Changes

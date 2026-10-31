@@ -54,11 +54,11 @@ The parser is checked against the regression tests the database runs on itself. 
 ## Compile time
 
 <span id="performance-summary-start"></span>
-The [real-world application workload](packages/bench/src/case1.ts) contains 379 statements and reusable SQL fragments. Average check time per statement, including schema and fragment checking: 6.55 ms with `tsc` and 1.85 ms with [tsrs](https://github.com/oxc-project/tsrs).
+The [real-world application workload](packages/bench/src/case1.ts) contains 379 statements and reusable SQL fragments. Average check time per statement, including schema and fragment checking: 3.84 ms with `tsc` and 1.2 ms with [tsrs](https://github.com/oxc-project/tsrs).
 
 | Application workload | `tsc` | tsrs |
 |---|---|---|
-| `case1` | 2.484 s | 0.702 s |
+| `case1` | 1.457 s | 0.454 s |
 <span id="performance-summary-end"></span>
 
 See [Performance](https://typesql.karsli.net/guide/performance) for how this is measured.
@@ -78,9 +78,9 @@ config:
 ---
 xychart-beta
     title "tsrs - real-world case1"
-    x-axis "Core version" ["0.7.1", "0.7.2", "0.7.3", "0.7.4", "0.7.5", "0.7.6", "0.8.0", "0.8.1", "0.9.0", "0.9.1", "0.9.2", "0.10.0", "0.10.1", "1.0.0", "1.0.1"]
-    y-axis "Check time (seconds, lower is faster)" 0 --> 2.3
-    line [2.03, 0.839, 0.829, 0.828, 0.673, 0.67, 0.668, 0.685, 0.714, 0.704, 0.638, 0.638, 0.689, 0.69, 0.702]
+    x-axis "Core version" ["0.7.1", "0.7.2", "0.7.3", "0.7.4", "0.7.5", "0.7.6", "0.8.0", "0.8.1", "0.9.0", "0.9.1", "0.9.2", "0.10.0", "0.10.1", "1.0.0", "1.0.1", "1.1.0"]
+    y-axis "Check time (seconds, lower is faster)" 0 --> 1.6
+    line [1.375, 0.557, 0.577, 0.575, 0.498, 0.473, 0.477, 0.486, 0.493, 0.431, 0.365, 0.406, 0.413, 0.432, 0.457, 0.454]
 ```
 <span id="performance-history-end"></span>
 

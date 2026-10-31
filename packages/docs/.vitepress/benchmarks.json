@@ -1,13 +1,13 @@
 {
 	"date": "2026-10-31",
-	"version": "1.0.1",
+	"version": "1.1.0",
 	"workload": {
 		"file": "src/case1.ts",
 		"statements": 379
 	},
 	"environment": {
 		"node": "v26.13.0",
-		"cpu": "AMD EPYC 7763 64-Core Processor",
+		"cpu": "AMD EPYC 9V45 96-Core Processor",
 		"cpus": 4
 	},
 	"compilers": {
@@ -17,31 +17,31 @@
 	"throughput": {
 		"tsrs": {
 			"instantiationsPerQuery": 8114,
-			"checkMsPerQuery": 1.85,
-			"queriesPerSec": 540
+			"checkMsPerQuery": 1.2,
+			"queriesPerSec": 835
 		},
 		"tsc": {
 			"instantiationsPerQuery": 8114,
-			"checkMsPerQuery": 6.55,
-			"queriesPerSec": 153
+			"checkMsPerQuery": 3.84,
+			"queriesPerSec": 260
 		}
 	},
 	"instantiationsPerQuery": "8.11K",
-	"speedup": 3.5,
+	"speedup": 3.2,
 	"rows": {
 		"case1": {
 			"instantiations": "3.08M",
-			"tsrs": 0.702,
-			"tsc": 2.484
+			"tsrs": 0.454,
+			"tsc": 1.457
 		},
 		"case1 source": {
 			"instantiations": "3.25M",
-			"tsrs": 0.735,
-			"tsc": 2.762
+			"tsrs": 0.45,
+			"tsc": 1.583
 		}
 	},
 	"runtime": {
-		"microsecondsPerQuery": "4.80",
-		"millisecondsPerWorkload": "1.82"
+		"microsecondsPerQuery": "2.68",
+		"millisecondsPerWorkload": "1.02"
 	}
 }

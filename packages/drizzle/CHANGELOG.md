@@ -1,5 +1,14 @@
 # @typesql/drizzle
 
+## 1.1.0
+
+### Patch Changes
+
+- `@typesql/core`, `@typesql/pg`, `@typesql/postgres`, `@typesql/kysely`, `@typesql/drizzle`, `@typesql/prisma`, `@typesql/sqlite` and `@typesql/cli` now share one version number and are released together: install them all at the same version.
+
+- Updated dependencies:
+  - @typesql/core@1.1.0
+
 ## 0.3.8
 
 ### Patch Changes

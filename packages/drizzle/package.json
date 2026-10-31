@@ -1,6 +1,6 @@
 {
 	"name": "@typesql/drizzle",
-	"version": "0.3.8",
+	"version": "1.1.0",
 	"description": "Use Drizzle ORM table definitions as a TypeSQL schema.",
 	"license": "MIT",
 	"repository": {
