@@ -528,6 +528,46 @@ assert.deepEqual(sql.as("SELECT $2, {piece}, {piece}", { piece }, 1, 2), {
 	text: "SELECT $2, $3, '$99', $$ $88 $$, $4, '$99', $$ $88 $$",
 	values: [1, 2, 3, 3],
 });
+// A `$` without digits (regex anchors, dollar quotes) survives renumbering in the types too.
+const anchored = sql.fragment(
+	"(SELECT u.id FROM users u WHERE u.email ~ '^a$' AND u.age = $1 AND u.display_name <> $tag$ $1 $tag$ ORDER BY substring(u.display_name FROM '[0-9]+$')::int LIMIT 1) AS x",
+	30,
+);
+assert.deepEqual(
+	sql(`SELECT {anchored} FROM users WHERE id = ${sql.param(7)}`, {
+		anchored,
+	}),
+	{
+		text: "SELECT (SELECT u.id FROM users u WHERE u.email ~ '^a$' AND u.age = $2 AND u.display_name <> $tag$ $1 $tag$ ORDER BY substring(u.display_name FROM '[0-9]+$')::int LIMIT 1) AS x FROM users WHERE id = $1",
+		values: [7, 30],
+	},
+);
+
+// sql.json() accepts recursive JSON types such as zod's `JSONType`.
+type JsonTree =
+	| string
+	| number
+	| boolean
+	| null
+	| JsonTree[]
+	| { [key: string]: JsonTree };
+const notes = core.createSql<{
+	notes: {
+		id: Col<"uuid", { hasDefault: true }>;
+		extra_data: Json<JsonTree, { nullable: true }>;
+	};
+}>(corePg.postgres);
+const note: { extra_data?: JsonTree | null } = {
+	extra_data: { tags: ["a", ["b"]] },
+};
+const noteInsert = notes(`INSERT INTO notes {v} RETURNING *`, {
+	v: notes.values("notes", [{ extra_data: notes.json(note.extra_data) }]),
+});
+assert.equal(
+	noteInsert.text,
+	'INSERT INTO notes ("extra_data") VALUES ($1) RETURNING *',
+);
+assert.equal(JSON.stringify(noteInsert.values[0]), '{"tags":["a",["b"]]}');
 
 const m = corePg
 	.migrations()

@@ -1,5 +1,4 @@
 import type { SqlError } from "../errors.js";
-import type { Opaque, SplitFirst } from "./inline.js";
 import type { NextOpaque } from "./named.js";
 
 export type Splice<Q extends string, S> = string extends Q
@@ -164,25 +163,48 @@ type Renumber<
 	T extends string,
 	Off extends number,
 	Acc extends string,
-> = T extends `${infer Pre}$${infer D}${infer Rest}`
-	? TakeDigits<Rest, D> extends [
-			infer N extends string,
-			infer R2 extends string,
-		]
-		? Add<ToNum<N>, Off> extends infer M extends number
-			? RenumberNext<R2, Off, `${Acc}${Pre}$${M}`, M>
-			: never
-		: never
+> = T extends `${string}$${string}`
+	? RenumberLoop<T, Off, Off, Acc>
 	: [`${Acc}${T}`, Off];
-type RenumberNext<
+type RenumberLoop<
 	T extends string,
 	Off extends number,
-	Acc extends string,
 	Max extends number,
+	Acc extends string,
 > =
-	Renumber<T, Off, Acc> extends [infer Txt, infer M2 extends number]
-		? [Txt, Gt<M2, Max> extends true ? M2 : Max]
+	NextOpaque<T> extends [
+		infer Code extends string,
+		infer Seg extends string,
+		infer After extends string,
+	]
+		? RenumberCode<Code, Off, Max, ""> extends [
+				infer C extends string,
+				infer M extends number,
+			]
+			? Seg extends ""
+				? [`${Acc}${C}`, M]
+				: RenumberLoop<After, Off, M, `${Acc}${C}${Seg}`>
+			: never
 		: never;
+type RenumberCode<
+	T extends string,
+	Off extends number,
+	Max extends number,
+	Acc extends string,
+> = T extends `${infer Pre}$${infer Rest}`
+	? Rest extends `${infer D extends Digit}${infer R}`
+		? TakeDigits<R, D> extends [infer N extends string, infer R2 extends string]
+			? Add<ToNum<N>, Off> extends infer M extends number
+				? RenumberCode<
+						R2,
+						Off,
+						Gt<M, Max> extends true ? M : Max,
+						`${Acc}${Pre}$${M}`
+					>
+				: never
+			: never
+		: RenumberCode<Rest, Off, Max, `${Acc}${Pre}$`>
+	: [`${Acc}${T}`, Max];
 
 type TakeDigits<
 	S extends string,
@@ -199,29 +221,26 @@ export type MaxParamStr<
 	Max extends number = 0,
 > = T extends `${string}$${string}` ? MaxLoop<T, Max> : Max;
 type MaxLoop<T extends string, Max extends number> =
-	SplitFirst<T> extends [
+	NextOpaque<T> extends [
 		infer Code extends string,
-		infer O extends string,
-		infer Rest extends string,
+		infer Seg extends string,
+		infer After extends string,
 	]
 		? MaxIn<Code, Max> extends infer M extends number
-			? O extends ""
+			? Seg extends ""
 				? M
-				: Opaque<O, Rest> extends [string, infer After extends string]
-					? MaxLoop<After, M>
-					: M
+				: MaxLoop<After, M>
 			: never
 		: never;
 type MaxIn<
 	T extends string,
 	Max extends number,
-> = T extends `${string}$${infer D extends Digit}${infer Rest}`
-	? TakeDigits<Rest, D> extends [
-			infer N extends string,
-			infer R2 extends string,
-		]
-		? MaxIn<R2, Gt<ToNum<N>, Max> extends true ? ToNum<N> : Max>
-		: never
+> = T extends `${string}$${infer Rest}`
+	? Rest extends `${infer D extends Digit}${infer R}`
+		? TakeDigits<R, D> extends [infer N extends string, infer R2 extends string]
+			? MaxIn<R2, Gt<ToNum<N>, Max> extends true ? ToNum<N> : Max>
+			: never
+		: MaxIn<Rest, Max>
 	: Max;
 
 type Tup<N extends number, A extends unknown[] = []> = A["length"] extends N

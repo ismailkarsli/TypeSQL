@@ -23,15 +23,29 @@ export type JsonValue = `\u0000PJ${string}\u0000`;
 
 export type DefaultMarker<T> = `\u0000Du${Enc<Exclude<T, Empty>>}\u0000`;
 
-export type Enc<T> = 0 extends 1 & T
+export type Enc<T, Depth extends unknown[] = []> = 0 extends 1 & T
 	? "*"
 	: unknown extends T
 		? "*"
-		: `${Flag<T, string, "s">}${Flag<T, number, "n">}${Flag<T, boolean, "b">}${Flag<T, bigint, "i">}${Flag<T, null, "0">}${Flag<T, undefined, "u">}${Flag<T, Date, "d">}${Flag<T, Uint8Array, "y">}${ArrFlag<T>}${ObjFlag<T>}`;
+		: `${Flag<T, string, "s">}${Flag<T, number, "n">}${Flag<T, boolean, "b">}${Flag<T, bigint, "i">}${Flag<T, null, "0">}${Flag<T, undefined, "u">}${Flag<T, Date, "d">}${Flag<T, Uint8Array, "y">}${ArrFlag<T, Depth>}${ObjFlag<T>}`;
 type Flag<T, U, F extends string> = [Extract<T, U>] extends [never] ? "" : F;
-type ArrFlag<T> = [Extract<T, readonly unknown[]>] extends [never]
+type ArrFlag<T, Depth extends unknown[]> = [
+	Extract<T, readonly unknown[]>,
+] extends [never]
 	? ""
-	: `[${Enc<Extract<T, readonly unknown[]>[number]>}]`;
+	: `[${ElemEnc<T, Extract<T, readonly unknown[]>[number], Depth>}]`;
+/**
+ * Recursive types (`type J = string | J[]`) would nest forever: an element
+ * that is its own array type, or one nested deeper than PostgreSQL's six
+ * array dimensions, encodes as `*`.
+ */
+type ElemEnc<T, E, Depth extends unknown[]> = Depth["length"] extends 6
+	? "*"
+	: [E] extends [T]
+		? [T] extends [E]
+			? "*"
+			: Enc<E, [...Depth, 0]>
+		: Enc<E, [...Depth, 0]>;
 type ObjFlag<T> = [
 	Exclude<Extract<T, object>, Date | Uint8Array | readonly unknown[]>,
 ] extends [never]
