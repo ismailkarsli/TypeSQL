@@ -277,6 +277,12 @@
   intents:
     - light-dragons-bake
     - tall-queens-arrive
+"@typesql/core@2.0.0":
+  dir: packages/core
+  intents:
+    - angry-mangos-scream
+    - cool-swans-fail
+    - olive-pandas-peel
 "@typesql/drizzle@0.0.2":
   dir: packages/drizzle
   intents:
