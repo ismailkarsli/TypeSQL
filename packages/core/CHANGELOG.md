@@ -1,5 +1,15 @@
 # @typesql/core
 
+## 2.0.1
+
+### Patch Changes
+
+- Parse a parenthesized subquery used as an operand inside parentheses, as in `((SELECT 1) - 1)`, and reject `first_value`, `last_value`, `nth_value`, `lag`, `lead` and `any_value` of an untyped literal or `NULL`, as PostgreSQL does.
+
+- Type as nullable a column that uses a cast parameter accepting `null`, such as `upper($1::text)` or `coalesce($1::date)`; the aggregates `stddev`, `stddev_samp`, `variance`, `var_samp`, `corr`, `covar_samp`, `regr_intercept`, `regr_r2` and `regr_slope`, which return `NULL` for a single row; `to_char` of a date, timestamp or interval; and `collation for` of an untyped literal or `NULL`.
+
+- Infer parameters in window `PARTITION BY` and `ORDER BY`, named `WINDOW` clauses, `DISTINCT ON` and a query's `ORDER BY`, which were left untyped. They accept `null`, as in `ORDER BY abs(extract(epoch from at - $1::timestamptz))`, unless another use of the parameter rejects it.
+
 ## 2.0.0
 
 ### Major Changes

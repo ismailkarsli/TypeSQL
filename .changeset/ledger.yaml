@@ -283,6 +283,12 @@
     - angry-mangos-scream
     - cool-swans-fail
     - olive-pandas-peel
+"@typesql/core@2.0.1":
+  dir: packages/core
+  intents:
+    - afraid-emus-do
+    - fresh-seals-dig
+    - kind-wolves-hang
 "@typesql/drizzle@0.0.2":
   dir: packages/drizzle
   intents:
@@ -741,3 +747,7 @@ typesql@0.0.9:
   dir: packages/vscode
   intents:
     - cool-moons-pretend
+typesql@0.1.0:
+  dir: packages/vscode
+  intents:
+    - smooth-walls-hammer
