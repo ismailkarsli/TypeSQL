@@ -73,6 +73,120 @@
 					"description": "Use types to color SQL: highlight the strings of TypeSQL's sql functions under any name, and show other functions' strings as plain strings. Needs the TypeScript 7 extension and a theme with semantic highlighting."
 				}
 			}
+		},
+		"configurationDefaults": {
+			"editor.tokenColorCustomizations": {
+				"[*Dark*][Default High Contrast]": {
+					"textMateRules": [
+						{
+							"scope": [
+								"meta.embedded.line.sql",
+								"meta.embedded.block.sql"
+							],
+							"settings": {
+								"foreground": "#F5D0A9"
+							}
+						},
+						{
+							"scope": [
+								"keyword.other.sql",
+								"keyword.operator.sql",
+								"keyword.operator.cast.sql"
+							],
+							"settings": {
+								"foreground": "#FF9F43"
+							}
+						},
+						{
+							"scope": "storage.type.sql",
+							"settings": {
+								"foreground": "#FFB86C"
+							}
+						},
+						{
+							"scope": "entity.name.function.sql",
+							"settings": {
+								"foreground": "#FFC777"
+							}
+						},
+						{
+							"scope": [
+								"constant.numeric.sql",
+								"constant.language.sql"
+							],
+							"settings": {
+								"foreground": "#FFD3A1"
+							}
+						},
+						{
+							"scope": [
+								"variable.parameter.positional.sql",
+								"variable.parameter.named.sql",
+								"variable.other.slot.sql"
+							],
+							"settings": {
+								"foreground": "#FF7A45",
+								"fontStyle": "bold"
+							}
+						}
+					]
+				},
+				"[*Light*]": {
+					"textMateRules": [
+						{
+							"scope": [
+								"meta.embedded.line.sql",
+								"meta.embedded.block.sql"
+							],
+							"settings": {
+								"foreground": "#7C2D12"
+							}
+						},
+						{
+							"scope": [
+								"keyword.other.sql",
+								"keyword.operator.sql",
+								"keyword.operator.cast.sql"
+							],
+							"settings": {
+								"foreground": "#C2410C"
+							}
+						},
+						{
+							"scope": "storage.type.sql",
+							"settings": {
+								"foreground": "#B45309"
+							}
+						},
+						{
+							"scope": "entity.name.function.sql",
+							"settings": {
+								"foreground": "#9A3412"
+							}
+						},
+						{
+							"scope": [
+								"constant.numeric.sql",
+								"constant.language.sql"
+							],
+							"settings": {
+								"foreground": "#A16207"
+							}
+						},
+						{
+							"scope": [
+								"variable.parameter.positional.sql",
+								"variable.parameter.named.sql",
+								"variable.other.slot.sql"
+							],
+							"settings": {
+								"foreground": "#C2380C",
+								"fontStyle": "bold"
+							}
+						}
+					]
+				}
+			}
 		}
 	},
 	"scripts": {

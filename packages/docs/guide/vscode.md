@@ -85,6 +85,58 @@ With the TypeScript 7 extension and `@typesql/core` in the project, the extensio
 
 The corrections are [semantic tokens](https://code.visualstudio.com/api/language-extensions/semantic-highlight-guide): they appear a moment after an edit, and need a theme with semantic highlighting (Dark+, Light+ and most popular themes have it; `"editor.semanticHighlighting.enabled": true` turns it on for others). In a string that the rules didn't color, table and column names take your theme's variable color. Set `"typesql.semanticHighlighting.enable": false` to keep only the text rules.
 
+### Colors
+
+The SQL is colored in shades of orange, so it stands out from the TypeScript around it:
+
+| Token | Example | Scope | Dark themes | Light themes |
+|---|---|---|---|---|
+| keywords and operators | `SELECT`, `=`, `::` | `keyword.other.sql`, `keyword.operator.sql`, `keyword.operator.cast.sql` | `#FF9F43` | `#C2410C` |
+| types | `int4`, `text` | `storage.type.sql` | `#FFB86C` | `#B45309` |
+| functions | `count(…)` | `entity.name.function.sql` | `#FFC777` | `#9A3412` |
+| numbers and constants | `42`, `true`, `null` | `constant.numeric.sql`, `constant.language.sql` | `#FFD3A1` | `#A16207` |
+| parameters and slots, in bold | `$1`, `:name`, `{slot}` | `variable.parameter.positional.sql`, `variable.parameter.named.sql`, `variable.other.slot.sql` | `#FF7A45` | `#C2380C` |
+| table and column names, punctuation | `users`, `u.id` | `meta.embedded.line.sql`, `meta.embedded.block.sql` | `#F5D0A9` | `#7C2D12` |
+
+Strings and comments keep your theme's colors, and so does TypeScript inside `${…}`.
+
+The colors are a default value of `editor.tokenColorCustomizations` under the keys `[*Dark*][Default High Contrast]` and `[*Light*]`, so they apply to the themes whose ID (the value of `workbench.colorTheme`) contains `Dark` or `Light`, with that case: Dark Modern, Dark+, Light Modern, Light+, Solarized Light, One Dark Pro and others. Dark High Contrast (ID `Default High Contrast`) gets the dark shades and Light High Contrast (ID `Default High Contrast Light`) the light ones. Themes with neither word in their ID, such as Monokai, Abyss and Dracula, keep their own colors.
+
+Strings that only type checking colors, such as `camel("…")` from `createSql`, get their colors from semantic tokens, which use your theme's keyword, function and type colors, so they are not orange.
+
+#### Change or turn off the colors
+
+VS Code merges your `editor.tokenColorCustomizations` into these defaults key by key, but a `textMateRules` list that you set under `[*Dark*][Default High Contrast]` or `[*Light*]` replaces the default list under that same key. Rules under a theme key apply after rules without one, and the last matching rule wins.
+
+To change a color, add a rule under your theme's ID. It comes after the defaults, so it wins:
+
+```jsonc
+{
+  "editor.tokenColorCustomizations": {
+    "[Dark Modern]": {
+      "textMateRules": [
+        { "scope": "keyword.other.sql", "settings": { "foreground": "#569CD6" } }
+      ]
+    }
+  }
+}
+```
+
+A rule at the top level, outside a `[…]` key, doesn't change the orange tokens, because the theme-specific defaults apply after it.
+
+To turn the colors off, set empty lists under both keys:
+
+```jsonc
+{
+  "editor.tokenColorCustomizations": {
+    "[*Dark*][Default High Contrast]": { "textMateRules": [] },
+    "[*Light*]": { "textMateRules": [] }
+  }
+}
+```
+
+If your settings already have a `textMateRules` list under `[*Light*]`, it replaces the orange for light themes; add the rules from the table to it to keep them. A list under another key, such as `[*Dark*]`, adds to the defaults instead. To color the SQL in a theme with neither word in its ID, add the rules under that theme's ID, such as `[Monokai]`. **Developer: Inspect Editor Tokens and Scopes** shows the scope of the token under the cursor.
+
 ## How it works
 
 The extension asks the TypeScript language server that is already running (no second TypeScript process) for the `DB` type of the `sql()` call at the cursor, and scans the text before the cursor for keywords, FROM items, aliases and CTEs. It never evaluates the statement's types, so a request usually takes 10 to 30 ms. A request that fails or takes longer than 150 ms adds nothing. For highlighting, it reads the types of every call with a string argument in one request each time TypeScript sends the file's semantic tokens, and adds its tokens to them. That usually takes under 50 ms; a request that takes longer than 500 ms keeps TypeScript's tokens as they are.
