@@ -1,4 +1,5 @@
 import { stat } from "node:fs/promises";
+import { registerHooks } from "node:module";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
@@ -67,6 +68,37 @@ const parse = (argv: readonly string[]) =>
 		},
 	});
 
+let mapped = false;
+
+/**
+ * A TypeScript project's files import each other as `./name.js`, which
+ * TypeScript resolves to `./name.ts`; Node doesn't. While the config loads,
+ * such an import from a `.ts` file outside node_modules loads the `.ts` file
+ * when there is no `.js` one, so an array config can import its migrations.
+ */
+function mapTypeScriptImports(): void {
+	if (mapped) return;
+	mapped = true;
+	registerHooks({
+		resolve(specifier, context, nextResolve) {
+			try {
+				return nextResolve(specifier, context);
+			} catch (error) {
+				const parent = context.parentURL;
+				if (
+					(error as { code?: unknown }).code !== "ERR_MODULE_NOT_FOUND" ||
+					!/^\.\.?\/.*\.[cm]?js$/.test(specifier) ||
+					parent === undefined ||
+					!/^file:.*\.[cm]?ts$/.test(parent) ||
+					parent.includes("/node_modules/")
+				)
+					throw error;
+				return nextResolve(specifier.replace(/js$/, "ts"), context);
+			}
+		},
+	});
+}
+
 /** The config file's migrator, with its relative paths resolved beside the file. */
 async function configured(
 	file: string,
@@ -79,6 +111,7 @@ async function configured(
 			return undefined;
 		throw error;
 	}
+	mapTypeScriptImports();
 	const module = (await import(pathToFileURL(file).href)) as {
 		default?: unknown;
 	};
