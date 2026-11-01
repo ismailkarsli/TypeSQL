@@ -221,16 +221,10 @@ type ColDesc<
 	S extends CreateTable,
 > =
 	IsRowidAlias<C, Pk, S> extends true
-		? {
-				readonly type: "integer";
-				readonly nullable: false;
-				readonly hasDefault: true;
-				readonly i: I;
-				readonly rowid: true;
-			}
-		: {
-				readonly type: NormalizeType<C["type"]>;
-				readonly nullable: C["notNull"] extends true
+		? RowidCol<I>
+		: MkCol<
+				NormalizeType<C["type"]>,
+				C["notNull"] extends true
 					? false
 					: Lowercase<C["name"]> extends Pk[number]
 						? S["strict"] extends true
@@ -238,14 +232,43 @@ type ColDesc<
 							: S["withoutRowid"] extends true
 								? false
 								: true
-						: true;
-				readonly hasDefault: C["hasDefault"];
-				readonly i: I;
-			} & GeneratedFlag<C>;
+						: true,
+				C["hasDefault"],
+				I,
+				C["generated"]
+			>;
 
-type GeneratedFlag<C extends ColumnDef> = C["generated"] extends true
-	? { readonly generated: true }
-	: {};
+// A column is built from plain values only, so equal columns of different
+// tables are one type, and a schema holds no statement's syntax tree. Each
+// later statement copies every table of the schema, which then stays cheap.
+type RowidCol<I extends number> = {
+	readonly type: "integer";
+	readonly nullable: false;
+	readonly hasDefault: true;
+	readonly i: I;
+	readonly rowid: true;
+};
+
+type MkCol<
+	Ty extends string,
+	N extends boolean,
+	H,
+	I extends number,
+	G,
+> = G extends true
+	? {
+			readonly type: Ty;
+			readonly nullable: N;
+			readonly hasDefault: H;
+			readonly i: I;
+			readonly generated: true;
+		}
+	: {
+			readonly type: Ty;
+			readonly nullable: N;
+			readonly hasDefault: H;
+			readonly i: I;
+		};
 
 type CtasEffect<DB, S extends CreateTableAs> =
 	Exists<DB, S["table"]> extends true
@@ -432,12 +455,25 @@ type AlterColumns<Rel extends Table, A> = A extends {
 				: never
 			: Rel;
 
-type AddedCol<C extends ColumnDef, Rel> = {
-	readonly type: NormalizeType<C["type"]>;
-	readonly nullable: C["notNull"] extends true ? false : true;
-	readonly hasDefault: C["hasDefault"];
-	readonly i: [MaxIndex<Rel>] extends [never] ? 0 : Nx<MaxOf<MaxIndex<Rel>>>;
-} & GeneratedFlag<C>;
+type AddedCol<C extends ColumnDef, Rel> = MkCol<
+	NormalizeType<C["type"]>,
+	C["notNull"] extends true ? false : true,
+	C["hasDefault"],
+	NextIndex<MaxIndex<Rel>>,
+	C["generated"]
+>;
+// The position after the last column. Positions are 0…n-1 unless a column
+// was dropped: count up while each one exists (one membership check per
+// column), and look for the largest one only after a gap.
+type NextIndex<
+	U extends number,
+	A extends unknown[] = [],
+	Seen extends number = never,
+> = A["length"] extends U
+	? NextIndex<U, [...A, 0], Seen | A["length"]>
+	: [Exclude<U, Seen>] extends [never]
+		? A["length"]
+		: Nx<MaxOf<U>>;
 type MaxOf<U extends number, A extends unknown[] = []> = [U] extends [never]
 	? 0
 	: [Exclude<U, A["length"]>] extends [never]
