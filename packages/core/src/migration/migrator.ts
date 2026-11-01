@@ -733,9 +733,13 @@ async function run(
 				}
 				if (command !== "latest") break;
 			}
-		} finally {
-			await history.unlock();
+		} catch (error) {
+			// The session may be gone, which releases the lock too: the
+			// error to report is the failure, not the unlock's.
+			await history.unlock().catch(() => {});
+			throw error;
 		}
+		await history.unlock();
 	} finally {
 		await connection.close();
 	}
