@@ -4,7 +4,14 @@ import type { TsShape } from "../../schema.js";
 import type { EnumsOf } from "../type-map/index.js";
 import type { Expr } from "./ast.js";
 import type { Nx } from "./parser/util.js";
-import type { AnyShaped, BaseOf, Shaped } from "./shape.js";
+import type {
+	AnyShaped,
+	ArrInfo,
+	BaseOf,
+	HasNullElems,
+	NullElems,
+	Shaped,
+} from "./shape.js";
 import type {
 	DateTimeT,
 	IntT,
@@ -66,16 +73,23 @@ type ValInfo<A extends ColInfo> = A["type"] extends "lit"
 	? Info<"text", A["nullable"]>
 	: A;
 
+/** A value that is not NULL, keeping whether its array elements can be. */
+type NonNull<A extends ColInfo> = ArrInfo<
+	LitToText<A["type"]>,
+	false,
+	HasNullElems<A>
+>;
+
 export type JsonRet<
 	P extends string,
 	As extends readonly ColInfo[],
 > = P extends `${infer K}:${infer B}`
 	? K extends "val"
-		? Shaped<B, ValShape<Info<LitToText<As[0]["type"]>>>>
+		? Shaped<B, ValShape<NonNull<As[0]>>>
 		: K extends "arr"
 			? Shaped<B, ArrShape<ValInfo<As[0]>>>
 			: K extends "arrnn"
-				? Shaped<B, ArrShape<Info<LitToText<As[0]["type"]>>>>
+				? Shaped<B, ArrShape<NonNull<As[0]>>>
 				: K extends "rec"
 					? Shaped<B, { readonly k: "rec"; readonly v: ValInfo<As[1]> }>
 					: K extends "recnn"
@@ -83,7 +97,7 @@ export type JsonRet<
 								B,
 								{
 									readonly k: "rec";
-									readonly v: Info<LitToText<As[1]["type"]>>;
+									readonly v: NonNull<As[1]>;
 								}
 							>
 						: K extends "tup"
@@ -321,9 +335,14 @@ export type JsonTs<S, DB> = S extends { readonly k: "obj"; readonly m: infer M }
 
 type JsonValueTs<C extends ColInfo, DB> = C extends ColInfo
 	? C["nullable"] extends true
-		? JsonOfType<C["type"], DB> | null
-		: JsonOfType<C["type"], DB>
+		? JsonOfInfo<C, DB> | null
+		: JsonOfInfo<C, DB>
 	: never;
+type JsonOfInfo<C extends ColInfo, DB> = C extends NullElems
+	? C["type"] extends `${infer E}[]`
+		? (JsonOfType<E, DB> | null)[]
+		: JsonOfType<C["type"], DB>
+	: JsonOfType<C["type"], DB>;
 
 type JsonStringT =
 	| StrT

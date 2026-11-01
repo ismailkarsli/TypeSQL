@@ -36,7 +36,15 @@ export function normalizeOurs(type: string): string {
 
 const NEEDS_CONTEXT = new Set(["34000", "26000", "3D000", "42P03", "25P01"]);
 
-export function compareStatement(ours: Ours, server: Server): Verdict {
+/**
+ * `elements` also checks that arrays typed with non-null elements hold no NULL.
+ * Only for seeded data: array columns are typed that way but can hold NULLs.
+ */
+export function compareStatement(
+	ours: Ours,
+	server: Server,
+	options: { readonly elements?: boolean } = {},
+): Verdict {
 	if ("crash" in ours)
 		return { disagreements: [{ kind: "crash", detail: ours.crash }] };
 	if ("error" in server) {
@@ -68,14 +76,24 @@ export function compareStatement(ours: Ours, server: Server): Verdict {
 			disagreements: [{ kind: "rejects", detail: `ours: ${ours.error}` }],
 		};
 	}
-	return { disagreements: compareShapes(ours.analysis, server.observed) };
+	return {
+		disagreements: compareShapes(
+			ours.analysis,
+			server.observed,
+			options.elements === true,
+		),
+	};
 }
 
-function compareShapes(a: Analysis, o: Observed): Disagreement[] {
+function compareShapes(
+	a: Analysis,
+	o: Observed,
+	elements: boolean,
+): Disagreement[] {
 	const out: Disagreement[] = [];
 	const ourCols = a.cols;
 	const theirs = o.columns;
-	if (ourCols.some((c) => c.star)) out.push(...compareByName(a, o));
+	if (ourCols.some((c) => c.star)) out.push(...compareByName(a, o, elements));
 	else if (ourCols.length === theirs.length) {
 		ourCols.forEach((c, i) => {
 			const t = theirs[i]!;
@@ -109,6 +127,13 @@ function compareShapes(a: Analysis, o: Observed): Disagreement[] {
 				kind: "unsound",
 				detail: `column ${i + 1} ${JSON.stringify(ourCols[i]!.name)}: typed non-null, the server returned NULL`,
 			});
+		ourCols.forEach((c, i) => {
+			if (elements && nullElement(c, o.rows, i))
+				out.push({
+					kind: "unsound",
+					detail: `column ${i + 1} ${JSON.stringify(c.name)}: elements typed non-null, the server returned a NULL element`,
+				});
+		});
 	}
 	const n = Math.max(a.max, o.params.length);
 	for (let k = 1; k <= n; k++) {
@@ -133,7 +158,28 @@ function compareShapes(a: Analysis, o: Observed): Disagreement[] {
 
 const typeName = (t: AnalysisType): string => normalizeOurs(t.type);
 
-function compareByName(a: Analysis, o: Observed): Disagreement[] {
+/**
+ * An array typed with non-null elements that came back holding NULL.
+ * postgres.js parses a NULL in arrays without an element parser (text, enums)
+ * as the string "NULL"; the seeded data holds no such string.
+ */
+function nullElement(
+	t: AnalysisType,
+	rows: readonly (readonly unknown[])[],
+	at: number,
+): boolean {
+	if (t.nullElems || !typeName(t).endsWith("[]")) return false;
+	const holdsNull = (v: unknown): boolean =>
+		Array.isArray(v) &&
+		v.some((e) => e === null || e === "NULL" || holdsNull(e));
+	return rows.some((r) => holdsNull(r[at]));
+}
+
+function compareByName(
+	a: Analysis,
+	o: Observed,
+	elements: boolean,
+): Disagreement[] {
 	const out: Disagreement[] = [];
 	const ours = new Map(a.cols.map((c) => [c.name, c]));
 	const theirs = new Map<string, { type: string; at: number }>();
@@ -159,6 +205,11 @@ function compareByName(a: Analysis, o: Observed): Disagreement[] {
 			out.push({
 				kind: "unsound",
 				detail: `column ${JSON.stringify(name)}: typed non-null, the server returned NULL`,
+			});
+		if (elements && nullElement(c, o.rows, t.at))
+			out.push({
+				kind: "unsound",
+				detail: `column ${JSON.stringify(name)}: elements typed non-null, the server returned a NULL element`,
 			});
 	}
 	return out;

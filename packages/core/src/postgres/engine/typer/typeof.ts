@@ -1,9 +1,13 @@
+import type { NarrowKeys, NarrowLevel } from "../../../engine/narrow.js";
 import type {
 	ColInfo,
 	ColMap,
 	Cols,
 	Ctx,
 	Info,
+	MkCtx,
+	Scope,
+	ScopeLevel,
 } from "../../../engine/types.js";
 import type { AnyErr, SqlError } from "../../../errors.js";
 import type {
@@ -20,7 +24,14 @@ import type { BuildObject, JsonArrow, JsonLitCast, LitType } from "../json.js";
 import type { Nx } from "../parser/util.js";
 import type { NoSubscript } from "../project/dml.js";
 import type { ProjectSelect } from "../project/select.js";
-import type { BaseOf, ObjShape, Shaped } from "../shape.js";
+import type {
+	ArrInfo,
+	BaseOf,
+	ElemNull,
+	HasNullElems,
+	ObjShape,
+	Shaped,
+} from "../shape.js";
 import type { CallType } from "./catalog.js";
 import type {
 	BinOpType,
@@ -349,9 +360,16 @@ type ExtractNull<T, F> = T extends "timestamp" | "timestamptz" | "date"
 			? false
 			: true
 		: false;
-type MakeNullable<A> = A extends ColInfo ? Info<A["type"], true> : A;
+type MakeNullable<A> = A extends ColInfo
+	? ArrInfo<A["type"], true, HasNullElems<A>>
+	: A;
+/** ARRAY(subquery): a NULL row is a NULL element; NULL arrays are rejected. */
 type ArrayOf<A> = A extends ColInfo
-	? Info<A["type"] extends `${string}[]` ? A["type"] : `${A["type"]}[]`>
+	? ArrInfo<
+			A["type"] extends `${string}[]` ? A["type"] : `${A["type"]}[]`,
+			false,
+			ElemNull<A>
+		>
 	: A;
 type TypeField<A, N extends string> = A extends ColInfo
 	? N extends "*"
@@ -615,7 +633,7 @@ type TypeCast<To extends string, E extends Expr, C extends Ctx> = E extends {
 	? To extends `${string}[]`
 		? CastItems<Items, C> extends infer X
 			? X extends true
-				? Info<To>
+				? ArrInfo<To, false, CastItemsNull<Items, C>>
 				: X
 			: never
 		: TypeOfCast<To, E, C>
@@ -634,16 +652,22 @@ type CastItems<Items, C extends Ctx> = Items extends readonly [
 			: X
 		: never
 	: true;
+type CastItemsNull<Items, C extends Ctx> = Items extends readonly Expr[]
+	? OperandList<Items, C, []> extends infer Ls extends readonly ColInfo[]
+		? AnyElemNull<Ls>
+		: false
+	: false;
 type TypeOfCast<To extends string, E extends Expr, C extends Ctx> =
 	TypeOf<E, C> extends infer T
 		? T extends ColInfo
-			? Info<
+			? ArrInfo<
 					To extends "json" | "jsonb"
 						? T["type"] extends Shaped<"json" | "jsonb", infer S>
 							? Shaped<To, S>
 							: To
 						: To,
-					T["nullable"]
+					T["nullable"],
+					HasNullElems<T>
 				>
 			: T
 		: never;
@@ -693,9 +717,22 @@ type TypeArrayCtor<
 type TypeArrayItems<Items extends readonly Expr[], C extends Ctx> =
 	OperandList<Items, C, []> extends infer Ls
 		? Ls extends readonly ColInfo[]
-			? Info<ArrayTypeOf<LitToText<CommonOf<Ls, "unknown">>>>
+			? ArrInfo<
+					ArrayTypeOf<LitToText<CommonOf<Ls, "unknown">>>,
+					false,
+					AnyElemNull<Ls>
+				>
 			: Ls
 		: never;
+/** A NULL item is a NULL element; a NULL sub-array adds no elements. */
+type AnyElemNull<Ls extends readonly ColInfo[]> = Ls extends readonly [
+	infer A extends ColInfo,
+	...infer R extends readonly ColInfo[],
+]
+	? ElemNull<A> extends true
+		? true
+		: AnyElemNull<R>
+	: false;
 type EmptyArrayErr = SqlError<"cannot determine type of empty array", null>;
 type ArrayTypeOf<T extends string> = T extends `${string}[]`
 	? T
@@ -710,7 +747,7 @@ type TypeIdx<E extends Expr, I extends Expr, C extends Ctx> =
 					? ChainOverArray<E, C> extends `${infer El}[]`
 						? ChainSliced<E> extends true
 							? ChainNullable<E, C> extends infer N extends boolean
-								? Info<`${El}[]`, Or<B["nullable"], N>>
+								? ArrInfo<`${El}[]`, Or<B["nullable"], N>, HasNullElems<A>>
 								: never
 							: Info<El, true>
 						: BaseOf<A["type"]> extends NoSubscript | EnumName<C["db"]>
@@ -784,7 +821,11 @@ type TypeSlice<
 						? D extends ColInfo | null
 							? ChainOverArray<E, C> extends infer R extends string
 								? ChainNullable<E, C> extends infer N extends boolean
-									? Info<R, Or<Or<NullableOpt<B>, NullableOpt<D>>, N>>
+									? ArrInfo<
+											R,
+											Or<Or<NullableOpt<B>, NullableOpt<D>>, N>,
+											HasNullElems<A>
+										>
 									: never
 								: BaseOf<A["type"]> extends NoSubscript | EnumName<C["db"]>
 									? NoSubscriptErr<A["type"]>
@@ -941,9 +982,19 @@ type TypeCase<
 					: Info<"null", true>
 			) extends infer ET
 			? ET extends ColInfo
-				? TypeWhens<Whens, C, ET["type"], ET["nullable"]> extends infer W
-					? W extends readonly [infer T extends string, infer N extends boolean]
-						? Info<LitToText<T>, N>
+				? TypeWhens<
+						Whens,
+						C,
+						ET["type"],
+						ET["nullable"],
+						HasNullElems<ET>
+					> extends infer W
+					? W extends readonly [
+							infer T extends string,
+							infer N extends boolean,
+							infer NE extends boolean,
+						]
+						? ArrInfo<LitToText<T>, N, NE>
 						: W
 					: never
 				: ET
@@ -955,6 +1006,7 @@ type TypeWhens<
 	C extends Ctx,
 	T extends string,
 	N extends boolean,
+	NE extends boolean,
 > = Whens extends readonly [
 	infer W extends CaseWhen,
 	...infer R extends readonly CaseWhen[],
@@ -968,12 +1020,18 @@ type TypeWhens<
 								`CASE types ${TypeDisplay<T>} and ${TypeDisplay<TT["type"]>} cannot be matched`,
 								null
 							>
-						: TypeWhens<R, C, CommonLit<T, TT["type"]>, Or<N, TT["nullable"]>>
+						: TypeWhens<
+								R,
+								C,
+								CommonLit<T, TT["type"]>,
+								Or<N, TT["nullable"]>,
+								Or<NE, HasNullElems<TT>>
+							>
 					: TT
 				: never
 			: WT
 		: never
-	: readonly [T, N];
+	: readonly [T, N, NE];
 
 type TypeWithinGroup<W extends Expr | null, C extends Ctx> = W extends {
 	readonly t: "row";
@@ -1006,8 +1064,23 @@ type VariadicNull<
 		: R
 	: R;
 
+/** FILTER (WHERE x IS NOT NULL) leaves only rows where x is not NULL. */
+type FilterCtx<E extends Call, C extends Ctx> = E["filter"] extends Expr
+	? C["scope"] extends readonly [
+			infer L extends ScopeLevel,
+			...infer R extends Scope,
+		]
+		? MkCtx<
+				C["db"],
+				[NarrowLevel<L, NarrowKeys<E["filter"]>>, ...R],
+				C["ctes"],
+				C["grouped"]
+			>
+		: C
+	: C;
+
 type TypeCall<E extends Call, C extends Ctx> =
-	OperandList<NonStarArgs<E["args"]>, C, []> extends infer As
+	OperandList<NonStarArgs<E["args"]>, FilterCtx<E, C>, []> extends infer As
 		? As extends readonly ColInfo[]
 			? E["name"] extends "json_build_object" | "jsonb_build_object"
 				? BuildObject<

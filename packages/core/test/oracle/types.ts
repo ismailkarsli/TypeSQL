@@ -304,7 +304,11 @@ async function checkStatement(
 	it: Item,
 ) {
 	const ours = oursOf(it);
-	return compareStatement(ours, await observe(conn, db, tables, it.text, ours));
+	return compareStatement(
+		ours,
+		await observe(conn, db, tables, it.text, ours),
+		{ elements: true },
+	);
 }
 
 export async function observe(

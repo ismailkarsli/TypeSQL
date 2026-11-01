@@ -1,6 +1,6 @@
 import type { TypeRegistry } from "../../schema.js";
 import type { JsonTs } from "../engine/json.js";
-import type { AnyShaped, BaseOf, Shaped } from "../engine/shape.js";
+import type { AnyShaped, BaseOf, NullElems, Shaped } from "../engine/shape.js";
 
 export interface DefaultTypeMap {
 	bool: boolean;
@@ -106,8 +106,19 @@ export type TsOf<
 > = T["type"] extends "null"
 	? null
 	: T["nullable"] extends true
-		? TsTypeOf<TM, DB, T["type"]> | null
-		: TsTypeOf<TM, DB, T["type"]>;
+		? ValueTs<TM, DB, T> | null
+		: ValueTs<TM, DB, T>;
+type ValueTs<
+	TM,
+	DB,
+	T extends { type: string; nullable: boolean },
+> = T extends NullElems
+	? T["type"] extends keyof TM
+		? TM[T["type"]]
+		: T["type"] extends `${infer E}[]`
+			? (TsTypeOf<TM, DB, E> | null)[]
+			: TsTypeOf<TM, DB, T["type"]>
+	: TsTypeOf<TM, DB, T["type"]>;
 
 export interface DefaultParamTypeMap {
 	int8: number | bigint | string;

@@ -2,6 +2,7 @@ import type { ColInfo, Info } from "../../../engine/types.js";
 import type { SqlError } from "../../../errors.js";
 import type { TypeDisplay } from "../binder/clauses.js";
 import type { JsonRet } from "../json.js";
+import type { ArrInfo, ElemNull, HasNullElems } from "../shape.js";
 import type {
 	CommonLit,
 	DateTimeT,
@@ -30,13 +31,27 @@ export type SigFlags = {
 	readonly window?: boolean;
 	readonly srf?: boolean;
 };
+/**
+ * Catalog only: the result array's elements can be NULL, always or when one of
+ * these arguments (1-based) can be NULL or is an array whose elements can be.
+ */
+type ElemsFlag = { readonly elems?: true | readonly number[] };
+/** `Sig` with `ElemsFlag`. */
+type ESig<
+	Args extends readonly string[],
+	Ret extends string,
+	Flags extends SigFlags & ElemsFlag,
+> = { readonly args: Args; readonly ret: Ret } & Flags;
 export type AnySig = {
 	readonly args: readonly string[];
 	readonly ret: string;
-} & SigFlags;
+} & SigFlags &
+	ElemsFlag;
 export type Overloads = AnySig | readonly AnySig[];
 
 type Agg = { agg: true };
+/** array_agg: the elements are the argument's values. */
+type AggElems = { agg: true; elems: [1] };
 type AggCollect = { agg: true; strict: false };
 type AggNN = { agg: true; nullable: false };
 /** NULL even over non-null input, e.g. for a single row or zero variance. */
@@ -46,6 +61,9 @@ type WinNullable = { window: true; nullable: true };
 type NN = { nullable: false };
 type Nullable = { nullable: true };
 type Srf = { srf: true };
+/** regexp_match(es): a group that takes no part in the match is NULL. */
+type NullableElems = { nullable: true; elems: true };
+type SrfElems = { srf: true; elems: true };
 type SrfNullable = { srf: true; nullable: true };
 
 export interface FunctionCatalog {
@@ -72,7 +90,7 @@ export interface FunctionCatalog {
 	min: Sig<["any"], "$1", Agg>;
 	max: Sig<["any"], "$1", Agg>;
 	any_value: Sig<["any"], "$1", Agg>;
-	array_agg: Sig<["any"], "$arr1", Agg>;
+	array_agg: ESig<["any"], "$arr1", AggElems>;
 	string_agg: [
 		Sig<["bytea", "bytea"], "bytea", Agg>,
 		Sig<["anystring", "anystring"], "text", Agg>,
@@ -146,11 +164,11 @@ export interface FunctionCatalog {
 	regr_sxy: Sig<["float8", "float8"], "float8", Agg>;
 	regr_syy: Sig<["float8", "float8"], "float8", Agg>;
 	percentile_cont: [
-		Sig<["float8[]"], "$pctarr", Agg>,
+		ESig<["float8[]"], "$pctarr", AggElems>,
 		Sig<["float8"], "$pct", Agg>,
 	];
 	percentile_disc: [
-		Sig<["float8[]"], "$wgarr", Agg>,
+		ESig<["float8[]"], "$wgarr", AggElems>,
 		Sig<["float8"], "$wg", Agg>,
 	];
 	mode: Sig<[], "$wg", Agg>;
@@ -277,12 +295,12 @@ export interface FunctionCatalog {
 		>,
 	];
 	regexp_match: [
-		Sig<["anystring", "anystring"], "text[]", Nullable>,
-		Sig<["anystring", "anystring", "anystring"], "text[]", Nullable>,
+		ESig<["anystring", "anystring"], "text[]", NullableElems>,
+		ESig<["anystring", "anystring", "anystring"], "text[]", NullableElems>,
 	];
 	regexp_matches: [
-		Sig<["anystring", "anystring"], "text[]", Srf>,
-		Sig<["anystring", "anystring", "anystring"], "text[]", Srf>,
+		ESig<["anystring", "anystring"], "text[]", SrfElems>,
+		ESig<["anystring", "anystring", "anystring"], "text[]", SrfElems>,
 	];
 	regexp_split_to_array: [
 		Sig<["anystring", "anystring"], "text[]">,
@@ -332,7 +350,11 @@ export interface FunctionCatalog {
 	];
 	string_to_array: [
 		Sig<["anystring", "anystring"], "text[]", { strict: [1] }>,
-		Sig<["anystring", "anystring", "anystring"], "text[]", { strict: [1] }>,
+		ESig<
+			["anystring", "anystring", "anystring"],
+			"text[]",
+			{ strict: [1]; elems: true }
+		>,
 	];
 	string_to_table: [
 		Sig<["anystring", "anystring"], "text", { srf: true; strict: [1] }>,
@@ -669,11 +691,23 @@ export interface FunctionCatalog {
 	unnest: [Sig<["anyarray"], "$elem1", Srf>, Sig<["anyrange"], "$elem1", Srf>];
 	array_length: Sig<["anyarray", "int4"], "int4", Nullable>;
 	cardinality: Sig<["anyarray"], "int4">;
-	array_append: Sig<["anyarray", "any"], "$1", { strict: [1] }>;
-	array_prepend: Sig<["any", "anyarray"], "$2", { strict: [2] }>;
-	array_cat: Sig<["anyarray", "anyarray"], "$1", { strict: false }>;
+	array_append: ESig<["anyarray", "any"], "$1", { strict: [1]; elems: [1, 2] }>;
+	array_prepend: ESig<
+		["any", "anyarray"],
+		"$2",
+		{ strict: [2]; elems: [1, 2] }
+	>;
+	array_cat: ESig<
+		["anyarray", "anyarray"],
+		"$1",
+		{ strict: false; elems: [1, 2] }
+	>;
 	array_remove: Sig<["anyarray", "any"], "$1", { strict: [1] }>;
-	array_replace: Sig<["anyarray", "any", "any"], "$1", { strict: [1] }>;
+	array_replace: ESig<
+		["anyarray", "any", "any"],
+		"$1",
+		{ strict: [1]; elems: [1, 3] }
+	>;
 	array_position: [
 		Sig<["anyarray", "any"], "int4", Nullable>,
 		Sig<["anyarray", "any", "int4"], "int4", Nullable>,
@@ -688,8 +722,8 @@ export interface FunctionCatalog {
 	array_ndims: Sig<["anyarray"], "int4", Nullable>;
 	array_dims: Sig<["anyarray"], "text", Nullable>;
 	array_fill: [
-		Sig<["any", "int4[]"], "$arr1">,
-		Sig<["any", "int4[]", "int4[]"], "$arr1">,
+		ESig<["any", "int4[]"], "$arr1", { elems: [1] }>,
+		ESig<["any", "int4[]", "int4[]"], "$arr1", { elems: [1] }>,
 	];
 	array_to_json: [
 		Sig<["anyarray"], "$jval:json">,
@@ -1333,6 +1367,62 @@ type CallNullable<
 					? AnyNullableAt<As, S["strict"]>
 					: AnyNullable<As>;
 
+type CallInfo<
+	Name extends string,
+	S extends AnySig,
+	As extends readonly ColInfo[],
+	C extends CallCtx,
+> = ArrInfo<
+	Ret<S["ret"], As, C>,
+	NullableCall<Name, S, As, C> extends true ? true : ElemRetNull<S, As>,
+	RetElemsNull<S, As>
+>;
+/** Whether the elements of the array a call returns can be NULL. */
+type RetElemsNull<
+	S extends AnySig,
+	As extends readonly ColInfo[],
+> = S["elems"] extends true | readonly number[]
+	? ElemsNullable<S["elems"], As> extends true
+		? true
+		: PassedElems<S["ret"], As>
+	: PassedElems<S["ret"], As>;
+type ElemsNullable<
+	E extends true | readonly number[],
+	As extends readonly ColInfo[],
+> = E extends readonly [
+	infer I extends keyof Prev,
+	...infer R extends readonly number[],
+]
+	? As[Prev[I]] extends infer A extends ColInfo
+		? ElemNull<A> extends true
+			? true
+			: ElemsNullable<R, As>
+		: ElemsNullable<R, As>
+	: E extends true
+		? true
+		: false;
+/** A returned argument keeps its elements (array_sample, coalesce, …). */
+type PassedElems<R extends string, As extends readonly ColInfo[]> = R extends
+	| "$1"
+	| "$arr1"
+	? HasNullElems<As[0]>
+	: R extends "$2"
+		? HasNullElems<As[1]>
+		: R extends "$3"
+			? HasNullElems<As[2]>
+			: R extends "$4"
+				? HasNullElems<As[3]>
+				: R extends "$common"
+					? HasNullElems<As[number]> extends false
+						? false
+						: true
+					: false;
+/** An element taken out of an array whose elements can be NULL (unnest). */
+type ElemRetNull<
+	S extends AnySig,
+	As extends readonly ColInfo[],
+> = S["ret"] extends "$elem1" ? HasNullElems<As[0]> : false;
+
 /** COLLATION FOR returns NULL for an argument of type unknown. */
 type NullableCall<
 	Name extends string,
@@ -1402,8 +1492,8 @@ export type CallType<
 								? CommonMismatch<Name, As, "unknown"> extends infer M extends
 										string
 									? SqlError<M, null>
-									: Info<Ret<S["ret"], As, C>, NullableCall<Name, S, As, C>>
-								: Info<Ret<S["ret"], As, C>, NullableCall<Name, S, As, C>>
+									: CallInfo<Name, S, As, C>
+								: CallInfo<Name, S, As, C>
 					: Info<"unknown", true>
 				: never
 		: never;
@@ -1498,9 +1588,14 @@ export type SrfType<
 > =
 	PickSig<LookupFn<DB, Name>, As> extends infer S
 		? S extends AnySig & { readonly srf: true }
-			? Info<
+			? ArrInfo<
 					Ret<S["ret"], As, { readonly wg: "unknown" }>,
-					S["nullable"] extends true ? true : AnyNullable<As>
+					S["nullable"] extends true
+						? true
+						: AnyNullable<As> extends true
+							? true
+							: ElemRetNull<S, As>,
+					RetElemsNull<S, As>
 				>
 			: null
 		: never;

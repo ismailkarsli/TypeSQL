@@ -12,7 +12,6 @@ import type {
 	Ctx,
 	Info,
 	MkCtx,
-	NullableMap,
 	Scope,
 	ScopeItem,
 	ScopeLevel,
@@ -30,6 +29,7 @@ import type {
 import type { Nx } from "../parser/util.js";
 import type { ColumnName } from "../project/naming.js";
 import type { ProjectSelect } from "../project/select.js";
+import type { ArrInfo, HasNullElems, NullableMap } from "../shape.js";
 import type { SrfType } from "../typer/catalog.js";
 import type { CommonType } from "../typer/operators.js";
 import type { BindJsonTable } from "../typer/sqljson.js";
@@ -526,7 +526,7 @@ type FuncBaseCols<
 		: never;
 
 type NonNullInfos<As extends readonly ColInfo[]> = {
-	readonly [K in keyof As]: Info<As[K]["type"]>;
+	readonly [K in keyof As]: ArrInfo<As[K]["type"], false, HasNullElems<As[K]>>;
 };
 
 type SrfOrScalar<

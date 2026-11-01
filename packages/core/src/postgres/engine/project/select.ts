@@ -8,7 +8,6 @@ import type {
 	Ctx,
 	Info,
 	MkCtx,
-	NullableMap,
 	Scope,
 	ScopeLevel,
 } from "../../../engine/types.js";
@@ -42,7 +41,13 @@ import type {
 import type { BindFrom, RenameCols } from "../binder/from.js";
 import type { ExpandStar } from "../binder/resolve.js";
 import type { Nx } from "../parser/util.js";
-import type { ObjShape, Shaped } from "../shape.js";
+import type {
+	ArrInfo,
+	HasNullElems,
+	NullableMap,
+	ObjShape,
+	Shaped,
+} from "../shape.js";
 import type { CommonLit, LitToText } from "../typer/operators.js";
 import type { TypeOf } from "../typer/typeof.js";
 import type { ColumnName } from "./naming.js";
@@ -576,7 +581,7 @@ type MergeNull<
 	N,
 	RM extends ColMap,
 	Any extends boolean | null,
-> = Info<
+> = ArrInfo<
 	T["type"],
 	T["nullable"] extends true
 		? true
@@ -584,7 +589,12 @@ type MergeNull<
 			? Any
 			: N extends keyof RM
 				? RM[N]["nullable"]
-				: true
+				: true,
+	HasNullElems<T> extends true
+		? true
+		: N extends keyof RM
+			? HasNullElems<RM[N]>
+			: false
 >;
 type AnyNullableMap<M extends ColMap> = true extends M[keyof M]["nullable"]
 	? true
@@ -640,9 +650,10 @@ type AlignCols<
 								...Acc,
 								{
 									readonly n: N;
-									readonly t: Info<
+									readonly t: ArrInfo<
 										LitToText<T>,
-										LT["nullable"] extends true ? true : RT["nullable"]
+										LT["nullable"] extends true ? true : RT["nullable"],
+										HasNullElems<LT> extends true ? true : HasNullElems<RT>
 									>;
 								},
 							],

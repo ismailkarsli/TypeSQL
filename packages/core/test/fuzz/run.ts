@@ -187,7 +187,7 @@ export class Fuzzer {
 			sql,
 			o,
 		);
-		const v = compareStatement(o, server);
+		const v = compareStatement(o, server, { elements: true });
 		const failures =
 			"skip" in v
 				? []
@@ -258,6 +258,7 @@ export class Fuzzer {
 					const v = compareStatement(
 						o,
 						await observe(conn, db, tablesOf(created), c.sql, o),
+						{ elements: true },
 					);
 					const failures =
 						"skip" in v

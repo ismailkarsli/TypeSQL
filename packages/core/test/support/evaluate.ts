@@ -430,6 +430,8 @@ class TypeTextParser {
 export interface AnalysisType {
 	readonly type: string;
 	readonly nullable: boolean;
+	/** The array's elements can be NULL. */
+	readonly nullElems?: true;
 	readonly printed?: string;
 }
 
@@ -501,6 +503,15 @@ export const asRecord = (v: TypeValue | undefined): TypeRecord | null =>
 		: null;
 
 function typeOf(v: TypeValue | undefined): AnalysisType {
+	const t = typeOfInfo(v);
+	return elemsOf(v) ? { ...t, nullElems: true } : t;
+}
+function elemsOf(v: TypeValue | undefined): boolean {
+	if (typeof v === "object" && v !== null && "union" in v)
+		return (v.union as readonly TypeValue[]).some(elemsOf);
+	return asRecord(v)?.nullElems === true;
+}
+function typeOfInfo(v: TypeValue | undefined): AnalysisType {
 	if (typeof v === "object" && v !== null && "union" in v) {
 		const all = (v.union as readonly TypeValue[]).map(typeOf);
 		const typed = all.filter((x) => x.type !== "unknown");

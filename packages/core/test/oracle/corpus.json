@@ -23952,6 +23952,168 @@
 			"source": "nested-limit-params",
 			"sql": "SELECT u.id, u.email FROM (SELECT * FROM users WHERE id > 0) u WHERE u.id IN (SELECT p0.author_id FROM posts p0 JOIN users w0 ON w0.id = p0.author_id WHERE p0.title <> 'x' LIMIT $1) AND u.id IN (SELECT p1.author_id FROM posts p1 JOIN users w1 ON w1.id = p1.author_id WHERE p1.title <> 'x' LIMIT $2) AND u.id IN (SELECT p2.author_id FROM posts p2 JOIN users w2 ON w2.id = p2.author_id WHERE p2.title <> 'x' LIMIT $3) AND u.id IN (SELECT p3.author_id FROM posts p3 JOIN users w3 ON w3.id = p3.author_id WHERE p3.title <> 'x' LIMIT $4) ORDER BY u.email OFFSET $5",
 			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "array-element-nullability",
+			"sql": "SELECT u.id, array_agg(p.body) AS bodies FROM users u LEFT JOIN posts p ON p.author_id = u.id GROUP BY u.id",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "array-element-nullability",
+			"sql": "SELECT u.id, array_agg(p.title) AS titles, array_agg(u.email) AS emails FROM users u JOIN posts p ON p.author_id = u.id GROUP BY u.id",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "array-element-nullability",
+			"sql": "SELECT array_agg(label) AS a, array_agg(n_text) AS b, array_agg(n_text ORDER BY id) AS c, array_agg(DISTINCT n_text) AS d, array_agg(id ORDER BY n_id) AS e FROM things",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "array-element-nullability",
+			"sql": "SELECT array_agg(n_text) FILTER (WHERE n_text IS NOT NULL) AS a, array_agg(n_text) FILTER (WHERE id > -5) AS b, array_agg(label) FILTER (WHERE flag) AS c, array_agg(n_id) FILTER (WHERE n_id > 0 AND flag) AS d FROM things GROUP BY big",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "array-element-nullability",
+			"sql": "SELECT array_agg(n_text) OVER () AS a, array_agg(label) OVER (ORDER BY id) AS b, array_agg(n_id) OVER (PARTITION BY flag) AS c, array_agg(n_text) FILTER (WHERE n_text IS NOT NULL) OVER () AS d FROM things",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "array-element-nullability",
+			"sql": "SELECT array_agg(ARRAY[n_id]) AS a, array_agg(ARRAY[id]) AS b, array_agg(ARRAY[label, n_text]) AS c FROM things GROUP BY id",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "array-element-nullability",
+			"sql": "SELECT ARRAY[label, n_text] AS a, ARRAY[label] AS b, ARRAY[id, NULL] AS c, ARRAY[n_id] AS d, ARRAY[ARRAY[n_id], ARRAY[id]] AS e, ARRAY[nums, nums] AS f FROM things",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "array-element-nullability",
+			"sql": "SELECT ARRAY(SELECT n_text FROM things) AS a, ARRAY(SELECT label FROM things) AS b, (SELECT array_agg(n_id) FROM things) AS c, ARRAY(SELECT ARRAY[n_id] FROM things) AS d",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "array-element-nullability",
+			"sql": "SELECT array_append(words, n_text) AS a, array_append(words, label) AS b, array_prepend(n_text, words) AS c, array_prepend(label, words) AS d, array_cat(words, ARRAY[n_text]) AS e, array_cat(words, words) AS f FROM things",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "array-element-nullability",
+			"sql": "SELECT words || n_text AS a, n_text || words AS b, words || label AS c, words || ARRAY[n_text] AS d, words || words AS e, nums || n_id AS f FROM things",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "array-element-nullability",
+			"sql": "SELECT array_replace(words, label, n_text) AS a, array_replace(words, label, 'x') AS b, array_fill(n_id, ARRAY[2]) AS c, array_fill(id, ARRAY[2]) AS d, array_remove(words, label) AS e, array_sample(ARRAY[n_text], 1) AS f, trim_array(ARRAY[n_id, id], 1) AS g FROM things",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "array-element-nullability",
+			"sql": "SELECT string_to_array(label, ',') AS a, string_to_array('a,,b', ',', '') AS b, string_to_array(label, '', label) AS c, regexp_match(label, '(z)?') AS d, regexp_split_to_array(label, ',') AS e, string_to_array(n_text, ',') AS f FROM things",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "array-element-nullability",
+			"sql": "SELECT regexp_matches(label, '(z)?') AS a FROM things",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "array-element-nullability",
+			"sql": "SELECT m FROM regexp_matches('a', '(b)?a') AS m",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "array-element-nullability",
+			"sql": "SELECT unnest(array_agg(n_text)) AS a FROM things",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "array-element-nullability",
+			"sql": "SELECT unnest(ARRAY[label]) AS a, unnest(ARRAY[n_text]) AS b FROM things",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "array-element-nullability",
+			"sql": "SELECT x FROM unnest(ARRAY['a', NULL]) AS x",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "array-element-nullability",
+			"sql": "SELECT t.id, x FROM things t, unnest(ARRAY[t.n_text, t.label]) AS x",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "array-element-nullability",
+			"sql": "SELECT (array_agg(n_text))[1:2] AS a, (array_agg(label))[1:2] AS b, (array_agg(n_text))[1] AS c, coalesce(array_agg(n_text), '{}') AS d, coalesce(array_agg(label), '{}') AS e, CASE WHEN true THEN array_agg(n_text) END AS f FROM things",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "array-element-nullability",
+			"sql": "SELECT array_agg(label) AS a FROM things UNION ALL SELECT array_agg(n_text) FROM things",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "array-element-nullability",
+			"sql": "SELECT array_agg(n_text) AS a FROM things UNION ALL SELECT array_agg(label) FROM things",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "array-element-nullability",
+			"sql": "SELECT t.id, s.a, s.b FROM things t LEFT JOIN (SELECT id, array_agg(n_text) AS a, array_agg(label) AS b FROM things GROUP BY id) s ON s.id = t.id",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "array-element-nullability",
+			"sql": "WITH s AS (SELECT array_agg(n_text) AS a, array_agg(label) AS b FROM things) SELECT a, b, a[1:1] AS c FROM s",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "array-element-nullability",
+			"sql": "SELECT to_json(array_agg(n_text)) AS a, json_agg(ARRAY[n_text]) AS b, to_json(array_agg(label)) AS c FROM things",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "array-element-nullability",
+			"sql": "SELECT percentile_cont(ARRAY[0.5, NULL]) WITHIN GROUP (ORDER BY ratio) AS a, percentile_disc(ARRAY[0.5, 1]) WITHIN GROUP (ORDER BY id) AS b FROM things",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "array-element-nullability",
+			"sql": "SELECT ARRAY[n_text]::varchar[] AS a, ARRAY[label]::varchar[] AS b, words::varchar[] AS c, ARRAY[n_id, id]::int8[] AS d FROM things",
+			"ddl": false
+		},
+		{
+			"schema": "a6e2bec03620",
+			"source": "array-element-nullability",
+			"sql": "SELECT array_agg(n_text)::varchar[] AS a, array_agg(n_id)::int8[] AS b, array_agg(label)::varchar[] AS c FROM things GROUP BY id",
+			"ddl": false
 		}
 	],
 	"skippedSlots": {

@@ -1,6 +1,6 @@
 import type { ColInfo, Info } from "../../../engine/types.js";
 import type { LitCommon } from "../json.js";
-import type { BaseOf, ShapedCommon } from "../shape.js";
+import type { ArrInfo, BaseOf, ElemNull, ShapedCommon } from "../shape.js";
 
 export type IntT = "int2" | "int4" | "int8";
 type FloatT = "float4" | "float8";
@@ -81,10 +81,32 @@ export type BinOpType<
 	Op extends string,
 	L extends ColInfo,
 	R extends ColInfo,
-> = Info<
-	BinOpResult<Op, Norm<L["type"]>, Norm<R["type"]>>,
-	BinOpNullable<Op, L, R>
->;
+> = Op extends "||"
+	? ArrInfo<
+			BinOpResult<Op, Norm<L["type"]>, Norm<R["type"]>>,
+			BinOpNullable<Op, L, R>,
+			ConcatElemNull<L, R>
+		>
+	: Info<
+			BinOpResult<Op, Norm<L["type"]>, Norm<R["type"]>>,
+			BinOpNullable<Op, L, R>
+		>;
+/** `array || x` adds x as an element; `array || array` keeps both arrays' elements. */
+type ConcatElemNull<
+	L extends ColInfo,
+	R extends ColInfo,
+> = L["type"] extends `${string}[]`
+	? ElemNull<L> extends true
+		? true
+		: ConcatItemNull<R>
+	: R["type"] extends `${string}[]`
+		? ElemNull<R> extends true
+			? true
+			: ConcatItemNull<L>
+		: false;
+type ConcatItemNull<A extends ColInfo> = A["type"] extends UnknownT | LitT
+	? false
+	: ElemNull<A>;
 
 type BinOpNullable<
 	Op extends string,

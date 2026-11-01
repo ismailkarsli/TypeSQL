@@ -3,7 +3,6 @@ import type {
 	Ctx,
 	Info,
 	MkCtx,
-	NullableMap,
 	Scope,
 	ScopeItem,
 	ScopeLevel,
@@ -13,6 +12,7 @@ import type { Table } from "../../../schema.js";
 import type { Expr, MergeStmt, MergeWhen, SetItem, TargetInd } from "../ast.js";
 import type { BindFrom } from "../binder/from.js";
 import type { TableCols } from "../binder/resolve.js";
+import type { NullableMap } from "../shape.js";
 import type { ParamsOfFromItems, ParamsOfOpt } from "../typer/params.js";
 import type {
 	AssignTargets,
