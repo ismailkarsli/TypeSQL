@@ -1514,6 +1514,13 @@ assert.match(
 			isolated,
 			`import { builtinModules, registerHooks } from "node:module";
 const { DatabaseSync } = process.getBuiltinModule("node:sqlite");
+// Workers forbid random values in global scope, as while importing.
+let imported = false;
+const getRandomValues = crypto.getRandomValues.bind(crypto);
+crypto.getRandomValues = (array) => {
+	if (!imported) throw new Error("random values in global scope");
+	return getRandomValues(array);
+};
 registerHooks({
 	resolve(specifier, context, nextResolve) {
 		if (specifier.startsWith("node:") || builtinModules.includes(specifier))
@@ -1523,6 +1530,10 @@ registerHooks({
 });
 const { createMigrator, migration } = await import(${JSON.stringify(new URL("../packages/core/dist/migration/index.js", import.meta.url).href)});
 const { positional } = await import(${JSON.stringify(new URL("../packages/core/dist/adapter.js", import.meta.url).href)});
+const { createSql } = await import(${JSON.stringify(new URL("../packages/core/dist/index.js", import.meta.url).href)});
+const { sqlite } = await import(${JSON.stringify(new URL("../packages/core/dist/sqlite/index.js", import.meta.url).href)});
+createSql(sqlite)("SELECT 1");
+imported = true;
 const database = new DatabaseSync(":memory:");
 // As for Cloudflare D1, which binds ?NNN but not $1.
 const execute = async (text, values) => {

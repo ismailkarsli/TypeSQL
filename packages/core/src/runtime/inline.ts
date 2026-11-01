@@ -2,8 +2,40 @@ import { empty, isEmpty } from "../empty.js";
 import type { InlineMarker } from "../sql/inline.js";
 import { DOLLAR_QUOTED, QUOTED, type Spliceable } from "./splice.js";
 
-const PREFIX = randomHex(8);
-const MARK = `\u0000typesql${PREFIX}`;
+interface Marks {
+	readonly prefix: string;
+	readonly mark: string;
+	readonly exact: RegExp;
+	readonly inline: RegExp;
+	readonly fragmentMark: string;
+	readonly fragment: RegExp;
+}
+
+// The markers hold a random prefix, so SQL text can't forge one. It is made
+// on first use: Cloudflare Workers forbid random values in global scope, so
+// importing @typesql/core must not need one. Until then no marker exists, and
+// the readers below have nothing to find.
+let created: Marks | undefined;
+
+function marks(): Marks {
+	if (created) return created;
+	const prefix = randomHex(8);
+	const mark = `\u0000typesql${prefix}`;
+	const fragmentMark = `${mark}~`;
+	created = {
+		prefix,
+		mark,
+		exact: new RegExp(`^${mark}[0-9a-z]+\u0000$`),
+		inline: new RegExp(`${QUOTED.source}|${mark}([0-9a-z]+)\u0000`, "g"),
+		fragmentMark,
+		fragment: new RegExp(
+			`${QUOTED.source}|${DOLLAR_QUOTED.source}|${fragmentMark}([0-9a-z]+)\u0000`,
+			"g",
+		),
+	};
+	return created;
+}
+
 const pending = new Map<string, unknown>();
 let counter = 0;
 
@@ -17,13 +49,10 @@ export function param<const T>(value: T): InlineMarker<T> {
 			"typesql: sql.param() takes a value, not a fragment or query; interpolate it itself: ${fragment}",
 		);
 	const id = (counter++).toString(36);
-	const token = `${MARK}${id}\u0000`;
+	const token = `${marks().mark}${id}\u0000`;
 	pending.set(id, value);
 	return token as InlineMarker<T>;
 }
-
-const EXACT = new RegExp(`^${MARK}[0-9a-z]+\u0000$`);
-const INLINE = new RegExp(`${QUOTED.source}|${MARK}([0-9a-z]+)\u0000`, "g");
 
 export function takeValue(value: unknown): unknown {
 	const v = take(value);
@@ -49,8 +78,8 @@ function take(value: unknown): unknown {
 		throw new Error(
 			"typesql: sql.optional(value) cannot be a bound parameter; use an inline sql.param(sql.optional(value)) for DEFAULT",
 		);
-	if (typeof value !== "string" || !EXACT.test(value)) return value;
-	const id = value.slice(MARK.length, -1);
+	if (typeof value !== "string" || !created?.exact.test(value)) return value;
+	const id = value.slice(created.mark.length, -1);
 	if (!pending.has(id))
 		throw new Error(
 			"typesql: this sql.json() / sql.param() value was already used by another statement; call it once per statement",
@@ -68,21 +97,26 @@ export function resolveInline(
 	text: string,
 	start: number,
 ): { text: string; values: unknown[] } {
+	if (!created)
+		throw new Error(
+			"typesql: the SQL text contains a NUL character that is not a sql.param() token",
+		);
+	const { mark, inline } = created;
 	const values: unknown[] = [];
 	const used: string[] = [];
 	let k = start;
 	let out = "";
 	let last = 0;
-	INLINE.lastIndex = 0;
+	inline.lastIndex = 0;
 	for (
-		let match = INLINE.exec(text);
+		let match = inline.exec(text);
 		match !== null;
-		match = INLINE.exec(text)
+		match = inline.exec(text)
 	) {
 		const m = match[0];
 		const id = match[1];
 		if (id === undefined) {
-			if (!m.includes(MARK)) continue;
+			if (!m.includes(mark)) continue;
 			const where =
 				m[0] === "'"
 					? "a quoted string"
@@ -118,11 +152,6 @@ export function resolveInline(
 
 const FRAGMENTS = new WeakSet<object>();
 const fragments = new Map<string, Spliceable>();
-const FRAGMENT_MARK = `${MARK}~`;
-const FRAGMENT = new RegExp(
-	`${QUOTED.source}|${DOLLAR_QUOTED.source}|${FRAGMENT_MARK}([0-9a-z]+)\u0000`,
-	"g",
-);
 
 /** Lets `${fragment}` or `${query}` splice it in place. */
 export function inlineable<F extends Spliceable>(fragment: F): F {
@@ -136,7 +165,7 @@ export function inlineable<F extends Spliceable>(fragment: F): F {
 function token(fragment: Spliceable): string {
 	const id = (counter++).toString(36);
 	fragments.set(id, fragment);
-	return `${FRAGMENT_MARK}${id}\u0000`;
+	return `${marks().fragmentMark}${id}\u0000`;
 }
 
 const NOTHING: Spliceable = { text: "", values: [] };
@@ -154,37 +183,35 @@ function isFragment(value: unknown): boolean {
 export function resolveFragments(
 	text: string,
 ): { text: string; slots: Record<string, Spliceable> } | null {
-	if (!text.includes(FRAGMENT_MARK)) return null;
+	if (!created || !text.includes(created.fragmentMark)) return null;
+	const { prefix, fragmentMark, fragment: pattern } = created;
 	const slots: Record<string, Spliceable> = {};
 	const used: string[] = [];
-	const out = text.replace(
-		FRAGMENT,
-		(m: string, _tag?: string, id?: string) => {
-			if (id === undefined) {
-				if (!m.includes(FRAGMENT_MARK)) return m;
-				const where =
-					m[0] === "$"
-						? "a dollar-quoted string"
-						: m[0] === '"'
-							? "a quoted identifier"
-							: m[0] === "'" || m[0] === "E" || m[0] === "e"
-								? "a quoted string"
-								: "a comment";
-				throw new Error(
-					`typesql: a fragment cannot be interpolated inside ${where}; remove the surrounding quotes or comment`,
-				);
-			}
-			const fragment = fragments.get(id);
-			if (fragment === undefined)
-				throw new Error(
-					"typesql: this interpolated fragment was already used by another statement; interpolate the fragment again for each statement",
-				);
-			used.push(id);
-			const name = `_typesql${PREFIX}_${used.length}`;
-			slots[name] = fragment;
-			return `{${name}}`;
-		},
-	);
+	const out = text.replace(pattern, (m: string, _tag?: string, id?: string) => {
+		if (id === undefined) {
+			if (!m.includes(fragmentMark)) return m;
+			const where =
+				m[0] === "$"
+					? "a dollar-quoted string"
+					: m[0] === '"'
+						? "a quoted identifier"
+						: m[0] === "'" || m[0] === "E" || m[0] === "e"
+							? "a quoted string"
+							: "a comment";
+			throw new Error(
+				`typesql: a fragment cannot be interpolated inside ${where}; remove the surrounding quotes or comment`,
+			);
+		}
+		const fragment = fragments.get(id);
+		if (fragment === undefined)
+			throw new Error(
+				"typesql: this interpolated fragment was already used by another statement; interpolate the fragment again for each statement",
+			);
+		used.push(id);
+		const name = `_typesql${prefix}_${used.length}`;
+		slots[name] = fragment;
+		return `{${name}}`;
+	});
 	for (const id of used) fragments.delete(id);
 	return { text: out, slots };
 }
