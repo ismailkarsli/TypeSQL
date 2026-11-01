@@ -53,7 +53,17 @@ export async function connectPostgres(url: string): Promise<Connection> {
 	return {
 		execute: async (sql, values) => {
 			if (lost) throw lost;
-			const result = await client.query(sql, [...values]);
+			const result = await client
+				.query(sql, [...values])
+				.catch((error: unknown) => {
+					// A session ended during a query rejects it with the server's
+					// FATAL error; later queries get pg's own "connection
+					// terminated" errors, so the server's message is the one to keep.
+					const { severity } = error as { severity?: unknown };
+					if (severity === "FATAL" || severity === "PANIC")
+						lost ??= error as Error;
+					throw error;
+				});
 			return Array.isArray(result)
 				? (result.at(-1) ?? { rows: [], rowCount: 0 })
 				: result;
