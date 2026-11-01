@@ -1601,7 +1601,10 @@ sql("SELECT 1");
 // A query with an inline value and a fragment makes the marker in global scope.
 const inline = sql(\`SELECT \${sql.param(1)} AS one FROM (SELECT 1 AS x) \${sql.fragment("WHERE x = $1", 1)}\`);
 if (inline.text !== "SELECT $1 AS one FROM (SELECT 1 AS x) WHERE x = $2") throw new Error(inline.text);
+const early = sql.param(0);
 imported = true;
+// Where crypto works again, new markers take their prefix from it.
+if (sql.param(0).slice(8, 24) === early.slice(8, 24)) throw new Error("the marker prefix still comes from Math.random");
 const database = new DatabaseSync(":memory:");
 // As for Cloudflare D1, which binds ?NNN but not $1.
 const execute = async (text, values) => {

@@ -2,39 +2,88 @@ import { empty, isEmpty } from "../empty.js";
 import type { InlineMarker } from "../sql/inline.js";
 import { DOLLAR_QUOTED, QUOTED, type Spliceable } from "./splice.js";
 
-interface Marks {
+/** Markers with one random prefix. */
+interface Generation {
 	readonly prefix: string;
 	readonly mark: string;
+	readonly fragmentMark: string;
+	/** Whether the prefix came from crypto rather than Math.random. */
+	readonly strong: boolean;
+	/** Its markers not used yet. */
+	readonly ids: Set<string>;
+}
+
+/** What the readers below look for: the markers of every live generation. */
+interface Readers {
+	readonly marks: readonly string[];
+	readonly fragmentMarks: readonly string[];
 	readonly exact: RegExp;
 	readonly inline: RegExp;
-	readonly fragmentMark: string;
 	readonly fragment: RegExp;
 }
 
 // The markers hold a random prefix, so SQL text can't forge one. It is made
 // on first use: Cloudflare Workers forbid crypto's random values in global
 // scope, so importing @typesql/core must not need one. Until then no marker
-// exists, and the readers below have nothing to find. A first use in global
-// scope takes Math.random's instead.
-let created: Marks | undefined;
+// exists, and the readers below have nothing to find.
+//
+// A first use in global scope, such as a module-level sql.param(), takes
+// Math.random's values instead. The next use where crypto works starts a
+// generation with a crypto prefix, and the Math.random one is read only
+// while one of its markers is still unused.
+const generations: Generation[] = [];
+let readers: Readers | undefined;
+const owners = new Map<string, Generation>();
 
-function marks(): Marks {
-	if (created) return created;
-	const prefix = randomHex(8);
+function generation(prefix: string, strong: boolean): Generation {
 	const mark = `\u0000typesql${prefix}`;
-	const fragmentMark = `${mark}~`;
-	created = {
-		prefix,
-		mark,
-		exact: new RegExp(`^${mark}[0-9a-z]+\u0000$`),
+	return { prefix, mark, fragmentMark: `${mark}~`, strong, ids: new Set() };
+}
+
+/** A new marker's generation, which holds `id` until it is used. */
+function issue(id: string): Generation {
+	let current = generations.at(-1);
+	if (!current?.strong) {
+		const random = cryptoHex(8);
+		if (random !== undefined || current === undefined) {
+			current = generation(random ?? mathHex(8), random !== undefined);
+			generations.push(current);
+			prune();
+		}
+	}
+	current.ids.add(id);
+	owners.set(id, current);
+	return current;
+}
+
+/** A marker was used. */
+function settle(id: string): void {
+	const owner = owners.get(id);
+	if (owner === undefined) return;
+	owners.delete(id);
+	owner.ids.delete(id);
+	if (owner.ids.size === 0 && owner !== generations.at(-1)) prune();
+}
+
+/** Drop the earlier generations with no unused marker, and rebuild the readers. */
+function prune(): void {
+	const live = generations.filter(
+		(g, i) => i === generations.length - 1 || g.ids.size > 0,
+	);
+	generations.splice(0, generations.length, ...live);
+	const marks = live.map((g) => g.mark);
+	const fragmentMarks = live.map((g) => g.fragmentMark);
+	const mark = `(?:${marks.join("|")})`;
+	readers = {
+		marks,
+		fragmentMarks,
+		exact: new RegExp(`^${mark}([0-9a-z]+)\u0000$`),
 		inline: new RegExp(`${QUOTED.source}|${mark}([0-9a-z]+)\u0000`, "g"),
-		fragmentMark,
 		fragment: new RegExp(
-			`${QUOTED.source}|${DOLLAR_QUOTED.source}|${fragmentMark}([0-9a-z]+)\u0000`,
+			`${QUOTED.source}|${DOLLAR_QUOTED.source}|(?:${fragmentMarks.join("|")})([0-9a-z]+)\u0000`,
 			"g",
 		),
 	};
-	return created;
 }
 
 const pending = new Map<string, unknown>();
@@ -50,7 +99,7 @@ export function param<const T>(value: T): InlineMarker<T> {
 			"typesql: sql.param() takes a value, not a fragment or query; interpolate it itself: ${fragment}",
 		);
 	const id = (counter++).toString(36);
-	const token = `${marks().mark}${id}\u0000`;
+	const token = `${issue(id).mark}${id}\u0000`;
 	pending.set(id, value);
 	return token as InlineMarker<T>;
 }
@@ -79,14 +128,16 @@ function take(value: unknown): unknown {
 		throw new Error(
 			"typesql: sql.optional(value) cannot be a bound parameter; use an inline sql.param(sql.optional(value)) for DEFAULT",
 		);
-	if (typeof value !== "string" || !created?.exact.test(value)) return value;
-	const id = value.slice(created.mark.length, -1);
+	if (typeof value !== "string") return value;
+	const id = readers?.exact.exec(value)?.[1];
+	if (id === undefined) return value;
 	if (!pending.has(id))
 		throw new Error(
 			"typesql: this sql.json() / sql.param() value was already used by another statement; call it once per statement",
 		);
 	const v = pending.get(id);
 	pending.delete(id);
+	settle(id);
 	return v;
 }
 
@@ -98,11 +149,11 @@ export function resolveInline(
 	text: string,
 	start: number,
 ): { text: string; values: unknown[] } {
-	if (!created)
+	if (!readers)
 		throw new Error(
 			"typesql: the SQL text contains a NUL character that is not a sql.param() token",
 		);
-	const { mark, inline } = created;
+	const { marks, inline } = readers;
 	const values: unknown[] = [];
 	const used: string[] = [];
 	let k = start;
@@ -117,7 +168,7 @@ export function resolveInline(
 		const m = match[0];
 		const id = match[1];
 		if (id === undefined) {
-			if (!m.includes(mark)) continue;
+			if (!marks.some((mark) => m.includes(mark))) continue;
 			const where =
 				m[0] === "'"
 					? "a quoted string"
@@ -143,7 +194,10 @@ export function resolveInline(
 		last = match.index + m.length;
 	}
 	out += text.slice(last);
-	for (const t of used) pending.delete(t);
+	for (const t of used) {
+		pending.delete(t);
+		settle(t);
+	}
 	if (out.includes("\u0000"))
 		throw new Error(
 			"typesql: the SQL text contains a NUL character that is not a sql.param() token",
@@ -166,7 +220,7 @@ export function inlineable<F extends Spliceable>(fragment: F): F {
 function token(fragment: Spliceable): string {
 	const id = (counter++).toString(36);
 	fragments.set(id, fragment);
-	return `${marks().fragmentMark}${id}\u0000`;
+	return `${issue(id).fragmentMark}${id}\u0000`;
 }
 
 const NOTHING: Spliceable = { text: "", values: [] };
@@ -184,13 +238,14 @@ function isFragment(value: unknown): boolean {
 export function resolveFragments(
 	text: string,
 ): { text: string; slots: Record<string, Spliceable> } | null {
-	if (!created || !text.includes(created.fragmentMark)) return null;
-	const { prefix, fragmentMark, fragment: pattern } = created;
+	if (!readers?.fragmentMarks.some((mark) => text.includes(mark))) return null;
+	const { fragmentMarks, fragment: pattern } = readers;
+	const prefix = generations.at(-1)?.prefix;
 	const slots: Record<string, Spliceable> = {};
 	const used: string[] = [];
 	const out = text.replace(pattern, (m: string, _tag?: string, id?: string) => {
 		if (id === undefined) {
-			if (!m.includes(fragmentMark)) return m;
+			if (!fragmentMarks.some((mark) => m.includes(mark))) return m;
 			const where =
 				m[0] === "$"
 					? "a dollar-quoted string"
@@ -213,21 +268,29 @@ export function resolveFragments(
 		slots[name] = fragment;
 		return `{${name}}`;
 	});
-	for (const id of used) fragments.delete(id);
+	for (const id of used) {
+		fragments.delete(id);
+		settle(id);
+	}
 	return { text: out, slots };
 }
 
-function randomHex(bytes: number): string {
+const hex = (bytes: Uint8Array): string =>
+	Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+
+/** Random hex from crypto, or undefined where it is missing or forbidden. */
+function cryptoHex(bytes: number): string | undefined {
 	const crypto = (
 		globalThis as { crypto?: { getRandomValues(a: Uint8Array): Uint8Array } }
 	).crypto;
-	let a: Uint8Array | undefined;
 	try {
-		a = crypto?.getRandomValues(new Uint8Array(bytes));
+		return crypto && hex(crypto.getRandomValues(new Uint8Array(bytes)));
 	} catch {
-		// Cloudflare Workers throw in global scope, where a module-level
-		// sql.param() or fragment makes the first marker.
+		// Cloudflare Workers throw in global scope.
+		return undefined;
 	}
-	a ??= new Uint8Array(bytes).map(() => Math.floor(Math.random() * 256));
-	return Array.from(a, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function mathHex(bytes: number): string {
+	return hex(new Uint8Array(bytes).map(() => Math.floor(Math.random() * 256)));
 }
