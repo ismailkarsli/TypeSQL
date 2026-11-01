@@ -17,4 +17,5 @@ export {
 	type MigrationStatus,
 	type Migrator,
 	type MigratorConfig,
+	type UpResult,
 } from "./migrator.js";

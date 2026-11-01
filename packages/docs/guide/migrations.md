@@ -132,7 +132,7 @@ const migrator = createMigrator({
 });
 ```
 
-Each migration must start from the one before it in the array, and the first one from the migrator's dialect; the migrator checks this before it connects, so a misordered array fails without touching the database. The schema is `SchemaOf<typeof addBio>` of the last migration: there is no generated file, and the type checker infers the chain where the schema is used. Array mode needs no file system, so it also runs [outside Node](#runtimes).
+Each migration must start from the one before it in the array, and the first one from the migrator's dialect; the migrator checks this before it connects, so a misordered array fails without touching the database. The schema is `SchemaOf<typeof addBio>` of the last migration: there is no generated file, and the type checker infers the chain where the schema is used. The migrator carries it too: `SchemaOf<typeof migrator>`, or `SchemaOf<typeof result>` of what `latest()` returns. Array mode needs no file system, so it also runs [outside Node](#runtimes).
 
 ### Moving between them
 
@@ -156,14 +156,15 @@ const { applied } = await migrator.latest();
 
 | Method | Does | Returns |
 |---|---|---|
-| `latest()` | applies every pending migration | `Promise<LatestResult>`: `{ applied, schemaFile?, schemaError? }` |
-| `up()` | applies the next pending migration | `Promise<LatestResult>` |
+| `latest()` | applies every pending migration | `Promise<LatestResult<Schema>>`: `{ applied, schemaFile?, schemaError? }` |
+| `up()` | applies the next pending migration | `Promise<UpResult>`: the same fields |
 | `down()` | reverts the last applied migration | `Promise<DownResult>`: `{ reverted, schemaFile?, schemaError? }` |
 | `status()` | lists every migration, applied or pending | `Promise<MigrationStatus[]>`: `{ name, applied, appliedAt: Date \| null }` |
 | `make(name)` | creates a migration file (directory mode) | `Promise<string>`: the file's path |
 | `generate()` | writes the [DB file](#the-db-file) (directory mode) | `Promise<string>`: the file's path |
 | `with(overrides)` | a new migrator with some config replaced | `Migrator` |
 
+- `Schema` is the schema after the last migration: inferred from the `migrations` array, or given in directory mode as `createMigrator<DB>({ … })`, with `DB` from the DB file. `SchemaOf<typeof result>` of the result of `latest()`, and `SchemaOf<typeof migrator>`, are that schema; it is a type only, not a property at runtime.
 - `applied` and `reverted` are the history names of the migrations that ran, in order; they are empty when there was nothing to do.
 - In directory mode, `latest()`, `up()` and `down()` then write the DB file: `schemaFile` is its path. If it can't be written, they still resolve, with `schemaError`: the database is migrated, only the file is not.
 - `status()` lists the migrations in order. An applied one has the name from its history row and `appliedAt` from `applied_at`.
@@ -389,7 +390,7 @@ Import `DB` in application code instead of `SchemaOf<typeof …>`, so the type c
 - After `down` reverts the first migration, the file holds that migration's starting schema.
 - `schemaFile` or `--out` changes the path. `generate: false` or `--no-generate` turns off writing after `latest`, `up` and `down`.
 
-In array mode there is no DB file; use `SchemaOf<typeof last>`.
+In array mode there is no DB file; use `SchemaOf<typeof last>` or `SchemaOf<typeof migrator>`.
 
 ## `ApplyDdl`
 

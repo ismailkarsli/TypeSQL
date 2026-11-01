@@ -41,7 +41,7 @@ Most breaking changes are compile errors at the call site, so after upgrading ru
 | `migrate(db, m)` of `@typesql/pg`, `@typesql/postgres` and `@typesql/sqlite`; `runMigrations(client, m)` of `@typesql/core` | `createMigrator({ dialect, migrations: [...], url \| db \| execute }).latest()` |
 | `migrateLatest(options)`, `migrateUp(options)`, `migrateDown(options)` | `createMigrator(config).latest()`, `.up()`, `.down()` |
 | `MigrationOptions` (`{ dialect, migrationsDir, execute, migrationTable? }`) | `MigratorConfig`: the same fields, plus `url`, `db`, `migrations`, `schemaFile`, `generate` and `transaction` |
-| `MigrationResult` (`{ direction, migrations }`) | `LatestResult` (`{ applied }`) and `DownResult` (`{ reverted }`), with `schemaFile` or `schemaError` in directory mode |
+| `MigrationResult` (`{ direction, migrations }`) | `LatestResult` and `UpResult` (`{ applied }`) and `DownResult` (`{ reverted }`), with `schemaFile` or `schemaError` in directory mode |
 | `discoverMigrations(dir)`, `MigrationFile`, `MigrationModule` | `createMigrator(config).status()`, which lists the migrations and whether they are applied |
 | `migrationHash(source)` | no replacement: migrations are tracked by a [fingerprint](./migrations#the-fingerprint) |
 | `MigrationSchema<typeof up>` | `SchemaOf<typeof up>` |

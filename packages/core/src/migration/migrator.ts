@@ -1,12 +1,26 @@
 import type { Executor, ExecutorResult } from "../query.js";
 import { createMigrationContext } from "./context.js";
-import { isMigration, MIGRATION_FROM, type Migration } from "./define.js";
+import {
+	isMigration,
+	MIGRATION_FROM,
+	type Migration,
+	type SCHEMA,
+	type SchemaOf,
+} from "./define.js";
 import { fingerprint, isFingerprint, sha256 } from "./fingerprint.js";
 
 type Dialect = "postgres" | "sqlite";
 // `down` takes what `up` returns, so only `any` accepts every migration.
 // biome-ignore lint/suspicious/noExplicitAny: see above.
 type AnyMigration = Migration<never, any>;
+type Migrations = readonly AnyMigration[];
+
+/** The schema after the last migration of an array. */
+type LastSchema<M extends Migrations> = M extends readonly []
+	? {}
+	: M extends readonly [...unknown[], infer Last]
+		? SchemaOf<Last>
+		: unknown;
 
 export interface MigratorConfig {
 	readonly dialect: Dialect;
@@ -42,8 +56,17 @@ interface SchemaWrite {
 	readonly schemaError?: Error;
 }
 
-export interface LatestResult extends SchemaWrite {
+export interface UpResult extends SchemaWrite {
 	readonly applied: readonly string[];
+}
+
+/**
+ * The result of `latest()`. `SchemaOf<typeof result>` is the schema after
+ * the last migration.
+ */
+export interface LatestResult<Schema = unknown> extends UpResult {
+	/** Type-only: there is no such property at runtime. */
+	readonly [SCHEMA]: Schema;
 }
 
 export interface DownResult extends SchemaWrite {
@@ -56,12 +79,19 @@ export interface MigrationStatus {
 	readonly appliedAt: Date | null;
 }
 
-export interface Migrator {
+/**
+ * Runs migrations. `Schema` is the schema after the last one: inferred
+ * from an array, or given as `createMigrator<DB>()`. `SchemaOf<typeof
+ * migrator>` is that schema too.
+ */
+export interface Migrator<Schema = unknown> {
+	/** Type-only: there is no such property at runtime. */
+	readonly [SCHEMA]: Schema;
 	readonly config: MigratorConfig;
 	/** Apply every pending migration. */
-	latest(): Promise<LatestResult>;
+	latest(): Promise<LatestResult<Schema>>;
 	/** Apply the next pending migration. */
-	up(): Promise<LatestResult>;
+	up(): Promise<UpResult>;
 	/** Revert the last applied migration. */
 	down(): Promise<DownResult>;
 	/** List applied and pending migrations. */
@@ -71,7 +101,12 @@ export interface Migrator {
 	/** Directory mode: write the schema of the last migration and return the file's path. */
 	generate(): Promise<string>;
 	/** A new migrator with some config replaced. */
-	with(overrides: Partial<MigratorConfig>): Migrator;
+	with<const M extends Migrations>(
+		overrides: Partial<Omit<MigratorConfig, "migrations">> & {
+			readonly migrations: M;
+		},
+	): Migrator<LastSchema<M>>;
+	with(overrides: Partial<MigratorConfig>): Migrator<Schema>;
 }
 
 const MIGRATOR: unique symbol = Symbol.for("typesql.migrator") as never;
@@ -160,6 +195,12 @@ function validate(config: MigratorConfig): void {
 }
 
 /** Create a migrator. It connects only when a method needs the database. */
+export function createMigrator<const M extends Migrations>(
+	config: Omit<MigratorConfig, "migrations"> & { readonly migrations: M },
+): Migrator<LastSchema<M>>;
+export function createMigrator<Schema = unknown>(
+	config: MigratorConfig,
+): Migrator<Schema>;
 export function createMigrator(config: MigratorConfig): Migrator {
 	validate(config);
 	const settled: MigratorConfig = Object.freeze({ ...config });
@@ -191,11 +232,14 @@ export function createMigrator(config: MigratorConfig): Migrator {
 			};
 		}
 	};
-	const migrator: Migrator = {
+	const migrator: Omit<Migrator, typeof SCHEMA> = {
 		config: settled,
 		async latest() {
 			const { names, applied } = await run(settled, "latest");
-			return { applied: names, ...(await afterCommand(applied)) };
+			return {
+				applied: names,
+				...(await afterCommand(applied)),
+			} as UpResult as LatestResult;
 		},
 		async up() {
 			const { names, applied } = await run(settled, "up");
@@ -214,7 +258,8 @@ export function createMigrator(config: MigratorConfig): Migrator {
 			return makeMigration(dir, name, settled.dialect);
 		},
 		generate: () => writeSchema("last"),
-		with(overrides) {
+		// The schema type follows the overrides; the runtime is the same.
+		with: ((overrides: Partial<MigratorConfig>) => {
 			const next: Record<string, unknown> = { ...settled };
 			const given = Object.entries(overrides).filter(
 				([, value]) => value !== undefined,
@@ -224,10 +269,10 @@ export function createMigrator(config: MigratorConfig): Migrator {
 					for (const key of group) delete next[key];
 			for (const [key, value] of given) next[key] = value;
 			return createMigrator(next as unknown as MigratorConfig);
-		},
+		}) as Migrator["with"],
 	};
 	Object.defineProperty(migrator, MIGRATOR, { value: true });
-	return Object.freeze(migrator);
+	return Object.freeze(migrator) as Migrator;
 }
 
 async function load(config: MigratorConfig): Promise<Entry[]> {

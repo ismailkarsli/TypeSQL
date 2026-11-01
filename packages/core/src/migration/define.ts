@@ -23,17 +23,21 @@ type ContextSchema<C> = C extends { readonly schema: infer Schema }
 	? Schema
 	: MissingSchema;
 
+/** Type-only: the schema a migrator or its `latest()` result leaves. */
+export declare const SCHEMA: unique symbol;
+
 /**
- * The schema after a migration: `SchemaOf<typeof m>`. It also takes a 3.x
- * migration's `up` function, or a migration context.
+ * The schema after a migration: `SchemaOf<typeof m>`. It also takes a
+ * migrator or its `latest()` result (the schema after the last migration),
+ * a 3.x migration's `up` function, or a migration context.
  */
-export type SchemaOf<M> = M extends {
-	readonly up: (db: never) => Promise<infer After>;
-}
-	? ContextSchema<After>
-	: M extends (db: never) => Promise<infer After>
+export type SchemaOf<M> = M extends { readonly [SCHEMA]: infer Schema }
+	? Schema
+	: M extends { readonly up: (db: never) => Promise<infer After> }
 		? ContextSchema<After>
-		: ContextSchema<M>;
+		: M extends (db: never) => Promise<infer After>
+			? ContextSchema<After>
+			: ContextSchema<M>;
 
 /** Where a migration starts; the runner checks the chain with it. */
 export const MIGRATION_FROM: unique symbol = Symbol.for(

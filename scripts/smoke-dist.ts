@@ -1575,7 +1575,7 @@ console.log(JSON.stringify({ applied, status: status.map((entry) => entry.applie
 		writeFileSync(
 			join(long, "check.ts"),
 			`import { migration, type SchemaOf } from "@typesql/core/migration";
-import { last } from "./migrations.js";
+import { last, migrator } from "./migrations.js";
 export const next = migration(last, {
 	up: async (db) => {
 		await db("SELECT t1.v, t${length}.v FROM t1, t${length}").execute();
@@ -1585,6 +1585,8 @@ export const next = migration(last, {
 	down: async () => {},
 });
 export const column: keyof SchemaOf<typeof last>["t${length}"] = "v";
+// latest() carries the schema after the last migration.
+export const latest: keyof SchemaOf<Awaited<ReturnType<typeof migrator.latest>>>["t${length}"] = "v";
 `,
 		);
 		{

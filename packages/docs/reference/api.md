@@ -300,13 +300,14 @@ An entry is one `Sig<Params, Return, Flags>` or a tuple of overloads.
 | `migration(from, { up, down })` | a `Migration`; `from` is `"postgres"`, `"sqlite"` or the previous migration |
 | `Migration<Before, After>` | `{ up(db: Before): Promise<After>; down(db: After): Promise<unknown> }` |
 | `MigrationSteps<Before, After>` | the `{ up, down }` argument of `migration()` |
-| `SchemaOf<M>` | the schema after the migration `M`; also takes a 3.x `up` function or a migration context. Also exported from `@typesql/core` |
+| `SchemaOf<M>` | the schema after the migration `M`; also takes a migrator, the result of its `latest()`, a 3.x `up` function or a migration context. Also exported from `@typesql/core` |
 | `PostgresMigration<DB = {}>`, `SqliteMigration<DB = {}>` | the `db` of a migration: a checked query function with `add(ddl)`, `raw<NewSchema>(sql)` and the type-only `schema` |
 | `MigrationContext<E, T, DB>` | the type behind both, for engine `E` and dialect `T` |
-| `createMigrator(config)` | a `Migrator`; never connects by itself |
-| `Migrator` | `latest()`, `up()`, `down()`, `status()`, `make(name)`, `generate()`, `with(overrides)` and `config` |
+| `createMigrator(config)` | a `Migrator`; never connects by itself. With a `migrations` array its schema is inferred; `createMigrator<DB>(config)` states it |
+| `Migrator<Schema>` | `latest()`, `up()`, `down()`, `status()`, `make(name)`, `generate()`, `with(overrides)` and `config` |
 | `MigratorConfig` | `dialect`; `url`, `db` or `execute`; `migrationsDir` or `migrations`; `migrationTable`, `schemaFile`, `generate`, `transaction` |
-| `LatestResult` | what `latest()` and `up()` resolve to: `{ applied, schemaFile?, schemaError? }` |
+| `LatestResult<Schema>` | what `latest()` resolves to: `{ applied, schemaFile?, schemaError? }`, and the type-only schema after the last migration |
+| `UpResult` | what `up()` resolves to: `{ applied, schemaFile?, schemaError? }` |
 | `DownResult` | what `down()` resolves to: `{ reverted, schemaFile?, schemaError? }` |
 | `MigrationStatus` | an entry of `status()`: `{ name, applied, appliedAt: Date \| null }` |
 | `isMigrator(value)` | whether `value` is a migrator, from any copy of `@typesql/core` |
