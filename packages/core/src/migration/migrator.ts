@@ -329,7 +329,14 @@ export function createMigrator(
 			const { makeMigration } = await loadFiles();
 			return makeMigration(dir, name, settled.dialect);
 		},
-		generate: () => writeSchema("last"),
+		async generate() {
+			directory("generate()");
+			// The DB file is written from the files' types; check first that
+			// they start from this dialect and follow each other, as the
+			// commands do.
+			checkChain(settled.dialect, await load(settled));
+			return writeSchema("last");
+		},
 		// The schema type follows the overrides; the runtime is the same.
 		with: ((overrides: Partial<MigratorConfig>) => {
 			const next: Record<string, unknown> = { ...settled };
