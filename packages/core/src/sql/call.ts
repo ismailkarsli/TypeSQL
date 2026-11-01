@@ -55,9 +55,13 @@ type CallCheck<E extends EngineTypes, DB, TM, Q extends string> =
 				: P
 			: never;
 
+/**
+ * Any arguments when the statement is invalid: an arity mismatch would
+ * otherwise be reported instead of the statement's SqlError.
+ */
 type CallArgs<E extends EngineTypes, DB, TM, Q extends string> =
 	IsLiteral<Q> extends false
-		? []
+		? readonly unknown[]
 		: Prepared<Q> extends [
 					infer X extends string,
 					infer Names extends string[],
@@ -65,9 +69,9 @@ type CallArgs<E extends EngineTypes, DB, TM, Q extends string> =
 					infer M extends number,
 				]
 			? Validate<E, DB, X> extends AnyErr
-				? []
+				? readonly unknown[]
 				: ArgsFor<E, DB, TM, X, Names, Encs, M>
-			: [];
+			: readonly unknown[];
 
 type Carried<
 	E extends EngineTypes,
