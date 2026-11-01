@@ -21,11 +21,16 @@ type NonStrict = null extends string
 	? SqlError<StrictNullChecksMessage, null>
 	: never;
 
-type GateDdl<T extends DialectTypes, DB, Q extends string> = null extends string
-	? NonStrict
-	: [DB, Q] extends [infer D, infer Text extends string]
-		? ValidateDdlOf<T, D, Text>
-		: never;
+// The strictNullChecks check sits inside the [DB, Q] inference: as the outer
+// conditional, the editor's string completion in `.add("…")` took about 35s.
+type GateDdl<T extends DialectTypes, DB, Q extends string> = [DB, Q] extends [
+	infer D,
+	infer Text extends string,
+]
+	? null extends string
+		? NonStrict
+		: ValidateDdlOf<T, D, Text>
+	: never;
 
 /** A checked SQL executor whose schema evolves after each awaited DDL statement. */
 export interface MigrationContext<
