@@ -1,0 +1,25 @@
+language js(typescript)
+
+pattern unparenthesized($inner) {
+	or {
+		$inner,
+		JsParenthesizedExpression(expression=$inner),
+		JsParenthesizedExpression(expression=JsParenthesizedExpression(expression=$inner)),
+		JsParenthesizedExpression(expression=JsParenthesizedExpression(expression=JsParenthesizedExpression(expression=$inner)))
+	}
+}
+
+pattern empty_object() { unparenthesized(JsObjectExpression(members=[])) }
+
+JsSpread(argument=unparenthesized(or {
+	JsConditionalExpression(consequent=empty_object()),
+	JsConditionalExpression(alternate=empty_object())
+})) as $spread where {
+	$spread <: within or {
+		JsObjectExpression(),
+		JsArrayExpression(),
+		JsCallArguments()
+	} as $owner,
+	$owner <: JsObjectExpression(),
+	register_diagnostic(span=$spread, message="This conditional spread hides property omission behind an empty object. Build the object in separate statements and add the property only when present.", severity="error")
+}

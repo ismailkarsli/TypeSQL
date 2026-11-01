@@ -1,0 +1,511 @@
+engine biome(1.0)
+language js(typescript)
+
+pattern wrapped_call() {
+	or {
+		JsCallExpression(),
+		JsParenthesizedExpression(expression=wrapped_call()),
+		TsAsExpression(expression=wrapped_call()),
+		TsTypeAssertionExpression(expression=wrapped_call()),
+		TsNonNullAssertionExpression(expression=wrapped_call()),
+		TsSatisfiesExpression(expression=wrapped_call())
+	}
+}
+
+pattern wrapped_member() {
+	or {
+		JsStaticMemberExpression(),
+		JsComputedMemberExpression(),
+		JsParenthesizedExpression(expression=wrapped_member()),
+		TsAsExpression(expression=wrapped_member()),
+		TsTypeAssertionExpression(expression=wrapped_member()),
+		TsNonNullAssertionExpression(expression=wrapped_member()),
+		TsSatisfiesExpression(expression=wrapped_member())
+	}
+}
+
+pattern member_call($object, $name) {
+	JsCallExpression(callee=$callee) where {
+		$callee <: wrapped_member(),
+		$callee <: contains or {
+			JsStaticMemberExpression(),
+			JsComputedMemberExpression()
+		} as $member,
+		$member <: or {
+			JsStaticMemberExpression(object=$object, member=$name),
+			JsComputedMemberExpression(object=$object, member=JsStringLiteralExpression() as $literal) where {
+				$literal <: r"^[\"'](.*)[\"']$"($name)
+			}
+		}
+	}
+}
+
+pattern var_boundary() {
+	or {
+		JsParameters(),
+		JsConstructorParameters(),
+		JsFunctionBody(),
+		JsFunctionExpression(),
+		JsArrowFunctionExpression(),
+		JsSetterClassMember(),
+		JsSetterObjectMember(),
+		JsStaticInitializationBlockClassMember()
+	}
+}
+
+pattern lexical_boundary() {
+	or {
+		var_boundary(),
+		JsBlockStatement(),
+		JsSwitchStatement(),
+		JsForStatement(),
+		JsForInStatement(),
+		JsForOfStatement(),
+		JsCatchClause(),
+		JsClassExpression()
+	}
+}
+
+pattern lexical_has($target) { contains $target until lexical_boundary() }
+
+pattern hoisted_has($target) {
+	or {
+		lexical_has($target),
+		contains or {
+			JsVariableDeclaration(),
+			JsForVariableDeclaration()
+		} as $declaration where {
+			$declaration <: r"(?s)var\b.*",
+			$declaration <: lexical_has($target)
+		} until var_boundary()
+	}
+}
+
+pattern scope_has($target) {
+	or {
+		JsModule(items=$region) where { $region <: hoisted_has($target) },
+		JsScript(statements=$region) where { $region <: hoisted_has($target) },
+		JsStaticInitializationBlockClassMember(statements=$region) where {
+			$region <: hoisted_has($target)
+		},
+		JsBlockStatement(statements=$region) where { $region <: lexical_has($target) },
+		JsSwitchStatement(cases=$region) where { $region <: lexical_has($target) },
+		JsForStatement(initializer=$region) where { $region <: lexical_has($target) },
+		JsForInStatement(initializer=$region) where { $region <: lexical_has($target) },
+		JsForOfStatement(initializer=$region) where { $region <: lexical_has($target) },
+		JsCatchClause(declaration=$region) where { $region <: lexical_has($target) },
+		JsFunctionExpression(id=$region) where { $region <: $target },
+		JsClassExpression(id=$region) where { $region <: $target },
+		or {
+			JsFunctionDeclaration(parameters=JsParameters(items=$parameters), body=JsFunctionBody(statements=$statements)),
+			JsFunctionExportDefaultDeclaration(parameters=JsParameters(items=$parameters), body=JsFunctionBody(statements=$statements)),
+			JsFunctionExpression(parameters=JsParameters(items=$parameters), body=JsFunctionBody(statements=$statements)),
+			JsArrowFunctionExpression(parameters=or {
+				JsParameters(items=$parameters),
+				$parameters
+			}, body=or {
+				JsFunctionBody(statements=$statements),
+				$statements
+			}),
+			JsMethodClassMember(parameters=JsParameters(items=$parameters), body=JsFunctionBody(statements=$statements)),
+			JsMethodObjectMember(parameters=JsParameters(items=$parameters), body=JsFunctionBody(statements=$statements)),
+			JsConstructorClassMember(parameters=JsConstructorParameters(parameters=$parameters), body=JsFunctionBody(statements=$statements)),
+			JsSetterClassMember(parameter=$parameters, body=JsFunctionBody(statements=$statements)),
+			JsSetterObjectMember(parameter=$parameters, body=JsFunctionBody(statements=$statements))
+		} where { or { $parameters <: lexical_has($target), $statements <: hoisted_has($target) } },
+		or {
+			JsGetterClassMember(body=JsFunctionBody(statements=$statements)),
+			JsGetterObjectMember(body=JsFunctionBody(statements=$statements))
+		} where { $statements <: hoisted_has($target) }
+	}
+}
+
+pattern named($name) { JsIdentifierBinding() as $binding where { $binding <: $name } }
+
+pattern write_to($name, $scope) {
+	JsIdentifierAssignment() as $write where {
+		$write <: $name,
+		$write <: within scope_has(named($name)) as $owner,
+		$owner <: $scope
+	}
+}
+
+pattern array_method_name() {
+	or {
+		"map",
+		"filter",
+		"flatMap",
+		"slice",
+		"concat",
+		"toSorted",
+		"toReversed",
+		"toSpliced"
+	}
+}
+
+pattern array_annotation() {
+	or {
+		TsArrayType(),
+		TsTupleType(),
+		TsParenthesizedType(ty=array_annotation()),
+		TsTypeOperatorType(ty=array_annotation()) as $operator where {
+			$operator <: r"(?s)readonly\b.*"
+		},
+		TsReferenceType(name=or {
+			"Array",
+			"ReadonlyArray"
+		})
+	}
+}
+
+pattern annotated($name, $type) {
+	or {
+		JsFormalParameter(binding=named($name), type_annotation=TsTypeAnnotation(ty=$type)),
+		JsVariableDeclarator(id=named($name), variable_annotation=or {
+			TsTypeAnnotation(ty=$type),
+			TsDefiniteVariableAnnotation(type_annotation=TsTypeAnnotation(ty=$type))
+		}),
+		JsCatchDeclaration(binding=named($name), type_annotation=TsTypeAnnotation(ty=$type))
+	}
+}
+
+pattern array_method_callee() {
+	or {
+		JsStaticMemberExpression(object=array_chain(), member=array_method_name()),
+		JsComputedMemberExpression(object=array_chain(), member=JsStringLiteralExpression() as $literal) where {
+			$literal <: r"^[\"'](.*)[\"']$"($text),
+			$text <: array_method_name()
+		},
+		JsParenthesizedExpression(expression=array_method_callee()),
+		TsAsExpression(expression=array_method_callee()),
+		TsTypeAssertionExpression(expression=array_method_callee()),
+		TsNonNullAssertionExpression(expression=array_method_callee()),
+		TsSatisfiesExpression(expression=array_method_callee())
+	}
+}
+
+pattern array_chain() {
+	or {
+		JsArrayExpression(),
+		JsIdentifierExpression(),
+		JsCallExpression(callee=array_method_callee()),
+		JsParenthesizedExpression(expression=array_chain()),
+		TsAsExpression(expression=array_chain()),
+		TsTypeAssertionExpression(expression=array_chain()),
+		TsNonNullAssertionExpression(expression=array_chain()),
+		TsSatisfiesExpression(expression=array_chain())
+	}
+}
+
+pattern array_identifier($seen, $declarator, $init) {
+	JsIdentifierExpression(name=$name) as $reference where {
+		$reference <: within scope_has(named($name)) as $scope,
+		or {
+			and {
+				$scope <: scope_has(annotated($name, array_annotation())),
+				$scope <: not scope_has(annotated($name, not array_annotation()))
+			},
+			and {
+				$scope <: not scope_has(annotated($name, $_)),
+				$scope <: scope_has( JsVariableDeclarator(id=named($name)) as $declarator where {
+					$declarator <: not $seen,
+					$declarator <: within JsVariableDeclaration() as $statement,
+					$statement <: r"(?s)const\b.*",
+					$declarator <: JsVariableDeclarator(initializer=JsInitializerClause(expression=$init))
+				})
+			}
+		},
+		$scope <: not contains write_to($name, $scope)
+	}
+}
+
+pattern known_array_0($seen) {
+	array_chain() as $expression where {
+		$expression <: contains or {
+			JsArrayExpression(),
+			JsIdentifierExpression()
+		} as $base,
+		$base <: JsArrayExpression()
+	}
+}
+
+pattern known_array_1($seen) {
+	array_chain() as $expression where {
+		$expression <: contains or {
+			JsArrayExpression(),
+			JsIdentifierExpression()
+		} as $base,
+		$base <: or {
+			JsArrayExpression(),
+			array_identifier($seen, $declarator, known_array_0(or {
+				$seen,
+				$declarator
+			}))
+		}
+	}
+}
+
+pattern known_array_2($seen) {
+	array_chain() as $expression where {
+		$expression <: contains or {
+			JsArrayExpression(),
+			JsIdentifierExpression()
+		} as $base,
+		$base <: or {
+			JsArrayExpression(),
+			array_identifier($seen, $declarator, known_array_1(or {
+				$seen,
+				$declarator
+			}))
+		}
+	}
+}
+
+pattern known_array_3($seen) {
+	array_chain() as $expression where {
+		$expression <: contains or {
+			JsArrayExpression(),
+			JsIdentifierExpression()
+		} as $base,
+		$base <: or {
+			JsArrayExpression(),
+			array_identifier($seen, $declarator, known_array_2(or {
+				$seen,
+				$declarator
+			}))
+		}
+	}
+}
+
+pattern known_array_4($seen) {
+	array_chain() as $expression where {
+		$expression <: contains or {
+			JsArrayExpression(),
+			JsIdentifierExpression()
+		} as $base,
+		$base <: or {
+			JsArrayExpression(),
+			array_identifier($seen, $declarator, known_array_3(or {
+				$seen,
+				$declarator
+			}))
+		}
+	}
+}
+
+pattern known_array_5($seen) {
+	array_chain() as $expression where {
+		$expression <: contains or {
+			JsArrayExpression(),
+			JsIdentifierExpression()
+		} as $base,
+		$base <: or {
+			JsArrayExpression(),
+			array_identifier($seen, $declarator, known_array_4(or {
+				$seen,
+				$declarator
+			}))
+		}
+	}
+}
+
+pattern known_array_6($seen) {
+	array_chain() as $expression where {
+		$expression <: contains or {
+			JsArrayExpression(),
+			JsIdentifierExpression()
+		} as $base,
+		$base <: or {
+			JsArrayExpression(),
+			array_identifier($seen, $declarator, known_array_5(or {
+				$seen,
+				$declarator
+			}))
+		}
+	}
+}
+
+pattern known_array_7($seen) {
+	array_chain() as $expression where {
+		$expression <: contains or {
+			JsArrayExpression(),
+			JsIdentifierExpression()
+		} as $base,
+		$base <: or {
+			JsArrayExpression(),
+			array_identifier($seen, $declarator, known_array_6(or {
+				$seen,
+				$declarator
+			}))
+		}
+	}
+}
+
+pattern known_array_8($seen) {
+	array_chain() as $expression where {
+		$expression <: contains or {
+			JsArrayExpression(),
+			JsIdentifierExpression()
+		} as $base,
+		$base <: or {
+			JsArrayExpression(),
+			array_identifier($seen, $declarator, known_array_7(or {
+				$seen,
+				$declarator
+			}))
+		}
+	}
+}
+
+pattern known_array_9($seen) {
+	array_chain() as $expression where {
+		$expression <: contains or {
+			JsArrayExpression(),
+			JsIdentifierExpression()
+		} as $base,
+		$base <: or {
+			JsArrayExpression(),
+			array_identifier($seen, $declarator, known_array_8(or {
+				$seen,
+				$declarator
+			}))
+		}
+	}
+}
+
+pattern known_array_10($seen) {
+	array_chain() as $expression where {
+		$expression <: contains or {
+			JsArrayExpression(),
+			JsIdentifierExpression()
+		} as $base,
+		$base <: or {
+			JsArrayExpression(),
+			array_identifier($seen, $declarator, known_array_9(or {
+				$seen,
+				$declarator
+			}))
+		}
+	}
+}
+
+pattern known_array_11($seen) {
+	array_chain() as $expression where {
+		$expression <: contains or {
+			JsArrayExpression(),
+			JsIdentifierExpression()
+		} as $base,
+		$base <: or {
+			JsArrayExpression(),
+			array_identifier($seen, $declarator, known_array_10(or {
+				$seen,
+				$declarator
+			}))
+		}
+	}
+}
+
+pattern known_array_12($seen) {
+	array_chain() as $expression where {
+		$expression <: contains or {
+			JsArrayExpression(),
+			JsIdentifierExpression()
+		} as $base,
+		$base <: or {
+			JsArrayExpression(),
+			array_identifier($seen, $declarator, known_array_11(or {
+				$seen,
+				$declarator
+			}))
+		}
+	}
+}
+
+pattern known_array_13($seen) {
+	array_chain() as $expression where {
+		$expression <: contains or {
+			JsArrayExpression(),
+			JsIdentifierExpression()
+		} as $base,
+		$base <: or {
+			JsArrayExpression(),
+			array_identifier($seen, $declarator, known_array_12(or {
+				$seen,
+				$declarator
+			}))
+		}
+	}
+}
+
+pattern known_array_14($seen) {
+	array_chain() as $expression where {
+		$expression <: contains or {
+			JsArrayExpression(),
+			JsIdentifierExpression()
+		} as $base,
+		$base <: or {
+			JsArrayExpression(),
+			array_identifier($seen, $declarator, known_array_13(or {
+				$seen,
+				$declarator
+			}))
+		}
+	}
+}
+
+pattern known_array_15($seen) {
+	array_chain() as $expression where {
+		$expression <: contains or {
+			JsArrayExpression(),
+			JsIdentifierExpression()
+		} as $base,
+		$base <: or {
+			JsArrayExpression(),
+			array_identifier($seen, $declarator, known_array_14(or {
+				$seen,
+				$declarator
+			}))
+		}
+	}
+}
+
+pattern known_array_16($seen) {
+	array_chain() as $expression where {
+		$expression <: contains or {
+			JsArrayExpression(),
+			JsIdentifierExpression()
+		} as $base,
+		$base <: or {
+			JsArrayExpression(),
+			array_identifier($seen, $declarator, known_array_15(or {
+				$seen,
+				$declarator
+			}))
+		}
+	}
+}
+
+JsCallExpression(callee=or {
+	JsStaticMemberExpression(member=or {
+		"map",
+		"filter"
+	}),
+	JsComputedMemberExpression(),
+	JsParenthesizedExpression(),
+	TsAsExpression(),
+	TsTypeAssertionExpression(),
+	TsNonNullAssertionExpression(),
+	TsSatisfiesExpression()
+}) as $chain where {
+	$chain <: member_call($inner, $outer),
+	$outer <: or {
+		"map",
+		"filter"
+	},
+	$inner <: wrapped_call(),
+	$inner <: contains JsCallExpression() as $call,
+	$call <: member_call($receiver, $first),
+	or { and { $outer <: "map", $first <: "filter" }, and { $outer <: "filter", $first <: "map" } },
+	$receiver <: known_array_16(JsDebuggerStatement()),
+	register_diagnostic(span=$chain, message="Avoid consecutive array filter/map passes. Use flatMap or a loop, preserving callback order, indexes, and filtering semantics. Explicit lazy iterator pipelines are allowed.", severity="error")
+}
