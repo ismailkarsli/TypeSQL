@@ -1,6 +1,7 @@
 import type { Executor } from "@typesql/core";
 import {
 	type PgField,
+	parsePgArray,
 	parsePgUserArrays,
 	type SqlDriver,
 } from "@typesql/core/adapter";
@@ -27,39 +28,60 @@ function clientOf(db: DrizzleDatabase): DriverClient {
 	);
 }
 
-// Drizzle replaces postgres.js's json, jsonb and date serializers and its date
-// parsers with identity functions on the shared client. Serialize those values
-// here, and parse dates back, so values match the default type map.
-const DATES = new Set([1082, 1114, 1184]);
-const DATE_ARRAYS = new Set([1182, 1115, 1185]);
+// Drizzle replaces postgres.js's json, jsonb, date, timestamp, timestamptz and
+// numeric[] serializers and parsers (and those of their arrays) with identity
+// functions on the shared client. Serialize those values here, and parse them
+// back, so values match the default type map.
+
+// A `timestamp` has no time zone. Dates are sent as UTC (toISOString), so read
+// it as UTC too, as Drizzle's timestamp() does, not as local time.
+const parseTimestamp = (text: string): Date =>
+	new Date(/^\d/.test(text) ? `${text}+0000` : text);
+const parseDate = (text: string): Date => new Date(text);
+const parseText = (text: string): string => text;
+
+const PARSERS: { readonly [oid: number]: (text: string) => unknown } = {
+	1082: parseDate,
+	1114: parseTimestamp,
+	1184: parseDate,
+};
+const ARRAY_PARSERS: { readonly [oid: number]: (text: string) => unknown } = {
+	1182: parseDate,
+	1115: parseTimestamp,
+	1185: parseDate,
+	1231: parseText,
+};
+
+// Array elements written as an array literal, at any depth.
+const isLiteral = (value: unknown): boolean =>
+	value === null ||
+	typeof value === "string" ||
+	typeof value === "number" ||
+	typeof value === "bigint" ||
+	typeof value === "boolean" ||
+	value instanceof Date ||
+	(Array.isArray(value) && value.every(isLiteral));
+
+function arrayLiteral(values: readonly unknown[]): string {
+	const element = (value: unknown): string => {
+		if (value === null) return "NULL";
+		if (Array.isArray(value)) return arrayLiteral(value);
+		if (typeof value === "boolean") return value ? "t" : "f";
+		const text = value instanceof Date ? value.toISOString() : String(value);
+		return `"${text.replace(/[\\"]/g, "\\$&")}"`;
+	};
+	return `{${values.map(element).join(",")}}`;
+}
 
 function postgresJsParam(value: unknown): unknown {
 	if (value instanceof Date) return value.toISOString();
-	if (
-		value === null ||
-		typeof value !== "object" ||
-		Array.isArray(value) ||
-		ArrayBuffer.isView(value)
-	)
+	// The identity serializers of date, timestamp and numeric arrays would send
+	// a JS array as `'' + array`; an array literal works for every array type.
+	if (Array.isArray(value))
+		return isLiteral(value) ? arrayLiteral(value) : value;
+	if (value === null || typeof value !== "object" || ArrayBuffer.isView(value))
 		return value;
 	return JSON.stringify(value);
-}
-
-const toDate = (value: unknown): unknown =>
-	typeof value === "string" ? new Date(value) : value;
-
-/** A one-dimensional date array literal, e.g. `{"2024-01-01 10:00:00+00",NULL}`. */
-function toDates(value: unknown): unknown {
-	if (Array.isArray(value)) return value.map(toDate);
-	if (typeof value !== "string" || !value.startsWith("{") || value[1] === "{")
-		return value;
-	if (value === "{}") return [];
-	return value
-		.slice(1, -1)
-		.split(",")
-		.map((item) =>
-			item === "NULL" ? null : new Date(item.replace(/^"|"$/g, "")),
-		);
 }
 
 type PostgresJsResult = unknown[] & {
@@ -72,14 +94,19 @@ type PostgresJsResult = unknown[] & {
 
 function postgresJsRows(result: PostgresJsResult): unknown[] {
 	const rows = Array.from(result);
-	const dates = (result.columns ?? []).filter(
-		(c) => DATES.has(c.type) || DATE_ARRAYS.has(c.type),
-	);
-	if (dates.length === 0) return rows;
+	const parsers = (result.columns ?? []).flatMap(({ name, type }) => {
+		const scalar = PARSERS[type];
+		if (scalar) return [[name, scalar] as const];
+		const element = ARRAY_PARSERS[type];
+		return element
+			? [[name, (text: string) => parsePgArray(text, element)] as const]
+			: [];
+	});
+	if (parsers.length === 0) return rows;
 	for (const row of rows as Record<string, unknown>[])
-		for (const { name, type } of dates) {
+		for (const [name, parse] of parsers) {
 			const value = row[name];
-			row[name] = DATES.has(type) ? toDate(value) : toDates(value);
+			if (typeof value === "string") row[name] = parse(value);
 		}
 	return rows;
 }

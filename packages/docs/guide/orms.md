@@ -317,7 +317,7 @@ await db.transaction(async (tx) => {
 
 Rows are what the driver returns: Drizzle's column mappers and logger are not involved. Only node-postgres and postgres.js databases are supported.
 
-`drizzle-orm/postgres-js` turns off postgres.js' JSON and date serializers and its date parsers on its client. On that driver TypeSQL serializes `sql.json()` values, objects and `Date` parameters itself, and parses `date`, `timestamp` and `timestamptz` columns (and one-dimensional arrays of them) back to `Date`, so rows match the default type map.
+`drizzle-orm/postgres-js` turns off postgres.js' JSON, date and `numeric[]` serializers and parsers on its client. On that driver TypeSQL serializes `sql.json()` values, objects, `Date` parameters and arrays itself, and parses `date`, `timestamp` and `timestamptz` columns (and arrays of them, of any dimension) back to `Date` and `numeric[]` to arrays of strings, so rows match the default type map. A `timestamp` (without time zone) is read as UTC, as Drizzle's `timestamp()` does, so a `Date` comes back unchanged whatever the process time zone.
 
 ### Overrides
 
