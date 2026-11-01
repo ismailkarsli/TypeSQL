@@ -39,7 +39,9 @@ export function createSql<DB>(
 export function createSql<DB>(
 	client?: PostgresJsQueryable,
 	_options?: { readonly bigint?: boolean },
-): PostgresJsSql<DB, PostgresJsTypeMap | PostgresJsBigIntTypeMap> {
+):
+	| PostgresJsSql<DB, PostgresJsTypeMap>
+	| PostgresJsSql<DB, PostgresJsBigIntTypeMap> {
 	return createTransactionalSql<
 		Postgres,
 		DB,

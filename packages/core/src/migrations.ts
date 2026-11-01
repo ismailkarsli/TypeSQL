@@ -1,11 +1,20 @@
-import type { ApplyDdlOf, DialectTypes, ValidateDdlOf } from "./dialect.js";
+import type {
+	ApplyDdlOf,
+	DialectTypes,
+	StrictNullChecksMessage,
+	ValidateDdlOf,
+} from "./dialect.js";
+import type { SqlError } from "./errors.js";
 
-type GateValidateDdl<T extends DialectTypes, DB, Q extends string> = [
+type GateValidateDdl<
+	T extends DialectTypes,
 	DB,
-	Q,
-] extends [infer D, infer Q2 extends string]
-	? ValidateDdlOf<T, D, Q2>
-	: never;
+	Q extends string,
+> = null extends string
+	? SqlError<StrictNullChecksMessage, null>
+	: [DB, Q] extends [infer D, infer Q2 extends string]
+		? ValidateDdlOf<T, D, Q2>
+		: never;
 
 export class Migrations<T extends DialectTypes, DB = {}> {
 	declare readonly schema: DB;

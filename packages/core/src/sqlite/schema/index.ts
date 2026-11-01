@@ -1,4 +1,4 @@
-import type { Shaped, TsShape, TypeName } from "../../schema.js";
+import type { ColOptions, Shaped, TsShape, TypeName } from "../../schema.js";
 
 export type { View } from "../../schema.js";
 
@@ -21,20 +21,30 @@ export type ColFlags = {
 	readonly hidden?: boolean;
 };
 
+// Options are read through ColOptions (see there) so columns with different
+// options compare by these properties. An unset rowid, generated, hidden or
+// position is an optional `never` property, so a column that has it is not
+// assignable to one that does not.
 export type Col<T extends TypeName, F extends ColFlags = {}> = {
 	readonly type: T;
-	readonly nullable: F extends { nullable: true } ? true : false;
-	readonly hasDefault: F extends { hasDefault: true }
+	readonly nullable: ColOptions<F> extends { nullable: true } ? true : false;
+	readonly hasDefault: ColOptions<F> extends { hasDefault: true }
 		? true
-		: F extends { generated: true }
+		: ColOptions<F> extends { generated: true }
 			? true
 			: false;
-} & (F extends { readonly position: infer P extends number }
+} & (ColOptions<F> extends { readonly position: infer P extends number }
 	? { readonly i: P }
-	: {}) &
-	(F extends { readonly rowid: true } ? { readonly rowid: true } : {}) &
-	(F extends { readonly generated: true } ? { readonly generated: true } : {}) &
-	(F extends { readonly hidden: true } ? { readonly hidden: true } : {});
+	: { readonly i?: never }) &
+	(ColOptions<F> extends { readonly rowid: true }
+		? { readonly rowid: true }
+		: { readonly rowid?: never }) &
+	(ColOptions<F> extends { readonly generated: true }
+		? { readonly generated: true }
+		: { readonly generated?: never }) &
+	(ColOptions<F> extends { readonly hidden: true }
+		? { readonly hidden: true }
+		: { readonly hidden?: never });
 
 export type Typed<Base extends string, T> = Shaped<Base, TsShape<T>>;
 

@@ -3,6 +3,7 @@
 ## Requirements
 
 - **TypeScript 7.1 or later.** This is the native compiler; `7.1.0-beta` works. You can also use [tsrs](https://github.com/oxc-project/tsrs) (a Rust port of TypeScript 7.1). Older versions are not supported: TypeScript 7.0, 6 and 5.9 may still type-check queries, but they are not tested and the peer dependency rejects them. TypeScript 6 and 5.9 are several times slower, and editor completions need 7.1.
+- **`strictNullChecks`.** Set `"strict": true` (or at least `"strictNullChecks": true`) in `tsconfig.json`. Without it `null` and `undefined` belong to every type, so TypeSQL cannot tell nullable columns from others: every `sql()` call and `.add()` of a migration is then an error that says TypeSQL requires strictNullChecks. With `"skipLibCheck": false`, TypeScript also reports errors inside TypeSQL's own declaration files (TS2344, TS2589) until strictNullChecks is on.
 - **A supported database.** TypeSQL supports PostgreSQL and SQLite. MySQL support is planned.
 
 ## Install TypeSQL

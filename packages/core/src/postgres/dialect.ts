@@ -23,10 +23,11 @@ export interface Postgres extends DialectTypes {
 	readonly applyDdl: ApplyDdl<this["db"], this["ddl"]>;
 }
 
+// Invariant parameters, as on Sql.
 export interface TransactionalSql<
-	DB,
-	TM,
-	Plugins extends readonly SqlPlugin[] = [],
+	in out DB,
+	in out TM,
+	in out Plugins extends readonly SqlPlugin[] = [],
 > extends Sql<DB, TM, Plugins>,
 		Transactional<TransactionalSql<DB, TM, Plugins>> {
 	withPlugin<const P extends SqlPlugin>(

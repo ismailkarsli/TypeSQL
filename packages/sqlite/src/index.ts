@@ -35,7 +35,7 @@ export function createSql<DB>(
 export function createSql<DB>(
 	client?: SqliteDatabase,
 	options?: { readonly bigint?: boolean },
-): SqliteSql<DB, DefaultTypeMap | BigIntTypeMap> {
+): SqliteSql<DB, DefaultTypeMap> | SqliteSql<DB, BigIntTypeMap> {
 	return createTransactionalSql<Sqlite, DB, DefaultTypeMap, SqliteDatabase>(
 		sqlite,
 		client,

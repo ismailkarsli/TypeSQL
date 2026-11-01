@@ -11,10 +11,25 @@ export type ColDesc = {
 	readonly hasDefault: boolean;
 };
 
+/**
+ * Column options as `Col` reads them. Read through a `-?` mapped type,
+ * TypeScript cannot measure a variance for the options parameter, so two
+ * columns with different options are compared by their resolved properties
+ * (`nullable`, `hasDefault`, …) instead of by the options objects. Read as
+ * plain `Flags extends { nullable: true }`, the parameter measures as
+ * bivariant, and `Col<"int8", { nullable: true }>` was assignable to
+ * `Col<"int8">` because `{ nullable: true }` is assignable to `{}`.
+ */
+export type ColOptions<Flags> = { readonly [K in keyof Flags]-?: Flags[K] };
+
 export type Col<T extends TypeName, Flags extends Partial<ColDesc> = {}> = {
 	readonly type: T;
-	readonly nullable: Flags extends { nullable: true } ? true : false;
-	readonly hasDefault: Flags extends { hasDefault: true } ? true : false;
+	readonly nullable: ColOptions<Flags> extends { nullable: true }
+		? true
+		: false;
+	readonly hasDefault: ColOptions<Flags> extends { hasDefault: true }
+		? true
+		: false;
 };
 
 export type Enum<

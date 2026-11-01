@@ -1,5 +1,10 @@
 import { createDialectSql } from "../create-sql.js";
-import type { ApplyDdlOf, DialectTypes, ValidateDdlOf } from "../dialect.js";
+import type {
+	ApplyDdlOf,
+	DialectTypes,
+	StrictNullChecksMessage,
+	ValidateDdlOf,
+} from "../dialect.js";
 import type { EngineTypes } from "../engine/contract.js";
 import type { SqlError } from "../errors.js";
 import { type Postgres, postgres } from "../postgres/dialect.js";
@@ -10,12 +15,17 @@ import type { BoxCallArgs, CallRet, GateCallCheck } from "../sql/call.js";
 import { type Sqlite, sqlite } from "../sqlite/dialect.js";
 import type { SqliteEngine } from "../sqlite/engine/engine.js";
 
-type GateDdl<T extends DialectTypes, DB, Q extends string> = [DB, Q] extends [
-	infer D,
-	infer Text extends string,
-]
-	? ValidateDdlOf<T, D, Text>
+// Without strictNullChecks every query and DDL statement is this error, as
+// for `sql` (see StrictSql).
+type NonStrict = null extends string
+	? SqlError<StrictNullChecksMessage, null>
 	: never;
+
+type GateDdl<T extends DialectTypes, DB, Q extends string> = null extends string
+	? NonStrict
+	: [DB, Q] extends [infer D, infer Text extends string]
+		? ValidateDdlOf<T, D, Text>
+		: never;
 
 /** A checked SQL executor whose schema evolves after each awaited DDL statement. */
 export interface MigrationContext<
@@ -27,12 +37,16 @@ export interface MigrationContext<
 	/** Type-only schema marker; no database introspection is performed. */
 	readonly schema: DB;
 	<const Q extends string>(
-		query: (DB extends MissingSchema
-			? MissingSchemaError
-			: GateCallCheck<E, DB, TM, Q>) &
+		query: (null extends string
+			? NonStrict
+			: DB extends MissingSchema
+				? MissingSchemaError
+				: GateCallCheck<E, DB, TM, Q>) &
 			Q,
-		...params: BoxCallArgs<E, DB, TM, Q>
-	): CallRet<E, DB, TM, Q>;
+		...params: null extends string
+			? readonly unknown[]
+			: BoxCallArgs<E, DB, TM, Q>
+	): null extends string ? any : CallRet<E, DB, TM, Q>;
 	add<const Q extends string>(
 		ddl: (DB extends MissingSchema ? MissingSchemaError : GateDdl<T, DB, Q>) &
 			Q,

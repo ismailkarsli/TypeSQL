@@ -8,7 +8,7 @@ Write SQL in TypeScript and get exact types for rows and parameters. TypeSQL par
 npm install @typesql/core
 ```
 
-Requires TypeScript 7.1 or later.
+Requires TypeScript 7.1 or later, with `strictNullChecks` on (`"strict": true` in `tsconfig.json` turns it on).
 
 ## Usage
 
