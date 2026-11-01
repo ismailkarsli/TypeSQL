@@ -34,10 +34,10 @@ type GateDdl<T extends DialectTypes, DB, Q extends string> = [DB, Q] extends [
 
 /** A checked SQL executor whose schema evolves after each awaited DDL statement. */
 export interface MigrationContext<
-	E extends EngineTypes,
-	T extends DialectTypes,
-	DB,
-	TM = T["typeMap"],
+	in out E extends EngineTypes,
+	in out T extends DialectTypes,
+	in out DB,
+	in out TM = T["typeMap"],
 > extends Omit<SqlApi<E, DB, TM>, "raw"> {
 	/** Type-only schema marker; no database introspection is performed. */
 	readonly schema: DB;

@@ -33,6 +33,13 @@ export async function connectPostgres(url: string): Promise<Connection> {
 		);
 	}
 	const client = new Client({ connectionString: url });
+	// The server can end the session between queries (a timeout, a failover,
+	// pg_terminate_backend). Without a listener, pg's 'error' event would end
+	// the process; the next query rejects with the error instead.
+	let lost: Error | undefined;
+	client.on("error", (error) => {
+		lost ??= error;
+	});
 	try {
 		await client.connect();
 	} catch (error) {
@@ -45,12 +52,17 @@ export async function connectPostgres(url: string): Promise<Connection> {
 	}
 	return {
 		execute: async (sql, values) => {
+			if (lost) throw lost;
 			const result = await client.query(sql, [...values]);
 			return Array.isArray(result)
 				? (result.at(-1) ?? { rows: [], rowCount: 0 })
 				: result;
 		},
-		close: () => client.end(),
+		close: async () => {
+			await client.end().catch((error: unknown) => {
+				if (!lost) throw error;
+			});
+		},
 	};
 }
 

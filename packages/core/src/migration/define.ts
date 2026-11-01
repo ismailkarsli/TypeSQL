@@ -8,7 +8,7 @@ import type {
  * A migration: `up` takes the schema the previous migration leaves and
  * returns its context, and `down` takes what `up` returns.
  */
-export interface Migration<Before = never, After = unknown> {
+export interface Migration<in Before = never, in out After = unknown> {
 	readonly up: (db: Before) => Promise<After>;
 	readonly down: (db: After) => Promise<unknown>;
 }

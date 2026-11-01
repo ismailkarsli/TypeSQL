@@ -1438,6 +1438,42 @@ assert.match(
 		assert.deepEqual(await both.down(), { reverted: [] });
 		assert.equal(exists(memory, "accounts"), false);
 
+		// A script runs every statement, also on a connection that prepares
+		// one statement per call (node:sqlite, bun:sqlite, D1); a trigger's
+		// body stays in its CREATE TRIGGER.
+		const scripted = new DatabaseSync(":memory:");
+		const script = migration("sqlite", {
+			up: async (db) => {
+				const next = await db.add(
+					"CREATE TABLE a (id INTEGER PRIMARY KEY, note TEXT DEFAULT 'x;y'); -- a; comment\nCREATE TABLE b (id INTEGER);",
+				);
+				await next.raw(
+					"CREATE TRIGGER copy AFTER INSERT ON a BEGIN INSERT INTO b VALUES (CASE WHEN new.id > 0 THEN new.id END); UPDATE a SET note = 'in; trigger' WHERE id = new.id; END; INSERT INTO a (id) VALUES (1)",
+				);
+				return next;
+			},
+			down: async () => {},
+		});
+		assert.deepEqual(
+			await createMigrator({
+				dialect: "sqlite",
+				execute: executor(scripted),
+				migrations: [script],
+			}).latest(),
+			{ applied: ["0001"] },
+		);
+		assert.deepEqual(
+			{
+				...scripted
+					.prepare(
+						"SELECT (SELECT note FROM a) AS note, (SELECT count(*) FROM b) AS n",
+					)
+					.get(),
+			},
+			{ note: "in; trigger", n: 1 },
+		);
+		scripted.close();
+
 		// transaction: false (Cloudflare D1) sends no BEGIN, COMMIT or ROLLBACK.
 		const statements: string[] = [];
 		const d1 = createMigrator({
@@ -1579,6 +1615,8 @@ console.log(JSON.stringify({ applied, status: status.map((entry) => entry.applie
 					(_, i) => `const m${i + 2} = migration(m${i + 1}, ${table(i + 2)});`,
 				),
 				`export const last = m${length};`,
+				// A plain array literal, compared by TypeScript element by element.
+				`export const all = [${Array.from({ length }, (_, i) => `m${i + 1}`).join(", ")}];`,
 				`export const migrator = createMigrator({ dialect: "sqlite", db: ":memory:", migrations: [${Array.from({ length }, (_, i) => `m${i + 1}`).join(", ")}] });`,
 				"",
 			].join("\n"),
@@ -2235,6 +2273,29 @@ if (process.env.TYPESQL_MIGRATION_POSTGRES_URL) {
 		assert.deepEqual(await pooled.down(), { reverted: ["0002"] });
 		assert.deepEqual(await on(client).down(), { reverted: ["0001"] });
 		assert.deepEqual(await pooled.down(), { reverted: [] });
+		// A session the server ends during a migration rejects the command;
+		// it doesn't end the process with an unhandled 'error' event.
+		const lost = migration("postgres", {
+			up: async (db) => {
+				const next = await db.add("CREATE TABLE lost_a (id integer)");
+				await new Promise((resolve) => setTimeout(resolve, 1000));
+				return next.add("CREATE TABLE lost_b (id integer)");
+			},
+			down: async () => {},
+		});
+		await assert.rejects(
+			createMigrator({
+				dialect: "postgres",
+				url: `${url}${url.includes("?") ? "&" : "?"}options=${encodeURIComponent(`-c search_path=${schema} -c idle_in_transaction_session_timeout=300`)}`,
+				migrations: [lost],
+			}).latest(),
+			/idle-in-transaction/,
+		);
+		assert.equal(
+			(await client.query("SELECT to_regclass('lost_a') AS name")).rows[0]
+				?.name,
+			null,
+		);
 	} finally {
 		await client
 			.query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`)

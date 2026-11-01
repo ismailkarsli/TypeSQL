@@ -594,6 +594,8 @@ async function run(
 					try {
 						await history.rollback();
 					} catch (rollbackError) {
+						// A lost connection fails the rollback with the same error.
+						if (rollbackError === error) throw error;
 						throw new AggregateError(
 							[error, rollbackError],
 							"typesql: the migration failed and rolling it back failed too",
@@ -662,10 +664,99 @@ async function runStep(
 				},
 	);
 	try {
-		await step(createMigrationContext(dialect, guarded) as never);
+		// A prepared SQLite statement runs only the first statement of a
+		// script (node:sqlite, bun:sqlite, D1), so the runner sends each one.
+		await step(
+			createMigrationContext(
+				dialect,
+				guarded,
+				dialect === "sqlite"
+					? async (_kind, script) => {
+							for (const statement of sqliteStatements(script))
+								await guarded(statement, []);
+						}
+					: undefined,
+			) as never,
+		);
 	} finally {
 		active = false;
 	}
+}
+
+/**
+ * The statements of a SQLite script, split at semicolons outside quotes,
+ * comments and a trigger's BEGIN … END body.
+ */
+function sqliteStatements(sql: string): string[] {
+	const statements: string[] = [];
+	const words: string[] = [];
+	let begin = 0;
+	let content = false;
+	let trigger = false;
+	let start = true;
+	for (let i = 0; i < sql.length; ) {
+		const char = sql.charAt(i);
+		if (/\s/.test(char)) {
+			i++;
+			continue;
+		}
+		if (sql.startsWith("--", i)) {
+			const end = /[\r\n]/.exec(sql.slice(i + 2));
+			i = end === null ? sql.length : i + 2 + end.index + 1;
+			continue;
+		}
+		if (sql.startsWith("/*", i)) {
+			const end = sql.indexOf("*/", i + 2);
+			i = end < 0 ? sql.length : end + 2;
+			continue;
+		}
+		if (char === "'" || char === '"' || char === "`" || char === "[") {
+			content = true;
+			const end = char === "[" ? "]" : char;
+			i++;
+			while (i < sql.length) {
+				if (sql[i] === end) {
+					if (sql[i + 1] === end && char !== "[") i += 2;
+					else {
+						i++;
+						break;
+					}
+				} else i++;
+			}
+			start = false;
+			continue;
+		}
+		if (char === ";") {
+			i++;
+			start = true;
+			// A trigger's body statements end in semicolons too.
+			if (trigger) continue;
+			if (content) statements.push(sql.slice(begin, i));
+			begin = i;
+			words.length = 0;
+			content = false;
+			continue;
+		}
+		content = true;
+		const word = /^[a-zA-Z_][a-zA-Z_0-9$]*/.exec(sql.slice(i))?.[0];
+		if (word) {
+			const upper = word.toUpperCase();
+			if (trigger && start && upper === "END") trigger = false;
+			if (words.length < 4) words.push(upper);
+			if (
+				upper === "TRIGGER" &&
+				/^CREATE (?:TEMP |TEMPORARY )?TRIGGER$/.test(words.join(" "))
+			)
+				trigger = true;
+			start = false;
+			i += word.length;
+			continue;
+		}
+		start = false;
+		i++;
+	}
+	if (content) statements.push(sql.slice(begin));
+	return statements;
 }
 
 /** Keep transaction ownership with the runner, including multi-statement raw SQL. */
