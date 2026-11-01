@@ -1,5 +1,13 @@
 # @typesql/language-server
 
+## 0.0.10
+
+### Patch Changes
+
+- Remove unused completion exports and an unused development dependency.
+
+- Stop coloring `{name}` as a fragment slot in `sql()` strings, since `{name}` slots were removed from `@typesql/core`, and treat an interpolated `${…}` hole in a `FROM` clause as a relation when completing columns.
+
 ## 0.0.9
 
 ### Patch Changes

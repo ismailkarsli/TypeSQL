@@ -289,6 +289,16 @@
     - afraid-emus-do
     - fresh-seals-dig
     - kind-wolves-hang
+"@typesql/core@3.0.0":
+  dir: packages/core
+  intents:
+    - clean-rice-hear
+    - fresh-knives-float
+    - fresh-planes-wink
+    - new-walls-crash
+    - shiny-bats-push
+    - tame-beds-stand
+    - tiny-waves-give
 "@typesql/drizzle@0.0.2":
   dir: packages/drizzle
   intents:
@@ -346,6 +356,10 @@
   dir: packages/drizzle
   intents:
     - light-dragons-bake
+"@typesql/drizzle@3.0.0":
+  dir: packages/drizzle
+  intents:
+    - wild-squids-bet
 "@typesql/kysely@0.0.2":
   dir: packages/kysely
   intents:
@@ -417,6 +431,11 @@
   dir: packages/language-server
   intents:
     - shaggy-cows-win
+"@typesql/language-server@0.0.10":
+  dir: packages/language-server
+  intents:
+    - gentle-lions-dance
+    - wild-emus-march
 "@typesql/language-server@0.0.2":
   dir: packages/language-server
   intents:
@@ -541,6 +560,10 @@
   dir: packages/pg
   intents:
     - light-dragons-bake
+"@typesql/pg@3.0.0":
+  dir: packages/pg
+  intents:
+    - clean-jobs-bathe
 "@typesql/postgres@0.0.2":
   dir: packages/postgres
   intents:
@@ -610,6 +633,10 @@
   dir: packages/postgres
   intents:
     - light-dragons-bake
+"@typesql/postgres@3.0.0":
+  dir: packages/postgres
+  intents:
+    - tall-boats-unite
 "@typesql/prisma@0.0.2":
   dir: packages/prisma
   intents:
@@ -677,6 +704,10 @@
   dir: packages/prisma
   intents:
     - light-dragons-bake
+"@typesql/prisma@3.0.0":
+  dir: packages/prisma
+  intents:
+    - lazy-hats-bathe
 "@typesql/sqlite@0.0.1":
   dir: packages/sqlite
   intents:
@@ -759,3 +790,7 @@ typesql@0.1.1:
   dir: packages/vscode
   intents:
     - clever-jokes-judge
+typesql@1.0.0:
+  dir: packages/vscode
+  intents:
+    - slow-mugs-worry

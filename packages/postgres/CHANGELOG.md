@@ -1,5 +1,14 @@
 # @typesql/postgres
 
+## 3.0.0
+
+### Patch Changes
+
+- Remove the unused postgres development dependency; postgres stays a peer dependency.
+
+- Updated dependencies:
+  - @typesql/core@3.0.0
+
 ## 2.0.1
 
 ### Patch Changes

@@ -1,5 +1,14 @@
 # @typesql/drizzle
 
+## 3.0.0
+
+### Patch Changes
+
+- Stop exporting an internal casing type.
+
+- Updated dependencies:
+  - @typesql/core@3.0.0
+
 ## 2.0.1
 
 ### Patch Changes

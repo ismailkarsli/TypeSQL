@@ -1,5 +1,25 @@
 # @typesql/core
 
+## 3.0.0
+
+### Major Changes
+
+- Leave the table out of `sql.set(values)` and `sql.values(rows)`: the fragment is checked against the target of the `UPDATE` or `INSERT` it is interpolated into, and `sql.values` also checks the statement with only the keys every row always sends, so a required column a row can leave out is still an error. A plugin's `transformInput` context then has `table: null`, so `InputContext["table"]` is now `string | null`.
+
+- Replace `sql.empty` with `sql.optional(value)`, whose argument is required: it returns the value, or for `undefined` an omission that sends `DEFAULT` in `sql.param()`, is skipped by `sql.combine`, `sql.and` and `sql.or`, and splices nothing when an optional fragment or query is interpolated as `${…}`. `null` is returned as is and stays SQL `NULL`, as in `sql.set`, `sql.values` and `sql.json`, and a fragment or query that can be `null` is a compile error. Write `sql.optional(value ?? undefined)` for `sql.empty(value)` and `value ?? sql.empty`, `sql.optional(value)` where `null` should stay `NULL`, and `sql.optional(undefined)` for a bare `sql.empty`. Add `sql.if(value, then)`, which returns the fragment or query `then(value)` builds when `value` is truthy, with `value` narrowed to its truthy type, and the same omission otherwise, as in ``sql.and([sql.if(search, (s) => sql.fragment(`"name" ILIKE ${sql.param(s)}`))])``.
+
+- Interpolate fragments into the SQL template: every `sql.*` fragment (`sql.fragment`, `sql.id`, `sql.combine`, `sql.and`, `sql.or`, `sql.set`, `sql.values`, `sql.raw`) and a whole query can be written as `${fragment}` in `sql()`, `sql.prepare()`, `sql.as()` and `sql.fragment()`, and the statement is checked with the fragment spliced in, nested queries included. `{name}` slots and the slot-map argument are removed: replace `sql("… {where}", { where }, ...params)` with ``sql(`… ${where}`, ...params)``, and `sql.prepare(text, slots)` with `sql.prepare(text)`; a `{name}` left in the SQL is now a syntax error. Fragment and `Query` types are also string types, so a fragment or query passed as a parameter value, to `sql.param()` or to `sql.id()` throws.
+
+### Patch Changes
+
+- Reject comparisons PostgreSQL has no operator for, between numbers, strings, booleans, date/time values, intervals, `uuid` and `bytea` of different kinds, as in `id = email` or `id IN (SELECT title FROM posts)`: `=`, `<>`, `<` and the other comparison operators, `IS DISTINCT FROM`, `IN` lists and subqueries, `ANY`/`ALL` subqueries and row comparisons now give `operator does not exist: integer = text`, as PostgreSQL does. Literals, parameters, enums, arrays and domains are still accepted.
+
+- Type statements with deeply nested subqueries that have a `LIMIT` or `OFFSET` parameter, as in `limit ${sql.param(1)}` three or more levels down, which failed with TS5115 "Instantiations … appear infinitely circular": parameter inference no longer nests the parameters found so far into each level, and skips `ORDER BY` handling when there is no `ORDER BY`.
+
+- Remove unused engine helpers and redundant internal exports.
+
+- Number the parameters right in the text, row and parameter types of a statement or fragment with several union fragments, such as two conditional pieces that each carry a value: the later piece's parameters were numbered as if every earlier piece were present and absent at once, while the statement itself was checked correctly.
+
 ## 2.0.1
 
 ### Patch Changes

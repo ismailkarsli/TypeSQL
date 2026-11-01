@@ -1,5 +1,14 @@
 # @typesql/prisma
 
+## 3.0.0
+
+### Patch Changes
+
+- Stop exporting internal generator helpers.
+
+- Updated dependencies:
+  - @typesql/core@3.0.0
+
 ## 2.0.1
 
 ### Patch Changes
