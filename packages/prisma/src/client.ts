@@ -21,10 +21,15 @@ type Compile = (
 	values: readonly unknown[],
 ) => { readonly text: string; readonly values: readonly unknown[] };
 
-const numbered: Compile = (text, values) => ({ text, values });
-
+// Prisma sends a JS array as a Postgres array and a string as text, so send
+// every sql.json() value as its JSON.stringify string.
 const jsonText = (value: unknown): unknown =>
 	value instanceof JsonParam ? JSON.stringify(value.value) : value;
+
+const numbered: Compile = (text, values) => ({
+	text,
+	values: values.map(jsonText),
+});
 
 const sqlite: Compile = (text, values) => positional(text, values, jsonText);
 
