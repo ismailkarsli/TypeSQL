@@ -1161,10 +1161,12 @@ assert.match(
 		readFileSync,
 		renameSync,
 		rmSync,
+		symlinkSync,
 		writeFileSync,
 	} = await import("node:fs");
+	const { createRequire } = await import("node:module");
 	const { tmpdir } = await import("node:os");
-	const { join } = await import("node:path");
+	const { basename, join } = await import("node:path");
 	const dir = mkdtempSync(join(tmpdir(), "typesql-migrations-"));
 	const migrationsDir = join(dir, "migrations");
 	writeFileSync(join(dir, "package.json"), '{"type":"module"}\n');
@@ -1494,6 +1496,90 @@ export async function down(db: SqliteMigration<MigrationSchema<typeof up>>) { aw
 			/c60: Col<"text", \{ nullable: true; position: 59 \}>;/,
 		);
 
+		// migration() chains: each file imports the previous one as .js, which
+		// TypeScript resolves to the .ts file with no tsconfig flag and the
+		// runner maps for Node. Every file type-checks cold, and the chain runs.
+		const defineDir = join(dir, "define");
+		mkdirSync(join(defineDir, "migrations"), { recursive: true });
+		mkdirSync(join(defineDir, "node_modules", "@typesql"), { recursive: true });
+		symlinkSync(
+			new URL("../packages/core", import.meta.url).pathname,
+			join(defineDir, "node_modules", "@typesql", "core"),
+		);
+		writeFileSync(join(defineDir, "package.json"), '{"type":"module"}');
+		writeFileSync(
+			join(defineDir, "tsconfig.json"),
+			JSON.stringify({
+				compilerOptions: {
+					strict: true,
+					module: "nodenext",
+					noEmit: true,
+					skipLibCheck: true,
+					types: [],
+				},
+			}),
+		);
+		const defineName = (n: number) => `${String(n).padStart(4, "0")}_m`;
+		for (let i = 1; i <= chainLength; i++)
+			writeFileSync(
+				join(defineDir, "migrations", `${defineName(i)}.ts`),
+				i === 1
+					? `import { migration } from '@typesql/core/migration';
+export const up = migration('sqlite', async (db) => db.add('CREATE TABLE t (id INTEGER PRIMARY KEY)'));
+export const down = migration(up, async (db) => { await db.add('DROP TABLE t'); });
+`
+					: `import { migration } from '@typesql/core/migration';
+import { up as previous } from './${defineName(i - 1)}.js';
+export const up = migration(previous, async (db) => {
+  const next = await db.add('ALTER TABLE t ADD COLUMN c${i} TEXT');
+  await next('SELECT id, c${i} FROM t').execute();
+  return next;
+});
+export const down = migration(up, async (db) => { await db.add('ALTER TABLE t DROP COLUMN c${i}'); });
+`,
+			);
+		const defineRun = (...args: string[]) =>
+			cli(
+				"migrate",
+				...args,
+				"--dialect",
+				"sqlite",
+				"--db",
+				join(defineDir, "app.db"),
+				"--dir",
+				join(defineDir, "migrations"),
+				"--out",
+				join(defineDir, "db.ts"),
+			);
+		assert.match(defineRun("latest"), /applied 0060_m\.ts/);
+		assert.equal(
+			readFileSync(join(defineDir, "db.ts"), "utf8").match(/Col</g)?.length,
+			chainLength,
+		);
+		assert.match(defineRun("down"), /reverted 0060_m\.ts/);
+		{
+			const { API } = createRequire(import.meta.url)("typescript/sync");
+			const api = new API({ cwd: defineDir });
+			try {
+				const last = join(
+					defineDir,
+					"migrations",
+					`${defineName(chainLength)}.ts`,
+				);
+				const project = api
+					.createSnapshot({ openFiles: [last] })
+					.getDefaultProjectForFile(last);
+				assert.deepEqual(
+					project.program
+						.getSemanticDiagnostics(last)
+						.map((d: { code: number }) => d.code),
+					[],
+				);
+			} finally {
+				api.close();
+			}
+		}
+
 		const generatedDir = join(dir, "generated");
 		const make = (...args: string[]) =>
 			cli(
@@ -1509,17 +1595,18 @@ export async function down(db: SqliteMigration<MigrationSchema<typeof up>>) { aw
 			.trim()
 			.replace(/^typesql migrate: created /, "");
 		assert.match(created, /\d+_create-accounts\.ts$/);
-		assert.match(readFileSync(created, "utf8"), /SqliteMigration/);
+		assert.match(
+			readFileSync(created, "utf8"),
+			/export const up = migration\("sqlite", async \(db\) => \{/,
+		);
 		const next = make("z add profile")
 			.trim()
 			.replace(/^typesql migrate: created /, "");
 		assert.match(
 			readFileSync(next, "utf8"),
-			/MigrationSchema<typeof previousUp>/,
-		);
-		assert.match(
-			readFileSync(next, "utf8"),
-			/import type \{ up as previousUp \}/,
+			new RegExp(
+				`import \\{ up as previous \\} from "\\./${basename(created).replace(/\.ts$/, "")}\\.js";[\\s\\S]*export const up = migration\\(previous, async \\(db\\) => \\{[\\s\\S]*export const down = migration\\(up, `,
+			),
 		);
 		const { spawnSync, execFile } = await import("node:child_process");
 		const { promisify } = await import("node:util");

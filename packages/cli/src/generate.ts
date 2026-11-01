@@ -214,7 +214,7 @@ function migrationReader(
 					unresolved(file, what) ??
 						(!context || context.isErrorType()
 							? notComputed(what)
-							: `${what} is untyped; type its parameter as PostgresMigration or SqliteMigration`),
+							: `${what} is untyped; define up with migration() from @typesql/core/migration`),
 				);
 			const schema = checker.getTypeOfPropertyOfType(context, "schema");
 			if (!schema)

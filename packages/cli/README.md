@@ -44,23 +44,23 @@ npx typesql migrate down     # one applied migration
 npx typesql migrate generate # write db.ts from the migrations
 ```
 
-`make` writes `<unix-seconds>_<name>.ts`, converting spaces to dashes and linking the new file's schema type to the previous `up` export. It refuses duplicate filenames and names that sort before existing files. Every `.ts` file is read in filename order, including manually named files.
+`make` writes `<unix-seconds>_<name>.ts`, converting spaces to dashes; its `up` starts from the previous file's `up`, imported as `./name.js`. It refuses duplicate filenames and names that sort before existing files. Every `.ts` file is read in filename order, including manually named files.
 
 ```ts
-import type { PostgresMigration, MigrationSchema } from "@typesql/core/migration";
+import { migration } from "@typesql/core/migration";
 
-export async function up(db: PostgresMigration) {
+export const up = migration("postgres", async (db) => {
   const next = await db.add("CREATE TABLE users (id serial PRIMARY KEY, name text NOT NULL)");
   await next("INSERT INTO users (name) VALUES ($1)", "Ada").execute();
   return next;
-}
+});
 
-export async function down(db: PostgresMigration<MigrationSchema<typeof up>>) {
+export const down = migration(up, async (db) => {
   await db.add("DROP TABLE users");
-}
+});
 ```
 
-Use `SqliteMigration` for SQLite. `up` returns its final context, including for a no-op migration. `down` is required but may have an empty body. Await `.add()` and `.raw<NewSchema>()`; retain each returned context in a new `const` to carry its changed schema. Query calls return checked queries with `.execute()` and inferred rows. The first migration may supply an existing schema type as its context's type argument.
+Use `"sqlite"` for SQLite. `up` returns its final context, including for a no-op migration. `down` is required but may have an empty body. Await `.add()` and `.raw<NewSchema>()`; retain each returned context in a new `const` to carry its changed schema. Query calls return checked queries with `.execute()` and inferred rows. A first migration that starts from an existing schema is written as `export async function up(db: PostgresMigration<Existing>)`.
 
 `--config <file>` selects another config; `--dialect`, `--url`, `--db`, and `--dir` override it. PostgreSQL uses `DATABASE_URL` when no URL is configured. Complete flags work without a config file:
 

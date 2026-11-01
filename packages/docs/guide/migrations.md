@@ -84,7 +84,7 @@ pnpm add -D @typesql/cli pg
 
 :::
 
-Migration files and the generated `db.ts` import their types from `@typesql/core`, so it must be a dependency of your project itself. `@typesql/cli` depends on it too, but pnpm doesn't let your files import a dependency's dependencies; without it, `typesql migrate make` warns, and writing `db.ts` fails with `TypeScript cannot find "@typesql/core/migration"`. Running migration files needs `typescript` 7.1 or later wherever `typesql migrate` runs, because it hashes each file with TypeScript's parser. Keep `typescript` as a regular dependency if you run migrations from a production install (`npm install --omit=dev`).
+Migration files import `migration()` from `@typesql/core/migration`, and the generated `db.ts` imports its types from `@typesql/core`, so it must be a dependency of your project itself. `@typesql/cli` depends on it too, but pnpm doesn't let your files import a dependency's dependencies; without it, `typesql migrate make` warns, and running a migration fails with `Cannot find package '@typesql/core'`. Running migration files needs `typescript` 7.1 or later wherever `typesql migrate` runs, because it hashes each file with TypeScript's parser. Keep `typescript` as a regular dependency if you run migrations from a production install (`npm install --omit=dev`).
 
 ```ts
 // typesql.config.ts
@@ -104,34 +104,48 @@ npx typesql migrate latest
 npx typesql migrate down
 ```
 
-`make` creates a timestamped `.ts` file and links its starting schema to the preceding file's `up` export. `up` applies one file, `down` reverts one, and `latest` applies all pending files. Manually named `.ts` files are also accepted, in filename order.
+`make` creates a timestamped `.ts` file whose `up` starts from the preceding file's `up`. `up` applies one file, `down` reverts one, and `latest` applies all pending files. Manually named `.ts` files are also accepted, in filename order.
 
 ```ts
-import type { PostgresMigration, MigrationSchema } from "@typesql/core/migration";
+import { migration } from "@typesql/core/migration";
 
-export async function up(db: PostgresMigration) {
+export const up = migration("postgres", async (db) => {
   const users = await db.add(`CREATE TABLE users (
     id serial PRIMARY KEY,
     name text NOT NULL
   )`);
   await users("INSERT INTO users (name) VALUES ($1)", "Ada").execute();
   return users;
-}
+});
 
-export async function down(db: PostgresMigration<MigrationSchema<typeof up>>) {
+export const down = migration(up, async (db) => {
   await db.add("DROP TABLE users");
-}
+});
 ```
 
-Use `SqliteMigration` for SQLite. The migration parameter declares its dialect at compile time; config selects the runtime connection. `up` must return its final context; a no-op `up` returns `db`. If it doesn't, the next migration's queries and `.add()` calls fail to compile with "the previous migration's up() does not return its migration context", instead of going unchecked. `down` is mandatory, may be empty, and need not restore the previous schema type. The first migration may accept an existing starting schema. For subsequent migrations the generated signature is:
+`migration(from, run)` returns `run`, typed from `from`: `"postgres"` or `"sqlite"` starts the first migration from an empty schema of that dialect, a migration's `up` starts from the schema it returns, and `down` starts from its own file's `up`. Config selects the runtime connection. Later files import the preceding `up`:
 
 ```ts
-import type { PostgresMigration, MigrationSchema } from "@typesql/core/migration";
-import type { up as previousUp } from "./1793356800_create-users.ts";
+import { migration } from "@typesql/core/migration";
+import { up as previous } from "./1793356800_create-users.js";
 
-export async function up(db: PostgresMigration<MigrationSchema<typeof previousUp>>) {
+export const up = migration(previous, async (db) => {
   return await db.add("ALTER TABLE users ADD COLUMN email text");
-}
+});
+
+export const down = migration(up, async (db) => {
+  await db.add("ALTER TABLE users DROP COLUMN email");
+});
+```
+
+Import the preceding file as `.js`: TypeScript resolves it to the `.ts` file without `allowImportingTsExtensions`, and `typesql migrate` loads the `.ts` file for it. `up` must return its final context; a no-op `up` returns `db`. If it doesn't, passing it to the next file's `migration()` fails to compile. `down` is mandatory, may be empty, and need not restore the previous schema type. A first migration that starts from an existing schema is written as `export async function up(db: PostgresMigration<Existing>)` (`SqliteMigration` for SQLite).
+
+Each migration's schema is inferred from the one before it. `migration()` keeps that inference one file deep, so a history of any length type-checks in the editor and with `tsc`. Files written for 3.0.0, whose `up` is declared as `up(db: PostgresMigration<MigrationSchema<typeof previousUp>>)`, still run, but TypeScript nests every earlier file into that type, and an editor opening the 29th or a later one reports false errors. Rewriting such a file to `migration()` changes its hash; instead, change only the parameter type, which doesn't, to the same inference written inline:
+
+```ts
+export async function up(
+  db: PostgresMigration<typeof previousUp extends (db: never) => Promise<{ readonly schema: infer Schema }> ? Schema : never>,
+) {
 ```
 
 Await `.add(ddl)` to execute checked DDL and carry the updated schema to a new `const`. Query calls return the usual checked queries with `.execute()` and inferred result rows. `.raw<NewSchema>(sql)` executes dynamic or unsupported SQL with an explicit schema assertion. Reassigning the original variable does not update its TypeScript type.

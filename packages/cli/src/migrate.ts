@@ -141,12 +141,24 @@ async function makeMigration(
 			`new migration ${filename} would sort before existing migration ${previous}`,
 		);
 	}
-	const context =
-		dialect === "postgres" ? "PostgresMigration" : "SqliteMigration";
-	const source =
-		previous === undefined
-			? `import type { ${context}, MigrationSchema } from "@typesql/core/migration";\n\nexport async function up(db: ${context}) {\n\treturn db;\n}\n\nexport async function down(_db: ${context}<MigrationSchema<typeof up>>) {}\n`
-			: `import type { ${context}, MigrationSchema } from "@typesql/core/migration";\nimport type { up as previousUp } from ${JSON.stringify(`./${previous}`)};\n\nexport async function up(db: ${context}<MigrationSchema<typeof previousUp>>) {\n\treturn db;\n}\n\nexport async function down(_db: ${context}<MigrationSchema<typeof up>>) {}\n`;
+	// `previous` is imported as .js, which TypeScript resolves to the .ts
+	// file without allowImportingTsExtensions; the runner maps it for Node.
+	const from = previous === undefined ? JSON.stringify(dialect) : "previous";
+	const source = [
+		'import { migration } from "@typesql/core/migration";',
+		...(previous === undefined
+			? []
+			: [
+					`import { up as previous } from ${JSON.stringify(`./${previous.replace(/\.ts$/, ".js")}`)};`,
+				]),
+		"",
+		`export const up = migration(${from}, async (db) => {`,
+		"\treturn db;",
+		"});",
+		"",
+		"export const down = migration(up, async (db) => {});",
+		"",
+	].join("\n");
 	const file = resolve(directory, filename);
 	await writeFile(file, source, { flag: "wx" });
 	return file;
@@ -309,14 +321,14 @@ export async function main(argv: readonly string[], io: Io): Promise<number> {
 			io.stdout(
 				`typesql migrate: created ${await makeMigration(migrationsDir, positionals[1] ?? "", dialect)}\n`,
 			);
-			// The new file imports its types from @typesql/core/migration. A
+			// The new file imports migration() from @typesql/core/migration. A
 			// package manager with strict layouts (pnpm) doesn't expose the
 			// CLI's own @typesql/core to the project. Look for it the way
 			// TypeScript does: require.resolve also honors the NODE_PATH that
 			// `pnpm exec` points at its hidden hoisted packages.
 			if (!(await installed(migrationsDir, "@typesql/core"))) {
 				io.stderr(
-					`typesql migrate: warning: @typesql/core/migration cannot be found from ${migrationsDir}, so the migration's types are unchecked; add @typesql/core to the project's dependencies (npm install @typesql/core, or pnpm add @typesql/core)\n`,
+					`typesql migrate: warning: @typesql/core/migration cannot be found from ${migrationsDir}, so the migration can't run and its types are unchecked; add @typesql/core to the project's dependencies (npm install @typesql/core, or pnpm add @typesql/core)\n`,
 				);
 			}
 			return 0;

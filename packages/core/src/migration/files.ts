@@ -1,6 +1,10 @@
 import { createHash } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
-import { createRequire, stripTypeScriptTypes } from "node:module";
+import {
+	createRequire,
+	registerHooks,
+	stripTypeScriptTypes,
+} from "node:module";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { formatSyntaxKind, Node } from "typescript/ast";
@@ -70,10 +74,41 @@ function typescript(): NonNullable<typeof loaded> {
 	return loaded;
 }
 
+/** File URLs of the migration directories whose imports are mapped. */
+const directories = new Set<string>();
+
+/**
+ * Migrations import each other as `./name.js`, which TypeScript resolves to
+ * `./name.ts`. Node doesn't, so a relative `.js` import that a migration
+ * makes and that doesn't exist loads the `.ts` file beside it instead.
+ */
+function mapMigrationImports(directory: string): void {
+	if (directories.size === 0)
+		registerHooks({
+			resolve(specifier, context, nextResolve) {
+				try {
+					return nextResolve(specifier, context);
+				} catch (error) {
+					const parent = context.parentURL;
+					if (
+						(error as { code?: unknown }).code !== "ERR_MODULE_NOT_FOUND" ||
+						!/^\.\.?\/.*\.js$/.test(specifier) ||
+						parent === undefined ||
+						!directories.has(new URL(".", parent).href)
+					)
+						throw error;
+					return nextResolve(`${specifier.slice(0, -3)}.ts`, context);
+				}
+			},
+		});
+	directories.add(pathToFileURL(`${directory}/`).href);
+}
+
 export async function discoverMigrations(
 	migrationsDir: string,
 ): Promise<readonly MigrationFile[]> {
 	const directory = resolve(migrationsDir);
+	mapMigrationImports(directory);
 	const entries = await readdir(directory, { withFileTypes: true });
 	const names = entries
 		.filter(
@@ -97,7 +132,22 @@ export async function discoverMigrations(
 						throw new Error(`Migration changed during execution: ${name}`);
 					const url = pathToFileURL(path);
 					url.searchParams.set("typesql", hash);
-					const module: unknown = await import(url.href);
+					let module: unknown;
+					try {
+						module = await import(url.href);
+					} catch (error) {
+						// migration() is imported at runtime, so with pnpm a project
+						// that only depends on @typesql/cli can't load its migrations.
+						if (
+							(error as { code?: unknown }).code === "ERR_MODULE_NOT_FOUND" &&
+							String(error).includes("'@typesql/core'")
+						)
+							throw new Error(
+								`${String((error as Error).message)}; add @typesql/core to the project's dependencies (npm install @typesql/core, or pnpm add @typesql/core)`,
+								{ cause: error },
+							);
+						throw error;
+					}
 					if (
 						module === null ||
 						typeof module !== "object" ||

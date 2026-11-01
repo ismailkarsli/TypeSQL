@@ -76,22 +76,22 @@ Named parameters and fixed fragments work too. The `pg` and `postgres` adapters 
 The separate `@typesql/core/migration` entry point loads TypeScript migration files and runs them against PostgreSQL or SQLite on Node 26. Each file exports `up` and `down`:
 
 ```ts
-import type { PostgresMigration } from "@typesql/core/migration";
+import { migration } from "@typesql/core/migration";
 
-export async function up(db: PostgresMigration) {
+export const up = migration("postgres", async (db) => {
   const next = await db.add("CREATE TABLE users (id int PRIMARY KEY, name text NOT NULL)");
   await next("INSERT INTO users (id, name) VALUES ($1, $2)", 1, "Ada").execute();
   return next;
-}
+});
 
-export async function down(db: PostgresMigration) {
-  await db.raw("DROP TABLE users");
-}
+export const down = migration(up, async (db) => {
+  await db.add("DROP TABLE users");
+});
 ```
 
-Use `SqliteMigration` for SQLite. Later files can declare their starting schema as
-`PostgresMigration<MigrationSchema<typeof previousUp>>` by importing the previous
-`up` as a type. Await `.add()` or `.raw<NewSchema>()` into a new constant to retain
+Use `"sqlite"` for SQLite. A later file imports the previous file's `up` (as
+`./name.js`) and starts from its schema with `migration(previous, async (db) => …)`;
+`down` starts from its own file's `up`. Await `.add()` or `.raw<NewSchema>()` into a new constant to retain
 the updated schema; return that context from `up`, including for a no-op migration.
 `down` may return nothing.
 

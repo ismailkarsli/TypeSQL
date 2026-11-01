@@ -4,6 +4,7 @@ export type {
 	PostgresMigration,
 	SqliteMigration,
 } from "./context.js";
+export { migration } from "./define.js";
 export {
 	discoverMigrations,
 	type MigrationFile,
