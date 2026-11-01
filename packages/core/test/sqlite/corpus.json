@@ -1,7 +1,8 @@
 {
 	"schemas": {
 		"app": "CREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT NOT NULL UNIQUE, name VARCHAR(80), score REAL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, active BOOLEAN NOT NULL DEFAULT 1); CREATE TABLE posts (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL REFERENCES users(id), title TEXT NOT NULL, body TEXT, meta JSON, data BLOB, views INT NOT NULL DEFAULT 0); CREATE TABLE tags (post_id INTEGER NOT NULL, tag TEXT NOT NULL, PRIMARY KEY (post_id, tag)) WITHOUT ROWID; CREATE VIEW active_users AS SELECT id, email, name FROM users WHERE active",
-		"types": "CREATE TABLE t (id INTEGER PRIMARY KEY, i INTEGER NOT NULL, ni INTEGER, r REAL NOT NULL, nr REAL, s TEXT NOT NULL, ns TEXT, b BLOB NOT NULL, nb BLOB, n NUMERIC NOT NULL, nn NUMERIC, d DATETIME NOT NULL, nd DATE, j JSON NOT NULL, nj JSON, u, flag BOOLEAN NOT NULL, big BIGINT NOT NULL, dec DECIMAL(10,2)); CREATE TABLE s (k INT PRIMARY KEY, v TEXT, w ANY) STRICT; CREATE TABLE \"Mixed Case\" (\"Id\" INTEGER PRIMARY KEY, \"Value\" TEXT NOT NULL, lower_col INT)"
+		"types": "CREATE TABLE t (id INTEGER PRIMARY KEY, i INTEGER NOT NULL, ni INTEGER, r REAL NOT NULL, nr REAL, s TEXT NOT NULL, ns TEXT, b BLOB NOT NULL, nb BLOB, n NUMERIC NOT NULL, nn NUMERIC, d DATETIME NOT NULL, nd DATE, j JSON NOT NULL, nj JSON, u, flag BOOLEAN NOT NULL, big BIGINT NOT NULL, dec DECIMAL(10,2)); CREATE TABLE s (k INT PRIMARY KEY, v TEXT, w ANY) STRICT; CREATE TABLE \"Mixed Case\" (\"Id\" INTEGER PRIMARY KEY, \"Value\" TEXT NOT NULL, lower_col INT)",
+		"upsert": "CREATE TABLE counters (name TEXT PRIMARY KEY, n INTEGER NOT NULL DEFAULT 0, note TEXT); CREATE TABLE other (m INT, n INT); CREATE TABLE excluded (name TEXT PRIMARY KEY, n INTEGER NOT NULL DEFAULT 0)"
 	},
 	"statements": [
 		{
@@ -11613,6 +11614,131 @@
 			"schema": "app",
 			"source": "functions",
 			"sql": "SELECT unistr('a') AS u, json_array_insert('[1,2]', '$[1]', 9) AS j"
+		},
+		{
+			"schema": "upsert",
+			"source": "upsert",
+			"sql": "INSERT INTO counters (name) VALUES ('a') ON CONFLICT (name) DO UPDATE SET n = n + 1"
+		},
+		{
+			"schema": "upsert",
+			"source": "upsert",
+			"sql": "INSERT INTO counters (name) VALUES ('a') ON CONFLICT (name) DO UPDATE SET n = excluded.n + 1"
+		},
+		{
+			"schema": "upsert",
+			"source": "upsert",
+			"sql": "INSERT INTO counters (name) VALUES ('a') ON CONFLICT (name) DO UPDATE SET n = counters.n + excluded.n"
+		},
+		{
+			"schema": "upsert",
+			"source": "upsert",
+			"sql": "INSERT INTO counters (name) VALUES ('a') ON CONFLICT (name) DO UPDATE SET n = n + 1 WHERE n < 10"
+		},
+		{
+			"schema": "upsert",
+			"source": "upsert",
+			"sql": "INSERT INTO counters (name) VALUES ('a') ON CONFLICT (name) DO UPDATE SET n = n + 1 WHERE excluded.n < counters.n"
+		},
+		{
+			"schema": "upsert",
+			"source": "upsert",
+			"sql": "INSERT INTO counters (name) VALUES ('a') ON CONFLICT (name) DO UPDATE SET n = n + 1 WHERE zz < 10"
+		},
+		{
+			"schema": "upsert",
+			"source": "upsert",
+			"sql": "INSERT INTO counters (name) VALUES ('a') ON CONFLICT (name) DO UPDATE SET n = zz"
+		},
+		{
+			"schema": "upsert",
+			"source": "upsert",
+			"sql": "INSERT INTO counters (name) VALUES ('a') ON CONFLICT (name) DO UPDATE SET n = excluded.zz"
+		},
+		{
+			"schema": "upsert",
+			"source": "upsert",
+			"sql": "INSERT INTO counters (name) VALUES ('a') ON CONFLICT (name) DO UPDATE SET n = main.counters.n + rowid + excluded.rowid"
+		},
+		{
+			"schema": "upsert",
+			"source": "upsert",
+			"sql": "INSERT INTO counters (name) VALUES ('a') ON CONFLICT (name) DO UPDATE SET (n, note) = (n + 1, excluded.note)"
+		},
+		{
+			"schema": "upsert",
+			"source": "upsert",
+			"sql": "INSERT INTO counters (name) VALUES ('a') ON CONFLICT (name) DO UPDATE SET note = coalesce(excluded.note, note) RETURNING n, note"
+		},
+		{
+			"schema": "upsert",
+			"source": "upsert",
+			"sql": "INSERT INTO counters (name) VALUES ('a') ON CONFLICT (name) DO UPDATE SET n = n + 1 RETURNING excluded.n"
+		},
+		{
+			"schema": "upsert",
+			"source": "upsert",
+			"sql": "INSERT INTO counters (name) VALUES ('a') ON CONFLICT (name) DO UPDATE SET n = coalesce((SELECT max(m) FROM other WHERE other.n = excluded.n), n)"
+		},
+		{
+			"schema": "upsert",
+			"source": "upsert",
+			"sql": "INSERT INTO counters (name) VALUES ('a') ON CONFLICT (name) DO UPDATE SET n = coalesce((SELECT max(m) FROM other WHERE m = n), 0)"
+		},
+		{
+			"schema": "upsert",
+			"source": "upsert",
+			"sql": "INSERT INTO counters (name) VALUES ('a') ON CONFLICT (name) DO UPDATE SET n = (SELECT n FROM other, other AS o2)"
+		},
+		{
+			"schema": "upsert",
+			"source": "upsert",
+			"sql": "INSERT INTO counters (name) VALUES ('a') ON CONFLICT (name) WHERE n > 0 DO UPDATE SET n = 1"
+		},
+		{
+			"schema": "upsert",
+			"source": "upsert",
+			"sql": "INSERT INTO counters (name) VALUES ('a') ON CONFLICT (name) WHERE excluded.n > 0 DO UPDATE SET n = 1"
+		},
+		{
+			"schema": "upsert",
+			"source": "upsert",
+			"sql": "INSERT INTO counters AS c (name) VALUES ('a') ON CONFLICT (name) DO UPDATE SET n = c.n + n WHERE c.n < excluded.n + 10"
+		},
+		{
+			"schema": "upsert",
+			"source": "upsert",
+			"sql": "INSERT INTO counters AS c (name) VALUES ('a') ON CONFLICT (name) DO UPDATE SET n = counters.n"
+		},
+		{
+			"schema": "upsert",
+			"source": "upsert",
+			"sql": "INSERT INTO counters AS excluded (name) VALUES ('a') ON CONFLICT (name) DO UPDATE SET n = excluded.n + n"
+		},
+		{
+			"schema": "upsert",
+			"source": "upsert",
+			"sql": "INSERT INTO excluded (name) VALUES ('a') ON CONFLICT (name) DO UPDATE SET n = excluded.n + 1"
+		},
+		{
+			"schema": "upsert",
+			"source": "upsert",
+			"sql": "INSERT INTO counters (name, n) VALUES ($1, $2) ON CONFLICT (name) DO UPDATE SET n = n + excluded.n WHERE n < $3 RETURNING n"
+		},
+		{
+			"schema": "upsert",
+			"source": "upsert",
+			"sql": "INSERT INTO counters (name) VALUES ('a') ON CONFLICT (name) DO UPDATE SET note = $1 WHERE note IS NOT $2 RETURNING note"
+		},
+		{
+			"schema": "upsert",
+			"source": "upsert",
+			"sql": "INSERT INTO counters (name) VALUES ('a') ON CONFLICT (name) DO UPDATE SET n = n + 1 ON CONFLICT DO UPDATE SET n = n - 1"
+		},
+		{
+			"schema": "app",
+			"source": "upsert",
+			"sql": "INSERT INTO users (email) VALUES ('a') ON CONFLICT (email) DO UPDATE SET score = score + 1, name = coalesce(excluded.name, name) RETURNING score, name"
 		}
 	]
 }

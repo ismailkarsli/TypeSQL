@@ -316,6 +316,15 @@ type FirstOf<U> =
 		? F
 		: never;
 
+// In DO UPDATE, SQLite resolves names against the table first and tries
+// `excluded` only for a qualified name nothing else matched, so a bare `n` is
+// the table's column and a table aliased `excluded` shadows it. An outer level
+// behind the table gives that order.
+type UpsertScope<Rel extends Table, It extends SqItem> = [
+	[It],
+	[Item<Rel, "excluded">],
+];
+
 type UpsertLoop<
 	Us extends readonly Upsert[],
 	Rel extends Table,
@@ -324,7 +333,7 @@ type UpsertLoop<
 	Ctes extends SqCteMap,
 	I extends number,
 > = Us[I] extends infer U extends Upsert
-	? Ctx<DB, [[It, Item<Rel, "excluded">]], Ctes> extends infer C extends SqCtx
+	? Ctx<DB, UpsertScope<Rel, It>, Ctes> extends infer C extends SqCtx
 		? TypeList<
 				[
 					...(U["target"] extends readonly Expr[] ? U["target"] : []),
@@ -334,7 +343,8 @@ type UpsertLoop<
 			> extends infer X
 			? X extends AnyErr
 				? X
-				: // DO UPDATE … WHERE sees excluded.*, like SET.
+				: // DO UPDATE … WHERE sees excluded.*, like SET; the conflict
+					// target and its WHERE see only the table.
 					(
 							U["setWhere"] extends Expr
 								? TypeList<[U["setWhere"]], C>
@@ -582,7 +592,7 @@ type UpsertParams<
 	M,
 	I extends number,
 > = Us[I] extends infer U extends Upsert
-	? Ctx<DB, [[It, Item<Rel, "excluded">]], Ctes> extends infer C extends SqCtx
+	? Ctx<DB, UpsertScope<Rel, It>, Ctes> extends infer C extends SqCtx
 		? UpsertParams<
 				Us,
 				Rel,
