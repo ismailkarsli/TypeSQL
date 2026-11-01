@@ -1,13 +1,11 @@
-import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
-import { registerHooks } from "node:module";
-import { resolve } from "node:path";
-import { pathToFileURL } from "node:url";
 import { isMigration, MIGRATION_FROM } from "./define.js";
 
 type Dialect = "postgres" | "sqlite";
 
 /** The migration files of a directory, in the order they run. */
 export async function migrationFiles(migrationsDir: string): Promise<string[]> {
+	const { readdir } = process.getBuiltinModule("node:fs/promises");
+	const { resolve } = process.getBuiltinModule("node:path");
 	const entries = await readdir(migrationsDir, { withFileTypes: true }).catch(
 		(error: unknown) => {
 			if ((error as { code?: unknown }).code === "ENOENT")
@@ -38,6 +36,9 @@ const directories = new Set<string>();
  * makes and that doesn't exist loads the `.ts` file beside it instead.
  */
 function mapMigrationImports(directory: string): void {
+	// Bun and Deno load the `.ts` file themselves, and have no registerHooks.
+	const { registerHooks } = process.getBuiltinModule("node:module");
+	if (typeof registerHooks !== "function") return;
 	if (directories.size === 0)
 		registerHooks({
 			resolve(specifier, context, nextResolve) {
@@ -56,7 +57,9 @@ function mapMigrationImports(directory: string): void {
 				}
 			},
 		});
-	directories.add(pathToFileURL(`${directory}/`).href);
+	directories.add(
+		process.getBuiltinModule("node:url").pathToFileURL(`${directory}/`).href,
+	);
 }
 
 /**
@@ -73,6 +76,8 @@ export async function loadMigrations(migrationsDir: string): Promise<
 		self: unknown;
 	}[]
 > {
+	const { resolve } = process.getBuiltinModule("node:path");
+	const { pathToFileURL } = process.getBuiltinModule("node:url");
 	const directory = resolve(migrationsDir);
 	const names = await migrationFiles(directory);
 	mapMigrationImports(directory);
@@ -133,6 +138,9 @@ export async function makeMigration(
 		throw new Error(
 			"typesql: a migration name must not be empty or contain path separators or control characters",
 		);
+	const { mkdir, readFile, writeFile } =
+		process.getBuiltinModule("node:fs/promises");
+	const { resolve } = process.getBuiltinModule("node:path");
 	const directory = resolve(migrationsDir);
 	const filename = `${Math.floor(Date.now() / 1000)}_${name.trim().replaceAll(" ", "-")}.ts`;
 	await mkdir(directory, { recursive: true });

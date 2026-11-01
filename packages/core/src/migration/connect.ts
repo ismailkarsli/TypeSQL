@@ -1,6 +1,7 @@
 import type { SQLInputValue } from "node:sqlite";
 import { paramNumbers, sqliteValue } from "../adapter.js";
 import type { Executor } from "../query.js";
+import { runtimeImport } from "./node.js";
 
 interface Connection {
 	readonly execute: Executor;
@@ -25,7 +26,7 @@ export async function connectPostgres(url: string): Promise<Connection> {
 		);
 	let Client: typeof import("pg").Client;
 	try {
-		({ Client } = (await import("pg")).default);
+		({ Client } = ((await runtimeImport("pg")) as typeof import("pg")).default);
 	} catch (cause) {
 		throw new Error(
 			'typesql: url connects with the "pg" package, which is not installed: npm install pg',
@@ -101,7 +102,7 @@ async function whenFree<T>(step: () => T): Promise<T> {
 
 /** One `node:sqlite` database for a migrator call. */
 export async function connectSqlite(file: string): Promise<Connection> {
-	const { DatabaseSync } = await import("node:sqlite");
+	const { DatabaseSync } = process.getBuiltinModule("node:sqlite");
 	const db = new DatabaseSync(file);
 	return {
 		execute: async (sql, values) => {

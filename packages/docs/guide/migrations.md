@@ -339,6 +339,8 @@ With `transaction: false`, the migrator sends no `BEGIN` or `COMMIT` and takes n
 
 `@typesql/core/migration` imports no Node built-ins when it loads. Fingerprints use Web Crypto. The Node-only parts load when they are used: reading a directory, connecting from `url` (`pg`) or `db` (`node:sqlite`), `make()` and `generate()`. So array mode with `execute` runs in Cloudflare Workers, Bun and Deno.
 
+Bundlers (esbuild, `bun build`, Wrangler) include the Node-only parts, which reach Node's built-ins through `process.getBuiltinModule()` and so leave a Worker bundle nothing to resolve. A Node bundle runs `url`, `db` and `migrationsDir` as unbundled code does, but `pg` and `typescript` (for `generate()`) are not bundled: they load from `node_modules` at runtime, so install them beside the bundle.
+
 Cloudflare D1 doesn't accept `BEGIN` and `COMMIT`, so set `transaction: false`:
 
 ```ts
@@ -361,7 +363,7 @@ export const migrator = (env: { DB: D1Database }) =>
 // in a handler: await migrator(env).latest();
 ```
 
-The migrator's statements and TypeSQL's queries use `$1`, `$2`, …, which D1 doesn't bind. `positional(text, values)`, from `@typesql/core/adapter`, rewrites them to `?` with the values in order, and converts values as for SQLite (`true` to `1`, `sql.json()` to JSON text). D1's `prepare` takes one statement, so keep one statement per `.add()`. Without a lock, run migrations from one place at a time, such as a deploy step.
+The migrator's statements and TypeSQL's queries use `$1`, `$2`, …, which D1 doesn't bind. `positional(text, values)`, from `@typesql/core/adapter`, rewrites them to `?` with the values in order, and converts values as for SQLite (`true` to `1`, `sql.json()` to JSON text). D1's `prepare` takes one statement; the migrator sends each statement of an `.add()` or `.raw()` on its own. Without a lock, run migrations from one place at a time, such as a deploy step.
 
 ## The DB file
 

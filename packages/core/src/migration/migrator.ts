@@ -196,15 +196,14 @@ const CONNECTIONS = ["url", "db", "execute"] as const;
 const SOURCES = ["migrationsDir", "migrations"] as const;
 
 /**
- * Bundlers for Workers follow a literal import() into `node:` modules; the
- * Node-only parts load only when a directory, `url`, `db` or `generate()`
- * needs them.
+ * The Node-only parts load only when a directory, `url`, `db` or
+ * `generate()` needs them. Bundlers include them: they reach Node's
+ * built-ins through process.getBuiltinModule() and `pg` from node_modules at
+ * runtime, so a Worker bundle has no Node imports to resolve.
  */
-const nodeOnly = <T>(path: string): Promise<T> =>
-	import(new URL(path, import.meta.url).href) as Promise<T>;
-type Files = typeof import("./files.js");
-type Connect = typeof import("./connect.js");
-type Generate = typeof import("./generate.js");
+const loadFiles = () => import("./files.js");
+const loadConnect = () => import("./connect.js");
+const loadGenerate = () => import("./generate.js");
 
 function validate(config: MigratorConfig): void {
 	if (config.dialect !== "postgres" && config.dialect !== "sqlite")
@@ -273,7 +272,7 @@ export function createMigrator(
 	};
 	const writeSchema = async (point: number | "last"): Promise<string> => {
 		const dir = directory("generate()");
-		const { writeSchema } = await nodeOnly<Generate>("./generate.js");
+		const { writeSchema } = await loadGenerate();
 		return writeSchema({
 			migrationsDir: dir,
 			dialect: settled.dialect,
@@ -327,7 +326,7 @@ export function createMigrator(
 		},
 		async make(name) {
 			const dir = directory("make()");
-			const { makeMigration } = await nodeOnly<Files>("./files.js");
+			const { makeMigration } = await loadFiles();
 			return makeMigration(dir, name, settled.dialect);
 		},
 		generate: () => writeSchema("last"),
@@ -350,7 +349,7 @@ export function createMigrator(
 
 async function load(config: MigratorConfig): Promise<Entry[]> {
 	if (config.migrationsDir !== undefined) {
-		const { loadMigrations } = await nodeOnly<Files>("./files.js");
+		const { loadMigrations } = await loadFiles();
 		return loadMigrations(config.migrationsDir);
 	}
 	return (config.migrations ?? []).map((migration, index): Entry => {
@@ -742,11 +741,11 @@ async function connect(
 	if (config.execute !== undefined)
 		return { execute: config.execute, close: async () => {} };
 	if (config.url !== undefined) {
-		const { connectPostgres } = await nodeOnly<Connect>("./connect.js");
+		const { connectPostgres } = await loadConnect();
 		return connectPostgres(config.url);
 	}
 	if (config.db !== undefined) {
-		const { connectSqlite } = await nodeOnly<Connect>("./connect.js");
+		const { connectSqlite } = await loadConnect();
 		return connectSqlite(config.db);
 	}
 	throw new Error(
