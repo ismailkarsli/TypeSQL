@@ -1428,6 +1428,34 @@ assert.match(
 		);
 		assert.equal(exists(memory, "escaped_transaction"), false);
 		assert.equal(exists(memory, "escaped_count"), false);
+		// A failed migration is named, with the ones the call applied before it.
+		const fresh = new DatabaseSync(":memory:");
+		await assert.rejects(
+			createMigrator({
+				dialect: "sqlite",
+				execute: executor(fresh),
+				migrations: [
+					accounts,
+					second,
+					migration(second, {
+						up: async (db) => db.raw("INSERT INTO missing VALUES (1)"),
+						down: async () => {},
+					}),
+				],
+			}).latest(),
+			(error: Error & { migration?: string; applied?: readonly string[] }) => {
+				assert.equal(error.name, "MigrationError");
+				assert.equal(
+					error.message,
+					"typesql: migration 3 (0003) failed: no such table: missing",
+				);
+				assert.equal(error.migration, "0003");
+				assert.deepEqual(error.applied, ["0001", "0002"]);
+				assert.match((error.cause as Error).message, /no such table: missing/);
+				return true;
+			},
+		);
+		fresh.close();
 		assert.deepEqual(
 			history().map((row) => row.name),
 			["0001", "0002"],
@@ -1568,7 +1596,11 @@ const { createMigrator, migration } = await import(${JSON.stringify(new URL("../
 const { positional } = await import(${JSON.stringify(new URL("../packages/core/dist/adapter.js", import.meta.url).href)});
 const { createSql } = await import(${JSON.stringify(new URL("../packages/core/dist/index.js", import.meta.url).href)});
 const { sqlite } = await import(${JSON.stringify(new URL("../packages/core/dist/sqlite/index.js", import.meta.url).href)});
-createSql(sqlite)("SELECT 1");
+const sql = createSql(sqlite);
+sql("SELECT 1");
+// A query with an inline value and a fragment makes the marker in global scope.
+const inline = sql(\`SELECT \${sql.param(1)} AS one FROM (SELECT 1 AS x) \${sql.fragment("WHERE x = $1", 1)}\`);
+if (inline.text !== "SELECT $1 AS one FROM (SELECT 1 AS x) WHERE x = $2") throw new Error(inline.text);
 imported = true;
 const database = new DatabaseSync(":memory:");
 // As for Cloudflare D1, which binds ?NNN but not $1.
@@ -1638,6 +1670,14 @@ export const column: keyof SchemaOf<typeof last>["t${length}"] = "v";
 export const latest: keyof SchemaOf<Awaited<ReturnType<typeof migrator.latest>>>["t${length}"] = "v";
 `,
 		);
+		// The plain array's type has no order, so it has no last schema.
+		writeFileSync(
+			join(long, "unordered.ts"),
+			`import { createMigrator } from "@typesql/core/migration";
+import { all } from "./migrations.js";
+export const unordered = createMigrator({ dialect: "sqlite", db: ":memory:", migrations: all });
+`,
+		);
 		{
 			const { API } = createRequire(import.meta.url)("typescript/sync");
 			const api = new API({ cwd: long });
@@ -1652,6 +1692,60 @@ export const latest: keyof SchemaOf<Awaited<ReturnType<typeof migrator.latest>>>
 						.map((d: { code: number }) => d.code);
 				assert.deepEqual(codes(check), [2345]);
 				assert.deepEqual(codes(join(long, "migrations.ts")), []);
+				const [unordered] = program.getSemanticDiagnostics(
+					join(long, "unordered.ts"),
+				);
+				assert.equal(unordered?.code, 2769);
+				assert.match(
+					JSON.stringify(unordered),
+					/this migrations array's type has no order/,
+				);
+			} finally {
+				api.close();
+			}
+		}
+		// A project that emits declarations can export migrations, a migrator
+		// and latest()'s result: their types name public entry points only.
+		const declared = project("declared");
+		writeFileSync(
+			join(declared, "tsconfig.json"),
+			JSON.stringify({
+				compilerOptions: {
+					strict: true,
+					module: "nodenext",
+					declaration: true,
+					emitDeclarationOnly: true,
+					outDir: "out",
+					skipLibCheck: true,
+					types: [],
+				},
+			}),
+		);
+		writeFileSync(
+			join(declared, "migrations.ts"),
+			`import { createMigrator, migration } from "@typesql/core/migration";
+export const users = migration("postgres", { up: async (db) => db.add("CREATE TABLE users (id int PRIMARY KEY)"), down: async () => {} });
+export const posts = migration(users, { up: async (db) => db.add("CREATE TABLE posts (id int)"), down: async () => {} });
+export const notes = migration("sqlite", { up: async (db) => db.add("CREATE TABLE notes (id INTEGER PRIMARY KEY)"), down: async () => {} });
+export const migrator = createMigrator({ dialect: "postgres", url: "postgres://localhost/x", migrations: [users, posts] });
+export const latest = () => migrator.latest();
+`,
+		);
+		{
+			const { API } = createRequire(import.meta.url)("typescript/sync");
+			const api = new API({ cwd: declared });
+			try {
+				const file = join(declared, "migrations.ts");
+				const program = api
+					.createSnapshot({ openFiles: [file] })
+					.getDefaultProjectForFile(file).program;
+				assert.deepEqual(
+					[
+						...program.getSemanticDiagnostics(file),
+						...program.getDeclarationDiagnostics(file),
+					].map((d: { code: number }) => d.code),
+					[],
+				);
 			} finally {
 				api.close();
 			}
@@ -1864,6 +1958,182 @@ export default migration(previous, {
 		assert.match(
 			fail(1, "status", "--dir", join(app, "migrations")),
 			/pass --dialect postgres or sqlite/,
+		);
+
+		// A failed migration: the CLI prints the ones the call applied before
+		// it and writes db.ts for them, then the error.
+		const broken = project("broken");
+		mkdirSync(join(broken, "migrations"));
+		writeFileSync(
+			join(broken, "migrations", "0001_a.ts"),
+			`import { migration } from "@typesql/core/migration";
+export default migration("sqlite", { up: async (db) => db.add("CREATE TABLE a (id INTEGER PRIMARY KEY)"), down: async (db) => { await db.add("DROP TABLE a"); } });
+`,
+		);
+		writeFileSync(
+			join(broken, "migrations", "0002_b.ts"),
+			`import { migration } from "@typesql/core/migration";
+import previous from "./0001_a.js";
+export default migration(previous, { up: async (db) => db.raw("INSERT INTO missing VALUES (1)"), down: async () => {} });
+`,
+		);
+		const brokenRun = (...args: string[]) =>
+			spawnSync(
+				process.execPath,
+				[
+					cliBin,
+					"migrate",
+					...args,
+					"--dir",
+					join(broken, "migrations"),
+					"--out",
+					join(broken, "db.ts"),
+				],
+				{ encoding: "utf8" },
+			);
+		const failed = brokenRun(
+			"latest",
+			"--dialect",
+			"sqlite",
+			"--db",
+			join(broken, "app.db"),
+		);
+		assert.equal(failed.status, 1, failed.stdout + failed.stderr);
+		assert.equal(
+			failed.stdout,
+			`typesql migrate: applied 0001_a.ts\ntypesql migrate: generated ${join(broken, "db.ts")}\n`,
+		);
+		assert.equal(
+			failed.stderr,
+			"typesql migrate: migration 2 (0002_b.ts) failed: no such table: missing\n",
+		);
+		assert.match(
+			readFileSync(join(broken, "db.ts"), "utf8"),
+			/from 0001_a\.ts/,
+		);
+		// generate checks the dialect the files start from before writing.
+		const wrongDialect = brokenRun("generate", "--dialect", "postgres");
+		assert.equal(wrongDialect.status, 1, wrongDialect.stdout);
+		assert.match(
+			wrongDialect.stderr,
+			/migration 1 \(0001_a\.ts\) starts from "sqlite", but the migrator's dialect is postgres/,
+		);
+		assert.match(
+			readFileSync(join(broken, "db.ts"), "utf8"),
+			/from "@typesql\/core\/sqlite"/,
+		);
+
+		// Two calls on one file in this process: the second waits for the
+		// first's lock without blocking the event loop the first runs on.
+		const slow = migration("sqlite", {
+			up: async (db) => {
+				await new Promise((resolve) => setTimeout(resolve, 100));
+				return db.add("CREATE TABLE slow (id INTEGER PRIMARY KEY)");
+			},
+			down: async () => {},
+		});
+		const shared = () =>
+			createMigrator({
+				dialect: "sqlite",
+				db: join(broken, "shared.db"),
+				migrations: [slow],
+			});
+		const started = Date.now();
+		assert.deepEqual(
+			(await Promise.all([shared().latest(), shared().latest()]))
+				.map((result) => result.applied.length)
+				.sort(),
+			[0, 1],
+		);
+		assert.ok(Date.now() - started < 10_000, "the second call waited");
+
+		// An array config imports its migrations as TypeScript does.
+		const arrayConfig = project("array-config");
+		mkdirSync(join(arrayConfig, "db"));
+		writeFileSync(
+			join(arrayConfig, "db", "first.ts"),
+			`import { migration } from "@typesql/core/migration";
+export const first = migration("sqlite", { up: async (db) => db.add("CREATE TABLE a (id INTEGER PRIMARY KEY)"), down: async () => {} });
+`,
+		);
+		writeFileSync(
+			join(arrayConfig, "db", "migrations.ts"),
+			'import { first } from "./first.js";\nexport const all = [first] as const;\n',
+		);
+		writeFileSync(
+			join(arrayConfig, "typesql.config.ts"),
+			`import { createMigrator } from "@typesql/core/migration";
+import { all } from "./db/migrations.js";
+export default createMigrator({ dialect: "sqlite", db: "./app.db", migrations: all });
+`,
+		);
+		assert.equal(
+			cli(
+				"migrate",
+				"latest",
+				"--config",
+				join(arrayConfig, "typesql.config.ts"),
+			),
+			"typesql migrate: applied 0001\n",
+		);
+
+		// A Node bundle runs db and migrationsDir; a Worker bundle has no Node
+		// module to resolve.
+		const bundled = project("bundled");
+		mkdirSync(join(bundled, "migrations"));
+		writeFileSync(
+			join(bundled, "migrations", "0001_a.ts"),
+			`import { migration } from "@typesql/core/migration";
+export default migration("sqlite", { up: async (db) => db.add("CREATE TABLE a (id INTEGER PRIMARY KEY)"), down: async () => {} });
+`,
+		);
+		writeFileSync(
+			join(bundled, "main.ts"),
+			`import { createMigrator, migration } from "@typesql/core/migration";
+const first = migration("sqlite", { up: async (db) => db.add("CREATE TABLE a (id INTEGER PRIMARY KEY)"), down: async () => {} });
+const array = await createMigrator({ dialect: "sqlite", db: ":memory:", migrations: [first] }).latest();
+const files = await createMigrator<unknown>({ dialect: "sqlite", db: ":memory:", migrationsDir: process.argv[2], generate: false }).latest();
+console.log(JSON.stringify([array.applied, files.applied]));
+`,
+		);
+		writeFileSync(
+			join(bundled, "worker.ts"),
+			`import { createMigrator, migration } from "@typesql/core/migration";
+import { createSql } from "@typesql/core";
+import { sqlite } from "@typesql/core/sqlite";
+export const first = migration("sqlite", { up: async (db) => db.add("CREATE TABLE a (id INTEGER PRIMARY KEY)"), down: async () => {} });
+export const sql = createSql(sqlite);
+export const migrate = (execute: never) => createMigrator({ dialect: "sqlite", execute, transaction: false, migrations: [first] }).latest();
+`,
+		);
+		const { build } = await import("esbuild");
+		await build({
+			entryPoints: [join(bundled, "main.ts")],
+			bundle: true,
+			platform: "node",
+			format: "esm",
+			outfile: join(bundled, "out", "main.mjs"),
+			logLevel: "silent",
+		});
+		const bundledRun = spawnSync(
+			process.execPath,
+			[join(bundled, "out", "main.mjs"), join(bundled, "migrations")],
+			{ encoding: "utf8" },
+		);
+		assert.equal(bundledRun.status, 0, bundledRun.stderr);
+		assert.equal(bundledRun.stdout, '[["0001"],["0001_a.ts"]]\n');
+		await build({
+			entryPoints: [join(bundled, "worker.ts")],
+			bundle: true,
+			platform: "neutral",
+			conditions: ["workerd", "worker"],
+			format: "esm",
+			outfile: join(bundled, "out", "worker.mjs"),
+			logLevel: "silent",
+		});
+		assert.doesNotMatch(
+			readFileSync(join(bundled, "out", "worker.mjs"), "utf8"),
+			/(?:from |import\(|require\()["']node:/,
 		);
 
 		// A 3.x history and 3.x files carry over: the source hashes become
@@ -2295,6 +2565,30 @@ if (process.env.TYPESQL_MIGRATION_POSTGRES_URL) {
 			(await client.query("SELECT to_regclass('lost_a') AS name")).rows[0]
 				?.name,
 			null,
+		);
+		// A session ended during a query rejects with the server's error, not
+		// pg's "connection terminated" of the queries after it.
+		const killed = migration("postgres", {
+			up: async (db) => {
+				const [row] = await db("SELECT pg_backend_pid() AS pid").execute();
+				if (row)
+					setTimeout(
+						() =>
+							void client.query("SELECT pg_terminate_backend($1)", [row.pid]),
+						200,
+					);
+				return db.raw("SELECT pg_sleep(5)");
+			},
+			down: async () => {},
+		});
+		await assert.rejects(
+			createMigrator({
+				dialect: "postgres",
+				url: `${url}${url.includes("?") ? "&" : "?"}options=${encodeURIComponent(`-c search_path=${schema}`)}`,
+				migrationTable: "killed_migrations",
+				migrations: [killed],
+			}).latest(),
+			/^MigrationError: typesql: migration 1 \(0001\) failed: terminating connection due to administrator command$/,
 		);
 	} finally {
 		await client
