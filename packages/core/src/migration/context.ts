@@ -7,13 +7,17 @@ import type {
 } from "../dialect.js";
 import type { EngineTypes } from "../engine/contract.js";
 import type { SqlError } from "../errors.js";
-import { type Postgres, postgres } from "../postgres/dialect.js";
-import type { PgEngine } from "../postgres/engine/engine.js";
+import { postgres } from "../postgres/dialect.js";
+// The types come from the public entry points, so the declarations of a
+// project that exports a migration can name its schema's types (TS2883).
+import type { PgEngine } from "../postgres/engine/index.js";
+import type { Postgres } from "../postgres/index.js";
 import type { Executor } from "../query.js";
 import type { SqlApi } from "../sql/api.js";
 import type { BoxCallArgs, CallRet, GateCallCheck } from "../sql/call.js";
-import { type Sqlite, sqlite } from "../sqlite/dialect.js";
-import type { SqliteEngine } from "../sqlite/engine/engine.js";
+import { sqlite } from "../sqlite/dialect.js";
+import type { SqliteEngine } from "../sqlite/engine/index.js";
+import type { Sqlite } from "../sqlite/index.js";
 
 // Without strictNullChecks every query and DDL statement is this error, as
 // for `sql` (see StrictSql).
