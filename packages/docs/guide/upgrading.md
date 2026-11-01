@@ -1,6 +1,6 @@
 # Upgrading
 
-This page lists every breaking change since the first 0.x releases, newest first, with the code to change. Start at the section for the version you are on and work up: from 2.x apply [3.0](#_3-0); from 1.x apply [2.0](#_2-0), then 3.0; from 0.x start at [Upgrading from 0.x](#upgrading-from-0-x). The [changelog](/changelog) has the release notes from 1.0.0 on.
+This page lists every breaking change since the first 0.x releases, newest first, with the code to change. Start at the section for the version you are on and work up: from 3.x apply [4.0](#_4-0); from 2.x apply [3.0](#_3-0), then 4.0; from 1.x apply [2.0](#_2-0), then 3.0 and 4.0; from 0.x start at [Upgrading from 0.x](#upgrading-from-0-x). The [changelog](/changelog) has the release notes from 1.0.0 on.
 
 Most breaking changes are compile errors at the call site, so after upgrading run `tsc --noEmit` (or your editor) and work through the list. The changes that compile but behave differently are marked **Runtime change**.
 
@@ -9,7 +9,7 @@ Most breaking changes are compile errors at the call site, so after upgrading ru
 - **One version for the library packages.** Since 1.1.0, `@typesql/core`, `@typesql/pg`, `@typesql/postgres`, `@typesql/sqlite`, `@typesql/kysely`, `@typesql/drizzle`, `@typesql/prisma` and `@typesql/cli` share one version and are released together. Upgrade them together, to the same version:
 
   ```sh
-  npm install @typesql/core@3 @typesql/pg@3   # and any other @typesql/* package you use
+  npm install @typesql/core@4 @typesql/pg@4   # and any other @typesql/* package you use
   ```
 
   Before 1.1.0 the adapters had their own 0.x versions (for example `@typesql/pg` 0.4.3 went with `@typesql/core` 1.0.1). `@typesql/language-server` and the VS Code extension keep their own versions.
@@ -25,6 +25,121 @@ Most breaking changes are compile errors at the call site, so after upgrading ru
     }
   }
   ```
+
+## 4.0
+
+### One migrator for every way of running migrations
+
+4.0 replaces the migration APIs with two functions from `@typesql/core/migration`: `migration(from, { up, down })` defines a migration, and `createMigrator(config)` runs a directory of migration files or an array of migrations, and records them in a history table. The untracked `migrations()` builder and the adapters' `migrate(db, m)` are removed; an array of migrations replaces them. See [From migrations](./migrations).
+
+| 3.x | 4.0 |
+|---|---|
+| `migrations()` of `@typesql/core/postgres` or `/sqlite`, and its `.add()` chain | `migration("postgres", { up, down })` (or `"sqlite"`), with the statements awaited in `up` |
+| `migrations<Existing>()` | a first migration whose `up` takes `PostgresMigration<Existing>`; see [Starting from an existing schema](./migrations#starting-from-an-existing-schema) |
+| `SchemaOf<typeof m>` of a builder | `SchemaOf<typeof last>` of the last migration (`@typesql/core` or `@typesql/core/migration`) |
+| `m.statements` | no replacement: the migrator runs `up` |
+| `migrate(db, m)` of `@typesql/pg`, `@typesql/postgres` and `@typesql/sqlite`; `runMigrations(client, m)` of `@typesql/core` | `createMigrator({ dialect, migrations: [...], url \| db \| execute }).latest()` |
+| `migrateLatest(options)`, `migrateUp(options)`, `migrateDown(options)` | `createMigrator(config).latest()`, `.up()`, `.down()` |
+| `MigrationOptions` (`{ dialect, migrationsDir, execute, migrationTable? }`) | `MigratorConfig`: the same fields, plus `url`, `db`, `migrations`, `schemaFile`, `generate` and `transaction` |
+| `MigrationResult` (`{ direction, migrations }`) | `LatestResult` (`{ applied }`) and `DownResult` (`{ reverted }`), with `schemaFile` or `schemaError` in directory mode |
+| `discoverMigrations(dir)`, `MigrationFile`, `MigrationModule` | `createMigrator(config).status()`, which lists the migrations and whether they are applied |
+| `migrationHash(source)` | no replacement: migrations are tracked by a [fingerprint](./migrations#the-fingerprint) |
+| `MigrationSchema<typeof up>` | `SchemaOf<typeof up>` |
+| `Migrations`, `PgMigrations`, `SqliteMigrations`, `MigrationClient`, `MigrationSource` | `Migration` |
+| `MigrationConfig` of `@typesql/cli` (a config object) | `export default createMigrator({ … })` in `typesql.config.ts` |
+
+`ApplyDdl` and `ValidateDdl` stay in `@typesql/core/postgres` and `@typesql/core/sqlite`.
+
+A builder becomes an array of migrations:
+
+```ts
+// 3.x
+import type { SchemaOf } from "@typesql/core";
+import { migrations } from "@typesql/core/postgres";
+import { migrate } from "@typesql/pg";
+
+export const m = migrations()
+	.add("CREATE TABLE users (id serial PRIMARY KEY, email text NOT NULL)")
+	.add("ALTER TABLE users ADD COLUMN bio text");
+export type DB = SchemaOf<typeof m>;
+
+await migrate(pool, m);
+
+// 4.0
+import { createMigrator, migration, type SchemaOf } from "@typesql/core/migration";
+
+export const createUsers = migration("postgres", {
+	up: async (db) =>
+		db.add("CREATE TABLE users (id serial PRIMARY KEY, email text NOT NULL)"),
+	down: async (db) => {
+		await db.add("DROP TABLE users");
+	},
+});
+export const addBio = migration(createUsers, {
+	up: async (db) => db.add("ALTER TABLE users ADD COLUMN bio text"),
+	down: async (db) => {
+		await db.add("ALTER TABLE users DROP COLUMN bio");
+	},
+});
+export type DB = SchemaOf<typeof addBio>;
+
+await createMigrator({
+	dialect: "postgres",
+	url: process.env.DATABASE_URL,
+	migrations: [createUsers, addBio],
+}).latest();
+```
+
+**Runtime change.** The builder ran every statement each time; the migrator runs only the migrations its history table doesn't list. On a database the builder already migrated, the history is empty, so `latest()` runs every migration again and fails on the first table that exists. Make the first migration's statements safe to rerun (`CREATE TABLE IF NOT EXISTS`), or begin the history with a migration that [starts from the existing schema](./migrations#starting-from-an-existing-schema).
+
+`url` connects with `pg`, now an optional peer dependency of `@typesql/core`; install it to use `url`. Running migrations no longer needs `typescript`; only writing `db.ts` does.
+
+### The `typesql migrate` config file default-exports a migrator
+
+```ts
+// 3.x
+import type { MigrationConfig } from "@typesql/cli";
+
+export default {
+	dialect: "postgres",
+	migrationsDir: "./migrations",
+} satisfies MigrationConfig;
+
+// 4.0
+import { createMigrator } from "@typesql/core/migration";
+
+export default createMigrator({
+	dialect: "postgres",
+	url: process.env.DATABASE_URL,
+	migrationsDir: "./migrations",
+});
+```
+
+A plain object is now an error. The flags, the `$DATABASE_URL` fallback, the paths beside the config file and the exit codes are unchanged; `typesql migrate status` is new. See [The `typesql migrate` command](./migrations#the-typesql-migrate-command).
+
+### 3.x migration files and history tables
+
+The history table keeps its columns (`name`, `hash`, `applied_at`), so it needs no schema change. 3.x stored a hash of each file's source; 4.0 stores a fingerprint of what `up` runs. The first 4.0 command in directory mode, `status` included, converts the table: each row with a 3.x hash is matched to the file of the same name and gets that file's fingerprint, in the same transaction. This trusts that the applied files are the ones 3.x last checked, so run 3.x's `typesql migrate latest` once before upgrading (it checks every applied file) and upgrade without editing the files in between. A 3.x row without a file of its name is an error. In array mode, a 3.x history is an error: run one command in directory mode first, then switch.
+
+3.x files, which export `up` and `down` functions, still load in directory mode, so applied ones need no rewrite. `MigrationSchema` is removed; replace it with `SchemaOf`, which takes a 3.x `up` too:
+
+```ts
+// 3.x
+import type { MigrationSchema, PostgresMigration } from "@typesql/core/migration";
+import type { up as previousUp } from "./1793356800_create-users.ts";
+
+export async function up(db: PostgresMigration<MigrationSchema<typeof previousUp>>) {
+
+// 4.0
+import type { PostgresMigration, SchemaOf } from "@typesql/core/migration";
+import type { up as previousUp } from "./1793356800_create-users.ts";
+
+export async function up(db: PostgresMigration<SchemaOf<typeof previousUp>>) {
+```
+
+New files use the default-export form. `typesql migrate make` writes it, and after a 3.x file it imports that file's `up`: `import { up as previous } from "./1793356800_create-users.js"`.
+
+Because the fingerprint covers what `up` runs and not its source, an applied 3.x file can also be rewritten to `export default migration(previous, { up, down })` after the conversion: as long as `up` runs the same `.add()` and `.raw()` steps, it still matches. A 3.x file that follows a rewritten one imports its default export instead of its `up` (`import type previous from "./….ts"` and `SchemaOf<typeof previous>`). Rewriting also fixes a long 3.x history whose later files report false type errors in the editor.
 
 ## 3.0
 
@@ -59,7 +174,7 @@ Update the [VS Code extension](./vscode) to 1.0 or later and `@typesql/language-
 ### Tracked migrations that use `{name}` slots {#tracked-migrations-with-slots}
 
 ::: warning Applied migration files
-A tracked migration file that uses `{name}` slots no longer compiles. Rewriting it as above changes the file's runtime code, and so its hash, and the next `typesql migrate` command fails with `Applied migration has changed`. [Rewriting an applied migration](./migrations#rewriting-an-applied-migration) shows how to record the new hash once you have checked that the file runs the same SQL.
+A tracked migration file that uses `{name}` slots no longer compiles. In 3.x, rewriting it as above changes the file's runtime code, and so its hash, and the next `typesql migrate` command fails with `Applied migration has changed`; 3.x's `migrationHash` gives the new hash to store in the history table once you have checked that the file runs the same SQL. From 4.0 on, queries are not part of a migration's fingerprint, so the rewrite is not a change; see [Changing an applied migration](./migrations#rewriting-an-applied-migration).
 :::
 
 ### `sql.empty` is now `sql.optional` and `sql.if`
@@ -214,7 +329,7 @@ With `@typesql/cli` 0.2.0 (released with `@typesql/core` 1.0.0), `typesql migrat
 
 ## Upgrading from 0.x
 
-The 0.x releases changed the API several times. The versions below are `@typesql/core`'s; the adapters' 0.x versions moved with it. Apply the ones newer than the version you are on, then [1.0](#_1-0), [2.0](#_2-0) and [3.0](#_3-0).
+The 0.x releases changed the API several times. The versions below are `@typesql/core`'s; the adapters' 0.x versions moved with it. Apply the ones newer than the version you are on, then [1.0](#_1-0), [2.0](#_2-0), [3.0](#_3-0) and [4.0](#_4-0).
 
 ### 0.10: plugins replace `rowKeys`, `sql.param(undefined)` is rejected
 

@@ -10,8 +10,6 @@ import type { PgTypeMap } from "./type-map.js";
 
 export {
 	executor,
-	type MigrationSource,
-	migrate,
 	type PgPoolLike,
 	type PgQueryable,
 	type PgQueryConfig,

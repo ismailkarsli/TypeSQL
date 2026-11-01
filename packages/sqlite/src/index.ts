@@ -12,8 +12,6 @@ import { driver, type SqliteDatabase } from "./client.js";
 export {
 	type ExecutorOptions,
 	executor,
-	type MigrationSource,
-	migrate,
 	type SqliteDatabase,
 	type SqliteStatement,
 } from "./client.js";

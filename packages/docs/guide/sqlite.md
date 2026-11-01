@@ -1,6 +1,6 @@
 # SQLite
 
-TypeSQL types SQLite statements with the `sqlite` dialect from `@typesql/core/sqlite`. It has its own parser and type rules, written against SQLite 3.53's behavior; everything else (`sql.param`, fragments, `sql.set` / `sql.values`, `:name` parameters, transactions, `migrations()`) works as described in the rest of this guide.
+TypeSQL types SQLite statements with the `sqlite` dialect from `@typesql/core/sqlite`. It has its own parser and type rules, written against SQLite 3.53's behavior; everything else (`sql.param`, fragments, `sql.set` / `sql.values`, `:name` parameters, transactions, [migrations](./migrations)) works as described in the rest of this guide.
 
 ```ts
 import { createSql } from "@typesql/core";
@@ -32,11 +32,19 @@ A schema derived [from migrations](./migrations) follows SQLite's rules:
 - `CREATE TABLE … AS SELECT` columns get the affinity names SQLite gives them (`int`, `text`, `real`, `num`) or `any`.
 
 ```ts
-import { migrations } from "@typesql/core/sqlite";
+import { migration } from "@typesql/core/migration";
 
-const m = migrations()
-  .add("CREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT NOT NULL)")
-  .add("ALTER TABLE users ADD COLUMN bio TEXT");
+export const createUsers = migration("sqlite", {
+	up: async (db) => {
+		const users = await db.add(
+			"CREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT NOT NULL)",
+		);
+		return users.add("ALTER TABLE users ADD COLUMN bio TEXT");
+	},
+	down: async (db) => {
+		await db.add("DROP TABLE users");
+	},
+});
 ```
 
 Or generate the schema from a database file with [`typesql introspect --dialect sqlite`](../adapters/sqlite#generate-the-schema), or convert your [Kysely, Drizzle or Prisma schema](./orms#sqlite).

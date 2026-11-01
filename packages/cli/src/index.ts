@@ -3,19 +3,17 @@ import { parseArgs } from "node:util";
 import { main as postgres } from "@typesql/pg/introspect";
 import { main as sqlite } from "@typesql/sqlite/introspect";
 
-export type { MigrationConfig } from "./migrate.js";
-
 export type Dialect = "postgres" | "sqlite";
 
 const DIALECTS: Readonly<
 	Record<Dialect, (argv: readonly string[]) => Promise<number>>
 > = { postgres, sqlite };
 
-const USAGE = `Usage: typesql migrate <up|down|latest|make name|generate> [options]
+const USAGE = `Usage: typesql migrate <latest|up|down|status|make name|generate> [options]
        typesql introspect [--dialect postgres|sqlite] [options]
        typesql --version
 
-Manage tracked schema migrations, or read a database and write its TypeSQL schema.
+Run tracked schema migrations, or read a database and write its TypeSQL schema.
 Run \`typesql migrate --help\` for migration options.
 
   --dialect postgres  a live PostgreSQL database (--url); the default

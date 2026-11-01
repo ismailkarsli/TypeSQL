@@ -13,11 +13,7 @@ export type {
 	TableName,
 	TableOf,
 } from "./engine/write.js";
-export {
-	migrations,
-	type PgMigrations,
-	type ValidateDdl,
-} from "./migrations.js";
+export type { ValidateDdl } from "./migrations.js";
 export type {
 	Col,
 	Enum,

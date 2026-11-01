@@ -1,17 +1,18 @@
-import { readdir } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import type { Checker, Symbol as TsSymbol, Type } from "typescript/sync";
+import { migrationFiles } from "./files.js";
 
 type Sync = typeof import("typescript/sync");
 type Project = NonNullable<
 	ReturnType<InstanceType<Sync["Snapshot"]>["getDefaultProjectForFile"]>
 >;
 
-export type Dialect = "postgres" | "sqlite";
+type Dialect = "postgres" | "sqlite";
 
 /** Which schema to write: after a migration's `up`, or before the first one. */
-export type SchemaPoint =
+type SchemaPoint =
 	| { readonly after: string }
 	| { readonly before: string }
 	| { readonly empty: true };
@@ -21,16 +22,36 @@ const key = (name: string): string =>
 	IDENT.test(name) ? name : JSON.stringify(name);
 const NOT_RELATIONS = new Set(["$types", "$functions"]);
 
-export async function migrationFiles(migrationsDir: string): Promise<string[]> {
-	const entries = await readdir(migrationsDir, { withFileTypes: true });
-	return entries
-		.filter(
-			(entry) =>
-				(entry.isFile() || entry.isSymbolicLink()) &&
-				entry.name.endsWith(".ts"),
-		)
-		.map((entry) => entry.name)
-		.sort();
+/**
+ * Write the schema after the first `point` migrations of a directory (or
+ * after the last one) to `schemaFile`, and return the file's path.
+ */
+export async function writeSchema(options: {
+	readonly migrationsDir: string;
+	readonly dialect: Dialect;
+	readonly schemaFile: string;
+	readonly point: number | "last";
+}): Promise<string> {
+	const migrationsDir = resolve(options.migrationsDir);
+	const files = await migrationFiles(migrationsDir);
+	const count = options.point === "last" ? files.length : options.point;
+	const first = files[0];
+	const last = files[count - 1];
+	const point: SchemaPoint =
+		first === undefined
+			? { empty: true }
+			: last === undefined
+				? { before: first }
+				: { after: last };
+	const source = generateSchema({
+		migrationsDir,
+		point,
+		dialect: options.dialect,
+	});
+	const out = resolve(options.schemaFile);
+	await mkdir(dirname(out), { recursive: true });
+	await writeFile(out, source);
+	return out;
 }
 
 function typescript(): Sync {
@@ -45,7 +66,7 @@ function typescript(): Sync {
 }
 
 /** Read the schema type a migration file carries and write it as a TypeSQL schema module. */
-export function generateSchema(options: {
+function generateSchema(options: {
 	readonly migrationsDir: string;
 	readonly point: SchemaPoint;
 	readonly dialect: Dialect;
@@ -115,16 +136,20 @@ function migrationReader(
 	fail: (reason: string) => never,
 ) {
 	const { checker, program } = project;
+	/** A migration's up: of its default export, or a 3.x file's named export. */
 	const upSignature = (file: string) => {
 		const module = checker.getSymbolOfSourceFile(file);
-		const up = module
-			? checker.getExportsOfModule(module).find((s) => s.name === "up")
-			: undefined;
-		if (!up) return "it does not export up";
-		const [signature] = checker.getSignaturesOfType(
-			checker.getTypeOfSymbol(up),
-			ts.SignatureKind.Call,
-		);
+		const exports = module ? checker.getExportsOfModule(module) : [];
+		const defined = exports.find((s) => s.name === "default");
+		const named = exports.find((s) => s.name === "up");
+		const up = defined
+			? checker.getTypeOfPropertyOfType(checker.getTypeOfSymbol(defined), "up")
+			: named && checker.getTypeOfSymbol(named);
+		if (!up)
+			return defined
+				? "its default export is not a migration; define it with migration() from @typesql/core/migration"
+				: "it neither default-exports a migration nor exports up";
+		const [signature] = checker.getSignaturesOfType(up, ts.SignatureKind.Call);
 		return signature ?? "up is not a function";
 	};
 
@@ -214,7 +239,7 @@ function migrationReader(
 					unresolved(file, what) ??
 						(!context || context.isErrorType()
 							? notComputed(what)
-							: `${what} is untyped; define up with migration() from @typesql/core/migration`),
+							: `${what} is untyped; define the migration with migration() from @typesql/core/migration`),
 				);
 			const schema = checker.getTypeOfPropertyOfType(context, "schema");
 			if (!schema)

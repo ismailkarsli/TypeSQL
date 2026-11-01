@@ -1,0 +1,5 @@
+---
+"@typesql/core": major
+---
+
+Replace the migration APIs with one migrator: `migration(from, { up, down })` from `@typesql/core/migration` defines a migration that starts from `"postgres"`, `"sqlite"` or the previous migration, and `createMigrator({ dialect, url | db | execute, migrationsDir | migrations })` runs a directory of files or an array with `latest()`, `up()`, `down()`, `status()`, `make()` and `generate()`, also in Bun, Deno and Cloudflare Workers (an array with `execute`; `transaction: false` for D1). Applied migrations are tracked by a fingerprint of the DDL `up` runs instead of a hash of the file, so reformatting a statement is not a change and a directory and an array share one history; a 3.x history is converted on the first command in directory mode. `migrateUp`, `migrateDown`, `migrateLatest`, `discoverMigrations`, `migrationHash`, `MigrationSchema` (use `SchemaOf`), the `Migrations` builder with `migrations()` of `@typesql/core/postgres` and `/sqlite`, `runMigrations` and `MigrationClient` are removed, and `SchemaOf` takes a migration.

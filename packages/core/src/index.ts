@@ -9,12 +9,7 @@ export type {
 } from "./dialect.js";
 export type { Empty, EmptyFragment, Optional } from "./empty.js";
 export type { AnyErr, ErrAt, ErrMsg, IsErr, SqlError } from "./errors.js";
-export {
-	type MigrationClient,
-	Migrations,
-	runMigrations,
-	type SchemaOf,
-} from "./migrations.js";
+export type { SchemaOf } from "./migration/define.js";
 export type {
 	IdentityPluginTypes,
 	InputContext,

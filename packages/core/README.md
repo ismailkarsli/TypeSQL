@@ -71,41 +71,44 @@ const query = findUser(7);
 
 Named parameters and fixed fragments work too. The `pg` and `postgres` adapters also request server-side preparation when these queries execute. See the [prepared query API](https://typesql.karsli.net/reference/api#sql-prepare-text).
 
-## Tracked migrations
+## Migrations
 
-The separate `@typesql/core/migration` entry point loads TypeScript migration files and runs them against PostgreSQL or SQLite on Node 26. Each file exports `up` and `down`:
+`@typesql/core/migration` defines migrations whose DDL is checked as you write it, and runs them with a history table. `migration(from, { up, down })` starts from `"postgres"` or `"sqlite"`, or from the previous migration:
 
 ```ts
-import { migration } from "@typesql/core/migration";
+import { createMigrator, migration, type SchemaOf } from "@typesql/core/migration";
 
-export const up = migration("postgres", async (db) => {
-  const next = await db.add("CREATE TABLE users (id int PRIMARY KEY, name text NOT NULL)");
-  await next("INSERT INTO users (id, name) VALUES ($1, $2)", 1, "Ada").execute();
-  return next;
+export const createUsers = migration("postgres", {
+  up: async (db) => {
+    const users = await db.add("CREATE TABLE users (id serial PRIMARY KEY, name text NOT NULL)");
+    await users("INSERT INTO users (name) VALUES ($1)", "Ada").execute();
+    return users;
+  },
+  down: async (db) => {
+    await db.add("DROP TABLE users");
+  },
 });
 
-export const down = migration(up, async (db) => {
-  await db.add("DROP TABLE users");
+export const addBio = migration(createUsers, {
+  up: async (db) => db.add("ALTER TABLE users ADD COLUMN bio text"),
+  down: async (db) => {
+    await db.add("ALTER TABLE users DROP COLUMN bio");
+  },
 });
+
+export type DB = SchemaOf<typeof addBio>;
+
+await createMigrator({
+  dialect: "postgres",
+  url: process.env.DATABASE_URL,
+  migrations: [createUsers, addBio],
+}).latest();
 ```
 
-Use `"sqlite"` for SQLite. A later file imports the previous file's `up` (as
-`./name.js`) and starts from its schema with `migration(previous, async (db) => …)`;
-`down` starts from its own file's `up`. Await `.add()` or `.raw<NewSchema>()` into a new constant to retain
-the updated schema; return that context from `up`, including for a no-op migration.
-`down` may return nothing.
+Await each `.add()` and keep the context it returns: it carries the changed schema. `up` returns its final context.
 
-`migrateUp`, `migrateDown`, and `migrateLatest` accept `{ dialect, migrationsDir,
-execute, migrationTable? }`. `execute` is a TypeSQL executor bound to one dedicated
-database connection for the entire call. Files run in filename order, each in its
-own transaction, with SHA-256 history checks and concurrency protection. A failed
-file rolls back while earlier committed files remain applied. Migration code must
-await every database operation and leave transaction management to the runner.
-The default tracking table is `schema_migrations`. Hashes cover each migration
-file's runtime code; imported runtime helpers are not tracked.
+`createMigrator(config)` takes the migrations as an array or as a directory of files (`migrationsDir`, one default export per file, in filename order), and connects with `url` (PostgreSQL, through the optional peer dependency `pg`), `db` (a SQLite file, through node:sqlite) or your own `execute`. `latest()`, `up()` and `down()` run each migration and its history row in one transaction, under a lock, and every command first checks, by a fingerprint of their DDL, that applied migrations haven't changed. Array mode with `execute` loads no Node built-ins, so it runs in Cloudflare Workers, Bun and Deno; set `transaction: false` for Cloudflare D1. In directory mode, the migrator also writes the schema to `db.ts`, and [`@typesql/cli`](https://www.npmjs.com/package/@typesql/cli) runs it as `typesql migrate`.
 
-For configuration, file generation, and command-line execution, install
-`@typesql/cli` and use `typesql migrate make <name>`, `up`, `down`, `latest`, or `generate`.
 See the [migration guide](https://typesql.karsli.net/guide/migrations).
 
 ## Documentation

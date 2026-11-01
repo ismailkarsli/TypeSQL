@@ -92,4 +92,16 @@ The command opens the file with node:sqlite, so it needs Node.js 22.13 or later.
 
 ## Migrations
 
-`migrate(db, m)` runs a [`migrations()`](../guide/migrations) builder's statements in one transaction. Build it with `migrations` from `@typesql/core/sqlite`.
+On Node, give the [migrator](../guide/migrations#the-migrator) the database file as `db`; it opens the file with node:sqlite and runs every statement of a `;`-separated `.add()`. To run it on a database you opened, pass `executor(database)` as `execute`. The adapter prepares each text, and a prepared statement holds one statement (node:sqlite runs only the first of several), so keep one statement per `.add()` then:
+
+```ts
+import { Database } from "bun:sqlite";
+import { createMigrator } from "@typesql/core/migration";
+import { executor } from "@typesql/sqlite";
+
+await createMigrator({
+	dialect: "sqlite",
+	execute: executor(new Database("app.db")),
+	migrations: [createUsers, addBio],
+}).latest();
+```

@@ -24,7 +24,7 @@ TypeSQL needs no database while you write code, and there is no generator to rer
 
 Kysely builds queries from typed method calls, which is handy when a query's shape depends on runtime input. Drizzle and Prisma add a schema, relations and migrations. All three support several databases.
 
-With TypeSQL you write the SQL itself, including syntax a builder has no method for. It is not an ORM: it can [run your migrations](./migrations), but it doesn't track which ones already ran.
+With TypeSQL you write the SQL itself, including syntax a builder has no method for. It is not an ORM, though it can [run your migrations](./migrations) and track which ones already ran.
 
 ## Using them together
 

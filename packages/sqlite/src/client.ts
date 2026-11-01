@@ -137,16 +137,3 @@ export const driver = (
 	executor: (db) => executor(db, options),
 	transaction,
 });
-
-export interface MigrationSource {
-	readonly statements: readonly string[];
-}
-
-export async function migrate(
-	db: SqliteDatabase,
-	m: MigrationSource,
-): Promise<void> {
-	await transaction(db, 0, async () => {
-		for (const statement of m.statements) db.exec(statement);
-	});
-}

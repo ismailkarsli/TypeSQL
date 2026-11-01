@@ -16,7 +16,7 @@ Install `@typesql/core` and the adapter for your driver:
 | [`@typesql/postgres`](../adapters/postgres) | postgres.js (`postgres`) |
 | [`@typesql/sqlite`](../adapters/sqlite) | node:sqlite, bun:sqlite or better-sqlite3 |
 
-`@typesql/core` has no runtime dependencies (only `typesql migrate` needs `typescript` at runtime; see [tracked migration files](./migrations#tracked-migration-files)). The packages are ESM-only. `import` and Node's `require()` of ES modules both work, but TypeScript rejects imports from `.cts` files under `node16`/`nodenext` resolution (TS1479). The adapter types rows the way your driver returns them and runs queries on your client.
+`@typesql/core` has no runtime dependencies. Its [migrator](./migrations#the-migrator) connects from a `url` with `pg`, an optional peer dependency, and writes `db.ts` with `typescript`. The packages are ESM-only. `import` and Node's `require()` of ES modules both work, but TypeScript rejects imports from `.cts` files under `node16`/`nodenext` resolution (TS1479). The adapter types rows the way your driver returns them and runs queries on your client.
 
 ## Install TypeScript 7.1
 
@@ -54,7 +54,7 @@ See [From Kysely, Drizzle or Prisma](./orms).
 
 ## The `typesql` command (optional)
 
-`@typesql/cli` provides `typesql introspect`, which writes your schema from a PostgreSQL or SQLite database. See [From a live database](./introspect). It also provides `typesql migrate` for [tracked migration files](./migrations#tracked-migration-files), which import their types from `@typesql/core`: keep `@typesql/core` a dependency of your project, as above, even though `@typesql/cli` depends on it too (pnpm doesn't let your files import it through the CLI).
+`@typesql/cli` provides `typesql introspect`, which writes your schema from a PostgreSQL or SQLite database. See [From a live database](./introspect). It also provides [`typesql migrate`](./migrations#the-typesql-migrate-command), which runs migration files. They import their types from `@typesql/core`: keep `@typesql/core` a dependency of your project, as above, even though `@typesql/cli` depends on it too (pnpm doesn't let your files import it through the CLI).
 
 ## Editor extension (optional)
 

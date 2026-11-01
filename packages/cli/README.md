@@ -1,16 +1,16 @@
 # @typesql/cli
 
-The `typesql` command runs tracked schema migrations and introspects databases. Requires Node.js 26 or newer. `typesql introspect` reads a PostgreSQL or SQLite database and writes its [TypeSQL](https://www.npmjs.com/package/@typesql/core) schema to a TypeScript file.
+The `typesql` command runs schema migrations and introspects databases. Requires Node.js 26 or newer. `typesql introspect` reads a PostgreSQL or SQLite database and writes its [TypeSQL](https://www.npmjs.com/package/@typesql/core) schema to a TypeScript file.
 
 ## Install
 
 ```sh
 npm install -D @typesql/cli
 npm install -D pg   # for PostgreSQL
-npm install @typesql/core   # for tracked migrations
+npm install @typesql/core   # for migrations
 ```
 
-Migration files and the generated `db.ts` import their types from `@typesql/core`, so tracked migrations need it as a dependency of your project; with pnpm, the CLI's own copy isn't importable from your files.
+Migration files and the generated `db.ts` import from `@typesql/core`, so migrations need it as a dependency of your project; with pnpm, the CLI's own copy isn't importable from your files.
 
 ## Usage
 
@@ -21,63 +21,62 @@ npx typesql introspect --dialect sqlite --db app.db --out src/db/schema.ts
 
 `--dialect` is `postgres` (the default) or `sqlite` (the default when `--db` is given). `typesql introspect --dialect <name> --help` lists the options of each dialect.
 
-## Tracked migrations
+## Migrations
 
-Create `typesql.config.ts` in your working directory:
+Create `typesql.config.ts` in your working directory. It default-exports a migrator from `@typesql/core/migration`:
 
 ```ts
-import type { MigrationConfig } from "@typesql/cli";
+import { createMigrator } from "@typesql/core/migration";
 
-export default {
+export default createMigrator({
   dialect: "postgres",
+  url: process.env.DATABASE_URL,
   migrationsDir: "./migrations",
-} satisfies MigrationConfig;
+});
 ```
 
-For SQLite, use `{ dialect: "sqlite", db: "./app.db" }`. The default directory is `migrations` beside the config file. Configured database and migration paths are relative to the config file; `--db` and `--dir` paths are relative to the working directory.
+For SQLite, use `{ dialect: "sqlite", db: "./app.db", migrationsDir: "./migrations" }`. Relative paths in the config resolve beside the config file.
 
 ```sh
 npx typesql migrate make "create users"
-npx typesql migrate up       # one pending migration
+npx typesql migrate up       # the next pending migration
 npx typesql migrate latest   # every pending migration
-npx typesql migrate down     # one applied migration
+npx typesql migrate down     # the last applied migration
+npx typesql migrate status   # applied and pending migrations
 npx typesql migrate generate # write db.ts from the migrations
 ```
 
-`make` writes `<unix-seconds>_<name>.ts`, converting spaces to dashes; its `up` starts from the previous file's `up`, imported as `./name.js`. It refuses duplicate filenames and names that sort before existing files. Every `.ts` file is read in filename order, including manually named files.
+`make` writes `<unix-seconds>_<name>.ts`, converting spaces to dashes, starting from the previous file. It refuses duplicate filenames and names that sort before existing files. Every `.ts` file runs in filename order, including manually named files. Each file default-exports its migration:
 
 ```ts
 import { migration } from "@typesql/core/migration";
+import previous from "./1793356800_create-users.js";
 
-export const up = migration("postgres", async (db) => {
-  const next = await db.add("CREATE TABLE users (id serial PRIMARY KEY, name text NOT NULL)");
-  await next("INSERT INTO users (name) VALUES ($1)", "Ada").execute();
-  return next;
-});
-
-export const down = migration(up, async (db) => {
-  await db.add("DROP TABLE users");
+export default migration(previous, {
+  up: async (db) => db.add("ALTER TABLE users ADD COLUMN bio text"),
+  down: async (db) => {
+    await db.add("ALTER TABLE users DROP COLUMN bio");
+  },
 });
 ```
 
-Use `"sqlite"` for SQLite. `up` returns its final context, including for a no-op migration. `down` is required but may have an empty body. Await `.add()` and `.raw<NewSchema>()`; retain each returned context in a new `const` to carry its changed schema. Query calls return checked queries with `.execute()` and inferred rows. A first migration that starts from an existing schema is written as `export async function up(db: PostgresMigration<Existing>)`.
+The first file starts from `"postgres"` or `"sqlite"` instead of `previous`. `up` returns its final context; await each `.add()` and keep the context it returns. Files written for TypeSQL 3.x, which export `up` and `down` functions, still run.
 
-`--config <file>` selects another config; `--dialect`, `--url`, `--db`, and `--dir` override it. PostgreSQL uses `DATABASE_URL` when no URL is configured. Complete flags work without a config file:
+`--config <file>` selects another config, and `--dialect`, `--url`, `--db`, `--dir`, `--out` and `--no-generate` override it, with paths relative to the working directory. PostgreSQL uses `$DATABASE_URL` when nothing else sets a connection. Without a config file, pass `--dialect` and `--url` or `--db`; the directory is then `./migrations`:
 
 ```sh
-npx typesql migrate latest --dialect sqlite --db app.db --dir migrations
+npx typesql migrate latest --dialect sqlite --db app.db
 ```
 
-Applied filenames, normalized runtime-code SHA-256 hashes, and timestamps are recorded in `schema_migrations`; set `migrationTable` in config to change its name. Changing runtime code in an applied file, deleting one, or inserting a file before an applied migration causes an error. Comments, formatting, and erased TypeScript types do not change hashes; runtime token spelling does.
+The history is recorded in `schema_migrations` (`migrationTable` changes the name). Each migration and its history row commit together; PostgreSQL holds an advisory lock for the command, and SQLite uses `BEGIN IMMEDIATE`. Editing the DDL of an applied migration, deleting one, or inserting or reordering one before it is an error; formatting, comments, types and queries are not tracked.
 
-Each migration and its history update run in their own transaction. Earlier successful migrations remain committed if `latest` later fails. PostgreSQL holds a session advisory lock for the command; SQLite uses `BEGIN IMMEDIATE` and checks history again in each transaction. SQL that cannot run in a transaction fails. An empty `down` still removes its history record.
+`up`, `down` and `latest` then write the schema of the last applied migration to `db.ts` beside the config. `generate` writes the schema of the last migration file without connecting. Writing it needs `typescript` 7.1 or later; set `schemaFile` or pass `--out` to change the path, and set `generate: false` or pass `--no-generate` to skip it.
 
-`up`, `down`, and `latest` then write the schema of the last applied migration to `db.ts` beside the config, as `export interface DB` with `Col` and `View` types. `npx typesql migrate generate` writes the schema of the last migration file without connecting. The schema is read from the migrations' types with TypeScript, so each `up` must be typed and return its context. Set `schemaFile` or pass `--out` to change the path; set `generate: false` or pass `--no-generate` to skip writing after a migration. A schema TypeScript could not compute is an error, never written.
-
-Successful and empty operations exit with code 0, configuration or execution failures with 1, and invalid command syntax with 2. If only the schema file can't be written after a successful migration, the command warns and exits with 0; fix the cause and run `npx typesql migrate generate`. Progress is written to stdout and errors to stderr.
+The command exits with 0 on success, 1 on configuration, connection or migration errors, and 2 on invalid usage. If only `db.ts` can't be written after a successful migration, it warns and exits with 0; fix the cause and run `npx typesql migrate generate`. Progress goes to stdout and errors to stderr.
 
 ## Documentation
 
+- [From migrations](https://typesql.karsli.net/guide/migrations): migration files, the config and `typesql migrate`
 - [From a live database](https://typesql.karsli.net/guide/introspect): PostgreSQL options
 - [SQLite](https://typesql.karsli.net/adapters/sqlite#generate-the-schema): SQLite options
 

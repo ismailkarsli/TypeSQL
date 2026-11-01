@@ -77,7 +77,7 @@ Unsupported syntax is always a compile error, never a silent `any`. See [Limits]
 
 ## Exporting queries from another package (TS2883)
 
-With `declaration` output, TypeScript 7.1 checks that every inferred type can be named from the package that exports it. Rows are plain object types, but a `Query`, `Fragment` or `Migrations` value is a TypeSQL type. A package that exports one without depending on `@typesql/core` itself fails:
+With `declaration` output, TypeScript 7.1 checks that every inferred type can be named from the package that exports it. Rows are plain object types, but a `Query`, `Fragment` or `Migration` value is a TypeSQL type. A package that exports one without depending on `@typesql/core` itself fails:
 
 ```
 

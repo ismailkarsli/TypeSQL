@@ -68,35 +68,40 @@ export type SqliteMigration<Base = {}> = MigrationContext<
 	Base
 >;
 
-/** Extract the final schema returned by an async migration's up function. */
-export type MigrationSchema<Up extends (...args: never[]) => unknown> =
-	Awaited<ReturnType<Up>> extends { readonly schema: infer Schema }
-		? Schema
-		: MissingSchema;
-
 declare const MISSING_SCHEMA: unique symbol;
 /** The schema of a migration whose `up` doesn't return its context. */
-type MissingSchema = { readonly [MISSING_SCHEMA]: true };
+export type MissingSchema = { readonly [MISSING_SCHEMA]: true };
 type MissingSchemaError = SqlError<
 	"the previous migration's up() does not return its migration context, so its schema is unknown; end it with `return db`",
 	0
 >;
 
-/** Internal factory: execution is bound to the runner's active transaction. */
+/**
+ * Internal factory: execution is bound to the runner's active transaction.
+ * `step` runs each `.add()` and `.raw()` statement; the fingerprint's dry
+ * run records them instead.
+ */
 export function createMigrationContext(
 	dialect: "postgres" | "sqlite",
 	execute: Executor,
+	step: (kind: "add" | "raw", statement: string) => Promise<void> = async (
+		_,
+		statement,
+	) => {
+		await execute(statement, []);
+	},
 ): PostgresMigration | SqliteMigration {
 	// Avoid comparing the two recursive SQL APIs when choosing a runtime dialect.
 	let sql: object;
 	if (dialect === "postgres") sql = createDialectSql(postgres, execute);
 	else if (dialect === "sqlite") sql = createDialectSql(sqlite, execute);
 	else throw new Error(`typesql: unsupported migration dialect: ${dialect}`);
-	const next = async (statement: string) => {
-		await execute(statement, []);
-		return createMigrationContext(dialect, execute);
+	const next = (kind: "add" | "raw") => async (statement: string) => {
+		await step(kind, statement);
+		return createMigrationContext(dialect, execute, step);
 	};
-	return Object.assign(sql, { add: next, raw: next }) as unknown as
-		| PostgresMigration
-		| SqliteMigration;
+	return Object.assign(sql, {
+		add: next("add"),
+		raw: next("raw"),
+	}) as unknown as PostgresMigration | SqliteMigration;
 }

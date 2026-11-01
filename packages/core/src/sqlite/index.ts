@@ -23,11 +23,7 @@ export type {
 	TableName,
 	TableOf,
 } from "./engine/write.js";
-export {
-	migrations,
-	type SqliteMigrations,
-	type ValidateDdl,
-} from "./migrations.js";
+export type { ValidateDdl } from "./migrations.js";
 export type {
 	Col,
 	ColFlags,
