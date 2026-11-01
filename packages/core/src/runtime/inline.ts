@@ -12,9 +12,10 @@ interface Marks {
 }
 
 // The markers hold a random prefix, so SQL text can't forge one. It is made
-// on first use: Cloudflare Workers forbid random values in global scope, so
-// importing @typesql/core must not need one. Until then no marker exists, and
-// the readers below have nothing to find.
+// on first use: Cloudflare Workers forbid crypto's random values in global
+// scope, so importing @typesql/core must not need one. Until then no marker
+// exists, and the readers below have nothing to find. A first use in global
+// scope takes Math.random's instead.
 let created: Marks | undefined;
 
 function marks(): Marks {
@@ -220,8 +221,13 @@ function randomHex(bytes: number): string {
 	const crypto = (
 		globalThis as { crypto?: { getRandomValues(a: Uint8Array): Uint8Array } }
 	).crypto;
-	const a = crypto
-		? crypto.getRandomValues(new Uint8Array(bytes))
-		: new Uint8Array(bytes).map(() => Math.floor(Math.random() * 256));
+	let a: Uint8Array | undefined;
+	try {
+		a = crypto?.getRandomValues(new Uint8Array(bytes));
+	} catch {
+		// Cloudflare Workers throw in global scope, where a module-level
+		// sql.param() or fragment makes the first marker.
+	}
+	a ??= new Uint8Array(bytes).map(() => Math.floor(Math.random() * 256));
 	return Array.from(a, (b) => b.toString(16).padStart(2, "0")).join("");
 }
