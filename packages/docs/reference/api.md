@@ -309,6 +309,7 @@ An entry is one `Sig<Params, Return, Flags>` or a tuple of overloads.
 | `LatestResult<Schema>` | what `latest()` resolves to: `{ applied, schemaFile?, schemaError? }`, and the type-only schema after the last migration |
 | `UpResult` | what `up()` resolves to: `{ applied, schemaFile?, schemaError? }` |
 | `DownResult` | what `down()` resolves to: `{ reverted, schemaFile?, schemaError? }` |
+| `MigrationError` | what `latest()`, `up()` and `down()` reject with when a migration fails: `{ migration, applied, schemaFile?, schemaError?, cause }` |
 | `MigrationStatus` | an entry of `status()`: `{ name, applied, appliedAt: Date \| null }` |
 | `isMigrator(value)` | whether `value` is a migrator, from any copy of `@typesql/core` |
 

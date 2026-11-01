@@ -4,9 +4,12 @@ import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 import {
 	createMigrator,
+	type DownResult,
 	isMigrator,
+	type MigrationError,
 	type Migrator,
 	type MigratorConfig,
+	type UpResult,
 } from "@typesql/core/migration";
 
 interface Io {
@@ -214,26 +217,40 @@ export async function main(argv: readonly string[], io: Io): Promise<number> {
 				return 0;
 			}
 		}
-		const result =
-			command === "down"
-				? await migrator.down()
-				: command === "up"
-					? await migrator.up()
-					: await migrator.latest();
+		const report = (
+			names: readonly string[],
+			write: { schemaFile?: string; schemaError?: Error },
+		) => {
+			for (const name of names)
+				print(`${command === "down" ? "reverted" : "applied"} ${name}`);
+			if (write.schemaFile !== undefined)
+				print(`generated ${write.schemaFile}`);
+			// The database is migrated by now: a schema file that can't be
+			// written is a warning, and the exit code reports the migration.
+			if (write.schemaError !== undefined)
+				io.stderr(
+					`typesql migrate: warning: the schema file was not updated: ${message(write.schemaError)}\n` +
+						"typesql migrate: fix the cause, then run `typesql migrate generate`\n",
+				);
+		};
+		let result: UpResult | DownResult;
+		try {
+			result =
+				command === "down"
+					? await migrator.down()
+					: command === "up"
+						? await migrator.up()
+						: await migrator.latest();
+		} catch (error) {
+			// The migrations before the one that failed stay applied.
+			if (error instanceof Error && error.name === "MigrationError")
+				report((error as MigrationError).applied, error as MigrationError);
+			throw error;
+		}
 		const names = "reverted" in result ? result.reverted : result.applied;
 		if (names.length === 0)
 			print(`no ${command === "down" ? "applied" : "pending"} migrations`);
-		for (const name of names)
-			print(`${command === "down" ? "reverted" : "applied"} ${name}`);
-		if (result.schemaFile !== undefined)
-			print(`generated ${result.schemaFile}`);
-		// The database is migrated by now: a schema file that can't be written
-		// is a warning, and the exit code reports the migration.
-		if (result.schemaError !== undefined)
-			io.stderr(
-				`typesql migrate: warning: the schema file was not updated: ${message(result.schemaError)}\n` +
-					"typesql migrate: fix the cause, then run `typesql migrate generate`\n",
-			);
+		report(names, result);
 		return 0;
 	} catch (error) {
 		io.stderr(`typesql migrate: ${message(error)}\n`);

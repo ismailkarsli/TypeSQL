@@ -167,6 +167,7 @@ const { applied } = await migrator.latest();
 - `Schema` is the schema after the last migration: inferred from the `migrations` array, or given in directory mode as `createMigrator<DB>({ … })`, with `DB` from the DB file. `SchemaOf<typeof result>` of the result of `latest()`, and `SchemaOf<typeof migrator>`, are that schema; it is a type only, not a property at runtime.
 - `applied` and `reverted` are the history names of the migrations that ran, in order; they are empty when there was nothing to do.
 - In directory mode, `latest()`, `up()` and `down()` then write the DB file: `schemaFile` is its path. If it can't be written, they still resolve, with `schemaError`: the database is migrated, only the file is not.
+- A migration that fails rejects the call with a `MigrationError`. Its message names the migration and gives the database's error, which is also its `cause`. `migration` is the name of the one that failed, and `applied` lists the ones the call applied before it; those stay applied, and in directory mode the DB file is written for them, with `schemaFile` or `schemaError` as above. The CLI prints them before the error.
 - `status()` lists the migrations in order. An applied one has the name from its history row and `appliedAt` from `applied_at`.
 - `make()` and `generate()` throw in array mode.
 - `.config` is the migrator's config. `isMigrator(value)` tells whether a value is a migrator, from any copy of `@typesql/core`.

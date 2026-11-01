@@ -73,6 +73,35 @@ export interface DownResult extends SchemaWrite {
 	readonly reverted: readonly string[];
 }
 
+/**
+ * A migration failed and was rolled back. `applied` lists the migrations the
+ * same call applied before it; with migrationsDir, the schema file was
+ * written for them, as after a command that succeeds.
+ */
+export class MigrationError extends Error {
+	override readonly name = "MigrationError";
+	/** The migration that failed: its file name, or its position in the array. */
+	readonly migration: string;
+	readonly applied: readonly string[];
+	readonly schemaFile?: string;
+	readonly schemaError?: Error;
+	constructor(
+		message: string,
+		options: {
+			readonly cause: unknown;
+			readonly migration: string;
+			readonly applied: readonly string[];
+		} & SchemaWrite,
+	) {
+		super(message, { cause: options.cause });
+		this.migration = options.migration;
+		this.applied = options.applied;
+		if (options.schemaFile !== undefined) this.schemaFile = options.schemaFile;
+		if (options.schemaError !== undefined)
+			this.schemaError = options.schemaError;
+	}
+}
+
 export interface MigrationStatus {
 	readonly name: string;
 	readonly applied: boolean;
@@ -232,22 +261,35 @@ export function createMigrator(config: MigratorConfig): Migrator {
 			};
 		}
 	};
+	const command = async (
+		kind: "latest" | "up" | "down",
+	): Promise<{ names: string[] } & SchemaWrite> => {
+		try {
+			const { names, applied } = await run(settled, kind);
+			return { names, ...(await afterCommand(applied)) };
+		} catch (error) {
+			if (!(error instanceof Failed)) throw error;
+			throw new MigrationError(error.message, {
+				cause: error.cause,
+				migration: error.migration,
+				applied: error.names,
+				...(error.names.length > 0 ? await afterCommand(error.applied) : {}),
+			});
+		}
+	};
 	const migrator: Omit<Migrator, typeof SCHEMA> = {
 		config: settled,
 		async latest() {
-			const { names, applied } = await run(settled, "latest");
-			return {
-				applied: names,
-				...(await afterCommand(applied)),
-			} as UpResult as LatestResult;
+			const { names, ...write } = await command("latest");
+			return { applied: names, ...write } as UpResult as LatestResult;
 		},
 		async up() {
-			const { names, applied } = await run(settled, "up");
-			return { applied: names, ...(await afterCommand(applied)) };
+			const { names, ...write } = await command("up");
+			return { applied: names, ...write };
 		},
 		async down() {
-			const { names, applied } = await run(settled, "down");
-			return { reverted: names, ...(await afterCommand(applied)) };
+			const { names, ...write } = await command("down");
+			return { reverted: names, ...write };
 		},
 		async status() {
 			return (await run(settled, "status")).status;
@@ -410,6 +452,38 @@ function checkHistory(
 
 type Command = "latest" | "up" | "down" | "status";
 
+/** A migration failed; createMigrator adds the schema file to it. */
+class Failed extends Error {
+	readonly migration: string;
+	/** What the call applied or reverted before it, and how many are applied. */
+	readonly names: string[];
+	readonly applied: number;
+	constructor(
+		message: string,
+		cause: unknown,
+		migration: string,
+		names: string[],
+		applied: number,
+	) {
+		super(message, { cause });
+		this.migration = migration;
+		this.names = names;
+		this.applied = applied;
+	}
+}
+
+// pg rejects a refused `localhost` connection (IPv4 and IPv6) with an
+// AggregateError whose own message is empty.
+const text = (error: unknown): string => {
+	if (!(error instanceof Error)) return String(error);
+	const message = error.message
+		? error.message
+		: error instanceof AggregateError && error.errors.length > 0
+			? [...new Set(error.errors.map(text))].join("; ")
+			: ((error as { code?: string }).code ?? error.name);
+	return message.replace(/^typesql: /, "");
+};
+
 /** The history table on one connection, and the transactions around it. */
 async function openHistory(
 	execute: Executor,
@@ -553,6 +627,8 @@ async function run(
 		);
 		try {
 			for (;;) {
+				// The migration this iteration runs, once it is known.
+				let current: { name: string; label: string } | undefined;
 				await history.begin();
 				try {
 					// SQLite reads the history only after taking its write lock.
@@ -580,6 +656,10 @@ async function run(
 						break;
 					}
 					const name = rows[index]?.name ?? entry.name;
+					current = {
+						name,
+						label: `${command === "down" ? "reverting " : ""}migration ${index + 1} (${name})`,
+					};
 					await runStep(
 						dialect,
 						connection.execute,
@@ -591,17 +671,28 @@ async function run(
 					names.push(name);
 					applied += command === "down" ? -1 : 1;
 				} catch (error) {
+					let failure = error;
+					let message = text(error);
 					try {
 						await history.rollback();
 					} catch (rollbackError) {
 						// A lost connection fails the rollback with the same error.
-						if (rollbackError === error) throw error;
-						throw new AggregateError(
-							[error, rollbackError],
-							"typesql: the migration failed and rolling it back failed too",
-						);
+						if (rollbackError !== error) {
+							failure = new AggregateError(
+								[error, rollbackError],
+								"typesql: the migration failed and rolling it back failed too",
+							);
+							message += `; rolling it back failed too: ${text(rollbackError)}`;
+						}
 					}
-					throw error;
+					if (current === undefined) throw failure;
+					throw new Failed(
+						`typesql: ${current.label} failed: ${message}`,
+						failure,
+						current.name,
+						names,
+						applied,
+					);
 				}
 				if (command !== "latest") break;
 			}

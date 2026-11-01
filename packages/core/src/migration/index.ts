@@ -14,6 +14,7 @@ export {
 	type DownResult,
 	isMigrator,
 	type LatestResult,
+	MigrationError,
 	type MigrationStatus,
 	type Migrator,
 	type MigratorConfig,
