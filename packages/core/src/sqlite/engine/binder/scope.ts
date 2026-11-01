@@ -93,6 +93,7 @@ type WithoutGenerated<O, G> = O extends readonly [
 	: [];
 // Each column's name by its position, built once: walking it is one lookup
 // per column, where scanning every column for each position is quadratic.
+// A dropped column leaves a gap; the walk goes on while a position is left.
 type PositionMap<Tbl> = {
 	[K in keyof Tbl & string as Tbl[K] extends {
 		readonly i: infer I extends number;
@@ -104,7 +105,12 @@ type ByIndex<
 	M,
 	N extends number,
 	Acc extends readonly string[],
-> = N extends keyof M ? ByIndex<M, Nx<N>, [...Acc, M[N] & string]> : Acc;
+	Seen extends number = never,
+> = N extends keyof M
+	? ByIndex<M, Nx<N>, [...Acc, M[N] & string], Seen | N>
+	: [Exclude<keyof M, Seen>] extends [never]
+		? Acc
+		: ByIndex<M, Nx<N>, Acc, Seen>;
 type LowerAll<L extends readonly unknown[]> = {
 	[I in keyof L]: Lowercase<L[I] & string>;
 };
