@@ -76,12 +76,33 @@ export async function connectPostgres(url: string): Promise<Connection> {
 	};
 }
 
+/** How long a statement waits for another connection's lock. */
+const BUSY_LIMIT = 30_000;
+
+/**
+ * Run a statement, waiting while another connection holds the database's
+ * lock. busy_timeout would wait inside SQLite and block the event loop, so a
+ * connection of the same process holding the lock could never release it.
+ */
+async function whenFree<T>(step: () => T): Promise<T> {
+	const start = Date.now();
+	for (let delay = 5; ; delay = Math.min(delay * 2, 100)) {
+		try {
+			return step();
+		} catch (error) {
+			const { errcode } = error as { errcode?: unknown };
+			// SQLITE_BUSY and its extended codes.
+			const busy = typeof errcode === "number" && (errcode & 0xff) === 5;
+			if (!busy || Date.now() - start >= BUSY_LIMIT) throw error;
+		}
+		await new Promise((resolve) => setTimeout(resolve, delay));
+	}
+}
+
 /** One `node:sqlite` database for a migrator call. */
 export async function connectSqlite(file: string): Promise<Connection> {
 	const { DatabaseSync } = await import("node:sqlite");
 	const db = new DatabaseSync(file);
-	// Wait for another migration transaction instead of failing immediately.
-	db.exec("PRAGMA busy_timeout = 30000");
 	return {
 		execute: async (sql, values) => {
 			let rest = sql;
@@ -93,7 +114,8 @@ export async function connectSqlite(file: string): Promise<Connection> {
 					"",
 				);
 				if (!rest) break;
-				const statement = db.prepare(rest);
+				const source = rest;
+				const statement = await whenFree(() => db.prepare(source));
 				const consumed = statement.sourceSQL.length;
 				if (!consumed) break;
 				const numbers = paramNumbers(statement.sourceSQL);
@@ -104,14 +126,18 @@ export async function connectSqlite(file: string): Promise<Connection> {
 					) as SQLInputValue;
 				const positional = values.map(sqliteValue) as SQLInputValue[];
 				if (statement.columns().length) {
-					rows = numbers.length
-						? statement.all(bindings)
-						: statement.all(...positional);
+					rows = await whenFree(() =>
+						numbers.length
+							? statement.all(bindings)
+							: statement.all(...positional),
+					);
 					rowCount = rows.length;
 				} else {
-					const result = numbers.length
-						? statement.run(bindings)
-						: statement.run(...positional);
+					const result = await whenFree(() =>
+						numbers.length
+							? statement.run(bindings)
+							: statement.run(...positional),
+					);
 					rows = [];
 					rowCount = Number(result.changes);
 				}
