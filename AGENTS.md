@@ -14,7 +14,8 @@ pnpm check:intents
 - The VS Code extension (`packages/vscode`, package name `typesql`) is released the same way:
   add `pnpm change typesql …` with every user-facing change to it. `pnpm check:intents` does not
   catch a missing one.
-- Use `patch` for fixes. Ask before `minor`, `major` or `none`.
+- Use `patch` for fixes. Use `major` for every change that could possibly break users, even
+  when the break is unlikely.
 - Write the summary like the existing `.changeset/*.md` files.
 
 ## PostgreSQL regression tests
@@ -31,6 +32,13 @@ A change to the engine or a new feature is done when these checks pass:
 the PostgreSQL regression parser and parse-tree checks (`pnpm test:pg-regress` and
 `pnpm test:pg-ast`), the type oracles (`pnpm test:oracle --regress --views`), the fuzzer
 (`pnpm fuzz`), and the built-package smoke checks (`pnpm build && pnpm smoke:dist`).
+
+Some of these take too long to run before you finish a task: the full `pnpm test`, the
+regression oracle (`pnpm test:oracle --regress`) and the default `pnpm fuzz`. Don't run them
+before you finish; CI runs them. Run the quick checks that cover your change instead:
+`pnpm test:oracle --views` or `pnpm test:oracle <test …>`, `pnpm fuzz --runs <n>` with a small
+`n`, and the other checks above. When you report back, list the slow checks you didn't run.
+
 Add query/schema inputs to `packages/core/test/oracle/corpus.json`, including nullable and
 non-nullable cases for nullability rules; derive expected behavior from PostgreSQL. Do not
 add unit/integration suites, static type assertion suites, or coverage gates. Include the
