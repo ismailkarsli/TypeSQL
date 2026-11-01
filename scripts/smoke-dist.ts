@@ -1448,6 +1448,52 @@ export async function down(db: SqliteMigration<MigrationSchema<typeof up>>) { aw
 		schemaRun("generate", "--out", out);
 		assert.equal(readFileSync(out, "utf8"), full);
 
+		// Each migration's schema starts from the previous one's; a history
+		// longer than TypeScript's instantiation depth still generates.
+		const chainDir = join(dir, "chain");
+		mkdirSync(join(chainDir, "migrations"), { recursive: true });
+		writeFileSync(
+			join(chainDir, "tsconfig.json"),
+			readFileSync(join(schemaDir, "tsconfig.json")),
+		);
+		const chainLength = 60;
+		for (let i = 1; i <= chainLength; i++) {
+			const name = (n: number) => `${String(n).padStart(4, "0")}_m.ts`;
+			writeFileSync(
+				join(chainDir, "migrations", name(i)),
+				i === 1
+					? `import type { MigrationSchema, SqliteMigration } from '@typesql/core/migration';
+export async function up(db: SqliteMigration) { return db.add('CREATE TABLE t (id INTEGER PRIMARY KEY)'); }
+export async function down(db: SqliteMigration<MigrationSchema<typeof up>>) { await db.add('DROP TABLE t'); }
+`
+					: `import type { MigrationSchema, SqliteMigration } from '@typesql/core/migration';
+import type { up as previousUp } from './${name(i - 1)}';
+export async function up(db: SqliteMigration<MigrationSchema<typeof previousUp>>) {
+  const next = await db.add('ALTER TABLE t ADD COLUMN c${i} TEXT');
+  await next('SELECT id, c${i} FROM t').execute();
+  return next;
+}
+export async function down(db: SqliteMigration<MigrationSchema<typeof up>>) { await db.add('ALTER TABLE t DROP COLUMN c${i}'); }
+`,
+			);
+		}
+		cli(
+			"migrate",
+			"generate",
+			"--dialect",
+			"sqlite",
+			"--dir",
+			join(chainDir, "migrations"),
+			"--out",
+			join(chainDir, "db.ts"),
+		);
+		const chain = readFileSync(join(chainDir, "db.ts"), "utf8");
+		assert.equal(chain.match(/Col</g)?.length, chainLength);
+		assert.match(
+			chain,
+			/c60: Col<"text", \{ nullable: true; position: 59 \}>;/,
+		);
+
 		const generatedDir = join(dir, "generated");
 		const make = (...args: string[]) =>
 			cli(
@@ -1513,6 +1559,23 @@ export async function down(db: SqliteMigration<MigrationSchema<typeof up>>) { aw
 			),
 			/cannot read the schema of beta\.ts/,
 		);
+		// The migration decides the exit code; the schema file only warns.
+		assert.match(
+			fail(
+				0,
+				"latest",
+				"--dialect",
+				"sqlite",
+				"--db",
+				join(dir, "warned.db"),
+				"--dir",
+				migrationsDir,
+				"--out",
+				join(dir, "never.ts"),
+			),
+			/warning: the schema file was not updated: cannot read the schema of beta\.ts[\s\S]*typesql migrate generate/,
+		);
+		assert.equal(existsSync(join(dir, "never.ts")), false);
 		writeFileSync(join(generatedDir, "9999999999_future.ts"), second);
 		assert.match(
 			fail(1, "make", "earlier", "--dialect", "sqlite", "--dir", generatedDir),

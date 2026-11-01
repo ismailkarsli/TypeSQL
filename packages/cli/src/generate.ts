@@ -1,9 +1,12 @@
 import { readdir } from "node:fs/promises";
 import { createRequire } from "node:module";
-import { basename, dirname, resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import type { Checker, Symbol as TsSymbol, Type } from "typescript/sync";
 
 type Sync = typeof import("typescript/sync");
+type Project = NonNullable<
+	ReturnType<InstanceType<Sync["Snapshot"]>["getDefaultProjectForFile"]>
+>;
 
 export type Dialect = "postgres" | "sqlite";
 
@@ -54,16 +57,31 @@ export function generateSchema(options: {
 	if ("empty" in point) return emit(header, dialect, new Set(), []);
 	const name = "after" in point ? point.after : point.before;
 	const file = resolve(options.migrationsDir, name);
+	const fail = (reason: string): never => {
+		throw new Error(`cannot read the schema of ${name}: ${reason}`);
+	};
 	const ts = typescript();
 	const api = new ts.API({ cwd: dirname(file) });
 	try {
 		const snapshot = api.createSnapshot({ openFiles: [file] });
 		const project = snapshot.getDefaultProjectForFile(file);
 		if (!project) throw new Error(`no TypeScript project contains ${file}`);
-		const checker = project.checker;
-		const schema = schemaType(ts, checker, file, "after" in point);
-		const { used, schema: write } = writer(ts, checker, dialect);
-		return emit(header, dialect, used, write(schema));
+		const reader = migrationReader(ts, project, fail);
+		// A migration's schema is its up's inferred return type, which starts
+		// from the previous migration's. Asked for the last file first, the
+		// checker nests every earlier file's inference inside it and, past its
+		// instantiation depth limit (about 30 files), caches error types.
+		// Inferring the files the target imports first, dependencies before
+		// dependents, caches each schema before the next one needs it, so the
+		// nesting is one file deep however long the history is.
+		for (const dependency of reader.dependencies(file)) reader.warm(dependency);
+		const schema = reader.schema(file, "after" in point);
+		const { used, schema: write } = writer(ts, project.checker, dialect, fail);
+		const source = emit(header, dialect, used, write(schema));
+		// A last guard: symbol keys such as SqlError's never belong in a schema.
+		if (source.includes("__@"))
+			fail("its schema type contains TypeScript-internal symbol keys");
+		return source;
 	} finally {
 		api.close();
 	}
@@ -91,53 +109,136 @@ function emit(
 	].join("\n");
 }
 
-function schemaType(
+function migrationReader(
 	ts: Sync,
-	checker: Checker,
-	file: string,
-	after: boolean,
-): Type {
-	const name = basename(file);
-	const fail = (reason: string): never => {
-		throw new Error(`cannot read the schema of ${name}: ${reason}`);
+	project: Project,
+	fail: (reason: string) => never,
+) {
+	const { checker, program } = project;
+	const upSignature = (file: string) => {
+		const module = checker.getSymbolOfSourceFile(file);
+		const up = module
+			? checker.getExportsOfModule(module).find((s) => s.name === "up")
+			: undefined;
+		if (!up) return "it does not export up";
+		const [signature] = checker.getSignaturesOfType(
+			checker.getTypeOfSymbol(up),
+			ts.SignatureKind.Call,
+		);
+		return signature ?? "up is not a function";
 	};
-	const module = checker.getSymbolOfSourceFile(file);
-	const up = module
-		? checker.getExportsOfModule(module).find((s) => s.name === "up")
-		: undefined;
-	if (!up) return fail("it does not export up");
-	const [signature] = checker.getSignaturesOfType(
-		checker.getTypeOfSymbol(up),
-		ts.SignatureKind.Call,
-	);
-	if (!signature) return fail("up is not a function");
-	const context = after
-		? checker.getAwaitedType(checker.getReturnTypeOfSignature(signature))
-		: checker.getParameterType(signature, 0);
-	const what = after ? "up's return type" : "up's parameter";
-	if (!context || context.flags & ts.TypeFlags.Any)
-		return fail(
-			`${what} is untyped; type its parameter as PostgresMigration or SqliteMigration`,
-		);
-	const schema = checker.getTypeOfPropertyOfType(context, "schema");
-	if (!schema)
-		return fail(
-			after
-				? "up() does not return its migration context; end it with `return db`"
-				: `${what} is not a migration context`,
-		);
-	if (schema.flags & ts.TypeFlags.Any) return fail(`${what} has an any schema`);
-	return schema;
+
+	/** The file's import and export specifiers, with the file each resolves to. */
+	const imports = (file: string) => {
+		const found: { specifier: string; resolved: string | undefined }[] = [];
+		for (const statement of program.getSourceFile(file)?.statements ?? []) {
+			const specifier = (
+				statement as {
+					moduleSpecifier?: Parameters<
+						typeof program.getResolvedModuleFromModuleSpecifier
+					>[0] & { text?: unknown };
+				}
+			).moduleSpecifier;
+			if (typeof specifier?.text !== "string") continue;
+			found.push({
+				specifier: specifier.text,
+				resolved: program.getResolvedModuleFromModuleSpecifier(specifier, file)
+					?.resolvedFileName,
+			});
+		}
+		return found;
+	};
+
+	/** Why the file's types are missing when one of its imports doesn't resolve. */
+	const unresolved = (file: string, what: string): string | undefined => {
+		const missing = imports(file)
+			.filter((i) => i.resolved === undefined)
+			.map((i) => i.specifier);
+		if (missing.length === 0) return undefined;
+		const hint = missing.some((m) => m.startsWith("@typesql/core"))
+			? "; add @typesql/core to the project's dependencies (npm install @typesql/core, or pnpm add @typesql/core)"
+			: "";
+		return `${what} is untyped because TypeScript cannot find ${missing.map((m) => JSON.stringify(m)).join(", ")} from ${dirname(file)}${hint}`;
+	};
+
+	const notComputed = (what: string) =>
+		`TypeScript could not compute ${what}; run tsc on the migrations to see why`;
+
+	return {
+		/** The project files `file` imports, transitively, dependencies first. */
+		dependencies(file: string): string[] {
+			const order: string[] = [];
+			const seen = new Set([file]);
+			const pending = [{ file, next: imports(file) }];
+			while (pending.length > 0) {
+				const top = pending.at(-1)!;
+				const next = top.next.shift();
+				if (!next) {
+					pending.pop();
+					if (top.file !== file) order.push(top.file);
+					continue;
+				}
+				// Only the project's own TypeScript files can be migrations.
+				const dependency = next.resolved;
+				if (
+					dependency &&
+					/\.[cm]?ts$/.test(dependency) &&
+					!/\.d\.[cm]?ts$/.test(dependency) &&
+					!/[\\/]node_modules[\\/]/.test(dependency) &&
+					!seen.has(dependency)
+				) {
+					seen.add(dependency);
+					pending.push({ file: dependency, next: imports(dependency) });
+				}
+			}
+			return order;
+		},
+		/** Infer a migration's resulting schema, so that later files find it cached. */
+		warm(file: string): void {
+			const signature = upSignature(file);
+			if (typeof signature === "string") return;
+			const context = checker.getAwaitedType(
+				checker.getReturnTypeOfSignature(signature),
+			);
+			if (context) checker.getTypeOfPropertyOfType(context, "schema");
+		},
+		schema(file: string, after: boolean): Type {
+			const signature = upSignature(file);
+			if (typeof signature === "string") return fail(signature);
+			const context = after
+				? checker.getAwaitedType(checker.getReturnTypeOfSignature(signature))
+				: checker.getParameterType(signature, 0);
+			const what = after ? "up's return type" : "up's parameter";
+			if (!context || context.flags & ts.TypeFlags.Any)
+				return fail(
+					unresolved(file, what) ??
+						(!context || context.isErrorType()
+							? notComputed(what)
+							: `${what} is untyped; type its parameter as PostgresMigration or SqliteMigration`),
+				);
+			const schema = checker.getTypeOfPropertyOfType(context, "schema");
+			if (!schema)
+				return fail(
+					after
+						? "up() does not return its migration context; end it with `return db`"
+						: `${what} is not a migration context`,
+				);
+			if (schema.isErrorType())
+				return fail(notComputed(`the schema of ${what}`));
+			if (schema.flags & ts.TypeFlags.Any)
+				return fail(`${what} has an any schema`);
+			return schema;
+		},
+	};
 }
 
-function writer(ts: Sync, checker: Checker, dialect: Dialect) {
+function writer(
+	ts: Sync,
+	checker: Checker,
+	dialect: Dialect,
+	fail: (reason: string) => never,
+) {
 	const used = new Set<string>();
-	const props = (t: Type): { name: string; type: Type }[] => {
-		const symbols = checker.getPropertiesOfType(t);
-		if (symbols.length === 0) return [];
-		const types = checker.getTypeOfSymbol(symbols as TsSymbol[]);
-		return symbols.map((p, i) => ({ name: p.name, type: types[i]! }));
-	};
 	const print = (t: Type): string =>
 		checker.typeToString(t, undefined, ts.TypeFormatFlags.NoTruncation);
 	const literal = (t: Type | undefined) =>
@@ -147,18 +248,53 @@ function writer(ts: Sync, checker: Checker, dialect: Dialect) {
 			t.isBooleanLiteralType())
 			? t.value
 			: undefined;
+	/** Reject what TypeScript produces when it gives up: error, any, unknown or never types, and SqlErrors. */
+	const check = (t: Type, at: string): Type => {
+		if (t.isErrorType())
+			fail(
+				`TypeScript could not compute ${at}; run tsc on the migrations to see why`,
+			);
+		if (
+			t.flags &
+			(ts.TypeFlags.AnyOrUnknown | ts.TypeFlags.Never | ts.TypeFlags.Primitive)
+		)
+			fail(`${at} is ${print(t)}; run tsc on the migrations to see why`);
+		return t;
+	};
+	const props = (t: Type, at: string): { name: string; type: Type }[] => {
+		const symbols = checker.getPropertiesOfType(t);
+		if (symbols.length === 0) return [];
+		const types = checker.getTypeOfSymbol(symbols as TsSymbol[]);
+		const entries = symbols.map((p, i) => ({ name: p.name, type: types[i]! }));
+		// Schemas have string keys only; SqlError and the missing-schema marker
+		// are keyed by unique symbols.
+		const internal = entries.find((e) => e.name.startsWith("__@"));
+		if (internal) {
+			const message = literal(internal.type);
+			fail(
+				internal.name.startsWith("__@MISSING_SCHEMA@")
+					? "the schema is unknown because an earlier migration's up() does not return its migration context; end it with `return db`"
+					: internal.name.startsWith("__@ERR@")
+						? `${at} is a type error (${typeof message === "string" ? message : print(internal.type)}); run tsc on the migrations to see why`
+						: `${at} is not a schema type: ${print(t)}`,
+			);
+		}
+		return entries;
+	};
 	const flag = (t: Type, name: string) =>
 		literal(checker.getTypeOfPropertyOfType(t, name));
 	const viewOf = (t: Type) => checker.getTypeOfPropertyOfType(t, "$view");
-	const isTable = (t: Type): boolean => {
-		const [first] = props(t);
+	const isTable = (t: Type, at: string): boolean => {
+		const [first] = props(t, at);
 		return (
 			!first ||
 			checker.getTypeOfPropertyOfType(first.type, "type") !== undefined
 		);
 	};
 
-	const column = (t: Type): string => {
+	const column = (t: Type, at: string): string => {
+		check(t, at);
+		props(t, at);
 		const type = flag(t, "type");
 		if (typeof type !== "string") return print(t);
 		used.add("Col");
@@ -181,9 +317,9 @@ function writer(ts: Sync, checker: Checker, dialect: Dialect) {
 			: `Col<${JSON.stringify(type)}>`;
 	};
 
-	const relation = (t: Type, indent: string): string => {
+	const relation = (t: Type, indent: string, at: string): string => {
 		const view = viewOf(t);
-		const columns = props(view ?? t).map((c) => ({
+		const columns = props(check(view ?? t, at), at).map((c) => ({
 			...c,
 			position: flag(c.type, "i"),
 		}));
@@ -191,7 +327,8 @@ function writer(ts: Sync, checker: Checker, dialect: Dialect) {
 		if (columns.every((c) => typeof c.position === "number"))
 			columns.sort((a, b) => Number(a.position) - Number(b.position));
 		const body = columns.map(
-			(c) => `${indent}\t${key(c.name)}: ${column(c.type)};`,
+			(c) =>
+				`${indent}\t${key(c.name)}: ${column(c.type, `column ${at.replace(/^relation /, "")}.${c.name}`)};`,
 		);
 		const object = `{\n${body.join("\n")}\n${indent}}`;
 		if (!view) return object;
@@ -201,16 +338,19 @@ function writer(ts: Sync, checker: Checker, dialect: Dialect) {
 
 	const schema = (db: Type): string[] => {
 		const lines: string[] = [];
-		for (const { name, type } of props(db)) {
+		for (const { name, type } of props(check(db, "the schema"), "the schema")) {
+			const at = `relation ${name}`;
+			check(type, at);
 			if (NOT_RELATIONS.has(name))
 				lines.push(`\t${key(name)}: ${print(type)};`);
-			else if (viewOf(type) || isTable(type))
-				lines.push(`\t${key(name)}: ${relation(type, "\t")};`);
+			else if (viewOf(type) || isTable(type, at))
+				lines.push(`\t${key(name)}: ${relation(type, "\t", at)};`);
 			else
 				lines.push(
 					`\t${key(name)}: {`,
-					...props(type).map(
-						(r) => `\t\t${key(r.name)}: ${relation(r.type, "\t\t")};`,
+					...props(type, `schema ${name}`).map(
+						(r) =>
+							`\t\t${key(r.name)}: ${relation(check(r.type, `relation ${name}.${r.name}`), "\t\t", `relation ${name}.${r.name}`)};`,
 					),
 					"\t};",
 				);

@@ -68,7 +68,23 @@ The adapter `migrate` helper executes an untracked batch. For versioned migratio
 
 ## Tracked migration files
 
-Install `@typesql/cli` and use Node.js 26 or newer. PostgreSQL also requires `pg`. Running migration files needs `typescript` 7.1 or later wherever `typesql migrate` runs, because it hashes each file with TypeScript's parser. Keep `typescript` as a regular dependency if you run migrations from a production install (`npm install --omit=dev`).
+Install `@typesql/cli` and `@typesql/core`, and use Node.js 26 or newer. PostgreSQL also requires `pg`:
+
+::: code-group
+
+```sh [npm]
+npm install @typesql/core
+npm install -D @typesql/cli pg
+```
+
+```sh [pnpm]
+pnpm add @typesql/core
+pnpm add -D @typesql/cli pg
+```
+
+:::
+
+Migration files and the generated `db.ts` import their types from `@typesql/core`, so it must be a dependency of your project itself. `@typesql/cli` depends on it too, but pnpm doesn't let your files import a dependency's dependencies; without it, `typesql migrate make` warns, and writing `db.ts` fails with `TypeScript cannot find "@typesql/core/migration"`. Running migration files needs `typescript` 7.1 or later wherever `typesql migrate` runs, because it hashes each file with TypeScript's parser. Keep `typescript` as a regular dependency if you run migrations from a production install (`npm install --omit=dev`).
 
 ```ts
 // typesql.config.ts
@@ -124,6 +140,32 @@ Each file and its history record commit together. The history table has `name`, 
 
 PostgreSQL holds a session advisory lock for the entire command. SQLite locks each file with `BEGIN IMMEDIATE` and rereads history before choosing the next file. Concurrent SQLite `latest` commands may interleave. A later failure leaves earlier successful files committed. SQL that cannot run inside a transaction fails; there is no transaction opt-out. An empty `down` succeeds and removes its history record.
 
+### Rewriting an applied migration
+
+`{name}` slots were removed from `sql()` in `@typesql/core` 3.0, so a migration that ran
+
+```ts
+const expired = db.fragment("expires_at < now()");
+await db("DELETE FROM sessions WHERE {expired}", { expired }).execute();
+```
+
+no longer compiles until it interpolates the fragment instead:
+
+```ts
+await db(`DELETE FROM sessions WHERE ${expired}`).execute();
+```
+
+The rewritten code hashes differently, so on a database where the file was already applied the next command fails with `Applied migration has changed: 1793356800_prune-sessions.ts`. TypeSQL has no command to accept a rewrite. Check that the new code runs the same SQL, then store the file's new hash, from `migrationHash` in `@typesql/core/migration`, in the history table of every database the file was applied to:
+
+```ts
+import { readFileSync } from "node:fs";
+import { migrationHash } from "@typesql/core/migration";
+
+const name = "1793356800_prune-sessions.ts";
+const hash = migrationHash(readFileSync(`migrations/${name}`, "utf8"));
+// UPDATE schema_migrations SET hash = '<hash>' WHERE name = '1793356800_prune-sessions.ts'
+```
+
 ### The DB file
 
 `up`, `down` and `latest` end by writing the schema of the last applied migration to `db.ts` beside the config:
@@ -144,7 +186,9 @@ export interface DB {
 }
 ```
 
-Import `DB` instead of `MigrationSchema<typeof up>` in application code, so the type checker doesn't replay every migration. The file is read from each migration's types with TypeScript, from the nearest `tsconfig.json`. A migration whose `up` is untyped or doesn't return its context is an error. After `down` reverts the first migration, the file holds that migration's starting schema. `schemaFile` in config or `--out` changes the path. `generate: false` in config or `--no-generate` turns off writing after `up`, `down` and `latest`.
+Import `DB` instead of `MigrationSchema<typeof up>` in application code, so the type checker doesn't replay every migration. The file is read from each migration's types with TypeScript, from the nearest `tsconfig.json`. It reads the migrations one at a time, each file's imports before the file, so the length of the history doesn't matter. A migration whose `up` is untyped or doesn't return its context is an error, and so is a schema TypeScript could not compute (an error type, or a type error from a wrong statement): run `tsc` on the migrations to see why. Nothing is written then. After `down` reverts the first migration, the file holds that migration's starting schema. `schemaFile` in config or `--out` changes the path. `generate: false` in config or `--no-generate` turns off writing after `up`, `down` and `latest`.
+
+The database decides the exit code of `up`, `down` and `latest`. If the schema file can't be written after they succeed (an unresolvable import, a read-only file), the command prints a warning and exits with 0; fix the cause and run `typesql migrate generate`.
 
 ### Programmatic execution
 
@@ -168,7 +212,7 @@ try {
 }
 ```
 
-The runtime entry point is separate from the type-only schema and builder APIs. CLI success and no-op commands return exit code 0; runtime or config errors return 1; invalid command syntax returns 2.
+The runtime entry point is separate from the type-only schema and builder APIs. CLI success and no-op commands return exit code 0, also when only the schema file could not be written after a migration; runtime or config errors return 1; invalid command syntax returns 2.
 
 ## `ApplyDdl`
 

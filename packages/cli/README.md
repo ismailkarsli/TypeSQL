@@ -7,7 +7,10 @@ The `typesql` command runs tracked schema migrations and introspects databases. 
 ```sh
 npm install -D @typesql/cli
 npm install -D pg   # for PostgreSQL
+npm install @typesql/core   # for tracked migrations
 ```
+
+Migration files and the generated `db.ts` import their types from `@typesql/core`, so tracked migrations need it as a dependency of your project; with pnpm, the CLI's own copy isn't importable from your files.
 
 ## Usage
 
@@ -69,9 +72,9 @@ Applied filenames, normalized runtime-code SHA-256 hashes, and timestamps are re
 
 Each migration and its history update run in their own transaction. Earlier successful migrations remain committed if `latest` later fails. PostgreSQL holds a session advisory lock for the command; SQLite uses `BEGIN IMMEDIATE` and checks history again in each transaction. SQL that cannot run in a transaction fails. An empty `down` still removes its history record.
 
-`up`, `down`, and `latest` then write the schema of the last applied migration to `db.ts` beside the config, as `export interface DB` with `Col` and `View` types. `npx typesql migrate generate` writes the schema of the last migration file without connecting. The schema is read from the migrations' types with TypeScript, so each `up` must be typed and return its context. Set `schemaFile` or pass `--out` to change the path; set `generate: false` or pass `--no-generate` to skip writing after a migration.
+`up`, `down`, and `latest` then write the schema of the last applied migration to `db.ts` beside the config, as `export interface DB` with `Col` and `View` types. `npx typesql migrate generate` writes the schema of the last migration file without connecting. The schema is read from the migrations' types with TypeScript, so each `up` must be typed and return its context. Set `schemaFile` or pass `--out` to change the path; set `generate: false` or pass `--no-generate` to skip writing after a migration. A schema TypeScript could not compute is an error, never written.
 
-Successful and empty operations exit with code 0, configuration or execution failures with 1, and invalid command syntax with 2. Progress is written to stdout and errors to stderr.
+Successful and empty operations exit with code 0, configuration or execution failures with 1, and invalid command syntax with 2. If only the schema file can't be written after a successful migration, the command warns and exits with 0; fix the cause and run `npx typesql migrate generate`. Progress is written to stdout and errors to stderr.
 
 ## Documentation
 

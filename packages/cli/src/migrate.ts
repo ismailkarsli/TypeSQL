@@ -1,5 +1,5 @@
 import { mkdir, readdir, stat, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import type { SQLInputValue } from "node:sqlite";
 import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
@@ -152,6 +152,17 @@ async function makeMigration(
 	return file;
 }
 
+/** Whether `node_modules/<name>` exists in `directory` or one of its parents. */
+async function installed(directory: string, name: string): Promise<boolean> {
+	for (let dir = directory; ; dir = dirname(dir)) {
+		try {
+			await stat(join(dir, "node_modules", name, "package.json"));
+			return true;
+		} catch {}
+		if (dirname(dir) === dir) return false;
+	}
+}
+
 // pg rejects a refused `localhost` connection (IPv4 and IPv6) with an
 // AggregateError whose own message is empty.
 const message = (err: unknown): string => {
@@ -298,6 +309,16 @@ export async function main(argv: readonly string[], io: Io): Promise<number> {
 			io.stdout(
 				`typesql migrate: created ${await makeMigration(migrationsDir, positionals[1] ?? "", dialect)}\n`,
 			);
+			// The new file imports its types from @typesql/core/migration. A
+			// package manager with strict layouts (pnpm) doesn't expose the
+			// CLI's own @typesql/core to the project. Look for it the way
+			// TypeScript does: require.resolve also honors the NODE_PATH that
+			// `pnpm exec` points at its hidden hoisted packages.
+			if (!(await installed(migrationsDir, "@typesql/core"))) {
+				io.stderr(
+					`typesql migrate: warning: @typesql/core/migration cannot be found from ${migrationsDir}, so the migration's types are unchecked; add @typesql/core to the project's dependencies (npm install @typesql/core, or pnpm add @typesql/core)\n`,
+				);
+			}
 			return 0;
 		}
 		const generate = async (point: SchemaPoint) => {
@@ -365,9 +386,18 @@ export async function main(argv: readonly string[], io: Io): Promise<number> {
 			await connection.close();
 		}
 		if (values.generate ?? config.generate ?? true) {
-			await generate(
-				appliedPoint(await migrationFiles(migrationsDir), command, changed),
-			);
+			// The database is migrated by now: a schema file that can't be
+			// written is a warning, and the exit code reports the migration.
+			try {
+				await generate(
+					appliedPoint(await migrationFiles(migrationsDir), command, changed),
+				);
+			} catch (error) {
+				io.stderr(
+					`typesql migrate: warning: the schema file was not updated: ${message(error)}\n` +
+						"typesql migrate: fix the cause, then run `typesql migrate generate`\n",
+				);
+			}
 		}
 		return 0;
 	} catch (error) {
