@@ -112,6 +112,8 @@ See the [migration guide](https://typesql.karsli.net/guide/migrations).
 
 The full guide is at **[typesql.karsli.net](https://typesql.karsli.net)**. It covers the [schema](https://typesql.karsli.net/guide/schema), [parameters](https://typesql.karsli.net/guide/parameters), [writing data](https://typesql.karsli.net/guide/writing-data), [dynamic SQL](https://typesql.karsli.net/guide/dynamic-sql), [migrations](https://typesql.karsli.net/guide/migrations) and [known limits](https://typesql.karsli.net/guide/limits).
 
+Upgrading from an earlier version? The [upgrade guide](https://typesql.karsli.net/guide/upgrading) lists every breaking change with the code to change, and the [changelog](https://typesql.karsli.net/changelog) every release since 1.0.0.
+
 ## License
 
 [MIT](LICENSE)

@@ -32,5 +32,5 @@
 			"drizzle-orm/*": ["../drizzle/node_modules/drizzle-orm/*"]
 		}
 	},
-	"include": [".vitepress/*.ts", ".vitepress/*.mts"]
+	"include": [".vitepress/*.ts", ".vitepress/*.mts", "*.paths.ts"]
 }

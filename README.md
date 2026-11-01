@@ -49,7 +49,7 @@ Every TypeScript editor shows a query's row type on hover and underlines mistake
 
 ## Documentation
 
-The full guide is at **[typesql.karsli.net](https://typesql.karsli.net)**. It covers the SQL TypeSQL supports, parameters and fragments, writing data, and known limits.
+The full guide is at **[typesql.karsli.net](https://typesql.karsli.net)**. It covers the SQL TypeSQL supports, parameters and fragments, writing data, and known limits. Upgrading? See the [upgrade guide](https://typesql.karsli.net/guide/upgrading) and the [changelog](https://typesql.karsli.net/changelog).
 
 ## License
 

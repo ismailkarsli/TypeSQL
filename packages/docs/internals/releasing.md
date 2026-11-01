@@ -267,8 +267,10 @@ Changelogs are not published to npm. pnpm's default `registry` changelog storage
 `CHANGELOG.md` into every tarball, whatever `files` says, so `pnpm-workspace.yaml` sets
 `versioning.changelog.storage: repository`: `pnpm version -r` writes each package's
 `CHANGELOG.md` into the repository instead, and since no `files` field lists it, `pnpm publish`
-leaves it out. Keep it out of `files`. The changelogs start at the first release made in this
-mode; earlier entries are in the GitHub releases. The fixed group sits under the same
+leaves it out. Keep it out of `files`. The docs site renders the same files at `/changelog`
+(`packages/docs/[page].paths.ts`), from 1.0.0 on; a package with no 1.x release yet is left
+out. The changelogs start at the first release made in this mode; earlier entries are in the
+GitHub releases. The fixed group sits under the same
 `versioning:` key; other versioning settings (ignored packages, lanes) would go there too, and the
 repository uses their defaults.
 

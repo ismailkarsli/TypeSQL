@@ -26,7 +26,9 @@ export default defineConfig({
 }`,
 		],
 	],
-	srcExclude: ["internals/**"],
+	// CHANGELOG.md is this private package's own; `/changelog` is generated
+	// from the published packages' changelogs by `[page].paths.ts`.
+	srcExclude: ["internals/**", "CHANGELOG.md"],
 	themeConfig: {
 		nav: [
 			{
@@ -35,6 +37,7 @@ export default defineConfig({
 				activeMatch: "/(guide|adapters)/",
 			},
 			{ text: "Reference", link: "/reference/api", activeMatch: "/reference/" },
+			{ text: "Changelog", link: "/changelog" },
 		],
 		socialLinks: [{ icon: "github", link: github }],
 		editLink: {
@@ -49,6 +52,7 @@ export default defineConfig({
 					{ text: "Installation", link: "/guide/installation" },
 					{ text: "Quick start", link: "/guide/quick-start" },
 					{ text: "Comparison", link: "/guide/comparison" },
+					{ text: "Upgrading", link: "/guide/upgrading" },
 				],
 			},
 			{
@@ -108,6 +112,7 @@ export default defineConfig({
 					{ text: "API", link: "/reference/api" },
 					{ text: "DDL support", link: "/reference/ddl" },
 					{ text: "Type mapping", link: "/reference/type-mapping" },
+					{ text: "Changelog", link: "/changelog" },
 				],
 			},
 		],

@@ -47,3 +47,4 @@ The PostgreSQL parser is checked against PostgreSQL 18's own regression tests, a
 - [Installation](./installation): requirements and the packages for your driver.
 - [Quick start](./quick-start): your first typed query.
 - [Comparison](./comparison): how TypeSQL differs from code generators, query builders and ORMs.
+- [Upgrading](./upgrading): moving from an earlier version, with the [changelog](/changelog).

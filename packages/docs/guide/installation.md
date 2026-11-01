@@ -63,3 +63,5 @@ The [VS Code extension](./vscode), and `@typesql/language-server` in [Neovim](./
 ## Next
 
 Continue with the [Quick start](./quick-start).
+
+Upgrading from an earlier version? See [Upgrading](./upgrading).

@@ -75,6 +75,7 @@
 		"packages/docs": {
 			"entry": [
 				"playground/*.ts",
+				"*.paths.ts",
 				"cloudflare.config.ts",
 				"wrangler.config.ts"
 			],
