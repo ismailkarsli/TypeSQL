@@ -184,12 +184,12 @@ export async function main(argv: readonly string[], io: Io): Promise<number> {
 			overrides.url = env.DATABASE_URL;
 		migrator =
 			migrator === undefined
-				? createMigrator({
+				? createMigrator<unknown>({
 						migrationsDir: from("migrations"),
 						schemaFile: from("db.ts"),
 						...overrides,
 					} as MigratorConfig)
-				: migrator.with(overrides as Partial<MigratorConfig>);
+				: migrator.with<unknown>(overrides as Partial<MigratorConfig>);
 
 		switch (command) {
 			case "make": {

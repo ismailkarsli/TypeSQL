@@ -22,6 +22,28 @@ type LastSchema<M extends Migrations> = M extends readonly []
 		? SchemaOf<Last>
 		: unknown;
 
+/**
+ * An array type without an order, such as `const all = [m1, m2]`, has no
+ * last migration: it is an error unless the schema is given.
+ */
+type Ordered<M extends Migrations> = number extends M["length"]
+	? Unordered
+	: unknown;
+type Unordered =
+	"typesql: this migrations array's type has no order, so its last schema is unknown; write the array in the call, declare it with `as const`, or give the schema: createMigrator<DB>()";
+
+declare const UNSET: unique symbol;
+/** The default of a schema type argument that isn't given. */
+type Unset = typeof UNSET;
+
+/**
+ * A config without a `migrations` array. The last overload's errors are the
+ * ones TypeScript shows, so an unordered array's error is here.
+ */
+type DirectoryConfig = Omit<MigratorConfig, "migrations"> & {
+	readonly migrations?: Unordered;
+};
+
 export interface MigratorConfig {
 	readonly dialect: Dialect;
 	/** A PostgreSQL connection URL; the migrator connects with `pg`. */
@@ -132,10 +154,14 @@ export interface Migrator<Schema = unknown> {
 	/** A new migrator with some config replaced. */
 	with<const M extends Migrations>(
 		overrides: Partial<Omit<MigratorConfig, "migrations">> & {
-			readonly migrations: M;
+			readonly migrations: M & Ordered<M>;
 		},
 	): Migrator<LastSchema<M>>;
-	with(overrides: Partial<MigratorConfig>): Migrator<Schema>;
+	with<NewSchema = Unset>(
+		overrides: [NewSchema] extends [Unset]
+			? Partial<DirectoryConfig>
+			: Partial<MigratorConfig>,
+	): Migrator<[NewSchema] extends [Unset] ? Schema : NewSchema>;
 }
 
 const MIGRATOR: unique symbol = Symbol.for("typesql.migrator") as never;
@@ -225,12 +251,17 @@ function validate(config: MigratorConfig): void {
 
 /** Create a migrator. It connects only when a method needs the database. */
 export function createMigrator<const M extends Migrations>(
-	config: Omit<MigratorConfig, "migrations"> & { readonly migrations: M },
+	config: Omit<MigratorConfig, "migrations"> & {
+		readonly migrations: M & Ordered<M>;
+	},
 ): Migrator<LastSchema<M>>;
-export function createMigrator<Schema = unknown>(
-	config: MigratorConfig,
-): Migrator<Schema>;
-export function createMigrator(config: MigratorConfig): Migrator {
+export function createMigrator<Schema = Unset>(
+	config: [Schema] extends [Unset] ? DirectoryConfig : MigratorConfig,
+): Migrator<[Schema] extends [Unset] ? unknown : Schema>;
+export function createMigrator(
+	input: MigratorConfig | DirectoryConfig,
+): Migrator {
+	const config = input as MigratorConfig;
 	validate(config);
 	const settled: MigratorConfig = Object.freeze({ ...config });
 	const directory = (what: string): string => {
@@ -310,7 +341,7 @@ export function createMigrator(config: MigratorConfig): Migrator {
 				if (given.some(([key]) => (group as readonly string[]).includes(key)))
 					for (const key of group) delete next[key];
 			for (const [key, value] of given) next[key] = value;
-			return createMigrator(next as unknown as MigratorConfig);
+			return createMigrator<unknown>(next as unknown as MigratorConfig);
 		}) as Migrator["with"],
 	};
 	Object.defineProperty(migrator, MIGRATOR, { value: true });

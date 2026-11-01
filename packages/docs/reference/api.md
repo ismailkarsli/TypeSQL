@@ -303,7 +303,7 @@ An entry is one `Sig<Params, Return, Flags>` or a tuple of overloads.
 | `SchemaOf<M>` | the schema after the migration `M`; also takes a migrator, the result of its `latest()`, a 3.x `up` function or a migration context. Also exported from `@typesql/core` |
 | `PostgresMigration<DB = {}>`, `SqliteMigration<DB = {}>` | the `db` of a migration: a checked query function with `add(ddl)`, `raw<NewSchema>(sql)` and the type-only `schema` |
 | `MigrationContext<E, T, DB>` | the type behind both, for engine `E` and dialect `T` |
-| `createMigrator(config)` | a `Migrator`; never connects by itself. With a `migrations` array its schema is inferred; `createMigrator<DB>(config)` states it |
+| `createMigrator(config)` | a `Migrator`; never connects by itself. With a `migrations` array its schema is inferred (from an array written in the call or declared `as const`); `createMigrator<DB>(config)` states it |
 | `Migrator<Schema>` | `latest()`, `up()`, `down()`, `status()`, `make(name)`, `generate()`, `with(overrides)` and `config` |
 | `MigratorConfig` | `dialect`; `url`, `db` or `execute`; `migrationsDir` or `migrations`; `migrationTable`, `schemaFile`, `generate`, `transaction` |
 | `LatestResult<Schema>` | what `latest()` resolves to: `{ applied, schemaFile?, schemaError? }`, and the type-only schema after the last migration |

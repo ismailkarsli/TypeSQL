@@ -2193,7 +2193,7 @@ if (process.env.TYPESQL_MIGRATION_POSTGRES_URL) {
 			},
 		});
 		const on = (connection: PgConnection, migrations = [once, fill]) =>
-			createMigrator({
+			createMigrator<unknown>({
 				dialect: "postgres",
 				execute: (text, values) => connection.query(text, values),
 				migrations,
