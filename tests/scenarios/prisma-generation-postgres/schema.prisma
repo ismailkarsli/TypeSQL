@@ -1,0 +1,19 @@
+generator client {
+  provider = "prisma-client"
+  output = "./generated/client"
+  moduleFormat = "esm"
+  importFileExtension = "js"
+}
+generator typesql {
+  provider = "typesql-prisma"
+  output = "./generated/schema.ts"
+}
+datasource db {
+  provider = "postgresql"
+}
+model User {
+  id Int @id @default(autoincrement())
+  name String @db.VarChar(100)
+  bio String? @map("display_name")
+  @@map("users")
+}

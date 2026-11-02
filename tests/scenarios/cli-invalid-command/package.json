@@ -1,0 +1,22 @@
+{
+	"name": "cli-invalid-command",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"compile": "tsc -p tsconfig.json --pretty false",
+		"generate": "typesql migrate invalid-command"
+	},
+	"dependencies": {
+		"@typesql/cli": "workspace:*"
+	},
+	"devDependencies": {
+		"typescript": "catalog:",
+		"@types/node": "catalog:"
+	},
+	"consumer": {
+		"failure": {
+			"stage": "generate",
+			"exitCode": 2
+		}
+	}
+}

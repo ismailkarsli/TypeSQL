@@ -1,0 +1,39 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`core-workflows > consumer 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "inline": "({ id: number })[]",
+      "mapped": "({ id: number })[]",
+      "named": "({ id: number })[]",
+      "overridden": "({ id: number })[]",
+      "rows": "({ display_name: null | string; id: number })[]",
+      "text": "string",
+      "values": "readonly (unknown)[]",
+      "wrapped": "{ data: { displayName: null | string } }",
+    },
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "{
+  rows: [ { id: 1, display_name: 'Ada' }, { id: 2, display_name: null } ],
+  named: [ { id: 1 } ],
+  inline: [ { id: 2 } ],
+  text: 'SELECT id, display_name FROM users WHERE id >= $1 AND balance > $2 ORDER BY "id"',
+  values: [ 1, 0 ],
+  mapped: [ { id: 1 }, { id: 2 } ],
+  overridden: [ { id: 1 }, { id: 2 } ],
+  wrapped: { data: { displayName: 'Ada' } }
+}
+",
+  },
+}
+`;

@@ -215,19 +215,10 @@ On PostgreSQL the migrator sends each `.add()` and `.raw()` text as one call wit
 
 `@typesql/cli` runs a migrator from the command line. It needs Node.js 26 or newer. Install it with `@typesql/core`, and `pg` for PostgreSQL:
 
-::: code-group
-
-```sh [npm]
-npm install @typesql/core
-npm install -D @typesql/cli pg
-```
-
-```sh [pnpm]
+```sh
 pnpm add @typesql/core
 pnpm add -D @typesql/cli pg
 ```
-
-:::
 
 Migration files and the generated `db.ts` import from `@typesql/core`, so it must be a dependency of your project itself. `@typesql/cli` depends on it too, but pnpm doesn't let your files import a dependency's dependencies; without it, `typesql migrate make` warns, and running a migration fails with `Cannot find package '@typesql/core'`.
 
@@ -247,12 +238,12 @@ export default createMigrator({
 A plain config object is an error. Relative paths in the config (`migrationsDir`, `schemaFile`, `db`) resolve beside the config file, and `schemaFile` defaults to `db.ts` beside it. An array config can import its migrations as TypeScript does, `import { all } from "./migrations.js"` for `migrations.ts`: Node loads the config with type stripping, and the command maps a relative `.js` import of a `.ts` file outside `node_modules` to the `.ts` file when there is no `.js` one.
 
 ```sh
-npx typesql migrate make "create users"   # create a migration file
-npx typesql migrate latest                # apply every pending migration
-npx typesql migrate up                    # apply the next one
-npx typesql migrate down                  # revert the last applied one
-npx typesql migrate status                # list applied and pending migrations
-npx typesql migrate generate              # write db.ts, without a database
+pnpm exec typesql migrate make "create users"   # create a migration file
+pnpm exec typesql migrate latest                # apply every pending migration
+pnpm exec typesql migrate up                    # apply the next one
+pnpm exec typesql migrate down                  # revert the last applied one
+pnpm exec typesql migrate status                # list applied and pending migrations
+pnpm exec typesql migrate generate              # write db.ts, without a database
 ```
 
 | Flag | Does |
@@ -268,7 +259,7 @@ npx typesql migrate generate              # write db.ts, without a database
 Flags override the config (through `with()`), and their paths resolve against the working directory. Without a config file, pass `--dialect` and `--url` or `--db`; the directory is then `./migrations` and the DB file `./db.ts`:
 
 ```sh
-npx typesql migrate latest --dialect sqlite --db app.db
+pnpm exec typesql migrate latest --dialect sqlite --db app.db
 ```
 
 `make <name>` writes `<unix-seconds>_<name>.ts`, with spaces turned into dashes. It refuses an existing filename and a name that would sort before the last file. The new file starts from the last one:
@@ -353,7 +344,7 @@ The migrator's statements and TypeSQL's queries use `$1`, `$2`, …, which D1 do
 In directory mode, `latest()`, `up()` and `down()` end by writing the schema after the last applied migration to `schemaFile` (with the command, `db.ts` beside the config):
 
 ```sh
-npx typesql migrate generate   # the schema after the last migration file, without a database
+pnpm exec typesql migrate generate   # the schema after the last migration file, without a database
 ```
 
 ```ts

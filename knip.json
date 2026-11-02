@@ -9,7 +9,7 @@
 		".": {
 			"entry": ["scripts/*.ts"],
 			"project": ["*.ts", "scripts/**/*.ts"],
-			"ignoreDependencies": ["kysely", "pg", "vitest"]
+			"ignoreDependencies": ["kysely", "pg"]
 		},
 		"packages/core": {
 			"entry": [
@@ -20,12 +20,9 @@
 				"src/sqlite/index.ts!",
 				"src/sqlite/engine/index.ts!",
 				"src/migration/index.ts!",
-				"examples/*.ts",
-				"test/pg-ast/canon.ts",
-				"test/sqlite/view.ts",
-				"test/support/analysis.ts"
+				"examples/*.ts"
 			],
-			"project": ["src/**/*.ts!", "examples/**/*.ts", "test/**/*.ts"]
+			"project": ["src/**/*.ts!", "examples/**/*.ts"]
 		},
 		"packages/cli": {
 			"entry": ["src/index.ts!", "src/bin.ts!"],
@@ -81,6 +78,15 @@
 			],
 			"project": ["*.ts", "playground/**/*.ts", ".vitepress/**/*.{ts,mts}"],
 			"ignoreDependencies": ["@typesql/drizzle"]
+		},
+		"tests": {
+			"entry": [
+				"consumer.test.ts",
+				"vitest.config.ts",
+				"support/setup.ts",
+				"run.ts"
+			],
+			"project": ["*.ts", "support/**/*.{ts,mjs}"]
 		}
 	}
 }

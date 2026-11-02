@@ -1,0 +1,14 @@
+generator client {
+  provider = "prisma-client"
+  output = "./generated/client"
+  moduleFormat = "esm"
+  importFileExtension = "js"
+}
+datasource db {
+  provider = "sqlite"
+}
+model User {
+  id Int @id @default(autoincrement())
+  name String
+  bio String?
+}

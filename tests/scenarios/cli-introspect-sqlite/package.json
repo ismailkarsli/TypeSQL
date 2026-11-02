@@ -1,0 +1,26 @@
+{
+	"name": "cli-introspect-sqlite",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"compile": "tsc -p tsconfig.json --pretty false",
+		"start": "node dist/app.js",
+		"setup": "node setup.ts",
+		"generate": "typesql introspect --dialect sqlite --db \"$SQLITE_PATH\" --out schema.ts"
+	},
+	"dependencies": {
+		"@typesql/core": "workspace:*",
+		"@typesql/cli": "workspace:*",
+		"@typesql/sqlite": "workspace:*"
+	},
+	"devDependencies": {
+		"typescript": "catalog:",
+		"@types/node": "catalog:"
+	},
+	"consumer": {
+		"database": "sqlite",
+		"artifacts": [
+			"schema.ts"
+		]
+	}
+}

@@ -1,0 +1,30 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`pg-left-join > consumer 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "narrowed": "({ id: number; title: string })[]",
+      "rows": "({ id: number; name: string; title: null | string })[]",
+    },
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "{
+  rows: [
+    { id: 1, name: 'Ada', title: 'SQL' },
+    { id: 2, name: 'Grace', title: null }
+  ],
+  narrowed: [ { id: 1, title: 'SQL' } ]
+}
+",
+  },
+}
+`;

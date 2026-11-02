@@ -5,7 +5,7 @@ Write [TypeSQL](https://www.npmjs.com/package/@typesql/core) queries against the
 ## Install
 
 ```sh
-npm install @typesql/core @typesql/kysely kysely
+pnpm add @typesql/core @typesql/kysely kysely
 ```
 
 ## Usage

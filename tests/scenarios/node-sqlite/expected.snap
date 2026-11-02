@@ -1,0 +1,44 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`node-sqlite > consumer 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "after": "({ id: number })[]",
+      "bigRows": "({ id: bigint })[]",
+      "changed": "number",
+      "division": "({ divided: null | number })[]",
+      "named": "{ name: string }",
+      "reused": "({ id: number; name: string })[]",
+      "rows": "({ bio: null | string; id: number; name: string })[]",
+    },
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "abort
+{
+  rows: [
+    [Object: null prototype] { id: 1, name: 'Ada', bio: null },
+    [Object: null prototype] { id: 2, name: 'Grace', bio: 'Compiler' }
+  ],
+  named: [Object: null prototype] { name: 'Ada' },
+  after: [
+    [Object: null prototype] { id: 1 },
+    [Object: null prototype] { id: 2 }
+  ],
+  changed: 1,
+  reused: [ [Object: null prototype] { id: 2, name: 'Grace' } ],
+  bigRows: [ [Object: null prototype] { id: 9007199254740993n } ],
+  division: [ [Object: null prototype] { divided: 3.5 } ]
+}
+",
+  },
+}
+`;

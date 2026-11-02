@@ -24,7 +24,7 @@ Version 1.0 of the TypeScript 7 extension bundles TypeScript 7.0, whose API cann
 **Option 1: the project's TypeScript.** Add TypeScript 7.1 to the project:
 
 ```sh
-npm install -D typescript@7.1.0-beta
+pnpm add -D typescript@7.1.0-beta
 ```
 
 Point the extension at it in `.vscode/settings.json`:

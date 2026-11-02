@@ -5,7 +5,7 @@ Run [TypeSQL](https://www.npmjs.com/package/@typesql/core) queries on [node-post
 ## Install
 
 ```sh
-npm install @typesql/core @typesql/pg pg
+pnpm add @typesql/core @typesql/pg pg
 ```
 
 ## Usage
@@ -36,8 +36,8 @@ await sql.transaction(async (tx) => {
 The `typesql` command of [`@typesql/cli`](https://www.npmjs.com/package/@typesql/cli) writes the `DB` type from a live database, using this package's introspection:
 
 ```sh
-npm install -D @typesql/cli
-npx typesql introspect --url postgres://localhost/app --out src/db/schema.ts
+pnpm add -D @typesql/cli
+pnpm exec typesql introspect --url postgres://localhost/app --out src/db/schema.ts
 ```
 
 ## Documentation

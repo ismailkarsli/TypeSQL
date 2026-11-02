@@ -1,0 +1,27 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`compiler-undeclared-dependency > consumer 1`] = `
+{
+  "compile": {
+    "status": 1,
+    "stderr": "[ELIFECYCLE] Command failed with exit code 1.
+",
+    "stdout": "app.ts(1,27): error TS2307: Cannot find module '@typesql/core' or its corresponding type declarations.
+",
+  },
+  "compiler": {
+    "diagnostics": [
+      {
+        "category": 1,
+        "code": 2307,
+        "column": 27,
+        "expression": ""@typesql/core"",
+        "file": "app.ts",
+        "line": 1,
+        "message": "Cannot find module '@typesql/core' or its corresponding type declarations.",
+      },
+    ],
+    "types": {},
+  },
+}
+`;

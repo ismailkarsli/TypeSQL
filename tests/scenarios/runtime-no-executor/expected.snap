@@ -1,0 +1,38 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`runtime-no-executor > consumer 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {},
+  },
+  "exception": {
+    "message": "typesql: no executor: pass one to createSql(executor) or to execute(executor)",
+    "name": "Error",
+  },
+  "start": {
+    "status": 1,
+    "stderr": "file://<consumer>/node_modules/.pnpm/@typesql+core@file+.consumer+packages+typesql-core-4.0.0.tgz_typescript@7.1.0-beta/node_modules/@typesql/core/dist/query.js:22
+            throw new Error("typesql: no executor: pass one to createSql(executor) or to execute(executor)");
+                  ^
+
+Error: typesql: no executor: pass one to createSql(executor) or to execute(executor)
+    at pick (file://<consumer>/node_modules/.pnpm/@typesql+core@file+.consumer+packages+typesql-core-4.0.0.tgz_typescript@7.1.0-beta/node_modules/@typesql/core/dist/query.js:22:19)
+    at Object.execute (file://<consumer>/node_modules/.pnpm/@typesql+core@file+.consumer+packages+typesql-core-4.0.0.tgz_typescript@7.1.0-beta/node_modules/@typesql/core/dist/query.js:26:30)
+    at file://<consumer>/dist/app.js:4:28
+    at ModuleJob.run (node:internal/modules/esm/module_job:569:25)
+    at async node:internal/modules/esm/loader:650:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+
+Node.js v26.8.1
+[ELIFECYCLE] Command failed with exit code 1.
+",
+    "stdout": "",
+  },
+}
+`;

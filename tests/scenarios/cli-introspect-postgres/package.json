@@ -1,0 +1,28 @@
+{
+	"name": "cli-introspect-postgres",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"compile": "tsc -p tsconfig.json --pretty false",
+		"start": "node dist/app.js",
+		"setup": "node setup.ts",
+		"generate": "typesql introspect --out schema.ts"
+	},
+	"dependencies": {
+		"@typesql/core": "workspace:*",
+		"@typesql/cli": "workspace:*",
+		"@typesql/pg": "workspace:*",
+		"pg": "catalog:",
+		"@types/pg": "catalog:"
+	},
+	"devDependencies": {
+		"typescript": "catalog:",
+		"@types/node": "catalog:"
+	},
+	"consumer": {
+		"database": "postgres",
+		"artifacts": [
+			"schema.ts"
+		]
+	}
+}

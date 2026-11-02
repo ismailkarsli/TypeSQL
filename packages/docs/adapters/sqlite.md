@@ -3,7 +3,7 @@
 `@typesql/sqlite` runs your queries on node:sqlite (`DatabaseSync`), better-sqlite3 or bun:sqlite. They share one synchronous interface, so the adapter has no dependencies.
 
 ```sh
-npm install @typesql/core @typesql/sqlite
+pnpm add @typesql/core @typesql/sqlite
 ```
 
 Add `better-sqlite3` if you use it; node:sqlite and bun:sqlite are built in.
@@ -56,8 +56,8 @@ The SQLite drivers return numbers, strings, `null` and `Uint8Array` (better-sqli
 `typesql introspect --dialect sqlite`, from `@typesql/cli`, reads a database file and writes its schema, with each column's declared type, nullability, default, position and `INTEGER PRIMARY KEY`, and the generated and hidden columns:
 
 ```sh
-npm install -D @typesql/cli
-npx typesql introspect --dialect sqlite --db app.db --out src/db/schema.ts
+pnpm add -D @typesql/cli
+pnpm exec typesql introspect --dialect sqlite --db app.db --out src/db/schema.ts
 ```
 
 ```ts
@@ -105,3 +105,9 @@ await createMigrator({
 	migrations: [createUsers, addBio],
 }).latest();
 ```
+
+## Runnable consumer
+
+This application uses a separate SQLite file, demonstrates named parameters and rollback, and prints driver values without converting bigints to numbers. Run its maintained scenario with `pnpm test:consumer node-sqlite`.
+
+<<< ../../../tests/scenarios/node-sqlite/app.ts

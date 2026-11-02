@@ -14,16 +14,16 @@ It hooks into TypeScript 7's language server (`tsc --lsp --stdio`) and reads its
 1. Install the server:
 
    ```sh
-   npm install -g @typesql/language-server
+   pnpm add -g @typesql/language-server
    ```
 
-2. Have `@typesql/core` 0.4.0 or later in the project, directly or through an adapter, and `typescript` 7.1 or later (`npm install -D typescript@7.1.0-beta`).
+2. Have `@typesql/core` 0.4.0 or later in the project, directly or through an adapter, and `typescript` 7.1 or later (`pnpm add -D typescript@7.1.0-beta`).
 
 3. With Neovim 0.11 or later, add `~/.config/nvim/lsp/tsgo.lua` (or `~/.config/nvim/after/lsp/tsgo.lua` if you use nvim-lspconfig; see below):
 
    ```lua
    return {
-     cmd = { "npx", "--no", "tsc", "--lsp", "--stdio" },
+     cmd = { "pnpm", "exec", "tsc", "--lsp", "--stdio" },
      filetypes = { "javascript", "javascriptreact", "typescript", "typescriptreact" },
      root_markers = { "pnpm-lock.yaml", "package-lock.json", "yarn.lock", "bun.lock", ".git" },
      capabilities = { general = { positionEncodings = { "utf-16" } } },
@@ -65,7 +65,7 @@ It hooks into TypeScript 7's language server (`tsc --lsp --stdio`) and reads its
    vim.lsp.enable("tsgo")
    ```
 
-`npx --no` runs the project's own `tsc` and fails instead of downloading the unrelated `tsc` package when the project has no TypeScript. `vim.NIL` keeps TypeScript's `null` answer (usual inside SQL strings), which Lua would otherwise drop from the request.
+`pnpm exec` runs the project's installed `tsc` without downloading a package. Install the supported TypeScript version in the project first. `vim.NIL` keeps TypeScript's `null` answer (usual inside SQL strings), which Lua would otherwise drop from the request.
 
 If you use [nvim-lspconfig](https://github.com/neovim/nvim-lspconfig), save the file as `~/.config/nvim/after/lsp/tsgo.lua` instead. nvim-lspconfig ships its own `lsp/tsgo.lua`, which comes later in the runtime path than `~/.config/nvim/lsp/tsgo.lua` and replaces its `cmd` and `on_init`; files under `after/lsp/` are merged last. You can leave out `filetypes` and `root_markers` there.
 

@@ -24,7 +24,6 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm playground --check
       - run: pnpm build
-      - run: pnpm smoke:dist
       - run: pnpm --filter typesql exec vsce package --no-dependencies --out "$RUNNER_TEMP/typesql.vsix"
       - run: pnpm docs:build
 
@@ -41,90 +40,21 @@ jobs:
         env:
           BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
 
-  pg-regress:
+  consumers:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:
-          node-version: 26
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm pg-regress:setup
-      - run: pnpm test:pg-regress
-      - run: pnpm test:pg-ast
-
-  oracle:
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:18
-        env:
-          POSTGRES_PASSWORD: typesql
-        ports: ["5432:5432"]
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 2s
-          --health-timeout 5s
-          --health-retries 30
-    env:
-      TYPESQL_ORACLE_URL: postgres://postgres:typesql@localhost:5432/postgres
-    steps:
-      - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v7
+          node-version: 26.8.1
+      - run: pnpm test
+      - name: Retain failing consumer applications and logs
+        if: failure()
+        uses: actions/upload-artifact@v7
         with:
-          node-version: 26
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm test:oracle --views
-
-  oracle-regress:
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [1, 2, 3, 4]
-    env:
-      TYPESQL_ORACLE_URL: postgres://postgres:typesql@localhost:5432/postgres
-    steps:
-      - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 26
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm pg-regress:setup
-      - name: start postgres:18
-        run: |
-          docker run -d --name pg -e POSTGRES_PASSWORD=typesql -p 5432:5432 \
-            -v "$PWD/vendor/postgres/src/test/regress:/regress:ro" postgres:18
-          until docker exec pg pg_isready -U postgres -h localhost; do sleep 1; done
-      - run: pnpm test:oracle --regress --views --shard ${{ matrix.shard }}/4
-
-  fuzz:
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:18
-        env:
-          POSTGRES_PASSWORD: typesql
-        ports: ["5432:5432"]
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 2s
-          --health-timeout 5s
-          --health-retries 30
-    env:
-      TYPESQL_ORACLE_URL: postgres://postgres:typesql@localhost:5432/postgres
-    steps:
-      - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 26
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm fuzz
+          name: consumer-failures
+          path: tests/.artifacts/
+          include-hidden-files: true
+          retention-days: 7

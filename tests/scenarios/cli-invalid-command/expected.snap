@@ -1,0 +1,41 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`cli-invalid-command > consumer 1`] = `
+{
+  "generate": {
+    "status": 2,
+    "stderr": "typesql migrate: expected latest, up, down, status, make <name>, or generate
+
+Usage: typesql migrate <latest|up|down|status|make name|generate> [options]
+
+  latest              apply every pending migration
+  up                  apply the next pending migration
+  down                revert the last applied migration
+  status              list applied and pending migrations
+  make <name>         create a migration file that starts from the last one
+  generate            write the schema of the last migration to a DB file
+
+Options:
+  --config <file>     config module (default: ./typesql.config.ts)
+  --dialect <name>    postgres or sqlite; overrides config
+  --url <url>         PostgreSQL URL; overrides config (default: $DATABASE_URL)
+  --db <file>         SQLite database file; overrides config
+  --dir <directory>   migrations directory; overrides config
+  --out <file>        schema file to write (default: config.schemaFile or db.ts)
+  --no-generate       don't write the schema file after up, down or latest
+  -h, --help          show this help
+
+The config file default-exports a migrator:
+
+  import { createMigrator } from "@typesql/core/migration";
+  export default createMigrator({ dialect: "postgres", url: process.env.DATABASE_URL, migrationsDir: "./migrations" });
+
+Without a config file, pass --dialect and --url or --db; the directory
+defaults to ./migrations. Paths in the config are relative to it, and paths
+in flags to the working directory. Requires Node.js 26 or newer.
+[ELIFECYCLE] Command failed with exit code 2.
+",
+    "stdout": "",
+  },
+}
+`;

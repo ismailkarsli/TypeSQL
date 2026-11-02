@@ -1,0 +1,35 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`module-entry-points > consumer 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {},
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "{
+  createSql: 'function',
+  positional: 'function',
+  postgres: 'postgres',
+  sqlite: 'sqlite',
+  pgEngine: [],
+  sqliteEngine: [],
+  migrations: 'function',
+  pgIntrospect: 'function',
+  sqliteIntrospect: 'function',
+  generateSource: 'function',
+  requireEsm: 'function'
+}
+4.0.0
+{ status: 0 }
+",
+  },
+}
+`;

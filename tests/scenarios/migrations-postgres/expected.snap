@@ -1,0 +1,53 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`migrations-postgres > consumer 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {},
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "{
+  name: 'MigrationError',
+  migration: '002-failure',
+  rolledBack: true,
+  applied: [ '001-users' ]
+}
+{ history: [ { name: '001-users' } ] }
+{
+  status: [
+    { name: '001-users', applied: true },
+    { name: '002-failure', applied: false }
+  ]
+}
+{
+  tables: [ { table_name: 'schema_migrations' }, { table_name: 'users' } ]
+}
+{ again: { applied: [] } }
+{ down: { reverted: [ '001-users' ] } }
+{ history: [] }
+{
+  name: 'MigrationError',
+  migration: '002-failure',
+  rolledBack: false,
+  applied: [ '001-users' ]
+}
+{
+  tablesWithoutTransaction: [
+    { table_name: 'schema_migrations' },
+    { table_name: 'temporary' },
+    { table_name: 'users' }
+  ],
+  history: [ { name: '001-users' } ]
+}
+",
+  },
+}
+`;

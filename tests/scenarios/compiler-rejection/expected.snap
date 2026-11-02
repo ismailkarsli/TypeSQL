@@ -1,0 +1,49 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`compiler-rejection > consumer 1`] = `
+{
+  "compile": {
+    "status": 1,
+    "stderr": "[ELIFECYCLE] Command failed with exit code 1.
+",
+    "stdout": "app.ts(7,43): error TS2345: Argument of type 'string' is not assignable to parameter of type 'number'.
+app.ts(8,5): error TS2345: Argument of type '"SELECT missing FROM users"' is not assignable to parameter of type 'SqlError<"column \\"missing\\" does not exist", 1> & "SELECT missing FROM users"'.
+  Type 'string' is not assignable to type 'SqlError<"column \\"missing\\" does not exist", 1>'.
+",
+  },
+  "compiler": {
+    "diagnostics": [
+      {
+        "category": 1,
+        "code": 2345,
+        "column": 43,
+        "expression": ""wrong"",
+        "file": "app.ts",
+        "line": 7,
+        "message": "Argument of type 'string' is not assignable to parameter of type 'number'.",
+      },
+      {
+        "category": 1,
+        "code": 2345,
+        "column": 5,
+        "details": [
+          {
+            "category": 1,
+            "code": 2322,
+            "column": 5,
+            "expression": ""SELECT missing FROM users"",
+            "file": "app.ts",
+            "line": 8,
+            "message": "Type 'string' is not assignable to type 'SqlError<"column \\"missing\\" does not exist", 1>'.",
+          },
+        ],
+        "expression": ""SELECT missing FROM users"",
+        "file": "app.ts",
+        "line": 8,
+        "message": "Argument of type '"SELECT missing FROM users"' is not assignable to parameter of type 'SqlError<"column \\"missing\\" does not exist", 1> & "SELECT missing FROM users"'.",
+      },
+    ],
+    "types": {},
+  },
+}
+`;

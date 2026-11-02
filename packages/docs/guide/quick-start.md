@@ -11,8 +11,8 @@ This page takes you from an empty project to a typed query in a few minutes.
 This page uses node-postgres. [Installation](./installation) covers postgres.js, other package managers and the requirements.
 
 ```sh
-npm install @typesql/core @typesql/pg pg
-npm install -D typescript@7.1.0-beta
+pnpm add @typesql/core @typesql/pg pg
+pnpm add -D typescript@7.1.0-beta
 ```
 
 ## 2. Describe your tables
@@ -108,3 +108,9 @@ The number after the message is the position of the wrong token. [Errors and tro
 - [Inserting and updating](./writing-data): `INSERT`, `UPDATE`, `DELETE` and `RETURNING`.
 - [Dynamic SQL](./dynamic-sql): build statements from pieces.
 - Editor support for [VS Code](./vscode) and [Neovim](./neovim): completions and highlighting inside your SQL strings.
+
+## Runnable consumer
+
+This complete application creates fixed example data, runs a left join, and narrows its nullable title with `IS NOT NULL`. Its source is also a packaged consumer scenario: `pnpm test:consumer pg-left-join` checks its inferred rows and real database output. The setup uses a fresh database provided through `DATABASE_URL`.
+
+<<< ../../../tests/scenarios/pg-left-join/app.ts

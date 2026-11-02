@@ -1,1 +1,0 @@
-SELECT t1.c FROM t1 WHERE t1.id = 0 OR true AND t1.c IS NOT NULL

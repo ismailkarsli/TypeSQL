@@ -180,7 +180,7 @@ Setup, done once for this repository:
 
 A new package is the one exception: npm only configures trust for a package that already
 exists. After the workflow has committed the release and published its established dependencies,
-check out the release commit, run `pnpm install --frozen-lockfile && pnpm build && pnpm smoke:dist`,
+check out the release commit, run `pnpm install --frozen-lockfile && pnpm build && pnpm test:consumer`,
 then run `pnpm publish --no-git-checks` from each new package's directory with 2FA. Use the
 release commit, not the preceding source commit, so workspace dependencies resolve to the
 versions the workflow just published. Run the `npm trust github` command in step 1 for each new
@@ -272,7 +272,7 @@ be the same on both registries.
    1. Log in at [open-vsx.org](https://open-vsx.org) with GitHub, link an Eclipse account and
       sign the Publisher Agreement (profile page).
    2. Create an access token (**Settings → Access Tokens**) and the namespace, once, from a
-      terminal: `npx ovsx create-namespace typesql -p <token>`.
+      terminal: `pnpm exec ovsx create-namespace typesql -p <token>`.
    3. Publish the first version by hand: a trusted publisher can only be added to an extension
       that exists. From the release commit, run `pnpm --filter "typesql..." run build`, then in
       `packages/vscode` `pnpm exec vsce package --no-dependencies --out typesql.vsix` and

@@ -1,0 +1,37 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`pg-ended-transaction > consumer 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {},
+  },
+  "exception": {
+    "message": "typesql: this transaction has ended; run later queries on the sql that started it",
+    "name": "Error",
+  },
+  "start": {
+    "status": 1,
+    "stderr": "file://<consumer>/node_modules/.pnpm/@typesql+core@file+.consumer+packages+typesql-core-4.0.0.tgz_pg@8.23.1_typescript@7.1.0-beta/node_modules/@typesql/core/dist/transaction.js:9
+            throw new Error("typesql: this transaction has ended; run later queries on the sql that started it");
+                  ^
+
+Error: typesql: this transaction has ended; run later queries on the sql that started it
+    at check (file://<consumer>/node_modules/.pnpm/@typesql+core@file+.consumer+packages+typesql-core-4.0.0.tgz_pg@8.23.1_typescript@7.1.0-beta/node_modules/@typesql/core/dist/transaction.js:9:19)
+    at run (file://<consumer>/node_modules/.pnpm/@typesql+core@file+.consumer+packages+typesql-core-4.0.0.tgz_pg@8.23.1_typescript@7.1.0-beta/node_modules/@typesql/core/dist/transaction.js:12:9)
+    at Object.execute (file://<consumer>/node_modules/.pnpm/@typesql+core@file+.consumer+packages+typesql-core-4.0.0.tgz_pg@8.23.1_typescript@7.1.0-beta/node_modules/@typesql/core/dist/query.js:26:41)
+    at file://<consumer>/dist/app.js:7:34
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+
+Node.js v26.8.1
+[ELIFECYCLE] Command failed with exit code 1.
+",
+    "stdout": "",
+  },
+}
+`;

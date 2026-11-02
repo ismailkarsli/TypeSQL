@@ -1,0 +1,93 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`compiler-nullability > consumer 1`] = `
+{
+  "compile": {
+    "status": 1,
+    "stderr": "[ELIFECYCLE] Command failed with exit code 1.
+",
+    "stdout": "app.ts(11,56): error TS2345: Argument of type 'null' is not assignable to parameter of type 'string'.
+app.ts(12,5): error TS2345: Argument of type '"INSERT INTO users (id) VALUES ($1)"' is not assignable to parameter of type 'SqlError<"null value in column \\"name\\" of relation \\"users\\" violates not-null constraint", 2> & "INSERT INTO users (id) VALUES ($1)"'.
+  Type 'string' is not assignable to type 'SqlError<"null value in column \\"name\\" of relation \\"users\\" violates not-null constraint", 2>'.
+app.ts(13,5): error TS2345: Argument of type 'string' is not assignable to parameter of type 'SqlError<"parameter $1: a null value cannot be used as text NOT NULL", 5> & "UPDATE users SET name = \\0P0\\0"'.
+  Type 'string' is not assignable to type 'SqlError<"parameter $1: a null value cannot be used as text NOT NULL", 5>'.
+app.ts(14,5): error TS2345: Argument of type '"SELECT slugify(name) FROM users"' is not assignable to parameter of type 'SqlError<"function slugify(text) does not exist. Declare it in the schema's $functions or in FunctionCatalog", 1> & "SELECT slugify(name) FROM users"'.
+  Type 'string' is not assignable to type 'SqlError<"function slugify(text) does not exist. Declare it in the schema's $functions or in FunctionCatalog", 1>'.
+",
+  },
+  "compiler": {
+    "diagnostics": [
+      {
+        "category": 1,
+        "code": 2345,
+        "column": 56,
+        "expression": "null",
+        "file": "app.ts",
+        "line": 11,
+        "message": "Argument of type 'null' is not assignable to parameter of type 'string'.",
+      },
+      {
+        "category": 1,
+        "code": 2345,
+        "column": 5,
+        "details": [
+          {
+            "category": 1,
+            "code": 2322,
+            "column": 5,
+            "expression": ""INSERT INTO users (id) VALUES ($1)"",
+            "file": "app.ts",
+            "line": 12,
+            "message": "Type 'string' is not assignable to type 'SqlError<"null value in column \\"name\\" of relation \\"users\\" violates not-null constraint", 2>'.",
+          },
+        ],
+        "expression": ""INSERT INTO users (id) VALUES ($1)"",
+        "file": "app.ts",
+        "line": 12,
+        "message": "Argument of type '"INSERT INTO users (id) VALUES ($1)"' is not assignable to parameter of type 'SqlError<"null value in column \\"name\\" of relation \\"users\\" violates not-null constraint", 2> & "INSERT INTO users (id) VALUES ($1)"'.",
+      },
+      {
+        "category": 1,
+        "code": 2345,
+        "column": 5,
+        "details": [
+          {
+            "category": 1,
+            "code": 2322,
+            "column": 5,
+            "expression": "\`UPDATE users SET name = \${sql.param(null)}\`",
+            "file": "app.ts",
+            "line": 13,
+            "message": "Type 'string' is not assignable to type 'SqlError<"parameter $1: a null value cannot be used as text NOT NULL", 5>'.",
+          },
+        ],
+        "expression": "\`UPDATE users SET name = \${sql.param(null)}\`",
+        "file": "app.ts",
+        "line": 13,
+        "message": "Argument of type 'string' is not assignable to parameter of type 'SqlError<"parameter $1: a null value cannot be used as text NOT NULL", 5> & "UPDATE users SET name = \\0P0\\0"'.",
+      },
+      {
+        "category": 1,
+        "code": 2345,
+        "column": 5,
+        "details": [
+          {
+            "category": 1,
+            "code": 2322,
+            "column": 5,
+            "expression": ""SELECT slugify(name) FROM users"",
+            "file": "app.ts",
+            "line": 14,
+            "message": "Type 'string' is not assignable to type 'SqlError<"function slugify(text) does not exist. Declare it in the schema's $functions or in FunctionCatalog", 1>'.",
+          },
+        ],
+        "expression": ""SELECT slugify(name) FROM users"",
+        "file": "app.ts",
+        "line": 14,
+        "message": "Argument of type '"SELECT slugify(name) FROM users"' is not assignable to parameter of type 'SqlError<"function slugify(text) does not exist. Declare it in the schema's $functions or in FunctionCatalog", 1> & "SELECT slugify(name) FROM users"'.",
+      },
+    ],
+    "types": {},
+  },
+}
+`;

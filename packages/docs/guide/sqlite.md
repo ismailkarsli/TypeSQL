@@ -179,7 +179,7 @@ no such column: emial. Perhaps you meant the column "email"?
 
 ## Compatibility testing
 
-`pnpm test:sqlite` runs every statement of `packages/core/test/sqlite/corpus.json` through TypeSQL and through the SQLite that ships with Node, and compares the outcome, the error message, the result column names and declared types, and the values returned for seeded tables against the inferred types. Reviewed disagreements are in `packages/core/test/sqlite/baseline.json`; they are the deliberate differences above. `pnpm fuzz` also generates random expressions and queries from a seed and runs them through the same comparison.
+`pnpm test:consumer` checks the documented SQLite workflows using standalone applications on pinned node:sqlite, better-sqlite3 and bun:sqlite runtimes. It checks inferred types, compiler errors, actual database results, transactions, introspection and generated schemas through reviewed Vitest snapshots. The retired generated-SQL corpus and fuzz runner are no longer maintained. See the [workflow inventory](https://github.com/ismailkarsli/TypeSQL/blob/main/tests/inventory.md).
 
 ## Limits
 

@@ -1,0 +1,33 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`pg-dynamic-sql > consumer 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "asserted": "({ id: number; name: string })[]",
+      "conditional": "({ id: number })[]",
+      "rows": "({ id: number; name: string })[]",
+      "subquery": "({ name: string })[]",
+    },
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "{
+  rows: [ { id: 2, name: 'Grace' }, { id: 1, name: 'Ada' } ],
+  subquery: [ { name: 'Grace' } ],
+  conditional: [ { id: 1 } ],
+  asserted: [ { id: 1, name: 'Ada' }, { id: 2, name: 'Grace' } ],
+  emptyAnd: 'true',
+  emptyOr: 'false'
+}
+",
+  },
+}
+`;

@@ -1,0 +1,30 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`pg-driver-values > consumer 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "rows": "({ absent: null | string; at: Date; big: string; decimal: string })[]",
+    },
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "[
+  {
+    big: '9007199254740993',
+    at: 2020-01-02T03:04:05.000Z,
+    decimal: '1.25',
+    absent: null
+  }
+]
+",
+  },
+}
+`;

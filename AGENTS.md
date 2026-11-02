@@ -3,7 +3,7 @@
 ## Change intents
 
 When you change `src/`, `README.md`, `LICENSE` or `package.json` of a published package
-(`@typesql/core`, `pg`, `postgres`, `kysely`, `drizzle`, `prisma`), add an intent in the same commit:
+(`@typesql/core`, `pg`, `postgres`, `sqlite`, `kysely`, `drizzle`, `prisma`, `cli`), add an intent in the same commit:
 
 ```sh
 pnpm change @typesql/core --bump patch --summary "One sentence on what users now see."
@@ -18,34 +18,25 @@ pnpm check:intents
   when the break is unlikely.
 - Write the summary like the existing `.changeset/*.md` files.
 
-## PostgreSQL regression tests
+## Consumer tests and definition of done
 
-`vendor/postgres` holds PostgreSQL's official regression tests (a git submodule). They are the
-gold source: never modify, reformat, add or delete files in it, and never edit them to make a
-test pass. Record disagreements in `packages/core/test/pg-regress/baseline.json` with
-`pnpm test:pg-regress --update`, and only when one went away or after moving to a new
-PostgreSQL release; a new disagreement is a parser regression to fix.
+`pnpm test` and `pnpm test:consumer` run the complete Vitest consumer suite in the pinned Docker environment. Use `pnpm test:consumer <scenario>` for a filtered iteration and run the complete suite before finishing a library or CLI change. CI runs every scenario without snapshot updates. See [tests/README.md](tests/README.md) and the [workflow inventory](tests/inventory.md).
 
-## Definition of done
+For a bug fix:
 
-A change to the engine or a new feature is done when these checks pass:
-the PostgreSQL regression parser and parse-tree checks (`pnpm test:pg-regress` and
-`pnpm test:pg-ast`), the type oracles (`pnpm test:oracle --regress --views`), the fuzzer
-(`pnpm fuzz`), and the built-package smoke checks (`pnpm build && pnpm smoke:dist`).
+1. Add a minimal standalone project under `tests/scenarios/` using the affected public workflow.
+2. Define and review intended public types, diagnostics, database output/errors or generated files from documented behavior and the real database.
+3. Observe the relevant failure against the unfixed checkout.
+4. Fix the library and rerun the same consumer without weakening expectations.
+5. Run the complete suite and retain the reproduction permanently.
 
-Some of these take too long to run before you finish a task: the full `pnpm test`, the
-regression oracle (`pnpm test:oracle --regress`) and the default `pnpm fuzz`. Don't run them
-before you finish; CI runs them. Run the quick checks that cover your change instead:
-`pnpm test:oracle --views` or `pnpm test:oracle <test …>`, `pnpm fuzz --runs <n>` with a small
-`n`, and the other checks above. When you report back, list the slow checks you didn't run.
+A normal scenario contains `package.json`, `app.ts` and `expected.snap`. Use ordinary package scripts for setup, generation, compilation and execution. Add ordinary application files when needed. Applications contain no test assertions, suppressed expected compiler errors or type-equality helpers. External versions belong in the exact test workspace catalogs and its single committed lockfile; consumers run against installed checkout tarballs, never repository source imports, workspace aliases or registry TypeSQL packages.
 
-Add query/schema inputs to `packages/core/test/oracle/corpus.json`, including nullable and
-non-nullable cases for nullability rules; derive expected behavior from PostgreSQL. Do not
-add unit/integration suites, static type assertion suites, or coverage gates. Include the
-change intent when required above.
-Record unrelated engine findings in the reviewed baseline and fix them in separate commits.
-Do not create GitHub issues or post issue comments automatically. Create issues or comments
-only when the user explicitly requests them.
+Snapshot changes require an explicit `--update` and review. Never accept current output merely because it is current. Include nullable and non-nullable cases when changing nullability rules. Do not add another runner, generated SQL corpus, baseline, unit suite or coverage gate. Failures retain their isolated consumer and logs under `tests/.artifacts/`; report the scenario, stage, command and expected-versus-observed difference. Infrastructure failures are separate from application rejections.
+
+`vendor/postgres` is an unchanged PostgreSQL submodule. Never modify, reformat, add or delete its files to make tests pass. The former parser, AST, oracle, fuzz and smoke runners and their corpora are retired.
+
+Do not create GitHub issues or post issue comments automatically. Create them only when explicitly requested.
 
 ## Releases
 

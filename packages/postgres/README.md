@@ -5,7 +5,7 @@ Run [TypeSQL](https://www.npmjs.com/package/@typesql/core) queries on [postgres.
 ## Install
 
 ```sh
-npm install @typesql/core @typesql/postgres postgres
+pnpm add @typesql/core @typesql/postgres postgres
 ```
 
 ## Usage

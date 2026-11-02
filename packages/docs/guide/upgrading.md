@@ -9,7 +9,7 @@ Most breaking changes are compile errors at the call site, so after upgrading ru
 - **One version for the library packages.** Since 1.1.0, `@typesql/core`, `@typesql/pg`, `@typesql/postgres`, `@typesql/sqlite`, `@typesql/kysely`, `@typesql/drizzle`, `@typesql/prisma` and `@typesql/cli` share one version and are released together. Upgrade them together, to the same version:
 
   ```sh
-  npm install @typesql/core@4 @typesql/pg@4   # and any other @typesql/* package you use
+  pnpm add @typesql/core@4 @typesql/pg@4   # and any other @typesql/* package you use
   ```
 
   Before 1.1.0 the adapters had their own 0.x versions (for example `@typesql/pg` 0.4.3 went with `@typesql/core` 1.0.1). `@typesql/language-server` and the VS Code extension keep their own versions.

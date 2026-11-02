@@ -12,32 +12,24 @@
 		"lint": "biome check",
 		"lint:fix": "biome check --write",
 		"knip": "knip",
-		"test": "pnpm build && pnpm smoke:dist && pnpm test:pg-regress && pnpm test:pg-ast && pnpm test:sqlite && pnpm test:oracle --regress --views && pnpm fuzz",
-		"test:pg-regress": "node packages/core/test/pg-regress/run.ts",
-		"test:oracle": "node scripts/oracle.ts",
-		"test:sqlite": "node scripts/sqlite-oracle.ts",
-		"fuzz": "node scripts/fuzz.ts",
-		"test:pg-ast": "node scripts/pg-ast.ts",
-		"pg-regress:setup": "node packages/core/test/pg-regress/setup.ts",
+		"test": "pnpm test:consumer",
 		"bench": "pnpm --filter @typesql/bench run bench",
-		"smoke:dist": "node scripts/smoke-dist.ts",
 		"check:intents": "node scripts/check-intents.ts",
 		"release": "gh workflow run release.yml --ref main && echo \"Release started: https://github.com/ismailkarsli/typesql/actions/workflows/release.yml\"",
 		"docs:dev": "pnpm --filter @typesql/docs run dev",
 		"docs:build": "pnpm --filter @typesql/docs run build",
 		"docs:preview": "pnpm --filter @typesql/docs run preview",
 		"docs:deploy": "pnpm --filter @typesql/docs run deploy",
-		"playground": "node scripts/playground.ts"
+		"playground": "node scripts/playground.ts",
+		"test:consumer": "node tests/run.ts"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.6.2",
 		"@types/node": "^26.6.5",
 		"esbuild": "^0.28.2",
-		"fast-check": "^4.10.2",
 		"knip": "^6.44.0",
 		"lz-string": "^1.5.0",
 		"tsrs": "0.18.0-ts7.1.0-dev.20260929",
-		"typescript": "7.1.0-beta",
-		"vitest": "^5.0.4"
+		"typescript": "7.1.0-beta"
 	}
 }

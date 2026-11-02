@@ -1,0 +1,36 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`pg-json > consumer 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "rows": "({ id: number; items: (string)[]; settings: { theme: "dark" | "light" }; theme: null | string })[]",
+      "shaped": "({ profile: { id: number; settings: { theme: "dark" | "light" } } })[]",
+    },
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "{
+  rows: [
+    {
+      id: 1,
+      settings: { theme: 'dark' },
+      items: [ 'one', 'two' ],
+      theme: 'dark'
+    }
+  ],
+  shaped: [
+    { profile: { id: 1, settings: { theme: 'dark' } } }
+  ]
+}
+",
+  },
+}
+`;

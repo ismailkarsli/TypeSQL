@@ -12,3 +12,7 @@ pnpm-publish-summary.json
 !docs/
 *.vsix
 reports/
+
+.consumer/
+tests/.artifacts/
+tests/.vitest/

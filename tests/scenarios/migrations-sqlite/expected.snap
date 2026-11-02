@@ -1,0 +1,56 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`migrations-sqlite > consumer 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {},
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "{
+  name: 'MigrationError',
+  migration: '002-failure',
+  rolledBack: true,
+  applied: [ '001-users' ]
+}
+{ history: [ [Object: null prototype] { name: '001-users' } ] }
+{
+  status: [
+    { name: '001-users', applied: true },
+    { name: '002-failure', applied: false }
+  ]
+}
+{
+  tables: [
+    [Object: null prototype] { name: 'schema_migrations' },
+    [Object: null prototype] { name: 'users' }
+  ]
+}
+{ again: { applied: [] } }
+{ down: { reverted: [ '001-users' ] } }
+{ history: [] }
+{
+  name: 'MigrationError',
+  migration: '002-failure',
+  rolledBack: false,
+  applied: [ '001-users' ]
+}
+{
+  tablesWithoutTransaction: [
+    [Object: null prototype] { name: 'schema_migrations' },
+    [Object: null prototype] { name: 'temporary' },
+    [Object: null prototype] { name: 'users' }
+  ],
+  history: [ [Object: null prototype] { name: '001-users' } ]
+}
+",
+  },
+}
+`;

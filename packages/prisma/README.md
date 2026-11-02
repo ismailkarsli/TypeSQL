@@ -5,7 +5,7 @@ Write [TypeSQL](https://www.npmjs.com/package/@typesql/core) queries against you
 ## Install
 
 ```sh
-npm install @typesql/core @typesql/prisma
+pnpm add @typesql/core @typesql/prisma
 ```
 
 Requires `@prisma/client` 7 or later, with the `postgresql` or `sqlite` provider.

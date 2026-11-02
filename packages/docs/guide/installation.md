@@ -22,21 +22,9 @@ Install `@typesql/core` and the adapter for your driver:
 
 If your project is on an older TypeScript, add 7.1 as a dev dependency:
 
-::: code-group
-
-```sh [npm]
-npm install -D typescript@7.1.0-beta
-```
-
-```sh [pnpm]
+```sh
 pnpm add -D typescript@7.1.0-beta
 ```
-
-```sh [yarn]
-yarn add -D typescript@7.1.0-beta
-```
-
-:::
 
 Your editor should check the project with TypeScript 7.1 as well. [VS Code extension](./vscode#setup) shows how to point VS Code at it. You can also use [tsrs](https://github.com/oxc-project/tsrs), a Rust port of TypeScript 7.1.
 

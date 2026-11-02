@@ -1,0 +1,23 @@
+{
+	"name": "drizzle-sqlite",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"compile": "tsc -p tsconfig.json --pretty false",
+		"start": "node dist/app.js"
+	},
+	"dependencies": {
+		"@typesql/core": "workspace:*",
+		"@typesql/drizzle": "workspace:*",
+		"drizzle-orm": "catalog:",
+		"better-sqlite3": "catalog:",
+		"@types/better-sqlite3": "catalog:"
+	},
+	"devDependencies": {
+		"typescript": "catalog:",
+		"@types/node": "catalog:"
+	},
+	"consumer": {
+		"database": "sqlite"
+	}
+}

@@ -19,7 +19,7 @@ For the exact Postgres types without overrides, [generate the schema from the da
 ## Kysely
 
 ```sh
-npm install @typesql/core @typesql/kysely kysely
+pnpm add @typesql/core @typesql/kysely kysely
 ```
 
 [Open an example in the TypeScript Playground](https://www.typescriptlang.org/play/?moduleResolution=100#code/JYWwDg9gTgLgBAbzpAzjA5lApiuBfOAMyghDgCIABGATzBwEcAbAegGNosXUNsVyA3AChQkWIjhtsAQxhYAys3xESZKrXopmLANY0UWJjUEjw0eAiEBIDVjgBhCEwCuIAHYAVOlgA0123AA4lhuWFCyWAAmflYA0vqGNDEAChBomDgAIsDSTFhsMH4ExKQUegZGJqLmEqlOyiVqYOgmQgEAkm4wABxwALwOTq6e3gA81mhQwG7oMQBGwOjT8AA+cG6uc2Fwa5PTs9YLS10765vbuzBTM0IAfMIBHqA4MNLg-YMu7l70o5kRPjg-zkpz2M0BwLsl2u6HubW8cAAshAIJEPuQABbSMBgYyncgoaSRVrLMKEaRsOyZABCiGszgMUBQAC46VYrMBIqzgqFwnJIqMNiAtlA4eysCBpMAmKywehhOyQCiuUjlacNkwmAqrFIsBFIgB9WTckJhfWjJ4gF5vMBivAKngstkclU8s380adHpiqzSZwwDHQA2c1lCkXamDAGB5WVXfbasDOOZMYAoDFRE2881zFF5aRuO3CPBCIQcNxoOCROYfUIAdzg8QqND+1NuAApLFZIjk8gVQ1h66l0nxsrl8jAO8hc-3B7m2wBKfDzorz4RlitaJgfXURRRMNs8DIoQFV1cl9fwSLhQgwXADaS1qWXubWAB0FXHADFVG3yI7yPOb4fgUbYANrkJy5CAuQkbRlg5AALqAVYr61um2C-omyapumxLQX0UFELkBjIa+WAAB75P6WALsIpYQOW8B5pEYQ5tIUBogMm5ttYAAG8gAKIADICfYHhwM4ZGStKgKSUqqKAhwzhdAer6couACC8hTmgx5CHABmGUZxkmaZhnhG4OgLnAADyABqAkAEpwG2NmOZkTlwNSACakgQMpE5gGpkSLh58j2Jp2lgEwFJYPpZkJSZn6OTZiISYyuDOHAImfuJABSNntAAcjpt7ILZJVBX6AZBpyHySXVGlFZkyCvlhKZplE8WJT1cAAOoABJOQJEmvvJnFwAAJAAjN1vUJYEKUAKrJF5vkNZEvExJi2K4lBQhnhecAWToUQfA+T5wMxrEQOxkRkZRbDUbRJYXVGlZzK+Vz5oSBTAAxC4PVRchttIKA0G4bAuVc5GLn0txsm98Aw9YKHOGAkQRB40jJjRf5pLeAGo++WATkg7U4RmcBXM4dh4MhKFoWEePVYGUDBnhFAEYC00M0DT0g2evqPu9O5yHuB4E0egIw-OPHsrxHkiR4I3JalpW4INw1wKztUTTNcBNS1RU2eJFOdZtMRWNNMTzvzz1nvTdHcfxwmieJdVq2lDJhJrQ2OSN40fDNW0UPmmDGGeQA) <span data-playground="kysely"></span>.
@@ -192,7 +192,7 @@ const post = await camelRows(
 ## Drizzle
 
 ```sh
-npm install @typesql/core @typesql/drizzle drizzle-orm
+pnpm add @typesql/core @typesql/drizzle drizzle-orm
 ```
 
 Pass your schema module as it is. Tables, views, enums and schemas are converted in the type checker; relations and other exports are ignored. SQL uses the database names (`display_name`), not the TypeScript keys (`displayName`).
@@ -353,10 +353,10 @@ The other gaps (generated-always columns, `$onUpdate`, `.$type<T>()`, `text({ en
 ## Prisma
 
 ```sh
-npm install @typesql/core @typesql/prisma
+pnpm add @typesql/core @typesql/prisma
 ```
 
-`@prisma/client` 7 or later is a peer dependency. Install the `prisma` CLI of the same major version (`npm install -D prisma@7`); a bare `npm install -D prisma` can pick up a prerelease of the next major whose CLI has no `generate` command. The `postgresql` and `sqlite` providers are supported; this section uses PostgreSQL, and [SQLite](#sqlite) covers the differences. [Open an example in the TypeScript Playground](https://www.typescriptlang.org/play/?moduleResolution=100#code/JYWwDg9gTgLgBAbzjAnmApnAwhANgGjkgGcYBzKdYuAXzgDMoIQ4AiAAVQ2IEdcB6AMbR0-EuUrFWAbgBQoSLERxBlAIYx0AZT6EumAApRgxEGoBKagO5ZcwdADt4dRszac0VPmOOm1M2XkndCh6NUFMABEAIURZAEgAV2IQ4gAuOPj44AATDJxcAB5WYCcAFlZCJAALNWJI9DDE3BgMmChEzBoAPjks9DNgXHy8YoA3NShBWqhWXoT4nJMwXDUUAH0HNRB0EaLWTQAPGErlB2bVgCNcXeQOrvmsphu94vM8dFOauoamlrb7rRHkkwDkNOgcgBBVrYUYHUBUGDbMBzPo0PridKZbJ5WH7RKJXKohZqRIwarQda5V4lcrErIwYAwF544pHE7Asb2KxYgrFUowAAcXzgtXqjVJ-zunSBaL6ABJ9FiEAt3izWJDIgBZACSADlWHAAD5sACqWgAouYAvF0bIaIEcuhBKtKCoIA5SERfGYMkYTGZLDY7I4YHJhJ74LxcHAALwqdSaHRFGLdAAU4goVEIYB9agAlHJZBGvWociBStR49Y1Ey4NG0wkAAaWgAyFqwABU4LlCEtiCs1pttuhCKxEqDwVCTnAAGLmADyWrgyVScAA6gAJK0WuDPTDx+UARib+ASGu1+sqsnzADp0IdnWT0GnC4ES1GkTAq3Aa3WG82bYdt2pLkpSvbuokThpgAVPmcCQloRAQKQxCEMQiQgGmXLoDy8GIXAOE8nOi7LpicAAOKLqaBhwNEACav5khSUBUjkp43vej6CM+r5Fh+cBOjcmg5HGv5WLWUZ8Le7RqJ64SMh6aZpjAhzwbG3QJKpaZNpEFrtp2u7zkuyGoRu27mLuoEsWxYnHqecBHneD5PpoOBQTAr5nm+sgNk2+qWuY3b6p2C6md+cBptZ4E5HoTI3PBABqkKtqaFpIWmx6EPKABM+YOUeY6buguC4BArBvkAA) <span data-playground="prisma"></span>.
+`@prisma/client` 7 or later is a peer dependency. Install the `prisma` CLI of the same major version (`pnpm add -D prisma@7`); a bare `pnpm add -D prisma` can pick up a prerelease of the next major whose CLI has no `generate` command. The `postgresql` and `sqlite` providers are supported; this section uses PostgreSQL, and [SQLite](#sqlite) covers the differences. [Open an example in the TypeScript Playground](https://www.typescriptlang.org/play/?moduleResolution=100#code/JYWwDg9gTgLgBAbzjAnmApnAwhANgGjkgGcYBzKdYuAXzgDMoIQ4AiAAVQ2IEdcB6AMbR0-EuUrFWAbgBQoSLERxBlAIYx0AZT6EumAApRgxEGoBKagO5ZcwdADt4dRszac0VPmOOm1M2XkndCh6NUFMABEAIURZAEgAV2IQ4gAuOPj44AATDJxcAB5WYCcAFlZCJAALNWJI9DDE3BgMmChEzBoAPjks9DNgXHy8YoA3NShBWqhWXoT4nJMwXDUUAH0HNRB0EaLWTQAPGErlB2bVgCNcXeQOrvmsphu94vM8dFOauoamlrb7rRHkkwDkNOgcgBBVrYUYHUBUGDbMBzPo0PridKZbJ5WH7RKJXKohZqRIwarQda5V4lcrErIwYAwF544pHE7Asb2KxYgrFUowAAcXzgtXqjVJ-zunSBaL6ABJ9FiEAt3izWJDIgBZACSADlWHAAD5sACqWgAouYAvF0bIaIEcuhBKtKCoIA5SERfGYMkYTGZLDY7I4YHJhJ74LxcHAALwqdSaHRFGLdAAU4goVEIYB9agAlHJZBGvWociBStR49Y1Ey4NG0wkAAaWgAyFqwABU4LlCEtiCs1pttuhCKxEqDwVCTnAAGLmADyWrgyVScAA6gAJK0WuDPTDx+UARib+ASGu1+sqsnzADp0IdnWT0GnC4ES1GkTAq3Aa3WG82bYdt2pLkpSvbuokThpgAVPmcCQloRAQKQxCEMQiQgGmXLoDy8GIXAOE8nOi7LpicAAOKLqaBhwNEACav5khSUBUjkp43vej6CM+r5Fh+cBOjcmg5HGv5WLWUZ8Le7RqJ64SMh6aZpjAhzwbG3QJKpaZNpEFrtp2u7zkuyGoRu27mLuoEsWxYnHqecBHneD5PpoOBQTAr5nm+sgNk2+qWuY3b6p2C6md+cBptZ4E5HoTI3PBABqkKtqaFpIWmx6EPKABM+YOUeY6buguC4BArBvkAA) <span data-playground="prisma"></span>.
 
 Prisma Client's types leave out the database names and native types, so `@typesql/prisma` has a generator that writes the exact schema. Add it to `schema.prisma`:
 

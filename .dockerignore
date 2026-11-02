@@ -1,0 +1,7 @@
+.git
+**/node_modules
+**/dist
+**/.consumer
+**/.artifacts
+**/.vitest
+vendor/postgres

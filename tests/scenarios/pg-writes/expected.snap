@@ -1,0 +1,29 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`pg-writes > consumer 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "deleted": "number",
+      "inserted": "({ displayName: null | string; id: number })[]",
+      "updated": "{ displayName: null | string; id: number }",
+    },
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "{
+  inserted: [ { id: 3, displayName: 'Lin' } ],
+  updated: { id: 2, displayName: 'Grace' },
+  deleted: 1
+}
+",
+  },
+}
+`;

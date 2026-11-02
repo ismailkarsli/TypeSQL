@@ -7,8 +7,8 @@
 The command ships with `@typesql/cli` and connects with `pg`:
 
 ```sh
-npm install -D @typesql/cli pg
-npx typesql introspect --url postgres://localhost/app --out src/db/schema.ts
+pnpm add -D @typesql/cli pg
+pnpm exec typesql introspect --url postgres://localhost/app --out src/db/schema.ts
 ```
 
 Then use the generated `DB` type, and run the command again after each migration:

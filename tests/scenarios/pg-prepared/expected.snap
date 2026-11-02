@@ -1,0 +1,27 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`pg-prepared > consumer 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "rows": "({ display_name: null | string; id: number })[]",
+      "second": "{ display_name: null | string; id: number }",
+    },
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "{
+  rows: [ { id: 1, display_name: 'Ada' } ],
+  second: { id: 2, display_name: null }
+}
+",
+  },
+}
+`;

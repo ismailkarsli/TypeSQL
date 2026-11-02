@@ -10,7 +10,7 @@ sql("SELECT u.| FROM users u");
 ```
 
 ```sh
-npm install -g @typesql/language-server
+pnpm add -g @typesql/language-server
 typesql-language-server <pipe>
 ```
 

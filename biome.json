@@ -15,16 +15,11 @@
 			"!packages/core/src/postgres/engine/typer/pg-functions.ts",
 			"!packages/core/src/postgres/schema/pg-catalog.ts",
 			"!packages/bench/src",
-			"!packages/core/test/oracle/baselines",
-			"!packages/core/test/fuzz/baseline.json",
-			"!packages/core/test/fuzz/sqlite-baseline.json",
-			"!packages/core/test/sqlite/baseline.json",
-			"!packages/core/test/fuzz/corpus/candidates.json",
-			"!packages/core/test/pg-ast/baseline.json",
-			"!packages/core/test/pg-ast/rejections.json",
-			"!packages/core/test/pg-regress/baseline.json",
 			"!pnpm-lock.yaml",
-			"!**/CHANGELOG.md"
+			"!**/CHANGELOG.md",
+			"!tests/pnpm-lock.yaml",
+			"!tests/.artifacts/**",
+			"!tests/.vitest/**"
 		]
 	},
 	"formatter": {
@@ -39,7 +34,9 @@
 				"noUselessTypeConstraint": "warn",
 				"noExcessiveCognitiveComplexity": {
 					"level": "warn",
-					"options": { "maxAllowedComplexity": 30 }
+					"options": {
+						"maxAllowedComplexity": 30
+					}
 				}
 			},
 			"nursery": {

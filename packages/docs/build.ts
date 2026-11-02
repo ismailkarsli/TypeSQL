@@ -27,7 +27,9 @@ const buildSite = (source: string) =>
 const git = (...args: string[]) =>
 	execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
 const filesAt = (ref: string) =>
-	git("ls-tree", "-r", "--name-only", ref, "packages").split("\n");
+	git("ls-tree", "-r", "--name-only", ref, "packages", "tests/scenarios").split(
+		"\n",
+	);
 const pages = (files: string[]) => {
 	const result = files.flatMap((file) =>
 		file.startsWith("packages/docs/") &&
@@ -100,6 +102,9 @@ try {
 				tag,
 				"packages/docs",
 				"packages/core/package.json",
+				...(files.some((file) => file.startsWith("tests/scenarios/"))
+					? ["tests/scenarios"]
+					: []),
 				...files.filter((file) =>
 					/^packages\/[^/]+\/CHANGELOG\.md$/.test(file),
 				),

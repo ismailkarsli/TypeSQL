@@ -1,0 +1,26 @@
+{
+	"name": "cli-make",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"compile": "tsc -p tsconfig.json --pretty false",
+		"start": "node dist/app.js",
+		"generate": "NODE_OPTIONS=--import=./fixed-time.mjs typesql migrate make \"create users\""
+	},
+	"dependencies": {
+		"@typesql/core": "workspace:*",
+		"@typesql/cli": "workspace:*",
+		"pg": "catalog:",
+		"@types/pg": "catalog:"
+	},
+	"devDependencies": {
+		"typescript": "catalog:",
+		"@types/node": "catalog:"
+	},
+	"consumer": {
+		"database": "postgres",
+		"artifacts": [
+			"migrations/1793356800_create-users.ts"
+		]
+	}
+}

@@ -1,7 +1,7 @@
 {
 	"name": "@typesql/core",
 	"version": "4.0.0",
-	"description": "Type-level SQL inference for TypeScript: PostgreSQL (tested against PostgreSQL 18's regression suite) and SQLite. Zero runtime dependencies.",
+	"description": "Type-level SQL inference for TypeScript: PostgreSQL and SQLite. Zero runtime dependencies.",
 	"license": "MIT",
 	"repository": {
 		"type": "git",
@@ -66,18 +66,15 @@
 	},
 	"devDependencies": {
 		"@types/pg": "^8.23.1",
-		"libpg-query": "18.1.5",
 		"pg": "^8.23.1",
-		"postgres": "^3.4.9",
 		"tsrs": "0.18.0-ts7.1.0-dev.20260929",
-		"typescript": "7.1.0-beta",
-		"vitest": "^5.0.4"
+		"typescript": "7.1.0-beta"
 	},
 	"homepage": "https://typesql.karsli.net",
 	"bugs": {
 		"url": "https://github.com/ismailkarsli/typesql/issues"
 	},
-	"author": "İsmail Karslı",
+	"author": "\u0130smail Karsl\u0131",
 	"keywords": [
 		"sql",
 		"postgres",

@@ -5,7 +5,7 @@ Run [TypeSQL](https://www.npmjs.com/package/@typesql/core) queries on SQLite: no
 ## Install
 
 ```sh
-npm install @typesql/core @typesql/sqlite
+pnpm add @typesql/core @typesql/sqlite
 ```
 
 ## Usage
@@ -42,8 +42,8 @@ The statement text is sent as written and `$1`, `$2`, … are bound by name, so 
 The `typesql` command of [`@typesql/cli`](https://www.npmjs.com/package/@typesql/cli) writes the `DB` type from a database file, using this package's introspection:
 
 ```sh
-npm install -D @typesql/cli
-npx typesql introspect --dialect sqlite --db app.db --out src/db/schema.ts
+pnpm add -D @typesql/cli
+pnpm exec typesql introspect --dialect sqlite --db app.db --out src/db/schema.ts
 ```
 
 ## Documentation

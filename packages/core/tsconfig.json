@@ -14,5 +14,5 @@
 			"@typesql/core/migration": ["./src/migration/index.ts"]
 		}
 	},
-	"include": ["src", "test", "examples"]
+	"include": ["src", "examples"]
 }

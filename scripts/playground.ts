@@ -2,7 +2,6 @@ import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import lz from "lz-string";
-import { checkExamples } from "./check-examples.ts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const sourceDir = join(root, "packages/docs/playground");
@@ -80,7 +79,6 @@ for (const name of sources.keys()) {
 		);
 }
 
-if (check) problems.push(...checkExamples());
 
 if (problems.length) {
 	for (const p of problems) console.error(p);
