@@ -1,0 +1,68 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`sqlite-json-writes > consumer 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "defaulted": "{ views: number }",
+      "inline": "{ views: number }",
+      "rows": "({ doc: string; id: number; item: null | number; label: null | string; optional: null | number; unshaped: null | string; views: number })[]",
+      "set": "{ optional: null | number; views: number }",
+    },
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "{
+  defaulted: [Object: null prototype] { views: 10 },
+  inline: [Object: null prototype] { views: 2 },
+  set: [Object: null prototype] { views: 3, optional: 4 },
+  rows: [
+    [Object: null prototype] {
+      id: 1,
+      doc: '{"views":3,"ok":false}',
+      views: 3,
+      optional: 4,
+      item: null,
+      label: '"published"',
+      unshaped: null
+    },
+    [Object: null prototype] {
+      id: 2,
+      doc: '{"views":5,"ok":true}',
+      views: 5,
+      optional: null,
+      item: 6,
+      label: '"draft"',
+      unshaped: '{"anything":[true]}'
+    },
+    [Object: null prototype] {
+      id: 3,
+      doc: '{"views":7,"ok":false}',
+      views: 7,
+      optional: null,
+      item: null,
+      label: null,
+      unshaped: null
+    },
+    [Object: null prototype] {
+      id: 4,
+      doc: '{"views":9,"ok":true}',
+      views: 9,
+      optional: null,
+      item: null,
+      label: null,
+      unshaped: null
+    }
+  ]
+}
+",
+  },
+}
+`;

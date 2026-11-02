@@ -50,16 +50,19 @@ type CheckValue<
 	V extends string,
 	P,
 	U,
+	J = JsonType<E, U, P>,
 > = V extends `J${infer R}`
 	? JsonContext<E, Exclude<U, NullTest>> extends false
 		? `a sql.json() value cannot be used as ${Expected<E, U>}`
-		: CheckEnc<R, P> extends true
+		: CheckEnc<R, J> extends true
 			? true
 			: // sql.json() binds JSON text, which a parameter taking text accepts
-				// (SQLite's json columns, or a type map that reads JSON as a string).
-				[Exclude<P, null | undefined>] extends [string]
-				? true
-				: `a sql.json() ${DescribeEnc<R>} value cannot be used as ${Expected<E, U>}${Hint<E, U, P>}`
+				// unless the column declares a shape for the value before serialization.
+				[JsonShapes<E, U>] extends [never]
+				? [Exclude<P, null | undefined>] extends [string]
+					? true
+					: JsonError<E, R, U, J>
+				: JsonError<E, R, U, J>
 	: CheckEnc<V, P> extends true
 		? V extends `${string}[0${string}`
 			? IsJsonParam<E, Exclude<U, NullTest>> extends true
@@ -67,6 +70,28 @@ type CheckValue<
 				: true
 			: true
 		: `a ${DescribeEnc<V>} value cannot be used as ${Expected<E, U>}${Hint<E, U, P>}`;
+
+type JsonError<
+	E extends EngineTypes,
+	R extends string,
+	U,
+	P,
+> = `a sql.json() ${DescribeEnc<R>} value cannot be used as ${Expected<E, U>}${Hint<E, U, P>}`;
+
+// Read/parameter maps can expose JSON as serialized text (as SQLite does).
+// Inline JSON still carries the original value, so check every declared shape.
+type JsonShapes<E extends EngineTypes, U> = U extends {
+	readonly type: E["json"] & {
+		readonly shape: { readonly k: "ts"; readonly v: infer V };
+	};
+}
+	? (value: V) => void
+	: never;
+type JsonType<E extends EngineTypes, U, P> = [JsonShapes<E, U>] extends [never]
+	? P
+	: JsonShapes<E, U> extends (value: infer V) => void
+		? V | Extract<P, null | undefined>
+		: P;
 
 // The database type alone doesn't say what a typed JSON, enum or object
 // parameter takes.

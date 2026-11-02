@@ -1,0 +1,68 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`pg-json-writes > consumer 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "defaulted": "{ views: null | number }",
+      "inline": "{ views: null | number }",
+      "rows": "({ doc: { views: number; ok: false | true }; id: number; item: null | number; label: null | "draft" | "published"; optional: null | number; unshaped: unknown; views: null | number })[]",
+      "set": "{ optional: null | number; views: null | number }",
+    },
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "{
+  defaulted: { views: 10 },
+  inline: { views: 2 },
+  set: { views: 3, optional: 4 },
+  rows: [
+    {
+      id: 1,
+      doc: { ok: false, views: 3 },
+      views: 3,
+      optional: 4,
+      item: null,
+      label: 'published',
+      unshaped: null
+    },
+    {
+      id: 2,
+      doc: { ok: true, views: 5 },
+      views: 5,
+      optional: null,
+      item: 6,
+      label: 'draft',
+      unshaped: { anything: [ true ] }
+    },
+    {
+      id: 3,
+      doc: { ok: false, views: 7 },
+      views: 7,
+      optional: null,
+      item: null,
+      label: null,
+      unshaped: null
+    },
+    {
+      id: 4,
+      doc: { ok: true, views: 9 },
+      views: 9,
+      optional: null,
+      item: null,
+      label: null,
+      unshaped: null
+    }
+  ]
+}
+",
+  },
+}
+`;
