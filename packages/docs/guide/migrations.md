@@ -167,7 +167,7 @@ const { applied } = await migrator.latest();
 - `Schema` is the schema after the last migration: inferred from the `migrations` array, or given in directory mode as `createMigrator<DB>({ … })`, with `DB` from the DB file. The array must keep its order in its type: write it in the call, or declare it with `as const`. A variable such as `const all = [m1, m2]` has the type `(typeof m1 | typeof m2)[]`, with no last migration, so passing it is a type error unless the schema is given: `createMigrator<SchemaOf<typeof m2>>({ … })`. A config typed `MigratorConfig` is accepted, with the schema `unknown`. `SchemaOf<typeof result>` of the result of `latest()`, and `SchemaOf<typeof migrator>`, are that schema; it is a type only, not a property at runtime.
 - `applied` and `reverted` are the history names of the migrations that ran, in order; they are empty when there was nothing to do.
 - In directory mode, `latest()`, `up()` and `down()` then write the DB file: `schemaFile` is its path. If it can't be written, they still resolve, with `schemaError`: the database is migrated, only the file is not.
-- A migration that fails rejects the call with a `MigrationError`. Its message names the migration and gives the database's error, which is also its `cause`. `migration` is the name of the one that failed, and `applied` lists the ones the call applied before it; those stay applied, and in directory mode the DB file is written for them, with `schemaFile` or `schemaError` as above. The CLI prints them before the error.
+- A migration that fails rejects the call with a `MigrationError`. Its message names the migration and gives the database's error, which is also its `cause`. `migration` is the name of the one that failed, and `rolledBack` tells whether the migrator rolled it back: not with `transaction: false`, nor when its statements didn't run in its transaction or the connection was lost (the server then ends the transaction itself); the message says so when it may be partly applied. `applied` lists the ones the call applied before it; those stay applied, and in directory mode the DB file is written for them, with `schemaFile` or `schemaError` as above. The CLI prints them before the error.
 - `status()` lists the migrations in order. An applied one has the name from its history row and `appliedAt` from `applied_at`.
 - `make()` and `generate()` throw in array mode. `generate()` first checks the chain as the commands do, so files that start from another dialect, or out of order, are an error and the DB file is not written.
 - `.config` is the migrator's config. `isMigrator(value)` tells whether a value is a migrator, from any copy of `@typesql/core`.
@@ -189,7 +189,7 @@ const { applied } = await migrator.latest();
 
 Set exactly one of `migrationsDir` and `migrations`, and at most one of `url`, `db` and `execute`. `url` goes with `postgres` and `db` with `sqlite`. Relative paths resolve against the working directory (the command resolves those of its config file beside the file).
 
-With `url` or `db`, each method call opens one connection, runs all its migrations on it, one after another, and closes it. With `execute`, every statement runs on your executor, so give it one dedicated connection, not a pool: `BEGIN` and `COMMIT` must reach the same session. Each adapter's `executor(client)` builds one:
+With `url` or `db`, each method call opens one connection, runs all its migrations on it, one after another, and closes it. With `execute`, every statement runs on your executor, so give it one dedicated connection, not a pool: `BEGIN` and `COMMIT` must reach the same session. After each `BEGIN`, and before each `COMMIT`, the migrator checks that the executor's next call is still in that transaction, and fails before anything runs when it isn't. Prisma, a Kysely on a pool and libsql's client send each call to any connection: with Kysely, run the migrator inside `db.connection().execute((connection) => …)` with `executor(connection)`; with Prisma, give it `url`; with libsql, set `transaction: false`. Each adapter's `executor(client)` builds an executor, and uses SQLite's placeholders when the client is on SQLite:
 
 ```ts
 import { Client } from "pg";
@@ -204,7 +204,7 @@ try {
 }
 ```
 
-The migrator sends each `.add()` and `.raw()` text as one call without values. node-postgres and postgres.js run every statement of a `;`-separated script then; a `prepare`-based executor, such as `@typesql/sqlite`'s on node:sqlite, runs only the first, so with one keep one statement per `.add()`. `db` runs them all.
+On PostgreSQL the migrator sends each `.add()` and `.raw()` text as one call without values, and node-postgres and postgres.js run every statement of a `;`-separated script. On SQLite, where a prepared statement runs only the first, it sends each statement of the script as a call of its own.
 
 `with(overrides)` returns a new migrator. Giving one of `url`, `db` and `execute` replaces the others, and giving `migrationsDir` or `migrations` replaces the other one; `undefined` values are ignored.
 
@@ -330,10 +330,10 @@ Code the fingerprint doesn't cover can change freely: a query rewritten for a ne
 
 By default (`transaction: true`) each migration and its history row commit together, in their own transaction. A failure rolls back that migration; the ones before it stay applied.
 
-- **PostgreSQL** holds an advisory lock (`pg_advisory_lock`) for the whole call, keyed by the database, schema and history table, so concurrent runs wait for each other. Statements that can't run in a transaction block (`CREATE INDEX CONCURRENTLY`, `VACUUM`) fail. After `ALTER TYPE … ADD VALUE`, the new label can't be used until a later migration.
+- **PostgreSQL** takes an advisory lock (`pg_advisory_xact_lock`) at the start of each migration's transaction, keyed by the database, schema and history table, and reads the history again after it, so concurrent runs apply each migration once, though their migrations may interleave. The lock ends with the transaction, so it is never left held on a pooled connection. Statements that can't run in a transaction block (`CREATE INDEX CONCURRENTLY`, `VACUUM`) fail. After `ALTER TYPE … ADD VALUE`, the new label can't be used until a later migration.
 - **SQLite** starts each migration with `BEGIN IMMEDIATE` and reads the history again after taking the write lock, so concurrent runs apply each migration once, though their migrations may interleave. `db` waits up to 30 seconds for another writer.
 
-With `transaction: false`, the migrator sends no `BEGIN` or `COMMIT` and takes no lock. Use it only where the database doesn't support them (Cloudflare D1), or to apply a single migration that can't run in a transaction: `migrator.with({ transaction: false }).up()`. It is not safe for concurrent runs, and a migration that fails partway leaves its earlier statements applied and no history row, so fix the database before running it again.
+With `transaction: false`, the migrator sends no `BEGIN` or `COMMIT` and takes no lock. Use it only where the database or client doesn't support them (Cloudflare D1, libsql's client), or to apply a single migration that can't run in a transaction: `migrator.with({ transaction: false }).up()`. It is not safe for concurrent runs, and a migration that fails partway leaves its earlier statements applied and no history row, so fix the database before running it again.
 
 ## Runtimes
 

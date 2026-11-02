@@ -156,7 +156,7 @@ type Executor = (text: string, values: unknown[]) => PromiseLike<readonly unknow
 type ExecutorResult = { rows: readonly unknown[]; rowCount: number | null };
 ```
 
-- Each adapter exports `executor(client)`.
+- Each adapter exports `executor(client)`. On a SQLite client (Kysely's SQLite dialects, Prisma with the `sqlite` provider, a Drizzle SQLite database), it uses SQLite's `?` placeholders without being told; `executor(client, { dialect })` states the dialect for Kysely and Prisma.
 - `rowCount: null` means no count, read as 0.
 - An executor that returns only rows works for everything but `executeCount`, unless it has a `count(text, values)` method.
 - An optional `prepare(text): Executor` creates an executor for server preparation. It must defer database work until execution. `sql.prepare` calls it once with the final SQL text and binds all resulting queries to that executor, including its `count` method.
@@ -309,7 +309,7 @@ An entry is one `Sig<Params, Return, Flags>` or a tuple of overloads.
 | `LatestResult<Schema>` | what `latest()` resolves to: `{ applied, schemaFile?, schemaError? }`, and the type-only schema after the last migration |
 | `UpResult` | what `up()` resolves to: `{ applied, schemaFile?, schemaError? }` |
 | `DownResult` | what `down()` resolves to: `{ reverted, schemaFile?, schemaError? }` |
-| `MigrationError` | what `latest()`, `up()` and `down()` reject with when a migration fails: `{ migration, applied, schemaFile?, schemaError?, cause }` |
+| `MigrationError` | what `latest()`, `up()` and `down()` reject with when a migration fails: `{ migration, applied, rolledBack, schemaFile?, schemaError?, cause }` |
 | `MigrationStatus` | an entry of `status()`: `{ name, applied, appliedAt: Date \| null }` |
 | `isMigrator(value)` | whether `value` is a migrator, from any copy of `@typesql/core` |
 

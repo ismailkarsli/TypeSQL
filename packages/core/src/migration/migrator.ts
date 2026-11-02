@@ -111,15 +111,23 @@ export interface DownResult extends SchemaWrite {
 }
 
 /**
- * A migration failed and was rolled back. `applied` lists the migrations the
- * same call applied before it; with migrationsDir, the schema file was
- * written for them, as after a command that succeeds.
+ * A migration failed. `rolledBack` tells whether its transaction was rolled
+ * back; `applied` lists the migrations the same call applied before it, and
+ * with migrationsDir the schema file was written for them, as after a
+ * command that succeeds.
  */
 export class MigrationError extends Error {
 	override readonly name = "MigrationError";
 	/** The migration that failed: its file name, or its position in the array. */
 	readonly migration: string;
 	readonly applied: readonly string[];
+	/**
+	 * Whether the migrator rolled the migration back. Not with `transaction:
+	 * false`, nor when its statements didn't run in its transaction (an
+	 * executor on a pool) or the connection was lost, which ends the
+	 * transaction on the server.
+	 */
+	readonly rolledBack: boolean;
 	readonly schemaFile?: string;
 	readonly schemaError?: Error;
 	constructor(
@@ -128,11 +136,13 @@ export class MigrationError extends Error {
 			readonly cause: unknown;
 			readonly migration: string;
 			readonly applied: readonly string[];
+			readonly rolledBack: boolean;
 		} & SchemaWrite,
 	) {
 		super(message, { cause: options.cause });
 		this.migration = options.migration;
 		this.applied = options.applied;
+		this.rolledBack = options.rolledBack;
 		if (options.schemaFile !== undefined) this.schemaFile = options.schemaFile;
 		if (options.schemaError !== undefined)
 			this.schemaError = options.schemaError;
@@ -312,6 +322,7 @@ export function createMigrator(config: MigratorConfig): Migrator {
 				cause: error.cause,
 				migration: error.migration,
 				applied: error.names,
+				rolledBack: error.rolledBack,
 				...(error.names.length > 0 ? await afterCommand(error.applied) : {}),
 			});
 		}
@@ -498,23 +509,36 @@ function checkHistory(
 
 type Command = "latest" | "up" | "down" | "status";
 
+/** PostgreSQL's in_failed_sql_transaction, from pg, postgres.js or Prisma. */
+const aborted = (error: unknown): boolean =>
+	(error as { code?: unknown }).code === "25P02" ||
+	/current transaction is aborted/.test(
+		error instanceof Error ? error.message : String(error),
+	);
+
+const SPLIT =
+	"typesql: execute didn't keep a transaction across its calls, so migrations can't run in one: give it one dedicated connection, not a pool (Prisma, a pooled Kysely and libsql's client send each call to any connection), or set transaction: false";
+
 /** A migration failed; createMigrator adds the schema file to it. */
 class Failed extends Error {
 	readonly migration: string;
 	/** What the call applied or reverted before it, and how many are applied. */
 	readonly names: string[];
 	readonly applied: number;
+	readonly rolledBack: boolean;
 	constructor(
 		message: string,
 		cause: unknown,
 		migration: string,
 		names: string[],
 		applied: number,
+		rolledBack: boolean,
 	) {
 		super(message, { cause });
 		this.migration = migration;
 		this.names = names;
 		this.applied = applied;
+		this.rolledBack = rolledBack;
 	}
 }
 
@@ -571,19 +595,74 @@ async function openHistory(
 				JSON.stringify([location.database, location.schema, tableName]),
 			);
 			lock = new DataView(digest).getBigInt64(0).toString();
-			await execute("SELECT pg_advisory_lock($1::bigint)", [lock]);
 		}
 	}
-	const control = (statement: string) => async () => {
-		if (transaction) await execute(statement, []);
+	/** The transaction's id, on PostgreSQL. */
+	let xid: unknown;
+	/**
+	 * Whether this call runs in the transaction begin() started. An executor
+	 * on a pool, or a client that runs each call on a connection of its own,
+	 * such as libsql's, sends each statement wherever it likes.
+	 */
+	const inTransaction = async (): Promise<boolean> => {
+		if (postgres) {
+			const [row] = await rows(
+				execute,
+				"SELECT txid_current_if_assigned()::text AS xid",
+			);
+			return (row as { xid?: unknown } | undefined)?.xid === xid;
+		}
+		// A BEGIN fails inside a transaction. One that succeeds started a
+		// transaction where there was none; end it.
+		const began = await execute("BEGIN", []).then(
+			() => true,
+			() => false,
+		);
+		if (began) await Promise.resolve(execute("ROLLBACK", [])).catch(() => {});
+		return !began;
 	};
 	return {
-		begin: control(postgres ? "BEGIN" : "BEGIN IMMEDIATE"),
-		commit: control("COMMIT"),
-		rollback: control("ROLLBACK"),
-		async unlock() {
-			if (lock !== undefined)
-				await execute("SELECT pg_advisory_unlock($1::bigint)", [lock]);
+		async begin(): Promise<void> {
+			if (!transaction) return;
+			await execute(postgres ? "BEGIN" : "BEGIN IMMEDIATE", []);
+			// The lock ends with the transaction, so it can't stay held on a
+			// pooled connection.
+			if (postgres)
+				[{ xid } = {} as { xid?: unknown }] = (await rows(
+					execute,
+					"SELECT pg_advisory_xact_lock($1::bigint), txid_current()::text AS xid",
+					[lock],
+				)) as { xid?: unknown }[];
+			if (!(await inTransaction())) {
+				if (postgres)
+					await Promise.resolve(execute("ROLLBACK", [])).catch(() => {});
+				throw new Error(SPLIT);
+			}
+		},
+		async commit(): Promise<void> {
+			if (!transaction) return;
+			if (!(await inTransaction())) throw new Error(SPLIT);
+			await execute("COMMIT", []);
+		},
+		/**
+		 * Roll back after a failure, and tell whether it was rolled back: not
+		 * without a transaction, or when its statements didn't run in it.
+		 */
+		async rollback(): Promise<boolean> {
+			if (!transaction) return false;
+			const intact = await inTransaction().catch((error: unknown) => {
+				// After a failed statement PostgreSQL refuses every one but
+				// ROLLBACK: the transaction is still there.
+				if (postgres && aborted(error)) return true;
+				throw error;
+			});
+			if (intact) {
+				await execute("ROLLBACK", []);
+				return true;
+			}
+			// It may still reach the connection that holds the transaction.
+			await Promise.resolve(execute("ROLLBACK", [])).catch(() => {});
+			return false;
 		},
 		/** Create the table if needed, and read it in the order it was applied. */
 		async read(): Promise<Row[]> {
@@ -660,6 +739,7 @@ async function run(
 	checkChain(dialect, entries);
 
 	const directoryMode = config.migrationsDir !== undefined;
+	const transaction = config.transaction ?? true;
 	const connection = await connect(config);
 	const names: string[] = [];
 	let applied = 0;
@@ -669,86 +749,84 @@ async function run(
 			connection.execute,
 			dialect,
 			config.migrationTable ?? "schema_migrations",
-			config.transaction ?? true,
+			transaction,
 		);
-		try {
-			for (;;) {
-				// The migration this iteration runs, once it is known.
-				let current: { name: string; label: string } | undefined;
-				await history.begin();
-				try {
-					// SQLite reads the history only after taking its write lock.
-					let rows = await history.read();
-					// Nothing else to do keeps the history unchanged, unless it
-					// was converted.
-					const converted =
-						directoryMode &&
-						(await convertHistory(history, rows, entries, fingerprints));
-					if (converted) rows = await history.read();
-					checkHistory(rows, entries, fingerprints, directoryMode);
-					applied = rows.length;
-					const index = command === "down" ? rows.length - 1 : rows.length;
-					const entry = entries[index];
-					if (command === "status" || entry === undefined) {
-						status = entries.map((entry, index) => {
-							const row = rows[index];
-							return {
-								name: row?.name ?? entry.name,
-								applied: row !== undefined,
-								appliedAt: row === undefined ? null : appliedAt(row.at),
-							};
-						});
-						await (converted ? history.commit() : history.rollback());
-						break;
-					}
-					const name = rows[index]?.name ?? entry.name;
-					current = {
-						name,
-						label: `${command === "down" ? "reverting " : ""}migration ${index + 1} (${name})`,
-					};
-					await runStep(
-						dialect,
-						connection.execute,
-						command === "down" ? entry.down : entry.up,
-					);
-					if (command === "down") await history.remove(name);
-					else await history.insert(name, fingerprints[index] ?? "");
-					await history.commit();
-					names.push(name);
-					applied += command === "down" ? -1 : 1;
-				} catch (error) {
-					let failure = error;
-					let message = text(error);
-					try {
-						await history.rollback();
-					} catch (rollbackError) {
-						// A lost connection fails the rollback with the same error.
-						if (rollbackError !== error) {
-							failure = new AggregateError(
-								[error, rollbackError],
-								"typesql: the migration failed and rolling it back failed too",
-							);
-							message += `; rolling it back failed too: ${text(rollbackError)}`;
-						}
-					}
-					if (current === undefined) throw failure;
-					throw new Failed(
-						`typesql: ${current.label} failed: ${message}`,
-						failure,
-						current.name,
-						names,
-						applied,
-					);
+		for (;;) {
+			// The migration this iteration runs, once it is known.
+			let current: { name: string; label: string } | undefined;
+			await history.begin();
+			try {
+				// SQLite reads the history only after taking its write lock.
+				let rows = await history.read();
+				// Nothing else to do keeps the history unchanged, unless it
+				// was converted.
+				const converted =
+					directoryMode &&
+					(await convertHistory(history, rows, entries, fingerprints));
+				if (converted) rows = await history.read();
+				checkHistory(rows, entries, fingerprints, directoryMode);
+				applied = rows.length;
+				const index = command === "down" ? rows.length - 1 : rows.length;
+				const entry = entries[index];
+				if (command === "status" || entry === undefined) {
+					status = entries.map((entry, index) => {
+						const row = rows[index];
+						return {
+							name: row?.name ?? entry.name,
+							applied: row !== undefined,
+							appliedAt: row === undefined ? null : appliedAt(row.at),
+						};
+					});
+					await (converted ? history.commit() : history.rollback());
+					break;
 				}
-				if (command !== "latest") break;
+				const name = rows[index]?.name ?? entry.name;
+				current = {
+					name,
+					label: `${command === "down" ? "reverting " : ""}migration ${index + 1} (${name})`,
+				};
+				await runStep(
+					dialect,
+					connection.execute,
+					command === "down" ? entry.down : entry.up,
+				);
+				if (command === "down") await history.remove(name);
+				else await history.insert(name, fingerprints[index] ?? "");
+				await history.commit();
+				names.push(name);
+				applied += command === "down" ? -1 : 1;
+			} catch (error) {
+				let failure = error;
+				let message = text(error);
+				let rolledBack = false;
+				try {
+					rolledBack = await history.rollback();
+					if (!rolledBack && current !== undefined)
+						message += transaction
+							? "; its statements didn't all run in the migration's transaction, so it was not rolled back and may be partly applied"
+							: "; without a transaction it was not rolled back, and may be partly applied";
+				} catch (rollbackError) {
+					// A lost connection fails the rollback with the same error.
+					if (rollbackError !== error) {
+						failure = new AggregateError(
+							[error, rollbackError],
+							"typesql: the migration failed and rolling it back failed too",
+						);
+						message += `; rolling it back failed too: ${text(rollbackError)}`;
+					}
+				}
+				if (current === undefined) throw failure;
+				throw new Failed(
+					`typesql: ${current.label} failed: ${message}`,
+					failure,
+					current.name,
+					names,
+					applied,
+					rolledBack,
+				);
 			}
-		} catch (error) {
-			// The session may be gone, which releases the lock too: the
-			// error to report is the failure, not the unlock's.
-			await history.unlock().catch(() => {});
-			throw error;
+			if (command !== "latest") break;
 		}
-		await history.unlock();
 	} finally {
 		await connection.close();
 	}

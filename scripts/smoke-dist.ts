@@ -1452,10 +1452,115 @@ assert.match(
 				assert.equal(error.migration, "0003");
 				assert.deepEqual(error.applied, ["0001", "0002"]);
 				assert.match((error.cause as Error).message, /no such table: missing/);
+				assert.equal((error as { rolledBack?: boolean }).rolledBack, true);
 				return true;
 			},
 		);
 		fresh.close();
+
+		// An executor that doesn't keep a transaction across calls (a pool, or
+		// libsql's client) is refused before anything runs.
+		{
+			const splitFile = join(dir, "split.db");
+			const pair = [new DatabaseSync(splitFile), new DatabaseSync(splitFile)];
+			let calls = 0;
+			const split = Object.assign(
+				async (text: string, values: readonly unknown[]) => {
+					const database = pair[calls++ % 2] as InstanceType<
+						typeof DatabaseSync
+					>;
+					return executor(database)(text, values);
+				},
+			);
+			await assert.rejects(
+				createMigrator({
+					dialect: "sqlite",
+					execute: split,
+					migrations: [accounts],
+				}).latest(),
+				/execute didn't keep a transaction across its calls/,
+			);
+			assert.equal(exists(pair[0] as never, "accounts"), false);
+			for (const database of pair) database.close();
+		}
+
+		// The adapters' executor(client) uses SQLite's placeholders on SQLite
+		// without being told.
+		{
+			const { Kysely, SqliteDialect } = (await import(
+				new URL(
+					"../packages/kysely/node_modules/kysely/dist/index.js",
+					import.meta.url,
+				).href
+			)) as {
+				Kysely: new <_>(config: unknown) => { destroy(): Promise<void> };
+				SqliteDialect: new (config: unknown) => unknown;
+			};
+			const kyselyAdapter = (await dist("kysely/dist/index.js")) as {
+				executor(db: unknown): Parameters<typeof createMigrator>[0]["execute"];
+			};
+			const lite = new DatabaseSync(":memory:");
+			// Kysely's SQLite dialect takes a better-sqlite3 database.
+			const database = {
+				close: () => lite.close(),
+				prepare: (text: string) => {
+					// better-sqlite3 binds $1 only by name.
+					if (/\$\d/.test(text))
+						throw new Error(`positional values for named parameters: ${text}`);
+					const statement = lite.prepare(text);
+					return {
+						reader: statement.columns().length > 0,
+						all: (values: SQLInputValue[]) => statement.all(...values),
+						run: (values: SQLInputValue[]) => statement.run(...values),
+						iterate: (values: SQLInputValue[]) => statement.iterate(...values),
+					};
+				},
+			};
+			const kysely = new Kysely<never>({
+				dialect: new SqliteDialect({ database }),
+			});
+			assert.deepEqual(
+				await createMigrator({
+					dialect: "sqlite",
+					execute: kyselyAdapter.executor(kysely),
+					migrations: [accounts, second],
+				}).latest(),
+				{ applied: ["0001", "0002"] },
+			);
+			await kysely.destroy();
+			const seen: string[] = [];
+			const prismaAdapter = (await dist("prisma/dist/index.js")) as {
+				executor(client: unknown): (text: string, values: unknown[]) => unknown;
+			};
+			const prisma = {
+				_activeProvider: "sqlite",
+				$queryRawUnsafe: async (text: string) => {
+					seen.push(text);
+					return [];
+				},
+				$executeRawUnsafe: async () => 0,
+			};
+			await prismaAdapter.executor(prisma)("SELECT $1, $2", [1, true]);
+			const drizzleAdapter = (await dist("drizzle/dist/index.js")) as {
+				executor(db: unknown): (text: string, values: unknown[]) => unknown;
+			};
+			const drizzle = {
+				all: async (query: { queryChunks: { value?: unknown }[] }) => {
+					seen.push(
+						query.queryChunks
+							.map((chunk) =>
+								Array.isArray(chunk.value) ? chunk.value.join("") : "?",
+							)
+							.join(""),
+					);
+					return [];
+				},
+				run: async () => ({ changes: 0 }),
+				transaction: async () => {},
+			};
+			await drizzleAdapter.executor(drizzle)("SELECT $1", [1]);
+			assert.deepEqual(seen, ["SELECT ?, ?", "SELECT ?"]);
+		}
 		assert.deepEqual(
 			history().map((row) => row.name),
 			["0001", "0002"],
@@ -2493,9 +2598,11 @@ if (process.env.TYPESQL_MIGRATION_POSTGRES_URL) {
 			on(client).latest(),
 			on(other).latest(),
 		]);
+		// Each migration is applied once, by one of them; the lock is per
+		// migration, so they may take turns.
 		assert.deepEqual(
-			results.map((result) => result.applied.length).sort(),
-			[0, 2],
+			results.flatMap((result) => result.applied).sort(),
+			["0001", "0002"],
 		);
 		assert.equal(
 			(await client.query("SELECT count(*)::integer AS n FROM once_only"))
@@ -2535,8 +2642,44 @@ if (process.env.TYPESQL_MIGRATION_POSTGRES_URL) {
 			]).latest();
 		await assert.rejects(
 			failing("CREATE INDEX CONCURRENTLY bad_index ON once_only (id)"),
-			/transaction|concurrently/i,
+			(error: Error & { rolledBack?: boolean }) =>
+				/transaction|concurrently/i.test(error.message) &&
+				error.rolledBack === true,
 		);
+		const advisoryLocks = async () =>
+			(
+				await client.query(
+					"SELECT count(*)::integer AS n FROM pg_locks WHERE locktype = 'advisory'",
+				)
+			).rows[0]?.n;
+		assert.equal(await advisoryLocks(), 0, "the lock ends with each migration");
+		// An executor that sends each call to another connection, as a pool
+		// can, is refused before anything runs, and leaves no lock held.
+		let turn = 0;
+		await assert.rejects(
+			createMigrator<unknown>({
+				dialect: "postgres",
+				execute: (text, values) =>
+					(turn++ % 2 === 0 ? client : other).query(text, values),
+				migrations: [
+					once,
+					fill,
+					migration(fill, {
+						up: async (db) => db.add("CREATE TABLE never_created (id integer)"),
+						down: async () => {},
+					}),
+				],
+			}).latest(),
+			/execute didn't keep a transaction across its calls/,
+		);
+		assert.equal(
+			(await client.query("SELECT to_regclass('never_created') AS name"))
+				.rows[0]?.name,
+			null,
+		);
+		await client.query("ROLLBACK");
+		await other.query("ROLLBACK");
+		assert.equal(await advisoryLocks(), 0);
 		await assert.rejects(
 			failing(
 				"CREATE TABLE escaped_transaction (id integer); /* end */ COMMIT",
