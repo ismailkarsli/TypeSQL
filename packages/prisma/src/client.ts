@@ -33,11 +33,20 @@ const numbered: Compile = (text, values) => ({
 
 const sqlite: Compile = (text, values) => positional(text, values, jsonText);
 
+/**
+ * An executor on `prisma`. SQLite's placeholders are used when `dialect` is
+ * `"sqlite"`, or, without `dialect`, when the client's provider is SQLite.
+ */
 export function executor(
 	prisma: PrismaRawClient,
 	options: { readonly dialect?: "postgres" | "sqlite" } = {},
 ): Executor {
-	const compile = options.dialect === "sqlite" ? sqlite : numbered;
+	const onSqlite =
+		options.dialect === undefined
+			? (prisma as { readonly _activeProvider?: unknown })._activeProvider ===
+				"sqlite"
+			: options.dialect === "sqlite";
+	const compile = onSqlite ? sqlite : numbered;
 	return Object.assign(
 		(text: string, values: readonly unknown[]) => {
 			const q = compile(text, values);

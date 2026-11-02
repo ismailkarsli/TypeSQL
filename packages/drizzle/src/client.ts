@@ -5,11 +5,19 @@ import {
 	parsePgUserArrays,
 	type SqlDriver,
 } from "@typesql/core/adapter";
+import { type DrizzleSqliteDatabase, sqliteExecutor } from "./sqlite-client.js";
 
 export interface DrizzleDatabase {
 	readonly _: { readonly session: object };
 	transaction<T>(fn: (tx: DrizzleDatabase) => Promise<T>): Promise<T>;
 }
+
+// Drizzle's SQLite databases have all() and run(); its PostgreSQL ones don't.
+const isSqliteDatabase = (
+	db: DrizzleDatabase | DrizzleSqliteDatabase,
+): db is DrizzleSqliteDatabase =>
+	typeof (db as { all?: unknown }).all === "function" &&
+	typeof (db as { run?: unknown }).run === "function";
 
 interface DriverClient {
 	query?(text: string, values: unknown[]): Promise<unknown>;
@@ -111,7 +119,14 @@ function postgresJsRows(result: PostgresJsResult): unknown[] {
 	return rows;
 }
 
-export function executor(db: DrizzleDatabase): Executor {
+/**
+ * An executor on `db`. A database on a SQLite driver (better-sqlite3,
+ * libsql, bun:sqlite, D1) gets `sqliteExecutor(db)`.
+ */
+export function executor(
+	db: DrizzleDatabase | DrizzleSqliteDatabase,
+): Executor {
+	if (isSqliteDatabase(db)) return sqliteExecutor(db);
 	return async (text, values) => {
 		const client = clientOf(db);
 		if (client.unsafe) {
