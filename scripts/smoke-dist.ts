@@ -1681,6 +1681,17 @@ import { all } from "./migrations.js";
 export const unordered = createMigrator({ dialect: "sqlite", db: ":memory:", migrations: all });
 `,
 		);
+		// A typed config is accepted, and a misspelled option is reported as itself.
+		writeFileSync(
+			join(long, "configs.ts"),
+			`import { createMigrator, type MigratorConfig } from "@typesql/core/migration";
+import { last } from "./migrations.js";
+const config: MigratorConfig = { dialect: "sqlite", db: ":memory:", migrationsDir: "migrations" };
+const overrides: Partial<MigratorConfig> = { db: "other.db" };
+export const typed = createMigrator(config).with(overrides);
+export const misspelled = createMigrator({ dialect: "sqlite", db: ":memory:", migrations: [last], migrationTabel: "x" });
+`,
+		);
 		{
 			const { API } = createRequire(import.meta.url)("typescript/sync");
 			const api = new API({ cwd: long });
@@ -1698,7 +1709,8 @@ export const unordered = createMigrator({ dialect: "sqlite", db: ":memory:", mig
 				const [unordered] = program.getSemanticDiagnostics(
 					join(long, "unordered.ts"),
 				);
-				assert.equal(unordered?.code, 2769);
+				assert.equal(unordered?.code, 2322);
+				assert.deepEqual(codes(join(long, "configs.ts")), [2561]);
 				assert.match(
 					JSON.stringify(unordered),
 					/this migrations array's type has no order/,

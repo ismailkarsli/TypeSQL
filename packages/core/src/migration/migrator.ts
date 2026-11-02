@@ -24,24 +24,39 @@ type LastSchema<M extends Migrations> = M extends readonly []
 
 /**
  * An array type without an order, such as `const all = [m1, m2]`, has no
- * last migration: it is an error unless the schema is given.
+ * last migration: it is an error unless the schema is given. An array of
+ * any migrations, as a `MigratorConfig` holds, has no schema to lose.
  */
-type Ordered<M extends Migrations> = number extends M["length"]
-	? Unordered
+type Ordered<M> = M extends readonly unknown[]
+	? number extends M["length"]
+		? AnyMigration extends M[number]
+			? unknown
+			: Unordered
+		: unknown
 	: unknown;
 type Unordered =
 	"typesql: this migrations array's type has no order, so its last schema is unknown; write the array in the call, declare it with `as const`, or give the schema: createMigrator<DB>()";
+
+/** The schema after the migrations of a config: unknown without an ordered array. */
+type ArraySchema<M> = [M] extends [Migrations]
+	? AnyMigration extends M[number]
+		? unknown
+		: LastSchema<M>
+	: unknown;
 
 declare const UNSET: unique symbol;
 /** The default of a schema type argument that isn't given. */
 type Unset = typeof UNSET;
 
 /**
- * A config without a `migrations` array. The last overload's errors are the
- * ones TypeScript shows, so an unordered array's error is here.
+ * A config whose `migrations` are inferred as `M`, or any migrations when
+ * the schema is given. One signature, so a mistake in the config is
+ * reported as itself.
  */
-type DirectoryConfig = Omit<MigratorConfig, "migrations"> & {
-	readonly migrations?: Unordered;
+type ConfigOf<Schema, M> = Omit<MigratorConfig, "migrations"> & {
+	readonly migrations?: [Schema] extends [Unset]
+		? M & Ordered<M>
+		: MigratorConfig["migrations"];
 };
 
 export interface MigratorConfig {
@@ -152,16 +167,15 @@ export interface Migrator<Schema = unknown> {
 	/** Directory mode: write the schema of the last migration and return the file's path. */
 	generate(): Promise<string>;
 	/** A new migrator with some config replaced. */
-	with<const M extends Migrations>(
-		overrides: Partial<Omit<MigratorConfig, "migrations">> & {
-			readonly migrations: M & Ordered<M>;
-		},
-	): Migrator<LastSchema<M>>;
-	with<NewSchema = Unset>(
-		overrides: [NewSchema] extends [Unset]
-			? Partial<DirectoryConfig>
-			: Partial<MigratorConfig>,
-	): Migrator<[NewSchema] extends [Unset] ? Schema : NewSchema>;
+	with<NewSchema = Unset, const M extends Migrations | undefined = undefined>(
+		overrides: Partial<ConfigOf<NewSchema, M>>,
+	): Migrator<
+		[NewSchema] extends [Unset]
+			? [M] extends [undefined]
+				? Schema
+				: ArraySchema<M>
+			: NewSchema
+	>;
 }
 
 const MIGRATOR: unique symbol = Symbol.for("typesql.migrator") as never;
@@ -249,18 +263,13 @@ function validate(config: MigratorConfig): void {
 }
 
 /** Create a migrator. It connects only when a method needs the database. */
-export function createMigrator<const M extends Migrations>(
-	config: Omit<MigratorConfig, "migrations"> & {
-		readonly migrations: M & Ordered<M>;
-	},
-): Migrator<LastSchema<M>>;
-export function createMigrator<Schema = Unset>(
-	config: [Schema] extends [Unset] ? DirectoryConfig : MigratorConfig,
-): Migrator<[Schema] extends [Unset] ? unknown : Schema>;
-export function createMigrator(
-	input: MigratorConfig | DirectoryConfig,
-): Migrator {
-	const config = input as MigratorConfig;
+export function createMigrator<
+	Schema = Unset,
+	const M extends Migrations | undefined = undefined,
+>(
+	config: ConfigOf<Schema, M>,
+): Migrator<[Schema] extends [Unset] ? ArraySchema<M> : Schema>;
+export function createMigrator(config: MigratorConfig): Migrator {
 	validate(config);
 	const settled: MigratorConfig = Object.freeze({ ...config });
 	const directory = (what: string): string => {
