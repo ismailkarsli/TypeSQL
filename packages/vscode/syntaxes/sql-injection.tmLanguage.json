@@ -1,5 +1,5 @@
 {
-	"$comment": "SQL highlighting inside sql(), tx(), sql.fragment(), sql.as<Row>(), a migration's .add() and .raw() and /* sql */ string literals. Injected into TypeScript and JavaScript. Every rule inside a literal stops at the literal's closing quote, so an unterminated SQL string or comment never runs past it, and takes escapes first, so an escaped quote never closes it. In \"…\" and '…', a line ends a rule unless it ends in a backslash (a line continuation).",
+	"$comment": "SQL highlighting inside sql(), tx(), sql.fragment(), sql.as<Row>(), a migration's .ddl(), .add() and .raw() and /* sql */ string literals. Injected into TypeScript and JavaScript. Every rule inside a literal stops at the literal's closing quote, so an unterminated SQL string or comment never runs past it, and takes escapes first, so an escaped quote never closes it. In \"…\" and '…', a line ends a rule unless it ends in a backslash (a line continuation).",
 	"scopeName": "inline.typesql",
 	"injectionSelector": "L:source.ts -comment -string, L:source.tsx -comment -string, L:source.js -comment -string, L:source.js.jsx -comment -string",
 	"patterns": [
@@ -47,8 +47,8 @@
 			"patterns": [{ "include": "#literal" }]
 		},
 		"migration-call": {
-			"$comment": "A migration's .add(…) and .raw(…) or .raw<Schema>(…), when the first argument starts like a SQL statement: a statement keyword followed by a space, `;` or `(`, a `(`, or a comment. A template literal whose first line is empty counts too, since a rule sees one line at a time. Any other first argument, such as set.add(\"x\"), stays TypeScript's.",
-			"begin": "(?:(?<![\\w$.#])((?:#?[A-Za-z_$][\\w$]*\\s*\\??\\.\\s*)+)|(\\??\\.)\\s*)(add|raw)(?![\\w$])(?:\\s*(<[^()]*>))?(?=\\s*\\(\\s*(?:[`\"'/]|$))",
+			"$comment": "A migration's .ddl(…), .add(…) and .raw(…) or .raw<Schema>(…), when the first argument starts like a SQL statement: a statement keyword followed by a space, `;` or `(`, a `(`, or a comment. A template literal whose first line is empty counts too, since a rule sees one line at a time. Any other first argument, such as set.add(\"x\"), stays TypeScript's.",
+			"begin": "(?:(?<![\\w$.#])((?:#?[A-Za-z_$][\\w$]*\\s*\\??\\.\\s*)+)|(\\??\\.)\\s*)(ddl|add|raw)(?![\\w$])(?:\\s*(<[^()]*>))?(?=\\s*\\(\\s*(?:[`\"'/]|$))",
 			"beginCaptures": {
 				"1": { "patterns": [{ "include": "#receiver" }] },
 				"2": { "name": "punctuation.accessor.ts" },

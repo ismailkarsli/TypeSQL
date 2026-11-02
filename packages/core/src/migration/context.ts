@@ -26,7 +26,7 @@ type NonStrict = null extends string
 	: never;
 
 // The strictNullChecks check sits inside the [DB, Q] inference: as the outer
-// conditional, the editor's string completion in `.add("…")` took about 35s.
+// conditional, the editor's string completion in `.ddl("…")` took about 35s.
 type GateDdl<T extends DialectTypes, DB, Q extends string> = [DB, Q] extends [
 	infer D,
 	infer Text extends string,
@@ -56,6 +56,16 @@ export interface MigrationContext<
 			? readonly unknown[]
 			: BoxCallArgs<E, DB, TM, Q>
 	): null extends string ? any : CallRet<E, DB, TM, Q>;
+	/**
+	 * Run a checked DDL script and return a context with the changed schema.
+	 * The script may also hold `SELECT`, `INSERT`, `UPDATE` and `DELETE`
+	 * statements, which are checked without changing the schema.
+	 */
+	ddl<const Q extends string>(
+		ddl: (DB extends MissingSchema ? MissingSchemaError : GateDdl<T, DB, Q>) &
+			Q,
+	): Promise<MigrationContext<E, T, ApplyDdlOf<T, DB, Q>, TM>>;
+	/** @deprecated Renamed to `ddl()`. */
 	add<const Q extends string>(
 		ddl: (DB extends MissingSchema ? MissingSchemaError : GateDdl<T, DB, Q>) &
 			Q,
@@ -87,13 +97,13 @@ type MissingSchemaError = SqlError<
 
 /**
  * Internal factory: execution is bound to the runner's active transaction.
- * `step` runs each `.add()` and `.raw()` statement; the runner splits a
+ * `step` runs each `.ddl()` and `.raw()` statement; the runner splits a
  * SQLite script into its statements there.
  */
 export function createMigrationContext(
 	dialect: "postgres" | "sqlite",
 	execute: Executor,
-	step: (kind: "add" | "raw", statement: string) => Promise<void> = async (
+	step: (kind: "ddl" | "raw", statement: string) => Promise<void> = async (
 		_,
 		statement,
 	) => {
@@ -105,12 +115,13 @@ export function createMigrationContext(
 	if (dialect === "postgres") sql = createDialectSql(postgres, execute);
 	else if (dialect === "sqlite") sql = createDialectSql(sqlite, execute);
 	else throw new Error(`typesql: unsupported migration dialect: ${dialect}`);
-	const next = (kind: "add" | "raw") => async (statement: string) => {
+	const next = (kind: "ddl" | "raw") => async (statement: string) => {
 		await step(kind, statement);
 		return createMigrationContext(dialect, execute, step);
 	};
 	return Object.assign(sql, {
-		add: next("add"),
+		ddl: next("ddl"),
+		add: next("ddl"),
 		raw: next("raw"),
 	}) as unknown as PostgresMigration | SqliteMigration;
 }

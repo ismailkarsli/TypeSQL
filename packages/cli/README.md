@@ -53,14 +53,14 @@ import { migration } from "@typesql/core/migration";
 import previous from "./1793356800_create-users.js";
 
 export default migration(previous, {
-  up: async (db) => db.add("ALTER TABLE users ADD COLUMN bio text"),
+  up: async (db) => db.ddl("ALTER TABLE users ADD COLUMN bio text"),
   down: async (db) => {
-    await db.add("ALTER TABLE users DROP COLUMN bio");
+    await db.ddl("ALTER TABLE users DROP COLUMN bio");
   },
 });
 ```
 
-The first file starts from `"postgres"` or `"sqlite"` instead of `previous`. `up` returns its final context; await each `.add()` and keep the context it returns. Files written for TypeSQL 3.x, which export `up` and `down` functions, still run.
+The first file starts from `"postgres"` or `"sqlite"` instead of `previous`. `up` returns its final context; await each `.ddl()` and keep the context it returns. Files written for TypeSQL 3.x, which export `up` and `down` functions, still run.
 
 `--config <file>` selects another config, and `--dialect`, `--url`, `--db`, `--dir`, `--out` and `--no-generate` override it, with paths relative to the working directory. PostgreSQL uses `$DATABASE_URL` when nothing else sets a connection. Without a config file, pass `--dialect` and `--url` or `--db`; the directory is then `./migrations`:
 

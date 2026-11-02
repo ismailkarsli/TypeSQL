@@ -31,13 +31,14 @@ const METHODS: Readonly<Record<string, readonly string[]>> = {
 	fragment: CALLABLE,
 	prepare: CALLABLE,
 	raw: CALLABLE,
+	ddl: ["MigrationContext"],
 	add: ["MigrationContext", "Migrations"],
 };
 
 // What the VS Code grammar colors without types, so its colors are kept for
 // TypeSQL calls and undone for others: calls of sql, tx and names ending in
-// Sql, SQL or _sql, their .fragment() and .as(), and .add() and .raw() of a
-// string that starts like a statement.
+// Sql, SQL or _sql, their .fragment() and .as(), and .ddl(), .add() and .raw()
+// of a string that starts like a statement.
 const NAME = /^(?:sql|tx|[A-Za-z_$][\w$]*(?:Sql|SQL|_sql))$/;
 const STATEMENT_WORDS =
 	"alter|analyze|attach|begin|call|cluster|comment|commit|copy|create|delete|detach|do|drop|explain|grant|import|insert|listen|lock|merge|notify|pragma|reassign|refresh|reindex|release|replace|reset|revoke|rollback|savepoint|security|select|set|table|truncate|unlisten|update|vacuum|values|with";
@@ -161,7 +162,9 @@ function candidate(
 			(member.name.text === "fragment" || member.name.text === "as") &&
 			NAME.test(nameOf(member.expression) ?? "")) ||
 		(!!member &&
-			(member.name.text === "add" || member.name.text === "raw") &&
+			(member.name.text === "ddl" ||
+				member.name.text === "add" ||
+				member.name.text === "raw") &&
 			(STATEMENT.test(firstLine) ||
 				(src[open] === "`" && /^\s*$/.test(firstLine))));
 	// A call that the grammar leaves alone needs a type only if it could be a

@@ -36,13 +36,13 @@ import { migration } from "@typesql/core/migration";
 
 export const createUsers = migration("sqlite", {
 	up: async (db) => {
-		const users = await db.add(
+		const users = await db.ddl(
 			"CREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT NOT NULL)",
 		);
-		return users.add("ALTER TABLE users ADD COLUMN bio TEXT");
+		return users.ddl("ALTER TABLE users ADD COLUMN bio TEXT");
 	},
 	down: async (db) => {
-		await db.add("DROP TABLE users");
+		await db.ddl("DROP TABLE users");
 	},
 });
 ```

@@ -68,18 +68,18 @@ The extension colors the SQL inside the string: keywords, types, functions, stri
 |---|---|
 | a call of `sql`, `tx`, or a name ending in `Sql`, `SQL` or `_sql`, also as a member | `sql("…")`, `tx('…')`, `` db.sql(`…`) ``, `pgSql("…")` |
 | `.fragment()` and `.as()` on those | `sql.fragment("…")`, `sql.as<Row>("…")` |
-| `.add()` and `.raw()`, when the string starts like a SQL statement | `` db.add(`CREATE TABLE …`) ``, `db.raw<Next>("…")` |
+| `.ddl()`, `.add()` and `.raw()`, when the string starts like a SQL statement | `` db.ddl(`CREATE TABLE …`) ``, `db.raw<Next>("…")` |
 | any string after a `/* sql */` comment | `camel(/* sql */ "…")`, `const text = /* sql */ "…"` |
 
 Only the first argument is SQL, and only when it is a string or template literal.
 
-These rules read the text, so they color as soon as you type and need neither the TypeScript 7 extension nor `@typesql/core`. `.add()` and `.raw()` cover [migrations](./migrations). Because other objects have an `add` method too, their string counts only when it starts with a statement keyword followed by a space, `;` or `(` (`CREATE TABLE`, `alter table`, `DO $$`), with a `(`, or with a comment. A template literal whose first line is empty also counts.
+These rules read the text, so they color as soon as you type and need neither the TypeScript 7 extension nor `@typesql/core`. `.ddl()` and `.raw()` cover [migrations](./migrations), and so does `.add()`, the earlier name of `.ddl()`. Because other objects have methods with these names too, their string counts only when it starts with a statement keyword followed by a space, `;` or `(` (`CREATE TABLE`, `alter table`, `DO $$`), with a `(`, or with a comment. A template literal whose first line is empty also counts.
 
 ### By type
 
 With the TypeScript 7 extension and `@typesql/core` in the project, the extension then checks each call's type and corrects the colors, so in the end only TypeSQL's functions are SQL:
 
-- A call is SQL when its function comes from TypeSQL, whatever its name: `const camel = createSql<DB>(postgres)` makes `camel("…")` SQL, and in a migration so does `users("INSERT …")` on the context that `db.add()` returns. Their `.fragment()`, `.as()`, `.prepare()` and `.raw()` are SQL too, and so is `.add()` on a migration context.
+- A call is SQL when its function comes from TypeSQL, whatever its name: `const camel = createSql<DB>(postgres)` makes `camel("…")` SQL, and in a migration so does `users("INSERT …")` on the context that `db.ddl()` returns. Their `.fragment()`, `.as()`, `.prepare()` and `.raw()` are SQL too, and so are `.ddl()` and `.add()` on a migration context.
 - A call that the rules above color but that isn't TypeSQL's, such as your own `sql()` function or `set.add("drop it")`, goes back to a plain string.
 - Strings after `/* sql */` stay SQL either way.
 

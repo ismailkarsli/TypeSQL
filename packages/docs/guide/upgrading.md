@@ -71,16 +71,16 @@ import { createMigrator, migration, type SchemaOf } from "@typesql/core/migratio
 export const createUsers = migration("postgres", {
 	name: "create-users",
 	up: async (db) =>
-		db.add("CREATE TABLE users (id serial PRIMARY KEY, email text NOT NULL)"),
+		db.ddl("CREATE TABLE users (id serial PRIMARY KEY, email text NOT NULL)"),
 	down: async (db) => {
-		await db.add("DROP TABLE users");
+		await db.ddl("DROP TABLE users");
 	},
 });
 export const addBio = migration(createUsers, {
 	name: "add-bio",
-	up: async (db) => db.add("ALTER TABLE users ADD COLUMN bio text"),
+	up: async (db) => db.ddl("ALTER TABLE users ADD COLUMN bio text"),
 	down: async (db) => {
-		await db.add("ALTER TABLE users DROP COLUMN bio");
+		await db.ddl("ALTER TABLE users DROP COLUMN bio");
 	},
 });
 export type DB = SchemaOf<typeof addBio>;

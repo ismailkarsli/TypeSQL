@@ -12,7 +12,7 @@ import { migration } from "@typesql/core/migration";
 export const createUsers = migration("postgres", {
 	name: "create-users",
 	up: async (db) => {
-		const users = await db.add(`CREATE TABLE users (
+		const users = await db.ddl(`CREATE TABLE users (
 			id serial PRIMARY KEY,
 			email text NOT NULL UNIQUE,
 			display_name text
@@ -21,15 +21,15 @@ export const createUsers = migration("postgres", {
 		return users;
 	},
 	down: async (db) => {
-		await db.add("DROP TABLE users");
+		await db.ddl("DROP TABLE users");
 	},
 });
 
 export const addBio = migration(createUsers, {
 	name: "add-bio",
-	up: async (db) => db.add("ALTER TABLE users ADD COLUMN bio text"),
+	up: async (db) => db.ddl("ALTER TABLE users ADD COLUMN bio text"),
 	down: async (db) => {
-		await db.add("ALTER TABLE users DROP COLUMN bio");
+		await db.ddl("ALTER TABLE users DROP COLUMN bio");
 	},
 });
 ```
@@ -37,12 +37,12 @@ export const addBio = migration(createUsers, {
 - `name` is the migration's name in the [history](#tracking). A migration in an [array](#an-array) needs one; a [migration file](#a-directory-of-files) is named by its file name and leaves it out.
 - `from` is `"postgres"` or `"sqlite"` for the first migration, which starts from an empty schema of that dialect, and the previous migration for a later one.
 - `up`'s `db` starts from the schema `from` leaves. `down`'s `db` starts from what `up` returns.
-- Await `db.add(ddl)`: it runs the statement and returns a new context with the changed schema. Keep it in a new `const`; reassigning a variable doesn't change its type. A wrong statement is a compile error on its string, worded like the database's error: `relation "users" already exists`, `column "age" of relation "users" does not exist`, and so on. One `.add()` may hold a `;`-separated script.
+- Await `db.ddl(ddl)`: it runs the statement and returns a new context with the changed schema. Keep it in a new `const`; reassigning a variable doesn't change its type. A wrong statement is a compile error on its string, worded like the database's error: `relation "users" already exists`, `column "age" of relation "users" does not exist`, and so on. One `.ddl()` may hold a `;`-separated script, which may also seed data: its `SELECT`, `INSERT`, `UPDATE` and `DELETE` statements are checked against the schema at that point, without changing it. For parameters or result rows, call the context instead (below). `.add()` is the earlier name of `.ddl()` and still works.
 - `up` must return its final context; a no-op `up` returns `db`. If it doesn't, passing its migration to the next `migration()` is a compile error.
 - `down` is required, may be empty, and need not restore the earlier schema type.
 - Calling the context runs a checked query, as with `sql`: `users("…", …)` returns a query with `.execute()` and inferred rows.
 - `.raw<NewSchema>(sql)` runs SQL the type checker can't see (dynamic or unsupported statements) and returns a context with the schema you state; without a type argument the schema stays the same.
-- The runner owns the transaction, so a migration that sends `BEGIN`, `COMMIT` or `ROLLBACK` fails (`ROLLBACK TO` a savepoint is fine). Await every query and `.add()` before `up` or `down` returns; the context rejects statements after its migration has finished.
+- The runner owns the transaction, so a migration that sends `BEGIN`, `COMMIT` or `ROLLBACK` fails (`ROLLBACK TO` a savepoint is fine). Await every query and `.ddl()` before `up` or `down` returns; the context rejects statements after its migration has finished.
 
 Each migration's starting schema is inferred from `from` as a function argument, not computed by a type alias, so checking a migration costs the same however many come before it. A history of any length type-checks, in the editor and with `tsc`.
 
@@ -73,9 +73,9 @@ export const baseline = {
 };
 
 export const addBio = migration(baseline, {
-	up: async (db) => db.add("ALTER TABLE users ADD COLUMN bio text"),
+	up: async (db) => db.ddl("ALTER TABLE users ADD COLUMN bio text"),
 	down: async (db) => {
-		await db.add("ALTER TABLE users DROP COLUMN bio");
+		await db.ddl("ALTER TABLE users DROP COLUMN bio");
 	},
 });
 ```
@@ -96,9 +96,9 @@ import { migration } from "@typesql/core/migration";
 
 export default migration("postgres", {
 	up: async (db) =>
-		db.add("CREATE TABLE users (id serial PRIMARY KEY, email text NOT NULL)"),
+		db.ddl("CREATE TABLE users (id serial PRIMARY KEY, email text NOT NULL)"),
 	down: async (db) => {
-		await db.add("DROP TABLE users");
+		await db.ddl("DROP TABLE users");
 	},
 });
 ```
@@ -109,9 +109,9 @@ import { migration } from "@typesql/core/migration";
 import previous from "./1793356800_create-users.js";
 
 export default migration(previous, {
-	up: async (db) => db.add("ALTER TABLE users ADD COLUMN bio text"),
+	up: async (db) => db.ddl("ALTER TABLE users ADD COLUMN bio text"),
 	down: async (db) => {
-		await db.add("ALTER TABLE users DROP COLUMN bio");
+		await db.ddl("ALTER TABLE users DROP COLUMN bio");
 	},
 });
 ```
@@ -207,7 +207,7 @@ try {
 }
 ```
 
-On PostgreSQL the migrator sends each `.add()` and `.raw()` text as one call without values, and node-postgres and postgres.js run every statement of a `;`-separated script. On SQLite, where a prepared statement runs only the first, it sends each statement of the script as a call of its own.
+On PostgreSQL the migrator sends each `.ddl()` and `.raw()` text as one call without values, and node-postgres and postgres.js run every statement of a `;`-separated script. On SQLite, where a prepared statement runs only the first, it sends each statement of the script as a call of its own.
 
 `with(overrides)` returns a new migrator. Giving one of `url`, `db` and `execute` replaces the others, and giving `migrationsDir` or `migrations` replaces the other one; `undefined` values are ignored.
 
@@ -337,7 +337,7 @@ export const migrator = (env: { DB: D1Database }) =>
 // in a handler: await migrator(env).latest();
 ```
 
-The migrator's statements and TypeSQL's queries use `$1`, `$2`, …, which D1 doesn't bind. `positional(text, values)`, from `@typesql/core/adapter`, rewrites them to `?` with the values in order, and converts values as for SQLite (`true` to `1`, `sql.json()` to JSON text). D1's `prepare` takes one statement; the migrator sends each statement of an `.add()` or `.raw()` on its own. Without a lock, run migrations from one place at a time, such as a deploy step.
+The migrator's statements and TypeSQL's queries use `$1`, `$2`, …, which D1 doesn't bind. `positional(text, values)`, from `@typesql/core/adapter`, rewrites them to `?` with the values in order, and converts values as for SQLite (`true` to `1`, `sql.json()` to JSON text). D1's `prepare` takes one statement; the migrator sends each statement of an `.ddl()` or `.raw()` on its own. Without a lock, run migrations from one place at a time, such as a deploy step.
 
 ## The DB file
 
@@ -371,7 +371,7 @@ In array mode there is no DB file; use `SchemaOf<typeof last>` or `SchemaOf<type
 
 ## `ApplyDdl`
 
-`ApplyDdl<DB, "…">`, from `@typesql/core/postgres` or `@typesql/core/sqlite`, is the type behind `.add()`. It returns the schema after one DDL statement, or after a `;`-separated script:
+`ApplyDdl<DB, "…">`, from `@typesql/core/postgres` or `@typesql/core/sqlite`, is the type behind `.ddl()`. It returns the schema after one DDL statement, or after a `;`-separated script:
 
 ```ts
 interface Before {
