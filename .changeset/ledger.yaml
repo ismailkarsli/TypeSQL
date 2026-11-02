@@ -20,6 +20,12 @@
   dir: packages/cli
   intents:
     - light-dragons-bake
+"@typesql/cli@4.0.0":
+  dir: packages/cli
+  intents:
+    - bright-lemons-pull
+    - cool-camels-join
+    - sharp-bats-mix
 "@typesql/core@0.0.2":
   dir: packages/core
   intents:
@@ -299,6 +305,20 @@
     - shiny-bats-push
     - tame-beds-stand
     - tiny-waves-give
+"@typesql/core@4.0.0":
+  dir: packages/core
+  intents:
+    - angry-suns-agree
+    - breezy-tables-smoke
+    - cool-squids-behave
+    - fresh-clocks-think
+    - fresh-moose-ask
+    - friendly-tigers-kneel
+    - funny-melons-deny
+    - new-tables-pay
+    - short-cats-bow
+    - silent-waves-grow
+    - wide-doors-think
 "@typesql/drizzle@0.0.2":
   dir: packages/drizzle
   intents:
@@ -360,6 +380,11 @@
   dir: packages/drizzle
   intents:
     - wild-squids-bet
+"@typesql/drizzle@4.0.0":
+  dir: packages/drizzle
+  intents:
+    - proud-planes-collect
+    - short-emus-listen
 "@typesql/kysely@0.0.2":
   dir: packages/kysely
   intents:
@@ -427,6 +452,10 @@
   dir: packages/kysely
   intents:
     - light-dragons-bake
+"@typesql/kysely@4.0.0":
+  dir: packages/kysely
+  intents:
+    - little-wasps-relate
 "@typesql/language-server@0.0.1":
   dir: packages/language-server
   intents:
@@ -564,6 +593,10 @@
   dir: packages/pg
   intents:
     - clean-jobs-bathe
+"@typesql/pg@4.0.0":
+  dir: packages/pg
+  intents:
+    - strong-apes-compete
 "@typesql/postgres@0.0.2":
   dir: packages/postgres
   intents:
@@ -637,6 +670,11 @@
   dir: packages/postgres
   intents:
     - tall-boats-unite
+"@typesql/postgres@4.0.0":
+  dir: packages/postgres
+  intents:
+    - fresh-moose-ask
+    - strong-apes-compete
 "@typesql/prisma@0.0.2":
   dir: packages/prisma
   intents:
@@ -708,6 +746,11 @@
   dir: packages/prisma
   intents:
     - lazy-hats-bathe
+"@typesql/prisma@4.0.0":
+  dir: packages/prisma
+  intents:
+    - proud-eggs-wink
+    - real-seas-ring
 "@typesql/sqlite@0.0.1":
   dir: packages/sqlite
   intents:
@@ -735,6 +778,11 @@
   dir: packages/sqlite
   intents:
     - light-dragons-bake
+"@typesql/sqlite@4.0.0":
+  dir: packages/sqlite
+  intents:
+    - fresh-moose-ask
+    - strong-apes-compete
 typesql@0.0.1:
   dir: packages/vscode
   intents:

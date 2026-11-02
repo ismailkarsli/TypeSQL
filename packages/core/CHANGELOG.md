@@ -1,5 +1,33 @@
 # @typesql/core
 
+## 4.0.0
+
+### Major Changes
+
+- Replace the migration APIs with one migrator: `migration(from, { name, up, down })` from `@typesql/core/migration` defines a migration that starts from `"postgres"`, `"sqlite"` or the previous migration, and `createMigrator({ dialect, url | db | execute, migrationsDir | migrations })` runs a directory of files or an array with `latest()`, `up()`, `down()`, `status()`, `make()` and `generate()`, also in Bun, Deno and Cloudflare Workers (an array with `execute`; `transaction: false` for D1). The migrator carries the schema after the last migration, inferred from an array or given as `createMigrator<DB>()`: `SchemaOf<typeof migrator>`, or `SchemaOf<typeof result>` of what `latest()` returns. A migration that fails rejects with a `MigrationError` that names it and lists the migrations the call applied before it. Applied migrations are tracked by name only, a file's name in a directory and a migration's `name` in an array, and no longer by a hash of the file: an edited applied migration is not an error, and a 3.x history works as it is. `migrateUp`, `migrateDown`, `migrateLatest`, `discoverMigrations`, `migrationHash`, `MigrationSchema` (use `SchemaOf`), the `Migrations` builder with `migrations()` of `@typesql/core/postgres` and `/sqlite`, `runMigrations` and `MigrationClient` are removed, and `SchemaOf` takes a migration.
+
+### Patch Changes
+
+- SQLite: after ALTER TABLE … DROP COLUMN, SELECT *, RETURNING * and INSERT … VALUES keep the columns after the dropped one.
+
+- A plain parameter value can no longer take another statement's pending `sql.param()` or `sql.json()` value: every marker carries its own random id, and `sql.param()` and `sql.json()` reject a value that holds another one, as a type error and at runtime, so a marker's text is no longer stored in the database.
+
+- Accept an unqualified column in a SQLite upsert's `DO UPDATE SET` and `WHERE`, as in `ON CONFLICT (name) DO UPDATE SET n = n + 1`: it names the target table's column, as in SQLite, and was rejected as an ambiguous column name. `excluded.n` still names the proposed row.
+
+- The README links to the new upgrade guide and changelog pages of the docs site.
+
+- Columns with different `Col` options are no longer assignable to each other: `Col<"int8", { nullable: true }>` to `Col<"int8">`, or a SQLite column with `rowid`, `generated`, `hidden` or `position` to one without. Nor is an `sql` for one schema, type map, plugin list or dialect assignable to one for another: `const sql: Sql<DB, DefaultTypeMap> = createSql<OtherDB>(postgres)` is an error.
+
+- Type array elements built from nullable values as nullable: `array_agg(body)` over a nullable column (with `ORDER BY`, `DISTINCT`, `FILTER` or `OVER` too) is now `(string | null)[]` instead of `string[]`, and so are `ARRAY[…]` and `ARRAY(SELECT …)` with a nullable item, `array_append`, `array_prepend`, `array_cat`, `array_replace`, `array_fill` and `||` with a nullable element, `string_to_array` with a null string, and `regexp_match` and `regexp_matches`, whose unmatched groups are `NULL`. Casts such as `array_agg(x)::varchar[]`, `coalesce`, `CASE`, `UNION`, subqueries and outer joins keep the nullable elements, `unnest` of such an array is nullable, and `array_agg(x) FILTER (WHERE x IS NOT NULL)` keeps non-null elements.
+
+- Start a Cloudflare Worker that imports `@typesql/core`, or builds a query with `sql.param()` or a fragment in its global scope: the random prefix of inline values and fragments is now made on first use instead of when the module loads. A first use in global scope, where Workers forbid `crypto.getRandomValues()`, takes `Math.random()`'s values, and the first use in a handler switches to a prefix from crypto.
+
+- Report the SqlError of an invalid statement called with arguments again, as in `sql("SELECT emial FROM users WHERE id = $1", 1)`, with `$1` or `:name` parameters, instead of `Expected 1 arguments, but got 2`; the function `sql.prepare()` returns for such a statement no longer adds an argument-count error either.
+
+- Type-check SQLite schemas built by many statements much faster: a history of 300 `CREATE TABLE` migrations checks in about 5 seconds instead of 42, and 300 `ALTER TABLE … ADD COLUMN` migrations on one table no longer run out of memory, because each column type is built from plain values and a table's column order is read in one pass.
+
+- Without `strictNullChecks` (`"strict": true` turns it on), every `sql()` call, migration query and migration `.add()` is an error saying TypeSQL requires it, instead of "Type instantiation is excessively deep" (TS2589), `any` rows and misleading errors.
+
 ## 3.0.0
 
 ### Major Changes

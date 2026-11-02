@@ -1,5 +1,16 @@
 # @typesql/pg
 
+## 4.0.0
+
+### Major Changes
+
+- Remove `migrate(db, m)` and `MigrationSource`: run migrations with `createMigrator` from `@typesql/core/migration`, passing a `url` or `db`, or one connection as `execute: executor(client)`.
+
+### Patch Changes
+
+- Updated dependencies:
+  - @typesql/core@4.0.0
+
 ## 3.0.0
 
 ### Patch Changes

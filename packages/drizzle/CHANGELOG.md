@@ -1,5 +1,16 @@
 # @typesql/drizzle
 
+## 4.0.0
+
+### Patch Changes
+
+- `executor(db)` works on a Drizzle SQLite database too, as `sqliteExecutor(db)` does, instead of failing because the database has no PostgreSQL client.
+
+- On postgres.js, read `timestamp` (without time zone) columns and arrays as UTC, as Drizzle's `timestamp()` does, so a `Date` comes back unchanged whatever the process time zone; parse `date`, `timestamp`, `timestamptz` and `numeric` arrays of any dimension; and send JS arrays of strings, numbers, bigints, booleans and dates as array literals, so `Date[]` and `numeric[]` parameters work.
+
+- Updated dependencies:
+  - @typesql/core@4.0.0
+
 ## 3.0.0
 
 ### Patch Changes

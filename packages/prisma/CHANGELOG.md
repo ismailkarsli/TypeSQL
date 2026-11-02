@@ -1,5 +1,16 @@
 # @typesql/prisma
 
+## 4.0.0
+
+### Patch Changes
+
+- `executor(prisma)` uses SQLite's `?` placeholders when the client's provider is SQLite, so it works on SQLite, also with the migrator, without the `{ dialect: "sqlite" }` option.
+
+- On PostgreSQL, send every `sql.json()` value to Prisma as a `JSON.stringify` string, so arrays and strings (`sql.json([1, 2])`, `sql.json("hello")`, also in `sql.set` and `sql.values`) no longer fail with `invalid input syntax for type json`.
+
+- Updated dependencies:
+  - @typesql/core@4.0.0
+
 ## 3.0.0
 
 ### Patch Changes

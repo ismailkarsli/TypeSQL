@@ -1,5 +1,22 @@
 # @typesql/cli
 
+## 4.0.0
+
+### Major Changes
+
+- `typesql migrate` runs the migrator that `typesql.config.ts` default-exports (`export default createMigrator({ … })` from `@typesql/core/migration`; a plain config object is an error), with the flags applied over it; `typesql migrate status` lists applied and pending migrations, `make` writes `export default migration(previous, { up, down })`, and the `MigrationConfig` type is removed.
+
+### Patch Changes
+
+- Write `db.ts` for migration histories of any length: `typesql migrate generate`, and the schema file written after `up`, `down` and `latest`, read each migration after the files it imports, so a history of 29 or more migrations no longer writes a garbage schema such as `"__@ERR@…": { toString: …; charAt: … }` or fails with "up's return type is untyped". A schema TypeScript could not compute (an error type, `never`, or a type error from a wrong statement) is now an error naming the migration, and nothing is written.
+
+- Exit with 0 when `typesql migrate up`, `down` or `latest` succeeds but the schema file can't be written, printing a warning to run `typesql migrate generate` instead of turning the applied migration into a failure on every later run. When the migrations can't import `@typesql/core/migration`, as with pnpm when `@typesql/core` is not a dependency of the project, the error says so and how to add it, and `typesql migrate make` warns about it.
+
+- Updated dependencies:
+  - @typesql/core@4.0.0
+  - @typesql/pg@4.0.0
+  - @typesql/sqlite@4.0.0
+
 ## 3.0.0
 
 ### Patch Changes
