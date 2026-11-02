@@ -45,7 +45,11 @@ export async function parsePgUserArrays(
 	fields: readonly PgField[] | undefined,
 	rows: unknown[],
 ): Promise<unknown[]> {
-	const user = fields?.filter((f) => f.dataTypeID >= FIRST_USER_OID) ?? [];
+	// Row objects keep the last column with each name, including its type.
+	const lastFields = new Map(fields?.map((f) => [f.name, f]));
+	const user = [...lastFields.values()].filter(
+		(f) => f.dataTypeID >= FIRST_USER_OID,
+	);
 	if (user.length === 0 || rows.length === 0) return rows;
 	const cache = caches.get(owner) ?? new Map<number, Promise<Parse | null>>();
 	caches.set(owner, cache);

@@ -22,10 +22,50 @@ const NAMED = new RegExp(
 	"g",
 );
 
+/** Extend block-comment matches through their outer closing delimiter. */
+export function* sqlMatches(
+	text: string,
+	pattern: RegExp,
+): Generator<RegExpExecArray> {
+	pattern.lastIndex = 0;
+	for (let match = pattern.exec(text); match; match = pattern.exec(text)) {
+		if (match[0].startsWith("/*")) {
+			let depth = 1;
+			let end = match.index + 2;
+			while (end < text.length && depth > 0) {
+				if (text.startsWith("/*", end)) {
+					depth++;
+					end += 2;
+				} else if (text.startsWith("*/", end)) {
+					depth--;
+					end += 2;
+				} else end++;
+			}
+			match[0] = text.slice(match.index, end);
+			pattern.lastIndex = end;
+		}
+		yield match;
+	}
+}
+
+export function replaceSql(
+	text: string,
+	pattern: RegExp,
+	replace: (match: RegExpExecArray) => string,
+): string {
+	let out = "";
+	let last = 0;
+	for (const match of sqlMatches(text, pattern)) {
+		out += text.slice(last, match.index) + replace(match);
+		last = match.index + match[0].length;
+	}
+	return out + text.slice(last);
+}
+
 export function maxParam(text: string): number {
 	if (!text.includes("$")) return 0;
 	let max = 0;
-	for (const match of text.matchAll(PARAMS)) {
+	for (const match of sqlMatches(text, PARAMS)) {
 		if (match[2] !== undefined) max = Math.max(max, Number(match[2]));
 	}
 	return max;
@@ -37,8 +77,8 @@ function renumberParams(text: string, offset: number): string {
 }
 
 function scan(text: string, onParam: (n: number) => string | null): string {
-	return text.replace(PARAMS, (m: string, _open?: string, n?: string) =>
-		n === undefined ? m : (onParam(Number(n)) ?? m),
+	return replaceSql(text, PARAMS, (match) =>
+		match[2] === undefined ? match[0] : (onParam(Number(match[2])) ?? match[0]),
 	);
 }
 
@@ -49,32 +89,28 @@ export function splice(
 ): { text: string; values: unknown[] } {
 	let offset = Math.max(maxParam(text), values.length);
 	const allValues: unknown[] = [...values];
-	const out = text.replace(
-		SLOT,
-		(match: string, _open?: string, name?: string) => {
-			if (name === undefined) return match;
-			const frag = slots[name];
-			if (frag === undefined) return match;
-			const fragmentText = renumberParams(frag.text, offset);
-			offset += frag.values.length;
-			allValues.push(...frag.values);
-			return fragmentText;
-		},
-	);
+	const out = replaceSql(text, SLOT, (match) => {
+		const name = match[2];
+		if (name === undefined) return match[0];
+		const frag = slots[name];
+		if (frag === undefined) return match[0];
+		const fragmentText = renumberParams(frag.text, offset);
+		offset += frag.values.length;
+		allValues.push(...frag.values);
+		return fragmentText;
+	});
 	return { text: out, values: allValues };
 }
 
 export function rewriteNamed(text: string): { text: string; names: string[] } {
 	const names: string[] = [];
-	const out = text.replace(
-		NAMED,
-		(m: string, _open?: string, name?: string) => {
-			if (name === undefined) return m;
-			let k = names.indexOf(name);
-			if (k === -1) k = names.push(name) - 1;
-			return `$${k + 1}`;
-		},
-	);
+	const out = replaceSql(text, NAMED, (match) => {
+		const name = match[2];
+		if (name === undefined) return match[0];
+		let k = names.indexOf(name);
+		if (k === -1) k = names.push(name) - 1;
+		return `$${k + 1}`;
+	});
 	return { text: out, names };
 }
 

@@ -1,6 +1,12 @@
 import { empty, isEmpty } from "../empty.js";
 import type { InlineMarker } from "../sql/inline.js";
-import { DOLLAR_QUOTED, QUOTED, type Spliceable } from "./splice.js";
+import {
+	DOLLAR_QUOTED,
+	QUOTED,
+	replaceSql,
+	type Spliceable,
+	sqlMatches,
+} from "./splice.js";
 
 /** Markers with one random prefix. */
 interface Generation {
@@ -201,12 +207,7 @@ export function resolveInline(
 	let k = start;
 	let out = "";
 	let last = 0;
-	inline.lastIndex = 0;
-	for (
-		let match = inline.exec(text);
-		match !== null;
-		match = inline.exec(text)
-	) {
+	for (const match of sqlMatches(text, inline)) {
 		const m = match[0];
 		const id = match[1];
 		if (id === undefined) {
@@ -285,7 +286,9 @@ export function resolveFragments(
 	const prefix = generations.at(-1)?.prefix;
 	const slots: Record<string, Spliceable> = {};
 	const used: string[] = [];
-	const out = text.replace(pattern, (m: string, _tag?: string, id?: string) => {
+	const out = replaceSql(text, pattern, (match) => {
+		const m = match[0];
+		const id = match[2];
 		if (id === undefined) {
 			if (!fragmentMarks.some((mark) => m.includes(mark))) return m;
 			const where =

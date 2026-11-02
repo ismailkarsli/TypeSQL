@@ -1,0 +1,39 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`pg-duplicate-output-names > consumer 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "pgRow": "{ a: string }",
+      "postgresRow": "{ a: string }",
+      "preparedRow": "{ a: string }",
+      "variants": "{ absent: null | string; array: (unknown)[]; numbers: (unknown)[]; scalar: unknown; unique_array: (unknown)[]; words: (unknown)[] }",
+    },
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "native pg [ { a: '{sad}' } ]
+{
+  pgRow: { a: '{sad}' },
+  postgresRow: { a: '{sad}' },
+  preparedRow: { a: '{sad}' }
+}
+{
+  array: [ 'sad' ],
+  scalar: '{sad}',
+  numbers: [ 1, 2 ],
+  words: [ 'sad' ],
+  absent: null,
+  unique_array: [ 'happy' ]
+}
+",
+  },
+}
+`;

@@ -521,10 +521,25 @@ export type Opaque<O extends string, S extends string> = O extends "'" | '"'
 			? [`${C}\n`, R]
 			: [S, ""]
 		: O extends "/*"
-			? S extends `${infer C}*/${infer R}`
-				? [`${C}*/`, R]
-				: [S, ""]
+			? CloseBlock<S, [0], "">
 			: ["", S];
+
+type CloseBlock<
+	S extends string,
+	Depth extends unknown[],
+	Acc extends string,
+> = S extends `${infer Pre}/${infer R}`
+	? Pre extends `${string}*`
+		? Depth extends [unknown, ...infer D]
+			? D extends []
+				? [`${Acc}${Pre}/`, R]
+				: CloseBlock<R, D, `${Acc}${Pre}/`>
+			: never
+		: R extends `*${infer Rest}`
+			? CloseBlock<Rest, [...Depth, 0], `${Acc}${Pre}/*`>
+			: CloseBlock<R, Depth, `${Acc}${Pre}/`>
+	: [`${Acc}${S}`, ""];
+
 type CloseQuote<
 	S extends string,
 	Q extends string,

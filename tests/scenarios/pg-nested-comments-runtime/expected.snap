@@ -1,0 +1,30 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`pg-nested-comments-runtime > consumer 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {},
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "native pg [ { n: 1 } ]
+native postgres [ { n: 1 } ]
+pg named SELECT 1 AS n /* outer /* inner */ :ignored */ WHERE 1=$1 [ 1 ]
+pg named rows [ { n: 1 } ]
+pg fragment SELECT 1 AS n /* outer /* inner */ $99 */ WHERE 1=$1 AND 1=$2 [ 1, 1 ]
+pg fragment rows [ { n: 1 } ]
+postgres named SELECT 1 AS n /* outer /* inner */ :ignored */ WHERE 1=$1 [ 1 ]
+postgres named rows [ { n: 1 } ]
+postgres fragment SELECT 1 AS n /* outer /* inner */ $99 */ WHERE 1=$1 AND 1=$2 [ 1, 1 ]
+postgres fragment rows [ { n: 1 } ]
+",
+  },
+}
+`;

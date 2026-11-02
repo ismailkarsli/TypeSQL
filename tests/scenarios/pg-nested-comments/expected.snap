@@ -1,0 +1,45 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`pg-nested-comments > consumer 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "pgControls": "({ dollar: string; escaped: string; quoted: string })[]",
+      "pgFragment": "({ n: number })[]",
+      "pgInline": "({ n: number })[]",
+      "pgNamed": "({ n: number })[]",
+      "pgPrepared": "({ n: number })[]",
+      "postgresControls": "({ dollar: string; escaped: string; quoted: string })[]",
+      "postgresFragment": "({ n: number })[]",
+      "postgresInline": "({ n: number })[]",
+      "postgresNamed": "({ n: number })[]",
+      "postgresPrepared": "({ n: number })[]",
+    },
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "pg SELECT 1 AS n /* outer /* inner */ $99 */ WHERE 1=$1 AND 1=$2 /* outer /* inner */ $88 */ [ 1, 1 ]
+postgres SELECT 1 AS n /* outer /* inner */ $99 */ WHERE 1=$1 AND 1=$2 /* outer /* inner */ $88 */ [ 1, 1 ]
+pg controls [{"quoted":":ignored $99 /*","dollar":":ignored $98 /*","escaped":"it's :ignored $97 /*"}]
+postgres controls [{"quoted":":ignored $99 /*","dollar":":ignored $98 /*","escaped":"it's :ignored $97 /*"}]
+{
+  pgNamed: [ { n: 1 } ],
+  postgresNamed: [ { n: 1 } ],
+  pgPrepared: [ { n: 1 } ],
+  postgresPrepared: [ { n: 1 } ],
+  pgFragment: [ { n: 1 } ],
+  postgresFragment: [ { n: 1 } ],
+  pgInline: [ { n: 1 } ],
+  postgresInline: [ { n: 1 } ]
+}
+",
+  },
+}
+`;
