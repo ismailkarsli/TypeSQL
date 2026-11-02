@@ -3,7 +3,7 @@
 ## Change intents
 
 When you change `src/`, `README.md`, `LICENSE` or `package.json` of a published package
-(`@typesql/core`, `pg`, `postgres`, `sqlite`, `kysely`, `drizzle`, `prisma`, `cli`), add an intent in the same commit:
+(`@typesql/core`, `pg`, `postgres`, `sqlite`, `kysely`, `drizzle`, `prisma`, `cli`, `better-auth`), add an intent in the same commit:
 
 ```sh
 pnpm change @typesql/core --bump patch --summary "One sentence on what users now see."

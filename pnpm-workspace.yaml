@@ -21,6 +21,7 @@ versioning:
       - "@typesql/prisma"
       - "@typesql/sqlite"
       - "@typesql/cli"
+      - "@typesql/better-auth"
 linkWorkspacePackages: false
 autoInstallPeers: false
 hoist: false
