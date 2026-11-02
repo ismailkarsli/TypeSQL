@@ -1,6 +1,6 @@
 import { empty } from "../empty.js";
 import type { JsonMarker } from "../sql/inline.js";
-import { param } from "./inline.js";
+import { holdsMarkers, param } from "./inline.js";
 
 export class JsonParam<T = unknown> {
 	readonly value: T;
@@ -20,6 +20,11 @@ export class JsonParam<T = unknown> {
 }
 
 export function json<const T>(value: T): JsonMarker<T> {
+	// The marker would be stored as text, and with it its secret prefix.
+	if (holdsMarkers(value))
+		throw new Error(
+			"typesql: sql.json() takes a plain value; a sql.param() or sql.json() inside it would be stored as its marker text",
+		);
 	return param(
 		value === undefined ? empty : value === null ? null : new JsonParam(value),
 	) as unknown as JsonMarker<T>;

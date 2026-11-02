@@ -25,7 +25,12 @@ import type {
 	LiteralParts,
 	PlainFragment,
 } from "./fragment.js";
-import type { InlineMarker, JsonMarker, ParamInput } from "./inline.js";
+import type {
+	InlineMarker,
+	JsonInput,
+	JsonMarker,
+	ParamInput,
+} from "./inline.js";
 import type { Slottable } from "./slots.js";
 import type { QuotedIdent } from "./splice.js";
 import type { NoExtraKeys, SentRows, SetRep, ValuesRep } from "./write.js";
@@ -123,7 +128,7 @@ export interface SqlApi<
 		| PluginEncoded<Exclude<T, Empty>, Plugins, { readonly kind: "value" }>
 	>;
 
-	json<const T>(value: T): JsonMarker<T>;
+	json<const T>(value: T & JsonInput<T>): JsonMarker<T>;
 
 	fragment<const Text extends string, const A extends readonly unknown[]>(
 		text: GateFragCheck<Text> & Text,

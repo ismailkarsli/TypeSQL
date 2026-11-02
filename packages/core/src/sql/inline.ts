@@ -11,11 +11,43 @@ export type ParamInput<T> = unknown extends T
 				null
 			>
 		: [Extract<Exclude<T, Empty>, InlineFragment>] extends [never]
-			? unknown
+			? true extends HoldsMarker<Exclude<T, Empty>>
+				? SqlError<
+						"sql.param() takes a value, not another sql.param() or sql.json(); pass the value itself",
+						null
+					>
+				: unknown
 			: SqlError<
 					"sql.param() takes a value, not a fragment or query; interpolate it itself: ${fragment}",
 					null
 				>;
+
+/** The value of `sql.json()`: one that holds no marker, which would be stored as text. */
+export type JsonInput<T> = unknown extends T
+	? unknown
+	: true extends HoldsMarker<T>
+		? SqlError<
+				"sql.json() takes a plain value; a sql.param() or sql.json() inside it would be stored as its marker text",
+				null
+			>
+		: unknown;
+
+/** Whether a value's type holds a marker, a few levels deep. */
+type HoldsMarker<T, Depth extends readonly unknown[] = []> = 0 extends 1 & T
+	? false
+	: unknown extends T
+		? false
+		: Depth["length"] extends 6
+			? false
+			: T extends `\u0000${string}\u0000`
+				? true
+				: T extends (...args: never) => unknown
+					? false
+					: T extends readonly unknown[]
+						? HoldsMarker<T[number], [...Depth, 0]>
+						: T extends object
+							? HoldsMarker<T[keyof T], [...Depth, 0]>
+							: false;
 
 export type InlineMarker<T> = unknown extends T
 	? PlainMarker<T>

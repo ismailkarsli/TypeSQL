@@ -89,6 +89,38 @@ function prune(): void {
 const pending = new Map<string, unknown>();
 let counter = 0;
 
+/** What every marker starts with, whatever its prefix. */
+const MARK = "\u0000typesql";
+
+/** Whether a string holds a marker: a sql.param() or sql.json() value, or a fragment. */
+export const holdsMarker = (text: string): boolean => text.includes(MARK);
+
+/** Whether a value holds a marker in a string, as itself or in a plain object or array. */
+export function holdsMarkers(
+	value: unknown,
+	seen = new Set<object>(),
+): boolean {
+	if (typeof value === "string") return holdsMarker(value);
+	if (value === null || typeof value !== "object" || seen.has(value))
+		return false;
+	seen.add(value);
+	if (Array.isArray(value)) return value.some((v) => holdsMarkers(v, seen));
+	const prototype = Object.getPrototypeOf(value);
+	if (prototype !== Object.prototype && prototype !== null) return false;
+	return Object.entries(value).some(
+		([key, v]) => holdsMarker(key) || holdsMarkers(v, seen),
+	);
+}
+
+/**
+ * A marker's id: a counter, so it is unique, and random hex, so a plain
+ * value can't name another statement's pending value even when a marker
+ * leaks, with its prefix, into stored data or a log.
+ */
+function nextId(): string {
+	return `${(counter++).toString(36)}${randomHex(8)}`;
+}
+
 export function param<const T>(value: T): InlineMarker<T> {
 	if (value === undefined)
 		throw new Error(
@@ -98,7 +130,11 @@ export function param<const T>(value: T): InlineMarker<T> {
 		throw new Error(
 			"typesql: sql.param() takes a value, not a fragment or query; interpolate it itself: ${fragment}",
 		);
-	const id = (counter++).toString(36);
+	if (holdsMarkers(value))
+		throw new Error(
+			"typesql: sql.param() takes a value, not another sql.param() or sql.json(); pass the value itself",
+		);
+	const id = nextId();
 	const token = `${issue(id).mark}${id}\u0000`;
 	pending.set(id, value);
 	return token as InlineMarker<T>;
@@ -130,7 +166,13 @@ function take(value: unknown): unknown {
 		);
 	if (typeof value !== "string") return value;
 	const id = readers?.exact.exec(value)?.[1];
-	if (id === undefined) return value;
+	if (id === undefined) {
+		if (holdsMarker(value))
+			throw new Error(
+				"typesql: a sql.param() or sql.json() value, or a fragment, can't be part of another value; pass it as a parameter by itself",
+			);
+		return value;
+	}
 	if (!pending.has(id))
 		throw new Error(
 			"typesql: this sql.json() / sql.param() value was already used by another statement; call it once per statement",
@@ -218,7 +260,7 @@ export function inlineable<F extends Spliceable>(fragment: F): F {
 }
 
 function token(fragment: Spliceable): string {
-	const id = (counter++).toString(36);
+	const id = nextId();
 	fragments.set(id, fragment);
 	return `${issue(id).fragmentMark}${id}\u0000`;
 }
@@ -278,19 +320,48 @@ export function resolveFragments(
 const hex = (bytes: Uint8Array): string =>
 	Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 
-/** Random hex from crypto, or undefined where it is missing or forbidden. */
-function cryptoHex(bytes: number): string | undefined {
+/** Random bytes from crypto, or undefined where it is missing or forbidden. */
+function cryptoBytes(length: number): Uint8Array | undefined {
 	const crypto = (
 		globalThis as { crypto?: { getRandomValues(a: Uint8Array): Uint8Array } }
 	).crypto;
 	try {
-		return crypto && hex(crypto.getRandomValues(new Uint8Array(bytes)));
+		return crypto?.getRandomValues(new Uint8Array(length));
 	} catch {
 		// Cloudflare Workers throw in global scope.
 		return undefined;
 	}
 }
 
-function mathHex(bytes: number): string {
-	return hex(new Uint8Array(bytes).map(() => Math.floor(Math.random() * 256)));
+const cryptoHex = (length: number): string | undefined => {
+	const bytes = cryptoBytes(length);
+	return bytes && hex(bytes);
+};
+
+const mathBytes = (length: number): Uint8Array =>
+	new Uint8Array(length).map(() => Math.floor(Math.random() * 256));
+
+const mathHex = (length: number): string => hex(mathBytes(length));
+
+// Marker ids take their random part from a pool, refilled from crypto. A
+// pool filled from Math.random, where crypto throws, is replaced as soon as
+// crypto works.
+let pool: Uint8Array = new Uint8Array(0);
+let drawn = 0;
+let poolFromCrypto = false;
+
+function randomHex(length: number): string {
+	if (!poolFromCrypto || drawn + length > pool.length) {
+		const bytes = cryptoBytes(1024);
+		if (bytes) {
+			pool = bytes;
+			poolFromCrypto = true;
+			drawn = 0;
+		} else if (drawn + length > pool.length) {
+			pool = mathBytes(1024);
+			drawn = 0;
+		}
+	}
+	drawn += length;
+	return hex(pool.subarray(drawn - length, drawn));
 }
