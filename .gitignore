@@ -5,7 +5,7 @@ scratchpad/
 .vitest/
 coverage/
 pnpm-publish-summary.json
-.vitepress/cache/
+**/.vitepress/cache/
 .wrangler/
 .cloudflare/
 

@@ -11,12 +11,8 @@ permissions:
   contents: read
 
 jobs:
-  checks:
-    if: github.ref == 'refs/heads/main'
-    uses: ./.github/workflows/ci.yml
-
   publish:
-    needs: checks
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: npm
     outputs:
@@ -74,7 +70,6 @@ jobs:
       - id: release
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - run: pnpm build
-      - run: pnpm smoke:dist
       - name: Publish packages with trusted publishing
         run: |
           mapfile -t packages < <(pnpm -r ls --depth -1 --json | node -e '
@@ -105,11 +100,21 @@ jobs:
 
   docs:
     needs: publish
-    uses: ./.github/workflows/docs.yml
-    with:
-      ref: ${{ needs.publish.outputs.sha }}
-    secrets:
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.publish.outputs.sha }}
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm docs:deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
   extension:
     needs: publish

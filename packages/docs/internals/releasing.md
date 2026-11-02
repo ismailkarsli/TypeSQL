@@ -78,15 +78,17 @@ pnpm release
 ```
 
 The workflow runs only when started by hand on `main`, with `pnpm release` or **Run workflow** on
-the Actions tab; pushing publishes nothing. It runs the `ci.yml` checks
-on the current `main`. Once they pass, its `publish` job runs `pnpm version -r` (bump
+the Actions tab; pushing publishes nothing. Tests, type checks, lint and smoke checks belong to
+`checks.yml`, which runs on pushes and pull requests (lint remains temporarily disabled
+while repository-wide violations are addressed). Release does not rerun those checks;
+start it from a revision whose checks have passed. Its `publish` job runs `pnpm version -r` (bump
 versions, write changelog sections, update the ledger) and commits the result to `main` as
-`chore: release <version>` from `github-actions[bot]`, then builds and smoke-tests the
+`chore: release <version>` from `github-actions[bot]`, then builds the
 packages, runs `pnpm publish -r`, and creates the GitHub releases. `main` requires signed
 commits, so the release commit is made through GitHub's API (`scripts/github-commit.ts`),
 which signs it, not with `git push`. It is rejected, and nothing is published, when `main`
 moved after the run started; start it again. A commit made with the workflow's token starts no
-other workflow, so `ci` does not run on the release commit, which changes only versions and
+other workflow, so `checks` does not run on the release commit, which changes only versions and
 changelogs.
 
 `pnpm publish -r` publishes every public package whose manifest version is not on the registry
@@ -109,6 +111,36 @@ After a run, check that every bumped version is live:
 ```sh
 for p in core pg postgres kysely drizzle prisma language-server sqlite cli; do pnpm view @typesql/$p version; done
 ```
+
+## Documentation deployment
+
+The release workflow's `docs` job deploys to Cloudflare after `publish` succeeds. It checks
+out the exact release commit, including all tags, then runs `pnpm docs:deploy` using the
+`CLOUDFLARE_API_TOKEN` repository secret. Docs are deployed only through release; a docs-only
+change can be deployed by running release without pending package intents.
+
+`pnpm docs:build` builds the current documentation at `/` and an archive at
+`/versions/<major>.<minor>/` for each major/minor release line from 3.0 onward, using the
+latest stable patch tag containing the VitePress site. For example, 3.1.0 and 3.1.2 produce
+one `3.1` entry backed by 3.1.2; 3.2.0 produces a separate `3.2` entry. Patch releases update
+their line's archive without adding selector entries. Core identifies the documentation
+version; the VS Code extension has its own version.
+Each archive uses that tag's Markdown, navigation and package changelogs with the current
+version selector. Its search and page links stay within that version. The selector is
+available on desktop and mobile, keeps the current page and anchor when the target version
+has the page, and otherwise opens that version's home page. Archives disable edit links and
+search engine indexing.
+
+For a complete local preview, fetch tags before building:
+
+```sh
+git fetch origin --tags
+pnpm docs:build
+pnpm docs:preview
+```
+
+`pnpm docs:dev` serves the working documentation with only the current version; use the built
+preview to inspect archives. No archived sources or generated site files are committed.
 
 ## Trusted publishing
 
@@ -290,5 +322,5 @@ with different versions.
   `pnpm version -r` while any public version is unpublished. When cutting a release commit by
   hand, run `pnpm release` right after it, before the next `pnpm version -r`.
 - **Build first.** The tarballs ship `dist/` and the packages have no publish-time build script;
-  the `publish` job builds and smoke-tests the output first. Keep it that way when editing the
+  the `publish` job builds the output first. Keep it that way when editing the
   workflow: a bare `pnpm publish -r` publishes whatever `dist/` holds.

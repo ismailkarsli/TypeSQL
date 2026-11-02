@@ -6,9 +6,9 @@
 	"description": "Documentation site for TypeSQL (VitePress).",
 	"scripts": {
 		"dev": "vitepress dev",
-		"build": "vitepress build",
+		"build": "node build.ts",
 		"preview": "vitepress preview",
-		"deploy": "vitepress build && cf deploy",
+		"deploy": "pnpm build && cf deploy",
 		"typecheck": "tsrs -p tsconfig.json"
 	},
 	"dependencies": {
@@ -28,6 +28,7 @@
 		"tsrs": "0.18.0-ts7.1.0-dev.20260929",
 		"typescript": "7.1.0-beta",
 		"vitepress": "1.6.4",
+		"vue": "^3.5.44",
 		"wrangler": "^4.151.3"
 	}
 }

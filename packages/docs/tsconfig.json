@@ -12,6 +12,7 @@
 		"erasableSyntaxOnly": true,
 		"skipLibCheck": true,
 		"noEmit": true,
+		"allowImportingTsExtensions": true,
 		"types": ["node"],
 		"paths": {
 			"@typesql/core/adapter": ["../core/src/adapter.ts"],
@@ -32,5 +33,5 @@
 			"drizzle-orm/*": ["../drizzle/node_modules/drizzle-orm/*"]
 		}
 	},
-	"include": [".vitepress/*.ts", ".vitepress/*.mts", "*.paths.ts"]
+	"include": [".vitepress/*.ts", ".vitepress/*.mts", "*.paths.ts", "build.ts"]
 }

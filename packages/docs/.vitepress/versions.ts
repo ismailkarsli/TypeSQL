@@ -1,0 +1,46 @@
+import { readFileSync } from "node:fs";
+import type { UserConfig } from "vitepress";
+
+export interface DocsVersion {
+	version: string;
+	base: string;
+	pages: string[];
+}
+
+export interface VersionTheme {
+	docsVersion: string;
+	docsVersions: DocsVersion[];
+}
+
+const { version }: { version: string } = JSON.parse(
+	readFileSync(new URL("../../core/package.json", import.meta.url), "utf8"),
+);
+
+export function withVersions(config: UserConfig): UserConfig {
+	const archive = process.env.TYPESQL_DOCS_VERSION;
+	const versions: DocsVersion[] = process.env.TYPESQL_DOCS_VERSIONS
+		? JSON.parse(process.env.TYPESQL_DOCS_VERSIONS)
+		: [
+				{
+					version: version.split(".").slice(0, 2).join("."),
+					base: "/",
+					pages: [],
+				},
+			];
+	const head = [...(config.head ?? [])];
+	const themeConfig = {
+		...config.themeConfig,
+		docsVersion: archive ?? "latest",
+		docsVersions: versions,
+	};
+	if (archive) {
+		head.push(["meta", { name: "robots", content: "noindex" }]);
+		delete themeConfig.editLink;
+	}
+	return {
+		...config,
+		base: archive ? `/versions/${archive}/` : "/",
+		head,
+		themeConfig,
+	};
+}
