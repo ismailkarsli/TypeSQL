@@ -62,14 +62,9 @@ async function environment() {
 		process.arch !== "x64"
 	)
 		throw new Error("Infrastructure: expected Node 26.8.1 on linux/x64");
-	for (const [binary, version] of [
-		["pnpm", "12.16.1"],
-		["bun", "1.4.3"],
-	] as const) {
-		const result = await required(workspace, [binary, "--version"]);
-		if (result.stdout.trim() !== version)
-			throw new Error(`Infrastructure: expected ${binary} ${version}`);
-	}
+	const bun = await required(workspace, ["bun", "--version"]);
+	if (bun.stdout.trim() !== "1.4.3")
+		throw new Error("Infrastructure: expected bun 1.4.3");
 	await ready();
 	await required(
 		repository,

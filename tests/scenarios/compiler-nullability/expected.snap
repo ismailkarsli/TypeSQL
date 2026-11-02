@@ -4,8 +4,7 @@ exports[`compiler-nullability > consumer 1`] = `
 {
   "compile": {
     "status": 1,
-    "stderr": "[ELIFECYCLE] Command failed with exit code 1.
-",
+    "stderr": "",
     "stdout": "app.ts(11,56): error TS2345: Argument of type 'null' is not assignable to parameter of type 'string'.
 app.ts(12,5): error TS2345: Argument of type '"INSERT INTO users (id) VALUES ($1)"' is not assignable to parameter of type 'SqlError<"null value in column \\"name\\" of relation \\"users\\" violates not-null constraint", 2> & "INSERT INTO users (id) VALUES ($1)"'.
   Type 'string' is not assignable to type 'SqlError<"null value in column \\"name\\" of relation \\"users\\" violates not-null constraint", 2>'.

@@ -30,7 +30,6 @@ NoResultError: The query returned no rows
 }
 
 Node.js v26.8.1
-[ELIFECYCLE] Command failed with exit code 1.
 ",
     "stdout": "",
   },

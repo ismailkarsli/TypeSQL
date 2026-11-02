@@ -4,8 +4,7 @@ exports[`sqlite-json-write-rejection > consumer 1`] = `
 {
   "compile": {
     "status": 1,
-    "stderr": "[ELIFECYCLE] Command failed with exit code 1.
-",
+    "stderr": "",
     "stdout": "app.ts(15,5): error TS2345: Argument of type 'string' is not assignable to parameter of type 'SqlError<\`parameter $1: a sql.json() { ok: true; views: "wrong" } value cannot be used as \${"json" & { readonly shape: TsShape<{ views: number; ok: boolean; }>; }} NOT NULL (expected { ok: boolean; views: number })\`, 5> & "UPDATE t SET doc=\\0PJ<0ok=t,0views=qwrong~>0\\0"'.
   Type 'string' is not assignable to type 'SqlError<\`parameter $1: a sql.json() { ok: true; views: "wrong" } value cannot be used as \${"json" & { readonly shape: TsShape<{ views: number; ok: boolean; }>; }} NOT NULL (expected { ok: boolean; views: number })\`, 5>'.
 app.ts(16,5): error TS2345: Argument of type 'string' is not assignable to parameter of type 'SqlError<\`parameter $1: a sql.json() { ok: true } value cannot be used as \${"json" & { readonly shape: TsShape<{ views: number; ok: boolean; }>; }} NOT NULL (expected { ok: boolean; views: number })\`, 5> & "UPDATE t SET doc=\\0PJ<0ok=t>0\\0"'.

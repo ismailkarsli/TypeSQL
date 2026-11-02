@@ -4,8 +4,7 @@ exports[`compiler-undeclared-dependency > consumer 1`] = `
 {
   "compile": {
     "status": 1,
-    "stderr": "[ELIFECYCLE] Command failed with exit code 1.
-",
+    "stderr": "",
     "stdout": "app.ts(1,27): error TS2307: Cannot find module '@typesql/core' or its corresponding type declarations.
 ",
   },

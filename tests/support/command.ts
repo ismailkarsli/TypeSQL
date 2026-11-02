@@ -23,7 +23,10 @@ export async function command(
 	const signal = cancellation.getStore();
 	signal?.throwIfAborted();
 	return new Promise((resolve, reject) => {
-		const child = spawn(argv[0]!, argv.slice(1), {
+		// Reuse the workspace-selected pnpm outside the workspace too.
+		const executable =
+			argv[0] === "pnpm" ? (process.env.npm_execpath ?? "pnpm") : argv[0]!;
+		const child = spawn(executable, argv.slice(1), {
 			cwd,
 			detached: true,
 			env: {

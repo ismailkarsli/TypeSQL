@@ -33,7 +33,6 @@ The config file default-exports a migrator:
 Without a config file, pass --dialect and --url or --db; the directory
 defaults to ./migrations. Paths in the config are relative to it, and paths
 in flags to the working directory. Requires Node.js 26 or newer.
-[ELIFECYCLE] Command failed with exit code 2.
 ",
     "stdout": "",
   },

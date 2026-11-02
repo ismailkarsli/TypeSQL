@@ -31,7 +31,6 @@ Error: typesql: this sql.param() value was already used by another statement; ca
     at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
 
 Node.js v26.8.1
-[ELIFECYCLE] Command failed with exit code 1.
 ",
     "stdout": "",
   },

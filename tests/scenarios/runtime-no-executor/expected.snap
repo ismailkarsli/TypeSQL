@@ -30,7 +30,6 @@ Error: typesql: no executor: pass one to createSql(executor) or to execute(execu
     at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
 
 Node.js v26.8.1
-[ELIFECYCLE] Command failed with exit code 1.
 ",
     "stdout": "",
   },

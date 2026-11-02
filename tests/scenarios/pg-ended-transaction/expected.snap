@@ -29,7 +29,6 @@ Error: typesql: this transaction has ended; run later queries on the sql that st
     at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
 
 Node.js v26.8.1
-[ELIFECYCLE] Command failed with exit code 1.
 ",
     "stdout": "",
   },
