@@ -54,7 +54,7 @@ RowOf / ParamsOf / Validate                 public projections of Analysis
 
 ## Result conventions
 
-- **Tokens are accessed by index, never sliced.** A parse function is `P<T extends Toks, I extends number> = Ok<Node, J> | SqlError` where `T` is the whole token tuple, `I` the current index and `J` the index after the node. `Ok<N, J>` is `readonly [N, J]`. `T[I]` is `undefined` past the end. `Nx<I>` (= I + 1) is a lookup in the generated `Next` table (`lexer/next.ts`, regenerate with `node scripts/gen-next.ts`). Propagate with:
+- **Tokens are accessed by index, never sliced.** A parse function is `P<T extends Toks, I extends number> = Ok<Node, J> | SqlError` where `T` is the whole token tuple, `I` the current index and `J` the index after the node. `Ok<N, J>` is `readonly [N, J]`. `T[I]` is `undefined` past the end. `Nx<I>` (= I + 1) is a lookup in the generated `Next` table (`lexer/next.ts`, regenerate with `node tools/gen-next.ts`). Propagate with:
   ```ts
   ParseX<T, I> extends infer R ? R extends Ok<infer N, infer J extends number> ? … : R : never
   ```
@@ -87,7 +87,7 @@ RowOf / ParamsOf / Validate                 public projections of Analysis
 ## Adding grammar
 
 - New expression syntax: add an AST node in `ast.ts`, parse it in `parser/expr.ts` (prefix or infix), type it in `typer/typeof.ts`, name it in `project/naming.ts`, and handle params in `typer/params.ts`. Add a workspace scenario under `tests/scenarios/`, deriving intended behavior from PostgreSQL and the documented contract.
-- New function: add a `Sig` to `FunctionCatalog` in `typer/catalog.ts`, then regenerate `typer/pg-functions.ts` (the uncurated pg_catalog rest) with `TYPESQL_PG_URL=… node scripts/gen-pg-functions.ts`.
+- New function: add a `Sig` to `FunctionCatalog` in `typer/catalog.ts`, then regenerate `typer/pg-functions.ts` (the uncurated pg_catalog rest) with `TYPESQL_PG_URL=… node tools/gen-pg-functions.ts`.
 - New statement: add to `ast.ts`, parse in `parser/<kind>.ts`, dispatch in `parser/stmt.ts`, project in `project/stmt.ts`.
 
 ## Checking behavior

@@ -7,7 +7,7 @@ const [branch, message] = process.argv
 const dryRun = process.argv.includes("--dry-run");
 if (!branch || !message) {
 	console.error(
-		"usage: node scripts/github-commit.ts <branch> <message> [--dry-run]",
+		"usage: node tools/github-commit.ts <branch> <message> [--dry-run]",
 	);
 	process.exit(2);
 }

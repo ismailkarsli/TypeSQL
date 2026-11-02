@@ -18,5 +18,5 @@
 			"@typesql/core": ["./packages/core/src/index.ts"]
 		}
 	},
-	"include": ["*.ts", "scripts"]
+	"include": ["*.ts", "tools"]
 }

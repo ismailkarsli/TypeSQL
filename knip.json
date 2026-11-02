@@ -9,8 +9,8 @@
 	},
 	"workspaces": {
 		".": {
-			"entry": ["scripts/*.ts"],
-			"project": ["scripts/**/*.ts"],
+			"entry": ["tools/*.ts"],
+			"project": ["tools/**/*.ts"],
 			"ignoreDependencies": ["pg"]
 		},
 		"packages/core": {
