@@ -93,7 +93,7 @@ let counter = 0;
 const MARK = "\u0000typesql";
 
 /** Whether a string holds a marker: a sql.param() or sql.json() value, or a fragment. */
-export const holdsMarker = (text: string): boolean => text.includes(MARK);
+const holdsMarker = (text: string): boolean => text.includes(MARK);
 
 /** Whether a value holds a marker in a string, as itself or in a plain object or array. */
 export function holdsMarkers(
