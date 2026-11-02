@@ -1,4 +1,5 @@
 import { createMigrator, migration } from "@typesql/core/migration";
+
 const first = migration("postgres", {
 	name: "001-users",
 	up: async (db) =>
@@ -38,7 +39,9 @@ try {
 		applied: e.applied,
 	});
 }
+
 import { Pool } from "pg";
+
 const db = new Pool({ connectionString: process.env.DATABASE_URL });
 const inspect = async () =>
 	(await db.query("SELECT name FROM schema_migrations ORDER BY name")).rows;

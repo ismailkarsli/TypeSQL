@@ -1,14 +1,15 @@
-import { Pool } from "pg";
 import {
-	createSql,
 	CasePlugin,
+	createSql,
 	type IdentityPluginTypes,
 	type SqlPlugin,
 } from "@typesql/core";
-import { postgres } from "@typesql/core/postgres";
 import { mapRows } from "@typesql/core/adapter";
-import { executor } from "@typesql/pg";
 import type { Col } from "@typesql/core/postgres";
+import { postgres } from "@typesql/core/postgres";
+import { executor } from "@typesql/pg";
+import { Pool } from "pg";
+
 interface DB {
 	users: {
 		id: Col<"int4">;

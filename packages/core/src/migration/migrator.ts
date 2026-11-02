@@ -543,7 +543,7 @@ const text = (error: unknown): string => {
 	const message = error.message
 		? error.message
 		: error instanceof AggregateError && error.errors.length > 0
-			? [...new Set(error.errors.map(text))].join("; ")
+			? Array.from(new Set(error.errors.map(text))).join("; ")
 			: ((error as { code?: string }).code ?? error.name);
 	return message.replace(/^typesql: /, "");
 };

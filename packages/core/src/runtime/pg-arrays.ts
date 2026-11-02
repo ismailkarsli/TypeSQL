@@ -53,11 +53,11 @@ export async function parsePgUserArrays(
 	if (user.length === 0 || rows.length === 0) return rows;
 	const cache = caches.get(owner) ?? new Map<number, Promise<Parse | null>>();
 	caches.set(owner, cache);
-	const missing = [...new Set(user.map((f) => f.dataTypeID))].filter(
-		(oid) => !cache.has(oid),
-	);
-	if (missing.length > 0) {
-		const found = lookupArrays(lookup, missing).catch(() => {
+	const missing = new Set<number>();
+	for (const { dataTypeID } of user)
+		if (!cache.has(dataTypeID)) missing.add(dataTypeID);
+	if (missing.size > 0) {
+		const found = lookupArrays(lookup, Array.from(missing)).catch(() => {
 			for (const oid of missing) cache.delete(oid);
 			return new Map<number, Parse>();
 		});

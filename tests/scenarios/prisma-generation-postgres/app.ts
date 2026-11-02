@@ -1,10 +1,13 @@
-import { PrismaClient } from "./generated/client/client.js";
-import { createSql } from "@typesql/prisma";
-import { postgres } from "@typesql/core/postgres";
 import { PrismaPg } from "@prisma/adapter-pg";
+import { postgres } from "@typesql/core/postgres";
+import { createSql } from "@typesql/prisma";
+import { PrismaClient } from "./generated/client/client.js";
+
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const client = new PrismaClient({ adapter });
+
 import type { DB } from "./generated/schema.js";
+
 const sql = createSql<DB>(postgres, client);
 await client.user.create({ data: { name: "Ada" } });
 export const rows = await sql(

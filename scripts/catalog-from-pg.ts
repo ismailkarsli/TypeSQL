@@ -47,13 +47,14 @@ const body = catalogSrc.slice(
 		catalogSrc.indexOf("export interface FunctionCatalog"),
 	),
 );
-const catalogNames = [
-	...new Set(
-		[
-			...body.matchAll(/(?:^|; )\s*([a-z_][a-z0-9_]*): (?:\[\s*Sig<|Sig<)/gm),
-		].map((m) => m[1]!),
+const catalogNames = Array.from(
+	new Set(
+		Array.from(
+			body.matchAll(/(?:^|; )\s*([a-z_][a-z0-9_]*): (?:\[\s*Sig<|Sig<)/gm),
+			(m) => m[1]!,
+		),
 	),
-];
+);
 const names = process.argv.slice(2).length
 	? process.argv.slice(2)
 	: catalogNames;

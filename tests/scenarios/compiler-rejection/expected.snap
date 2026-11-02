@@ -5,8 +5,8 @@ exports[`compiler-rejection > scenario 1`] = `
   "compile": {
     "status": 1,
     "stderr": "",
-    "stdout": "app.ts(7,43): error TS2345: Argument of type 'string' is not assignable to parameter of type 'number'.
-app.ts(8,5): error TS2345: Argument of type '"SELECT missing FROM users"' is not assignable to parameter of type 'SqlError<"column \\"missing\\" does not exist", 1> & "SELECT missing FROM users"'.
+    "stdout": "app.ts(8,43): error TS2345: Argument of type 'string' is not assignable to parameter of type 'number'.
+app.ts(9,5): error TS2345: Argument of type '"SELECT missing FROM users"' is not assignable to parameter of type 'SqlError<"column \\"missing\\" does not exist", 1> & "SELECT missing FROM users"'.
   Type 'string' is not assignable to type 'SqlError<"column \\"missing\\" does not exist", 1>'.
 ",
   },
@@ -18,7 +18,7 @@ app.ts(8,5): error TS2345: Argument of type '"SELECT missing FROM users"' is not
         "column": 43,
         "expression": ""wrong"",
         "file": "app.ts",
-        "line": 7,
+        "line": 8,
         "message": "Argument of type 'string' is not assignable to parameter of type 'number'.",
       },
       {
@@ -32,13 +32,13 @@ app.ts(8,5): error TS2345: Argument of type '"SELECT missing FROM users"' is not
             "column": 5,
             "expression": ""SELECT missing FROM users"",
             "file": "app.ts",
-            "line": 8,
+            "line": 9,
             "message": "Type 'string' is not assignable to type 'SqlError<"column \\"missing\\" does not exist", 1>'.",
           },
         ],
         "expression": ""SELECT missing FROM users"",
         "file": "app.ts",
-        "line": 8,
+        "line": 9,
         "message": "Argument of type '"SELECT missing FROM users"' is not assignable to parameter of type 'SqlError<"column \\"missing\\" does not exist", 1> & "SELECT missing FROM users"'.",
       },
     ],

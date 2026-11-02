@@ -14,7 +14,9 @@ pattern value_declares($name) {
 				JsFunctionDeclaration(),
 				JsClassDeclaration()
 			},
-			$statement <: contains JsIdentifierBinding() as $b where { $b <: $name } until or {
+			$statement <: contains JsIdentifierBinding() as $b where {
+				$b <: $name
+			} until or {
 				JsFunctionDeclaration(),
 				JsFunctionExpression(),
 				JsArrowFunctionExpression(),
@@ -76,15 +78,27 @@ pattern unparenthesized($inner) {
 pattern framework_import($local) {
 	JsImport() as $import where {
 		$import <: or {
-			and { contains JsModuleSource() as $source where { $source <: r"[\"']vitest[\"']" },
+			and { contains JsModuleSource() as $source where {
+				$source <: r"[\"']vitest[\"']"
+			},
 			contains or {
-				JsShorthandNamedImportSpecifier(local_name=$binding) where { $binding <: "vi" },
-				JsNamedImportSpecifier(name=$imported, local_name=$binding) where { $imported <: "vi" }
+				JsShorthandNamedImportSpecifier(local_name=$binding) where {
+					$binding <: "vi"
+				},
+				JsNamedImportSpecifier(name=$imported, local_name=$binding) where {
+					$imported <: "vi"
+				}
 			} where { $binding <: $local } },
-			and { contains JsModuleSource() as $source where { $source <: r"[\"']@jest/globals[\"']" },
+			and { contains JsModuleSource() as $source where {
+				$source <: r"[\"']@jest/globals[\"']"
+			},
 			contains or {
-				JsShorthandNamedImportSpecifier(local_name=$binding) where { $binding <: "jest" },
-				JsNamedImportSpecifier(name=$imported, local_name=$binding) where { $imported <: "jest" }
+				JsShorthandNamedImportSpecifier(local_name=$binding) where {
+					$binding <: "jest"
+				},
+				JsNamedImportSpecifier(name=$imported, local_name=$binding) where {
+					$imported <: "jest"
+				}
 			} where { $binding <: $local } }
 		}
 	}
@@ -112,7 +126,10 @@ JsCallExpression(callee=unparenthesized(or {
 		},
 		and {
 			$call <: within JsModule(items=some framework_import($name)),
-			$call <: not within $scope where { $scope <: binds_value($name), $scope <: not JsModule() }
+			$call <: not within $scope where {
+				$scope <: binds_value($name),
+				$scope <: not JsModule()
+			}
 		}
 	},
 	register_diagnostic(span=$call, message="Replace module mocking with dependency injection through a real interface, service layer, or faithful test implementation.", severity="error")

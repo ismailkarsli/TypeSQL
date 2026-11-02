@@ -118,12 +118,12 @@ for (const file of changed) {
 }
 const covered = new Set(intentTexts.flatMap(intentTargets));
 
-const missing = packages
-	.map((pkg) => ({ pkg, file: shippedChange(pkg) }))
-	.filter(
-		({ pkg, file }) =>
-			file && !covered.has(pkg.manifest.name) && !covered.has(pkg.dir),
-	);
+const missing = packages.flatMap((pkg) => {
+	const file = shippedChange(pkg);
+	return file && !covered.has(pkg.manifest.name) && !covered.has(pkg.dir)
+		? [{ pkg, file }]
+		: [];
+});
 
 if (missing.length === 0) {
 	console.log(`check-intents: ok (since ${base.slice(0, 7)})`);

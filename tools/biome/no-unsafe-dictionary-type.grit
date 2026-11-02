@@ -123,7 +123,9 @@ pattern optional_never_member() {
 }
 
 pattern empty_object() {
-	TsObjectType(members=$members) where { $members <: every optional_never_member() }
+	TsObjectType(members=$members) where {
+		$members <: every optional_never_member()
+	}
 }
 
 pattern empty_interface($name) {
@@ -149,7 +151,9 @@ pattern wrapper_names() {
 }
 
 pattern readonly_operator($inner) {
-	TsTypeOperatorType(ty=$inner) as $operator where { $operator <: r"(?s)readonly\s.*" }
+	TsTypeOperatorType(ty=$inner) as $operator where {
+		$operator <: r"(?s)readonly\s.*"
+	}
 }
 
 pattern reference_to($parameter) {
@@ -189,7 +193,9 @@ pattern forwards_parameter($parameter) {
 
 pattern record_slot($parameter) {
 	builtin(`Record`) as $record where {
-		$record <: TsReferenceType(type_arguments=TsTypeArguments(ts_type_argument_list=[$_, $value])),
+		$record <: TsReferenceType(type_arguments=TsTypeArguments(ts_type_argument_list=[
+			$_, $value
+		])),
 		$value <: value_slot($parameter)
 	}
 }
@@ -216,7 +222,9 @@ pattern applied_value_0($arguments, $parameters, $aliased) {
 		or {
 			$aliased <: unsafe_value_1(),
 			and {
-				$parameters <: TsTypeParameters(items=[TsTypeParameter(name=$q1, default=$d1), ...]),
+				$parameters <: TsTypeParameters(items=[
+					TsTypeParameter(name=$q1, default=$d1), ...
+				]),
 				or {
 					$arguments <: TsTypeArguments(ts_type_argument_list=[$c1, ...]),
 					$d1 <: TsDefaultTypeClause(ty=$c1)
@@ -228,10 +236,15 @@ pattern applied_value_0($arguments, $parameters, $aliased) {
 							$_, TsTypeParameter(name=$q2, default=$d2), ...
 						]),
 						or {
-							$arguments <: TsTypeArguments(ts_type_argument_list=[$_, $c2, ...]),
+							$arguments <: TsTypeArguments(ts_type_argument_list=[
+								$_, $c2, ...
+							]),
 							and {
 								$d2 <: TsDefaultTypeClause(ty=$x2),
-								or { and { $x2 <: forwards_parameter($q1), $c2 = $c1 }, $c2 = $x2 }
+								or {
+									and { $x2 <: forwards_parameter($q1), $c2 = $c1 },
+									$c2 = $x2
+								}
 							}
 						},
 						and { $aliased <: value_slot($q2), $c2 <: unsafe_value_1() }
@@ -247,7 +260,9 @@ pattern applied_dictionary_0($arguments, $parameters, $aliased) {
 		or {
 			$aliased <: dictionary_position_1(),
 			and {
-				$parameters <: TsTypeParameters(items=[TsTypeParameter(name=$q1, default=$d1), ...]),
+				$parameters <: TsTypeParameters(items=[
+					TsTypeParameter(name=$q1, default=$d1), ...
+				]),
 				or {
 					$arguments <: TsTypeArguments(ts_type_argument_list=[$c1, ...]),
 					$d1 <: TsDefaultTypeClause(ty=$c1)
@@ -262,15 +277,23 @@ pattern applied_dictionary_0($arguments, $parameters, $aliased) {
 							$_, TsTypeParameter(name=$q2, default=$d2), ...
 						]),
 						or {
-							$arguments <: TsTypeArguments(ts_type_argument_list=[$_, $c2, ...]),
+							$arguments <: TsTypeArguments(ts_type_argument_list=[
+								$_, $c2, ...
+							]),
 							and {
 								$d2 <: TsDefaultTypeClause(ty=$x2),
-								or { and { $x2 <: forwards_parameter($q1), $c2 = $c1 }, $c2 = $x2 }
+								or {
+									and { $x2 <: forwards_parameter($q1), $c2 = $c1 },
+									$c2 = $x2
+								}
 							}
 						},
 						or {
 							and { $aliased <: dictionary_slot($q2), $c2 <: unsafe_value_1() },
-							and { $aliased <: value_slot($q2), $c2 <: dictionary_position_1() }
+							and {
+								$aliased <: value_slot($q2),
+								$c2 <: dictionary_position_1()
+							}
 						}
 					}
 				}
@@ -360,7 +383,9 @@ pattern applied_value_1($arguments, $parameters, $aliased) {
 		or {
 			$aliased <: unsafe_value_2(),
 			and {
-				$parameters <: TsTypeParameters(items=[TsTypeParameter(name=$q1, default=$d1), ...]),
+				$parameters <: TsTypeParameters(items=[
+					TsTypeParameter(name=$q1, default=$d1), ...
+				]),
 				or {
 					$arguments <: TsTypeArguments(ts_type_argument_list=[$c1, ...]),
 					$d1 <: TsDefaultTypeClause(ty=$c1)
@@ -372,10 +397,15 @@ pattern applied_value_1($arguments, $parameters, $aliased) {
 							$_, TsTypeParameter(name=$q2, default=$d2), ...
 						]),
 						or {
-							$arguments <: TsTypeArguments(ts_type_argument_list=[$_, $c2, ...]),
+							$arguments <: TsTypeArguments(ts_type_argument_list=[
+								$_, $c2, ...
+							]),
 							and {
 								$d2 <: TsDefaultTypeClause(ty=$x2),
-								or { and { $x2 <: forwards_parameter($q1), $c2 = $c1 }, $c2 = $x2 }
+								or {
+									and { $x2 <: forwards_parameter($q1), $c2 = $c1 },
+									$c2 = $x2
+								}
 							}
 						},
 						and { $aliased <: value_slot($q2), $c2 <: unsafe_value_2() }
@@ -391,7 +421,9 @@ pattern applied_dictionary_1($arguments, $parameters, $aliased) {
 		or {
 			$aliased <: dictionary_position_2(),
 			and {
-				$parameters <: TsTypeParameters(items=[TsTypeParameter(name=$q1, default=$d1), ...]),
+				$parameters <: TsTypeParameters(items=[
+					TsTypeParameter(name=$q1, default=$d1), ...
+				]),
 				or {
 					$arguments <: TsTypeArguments(ts_type_argument_list=[$c1, ...]),
 					$d1 <: TsDefaultTypeClause(ty=$c1)
@@ -406,15 +438,23 @@ pattern applied_dictionary_1($arguments, $parameters, $aliased) {
 							$_, TsTypeParameter(name=$q2, default=$d2), ...
 						]),
 						or {
-							$arguments <: TsTypeArguments(ts_type_argument_list=[$_, $c2, ...]),
+							$arguments <: TsTypeArguments(ts_type_argument_list=[
+								$_, $c2, ...
+							]),
 							and {
 								$d2 <: TsDefaultTypeClause(ty=$x2),
-								or { and { $x2 <: forwards_parameter($q1), $c2 = $c1 }, $c2 = $x2 }
+								or {
+									and { $x2 <: forwards_parameter($q1), $c2 = $c1 },
+									$c2 = $x2
+								}
 							}
 						},
 						or {
 							and { $aliased <: dictionary_slot($q2), $c2 <: unsafe_value_2() },
-							and { $aliased <: value_slot($q2), $c2 <: dictionary_position_2() }
+							and {
+								$aliased <: value_slot($q2),
+								$c2 <: dictionary_position_2()
+							}
 						}
 					}
 				}
@@ -504,7 +544,9 @@ pattern applied_value_2($arguments, $parameters, $aliased) {
 		or {
 			$aliased <: unsafe_value_3(),
 			and {
-				$parameters <: TsTypeParameters(items=[TsTypeParameter(name=$q1, default=$d1), ...]),
+				$parameters <: TsTypeParameters(items=[
+					TsTypeParameter(name=$q1, default=$d1), ...
+				]),
 				or {
 					$arguments <: TsTypeArguments(ts_type_argument_list=[$c1, ...]),
 					$d1 <: TsDefaultTypeClause(ty=$c1)
@@ -516,10 +558,15 @@ pattern applied_value_2($arguments, $parameters, $aliased) {
 							$_, TsTypeParameter(name=$q2, default=$d2), ...
 						]),
 						or {
-							$arguments <: TsTypeArguments(ts_type_argument_list=[$_, $c2, ...]),
+							$arguments <: TsTypeArguments(ts_type_argument_list=[
+								$_, $c2, ...
+							]),
 							and {
 								$d2 <: TsDefaultTypeClause(ty=$x2),
-								or { and { $x2 <: forwards_parameter($q1), $c2 = $c1 }, $c2 = $x2 }
+								or {
+									and { $x2 <: forwards_parameter($q1), $c2 = $c1 },
+									$c2 = $x2
+								}
 							}
 						},
 						and { $aliased <: value_slot($q2), $c2 <: unsafe_value_3() }
@@ -535,7 +582,9 @@ pattern applied_dictionary_2($arguments, $parameters, $aliased) {
 		or {
 			$aliased <: dictionary_position_3(),
 			and {
-				$parameters <: TsTypeParameters(items=[TsTypeParameter(name=$q1, default=$d1), ...]),
+				$parameters <: TsTypeParameters(items=[
+					TsTypeParameter(name=$q1, default=$d1), ...
+				]),
 				or {
 					$arguments <: TsTypeArguments(ts_type_argument_list=[$c1, ...]),
 					$d1 <: TsDefaultTypeClause(ty=$c1)
@@ -550,15 +599,23 @@ pattern applied_dictionary_2($arguments, $parameters, $aliased) {
 							$_, TsTypeParameter(name=$q2, default=$d2), ...
 						]),
 						or {
-							$arguments <: TsTypeArguments(ts_type_argument_list=[$_, $c2, ...]),
+							$arguments <: TsTypeArguments(ts_type_argument_list=[
+								$_, $c2, ...
+							]),
 							and {
 								$d2 <: TsDefaultTypeClause(ty=$x2),
-								or { and { $x2 <: forwards_parameter($q1), $c2 = $c1 }, $c2 = $x2 }
+								or {
+									and { $x2 <: forwards_parameter($q1), $c2 = $c1 },
+									$c2 = $x2
+								}
 							}
 						},
 						or {
 							and { $aliased <: dictionary_slot($q2), $c2 <: unsafe_value_3() },
-							and { $aliased <: value_slot($q2), $c2 <: dictionary_position_3() }
+							and {
+								$aliased <: value_slot($q2),
+								$c2 <: dictionary_position_3()
+							}
 						}
 					}
 				}
@@ -722,14 +779,20 @@ pattern outermost() {
 			or {
 				TsObjectType(),
 				TsMappedType()
-			} as $outer where { $outer <: unsafe_dictionary_0(), $outer <: not $dictionary }
+			} as $outer where {
+				$outer <: unsafe_dictionary_0(),
+				$outer <: not $dictionary
+			}
 		}
 	}
 }
 
 pattern alias_reference() {
 	bubble TsReferenceType(type_arguments=$arguments) as $dictionary where {
-		or { $arguments <: TsTypeArguments(), $dictionary <: within TsTypeAliasDeclaration() },
+		or {
+			$arguments <: TsTypeArguments(),
+			$dictionary <: within TsTypeAliasDeclaration()
+		},
 		$dictionary <: dictionary_position_0(),
 		$dictionary <: outermost(),
 		register_diagnostic(span=$dictionary, message="This dictionary value type gives callers no concrete contract. Use an owner/schema-derived value type and parse external payloads before insertion.", severity="error")
@@ -738,7 +801,10 @@ pattern alias_reference() {
 
 pattern resolved_alias_reference() {
 	bubble TsReferenceType(name=$name, type_arguments=$arguments) as $dictionary where {
-		or { $arguments <: TsTypeArguments(), $dictionary <: within TsTypeAliasDeclaration() },
+		or {
+			$arguments <: TsTypeArguments(),
+			$dictionary <: within TsTypeAliasDeclaration()
+		},
 		$dictionary <: not type_parameter_bound($name),
 		$dictionary <: outermost(),
 		register_diagnostic(span=$dictionary, message="This dictionary value type gives callers no concrete contract. Use an owner/schema-derived value type and parse external payloads before insertion.", severity="error")
@@ -757,7 +823,9 @@ pattern alias_may_be_dictionary($parameters, $aliased) {
 				}
 			},
 			and {
-				$parameters <: TsTypeParameters(items=[$_, TsTypeParameter(name=$q2), ...]),
+				$parameters <: TsTypeParameters(items=[
+					$_, TsTypeParameter(name=$q2), ...
+				]),
 				$aliased <: or {
 					dictionary_slot($q2),
 					value_slot($q2)

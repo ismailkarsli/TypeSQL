@@ -88,12 +88,22 @@ pattern scope_has($target) {
 		JsStaticInitializationBlockClassMember(statements=$region) where {
 			$region <: hoisted_has($target)
 		},
-		JsBlockStatement(statements=$region) where { $region <: lexical_has($target) },
+		JsBlockStatement(statements=$region) where {
+			$region <: lexical_has($target)
+		},
 		JsSwitchStatement(cases=$region) where { $region <: lexical_has($target) },
-		JsForStatement(initializer=$region) where { $region <: lexical_has($target) },
-		JsForInStatement(initializer=$region) where { $region <: lexical_has($target) },
-		JsForOfStatement(initializer=$region) where { $region <: lexical_has($target) },
-		JsCatchClause(declaration=$region) where { $region <: lexical_has($target) },
+		JsForStatement(initializer=$region) where {
+			$region <: lexical_has($target)
+		},
+		JsForInStatement(initializer=$region) where {
+			$region <: lexical_has($target)
+		},
+		JsForOfStatement(initializer=$region) where {
+			$region <: lexical_has($target)
+		},
+		JsCatchClause(declaration=$region) where {
+			$region <: lexical_has($target)
+		},
 		JsFunctionExpression(id=$region) where { $region <: $target },
 		JsClassExpression(id=$region) where { $region <: $target },
 		or {
@@ -112,7 +122,12 @@ pattern scope_has($target) {
 			JsConstructorClassMember(parameters=JsConstructorParameters(parameters=$parameters), body=JsFunctionBody(statements=$statements)),
 			JsSetterClassMember(parameter=$parameters, body=JsFunctionBody(statements=$statements)),
 			JsSetterObjectMember(parameter=$parameters, body=JsFunctionBody(statements=$statements))
-		} where { or { $parameters <: lexical_has($target), $statements <: hoisted_has($target) } },
+		} where {
+			or {
+				$parameters <: lexical_has($target),
+				$statements <: hoisted_has($target)
+			}
+		},
 		or {
 			JsGetterClassMember(body=JsFunctionBody(statements=$statements)),
 			JsGetterObjectMember(body=JsFunctionBody(statements=$statements))
@@ -120,7 +135,9 @@ pattern scope_has($target) {
 	}
 }
 
-pattern named($name) { JsIdentifierBinding() as $binding where { $binding <: $name } }
+pattern named($name) {
+	JsIdentifierBinding() as $binding where { $binding <: $name }
+}
 
 pattern write_to($name, $scope) {
 	JsIdentifierAssignment() as $write where {
@@ -505,7 +522,10 @@ JsCallExpression(callee=or {
 	$inner <: wrapped_call(),
 	$inner <: contains JsCallExpression() as $call,
 	$call <: member_call($receiver, $first),
-	or { and { $outer <: "map", $first <: "filter" }, and { $outer <: "filter", $first <: "map" } },
+	or {
+		and { $outer <: "map", $first <: "filter" },
+		and { $outer <: "filter", $first <: "map" }
+	},
 	$receiver <: known_array_16(JsDebuggerStatement()),
 	register_diagnostic(span=$chain, message="Avoid consecutive array filter/map passes. Use flatMap or a loop, preserving callback order, indexes, and filtering semantics. Explicit lazy iterator pipelines are allowed.", severity="error")
 }

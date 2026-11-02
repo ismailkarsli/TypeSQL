@@ -1,7 +1,8 @@
-import { PrismaClient } from "./generated/client/client.js";
-import { createSql } from "@typesql/prisma";
-import { sqlite } from "@typesql/core/sqlite";
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
+import { sqlite } from "@typesql/core/sqlite";
+import { createSql } from "@typesql/prisma";
+import { PrismaClient } from "./generated/client/client.js";
+
 const adapter = new PrismaBetterSqlite3({
 	url: `file:${process.env.SQLITE_PATH}`,
 });

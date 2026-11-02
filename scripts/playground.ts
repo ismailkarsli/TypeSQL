@@ -79,7 +79,6 @@ for (const name of sources.keys()) {
 		);
 }
 
-
 if (problems.length) {
 	for (const p of problems) console.error(p);
 	process.exit(1);

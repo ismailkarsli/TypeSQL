@@ -1,4 +1,5 @@
 import { createMigrator, migration } from "@typesql/core/migration";
+
 const first = migration("sqlite", {
 	name: "001-users",
 	up: async (db) =>
@@ -38,7 +39,9 @@ try {
 		applied: e.applied,
 	});
 }
+
 import { DatabaseSync } from "node:sqlite";
+
 const db = new DatabaseSync(process.env.SQLITE_PATH!);
 const inspect = async () =>
 	db.prepare("SELECT name FROM schema_migrations ORDER BY name").all();

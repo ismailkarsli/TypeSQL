@@ -105,7 +105,7 @@ export function serveGenerator(
 		}
 		pending.push(
 			respond(handler, req).then(
-				(res) => void output.write(JSON.stringify(res) + "\n"),
+				(res) => void output.write(`${JSON.stringify(res)}\n`),
 			),
 		);
 	});

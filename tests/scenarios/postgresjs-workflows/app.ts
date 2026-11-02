@@ -1,6 +1,7 @@
-import postgres from "postgres";
-import { createSql } from "@typesql/postgres";
 import type { Col } from "@typesql/core/postgres";
+import { createSql } from "@typesql/postgres";
+import postgres from "postgres";
+
 interface DB {
 	users: { id: Col<"int4">; name: Col<"text", { nullable: true }> };
 }

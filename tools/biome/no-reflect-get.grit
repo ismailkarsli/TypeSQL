@@ -14,7 +14,9 @@ pattern value_declares($name) {
 				JsFunctionDeclaration(),
 				JsClassDeclaration()
 			},
-			$statement <: contains JsIdentifierBinding() as $b where { $b <: $name } until or {
+			$statement <: contains JsIdentifierBinding() as $b where {
+				$b <: $name
+			} until or {
 				JsFunctionDeclaration(),
 				JsFunctionExpression(),
 				JsArrowFunctionExpression(),

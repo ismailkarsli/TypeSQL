@@ -1,12 +1,15 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
+
 const client = new Pool({ connectionString: process.env.DATABASE_URL });
 await client.query(
 	"CREATE TABLE users (id serial PRIMARY KEY, display_name text NOT NULL, bio text)",
 );
-import { createSql } from "@typesql/drizzle";
+
 import { postgres } from "@typesql/core/postgres";
+import { createSql } from "@typesql/drizzle";
 import { pgTable, serial, text } from "drizzle-orm/pg-core";
+
 const users = pgTable("users", {
 	id: serial().primaryKey(),
 	displayName: text("display_name").notNull(),

@@ -51,7 +51,7 @@ const message = (err: unknown): string => {
 	if (!(err instanceof Error)) return String(err);
 	if (err.message) return err.message;
 	if (err instanceof AggregateError && err.errors.length > 0)
-		return [...new Set(err.errors.map(message))].join("; ");
+		return Array.from(new Set(err.errors.map(message))).join("; ");
 	return (err as { code?: string }).code ?? err.name;
 };
 
@@ -151,7 +151,7 @@ export async function main(
 			config = mod.default as IntrospectConfig;
 			configDir = dirname(file);
 		}
-		const url = values.url ?? config.url ?? io.env["DATABASE_URL"];
+		const url = values.url ?? config.url ?? io.env.DATABASE_URL;
 		if (!url) {
 			io.stderr("typesql introspect: pass --url or set DATABASE_URL\n");
 			return 2;

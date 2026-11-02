@@ -4,7 +4,9 @@ pattern transparent($inner) {
 	or {
 		$inner,
 		TsParenthesizedType(ty=$inner),
-		TsTypeOperatorType(ty=$inner) as $operator where { $operator <: r"(?s)readonly\s.*" },
+		TsTypeOperatorType(ty=$inner) as $operator where {
+			$operator <: r"(?s)readonly\s.*"
+		},
 		TsParenthesizedType(ty=TsParenthesizedType(ty=$inner)),
 		TsParenthesizedType(ty= TsTypeOperatorType(ty=$inner) as $operator where {
 			$operator <: r"(?s)readonly\s.*"
@@ -119,7 +121,9 @@ pattern binding_named($name) {
 			JsObjectBindingPattern(),
 			JsArrayBindingPattern()
 		} as $x where {
-			$x <: contains JsIdentifierBinding() as $id where { $id <: $name } until JsInitializerClause()
+			$x <: contains JsIdentifierBinding() as $id where {
+				$id <: $name
+			} until JsInitializerClause()
 		}
 	}
 }
@@ -137,7 +141,9 @@ pattern value_entry($name) {
 			JsFunctionExportDefaultDeclaration(id= $id where { $id <: $name }),
 			JsClassExportDefaultDeclaration(id= $id where { $id <: $name })
 		}),
-		JsImport() as $x where { $x <: contains JsIdentifierBinding() as $id where { $id <: $name } },
+		JsImport() as $x where {
+			$x <: contains JsIdentifierBinding() as $id where { $id <: $name }
+		},
 		JsFormalParameter(binding=binding_named($name)),
 		JsRestParameter(binding=binding_named($name)),
 		TsPropertyParameter(formal_parameter=JsFormalParameter(binding=binding_named($name))),
@@ -203,7 +209,9 @@ pattern value_scope_twice($first, $second) {
 		TsModuleBlock(items=[..., $first, ..., $second, ...]),
 		JsFunctionBody(statements=[..., $first, ..., $second, ...]),
 		JsBlockStatement(statements=[..., $first, ..., $second, ...]),
-		JsStaticInitializationBlockClassMember(statements=[..., $first, ..., $second, ...]),
+		JsStaticInitializationBlockClassMember(statements=[
+			..., $first, ..., $second, ...
+		]),
 		JsSwitchStatement(cases=some or {
 			JsCaseClause(consequent=[..., $first, ..., $second, ...]),
 			JsDefaultClause(consequent=[..., $first, ..., $second, ...])
@@ -354,7 +362,10 @@ predicate type_parameter_shadowed($node, $name) {
 		TsConstructorType(type_parameters=TsTypeParameters(items=some TsTypeParameter(name= $x where {
 			$x <: $name
 		}))),
-		TsMappedType(property_name=$x, keys_type=$y) where { $x <: $name, $node <: not within $y },
+		TsMappedType(property_name=$x, keys_type=$y) where {
+			$x <: $name,
+			$node <: not within $y
+		},
 		TsConditionalType(extends_type=$y, true_type=$z) where {
 			$y <: contains TsInferType(name= $x where { $x <: $name }),
 			$node <: within $z
@@ -371,7 +382,9 @@ pattern type_entry($name) {
 			JsClassDeclaration(id= $id where { $id <: $name }),
 			JsClassExportDefaultDeclaration(id= $id where { $id <: $name })
 		}),
-		JsImport() as $x where { $x <: contains JsIdentifierBinding() as $id where { $id <: $name } }
+		JsImport() as $x where {
+			$x <: contains JsIdentifierBinding() as $id where { $id <: $name }
+		}
 	}
 }
 
@@ -403,7 +416,10 @@ pattern broad_key_terminal() {
 		TsStringType(),
 		TsNumberType(),
 		TsSymbolType(),
-		TsReferenceType(name=$n, type_arguments=.) as $r where { $n <: r"PropertyKey", builtin($r, $n) }
+		TsReferenceType(name=$n, type_arguments=.) as $r where {
+			$n <: r"PropertyKey",
+			builtin($r, $n)
+		}
 	}
 }
 
@@ -441,7 +457,9 @@ pattern broad_key_4() {
 	})
 }
 
-pattern defaulted($argument) { TsTypeParameter(default=TsDefaultTypeClause(ty=$argument)) }
+pattern defaulted($argument) {
+	TsTypeParameter(default=TsDefaultTypeClause(ty=$argument))
+}
 
 predicate parameter_argument($parameters, $arguments, $name, $argument) {
 	or {
@@ -450,7 +468,10 @@ predicate parameter_argument($parameters, $arguments, $name, $argument) {
 			$x <: $name,
 			or {
 				$arguments <: [$argument, ...],
-				and { $arguments <: not [$_, ...], $parameters <: [defaulted($argument), ...] }
+				and {
+					$arguments <: not [$_, ...],
+					$parameters <: [defaulted($argument), ...]
+				}
 			}
 		},
 		and {
@@ -458,7 +479,10 @@ predicate parameter_argument($parameters, $arguments, $name, $argument) {
 			$x <: $name,
 			or {
 				$arguments <: [$_, $argument, ...],
-				and { $arguments <: not [$_, $_, ...], $parameters <: [$_, defaulted($argument), ...] }
+				and {
+					$arguments <: not [$_, $_, ...],
+					$parameters <: [$_, defaulted($argument), ...]
+				}
 			}
 		},
 		and {
@@ -540,7 +564,9 @@ pattern substituted_open($items, $arguments) {
 			builtin($r, $n),
 			$r <: TsReferenceType(type_arguments=or {
 				.,
-				TsTypeArguments(ts_type_argument_list=[substituted_broad_key($items, $arguments), ...])
+				TsTypeArguments(ts_type_argument_list=[
+					substituted_broad_key($items, $arguments), ...
+				])
 			})
 		}
 	})
@@ -618,7 +644,9 @@ pattern alias_broad_terminal($kind) {
 	or {
 		TsUnknownType() where { $kind = "strict" },
 		TsNonPrimitiveType() where { $kind = "strict" },
-		TsObjectType(members=some TsIndexSignatureTypeMember()) where { $kind = "dict" },
+		TsObjectType(members=some TsIndexSignatureTypeMember()) where {
+			$kind = "dict"
+		},
 		TsMappedType(keys_type=broad_key_4()) where { $kind = "dict" },
 		TsReferenceType(name=$n) as $r where {
 			$n <: r"Record",
@@ -656,7 +684,10 @@ predicate generic_open($parameters, $type_arguments, $body) {
 			parameter_argument($items, $arguments, $n, alias_broad_4($kind)),
 			$kind <: "dict"
 		}),
-		transparent( alias_reference($_, ., $b) where { $b <: alias_broad_4($kind), $kind <: "dict" }),
+		transparent( alias_reference($_, ., $b) where {
+			$b <: alias_broad_4($kind),
+			$kind <: "dict"
+		}),
 		transparent( alias_reference($_, TsTypeParameters(items=$inner_items), $b) as $r where {
 			$r <: TsReferenceType(type_arguments=$t),
 			or {
@@ -674,7 +705,9 @@ predicate generic_open($parameters, $type_arguments, $body) {
 					$n <: r"Readonly|Partial|Required|NonNullable",
 					builtin($r, $n),
 					$r <: TsReferenceType(type_arguments=TsTypeArguments(ts_type_argument_list=[
-						chained_open($inner_items, $inner_arguments, $items, $arguments), ...
+						chained_open($inner_items, $inner_arguments, $items, $arguments),
+
+						...
 					]))
 				})
 			}
@@ -878,7 +911,11 @@ pattern direct_target($kind) {
 		alias_reference($_, $p, $b) as $r where {
 			or {
 				and { $p <: ., $b <: alias_broad_4($kind) },
-				and { $r <: TsReferenceType(type_arguments=$t), generic_open($p, $t, $b), $kind = "dict" }
+				and {
+					$r <: TsReferenceType(type_arguments=$t),
+					generic_open($p, $t, $b),
+					$kind = "dict"
+				}
 			}
 		}
 	}
@@ -1045,8 +1082,12 @@ predicate empty_interface($node, $name) {
 		JsScript()
 	} as $y,
 	$y <: not or {
-		JsModule(items=[..., interface_named($name, $z), ..., interface_named($name, $id), ...]),
-		JsScript(statements=[..., interface_named($name, $z), ..., interface_named($name, $id), ...])
+		JsModule(items=[
+			..., interface_named($name, $z), ..., interface_named($name, $id), ...
+		]),
+		JsScript(statements=[
+			..., interface_named($name, $z), ..., interface_named($name, $id), ...
+		])
 	}
 }
 
@@ -1060,13 +1101,22 @@ pattern unsafe_1() {
 		TsReferenceType(name=$n) as $r where {
 			$n <: r"Readonly|Partial|Required|NonNullable",
 			builtin($r, $n),
-			$r <: TsReferenceType(type_arguments=TsTypeArguments(ts_type_argument_list=[unsafe_0(), ...]))
+			$r <: TsReferenceType(type_arguments=TsTypeArguments(ts_type_argument_list=[
+				unsafe_0(), ...
+			]))
 		},
 		TsReferenceType(name=$n) as $r where {
-			or { $n <: not r"Readonly|Partial|Required|NonNullable", not builtin($r, $n) },
+			or {
+				$n <: not r"Readonly|Partial|Required|NonNullable",
+				not builtin($r, $n)
+			},
 			or {
 				empty_interface($r, $n),
-				and { not module_interface($r, $n, $_), find_alias($r, $n, ., $t), $t <: unsafe_0() }
+				and {
+					not module_interface($r, $n, $_),
+					find_alias($r, $n, ., $t),
+					$t <: unsafe_0()
+				}
 			}
 		}
 	})
@@ -1082,13 +1132,22 @@ pattern unsafe_2() {
 		TsReferenceType(name=$n) as $r where {
 			$n <: r"Readonly|Partial|Required|NonNullable",
 			builtin($r, $n),
-			$r <: TsReferenceType(type_arguments=TsTypeArguments(ts_type_argument_list=[unsafe_1(), ...]))
+			$r <: TsReferenceType(type_arguments=TsTypeArguments(ts_type_argument_list=[
+				unsafe_1(), ...
+			]))
 		},
 		TsReferenceType(name=$n) as $r where {
-			or { $n <: not r"Readonly|Partial|Required|NonNullable", not builtin($r, $n) },
+			or {
+				$n <: not r"Readonly|Partial|Required|NonNullable",
+				not builtin($r, $n)
+			},
 			or {
 				empty_interface($r, $n),
-				and { not module_interface($r, $n, $_), find_alias($r, $n, ., $t), $t <: unsafe_1() }
+				and {
+					not module_interface($r, $n, $_),
+					find_alias($r, $n, ., $t),
+					$t <: unsafe_1()
+				}
 			}
 		}
 	})
@@ -1104,13 +1163,22 @@ pattern unsafe_3() {
 		TsReferenceType(name=$n) as $r where {
 			$n <: r"Readonly|Partial|Required|NonNullable",
 			builtin($r, $n),
-			$r <: TsReferenceType(type_arguments=TsTypeArguments(ts_type_argument_list=[unsafe_2(), ...]))
+			$r <: TsReferenceType(type_arguments=TsTypeArguments(ts_type_argument_list=[
+				unsafe_2(), ...
+			]))
 		},
 		TsReferenceType(name=$n) as $r where {
-			or { $n <: not r"Readonly|Partial|Required|NonNullable", not builtin($r, $n) },
+			or {
+				$n <: not r"Readonly|Partial|Required|NonNullable",
+				not builtin($r, $n)
+			},
 			or {
 				empty_interface($r, $n),
-				and { not module_interface($r, $n, $_), find_alias($r, $n, ., $t), $t <: unsafe_2() }
+				and {
+					not module_interface($r, $n, $_),
+					find_alias($r, $n, ., $t),
+					$t <: unsafe_2()
+				}
 			}
 		}
 	})
@@ -1360,7 +1428,9 @@ or {
 	JsPropertyClassMember(property_annotation=or {
 		TsTypeAnnotation(ty=$type),
 		TsOptionalPropertyAnnotation(type_annotation=TsTypeAnnotation(ty=$type))
-	}, value=JsInitializerClause(expression=$value)) where { widens($type, $value) },
+	}, value=JsInitializerClause(expression=$value)) where {
+		widens($type, $value)
+	},
 	JsAssignmentExpression(left=JsIdentifierAssignment() as $x, right=$value) as $node where {
 		$node <: r"(?s)[\w$]+\s*=[^=].*",
 		$value <: or {

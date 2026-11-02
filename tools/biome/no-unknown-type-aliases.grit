@@ -38,7 +38,11 @@ pattern type_parameters_bind($name) {
 		TsInterfaceDeclaration(type_parameters=$tp),
 		JsClassDeclaration(type_parameters=$tp),
 		JsClassExpression(type_parameters=$tp)
-	} where { $tp <: TsTypeParameters(items=some TsTypeParameter(name=$p) where { $p <: $name }) }
+	} where {
+		$tp <: TsTypeParameters(items=some TsTypeParameter(name=$p) where {
+			$p <: $name
+		})
+	}
 }
 
 pattern type_parameter_scope($name, $use) {
@@ -75,7 +79,9 @@ pattern alias_to($target) {
 	}
 }
 
-pattern passes_direct_2($p) { or { TsReferenceType(name=$x, type_arguments=.) where { $x <: $p } } }
+pattern passes_direct_2($p) {
+	or { TsReferenceType(name=$x, type_arguments=.) where { $x <: $p } }
+}
 
 pattern passes_direct_1($p) {
 	or {
@@ -114,7 +120,9 @@ pattern generic_alias_inner($ref, $name, $target) {
 					])) where { $a1 <: $target }
 				},
 				and {
-					$tps <: TsTypeParameters(items=[$_, $_, TsTypeParameter(name=$q2), ...]),
+					$tps <: TsTypeParameters(items=[
+						$_, $_, TsTypeParameter(name=$q2), ...
+					]),
 					$body <: passes_direct($q2),
 					$ref <: TsReferenceType(type_arguments=TsTypeArguments(ts_type_argument_list=[
 						$_, $_, $a2, ...
@@ -133,7 +141,9 @@ pattern passes_nested_1($p) {
 		TsReferenceType(name=$x, type_arguments=.) where { $x <: $p },
 		TsParenthesizedType(ty=passes_direct_1($p)),
 		TsUnionType(types=some passes_direct_1($p)),
-		TsReferenceType(name=$m) as $r where { $r <: generic_alias_inner($r, $m, passes_direct_1($p)) }
+		TsReferenceType(name=$m) as $r where {
+			$r <: generic_alias_inner($r, $m, passes_direct_1($p))
+		}
 	}
 }
 
@@ -142,7 +152,9 @@ pattern passes_nested($p) {
 		TsReferenceType(name=$x, type_arguments=.) where { $x <: $p },
 		TsParenthesizedType(ty=passes_nested_1($p)),
 		TsUnionType(types=some passes_nested_1($p)),
-		TsReferenceType(name=$m) as $r where { $r <: generic_alias_inner($r, $m, passes_nested_1($p)) }
+		TsReferenceType(name=$m) as $r where {
+			$r <: generic_alias_inner($r, $m, passes_nested_1($p))
+		}
 	}
 }
 
@@ -153,7 +165,9 @@ pattern generic_alias($ref, $name, $target) {
 			$b <: $name,
 			or {
 				and {
-					$tps <: TsTypeParameters(items=[TsTypeParameter(name=$q0, default=$d0), ...]),
+					$tps <: TsTypeParameters(items=[
+						TsTypeParameter(name=$q0, default=$d0), ...
+					]),
 					$body <: passes_nested($q0),
 					$ref <: or {
 						TsReferenceType(type_arguments=TsTypeArguments(ts_type_argument_list=[
@@ -165,7 +179,9 @@ pattern generic_alias($ref, $name, $target) {
 					}
 				},
 				and {
-					$tps <: TsTypeParameters(items=[$_, TsTypeParameter(name=$q1, default=$d1), ...]),
+					$tps <: TsTypeParameters(items=[
+						$_, TsTypeParameter(name=$q1, default=$d1), ...
+					]),
 					$body <: passes_nested($q1),
 					$ref <: or {
 						TsReferenceType(type_arguments=TsTypeArguments(ts_type_argument_list=[
@@ -173,12 +189,16 @@ pattern generic_alias($ref, $name, $target) {
 						])) where { $a1 <: $target },
 						or {
 							TsReferenceType(type_arguments=.),
-							TsReferenceType(type_arguments=TsTypeArguments(ts_type_argument_list=[$_]))
+							TsReferenceType(type_arguments=TsTypeArguments(ts_type_argument_list=[
+								$_
+							]))
 						} where { $d1 <: TsDefaultTypeClause(ty=$target) }
 					}
 				},
 				and {
-					$tps <: TsTypeParameters(items=[$_, $_, TsTypeParameter(name=$q2, default=$d2), ...]),
+					$tps <: TsTypeParameters(items=[
+						$_, $_, TsTypeParameter(name=$q2, default=$d2), ...
+					]),
 					$body <: passes_nested($q2),
 					$ref <: or {
 						TsReferenceType(type_arguments=TsTypeArguments(ts_type_argument_list=[
@@ -186,8 +206,12 @@ pattern generic_alias($ref, $name, $target) {
 						])) where { $a2 <: $target },
 						or {
 							TsReferenceType(type_arguments=.),
-							TsReferenceType(type_arguments=TsTypeArguments(ts_type_argument_list=[$_])),
-							TsReferenceType(type_arguments=TsTypeArguments(ts_type_argument_list=[$_, $_]))
+							TsReferenceType(type_arguments=TsTypeArguments(ts_type_argument_list=[
+								$_
+							])),
+							TsReferenceType(type_arguments=TsTypeArguments(ts_type_argument_list=[
+								$_, $_
+							]))
 						} where { $d2 <: TsDefaultTypeClause(ty=$target) }
 					}
 				}

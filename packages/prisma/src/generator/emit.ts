@@ -187,7 +187,7 @@ export function generateSource(
 			if (!u || sqlite) return;
 			used.add("Col");
 			cols.push(
-				`${doc(u.dbName ? [`Prisma field \`${field.name}\`: Unsupported.`] : ["Prisma `Unsupported` field."], indent + "  ")}${indent}  ${key(u.dbName ?? field.name)}: ${column(str(u.type), u.nullable, !isView && u.hasDefault)};`,
+				`${doc(u.dbName ? [`Prisma field \`${field.name}\`: Unsupported.`] : ["Prisma `Unsupported` field."], `${indent}  `)}${indent}  ${key(u.dbName ?? field.name)}: ${column(str(u.type), u.nullable, !isView && u.hasDefault)};`,
 			);
 		};
 		const written = options.fields?.get(model.name) ?? [];
@@ -222,7 +222,7 @@ export function generateSource(
 				...(f.documentation ? f.documentation.split("\n") : []),
 			];
 			cols.push(
-				`${doc(notes, indent + "  ")}${indent}  ${key(f.dbName ?? f.name)}: ${column(type, nullable, !isView && hasDbDefault(f))};`,
+				`${doc(notes, `${indent}  `)}${indent}  ${key(f.dbName ?? f.name)}: ${column(type, nullable, !isView && hasDbDefault(f))};`,
 			);
 		}
 		const body = `{\n${cols.join("\n")}\n${indent}}`;

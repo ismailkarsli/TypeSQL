@@ -14,7 +14,7 @@ const message = (err: unknown): string => {
 	if (!(err instanceof Error)) return String(err);
 	if (err.message) return err.message;
 	if (err instanceof AggregateError && err.errors.length > 0)
-		return [...new Set(err.errors.map(message))].join("; ");
+		return Array.from(new Set(err.errors.map(message))).join("; ");
 	return (err as { code?: string }).code ?? err.name;
 };
 

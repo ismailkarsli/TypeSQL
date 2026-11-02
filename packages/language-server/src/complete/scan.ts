@@ -411,7 +411,10 @@ function structure(toks: readonly Tok[]): { at: At[]; used: RelRef[] } {
 			expectRel = false;
 
 			if (t.k === "o" && t.v === ",") {
-				if (out) endOutput(), (out = []);
+				if (out) {
+					endOutput();
+					out = [];
+				}
 				if (clause === "from") here.relNext = expectRel = true;
 				else cteNext = true;
 				continue;
@@ -525,7 +528,7 @@ function outputName(toks: readonly Tok[]): string | null {
 	if (!last) return null;
 	if (last.k === "q" || (last.k === "w" && !NOT_ALIAS.has(last.v))) {
 		const before = toks.at(-2);
-		if (!before || before.k !== "o" || before.v === ")" || before.v === ".")
+		if (before?.k !== "o" || before.v === ")" || before.v === ".")
 			return last.v;
 	}
 	const head = toks[0]!;
@@ -562,17 +565,10 @@ function expectAfter(
 		for (let l: Level | null = a.level; l; l = l.parent)
 			sources.push(...l.items);
 		if (!sources.length && a.level.target) sources.push(a.level.target);
-		return {
-			kind: "column",
-			sources,
-			aliases: [
-				...new Set(
-					sources
-						.map((s) => s.name)
-						.filter((n) => n !== "" && n !== "excluded"),
-				),
-			],
-		};
+		const aliases = new Set<string>();
+		for (const { name } of sources)
+			if (name !== "" && name !== "excluded") aliases.add(name);
+		return { kind: "column", sources, aliases: Array.from(aliases) };
 	};
 	const target = (): Expect =>
 		a.level.target
