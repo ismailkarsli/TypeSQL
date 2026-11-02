@@ -1,5 +1,11 @@
 # typesql
 
+## 2.0.0
+
+### Major Changes
+
+- Require VS Code 1.144 or newer and update extension tooling.
+
 ## 1.0.0
 
 ### Major Changes

@@ -2,7 +2,7 @@
 	"name": "typesql",
 	"displayName": "TypeSQL",
 	"description": "SQL highlighting and completions for tables and columns inside TypeSQL's sql() strings.",
-	"version": "1.0.0",
+	"version": "2.0.0",
 	"private": true,
 	"preview": true,
 	"publisher": "typesql",

@@ -26,6 +26,11 @@
     - bright-lemons-pull
     - cool-camels-join
     - sharp-bats-mix
+"@typesql/cli@4.0.1":
+  dir: packages/cli
+  intents:
+    - calm-jokes-dream
+    - strong-elephants-glow
 "@typesql/core@0.0.2":
   dir: packages/core
   intents:
@@ -319,6 +324,14 @@
     - short-cats-bow
     - silent-waves-grow
     - wide-doors-think
+"@typesql/core@4.0.1":
+  dir: packages/core
+  intents:
+    - big-trains-doubt
+    - calm-jokes-dream
+    - heavy-tables-tap
+    - real-bears-occur
+    - strong-elephants-glow
 "@typesql/drizzle@0.0.2":
   dir: packages/drizzle
   intents:
@@ -385,6 +398,11 @@
   intents:
     - proud-planes-collect
     - short-emus-listen
+"@typesql/drizzle@4.0.1":
+  dir: packages/drizzle
+  intents:
+    - calm-jokes-dream
+    - strong-elephants-glow
 "@typesql/kysely@0.0.2":
   dir: packages/kysely
   intents:
@@ -456,6 +474,11 @@
   dir: packages/kysely
   intents:
     - little-wasps-relate
+"@typesql/kysely@4.0.1":
+  dir: packages/kysely
+  intents:
+    - calm-jokes-dream
+    - strong-elephants-glow
 "@typesql/language-server@0.0.1":
   dir: packages/language-server
   intents:
@@ -465,6 +488,11 @@
   intents:
     - gentle-lions-dance
     - wild-emus-march
+"@typesql/language-server@0.0.11":
+  dir: packages/language-server
+  intents:
+    - afraid-monkeys-bathe
+    - strong-elephants-glow
 "@typesql/language-server@0.0.2":
   dir: packages/language-server
   intents:
@@ -597,6 +625,11 @@
   dir: packages/pg
   intents:
     - strong-apes-compete
+"@typesql/pg@4.0.1":
+  dir: packages/pg
+  intents:
+    - calm-jokes-dream
+    - strong-elephants-glow
 "@typesql/postgres@0.0.2":
   dir: packages/postgres
   intents:
@@ -675,6 +708,11 @@
   intents:
     - fresh-moose-ask
     - strong-apes-compete
+"@typesql/postgres@4.0.1":
+  dir: packages/postgres
+  intents:
+    - calm-jokes-dream
+    - strong-elephants-glow
 "@typesql/prisma@0.0.2":
   dir: packages/prisma
   intents:
@@ -751,6 +789,11 @@
   intents:
     - proud-eggs-wink
     - real-seas-ring
+"@typesql/prisma@4.0.1":
+  dir: packages/prisma
+  intents:
+    - calm-jokes-dream
+    - strong-elephants-glow
 "@typesql/sqlite@0.0.1":
   dir: packages/sqlite
   intents:
@@ -783,6 +826,11 @@
   intents:
     - fresh-moose-ask
     - strong-apes-compete
+"@typesql/sqlite@4.0.1":
+  dir: packages/sqlite
+  intents:
+    - calm-jokes-dream
+    - strong-elephants-glow
 typesql@0.0.1:
   dir: packages/vscode
   intents:
@@ -842,3 +890,7 @@ typesql@1.0.0:
   dir: packages/vscode
   intents:
     - slow-mugs-worry
+typesql@2.0.0:
+  dir: packages/vscode
+  intents:
+    - shaggy-olives-count

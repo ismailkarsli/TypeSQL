@@ -1,5 +1,16 @@
 # @typesql/sqlite
 
+## 4.0.1
+
+### Patch Changes
+
+- Standardize installation instructions on pnpm and document packaged consumer validation.
+
+- Build packages with the updated TypeScript toolchain and dependency type definitions.
+
+- Updated dependencies:
+  - @typesql/core@4.0.1
+
 ## 4.0.0
 
 ### Major Changes

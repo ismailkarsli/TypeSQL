@@ -1,5 +1,19 @@
 # @typesql/core
 
+## 4.0.1
+
+### Patch Changes
+
+- Check inline SQLite JSON writes against declared column shapes, including sql.set and sql.values.
+
+- Standardize installation instructions on pnpm and document packaged consumer validation.
+
+- Handle nested PostgreSQL block comments when scanning parameters and splicing fragments.
+
+- Decode duplicate PostgreSQL output names using the final column's type in the pg adapter.
+
+- Build packages with the updated TypeScript toolchain and dependency type definitions.
+
 ## 4.0.0
 
 ### Major Changes
