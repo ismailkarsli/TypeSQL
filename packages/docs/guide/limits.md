@@ -25,7 +25,13 @@ When you hit a limit, [`sql.as<Row>()`](./errors#when-typesql-can-t-type-a-state
 
   `AND`/`OR` chains (the parser balances them), 20 joins, 20 CTEs and a `CASE` with 150 branches are fine.
 - Past these sizes the compiler reports its own error instead of a SQL error: TS2589 ("Type instantiation is excessively deep and possibly infinite"), TS5114 or TS5115. Split the statement, or give its row type with [`sql.as<Row>()`](./dynamic-sql#fully-dynamic-sql), which skips the analysis.
-- In `migrations()`, keep one migration per `.add()`: one text is limited to about 4000 tokens, and past that the error is a raw TS2589.
+- Split long migration DDL across several `.add()` calls: one text is limited to about 4000 tokens, and past that the error is a raw TS2589.
+
+## Migrations
+
+The migrator records a migration by its name, not its contents: editing an applied migration goes unnoticed. See [Changing an applied migration](./migrations#rewriting-an-applied-migration).
+
+With `transaction: false` (Cloudflare D1, libsql's client), there is no transaction and no lock: don't run migrations concurrently.
 
 ## SQL text
 

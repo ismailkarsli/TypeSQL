@@ -57,4 +57,22 @@ Rows are typed with `PostgresJsTypeMap`, which matches postgres.js' default pars
 
 ## Migrations
 
-`migrate(db, m)` runs a [`migrations()`](../guide/migrations) builder's statements in one transaction. See [From migrations](../guide/migrations#running-migrations).
+The [migrator](../guide/migrations#the-migrator) needs one connection for the whole call. With postgres.js, reserve one and pass `executor(reserved)` as `execute`:
+
+```ts
+import { createMigrator } from "@typesql/core/migration";
+import { executor } from "@typesql/postgres";
+
+const reserved = await db.reserve();
+try {
+	await createMigrator({
+		dialect: "postgres",
+		execute: executor(reserved),
+		migrations: [createUsers, addBio],
+	}).latest();
+} finally {
+	reserved.release();
+}
+```
+
+With `url` instead, the migrator connects with `pg`.

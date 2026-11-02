@@ -5,18 +5,25 @@ The DDL statements TypeSQL understands, how their columns are typed, the errors 
 ## Overview
 
 ```ts
-import { createSql, type SchemaOf } from "@typesql/core";
-import { migrations, postgres } from "@typesql/core/postgres";
+import { createSql } from "@typesql/core";
+import { migration, type SchemaOf } from "@typesql/core/migration";
+import { postgres } from "@typesql/core/postgres";
 
-export const m = migrations()
-	.add("CREATE TYPE mood AS ENUM ('happy', 'sad')")
-	.add(
-		"CREATE TABLE users (id serial PRIMARY KEY, email text NOT NULL UNIQUE, mood mood)",
-	)
-	.add("ALTER TABLE users ADD COLUMN display_name text")
-	.add("CREATE VIEW user_emails AS SELECT id, email FROM users");
+export const init = migration("postgres", {
+	up: async (db) => {
+		const a = await db.add("CREATE TYPE mood AS ENUM ('happy', 'sad')");
+		const b = await a.add(
+			"CREATE TABLE users (id serial PRIMARY KEY, email text NOT NULL UNIQUE, mood mood)",
+		);
+		const c = await b.add("ALTER TABLE users ADD COLUMN display_name text");
+		return c.add("CREATE VIEW user_emails AS SELECT id, email FROM users");
+	},
+	down: async (db) => {
+		await db.add("DROP VIEW user_emails; DROP TABLE users; DROP TYPE mood");
+	},
+});
 
-type DB = SchemaOf<typeof m>;
+type DB = SchemaOf<typeof init>;
 
 const sql = createSql<DB>(postgres);
 const q = sql("SELECT id, mood FROM users WHERE email = $1", "a@b.c");
@@ -25,8 +32,9 @@ const q = sql("SELECT id, mood FROM users WHERE email = $1", "a@b.c");
 | Piece | What it does |
 |---|---|
 | `ApplyDdl<DB, Q>` | type: the schema after running the DDL script `Q` (one or more `;`-separated statements) on `DB`, or `SqlError<message, tokenIndex>` |
-| `migrations()` | runtime and type: an immutable list of SQL texts whose type tracks the resulting schema; invalid DDL is a compile error on the literal |
-| `runMigrations(client, m)` | runtime: runs the list in order inside one transaction |
+| `ValidateDdl<DB, Q>` | type: `Q` when it applies to `DB`, else the `SqlError`; what `.add()` checks its argument against |
+| `db.add(ddl)` | runtime and type: in a [migration](../guide/migrations), runs `ddl` and returns a context whose schema is `ApplyDdl<DB, ddl>`; invalid DDL is a compile error on the literal |
+| `SchemaOf<typeof m>` | type: the schema after the migration `m` |
 
 ## Supported statements
 
@@ -98,50 +106,26 @@ The message is Postgres's where there is one. The position is the token index in
 | Types | `type "mood" already exists`, `type "nope" does not exist`, `enum label "happy" already exists`, `"zz" is not an existing enum label`, `cannot drop type mood because other objects depend on it` |
 | Schemas | `schema "s" does not exist`, `schema "s" already exists`, `cannot drop schema s because other objects depend on it` |
 
-## `migrations()`
+## `.add()` and `.raw()`
 
 ```ts
-const m = migrations()
-const m2 = migrations<ExistingDB>()
-  .add("ALTER TABLE users ADD COLUMN bio text")
-  .add(`CREATE TABLE a (...); CREATE INDEX ON a (x);`)
-  .raw("SELECT pg_advisory_lock(1)");
-const m3 = m2.raw<NewDB>("...");
-
-m2.statements
-m2.schema
-SchemaOf<typeof m2>
+export const addBio = migration(previous, {
+	up: async (db) => {
+		const next = await db.add("ALTER TABLE users ADD COLUMN bio text");
+		const indexed = await next.add(`CREATE TABLE a (x int); CREATE INDEX ON a (x);`);
+		return indexed.raw<NewDB>("...");
+	},
+	down: async (db) => {},
+});
 ```
 
-- `.add<const Q>(ddl: ValidateDdl<Schema, Q> & Q)` checks `Q` against the schema built so far.
+- `.add<const Q>(ddl: ValidateDdl<Schema, Q> & Q)` checks `Q` against the context's schema, runs it, and resolves to a new context with the changed schema.
 - An error lands on the literal, like with `sql()`: `Argument of type '"DROP TABLE nope"' is not assignable to parameter of type 'SqlError<"table \"nope\" does not exist", 2> & "DROP TABLE nope"'`.
 - A non-literal string is rejected. Use `.raw()` for it.
-- Builders are immutable: `.add()` returns a new builder, so a shared prefix can branch.
-- Keep one migration per `.add()`. A single text is limited to about 4000 tokens.
-
-## `runMigrations(client, m)`
-
-```ts
-interface MigrationClient { query(text: string): Promise<unknown> }
-runMigrations(client: MigrationClient, m: { readonly statements: readonly string[] }): Promise<void>
-```
-
-- Sends `BEGIN`, each entry of `m.statements`, then `COMMIT`. On the first failure it sends `ROLLBACK` and rethrows the original error.
-- Each entry is one `query()` call without parameters, so multi-statement entries need a driver that uses the simple query protocol for them (node-postgres does).
-- The client must be a single connection, because `BEGIN` and `COMMIT` have to reach the same session:
-
-```ts
-const client = await pool.connect();
-try { await runMigrations(client, m); } finally { client.release(); }
-
-const reserved = await sql.reserve();
-try { await runMigrations({ query: (text) => reserved.unsafe(text) }, m); } finally { reserved.release(); }
-```
-
-The adapters' `migrate(db, m)` does the same and handles the connection.
-
-- It doesn't record which migrations already ran. Track applied entries in your own table and pass only the pending ones: `runMigrations(client, { statements: m.statements.slice(applied) })`.
-- Statements that can't run in a transaction block (`CREATE INDEX CONCURRENTLY`, `VACUUM`) need a separate step. After `ALTER TYPE ... ADD VALUE`, the new label can't be used in the same transaction.
+- Contexts are immutable: `.add()` returns a new context, and the one it was called on keeps its schema.
+- `.raw<NewSchema = Schema>(sql)` runs `sql` unchecked and resolves to a context with the schema you state.
+- Each text is sent in one call without parameters, so `$$`-quoted function bodies work, and a `;`-separated script runs whole on node-postgres and postgres.js. A single text is limited to about 4000 tokens; split longer scripts across several `.add()` calls.
+- Each migration runs in a transaction by default. Statements that can't run in a transaction block (`CREATE INDEX CONCURRENTLY`, `VACUUM`) fail there, and after `ALTER TYPE ... ADD VALUE` the new label can't be used until a later migration. See [Transactions and locking](../guide/migrations#transactions-and-locking).
 
 ## Cost
 

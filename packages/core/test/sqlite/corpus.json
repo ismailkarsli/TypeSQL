@@ -2,7 +2,8 @@
 	"schemas": {
 		"app": "CREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT NOT NULL UNIQUE, name VARCHAR(80), score REAL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, active BOOLEAN NOT NULL DEFAULT 1); CREATE TABLE posts (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL REFERENCES users(id), title TEXT NOT NULL, body TEXT, meta JSON, data BLOB, views INT NOT NULL DEFAULT 0); CREATE TABLE tags (post_id INTEGER NOT NULL, tag TEXT NOT NULL, PRIMARY KEY (post_id, tag)) WITHOUT ROWID; CREATE VIEW active_users AS SELECT id, email, name FROM users WHERE active",
 		"types": "CREATE TABLE t (id INTEGER PRIMARY KEY, i INTEGER NOT NULL, ni INTEGER, r REAL NOT NULL, nr REAL, s TEXT NOT NULL, ns TEXT, b BLOB NOT NULL, nb BLOB, n NUMERIC NOT NULL, nn NUMERIC, d DATETIME NOT NULL, nd DATE, j JSON NOT NULL, nj JSON, u, flag BOOLEAN NOT NULL, big BIGINT NOT NULL, dec DECIMAL(10,2)); CREATE TABLE s (k INT PRIMARY KEY, v TEXT, w ANY) STRICT; CREATE TABLE \"Mixed Case\" (\"Id\" INTEGER PRIMARY KEY, \"Value\" TEXT NOT NULL, lower_col INT)",
-		"upsert": "CREATE TABLE counters (name TEXT PRIMARY KEY, n INTEGER NOT NULL DEFAULT 0, note TEXT); CREATE TABLE other (m INT, n INT); CREATE TABLE excluded (name TEXT PRIMARY KEY, n INTEGER NOT NULL DEFAULT 0)"
+		"upsert": "CREATE TABLE counters (name TEXT PRIMARY KEY, n INTEGER NOT NULL DEFAULT 0, note TEXT); CREATE TABLE other (m INT, n INT); CREATE TABLE excluded (name TEXT PRIMARY KEY, n INTEGER NOT NULL DEFAULT 0)",
+		"dropped": "CREATE TABLE d (a INT NOT NULL, b TEXT, c REAL NOT NULL, e TEXT); ALTER TABLE d DROP COLUMN b; ALTER TABLE d ADD COLUMN f INT"
 	},
 	"statements": [
 		{
@@ -6134,6 +6135,26 @@
 			"schema": "app",
 			"source": "ddl",
 			"sql": "ALTER TABLE users DROP COLUMN nope"
+		},
+		{
+			"schema": "dropped",
+			"source": "ddl",
+			"sql": "SELECT * FROM d"
+		},
+		{
+			"schema": "dropped",
+			"source": "ddl",
+			"sql": "INSERT INTO d VALUES (1, 2.5, 'x', 3) RETURNING *"
+		},
+		{
+			"schema": "dropped",
+			"source": "ddl",
+			"sql": "INSERT INTO d VALUES (1, 2.5, 'x')"
+		},
+		{
+			"schema": "dropped",
+			"source": "ddl",
+			"sql": "UPDATE d SET e = NULL RETURNING *"
 		},
 		{
 			"schema": "app",

@@ -68,16 +68,3 @@ async function transaction<T>(
 }
 
 export const driver: SqlDriver<PostgresJsQueryable> = { executor, transaction };
-
-export interface MigrationSource {
-	readonly statements: readonly string[];
-}
-
-export async function migrate<Tx extends PostgresJsQueryable>(
-	sql: PostgresJsTransactable<Tx>,
-	m: MigrationSource,
-): Promise<void> {
-	await sql.begin(async (tx) => {
-		for (const statement of m.statements) await tx.unsafe(statement);
-	});
-}

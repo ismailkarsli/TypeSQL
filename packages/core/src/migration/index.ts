@@ -1,20 +1,22 @@
 export type {
 	MigrationContext,
-	MigrationSchema,
 	PostgresMigration,
 	SqliteMigration,
 } from "./context.js";
-export { migration } from "./define.js";
 export {
-	discoverMigrations,
-	type MigrationFile,
-	type MigrationModule,
-	migrationHash,
-} from "./files.js";
+	type Migration,
+	type MigrationSteps,
+	migration,
+	type SchemaOf,
+} from "./define.js";
 export {
-	type MigrationOptions,
-	type MigrationResult,
-	migrateDown,
-	migrateLatest,
-	migrateUp,
-} from "./runtime.js";
+	createMigrator,
+	type DownResult,
+	isMigrator,
+	type LatestResult,
+	MigrationError,
+	type MigrationStatus,
+	type Migrator,
+	type MigratorConfig,
+	type UpResult,
+} from "./migrator.js";

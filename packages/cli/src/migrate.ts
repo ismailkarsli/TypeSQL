@@ -1,33 +1,17 @@
-import { mkdir, readdir, stat, writeFile } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
-import type { SQLInputValue } from "node:sqlite";
+import { stat } from "node:fs/promises";
+import { registerHooks } from "node:module";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
-import { paramNumbers, sqliteValue } from "@typesql/core/adapter";
 import {
-	type MigrationOptions,
-	migrateDown,
-	migrateLatest,
-	migrateUp,
+	createMigrator,
+	type DownResult,
+	isMigrator,
+	type MigrationError,
+	type Migrator,
+	type MigratorConfig,
+	type UpResult,
 } from "@typesql/core/migration";
-import {
-	generateSchema,
-	migrationFiles,
-	type SchemaPoint,
-} from "./generate.js";
-
-/** Default export of typesql.config.ts. Relative paths are resolved beside it. */
-export interface MigrationConfig {
-	readonly dialect: "postgres" | "sqlite";
-	readonly url?: string;
-	readonly db?: string;
-	readonly migrationsDir?: string;
-	readonly migrationTable?: string;
-	/** Where `typesql migrate generate` writes the schema (default: db.ts). */
-	readonly schemaFile?: string;
-	/** Regenerate the schema file after up, down and latest (default: true). */
-	readonly generate?: boolean;
-}
 
 interface Io {
 	readonly stdout: (text: string) => void;
@@ -36,28 +20,35 @@ interface Io {
 	readonly env?: Readonly<Record<string, string | undefined>>;
 }
 
-const USAGE = `Usage: typesql migrate <up|down|latest|make name|generate> [options]
+const COMMANDS = ["latest", "up", "down", "status", "make", "generate"];
 
-  up                  apply the next migration
-  down                revert the last applied migration
+const USAGE = `Usage: typesql migrate <latest|up|down|status|make name|generate> [options]
+
   latest              apply every pending migration
-  make <name>         create a TypeScript migration linked to its predecessor
+  up                  apply the next pending migration
+  down                revert the last applied migration
+  status              list applied and pending migrations
+  make <name>         create a migration file that starts from the last one
   generate            write the schema of the last migration to a DB file
 
 Options:
   --config <file>     config module (default: ./typesql.config.ts)
   --dialect <name>    postgres or sqlite; overrides config
-  --url <url>         PostgreSQL URL (default: config.url or $DATABASE_URL)
+  --url <url>         PostgreSQL URL; overrides config (default: $DATABASE_URL)
   --db <file>         SQLite database file; overrides config
   --dir <directory>   migrations directory; overrides config
   --out <file>        schema file to write (default: config.schemaFile or db.ts)
   --no-generate       don't write the schema file after up, down or latest
   -h, --help          show this help
 
-Config defaults to migrations/ beside the config file, or the working directory.
-up, down and latest then write the schema of the last applied migration, unless
-config.generate is false. Each migration must export up and down functions.
-Requires Node.js 26 or newer.
+The config file default-exports a migrator:
+
+  import { createMigrator } from "@typesql/core/migration";
+  export default createMigrator({ dialect: "postgres", url: process.env.DATABASE_URL, migrationsDir: "./migrations" });
+
+Without a config file, pass --dialect and --url or --db; the directory
+defaults to ./migrations. Paths in the config are relative to it, and paths
+in flags to the working directory. Requires Node.js 26 or newer.
 `;
 
 const parse = (argv: readonly string[]) =>
@@ -77,91 +68,69 @@ const parse = (argv: readonly string[]) =>
 		},
 	});
 
-async function configuration(file: string, explicit: boolean) {
+let mapped = false;
+
+/**
+ * A TypeScript project's files import each other as `./name.js`, which
+ * TypeScript resolves to `./name.ts`; Node doesn't. While the config loads,
+ * such an import from a `.ts` file outside node_modules loads the `.ts` file
+ * when there is no `.js` one, so an array config can import its migrations.
+ */
+function mapTypeScriptImports(): void {
+	if (mapped) return;
+	mapped = true;
+	registerHooks({
+		resolve(specifier, context, nextResolve) {
+			try {
+				return nextResolve(specifier, context);
+			} catch (error) {
+				const parent = context.parentURL;
+				if (
+					(error as { code?: unknown }).code !== "ERR_MODULE_NOT_FOUND" ||
+					!/^\.\.?\/.*\.[cm]?js$/.test(specifier) ||
+					parent === undefined ||
+					!/^file:.*\.[cm]?ts$/.test(parent) ||
+					parent.includes("/node_modules/")
+				)
+					throw error;
+				return nextResolve(specifier.replace(/js$/, "ts"), context);
+			}
+		},
+	});
+}
+
+/** The config file's migrator, with its relative paths resolved beside the file. */
+async function configured(
+	file: string,
+	explicit: boolean,
+): Promise<Migrator | undefined> {
 	try {
 		await stat(file);
 	} catch (error) {
-		if (!explicit && (error as NodeJS.ErrnoException).code === "ENOENT") {
-			return {};
-		}
+		if (!explicit && (error as { code?: unknown }).code === "ENOENT")
+			return undefined;
 		throw error;
 	}
+	mapTypeScriptImports();
 	const module = (await import(pathToFileURL(file).href)) as {
 		default?: unknown;
 	};
-	const config = module.default;
-	if (config === null || typeof config !== "object" || Array.isArray(config)) {
-		throw new Error(`${file} must default-export a configuration object`);
-	}
-	for (const key of [
-		"dialect",
-		"url",
-		"db",
-		"migrationsDir",
-		"migrationTable",
-		"schemaFile",
-	]) {
-		const value = (config as Record<string, unknown>)[key];
-		if (value !== undefined && (typeof value !== "string" || !value)) {
-			throw new Error(`config.${key} must be a non-empty string`);
-		}
-	}
-	const generate = (config as Record<string, unknown>).generate;
-	if (generate !== undefined && typeof generate !== "boolean") {
-		throw new Error("config.generate must be a boolean");
-	}
-	return config as Partial<MigrationConfig>;
-}
-
-async function makeMigration(
-	directory: string,
-	name: string,
-	dialect: MigrationConfig["dialect"],
-): Promise<string> {
-	if (!name.trim() || /[\\/\p{Cc}]/u.test(name)) {
+	if (!isMigrator(module.default))
 		throw new Error(
-			"migration name must not be empty or contain path separators or control characters",
+			`${file} must default-export a migrator: export default createMigrator({ … }) from @typesql/core/migration`,
 		);
+	const migrator = module.default;
+	const base = dirname(file);
+	const { config } = migrator;
+	const paths: Record<string, string> = {};
+	for (const key of ["migrationsDir", "schemaFile", "db"] as const) {
+		const value = config[key];
+		if (value !== undefined && value !== ":memory:" && !isAbsolute(value))
+			paths[key] = resolve(base, value);
 	}
-	const filename = `${Math.floor(Date.now() / 1000)}_${name.replaceAll(" ", "-")}.ts`;
-	await mkdir(directory, { recursive: true });
-	const files = (await readdir(directory, { withFileTypes: true }))
-		.filter(
-			(file) =>
-				(file.isFile() || file.isSymbolicLink()) && file.name.endsWith(".ts"),
-		)
-		.map((file) => file.name)
-		.sort();
-	if (files.includes(filename)) {
-		throw new Error(`migration already exists: ${filename}`);
-	}
-	const previous = files.at(-1);
-	if (previous !== undefined && filename < previous) {
-		throw new Error(
-			`new migration ${filename} would sort before existing migration ${previous}`,
-		);
-	}
-	// `previous` is imported as .js, which TypeScript resolves to the .ts
-	// file without allowImportingTsExtensions; the runner maps it for Node.
-	const from = previous === undefined ? JSON.stringify(dialect) : "previous";
-	const source = [
-		'import { migration } from "@typesql/core/migration";',
-		...(previous === undefined
-			? []
-			: [
-					`import { up as previous } from ${JSON.stringify(`./${previous.replace(/\.ts$/, ".js")}`)};`,
-				]),
-		"",
-		`export const up = migration(${from}, async (db) => {`,
-		"\treturn db;",
-		"});",
-		"",
-		"export const down = migration(up, async (db) => {});",
-		"",
-	].join("\n");
-	const file = resolve(directory, filename);
-	await writeFile(file, source, { flag: "wx" });
-	return file;
+	if (config.schemaFile === undefined && config.migrationsDir !== undefined)
+		paths.schemaFile = join(base, "db.ts");
+	return Object.keys(paths).length > 0 ? migrator.with(paths) : migrator;
 }
 
 /** Whether `node_modules/<name>` exists in `directory` or one of its parents. */
@@ -179,104 +148,13 @@ async function installed(directory: string, name: string): Promise<boolean> {
 // AggregateError whose own message is empty.
 const message = (err: unknown): string => {
 	if (!(err instanceof Error)) return String(err);
-	if (err.message) return err.message;
-	if (err instanceof AggregateError && err.errors.length > 0)
-		return [...new Set(err.errors.map(message))].join("; ");
-	return (err as { code?: string }).code ?? err.name;
+	const text = err.message
+		? err.message
+		: err instanceof AggregateError && err.errors.length > 0
+			? [...new Set(err.errors.map(message))].join("; ")
+			: ((err as { code?: string }).code ?? err.name);
+	return text.replace(/^typesql: /, "");
 };
-
-async function connectPostgres(url: string) {
-	if (!URL.canParse(url) && !url.startsWith("/"))
-		throw new Error(
-			`invalid connection URL ${JSON.stringify(url)} (expected postgres://user:password@host:port/database)`,
-		);
-	let Client: typeof import("pg").Client;
-	try {
-		({ Client } = (await import("pg")).default);
-	} catch {
-		throw new Error('the "pg" package is not installed: npm install pg');
-	}
-	const client = new Client({ connectionString: url });
-	await client.connect();
-	return {
-		execute: (async (sql, values) => {
-			const result = await client.query(sql, [...values]);
-			return Array.isArray(result)
-				? (result.at(-1) ?? { rows: [], rowCount: 0 })
-				: result;
-		}) satisfies MigrationOptions["execute"],
-		close: () => client.end(),
-	};
-}
-
-async function connectSqlite(file: string) {
-	const { DatabaseSync } = await import("node:sqlite");
-	const db = new DatabaseSync(file);
-	// Wait for the current migration transaction instead of failing immediately.
-	db.exec("PRAGMA busy_timeout = 30000");
-	return {
-		execute: (async (sql, values) => {
-			let rest = sql;
-			let rows: Record<string, unknown>[] = [];
-			let rowCount = 0;
-			while (rest.trim()) {
-				rest = rest.replace(
-					/^(?:\s+|;|--[^\r\n]*(?:\r?\n|$)|\/\*[\s\S]*?(?:\*\/|$))+/,
-					"",
-				);
-				if (!rest) break;
-				const statement = db.prepare(rest);
-				const consumed = statement.sourceSQL.length;
-				if (!consumed) break;
-				const numbers = paramNumbers(statement.sourceSQL);
-				const bindings: Record<string, SQLInputValue> = {};
-				for (const number of numbers) {
-					bindings[`$${number}`] = sqliteValue(
-						values[number - 1],
-					) as SQLInputValue;
-				}
-				const positional = values.map(sqliteValue) as SQLInputValue[];
-				if (statement.columns().length) {
-					rows = numbers.length
-						? statement.all(bindings)
-						: statement.all(...positional);
-					rowCount = rows.length;
-				} else {
-					const result = numbers.length
-						? statement.run(bindings)
-						: statement.run(...positional);
-					rows = [];
-					rowCount = Number(result.changes);
-				}
-				rest = rest.slice(consumed);
-			}
-			return { rows, rowCount };
-		}) satisfies MigrationOptions["execute"],
-		close: async () => db.close(),
-	};
-}
-
-/**
- * The schema the database has after a command. Applied migrations are always a
- * prefix of the sorted files, so the command's result locates the last one.
- */
-function appliedPoint(
-	files: readonly string[],
-	command: string,
-	changed: readonly string[],
-): SchemaPoint {
-	const first = files[0];
-	if (first === undefined) return { empty: true };
-	if (command === "down") {
-		const reverted = changed[0];
-		const index = reverted === undefined ? 0 : files.indexOf(reverted);
-		const previous = files[index - 1];
-		return previous === undefined ? { before: first } : { after: previous };
-	}
-	const applied =
-		command === "up" ? (changed[0] ?? files.at(-1)) : files.at(-1);
-	return { after: applied ?? first };
-}
 
 export async function main(argv: readonly string[], io: Io): Promise<number> {
 	let parsed: ReturnType<typeof parse>;
@@ -294,123 +172,118 @@ export async function main(argv: readonly string[], io: Io): Promise<number> {
 	const command = positionals[0];
 	if (
 		!command ||
-		!["up", "down", "latest", "make", "generate"].includes(command) ||
+		!COMMANDS.includes(command) ||
 		positionals.length !== (command === "make" ? 2 : 1)
 	) {
 		io.stderr(
-			`typesql migrate: expected up, down, latest, make <name>, or generate\n\n${USAGE}`,
+			`typesql migrate: expected latest, up, down, status, make <name>, or generate\n\n${USAGE}`,
 		);
 		return 2;
 	}
+	const print = (text: string) => io.stdout(`typesql migrate: ${text}\n`);
 	try {
 		const cwd = io.cwd ?? process.cwd();
-		const configFile = resolve(cwd, values.config ?? "typesql.config.ts");
-		const config = await configuration(configFile, values.config !== undefined);
-		const base = dirname(configFile);
-		const dialect = values.dialect ?? config.dialect;
-		if (dialect !== "postgres" && dialect !== "sqlite") {
+		const env = io.env ?? process.env;
+		const from = (path: string) => resolve(cwd, path);
+		let migrator = await configured(
+			from(values.config ?? "typesql.config.ts"),
+			values.config !== undefined,
+		);
+		const overrides: Record<string, unknown> = {};
+		if (values.dialect !== undefined) overrides.dialect = values.dialect;
+		if (values.url !== undefined) overrides.url = values.url;
+		if (values.db !== undefined)
+			overrides.db = values.db === ":memory:" ? values.db : from(values.db);
+		if (values.dir !== undefined) overrides.migrationsDir = from(values.dir);
+		if (values.out !== undefined) overrides.schemaFile = from(values.out);
+		if (values.generate !== undefined) overrides.generate = values.generate;
+		const dialect = overrides.dialect ?? migrator?.config.dialect;
+		if (dialect !== "postgres" && dialect !== "sqlite")
 			throw new Error(
-				"set dialect to postgres or sqlite in config or pass --dialect",
+				migrator === undefined
+					? "no typesql.config.ts: pass --dialect postgres or sqlite, or pass --config"
+					: `unsupported dialect: ${String(dialect)} (expected postgres or sqlite)`,
 			);
-		}
-		const migrationsDir =
-			values.dir === undefined
-				? resolve(base, config.migrationsDir ?? "migrations")
-				: resolve(cwd, values.dir);
-		if (command === "make") {
-			io.stdout(
-				`typesql migrate: created ${await makeMigration(migrationsDir, positionals[1] ?? "", dialect)}\n`,
-			);
-			// The new file imports migration() from @typesql/core/migration. A
-			// package manager with strict layouts (pnpm) doesn't expose the
-			// CLI's own @typesql/core to the project. Look for it the way
-			// TypeScript does: require.resolve also honors the NODE_PATH that
-			// `pnpm exec` points at its hidden hoisted packages.
-			if (!(await installed(migrationsDir, "@typesql/core"))) {
-				io.stderr(
-					`typesql migrate: warning: @typesql/core/migration cannot be found from ${migrationsDir}, so the migration can't run and its types are unchecked; add @typesql/core to the project's dependencies (npm install @typesql/core, or pnpm add @typesql/core)\n`,
-				);
-			}
-			return 0;
-		}
-		const generate = async (point: SchemaPoint) => {
-			const out =
-				values.out === undefined
-					? resolve(base, config.schemaFile ?? "db.ts")
-					: resolve(cwd, values.out);
-			const source = generateSchema({ migrationsDir, point, dialect });
-			await mkdir(dirname(out), { recursive: true });
-			await writeFile(out, source);
-			io.stdout(`typesql migrate: generated ${out}\n`);
-		};
-		if (command === "generate") {
-			const last = (await migrationFiles(migrationsDir)).at(-1);
-			await generate(last === undefined ? { empty: true } : { after: last });
-			return 0;
-		}
-		const url =
-			values.url ?? config.url ?? (io.env ?? process.env).DATABASE_URL;
-		const db = values.db ?? config.db;
-		let connection: Awaited<
-			ReturnType<typeof connectPostgres | typeof connectSqlite>
-		>;
-		if (dialect === "postgres") {
-			if (!url)
-				throw new Error("pass --url, set config.url, or set DATABASE_URL");
-			connection = await connectPostgres(url);
-		} else {
-			if (!db) throw new Error("pass --db or set config.db");
-			connection = await connectSqlite(
-				db === ":memory:"
-					? db
-					: resolve(values.db === undefined ? base : cwd, db),
-			);
-		}
-		let changed: readonly string[];
-		try {
-			const run =
-				command === "up"
-					? migrateUp
-					: command === "down"
-						? migrateDown
-						: migrateLatest;
-			const result = await run({
-				dialect,
-				migrationsDir,
-				execute: connection.execute,
-				...(config.migrationTable === undefined
-					? {}
-					: { migrationTable: config.migrationTable }),
-			});
-			if (result.migrations.length === 0) {
-				io.stdout(
-					`typesql migrate: no ${command === "down" ? "applied" : "pending"} migrations\n`,
-				);
-			} else {
-				for (const name of result.migrations) {
-					io.stdout(
-						`typesql migrate: ${result.direction === "down" ? "reverted" : "applied"} ${name}\n`,
+		const connected = (config: Partial<MigratorConfig> | undefined) =>
+			config?.url !== undefined ||
+			config?.db !== undefined ||
+			config?.execute !== undefined;
+		if (
+			dialect === "postgres" &&
+			!connected(overrides) &&
+			!(migrator !== undefined && connected(migrator.config)) &&
+			env.DATABASE_URL
+		)
+			overrides.url = env.DATABASE_URL;
+		migrator =
+			migrator === undefined
+				? createMigrator<unknown>({
+						migrationsDir: from("migrations"),
+						schemaFile: from("db.ts"),
+						...overrides,
+					} as MigratorConfig)
+				: migrator.with<unknown>(overrides as Partial<MigratorConfig>);
+
+		switch (command) {
+			case "make": {
+				const created = await migrator.make(positionals[1] ?? "");
+				print(`created ${created}`);
+				// The new file imports migration() from @typesql/core/migration.
+				// A package manager with strict layouts (pnpm) doesn't expose the
+				// CLI's own @typesql/core to the project.
+				if (!(await installed(dirname(created), "@typesql/core")))
+					io.stderr(
+						`typesql migrate: warning: @typesql/core/migration cannot be found from ${dirname(created)}, so the migration can't run and its types are unchecked; add @typesql/core to the project's dependencies (npm install @typesql/core, or pnpm add @typesql/core)\n`,
 					);
-				}
+				return 0;
 			}
-			changed = result.migrations;
-		} finally {
-			await connection.close();
+			case "generate":
+				print(`generated ${await migrator.generate()}`);
+				return 0;
+			case "status": {
+				const status = await migrator.status();
+				if (status.length === 0) print("no migrations");
+				for (const entry of status)
+					io.stdout(
+						`${entry.applied ? "applied" : "pending"}  ${entry.appliedAt?.toISOString() ?? "                        "}  ${entry.name}\n`,
+					);
+				return 0;
+			}
 		}
-		if (values.generate ?? config.generate ?? true) {
+		const report = (
+			names: readonly string[],
+			write: { schemaFile?: string; schemaError?: Error },
+		) => {
+			for (const name of names)
+				print(`${command === "down" ? "reverted" : "applied"} ${name}`);
+			if (write.schemaFile !== undefined)
+				print(`generated ${write.schemaFile}`);
 			// The database is migrated by now: a schema file that can't be
 			// written is a warning, and the exit code reports the migration.
-			try {
-				await generate(
-					appliedPoint(await migrationFiles(migrationsDir), command, changed),
-				);
-			} catch (error) {
+			if (write.schemaError !== undefined)
 				io.stderr(
-					`typesql migrate: warning: the schema file was not updated: ${message(error)}\n` +
+					`typesql migrate: warning: the schema file was not updated: ${message(write.schemaError)}\n` +
 						"typesql migrate: fix the cause, then run `typesql migrate generate`\n",
 				);
-			}
+		};
+		let result: UpResult | DownResult;
+		try {
+			result =
+				command === "down"
+					? await migrator.down()
+					: command === "up"
+						? await migrator.up()
+						: await migrator.latest();
+		} catch (error) {
+			// The migrations before the one that failed stay applied.
+			if (error instanceof Error && error.name === "MigrationError")
+				report((error as MigrationError).applied, error as MigrationError);
+			throw error;
 		}
+		const names = "reverted" in result ? result.reverted : result.applied;
+		if (names.length === 0)
+			print(`no ${command === "down" ? "applied" : "pending"} migrations`);
+		report(names, result);
 		return 0;
 	} catch (error) {
 		io.stderr(`typesql migrate: ${message(error)}\n`);

@@ -65,7 +65,7 @@ type TableOrder<Tbl> =
 		? [V] extends [never]
 			? []
 			: Tbl[V & keyof Tbl] extends { readonly i: number }
-				? ByIndex<Tbl, 0, []>
+				? ByIndex<PositionMap<Tbl>, 0, []>
 				: LowerAll<UnionList<V>>
 		: never;
 type VisibleKeys<Tbl> = {
@@ -91,13 +91,26 @@ type WithoutGenerated<O, G> = O extends readonly [
 		? WithoutGenerated<R, G>
 		: [H, ...WithoutGenerated<R, G>]
 	: [];
-type ByIndex<Tbl, N extends number, Acc extends readonly string[]> = {
-	[K in keyof Tbl & string]: Tbl[K] extends { readonly i: N } ? K : never;
-}[keyof Tbl & string] extends infer K extends string
-	? [K] extends [never]
+// Each column's name by its position, built once: walking it is one lookup
+// per column, where scanning every column for each position is quadratic.
+// A dropped column leaves a gap; the walk goes on while a position is left.
+type PositionMap<Tbl> = {
+	[K in keyof Tbl & string as Tbl[K] extends {
+		readonly i: infer I extends number;
+	}
+		? I
+		: never]: Lowercase<K>;
+};
+type ByIndex<
+	M,
+	N extends number,
+	Acc extends readonly string[],
+	Seen extends number = never,
+> = N extends keyof M
+	? ByIndex<M, Nx<N>, [...Acc, M[N] & string], Seen | N>
+	: [Exclude<keyof M, Seen>] extends [never]
 		? Acc
-		: ByIndex<Tbl, Nx<N>, [...Acc, Lowercase<K>]>
-	: Acc;
+		: ByIndex<M, Nx<N>, Acc, Seen>;
 type LowerAll<L extends readonly unknown[]> = {
 	[I in keyof L]: Lowercase<L[I] & string>;
 };

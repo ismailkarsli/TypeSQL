@@ -56,7 +56,13 @@
 		"typecheck": "tsrs -p tsconfig.json --noEmit"
 	},
 	"peerDependencies": {
+		"pg": ">=8",
 		"typescript": ">=7.1.0-0"
+	},
+	"peerDependenciesMeta": {
+		"pg": {
+			"optional": true
+		}
 	},
 	"devDependencies": {
 		"@types/pg": "^8.23.1",

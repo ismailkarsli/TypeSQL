@@ -4,7 +4,7 @@ import {
 	runTransaction,
 	type SqlDriver,
 } from "@typesql/core/adapter";
-import { CompiledQuery, type QueryResult } from "kysely";
+import { CompiledQuery, type QueryResult, SqliteAdapter } from "kysely";
 
 export interface KyselyExecutor {
 	withoutPlugins(): {
@@ -44,11 +44,32 @@ function rowCount(result: QueryResult<unknown>): number {
 		: Number(result.numAffectedRows);
 }
 
+/**
+ * Whether `db` runs on SQLite: its dialect's adapter is Kysely's SQLite one,
+ * from this copy of Kysely or by name from another.
+ */
+function isSqlite(db: KyselyExecutor): boolean {
+	const { getExecutor } = db as { getExecutor?: () => { adapter?: unknown } };
+	if (typeof getExecutor !== "function") return false;
+	const { adapter } = getExecutor.call(db);
+	return (
+		adapter instanceof SqliteAdapter ||
+		(adapter as { constructor?: { name?: unknown } } | undefined)?.constructor
+			?.name === "SqliteAdapter"
+	);
+}
+
+/**
+ * An executor on `db`. SQLite's placeholders are used when `dialect` is
+ * `"sqlite"`, or, without `dialect`, when `db` runs on SQLite.
+ */
 export function executor(
 	db: KyselyExecutor,
 	options: { readonly dialect?: "postgres" | "sqlite" } = {},
 ): Executor {
-	const compile = options.dialect === "sqlite" ? positional : numbered;
+	const sqlite =
+		options.dialect === undefined ? isSqlite(db) : options.dialect === "sqlite";
+	const compile = sqlite ? positional : numbered;
 	return async (text, values) => {
 		const result = await run<unknown>(db, text, values, compile);
 		return { rows: result.rows, rowCount: rowCount(result) };

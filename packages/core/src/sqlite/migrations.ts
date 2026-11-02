@@ -1,6 +1,4 @@
 import type { AnyErr, SqlError } from "../errors.js";
-import { Migrations } from "../migrations.js";
-import type { Sqlite } from "./dialect.js";
 import type { ApplyDdl } from "./engine/infer.js";
 
 export type ValidateDdl<DB, Q extends string> = string extends Q
@@ -13,9 +11,3 @@ export type ValidateDdl<DB, Q extends string> = string extends Q
 			? R
 			: Q
 		: never;
-
-export type SqliteMigrations<DB = {}> = Migrations<Sqlite, DB>;
-
-export function migrations<Base = {}>(): SqliteMigrations<Base> {
-	return new Migrations<Sqlite, Base>();
-}

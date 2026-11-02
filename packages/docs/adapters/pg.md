@@ -14,7 +14,7 @@ Pass your pool or client to `createSql`. Every query you build with it runs on t
 
 ```ts
 import { Pool } from "pg";
-import { createSql, migrate } from "@typesql/pg";
+import { createSql } from "@typesql/pg";
 
 const pool = new Pool();
 const sql = createSql<DB>(pool);
@@ -69,6 +69,22 @@ Rows are typed with `PgTypeMap`, which matches what `pg` returns by default. `in
 
 ## Migrations
 
-`migrate(pool, m)` runs a [`migrations()`](../guide/migrations) builder's statements in one transaction, on one client from the pool. See [From migrations](../guide/migrations#running-migrations).
+The [migrator](../guide/migrations#the-migrator) connects by itself from a `url`, with `pg`. To run it on a connection you manage, pass `executor(client)` as `execute`, with one `Client` or `PoolClient` for the whole call, not the pool:
+
+```ts
+import { createMigrator } from "@typesql/core/migration";
+import { executor } from "@typesql/pg";
+
+const client = await pool.connect();
+try {
+	await createMigrator({
+		dialect: "postgres",
+		execute: executor(client),
+		migrations: [createUsers, addBio],
+	}).latest();
+} finally {
+	client.release();
+}
+```
 
 The `typesql introspect` command of `@typesql/cli` reads a database through this package; see [From a live database](../guide/introspect).

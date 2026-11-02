@@ -1,8 +1,8 @@
 # API
 
-Everything `@typesql/core` exports, plus `@typesql/core/postgres`, `@typesql/core/adapter` and the extra exports of the adapter and ORM packages. Each entry links to the guide page that explains it.
+Everything `@typesql/core` exports, plus `@typesql/core/postgres`, `@typesql/core/adapter`, `@typesql/core/migration` and the extra exports of the adapter and ORM packages. Each entry links to the guide page that explains it.
 
-`@typesql/core` holds what every SQL dialect shares: `createSql`, queries, fragments, executors, plugins, transactions, migrations, the schema markers and the [dialect contract](#dialects). Everything PostgreSQL-specific is in `@typesql/core/postgres`: the `postgres` dialect, the type engine, `Json` and `PgCatalog`, the type maps and the function catalog.
+`@typesql/core` holds what every SQL dialect shares: `createSql`, queries, fragments, executors, plugins, transactions, the schema markers and the [dialect contract](#dialects). Migrations are in `@typesql/core/migration`. Everything PostgreSQL-specific is in `@typesql/core/postgres`: the `postgres` dialect, the type engine, `Json` and `PgCatalog`, the type maps and the function catalog.
 
 ## `createSql`
 
@@ -156,7 +156,7 @@ type Executor = (text: string, values: unknown[]) => PromiseLike<readonly unknow
 type ExecutorResult = { rows: readonly unknown[]; rowCount: number | null };
 ```
 
-- Each adapter exports `executor(client)`.
+- Each adapter exports `executor(client)`. On a SQLite client (Kysely's SQLite dialects, Prisma with the `sqlite` provider, a Drizzle SQLite database), it uses SQLite's `?` placeholders without being told; `executor(client, { dialect })` states the dialect for Kysely and Prisma.
 - `rowCount: null` means no count, read as 0.
 - An executor that returns only rows works for everything but `executeCount`, unless it has a `count(text, values)` method.
 - An optional `prepare(text): Executor` creates an executor for server preparation. It must defer database work until execution. `sql.prepare` calls it once with the final SQL text and binds all resulting queries to that executor, including its `count` method.
@@ -217,6 +217,7 @@ These come from the dialect module, `@typesql/core/postgres` or `@typesql/core/s
 | `ParamsOf<DB, TM, Q>` | the positional parameter tuple |
 | `Validate<DB, Q>` | `Q` when valid, else `SqlError<message, tokenIndex>` |
 | `ApplyDdl<DB, Q>` | the schema after a DDL statement or a `;`-separated script |
+| `ValidateDdl<DB, Q>` | `Q` when it is valid DDL for `DB`, else `SqlError<message, tokenIndex>` |
 | `SqlError<Message, At>` | the compile-time error carrier; `At` is the index of the offending token |
 
 ### `@typesql/core/postgres/engine`
@@ -292,15 +293,29 @@ An entry is one `Sig<Params, Return, Flags>` or a tuple of overloads.
 
 ## Migrations
 
+`@typesql/core/migration` defines and runs migrations. See [From migrations](../guide/migrations).
+
 | Export | Meaning |
 |---|---|
-| `migrations<DB = {}>()` | a builder of DDL statements whose type tracks the schema (`@typesql/core/postgres`); a `PgMigrations<DB>` |
-| `Migrations<T, DB>` | the builder class for dialect `T` (`@typesql/core`) |
-| `SchemaOf<M>` | the schema of a builder |
-| `runMigrations(client, m)` | runs `m.statements` in one transaction (`@typesql/core`) |
-| `migrate(db, m)` | the same, from `@typesql/pg`, `@typesql/postgres` and `@typesql/sqlite` |
+| `migration(from, { name, up, down })` | a `Migration`; `from` is `"postgres"`, `"sqlite"` or the previous migration. `name` is its name in the history: needed in an array, left out in a migration file, whose name is its file name |
+| `Migration<Before, After>` | `{ name?: string; up(db: Before): Promise<After>; down(db: After): Promise<unknown> }` |
+| `MigrationSteps<Before, After>` | the `{ up, down }` argument of `migration()` |
+| `SchemaOf<M>` | the schema after the migration `M`; also takes a migrator, the result of its `latest()`, a 3.x `up` function or a migration context. Also exported from `@typesql/core` |
+| `PostgresMigration<DB = {}>`, `SqliteMigration<DB = {}>` | the `db` of a migration: a checked query function with `add(ddl)`, `raw<NewSchema>(sql)` and the type-only `schema` |
+| `MigrationContext<E, T, DB>` | the type behind both, for engine `E` and dialect `T` |
+| `createMigrator(config)` | a `Migrator`; never connects by itself. With a `migrations` array its schema is inferred (from an array written in the call or declared `as const`); `createMigrator<DB>(config)` states it |
+| `Migrator<Schema>` | `latest()`, `up()`, `down()`, `status()`, `make(name)`, `generate()`, `with(overrides)` and `config` |
+| `MigratorConfig` | `dialect`; `url`, `db` or `execute`; `migrationsDir` or `migrations`; `migrationTable`, `schemaFile`, `generate`, `transaction` |
+| `LatestResult<Schema>` | what `latest()` resolves to: `{ applied, schemaFile?, schemaError? }`, and the type-only schema after the last migration |
+| `UpResult` | what `up()` resolves to: `{ applied, schemaFile?, schemaError? }` |
+| `DownResult` | what `down()` resolves to: `{ reverted, schemaFile?, schemaError? }` |
+| `MigrationError` | what `latest()`, `up()` and `down()` reject with when a migration fails: `{ migration, applied, rolledBack, schemaFile?, schemaError?, cause }` |
+| `MigrationStatus` | an entry of `status()`: `{ name, applied, appliedAt: Date \| null }` |
+| `isMigrator(value)` | whether `value` is a migrator, from any copy of `@typesql/core` |
 
-See [DDL support](./ddl#migrations) and [From migrations](../guide/migrations).
+The config options and the method results are described in [The migrator](../guide/migrations#the-migrator). `ApplyDdl` and `ValidateDdl` come from the dialect modules ([Statement analysis](#statement-analysis)); see [DDL support](./ddl).
+
+`typesql migrate <latest|up|down|status|make <name>|generate>`, the other command of `@typesql/cli`, runs the migrator that `typesql.config.ts` default-exports. See [The `typesql migrate` command](../guide/migrations#the-typesql-migrate-command).
 
 ## Dialects
 
@@ -317,7 +332,7 @@ A dialect pairs the runtime that builds its `sql` function with that function's 
 
 `SqlOf<Postgres, DB, TM>` is `Sql<DB, TM>`, and `TransactionalSqlOf<Postgres, DB, TM>` is `TransactionalSql<DB, TM>`; the same holds for `Sqlite` and the `Sql` and `TransactionalSql` of `@typesql/core/sqlite`.
 
-`@typesql/core/sqlite` exports the same kinds of names as `@typesql/core/postgres`: `sqlite`, `Sql`, `TransactionalSql`, `RowOf`, `ParamsOf`, `Validate`, `ApplyDdl`, `migrations()` and `SqliteMigrations`, the write-helper types, the schema markers (`Col`, `View`), and the type maps `DefaultTypeMap`, `BigIntTypeMap` and `DefaultParamTypeMap`. It also exports `ColFlags` (the [column flags](../guide/sqlite#column-flags)), `Json<T, Flags>` and `Typed<Type, T>` ([typed values](../guide/sqlite#typed-values)), and `Sig`, `SigFlags`, `FunctionRegistry` and the augmentable `FunctionCatalog` ([functions](../guide/sqlite#functions)). Its engine types are under `@typesql/core/sqlite/engine`. See [SQLite](../guide/sqlite).
+`@typesql/core/sqlite` exports the same kinds of names as `@typesql/core/postgres`: `sqlite`, `Sql`, `TransactionalSql`, `RowOf`, `ParamsOf`, `Validate`, `ApplyDdl` and `ValidateDdl`, the write-helper types, the schema markers (`Col`, `View`), and the type maps `DefaultTypeMap`, `BigIntTypeMap` and `DefaultParamTypeMap`. It also exports `ColFlags` (the [column flags](../guide/sqlite#column-flags)), `Json<T, Flags>` and `Typed<Type, T>` ([typed values](../guide/sqlite#typed-values)), and `Sig`, `SigFlags`, `FunctionRegistry` and the augmentable `FunctionCatalog` ([functions](../guide/sqlite#functions)). Its engine types are under `@typesql/core/sqlite/engine`. See [SQLite](../guide/sqlite).
 
 ## ORM packages
 

@@ -133,16 +133,3 @@ function transaction<T>(
 }
 
 export const driver: SqlDriver<PgQueryable> = { executor, transaction };
-
-export interface MigrationSource {
-	readonly statements: readonly string[];
-}
-
-export async function migrate<C extends PgTransactionClient>(
-	pool: PgPoolLike<C>,
-	m: MigrationSource,
-): Promise<void> {
-	await inPoolTransaction(pool, async (client) => {
-		for (const statement of m.statements) await client.query(statement);
-	});
-}

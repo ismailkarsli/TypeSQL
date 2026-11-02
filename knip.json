@@ -9,7 +9,7 @@
 		".": {
 			"entry": ["scripts/*.ts"],
 			"project": ["*.ts", "scripts/**/*.ts"],
-			"ignoreDependencies": ["pg", "vitest"]
+			"ignoreDependencies": ["kysely", "pg", "vitest"]
 		},
 		"packages/core": {
 			"entry": [

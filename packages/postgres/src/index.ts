@@ -10,8 +10,6 @@ import type { PostgresJsBigIntTypeMap, PostgresJsTypeMap } from "./type-map.js";
 
 export {
 	executor,
-	type MigrationSource,
-	migrate,
 	type PostgresJsQueryable,
 	type PostgresJsRows,
 	type PostgresJsTransactable,
