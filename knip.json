@@ -1,15 +1,17 @@
 {
 	"$schema": "https://unpkg.com/knip@6/schema.json",
 	"ignoreBinaries": ["change", "vsce", "ovsx"],
+	"ignoreWorkspaces": ["tests/scenarios/*"],
 	"ignoreIssues": {
+		"pnpm-workspace.yaml": ["catalog"],
 		"packages/cli/package.json": ["optionalPeerDependencies"],
 		"packages/drizzle/src/pg-type.ts": ["duplicates"]
 	},
 	"workspaces": {
 		".": {
 			"entry": ["scripts/*.ts"],
-			"project": ["*.ts", "scripts/**/*.ts"],
-			"ignoreDependencies": ["kysely", "pg"]
+			"project": ["scripts/**/*.ts"],
+			"ignoreDependencies": ["pg"]
 		},
 		"packages/core": {
 			"entry": [
@@ -76,17 +78,12 @@
 				"cloudflare.config.ts",
 				"wrangler.config.ts"
 			],
-			"project": ["*.ts", "playground/**/*.ts", ".vitepress/**/*.{ts,mts}"],
-			"ignoreDependencies": ["@typesql/drizzle"]
+			"project": ["*.ts", "playground/**/*.ts", ".vitepress/**/*.{ts,mts,vue}"],
+			"ignoreDependencies": ["@typesql/drizzle", "vue"]
 		},
 		"tests": {
-			"entry": [
-				"consumer.test.ts",
-				"vitest.config.ts",
-				"support/setup.ts",
-				"run.ts"
-			],
-			"project": ["*.ts", "support/**/*.{ts,mjs}"]
+			"entry": ["consumer.test.ts", "support/observe.ts", "support/runtime.ts"],
+			"project": ["*.ts", "support/**/*.ts"]
 		}
 	}
 }

@@ -20,15 +20,15 @@
 		"@typesql/sqlite": "workspace:*"
 	},
 	"devDependencies": {
-		"@types/node": "^26.6.5",
+		"@types/node": "^26.6.6",
 		"@types/pg": "^8.23.1",
-		"cf": "1.0.0-beta.12",
+		"cf": "1.0.0-beta.26",
 		"pg": "^8.23.1",
-		"postgres": "^3.4.9",
-		"tsrs": "0.18.0-ts7.1.0-dev.20260929",
+		"postgres": "^4.0.0",
+		"tsrs": "0.20.1-ts7.1.0-beta",
 		"typescript": "7.1.0-beta",
 		"vitepress": "1.6.4",
 		"vue": "^3.5.44",
-		"wrangler": "^4.151.3"
+		"wrangler": "^4.156.0"
 	}
 }

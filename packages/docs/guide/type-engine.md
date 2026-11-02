@@ -86,14 +86,14 @@ RowOf / ParamsOf / Validate                 public projections of Analysis
 
 ## Adding grammar
 
-- New expression syntax: add an AST node in `ast.ts`, parse it in `parser/expr.ts` (prefix or infix), type it in `typer/typeof.ts`, name it in `project/naming.ts`, and handle params in `typer/params.ts`. Add a standalone consumer under `tests/scenarios/`, deriving intended behavior from PostgreSQL and the documented contract.
+- New expression syntax: add an AST node in `ast.ts`, parse it in `parser/expr.ts` (prefix or infix), type it in `typer/typeof.ts`, name it in `project/naming.ts`, and handle params in `typer/params.ts`. Add a workspace scenario under `tests/scenarios/`, deriving intended behavior from PostgreSQL and the documented contract.
 - New function: add a `Sig` to `FunctionCatalog` in `typer/catalog.ts`, then regenerate `typer/pg-functions.ts` (the uncurated pg_catalog rest) with `TYPESQL_PG_URL=… node scripts/gen-pg-functions.ts`.
 - New statement: add to `ast.ts`, parse in `parser/<kind>.ts`, dispatch in `parser/stmt.ts`, project in `project/stmt.ts`.
 
 ## Checking behavior
 
-Run `pnpm test:consumer` (also `pnpm test`). Docker builds and packs the checkout, installs standalone consumer applications outside the repository, compiles them with the pinned compiler, and executes them against fresh PostgreSQL databases or SQLite files. Vitest checks inferred public types, exact compiler diagnostics, application output/errors, and generated artifacts against reviewed snapshots.
+Start PostgreSQL as described in the [consumer test guide](https://github.com/ismailkarsli/TypeSQL/blob/main/tests/README.md), then run `pnpm test`. The runner builds the workspace packages and runs temporary copies of the scenarios with their installed workspace dependencies against fresh PostgreSQL databases or SQLite files. Vitest checks inferred public types, exact compiler diagnostics, application output/errors, and generated artifacts against reviewed snapshots.
 
 For a bug fix, first add a consumer and its intended contract and observe it fail against the unfixed library. Fix the library and rerun the same scenario, then run the complete suite. Include both nullable and non-nullable inputs when changing nullability rules. Applications contain no test assertions or type-equality helpers.
 
-See the [consumer test guide](https://github.com/ismailkarsli/TypeSQL/blob/main/tests/README.md) for filtering, explicit snapshot updates, retained failing projects, and the workflow inventory. The old parser/AST/oracle/fuzz/smoke runners and corpora have been retired. The consumer suite establishes confidence in its workflows and reproductions, rather than exhaustive SQL coverage. `vendor/postgres` remains untouched.
+See the [consumer test guide](https://github.com/ismailkarsli/TypeSQL/blob/main/tests/README.md) for filtering, explicit snapshot updates, and retained failing projects. The suite checks documented workflows and permanent bug reproductions.

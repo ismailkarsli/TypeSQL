@@ -17,14 +17,14 @@ exports[`pg-ended-transaction > consumer 1`] = `
   },
   "start": {
     "status": 1,
-    "stderr": "file://<consumer>/node_modules/.pnpm/@typesql+core@file+.consumer+packages+typesql-core-4.0.0.tgz_pg@8.23.1_typescript@7.1.0-beta/node_modules/@typesql/core/dist/transaction.js:9
+    "stderr": "file://<workspace>/packages/core/dist/transaction.js:9
             throw new Error("typesql: this transaction has ended; run later queries on the sql that started it");
                   ^
 
 Error: typesql: this transaction has ended; run later queries on the sql that started it
-    at check (file://<consumer>/node_modules/.pnpm/@typesql+core@file+.consumer+packages+typesql-core-4.0.0.tgz_pg@8.23.1_typescript@7.1.0-beta/node_modules/@typesql/core/dist/transaction.js:9:19)
-    at run (file://<consumer>/node_modules/.pnpm/@typesql+core@file+.consumer+packages+typesql-core-4.0.0.tgz_pg@8.23.1_typescript@7.1.0-beta/node_modules/@typesql/core/dist/transaction.js:12:9)
-    at Object.execute (file://<consumer>/node_modules/.pnpm/@typesql+core@file+.consumer+packages+typesql-core-4.0.0.tgz_pg@8.23.1_typescript@7.1.0-beta/node_modules/@typesql/core/dist/query.js:26:41)
+    at check (file://<workspace>/packages/core/dist/transaction.js:9:19)
+    at run (file://<workspace>/packages/core/dist/transaction.js:12:9)
+    at Object.execute (file://<workspace>/packages/core/dist/query.js:26:41)
     at file://<consumer>/dist/app.js:7:34
     at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
 

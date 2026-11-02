@@ -38,10 +38,6 @@ TypeSQL is written in TypeScript's type system. When you call `sql("…")` with 
 
 The core is dialect-neutral: each SQL dialect brings its own parser, type rules and type names. PostgreSQL and [SQLite](./sqlite) are supported. MySQL is planned.
 
-## Tested against the database itself
-
-The PostgreSQL parser is checked against PostgreSQL 18's own regression tests, about 50,000 statements. It accepts what Postgres accepts and rejects what Postgres rejects, on every statement that can be checked without running it. See [Postgres compatibility](./postgres-compatibility).
-
 ## Next
 
 - [Installation](./installation): requirements and the packages for your driver.

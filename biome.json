@@ -1,5 +1,5 @@
 {
-	"$schema": "https://biomejs.dev/schemas/2.6.2/schema.json",
+	"$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
 	"vcs": {
 		"enabled": true,
 		"clientKind": "git",
@@ -9,7 +9,6 @@
 		"ignoreUnknown": false,
 		"includes": [
 			"**",
-			"!!vendor",
 			"!!.changeset",
 			"!packages/core/src/postgres/engine/lexer/next.ts",
 			"!packages/core/src/postgres/engine/typer/pg-functions.ts",
@@ -17,9 +16,8 @@
 			"!packages/bench/src",
 			"!pnpm-lock.yaml",
 			"!**/CHANGELOG.md",
-			"!tests/pnpm-lock.yaml",
-			"!tests/.artifacts/**",
-			"!tests/.vitest/**"
+			"!tests/.artifacts",
+			"!tests/.vitest"
 		]
 	},
 	"formatter": {

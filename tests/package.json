@@ -2,10 +2,10 @@
 	"name": "typesql-consumers",
 	"private": true,
 	"type": "module",
-	"packageManager": "pnpm@12.11.2",
+	"packageManager": "pnpm@12.16.1",
 	"scripts": {
 		"test": "vitest run",
-		"typecheck": "tsc --noEmit -p tsconfig.harness.json"
+		"typecheck": "tsc -p tsconfig.json"
 	},
 	"devDependencies": {
 		"vitest": "catalog:",
@@ -13,7 +13,6 @@
 		"@types/node": "catalog:",
 		"pg": "catalog:",
 		"@types/pg": "catalog:",
-		"yaml": "catalog:",
 		"vite": "catalog:"
 	}
 }

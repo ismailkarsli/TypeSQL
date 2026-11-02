@@ -49,6 +49,13 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 26.8.1
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.3
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --dir tests typecheck
+      - name: Start PostgreSQL
+        run: docker compose -f tests/compose.yaml up --detach --wait
       - run: pnpm test
       - name: Retain failing consumer applications and logs
         if: failure()
@@ -58,3 +65,6 @@ jobs:
           path: tests/.artifacts/
           include-hidden-files: true
           retention-days: 7
+      - name: Stop PostgreSQL
+        if: always()
+        run: docker compose -f tests/compose.yaml down --volumes --remove-orphans

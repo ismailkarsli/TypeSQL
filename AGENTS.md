@@ -20,21 +20,19 @@ pnpm check:intents
 
 ## Consumer tests and definition of done
 
-`pnpm test` and `pnpm test:consumer` run the complete Vitest consumer suite in the pinned Docker environment. Use `pnpm test:consumer <scenario>` for a filtered iteration and run the complete suite before finishing a library or CLI change. CI runs every scenario without snapshot updates. See [tests/README.md](tests/README.md) and the [workflow inventory](tests/inventory.md).
+`pnpm test` runs the complete Vitest consumer suite locally against a PostgreSQL instance. Use `pnpm test <scenario>` for a filtered iteration and run the complete suite before finishing a library or CLI change. CI runs every scenario without snapshot updates. See [tests/README.md](tests/README.md).
 
 For a bug fix:
 
-1. Add a minimal standalone project under `tests/scenarios/` using the affected public workflow.
+1. Add a minimal workspace project under `tests/scenarios/` using the affected public workflow.
 2. Define and review intended public types, diagnostics, database output/errors or generated files from documented behavior and the real database.
 3. Observe the relevant failure against the unfixed checkout.
 4. Fix the library and rerun the same consumer without weakening expectations.
 5. Run the complete suite and retain the reproduction permanently.
 
-A normal scenario contains `package.json`, `app.ts` and `expected.snap`. Use ordinary package scripts for setup, generation, compilation and execution. Add ordinary application files when needed. Applications contain no test assertions, suppressed expected compiler errors or type-equality helpers. External versions belong in the exact test workspace catalogs and its single committed lockfile; consumers run against installed checkout tarballs, never repository source imports, workspace aliases or registry TypeSQL packages.
+A normal scenario contains `package.json`, `app.ts` and `expected.snap`. Use ordinary package scripts for setup, generation, compilation and execution. Add ordinary application files when needed. Applications contain no test assertions, suppressed expected compiler errors or type-equality helpers. External versions belong in the exact catalog in `pnpm-workspace.yaml` and the root `pnpm-lock.yaml`. Scenarios depend on TypeSQL packages through `workspace:*` and their public exports after building; never use repository source imports, TypeScript path aliases or registry TypeSQL packages. Temporary execution directories reuse installed workspace dependencies.
 
-Snapshot changes require an explicit `--update` and review. Never accept current output merely because it is current. Include nullable and non-nullable cases when changing nullability rules. Do not add another runner, generated SQL corpus, baseline, unit suite or coverage gate. Failures retain their isolated consumer and logs under `tests/.artifacts/`; report the scenario, stage, command and expected-versus-observed difference. Infrastructure failures are separate from application rejections.
-
-`vendor/postgres` is an unchanged PostgreSQL submodule. Never modify, reformat, add or delete its files to make tests pass. The former parser, AST, oracle, fuzz and smoke runners and their corpora are retired.
+Snapshot changes require an explicit `--update` and review. Never accept current output merely because it is current. Include nullable and non-nullable cases when changing nullability rules. Do not add another runner, generated SQL corpus, baseline, unit suite or coverage gate. Failures retain their application and logs under `tests/.artifacts/`; dependencies remain linked to the workspace. Report the scenario, stage, command and expected-versus-observed difference. Infrastructure failures are separate from application rejections.
 
 Do not create GitHub issues or post issue comments automatically. Create them only when explicitly requested.
 

@@ -1,8 +1,9 @@
-// Runs inside the consumer. Both this API and `tsc` resolve to its pinned package.
+// Runs with the consumer's working directory and the workspace's pinned compiler.
 
 import { readFileSync, writeFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
 import * as ts from "typescript/sync";
+import type { Diagnostic } from "./types.ts";
 
 const cwd = process.cwd();
 const app = resolve("app.ts");
@@ -13,42 +14,36 @@ try {
 	if (!project)
 		throw new Error("Infrastructure: compiler did not open consumer project");
 	const { checker, program } = project;
-	for (const file of program.getSourceFileNames()) {
-		if (!file.startsWith(`${cwd}/`))
-			throw new Error(
-				`Infrastructure: source import escaped consumer: ${file}`,
-			);
-	}
-	const printed = (t) =>
+	const printed = (t: ts.Type) =>
 		checker.typeToString(
 			t,
 			undefined,
 			ts.TypeFormatFlags.NoTruncation | ts.TypeFormatFlags.InTypeAlias,
 		);
-	function render(t, parents = new Set()) {
+	function render(t: ts.Type, parents = new Set<number>()): string {
 		if (parents.has(t.id))
 			throw new Error(
 				`Recursive observed type requires an explicit observer extension: ${printed(t)}`,
 			);
 		const next = new Set([...parents, t.id]);
-		if (t.flags & ts.TypeFlags.Union)
+		if (t.isUnionType())
 			return t
 				.getTypes()
 				.map((x) => render(x, next))
 				.join(" | ");
-		if (t.flags & ts.TypeFlags.Intersection)
+		if (t.isIntersectionType())
 			return t
 				.getTypes()
 				.map((x) => `(${render(x, next)})`)
 				.join(" & ");
-		if (checker.isTupleType(t)) {
+		if (t.isTupleType()) {
 			const target = t.getTarget();
 			const args = checker.getTypeArguments(t);
 			return `${target.readonly ? "readonly " : ""}[${args
 				.map((arg, i) => {
-					const flags = target.elementFlags[i];
-					const label =
-						target.labeledElementDeclarations?.[i]?.getNode?.()?.name?.text;
+					const flags = target.elementFlags[i] ?? ts.ElementFlags.Required;
+					const name = target.labeledElementDeclarations?.[i]?.resolve()?.name;
+					const label = name && "text" in name ? name.text : undefined;
 					const optional = flags & ts.ElementFlags.Optional;
 					const rest =
 						flags & (ts.ElementFlags.Rest | ts.ElementFlags.Variadic);
@@ -56,15 +51,22 @@ try {
 				})
 				.join(", ")}]`;
 		}
-		if (checker.isArrayType(t) || t.getSymbol()?.name === "ReadonlyArray") {
+		if (
+			t.isTypeReference() &&
+			(checker.isArrayType(t) || t.getSymbol()?.name === "ReadonlyArray")
+		) {
 			const [item] = checker.getTypeArguments(t);
+			if (!item) throw new Error("Array type has no element type");
 			return `${t.getSymbol()?.name === "ReadonlyArray" ? "readonly " : ""}(${render(item, next)})[]`;
 		}
 		if (!(t.flags & ts.TypeFlags.Object)) return printed(t);
 		// Built-in public value types have meaningful names. Application aliases do
 		// not: walk them so an inferred nullable field cannot hide behind an alias.
 		const symbol = t.getSymbol();
-		if (["Date", "Buffer", "Uint8Array", "Decimal"].includes(symbol?.name))
+		if (
+			symbol &&
+			["Date", "Buffer", "Uint8Array", "Decimal"].includes(symbol.name)
+		)
 			return checker.typeToString(
 				t,
 				undefined,
@@ -80,7 +82,7 @@ try {
 			);
 		for (const index of checker.getIndexInfosOfType(t))
 			properties.push(
-				`${index.isReadonly ? "readonly " : ""}[key: ${render(index.keyType, next)}]: ${render(index.type, next)}`,
+				`${index.isReadonly ? "readonly " : ""}[key: ${render(index.keyType, next)}]: ${render(index.valueType, next)}`,
 			);
 		return `{ ${properties.join("; ")} }`;
 	}
@@ -97,9 +99,15 @@ try {
 			return [s.name, render(type)];
 		}),
 	);
-	function diagnostic(d) {
-		const observation = { code: d.code, category: d.category, message: d.text };
+	function diagnostic(d: ts.Diagnostic): Diagnostic {
+		const observation: Diagnostic = {
+			code: d.code,
+			category: d.category,
+			message: d.text,
+		};
 		if (d.fileName) {
+			if (!d.startPosition)
+				throw new Error("File diagnostic has no start position");
 			const source = readFileSync(d.fileName, "utf8");
 			Object.assign(observation, {
 				file: relative(cwd, d.fileName),

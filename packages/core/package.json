@@ -67,14 +67,14 @@
 	"devDependencies": {
 		"@types/pg": "^8.23.1",
 		"pg": "^8.23.1",
-		"tsrs": "0.18.0-ts7.1.0-dev.20260929",
+		"tsrs": "0.20.1-ts7.1.0-beta",
 		"typescript": "7.1.0-beta"
 	},
 	"homepage": "https://typesql.karsli.net",
 	"bugs": {
 		"url": "https://github.com/ismailkarsli/typesql/issues"
 	},
-	"author": "\u0130smail Karsl\u0131",
+	"author": "İsmail Karslı",
 	"keywords": [
 		"sql",
 		"postgres",

@@ -108,6 +108,6 @@ await createMigrator({
 
 ## Runnable consumer
 
-This application uses a separate SQLite file, demonstrates named parameters and rollback, and prints driver values without converting bigints to numbers. Run its maintained scenario with `pnpm test:consumer node-sqlite`.
+This application uses a separate SQLite file, demonstrates named parameters and rollback, and prints driver values without converting bigints to numbers. Run its maintained scenario with `pnpm test node-sqlite`.
 
 <<< ../../../tests/scenarios/node-sqlite/app.ts

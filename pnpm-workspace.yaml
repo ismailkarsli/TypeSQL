@@ -1,11 +1,14 @@
 packages:
-  - "packages/*"
+  - packages/*
+  - tests
+  - tests/scenarios/*
 allowBuilds:
   esbuild: true
   workerd: true
-  "@prisma/engines": false
+  "@prisma/engines": true
   prisma: false
   "@vscode/vsce-sign": false
+  better-sqlite3: true
 versioning:
   changelog:
     storage: repository
@@ -18,3 +21,27 @@ versioning:
       - "@typesql/prisma"
       - "@typesql/sqlite"
       - "@typesql/cli"
+linkWorkspacePackages: false
+autoInstallPeers: false
+hoist: false
+dedupePeerDependents: false
+resolvePeersFromWorkspaceRoot: false
+overrides:
+  "vite@5>esbuild": 0.24.2
+catalog:
+  vitest: 5.0.5
+  typescript: 7.1.0-beta
+  "@types/node": 26.6.6
+  pg: 8.23.1
+  "@types/pg": 8.23.1
+  postgres: 4.0.0
+  kysely: 0.29.8
+  drizzle-orm: 0.45.4
+  prisma: 7.10.1
+  "@prisma/client": 7.10.1
+  "@prisma/adapter-pg": 7.10.1
+  "@prisma/adapter-better-sqlite3": 7.10.1
+  better-sqlite3: 13.0.3
+  "@types/better-sqlite3": 9.6.0
+  "@types/bun": 1.4.4
+  vite: 8.3.5

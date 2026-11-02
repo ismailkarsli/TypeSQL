@@ -111,6 +111,6 @@ The number after the message is the position of the wrong token. [Errors and tro
 
 ## Runnable consumer
 
-This complete application creates fixed example data, runs a left join, and narrows its nullable title with `IS NOT NULL`. Its source is also a packaged consumer scenario: `pnpm test:consumer pg-left-join` checks its inferred rows and real database output. The setup uses a fresh database provided through `DATABASE_URL`.
+This complete application creates fixed example data, runs a left join, and narrows its nullable title with `IS NOT NULL`. Its source is also a workspace scenario: `pnpm test pg-left-join` checks its inferred rows and real database output. The setup uses a fresh database provided through `DATABASE_URL`.
 
 <<< ../../../tests/scenarios/pg-left-join/app.ts

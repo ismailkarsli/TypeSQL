@@ -97,10 +97,6 @@ export default withVersions({
 				items: [
 					{ text: "Errors and troubleshooting", link: "/guide/errors" },
 					{ text: "Limits", link: "/guide/limits" },
-					{
-						text: "Postgres compatibility",
-						link: "/guide/postgres-compatibility",
-					},
 					{ text: "SQLite", link: "/guide/sqlite" },
 					{ text: "Type engine", link: "/guide/type-engine" },
 					{ text: "FAQ", link: "/guide/faq" },

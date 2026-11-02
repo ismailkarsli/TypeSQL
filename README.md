@@ -53,18 +53,6 @@ Every TypeScript editor shows a query's row type on hover and underlines mistake
 
 The full guide is at **[typesql.karsli.net](https://typesql.karsli.net)**. It covers the SQL TypeSQL supports, parameters and fragments, writing data, and known limits. Upgrading? See the [upgrade guide](https://typesql.karsli.net/guide/upgrading) and the [changelog](https://typesql.karsli.net/changelog).
 
-## Development
-
-Use Node 26, pnpm 12.11.2, and Docker Compose:
-
-```sh
-pnpm install --frozen-lockfile
-pnpm test:consumer
-pnpm test:consumer pg-left-join
-```
-
-`pnpm test` runs the complete packaged consumer suite. See [the test guide](tests/README.md) for snapshot review, reproducing bugs, and manually rerunning a retained application, and [the workflow inventory](tests/inventory.md) for coverage and limits.
-
 ## License
 
 [MIT](LICENSE)

@@ -1,13 +1,10 @@
-import { cp, mkdir, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { cp, mkdir, writeFile } from "node:fs/promises";
+import { join, resolve } from "node:path";
 import { required } from "./command.ts";
 import { ready } from "./database.ts";
-import {
-	packageNames,
-	preparePackages,
-	repository,
-	workspace,
-} from "./packages.ts";
+
+const workspace = resolve(import.meta.dirname, "..");
+const repository = resolve(workspace, "..");
 
 export default async function setup() {
 	try {
@@ -22,7 +19,7 @@ export default async function setup() {
 			join(retained, "failure.json"),
 			JSON.stringify(
 				{
-					stage: "environment/build/pack",
+					stage: "environment/build",
 					node: process.version,
 					platform: process.platform,
 					architecture: process.arch,
@@ -35,10 +32,9 @@ export default async function setup() {
 		for (const [name, cwd] of [
 			["root", repository],
 			["tests", workspace],
-			...packageNames.map((name) => [name, join(repository, "packages", name)]),
-		]) {
+		] as const) {
 			try {
-				await cp(join(cwd!, ".consumer"), join(retained, name!), {
+				await cp(join(cwd, ".consumer"), join(retained, name), {
 					recursive: true,
 				});
 			} catch (error) {
@@ -65,24 +61,34 @@ async function environment() {
 		process.platform !== "linux" ||
 		process.arch !== "x64"
 	)
-		throw new Error(
-			"Infrastructure: use the pinned linux/amd64 Docker environment",
-		);
+		throw new Error("Infrastructure: expected Node 26.8.1 on linux/x64");
 	for (const [binary, version] of [
-		["pnpm", "12.11.2"],
+		["pnpm", "12.16.1"],
 		["bun", "1.4.3"],
-	]) {
-		const result = await required(workspace, [binary!, "--version"]);
+	] as const) {
+		const result = await required(workspace, [binary, "--version"]);
 		if (result.stdout.trim() !== version)
 			throw new Error(`Infrastructure: expected ${binary} ${version}`);
 	}
 	await ready();
-	const run = await preparePackages();
-	await writeFile(
-		join(workspace, ".vitest", "candidates.json"),
-		JSON.stringify(run.candidates),
+	await required(
+		repository,
+		[
+			"pnpm",
+			...[
+				"core",
+				"pg",
+				"postgres",
+				"sqlite",
+				"kysely",
+				"drizzle",
+				"prisma",
+				"cli",
+			].flatMap((name) => ["--filter", `@typesql/${name}`]),
+			"run",
+			"build",
+		],
+		{},
+		300_000,
 	);
-	return async () => {
-		await rm(run.directory, { recursive: true, force: true });
-	};
 }

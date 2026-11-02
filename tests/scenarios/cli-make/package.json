@@ -5,7 +5,7 @@
 	"scripts": {
 		"compile": "tsc -p tsconfig.json --pretty false",
 		"start": "node dist/app.js",
-		"generate": "NODE_OPTIONS=--import=./fixed-time.mjs typesql migrate make \"create users\""
+		"generate": "NODE_OPTIONS=--import=./fixed-time.ts typesql migrate make \"create users\""
 	},
 	"dependencies": {
 		"@typesql/core": "workspace:*",

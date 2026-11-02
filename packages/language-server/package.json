@@ -31,8 +31,8 @@
 		"typecheck": "tsrs -p tsconfig.json --noEmit"
 	},
 	"devDependencies": {
-		"@types/node": "^26.6.5",
-		"tsrs": "0.18.0-ts7.1.0-dev.20260929",
+		"@types/node": "^26.6.6",
+		"tsrs": "0.20.1-ts7.1.0-beta",
 		"typescript": "7.1.0-beta"
 	},
 	"keywords": [

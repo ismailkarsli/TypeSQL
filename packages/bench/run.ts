@@ -24,8 +24,8 @@ import {
 	isVariableStatement,
 	SyntaxKind,
 	type TypeNode,
-} from "tsrs/unstable/ast";
-import { API } from "tsrs/unstable/sync";
+} from "tsrs/ast";
+import { API } from "tsrs/sync";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fixture = "src/case1.ts";

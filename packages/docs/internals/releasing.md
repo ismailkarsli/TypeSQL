@@ -180,7 +180,7 @@ Setup, done once for this repository:
 
 A new package is the one exception: npm only configures trust for a package that already
 exists. After the workflow has committed the release and published its established dependencies,
-check out the release commit, run `pnpm install --frozen-lockfile && pnpm build && pnpm test:consumer`,
+check out the release commit, run `pnpm install --frozen-lockfile && pnpm build && pnpm test`,
 then run `pnpm publish --no-git-checks` from each new package's directory with 2FA. Use the
 release commit, not the preceding source commit, so workspace dependencies resolve to the
 versions the workflow just published. Run the `npm trust github` command in step 1 for each new

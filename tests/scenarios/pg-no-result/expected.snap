@@ -18,12 +18,12 @@ exports[`pg-no-result > consumer 1`] = `
   },
   "start": {
     "status": 1,
-    "stderr": "file://<consumer>/node_modules/.pnpm/@typesql+core@file+.consumer+packages+typesql-core-4.0.0.tgz_pg@8.23.1_typescript@7.1.0-beta/node_modules/@typesql/core/dist/query.js:54
+    "stderr": "file://<workspace>/packages/core/dist/query.js:54
                 throw new NoResultError(text);
                       ^
 
 NoResultError: The query returned no rows
-    at Object.value (file://<consumer>/node_modules/.pnpm/@typesql+core@file+.consumer+packages+typesql-core-4.0.0.tgz_pg@8.23.1_typescript@7.1.0-beta/node_modules/@typesql/core/dist/query.js:54:23)
+    at Object.value (file://<workspace>/packages/core/dist/query.js:54:23)
     at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
     at async file://<consumer>/dist/app.js:10:5 {
   text: 'SELECT id FROM users WHERE id = $1'

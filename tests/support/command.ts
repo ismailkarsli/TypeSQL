@@ -1,20 +1,8 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { spawn } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
-import { delimiter, join, resolve } from "node:path";
+import { join } from "node:path";
 
-// pnpm scripts prepend workspace executables to PATH. Drop those before
-// launching a consumer so an undeclared compiler/CLI cannot fall back to them.
-const checkout = resolve(import.meta.dirname, "../..");
-const cleanPath = (process.env.PATH ?? "")
-	.split(delimiter)
-	.filter(
-		(path) =>
-			!path.includes("node_modules") &&
-			path !== checkout &&
-			!path.startsWith(`${checkout}/`),
-	)
-	.join(delimiter);
 const cancellation = new AsyncLocalStorage<AbortSignal>();
 export function withCommands<T>(signal: AbortSignal, run: () => Promise<T>) {
 	return cancellation.run(signal, run);
@@ -40,7 +28,6 @@ export async function command(
 			detached: true,
 			env: {
 				...process.env,
-				PATH: cleanPath,
 				NODE_PATH: undefined,
 				NODE_OPTIONS: undefined,
 				TZ: "UTC",

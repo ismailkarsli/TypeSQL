@@ -5,34 +5,35 @@ import {
 	mkdtemp,
 	readFile,
 	rm,
+	symlink,
 	writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 import { expect, test } from "vitest";
 import { command, withCommands } from "./support/command.ts";
 import { observeCompiler } from "./support/compiler.ts";
 import { allocate } from "./support/database.ts";
-import { type Candidate, workspace } from "./support/packages.ts";
-import { materialize } from "./support/project.ts";
-import type { ApplicationException, Observation } from "./support/types.ts";
+import type {
+	ApplicationException,
+	Observation,
+	Scenario,
+} from "./support/types.ts";
+
+const workspace = import.meta.dirname;
+const repository = resolve(workspace, "..");
 
 // Generated discovery files only select a scenario. Assertions remain Vitest's.
 export function consumer(name: string) {
 	test(name, async ({ signal }) =>
 		withCommands(signal, async () => {
-			const candidates: Candidate[] = JSON.parse(
-				await readFile(join(workspace, ".vitest", "candidates.json"), "utf8"),
-			);
 			let directory: string | undefined;
 			let database: Awaited<ReturnType<typeof allocate>> | undefined;
-			let stage = "install";
+			let stage = "prepare";
 			const observed: Observation = {};
 			try {
 				directory = await mkdtemp(join(tmpdir(), `typesql-${name}-`));
-				const project = await materialize(name, candidates, directory);
-				directory = project.directory;
-				const { manifest } = project;
+				const manifest = await prepare(name, directory);
 				if (
 					manifest.consumer?.failure &&
 					(!manifest.scripts[manifest.consumer.failure.stage] ||
@@ -43,10 +44,12 @@ export function consumer(name: string) {
 				const env = {
 					...database.env,
 					CONSUMER_ERROR_FILE: join(directory, ".consumer", "exception.json"),
-					NODE_OPTIONS: `--import=${join(directory, ".consumer", "runtime.mjs")}`,
+					NODE_OPTIONS: `--import=${join(workspace, "support", "runtime.ts")}`,
 				};
 				const normalize = (text: string) => {
-					let value = text.replaceAll(directory!, "<consumer>");
+					let value = text
+						.replaceAll(directory!, "<consumer>")
+						.replaceAll(repository, "<workspace>");
 					if (database?.env.DATABASE_URL)
 						value = value.replaceAll(
 							database.env.DATABASE_URL,
@@ -191,4 +194,54 @@ export function consumer(name: string) {
 			}
 		}),
 	);
+}
+
+async function prepare(name: string, directory: string) {
+	const source = join(workspace, "scenarios", name);
+	await cp(source, directory, {
+		recursive: true,
+		filter: (path) =>
+			!["node_modules", "dist", ".consumer", "expected.snap"].includes(
+				basename(path),
+			),
+	});
+	await symlink(
+		join(source, "node_modules"),
+		join(directory, "node_modules"),
+		"dir",
+	);
+	await mkdir(join(directory, ".consumer"));
+	const config = JSON.parse(
+		await readFile(join(workspace, "tsconfig.json"), "utf8"),
+	);
+	delete config.compilerOptions.noEmit;
+	delete config.compilerOptions.allowImportingTsExtensions;
+	config.include = ["**/*.ts"];
+	const configPath = join(directory, "tsconfig.json");
+	try {
+		const overrides = JSON.parse(await readFile(configPath, "utf8"));
+		if (
+			overrides.extends ||
+			overrides.compilerOptions?.paths ||
+			overrides.compilerOptions?.baseUrl
+		)
+			throw new Error(
+				"Scenario compiler options must use public package imports",
+			);
+		Object.assign(config, {
+			...overrides,
+			compilerOptions: {
+				...config.compilerOptions,
+				...overrides.compilerOptions,
+			},
+		});
+	} catch (error) {
+		if (!(error instanceof Error && "code" in error && error.code === "ENOENT"))
+			throw error;
+	}
+	await writeFile(configPath, JSON.stringify(config, null, 2));
+	const manifest: Scenario = JSON.parse(
+		await readFile(join(directory, "package.json"), "utf8"),
+	);
+	return manifest;
 }
