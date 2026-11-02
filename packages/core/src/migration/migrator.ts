@@ -7,7 +7,6 @@ import {
 	type SCHEMA,
 	type SchemaOf,
 } from "./define.js";
-import { fingerprint, isFingerprint, sha256 } from "./fingerprint.js";
 
 type Dialect = "postgres" | "sqlite";
 // `down` takes what `up` returns, so only `any` accepts every migration.
@@ -212,7 +211,6 @@ interface Entry {
 
 interface Row {
 	readonly name: string;
-	readonly hash: string;
 	readonly at: unknown;
 }
 
@@ -375,28 +373,36 @@ export function createMigrator(config: MigratorConfig): Migrator {
 }
 
 async function load(config: MigratorConfig): Promise<Entry[]> {
-	if (config.migrationsDir !== undefined) {
-		const { loadMigrations } = await loadFiles();
-		return loadMigrations(config.migrationsDir);
-	}
-	return (config.migrations ?? []).map((migration, index): Entry => {
-		const name = label(index);
-		if (!isMigration(migration))
+	const entries =
+		config.migrationsDir === undefined
+			? (config.migrations ?? []).map((migration, index): Entry => {
+					if (!isMigration(migration))
+						throw new Error(
+							`typesql: migrations[${index}] is not a migration; define it with migration()`,
+						);
+					if (migration.name === undefined)
+						throw new Error(
+							`typesql: migrations[${index}] has no name, which the history records it by; give it one: migration(from, { name: "create-users", up, down })`,
+						);
+					return {
+						name: migration.name,
+						up: migration.up,
+						down: migration.down,
+						from: (migration as { [MIGRATION_FROM]?: unknown })[MIGRATION_FROM],
+						self: migration,
+					};
+				})
+			: await (await loadFiles()).loadMigrations(config.migrationsDir);
+	const seen = new Set<string>();
+	for (const entry of entries) {
+		if (seen.has(entry.name))
 			throw new Error(
-				`typesql: migrations[${index}] is not a migration; define it with migration()`,
+				`typesql: two migrations are named ${JSON.stringify(entry.name)}; the history records each by its name`,
 			);
-		return {
-			name,
-			up: migration.up,
-			down: migration.down,
-			from: (migration as { [MIGRATION_FROM]?: unknown })[MIGRATION_FROM],
-			self: migration,
-		};
-	});
+		seen.add(entry.name);
+	}
+	return entries;
 }
-
-/** An array migration's history name: its position, zero-padded. */
-const label = (index: number): string => String(index + 1).padStart(4, "0");
 
 const describe = (entries: readonly Entry[], index: number): string =>
 	`migration ${index + 1} (${entries[index]?.name ?? "missing"})`;
@@ -456,18 +462,12 @@ function readHistory(records: readonly unknown[]): Row[] {
 			typeof record !== "object" ||
 			record === null ||
 			!("name" in record) ||
-			typeof record.name !== "string" ||
-			!("hash" in record) ||
-			typeof record.hash !== "string"
+			typeof record.name !== "string"
 		)
 			throw new Error(
-				"typesql: invalid migration history: expected string name and hash columns",
+				"typesql: invalid migration history: expected a string name column",
 			);
-		return {
-			name: record.name,
-			hash: record.hash,
-			at: "at" in record ? record.at : null,
-		};
+		return { name: record.name, at: "at" in record ? record.at : null };
 	});
 }
 
@@ -481,33 +481,27 @@ function appliedAt(value: unknown): Date | null {
 	return Number.isNaN(date.getTime()) ? null : date;
 }
 
-/** The applied rows must be the first migrations, by position and fingerprint. */
+/** The applied rows must be the first migrations, in order, by name. */
 function checkHistory(
 	history: readonly Row[],
 	entries: readonly Entry[],
-	fingerprints: readonly string[],
-	directoryMode: boolean,
 ): void {
 	history.forEach((row, index) => {
-		if (!isFingerprint(row.hash))
-			throw new Error(
-				directoryMode
-					? `typesql: applied migration ${index + 1} (${row.name}) has a 3.x source hash, and no migration file is named ${row.name}`
-					: `typesql: the history was written by TypeSQL 3.x; run a command once with migrationsDir to convert it, then switch to migrations`,
-			);
-		const entry = entries[index];
-		if (entry === undefined)
-			throw new Error(
-				`typesql: applied migration ${index + 1} (${row.name}) is missing: there are only ${entries.length} migrations`,
-			);
-		if (row.hash !== fingerprints[index])
-			throw new Error(
-				`typesql: applied migration ${index + 1} (${row.name}) ${row.name === entry.name ? "has changed" : `does not match ${describe(entries, index)}`}: it was edited, or a migration was inserted, removed or reordered before it`,
-			);
+		if (entries[index]?.name === row.name) return;
+		const later = entries.findIndex((entry) => entry.name === row.name);
+		throw new Error(
+			later < 0
+				? `typesql: applied migration ${index + 1} (${row.name}) is not among the migrations: it was removed or renamed`
+				: `typesql: ${describe(entries, index)} is not applied, but ${describe(entries, later)} after it is: a migration was added before applied ones, or the order changed`,
+		);
 	});
 }
 
 type Command = "latest" | "up" | "down" | "status";
+
+/** SHA-256 of `text`, with Web Crypto (Node, Bun, Deno and Workers). */
+const sha256 = (text: string): Promise<ArrayBuffer> =>
+	crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
 
 /** PostgreSQL's in_failed_sql_transaction, from pg, postgres.js or Prisma. */
 const aborted = (error: unknown): boolean =>
@@ -678,53 +672,27 @@ async function openHistory(
 				await rows(
 					execute,
 					postgres
-						? `SELECT name, hash, to_char(applied_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS at FROM ${table} ORDER BY applied_at, name`
-						: `SELECT name, hash, applied_at AS at FROM ${table} ORDER BY applied_at, name`,
+						? `SELECT name, to_char(applied_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS at FROM ${table} ORDER BY applied_at, name`
+						: `SELECT name, applied_at AS at FROM ${table} ORDER BY applied_at, name`,
 				),
 			);
 		},
-		/** Record a migration, after every earlier one (applied_at strictly increases). */
-		async insert(name: string, hash: string): Promise<void> {
+		/**
+		 * Record a migration, after every earlier one (applied_at strictly
+		 * increases). `hash` is unused; 3.x stored a hash of the file there.
+		 */
+		async insert(name: string): Promise<void> {
 			await execute(
 				postgres
-					? `INSERT INTO ${table} (name, hash, applied_at) SELECT $1, $2, greatest(clock_timestamp(), max(applied_at) + interval '1 microsecond') FROM ${table}`
-					: `INSERT INTO ${table} (name, hash, applied_at) SELECT $1, $2, CASE WHEN max(applied_at) IS NULL OR strftime('%Y-%m-%d %H:%M:%f', 'now') > max(applied_at) THEN strftime('%Y-%m-%d %H:%M:%f', 'now') ELSE strftime('%Y-%m-%d %H:%M:%f', max(applied_at), '+0.001 seconds') END FROM ${table}`,
-				[name, hash],
+					? `INSERT INTO ${table} (name, hash, applied_at) SELECT $1, '', greatest(clock_timestamp(), max(applied_at) + interval '1 microsecond') FROM ${table}`
+					: `INSERT INTO ${table} (name, hash, applied_at) SELECT $1, '', CASE WHEN max(applied_at) IS NULL OR strftime('%Y-%m-%d %H:%M:%f', 'now') > max(applied_at) THEN strftime('%Y-%m-%d %H:%M:%f', 'now') ELSE strftime('%Y-%m-%d %H:%M:%f', max(applied_at), '+0.001 seconds') END FROM ${table}`,
+				[name],
 			);
 		},
 		async remove(name: string): Promise<void> {
 			await execute(`DELETE FROM ${table} WHERE name = $1`, [name]);
 		},
-		async rehash(name: string, hash: string): Promise<void> {
-			await execute(`UPDATE ${table} SET hash = $1 WHERE name = $2`, [
-				hash,
-				name,
-			]);
-		},
 	};
-}
-
-/**
- * 3.x stored source hashes. Trust that the files are the ones 3.x last
- * checked, and store their fingerprints instead. Returns whether any row
- * changed.
- */
-async function convertHistory(
-	history: Awaited<ReturnType<typeof openHistory>>,
-	rows: readonly Row[],
-	entries: readonly Entry[],
-	fingerprints: readonly string[],
-): Promise<boolean> {
-	let converted = false;
-	for (const row of rows) {
-		if (isFingerprint(row.hash)) continue;
-		const index = entries.findIndex((entry) => entry.name === row.name);
-		const hash = fingerprints[index];
-		if (hash === undefined) continue;
-		await history.rehash(row.name, hash);
-		converted = true;
-	}
-	return converted;
 }
 
 async function run(
@@ -733,16 +701,8 @@ async function run(
 ): Promise<{ names: string[]; applied: number; status: MigrationStatus[] }> {
 	const { dialect } = config;
 	const entries = await load(config);
-	// Dry runs come first: one that fails stops the command before anything
-	// touches the database.
-	const fingerprints: string[] = [];
-	for (const [index, entry] of entries.entries())
-		fingerprints.push(
-			await fingerprint(dialect, entry.up, `${index + 1} (${entry.name})`),
-		);
 	checkChain(dialect, entries);
 
-	const directoryMode = config.migrationsDir !== undefined;
 	const transaction = config.transaction ?? true;
 	const connection = await connect(config);
 	const names: string[] = [];
@@ -760,15 +720,9 @@ async function run(
 			let current: { name: string; label: string } | undefined;
 			await history.begin();
 			try {
-				// SQLite reads the history only after taking its write lock.
-				let rows = await history.read();
-				// Nothing else to do keeps the history unchanged, unless it
-				// was converted.
-				const converted =
-					directoryMode &&
-					(await convertHistory(history, rows, entries, fingerprints));
-				if (converted) rows = await history.read();
-				checkHistory(rows, entries, fingerprints, directoryMode);
+				// The history is read only after taking the lock.
+				const rows = await history.read();
+				checkHistory(rows, entries);
 				applied = rows.length;
 				const index = command === "down" ? rows.length - 1 : rows.length;
 				const entry = entries[index];
@@ -776,15 +730,16 @@ async function run(
 					status = entries.map((entry, index) => {
 						const row = rows[index];
 						return {
-							name: row?.name ?? entry.name,
+							name: entry.name,
 							applied: row !== undefined,
 							appliedAt: row === undefined ? null : appliedAt(row.at),
 						};
 					});
-					await (converted ? history.commit() : history.rollback());
+					// Nothing to do leaves the history as it was.
+					await history.rollback();
 					break;
 				}
-				const name = rows[index]?.name ?? entry.name;
+				const { name } = entry;
 				current = {
 					name,
 					label: `${command === "down" ? "reverting " : ""}migration ${index + 1} (${name})`,
@@ -795,7 +750,7 @@ async function run(
 					command === "down" ? entry.down : entry.up,
 				);
 				if (command === "down") await history.remove(name);
-				else await history.insert(name, fingerprints[index] ?? "");
+				else await history.insert(name);
 				await history.commit();
 				names.push(name);
 				applied += command === "down" ? -1 : 1;

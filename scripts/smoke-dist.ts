@@ -1224,11 +1224,11 @@ assert.match(
 	try {
 		// Array mode with the caller's connection.
 		const accounts = migration("sqlite", {
+			name: "0001",
 			up: async (db) => {
 				const next = await db.add(
 					"CREATE TABLE accounts (id INTEGER PRIMARY KEY, email TEXT NOT NULL, note TEXT)",
 				);
-				// The dry run's queries change no rows: it ends here.
 				const inserted = await next(
 					"INSERT INTO accounts (email, note) VALUES ($1, $2)",
 					"a@b.c",
@@ -1250,11 +1250,14 @@ assert.match(
 			},
 		});
 		type Accounts = Awaited<ReturnType<typeof accounts.up>>;
-		// A raw step whose SQL is built at runtime, a branch only real rows
-		// take, and executeTakeFirstOrThrow, which ends the dry run: none of
-		// them changes the fingerprint between runs.
-		const profile = (from: { readonly up: (db: never) => Promise<Accounts> }) =>
+		// A raw step whose SQL is built at runtime, and a branch only real
+		// rows take.
+		const profile = (
+			from: { readonly up: (db: never) => Promise<Accounts> },
+			name = "0002",
+		) =>
 			migration(from, {
+				name,
 				up: async (db) => {
 					const next = await db.add("ALTER TABLE accounts ADD COLUMN bio TEXT");
 					await next.raw(
@@ -1312,66 +1315,57 @@ assert.match(
 		assert.deepEqual(await both.latest(), { applied: ["0002"] });
 		assert.equal(exists(memory, "accounts_bio"), true);
 		assert.deepEqual(await both.latest(), { applied: [] });
-		assert.match(history()[0]?.hash ?? "", /^v4:[0-9a-f]{64}$/);
+		assert.equal(history()[0]?.hash, "");
 
-		// Reformatting a DDL string is not a change; editing it is.
-		const reformatted = migration("sqlite", {
-			up: async (db) =>
-				db.add(`create table accounts (
-					id integer primary key, -- the key
-					email text not null,
-					note   text
-				)`),
-			down: async (db) => {
-				await db.add("DROP TABLE accounts");
-			},
-		});
-		assert.deepEqual(
-			(
-				await both
-					.with({ migrations: [reformatted, profile(reformatted)] })
-					.status()
-			).map((entry) => entry.applied),
-			[true, true],
-		);
-		const edited = migration("sqlite", {
-			up: async (db) =>
-				db.add(
-					"CREATE TABLE accounts (id INTEGER PRIMARY KEY, email TEXT, note TEXT)",
-				),
-			down: async (db) => {
-				await db.add("DROP TABLE accounts");
-			},
+		// The history matches the migrations by name, in order.
+		const renamed = migration("sqlite", {
+			name: "0001-accounts",
+			up: accounts.up,
+			down: accounts.down,
 		});
 		await assert.rejects(
-			both.with({ migrations: [edited, profile(edited as never)] }).status(),
-			/applied migration 1 \(0001\) has changed/,
+			both.with({ migrations: [renamed, profile(renamed)] }).status(),
+			/applied migration 1 \(0001\) is not among the migrations: it was removed or renamed/,
 		);
-		// An inserted migration: the fingerprints catch it, and so does the
-		// chain check when the next one still starts from the old one.
-		const inserted = migration(reformatted, {
-			up: async (db) => {
-				await db.raw("SELECT 1");
-				return db;
-			},
+		const inserted = migration(accounts, {
+			name: "0001-extra",
+			up: async (db) => db,
 			down: async () => {},
 		});
 		await assert.rejects(
 			both
-				.with({ migrations: [reformatted, inserted, profile(inserted)] })
+				.with({ migrations: [accounts, inserted, profile(inserted)] })
 				.status(),
-			/applied migration 2 \(0002\) has changed/,
+			/migration 2 \(0001-extra\) is not applied, but migration 3 \(0002\) after it is/,
 		);
+		// The chain catches an insertion when the next one still starts from
+		// the one before.
 		await assert.rejects(
 			both.with({ migrations: [accounts, inserted, second] }).status(),
+			/migration 3 \(0002\) starts from migration 1 \(0001\), not from migration 2 \(0001-extra\)/,
+		);
+		await assert.rejects(
+			both.with({ migrations: [accounts, profile(renamed)] }).status(),
 			/migration 2 \(0002\) starts from a migration that isn't in the list/,
 		);
 		await assert.rejects(
-			both.with({ migrations: [accounts, profile(reformatted)] }).status(),
-			/migration 2 \(0002\) starts from a migration that isn't in the list/,
+			both
+				.with({
+					migrations: [
+						accounts,
+						migration(accounts, { up: async (db) => db, down: async () => {} }),
+					],
+				})
+				.status(),
+			/migrations\[1\] has no name, which the history records it by/,
+		);
+		await assert.rejects(
+			both.with({ migrations: [accounts, profile(accounts, "0001")] }).status(),
+			/two migrations are named "0001"/,
 		);
 		// A reordered array fails the chain check before the database is read.
 		const notes = migration(second, {
+			name: "0003",
 			up: async (db) =>
 				db.add("CREATE TABLE notes (id INTEGER PRIMARY KEY, body TEXT)"),
 			down: async (db) => {
@@ -1380,11 +1374,11 @@ assert.match(
 		});
 		await assert.rejects(
 			both.with({ migrations: [second, accounts] }).status(),
-			/migration 1 \(0001\) starts from another migration, but it is the first one/,
+			/migration 1 \(0002\) starts from another migration, but it is the first one/,
 		);
 		await assert.rejects(
 			both.with({ migrations: [accounts, notes, second] }).status(),
-			/migration 2 \(0002\) starts from migration 3 \(0003\), not from migration 1 \(0001\)/,
+			/migration 2 \(0003\) starts from migration 3 \(0002\), not from migration 1 \(0001\)/,
 		);
 
 		// Each migration runs in a transaction; it can't end it.
@@ -1394,6 +1388,7 @@ assert.match(
 					accounts,
 					second,
 					migration(second, {
+						name: "0003",
 						up: async (db) => {
 							await step(db as never);
 							return db;
@@ -1438,6 +1433,7 @@ assert.match(
 					accounts,
 					second,
 					migration(second, {
+						name: "0003",
 						up: async (db) => db.raw("INSERT INTO missing VALUES (1)"),
 						down: async () => {},
 					}),
@@ -1576,6 +1572,7 @@ assert.match(
 		// body stays in its CREATE TRIGGER.
 		const scripted = new DatabaseSync(":memory:");
 		const script = migration("sqlite", {
+			name: "0001",
 			up: async (db) => {
 				const next = await db.add(
 					"CREATE TABLE a (id INTEGER PRIMARY KEY, note TEXT DEFAULT 'x;y'); -- a; comment\nCREATE TABLE b (id INTEGER);",
@@ -1623,32 +1620,6 @@ assert.match(
 			),
 			statements.join("\n"),
 		);
-
-		// A dry run that waits for rows times out before the database is touched.
-		const waiting = migration("sqlite", {
-			up: async (db) => {
-				for (;;) {
-					const rows = await db("SELECT 1 AS one").execute();
-					if (rows.length > 0) return db;
-					await new Promise((resolve) => setTimeout(resolve, 50));
-				}
-			},
-			down: async () => {},
-		});
-		const untouched = new DatabaseSync(":memory:");
-		await assert.rejects(
-			createMigrator({
-				dialect: "sqlite",
-				execute: executor(untouched),
-				migrations: [waiting],
-			}).latest(),
-			/migration 1 \(0001\) ran longer than 5 seconds/,
-		);
-		assert.equal(
-			untouched.prepare("SELECT count(*) AS n FROM sqlite_master").get()?.n,
-			0,
-		);
-		untouched.close();
 
 		assert.throws(
 			() => createMigrator({ dialect: "sqlite", db: "x.db" }),
@@ -1717,10 +1688,12 @@ const execute = async (text, values) => {
 	return database.prepare(query.text).all(...query.values);
 };
 const first = migration("sqlite", {
+	name: "0001",
 	up: async (db) => db.add("CREATE TABLE t (id INTEGER PRIMARY KEY)"),
 	down: async (db) => { await db.add("DROP TABLE t"); },
 });
 const second = migration(first, {
+	name: "0002",
 	up: async (db) => db.add("ALTER TABLE t ADD COLUMN name TEXT"),
 	down: async (db) => { await db.add("ALTER TABLE t DROP COLUMN name"); },
 });
@@ -1744,7 +1717,7 @@ console.log(JSON.stringify({ applied, status: status.map((entry) => entry.applie
 		const long = project("long");
 		const length = 300;
 		const table = (i: number) =>
-			`{ up: async (db) => db.add("CREATE TABLE t${i} (id INTEGER PRIMARY KEY, v TEXT)"), down: async (db) => { await db.add("DROP TABLE t${i}"); } }`;
+			`{ name: "t${i}", up: async (db) => db.add("CREATE TABLE t${i} (id INTEGER PRIMARY KEY, v TEXT)"), down: async (db) => { await db.add("DROP TABLE t${i}"); } }`;
 		writeFileSync(
 			join(long, "migrations.ts"),
 			[
@@ -1844,8 +1817,8 @@ export const misspelled = createMigrator({ dialect: "sqlite", db: ":memory:", mi
 		writeFileSync(
 			join(declared, "migrations.ts"),
 			`import { createMigrator, migration } from "@typesql/core/migration";
-export const users = migration("postgres", { up: async (db) => db.add("CREATE TABLE users (id int PRIMARY KEY)"), down: async () => {} });
-export const posts = migration(users, { up: async (db) => db.add("CREATE TABLE posts (id int)"), down: async () => {} });
+export const users = migration("postgres", { name: "users", up: async (db) => db.add("CREATE TABLE users (id int PRIMARY KEY)"), down: async () => {} });
+export const posts = migration(users, { name: "posts", up: async (db) => db.add("CREATE TABLE posts (id int)"), down: async () => {} });
 export const notes = migration("sqlite", { up: async (db) => db.add("CREATE TABLE notes (id INTEGER PRIMARY KEY)"), down: async () => {} });
 export const migrator = createMigrator({ dialect: "postgres", url: "postgres://localhost/x", migrations: [users, posts] });
 export const latest = () => migrator.latest();
@@ -1967,20 +1940,43 @@ export default migration(previous, {
 			(await inProcess.status()).map((entry) => entry.applied),
 			[true, true],
 		);
-		// Reformatting an applied file's DDL is not a change; editing it is.
+		// The history matches the files by name, in order: a file added before
+		// applied ones is an error, also when the next file starts from it.
 		const source = readFileSync(usersFile, "utf8");
+		const usersBase = basename(usersFile, ".ts");
+		const middle = join(app, "migrations", `${usersBase.split("_")[0]}_m.ts`);
+		writeFileSync(
+			middle,
+			`import { migration } from "@typesql/core/migration";
+import previous from "./${usersBase}.js";
+export default migration(previous, { up: async (db) => db, down: async () => {} });
+`,
+		);
+		const profileSource = readFileSync(profileFile, "utf8");
+		writeFileSync(
+			profileFile,
+			profileSource.replace(
+				`./${usersBase}.js`,
+				`./${basename(middle, ".ts")}.js`,
+			),
+		);
+		assert.match(
+			fail(1, "status", "--config", config),
+			/migration 2 \(\d+_m\.ts\) is not applied, but migration 3 \(\d+_profile\.ts\) after it is/,
+		);
+		writeFileSync(profileFile, profileSource);
+		rmSync(middle);
+		// A file's migration is named by the file.
 		writeFileSync(
 			usersFile,
 			source.replace(
-				`"${users}"`,
-				"`create table users (\n\t\tid integer primary key, -- the key\n\t\temail text not null\n\t)`",
+				'migration("sqlite", {',
+				'migration("sqlite", {\n\tname: "users",',
 			),
 		);
-		assert.match(run("status"), /^applied .*\napplied /);
-		writeFileSync(usersFile, source.replace("NOT NULL", ""));
 		assert.match(
 			fail(1, "status", "--config", config),
-			/applied migration 1 \(\d+_create-users\.ts\) has changed/,
+			/names its migration "users", but a migration file's name is its file name/,
 		);
 		writeFileSync(usersFile, source);
 		assert.match(run("down"), /reverted \d+_profile\.ts/);
@@ -1997,20 +1993,24 @@ export default migration(previous, {
 		run("generate", "--out", out);
 		assert.equal(readFileSync(out, "utf8"), full);
 
-		// The same history from an array with the same steps, and back.
+		// The same history from an array whose names are the file names, and
+		// back.
 		const appUsers = migration("sqlite", {
+			name: basename(usersFile),
 			up: async (db) => db.add(users),
 			down: async (db) => {
 				await db.add("DROP TABLE users");
 			},
 		});
 		const appProfile = migration(appUsers, {
+			name: basename(profileFile),
 			up: async (db) => db.add(bio),
 			down: async (db) => {
 				await db.add("ALTER TABLE users DROP COLUMN bio");
 			},
 		});
 		const appPosts = migration(appProfile, {
+			name: "9999999999_posts.ts",
 			up: async (db) =>
 				db.add("CREATE TABLE posts (id INTEGER PRIMARY KEY, title TEXT)"),
 			down: async (db) => {
@@ -2028,10 +2028,12 @@ export default migration(previous, {
 			[
 				[basename(usersFile), true],
 				[basename(profileFile), true],
-				["0003", false],
+				["9999999999_posts.ts", false],
 			],
 		);
-		assert.deepEqual(await appArray.latest(), { applied: ["0003"] });
+		assert.deepEqual(await appArray.latest(), {
+			applied: ["9999999999_posts.ts"],
+		});
 		writeFileSync(
 			join(app, "migrations", "9999999999_posts.ts"),
 			`import { migration } from "@typesql/core/migration";
@@ -2045,8 +2047,8 @@ export default migration(previous, {
 });
 `,
 		);
-		assert.match(run("status"), /\napplied .* 0003\n$/);
-		assert.match(run("down"), /reverted 0003/);
+		assert.match(run("status"), /\napplied .* 9999999999_posts\.ts\n$/);
+		assert.match(run("down"), /reverted 9999999999_posts\.ts/);
 		assert.match(run("latest"), /applied 9999999999_posts\.ts/);
 		assert.match(schema(), /posts: \{/);
 
@@ -2146,6 +2148,7 @@ export default migration(previous, { up: async (db) => db.raw("INSERT INTO missi
 		// Two calls on one file in this process: the second waits for the
 		// first's lock without blocking the event loop the first runs on.
 		const slow = migration("sqlite", {
+			name: "0001",
 			up: async (db) => {
 				await new Promise((resolve) => setTimeout(resolve, 100));
 				return db.add("CREATE TABLE slow (id INTEGER PRIMARY KEY)");
@@ -2173,7 +2176,7 @@ export default migration(previous, { up: async (db) => db.raw("INSERT INTO missi
 		writeFileSync(
 			join(arrayConfig, "db", "first.ts"),
 			`import { migration } from "@typesql/core/migration";
-export const first = migration("sqlite", { up: async (db) => db.add("CREATE TABLE a (id INTEGER PRIMARY KEY)"), down: async () => {} });
+export const first = migration("sqlite", { name: "0001", up: async (db) => db.add("CREATE TABLE a (id INTEGER PRIMARY KEY)"), down: async () => {} });
 `,
 		);
 		writeFileSync(
@@ -2210,7 +2213,7 @@ export default migration("sqlite", { up: async (db) => db.add("CREATE TABLE a (i
 		writeFileSync(
 			join(bundled, "main.ts"),
 			`import { createMigrator, migration } from "@typesql/core/migration";
-const first = migration("sqlite", { up: async (db) => db.add("CREATE TABLE a (id INTEGER PRIMARY KEY)"), down: async () => {} });
+const first = migration("sqlite", { name: "0001", up: async (db) => db.add("CREATE TABLE a (id INTEGER PRIMARY KEY)"), down: async () => {} });
 const array = await createMigrator({ dialect: "sqlite", db: ":memory:", migrations: [first] }).latest();
 const files = await createMigrator<unknown>({ dialect: "sqlite", db: ":memory:", migrationsDir: process.argv[2], generate: false }).latest();
 console.log(JSON.stringify([array.applied, files.applied]));
@@ -2221,7 +2224,7 @@ console.log(JSON.stringify([array.applied, files.applied]));
 			`import { createMigrator, migration } from "@typesql/core/migration";
 import { createSql } from "@typesql/core";
 import { sqlite } from "@typesql/core/sqlite";
-export const first = migration("sqlite", { up: async (db) => db.add("CREATE TABLE a (id INTEGER PRIMARY KEY)"), down: async () => {} });
+export const first = migration("sqlite", { name: "0001", up: async (db) => db.add("CREATE TABLE a (id INTEGER PRIMARY KEY)"), down: async () => {} });
 export const sql = createSql(sqlite);
 export const migrate = (execute: never) => createMigrator({ dialect: "sqlite", execute, transaction: false, migrations: [first] }).latest();
 `,
@@ -2256,8 +2259,8 @@ export const migrate = (execute: never) => createMigrator({ dialect: "sqlite", e
 			/(?:from |import\(|require\()["']node:/,
 		);
 
-		// A 3.x history and 3.x files carry over: the source hashes become
-		// fingerprints, and a new file starts from the last 3.x file's up.
+		// A 3.x history and 3.x files carry over: the history matches by name,
+		// as in 3.x, and a new file starts from the last 3.x file's up.
 		const legacy = project("legacy");
 		const legacyDir = join(legacy, "migrations");
 		mkdirSync(legacyDir);
@@ -2311,8 +2314,9 @@ INSERT INTO schema_migrations (name, hash) VALUES ('0001_posts.ts', '${"a".repea
 			legacyDb
 				.prepare("SELECT hash FROM schema_migrations ORDER BY name")
 				.all()
-				.map((row) => /^v4:/.test(String(row.hash))),
-			[true, true],
+				.map((row) => row.hash),
+			["a".repeat(64), "b".repeat(64)],
+			"the 3.x history is left as it was",
 		);
 		const tags = created(legacyRun("make", "tags"));
 		assert.match(
@@ -2555,6 +2559,7 @@ if (process.env.TYPESQL_MIGRATION_POSTGRES_URL) {
 		await client.query(`SET search_path TO "${schema}"`);
 		await other.query(`SET search_path TO "${schema}"`);
 		const once = migration("postgres", {
+			name: "0001",
 			up: async (db) => {
 				await db("SELECT pg_sleep(0.05)").execute();
 				return db.add(
@@ -2566,6 +2571,7 @@ if (process.env.TYPESQL_MIGRATION_POSTGRES_URL) {
 			},
 		});
 		const fill = migration(once, {
+			name: "0002",
 			up: async (db) => {
 				await db(
 					"INSERT INTO once_only (id, note) VALUES ($1, $2)",
@@ -2633,6 +2639,7 @@ if (process.env.TYPESQL_MIGRATION_POSTGRES_URL) {
 				once,
 				fill,
 				migration(fill, {
+					name: "0003",
 					up: async (db) => {
 						await db.raw("CREATE TABLE rolled_back (id integer)");
 						return db.raw(step);
@@ -2665,6 +2672,7 @@ if (process.env.TYPESQL_MIGRATION_POSTGRES_URL) {
 					once,
 					fill,
 					migration(fill, {
+						name: "0003",
 						up: async (db) => db.add("CREATE TABLE never_created (id integer)"),
 						down: async () => {},
 					}),
@@ -2748,6 +2756,7 @@ if (process.env.TYPESQL_MIGRATION_POSTGRES_URL) {
 		// A session the server ends during a migration rejects the command;
 		// it doesn't end the process with an unhandled 'error' event.
 		const lost = migration("postgres", {
+			name: "0001",
 			up: async (db) => {
 				const next = await db.add("CREATE TABLE lost_a (id integer)");
 				await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -2771,6 +2780,7 @@ if (process.env.TYPESQL_MIGRATION_POSTGRES_URL) {
 		// A session ended during a query rejects with the server's error, not
 		// pg's "connection terminated" of the queries after it.
 		const killed = migration("postgres", {
+			name: "0001",
 			up: async (db) => {
 				const [row] = await db("SELECT pg_backend_pid() AS pid").execute();
 				if (row)

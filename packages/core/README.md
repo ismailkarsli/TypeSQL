@@ -79,6 +79,7 @@ Named parameters and fixed fragments work too. The `pg` and `postgres` adapters 
 import { createMigrator, migration, type SchemaOf } from "@typesql/core/migration";
 
 export const createUsers = migration("postgres", {
+  name: "create-users",
   up: async (db) => {
     const users = await db.add("CREATE TABLE users (id serial PRIMARY KEY, name text NOT NULL)");
     await users("INSERT INTO users (name) VALUES ($1)", "Ada").execute();
@@ -90,6 +91,7 @@ export const createUsers = migration("postgres", {
 });
 
 export const addBio = migration(createUsers, {
+  name: "add-bio",
   up: async (db) => db.add("ALTER TABLE users ADD COLUMN bio text"),
   down: async (db) => {
     await db.add("ALTER TABLE users DROP COLUMN bio");
@@ -107,7 +109,7 @@ await createMigrator({
 
 Await each `.add()` and keep the context it returns: it carries the changed schema. `up` returns its final context.
 
-`createMigrator(config)` takes the migrations as an array or as a directory of files (`migrationsDir`, one default export per file, in filename order), and connects with `url` (PostgreSQL, through the optional peer dependency `pg`), `db` (a SQLite file, through node:sqlite) or your own `execute`. `latest()`, `up()` and `down()` run each migration and its history row in one transaction, under a lock, and every command first checks, by a fingerprint of their DDL, that applied migrations haven't changed. Array mode with `execute` loads no Node built-ins, so it runs in Cloudflare Workers, Bun and Deno; set `transaction: false` for Cloudflare D1. In directory mode, the migrator also writes the schema to `db.ts`, and [`@typesql/cli`](https://www.npmjs.com/package/@typesql/cli) runs it as `typesql migrate`.
+`createMigrator(config)` takes the migrations as an array or as a directory of files (`migrationsDir`, one default export per file, in filename order), and connects with `url` (PostgreSQL, through the optional peer dependency `pg`), `db` (a SQLite file, through node:sqlite) or your own `execute`. `latest()`, `up()` and `down()` run each migration and its history row in one transaction, under a lock, and every command first checks that the applied migrations, recorded by name (a migration's `name` in an array, its file name in a directory), are the first ones, in order. Array mode with `execute` loads no Node built-ins, so it runs in Cloudflare Workers, Bun and Deno; set `transaction: false` for Cloudflare D1. In directory mode, the migrator also writes the schema to `db.ts`, and [`@typesql/cli`](https://www.npmjs.com/package/@typesql/cli) runs it as `typesql migrate`.
 
 See the [migration guide](https://typesql.karsli.net/guide/migrations).
 

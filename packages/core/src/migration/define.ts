@@ -9,12 +9,16 @@ import type {
  * returns its context, and `down` takes what `up` returns.
  */
 export interface Migration<in Before = never, in out After = unknown> {
+	/** Its name in the history: needed in an array; a file's is its file name. */
+	readonly name?: string | undefined;
 	readonly up: (db: Before) => Promise<After>;
 	readonly down: (db: After) => Promise<unknown>;
 }
 
-/** The `up` and `down` passed to {@link migration}. */
+/** The `name`, `up` and `down` passed to {@link migration}. */
 export interface MigrationSteps<Before, After> {
+	/** Its name in the history: needed in an array; a file's is its file name. */
+	readonly name?: string | undefined;
 	readonly up: (db: Before) => Promise<After>;
 	readonly down: (db: NoInfer<After>) => Promise<unknown>;
 }
@@ -48,6 +52,8 @@ export const MIGRATION_FROM: unique symbol = Symbol.for(
  * Define a migration. `from` is `"postgres"` or `"sqlite"` for the first
  * migration, and the previous migration for a later one. `up`'s `db` starts
  * from the schema `from` leaves; `down`'s `db` starts from what `up` returns.
+ * `name` is its name in the history, which a migration in an array needs; a
+ * migration file's name is its file name.
  *
  * The starting schema is inferred from `from` as a function argument rather
  * than computed by a type alias, so checking a migration costs the same
@@ -91,10 +97,16 @@ export function migration(
 		throw new TypeError(
 			"typesql: migration() takes { up, down } with async functions",
 		);
-	const defined = { up: steps.up, down: steps.down } as Migration<
-		never,
-		unknown
-	>;
+	const { name } = steps as { name?: unknown };
+	if (name !== undefined && (typeof name !== "string" || name.trim() === ""))
+		throw new TypeError(
+			"typesql: a migration's name must be a non-empty string",
+		);
+	const defined = {
+		...(name === undefined ? {} : { name }),
+		up: steps.up,
+		down: steps.down,
+	} as Migration<never, unknown>;
 	Object.defineProperty(defined, MIGRATION_FROM, { value: from });
 	return Object.freeze(defined);
 }

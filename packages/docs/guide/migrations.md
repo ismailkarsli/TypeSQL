@@ -10,6 +10,7 @@ If you already write DDL to create your database, TypeSQL can read the schema fr
 import { migration } from "@typesql/core/migration";
 
 export const createUsers = migration("postgres", {
+	name: "create-users",
 	up: async (db) => {
 		const users = await db.add(`CREATE TABLE users (
 			id serial PRIMARY KEY,
@@ -25,6 +26,7 @@ export const createUsers = migration("postgres", {
 });
 
 export const addBio = migration(createUsers, {
+	name: "add-bio",
 	up: async (db) => db.add("ALTER TABLE users ADD COLUMN bio text"),
 	down: async (db) => {
 		await db.add("ALTER TABLE users DROP COLUMN bio");
@@ -32,6 +34,7 @@ export const addBio = migration(createUsers, {
 });
 ```
 
+- `name` is the migration's name in the [history](#tracking). A migration in an [array](#an-array) needs one; a [migration file](#a-directory-of-files) is named by its file name and leaves it out.
 - `from` is `"postgres"` or `"sqlite"` for the first migration, which starts from an empty schema of that dialect, and the previous migration for a later one.
 - `up`'s `db` starts from the schema `from` leaves. `down`'s `db` starts from what `up` returns.
 - Await `db.add(ddl)`: it runs the statement and returns a new context with the changed schema. Keep it in a new `const`; reassigning a variable doesn't change its type. A wrong statement is a compile error on its string, worded like the database's error: `relation "users" already exists`, `column "age" of relation "users" does not exist`, and so on. One `.add()` may hold a `;`-separated script.
@@ -132,11 +135,11 @@ const migrator = createMigrator({
 });
 ```
 
-Each migration must start from the one before it in the array, and the first one from the migrator's dialect; the migrator checks this before it connects, so a misordered array fails without touching the database. The schema is `SchemaOf<typeof addBio>` of the last migration: there is no generated file, and the type checker infers the chain where the schema is used. The migrator carries it too: `SchemaOf<typeof migrator>`, or `SchemaOf<typeof result>` of what `latest()` returns. Array mode needs no file system, so it also runs [outside Node](#runtimes).
+Each migration needs a `name`, unique in the array, which the history records it by. Each must start from the one before it in the array, and the first one from the migrator's dialect; the migrator checks this before it connects, so a misordered array fails without touching the database. The schema is `SchemaOf<typeof addBio>` of the last migration: there is no generated file, and the type checker infers the chain where the schema is used. The migrator carries it too: `SchemaOf<typeof migrator>`, or `SchemaOf<typeof result>` of what `latest()` returns. Array mode needs no file system, so it also runs [outside Node](#runtimes).
 
 ### Moving between them
 
-A migration's identity is its position and its [fingerprint](#tracking), and both are the same in either mode. The `name` column of the history is a label: the filename in directory mode, and the position, zero-padded, in array mode (`0001`, `0002`, …). Rows keep the name they were written with. So a database migrated from a directory can continue from an array that holds the same migrations in the same order, and the other way round.
+The history records each migration by its name: the file name in directory mode, and its `name` in array mode. So a database migrated from a directory can continue from an array whose migrations are named after the files (`name: "1793356800_create-users.ts"`), in the same order, and the other way round.
 
 ## The migrator
 
@@ -290,41 +293,21 @@ The command exits with 0 on success, also when there was nothing to do and when 
 
 ## Tracking
 
-The history table has three columns: `name` (the primary key), `hash` (the migration's fingerprint) and `applied_at`. The migrator creates it when it is missing; on PostgreSQL it is in the connection's current schema. Rows are read in the order they were applied (`ORDER BY applied_at, name`); the migrator writes strictly increasing `applied_at` values so that two migrations applied in the same second keep their order.
+The history table has three columns: `name` (the primary key), `hash` and `applied_at`. `hash` is unused and left empty; TypeSQL 3.x stored a hash of each file there, and the column stays so 3.x tables keep working. The migrator creates the table when it is missing; on PostgreSQL it is in the connection's current schema. Rows are read in the order they were applied (`ORDER BY applied_at, name`); the migrator writes strictly increasing `applied_at` values so that two migrations applied in the same second keep their order.
 
 Each command:
 
-1. Computes the fingerprint of every migration, applied and pending, by a dry run of its `up` (below). This happens before it connects.
-2. Checks the chain: each migration must start from the one before it, and the first one from the dialect.
-3. Reads the history. The applied rows must match the first migrations by position and fingerprint, so an applied migration that was edited, removed, reordered, or had one inserted before it, is an error with its position and name: `applied migration 2 (0002) has changed: it was edited, or a migration was inserted, removed or reordered before it`.
-4. Applies or reverts migrations one at a time: runs `up`, then inserts its row, in the same transaction (`down` deletes the row).
+1. Checks the chain: each migration must start from the one before it, and the first one from the dialect. This happens before it connects.
+2. Reads the history. The applied rows must be the first migrations, in order, by name, so these are errors that name the migration:
+   - an applied migration that was removed or renamed: `applied migration 2 (add-bio) is not among the migrations: it was removed or renamed`;
+   - a migration added before applied ones, or a changed order: `migration 2 (add-email) is not applied, but migration 3 (add-bio) after it is`.
+3. Applies or reverts migrations one at a time: runs `up`, then inserts its row, in the same transaction (`down` deletes the row).
 
-### The fingerprint
-
-A dry run calls `up` with a `db` that records instead of connecting:
-
-- Queries return no rows: `execute()` resolves to `[]`, `executeTakeFirst()` to `undefined`, `executeCount()` to `0`, and `executeTakeFirstOrThrow()` rejects.
-- Each `.add()` is recorded with its text, and each `.raw()` as a step without its text, since its SQL may be built at runtime.
-- A dry run that throws ends there; the fingerprint covers the steps recorded until then.
-- A dry run that takes longer than 5 seconds is an error. This is usually a loop that waits for rows, which never come.
-
-The fingerprint is a SHA-256 of the recorded steps. Before hashing, each `.add()` text is normalized outside its quoted parts: comments are removed, runs of whitespace become one space, spaces next to `(`, `)`, `,` and `;` are removed, and the text is lowercased. String literals (`'…'`), quoted identifiers (`"…"`), PostgreSQL's dollar-quoted bodies (`$$…$$`) and SQLite's `` `…` `` and `[…]` identifiers stay exact. So:
-
-- Reformatting, re-indenting or recasing a DDL string, and editing its comments, is not a change.
-- A change inside a quoted part, a changed statement, and adding, removing, splitting or merging `.add()` and `.raw()` steps are changes.
-- Queries are not part of the fingerprint: editing an `INSERT` that seeds data is not a change. Neither are types, formatting and the shape of the code around the steps.
-
-Because the stored fingerprint and the checked one come from the same dry run, unchanged code always matches.
-
-### Limits of tracking
-
-- DDL that runs only when a query returns rows (`if (rows.length > 0) await db.add(…)`), or after a query that throws without rows (`executeTakeFirstOrThrow()`), is not in the fingerprint. Editing it in an applied migration goes unnoticed.
-- Code outside the database, such as `fetch` or a file write, also runs during dry runs, on every command.
-- `.raw()` is recorded without its text: editing the SQL of an applied `.raw()` goes unnoticed.
+A new file sorts after the applied ones when its name starts with a later timestamp, as `typesql migrate make` writes them.
 
 ### Changing an applied migration {#rewriting-an-applied-migration}
 
-Code the fingerprint doesn't cover can change freely: a query rewritten for a new TypeSQL version, a reformatted statement, types. A change to an applied migration's DDL is an error on every database it was applied to, and TypeSQL has no command to accept it. Leave applied migrations as they are and add a new migration that makes the change.
+The migrator doesn't notice an applied migration's code changing: it records names, not contents. Editing its DDL changes the schema type your code is checked against, but not the databases it was applied to. Leave applied migrations as they are and add a new migration that makes the change. Changing code that has no effect on the database, such as a query rewritten for a new TypeSQL version, a reformatted statement or types, is fine.
 
 ## Transactions and locking
 
@@ -337,7 +320,7 @@ With `transaction: false`, the migrator sends no `BEGIN` or `COMMIT` and takes n
 
 ## Runtimes
 
-`@typesql/core/migration` imports no Node built-ins when it loads. Fingerprints use Web Crypto. The Node-only parts load when they are used: reading a directory, connecting from `url` (`pg`) or `db` (`node:sqlite`), `make()` and `generate()`. So array mode with `execute` runs in Cloudflare Workers, Bun and Deno.
+`@typesql/core/migration` imports no Node built-ins when it loads. The Node-only parts load when they are used: reading a directory, connecting from `url` (`pg`) or `db` (`node:sqlite`), `make()` and `generate()`. So array mode with `execute` runs in Cloudflare Workers, Bun and Deno.
 
 Bundlers (esbuild, `bun build`, Wrangler) include the Node-only parts, which reach Node's built-ins through `process.getBuiltinModule()` and so leave a Worker bundle nothing to resolve. A Node bundle runs `url`, `db` and `migrationsDir` as unbundled code does, but `pg` and `typescript` (for `generate()`) are not bundled: they load from `node_modules` at runtime, so install them beside the bundle.
 

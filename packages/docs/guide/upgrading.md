@@ -43,7 +43,7 @@ Most breaking changes are compile errors at the call site, so after upgrading ru
 | `MigrationOptions` (`{ dialect, migrationsDir, execute, migrationTable? }`) | `MigratorConfig`: the same fields, plus `url`, `db`, `migrations`, `schemaFile`, `generate` and `transaction` |
 | `MigrationResult` (`{ direction, migrations }`) | `LatestResult` and `UpResult` (`{ applied }`) and `DownResult` (`{ reverted }`), with `schemaFile` or `schemaError` in directory mode |
 | `discoverMigrations(dir)`, `MigrationFile`, `MigrationModule` | `createMigrator(config).status()`, which lists the migrations and whether they are applied |
-| `migrationHash(source)` | no replacement: migrations are tracked by a [fingerprint](./migrations#the-fingerprint) |
+| `migrationHash(source)` | no replacement: migrations are [tracked](./migrations#tracking) by name only |
 | `MigrationSchema<typeof up>` | `SchemaOf<typeof up>` |
 | `Migrations`, `PgMigrations`, `SqliteMigrations`, `MigrationClient`, `MigrationSource` | `Migration` |
 | `MigrationConfig` of `@typesql/cli` (a config object) | `export default createMigrator({ … })` in `typesql.config.ts` |
@@ -69,6 +69,7 @@ await migrate(pool, m);
 import { createMigrator, migration, type SchemaOf } from "@typesql/core/migration";
 
 export const createUsers = migration("postgres", {
+	name: "create-users",
 	up: async (db) =>
 		db.add("CREATE TABLE users (id serial PRIMARY KEY, email text NOT NULL)"),
 	down: async (db) => {
@@ -76,6 +77,7 @@ export const createUsers = migration("postgres", {
 	},
 });
 export const addBio = migration(createUsers, {
+	name: "add-bio",
 	up: async (db) => db.add("ALTER TABLE users ADD COLUMN bio text"),
 	down: async (db) => {
 		await db.add("ALTER TABLE users DROP COLUMN bio");
@@ -119,7 +121,7 @@ A plain object is now an error. The flags, the `$DATABASE_URL` fallback, the pat
 
 ### 3.x migration files and history tables
 
-The history table keeps its columns (`name`, `hash`, `applied_at`), so it needs no schema change. 3.x stored a hash of each file's source; 4.0 stores a fingerprint of what `up` runs. The first 4.0 command in directory mode, `status` included, converts the table: each row with a 3.x hash is matched to the file of the same name and gets that file's fingerprint, in the same transaction. This trusts that the applied files are the ones 3.x last checked, so run 3.x's `typesql migrate latest` once before upgrading (it checks every applied file) and upgrade without editing the files in between. A 3.x row without a file of its name is an error. In array mode, a 3.x history is an error: run one command in directory mode first, then switch.
+The history table keeps its columns (`name`, `hash`, `applied_at`) and its rows, so it needs no change. 4.0 matches rows to files by name, as 3.x did, and no longer checks or writes the hash: an edited applied file is not an error any more.
 
 3.x files, which export `up` and `down` functions, still load in directory mode, so applied ones need no rewrite. `MigrationSchema` is removed; replace it with `SchemaOf`, which takes a 3.x `up` too:
 
@@ -139,7 +141,7 @@ export async function up(db: PostgresMigration<SchemaOf<typeof previousUp>>) {
 
 New files use the default-export form. `typesql migrate make` writes it, and after a 3.x file it imports that file's `up`: `import { up as previous } from "./1793356800_create-users.js"`.
 
-Because the fingerprint covers what `up` runs and not its source, an applied 3.x file can also be rewritten to `export default migration(previous, { up, down })` after the conversion: as long as `up` runs the same `.add()` and `.raw()` steps, it still matches. A 3.x file that follows a rewritten one imports its default export instead of its `up` (`import type previous from "./….ts"` and `SchemaOf<typeof previous>`). Rewriting also fixes a long 3.x history whose later files report false type errors in the editor.
+Because the history records only names, an applied 3.x file can also be rewritten to `export default migration(previous, { up, down })`; keep its `up` running the same statements. A 3.x file that follows a rewritten one imports its default export instead of its `up` (`import type previous from "./….ts"` and `SchemaOf<typeof previous>`). Rewriting also fixes a long 3.x history whose later files report false type errors in the editor.
 
 ## 3.0
 
@@ -174,7 +176,7 @@ Update the [VS Code extension](./vscode) to 1.0 or later and `@typesql/language-
 ### Tracked migrations that use `{name}` slots {#tracked-migrations-with-slots}
 
 ::: warning Applied migration files
-A tracked migration file that uses `{name}` slots no longer compiles. In 3.x, rewriting it as above changes the file's runtime code, and so its hash, and the next `typesql migrate` command fails with `Applied migration has changed`; 3.x's `migrationHash` gives the new hash to store in the history table once you have checked that the file runs the same SQL. From 4.0 on, queries are not part of a migration's fingerprint, so the rewrite is not a change; see [Changing an applied migration](./migrations#rewriting-an-applied-migration).
+A tracked migration file that uses `{name}` slots no longer compiles. In 3.x, rewriting it as above changes the file's runtime code, and so its hash, and the next `typesql migrate` command fails with `Applied migration has changed`; 3.x's `migrationHash` gives the new hash to store in the history table once you have checked that the file runs the same SQL. From 4.0 on, the history records only names, so the rewrite is not a change; see [Changing an applied migration](./migrations#rewriting-an-applied-migration).
 :::
 
 ### `sql.empty` is now `sql.optional` and `sql.if`

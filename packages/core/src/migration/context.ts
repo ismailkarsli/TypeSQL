@@ -87,8 +87,8 @@ type MissingSchemaError = SqlError<
 
 /**
  * Internal factory: execution is bound to the runner's active transaction.
- * `step` runs each `.add()` and `.raw()` statement; the fingerprint's dry
- * run records them instead.
+ * `step` runs each `.add()` and `.raw()` statement; the runner splits a
+ * SQLite script into its statements there.
  */
 export function createMigrationContext(
 	dialect: "postgres" | "sqlite",

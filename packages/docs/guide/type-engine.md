@@ -18,7 +18,7 @@ Core separates what every dialect shares from the dialects under `postgres/` and
 | `runtime/` | Runtime parameter encoding, statement building, splicing, JSON, and writes. `build.ts` turns interpolated fragments into internal slots, then applies named parameters, inline parameters and those slots, in that order. |
 | `schema.ts` | The schema markers (`Col`, `View`, …) and the `ColumnTypes` registry a dialect augments with its type names. |
 | `query.ts`, `transaction.ts`, `plugin.ts`, `plugins/case.ts` | Query execution and transaction APIs, and typed input/output plugins. |
-| `migration/` | `@typesql/core/migration`: `migration()` and the migration context (`define.ts`, `context.ts`), the migrator and its history (`migrator.ts`), dry-run fingerprints (`fingerprint.ts`), and the Node-only parts it loads on demand: migration files (`files.ts`), connections (`connect.ts`) and the DB file writer (`generate.ts`). |
+| `migration/` | `@typesql/core/migration`: `migration()` and the migration context (`define.ts`, `context.ts`), the migrator and its history (`migrator.ts`), and the Node-only parts it loads on demand: migration files (`files.ts`), connections (`connect.ts`) and the DB file writer (`generate.ts`). |
 | `postgres/dialect.ts` | The `postgres` dialect. |
 | `postgres/sql/`, `postgres/engine/engine.ts` | PostgreSQL's `Sql` (the shared `SqlApi` bound to `PgEngine`) and the `PgEngine` binding of the engine contract. |
 | `postgres/schema/`, `postgres/type-map/` | PostgreSQL schema types (`Json`, `PgCatalog`, functions) and PostgreSQL-to-TypeScript type mappings. |

@@ -297,8 +297,8 @@ An entry is one `Sig<Params, Return, Flags>` or a tuple of overloads.
 
 | Export | Meaning |
 |---|---|
-| `migration(from, { up, down })` | a `Migration`; `from` is `"postgres"`, `"sqlite"` or the previous migration |
-| `Migration<Before, After>` | `{ up(db: Before): Promise<After>; down(db: After): Promise<unknown> }` |
+| `migration(from, { name, up, down })` | a `Migration`; `from` is `"postgres"`, `"sqlite"` or the previous migration. `name` is its name in the history: needed in an array, left out in a migration file, whose name is its file name |
+| `Migration<Before, After>` | `{ name?: string; up(db: Before): Promise<After>; down(db: After): Promise<unknown> }` |
 | `MigrationSteps<Before, After>` | the `{ up, down }` argument of `migration()` |
 | `SchemaOf<M>` | the schema after the migration `M`; also takes a migrator, the result of its `latest()`, a 3.x `up` function or a migration context. Also exported from `@typesql/core` |
 | `PostgresMigration<DB = {}>`, `SqliteMigration<DB = {}>` | the `db` of a migration: a checked query function with `add(ddl)`, `raw<NewSchema>(sql)` and the type-only `schema` |

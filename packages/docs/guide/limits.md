@@ -29,13 +29,9 @@ When you hit a limit, [`sql.as<Row>()`](./errors#when-typesql-can-t-type-a-state
 
 ## Migrations
 
-The migrator tracks a migration by a [fingerprint](./migrations#the-fingerprint) of the `.add()` and `.raw()` steps a dry run of its `up` takes, without a database. So in an applied migration:
+The migrator records a migration by its name, not its contents: editing an applied migration goes unnoticed. See [Changing an applied migration](./migrations#rewriting-an-applied-migration).
 
-- DDL that runs only when a query returns rows, or after `executeTakeFirstOrThrow()`, can be edited unnoticed.
-- The SQL of a `.raw()` step, and queries such as seed data, can be edited unnoticed.
-- Code outside the database (`fetch`, file writes) also runs during the dry runs, on every command, and a dry run longer than 5 seconds is an error.
-
-With `transaction: false` (Cloudflare D1), there is no transaction and no lock: don't run migrations concurrently. See [Limits of tracking](./migrations#limits-of-tracking).
+With `transaction: false` (Cloudflare D1, libsql's client), there is no transaction and no lock: don't run migrations concurrently.
 
 ## SQL text
 

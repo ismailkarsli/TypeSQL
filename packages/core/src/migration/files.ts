@@ -100,6 +100,14 @@ export async function loadMigrations(migrationsDir: string): Promise<
 			throw error;
 		}
 		const defined = module.default;
+		if (
+			isMigration(defined) &&
+			defined.name !== undefined &&
+			defined.name !== name
+		)
+			throw new Error(
+				`typesql: ${name} names its migration ${JSON.stringify(defined.name)}, but a migration file's name is its file name; remove the name`,
+			);
 		if (isMigration(defined))
 			loaded.push({
 				name,
