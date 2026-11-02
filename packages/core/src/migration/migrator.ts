@@ -625,18 +625,22 @@ async function openHistory(
 		async begin(): Promise<void> {
 			if (!transaction) return;
 			await execute(postgres ? "BEGIN" : "BEGIN IMMEDIATE", []);
-			// The lock ends with the transaction, so it can't stay held on a
-			// pooled connection.
-			if (postgres)
-				[{ xid } = {} as { xid?: unknown }] = (await rows(
-					execute,
-					"SELECT pg_advisory_xact_lock($1::bigint), txid_current()::text AS xid",
-					[lock],
-				)) as { xid?: unknown }[];
-			if (!(await inTransaction())) {
+			try {
+				// The lock ends with the transaction, so it can't stay held on
+				// a pooled connection. Its void result stays in FROM: Prisma
+				// can't read a void column.
 				if (postgres)
-					await Promise.resolve(execute("ROLLBACK", [])).catch(() => {});
-				throw new Error(SPLIT);
+					[{ xid } = {} as { xid?: unknown }] = (await rows(
+						execute,
+						"SELECT txid_current()::text AS xid FROM pg_advisory_xact_lock($1::bigint)",
+						[lock],
+					)) as { xid?: unknown }[];
+				if (!(await inTransaction())) throw new Error(SPLIT);
+			} catch (error) {
+				// Leave no transaction, and with it the lock, open on the
+				// caller's connection, where its later writes would be lost.
+				await Promise.resolve(execute("ROLLBACK", [])).catch(() => {});
+				throw error;
 			}
 		},
 		async commit(): Promise<void> {

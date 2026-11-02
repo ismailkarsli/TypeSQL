@@ -2600,10 +2600,10 @@ if (process.env.TYPESQL_MIGRATION_POSTGRES_URL) {
 		]);
 		// Each migration is applied once, by one of them; the lock is per
 		// migration, so they may take turns.
-		assert.deepEqual(
-			results.flatMap((result) => result.applied).sort(),
-			["0001", "0002"],
-		);
+		assert.deepEqual(results.flatMap((result) => result.applied).sort(), [
+			"0001",
+			"0002",
+		]);
 		assert.equal(
 			(await client.query("SELECT count(*)::integer AS n FROM once_only"))
 				.rows[0]?.n,
@@ -2679,6 +2679,50 @@ if (process.env.TYPESQL_MIGRATION_POSTGRES_URL) {
 		);
 		await client.query("ROLLBACK");
 		await other.query("ROLLBACK");
+		assert.equal(await advisoryLocks(), 0);
+		// Prisma can't read a void column, which the lock query doesn't return.
+		const noVoid =
+			(connection: PgConnection) =>
+			async (text: string, values: readonly unknown[]) => {
+				const result = (await connection.query(text, values)) as {
+					rows: unknown[];
+					fields?: { dataTypeID: number }[];
+				};
+				if (result.fields?.some((field) => field.dataTypeID === 2278))
+					throw new Error("Failed to deserialize column of type 'void'");
+				return result.rows;
+			};
+		assert.deepEqual(
+			(
+				await on(client)
+					.with({ execute: noVoid(client) })
+					.status()
+			).length,
+			2,
+		);
+		// A lock query that fails leaves no transaction open on the caller's
+		// connection, where its later writes would be lost.
+		await assert.rejects(
+			on(client)
+				.with({
+					execute: (text, values) =>
+						text.includes("pg_advisory_xact_lock")
+							? Promise.reject(new Error("lock failed"))
+							: client.query(text, values),
+				})
+				.latest(),
+			/lock failed/,
+		);
+		const pid = (await client.query("SELECT pg_backend_pid() AS pid")).rows[0]
+			?.pid;
+		assert.equal(
+			(
+				await other.query("SELECT state FROM pg_stat_activity WHERE pid = $1", [
+					pid,
+				])
+			).rows[0]?.state,
+			"idle",
+		);
 		assert.equal(await advisoryLocks(), 0);
 		await assert.rejects(
 			failing(
