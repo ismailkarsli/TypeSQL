@@ -25,10 +25,9 @@ exports[`module-entry-points > scenario 1`] = `
   pgIntrospect: 'function',
   sqliteIntrospect: 'function',
   generateSource: 'function',
+  cli: 'function',
   requireEsm: 'function'
 }
-4.0.0
-{ status: 0 }
 ",
   },
 }

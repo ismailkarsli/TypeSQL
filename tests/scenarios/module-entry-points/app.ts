@@ -22,6 +22,6 @@ console.log({
 	pgIntrospect: typeof pgIntrospect.introspect,
 	sqliteIntrospect: typeof sqliteIntrospect.introspect,
 	generateSource: typeof generator.generateSource,
+	cli: typeof main,
 	requireEsm: typeof require("@typesql/core").createSql,
 });
-console.log({ status: await main(["--version"]) });
