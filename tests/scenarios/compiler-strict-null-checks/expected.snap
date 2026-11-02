@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`compiler-strict-null-checks > consumer 1`] = `
+exports[`compiler-strict-null-checks > scenario 1`] = `
 {
   "compile": {
     "status": 1,

@@ -79,11 +79,11 @@ export async function command(
 			signal?.removeEventListener("abort", abort);
 			const result = { command: argv, status: status ?? -1, stdout, stderr };
 			try {
-				await mkdir(join(cwd, ".consumer", "logs"), { recursive: true });
+				await mkdir(join(cwd, ".scenario", "logs"), { recursive: true });
 				await writeFile(
 					join(
 						cwd,
-						".consumer",
+						".scenario",
 						"logs",
 						`${argv
 							.map((x) => x.replace(/[^a-z0-9-]/gi, "_"))

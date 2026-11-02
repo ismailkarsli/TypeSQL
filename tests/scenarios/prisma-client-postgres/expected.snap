@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`prisma-client-postgres > consumer 1`] = `
+exports[`prisma-client-postgres > scenario 1`] = `
 {
   "compile": {
     "status": 0,

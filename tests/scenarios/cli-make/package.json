@@ -17,7 +17,7 @@
 		"typescript": "catalog:",
 		"@types/node": "catalog:"
 	},
-	"consumer": {
+	"scenario": {
 		"database": "postgres",
 		"artifacts": [
 			"migrations/1793356800_create-users.ts"

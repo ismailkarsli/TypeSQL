@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`pg-driver-values > consumer 1`] = `
+exports[`pg-driver-values > scenario 1`] = `
 {
   "compile": {
     "status": 0,

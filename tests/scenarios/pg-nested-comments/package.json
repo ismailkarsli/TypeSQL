@@ -17,7 +17,7 @@
 		"typescript": "catalog:",
 		"@types/node": "catalog:"
 	},
-	"consumer": {
+	"scenario": {
 		"database": "postgres"
 	}
 }

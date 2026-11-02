@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`cli-invalid-command > consumer 1`] = `
+exports[`cli-invalid-command > scenario 1`] = `
 {
   "generate": {
     "status": 2,

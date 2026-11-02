@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`drizzle-pg > consumer 1`] = `
+exports[`drizzle-pg > scenario 1`] = `
 {
   "compile": {
     "status": 0,

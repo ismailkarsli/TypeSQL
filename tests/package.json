@@ -1,5 +1,5 @@
 {
-	"name": "typesql-consumers",
+	"name": "typesql-scenarios",
 	"private": true,
 	"type": "module",
 	"packageManager": "pnpm@12.16.1",

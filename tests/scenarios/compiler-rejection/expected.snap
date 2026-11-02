@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`compiler-rejection > consumer 1`] = `
+exports[`compiler-rejection > scenario 1`] = `
 {
   "compile": {
     "status": 1,

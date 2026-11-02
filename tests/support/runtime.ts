@@ -1,8 +1,8 @@
 import { writeFileSync } from "node:fs";
 import type { ApplicationException } from "./types.ts";
 
-const errorFile = process.env.CONSUMER_ERROR_FILE;
-if (!errorFile) throw new Error("CONSUMER_ERROR_FILE is required");
+const errorFile = process.env.SCENARIO_ERROR_FILE;
+if (!errorFile) throw new Error("SCENARIO_ERROR_FILE is required");
 
 // Monitoring preserves Node's normal exception reporting and exit status.
 process.on("uncaughtExceptionMonitor", (error) => {

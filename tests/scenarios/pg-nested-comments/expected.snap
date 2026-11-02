@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`pg-nested-comments > consumer 1`] = `
+exports[`pg-nested-comments > scenario 1`] = `
 {
   "compile": {
     "status": 0,

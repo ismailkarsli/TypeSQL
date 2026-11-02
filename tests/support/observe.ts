@@ -1,4 +1,4 @@
-// Runs with the consumer's working directory and the workspace's pinned compiler.
+// Runs with the scenario's working directory and the workspace's pinned compiler.
 
 import { readFileSync, writeFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
@@ -12,7 +12,7 @@ try {
 	const snapshot = api.createSnapshot({ openFiles: [app] });
 	const project = snapshot.getDefaultProjectForFile(app);
 	if (!project)
-		throw new Error("Infrastructure: compiler did not open consumer project");
+		throw new Error("Infrastructure: compiler did not open scenario project");
 	const { checker, program } = project;
 	const printed = (t: ts.Type) =>
 		checker.typeToString(
@@ -134,7 +134,7 @@ try {
 		...new Map(diagnostics.map((d) => [JSON.stringify(d), d])).values(),
 	];
 	writeFileSync(
-		".consumer/compiler.json",
+		".scenario/compiler.json",
 		JSON.stringify({ types, diagnostics: unique }, null, 2),
 	);
 } finally {

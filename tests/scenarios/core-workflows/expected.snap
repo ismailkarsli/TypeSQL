@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`core-workflows > consumer 1`] = `
+exports[`core-workflows > scenario 1`] = `
 {
   "compile": {
     "status": 0,

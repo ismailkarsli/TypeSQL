@@ -42,7 +42,7 @@ jobs:
         env:
           BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
 
-  consumers:
+  scenario:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -61,11 +61,11 @@ jobs:
       - name: Start PostgreSQL
         run: docker compose -f tests/compose.yaml up --detach --wait
       - run: pnpm test
-      - name: Retain failing consumer applications and logs
+      - name: Retain failing scenario applications and logs
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: consumer-failures
+          name: scenario-failures
           path: tests/.artifacts/
           include-hidden-files: true
           retention-days: 7

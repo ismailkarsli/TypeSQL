@@ -24,7 +24,7 @@ const workspace = import.meta.dirname;
 const repository = resolve(workspace, "..");
 
 // Generated discovery files only select a scenario. Assertions remain Vitest's.
-export function consumer(name: string) {
+export function scenario(name: string) {
 	test(name, async ({ signal }) =>
 		withCommands(signal, async () => {
 			let directory: string | undefined;
@@ -35,20 +35,20 @@ export function consumer(name: string) {
 				directory = await mkdtemp(join(tmpdir(), `typesql-${name}-`));
 				const manifest = await prepare(name, directory);
 				if (
-					manifest.consumer?.failure &&
-					(!manifest.scripts[manifest.consumer.failure.stage] ||
-						manifest.consumer.failure.exitCode <= 0)
+					manifest.scenario?.failure &&
+					(!manifest.scripts[manifest.scenario.failure.stage] ||
+						manifest.scenario.failure.exitCode <= 0)
 				)
 					throw new Error("Invalid expected failure contract");
-				database = await allocate(manifest.consumer?.database, directory);
+				database = await allocate(manifest.scenario?.database, directory);
 				const env = {
 					...database.env,
-					CONSUMER_ERROR_FILE: join(directory, ".consumer", "exception.json"),
+					SCENARIO_ERROR_FILE: join(directory, ".scenario", "exception.json"),
 					NODE_OPTIONS: `--import=${join(workspace, "support", "runtime.ts")}`,
 				};
 				const normalize = (text: string) => {
 					let value = text
-						.replaceAll(directory!, "<consumer>")
+						.replaceAll(directory!, "<scenario>")
 						.replaceAll(repository, "<workspace>");
 					if (database?.env.DATABASE_URL)
 						value = value.replaceAll(
@@ -71,7 +71,7 @@ export function consumer(name: string) {
 						stdout: normalize(result.stdout),
 						stderr: normalize(result.stderr),
 					};
-					const failure = manifest.consumer?.failure;
+					const failure = manifest.scenario?.failure;
 					if (
 						result.status !== 0 &&
 						(failure?.stage !== step || result.status !== failure.exitCode)
@@ -91,17 +91,17 @@ export function consumer(name: string) {
 						if (result.status !== 0) {
 							expect(
 								JSON.parse(normalize(JSON.stringify(observed))),
-							).toMatchSnapshot("consumer");
+							).toMatchSnapshot("scenario");
 							return;
 						}
 					}
 				}
 				if (manifest.scripts.generate) {
 					stage = "generated artifacts";
-					for (const file of manifest.consumer?.artifacts ?? []) {
+					for (const file of manifest.scenario?.artifacts ?? []) {
 						const path = resolve(directory, file);
 						if (!path.startsWith(`${directory}/`))
-							throw new Error(`Artifact escapes consumer: ${file}`);
+							throw new Error(`Artifact escapes scenario: ${file}`);
 						await access(path);
 					}
 				}
@@ -116,13 +116,13 @@ export function consumer(name: string) {
 						"Compiler command and observer disagree about diagnostics",
 					);
 				if (compilation.status === 0 && manifest.scripts.start) {
-					await rm(env.CONSUMER_ERROR_FILE, { force: true });
+					await rm(env.SCENARIO_ERROR_FILE, { force: true });
 					const runtime = await script("start");
 					if (runtime.status !== 0) {
 						let exception: ApplicationException;
 						try {
 							exception = JSON.parse(
-								await readFile(env.CONSUMER_ERROR_FILE, "utf8"),
+								await readFile(env.SCENARIO_ERROR_FILE, "utf8"),
 							);
 						} catch {
 							throw new Error(
@@ -134,32 +134,32 @@ export function consumer(name: string) {
 				}
 				stage = "artifacts";
 				const artifacts: Record<string, string> = {};
-				for (const file of manifest.consumer?.artifacts ?? []) {
+				for (const file of manifest.scenario?.artifacts ?? []) {
 					const path = resolve(directory, file);
 					if (!path.startsWith(`${directory}/`))
-						throw new Error(`Artifact escapes consumer: ${file}`);
+						throw new Error(`Artifact escapes scenario: ${file}`);
 					artifacts[file] = normalize(await readFile(path, "utf8"));
 				}
 				if (Object.keys(artifacts).length) observed.artifacts = artifacts;
 				stage = "snapshot";
 				await writeFile(
-					join(directory, ".consumer", "observed.json"),
+					join(directory, ".scenario", "observed.json"),
 					JSON.stringify(observed, null, 2),
 				);
 				expect(JSON.parse(normalize(JSON.stringify(observed)))).toMatchSnapshot(
-					"consumer",
+					"scenario",
 				);
 			} catch (cause) {
 				if (directory) {
 					const retained = resolve(
-						process.env.CONSUMER_ARTIFACTS ?? join(workspace, ".artifacts"),
+						process.env.SCENARIO_ARTIFACTS ?? join(workspace, ".artifacts"),
 						name,
 					);
 					await rm(retained, { recursive: true, force: true });
 					await mkdir(retained, { recursive: true });
-					await mkdir(join(directory, ".consumer"), { recursive: true });
+					await mkdir(join(directory, ".scenario"), { recursive: true });
 					await writeFile(
-						join(directory, ".consumer", "failure.json"),
+						join(directory, ".scenario", "failure.json"),
 						JSON.stringify(
 							{ name, stage, observed, error: String(cause) },
 							null,
@@ -169,7 +169,7 @@ export function consumer(name: string) {
 					try {
 						await cp(
 							join(workspace, "scenarios", name, "expected.snap"),
-							join(directory, ".consumer", "expected.snap"),
+							join(directory, ".scenario", "expected.snap"),
 						);
 					} catch (error) {
 						if (
@@ -183,7 +183,7 @@ export function consumer(name: string) {
 					}
 					await cp(directory, retained, { recursive: true });
 					throw new Error(
-						`${name}: failed at ${stage}. Consumer and logs retained at ${retained}`,
+						`${name}: failed at ${stage}. Scenario and logs retained at ${retained}`,
 						{ cause },
 					);
 				}
@@ -201,7 +201,7 @@ async function prepare(name: string, directory: string) {
 	await cp(source, directory, {
 		recursive: true,
 		filter: (path) =>
-			!["node_modules", "dist", ".consumer", "expected.snap"].includes(
+			!["node_modules", "dist", ".scenario", "expected.snap"].includes(
 				basename(path),
 			),
 	});
@@ -210,7 +210,7 @@ async function prepare(name: string, directory: string) {
 		join(directory, "node_modules"),
 		"dir",
 	);
-	await mkdir(join(directory, ".consumer"));
+	await mkdir(join(directory, ".scenario"));
 	const config = JSON.parse(
 		await readFile(join(workspace, "tsconfig.json"), "utf8"),
 	);

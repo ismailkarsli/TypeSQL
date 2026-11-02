@@ -5,7 +5,7 @@ import type { CompilerObservation } from "./types.ts";
 export async function observeCompiler(directory: string) {
 	await required(directory, ["node", join(import.meta.dirname, "observe.ts")]);
 	const observation: CompilerObservation = JSON.parse(
-		await readFile(join(directory, ".consumer", "compiler.json"), "utf8"),
+		await readFile(join(directory, ".scenario", "compiler.json"), "utf8"),
 	);
 	return observation;
 }

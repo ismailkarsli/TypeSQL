@@ -1,4 +1,4 @@
-# Tests
+# Scenario tests
 
 Requires Linux, Node, pnpm, and Bun. Start PostgreSQL yourself with `docker compose -f tests/compose.yaml up -d --wait`, then run from the repository root:
 

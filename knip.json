@@ -82,7 +82,7 @@
 			"ignoreDependencies": ["@typesql/drizzle", "vue"]
 		},
 		"tests": {
-			"entry": ["consumer.test.ts", "support/observe.ts", "support/runtime.ts"],
+			"entry": ["scenario.test.ts", "support/observe.ts", "support/runtime.ts"],
 			"project": ["*.ts", "support/**/*.ts"]
 		}
 	}

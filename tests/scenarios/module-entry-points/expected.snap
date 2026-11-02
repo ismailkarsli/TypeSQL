@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`module-entry-points > consumer 1`] = `
+exports[`module-entry-points > scenario 1`] = `
 {
   "compile": {
     "status": 0,

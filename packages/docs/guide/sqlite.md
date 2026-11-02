@@ -179,7 +179,7 @@ no such column: emial. Perhaps you meant the column "email"?
 
 ## Compatibility testing
 
-`pnpm test` checks the documented SQLite workflows using workspace scenarios for node:sqlite, better-sqlite3 and bun:sqlite. It checks inferred types, compiler errors, actual database results, transactions, introspection and generated schemas through reviewed Vitest snapshots. See the [consumer test guide](https://github.com/ismailkarsli/TypeSQL/blob/main/tests/README.md).
+`pnpm test` checks the documented SQLite workflows using workspace scenarios for node:sqlite, better-sqlite3 and bun:sqlite. It checks inferred types, compiler errors, actual database results, transactions, introspection and generated schemas through reviewed Vitest snapshots. See the [scenario test guide](https://github.com/ismailkarsli/TypeSQL/blob/main/tests/README.md).
 
 ## Limits
 

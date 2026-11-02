@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`runtime-inline-reuse > consumer 1`] = `
+exports[`runtime-inline-reuse > scenario 1`] = `
 {
   "compile": {
     "status": 0,
@@ -25,7 +25,7 @@ Error: typesql: this sql.param() value was already used by another statement; ca
     at resolveInline (file://<workspace>/packages/core/dist/runtime/inline.js:156:19)
     at build (file://<workspace>/packages/core/dist/runtime/build.js:30:19)
     at call (file://<workspace>/packages/core/dist/create-sql.js:16:34)
-    at file://<consumer>/dist/app.js:6:1
+    at file://<scenario>/dist/app.js:6:1
     at ModuleJob.run (node:internal/modules/esm/module_job:569:25)
     at async node:internal/modules/esm/loader:650:26
     at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)

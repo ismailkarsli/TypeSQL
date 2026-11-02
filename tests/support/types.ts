@@ -1,6 +1,6 @@
 export interface Scenario {
 	scripts: Record<string, string>;
-	consumer?: {
+	scenario?: {
 		database?: "postgres" | "sqlite";
 		failure?: { stage: "generate" | "compile" | "start"; exitCode: number };
 		artifacts?: string[];

@@ -15,14 +15,14 @@ if (
 	process.env.CI &&
 	tokens.some((t) => t.kind === "option" && t.name === "update")
 )
-	throw new Error("CI must never update consumer snapshots");
+	throw new Error("CI must never update scenario snapshots");
 const running = spawn("pnpm", ["exec", "vitest", "run", ...args], {
 	cwd: import.meta.dirname,
 	stdio: "inherit",
 	env: {
 		...process.env,
-		CONSUMER_ARTIFACTS:
-			process.env.CONSUMER_ARTIFACTS ??
+		SCENARIO_ARTIFACTS:
+			process.env.SCENARIO_ARTIFACTS ??
 			resolve(import.meta.dirname, ".artifacts", randomUUID()),
 	},
 });

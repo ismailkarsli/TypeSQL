@@ -92,8 +92,8 @@ RowOf / ParamsOf / Validate                 public projections of Analysis
 
 ## Checking behavior
 
-Start PostgreSQL as described in the [consumer test guide](https://github.com/ismailkarsli/TypeSQL/blob/main/tests/README.md), then run `pnpm test`. The runner builds the workspace packages and runs temporary copies of the scenarios with their installed workspace dependencies against fresh PostgreSQL databases or SQLite files. Vitest checks inferred public types, exact compiler diagnostics, application output/errors, and generated artifacts against reviewed snapshots.
+Start PostgreSQL as described in the [scenario test guide](https://github.com/ismailkarsli/TypeSQL/blob/main/tests/README.md), then run `pnpm test`. The runner builds the workspace packages and runs temporary copies of the scenarios with their installed workspace dependencies against fresh PostgreSQL databases or SQLite files. Vitest checks inferred public types, exact compiler diagnostics, application output/errors, and generated artifacts against reviewed snapshots.
 
-For a bug fix, first add a consumer and its intended contract and observe it fail against the unfixed library. Fix the library and rerun the same scenario, then run the complete suite. Include both nullable and non-nullable inputs when changing nullability rules. Applications contain no test assertions or type-equality helpers.
+For a bug fix, first add a scenario and its intended contract and observe it fail against the unfixed library. Fix the library and rerun the same scenario, then run the complete suite. Include both nullable and non-nullable inputs when changing nullability rules. Applications contain no test assertions or type-equality helpers.
 
-See the [consumer test guide](https://github.com/ismailkarsli/TypeSQL/blob/main/tests/README.md) for filtering, explicit snapshot updates, and retained failing projects. The suite checks documented workflows and permanent bug reproductions.
+See the [scenario test guide](https://github.com/ismailkarsli/TypeSQL/blob/main/tests/README.md) for filtering, explicit snapshot updates, and retained failing projects. The suite checks documented workflows and permanent bug reproductions.

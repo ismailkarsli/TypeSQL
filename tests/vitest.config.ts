@@ -10,7 +10,7 @@ mkdirSync(discovery, { recursive: true });
 for (const name of readdirSync(join(root, "scenarios")).sort()) {
 	writeFileSync(
 		join(discovery, `${name}.test.ts`),
-		`import { consumer } from '../consumer.test.ts';\nconsumer(${JSON.stringify(name)});\n`,
+		`import { scenario } from '../scenario.test.ts';\nscenario(${JSON.stringify(name)});\n`,
 	);
 }
 export default defineConfig({

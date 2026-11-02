@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`cli-make > consumer 1`] = `
+exports[`cli-make > scenario 1`] = `
 {
   "artifacts": {
     "migrations/1793356800_create-users.ts": "import { migration } from "@typesql/core/migration";
@@ -25,7 +25,7 @@ export default migration("postgres", {
   "generate": {
     "status": 0,
     "stderr": "",
-    "stdout": "typesql migrate: created <consumer>/migrations/1793356800_create-users.ts
+    "stdout": "typesql migrate: created <scenario>/migrations/1793356800_create-users.ts
 ",
   },
   "start": {

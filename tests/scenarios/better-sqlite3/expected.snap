@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`better-sqlite3 > consumer 1`] = `
+exports[`better-sqlite3 > scenario 1`] = `
 {
   "compile": {
     "status": 0,

@@ -14,7 +14,7 @@
 		"typescript": "catalog:",
 		"@types/node": "catalog:"
 	},
-	"consumer": {
+	"scenario": {
 		"failure": {
 			"stage": "compile",
 			"exitCode": 1

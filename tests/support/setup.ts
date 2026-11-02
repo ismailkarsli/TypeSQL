@@ -11,7 +11,7 @@ export default async function setup() {
 		return await environment();
 	} catch (cause) {
 		const retained = join(
-			process.env.CONSUMER_ARTIFACTS ?? join(workspace, ".artifacts"),
+			process.env.SCENARIO_ARTIFACTS ?? join(workspace, ".artifacts"),
 			"setup",
 		);
 		await mkdir(retained, { recursive: true });
@@ -34,7 +34,7 @@ export default async function setup() {
 			["tests", workspace],
 		] as const) {
 			try {
-				await cp(join(cwd, ".consumer"), join(retained, name), {
+				await cp(join(cwd, ".scenario"), join(retained, name), {
 					recursive: true,
 				});
 			} catch (error) {
@@ -49,7 +49,7 @@ export default async function setup() {
 			}
 		}
 		throw new Error(
-			`Infrastructure: consumer prerequisites failed; logs retained at ${retained}`,
+			`Infrastructure: scenario prerequisites failed; logs retained at ${retained}`,
 			{ cause },
 		);
 	}

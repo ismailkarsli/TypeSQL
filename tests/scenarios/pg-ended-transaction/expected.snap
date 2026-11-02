@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`pg-ended-transaction > consumer 1`] = `
+exports[`pg-ended-transaction > scenario 1`] = `
 {
   "compile": {
     "status": 0,
@@ -25,7 +25,7 @@ Error: typesql: this transaction has ended; run later queries on the sql that st
     at check (file://<workspace>/packages/core/dist/transaction.js:9:19)
     at run (file://<workspace>/packages/core/dist/transaction.js:12:9)
     at Object.execute (file://<workspace>/packages/core/dist/query.js:26:41)
-    at file://<consumer>/dist/app.js:7:34
+    at file://<scenario>/dist/app.js:7:34
     at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
 
 Node.js v26.8.1

@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`pg-dynamic-sql > consumer 1`] = `
+exports[`pg-dynamic-sql > scenario 1`] = `
 {
   "compile": {
     "status": 0,

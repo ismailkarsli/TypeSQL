@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`pg-duplicate-output-names > consumer 1`] = `
+exports[`pg-duplicate-output-names > scenario 1`] = `
 {
   "compile": {
     "status": 0,

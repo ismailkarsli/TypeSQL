@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`pg-left-join > consumer 1`] = `
+exports[`pg-left-join > scenario 1`] = `
 {
   "compile": {
     "status": 0,

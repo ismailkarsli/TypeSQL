@@ -13,7 +13,7 @@
 		"typescript": "catalog:",
 		"@types/node": "catalog:"
 	},
-	"consumer": {
+	"scenario": {
 		"failure": {
 			"stage": "start",
 			"exitCode": 1

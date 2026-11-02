@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`migrations-sqlite > consumer 1`] = `
+exports[`migrations-sqlite > scenario 1`] = `
 {
   "compile": {
     "status": 0,

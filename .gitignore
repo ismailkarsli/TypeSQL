@@ -14,5 +14,6 @@ pnpm-publish-summary.json
 reports/
 
 .consumer/
+.scenario/
 tests/.artifacts/
 tests/.vitest/

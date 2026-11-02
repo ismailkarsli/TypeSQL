@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`sqlite-json-write-rejection > consumer 1`] = `
+exports[`sqlite-json-write-rejection > scenario 1`] = `
 {
   "compile": {
     "status": 1,

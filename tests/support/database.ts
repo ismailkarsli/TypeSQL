@@ -39,7 +39,7 @@ export async function allocate(
 			env: { SQLITE_PATH: joinSqlite(directory) },
 			cleanup: async () => {},
 		};
-	const name = `consumer_${randomUUID().replaceAll("-", "")}`;
+	const name = `scenario_${randomUUID().replaceAll("-", "")}`;
 	await admin((client) =>
 		client
 			.query(

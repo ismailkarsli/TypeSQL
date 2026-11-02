@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`pg-no-result > consumer 1`] = `
+exports[`pg-no-result > scenario 1`] = `
 {
   "compile": {
     "status": 0,
@@ -25,7 +25,7 @@ exports[`pg-no-result > consumer 1`] = `
 NoResultError: The query returned no rows
     at Object.value (file://<workspace>/packages/core/dist/query.js:54:23)
     at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
-    at async file://<consumer>/dist/app.js:10:5 {
+    at async file://<scenario>/dist/app.js:10:5 {
   text: 'SELECT id FROM users WHERE id = $1'
 }
 

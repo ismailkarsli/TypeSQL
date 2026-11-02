@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`prisma-client-sqlite > consumer 1`] = `
+exports[`prisma-client-sqlite > scenario 1`] = `
 {
   "compile": {
     "status": 0,
