@@ -1,14 +1,14 @@
 # TypeSQL
 
+Write SQL in TypeScript and get exact types for rows and parameters. TypeSQL parses your SQL inside the type checker: no codegen, no database connection, no build step.
+
+TypeSQL supports PostgreSQL and SQLite. MySQL is planned.
+
 <a href="https://www.npmjs.com/package/@typesql/core"><img src="https://img.shields.io/npm/v/@typesql/core" alt="npm version" height="20"></a>
 <a href="https://www.npmjs.com/package/@typesql/core"><img src="https://img.shields.io/npm/dm/@typesql/core" alt="npm downloads" height="20"></a>
 <a href="https://bundlejs.com/?q=@typesql/core"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fdeno.bundlejs.com%2F%3Fq%3D%40typesql%2Fcore&amp;query=%24.size.size&amp;label=bundle%20size" alt="bundle size" height="20"></a>
 <a href="https://github.com/ismailkarsli/TypeSQL"><img src="https://img.shields.io/github/stars/ismailkarsli/TypeSQL" alt="GitHub stars" height="20"></a>
 <a href="LICENSE"><img src="https://img.shields.io/github/license/ismailkarsli/TypeSQL" alt="License" height="20"></a>
-
-Write SQL in TypeScript and get exact types for rows and parameters. TypeSQL parses your SQL inside the type checker: no codegen, no database connection, no build step.
-
-TypeSQL supports PostgreSQL and SQLite. MySQL is planned.
 
 [![TypeSQL migrations and typed queries](.github/assets/demo.gif)](https://cdn.jsdelivr.net/gh/ismailkarsli/TypeSQL@main/.github/assets/demo.mp4)
 
