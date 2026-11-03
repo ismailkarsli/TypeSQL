@@ -18,16 +18,6 @@ Install `@typesql/core` and the adapter for your driver:
 
 `@typesql/core` has no runtime dependencies. Its [migrator](./migrations#the-migrator) connects from a `url` with `pg`, an optional peer dependency, and writes `db.ts` with `typescript`. The packages are ESM-only. `import` and Node's `require()` of ES modules both work, but TypeScript rejects imports from `.cts` files under `node16`/`nodenext` resolution (TS1479). The adapter types rows the way your driver returns them and runs queries on your client.
 
-## Install TypeScript 7.1
-
-If your project is on an older TypeScript, add 7.1 as a dev dependency:
-
-```sh
-pnpm add -D typescript@7.1.0-beta
-```
-
-Your editor should check the project with TypeScript 7.1 as well. [VS Code extension](./vscode#setup) shows how to point VS Code at it. You can also use [tsrs](https://github.com/oxc-project/tsrs), a Rust port of TypeScript 7.1.
-
 ## Using Kysely, Drizzle or Prisma
 
 If your schema is already described for one of them, install its TypeSQL package instead of writing it again:

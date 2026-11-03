@@ -103,7 +103,6 @@ export default withVersions({
 					{ text: "Errors and troubleshooting", link: "/guide/errors" },
 					{ text: "Limits", link: "/guide/limits" },
 					{ text: "SQLite", link: "/guide/sqlite" },
-					{ text: "FAQ", link: "/guide/faq" },
 				],
 			},
 			{

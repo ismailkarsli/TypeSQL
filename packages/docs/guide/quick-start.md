@@ -108,9 +108,3 @@ The number after the message is the position of the wrong token. [Errors and tro
 - [Inserting and updating](./writing-data): `INSERT`, `UPDATE`, `DELETE` and `RETURNING`.
 - [Dynamic SQL](./dynamic-sql): build statements from pieces.
 - Editor support for [VS Code](./vscode) and [Neovim](./neovim): completions and highlighting inside your SQL strings.
-
-## Runnable scenario
-
-This complete application creates fixed example data, runs a left join, and narrows its nullable title with `IS NOT NULL`. Its source is also a workspace scenario: `pnpm test pg-left-join` checks its inferred rows and real database output. The setup uses a fresh database provided through `DATABASE_URL`.
-
-<<< ../../../tests/scenarios/pg-left-join/app.ts
