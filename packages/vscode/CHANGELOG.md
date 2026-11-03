@@ -1,5 +1,13 @@
 # typesql
 
+## 3.0.2
+
+### Patch Changes
+
+- The extension shows the TypeSQL logo as its icon in the Marketplace and the Extensions view, and its Marketplace page has a matching teal header.
+
+- SQL in strings is highlighted in shades of teal, TypeSQL's color, instead of orange, in dark and light themes.
+
 ## 3.0.1
 
 ### Patch Changes

@@ -1,5 +1,12 @@
 # @typesql/kysely
 
+## 5.0.3
+
+### Patch Changes
+
+- Updated dependencies:
+  - @typesql/core@5.0.3
+
 ## 5.0.2
 
 ### Patch Changes

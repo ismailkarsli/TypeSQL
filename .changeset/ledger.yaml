@@ -353,6 +353,10 @@
   dir: packages/core
   intents:
     - warm-birds-rhyme
+"@typesql/core@5.0.3":
+  dir: packages/core
+  intents:
+    - slow-rings-look
 "@typesql/drizzle@0.0.2":
   dir: packages/drizzle
   intents:
@@ -957,3 +961,8 @@ typesql@3.0.1:
   dir: packages/vscode
   intents:
     - ancient-eggs-float
+typesql@3.0.2:
+  dir: packages/vscode
+  intents:
+    - calm-foxes-sneeze
+    - curly-fishes-wink

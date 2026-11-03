@@ -1,5 +1,11 @@
 # @typesql/core
 
+## 5.0.3
+
+### Patch Changes
+
+- Reduce type-checking work when validating SQL expressions and inferring parameter types.
+
 ## 5.0.2
 
 ### Patch Changes
