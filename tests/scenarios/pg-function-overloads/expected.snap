@@ -11,6 +11,7 @@ exports[`pg-function-overloads > scenario 1`] = `
     "diagnostics": [],
     "types": {
       "parameterized": "({ matches: null | number })[]",
+      "predicates": "({ id: number })[]",
       "rows": "({ following: string; following_optional: null | string; matches: number; matches_optional: null | number; missing: null | string; padded: string; padded_optional: null | string; path_match: false | true; position: number; upper_label: string; upper_optional: null | string })[]",
       "statistics": "{ deviation: null | number; population: null | number; sample: null | number; variance: null | number }",
     },
@@ -53,7 +54,8 @@ exports[`pg-function-overloads > scenario 1`] = `
     sample: 2,
     population: 1
   },
-  parameterized: [ { matches: 2 }, { matches: 1 } ]
+  parameterized: [ { matches: 2 }, { matches: 1 } ],
+  predicates: [ { id: 1 }, { id: 3 } ]
 }
 ",
   },

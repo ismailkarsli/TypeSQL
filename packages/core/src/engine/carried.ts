@@ -51,19 +51,18 @@ type CheckValue<
 	V extends string,
 	P,
 	U,
-	J = JsonType<E, U, P>,
 > = V extends `J${infer R}`
 	? JsonContext<E, Exclude<U, NullTest>> extends false
 		? `a sql.json() value cannot be used as ${Expected<E, U>}`
-		: CheckEnc<R, J> extends true
+		: CheckEnc<R, JsonType<E, U, P>> extends true
 			? true
 			: // sql.json() binds JSON text, which a parameter taking text accepts
 				// unless the column declares a shape for the value before serialization.
 				[JsonShapes<E, U>] extends [never]
 				? [Exclude<P, null | undefined>] extends [string]
 					? true
-					: JsonError<E, R, U, J>
-				: JsonError<E, R, U, J>
+					: JsonError<E, R, U, JsonType<E, U, P>>
+				: JsonError<E, R, U, JsonType<E, U, P>>
 	: CheckEnc<V, P> extends true
 		? V extends `${string}[0${string}`
 			? IsJsonParam<E, Exclude<U, NullTest>> extends true

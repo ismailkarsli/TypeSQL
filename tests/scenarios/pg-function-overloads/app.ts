@@ -41,5 +41,20 @@ export const parameterized = await sql(
 	1,
 	"i",
 ).execute();
-console.dir({ rows, statistics, parameterized }, { depth: null });
+// Long predicates exercise structural traversal both without calls and with
+// a call nested at the bottom of the arithmetic expression.
+export const predicates = await sql(`
+ SELECT id FROM items
+ WHERE id + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1
+          + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1
+          > 16
+   AND length(label) + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1
+          + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1
+          > 16
+   AND id = ANY(ARRAY[1, 3])
+   AND id IN (SELECT id FROM items)
+   AND EXISTS (SELECT 1 FROM items WHERE length(label) > 0)
+ ORDER BY id
+`).execute();
+console.dir({ rows, statistics, parameterized, predicates }, { depth: null });
 await pool.end();

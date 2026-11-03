@@ -409,10 +409,9 @@ export type CheckWindowRefs<
 	Defs extends WindowDefs,
 	C extends Ctx,
 	I extends number = 0,
-> =
-	Wins<Es[number], []> extends readonly []
-		? true
-		: CheckWindowRefsAt<Es, Defs, C, I>;
+> = [Extract<Calls<Es[number]>, { readonly win: WindowSpec }>] extends [never]
+	? true
+	: CheckWindowRefsAt<Es, Defs, C, I>;
 type CheckWindowRefsAt<
 	Es extends readonly Expr[],
 	Defs extends WindowDefs,
@@ -433,7 +432,7 @@ type CheckSpecs<
 		: CheckWindowSpec<S, Defs, C>
 	: true;
 
-type WindowLeaf = {
+type ScalarLeaf = {
 	readonly t:
 		| "col"
 		| "star"
@@ -445,7 +444,7 @@ type WindowLeaf = {
 		| "typed"
 		| "default";
 };
-type Wins<E, Acc> = E extends WindowLeaf
+type Wins<E, Acc> = E extends ScalarLeaf
 	? Acc
 	: E extends {
 				readonly t: "call";
@@ -542,10 +541,57 @@ type IsAggName<DB, N extends string> =
 
 // The walks below go breadth-first over a union of AST nodes, one level per
 // step, so their depth is the AST's depth (tail-recursive), not a multiple of it.
-type Children<U> = U extends readonly unknown[]
-	? U[number]
-	: U extends { readonly t: "select" }
-		? never
+// These expression shapes cannot contain a call outside a subquery. Checking
+// their structure avoids walking every node of ordinary predicates.
+type CallFree =
+	| ScalarLeaf
+	| {
+			readonly t:
+				| "cast"
+				| "un"
+				| "collate"
+				| "is"
+				| "field"
+				| "named"
+				| "variadic";
+			readonly e: CallFree;
+	  }
+	| {
+			readonly t: "bin" | "isdistinct";
+			readonly l: CallFree;
+			readonly r: CallFree;
+	  }
+	| { readonly t: "array" | "row"; readonly items: readonly CallFree[] }
+	| {
+			readonly t: "in";
+			readonly e: CallFree;
+			readonly list: readonly CallFree[];
+	  }
+	| {
+			readonly t: "between";
+			readonly e: CallFree;
+			readonly lo: CallFree;
+			readonly hi: CallFree;
+	  }
+	| { readonly t: "like"; readonly e: CallFree; readonly pat: CallFree }
+	| {
+			readonly t: "quant";
+			readonly l: CallFree;
+			readonly r: CallFree | { readonly t: "select" };
+	  }
+	| {
+			readonly t: "sub" | "exists" | "arraysub";
+			readonly q: { readonly t: "select" };
+	  }
+	| {
+			readonly t: "insub";
+			readonly e: CallFree;
+			readonly q: { readonly t: "select" };
+	  };
+type Children<U> = U extends CallFree | { readonly t: "select" }
+	? never
+	: U extends readonly unknown[]
+		? U[number]
 		: U extends object
 			? U[keyof U]
 			: never;
@@ -565,13 +611,13 @@ type Kind<U, DB> = U extends { readonly t: "call"; readonly over: true }
 		: "agg";
 
 /** `"agg"` and `"win"` for the aggregate and window calls in E, outside subqueries. */
-type CallKinds<U, DB, Acc = never> = [U] extends [never]
+type CallKinds<U, DB> = Kind<Calls<U>, DB>;
+// Collect once without a database context, then classify the calls as needed.
+type Calls<U, Acc = never> = [U] extends [never]
 	? Acc
-	: CallKinds<Children<U>, DB, Acc | Kind<U, DB>>;
-/** The aggregate calls in E, outside subqueries. */
-type AggCalls<U, DB, Acc = never> = [U] extends [never]
-	? Acc
-	: AggCalls<Children<U>, DB, Acc | AggCall<U, DB>>;
+	: Calls<Children<U>, Acc | Extract<U, { readonly t: "call" }>>;
+/** Aggregate calls outside subqueries. */
+type AggCalls<U, DB> = AggCall<Calls<U>, DB>;
 
 /**
  * PostgreSQL's errors for aggregate and window calls where they can't be. An

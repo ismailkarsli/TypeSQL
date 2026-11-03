@@ -853,7 +853,7 @@ type CheckSimple<
 > =
 	CallPlacement<
 		Where,
-		Ts,
+		Ts[number]["e"],
 		C0["db"],
 		C0["scope"] extends readonly [unknown] ? true : false
 	> extends infer P extends AnyErr

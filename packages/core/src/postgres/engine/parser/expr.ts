@@ -217,22 +217,20 @@ type NotPrefixOp =
 	| ":=";
 type Terminator = "(" | ")" | "," | ";" | "]" | ":";
 
-type ParseInfix<
-	T extends Toks,
-	L,
-	I extends number,
-	Min extends MinPrec,
-> = Min extends "target"
-	? T[I] extends WordTok<infer W>
-		? W extends NotBareLabel
-			? ParseInfixAt<T, L, I, Min>
-			: T[Nx<I>] extends OpTok<",">
-				? Ok<L, I>
-				: EndsTargetList<T, Nx<I>> extends true
-					? Ok<L, I>
-					: ParseInfixAt<T, L, I, Min>
-		: ParseInfixAt<T, L, I, Min>
-	: ParseInfixAt<T, L, I, Min>;
+type ParseInfix<T extends Toks, L, I extends number, Min extends MinPrec> =
+	InfixAction<T[I], Min> extends "done"
+		? Ok<L, I>
+		: Min extends "target"
+			? T[I] extends WordTok<infer W>
+				? W extends NotBareLabel
+					? ParseInfixAt<T, L, I, Min>
+					: T[Nx<I>] extends OpTok<",">
+						? Ok<L, I>
+						: EndsTargetList<T, Nx<I>> extends true
+							? Ok<L, I>
+							: ParseInfixAt<T, L, I, Min>
+				: ParseInfixAt<T, L, I, Min>
+			: ParseInfixAt<T, L, I, Min>;
 // Classify a token independently of its enclosing stream and left expression.
 type InfixAction<H, Min extends MinPrec> =
 	H extends OpTok<infer O>
