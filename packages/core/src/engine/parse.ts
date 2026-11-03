@@ -52,10 +52,16 @@ export type AtEnd<T extends Toks, I extends number> = T[I] extends Tok
 	? false
 	: true;
 
-export type EatWord<T extends Toks, I extends number, W extends string> =
-	T[I] extends WordTok<W> ? Nx<I> : never;
-export type EatOp<T extends Toks, I extends number, O extends string> =
-	T[I] extends OpTok<O> ? Nx<I> : never;
+export type EatWord<
+	T extends Toks,
+	I extends number,
+	W extends string,
+> = T[I] extends { readonly k: "w"; readonly v: W } ? Nx<I> : never;
+export type EatOp<
+	T extends Toks,
+	I extends number,
+	O extends string,
+> = T[I] extends { readonly k: "o"; readonly v: O } ? Nx<I> : never;
 export type EatWords<
 	T extends Toks,
 	I extends number,

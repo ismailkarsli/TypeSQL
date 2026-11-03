@@ -27,21 +27,42 @@ export type InlinedText<Q extends string> =
 export type InlinedSlots<Q extends string> =
 	Inlined<Q> extends readonly [string, infer F] ? F : {};
 
-/** Splits at spaces, so only the words holding a placeholder go char by char. */
 type Lift<
 	Q extends string,
 	Acc extends string,
 	Fs extends readonly unknown[],
-> = Q extends InlineFragment
-	? Finish<LiftWord<Q, Acc, Fs>>
-	: Q extends `${infer Word} ${infer Rest}`
-		? LiftWord<Word, Acc, Fs> extends [
+> = Q extends `${infer Line}\n${infer Rest}`
+	? {} extends Record<Line, 1>
+		? LiftLine<Line, Acc, Fs> extends [
 				infer A extends string,
 				infer F extends readonly unknown[],
 			]
-			? Lift<Rest, `${A} `, F>
-			: LiftWord<Word, Acc, Fs>
-		: Finish<LiftWord<Q, Acc, Fs>>;
+			? Lift<Rest, `${A}\n`, F>
+			: LiftLine<Line, Acc, Fs>
+		: Lift<Rest, `${Acc}${Line}\n`, Fs>
+	: LiftLine<Q, Acc, Fs> extends infer R
+		? Finish<R>
+		: never;
+
+type LiftLine<
+	Q extends string,
+	Acc extends string,
+	Fs extends readonly unknown[],
+> =
+	{} extends Record<Q, 1>
+		? Q extends InlineFragment
+			? [`${Acc}{${InlineName<Fs["length"]>}}`, [...Fs, Q]]
+			: Q extends `${infer Word} ${infer Rest}`
+				? {} extends Record<Word, 1>
+					? LiftChars<Word, Acc, Fs> extends [
+							infer A extends string,
+							infer F extends readonly unknown[],
+						]
+						? LiftLine<Rest, `${A} `, F>
+						: LiftChars<Word, Acc, Fs>
+					: LiftLine<Rest, `${Acc}${Word} `, Fs>
+				: LiftChars<Q, Acc, Fs>
+		: [`${Acc}${Q}`, Fs];
 
 type Finish<R> = R extends [
 	infer A extends string,
@@ -62,20 +83,6 @@ type Finish<R> = R extends [
 				},
 			]
 	: R;
-
-/**
- * A word that is one placeholder comes back as the fragment's own type, and
- * so does the rest of a word after a placeholder when it is one too.
- */
-type LiftWord<
-	W extends string,
-	Acc extends string,
-	Fs extends readonly unknown[],
-> = W extends InlineFragment
-	? [`${Acc}{${InlineName<Fs["length"]>}}`, [...Fs, W]]
-	: {} extends Record<W, 1>
-		? LiftChars<W, Acc, Fs>
-		: [`${Acc}${W}`, Fs];
 
 type LiftChars<
 	W extends string,

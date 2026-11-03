@@ -40,7 +40,7 @@ type Carried<
 	TM,
 	X extends string,
 	K extends readonly unknown[],
-> = K extends readonly null[] ? true : CheckCarried<E, DB, TM, X, K>;
+> = K extends readonly (null | "*")[] ? true : CheckCarried<E, DB, TM, X, K>;
 
 type DefaultsCheck<E extends EngineTypes, DB, Q extends string, S> =
 	HasDefaultable<Q> extends false
@@ -90,27 +90,25 @@ type SpliceCheck<E extends EngineTypes, DB, TM, Q extends string, S> =
 				]
 				? Spliced<T2, S> extends infer X
 					? X extends string
-						? Validate<E, DB, X> extends infer V
-							? V extends AnyErr
-								? V
-								: Carried<
-											E,
-											DB,
-											TM,
-											X,
-											[
-												...Skip<M>,
-												...Encs,
-												...([S] extends [null]
-													? []
-													: SpliceCarried<T2, SlotCarried<S>>),
-											]
-										> extends infer K
-									? K extends AnyErr
-										? K
-										: DefaultsCheck<E, DB, Q, S>
-									: never
-							: never
+						? Validate<E, DB, X> extends AnyErr
+							? Validate<E, DB, X>
+							: Carried<
+										E,
+										DB,
+										TM,
+										X,
+										[
+											...Skip<M>,
+											...Encs,
+											...([S] extends [null]
+												? []
+												: SpliceCarried<T2, SlotCarried<S>>),
+										]
+									> extends infer K
+								? K extends AnyErr
+									? K
+									: DefaultsCheck<E, DB, Q, S>
+								: never
 						: X
 					: never
 				: P
@@ -149,70 +147,49 @@ type SpliceArgs<E extends EngineTypes, DB, TM, Q extends string, S> =
 				: readonly unknown[]
 			: readonly unknown[];
 
-type SplicedOr<Q extends string> =
-	SplicedText<Q> extends infer X extends string ? X : string;
-
-// Boxed like InferredCheck, so relating two instantiations of the call
-// signature (TransactionalSql extends Sql) does not evaluate Inlined<Q>.
 export type GateCallCheck<E extends EngineTypes, DB, TM, Q extends string> = [
 	Q,
 ] extends [infer Q2 extends string]
-	? Inlined<Q2> extends null
-		? InferredCheck<E, DB, TM, Q2>
-		: InlineCheck<E, DB, TM, Q2>
+	? Inlined<Q2> extends infer I
+		? [I] extends [null]
+			? InferredCheck<E, DB, TM, Q2>
+			: I extends AnyErr
+				? I
+				: I extends readonly [infer T2 extends string, infer S2]
+					? Surface<
+							SlotVariants<S2> extends infer V
+								? V extends unknown
+									? SpliceCheck<E, DB, TM, T2, V>
+									: never
+								: never
+						>
+					: never
+		: never
 	: never;
 
-type InferredCheck<E extends EngineTypes, DB, TM, Q extends string> = [
-	DB,
-	TM,
-	Q,
-] extends [infer D, infer M, infer Q2 extends string]
-	? Surface<SpliceCheck<E, D, M, Q2, null>>
-	: never;
-
-type InlineCheck<E extends EngineTypes, DB, TM, Q extends string> =
-	Inlined<Q> extends infer I extends AnyErr
-		? I
-		: [DB, TM, InlinedText<Q>, InlinedSlots<Q>] extends [
-					infer D,
-					infer M,
-					infer Q2 extends string,
-					infer S2,
-				]
-			? Surface<
-					SlotVariants<S2> extends infer V
-						? V extends unknown
-							? SpliceCheck<E, D, M, Q2, V>
-							: never
-						: never
-				>
-			: never;
+type InferredCheck<E extends EngineTypes, DB, TM, Q extends string> = Surface<
+	SpliceCheck<E, DB, TM, Q, null>
+>;
 
 export type BoxCallArgs<E extends EngineTypes, DB, TM, Q extends string> = [
 	Q,
 ] extends [infer Q2 extends string]
-	? Inlined<Q2> extends null
-		? Extract<
-				{
-					[K in Q2 as `${K}`]: SpliceArgs<E, DB, TM, K, null>;
-				}[`${Q2}`],
-				readonly unknown[]
-			>
-		: InlineArgs<E, DB, TM, Q2>
-	: never;
-
-type InlineArgs<E extends EngineTypes, DB, TM, Q extends string> =
-	Inlined<Q> extends AnyErr
-		? readonly unknown[]
-		: [InlinedText<Q>, InlinedSlots<Q>] extends [
-					infer Q2 extends string,
-					infer S2,
-				]
+	? Inlined<Q2> extends infer I
+		? [I] extends [null]
 			? Extract<
-					{ [K in Q2 as `${K}`]: SpliceArgs<E, DB, TM, K, S2> }[`${Q2}`],
+					{ [K in Q2 as `${K}`]: SpliceArgs<E, DB, TM, K, null> }[`${Q2}`],
 					readonly unknown[]
 				>
-			: never;
+			: I extends AnyErr
+				? readonly unknown[]
+				: I extends readonly [infer T2 extends string, infer S2]
+					? Extract<
+							{ [K in T2 as `${K}`]: SpliceArgs<E, DB, TM, K, S2> }[`${T2}`],
+							readonly unknown[]
+						>
+					: never
+		: never
+	: never;
 
 /** The text sql() types: interpolated fragments spliced in. */
 type CallText<Q extends string> = [Q] extends [infer Q2 extends string]
@@ -220,6 +197,9 @@ type CallText<Q extends string> = [Q] extends [infer Q2 extends string]
 		? PText<Q2>
 		: SplicedOr<Q2>
 	: never;
+
+type SplicedOr<Q extends string> =
+	SplicedText<Q> extends infer X extends string ? X : string;
 
 export type CallRet<
 	E extends EngineTypes,

@@ -918,36 +918,42 @@ export type ProjectTargets<
 	Acc extends Cols,
 	I extends number = 0,
 	Lit extends boolean = false,
-> = Ts[I] extends undefined
-	? Acc
-	: Ts[I]["e"] extends {
-				readonly t: "star";
-				readonly tbl: infer Tbl extends string | null;
-			}
-		? ExpandStar<C["scope"], Tbl> extends infer M extends ColMap
-			? ProjectTargets<Ts, C, [...Acc, { readonly star: M }], Nx<I>, Lit>
-			: ExpandStar<C["scope"], Tbl>
-		: Ts[I]["e"] extends { readonly t: "field"; readonly name: "*" }
-			? FieldStar<TypeOf<Ts[I]["e"]["e"], C>> extends infer M extends ColMap
-				? ProjectTargets<Ts, C, [...Acc, { readonly star: M }], Nx<I>, Lit>
-				: FieldStar<TypeOf<Ts[I]["e"]["e"], C>>
-			: (
+> = Ts[I] extends infer Tg extends Target
+	? ProjectStarTarget<Tg["e"], C> extends infer R
+		? R extends { readonly star: ColMap }
+			? ProjectTargets<Ts, C, [...Acc, R], Nx<I>, Lit>
+			: R extends "typed"
+				? (
 						Lit extends true
-							? Ts[I]["e"] extends Tag<"str">
+							? Tg["e"] extends Tag<"str">
 								? Info<"lit">
-								: TypeOf<Ts[I]["e"], C>
-							: TypeOf<Ts[I]["e"], C>
+								: TypeOf<Tg["e"], C>
+							: TypeOf<Tg["e"], C>
 					) extends infer Ty
-				? Ty extends ColInfo
-					? ColumnName<Ts[I]["e"], Ts[I]["alias"], C> extends infer N extends
-							string
-						? ProjectTargets<
-								Ts,
-								C,
-								[...Acc, { readonly n: N; readonly t: Ty }],
-								Nx<I>,
-								Lit
-							>
-						: ColumnName<Ts[I]["e"], Ts[I]["alias"], C>
-					: Ty
-				: never;
+					? Ty extends ColInfo
+						? ColumnName<Tg["e"], Tg["alias"], C> extends infer N extends string
+							? ProjectTargets<
+									Ts,
+									C,
+									[...Acc, { readonly n: N; readonly t: Ty }],
+									Nx<I>,
+									Lit
+								>
+							: ColumnName<Tg["e"], Tg["alias"], C>
+						: Ty
+					: never
+				: R
+		: never
+	: Acc;
+type ProjectStarTarget<E, C extends Ctx> = E extends {
+	readonly t: "star";
+	readonly tbl: infer Tbl extends string | null;
+}
+	? ExpandStar<C["scope"], Tbl> extends infer M extends ColMap
+		? { readonly star: M }
+		: ExpandStar<C["scope"], Tbl>
+	: E extends { readonly t: "field"; readonly name: "*"; readonly e: infer F }
+		? FieldStar<TypeOf<F & Expr, C>> extends infer M extends ColMap
+			? { readonly star: M }
+			: FieldStar<TypeOf<F & Expr, C>>
+		: "typed";

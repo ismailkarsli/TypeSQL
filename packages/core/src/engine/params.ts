@@ -7,14 +7,15 @@ export type ParamEntry<N extends number = number, T = ColInfo> = {
 	readonly t: T;
 };
 
-export type ParamsToMap<U> = {
+export type ParamsToMap<U> = ParamsGrouped<{
 	readonly [E in U as E extends { readonly n: infer N extends number }
 		? N
 		: never]: E extends { readonly t: infer T } ? T : never;
-};
+}>;
+type ParamsGrouped<M> = { readonly [K in keyof M]: M[K] };
 
 export type MaxParam<T extends Toks> = HighestParam<
-	MaxCandidates<Extract<T[number], { readonly k: "$" }>["v"] | 0>
+	MaxCandidates<((T[number] & { readonly k: "$" })["v"] & number) | 0>
 >;
 
 // A number with a successor present cannot be the maximum. Dense parameter

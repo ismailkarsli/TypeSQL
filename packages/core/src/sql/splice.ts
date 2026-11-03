@@ -99,7 +99,11 @@ type Renumber<
 	Off extends number,
 	Acc extends string,
 > = T extends `${string}$${string}`
-	? RenumberLoop<T, Off, Off, Acc>
+	? Off extends 0
+		? T extends `${string}$0${string}`
+			? RenumberLoop<T, Off, Off, Acc>
+			: [`${Acc}${T}`, MaxParamStr<T>]
+		: RenumberLoop<T, Off, Off, Acc>
 	: [`${Acc}${T}`, Off];
 type RenumberLoop<
 	T extends string,

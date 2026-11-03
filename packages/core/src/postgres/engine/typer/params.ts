@@ -477,14 +477,18 @@ type SortKeys<E> = E extends unknown ? { readonly sortKey: E } : never;
  * A sort key's entry is dropped when another use already has the same entry,
  * and accepts null otherwise.
  */
-export type SettleSortKeys<U> =
-	| Exclude<U, { readonly sortKey: unknown }>
-	| AcceptNull<
-			SortKeyEntries<
-				Extract<U, { readonly sortKey: unknown }>,
-				Exclude<U, { readonly sortKey: unknown }>
-			>
-	  >;
+export type SettleSortKeys<U> = [
+	Extract<U, { readonly sortKey: unknown }>,
+] extends [never]
+	? U
+	:
+			| Exclude<U, { readonly sortKey: unknown }>
+			| AcceptNull<
+					SortKeyEntries<
+						Extract<U, { readonly sortKey: unknown }>,
+						Exclude<U, { readonly sortKey: unknown }>
+					>
+			  >;
 type SortKeyEntries<S, Uses> = S extends { readonly sortKey: infer E }
 	? E extends Uses
 		? never

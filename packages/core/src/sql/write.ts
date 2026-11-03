@@ -14,6 +14,7 @@ type ValueAt<R, K extends string> = R extends unknown
 		? R[K]
 		: never
 	: never;
+type Flat<R> = R extends unknown ? { readonly [K in keyof R]: R[K] } : never;
 type CarriedOfKeys<
 	R,
 	Ks extends readonly unknown[],
@@ -60,7 +61,7 @@ export type SetRep<P> =
 	UnionList<KeysOf<P>> extends infer Ks extends readonly unknown[]
 		? {
 				readonly text: JoinAssignments<Ks>;
-				readonly carried: CarriedOfKeys<P, Ks>;
+				readonly carried: CarriedOfKeys<Flat<P>, Ks>;
 			}
 		: never;
 
@@ -70,7 +71,7 @@ export type ValuesRep<R> =
 			? { readonly text: "DEFAULT VALUES"; readonly carried: [] }
 			: {
 					readonly text: `(${JoinNames<Ks>}) VALUES (${JoinPlaceholders<Ks>})`;
-					readonly carried: CarriedOfKeys<R, Ks>;
+					readonly carried: CarriedOfKeys<Flat<R>, Ks>;
 				}
 		: never;
 

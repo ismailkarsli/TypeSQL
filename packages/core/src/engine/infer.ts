@@ -61,7 +61,7 @@ type ParamTypes<P extends readonly ParamData[]> = {
 	[K in keyof P]: P[K]["type"];
 };
 
-type ParamTs<E extends EngineTypes, U, TM, DB> =
+export type ParamTs<E extends EngineTypes, U, TM, DB> =
 	IntersectUses<E, U, TM, DB> extends infer X
 		? [X] extends [never]
 			? never
@@ -125,7 +125,7 @@ export type ParamsArgs<E extends EngineTypes, DB, TM, Q extends string> =
 		: never;
 
 export type Validate<E extends EngineTypes, DB, Q extends string> =
-	AnalysisOf<E, DB, Q> extends infer R ? (R extends AnyErr ? R : Q) : never;
+	AnalysisOf<E, DB, Q> extends AnyErr ? AnalysisOf<E, DB, Q> : Q;
 
 export type KindOf<E extends EngineTypes, DB, Q extends string> =
 	AnalysisOf<E, DB, Q> extends { readonly kind: infer K } ? K : never;

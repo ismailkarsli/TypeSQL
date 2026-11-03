@@ -635,8 +635,10 @@ type ToNum<S extends string> = S extends `${infer N extends number}`
 
 type TrimIndent<S extends string, B extends number = 0> = B extends 128
 	? S
-	: S extends `\t${infer R}`
+	: S extends `\t\t\t\t${infer R}`
 		? TrimIndent<R, Nx<B>>
-		: S extends ` ${infer R}`
+		: S extends `\t${infer R}`
 			? TrimIndent<R, Nx<B>>
-			: S;
+			: S extends ` ${infer R}`
+				? TrimIndent<R, Nx<B>>
+				: S;
