@@ -87,16 +87,16 @@ The corrections are [semantic tokens](https://code.visualstudio.com/api/language
 
 ### Colors
 
-The SQL is colored in shades of teal, TypeSQL's color, so it stands out from the TypeScript around it:
+The SQL is colored in shades of coral, a hue that the default themes don't use for TypeScript, so it stands out from the code around it:
 
 | Token | Example | Scope | Dark themes | Light themes |
 |---|---|---|---|---|
-| keywords and operators | `SELECT`, `=`, `::` | `keyword.other.sql`, `keyword.operator.sql`, `keyword.operator.cast.sql` | `#2DD4BF` | `#0C645D` |
-| types | `int4`, `text` | `storage.type.sql` | `#5EEAD4` | `#0B5E75` |
-| functions | `count(…)` | `entity.name.function.sql` | `#6EE7B7` | `#046248` |
-| numbers and constants | `42`, `true`, `null` | `constant.numeric.sql`, `constant.language.sql` | `#99F6E4` | `#0F5F6B` |
-| parameters, in bold | `$1`, `:name` | `variable.parameter.positional.sql`, `variable.parameter.named.sql` | `#22D3EE` | `#07645B` |
-| table and column names, punctuation | `users`, `u.id` | `meta.embedded.line.sql`, `meta.embedded.block.sql` | `#CCFBF1` | `#134E4A` |
+| keywords and operators | `SELECT`, `=`, `::` | `keyword.other.sql`, `keyword.operator.sql`, `keyword.operator.cast.sql` | `#FDA4AF` | `#A51034` |
+| types | `int4`, `text` | `storage.type.sql` | `#FDBA9A` | `#8A2E10` |
+| functions | `count(…)` | `entity.name.function.sql` | `#F0ABFC` | `#86198F` |
+| numbers and constants | `42`, `true`, `null` | `constant.numeric.sql`, `constant.language.sql` | `#FED7AA` | `#7F1D1D` |
+| parameters, in bold | `$1`, `:name` | `variable.parameter.positional.sql`, `variable.parameter.named.sql` | `#F9A8D4` | `#A1144F` |
+| table and column names, punctuation | `users`, `u.id` | `meta.embedded.line.sql`, `meta.embedded.block.sql` | `#FFE4E6` | `#4C0519` |
 
 Strings and comments keep your theme's colors, and so does TypeScript inside `${…}`.
 
@@ -122,7 +122,7 @@ To change a color, add a rule under your theme's ID. It comes after the defaults
 }
 ```
 
-A rule at the top level, outside a `[…]` key, doesn't change the teal tokens, because the theme-specific defaults apply after it.
+A rule at the top level, outside a `[…]` key, doesn't change the coral tokens, because the theme-specific defaults apply after it.
 
 To turn the colors off, set empty lists under both keys:
 
@@ -135,7 +135,7 @@ To turn the colors off, set empty lists under both keys:
 }
 ```
 
-If your settings already have a `textMateRules` list under `[*Light*]`, it replaces the teal for light themes; add the rules from the table to it to keep them. A list under another key, such as `[*Dark*]`, adds to the defaults instead. To color the SQL in a theme with neither word in its ID, add the rules under that theme's ID, such as `[Monokai]`. **Developer: Inspect Editor Tokens and Scopes** shows the scope of the token under the cursor.
+If your settings already have a `textMateRules` list under `[*Light*]`, it replaces the coral for light themes; add the rules from the table to it to keep them. A list under another key, such as `[*Dark*]`, adds to the defaults instead. To color the SQL in a theme with neither word in its ID, add the rules under that theme's ID, such as `[Monokai]`. **Developer: Inspect Editor Tokens and Scopes** shows the scope of the token under the cursor.
 
 ## How it works
 

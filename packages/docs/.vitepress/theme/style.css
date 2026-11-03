@@ -1,20 +1,20 @@
-/* TypeSQL teal, matching the logo (.github/assets). */
+/* TypeSQL rose, matching the logo (.github/assets). */
 :root {
-	--vp-c-brand-1: #0f766e;
-	--vp-c-brand-2: #0d9488;
-	--vp-c-brand-3: #14b8a6;
-	--vp-c-brand-soft: rgba(20, 184, 166, 0.14);
+	--vp-c-brand-1: #be123c;
+	--vp-c-brand-2: #e11d48;
+	--vp-c-brand-3: #f43f5e;
+	--vp-c-brand-soft: rgba(244, 63, 94, 0.14);
 
-	/* White button text needs a darker teal than brand-3. */
-	--vp-button-brand-bg: #0f766e;
-	--vp-button-brand-hover-bg: #115e59;
-	--vp-button-brand-active-bg: #134e4a;
+	/* White button text needs a darker rose than brand-3. */
+	--vp-button-brand-bg: #be123c;
+	--vp-button-brand-hover-bg: #9f1239;
+	--vp-button-brand-active-bg: #881337;
 
 	--vp-home-hero-name-color: transparent;
-	--vp-home-hero-name-background: linear-gradient(120deg, #0f766e 30%, #14b8a6);
+	--vp-home-hero-name-background: linear-gradient(120deg, #be123c 30%, #f43f5e);
 
 	/* A dot grid behind the hero logo, fading out from the center. */
-	--typesql-hero-dot: rgba(13, 148, 136, 0.55);
+	--typesql-hero-dot: rgba(225, 29, 72, 0.5);
 	--vp-home-hero-image-background-image: radial-gradient(
 		var(--typesql-hero-dot) 1.6px,
 		transparent 1.8px
@@ -23,18 +23,18 @@
 }
 
 .dark {
-	--vp-c-brand-1: #2dd4bf;
-	--vp-c-brand-2: #14b8a6;
-	--vp-c-brand-3: #0d9488;
-	--vp-c-brand-soft: rgba(45, 212, 191, 0.16);
+	--vp-c-brand-1: #fda4af;
+	--vp-c-brand-2: #fb7185;
+	--vp-c-brand-3: #e11d48;
+	--vp-c-brand-soft: rgba(251, 113, 133, 0.16);
 
-	--vp-button-brand-bg: #0f766e;
-	--vp-button-brand-hover-bg: #0d9488;
-	--vp-button-brand-active-bg: #115e59;
+	--vp-button-brand-bg: #be123c;
+	--vp-button-brand-hover-bg: #e11d48;
+	--vp-button-brand-active-bg: #9f1239;
 
-	--vp-home-hero-name-background: linear-gradient(120deg, #2dd4bf 30%, #5eead4);
+	--vp-home-hero-name-background: linear-gradient(120deg, #fb7185 30%, #fda4af);
 
-	--typesql-hero-dot: rgba(45, 212, 191, 0.4);
+	--typesql-hero-dot: rgba(251, 113, 133, 0.4);
 }
 
 .VPHero .image-bg {

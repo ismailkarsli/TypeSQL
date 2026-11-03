@@ -1,3 +1,4 @@
+import { sqlHighlighting } from "./sql-highlighting.ts";
 import { withVersions } from "./versions.ts";
 
 const github = "https://github.com/ismailkarsli/TypeSQL";
@@ -7,6 +8,7 @@ export default withVersions({
 	description:
 		"Write SQL in TypeScript and get exact types for rows and parameters. No codegen, no database connection, no build step.",
 	cleanUrls: true,
+	markdown: sqlHighlighting,
 	head: [
 		["link", { rel: "icon", type: "image/svg+xml", href: "/logo.svg" }],
 		[

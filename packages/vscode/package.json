@@ -8,7 +8,7 @@
 	"publisher": "typesql",
 	"icon": "icon.png",
 	"galleryBanner": {
-		"color": "#042F2E",
+		"color": "#4C0519",
 		"theme": "dark"
 	},
 	"license": "MIT",
@@ -231,7 +231,7 @@
 								"meta.embedded.block.sql"
 							],
 							"settings": {
-								"foreground": "#CCFBF1"
+								"foreground": "#FFE4E6"
 							}
 						},
 						{
@@ -241,19 +241,19 @@
 								"keyword.operator.cast.sql"
 							],
 							"settings": {
-								"foreground": "#2DD4BF"
+								"foreground": "#FDA4AF"
 							}
 						},
 						{
 							"scope": "storage.type.sql",
 							"settings": {
-								"foreground": "#5EEAD4"
+								"foreground": "#FDBA9A"
 							}
 						},
 						{
 							"scope": "entity.name.function.sql",
 							"settings": {
-								"foreground": "#6EE7B7"
+								"foreground": "#F0ABFC"
 							}
 						},
 						{
@@ -262,7 +262,7 @@
 								"constant.language.sql"
 							],
 							"settings": {
-								"foreground": "#99F6E4"
+								"foreground": "#FED7AA"
 							}
 						},
 						{
@@ -271,7 +271,7 @@
 								"variable.parameter.named.sql"
 							],
 							"settings": {
-								"foreground": "#22D3EE",
+								"foreground": "#F9A8D4",
 								"fontStyle": "bold"
 							}
 						}
@@ -285,7 +285,7 @@
 								"meta.embedded.block.sql"
 							],
 							"settings": {
-								"foreground": "#134E4A"
+								"foreground": "#4C0519"
 							}
 						},
 						{
@@ -295,19 +295,19 @@
 								"keyword.operator.cast.sql"
 							],
 							"settings": {
-								"foreground": "#0C645D"
+								"foreground": "#A51034"
 							}
 						},
 						{
 							"scope": "storage.type.sql",
 							"settings": {
-								"foreground": "#0B5E75"
+								"foreground": "#8A2E10"
 							}
 						},
 						{
 							"scope": "entity.name.function.sql",
 							"settings": {
-								"foreground": "#046248"
+								"foreground": "#86198F"
 							}
 						},
 						{
@@ -316,7 +316,7 @@
 								"constant.language.sql"
 							],
 							"settings": {
-								"foreground": "#0F5F6B"
+								"foreground": "#7F1D1D"
 							}
 						},
 						{
@@ -325,7 +325,7 @@
 								"variable.parameter.named.sql"
 							],
 							"settings": {
-								"foreground": "#07645B",
+								"foreground": "#A1144F",
 								"fontStyle": "bold"
 							}
 						}
