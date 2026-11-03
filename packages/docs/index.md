@@ -1,4 +1,5 @@
 ---
+description: "Write plain SQL in TypeScript and get exact types for rows and parameters. No codegen, no database connection, no build step."
 layout: home
 
 hero:

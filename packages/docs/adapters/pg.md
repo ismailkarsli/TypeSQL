@@ -1,3 +1,7 @@
+---
+description: "Run TypeSQL queries on node-postgres (pg) with @typesql/pg: create sql, run queries and transactions, type parsing and migrations."
+---
+
 # node-postgres
 
 `@typesql/pg` runs your queries on node-postgres (`pg` 8.x).

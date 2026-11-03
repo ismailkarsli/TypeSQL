@@ -1,3 +1,7 @@
+---
+description: "What TypeSQL can't type, or types only in part, because it runs inside the TypeScript compiler, and what to do instead."
+---
+
 # Limits
 
 TypeSQL runs inside the TypeScript compiler, so it works within the compiler's budgets. This page lists what it can't do, or does only in part, and what to do instead.

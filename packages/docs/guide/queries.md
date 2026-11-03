@@ -1,3 +1,7 @@
+---
+description: "What TypeSQL infers from a SELECT: column names, column types, and when joins, aggregates, subqueries and expressions make a column nullable."
+---
+
 # Selecting data
 
 This page shows what TypeSQL infers from a `SELECT`: column names, column types and when a column can be `NULL`. The comments in the examples show the row type the compiler reports.

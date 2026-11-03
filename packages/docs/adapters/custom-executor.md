@@ -1,3 +1,7 @@
+---
+description: "Build TypeSQL queries without a client, run them on another client, or write your own executor."
+---
+
 # Custom executor
 
 An executor is the function a query runs on. The adapters build one from your driver client, so most apps never need this page. It covers building queries without a client, running on another client, writing an executor, and changing the rows it returns.

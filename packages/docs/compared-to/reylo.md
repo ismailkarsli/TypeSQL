@@ -1,3 +1,7 @@
+---
+description: "TypeSQL compared to Reylo: types from a TypeScript schema versus .sql imports typed from a live database."
+---
+
 # TypeSQL vs Reylo
 
 [Reylo](https://reylo.dev) lets TypeScript import `.sql` files and types them from a live database. Like TypeSQL, it has no generated files and needs TypeScript 7.1: it runs as a content mapper that the compiler calls for each `.sql` import. To type a query, it prepares the statement on your development database (PostgreSQL, MySQL) or reads the database file (SQLite).

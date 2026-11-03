@@ -1,3 +1,7 @@
+---
+description: "Generate a TypeSQL schema from a live PostgreSQL database with typesql introspect: tables, views, materialized views and enums."
+---
+
 # From a live database
 
 `typesql introspect` reads your Postgres database and writes its schema to a TypeScript file. You get every table, view, materialized view and enum, with the exact Postgres type of each column. For a SQLite database file, see [SQLite](../adapters/sqlite#generate-the-schema).

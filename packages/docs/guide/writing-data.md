@@ -1,3 +1,7 @@
+---
+description: "Typed INSERT, UPDATE, DELETE and MERGE in TypeSQL, with helpers for optional values, partial updates and bulk inserts."
+---
+
 # Inserting and updating
 
 `INSERT`, `UPDATE`, `DELETE` and `MERGE` are checked against your schema like queries, and parameters take the types of the columns they are assigned to. This page covers what is checked, plus helpers for optional values, partial updates and bulk inserts.

@@ -1,3 +1,7 @@
+---
+description: "TypeSQL compared to Kysely: plain SQL strings versus a type-safe query builder, with the same query in both."
+---
+
 # TypeSQL vs Kysely
 
 [Kysely](https://kysely.dev) is a type-safe SQL query builder. You build queries from method calls, and it types them from a `DB` interface that you write or generate with kysely-codegen.

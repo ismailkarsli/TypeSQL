@@ -1,3 +1,7 @@
+---
+description: "Read TypeSQL compile errors on SQL strings, and what to do when TypeSQL can't type a statement."
+---
+
 # Errors and troubleshooting
 
 When a statement is wrong, TypeSQL reports a compile error on the SQL string. This page shows how to read it, and what to do when TypeSQL can't type a statement.

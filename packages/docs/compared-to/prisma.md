@@ -1,3 +1,7 @@
+---
+description: "TypeSQL compared to Prisma ORM: plain SQL typed by the compiler versus a generated client from a Prisma schema."
+---
+
 # TypeSQL vs Prisma ORM
 
 [Prisma ORM](https://www.prisma.io/orm) describes your database in a Prisma schema (`schema.prisma`). `prisma generate` turns it into a typed client, and `prisma migrate` creates and applies migrations.

@@ -1,3 +1,7 @@
+---
+description: "Derive the TypeSQL schema from checked DDL migrations, and run them with createMigrator or the typesql migrate command."
+---
+
 # From migrations
 
 If you already write DDL to create your database, TypeSQL can read the schema from it. Each migration runs checked DDL, and the schema it leaves is a type: a wrong statement is a compile error, and the schema after the last migration is the `DB` your queries use. `createMigrator()` runs the migrations and records which ones ran, from a directory of files or from an array, with the `typesql migrate` command or from your own code.

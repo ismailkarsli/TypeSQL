@@ -1,3 +1,7 @@
+---
+description: "How the sql function works: compile-time checking of SQL statements and the sql.* helpers for parameters, fragments, bulk writes and transactions."
+---
+
 # Using `sql`
 
 TypeSQL centers on the `sql` function returned by your driver adapter's `createSql<DB>(client)` (or core's `createSql<DB>(dialect)`, such as `createSql<DB>(postgres)`). It compiles and type-checks your SQL statements against your schema at compile time, and provides helper functions on `sql.*` for parameter binding, dynamic SQL, fragments, bulk writes, and transactions.

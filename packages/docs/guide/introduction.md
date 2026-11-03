@@ -1,3 +1,7 @@
+---
+description: "What TypeSQL is: describe your tables once, write SQL as a string, and the TypeScript compiler infers the exact row and parameter types."
+---
+
 # Introduction
 
 TypeSQL gives you exact TypeScript types for the SQL you write. You describe your tables once, write SQL as a string, and the compiler tells you what comes back:

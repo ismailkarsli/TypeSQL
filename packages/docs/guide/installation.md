@@ -1,3 +1,7 @@
+---
+description: "Install TypeSQL: requirements (TypeScript 7.1, strictNullChecks, PostgreSQL or SQLite) and the packages for your database driver."
+---
+
 # Installation
 
 ## Requirements

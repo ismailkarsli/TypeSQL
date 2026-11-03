@@ -41,8 +41,11 @@ export function withVersions(
 		head.push(["meta", { name: "robots", content: "noindex" }]);
 		delete themeConfig.editLink;
 	}
+	// Archived versions are not indexed, so only the latest site has a sitemap.
+	const { sitemap, ...rest } = config;
 	return {
-		...config,
+		...rest,
+		...(sitemap && !archive ? { sitemap } : {}),
 		base: archive ? `/versions/${archive}/` : "/",
 		head,
 		themeConfig,

@@ -1,3 +1,7 @@
+---
+description: "The DDL statements TypeSQL understands, how their columns are typed, the errors it reports and its limitations."
+---
+
 # DDL support
 
 The DDL statements TypeSQL understands, how their columns are typed, the errors it reports and its limitations. For a guided introduction, see [From migrations](../guide/migrations).

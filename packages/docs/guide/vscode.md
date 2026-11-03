@@ -1,3 +1,7 @@
+---
+description: "The TypeSQL VS Code extension: completion of table and column names and syntax highlighting inside SQL strings."
+---
+
 # VS Code extension
 
 The TypeSQL extension for VS Code completes table and column names inside your SQL strings, and highlights the SQL.

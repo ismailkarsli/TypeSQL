@@ -1,3 +1,7 @@
+---
+description: "Run TypeSQL queries on postgres.js with @typesql/postgres: create sql, run queries and transactions, type parsing and migrations."
+---
+
 # postgres.js
 
 `@typesql/postgres` runs your queries on postgres.js (`postgres` 3.x or 4.x). The two versions parse a few date values differently; see [Type mapping](../reference/type-mapping#dates).

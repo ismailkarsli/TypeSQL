@@ -1,3 +1,7 @@
+---
+description: "Go from an empty project to a typed SQL query in a few minutes with TypeSQL and PostgreSQL."
+---
+
 # Quick start
 
 This page takes you from an empty project to a typed query in a few minutes.

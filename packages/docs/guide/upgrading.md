@@ -1,3 +1,7 @@
+---
+description: "Breaking changes in each TypeSQL major version and the code to change when you upgrade, newest first."
+---
+
 # Upgrading
 
 This page lists breaking changes and migration guidance since the first 0.x releases, newest first, with the code to change. Apply the sections newer than your installed version, oldest first: from 4.x apply [5.0](#_5-0); from 3.x apply [4.0](#_4-0), then 5.0. From 2.x start at [3.0](#_3-0), from 1.x at [2.0](#_2-0), and from 0.x at [Upgrading from 0.x](#upgrading-from-0-x). The [changelog](/changelog) has the release notes from 1.0.0 on.

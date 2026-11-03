@@ -1,3 +1,7 @@
+---
+description: "Type SQLite statements with TypeSQL's sqlite dialect: schema, functions, types, nullability, parameters, supported statements and limits."
+---
+
 # SQLite
 
 TypeSQL types SQLite statements with the `sqlite` dialect from `@typesql/core/sqlite`. It has its own parser and type rules, written against SQLite 3.53's behavior; everything else (`sql.param`, fragments, `sql.set` / `sql.values`, `:name` parameters, transactions, [migrations](./migrations)) works as described in the rest of this guide.

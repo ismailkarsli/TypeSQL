@@ -1,3 +1,7 @@
+---
+description: "Write the TypeScript schema TypeSQL checks your queries against: tables, column helpers, typed JSON columns, enums, functions and schemas."
+---
+
 # Declaring tables
 
 TypeSQL checks every query against a schema: a TypeScript interface that lists your tables and columns. This page shows how to write one by hand. You can also generate it [from a live database](./introspect), derive it [from your migrations](./migrations), or take it [from Kysely, Drizzle or Prisma](./orms).

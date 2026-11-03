@@ -1,3 +1,7 @@
+---
+description: "Run several typed statements in one transaction with sql.transaction, the same way with every TypeSQL adapter."
+---
+
 # Transactions
 
 `sql.transaction(fn)` runs several statements in one transaction. It works the same way with every adapter.

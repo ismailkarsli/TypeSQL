@@ -1,3 +1,7 @@
+---
+description: "TypeSQL compared to Prisma TypedSQL: types inferred by the compiler versus .sql files typed by prisma generate against a database."
+---
+
 # TypeSQL vs Prisma TypedSQL
 
 [TypedSQL](https://www.prisma.io/docs/orm/prisma-client/using-raw-sql/typedsql) is Prisma ORM's way to run typed raw SQL. You put each query in a `.sql` file under `prisma/sql`, and `prisma generate --sql` connects to your database to type it.

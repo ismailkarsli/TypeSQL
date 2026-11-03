@@ -1,3 +1,7 @@
+---
+description: "Run TypeSQL queries on node:sqlite, better-sqlite3 or bun:sqlite with @typesql/sqlite, and generate the schema from a database file."
+---
+
 # SQLite
 
 `@typesql/sqlite` runs your queries on node:sqlite (`DatabaseSync`), better-sqlite3 or bun:sqlite. They share one synchronous interface, so the adapter has no dependencies.

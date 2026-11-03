@@ -1,3 +1,7 @@
+---
+description: "Pass values to SQL as positional, named or inline parameters, each typed from the column or expression it is used with."
+---
+
 # Parameters
 
 Values are always sent as parameters, never pasted into the SQL. You can write them in three ways, and in all three the parameter's type comes from where it is used.

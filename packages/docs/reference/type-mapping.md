@@ -1,3 +1,7 @@
+---
+description: "How TypeSQL maps PostgreSQL and SQLite types to TypeScript for each driver, what parameters accept, and how to write a custom type map."
+---
+
 # Type mapping
 
 Your schema uses the database's type names (in PostgreSQL, `int8`, `timestamptz`). A **type map** says which TypeScript type each one becomes. This page lists the maps for each driver, what parameters accept, and how to write your own map.

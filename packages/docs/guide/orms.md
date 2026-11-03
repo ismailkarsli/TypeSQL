@@ -1,3 +1,7 @@
+---
+description: "Reuse the schema of Kysely, Drizzle or Prisma with TypeSQL and write typed SQL next to your ORM code."
+---
+
 # From Kysely, Drizzle or Prisma
 
 If Kysely, Drizzle or Prisma already describes your database, you don't need to write the schema again. TypeSQL's package for your ORM turns its types into the schema `createSql` needs, so you can write SQL next to your ORM code, checked against the same tables.

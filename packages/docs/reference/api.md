@@ -1,3 +1,7 @@
+---
+description: "API reference for @typesql/core, its PostgreSQL, SQLite, adapter and migration entry points, and the adapter and ORM packages."
+---
+
 # API
 
 The public APIs of `@typesql/core`, `@typesql/core/postgres`, `@typesql/core/sqlite`, `@typesql/core/adapter`, `@typesql/core/migration` and the extra exports of the adapter and ORM packages. Each entry links to the guide page that explains it.

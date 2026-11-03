@@ -1,3 +1,7 @@
+---
+description: "TypeSQL compared to Drizzle ORM: plain SQL with inferred types versus a TypeScript schema and query builder."
+---
+
 # TypeSQL vs Drizzle
 
 [Drizzle](https://orm.drizzle.team) is a TypeScript ORM. You declare tables in TypeScript (`pgTable`, `sqliteTable`), query them with a SQL-like builder or its relational query API, and manage migrations with drizzle-kit.
