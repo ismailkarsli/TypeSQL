@@ -13,7 +13,7 @@ When you hit a limit, [`sql.as<Row>()`](./errors#when-typesql-can-t-type-a-state
 
 ## Statement size
 
-- The lexer handles up to 4096 tokens per statement (a generated table in the [engine](./type-engine) sets this), but some shapes hit TypeScript's own depth limits well before that. Measured with TypeScript 7.1 (tsrs gives the same results):
+- The lexer handles up to 4096 tokens per statement (the engine stops counting there), but some shapes hit TypeScript's own depth limits well before that. Measured with TypeScript 7.1 (tsrs gives the same results):
 
   | Construct | Largest that compiles |
   |---|---|

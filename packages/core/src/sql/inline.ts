@@ -1,4 +1,5 @@
 import type { Empty } from "../empty.js";
+import type { Members } from "../engine/object.js";
 import type { SqlError } from "../errors.js";
 import type { InlineFragment } from "../query.js";
 import type { Next } from "./next.js";
@@ -120,30 +121,6 @@ type LitEnc<
 	: L extends readonly []
 		? Acc
 		: Wide;
-
-/** A union's members as a tuple, or `null` when it has more than `Max`. */
-type Members<U, Max extends number, Acc extends readonly unknown[] = []> = [
-	U,
-] extends [never]
-	? Acc
-	: Acc["length"] extends Max
-		? null
-		: LastOf<U> extends infer L
-			? Members<Exclude<U, L>, Max, [L, ...Acc]>
-			: never;
-type UnionToIntersection<U> = (
-	U extends unknown
-		? (u: U) => void
-		: never
-) extends (u: infer I) => void
-	? I
-	: never;
-type LastOf<U> =
-	UnionToIntersection<U extends unknown ? (x: U) => void : never> extends (
-		x: infer L,
-	) => void
-		? L
-		: never;
 
 type ArrEnc<T, Depth extends unknown[]> = [
 	Extract<T, readonly unknown[]>,
@@ -308,37 +285,33 @@ type CheckLoop<E extends string, P, InObject extends boolean> = E extends ""
 // Literals and object shapes are checked exactly. A plain `string`, `number`
 // or `boolean` only needs the parameter to take that kind, so a `string` fits
 // an enum.
-type FlagOk<C extends string, P, InObject extends boolean> = C extends "s"
-	? Has<P, string>
-	: C extends "n"
-		? Has<P, number>
-		: C extends "b"
-			? Has<P, boolean>
-			: C extends "t"
-				? [true] extends [P]
+type FlagOk<C extends string, P, InObject extends boolean> = C extends "t"
+	? [true] extends [P]
+		? true
+		: false
+	: C extends "f"
+		? [false] extends [P]
+			? true
+			: false
+		: C extends "u"
+			? InObject extends true
+				? [undefined] extends [P]
 					? true
 					: false
-				: C extends "f"
-					? [false] extends [P]
-						? true
-						: false
-					: C extends "i"
-						? Has<P, bigint>
-						: C extends "0"
-							? Has<P, null>
-							: C extends "u"
-								? InObject extends true
-									? [undefined] extends [P]
-										? true
-										: false
-									: Has<P, null>
-								: C extends "d"
-									? Has<P, Date>
-									: C extends "y"
-										? Has<P, Uint8Array>
-										: C extends "o"
-											? Has<P, object>
-											: true;
+				: Has<P, null>
+			: C extends keyof FlagTypes
+				? Has<P, FlagTypes[C]>
+				: true;
+interface FlagTypes {
+	s: string;
+	n: number;
+	b: boolean;
+	i: bigint;
+	"0": null;
+	d: Date;
+	y: Uint8Array;
+	o: object;
+}
 type Has<P, U> = [Extract<P, U>] extends [never] ? false : true;
 
 type ArrOk<Inner extends string, P> = [Extract<P, readonly unknown[]>] extends [
@@ -456,29 +429,22 @@ type DescObject<
 	: Acc extends ""
 		? "{}"
 		: `{ ${Acc} }`;
-type FlagName<C extends string> = C extends "s"
-	? "string"
-	: C extends "n"
-		? "number"
-		: C extends "b"
-			? "boolean"
-			: C extends "t"
-				? "true"
-				: C extends "f"
-					? "false"
-					: C extends "i"
-						? "bigint"
-						: C extends "0"
-							? "null"
-							: C extends "u"
-								? "undefined"
-								: C extends "d"
-									? "Date"
-									: C extends "y"
-										? "Uint8Array"
-										: C extends "o"
-											? "object"
-											: "unknown";
+type FlagName<C extends string> = C extends keyof FlagNames
+	? FlagNames[C]
+	: "unknown";
+interface FlagNames {
+	s: "string";
+	n: "number";
+	b: "boolean";
+	t: "true";
+	f: "false";
+	i: "bigint";
+	"0": "null";
+	u: "undefined";
+	d: "Date";
+	y: "Uint8Array";
+	o: "object";
+}
 type JoinBar<Parts extends string[]> = Parts extends [infer A]
 	? A
 	: Parts extends [infer A extends string, ...infer R extends string[]]
@@ -555,7 +521,7 @@ type HasMarker<S extends string> = S extends `${string}\u0000${string}`
 	: false;
 
 export type RewriteInlineStr<T extends string, Start extends number> =
-	HasMarker<T> extends false ? [T, []] : InlineLoop<T, "", [], Next[Start]>;
+	HasMarker<T> extends false ? [T, []] : InlineLoop<T, "", [], Next<Start>>;
 
 type InlineLoop<
 	T extends string,
@@ -595,7 +561,7 @@ type InlineCode<
 	Encs extends string[],
 	K extends number,
 > = S extends `${infer Pre}\u0000${infer Body}\u0000${infer Rest}`
-	? InlineCode<Rest, `${Acc}${Pre}$${K}`, [...Encs, MarkerEnc<Body>], Next[K]>
+	? InlineCode<Rest, `${Acc}${Pre}$${K}`, [...Encs, MarkerEnc<Body>], Next<K>>
 	: [`${Acc}${S}`, Encs, K];
 type MarkerEnc<B extends string> = B extends `P${infer E}`
 	? E

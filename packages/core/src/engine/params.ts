@@ -24,7 +24,7 @@ export type MaxParam<T extends Toks> = HighestParam<
 type MaxCandidates<N extends number, All extends number = N> = N extends number
 	? number extends N
 		? N
-		: Next[N] extends All
+		: Next<N> extends All
 			? never
 			: N
 	: never;

@@ -1,0 +1,61 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`pg-function-overloads > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "parameterized": "({ matches: null | number })[]",
+      "rows": "({ following: string; following_optional: null | string; matches: number; matches_optional: null | number; missing: null | string; padded: string; padded_optional: null | string; path_match: false | true; position: number; upper_label: string; upper_optional: null | string })[]",
+      "statistics": "{ deviation: null | number; population: null | number; sample: null | number; variance: null | number }",
+    },
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "{
+  rows: [
+    {
+      upper_label: 'ADA',
+      upper_optional: null,
+      padded: 'Ada   ',
+      padded_optional: null,
+      matches: 1,
+      matches_optional: null,
+      position: 1,
+      missing: null,
+      following: 'Grace',
+      following_optional: 'Grace',
+      path_match: true
+    },
+    {
+      upper_label: 'GRACE',
+      upper_optional: 'GRACE',
+      padded: 'Grace ',
+      padded_optional: 'Grace.',
+      matches: 1,
+      matches_optional: 1,
+      position: 3,
+      missing: null,
+      following: 'none',
+      following_optional: null,
+      path_match: true
+    }
+  ],
+  statistics: {
+    deviation: 1.414213562373095,
+    variance: 2,
+    sample: 2,
+    population: 1
+  },
+  parameterized: [ { matches: 2 }, { matches: 1 } ]
+}
+",
+  },
+}
+`;

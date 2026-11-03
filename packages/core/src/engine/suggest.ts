@@ -1,3 +1,5 @@
+import type { Lt, Members, Tup } from "./object.js";
+
 export type IsRelation<X> = X extends { readonly $view: unknown }
 	? true
 	: X extends object
@@ -14,7 +16,7 @@ export type Best<
 	Name extends string,
 	Cands,
 	Fold extends boolean = false,
-> = Pick2<Name, UnionToTuple<Cands>, null, 3, Fold>;
+> = Pick2<Name, Members<Cands>, null, 3, Fold>;
 type Pick2<
 	Name extends string,
 	Cs extends readonly unknown[],
@@ -33,21 +35,6 @@ type Pick2<
 				: Pick2<Name, R, Best, BestD, Fold>
 			: never
 	: Best;
-
-type UnionToTuple<U, Acc extends unknown[] = []> = [U] extends [never]
-	? Acc
-	: LastOf<U> extends infer L
-		? UnionToTuple<Exclude<U, L>, [L, ...Acc]>
-		: never;
-type LastOf<U> = (
-	(U extends unknown ? (x: () => U) => void : never) extends (
-		x: infer I,
-	) => void
-		? I
-		: never
-) extends () => infer R
-	? R
-	: never;
 
 type Chars<
 	S extends string,
@@ -84,15 +71,7 @@ type Min3<A extends number, B extends number, C extends number> = Min<
 	Min<B, C>
 >;
 type Min<A extends number, B extends number> = Lt<A, B> extends true ? A : B;
-type Lt<A extends number, B extends number> = A extends B
-	? false
-	: Tup<B> extends [...Tup<A>, ...unknown[]]
-		? true
-		: false;
 type Abs<A extends number, B extends number> =
 	Lt<A, B> extends true ? Sub<B, A> : Sub<A, B>;
 type Sub<A extends number, B extends number> =
 	Tup<A> extends [...Tup<B>, ...infer R] ? R["length"] : 0;
-type Tup<N extends number, A extends unknown[] = []> = A["length"] extends N
-	? A
-	: Tup<N, [...A, 0]>;

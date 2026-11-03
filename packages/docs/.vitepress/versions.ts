@@ -15,6 +15,7 @@ export interface VersionTheme {
 const { version }: { version: string } = JSON.parse(
 	readFileSync(new URL("../../core/package.json", import.meta.url), "utf8"),
 );
+export const latestVersion = version.split(".").slice(0, 2).join(".");
 
 export function withVersions(
 	config: UserConfig<DefaultTheme.Config>,
@@ -22,13 +23,7 @@ export function withVersions(
 	const archive = process.env.TYPESQL_DOCS_VERSION;
 	const versions: DocsVersion[] = process.env.TYPESQL_DOCS_VERSIONS
 		? JSON.parse(process.env.TYPESQL_DOCS_VERSIONS)
-		: [
-				{
-					version: version.split(".").slice(0, 2).join("."),
-					base: "/",
-					pages: [],
-				},
-			];
+		: [{ version: latestVersion, base: "/", pages: [] }];
 	const head = [...(config.head ?? [])];
 	const themeConfig = {
 		...config.themeConfig,

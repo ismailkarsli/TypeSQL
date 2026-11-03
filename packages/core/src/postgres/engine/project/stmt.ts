@@ -1,32 +1,21 @@
 import type { CteMap, Scope } from "../../../engine/types.js";
 import type { AnyErr } from "../../../errors.js";
-import type { DmlStmt, Stmt } from "../ast.js";
+import type { DmlStmt, SelectStmt, Stmt, Tag } from "../ast.js";
 import type { ProjectDml } from "./dml.js";
-import type { ProjectSelectParts } from "./select.js";
+import type { ProjectSelect } from "./select.js";
 
 export type ProjectStmt<
 	S extends Stmt,
 	DB,
 	Outer extends Scope,
 	Ctes extends CteMap,
-> = S extends TagSelect
-	? ProjectSelectParts<S["with"], S["body"], S["orderBy"], DB, Outer, Ctes>
-	: S extends DmlStmt
-		? ProjectDml<S, DB, Outer, Ctes>
-		: S extends TagDeclareCursor
-			? ProjectSelectParts<
-					S["q"]["with"],
-					S["q"]["body"],
-					S["q"]["orderBy"],
-					DB,
-					Outer,
-					Ctes
-				> extends infer C
-				? C extends AnyErr
-					? C
+> =
+	S extends Tag<"select">
+		? ProjectSelect<Extract<S, SelectStmt>, DB, Outer, Ctes>
+		: S extends DmlStmt
+			? ProjectDml<S, DB, Outer, Ctes>
+			: S extends Tag<"declare_cursor">
+				? ProjectSelect<S["q"], DB, Outer, Ctes> extends AnyErr
+					? ProjectSelect<S["q"], DB, Outer, Ctes>
 					: null
-				: never
-			: null;
-
-type TagSelect = { readonly t: "select" };
-type TagDeclareCursor = { readonly t: "declare_cursor" };
+				: null;

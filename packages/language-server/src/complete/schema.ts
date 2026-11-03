@@ -26,15 +26,11 @@ interface Entry {
 	readonly type: Type;
 }
 
-export function schemaOf(
+export async function schemaOf(
 	checker: Checker,
 	db: Type,
-	caseInsensitive = false,
+	ci: boolean,
 ): Promise<Schema> {
-	return read(checker, db, caseInsensitive);
-}
-
-async function read(checker: Checker, db: Type, ci: boolean): Promise<Schema> {
 	const norm = (name: string): string => (ci ? name.toLowerCase() : name);
 	const entries = async (t: Type): Promise<Entry[]> => {
 		const props = (await checker.getPropertiesOfType(t)).filter(

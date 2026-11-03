@@ -5,12 +5,22 @@ import type { TableRef } from "../ast.js";
 
 type IsTop<S> = S extends null | "public" ? true : false;
 
-export type Written<Ref extends TableRef> = Ref["schema"] extends string
+type Written<Ref extends TableRef> = Ref["schema"] extends string
 	? `${Ref["schema"]}.${Ref["name"]}`
 	: Ref["name"];
 
-export type MissingRel<DB, Ref extends TableRef, E> =
+export type AlreadyExists<DB, Ine, What extends string> = Ine extends true
+	? DB
+	: SqlError<`${What} already exists`, null>;
+
+type MissingRel<DB, Ref extends TableRef, E> =
 	SchemaExists<DB, Ref["schema"]> extends false ? NoSchema<Ref["schema"]> : E;
+
+export type NoRelation<DB, Ref extends TableRef> = MissingRel<
+	DB,
+	Ref,
+	SqlError<`relation "${Written<Ref>}" does not exist`, null>
+>;
 
 export type IsViewVal<X> = X extends { readonly $view: unknown } ? true : false;
 

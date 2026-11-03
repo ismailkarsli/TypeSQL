@@ -1,3 +1,4 @@
+import { globRegExp } from "@typesql/core/adapter";
 import type { PgQueryable } from "../client.js";
 import { type NullabilityOptions, ViewNullability } from "./nullability.js";
 
@@ -49,14 +50,6 @@ export interface IntrospectOptions {
 	readonly exclude?: readonly string[];
 	readonly viewNotNull?: NullabilityOptions["notNull"];
 }
-
-const globToRegExp = (glob: string): RegExp =>
-	new RegExp(
-		`^${glob
-			.split("*")
-			.map((part) => part.replace(/[.+?^${}()|[\]\\]/g, "\\$&"))
-			.join(".*")}$`,
-	);
 
 const KINDS: Readonly<Record<string, RelationKind>> = {
 	r: "table",
@@ -160,7 +153,7 @@ export async function introspect(
 	);
 	const resolve = resolver(types);
 
-	const excluded = options.exclude?.map(globToRegExp);
+	const excluded = options.exclude?.map(globRegExp);
 	const relRows = (
 		await q<{
 			oid: string;
@@ -209,9 +202,7 @@ export async function introspect(
 
 	const views = new ViewNullability(
 		(text, values) => client.query(text, values),
-		{
-			...(options.viewNotNull && { notNull: options.viewNotNull }),
-		},
+		options.viewNotNull && { notNull: options.viewNotNull },
 	);
 	const usedTypes = new Set<string>();
 	const relations: IntrospectedRelation[] = [];

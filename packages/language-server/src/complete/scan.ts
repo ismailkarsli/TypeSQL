@@ -1,3 +1,5 @@
+import { blockComment } from "../highlight/lex.js";
+
 export interface RelRef {
 	readonly schema: string | null;
 	readonly name: string;
@@ -44,7 +46,6 @@ interface Tok {
 
 const WORD = /[A-Za-z_\u0080-￿][A-Za-z0-9_$\u0080-￿]*/y;
 const LINE_COMMENT = /--[^\n\r]*/y;
-const COMMENT_MARK = /\/\*|\*\//g;
 const STRING = /(?:([eE])|[bBxXnN]|[uU]&)?'/y;
 const STRING_REST = /[^']*'?/y;
 const ESCAPE_STRING_REST = /(?:[^'\\]|\\.|'')*'?/sy;
@@ -102,14 +103,9 @@ function lex(text: string, offset: number): { toks: Tok[]; inside: boolean } {
 			continue;
 		}
 		if (text.startsWith("/*", i)) {
-			let depth = 0;
-			COMMENT_MARK.lastIndex = i;
-			for (let c = COMMENT_MARK.exec(text); c; c = COMMENT_MARK.exec(text)) {
-				depth += c[0] === "/*" ? 1 : -1;
-				if (depth === 0) break;
-			}
-			i = depth === 0 ? COMMENT_MARK.lastIndex : n;
-			comment(s, depth > 0);
+			const [end, closed] = blockComment(text, i);
+			i = end;
+			comment(s, !closed);
 			continue;
 		}
 		if (take(HOLE)) {
@@ -238,6 +234,13 @@ interface At {
 	relNext?: boolean;
 }
 
+const named = (t: Tok | undefined): boolean =>
+	!!t && (t.k === "q" || (t.k === "w" && !NOT_ALIAS.has(t.v)));
+
+function* levels(level: Level | null): Generator<Level> {
+	for (let l = level; l; l = l.parent) yield l;
+}
+
 function structure(toks: readonly Tok[]): { at: At[]; used: RelRef[] } {
 	const at: At[] = [];
 	const used: RelRef[] = [];
@@ -245,20 +248,19 @@ function structure(toks: readonly Tok[]): { at: At[]; used: RelRef[] } {
 		toks[i]?.k === "w" ? toks[i]!.v : null;
 	const is = (i: number, v: string): boolean =>
 		toks[i]?.k === "o" && toks[i]!.v === v;
-	const named = (t: Tok | undefined): boolean =>
-		!!t && (t.k === "q" || (t.k === "w" && !NOT_ALIAS.has(t.v)));
 
 	const level = (
 		i: number,
 		parent: Level | null,
 	): { level: Level; i: number } => {
-		const first: Level = {
+		const fresh = (): Level => ({
 			parent,
 			items: [],
 			ctes: [],
 			outputs: null,
 			target: null,
-		};
+		});
+		const first = fresh();
 		let lv = first;
 		let clause = "";
 		const parens: { kind: ParenKind; item: Item | null }[] = [];
@@ -276,13 +278,8 @@ function structure(toks: readonly Tok[]): { at: At[]; used: RelRef[] } {
 			if (name !== null) lv.outputs!.push(name);
 			out = null;
 		};
-		const visibleCte = (name: string): Item | undefined => {
-			for (let l: Level | null = lv; l; l = l.parent) {
-				const c = l.ctes.find((x) => x.name === name);
-				if (c) return c;
-			}
-			return undefined;
-		};
+		const visibleCte = (name: string): Item | undefined =>
+			[...levels(lv)].flatMap((l) => l.ctes).find((x) => x.name === name);
 		const addItem = (item: Item): void => {
 			lv.items.push(item);
 			if (item.rel) used.push(item.rel);
@@ -421,7 +418,7 @@ function structure(toks: readonly Tok[]): { at: At[]; used: RelRef[] } {
 			}
 			if (t.k === "o" && t.v === ";") {
 				out = null;
-				lv = { parent, items: [], ctes: [], outputs: null, target: null };
+				lv = fresh();
 				clause = "";
 				continue;
 			}
@@ -526,7 +523,7 @@ function structure(toks: readonly Tok[]): { at: At[]; used: RelRef[] } {
 function outputName(toks: readonly Tok[]): string | null {
 	const last = toks.at(-1);
 	if (!last) return null;
-	if (last.k === "q" || (last.k === "w" && !NOT_ALIAS.has(last.v))) {
+	if (named(last)) {
 		const before = toks.at(-2);
 		if (before?.k !== "o" || before.v === ")" || before.v === ".")
 			return last.v;
@@ -561,9 +558,7 @@ function expectAfter(
 	if (t.v === ")") return NONE;
 	const a = at[j]!;
 	const scope = (): Expect => {
-		const sources: ScopeItem[] = [];
-		for (let l: Level | null = a.level; l; l = l.parent)
-			sources.push(...l.items);
+		const sources: ScopeItem[] = [...levels(a.level)].flatMap((l) => l.items);
 		if (!sources.length && a.level.target) sources.push(a.level.target);
 		const aliases = new Set<string>();
 		for (const { name } of sources)
@@ -574,11 +569,7 @@ function expectAfter(
 		a.level.target
 			? { kind: "column", sources: [a.level.target], aliases: [] }
 			: NONE;
-	const ctes = (): Cte[] => {
-		const all: Cte[] = [];
-		for (let l: Level | null = a.level; l; l = l.parent) all.push(...l.ctes);
-		return all;
-	};
+	const ctes = (): Cte[] => [...levels(a.level)].flatMap((l) => l.ctes);
 	const relation = (schema: string | null): Expect => ({
 		kind: "relation",
 		schema,
@@ -640,14 +631,11 @@ function expectAfter(
 
 function qualified(level: Level, q: readonly string[]): Expect {
 	if (q.length === 1) {
-		for (let l: Level | null = level; l; l = l.parent) {
-			const item = l.items.find((x) => x.name === q[0]);
-			if (item) return { kind: "column", sources: [item], aliases: [] };
-		}
-		for (let l: Level | null = level; l; l = l.parent) {
-			const c = l.ctes.find((x) => x.name === q[0]);
-			if (c) return { kind: "column", sources: [c], aliases: [] };
-		}
+		const all = [...levels(level)];
+		const item =
+			all.flatMap((l) => l.items).find((x) => x.name === q[0]) ??
+			all.flatMap((l) => l.ctes).find((x) => x.name === q[0]);
+		if (item) return { kind: "column", sources: [item], aliases: [] };
 		return {
 			kind: "column",
 			sources: [

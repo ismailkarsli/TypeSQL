@@ -139,7 +139,7 @@ Measured with TypeScript 7.1.0-beta (`tsc --extendedDiagnostics`):
 | 50 statements | 297K | 0.22 s |
 | 200 statements and four queries | 1.15M | 0.53 s |
 
-Each statement rebuilds only the table it changes, so long migration histories stay within TypeScript's limits ([Type engine](../guide/type-engine)).
+Each statement rebuilds only the table it changes, so long migration histories stay within TypeScript's limits ([Limits](../guide/limits)).
 
 ## Limitations
 

@@ -21,34 +21,33 @@ import type {
 	Stmt,
 	TableRef,
 } from "../ast.js";
-import type { FindKey, LookupRelation, UniqueCells } from "../binder/scope.js";
+import type {
+	FindKey,
+	LookupRelation,
+	LowerAll,
+	UniqueCells,
+} from "../binder/scope.js";
 import type { Lex } from "../lexer.js";
 import type { ParseScript } from "../parser/stmt.js";
 import type { ProjectDml } from "../project/dml.js";
-import type { ProjectSelect } from "../project/select.js";
+import type { ProjectSelect, RenameCells } from "../project/select.js";
 import type { Cell, NormalizeType } from "../types.js";
 
 export type ApplyDdlAll<DB, Q extends string> =
-	Lex<Q> extends infer T
-		? T extends Toks
-			? ParseScript<T> extends infer S
-				? S extends readonly Stmt[]
-					? ApplyLoop<DB, S, 0>
-					: S
-				: never
-			: T
-		: never;
+	Lex<Q> extends infer T extends Toks
+		? ParseScript<T> extends infer S extends readonly Stmt[]
+			? ApplyLoop<DB, S, 0>
+			: ParseScript<T>
+		: Lex<Q>;
 
 type ApplyLoop<
 	DB,
 	S extends readonly Stmt[],
 	I extends number,
 > = S[I] extends infer St extends Stmt
-	? ApplyOne<DB, St> extends infer DB2
-		? DB2 extends AnyErr
-			? DB2
-			: ApplyLoop<DB2, S, Nx<I>>
-		: never
+	? ApplyOne<DB, St> extends AnyErr
+		? ApplyOne<DB, St>
+		: ApplyLoop<ApplyOne<DB, St>, S, Nx<I>>
 	: DB;
 
 export type ApplyOne<DB, S extends Stmt> = S extends {
@@ -79,29 +78,27 @@ export type ApplyOne<DB, S extends Stmt> = S extends {
 										: DB
 									: never
 								: S extends { readonly t: "insert" | "update" | "delete" }
-									? ProjectDml<Extract<S, DmlStmt>, DB, {}> extends infer X
-										? X extends AnyErr
-											? X
-											: DB
-										: never
+									? ProjectDml<Extract<S, DmlStmt>, DB, {}> extends AnyErr
+										? ProjectDml<Extract<S, DmlStmt>, DB, {}>
+										: DB
 									: DB;
 
 type Exists<DB, Ref extends TableRef> =
 	LookupRelation<DB, Ref> extends [unknown, string] ? true : false;
 
+type Existing<DB, Rel, K extends string, Ine> = Ine extends true
+	? DB
+	: SqlError<
+			`${Rel extends View<Table> ? "view" : "table"} ${K} already exists`,
+			null
+		>;
+
 type CreateTableEffect<DB, S extends CreateTable> =
 	LookupRelation<DB, S["table"]> extends [infer Rel, infer K extends string]
-		? S["ifNotExists"] extends true
-			? DB
-			: SqlError<
-					`${Rel extends View<Table> ? "view" : "table"} ${K} already exists`,
-					null
-				>
-		: TableFromDefs<S> extends infer Tbl
-			? Tbl extends AnyErr
-				? Tbl
-				: SetKey<DB, DisplayName<S>, Tbl>
-			: never;
+		? Existing<DB, Rel, K, S["ifNotExists"]>
+		: TableFromDefs<S> extends AnyErr
+			? TableFromDefs<S>
+			: SetKey<DB, DisplayName<S>, TableFromDefs<S>>;
 
 type DisplayName<S extends { readonly table: TableRef }> = S extends {
 	readonly display: infer D extends string;
@@ -161,28 +158,18 @@ type StrictCheck<
 type TableFromDefs<S extends CreateTable> =
 	DupName<S["columns"]> extends infer D extends string
 		? SqlError<`duplicate column name: ${D}`, null>
-		: StrictCheck<S, S["columns"]> extends infer E
-			? E extends AnyErr
-				? E
-				: ColumnPks<S["columns"]> extends infer CP extends readonly string[]
-					? CP["length"] extends 0 | 1
-						? CP["length"] extends 1
-							? S["pk"]["length"] extends 0
-								? BuildTable<S, CP>
-								: SqlError<
-										`table "${S["table"]["name"]}" has more than one primary key`,
-										null
-									>
-							: BuildTable<S, LowerAll<S["pk"]>>
+		: StrictCheck<S, S["columns"]> extends AnyErr
+			? StrictCheck<S, S["columns"]>
+			: ColumnPks<S["columns"]> extends infer CP extends readonly string[]
+				? CP["length"] extends 0
+					? BuildTable<S, LowerAll<S["pk"]>>
+					: [CP["length"], S["pk"]["length"]] extends [1, 0]
+						? BuildTable<S, CP>
 						: SqlError<
 								`table "${S["table"]["name"]}" has more than one primary key`,
 								null
 							>
-					: never
-			: never;
-type LowerAll<L extends readonly string[]> = {
-	[I in keyof L]: Lowercase<L[I]>;
-};
+				: never;
 
 type Indexed<L extends readonly unknown[]> = {
 	[I in keyof L]: {
@@ -275,15 +262,13 @@ type CtasEffect<DB, S extends CreateTableAs> =
 		? S["ifNotExists"] extends true
 			? DB
 			: SqlError<`table ${S["table"]["name"]} already exists`, null>
-		: ProjectSelect<S["q"], DB, [], {}> extends infer C
-			? C extends readonly Cell[]
-				? SetKey<
-						DB,
-						S["table"]["name"],
-						CellsTable<UniqueCells<C>, CtasTypes<S["q"], C>>
-					>
-				: C
-			: never;
+		: ProjectSelect<S["q"], DB, [], {}> extends infer C extends readonly Cell[]
+			? SetKey<
+					DB,
+					S["table"]["name"],
+					CellsTable<UniqueCells<C>, CtasTypes<S["q"], C>>
+				>
+			: ProjectSelect<S["q"], DB, [], {}>;
 
 type CtasTypes<
 	Q extends SelectStmt,
@@ -327,20 +312,15 @@ type CtasAffinity<T extends string> =
 
 type CellsTable<
 	C extends readonly Cell[],
-	Types extends readonly unknown[],
+	Types extends readonly unknown[] | null = null,
 > = Rebuild<{
 	[D in Indexed<C>[number] as D["c"]["n"]]: {
-		readonly type: Types[D["i"]] extends string ? Types[D["i"]] : "any";
-		readonly nullable: true;
-		readonly hasDefault: false;
-		readonly i: D["i"];
-	};
-}>;
-
-type ViewCols<C extends readonly Cell[]> = Rebuild<{
-	[D in Indexed<C>[number] as D["c"]["n"]]: {
-		readonly type: D["c"]["t"]["type"];
-		readonly nullable: D["c"]["t"]["nullable"];
+		readonly type: Types extends readonly unknown[]
+			? Types[D["i"]] extends string
+				? Types[D["i"]]
+				: "any"
+			: D["c"]["t"]["type"];
+		readonly nullable: Types extends null ? D["c"]["t"]["nullable"] : true;
 		readonly hasDefault: false;
 		readonly i: D["i"];
 	};
@@ -348,44 +328,25 @@ type ViewCols<C extends readonly Cell[]> = Rebuild<{
 
 type CreateViewEffect<DB, S extends CreateView> =
 	LookupRelation<DB, S["view"]> extends [infer Rel, infer K extends string]
-		? S["ifNotExists"] extends true
-			? DB
-			: SqlError<
-					`${Rel extends View<Table> ? "view" : "table"} ${K} already exists`,
-					null
-				>
-		: ProjectSelect<S["q"], DB, [], {}> extends infer C
-			? C extends readonly Cell[]
-				? (
-						S["cols"] extends readonly { readonly n: string }[]
-							? S["cols"]["length"] extends C["length"]
-								? RenameCells<C, S["cols"]>
-								: SqlError<
-										`expected ${S["cols"]["length"]} columns for '${S["view"]["name"]}' but got ${C["length"]}`,
-										null
-									>
-							: UniqueCells<C>
-					) extends infer R
-					? R extends readonly Cell[]
-						? ViewCols<R> extends infer V extends Table
-							? SetKey<DB, S["view"]["name"], View<V>>
-							: never
-						: R
-					: never
-				: C
-			: never;
-
-type RenameCells<
-	C extends readonly Cell[],
-	N extends readonly { readonly n: string }[],
-> = {
-	[I in keyof C]: {
-		readonly n: N[I & keyof N] extends { readonly n: infer X extends string }
-			? X
-			: C[I]["n"];
-		readonly t: C[I]["t"];
-	};
-};
+		? Existing<DB, Rel, K, S["ifNotExists"]>
+		: ProjectSelect<S["q"], DB, [], {}> extends infer C extends readonly Cell[]
+			? (
+					S["cols"] extends readonly { readonly n: string }[]
+						? S["cols"]["length"] extends C["length"]
+							? RenameCells<C, S["cols"]>
+							: SqlError<
+									`expected ${S["cols"]["length"]} columns for '${S["view"]["name"]}' but got ${C["length"]}`,
+									null
+								>
+						: UniqueCells<C>
+				) extends infer R
+				? R extends readonly Cell[]
+					? CellsTable<R> extends infer V extends Table
+						? SetKey<DB, S["view"]["name"], View<V>>
+						: never
+					: R
+				: never
+			: ProjectSelect<S["q"], DB, [], {}>;
 
 type AlterEffect<DB, S extends AlterTable> =
 	LookupRelation<DB, S["table"]> extends [infer Rel, infer K extends string]
@@ -402,11 +363,9 @@ type AlterEffect<DB, S extends AlterTable> =
 								null
 							>
 						: RenameKey<DB, K, To>
-					: AlterColumns<Rel, S["action"]> extends infer Tbl
-						? Tbl extends AnyErr
-							? Tbl
-							: SetKey<DB, K, Tbl>
-						: never
+					: AlterColumns<Rel, S["action"]> extends AnyErr
+						? AlterColumns<Rel, S["action"]>
+						: SetKey<DB, K, AlterColumns<Rel, S["action"]>>
 				: SqlError<`no such table: ${S["table"]["name"]}`, null>
 		: SqlError<`no such table: ${S["table"]["name"]}`, null>;
 

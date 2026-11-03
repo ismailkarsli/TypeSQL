@@ -144,17 +144,19 @@ type Desc<T extends string, N, H> = N extends true
 		? Col<T, { hasDefault: true }>
 		: Col<T>;
 
+export type DbDefault<D extends ColumnConfig> = D["hasDefault"] extends true
+	? D["hasRuntimeDefault"] extends true
+		? false
+		: true
+	: false;
+
 type ColOf<D extends ColumnConfig, Opts, E> = Desc<
 	PgTypeOf<D, Opts, E>,
 	D["notNull"] extends true ? false : true,
-	D["hasDefault"] extends true
-		? D["hasRuntimeDefault"] extends true
-			? false
-			: true
-		: false
+	DbDefault<D>
 >;
 
-export type Cased<N extends string, Opts> = Opts extends {
+type Cased<N extends string, Opts> = Opts extends {
 	readonly casing: "snake_case";
 }
 	? ToSnakeCase<N>
@@ -164,21 +166,27 @@ export type Cased<N extends string, Opts> = Opts extends {
 
 // Drizzle types an unnamed column's name as its key. Its casing setting renames
 // only those; an explicit name that differs from the key is kept as written.
+export type ColumnKey<C, K extends keyof C, Opts> = C[K] extends ColumnLike
+	? C[K]["_"]["name"] extends K
+		? Cased<C[K]["_"]["name"], Opts>
+		: C[K]["_"]["name"]
+	: never;
+
 type Columns<C, Opts, E> = {
-	-readonly [K in keyof C as C[K] extends ColumnLike
-		? C[K]["_"]["name"] extends K
-			? Cased<C[K]["_"]["name"], Opts>
-			: C[K]["_"]["name"]
-		: never]: C[K] extends ColumnLike ? ColOf<C[K]["_"], Opts, E> : never;
+	-readonly [K in keyof C as ColumnKey<C, K, Opts>]: C[K] extends ColumnLike
+		? ColOf<C[K]["_"], Opts, E>
+		: never;
 };
 
-export type Aliased = { readonly _: { readonly brand: "SQL.Aliased" } };
+type Aliased = { readonly _: { readonly brand: "SQL.Aliased" } };
+export type ViewKey<F, K extends keyof F, Opts> = F[K] extends ColumnLike
+	? Cased<F[K]["_"]["name"], Opts>
+	: F[K] extends Aliased
+		? K
+		: never;
+
 type ViewColumns<F, Opts, E> = {
-	-readonly [K in keyof F as F[K] extends ColumnLike
-		? Cased<F[K]["_"]["name"], Opts>
-		: F[K] extends Aliased
-			? K
-			: never]: F[K] extends ColumnLike
+	-readonly [K in keyof F as ViewKey<F, K, Opts>]: F[K] extends ColumnLike
 		? Desc<
 				PgTypeOf<F[K]["_"], Opts, E>,
 				F[K]["_"]["notNull"] extends true ? false : true,

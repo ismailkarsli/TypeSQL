@@ -1,13 +1,10 @@
+import { propertyKey as key } from "@typesql/core/adapter";
 import type { IntrospectedDatabase } from "./introspect.js";
 
 export interface GenerateOptions {
 	readonly typeName?: string;
 	readonly importFrom?: string;
 }
-
-const IDENT = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
-const key = (name: string): string =>
-	IDENT.test(name) ? name : JSON.stringify(name);
 
 export function generateSource(
 	db: IntrospectedDatabase,

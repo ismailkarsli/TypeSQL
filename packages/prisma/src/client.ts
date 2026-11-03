@@ -16,22 +16,10 @@ export interface PrismaRawClient {
 	$transaction?<R>(fn: (tx: PrismaRawClient) => Promise<R>): Promise<R>;
 }
 
-type Compile = (
-	text: string,
-	values: readonly unknown[],
-) => { readonly text: string; readonly values: readonly unknown[] };
-
 // Prisma sends a JS array as a Postgres array and a string as text, so send
 // every sql.json() value as its JSON.stringify string.
 const jsonText = (value: unknown): unknown =>
 	value instanceof JsonParam ? JSON.stringify(value.value) : value;
-
-const numbered: Compile = (text, values) => ({
-	text,
-	values: values.map(jsonText),
-});
-
-const sqlite: Compile = (text, values) => positional(text, values, jsonText);
 
 /**
  * An executor on `prisma`. SQLite's placeholders are used when `dialect` is
@@ -46,7 +34,13 @@ export function executor(
 			? (prisma as { readonly _activeProvider?: unknown })._activeProvider ===
 				"sqlite"
 			: options.dialect === "sqlite";
-	const compile = onSqlite ? sqlite : numbered;
+	const compile = onSqlite
+		? (text: string, values: readonly unknown[]) =>
+				positional(text, values, jsonText)
+		: (text: string, values: readonly unknown[]) => ({
+				text,
+				values: values.map(jsonText),
+			});
 	return Object.assign(
 		(text: string, values: readonly unknown[]) => {
 			const q = compile(text, values);

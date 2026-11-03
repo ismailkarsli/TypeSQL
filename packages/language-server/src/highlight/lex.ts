@@ -297,6 +297,20 @@ const at = (re: RegExp, s: string, i: number): string | null => {
 };
 
 /** Splits SQL text into tokens; whitespace is left out. */
+export function blockComment(s: string, i: number): [number, boolean] {
+	let depth = 0;
+	for (let j = i; j < s.length; ) {
+		if (s.startsWith("/*", j)) {
+			depth++;
+			j += 2;
+		} else if (s.startsWith("*/", j)) {
+			j += 2;
+			if (--depth === 0) return [j, true];
+		} else j++;
+	}
+	return [s.length, false];
+}
+
 export function lex(s: string): Token[] {
 	const out: { start: number; end: number; kind: TokenKind }[] = [];
 	const push = (start: number, end: number, kind: TokenKind): void => {
@@ -324,19 +338,9 @@ export function lex(s: string): Token[] {
 			continue;
 		}
 		if (s.startsWith("/*", i)) {
-			let depth = 0;
-			let j = i;
-			while (j < s.length) {
-				if (s.startsWith("/*", j)) {
-					depth++;
-					j += 2;
-				} else if (s.startsWith("*/", j)) {
-					j += 2;
-					if (--depth === 0) break;
-				} else j++;
-			}
-			push(i, j, "comment");
-			i = j;
+			const [end] = blockComment(s, i);
+			push(i, end, "comment");
+			i = end;
 			continue;
 		}
 		const prefix = at(STRING_PREFIX, s, i);

@@ -1,27 +1,24 @@
 engine biome(1.0)
 language js(typescript)
 
-pattern wrapped_call() {
+pattern wrapped($leaf, $self) {
 	or {
-		JsCallExpression(),
-		JsParenthesizedExpression(expression=wrapped_call()),
-		TsAsExpression(expression=wrapped_call()),
-		TsTypeAssertionExpression(expression=wrapped_call()),
-		TsNonNullAssertionExpression(expression=wrapped_call()),
-		TsSatisfiesExpression(expression=wrapped_call())
+		$leaf,
+		JsParenthesizedExpression(expression=$self),
+		TsAsExpression(expression=$self),
+		TsTypeAssertionExpression(expression=$self),
+		TsNonNullAssertionExpression(expression=$self),
+		TsSatisfiesExpression(expression=$self)
 	}
 }
 
+pattern wrapped_call() { wrapped(JsCallExpression(), wrapped_call()) }
+
 pattern wrapped_member() {
-	or {
+	wrapped(or {
 		JsStaticMemberExpression(),
-		JsComputedMemberExpression(),
-		JsParenthesizedExpression(expression=wrapped_member()),
-		TsAsExpression(expression=wrapped_member()),
-		TsTypeAssertionExpression(expression=wrapped_member()),
-		TsNonNullAssertionExpression(expression=wrapped_member()),
-		TsSatisfiesExpression(expression=wrapped_member())
-	}
+		JsComputedMemberExpression()
+	}, wrapped_member())
 }
 
 pattern member_call($object, $name) {
@@ -83,29 +80,23 @@ pattern hoisted_has($target) {
 
 pattern scope_has($target) {
 	or {
-		JsModule(items=$region) where { $region <: hoisted_has($target) },
-		JsScript(statements=$region) where { $region <: hoisted_has($target) },
-		JsStaticInitializationBlockClassMember(statements=$region) where {
-			$region <: hoisted_has($target)
-		},
-		JsBlockStatement(statements=$region) where {
-			$region <: lexical_has($target)
-		},
-		JsSwitchStatement(cases=$region) where { $region <: lexical_has($target) },
-		JsForStatement(initializer=$region) where {
-			$region <: lexical_has($target)
-		},
-		JsForInStatement(initializer=$region) where {
-			$region <: lexical_has($target)
-		},
-		JsForOfStatement(initializer=$region) where {
-			$region <: lexical_has($target)
-		},
-		JsCatchClause(declaration=$region) where {
-			$region <: lexical_has($target)
-		},
-		JsFunctionExpression(id=$region) where { $region <: $target },
-		JsClassExpression(id=$region) where { $region <: $target },
+		or {
+			JsModule(items=$region),
+			JsScript(statements=$region),
+			JsStaticInitializationBlockClassMember(statements=$region)
+		} where { $region <: hoisted_has($target) },
+		or {
+			JsBlockStatement(statements=$region),
+			JsSwitchStatement(cases=$region),
+			JsForStatement(initializer=$region),
+			JsForInStatement(initializer=$region),
+			JsForOfStatement(initializer=$region),
+			JsCatchClause(declaration=$region)
+		} where { $region <: lexical_has($target) },
+		or {
+			JsFunctionExpression(id=$region),
+			JsClassExpression(id=$region)
+		} where { $region <: $target },
 		or {
 			JsFunctionDeclaration(parameters=JsParameters(items=$parameters), body=JsFunctionBody(statements=$statements)),
 			JsFunctionExportDefaultDeclaration(parameters=JsParameters(items=$parameters), body=JsFunctionBody(statements=$statements)),
@@ -148,14 +139,7 @@ pattern write_to($name, $scope) {
 }
 
 pattern wrapped_identifier() {
-	or {
-		JsIdentifierExpression(),
-		JsParenthesizedExpression(expression=wrapped_identifier()),
-		TsAsExpression(expression=wrapped_identifier()),
-		TsTypeAssertionExpression(expression=wrapped_identifier()),
-		TsNonNullAssertionExpression(expression=wrapped_identifier()),
-		TsSatisfiesExpression(expression=wrapped_identifier())
-	}
+	wrapped(JsIdentifierExpression(), wrapped_identifier())
 }
 
 pattern unwrapped_identifier($target) {
@@ -181,27 +165,13 @@ pattern function_like() {
 	}
 }
 
-pattern wrapped_object() {
-	or {
-		JsObjectExpression(),
-		JsParenthesizedExpression(expression=wrapped_object()),
-		TsAsExpression(expression=wrapped_object()),
-		TsTypeAssertionExpression(expression=wrapped_object()),
-		TsNonNullAssertionExpression(expression=wrapped_object()),
-		TsSatisfiesExpression(expression=wrapped_object())
-	}
-}
+pattern wrapped_object() { wrapped(JsObjectExpression(), wrapped_object()) }
 
 pattern wrapped_function() {
-	or {
+	wrapped(or {
 		JsArrowFunctionExpression(),
-		JsFunctionExpression(),
-		JsParenthesizedExpression(expression=wrapped_function()),
-		TsAsExpression(expression=wrapped_function()),
-		TsTypeAssertionExpression(expression=wrapped_function()),
-		TsNonNullAssertionExpression(expression=wrapped_function()),
-		TsSatisfiesExpression(expression=wrapped_function())
-	}
+		JsFunctionExpression()
+	}, wrapped_function())
 }
 
 pattern global($global) {
@@ -232,163 +202,135 @@ pattern accumulator_alias($seen, $declarator, $init) {
 	}
 }
 
-pattern accumulator_1($callback, $accumulator, $seen) {
+pattern accumulator_via($callback, $accumulator, $seen, $declarator, $previous) {
 	or {
 		accumulator_0($callback, $accumulator, $seen),
-		accumulator_alias($seen, $declarator, unwrapped_identifier(accumulator_0($callback, $accumulator, or {
-			$seen,
-			$declarator
-		})))
+		accumulator_alias($seen, $declarator, unwrapped_identifier($previous))
 	}
+}
+
+pattern accumulator_1($callback, $accumulator, $seen) {
+	accumulator_via($callback, $accumulator, $seen, $declarator, accumulator_0($callback, $accumulator, or {
+		$seen,
+		$declarator
+	}))
 }
 
 pattern accumulator_2($callback, $accumulator, $seen) {
-	or {
-		accumulator_0($callback, $accumulator, $seen),
-		accumulator_alias($seen, $declarator, unwrapped_identifier(accumulator_1($callback, $accumulator, or {
-			$seen,
-			$declarator
-		})))
-	}
+	accumulator_via($callback, $accumulator, $seen, $declarator, accumulator_1($callback, $accumulator, or {
+		$seen,
+		$declarator
+	}))
 }
 
 pattern accumulator_3($callback, $accumulator, $seen) {
-	or {
-		accumulator_0($callback, $accumulator, $seen),
-		accumulator_alias($seen, $declarator, unwrapped_identifier(accumulator_2($callback, $accumulator, or {
-			$seen,
-			$declarator
-		})))
-	}
+	accumulator_via($callback, $accumulator, $seen, $declarator, accumulator_2($callback, $accumulator, or {
+		$seen,
+		$declarator
+	}))
 }
 
 pattern accumulator_4($callback, $accumulator, $seen) {
-	or {
-		accumulator_0($callback, $accumulator, $seen),
-		accumulator_alias($seen, $declarator, unwrapped_identifier(accumulator_3($callback, $accumulator, or {
-			$seen,
-			$declarator
-		})))
-	}
+	accumulator_via($callback, $accumulator, $seen, $declarator, accumulator_3($callback, $accumulator, or {
+		$seen,
+		$declarator
+	}))
 }
 
 pattern accumulator_5($callback, $accumulator, $seen) {
-	or {
-		accumulator_0($callback, $accumulator, $seen),
-		accumulator_alias($seen, $declarator, unwrapped_identifier(accumulator_4($callback, $accumulator, or {
-			$seen,
-			$declarator
-		})))
-	}
+	accumulator_via($callback, $accumulator, $seen, $declarator, accumulator_4($callback, $accumulator, or {
+		$seen,
+		$declarator
+	}))
 }
 
 pattern accumulator_6($callback, $accumulator, $seen) {
-	or {
-		accumulator_0($callback, $accumulator, $seen),
-		accumulator_alias($seen, $declarator, unwrapped_identifier(accumulator_5($callback, $accumulator, or {
-			$seen,
-			$declarator
-		})))
-	}
+	accumulator_via($callback, $accumulator, $seen, $declarator, accumulator_5($callback, $accumulator, or {
+		$seen,
+		$declarator
+	}))
 }
 
 pattern accumulator_7($callback, $accumulator, $seen) {
-	or {
-		accumulator_0($callback, $accumulator, $seen),
-		accumulator_alias($seen, $declarator, unwrapped_identifier(accumulator_6($callback, $accumulator, or {
-			$seen,
-			$declarator
-		})))
-	}
+	accumulator_via($callback, $accumulator, $seen, $declarator, accumulator_6($callback, $accumulator, or {
+		$seen,
+		$declarator
+	}))
 }
 
 pattern accumulator_8($callback, $accumulator, $seen) {
-	or {
-		accumulator_0($callback, $accumulator, $seen),
-		accumulator_alias($seen, $declarator, unwrapped_identifier(accumulator_7($callback, $accumulator, or {
-			$seen,
-			$declarator
-		})))
-	}
+	accumulator_via($callback, $accumulator, $seen, $declarator, accumulator_7($callback, $accumulator, or {
+		$seen,
+		$declarator
+	}))
 }
 
 pattern accumulator_9($callback, $accumulator, $seen) {
-	or {
-		accumulator_0($callback, $accumulator, $seen),
-		accumulator_alias($seen, $declarator, unwrapped_identifier(accumulator_8($callback, $accumulator, or {
-			$seen,
-			$declarator
-		})))
-	}
+	accumulator_via($callback, $accumulator, $seen, $declarator, accumulator_8($callback, $accumulator, or {
+		$seen,
+		$declarator
+	}))
 }
 
 pattern accumulator_10($callback, $accumulator, $seen) {
-	or {
-		accumulator_0($callback, $accumulator, $seen),
-		accumulator_alias($seen, $declarator, unwrapped_identifier(accumulator_9($callback, $accumulator, or {
-			$seen,
-			$declarator
-		})))
-	}
+	accumulator_via($callback, $accumulator, $seen, $declarator, accumulator_9($callback, $accumulator, or {
+		$seen,
+		$declarator
+	}))
 }
 
 pattern accumulator_11($callback, $accumulator, $seen) {
-	or {
-		accumulator_0($callback, $accumulator, $seen),
-		accumulator_alias($seen, $declarator, unwrapped_identifier(accumulator_10($callback, $accumulator, or {
-			$seen,
-			$declarator
-		})))
-	}
+	accumulator_via($callback, $accumulator, $seen, $declarator, accumulator_10($callback, $accumulator, or {
+		$seen,
+		$declarator
+	}))
 }
 
 pattern accumulator_12($callback, $accumulator, $seen) {
-	or {
-		accumulator_0($callback, $accumulator, $seen),
-		accumulator_alias($seen, $declarator, unwrapped_identifier(accumulator_11($callback, $accumulator, or {
-			$seen,
-			$declarator
-		})))
-	}
+	accumulator_via($callback, $accumulator, $seen, $declarator, accumulator_11($callback, $accumulator, or {
+		$seen,
+		$declarator
+	}))
 }
 
 pattern accumulator_13($callback, $accumulator, $seen) {
-	or {
-		accumulator_0($callback, $accumulator, $seen),
-		accumulator_alias($seen, $declarator, unwrapped_identifier(accumulator_12($callback, $accumulator, or {
-			$seen,
-			$declarator
-		})))
-	}
+	accumulator_via($callback, $accumulator, $seen, $declarator, accumulator_12($callback, $accumulator, or {
+		$seen,
+		$declarator
+	}))
 }
 
 pattern accumulator_14($callback, $accumulator, $seen) {
-	or {
-		accumulator_0($callback, $accumulator, $seen),
-		accumulator_alias($seen, $declarator, unwrapped_identifier(accumulator_13($callback, $accumulator, or {
-			$seen,
-			$declarator
-		})))
-	}
+	accumulator_via($callback, $accumulator, $seen, $declarator, accumulator_13($callback, $accumulator, or {
+		$seen,
+		$declarator
+	}))
 }
 
 pattern accumulator_15($callback, $accumulator, $seen) {
-	or {
-		accumulator_0($callback, $accumulator, $seen),
-		accumulator_alias($seen, $declarator, unwrapped_identifier(accumulator_14($callback, $accumulator, or {
-			$seen,
-			$declarator
-		})))
-	}
+	accumulator_via($callback, $accumulator, $seen, $declarator, accumulator_14($callback, $accumulator, or {
+		$seen,
+		$declarator
+	}))
 }
 
 pattern accumulator_16($callback, $accumulator, $seen) {
+	accumulator_via($callback, $accumulator, $seen, $declarator, accumulator_15($callback, $accumulator, or {
+		$seen,
+		$declarator
+	}))
+}
+
+pattern copy_method_name() {
 	or {
-		accumulator_0($callback, $accumulator, $seen),
-		accumulator_alias($seen, $declarator, unwrapped_identifier(accumulator_15($callback, $accumulator, or {
-			$seen,
-			$declarator
-		})))
+		"assign",
+		"from",
+		"concat",
+		"slice",
+		"toSpliced",
+		"toSorted",
+		"toReversed",
+		"with"
 	}
 }
 
@@ -432,31 +374,21 @@ pattern annotated($name, $type) {
 }
 
 pattern array_method_callee() {
-	or {
+	wrapped(or {
 		JsStaticMemberExpression(object=array_chain(), member=array_method_name()),
 		JsComputedMemberExpression(object=array_chain(), member=JsStringLiteralExpression() as $literal) where {
 			$literal <: r"^[\"'](.*)[\"']$"($text),
 			$text <: array_method_name()
-		},
-		JsParenthesizedExpression(expression=array_method_callee()),
-		TsAsExpression(expression=array_method_callee()),
-		TsTypeAssertionExpression(expression=array_method_callee()),
-		TsNonNullAssertionExpression(expression=array_method_callee()),
-		TsSatisfiesExpression(expression=array_method_callee())
-	}
+		}
+	}, array_method_callee())
 }
 
 pattern array_chain() {
-	or {
+	wrapped(or {
 		JsArrayExpression(),
 		JsIdentifierExpression(),
-		JsCallExpression(callee=array_method_callee()),
-		JsParenthesizedExpression(expression=array_chain()),
-		TsAsExpression(expression=array_chain()),
-		TsTypeAssertionExpression(expression=array_chain()),
-		TsNonNullAssertionExpression(expression=array_chain()),
-		TsSatisfiesExpression(expression=array_chain())
-	}
+		JsCallExpression(callee=array_method_callee())
+	}, array_chain())
 }
 
 pattern array_identifier($seen, $declarator, $init) {
@@ -491,7 +423,7 @@ pattern known_array_0($seen) {
 	}
 }
 
-pattern known_array_1($seen) {
+pattern known_array_via($seen, $declarator, $previous) {
 	array_chain() as $expression where {
 		$expression <: contains or {
 			JsArrayExpression(),
@@ -499,341 +431,221 @@ pattern known_array_1($seen) {
 		} as $base,
 		$base <: or {
 			JsArrayExpression(),
-			array_identifier($seen, $declarator, known_array_0(or {
-				$seen,
-				$declarator
-			}))
+			array_identifier($seen, $declarator, $previous)
 		}
 	}
+}
+
+pattern known_array_1($seen) {
+	known_array_via($seen, $declarator, known_array_0(or {
+		$seen,
+		$declarator
+	}))
 }
 
 pattern known_array_2($seen) {
-	array_chain() as $expression where {
-		$expression <: contains or {
-			JsArrayExpression(),
-			JsIdentifierExpression()
-		} as $base,
-		$base <: or {
-			JsArrayExpression(),
-			array_identifier($seen, $declarator, known_array_1(or {
-				$seen,
-				$declarator
-			}))
-		}
-	}
+	known_array_via($seen, $declarator, known_array_1(or {
+		$seen,
+		$declarator
+	}))
 }
 
 pattern known_array_3($seen) {
-	array_chain() as $expression where {
-		$expression <: contains or {
-			JsArrayExpression(),
-			JsIdentifierExpression()
-		} as $base,
-		$base <: or {
-			JsArrayExpression(),
-			array_identifier($seen, $declarator, known_array_2(or {
-				$seen,
-				$declarator
-			}))
-		}
-	}
+	known_array_via($seen, $declarator, known_array_2(or {
+		$seen,
+		$declarator
+	}))
 }
 
 pattern known_array_4($seen) {
-	array_chain() as $expression where {
-		$expression <: contains or {
-			JsArrayExpression(),
-			JsIdentifierExpression()
-		} as $base,
-		$base <: or {
-			JsArrayExpression(),
-			array_identifier($seen, $declarator, known_array_3(or {
-				$seen,
-				$declarator
-			}))
-		}
-	}
+	known_array_via($seen, $declarator, known_array_3(or {
+		$seen,
+		$declarator
+	}))
 }
 
 pattern known_array_5($seen) {
-	array_chain() as $expression where {
-		$expression <: contains or {
-			JsArrayExpression(),
-			JsIdentifierExpression()
-		} as $base,
-		$base <: or {
-			JsArrayExpression(),
-			array_identifier($seen, $declarator, known_array_4(or {
-				$seen,
-				$declarator
-			}))
-		}
-	}
+	known_array_via($seen, $declarator, known_array_4(or {
+		$seen,
+		$declarator
+	}))
 }
 
 pattern known_array_6($seen) {
-	array_chain() as $expression where {
-		$expression <: contains or {
-			JsArrayExpression(),
-			JsIdentifierExpression()
-		} as $base,
-		$base <: or {
-			JsArrayExpression(),
-			array_identifier($seen, $declarator, known_array_5(or {
-				$seen,
-				$declarator
-			}))
-		}
-	}
+	known_array_via($seen, $declarator, known_array_5(or {
+		$seen,
+		$declarator
+	}))
 }
 
 pattern known_array_7($seen) {
-	array_chain() as $expression where {
-		$expression <: contains or {
-			JsArrayExpression(),
-			JsIdentifierExpression()
-		} as $base,
-		$base <: or {
-			JsArrayExpression(),
-			array_identifier($seen, $declarator, known_array_6(or {
-				$seen,
-				$declarator
-			}))
-		}
-	}
+	known_array_via($seen, $declarator, known_array_6(or {
+		$seen,
+		$declarator
+	}))
 }
 
 pattern known_array_8($seen) {
-	array_chain() as $expression where {
-		$expression <: contains or {
-			JsArrayExpression(),
-			JsIdentifierExpression()
-		} as $base,
-		$base <: or {
-			JsArrayExpression(),
-			array_identifier($seen, $declarator, known_array_7(or {
-				$seen,
-				$declarator
-			}))
-		}
-	}
+	known_array_via($seen, $declarator, known_array_7(or {
+		$seen,
+		$declarator
+	}))
 }
 
 pattern known_array_9($seen) {
-	array_chain() as $expression where {
-		$expression <: contains or {
-			JsArrayExpression(),
-			JsIdentifierExpression()
-		} as $base,
-		$base <: or {
-			JsArrayExpression(),
-			array_identifier($seen, $declarator, known_array_8(or {
-				$seen,
-				$declarator
-			}))
-		}
-	}
+	known_array_via($seen, $declarator, known_array_8(or {
+		$seen,
+		$declarator
+	}))
 }
 
 pattern known_array_10($seen) {
-	array_chain() as $expression where {
-		$expression <: contains or {
-			JsArrayExpression(),
-			JsIdentifierExpression()
-		} as $base,
-		$base <: or {
-			JsArrayExpression(),
-			array_identifier($seen, $declarator, known_array_9(or {
-				$seen,
-				$declarator
-			}))
-		}
-	}
+	known_array_via($seen, $declarator, known_array_9(or {
+		$seen,
+		$declarator
+	}))
 }
 
 pattern known_array_11($seen) {
-	array_chain() as $expression where {
-		$expression <: contains or {
-			JsArrayExpression(),
-			JsIdentifierExpression()
-		} as $base,
-		$base <: or {
-			JsArrayExpression(),
-			array_identifier($seen, $declarator, known_array_10(or {
-				$seen,
-				$declarator
-			}))
-		}
-	}
+	known_array_via($seen, $declarator, known_array_10(or {
+		$seen,
+		$declarator
+	}))
 }
 
 pattern known_array_12($seen) {
-	array_chain() as $expression where {
-		$expression <: contains or {
-			JsArrayExpression(),
-			JsIdentifierExpression()
-		} as $base,
-		$base <: or {
-			JsArrayExpression(),
-			array_identifier($seen, $declarator, known_array_11(or {
-				$seen,
-				$declarator
-			}))
-		}
-	}
+	known_array_via($seen, $declarator, known_array_11(or {
+		$seen,
+		$declarator
+	}))
 }
 
 pattern known_array_13($seen) {
-	array_chain() as $expression where {
-		$expression <: contains or {
-			JsArrayExpression(),
-			JsIdentifierExpression()
-		} as $base,
-		$base <: or {
-			JsArrayExpression(),
-			array_identifier($seen, $declarator, known_array_12(or {
-				$seen,
-				$declarator
-			}))
-		}
-	}
+	known_array_via($seen, $declarator, known_array_12(or {
+		$seen,
+		$declarator
+	}))
 }
 
 pattern known_array_14($seen) {
-	array_chain() as $expression where {
-		$expression <: contains or {
-			JsArrayExpression(),
-			JsIdentifierExpression()
-		} as $base,
-		$base <: or {
-			JsArrayExpression(),
-			array_identifier($seen, $declarator, known_array_13(or {
-				$seen,
-				$declarator
-			}))
-		}
-	}
+	known_array_via($seen, $declarator, known_array_13(or {
+		$seen,
+		$declarator
+	}))
 }
 
 pattern known_array_15($seen) {
-	array_chain() as $expression where {
-		$expression <: contains or {
-			JsArrayExpression(),
-			JsIdentifierExpression()
-		} as $base,
-		$base <: or {
-			JsArrayExpression(),
-			array_identifier($seen, $declarator, known_array_14(or {
-				$seen,
-				$declarator
-			}))
-		}
-	}
+	known_array_via($seen, $declarator, known_array_14(or {
+		$seen,
+		$declarator
+	}))
 }
 
 pattern known_array_16($seen) {
-	array_chain() as $expression where {
-		$expression <: contains or {
-			JsArrayExpression(),
-			JsIdentifierExpression()
-		} as $base,
-		$base <: or {
-			JsArrayExpression(),
-			array_identifier($seen, $declarator, known_array_15(or {
-				$seen,
-				$declarator
-			}))
-		}
-	}
+	known_array_via($seen, $declarator, known_array_15(or {
+		$seen,
+		$declarator
+	}))
 }
 
-JsCallExpression(callee=or {
-	JsStaticMemberExpression(member=or {
-		"assign",
-		"from",
-		"concat",
-		"slice",
-		"toSpliced",
-		"toSorted",
-		"toReversed",
-		"with"
-	}),
-	JsComputedMemberExpression(),
-	JsParenthesizedExpression(),
-	TsAsExpression(),
-	TsTypeAssertionExpression(),
-	TsNonNullAssertionExpression(),
-	TsSatisfiesExpression()
-}) as $copy where {
-	$copy <: member_call($owner, $method),
-	$method <: or {
-		"assign",
-		"from",
-		"concat",
-		"slice",
-		"toSpliced",
-		"toSorted",
-		"toReversed",
-		"with"
-	},
-	$copy <: within function_like() as $callback,
-	$callback <: or {
-		JsArrowFunctionExpression(parameters=JsParameters(items=[
-			JsFormalParameter(binding=JsIdentifierBinding() as $accumulator),
-
-			...
-		])),
-		JsArrowFunctionExpression(parameters=JsIdentifierBinding() as $accumulator),
-		JsFunctionExpression(parameters=JsParameters(items=[
-			JsFormalParameter(binding=JsIdentifierBinding() as $accumulator),
-
-			...
-		]))
-	},
-	$callback <: within JsCallExpression() as $reducer,
-	$reducer <: member_call($_, or {
-		"reduce",
-		"reduceRight"
-	}),
-	$reducer <: JsCallExpression(arguments=JsCallArguments(args=or {
-		[$first],
-		[$first, $initial]
-	})),
-	$first <: wrapped_function(),
-	$first <: contains or {
-		JsArrowFunctionExpression(),
-		JsFunctionExpression()
-	} as $function,
-	$function <: $callback,
-	$copy <: JsCallExpression(arguments=JsCallArguments(args=$arguments)),
-	or {
-		and {
-			$method <: "assign",
-			$owner <: unwrapped_identifier(global("Object")),
-			$arguments <: [wrapped_object(), ...],
-			$arguments <: some unwrapped_identifier(accumulator_16($callback, $accumulator, JsDebuggerStatement()))
+or {
+	JsCallExpression(callee=or {
+		JsStaticMemberExpression(member=or {
+			"map",
+			"filter"
+		}),
+		JsComputedMemberExpression(),
+		JsParenthesizedExpression(),
+		TsAsExpression(),
+		TsTypeAssertionExpression(),
+		TsNonNullAssertionExpression(),
+		TsSatisfiesExpression()
+	}) as $chain where {
+		$chain <: member_call($inner, $outer),
+		$outer <: or {
+			"map",
+			"filter"
 		},
-		and {
-			$method <: "from",
-			$owner <: unwrapped_identifier(global("Array")),
-			$arguments <: [
-				unwrapped_identifier(accumulator_16($callback, $accumulator, JsDebuggerStatement())),
+		$inner <: wrapped_call(),
+		$inner <: contains JsCallExpression() as $call,
+		$call <: member_call($receiver, $first),
+		or {
+			and { $outer <: "map", $first <: "filter" },
+			and { $outer <: "filter", $first <: "map" }
+		},
+		$receiver <: known_array_16(JsDebuggerStatement()),
+		register_diagnostic(span=$chain, message="Avoid consecutive array filter/map passes. Use flatMap or a loop, preserving callback order, indexes, and filtering semantics. Explicit lazy iterator pipelines are allowed.", severity="error")
+	},
+	JsCallExpression(callee=or {
+		JsStaticMemberExpression(member=copy_method_name()),
+		JsComputedMemberExpression(),
+		JsParenthesizedExpression(),
+		TsAsExpression(),
+		TsTypeAssertionExpression(),
+		TsNonNullAssertionExpression(),
+		TsSatisfiesExpression()
+	}) as $copy where {
+		$copy <: member_call($owner, $method),
+		$method <: copy_method_name(),
+		$copy <: within function_like() as $callback,
+		$callback <: or {
+			JsArrowFunctionExpression(parameters=JsParameters(items=[
+				JsFormalParameter(binding=JsIdentifierBinding() as $accumulator),
 
 				...
-			]
+			])),
+			JsArrowFunctionExpression(parameters=JsIdentifierBinding() as $accumulator),
+			JsFunctionExpression(parameters=JsParameters(items=[
+				JsFormalParameter(binding=JsIdentifierBinding() as $accumulator),
+
+				...
+			]))
 		},
-		and {
-			$method <: or {
-				"concat",
-				"slice",
-				"toSpliced",
-				"toSorted",
-				"toReversed",
-				"with"
+		$callback <: within JsCallExpression() as $reducer,
+		$reducer <: member_call($_, or {
+			"reduce",
+			"reduceRight"
+		}),
+		$reducer <: JsCallExpression(arguments=JsCallArguments(args=or {
+			[$first],
+			[$first, $initial]
+		})),
+		$first <: wrapped_function(),
+		$first <: contains or {
+			JsArrowFunctionExpression(),
+			JsFunctionExpression()
+		} as $function,
+		$function <: $callback,
+		$copy <: JsCallExpression(arguments=JsCallArguments(args=$arguments)),
+		or {
+			and {
+				$method <: "assign",
+				$owner <: unwrapped_identifier(global("Object")),
+				$arguments <: [wrapped_object(), ...],
+				$arguments <: some unwrapped_identifier(accumulator_16($callback, $accumulator, JsDebuggerStatement()))
 			},
-			$owner <: unwrapped_identifier(accumulator_16($callback, $accumulator, JsDebuggerStatement())),
-			$initial <: known_array_16(JsDebuggerStatement())
-		}
-	},
-	register_diagnostic(span=$copy, message="Do not copy the reducer accumulator on every iteration; growing copies can cause quadratic work. Mutate a fresh, locally owned accumulator and return it, or use an iterator pipeline or flatMap.", severity="error")
+			and {
+				$method <: "from",
+				$owner <: unwrapped_identifier(global("Array")),
+				$arguments <: [
+					unwrapped_identifier(accumulator_16($callback, $accumulator, JsDebuggerStatement())),
+
+					...
+				]
+			},
+			and {
+				$method <: or {
+					"concat",
+					"slice",
+					"toSpliced",
+					"toSorted",
+					"toReversed",
+					"with"
+				},
+				$owner <: unwrapped_identifier(accumulator_16($callback, $accumulator, JsDebuggerStatement())),
+				$initial <: known_array_16(JsDebuggerStatement())
+			}
+		},
+		register_diagnostic(span=$copy, message="Do not copy the reducer accumulator on every iteration; growing copies can cause quadratic work. Mutate a fresh, locally owned accumulator and return it, or use an iterator pipeline or flatMap.", severity="error")
+	}
 }

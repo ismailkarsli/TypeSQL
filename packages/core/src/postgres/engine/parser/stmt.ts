@@ -14,11 +14,11 @@ export type ParseProgram<T extends Toks> =
 				? S
 				: EatOp<T, J, ";"> extends never
 					? Fail<`syntax error at or near ${Near<T, J>}`, J>
-					: AtEnd<T, EatOp<T, J, ";">> extends true
+					: AtEnd<T, Nx<J>> extends true
 						? S
 						: Fail<
-								`syntax error at or near ${Near<T, EatOp<T, J, ";">>}: only one statement is allowed`,
-								EatOp<T, J, ";">
+								`syntax error at or near ${Near<T, Nx<J>>}: only one statement is allowed`,
+								Nx<J>
 							>
 			: X
 		: never;

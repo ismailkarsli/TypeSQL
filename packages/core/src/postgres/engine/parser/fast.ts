@@ -18,14 +18,15 @@ type FastSelectStart<Q extends string> =
 		? SplitFrom<TrimStart<Rest>>
 		: never;
 
-type SplitFrom<S extends string> = S extends `${infer Cs}FROM${Ws}${infer Rest}`
+type SplitFrom<
+	S extends string,
+	K extends string = "FROM",
+> = S extends `${infer Cs}${K}${Ws}${infer Rest}`
 	? Cs extends `${string}${Ws}`
 		? SelectFrom<Cs, TrimStart<Rest>>
 		: never
-	: S extends `${infer Cs}from${Ws}${infer Rest}`
-		? Cs extends `${string}${Ws}`
-			? SelectFrom<Cs, TrimStart<Rest>>
-			: never
+	: K extends "FROM"
+		? SplitFrom<S, "from">
 		: never;
 type SelectFrom<
 	Cs extends string,
@@ -76,24 +77,20 @@ type LastOrder<S extends string> = [OrderTail<S>] extends [never]
 				? [Body, Tail]
 				: never
 		: never;
-type OrderTail<S extends string> =
-	S extends `${infer Before}ORDER BY${infer After}`
-		? Before extends `${string}${Ws}`
-			? After extends `${Ws}${string}`
-				? [OrderTail<After>] extends [never]
-					? After
-					: OrderTail<After>
-				: never
+type OrderTail<
+	S extends string,
+	K extends string = "ORDER BY",
+> = S extends `${infer Before}${K}${infer After}`
+	? Before extends `${string}${Ws}`
+		? After extends `${Ws}${string}`
+			? [OrderTail<After>] extends [never]
+				? After
+				: OrderTail<After>
 			: never
-		: S extends `${infer Before}order by${infer After}`
-			? Before extends `${string}${Ws}`
-				? After extends `${Ws}${string}`
-					? [OrderTail<After>] extends [never]
-						? After
-						: OrderTail<After>
-					: never
-				: never
-			: never;
+		: never
+	: K extends "ORDER BY"
+		? OrderTail<S, "order by">
+		: never;
 
 type SplitOrder<Ts, Body extends string, Order extends string> =
 	Lex<`FROM ${Body}`> extends infer BT

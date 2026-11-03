@@ -11,18 +11,16 @@ import type {
 } from "../ast.js";
 import type { BindFrom } from "../binder/scope.js";
 import type { BindWith } from "../project/select.js";
-import type { Affinity, SqCteMap, SqCtx, SqLevel } from "../types.js";
+import type { Affinity, MkCtx, SqCteMap, SqCtx, SqLevel } from "../types.js";
 import type { DeclaredFn, PickSig, SigArgType } from "./functions.js";
 import type { Common, Info, SubqueryCol, TypeOf } from "./typeof.js";
 
-type Ctx<DB, S extends Scope, Ctes extends SqCteMap> = {
-	readonly db: DB;
-	readonly scope: S;
-	readonly ctes: Ctes;
-	readonly agg: "group";
-	readonly inAgg: false;
-	readonly aliases: {};
-};
+type Ctx<DB, S extends Scope, Ctes extends SqCteMap> = MkCtx<
+	DB,
+	S,
+	Ctes,
+	"group"
+>;
 
 type ParamN<E> = E extends {
 	readonly t: "param";
@@ -82,29 +80,18 @@ type ParamsComplex<E extends Expr, C extends SqCtx, M> = E extends {
 }
 	? ParamsOfBin<E["op"], E["l"], E["r"], C, M>
 	: E extends { readonly t: "un" }
-		? [ParamN<E["e"]>] extends [never]
-			? ParamsOfExpr<E["e"], C, M>
-			: AddParam<
-					M,
-					ParamN<E["e"]>,
-					E["op"] extends "-" ? Info<"numeric", false> : Info<"integer", true>
-				>
+		? Slot<
+				E["e"],
+				C,
+				M,
+				E["op"] extends "-" ? Info<"numeric", false> : Info<"integer", true>
+			>
 		: E extends { readonly t: "cast" }
-			? [ParamN<E["e"]>] extends [never]
-				? ParamsOfExpr<E["e"], C, M>
-				: AddParam<
-						M,
-						ParamN<E["e"]>,
-						Info<CastParam<Lowercase<E["to"]>>, false>
-					>
+			? Slot<E["e"], C, M, Info<CastParam<Lowercase<E["to"]>>, false>>
 			: E extends { readonly t: "collate" }
-				? [ParamN<E["e"]>] extends [never]
-					? ParamsOfExpr<E["e"], C, M>
-					: AddParam<M, ParamN<E["e"]>, Info<"text", false>>
+				? Slot<E["e"], C, M, Info<"text", false>>
 				: E extends { readonly t: "is" }
-					? [ParamN<E["e"]>] extends [never]
-						? ParamsOfExpr<E["e"], C, M>
-						: AddParam<M, ParamN<E["e"]>, NullTest>
+					? Slot<E["e"], C, M, NullTest>
 					: E extends { readonly t: "isdistinct" }
 						? PairParams<E["l"], E["r"], C, M, true>
 						: E extends { readonly t: "between" }
@@ -149,11 +136,9 @@ type ParamsComplex<E extends Expr, C extends SqCtx, M> = E extends {
 
 type CastParam<To extends string> = To extends ""
 	? "unknown"
-	: Affinity<To> extends infer A
-		? A extends "any"
-			? "numeric"
-			: A
-		: never;
+	: Affinity<To> extends "any"
+		? "numeric"
+		: Affinity<To>;
 
 type ParamsOfBin<
 	Op,
@@ -169,13 +154,11 @@ type ParamsOfBin<
 				? RowPairs<L["items"], R["items"], C, M, 0>
 				: ParamsOfExpr<R, C, ParamsOfList<L["items"], C, M>>
 			: PairParams<L, R, C, M, false>
-		: Op extends "||"
+		: Op extends "||" | "->" | "->>"
 			? FixedPair<L, R, C, M, Info<"text", false>>
-			: Op extends "->" | "->>"
-				? FixedPair<L, R, C, M, Info<"text", false>>
-				: Op extends "&" | "|" | "<<" | ">>"
-					? FixedPair<L, R, C, M, Info<"integer", false>>
-					: ArithParams<L, R, C, M>;
+			: Op extends "&" | "|" | "<<" | ">>"
+				? FixedPair<L, R, C, M, Info<"integer", false>>
+				: PairParams<L, R, C, M, "num">;
 
 type BoolParam<E, M> = [ParamN<E>] extends [never]
 	? M
@@ -198,53 +181,29 @@ type PairParams<
 	R extends Expr,
 	C extends SqCtx,
 	M,
-	Nullable extends boolean,
+	K extends boolean | "num",
 > = [ParamN<L>] extends [never]
 	? [ParamN<R>] extends [never]
 		? ParamsOfExpr<R, C, ParamsOfExpr<L, C, M>>
-		: AddParam<ParamsOfExpr<L, C, M>, ParamN<R>, Use<Sib<L, C>, Nullable>>
+		: AddParam<ParamsOfExpr<L, C, M>, ParamN<R>, SibSlot<Sib<L, C>, K>>
 	: [ParamN<R>] extends [never]
-		? AddParam<ParamsOfExpr<R, C, M>, ParamN<L>, Use<Sib<R, C>, Nullable>>
-		: AddParam<
-				AddParam<M, ParamN<L>, Info<"unknown", Nullable>>,
-				ParamN<R>,
-				Info<"unknown", Nullable>
-			>;
+		? AddParam<ParamsOfExpr<R, C, M>, ParamN<L>, SibSlot<Sib<R, C>, K>>
+		: AddParam<AddParam<M, ParamN<L>, BothSlot<K>>, ParamN<R>, BothSlot<K>>;
+type SibSlot<S, K> = K extends boolean ? Use<S, K> : Info<NumParam<S>, false>;
+type BothSlot<K> = K extends boolean
+	? Info<"unknown", K>
+	: Info<"numeric", false>;
 
-type FixedPair<
-	L extends Expr,
-	R extends Expr,
-	C extends SqCtx,
-	M,
-	T,
-> = FixedOne<R, C, FixedOne<L, C, M, T>, T>;
-type FixedOne<E extends Expr, C extends SqCtx, M, T> = [ParamN<E>] extends [
-	never,
-]
+type FixedPair<L extends Expr, R extends Expr, C extends SqCtx, M, T> = Slot<
+	R,
+	C,
+	Slot<L, C, M, T>,
+	T
+>;
+export type Slot<E, C extends SqCtx, M, T> = [ParamN<E>] extends [never]
 	? ParamsOfExpr<E, C, M>
 	: AddParam<M, ParamN<E>, T>;
 
-type ArithParams<L extends Expr, R extends Expr, C extends SqCtx, M> = [
-	ParamN<L>,
-] extends [never]
-	? [ParamN<R>] extends [never]
-		? ParamsOfExpr<R, C, ParamsOfExpr<L, C, M>>
-		: AddParam<
-				ParamsOfExpr<L, C, M>,
-				ParamN<R>,
-				Info<NumParam<Sib<L, C>>, false>
-			>
-	: [ParamN<R>] extends [never]
-		? AddParam<
-				ParamsOfExpr<R, C, M>,
-				ParamN<L>,
-				Info<NumParam<Sib<R, C>>, false>
-			>
-		: AddParam<
-				AddParam<M, ParamN<L>, Info<"numeric", false>>,
-				ParamN<R>,
-				Info<"numeric", false>
-			>;
 type NumParam<S> = S extends ColInfo
 	? Affinity<S["type"]> extends infer A
 		? A extends "integer" | "real"
@@ -260,7 +219,7 @@ type ListParams<
 	Nullable extends boolean,
 	Fixed = null,
 > = (Fixed extends ColInfo ? Fixed : FirstSib<L, C, 0>) extends infer S
-	? ListLoop<L, C, M, Use<S, Nullable>, 0>
+	? FnArgs<L, C, M, readonly Use<S, Nullable>[]>
 	: never;
 type FirstSib<
 	L extends readonly Expr[],
@@ -275,39 +234,11 @@ type FirstSib<
 			: never
 		: FirstSib<L, C, Nx<I>>
 	: null;
-type ListLoop<
-	L extends readonly Expr[],
-	C extends SqCtx,
-	M,
-	U,
-	I extends number,
-> = L[I] extends infer E extends Expr
-	? ListLoop<
-			L,
-			C,
-			[ParamN<E>] extends [never]
-				? ParamsOfExpr<E, C, M>
-				: AddParam<M, ParamN<E>, U>,
-			U,
-			Nx<I>
-		>
-	: M;
-
 export type ParamsOfList<
 	L extends readonly Expr[],
 	C extends SqCtx,
 	M,
-	I extends number = 0,
-> = L[I] extends infer E extends Expr
-	? ParamsOfList<
-			L,
-			C,
-			[ParamN<E>] extends [never]
-				? ParamsOfExpr<E, C, M>
-				: AddParam<M, ParamN<E>, Info<"unknown", true>>,
-			Nx<I>
-		>
-	: M;
+> = FnArgs<L, C, M, readonly Info<"unknown", true>[]>;
 
 type InSubParams<
 	L extends Expr,
@@ -344,9 +275,7 @@ type CaseParams<E extends Expr, C extends SqCtx, M> = (
 			0
 		> extends infer M2
 		? E["else"] extends Expr
-			? [ParamN<E["else"]>] extends [never]
-				? ParamsOfExpr<E["else"], C, M2>
-				: AddParam<M2, ParamN<E["else"]>, CaseValueType<E, C>>
+			? Slot<E["else"], C, M2, CaseValueType<E, C>>
 			: M2
 		: never
 	: never;
@@ -395,11 +324,7 @@ type CaseLoop<
 			C,
 			Op,
 			VT,
-			(
-				[ParamN<V>] extends [never]
-					? ParamsOfExpr<V, C, M>
-					: AddParam<M, ParamN<V>, VT>
-			) extends infer M1
+			Slot<V, C, M, VT> extends infer M1
 				? [ParamN<W>] extends [never]
 					? ParamsOfExpr<W, C, M1>
 					: AddParam<
@@ -480,19 +405,23 @@ type CallParams<E extends Expr, C extends SqCtx, M> = (
 			E["order"],
 			C,
 			DeclaredFn<C["db"], E["name"]> extends infer D extends {}
-				? DeclaredParams<E["args"], C, M1, PickSig<D, E["args"]["length"]>, 0>
+				? FnArgs<
+						E["args"],
+						C,
+						M1,
+						SigSlots<PickSig<D, E["args"]["length"]>, E["args"]>
+					>
 				: E["name"] extends SameFns
-					? ListLoop<
+					? FnArgs<
 							E["args"],
 							C,
 							M1,
-							Info<
+							readonly Info<
 								FirstSib<E["args"], C, 0> extends infer S extends ColInfo
 									? S["type"]
 									: "unknown",
 								true
-							>,
-							0
+							>[]
 						>
 					: E["name"] extends "iif" | "if"
 						? IifParams<E["args"], C, M1>
@@ -531,11 +460,21 @@ type CallParams<E extends Expr, C extends SqCtx, M> = (
 											| "json_patch"
 											| "jsonb_patch"
 											| "json_pretty"
-									? JsonFnParams<E["args"], C, M1, 0>
+									? FnArgs<
+											E["args"],
+											C,
+											M1,
+											[Info<"json", true>, ...Info<"text", true>[]]
+										>
 									: E["name"] extends TextFns
-										? ListLoop<E["args"], C, M1, Info<"text", true>, 0>
+										? FnArgs<E["args"], C, M1, readonly Info<"text", true>[]>
 										: E["name"] extends NumFns
-											? ListLoop<E["args"], C, M1, Info<"numeric", true>, 0>
+											? FnArgs<
+													E["args"],
+													C,
+													M1,
+													readonly Info<"numeric", true>[]
+												>
 											: ParamsOfList<E["args"], C, M1>
 		> extends infer M2
 		? E["over"] extends {
@@ -547,41 +486,15 @@ type CallParams<E extends Expr, C extends SqCtx, M> = (
 		: never
 	: never;
 
-type JsonFnParams<
-	L extends readonly Expr[],
-	C extends SqCtx,
-	M,
-	I extends number,
-> = L[I] extends infer E extends Expr
-	? JsonFnParams<
-			L,
-			C,
-			[ParamN<E>] extends [never]
-				? ParamsOfExpr<E, C, M>
-				: AddParam<M, ParamN<E>, Info<I extends 0 ? "json" : "text", true>>,
-			Nx<I>
-		>
-	: M;
-
-type DeclaredParams<
-	L extends readonly Expr[],
-	C extends SqCtx,
-	M,
+type SigSlots<
 	S,
-	I extends number,
-> = L[I] extends infer E extends Expr
-	? DeclaredParams<
-			L,
-			C,
-			[ParamN<E>] extends [never]
-				? ParamsOfExpr<E, C, M>
-				: AddParam<M, ParamN<E>, Info<SigArgType<S, I>, true>>,
-			S,
-			Nx<I>
-		>
-	: M;
+	L extends readonly unknown[],
+	Acc extends readonly unknown[] = [],
+> = Acc["length"] extends L["length"]
+	? Acc
+	: SigSlots<S, L, [...Acc, Info<SigArgType<S, Acc["length"]>, true>]>;
 
-type FnArgs<
+export type FnArgs<
 	L extends readonly Expr[],
 	C extends SqCtx,
 	M,
@@ -591,24 +504,17 @@ type FnArgs<
 	? FnArgs<
 			L,
 			C,
-			[ParamN<E>] extends [never]
-				? ParamsOfExpr<E, C, M>
-				: AddParam<
-						M,
-						ParamN<E>,
-						Ts[I] extends ColInfo ? Ts[I] : Info<"unknown", true>
-					>,
+			Slot<E, C, M, Ts[I] extends ColInfo ? Ts[I] : Info<"unknown", true>>,
 			Ts,
 			Nx<I>
 		>
 	: M;
 
-type IifParams<L extends readonly Expr[], C extends SqCtx, M> = IifLoop<
+type IifParams<L extends readonly Expr[], C extends SqCtx, M> = FnArgs<
 	L,
 	C,
 	M,
-	Info<IifValueType<L, C, 1, []>, true>,
-	0
+	IifSlots<L, Info<IifValueType<L, C, 1, []>, true>>
 >;
 type IifValueType<
 	L extends readonly Expr[],
@@ -622,30 +528,21 @@ type IifValueType<
 			Nx<Nx<I>>,
 			Sib<E, C> extends infer S extends ColInfo ? [...Acc, S] : Acc
 		>
-	: L["length"] extends 3 | 5 | 7 | 9
-		? Common<Acc>
-		: Common<Acc>;
-type IifLoop<
+	: Common<Acc>;
+type IifSlots<
 	L extends readonly Expr[],
-	C extends SqCtx,
-	M,
 	V,
-	I extends number,
-> = L[I] extends infer E extends Expr
-	? IifLoop<
+	Acc extends readonly unknown[] = [],
+> = Acc["length"] extends L["length"]
+	? Acc
+	: IifSlots<
 			L,
-			C,
-			[ParamN<E>] extends [never]
-				? ParamsOfExpr<E, C, M>
-				: AddParam<
-						M,
-						ParamN<E>,
-						IsCond<L, I> extends true ? Info<"integer", true> : V
-					>,
 			V,
-			Nx<I>
-		>
-	: M;
+			[
+				...Acc,
+				IsCond<L, Acc["length"]> extends true ? Info<"integer", true> : V,
+			]
+		>;
 type IsCond<L extends readonly Expr[], I extends number> = I extends
 	| 0
 	| 2
@@ -665,14 +562,7 @@ export type ParamsOfTargets<
 	I extends number = 0,
 > = Ts[I] extends infer T
 	? T extends { readonly t: "expr"; readonly e: infer E extends Expr }
-		? ParamsOfTargets<
-				Ts,
-				C,
-				[ParamN<E>] extends [never]
-					? ParamsOfExpr<E, C, M>
-					: AddParam<M, ParamN<E>, Info<"unknown", true>>,
-				Nx<I>
-			>
+		? ParamsOfTargets<Ts, C, Slot<E, C, M, Info<"unknown", true>>, Nx<I>>
 		: T extends Target
 			? ParamsOfTargets<Ts, C, M, Nx<I>>
 			: M
@@ -700,9 +590,7 @@ export type ParamsOfSelect<
 		: M;
 
 type LimitParams<E, M> = E extends Expr
-	? [ParamN<E>] extends [never]
-		? ParamsOfExpr<E, Ctx<{}, [], {}>, M>
-		: AddParam<M, ParamN<E>, Info<"integer", false>>
+	? Slot<E, Ctx<{}, [], {}>, M, Info<"integer", false>>
 	: M;
 
 type ParamsOfWith<
@@ -820,9 +708,5 @@ type ParamsOfSimple<
 		: never;
 
 export type ParamsOfOpt<E, C extends SqCtx, M> = E extends Expr
-	? [ParamN<E>] extends [never]
-		? ParamsOfExpr<E, C, M>
-		: AddParam<M, ParamN<E>, Info<"integer", true>>
+	? Slot<E, C, M, Info<"integer", true>>
 	: M;
-
-export type { ParamN };

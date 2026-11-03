@@ -33,7 +33,7 @@ type JoinAssignments<
 > = Ks extends readonly [infer K extends string, ...infer Rest]
 	? JoinAssignments<
 			Rest,
-			Next[N],
+			Next<N>,
 			Acc extends ""
 				? `${QuotedIdent<[K]>} = $${N}`
 				: `${Acc}, ${QuotedIdent<[K]>} = $${N}`
@@ -53,7 +53,7 @@ type JoinPlaceholders<
 	N extends number = 1,
 	Acc extends string = "",
 > = Ks extends readonly [string, ...infer Rest]
-	? JoinPlaceholders<Rest, Next[N], Acc extends "" ? `$${N}` : `${Acc}, $${N}`>
+	? JoinPlaceholders<Rest, Next<N>, Acc extends "" ? `$${N}` : `${Acc}, $${N}`>
 	: Acc;
 
 export type SetRep<P> =

@@ -31,7 +31,7 @@ const catalogSrc = readFileSync(
 const start = catalogSrc.indexOf("export interface FunctionCatalog");
 const body = catalogSrc.slice(start, catalogSrc.indexOf("\n}\n", start));
 const curated = new Set(
-	[...body.matchAll(/(?:^|; )\s*([a-z_][a-z0-9_]*): (?:\[\s*Sig<|Sig<)/gm)].map(
+	[...body.matchAll(/(?:^|; )\s*([a-z_][a-z0-9_]*): (?:\[\s*)?E?Sig</gm)].map(
 		(m) => m[1]!,
 	),
 );

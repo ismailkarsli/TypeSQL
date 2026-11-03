@@ -1,11 +1,12 @@
 import type { Readable, Writable } from "node:stream";
-import { mayBeInSqlLiteral } from "./literal.js";
+import { mayBeInSqlLiteral, offsetOf } from "./literal.js";
 import { merge } from "./merge.js";
 import {
 	type Connector,
 	type Position,
 	Session,
 	typescriptModules,
+	withBudget,
 } from "./session.js";
 
 const BUDGET_MS = 150;
@@ -115,22 +116,4 @@ function frame(m: {
 		Buffer.from(`Content-Length: ${body.length}\r\n\r\n`),
 		body,
 	]);
-}
-
-function offsetOf(text: string, p: Position): number {
-	let offset = 0;
-	for (let line = 0; line < p.line; line++) {
-		const nl = text.indexOf("\n", offset);
-		if (nl < 0) return text.length;
-		offset = nl + 1;
-	}
-	return offset + p.character;
-}
-
-function withBudget<T>(p: Promise<T>, ms: number): Promise<T | "late"> {
-	let timer: NodeJS.Timeout | undefined;
-	const late = new Promise<"late">(
-		(resolve) => (timer = setTimeout(() => resolve("late"), ms)),
-	);
-	return Promise.race([p, late]).finally(() => clearTimeout(timer));
 }

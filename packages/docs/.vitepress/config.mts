@@ -98,7 +98,6 @@ export default withVersions({
 					{ text: "Errors and troubleshooting", link: "/guide/errors" },
 					{ text: "Limits", link: "/guide/limits" },
 					{ text: "SQLite", link: "/guide/sqlite" },
-					{ text: "Type engine", link: "/guide/type-engine" },
 					{ text: "FAQ", link: "/guide/faq" },
 				],
 			},

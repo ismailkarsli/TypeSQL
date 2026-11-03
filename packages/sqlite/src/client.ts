@@ -1,8 +1,8 @@
 import type { Executor } from "@typesql/core";
 import {
 	paramNumbers,
-	runTransaction,
 	type SqlDriver,
+	serialTransaction,
 	sqliteValue,
 } from "@typesql/core/adapter";
 
@@ -105,30 +105,19 @@ function run(p: Prepared, values: readonly unknown[]) {
 	return { rows: [], rowCount: Number(changes) };
 }
 
-const queues = new WeakMap<SqliteDatabase, Promise<unknown>>();
-
 async function transaction<T>(
 	db: SqliteDatabase,
 	depth: number,
 	fn: (tx: SqliteDatabase) => Promise<T>,
 ): Promise<T> {
-	const run = async (statement: string): Promise<void> => {
-		db.exec(statement);
-	};
-	if (depth > 0)
-		return runTransaction(run, () => fn(db), {
-			savepoint: `typesql_${depth}`,
-		});
-	const previous = queues.get(db) ?? Promise.resolve();
-	const current = previous.then(
-		() => runTransaction(run, () => fn(db)),
-		() => runTransaction(run, () => fn(db)),
-	);
-	queues.set(
+	return serialTransaction(
 		db,
-		current.catch(() => undefined),
+		depth,
+		async (statement) => {
+			db.exec(statement);
+		},
+		() => fn(db),
 	);
-	return current;
 }
 
 export const driver = (

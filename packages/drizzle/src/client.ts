@@ -152,12 +152,7 @@ export function executor(
 	};
 }
 
-function transaction<T>(
-	db: DrizzleDatabase,
-	_depth: number,
-	fn: (tx: DrizzleDatabase) => Promise<T>,
-): Promise<T> {
-	return db.transaction(fn);
-}
-
-export const driver: SqlDriver<DrizzleDatabase> = { executor, transaction };
+export const driver: SqlDriver<DrizzleDatabase> = {
+	executor,
+	transaction: (db, _depth, fn) => db.transaction(fn),
+};

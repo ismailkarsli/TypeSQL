@@ -1,0 +1,35 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`sqlite-aggregate-traversal > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "aggregate": "({ contained: null | number; total: null | number })[]",
+      "subquery": "({ id: number; maximum: null | number })[]",
+      "windows": "({ id: number; ids: number; total: null | number })[]",
+    },
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "{
+  aggregate: [ [Object: null prototype] { total: 5, contained: 0 } ],
+  subquery: [
+    [Object: null prototype] { id: 1, maximum: 5 },
+    [Object: null prototype] { id: 3, maximum: 5 }
+  ],
+  windows: [
+    [Object: null prototype] { id: 1, total: null, ids: 1 },
+    [Object: null prototype] { id: 3, total: 5, ids: 4 }
+  ]
+}
+",
+  },
+}
+`;

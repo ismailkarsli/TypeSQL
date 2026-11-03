@@ -156,6 +156,14 @@ pattern readonly_operator($inner) {
 	}
 }
 
+pattern wrapper_of($inner) {
+	builtin(wrapper_names()) as $wrapper where {
+		$wrapper <: TsReferenceType(type_arguments=TsTypeArguments(ts_type_argument_list=[
+			$inner, ...
+		]))
+	}
+}
+
 pattern reference_to($parameter) {
 	TsReferenceType(name=$name, type_arguments=.) where { $name <: $parameter }
 }
@@ -164,15 +172,10 @@ pattern value_slot($parameter) {
 	or {
 		reference_to($parameter),
 		TsParenthesizedType(ty=reference_to($parameter)),
-		builtin(wrapper_names()) as $wrapper where {
-			$wrapper <: TsReferenceType(type_arguments=TsTypeArguments(ts_type_argument_list=[
-				$wrapped, ...
-			])),
-			$wrapped <: or {
-				reference_to($parameter),
-				TsParenthesizedType(ty=reference_to($parameter))
-			}
-		}
+		wrapper_of(or {
+			reference_to($parameter),
+			TsParenthesizedType(ty=reference_to($parameter))
+		})
 	}
 }
 
@@ -191,74 +194,34 @@ pattern forwards_parameter($parameter) {
 	}
 }
 
-pattern record_slot($parameter) {
+pattern record_of($value) {
 	builtin(`Record`) as $record where {
 		$record <: TsReferenceType(type_arguments=TsTypeArguments(ts_type_argument_list=[
 			$_, $value
-		])),
-		$value <: value_slot($parameter)
+		]))
 	}
 }
+
+pattern record_slot($parameter) { record_of(value_slot($parameter)) }
 
 pattern dictionary_slot($parameter) {
 	or {
 		record_slot($parameter),
 		TsParenthesizedType(ty=record_slot($parameter)),
 		readonly_operator(record_slot($parameter)),
-		builtin(wrapper_names()) as $wrapper where {
-			$wrapper <: TsReferenceType(type_arguments=TsTypeArguments(ts_type_argument_list=[
-				$wrapped, ...
-			])),
-			$wrapped <: or {
-				record_slot($parameter),
-				TsParenthesizedType(ty=record_slot($parameter))
-			}
-		}
+		wrapper_of(or {
+			record_slot($parameter),
+			TsParenthesizedType(ty=record_slot($parameter))
+		})
 	}
 }
 
-pattern applied_value_0($arguments, $parameters, $aliased) {
+// Applies an alias whose body is `$position`, or forwards an argument into a dictionary
+// slot holding `$value` or a value slot holding `$position`. Each is matched at most once.
+pattern applied($arguments, $parameters, $aliased, $value, $position) {
 	$_ where {
 		or {
-			$aliased <: unsafe_value_1(),
-			and {
-				$parameters <: TsTypeParameters(items=[
-					TsTypeParameter(name=$q1, default=$d1), ...
-				]),
-				or {
-					$arguments <: TsTypeArguments(ts_type_argument_list=[$c1, ...]),
-					$d1 <: TsDefaultTypeClause(ty=$c1)
-				},
-				or {
-					and { $aliased <: value_slot($q1), $c1 <: unsafe_value_1() },
-					and {
-						$parameters <: TsTypeParameters(items=[
-							$_, TsTypeParameter(name=$q2, default=$d2), ...
-						]),
-						or {
-							$arguments <: TsTypeArguments(ts_type_argument_list=[
-								$_, $c2, ...
-							]),
-							and {
-								$d2 <: TsDefaultTypeClause(ty=$x2),
-								or {
-									and { $x2 <: forwards_parameter($q1), $c2 = $c1 },
-									$c2 = $x2
-								}
-							}
-						},
-						and { $aliased <: value_slot($q2), $c2 <: unsafe_value_1() }
-					}
-				}
-			}
-		}
-	}
-}
-
-pattern applied_dictionary_0($arguments, $parameters, $aliased) {
-	$_ where {
-		or {
-			$aliased <: dictionary_position_1(),
+			$aliased <: $position,
 			and {
 				$parameters <: TsTypeParameters(items=[
 					TsTypeParameter(name=$q1, default=$d1), ...
@@ -269,8 +232,8 @@ pattern applied_dictionary_0($arguments, $parameters, $aliased) {
 				},
 				or {
 					or {
-						and { $aliased <: dictionary_slot($q1), $c1 <: unsafe_value_1() },
-						and { $aliased <: value_slot($q1), $c1 <: dictionary_position_1() }
+						and { $aliased <: dictionary_slot($q1), $c1 <: $value },
+						and { $aliased <: value_slot($q1), $c1 <: $position }
 					},
 					and {
 						$parameters <: TsTypeParameters(items=[
@@ -289,483 +252,124 @@ pattern applied_dictionary_0($arguments, $parameters, $aliased) {
 							}
 						},
 						or {
-							and { $aliased <: dictionary_slot($q2), $c2 <: unsafe_value_1() },
-							and {
-								$aliased <: value_slot($q2),
-								$c2 <: dictionary_position_1()
-							}
+							and { $aliased <: dictionary_slot($q2), $c2 <: $value },
+							and { $aliased <: value_slot($q2), $c2 <: $position }
 						}
 					}
 				}
 			}
 		}
+	}
+}
+
+pattern aliased($value, $position) {
+	TsReferenceType(name=JsReferenceIdentifier() as $name, type_arguments=$arguments) as $reference where {
+		$reference <: visible_alias($name, $parameters, $aliased),
+		$reference <: applied($arguments, $parameters, $aliased, $value, $position)
+	}
+}
+
+// `$self` recurses within one level; `every` matches it under double negation so that
+// intersection members are not compared with the first member's binding.
+pattern unsafe_value($self, $aliased_value) {
+	or {
+		TsUnknownType(),
+		TsAnyType(),
+		TsNonPrimitiveType(),
+		empty_object(),
+		TsParenthesizedType(ty=$self),
+		readonly_operator($self),
+		TsUnionType(types=some $self),
+		TsIntersectionType(types=$members) where {
+			or {
+				$members <: some or {
+					TsAnyType(),
+					TsParenthesizedType(ty=TsAnyType())
+				},
+				$members <: every not not $self
+			}
+		},
+		wrapper_of($self),
+		TsReferenceType(name=$name, type_arguments=.) where {
+			$name <: not wrapper_names(),
+			$name <: empty_interface($name)
+		},
+		$aliased_value
+	}
+}
+
+pattern unsafe_dictionary($value, $self, $position) {
+	or {
+		TsObjectType(members=some TsIndexSignatureTypeMember(type_annotation=TsTypeAnnotation(ty=$value))),
+		TsMappedType(mapped_type=TsTypeAnnotation(ty=$value)),
+		TsParenthesizedType(ty=$self),
+		readonly_operator($self),
+		wrapper_of($position),
+		record_of($value),
+		builtin(or {
+			`Pick`,
+			`Omit`
+		}) as $picked where {
+			$picked <: TsReferenceType(type_arguments=TsTypeArguments(ts_type_argument_list=[
+				$source, ...
+			])),
+			$source <: $position
+		}
+	}
+}
+
+pattern dictionary_position($dictionary, $self, $aliased) {
+	or {
+		$dictionary,
+		TsParenthesizedType(ty=$self),
+		$aliased
 	}
 }
 
 pattern unsafe_value_0() {
-	or {
-		TsUnknownType(),
-		TsAnyType(),
-		TsNonPrimitiveType(),
-		empty_object(),
-		TsParenthesizedType(ty=unsafe_value_0()),
-		readonly_operator(unsafe_value_0()),
-		TsUnionType(types=some unsafe_value_0()),
-		TsIntersectionType(types=$members) where {
-			or {
-				$members <: some or {
-					TsAnyType(),
-					TsParenthesizedType(ty=TsAnyType())
-				},
-				$members <: every unsafe_value_0()
-			}
-		},
-		builtin(wrapper_names()) as $wrapper where {
-			$wrapper <: TsReferenceType(type_arguments=TsTypeArguments(ts_type_argument_list=[
-				$wrapped, ...
-			])),
-			$wrapped <: unsafe_value_0()
-		},
-		TsReferenceType(name=$name, type_arguments=.) where {
-			$name <: not wrapper_names(),
-			$name <: empty_interface($name)
-		},
-		TsReferenceType(name=JsReferenceIdentifier() as $name, type_arguments=$arguments) as $reference where {
-			$reference <: visible_alias($name, $parameters, $aliased),
-			$reference <: applied_value_0($arguments, $parameters, $aliased)
-		}
-	}
+	unsafe_value(unsafe_value_0(), aliased(or {}, unsafe_value_1()))
 }
 
 pattern unsafe_dictionary_0() {
-	or {
-		TsObjectType(members=some TsIndexSignatureTypeMember(type_annotation=TsTypeAnnotation(ty=unsafe_value_0()))),
-		TsMappedType(mapped_type=TsTypeAnnotation(ty=unsafe_value_0())),
-		TsParenthesizedType(ty=unsafe_dictionary_0()),
-		readonly_operator(unsafe_dictionary_0()),
-		builtin(wrapper_names()) as $wrapper where {
-			$wrapper <: TsReferenceType(type_arguments=TsTypeArguments(ts_type_argument_list=[
-				$wrapped, ...
-			])),
-			$wrapped <: dictionary_position_0()
-		},
-		builtin(`Record`) as $record where {
-			$record <: TsReferenceType(type_arguments=TsTypeArguments(ts_type_argument_list=[
-				$_, $value
-			])),
-			$value <: unsafe_value_0()
-		},
-		builtin(or {
-			`Pick`,
-			`Omit`
-		}) as $picked where {
-			$picked <: TsReferenceType(type_arguments=TsTypeArguments(ts_type_argument_list=[
-				$source, ...
-			])),
-			$source <: dictionary_position_0()
-		}
-	}
+	unsafe_dictionary(unsafe_value_0(), unsafe_dictionary_0(), dictionary_position_0())
 }
 
 pattern dictionary_position_0() {
-	or {
-		unsafe_dictionary_0(),
-		TsParenthesizedType(ty=dictionary_position_0()),
-		TsReferenceType(name=JsReferenceIdentifier() as $name, type_arguments=$arguments) as $reference where {
-			$reference <: visible_alias($name, $parameters, $aliased),
-			$reference <: applied_dictionary_0($arguments, $parameters, $aliased)
-		}
-	}
-}
-
-pattern applied_value_1($arguments, $parameters, $aliased) {
-	$_ where {
-		or {
-			$aliased <: unsafe_value_2(),
-			and {
-				$parameters <: TsTypeParameters(items=[
-					TsTypeParameter(name=$q1, default=$d1), ...
-				]),
-				or {
-					$arguments <: TsTypeArguments(ts_type_argument_list=[$c1, ...]),
-					$d1 <: TsDefaultTypeClause(ty=$c1)
-				},
-				or {
-					and { $aliased <: value_slot($q1), $c1 <: unsafe_value_2() },
-					and {
-						$parameters <: TsTypeParameters(items=[
-							$_, TsTypeParameter(name=$q2, default=$d2), ...
-						]),
-						or {
-							$arguments <: TsTypeArguments(ts_type_argument_list=[
-								$_, $c2, ...
-							]),
-							and {
-								$d2 <: TsDefaultTypeClause(ty=$x2),
-								or {
-									and { $x2 <: forwards_parameter($q1), $c2 = $c1 },
-									$c2 = $x2
-								}
-							}
-						},
-						and { $aliased <: value_slot($q2), $c2 <: unsafe_value_2() }
-					}
-				}
-			}
-		}
-	}
-}
-
-pattern applied_dictionary_1($arguments, $parameters, $aliased) {
-	$_ where {
-		or {
-			$aliased <: dictionary_position_2(),
-			and {
-				$parameters <: TsTypeParameters(items=[
-					TsTypeParameter(name=$q1, default=$d1), ...
-				]),
-				or {
-					$arguments <: TsTypeArguments(ts_type_argument_list=[$c1, ...]),
-					$d1 <: TsDefaultTypeClause(ty=$c1)
-				},
-				or {
-					or {
-						and { $aliased <: dictionary_slot($q1), $c1 <: unsafe_value_2() },
-						and { $aliased <: value_slot($q1), $c1 <: dictionary_position_2() }
-					},
-					and {
-						$parameters <: TsTypeParameters(items=[
-							$_, TsTypeParameter(name=$q2, default=$d2), ...
-						]),
-						or {
-							$arguments <: TsTypeArguments(ts_type_argument_list=[
-								$_, $c2, ...
-							]),
-							and {
-								$d2 <: TsDefaultTypeClause(ty=$x2),
-								or {
-									and { $x2 <: forwards_parameter($q1), $c2 = $c1 },
-									$c2 = $x2
-								}
-							}
-						},
-						or {
-							and { $aliased <: dictionary_slot($q2), $c2 <: unsafe_value_2() },
-							and {
-								$aliased <: value_slot($q2),
-								$c2 <: dictionary_position_2()
-							}
-						}
-					}
-				}
-			}
-		}
-	}
+	dictionary_position(unsafe_dictionary_0(), dictionary_position_0(), aliased(unsafe_value_1(), dictionary_position_1()))
 }
 
 pattern unsafe_value_1() {
-	or {
-		TsUnknownType(),
-		TsAnyType(),
-		TsNonPrimitiveType(),
-		empty_object(),
-		TsParenthesizedType(ty=unsafe_value_1()),
-		readonly_operator(unsafe_value_1()),
-		TsUnionType(types=some unsafe_value_1()),
-		TsIntersectionType(types=$members) where {
-			or {
-				$members <: some or {
-					TsAnyType(),
-					TsParenthesizedType(ty=TsAnyType())
-				},
-				$members <: every unsafe_value_1()
-			}
-		},
-		builtin(wrapper_names()) as $wrapper where {
-			$wrapper <: TsReferenceType(type_arguments=TsTypeArguments(ts_type_argument_list=[
-				$wrapped, ...
-			])),
-			$wrapped <: unsafe_value_1()
-		},
-		TsReferenceType(name=$name, type_arguments=.) where {
-			$name <: not wrapper_names(),
-			$name <: empty_interface($name)
-		},
-		TsReferenceType(name=JsReferenceIdentifier() as $name, type_arguments=$arguments) as $reference where {
-			$reference <: visible_alias($name, $parameters, $aliased),
-			$reference <: applied_value_1($arguments, $parameters, $aliased)
-		}
-	}
+	unsafe_value(unsafe_value_1(), aliased(or {}, unsafe_value_2()))
 }
 
 pattern unsafe_dictionary_1() {
-	or {
-		TsObjectType(members=some TsIndexSignatureTypeMember(type_annotation=TsTypeAnnotation(ty=unsafe_value_1()))),
-		TsMappedType(mapped_type=TsTypeAnnotation(ty=unsafe_value_1())),
-		TsParenthesizedType(ty=unsafe_dictionary_1()),
-		readonly_operator(unsafe_dictionary_1()),
-		builtin(wrapper_names()) as $wrapper where {
-			$wrapper <: TsReferenceType(type_arguments=TsTypeArguments(ts_type_argument_list=[
-				$wrapped, ...
-			])),
-			$wrapped <: dictionary_position_1()
-		},
-		builtin(`Record`) as $record where {
-			$record <: TsReferenceType(type_arguments=TsTypeArguments(ts_type_argument_list=[
-				$_, $value
-			])),
-			$value <: unsafe_value_1()
-		},
-		builtin(or {
-			`Pick`,
-			`Omit`
-		}) as $picked where {
-			$picked <: TsReferenceType(type_arguments=TsTypeArguments(ts_type_argument_list=[
-				$source, ...
-			])),
-			$source <: dictionary_position_1()
-		}
-	}
+	unsafe_dictionary(unsafe_value_1(), unsafe_dictionary_1(), dictionary_position_1())
 }
 
 pattern dictionary_position_1() {
-	or {
-		unsafe_dictionary_1(),
-		TsParenthesizedType(ty=dictionary_position_1()),
-		TsReferenceType(name=JsReferenceIdentifier() as $name, type_arguments=$arguments) as $reference where {
-			$reference <: visible_alias($name, $parameters, $aliased),
-			$reference <: applied_dictionary_1($arguments, $parameters, $aliased)
-		}
-	}
-}
-
-pattern applied_value_2($arguments, $parameters, $aliased) {
-	$_ where {
-		or {
-			$aliased <: unsafe_value_3(),
-			and {
-				$parameters <: TsTypeParameters(items=[
-					TsTypeParameter(name=$q1, default=$d1), ...
-				]),
-				or {
-					$arguments <: TsTypeArguments(ts_type_argument_list=[$c1, ...]),
-					$d1 <: TsDefaultTypeClause(ty=$c1)
-				},
-				or {
-					and { $aliased <: value_slot($q1), $c1 <: unsafe_value_3() },
-					and {
-						$parameters <: TsTypeParameters(items=[
-							$_, TsTypeParameter(name=$q2, default=$d2), ...
-						]),
-						or {
-							$arguments <: TsTypeArguments(ts_type_argument_list=[
-								$_, $c2, ...
-							]),
-							and {
-								$d2 <: TsDefaultTypeClause(ty=$x2),
-								or {
-									and { $x2 <: forwards_parameter($q1), $c2 = $c1 },
-									$c2 = $x2
-								}
-							}
-						},
-						and { $aliased <: value_slot($q2), $c2 <: unsafe_value_3() }
-					}
-				}
-			}
-		}
-	}
-}
-
-pattern applied_dictionary_2($arguments, $parameters, $aliased) {
-	$_ where {
-		or {
-			$aliased <: dictionary_position_3(),
-			and {
-				$parameters <: TsTypeParameters(items=[
-					TsTypeParameter(name=$q1, default=$d1), ...
-				]),
-				or {
-					$arguments <: TsTypeArguments(ts_type_argument_list=[$c1, ...]),
-					$d1 <: TsDefaultTypeClause(ty=$c1)
-				},
-				or {
-					or {
-						and { $aliased <: dictionary_slot($q1), $c1 <: unsafe_value_3() },
-						and { $aliased <: value_slot($q1), $c1 <: dictionary_position_3() }
-					},
-					and {
-						$parameters <: TsTypeParameters(items=[
-							$_, TsTypeParameter(name=$q2, default=$d2), ...
-						]),
-						or {
-							$arguments <: TsTypeArguments(ts_type_argument_list=[
-								$_, $c2, ...
-							]),
-							and {
-								$d2 <: TsDefaultTypeClause(ty=$x2),
-								or {
-									and { $x2 <: forwards_parameter($q1), $c2 = $c1 },
-									$c2 = $x2
-								}
-							}
-						},
-						or {
-							and { $aliased <: dictionary_slot($q2), $c2 <: unsafe_value_3() },
-							and {
-								$aliased <: value_slot($q2),
-								$c2 <: dictionary_position_3()
-							}
-						}
-					}
-				}
-			}
-		}
-	}
+	dictionary_position(unsafe_dictionary_1(), dictionary_position_1(), aliased(unsafe_value_2(), dictionary_position_2()))
 }
 
 pattern unsafe_value_2() {
-	or {
-		TsUnknownType(),
-		TsAnyType(),
-		TsNonPrimitiveType(),
-		empty_object(),
-		TsParenthesizedType(ty=unsafe_value_2()),
-		readonly_operator(unsafe_value_2()),
-		TsUnionType(types=some unsafe_value_2()),
-		TsIntersectionType(types=$members) where {
-			or {
-				$members <: some or {
-					TsAnyType(),
-					TsParenthesizedType(ty=TsAnyType())
-				},
-				$members <: every unsafe_value_2()
-			}
-		},
-		builtin(wrapper_names()) as $wrapper where {
-			$wrapper <: TsReferenceType(type_arguments=TsTypeArguments(ts_type_argument_list=[
-				$wrapped, ...
-			])),
-			$wrapped <: unsafe_value_2()
-		},
-		TsReferenceType(name=$name, type_arguments=.) where {
-			$name <: not wrapper_names(),
-			$name <: empty_interface($name)
-		},
-		TsReferenceType(name=JsReferenceIdentifier() as $name, type_arguments=$arguments) as $reference where {
-			$reference <: visible_alias($name, $parameters, $aliased),
-			$reference <: applied_value_2($arguments, $parameters, $aliased)
-		}
-	}
+	unsafe_value(unsafe_value_2(), aliased(or {}, unsafe_value_3()))
 }
 
 pattern unsafe_dictionary_2() {
-	or {
-		TsObjectType(members=some TsIndexSignatureTypeMember(type_annotation=TsTypeAnnotation(ty=unsafe_value_2()))),
-		TsMappedType(mapped_type=TsTypeAnnotation(ty=unsafe_value_2())),
-		TsParenthesizedType(ty=unsafe_dictionary_2()),
-		readonly_operator(unsafe_dictionary_2()),
-		builtin(wrapper_names()) as $wrapper where {
-			$wrapper <: TsReferenceType(type_arguments=TsTypeArguments(ts_type_argument_list=[
-				$wrapped, ...
-			])),
-			$wrapped <: dictionary_position_2()
-		},
-		builtin(`Record`) as $record where {
-			$record <: TsReferenceType(type_arguments=TsTypeArguments(ts_type_argument_list=[
-				$_, $value
-			])),
-			$value <: unsafe_value_2()
-		},
-		builtin(or {
-			`Pick`,
-			`Omit`
-		}) as $picked where {
-			$picked <: TsReferenceType(type_arguments=TsTypeArguments(ts_type_argument_list=[
-				$source, ...
-			])),
-			$source <: dictionary_position_2()
-		}
-	}
+	unsafe_dictionary(unsafe_value_2(), unsafe_dictionary_2(), dictionary_position_2())
 }
 
 pattern dictionary_position_2() {
-	or {
-		unsafe_dictionary_2(),
-		TsParenthesizedType(ty=dictionary_position_2()),
-		TsReferenceType(name=JsReferenceIdentifier() as $name, type_arguments=$arguments) as $reference where {
-			$reference <: visible_alias($name, $parameters, $aliased),
-			$reference <: applied_dictionary_2($arguments, $parameters, $aliased)
-		}
-	}
+	dictionary_position(unsafe_dictionary_2(), dictionary_position_2(), aliased(unsafe_value_3(), dictionary_position_3()))
 }
 
-pattern unsafe_value_3() {
-	or {
-		TsUnknownType(),
-		TsAnyType(),
-		TsNonPrimitiveType(),
-		empty_object(),
-		TsParenthesizedType(ty=unsafe_value_3()),
-		readonly_operator(unsafe_value_3()),
-		TsUnionType(types=some unsafe_value_3()),
-		TsIntersectionType(types=$members) where {
-			or {
-				$members <: some or {
-					TsAnyType(),
-					TsParenthesizedType(ty=TsAnyType())
-				},
-				$members <: every unsafe_value_3()
-			}
-		},
-		builtin(wrapper_names()) as $wrapper where {
-			$wrapper <: TsReferenceType(type_arguments=TsTypeArguments(ts_type_argument_list=[
-				$wrapped, ...
-			])),
-			$wrapped <: unsafe_value_3()
-		},
-		TsReferenceType(name=$name, type_arguments=.) where {
-			$name <: not wrapper_names(),
-			$name <: empty_interface($name)
-		}
-	}
-}
+pattern unsafe_value_3() { unsafe_value(unsafe_value_3(), or {}) }
 
 pattern unsafe_dictionary_3() {
-	or {
-		TsObjectType(members=some TsIndexSignatureTypeMember(type_annotation=TsTypeAnnotation(ty=unsafe_value_3()))),
-		TsMappedType(mapped_type=TsTypeAnnotation(ty=unsafe_value_3())),
-		TsParenthesizedType(ty=unsafe_dictionary_3()),
-		readonly_operator(unsafe_dictionary_3()),
-		builtin(wrapper_names()) as $wrapper where {
-			$wrapper <: TsReferenceType(type_arguments=TsTypeArguments(ts_type_argument_list=[
-				$wrapped, ...
-			])),
-			$wrapped <: dictionary_position_3()
-		},
-		builtin(`Record`) as $record where {
-			$record <: TsReferenceType(type_arguments=TsTypeArguments(ts_type_argument_list=[
-				$_, $value
-			])),
-			$value <: unsafe_value_3()
-		},
-		builtin(or {
-			`Pick`,
-			`Omit`
-		}) as $picked where {
-			$picked <: TsReferenceType(type_arguments=TsTypeArguments(ts_type_argument_list=[
-				$source, ...
-			])),
-			$source <: dictionary_position_3()
-		}
-	}
+	unsafe_dictionary(unsafe_value_3(), unsafe_dictionary_3(), dictionary_position_3())
 }
 
 pattern dictionary_position_3() {
-	or {
-		unsafe_dictionary_3(),
-		TsParenthesizedType(ty=dictionary_position_3())
-	}
+	dictionary_position(unsafe_dictionary_3(), dictionary_position_3(), or {})
 }
 
 pattern outermost() {

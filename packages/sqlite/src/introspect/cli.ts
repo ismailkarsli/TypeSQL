@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { parseArgs } from "node:util";
+import { type CommandIo, introspectArgs } from "@typesql/core/adapter";
 import type { SqliteDatabase } from "../client.js";
 import { type GenerateOptions, generateSource } from "./emit.js";
 import { introspect } from "./introspect.js";
@@ -18,9 +19,7 @@ Options:
   -h, --help           show this help
 `;
 
-interface Io {
-	readonly stdout: (s: string) => void;
-	readonly stderr: (s: string) => void;
+interface Io extends CommandIo {
 	readonly cwd: string;
 	readonly open?: (file: string) => Promise<SqliteDatabase & { close(): void }>;
 }
@@ -60,22 +59,8 @@ export async function main(
 	argv: readonly string[],
 	io: Io = defaultIo(),
 ): Promise<number> {
-	let parsed: ReturnType<typeof parse>;
-	try {
-		parsed = parse(argv);
-	} catch (err) {
-		io.stderr(`${(err as Error).message}\n\n${USAGE}`);
-		return 2;
-	}
-	const { values, positionals } = parsed;
-	if (values.help || positionals.length === 0) {
-		(values.help ? io.stdout : io.stderr)(USAGE);
-		return values.help ? 0 : 2;
-	}
-	if (positionals[0] !== "introspect" || positionals.length > 1) {
-		io.stderr(`unknown command: ${positionals.join(" ")}\n\n${USAGE}`);
-		return 2;
-	}
+	const values = introspectArgs(io, USAGE, () => parse(argv));
+	if (typeof values === "number") return values;
 	if (!values.db) {
 		io.stderr(`typesql introspect: pass --db <file>\n`);
 		return 2;

@@ -3,6 +3,7 @@ import type { CheckEnc, DescribeEnc, Enc } from "../sql/inline.js";
 import type { Next } from "../sql/next.js";
 import type { EngineTypes, TokensOf, TypeDisplayOf } from "./contract.js";
 import type { ParamData, ParamDataOf } from "./infer.js";
+import type { PickOne } from "./object.js";
 import type { NullTest } from "./params.js";
 import type { Toks } from "./tokens.js";
 
@@ -37,13 +38,13 @@ type CarriedLoop<
 				string
 			> extends infer M extends string
 			? [M] extends [never]
-				? CarriedLoop<E, X, K, P, Next[I]>
+				? CarriedLoop<E, X, K, P, Next<I>>
 				: SqlError<
-						`parameter $${Next[I]}: ${M}`,
-						FindParam<TokensOf<E, X>, Next[I], 0>
+						`parameter $${Next<I>}: ${M}`,
+						FindParam<TokensOf<E, X>, Next<I>, 0>
 					>
-			: CarriedLoop<E, X, K, P, Next[I]>
-		: CarriedLoop<E, X, K, P, Next[I]>;
+			: CarriedLoop<E, X, K, P, Next<I>>
+		: CarriedLoop<E, X, K, P, Next<I>>;
 
 type CheckValue<
 	E extends EngineTypes,
@@ -117,24 +118,17 @@ type JsonContext<E extends EngineTypes, U> = [U] extends [never]
 		: true;
 
 type Expected<E extends EngineTypes, U> =
-	First<U> extends {
+	PickOne<U> extends {
 		readonly type: infer T extends string;
 		readonly nullable: infer Nl;
 	}
 		? `${TypeDisplayOf<E, T>}${Nl extends true ? "" : " NOT NULL"}`
 		: "this parameter";
-type First<U> = (U extends unknown ? (u: () => U) => void : never) extends (
-	u: infer F,
-) => void
-	? F extends () => infer R
-		? R
-		: never
-	: never;
 
 type FindParam<T, N extends number, I extends number> = T extends Toks
 	? T[I] extends { readonly k: "$"; readonly v: N }
 		? I
 		: T[I] extends { readonly k: string }
-			? FindParam<T, N, Next[I]>
+			? FindParam<T, N, Next<I>>
 			: 0
 	: 0;

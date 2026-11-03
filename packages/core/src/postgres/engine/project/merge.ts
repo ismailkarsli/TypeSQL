@@ -9,15 +9,21 @@ import type {
 } from "../../../engine/types.js";
 import type { AnyErr, SqlError } from "../../../errors.js";
 import type { Table } from "../../../schema.js";
-import type { Expr, MergeStmt, MergeWhen, SetItem, TargetInd } from "../ast.js";
+import type {
+	Expr,
+	MergeStmt,
+	MergeWhen,
+	SetItem,
+	Tag,
+	TargetInd,
+} from "../ast.js";
 import type { BindFrom } from "../binder/from.js";
-import type { TableCols } from "../binder/resolve.js";
 import type { NullableMap } from "../shape.js";
 import type { ParamsOfFromItems, ParamsOfOpt } from "../typer/params.js";
+import type { TypeOf } from "../typer/typeof.js";
 import type {
 	AssignTargets,
 	CheckAssignedCols,
-	CheckExpr,
 	CheckOptExpr,
 	CheckRequired,
 	CheckRows,
@@ -34,6 +40,7 @@ import type {
 	TargetInfos,
 	UnionToTuple,
 	WidthCheck,
+	WidthResult,
 } from "./dml.js";
 
 export type ProjectMerge<
@@ -42,60 +49,61 @@ export type ProjectMerge<
 	Outer extends Scope,
 	Ctes extends CteMap,
 > =
-	ResolveTarget<DB, S["table"], S["alias"], "merge into"> extends infer Tg
-		? Tg extends Target_<infer Tbl, infer Item>
-			? BindFrom<[S["source"]], DB, Outer, Ctes> extends infer L
-				? L extends ScopeLevel
-					? Item["alias"] extends L[number]["alias"]
-						? SqlError<`name "${Item["alias"]}" specified more than once`, null>
-						: CheckExpr<
-									S["on"],
-									DmlCtx<DB, [Item, ...L], Outer, Ctes>
-								> extends infer On
-							? On extends AnyErr
-								? On
-								: CheckWhens<
-											S["whens"],
-											Tbl,
-											Item,
-											L,
-											S["table"]["name"],
-											DB,
-											Outer,
-											Ctes,
-											never
-										> extends infer W
-									? W extends AnyErr
-										? W
-										: ProjectReturning<
-												S["returning"],
-												S["retOpts"],
-												[Item, ...ReturningSource<S["whens"], L>],
-												TableCols<Tbl>,
-												HasAction<S["whens"], "insert">,
-												HasAction<S["whens"], "delete">,
-												DB,
-												Outer,
-												Ctes
-											>
-									: never
+	ResolveTarget<DB, S["table"], S["alias"], "merge into"> extends Target_<
+		infer Tbl,
+		infer Item
+	>
+		? BindFrom<[S["source"]], DB, Outer, Ctes> extends infer L extends
+				ScopeLevel
+			? Item["alias"] extends L[number]["alias"]
+				? SqlError<`name "${Item["alias"]}" specified more than once`, null>
+				: TypeOf<
+							S["on"],
+							DmlCtx<DB, [Item, ...L], Outer, Ctes>
+						> extends infer On
+					? On extends AnyErr
+						? On
+						: CheckWhens<
+									S["whens"],
+									Tbl,
+									Item,
+									L,
+									S["table"]["name"],
+									DB,
+									Outer,
+									Ctes,
+									never
+								> extends infer W
+							? W extends AnyErr
+								? W
+								: ProjectReturning<
+										S["returning"],
+										S["retOpts"],
+										[Item, ...ReturningSource<S["whens"], L>],
+										Tbl,
+										HasAction<S["whens"], "insert">,
+										HasAction<S["whens"], "delete">,
+										DB,
+										Outer,
+										Ctes
+									>
 							: never
-					: InvalidRef<L, Item["alias"]>
-				: never
-			: Tg
-		: never;
+					: never
+			: InvalidRef<BindFrom<[S["source"]], DB, Outer, Ctes>, Item["alias"]>
+		: ResolveTarget<DB, S["table"], S["alias"], "merge into">;
 
 type ReturningSource<Ws extends readonly MergeWhen[], L extends ScopeLevel> = [
 	Extract<
 		Ws[number],
 		{
 			readonly match: "source";
-			readonly action: TagUpdateDelete;
+			readonly action: Tag<"update" | "delete">;
 		}
 	>,
 ] extends [never]
 	? L
 	: NullableLevel<L>;
+
 type NullableLevel<L extends ScopeLevel> = {
 	readonly [I in keyof L]: {
 		readonly alias: L[I]["alias"];
@@ -182,23 +190,21 @@ type CheckWhen<
 	Name extends string,
 	C extends Ctx,
 > =
-	CheckOptExpr<W["cond"], C> extends infer X
-		? X extends AnyErr
-			? X
+	CheckOptExpr<W["cond"], C> extends AnyErr
+		? CheckOptExpr<W["cond"], C>
+		: W["action"] extends {
+					readonly t: "update";
+					readonly set: infer Set extends readonly SetItem[];
+				}
+			? CheckSet<Set, Tbl, Name, C>
 			: W["action"] extends {
-						readonly t: "update";
-						readonly set: infer Set extends readonly SetItem[];
+						readonly t: "insert";
+						readonly columns: infer Cols extends readonly string[] | null;
+						readonly colInd: infer Ind extends readonly TargetInd[] | null;
+						readonly values: infer Vals extends readonly Expr[] | null;
 					}
-				? CheckSet<Set, Tbl, Name, C>
-				: W["action"] extends {
-							readonly t: "insert";
-							readonly columns: infer Cols extends readonly string[] | null;
-							readonly colInd: infer Ind extends readonly TargetInd[] | null;
-							readonly values: infer Vals extends readonly Expr[] | null;
-						}
-					? CheckMergeInsert<Cols, Ind, Vals, Tbl, Name, C>
-					: true
-		: never;
+				? CheckMergeInsert<Cols, Ind, Vals, Tbl, Name, C>
+				: true;
 
 type CheckMergeInsert<
 	Cols extends readonly string[] | null,
@@ -218,27 +224,21 @@ type CheckMergeInsert<
 			> extends infer E
 			? E extends AnyErr
 				? E
-				: WidthCheck<Vals, Cols> extends infer Wd
-					? Wd extends "more"
-						? SqlError<"INSERT has more expressions than target columns", null>
-						: Wd extends "fewer"
-							? SqlError<
-									"INSERT has more target columns than expressions",
-									null
-								>
-							: CheckRows<
-										[Vals],
-										Cols,
-										AssignTargets<Cols, Ind>,
-										Tbl,
-										Name,
-										C
-									> extends infer V
-								? V extends AnyErr
-									? V
-									: CheckRequired<Tbl, Cols, Name>
-								: never
-					: never
+				: WidthResult<
+						WidthCheck<Vals, Cols>,
+						CheckRows<
+							[Vals],
+							Cols,
+							AssignTargets<Cols, Ind>,
+							Tbl,
+							Name,
+							C
+						> extends infer V
+							? V extends AnyErr
+								? V
+								: CheckRequired<Tbl, Cols, Name>
+							: never
+					>
 			: never
 		: WidthCheck<Vals, UnionToTuple<keyof Tbl>> extends "more"
 			? SqlError<"INSERT has more expressions than target columns", null>
@@ -246,42 +246,37 @@ type CheckMergeInsert<
 	: CheckRequired<Tbl, [], Name>;
 
 export type ParamsOfMerge<S extends MergeStmt, DB, Ctes extends CteMap, M> =
-	ResolveTarget<DB, S["table"], S["alias"], "merge into"> extends infer Tg
-		? Tg extends Target_<infer Tbl, infer Item>
-			? BindFrom<[S["source"]], DB, [], Ctes> extends infer L
-				? L extends ScopeLevel
-					? ParamsOfReturning<
-							S["returning"],
-							S["retOpts"],
-							[Item, ...ReturningSource<S["whens"], L>],
-							TableCols<Tbl>,
-							HasAction<S["whens"], "insert">,
-							HasAction<S["whens"], "delete">,
-							DB,
-							Ctes,
-							ParamsOfWhens<
-								S["whens"],
-								Tbl,
-								Item,
-								L,
-								DB,
-								Ctes,
-								ParamsOfOpt<
-									S["on"],
-									DmlCtx<DB, [Item, ...L], [], Ctes>,
-									ParamsOfFromItems<
-										[S["source"]],
-										MkCtx<DB, [], Ctes, false>,
-										M
-									>,
-									Info<"bool">
-								>
-							>
+	ResolveTarget<DB, S["table"], S["alias"], "merge into"> extends Target_<
+		infer Tbl,
+		infer Item
+	>
+		? BindFrom<[S["source"]], DB, [], Ctes> extends infer L extends ScopeLevel
+			? ParamsOfReturning<
+					S["returning"],
+					S["retOpts"],
+					[Item, ...ReturningSource<S["whens"], L>],
+					Tbl,
+					HasAction<S["whens"], "insert">,
+					HasAction<S["whens"], "delete">,
+					DB,
+					Ctes,
+					ParamsOfWhens<
+						S["whens"],
+						Tbl,
+						Item,
+						L,
+						DB,
+						Ctes,
+						ParamsOfOpt<
+							S["on"],
+							DmlCtx<DB, [Item, ...L], [], Ctes>,
+							ParamsOfFromItems<[S["source"]], MkCtx<DB, [], Ctes, false>, M>,
+							Info<"bool">
 						>
-					: M
-				: never
+					>
+				>
 			: M
-		: never;
+		: M;
 
 type ParamsOfWhens<
 	Ws extends readonly MergeWhen[],
@@ -324,29 +319,14 @@ type ParamsOfWhen<W extends MergeWhen, Tbl extends Table, C extends Ctx, M> =
 						readonly colInd: infer Ind extends readonly TargetInd[] | null;
 						readonly values: infer Vals extends readonly Expr[];
 					}
-				? ParamsOfMergeInsert<
-						Vals,
-						Cols extends readonly string[] ? Cols : [],
-						Ind,
-						Tbl,
-						C,
-						M1
-					>
+				? (Cols extends readonly string[] ? Cols : []) extends infer Cs extends
+						readonly string[]
+					? ParamsOfRowInfos<
+							Vals,
+							TargetInfos<Cs, Ind, Tbl, C>,
+							C,
+							ParamsOfInds<Cs, Ind, Tbl, C, M1>
+						>
+					: never
 				: M1
 		: never;
-
-type ParamsOfMergeInsert<
-	Vals extends readonly Expr[],
-	Cs extends readonly string[],
-	Ind extends readonly TargetInd[] | null,
-	Tbl extends Table,
-	C extends Ctx,
-	M,
-> = ParamsOfRowInfos<
-	Vals,
-	TargetInfos<Cs, Ind, Tbl, C>,
-	C,
-	ParamsOfInds<Cs, Ind, Tbl, C, M>
->;
-
-type TagUpdateDelete = { readonly t: "update" | "delete" };

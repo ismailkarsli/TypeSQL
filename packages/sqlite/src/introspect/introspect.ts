@@ -1,3 +1,4 @@
+import { globRegExp } from "@typesql/core/adapter";
 import type { SqliteDatabase } from "../client.js";
 
 export type RelationKind = "table" | "view";
@@ -40,14 +41,6 @@ interface XInfo {
 	readonly hidden: number | bigint;
 }
 
-const pattern = (glob: string): RegExp =>
-	new RegExp(
-		`^${glob
-			.toLowerCase()
-			.replace(/[.+?^${}()|[\]\\]/g, "\\$&")
-			.replace(/\*/g, ".*")}$`,
-	);
-
 export const normalizeType = (declared: string): string =>
 	declared.toLowerCase().replace(/\(.*$/, "").replace(/\s+/g, " ").trim() ||
 	"any";
@@ -62,7 +55,9 @@ export function introspect(
 	db: SqliteDatabase,
 	opts: IntrospectOptions = {},
 ): IntrospectedDatabase {
-	const excluded = (opts.exclude ?? []).map(pattern);
+	const excluded = (opts.exclude ?? []).map((glob) =>
+		globRegExp(glob.toLowerCase()),
+	);
 	const version = String(
 		(db.prepare("SELECT sqlite_version() AS v").all()[0] as { v: string }).v,
 	);

@@ -13,7 +13,7 @@ import type {
 
 export type Ok<N, J extends number> = readonly [N, J];
 
-export type Nx<I extends number> = Next[I];
+export type Nx<I extends number> = Next<I>;
 export type Nx2<I extends number> = Nx<Nx<I>>;
 export type Nx3<I extends number> = Nx<Nx2<I>>;
 

@@ -1,6 +1,4 @@
-import type { AddParam } from "../../../engine/params.js";
 import type { Nx } from "../../../engine/parse.js";
-import type { ColInfo, Scope } from "../../../engine/types.js";
 import type { AnyErr, SqlError } from "../../../errors.js";
 import type { Table, View } from "../../../schema.js";
 import type {
@@ -21,29 +19,32 @@ import type {
 	LookupRelation,
 	RefDisplay,
 	RelationItem,
-	StarCells,
 } from "../binder/scope.js";
 import type {
-	ParamN,
+	FnArgs,
 	ParamsOfExpr,
 	ParamsOfFrom,
 	ParamsOfList,
 	ParamsOfOpt,
 	ParamsOfSelect,
 	ParamsOfTargets,
+	Slot,
 } from "../typer/params.js";
 import type { Info, TypeList, TypeOf } from "../typer/typeof.js";
-import type { Cell, SqCteMap, SqCtx, SqItem, SqLevel } from "../types.js";
-import type { BindWith, ProjectSelect } from "./select.js";
-
-type Ctx<DB, S extends Scope, Ctes extends SqCteMap> = {
-	readonly db: DB;
-	readonly scope: S;
-	readonly ctes: Ctes;
-	readonly agg: "none";
-	readonly inAgg: false;
-	readonly aliases: {};
-};
+import type {
+	Cell,
+	MkCtx,
+	SqCteMap,
+	SqCtx,
+	SqItem,
+	SqLevel,
+} from "../types.js";
+import type {
+	BindWith,
+	FirstName,
+	ProjectSelect,
+	ProjectTargets,
+} from "./select.js";
 
 type Target_<
 	DB,
@@ -67,87 +68,39 @@ type Item<Rel, Alias extends string> =
 	RelationItem<Rel, Alias> extends infer It extends SqItem ? It : never;
 
 export type ProjectDml<S extends DmlStmt, DB, Ctes0 extends SqCteMap> =
-	BindWith<S["with"], DB, [], Ctes0> extends infer Ctes
-		? Ctes extends SqCteMap
-			? Target_<DB, S["table"], Ctes> extends infer Tg
-				? Tg extends [infer Rel extends Table, infer K extends string]
-					? (
-							S extends { readonly t: "insert" }
-								? CheckInsert<Extract<S, InsertStmt>, Rel, K, DB, Ctes>
-								: S extends { readonly t: "update" }
-									? CheckUpdate<Extract<S, UpdateStmt>, Rel, DB, Ctes>
-									: S extends { readonly t: "delete" }
-										? CheckDelete<Extract<S, DeleteStmt>, Rel, DB, Ctes>
-										: true
-						) extends infer X
-						? X extends AnyErr
-							? X
-							: S["returning"] extends readonly Target[]
-								? Returning<
-										S["returning"],
-										Item<Rel, S["table"]["name"]>,
-										DB,
-										Ctes
-									>
-								: []
-						: never
-					: Tg
-				: never
-			: Ctes
-		: never;
+	BindWith<S["with"], DB, [], Ctes0> extends infer Ctes extends SqCteMap
+		? Target_<DB, S["table"], Ctes> extends infer Tg
+			? Tg extends [infer Rel extends Table, infer K extends string]
+				? (
+						S extends { readonly t: "insert" }
+							? CheckInsert<Extract<S, InsertStmt>, Rel, K, DB, Ctes>
+							: S extends { readonly t: "update" }
+								? CheckUpdate<Extract<S, UpdateStmt>, Rel, DB, Ctes>
+								: S extends { readonly t: "delete" }
+									? CheckDelete<Extract<S, DeleteStmt>, Rel, DB, Ctes>
+									: true
+					) extends infer X
+					? X extends AnyErr
+						? X
+						: S["returning"] extends readonly Target[]
+							? Returning<
+									S["returning"],
+									Item<Rel, S["table"]["name"]>,
+									DB,
+									Ctes
+								>
+							: []
+					: never
+				: Tg
+			: never
+		: BindWith<S["with"], DB, [], Ctes0>;
 
 type Returning<
 	Ts extends readonly Target[],
 	It extends SqItem,
 	DB,
 	Ctes extends SqCteMap,
-> =
-	Ctx<DB, [[It]], Ctes> extends infer C extends SqCtx
-		? RetLoop<Ts, It, C, 0, []>
-		: never;
-type RetLoop<
-	Ts extends readonly Target[],
-	It extends SqItem,
-	C extends SqCtx,
-	I extends number,
-	Acc extends readonly Cell[],
-> = Ts[I] extends infer T extends Target
-	? T extends { readonly t: "star"; readonly tbl: infer Tb }
-		? Tb extends string
-			? SqlError<'RETURNING may not use "TABLE.*" wildcards', null>
-			: StarCells<[It], null> extends infer S extends readonly Cell[]
-				? RetLoop<Ts, It, C, Nx<I>, [...Acc, ...S]>
-				: never
-		: T extends {
-					readonly e: infer E extends Expr;
-					readonly alias: infer A;
-					readonly span: infer Sp extends string;
-				}
-			? TypeOf<E, C> extends infer X
-				? X extends ColInfo
-					? RetLoop<
-							Ts,
-							It,
-							C,
-							Nx<I>,
-							[
-								...Acc,
-								{
-									readonly n: A extends string
-										? A
-										: E extends { readonly t: "col" }
-											? X extends { readonly n: infer N extends string }
-												? N
-												: Sp
-											: Sp;
-									readonly t: Info<X["type"], X["nullable"]>;
-								},
-							]
-						>
-					: X
-				: never
-			: never
-	: Acc;
+> = ProjectTargets<Ts, [It], MkCtx<DB, [[It]], Ctes>, 0, [], true>;
 
 type ColOf<Rel extends Table, C extends string> = {
 	[K in keyof Rel & string]: Lowercase<K> extends C ? Rel[K] : never;
@@ -186,11 +139,9 @@ type Width<
 				readonly t: "select";
 				readonly q: infer Q extends SelectStmt;
 			}
-		? ProjectSelect<Q, DB, [], Ctes> extends infer X
-			? X extends readonly Cell[]
-				? X["length"]
-				: X
-			: never
+		? ProjectSelect<Q, DB, [], Ctes> extends infer X extends readonly Cell[]
+			? X["length"]
+			: ProjectSelect<Q, DB, [], Ctes>
 		: null;
 
 type TableWidth<Rel extends Table> =
@@ -206,29 +157,27 @@ type CheckInsert<
 	S["columns"] extends readonly string[]
 		? CheckCols<S["columns"], Rel, `table ${K} has no column named `>
 		: true
-) extends infer E1
-	? E1 extends AnyErr
-		? E1
-		: Width<S, DB, Ctes> extends infer W
-			? W extends AnyErr
-				? W
-				: W extends number
-					? S["columns"] extends readonly string[]
-						? W extends S["columns"]["length"]
-							? InsertRest<S, Rel, K, DB, Ctes>
-							: SqlError<
-									`${W} values for ${S["columns"]["length"]} columns`,
-									null
-								>
-						: W extends TableWidth<Rel>
-							? InsertRest<S, Rel, K, DB, Ctes>
-							: SqlError<
-									`table ${K} has ${TableWidth<Rel>} columns but ${W} values were supplied`,
-									null
-								>
-					: InsertRest<S, Rel, K, DB, Ctes>
-			: never
-	: never;
+) extends infer E1 extends AnyErr
+	? E1
+	: Width<S, DB, Ctes> extends infer W
+		? W extends AnyErr
+			? W
+			: W extends number
+				? S["columns"] extends readonly string[]
+					? W extends S["columns"]["length"]
+						? InsertRest<S, Rel, K, DB, Ctes>
+						: SqlError<
+								`${W} values for ${S["columns"]["length"]} columns`,
+								null
+							>
+					: W extends TableWidth<Rel>
+						? InsertRest<S, Rel, K, DB, Ctes>
+						: SqlError<
+								`table ${K} has ${TableWidth<Rel>} columns but ${W} values were supplied`,
+								null
+							>
+				: InsertRest<S, Rel, K, DB, Ctes>
+		: never;
 
 type InsertRest<
 	S extends InsertStmt,
@@ -241,38 +190,29 @@ type InsertRest<
 		readonly t: "values";
 		readonly rows: infer Rows extends readonly (readonly Expr[])[];
 	}
-		? ValuesTyped<Rows, Ctx<DB, [], Ctes>, 0>
+		? ValuesTyped<Rows, MkCtx<DB, [], Ctes>, 0>
 		: true
-) extends infer E1
-	? E1 extends AnyErr
-		? E1
-		: MissingRequired<S, Rel, K> extends infer E2
-			? E2 extends AnyErr
-				? E2
-				: UpsertLoop<
-						S["upsert"],
-						Rel,
-						Item<
-							Rel,
-							S["alias"] extends string ? S["alias"] : S["table"]["name"]
-						>,
-						DB,
-						Ctes,
-						0
-					>
-			: never
-	: never;
+) extends infer E1 extends AnyErr
+	? E1
+	: MissingRequired<S, Rel, K> extends AnyErr
+		? MissingRequired<S, Rel, K>
+		: UpsertLoop<
+				S["upsert"],
+				Rel,
+				Item<Rel, S["alias"] extends string ? S["alias"] : S["table"]["name"]>,
+				DB,
+				Ctes,
+				0
+			>;
 
 type ValuesTyped<
 	Rows extends readonly (readonly Expr[])[],
 	C extends SqCtx,
 	I extends number,
 > = Rows[I] extends infer R extends readonly Expr[]
-	? TypeList<R, C> extends infer X
-		? X extends AnyErr
-			? X
-			: ValuesTyped<Rows, C, Nx<I>>
-		: never
+	? TypeList<R, C> extends AnyErr
+		? TypeList<R, C>
+		: ValuesTyped<Rows, C, Nx<I>>
 	: true;
 
 type MissingRequired<
@@ -292,7 +232,7 @@ type MissingRequired<
 		}[keyof Rel & string] extends infer M extends string
 		? [M] extends [never]
 			? true
-			: SqlError<`NOT NULL constraint failed: ${K}.${FirstOf<M>}`, null>
+			: SqlError<`NOT NULL constraint failed: ${K}.${FirstName<M>}`, null>
 		: never
 	: S["source"] extends { readonly t: "default" }
 		? {
@@ -305,16 +245,9 @@ type MissingRequired<
 			}[keyof Rel & string] extends infer M extends string
 			? [M] extends [never]
 				? true
-				: SqlError<`NOT NULL constraint failed: ${K}.${FirstOf<M>}`, null>
+				: SqlError<`NOT NULL constraint failed: ${K}.${FirstName<M>}`, null>
 			: never
 		: true;
-type FirstOf<U> =
-	import("../../../sql/splice.js").UnionList<U> extends readonly [
-		infer F extends string,
-		...unknown[],
-	]
-		? F
-		: never;
 
 // In DO UPDATE, SQLite resolves names against the table first and tries
 // `excluded` only for a qualified name nothing else matched, so a bare `n` is
@@ -333,13 +266,13 @@ type UpsertLoop<
 	Ctes extends SqCteMap,
 	I extends number,
 > = Us[I] extends infer U extends Upsert
-	? Ctx<DB, UpsertScope<Rel, It>, Ctes> extends infer C extends SqCtx
+	? MkCtx<DB, UpsertScope<Rel, It>, Ctes> extends infer C extends SqCtx
 		? TypeList<
 				[
 					...(U["target"] extends readonly Expr[] ? U["target"] : []),
 					...(U["where"] extends Expr ? [U["where"]] : []),
 				],
-				Ctx<DB, [[It]], Ctes>
+				MkCtx<DB, [[It]], Ctes>
 			> extends infer X
 			? X extends AnyErr
 				? X
@@ -371,45 +304,42 @@ type CheckSet<
 	Rel,
 	I extends number = 0,
 > = Set[I] extends infer S extends SetItem
-	? MissingCol<S["cols"], It, Rel> extends infer E1
-		? E1 extends AnyErr
-			? E1
-			: S["cols"]["length"] extends 1
-				? TypeOf<S["e"], C> extends infer X
-					? X extends AnyErr
-						? X
+	? MissingCol<S["cols"], It, Rel> extends AnyErr
+		? MissingCol<S["cols"], It, Rel>
+		: S["cols"]["length"] extends 1
+			? TypeOf<S["e"], C> extends AnyErr
+				? TypeOf<S["e"], C>
+				: CheckSet<Set, It, C, Rel, Nx<I>>
+			: S["e"] extends {
+						readonly t: "row";
+						readonly items: infer Items extends readonly Expr[];
+					}
+				? Items["length"] extends S["cols"]["length"]
+					? TypeList<Items, C> extends AnyErr
+						? TypeList<Items, C>
 						: CheckSet<Set, It, C, Rel, Nx<I>>
-					: never
+					: SqlError<
+							`${S["cols"]["length"]} columns assigned ${Items["length"]} values`,
+							null
+						>
 				: S["e"] extends {
-							readonly t: "row";
-							readonly items: infer Items extends readonly Expr[];
+							readonly t: "sub";
+							readonly q: infer Q extends SelectStmt;
 						}
-					? Items["length"] extends S["cols"]["length"]
-						? TypeList<Items, C> extends infer X
-							? X extends AnyErr
-								? X
-								: CheckSet<Set, It, C, Rel, Nx<I>>
-							: never
-						: SqlError<
-								`${S["cols"]["length"]} columns assigned ${Items["length"]} values`,
-								null
-							>
-					: S["e"] extends {
-								readonly t: "sub";
-								readonly q: infer Q extends SelectStmt;
-							}
-						? ProjectSelect<Q, C["db"], C["scope"], C["ctes"]> extends infer X
-							? X extends readonly Cell[]
-								? X["length"] extends S["cols"]["length"]
-									? CheckSet<Set, It, C, Rel, Nx<I>>
-									: SqlError<
-											`${S["cols"]["length"]} columns assigned ${X["length"]} values`,
-											null
-										>
-								: X
-							: never
-						: SqlError<`${S["cols"]["length"]} columns assigned 1 values`, null>
-		: never
+					? ProjectSelect<
+							Q,
+							C["db"],
+							C["scope"],
+							C["ctes"]
+						> extends infer X extends readonly Cell[]
+						? X["length"] extends S["cols"]["length"]
+							? CheckSet<Set, It, C, Rel, Nx<I>>
+							: SqlError<
+									`${S["cols"]["length"]} columns assigned ${X["length"]} values`,
+									null
+								>
+						: ProjectSelect<Q, C["db"], C["scope"], C["ctes"]>
+					: SqlError<`${S["cols"]["length"]} columns assigned 1 values`, null>
 	: true;
 type GenCol<Rel, C extends string> = true extends {
 	[K in keyof Rel & string]: Lowercase<K> extends C
@@ -440,28 +370,22 @@ type CheckUpdate<
 	DB,
 	Ctes extends SqCteMap,
 > =
-	BindFrom<S["from"], DB, [], Ctes> extends infer L
-		? L extends SqLevel
-			? Item<
-					Rel,
-					S["alias"] extends string ? S["alias"] : S["table"]["name"]
-				> extends infer It extends SqItem
-				? Ctx<DB, [[It, ...L]], Ctes> extends infer C extends SqCtx
-					? CheckSet<S["set"], It, C, Rel> extends infer X
-						? X extends AnyErr
-							? X
-							: S["where"] extends Expr
-								? TypeOf<S["where"], C> extends infer W
-									? W extends AnyErr
-										? W
-										: true
-									: never
-								: true
-						: never
-					: never
+	BindFrom<S["from"], DB, [], Ctes> extends infer L extends SqLevel
+		? Item<
+				Rel,
+				S["alias"] extends string ? S["alias"] : S["table"]["name"]
+			> extends infer It extends SqItem
+			? MkCtx<DB, [[It, ...L]], Ctes> extends infer C extends SqCtx
+				? CheckSet<S["set"], It, C, Rel> extends AnyErr
+					? CheckSet<S["set"], It, C, Rel>
+					: S["where"] extends Expr
+						? TypeOf<S["where"], C> extends AnyErr
+							? TypeOf<S["where"], C>
+							: true
+						: true
 				: never
-			: L
-		: never;
+			: never
+		: BindFrom<S["from"], DB, [], Ctes>;
 
 type CheckDelete<
 	S extends DeleteStmt,
@@ -471,7 +395,7 @@ type CheckDelete<
 > = S["where"] extends Expr
 	? TypeOf<
 			S["where"],
-			Ctx<
+			MkCtx<
 				DB,
 				[
 					[
@@ -504,13 +428,13 @@ export type ParamsOfDml<S extends DmlStmt, DB, Ctes0 extends SqCteMap, M> =
 								: S extends { readonly t: "update" }
 									? UpdateParams<Extract<S, UpdateStmt>, It, DB, Ctes, M>
 									: S extends { readonly t: "delete" }
-										? ParamsOfOpt<S["where"], Ctx<DB, [[It]], Ctes>, M>
+										? ParamsOfOpt<S["where"], MkCtx<DB, [[It]], Ctes>, M>
 										: M
 						) extends infer M1
 						? S["returning"] extends readonly Target[]
 							? ParamsOfTargets<
 									S["returning"],
-									Ctx<DB, [[Item<Rel, S["table"]["name"]>]], Ctes>,
+									MkCtx<DB, [[Item<Rel, S["table"]["name"]>]], Ctes>,
 									M1
 								>
 							: M1
@@ -541,7 +465,7 @@ type InsertParams<
 				readonly t: "values";
 				readonly rows: infer Rows extends readonly (readonly Expr[])[];
 			}
-				? RowsParams<Rows, Cols, It, Ctx<DB, [], Ctes>, M, 0>
+				? RowsParams<Rows, Cols, It, MkCtx<DB, [], Ctes>, M, 0>
 				: S["source"] extends {
 							readonly t: "select";
 							readonly q: infer Q extends SelectStmt;
@@ -561,7 +485,7 @@ type RowsParams<
 	M,
 	I extends number,
 > = Rows[I] extends infer R extends readonly Expr[]
-	? RowsParams<Rows, Cols, It, C, RowParams<R, Cols, It, C, M, 0>, Nx<I>>
+	? RowsParams<Rows, Cols, It, C, RowParams<R, Cols, It, C, M>, Nx<I>>
 	: M;
 type RowParams<
 	R extends readonly Expr[],
@@ -569,19 +493,7 @@ type RowParams<
 	It extends SqItem,
 	C extends SqCtx,
 	M,
-	I extends number,
-> = R[I] extends infer E extends Expr
-	? RowParams<
-			R,
-			Cols,
-			It,
-			C,
-			[ParamN<E>] extends [never]
-				? ParamsOfExpr<E, C, M>
-				: AddParam<M, ParamN<E>, ColParam<It, Cols[I]>>,
-			Nx<I>
-		>
-	: M;
+> = FnArgs<R, C, M, { [K in keyof Cols]: ColParam<It, Cols[K]> }>;
 
 type UpsertParams<
 	Us extends readonly Upsert[],
@@ -592,7 +504,7 @@ type UpsertParams<
 	M,
 	I extends number,
 > = Us[I] extends infer U extends Upsert
-	? Ctx<DB, UpsertScope<Rel, It>, Ctes> extends infer C extends SqCtx
+	? MkCtx<DB, UpsertScope<Rel, It>, Ctes> extends infer C extends SqCtx
 		? UpsertParams<
 				Us,
 				Rel,
@@ -635,14 +547,12 @@ type SetParams<
 			It,
 			C,
 			S["cols"]["length"] extends 1
-				? [ParamN<S["e"]>] extends [never]
-					? ParamsOfExpr<S["e"], C, M>
-					: AddParam<M, ParamN<S["e"]>, ColParam<It, S["cols"][0]>>
+				? Slot<S["e"], C, M, ColParam<It, S["cols"][0]>>
 				: S["e"] extends {
 							readonly t: "row";
 							readonly items: infer Items extends readonly Expr[];
 						}
-					? RowParams<Items, S["cols"], It, C, M, 0>
+					? RowParams<Items, S["cols"], It, C, M>
 					: ParamsOfExpr<S["e"], C, M>,
 			Nx<I>
 		>
@@ -657,7 +567,7 @@ type UpdateParams<
 > =
 	ParamsOfFrom<S["from"], DB, [], Ctes, M> extends infer M1
 		? BindFrom<S["from"], DB, [], Ctes> extends infer L extends SqLevel
-			? Ctx<DB, [[It, ...L]], Ctes> extends infer C extends SqCtx
+			? MkCtx<DB, [[It, ...L]], Ctes> extends infer C extends SqCtx
 				? ParamsOfOpt<S["where"], C, SetParams<S["set"], It, C, M1, 0>>
 				: never
 			: M1

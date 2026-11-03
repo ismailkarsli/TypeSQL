@@ -1,6 +1,7 @@
 import type {
 	AnyLabel,
 	EatOp,
+	EatWords,
 	Expected,
 	Nx,
 	Ok,
@@ -31,7 +32,7 @@ type QualParts<
 > =
 	EatOp<T, I, "."> extends never
 		? [Acc, I]
-		: AnyLabel<T, EatOp<T, I, ".">> extends [
+		: AnyLabel<T, Nx<I>> extends [
 					infer B extends string,
 					infer J extends number,
 				]
@@ -49,10 +50,26 @@ export type FuncName<T extends Toks, I extends number> =
 type FuncKeyword<H> =
 	H extends WordTok<infer V extends TypeFuncNameKeyword> ? V : null;
 
+export type SkipFirst<
+	T extends Toks,
+	I extends number,
+	Alts extends readonly (readonly string[])[],
+> = Alts extends readonly [
+	infer W extends readonly string[],
+	...infer R extends readonly (readonly string[])[],
+]
+	? EatWords<T, I, W> extends never
+		? SkipFirst<T, I, R>
+		: EatWords<T, I, W>
+	: I;
+
+export type Close<T extends Toks, I extends number, N, C extends string = ")"> =
+	EatOp<T, I, C> extends never ? Expected<`"${C}"`, T, I> : Ok<N, Nx<I>>;
+
 export type ParenIdentList<T extends Toks, I extends number> =
 	EatOp<T, I, "("> extends never
 		? Expected<'"("', T, I>
-		: IdentListLoop<T, EatOp<T, I, "(">, []>;
+		: IdentListLoop<T, Nx<I>, []>;
 type IdentListLoop<
 	T extends Toks,
 	I extends number,
@@ -62,8 +79,8 @@ type IdentListLoop<
 		? EatOp<T, J, ","> extends never
 			? EatOp<T, J, ")"> extends never
 				? Expected<'"," or ")"', T, J>
-				: Ok<[...Acc, N], EatOp<T, J, ")">>
-			: IdentListLoop<T, EatOp<T, J, ",">, [...Acc, N]>
+				: Ok<[...Acc, N], Nx<J>>
+			: IdentListLoop<T, Nx<J>, [...Acc, N]>
 		: Expected<"identifier", T, I>;
 
 export type {

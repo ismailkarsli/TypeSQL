@@ -1,3 +1,5 @@
+import type { Simplify } from "./types.js";
+
 type Single<K extends PropertyKey, V> = { [P in K]: V };
 
 type U2I<U> = (U extends unknown ? (x: U) => void : never) extends (
@@ -6,9 +8,7 @@ type U2I<U> = (U extends unknown ? (x: U) => void : never) extends (
 	? I
 	: never;
 
-type Flat<T> = { [K in keyof T]: T[K] } & {};
-
-type Build<U> = [U] extends [never] ? {} : Flat<U2I<U>>;
+type Build<U> = [U] extends [never] ? {} : Simplify<U2I<U>>;
 
 export type Rebuild<O> = Build<
 	{ [K in keyof O]: Single<K & string, O[K]> }[keyof O]
@@ -45,3 +45,26 @@ export type PickOne<U> = (
 		? R
 		: never
 	: never;
+
+/** A union's members as a tuple, or `null` when it has more than `Max`. */
+export type Members<
+	U,
+	Max extends number = never,
+	Acc extends readonly unknown[] = [],
+> = [U] extends [never]
+	? Acc
+	: Acc["length"] extends Max
+		? null
+		: PickOne<U> extends infer L
+			? Members<Exclude<U, L>, Max, [L, ...Acc]>
+			: never;
+
+export type Tup<
+	N extends number,
+	A extends unknown[] = [],
+> = A["length"] extends N ? A : Tup<N, [...A, 0]>;
+export type Lt<A extends number, B extends number> = A extends B
+	? false
+	: Tup<B> extends [...Tup<A>, ...unknown[]]
+		? true
+		: false;

@@ -11,11 +11,16 @@ import {
 import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { expect, test } from "vitest";
-import { command, withCommands } from "./support/command.ts";
-import { observeCompiler } from "./support/compiler.ts";
+import {
+	command,
+	required,
+	unlessMissing,
+	withCommands,
+} from "./support/command.ts";
 import { allocate } from "./support/database.ts";
 import type {
 	ApplicationException,
+	CompilerObservation,
 	Observation,
 	Scenario,
 } from "./support/types.ts";
@@ -98,18 +103,20 @@ export function scenario(name: string) {
 				}
 				if (manifest.scripts.generate) {
 					stage = "generated artifacts";
-					for (const file of manifest.scenario?.artifacts ?? []) {
-						const path = resolve(directory, file);
-						if (!path.startsWith(`${directory}/`))
-							throw new Error(`Artifact escapes scenario: ${file}`);
-						await access(path);
-					}
+					for (const file of manifest.scenario?.artifacts ?? [])
+						await access(artifact(directory, file));
 				}
 				if (!manifest.scripts.compile)
 					throw new Error("Scenario requires a compile script");
 				const compilation = await script("compile");
 				stage = "types and diagnostics";
-				const compiler = await observeCompiler(directory);
+				await required(directory, [
+					"node",
+					join(workspace, "support", "observe.ts"),
+				]);
+				const compiler: CompilerObservation = JSON.parse(
+					await readFile(join(directory, ".scenario", "compiler.json"), "utf8"),
+				);
 				observed.compiler = compiler;
 				if ((compilation.status === 0) !== (compiler.diagnostics.length === 0))
 					throw new Error(
@@ -134,12 +141,10 @@ export function scenario(name: string) {
 				}
 				stage = "artifacts";
 				const artifacts: Record<string, string> = {};
-				for (const file of manifest.scenario?.artifacts ?? []) {
-					const path = resolve(directory, file);
-					if (!path.startsWith(`${directory}/`))
-						throw new Error(`Artifact escapes scenario: ${file}`);
-					artifacts[file] = normalize(await readFile(path, "utf8"));
-				}
+				for (const file of manifest.scenario?.artifacts ?? [])
+					artifacts[file] = normalize(
+						await readFile(artifact(directory, file), "utf8"),
+					);
 				if (Object.keys(artifacts).length) observed.artifacts = artifacts;
 				stage = "snapshot";
 				await writeFile(
@@ -166,21 +171,12 @@ export function scenario(name: string) {
 							2,
 						),
 					);
-					try {
-						await cp(
+					await unlessMissing(
+						cp(
 							join(workspace, "scenarios", name, "expected.snap"),
 							join(directory, ".scenario", "expected.snap"),
-						);
-					} catch (error) {
-						if (
-							!(
-								error instanceof Error &&
-								"code" in error &&
-								error.code === "ENOENT"
-							)
-						)
-							throw error;
-					}
+						),
+					);
 					await cp(directory, retained, { recursive: true });
 					throw new Error(
 						`${name}: failed at ${stage}. Scenario and logs retained at ${retained}`,
@@ -194,6 +190,13 @@ export function scenario(name: string) {
 			}
 		}),
 	);
+}
+
+function artifact(directory: string, file: string) {
+	const path = resolve(directory, file);
+	if (!path.startsWith(`${directory}/`))
+		throw new Error(`Artifact escapes scenario: ${file}`);
+	return path;
 }
 
 async function prepare(name: string, directory: string) {
@@ -218,8 +221,9 @@ async function prepare(name: string, directory: string) {
 	delete config.compilerOptions.allowImportingTsExtensions;
 	config.include = ["**/*.ts"];
 	const configPath = join(directory, "tsconfig.json");
-	try {
-		const overrides = JSON.parse(await readFile(configPath, "utf8"));
+	const text = await unlessMissing(readFile(configPath, "utf8"));
+	if (text !== undefined) {
+		const overrides = JSON.parse(text);
 		if (
 			overrides.extends ||
 			overrides.compilerOptions?.paths ||
@@ -235,9 +239,6 @@ async function prepare(name: string, directory: string) {
 				...overrides.compilerOptions,
 			},
 		});
-	} catch (error) {
-		if (!(error instanceof Error && "code" in error && error.code === "ENOENT"))
-			throw error;
 	}
 	await writeFile(configPath, JSON.stringify(config, null, 2));
 	const manifest: Scenario = JSON.parse(

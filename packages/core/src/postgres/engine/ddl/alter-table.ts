@@ -19,14 +19,13 @@ import type {
 	DelRel,
 	GetRel,
 	IsViewVal,
-	MissingRel,
+	NoRelation,
 	NoSchema,
 	PutRel,
 	RenameRel,
 	Rewrap,
 	SchemaClash,
 	SchemaExists,
-	Written,
 } from "./relation.js";
 
 export type ApplyAlterTable<DB, Ife, Ref extends TableRef, As> =
@@ -34,11 +33,7 @@ export type ApplyAlterTable<DB, Ife, Ref extends TableRef, As> =
 		? Rel extends null
 			? Ife extends true
 				? DB
-				: MissingRel<
-						DB,
-						Ref,
-						SqlError<`relation "${Written<Ref>}" does not exist`, null>
-					>
+				: NoRelation<DB, Ref>
 			: As extends readonly [
 						{
 							readonly t: "rename_table";
@@ -78,22 +73,18 @@ export type ApplyAlterTable<DB, Ife, Ref extends TableRef, As> =
 
 type RenameTable<DB, Ref extends TableRef, To extends string> =
 	GetRel<DB, { schema: Ref["schema"]; name: To }> extends null
-		? SchemaClash<DB, { schema: Ref["schema"]; name: To }> extends infer E
-			? E extends AnyErr
-				? E
-				: RenameRel<DB, Ref, To>
-			: never
+		? SchemaClash<DB, { schema: Ref["schema"]; name: To }> extends AnyErr
+			? SchemaClash<DB, { schema: Ref["schema"]; name: To }>
+			: RenameRel<DB, Ref, To>
 		: SqlError<`relation "${To}" already exists`, null>;
 
 type SetSchema<DB, Ref extends TableRef, S extends string, Rel> =
 	SchemaExists<DB, S> extends false
 		? NoSchema<S>
 		: GetRel<DB, { schema: S; name: Ref["name"] }> extends null
-			? SchemaClash<DB, { schema: S; name: Ref["name"] }> extends infer E
-				? E extends AnyErr
-					? E
-					: PutRel<DelRel<DB, Ref>, { schema: S; name: Ref["name"] }, Rel>
-				: never
+			? SchemaClash<DB, { schema: S; name: Ref["name"] }> extends AnyErr
+				? SchemaClash<DB, { schema: S; name: Ref["name"] }>
+				: PutRel<DelRel<DB, Ref>, { schema: S; name: Ref["name"] }, Rel>
 			: SqlError<
 					`relation "${Ref["name"]}" already exists in schema "${S}"`,
 					null
@@ -136,34 +127,24 @@ type ViewActionError<As, TN extends string> = As extends readonly [
 		: ViewActionError<R, TN>
 	: null;
 
-type RunPasses<Tbl, As, TN extends string> =
-	RunPass<
-		Tbl,
-		As,
-		TN,
-		"drop_column" | "drop_not_null" | "drop_default"
-	> extends infer T1
-		? T1 extends AnyErr
-			? T1
-			: RunPass<T1, As, TN, "alter_type"> extends infer T2
-				? T2 extends AnyErr
-					? T2
-					: RunPass<T2, As, TN, "add_column"> extends infer T3
-						? T3 extends AnyErr
-							? T3
-							: RunPass<
-										T3,
-										As,
-										TN,
-										"set_not_null" | "add_identity" | "add_pk"
-									> extends infer T4
-								? T4 extends AnyErr
-									? T4
-									: RunPass<T4, As, TN, "set_default">
-								: never
-						: never
-				: never
-		: never;
+type RunPasses<
+	Tbl,
+	As,
+	TN extends string,
+	Ps = [
+		"drop_column" | "drop_not_null" | "drop_default",
+		"alter_type",
+		"add_column",
+		"set_not_null" | "add_identity" | "add_pk",
+		"set_default",
+	],
+> = Ps extends readonly [infer K, ...infer R]
+	? RunPass<Tbl, As, TN, K> extends infer T2
+		? T2 extends AnyErr
+			? T2
+			: RunPasses<T2, As, TN, R>
+		: never
+	: Tbl;
 
 type RunPass<Tbl, As, TN extends string, K> = As extends readonly [
 	infer A,

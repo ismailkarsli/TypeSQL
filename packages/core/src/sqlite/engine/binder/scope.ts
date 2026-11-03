@@ -5,13 +5,13 @@ import type { Table, View } from "../../../schema.js";
 import type { UnionList } from "../../../sql/splice.js";
 import type { Expr, FromItem, FromJoin, TableRef } from "../ast.js";
 import type { ProjectSelect } from "../project/select.js";
-import type { CheckBool, TypeOf } from "../typer/typeof.js";
+import type { CheckBool, TypeList } from "../typer/typeof.js";
 import type {
 	Cell,
 	MkCtx,
 	SqColMap,
+	SqColOf,
 	SqCteMap,
-	SqCtx,
 	SqItem,
 	SqLevel,
 } from "../types.js";
@@ -53,11 +53,11 @@ export type RefDisplay<Ref extends TableRef> = Ref["schema"] extends string
 	: Ref["name"];
 
 type TableCols<Tbl> = {
-	readonly [K in keyof Tbl & string as Lowercase<K>]: {
-		readonly type: Tbl[K] extends { readonly type: infer T } ? T : "any";
-		readonly nullable: Tbl[K] extends { readonly nullable: infer N } ? N : true;
-		readonly n: K;
-	};
+	readonly [K in keyof Tbl & string as Lowercase<K>]: SqColOf<
+		Tbl[K] extends { readonly type: infer T } ? T : "any",
+		Tbl[K] extends { readonly nullable: infer N } ? N : true,
+		K
+	>;
 };
 
 type TableOrder<Tbl> =
@@ -111,7 +111,7 @@ type ByIndex<
 	: [Exclude<keyof M, Seen>] extends [never]
 		? Acc
 		: ByIndex<M, Nx<N>, Acc, Seen>;
-type LowerAll<L extends readonly unknown[]> = {
+export type LowerAll<L extends readonly unknown[]> = {
 	[I in keyof L]: Lowercase<L[I] & string>;
 };
 
@@ -127,22 +127,17 @@ type RowidName<Tbl> = {
 
 export type RelationItem<Rel, Alias extends string> =
 	Rel extends View<infer Cols extends Table>
-		? {
-				readonly alias: Alias;
-				readonly cols: TableCols<Cols>;
-				readonly skip: [];
-				readonly order: TableOrder<Cols>;
-				readonly rowid: null;
-			}
+		? TableItem<Cols, Alias, null>
 		: Rel extends Table
-			? {
-					readonly alias: Alias;
-					readonly cols: TableCols<Rel>;
-					readonly skip: [];
-					readonly order: TableOrder<Rel>;
-					readonly rowid: RowidName<Rel>;
-				}
+			? TableItem<Rel, Alias, RowidName<Rel>>
 			: null;
+type TableItem<Tbl, Alias extends string, Rowid> = {
+	readonly alias: Alias;
+	readonly cols: TableCols<Tbl>;
+	readonly skip: [];
+	readonly order: TableOrder<Tbl>;
+	readonly rowid: Rowid;
+};
 
 type BindTable<
 	DB,
@@ -151,15 +146,7 @@ type BindTable<
 	Ctes extends SqCteMap,
 > = Ref["schema"] extends null
 	? Ref["name"] extends keyof Ctes
-		? [
-				{
-					readonly alias: Alias extends string ? Alias : Ref["name"];
-					readonly cols: Ctes[Ref["name"]]["cols"];
-					readonly skip: [];
-					readonly order: Ctes[Ref["name"]]["order"];
-					readonly rowid: null;
-				},
-			]
+		? [EntryItem<Ctes[Ref["name"]], Alias extends string ? Alias : Ref["name"]>]
 		: BindDbTable<DB, Ref, Alias>
 	: BindDbTable<DB, Ref, Alias>;
 
@@ -173,23 +160,23 @@ type BindDbTable<DB, Ref extends TableRef, Alias extends string | null> =
 			: SqlError<`no such table: ${RefDisplay<Ref>}`, null>
 		: SqlError<`no such table: ${RefDisplay<Ref>}`, null>;
 
-type CellsItem<C extends readonly Cell[], Alias extends string | null> =
-	UniqueCells<C> extends infer U extends readonly Cell[]
-		? {
-				readonly alias: Alias;
-				readonly cols: CellsMap<U>;
-				readonly skip: [];
-				readonly order: { [I in keyof U]: Lowercase<U[I]["n"]> };
-				readonly rowid: null;
-			}
-		: never;
+type EntryItem<
+	E extends { readonly cols: unknown; readonly order: unknown },
+	Alias extends string | null,
+> = {
+	readonly alias: Alias;
+	readonly cols: E["cols"];
+	readonly skip: [];
+	readonly order: E["order"];
+	readonly rowid: null;
+};
 
-type CellsMap<C extends readonly Cell[]> = {
-	readonly [E in C[number] as Lowercase<E["n"]>]: {
-		readonly type: E["t"]["type"];
-		readonly nullable: E["t"]["nullable"];
-		readonly n: E["n"];
-	};
+export type CellsMap<C extends readonly Cell[]> = {
+	readonly [E in C[number] as Lowercase<E["n"]>]: SqColOf<
+		E["t"]["type"],
+		E["t"]["nullable"],
+		E["n"]
+	>;
 };
 
 export type UniqueCells<
@@ -232,57 +219,24 @@ export type CteEntry<C extends readonly Cell[]> =
 			}
 		: never;
 
+type JsonEachSpec = {
+	key: ["any", true];
+	value: ["any", true];
+	type: ["text", false];
+	atom: ["any", true];
+	id: ["integer", false];
+	parent: ["integer", true];
+	fullkey: ["text", false];
+	path: ["text", false];
+	json: ["any", true];
+	root: ["text", true];
+};
 type JsonEachCols = {
-	readonly key: {
-		readonly type: "any";
-		readonly nullable: true;
-		readonly n: "key";
-	};
-	readonly value: {
-		readonly type: "any";
-		readonly nullable: true;
-		readonly n: "value";
-	};
-	readonly type: {
-		readonly type: "text";
-		readonly nullable: false;
-		readonly n: "type";
-	};
-	readonly atom: {
-		readonly type: "any";
-		readonly nullable: true;
-		readonly n: "atom";
-	};
-	readonly id: {
-		readonly type: "integer";
-		readonly nullable: false;
-		readonly n: "id";
-	};
-	readonly parent: {
-		readonly type: "integer";
-		readonly nullable: true;
-		readonly n: "parent";
-	};
-	readonly fullkey: {
-		readonly type: "text";
-		readonly nullable: false;
-		readonly n: "fullkey";
-	};
-	readonly path: {
-		readonly type: "text";
-		readonly nullable: false;
-		readonly n: "path";
-	};
-	readonly json: {
-		readonly type: "any";
-		readonly nullable: true;
-		readonly n: "json";
-	};
-	readonly root: {
-		readonly type: "text";
-		readonly nullable: true;
-		readonly n: "root";
-	};
+	readonly [K in keyof JsonEachSpec]: SqColOf<
+		JsonEachSpec[K][0],
+		JsonEachSpec[K][1],
+		K
+	>;
 };
 
 type BindFunc<
@@ -295,41 +249,29 @@ type BindFunc<
 	Sofar extends SqLevel,
 > = Name extends "json_each" | "json_tree"
 	? Args["length"] extends 1 | 2
-		? CheckArgs<Args, MkCtx<DB, [Sofar, ...Outer], Ctes>> extends infer E
-			? E extends AnyErr
-				? E
-				: [
-						{
-							readonly alias: Alias extends string ? Alias : Name;
-							readonly cols: JsonEachCols;
-							readonly skip: ["json", "root"];
-							readonly order: [
-								"key",
-								"value",
-								"type",
-								"atom",
-								"id",
-								"parent",
-								"fullkey",
-								"path",
-							];
-							readonly rowid: null;
-						},
-					]
-			: never
+		? TypeList<Args, MkCtx<DB, [Sofar, ...Outer], Ctes>> extends infer E extends
+				AnyErr
+			? E
+			: [
+					{
+						readonly alias: Alias extends string ? Alias : Name;
+						readonly cols: JsonEachCols;
+						readonly skip: ["json", "root"];
+						readonly order: [
+							"key",
+							"value",
+							"type",
+							"atom",
+							"id",
+							"parent",
+							"fullkey",
+							"path",
+						];
+						readonly rowid: null;
+					},
+				]
 		: SqlError<`too many arguments on ${Name}() - max 2`, null>
 	: SqlError<`no such table: ${Name}`, null>;
-
-type CheckArgs<Args extends readonly Expr[], C> = Args extends readonly [
-	infer H extends Expr,
-	...infer R extends readonly Expr[],
-]
-	? (C extends SqCtx ? TypeOf<H, C> : never) extends infer T
-		? T extends AnyErr
-			? T
-			: CheckArgs<R, C>
-		: never
-	: true;
 
 export type BindFrom<
 	F extends FromItem | null,
@@ -347,11 +289,10 @@ type BindItem<
 > = F extends { readonly t: "table" }
 	? BindTable<DB, F["ref"], F["alias"], Ctes>
 	: F extends { readonly t: "sub" }
-		? ProjectSelect<F["q"], DB, Outer, Ctes> extends infer C
-			? C extends readonly Cell[]
-				? [CellsItem<C, F["alias"]>]
-				: C
-			: never
+		? ProjectSelect<F["q"], DB, Outer, Ctes> extends infer C extends
+				readonly Cell[]
+			? [EntryItem<CteEntry<C>, F["alias"]>]
+			: ProjectSelect<F["q"], DB, Outer, Ctes>
 		: F extends { readonly t: "func" }
 			? BindFunc<F["name"], F["args"], F["alias"], DB, Outer, Ctes, Sofar>
 			: F extends { readonly t: "join" }
@@ -364,30 +305,22 @@ type BindJoin<
 	Outer extends Scope,
 	Ctes extends SqCteMap,
 > =
-	BindItem<F["l"], DB, Outer, Ctes, []> extends infer L
-		? L extends SqLevel
-			? BindItem<F["r"], DB, Outer, Ctes, L> extends infer R
-				? R extends SqLevel
-					? JoinUsing<F, L, R> extends infer U
-						? U extends readonly string[] | null
-							? Joined<F["kind"], L, R, U> extends infer J extends SqLevel
-								? F["on"] extends Expr
-									? CheckBool<
-											F["on"],
-											MkCtx<DB, [J, ...Outer], Ctes>
-										> extends infer E
-										? E extends AnyErr
-											? E
-											: J
-										: never
-									: J
-								: never
-							: U
-						: never
-					: R
-				: never
-			: L
-		: never;
+	BindItem<F["l"], DB, Outer, Ctes, []> extends infer L extends SqLevel
+		? BindItem<F["r"], DB, Outer, Ctes, L> extends infer R extends SqLevel
+			? JoinUsing<F, L, R> extends infer U extends readonly string[] | null
+				? Joined<F["kind"], L, R, U> extends infer J extends SqLevel
+					? F["on"] extends Expr
+						? CheckBool<
+								F["on"],
+								MkCtx<DB, [J, ...Outer], Ctes>
+							> extends infer E extends AnyErr
+							? E
+							: J
+						: J
+					: never
+				: JoinUsing<F, L, R>
+			: BindItem<F["r"], DB, Outer, Ctes, L>
+		: BindItem<F["l"], DB, Outer, Ctes, []>;
 
 type JoinUsing<
 	F extends { readonly using: unknown; readonly natural: boolean },
@@ -417,13 +350,8 @@ type CheckUsing<
 	R extends SqLevel,
 	I extends number = 0,
 > = U[I] extends infer C extends string
-	? LevelHas<L, C> extends true
-		? LevelHas<R, C> extends true
-			? CheckUsing<U, L, R, Nx<I>>
-			: SqlError<
-					`cannot join using column ${C} - column not present in both tables`,
-					null
-				>
+	? [LevelHas<L, C>, LevelHas<R, C>] extends [true, true]
+		? CheckUsing<U, L, R, Nx<I>>
 		: SqlError<
 				`cannot join using column ${C} - column not present in both tables`,
 				null
@@ -468,11 +396,11 @@ type FilterNames<O extends readonly string[], Keep> = O extends readonly [
 type NullItem<It extends SqItem> = {
 	readonly alias: It["alias"];
 	readonly cols: {
-		readonly [K in keyof It["cols"]]: {
-			readonly type: It["cols"][K]["type"];
-			readonly nullable: true;
-			readonly n: It["cols"][K]["n"];
-		};
+		readonly [K in keyof It["cols"]]: SqColOf<
+			It["cols"][K]["type"],
+			true,
+			It["cols"][K]["n"]
+		>;
 	};
 	readonly skip: It["skip"];
 	readonly order: It["order"];
@@ -709,27 +637,29 @@ type ItemCells<
 	...infer R extends readonly string[],
 ]
 	? H extends Skip
-		? It extends { readonly subst: infer S }
-			? H extends keyof S
-				? S[H] extends {
-						readonly type: infer T extends string;
-						readonly nullable: infer N extends boolean;
-						readonly n: infer D extends string;
-					}
-					? ItemCells<
-							It,
-							R,
-							Skip,
-							[
-								...Acc,
-								{
-									readonly n: D;
-									readonly t: { readonly type: T; readonly nullable: N };
-								},
-							]
-						>
-					: ItemCells<It, R, Skip, Acc>
-				: ItemCells<It, R, Skip, Acc>
+		? (
+				It extends { readonly subst: infer S }
+					? H extends keyof S
+						? S[H]
+						: null
+					: null
+			) extends {
+				readonly type: infer T extends string;
+				readonly nullable: infer N extends boolean;
+				readonly n: infer D extends string;
+			}
+			? ItemCells<
+					It,
+					R,
+					Skip,
+					[
+						...Acc,
+						{
+							readonly n: D;
+							readonly t: { readonly type: T; readonly nullable: N };
+						},
+					]
+				>
 			: ItemCells<It, R, Skip, Acc>
 		: ItemCells<
 				It,

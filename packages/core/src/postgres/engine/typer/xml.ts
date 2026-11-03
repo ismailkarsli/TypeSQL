@@ -1,32 +1,31 @@
 import type { ColInfo, Cols, Ctx, Info } from "../../../engine/types.js";
 import type { SqlError } from "../../../errors.js";
-import type { Expr, XmlTableCol } from "../ast.js";
+import type { Expr, Tag, XmlTableCol } from "../ast.js";
 import type { TypeDisplay } from "../binder/clauses.js";
+import type { AllNullable } from "./catalog.js";
 import type { ParamsOfList, ParamsOfOpt } from "./params.js";
 import type { TypeList, TypeOf } from "./typeof.js";
 
 export type TypeXml<E extends Expr, C extends Ctx> = E["op"] extends "element"
-	? TypeList<E["named"], C, []> extends infer Ls
-		? Ls extends readonly ColInfo[]
-			? TypeList<E["args"], C, []> extends infer As
-				? As extends readonly ColInfo[]
-					? Info<"xml">
-					: As
-				: never
-			: Ls
-		: never
+	? TypeList<E["named"], C, []> extends readonly ColInfo[]
+		? TypeList<E["args"], C, []> extends readonly ColInfo[]
+			? Info<"xml">
+			: TypeList<E["args"], C, []>
+		: TypeList<E["named"], C, []>
 	: E["op"] extends "forest"
-		? TypeList<E["named"], C, []> extends infer Ls
-			? Ls extends readonly ColInfo[]
-				? Info<"xml", AllNullable<Ls>>
-				: Ls
-			: never
+		? TypeList<E["named"], C, []> extends infer Ls extends readonly ColInfo[]
+			? Info<"xml", AllNullable<Ls>>
+			: TypeList<E["named"], C, []>
 		: E["op"] extends "concat"
-			? CoerceList<E["args"], C, "xml", "XMLCONCAT", []> extends infer Ls
-				? Ls extends readonly ColInfo[]
-					? Info<"xml", AllNullable<Ls>>
-					: Ls
-				: never
+			? CoerceList<
+					E["args"],
+					C,
+					"xml",
+					"XMLCONCAT",
+					[]
+				> extends infer Ls extends readonly ColInfo[]
+				? Info<"xml", AllNullable<Ls>>
+				: CoerceList<E["args"], C, "xml", "XMLCONCAT", []>
 			: E["op"] extends "pi"
 				? E["args"] extends readonly [infer A extends Expr]
 					? WithType<Coerce<A, C, "text", "XMLPI">, "xml">
@@ -49,28 +48,16 @@ type TypeRoot<
 	infer X extends Expr,
 	...infer R extends readonly Expr[],
 ]
-	? Coerce<X, C, "xml", "XMLROOT"> extends infer T
-		? T extends ColInfo
-			? CoerceList<R, C, "text", "XMLROOT", []> extends infer V
-				? V extends readonly ColInfo[]
-					? T
-					: V
-				: never
-			: T
-		: never
+	? Coerce<X, C, "xml", "XMLROOT"> extends infer T extends ColInfo
+		? CoerceList<R, C, "text", "XMLROOT", []> extends readonly ColInfo[]
+			? T
+			: CoerceList<R, C, "text", "XMLROOT", []>
+		: Coerce<X, C, "xml", "XMLROOT">
 	: never;
 
 type WithType<X, T> = X extends ColInfo
 	? { readonly type: T; readonly nullable: X["nullable"] }
 	: X;
-type AllNullable<As extends readonly ColInfo[]> = As extends readonly [
-	infer A extends ColInfo,
-	...infer R extends readonly ColInfo[],
-]
-	? A["nullable"] extends true
-		? AllNullable<R>
-		: false
-	: true;
 
 type Coerce<
 	A extends Expr,
@@ -78,20 +65,18 @@ type Coerce<
 	Target extends string,
 	Construct extends string,
 > =
-	TypeOf<A, C> extends infer T
-		? T extends ColInfo
-			? Target extends "text"
+	TypeOf<A, C> extends infer T extends ColInfo
+		? Target extends "text"
+			? Info<Target, T["nullable"]>
+			: A extends Tag<"str">
 				? Info<Target, T["nullable"]>
-				: A extends TagStr
+				: T["type"] extends Target | "unknown" | "null"
 					? Info<Target, T["nullable"]>
-					: T["type"] extends Target | "unknown" | "null"
-						? Info<Target, T["nullable"]>
-						: SqlError<
-								`argument of ${Construct} must be type ${TypeDisplay<Target>}, not type ${TypeDisplay<T["type"]>}`,
-								null
-							>
-			: T
-		: never;
+					: SqlError<
+							`argument of ${Construct} must be type ${TypeDisplay<Target>}, not type ${TypeDisplay<T["type"]>}`,
+							null
+						>
+		: TypeOf<A, C>;
 type CoerceList<
 	Es extends readonly Expr[],
 	C extends Ctx,
@@ -102,11 +87,9 @@ type CoerceList<
 	infer E extends Expr,
 	...infer R extends readonly Expr[],
 ]
-	? Coerce<E, C, Target, Construct> extends infer T
-		? T extends ColInfo
-			? CoerceList<R, C, Target, Construct, [...Acc, T]>
-			: T
-		: never
+	? Coerce<E, C, Target, Construct> extends infer T extends ColInfo
+		? CoerceList<R, C, Target, Construct, [...Acc, T]>
+		: Coerce<E, C, Target, Construct>
 	: Acc;
 
 export type XmlTableCols<F, C extends Ctx> = F extends {
@@ -115,19 +98,13 @@ export type XmlTableCols<F, C extends Ctx> = F extends {
 	readonly doc: infer Doc extends Expr;
 	readonly cols: infer Cs extends readonly XmlTableCol[];
 }
-	? CoerceList<Ns, C, "text", "XMLTABLE", []> extends infer N
-		? N extends readonly ColInfo[]
-			? Coerce<Row, C, "text", "XMLTABLE"> extends infer R
-				? R extends ColInfo
-					? Coerce<Doc, C, "xml", "XMLTABLE"> extends infer D
-						? D extends ColInfo
-							? XmlCols<Cs, C, [], false>
-							: D
-						: never
-					: R
-				: never
-			: N
-		: never
+	? CoerceList<Ns, C, "text", "XMLTABLE", []> extends readonly ColInfo[]
+		? Coerce<Row, C, "text", "XMLTABLE"> extends ColInfo
+			? Coerce<Doc, C, "xml", "XMLTABLE"> extends ColInfo
+				? XmlCols<Cs, C, [], false>
+				: Coerce<Doc, C, "xml", "XMLTABLE">
+			: Coerce<Row, C, "text", "XMLTABLE">
+		: CoerceList<Ns, C, "text", "XMLTABLE", []>
 	: never;
 
 type XmlCols<
@@ -255,5 +232,3 @@ type ParamsOfXmlCols<
 			>
 		>
 	: M;
-
-type TagStr = { readonly t: "str" };

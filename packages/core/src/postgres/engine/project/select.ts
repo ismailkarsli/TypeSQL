@@ -22,6 +22,7 @@ import type {
 	SelectBody,
 	SelectStmt,
 	SetOp,
+	Tag,
 	Target,
 	WithClause,
 } from "../ast.js";
@@ -34,7 +35,9 @@ import type {
 	CheckOutputOrder,
 	CheckWindowClause,
 	CheckWindowRefs,
+	HasStar,
 	ResolveSortKeys,
+	TargetExprs,
 	TypeDisplay,
 	WindowDefs,
 } from "../binder/clauses.js";
@@ -68,7 +71,7 @@ export type ProjectSelect<
 	false
 >;
 
-export type ProjectSelectParts<
+type ProjectSelectParts<
 	W extends WithClause | null,
 	B extends SelectBody,
 	Order extends readonly Expr[],
@@ -77,11 +80,9 @@ export type ProjectSelectParts<
 	Ctes extends CteMap,
 	Lit extends boolean = false,
 > =
-	BindWith<W, DB, Outer, Ctes> extends infer C2
-		? C2 extends CteMap
-			? ProjectBody<B, DB, Outer, C2, Order, Lit>
-			: C2
-		: never;
+	BindWith<W, DB, Outer, Ctes> extends infer C2 extends CteMap
+		? ProjectBody<B, DB, Outer, C2, Order, Lit>
+		: BindWith<W, DB, Outer, Ctes>;
 
 export type BindWith<
 	W extends WithClause | null,
@@ -113,19 +114,17 @@ type BindCtes<
 				`WITH query name "${Cs[I]["name"]}" specified more than once`,
 				null
 			>
-		: BindCte<Cs[I], Rec, DB, Outer, Ctes> extends infer M
-			? M extends ColMap
-				? BindCtes<
-						Cs,
-						Rec,
-						DB,
-						Outer,
-						AddCte<Ctes, Cs[I]["name"], M>,
-						Seen | Cs[I]["name"],
-						Nx<I>
-					>
-				: M
-			: never;
+		: BindCte<Cs[I], Rec, DB, Outer, Ctes> extends infer M extends ColMap
+			? BindCtes<
+					Cs,
+					Rec,
+					DB,
+					Outer,
+					AddCte<Ctes, Cs[I]["name"], M>,
+					Seen | Cs[I]["name"],
+					Nx<I>
+				>
+			: BindCte<Cs[I], Rec, DB, Outer, Ctes>;
 
 type AddCte<Ctes extends CteMap, N extends string, M extends ColMap> = Omit<
 	Ctes,
@@ -141,7 +140,7 @@ type BindCte<
 > = Rec extends true
 	? C["q"] extends {
 			readonly t: "select";
-			readonly body: TagSetop;
+			readonly body: Tag<"setop">;
 		}
 		? CheckExpandable<
 				C,
@@ -168,20 +167,16 @@ type ProjectCteBody<
 	Outer extends Scope,
 	Ctes extends CteMap,
 > =
-	ProjectStmt<C["q"], DB, Outer, Ctes> extends infer R
-		? R extends Cols
-			? ApplyCteCols<R, C["cols"], C["name"]> extends infer R2
-				? R2 extends Cols
-					? ColsToMap<R2>
-					: R2
-				: never
-			: R extends null
-				? SqlError<
-						`WITH query "${C["name"]}" does not have a RETURNING clause`,
-						null
-					>
-				: R
-		: never;
+	ProjectStmt<C["q"], DB, Outer, Ctes> extends infer R extends Cols
+		? ApplyCteCols<R, C["cols"], C["name"]> extends infer R2 extends Cols
+			? ColsToMap<R2>
+			: ApplyCteCols<R, C["cols"], C["name"]>
+		: ProjectStmt<C["q"], DB, Outer, Ctes> extends null
+			? SqlError<
+					`WITH query "${C["name"]}" does not have a RETURNING clause`,
+					null
+				>
+			: ProjectStmt<C["q"], DB, Outer, Ctes>;
 
 type NotRecursive<C extends Cte, R> = C extends {
 	readonly search: null;
@@ -206,10 +201,10 @@ type CheckExpandable<C extends Cte, B extends SetOp, R> = C extends {
 				>
 			: R;
 type SetOperand =
-	| TagSetop
+	| Tag<"setop">
 	| {
 			readonly t: "paren";
-			readonly q: { readonly body: TagSetop };
+			readonly q: { readonly body: Tag<"setop"> };
 	  };
 type CheckCteColList<
 	Cols extends readonly string[],
@@ -227,70 +222,61 @@ type CheckCteColList<
 		: SqlError<`${What} column "${H}" not in WITH query column list`, null>
 	: true;
 type SearchCycleCols<S, Y, M extends ColMap> =
-	SearchCols<S, M> extends infer SC
-		? SC extends AnyErr
-			? SC
-			: CycleCols<Y, S, M> extends infer YC
-				? YC extends AnyErr
-					? YC
-					: SC & YC extends infer All
-						? { readonly [K in keyof All]: All[K] }
-						: never
-				: never
-		: never;
+	SearchCols<S, M> extends AnyErr
+		? SearchCols<S, M>
+		: CycleCols<Y, S, M> extends AnyErr
+			? CycleCols<Y, S, M>
+			: SearchCols<S, M> & CycleCols<Y, S, M> extends infer All
+				? { readonly [K in keyof All]: All[K] }
+				: never;
 type SearchCols<S, M extends ColMap> = S extends CteSearch
-	? CheckCteColList<S["cols"], M, "search", never> extends infer E
-		? E extends AnyErr
-			? E
-			: S["set"] extends keyof M
-				? SqlError<
-						`search sequence column name "${S["set"]}" already used in WITH query column list`,
-						null
-					>
-				: {
-						readonly [K in S["set"]]: Info<
-							S["breadth"] extends true ? "record" : "record[]"
-						>;
-					}
-		: never
+	? CheckCteColList<S["cols"], M, "search", never> extends AnyErr
+		? CheckCteColList<S["cols"], M, "search", never>
+		: S["set"] extends keyof M
+			? SqlError<
+					`search sequence column name "${S["set"]}" already used in WITH query column list`,
+					null
+				>
+			: {
+					readonly [K in S["set"]]: Info<
+						S["breadth"] extends true ? "record" : "record[]"
+					>;
+				}
 	: {};
 type CycleCols<Y, S, M extends ColMap> = Y extends CteCycle
-	? CheckCteColList<Y["cols"], M, "cycle", never> extends infer E
-		? E extends AnyErr
-			? E
-			: Y["set"] extends keyof M
+	? CheckCteColList<Y["cols"], M, "cycle", never> extends AnyErr
+		? CheckCteColList<Y["cols"], M, "cycle", never>
+		: Y["set"] extends keyof M
+			? SqlError<
+					`cycle mark column name "${Y["set"]}" already used in WITH query column list`,
+					null
+				>
+			: Y["using"] extends keyof M
 				? SqlError<
-						`cycle mark column name "${Y["set"]}" already used in WITH query column list`,
+						`cycle path column name "${Y["using"]}" already used in WITH query column list`,
 						null
 					>
-				: Y["using"] extends keyof M
+				: Y["set"] extends Y["using"]
 					? SqlError<
-							`cycle path column name "${Y["using"]}" already used in WITH query column list`,
+							"cycle mark column name and cycle path column name are the same",
 							null
 						>
-					: Y["set"] extends Y["using"]
+					: S extends CteSearch & { readonly set: Y["set"] }
 						? SqlError<
-								"cycle mark column name and cycle path column name are the same",
+								"search sequence column name and cycle mark column name are the same",
 								null
 							>
-						: S extends CteSearch & { readonly set: Y["set"] }
+						: S extends CteSearch & { readonly set: Y["using"] }
 							? SqlError<
-									"search sequence column name and cycle mark column name are the same",
+									"search sequence column name and cycle path column name are the same",
 									null
 								>
-							: S extends CteSearch & { readonly set: Y["using"] }
-								? SqlError<
-										"search sequence column name and cycle path column name are the same",
-										null
-									>
-								: CycleMarkType<Y["to"], Y["default"]> extends infer T
-									? T extends string
-										? { readonly [K in Y["set"]]: Info<T> } & {
-												readonly [K in Y["using"]]: Info<"record[]">;
-											}
-										: T
-									: never
-		: never
+							: CycleMarkType<Y["to"], Y["default"]> extends infer T extends
+										string
+								? { readonly [K in Y["set"]]: Info<T> } & {
+										readonly [K in Y["using"]]: Info<"record[]">;
+									}
+								: CycleMarkType<Y["to"], Y["default"]>
 	: {};
 type CycleMarkType<To, Def> = [To, Def] extends [
 	infer V extends Expr,
@@ -335,13 +321,12 @@ type NoEquality =
 	| "refcursor"
 	| "txid_snapshot"
 	| "xml";
-type ConstType<E extends Expr> = E extends TagStr
-	? "lit"
-	: TypeOf<E, MkCtx<unknown, [], {}, false>> extends infer T
-		? T extends ColInfo
+type ConstType<E extends Expr> =
+	E extends Tag<"str">
+		? "lit"
+		: TypeOf<E, MkCtx<unknown, [], {}, false>> extends infer T extends ColInfo
 			? T["type"]
-			: "unknown"
-		: never;
+			: "unknown";
 
 type ApplyCteCols<
 	C extends Cols,
@@ -363,36 +348,29 @@ type RecursiveCte<
 	S,
 	Y,
 > =
-	BindWith<W, DB, Outer, Ctes> extends infer C2
-		? C2 extends CteMap
-			? ProjectBody<B["l"], DB, Outer, C2, [], false> extends infer C0
-				? C0 extends Cols
-					? ApplyCteCols<C0, Names, Name> extends infer C1
-						? C1 extends Cols
-							? SearchCycleCols<S, Y, ColsToMap<C1>> extends infer X
-								? X extends ColMap
-									? RecursiveFix<
-											Name,
-											Names,
-											W,
-											B,
-											Order,
-											DB,
-											Outer,
-											Ctes,
-											ColsToMap<C1>,
-											ColsToMap<C1>,
-											[0],
-											X
-										>
-									: X
-								: never
-							: C1
-						: never
-					: C0
-				: never
-			: C2
-		: never;
+	BindWith<W, DB, Outer, Ctes> extends infer C2 extends CteMap
+		? ProjectBody<B["l"], DB, Outer, C2, [], false> extends infer C0 extends
+				Cols
+			? ApplyCteCols<C0, Names, Name> extends infer C1 extends Cols
+				? SearchCycleCols<S, Y, ColsToMap<C1>> extends infer X extends ColMap
+					? RecursiveFix<
+							Name,
+							Names,
+							W,
+							B,
+							Order,
+							DB,
+							Outer,
+							Ctes,
+							ColsToMap<C1>,
+							ColsToMap<C1>,
+							[0],
+							X
+						>
+					: SearchCycleCols<S, Y, ColsToMap<C1>>
+				: ApplyCteCols<C0, Names, Name>
+			: ProjectBody<B["l"], DB, Outer, C2, [], false>
+		: BindWith<W, DB, Outer, Ctes>;
 type RecursiveFix<
 	Name extends string,
 	Names extends readonly string[] | null,
@@ -416,30 +394,28 @@ type RecursiveFix<
 		AddCte<Ctes, Name, WithExtra<M, X>>
 	> extends infer Full
 		? Full extends Cols
-			? ApplyCteCols<Full, Names, Name> extends infer F2
-				? F2 extends Cols
-					? FixStep<M0, ColsToMap<F2>> extends infer Next extends ColMap
-						? [Changed<M, Next>] extends [never]
-							? WithExtra<Next, X>
-							: Iter["length"] extends 4
-								? WithExtra<NullableMap<Next>, X>
-								: RecursiveFix<
-										Name,
-										Names,
-										W,
-										B,
-										Order,
-										DB,
-										Outer,
-										Ctes,
-										M0,
-										Next,
-										[...Iter, 0],
-										X
-									>
-						: never
-					: F2
-				: never
+			? ApplyCteCols<Full, Names, Name> extends infer F2 extends Cols
+				? FixStep<M0, ColsToMap<F2>> extends infer Next extends ColMap
+					? [Changed<M, Next>] extends [never]
+						? WithExtra<Next, X>
+						: Iter["length"] extends 4
+							? WithExtra<NullableMap<Next>, X>
+							: RecursiveFix<
+									Name,
+									Names,
+									W,
+									B,
+									Order,
+									DB,
+									Outer,
+									Ctes,
+									M0,
+									Next,
+									[...Iter, 0],
+									X
+								>
+					: never
+				: ApplyCteCols<Full, Names, Name>
 			: Full
 		: never;
 type WithExtra<M extends ColMap, X extends ColMap> = M & X extends infer All
@@ -464,59 +440,59 @@ type ProjectBody<
 	Ctes extends CteMap,
 	Order extends readonly Expr[],
 	Lit extends boolean,
-> = B extends TagSimple
-	? B extends { readonly into: unknown }
-		? SqlError<"SELECT ... INTO is not allowed here", null>
-		: ProjectSimple<
-				B["distinct"],
-				B["targets"],
-				B["from"],
-				B["where"],
-				B["groupBy"],
-				B["groupingSets"],
-				B["having"],
-				B["windows"],
-				Order,
-				DB,
-				Outer,
-				Ctes,
-				Lit
-			>
-	: B extends TagSetop
-		? ProjectSetOp<B["l"], B["r"], B["op"], DB, Outer, Ctes> extends infer C
-			? C extends Cols
-				? CheckOutputOrder<Order, C> extends infer O
-					? O extends AnyErr
-						? O
-						: C
-					: never
-				: C
-			: never
-		: B extends TagValues
-			? ProjectValues<B["rows"], DB, Outer, Ctes, Order>
-			: B extends TagParen
-				? Order extends readonly []
-					? ProjectSelectParts<
-							B["q"]["with"],
-							B["q"]["body"],
-							B["q"]["orderBy"],
-							DB,
-							Outer,
-							Ctes,
-							Lit
-						>
-					: B["q"]["orderBy"] extends readonly []
+> =
+	B extends Tag<"simple">
+		? B extends { readonly into: unknown }
+			? SqlError<"SELECT ... INTO is not allowed here", null>
+			: ProjectSimple<
+					B["distinct"],
+					B["targets"],
+					B["from"],
+					B["where"],
+					B["groupBy"],
+					B["groupingSets"],
+					B["having"],
+					B["windows"],
+					Order,
+					DB,
+					Outer,
+					Ctes,
+					Lit
+				>
+		: B extends Tag<"setop">
+			? ProjectSetOp<
+					B["l"],
+					B["r"],
+					B["op"],
+					DB,
+					Outer,
+					Ctes
+				> extends infer C extends Cols
+				? CheckOutputOrder<Order, C> extends AnyErr
+					? CheckOutputOrder<Order, C>
+					: C
+				: ProjectSetOp<B["l"], B["r"], B["op"], DB, Outer, Ctes>
+			: B extends Tag<"values">
+				? ProjectValues<B["rows"], DB, Outer, Ctes, Order>
+				: B extends Tag<"paren">
+					? (
+							Order extends readonly []
+								? B["q"]["orderBy"]
+								: B["q"]["orderBy"] extends readonly []
+									? Order
+									: null
+						) extends infer O extends readonly Expr[]
 						? ProjectSelectParts<
 								B["q"]["with"],
 								B["q"]["body"],
-								Order,
+								O,
 								DB,
 								Outer,
 								Ctes,
 								Lit
 							>
 						: SqlError<"multiple ORDER BY clauses not allowed", null>
-				: SqlError<"unsupported query body", null>;
+					: SqlError<"unsupported query body", null>;
 
 type ProjectSetOp<
 	L extends SelectBody,
@@ -526,21 +502,11 @@ type ProjectSetOp<
 	Outer extends Scope,
 	Ctes extends CteMap,
 > =
-	ProjectBody<L, DB, Outer, Ctes, [], true> extends infer LC
-		? LC extends Cols
-			? ProjectBody<R, DB, Outer, Ctes, [], true> extends infer RC
-				? RC extends Cols
-					? AlignSetOp<LC, RC, Uppercase<Op>, [], 0>
-					: RC
-				: never
-			: LC
-		: never;
-
-type HasStarEntry<C extends Cols> = [
-	Extract<C[number], { readonly star: unknown }>,
-] extends [never]
-	? false
-	: true;
+	ProjectBody<L, DB, Outer, Ctes, [], true> extends infer LC extends Cols
+		? ProjectBody<R, DB, Outer, Ctes, [], true> extends infer RC extends Cols
+			? AlignSetOp<LC, RC, Uppercase<Op>, [], 0>
+			: ProjectBody<R, DB, Outer, Ctes, [], true>
+		: ProjectBody<L, DB, Outer, Ctes, [], true>;
 
 /**
  * A `*` branch keeps its columns as a map, without positions. Keep the left
@@ -607,9 +573,9 @@ type AlignSetOp<
 	Acc extends Cols,
 	I extends number,
 > = I extends 0
-	? HasStarEntry<L> extends true
+	? HasStar<L> extends true
 		? StarSetOp<L, R>
-		: HasStarEntry<R> extends true
+		: HasStar<R> extends true
 			? StarSetOp<L, R>
 			: AlignCols<L, R, Op, Acc, I>
 	: AlignCols<L, R, Op, Acc, I>;
@@ -681,41 +647,47 @@ type ProjectValues<
 	Ctes extends CteMap,
 	Order extends readonly Expr[],
 > =
-	OperandRow<Rows[0], MkCtx<DB, Outer, Ctes, false>, [], 0> extends infer T0
-		? T0 extends readonly ColInfo[]
-			? MergeRows<Rows, T0, MkCtx<DB, Outer, Ctes, false>, 1> extends infer Ts
-				? Ts extends readonly ColInfo[]
-					? ValuesCols<Ts, 1, []> extends infer Cs extends Cols
-						? ResolveSortKeys<
-								Order,
-								"ORDER BY",
-								ValuesTargets<Cs>,
-								Cs,
-								MkCtx<
-									DB,
-									[
-										[
-											{
-												readonly alias: "*VALUES*";
-												readonly cols: ColsToMap<Cs>;
-												readonly skip: [];
-											},
-										],
-										...Outer,
-									],
-									Ctes,
-									false
-								>
-							> extends infer K
-							? K extends AnyErr
-								? K
-								: Cs
-							: never
-						: never
-					: Ts
+	OperandRow<
+		Rows[0],
+		MkCtx<DB, Outer, Ctes, false>,
+		[],
+		0
+	> extends infer T0 extends readonly ColInfo[]
+		? MergeRows<
+				Rows,
+				T0,
+				MkCtx<DB, Outer, Ctes, false>,
+				1
+			> extends infer Ts extends readonly ColInfo[]
+			? ValuesCols<Ts, 1, []> extends infer Cs extends Cols
+				? ResolveSortKeys<
+						Order,
+						"ORDER BY",
+						ValuesTargets<Cs>,
+						Cs,
+						MkCtx<
+							DB,
+							[
+								[
+									{
+										readonly alias: "*VALUES*";
+										readonly cols: ColsToMap<Cs>;
+										readonly skip: [];
+									},
+								],
+								...Outer,
+							],
+							Ctes,
+							false
+						>
+					> extends infer K
+					? K extends AnyErr
+						? K
+						: Cs
+					: never
 				: never
-			: T0
-		: never;
+			: MergeRows<Rows, T0, MkCtx<DB, Outer, Ctes, false>, 1>
+		: OperandRow<Rows[0], MkCtx<DB, Outer, Ctes, false>, [], 0>;
 
 type OperandRow<
 	Row extends readonly Expr[],
@@ -724,7 +696,11 @@ type OperandRow<
 	I extends number,
 > = Row[I] extends undefined
 	? Acc
-	: (Row[I] extends TagStr ? Info<"lit"> : TypeOf<Row[I], C>) extends infer T
+	: (
+				Row[I] extends Tag<"str">
+					? Info<"lit">
+					: TypeOf<Row[I], C>
+			) extends infer T
 		? T extends ColInfo
 			? OperandRow<Row, C, [...Acc, T], Nx<I>>
 			: T
@@ -736,17 +712,13 @@ type MergeRows<
 	C extends Ctx,
 	I extends number,
 > = Rows[I] extends readonly Expr[]
-	? OperandRow<Rows[I], C, [], 0> extends infer Us
-		? Us extends readonly ColInfo[]
-			? Us["length"] extends Acc["length"]
-				? ZipCommon<Acc, Us, [], 0> extends infer Z
-					? Z extends readonly ColInfo[]
-						? MergeRows<Rows, Z, C, Nx<I>>
-						: Z
-					: never
-				: SqlError<"VALUES lists must all be the same length", null>
-			: Us
-		: never
+	? OperandRow<Rows[I], C, [], 0> extends infer Us extends readonly ColInfo[]
+		? Us["length"] extends Acc["length"]
+			? ZipCommon<Acc, Us, [], 0> extends infer Z extends readonly ColInfo[]
+				? MergeRows<Rows, Z, C, Nx<I>>
+				: ZipCommon<Acc, Us, [], 0>
+			: SqlError<"VALUES lists must all be the same length", null>
+		: OperandRow<Rows[I], C, [], 0>
 	: Acc;
 
 type ZipCommon<
@@ -821,41 +793,39 @@ type ProjectSimple<
 	Ctes extends CteMap,
 	Lit extends boolean,
 > =
-	BindFrom<From, DB, Outer, Ctes> extends infer L
-		? L extends ScopeLevel
-			? SetsLevel<
-					NarrowLevel<L, NarrowKeys<Where>>,
-					Sets
-				> extends infer L2 extends ScopeLevel
-				? ProjectTargets<
-						Ts,
-						MkCtx<DB, [L2, ...Outer], Ctes, Grouped<GroupBy, Sets>>,
-						[],
-						0,
-						Lit
-					> extends infer Cs
-					? Cs extends Cols
-						? CheckSimple<
-								Distinct,
-								Ts,
-								Cs,
-								Where,
-								GroupBy,
-								Having,
-								Ws,
-								Order,
-								MkCtx<DB, [L, ...Outer], Ctes, Grouped<GroupBy, Sets>>,
-								MkCtx<DB, [L2, ...Outer], Ctes, Grouped<GroupBy, Sets>>
-							> extends infer R
-							? R extends AnyErr
-								? R
-								: Cs
-							: never
-						: Cs
-					: never
+	BindFrom<From, DB, Outer, Ctes> extends infer L extends ScopeLevel
+		? SetsLevel<
+				NarrowLevel<L, NarrowKeys<Where>>,
+				Sets
+			> extends infer L2 extends ScopeLevel
+			? ProjectTargets<
+					Ts,
+					MkCtx<DB, [L2, ...Outer], Ctes, Grouped<GroupBy, Sets>>,
+					[],
+					0,
+					Lit
+				> extends infer Cs
+				? Cs extends Cols
+					? CheckSimple<
+							Distinct,
+							Ts,
+							Cs,
+							Where,
+							GroupBy,
+							Having,
+							Ws,
+							Order,
+							MkCtx<DB, [L, ...Outer], Ctes, Grouped<GroupBy, Sets>>,
+							MkCtx<DB, [L2, ...Outer], Ctes, Grouped<GroupBy, Sets>>
+						> extends infer R
+						? R extends AnyErr
+							? R
+							: Cs
+						: never
+					: Cs
 				: never
-			: L
-		: never;
+			: never
+		: BindFrom<From, DB, Outer, Ctes>;
 
 type Grouped<GroupBy, Sets> = Sets extends false
 	? GroupBy extends null
@@ -910,29 +880,21 @@ type CheckSimple<
 		C0["scope"] extends readonly [unknown] ? true : false
 	> extends infer P extends AnyErr
 		? P
-		: CheckCondition<"WHERE", Where, C0> extends infer W
-			? W extends AnyErr
-				? W
-				: CheckCondition<"HAVING", Having, C> extends infer H
-					? H extends AnyErr
-						? H
-						: ResolveSortKeys<Order, "ORDER BY", Ts, Cs, C> extends infer OK
-							? OK extends AnyErr
-								? OK
-								: OK extends readonly unknown[]
-									? CheckGroupBy<GroupBy, Ts, Cs, C> extends infer G
-										? G extends AnyErr
-											? G
-											: CheckDistinct<Distinct, OK, Ts, Cs, C> extends infer D
-												? D extends AnyErr
-													? D
-													: CheckWindows<Ws, Ts, Order, C>
-												: never
-										: never
-									: never
+		: CheckCondition<"WHERE", Where, C0> extends AnyErr
+			? CheckCondition<"WHERE", Where, C0>
+			: CheckCondition<"HAVING", Having, C> extends AnyErr
+				? CheckCondition<"HAVING", Having, C>
+				: ResolveSortKeys<Order, "ORDER BY", Ts, Cs, C> extends infer OK
+					? OK extends AnyErr
+						? OK
+						: OK extends readonly unknown[]
+							? CheckGroupBy<GroupBy, Ts, Cs, C> extends AnyErr
+								? CheckGroupBy<GroupBy, Ts, Cs, C>
+								: CheckDistinct<Distinct, OK, Ts, Cs, C> extends AnyErr
+									? CheckDistinct<Distinct, OK, Ts, Cs, C>
+									: CheckWindows<Ws, Ts, Order, C>
 							: never
-					: never
-			: never;
+					: never;
 
 type CheckDistinct<
 	Distinct,
@@ -958,18 +920,11 @@ type CheckWindows<
 	Order extends readonly Expr[],
 	C extends Ctx,
 > =
-	CheckWindowClause<Ws, C> extends infer Defs
-		? Defs extends WindowDefs
-			? CheckWindowRefs<TargetExprs<Ts>, Defs, C> extends infer R
-				? R extends AnyErr
-					? R
-					: CheckWindowRefs<Order, Defs, C>
-				: never
-			: Defs
-		: never;
-type TargetExprs<Ts extends readonly Target[]> = {
-	readonly [K in keyof Ts]: Ts[K]["e"];
-};
+	CheckWindowClause<Ws, C> extends infer Defs extends WindowDefs
+		? CheckWindowRefs<TargetExprs<Ts>, Defs, C> extends AnyErr
+			? CheckWindowRefs<TargetExprs<Ts>, Defs, C>
+			: CheckWindowRefs<Order, Defs, C>
+		: CheckWindowClause<Ws, C>;
 
 type FieldStar<A> = A extends ColInfo
 	? A["type"] extends Shaped<"record", ObjShape<infer M>>
@@ -991,41 +946,30 @@ export type ProjectTargets<
 				readonly t: "star";
 				readonly tbl: infer Tbl extends string | null;
 			}
-		? ExpandStar<C["scope"], Tbl> extends infer M
-			? M extends ColMap
-				? ProjectTargets<Ts, C, [...Acc, { readonly star: M }], Nx<I>, Lit>
-				: M
-			: never
+		? ExpandStar<C["scope"], Tbl> extends infer M extends ColMap
+			? ProjectTargets<Ts, C, [...Acc, { readonly star: M }], Nx<I>, Lit>
+			: ExpandStar<C["scope"], Tbl>
 		: Ts[I]["e"] extends { readonly t: "field"; readonly name: "*" }
-			? FieldStar<TypeOf<Ts[I]["e"]["e"], C>> extends infer M
-				? M extends ColMap
-					? ProjectTargets<Ts, C, [...Acc, { readonly star: M }], Nx<I>, Lit>
-					: M
-				: never
+			? FieldStar<TypeOf<Ts[I]["e"]["e"], C>> extends infer M extends ColMap
+				? ProjectTargets<Ts, C, [...Acc, { readonly star: M }], Nx<I>, Lit>
+				: FieldStar<TypeOf<Ts[I]["e"]["e"], C>>
 			: (
 						Lit extends true
-							? Ts[I]["e"] extends TagStr
+							? Ts[I]["e"] extends Tag<"str">
 								? Info<"lit">
 								: TypeOf<Ts[I]["e"], C>
 							: TypeOf<Ts[I]["e"], C>
 					) extends infer Ty
 				? Ty extends ColInfo
-					? ColumnName<Ts[I]["e"], Ts[I]["alias"], C> extends infer N
-						? N extends string
-							? ProjectTargets<
-									Ts,
-									C,
-									[...Acc, { readonly n: N; readonly t: Ty }],
-									Nx<I>,
-									Lit
-								>
-							: N
-						: never
+					? ColumnName<Ts[I]["e"], Ts[I]["alias"], C> extends infer N extends
+							string
+						? ProjectTargets<
+								Ts,
+								C,
+								[...Acc, { readonly n: N; readonly t: Ty }],
+								Nx<I>,
+								Lit
+							>
+						: ColumnName<Ts[I]["e"], Ts[I]["alias"], C>
 					: Ty
 				: never;
-
-type TagSetop = { readonly t: "setop" };
-type TagStr = { readonly t: "str" };
-type TagSimple = { readonly t: "simple" };
-type TagValues = { readonly t: "values" };
-type TagParen = { readonly t: "paren" };

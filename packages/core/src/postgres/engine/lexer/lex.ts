@@ -25,7 +25,7 @@ import type {
 	UEscape,
 } from "./unicode.js";
 
-type Nx<I extends number> = Next[I];
+type Nx<I extends number> = Next<I>;
 
 export type Lex<Q extends string> = LexLines<Q, []>;
 
@@ -147,24 +147,7 @@ type LexChunk<
 type Err<M extends string, Acc extends readonly Tok[]> = ["err", M, Acc];
 
 type Punct1 = "(" | ")" | "," | ";" | "[" | "]";
-type OpChar =
-	| "~"
-	| "!"
-	| "@"
-	| "#"
-	| "^"
-	| "&"
-	| "|"
-	| "`"
-	| "?"
-	| "+"
-	| "-"
-	| "*"
-	| "/"
-	| "%"
-	| "<"
-	| ">"
-	| "=";
+type OpChar = OpSpecial | "+" | "-" | "*" | "/" | "<" | ">" | "=";
 type OpSpecial = "~" | "!" | "@" | "#" | "^" | "&" | "|" | "`" | "?" | "%";
 
 type LexStep<

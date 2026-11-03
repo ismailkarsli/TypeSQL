@@ -43,9 +43,9 @@ type LookupTable<
 	Display extends string = Name,
 > = Name extends keyof NS
 	? NS[Name] extends View<infer Cols>
-		? TableCols<Cols>
+		? Cols
 		: NS[Name] extends Table
-			? TableCols<NS[Name]>
+			? NS[Name]
 			: SqlError<`"${Display}" is not a table`, null>
 	: SqlError<`relation "${Display}" does not exist`, null>;
 
@@ -56,8 +56,6 @@ type InPgCatalog<DB, Name extends string> = DB extends {
 		? true
 		: false
 	: false;
-
-export type TableCols<T extends Table> = T;
 
 export type ResolveWritableTable<
 	DB,
@@ -132,15 +130,13 @@ type ResolveQualifiedAt<
 > = Depth extends S["length"]
 	? SqlError<`missing FROM-clause entry for table "${Tbl}"`, null>
 	: L extends unknown
-		? FindAliasAt<L, Tbl> extends infer Item
-			? Item extends number
-				? Name extends keyof L[Item]["cols"]
-					? L[Item]["cols"][Name]
-					: SqlError<`column ${Tbl}.${Name} does not exist`, null>
-				: Item extends null
-					? ResolveQualifiedAt<S, Tbl, Name, Nx<Depth>>
-					: Item
-			: never
+		? FindAliasAt<L, Tbl> extends infer Item extends number
+			? Name extends keyof L[Item]["cols"]
+				? L[Item]["cols"][Name]
+				: SqlError<`column ${Tbl}.${Name} does not exist`, null>
+			: FindAliasAt<L, Tbl> extends null
+				? ResolveQualifiedAt<S, Tbl, Name, Nx<Depth>>
+				: FindAliasAt<L, Tbl>
 		: never;
 
 type FindAliasAt<
@@ -169,13 +165,11 @@ type ResolveBareAt<
 	Depth extends number = 0,
 > = Depth extends S["length"]
 	? WholeRow<All, Name, `column "${Name}" does not exist`>
-	: FindBare<S[Depth], Name, null> extends infer R
-		? R extends ColInfo
-			? R
-			: R extends "ambiguous"
-				? SqlError<`column reference "${Name}" is ambiguous`, null>
-				: ResolveBareAt<S, Name, All, Nx<Depth>>
-		: never;
+	: FindBare<S[Depth], Name, null> extends ColInfo
+		? FindBare<S[Depth], Name, null>
+		: FindBare<S[Depth], Name, null> extends "ambiguous"
+			? SqlError<`column reference "${Name}" is ambiguous`, null>
+			: ResolveBareAt<S, Name, All, Nx<Depth>>;
 export type WholeRow<
 	S extends Scope,
 	Name extends string,
@@ -191,13 +185,11 @@ type WholeRowAt<
 > = Depth extends S["length"]
 	? SqlError<Missing, null>
 	: L extends unknown
-		? FindAliasAt<L, Name> extends infer Item
-			? Item extends number
-				? RowInfo<L[Item]["cols"]>
-				: Item extends null
-					? WholeRowAt<S, Name, Missing, Nx<Depth>>
-					: Item
-			: never
+		? FindAliasAt<L, Name> extends infer Item extends number
+			? RowInfo<L[Item]["cols"]>
+			: FindAliasAt<L, Name> extends null
+				? WholeRowAt<S, Name, Missing, Nx<Depth>>
+				: FindAliasAt<L, Name>
 		: never;
 
 type FindBare<
@@ -230,13 +222,11 @@ export type ExpandStar<
 ]
 	? Tbl extends string
 		? L extends unknown
-			? FindAliasAt<L, Tbl> extends infer Item
-				? Item extends number
-					? L[Item]["cols"]
-					: Item extends null
-						? ExpandStar<Outer, Tbl>
-						: Item
-				: never
+			? FindAliasAt<L, Tbl> extends infer Item extends number
+				? L[Item]["cols"]
+				: FindAliasAt<L, Tbl> extends null
+					? ExpandStar<Outer, Tbl>
+					: FindAliasAt<L, Tbl>
 			: never
 		: L extends readonly []
 			? SqlError<"SELECT * with no tables specified is not valid", null>

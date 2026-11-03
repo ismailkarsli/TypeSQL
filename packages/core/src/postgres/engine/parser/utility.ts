@@ -14,23 +14,17 @@ export type ParseCursorStmt<T extends Toks, I extends number> =
 
 type ParseDeclare<T extends Toks, I extends number> =
 	Ident<T, I> extends [infer N, infer J extends number]
-		? CursorOptions<T, J, never> extends infer K
-			? K extends number
-				? EatWord<T, K, "cursor"> extends never
-					? Expected<"CURSOR", T, K>
-					: SkipHold<T, EatWord<T, K, "cursor">> extends infer L
-						? L extends number
-							? EatWord<T, L, "for"> extends never
-								? Expected<"FOR", T, L>
-								: ParseSelectStmt<T, EatWord<T, L, "for">> extends infer R
-									? R extends Ok<infer Q, infer J2>
-										? Ok<{ t: "declare_cursor"; name: N; q: Q }, J2>
-										: R
-									: never
-							: L
-						: never
-				: K
-			: never
+		? CursorOptions<T, J, never> extends infer K extends number
+			? EatWord<T, K, "cursor"> extends never
+				? Expected<"CURSOR", T, K>
+				: SkipHold<T, Nx<K>> extends infer L extends number
+					? EatWord<T, L, "for"> extends never
+						? Expected<"FOR", T, L>
+						: ParseSelectStmt<T, Nx<L>> extends Ok<infer Q, infer J2>
+							? Ok<{ t: "declare_cursor"; name: N; q: Q }, J2>
+							: ParseSelectStmt<T, Nx<L>>
+					: SkipHold<T, Nx<K>>
+			: CursorOptions<T, J, never>
 		: Expected<"cursor name", T, I>;
 
 type CursorOptions<T extends Toks, I extends number, Seen extends string> =

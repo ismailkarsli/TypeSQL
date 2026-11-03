@@ -1,3 +1,4 @@
+import type { Digit } from "../../../engine/chars.js";
 import type {
 	IdTok,
 	NumTok,
@@ -23,15 +24,13 @@ import type {
 } from "./util.js";
 
 export type ParseTypeName<T extends Toks, I extends number> =
-	ParseBaseType<T, I> extends infer R
-		? R extends Ok<infer Base extends string, infer J>
-			? ParseArraySuffix<
-					T,
-					J,
-					Base extends "char" ? Base : NormalizeTypeName<Base>
-				>
-			: R
-		: never;
+	ParseBaseType<T, I> extends Ok<infer Base extends string, infer J>
+		? ParseArraySuffix<
+				T,
+				J,
+				Base extends "char" ? Base : NormalizeTypeName<Base>
+			>
+		: ParseBaseType<T, I>;
 
 type ParseBaseType<T extends Toks, I extends number> =
 	T[I] extends IdTok<infer V>
@@ -40,7 +39,7 @@ type ParseBaseType<T extends Toks, I extends number> =
 			? W extends "double"
 				? EatWord<T, Nx<I>, "precision"> extends never
 					? Expected<"PRECISION", T, Nx<I>>
-					: Ok<"float8", EatWord<T, Nx<I>, "precision">>
+					: Ok<"float8", Nx2<I>>
 				: W extends "national"
 					? EatWord<T, Nx<I>, "character" | "char"> extends never
 						? Expected<"CHARACTER", T, Nx<I>>
@@ -48,17 +47,15 @@ type ParseBaseType<T extends Toks, I extends number> =
 					: W extends "character" | "char" | "nchar"
 						? EatWord<T, Nx<I>, "varying"> extends never
 							? OkAt<"bpchar", OptPrecision<T, Nx<I>>>
-							: OkAt<"varchar", OptPrecision<T, EatWord<T, Nx<I>, "varying">>>
+							: OkAt<"varchar", OptPrecision<T, Nx2<I>>>
 						: W extends "bit"
 							? EatWord<T, Nx<I>, "varying"> extends never
 								? TypeModifiers<T, Ok<"bit", Nx<I>>>
-								: TypeModifiers<T, Ok<"varbit", EatWord<T, Nx<I>, "varying">>>
+								: TypeModifiers<T, Ok<"varbit", Nx2<I>>>
 							: W extends "timestamp" | "time"
-								? OptPrecision<T, Nx<I>> extends infer J
-									? J extends number
-										? WithTz<T, J, W>
-										: J
-									: never
+								? OptPrecision<T, Nx<I>> extends infer J extends number
+									? WithTz<T, J, W>
+									: OptPrecision<T, Nx<I>>
 								: W extends "interval"
 									? OkAt<
 											"interval",
@@ -101,60 +98,13 @@ type FloatPrecision<T extends Toks, I extends number> =
 			: Expected<"precision", T, Nx<I>>
 		: Ok<"float8", I>;
 type SmallFloat =
-	| "1"
-	| "2"
-	| "3"
-	| "4"
-	| "5"
-	| "6"
-	| "7"
-	| "8"
-	| "9"
-	| "10"
-	| "11"
-	| "12"
-	| "13"
-	| "14"
-	| "15"
-	| "16"
-	| "17"
-	| "18"
-	| "19"
-	| "20"
-	| "21"
-	| "22"
-	| "23"
-	| "24";
+	| Exclude<Digit, "0">
+	| `1${Digit}`
+	| `2${"0" | "1" | "2" | "3" | "4"}`;
 type BigFloat =
-	| "25"
-	| "26"
-	| "27"
-	| "28"
-	| "29"
-	| "30"
-	| "31"
-	| "32"
-	| "33"
-	| "34"
-	| "35"
-	| "36"
-	| "37"
-	| "38"
-	| "39"
-	| "40"
-	| "41"
-	| "42"
-	| "43"
-	| "44"
-	| "45"
-	| "46"
-	| "47"
-	| "48"
-	| "49"
-	| "50"
-	| "51"
-	| "52"
-	| "53";
+	| `2${"5" | "6" | "7" | "8" | "9"}`
+	| `${"3" | "4"}${Digit}`
+	| `5${"0" | "1" | "2" | "3"}`;
 
 type ColNameTypeWord =
 	| "bigint"
@@ -168,27 +118,25 @@ type ColNameTypeWord =
 type QualifiedTail<T extends Toks, First extends string, I extends number> =
 	EatOp<T, I, "."> extends never
 		? Ok<First, I>
-		: AnyLabel<T, EatOp<T, I, ".">> extends [infer N, infer J extends number]
+		: AnyLabel<T, Nx<I>> extends [infer N, infer J extends number]
 			? Ok<N, J>
-			: Expected<"type name", T, EatOp<T, I, ".">>;
+			: Expected<"type name", T, Nx<I>>;
 
 type WithTz<T extends Toks, I extends number, W extends string> =
 	EatWords<T, I, ["with", "time", "zone"]> extends never
 		? EatWords<T, I, ["without", "time", "zone"]> extends never
 			? Ok<W, I>
-			: Ok<W, EatWords<T, I, ["without", "time", "zone"]>>
-		: Ok<`${W}tz`, EatWords<T, I, ["with", "time", "zone"]>>;
+			: Ok<W, Nx3<I>>
+		: Ok<`${W}tz`, Nx3<I>>;
 
 type TypeModifiers<T extends Toks, R> =
 	R extends Ok<infer N, infer J>
 		? T[J] extends OpTok<"(">
-			? ParseExprList<T, Nx<J>, []> extends infer X
-				? X extends Ok<unknown, infer K>
-					? T[K] extends OpTok<")">
-						? Ok<N, Nx<K>>
-						: Expected<'")"', T, K>
-					: X
-				: never
+			? ParseExprList<T, Nx<J>, []> extends Ok<unknown, infer K>
+				? T[K] extends OpTok<")">
+					? Ok<N, Nx<K>>
+					: Expected<'")"', T, K>
+				: ParseExprList<T, Nx<J>, []>
 			: R
 		: R;
 

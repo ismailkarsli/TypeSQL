@@ -31,12 +31,12 @@
 			"project": ["src/**/*.ts!"]
 		},
 		"packages/drizzle": {
-			"entry": ["src/index.ts!", "examples/*.ts"],
-			"project": ["src/**/*.ts!", "examples/**/*.ts"]
+			"entry": ["src/index.ts!"],
+			"project": ["src/**/*.ts!"]
 		},
 		"packages/kysely": {
-			"entry": ["src/index.ts!", "examples/*.ts"],
-			"project": ["src/**/*.ts!", "examples/**/*.ts"]
+			"entry": ["src/index.ts!"],
+			"project": ["src/**/*.ts!"]
 		},
 		"packages/pg": {
 			"entry": ["src/index.ts!", "src/introspect/index.ts!"],
@@ -47,13 +47,8 @@
 			"project": ["src/**/*.ts!"]
 		},
 		"packages/prisma": {
-			"entry": [
-				"src/index.ts!",
-				"src/bin.ts!",
-				"src/generator/api.ts!",
-				"examples/*.ts"
-			],
-			"project": ["src/**/*.ts!", "examples/**/*.ts"]
+			"entry": ["src/index.ts!", "src/bin.ts!", "src/generator/api.ts!"],
+			"project": ["src/**/*.ts!"]
 		},
 		"packages/sqlite": {
 			"entry": ["src/index.ts!", "src/introspect/index.ts!"],

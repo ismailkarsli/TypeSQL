@@ -1,6 +1,6 @@
 import { cp, mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import { required } from "./command.ts";
+import { required, unlessMissing } from "./command.ts";
 import { ready } from "./database.ts";
 
 const workspace = resolve(import.meta.dirname, "..");
@@ -33,20 +33,9 @@ export default async function setup() {
 			["root", repository],
 			["tests", workspace],
 		] as const) {
-			try {
-				await cp(join(cwd, ".scenario"), join(retained, name), {
-					recursive: true,
-				});
-			} catch (error) {
-				if (
-					!(
-						error instanceof Error &&
-						"code" in error &&
-						error.code === "ENOENT"
-					)
-				)
-					throw error;
-			}
+			await unlessMissing(
+				cp(join(cwd, ".scenario"), join(retained, name), { recursive: true }),
+			);
 		}
 		throw new Error(
 			`Infrastructure: scenario prerequisites failed; logs retained at ${retained}`,

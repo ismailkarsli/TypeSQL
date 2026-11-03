@@ -9,6 +9,7 @@
 /adapters/kysely /guide/orms#kysely 301
 /adapters/drizzle /guide/orms#drizzle 301
 /adapters/prisma /guide/orms#prisma 301
-/internals/engine /guide/type-engine 301
+/internals/engine /guide/limits 301
+/guide/type-engine /guide/limits 301
 /internals/releasing https://github.com/ismailkarsli/TypeSQL/blob/main/packages/docs/internals/releasing.md 301
 /CHANGELOG /changelog 301

@@ -66,6 +66,22 @@ type NullableElems = { nullable: true; elems: true };
 type SrfElems = { srf: true; elems: true };
 type SrfNullable = { srf: true; nullable: true };
 
+/** Ordered overloads for each supported number of trailing optional arguments. */
+type OptionalArgs<
+	Args extends readonly string[],
+	Optional extends readonly string[],
+	Ret extends string,
+	Flags extends SigFlags & ElemsFlag = {},
+> = [
+	ESig<Args, Ret, Flags>,
+	...(Optional extends readonly [
+		infer H extends string,
+		...infer R extends readonly string[],
+	]
+		? OptionalArgs<[...Args, H], R, Ret, Flags>
+		: []),
+];
+
 export interface FunctionCatalog {
 	count: Sig<["..."], "int8", AggNN>;
 	sum: [
@@ -105,16 +121,8 @@ export interface FunctionCatalog {
 	jsonb_object_agg_strict: Sig<["any", "any"], "$jrecnn:jsonb", AggCollect>;
 	json_object_agg_unique: Sig<["any", "any"], "$jrec:json", AggCollect>;
 	jsonb_object_agg_unique: Sig<["any", "any"], "$jrec:jsonb", AggCollect>;
-	json_object_agg_unique_strict: Sig<
-		["any", "any"],
-		"$jrecnn:json",
-		AggCollect
-	>;
-	jsonb_object_agg_unique_strict: Sig<
-		["any", "any"],
-		"$jrecnn:jsonb",
-		AggCollect
-	>;
+	json_object_agg_unique_strict: FunctionCatalog["json_object_agg_strict"];
+	jsonb_object_agg_unique_strict: FunctionCatalog["jsonb_object_agg_strict"];
 	bool_and: Sig<["bool"], "bool", Agg>;
 	bool_or: Sig<["bool"], "bool", Agg>;
 	every: Sig<["bool"], "bool", Agg>;
@@ -131,26 +139,10 @@ export interface FunctionCatalog {
 		Sig<["float8"], "float8", Agg>,
 		Sig<["anynumeric"], "numeric", Agg>,
 	];
-	stddev_samp: [
-		Sig<["float4"], "float8", AggNullable>,
-		Sig<["float8"], "float8", AggNullable>,
-		Sig<["anynumeric"], "numeric", AggNullable>,
-	];
-	variance: [
-		Sig<["float4"], "float8", AggNullable>,
-		Sig<["float8"], "float8", AggNullable>,
-		Sig<["anynumeric"], "numeric", AggNullable>,
-	];
-	var_pop: [
-		Sig<["float4"], "float8", Agg>,
-		Sig<["float8"], "float8", Agg>,
-		Sig<["anynumeric"], "numeric", Agg>,
-	];
-	var_samp: [
-		Sig<["float4"], "float8", AggNullable>,
-		Sig<["float8"], "float8", AggNullable>,
-		Sig<["anynumeric"], "numeric", AggNullable>,
-	];
+	stddev_samp: FunctionCatalog["stddev"];
+	variance: FunctionCatalog["stddev"];
+	var_pop: FunctionCatalog["stddev_pop"];
+	var_samp: FunctionCatalog["stddev"];
 	corr: Sig<["float8", "float8"], "float8", AggNullable>;
 	covar_pop: Sig<["float8", "float8"], "float8", Agg>;
 	covar_samp: Sig<["float8", "float8"], "float8", AggNullable>;
@@ -187,11 +179,7 @@ export interface FunctionCatalog {
 		Sig<["any", "int4"], "$1", WinNullable>,
 		Sig<["any", "int4", "any"], "$1", { window: true }>,
 	];
-	lead: [
-		Sig<["any"], "$1", WinNullable>,
-		Sig<["any", "int4"], "$1", WinNullable>,
-		Sig<["any", "int4", "any"], "$1", { window: true }>,
-	];
+	lead: FunctionCatalog["lag"];
 	first_value: Sig<["any"], "$1", WinNullable>;
 	last_value: Sig<["any"], "$1", WinNullable>;
 	nth_value: Sig<["any", "int4"], "$1", WinNullable>;
@@ -206,10 +194,7 @@ export interface FunctionCatalog {
 		Sig<["anystring"], "text">,
 		Sig<["anyrange"], "$rangeelem1", Nullable>,
 	];
-	upper: [
-		Sig<["anystring"], "text">,
-		Sig<["anyrange"], "$rangeelem1", Nullable>,
-	];
+	upper: FunctionCatalog["lower"];
 	initcap: Sig<["anystring"], "text">;
 	length: [
 		Sig<["anystring"], "int4">,
@@ -227,12 +212,7 @@ export interface FunctionCatalog {
 		Sig<["bit"], "int4">,
 		Sig<["varbit"], "int4">,
 	];
-	bit_length: [
-		Sig<["anystring"], "int4">,
-		Sig<["bytea"], "int4">,
-		Sig<["bit"], "int4">,
-		Sig<["varbit"], "int4">,
-	];
+	bit_length: FunctionCatalog["octet_length"];
 	bit_count: [
 		Sig<["bytea"], "int8">,
 		Sig<["bit"], "int8">,
@@ -243,29 +223,15 @@ export interface FunctionCatalog {
 	format: Sig<["anystring", "..."], "text", { strict: [1] }>;
 	left: Sig<["anystring", "int4"], "text">;
 	right: Sig<["anystring", "int4"], "text">;
-	lpad: [
-		Sig<["anystring", "int4"], "text">,
-		Sig<["anystring", "int4", "anystring"], "text">,
-	];
-	rpad: [
-		Sig<["anystring", "int4"], "text">,
-		Sig<["anystring", "int4", "anystring"], "text">,
-	];
+	lpad: OptionalArgs<["anystring", "int4"], ["anystring"], "text">;
+	rpad: FunctionCatalog["lpad"];
 	ltrim: [
 		Sig<["bytea", "bytea"], "bytea">,
 		Sig<["anystring"], "text">,
 		Sig<["anystring", "anystring"], "text">,
 	];
-	rtrim: [
-		Sig<["bytea", "bytea"], "bytea">,
-		Sig<["anystring"], "text">,
-		Sig<["anystring", "anystring"], "text">,
-	];
-	btrim: [
-		Sig<["bytea", "bytea"], "bytea">,
-		Sig<["anystring"], "text">,
-		Sig<["anystring", "anystring"], "text">,
-	];
+	rtrim: FunctionCatalog["ltrim"];
+	btrim: FunctionCatalog["ltrim"];
 	repeat: Sig<["anystring", "int4"], "text">;
 	replace: Sig<["anystring", "anystring", "anystring"], "text">;
 	reverse: [Sig<["anystring"], "text">, Sig<["bytea"], "bytea">];
@@ -294,60 +260,46 @@ export interface FunctionCatalog {
 			"text"
 		>,
 	];
-	regexp_match: [
-		ESig<["anystring", "anystring"], "text[]", NullableElems>,
-		ESig<["anystring", "anystring", "anystring"], "text[]", NullableElems>,
-	];
-	regexp_matches: [
-		ESig<["anystring", "anystring"], "text[]", SrfElems>,
-		ESig<["anystring", "anystring", "anystring"], "text[]", SrfElems>,
-	];
-	regexp_split_to_array: [
-		Sig<["anystring", "anystring"], "text[]">,
-		Sig<["anystring", "anystring", "anystring"], "text[]">,
-	];
-	regexp_split_to_table: [
-		Sig<["anystring", "anystring"], "text", Srf>,
-		Sig<["anystring", "anystring", "anystring"], "text", Srf>,
-	];
-	regexp_count: [
-		Sig<["anystring", "anystring"], "int4">,
-		Sig<["anystring", "anystring", "int4"], "int4">,
-		Sig<["anystring", "anystring", "int4", "anystring"], "int4">,
-	];
-	regexp_like: [
-		Sig<["anystring", "anystring"], "bool">,
-		Sig<["anystring", "anystring", "anystring"], "bool">,
-	];
-	regexp_instr: [
-		Sig<["anystring", "anystring"], "int4">,
-		Sig<["anystring", "anystring", "int4"], "int4">,
-		Sig<["anystring", "anystring", "int4", "int4"], "int4">,
-		Sig<["anystring", "anystring", "int4", "int4", "int4"], "int4">,
-		Sig<
-			["anystring", "anystring", "int4", "int4", "int4", "anystring"],
-			"int4"
-		>,
-		Sig<
-			["anystring", "anystring", "int4", "int4", "int4", "anystring", "int4"],
-			"int4"
-		>,
-	];
-	regexp_substr: [
-		Sig<["anystring", "anystring"], "text", Nullable>,
-		Sig<["anystring", "anystring", "int4"], "text", Nullable>,
-		Sig<["anystring", "anystring", "int4", "int4"], "text", Nullable>,
-		Sig<
-			["anystring", "anystring", "int4", "int4", "anystring"],
-			"text",
-			Nullable
-		>,
-		Sig<
-			["anystring", "anystring", "int4", "int4", "anystring", "int4"],
-			"text",
-			Nullable
-		>,
-	];
+	regexp_match: OptionalArgs<
+		["anystring", "anystring"],
+		["anystring"],
+		"text[]",
+		NullableElems
+	>;
+	regexp_matches: OptionalArgs<
+		["anystring", "anystring"],
+		["anystring"],
+		"text[]",
+		SrfElems
+	>;
+	regexp_split_to_array: OptionalArgs<
+		["anystring", "anystring"],
+		["anystring"],
+		"text[]"
+	>;
+	regexp_split_to_table: OptionalArgs<
+		["anystring", "anystring"],
+		["anystring"],
+		"text",
+		Srf
+	>;
+	regexp_count: OptionalArgs<
+		["anystring", "anystring"],
+		["int4", "anystring"],
+		"int4"
+	>;
+	regexp_like: OptionalArgs<["anystring", "anystring"], ["anystring"], "bool">;
+	regexp_instr: OptionalArgs<
+		["anystring", "anystring"],
+		["int4", "int4", "int4", "anystring", "int4"],
+		"int4"
+	>;
+	regexp_substr: OptionalArgs<
+		["anystring", "anystring"],
+		["int4", "int4", "anystring", "int4"],
+		"text",
+		Nullable
+	>;
 	string_to_array: [
 		Sig<["anystring", "anystring"], "text[]", { strict: [1] }>,
 		ESig<
@@ -356,14 +308,12 @@ export interface FunctionCatalog {
 			{ strict: [1]; elems: true }
 		>,
 	];
-	string_to_table: [
-		Sig<["anystring", "anystring"], "text", { srf: true; strict: [1] }>,
-		Sig<
-			["anystring", "anystring", "anystring"],
-			"text",
-			{ srf: true; strict: [1] }
-		>,
-	];
+	string_to_table: OptionalArgs<
+		["anystring", "anystring"],
+		["anystring"],
+		"text",
+		{ srf: true; strict: [1] }
+	>;
 	to_hex: Sig<["anynumeric"], "text">;
 	to_bin: Sig<["anynumeric"], "text">;
 	to_oct: Sig<["anynumeric"], "text">;
@@ -380,19 +330,10 @@ export interface FunctionCatalog {
 		Sig<["anystring", "anystring"], "timestamptz">,
 		Sig<["anynumeric"], "timestamptz">,
 	];
-	parse_ident: [
-		Sig<["anystring"], "text[]">,
-		Sig<["anystring", "bool"], "text[]">,
-	];
+	parse_ident: OptionalArgs<["anystring"], ["bool"], "text[]">;
 	unistr: Sig<["anystring"], "text">;
-	normalize: [
-		Sig<["anystring"], "text">,
-		Sig<["anystring", "anystring"], "text">,
-	];
-	is_normalized: [
-		Sig<["anystring"], "bool">,
-		Sig<["anystring", "anystring"], "bool">,
-	];
+	normalize: OptionalArgs<["anystring"], ["anystring"], "text">;
+	is_normalized: OptionalArgs<["anystring"], ["anystring"], "bool">;
 	pg_collation_for: Sig<["any"], "text", NN>;
 	convert_from: Sig<["bytea", "anystring"], "text">;
 	convert_to: Sig<["anystring", "anystring"], "bytea">;
@@ -477,11 +418,7 @@ export interface FunctionCatalog {
 		Sig<["int8", "int8"], "int8">,
 		Sig<["numeric", "numeric"], "numeric">,
 	];
-	lcm: [
-		Sig<["int4", "int4"], "int4">,
-		Sig<["int8", "int8"], "int8">,
-		Sig<["numeric", "numeric"], "numeric">,
-	];
+	lcm: FunctionCatalog["gcd"];
 	factorial: Sig<["int8"], "numeric">;
 	sin: Sig<["float8"], "float8">;
 	cos: Sig<["float8"], "float8">;
@@ -520,10 +457,7 @@ export interface FunctionCatalog {
 	current_timestamp: Sig<[], "timestamptz", NN>;
 	localtime: Sig<[], "time", NN>;
 	localtimestamp: Sig<[], "timestamp", NN>;
-	age: [
-		Sig<["anydatetime"], "interval">,
-		Sig<["anydatetime", "anydatetime"], "interval">,
-	];
+	age: OptionalArgs<["anydatetime"], ["anydatetime"], "interval">;
 	date_part: Sig<["anystring", "any"], "float8">;
 	date_trunc: [
 		Sig<["anystring", "timestamptz"], "timestamptz">,
@@ -535,27 +469,23 @@ export interface FunctionCatalog {
 		Sig<["interval", "timestamptz", "timestamptz"], "timestamptz">,
 		Sig<["interval", "timestamp", "timestamp"], "timestamp">,
 	];
-	date_add: [
-		Sig<["timestamptz", "interval"], "timestamptz">,
-		Sig<["timestamptz", "interval", "anystring"], "timestamptz">,
-	];
-	date_subtract: [
-		Sig<["timestamptz", "interval"], "timestamptz">,
-		Sig<["timestamptz", "interval", "anystring"], "timestamptz">,
-	];
+	date_add: OptionalArgs<
+		["timestamptz", "interval"],
+		["anystring"],
+		"timestamptz"
+	>;
+	date_subtract: FunctionCatalog["date_add"];
 	make_date: Sig<["int4", "int4", "int4"], "date">;
 	make_time: Sig<["int4", "int4", "float8"], "time">;
 	make_timestamp: Sig<
 		["int4", "int4", "int4", "int4", "int4", "float8"],
 		"timestamp"
 	>;
-	make_timestamptz: [
-		Sig<["int4", "int4", "int4", "int4", "int4", "float8"], "timestamptz">,
-		Sig<
-			["int4", "int4", "int4", "int4", "int4", "float8", "anystring"],
-			"timestamptz"
-		>,
-	];
+	make_timestamptz: OptionalArgs<
+		["int4", "int4", "int4", "int4", "int4", "float8"],
+		["anystring"],
+		"timestamptz"
+	>;
 	make_interval: Sig<["..."], "interval">;
 	justify_days: Sig<["interval"], "interval">;
 	justify_hours: Sig<["interval"], "interval">;
@@ -586,10 +516,12 @@ export interface FunctionCatalog {
 			Srf
 		>,
 	];
-	generate_subscripts: [
-		Sig<["anyarray", "int4"], "int4", Srf>,
-		Sig<["anyarray", "int4", "bool"], "int4", Srf>,
-	];
+	generate_subscripts: OptionalArgs<
+		["anyarray", "int4"],
+		["bool"],
+		"int4",
+		Srf
+	>;
 
 	current_user: Sig<[], "name", NN>;
 	current_role: Sig<[], "name", NN>;
@@ -608,24 +540,21 @@ export interface FunctionCatalog {
 	set_config: Sig<["anystring", "anystring", "bool"], "text">;
 	pg_backend_pid: Sig<[], "int4", NN>;
 	pg_cancel_backend: Sig<["int4"], "bool">;
-	pg_terminate_backend: [Sig<["int4"], "bool">, Sig<["int4", "int8"], "bool">];
+	pg_terminate_backend: OptionalArgs<["int4"], ["int8"], "bool">;
 	version: Sig<[], "text", NN>;
 	merge_action: Sig<[], "text", NN>;
 	pg_typeof: Sig<["any"], "regtype", NN>;
 	pg_column_size: Sig<["any"], "int4">;
 	pg_size_pretty: [Sig<["int8"], "text">, Sig<["numeric"], "text">];
 	pg_total_relation_size: Sig<["any"], "int8">;
-	pg_relation_size: [Sig<["any"], "int8">, Sig<["any", "anystring"], "int8">];
+	pg_relation_size: OptionalArgs<["any"], ["anystring"], "int8">;
 	pg_database_size: Sig<["any"], "int8">;
 	pg_postmaster_start_time: Sig<[], "timestamptz", NN>;
 	pg_conf_load_time: Sig<[], "timestamptz", NN>;
 	pg_is_in_recovery: Sig<[], "bool", NN>;
 	inet_client_addr: Sig<[], "inet", Nullable>;
 	inet_server_addr: Sig<[], "inet", Nullable>;
-	obj_description: [
-		Sig<["any"], "text", Nullable>,
-		Sig<["any", "anystring"], "text", Nullable>,
-	];
+	obj_description: OptionalArgs<["any"], ["anystring"], "text", Nullable>;
 	col_description: Sig<["any", "int4"], "text", Nullable>;
 	to_regclass: Sig<["anystring"], "regclass", Nullable>;
 	to_regtype: Sig<["anystring"], "regtype", Nullable>;
@@ -645,7 +574,7 @@ export interface FunctionCatalog {
 
 	nextval: Sig<["any"], "int8">;
 	currval: Sig<["any"], "int8">;
-	setval: [Sig<["any", "int8"], "int8">, Sig<["any", "int8", "bool"], "int8">];
+	setval: OptionalArgs<["any", "int8"], ["bool"], "int8">;
 	lastval: Sig<[], "int8", NN>;
 
 	gen_random_uuid: Sig<[], "uuid", NN>;
@@ -667,7 +596,7 @@ export interface FunctionCatalog {
 		Sig<["anystring", "anystring", "anystring"], "bytea">,
 	];
 	crypt: Sig<["anystring", "anystring"], "text">;
-	gen_salt: [Sig<["anystring"], "text">, Sig<["anystring", "int4"], "text">];
+	gen_salt: OptionalArgs<["anystring"], ["int4"], "text">;
 
 	unaccent: [Sig<["anystring"], "text">, Sig<["any", "anystring"], "text">];
 	similarity: Sig<["anystring", "anystring"], "float4">;
@@ -708,10 +637,7 @@ export interface FunctionCatalog {
 		"$1",
 		{ strict: [1]; elems: [1, 3] }
 	>;
-	array_position: [
-		Sig<["anyarray", "any"], "int4", Nullable>,
-		Sig<["anyarray", "any", "int4"], "int4", Nullable>,
-	];
+	array_position: OptionalArgs<["anyarray", "any"], ["int4"], "int4", Nullable>;
 	array_positions: Sig<["anyarray", "any"], "int4[]", { strict: [1] }>;
 	array_to_string: [
 		Sig<["anyarray", "anystring"], "text">,
@@ -721,14 +647,13 @@ export interface FunctionCatalog {
 	array_lower: Sig<["anyarray", "int4"], "int4", Nullable>;
 	array_ndims: Sig<["anyarray"], "int4", Nullable>;
 	array_dims: Sig<["anyarray"], "text", Nullable>;
-	array_fill: [
-		ESig<["any", "int4[]"], "$arr1", { elems: [1] }>,
-		ESig<["any", "int4[]", "int4[]"], "$arr1", { elems: [1] }>,
-	];
-	array_to_json: [
-		Sig<["anyarray"], "$jval:json">,
-		Sig<["anyarray", "bool"], "$jval:json">,
-	];
+	array_fill: OptionalArgs<
+		["any", "int4[]"],
+		["int4[]"],
+		"$arr1",
+		{ elems: [1] }
+	>;
+	array_to_json: OptionalArgs<["anyarray"], ["bool"], "$jval:json">;
 	array_sample: Sig<["anyarray", "int4"], "$1">;
 	array_shuffle: Sig<["anyarray"], "$1">;
 	trim_array: Sig<["anyarray", "int4"], "$1">;
@@ -739,8 +664,8 @@ export interface FunctionCatalog {
 	jsonb_build_object: Sig<["..."], "jsonb", NN>;
 	json_build_array: Sig<["..."], "$jtup:json", NN>;
 	jsonb_build_array: Sig<["..."], "$jtup:jsonb", NN>;
-	json_object: [Sig<["text[]"], "json">, Sig<["text[]", "text[]"], "json">];
-	jsonb_object: [Sig<["text[]"], "jsonb">, Sig<["text[]", "text[]"], "jsonb">];
+	json_object: OptionalArgs<["text[]"], ["text[]"], "json">;
+	jsonb_object: OptionalArgs<["text[]"], ["text[]"], "jsonb">;
 	json_array_length: Sig<["json"], "int4">;
 	jsonb_array_length: Sig<["jsonb"], "int4">;
 	json_extract_path: Sig<["json", "..."], "json", Nullable>;
@@ -749,92 +674,55 @@ export interface FunctionCatalog {
 	jsonb_extract_path_text: Sig<["jsonb", "..."], "text", Nullable>;
 	json_typeof: Sig<["json"], "text">;
 	jsonb_typeof: Sig<["jsonb"], "text">;
-	json_strip_nulls: [Sig<["json"], "json">, Sig<["json", "bool"], "json">];
-	jsonb_strip_nulls: [Sig<["jsonb"], "jsonb">, Sig<["jsonb", "bool"], "jsonb">];
-	jsonb_set: [
-		Sig<["jsonb", "text[]", "jsonb"], "jsonb">,
-		Sig<["jsonb", "text[]", "jsonb", "bool"], "jsonb">,
-	];
-	jsonb_set_lax: [
-		Sig<["jsonb", "text[]", "jsonb"], "jsonb", { strict: [1, 2] }>,
-		Sig<["jsonb", "text[]", "jsonb", "bool"], "jsonb", { strict: [1, 2] }>,
-		Sig<
-			["jsonb", "text[]", "jsonb", "bool", "anystring"],
-			"jsonb",
-			{ strict: [1, 2] }
-		>,
-	];
-	jsonb_insert: [
-		Sig<["jsonb", "text[]", "jsonb"], "jsonb">,
-		Sig<["jsonb", "text[]", "jsonb", "bool"], "jsonb">,
-	];
+	json_strip_nulls: OptionalArgs<["json"], ["bool"], "json">;
+	jsonb_strip_nulls: OptionalArgs<["jsonb"], ["bool"], "jsonb">;
+	jsonb_set: OptionalArgs<["jsonb", "text[]", "jsonb"], ["bool"], "jsonb">;
+	jsonb_set_lax: OptionalArgs<
+		["jsonb", "text[]", "jsonb"],
+		["bool", "anystring"],
+		"jsonb",
+		{ strict: [1, 2] }
+	>;
+	jsonb_insert: FunctionCatalog["jsonb_set"];
 	jsonb_pretty: Sig<["jsonb"], "text">;
-	jsonb_path_exists: [
-		Sig<["jsonb", "jsonpath"], "bool">,
-		Sig<["jsonb", "jsonpath", "jsonb"], "bool">,
-		Sig<["jsonb", "jsonpath", "jsonb", "bool"], "bool">,
-	];
-	jsonb_path_match: [
-		Sig<["jsonb", "jsonpath"], "bool">,
-		Sig<["jsonb", "jsonpath", "jsonb"], "bool">,
-		Sig<["jsonb", "jsonpath", "jsonb", "bool"], "bool">,
-	];
-	jsonb_path_query: [
-		Sig<["jsonb", "jsonpath"], "jsonb", Srf>,
-		Sig<["jsonb", "jsonpath", "jsonb"], "jsonb", Srf>,
-		Sig<["jsonb", "jsonpath", "jsonb", "bool"], "jsonb", Srf>,
-	];
-	jsonb_path_query_array: [
-		Sig<["jsonb", "jsonpath"], "jsonb">,
-		Sig<["jsonb", "jsonpath", "jsonb"], "jsonb">,
-		Sig<["jsonb", "jsonpath", "jsonb", "bool"], "jsonb">,
-	];
-	jsonb_path_query_first: [
-		Sig<["jsonb", "jsonpath"], "jsonb", Nullable>,
-		Sig<["jsonb", "jsonpath", "jsonb"], "jsonb", Nullable>,
-		Sig<["jsonb", "jsonpath", "jsonb", "bool"], "jsonb", Nullable>,
-	];
-	jsonb_path_exists_tz: [
-		Sig<["jsonb", "jsonpath"], "bool">,
-		Sig<["jsonb", "jsonpath", "jsonb"], "bool">,
-		Sig<["jsonb", "jsonpath", "jsonb", "bool"], "bool">,
-	];
-	jsonb_path_match_tz: [
-		Sig<["jsonb", "jsonpath"], "bool">,
-		Sig<["jsonb", "jsonpath", "jsonb"], "bool">,
-		Sig<["jsonb", "jsonpath", "jsonb", "bool"], "bool">,
-	];
-	jsonb_path_query_tz: [
-		Sig<["jsonb", "jsonpath"], "jsonb", Srf>,
-		Sig<["jsonb", "jsonpath", "jsonb"], "jsonb", Srf>,
-		Sig<["jsonb", "jsonpath", "jsonb", "bool"], "jsonb", Srf>,
-	];
-	jsonb_path_query_array_tz: [
-		Sig<["jsonb", "jsonpath"], "jsonb">,
-		Sig<["jsonb", "jsonpath", "jsonb"], "jsonb">,
-		Sig<["jsonb", "jsonpath", "jsonb", "bool"], "jsonb">,
-	];
-	jsonb_path_query_first_tz: [
-		Sig<["jsonb", "jsonpath"], "jsonb", Nullable>,
-		Sig<["jsonb", "jsonpath", "jsonb"], "jsonb", Nullable>,
-		Sig<["jsonb", "jsonpath", "jsonb", "bool"], "jsonb", Nullable>,
-	];
+	jsonb_path_exists: OptionalArgs<
+		["jsonb", "jsonpath"],
+		["jsonb", "bool"],
+		"bool"
+	>;
+	jsonb_path_match: FunctionCatalog["jsonb_path_exists"];
+	jsonb_path_query: OptionalArgs<
+		["jsonb", "jsonpath"],
+		["jsonb", "bool"],
+		"jsonb",
+		Srf
+	>;
+	jsonb_path_query_array: OptionalArgs<
+		["jsonb", "jsonpath"],
+		["jsonb", "bool"],
+		"jsonb"
+	>;
+	jsonb_path_query_first: OptionalArgs<
+		["jsonb", "jsonpath"],
+		["jsonb", "bool"],
+		"jsonb",
+		Nullable
+	>;
+	jsonb_path_exists_tz: FunctionCatalog["jsonb_path_exists"];
+	jsonb_path_match_tz: FunctionCatalog["jsonb_path_exists"];
+	jsonb_path_query_tz: FunctionCatalog["jsonb_path_query"];
+	jsonb_path_query_array_tz: FunctionCatalog["jsonb_path_query_array"];
+	jsonb_path_query_first_tz: FunctionCatalog["jsonb_path_query_first"];
 	json_array_elements: Sig<["json"], "$jelem:json", Srf>;
 	jsonb_array_elements: Sig<["jsonb"], "$jelem:jsonb", Srf>;
 	json_array_elements_text: Sig<["json"], "text", SrfNullable>;
 	jsonb_array_elements_text: Sig<["jsonb"], "text", SrfNullable>;
 	json_object_keys: Sig<["json"], "text", Srf>;
 	jsonb_object_keys: Sig<["jsonb"], "text", Srf>;
-	row_to_json: [Sig<["any"], "$jval:json">, Sig<["any", "bool"], "$jval:json">];
-	json_populate_record: [
-		Sig<["any", "json"], "$1">,
-		Sig<["any", "json", "bool"], "$1">,
-	];
+	row_to_json: OptionalArgs<["any"], ["bool"], "$jval:json">;
+	json_populate_record: OptionalArgs<["any", "json"], ["bool"], "$1">;
 	jsonb_populate_record: Sig<["any", "jsonb"], "$1">;
-	json_populate_recordset: [
-		Sig<["any", "json"], "$1", Srf>,
-		Sig<["any", "json", "bool"], "$1", Srf>,
-	];
+	json_populate_recordset: OptionalArgs<["any", "json"], ["bool"], "$1", Srf>;
 	jsonb_populate_recordset: Sig<["any", "jsonb"], "$1", Srf>;
 	json_to_record: Sig<["json"], "record">;
 	jsonb_to_record: Sig<["jsonb"], "record">;
@@ -876,30 +764,16 @@ export interface FunctionCatalog {
 		Sig<["anystring"], "tsquery">,
 		Sig<["any", "anystring"], "tsquery">,
 	];
-	plainto_tsquery: [
-		Sig<["anystring"], "tsquery">,
-		Sig<["any", "anystring"], "tsquery">,
-	];
-	phraseto_tsquery: [
-		Sig<["anystring"], "tsquery">,
-		Sig<["any", "anystring"], "tsquery">,
-	];
-	websearch_to_tsquery: [
-		Sig<["anystring"], "tsquery">,
-		Sig<["any", "anystring"], "tsquery">,
-	];
+	plainto_tsquery: FunctionCatalog["to_tsquery"];
+	phraseto_tsquery: FunctionCatalog["to_tsquery"];
+	websearch_to_tsquery: FunctionCatalog["to_tsquery"];
 	ts_rank: [
 		Sig<["tsvector", "tsquery"], "float4">,
 		Sig<["tsvector", "tsquery", "int4"], "float4">,
 		Sig<["float4[]", "tsvector", "tsquery"], "float4">,
 		Sig<["float4[]", "tsvector", "tsquery", "int4"], "float4">,
 	];
-	ts_rank_cd: [
-		Sig<["tsvector", "tsquery"], "float4">,
-		Sig<["tsvector", "tsquery", "int4"], "float4">,
-		Sig<["float4[]", "tsvector", "tsquery"], "float4">,
-		Sig<["float4[]", "tsvector", "tsquery", "int4"], "float4">,
-	];
+	ts_rank_cd: FunctionCatalog["ts_rank"];
 	ts_headline: [
 		Sig<["anystring", "tsquery"], "text">,
 		Sig<["anystring", "tsquery", "anystring"], "text">,
@@ -910,10 +784,7 @@ export interface FunctionCatalog {
 		Sig<["any", "anyjson", "tsquery"], "$2">,
 		Sig<["any", "anyjson", "tsquery", "anystring"], "$2">,
 	];
-	setweight: [
-		Sig<["tsvector", "anystring"], "tsvector">,
-		Sig<["tsvector", "anystring", "text[]"], "tsvector">,
-	];
+	setweight: OptionalArgs<["tsvector", "anystring"], ["text[]"], "tsvector">;
 	strip: Sig<["tsvector"], "tsvector">;
 	numnode: Sig<["tsquery"], "int4">;
 	querytree: Sig<["tsquery"], "text">;
@@ -928,10 +799,7 @@ export interface FunctionCatalog {
 		Sig<["tsquery", "anystring"], "tsquery">,
 		Sig<["tsquery", "tsquery", "tsquery"], "tsquery">,
 	];
-	tsquery_phrase: [
-		Sig<["tsquery", "tsquery"], "tsquery">,
-		Sig<["tsquery", "tsquery", "int4"], "tsquery">,
-	];
+	tsquery_phrase: OptionalArgs<["tsquery", "tsquery"], ["int4"], "tsquery">;
 	get_current_ts_config: Sig<[], "regconfig", NN>;
 	ts_lexize: Sig<["any", "anystring"], "text[]", Nullable>;
 
@@ -944,30 +812,22 @@ export interface FunctionCatalog {
 		Sig<["anyrange", "anyrange"], "$1">,
 		Sig<["anyrange"], "$elem1">,
 	];
-	int4range: [
-		Sig<["int4", "int4"], "int4range", NN>,
-		Sig<["int4", "int4", "anystring"], "int4range", NN>,
-	];
-	int8range: [
-		Sig<["int8", "int8"], "int8range", NN>,
-		Sig<["int8", "int8", "anystring"], "int8range", NN>,
-	];
-	numrange: [
-		Sig<["numeric", "numeric"], "numrange", NN>,
-		Sig<["numeric", "numeric", "anystring"], "numrange", NN>,
-	];
-	tsrange: [
-		Sig<["timestamp", "timestamp"], "tsrange", NN>,
-		Sig<["timestamp", "timestamp", "anystring"], "tsrange", NN>,
-	];
-	tstzrange: [
-		Sig<["timestamptz", "timestamptz"], "tstzrange", NN>,
-		Sig<["timestamptz", "timestamptz", "anystring"], "tstzrange", NN>,
-	];
-	daterange: [
-		Sig<["date", "date"], "daterange", NN>,
-		Sig<["date", "date", "anystring"], "daterange", NN>,
-	];
+	int4range: OptionalArgs<["int4", "int4"], ["anystring"], "int4range", NN>;
+	int8range: OptionalArgs<["int8", "int8"], ["anystring"], "int8range", NN>;
+	numrange: OptionalArgs<["numeric", "numeric"], ["anystring"], "numrange", NN>;
+	tsrange: OptionalArgs<
+		["timestamp", "timestamp"],
+		["anystring"],
+		"tsrange",
+		NN
+	>;
+	tstzrange: OptionalArgs<
+		["timestamptz", "timestamptz"],
+		["anystring"],
+		"tstzrange",
+		NN
+	>;
+	daterange: OptionalArgs<["date", "date"], ["anystring"], "daterange", NN>;
 	int4multirange: Sig<["..."], "int4multirange", NN>;
 	int8multirange: Sig<["..."], "int8multirange", NN>;
 	nummultirange: Sig<["..."], "nummultirange", NN>;
@@ -978,17 +838,11 @@ export interface FunctionCatalog {
 
 	enum_first: Sig<["any"], "$1", NN>;
 	enum_last: Sig<["any"], "$1", NN>;
-	enum_range: [Sig<["any"], "$arr1", NN>, Sig<["any", "any"], "$arr1", NN>];
+	enum_range: OptionalArgs<["any"], ["any"], "$arr1", NN>;
 
 	xmlexists: Sig<["text", "xml"], "bool">;
-	xpath: [
-		Sig<["text", "xml"], "xml[]">,
-		Sig<["text", "xml", "text[]"], "xml[]">,
-	];
-	xpath_exists: [
-		Sig<["text", "xml"], "bool">,
-		Sig<["text", "xml", "text[]"], "bool">,
-	];
+	xpath: OptionalArgs<["text", "xml"], ["text[]"], "xml[]">;
+	xpath_exists: OptionalArgs<["text", "xml"], ["text[]"], "bool">;
 	xmlcomment: Sig<["text"], "xml">;
 	xmltext: Sig<["text"], "xml">;
 	xml_is_well_formed: Sig<["text"], "bool">;
@@ -1046,94 +900,53 @@ export type MatchKind<P extends string, A extends string> = A extends
 			: "c"
 		: P extends "any" | "..."
 			? "c"
-			: P extends "anynumeric"
-				? A extends NumT
+			: P extends keyof PolyCat
+				? A extends PolyCat[P]
 					? "x"
 					: false
-				: P extends "anystring"
-					? A extends StrT
-						? "x"
-						: false
-					: P extends "anyarray"
-						? A extends `${string}[]`
-							? "x"
-							: false
-						: P extends "anyjson"
-							? A extends JsonT
-								? "x"
+				: A extends P
+					? "x"
+					: A extends "text"
+						? "c"
+						: P extends `${infer PE}[]`
+							? A extends `${infer AE}[]`
+								? MatchKind<PE, AE> extends false
+									? false
+									: "c"
 								: false
-							: P extends "anydatetime"
-								? A extends DateTimeT
-									? "x"
+							: P extends keyof ImplicitFrom
+								? A extends ImplicitFrom[P]
+									? "c"
 									: false
-								: P extends "anyrange"
-									? A extends RangeT
-										? "x"
-										: false
-									: A extends P
-										? "x"
-										: A extends "text"
-											? "c"
-											: P extends `${infer PE}[]`
-												? A extends `${infer AE}[]`
-													? MatchKind<PE, AE> extends false
-														? false
-														: "c"
-													: false
-												: P extends "int4"
-													? A extends "int2"
-														? "c"
-														: false
-													: P extends "int8"
-														? A extends "int2" | "int4"
-															? "c"
-															: false
-														: P extends "numeric"
-															? A extends IntT
-																? "c"
-																: false
-															: P extends "float4"
-																? A extends IntT | "numeric"
-																	? "c"
-																	: false
-																: P extends "float8"
-																	? A extends IntT | "numeric" | "float4"
-																		? "c"
-																		: false
-																	: P extends "text" | "varchar" | "bpchar"
-																		? A extends StrT
-																			? "c"
-																			: false
-																		: P extends "timestamptz"
-																			? A extends "date" | "timestamp"
-																				? "c"
-																				: false
-																			: P extends "timestamp"
-																				? A extends "date"
-																					? "c"
-																					: false
-																				: P extends "timetz"
-																					? A extends "time"
-																						? "c"
-																						: false
-																					: P extends "interval"
-																						? A extends "time"
-																							? "c"
-																							: false
-																						: P extends "inet"
-																							? A extends "cidr"
-																								? "c"
-																								: false
-																							: P extends
-																										| "oid"
-																										| "regclass"
-																										| "regtype"
-																										| "regproc"
-																										| "regconfig"
-																								? A extends IntT
-																									? "c"
-																									: false
-																								: false;
+								: false;
+type PolyCat = {
+	anynumeric: NumT;
+	anystring: StrT;
+	anyarray: `${string}[]`;
+	anyjson: JsonT;
+	anydatetime: DateTimeT;
+	anyrange: RangeT;
+};
+type ImplicitFrom = {
+	int4: "int2";
+	int8: "int2" | "int4";
+	numeric: IntT;
+	float4: IntT | "numeric";
+	float8: IntT | "numeric" | "float4";
+	text: StrT;
+	varchar: StrT;
+	bpchar: StrT;
+	timestamptz: "date" | "timestamp";
+	timestamp: "date";
+	timetz: "time";
+	interval: "time";
+	inet: "cidr";
+	oid: IntT;
+	regclass: IntT;
+	regtype: IntT;
+	regproc: IntT;
+	regconfig: IntT;
+};
 
 type ArgsMatch<
 	Ps extends readonly string[],
@@ -1149,13 +962,11 @@ type ArgsMatch<
 				infer A extends ColInfo,
 				...infer AR extends readonly ColInfo[],
 			]
-			? MatchKind<P, A["type"]> extends infer K
-				? K extends "x"
-					? ArgsMatch<PR, AR, [...Score, 0]>
-					: K extends "c"
-						? ArgsMatch<PR, AR, Score>
-						: false
-				: never
+			? MatchKind<P, A["type"]> extends "x"
+				? ArgsMatch<PR, AR, [...Score, 0]>
+				: MatchKind<P, A["type"]> extends "c"
+					? ArgsMatch<PR, AR, Score>
+					: false
 			: false
 		: As extends readonly []
 			? Score
@@ -1170,15 +981,13 @@ type BestSig<
 	infer S extends AnySig,
 	...infer R extends readonly AnySig[],
 ]
-	? ArgsMatch<S["args"], As, []> extends infer K
-		? K extends readonly unknown[]
-			? Best extends null
+	? ArgsMatch<S["args"], As, []> extends infer K extends readonly unknown[]
+		? Best extends null
+			? BestSig<R, As, S, K>
+			: K extends readonly [...BestScore, unknown, ...unknown[]]
 				? BestSig<R, As, S, K>
-				: K extends readonly [...BestScore, unknown, ...unknown[]]
-					? BestSig<R, As, S, K>
-					: BestSig<R, As, Best, BestScore>
-			: BestSig<R, As, Best, BestScore>
-		: never
+				: BestSig<R, As, Best, BestScore>
+		: BestSig<R, As, Best, BestScore>
 	: Best;
 
 type ArityFallback<
@@ -1204,17 +1013,15 @@ type ArityOk<
 		: false;
 
 export type PickSig<Sigs, As extends readonly ColInfo[]> =
-	BestSig<ToList<Sigs>, As, null, []> extends infer S
-		? S extends AnySig
-			? S
-			: ArityFallback<ToList<Sigs>, As>
-		: never;
+	BestSig<ToList<Sigs>, As, null, []> extends AnySig
+		? BestSig<ToList<Sigs>, As, null, []>
+		: ArityFallback<ToList<Sigs>, As>;
 
 type TypeAt<
 	As extends readonly ColInfo[],
 	I extends number,
 > = As[I] extends ColInfo ? LitToText<As[I]["type"]> : "unknown";
-type CommonOf<
+export type CommonOf<
 	As extends readonly ColInfo[],
 	Acc extends string,
 > = As extends readonly [
@@ -1270,47 +1077,42 @@ type CallCtx = {
 	readonly untypedFirst?: boolean;
 };
 
+type RetArg = { $1: 0; $2: 1; $3: 2; $4: 3 };
 type Ret<
 	R extends string,
 	As extends readonly ColInfo[],
 	C extends { readonly wg: string },
 > = R extends `$${string}`
-	? R extends "$1"
-		? TypeAt<As, 0>
-		: R extends "$2"
-			? TypeAt<As, 1>
-			: R extends "$3"
-				? TypeAt<As, 2>
-				: R extends "$4"
-					? TypeAt<As, 3>
-					: R extends "$elem1"
-						? ElemOf<TypeAt<As, 0>>
-						: R extends "$arr1"
-							? ArrOf<TypeAt<As, 0>>
-							: R extends "$common"
-								? CommonOf<As, "unknown">
-								: R extends "$rangeelem1"
-									? RangeElem<TypeAt<As, 0>>
-									: R extends "$multirange1"
-										? MultirangeOf<TypeAt<As, 0>>
-										: R extends "$wg"
-											? C["wg"]
-											: R extends "$wgarr"
-												? ArrOf<C["wg"]>
-												: R extends "$pct"
-													? C["wg"] extends "interval"
-														? "interval"
-														: "float8"
-													: R extends "$pctarr"
-														? C["wg"] extends "interval"
-															? "interval[]"
-															: "float8[]"
-														: R extends `$j${infer P}`
-															? JsonRet<P, As>
-															: R
+	? R extends keyof RetArg
+		? TypeAt<As, RetArg[R]>
+		: R extends "$elem1"
+			? ElemOf<TypeAt<As, 0>>
+			: R extends "$arr1"
+				? ArrOf<TypeAt<As, 0>>
+				: R extends "$common"
+					? CommonOf<As, "unknown">
+					: R extends "$rangeelem1"
+						? RangeElem<TypeAt<As, 0>>
+						: R extends "$multirange1"
+							? MultirangeOf<TypeAt<As, 0>>
+							: R extends "$wg"
+								? C["wg"]
+								: R extends "$wgarr"
+									? ArrOf<C["wg"]>
+									: R extends "$pct"
+										? C["wg"] extends "interval"
+											? "interval"
+											: "float8"
+										: R extends "$pctarr"
+											? C["wg"] extends "interval"
+												? "interval[]"
+												: "float8[]"
+											: R extends `$j${infer P}`
+												? JsonRet<P, As>
+												: R
 	: R;
 
-type AnyNullable<As extends readonly ColInfo[]> = As extends readonly [
+export type AnyNullable<As extends readonly ColInfo[]> = As extends readonly [
 	infer A extends ColInfo,
 	...infer R extends readonly ColInfo[],
 ]
@@ -1318,7 +1120,7 @@ type AnyNullable<As extends readonly ColInfo[]> = As extends readonly [
 		? true
 		: AnyNullable<R>
 	: false;
-type AllNullable<As extends readonly ColInfo[]> = As extends readonly [
+export type AllNullable<As extends readonly ColInfo[]> = As extends readonly [
 	infer A extends ColInfo,
 	...infer R extends readonly ColInfo[],
 ]
@@ -1402,21 +1204,18 @@ type ElemsNullable<
 		? true
 		: false;
 /** A returned argument keeps its elements (array_sample, coalesce, …). */
-type PassedElems<R extends string, As extends readonly ColInfo[]> = R extends
-	| "$1"
-	| "$arr1"
+type PassedElems<
+	R extends string,
+	As extends readonly ColInfo[],
+> = R extends "$arr1"
 	? HasNullElems<As[0]>
-	: R extends "$2"
-		? HasNullElems<As[1]>
-		: R extends "$3"
-			? HasNullElems<As[2]>
-			: R extends "$4"
-				? HasNullElems<As[3]>
-				: R extends "$common"
-					? HasNullElems<As[number]> extends false
-						? false
-						: true
-					: false;
+	: R extends keyof RetArg
+		? HasNullElems<As[RetArg[R]]>
+		: R extends "$common"
+			? HasNullElems<As[number]> extends false
+				? false
+				: true
+			: false;
 /** An element taken out of an array whose elements can be NULL (unnest). */
 type ElemRetNull<
 	S extends AnySig,
@@ -1476,27 +1275,22 @@ export type CallType<
 	C extends CallCtx,
 	DB = {},
 > =
-	LookupFn<DB, Name> extends infer O
-		? O extends null
-			? UnknownFunction<Name, As>
-			: PickSig<O, As> extends infer S
-				? S extends AnySig
-					? CallMisuse<Name, S, As, C> extends infer M extends string
-						? SqlError<M, null>
-						: UnknownPolymorphic<Name, As, C> extends true
-							? SqlError<
-									"could not determine polymorphic type because input has type unknown",
-									null
-								>
-							: S["ret"] extends "$common"
-								? CommonMismatch<Name, As, "unknown"> extends infer M extends
-										string
-									? SqlError<M, null>
-									: CallInfo<Name, S, As, C>
-								: CallInfo<Name, S, As, C>
-					: Info<"unknown", true>
-				: never
-		: never;
+	LookupFn<DB, Name> extends null
+		? UnknownFunction<Name, As>
+		: PickSig<LookupFn<DB, Name>, As> extends infer S extends AnySig
+			? CallMisuse<Name, S, As, C> extends infer M extends string
+				? SqlError<M, null>
+				: UnknownPolymorphic<Name, As, C> extends true
+					? SqlError<
+							"could not determine polymorphic type because input has type unknown",
+							null
+						>
+					: S["ret"] extends "$common"
+						? CommonMismatch<Name, As, "unknown"> extends infer M extends string
+							? SqlError<M, null>
+							: CallInfo<Name, S, As, C>
+						: CallInfo<Name, S, As, C>
+			: Info<"unknown", true>;
 
 /** An anyelement argument that only an untyped literal or NULL fills. */
 type UnknownPolymorphic<
@@ -1586,16 +1380,16 @@ export type SrfType<
 	As extends readonly ColInfo[],
 	DB = {},
 > =
-	PickSig<LookupFn<DB, Name>, As> extends infer S
-		? S extends AnySig & { readonly srf: true }
-			? ArrInfo<
-					Ret<S["ret"], As, { readonly wg: "unknown" }>,
-					S["nullable"] extends true
+	PickSig<LookupFn<DB, Name>, As> extends infer S extends AnySig & {
+		readonly srf: true;
+	}
+		? ArrInfo<
+				Ret<S["ret"], As, { readonly wg: "unknown" }>,
+				S["nullable"] extends true
+					? true
+					: AnyNullable<As> extends true
 						? true
-						: AnyNullable<As> extends true
-							? true
-							: ElemRetNull<S, As>,
-					RetElemsNull<S, As>
-				>
-			: null
-		: never;
+						: ElemRetNull<S, As>,
+				RetElemsNull<S, As>
+			>
+		: null;

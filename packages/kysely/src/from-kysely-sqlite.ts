@@ -1,11 +1,12 @@
 import type { Typed, View } from "@typesql/core/sqlite";
 import type {
 	ColumnOverrideOf,
-	HasDefault,
+	HasDefaultOf,
 	Hint,
 	KyselyOptions,
 	KyselyOverrides,
 	LiteralUnion,
+	NullableOf,
 	OverrideType,
 	Sel,
 	Sn,
@@ -36,18 +37,8 @@ type Column<T, V> = {
 	readonly type: [OverrideType<V>] extends [never]
 		? SqliteTypeOf<NonNullable<Sel<T>>, Exclude<Hint<T>, null | undefined>>
 		: OverrideType<V>;
-	readonly nullable: [V] extends [
-		{ readonly nullable: infer B extends boolean },
-	]
-		? B
-		: null extends Sel<T>
-			? true
-			: false;
-	readonly hasDefault: [V] extends [
-		{ readonly hasDefault: infer B extends boolean },
-	]
-		? B
-		: HasDefault<T>;
+	readonly nullable: NullableOf<T, V>;
+	readonly hasDefault: HasDefaultOf<T, V>;
 };
 
 type SqliteTypeOf<S, H> = unknown extends S

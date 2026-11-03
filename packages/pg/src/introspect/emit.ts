@@ -1,3 +1,8 @@
+import {
+	colSource,
+	propertyKey as key,
+	schemaMembers,
+} from "@typesql/core/adapter";
 import type {
 	IntrospectedColumn,
 	IntrospectedDatabase,
@@ -21,9 +26,6 @@ export interface GenerateOptions {
 	readonly comments?: boolean;
 }
 
-const IDENT = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
-const key = (name: string): string =>
-	IDENT.test(name) ? name : JSON.stringify(name);
 const str = (s: string): string => JSON.stringify(s);
 
 function doc(lines: readonly string[], indent: string): string {
@@ -107,12 +109,8 @@ export function generateSource(
 				const custom = customType(rel, c);
 				if (custom !== undefined) descriptor = jsonDescriptor(c, custom);
 				else {
-					const flags = flagsOf(c);
 					used.add("Col");
-					descriptor =
-						flags.length > 0
-							? `Col<${str(c.type)}, { ${flags.join("; ")} }>`
-							: `Col<${str(c.type)}>`;
+					descriptor = colSource(str(c.type), c.nullable, c.hasDefault);
 				}
 			}
 			return `${comments ? doc(columnNotes(c), `${indent}  `) : ""}${indent}  ${key(c.name)}: ${descriptor};`;
@@ -143,27 +141,17 @@ export function generateSource(
 			throw new Error(
 				`"${reserved}" is a relation or schema name, but TypeSQL's schema uses the key ${reserved}; leave it out with --exclude '${reserved}'`,
 			);
-	const lines: string[] = [];
-	const namespaces = new Map<string, IntrospectedRelation[]>();
-	for (const rel of db.relations) {
-		if (rel.schema === "public")
-			lines.push(
-				`${relDoc(rel, "  ")}  ${key(rel.name)}: ${relation(rel, "  ")};`,
-			);
-		else
-			namespaces.set(rel.schema, [...(namespaces.get(rel.schema) ?? []), rel]);
-	}
-	for (const [schema, rels] of namespaces) {
-		if (topLevel.has(schema)) {
-			throw new Error(
-				`schema "${schema}" has the same name as the table "public.${schema}": TypeSQL keeps public relations and schemas in one object`,
-			);
-		}
-		const body = rels.map(
-			(r) => `${relDoc(r, "    ")}    ${key(r.name)}: ${relation(r, "    ")};`,
-		);
-		lines.push(`  ${key(schema)}: {\n${body.join("\n")}\n  };`);
-	}
+	const lines = schemaMembers(
+		db.relations,
+		(rel) => rel.schema,
+		(rel, indent) => {
+			if (rel.schema !== "public" && topLevel.has(rel.schema))
+				throw new Error(
+					`schema "${rel.schema}" has the same name as the table "public.${rel.schema}": TypeSQL keeps public relations and schemas in one object`,
+				);
+			return `${relDoc(rel, indent)}${indent}${key(rel.name)}: ${relation(rel, indent)};`;
+		},
+	);
 
 	if (db.enums.length > 0) {
 		const byName = new Map<

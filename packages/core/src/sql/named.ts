@@ -1,3 +1,4 @@
+import type { Digit, IdStart } from "../engine/chars.js";
 import type { SqlError } from "../errors.js";
 import type { Opaque, SplitFirst } from "./inline.js";
 import type { MaxParamStr } from "./splice.js";
@@ -121,7 +122,7 @@ type DollarOpen<
 > = S extends `${infer A}$${infer B}`
 	? B extends `$${infer R}`
 		? [`${Acc}${A}`, "$$", R]
-		: B extends `${infer C extends NStart}${infer R}`
+		: B extends `${infer C extends IdStart}${infer R}`
 			? TakeName<R, C> extends [infer Tag extends string, `$${infer R2}`]
 				? [`${Acc}${A}`, `$${Tag}$`, R2]
 				: DollarOpen<B, `${Acc}${A}$`>
@@ -132,61 +133,7 @@ type DollarBody<
 	Tag extends string,
 > = S extends `${infer Body}${Tag}${infer R}` ? [`${Body}${Tag}`, R] : [S, ""];
 
-type NStart =
-	| "a"
-	| "b"
-	| "c"
-	| "d"
-	| "e"
-	| "f"
-	| "g"
-	| "h"
-	| "i"
-	| "j"
-	| "k"
-	| "l"
-	| "m"
-	| "n"
-	| "o"
-	| "p"
-	| "q"
-	| "r"
-	| "s"
-	| "t"
-	| "u"
-	| "v"
-	| "w"
-	| "x"
-	| "y"
-	| "z"
-	| "A"
-	| "B"
-	| "C"
-	| "D"
-	| "E"
-	| "F"
-	| "G"
-	| "H"
-	| "I"
-	| "J"
-	| "K"
-	| "L"
-	| "M"
-	| "N"
-	| "O"
-	| "P"
-	| "Q"
-	| "R"
-	| "S"
-	| "T"
-	| "U"
-	| "V"
-	| "W"
-	| "X"
-	| "Y"
-	| "Z"
-	| "_";
-type NChar = NStart | "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9";
+type NChar = IdStart | Digit;
 
 type RewriteCode<
 	S extends string,
@@ -195,7 +142,7 @@ type RewriteCode<
 > = S extends `${infer Pre}:${infer Rest}`
 	? Rest extends `:${infer Rest2}`
 		? RewriteCode<Rest2, `${Acc}${Pre}::`, Names>
-		: Rest extends `${infer C extends NStart}${infer Rest2}`
+		: Rest extends `${infer C extends IdStart}${infer Rest2}`
 			? TakeName<Rest2, C> extends [
 					infer Name extends string,
 					infer Rest3 extends string,

@@ -75,62 +75,71 @@ pattern unparenthesized($inner) {
 	}
 }
 
+// Regex literals are wrapped in `or` because Grit rejects them as bare pattern arguments.
+pattern imports_from($local, $module, $export) {
+	and { contains JsModuleSource() as $source where { $source <: $module },
+	contains or {
+		JsShorthandNamedImportSpecifier(local_name=$binding) where {
+			$binding <: $export
+		},
+		JsNamedImportSpecifier(name=$imported, local_name=$binding) where {
+			$imported <: $export
+		}
+	} where { $binding <: $local } }
+}
+
 pattern framework_import($local) {
 	JsImport() as $import where {
 		$import <: or {
-			and { contains JsModuleSource() as $source where {
-				$source <: r"[\"']vitest[\"']"
-			},
-			contains or {
-				JsShorthandNamedImportSpecifier(local_name=$binding) where {
-					$binding <: "vi"
-				},
-				JsNamedImportSpecifier(name=$imported, local_name=$binding) where {
-					$imported <: "vi"
-				}
-			} where { $binding <: $local } },
-			and { contains JsModuleSource() as $source where {
-				$source <: r"[\"']@jest/globals[\"']"
-			},
-			contains or {
-				JsShorthandNamedImportSpecifier(local_name=$binding) where {
-					$binding <: "jest"
-				},
-				JsNamedImportSpecifier(name=$imported, local_name=$binding) where {
-					$imported <: "jest"
-				}
-			} where { $binding <: $local } }
+			imports_from($local, or { r"[\"']vitest[\"']" }, "vi"),
+			imports_from($local, or { r"[\"']@jest/globals[\"']" }, "jest")
 		}
 	}
 }
 
-JsCallExpression(callee=unparenthesized(or {
-	JsStaticMemberExpression(object=unparenthesized(JsIdentifierExpression(name=$name)), member=$member) where {
-		$member <: or {
-			"doMock",
-			"mock",
-			"unstable_mockModule"
-		}
-	},
-	JsComputedMemberExpression(object=unparenthesized(JsIdentifierExpression(name=$name)), member=$member) where {
-		$member <: r"[\"'](?:doMock|mock|unstable_mockModule)[\"']"
-	}
-})) as $call where {
-	or {
-		and {
-			$name <: or {
-				"vi",
-				"jest"
-			},
-			$call <: not within binds_value($name)
+pattern member_call($object, $member_name, $quoted_member) {
+	JsCallExpression(callee=unparenthesized(or {
+		JsStaticMemberExpression(object=unparenthesized(JsIdentifierExpression(name=$object)), member=$member) where {
+			$member <: $member_name
 		},
-		and {
-			$call <: within JsModule(items=some framework_import($name)),
-			$call <: not within $scope where {
-				$scope <: binds_value($name),
-				$scope <: not JsModule()
-			}
+		JsComputedMemberExpression(object=unparenthesized(JsIdentifierExpression(name=$object)), member=$member) where {
+			$member <: $quoted_member
 		}
+	}))
+}
+
+or {
+	member_call($name, "apply", or { r"[\"']apply[\"']" }) as $call where {
+		$name <: "Reflect",
+		$call <: not within binds_value($name),
+		register_diagnostic(span=$call, message="Replace `Reflect.apply` with a typed function call. Model dynamic dispatch behind a named interface.", severity="error")
 	},
-	register_diagnostic(span=$call, message="Replace module mocking with dependency injection through a real interface, service layer, or faithful test implementation.", severity="error")
+	member_call($name, "get", or { r"[\"']get[\"']" }) as $call where {
+		$name <: "Reflect",
+		$call <: not within binds_value($name),
+		register_diagnostic(span=$call, message="Replace `Reflect.get` with typed property access. Parse dynamic input into a named domain type before reading it.", severity="error")
+	},
+	member_call($name, or {
+		"doMock",
+		"mock",
+		"unstable_mockModule"
+	}, or { r"[\"'](?:doMock|mock|unstable_mockModule)[\"']" }) as $call where {
+		or {
+			and {
+				$name <: or {
+					"vi",
+					"jest"
+				},
+				$call <: not within binds_value($name)
+			},
+			and {
+				$call <: within JsModule(items=some framework_import($name)),
+				$call <: not within $scope where {
+					$scope <: binds_value($name),
+					$scope <: not JsModule()
+				}
+			}
+		},
+		register_diagnostic(span=$call, message="Replace module mocking with dependency injection through a real interface, service layer, or faithful test implementation.", severity="error")
+	}
 }

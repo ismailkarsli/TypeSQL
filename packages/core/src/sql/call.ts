@@ -25,53 +25,14 @@ type ArgsFor<
 	Names extends string[],
 	Encs extends readonly unknown[],
 	M extends number,
+	S,
 > = Names extends []
 	? M extends 0
 		? []
-		: Encs extends readonly []
+		: [S, Encs] extends [null, readonly []]
 			? ArgsOf<E, DB, TM, X>
 			: Take<ArgsOf<E, DB, TM, X>, M>
 	: [params: NamedParams<Names, Take<ArgsOf<E, DB, TM, X>, Names["length"]>>];
-
-type CallCheck<E extends EngineTypes, DB, TM, Q extends string> =
-	IsLiteral<Q> extends false
-		? SqlError<NotLiteralMessage, 0>
-		: Prepared<Q> extends infer P
-			? P extends [
-					infer X extends string,
-					string[],
-					infer Encs extends readonly string[],
-					infer M extends number,
-				]
-				? Validate<E, DB, X> extends infer V
-					? V extends AnyErr
-						? V
-						: Carried<E, DB, TM, X, [...Skip<M>, ...Encs]> extends infer K
-							? K extends AnyErr
-								? K
-								: DefaultsCheck<E, DB, Q, null>
-							: never
-					: never
-				: P
-			: never;
-
-/**
- * Any arguments when the statement is invalid: an arity mismatch would
- * otherwise be reported instead of the statement's SqlError.
- */
-type CallArgs<E extends EngineTypes, DB, TM, Q extends string> =
-	IsLiteral<Q> extends false
-		? readonly unknown[]
-		: Prepared<Q> extends [
-					infer X extends string,
-					infer Names extends string[],
-					infer Encs extends readonly string[],
-					infer M extends number,
-				]
-			? Validate<E, DB, X> extends AnyErr
-				? readonly unknown[]
-				: ArgsFor<E, DB, TM, X, Names, Encs, M>
-			: readonly unknown[];
 
 type Carried<
 	E extends EngineTypes,
@@ -116,7 +77,7 @@ export type SplicedText<Q extends string> =
 			: never
 		: never;
 
-/** The check of a statement whose `${fragment}`s became slots `S`. */
+/** The check of a statement whose `${fragment}`s became slots `S` (`null`: none). */
 type SpliceCheck<E extends EngineTypes, DB, TM, Q extends string, S> =
 	IsLiteral<Q> extends false
 		? SqlError<NotLiteralMessage, 0>
@@ -127,61 +88,64 @@ type SpliceCheck<E extends EngineTypes, DB, TM, Q extends string, S> =
 					infer Encs extends readonly string[],
 					infer M extends number,
 				]
-				? Splice<T2, SlotTexts<S>> extends infer X
+				? Spliced<T2, S> extends infer X
 					? X extends string
-						? string extends X
-							? SqlError<
-									"dynamic SQL fragment: the statement text is not a literal; use sql.as<Row>() to assert the row type",
-									null
-								>
-							: Validate<E, DB, X> extends infer V
-								? V extends AnyErr
-									? V
-									: Carried<
-												E,
-												DB,
-												TM,
-												X,
-												[
-													...Skip<M>,
-													...Encs,
-													...SpliceCarried<T2, SlotCarried<S>>,
-												]
-											> extends infer K
-										? K extends AnyErr
-											? K
-											: DefaultsCheck<E, DB, Q, S>
-										: never
-								: never
+						? Validate<E, DB, X> extends infer V
+							? V extends AnyErr
+								? V
+								: Carried<
+											E,
+											DB,
+											TM,
+											X,
+											[
+												...Skip<M>,
+												...Encs,
+												...([S] extends [null]
+													? []
+													: SpliceCarried<T2, SlotCarried<S>>),
+											]
+										> extends infer K
+									? K extends AnyErr
+										? K
+										: DefaultsCheck<E, DB, Q, S>
+									: never
+							: never
 						: X
 					: never
 				: P
 			: never;
 
+type Spliced<T2 extends string, S> = [S] extends [null]
+	? T2
+	: Splice<T2, SlotTexts<S>> extends infer X
+		? X extends string
+			? string extends X
+				? SqlError<
+						"dynamic SQL fragment: the statement text is not a literal; use sql.as<Row>() to assert the row type",
+						null
+					>
+				: X
+			: X
+		: never;
+
+/**
+ * Any arguments when the statement is invalid: an arity mismatch would
+ * otherwise be reported instead of the statement's SqlError.
+ */
 type SpliceArgs<E extends EngineTypes, DB, TM, Q extends string, S> =
 	IsLiteral<Q> extends false
 		? readonly unknown[]
 		: Prepared<Q> extends [
 					infer T2 extends string,
 					infer Names extends string[],
-					readonly unknown[],
+					infer Encs extends readonly string[],
 					infer M extends number,
 				]
-			? Splice<T2, SlotTexts<S>> extends infer X extends string
-				? string extends X
+			? Spliced<T2, S> extends infer X extends string
+				? Validate<E, DB, X> extends AnyErr
 					? readonly unknown[]
-					: Validate<E, DB, X> extends AnyErr
-						? readonly unknown[]
-						: Names extends []
-							? M extends 0
-								? []
-								: Take<ArgsOf<E, DB, TM, X>, M>
-							: [
-									params: NamedParams<
-										Names,
-										Take<ArgsOf<E, DB, TM, X>, Names["length"]>
-									>,
-								]
+					: ArgsFor<E, DB, TM, X, Names, Encs, M, S>
 				: readonly unknown[]
 			: readonly unknown[];
 
@@ -203,7 +167,7 @@ type InferredCheck<E extends EngineTypes, DB, TM, Q extends string> = [
 	TM,
 	Q,
 ] extends [infer D, infer M, infer Q2 extends string]
-	? Surface<CallCheck<E, D, M, Q2>>
+	? Surface<SpliceCheck<E, D, M, Q2, null>>
 	: never;
 
 type InlineCheck<E extends EngineTypes, DB, TM, Q extends string> =
@@ -230,7 +194,7 @@ export type BoxCallArgs<E extends EngineTypes, DB, TM, Q extends string> = [
 	? Inlined<Q2> extends null
 		? Extract<
 				{
-					[K in Q2 as `${K}`]: CallArgs<E, DB, TM, K>;
+					[K in Q2 as `${K}`]: SpliceArgs<E, DB, TM, K, null>;
 				}[`${Q2}`],
 				readonly unknown[]
 			>

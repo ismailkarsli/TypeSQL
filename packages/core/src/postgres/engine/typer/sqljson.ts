@@ -1,7 +1,5 @@
 import type {
 	ColInfo,
-	Cols,
-	ColsToMap,
 	CteMap,
 	Ctx,
 	Info,
@@ -10,23 +8,24 @@ import type {
 	ScopeLevel,
 } from "../../../engine/types.js";
 import type { AnyErr, SqlError } from "../../../errors.js";
-import type { Expr, FromJsonTable, SelectStmt } from "../ast.js";
+import type { Expr, FromJsonTable, SelectStmt, Tag } from "../ast.js";
 import type { TypeDisplay } from "../binder/clauses.js";
-import type { CheckAlias, RenameCols } from "../binder/from.js";
+import type { CheckAlias, RenamedLevel } from "../binder/from.js";
 import type { BuildObject, JsonLitCast, JsonRet } from "../json.js";
 import type { Nx } from "../parser/util.js";
 import type { BaseOf } from "../shape.js";
-import type { DateTimeT, NumT } from "./operators.js";
+import type { DateTimeT, NumT, Or } from "./operators.js";
 import type { ParamsOfList, ParamsOfOpt, ParamsOfSelect } from "./params.js";
-import type { FirstColOf, Or, TypeList, TypeOf } from "./typeof.js";
+import type { FirstColOf, TypeList, TypeOf } from "./typeof.js";
 
-export type TypeSqlJson<E extends Expr, C extends Ctx> = E extends TagJsonfmt
-	? TypeFormat<TypeOf<E["e"], C>>
-	: E extends TagIsjson
-		? TypeIsJson<TypeOf<E["e"], C>>
-		: E extends TagJsonagg
-			? AggResult<TypeOf<E["e"], C>, E["ret"]>
-			: TypeFn<E, C>;
+export type TypeSqlJson<E extends Expr, C extends Ctx> =
+	E extends Tag<"jsonfmt">
+		? TypeFormat<TypeOf<E["e"], C>>
+		: E extends Tag<"isjson">
+			? TypeIsJson<TypeOf<E["e"], C>>
+			: E extends Tag<"jsonagg">
+				? AggResult<TypeOf<E["e"], C>, E["ret"]>
+				: TypeFn<E, C>;
 
 type NonString =
 	| NumT
@@ -71,15 +70,15 @@ type AggResult<A, Ret> = A extends ColInfo
 type RetOr<R, D extends string> = R extends string ? R : D;
 
 type TypeFn<E extends Expr, C extends Ctx> =
-	TypeList<E["args"], C, []> extends infer As
-		? As extends readonly ColInfo[]
-			? TypeList<[...E["passing"], ...E["defaults"]], C, []> extends infer Ms
-				? Ms extends readonly ColInfo[]
-					? FnResult<E, As, C>
-					: Ms
-				: never
-			: As
-		: never;
+	TypeList<E["args"], C, []> extends infer As extends readonly ColInfo[]
+		? TypeList<
+				[...E["passing"], ...E["defaults"]],
+				C,
+				[]
+			> extends readonly ColInfo[]
+			? FnResult<E, As, C>
+			: TypeList<[...E["passing"], ...E["defaults"]], C, []>
+		: TypeList<E["args"], C, []>;
 
 type FnResult<
 	E extends Expr,
@@ -152,25 +151,23 @@ type TypeObject<
 	As extends readonly ColInfo[],
 	Absent,
 > =
-	CheckKeys<As, 0> extends infer K
-		? K extends AnyErr
-			? K
-			: BuildObject<
-						R extends "jsonb" ? "jsonb" : "json",
-						Args,
-						As
-					> extends infer O
-				? O extends ColInfo
-					? R extends "json" | "jsonb"
-						? Absent extends true
-							? NullableValue<As, 1> extends true
-								? Info<R>
-								: O
+	CheckKeys<As, 0> extends AnyErr
+		? CheckKeys<As, 0>
+		: BuildObject<
+					R extends "jsonb" ? "jsonb" : "json",
+					Args,
+					As
+				> extends infer O
+			? O extends ColInfo
+				? R extends "json" | "jsonb"
+					? Absent extends true
+						? NullableValue<As, 1> extends true
+							? Info<R>
 							: O
-						: Info<R>
-					: O
-				: never
-		: never;
+						: O
+					: Info<R>
+				: O
+			: never;
 
 type AnyNull<As extends readonly ColInfo[]> =
 	As[number]["nullable"] extends false ? false : true;
@@ -190,27 +187,24 @@ type TypeArrayQuery<R extends string, A> = A extends ColInfo
 	? Info<R extends "json" | "jsonb" ? JsonRet<`arrnn:${R}`, [A]> : R, true>
 	: A;
 
-export type ParamsOfSqlJson<
-	E extends Expr,
-	C extends Ctx,
-	M,
-> = E extends TagJsonfmtIsjson
-	? ParamsOfOpt<E["e"], C, M, Info<"text", true>>
-	: E extends TagJsonagg
-		? ParamsOfOpt<
-				E["e"]["filter"],
-				C,
-				ParamsOfList<E["e"]["args"], C, M, Info<"text", true>>,
-				Info<"bool", true>
-			>
-		: ParamsOfList<
-				[...E["args"], ...E["passing"], ...E["defaults"]],
-				C,
-				E["q"] extends SelectStmt
-					? ParamsOfSelect<E["q"], C["db"], C["scope"], C["ctes"], M>
-					: M,
-				Info<"text", true>
-			>;
+export type ParamsOfSqlJson<E extends Expr, C extends Ctx, M> =
+	E extends Tag<"jsonfmt" | "isjson">
+		? ParamsOfOpt<E["e"], C, M, Info<"text", true>>
+		: E extends Tag<"jsonagg">
+			? ParamsOfOpt<
+					E["e"]["filter"],
+					C,
+					ParamsOfList<E["e"]["args"], C, M, Info<"text", true>>,
+					Info<"bool", true>
+				>
+			: ParamsOfList<
+					[...E["args"], ...E["passing"], ...E["defaults"]],
+					C,
+					E["q"] extends SelectStmt
+						? ParamsOfSelect<E["q"], C["db"], C["scope"], C["ctes"], M>
+						: M,
+					Info<"text", true>
+				>;
 
 export type BindJsonTable<
 	J extends FromJsonTable["jt"],
@@ -220,9 +214,9 @@ export type BindJsonTable<
 	Outer extends Scope,
 	Ctes extends CteMap,
 	Sofar extends ScopeLevel,
-> = J["path"] extends TagStr
-	? DuplicateName<J["names"], never> extends infer D
-		? D extends string
+> =
+	J["path"] extends Tag<"str">
+		? DuplicateName<J["names"], never> extends infer D extends string
 			? SqlError<`duplicate JSON_TABLE column or path name: ${D}`, null>
 			: TypeList<
 						[J["ctx"], ...J["passing"], ...J["defs"]],
@@ -235,30 +229,15 @@ export type BindJsonTable<
 							Sofar
 						> extends infer A
 						? A extends string
-							? (
-									CA extends readonly string[]
-										? RenameCols<J["cols"], CA, [], "JSON_TABLE function">
-										: J["cols"]
-								) extends infer C2
-								? C2 extends Cols
-									? [
-											{
-												readonly alias: A;
-												readonly cols: ColsToMap<C2>;
-												readonly skip: [];
-											},
-										]
-									: C2
-								: never
+							? RenamedLevel<A, J["cols"], CA, "JSON_TABLE function">
 							: A
 						: never
 					: Ts
 				: never
-		: never
-	: SqlError<
-			"only string constants are supported in JSON_TABLE path specification",
-			null
-		>;
+		: SqlError<
+				"only string constants are supported in JSON_TABLE path specification",
+				null
+			>;
 type DuplicateName<Ns extends readonly string[], Seen> = Ns extends readonly [
 	infer N,
 	...infer R extends readonly string[],
@@ -278,9 +257,3 @@ export type ParamsOfJsonTable<
 	M,
 	Info<"text", true>
 >;
-
-type TagJsonfmt = { readonly t: "jsonfmt" };
-type TagIsjson = { readonly t: "isjson" };
-type TagJsonagg = { readonly t: "jsonagg" };
-type TagJsonfmtIsjson = { readonly t: "jsonfmt" | "isjson" };
-type TagStr = { readonly t: "str" };

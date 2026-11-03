@@ -1,12 +1,13 @@
 import type { Col, Typed } from "@typesql/core/sqlite";
 import type {
-	Aliased,
-	Cased,
 	ColumnConfig,
+	ColumnKey,
 	ColumnLike,
+	DbDefault,
 	Flat,
 	FromDrizzleOptions,
 	TableLike,
+	ViewKey,
 	ViewLike,
 } from "./from-drizzle.js";
 
@@ -50,30 +51,19 @@ type ColOf<D extends ColumnConfig> = Col<
 	SqliteTypeOf<D>,
 	{
 		nullable: D["notNull"] extends true ? false : true;
-		hasDefault: D["hasDefault"] extends true
-			? D["hasRuntimeDefault"] extends true
-				? false
-				: true
-			: false;
+		hasDefault: DbDefault<D>;
 		generated: IsGenerated<D>;
 	}
 >;
 
-// See from-drizzle.ts: casing renames only columns whose name is their key.
 type Columns<C, Opts> = {
-	-readonly [K in keyof C as C[K] extends ColumnLike
-		? C[K]["_"]["name"] extends K
-			? Cased<C[K]["_"]["name"], Opts>
-			: C[K]["_"]["name"]
-		: never]: C[K] extends ColumnLike ? ColOf<C[K]["_"]> : never;
+	-readonly [K in keyof C as ColumnKey<C, K, Opts>]: C[K] extends ColumnLike
+		? ColOf<C[K]["_"]>
+		: never;
 };
 
 type ViewColumns<F, Opts> = {
-	-readonly [K in keyof F as F[K] extends ColumnLike
-		? Cased<F[K]["_"]["name"], Opts>
-		: F[K] extends Aliased
-			? K
-			: never]: F[K] extends ColumnLike
+	-readonly [K in keyof F as ViewKey<F, K, Opts>]: F[K] extends ColumnLike
 		? Col<
 				SqliteTypeOf<F[K]["_"]>,
 				{ nullable: F[K]["_"]["notNull"] extends true ? false : true }

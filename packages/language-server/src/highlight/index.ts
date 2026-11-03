@@ -11,7 +11,12 @@ import type {
 	Program,
 	Type,
 } from "typescript/async";
-import { type EditorKinds, isCoreRef, textOf } from "../complete/call.js";
+import {
+	type EditorKinds,
+	isCoreRef,
+	isSqlLiteral,
+	textOf,
+} from "../complete/call.js";
 import { lex, type TokenKind } from "./lex.js";
 
 export type { TokenKind } from "./lex.js";
@@ -131,13 +136,7 @@ function candidate(
 	kinds: EditorKinds,
 ): Candidate | null {
 	const literal = call.arguments[0];
-	if (
-		!literal ||
-		(literal.kind !== kinds.StringLiteral &&
-			literal.kind !== kinds.NoSubstitutionTemplateLiteral &&
-			literal.kind !== kinds.TemplateExpression)
-	)
-		return null;
+	if (!isSqlLiteral(literal, kinds)) return null;
 	const src = file.text;
 	const open = literal.getStart(file);
 	if (MARKER.test(src.slice(literal.pos, open))) return null;

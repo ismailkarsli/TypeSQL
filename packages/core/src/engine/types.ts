@@ -55,7 +55,7 @@ type HasDuplicateNames<
 > = C[I] extends { readonly n: infer N extends string }
 	? N extends Seen
 		? true
-		: HasDuplicateNames<C, Next[I], Seen | N>
+		: HasDuplicateNames<C, Next<I>, Seen | N>
 	: false;
 type UniqueMap<C extends Cols> = {
 	[E in C[number] as E extends { readonly n: infer N extends string }

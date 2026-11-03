@@ -1,6 +1,6 @@
 import type { ColInfo, Cols, Ctx } from "../../../engine/types.js";
 import type { AnyErr, ErrMsg, SqlError } from "../../../errors.js";
-import type { Expr, NamedWindow, Target, WindowSpec } from "../ast.js";
+import type { Expr, NamedWindow, Tag, Target, WindowSpec } from "../ast.js";
 import type { Nx } from "../parser/util.js";
 import type { AnyShaped, BaseOf } from "../shape.js";
 import type { LookupFn } from "../typer/catalog.js";
@@ -39,18 +39,16 @@ export type CheckCondition<
 	C extends Ctx,
 > = E extends null
 	? true
-	: TypeOf<NonNullable<E>, C> extends infer T
-		? T extends ColInfo
-			? T["type"] extends "bool" | "unknown" | "null"
+	: TypeOf<NonNullable<E>, C> extends infer T extends ColInfo
+		? T["type"] extends "bool" | "unknown" | "null"
+			? true
+			: E extends Tag<"str">
 				? true
-				: E extends TagStr
-					? true
-					: SqlError<
-							`argument of ${Clause} must be type boolean, not type ${TypeDisplay<T["type"]>}`,
-							null
-						>
-			: T
-		: never;
+				: SqlError<
+						`argument of ${Clause} must be type boolean, not type ${TypeDisplay<T["type"]>}`,
+						null
+					>
+		: TypeOf<NonNullable<E>, C>;
 
 export type HasStar<C extends Cols> =
 	Extract<C[number], { readonly star: unknown }> extends never ? false : true;
@@ -151,11 +149,9 @@ type Position<
 	: Star extends true
 		? null
 		: P extends `${infer N extends number}`
-			? [null, ...L][N] extends infer X
-				? X extends undefined
-					? SqlError<`${Clause} position ${P} is not in select list`, null>
-					: X
-				: never
+			? [null, ...L][N] extends undefined
+				? SqlError<`${Clause} position ${P} is not in select list`, null>
+				: [null, ...L][N]
 			: never;
 
 type CheckExpr<E extends Expr, C extends Ctx> =
@@ -172,8 +168,8 @@ type ResolveSortKey<
 		infer Neg extends boolean,
 		infer V extends string,
 	]
-		? Ordinal<Neg, V, Clause, TargetExprs<Ts, [], 0>, HasStar<Cs>>
-		: E extends TagConst
+		? Ordinal<Neg, V, Clause, TargetExprs<Ts>, HasStar<Cs>>
+		: E extends Tag<"str" | "bool" | "null">
 			? SqlError<`non-integer constant in ${Clause}`, null>
 			: E extends {
 						readonly t: "col";
@@ -200,28 +196,26 @@ type ResolveGroupKey<
 		infer Neg extends boolean,
 		infer V extends string,
 	]
-		? Ordinal<Neg, V, "GROUP BY", TargetExprs<Ts, [], 0>, HasStar<Cs>>
-		: E extends TagConst
+		? Ordinal<Neg, V, "GROUP BY", TargetExprs<Ts>, HasStar<Cs>>
+		: E extends Tag<"str" | "bool" | "null">
 			? SqlError<"non-integer constant in GROUP BY", null>
 			: E extends {
 						readonly t: "col";
 						readonly tbl: null;
 						readonly name: infer N extends string;
 					}
-				? TypeOf<E, C> extends infer T
-					? T extends ColInfo
-						? E
-						: ErrMsg<T> extends `column "${string}" does not exist`
-							? OutputExprs<Ts, Cs, N, [], 0> extends infer Ms extends
-									readonly unknown[]
-								? Ms extends readonly []
-									? T
-									: AllSame<Ms> extends true
-										? Ms[0]
-										: SqlError<`GROUP BY "${N}" is ambiguous`, null>
-								: never
-							: T
-					: never
+				? TypeOf<E, C> extends ColInfo
+					? E
+					: ErrMsg<TypeOf<E, C>> extends `column "${string}" does not exist`
+						? OutputExprs<Ts, Cs, N, [], 0> extends infer Ms extends
+								readonly unknown[]
+							? Ms extends readonly []
+								? TypeOf<E, C>
+								: AllSame<Ms> extends true
+									? Ms[0]
+									: SqlError<`GROUP BY "${N}" is ambiguous`, null>
+							: never
+						: TypeOf<E, C>
 				: CheckExpr<E, C>;
 
 export type ResolveSortKeys<
@@ -249,11 +243,9 @@ export type CheckGroupBy<
 > = Items extends readonly Expr[]
 	? Items[I] extends undefined
 		? true
-		: ResolveGroupKey<Items[I], Ts, Cs, C> extends infer K
-			? K extends AnyErr
-				? K
-				: CheckGroupBy<Items, Ts, Cs, C, Nx<I>>
-			: never
+		: ResolveGroupKey<Items[I], Ts, Cs, C> extends AnyErr
+			? ResolveGroupKey<Items[I], Ts, Cs, C>
+			: CheckGroupBy<Items, Ts, Cs, C, Nx<I>>
 	: true;
 
 export type CheckDistinctOnOrder<
@@ -296,14 +288,10 @@ export type CheckDistinctOrder<
 	O extends readonly unknown[],
 	Ts extends readonly Target[],
 	Cs extends Cols,
-> = DistinctOrderWalk<O, TargetExprs<Ts, [], 0>, HasStar<Cs>, 0>;
-type TargetExprs<
-	Ts extends readonly Target[],
-	Acc extends readonly unknown[],
-	I extends number,
-> = Ts[I] extends undefined
-	? Acc
-	: TargetExprs<Ts, [...Acc, Ts[I]["e"]], Nx<I>>;
+> = DistinctOrderWalk<O, TargetExprs<Ts>, HasStar<Cs>, 0>;
+export type TargetExprs<Ts extends readonly Target[]> = {
+	readonly [K in keyof Ts]: Ts[K]["e"];
+};
 type DistinctOrderWalk<
 	O extends readonly unknown[],
 	Es extends readonly unknown[],
@@ -315,7 +303,7 @@ type DistinctOrderWalk<
 		? DistinctOrderWalk<O, Es, Star, Nx<I>>
 		: InList<O[I], Es> extends true
 			? DistinctOrderWalk<O, Es, Star, Nx<I>>
-			: [Star, O[I]] extends [true, TagCol]
+			: [Star, O[I]] extends [true, Tag<"col">]
 				? DistinctOrderWalk<O, Es, Star, Nx<I>>
 				: SqlError<
 						"for SELECT DISTINCT, ORDER BY expressions must appear in select list",
@@ -328,18 +316,16 @@ export type CheckOutputOrder<
 	I extends number = 0,
 > = Items[I] extends undefined
 	? true
-	: OutputOrderItem<Items[I], Cs> extends infer R
-		? R extends AnyErr
-			? R
-			: CheckOutputOrder<Items, Cs, Nx<I>>
-		: never;
+	: OutputOrderItem<Items[I], Cs> extends AnyErr
+		? OutputOrderItem<Items[I], Cs>
+		: CheckOutputOrder<Items, Cs, Nx<I>>;
 type OutputOrderItem<E extends Expr, Cs extends Cols> =
 	SignedNum<E, false> extends [
 		infer Neg extends boolean,
 		infer V extends string,
 	]
 		? Ordinal<Neg, V, "ORDER BY", Cs, HasStar<Cs>>
-		: E extends TagConst
+		: E extends Tag<"str" | "bool" | "null">
 			? SqlError<"non-integer constant in ORDER BY", null>
 			: E extends {
 						readonly t: "col";
@@ -348,13 +334,11 @@ type OutputOrderItem<E extends Expr, Cs extends Cols> =
 					}
 				? Tb extends string
 					? SqlError<`missing FROM-clause entry for table "${Tb}"`, null>
-					: OutputNameCount<Cs, N, [], 0> extends infer K
-						? K extends readonly []
-							? SqlError<`column "${N}" does not exist`, null>
-							: K extends readonly [unknown]
-								? true
-								: SqlError<`ORDER BY "${N}" is ambiguous`, null>
-						: never
+					: OutputNameCount<Cs, N, [], 0> extends readonly []
+						? SqlError<`column "${N}" does not exist`, null>
+						: OutputNameCount<Cs, N, [], 0> extends readonly [unknown]
+							? true
+							: SqlError<`ORDER BY "${N}" is ambiguous`, null>
 				: SqlError<"invalid UNION/INTERSECT/EXCEPT ORDER BY clause", null>;
 type OutputNameCount<
 	Cs extends Cols,
@@ -380,51 +364,45 @@ export type CheckWindowClause<
 	? Defs
 	: Ws[I]["name"] extends keyof Defs
 		? SqlError<`window "${Ws[I]["name"]}" is already defined`, null>
-		: CheckWindowSpec<Ws[I]["spec"], Defs, C> extends infer R
-			? R extends boolean
-				? CheckWindowClause<
-						Ws,
-						C,
-						Defs & { readonly [K in Ws[I]["name"]]: R },
-						Nx<I>
-					>
-				: R
-			: never;
+		: CheckWindowSpec<Ws[I]["spec"], Defs, C> extends infer R extends boolean
+			? CheckWindowClause<
+					Ws,
+					C,
+					Defs & { readonly [K in Ws[I]["name"]]: R },
+					Nx<I>
+				>
+			: CheckWindowSpec<Ws[I]["spec"], Defs, C>;
 
 type CheckWindowSpec<
 	S extends WindowSpec,
 	Defs extends WindowDefs,
 	C extends Ctx,
 > =
-	TypeList<S["partition"], C, []> extends infer P
-		? P extends readonly ColInfo[]
-			? TypeList<S["order"], C, []> extends infer O
-				? O extends readonly ColInfo[]
-					? S["name"] extends string
-						? S["name"] extends keyof Defs
-							? S["partition"] extends readonly []
-								? Defs[S["name"]] extends true
-									? S["order"] extends readonly []
-										? true
-										: SqlError<
-												`cannot override ORDER BY clause of window "${S["name"]}"`,
-												null
-											>
-									: S["order"] extends readonly []
-										? false
-										: true
+	TypeList<S["partition"], C, []> extends readonly ColInfo[]
+		? TypeList<S["order"], C, []> extends readonly ColInfo[]
+			? S["name"] extends string
+				? S["name"] extends keyof Defs
+					? S["partition"] extends readonly []
+						? Defs[S["name"]] extends true
+							? S["order"] extends readonly []
+								? true
 								: SqlError<
-										`cannot override PARTITION BY clause of window "${S["name"]}"`,
+										`cannot override ORDER BY clause of window "${S["name"]}"`,
 										null
 									>
-							: SqlError<`window "${S["name"]}" does not exist`, null>
-						: S["order"] extends readonly []
-							? false
-							: true
-					: O
-				: never
-			: P
-		: never;
+							: S["order"] extends readonly []
+								? false
+								: true
+						: SqlError<
+								`cannot override PARTITION BY clause of window "${S["name"]}"`,
+								null
+							>
+					: SqlError<`window "${S["name"]}" does not exist`, null>
+				: S["order"] extends readonly []
+					? false
+					: true
+			: TypeList<S["order"], C, []>
+		: TypeList<S["partition"], C, []>;
 
 export type CheckWindowRefs<
 	Es extends readonly Expr[],
@@ -442,21 +420,17 @@ type CheckWindowRefsAt<
 	I extends number,
 > = Es[I] extends undefined
 	? true
-	: CheckSpecs<Wins<Es[I], []>, Defs, C> extends infer R
-		? R extends AnyErr
-			? R
-			: CheckWindowRefsAt<Es, Defs, C, Nx<I>>
-		: never;
+	: CheckSpecs<Wins<Es[I], []>, Defs, C> extends AnyErr
+		? CheckSpecs<Wins<Es[I], []>, Defs, C>
+		: CheckWindowRefsAt<Es, Defs, C, Nx<I>>;
 type CheckSpecs<
 	Ss,
 	Defs extends WindowDefs,
 	C extends Ctx,
 > = Ss extends readonly [infer S extends WindowSpec, ...infer R]
-	? CheckWindowSpec<S, Defs, C> extends infer X
-		? X extends boolean
-			? CheckSpecs<R, Defs, C>
-			: X
-		: never
+	? CheckWindowSpec<S, Defs, C> extends boolean
+		? CheckSpecs<R, Defs, C>
+		: CheckWindowSpec<S, Defs, C>
 	: true;
 
 type WindowLeaf = {
@@ -551,10 +525,7 @@ type WhenWins<
 	? Acc
 	: WhenWins<L, Wins<L[I]["then"], Wins<L[I]["when"], Acc>>, Nx<I>>;
 
-type TagStr = { readonly t: "str" };
 /** A bare constant other than an integer: a string, `true`/`false` or `NULL`. */
-type TagConst = { readonly t: "str" | "bool" | "null" };
-type TagCol = { readonly t: "col" };
 
 type IsAggName<DB, N extends string> =
 	LookupFn<DB, N> extends infer O
