@@ -361,6 +361,10 @@
   dir: packages/core
   intents:
     - fair-tigers-beam
+"@typesql/core@6.0.0":
+  dir: packages/core
+  intents:
+    - sour-pears-kneel
 "@typesql/drizzle@0.0.2":
   dir: packages/drizzle
   intents:
