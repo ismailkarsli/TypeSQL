@@ -1,5 +1,11 @@
 # typesql
 
+## 3.0.1
+
+### Patch Changes
+
+- The documentation reflects migration tracking and locking, supported driver and editor versions, and the current query APIs.
+
 ## 3.0.0
 
 ### Major Changes

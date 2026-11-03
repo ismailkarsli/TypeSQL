@@ -1,5 +1,14 @@
 # @typesql/postgres
 
+## 5.0.1
+
+### Patch Changes
+
+- The documentation reflects migration tracking and locking, supported driver and editor versions, and the current query APIs.
+
+- Updated dependencies:
+  - @typesql/core@5.0.1
+
 ## 5.0.0
 
 ### Patch Changes

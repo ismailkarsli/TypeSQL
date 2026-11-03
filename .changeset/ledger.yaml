@@ -35,6 +35,10 @@
   dir: packages/cli
   intents:
     - fast-cats-fly
+"@typesql/cli@5.0.1":
+  dir: packages/cli
+  intents:
+    - ancient-eggs-float
 "@typesql/core@0.0.2":
   dir: packages/core
   intents:
@@ -341,6 +345,10 @@
   intents:
     - cool-mugs-grow
     - young-dolphins-rhyme
+"@typesql/core@5.0.1":
+  dir: packages/core
+  intents:
+    - ancient-eggs-float
 "@typesql/drizzle@0.0.2":
   dir: packages/drizzle
   intents:
@@ -416,6 +424,10 @@
   dir: packages/drizzle
   intents:
     - cool-mugs-grow
+"@typesql/drizzle@5.0.1":
+  dir: packages/drizzle
+  intents:
+    - ancient-eggs-float
 "@typesql/kysely@0.0.2":
   dir: packages/kysely
   intents:
@@ -739,6 +751,10 @@
   intents:
     - calm-jokes-dream
     - strong-elephants-glow
+"@typesql/postgres@5.0.1":
+  dir: packages/postgres
+  intents:
+    - ancient-eggs-float
 "@typesql/prisma@0.0.2":
   dir: packages/prisma
   intents:
@@ -933,3 +949,7 @@ typesql@3.0.0:
   intents:
     - funny-moons-invent
     - good-zebras-judge
+typesql@3.0.1:
+  dir: packages/vscode
+  intents:
+    - ancient-eggs-float
