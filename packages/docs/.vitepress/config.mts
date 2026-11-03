@@ -39,7 +39,7 @@ export default withVersions({
 			{
 				text: "Guide",
 				link: "/guide/introduction",
-				activeMatch: "/(guide|adapters)/",
+				activeMatch: "/(guide|adapters|compared-to)/",
 			},
 			{ text: "Reference", link: "/reference/api", activeMatch: "/reference/" },
 			{ text: "Changelog", link: "/changelog" },
@@ -56,7 +56,6 @@ export default withVersions({
 					{ text: "Introduction", link: "/guide/introduction" },
 					{ text: "Installation", link: "/guide/installation" },
 					{ text: "Quick start", link: "/guide/quick-start" },
-					{ text: "Comparison", link: "/guide/comparison" },
 					{ text: "Upgrading", link: "/guide/upgrading" },
 				],
 			},
@@ -103,6 +102,16 @@ export default withVersions({
 					{ text: "Errors and troubleshooting", link: "/guide/errors" },
 					{ text: "Limits", link: "/guide/limits" },
 					{ text: "SQLite", link: "/guide/sqlite" },
+				],
+			},
+			{
+				text: "Compared to",
+				items: [
+					{ text: "Kysely", link: "/compared-to/kysely" },
+					{ text: "Drizzle", link: "/compared-to/drizzle" },
+					{ text: "Prisma ORM", link: "/compared-to/prisma" },
+					{ text: "Prisma TypedSQL", link: "/compared-to/prisma-typedsql" },
+					{ text: "Reylo", link: "/compared-to/reylo" },
 				],
 			},
 			{

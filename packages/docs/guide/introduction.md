@@ -42,5 +42,5 @@ The core is dialect-neutral: each SQL dialect brings its own parser, type rules 
 
 - [Installation](./installation): requirements and the packages for your driver.
 - [Quick start](./quick-start): your first typed query.
-- [Comparison](./comparison): how TypeSQL differs from code generators, query builders and ORMs.
+- [Compared to other tools](../compared-to/kysely): Kysely, Drizzle, Prisma and Reylo.
 - [Upgrading](./upgrading): moving from an earlier version, with the [changelog](/changelog).
