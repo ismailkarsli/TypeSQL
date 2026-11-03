@@ -1,5 +1,16 @@
 # @typesql/sqlite
 
+## 5.0.0
+
+### Major Changes
+
+- Query inference, migrations and database adapters share smaller implementations while retaining the supported SQL workflows.
+
+### Patch Changes
+
+- Updated dependencies:
+  - @typesql/core@5.0.0
+
 ## 4.0.1
 
 ### Patch Changes

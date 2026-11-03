@@ -1,5 +1,15 @@
 # @typesql/language-server
 
+## 1.0.0
+
+### Major Changes
+
+- SQL highlighting and completion reuse shared scanning and session helpers.
+
+### Patch Changes
+
+- Highlights SQL in a migration's `db.ddl(…)` statements by their type, as in `db.add(…)` and `db.raw(…)`.
+
 ## 0.0.11
 
 ### Patch Changes

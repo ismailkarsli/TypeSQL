@@ -1,5 +1,15 @@
 # @typesql/core
 
+## 5.0.0
+
+### Major Changes
+
+- Query inference, migrations and database adapters share smaller implementations while retaining the supported SQL workflows.
+
+### Minor Changes
+
+- Migration contexts run checked DDL with `db.ddl(…)`; `db.add(…)` still works as a deprecated alias.
+
 ## 4.0.1
 
 ### Patch Changes

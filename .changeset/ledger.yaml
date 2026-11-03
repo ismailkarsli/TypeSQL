@@ -31,6 +31,10 @@
   intents:
     - calm-jokes-dream
     - strong-elephants-glow
+"@typesql/cli@5.0.0":
+  dir: packages/cli
+  intents:
+    - fast-cats-fly
 "@typesql/core@0.0.2":
   dir: packages/core
   intents:
@@ -332,6 +336,11 @@
     - heavy-tables-tap
     - real-bears-occur
     - strong-elephants-glow
+"@typesql/core@5.0.0":
+  dir: packages/core
+  intents:
+    - cool-mugs-grow
+    - young-dolphins-rhyme
 "@typesql/drizzle@0.0.2":
   dir: packages/drizzle
   intents:
@@ -403,6 +412,10 @@
   intents:
     - calm-jokes-dream
     - strong-elephants-glow
+"@typesql/drizzle@5.0.0":
+  dir: packages/drizzle
+  intents:
+    - cool-mugs-grow
 "@typesql/kysely@0.0.2":
   dir: packages/kysely
   intents:
@@ -479,6 +492,10 @@
   intents:
     - calm-jokes-dream
     - strong-elephants-glow
+"@typesql/kysely@5.0.0":
+  dir: packages/kysely
+  intents:
+    - cool-mugs-grow
 "@typesql/language-server@0.0.1":
   dir: packages/language-server
   intents:
@@ -532,6 +549,11 @@
   dir: packages/language-server
   intents:
     - curvy-dogs-camp
+"@typesql/language-server@1.0.0":
+  dir: packages/language-server
+  intents:
+    - gentle-clouds-float
+    - good-zebras-judge
 "@typesql/pg@0.0.2":
   dir: packages/pg
   intents:
@@ -630,6 +652,10 @@
   intents:
     - calm-jokes-dream
     - strong-elephants-glow
+"@typesql/pg@5.0.0":
+  dir: packages/pg
+  intents:
+    - cool-mugs-grow
 "@typesql/postgres@0.0.2":
   dir: packages/postgres
   intents:
@@ -794,6 +820,10 @@
   intents:
     - calm-jokes-dream
     - strong-elephants-glow
+"@typesql/prisma@5.0.0":
+  dir: packages/prisma
+  intents:
+    - cool-mugs-grow
 "@typesql/sqlite@0.0.1":
   dir: packages/sqlite
   intents:
@@ -831,6 +861,10 @@
   intents:
     - calm-jokes-dream
     - strong-elephants-glow
+"@typesql/sqlite@5.0.0":
+  dir: packages/sqlite
+  intents:
+    - cool-mugs-grow
 typesql@0.0.1:
   dir: packages/vscode
   intents:
@@ -894,3 +928,8 @@ typesql@2.0.0:
   dir: packages/vscode
   intents:
     - shaggy-olives-count
+typesql@3.0.0:
+  dir: packages/vscode
+  intents:
+    - funny-moons-invent
+    - good-zebras-judge

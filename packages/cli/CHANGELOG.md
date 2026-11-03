@@ -1,5 +1,16 @@
 # @typesql/cli
 
+## 5.0.0
+
+### Patch Changes
+
+- The README shows migrations with `db.ddl(…)`, the new name of `db.add(…)`.
+
+- Updated dependencies:
+  - @typesql/core@5.0.0
+  - @typesql/pg@5.0.0
+  - @typesql/sqlite@5.0.0
+
 ## 4.0.1
 
 ### Patch Changes

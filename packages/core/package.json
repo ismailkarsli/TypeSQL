@@ -1,6 +1,6 @@
 {
 	"name": "@typesql/core",
-	"version": "4.0.1",
+	"version": "5.0.0",
 	"description": "Type-level SQL inference for TypeScript: PostgreSQL and SQLite. Zero runtime dependencies.",
 	"license": "MIT",
 	"repository": {

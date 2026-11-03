@@ -1,5 +1,15 @@
 # typesql
 
+## 3.0.0
+
+### Major Changes
+
+- SQL highlighting and completion reuse shared scanning and session helpers.
+
+### Patch Changes
+
+- Highlights SQL in a migration's `db.ddl(…)` statements, as in `db.add(…)` and `db.raw(…)`.
+
 ## 2.0.0
 
 ### Major Changes
