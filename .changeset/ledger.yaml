@@ -357,6 +357,10 @@
   dir: packages/core
   intents:
     - slow-rings-look
+"@typesql/core@5.0.4":
+  dir: packages/core
+  intents:
+    - fair-tigers-beam
 "@typesql/drizzle@0.0.2":
   dir: packages/drizzle
   intents:

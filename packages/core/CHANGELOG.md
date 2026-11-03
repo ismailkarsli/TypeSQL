@@ -1,5 +1,11 @@
 # @typesql/core
 
+## 5.0.4
+
+### Patch Changes
+
+- Statements type-check with about 10% fewer type instantiations, mostly in parameter checks, fragment interpolation, sql.values and sql.set, and parsing.
+
 ## 5.0.3
 
 ### Patch Changes
