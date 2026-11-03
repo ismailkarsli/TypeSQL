@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="12 12 104 104" role="img" aria-label="TypeSQL">
+  <path d="M18 26V44A46 14 0 0 0 110 44V26Z" fill="#EA580C"/>
+  <ellipse cx="64" cy="26" rx="46" ry="14" fill="#FDBA74"/>
+  <path d="M18 56V102A46 14 0 0 0 55 115.73V69.73A46 14 0 0 1 18 56Z" fill="#EA580C"/>
+  <path d="M110 56V102A46 14 0 0 1 73 115.73V69.73A46 14 0 0 0 110 56Z" fill="#EA580C"/>
+</svg>

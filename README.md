@@ -1,4 +1,9 @@
-# TypeSQL
+<h1>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset=".github/assets/logo-dark.svg">
+    <img src=".github/assets/logo-light.svg" alt="TypeSQL" height="56">
+  </picture>
+</h1>
 
 Write SQL in TypeScript and get exact types for rows and parameters. TypeSQL parses your SQL inside the type checker: no codegen, no database connection, no build step.
 

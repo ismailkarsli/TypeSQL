@@ -6,6 +6,7 @@
 	"private": true,
 	"preview": true,
 	"publisher": "typesql",
+	"icon": "icon.png",
 	"license": "MIT",
 	"repository": {
 		"type": "git",

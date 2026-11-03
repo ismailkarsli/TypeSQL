@@ -8,6 +8,7 @@ export default withVersions({
 		"Write SQL in TypeScript and get exact types for rows and parameters. No codegen, no database connection, no build step.",
 	cleanUrls: true,
 	head: [
+		["link", { rel: "icon", type: "image/svg+xml", href: "/logo.svg" }],
 		[
 			"style",
 			{},
@@ -30,6 +31,7 @@ export default withVersions({
 	// from the published packages' changelogs by `[page].paths.ts`.
 	srcExclude: ["internals/**", "CHANGELOG.md"],
 	themeConfig: {
+		logo: "/logo.svg",
 		nav: [
 			{
 				text: "Guide",
