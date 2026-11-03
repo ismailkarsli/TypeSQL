@@ -4,8 +4,6 @@ Write SQL in TypeScript and get exact types for rows and parameters. TypeSQL par
 
 TypeSQL supports PostgreSQL and SQLite. MySQL is planned.
 
-**This library is in an early stage, so expect many experimental changes. Every breaking change will ship in a major release.**
-
 [![TypeSQL migrations and typed queries](.github/assets/demo.gif)](https://cdn.jsdelivr.net/gh/ismailkarsli/TypeSQL@main/.github/assets/demo.mp4)
 
 ## Get started
