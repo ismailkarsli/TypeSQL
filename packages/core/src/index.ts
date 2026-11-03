@@ -54,4 +54,5 @@ export type {
 	TypeRegistry,
 	View,
 } from "./schema.js";
+export type { InferredQuery } from "./sql/call.js";
 export type { SqlDriver, Transactional } from "./transaction.js";

@@ -1,10 +1,9 @@
 import type {
 	ColInfo,
-	CteMap,
 	Ctx,
 	Info,
 	MkCtx,
-	Scope,
+	QueryContext,
 	ScopeLevel,
 } from "../../../engine/types.js";
 import type { AnyErr, SqlError } from "../../../errors.js";
@@ -187,32 +186,26 @@ type TypeArrayQuery<R extends string, A> = A extends ColInfo
 	? Info<R extends "json" | "jsonb" ? JsonRet<`arrnn:${R}`, [A]> : R, true>
 	: A;
 
-export type ParamsOfSqlJson<E extends Expr, C extends Ctx, M> =
+export type ParamsOfSqlJson<E extends Expr, C extends Ctx> =
 	E extends Tag<"jsonfmt" | "isjson">
-		? ParamsOfOpt<E["e"], C, M, Info<"text", true>>
+		? ParamsOfOpt<E["e"], C, Info<"text", true>>
 		: E extends Tag<"jsonagg">
-			? ParamsOfOpt<
-					E["e"]["filter"],
-					C,
-					ParamsOfList<E["e"]["args"], C, M, Info<"text", true>>,
-					Info<"bool", true>
-				>
-			: ParamsOfList<
-					[...E["args"], ...E["passing"], ...E["defaults"]],
-					C,
-					E["q"] extends SelectStmt
-						? ParamsOfSelect<E["q"], C["db"], C["scope"], C["ctes"], M>
-						: M,
-					Info<"text", true>
-				>;
+			?
+					| ParamsOfList<E["e"]["args"], C, Info<"text", true>>
+					| ParamsOfOpt<E["e"]["filter"], C, Info<"bool", true>>
+			:
+					| (E["q"] extends SelectStmt ? ParamsOfSelect<E["q"], C> : never)
+					| ParamsOfList<
+							[...E["args"], ...E["passing"], ...E["defaults"]],
+							C,
+							Info<"text", true>
+					  >;
 
 export type BindJsonTable<
 	J extends FromJsonTable["jt"],
 	Alias extends string | null,
 	CA extends readonly string[] | null,
-	DB,
-	Outer extends Scope,
-	Ctes extends CteMap,
+	Env extends QueryContext,
 	Sofar extends ScopeLevel,
 > =
 	J["path"] extends Tag<"str">
@@ -220,7 +213,7 @@ export type BindJsonTable<
 			? SqlError<`duplicate JSON_TABLE column or path name: ${D}`, null>
 			: TypeList<
 						[J["ctx"], ...J["passing"], ...J["defs"]],
-						MkCtx<DB, [Sofar, ...Outer], Ctes, false>,
+						MkCtx<Env["db"], [Sofar, ...Env["scope"]], Env["ctes"], false>,
 						[]
 					> extends infer Ts
 				? Ts extends readonly ColInfo[]
@@ -250,10 +243,8 @@ type DuplicateName<Ns extends readonly string[], Seen> = Ns extends readonly [
 export type ParamsOfJsonTable<
 	J extends FromJsonTable["jt"],
 	C extends Ctx,
-	M,
 > = ParamsOfList<
 	[J["ctx"], ...J["passing"], ...J["defs"]],
 	C,
-	M,
 	Info<"text", true>
 >;

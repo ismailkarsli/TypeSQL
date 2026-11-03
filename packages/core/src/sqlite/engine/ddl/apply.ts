@@ -6,6 +6,7 @@ import type {
 } from "../../../engine/object.js";
 import type { Nx } from "../../../engine/parse.js";
 import type { Toks } from "../../../engine/tokens.js";
+import type { QueryContext } from "../../../engine/types.js";
 import type { AnyErr, SqlError } from "../../../errors.js";
 import type { Table, View } from "../../../schema.js";
 import type {
@@ -69,9 +70,7 @@ export type ApplyOne<DB, S extends Stmt> = S extends {
 							: S extends { readonly t: "select" }
 								? ProjectSelect<
 										Extract<S, SelectStmt>,
-										DB,
-										[],
-										{}
+										QueryContext<DB, [], {}>
 									> extends infer X
 									? X extends AnyErr
 										? X
@@ -262,13 +261,14 @@ type CtasEffect<DB, S extends CreateTableAs> =
 		? S["ifNotExists"] extends true
 			? DB
 			: SqlError<`table ${S["table"]["name"]} already exists`, null>
-		: ProjectSelect<S["q"], DB, [], {}> extends infer C extends readonly Cell[]
+		: ProjectSelect<S["q"], QueryContext<DB, [], {}>> extends infer C extends
+					readonly Cell[]
 			? SetKey<
 					DB,
 					S["table"]["name"],
 					CellsTable<UniqueCells<C>, CtasTypes<S["q"], C>>
 				>
-			: ProjectSelect<S["q"], DB, [], {}>;
+			: ProjectSelect<S["q"], QueryContext<DB, [], {}>>;
 
 type CtasTypes<
 	Q extends SelectStmt,
@@ -329,7 +329,8 @@ type CellsTable<
 type CreateViewEffect<DB, S extends CreateView> =
 	LookupRelation<DB, S["view"]> extends [infer Rel, infer K extends string]
 		? Existing<DB, Rel, K, S["ifNotExists"]>
-		: ProjectSelect<S["q"], DB, [], {}> extends infer C extends readonly Cell[]
+		: ProjectSelect<S["q"], QueryContext<DB, [], {}>> extends infer C extends
+					readonly Cell[]
 			? (
 					S["cols"] extends readonly { readonly n: string }[]
 						? S["cols"]["length"] extends C["length"]
@@ -346,7 +347,7 @@ type CreateViewEffect<DB, S extends CreateView> =
 						: never
 					: R
 				: never
-			: ProjectSelect<S["q"], DB, [], {}>;
+			: ProjectSelect<S["q"], QueryContext<DB, [], {}>>;
 
 type AlterEffect<DB, S extends AlterTable> =
 	LookupRelation<DB, S["table"]> extends [infer Rel, infer K extends string]

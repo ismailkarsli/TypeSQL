@@ -1,4 +1,9 @@
-import type { Dialect, DialectTypes } from "../dialect.js";
+import type {
+	DIALECT,
+	Dialect,
+	DialectBrand,
+	DialectTypes,
+} from "../dialect.js";
 import type { SqlPlugin } from "../plugin.js";
 import type { Executor } from "../query.js";
 import type { Transactional } from "../transaction.js";
@@ -30,6 +35,7 @@ export interface TransactionalSql<
 	in out Plugins extends readonly SqlPlugin[] = [],
 > extends Sql<DB, TM, Plugins>,
 		Transactional<TransactionalSql<DB, TM, Plugins>> {
+	readonly [DIALECT]?: DialectBrand<"sqlite", DB, TM, Plugins>;
 	withPlugin<const P extends SqlPlugin>(
 		plugin: P,
 	): TransactionalSql<DB, TM, [...Plugins, P]>;

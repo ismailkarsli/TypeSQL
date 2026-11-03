@@ -2,12 +2,10 @@ import type { Next } from "../sql/next.js";
 import type { Toks } from "./tokens.js";
 import type { ColInfo } from "./types.js";
 
-type ParamEntry<N extends number = number, T = ColInfo> = {
+export type ParamEntry<N extends number = number, T = ColInfo> = {
 	readonly n: N;
 	readonly t: T;
 };
-
-export type AddParam<M, N extends number, T> = M | ParamEntry<N, T>;
 
 export type ParamsToMap<U> = {
 	readonly [E in U as E extends { readonly n: infer N extends number }

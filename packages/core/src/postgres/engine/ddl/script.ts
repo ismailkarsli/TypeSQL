@@ -1,4 +1,5 @@
 import type { OpTok, Tok, Toks } from "../../../engine/tokens.js";
+import type { QueryContext } from "../../../engine/types.js";
 import type { AnyErr, SqlError } from "../../../errors.js";
 import type { DdlStmt, Stmt } from "../ast.js";
 import type { Lex } from "../lexer/lex.js";
@@ -39,7 +40,7 @@ type EndsAt<T extends Toks, J extends number> =
 type ApplyOne<DB, S> = S extends { readonly t: DdlKind }
 	? ApplyDdlNode<DB, S>
 	: S extends Stmt
-		? ProjectStmt<S, DB, [], {}> extends infer C
+		? ProjectStmt<S, QueryContext<DB, [], {}>> extends infer C
 			? C extends AnyErr
 				? C
 				: DB

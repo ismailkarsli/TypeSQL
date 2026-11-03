@@ -60,10 +60,7 @@ type Fig<E extends Expr, C extends Ctx> =
 type StripArray<T extends string> = T extends `${infer B}[]` ? B : T;
 
 type SubName<Q extends SelectStmt, C extends Ctx> =
-	ProjectSelect<Q, C["db"], C["scope"], C["ctes"]> extends readonly [
-		{ readonly n: infer N },
-		...unknown[],
-	]
+	ProjectSelect<Q, C> extends readonly [{ readonly n: infer N }, ...unknown[]]
 		? N
 		: "?column?";
 

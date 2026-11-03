@@ -100,12 +100,7 @@ type TypeComplex<E extends Expr, C extends SqCtx> = E extends {
 															? Info<X["type"], true>
 															: SubqueryCol<E["q"], C>
 														: E extends { readonly t: "exists" }
-															? ProjectSelect<
-																	E["q"],
-																	C["db"],
-																	C["scope"],
-																	C["ctes"]
-																> extends infer X
+															? ProjectSelect<E["q"], C> extends infer X
 																? X extends AnyErr
 																	? X
 																	: Info<"integer">
@@ -162,12 +157,11 @@ type TypeLike<E extends Expr, C extends SqCtx> = E["kind"] extends "regexp"
 		>;
 
 export type SubqueryCol<Q extends SelectStmt, C extends SqCtx> =
-	ProjectSelect<Q, C["db"], C["scope"], C["ctes"]> extends infer X extends
-		readonly Cell[]
+	ProjectSelect<Q, C> extends infer X extends readonly Cell[]
 		? X extends readonly [infer One extends Cell]
 			? One["t"]
 			: SqlError<`sub-select returns ${X["length"]} columns - expected 1`, null>
-		: ProjectSelect<Q, C["db"], C["scope"], C["ctes"]>;
+		: ProjectSelect<Q, C>;
 
 type TypeInSub<
 	L extends Expr,
@@ -336,8 +330,7 @@ type RowVsSub<
 	Q extends SelectStmt,
 	C extends SqCtx,
 > =
-	ProjectSelect<Q, C["db"], C["scope"], C["ctes"]> extends infer X extends
-		readonly Cell[]
+	ProjectSelect<Q, C> extends infer X extends readonly Cell[]
 		? X["length"] extends Items["length"]
 			? TypeList<Items, C> extends readonly ColInfo[]
 				? Info<"integer", true>
@@ -346,7 +339,7 @@ type RowVsSub<
 					`sub-select returns ${X["length"]} columns - expected ${Items["length"]}`,
 					null
 				>
-		: ProjectSelect<Q, C["db"], C["scope"], C["ctes"]>;
+		: ProjectSelect<Q, C>;
 
 type TypeUn<Op, X extends Expr, C extends SqCtx> =
 	TypeOf<X, C> extends infer A extends ColInfo

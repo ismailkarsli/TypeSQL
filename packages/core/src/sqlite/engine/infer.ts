@@ -1,7 +1,7 @@
 import type * as Shared from "../../engine/infer.js";
 import type { MaxParam, ParamsToMap } from "../../engine/params.js";
 import type { Toks } from "../../engine/tokens.js";
-import type { Cols, Simplify } from "../../engine/types.js";
+import type { Cols, QueryContext, Simplify } from "../../engine/types.js";
 import type { AnyErr } from "../../errors.js";
 import type { RewriteNamed } from "../../sql/named.js";
 import type { TsOf } from "../type-map/index.js";
@@ -45,7 +45,7 @@ export type Analyze<DB, Q extends string> =
 export type Analysis<DB, Q extends string> = Analyze<DB, Q>;
 
 type ProjectStmt<S extends Stmt, DB> = S extends { readonly t: "select" }
-	? ProjectSelect<Extract<S, SelectStmt>, DB, [], {}>
+	? ProjectSelect<Extract<S, SelectStmt>, QueryContext<DB, [], {}>>
 	: S extends { readonly t: "insert" | "update" | "delete" }
 		? ProjectDml<Extract<S, DmlStmt>, DB, {}>
 		: ApplyStmt<S, DB>;
@@ -54,9 +54,9 @@ type ApplyStmt<S extends Stmt, DB> =
 	ApplyOne<DB, S> extends infer R ? (R extends AnyErr ? R : null) : never;
 
 type ParamsOfStmt<S extends Stmt, DB> = S extends { readonly t: "select" }
-	? ParamsOfSelect<Extract<S, SelectStmt>, DB, [], {}, never>
+	? ParamsOfSelect<Extract<S, SelectStmt>, QueryContext<DB, [], {}>>
 	: S extends { readonly t: "insert" | "update" | "delete" }
-		? ParamsOfDml<Extract<S, DmlStmt>, DB, {}, never>
+		? ParamsOfDml<Extract<S, DmlStmt>, DB, {}>
 		: never;
 
 export type RowOf<DB, TM, Q extends string> = Shared.RowOf<

@@ -1,0 +1,38 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`pg-parameter-inference > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "CaseParams": "[null | false | true, null | number, null | number]",
+      "SelectParams": "[null | number, null | string, null | number, null | number]",
+      "ValuesParams": "[number, null | string, number, null | string]",
+      "WriteParams": "[number, string, null | string, number, string, null | string, null | string, null | string, null | number]",
+      "chosen": "({ value: null | number })[]",
+      "inserted": "({ bio: null | string; id: number; name: string })[]",
+      "pairs": "({ id: number; name: null | string })[]",
+      "rows": "({ id: number; name: string })[]",
+    },
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "{
+  rows: [ { id: 1, name: 'Ada' } ],
+  pairs: [ { id: 3, name: 'ADA' }, { id: 4, name: 'grace' } ],
+  inserted: [
+    { id: 3, name: 'Lin', bio: null },
+    { id: 4, name: 'Ken', bio: 'Unix' }
+  ],
+  chosen: [ { value: 7 } ]
+}
+",
+  },
+}
+`;

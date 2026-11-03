@@ -8,7 +8,7 @@ import type {
 	Ctx,
 	Info,
 	MkCtx,
-	Scope,
+	QueryContext,
 	ScopeLevel,
 } from "../../../engine/types.js";
 import type { AnyErr, SqlError } from "../../../errors.js";
@@ -58,43 +58,27 @@ import type { ProjectStmt } from "./stmt.js";
 
 export type ProjectSelect<
 	Q extends SelectStmt,
-	DB,
-	Outer extends Scope,
-	Ctes extends CteMap,
-> = ProjectSelectParts<
-	Q["with"],
-	Q["body"],
-	Q["orderBy"],
-	DB,
-	Outer,
-	Ctes,
-	false
->;
+	Env extends QueryContext,
+> = ProjectSelectParts<Q["with"], Q["body"], Q["orderBy"], Env, false>;
 
 type ProjectSelectParts<
 	W extends WithClause | null,
 	B extends SelectBody,
 	Order extends readonly Expr[],
-	DB,
-	Outer extends Scope,
-	Ctes extends CteMap,
+	Env extends QueryContext,
 	Lit extends boolean = false,
 > =
-	BindWith<W, DB, Outer, Ctes> extends infer C2 extends CteMap
-		? ProjectBody<B, DB, Outer, C2, Order, Lit>
-		: BindWith<W, DB, Outer, Ctes>;
+	BindWith<W, Env> extends infer C2 extends CteMap
+		? ProjectBody<B, QueryContext<Env["db"], Env["scope"], C2>, Order, Lit>
+		: BindWith<W, Env>;
 
 export type BindWith<
 	W extends WithClause | null,
-	DB,
-	Outer extends Scope,
-	Ctes extends CteMap,
+	Env extends QueryContext,
 > = BindCtes<
 	NonNullable<W>["ctes"],
 	NonNullable<W>["recursive"],
-	DB,
-	Outer,
-	Ctes,
+	Env,
 	never,
 	0
 >;
@@ -102,29 +86,29 @@ export type BindWith<
 type BindCtes<
 	Cs extends readonly Cte[],
 	Rec extends boolean,
-	DB,
-	Outer extends Scope,
-	Ctes extends CteMap,
+	Env extends QueryContext,
 	Seen extends string,
 	I extends number,
 > = Cs[I] extends undefined
-	? Ctes
+	? Env["ctes"]
 	: Cs[I]["name"] extends Seen
 		? SqlError<
 				`WITH query name "${Cs[I]["name"]}" specified more than once`,
 				null
 			>
-		: BindCte<Cs[I], Rec, DB, Outer, Ctes> extends infer M extends ColMap
+		: BindCte<Cs[I], Rec, Env> extends infer M extends ColMap
 			? BindCtes<
 					Cs,
 					Rec,
-					DB,
-					Outer,
-					AddCte<Ctes, Cs[I]["name"], M>,
+					QueryContext<
+						Env["db"],
+						Env["scope"],
+						AddCte<Env["ctes"], Cs[I]["name"], M>
+					>,
 					Seen | Cs[I]["name"],
 					Nx<I>
 				>
-			: BindCte<Cs[I], Rec, DB, Outer, Ctes>;
+			: BindCte<Cs[I], Rec, Env>;
 
 type AddCte<Ctes extends CteMap, N extends string, M extends ColMap> = Omit<
 	Ctes,
@@ -134,9 +118,7 @@ type AddCte<Ctes extends CteMap, N extends string, M extends ColMap> = Omit<
 type BindCte<
 	C extends Cte,
 	Rec extends boolean,
-	DB,
-	Outer extends Scope,
-	Ctes extends CteMap,
+	Env extends QueryContext,
 > = Rec extends true
 	? C["q"] extends {
 			readonly t: "select";
@@ -151,32 +133,25 @@ type BindCte<
 					C["q"]["with"],
 					C["q"]["body"],
 					C["q"]["orderBy"],
-					DB,
-					Outer,
-					Ctes,
+					Env,
 					C["search"],
 					C["cycle"]
 				>
 			>
-		: NotRecursive<C, ProjectCteBody<C, DB, Outer, Ctes>>
-	: NotRecursive<C, ProjectCteBody<C, DB, Outer, Ctes>>;
+		: NotRecursive<C, ProjectCteBody<C, Env>>
+	: NotRecursive<C, ProjectCteBody<C, Env>>;
 
-type ProjectCteBody<
-	C extends Cte,
-	DB,
-	Outer extends Scope,
-	Ctes extends CteMap,
-> =
-	ProjectStmt<C["q"], DB, Outer, Ctes> extends infer R extends Cols
+type ProjectCteBody<C extends Cte, Env extends QueryContext> =
+	ProjectStmt<C["q"], Env> extends infer R extends Cols
 		? ApplyCteCols<R, C["cols"], C["name"]> extends infer R2 extends Cols
 			? ColsToMap<R2>
 			: ApplyCteCols<R, C["cols"], C["name"]>
-		: ProjectStmt<C["q"], DB, Outer, Ctes> extends null
+		: ProjectStmt<C["q"], Env> extends null
 			? SqlError<
 					`WITH query "${C["name"]}" does not have a RETURNING clause`,
 					null
 				>
-			: ProjectStmt<C["q"], DB, Outer, Ctes>;
+			: ProjectStmt<C["q"], Env>;
 
 type NotRecursive<C extends Cte, R> = C extends {
 	readonly search: null;
@@ -342,15 +317,17 @@ type RecursiveCte<
 	W extends WithClause | null,
 	B extends SetOp,
 	Order extends readonly Expr[],
-	DB,
-	Outer extends Scope,
-	Ctes extends CteMap,
+	Env extends QueryContext,
 	S,
 	Y,
 > =
-	BindWith<W, DB, Outer, Ctes> extends infer C2 extends CteMap
-		? ProjectBody<B["l"], DB, Outer, C2, [], false> extends infer C0 extends
-				Cols
+	BindWith<W, Env> extends infer C2 extends CteMap
+		? ProjectBody<
+				B["l"],
+				QueryContext<Env["db"], Env["scope"], C2>,
+				[],
+				false
+			> extends infer C0 extends Cols
 			? ApplyCteCols<C0, Names, Name> extends infer C1 extends Cols
 				? SearchCycleCols<S, Y, ColsToMap<C1>> extends infer X extends ColMap
 					? RecursiveFix<
@@ -359,9 +336,7 @@ type RecursiveCte<
 							W,
 							B,
 							Order,
-							DB,
-							Outer,
-							Ctes,
+							Env,
 							ColsToMap<C1>,
 							ColsToMap<C1>,
 							[0],
@@ -369,17 +344,20 @@ type RecursiveCte<
 						>
 					: SearchCycleCols<S, Y, ColsToMap<C1>>
 				: ApplyCteCols<C0, Names, Name>
-			: ProjectBody<B["l"], DB, Outer, C2, [], false>
-		: BindWith<W, DB, Outer, Ctes>;
+			: ProjectBody<
+					B["l"],
+					QueryContext<Env["db"], Env["scope"], C2>,
+					[],
+					false
+				>
+		: BindWith<W, Env>;
 type RecursiveFix<
 	Name extends string,
 	Names extends readonly string[] | null,
 	W extends WithClause | null,
 	B extends SelectBody,
 	Order extends readonly Expr[],
-	DB,
-	Outer extends Scope,
-	Ctes extends CteMap,
+	Env extends QueryContext,
 	M0 extends ColMap,
 	M extends ColMap,
 	Iter extends readonly unknown[],
@@ -389,9 +367,11 @@ type RecursiveFix<
 		W,
 		B,
 		Order,
-		DB,
-		Outer,
-		AddCte<Ctes, Name, WithExtra<M, X>>
+		QueryContext<
+			Env["db"],
+			Env["scope"],
+			AddCte<Env["ctes"], Name, WithExtra<M, X>>
+		>
 	> extends infer Full
 		? Full extends Cols
 			? ApplyCteCols<Full, Names, Name> extends infer F2 extends Cols
@@ -406,9 +386,7 @@ type RecursiveFix<
 									W,
 									B,
 									Order,
-									DB,
-									Outer,
-									Ctes,
+									Env,
 									M0,
 									Next,
 									[...Iter, 0],
@@ -435,9 +413,7 @@ type Changed<A extends ColMap, B extends ColMap> = {
 
 type ProjectBody<
 	B extends SelectBody,
-	DB,
-	Outer extends Scope,
-	Ctes extends CteMap,
+	Env extends QueryContext,
 	Order extends readonly Expr[],
 	Lit extends boolean,
 > =
@@ -454,26 +430,17 @@ type ProjectBody<
 					B["having"],
 					B["windows"],
 					Order,
-					DB,
-					Outer,
-					Ctes,
+					Env,
 					Lit
 				>
 		: B extends Tag<"setop">
-			? ProjectSetOp<
-					B["l"],
-					B["r"],
-					B["op"],
-					DB,
-					Outer,
-					Ctes
-				> extends infer C extends Cols
+			? ProjectSetOp<B["l"], B["r"], B["op"], Env> extends infer C extends Cols
 				? CheckOutputOrder<Order, C> extends AnyErr
 					? CheckOutputOrder<Order, C>
 					: C
-				: ProjectSetOp<B["l"], B["r"], B["op"], DB, Outer, Ctes>
+				: ProjectSetOp<B["l"], B["r"], B["op"], Env>
 			: B extends Tag<"values">
-				? ProjectValues<B["rows"], DB, Outer, Ctes, Order>
+				? ProjectValues<B["rows"], Env, Order>
 				: B extends Tag<"paren">
 					? (
 							Order extends readonly []
@@ -482,15 +449,7 @@ type ProjectBody<
 									? Order
 									: null
 						) extends infer O extends readonly Expr[]
-						? ProjectSelectParts<
-								B["q"]["with"],
-								B["q"]["body"],
-								O,
-								DB,
-								Outer,
-								Ctes,
-								Lit
-							>
+						? ProjectSelectParts<B["q"]["with"], B["q"]["body"], O, Env, Lit>
 						: SqlError<"multiple ORDER BY clauses not allowed", null>
 					: SqlError<"unsupported query body", null>;
 
@@ -498,15 +457,13 @@ type ProjectSetOp<
 	L extends SelectBody,
 	R extends SelectBody,
 	Op extends string,
-	DB,
-	Outer extends Scope,
-	Ctes extends CteMap,
+	Env extends QueryContext,
 > =
-	ProjectBody<L, DB, Outer, Ctes, [], true> extends infer LC extends Cols
-		? ProjectBody<R, DB, Outer, Ctes, [], true> extends infer RC extends Cols
+	ProjectBody<L, Env, [], true> extends infer LC extends Cols
+		? ProjectBody<R, Env, [], true> extends infer RC extends Cols
 			? AlignSetOp<LC, RC, Uppercase<Op>, [], 0>
-			: ProjectBody<R, DB, Outer, Ctes, [], true>
-		: ProjectBody<L, DB, Outer, Ctes, [], true>;
+			: ProjectBody<R, Env, [], true>
+		: ProjectBody<L, Env, [], true>;
 
 /**
  * A `*` branch keeps its columns as a map, without positions. Keep the left
@@ -642,21 +599,19 @@ type RestFrom<
 
 type ProjectValues<
 	Rows extends readonly (readonly Expr[])[],
-	DB,
-	Outer extends Scope,
-	Ctes extends CteMap,
+	Env extends QueryContext,
 	Order extends readonly Expr[],
 > =
 	OperandRow<
 		Rows[0],
-		MkCtx<DB, Outer, Ctes, false>,
+		MkCtx<Env["db"], Env["scope"], Env["ctes"], false>,
 		[],
 		0
 	> extends infer T0 extends readonly ColInfo[]
 		? MergeRows<
 				Rows,
 				T0,
-				MkCtx<DB, Outer, Ctes, false>,
+				MkCtx<Env["db"], Env["scope"], Env["ctes"], false>,
 				1
 			> extends infer Ts extends readonly ColInfo[]
 			? ValuesCols<Ts, 1, []> extends infer Cs extends Cols
@@ -666,7 +621,7 @@ type ProjectValues<
 						ValuesTargets<Cs>,
 						Cs,
 						MkCtx<
-							DB,
+							Env["db"],
 							[
 								[
 									{
@@ -675,9 +630,9 @@ type ProjectValues<
 										readonly skip: [];
 									},
 								],
-								...Outer,
+								...Env["scope"],
 							],
-							Ctes,
+							Env["ctes"],
 							false
 						>
 					> extends infer K
@@ -686,8 +641,18 @@ type ProjectValues<
 						: Cs
 					: never
 				: never
-			: MergeRows<Rows, T0, MkCtx<DB, Outer, Ctes, false>, 1>
-		: OperandRow<Rows[0], MkCtx<DB, Outer, Ctes, false>, [], 0>;
+			: MergeRows<
+					Rows,
+					T0,
+					MkCtx<Env["db"], Env["scope"], Env["ctes"], false>,
+					1
+				>
+		: OperandRow<
+				Rows[0],
+				MkCtx<Env["db"], Env["scope"], Env["ctes"], false>,
+				[],
+				0
+			>;
 
 type OperandRow<
 	Row extends readonly Expr[],
@@ -788,19 +753,22 @@ type ProjectSimple<
 	Having extends Expr | null,
 	Ws extends readonly NamedWindow[],
 	Order extends readonly Expr[],
-	DB,
-	Outer extends Scope,
-	Ctes extends CteMap,
+	Env extends QueryContext,
 	Lit extends boolean,
 > =
-	BindFrom<From, DB, Outer, Ctes> extends infer L extends ScopeLevel
+	BindFrom<From, Env> extends infer L extends ScopeLevel
 		? SetsLevel<
 				NarrowLevel<L, NarrowKeys<Where>>,
 				Sets
 			> extends infer L2 extends ScopeLevel
 			? ProjectTargets<
 					Ts,
-					MkCtx<DB, [L2, ...Outer], Ctes, Grouped<GroupBy, Sets>>,
+					MkCtx<
+						Env["db"],
+						[L2, ...Env["scope"]],
+						Env["ctes"],
+						Grouped<GroupBy, Sets>
+					>,
 					[],
 					0,
 					Lit
@@ -815,8 +783,18 @@ type ProjectSimple<
 							Having,
 							Ws,
 							Order,
-							MkCtx<DB, [L, ...Outer], Ctes, Grouped<GroupBy, Sets>>,
-							MkCtx<DB, [L2, ...Outer], Ctes, Grouped<GroupBy, Sets>>
+							MkCtx<
+								Env["db"],
+								[L, ...Env["scope"]],
+								Env["ctes"],
+								Grouped<GroupBy, Sets>
+							>,
+							MkCtx<
+								Env["db"],
+								[L2, ...Env["scope"]],
+								Env["ctes"],
+								Grouped<GroupBy, Sets>
+							>
 						> extends infer R
 						? R extends AnyErr
 							? R
@@ -825,7 +803,7 @@ type ProjectSimple<
 					: Cs
 				: never
 			: never
-		: BindFrom<From, DB, Outer, Ctes>;
+		: BindFrom<From, Env>;
 
 type Grouped<GroupBy, Sets> = Sets extends false
 	? GroupBy extends null

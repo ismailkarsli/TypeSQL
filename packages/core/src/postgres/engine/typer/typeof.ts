@@ -117,12 +117,7 @@ type TypeOfMore<E extends Expr, C extends Ctx> =
 									: E extends Tag<"sub">
 										? MakeNullable<FirstColOf<E["q"], C>>
 										: E extends Tag<"exists">
-											? ProjectSelect<
-													E["q"],
-													C["db"],
-													C["scope"],
-													C["ctes"]
-												> extends infer R
+											? ProjectSelect<E["q"], C> extends infer R
 												? R extends Cols
 													? Info<"bool">
 													: R
@@ -379,7 +374,7 @@ type SubCompare<
 					}
 						? TypeList<Items, C, [], true>
 						: [TypeOperand<L, C>],
-					ProjectSelect<Q, C["db"], C["scope"], C["ctes"]>,
+					ProjectSelect<Q, C>,
 					0
 				> extends infer X
 				? X extends true
@@ -701,9 +696,9 @@ export type FirstColOf<
 	C extends Ctx,
 	TooMany extends string = "subquery must return only one column",
 > =
-	ProjectSelect<Q, C["db"], C["scope"], C["ctes"]> extends infer R extends Cols
+	ProjectSelect<Q, C> extends infer R extends Cols
 		? OnlyCol<R, TooMany>
-		: ProjectSelect<Q, C["db"], C["scope"], C["ctes"]>;
+		: ProjectSelect<Q, C>;
 
 type SubqueryOperand<
 	L extends Expr,
@@ -713,8 +708,7 @@ type SubqueryOperand<
 	readonly t: "row";
 	readonly items: infer Items extends readonly unknown[];
 }
-	? ProjectSelect<Q, C["db"], C["scope"], C["ctes"]> extends infer R extends
-			Cols
+	? ProjectSelect<Q, C> extends infer R extends Cols
 		? HasStar<R> extends true
 			? Info<"record">
 			: R["length"] extends Items["length"]
@@ -722,7 +716,7 @@ type SubqueryOperand<
 				: WidthCheck<R, Items> extends "more"
 					? SqlError<"subquery has too many columns", null>
 					: SqlError<"subquery has too few columns", null>
-		: ProjectSelect<Q, C["db"], C["scope"], C["ctes"]>
+		: ProjectSelect<Q, C>
 	: FirstColOf<Q, C, "subquery has too many columns">;
 
 type OnlyCol<R extends Cols, TooMany extends string> = R extends readonly [

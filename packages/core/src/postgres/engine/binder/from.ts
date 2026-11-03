@@ -12,6 +12,7 @@ import type {
 	Ctx,
 	Info,
 	MkCtx,
+	QueryContext,
 	Scope,
 	ScopeItem,
 	ScopeLevel,
@@ -41,38 +42,31 @@ import type { ResolveTable } from "./resolve.js";
 
 export type BindFrom<
 	Items extends readonly FromItem[],
-	DB,
-	Outer extends Scope,
-	Ctes extends CteMap,
+	Env extends QueryContext,
 	Acc extends ScopeLevel = [],
 	I extends number = 0,
 > = Items[I] extends undefined
 	? Acc
-	: BindFromItem<Items[I], DB, Outer, Ctes, Acc> extends infer L extends
-				ScopeLevel
-		? BindFrom<Items, DB, Outer, Ctes, [...Acc, ...L], Nx<I>>
-		: BindFromItem<Items[I], DB, Outer, Ctes, Acc>;
+	: BindFromItem<Items[I], Env, Acc> extends infer L extends ScopeLevel
+		? BindFrom<Items, Env, [...Acc, ...L], Nx<I>>
+		: BindFromItem<Items[I], Env, Acc>;
 
 type BindFromItem<
 	F extends FromItem,
-	DB,
-	Outer extends Scope,
-	Ctes extends CteMap,
+	Env extends QueryContext,
 	Sofar extends ScopeLevel,
 > =
 	F extends Tag<"table">
-		? BindTable<F["ref"], F["alias"], F["colAliases"], DB, Ctes, Sofar>
+		? BindTable<
+				F["ref"],
+				F["alias"],
+				F["colAliases"],
+				Env["db"],
+				Env["ctes"],
+				Sofar
+			>
 		: F extends Tag<"sub">
-			? BindSub<
-					F["q"],
-					F["alias"],
-					F["colAliases"],
-					F["lateral"],
-					DB,
-					Outer,
-					Ctes,
-					Sofar
-				>
+			? BindSub<F["q"], F["alias"], F["colAliases"], F["lateral"], Env, Sofar>
 			: F extends Tag<"func">
 				? BindFunc<
 						F["call"],
@@ -80,9 +74,7 @@ type BindFromItem<
 						F["colAliases"],
 						F["colDefs"],
 						F["withOrdinality"],
-						DB,
-						Outer,
-						Ctes,
+						Env,
 						Sofar
 					>
 				: F extends Tag<"join">
@@ -93,40 +85,20 @@ type BindFromItem<
 							F["on"],
 							F["using"],
 							F["natural"],
-							DB,
-							Outer,
-							Ctes,
+							Env,
 							Sofar
 						>
 					: F extends Tag<"xmltable">
-						? BindXmlTable<
-								F,
-								F["alias"],
-								F["colAliases"],
-								DB,
-								Outer,
-								Ctes,
-								Sofar
-							>
+						? BindXmlTable<F, F["alias"], F["colAliases"], Env, Sofar>
 						: F extends Tag<"jsontable">
-							? BindJsonTable<
-									F["jt"],
-									F["alias"],
-									F["colAliases"],
-									DB,
-									Outer,
-									Ctes,
-									Sofar
-								>
+							? BindJsonTable<F["jt"], F["alias"], F["colAliases"], Env, Sofar>
 							: F extends Tag<"sample">
 								? BindSample<
 										F["table"],
 										F["method"],
 										F["args"],
 										F["repeatable"],
-										DB,
-										Outer,
-										Ctes,
+										Env,
 										Sofar
 									>
 								: F extends Tag<"rowsfrom">
@@ -136,9 +108,7 @@ type BindFromItem<
 											F["colAliases"],
 											F["colDefs"],
 											F["withOrdinality"],
-											DB,
-											Outer,
-											Ctes,
+											Env,
 											Sofar
 										>
 									: SqlError<"unsupported FROM item", null>;
@@ -147,9 +117,7 @@ type BindXmlTable<
 	F,
 	Alias extends string | null,
 	CA extends readonly string[] | null,
-	DB,
-	Outer extends Scope,
-	Ctes extends CteMap,
+	Env extends QueryContext,
 	Sofar extends ScopeLevel,
 > = F extends { readonly defaultNs: true }
 	? SqlError<"DEFAULT namespace is not supported", null>
@@ -157,7 +125,7 @@ type BindXmlTable<
 		? A extends string
 			? XmlTableCols<
 					F,
-					MkCtx<DB, [Sofar, ...Outer], Ctes, false>
+					MkCtx<Env["db"], [Sofar, ...Env["scope"]], Env["ctes"], false>
 				> extends infer Base
 				? Base extends Cols
 					? RenamedLevel<A, Base, CA, "XMLTABLE function">
@@ -224,11 +192,12 @@ type BindSample<
 	Method extends string,
 	Args extends readonly Expr[],
 	Rep extends Expr | null,
-	DB,
-	Outer extends Scope,
-	Ctes extends CteMap,
+	Env extends QueryContext,
 	Sofar extends ScopeLevel,
-> = Tbl["ref"] extends { readonly schema: null; readonly name: keyof Ctes }
+> = Tbl["ref"] extends {
+	readonly schema: null;
+	readonly name: keyof Env["ctes"];
+}
 	? SqlError<
 			"TABLESAMPLE clause can only be applied to tables and materialized views",
 			null
@@ -239,7 +208,7 @@ type BindSample<
 					SampleArgs<
 						[...Args, ...(Rep extends Expr ? [Rep] : [])],
 						[SampleMethods[Method], ...(Rep extends Expr ? ["float8"] : [])],
-						MkCtx<DB, Outer, Ctes, false>,
+						MkCtx<Env["db"], Env["scope"], Env["ctes"], false>,
 						0
 					>,
 					Sofar,
@@ -251,8 +220,8 @@ type BindSample<
 							Tbl["ref"],
 							Tbl["alias"],
 							Tbl["colAliases"],
-							DB,
-							Ctes,
+							Env["db"],
+							Env["ctes"],
 							Sofar
 						>
 				: never
@@ -296,18 +265,18 @@ type BindSub<
 	Alias extends string | null,
 	ColAliases extends readonly string[] | null,
 	Lateral extends boolean,
-	DB,
-	Outer extends Scope,
-	Ctes extends CteMap,
+	Env extends QueryContext,
 	Sofar extends ScopeLevel,
 > = (Alias extends string ? CheckAlias<Alias, Sofar> : null) extends infer A
 	? A extends AnyErr
 		? A
 		: ProjectSelect<
 					Q,
-					DB,
-					Lateral extends true ? [Sofar, ...Outer] : Outer,
-					Ctes
+					QueryContext<
+						Env["db"],
+						Lateral extends true ? [Sofar, ...Env["scope"]] : Env["scope"],
+						Env["ctes"]
+					>
 				> extends infer C
 			? C extends Cols
 				? RenamedLevel<
@@ -389,9 +358,7 @@ type BindFunc<
 	CA extends readonly string[] | null,
 	CD,
 	Ord extends boolean,
-	DB,
-	Outer extends Scope,
-	Ctes extends CteMap,
+	Env extends QueryContext,
 	Sofar extends ScopeLevel,
 > =
 	Call extends Tag<"call">
@@ -405,7 +372,7 @@ type BindFunc<
 						Call["args"],
 						CD,
 						Call,
-						MkCtx<DB, [Sofar, ...Outer], Ctes, false>
+						MkCtx<Env["db"], [Sofar, ...Env["scope"]], Env["ctes"], false>
 					> extends infer Base
 					? Base extends Cols
 						? LevelOf<
@@ -432,7 +399,7 @@ type BindFunc<
 					Alias,
 					CA,
 					Ord,
-					MkCtx<DB, [Sofar, ...Outer], Ctes, false>,
+					MkCtx<Env["db"], [Sofar, ...Env["scope"]], Env["ctes"], false>,
 					Sofar
 				>
 			: SqlError<"unsupported function call in FROM", null>;
@@ -556,9 +523,7 @@ type BindRowsFrom<
 	CA extends readonly string[] | null,
 	CD extends readonly ColDef[] | null,
 	Ord extends boolean,
-	DB,
-	Outer extends Scope,
-	Ctes extends CteMap,
+	Env extends QueryContext,
 	Sofar extends ScopeLevel,
 > = Fs extends readonly [infer F extends RowsFromFunc]
 	? BindFunc<
@@ -567,9 +532,7 @@ type BindRowsFrom<
 			CA,
 			CD extends null ? F["colDefs"] : CD,
 			Ord,
-			DB,
-			Outer,
-			Ctes,
+			Env,
 			Sofar
 		>
 	: CD extends readonly ColDef[]
@@ -588,7 +551,7 @@ type BindRowsFrom<
 			? A extends string
 				? RowsFromCols<
 						Fs,
-						MkCtx<DB, [Sofar, ...Outer], Ctes, false>,
+						MkCtx<Env["db"], [Sofar, ...Env["scope"]], Env["ctes"], false>,
 						[]
 					> extends infer Base
 					? Base extends Cols
@@ -655,23 +618,26 @@ type BindJoin<
 	On extends Expr | null,
 	Using extends readonly string[] | null,
 	Natural extends boolean,
-	DB,
-	Outer extends Scope,
-	Ctes extends CteMap,
+	Env extends QueryContext,
 	Sofar extends ScopeLevel,
 > =
-	BindFromItem<L, DB, Outer, Ctes, Sofar> extends infer LL extends ScopeLevel
+	BindFromItem<L, Env, Sofar> extends infer LL extends ScopeLevel
 		? (
 				K extends "right" | "full"
-					? LateralHint<BindFromItem<R, DB, Outer, Ctes, Sofar>, LL, "">
-					: BindFromItem<R, DB, Outer, Ctes, [...Sofar, ...LL]>
+					? LateralHint<BindFromItem<R, Env, Sofar>, LL, "">
+					: BindFromItem<R, Env, [...Sofar, ...LL]>
 			) extends infer RL
 			? RL extends ScopeLevel
 				? LateralHint<
 						CheckCondition<
 							"JOIN/ON",
 							On,
-							MkCtx<DB, [[...LL, ...RL], ...Outer], Ctes, false>
+							MkCtx<
+								Env["db"],
+								[[...LL, ...RL], ...Env["scope"]],
+								Env["ctes"],
+								false
+							>
 						>,
 						Sofar,
 						""
@@ -695,7 +661,7 @@ type BindJoin<
 					: never
 				: RL
 			: never
-		: BindFromItem<L, DB, Outer, Ctes, Sofar>;
+		: BindFromItem<L, Env, Sofar>;
 
 type ApplyNullability<
 	K extends JoinKind,

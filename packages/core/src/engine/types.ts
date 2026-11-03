@@ -110,3 +110,14 @@ export type MkCtx<
 	readonly ctes: Ctes;
 	readonly grouped: G;
 };
+
+/** The environment shared by query binding, projection and parameter inference. */
+export type QueryContext<
+	DB = unknown,
+	S extends Scope = Scope,
+	Ctes = CteMap,
+> = {
+	readonly db: DB;
+	readonly scope: S;
+	readonly ctes: Ctes;
+};

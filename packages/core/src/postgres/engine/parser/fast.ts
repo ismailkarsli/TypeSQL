@@ -21,23 +21,23 @@ type FastSelectStart<Q extends string> =
 type SplitFrom<
 	S extends string,
 	K extends string = "FROM",
-> = S extends `${infer Cs}${K}${Ws}${infer Rest}`
-	? Cs extends `${string}${Ws}`
-		? SelectFrom<Cs, TrimStart<Rest>>
-		: never
-	: K extends "FROM"
-		? SplitFrom<S, "from">
-		: never;
-type SelectFrom<
-	Cs extends string,
-	Rest extends string,
-> = Cs extends `${string}--${string}`
+	Prefix extends string = "",
+	Budget extends unknown[] = [],
+> = Budget["length"] extends 16
 	? never
-	: AllTargets<Cs> extends infer Ts
-		? Ts extends readonly unknown[]
-			? GeneralTail<Ts, Rest>
-			: never
-		: never;
+	: S extends `${infer Cs}${K}${infer W extends Ws}${infer Rest}`
+		? `${Prefix}${Cs}` extends `${string}${Ws}`
+			? `${Prefix}${Cs}` extends `${string}${"$" | "--"}${string}`
+				? never
+				: AllTargets<`${Prefix}${Cs}`> extends infer Ts
+					? Ts extends readonly unknown[]
+						? GeneralTail<Ts, TrimStart<Rest>>
+						: SplitFrom<Rest, K, `${Prefix}${Cs}${K}${W}`, [...Budget, 0]>
+					: never
+			: SplitFrom<Rest, K, `${Prefix}${Cs}${K}${W}`, [...Budget, 0]>
+		: K extends "FROM"
+			? SplitFrom<`${Prefix}${S}`, "from">
+			: never;
 type AllTargets<S extends string> = S extends `${string}$${string}`
 	? null
 	: ParsedTargets<S>;

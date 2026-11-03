@@ -3,7 +3,7 @@ import type {
 	Ctx,
 	Info,
 	MkCtx,
-	Scope,
+	QueryContext,
 	ScopeItem,
 	ScopeLevel,
 } from "../../../engine/types.js";
@@ -43,24 +43,17 @@ import type {
 	WidthResult,
 } from "./dml.js";
 
-export type ProjectMerge<
-	S extends MergeStmt,
-	DB,
-	Outer extends Scope,
-	Ctes extends CteMap,
-> =
-	ResolveTarget<DB, S["table"], S["alias"], "merge into"> extends Target_<
-		infer Tbl,
-		infer Item
-	>
-		? BindFrom<[S["source"]], DB, Outer, Ctes> extends infer L extends
-				ScopeLevel
+export type ProjectMerge<S extends MergeStmt, Env extends QueryContext> =
+	ResolveTarget<
+		Env["db"],
+		S["table"],
+		S["alias"],
+		"merge into"
+	> extends Target_<infer Tbl, infer Item>
+		? BindFrom<[S["source"]], Env> extends infer L extends ScopeLevel
 			? Item["alias"] extends L[number]["alias"]
 				? SqlError<`name "${Item["alias"]}" specified more than once`, null>
-				: TypeOf<
-							S["on"],
-							DmlCtx<DB, [Item, ...L], Outer, Ctes>
-						> extends infer On
+				: TypeOf<S["on"], DmlCtx<Env, [Item, ...L]>> extends infer On
 					? On extends AnyErr
 						? On
 						: CheckWhens<
@@ -69,9 +62,7 @@ export type ProjectMerge<
 									Item,
 									L,
 									S["table"]["name"],
-									DB,
-									Outer,
-									Ctes,
+									Env,
 									never
 								> extends infer W
 							? W extends AnyErr
@@ -83,14 +74,12 @@ export type ProjectMerge<
 										Tbl,
 										HasAction<S["whens"], "insert">,
 										HasAction<S["whens"], "delete">,
-										DB,
-										Outer,
-										Ctes
+										Env
 									>
 							: never
 					: never
-			: InvalidRef<BindFrom<[S["source"]], DB, Outer, Ctes>, Item["alias"]>
-		: ResolveTarget<DB, S["table"], S["alias"], "merge into">;
+			: InvalidRef<BindFrom<[S["source"]], Env>, Item["alias"]>
+		: ResolveTarget<Env["db"], S["table"], S["alias"], "merge into">;
 
 type ReturningSource<Ws extends readonly MergeWhen[], L extends ScopeLevel> = [
 	Extract<
@@ -149,9 +138,7 @@ type CheckWhens<
 	Item extends ScopeItem,
 	L extends ScopeLevel,
 	Name extends string,
-	DB,
-	Outer extends Scope,
-	Ctes extends CteMap,
+	Env extends QueryContext,
 	Done extends string,
 > = Ws extends readonly [
 	infer W extends MergeWhen,
@@ -166,7 +153,7 @@ type CheckWhens<
 					W,
 					Tbl,
 					Name,
-					DmlCtx<DB, WhenLevel<W["match"], Item, L>, Outer, Ctes>
+					DmlCtx<Env, WhenLevel<W["match"], Item, L>>
 				> extends infer X
 			? X extends AnyErr
 				? InvalidRef<X, HiddenNames<W["match"], Item, L>>
@@ -176,9 +163,7 @@ type CheckWhens<
 						Item,
 						L,
 						Name,
-						DB,
-						Outer,
-						Ctes,
+						Env,
 						W["cond"] extends null ? Done | W["match"] : Done
 					>
 			: never
@@ -245,38 +230,35 @@ type CheckMergeInsert<
 			: CheckValueItems<Vals, C>
 	: CheckRequired<Tbl, [], Name>;
 
-export type ParamsOfMerge<S extends MergeStmt, DB, Ctes extends CteMap, M> =
+export type ParamsOfMerge<S extends MergeStmt, DB, Ctes extends CteMap> =
 	ResolveTarget<DB, S["table"], S["alias"], "merge into"> extends Target_<
 		infer Tbl,
 		infer Item
 	>
-		? BindFrom<[S["source"]], DB, [], Ctes> extends infer L extends ScopeLevel
-			? ParamsOfReturning<
-					S["returning"],
-					S["retOpts"],
-					[Item, ...ReturningSource<S["whens"], L>],
-					Tbl,
-					HasAction<S["whens"], "insert">,
-					HasAction<S["whens"], "delete">,
-					DB,
-					Ctes,
-					ParamsOfWhens<
-						S["whens"],
-						Tbl,
-						Item,
-						L,
-						DB,
-						Ctes,
-						ParamsOfOpt<
+		? BindFrom<
+				[S["source"]],
+				QueryContext<DB, [], Ctes>
+			> extends infer L extends ScopeLevel
+			?
+					| ParamsOfFromItems<[S["source"]], MkCtx<DB, [], Ctes, false>>
+					| ParamsOfOpt<
 							S["on"],
-							DmlCtx<DB, [Item, ...L], [], Ctes>,
-							ParamsOfFromItems<[S["source"]], MkCtx<DB, [], Ctes, false>, M>,
+							DmlCtx<QueryContext<DB, [], Ctes>, [Item, ...L]>,
 							Info<"bool">
-						>
-					>
-				>
-			: M
-		: M;
+					  >
+					| ParamsOfWhens<S["whens"], Tbl, Item, L, DB, Ctes>
+					| ParamsOfReturning<
+							S["returning"],
+							S["retOpts"],
+							[Item, ...ReturningSource<S["whens"], L>],
+							Tbl,
+							HasAction<S["whens"], "insert">,
+							HasAction<S["whens"], "delete">,
+							DB,
+							Ctes
+					  >
+			: never
+		: never;
 
 type ParamsOfWhens<
 	Ws extends readonly MergeWhen[],
@@ -285,34 +267,29 @@ type ParamsOfWhens<
 	L extends ScopeLevel,
 	DB,
 	Ctes extends CteMap,
-	M,
-> = Ws extends readonly [
-	infer W extends MergeWhen,
-	...infer R extends readonly MergeWhen[],
-]
-	? ParamsOfWhens<
-			R,
+> = ParamsOfBranch<Ws[number], Tbl, Item, L, DB, Ctes>;
+type ParamsOfBranch<
+	W extends MergeWhen,
+	Tbl extends Table,
+	Item extends ScopeItem,
+	L extends ScopeLevel,
+	DB,
+	Ctes extends CteMap,
+> = W extends unknown
+	? ParamsOfWhen<
+			W,
 			Tbl,
-			Item,
-			L,
-			DB,
-			Ctes,
-			ParamsOfWhen<
-				W,
-				Tbl,
-				DmlCtx<DB, WhenLevel<W["match"], Item, L>, [], Ctes>,
-				M
-			>
+			DmlCtx<QueryContext<DB, [], Ctes>, WhenLevel<W["match"], Item, L>>
 		>
-	: M;
+	: never;
 
-type ParamsOfWhen<W extends MergeWhen, Tbl extends Table, C extends Ctx, M> =
-	ParamsOfOpt<W["cond"], C, M, Info<"bool">> extends infer M1
+type ParamsOfWhen<W extends MergeWhen, Tbl extends Table, C extends Ctx> =
+	ParamsOfOpt<W["cond"], C, Info<"bool">> extends infer M1
 		? W["action"] extends {
 				readonly t: "update";
 				readonly set: infer Set extends readonly SetItem[];
 			}
-			? ParamsOfSet<Set, Tbl, C, M1>
+			? M1 | ParamsOfSet<Set, Tbl, C>
 			: W["action"] extends {
 						readonly t: "insert";
 						readonly columns: infer Cols;
@@ -321,12 +298,10 @@ type ParamsOfWhen<W extends MergeWhen, Tbl extends Table, C extends Ctx, M> =
 					}
 				? (Cols extends readonly string[] ? Cols : []) extends infer Cs extends
 						readonly string[]
-					? ParamsOfRowInfos<
-							Vals,
-							TargetInfos<Cs, Ind, Tbl, C>,
-							C,
-							ParamsOfInds<Cs, Ind, Tbl, C, M1>
-						>
+					?
+							| M1
+							| ParamsOfInds<Cs, Ind, Tbl, C>
+							| ParamsOfRowInfos<Vals, TargetInfos<Cs, Ind, Tbl, C>, C>
 					: never
 				: M1
 		: never;

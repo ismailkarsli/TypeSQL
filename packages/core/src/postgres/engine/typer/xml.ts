@@ -170,65 +170,45 @@ type ColNames<Acc extends Cols> = Acc[number] extends infer E
 export type ParamsOfXml<
 	E extends Expr,
 	C extends Ctx,
-	M,
 > = E["op"] extends "element"
-	? ParamsOfList<E["args"], C, ParamsOfList<E["named"], C, M, null>, null>
+	? ParamsOfList<E["named"], C, null> | ParamsOfList<E["args"], C, null>
 	: E["op"] extends "forest"
-		? ParamsOfList<E["named"], C, M, null>
+		? ParamsOfList<E["named"], C, null>
 		: E["op"] extends "pi" | "parse"
-			? ParamsOfList<E["args"], C, M, Info<"text", true>>
+			? ParamsOfList<E["args"], C, Info<"text", true>>
 			: E["op"] extends "root"
 				? E["args"] extends readonly [
 						infer X extends Expr,
 						...infer R extends readonly Expr[],
 					]
-					? ParamsOfList<
-							R,
-							C,
-							ParamsOfOpt<X, C, M, Info<"xml", true>>,
-							Info<"text", true>
-						>
+					?
+							| ParamsOfOpt<X, C, Info<"xml", true>>
+							| ParamsOfList<R, C, Info<"text", true>>
 					: never
-				: ParamsOfList<E["args"], C, M, Info<"xml", true>>;
+				: ParamsOfList<E["args"], C, Info<"xml", true>>;
 
-export type ParamsOfXmlTable<F, C extends Ctx, M> = F extends {
+export type ParamsOfXmlTable<F, C extends Ctx> = F extends {
 	readonly ns: infer Ns extends readonly Expr[];
 	readonly row: infer Row extends Expr;
 	readonly doc: infer Doc extends Expr;
 	readonly cols: infer Cs extends readonly XmlTableCol[];
 }
-	? ParamsOfXmlCols<
-			Cs,
-			C,
-			ParamsOfOpt<
-				Doc,
-				C,
-				ParamsOfOpt<
-					Row,
-					C,
-					ParamsOfList<Ns, C, M, Info<"text", true>>,
-					Info<"text", true>
-				>,
-				Info<"xml", true>
-			>
-		>
+	?
+			| ParamsOfList<Ns, C, Info<"text", true>>
+			| ParamsOfOpt<Row, C, Info<"text", true>>
+			| ParamsOfOpt<Doc, C, Info<"xml", true>>
+			| ParamsOfXmlCols<Cs, C>
 	: never;
 type ParamsOfXmlCols<
 	Cs extends readonly XmlTableCol[],
 	C extends Ctx,
-	M,
-> = Cs extends readonly [
-	infer D extends XmlTableCol,
-	...infer R extends readonly XmlTableCol[],
-]
-	? ParamsOfXmlCols<
-			R,
-			C,
-			ParamsOfOpt<
-				D["def"],
-				C,
-				ParamsOfOpt<D["path"], C, M, Info<"text", true>>,
-				{ readonly type: D["type"]; readonly nullable: true }
-			>
-		>
-	: M;
+> = ParamsOfXmlCol<Cs[number], C>;
+type ParamsOfXmlCol<D extends XmlTableCol, C extends Ctx> = D extends unknown
+	?
+			| ParamsOfOpt<D["path"], C, Info<"text", true>>
+			| ParamsOfOpt<
+					D["def"],
+					C,
+					{ readonly type: D["type"]; readonly nullable: true }
+			  >
+	: never;

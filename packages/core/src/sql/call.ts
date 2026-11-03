@@ -3,7 +3,7 @@ import type { EngineTypes } from "../engine/contract.js";
 import type { ArgsOf, ParamsOf, RowOf, Validate } from "../engine/infer.js";
 import type { AnyErr, SqlError } from "../errors.js";
 import type { PluginInput, PluginOutput, SqlPlugin } from "../plugin.js";
-import type { Query } from "../query.js";
+import type { Executor, InlineFragment, PARAMS, ROW, TEXT } from "../query.js";
 import type { HasDefaultable, Skip, WithDefaults } from "./inline.js";
 import type { Inlined, InlinedSlots, InlinedText } from "./inline-fragment.js";
 import type { NamedParams } from "./named.js";
@@ -228,16 +228,40 @@ export type CallRet<
 	Q extends string,
 	Plugins extends readonly SqlPlugin[] = [],
 > = [CallText<Q>] extends [infer X extends string]
-	? Query<
-			PluginOutput<RowOf<E, DB, TM, X>, Plugins>,
-			Extract<
-				PluginInput<
-					ParamsOf<E, DB, TM, X>,
-					Plugins,
-					{ readonly kind: "parameters"; readonly query: string }
-				>,
-				readonly unknown[]
-			>,
-			X
-		>
+	? InferredQuery<E, DB, TM, X, Plugins> & InlineFragment
 	: never;
+type CallRow<
+	E extends EngineTypes,
+	DB,
+	TM,
+	X extends string,
+	Plugins extends readonly SqlPlugin[],
+> = PluginOutput<RowOf<E, DB, TM, X>, Plugins>;
+export interface InferredQuery<
+	E extends EngineTypes,
+	DB,
+	TM,
+	X extends string,
+	Plugins extends readonly SqlPlugin[],
+> {
+	readonly text: string;
+	readonly values: readonly unknown[];
+	readonly [ROW]?: CallRow<E, DB, TM, X, Plugins>;
+	readonly [PARAMS]?: Extract<
+		PluginInput<
+			ParamsOf<E, DB, TM, X>,
+			Plugins,
+			{ readonly kind: "parameters"; readonly query: string }
+		>,
+		readonly unknown[]
+	>;
+	readonly [TEXT]?: X;
+	execute(executor?: Executor): Promise<CallRow<E, DB, TM, X, Plugins>[]>;
+	executeTakeFirst(
+		executor?: Executor,
+	): Promise<CallRow<E, DB, TM, X, Plugins> | undefined>;
+	executeTakeFirstOrThrow(
+		executor?: Executor,
+	): Promise<CallRow<E, DB, TM, X, Plugins>>;
+	executeCount(executor?: Executor): Promise<number>;
+}

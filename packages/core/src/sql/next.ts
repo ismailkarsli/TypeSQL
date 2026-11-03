@@ -11,9 +11,16 @@ interface Succ {
 }
 type Inc<S extends string> = S extends `${infer H}9`
 	? `${H extends "" ? "1" : Inc<H>}0`
-	: {
-			[D in keyof Succ]: S extends `${infer H}${D}` ? `${H}${Succ[D]}` : never;
-		}[keyof Succ];
+	: IncLast<S>;
+type IncLast<
+	S extends string,
+	Prefix extends string = "",
+> = S extends keyof Succ
+	? `${Prefix}${Succ[S]}`
+	: S extends `${infer H}${infer R}`
+		? IncLast<R, `${Prefix}${H}`>
+		: never;
+
 type Untracked<S extends string> =
 	S extends `${infer A}${infer B}${infer C}${infer D}${infer E}`
 		? E extends ""

@@ -1,21 +1,16 @@
-import type { CteMap, Scope } from "../../../engine/types.js";
+import type { QueryContext } from "../../../engine/types.js";
 import type { AnyErr } from "../../../errors.js";
 import type { DmlStmt, SelectStmt, Stmt, Tag } from "../ast.js";
 import type { ProjectDml } from "./dml.js";
 import type { ProjectSelect } from "./select.js";
 
-export type ProjectStmt<
-	S extends Stmt,
-	DB,
-	Outer extends Scope,
-	Ctes extends CteMap,
-> =
+export type ProjectStmt<S extends Stmt, Env extends QueryContext> =
 	S extends Tag<"select">
-		? ProjectSelect<Extract<S, SelectStmt>, DB, Outer, Ctes>
+		? ProjectSelect<Extract<S, SelectStmt>, Env>
 		: S extends DmlStmt
-			? ProjectDml<S, DB, Outer, Ctes>
+			? ProjectDml<S, Env>
 			: S extends Tag<"declare_cursor">
-				? ProjectSelect<S["q"], DB, Outer, Ctes> extends AnyErr
-					? ProjectSelect<S["q"], DB, Outer, Ctes>
+				? ProjectSelect<S["q"], Env> extends AnyErr
+					? ProjectSelect<S["q"], Env>
 					: null
 				: null;

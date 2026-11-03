@@ -1,6 +1,6 @@
-import type { AddParam, NullTest } from "../../../engine/params.js";
+import type { NullTest, ParamEntry } from "../../../engine/params.js";
 import type { Nx } from "../../../engine/parse.js";
-import type { ColInfo, Scope } from "../../../engine/types.js";
+import type { ColInfo, QueryContext, Scope } from "../../../engine/types.js";
 import type {
 	Expr,
 	FromItem,
@@ -59,7 +59,7 @@ type Use<T, N extends boolean> = T extends ColInfo
 
 type Comparison = "=" | "!=" | "<" | ">" | "<=" | ">=";
 
-export type ParamsOfExpr<E, C extends SqCtx, M> = E extends {
+export type ParamsOfExpr<E, C extends SqCtx> = E extends {
 	readonly t:
 		| "col"
 		| "num"
@@ -70,43 +70,41 @@ export type ParamsOfExpr<E, C extends SqCtx, M> = E extends {
 		| "ctime"
 		| "param";
 }
-	? M
+	? never
 	: E extends Expr
-		? ParamsComplex<E, C, M>
-		: M;
+		? ParamsComplex<E, C>
+		: never;
 
-type ParamsComplex<E extends Expr, C extends SqCtx, M> = E extends {
+type ParamsComplex<E extends Expr, C extends SqCtx> = E extends {
 	readonly t: "bin";
 }
-	? ParamsOfBin<E["op"], E["l"], E["r"], C, M>
+	? ParamsOfBin<E["op"], E["l"], E["r"], C>
 	: E extends { readonly t: "un" }
 		? Slot<
 				E["e"],
 				C,
-				M,
 				E["op"] extends "-" ? Info<"numeric", false> : Info<"integer", true>
 			>
 		: E extends { readonly t: "cast" }
-			? Slot<E["e"], C, M, Info<CastParam<Lowercase<E["to"]>>, false>>
+			? Slot<E["e"], C, Info<CastParam<Lowercase<E["to"]>>, false>>
 			: E extends { readonly t: "collate" }
-				? Slot<E["e"], C, M, Info<"text", false>>
+				? Slot<E["e"], C, Info<"text", false>>
 				: E extends { readonly t: "is" }
-					? Slot<E["e"], C, M, NullTest>
+					? Slot<E["e"], C, NullTest>
 					: E extends { readonly t: "isdistinct" }
-						? PairParams<E["l"], E["r"], C, M, true>
+						? PairParams<E["l"], E["r"], C, true>
 						: E extends { readonly t: "between" }
-							? ListParams<[E["e"], E["lo"], E["hi"]], C, M, false>
+							? ListParams<[E["e"], E["lo"], E["hi"]], C, false>
 							: E extends { readonly t: "in" }
-								? ListParams<[E["e"], ...E["list"]], C, M, false>
+								? ListParams<[E["e"], ...E["list"]], C, false>
 								: E extends { readonly t: "insub" }
-									? InSubParams<E["e"], E["q"], C, M>
+									? InSubParams<E["e"], E["q"], C>
 									: E extends { readonly t: "intable" }
 										? ParamsOfList<
 												E["args"] extends readonly Expr[]
 													? [E["e"], ...E["args"]]
 													: [E["e"]],
-												C,
-												M
+												C
 											>
 										: E extends { readonly t: "like" }
 											? ListParams<
@@ -114,25 +112,18 @@ type ParamsComplex<E extends Expr, C extends SqCtx, M> = E extends {
 														? [E["e"], E["pat"], E["esc"]]
 														: [E["e"], E["pat"]],
 													C,
-													M,
 													false,
 													Info<"text", false>
 												>
 											: E extends { readonly t: "case" }
-												? CaseParams<E, C, M>
+												? CaseParams<E, C>
 												: E extends { readonly t: "call" }
-													? CallParams<E, C, M>
+													? CallParams<E, C>
 													: E extends { readonly t: "sub" | "exists" }
-														? ParamsOfSelect<
-																E["q"],
-																C["db"],
-																C["scope"],
-																C["ctes"],
-																M
-															>
+														? ParamsOfSelect<E["q"], C>
 														: E extends { readonly t: "row" }
-															? ParamsOfList<E["items"], C, M>
-															: M;
+															? ParamsOfList<E["items"], C>
+															: never;
 
 type CastParam<To extends string> = To extends ""
 	? "unknown"
@@ -145,24 +136,23 @@ type ParamsOfBin<
 	L extends Expr,
 	R extends Expr,
 	C extends SqCtx,
-	M,
 > = Op extends "and" | "or"
-	? ParamsOfExpr<R, C, ParamsOfExpr<L, C, BoolParam<L, BoolParam<R, M>>>>
+	? BoolParam<R> | BoolParam<L> | ParamsOfExpr<L | R, C>
 	: Op extends Comparison
 		? L extends { readonly t: "row" }
 			? R extends { readonly t: "row" }
-				? RowPairs<L["items"], R["items"], C, M, 0>
-				: ParamsOfExpr<R, C, ParamsOfList<L["items"], C, M>>
-			: PairParams<L, R, C, M, false>
+				? RowPairs<L["items"], R["items"], C, never, 0>
+				: ParamsOfList<L["items"], C> | ParamsOfExpr<R, C>
+			: PairParams<L, R, C, false>
 		: Op extends "||" | "->" | "->>"
-			? FixedPair<L, R, C, M, Info<"text", false>>
+			? FixedPair<L, R, C, Info<"text", false>>
 			: Op extends "&" | "|" | "<<" | ">>"
-				? FixedPair<L, R, C, M, Info<"integer", false>>
-				: PairParams<L, R, C, M, "num">;
+				? FixedPair<L, R, C, Info<"integer", false>>
+				: PairParams<L, R, C, "num">;
 
-type BoolParam<E, M> = [ParamN<E>] extends [never]
-	? M
-	: AddParam<M, ParamN<E>, Info<"integer", true>>;
+type BoolParam<E> = [ParamN<E>] extends [never]
+	? never
+	: ParamEntry<ParamN<E>, Info<"integer", true>>;
 
 type RowPairs<
 	L extends readonly Expr[],
@@ -172,7 +162,7 @@ type RowPairs<
 	I extends number,
 > = L[I] extends infer A extends Expr
 	? R[I] extends infer B extends Expr
-		? RowPairs<L, R, C, PairParams<A, B, C, M, false>, Nx<I>>
+		? RowPairs<L, R, C, M | PairParams<A, B, C, false>, Nx<I>>
 		: M
 	: M;
 
@@ -180,29 +170,27 @@ type PairParams<
 	L extends Expr,
 	R extends Expr,
 	C extends SqCtx,
-	M,
 	K extends boolean | "num",
 > = [ParamN<L>] extends [never]
 	? [ParamN<R>] extends [never]
-		? ParamsOfExpr<R, C, ParamsOfExpr<L, C, M>>
-		: AddParam<ParamsOfExpr<L, C, M>, ParamN<R>, SibSlot<Sib<L, C>, K>>
+		? ParamsOfExpr<L | R, C>
+		: ParamsOfExpr<L, C> | ParamEntry<ParamN<R>, SibSlot<Sib<L, C>, K>>
 	: [ParamN<R>] extends [never]
-		? AddParam<ParamsOfExpr<R, C, M>, ParamN<L>, SibSlot<Sib<R, C>, K>>
-		: AddParam<AddParam<M, ParamN<L>, BothSlot<K>>, ParamN<R>, BothSlot<K>>;
+		? ParamsOfExpr<R, C> | ParamEntry<ParamN<L>, SibSlot<Sib<R, C>, K>>
+		: ParamEntry<ParamN<L>, BothSlot<K>> | ParamEntry<ParamN<R>, BothSlot<K>>;
 type SibSlot<S, K> = K extends boolean ? Use<S, K> : Info<NumParam<S>, false>;
 type BothSlot<K> = K extends boolean
 	? Info<"unknown", K>
 	: Info<"numeric", false>;
 
-type FixedPair<L extends Expr, R extends Expr, C extends SqCtx, M, T> = Slot<
-	R,
-	C,
-	Slot<L, C, M, T>,
-	T
->;
-export type Slot<E, C extends SqCtx, M, T> = [ParamN<E>] extends [never]
-	? ParamsOfExpr<E, C, M>
-	: AddParam<M, ParamN<E>, T>;
+type FixedPair<L extends Expr, R extends Expr, C extends SqCtx, T> =
+	| Slot<L, C, T>
+	| Slot<R, C, T>;
+export type Slot<E, C extends SqCtx, T> = E extends unknown
+	? [ParamN<E>] extends [never]
+		? ParamsOfExpr<E, C>
+		: ParamEntry<ParamN<E>, T>
+	: never;
 
 type NumParam<S> = S extends ColInfo
 	? Affinity<S["type"]> extends infer A
@@ -215,11 +203,10 @@ type NumParam<S> = S extends ColInfo
 type ListParams<
 	L extends readonly Expr[],
 	C extends SqCtx,
-	M,
 	Nullable extends boolean,
 	Fixed = null,
 > = (Fixed extends ColInfo ? Fixed : FirstSib<L, C, 0>) extends infer S
-	? FnArgs<L, C, M, readonly Use<S, Nullable>[]>
+	? FnArgs<L, C, never, readonly Use<S, Nullable>[]>
 	: never;
 type FirstSib<
 	L extends readonly Expr[],
@@ -234,48 +221,39 @@ type FirstSib<
 			: never
 		: FirstSib<L, C, Nx<I>>
 	: null;
-export type ParamsOfList<
-	L extends readonly Expr[],
-	C extends SqCtx,
-	M,
-> = FnArgs<L, C, M, readonly Info<"unknown", true>[]>;
-
-type InSubParams<
-	L extends Expr,
-	Q extends SelectStmt,
-	C extends SqCtx,
-	M,
-> = ParamsOfSelect<
-	Q,
-	C["db"],
-	C["scope"],
-	C["ctes"],
-	[ParamN<L>] extends [never]
-		? ParamsOfExpr<L, C, M>
-		: AddParam<
-				M,
-				ParamN<L>,
-				SubqueryCol<Q, C> extends infer S extends ColInfo
-					? Info<S["type"], false>
-					: Info<"unknown", false>
-			>
+export type ParamsOfList<L extends readonly Expr[], C extends SqCtx> = FnArgs<
+	L,
+	C,
+	never,
+	readonly Info<"unknown", true>[]
 >;
 
-type CaseParams<E extends Expr, C extends SqCtx, M> = (
+type InSubParams<L extends Expr, Q extends SelectStmt, C extends SqCtx> =
+	| ([ParamN<L>] extends [never]
+			? ParamsOfExpr<L, C>
+			: ParamEntry<
+					ParamN<L>,
+					SubqueryCol<Q, C> extends infer S extends ColInfo
+						? Info<S["type"], false>
+						: Info<"unknown", false>
+				>)
+	| ParamsOfSelect<Q, C>;
+
+type CaseParams<E extends Expr, C extends SqCtx> = (
 	E["operand"] extends Expr
 		? E["operand"]
 		: null
 ) extends infer Op
-	? CaseLoop<
-			E["whens"],
-			C,
-			Op,
-			CaseValueType<E, C>,
-			Op extends Expr ? ParamsOfExpr<Op, C, M> : M,
-			0
-		> extends infer M2
+	?
+			| (Op extends Expr ? ParamsOfExpr<Op, C> : never)
+			| CaseLoop<
+					E["whens"][number],
+					C,
+					Op,
+					CaseValueType<E, C>
+			  > extends infer M2
 		? E["else"] extends Expr
-			? Slot<E["else"], C, M2, CaseValueType<E, C>>
+			? M2 | Slot<E["else"], C, CaseValueType<E, C>>
 			: M2
 		: never
 	: never;
@@ -308,34 +286,19 @@ type CaseValues<
 			? [...Acc, S]
 			: Acc
 		: Acc;
-type CaseLoop<
-	Ws extends readonly unknown[],
-	C extends SqCtx,
-	Op,
-	VT,
-	M,
-	I extends number,
-> = Ws[I] extends {
+type CaseLoop<Branch, C extends SqCtx, Op, VT> = Branch extends {
 	readonly when: infer W extends Expr;
 	readonly then: infer V extends Expr;
 }
-	? CaseLoop<
-			Ws,
-			C,
-			Op,
-			VT,
-			Slot<V, C, M, VT> extends infer M1
-				? [ParamN<W>] extends [never]
-					? ParamsOfExpr<W, C, M1>
-					: AddParam<
-							M1,
+	?
+			| Slot<V, C, VT>
+			| ([ParamN<W>] extends [never]
+					? ParamsOfExpr<W, C>
+					: ParamEntry<
 							ParamN<W>,
 							Op extends Expr ? Use<Sib<Op, C>, false> : Info<"integer", true>
-						>
-				: never,
-			Nx<I>
-		>
-	: M;
+						>)
+	: never;
 
 type TextFns =
 	| "lower"
@@ -396,95 +359,55 @@ type NumFns =
 	| "avg";
 type SameFns = "coalesce" | "ifnull" | "nullif" | "max" | "min";
 
-type CallParams<E extends Expr, C extends SqCtx, M> = (
-	E["filter"] extends Expr
-		? ParamsOfExpr<E["filter"], C, M>
-		: M
-) extends infer M1
-	? ParamsOfList<
-			E["order"],
-			C,
-			DeclaredFn<C["db"], E["name"]> extends infer D extends {}
-				? FnArgs<
-						E["args"],
-						C,
-						M1,
-						SigSlots<PickSig<D, E["args"]["length"]>, E["args"]>
-					>
-				: E["name"] extends SameFns
-					? FnArgs<
-							E["args"],
-							C,
-							M1,
-							readonly Info<
-								FirstSib<E["args"], C, 0> extends infer S extends ColInfo
-									? S["type"]
-									: "unknown",
-								true
-							>[]
-						>
-					: E["name"] extends "iif" | "if"
-						? IifParams<E["args"], C, M1>
-						: E["name"] extends "substr" | "substring"
-							? FnArgs<
-									E["args"],
-									C,
-									M1,
-									[
-										Info<"text", true>,
-										Info<"integer", true>,
-										Info<"integer", true>,
-									]
-								>
-							: E["name"] extends "lag" | "lead" | "nth_value"
-								? FnArgs<
-										E["args"],
-										C,
-										M1,
-										[
-											Info<"unknown", true>,
-											Info<"integer", false>,
-											Info<"unknown", true>,
-										]
-									>
-								: E["name"] extends
-											| "json_extract"
-											| "jsonb_extract"
-											| "json_type"
-											| "json_array_length"
-											| "json_remove"
-											| "jsonb_remove"
-											| "json_valid"
-											| "json"
-											| "jsonb"
-											| "json_patch"
-											| "jsonb_patch"
-											| "json_pretty"
-									? FnArgs<
-											E["args"],
-											C,
-											M1,
-											[Info<"json", true>, ...Info<"text", true>[]]
-										>
-									: E["name"] extends TextFns
-										? FnArgs<E["args"], C, M1, readonly Info<"text", true>[]>
-										: E["name"] extends NumFns
-											? FnArgs<
-													E["args"],
-													C,
-													M1,
-													readonly Info<"numeric", true>[]
-												>
-											: ParamsOfList<E["args"], C, M1>
-		> extends infer M2
-		? E["over"] extends {
-				readonly partition: infer P extends readonly Expr[];
-				readonly order: infer O extends readonly Expr[];
-			}
-			? ParamsOfList<[...P, ...O], C, M2>
-			: M2
-		: never
-	: never;
+type CallParams<E extends Expr, C extends SqCtx> =
+	| ParamsOfExpr<E["filter"], C>
+	| FnArgs<E["args"], C, never, CallSlots<E, C>>
+	| ParamsOfList<E["order"], C>
+	| (E["over"] extends {
+			readonly partition: infer P extends readonly Expr[];
+			readonly order: infer O extends readonly Expr[];
+	  }
+			? ParamsOfList<[...P, ...O], C>
+			: never);
+type CallSlots<E extends Expr, C extends SqCtx> =
+	DeclaredFn<C["db"], E["name"]> extends infer D extends {}
+		? SigSlots<PickSig<D, E["args"]["length"]>, E["args"]>
+		: E["name"] extends SameFns
+			? readonly Info<
+					FirstSib<E["args"], C, 0> extends infer S extends ColInfo
+						? S["type"]
+						: "unknown",
+					true
+				>[]
+			: E["name"] extends "iif" | "if"
+				? IifSlots<E["args"], Info<IifValueType<E["args"], C, 1, []>, true>>
+				: E["name"] extends "substr" | "substring"
+					? [Info<"text", true>, Info<"integer", true>, Info<"integer", true>]
+					: E["name"] extends "lag" | "lead" | "nth_value"
+						? [
+								Info<"unknown", true>,
+								Info<"integer", false>,
+								Info<"unknown", true>,
+							]
+						: E["name"] extends
+									| "json_extract"
+									| "jsonb_extract"
+									| "json_type"
+									| "json_array_length"
+									| "json_remove"
+									| "jsonb_remove"
+									| "json_valid"
+									| "json"
+									| "jsonb"
+									| "json_patch"
+									| "jsonb_patch"
+									| "json_pretty"
+							? [Info<"json", true>, ...Info<"text", true>[]]
+							: E["name"] extends TextFns
+								? readonly Info<"text", true>[]
+								: E["name"] extends NumFns
+									? readonly Info<"numeric", true>[]
+									: readonly Info<"unknown", true>[];
 
 type SigSlots<
 	S,
@@ -504,18 +427,12 @@ export type FnArgs<
 	? FnArgs<
 			L,
 			C,
-			Slot<E, C, M, Ts[I] extends ColInfo ? Ts[I] : Info<"unknown", true>>,
+			M | Slot<E, C, Ts[I] extends ColInfo ? Ts[I] : Info<"unknown", true>>,
 			Ts,
 			Nx<I>
 		>
 	: M;
 
-type IifParams<L extends readonly Expr[], C extends SqCtx, M> = FnArgs<
-	L,
-	C,
-	M,
-	IifSlots<L, Info<IifValueType<L, C, 1, []>, true>>
->;
 type IifValueType<
 	L extends readonly Expr[],
 	C extends SqCtx,
@@ -558,155 +475,121 @@ type IsCond<L extends readonly Expr[], I extends number> = I extends
 export type ParamsOfTargets<
 	Ts extends readonly Target[],
 	C extends SqCtx,
-	M,
-	I extends number = 0,
-> = Ts[I] extends infer T
-	? T extends { readonly t: "expr"; readonly e: infer E extends Expr }
-		? ParamsOfTargets<Ts, C, Slot<E, C, M, Info<"unknown", true>>, Nx<I>>
-		: T extends Target
-			? ParamsOfTargets<Ts, C, M, Nx<I>>
-			: M
-	: M;
+> = TargetParams<Ts[number], C>;
+type TargetParams<T, C extends SqCtx> = T extends {
+	readonly t: "expr";
+	readonly e: infer E extends Expr;
+}
+	? Slot<E, C, Info<"unknown", true>>
+	: never;
 
 export type ParamsOfSelect<
 	Q extends SelectStmt,
-	DB,
-	Outer extends Scope,
-	Ctes extends SqCteMap,
-	M,
-> =
-	BindWith<Q["with"], DB, Outer, Ctes> extends infer C2
-		? C2 extends SqCteMap
-			? ParamsOfWith<
-					Q["with"],
-					DB,
-					Outer,
-					C2,
-					ParamsOfBody<Q["body"], DB, Outer, C2, Q["orderBy"], M>
-				> extends infer M1
-				? LimitParams<Q["limit"], LimitParams<Q["offset"], M1>>
-				: never
-			: M
-		: M;
+	Env extends QueryContext<unknown, Scope, SqCteMap>,
+> = Q extends unknown
+	? BindWith<Q["with"], Env> extends infer C2 extends SqCteMap
+		?
+				| ParamsOfBody<
+						Q["body"],
+						QueryContext<Env["db"], Env["scope"], C2>,
+						Q["orderBy"]
+				  >
+				| ParamsOfWith<Q["with"], QueryContext<Env["db"], Env["scope"], C2>>
+				| LimitParams<Q["offset"]>
+				| LimitParams<Q["limit"]>
+		: never
+	: never;
 
-type LimitParams<E, M> = E extends Expr
-	? Slot<E, Ctx<{}, [], {}>, M, Info<"integer", false>>
-	: M;
+type LimitParams<E> = E extends Expr
+	? Slot<E, Ctx<{}, [], {}>, Info<"integer", false>>
+	: never;
 
 type ParamsOfWith<
 	W,
-	DB,
-	Outer extends Scope,
-	Ctes extends SqCteMap,
-	M,
+	Env extends QueryContext<unknown, Scope, SqCteMap>,
 > = W extends {
 	readonly ctes: infer L extends readonly { readonly q: SelectStmt }[];
 }
-	? WithLoop<L, DB, Outer, Ctes, M, 0>
-	: M;
+	? WithLoop<L, Env>
+	: never;
 type WithLoop<
 	L extends readonly { readonly q: SelectStmt }[],
-	DB,
-	Outer extends Scope,
-	Ctes extends SqCteMap,
-	M,
-	I extends number,
-> = L[I] extends { readonly q: infer Q extends SelectStmt }
-	? WithLoop<L, DB, Outer, Ctes, ParamsOfSelect<Q, DB, Outer, Ctes, M>, Nx<I>>
-	: M;
+	Env extends QueryContext<unknown, Scope, SqCteMap>,
+> = ParamsOfSelect<L[number]["q"], Env>;
 
 type ParamsOfBody<
 	B extends SelectBody,
-	DB,
-	Outer extends Scope,
-	Ctes extends SqCteMap,
+	Env extends QueryContext<unknown, Scope, SqCteMap>,
 	OrderBy extends readonly Expr[],
-	M,
 > = B extends { readonly t: "simple" }
-	? ParamsOfSimple<Extract<B, SimpleSelect>, DB, Outer, Ctes, OrderBy, M>
+	? ParamsOfSimple<Extract<B, SimpleSelect>, Env, OrderBy>
 	: B extends { readonly t: "values" }
-		? ValuesParams<B["rows"], Ctx<DB, Outer, Ctes>, M, 0>
+		? ValuesParams<B["rows"], Ctx<Env["db"], Env["scope"], Env["ctes"]>>
 		: B extends { readonly t: "setop" }
-			? ParamsOfBody<
-					B["r"],
-					DB,
-					Outer,
-					Ctes,
-					[],
-					ParamsOfBody<B["l"], DB, Outer, Ctes, [], M>
-				>
-			: M;
+			? ParamsOfBody<B["l"], Env, []> | ParamsOfBody<B["r"], Env, []>
+			: never;
 
 type ValuesParams<
 	Rows extends readonly (readonly Expr[])[],
 	C extends SqCtx,
-	M,
-	I extends number,
-> = Rows[I] extends infer R extends readonly Expr[]
-	? ValuesParams<Rows, C, ParamsOfList<R, C, M>, Nx<I>>
-	: M;
+> = Slot<Rows[number][number], C, Info<"unknown", true>>;
 
 export type ParamsOfFrom<
 	F,
-	DB,
-	Outer extends Scope,
-	Ctes extends SqCteMap,
-	M,
+	Env extends QueryContext<unknown, Scope, SqCteMap>,
 > = F extends FromItem
 	? F extends { readonly t: "sub" }
-		? ParamsOfSelect<F["q"], DB, Outer, Ctes, M>
+		? ParamsOfSelect<F["q"], Env>
 		: F extends { readonly t: "func" }
-			? ParamsOfList<F["args"], Ctx<DB, Outer, Ctes>, M>
+			? ParamsOfList<F["args"], Ctx<Env["db"], Env["scope"], Env["ctes"]>>
 			: F extends { readonly t: "join" }
-				? ParamsOfFrom<
-						F["r"],
-						DB,
-						Outer,
-						Ctes,
-						ParamsOfFrom<F["l"], DB, Outer, Ctes, M>
-					> extends infer M1
+				? ParamsOfFrom<F["l"], Env> | ParamsOfFrom<F["r"], Env> extends infer M1
 					? F["on"] extends Expr
-						? BindFrom<F, DB, Outer, Ctes> extends infer L extends SqLevel
-							? ParamsOfExpr<
-									F["on"],
-									Ctx<DB, [L, ...Outer], Ctes>,
-									BoolParam<F["on"], M1>
-								>
+						? BindFrom<F, Env> extends infer L extends SqLevel
+							?
+									| M1
+									| BoolParam<F["on"]>
+									| ParamsOfExpr<
+											F["on"],
+											Ctx<Env["db"], [L, ...Env["scope"]], Env["ctes"]>
+									  >
 							: M1
 						: M1
 					: never
-				: M
-	: M;
+				: never
+	: never;
 
 type ParamsOfSimple<
 	S extends SimpleSelect,
-	DB,
-	Outer extends Scope,
-	Ctes extends SqCteMap,
+	Env extends QueryContext<unknown, Scope, SqCteMap>,
 	OrderBy extends readonly Expr[],
-	M,
 > =
-	ParamsOfFrom<S["from"], DB, Outer, Ctes, M> extends infer M1
-		? BindFrom<S["from"], DB, Outer, Ctes> extends infer L
+	ParamsOfFrom<S["from"], Env> extends infer M1
+		? BindFrom<S["from"], Env> extends infer L
 			? L extends SqLevel
-				? Ctx<DB, [L, ...Outer], Ctes> extends infer C extends SqCtx
-					? ParamsOfTargets<
-							S["targets"],
-							C,
-							ParamsOfList<
-								[
-									...(S["groupBy"] extends readonly Expr[] ? S["groupBy"] : []),
-									...OrderBy,
-								],
-								C,
-								ParamsOfOpt<S["having"], C, ParamsOfOpt<S["where"], C, M1>>
-							>
-						>
+				? Ctx<
+						Env["db"],
+						[L, ...Env["scope"]],
+						Env["ctes"]
+					> extends infer C extends SqCtx
+					?
+							| M1
+							| ParamsOfOpt<S["where"] | S["having"], C>
+							| ParamsOfList<
+									[
+										...(S["groupBy"] extends readonly Expr[]
+											? S["groupBy"]
+											: []),
+										...OrderBy,
+									],
+									C
+							  >
+							| ParamsOfTargets<S["targets"], C>
 					: never
 				: M1
 			: never
 		: never;
 
-export type ParamsOfOpt<E, C extends SqCtx, M> = E extends Expr
-	? Slot<E, C, M, Info<"integer", true>>
-	: M;
+export type ParamsOfOpt<E, C extends SqCtx> = E extends Expr
+	? Slot<E, C, Info<"integer", true>>
+	: never;

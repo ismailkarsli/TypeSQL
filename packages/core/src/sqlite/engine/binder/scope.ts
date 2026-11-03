@@ -1,5 +1,5 @@
 import type { Nx } from "../../../engine/parse.js";
-import type { Scope } from "../../../engine/types.js";
+import type { QueryContext, Scope } from "../../../engine/types.js";
 import type { AnyErr, SqlError } from "../../../errors.js";
 import type { Table, View } from "../../../schema.js";
 import type { UnionList } from "../../../sql/splice.js";
@@ -243,14 +243,14 @@ type BindFunc<
 	Name extends string,
 	Args extends readonly Expr[],
 	Alias extends string | null,
-	DB,
-	Outer extends Scope,
-	Ctes extends SqCteMap,
+	Env extends QueryContext<unknown, Scope, SqCteMap>,
 	Sofar extends SqLevel,
 > = Name extends "json_each" | "json_tree"
 	? Args["length"] extends 1 | 2
-		? TypeList<Args, MkCtx<DB, [Sofar, ...Outer], Ctes>> extends infer E extends
-				AnyErr
+		? TypeList<
+				Args,
+				MkCtx<Env["db"], [Sofar, ...Env["scope"]], Env["ctes"]>
+			> extends infer E extends AnyErr
 			? E
 			: [
 					{
@@ -275,52 +275,45 @@ type BindFunc<
 
 export type BindFrom<
 	F extends FromItem | null,
-	DB,
-	Outer extends Scope,
-	Ctes extends SqCteMap,
-> = F extends FromItem ? BindItem<F, DB, Outer, Ctes, []> : [];
+	Env extends QueryContext<unknown, Scope, SqCteMap>,
+> = F extends FromItem ? BindItem<F, Env, []> : [];
 
 type BindItem<
 	F extends FromItem,
-	DB,
-	Outer extends Scope,
-	Ctes extends SqCteMap,
+	Env extends QueryContext<unknown, Scope, SqCteMap>,
 	Sofar extends SqLevel,
 > = F extends { readonly t: "table" }
-	? BindTable<DB, F["ref"], F["alias"], Ctes>
+	? BindTable<Env["db"], F["ref"], F["alias"], Env["ctes"]>
 	: F extends { readonly t: "sub" }
-		? ProjectSelect<F["q"], DB, Outer, Ctes> extends infer C extends
-				readonly Cell[]
+		? ProjectSelect<F["q"], Env> extends infer C extends readonly Cell[]
 			? [EntryItem<CteEntry<C>, F["alias"]>]
-			: ProjectSelect<F["q"], DB, Outer, Ctes>
+			: ProjectSelect<F["q"], Env>
 		: F extends { readonly t: "func" }
-			? BindFunc<F["name"], F["args"], F["alias"], DB, Outer, Ctes, Sofar>
+			? BindFunc<F["name"], F["args"], F["alias"], Env, Sofar>
 			: F extends { readonly t: "join" }
-				? BindJoin<Extract<F, FromJoin>, DB, Outer, Ctes>
+				? BindJoin<Extract<F, FromJoin>, Env>
 				: never;
 
 type BindJoin<
 	F extends FromItem & { readonly t: "join" },
-	DB,
-	Outer extends Scope,
-	Ctes extends SqCteMap,
+	Env extends QueryContext<unknown, Scope, SqCteMap>,
 > =
-	BindItem<F["l"], DB, Outer, Ctes, []> extends infer L extends SqLevel
-		? BindItem<F["r"], DB, Outer, Ctes, L> extends infer R extends SqLevel
+	BindItem<F["l"], Env, []> extends infer L extends SqLevel
+		? BindItem<F["r"], Env, L> extends infer R extends SqLevel
 			? JoinUsing<F, L, R> extends infer U extends readonly string[] | null
 				? Joined<F["kind"], L, R, U> extends infer J extends SqLevel
 					? F["on"] extends Expr
 						? CheckBool<
 								F["on"],
-								MkCtx<DB, [J, ...Outer], Ctes>
+								MkCtx<Env["db"], [J, ...Env["scope"]], Env["ctes"]>
 							> extends infer E extends AnyErr
 							? E
 							: J
 						: J
 					: never
 				: JoinUsing<F, L, R>
-			: BindItem<F["r"], DB, Outer, Ctes, L>
-		: BindItem<F["l"], DB, Outer, Ctes, []>;
+			: BindItem<F["r"], Env, L>
+		: BindItem<F["l"], Env, []>;
 
 type JoinUsing<
 	F extends { readonly using: unknown; readonly natural: boolean },

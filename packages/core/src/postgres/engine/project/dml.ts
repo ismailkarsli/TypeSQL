@@ -1,4 +1,4 @@
-import type { AddParam } from "../../../engine/params.js";
+import type { ParamEntry } from "../../../engine/params.js";
 import type {
 	ColInfo,
 	ColMap,
@@ -8,7 +8,7 @@ import type {
 	Info,
 	MkCtx,
 	NullableMap,
-	Scope,
+	QueryContext,
 	ScopeItem,
 	ScopeLevel,
 } from "../../../engine/types.js";
@@ -50,33 +50,30 @@ import type { TypeOf } from "../typer/typeof.js";
 import type { ParamsOfMerge, ProjectMerge } from "./merge.js";
 import type { BindWith, ProjectSelect, ProjectTargets } from "./select.js";
 
-export type ProjectDml<
-	S extends DmlStmt,
-	DB,
-	Outer extends Scope,
-	Ctes extends CteMap,
-> =
-	BindWith<S["with"], DB, Outer, Ctes> extends infer C2 extends CteMap
+export type ProjectDml<S extends DmlStmt, Env extends QueryContext> =
+	BindWith<S["with"], Env> extends infer C2 extends CteMap
 		? S extends Tag<"insert">
-			? ProjectInsert<Extract<S, InsertStmt>, DB, Outer, C2>
+			? ProjectInsert<
+					Extract<S, InsertStmt>,
+					QueryContext<Env["db"], Env["scope"], C2>
+				>
 			: S extends Tag<"update">
 				? ProjectUpdDel<
 						Extract<S, UpdateStmt>,
 						Extract<S, UpdateStmt>["from"],
-						DB,
-						Outer,
-						C2
+						QueryContext<Env["db"], Env["scope"], C2>
 					>
 				: S extends Tag<"delete">
 					? ProjectUpdDel<
 							Extract<S, DeleteStmt>,
 							Extract<S, DeleteStmt>["using"],
-							DB,
-							Outer,
-							C2
+							QueryContext<Env["db"], Env["scope"], C2>
 						>
-					: ProjectMerge<Extract<S, MergeStmt>, DB, Outer, C2>
-		: BindWith<S["with"], DB, Outer, Ctes>;
+					: ProjectMerge<
+							Extract<S, MergeStmt>,
+							QueryContext<Env["db"], Env["scope"], C2>
+						>
+		: BindWith<S["with"], Env>;
 
 export type Target_<Tbl extends Table, Item extends ScopeItem> = {
 	readonly tbl: Tbl;
@@ -105,12 +102,12 @@ export type ResolveTarget<
 			? SqlError<`cannot ${Verb} view "${V}"`, null>
 			: ResolveWritableTable<DB, Ref>;
 
-export type DmlCtx<
-	DB,
-	Level extends ScopeLevel,
-	Outer extends Scope,
-	Ctes extends CteMap,
-> = MkCtx<DB, [Level, ...Outer], Ctes, false>;
+export type DmlCtx<Env extends QueryContext, Level extends ScopeLevel> = MkCtx<
+	Env["db"],
+	[Level, ...Env["scope"]],
+	Env["ctes"],
+	false
+>;
 
 // Preserve column identity instead of rebuilding type/nullability for each use.
 type ColInfoOf<Tbl extends Table, Col extends string> = Tbl[Col & keyof Tbl];
@@ -225,47 +222,30 @@ export type ParamsOfInds<
 	Ind extends readonly TargetInd[] | null,
 	Tbl extends Table,
 	C extends Ctx,
-	M,
 > = Ind extends readonly TargetInd[]
-	? ParamsOfIndsLoop<Cs, Ind, Tbl, C, M, 0>
-	: M;
-type ParamsOfIndsLoop<
-	Cs extends readonly string[],
-	Ind extends readonly TargetInd[],
-	Tbl extends Table,
-	C extends Ctx,
-	M,
-	I extends number,
-> = Cs[I] extends string
-	? ParamsOfIndsLoop<
-			Cs,
-			Ind,
-			Tbl,
-			C,
-			Ind[I] extends Expr ? ParamsOfExpr<Ind[I], IndCtx<Tbl, Cs[I], C>, M> : M,
-			Nx<I>
-		>
-	: M;
+	? {
+			[K in keyof Cs]: K extends keyof Ind
+				? Ind[K] extends Expr
+					? ParamsOfExpr<Ind[K], IndCtx<Tbl, Cs[K], C>>
+					: never
+				: never;
+		}[number]
+	: never;
 
-type ProjectInsert<
-	S extends InsertStmt,
-	DB,
-	Outer extends Scope,
-	Ctes extends CteMap,
-> =
-	ResolveTarget<DB, S["table"], S["alias"], "insert into"> extends Target_<
-		infer Tbl,
-		infer Item
-	>
+type ProjectInsert<S extends InsertStmt, Env extends QueryContext> =
+	ResolveTarget<
+		Env["db"],
+		S["table"],
+		S["alias"],
+		"insert into"
+	> extends Target_<infer Tbl, infer Item>
 		? InsertTargetCols<
 				S["columns"],
 				S["colInd"],
 				S["source"],
 				Tbl,
 				S["table"]["name"],
-				DB,
-				Outer,
-				Ctes
+				Env
 			> extends infer Cs
 			? Cs extends readonly string[] | null
 				? CheckInsertSource<
@@ -274,7 +254,7 @@ type ProjectInsert<
 						S["colInd"],
 						Tbl,
 						S["table"]["name"],
-						MkCtx<DB, Outer, Ctes, false>
+						MkCtx<Env["db"], Env["scope"], Env["ctes"], false>
 					> extends infer Chk
 					? Chk extends AnyErr
 						? Chk
@@ -285,9 +265,7 @@ type ProjectInsert<
 										Tbl,
 										Item,
 										S["table"]["name"],
-										DB,
-										Outer,
-										Ctes
+										Env
 									> extends infer Oc
 								? Oc extends AnyErr
 									? Oc
@@ -298,15 +276,13 @@ type ProjectInsert<
 											Tbl,
 											true,
 											false,
-											DB,
-											Outer,
-											Ctes
+											Env
 										>
 								: never
 					: never
 				: Cs
 			: never
-		: ResolveTarget<DB, S["table"], S["alias"], "insert into">;
+		: ResolveTarget<Env["db"], S["table"], S["alias"], "insert into">;
 
 type InsertTargetCols<
 	Columns extends readonly string[] | null,
@@ -314,11 +290,9 @@ type InsertTargetCols<
 	Source extends InsertSource,
 	Tbl extends Table,
 	Name extends string,
-	DB,
-	Outer extends Scope,
-	Ctes extends CteMap,
+	Env extends QueryContext,
 > =
-	SourceWidth<Source, DB, Outer, Ctes> extends infer W
+	SourceWidth<Source, Env> extends infer W
 		? W extends AnyErr
 			? W
 			: Columns extends readonly string[]
@@ -355,9 +329,7 @@ export type WidthResult<R, Ok_> = R extends "eq"
 
 type SourceWidth<
 	Source extends InsertSource,
-	DB,
-	Outer extends Scope,
-	Ctes extends CteMap,
+	Env extends QueryContext,
 > = Source extends {
 	readonly t: "values";
 	readonly rows: readonly [
@@ -372,11 +344,11 @@ type SourceWidth<
 				readonly t: "select";
 				readonly q: infer Q extends SelectStmt;
 			}
-		? ProjectSelect<Q, DB, Outer, Ctes> extends infer C extends Cols
+		? ProjectSelect<Q, Env> extends infer C extends Cols
 			? HasStar<C> extends true
 				? null
 				: C
-			: ProjectSelect<Q, DB, Outer, Ctes>
+			: ProjectSelect<Q, Env>
 		: [];
 
 type SameLength<
@@ -577,9 +549,7 @@ type CheckOnConflict<
 	Tbl extends Table,
 	Item extends ScopeItem,
 	Name extends string,
-	DB,
-	Outer extends Scope,
-	Ctes extends CteMap,
+	Env extends QueryContext,
 > = Oc extends {
 	readonly t: "update";
 	readonly set: infer Set extends readonly SetItem[];
@@ -589,11 +559,11 @@ type CheckOnConflict<
 			Set,
 			Tbl,
 			Name,
-			DmlCtx<DB, [Item, ExcludedItem<Tbl>], Outer, Ctes>
+			DmlCtx<Env, [Item, ExcludedItem<Tbl>]>
 		> extends infer R
 		? R extends AnyErr
 			? R
-			: CheckOptExpr<Where, DmlCtx<DB, [Item, ExcludedItem<Tbl>], Outer, Ctes>>
+			: CheckOptExpr<Where, DmlCtx<Env, [Item, ExcludedItem<Tbl>]>>
 		: never
 	: true;
 
@@ -746,14 +716,13 @@ type CheckMultiSource<
 	Cols_ extends readonly string[],
 	C extends Ctx,
 > = E extends { readonly t: "sub"; readonly q: infer Q extends SelectStmt }
-	? ProjectSelect<Q, C["db"], C["scope"], C["ctes"]> extends infer R extends
-			Cols
+	? ProjectSelect<Q, C> extends infer R extends Cols
 		? HasStar<R> extends true
 			? true
 			: WidthCheck<R, Cols_> extends "eq"
 				? true
 				: SqlError<"number of columns does not match number of values", null>
-		: ProjectSelect<Q, C["db"], C["scope"], C["ctes"]>
+		: ProjectSelect<Q, C>
 	: E extends {
 				readonly t: "row";
 				readonly items: infer Items extends readonly Expr[];
@@ -773,15 +742,15 @@ export type CheckOptExpr<E extends Expr | null, C extends Ctx> = E extends Expr
 type ProjectUpdDel<
 	S extends UpdateStmt | DeleteStmt,
 	From extends readonly FromItem[],
-	DB,
-	Outer extends Scope,
-	Ctes extends CteMap,
+	Env extends QueryContext,
 > =
-	ResolveTarget<DB, S["table"], S["alias"], UpdDelVerb<S>> extends Target_<
-		infer Tbl,
-		infer Item
-	>
-		? BindFrom<From, DB, Outer, Ctes> extends infer L extends ScopeLevel
+	ResolveTarget<
+		Env["db"],
+		S["table"],
+		S["alias"],
+		UpdDelVerb<S>
+	> extends Target_<infer Tbl, infer Item>
+		? BindFrom<From, Env> extends infer L extends ScopeLevel
 			? Item["alias"] extends L[number]["alias"]
 				? SqlError<
 						`table name "${Item["alias"]}" specified more than once`,
@@ -793,7 +762,7 @@ type ProjectUpdDel<
 										S["set"],
 										Tbl,
 										S["table"]["name"],
-										DmlCtx<DB, [Item, ...L], Outer, Ctes>
+										DmlCtx<Env, [Item, ...L]>
 									>
 								: null
 						) extends infer R
@@ -801,7 +770,7 @@ type ProjectUpdDel<
 						? R
 						: CheckOptExpr<
 									S["where"],
-									DmlCtx<DB, [Item, ...L], Outer, Ctes>
+									DmlCtx<Env, [Item, ...L]>
 								> extends infer Wc
 							? Wc extends AnyErr
 								? Wc
@@ -812,14 +781,12 @@ type ProjectUpdDel<
 										Tbl,
 										false,
 										S extends UpdateStmt ? false : true,
-										DB,
-										Outer,
-										Ctes
+										Env
 									>
 							: never
 					: never
-			: BindFrom<From, DB, Outer, Ctes>
-		: ResolveTarget<DB, S["table"], S["alias"], UpdDelVerb<S>>;
+			: BindFrom<From, Env>
+		: ResolveTarget<Env["db"], S["table"], S["alias"], UpdDelVerb<S>>;
 type UpdDelVerb<S extends UpdateStmt | DeleteStmt> = S extends UpdateStmt
 	? "update"
 	: "delete from";
@@ -831,13 +798,15 @@ export type ProjectReturning<
 	Row extends ColMap,
 	OldNull extends boolean,
 	NewNull extends boolean,
-	DB,
-	Outer extends Scope,
-	Ctes extends CteMap,
+	Env extends QueryContext,
 > = Ret extends readonly Target[]
 	? OldNewLevel<Opts, Level, Row, OldNull, NewNull> extends infer ON extends
 			ScopeLevel
-		? ProjectTargets<Ret, MkCtx<DB, [Level, ON, ...Outer], Ctes, false>, []>
+		? ProjectTargets<
+				Ret,
+				MkCtx<Env["db"], [Level, ON, ...Env["scope"]], Env["ctes"], false>,
+				[]
+			>
 		: OldNewLevel<Opts, Level, Row, OldNull, NewNull>
 	: null;
 
@@ -923,57 +892,49 @@ export type UnionToTuple<U, Acc extends readonly unknown[] = []> = [U] extends [
 	? Acc
 	: UnionToTuple<Exclude<U, FirstOf<U>>, [FirstOf<U>, ...Acc]>;
 
-export type ParamsOfDml<S extends DmlStmt, DB, Ctes extends CteMap, M> =
-	BindWith<S["with"], DB, [], Ctes> extends infer C2 extends CteMap
-		? ParamsOfWith<S["with"], DB, C2, M> extends infer M1
+export type ParamsOfDml<S extends DmlStmt, DB, Ctes extends CteMap> =
+	BindWith<S["with"], QueryContext<DB, [], Ctes>> extends infer C2 extends
+		CteMap
+		? ParamsOfWith<S["with"], DB, C2> extends infer M1
 			? S extends Tag<"insert">
-				? ParamsOfInsert<Extract<S, InsertStmt>, DB, C2, M1>
+				? M1 | ParamsOfInsert<Extract<S, InsertStmt>, DB, C2>
 				: S extends Tag<"update">
-					? ParamsOfUpdDel<
-							Extract<S, UpdateStmt>,
-							Extract<S, UpdateStmt>["from"],
-							DB,
-							C2,
-							M1
-						>
+					?
+							| M1
+							| ParamsOfUpdDel<
+									Extract<S, UpdateStmt>,
+									Extract<S, UpdateStmt>["from"],
+									DB,
+									C2
+							  >
 					: S extends Tag<"delete">
-						? ParamsOfUpdDel<
-								Extract<S, DeleteStmt>,
-								Extract<S, DeleteStmt>["using"],
-								DB,
-								C2,
-								M1
-							>
-						: ParamsOfMerge<Extract<S, MergeStmt>, DB, C2, M1>
+						?
+								| M1
+								| ParamsOfUpdDel<
+										Extract<S, DeleteStmt>,
+										Extract<S, DeleteStmt>["using"],
+										DB,
+										C2
+								  >
+						: M1 | ParamsOfMerge<Extract<S, MergeStmt>, DB, C2>
 			: never
-		: M;
+		: never;
 
 export type ParamsOfWith<
 	W extends WithClause | null,
 	DB,
 	Ctes extends CteMap,
-	M,
-> = W extends WithClause ? ParamsOfCteList<W["ctes"], DB, Ctes, M> : M;
+> = W extends WithClause ? ParamsOfCteList<W["ctes"], DB, Ctes> : never;
 type ParamsOfCteList<
 	Cs extends readonly Cte[],
 	DB,
 	Ctes extends CteMap,
-	M,
-> = Cs extends readonly [
-	{ readonly q: infer Q },
-	...infer R extends readonly Cte[],
-]
-	? ParamsOfCteList<
-			R,
-			DB,
-			Ctes,
-			Q extends SelectStmt
-				? ParamsOfSelect<Q, DB, [], Ctes, M>
-				: ParamsOfDml<Extract<Q, DmlStmt>, DB, Ctes, M>
-		>
-	: M;
+> = ParamsOfCte<Cs[number]["q"], DB, Ctes>;
+type ParamsOfCte<Q, DB, Ctes extends CteMap> = Q extends SelectStmt
+	? ParamsOfSelect<Q, QueryContext<DB, [], Ctes>>
+	: ParamsOfDml<Extract<Q, DmlStmt>, DB, Ctes>;
 
-type ParamsOfInsert<S extends InsertStmt, DB, Ctes extends CteMap, M> =
+type ParamsOfInsert<S extends InsertStmt, DB, Ctes extends CteMap> =
 	ResolveTarget<DB, S["table"], S["alias"], "insert into"> extends Target_<
 		infer Tbl,
 		infer Item
@@ -984,38 +945,30 @@ type ParamsOfInsert<S extends InsertStmt, DB, Ctes extends CteMap, M> =
 				S["source"],
 				Tbl,
 				S["table"]["name"],
-				DB,
-				[],
-				Ctes
+				QueryContext<DB, [], Ctes>
 			> extends infer Cs
-			? ParamsOfReturning<
-					S["returning"],
-					S["retOpts"],
-					[Item],
-					Tbl,
-					true,
-					false,
-					DB,
-					Ctes,
-					ParamsOfOnConflict<
-						S["onConflict"],
-						Tbl,
-						Item,
-						DB,
-						Ctes,
-						ParamsOfInsertSource<
+			?
+					| ParamsOfInsertSource<
 							S["source"],
 							Cs extends readonly string[] ? Cs : [],
 							S["colInd"],
 							Tbl,
 							DB,
-							MkCtx<DB, [], Ctes, false>,
-							M
-						>
-					>
-				>
+							MkCtx<DB, [], Ctes, false>
+					  >
+					| ParamsOfOnConflict<S["onConflict"], Tbl, Item, DB, Ctes>
+					| ParamsOfReturning<
+							S["returning"],
+							S["retOpts"],
+							[Item],
+							Tbl,
+							true,
+							false,
+							DB,
+							Ctes
+					  >
 			: never
-		: M;
+		: never;
 
 type ParamsOfInsertSource<
 	Source extends InsertSource,
@@ -1024,79 +977,56 @@ type ParamsOfInsertSource<
 	Tbl extends Table,
 	DB,
 	C extends Ctx,
-	M,
 > = Source extends {
 	readonly t: "values";
 	readonly rows: infer Rows extends readonly (readonly Expr[])[];
 }
-	? ParamsOfInfoRows<
-			Rows,
-			TargetInfos<Cs, Ind, Tbl, C>,
-			C,
-			ParamsOfInds<Cs, Ind, Tbl, C, M>
-		>
+	?
+			| ParamsOfInds<Cs, Ind, Tbl, C>
+			| ParamsOfInfoRows<Rows, TargetInfos<Cs, Ind, Tbl, C>, C>
 	: Source extends {
 				readonly t: "select";
 				readonly q: infer Q extends SelectStmt;
 			}
-		? ParamsOfSelect<
-				Q,
-				DB,
-				[],
-				C["ctes"],
-				ParamsOfInds<Cs, Ind, Tbl, C, M>
-			> extends infer M1
+		?
+				| ParamsOfInds<Cs, Ind, Tbl, C>
+				| ParamsOfSelect<Q, QueryContext<DB, [], C["ctes"]>> extends infer M1
 			? Q["body"] extends {
 					readonly t: "simple";
 					readonly targets: infer Ts extends readonly Target[];
 				}
-				? ParamsOfInfoTargets<Ts, TargetInfos<Cs, Ind, Tbl, C>, M1>
+				? M1 | ParamsOfInfoTargets<Ts, TargetInfos<Cs, Ind, Tbl, C>>
 				: M1
 			: never
-		: ParamsOfInds<Cs, Ind, Tbl, C, M>;
+		: ParamsOfInds<Cs, Ind, Tbl, C>;
 type ParamsOfInfoRows<
 	Rows extends readonly (readonly Expr[])[],
 	Infos extends readonly ColInfo[],
 	C extends Ctx,
-	M,
-> = Rows extends readonly [
-	infer R extends readonly Expr[],
-	...infer Rest extends readonly (readonly Expr[])[],
-]
-	? ParamsOfInfoRows<Rest, Infos, C, ParamsOfRowInfos<R, Infos, C, M>>
-	: M;
+> = ParamsOfRowInfos<Rows[number], Infos, C>;
 export type ParamsOfRowInfos<
 	Es extends readonly Expr[],
 	Infos extends readonly ColInfo[],
 	C extends Ctx,
-	M,
 > = Es extends infer ET extends readonly Expr[]
-	?
-			| M
-			| {
-					[K in keyof ET]: K extends `${number}`
-						? K extends keyof Infos
-							? ParamsOfOpt<ET[K] & Expr, C, never, Infos[K]>
-							: ParamsOfExpr<ET[K] & Expr, C, never>
-						: never;
-			  }[number]
+	? {
+			[K in keyof ET]: K extends `${number}`
+				? K extends keyof Infos
+					? ParamsOfOpt<ET[K] & Expr, C, Infos[K]>
+					: ParamsOfExpr<ET[K] & Expr, C>
+				: never;
+		}[number]
 	: never;
 type ParamsOfInfoTargets<
 	Ts extends readonly Target[],
 	Infos extends readonly ColInfo[],
-	M,
-> = Ts extends readonly [
-	infer T extends Target,
-	...infer TR extends readonly Target[],
-]
-	? Infos extends readonly [infer CI, ...infer IR extends readonly ColInfo[]]
-		? ParamsOfInfoTargets<
-				TR,
-				IR,
-				T["e"] extends ParamOf<infer N extends number> ? AddParam<M, N, CI> : M
-			>
-		: M
-	: M;
+> = {
+	[K in keyof Ts]: K extends keyof Infos
+		? Ts[K]["e"] extends ParamOf<infer N extends number>
+			? ParamEntry<N, Infos[K]>
+			: never
+		: never;
+}[number];
 
 type ParamsOfOnConflict<
 	Oc extends OnConflict | null,
@@ -1104,28 +1034,31 @@ type ParamsOfOnConflict<
 	Item extends ScopeItem,
 	DB,
 	Ctes extends CteMap,
-	M,
 > = Oc extends {
 	readonly t: "update";
 	readonly set: infer Set extends readonly SetItem[];
 	readonly where: infer Where extends Expr | null;
 }
-	? ParamsOfOpt<
-			Where,
-			DmlCtx<DB, [Item, ExcludedItem<Tbl>], [], Ctes>,
-			ParamsOfSet<Set, Tbl, DmlCtx<DB, [Item, ExcludedItem<Tbl>], [], Ctes>, M>,
-			Info<"bool">
-		>
-	: M;
+	?
+			| ParamsOfSet<
+					Set,
+					Tbl,
+					DmlCtx<QueryContext<DB, [], Ctes>, [Item, ExcludedItem<Tbl>]>
+			  >
+			| ParamsOfOpt<
+					Where,
+					DmlCtx<QueryContext<DB, [], Ctes>, [Item, ExcludedItem<Tbl>]>,
+					Info<"bool">
+			  >
+	: never;
 
 export type ParamsOfSet<
 	Set extends readonly SetItem[],
 	Tbl extends Table,
 	C extends Ctx,
-	M,
 > = Set[number] extends PlainParamSet
-	? M | PlainSetParams<Set[number], Tbl>
-	: ParamsOfSetWalk<Set, Tbl, C, M>;
+	? PlainSetParams<Set[number], Tbl>
+	: ParamsOfSetItem<Set[number], Tbl, C>;
 type PlainParamSet = {
 	readonly t: "set";
 	readonly col: string;
@@ -1133,57 +1066,43 @@ type PlainParamSet = {
 };
 type PlainSetParams<S, Tbl extends Table> = S extends PlainParamSet
 	? ColInfoOf<Tbl, S["col"]> extends infer T extends ColInfo
-		? AddParam<never, S["e"]["n"], T>
+		? ParamEntry<S["e"]["n"], T>
 		: never
 	: never;
-type ParamsOfSetWalk<
-	Set extends readonly SetItem[],
+type ParamsOfSetItem<
+	S extends SetItem,
 	Tbl extends Table,
 	C extends Ctx,
-	M,
-> = Set extends readonly [infer S, ...infer R extends readonly SetItem[]]
-	? ParamsOfSetWalk<
-			R,
-			Tbl,
-			C,
-			S extends {
-				readonly t: "set";
+> = S extends {
+	readonly t: "set";
+	readonly col: infer Col extends string;
+	readonly e: infer E extends Expr;
+}
+	? ParamsOfOpt<E, C, ColInfoOf<Tbl, Col>>
+	: S extends {
+				readonly t: "setind";
 				readonly col: infer Col extends string;
+				readonly target: infer Ind extends Expr;
 				readonly e: infer E extends Expr;
 			}
-				? ParamsOfOpt<E, C, M, ColInfoOf<Tbl, Col>>
-				: S extends {
-							readonly t: "setind";
-							readonly col: infer Col extends string;
-							readonly target: infer Ind extends Expr;
-							readonly e: infer E extends Expr;
-						}
-					? ParamsOfOpt<
-							E,
-							C,
-							ParamsOfInds<[Col], [Ind], Tbl, C, M>,
-							AssignParamInfo<Tbl, Col, Ind, C>
-						>
-					: S extends {
-								readonly t: "setmulti";
-								readonly cols: infer Cols_ extends readonly string[];
-								readonly ind: infer Ind extends readonly TargetInd[] | null;
-								readonly e: infer E extends Expr;
-							}
-						? E extends {
-								readonly t: "row";
-								readonly items: infer Items extends readonly Expr[];
-							}
-							? ParamsOfRowInfos<
-									Items,
-									TargetInfos<Cols_, Ind, Tbl, C>,
-									C,
-									ParamsOfInds<Cols_, Ind, Tbl, C, M>
-								>
-							: ParamsOfExpr<E, C, ParamsOfInds<Cols_, Ind, Tbl, C, M>>
-						: M
-		>
-	: M;
+		?
+				| ParamsOfInds<[Col], [Ind], Tbl, C>
+				| ParamsOfOpt<E, C, AssignParamInfo<Tbl, Col, Ind, C>>
+		: S extends {
+					readonly t: "setmulti";
+					readonly cols: infer Cols_ extends readonly string[];
+					readonly ind: infer Ind extends readonly TargetInd[] | null;
+					readonly e: infer E extends Expr;
+				}
+			? E extends {
+					readonly t: "row";
+					readonly items: infer Items extends readonly Expr[];
+				}
+				?
+						| ParamsOfInds<Cols_, Ind, Tbl, C>
+						| ParamsOfRowInfos<Items, TargetInfos<Cols_, Ind, Tbl, C>, C>
+				: ParamsOfInds<Cols_, Ind, Tbl, C> | ParamsOfExpr<E, C>
+			: never;
 
 export type ParamsOfReturning<
 	Ret extends readonly Target[] | null,
@@ -1194,56 +1113,55 @@ export type ParamsOfReturning<
 	NewNull extends boolean,
 	DB,
 	Ctes extends CteMap,
-	M,
 > = Ret extends readonly Target[]
 	? OldNewLevel<Opts, Level, Row, OldNull, NewNull> extends infer ON extends
 			ScopeLevel
-		? ParamsOfTargets<Ret, MkCtx<DB, [Level, ON], Ctes, false>, M>
-		: M
-	: M;
+		? ParamsOfTargets<Ret, MkCtx<DB, [Level, ON], Ctes, false>>
+		: never
+	: never;
 
 type ParamsOfUpdDel<
 	S extends UpdateStmt | DeleteStmt,
 	From extends readonly FromItem[],
 	DB,
 	Ctes extends CteMap,
-	M,
 > =
 	ResolveTarget<DB, S["table"], S["alias"], UpdDelVerb<S>> extends Target_<
 		infer Tbl,
 		infer Item
 	>
-		? BindFrom<From, DB, [], Ctes> extends infer L
+		? BindFrom<From, QueryContext<DB, [], Ctes>> extends infer L
 			? L extends ScopeLevel
-				? ParamsOfReturning<
-						S["returning"],
-						S["retOpts"],
-						[Item, ...L],
-						Tbl,
-						false,
-						S extends UpdateStmt ? false : true,
-						DB,
-						Ctes,
-						ParamsOfOpt<
-							S["where"],
-							DmlCtx<DB, [Item, ...L], [], Ctes>,
-							ParamsOfFromItems<
+				?
+						| (ParamsOfFromItems<
 								From,
-								DmlCtx<DB, [Item, ...L], [], Ctes>,
-								M
-							> extends infer MF
+								DmlCtx<QueryContext<DB, [], Ctes>, [Item, ...L]>
+						  > extends infer MF
 								? S extends UpdateStmt
-									? ParamsOfSet<
-											S["set"],
-											Tbl,
-											DmlCtx<DB, [Item, ...L], [], Ctes>,
-											MF
-										>
+									?
+											| MF
+											| ParamsOfSet<
+													S["set"],
+													Tbl,
+													DmlCtx<QueryContext<DB, [], Ctes>, [Item, ...L]>
+											  >
 									: MF
-								: never,
-							Info<"bool">
-						>
-					>
-				: M
+								: never)
+						| ParamsOfOpt<
+								S["where"],
+								DmlCtx<QueryContext<DB, [], Ctes>, [Item, ...L]>,
+								Info<"bool">
+						  >
+						| ParamsOfReturning<
+								S["returning"],
+								S["retOpts"],
+								[Item, ...L],
+								Tbl,
+								false,
+								S extends UpdateStmt ? false : true,
+								DB,
+								Ctes
+						  >
+				: never
 			: never
-		: M;
+		: never;

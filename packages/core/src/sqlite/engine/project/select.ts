@@ -1,6 +1,6 @@
 import type { NarrowKeys, NarrowLevel } from "../../../engine/narrow.js";
 import type { Nx } from "../../../engine/parse.js";
-import type { ColInfo, Scope } from "../../../engine/types.js";
+import type { ColInfo, QueryContext, Scope } from "../../../engine/types.js";
 import type { AnyErr, SqlError } from "../../../errors.js";
 import type {
 	Cte,
@@ -35,81 +35,81 @@ import type {
 
 export type ProjectSelect<
 	Q extends SelectStmt,
-	DB,
-	Outer extends Scope,
-	Ctes extends SqCteMap,
+	Env extends QueryContext<unknown, Scope, SqCteMap>,
 > =
-	BindWith<Q["with"], DB, Outer, Ctes> extends infer C2 extends SqCteMap
+	BindWith<Q["with"], Env> extends infer C2 extends SqCteMap
 		? ProjectBody<
 				Q["body"],
-				DB,
-				Outer,
-				C2,
+				QueryContext<Env["db"], Env["scope"], C2>,
 				Q["orderBy"]
 			> extends infer R extends readonly Cell[]
-			? CheckLimit<Q, DB, Outer, C2> extends AnyErr
-				? CheckLimit<Q, DB, Outer, C2>
+			? CheckLimit<Q, QueryContext<Env["db"], Env["scope"], C2>> extends AnyErr
+				? CheckLimit<Q, QueryContext<Env["db"], Env["scope"], C2>>
 				: R
-			: ProjectBody<Q["body"], DB, Outer, C2, Q["orderBy"]>
-		: BindWith<Q["with"], DB, Outer, Ctes>;
+			: ProjectBody<
+					Q["body"],
+					QueryContext<Env["db"], Env["scope"], C2>,
+					Q["orderBy"]
+				>
+		: BindWith<Q["with"], Env>;
 
 type CheckLimit<
 	Q extends SelectStmt,
-	DB,
-	Outer extends Scope,
-	Ctes extends SqCteMap,
+	Env extends QueryContext<unknown, Scope, SqCteMap>,
 > = TypeList<
 	[
 		...(Q["limit"] extends Expr ? [Q["limit"]] : []),
 		...(Q["offset"] extends Expr ? [Q["offset"]] : []),
 	],
-	MkCtx<DB, Outer, Ctes, "none", {}>
+	MkCtx<Env["db"], Env["scope"], Env["ctes"], "none", {}>
 >;
 
 export type BindWith<
 	W,
-	DB,
-	Outer extends Scope,
-	Ctes extends SqCteMap,
-> = W extends WithClause ? CteLoop<W["ctes"], DB, Outer, Ctes, 0> : Ctes;
+	Env extends QueryContext<unknown, Scope, SqCteMap>,
+> = W extends WithClause ? CteLoop<W["ctes"], Env, 0> : Env["ctes"];
 
 type CteLoop<
 	L extends readonly Cte[],
-	DB,
-	Outer extends Scope,
-	Ctes extends SqCteMap,
+	Env extends QueryContext<unknown, Scope, SqCteMap>,
 	I extends number,
 > = L[I] extends infer C extends Cte
-	? CteCells<C, DB, Outer, Ctes> extends infer R extends readonly Cell[]
+	? CteCells<C, Env> extends infer R extends readonly Cell[]
 		? CteLoop<
 				L,
-				DB,
-				Outer,
-				Ctes & { readonly [K in C["name"]]: CteEntry<R> },
+				QueryContext<
+					Env["db"],
+					Env["scope"],
+					Env["ctes"] & { readonly [K in C["name"]]: CteEntry<R> }
+				>,
 				Nx<I>
 			>
-		: CteCells<C, DB, Outer, Ctes>
-	: Ctes;
+		: CteCells<C, Env>
+	: Env["ctes"];
 
-type CteCells<C extends Cte, DB, Outer extends Scope, Ctes extends SqCteMap> = (
+type CteCells<
+	C extends Cte,
+	Env extends QueryContext<unknown, Scope, SqCteMap>,
+> = (
 	C["q"]["body"] extends {
 		readonly t: "setop";
 		readonly l: infer Anchor extends SelectBody;
 	}
 		? LeftMost<Anchor> extends infer A extends SelectBody
-			? ProjectBody<A, DB, Outer, Ctes, []> extends infer AC extends
-					readonly Cell[]
+			? ProjectBody<A, Env, []> extends infer AC extends readonly Cell[]
 				? Renamed<C, AC> extends infer RC extends readonly Cell[]
 					? ProjectSelect<
 							C["q"],
-							DB,
-							Outer,
-							Ctes & { readonly [K in C["name"]]: CteEntry<RC> }
+							QueryContext<
+								Env["db"],
+								Env["scope"],
+								Env["ctes"] & { readonly [K in C["name"]]: CteEntry<RC> }
+							>
 						>
 					: Renamed<C, AC>
-				: ProjectBody<A, DB, Outer, Ctes, []>
+				: ProjectBody<A, Env, []>
 			: never
-		: ProjectSelect<C["q"], DB, Outer, Ctes>
+		: ProjectSelect<C["q"], Env>
 ) extends infer R
 	? R extends readonly Cell[]
 		? Renamed<C, R>
@@ -150,29 +150,23 @@ export type RenameCells<
 
 type ProjectBody<
 	B extends SelectBody,
-	DB,
-	Outer extends Scope,
-	Ctes extends SqCteMap,
+	Env extends QueryContext<unknown, Scope, SqCteMap>,
 	OrderBy extends readonly Expr[],
 > = B extends { readonly t: "simple" }
-	? ProjectSimple<Extract<B, SimpleSelect>, DB, Outer, Ctes, OrderBy>
+	? ProjectSimple<Extract<B, SimpleSelect>, Env, OrderBy>
 	: B extends { readonly t: "values" }
-		? ProjectValues<B["rows"], DB, Outer, Ctes>
+		? ProjectValues<B["rows"], Env>
 		: B extends { readonly t: "setop" }
-			? ProjectSetOp<Extract<B, SetOp>, DB, Outer, Ctes, OrderBy>
+			? ProjectSetOp<Extract<B, SetOp>, Env, OrderBy>
 			: never;
 
 type ProjectSetOp<
 	B extends SelectBody & { readonly t: "setop" },
-	DB,
-	Outer extends Scope,
-	Ctes extends SqCteMap,
+	Env extends QueryContext<unknown, Scope, SqCteMap>,
 	OrderBy extends readonly Expr[],
 > =
-	ProjectBody<B["l"], DB, Outer, Ctes, []> extends infer L extends
-		readonly Cell[]
-		? ProjectBody<B["r"], DB, Outer, Ctes, []> extends infer R extends
-				readonly Cell[]
+	ProjectBody<B["l"], Env, []> extends infer L extends readonly Cell[]
+		? ProjectBody<B["r"], Env, []> extends infer R extends readonly Cell[]
 			? L["length"] extends R["length"]
 				? MergeCells<L, R, B["op"]> extends infer M extends readonly Cell[]
 					? CompoundOrder<OrderBy, M> extends AnyErr
@@ -183,8 +177,8 @@ type ProjectSetOp<
 						`SELECTs to the left and right of ${Uppercase<B["op"]>}${B["all"] extends true ? " ALL" : ""} do not have the same number of result columns`,
 						null
 					>
-			: ProjectBody<B["r"], DB, Outer, Ctes, []>
-		: ProjectBody<B["l"], DB, Outer, Ctes, []>;
+			: ProjectBody<B["r"], Env, []>
+		: ProjectBody<B["l"], Env, []>;
 
 type MergeCells<L extends readonly Cell[], R extends readonly Cell[], Op> = {
 	[I in keyof L]: {
@@ -406,11 +400,14 @@ type Ordinal<N extends number> = N extends 1
 
 type ProjectValues<
 	Rows extends readonly (readonly Expr[])[],
-	DB,
-	Outer extends Scope,
-	Ctes extends SqCteMap,
+	Env extends QueryContext<unknown, Scope, SqCteMap>,
 > =
-	ValuesRows<Rows, MkCtx<DB, Outer, Ctes, "none", {}>, 0, []> extends infer R
+	ValuesRows<
+		Rows,
+		MkCtx<Env["db"], Env["scope"], Env["ctes"], "none", {}>,
+		0,
+		[]
+	> extends infer R
 		? R extends readonly [
 				infer R0 extends readonly ColInfo[],
 				...(readonly (readonly ColInfo[])[]),
@@ -545,27 +542,23 @@ export type FirstName<U extends string> =
 
 type ProjectSimple<
 	S extends SimpleSelect,
-	DB,
-	Outer extends Scope,
-	Ctes extends SqCteMap,
+	Env extends QueryContext<unknown, Scope, SqCteMap>,
 	OrderBy extends readonly Expr[],
 > =
 	MissingWindow<S, OrderBy> extends infer W extends AnyErr
 		? W
-		: ProjectSimpleChecked<S, DB, Outer, Ctes, OrderBy>;
+		: ProjectSimpleChecked<S, Env, OrderBy>;
 type ProjectSimpleChecked<
 	S extends SimpleSelect,
-	DB,
-	Outer extends Scope,
-	Ctes extends SqCteMap,
+	Env extends QueryContext<unknown, Scope, SqCteMap>,
 	OrderBy extends readonly Expr[],
 > =
-	BindFrom<S["from"], DB, Outer, Ctes> extends infer L extends SqLevel
+	BindFrom<S["from"], Env> extends infer L extends SqLevel
 		? CheckWhere<
 				S["where"],
-				DB,
-				[L, ...Outer],
-				Ctes,
+				Env["db"],
+				[L, ...Env["scope"]],
+				Env["ctes"],
 				S["targets"]
 			> extends infer W
 			? W extends AnyErr
@@ -575,20 +568,27 @@ type ProjectSimpleChecked<
 								? NarrowLevel<L, NarrowKeys<S["where"]>>
 								: L
 						) extends infer NL extends SqLevel
-					? AggModeOf<S, OrderBy, DB> extends "bad-having"
+					? AggModeOf<S, OrderBy, Env["db"]> extends "bad-having"
 						? SqlError<"HAVING clause on a non-aggregate query", null>
-						: AggModeOf<S, OrderBy, DB> extends infer Mode extends AggMode
+						: AggModeOf<S, OrderBy, Env["db"]> extends infer Mode extends
+									AggMode
 							? (
 									Mode extends "whole"
 										? MkCtx<
-												DB,
-												[NullLevel<NL>, ...Outer],
-												Ctes,
+												Env["db"],
+												[NullLevel<NL>, ...Env["scope"]],
+												Env["ctes"],
 												"whole",
 												{},
-												[NL, ...Outer]
+												[NL, ...Env["scope"]]
 											>
-										: MkCtx<DB, [NL, ...Outer], Ctes, Mode, {}>
+										: MkCtx<
+												Env["db"],
+												[NL, ...Env["scope"]],
+												Env["ctes"],
+												Mode,
+												{}
+											>
 								) extends infer C extends SqCtx
 								? ProjectTargets<S["targets"], NL, C, 0, []> extends infer Cells
 									? Cells extends readonly Cell[]
@@ -598,9 +598,9 @@ type ProjectSimpleChecked<
 												Cells,
 												C,
 												MkCtx<
-													DB,
-													[L, ...Outer],
-													Ctes,
+													Env["db"],
+													[L, ...Env["scope"]],
+													Env["ctes"],
 													"none",
 													AliasMap<S["targets"], Cells>
 												>
@@ -615,7 +615,7 @@ type ProjectSimpleChecked<
 							: never
 					: never
 			: never
-		: BindFrom<S["from"], DB, Outer, Ctes>;
+		: BindFrom<S["from"], Env>;
 
 type CheckWhere<
 	W,

@@ -1,3 +1,4 @@
+import type { QueryContext } from "../../../engine/types.js";
 import type { AnyErr, SqlError } from "../../../errors.js";
 import type {
 	AlterEnum,
@@ -38,7 +39,7 @@ export type ApplyDdlNode<DB, S> =
 					readonly t: "declare_cursor";
 					readonly q: infer Q extends SelectStmt;
 				}
-			? ProjectSelect<Q, DB, [], {}> extends infer C
+			? ProjectSelect<Q, QueryContext<DB, [], {}>> extends infer C
 				? C extends AnyErr
 					? C
 					: DB

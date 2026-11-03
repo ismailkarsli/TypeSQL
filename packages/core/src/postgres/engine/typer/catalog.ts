@@ -1012,7 +1012,19 @@ type ArityOk<
 		? true
 		: false;
 
-export type PickSig<Sigs, As extends readonly ColInfo[]> =
+export type PickSig<
+	Sigs,
+	As extends readonly ColInfo[],
+> = Sigs extends readonly unknown[]
+	? PickOverload<Sigs, As>
+	: Sigs extends AnySig
+		? number extends Sigs["args"]["length"]
+			? PickOverload<Sigs, As>
+			: ArityOk<Sigs["args"], As> extends true
+				? Sigs
+				: null
+		: PickOverload<Sigs, As>;
+type PickOverload<Sigs, As extends readonly ColInfo[]> =
 	BestSig<ToList<Sigs>, As, null, []> extends AnySig
 		? BestSig<ToList<Sigs>, As, null, []>
 		: ArityFallback<ToList<Sigs>, As>;
