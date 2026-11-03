@@ -349,6 +349,10 @@
   dir: packages/core
   intents:
     - ancient-eggs-float
+"@typesql/core@5.0.2":
+  dir: packages/core
+  intents:
+    - warm-birds-rhyme
 "@typesql/drizzle@0.0.2":
   dir: packages/drizzle
   intents:

@@ -1,5 +1,11 @@
 # @typesql/core
 
+## 5.0.2
+
+### Patch Changes
+
+- Reduce type-checking work by sharing query contexts, collecting parameter hints independently, and deferring generic index arithmetic.
+
 ## 5.0.1
 
 ### Patch Changes
