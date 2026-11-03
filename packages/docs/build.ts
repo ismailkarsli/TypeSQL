@@ -104,6 +104,12 @@ try {
 				...files.filter((file) =>
 					/^packages\/[^/]+\/CHANGELOG\.md$/.test(file),
 				),
+				// The SQL highlighting reads the extension's grammar and colors.
+				...files.filter(
+					(file) =>
+						file === "packages/vscode/package.json" ||
+						file.startsWith("packages/vscode/syntaxes/"),
+				),
 			],
 			{ cwd: root, maxBuffer: 64 * 1024 * 1024 },
 		);
