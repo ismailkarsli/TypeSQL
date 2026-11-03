@@ -95,7 +95,7 @@ export interface DB {
 Rows read the column as `T`, and you write values with [`sql.json()`](./parameters#json-values):
 
 ```ts
-const sql = createSql<DB, PgTypeMap>();
+const sql = createSql<DB>(pool);
 
 const recent = sql(`
   SELECT name, history, history -> -1 -> 'value' AS last, created_at::date AS day

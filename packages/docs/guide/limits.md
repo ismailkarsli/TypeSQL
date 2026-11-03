@@ -13,19 +13,10 @@ When you hit a limit, [`sql.as<Row>()`](./errors#when-typesql-can-t-type-a-state
 
 ## Statement size
 
-- The lexer handles up to 4096 tokens per statement (the engine stops counting there), but some shapes hit TypeScript's own depth limits well before that. Measured with TypeScript 7.1 (tsrs gives the same results):
-
-  | Construct | Largest that compiles |
-  |---|---|
-  | `a \|\| a \|\| …`, `a + a + …` | about 85 terms |
-  | select list of `id + n AS cn` | about 300 columns (~1800 tokens) |
-  | nested derived tables (`FROM (SELECT … FROM (…))`) | 11 levels |
-  | `UNION ALL` branches | 42 |
-  | `IN (1, 2, …)` items, multi-row `VALUES` rows | about 1000 |
-
-  `AND`/`OR` chains (the parser balances them), 20 joins, 20 CTEs and a `CASE` with 150 branches are fine.
-- Past these sizes the compiler reports its own error instead of a SQL error: TS2589 ("Type instantiation is excessively deep and possibly infinite"), TS5114 or TS5115. Split the statement, or give its row type with [`sql.as<Row>()`](./dynamic-sql#fully-dynamic-sql), which skips the analysis.
-- Split long migration DDL across several `.ddl()` calls: one text is limited to about 4000 tokens, and past that the error is a raw TS2589.
+- Query size is limited by TypeScript's instantiation depth and work budgets. Long expression chains, wide select lists, nested subqueries, many `UNION` branches and large `IN` or `VALUES` lists can reach those budgets. The practical limit depends on the statement's shape, compiler version and schema.
+- The engine tracks precise token positions below 4096 tokens. Beyond that it uses a general numeric position; this is not a guarantee that statements of that size will compile.
+- When the compiler reaches its own budget, it reports TS2589 ("Type instantiation is excessively deep and possibly infinite"), TS5114 or TS5115 instead of a SQL error. Split the statement, or give its row type with [`sql.as<Row>()`](./dynamic-sql#fully-dynamic-sql), which skips analysis.
+- Split long migration scripts across several `.ddl()` calls. Each call is checked separately against the schema returned by the previous one.
 
 ## Migrations
 
@@ -42,7 +33,7 @@ With `transaction: false` (Cloudflare D1, libsql's client), there is no transact
 
 ## Fragments and lists
 
-- [`sql.combine` over an array](./dynamic-sql#lists-from-runtime-arrays) checks the statement once, with every distinct element once. Its cost grows with the number of distinct elements, not with the number of combinations (80 distinct sort elements cost about 0.2M instantiations).
+- [`sql.combine` over an array](./dynamic-sql#lists-from-runtime-arrays) checks the statement once, with every distinct element once. Its cost grows with the number of distinct elements, not with the number of combinations.
 - In a select list (``SELECT ${cols}``), such a list counts every element as selected.
 - A fragment whose text is a union (`sql.id(name)` with `name: "a" | "b"`) is checked once per member. So two such fragments in one statement cost `n × m` checks. A generic `sql.id` over `RelationName<DB>` checks the statement against every table and view. For lists, use `sql.combine` over an array, which costs one check.
 - `sql.set` and `sql.values` are checked like `sql.combine` over an array, with every key of the input type once.

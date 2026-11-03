@@ -9,12 +9,12 @@ sql("SELECT u.| FROM users u");
 
 The names come from the `DB` type of the `sql` you call, so they follow your schema as you edit it, unsaved changes included.
 
-The extension is optional: errors, hovers and row types come from TypeScript, with or without it.
+The extension requires VS Code 1.144 or newer. It is optional: errors, hovers and row types come from TypeScript, with or without it.
 
 ## Setup
 
 1. Install the TypeSQL extension from the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=typesql.typesql) or [Open VSX](https://open-vsx.org/extension/typesql/typesql). Install the [TypeScript 7 extension](https://marketplace.visualstudio.com/items?itemName=TypeScriptTeam.native-preview) (`TypeScriptTeam.native-preview`) too. The TypeScript 7 extension is published only on the Visual Studio Marketplace, not on Open VSX, so in VSCodium and other Open VSX editors you get SQL highlighting but no completions unless you install it from a `.vsix`.
-2. Have `@typesql/core` 0.4.0 or later in the project, directly or through an adapter (`@typesql/pg`, `@typesql/postgres`, `@typesql/kysely`, `@typesql/drizzle`, `@typesql/prisma`).
+2. Have `@typesql/core` 0.4.0 or later in the project, directly or through an adapter (`@typesql/pg`, `@typesql/postgres`, `@typesql/sqlite`, `@typesql/kysely`, `@typesql/drizzle`, `@typesql/prisma`).
 3. Run the language server on TypeScript 7.1 or later, as below.
 
 ### Use TypeScript 7.1
@@ -57,7 +57,7 @@ To turn suggestions off, set `"typesql.completions.enable": false`.
 - Aliases follow scope: a subquery sees its own FROM items first, then the outer query's.
 - Subqueries and CTEs offer the names of their output columns.
 - Names that the database would fold to lower case or read as a keyword are inserted in double quotes (`"UserAccounts"`, `"order"`).
-- Suggestions work in `sql()`, in `tx()` inside `sql.transaction()`, in `sql.fragment()` and `sql.as()`, in template literals across lines, and between `${sql.param()}` values.
+- Suggestions work in `sql()`, in `tx()` inside `sql.transaction()`, in `sql.fragment()`, `sql.prepare()` and `sql.as()`, in template literals across lines, and between `${sql.param()}` values.
 - There are none inside string literals, comments and quoted identifiers.
 
 ## Syntax highlighting

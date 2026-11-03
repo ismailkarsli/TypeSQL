@@ -90,6 +90,14 @@ sql("SELECT meta ->> '$.views' AS views, meta ->> '$.tags[0]' AS tag FROM posts"
 // { views: number | null; tag: string | null }[]
 ```
 
+Inline `${sql.json(value)}` writes are checked against the declared `Json<T>` shape, including values inside fragments, `sql.set` and `sql.values`. A nullable JSON column accepts `null`; a non-nullable one rejects it. Reading the whole column still returns JSON text:
+
+```ts
+const updated = sql(`UPDATE posts SET meta = ${sql.json({ tags: ["sql"], views: 1 })}`);
+```
+
+As with PostgreSQL, a `sql.json()` marker passed as a positional or named argument does not check the original document against `T`; use it inline for that check. See [JSON parameter limits](./limits#json).
+
 `Typed<Type, T>` keeps a column's SQLite type (`"text"`) and types its values as `T`, for example a union of string literals for a text column used as an enum.
 
 ## Functions

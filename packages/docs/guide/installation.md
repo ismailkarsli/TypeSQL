@@ -42,7 +42,7 @@ See [From Kysely, Drizzle or Prisma](./orms).
 
 ## The `typesql` command (optional)
 
-`@typesql/cli` provides `typesql introspect`, which writes your schema from a PostgreSQL or SQLite database. See [From a live database](./introspect). It also provides [`typesql migrate`](./migrations#the-typesql-migrate-command), which runs migration files. They import their types from `@typesql/core`: keep `@typesql/core` a dependency of your project, as above, even though `@typesql/cli` depends on it too (pnpm doesn't let your files import it through the CLI).
+`@typesql/cli` requires Node.js 26 or newer and provides `typesql introspect`, which writes your schema from a PostgreSQL or SQLite database. See [From a live database](./introspect). It also provides [`typesql migrate`](./migrations#the-typesql-migrate-command), which runs migration files. They import their types from `@typesql/core`: keep `@typesql/core` a dependency of your project, as above, even though `@typesql/cli` depends on it too (pnpm doesn't let your files import it through the CLI).
 
 ## Editor extension (optional)
 

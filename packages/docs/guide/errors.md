@@ -89,7 +89,10 @@ Any of these fixes it:
 
 - Re-export TypeSQL's types from the module that calls `createSql`. TypeScript then names them through that module:
   ```ts
-  export const sql = createSql<DB>(executor);
+  import { createSql } from "@typesql/core";
+  import { postgres } from "@typesql/core/postgres";
+
+  export const sql = createSql<DB>(postgres, executor);
   export type * from "@typesql/core";
   export type * from "@typesql/core/postgres";
   ```

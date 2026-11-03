@@ -1,6 +1,6 @@
 # Recipes
 
-Short answers to common tasks. Every example is type-checked against the schema from [Declaring tables](./schema), with `sql` from `createSql<DB>()`.
+Short answers to common tasks. Every example is type-checked against the schema from [Declaring tables](./schema), with `sql` from `createSql<DB>(pool)` of `@typesql/pg`.
 
 ## Optional filters
 

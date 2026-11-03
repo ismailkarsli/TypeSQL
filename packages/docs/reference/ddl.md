@@ -124,22 +124,12 @@ export const addBio = migration(previous, {
 - A non-literal string is rejected. Use `.raw()` for it.
 - Contexts are immutable: `.ddl()` returns a new context, and the one it was called on keeps its schema.
 - `.raw<NewSchema = Schema>(sql)` runs `sql` unchecked and resolves to a context with the schema you state.
-- Each text is sent in one call without parameters, so `$$`-quoted function bodies work, and a `;`-separated script runs whole on node-postgres and postgres.js. A single text is limited to about 4000 tokens; split longer scripts across several `.ddl()` calls.
+- On PostgreSQL, each text is sent in one call without parameters, so `$$`-quoted function bodies work, and a `;`-separated script runs whole on node-postgres and postgres.js. Large scripts can reach the compiler's instantiation limits; split them across several `.ddl()` calls.
 - Each migration runs in a transaction by default. Statements that can't run in a transaction block (`CREATE INDEX CONCURRENTLY`, `VACUUM`) fail there, and after `ALTER TYPE ... ADD VALUE` the new label can't be used until a later migration. See [Transactions and locking](../guide/migrations#transactions-and-locking).
 
-## Cost
+## Checking long histories
 
-Measured with TypeScript 7.1.0-beta (`tsc --extendedDiagnostics`):
-
-| Input | Instantiations | Check time |
-|---|---|---|
-| importing `@typesql/core` (baseline) | 131K | 0.16 s |
-| a 10-statement migration chain, DDL only | +33K | +0.01 s |
-| the same chain plus one query on the result | 186K total | 0.17 s |
-| 50 statements | 297K | 0.22 s |
-| 200 statements and four queries | 1.15M | 0.53 s |
-
-Each statement rebuilds only the table it changes, so long migration histories stay within TypeScript's limits ([Limits](../guide/limits)).
+Each `migration(previous, { up, down })` infers its starting schema from `previous` rather than recursively evaluating the whole history. Return the final context from `up`, and use the generated `db.ts` for application queries in directory mode. Split large DDL scripts across several `.ddl()` calls when they reach [compiler limits](../guide/limits#statement-size).
 
 ## Limitations
 

@@ -88,7 +88,7 @@ export interface DB {
 | `--type-name <name>` | name of the interface; default `DB` |
 | `--import-from <module>` | where `Col` and `View` are imported from; default `@typesql/core/sqlite` |
 
-The command opens the file with node:sqlite, so it needs Node.js 22.13 or later. SQLite doesn't record whether a view's column can be `NULL`, so view columns are nullable; FTS shadow tables and `sqlite_*` tables are left out. From code, `@typesql/sqlite/introspect` exports `introspect(db, { exclude })`, which takes a node:sqlite, better-sqlite3 or bun:sqlite database, and `generateSource(result, { typeName, importFrom })`.
+The command requires Node.js 26 or newer and opens the file with node:sqlite. SQLite doesn't record whether a view's column can be `NULL`, so view columns are nullable; FTS shadow tables and `sqlite_*` tables are left out. From code, `@typesql/sqlite/introspect` exports `introspect(db, { exclude })`, which takes a node:sqlite, better-sqlite3 or bun:sqlite database, and `generateSource(result, { typeName, importFrom })`.
 
 ## Migrations
 

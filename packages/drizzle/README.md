@@ -8,7 +8,7 @@ Write [TypeSQL](https://www.npmjs.com/package/@typesql/core) queries against you
 pnpm add @typesql/core @typesql/drizzle drizzle-orm
 ```
 
-Requires `drizzle-orm` 0.45 or later: on node-postgres or postgres.js for PostgreSQL, or any Drizzle SQLite driver.
+Requires `drizzle-orm` 0.45 or later, before 1.0: on node-postgres or postgres.js for PostgreSQL, or any Drizzle SQLite driver.
 
 ## Usage
 

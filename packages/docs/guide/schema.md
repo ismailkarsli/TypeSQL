@@ -134,7 +134,9 @@ interface DB {
 `pg_catalog` and `information_schema` are not part of your schema by default. To query them, add `PgCatalog` to your schema:
 
 ```ts
-const admin = createSql<DB & PgCatalog>();
+import type { PgCatalog } from "@typesql/core/postgres";
+
+const admin = createSql<DB & PgCatalog>(postgres);
 
 const connections = admin(`
   SELECT state, count(*)::int AS total

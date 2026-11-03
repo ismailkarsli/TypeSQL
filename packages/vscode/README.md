@@ -14,7 +14,7 @@ Errors, hovers and row types come from TypeScript, with or without this extensio
 
 ## Requirements
 
-Highlighting by name works on its own. Completions and highlighting by type need:
+Requires VS Code 1.144 or newer. Highlighting by name works on its own. Completions and highlighting by type need:
 
 - The [TypeScript 7 extension](https://marketplace.visualstudio.com/items?itemName=TypeScriptTeam.native-preview), running TypeScript 7.1 or later. Its version 1.0 bundles TypeScript 7.0, so [point it at TypeScript 7.1](https://typesql.karsli.net/guide/vscode#use-typescript-7-1) or install the **TypeScript 7 Nightly** extension.
 - `@typesql/core` 0.4.0 or later in the project, directly or through an adapter.

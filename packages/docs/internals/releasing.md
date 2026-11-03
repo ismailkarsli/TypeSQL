@@ -44,11 +44,11 @@ A parameter tested with `IS NULL` or `IS NOT NULL`, as in `($1::text IS NULL OR 
 
 - The summary becomes the changelog entry word for word. Write one sentence on the behaviour a
   user now sees, with identifiers in backticks; leave out the implementation.
-- Name only the packages whose code changed. Packages that depend on them through
-  `workspace:*` are bumped automatically and get an "Updated dependencies" entry, and the rest
+- Name only the packages whose shipped files changed, including README documentation.
+  Packages that depend on them through `workspace:*` are bumped automatically and get an "Updated dependencies" entry, and the rest
   of the fixed group moves to the same version.
-- One change, one intent. A change that spans packages lists all of them in one file (as
-  `.changeset/wise-snails-clean.md` does for the five integration packages).
+- One change, one intent. A change that spans packages lists all of them in one file (with
+  one package entry per line in its front matter).
 - To fix a summary before it is released, edit the intent file.
 
 ### Enforcement
@@ -58,8 +58,10 @@ changed since `origin/main` (in CI: since the pull request's base, or the previo
 push) and no intent added in that range names the package. Shipped files are the entries of
 the package's `files` field (`src`, `README.md`, `LICENSE`) plus `package.json`; a change to
 `version` alone, as in a release commit, does not count. Tests, examples, the docs site and the
-private packages need no intent. When a change needs no release (a refactor, a README typo),
-record that with `--bump none`. Run it before pushing:
+private packages need no intent, except for user-facing changes to the VS Code extension.
+Use `patch` for fixes, including README corrections, and `major` for any change that could
+break users. Use `--bump none` only for internal changes that need no release and cannot
+change supported behavior. Run it before pushing:
 
 ```sh
 pnpm check:intents
@@ -78,8 +80,8 @@ pnpm release
 ```
 
 The workflow runs only when started by hand on `main`, with `pnpm release` or **Run workflow** on
-the Actions tab; pushing publishes nothing. Tests, type checks, lint and smoke checks belong to
-`checks.yml`, which runs on pushes and pull requests (lint remains temporarily disabled
+the Actions tab; pushing publishes nothing. Scenario tests, type checks, lint, Playground
+validation and documentation builds belong to `checks.yml`, which runs on pushes and pull requests (lint remains temporarily disabled
 while repository-wide violations are addressed). Release does not rerun those checks;
 start it from a revision whose checks have passed. Its `publish` job runs `pnpm version -r` (bump
 versions, write changelog sections, update the ledger) and commits the result to `main` as
@@ -306,9 +308,9 @@ GitHub releases. The fixed group sits under the same
 `versioning:` key; other versioning settings (ignored packages, lanes) would go there too, and the
 repository uses their defaults.
 
-CI runs `pnpm change check`, which fails when an intent names a package that does not exist or
-the committed versions break a configured versioning rule, such as fixed-group packages
-with different versions.
+CI runs `pnpm check:intents` to enforce intent coverage. Use `pnpm change check` locally to
+check pnpm's versioning rules too, including unknown packages in intents and fixed-group
+packages with different committed versions.
 
 ## Pitfalls
 

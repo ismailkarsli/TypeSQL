@@ -19,7 +19,7 @@ hero:
 
 features:
   - title: "Plain SQL, exact types"
-    details: "Write the SQL your database runs. Row and parameter types follow its rules, including nullability from joins. PostgreSQL today; MySQL and SQLite are planned."
+    details: "Write the SQL your database runs. Row and parameter types follow its rules, including nullability from joins. PostgreSQL and SQLite are supported; MySQL is planned."
   - title: "No codegen"
     details: "The TypeScript compiler reads your SQL. There is no generate step and no database to connect to."
   - title: "Mistakes are compile errors"

@@ -134,7 +134,7 @@ Like `sql.set`, `sql.values` checks column types at compile time, but at runtime
 
 ### JSON columns
 
-`sql.set` and `sql.values` send their values as parameters, so JSON values go through `sql.json(value)` there too. It is sent as JSON text by both drivers. Against a [`Json<T>`](./schema#typed-json-columns) column it is checked against `T` (see [Limits](./limits)):
+`sql.set` and `sql.values` send their values as parameters, so JSON values go through `sql.json(value)` there too. It is sent as JSON text by the adapters. Against a [`Json<T>`](./schema#typed-json-columns) column it is checked against `T` (see [Limits](./limits)):
 
 ```ts
 const patch = sql.set("portfolio", {

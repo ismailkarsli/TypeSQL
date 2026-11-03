@@ -57,7 +57,7 @@ The value's TypeScript type is checked against the parameter's type. A mismatch 
 ```ts
 sql(`SELECT id FROM users WHERE id = ${sql.param("7")}`);
 
-sql(`INSERT INTO users (email) VALUES (${sql.param(maybeEmail  )})`);
+sql(`INSERT INTO users (email) VALUES (${sql.param(maybeEmail)})`);
 ```
 
 Literals and objects are checked exactly: `sql.param("angry")` is an error for an enum without that value, and an object for a [`Json<T>` column](./schema#typed-json-columns) must fit `T`. A value typed as plain `string`, `number` or `boolean` is only checked for its kind, so any `string` is accepted for an enum column, and an object with an index signature (`Record<string, unknown>`) is not checked for missing keys. Arrays for JSON go through [`sql.json()`](#json-values). With no context (`SELECT ${sql.param(x)}`), anything is accepted. `sql.param()` inside quotes or a comment is an error.
@@ -86,7 +86,7 @@ optional.text;
 
 ## JSON values
 
-Use `${sql.json(value)}` for `json` and `jsonb` values. It sends the same JSON text with both drivers, and sends `null` as SQL `NULL`. `undefined` sends `DEFAULT`, like [`sql.param(sql.optional(undefined))`](./writing-data#optional-values): a value that can be `undefined` is only accepted where `DEFAULT` is, and can't be a positional or named argument. In `sql.set` and `sql.values` it leaves the column out, as `undefined` does.
+Use `${sql.json(value)}` for `json` and `jsonb` values. It sends JSON text through the adapters, and sends `null` as SQL `NULL`. `undefined` sends `DEFAULT`, like [`sql.param(sql.optional(undefined))`](./writing-data#optional-values): a value that can be `undefined` is only accepted where `DEFAULT` is, and can't be a positional or named argument. In `sql.set` and `sql.values` it leaves the column out, as `undefined` does.
 
 ```ts
 const save = sql(
@@ -171,7 +171,7 @@ The full list for each driver is in [Type mapping](../reference/type-mapping#par
 
 ## Only literal SQL is analysed
 
-The SQL must be a string literal, or a template literal whose `${…}` parts are compile-time constants, `sql.param()` / `sql.json()` values or [fragments](./dynamic-sql#interpolating-fragments). TypeScript folds constants into the literal:
+The SQL must be a string literal, or a template literal whose `${…}` parts are compile-time constants, `sql.param()` / `sql.json()` values or [fragments](./dynamic-sql#fragments). TypeScript folds constants into the literal:
 
 ```ts
 const table = "users";

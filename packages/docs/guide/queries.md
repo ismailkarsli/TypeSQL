@@ -68,7 +68,7 @@ Attach `CasePlugin` to get camelCase row keys and write input keys. The inferred
 ```ts
 import { CasePlugin } from "@typesql/core";
 
-const camel = createSql<DB>(executor).withPlugin(new CasePlugin());
+const camel = createSql<DB>(postgres, executor).withPlugin(new CasePlugin());
 
 const rows = await camel(
 	"SELECT id, display_name, created_at, count(*) OVER () AS total_count FROM users",
@@ -152,7 +152,7 @@ const overall = sql(`SELECT count(*) AS n, max(title) AS last FROM posts`);
 
 Result types follow Postgres: `sum` of integers is `int8` (`numeric` for `int8` input), and `avg` is `numeric`.
 
-Window functions work the same way. `row_number()`, `rank()` and similar functions are non-null `int8`. `lag()`, `lead()` and `first_value()` are nullable.
+Window aggregates also account for frames that can be empty. `row_number()`, `rank()` and similar functions are non-null `int8`. `lag()` and `lead()` without a default are nullable; with a non-null value and a non-null default, they are non-null. `first_value()`, `last_value()` and `nth_value()` are nullable because their frame may contain no matching row.
 
 ## Subqueries, CTEs and set operations
 
@@ -243,7 +243,7 @@ const withPosts = sql(`
 
 Operators follow Postgres's rules. For example, `int4 + int8` is `int8`, `timestamptz - timestamptz` is an `interval`, and `->>` is `text`.
 
-About 450 built-in functions have signatures with return types and null handling, including those of `pgcrypto`, `uuid-ossp`, `unaccent`, `pg_trgm` and `fuzzystrmatch`. A signature picks the overload and the return type, but argument types are not checked against it: `lower(id)` on an `int4` column compiles as `string`, while PostgreSQL rejects it. Operators likewise aren't checked for their operand types (`email = 1` compiles). Every other `pg_catalog` function is known by its return type only.
+About 450 built-in functions have signatures with return types and null handling, including those of `pgcrypto`, `uuid-ossp`, `unaccent`, `pg_trgm` and `fuzzystrmatch`. A signature picks the overload and the return type, but argument types are not checked against it: `lower(id)` on an `int4` column compiles as `string`, while PostgreSQL rejects it. Comparison operators reject incompatible known column types, such as `id = email` between `int4` and `text`, but literals, parameters, enums, arrays and domains are more permissive (`email = 1` compiles). Every other `pg_catalog` function is known by its return type only.
 
 A function Postgres would not find is an error. A close known name gives a hint:
 
@@ -260,7 +260,7 @@ interface AppDB extends DB {
 		rank_in: Sig<["int4", "..."], "int8", { nullable: false }>;
 	};
 }
-const appSql = createSql<AppDB>();
+const appSql = createSql<AppDB>(postgres);
 const slugs = appSql(
 	`SELECT slugify(email) AS slug, slugify(display_name) AS alt, rank_in(id, 1, 2) AS r FROM users`,
 );

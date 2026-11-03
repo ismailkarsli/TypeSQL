@@ -68,7 +68,7 @@ The first file starts from `"postgres"` or `"sqlite"` instead of `previous`. `up
 pnpm exec typesql migrate latest --dialect sqlite --db app.db
 ```
 
-The history is recorded in `schema_migrations` (`migrationTable` changes the name). Each migration and its history row commit together; PostgreSQL holds an advisory lock for the command, and SQLite uses `BEGIN IMMEDIATE`. Editing the DDL of an applied migration, deleting one, or inserting or reordering one before it is an error; formatting, comments, types and queries are not tracked.
+The history is recorded in `schema_migrations` (`migrationTable` changes the name). Each migration and its history row commit together in their own transaction; PostgreSQL takes a transaction-scoped advisory lock, and SQLite uses `BEGIN IMMEDIATE`. The history is checked under the lock before each migration. Removing or renaming an applied migration, or inserting or reordering one before it, is an error. Applied migrations are tracked by name only: editing their DDL is not detected, so add a new migration to change the database.
 
 `up`, `down` and `latest` then write the schema of the last applied migration to `db.ts` beside the config. `generate` writes the schema of the last migration file without connecting. Writing it needs `typescript` 7.1 or later; set `schemaFile` or pass `--out` to change the path, and set `generate: false` or pass `--no-generate` to skip it.
 

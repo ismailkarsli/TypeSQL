@@ -1,6 +1,6 @@
 # @typesql/postgres
 
-Run [TypeSQL](https://www.npmjs.com/package/@typesql/core) queries on [postgres.js](https://github.com/porsager/postgres) (`postgres` 3.x), with rows typed the way postgres.js returns them.
+Run [TypeSQL](https://www.npmjs.com/package/@typesql/core) queries on [postgres.js](https://github.com/porsager/postgres) (`postgres` 3.x or 4.x), with rows typed the way postgres.js returns them.
 
 ## Install
 

@@ -1,6 +1,6 @@
 # API
 
-Everything `@typesql/core` exports, plus `@typesql/core/postgres`, `@typesql/core/adapter`, `@typesql/core/migration` and the extra exports of the adapter and ORM packages. Each entry links to the guide page that explains it.
+The public APIs of `@typesql/core`, `@typesql/core/postgres`, `@typesql/core/sqlite`, `@typesql/core/adapter`, `@typesql/core/migration` and the extra exports of the adapter and ORM packages. Each entry links to the guide page that explains it.
 
 `@typesql/core` holds what every SQL dialect shares: `createSql`, queries, fragments, executors, plugins, transactions, the schema markers and the [dialect contract](#dialects). Migrations are in `@typesql/core/migration`. Everything PostgreSQL-specific is in `@typesql/core/postgres`: the `postgres` dialect, the type engine, `Json` and `PgCatalog`, the type maps and the function catalog.
 
@@ -15,7 +15,7 @@ createSql<DB, TypeMap = DefaultTypeMap>(postgres, executor?): Sql<DB, TypeMap>
 
 Returns the typed `sql` function for a schema in a [dialect](#dialects).
 
-- The dialect is the first argument: `postgres` from `@typesql/core/postgres`. Each dialect adds its own `createSql` signature, so the type arguments start with `DB`.
+- The dialect is the first argument: `postgres` from `@typesql/core/postgres` or `sqlite` from `@typesql/core/sqlite`. Each dialect adds its own `createSql` signature, so the type arguments start with `DB`.
 - `DB` is your [schema](../guide/schema). `TypeMap` turns the dialect's column types into TypeScript types ([Type mapping](./type-mapping)); it defaults to the dialect's map.
 - `executor` is what `execute*` runs on. Without one, `sql` only builds queries.
 - Use `.withPlugin(new CasePlugin())` for camelCase input and output keys, or attach a custom typed plugin. See [plugins](../guide/queries#plugins).
@@ -26,6 +26,7 @@ The adapters export their own `createSql`, which takes the driver client and add
 |---|---|
 | `@typesql/pg` | `createSql<DB>(pool)`, with `PgTypeMap` |
 | `@typesql/postgres` | `createSql<DB>(sql, options?)` with `PostgresJsTypeMap`, or `PostgresJsBigIntTypeMap` with `{ bigint: true }` |
+| `@typesql/sqlite` | `createSql<DB>(db, options?)` with SQLite's `DefaultTypeMap`, or `BigIntTypeMap` with `{ bigint: true }` |
 | `@typesql/kysely`, `@typesql/drizzle`, `@typesql/prisma` | see [ORM packages](#orm-packages) |
 
 ## `sql(text, ...params)`
@@ -147,13 +148,17 @@ See [Transactions](../guide/transactions).
 
 The methods run on the executor passed to the call, or else on the one `createSql` bound. Without either, they reject. They are non-enumerable, so a query still deep-equals `{ text, values }`.
 
-Every adapter reports the row count for `executeCount`: `rowCount` (`pg`), `count` (postgres.js), `numAffectedRows` or the number of rows (Kysely), `$executeRawUnsafe` (Prisma), and for Drizzle the count of the driver underneath.
+Every adapter reports the row count for `executeCount`: SQLite uses the changed-row count or the number of returned rows; the others use `rowCount` (`pg`), `count` (postgres.js), `numAffectedRows` or the number of rows (Kysely), `$executeRawUnsafe` (Prisma), and for Drizzle the count of the driver underneath.
 
 ### Executors
 
 ```ts
-type Executor = (text: string, values: unknown[]) => PromiseLike<readonly unknown[] | ExecutorResult>;
-type ExecutorResult = { rows: readonly unknown[]; rowCount: number | null };
+type Executor = ((text: string, values: readonly unknown[]) =>
+  PromiseLike<readonly unknown[] | ExecutorResult>) & {
+  readonly prepare?: (text: string) => Executor;
+  readonly count?: (text: string, values: readonly unknown[]) => PromiseLike<number>;
+};
+type ExecutorResult = { readonly rows: readonly unknown[]; readonly rowCount: number | null };
 ```
 
 - Each adapter exports `executor(client)`. On a SQLite client (Kysely's SQLite dialects, Prisma with the `sqlite` provider, a Drizzle SQLite database), it uses SQLite's `?` placeholders without being told; `executor(client, { dialect })` states the dialect for Kysely and Prisma.
@@ -178,6 +183,14 @@ What adapters and custom executors build on.
 | `positional(text, values, map?)` | rewrites `$n` parameters (outside strings, quoted names and comments) to `?` and returns the values in order, mapped by `map` (default `sqliteValue`), for SQLite drivers that bind positional parameters |
 | `splitParams(text, values, map?)` | the statement split at its `$n` parameters: `{ parts, values }` |
 | `paramNumbers(text)` | the parameter numbers a statement uses, in order of first use |
+| `SplitStatement` | the `{ parts, values }` result of `splitParams` |
+| `serialTransaction(client, depth, run, fn)` | serializes top-level transactions on one client object; nested calls use savepoints |
+| `parsePgArray(text, parse)` | parses a PostgreSQL array literal, including nested arrays and null elements, using an element parser |
+| `parsePgUserArrays(owner, lookup, fields, rows)` | decodes arrays of user-defined PostgreSQL types using result fields and catalog lookups |
+| `PgField`, `PgLookup` | field metadata and the catalog lookup contract for PostgreSQL array decoding |
+| `propertyKey(name)`, `colSource(type, nullable, hasDefault)`, `schemaMembers(relations, schemaOf, member)` | helpers for emitting TypeScript schema source |
+| `globRegExp(pattern)` | an anchored name-matching expression where `*` matches any text |
+| `introspectArgs(io, usage, parse)`, `CommandIo` | shared introspection argument validation and command output callbacks |
 | `sqliteValue(value)` | a value as SQLite binds it: `sql.json()` values as JSON text, booleans as `1` / `0`; throws for a `Date` |
 
 ## Public types
@@ -196,7 +209,10 @@ What adapters and custom executors build on.
 | `ExecutorResult` | `{ rows, rowCount: number \| null }` |
 | `NoResultError` | thrown by `executeTakeFirstOrThrow` on 0 rows; carries `text` |
 | `RowType<Q>`, `ParamsType<Q>`, `TextType<Q>` | the row, parameters and text of a `Query` or `Fragment` type |
-| `Fragment<Text, Params>` | a spliceable SQL piece |
+| `Fragment<Text, Params, Carried>` | a spliceable SQL piece, with carried input types for checking when spliced |
+| `QueryObject<Row, Params, Text>`, `FragmentObject<Text, Params, Carried>` | the object interfaces behind the string-branded `Query` and `Fragment` aliases |
+
+The `Sql` and `TransactionalSql` types come from `@typesql/core/postgres` or `@typesql/core/sqlite`. The remaining types above come from `@typesql/core`.
 
 ### Tables and write helpers
 
@@ -251,7 +267,8 @@ type WithCatalog = DB & PgCatalog;
 | `DefaultParamTypeMap` | what parameters accept when a map has no `$params` |
 | `PgTypeMap`, `PgParamTypeMap` | `@typesql/pg` |
 | `PostgresJsTypeMap`, `PostgresJsBigIntTypeMap`, `PostgresJsParamTypeMap` | `@typesql/postgres` |
-| `PrismaTypeMap` | `@typesql/prisma` |
+| `PrismaTypeMap`, `PrismaSqliteTypeMap` | `@typesql/prisma`, for PostgreSQL and SQLite |
+| `BigIntTypeMap` | `@typesql/core/sqlite`, for SQLite integer results read as `bigint` |
 | `ParamTypeMapOf<TM>` | the parameter map in effect for `TM` |
 | `TsParamTypeOf<TM, DB, T>` | what a parameter of Postgres type `T` accepts |
 
@@ -289,7 +306,7 @@ An entry is one `Sig<Params, Return, Flags>` or a tuple of overloads.
 | Parameter patterns | an exact type name, `any`, `anynumeric`, `anystring`, `anyarray`, `anyjson`, `anydatetime`, `...` (variadic) |
 | Return patterns | an exact name, `$1`..`$4`, `$elem1`, `$arr1`, `$common`, `$sum1`, `$avg1` |
 | Typed-JSON return patterns | `$jval:json` (`to_json`), `$jarr:json` (`json_agg`), `$jrec:json` (`json_object_agg`), `$jtup:json` (`json_build_array`), `$jelem:json` (`json_array_elements`); `jsonb` for the jsonb variants |
-| Flags | `strict` (the default: nullable if any argument is), `nullable`, `agg`, `window`, `srf` |
+| Flags | `strict` (default `true`: nullable if any argument is; `false` disables this; an array of 1-based argument numbers checks only those arguments), `nullable`, `agg`, `window`, `srf` |
 
 ## Migrations
 
@@ -301,8 +318,8 @@ An entry is one `Sig<Params, Return, Flags>` or a tuple of overloads.
 | `Migration<Before, After>` | `{ name?: string; up(db: Before): Promise<After>; down(db: After): Promise<unknown> }` |
 | `MigrationSteps<Before, After>` | the `{ up, down }` argument of `migration()` |
 | `SchemaOf<M>` | the schema after the migration `M`; also takes a migrator, the result of its `latest()`, a 3.x `up` function or a migration context. Also exported from `@typesql/core` |
-| `PostgresMigration<DB = {}>`, `SqliteMigration<DB = {}>` | the `db` of a migration: a checked query function with `add(ddl)`, `raw<NewSchema>(sql)` and the type-only `schema` |
-| `MigrationContext<E, T, DB>` | the type behind both, for engine `E` and dialect `T` |
+| `PostgresMigration<DB = {}>`, `SqliteMigration<DB = {}>` | the `db` of a migration: a checked query function with `ddl(ddl)`, its deprecated alias `add(ddl)`, `raw<NewSchema>(sql)` and the type-only `schema` |
+| `MigrationContext<E, T, DB, TM = T["typeMap"]>` | the type behind both, for engine `E` and dialect `T` |
 | `createMigrator(config)` | a `Migrator`; never connects by itself. With a `migrations` array its schema is inferred (from an array written in the call or declared `as const`); `createMigrator<DB>(config)` states it |
 | `Migrator<Schema>` | `latest()`, `up()`, `down()`, `status()`, `make(name)`, `generate()`, `with(overrides)` and `config` |
 | `MigratorConfig` | `dialect`; `url`, `db` or `execute`; `migrationsDir` or `migrations`; `migrationTable`, `schemaFile`, `generate`, `transaction` |
@@ -324,8 +341,8 @@ A dialect pairs the runtime that builds its `sql` function with that function's 
 | Export of `@typesql/core` | Meaning |
 |---|---|
 | `Dialect<T>` | the runtime side, what `createSql` takes: `{ name, valuesDefault? }`. Statements are built with `$n` parameters and sent as written. `valuesDefault: false` makes `sql.values()` throw instead of writing `DEFAULT` for a missing column |
-| `DialectTypes` | the type side: its default `typeMap`, and given `db`, `tm`, `keys` and `ddl`, the `sql`, `transactionalSql`, `validateDdl` and `applyDdl` types |
-| `SqlOf<T, DB, TM, Keys>`, `TransactionalSqlOf<T, DB, TM, Keys>` | the `sql` function of dialect `T`, without or with `transaction(fn)` |
+| `DialectTypes` | the type side: its default `typeMap`, and given `db`, `tm`, `plugins` and `ddl`, the `sql`, `transactionalSql`, `validateDdl` and `applyDdl` types |
+| `SqlOf<T, DB, TM, Plugins = []>`, `TransactionalSqlOf<T, DB, TM, Plugins = []>` | the `sql` function of dialect `T`, without or with `transaction(fn)` |
 | `ValidateDdlOf<T, DB, Q>`, `ApplyDdlOf<T, DB, Q>` | DDL checking and the schema after `Q`, in dialect `T` |
 | `Transactional<Self>` | the `transaction(fn)` method an adapter's `sql` adds |
 | `CreateSql` | the type of `createSql`. A dialect adds its call signatures by augmenting it, so `createSql<DB>(postgres)` picks PostgreSQL's from the `postgres` argument. A dialect without its own signatures uses the generic one: `createSql<T, DB>(dialect)` |

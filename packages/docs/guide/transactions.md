@@ -27,7 +27,7 @@ const userId = await sql.transaction(async (tx) => {
 - When `fn` resolves, the transaction commits and `sql.transaction` resolves to `fn`'s result.
 - When `fn` throws, the transaction rolls back and the error is rethrown.
 
-`sql.transaction` needs a client. On a `sql` from `createSql<DB>()` without one, it rejects.
+`sql.transaction` needs a client. On an adapter's `sql` created without a client, it rejects. Core's `createSql<DB>(dialect)` builds queries without a `transaction` method.
 
 ## Nested transactions
 
@@ -61,7 +61,7 @@ A `sql` bound to a client that is already in a transaction also uses a savepoint
 Statements in one transaction share one connection. Run them one after another, not with `Promise.all`.
 :::
 
-Once the callback's promise settles, `tx` (and everything built from it, such as `tx.withPlugin(…)` and `tx.prepare(…)`) rejects new queries with "this transaction has ended". Otherwise a query that was not awaited could run outside the transaction, on a connection the pool has already handed to someone else.
+Once the callback's promise settles, executing queries on `tx` (including queries built earlier, `tx.withPlugin(…)` and `tx.prepare(…)`) rejects with "this transaction has ended". Otherwise a query that was not awaited could run outside the transaction, on a connection the pool has already handed to someone else.
 
 ```ts
 await sql.transaction(async (tx) => {
@@ -83,7 +83,8 @@ await sql.transaction(async (tx) => {
 | Adapter | `sql.transaction(fn)` | `tx.transaction(fn)` |
 |---|---|---|
 | `@typesql/pg` | on a `Pool`: checks out a client, runs `BEGIN`…`COMMIT` on it, releases it. On a `Client` or `PoolClient`: `BEGIN`…`COMMIT` on it | `SAVEPOINT` |
-| `@typesql/postgres` | `sql.begin(fn)` | `tx.savepoint(fn)` |
+| `@typesql/postgres` | `sql.begin(fn)`; on a reserved connection, `BEGIN`…`COMMIT` | `tx.savepoint(fn)`; on a reserved connection, `SAVEPOINT` |
+| `@typesql/sqlite` | `BEGIN`…`COMMIT` on the database; top-level transactions run one after another | `SAVEPOINT` |
 | `@typesql/kysely` | `db.transaction().execute(fn)` | `SAVEPOINT` on the transaction |
 | `@typesql/prisma` | `prisma.$transaction(fn)` (interactive) | `SAVEPOINT` on the transaction client |
 | `@typesql/drizzle` | `db.transaction(fn)` | Drizzle's nested `tx.transaction(fn)` (a savepoint) |
