@@ -31,7 +31,8 @@ export default withVersions({
 	// from the published packages' changelogs by `[page].paths.ts`.
 	srcExclude: ["internals/**", "CHANGELOG.md"],
 	themeConfig: {
-		logo: "/logo.svg",
+		logo: { light: "/logo-light.svg", dark: "/logo-dark.svg", alt: "TypeSQL" },
+		siteTitle: false,
 		nav: [
 			{
 				text: "Guide",
