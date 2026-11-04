@@ -1,12 +1,17 @@
 import type { PickOne, Rebuild } from "../../../engine/object.js";
-import type { ColInfo, Cols, ColsToMap } from "../../../engine/types.js";
+import type {
+	ColInfo,
+	Cols,
+	ColsToMap,
+	QueryContext,
+} from "../../../engine/types.js";
 import type { SqlError } from "../../../errors.js";
 import type { SelectStmt } from "../ast.js";
 import type { ProjectSelect } from "../project/select.js";
 import type { MkCol, NullOf, TypeOfCol } from "./column.js";
 
 type QueryProjection<DB, Q> = Q extends SelectStmt
-	? ProjectSelect<Q, DB, [], {}>
+	? ProjectSelect<Q, QueryContext<DB, [], {}>>
 	: Q extends { readonly t: "execute"; readonly name: infer N extends string }
 		? SqlError<
 				`CREATE TABLE ... AS EXECUTE ${N} is not supported: the columns of a prepared statement are unknown`,

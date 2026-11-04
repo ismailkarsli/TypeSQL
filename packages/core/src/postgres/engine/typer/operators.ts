@@ -43,9 +43,9 @@ export type Unmatchable<A extends string, B extends string> =
 type LitT = "lit";
 export type LitToText<T extends string> = T extends LitT ? "text" : T;
 
-type Either<L extends boolean, R extends boolean> = L extends true
+export type Or<A extends boolean, B extends boolean> = A extends true
 	? true
-	: R extends true
+	: B extends true
 		? true
 		: false;
 
@@ -117,8 +117,8 @@ type BinOpNullable<
 	: Op extends "@@"
 		? L["type"] extends "jsonb"
 			? true
-			: Either<L["nullable"], R["nullable"]>
-		: Either<L["nullable"], R["nullable"]>;
+			: Or<L["nullable"], R["nullable"]>
+		: Or<L["nullable"], R["nullable"]>;
 
 type BinOpResult<
 	Op extends string,
@@ -661,22 +661,14 @@ type IntBounds = {
 };
 
 type IntLitType<D extends string, Max extends [string, string]> =
-	ValueCmp<NoZeros<D>, Max[0]> extends infer C4
-		? C4 extends "gt"
-			? ValueCmp<NoZeros<D>, Max[1]> extends infer C8
-				? C8 extends "gt"
-					? "numeric"
-					: "int8"
-				: never
-			: "int4"
-		: never;
+	ValueCmp<NoZeros<D>, Max[0]> extends "gt"
+		? ValueCmp<NoZeros<D>, Max[1]> extends "gt"
+			? "numeric"
+			: "int8"
+		: "int4";
 type NoZeros<D extends string> = D extends `0${infer R}` ? NoZeros<R> : D;
 type ValueCmp<V extends string, Max extends string> =
-	LengthCmp<V, Max> extends infer L
-		? L extends "eq"
-			? DigitsCmp<V, Max>
-			: L
-		: never;
+	LengthCmp<V, Max> extends "eq" ? DigitsCmp<V, Max> : LengthCmp<V, Max>;
 type LengthCmp<
 	A extends string,
 	B extends string,

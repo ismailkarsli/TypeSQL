@@ -1,8 +1,14 @@
+---
+description: "What TypeSQL is: describe your tables once, write SQL as a string, and the TypeScript compiler infers the exact row and parameter types."
+---
+
 # Introduction
 
 TypeSQL gives you exact TypeScript types for the SQL you write. You describe your tables once, write SQL as a string, and the compiler tells you what comes back:
 
-```ts
+::: code-group
+
+```ts [PostgreSQL]
 import { Pool } from "pg";
 import { createSql } from "@typesql/pg";
 import type { DB } from "./schema.js";
@@ -20,6 +26,26 @@ const recent = sql(
 
 const rows = await recent.execute();
 ```
+
+```ts [SQLite]
+import { DatabaseSync } from "node:sqlite";
+import { createSql } from "@typesql/sqlite";
+import type { DB } from "./schema.js";
+
+const sql = createSql<DB>(new DatabaseSync("app.db"));
+
+const recent = sql(
+	`SELECT u.id, u.email, p.title
+   FROM users u
+   LEFT JOIN posts p ON p.author_id = u.id
+   WHERE u.created_at > $1`,
+	"2026-01-01",
+);
+
+const rows = await recent.execute();
+```
+
+:::
 
 ## How it works
 
@@ -42,5 +68,5 @@ The core is dialect-neutral: each SQL dialect brings its own parser, type rules 
 
 - [Installation](./installation): requirements and the packages for your driver.
 - [Quick start](./quick-start): your first typed query.
-- [Comparison](./comparison): how TypeSQL differs from code generators, query builders and ORMs.
+- [Compared to other tools](../compared-to/kysely): Kysely, Drizzle, Prisma and Reylo.
 - [Upgrading](./upgrading): moving from an earlier version, with the [changelog](/changelog).

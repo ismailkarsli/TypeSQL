@@ -1,8 +1,14 @@
+---
+description: "Run several typed statements in one transaction with sql.transaction, the same way with every TypeSQL adapter."
+---
+
 # Transactions
 
 `sql.transaction(fn)` runs several statements in one transaction. It works the same way with every adapter.
 
-```ts
+::: code-group
+
+```ts [PostgreSQL]
 import { Pool } from "pg";
 import { createSql } from "@typesql/pg";
 
@@ -22,12 +28,34 @@ const userId = await sql.transaction(async (tx) => {
 });
 ```
 
+```ts [SQLite]
+import { DatabaseSync } from "node:sqlite";
+import { createSql } from "@typesql/sqlite";
+
+const sql = createSql<DB>(new DatabaseSync("app.db"));
+
+const userId = await sql.transaction(async (tx) => {
+	const { id } = await tx(
+		"INSERT INTO users (email) VALUES ($1) RETURNING id",
+		"ada@example.com",
+	).executeTakeFirstOrThrow();
+	await tx(
+		"INSERT INTO posts (author_id, title) VALUES ($1, $2)",
+		id,
+		"Hello",
+	).execute();
+	return id;
+});
+```
+
+:::
+
 `fn` receives `tx`, the same `sql` bound to the transaction. It has the same types and helpers as `sql`.
 
 - When `fn` resolves, the transaction commits and `sql.transaction` resolves to `fn`'s result.
 - When `fn` throws, the transaction rolls back and the error is rethrown.
 
-`sql.transaction` needs a client. On a `sql` from `createSql<DB>()` without one, it rejects.
+`sql.transaction` needs a client. On an adapter's `sql` created without a client, it rejects. Core's `createSql<DB>(dialect)` builds queries without a `transaction` method.
 
 ## Nested transactions
 
@@ -61,7 +89,7 @@ A `sql` bound to a client that is already in a transaction also uses a savepoint
 Statements in one transaction share one connection. Run them one after another, not with `Promise.all`.
 :::
 
-Once the callback's promise settles, `tx` (and everything built from it, such as `tx.withPlugin(…)` and `tx.prepare(…)`) rejects new queries with "this transaction has ended". Otherwise a query that was not awaited could run outside the transaction, on a connection the pool has already handed to someone else.
+Once the callback's promise settles, executing queries on `tx` (including queries built earlier, `tx.withPlugin(…)` and `tx.prepare(…)`) rejects with "this transaction has ended". Otherwise a query that was not awaited could run outside the transaction, on a connection the pool has already handed to someone else.
 
 ```ts
 await sql.transaction(async (tx) => {
@@ -83,9 +111,10 @@ await sql.transaction(async (tx) => {
 | Adapter | `sql.transaction(fn)` | `tx.transaction(fn)` |
 |---|---|---|
 | `@typesql/pg` | on a `Pool`: checks out a client, runs `BEGIN`…`COMMIT` on it, releases it. On a `Client` or `PoolClient`: `BEGIN`…`COMMIT` on it | `SAVEPOINT` |
-| `@typesql/postgres` | `sql.begin(fn)` | `tx.savepoint(fn)` |
+| `@typesql/postgres` | `sql.begin(fn)`; on a reserved connection, `BEGIN`…`COMMIT` | `tx.savepoint(fn)`; on a reserved connection, `SAVEPOINT` |
+| `@typesql/sqlite` | `BEGIN`…`COMMIT` on the database; top-level transactions run one after another | `SAVEPOINT` |
 | `@typesql/kysely` | `db.transaction().execute(fn)` | `SAVEPOINT` on the transaction |
 | `@typesql/prisma` | `prisma.$transaction(fn)` (interactive) | `SAVEPOINT` on the transaction client |
 | `@typesql/drizzle` | `db.transaction(fn)` | Drizzle's nested `tx.transaction(fn)` (a savepoint) |
 
-More on each driver: [node-postgres](../adapters/pg), [postgres.js](../adapters/postgres), and [Kysely, Drizzle and Prisma](./orms).
+More on each driver: [node-postgres](../adapters/pg), [postgres.js](../adapters/postgres), [SQLite](../adapters/sqlite#transactions), and [Kysely, Drizzle and Prisma](./orms).

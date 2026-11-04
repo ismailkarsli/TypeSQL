@@ -1,3 +1,7 @@
+---
+description: "The TypeSQL VS Code extension: completion of table and column names and syntax highlighting inside SQL strings."
+---
+
 # VS Code extension
 
 The TypeSQL extension for VS Code completes table and column names inside your SQL strings, and highlights the SQL.
@@ -9,12 +13,12 @@ sql("SELECT u.| FROM users u");
 
 The names come from the `DB` type of the `sql` you call, so they follow your schema as you edit it, unsaved changes included.
 
-The extension is optional: errors, hovers and row types come from TypeScript, with or without it.
+The extension requires VS Code 1.144 or newer. It is optional: errors, hovers and row types come from TypeScript, with or without it.
 
 ## Setup
 
 1. Install the TypeSQL extension from the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=typesql.typesql) or [Open VSX](https://open-vsx.org/extension/typesql/typesql). Install the [TypeScript 7 extension](https://marketplace.visualstudio.com/items?itemName=TypeScriptTeam.native-preview) (`TypeScriptTeam.native-preview`) too. The TypeScript 7 extension is published only on the Visual Studio Marketplace, not on Open VSX, so in VSCodium and other Open VSX editors you get SQL highlighting but no completions unless you install it from a `.vsix`.
-2. Have `@typesql/core` 0.4.0 or later in the project, directly or through an adapter (`@typesql/pg`, `@typesql/postgres`, `@typesql/kysely`, `@typesql/drizzle`, `@typesql/prisma`).
+2. Have `@typesql/core` 0.4.0 or later in the project, directly or through an adapter (`@typesql/pg`, `@typesql/postgres`, `@typesql/sqlite`, `@typesql/kysely`, `@typesql/drizzle`, `@typesql/prisma`).
 3. Run the language server on TypeScript 7.1 or later, as below.
 
 ### Use TypeScript 7.1
@@ -57,7 +61,7 @@ To turn suggestions off, set `"typesql.completions.enable": false`.
 - Aliases follow scope: a subquery sees its own FROM items first, then the outer query's.
 - Subqueries and CTEs offer the names of their output columns.
 - Names that the database would fold to lower case or read as a keyword are inserted in double quotes (`"UserAccounts"`, `"order"`).
-- Suggestions work in `sql()`, in `tx()` inside `sql.transaction()`, in `sql.fragment()` and `sql.as()`, in template literals across lines, and between `${sql.param()}` values.
+- Suggestions work in `sql()`, in `tx()` inside `sql.transaction()`, in `sql.fragment()`, `sql.prepare()` and `sql.as()`, in template literals across lines, and between `${sql.param()}` values.
 - There are none inside string literals, comments and quoted identifiers.
 
 ## Syntax highlighting
@@ -68,18 +72,18 @@ The extension colors the SQL inside the string: keywords, types, functions, stri
 |---|---|
 | a call of `sql`, `tx`, or a name ending in `Sql`, `SQL` or `_sql`, also as a member | `sql("…")`, `tx('…')`, `` db.sql(`…`) ``, `pgSql("…")` |
 | `.fragment()` and `.as()` on those | `sql.fragment("…")`, `sql.as<Row>("…")` |
-| `.add()` and `.raw()`, when the string starts like a SQL statement | `` db.add(`CREATE TABLE …`) ``, `db.raw<Next>("…")` |
+| `.ddl()`, `.add()` and `.raw()`, when the string starts like a SQL statement | `` db.ddl(`CREATE TABLE …`) ``, `db.raw<Next>("…")` |
 | any string after a `/* sql */` comment | `camel(/* sql */ "…")`, `const text = /* sql */ "…"` |
 
 Only the first argument is SQL, and only when it is a string or template literal.
 
-These rules read the text, so they color as soon as you type and need neither the TypeScript 7 extension nor `@typesql/core`. `.add()` and `.raw()` cover [migrations](./migrations). Because other objects have an `add` method too, their string counts only when it starts with a statement keyword followed by a space, `;` or `(` (`CREATE TABLE`, `alter table`, `DO $$`), with a `(`, or with a comment. A template literal whose first line is empty also counts.
+These rules read the text, so they color as soon as you type and need neither the TypeScript 7 extension nor `@typesql/core`. `.ddl()` and `.raw()` cover [migrations](./migrations), and so does `.add()`, the earlier name of `.ddl()`. Because other objects have methods with these names too, their string counts only when it starts with a statement keyword followed by a space, `;` or `(` (`CREATE TABLE`, `alter table`, `DO $$`), with a `(`, or with a comment. A template literal whose first line is empty also counts.
 
 ### By type
 
 With the TypeScript 7 extension and `@typesql/core` in the project, the extension then checks each call's type and corrects the colors, so in the end only TypeSQL's functions are SQL:
 
-- A call is SQL when its function comes from TypeSQL, whatever its name: `const camel = createSql<DB>(postgres)` makes `camel("…")` SQL, and in a migration so does `users("INSERT …")` on the context that `db.add()` returns. Their `.fragment()`, `.as()`, `.prepare()` and `.raw()` are SQL too, and so is `.add()` on a migration context.
+- A call is SQL when its function comes from TypeSQL, whatever its name: `const camel = createSql<DB>(postgres)` makes `camel("…")` SQL, and in a migration so does `users("INSERT …")` on the context that `db.ddl()` returns. Their `.fragment()`, `.as()`, `.prepare()` and `.raw()` are SQL too, and so are `.ddl()` and `.add()` on a migration context.
 - A call that the rules above color but that isn't TypeSQL's, such as your own `sql()` function or `set.add("drop it")`, goes back to a plain string.
 - Strings after `/* sql */` stay SQL either way.
 
@@ -87,16 +91,16 @@ The corrections are [semantic tokens](https://code.visualstudio.com/api/language
 
 ### Colors
 
-The SQL is colored in shades of orange, so it stands out from the TypeScript around it:
+The SQL is colored in shades of coral, a hue that the default themes don't use for TypeScript, so it stands out from the code around it:
 
 | Token | Example | Scope | Dark themes | Light themes |
 |---|---|---|---|---|
-| keywords and operators | `SELECT`, `=`, `::` | `keyword.other.sql`, `keyword.operator.sql`, `keyword.operator.cast.sql` | `#FF9F43` | `#C2410C` |
-| types | `int4`, `text` | `storage.type.sql` | `#FFB86C` | `#B45309` |
-| functions | `count(…)` | `entity.name.function.sql` | `#FFC777` | `#9A3412` |
-| numbers and constants | `42`, `true`, `null` | `constant.numeric.sql`, `constant.language.sql` | `#FFD3A1` | `#A16207` |
-| parameters, in bold | `$1`, `:name` | `variable.parameter.positional.sql`, `variable.parameter.named.sql` | `#FF7A45` | `#C2380C` |
-| table and column names, punctuation | `users`, `u.id` | `meta.embedded.line.sql`, `meta.embedded.block.sql` | `#F5D0A9` | `#7C2D12` |
+| keywords and operators | `SELECT`, `=`, `::` | `keyword.other.sql`, `keyword.operator.sql`, `keyword.operator.cast.sql` | `#FDA4AF` | `#A51034` |
+| types | `int4`, `text` | `storage.type.sql` | `#FDBA9A` | `#8A2E10` |
+| functions | `count(…)` | `entity.name.function.sql` | `#F0ABFC` | `#86198F` |
+| numbers and constants | `42`, `true`, `null` | `constant.numeric.sql`, `constant.language.sql` | `#FED7AA` | `#7F1D1D` |
+| parameters, in bold | `$1`, `:name` | `variable.parameter.positional.sql`, `variable.parameter.named.sql` | `#F9A8D4` | `#A1144F` |
+| table and column names, punctuation | `users`, `u.id` | `meta.embedded.line.sql`, `meta.embedded.block.sql` | `#FFE4E6` | `#4C0519` |
 
 Strings and comments keep your theme's colors, and so does TypeScript inside `${…}`.
 
@@ -122,7 +126,7 @@ To change a color, add a rule under your theme's ID. It comes after the defaults
 }
 ```
 
-A rule at the top level, outside a `[…]` key, doesn't change the orange tokens, because the theme-specific defaults apply after it.
+A rule at the top level, outside a `[…]` key, doesn't change the coral tokens, because the theme-specific defaults apply after it.
 
 To turn the colors off, set empty lists under both keys:
 
@@ -135,7 +139,7 @@ To turn the colors off, set empty lists under both keys:
 }
 ```
 
-If your settings already have a `textMateRules` list under `[*Light*]`, it replaces the orange for light themes; add the rules from the table to it to keep them. A list under another key, such as `[*Dark*]`, adds to the defaults instead. To color the SQL in a theme with neither word in its ID, add the rules under that theme's ID, such as `[Monokai]`. **Developer: Inspect Editor Tokens and Scopes** shows the scope of the token under the cursor.
+If your settings already have a `textMateRules` list under `[*Light*]`, it replaces the coral for light themes; add the rules from the table to it to keep them. A list under another key, such as `[*Dark*]`, adds to the defaults instead. To color the SQL in a theme with neither word in its ID, add the rules under that theme's ID, such as `[Monokai]`. **Developer: Inspect Editor Tokens and Scopes** shows the scope of the token under the cursor.
 
 ## How it works
 

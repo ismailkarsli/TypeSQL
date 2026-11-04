@@ -23,12 +23,6 @@ function corePackage(fileName: string): string | null {
 	return null;
 }
 
-const isCorePathIn =
-	(dir: string) =>
-	(path: string): boolean =>
-		path.startsWith(join(dir, "dist") + sep) ||
-		path.startsWith(join(dir, "src") + sep);
-
 export class CorePaths {
 	private readonly logged = new Set<string>();
 	private readonly log: (message: string) => void;
@@ -47,6 +41,10 @@ export class CorePaths {
 			this.logged.add(message);
 			this.log(message);
 		}
-		return core === null ? null : isCorePathIn(core);
+		return core === null
+			? null
+			: (path) =>
+					path.startsWith(join(core, "dist") + sep) ||
+					path.startsWith(join(core, "src") + sep);
 	}
 }

@@ -44,7 +44,7 @@ export type SchemaOf<M> = M extends { readonly [SCHEMA]: infer Schema }
 			: ContextSchema<M>;
 
 /** Where a migration starts; the runner checks the chain with it. */
-export const MIGRATION_FROM: unique symbol = Symbol.for(
+const MIGRATION_FROM: unique symbol = Symbol.for(
 	"typesql.migration.from",
 ) as never;
 
@@ -109,6 +109,29 @@ export function migration(
 	} as Migration<never, unknown>;
 	Object.defineProperty(defined, MIGRATION_FROM, { value: from });
 	return Object.freeze(defined);
+}
+
+export type Dialect = "postgres" | "sqlite";
+
+/** A loaded migration, from the array or a file. */
+export interface Entry {
+	readonly name: string;
+	readonly up: (db: never) => unknown;
+	readonly down: (db: never) => unknown;
+	/** What it starts from, when it was defined with migration(). */
+	readonly from: unknown;
+	/** What a later migration's `from` is when it follows this one. */
+	readonly self: unknown;
+}
+
+export function toEntry(name: string, migration: Migration): Entry {
+	return {
+		name,
+		up: migration.up,
+		down: migration.down,
+		from: (migration as { [MIGRATION_FROM]?: unknown })[MIGRATION_FROM],
+		self: migration,
+	};
 }
 
 /** Whether `value` has a migration's `up` and `down` functions. */

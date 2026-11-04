@@ -1,3 +1,7 @@
+---
+description: "How TypeSQL maps PostgreSQL and SQLite types to TypeScript for each driver, what parameters accept, and how to write a custom type map."
+---
+
 # Type mapping
 
 Your schema uses the database's type names (in PostgreSQL, `int8`, `timestamptz`). A **type map** says which TypeScript type each one becomes. This page lists the maps for each driver, what parameters accept, and how to write your own map.
@@ -50,7 +54,7 @@ A `json` / `jsonb` value with a known shape ([`Json<T>` columns](../guide/schema
 
 ### Arrays
 
-Arrays are mapped element by element (`T[]` becomes the element's type `[]`), which is right for every array type `pg-types` registers. Two cases differ at runtime, and the map can't express them (the `[]` suffix is handled before the map is read):
+Arrays are mapped element by element (`T[]` becomes the element's type `[]`), which is right for every array type `pg-types` registers. Two cases differ at runtime under the default map; exact array entries in a custom map can describe them:
 
 - `numeric[]` is parsed with `parseFloat`, so it is `number[]` at runtime but typed `string[]`.
 - Array types without a registered parser come back as the raw `{…}` string: `name[]`, `"char"[]`, `xml[]`, `bit[]`, `varbit[]`, `tsvector[]`, `tsquery[]`, `circle[]`, `line[]`, `lseg[]`, `box[]`, `path[]`, `polygon[]`, `int4range[]`, `int8range[]`, `tsrange[]`, `tstzrange[]`, `daterange[]`, `macaddr8[]`, `regclass[]`, `record[]`.
@@ -193,7 +197,7 @@ const recent = app(
 
 ## Custom type maps
 
-A type map is any object type from Postgres type names to TypeScript types. Pass it as the second type argument of an adapter's `createSql`, or the third of core's:
+A type map is any object type from Postgres type names to TypeScript types. Pass it as the second type argument of core's dialect-specific `createSql` overload or an ORM package's `createSql`. Driver adapters select fixed maps; to use a custom map with one, pass its `executor(client)` to core's `createSql`:
 
 ```ts
 import { createSql } from "@typesql/core";
@@ -204,6 +208,7 @@ interface MyMap extends Omit<DefaultTypeMap, "int8"> {
 	"int8[]": number[];
 }
 const sql = createSql<DB, MyMap>(postgres);
+// Bind it to a client with createSql<DB, MyMap>(postgres, executor(client)).
 const counts = sql(
 	"SELECT author_id, count(*) AS n FROM posts GROUP BY author_id",
 );

@@ -1,0 +1,382 @@
+engine biome(1.0)
+language js(typescript)
+
+pattern scope_has($decl) {
+	or {
+		JsModule(items=some or {
+			$decl,
+			JsExport(export_clause=$decl)
+		}),
+		JsScript(statements=some $decl),
+		JsFunctionBody(statements=some $decl),
+		JsBlockStatement(statements=some $decl),
+		TsModuleBlock(items=some or {
+			$decl,
+			JsExport(export_clause=$decl)
+		}),
+		JsStaticInitializationBlockClassMember(statements=some $decl),
+		JsCaseClause(consequent=some $decl),
+		JsDefaultClause(consequent=some $decl)
+	}
+}
+
+pattern type_parameters_bind($name) {
+	or {
+		JsFunctionDeclaration(type_parameters=$tp),
+		JsFunctionExpression(type_parameters=$tp),
+		JsArrowFunctionExpression(type_parameters=$tp),
+		TsDeclareFunctionDeclaration(type_parameters=$tp),
+		JsMethodClassMember(type_parameters=$tp),
+		JsMethodObjectMember(type_parameters=$tp),
+		TsMethodSignatureClassMember(type_parameters=$tp),
+		TsMethodSignatureTypeMember(type_parameters=$tp),
+		TsCallSignatureTypeMember(type_parameters=$tp),
+		TsConstructSignatureTypeMember(type_parameters=$tp),
+		TsFunctionType(type_parameters=$tp),
+		TsConstructorType(type_parameters=$tp),
+		TsTypeAliasDeclaration(type_parameters=$tp),
+		TsInterfaceDeclaration(type_parameters=$tp),
+		JsClassDeclaration(type_parameters=$tp),
+		JsClassExpression(type_parameters=$tp)
+	} where {
+		$tp <: TsTypeParameters(items=some TsTypeParameter(name=$p) where {
+			$p <: $name
+		})
+	}
+}
+
+pattern type_parameter_scope($name, $use) {
+	or {
+		type_parameters_bind($name),
+		TsMappedType(property_name=$p) where { $p <: $name },
+		TsConditionalType(extends_type=$e, true_type=$t) where {
+			$e <: contains TsInferType(name=$p) where { $p <: $name },
+			$t <: contains $use
+		}
+	}
+}
+
+pattern named_type_binding($name) {
+	or {
+		TsTypeAliasDeclaration(binding_identifier=$b),
+		TsInterfaceDeclaration(id=$b),
+		TsEnumDeclaration(id=$b),
+		JsClassDeclaration(id=$b),
+		JsImport() as $i where { $i <: contains JsIdentifierBinding() as $b }
+	} where { $b <: $name }
+}
+
+pattern alias_to($target) {
+	TsReferenceType(name=$n, type_arguments=.) as $ref where {
+		$ref <: not within type_parameter_scope($n, $ref),
+		$ref <: within scope_has( TsTypeAliasDeclaration(binding_identifier=$b, ty=$aliased) where {
+			$b <: $n,
+			$aliased <: $target
+		}),
+		$ref <: not within scope_has( named_type_binding($n) as $other where {
+			$other <: not TsTypeAliasDeclaration(ty=$target)
+		})
+	}
+}
+
+// `$wrappers` names references such as `Promise` whose first type argument is looked through.
+// It is matched under double negation so that one wrapper name never binds for nested references.
+pattern wrapped_by($wrappers, $inner) {
+	TsReferenceType(name=$wrapper) as $reference where {
+		$wrapper <: not not $wrappers,
+		$reference <: TsReferenceType(type_arguments=TsTypeArguments(ts_type_argument_list=[
+			$inner, ...
+		]))
+	}
+}
+
+pattern passes_direct_2($p) {
+	TsReferenceType(name=$x, type_arguments=.) where { $x <: $p }
+}
+
+pattern passes_direct_1($p, $wrappers) {
+	or {
+		passes_direct_2($p),
+		TsParenthesizedType(ty=passes_direct_2($p)),
+		TsUnionType(types=some passes_direct_2($p)),
+		wrapped_by($wrappers, passes_direct_2($p))
+	}
+}
+
+pattern passes_direct($p, $wrappers) {
+	or {
+		passes_direct_2($p),
+		TsParenthesizedType(ty=passes_direct_1($p, $wrappers)),
+		TsUnionType(types=some passes_direct_1($p, $wrappers)),
+		wrapped_by($wrappers, passes_direct_1($p, $wrappers))
+	}
+}
+
+pattern generic_alias_inner($ref, $name, $target, $wrappers) {
+	$ref where {
+		$ref <: not within type_parameter_scope($name, $ref),
+		$ref <: within scope_has( TsTypeAliasDeclaration(binding_identifier=$b, type_parameters=$tps, ty=$body) where {
+			$b <: $name,
+			or {
+				and {
+					$tps <: TsTypeParameters(items=[TsTypeParameter(name=$q0), ...]),
+					$body <: passes_direct($q0, $wrappers),
+					$ref <: TsReferenceType(type_arguments=TsTypeArguments(ts_type_argument_list=[
+						$a0, ...
+					])) where { $a0 <: $target }
+				},
+				and {
+					$tps <: TsTypeParameters(items=[$_, TsTypeParameter(name=$q1), ...]),
+					$body <: passes_direct($q1, $wrappers),
+					$ref <: TsReferenceType(type_arguments=TsTypeArguments(ts_type_argument_list=[
+						$_, $a1, ...
+					])) where { $a1 <: $target }
+				},
+				and {
+					$tps <: TsTypeParameters(items=[
+						$_, $_, TsTypeParameter(name=$q2), ...
+					]),
+					$body <: passes_direct($q2, $wrappers),
+					$ref <: TsReferenceType(type_arguments=TsTypeArguments(ts_type_argument_list=[
+						$_, $_, $a2, ...
+					])) where { $a2 <: $target }
+				}
+			}
+		}),
+		$ref <: not within scope_has( named_type_binding($name) as $other where {
+			$other <: not TsTypeAliasDeclaration(type_parameters=TsTypeParameters())
+		})
+	}
+}
+
+pattern passes_nested_1($p, $wrappers) {
+	or {
+		passes_direct_2($p),
+		TsParenthesizedType(ty=passes_direct_1($p, $wrappers)),
+		TsUnionType(types=some passes_direct_1($p, $wrappers)),
+		wrapped_by($wrappers, passes_direct_1($p, $wrappers)),
+		TsReferenceType(name=$m) as $r where {
+			$r <: generic_alias_inner($r, $m, passes_direct_1($p, $wrappers), $wrappers)
+		}
+	}
+}
+
+pattern passes_nested($p, $wrappers) {
+	or {
+		passes_direct_2($p),
+		TsParenthesizedType(ty=passes_nested_1($p, $wrappers)),
+		TsUnionType(types=some passes_nested_1($p, $wrappers)),
+		wrapped_by($wrappers, passes_nested_1($p, $wrappers)),
+		TsReferenceType(name=$m) as $r where {
+			$r <: generic_alias_inner($r, $m, passes_nested_1($p, $wrappers), $wrappers)
+		}
+	}
+}
+
+pattern generic_alias($ref, $name, $target, $wrappers) {
+	$ref where {
+		$ref <: not within type_parameter_scope($name, $ref),
+		$ref <: within scope_has( TsTypeAliasDeclaration(binding_identifier=$b, type_parameters=$tps, ty=$body) where {
+			$b <: $name,
+			or {
+				and {
+					$tps <: TsTypeParameters(items=[
+						TsTypeParameter(name=$q0, default=$d0), ...
+					]),
+					$body <: passes_nested($q0, $wrappers),
+					$ref <: or {
+						TsReferenceType(type_arguments=TsTypeArguments(ts_type_argument_list=[
+							$a0, ...
+						])) where { $a0 <: $target },
+						or { TsReferenceType(type_arguments=.) } where {
+							$d0 <: TsDefaultTypeClause(ty=$target)
+						}
+					}
+				},
+				and {
+					$tps <: TsTypeParameters(items=[
+						$_, TsTypeParameter(name=$q1, default=$d1), ...
+					]),
+					$body <: passes_nested($q1, $wrappers),
+					$ref <: or {
+						TsReferenceType(type_arguments=TsTypeArguments(ts_type_argument_list=[
+							$_, $a1, ...
+						])) where { $a1 <: $target },
+						or {
+							TsReferenceType(type_arguments=.),
+							TsReferenceType(type_arguments=TsTypeArguments(ts_type_argument_list=[
+								$_
+							]))
+						} where { $d1 <: TsDefaultTypeClause(ty=$target) }
+					}
+				},
+				and {
+					$tps <: TsTypeParameters(items=[
+						$_, $_, TsTypeParameter(name=$q2, default=$d2), ...
+					]),
+					$body <: passes_nested($q2, $wrappers),
+					$ref <: or {
+						TsReferenceType(type_arguments=TsTypeArguments(ts_type_argument_list=[
+							$_, $_, $a2, ...
+						])) where { $a2 <: $target },
+						or {
+							TsReferenceType(type_arguments=.),
+							TsReferenceType(type_arguments=TsTypeArguments(ts_type_argument_list=[
+								$_
+							])),
+							TsReferenceType(type_arguments=TsTypeArguments(ts_type_argument_list=[
+								$_, $_
+							]))
+						} where { $d2 <: TsDefaultTypeClause(ty=$target) }
+					}
+				}
+			}
+		}),
+		$ref <: not within scope_has( named_type_binding($name) as $other where {
+			$other <: not TsTypeAliasDeclaration(type_parameters=TsTypeParameters())
+		})
+	}
+}
+
+// One alias level: `$leaf` itself, an alias resolving to `$next`, or `$self` inside
+// parentheses, unions and `$wrappers`.
+pattern resolves($leaf, $next, $self, $wrappers) {
+	or {
+		$leaf,
+		alias_to($next),
+		TsReferenceType(name=$n) as $ref where {
+			$ref <: generic_alias($ref, $n, $next, $wrappers)
+		},
+		TsParenthesizedType(ty=$self),
+		TsUnionType(types=some $self),
+		wrapped_by($wrappers, $self)
+	}
+}
+
+// The last level stops resolving aliases.
+pattern resolves_last($leaf, $self, $wrappers) {
+	or {
+		$leaf,
+		TsParenthesizedType(ty=$self),
+		TsUnionType(types=some $self),
+		wrapped_by($wrappers, $self)
+	}
+}
+
+pattern resolves_unknown_1() {
+	resolves(TsUnknownType(), resolves_unknown_2(), resolves_unknown_1(), or {})
+}
+
+pattern resolves_unknown_2() {
+	resolves(TsUnknownType(), resolves_unknown_3(), resolves_unknown_2(), or {})
+}
+
+pattern resolves_unknown_3() {
+	resolves(TsUnknownType(), resolves_unknown_4(), resolves_unknown_3(), or {})
+}
+
+pattern resolves_unknown_4() {
+	resolves(TsUnknownType(), resolves_unknown_5(), resolves_unknown_4(), or {})
+}
+
+pattern resolves_unknown_5() {
+	resolves(TsUnknownType(), resolves_unknown_6(), resolves_unknown_5(), or {})
+}
+
+pattern resolves_unknown_6() {
+	resolves_last(TsUnknownType(), resolves_unknown_6(), or {})
+}
+
+pattern resolves_object_1() {
+	resolves(TsNonPrimitiveType(), resolves_object_2(), resolves_object_1(), or {})
+}
+
+pattern resolves_object_2() {
+	resolves(TsNonPrimitiveType(), resolves_object_3(), resolves_object_2(), or {})
+}
+
+pattern resolves_object_3() {
+	resolves(TsNonPrimitiveType(), resolves_object_4(), resolves_object_3(), or {})
+}
+
+pattern resolves_object_4() {
+	resolves(TsNonPrimitiveType(), resolves_object_5(), resolves_object_4(), or {})
+}
+
+pattern resolves_object_5() {
+	resolves(TsNonPrimitiveType(), resolves_object_6(), resolves_object_5(), or {})
+}
+
+pattern resolves_object_6() {
+	resolves_last(TsNonPrimitiveType(), resolves_object_6(), or {})
+}
+
+pattern resolves_returned_unknown_1() {
+	resolves(TsUnknownType(), resolves_returned_unknown_2(), resolves_returned_unknown_1(), or {
+		"Promise",
+		"PromiseLike"
+	})
+}
+
+pattern resolves_returned_unknown_2() {
+	resolves(TsUnknownType(), resolves_returned_unknown_3(), resolves_returned_unknown_2(), or {
+		"Promise",
+		"PromiseLike"
+	})
+}
+
+pattern resolves_returned_unknown_3() {
+	resolves(TsUnknownType(), resolves_returned_unknown_4(), resolves_returned_unknown_3(), or {
+		"Promise",
+		"PromiseLike"
+	})
+}
+
+pattern resolves_returned_unknown_4() {
+	resolves(TsUnknownType(), resolves_returned_unknown_5(), resolves_returned_unknown_4(), or {
+		"Promise",
+		"PromiseLike"
+	})
+}
+
+pattern resolves_returned_unknown_5() {
+	resolves(TsUnknownType(), resolves_returned_unknown_6(), resolves_returned_unknown_5(), or {
+		"Promise",
+		"PromiseLike"
+	})
+}
+
+pattern resolves_returned_unknown_6() {
+	resolves_last(TsUnknownType(), resolves_returned_unknown_6(), or {
+		"Promise",
+		"PromiseLike"
+	})
+}
+
+or {
+	TsTypeAliasDeclaration(binding_identifier=$alias, ty=$type) where {
+		$type <: resolves_unknown_1(),
+		register_diagnostic(span=$alias, message="This type alias hides `unknown`. Keep `unknown` explicit at the parsing boundary or use the parsed owner type.", severity="error")
+	},
+	or {
+		JsFormalParameter(type_annotation=TsTypeAnnotation(ty=$type)),
+		JsRestParameter(type_annotation=TsTypeAnnotation(ty=$type)),
+		TsThisParameter(type_annotation=TsTypeAnnotation(ty=$type))
+	} where {
+		$type <: resolves_object_1(),
+		register_diagnostic(span=$type, message="This parameter uses the broad `object` type. Accept a named owner type and parse external input at its boundary before calling this function.", severity="error")
+	},
+	or {
+		TsReturnTypeAnnotation(ty=$type),
+		TsFunctionType(return_type=$type),
+		TsConstructorType(return_type=$type),
+		TsConstructSignatureTypeMember(type_annotation=TsTypeAnnotation(ty=$type)),
+		JsGetterClassMember(return_type=TsTypeAnnotation(ty=$type)),
+		JsGetterObjectMember(return_type=TsTypeAnnotation(ty=$type)),
+		TsGetterSignatureClassMember(return_type=TsTypeAnnotation(ty=$type)),
+		TsGetterSignatureTypeMember(type_annotation=TsTypeAnnotation(ty=$type))
+	} where {
+		$type <: resolves_returned_unknown_1(),
+		register_diagnostic(span=$type, message="This function exposes `unknown` to its caller. Parse the value at its boundary and return a named domain type.", severity="error")
+	}
+}

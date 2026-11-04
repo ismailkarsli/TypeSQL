@@ -17,7 +17,7 @@ import type {
 	SqWord,
 } from "./tokens.js";
 
-type Nx<I extends number> = Next[I];
+type Nx<I extends number> = Next<I>;
 
 export type Lex<Q extends string> = LexAll<Q, [], "">;
 

@@ -1,3 +1,5 @@
+import type { Position } from "./session.js";
+
 // A call whose first argument is a string, optionally after comments such as
 // the `/* sql */` marker.
 const CALL =
@@ -24,4 +26,14 @@ function closes(s: string, from: number, quote: string): boolean {
 		else if (c === quote || (quote !== "`" && c === "\n")) return true;
 	}
 	return false;
+}
+
+export function offsetOf(text: string, p: Position): number {
+	let offset = 0;
+	for (let line = 0; line < p.line; line++) {
+		const nl = text.indexOf("\n", offset);
+		if (nl < 0) return text.length;
+		offset = nl + 1;
+	}
+	return offset + p.character;
 }

@@ -1,5 +1,35 @@
 # typesql
 
+## 3.0.3
+
+### Patch Changes
+
+- SQL in strings is highlighted in shades of coral instead of teal, which TypeScript types also use in the default themes, with at least 7:1 contrast on common themes. The icon and the Marketplace header are rose to match.
+
+## 3.0.2
+
+### Patch Changes
+
+- The extension shows the TypeSQL logo as its icon in the Marketplace and the Extensions view, and its Marketplace page has a matching teal header.
+
+- SQL in strings is highlighted in shades of teal, TypeSQL's color, instead of orange, in dark and light themes.
+
+## 3.0.1
+
+### Patch Changes
+
+- The documentation reflects migration tracking and locking, supported driver and editor versions, and the current query APIs.
+
+## 3.0.0
+
+### Major Changes
+
+- SQL highlighting and completion reuse shared scanning and session helpers.
+
+### Patch Changes
+
+- Highlights SQL in a migration's `db.ddl(…)` statements, as in `db.add(…)` and `db.raw(…)`.
+
 ## 2.0.0
 
 ### Major Changes

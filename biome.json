@@ -10,7 +10,6 @@
 		"includes": [
 			"**",
 			"!!.changeset",
-			"!packages/core/src/postgres/engine/lexer/next.ts",
 			"!packages/core/src/postgres/engine/typer/pg-functions.ts",
 			"!packages/core/src/postgres/schema/pg-catalog.ts",
 			"!packages/bench/src",
@@ -53,20 +52,15 @@
 		}
 	},
 	"plugins": [
-		"./tools/biome/no-array-filter-map.grit",
 		"./tools/biome/no-builtin-instanceof.grit",
 		"./tools/biome/no-chained-type-assertions.grit",
 		"./tools/biome/no-conditional-empty-object-spread.grit",
+		"./tools/biome/no-hidden-unknown-and-object-types.grit",
 		"./tools/biome/no-known-value-widening.grit",
-		"./tools/biome/no-module-mocking.grit",
-		"./tools/biome/no-object-parameters.grit",
 		"./tools/biome/no-reduce-accumulator-copy.grit",
-		"./tools/biome/no-reflect-apply.grit",
-		"./tools/biome/no-reflect-get.grit",
+		"./tools/biome/no-reflection-and-module-mocking.grit",
 		"./tools/biome/no-spread-new-set.grit",
 		"./tools/biome/no-unknown-parameters.grit",
-		"./tools/biome/no-unknown-returns.grit",
-		"./tools/biome/no-unknown-type-aliases.grit",
 		"./tools/biome/no-unsafe-dictionary-type.grit"
 	],
 	"javascript": {

@@ -1,14 +1,21 @@
+---
+description: "How the sql function works: compile-time checking of SQL statements and the sql.* helpers for parameters, fragments, bulk writes and transactions."
+---
+
 # Using `sql`
 
-TypeSQL centers on the `sql` function returned by your driver adapter's `createSql<DB>()` (or core's `createSql<DB>(dialect)`, such as `createSql<DB>(postgres)`). It compiles and type-checks your SQL statements against your schema at compile time, and provides helper functions on `sql.*` for parameter binding, dynamic SQL, fragments, bulk writes, and transactions.
+TypeSQL centers on the `sql` function returned by your driver adapter's `createSql<DB>(client)` (or core's `createSql<DB>(dialect)`, such as `createSql<DB>(postgres)`). It compiles and type-checks your SQL statements against your schema at compile time, and provides helper functions on `sql.*` for parameter binding, dynamic SQL, fragments, bulk writes, and transactions.
 
 **`sql(...)` is all you need to write queries. Every other `sql.*` function is a helper for specific use cases.**
+
+The signatures below are simplified; validation and plugin types are described in the [API reference](../reference/api).
 
 ## Overview
 
 | Method | Summary | Expected parameters |
 |---|---|---|
 | [`sql(query, ...params)`](#sql-query-params) | Parses and type-checks a SQL statement literal, inferring row and parameter types. | `query: string` (literal), `...params: T[]` or `{ [name]: T }` |
+| [`sql.prepare(query)`](#sql-prepare-query) | Compiles a reusable query that accepts new positional or named parameters. | `query: string` (literal) |
 | [`sql.as<Row>(query, ...params)`](#sql-as-row-query-params) | Escape hatch: bypasses compile-time inference and asserts the row type directly. | `<Row>`, `query: string`, `...params: unknown[]` |
 | [`sql.param(value)`](#sql-param-value) | Binds a value inline inside a template string as a positional `$n` parameter. | `value: T` (`sql.optional(undefined)` becomes `DEFAULT`; `undefined` is rejected) |
 | [`sql.optional(value)`](#sql-optional-value) | Turns `undefined` into an omission: SQL `DEFAULT`, a skipped item, or nothing. `null` stays SQL `NULL`. | `value: T` |
@@ -34,7 +41,7 @@ sql<Q>(query: Q, ...params: Params): Query<Row, Params, Text>
 The core function for writing typed queries. TypeSQL's type engine parses the SQL string literal at compile time, checks syntax and relation/column references against `DB`, and infers:
 - **`Row`**: The resulting row shape (column names, types, and nullability).
 - **`Params`**: The expected parameter types (or named parameter object).
-- **`Text`**: The normalized SQL text sent to the database.
+- **`Text`**: The final SQL text after parameter rewriting and fragment splicing.
 
 Invalid statements cause compile errors directly on the SQL string.
 
@@ -78,6 +85,22 @@ See [Selecting data](./queries) and [Parameters](./parameters).
 
 ---
 
+## `sql.prepare(query)`
+
+Compiles the statement once and returns a function that takes the same positional or named arguments as `sql(query, ...params)`:
+
+```ts
+const findUser = sql.prepare("SELECT id, email FROM users WHERE id = $1");
+const first = await findUser(1).executeTakeFirst();
+const second = await findUser(2).executeTakeFirst();
+```
+
+Inline values and fragments are captured when prepared; pass values that change as `$n` or `:name` arguments. Each call returns a normal query with all four execution methods. The pg and postgres.js adapters request server preparation; the SQLite adapter reuses a driver statement after the first execution. Create prepared queries inside a transaction with `tx.prepare(...)` to bind them to it.
+
+See [Prepared queries](../reference/api#sql-prepare-text) for driver behavior and schema-change considerations.
+
+---
+
 ## `sql.as<Row>(query, ...params)`
 
 ```ts
@@ -101,14 +124,14 @@ const summary = sql.as<Summary>(
 );
 ```
 
-See [Errors and troubleshooting](./errors#sql-as-row).
+See [Errors and troubleshooting](./errors#when-typesql-can-t-type-a-statement).
 
 ---
 
 ## `sql.param(value)`
 
 ```ts
-sql.param<T>(value: T): InlineMarker<T>
+sql.param<const T>(value: T): InlineMarker<T>
 ```
 
 Binds an expression as an inline parameter inside an interpolated template string (e.g. `` sql(`… WHERE id = ${sql.param(userId)}`) ``).
@@ -133,7 +156,7 @@ See [Inline parameters](./parameters#inline-sql-param-value).
 ## `sql.optional(value)`
 
 ```ts
-sql.optional<T>(value: T): Optional<T>
+sql.optional<const T>(value: T): Optional<T>
 ```
 
 Turns `undefined` into an omission and returns other values unchanged, including `null`, `0`, `false` and `""`. The argument is required; `sql.optional(undefined)` is an explicit omission. As in `sql.set`, `sql.values` and `sql.json`, `undefined` means "leave it out" and `null` means SQL `NULL`, so a missing key and an explicit `null` in a request body stay different:
@@ -196,7 +219,7 @@ Interpolated, the statement is checked both with and without the fragment, as wi
 ## `sql.json(value)`
 
 ```ts
-sql.json<T>(value: T): JsonMarker<T>
+sql.json<const T>(value: T): JsonMarker<T>
 ```
 
 Binds an inline JSON or JSONB value inside an interpolated template string.
@@ -223,7 +246,7 @@ See [JSON values](./parameters#json-values).
 ## `sql.fragment(text, ...params)`
 
 ```ts
-sql.fragment<Text>(text: Text, ...params: Params): Fragment<Text, Params>
+sql.fragment(text, ...params): Fragment
 ```
 
 Creates a reusable piece of SQL to interpolate as `${fragment}` into queries or other fragments.
@@ -487,7 +510,7 @@ See [Fully dynamic SQL](./dynamic-sql#fully-dynamic-sql).
 sql.transaction<T>(fn: (tx: TransactionalSql) => Promise<T>): Promise<T>
 ```
 
-Runs an async callback inside a database transaction. Available on `sql` instances created with an adapter package (`@typesql/pg`, `@typesql/postgres`, `@typesql/kysely`, `@typesql/drizzle`, `@typesql/prisma`).
+Runs an async callback inside a database transaction. Available on `sql` instances created with an adapter package (`@typesql/pg`, `@typesql/postgres`, `@typesql/sqlite`, `@typesql/kysely`, `@typesql/drizzle`, `@typesql/prisma`).
 
 - Automatically commits when `fn` resolves, and rolls back if `fn` throws.
 - The callback receives `tx`, a transactional `sql` instance bound to the active transaction.
@@ -542,7 +565,7 @@ const count = await runner.executeCount();
 | Property | Type | Description |
 |---|---|---|
 | `q.text` | `string` | The finalized SQL statement with positional `$1, $2, …` parameters and spliced fragments. |
-| `q.values` | `unknown[]` | The array of parameter values sent to the database in `$n` order. |
+| `q.values` | `readonly unknown[]` | The array of parameter values sent to the database in `$n` order. |
 
 ### Execution methods
 

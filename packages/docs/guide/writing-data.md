@@ -1,3 +1,7 @@
+---
+description: "Typed INSERT, UPDATE, DELETE and MERGE in TypeSQL, with helpers for optional values, partial updates and bulk inserts."
+---
+
 # Inserting and updating
 
 `INSERT`, `UPDATE`, `DELETE` and `MERGE` are checked against your schema like queries, and parameters take the types of the columns they are assigned to. This page covers what is checked, plus helpers for optional values, partial updates and bulk inserts.
@@ -13,7 +17,9 @@ const created = sql(
 
 With `RETURNING`, a statement has a row type. Without it, the row type is `never`: `execute()` resolves to `[]`, and `executeCount()` returns the number of affected rows. `executeTakeFirstOrThrow()` on such a statement always throws `NoResultError`:
 
-```ts
+::: code-group
+
+```ts [PostgreSQL]
 const renamed = sql(
 	"UPDATE users SET display_name = $1 WHERE id = $2",
 	"Ada",
@@ -26,6 +32,23 @@ const touched = sql(`
   RETURNING p.id, u.email`);
 ```
 
+```ts [SQLite]
+const renamed = sql(
+	"UPDATE users SET display_name = $1 WHERE id = $2",
+	"Ada",
+	7,
+);
+const touched = sql(`
+  UPDATE posts AS p SET title = upper(p.title)
+  FROM users u
+  WHERE u.id = p.author_id AND u.mood = 'sad'
+  RETURNING id, title`);
+```
+
+:::
+
+SQLite's `RETURNING` sees only the target table, and not through its alias: write `id`, not `p.id`.
+
 ## What is checked
 
 - Target columns must exist, and values must fit their types, `null` only for nullable columns.
@@ -37,8 +60,8 @@ const touched = sql(`
 
 - `DEFAULT` is only allowed as a whole `VALUES` item or `SET` value, and not for a `NOT NULL` column without a default.
 - Assigning to an array element, a `jsonb` key or a composite field (`SET tags[1] = $1`) takes that element's or field's type.
-- Writing to a view is an error: `cannot insert into view "v"`.
-- `RETURNING *` expands as in Postgres: to the target table, or to every table in `FROM` / `USING`.
+- Writing to a view is an error: `cannot insert into view "v"` (SQLite: `cannot modify v because it is a view`).
+- `RETURNING *` expands as in the database. On Postgres: to the target table, or to every table in `FROM` / `USING`.
 - `RETURNING old.*` and `new.*` (PostgreSQL 18): `old` columns are nullable in an `INSERT`, `new` columns in a `DELETE`.
 - In `MERGE`, each `WHEN` clause sees only the tables Postgres lets it see, and its actions are checked like an `UPDATE` or `INSERT`. Source columns in `RETURNING` are nullable when a `NOT MATCHED BY SOURCE` action returns rows.
 
@@ -65,6 +88,10 @@ sql(`SELECT id FROM users WHERE email = ${sql.param(sql.optional(maybeEmail))}`)
 Narrow the value first, or pass `maybeEmail ?? null` to send `NULL`. To send `DEFAULT` for `null` as well, pass `sql.optional(maybeEmail ?? undefined)`. `sql.fragment(…)` refuses a value that can be omitted: a fragment is checked where it is spliced, with `$n` for its values, so a `DEFAULT` there couldn't be checked. `any` and `unknown` values are not checked.
 
 `sql.json(value)` does the same for `undefined`: `sql.json(settings)` sends `DEFAULT` when `settings` is `undefined` and `NULL` when it is `null`, and is checked the same way.
+
+::: info SQLite
+SQLite has no `DEFAULT` inside `VALUES` or `SET`, so a value that can be omitted is an error there: `near "DEFAULT": syntax error`. Narrow the value, write a statement without the column, or use [`sql.set`](#partial-updates-sql-set), which skips `undefined` keys.
+:::
 
 ## Partial updates: `sql.set`
 
@@ -114,7 +141,7 @@ inserted.text;
 ```
 
 - `NOT NULL` columns without a default are required in every row. The others are optional.
-- The columns are the keys that have a value in any row, in order of first use. A missing or `undefined` value is sent as `DEFAULT`, so rows with different keys can be mixed.
+- The columns are the keys that have a value in any row, in order of first use. A missing or `undefined` value is sent as `DEFAULT`, so rows with different keys can be mixed. SQLite has no `DEFAULT` inside `VALUES`, so there every row needs the same keys; `sql.values` throws otherwise.
 - A single row with no values becomes `DEFAULT VALUES`. An empty array throws, and so do several rows with no values.
 
 The table name is only used for typing. Write tables in other schemas as `"schema.table"`: `sql.values("auth.sessions", rows)`.
@@ -134,9 +161,11 @@ Like `sql.set`, `sql.values` checks column types at compile time, but at runtime
 
 ### JSON columns
 
-`sql.set` and `sql.values` send their values as parameters, so JSON values go through `sql.json(value)` there too. It is sent as JSON text by both drivers. Against a [`Json<T>`](./schema#typed-json-columns) column it is checked against `T` (see [Limits](./limits)):
+`sql.set` and `sql.values` send their values as parameters, so JSON values go through `sql.json(value)` there too. It is sent as JSON text by the adapters. Against a [`Json<T>`](./schema#typed-json-columns) column it is checked against `T` (see [Limits](./limits)):
 
-```ts
+::: code-group
+
+```ts [PostgreSQL]
 const patch = sql.set("portfolio", {
 	history: sql.json(history),
 	settings: { theme: "dark" },
@@ -149,6 +178,22 @@ const rows = sql.values("portfolio", [
 ]);
 const created = sql(`INSERT INTO portfolio ${rows} RETURNING id`);
 ```
+
+```ts [SQLite]
+const patch = sql.set("portfolio", {
+	history: sql.json(history),
+	settings: sql.json({ theme: "dark" }),
+});
+const patched = sql(`UPDATE portfolio SET ${patch} WHERE id = $1`, 1);
+
+const rows = sql.values("portfolio", [
+	{ name: "a", history: sql.json(history) },
+	{ name: "b", history: sql.json([]) },
+]);
+const created = sql(`INSERT INTO portfolio ${rows} RETURNING id`);
+```
+
+:::
 
 On PostgreSQL a plain object also works as it is. SQLite drivers can't bind objects, so use `sql.json()` there. An array without `sql.json()` is an error, because node-postgres would send it as a Postgres array.
 

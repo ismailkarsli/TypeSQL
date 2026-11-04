@@ -1,6 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
-import { createSql } from "@typesql/sqlite";
 import type { Col } from "@typesql/core/sqlite";
+import { createSql } from "@typesql/sqlite";
+
 interface DB {
 	users: {
 		id: Col<"integer">;

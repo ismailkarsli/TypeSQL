@@ -1,6 +1,11 @@
 import type { ColInfo, Scope } from "../../engine/types.js";
 
 export type SqCol = ColInfo & { readonly n: string };
+export type SqColOf<T, N, Name> = {
+	readonly type: T;
+	readonly nullable: N;
+	readonly n: Name;
+};
 export type SqColMap = { readonly [lc: string]: SqCol };
 
 export type SqItem = {
@@ -36,12 +41,15 @@ export type MkCtx<
 	Ctes extends SqCteMap,
 	Agg extends AggMode = "none",
 	Aliases extends SqColMap = {},
+	AggScope extends Scope = S,
+	InAgg extends boolean = false,
 > = {
 	readonly db: DB;
 	readonly scope: S;
+	readonly aggScope: AggScope;
 	readonly ctes: Ctes;
 	readonly agg: Agg;
-	readonly inAgg: false;
+	readonly inAgg: InAgg;
 	readonly aliases: Aliases;
 };
 
@@ -79,3 +87,10 @@ export type Cell = {
 	readonly t: ColInfo;
 	readonly d?: string;
 };
+
+export type Tup<
+	N extends number,
+	A extends unknown[] = [],
+> = A["length"] extends N ? A : Tup<N, [...A, 0]>;
+export type GE<A extends number, B extends number> =
+	Tup<A> extends [...Tup<B>, ...unknown[]] ? true : false;

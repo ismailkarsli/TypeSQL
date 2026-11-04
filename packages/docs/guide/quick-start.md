@@ -1,25 +1,36 @@
+---
+description: "Go from an empty project to a typed SQL query in a few minutes with TypeSQL and PostgreSQL or SQLite."
+---
+
 # Quick start
 
 This page takes you from an empty project to a typed query in a few minutes.
 
-::: tip Try it first
-[Open the example in the TypeScript Playground](https://www.typescriptlang.org/play/?moduleResolution=100#code/JYWwDg9gTgLgBAbzgYygUwIYzQZQI4A2ANHDAJ5hpwAKGUGIAzgCoVonmVwBKEA7qy4BfOADMoEEHABEAAU5pGhAPTJoaaQG4AUKEixEpNnADCEYnEiMYAc3SM4I8ZJny2SgqvXKrt+1u1dADtsKFEMZCoAEQAhRG0ASABXRjQoRgAueISE4AATLLMCAB5pYBCAFmkSJAALDEYotHCkghgsmCgkqiEAPh0ctBAMYAJC81LsAA8YaX7EhLzgRjACDDIAfSCGNHGS6WnZmrgg1rWAIwJd0i6e+ZzUTGw8jaw9ydBFGAYwGAAvaqGeqNZoYVrtG7dRz3IQDXyZbK5AqmCZlEIADkBdQaTRabQ6t2hAwSYJgtWgG3y7zRMCq9wSMGAMCu1MOc2J5wgeTIrLQMyxJzOGEu106UL6A1h2iEgTUQWscA8cAAvCh0FhcIRirFegAKXx2RQASh02jlCrwKsVhF1iQABjgAKIAGUdJmYcCSADp8iRvUMRhYwF7Gcy0No4JGo9GYwAxbgAeQAsp7UulPXBXbGPQApBMASQAcpYINYHGA4Ani8HSeSoJS8lbvfkIzG21GAOoACUd3Ednp9jdVABIAIx2oiJADsk5N2gUPH4Vt4AjYxQUEFEcDw8wXtHoTCt+4YLDXG63O9N5vg1iwDlVHltCQdLrdHtrFN9KAgSRCuoAVEaJDDFMuqhlcRpwAAgjgcBrNgCrxsmJZlnAADiiYAKrUHAMQAJpwB+9b5BO2hzguODfDA96LqulDrmwm6KlRjDzGaEDyvAAajFa0gYHkGCyHyPxXF6aggAE15qk8aBDtaBBPnaRZOtwHpFswCapmkDi6txBCQQAalBzqYY6sG6sOCAeF6YB0AwunDKMRpCJBfbMJh3CFkWaFwF+jwai8WCkeRxgmOqzzLvwghoAxlBMf5zxsY+L6uu6JwgFQSEpik2l2nOyXKb2amFhpKHUXAYFMhBcBGSZZkVWORoTjIXZoAQBAQNIc5AA) <span data-playground="core"></span> to edit the SQL and hover the types, with nothing to install. The Playground runs TypeScript 6, which TypeSQL does not support, so treat it as a demo.
-:::
-
 ## 1. Install
 
-This page uses node-postgres. [Installation](./installation) covers postgres.js, other package managers and the requirements.
+The examples come in two variants: PostgreSQL with node-postgres, and SQLite with node:sqlite. Pick one in any example and the page follows. [Installation](./installation) covers postgres.js, better-sqlite3, bun:sqlite, other package managers and the requirements.
 
-```sh
+::: code-group
+
+```sh [PostgreSQL]
 pnpm add @typesql/core @typesql/pg pg
 pnpm add -D typescript@7.1.0-beta
 ```
+
+```sh [SQLite]
+pnpm add @typesql/core @typesql/sqlite
+pnpm add -D typescript@7.1.0-beta
+```
+
+:::
 
 ## 2. Describe your tables
 
 A schema is a TypeScript interface. Each key is a table, and each column has a type name from your database.
 
-```ts
+::: code-group
+
+```ts [PostgreSQL]
 import type { Col } from "@typesql/core/postgres";
 
 export interface DB {
@@ -37,9 +48,29 @@ export interface DB {
 }
 ```
 
+```ts [SQLite]
+import type { Col } from "@typesql/core/sqlite";
+
+export interface DB {
+	users: {
+		id: Col<"integer", { hasDefault: true }>;
+		email: Col<"text">;
+		display_name: Col<"text", { nullable: true }>;
+		created_at: Col<"datetime", { hasDefault: true }>;
+	};
+	posts: {
+		id: Col<"integer", { hasDefault: true }>;
+		author_id: Col<"integer">;
+		title: Col<"text">;
+	};
+}
+```
+
+:::
+
 - `Col` is a `NOT NULL` column.
 - `{ nullable: true }` allows `NULL`.
-- `{ hasDefault: true }` means it has a default (`serial`, identity, `DEFAULT …`), so `INSERT` can leave it out.
+- `{ hasDefault: true }` means it has a default (`serial`, identity, SQLite's `INTEGER PRIMARY KEY`, `DEFAULT …`), so `INSERT` can leave it out.
 
 You can also generate it [from a live database](./introspect), derive it [from your migrations](./migrations), or take it [from Kysely, Drizzle or Prisma](./orms). [Declaring tables](./schema) lists every column helper.
 
@@ -47,7 +78,9 @@ You can also generate it [from a live database](./introspect), derive it [from y
 
 Pass the schema and your driver's client to `createSql`:
 
-```ts
+::: code-group
+
+```ts [PostgreSQL]
 import { Pool } from "pg";
 import { createSql } from "@typesql/pg";
 
@@ -55,9 +88,20 @@ const pool = new Pool({ connectionString: process.env["DATABASE_URL"] });
 const sql = createSql<DB>(pool);
 ```
 
+```ts [SQLite]
+import { DatabaseSync } from "node:sqlite";
+import { createSql } from "@typesql/sqlite";
+
+const sql = createSql<DB>(new DatabaseSync("app.db"));
+```
+
+:::
+
 ## 4. Write a query
 
-```ts
+::: code-group
+
+```ts [PostgreSQL]
 const recent = sql(
 	`SELECT u.id, u.email, p.title
    FROM users u
@@ -67,7 +111,19 @@ const recent = sql(
 );
 ```
 
-The `LEFT JOIN` makes `title` nullable, because a user may have no posts. `$1` takes the type of `created_at`, so it accepts a `Date`.
+```ts [SQLite]
+const recent = sql(
+	`SELECT u.id, u.email, p.title
+   FROM users u
+   LEFT JOIN posts p ON p.author_id = u.id
+   WHERE u.created_at > $1`,
+	"2026-01-01",
+);
+```
+
+:::
+
+The `LEFT JOIN` makes `title` nullable, because a user may have no posts. `$1` takes the type of `created_at`: a `Date` on PostgreSQL, and a string on SQLite, which has no date type.
 
 ## 5. Run it
 
@@ -80,7 +136,7 @@ const user = await sql(
 ).executeTakeFirstOrThrow();
 ```
 
-`executeTakeFirstOrThrow()` throws a `NoResultError` when there is no row. [node-postgres](../adapters/pg) lists all the `execute*` methods.
+`executeTakeFirstOrThrow()` throws a `NoResultError` when there is no row. [node-postgres](../adapters/pg#run-queries) lists all the `execute*` methods, which work the same on [SQLite](../adapters/sqlite#run-queries).
 
 The text goes to the database as you wrote it, and the values go as parameters:
 
@@ -108,9 +164,3 @@ The number after the message is the position of the wrong token. [Errors and tro
 - [Inserting and updating](./writing-data): `INSERT`, `UPDATE`, `DELETE` and `RETURNING`.
 - [Dynamic SQL](./dynamic-sql): build statements from pieces.
 - Editor support for [VS Code](./vscode) and [Neovim](./neovim): completions and highlighting inside your SQL strings.
-
-## Runnable scenario
-
-This complete application creates fixed example data, runs a left join, and narrows its nullable title with `IS NOT NULL`. Its source is also a workspace scenario: `pnpm test pg-left-join` checks its inferred rows and real database output. The setup uses a fresh database provided through `DATABASE_URL`.
-
-<<< ../../../tests/scenarios/pg-left-join/app.ts

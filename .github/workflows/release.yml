@@ -62,7 +62,7 @@ jobs:
           git add -A
           message="chore: release $versions"
           [ -n "$versions" ] || message="chore: update release metadata"
-          node scripts/github-commit.ts main "$message"
+          node tools/github-commit.ts main "$message"
           git fetch origin main
           git reset --hard origin/main
         env:
@@ -88,7 +88,7 @@ jobs:
             printf '%s\n' "${new[@]}" > .new-packages
           fi
           pnpm publish -r --no-git-checks --report-summary "${filters[@]}"
-      - run: node scripts/github-releases.ts --summary pnpm-publish-summary.json --current
+      - run: node tools/github-releases.ts --summary pnpm-publish-summary.json --current
         env:
           GH_TOKEN: ${{ github.token }}
       - name: Check first-time npm packages

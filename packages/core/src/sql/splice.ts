@@ -1,3 +1,5 @@
+import type { Digit } from "../engine/chars.js";
+import type { Lt, Members, Tup } from "../engine/object.js";
 import type { SqlError } from "../errors.js";
 import type { NextOpaque } from "./named.js";
 
@@ -79,7 +81,6 @@ type CarriedIn<
 		: CarriedIn<Post, C, Acc>
 	: Acc;
 
-type Digit = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9";
 /** Only the internal slots that interpolated fragments become; any other `{…}` is SQL text. */
 type IsSlotName<N extends string> = N extends `__typesql_inline${number}`
 	? true
@@ -98,7 +99,11 @@ type Renumber<
 	Off extends number,
 	Acc extends string,
 > = T extends `${string}$${string}`
-	? RenumberLoop<T, Off, Off, Acc>
+	? Off extends 0
+		? T extends `${string}$0${string}`
+			? RenumberLoop<T, Off, Off, Acc>
+			: [`${Acc}${T}`, MaxParamStr<T>]
+		: RenumberLoop<T, Off, Off, Acc>
 	: [`${Acc}${T}`, Off];
 type RenumberLoop<
 	T extends string,
@@ -132,7 +137,7 @@ type RenumberCode<
 				? RenumberCode<
 						R2,
 						Off,
-						Gt<M, Max> extends true ? M : Max,
+						Lt<Max, M> extends true ? M : Max,
 						`${Acc}${Pre}$${M}`
 					>
 				: never
@@ -172,21 +177,16 @@ type MaxIn<
 > = T extends `${string}$${infer Rest}`
 	? Rest extends `${infer D extends Digit}${infer R}`
 		? TakeDigits<R, D> extends [infer N extends string, infer R2 extends string]
-			? MaxIn<R2, Gt<ToNum<N>, Max> extends true ? ToNum<N> : Max>
+			? MaxIn<R2, Lt<Max, ToNum<N>> extends true ? ToNum<N> : Max>
 			: never
 		: MaxIn<Rest, Max>
 	: Max;
 
-type Tup<N extends number, A extends unknown[] = []> = A["length"] extends N
-	? A
-	: Tup<N, [...A, 0]>;
 type Add<A extends number, B extends number> = [
 	...Tup<A>,
 	...Tup<B>,
 ]["length"] &
 	number;
-type Gt<A extends number, B extends number> =
-	Tup<B> extends [...Tup<A>, ...unknown[]] ? false : true;
 
 export type UnknownTuple<
 	N extends number,
@@ -216,26 +216,7 @@ type Dq<S extends string> = S extends `${infer A}"${infer B}`
 	? `${A}""${Dq<B>}`
 	: S;
 
-type UnionToIntersection<U> = (
-	U extends unknown
-		? (u: U) => void
-		: never
-) extends (u: infer I) => void
-	? I
-	: never;
-type LastOf<U> =
-	UnionToIntersection<U extends unknown ? (x: U) => void : never> extends (
-		x: infer L,
-	) => void
-		? L
-		: never;
-export type UnionList<U, Acc extends readonly unknown[] = []> = [U] extends [
-	never,
-]
-	? Acc
-	: LastOf<U> extends infer L
-		? UnionList<Exclude<U, L>, [L, ...Acc]>
-		: never;
+export type UnionList<U> = Members<U>;
 
 export type JoinedText<
 	Items extends readonly { readonly text: string }[],

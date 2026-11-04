@@ -1,5 +1,81 @@
 # @typesql/cli
 
+## 6.0.2
+
+### Patch Changes
+
+- Updated dependencies:
+  - @typesql/core@6.0.2
+  - @typesql/pg@6.0.2
+  - @typesql/sqlite@6.0.2
+
+## 6.0.1
+
+### Patch Changes
+
+- Updated dependencies:
+  - @typesql/core@6.0.1
+  - @typesql/pg@6.0.1
+  - @typesql/sqlite@6.0.1
+
+## 6.0.0
+
+### Patch Changes
+
+- Updated dependencies:
+  - @typesql/core@6.0.0
+  - @typesql/pg@6.0.0
+  - @typesql/sqlite@6.0.0
+
+## 5.0.4
+
+### Patch Changes
+
+- Updated dependencies:
+  - @typesql/core@5.0.4
+  - @typesql/pg@5.0.4
+  - @typesql/sqlite@5.0.4
+
+## 5.0.3
+
+### Patch Changes
+
+- Updated dependencies:
+  - @typesql/core@5.0.3
+  - @typesql/pg@5.0.3
+  - @typesql/sqlite@5.0.3
+
+## 5.0.2
+
+### Patch Changes
+
+- Updated dependencies:
+  - @typesql/core@5.0.2
+  - @typesql/pg@5.0.2
+  - @typesql/sqlite@5.0.2
+
+## 5.0.1
+
+### Patch Changes
+
+- The documentation reflects migration tracking and locking, supported driver and editor versions, and the current query APIs.
+
+- Updated dependencies:
+  - @typesql/core@5.0.1
+  - @typesql/pg@5.0.1
+  - @typesql/sqlite@5.0.1
+
+## 5.0.0
+
+### Patch Changes
+
+- The README shows migrations with `db.ddl(…)`, the new name of `db.add(…)`.
+
+- Updated dependencies:
+  - @typesql/core@5.0.0
+  - @typesql/pg@5.0.0
+  - @typesql/sqlite@5.0.0
+
 ## 4.0.1
 
 ### Patch Changes

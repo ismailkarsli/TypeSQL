@@ -1,3 +1,5 @@
+import type { GE, Tup } from "../types.js";
+
 type F<
 	Min extends number,
 	Max extends number,
@@ -261,9 +263,6 @@ type PickLoop<
 		: PickLoop<D, Argc, [...Tup<I>, 0]["length"] & number>
 	: D[0];
 
-type Tup<N extends number, A extends unknown[] = []> = A["length"] extends N
-	? A
-	: Tup<N, [...A, 0]>;
 type Required_<A extends readonly string[]> = A extends readonly [
 	...infer H extends readonly string[],
 	"...",
@@ -274,9 +273,7 @@ type Accepts<
 	A extends readonly string[],
 	N extends number,
 > = A extends readonly [...unknown[], "..."]
-	? Tup<N> extends [...Tup<Required_<A>>, ...unknown[]]
-		? true
-		: false
+	? GE<N, Required_<A>>
 	: N extends A["length"]
 		? true
 		: false;

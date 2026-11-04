@@ -1,6 +1,6 @@
 import type { EditorKinds } from "./call.js";
 
-export { type EditorKinds } from "./call.js";
+export type { EditorKinds } from "./call.js";
 export {
 	type CompletionItem,
 	type Completions,

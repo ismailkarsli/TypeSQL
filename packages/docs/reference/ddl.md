@@ -1,3 +1,7 @@
+---
+description: "The DDL statements TypeSQL understands, how their columns are typed, the errors it reports and its limitations."
+---
+
 # DDL support
 
 The DDL statements TypeSQL understands, how their columns are typed, the errors it reports and its limitations. For a guided introduction, see [From migrations](../guide/migrations).
@@ -11,15 +15,15 @@ import { postgres } from "@typesql/core/postgres";
 
 export const init = migration("postgres", {
 	up: async (db) => {
-		const a = await db.add("CREATE TYPE mood AS ENUM ('happy', 'sad')");
-		const b = await a.add(
+		const a = await db.ddl("CREATE TYPE mood AS ENUM ('happy', 'sad')");
+		const b = await a.ddl(
 			"CREATE TABLE users (id serial PRIMARY KEY, email text NOT NULL UNIQUE, mood mood)",
 		);
-		const c = await b.add("ALTER TABLE users ADD COLUMN display_name text");
-		return c.add("CREATE VIEW user_emails AS SELECT id, email FROM users");
+		const c = await b.ddl("ALTER TABLE users ADD COLUMN display_name text");
+		return c.ddl("CREATE VIEW user_emails AS SELECT id, email FROM users");
 	},
 	down: async (db) => {
-		await db.add("DROP VIEW user_emails; DROP TABLE users; DROP TYPE mood");
+		await db.ddl("DROP VIEW user_emails; DROP TABLE users; DROP TYPE mood");
 	},
 });
 
@@ -32,8 +36,8 @@ const q = sql("SELECT id, mood FROM users WHERE email = $1", "a@b.c");
 | Piece | What it does |
 |---|---|
 | `ApplyDdl<DB, Q>` | type: the schema after running the DDL script `Q` (one or more `;`-separated statements) on `DB`, or `SqlError<message, tokenIndex>` |
-| `ValidateDdl<DB, Q>` | type: `Q` when it applies to `DB`, else the `SqlError`; what `.add()` checks its argument against |
-| `db.add(ddl)` | runtime and type: in a [migration](../guide/migrations), runs `ddl` and returns a context whose schema is `ApplyDdl<DB, ddl>`; invalid DDL is a compile error on the literal |
+| `ValidateDdl<DB, Q>` | type: `Q` when it applies to `DB`, else the `SqlError`; what `.ddl()` checks its argument against |
+| `db.ddl(ddl)` | runtime and type: in a [migration](../guide/migrations), runs `ddl` and returns a context whose schema is `ApplyDdl<DB, ddl>`; invalid DDL is a compile error on the literal |
 | `SchemaOf<typeof m>` | type: the schema after the migration `m` |
 
 ## Supported statements
@@ -106,40 +110,30 @@ The message is Postgres's where there is one. The position is the token index in
 | Types | `type "mood" already exists`, `type "nope" does not exist`, `enum label "happy" already exists`, `"zz" is not an existing enum label`, `cannot drop type mood because other objects depend on it` |
 | Schemas | `schema "s" does not exist`, `schema "s" already exists`, `cannot drop schema s because other objects depend on it` |
 
-## `.add()` and `.raw()`
+## `.ddl()` and `.raw()`
 
 ```ts
 export const addBio = migration(previous, {
 	up: async (db) => {
-		const next = await db.add("ALTER TABLE users ADD COLUMN bio text");
-		const indexed = await next.add(`CREATE TABLE a (x int); CREATE INDEX ON a (x);`);
+		const next = await db.ddl("ALTER TABLE users ADD COLUMN bio text");
+		const indexed = await next.ddl(`CREATE TABLE a (x int); CREATE INDEX ON a (x);`);
 		return indexed.raw<NewDB>("...");
 	},
 	down: async (db) => {},
 });
 ```
 
-- `.add<const Q>(ddl: ValidateDdl<Schema, Q> & Q)` checks `Q` against the context's schema, runs it, and resolves to a new context with the changed schema.
+- `.ddl<const Q>(ddl: ValidateDdl<Schema, Q> & Q)` checks `Q` against the context's schema, runs it, and resolves to a new context with the changed schema. `.add()` is a deprecated alias.
 - An error lands on the literal, like with `sql()`: `Argument of type '"DROP TABLE nope"' is not assignable to parameter of type 'SqlError<"table \"nope\" does not exist", 2> & "DROP TABLE nope"'`.
 - A non-literal string is rejected. Use `.raw()` for it.
-- Contexts are immutable: `.add()` returns a new context, and the one it was called on keeps its schema.
+- Contexts are immutable: `.ddl()` returns a new context, and the one it was called on keeps its schema.
 - `.raw<NewSchema = Schema>(sql)` runs `sql` unchecked and resolves to a context with the schema you state.
-- Each text is sent in one call without parameters, so `$$`-quoted function bodies work, and a `;`-separated script runs whole on node-postgres and postgres.js. A single text is limited to about 4000 tokens; split longer scripts across several `.add()` calls.
+- On PostgreSQL, each text is sent in one call without parameters, so `$$`-quoted function bodies work, and a `;`-separated script runs whole on node-postgres and postgres.js. Large scripts can reach the compiler's instantiation limits; split them across several `.ddl()` calls.
 - Each migration runs in a transaction by default. Statements that can't run in a transaction block (`CREATE INDEX CONCURRENTLY`, `VACUUM`) fail there, and after `ALTER TYPE ... ADD VALUE` the new label can't be used until a later migration. See [Transactions and locking](../guide/migrations#transactions-and-locking).
 
-## Cost
+## Checking long histories
 
-Measured with TypeScript 7.1.0-beta (`tsc --extendedDiagnostics`):
-
-| Input | Instantiations | Check time |
-|---|---|---|
-| importing `@typesql/core` (baseline) | 131K | 0.16 s |
-| a 10-statement migration chain, DDL only | +33K | +0.01 s |
-| the same chain plus one query on the result | 186K total | 0.17 s |
-| 50 statements | 297K | 0.22 s |
-| 200 statements and four queries | 1.15M | 0.53 s |
-
-Each statement rebuilds only the table it changes, so long migration histories stay within TypeScript's limits ([Type engine](../guide/type-engine)).
+Each `migration(previous, { up, down })` infers its starting schema from `previous` rather than recursively evaluating the whole history. Return the final context from `up`, and use the generated `db.ts` for application queries in directory mode. Split large DDL scripts across several `.ddl()` calls when they reach [compiler limits](../guide/limits#statement-size).
 
 ## Limitations
 

@@ -1,7 +1,8 @@
-import { Kysely, Generated, SqliteDialect } from "kysely";
-import { createSql } from "@typesql/kysely";
 import { sqlite } from "@typesql/core/sqlite";
+import { createSql } from "@typesql/kysely";
 import Database from "better-sqlite3";
+import { type Generated, Kysely, SqliteDialect } from "kysely";
+
 const connection = new Database(process.env.SQLITE_PATH!);
 connection.exec(
 	"CREATE TABLE users (id integer PRIMARY KEY, name text NOT NULL, bio text)",

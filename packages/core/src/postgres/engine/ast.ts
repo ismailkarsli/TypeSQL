@@ -1,3 +1,5 @@
+/** A node pattern matching every tag in `K`. */
+export type Tag<K extends string> = { readonly t: K };
 export type ColRef = {
 	readonly t: "col";
 	readonly tbl: string | null;

@@ -1,6 +1,10 @@
+---
+description: "Breaking changes in each TypeSQL major version and the code to change when you upgrade, newest first."
+---
+
 # Upgrading
 
-This page lists every breaking change since the first 0.x releases, newest first, with the code to change. Start at the section for the version you are on and work up: from 3.x apply [4.0](#_4-0); from 2.x apply [3.0](#_3-0), then 4.0; from 1.x apply [2.0](#_2-0), then 3.0 and 4.0; from 0.x start at [Upgrading from 0.x](#upgrading-from-0-x). The [changelog](/changelog) has the release notes from 1.0.0 on.
+This page lists breaking changes and migration guidance since the first 0.x releases, newest first, with the code to change. Apply the sections newer than your installed version, oldest first: from 4.x apply [5.0](#_5-0); from 3.x apply [4.0](#_4-0), then 5.0. From 2.x start at [3.0](#_3-0), from 1.x at [2.0](#_2-0), and from 0.x at [Upgrading from 0.x](#upgrading-from-0-x). The [changelog](/changelog) has the release notes from 1.0.0 on.
 
 Most breaking changes are compile errors at the call site, so after upgrading run `tsc --noEmit` (or your editor) and work through the list. The changes that compile but behave differently are marked **Runtime change**.
 
@@ -9,7 +13,7 @@ Most breaking changes are compile errors at the call site, so after upgrading ru
 - **One version for the library packages.** Since 1.1.0, `@typesql/core`, `@typesql/pg`, `@typesql/postgres`, `@typesql/sqlite`, `@typesql/kysely`, `@typesql/drizzle`, `@typesql/prisma` and `@typesql/cli` share one version and are released together. Upgrade them together, to the same version:
 
   ```sh
-  pnpm add @typesql/core@4 @typesql/pg@4   # and any other @typesql/* package you use
+  pnpm add @typesql/core@5 @typesql/pg@5   # and any other @typesql/* package you use
   ```
 
   Before 1.1.0 the adapters had their own 0.x versions (for example `@typesql/pg` 0.4.3 went with `@typesql/core` 1.0.1). `@typesql/language-server` and the VS Code extension keep their own versions.
@@ -25,6 +29,14 @@ Most breaking changes are compile errors at the call site, so after upgrading ru
     }
   }
   ```
+
+## 5.0
+
+### Migration DDL uses `.ddl()`
+
+5.0 consolidates query inference, migrations and adapters around shared implementations. The supported SQL workflows continue to use the same public APIs.
+
+Migration contexts now expose `.ddl(sql)` for checked schema changes. Replace `db.add(...)` with `db.ddl(...)`; the arguments, returned context and inferred schema are the same. `.add()` remains available as a deprecated alias, so existing migrations continue to work. The editor integrations recognize both names. See [From migrations](./migrations#define-a-migration).
 
 ## 4.0
 
@@ -71,16 +83,16 @@ import { createMigrator, migration, type SchemaOf } from "@typesql/core/migratio
 export const createUsers = migration("postgres", {
 	name: "create-users",
 	up: async (db) =>
-		db.add("CREATE TABLE users (id serial PRIMARY KEY, email text NOT NULL)"),
+		db.ddl("CREATE TABLE users (id serial PRIMARY KEY, email text NOT NULL)"),
 	down: async (db) => {
-		await db.add("DROP TABLE users");
+		await db.ddl("DROP TABLE users");
 	},
 });
 export const addBio = migration(createUsers, {
 	name: "add-bio",
-	up: async (db) => db.add("ALTER TABLE users ADD COLUMN bio text"),
+	up: async (db) => db.ddl("ALTER TABLE users ADD COLUMN bio text"),
 	down: async (db) => {
-		await db.add("ALTER TABLE users DROP COLUMN bio");
+		await db.ddl("ALTER TABLE users DROP COLUMN bio");
 	},
 });
 export type DB = SchemaOf<typeof addBio>;
@@ -331,7 +343,7 @@ With `@typesql/cli` 0.2.0 (released with `@typesql/core` 1.0.0), `typesql migrat
 
 ## Upgrading from 0.x
 
-The 0.x releases changed the API several times. The versions below are `@typesql/core`'s; the adapters' 0.x versions moved with it. Apply the ones newer than the version you are on, then [1.0](#_1-0), [2.0](#_2-0), [3.0](#_3-0) and [4.0](#_4-0).
+The 0.x releases changed the API several times. The versions below are `@typesql/core`'s; the adapters' 0.x versions moved with it. Apply the ones newer than the version you are on, then [1.0](#_1-0), [2.0](#_2-0), [3.0](#_3-0), [4.0](#_4-0) and [5.0](#_5-0).
 
 ### 0.10: plugins replace `rowKeys`, `sql.param(undefined)` is rejected
 
@@ -397,7 +409,7 @@ For conditions, use `sql.and(items)` and `sql.or(items)` (1.1 and later) instead
 - `sql.valueOrDefault(value)` and the standalone `valueOrDefault` are removed; today write `sql.param(sql.optional(value))`.
 - `sql.list` is merged into `sql.join` (now `sql.combine`), which throws when there are no items.
 - `@typesql/postgres`: `createBigIntSql(client)` is `createSql(client, { bigint: true })`, and `PostgresJsBigIntSql<DB>` is `PostgresJsSql<DB, PostgresJsBigIntTypeMap>`.
-- The adapters no longer re-export `NoResultError`, `Executor` and `TransactionalSql` (`@typesql/drizzle` also `Sql`, `Query`, `RowType`, `ParamsType`, `DefaultTypeMap` and `TypeMap`): import them from `@typesql/core`.
+- The adapters no longer re-export `NoResultError`, `Executor` and `TransactionalSql` (`@typesql/drizzle` also `Sql`, `Query`, `RowType`, `ParamsType`, `DefaultTypeMap` and `TypeMap`). In current versions, shared types come from `@typesql/core`; `Sql`, `TransactionalSql`, `DefaultTypeMap` and `TypeMap` come from the dialect module (`@typesql/core/postgres` or `@typesql/core/sqlite`).
 - `@typesql/pg/introspect` no longer exports `main`, `ViewNullability` and `parseNodeTree`; `@typesql/prisma/generator` exports only `generateSource`.
 
 ### 0.2: TypeScript 7.1

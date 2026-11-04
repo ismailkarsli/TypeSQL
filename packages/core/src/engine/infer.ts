@@ -46,11 +46,11 @@ type BuildParamData<E extends EngineTypes, P, N extends number, TM, DB> =
 					: never;
 			}
 		: never;
-type DataFor<E extends EngineTypes, U, TM, DB> = {
+interface DataFor<E extends EngineTypes, U, TM, DB> {
 	readonly type: ParamTs<E, U, TM, DB>;
 	readonly uses: U;
 	readonly arg: JsonArg<E, ParamTs<E, U, TM, DB>, U>;
-};
+}
 export type ParamsOf<
 	E extends EngineTypes,
 	DB,
@@ -61,8 +61,8 @@ type ParamTypes<P extends readonly ParamData[]> = {
 	[K in keyof P]: P[K]["type"];
 };
 
-type ParamTs<E extends EngineTypes, U, TM, DB> =
-	IntersectUses<E, Exclude<U, NullTest>, TM, DB> extends infer X
+export type ParamTs<E extends EngineTypes, U, TM, DB> =
+	IntersectUses<E, U, TM, DB> extends infer X
 		? [X] extends [never]
 			? never
 			: [Extract<U, NullTest | { readonly nullable: false }>] extends [never]
@@ -73,9 +73,11 @@ type ParamTs<E extends EngineTypes, U, TM, DB> =
 		: never;
 
 type IntersectUses<E extends EngineTypes, U, TM, DB> = (
-	U extends { readonly type: infer T extends string }
-		? (u: TsParamTypeOf<E, TM, DB, T>) => void
-		: never
+	U extends NullTest
+		? never
+		: U extends { readonly type: infer T extends string }
+			? (u: TsParamTypeOf<E, TM, DB, T>) => void
+			: never
 ) extends (u: infer X) => void
 	? X
 	: never;
@@ -123,7 +125,7 @@ export type ParamsArgs<E extends EngineTypes, DB, TM, Q extends string> =
 		: never;
 
 export type Validate<E extends EngineTypes, DB, Q extends string> =
-	AnalysisOf<E, DB, Q> extends infer R ? (R extends AnyErr ? R : Q) : never;
+	AnalysisOf<E, DB, Q> extends AnyErr ? AnalysisOf<E, DB, Q> : Q;
 
 export type KindOf<E extends EngineTypes, DB, Q extends string> =
 	AnalysisOf<E, DB, Q> extends { readonly kind: infer K } ? K : never;

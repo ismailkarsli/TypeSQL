@@ -1,25 +1,50 @@
+---
+description: "Generate a TypeSQL schema from a live PostgreSQL or SQLite database with typesql introspect: tables, views, materialized views and enums."
+---
+
 # From a live database
 
-`typesql introspect` reads your Postgres database and writes its schema to a TypeScript file. You get every table, view, materialized view and enum, with the exact Postgres type of each column. For a SQLite database file, see [SQLite](../adapters/sqlite#generate-the-schema).
+`typesql introspect` reads your database and writes its schema to a TypeScript file. From Postgres, you get every table, view, materialized view and enum, with the exact Postgres type of each column. From a SQLite database file, you get its tables and views with each column's declared type; [SQLite](../adapters/sqlite#generate-the-schema) has the details. The rest of this page is about PostgreSQL.
 
 ## Generate the schema
 
-The command ships with `@typesql/cli` and connects with `pg`:
+The command ships with `@typesql/cli`, and connects to PostgreSQL with `pg`:
 
-```sh
+::: code-group
+
+```sh [PostgreSQL]
 pnpm add -D @typesql/cli pg
 pnpm exec typesql introspect --url postgres://localhost/app --out src/db/schema.ts
 ```
 
+```sh [SQLite]
+pnpm add -D @typesql/cli
+pnpm exec typesql introspect --db app.db --out src/db/schema.ts
+```
+
+:::
+
 Then use the generated `DB` type, and run the command again after each migration:
 
-```ts
+::: code-group
+
+```ts [PostgreSQL]
 import { Pool } from "pg";
 import { createSql } from "@typesql/pg";
 import type { DB } from "./db/schema.js";
 
 const sql = createSql<DB>(new Pool());
 ```
+
+```ts [SQLite]
+import { DatabaseSync } from "node:sqlite";
+import { createSql } from "@typesql/sqlite";
+import type { DB } from "./db/schema.js";
+
+const sql = createSql<DB>(new DatabaseSync("app.db"));
+```
+
+:::
 
 ::: tip Why introspect?
 The file has the real Postgres types: `timestamptz`, `date` and `timestamp` stay apart, as do `float8` and `int4`, or `uuid` and `text`. [ORM schemas](./orms) read types back from TypeScript types, which can't tell these apart.
@@ -95,7 +120,7 @@ export interface DB {
 Rows read the column as `T`, and you write values with [`sql.json()`](./parameters#json-values):
 
 ```ts
-const sql = createSql<DB, PgTypeMap>();
+const sql = createSql<DB>(pool);
 
 const recent = sql(`
   SELECT name, history, history -> -1 -> 'value' AS last, created_at::date AS day

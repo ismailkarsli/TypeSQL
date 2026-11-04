@@ -1,3 +1,7 @@
+---
+description: "Build SQL from fragments with sql.fragment, sql.id, sql.and, sql.set and more, and keep the finished statement type-checked."
+---
+
 # Dynamic SQL
 
 This page shows how to build statements from pieces and keep them type-checked. You write a piece once as a **fragment** and interpolate it into statements as `${fragment}`. Splicing happens before type inference, so the finished statement is checked as a whole.

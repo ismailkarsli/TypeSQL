@@ -1,25 +1,25 @@
 ---
+description: "Write plain SQL in TypeScript and get exact types for rows and parameters. No codegen, no database connection, no build step."
 layout: home
 
 hero:
   name: "TypeSQL"
   text: "Typed SQL for TypeScript"
   tagline: "Write plain SQL and get exact types for rows and parameters. No codegen, no database connection, no build step."
+  image:
+    src: /logo.svg
+    alt: "TypeSQL logo"
   actions:
     - theme: brand
       text: "Get started"
       link: /guide/quick-start
     - theme: alt
-      text: "Try it in the Playground"
-      link: https://www.typescriptlang.org/play/?moduleResolution=100#code/JYWwDg9gTgLgBAbzgYygUwIYzQZQI4A2ANHDAJ5hpwAKGUGIAzgCoVonmVwBKEA7qy4BfOADMoEEHABEAAU5pGhAPTJoaaQG4AUKEixEpNnADCEYnEiMYAc3SM4I8ZJny2SgqvXKrt+1u1dADtsKFEMZCoAEQAhRG0ASABXRjQoRgAueISE4AATLLMCAB5pYBCAFmkSJAALDEYotHCkghgsmCgkqiEAPh0ctBAMYAJC81LsAA8YaX7EhLzgRjACDDIAfSCGNHGS6WnZmrgg1rWAIwJd0i6e+ZzUTGw8jaw9ydBFGAYwGAAvaqGeqNZoYVrtG7dRz3IQDXyZbK5AqmCZlEIADkBdQaTRabQ6t2hAwSYJgtWgG3y7zRMCq9wSMGAMCu1MOc2J5wgeTIrLQMyxJzOGEu106UL6A1h2iEgTUQWscA8cAAvCh0FhcIRirFegAKXx2RQASh02jlCrwKsVhF1iQABjgAKIAGUdJmYcCSADp8iRvUMRhYwF7Gcy0No4JGo9GYwAxbgAeQAsp7UulPXBXbGPQApBMASQAcpYINYHGA4Ani8HSeSoJS8lbvfkIzG21GAOoACUd3Ednp9jdVABIAIx2oiJADsk5N2gUPH4Vt4AjYxQUEFEcDw8wXtHoTCt+4YLDXG63O9N5vg1iwDlVHltCQdLrdHtrFN9KAgSRCuoAVEaJDDFMuqhlcRpwAAgjgcBrNgCrxsmJZlnAADiiYAKrUHAMQAJpwB+9b5BO2hzguODfDA96LqulDrmwm6KlRjDzGaEDyvAAajFa0gYHkGCyHyPxXF6aggAE15qk8aBDtaBBPnaRZOtwHpFswCapmkDi6txBCQQAalBzqYY6sG6sOCAeF6YB0AwunDKMRpCJBfbMJh3CFkWaFwF+jwai8WCkeRxgmOqzzLvwghoAxlBMf5zxsY+L6uu6JwgFQSEpik2l2nOyXKb2amFhpKHUXAYFMhBcBGSZZkVWORoTjIXZoAQBAQNIc5AA
-      playground: core
-    - theme: alt
-      text: "View on GitHub"
-      link: https://github.com/ismailkarsli/TypeSQL
+      text: "Introduction"
+      link: /guide/introduction
 
 features:
   - title: "Plain SQL, exact types"
-    details: "Write the SQL your database runs. Row and parameter types follow its rules, including nullability from joins. PostgreSQL today; MySQL and SQLite are planned."
+    details: "Write the SQL your database runs. Row and parameter types follow its rules, including nullability from joins. PostgreSQL and SQLite are supported; MySQL is planned."
   - title: "No codegen"
     details: "The TypeScript compiler reads your SQL. There is no generate step and no database to connect to."
   - title: "Mistakes are compile errors"
@@ -30,7 +30,9 @@ features:
     linkText: "Set it up"
 ---
 
-```ts
+::: code-group
+
+```ts [PostgreSQL]
 import { Pool } from "pg";
 import { createSql } from "@typesql/pg";
 import type { DB } from "./schema.js";
@@ -48,3 +50,23 @@ const recent = sql(
 
 const rows = await recent.execute();
 ```
+
+```ts [SQLite]
+import { DatabaseSync } from "node:sqlite";
+import { createSql } from "@typesql/sqlite";
+import type { DB } from "./schema.js";
+
+const sql = createSql<DB>(new DatabaseSync("app.db"));
+
+const recent = sql(
+	`SELECT u.id, u.email, p.title
+   FROM users u
+   LEFT JOIN posts p ON p.author_id = u.id
+   WHERE u.created_at > $1`,
+	"2026-01-01",
+);
+
+const rows = await recent.execute();
+```
+
+:::

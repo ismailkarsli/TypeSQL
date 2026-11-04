@@ -1,6 +1,4 @@
-import { isMigration, MIGRATION_FROM } from "./define.js";
-
-type Dialect = "postgres" | "sqlite";
+import { type Dialect, type Entry, isMigration, toEntry } from "./define.js";
 
 /** The migration files of a directory, in the order they run. */
 export async function migrationFiles(migrationsDir: string): Promise<string[]> {
@@ -67,21 +65,13 @@ function mapMigrationImports(directory: string): void {
  * in 3.x, exports `up` and `down`. Each file is imported once per process,
  * so a file's `import previous from "./x.js"` is the runner's migration.
  */
-export async function loadMigrations(migrationsDir: string): Promise<
-	{
-		name: string;
-		up: (db: never) => unknown;
-		down: (db: never) => unknown;
-		from: unknown;
-		self: unknown;
-	}[]
-> {
+export async function loadMigrations(migrationsDir: string): Promise<Entry[]> {
 	const { resolve } = process.getBuiltinModule("node:path");
 	const { pathToFileURL } = process.getBuiltinModule("node:url");
 	const directory = resolve(migrationsDir);
 	const names = await migrationFiles(directory);
 	mapMigrationImports(directory);
-	const loaded = [];
+	const loaded: Entry[] = [];
 	for (const name of names) {
 		let module: Record<string, unknown>;
 		try {
@@ -100,23 +90,13 @@ export async function loadMigrations(migrationsDir: string): Promise<
 			throw error;
 		}
 		const defined = module.default;
-		if (
-			isMigration(defined) &&
-			defined.name !== undefined &&
-			defined.name !== name
-		)
-			throw new Error(
-				`typesql: ${name} names its migration ${JSON.stringify(defined.name)}, but a migration file's name is its file name; remove the name`,
-			);
-		if (isMigration(defined))
-			loaded.push({
-				name,
-				up: defined.up,
-				down: defined.down,
-				from: (defined as { [MIGRATION_FROM]?: unknown })[MIGRATION_FROM],
-				self: defined,
-			});
-		else if (
+		if (isMigration(defined)) {
+			if (defined.name !== undefined && defined.name !== name)
+				throw new Error(
+					`typesql: ${name} names its migration ${JSON.stringify(defined.name)}, but a migration file's name is its file name; remove the name`,
+				);
+			loaded.push(toEntry(name, defined));
+		} else if (
 			typeof module.up === "function" &&
 			typeof module.down === "function"
 		)

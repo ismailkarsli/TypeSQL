@@ -48,23 +48,22 @@ async function respond(
 	handler: GeneratorHandler,
 	req: Request,
 ): Promise<object> {
+	const reply = { jsonrpc: "2.0", id: req.id };
 	try {
 		switch (req.method) {
 			case "getManifest":
 				return {
-					jsonrpc: "2.0",
-					id: req.id,
+					...reply,
 					result: {
 						manifest: await handler.onManifest(req.params as GeneratorConfig),
 					},
 				};
 			case "generate":
 				await handler.onGenerate(req.params as GeneratorOptions);
-				return { jsonrpc: "2.0", id: req.id, result: null };
+				return { ...reply, result: null };
 			default:
 				return {
-					jsonrpc: "2.0",
-					id: req.id,
+					...reply,
 					error: {
 						code: METHOD_NOT_FOUND,
 						message: `Method not found: ${req.method}`,
@@ -74,8 +73,7 @@ async function respond(
 	} catch (err) {
 		const e = err instanceof Error ? err : new Error(String(err));
 		return {
-			jsonrpc: "2.0",
-			id: req.id,
+			...reply,
 			error: {
 				code: SERVER_ERROR,
 				message: e.message,
@@ -105,7 +103,7 @@ export function serveGenerator(
 		}
 		pending.push(
 			respond(handler, req).then(
-				(res) => void output.write(JSON.stringify(res) + "\n"),
+				(res) => void output.write(`${JSON.stringify(res)}\n`),
 			),
 		);
 	});

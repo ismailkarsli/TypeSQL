@@ -9,8 +9,8 @@
 	},
 	"workspaces": {
 		".": {
-			"entry": ["scripts/*.ts"],
-			"project": ["scripts/**/*.ts"],
+			"entry": ["tools/*.ts"],
+			"project": ["tools/**/*.ts"],
 			"ignoreDependencies": ["pg"]
 		},
 		"packages/core": {
@@ -31,12 +31,12 @@
 			"project": ["src/**/*.ts!"]
 		},
 		"packages/drizzle": {
-			"entry": ["src/index.ts!", "examples/*.ts"],
-			"project": ["src/**/*.ts!", "examples/**/*.ts"]
+			"entry": ["src/index.ts!"],
+			"project": ["src/**/*.ts!"]
 		},
 		"packages/kysely": {
-			"entry": ["src/index.ts!", "examples/*.ts"],
-			"project": ["src/**/*.ts!", "examples/**/*.ts"]
+			"entry": ["src/index.ts!"],
+			"project": ["src/**/*.ts!"]
 		},
 		"packages/pg": {
 			"entry": ["src/index.ts!", "src/introspect/index.ts!"],
@@ -47,13 +47,8 @@
 			"project": ["src/**/*.ts!"]
 		},
 		"packages/prisma": {
-			"entry": [
-				"src/index.ts!",
-				"src/bin.ts!",
-				"src/generator/api.ts!",
-				"examples/*.ts"
-			],
-			"project": ["src/**/*.ts!", "examples/**/*.ts"]
+			"entry": ["src/index.ts!", "src/bin.ts!", "src/generator/api.ts!"],
+			"project": ["src/**/*.ts!"]
 		},
 		"packages/sqlite": {
 			"entry": ["src/index.ts!", "src/introspect/index.ts!"],
@@ -72,14 +67,9 @@
 			"project": ["*.ts", "src/**/*.ts!"]
 		},
 		"packages/docs": {
-			"entry": [
-				"playground/*.ts",
-				"*.paths.ts",
-				"cloudflare.config.ts",
-				"wrangler.config.ts"
-			],
-			"project": ["*.ts", "playground/**/*.ts", ".vitepress/**/*.{ts,mts,vue}"],
-			"ignoreDependencies": ["@typesql/drizzle", "vue"]
+			"entry": ["*.paths.ts", "cloudflare.config.ts", "wrangler.config.ts"],
+			"project": ["*.ts", ".vitepress/**/*.{ts,mts,vue}"],
+			"ignoreDependencies": ["vue"]
 		},
 		"tests": {
 			"entry": ["scenario.test.ts", "support/observe.ts", "support/runtime.ts"],

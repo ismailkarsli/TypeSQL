@@ -75,7 +75,7 @@ function sample(type: TypeNode): string {
 }
 
 interface Workload {
-	statements: number;
+	queries: string[];
 	build: () => { readonly text: string }[];
 }
 
@@ -150,16 +150,21 @@ function loadWorkload(): Workload {
 			`${code}\nreturn () => [${queries.map((q) => `${q}()`).join(",")}];`,
 			["createSql", "postgres", "CasePlugin"],
 		)(createSql, postgres, CasePlugin) as Workload["build"];
-		return { statements: queries.length, build };
+		return { queries, build };
 	} finally {
 		lease.dispose();
 		api.close();
 	}
 }
 
-const { statements, build } = loadWorkload();
+const { queries, build } = loadWorkload();
+const statements = queries.length;
 
-// Check case1 against the built package, as an application would.
+// Check case1 against the built package, as an application would: it reads
+// every statement's row type, as executing the statement does. The reads are
+// appended to a copy of case1, not put in a second file, which the compiler
+// would check on another checker that infers every statement again.
+const checked = "src/case1.check.ts";
 for (const compiler of ["tsrs", "tsc"]) {
 	const config = join(here, "tsconfig.case1.json");
 	writeFileSync(
@@ -168,8 +173,19 @@ for (const compiler of ["tsrs", "tsc"]) {
 			extends: "./tsconfig.json",
 			compilerOptions: { paths: {} },
 			include: [],
-			files: [fixture],
+			files: [checked],
 		}),
+	);
+	writeFileSync(
+		join(here, checked),
+		[
+			source,
+			'import type { RowType } from "@typesql/core";',
+			"export type Rows = [",
+			...queries.map((q) => `\tRowType<typeof ${q}>,`),
+			"];",
+			"",
+		].join("\n"),
 	);
 	try {
 		const proc = spawnSync(
@@ -190,6 +206,7 @@ for (const compiler of ["tsrs", "tsc"]) {
 		);
 	} finally {
 		unlinkSync(config);
+		unlinkSync(join(here, checked));
 	}
 }
 

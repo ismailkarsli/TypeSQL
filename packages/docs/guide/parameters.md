@@ -1,3 +1,7 @@
+---
+description: "Pass values to SQL as positional, named or inline parameters, each typed from the column or expression it is used with."
+---
+
 # Parameters
 
 Values are always sent as parameters, never pasted into the SQL. You can write them in three ways, and in all three the parameter's type comes from where it is used.
@@ -12,13 +16,27 @@ Values are always sent as parameters, never pasted into the SQL. You can write t
 
 The SQL is sent as written, and the values follow it as arguments:
 
-```ts
+::: code-group
+
+```ts [PostgreSQL]
 const byId = sql(
 	"SELECT id, email FROM users WHERE id = $1 AND created_at > $2",
 	7,
 	new Date(),
 );
 ```
+
+```ts [SQLite]
+const byId = sql(
+	"SELECT id, email FROM users WHERE id = $1 AND created_at > $2",
+	7,
+	new Date().toISOString(),
+);
+```
+
+:::
+
+SQLite's own `?`, `?NNN`, `@name` and `$name` placeholders are rejected; write `$n` or `:name` there too.
 
 A wrong argument is a normal TypeScript error:
 
@@ -57,7 +75,7 @@ The value's TypeScript type is checked against the parameter's type. A mismatch 
 ```ts
 sql(`SELECT id FROM users WHERE id = ${sql.param("7")}`);
 
-sql(`INSERT INTO users (email) VALUES (${sql.param(maybeEmail  )})`);
+sql(`INSERT INTO users (email) VALUES (${sql.param(maybeEmail)})`);
 ```
 
 Literals and objects are checked exactly: `sql.param("angry")` is an error for an enum without that value, and an object for a [`Json<T>` column](./schema#typed-json-columns) must fit `T`. A value typed as plain `string`, `number` or `boolean` is only checked for its kind, so any `string` is accepted for an enum column, and an object with an index signature (`Record<string, unknown>`) is not checked for missing keys. Arrays for JSON go through [`sql.json()`](#json-values). With no context (`SELECT ${sql.param(x)}`), anything is accepted. `sql.param()` inside quotes or a comment is an error.
@@ -76,7 +94,9 @@ Each `${sql.param(x)}` is its own `$n`, even for the same `x`. The value is sent
 
 To send a value once and use it in several places, write it as a `:name` (or a `$n`). It is then one parameter, and its type must fit every use:
 
-```ts
+::: code-group
+
+```ts [PostgreSQL]
 const optional = sql(
 	"SELECT id FROM users WHERE (:name::text IS NULL OR display_name = :name)",
 	{ name },
@@ -84,9 +104,19 @@ const optional = sql(
 optional.text;
 ```
 
+```ts [SQLite]
+const optional = sql(
+	"SELECT id FROM users WHERE (:name IS NULL OR display_name = :name)",
+	{ name },
+);
+optional.text;
+```
+
+:::
+
 ## JSON values
 
-Use `${sql.json(value)}` for `json` and `jsonb` values. It sends the same JSON text with both drivers, and sends `null` as SQL `NULL`. `undefined` sends `DEFAULT`, like [`sql.param(sql.optional(undefined))`](./writing-data#optional-values): a value that can be `undefined` is only accepted where `DEFAULT` is, and can't be a positional or named argument. In `sql.set` and `sql.values` it leaves the column out, as `undefined` does.
+Use `${sql.json(value)}` for `json` and `jsonb` values. It sends JSON text through the adapters, and sends `null` as SQL `NULL`. `undefined` sends `DEFAULT`, like [`sql.param(sql.optional(undefined))`](./writing-data#optional-values): a value that can be `undefined` is only accepted where `DEFAULT` is, and can't be a positional or named argument. In `sql.set` and `sql.values` it leaves the column out, as `undefined` does.
 
 ```ts
 const save = sql(
@@ -94,9 +124,9 @@ const save = sql(
 );
 ```
 
-Why not a raw value? node-postgres sends a JS array as a Postgres array literal, which Postgres rejects as JSON, and postgres.js runs `JSON.stringify` on every value, so a string you already stringified is stored as a JSON string.
+Why not a raw value? node-postgres sends a JS array as a Postgres array literal, which Postgres rejects as JSON, and postgres.js runs `JSON.stringify` on every value, so a string you already stringified is stored as a JSON string. The SQLite drivers can't bind objects or arrays at all.
 
-`sql.json()` is accepted only where a `json` or `jsonb` value is expected, or with no context (`SELECT ${sql.json(v)}::jsonb`). For a [`Json<T>` column](./schema#typed-json-columns), the value is checked against `T` like a `sql.param()` value. Passing a raw array with `sql.param()` is an error:
+`sql.json()` is accepted only where a `json` or `jsonb` value is expected (on SQLite, a JSON value or a JSON function's document argument), or with no context (`SELECT ${sql.json(v)}::jsonb`). For a [`Json<T>` column](./schema#typed-json-columns), the value is checked against `T` like a `sql.param()` value. Passing a raw array with `sql.param()` is an error:
 
 ```ts
 sql(`UPDATE portfolio SET name = ${sql.json({ a: 1 })}`);
@@ -106,7 +136,7 @@ sql(`UPDATE portfolio SET settings = ${sql.json({ theme: "blue" })}`);
 sql(`UPDATE portfolio SET history = ${sql.param(items)}`);
 ```
 
-Positional and named JSON parameters don't take a raw array either. Pass `sql.json(value)` as the argument. Objects work as they are on PostgreSQL. A plain string goes to the driver unchanged: node-postgres sends it as JSON text, so `"hello"` fails as invalid JSON, while postgres.js stores it as a JSON string. Wrap strings in `sql.json()` to get a JSON string on every driver:
+Positional and named JSON parameters don't take a raw array either. Pass `sql.json(value)` as the argument. Objects work as they are on PostgreSQL; on SQLite, pass them through `sql.json()` too. A plain string goes to the driver unchanged: node-postgres sends it as JSON text, so `"hello"` fails as invalid JSON, while postgres.js stores it as a JSON string. Wrap strings in `sql.json()` to get a JSON string on every driver:
 
 ```ts
 sql("UPDATE portfolio SET history = $1 WHERE id = $2", sql.json(items), 1);
@@ -134,7 +164,9 @@ As a positional or named argument, `sql.json(value)` is not checked: a JSON para
 | `$1 IS NULL`, `$1::T IS NOT NULL` | adds `\| null` to the type the other uses give |
 | anywhere else | `unknown` |
 
-```ts
+::: code-group
+
+```ts [PostgreSQL]
 sql("SELECT id FROM users WHERE id = ANY($1)", ids);
 sql("SELECT id FROM users LIMIT $1 OFFSET $2", 10, 20);
 sql(
@@ -149,6 +181,25 @@ sql("SELECT $1 AS anything", { any: "value" });
 sql("SELECT v FROM unnest($1::text[]) AS t(v)", ["a", null]);
 ```
 
+```ts [SQLite]
+sql("SELECT id FROM users WHERE id IN (SELECT value FROM json_each($1))", sql.json(ids));
+sql("SELECT id FROM users LIMIT $1 OFFSET $2", 10, 20);
+sql(
+	"INSERT INTO users (email, display_name, mood) VALUES ($1, $2, $3)",
+	"a@b.c",
+	null,
+	"happy",
+);
+sql("SELECT lower($1) AS l", "ABC");
+sql("SELECT CAST($1 AS INTEGER) + 1 AS n", 41);
+sql("SELECT $1 AS anything", "value");
+sql("SELECT value FROM json_each($1)", sql.json(["a", null]));
+```
+
+:::
+
+SQLite has no array parameters: send a list as JSON and read it with `json_each`, as above. [SQLite parameters](./sqlite#parameters) lists what each type accepts.
+
 ### When `null` is allowed
 
 `null` is accepted wherever Postgres accepts it: `col = NULL` is legal and matches no row, and `LIMIT NULL` means no limit. It is rejected only when assigned to a `NOT NULL` column (`VALUES`, `SET`). A parameter used in several places accepts `null` only if every use does, so `UPDATE t SET label = $1 WHERE label <> $1` rejects `null` for a `NOT NULL` `label`.
@@ -159,7 +210,7 @@ Array elements always accept `null`: an `int4[]` parameter takes `(number | null
 
 ### What a parameter accepts
 
-A parameter accepts the TypeScript type of a result column of its type, plus whatever the driver can send for that type. Under node-postgres, `int8` rows are strings, but `int8` parameters also take a `number` or `bigint`:
+A parameter accepts the TypeScript type of a result column of its type, plus whatever the driver can send for that type. Under node-postgres, `int8` rows are strings, but `int8` parameters also take a `number` or `bigint`. On SQLite, integer parameters take `number | bigint`, and the `datetime` column takes a string:
 
 ```ts
 const post = sql("SELECT id FROM posts WHERE id = $1", 42);
@@ -171,7 +222,7 @@ The full list for each driver is in [Type mapping](../reference/type-mapping#par
 
 ## Only literal SQL is analysed
 
-The SQL must be a string literal, or a template literal whose `${…}` parts are compile-time constants, `sql.param()` / `sql.json()` values or [fragments](./dynamic-sql#interpolating-fragments). TypeScript folds constants into the literal:
+The SQL must be a string literal, or a template literal whose `${…}` parts are compile-time constants, `sql.param()` / `sql.json()` values or [fragments](./dynamic-sql#fragments). TypeScript folds constants into the literal:
 
 ```ts
 const table = "users";

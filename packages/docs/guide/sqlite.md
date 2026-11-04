@@ -1,3 +1,7 @@
+---
+description: "Type SQLite statements with TypeSQL's sqlite dialect: schema, functions, types, nullability, parameters, supported statements and limits."
+---
+
 # SQLite
 
 TypeSQL types SQLite statements with the `sqlite` dialect from `@typesql/core/sqlite`. It has its own parser and type rules, written against SQLite 3.53's behavior; everything else (`sql.param`, fragments, `sql.set` / `sql.values`, `:name` parameters, transactions, [migrations](./migrations)) works as described in the rest of this guide.
@@ -36,13 +40,13 @@ import { migration } from "@typesql/core/migration";
 
 export const createUsers = migration("sqlite", {
 	up: async (db) => {
-		const users = await db.add(
+		const users = await db.ddl(
 			"CREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT NOT NULL)",
 		);
-		return users.add("ALTER TABLE users ADD COLUMN bio TEXT");
+		return users.ddl("ALTER TABLE users ADD COLUMN bio TEXT");
 	},
 	down: async (db) => {
-		await db.add("DROP TABLE users");
+		await db.ddl("DROP TABLE users");
 	},
 });
 ```
@@ -89,6 +93,14 @@ interface DB {
 sql("SELECT meta ->> '$.views' AS views, meta ->> '$.tags[0]' AS tag FROM posts");
 // { views: number | null; tag: string | null }[]
 ```
+
+Inline `${sql.json(value)}` writes are checked against the declared `Json<T>` shape, including values inside fragments, `sql.set` and `sql.values`. A nullable JSON column accepts `null`; a non-nullable one rejects it. Reading the whole column still returns JSON text:
+
+```ts
+const updated = sql(`UPDATE posts SET meta = ${sql.json({ tags: ["sql"], views: 1 })}`);
+```
+
+As with PostgreSQL, a `sql.json()` marker passed as a positional or named argument does not check the original document against `T`; use it inline for that check. See [JSON parameter limits](./limits#json).
 
 `Typed<Type, T>` keeps a column's SQLite type (`"text"`) and types its values as `T`, for example a union of string literals for a text column used as an enum.
 

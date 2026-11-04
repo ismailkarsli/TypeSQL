@@ -68,6 +68,9 @@ export type Expect<
 	O extends string,
 > = T[I] extends { readonly k: "o"; readonly v: O } ? Nx<I> : SyntaxErr<T, I>;
 
+export type CloseOk<T extends Toks, I extends number, V> =
+	IsOp<T, I, ")"> extends true ? Ok<V, Nx<I>> : SyntaxErr<T, I>;
+
 export type SpanText<T extends Toks, I extends number, J extends number> = Trim<
 	SpanLoop<T, Nx<I>, J, RawOf<T[I]>>
 >;
@@ -87,11 +90,9 @@ type Space = " " | "\n" | "\t" | "\r" | "\f" | "\v";
 type Trim<S extends string> = S extends `${infer R}${Space}` ? Trim<R> : S;
 
 export type IdentList<T extends Toks, I extends number> =
-	Expect<T, I, "("> extends infer J
-		? J extends number
-			? IdentListLoop<T, J, []>
-			: J
-		: never;
+	Expect<T, I, "("> extends infer J extends number
+		? IdentListLoop<T, J, []>
+		: Expect<T, I, "(">;
 type IdentListLoop<
 	T extends Toks,
 	I extends number,
@@ -100,7 +101,34 @@ type IdentListLoop<
 	Ident<T, I> extends infer N extends Name
 		? T[Nx<I>] extends { readonly k: "o"; readonly v: "," }
 			? IdentListLoop<T, Nx<Nx<I>>, [...Acc, N]>
-			: Expect<T, Nx<I>, ")"> extends infer J extends number
-				? Ok<[...Acc, N], J>
-				: SyntaxErr<T, Nx<I>>
+			: CloseOk<T, Nx<I>, [...Acc, N]>
 		: SyntaxErr<T, I>;
+
+export type OptCols<T extends Toks, I extends number> =
+	IsOp<T, I, "("> extends true ? IdentList<T, I> : Ok<null, I>;
+
+export type NamesV<N extends readonly Name[]> = {
+	[K in keyof N]: N[K] extends Name ? N[K]["v"] : never;
+};
+
+export type TableRefAt<T extends Toks, I extends number> =
+	Ident<T, I> extends infer A extends Name
+		? IsOp<T, Nx<I>, "."> extends true
+			? Ident<T, Nx<Nx<I>>> extends infer B extends Name
+				? Ok<{ schema: A["v"]; name: B["v"] }, Nx<Nx<Nx<I>>>>
+				: SyntaxErr<T, Nx<Nx<I>>>
+			: Ok<{ schema: null; name: A["v"] }, Nx<I>>
+		: SyntaxErr<T, I>;
+
+export type SkipIndexed<T extends Toks, I extends number> =
+	IsWord<T, I, "indexed"> extends true
+		? IsWord<T, Nx<I>, "by"> extends true
+			? Ident<T, Nx<Nx<I>>> extends Name
+				? Nx<Nx<Nx<I>>>
+				: SyntaxErr<T, Nx<Nx<I>>>
+			: SyntaxErr<T, Nx<I>>
+		: IsWord<T, I, "not"> extends true
+			? IsWord<T, Nx<I>, "indexed"> extends true
+				? Nx<Nx<I>>
+				: SyntaxErr<T, Nx<I>>
+			: I;

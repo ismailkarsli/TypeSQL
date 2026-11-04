@@ -88,20 +88,19 @@ export type ColumnName<F, O> = O extends {
 }
 	? C
 	: F;
-type ColumnType<T extends string, O> = O extends string
-	? IsList<T> extends true
-		? `${O}[]`
-		: O
-	: O extends { readonly type: infer X extends string }
-		? IsList<T> extends true
-			? `${X}[]`
-			: X
-		: IsList<T> extends true
-			? `${PgOf<ElemName<T>>}[]`
-			: PgOf<T>;
+type ListOf<T extends string, E extends string> =
+	IsList<T> extends true ? `${E}[]` : E;
+type ColumnType<T extends string, O> = ListOf<
+	T,
+	O extends string
+		? O
+		: O extends { readonly type: infer X extends string }
+			? X
+			: PgOf<ElemName<T>>
+>;
 
-type Column<
-	T extends string,
+export type Column<
+	Type,
 	Nullable extends boolean,
 	Optional extends boolean,
 	O,
@@ -111,7 +110,7 @@ type Column<
 		: Nullable
 ) extends infer N extends boolean
 	? {
-			readonly type: ColumnType<T, O>;
+			readonly type: Type;
 			readonly nullable: N;
 			readonly hasDefault: O extends {
 				readonly default: infer D extends boolean;
@@ -131,7 +130,7 @@ type ModelColumns<
 	Opt = OptionalCreateKeys<M>,
 > = {
 	-readonly [F in keyof FS as ColumnName<F, Get<MO, F>>]: Column<
-		TypeName<FS[F]>,
+		ColumnType<TypeName<FS[F]>, Get<MO, F>>,
 		IsList<TypeName<FS[F]>> extends true ? true : F extends Null ? true : false,
 		F extends Opt ? true : false,
 		Get<MO, F>

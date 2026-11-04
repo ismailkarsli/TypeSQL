@@ -14,8 +14,6 @@ pnpm check:intents
 - The VS Code extension (`packages/vscode`, package name `typesql`) is released the same way:
   add `pnpm change typesql …` with every user-facing change to it. `pnpm check:intents` does not
   catch a missing one.
-- Use `patch` for fixes. Use `major` for every change that could possibly break users, even
-  when the break is unlikely.
 - Write the summary like the existing `.changeset/*.md` files.
 
 ## Scenario tests and definition of done

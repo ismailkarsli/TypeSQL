@@ -1,0 +1,41 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`sqlite-parameter-inference > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "CaseParams": "[null | number | bigint, null | number | bigint, number | bigint]",
+      "SelectParams": "[number | bigint, string, number | bigint, number | bigint]",
+      "ValuesParams": "[unknown, null | string, unknown, null | string]",
+      "WriteParams": "[number | bigint, string, null | string, number | bigint, string, null | string, null | string, null | string, number | bigint]",
+      "chosen": "({ value: null | number })[]",
+      "inserted": "({ bio: null | string; id: number; name: string })[]",
+      "pairs": "({ id: unknown; name: null | string })[]",
+      "rows": "({ id: number; name: string })[]",
+    },
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "{
+  rows: [ [Object: null prototype] { id: 1, name: 'Ada' } ],
+  pairs: [
+    [Object: null prototype] { id: 3, name: 'ADA' },
+    [Object: null prototype] { id: 4, name: 'grace' }
+  ],
+  inserted: [
+    [Object: null prototype] { id: 3, name: 'Lin', bio: null },
+    [Object: null prototype] { id: 4, name: 'Ken', bio: 'Unix' }
+  ],
+  chosen: [ [Object: null prototype] { value: 7 } ]
+}
+",
+  },
+}
+`;

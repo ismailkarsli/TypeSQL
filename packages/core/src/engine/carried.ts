@@ -1,9 +1,16 @@
 import type { SqlError } from "../errors.js";
 import type { CheckEnc, DescribeEnc, Enc } from "../sql/inline.js";
 import type { Next } from "../sql/next.js";
-import type { EngineTypes, TokensOf, TypeDisplayOf } from "./contract.js";
-import type { ParamData, ParamDataOf } from "./infer.js";
+import type {
+	AnalysisOf,
+	EngineTypes,
+	TokensOf,
+	TypeDisplayOf,
+} from "./contract.js";
+import type { ParamTs } from "./infer.js";
+import type { PickOne } from "./object.js";
 import type { NullTest } from "./params.js";
+import type { Nx } from "./parse.js";
 import type { Toks } from "./tokens.js";
 
 export type CheckCarried<
@@ -16,53 +23,63 @@ export type CheckCarried<
 	? true
 	: number extends K["length"]
 		? true
-		: CarriedLoop<E, X, K, ParamDataOf<E, DB, TM, X>, 0>;
+		: CarriedLoop<
+				E,
+				DB,
+				TM,
+				X,
+				K,
+				AnalysisOf<E, DB, X>["params" & keyof AnalysisOf<E, DB, X>],
+				0
+			>;
 
 type CarriedLoop<
 	E extends EngineTypes,
+	DB,
+	TM,
 	X extends string,
 	K extends readonly unknown[],
-	P extends readonly ParamData[],
+	P,
 	I extends number,
 > = I extends K["length"]
 	? true
 	: K[I] extends infer V extends string
-		? Extract<
-				CheckValue<
-					E,
-					V,
-					P[I] extends ParamData ? P[I]["type"] : undefined,
-					P[I] extends ParamData ? P[I]["uses"] : never
-				>,
+		? CarriedMessage<E, DB, TM, V, P[Nx<I> & keyof P]> extends infer M extends
 				string
-			> extends infer M extends string
 			? [M] extends [never]
-				? CarriedLoop<E, X, K, P, Next[I]>
+				? CarriedLoop<E, DB, TM, X, K, P, Next<I>>
 				: SqlError<
-						`parameter $${Next[I]}: ${M}`,
-						FindParam<TokensOf<E, X>, Next[I], 0>
+						`parameter $${Next<I>}: ${M}`,
+						FindParam<TokensOf<E, X>, Next<I>, 0>
 					>
-			: CarriedLoop<E, X, K, P, Next[I]>
-		: CarriedLoop<E, X, K, P, Next[I]>;
+			: CarriedLoop<E, DB, TM, X, K, P, Next<I>>
+		: CarriedLoop<E, DB, TM, X, K, P, Next<I>>;
+
+type CarriedMessage<
+	E extends EngineTypes,
+	DB,
+	TM,
+	V extends string,
+	U,
+> = Extract<CheckValue<E, V, ParamTs<E, U, TM, DB>, U>, string>;
 
 type CheckValue<
 	E extends EngineTypes,
 	V extends string,
 	P,
 	U,
-	J = JsonType<E, U, P>,
 > = V extends `J${infer R}`
 	? JsonContext<E, Exclude<U, NullTest>> extends false
 		? `a sql.json() value cannot be used as ${Expected<E, U>}`
-		: CheckEnc<R, J> extends true
+		: CheckEnc<R, JsonType<E, U, P>> extends true
 			? true
 			: // sql.json() binds JSON text, which a parameter taking text accepts
 				// unless the column declares a shape for the value before serialization.
 				[JsonShapes<E, U>] extends [never]
 				? [Exclude<P, null | undefined>] extends [string]
 					? true
-					: JsonError<E, R, U, J>
-				: JsonError<E, R, U, J>
+					: JsonError<E, R, U, JsonType<E, U, P>>
+				: JsonError<E, R, U, JsonType<E, U, P>>
 	: CheckEnc<V, P> extends true
 		? V extends `${string}[0${string}`
 			? IsJsonParam<E, Exclude<U, NullTest>> extends true
@@ -117,24 +134,17 @@ type JsonContext<E extends EngineTypes, U> = [U] extends [never]
 		: true;
 
 type Expected<E extends EngineTypes, U> =
-	First<U> extends {
+	PickOne<U> extends {
 		readonly type: infer T extends string;
 		readonly nullable: infer Nl;
 	}
 		? `${TypeDisplayOf<E, T>}${Nl extends true ? "" : " NOT NULL"}`
 		: "this parameter";
-type First<U> = (U extends unknown ? (u: () => U) => void : never) extends (
-	u: infer F,
-) => void
-	? F extends () => infer R
-		? R
-		: never
-	: never;
 
 type FindParam<T, N extends number, I extends number> = T extends Toks
 	? T[I] extends { readonly k: "$"; readonly v: N }
 		? I
 		: T[I] extends { readonly k: string }
-			? FindParam<T, N, Next[I]>
+			? FindParam<T, N, Next<I>>
 			: 0
 	: 0;

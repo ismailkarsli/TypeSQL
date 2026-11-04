@@ -151,7 +151,7 @@ const message = (err: unknown): string => {
 	const text = err.message
 		? err.message
 		: err instanceof AggregateError && err.errors.length > 0
-			? [...new Set(err.errors.map(message))].join("; ")
+			? Array.from(new Set(err.errors.map(message))).join("; ")
 			: ((err as { code?: string }).code ?? err.name);
 	return text.replace(/^typesql: /, "");
 };

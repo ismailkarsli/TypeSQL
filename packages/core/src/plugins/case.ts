@@ -39,9 +39,17 @@ type SnakeCase<S extends string> = string extends S
 	? string
 	: S extends Lowercase<S>
 		? S
-		: S extends `${infer Head}${infer Tail}`
-			? `${Head extends Lowercase<Head> ? Head : `_${Lowercase<Head>}`}${SnakeCase<Tail>}`
-			: S;
+		: SnakeRest<S>;
+type SnakeRest<S extends string> =
+	S extends Lowercase<S>
+		? S
+		: S extends `${infer A}${infer B}${infer C}${infer D}${infer Tail}`
+			? `${SnakeChar<A>}${SnakeChar<B>}${SnakeChar<C>}${SnakeChar<D>}${SnakeRest<Tail>}`
+			: S extends `${infer Head}${infer Tail}`
+				? `${SnakeChar<Head>}${SnakeRest<Tail>}`
+				: S;
+type SnakeChar<C extends string> =
+	C extends Lowercase<C> ? C : `_${Lowercase<C>}`;
 
 function snakeCase(key: string): string {
 	let result = "";

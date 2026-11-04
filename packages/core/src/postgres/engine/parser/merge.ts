@@ -10,12 +10,15 @@ import type {
 import type { ParseExpr, ParseExprList } from "./expr.js";
 import type { ParseFromItem } from "./select.js";
 import type {
+	Close,
 	EatOp,
 	EatWord,
 	EatWords,
 	Expected,
 	Nx,
+	Nx2,
 	Ok,
+	SkipWords,
 	SyntaxErrorAt,
 } from "./util.js";
 
@@ -26,46 +29,42 @@ export type ParseMerge<
 > =
 	EatWord<T, I, "into"> extends never
 		? Expected<"INTO", T, I>
-		: ParseDmlTarget<T, EatWord<T, I, "into">, never, true> extends infer Tg
-			? Tg extends Ok<[infer Ref, infer Alias], infer I1>
-				? EatWord<T, I1, "using"> extends never
-					? Expected<"USING", T, I1>
-					: ParseFromItem<T, EatWord<T, I1, "using">> extends infer Src
-						? Src extends Ok<infer Source, infer I2>
-							? EatWord<T, I2, "on"> extends never
-								? Expected<"ON", T, I2>
-								: ParseExpr<T, EatWord<T, I2, "on">, 0> extends infer On
-									? On extends Ok<infer Cond, infer I3>
-										? T[I3] extends WordTok<"when">
-											? ParseWhens<T, I3, []> extends infer Ws
-												? Ws extends Ok<infer Whens, infer I4>
-													? ParseReturningOpt<T, I4> extends infer Rt
-														? Rt extends Ok<[infer Ret, infer Opts], infer I5>
-															? Ok<
-																	{
-																		t: "merge";
-																		with: W;
-																		table: Ref;
-																		alias: Alias;
-																		source: Source;
-																		on: Cond;
-																		whens: Whens;
-																		returning: Ret;
-																		retOpts: Opts;
-																	},
-																	I5
-																>
-															: Rt
-														: never
-													: Ws
-												: never
-											: Expected<"WHEN", T, I3>
-										: On
-									: never
-							: Src
-						: never
-				: Tg
-			: never;
+		: ParseDmlTarget<T, Nx<I>, never, true> extends Ok<
+					[infer Ref, infer Alias],
+					infer I1
+				>
+			? EatWord<T, I1, "using"> extends never
+				? Expected<"USING", T, I1>
+				: ParseFromItem<T, Nx<I1>> extends Ok<infer Source, infer I2>
+					? EatWord<T, I2, "on"> extends never
+						? Expected<"ON", T, I2>
+						: ParseExpr<T, Nx<I2>, 0> extends Ok<infer Cond, infer I3>
+							? T[I3] extends WordTok<"when">
+								? ParseWhens<T, I3, []> extends Ok<infer Whens, infer I4>
+									? ParseReturningOpt<T, I4> extends Ok<
+											[infer Ret, infer Opts],
+											infer I5
+										>
+										? Ok<
+												{
+													t: "merge";
+													with: W;
+													table: Ref;
+													alias: Alias;
+													source: Source;
+													on: Cond;
+													whens: Whens;
+													returning: Ret;
+													retOpts: Opts;
+												},
+												I5
+											>
+										: ParseReturningOpt<T, I4>
+									: ParseWhens<T, I3, []>
+								: Expected<"WHEN", T, I3>
+							: ParseExpr<T, Nx<I2>, 0>
+					: ParseFromItem<T, Nx<I1>>
+			: ParseDmlTarget<T, Nx<I>, never, true>;
 
 type ParseWhens<
 	T extends Toks,
@@ -73,38 +72,19 @@ type ParseWhens<
 	Acc extends readonly MergeWhen[],
 > =
 	T[I] extends WordTok<"when">
-		? ParseWhen<T, Nx<I>> extends infer X
-			? X extends Ok<infer When extends MergeWhen, infer J>
-				? ParseWhens<T, J, [...Acc, When]>
-				: X
-			: never
+		? ParseWhen<T, Nx<I>> extends Ok<infer When extends MergeWhen, infer J>
+			? ParseWhens<T, J, [...Acc, When]>
+			: ParseWhen<T, Nx<I>>
 		: Ok<Acc, I>;
 
 type ParseWhen<T extends Toks, I extends number> =
 	EatWord<T, I, "matched"> extends never
 		? EatWords<T, I, ["not", "matched"]> extends never
 			? Expected<"MATCHED or NOT MATCHED", T, I>
-			: EatWords<
-						T,
-						EatWords<T, I, ["not", "matched"]>,
-						["by", "source"]
-					> extends never
-				? ParseWhenCond<
-						T,
-						SkipByTarget<T, EatWords<T, I, ["not", "matched"]>>,
-						"target"
-					>
-				: ParseWhenCond<
-						T,
-						EatWords<T, EatWords<T, I, ["not", "matched"]>, ["by", "source"]>,
-						"source"
-					>
-		: ParseWhenCond<T, EatWord<T, I, "matched">, "matched">;
-type SkipByTarget<T extends Toks, I extends number> =
-	EatWords<T, I, ["by", "target"]> extends never
-		? I
-		: EatWords<T, I, ["by", "target"]>;
-
+			: EatWords<T, Nx2<I>, ["by", "source"]> extends never
+				? ParseWhenCond<T, SkipWords<T, Nx2<I>, ["by", "target"]>, "target">
+				: ParseWhenCond<T, Nx2<Nx2<I>>, "source">
+		: ParseWhenCond<T, Nx<I>, "matched">;
 type ParseWhenCond<
 	T extends Toks,
 	I extends number,
@@ -112,11 +92,9 @@ type ParseWhenCond<
 > =
 	EatWord<T, I, "and"> extends never
 		? ParseThen<T, I, M, null>
-		: ParseExpr<T, EatWord<T, I, "and">, 0> extends infer X
-			? X extends Ok<infer Cond extends Expr, infer J>
-				? ParseThen<T, J, M, Cond>
-				: X
-			: never;
+		: ParseExpr<T, Nx<I>, 0> extends Ok<infer Cond extends Expr, infer J>
+			? ParseThen<T, J, M, Cond>
+			: ParseExpr<T, Nx<I>, 0>;
 
 type ParseThen<
 	T extends Toks,
@@ -126,11 +104,9 @@ type ParseThen<
 > =
 	EatWord<T, I, "then"> extends never
 		? Expected<"THEN", T, I>
-		: ParseAction<T, EatWord<T, I, "then">, M> extends infer X
-			? X extends Ok<infer A, infer J>
-				? Ok<{ match: M; cond: Cond; action: A }, J>
-				: X
-			: never;
+		: ParseAction<T, Nx<I>, M> extends Ok<infer A, infer J>
+			? Ok<{ match: M; cond: Cond; action: A }, J>
+			: ParseAction<T, Nx<I>, M>;
 
 type ParseAction<
 	T extends Toks,
@@ -143,23 +119,19 @@ type ParseAction<
 				? T[I] extends WordTok<"do">
 					? SyntaxErrorAt<T, Nx<I>>
 					: Expected<"INSERT or DO NOTHING", T, I>
-				: ParseMergeInsert<T, EatWord<T, I, "insert">>
+				: ParseMergeInsert<T, Nx<I>>
 			: EatWord<T, I, "delete"> extends never
 				? EatWords<T, I, ["update", "set"]> extends never
 					? T[I] extends WordTok<"update" | "do">
 						? SyntaxErrorAt<T, Nx<I>>
 						: Expected<"UPDATE, DELETE or DO NOTHING", T, I>
-					: ParseSetList<
-								T,
-								EatWords<T, I, ["update", "set"]>,
-								[]
-							> extends infer X
+					: ParseSetList<T, Nx2<I>, []> extends infer X
 						? X extends Ok<infer Set, infer J>
 							? Ok<{ t: "update"; set: Set }, J>
 							: X
 						: never
-				: Ok<{ t: "delete" }, EatWord<T, I, "delete">>
-		: Ok<{ t: "nothing" }, EatWords<T, I, ["do", "nothing"]>>;
+				: Ok<{ t: "delete" }, Nx<I>>
+		: Ok<{ t: "nothing" }, Nx2<I>>;
 
 type ParseMergeInsert<T extends Toks, I extends number> =
 	EatWords<T, I, ["default", "values"]> extends never
@@ -169,36 +141,24 @@ type ParseMergeInsert<T extends Toks, I extends number> =
 					: Ok<[null, null], I>
 			) extends infer Cl
 			? Cl extends Ok<[infer Cols, infer Ind], infer J>
-				? ParseOverriding<T, J> extends infer Ov
-					? Ov extends Ok<unknown, infer J2>
-						? EatWord<T, J2, "values"> extends never
-							? Expected<"VALUES", T, J2>
-							: EatOp<T, EatWord<T, J2, "values">, "("> extends never
-								? Expected<'"("', T, EatWord<T, J2, "values">>
-								: ParseExprList<
-											T,
-											EatOp<T, EatWord<T, J2, "values">, "(">,
-											[]
-										> extends infer X
-									? X extends Ok<infer Vals, infer J3>
-										? EatOp<T, J3, ")"> extends never
-											? Expected<'")"', T, J3>
-											: Ok<
-													{
-														t: "insert";
-														columns: Cols;
-														colInd: Ind;
-														values: Vals;
-													},
-													EatOp<T, J3, ")">
-												>
-										: X
-									: never
-						: Ov
-					: never
+				? ParseOverriding<T, J> extends Ok<unknown, infer J2>
+					? EatWord<T, J2, "values"> extends never
+						? Expected<"VALUES", T, J2>
+						: EatOp<T, Nx<J2>, "("> extends never
+							? Expected<'"("', T, Nx<J2>>
+							: ParseExprList<T, Nx2<J2>, []> extends Ok<infer Vals, infer J3>
+								? Close<
+										T,
+										J3,
+										{
+											t: "insert";
+											columns: Cols;
+											colInd: Ind;
+											values: Vals;
+										}
+									>
+								: ParseExprList<T, Nx2<J2>, []>
+					: ParseOverriding<T, J>
 				: Cl
 			: never
-		: Ok<
-				{ t: "insert"; columns: null; colInd: null; values: null },
-				EatWords<T, I, ["default", "values"]>
-			>;
+		: Ok<{ t: "insert"; columns: null; colInd: null; values: null }, Nx2<I>>;

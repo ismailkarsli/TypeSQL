@@ -1,0 +1,20 @@
+{
+	"name": "sqlite-aggregate-traversal",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"compile": "tsc -p tsconfig.json --pretty false",
+		"start": "node dist/app.js"
+	},
+	"dependencies": {
+		"@typesql/core": "workspace:*",
+		"@typesql/sqlite": "workspace:*"
+	},
+	"devDependencies": {
+		"typescript": "catalog:",
+		"@types/node": "catalog:"
+	},
+	"scenario": {
+		"database": "sqlite"
+	}
+}

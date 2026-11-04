@@ -37,8 +37,6 @@ await sql.transaction(async (tx) => {
 });
 ```
 
-[Open an example in the TypeScript Playground](https://www.typescriptlang.org/play/?moduleResolution=100#code/JYWwDg9gTgLgBAbzjAnmApnAwhANgGjkgGcYBzKdYuAXzgDMoIQ4AiAAVQ2IEdcB6AMbR0-EuUrFWAbgBQoSLERxBlAIYx0AZT6EumAApRgxEGoBKagO5ZcwdADt4dRszac0VPmOOm1M2XkndCh6NUFMABEAIURZAEgAV2IQ4gAuOPj44AATDJxcAB5WYCcAFlZCJAALNWJI9DDE3BgMmChEzBoAPjks9DNgXHy8YoA3NShBWqhWXoT4nJMwXDUUAH0HNRB0EaLWTQAPGErlB2bVgCNcXeQOrvmsphu94vM8dFOauoamlrb7rRHkkwDkNOgcgBBVrYUYHUBUGDbMBzPo0PridKZbJ5WH7RKJXKohZqRIwarQda5V4lcrErIwYAwF544pHE7Asb2KxYgrFUowAAcXzgtXqjVJ-zunSBaL6ABJ9FiEAt3izWJDIgBZACSADlWHAAD5sACqWgAouYAvF0bIaIEcuhBKtKCoIA5SERfGYMkYTGZLDY7I4YHJhJ74LxcHAALwqdSaHRFGLdAAU4goVEIYB9agAlHJZBGvWociBStR49Y1Ey4NG0wkAAaWgAyFqwABU4LlCEtiCs1pttuhCKxEqDwVCTnAAGLmADyWrgyVScAA6gAJK0WuDPTDx+UARib+ASGu1+sqsnzADp0IdnWT0GnC4ES1GkTAq3Aa3WG82bYdt2pLkpSvbuokThpgAVPmcCQloRAQKQxCEMQiQgGmXLoDy8GIXAOE8nOi7LpicAAOKLqaBhwNEACav5khSUBUjkp43vej6CM+r5Fh+cBOjcmg5HGv5WLWUZ8Le7RqJ64SMh6aZpjAhzwbG3QJKpaZNpEFrtp2u7zkuyGoRu27mLuoEsWxYnHqecBHneD5PpoOBQTAr5nm+sgNk2+qWuY3b6p2C6md+cBptZ4E5HoTI3PBABqkKtqaFpIWmx6EPKABM+YOUeY6buguC4BArBvkAA) <span data-playground="prisma"></span> to hover the types and edit the SQL, with nothing to install.
-
 Good to know:
 
 - Rows are typed the way Prisma's raw queries return them: `int8` (so `count(*)`) is `bigint`, `numeric` is `Decimal`.

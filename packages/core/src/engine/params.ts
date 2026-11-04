@@ -2,21 +2,20 @@ import type { Next } from "../sql/next.js";
 import type { Toks } from "./tokens.js";
 import type { ColInfo } from "./types.js";
 
-type ParamEntry<N extends number = number, T = ColInfo> = {
+export type ParamEntry<N extends number = number, T = ColInfo> = {
 	readonly n: N;
 	readonly t: T;
 };
 
-export type AddParam<M, N extends number, T> = M | ParamEntry<N, T>;
-
-export type ParamsToMap<U> = {
+export type ParamsToMap<U> = ParamsGrouped<{
 	readonly [E in U as E extends { readonly n: infer N extends number }
 		? N
 		: never]: E extends { readonly t: infer T } ? T : never;
-};
+}>;
+type ParamsGrouped<M> = { readonly [K in keyof M]: M[K] };
 
 export type MaxParam<T extends Toks> = HighestParam<
-	MaxCandidates<Extract<T[number], { readonly k: "$" }>["v"] | 0>
+	MaxCandidates<((T[number] & { readonly k: "$" })["v"] & number) | 0>
 >;
 
 // A number with a successor present cannot be the maximum. Dense parameter
@@ -24,7 +23,7 @@ export type MaxParam<T extends Toks> = HighestParam<
 type MaxCandidates<N extends number, All extends number = N> = N extends number
 	? number extends N
 		? N
-		: Next[N] extends All
+		: Next<N> extends All
 			? never
 			: N
 	: never;

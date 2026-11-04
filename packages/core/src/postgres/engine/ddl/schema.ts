@@ -7,7 +7,7 @@ import type {
 import type { AnyErr, SqlError } from "../../../errors.js";
 import type { TableRef } from "../ast.js";
 import type { ApplyCreateTable, ApplyTypedTable } from "./create-table.js";
-import type { IsSchemaKey } from "./relation.js";
+import type { AlreadyExists, IsSchemaKey } from "./relation.js";
 import type { ApplyCreateView } from "./view.js";
 
 export type ApplyCreateSchema<
@@ -15,14 +15,10 @@ export type ApplyCreateSchema<
 	Ine,
 	Name extends string,
 > = Name extends "public"
-	? Ine extends true
-		? DB
-		: SqlError<`schema "public" already exists`, null>
+	? AlreadyExists<DB, Ine, `schema "public"`>
 	: Name extends keyof DB
 		? IsSchemaKey<DB, Name> extends true
-			? Ine extends true
-				? DB
-				: SqlError<`schema "${Name}" already exists`, null>
+			? AlreadyExists<DB, Ine, `schema "${Name}"`>
 			: SqlError<
 					`cannot create schema "${Name}": a relation with that name exists (TypeSQL keeps schemas and public relations in one object)`,
 					null
@@ -40,7 +36,7 @@ export type ApplyElements<DB, S extends string, Els> = Els extends readonly [
 		: never
 	: DB;
 
-type ApplyElement<DB, S extends string, E> = E extends {
+export type ApplyElement<DB, S extends string | null, E> = E extends {
 	readonly t: "create_table";
 	readonly ifNotExists: infer Ine;
 	readonly table: infer Ref extends TableRef;
@@ -52,15 +48,17 @@ type ApplyElement<DB, S extends string, E> = E extends {
 }
 	? Of extends TableRef
 		? ApplyTypedTable<DB, Ine, Ref, Of>
-		: ApplyCreateTable<
-				DB,
-				Ine,
-				Ref,
-				Defs,
-				Cons,
-				InSearchPath<DB, S, Likes>,
-				InSearchPath<DB, S, Inh>
-			>
+		: S extends string
+			? ApplyCreateTable<
+					DB,
+					Ine,
+					Ref,
+					Defs,
+					Cons,
+					InSearchPath<DB, S, Likes>,
+					InSearchPath<DB, S, Inh>
+				>
+			: ApplyCreateTable<DB, Ine, Ref, Defs, Cons, Likes, Inh>
 	: E extends {
 				readonly t: "create_view";
 				readonly orReplace: infer OrR;

@@ -1,0 +1,24 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`pg-declaration-emit > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "active": "({ readonly endedAt: null | Date; readonly id: number; readonly planName: string })[]",
+      "activeSubscriptionQuery": "(userId: string) => Query<Readonly<{ endedAt: Date | null; id: number; planName: string; }>, [string | null], "SELECT id, plan_name, ended_at FROM subscriptions WHERE user_id = $1 AND ended_at IS NULL">",
+    },
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "[ { id: 1, planName: 'pro', endedAt: null } ] true
+",
+  },
+}
+`;

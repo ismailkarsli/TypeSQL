@@ -4,7 +4,7 @@ Versions and changelogs are managed by pnpm itself (pnpm ≥ 11.13; the reposito
 `packageManager`), not by a Changesets dependency: `pnpm change` records what changed,
 `pnpm version -r` turns that into versions and changelogs, and `pnpm publish -r`, run only by
 the `release` workflow through npm trusted publishing, publishes. Two scripts fill the gaps pnpm leaves:
-`scripts/check-intents.ts` enforces intents and `scripts/github-releases.ts` creates GitHub
+`tools/check-intents.ts` enforces intents and `tools/github-releases.ts` creates GitHub
 releases. See pnpm's [release management](https://pnpm.io/versioning) docs for the full model.
 
 The published packages are `@typesql/core`, `@typesql/pg`, `@typesql/postgres`,
@@ -44,11 +44,11 @@ A parameter tested with `IS NULL` or `IS NOT NULL`, as in `($1::text IS NULL OR 
 
 - The summary becomes the changelog entry word for word. Write one sentence on the behaviour a
   user now sees, with identifiers in backticks; leave out the implementation.
-- Name only the packages whose code changed. Packages that depend on them through
-  `workspace:*` are bumped automatically and get an "Updated dependencies" entry, and the rest
+- Name only the packages whose shipped files changed, including README documentation.
+  Packages that depend on them through `workspace:*` are bumped automatically and get an "Updated dependencies" entry, and the rest
   of the fixed group moves to the same version.
-- One change, one intent. A change that spans packages lists all of them in one file (as
-  `.changeset/wise-snails-clean.md` does for the five integration packages).
+- One change, one intent. A change that spans packages lists all of them in one file (with
+  one package entry per line in its front matter).
 - To fix a summary before it is released, edit the intent file.
 
 ### Enforcement
@@ -58,8 +58,10 @@ changed since `origin/main` (in CI: since the pull request's base, or the previo
 push) and no intent added in that range names the package. Shipped files are the entries of
 the package's `files` field (`src`, `README.md`, `LICENSE`) plus `package.json`; a change to
 `version` alone, as in a release commit, does not count. Tests, examples, the docs site and the
-private packages need no intent. When a change needs no release (a refactor, a README typo),
-record that with `--bump none`. Run it before pushing:
+private packages need no intent, except for user-facing changes to the VS Code extension.
+Use `patch` for fixes, including README corrections, and `major` for any change that could
+break users. Use `--bump none` only for internal changes that need no release and cannot
+change supported behavior. Run it before pushing:
 
 ```sh
 pnpm check:intents
@@ -78,14 +80,14 @@ pnpm release
 ```
 
 The workflow runs only when started by hand on `main`, with `pnpm release` or **Run workflow** on
-the Actions tab; pushing publishes nothing. Tests, type checks, lint and smoke checks belong to
-`checks.yml`, which runs on pushes and pull requests (lint remains temporarily disabled
+the Actions tab; pushing publishes nothing. Scenario tests, type checks, lint and
+documentation builds belong to `checks.yml`, which runs on pushes and pull requests (lint remains temporarily disabled
 while repository-wide violations are addressed). Release does not rerun those checks;
 start it from a revision whose checks have passed. Its `publish` job runs `pnpm version -r` (bump
 versions, write changelog sections, update the ledger) and commits the result to `main` as
 `chore: release <version>` from `github-actions[bot]`, then builds the
 packages, runs `pnpm publish -r`, and creates the GitHub releases. `main` requires signed
-commits, so the release commit is made through GitHub's API (`scripts/github-commit.ts`),
+commits, so the release commit is made through GitHub's API (`tools/github-commit.ts`),
 which signs it, not with `git push`. It is rejected, and nothing is published, when `main`
 moved after the run started; start it again. A commit made with the workflow's token starts no
 other workflow, so `checks` does not run on the release commit, which changes only versions and
@@ -191,7 +193,7 @@ checks it against the workflow's repository.
 
 ## GitHub releases
 
-pnpm creates no git tags and no GitHub releases, so `scripts/github-releases.ts` does, as the
+pnpm creates no git tags and no GitHub releases, so `tools/github-releases.ts` does, as the
 last step of the `publish` job. For every package version that is on npm and has no release yet,
 it creates a release on the repository's Releases tab:
 
@@ -208,7 +210,7 @@ packages first published by hand); the `pnpm publish -r --report-summary` output
 that may not yet appear in the registry. Its `GITHUB_TOKEN` was refused (HTTP 403) tags on the
 0.0.2 and 0.0.3 release commits, whose workflow files differ from `main`'s, so older versions
 are backfilled by a maintainer instead: from a checkout with `gh` logged in,
-`node scripts/github-releases.ts --dry-run` lists every published version
+`node tools/github-releases.ts --dry-run` lists every published version
 without a release, and the same command without `--dry-run` creates them. That only touches
 GitHub; nothing is published to npm.
 
@@ -306,9 +308,9 @@ GitHub releases. The fixed group sits under the same
 `versioning:` key; other versioning settings (ignored packages, lanes) would go there too, and the
 repository uses their defaults.
 
-CI runs `pnpm change check`, which fails when an intent names a package that does not exist or
-the committed versions break a configured versioning rule, such as fixed-group packages
-with different versions.
+CI runs `pnpm check:intents` to enforce intent coverage. Use `pnpm change check` locally to
+check pnpm's versioning rules too, including unknown packages in intents and fixed-group
+packages with different committed versions.
 
 ## Pitfalls
 

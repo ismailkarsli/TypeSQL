@@ -5,12 +5,14 @@ import {
 	mayBeInSqlLiteral,
 	merge,
 	mergeTokens,
+	offsetOf,
 	Session,
 	type CompletionItem as SqlItem,
 	type TokenLegend,
 	type TokenNames,
 	type TypeScriptModules,
 	typescriptModules,
+	withBudget,
 } from "@typesql/language-server";
 import type {
 	ExtensionAPI,
@@ -314,25 +316,4 @@ function toItem(i: SqlItem, c: Completions): vscode.CompletionItem {
 		r.end.character,
 	);
 	return item;
-}
-
-function offsetOf(
-	text: string,
-	p: { line: number; character: number },
-): number {
-	let offset = 0;
-	for (let line = 0; line < p.line; line++) {
-		const nl = text.indexOf("\n", offset);
-		if (nl < 0) return text.length;
-		offset = nl + 1;
-	}
-	return offset + p.character;
-}
-
-function withBudget<T>(p: Promise<T>, ms: number): Promise<T | "late"> {
-	let timer: NodeJS.Timeout | undefined;
-	const late = new Promise<"late">(
-		(resolve) => (timer = setTimeout(() => resolve("late"), ms)),
-	);
-	return Promise.race([p, late]).finally(() => clearTimeout(timer));
 }

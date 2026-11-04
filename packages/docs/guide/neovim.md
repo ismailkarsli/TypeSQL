@@ -1,3 +1,7 @@
+---
+description: "Set up the TypeSQL language server in Neovim to complete table and column names inside SQL strings."
+---
+
 # Neovim
 
 `@typesql/language-server` completes table and column names inside your SQL strings in Neovim, like the [VS Code extension](./vscode).

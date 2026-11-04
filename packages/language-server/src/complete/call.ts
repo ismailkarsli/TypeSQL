@@ -64,13 +64,12 @@ export async function sqlCallAt(
 		return null;
 
 	const callee = call.expression;
-	const sqlType =
+	const sqlType = await checker.getTypeAtLocation(
 		callee.kind === kinds.PropertyAccessExpression &&
-		METHODS.has((callee as PropertyAccessExpression).name.text)
-			? await checker.getTypeAtLocation(
-					(callee as PropertyAccessExpression).expression,
-				)
-			: await checker.getTypeAtLocation(callee);
+			METHODS.has((callee as PropertyAccessExpression).name.text)
+			? (callee as PropertyAccessExpression).expression
+			: callee,
+	);
 	const target = await sqlTarget(checker, sqlType, isCorePath);
 	if (!target) return null;
 	return {
@@ -117,21 +116,23 @@ function callAt(
 	const visit = (n: Node): void => {
 		if (offset < n.pos || offset > n.end) return;
 		if (n.kind === kinds.CallExpression) {
-			const arg = (n as CallExpression).arguments[0];
-			if (
-				arg &&
-				(arg.kind === kinds.StringLiteral ||
-					arg.kind === kinds.NoSubstitutionTemplateLiteral ||
-					arg.kind === kinds.TemplateExpression)
-			) {
+			if (isSqlLiteral((n as CallExpression).arguments[0], kinds))
 				found = n as CallExpression;
-			}
 		}
 		n.forEachChild(visit);
 	};
 	visit(file);
 	return found;
 }
+
+export const isSqlLiteral = (
+	n: Node | undefined,
+	kinds: EditorKinds,
+): n is Node =>
+	n !== undefined &&
+	(n.kind === kinds.StringLiteral ||
+		n.kind === kinds.NoSubstitutionTemplateLiteral ||
+		n.kind === kinds.TemplateExpression);
 
 export function textOf(
 	file: SourceFile,

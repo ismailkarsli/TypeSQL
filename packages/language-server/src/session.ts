@@ -223,3 +223,11 @@ export class Session {
 		await connection?.api.close().catch(() => {});
 	}
 }
+
+export function withBudget<T>(p: Promise<T>, ms: number): Promise<T | "late"> {
+	let timer: NodeJS.Timeout | undefined;
+	const late = new Promise<"late">(
+		(resolve) => (timer = setTimeout(() => resolve("late"), ms)),
+	);
+	return Promise.race([p, late]).finally(() => clearTimeout(timer));
+}

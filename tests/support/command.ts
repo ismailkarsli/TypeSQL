@@ -8,6 +8,18 @@ export function withCommands<T>(signal: AbortSignal, run: () => Promise<T>) {
 	return cancellation.run(signal, run);
 }
 
+export async function unlessMissing<T>(
+	work: Promise<T>,
+): Promise<T | undefined> {
+	try {
+		return await work;
+	} catch (error) {
+		if (!(error instanceof Error && "code" in error && error.code === "ENOENT"))
+			throw error;
+		return undefined;
+	}
+}
+
 export interface Result {
 	command: string[];
 	status: number;

@@ -25,13 +25,13 @@ export function createTransactionalSql<T extends DialectTypes, DB, TM, C>(
 	return createWithPlugins<T, DB, TM, C>(dialect, client, driver, depth, []);
 }
 
+const ENDED =
+	"typesql: this transaction has ended; run later queries on the sql that started it";
+
 /** Rejects queries once the transaction that handed out `tx` has ended. */
 function whileOpen(executor: Executor, open: () => boolean): Executor {
 	const check = (): void => {
-		if (!open())
-			throw new Error(
-				"typesql: this transaction has ended; run later queries on the sql that started it",
-			);
+		if (!open()) throw new Error(ENDED);
 	};
 	const run = async (text: string, values: readonly unknown[]) => {
 		check();
@@ -82,10 +82,7 @@ function createWithPlugins<T extends DialectTypes, DB, TM, C>(
 				throw new Error(
 					"typesql: no client: pass one to createSql(client) to use sql.transaction()",
 				);
-			if (open && !open())
-				throw new Error(
-					"typesql: this transaction has ended; run later queries on the sql that started it",
-				);
+			if (open && !open()) throw new Error(ENDED);
 			let ended = false;
 			const txOpen = () => !ended && (open?.() ?? true);
 			return driver.transaction(client, depth, async (tx) => {

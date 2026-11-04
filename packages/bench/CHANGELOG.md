@@ -1,5 +1,61 @@
 # @typesql/bench
 
+## 0.0.43
+
+### Patch Changes
+
+- Updated dependencies:
+  - @typesql/core@6.0.2
+
+## 0.0.42
+
+### Patch Changes
+
+- Updated dependencies:
+  - @typesql/core@6.0.1
+
+## 0.0.41
+
+### Patch Changes
+
+- Updated dependencies:
+  - @typesql/core@6.0.0
+
+## 0.0.40
+
+### Patch Changes
+
+- Updated dependencies:
+  - @typesql/core@5.0.4
+
+## 0.0.39
+
+### Patch Changes
+
+- Updated dependencies:
+  - @typesql/core@5.0.3
+
+## 0.0.38
+
+### Patch Changes
+
+- Updated dependencies:
+  - @typesql/core@5.0.2
+
+## 0.0.37
+
+### Patch Changes
+
+- Updated dependencies:
+  - @typesql/core@5.0.1
+
+## 0.0.36
+
+### Patch Changes
+
+- Updated dependencies:
+  - @typesql/core@5.0.0
+
 ## 0.0.35
 
 ### Patch Changes

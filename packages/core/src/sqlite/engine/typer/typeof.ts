@@ -8,7 +8,15 @@ import type {
 	ResolveColumn,
 } from "../binder/scope.js";
 import type { ProjectSelect } from "../project/select.js";
-import type { Affinity, Cell, NumClass, SqCtx, SqItem } from "../types.js";
+import type {
+	Affinity,
+	Cell,
+	GE,
+	MkCtx,
+	NumClass,
+	SqCtx,
+	SqItem,
+} from "../types.js";
 import type { DeclaredFn, Fn, Functions, PickSig, SigFn } from "./functions.js";
 import type { JsonGet, JsonPath, JsonShapeOf, JsonStep } from "./json.js";
 
@@ -61,17 +69,13 @@ type TypeComplex<E extends Expr, C extends SqCtx> = E extends {
 	: E extends { readonly t: "un" }
 		? TypeUn<E["op"], E["e"], C>
 		: E extends { readonly t: "cast" }
-			? TypeOf<E["e"], C> extends infer X
-				? X extends ColInfo
-					? Info<CastType<Lowercase<E["to"]>, X["type"]>, X["nullable"]>
-					: X
-				: never
+			? TypeOf<E["e"], C> extends infer X extends ColInfo
+				? Info<CastType<Lowercase<E["to"]>, X["type"]>, X["nullable"]>
+				: TypeOf<E["e"], C>
 			: E extends { readonly t: "collate" }
-				? TypeOf<E["e"], C> extends infer X
-					? X extends ColInfo
-						? Info<X["type"], X["nullable"]>
-						: X
-					: never
+				? TypeOf<E["e"], C> extends infer X extends ColInfo
+					? Info<X["type"], X["nullable"]>
+					: TypeOf<E["e"], C>
 				: E extends { readonly t: "call" }
 					? TypeCall<Extract<E, Call>, C>
 					: E extends { readonly t: "case" }
@@ -91,18 +95,12 @@ type TypeComplex<E extends Expr, C extends SqCtx> = E extends {
 												: E extends { readonly t: "intable" }
 													? TypeInTable<E, C>
 													: E extends { readonly t: "sub" }
-														? SubqueryCol<E["q"], C> extends infer X
-															? X extends ColInfo
-																? Info<X["type"], true>
-																: X
-															: never
+														? SubqueryCol<E["q"], C> extends infer X extends
+																ColInfo
+															? Info<X["type"], true>
+															: SubqueryCol<E["q"], C>
 														: E extends { readonly t: "exists" }
-															? ProjectSelect<
-																	E["q"],
-																	C["db"],
-																	C["scope"],
-																	C["ctes"]
-																> extends infer X
+															? ProjectSelect<E["q"], C> extends infer X
 																? X extends AnyErr
 																	? X
 																	: Info<"integer">
@@ -127,11 +125,9 @@ export type TypeList<
 	infer H extends Expr,
 	...infer R extends readonly Expr[],
 ]
-	? TypeOf<H, C> extends infer X
-		? X extends ColInfo
-			? TypeList<R, C, [...Acc, X]>
-			: X
-		: never
+	? TypeOf<H, C> extends infer X extends ColInfo
+		? TypeList<R, C, [...Acc, X]>
+		: TypeOf<H, C>
 	: Acc;
 
 type AnyNull<L extends readonly ColInfo[]> = true extends L[number]["nullable"]
@@ -146,11 +142,9 @@ type Pred<
 	C extends SqCtx,
 	Propagate extends boolean,
 > =
-	TypeList<L, C> extends infer X
-		? X extends readonly ColInfo[]
-			? Info<"integer", Propagate extends true ? AnyNull<X> : false>
-			: X
-		: never;
+	TypeList<L, C> extends infer X extends readonly ColInfo[]
+		? Info<"integer", Propagate extends true ? AnyNull<X> : false>
+		: TypeList<L, C>;
 
 type TypeLike<E extends Expr, C extends SqCtx> = E["kind"] extends "regexp"
 	? DeclaredFn<C["db"], "regexp"> extends null
@@ -163,16 +157,11 @@ type TypeLike<E extends Expr, C extends SqCtx> = E["kind"] extends "regexp"
 		>;
 
 export type SubqueryCol<Q extends SelectStmt, C extends SqCtx> =
-	ProjectSelect<Q, C["db"], C["scope"], C["ctes"]> extends infer X
-		? X extends readonly Cell[]
-			? X extends readonly [infer One extends Cell]
-				? One["t"]
-				: SqlError<
-						`sub-select returns ${X["length"]} columns - expected 1`,
-						null
-					>
-			: X
-		: never;
+	ProjectSelect<Q, C> extends infer X extends readonly Cell[]
+		? X extends readonly [infer One extends Cell]
+			? One["t"]
+			: SqlError<`sub-select returns ${X["length"]} columns - expected 1`, null>
+		: ProjectSelect<Q, C>;
 
 type TypeInSub<
 	L extends Expr,
@@ -182,65 +171,40 @@ type TypeInSub<
 	readonly t: "row";
 	readonly items: infer Items extends readonly Expr[];
 }
-	? ProjectSelect<Q, C["db"], C["scope"], C["ctes"]> extends infer X
-		? X extends readonly Cell[]
-			? X["length"] extends Items["length"]
-				? TypeList<Items, C> extends infer Y
-					? Y extends readonly ColInfo[]
-						? Info<"integer", true>
-						: Y
-					: never
-				: SqlError<
-						`sub-select returns ${X["length"]} columns - expected ${Items["length"]}`,
-						null
-					>
-			: X
-		: never
-	: TypeOf<L, C> extends infer X
-		? X extends ColInfo
-			? SubqueryCol<Q, C> extends infer S
-				? S extends ColInfo
-					? Info<"integer", X["nullable"] extends true ? true : S["nullable"]>
-					: S
-				: never
-			: X
-		: never;
+	? RowVsSub<Items, Q, C>
+	: TypeOf<L, C> extends infer X extends ColInfo
+		? SubqueryCol<Q, C> extends infer S extends ColInfo
+			? Info<"integer", X["nullable"] extends true ? true : S["nullable"]>
+			: SubqueryCol<Q, C>
+		: TypeOf<L, C>;
 
 type InWidth<N extends number> = N extends 1
 	? Info<"integer", true>
 	: SqlError<`sub-select returns ${N} columns - expected 1`, null>;
 
 type TypeInTable<E extends Expr, C extends SqCtx> =
-	TypeOf<E["e"], C> extends infer X
-		? X extends ColInfo
-			? E["args"] extends readonly Expr[]
-				? E["table"] extends "json_each" | "json_tree"
-					? InWidth<8>
-					: SqlError<`no such table: ${E["table"]}`, null>
-				: E["table"] extends keyof C["ctes"]
-					? InWidth<C["ctes"][E["table"]]["order"]["length"]>
-					: LookupRelation<
-								C["db"],
-								{ schema: E["schema"]; name: E["table"] }
-							> extends [infer Rel, string]
-						? RelationItem<Rel, "x"> extends infer It extends SqItem
-							? InWidth<It["order"]["length"]>
-							: SqlError<`no such table: ${E["table"]}`, null>
+	TypeOf<E["e"], C> extends ColInfo
+		? E["args"] extends readonly Expr[]
+			? E["table"] extends "json_each" | "json_tree"
+				? InWidth<8>
+				: SqlError<`no such table: ${E["table"]}`, null>
+			: E["table"] extends keyof C["ctes"]
+				? InWidth<C["ctes"][E["table"]]["order"]["length"]>
+				: LookupRelation<
+							C["db"],
+							{ schema: E["schema"]; name: E["table"] }
+						> extends [infer Rel, string]
+					? RelationItem<Rel, "x"> extends infer It extends SqItem
+						? InWidth<It["order"]["length"]>
 						: SqlError<`no such table: ${E["table"]}`, null>
-			: X
-		: never;
+					: SqlError<`no such table: ${E["table"]}`, null>
+		: TypeOf<E["e"], C>;
 
 type CastType<To extends string, From extends string> = From extends "null"
 	? "null"
-	: To extends `${string}int${string}`
-		? "integer"
-		: To extends `${string}${"char" | "clob" | "text"}${string}`
-			? "text"
-			: To extends `${string}blob${string}`
-				? "blob"
-				: To extends `${string}${"real" | "floa" | "doub"}${string}`
-					? "real"
-					: "numeric";
+	: Affinity<To> extends "null" | "unknown" | "any"
+		? "numeric"
+		: Affinity<To>;
 
 type Arith<A extends string, B extends string> = A extends "null"
 	? "null"
@@ -304,26 +268,22 @@ type TypeBin<Op, L extends Expr, R extends Expr, C extends SqCtx> = Op extends
 		: R extends { readonly t: "row" }
 			? SqlError<"row value misused", null>
 			: Pred<[L, R], C, true>
-	: TypeOf<L, C> extends infer A
-		? A extends ColInfo
-			? TypeOf<R, C> extends infer B
-				? B extends ColInfo
-					? Op extends "->" | "->>"
-						? JsonOp<Op, A, R>
-						: Info<
-								BinType<Op, A["type"], B["type"]>,
-								Op extends "->" | "->>"
-									? true
-									: Op extends "/" | "%"
-										? (Op extends "%" ? ModNonZero<R> : NonZero<R>) extends true
-											? Or<A["nullable"], B["nullable"]>
-											: true
-										: Or<A["nullable"], B["nullable"]>
-							>
-					: B
-				: never
-			: A
-		: never;
+	: TypeOf<L, C> extends infer A extends ColInfo
+		? TypeOf<R, C> extends infer B extends ColInfo
+			? Op extends "->" | "->>"
+				? JsonOp<Op, A, R>
+				: Info<
+						BinType<Op, A["type"], B["type"]>,
+						Op extends "->" | "->>"
+							? true
+							: Op extends "/" | "%"
+								? (Op extends "%" ? ModNonZero<R> : NonZero<R>) extends true
+									? Or<A["nullable"], B["nullable"]>
+									: true
+								: Or<A["nullable"], B["nullable"]>
+					>
+			: TypeOf<R, C>
+		: TypeOf<L, C>;
 
 type Or<A, B> = A extends true ? true : B extends true ? true : false;
 
@@ -363,35 +323,35 @@ type RowCompare<L extends Expr, R extends Expr, C extends SqCtx> = R extends {
 		? Pred<[...L["items"], ...R["items"]], C, true>
 		: SqlError<"row value misused", null>
 	: R extends { readonly t: "sub" }
-		? ProjectSelect<R["q"], C["db"], C["scope"], C["ctes"]> extends infer X
-			? X extends readonly Cell[]
-				? X["length"] extends L["items"]["length"]
-					? TypeList<L["items"], C> extends infer Y
-						? Y extends readonly ColInfo[]
-							? Info<"integer", true>
-							: Y
-						: never
-					: SqlError<
-							`sub-select returns ${X["length"]} columns - expected ${L["items"]["length"]}`,
-							null
-						>
-				: X
-			: never
+		? RowVsSub<L["items"], R["q"], C>
 		: SqlError<"row value misused", null>;
+type RowVsSub<
+	Items extends readonly Expr[],
+	Q extends SelectStmt,
+	C extends SqCtx,
+> =
+	ProjectSelect<Q, C> extends infer X extends readonly Cell[]
+		? X["length"] extends Items["length"]
+			? TypeList<Items, C> extends readonly ColInfo[]
+				? Info<"integer", true>
+				: TypeList<Items, C>
+			: SqlError<
+					`sub-select returns ${X["length"]} columns - expected ${Items["length"]}`,
+					null
+				>
+		: ProjectSelect<Q, C>;
 
 type TypeUn<Op, X extends Expr, C extends SqCtx> =
-	TypeOf<X, C> extends infer A
-		? A extends ColInfo
-			? Op extends "+"
-				? Info<A["type"], A["nullable"]>
-				: Op extends "-"
-					? Info<
-							A["type"] extends "null" ? "null" : Negate<NumClass<A["type"]>>,
-							A["nullable"]
-						>
-					: Info<A["type"] extends "null" ? "null" : "integer", A["nullable"]>
-			: A
-		: never;
+	TypeOf<X, C> extends infer A extends ColInfo
+		? Op extends "+"
+			? Info<A["type"], A["nullable"]>
+			: Op extends "-"
+				? Info<
+						A["type"] extends "null" ? "null" : Negate<NumClass<A["type"]>>,
+						A["nullable"]
+					>
+				: Info<A["type"] extends "null" ? "null" : "integer", A["nullable"]>
+		: TypeOf<X, C>;
 type Negate<K> = [K] extends ["integer"]
 	? "integer"
 	: [K] extends ["real"]
@@ -403,23 +363,23 @@ type TypeCase<
 	Whens extends readonly unknown[],
 	Else,
 	C extends SqCtx,
-> = (Operand extends Expr ? TypeOf<Operand, C> : Info<"null">) extends infer O
-	? O extends AnyErr
-		? O
-		: CaseLoop<Whens, C, [], 0> extends infer Vs
-			? Vs extends readonly ColInfo[]
-				? (
-						Else extends Expr
-							? TypeOf<Else, C>
-							: Info<"null", true>
-					) extends infer El
-					? El extends ColInfo
-						? Info<Common<[...Vs, El]>, AnyNull<[...Vs, El]>>
-						: El
-					: never
-				: Vs
+> = (
+	Operand extends Expr
+		? TypeOf<Operand, C>
+		: Info<"null">
+) extends infer O extends AnyErr
+	? O
+	: CaseLoop<Whens, C, [], 0> extends infer Vs extends readonly ColInfo[]
+		? (
+				Else extends Expr
+					? TypeOf<Else, C>
+					: Info<"null", true>
+			) extends infer El
+			? El extends ColInfo
+				? Info<Common<[...Vs, El]>, AnyNull<[...Vs, El]>>
+				: El
 			: never
-	: never;
+		: CaseLoop<Whens, C, [], 0>;
 type CaseLoop<
 	Whens extends readonly unknown[],
 	C extends SqCtx,
@@ -429,15 +389,11 @@ type CaseLoop<
 	readonly when: infer W extends Expr;
 	readonly then: infer V extends Expr;
 }
-	? TypeOf<W, C> extends infer X
-		? X extends AnyErr
-			? X
-			: TypeOf<V, C> extends infer Y
-				? Y extends ColInfo
-					? CaseLoop<Whens, C, [...Acc, Y], Nx<I>>
-					: Y
-				: never
-		: never
+	? TypeOf<W, C> extends AnyErr
+		? TypeOf<W, C>
+		: TypeOf<V, C> extends infer Y extends ColInfo
+			? CaseLoop<Whens, C, [...Acc, Y], Nx<I>>
+			: TypeOf<V, C>
 	: Acc;
 
 export type Common<L extends readonly ColInfo[]> =
@@ -449,29 +405,17 @@ export type Common<L extends readonly ColInfo[]> =
 			: U
 		: never;
 
-type AggOf<E extends Call> = E["over"] extends null
-	? E["name"] extends "min" | "max"
-		? E["args"]["length"] extends 1
-			? {
-					readonly min: 1;
-					readonly max: 1;
-					readonly ret: "arg0";
-					readonly null: "agg";
-					readonly kind: "agg";
-				}
-			: Functions[E["name"]]
-		: Functions[E["name"] & keyof Functions]
-	: E["name"] extends "min" | "max"
-		? E["args"]["length"] extends 1
-			? {
-					readonly min: 1;
-					readonly max: 1;
-					readonly ret: "arg0";
-					readonly null: "agg";
-					readonly kind: "agg";
-				}
-			: Functions[E["name"]]
-		: Functions[E["name"] & keyof Functions];
+type AggOf<E extends Call> = E["name"] extends "min" | "max"
+	? E["args"]["length"] extends 1
+		? {
+				readonly min: 1;
+				readonly max: 1;
+				readonly ret: "arg0";
+				readonly null: "agg";
+				readonly kind: "agg";
+			}
+		: Functions[E["name"]]
+	: Functions[E["name"] & keyof Functions];
 
 type FnOf<E extends Call, C extends SqCtx> =
 	DeclaredFn<C["db"], E["name"]> extends infer D
@@ -486,51 +430,39 @@ type TypeCall<E extends Call, C extends SqCtx> =
 	FnOf<E, C> extends infer F
 		? F extends Fn
 			? (
-					F["kind"] extends "agg"
-						? E["over"] extends null
-							? C["inAgg"] extends true
-								? `misuse of aggregate function ${E["disp"]}()`
-								: C["agg"] extends "none"
-									? `misuse of aggregate function ${E["disp"]}()`
-									: CallShape<E, F>
-							: CallShape<E, F>
+					[F["kind"], E["over"]] extends ["agg", null]
+						? [C["inAgg"], C["agg"]] extends [false, "group" | "whole"]
+							? CallShape<E, F>
+							: `misuse of aggregate function ${E["disp"]}()`
 						: CallShape<E, F>
 				) extends infer M extends string
 				? SqlError<M, null>
 				: (
-							F["kind"] extends "agg"
-								? E["over"] extends null
-									? AggCtx<C>
-									: C
+							[F["kind"], E["over"]] extends ["agg", null]
+								? AggCtx<C>
 								: C
 						) extends infer AC extends SqCtx
-					? TypeList<E["args"], AC> extends infer Args
-						? Args extends readonly ColInfo[]
-							? CheckExtras<E, AC> extends infer X
-								? X extends AnyErr
-									? X
-									: E["name"] extends "json_extract"
-										? E["args"]["length"] extends 2
-											? JsonOp<"->>", Args[0], E["args"][1]>
-											: Info<RetType<F["ret"], Args>, NullOf<F, E, Args, C>>
-										: Info<RetType<F["ret"], Args>, NullOf<F, E, Args, C>>
-								: never
-							: Args
-						: never
+					? TypeList<E["args"], AC> extends infer Args extends
+							readonly ColInfo[]
+						? CheckExtras<E, AC> extends AnyErr
+							? CheckExtras<E, AC>
+							: E["name"] extends "json_extract"
+								? E["args"]["length"] extends 2
+									? JsonOp<"->>", Args[0], E["args"][1]>
+									: Info<RetType<F["ret"], Args>, NullOf<F, E, Args, C>>
+								: Info<RetType<F["ret"], Args>, NullOf<F, E, Args, C>>
+						: TypeList<E["args"], AC>
 					: never
 			: SqlError<`no such function: ${E["disp"]}`, null>
 		: never;
 
-type AggCtx<C extends SqCtx> = {
-	readonly db: C["db"];
-	readonly scope: C extends { readonly aggScope: infer S extends Scope }
+type AggCtx<C extends SqCtx> = (
+	C extends { readonly aggScope: infer S extends Scope }
 		? S
-		: C["scope"];
-	readonly ctes: C["ctes"];
-	readonly agg: "none";
-	readonly inAgg: true;
-	readonly aliases: C["aliases"];
-};
+		: C["scope"]
+) extends infer S extends Scope
+	? MkCtx<C["db"], S, C["ctes"], "none", C["aliases"], S, true>
+	: never;
 
 type CallShape<E extends Call, F extends Fn> = E["star"] extends true
 	? E["name"] extends "count"
@@ -565,30 +497,21 @@ type AggPlacement<E extends Call> = E["distinct"] extends true
 
 type ArityOk<N extends number, Min extends number, Max extends number> =
 	GE<N, Min> extends true ? (Max extends 1000 ? true : GE<Max, N>) : false;
-type GE<A extends number, B extends number> =
-	Tup<A> extends [...Tup<B>, ...unknown[]] ? true : false;
-type Tup<N extends number, A extends unknown[] = []> = A["length"] extends N
-	? A
-	: Tup<N, [...A, 0]>;
 
 type CheckExtras<E extends Call, C extends SqCtx> = (
 	E["filter"] extends Expr
 		? TypeOf<E["filter"], C>
 		: true
-) extends infer X
-	? X extends AnyErr
-		? X
-		: TypeList<E["order"], C> extends infer Y
-			? Y extends AnyErr
-				? Y
-				: E["over"] extends {
-							readonly partition: infer P extends readonly Expr[];
-							readonly order: infer O extends readonly Expr[];
-						}
-					? TypeList<[...P, ...O], C>
-					: true
-			: never
-	: never;
+) extends infer X extends AnyErr
+	? X
+	: TypeList<E["order"], C> extends AnyErr
+		? TypeList<E["order"], C>
+		: E["over"] extends {
+					readonly partition: infer P extends readonly Expr[];
+					readonly order: infer O extends readonly Expr[];
+				}
+			? TypeList<[...P, ...O], C>
+			: true;
 
 type RetType<R extends string, A extends readonly ColInfo[]> = R extends "arg0"
 	? A[0]["type"]
@@ -704,4 +627,4 @@ type NullOf<
 												: A[0]["nullable"];
 
 export type CheckBool<E extends Expr, C extends SqCtx> =
-	TypeOf<E, C> extends infer X ? (X extends AnyErr ? X : true) : never;
+	TypeOf<E, C> extends infer X extends AnyErr ? X : true;

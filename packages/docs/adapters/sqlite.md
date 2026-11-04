@@ -1,3 +1,7 @@
+---
+description: "Run TypeSQL queries on node:sqlite, better-sqlite3 or bun:sqlite with @typesql/sqlite, and generate the schema from a database file."
+---
+
 # SQLite
 
 `@typesql/sqlite` runs your queries on node:sqlite (`DatabaseSync`), better-sqlite3 or bun:sqlite. They share one synchronous interface, so the adapter has no dependencies.
@@ -7,8 +11,6 @@ pnpm add @typesql/core @typesql/sqlite
 ```
 
 Add `better-sqlite3` if you use it; node:sqlite and bun:sqlite are built in.
-
-[Open an example in the TypeScript Playground](https://www.typescriptlang.org/play/?moduleResolution=100#code/JYWwDg9gTgLgBAbzgEQIY1QI1QZwKYDKAngHYDGcAvnAGZQQhwBEJEAJngFw4COANsBh4mAbgBQoSLDgwiYPIjgBhCHyq16jJgAFZ83nwD0ZaHkMHBw8ZOjwkZKHnSF+6ug2a65eA+f6XRMQkSISgaVDIFZAAhRDEASABXfCgcTjj4+OA2dJU+AB4mYBC8AHM8KCYAGkUAC1xkPHDEvhh0mChEhUoAPnFMvBBUYD5c1UKhAA8YJj6E+LZgHDA+VCIAfRJUEC5lcaYpmZqkEhbVzD5djq6qOcyHJyE2dfQxgqY2ZxhQYWO4epwjWarXanW6d0o-UgOBgaQyWRye3exSE5UqfwBQNQLTaMjBt368WxMFq0HW2TehRRZQqs0J3xgl0pBzw0zp80w7CIzMO1UUpz45yZeJuvX6kLElCCJhIMLgBjgAF44A9nAR+PkYj0ABQkPAAdxQ6CwuEIpDI2qYqDAYAAdGxMEwAJRO8RiGVy6GwpVwVD64bwAzahIAAwIAFEADLhpQAFTgduyNTtDMuNUS9qWKzWm22eAScAAYgAlADyAFkExAYTgE3AAFKlgCSADk4MkKrXEnBS22M9kfXbiaSoOS2AWAOoACXDxfD7dtg2GamVnCXIxDVQSSHXo2YqE+2lZ2xWeFtJhATCoW6di8meDIiSE2td0ogsvgAG0vQBdH1+gN5X4YN4hDVsI2LeNW1jUsqxrOBtWHMkkxkQRLidOAADUAEFIwAVXDAgEIAEgARhqYiACYMLnWM8OLFtWwAcTgFDUzwTcEnIhImCnPBBQgaoxFvVkHyfPAXzdADBCAvhbQ6VBZQib530QnBzQQmBJgwxUegyaT4C0kDQLwgAFZBsNjecvVrCN43Yn1EhtCptXYjDp1neckNHAdlTIzjMm4+IRPvR9n1feIPXgEh-39GSjJDZAo3DKyizLSsbLgDy5zgTk2CIOAmyIls8MjSMQxCsShBURIQkkyVXzEIMw2SuNUMZBQSwrODvWy+dfLgAB+CrxCAA) <span data-playground="sqlite"></span> to hover the types and edit the SQL, with nothing to install.
 
 ## Create `sql`
 
@@ -88,11 +90,11 @@ export interface DB {
 | `--type-name <name>` | name of the interface; default `DB` |
 | `--import-from <module>` | where `Col` and `View` are imported from; default `@typesql/core/sqlite` |
 
-The command opens the file with node:sqlite, so it needs Node.js 22.13 or later. SQLite doesn't record whether a view's column can be `NULL`, so view columns are nullable; FTS shadow tables and `sqlite_*` tables are left out. From code, `@typesql/sqlite/introspect` exports `introspect(db, { exclude })`, which takes a node:sqlite, better-sqlite3 or bun:sqlite database, and `generateSource(result, { typeName, importFrom })`.
+The command requires Node.js 26 or newer and opens the file with node:sqlite. SQLite doesn't record whether a view's column can be `NULL`, so view columns are nullable; FTS shadow tables and `sqlite_*` tables are left out. From code, `@typesql/sqlite/introspect` exports `introspect(db, { exclude })`, which takes a node:sqlite, better-sqlite3 or bun:sqlite database, and `generateSource(result, { typeName, importFrom })`.
 
 ## Migrations
 
-On Node, give the [migrator](../guide/migrations#the-migrator) the database file as `db`; it opens the file with node:sqlite and runs every statement of a `;`-separated `.add()`. To run it on a database you opened, pass `executor(database)` as `execute`. A prepared statement holds one statement, so the migrator sends each statement of an `.add()` as a call of its own:
+On Node, give the [migrator](../guide/migrations#the-migrator) the database file as `db`; it opens the file with node:sqlite and runs every statement of a `;`-separated `.ddl()`. To run it on a database you opened, pass `executor(database)` as `execute`. A prepared statement holds one statement, so the migrator sends each statement of an `.ddl()` as a call of its own:
 
 ```ts
 import { Database } from "bun:sqlite";

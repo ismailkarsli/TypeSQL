@@ -1,3 +1,8 @@
+import {
+	colSource,
+	propertyKey as key,
+	schemaMembers,
+} from "@typesql/core/adapter";
 import type { DmmfDatamodel, DmmfEnum, DmmfField, DmmfModel } from "./dmmf.js";
 
 export interface EmitOptions {
@@ -134,9 +139,6 @@ function hasDbDefault(field: DmmfField): boolean {
 	return true;
 }
 
-const IDENT = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
-const key = (name: string): string =>
-	IDENT.test(name) ? name : JSON.stringify(name);
 const str = (s: string): string => JSON.stringify(s);
 const docText = (s: string): string => s.replace(/\*\//g, "*\\/");
 
@@ -144,20 +146,6 @@ function doc(lines: readonly string[], indent: string): string {
 	if (lines.length === 0) return "";
 	if (lines.length === 1) return `${indent}/** ${docText(lines[0]!)} */\n`;
 	return `${indent}/**\n${lines.map((l) => `${indent} * ${docText(l)}`).join("\n")}\n${indent} */\n`;
-}
-
-function column(type: string, nullable: boolean, hasDefault: boolean): string {
-	const flags = [
-		...(nullable ? ["nullable: true"] : []),
-		...(hasDefault ? ["hasDefault: true"] : []),
-	];
-	return flags.length > 0
-		? `Col<${type}, { ${flags.join("; ")} }>`
-		: `Col<${type}>`;
-}
-
-function enumKeys(enums: readonly DmmfEnum[]): Map<string, string> {
-	return new Map(enums.map((e) => [e.name, e.dbName ?? e.name]));
 }
 
 function sqliteTypeOf(field: DmmfField, enums: readonly DmmfEnum[]): string {
@@ -175,21 +163,15 @@ export function generateSource(
 ): string {
 	const typeName = options.typeName ?? "DB";
 	const views = new Set(options.views);
-	const enums = enumKeys(datamodel.enums);
+	const enums = new Map(
+		datamodel.enums.map((e) => [e.name, e.dbName ?? e.name]),
+	);
 	const used = new Set<string>();
 	const sqlite = options.dialect === "sqlite";
 
 	const table = (model: DmmfModel, indent: string): string => {
 		const isView = views.has(model.name);
 		const cols: string[] = [];
-		const unsupported = (field: SchemaField): void => {
-			const u = field.unsupported;
-			if (!u || sqlite) return;
-			used.add("Col");
-			cols.push(
-				`${doc(u.dbName ? [`Prisma field \`${field.name}\`: Unsupported.`] : ["Prisma `Unsupported` field."], indent + "  ")}${indent}  ${key(u.dbName ?? field.name)}: ${column(str(u.type), u.nullable, !isView && u.hasDefault)};`,
-			);
-		};
 		const written = options.fields?.get(model.name) ?? [];
 		const byName = new Map(model.fields.map((f) => [f.name, f]));
 		const ordered: (DmmfField | SchemaField)[] = [
@@ -199,12 +181,17 @@ export function generateSource(
 			}),
 			...model.fields.filter((f) => !written.some((w) => w.name === f.name)),
 		];
-		for (const item of ordered) {
-			if (!("kind" in item)) {
-				unsupported(item);
+		for (const f of ordered) {
+			if (!("kind" in f)) {
+				const u = f.unsupported;
+				if (u && !sqlite) {
+					used.add("Col");
+					cols.push(
+						`${doc(u.dbName ? [`Prisma field \`${f.name}\`: Unsupported.`] : ["Prisma `Unsupported` field."], `${indent}  `)}${indent}  ${key(u.dbName ?? f.name)}: ${colSource(str(u.type), u.nullable, !isView && u.hasDefault)};`,
+					);
+				}
 				continue;
 			}
-			const f = item;
 			if (f.kind !== "scalar" && f.kind !== "enum") continue;
 			const nullable = f.isList || !f.isRequired;
 			used.add("Col");
@@ -222,7 +209,7 @@ export function generateSource(
 				...(f.documentation ? f.documentation.split("\n") : []),
 			];
 			cols.push(
-				`${doc(notes, indent + "  ")}${indent}  ${key(f.dbName ?? f.name)}: ${column(type, nullable, !isView && hasDbDefault(f))};`,
+				`${doc(notes, `${indent}  `)}${indent}  ${key(f.dbName ?? f.name)}: ${colSource(type, nullable, !isView && hasDbDefault(f))};`,
 			);
 		}
 		const body = `{\n${cols.join("\n")}\n${indent}}`;
@@ -231,34 +218,20 @@ export function generateSource(
 		return `View<${body}>`;
 	};
 
-	const modelDoc = (m: DmmfModel, indent: string): string =>
-		doc(
-			[
-				...((m.dbName ?? m.name) !== m.name
-					? [`Prisma ${views.has(m.name) ? "view" : "model"} \`${m.name}\`.`]
-					: []),
-				...(m.documentation ? m.documentation.split("\n") : []),
-			],
-			indent,
-		);
-
-	const lines: string[] = [];
-	const namespaces = new Map<string, DmmfModel[]>();
-	for (const m of datamodel.models) {
-		const schema = sqlite ? "public" : (m.schema ?? "public");
-		if (schema === "public")
-			lines.push(
-				`${modelDoc(m, "  ")}  ${key(m.dbName ?? m.name)}: ${table(m, "  ")};`,
-			);
-		else namespaces.set(schema, [...(namespaces.get(schema) ?? []), m]);
-	}
-	for (const [schema, models] of namespaces) {
-		const tables = models.map(
-			(m) =>
-				`${modelDoc(m, "    ")}    ${key(m.dbName ?? m.name)}: ${table(m, "    ")};`,
-		);
-		lines.push(`  ${key(schema)}: {\n${tables.join("\n")}\n  };`);
-	}
+	const lines = schemaMembers(
+		datamodel.models,
+		(m) => (sqlite ? "public" : (m.schema ?? "public")),
+		(m, indent) =>
+			`${doc(
+				[
+					...((m.dbName ?? m.name) !== m.name
+						? [`Prisma ${views.has(m.name) ? "view" : "model"} \`${m.name}\`.`]
+						: []),
+					...(m.documentation ? m.documentation.split("\n") : []),
+				],
+				indent,
+			)}${indent}${key(m.dbName ?? m.name)}: ${table(m, indent)};`,
+	);
 	if (!sqlite && datamodel.enums.length > 0) {
 		const entries = datamodel.enums.map((e) => {
 			const values = e.values.map((v) => str(v.dbName ?? v.name)).join(" | ");

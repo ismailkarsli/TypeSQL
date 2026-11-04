@@ -71,10 +71,7 @@ export function createDialectSql<T extends DialectTypes, DB, TM = T["typeMap"]>(
 				);
 			};
 		},
-		as: (query: string, ...rest: readonly unknown[]) => {
-			const { text, values } = buildInput(query, rest);
-			return makeQuery(text, values, executor, pipeline);
-		},
+		as: call,
 		param:
 			plugins.length === 0
 				? param

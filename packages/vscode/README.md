@@ -8,13 +8,13 @@ sql("SELECT u.| FROM users u");
 ```
 
 - **Completions** for tables, views and schemas after `FROM`, `JOIN`, `INTO` and `UPDATE`, and for columns with their SQL types after `alias.` and in expressions. They come from your `DB` type and follow it as you edit, unsaved changes included.
-- **Syntax highlighting** for keywords, types, functions, strings, `$1` parameters and more, in `sql()` and `tx()` strings, in migrations' `db.add()` and `db.raw()` statements, and in any string after a `/* sql */` comment. The SQL is in shades of orange in dark and light themes, so it stands out from the TypeScript. With the TypeScript 7 extension, types then decide: TypeSQL's functions are highlighted under any name, in the same colors, and other functions' strings stay plain.
+- **Syntax highlighting** for keywords, types, functions, strings, `$1` parameters and more, in `sql()` and `tx()` strings, in migrations' `db.ddl()` and `db.raw()` statements, and in any string after a `/* sql */` comment. The SQL is in shades of coral in dark and light themes, so it stands out from the TypeScript. With the TypeScript 7 extension, types then decide: TypeSQL's functions are highlighted under any name, in the same colors, and other functions' strings stay plain.
 
 Errors, hovers and row types come from TypeScript, with or without this extension.
 
 ## Requirements
 
-Highlighting by name works on its own. Completions and highlighting by type need:
+Requires VS Code 1.144 or newer. Highlighting by name works on its own. Completions and highlighting by type need:
 
 - The [TypeScript 7 extension](https://marketplace.visualstudio.com/items?itemName=TypeScriptTeam.native-preview), running TypeScript 7.1 or later. Its version 1.0 bundles TypeScript 7.0, so [point it at TypeScript 7.1](https://typesql.karsli.net/guide/vscode#use-typescript-7-1) or install the **TypeScript 7 Nightly** extension.
 - `@typesql/core` 0.4.0 or later in the project, directly or through an adapter.

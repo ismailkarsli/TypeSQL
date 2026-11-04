@@ -1,7 +1,7 @@
 import type { Executor } from "@typesql/core";
 import {
-	runTransaction,
 	type SqlDriver,
+	serialTransaction,
 	splitParams,
 } from "@typesql/core/adapter";
 import { Param, SQL, type SQLChunk, StringChunk } from "drizzle-orm";
@@ -83,31 +83,20 @@ export function sqliteExecutor(db: DrizzleSqliteDatabase): Executor {
 	);
 }
 
-const queues = new WeakMap<object, Promise<unknown>>();
-
 function transaction<T>(
 	db: DrizzleSqliteDatabase,
 	depth: number,
 	fn: (tx: DrizzleSqliteDatabase) => Promise<T>,
 ): Promise<T> {
 	if (isAsync(db)) return runner(db).transaction(fn);
-	const run = async (sql: string): Promise<void> => {
-		await runner(db).run(new SQL([new StringChunk(sql)]));
-	};
-	if (depth > 0)
-		return runTransaction(run, () => fn(db), {
-			savepoint: `typesql_${depth}`,
-		});
-	const previous = queues.get(db) ?? Promise.resolve();
-	const current = previous.then(
-		() => runTransaction(run, () => fn(db)),
-		() => runTransaction(run, () => fn(db)),
-	);
-	queues.set(
+	return serialTransaction(
 		db,
-		current.catch(() => undefined),
+		depth,
+		async (sql) => {
+			await runner(db).run(new SQL([new StringChunk(sql)]));
+		},
+		() => fn(db),
 	);
-	return current;
 }
 
 export const sqliteDriver: SqlDriver<DrizzleSqliteDatabase> = {

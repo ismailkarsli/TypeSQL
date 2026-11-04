@@ -1,3 +1,7 @@
+---
+description: "Run TypeSQL queries on node-postgres (pg) with @typesql/pg: create sql, run queries and transactions, type parsing and migrations."
+---
+
 # node-postgres
 
 `@typesql/pg` runs your queries on node-postgres (`pg` 8.x).
@@ -5,8 +9,6 @@
 ```sh
 pnpm add @typesql/core @typesql/pg pg
 ```
-
-[Open an example in the TypeScript Playground](https://www.typescriptlang.org/play/?moduleResolution=100#code/JYWwDg9gTgLgBDAnmApnA3nAwhANnAXzgDMoIQ4AiAASVQGcBHXAegGNoUXJ6YBzKCnqUA3AChQkWBjhtBAQxgoAys0IkyFGnSHNufURPDR4mAAoQ860uSpgD4iQDslUYvLZoAIgCEMYgEgAV3oUKHoALn8AgOAAEyicXAAeSmAXABZKABoZAAt5ei8UdyDcGCiYKCC0AgA+cRiUEHlgXES8VKUADxhKBsCAuOB6MFx5RAB9J3kQFA6Uyh6+3MwnMvGAI1x5hGragZjN+XGnTwXU9bmoYDZ+xoC5FEUUOMnFC6XQIRhZsBgAF45fKFYqlcqVfaEQ4ERo8GCRaKxBLYTppFwADmBmAKRRK8jKFT2NWhDwJMDy0Em8U+6RgWUOARgwBgO0+y3ugzAQW2Izyr3eRKSXW+vD+gOxcHWuC2bOJB0asLEBDEYg4Tl4cEgVgAvFKUAB3OAWPAACkw6qcKDYzIgTmUVXSfCilHhAiEERYLFwEDYJ0pvBY8jAYEohAAlOJ1ZqmPg9U8XqoUr46qbtbhI6ro-BNogAIJBCnQOB62OmwIAA2UAFEADLVrAAFS1ADp4rkwC3mayUB2W9zefR+W9FLkgi3mq1cGI4LO5-OF4u4AAxABKAHkALJaiC8ehauAAKXXAEkAHJwEJhfdBODri-j+Il1vkylQalxGdL7+LgDqAAlq1XasX0LN8P2fAASABGCtskCAB2eDM2zHc92feQDVaHN8zA6AJ26a1CxQU1MzVO1NSvKAMKwlk4DLSsa3rJs4HbOBjlOTxcgTJQR3gNct0vUJwjgACgJAyc2ig2D4ICSh5DieRqBQbo-h2FsOBAHIxHDAiiKURt5AAaxQZdgHCGB1ygRs8jIA1SMcVCOCCFx9z1TDsPo5hywCKs6wbZtXypNjnJcU0ACpwzgPNlClFcN23eF9wAcQ3ABVMw4B8ABNOAgvfeI4J0vS2GIhyswo+B4RPOIaM82MuygeQNQ8W0nFNQpEDOOBTRgboop1OpolQzAnyIdzaPgPqfN888a1XZtz0bdchOvHrJNwXIOOazwooANTzWs0urWLTRg3JIIAJii4DGzS1cz3PZLWLiIqYkoAQPBQZTVPAdTNO0mIAAZZN0lT9JQQyTLMiyrJsuzyseSq0PgCbPOmwYKzmoDFrPZaUf3Dq8IKuJcm7HZ9sO47TvOuArpu6s7oep6Xre5FZLk-8UBlCBAbBwjSoM4zTPM3g4dsiB7MzAJBBgIIoCcFG2zicQCDIjy6LLCsvH8xsQIExLdwRUTAOAvLiYgvUYLgqgEMofmIfKoA) <span data-playground="pg"></span> to hover the types and edit the SQL, with nothing to install.
 
 ## Create `sql`
 

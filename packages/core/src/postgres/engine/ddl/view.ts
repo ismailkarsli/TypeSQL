@@ -23,11 +23,9 @@ export type ApplyCreateView<
 > =
 	GetRel<DB, Ref> extends infer Rel
 		? Rel extends null
-			? CanCreate<DB, Ref> extends infer E
-				? E extends AnyErr
-					? E
-					: BuildView<DB, Ref, Names, Q, null, QDB>
-				: never
+			? CanCreate<DB, Ref> extends AnyErr
+				? CanCreate<DB, Ref>
+				: BuildView<DB, Ref, Names, Q, null, QDB>
 			: Ine extends true
 				? DB
 				: OrR extends true
@@ -47,11 +45,9 @@ type BuildView<DB, Ref extends TableRef, Names, Q, Old, QDB = DB> =
 		? M extends AnyErr
 			? M
 			: ViewTable<M> extends infer V
-				? ReplaceCheck<Old, V> extends infer E
-					? E extends AnyErr
-						? E
-						: PutRel<DB, Ref, AsView<V>>
-					: never
+				? ReplaceCheck<Old, V> extends AnyErr
+					? ReplaceCheck<Old, V>
+					: PutRel<DB, Ref, AsView<V>>
 				: never
 		: never;
 

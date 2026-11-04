@@ -1,6 +1,7 @@
-import Database from "better-sqlite3";
-import { createSql } from "@typesql/sqlite";
 import type { Col } from "@typesql/core/sqlite";
+import { createSql } from "@typesql/sqlite";
+import Database from "better-sqlite3";
+
 interface DB {
 	users: {
 		id: Col<"integer">;

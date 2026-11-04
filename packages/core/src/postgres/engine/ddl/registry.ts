@@ -9,6 +9,7 @@ import type { TableRef } from "../ast.js";
 import type { Sig } from "../typer/catalog.js";
 import type { TypeOfCol, WithType } from "./column.js";
 import type {
+	AlreadyExists,
 	AsView,
 	ColsOf,
 	IsNamespace,
@@ -55,9 +56,7 @@ export type ApplyAlterEnum<DB, Name extends string, Act> =
 					readonly ifNotExists: infer Ine;
 				}
 				? V extends R[Name]
-					? Ine extends true
-						? DB
-						: SqlError<`enum label "${V}" already exists`, null>
+					? AlreadyExists<DB, Ine, `enum label "${V}"`>
 					: SetKey<DB, "$types", SetKey<R, Name, R[Name] | V>>
 				: Act extends {
 							readonly t: "rename_value";

@@ -1,0 +1,65 @@
+/* TypeSQL rose, matching the logo (.github/assets). */
+:root {
+	--vp-c-brand-1: #be123c;
+	--vp-c-brand-2: #e11d48;
+	--vp-c-brand-3: #f43f5e;
+	--vp-c-brand-soft: rgba(244, 63, 94, 0.14);
+
+	/* White button text needs a darker rose than brand-3. */
+	--vp-button-brand-bg: #be123c;
+	--vp-button-brand-hover-bg: #9f1239;
+	--vp-button-brand-active-bg: #881337;
+
+	--vp-home-hero-name-color: transparent;
+	--vp-home-hero-name-background: linear-gradient(120deg, #be123c 30%, #f43f5e);
+
+	/* A dot grid behind the hero logo, fading out from the center. */
+	--typesql-hero-dot: rgba(225, 29, 72, 0.5);
+	--vp-home-hero-image-background-image: radial-gradient(
+		var(--typesql-hero-dot) 1.6px,
+		transparent 1.8px
+	);
+	--vp-home-hero-image-filter: none;
+}
+
+.dark {
+	--vp-c-brand-1: #fda4af;
+	--vp-c-brand-2: #fb7185;
+	--vp-c-brand-3: #e11d48;
+	--vp-c-brand-soft: rgba(251, 113, 133, 0.16);
+
+	--vp-button-brand-bg: #be123c;
+	--vp-button-brand-hover-bg: #e11d48;
+	--vp-button-brand-active-bg: #9f1239;
+
+	--vp-home-hero-name-background: linear-gradient(120deg, #fb7185 30%, #fda4af);
+
+	--typesql-hero-dot: rgba(251, 113, 133, 0.4);
+}
+
+.VPHero .image-bg {
+	width: 280px;
+	height: 280px;
+	border-radius: 0;
+	background-size: 18px 18px;
+	mask-image: radial-gradient(circle, #000 25%, transparent 68%);
+}
+
+@media (min-width: 640px) {
+	.VPHero .image-bg {
+		width: 370px;
+		height: 370px;
+	}
+}
+
+@media (min-width: 960px) {
+	.VPHero .image-bg {
+		width: 460px;
+		height: 460px;
+	}
+}
+
+/* The logo is the full wordmark, so give it a little more height than the default 24px. */
+.VPNavBarTitle .logo {
+	height: 28px;
+}

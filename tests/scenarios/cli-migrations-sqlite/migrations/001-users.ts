@@ -1,10 +1,10 @@
 import { migration } from "@typesql/core/migration";
 export default migration("sqlite", {
 	up: async (db) =>
-		db.add(
+		db.ddl(
 			"CREATE TABLE users (id integer PRIMARY KEY, name text NOT NULL, bio text)",
 		),
 	down: async (db) => {
-		await db.add("DROP TABLE users");
+		await db.ddl("DROP TABLE users");
 	},
 });

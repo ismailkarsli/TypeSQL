@@ -84,6 +84,7 @@ function changelog(): string {
 	const out = [
 		"---",
 		"outline: 2",
+		'description: "Release notes for every TypeSQL package since 1.0.0, newest first, with breaking changes under Major Changes."',
 		"editLink: false",
 		"---",
 		"",

@@ -1,5 +1,101 @@
 # @typesql/docs
 
+## 0.0.43
+
+### Patch Changes
+
+- Updated dependencies:
+  - @typesql/core@6.0.2
+  - @typesql/drizzle@6.0.2
+  - @typesql/kysely@6.0.2
+  - @typesql/pg@6.0.2
+  - @typesql/prisma@6.0.2
+  - @typesql/sqlite@6.0.2
+
+## 0.0.42
+
+### Patch Changes
+
+- Updated dependencies:
+  - @typesql/core@6.0.1
+  - @typesql/drizzle@6.0.1
+  - @typesql/kysely@6.0.1
+  - @typesql/pg@6.0.1
+  - @typesql/prisma@6.0.1
+  - @typesql/sqlite@6.0.1
+
+## 0.0.41
+
+### Patch Changes
+
+- Updated dependencies:
+  - @typesql/core@6.0.0
+  - @typesql/drizzle@6.0.0
+  - @typesql/kysely@6.0.0
+  - @typesql/pg@6.0.0
+  - @typesql/prisma@6.0.0
+  - @typesql/sqlite@6.0.0
+
+## 0.0.40
+
+### Patch Changes
+
+- Updated dependencies:
+  - @typesql/core@5.0.4
+  - @typesql/drizzle@5.0.4
+  - @typesql/kysely@5.0.4
+  - @typesql/pg@5.0.4
+  - @typesql/prisma@5.0.4
+  - @typesql/sqlite@5.0.4
+
+## 0.0.39
+
+### Patch Changes
+
+- Updated dependencies:
+  - @typesql/core@5.0.3
+  - @typesql/drizzle@5.0.3
+  - @typesql/kysely@5.0.3
+  - @typesql/pg@5.0.3
+  - @typesql/prisma@5.0.3
+  - @typesql/sqlite@5.0.3
+
+## 0.0.38
+
+### Patch Changes
+
+- Updated dependencies:
+  - @typesql/core@5.0.2
+  - @typesql/drizzle@5.0.2
+  - @typesql/kysely@5.0.2
+  - @typesql/pg@5.0.2
+  - @typesql/prisma@5.0.2
+  - @typesql/sqlite@5.0.2
+
+## 0.0.37
+
+### Patch Changes
+
+- Updated dependencies:
+  - @typesql/core@5.0.1
+  - @typesql/drizzle@5.0.1
+  - @typesql/kysely@5.0.1
+  - @typesql/pg@5.0.1
+  - @typesql/prisma@5.0.1
+  - @typesql/sqlite@5.0.1
+
+## 0.0.36
+
+### Patch Changes
+
+- Updated dependencies:
+  - @typesql/core@5.0.0
+  - @typesql/drizzle@5.0.0
+  - @typesql/kysely@5.0.0
+  - @typesql/pg@5.0.0
+  - @typesql/prisma@5.0.0
+  - @typesql/sqlite@5.0.0
+
 ## 0.0.35
 
 ### Patch Changes

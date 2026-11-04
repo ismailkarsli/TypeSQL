@@ -23,7 +23,7 @@ const NAMED = new RegExp(
 );
 
 /** Extend block-comment matches through their outer closing delimiter. */
-export function* sqlMatches(
+function* sqlMatches(
 	text: string,
 	pattern: RegExp,
 ): Generator<RegExpExecArray> {
@@ -73,12 +73,8 @@ export function maxParam(text: string): number {
 
 function renumberParams(text: string, offset: number): string {
 	if (offset === 0 || !text.includes("$")) return text;
-	return scan(text, (n) => `$${n + offset}`);
-}
-
-function scan(text: string, onParam: (n: number) => string | null): string {
 	return replaceSql(text, PARAMS, (match) =>
-		match[2] === undefined ? match[0] : (onParam(Number(match[2])) ?? match[0]),
+		match[2] === undefined ? match[0] : `$${Number(match[2]) + offset}`,
 	);
 }
 

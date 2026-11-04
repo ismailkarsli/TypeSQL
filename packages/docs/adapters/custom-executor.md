@@ -1,3 +1,7 @@
+---
+description: "Build TypeSQL queries without a client, run them on another client, or write your own executor."
+---
+
 # Custom executor
 
 An executor is the function a query runs on. The adapters build one from your driver client, so most apps never need this page. It covers building queries without a client, running on another client, writing an executor, and changing the rows it returns.
@@ -121,12 +125,12 @@ async function wire<Q extends Query<object>>(
 const payload = await wire(sql("SELECT id, created_at FROM users"));
 ```
 
-::: warning Augmenting `Query`
-You can also augment `Query` to change what `execute*` returns for every query in the program:
+::: warning Augmenting `QueryObject`
+`Query` is a type alias. You can augment its `QueryObject` interface to change what `execute*` returns for every query in the program:
 
 ```ts
 declare module "@typesql/core" {
-  interface Query<Row, Params extends readonly unknown[] = readonly unknown[], Text extends string = string> {
+  interface QueryObject<Row, Params extends readonly unknown[], Text extends string> {
     execute(executor?: Executor): Promise<Wire<Row>[]>;
     executeTakeFirst(executor?: Executor): Promise<Wire<Row> | undefined>;
     executeTakeFirstOrThrow(executor?: Executor): Promise<Wire<Row>>;

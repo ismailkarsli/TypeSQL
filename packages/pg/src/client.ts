@@ -73,8 +73,7 @@ export function executor(client: PgQueryable): Executor {
 function isPool(client: PgQueryable): client is PgQueryable & PgPoolLike {
 	return (
 		typeof (client as Partial<PgPoolLike>).connect === "function" &&
-		!("release" in client) &&
-		!("processID" in client)
+		!isConnection(client)
 	);
 }
 

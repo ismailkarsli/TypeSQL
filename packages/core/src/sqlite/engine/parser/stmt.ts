@@ -51,19 +51,20 @@ type NoopKeyword =
 	| "explain";
 
 type ParseWithStatement<T extends Toks, I extends number> =
-	ParseWith<T, I> extends infer W
-		? W extends Ok<infer Wc extends WithClause, infer J extends number>
-			? IsWord<T, J, "select" | "values"> extends true
-				? ParseSelectAfterWith<T, J, Wc>
-				: IsWord<T, J, "insert" | "replace"> extends true
-					? ParseInsert<T, J, Wc>
-					: IsWord<T, J, "update"> extends true
-						? ParseUpdate<T, Nx<J>, Wc>
-						: IsWord<T, J, "delete"> extends true
-							? ParseDelete<T, Nx<J>, Wc>
-							: SyntaxErr<T, J>
-			: W
-		: never;
+	ParseWith<T, I> extends Ok<
+		infer Wc extends WithClause,
+		infer J extends number
+	>
+		? IsWord<T, J, "select" | "values"> extends true
+			? ParseSelectAfterWith<T, J, Wc>
+			: IsWord<T, J, "insert" | "replace"> extends true
+				? ParseInsert<T, J, Wc>
+				: IsWord<T, J, "update"> extends true
+					? ParseUpdate<T, Nx<J>, Wc>
+					: IsWord<T, J, "delete"> extends true
+						? ParseDelete<T, Nx<J>, Wc>
+						: SyntaxErr<T, J>
+		: ParseWith<T, I>;
 
 type SkipSemis<T extends Toks, I extends number> =
 	IsOp<T, I, ";"> extends true ? SkipSemis<T, Nx<I>> : I;
@@ -72,19 +73,20 @@ export type ParseProgram<T extends Toks> =
 	SkipSemis<T, 0> extends infer I0 extends number
 		? AtEnd<T, I0> extends true
 			? SqlError<"the SQL text contains no statements", 0>
-			: ParseStatement<T, I0> extends infer X
-				? X extends Ok<infer S extends Stmt, infer J extends number>
-					? AtEnd<T, J> extends true
-						? S
-						: IsOp<T, J, ";"> extends true
-							? SkipSemis<T, J> extends infer J2 extends number
-								? AtEnd<T, J2> extends true
-									? S
-									: SqlError<"only one statement is allowed", J2>
-								: never
-							: SyntaxErr<T, J>
-					: X
-				: never
+			: ParseStatement<T, I0> extends Ok<
+						infer S extends Stmt,
+						infer J extends number
+					>
+				? AtEnd<T, J> extends true
+					? S
+					: IsOp<T, J, ";"> extends true
+						? SkipSemis<T, J> extends infer J2 extends number
+							? AtEnd<T, J2> extends true
+								? S
+								: SqlError<"only one statement is allowed", J2>
+							: never
+						: SyntaxErr<T, J>
+				: ParseStatement<T, I0>
 		: never;
 
 export type ParseScript<
@@ -95,13 +97,14 @@ export type ParseScript<
 	SkipSemis<T, I> extends infer I0 extends number
 		? AtEnd<T, I0> extends true
 			? Acc
-			: ParseStatement<T, I0> extends infer X
-				? X extends Ok<infer S extends Stmt, infer J extends number>
-					? AtEnd<T, J> extends true
-						? [...Acc, S]
-						: IsOp<T, J, ";"> extends true
-							? ParseScript<T, J, [...Acc, S]>
-							: SyntaxErr<T, J>
-					: X
-				: never
+			: ParseStatement<T, I0> extends Ok<
+						infer S extends Stmt,
+						infer J extends number
+					>
+				? AtEnd<T, J> extends true
+					? [...Acc, S]
+					: IsOp<T, J, ";"> extends true
+						? ParseScript<T, J, [...Acc, S]>
+						: SyntaxErr<T, J>
+				: ParseStatement<T, I0>
 		: never;

@@ -55,7 +55,7 @@ type HasDuplicateNames<
 > = C[I] extends { readonly n: infer N extends string }
 	? N extends Seen
 		? true
-		: HasDuplicateNames<C, Next[I], Seen | N>
+		: HasDuplicateNames<C, Next<I>, Seen | N>
 	: false;
 type UniqueMap<C extends Cols> = {
 	[E in C[number] as E extends { readonly n: infer N extends string }
@@ -109,4 +109,15 @@ export type MkCtx<
 	readonly scope: S;
 	readonly ctes: Ctes;
 	readonly grouped: G;
+};
+
+/** The environment shared by query binding, projection and parameter inference. */
+export type QueryContext<
+	DB = unknown,
+	S extends Scope = Scope,
+	Ctes = CteMap,
+> = {
+	readonly db: DB;
+	readonly scope: S;
+	readonly ctes: Ctes;
 };

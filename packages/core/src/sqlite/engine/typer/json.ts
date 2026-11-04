@@ -56,15 +56,7 @@ type Walk<
 							? Walk<
 									O[K],
 									R,
-									Missing extends true
-										? true
-										: null extends V
-											? true
-											: undefined extends V
-												? true
-												: {} extends Pick<O, K>
-													? true
-													: false
+									Absent<Missing, V, {} extends Pick<O, K> ? true : false>
 								>
 							: string extends keyof O
 								? Walk<O[string & keyof O], R, true>
@@ -74,16 +66,14 @@ type Walk<
 			: Exclude<V, null | undefined> extends readonly (infer El)[]
 				? Walk<El, R, true>
 				: [unknown, true]
-	: [
-			V,
-			Missing extends true
-				? true
-				: null extends V
-					? true
-					: undefined extends V
-						? true
-						: false,
-		];
+	: [V, Absent<Missing, V, false>];
+type Absent<Missing extends boolean, V, Else> = Missing extends true
+	? true
+	: null extends V
+		? true
+		: undefined extends V
+			? true
+			: Else;
 
 type SqlValue<V> = V extends boolean
 	? 0 | 1

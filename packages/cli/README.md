@@ -53,14 +53,14 @@ import { migration } from "@typesql/core/migration";
 import previous from "./1793356800_create-users.js";
 
 export default migration(previous, {
-  up: async (db) => db.add("ALTER TABLE users ADD COLUMN bio text"),
+  up: async (db) => db.ddl("ALTER TABLE users ADD COLUMN bio text"),
   down: async (db) => {
-    await db.add("ALTER TABLE users DROP COLUMN bio");
+    await db.ddl("ALTER TABLE users DROP COLUMN bio");
   },
 });
 ```
 
-The first file starts from `"postgres"` or `"sqlite"` instead of `previous`. `up` returns its final context; await each `.add()` and keep the context it returns. Files written for TypeSQL 3.x, which export `up` and `down` functions, still run.
+The first file starts from `"postgres"` or `"sqlite"` instead of `previous`. `up` returns its final context; await each `.ddl()` and keep the context it returns. Files written for TypeSQL 3.x, which export `up` and `down` functions, still run.
 
 `--config <file>` selects another config, and `--dialect`, `--url`, `--db`, `--dir`, `--out` and `--no-generate` override it, with paths relative to the working directory. PostgreSQL uses `$DATABASE_URL` when nothing else sets a connection. Without a config file, pass `--dialect` and `--url` or `--db`; the directory is then `./migrations`:
 
@@ -68,7 +68,7 @@ The first file starts from `"postgres"` or `"sqlite"` instead of `previous`. `up
 pnpm exec typesql migrate latest --dialect sqlite --db app.db
 ```
 
-The history is recorded in `schema_migrations` (`migrationTable` changes the name). Each migration and its history row commit together; PostgreSQL holds an advisory lock for the command, and SQLite uses `BEGIN IMMEDIATE`. Editing the DDL of an applied migration, deleting one, or inserting or reordering one before it is an error; formatting, comments, types and queries are not tracked.
+The history is recorded in `schema_migrations` (`migrationTable` changes the name). Each migration and its history row commit together in their own transaction; PostgreSQL takes a transaction-scoped advisory lock, and SQLite uses `BEGIN IMMEDIATE`. The history is checked under the lock before each migration. Removing or renaming an applied migration, or inserting or reordering one before it, is an error. Applied migrations are tracked by name only: editing their DDL is not detected, so add a new migration to change the database.
 
 `up`, `down` and `latest` then write the schema of the last applied migration to `db.ts` beside the config. `generate` writes the schema of the last migration file without connecting. Writing it needs `typescript` 7.1 or later; set `schemaFile` or pass `--out` to change the path, and set `generate: false` or pass `--no-generate` to skip it.
 

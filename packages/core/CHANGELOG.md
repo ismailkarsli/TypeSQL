@@ -1,5 +1,57 @@
 # @typesql/core
 
+## 6.0.2
+
+### Patch Changes
+
+- The README's example opens in the new TypeSQL Playground, which checks it with TypeScript 7.1 in the browser and shows its errors and row types, instead of the TypeScript Playground, which ran TypeScript 6.
+
+## 6.0.1
+
+### Patch Changes
+
+- With `"skipLibCheck": false`, TypeSQL's own declarations type-check again in about a second, as before 5.0.4. Since 5.0.4 they took about 30 seconds and reported "Excessive complexity comparing types" (TS2859) errors in TypeSQL's files: a few with the default four checkers, and thousands, on the application's schema and queries too, with one checker (`--singleThreaded` or WebAssembly builds such as the tsrs playground).
+
+## 6.0.0
+
+### Major Changes
+
+- An exported function that returns an unexecuted `sql()` or `sql.prepare()` query again compiles with `declaration: true` (or `composite`) when the type map, plugin types or plugin classes are not exported: a query is typed `Query<Row, Params, Text>` again, as before 5.0.2, instead of `InferredQuery<…>`, which is no longer exported.
+
+## 5.0.4
+
+### Patch Changes
+
+- Statements type-check with about 10% fewer type instantiations, mostly in parameter checks, fragment interpolation, sql.values and sql.set, and parsing.
+
+## 5.0.3
+
+### Patch Changes
+
+- Reduce type-checking work when validating SQL expressions and inferring parameter types.
+
+## 5.0.2
+
+### Patch Changes
+
+- Reduce type-checking work by sharing query contexts, collecting parameter hints independently, and deferring generic index arithmetic.
+
+## 5.0.1
+
+### Patch Changes
+
+- The documentation reflects migration tracking and locking, supported driver and editor versions, and the current query APIs.
+
+## 5.0.0
+
+### Major Changes
+
+- Query inference, migrations and database adapters share smaller implementations while retaining the supported SQL workflows.
+
+### Minor Changes
+
+- Migration contexts run checked DDL with `db.ddl(…)`; `db.add(…)` still works as a deprecated alias.
+
 ## 4.0.1
 
 ### Patch Changes

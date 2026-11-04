@@ -1,5 +1,6 @@
 import type { Typed } from "@typesql/core/sqlite";
 import type {
+	Column,
 	ColumnName,
 	Fields,
 	Get,
@@ -35,30 +36,6 @@ type ColumnType<T extends string, V, O> = O extends string
 		? X
 		: SqliteOf<T, V>;
 
-type Column<
-	T extends string,
-	V,
-	Nullable extends boolean,
-	Optional extends boolean,
-	O,
-> = (
-	O extends { readonly nullable: infer N extends boolean }
-		? N
-		: Nullable
-) extends infer N extends boolean
-	? {
-			readonly type: ColumnType<T, V, O>;
-			readonly nullable: N;
-			readonly hasDefault: O extends {
-				readonly default: infer D extends boolean;
-			}
-				? D
-				: N extends true
-					? false
-					: Optional;
-		}
-	: never;
-
 type ModelColumns<
 	M,
 	MO,
@@ -68,8 +45,7 @@ type ModelColumns<
 	Opt = OptionalCreateKeys<M>,
 > = {
 	-readonly [F in keyof FS as ColumnName<F, Get<MO, F>>]: Column<
-		TypeName<FS[F]>,
-		Get<S, F>,
+		ColumnType<TypeName<FS[F]>, Get<S, F>, Get<MO, F>>,
 		F extends Null ? true : false,
 		F extends Opt ? true : false,
 		Get<MO, F>

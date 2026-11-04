@@ -40,25 +40,16 @@ export async function allocate(
 			cleanup: async () => {},
 		};
 	const name = `scenario_${randomUUID().replaceAll("-", "")}`;
-	await admin((client) =>
-		client
-			.query(
-				`CREATE DATABASE "${name}" TEMPLATE template0 ENCODING 'UTF8' LC_COLLATE 'C' LC_CTYPE 'C'`,
-			)
-			.then(() => {}),
-	);
+	await admin(async (client) => {
+		for (const statement of [
+			`CREATE DATABASE "${name}" TEMPLATE template0 ENCODING 'UTF8' LC_COLLATE 'C' LC_CTYPE 'C'`,
+			`ALTER DATABASE "${name}" SET timezone TO 'UTC'`,
+			`ALTER DATABASE "${name}" SET datestyle TO 'ISO, YMD'`,
+		])
+			await client.query(statement);
+	});
 	const url = new URL(adminUrl());
 	url.pathname = `/${name}`;
-	await admin((client) =>
-		client
-			.query(`ALTER DATABASE "${name}" SET timezone TO 'UTC'`)
-			.then(() => {}),
-	);
-	await admin((client) =>
-		client
-			.query(`ALTER DATABASE "${name}" SET datestyle TO 'ISO, YMD'`)
-			.then(() => {}),
-	);
 	return {
 		env: { DATABASE_URL: url.toString(), SQLITE_PATH: joinSqlite(directory) },
 		cleanup: () =>

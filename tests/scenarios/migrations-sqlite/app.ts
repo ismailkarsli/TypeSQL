@@ -1,21 +1,22 @@
 import { createMigrator, migration } from "@typesql/core/migration";
+
 const first = migration("sqlite", {
 	name: "001-users",
 	up: async (db) =>
-		db.add("CREATE TABLE users (id integer PRIMARY KEY, name text NOT NULL)"),
+		db.ddl("CREATE TABLE users (id integer PRIMARY KEY, name text NOT NULL)"),
 	down: async (db) => {
-		await db.add("DROP TABLE users");
+		await db.ddl("DROP TABLE users");
 	},
 });
 const failed = migration(first, {
 	name: "002-failure",
 	up: async (db) => {
-		const next = await db.add("CREATE TABLE temporary (id integer)");
+		const next = await db.ddl("CREATE TABLE temporary (id integer)");
 		await next.raw("INSERT INTO users (id, name) VALUES (1, NULL)");
 		return next;
 	},
 	down: async (db) => {
-		await db.add("DROP TABLE temporary");
+		await db.ddl("DROP TABLE temporary");
 	},
 });
 const migrator = createMigrator({
@@ -38,7 +39,9 @@ try {
 		applied: e.applied,
 	});
 }
+
 import { DatabaseSync } from "node:sqlite";
+
 const db = new DatabaseSync(process.env.SQLITE_PATH!);
 const inspect = async () =>
 	db.prepare("SELECT name FROM schema_migrations ORDER BY name").all();

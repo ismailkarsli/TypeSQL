@@ -2,10 +2,15 @@
 	"name": "typesql",
 	"displayName": "TypeSQL",
 	"description": "SQL highlighting and completions for tables and columns inside TypeSQL's sql() strings.",
-	"version": "2.0.0",
+	"version": "3.0.3",
 	"private": true,
 	"preview": true,
 	"publisher": "typesql",
+	"icon": "icon.png",
+	"galleryBanner": {
+		"color": "#4C0519",
+		"theme": "dark"
+	},
 	"license": "MIT",
 	"repository": {
 		"type": "git",
@@ -226,7 +231,7 @@
 								"meta.embedded.block.sql"
 							],
 							"settings": {
-								"foreground": "#F5D0A9"
+								"foreground": "#FFE4E6"
 							}
 						},
 						{
@@ -236,19 +241,19 @@
 								"keyword.operator.cast.sql"
 							],
 							"settings": {
-								"foreground": "#FF9F43"
+								"foreground": "#FDA4AF"
 							}
 						},
 						{
 							"scope": "storage.type.sql",
 							"settings": {
-								"foreground": "#FFB86C"
+								"foreground": "#FDBA9A"
 							}
 						},
 						{
 							"scope": "entity.name.function.sql",
 							"settings": {
-								"foreground": "#FFC777"
+								"foreground": "#F0ABFC"
 							}
 						},
 						{
@@ -257,7 +262,7 @@
 								"constant.language.sql"
 							],
 							"settings": {
-								"foreground": "#FFD3A1"
+								"foreground": "#FED7AA"
 							}
 						},
 						{
@@ -266,7 +271,7 @@
 								"variable.parameter.named.sql"
 							],
 							"settings": {
-								"foreground": "#FF7A45",
+								"foreground": "#F9A8D4",
 								"fontStyle": "bold"
 							}
 						}
@@ -280,7 +285,7 @@
 								"meta.embedded.block.sql"
 							],
 							"settings": {
-								"foreground": "#7C2D12"
+								"foreground": "#4C0519"
 							}
 						},
 						{
@@ -290,19 +295,19 @@
 								"keyword.operator.cast.sql"
 							],
 							"settings": {
-								"foreground": "#C2410C"
+								"foreground": "#A51034"
 							}
 						},
 						{
 							"scope": "storage.type.sql",
 							"settings": {
-								"foreground": "#B45309"
+								"foreground": "#8A2E10"
 							}
 						},
 						{
 							"scope": "entity.name.function.sql",
 							"settings": {
-								"foreground": "#9A3412"
+								"foreground": "#86198F"
 							}
 						},
 						{
@@ -311,7 +316,7 @@
 								"constant.language.sql"
 							],
 							"settings": {
-								"foreground": "#A16207"
+								"foreground": "#7F1D1D"
 							}
 						},
 						{
@@ -320,7 +325,7 @@
 								"variable.parameter.named.sql"
 							],
 							"settings": {
-								"foreground": "#C2380C",
+								"foreground": "#A1144F",
 								"fontStyle": "bold"
 							}
 						}

@@ -4,14 +4,13 @@ import {
 	existsSync,
 	mkdirSync,
 	mkdtempSync,
-	readFileSync,
 	renameSync,
 	rmSync,
 	writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { DocsVersion } from "./.vitepress/versions.ts";
+import { type DocsVersion, latestVersion } from "./.vitepress/versions.ts";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const docs = join(root, "packages/docs");
@@ -63,9 +62,6 @@ for (const tag of git(
 	lines.add(version);
 	tags.push({ tag, version, files });
 }
-const { version }: { version: string } = JSON.parse(
-	readFileSync(join(root, "packages/core/package.json"), "utf8"),
-);
 const currentFiles = git(
 	"ls-files",
 	"--cached",
@@ -75,7 +71,7 @@ const currentFiles = git(
 ).split("\n");
 const versions: DocsVersion[] = [
 	{
-		version: version.split(".").slice(0, 2).join("."),
+		version: latestVersion,
 		base: "/",
 		pages: pages(currentFiles),
 	},
@@ -107,6 +103,12 @@ try {
 					: []),
 				...files.filter((file) =>
 					/^packages\/[^/]+\/CHANGELOG\.md$/.test(file),
+				),
+				// The SQL highlighting reads the extension's grammar and colors.
+				...files.filter(
+					(file) =>
+						file === "packages/vscode/package.json" ||
+						file.startsWith("packages/vscode/syntaxes/"),
 				),
 			],
 			{ cwd: root, maxBuffer: 64 * 1024 * 1024 },

@@ -14,19 +14,17 @@
 		"knip": "knip",
 		"test": "node tests/run.ts",
 		"bench": "pnpm --filter @typesql/bench run bench",
-		"check:intents": "node scripts/check-intents.ts",
+		"check:intents": "node tools/check-intents.ts",
 		"release": "gh workflow run release.yml --ref main && echo \"Release started: https://github.com/ismailkarsli/typesql/actions/workflows/release.yml\"",
 		"docs:dev": "pnpm --filter @typesql/docs run dev",
 		"docs:build": "pnpm --filter @typesql/docs run build",
 		"docs:preview": "pnpm --filter @typesql/docs run preview",
-		"docs:deploy": "pnpm --filter @typesql/docs run deploy",
-		"playground": "node scripts/playground.ts"
+		"docs:deploy": "pnpm --filter @typesql/docs run deploy"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.6.4",
 		"@types/node": "^26.6.6",
 		"knip": "^6.44.1",
-		"lz-string": "^1.5.0",
 		"tsrs": "0.20.1-ts7.1.0-beta",
 		"typescript": "7.1.0-beta"
 	}

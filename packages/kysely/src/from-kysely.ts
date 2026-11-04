@@ -127,9 +127,9 @@ export type Hint<T> = T extends {
 type InnerIns<S, I> = S extends { readonly __insert__: infer I2 } ? I2 : I;
 type Ins<T> = T extends { readonly __insert__: infer I } ? I : T;
 
-export type HasDefault<T> = [
-	Extract<T, { readonly __insert__: unknown }>,
-] extends [never]
+type HasDefault<T> = [Extract<T, { readonly __insert__: unknown }>] extends [
+	never,
+]
 	? false
 	: undefined extends Ins<T>
 		? true
@@ -246,19 +246,23 @@ type ColumnTypeName<T, V, Reg, Default extends string> = [
 
 type Column<T, V, Reg, Default extends string> = {
 	readonly type: ColumnTypeName<T, V, Reg, Default>;
-	readonly nullable: [V] extends [
-		{ readonly nullable: infer B extends boolean },
-	]
-		? B
-		: null extends Sel<T>
-			? true
-			: false;
-	readonly hasDefault: [V] extends [
-		{ readonly hasDefault: infer B extends boolean },
-	]
-		? B
-		: HasDefault<T>;
+	readonly nullable: NullableOf<T, V>;
+	readonly hasDefault: HasDefaultOf<T, V>;
 };
+
+export type NullableOf<T, V> = [V] extends [
+	{ readonly nullable: infer B extends boolean },
+]
+	? B
+	: null extends Sel<T>
+		? true
+		: false;
+
+export type HasDefaultOf<T, V> = [V] extends [
+	{ readonly hasDefault: infer B extends boolean },
+]
+	? B
+	: HasDefault<T>;
 
 type BaseName<T extends string> = T extends `${infer B}[]` ? B : T;
 

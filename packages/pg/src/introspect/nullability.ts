@@ -215,14 +215,14 @@ export class ViewNullability {
 		const query = node(list(parseNodeTree(row.ev_action))[0]);
 		if (!query) return [];
 		const out: boolean[] = [];
-		for (const te of list(query["targetList"])) {
+		for (const te of list(query.targetList)) {
 			const entry = node(te);
-			if (!entry || entry["resjunk"] === "true") continue;
-			const name = str(entry["resname"]) ?? "";
+			if (!entry || entry.resjunk === "true") continue;
+			const name = str(entry.resname) ?? "";
 			// A set operation's targets refer to its first branch only; check all.
-			const notNull = query["setOperations"]
+			const notNull = query.setOperations
 				? await this.queryColumn(query, out.length + 1)
-				: await this.expr(entry["expr"], query);
+				: await this.expr(entry.expr, query);
 			out.push(notNull || (this.options.notNull?.(row.relname, name) ?? false));
 		}
 		return out;
@@ -241,7 +241,7 @@ export class ViewNullability {
 		const { rows } = await this.query(
 			`SELECT o.oprname AS name, o.oprnamespace = 'pg_catalog'::regnamespace AS system
     FROM pg_operator o WHERE o.oid = $1`,
-			[String(e["opno"])],
+			[String(e.opno)],
 		);
 		const op = rows[0] as Pick<Proc, "name" | "system"> | undefined;
 		return op?.system === true && !NULLABLE_OPERATORS.has(op.name);
@@ -269,28 +269,28 @@ export class ViewNullability {
 	): Promise<boolean> {
 		const query = node(value);
 		if (!query) return false;
-		if (query["setOperations"]) {
-			for (const r of list(query["rtable"]))
+		if (query.setOperations) {
+			for (const r of list(query.rtable))
 				if (!(await this.queryColumn(node(r)?.subquery, attno))) return false;
 			return true;
 		}
-		const entries = list(query["targetList"])
+		const entries = list(query.targetList)
 			.map(node)
-			.filter((t): t is Node => t !== null && t["resjunk"] !== "true");
+			.filter((t): t is Node => t !== null && t.resjunk !== "true");
 		const te = entries[attno - 1];
-		return te ? this.expr(te["expr"], query) : false;
+		return te ? this.expr(te.expr, query) : false;
 	}
 
 	private async variable(v: Node, query: Node): Promise<boolean> {
-		if (!("varnullingrels" in v) || v["varlevelsup"] !== "0") return false;
-		if (list(v["varnullingrels"]).length > 1) return false;
-		if (list(query["groupingSets"]).length > 0) return false;
-		const rte = node(list(query["rtable"])[Number(v["varno"]) - 1]);
-		const attno = Number(v["varattno"]);
+		if (!("varnullingrels" in v) || v.varlevelsup !== "0") return false;
+		if (list(v.varnullingrels).length > 1) return false;
+		if (list(query.groupingSets).length > 0) return false;
+		const rte = node(list(query.rtable)[Number(v.varno) - 1]);
+		const attno = Number(v.varattno);
 		if (!rte || !(attno > 0)) return false;
-		switch (rte["rtekind"]) {
+		switch (rte.rtekind) {
 			case "0": {
-				const relid = str(rte["relid"])!;
+				const relid = str(rte.relid)!;
 				const att = (await this.columns(relid)).find((a) => a.attnum === attno);
 				if (!att) return false;
 				if (att.relkind === "v" || att.relkind === "m")
@@ -298,26 +298,26 @@ export class ViewNullability {
 				return att.notnull;
 			}
 			case "1":
-				return this.queryColumn(rte["subquery"], attno);
+				return this.queryColumn(rte.subquery, attno);
 			case "2":
-				return this.expr(list(rte["joinaliasvars"])[attno - 1], query);
+				return this.expr(list(rte.joinaliasvars)[attno - 1], query);
 			case "3":
 				return this.functionColumn(rte, attno);
 			case "9":
-				return this.expr(list(rte["groupexprs"])[attno - 1], query);
+				return this.expr(list(rte.groupexprs)[attno - 1], query);
 		}
 		return false;
 	}
 
 	private async functionColumn(rte: Node, attno: number): Promise<boolean> {
-		const functions = list(rte["functions"]);
+		const functions = list(rte.functions);
 		const only = node(functions[0]);
 		if (functions.length !== 1 || !only) return false;
-		const count = Number(str(only["funccolcount"]));
-		if (rte["funcordinality"] === "true" && attno === count + 1) return true;
-		const call = node(only["funcexpr"]);
+		const count = Number(str(only.funccolcount));
+		if (rte.funcordinality === "true" && attno === count + 1) return true;
+		const call = node(only.funcexpr);
 		if (call?._ !== "FUNCEXPR") return false;
-		const proc = await this.proc(String(call["funcid"]));
+		const proc = await this.proc(String(call.funcid));
 		return (
 			proc?.system === true &&
 			(NON_NULL_SRF_COLUMNS[proc.name]?.includes(attno) ?? false)
@@ -342,37 +342,37 @@ export class ViewNullability {
 			case "VAR":
 				return this.variable(e, query);
 			case "CONST":
-				return e["constisnull"] === "false";
+				return e.constisnull === "false";
 			case "RELABELTYPE":
 			case "COERCEVIAIO":
 			case "COERCETODOMAIN":
 			case "ARRAYCOERCEEXPR":
 			case "COLLATEEXPR":
-				return this.expr(e["arg"], query);
+				return this.expr(e.arg, query);
 			case "FUNCEXPR": {
-				if (e["funcretset"] !== "false") return false;
-				const proc = await this.proc(String(e["funcid"]));
+				if (e.funcretset !== "false") return false;
+				const proc = await this.proc(String(e.funcid));
 				if (proc?.system && proc.name === "format_type")
-					return this.expr(list(e["args"])[0], query);
-				const castLike = e["funcformat"] === "1" || e["funcformat"] === "2";
+					return this.expr(list(e.args)[0], query);
+				const castLike = e.funcformat === "1" || e.funcformat === "2";
 				const known =
 					proc?.system === true &&
 					(NON_NULL_FUNCTIONS.has(proc.name) ||
 						isNonNullStatFunction(proc.name, proc.ret));
-				return (castLike || known) && this.all(e["args"], query);
+				return (castLike || known) && this.all(e.args, query);
 			}
 			case "BOOLEXPR":
-				return this.all(e["args"], query);
+				return this.all(e.args, query);
 			case "OPEXPR":
-				return (await this.strictOperator(e)) && this.all(e["args"], query);
+				return (await this.strictOperator(e)) && this.all(e.args, query);
 			case "SCALARARRAYOPEXPR": {
-				const [left, right] = list(e["args"]);
+				const [left, right] = list(e.args);
 				const array = node(right);
 				return (
 					(await this.strictOperator(e)) &&
 					array?._ === "ARRAYEXPR" &&
 					(await this.expr(left, query)) &&
-					this.all(array["elements"], query)
+					this.all(array.elements, query)
 				);
 			}
 			case "DISTINCTEXPR":
@@ -383,21 +383,21 @@ export class ViewNullability {
 				return true;
 			case "COALESCEEXPR":
 			case "MINMAXEXPR":
-				for (const a of list(e["args"]))
+				for (const a of list(e.args))
 					if (await this.expr(a, query)) return true;
 				return false;
 			case "CASEEXPR":
-				for (const w of list(e["args"]))
-					if (!(await this.expr(node(w)?.["result"], query))) return false;
-				return this.expr(e["defresult"], query);
+				for (const w of list(e.args))
+					if (!(await this.expr(node(w)?.result, query))) return false;
+				return this.expr(e.defresult, query);
 			case "SUBLINK":
-				return e["subLinkType"] === "0" || e["subLinkType"] === "6";
+				return e.subLinkType === "0" || e.subLinkType === "6";
 			case "AGGREF": {
-				const proc = await this.proc(String(e["aggfnoid"]));
+				const proc = await this.proc(String(e.aggfnoid));
 				return proc?.system === true && NON_NULL_AGGREGATES.has(proc.name);
 			}
 			case "WINDOWFUNC": {
-				const proc = await this.proc(String(e["winfnoid"]));
+				const proc = await this.proc(String(e.winfnoid));
 				return (
 					proc?.system === true && NON_NULL_WINDOW_FUNCTIONS.has(proc.name)
 				);

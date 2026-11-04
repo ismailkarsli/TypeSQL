@@ -1,12 +1,15 @@
-import { drizzle } from "drizzle-orm/better-sqlite3";
 import Database from "better-sqlite3";
+import { drizzle } from "drizzle-orm/better-sqlite3";
+
 const client = new Database(process.env.SQLITE_PATH!);
 client.exec(
 	"CREATE TABLE users (id integer PRIMARY KEY, display_name text NOT NULL, bio text)",
 );
-import { createSql } from "@typesql/drizzle";
+
 import { sqlite } from "@typesql/core/sqlite";
-import { sqliteTable, integer, text } from "drizzle-orm/sqlite-core";
+import { createSql } from "@typesql/drizzle";
+import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+
 const users = sqliteTable("users", {
 	id: integer().primaryKey(),
 	displayName: text("display_name").notNull(),

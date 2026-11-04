@@ -1,14 +1,15 @@
 import type { Executor, ExecutorResult } from "../query.js";
 import { createMigrationContext } from "./context.js";
 import {
+	type Dialect,
+	type Entry,
 	isMigration,
-	MIGRATION_FROM,
 	type Migration,
 	type SCHEMA,
 	type SchemaOf,
+	toEntry,
 } from "./define.js";
 
-type Dialect = "postgres" | "sqlite";
 // `down` takes what `up` returns, so only `any` accepts every migration.
 // biome-ignore lint/suspicious/noExplicitAny: see above.
 type AnyMigration = Migration<never, any>;
@@ -198,17 +199,6 @@ export function isMigrator(value: unknown): value is Migrator {
 	);
 }
 
-/** A loaded migration, from the array or a file. */
-interface Entry {
-	readonly name: string;
-	readonly up: (db: never) => unknown;
-	readonly down: (db: never) => unknown;
-	/** What it starts from, when it was defined with migration(). */
-	readonly from: unknown;
-	/** What a later migration's `from` is when it follows this one. */
-	readonly self: unknown;
-}
-
 interface Row {
 	readonly name: string;
 	readonly at: unknown;
@@ -384,13 +374,7 @@ async function load(config: MigratorConfig): Promise<Entry[]> {
 						throw new Error(
 							`typesql: migrations[${index}] has no name, which the history records it by; give it one: migration(from, { name: "create-users", up, down })`,
 						);
-					return {
-						name: migration.name,
-						up: migration.up,
-						down: migration.down,
-						from: (migration as { [MIGRATION_FROM]?: unknown })[MIGRATION_FROM],
-						self: migration,
-					};
+					return toEntry(migration.name, migration);
 				})
 			: await (await loadFiles()).loadMigrations(config.migrationsDir);
 	const seen = new Set<string>();
@@ -543,7 +527,7 @@ const text = (error: unknown): string => {
 	const message = error.message
 		? error.message
 		: error instanceof AggregateError && error.errors.length > 0
-			? [...new Set(error.errors.map(text))].join("; ")
+			? Array.from(new Set(error.errors.map(text))).join("; ")
 			: ((error as { code?: string }).code ?? error.name);
 	return message.replace(/^typesql: /, "");
 };
@@ -862,98 +846,15 @@ async function runStep(
 }
 
 /**
- * The statements of a SQLite script, split at semicolons outside quotes,
- * comments and a trigger's BEGIN … END body.
+ * Calls `on` for each token of `sql` outside whitespace and comments: an
+ * uppercased word, ";", or "" for a quoted string, identifier or any other
+ * character. `start` tells whether it begins a statement.
  */
-function sqliteStatements(sql: string): string[] {
-	const statements: string[] = [];
-	const words: string[] = [];
-	let begin = 0;
-	let content = false;
-	let trigger = false;
-	let start = true;
-	for (let i = 0; i < sql.length; ) {
-		const char = sql.charAt(i);
-		if (/\s/.test(char)) {
-			i++;
-			continue;
-		}
-		if (sql.startsWith("--", i)) {
-			const end = /[\r\n]/.exec(sql.slice(i + 2));
-			i = end === null ? sql.length : i + 2 + end.index + 1;
-			continue;
-		}
-		if (sql.startsWith("/*", i)) {
-			const end = sql.indexOf("*/", i + 2);
-			i = end < 0 ? sql.length : end + 2;
-			continue;
-		}
-		if (char === "'" || char === '"' || char === "`" || char === "[") {
-			content = true;
-			const end = char === "[" ? "]" : char;
-			i++;
-			while (i < sql.length) {
-				if (sql[i] === end) {
-					if (sql[i + 1] === end && char !== "[") i += 2;
-					else {
-						i++;
-						break;
-					}
-				} else i++;
-			}
-			start = false;
-			continue;
-		}
-		if (char === ";") {
-			i++;
-			start = true;
-			// A trigger's body statements end in semicolons too.
-			if (trigger) continue;
-			if (content) statements.push(sql.slice(begin, i));
-			begin = i;
-			words.length = 0;
-			content = false;
-			continue;
-		}
-		content = true;
-		const word = /^[a-zA-Z_][a-zA-Z_0-9$]*/.exec(sql.slice(i))?.[0];
-		if (word) {
-			const upper = word.toUpperCase();
-			if (trigger && start && upper === "END") trigger = false;
-			if (words.length < 4) words.push(upper);
-			if (
-				upper === "TRIGGER" &&
-				/^CREATE (?:TEMP |TEMPORARY )?TRIGGER$/.test(words.join(" "))
-			)
-				trigger = true;
-			start = false;
-			i += word.length;
-			continue;
-		}
-		start = false;
-		i++;
-	}
-	if (content) statements.push(sql.slice(begin));
-	return statements;
-}
-
-/** Keep transaction ownership with the runner, including multi-statement raw SQL. */
-function assertMigrationSql(sql: string, dialect: Dialect): void {
-	const words: string[] = [];
-	const checkRollback = (): void => {
-		if (
-			words[0] === "ROLLBACK" &&
-			words[1] !== "TO" &&
-			!(
-				(words[1] === "WORK" || words[1] === "TRANSACTION") &&
-				words[2] === "TO"
-			)
-		)
-			throw new Error(
-				"typesql: migrations cannot roll back their enclosing transaction; use ROLLBACK TO a savepoint",
-			);
-	};
-	let trigger = false;
+function scanSql(
+	sql: string,
+	dialect: Dialect,
+	on: (token: string, end: number, start: boolean) => void,
+): void {
 	let start = true;
 	for (let i = 0; i < sql.length; ) {
 		const char = sql.charAt(i);
@@ -980,6 +881,7 @@ function assertMigrationSql(sql: string, dialect: Dialect): void {
 			}
 			continue;
 		}
+		let token = "";
 		if (
 			char === "'" ||
 			char === '"' ||
@@ -1002,61 +904,100 @@ function assertMigrationSql(sql: string, dialect: Dialect): void {
 					}
 				} else i++;
 			}
-			if (words.length < 4) words.push("");
-			start = false;
-			continue;
-		}
-		if (char === "$" && dialect === "postgres") {
-			const tag = /^\$(?:[a-zA-Z_][a-zA-Z_0-9]*)?\$/.exec(sql.slice(i))?.[0];
+		} else if (char === ";") {
+			token = ";";
+			i++;
+		} else {
+			const rest = sql.slice(i);
+			const tag =
+				char === "$" && dialect === "postgres"
+					? /^\$(?:[a-zA-Z_][a-zA-Z_0-9]*)?\$/.exec(rest)?.[0]
+					: undefined;
+			const word = /^[a-zA-Z_][a-zA-Z_0-9$]*/.exec(rest)?.[0];
 			if (tag) {
 				const end = sql.indexOf(tag, i + tag.length);
 				i = end < 0 ? sql.length : end + tag.length;
-				if (words.length < 4) words.push("");
-				start = false;
-				continue;
-			}
+			} else if (word) {
+				token = word.toUpperCase();
+				i += word.length;
+			} else i++;
 		}
-		if (char === ";") {
+		on(token, i, start);
+		start = token === ";";
+	}
+}
+
+/**
+ * The statements of a SQLite script, split at semicolons outside quotes,
+ * comments and a trigger's BEGIN … END body.
+ */
+function sqliteStatements(sql: string): string[] {
+	const statements: string[] = [];
+	const words: string[] = [];
+	let begin = 0;
+	let content = false;
+	let trigger = false;
+	scanSql(sql, "sqlite", (token, end, start) => {
+		if (token === ";") {
+			// A trigger's body statements end in semicolons too.
+			if (trigger) return;
+			if (content) statements.push(sql.slice(begin, end));
+			begin = end;
+			words.length = 0;
+			content = false;
+			return;
+		}
+		content = true;
+		if (token === "") return;
+		if (trigger && start && token === "END") trigger = false;
+		if (words.length < 4) words.push(token);
+		if (token === "TRIGGER" && opensTrigger(words)) trigger = true;
+	});
+	if (content) statements.push(sql.slice(begin));
+	return statements;
+}
+
+function opensTrigger(words: readonly string[]): boolean {
+	return /^CREATE (?:TEMP |TEMPORARY )?TRIGGER$/.test(words.join(" "));
+}
+
+/** Keep transaction ownership with the runner, including multi-statement raw SQL. */
+function assertMigrationSql(sql: string, dialect: Dialect): void {
+	const words: string[] = [];
+	const checkRollback = (): void => {
+		if (
+			words[0] === "ROLLBACK" &&
+			words[1] !== "TO" &&
+			!(
+				(words[1] === "WORK" || words[1] === "TRANSACTION") &&
+				words[2] === "TO"
+			)
+		)
+			throw new Error(
+				"typesql: migrations cannot roll back their enclosing transaction; use ROLLBACK TO a savepoint",
+			);
+	};
+	let trigger = false;
+	scanSql(sql, dialect, (token, _end, start) => {
+		if (token === ";") {
 			checkRollback();
 			words.length = 0;
-			start = true;
-			i++;
-			continue;
+			return;
 		}
-		const word = /^[a-zA-Z_][a-zA-Z_0-9$]*/.exec(sql.slice(i))?.[0];
-		if (word) {
-			const upper = word.toUpperCase();
-			if (trigger && start && upper === "END") trigger = false;
-			else if (
-				!trigger &&
-				start &&
-				/^(BEGIN|START|COMMIT|END|ABORT)$/.test(upper)
-			)
-				throw new Error(
-					"typesql: migrations cannot control transactions; each migration runs in its own transaction",
-				);
-			if (words.length < 4) words.push(upper);
-			if (
-				words.length === 2 &&
-				words[0] === "PREPARE" &&
-				upper === "TRANSACTION"
-			)
-				throw new Error("typesql: migrations cannot prepare transactions");
-			if (
-				dialect === "sqlite" &&
-				upper === "TRIGGER" &&
-				(words.join(" ") === "CREATE TRIGGER" ||
-					words.join(" ") === "CREATE TEMP TRIGGER" ||
-					words.join(" ") === "CREATE TEMPORARY TRIGGER")
-			)
-				trigger = true;
-			start = false;
-			i += word.length;
-			continue;
-		}
-		if (words.length < 4) words.push("");
-		start = false;
-		i++;
-	}
+		if (trigger && start && token === "END") trigger = false;
+		else if (
+			!trigger &&
+			start &&
+			/^(BEGIN|START|COMMIT|END|ABORT)$/.test(token)
+		)
+			throw new Error(
+				"typesql: migrations cannot control transactions; each migration runs in its own transaction",
+			);
+		if (words.length < 4) words.push(token);
+		if (words.length === 2 && words[0] === "PREPARE" && token === "TRANSACTION")
+			throw new Error("typesql: migrations cannot prepare transactions");
+		if (dialect === "sqlite" && token === "TRIGGER" && opensTrigger(words))
+			trigger = true;
+	});
 	checkRollback();
 }

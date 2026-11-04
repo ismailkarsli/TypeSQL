@@ -1,7 +1,7 @@
 import type * as Shared from "../../engine/infer.js";
 import type { MaxParam, NullTest, ParamsToMap } from "../../engine/params.js";
-import type { Toks } from "../../engine/tokens.js";
-import type { Cols, Simplify } from "../../engine/types.js";
+import type { IdTok, OpTok, Toks, WordTok } from "../../engine/tokens.js";
+import type { Cols, QueryContext, Simplify } from "../../engine/types.js";
 import type { RewriteNamed } from "../../sql/named.js";
 import type { TsOf } from "../type-map/index.js";
 import type { DmlStmt, SelectStmt, Stmt } from "./ast.js";
@@ -16,33 +16,31 @@ import type { ProjectStmt } from "./project/stmt.js";
 import type { ParamsOfSelect, SettleSortKeys } from "./typer/params.js";
 
 export type Analyze<DB, Q extends string> =
-	RewriteNamed<Q> extends infer RN
-		? RN extends [infer Q1 extends string, infer Names]
-			? FastSelect<Q1> extends infer F
-				? [F] extends [never]
-					? AnalyzeGeneral<DB, Q1, Names>
-					: F extends {
-								stmt: infer S extends Stmt;
-								max: infer M extends number;
-							}
-						? ProjectStmt<S, DB, [], {}> extends infer C
-							? C extends Cols | null
-								? {
-										readonly kind: S["t"];
-										readonly cols: C;
-										readonly params: M extends 0
-											? {}
-											: ParamsToMap<ParamsOfStmt<S, DB, true>>;
-										readonly max: M;
-										readonly names: Names;
-										readonly stmt: S;
-									}
-								: AnalyzeGeneral<DB, Q1, Names>
-							: never
-						: AnalyzeGeneral<DB, Q1, Names>
-				: never
-			: RN
-		: never;
+	RewriteNamed<Q> extends [infer Q1 extends string, infer Names]
+		? FastSelect<Q1> extends infer F
+			? [F] extends [never]
+				? AnalyzeGeneral<DB, Q1, Names>
+				: F extends {
+							stmt: infer S extends Stmt;
+							max: infer M extends number;
+						}
+					? ProjectStmt<S, QueryContext<DB, [], {}>> extends infer C
+						? C extends Cols | null
+							? {
+									readonly kind: S["t"];
+									readonly cols: C;
+									readonly params: M extends 0
+										? {}
+										: ParamsToMap<ParamsOfStmt<S, DB, true>>;
+									readonly max: M;
+									readonly names: Names;
+									readonly stmt: S;
+								}
+							: AnalyzeGeneral<DB, Q1, Names>
+						: never
+					: AnalyzeGeneral<DB, Q1, Names>
+			: never
+		: RewriteNamed<Q>;
 
 type AnalyzeGeneral<DB, Q1 extends string, Names> =
 	Lex<Q1> extends infer T
@@ -56,9 +54,7 @@ type AnalyzeGeneral<DB, Q1 extends string, Names> =
 						) extends infer P
 						? ProjectStmt<
 								S,
-								WithNullParams<DB, NullParams<P>>,
-								[],
-								{}
+								QueryContext<ProjectionDb<DB, P, T>, [], {}>
 							> extends infer C
 							? C extends Cols | null
 								? {
@@ -76,6 +72,13 @@ type AnalyzeGeneral<DB, Q1 extends string, Names> =
 				: never
 			: T
 		: never;
+
+// Only casts read parameter nullability. Retain metadata for an explicit metadata-name lookup too.
+type ProjectionDb<DB, P, T extends Toks> = [
+	Extract<T[number], OpTok<"::"> | WordTok<"cast"> | IdTok<"$nullParams">>,
+] extends [never]
+	? DB
+	: WithNullParams<DB, NullParams<P>>;
 
 /** Parameters that accept null, with the same rule the parameter types use. */
 type NullParams<P> = {
@@ -100,14 +103,14 @@ type ParamsOfStmt<
 	SkipTargets extends boolean = false,
 > = SettleSortKeys<
 	S extends SelectStmt
-		? ParamsOfSelect<S, DB, [], {}, never, SkipTargets>
+		? ParamsOfSelect<S, QueryContext<DB, [], {}>, SkipTargets>
 		: S extends DmlStmt
-			? ParamsOfDml<S, DB, {}, never>
+			? ParamsOfDml<S, DB, {}>
 			: S extends {
 						readonly t: "declare_cursor";
 						readonly q: infer Q extends SelectStmt;
 					}
-				? ParamsOfSelect<Q, DB, [], {}, never>
+				? ParamsOfSelect<Q, QueryContext<DB, [], {}>>
 				: never
 >;
 

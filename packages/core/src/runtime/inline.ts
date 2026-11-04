@@ -5,7 +5,6 @@ import {
 	QUOTED,
 	replaceSql,
 	type Spliceable,
-	sqlMatches,
 } from "./splice.js";
 
 /** Markers with one random prefix. */
@@ -64,6 +63,8 @@ function issue(id: string): Generation {
 
 /** A marker was used. */
 function settle(id: string): void {
+	pending.delete(id);
+	fragments.delete(id);
 	const owner = owners.get(id);
 	if (owner === undefined) return;
 	owners.delete(id);
@@ -184,7 +185,6 @@ function take(value: unknown): unknown {
 			"typesql: this sql.json() / sql.param() value was already used by another statement; call it once per statement",
 		);
 	const v = pending.get(id);
-	pending.delete(id);
 	settle(id);
 	return v;
 }
@@ -205,13 +205,11 @@ export function resolveInline(
 	const values: unknown[] = [];
 	const used: string[] = [];
 	let k = start;
-	let out = "";
-	let last = 0;
-	for (const match of sqlMatches(text, inline)) {
+	const out = replaceSql(text, inline, (match) => {
 		const m = match[0];
 		const id = match[1];
 		if (id === undefined) {
-			if (!marks.some((mark) => m.includes(mark))) continue;
+			if (!marks.some((mark) => m.includes(mark))) return m;
 			const where =
 				m[0] === "'"
 					? "a quoted string"
@@ -228,19 +226,11 @@ export function resolveInline(
 			);
 		const value = pending.get(id);
 		used.push(id);
-		out += text.slice(last, match.index);
-		if (isEmpty(value)) out += "DEFAULT";
-		else {
-			values.push(value);
-			out += `$${++k}`;
-		}
-		last = match.index + m.length;
-	}
-	out += text.slice(last);
-	for (const t of used) {
-		pending.delete(t);
-		settle(t);
-	}
+		if (isEmpty(value)) return "DEFAULT";
+		values.push(value);
+		return `$${++k}`;
+	});
+	for (const t of used) settle(t);
 	if (out.includes("\u0000"))
 		throw new Error(
 			"typesql: the SQL text contains a NUL character that is not a sql.param() token",
@@ -313,10 +303,7 @@ export function resolveFragments(
 		slots[name] = fragment;
 		return `{${name}}`;
 	});
-	for (const id of used) {
-		fragments.delete(id);
-		settle(id);
-	}
+	for (const id of used) settle(id);
 	return { text: out, slots };
 }
 

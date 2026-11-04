@@ -1,0 +1,19 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`compiler-lib-check > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "PgParams": "[null | number]",
+      "PgRow": "{ display_name: null | string; email: string; id: number; title: null | string }",
+      "SqliteRow": "{ bio: null | string; id: number; name: string }",
+    },
+  },
+}
+`;

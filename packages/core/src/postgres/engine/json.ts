@@ -2,7 +2,7 @@ import type { ColInfo, Info } from "../../engine/types.js";
 import type { SqlError } from "../../errors.js";
 import type { TsShape } from "../../schema.js";
 import type { EnumsOf } from "../type-map/index.js";
-import type { Expr } from "./ast.js";
+import type { Expr, Tag } from "./ast.js";
 import type { Nx } from "./parser/util.js";
 import type {
 	AnyShaped,
@@ -126,7 +126,7 @@ export type BuildObject<
 		>
 	: Args[Nx<I>] extends undefined
 		? SqlError<"argument list must have even number of elements", null>
-		: Args[I] extends TagNull
+		: Args[I] extends Tag<"null">
 			? SqlError<"null value not allowed for object key", null>
 			: KeyOf<Args[I]> extends infer K extends string
 				? BuildObject<
@@ -395,5 +395,3 @@ type JsonOfType<T extends string, DB> = T extends AnyShaped
 						: T extends keyof EnumsOf<DB>
 							? EnumsOf<DB>[T]
 							: unknown;
-
-type TagNull = { readonly t: "null" };

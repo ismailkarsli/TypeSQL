@@ -1,5 +1,65 @@
 # @typesql/prisma
 
+## 6.0.2
+
+### Patch Changes
+
+- Updated dependencies:
+  - @typesql/core@6.0.2
+
+## 6.0.1
+
+### Patch Changes
+
+- Updated dependencies:
+  - @typesql/core@6.0.1
+
+## 6.0.0
+
+### Patch Changes
+
+- Updated dependencies:
+  - @typesql/core@6.0.0
+
+## 5.0.4
+
+### Patch Changes
+
+- Updated dependencies:
+  - @typesql/core@5.0.4
+
+## 5.0.3
+
+### Patch Changes
+
+- Updated dependencies:
+  - @typesql/core@5.0.3
+
+## 5.0.2
+
+### Patch Changes
+
+- Updated dependencies:
+  - @typesql/core@5.0.2
+
+## 5.0.1
+
+### Patch Changes
+
+- Updated dependencies:
+  - @typesql/core@5.0.1
+
+## 5.0.0
+
+### Major Changes
+
+- Query inference, migrations and database adapters share smaller implementations while retaining the supported SQL workflows.
+
+### Patch Changes
+
+- Updated dependencies:
+  - @typesql/core@5.0.0
+
 ## 4.0.1
 
 ### Patch Changes

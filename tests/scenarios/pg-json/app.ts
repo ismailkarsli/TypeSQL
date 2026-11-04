@@ -1,6 +1,7 @@
-import { Pool } from "pg";
-import { createSql } from "@typesql/pg";
 import type { Col, Json } from "@typesql/core/postgres";
+import { createSql } from "@typesql/pg";
+import { Pool } from "pg";
+
 interface DB {
 	users: {
 		id: Col<"int4">;

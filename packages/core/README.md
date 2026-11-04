@@ -43,8 +43,6 @@ const query = sql(
 sql("SELECT emial FROM users");
 ```
 
-[Open the example in the TypeScript Playground](https://www.typescriptlang.org/play/?moduleResolution=100#code/JYWwDg9gTgLgBAbzgYygUwIYzQZQI4A2ANHDAJ5hpwAKGUGIAzgCoVonmVwBKEA7qy4BfOADMoEEHABEAAU5pGhAPTJoaaQG4AUKEixEpNnADCEYnEiMYAc3SM4I8ZJny2SgqvXKrt+1u1dADtsKFEMZCoAEQAhRG0ASABXRjQoRgAueISE4AATLLMCAB5pYBCAFmkSJAALDEYotHCkghgsmCgkqiEAPh0ctBAMYAJC81LsAA8YaX7EhLzgRjACDDIAfSCGNHGS6WnZmrgg1rWAIwJd0i6e+ZzUTGw8jaw9ydBFGAYwGAAvaqGeqNZoYVrtG7dRz3IQDXyZbK5AqmCZlEIADkBdQaTRabQ6t2hAwSYJgtWgG3y7zRMCq9wSMGAMCu1MOc2J5wgeTIrLQMyxJzOGEu106UL6A1h2iEgTUQWscA8cAAvCh0FhcIRirFegAKXx2RQASh02jlCrwKsVhF1iQABjgAKIAGUdJmYcCSADp8iRvUMRhYwF7Gcy0No4JGo9GYwAxbgAeQAsp7UulPXBXbGPQApBMASQAcpYINYHGA4Ani8HSeSoJS8lbvfkIzG21GAOoACUd3Ednp9jdVABIAIx2oiJADsk5N2gUPH4Vt4AjYxQUEFEcDw8wXtHoTCt+4YLDXG63O9N5vg1iwDlVHltCQdLrdHtrFN9KAgSRCuoAVEaJDDFMuqhlcRpwAAgjgcBrNgCrxsmJZlnAADiiYAKrUHAMQAJpwB+9b5BO2hzguODfDA96LqulDrmwm6KlRjDzGaEDyvAAajFa0gYHkGCyHyPxXF6aggAE15qk8aBDtaBBPnaRZOtwHpFswCapmkDi6txBCQQAalBzqYY6sG6sOCAeF6YB0AwunDKMRpCJBfbMJh3CFkWaFwF+jwai8WCkeRxgmOqzzLvwghoAxlBMf5zxsY+L6uu6JwgFQSEpik2l2nOyXKb2amFhpKHUXAYFMhBcBGSZZkVWORoTjIXZoAQBAQNIc5AA) <span data-playground="core"></span>: edit the SQL and hover the types, with nothing to install. The Playground runs TypeScript 6, so treat it as a demo.
-
 For SQLite, import `sqlite` and the schema markers from `@typesql/core/sqlite` and use SQLite's type names (`integer`, `text`, `real`, `blob`). See [SQLite](https://typesql.karsli.net/guide/sqlite).
 
 ## Run queries
@@ -81,20 +79,20 @@ import { createMigrator, migration, type SchemaOf } from "@typesql/core/migratio
 export const createUsers = migration("postgres", {
   name: "create-users",
   up: async (db) => {
-    const users = await db.add("CREATE TABLE users (id serial PRIMARY KEY, name text NOT NULL)");
+    const users = await db.ddl("CREATE TABLE users (id serial PRIMARY KEY, name text NOT NULL)");
     await users("INSERT INTO users (name) VALUES ($1)", "Ada").execute();
     return users;
   },
   down: async (db) => {
-    await db.add("DROP TABLE users");
+    await db.ddl("DROP TABLE users");
   },
 });
 
 export const addBio = migration(createUsers, {
   name: "add-bio",
-  up: async (db) => db.add("ALTER TABLE users ADD COLUMN bio text"),
+  up: async (db) => db.ddl("ALTER TABLE users ADD COLUMN bio text"),
   down: async (db) => {
-    await db.add("ALTER TABLE users DROP COLUMN bio");
+    await db.ddl("ALTER TABLE users DROP COLUMN bio");
   },
 });
 
@@ -107,21 +105,13 @@ await createMigrator({
 }).latest();
 ```
 
-Await each `.add()` and keep the context it returns: it carries the changed schema. `up` returns its final context.
+Await each `.ddl()` and keep the context it returns: it carries the changed schema. `up` returns its final context.
 
-`createMigrator(config)` takes the migrations as an array or as a directory of files (`migrationsDir`, one default export per file, in filename order), and connects with `url` (PostgreSQL, through the optional peer dependency `pg`), `db` (a SQLite file, through node:sqlite) or your own `execute`. `latest()`, `up()` and `down()` run each migration and its history row in one transaction, under a lock, and every command first checks that the applied migrations, recorded by name (a migration's `name` in an array, its file name in a directory), are the first ones, in order. Array mode with `execute` loads no Node built-ins, so it runs in Cloudflare Workers, Bun and Deno; set `transaction: false` for Cloudflare D1. In directory mode, the migrator also writes the schema to `db.ts`, and [`@typesql/cli`](https://www.npmjs.com/package/@typesql/cli) runs it as `typesql migrate`.
+`createMigrator(config)` takes the migrations as an array or as a directory of files (`migrationsDir`, one default export per file, in filename order), and connects with `url` (PostgreSQL, through the optional peer dependency `pg`), `db` (a SQLite file, through node:sqlite) or your own `execute`. `latest()`, `up()` and `down()` run each migration and its history row in one transaction, under a lock for that migration, and each database command checks that the applied migrations, recorded by name (a migration's `name` in an array, its file name in a directory), are the first ones, in order. Array mode with `execute` loads no Node built-ins, so it runs in Cloudflare Workers, Bun and Deno; set `transaction: false` for Cloudflare D1. In directory mode, the migrator also writes the schema to `db.ts`, and [`@typesql/cli`](https://www.npmjs.com/package/@typesql/cli) runs it as `typesql migrate`.
 
 See the [migration guide](https://typesql.karsli.net/guide/migrations).
 
-## Documentation
-
-The full guide is at **[typesql.karsli.net](https://typesql.karsli.net)**. It covers the [schema](https://typesql.karsli.net/guide/schema), [parameters](https://typesql.karsli.net/guide/parameters), [writing data](https://typesql.karsli.net/guide/writing-data), [dynamic SQL](https://typesql.karsli.net/guide/dynamic-sql), [migrations](https://typesql.karsli.net/guide/migrations) and [known limits](https://typesql.karsli.net/guide/limits).
-
-Upgrading from an earlier version? The [upgrade guide](https://typesql.karsli.net/guide/upgrading) lists every breaking change with the code to change, and the [changelog](https://typesql.karsli.net/changelog) every release since 1.0.0.
-
-## License
-
-[MIT](LICENSE)
+## Plugins
 
 Use `sql.withPlugin(new CasePlugin())` to accept camelCase write keys and return camelCase rows. Import `CasePlugin` from `@typesql/core`. The inferred input and output types follow the runtime conversion; JSON keys stay unchanged. SQL text and `sql.id()` use database identifiers. Use the original SQL instance for snake_case write objects.
 
@@ -134,4 +124,14 @@ const query = appSql(`UPDATE users SET ${changes} RETURNING display_name`);
 // query.execute() returns rows with displayName.
 ```
 
-`withPlugin()` returns a new SQL instance and preserves transactions. Custom plugins implement `SqlPlugin<Types>` with `transformInput(value, context)` and/or `transformOutput(row)`. Their `PluginTypes` describe the accepted input, encoded database input, and returned row using `this["value"]`. Inputs encode in reverse registration order; outputs transform in registration order. Positional and named arguments, prepared queries, write helpers, and `mapRows()` use the same pipeline. See [plugins](https://typesql.karsli.net/guide/queries#plugins) and the [custom plugin example](./examples/plugins.ts).
+`withPlugin()` returns a new SQL instance and preserves transactions. Custom plugins implement `SqlPlugin<Types>` with `transformInput(value, context)` and/or `transformOutput(row)`. Their `PluginTypes` describe the accepted input, encoded database input, and returned row using `this["value"]`. Inputs encode in reverse registration order; outputs transform in registration order. Positional and named arguments, prepared queries, write helpers, and `mapRows()` use the same pipeline. See [plugins](https://typesql.karsli.net/guide/queries#plugins) and the [custom plugin example](https://github.com/ismailkarsli/TypeSQL/blob/main/packages/core/examples/plugins.ts).
+
+## Documentation
+
+The full guide is at **[typesql.karsli.net](https://typesql.karsli.net)**. It covers the [schema](https://typesql.karsli.net/guide/schema), [parameters](https://typesql.karsli.net/guide/parameters), [writing data](https://typesql.karsli.net/guide/writing-data), [dynamic SQL](https://typesql.karsli.net/guide/dynamic-sql), [migrations](https://typesql.karsli.net/guide/migrations) and [known limits](https://typesql.karsli.net/guide/limits).
+
+Upgrading from an earlier version? The [upgrade guide](https://typesql.karsli.net/guide/upgrading) lists every breaking change with the code to change, and the [changelog](https://typesql.karsli.net/changelog) every release since 1.0.0.
+
+## License
+
+[MIT](LICENSE)

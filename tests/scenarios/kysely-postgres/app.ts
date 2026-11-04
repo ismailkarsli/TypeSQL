@@ -1,7 +1,8 @@
-import { Kysely, Generated, PostgresDialect } from "kysely";
-import { createSql } from "@typesql/kysely";
 import { postgres } from "@typesql/core/postgres";
+import { createSql } from "@typesql/kysely";
+import { type Generated, Kysely, PostgresDialect } from "kysely";
 import { Pool } from "pg";
+
 const connection = new Pool({ connectionString: process.env.DATABASE_URL });
 await connection.query(
 	"CREATE TABLE users (id serial PRIMARY KEY, name text NOT NULL, bio text)",

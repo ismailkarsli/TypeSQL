@@ -14,13 +14,13 @@ import type {
 } from "./column.js";
 import type { QueryCols, StoredType } from "./query.js";
 import type {
+	AlreadyExists,
 	CanCreate,
 	ColsOf,
 	GetRel,
 	IsViewVal,
-	MissingRel,
+	NoRelation,
 	PutRel,
-	Written,
 } from "./relation.js";
 
 export type ApplyTypedTable<
@@ -34,9 +34,7 @@ export type ApplyTypedTable<
 				`typed table "${Ref["name"]}" (CREATE TABLE ... OF ${Of["name"]}) is not supported: TypeSQL does not track the columns of composite types; list the columns`,
 				null
 			>
-		: Ine extends true
-			? DB
-			: SqlError<`relation "${Ref["name"]}" already exists`, null>;
+		: AlreadyExists<DB, Ine, `relation "${Ref["name"]}"`>;
 
 export type ApplyCreateTable<
 	DB,
@@ -48,47 +46,42 @@ export type ApplyCreateTable<
 	Inh,
 > =
 	GetRel<DB, Ref> extends null
-		? CanCreate<DB, Ref> extends infer E
-			? E extends AnyErr
-				? E
-				: BuildTable<DB, Ref["name"], Defs, Cons, Likes, Inh> extends infer Tbl
-					? Tbl extends AnyErr
-						? Tbl
-						: PutRel<DB, Ref, Tbl>
-					: never
-			: never
-		: Ine extends true
-			? DB
-			: SqlError<`relation "${Ref["name"]}" already exists`, null>;
+		? CanCreate<DB, Ref> extends AnyErr
+			? CanCreate<DB, Ref>
+			: BuildTable<DB, Ref["name"], Defs, Cons, Likes, Inh> extends infer Tbl
+				? Tbl extends AnyErr
+					? Tbl
+					: PutRel<DB, Ref, Tbl>
+				: never
+		: AlreadyExists<DB, Ine, `relation "${Ref["name"]}"`>;
 
 type BuildTable<DB, TN extends string, Defs, Cons, Likes, Inh> =
 	AddInherits<Inh, DB, {}> extends infer A0
 		? A0 extends AnyErr
 			? A0
-			: AddLikes<Likes, DB, A0, never> extends infer A1
-				? A1 extends readonly [infer Acc1, infer Seen1]
-					? AddDefs<Defs, Acc1, keyof A0, Seen1> extends infer A2
-						? A2 extends AnyErr
-							? A2
-							: PrimaryKey<Defs, Cons, A2, TN> extends infer Pk
-								? Pk extends readonly [infer P]
-									? ConNotNulls<Cons> extends infer NN
-										? [Exclude<NN, keyof A2>] extends [never]
-											? Rebuild<{
-													[K in keyof A2]: K extends P | NN
-														? WithNullable<A2[K], false>
-														: A2[K];
-												}>
-											: SqlError<
-													`column "${PickOne<Exclude<NN, keyof A2>> & string}" of relation "${TN}" does not exist`,
-													null
-												>
-										: never
-									: Pk
+			: AddLikes<Likes, DB, A0, never> extends readonly [
+						infer Acc1,
+						infer Seen1,
+					]
+				? AddDefs<Defs, Acc1, keyof A0, Seen1> extends infer A2
+					? A2 extends AnyErr
+						? A2
+						: PrimaryKey<Defs, Cons, A2, TN> extends readonly [infer P]
+							? ConNotNulls<Cons> extends infer NN
+								? [Exclude<NN, keyof A2>] extends [never]
+									? Rebuild<{
+											[K in keyof A2]: K extends P | NN
+												? WithNullable<A2[K], false>
+												: A2[K];
+										}>
+									: SqlError<
+											`column "${PickOne<Exclude<NN, keyof A2>> & string}" of relation "${TN}" does not exist`,
+											null
+										>
 								: never
-						: never
-					: A1
-				: never
+							: PrimaryKey<Defs, Cons, A2, TN>
+					: never
+				: AddLikes<Likes, DB, A0, never>
 		: never;
 
 type AddInherits<Ps, DB, Acc> = Ps extends readonly [
@@ -97,11 +90,7 @@ type AddInherits<Ps, DB, Acc> = Ps extends readonly [
 ]
 	? GetRel<DB, P> extends infer Rel
 		? Rel extends null
-			? MissingRel<
-					DB,
-					P,
-					SqlError<`relation "${Written<P>}" does not exist`, null>
-				>
+			? NoRelation<DB, P>
 			: IsViewVal<Rel> extends true
 				? SqlError<
 						`inherited relation "${P["name"]}" is not a table or foreign table`,
@@ -136,11 +125,7 @@ type AddLikes<Ls, DB, Acc, Seen> = Ls extends readonly [
 ]
 	? GetRel<DB, L["ref"]> extends infer Rel
 		? Rel extends null
-			? MissingRel<
-					DB,
-					L["ref"],
-					SqlError<`relation "${Written<L["ref"]>}" does not exist`, null>
-				>
+			? NoRelation<DB, L["ref"]>
 			: CopyCols<ColsOf<Rel>, L["defaults"]> extends infer C
 				? [keyof C & keyof Acc] extends [never]
 					? AddLikes<R, DB, Acc & C, Seen | keyof C>
@@ -226,23 +211,19 @@ type ConNotNulls<Cons> = Cons extends readonly (infer C)[]
 
 export type ApplyCreateTableAs<DB, Ine, Ref extends TableRef, Names, Q> =
 	GetRel<DB, Ref> extends null
-		? CanCreate<DB, Ref> extends infer E
-			? E extends AnyErr
-				? E
-				: QueryCols<
-							DB,
-							Q,
-							Names,
-							"too many column names were specified"
-						> extends infer M
-					? M extends AnyErr
-						? M
-						: PutRel<DB, Ref, CtasTable<M>>
-					: never
-			: never
-		: Ine extends true
-			? DB
-			: SqlError<`relation "${Ref["name"]}" already exists`, null>;
+		? CanCreate<DB, Ref> extends AnyErr
+			? CanCreate<DB, Ref>
+			: QueryCols<
+						DB,
+						Q,
+						Names,
+						"too many column names were specified"
+					> extends infer M
+				? M extends AnyErr
+					? M
+					: PutRel<DB, Ref, CtasTable<M>>
+				: never
+		: AlreadyExists<DB, Ine, `relation "${Ref["name"]}"`>;
 
 type CtasTable<M> = Rebuild<{
 	[K in keyof M]: MkCol<StoredType<M[K]>, true, false>;
