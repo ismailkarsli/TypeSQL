@@ -712,6 +712,10 @@
   dir: packages/pg
   intents:
     - smooth-teeth-punch
+"@typesql/pg@6.1.1":
+  dir: packages/pg
+  intents:
+    - modern-teeth-play
 "@typesql/postgres@0.0.2":
   dir: packages/postgres
   intents:
@@ -803,6 +807,10 @@
   dir: packages/postgres
   intents:
     - smooth-teeth-punch
+"@typesql/postgres@6.1.1":
+  dir: packages/postgres
+  intents:
+    - quiet-mugs-try
 "@typesql/prisma@0.0.2":
   dir: packages/prisma
   intents:

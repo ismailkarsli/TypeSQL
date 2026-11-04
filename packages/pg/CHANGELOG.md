@@ -1,5 +1,14 @@
 # @typesql/pg
 
+## 6.1.1
+
+### Patch Changes
+
+- The README and package homepage link to the merged PostgreSQL adapter page of the documentation.
+
+- Updated dependencies:
+  - @typesql/core@6.1.1
+
 ## 6.1.0
 
 ### Patch Changes
