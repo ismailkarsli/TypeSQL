@@ -80,8 +80,8 @@ pnpm release
 ```
 
 The workflow runs only when started by hand on `main`, with `pnpm release` or **Run workflow** on
-the Actions tab; pushing publishes nothing. Scenario tests, type checks, lint, Playground
-validation and documentation builds belong to `checks.yml`, which runs on pushes and pull requests (lint remains temporarily disabled
+the Actions tab; pushing publishes nothing. Scenario tests, type checks, lint and
+documentation builds belong to `checks.yml`, which runs on pushes and pull requests (lint remains temporarily disabled
 while repository-wide violations are addressed). Release does not rerun those checks;
 start it from a revision whose checks have passed. Its `publish` job runs `pnpm version -r` (bump
 versions, write changelog sections, update the ledger) and commits the result to `main` as

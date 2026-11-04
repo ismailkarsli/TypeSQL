@@ -67,14 +67,9 @@
 			"project": ["*.ts", "src/**/*.ts!"]
 		},
 		"packages/docs": {
-			"entry": [
-				"playground/*.ts",
-				"*.paths.ts",
-				"cloudflare.config.ts",
-				"wrangler.config.ts"
-			],
-			"project": ["*.ts", "playground/**/*.ts", ".vitepress/**/*.{ts,mts,vue}"],
-			"ignoreDependencies": ["@typesql/drizzle", "vue"]
+			"entry": ["*.paths.ts", "cloudflare.config.ts", "wrangler.config.ts"],
+			"project": ["*.ts", ".vitepress/**/*.{ts,mts,vue}"],
+			"ignoreDependencies": ["vue"]
 		},
 		"tests": {
 			"entry": ["scenario.test.ts", "support/observe.ts", "support/runtime.ts"],

@@ -11,20 +11,9 @@
 		"deploy": "pnpm build && cf deploy",
 		"typecheck": "tsrs -p tsconfig.json"
 	},
-	"dependencies": {
-		"@typesql/core": "workspace:*",
-		"@typesql/drizzle": "workspace:*",
-		"@typesql/kysely": "workspace:*",
-		"@typesql/pg": "workspace:*",
-		"@typesql/prisma": "workspace:*",
-		"@typesql/sqlite": "workspace:*"
-	},
 	"devDependencies": {
 		"@types/node": "^26.6.6",
-		"@types/pg": "^8.23.1",
 		"cf": "1.0.0-beta.26",
-		"pg": "^8.23.1",
-		"postgres": "^4.0.0",
 		"tsrs": "0.20.1-ts7.1.0-beta",
 		"typescript": "7.1.0-beta",
 		"vitepress": "1.6.4",

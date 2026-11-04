@@ -229,9 +229,6 @@ importers:
       knip:
         specifier: ^6.44.1
         version: 6.44.1
-      lz-string:
-        specifier: ^1.5.0
-        version: 1.5.0
       tsrs:
         specifier: 0.20.1-ts7.1.0-beta
         version: 0.20.1-ts7.1.0-beta
@@ -290,41 +287,13 @@ importers:
         version: 7.1.0-beta
 
   packages/docs:
-    dependencies:
-      '@typesql/core':
-        specifier: workspace:*
-        version: link:../core
-      '@typesql/drizzle':
-        specifier: workspace:*
-        version: link:../drizzle
-      '@typesql/kysely':
-        specifier: workspace:*
-        version: link:../kysely
-      '@typesql/pg':
-        specifier: workspace:*
-        version: link:../pg
-      '@typesql/prisma':
-        specifier: workspace:*
-        version: link:../prisma
-      '@typesql/sqlite':
-        specifier: workspace:*
-        version: link:../sqlite
     devDependencies:
       '@types/node':
         specifier: ^26.6.6
         version: 26.6.6
-      '@types/pg':
-        specifier: ^8.23.1
-        version: 8.23.1
       cf:
         specifier: 1.0.0-beta.26
         version: 1.0.0-beta.26(@types/node@26.6.6)
-      pg:
-        specifier: ^8.23.1
-        version: 8.23.1
-      postgres:
-        specifier: ^4.0.0
-        version: 4.0.0
       tsrs:
         specifier: 0.20.1-ts7.1.0-beta
         version: 0.20.1-ts7.1.0-beta
@@ -4702,10 +4671,6 @@ packages:
     resolution: {integrity: sha512-5J9ysMYUpYIg9RF2vJpy9SinEmSviFSe0GyPpCQ4L5QSkLAgeLXlTAOu2ZwWUU5m+0SBl6gUU1R1ZQB3aKypfA==}
     engines: {bun: '>=1.0.0', deno: '>=1.30.0', node: '>=8.0.0'}
 
-  lz-string@1.5.0:
-    resolution: {integrity: sha512-h5bgJWpxJNswbU7qCrV0tIKQCaS3blPDrqKWx+QxzuzL1zGUzij9XCWLrSLsJPu5t+eWA/ycetzYAO5IOMcWAQ==}
-    hasBin: true
-
   magic-string@0.30.21:
     resolution: {integrity: sha512-vd2F4YUyEXKGcLHoq+TEyCjxueSeHnFxyyjNp80yg0XV4vUhnDer/lvvlqM/arB5bXQN5K2/3oinyCRyx8T2CQ==}
 
@@ -8073,8 +8038,6 @@ snapshots:
       yallist: 4.0.0
 
   lru.min@1.1.5: {}
-
-  lz-string@1.5.0: {}
 
   magic-string@0.30.21:
     dependencies:
