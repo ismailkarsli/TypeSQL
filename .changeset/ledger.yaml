@@ -373,6 +373,10 @@
   dir: packages/core
   intents:
     - tall-boats-clap
+"@typesql/core@6.0.3":
+  dir: packages/core
+  intents:
+    - smooth-teeth-punch
 "@typesql/drizzle@0.0.2":
   dir: packages/drizzle
   intents:
@@ -532,6 +536,10 @@
   dir: packages/kysely
   intents:
     - cool-mugs-grow
+"@typesql/kysely@6.0.3":
+  dir: packages/kysely
+  intents:
+    - smooth-teeth-punch
 "@typesql/language-server@0.0.1":
   dir: packages/language-server
   intents:
@@ -692,6 +700,10 @@
   dir: packages/pg
   intents:
     - cool-mugs-grow
+"@typesql/pg@6.0.3":
+  dir: packages/pg
+  intents:
+    - smooth-teeth-punch
 "@typesql/postgres@0.0.2":
   dir: packages/postgres
   intents:
@@ -779,6 +791,10 @@
   dir: packages/postgres
   intents:
     - ancient-eggs-float
+"@typesql/postgres@6.0.3":
+  dir: packages/postgres
+  intents:
+    - smooth-teeth-punch
 "@typesql/prisma@0.0.2":
   dir: packages/prisma
   intents:
@@ -864,6 +880,10 @@
   dir: packages/prisma
   intents:
     - cool-mugs-grow
+"@typesql/prisma@6.0.3":
+  dir: packages/prisma
+  intents:
+    - smooth-teeth-punch
 "@typesql/sqlite@0.0.1":
   dir: packages/sqlite
   intents:
@@ -905,6 +925,10 @@
   dir: packages/sqlite
   intents:
     - cool-mugs-grow
+"@typesql/sqlite@6.0.3":
+  dir: packages/sqlite
+  intents:
+    - smooth-teeth-punch
 typesql@0.0.1:
   dir: packages/vscode
   intents:
