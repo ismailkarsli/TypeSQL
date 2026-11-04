@@ -410,6 +410,10 @@
   dir: packages/core
   intents:
     - curvy-pens-obey
+"@typesql/core@6.1.4":
+  dir: packages/core
+  intents:
+    - ancient-kiwis-wonder
 "@typesql/drizzle@0.0.2":
   dir: packages/drizzle
   intents:
@@ -1032,6 +1036,10 @@
   dir: packages/sqlite
   intents:
     - curvy-pens-obey
+"@typesql/sqlite@6.1.4":
+  dir: packages/sqlite
+  intents:
+    - little-forks-promise
 typesql@0.0.1:
   dir: packages/vscode
   intents:

@@ -1,5 +1,11 @@
 # @typesql/core
 
+## 6.1.4
+
+### Patch Changes
+
+- The README links to the new "Using `sql`" and Plugins pages of the documentation.
+
 ## 6.1.3
 
 ### Patch Changes

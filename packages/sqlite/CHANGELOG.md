@@ -1,5 +1,14 @@
 # @typesql/sqlite
 
+## 6.1.4
+
+### Patch Changes
+
+- The README links to the single SQLite page of the documentation.
+
+- Updated dependencies:
+  - @typesql/core@6.1.4
+
 ## 6.1.3
 
 ### Patch Changes
