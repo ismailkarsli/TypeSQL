@@ -1,5 +1,17 @@
 # @typesql/docs
 
+## 0.0.42
+
+### Patch Changes
+
+- Updated dependencies:
+  - @typesql/core@6.0.1
+  - @typesql/drizzle@6.0.1
+  - @typesql/kysely@6.0.1
+  - @typesql/pg@6.0.1
+  - @typesql/prisma@6.0.1
+  - @typesql/sqlite@6.0.1
+
 ## 0.0.41
 
 ### Patch Changes

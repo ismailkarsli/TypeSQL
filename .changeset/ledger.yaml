@@ -365,6 +365,10 @@
   dir: packages/core
   intents:
     - sour-pears-kneel
+"@typesql/core@6.0.1":
+  dir: packages/core
+  intents:
+    - modern-cooks-compete
 "@typesql/drizzle@0.0.2":
   dir: packages/drizzle
   intents:
