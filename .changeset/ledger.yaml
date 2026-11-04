@@ -1,3 +1,7 @@
+"@typesql/better-auth@6.1.0":
+  dir: packages/better-auth
+  intents:
+    - hungry-donkeys-call
 "@typesql/cli@0.0.1":
   dir: packages/cli
   intents:
@@ -377,6 +381,10 @@
   dir: packages/core
   intents:
     - smooth-teeth-punch
+"@typesql/core@6.1.0":
+  dir: packages/core
+  intents:
+    - wild-bears-lick
 "@typesql/drizzle@0.0.2":
   dir: packages/drizzle
   intents:
