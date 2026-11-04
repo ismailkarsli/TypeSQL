@@ -38,8 +38,8 @@
 		"postgres": ">=3"
 	},
 	"devDependencies": {
-		"tsrs": "0.20.1-ts7.1.0-beta",
-		"typescript": "7.1.0-beta"
+		"tsrs": "catalog:",
+		"typescript": "catalog:"
 	},
 	"homepage": "https://typesql.karsli.net/adapters/postgresql",
 	"bugs": {

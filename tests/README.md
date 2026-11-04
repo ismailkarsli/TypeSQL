@@ -1,6 +1,6 @@
 # Scenario tests
 
-Requires Linux, Node.js 26 (CI pins 26.8.1), the repository's pnpm version, and Bun (CI pins 1.4.3). Start PostgreSQL yourself with `docker compose -f tests/compose.yaml up -d --wait`, then run from the repository root:
+Requires Linux, Node.js 26 (CI pins 26.8.1) and the repository's pnpm version. pnpm installs Bun for the scenarios that run it, at the version in the root catalog. Start PostgreSQL yourself with `docker compose -f tests/compose.yaml up -d --wait`, then run from the repository root:
 
 ```sh
 pnpm install --frozen-lockfile

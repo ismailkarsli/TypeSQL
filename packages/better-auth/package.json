@@ -37,9 +37,9 @@
 	},
 	"devDependencies": {
 		"@typesql/core": "workspace:*",
-		"better-auth": "^1.7.14",
-		"tsrs": "0.20.1-ts7.1.0-beta",
-		"typescript": "7.1.0-beta"
+		"better-auth": "catalog:",
+		"tsrs": "catalog:",
+		"typescript": "catalog:"
 	},
 	"homepage": "https://github.com/ismailkarsli/typesql/tree/main/packages/better-auth#readme",
 	"bugs": {

@@ -12,6 +12,7 @@
 		"@types/bun": "catalog:"
 	},
 	"devDependencies": {
+		"bun": "catalog:",
 		"typescript": "catalog:",
 		"@types/node": "catalog:"
 	},

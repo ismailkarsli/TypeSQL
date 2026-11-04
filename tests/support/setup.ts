@@ -51,9 +51,6 @@ async function environment() {
 		process.arch !== "x64"
 	)
 		throw new Error("Infrastructure: expected Node 26.8.1 on linux/x64");
-	const bun = await required(workspace, ["bun", "--version"]);
-	if (bun.stdout.trim() !== "1.4.3")
-		throw new Error("Infrastructure: expected bun 1.4.3");
 	await ready();
 	await required(
 		repository,

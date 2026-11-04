@@ -45,9 +45,9 @@
 		"@prisma/client": ">=7"
 	},
 	"devDependencies": {
-		"@prisma/client": "^7.10.1",
-		"tsrs": "0.20.1-ts7.1.0-beta",
-		"typescript": "7.1.0-beta"
+		"@prisma/client": "catalog:",
+		"tsrs": "catalog:",
+		"typescript": "catalog:"
 	},
 	"homepage": "https://typesql.karsli.net/adapters/prisma",
 	"bugs": {

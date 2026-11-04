@@ -340,13 +340,13 @@
 		"package": "pnpm run build && vsce package --no-dependencies --out typesql.vsix"
 	},
 	"devDependencies": {
-		"@types/node": "^26.6.6",
+		"@types/node": "catalog:",
 		"@types/vscode": "~1.144.0",
 		"@typesql/language-server": "workspace:*",
-		"@vscode/vsce": "^4.1.0",
-		"esbuild": "^0.28.2",
-		"ovsx": "^1.3.0",
-		"tsrs": "0.20.1-ts7.1.0-beta",
-		"typescript": "7.1.0-beta"
+		"@vscode/vsce": "catalog:",
+		"esbuild": "catalog:",
+		"ovsx": "catalog:",
+		"tsrs": "catalog:",
+		"typescript": "catalog:"
 	}
 }

@@ -31,9 +31,9 @@
 		"typecheck": "tsrs -p tsconfig.json --noEmit"
 	},
 	"devDependencies": {
-		"@types/node": "^26.6.6",
-		"tsrs": "0.20.1-ts7.1.0-beta",
-		"typescript": "7.1.0-beta"
+		"@types/node": "catalog:",
+		"tsrs": "catalog:",
+		"typescript": "catalog:"
 	},
 	"keywords": [
 		"sql",

@@ -22,10 +22,10 @@
 		"docs:deploy": "pnpm --filter @typesql/docs run deploy"
 	},
 	"devDependencies": {
-		"@biomejs/biome": "2.6.4",
-		"@types/node": "^26.6.6",
-		"knip": "^6.44.1",
-		"tsrs": "0.20.1-ts7.1.0-beta",
-		"typescript": "7.1.0-beta"
+		"@biomejs/biome": "catalog:",
+		"@types/node": "catalog:",
+		"knip": "catalog:",
+		"tsrs": "catalog:",
+		"typescript": "catalog:"
 	}
 }
