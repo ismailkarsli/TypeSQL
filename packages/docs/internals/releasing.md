@@ -86,14 +86,16 @@ the canonical repository, the event and the branch. Scenario tests, type checks,
 documentation builds belong to `checks.yml`, which runs on pushes and pull requests (lint remains temporarily disabled
 while repository-wide violations are addressed). Release does not rerun those checks;
 start it from a revision whose checks have passed. Its `publish` job runs `pnpm version -r` (bump
-versions, write changelog sections, update the ledger) and commits the result to `main` as
-`chore: release <version>` from `github-actions[bot]`, then builds the
+versions, write changelog sections, update the ledger) and commits the result to `main` from
+`github-actions[bot]`, then builds the
 packages, runs `pnpm publish -r`, and creates the GitHub releases. `main` requires signed
 commits, so the release commit is made through GitHub's API (`tools/github-commit.ts`),
 which signs it, not with `git push`. It is rejected, and nothing is published, when `main`
 moved after the run started; start it again. A commit made with the workflow's token starts no
 other workflow, so `checks` does not run on the release commit, which changes only versions and
-changelogs. The build checks out the exact commit returned by the commit API, even if `main`
+changelogs. Its subject names a package for each released version, for example
+`chore: release @typesql/core 6.1.2 (+8 packages), @typesql/language-server 1.0.1`, and its body
+lists every released package with its version (`tools/release-message.ts`). The build checks out the exact commit returned by the commit API, even if `main`
 advances immediately afterward; deployment jobs use that same commit.
 
 `pnpm publish -r` publishes every public package whose manifest version is not on the registry
