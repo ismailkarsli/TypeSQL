@@ -1,7 +1,7 @@
 export type QueryFn = (
 	text: string,
 	values?: unknown[],
-) => Promise<{ readonly rows: readonly any[] }>;
+) => Promise<{ readonly rows: readonly unknown[] }>;
 
 export interface NullabilityOptions {
 	readonly notNull?: (view: string, column: string) => boolean;
@@ -57,23 +57,27 @@ function tokenize(s: string): Token[] {
 function parseNodeTree(text: string): NodeValue {
 	const toks = tokenize(text);
 	let p = 0;
-	const isLabel = (t: Token | undefined): boolean =>
+	const isLabel = (t: Token | undefined): t is string =>
 		typeof t === "string" && t.startsWith(":");
 	const value = (): NodeValue => {
 		const t = toks[p++];
 		if (t === "{") {
-			const node: Record<string, NodeValue> = { _: toks[p++] as string };
+			const tag = toks[p++];
+			const fields: [string, NodeValue][] = [];
 			while (p < toks.length && toks[p] !== "}") {
 				const label = toks[p++];
 				if (!isLabel(label)) continue;
 				if (toks[p] === "}" || isLabel(toks[p])) {
-					node[(label as string).slice(1)] = null;
+					fields.push([label.slice(1), null]);
 					continue;
 				}
-				node[(label as string).slice(1)] = value();
+				fields.push([label.slice(1), value()]);
 			}
 			p++;
-			return node as Node;
+			return {
+				_: typeof tag === "object" ? tag.str : (tag ?? ""),
+				...Object.fromEntries(fields),
+			};
 		}
 		if (t === "(") {
 			const list: NodeValue[] = [];
@@ -87,10 +91,12 @@ function parseNodeTree(text: string): NodeValue {
 	return value();
 }
 
+const isList = (x: NodeValue | undefined): x is readonly NodeValue[] =>
+	Array.isArray(x);
 const list = (x: NodeValue | undefined): readonly NodeValue[] =>
-	Array.isArray(x) ? x : [];
+	isList(x) ? x : [];
 const node = (x: NodeValue | undefined): Node | null =>
-	x !== null && typeof x === "object" && !Array.isArray(x) ? (x as Node) : null;
+	x !== null && typeof x === "object" && !isList(x) ? x : null;
 const str = (x: NodeValue | undefined): string | null =>
 	typeof x === "string" ? x : null;
 
@@ -159,33 +165,66 @@ const NON_NULL_WINDOW_FUNCTIONS = new Set([
 	"cume_dist",
 ]);
 
-const NON_NULL_SRF_COLUMNS: Readonly<Record<string, readonly number[]>> = {
-	generate_series: [1],
-	generate_subscripts: [1],
-	jsonb_each: [1, 2],
-	json_each: [1, 2],
-	jsonb_each_text: [1],
-	json_each_text: [1],
-	jsonb_object_keys: [1],
-	json_object_keys: [1],
-	jsonb_array_elements: [1],
-	json_array_elements: [1],
-	regexp_matches: [1],
-	regexp_split_to_table: [1],
-};
+const NON_NULL_SRF_COLUMNS: ReadonlyMap<string, readonly number[]> = new Map([
+	["generate_series", [1]],
+	["generate_subscripts", [1]],
+	["jsonb_each", [1, 2]],
+	["json_each", [1, 2]],
+	["jsonb_each_text", [1]],
+	["json_each_text", [1]],
+	["jsonb_object_keys", [1]],
+	["json_object_keys", [1]],
+	["jsonb_array_elements", [1]],
+	["json_array_elements", [1]],
+	["regexp_matches", [1]],
+	["regexp_split_to_table", [1]],
+]);
 
 const NULLABLE_OPERATORS = new Set(["->", "->>", "#>", "#>>", "@@", "@?"]);
 
-interface Proc {
+interface RuleRow {
+	readonly ev_action: string;
+	readonly relname: string;
+}
+interface Operator {
 	readonly name: string;
-	readonly ret: string;
 	readonly system: boolean;
+}
+interface Proc extends Operator {
+	readonly ret: string;
 }
 interface Att {
 	readonly attnum: number;
 	readonly notnull: boolean;
 	readonly relkind: string;
 }
+
+// Rows of the catalog queries below, as node-postgres returns them.
+const isRuleRow = (row: unknown): row is RuleRow =>
+	typeof row === "object" &&
+	row !== null &&
+	"ev_action" in row &&
+	typeof row.ev_action === "string" &&
+	"relname" in row &&
+	typeof row.relname === "string";
+const isOperator = (row: unknown): row is Operator =>
+	typeof row === "object" &&
+	row !== null &&
+	"name" in row &&
+	typeof row.name === "string" &&
+	"system" in row &&
+	typeof row.system === "boolean";
+const isProc = (row: unknown): row is Proc =>
+	isOperator(row) && "ret" in row && typeof row.ret === "string";
+const isAtt = (row: unknown): row is Att =>
+	typeof row === "object" &&
+	row !== null &&
+	"attnum" in row &&
+	typeof row.attnum === "number" &&
+	"notnull" in row &&
+	typeof row.notnull === "boolean" &&
+	"relkind" in row &&
+	typeof row.relkind === "string";
 
 export class ViewNullability {
 	private readonly query: QueryFn;
@@ -210,8 +249,8 @@ export class ViewNullability {
         WHERE r.ev_class = $1 AND r.rulename = '_RETURN'`,
 			[relid],
 		);
-		const row = rows[0] as { ev_action: string; relname: string } | undefined;
-		if (!row) return [];
+		const row = rows[0];
+		if (!isRuleRow(row)) return [];
 		const query = node(list(parseNodeTree(row.ev_action))[0]);
 		if (!query) return [];
 		const out: boolean[] = [];
@@ -234,7 +273,8 @@ export class ViewNullability {
     FROM pg_proc p JOIN pg_type t ON t.oid = p.prorettype WHERE p.oid = $1`,
 			[oid],
 		);
-		return rows[0] as Proc | undefined;
+		const proc = rows[0];
+		return isProc(proc) ? proc : undefined;
 	}
 
 	private async strictOperator(e: Node): Promise<boolean> {
@@ -243,8 +283,8 @@ export class ViewNullability {
     FROM pg_operator o WHERE o.oid = $1`,
 			[String(e.opno)],
 		);
-		const op = rows[0] as Pick<Proc, "name" | "system"> | undefined;
-		return op?.system === true && !NULLABLE_OPERATORS.has(op.name);
+		const op = rows[0];
+		return isOperator(op) && op.system && !NULLABLE_OPERATORS.has(op.name);
 	}
 
 	private columns(relid: string): Promise<Att[]> {
@@ -260,7 +300,7 @@ export class ViewNullability {
            FROM pg_attribute a JOIN pg_class c ON c.oid = a.attrelid
           WHERE a.attrelid = $1 AND a.attnum > 0 AND NOT a.attisdropped`,
 			[relid],
-		).then(({ rows }) => rows as Att[]);
+		).then(({ rows }) => rows.filter(isAtt));
 	}
 
 	private async queryColumn(
@@ -320,7 +360,7 @@ export class ViewNullability {
 		const proc = await this.proc(String(call.funcid));
 		return (
 			proc?.system === true &&
-			(NON_NULL_SRF_COLUMNS[proc.name]?.includes(attno) ?? false)
+			(NON_NULL_SRF_COLUMNS.get(proc.name)?.includes(attno) ?? false)
 		);
 	}
 

@@ -13,7 +13,7 @@ export interface SqliteStatement {
 
 export interface SqliteDatabase {
 	prepare(sql: string): SqliteStatement;
-	exec(sql: string): unknown;
+	exec(sql: string): void;
 }
 
 interface Prepared {
@@ -23,28 +23,41 @@ interface Prepared {
 	readonly bare: boolean;
 }
 
+// Statements of the drivers differ: better-sqlite3 has `reader` and `pluck()`,
+// bun:sqlite `columnNames` and `safeIntegers()`, node:sqlite `columns()` and
+// `setReadBigInts()`.
+
+const hasColumns = (
+	stmt: SqliteStatement,
+): stmt is SqliteStatement & { columns(): readonly unknown[] } =>
+	"columns" in stmt && typeof stmt.columns === "function";
+
+const hasSetReadBigInts = (
+	stmt: SqliteStatement,
+): stmt is SqliteStatement & { setReadBigInts(on: boolean): void } =>
+	"setReadBigInts" in stmt && typeof stmt.setReadBigInts === "function";
+
+const hasSafeIntegers = (
+	stmt: SqliteStatement,
+): stmt is SqliteStatement & { safeIntegers(on: boolean): void } =>
+	"safeIntegers" in stmt && typeof stmt.safeIntegers === "function";
+
 function isReader(stmt: SqliteStatement): boolean {
-	const s = stmt as {
-		readonly reader?: boolean;
-		readonly columnNames?: readonly string[];
-		columns?(): readonly unknown[];
-	};
-	if (typeof s.reader === "boolean") return s.reader;
-	if (Array.isArray(s.columnNames)) return s.columnNames.length > 0;
-	return typeof s.columns === "function" ? s.columns().length > 0 : true;
+	if ("reader" in stmt && typeof stmt.reader === "boolean") return stmt.reader;
+	if ("columnNames" in stmt && Array.isArray(stmt.columnNames))
+		return stmt.columnNames.length > 0;
+	return hasColumns(stmt) ? stmt.columns().length > 0 : true;
 }
 
 const isBetterSqlite3 = (stmt: SqliteStatement): boolean =>
-	typeof (stmt as { readonly reader?: unknown }).reader === "boolean" &&
-	typeof (stmt as { readonly pluck?: unknown }).pluck === "function";
+	"reader" in stmt &&
+	typeof stmt.reader === "boolean" &&
+	"pluck" in stmt &&
+	typeof stmt.pluck === "function";
 
 function readBigInts(stmt: SqliteStatement): void {
-	const s = stmt as {
-		setReadBigInts?(on: boolean): void;
-		safeIntegers?(on: boolean): unknown;
-	};
-	if (s.setReadBigInts) s.setReadBigInts(true);
-	else if (s.safeIntegers) s.safeIntegers(true);
+	if (hasSetReadBigInts(stmt)) stmt.setReadBigInts(true);
+	else if (hasSafeIntegers(stmt)) stmt.safeIntegers(true);
 	else
 		throw new Error(
 			"typesql: this driver cannot read integers as bigint per statement; enable it on the database (bun:sqlite: new Database(file, { safeIntegers: true }))",
@@ -64,9 +77,12 @@ function prepared(db: SqliteDatabase, text: string, bigint: boolean): Prepared {
 
 function bind(p: Prepared, values: readonly unknown[]): unknown[] {
 	if (p.names.length === 0) return [];
-	const params: Record<string, unknown> = {};
-	for (const n of p.names)
-		params[p.bare ? String(n) : `$${n}`] = sqliteValue(values[n - 1]);
+	const params = Object.fromEntries(
+		p.names.map((n) => [
+			p.bare ? String(n) : `$${n}`,
+			sqliteValue(values[n - 1]),
+		]),
+	);
 	return [params];
 }
 

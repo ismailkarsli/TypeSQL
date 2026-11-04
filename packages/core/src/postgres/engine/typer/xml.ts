@@ -1,12 +1,15 @@
 import type { ColInfo, Cols, Ctx, Info } from "../../../engine/types.js";
 import type { SqlError } from "../../../errors.js";
-import type { Expr, Tag, XmlTableCol } from "../ast.js";
+import type { Expr, Tag, XmlExpr, XmlTableCol } from "../ast.js";
 import type { TypeDisplay } from "../binder/clauses.js";
 import type { AllNullable } from "./catalog.js";
 import type { ParamsOfList, ParamsOfOpt } from "./params.js";
 import type { TypeList, TypeOf } from "./typeof.js";
 
-export type TypeXml<E extends Expr, C extends Ctx> = E["op"] extends "element"
+export type TypeXml<
+	E extends XmlExpr,
+	C extends Ctx,
+> = E["op"] extends "element"
 	? TypeList<E["named"], C, []> extends readonly ColInfo[]
 		? TypeList<E["args"], C, []> extends readonly ColInfo[]
 			? Info<"xml">
@@ -168,7 +171,7 @@ type ColNames<Acc extends Cols> = Acc[number] extends infer E
 	: never;
 
 export type ParamsOfXml<
-	E extends Expr,
+	E extends XmlExpr,
 	C extends Ctx,
 > = E["op"] extends "element"
 	? ParamsOfList<E["named"], C, null> | ParamsOfList<E["args"], C, null>

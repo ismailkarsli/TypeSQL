@@ -7,7 +7,16 @@ import type {
 	ScopeLevel,
 } from "../../../engine/types.js";
 import type { AnyErr, SqlError } from "../../../errors.js";
-import type { Expr, FromJsonTable, SelectStmt, Tag } from "../ast.js";
+import type {
+	Expr,
+	FromJsonTable,
+	IsJson,
+	JsonAgg,
+	JsonFn,
+	JsonFormat,
+	SelectStmt,
+	Tag,
+} from "../ast.js";
 import type { TypeDisplay } from "../binder/clauses.js";
 import type { CheckAlias, RenamedLevel } from "../binder/from.js";
 import type { BuildObject, JsonLitCast, JsonRet } from "../json.js";
@@ -17,14 +26,16 @@ import type { DateTimeT, NumT, Or } from "./operators.js";
 import type { ParamsOfList, ParamsOfOpt, ParamsOfSelect } from "./params.js";
 import type { FirstColOf, TypeList, TypeOf } from "./typeof.js";
 
-export type TypeSqlJson<E extends Expr, C extends Ctx> =
+export type SqlJsonExpr = JsonFormat | IsJson | JsonAgg | JsonFn;
+
+export type TypeSqlJson<E extends SqlJsonExpr, C extends Ctx> =
 	E extends Tag<"jsonfmt">
 		? TypeFormat<TypeOf<E["e"], C>>
 		: E extends Tag<"isjson">
 			? TypeIsJson<TypeOf<E["e"], C>>
 			: E extends Tag<"jsonagg">
 				? AggResult<TypeOf<E["e"], C>, E["ret"]>
-				: TypeFn<E, C>;
+				: TypeFn<Extract<E, JsonFn>, C>;
 
 type NonString =
 	| NumT
@@ -68,7 +79,7 @@ type AggResult<A, Ret> = A extends ColInfo
 
 type RetOr<R, D extends string> = R extends string ? R : D;
 
-type TypeFn<E extends Expr, C extends Ctx> =
+type TypeFn<E extends JsonFn, C extends Ctx> =
 	TypeList<E["args"], C, []> extends infer As extends readonly ColInfo[]
 		? TypeList<
 				[...E["passing"], ...E["defaults"]],
@@ -80,7 +91,7 @@ type TypeFn<E extends Expr, C extends Ctx> =
 		: TypeList<E["args"], C, []>;
 
 type FnResult<
-	E extends Expr,
+	E extends JsonFn,
 	As extends readonly ColInfo[],
 	C extends Ctx,
 > = E["fn"] extends "json_value"
@@ -186,20 +197,22 @@ type TypeArrayQuery<R extends string, A> = A extends ColInfo
 	? Info<R extends "json" | "jsonb" ? JsonRet<`arrnn:${R}`, [A]> : R, true>
 	: A;
 
-export type ParamsOfSqlJson<E extends Expr, C extends Ctx> =
+export type ParamsOfSqlJson<E extends SqlJsonExpr, C extends Ctx> =
 	E extends Tag<"jsonfmt" | "isjson">
 		? ParamsOfOpt<E["e"], C, Info<"text", true>>
 		: E extends Tag<"jsonagg">
 			?
 					| ParamsOfList<E["e"]["args"], C, Info<"text", true>>
 					| ParamsOfOpt<E["e"]["filter"], C, Info<"bool", true>>
-			:
-					| (E["q"] extends SelectStmt ? ParamsOfSelect<E["q"], C> : never)
-					| ParamsOfList<
-							[...E["args"], ...E["passing"], ...E["defaults"]],
-							C,
-							Info<"text", true>
-					  >;
+			: ParamsOfJsonFn<Extract<E, JsonFn>, C>;
+
+type ParamsOfJsonFn<E extends JsonFn, C extends Ctx> =
+	| (E["q"] extends SelectStmt ? ParamsOfSelect<E["q"], C> : never)
+	| ParamsOfList<
+			[...E["args"], ...E["passing"], ...E["defaults"]],
+			C,
+			Info<"text", true>
+	  >;
 
 export type BindJsonTable<
 	J extends FromJsonTable["jt"],

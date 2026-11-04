@@ -28,6 +28,7 @@ export interface EnvelopeTypes extends IdentityPluginTypes {
 
 export class EnvelopePlugin implements SqlPlugin<EnvelopeTypes> {
 	declare readonly types?: EnvelopeTypes;
+	// biome-ignore lint/plugin: implements the public `SqlPlugin.transformInput` signature, which takes any query parameter.
 	transformInput(value: unknown, context: InputContext): unknown {
 		if (context.kind === "parameters") {
 			if (!Array.isArray(value) || value.length !== 1)
@@ -38,7 +39,8 @@ export class EnvelopePlugin implements SqlPlugin<EnvelopeTypes> {
 			throw new Error("Expected a data envelope");
 		return value.data;
 	}
-	transformOutput(row: unknown): unknown {
+	// biome-ignore lint/plugin: implements the public `SqlPlugin.transformOutput` signature, which takes any result row.
+	transformOutput(row: unknown): Envelope<unknown> {
 		return { data: row };
 	}
 }

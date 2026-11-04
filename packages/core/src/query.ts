@@ -96,11 +96,26 @@ export function mapRows<Q extends { readonly text: string }>(
 	q: Q,
 	rows: readonly unknown[],
 ): RowType<Q>[] {
+	// biome-ignore lint/nursery/noUnsafeTypeAssertion: row types are inferred from the SQL text, not from the driver's rows.
 	return applyPlugins(rows, pluginsOf(q)) as RowType<Q>[];
 }
 
 export function pluginsOf(q: { readonly text: string }): readonly SqlPlugin[] {
-	return (q as { readonly [PLUGINS]?: readonly SqlPlugin[] })[PLUGINS] ?? [];
+	if (!(PLUGINS in q)) return [];
+	const plugins = q[PLUGINS];
+	return isPluginList(plugins) ? plugins : [];
+}
+
+/** makeQuery() stores its plugins under PLUGINS, which `Symbol.for` shares across copies of this module. */
+function isPluginList(value: unknown): value is readonly SqlPlugin[] {
+	return (
+		Array.isArray(value) &&
+		value.every(
+			(plugin) =>
+				(typeof plugin === "object" && plugin !== null) ||
+				typeof plugin === "function",
+		)
+	);
 }
 
 export function makeQuery<
@@ -155,7 +170,8 @@ export function makeQuery<
 		},
 	});
 	inlineable(query);
-	return query as unknown as Query<Row, Params, Text>;
+	// biome-ignore lint/nursery/noUnsafeTypeAssertion: `Query` carries its row and parameter types as type-only brands.
+	return query as Query<Row, Params, Text>;
 }
 
 function isRows(
@@ -169,5 +185,6 @@ export function makeFragment<
 	Params extends readonly unknown[],
 	Carried extends readonly unknown[] = readonly unknown[],
 >(text: string, values: readonly unknown[]): Fragment<Text, Params, Carried> {
+	// biome-ignore lint/nursery/noUnsafeTypeAssertion: `Fragment` carries its text and parameter types as type-only brands.
 	return inlineable({ text, values }) as Fragment<Text, Params, Carried>;
 }

@@ -34,11 +34,7 @@ async function openReadOnly(
 	file: string,
 ): Promise<SqliteDatabase & { close(): void }> {
 	const { DatabaseSync } = await import("node:sqlite");
-	return new DatabaseSync(file, {
-		readOnly: true,
-	}) as unknown as SqliteDatabase & {
-		close(): void;
-	};
+	return new DatabaseSync(file, { readOnly: true });
 }
 
 const parse = (argv: readonly string[]) =>
@@ -70,8 +66,8 @@ export async function main(
 		let source: string;
 		try {
 			const options: GenerateOptions = {
-				...(values["type-name"] ? { typeName: values["type-name"] } : {}),
-				...(values["import-from"] ? { importFrom: values["import-from"] } : {}),
+				...(values["type-name"] && { typeName: values["type-name"] }),
+				...(values["import-from"] && { importFrom: values["import-from"] }),
 			};
 			source = generateSource(
 				introspect(db, {
@@ -90,7 +86,9 @@ export async function main(
 		} else io.stdout(source);
 		return 0;
 	} catch (err) {
-		io.stderr(`typesql introspect: ${(err as Error).message}\n`);
+		io.stderr(
+			`typesql introspect: ${err instanceof Error ? err.message : String(err)}\n`,
+		);
 		return 1;
 	}
 }

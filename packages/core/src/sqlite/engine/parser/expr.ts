@@ -708,29 +708,31 @@ type ParsePredicate<
 		: ParseExprPrec<T, I, Prec["not"]>
 	: W extends "in"
 		? ParseIn<T, I, L, Min, Not>
-		: ParseExprPrec<T, I, Prec["cmp"]> extends Ok<
+		: W extends LikeOp
+			? ParseExprPrec<T, I, Prec["cmp"]> extends Ok<
 					infer Pat extends Expr,
 					infer J extends number
 				>
-			? IsWord<T, J, "escape"> extends true
-				? ParseExprPrec<T, Nx<J>, Prec["cmp"]> extends Ok<
-						infer EsE extends Expr,
-						infer J2 extends number
-					>
-					? ParseInfix<
+				? IsWord<T, J, "escape"> extends true
+					? ParseExprPrec<T, Nx<J>, Prec["cmp"]> extends Ok<
+							infer EsE extends Expr,
+							infer J2 extends number
+						>
+						? ParseInfix<
+								T,
+								J2,
+								{ t: "like"; e: L; pat: Pat; esc: EsE; kind: W; not: Not },
+								Min
+							>
+						: ParseExprPrec<T, Nx<J>, Prec["cmp"]>
+					: ParseInfix<
 							T,
-							J2,
-							{ t: "like"; e: L; pat: Pat; esc: EsE; kind: W; not: Not },
+							J,
+							{ t: "like"; e: L; pat: Pat; esc: null; kind: W; not: Not },
 							Min
 						>
-					: ParseExprPrec<T, Nx<J>, Prec["cmp"]>
-				: ParseInfix<
-						T,
-						J,
-						{ t: "like"; e: L; pat: Pat; esc: null; kind: W; not: Not },
-						Min
-					>
-			: ParseExprPrec<T, I, Prec["cmp"]>;
+				: ParseExprPrec<T, I, Prec["cmp"]>
+			: never;
 
 type ParseIn<
 	T extends Toks,
@@ -768,7 +770,7 @@ type InTable<
 	R extends TableRef,
 > =
 	(IsOp<T, I, "("> extends true ? ParenArgs<T, Nx<I>> : Ok<null, I>) extends Ok<
-		infer Args,
+		infer Args extends readonly Expr[] | null,
 		infer J extends number
 	>
 		? ParseInfix<

@@ -16,7 +16,7 @@ export interface PostgresJsQueryable {
 export interface PostgresJsTransactable<
 	Tx extends PostgresJsQueryable = PostgresJsQueryable,
 > {
-	begin(fn: (tx: Tx) => Promise<unknown>): Promise<unknown>;
+	begin<T>(fn: (tx: Tx) => Promise<T>): Promise<T>;
 }
 
 interface PostgresJsReserved {
@@ -24,10 +24,24 @@ interface PostgresJsReserved {
 }
 
 interface PostgresJsSavepointable {
-	savepoint(
-		fn: (tx: PostgresJsQueryable) => Promise<unknown>,
-	): Promise<unknown>;
+	savepoint<T>(fn: (tx: PostgresJsQueryable) => Promise<T>): Promise<T>;
 }
+
+// A TransactionSql has savepoint(), a Sql begin() and a ReservedSql release().
+const canSavepoint = (
+	sql: PostgresJsQueryable,
+): sql is PostgresJsQueryable & PostgresJsSavepointable =>
+	"savepoint" in sql && typeof sql.savepoint === "function";
+
+const canBegin = (
+	sql: PostgresJsQueryable,
+): sql is PostgresJsQueryable & PostgresJsTransactable =>
+	"begin" in sql && typeof sql.begin === "function";
+
+const isReserved = (
+	sql: PostgresJsQueryable,
+): sql is PostgresJsQueryable & PostgresJsReserved =>
+	"release" in sql && typeof sql.release === "function";
 
 export function executor(sql: PostgresJsQueryable): Executor {
 	const run: Executor = async (text, values) => {
@@ -50,13 +64,10 @@ async function transaction<T>(
 	depth: number,
 	fn: (tx: PostgresJsQueryable) => Promise<T>,
 ): Promise<T> {
-	const { savepoint, begin, release } = sql as Partial<
-		PostgresJsSavepointable & PostgresJsTransactable & PostgresJsReserved
-	>;
-	if (savepoint) return (await savepoint.call(sql, fn)) as T;
-	if (begin) return (await begin.call(sql, fn)) as T;
+	if (canSavepoint(sql)) return sql.savepoint(fn);
+	if (canBegin(sql)) return sql.begin(fn);
 	// A ReservedSql is one connection without begin or savepoint.
-	if (release)
+	if (isReserved(sql))
 		return runTransaction(
 			(statement) => sql.unsafe(statement),
 			() => fn(sql),

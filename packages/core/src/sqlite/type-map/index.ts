@@ -24,6 +24,7 @@ export interface BigIntTypeMap
 	numeric: number | bigint;
 }
 
+// biome-ignore lint/plugin: a type map maps any SQL type name to any TypeScript type.
 export type TypeMap = { readonly [sqliteType: string]: unknown };
 
 export type Bindable = string | number | bigint | Uint8Array | null;

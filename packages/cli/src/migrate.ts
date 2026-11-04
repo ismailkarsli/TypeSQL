@@ -86,7 +86,7 @@ function mapTypeScriptImports(): void {
 			} catch (error) {
 				const parent = context.parentURL;
 				if (
-					(error as { code?: unknown }).code !== "ERR_MODULE_NOT_FOUND" ||
+					!hasCode(error, "ERR_MODULE_NOT_FOUND") ||
 					!/^\.\.?\/.*\.[cm]?js$/.test(specifier) ||
 					parent === undefined ||
 					!/^file:.*\.[cm]?ts$/.test(parent) ||
@@ -107,19 +107,18 @@ async function configured(
 	try {
 		await stat(file);
 	} catch (error) {
-		if (!explicit && (error as { code?: unknown }).code === "ENOENT")
-			return undefined;
+		if (!explicit && hasCode(error, "ENOENT")) return undefined;
 		throw error;
 	}
 	mapTypeScriptImports();
-	const module = (await import(pathToFileURL(file).href)) as {
-		default?: unknown;
-	};
-	if (!isMigrator(module.default))
+	const module: { readonly default?: unknown } = await import(
+		pathToFileURL(file).href
+	);
+	const migrator = module.default;
+	if (!isMigrator(migrator))
 		throw new Error(
 			`${file} must default-export a migrator: export default createMigrator({ … }) from @typesql/core/migration`,
 		);
-	const migrator = module.default;
 	const base = dirname(file);
 	const { config } = migrator;
 	const paths: Record<string, string> = {};
@@ -144,24 +143,57 @@ async function installed(directory: string, name: string): Promise<boolean> {
 	}
 }
 
+/** Whether `error` carries the `code` Node sets. */
+function hasCode(
+	error: unknown,
+	code: string,
+): error is { readonly code: string } {
+	return (
+		typeof error === "object" &&
+		error !== null &&
+		"code" in error &&
+		error.code === code
+	);
+}
+
+/** Whether `error` is a MigrationError from any copy of `@typesql/core`. */
+function isMigrationError(error: unknown): error is MigrationError {
+	return error instanceof Error && error.name === "MigrationError";
+}
+
 // pg rejects a refused `localhost` connection (IPv4 and IPv6) with an
 // AggregateError whose own message is empty.
-const message = (err: unknown): string => {
-	if (!(err instanceof Error)) return String(err);
-	const text = err.message
-		? err.message
-		: err instanceof AggregateError && err.errors.length > 0
-			? Array.from(new Set(err.errors.map(message))).join("; ")
-			: ((err as { code?: string }).code ?? err.name);
+const message = (cause: unknown): string => {
+	if (!(cause instanceof Error)) return String(cause);
+	const text = cause.message
+		? cause.message
+		: cause instanceof AggregateError && cause.errors.length > 0
+			? Array.from(new Set(cause.errors.map(message))).join("; ")
+			: "code" in cause && typeof cause.code === "string"
+				? cause.code
+				: cause.name;
 	return text.replace(/^typesql: /, "");
 };
 
-export async function main(argv: readonly string[], io: Io): Promise<number> {
+/** 0: done, 1: the command failed, 2: a usage error. */
+type ExitCode = 0 | 1 | 2;
+
+/** The config the flags replace. */
+interface Overrides {
+	dialect?: MigratorConfig["dialect"];
+	url?: string;
+	db?: string;
+	migrationsDir?: string;
+	schemaFile?: string;
+	generate?: boolean;
+}
+
+export async function main(argv: readonly string[], io: Io): Promise<ExitCode> {
 	let parsed: ReturnType<typeof parse>;
 	try {
 		parsed = parse(argv);
 	} catch (error) {
-		io.stderr(`typesql migrate: ${(error as Error).message}\n\n${USAGE}`);
+		io.stderr(`typesql migrate: ${message(error)}\n\n${USAGE}`);
 		return 2;
 	}
 	const { values, positionals } = parsed;
@@ -189,21 +221,21 @@ export async function main(argv: readonly string[], io: Io): Promise<number> {
 			from(values.config ?? "typesql.config.ts"),
 			values.config !== undefined,
 		);
-		const overrides: Record<string, unknown> = {};
-		if (values.dialect !== undefined) overrides.dialect = values.dialect;
-		if (values.url !== undefined) overrides.url = values.url;
-		if (values.db !== undefined)
-			overrides.db = values.db === ":memory:" ? values.db : from(values.db);
-		if (values.dir !== undefined) overrides.migrationsDir = from(values.dir);
-		if (values.out !== undefined) overrides.schemaFile = from(values.out);
-		if (values.generate !== undefined) overrides.generate = values.generate;
-		const dialect = overrides.dialect ?? migrator?.config.dialect;
+		const dialect = values.dialect ?? migrator?.config.dialect;
 		if (dialect !== "postgres" && dialect !== "sqlite")
 			throw new Error(
 				migrator === undefined
 					? "no typesql.config.ts: pass --dialect postgres or sqlite, or pass --config"
 					: `unsupported dialect: ${String(dialect)} (expected postgres or sqlite)`,
 			);
+		const overrides: Overrides = {};
+		if (values.dialect !== undefined) overrides.dialect = dialect;
+		if (values.url !== undefined) overrides.url = values.url;
+		if (values.db !== undefined)
+			overrides.db = values.db === ":memory:" ? values.db : from(values.db);
+		if (values.dir !== undefined) overrides.migrationsDir = from(values.dir);
+		if (values.out !== undefined) overrides.schemaFile = from(values.out);
+		if (values.generate !== undefined) overrides.generate = values.generate;
 		const connected = (config: Partial<MigratorConfig> | undefined) =>
 			config?.url !== undefined ||
 			config?.db !== undefined ||
@@ -221,8 +253,9 @@ export async function main(argv: readonly string[], io: Io): Promise<number> {
 						migrationsDir: from("migrations"),
 						schemaFile: from("db.ts"),
 						...overrides,
-					} as MigratorConfig)
-				: migrator.with<unknown>(overrides as Partial<MigratorConfig>);
+						dialect,
+					})
+				: migrator.with<unknown>(overrides);
 
 		switch (command) {
 			case "make": {
@@ -276,8 +309,7 @@ export async function main(argv: readonly string[], io: Io): Promise<number> {
 						: await migrator.latest();
 		} catch (error) {
 			// The migrations before the one that failed stay applied.
-			if (error instanceof Error && error.name === "MigrationError")
-				report((error as MigrationError).applied, error as MigrationError);
+			if (isMigrationError(error)) report(error.applied, error);
 			throw error;
 		}
 		const names = "reverted" in result ? result.reverted : result.applied;

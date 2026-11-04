@@ -79,7 +79,7 @@ export type ValuesRep<R> =
 type MayOmit = undefined | `\u0000Du${string}\u0000`;
 /** Keys every row has, with a value that is always sent. */
 type AlwaysSent<R> = {
-	[K in KeysOf<R>]: [R] extends [{ readonly [P in K]: unknown }]
+	[K in KeysOf<R>]: [R] extends [{ readonly [P in K]: ValueAt<R, K> }]
 		? [Extract<ValueAt<R, K>, MayOmit>] extends [never]
 			? K
 			: never

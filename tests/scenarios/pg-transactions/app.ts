@@ -28,7 +28,7 @@ try {
 		throw new Error("abort transfer");
 	});
 } catch (error) {
-	console.log((error as Error).message);
+	console.log(error instanceof Error ? error.message : error);
 }
 await sql.transaction(async (tx) => {
 	await tx(
@@ -42,7 +42,7 @@ await sql.transaction(async (tx) => {
 			throw new Error("abort savepoint");
 		});
 	} catch (error) {
-		console.log((error as Error).message);
+		console.log(error instanceof Error ? error.message : error);
 	}
 });
 export const balances = await sql(

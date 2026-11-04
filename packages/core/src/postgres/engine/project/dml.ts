@@ -206,7 +206,19 @@ export type AssignTargets<
 		: null;
 };
 
+// Inferred rather than checked against `readonly ColInfo[]` where it is
+// passed: that check would evaluate TypeOf over the whole `Expr` union.
 export type TargetInfos<
+	Cs extends readonly string[],
+	Ind extends readonly TargetInd[] | null,
+	Tbl extends Table,
+	C extends Ctx,
+> =
+	TargetInfoMap<Cs, Ind, Tbl, C> extends infer Infos extends readonly ColInfo[]
+		? Infos
+		: never;
+
+type TargetInfoMap<
 	Cs extends readonly string[],
 	Ind extends readonly TargetInd[] | null,
 	Tbl extends Table,

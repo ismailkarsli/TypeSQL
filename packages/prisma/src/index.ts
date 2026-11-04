@@ -80,7 +80,7 @@ export function createSql<S, TM = PrismaTypeMap>(
 export function createSql(
 	dialect: PostgresDialect | SqliteDialect,
 	prisma?: PrismaRawClient,
-): unknown {
+): object {
 	return dialect.name === "sqlite"
 		? createTransactionalSql(dialect, prisma, sqliteDriver)
 		: createTransactionalSql(dialect, prisma, driver);

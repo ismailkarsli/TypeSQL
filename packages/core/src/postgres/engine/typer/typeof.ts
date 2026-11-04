@@ -18,6 +18,7 @@ import type {
 	SelectStmt,
 	Tag,
 	VariadicArg,
+	XmlExpr,
 } from "../ast.js";
 import type { HasStar, TypeDisplay } from "../binder/clauses.js";
 import type { ResolveColumn, WholeRow } from "../binder/resolve.js";
@@ -48,7 +49,7 @@ import type {
 	Unmatchable,
 	UnOpType,
 } from "./operators.js";
-import type { TypeSqlJson } from "./sqljson.js";
+import type { SqlJsonExpr, TypeSqlJson } from "./sqljson.js";
 import type { TypeXml } from "./xml.js";
 
 export type TypeOf<E extends Expr, C extends Ctx> =
@@ -174,7 +175,7 @@ type TypeOfRest<E extends Expr, C extends Ctx> =
 											: E extends Tag<
 														"jsonfn" | "jsonagg" | "isjson" | "jsonfmt"
 													>
-												? TypeSqlJson<E, C>
+												? TypeSqlJson<Extract<E, SqlJsonExpr>, C>
 												: E extends Tag<"star">
 													? E["tbl"] extends string
 														? WholeRow<
@@ -187,7 +188,7 @@ type TypeOfRest<E extends Expr, C extends Ctx> =
 																null
 															>
 													: E extends Tag<"xml">
-														? TypeXml<E, C>
+														? TypeXml<Extract<E, XmlExpr>, C>
 														: TypeOf<
 																Extract<E, NamedArg | VariadicArg>["e"],
 																C
@@ -583,10 +584,12 @@ type TypeIdx<E extends Expr, I extends Expr, C extends Ctx> =
 			: TypeOf<I, C>
 		: TypeOf<E, C>;
 type ChainOverArray<E extends Expr, C extends Ctx> =
-	TypeOf<ChainRoot<E>, C> extends {
-		readonly type: infer T extends `${string}[]`;
-	}
-		? T
+	ChainRoot<E> extends infer R extends Expr
+		? TypeOf<R, C> extends {
+				readonly type: infer T extends `${string}[]`;
+			}
+			? T
+			: null
 		: null;
 type ChainRoot<E extends Expr> = E extends {
 	readonly t: "idx";

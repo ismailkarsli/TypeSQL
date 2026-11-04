@@ -19,13 +19,18 @@ import type {
 	Tag,
 	Target,
 	WindowSpec,
+	XmlExpr,
 } from "../ast.js";
 import type { BindFrom } from "../binder/from.js";
 import type { ParamsOfWith } from "../project/dml.js";
 import type { BindWith } from "../project/select.js";
 import type { AnySig, LookupFn, PickSig } from "./catalog.js";
 import type { CommonType, DateTimeT } from "./operators.js";
-import type { ParamsOfJsonTable, ParamsOfSqlJson } from "./sqljson.js";
+import type {
+	ParamsOfJsonTable,
+	ParamsOfSqlJson,
+	SqlJsonExpr,
+} from "./sqljson.js";
 import type { NonStarArgs, TypeList, TypeOf } from "./typeof.js";
 import type { ParamsOfXml, ParamsOfXmlTable } from "./xml.js";
 
@@ -176,11 +181,11 @@ type ParamsOfExprMore<E extends Expr, C extends Ctx> =
 													>
 												? ParamsOfExpr<E["e"], C>
 												: E extends Tag<"xml">
-													? ParamsOfXml<E, C>
+													? ParamsOfXml<Extract<E, XmlExpr>, C>
 													: E extends Tag<
 																"jsonfn" | "jsonagg" | "isjson" | "jsonfmt"
 															>
-														? ParamsOfSqlJson<E, C>
+														? ParamsOfSqlJson<Extract<E, SqlJsonExpr>, C>
 														: never;
 type ParamsOfMember<
 	X extends Expr,
@@ -220,7 +225,7 @@ export type ParamsOfOpt<E extends Expr | null, C extends Ctx, T> =
 		: E extends CastParamOf<infer N extends number>
 			? T extends ColInfo
 				? ParamEntry<N, Mk<E["to"], T["nullable"]>>
-				: ParamsOfExpr<E, C>
+				: ParamsOfExpr<Extract<E, Expr>, C>
 			: E extends Expr
 				? ParamsOfExpr<E, C>
 				: never;

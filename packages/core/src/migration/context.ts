@@ -119,9 +119,31 @@ export function createMigrationContext(
 		await step(kind, statement);
 		return createMigrationContext(dialect, execute, step);
 	};
-	return Object.assign(sql, {
+	Object.assign(sql, {
 		ddl: next("ddl"),
 		add: next("ddl"),
 		raw: next("raw"),
-	}) as unknown as PostgresMigration | SqliteMigration;
+	});
+	if (!isMigrationContext(sql))
+		throw new Error("typesql: cannot create the migration context");
+	return sql;
+}
+
+/**
+ * Whether `value` is a migration context: the dialect's SQL API with the
+ * methods that run DDL. Its types are the schema's, which exist only for the
+ * checker.
+ */
+function isMigrationContext(
+	value: unknown,
+): value is PostgresMigration | SqliteMigration {
+	return (
+		typeof value === "function" &&
+		"ddl" in value &&
+		typeof value.ddl === "function" &&
+		"add" in value &&
+		typeof value.add === "function" &&
+		"raw" in value &&
+		typeof value.raw === "function"
+	);
 }

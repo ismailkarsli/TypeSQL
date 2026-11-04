@@ -20,15 +20,16 @@ export type StrictNullChecksMessage =
 
 /**
  * What an `sql` is without strictNullChecks: every call is an error saying
- * so. Without it `null` and `undefined` belong to every type, so nullability
- * cannot be inferred and the checks instantiate too deeply (TS2589).
+ * so, members included. Without it `null` and `undefined` belong to every
+ * type, so nullability cannot be inferred and the checks instantiate too
+ * deeply (TS2589).
  */
 interface NonStrictSql {
 	(
 		query: SqlError<StrictNullChecksMessage, null>,
 		...params: readonly unknown[]
 	): any;
-	readonly [member: string]: any;
+	readonly [member: string]: NonStrictSql;
 }
 
 /**

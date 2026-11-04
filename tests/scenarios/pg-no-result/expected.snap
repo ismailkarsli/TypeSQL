@@ -18,12 +18,12 @@ exports[`pg-no-result > scenario 1`] = `
   },
   "start": {
     "status": 1,
-    "stderr": "file://<workspace>/packages/core/dist/query.js:54
+    "stderr": "file://<workspace>/packages/core/dist/query.js:64
                 throw new NoResultError(text);
                       ^
 
 NoResultError: The query returned no rows
-    at Object.value (file://<workspace>/packages/core/dist/query.js:54:23)
+    at Object.value (file://<workspace>/packages/core/dist/query.js:64:23)
     at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
     at async file://<scenario>/dist/app.js:10:5 {
   text: 'SELECT id FROM users WHERE id = $1'

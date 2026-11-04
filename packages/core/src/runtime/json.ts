@@ -27,5 +27,6 @@ export function json<const T>(value: T): JsonMarker<T> {
 		);
 	return param(
 		value === undefined ? empty : value === null ? null : new JsonParam(value),
-	) as unknown as JsonMarker<T>;
+		// biome-ignore lint/nursery/noUnsafeTypeAssertion: the marker is a string branded with the value's type.
+	) as JsonMarker<T>;
 }

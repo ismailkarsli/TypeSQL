@@ -7,21 +7,40 @@ import {
 import { Param, SQL, type SQLChunk, StringChunk } from "drizzle-orm";
 
 export interface DrizzleSqliteDatabase {
-	all(query: never): unknown;
-	run(query: never): unknown;
-	transaction(fn: never): unknown;
+	all(query: never): void;
+	run(query: never): void;
+	transaction(fn: never): void;
 }
 
+/** What `run()` resolves to: better-sqlite3 and bun:sqlite count `changes`, libsql `rowsAffected`. */
+interface RunResult {
+	readonly changes?: number | bigint;
+	readonly rowsAffected?: number | bigint;
+}
+
+/** The methods of a Drizzle SQLite database, sync or async, that typesql calls. */
 interface Runner {
-	all(query: SQL): unknown;
-	run(query: SQL): unknown;
+	all(query: SQL): unknown[] | PromiseLike<unknown[]>;
+	run(
+		query: SQL,
+	): RunResult | null | undefined | PromiseLike<RunResult | null | undefined>;
 	transaction<T>(fn: (tx: DrizzleSqliteDatabase) => Promise<T>): Promise<T>;
 }
 
-const runner = (db: DrizzleSqliteDatabase): Runner => db as unknown as Runner;
+const isRunner = (db: DrizzleSqliteDatabase): db is Runner =>
+	typeof db.all === "function" &&
+	typeof db.run === "function" &&
+	typeof db.transaction === "function";
+
+function runner(db: DrizzleSqliteDatabase): Runner {
+	if (isRunner(db)) return db;
+	throw new Error(
+		"typesql: a Drizzle SQLite database needs all(), run() and transaction()",
+	);
+}
 
 const isAsync = (db: DrizzleSqliteDatabase): boolean =>
-	(db as { readonly resultKind?: unknown }).resultKind === "async";
+	"resultKind" in db && db.resultKind === "async";
 
 function statement(text: string, values: readonly unknown[]): SQL {
 	const split = splitParams(text, values);
@@ -33,27 +52,24 @@ function statement(text: string, values: readonly unknown[]): SQL {
 	return new SQL(chunks);
 }
 
-function changes(result: unknown): number {
-	const r = (result ?? {}) as {
-		readonly changes?: number | bigint;
-		readonly rowsAffected?: number | bigint;
-	};
-	return Number(r.changes ?? r.rowsAffected ?? 0);
+function changes(result: RunResult | null | undefined): number {
+	return Number(result?.changes ?? result?.rowsAffected ?? 0);
 }
 
 // better-sqlite3 refuses `all()` for statements without rows before running
 // them; such statements run with `run()` instead. Drizzle may wrap the error.
 const NO_DATA = /does not return data/;
-const noData = (e: unknown): boolean =>
-	e instanceof Error && (NO_DATA.test(e.message) || noData(e.cause));
+const noData = (cause: unknown): boolean =>
+	cause instanceof Error &&
+	(NO_DATA.test(cause.message) || noData(cause.cause));
 
 // libsql returns BLOBs as ArrayBuffer; rows are typed with Uint8Array.
-function blobs(row: unknown): unknown {
+function blobs<R>(row: R): R {
 	if (row === null || typeof row !== "object") return row;
-	const values = row as Record<string, unknown>;
-	for (const key in values) {
-		const value = values[key];
-		if (value instanceof ArrayBuffer) values[key] = new Uint8Array(value);
+	for (const key in row) {
+		const value = row[key];
+		if (value instanceof ArrayBuffer)
+			Object.assign(row, { [key]: new Uint8Array(value) });
 	}
 	return row;
 }
@@ -64,7 +80,7 @@ async function all(
 	values: readonly unknown[],
 ): Promise<unknown[]> {
 	try {
-		const rows = (await runner(db).all(statement(text, values))) as unknown[];
+		const rows = await runner(db).all(statement(text, values));
 		return isAsync(db) ? rows.map(blobs) : rows;
 	} catch (e) {
 		if (!noData(e)) throw e;

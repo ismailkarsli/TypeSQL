@@ -1,4 +1,8 @@
-import { createMigrator, migration } from "@typesql/core/migration";
+import {
+	createMigrator,
+	MigrationError,
+	migration,
+} from "@typesql/core/migration";
 
 const first = migration("postgres", {
 	name: "001-users",
@@ -27,16 +31,12 @@ const migrator = createMigrator({
 try {
 	await migrator.latest();
 } catch (error) {
-	const e = error as Error & {
-		migration: string;
-		rolledBack: boolean;
-		applied: string[];
-	};
+	if (!(error instanceof MigrationError)) throw error;
 	console.log({
-		name: e.name,
-		migration: e.migration,
-		rolledBack: e.rolledBack,
-		applied: e.applied,
+		name: error.name,
+		migration: error.migration,
+		rolledBack: error.rolledBack,
+		applied: error.applied,
 	});
 }
 
@@ -65,16 +65,12 @@ console.log({ history: await inspect() });
 try {
 	await migrator.with({ transaction: false }).latest();
 } catch (error) {
-	const e = error as Error & {
-		migration: string;
-		rolledBack: boolean;
-		applied: string[];
-	};
+	if (!(error instanceof MigrationError)) throw error;
 	console.log({
-		name: e.name,
-		migration: e.migration,
-		rolledBack: e.rolledBack,
-		applied: e.applied,
+		name: error.name,
+		migration: error.migration,
+		rolledBack: error.rolledBack,
+		applied: error.applied,
 	});
 }
 console.dir(

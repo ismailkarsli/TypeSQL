@@ -1,17 +1,24 @@
-import { type Dialect, type Entry, isMigration, toEntry } from "./define.js";
+import {
+	type Dialect,
+	type Entry,
+	hasCode,
+	isMigration,
+	isStep,
+	toEntry,
+} from "./define.js";
 
 /** The migration files of a directory, in the order they run. */
 export async function migrationFiles(migrationsDir: string): Promise<string[]> {
 	const { readdir } = process.getBuiltinModule("node:fs/promises");
 	const { resolve } = process.getBuiltinModule("node:path");
 	const entries = await readdir(migrationsDir, { withFileTypes: true }).catch(
-		(error: unknown) => {
-			if ((error as { code?: unknown }).code === "ENOENT")
+		(cause: unknown) => {
+			if (hasCode(cause, "ENOENT"))
 				throw new Error(
 					`typesql: the migrations directory does not exist: ${resolve(migrationsDir)}`,
-					{ cause: error },
+					{ cause },
 				);
-			throw error;
+			throw cause;
 		},
 	);
 	return entries
@@ -45,7 +52,7 @@ function mapMigrationImports(directory: string): void {
 				} catch (error) {
 					const parent = context.parentURL;
 					if (
-						(error as { code?: unknown }).code !== "ERR_MODULE_NOT_FOUND" ||
+						!hasCode(error, "ERR_MODULE_NOT_FOUND") ||
 						!/^\.\.?\/.*\.js$/.test(specifier) ||
 						parent === undefined ||
 						!directories.has(new URL(".", parent).href)
@@ -58,6 +65,13 @@ function mapMigrationImports(directory: string): void {
 	directories.add(
 		process.getBuiltinModule("node:url").pathToFileURL(`${directory}/`).href,
 	);
+}
+
+/** What the runner reads of a migration file's exports. */
+interface MigrationModule {
+	readonly default?: unknown;
+	readonly up?: unknown;
+	readonly down?: unknown;
 }
 
 /**
@@ -73,40 +87,37 @@ export async function loadMigrations(migrationsDir: string): Promise<Entry[]> {
 	mapMigrationImports(directory);
 	const loaded: Entry[] = [];
 	for (const name of names) {
-		let module: Record<string, unknown>;
+		let module: MigrationModule;
 		try {
 			module = await import(pathToFileURL(resolve(directory, name)).href);
 		} catch (error) {
 			// migration() is imported at runtime, so with pnpm a project that
 			// only depends on @typesql/cli can't load its migrations.
 			if (
-				(error as { code?: unknown }).code === "ERR_MODULE_NOT_FOUND" &&
+				hasCode(error, "ERR_MODULE_NOT_FOUND") &&
 				String(error).includes("'@typesql/core")
 			)
 				throw new Error(
-					`${(error as Error).message}; add @typesql/core to the project's dependencies (npm install @typesql/core, or pnpm add @typesql/core)`,
+					`${"message" in error ? error.message : undefined}; add @typesql/core to the project's dependencies (npm install @typesql/core, or pnpm add @typesql/core)`,
 					{ cause: error },
 				);
 			throw error;
 		}
-		const defined = module.default;
+		const { default: defined, up, down } = module;
 		if (isMigration(defined)) {
 			if (defined.name !== undefined && defined.name !== name)
 				throw new Error(
 					`typesql: ${name} names its migration ${JSON.stringify(defined.name)}, but a migration file's name is its file name; remove the name`,
 				);
 			loaded.push(toEntry(name, defined));
-		} else if (
-			typeof module.up === "function" &&
-			typeof module.down === "function"
-		)
+		} else if (isStep(up) && isStep(down))
 			loaded.push({
 				name,
-				up: module.up as (db: never) => unknown,
-				down: module.down as (db: never) => unknown,
+				up,
+				down,
 				from: undefined,
 				// A later file starts from a 3.x file's up.
-				self: module.up,
+				self: up,
 			});
 		else
 			throw new Error(

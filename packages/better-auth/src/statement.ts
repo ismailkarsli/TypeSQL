@@ -10,7 +10,7 @@ export class Statement {
 		this.dialect = dialect;
 	}
 
-	param(value: unknown): string {
+	param<V>(value: V): string {
 		this.values.push(value);
 		return `$${this.values.length}`;
 	}
@@ -55,7 +55,7 @@ function condition(s: Statement, clause: CleanedWhere): string {
 		(typeof value === "string" ||
 			(Array.isArray(value) && value.every((v) => typeof v === "string")));
 	const lhs = insensitive ? `LOWER(${column})` : column;
-	const rhs = (v: unknown) =>
+	const rhs = <V>(v: V) =>
 		s.param(insensitive && typeof v === "string" ? v.toLowerCase() : v);
 	switch (operator) {
 		case "eq":

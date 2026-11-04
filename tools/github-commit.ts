@@ -64,10 +64,11 @@ const res = await fetch("https://api.github.com/graphql", {
 		variables: { input },
 	}),
 });
-const json = (await res.json()) as {
+interface GraphqlResponse {
 	data?: { createCommitOnBranch?: { commit?: { oid?: string } } };
-	errors?: unknown;
-};
+	errors?: { message: string }[];
+}
+const json: GraphqlResponse = JSON.parse(await res.text());
 const oid = json.data?.createCommitOnBranch?.commit?.oid;
 if (!res.ok || json.errors || !oid) {
 	console.error(

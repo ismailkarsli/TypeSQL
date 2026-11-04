@@ -263,7 +263,7 @@ export type ExprNode =
 
 export type ExprTag = ExprNode["t"];
 
-export type Expr = { readonly t: ExprTag; readonly [field: string]: any };
+export type Expr = ExprNode;
 
 export type Target = { readonly e: Expr; readonly alias: string | null };
 

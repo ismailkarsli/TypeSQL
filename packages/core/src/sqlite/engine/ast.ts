@@ -1,33 +1,3 @@
-export type ExprTag =
-	| "col"
-	| "num"
-	| "str"
-	| "blob"
-	| "bool"
-	| "null"
-	| "param"
-	| "ctime"
-	| "bin"
-	| "un"
-	| "cast"
-	| "collate"
-	| "call"
-	| "case"
-	| "is"
-	| "isdistinct"
-	| "between"
-	| "in"
-	| "insub"
-	| "intable"
-	| "like"
-	| "sub"
-	| "exists"
-	| "row"
-	| "raise"
-	| "default";
-
-export type Expr = { readonly t: ExprTag; readonly [field: string]: any };
-
 export type ColRef = {
 	readonly t: "col";
 	readonly schema: string | null;
@@ -35,6 +5,123 @@ export type ColRef = {
 	readonly name: string;
 	readonly disp: string;
 };
+
+export type NumLit = { readonly t: "num"; readonly v: string };
+export type StrLit = { readonly t: "str"; readonly v: string };
+export type BlobLit = { readonly t: "blob"; readonly v: string };
+export type BoolLit = { readonly t: "bool"; readonly v: boolean };
+export type NullLit = { readonly t: "null" };
+export type Param = { readonly t: "param"; readonly n: number };
+export type CurrentTime = {
+	readonly t: "ctime";
+	readonly fn: "current_time" | "current_date" | "current_timestamp";
+};
+export type BinOp = {
+	readonly t: "bin";
+	readonly op: string;
+	readonly l: Expr;
+	readonly r: Expr;
+};
+export type UnOp = { readonly t: "un"; readonly op: string; readonly e: Expr };
+export type Cast = {
+	readonly t: "cast";
+	readonly e: Expr;
+	readonly to: string;
+};
+export type Collate = {
+	readonly t: "collate";
+	readonly e: Expr;
+	readonly collation: string;
+};
+export type CaseWhen = { readonly when: Expr; readonly then: Expr };
+export type CaseExpr = {
+	readonly t: "case";
+	readonly operand: Expr | null;
+	readonly whens: readonly CaseWhen[];
+	readonly else: Expr | null;
+};
+export type IsTest = {
+	readonly t: "is";
+	readonly e: Expr;
+	readonly what: "null";
+	readonly not: boolean;
+};
+export type IsDistinct = {
+	readonly t: "isdistinct";
+	readonly l: Expr;
+	readonly r: Expr;
+	readonly not: boolean;
+};
+export type Between = {
+	readonly t: "between";
+	readonly e: Expr;
+	readonly lo: Expr;
+	readonly hi: Expr;
+	readonly not: boolean;
+};
+export type InList = {
+	readonly t: "in";
+	readonly e: Expr;
+	readonly list: readonly Expr[];
+	readonly not: boolean;
+};
+export type InSub = {
+	readonly t: "insub";
+	readonly e: Expr;
+	readonly q: SelectStmt;
+	readonly not: boolean;
+};
+export type InTable = {
+	readonly t: "intable";
+	readonly e: Expr;
+	readonly schema: string | null;
+	readonly table: string;
+	readonly args: readonly Expr[] | null;
+	readonly not: boolean;
+};
+export type Like = {
+	readonly t: "like";
+	readonly e: Expr;
+	readonly pat: Expr;
+	readonly esc: Expr | null;
+	readonly kind: "like" | "glob" | "match" | "regexp";
+	readonly not: boolean;
+};
+export type ScalarSub = { readonly t: "sub"; readonly q: SelectStmt };
+export type Exists = { readonly t: "exists"; readonly q: SelectStmt };
+export type RowCtor = { readonly t: "row"; readonly items: readonly Expr[] };
+export type Raise = { readonly t: "raise" };
+export type DefaultExpr = { readonly t: "default" };
+
+export type Expr =
+	| ColRef
+	| NumLit
+	| StrLit
+	| BlobLit
+	| BoolLit
+	| NullLit
+	| Param
+	| CurrentTime
+	| BinOp
+	| UnOp
+	| Cast
+	| Collate
+	| Call
+	| CaseExpr
+	| IsTest
+	| IsDistinct
+	| Between
+	| InList
+	| InSub
+	| InTable
+	| Like
+	| ScalarSub
+	| Exists
+	| RowCtor
+	| Raise
+	| DefaultExpr;
+
+export type ExprTag = Expr["t"];
 
 export type WindowSpec = {
 	readonly name: string | null;

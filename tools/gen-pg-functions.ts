@@ -9,9 +9,10 @@ interface PgClient {
 	query<R extends readonly unknown[]>(text: string): Promise<{ rows: R }>;
 	end(): Promise<void>;
 }
-const { Client } = require("pg") as {
-	Client: new (config: { connectionString: string }) => PgClient;
-};
+const {
+	Client,
+}: { Client: new (config: { connectionString: string }) => PgClient } =
+	require("pg");
 
 const url = process.env.TYPESQL_PG_URL;
 if (!url) {

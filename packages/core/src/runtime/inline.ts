@@ -1,6 +1,7 @@
 import { empty, isEmpty } from "../empty.js";
 import type { InlineMarker } from "../sql/inline.js";
 import {
+	type CompiledSql,
 	DOLLAR_QUOTED,
 	QUOTED,
 	replaceSql,
@@ -103,10 +104,7 @@ const MARK = "\u0000typesql";
 const holdsMarker = (text: string): boolean => text.includes(MARK);
 
 /** Whether a value holds a marker in a string, as itself or in a plain object or array. */
-export function holdsMarkers(
-	value: unknown,
-	seen = new Set<object>(),
-): boolean {
+export function holdsMarkers<V>(value: V, seen = new Set<object>()): boolean {
 	if (typeof value === "string") return holdsMarker(value);
 	if (value === null || typeof value !== "object" || seen.has(value))
 		return false;
@@ -144,59 +142,61 @@ export function param<const T>(value: T): InlineMarker<T> {
 	const id = nextId();
 	const token = `${issue(id).mark}${id}\u0000`;
 	pending.set(id, value);
+	// biome-ignore lint/nursery/noUnsafeTypeAssertion: the marker is a string branded with the value's type.
 	return token as InlineMarker<T>;
 }
 
-export function takeValue(value: unknown): unknown {
-	const v = take(value);
-	if (isEmpty(v))
+/** Parameter values: each sql.param() or sql.json() marker becomes its value. */
+export function takeValues(values: readonly unknown[]): unknown[] {
+	return takeEach(values, "reject");
+}
+
+/** Column values for sql.set / sql.values: a DEFAULT token leaves the column out, as `undefined` does. */
+export function takeColumnValues(values: readonly unknown[]): unknown[] {
+	return takeEach(values, "omit");
+}
+
+function takeEach(
+	values: readonly unknown[],
+	defaults: "reject" | "omit",
+): unknown[] {
+	return values.map((value) => {
+		if (isFragment(value))
+			throw new Error(
+				"typesql: a fragment or query is not a parameter value; interpolate it into the SQL: ${fragment}",
+			);
+		if (isEmpty(value))
+			throw new Error(
+				"typesql: sql.optional(value) cannot be a bound parameter; use an inline sql.param(sql.optional(value)) for DEFAULT",
+			);
+		if (typeof value !== "string") return value;
+		const id = readers?.exact.exec(value)?.[1];
+		if (id === undefined) {
+			if (holdsMarker(value))
+				throw new Error(
+					"typesql: a sql.param() or sql.json() value, or a fragment, can't be part of another value; pass it as a parameter by itself",
+				);
+			return value;
+		}
+		if (!pending.has(id))
+			throw new Error(
+				"typesql: this sql.json() / sql.param() value was already used by another statement; call it once per statement",
+			);
+		const v = pending.get(id);
+		settle(id);
+		if (!isEmpty(v)) return v;
+		if (defaults === "omit") return undefined;
 		throw new Error(
 			"typesql: sql.param(sql.optional(value)) and sql.json(undefined) must be interpolated inline to emit DEFAULT",
 		);
-	return v;
-}
-
-/** A column value for sql.set / sql.values: a DEFAULT token leaves the column out, as `undefined` does. */
-export function takeColumnValue(value: unknown): unknown {
-	const v = take(value);
-	return isEmpty(v) ? undefined : v;
-}
-
-function take(value: unknown): unknown {
-	if (isFragment(value))
-		throw new Error(
-			"typesql: a fragment or query is not a parameter value; interpolate it into the SQL: ${fragment}",
-		);
-	if (isEmpty(value))
-		throw new Error(
-			"typesql: sql.optional(value) cannot be a bound parameter; use an inline sql.param(sql.optional(value)) for DEFAULT",
-		);
-	if (typeof value !== "string") return value;
-	const id = readers?.exact.exec(value)?.[1];
-	if (id === undefined) {
-		if (holdsMarker(value))
-			throw new Error(
-				"typesql: a sql.param() or sql.json() value, or a fragment, can't be part of another value; pass it as a parameter by itself",
-			);
-		return value;
-	}
-	if (!pending.has(id))
-		throw new Error(
-			"typesql: this sql.json() / sql.param() value was already used by another statement; call it once per statement",
-		);
-	const v = pending.get(id);
-	settle(id);
-	return v;
+	});
 }
 
 export function hasInline(text: string): boolean {
 	return text.includes("\u0000");
 }
 
-export function resolveInline(
-	text: string,
-	start: number,
-): { text: string; values: unknown[] } {
+export function resolveInline(text: string, start: number): CompiledSql {
 	if (!readers)
 		throw new Error(
 			"typesql: the SQL text contains a NUL character that is not a sql.param() token",
@@ -259,7 +259,8 @@ function token(fragment: Spliceable): string {
 const NOTHING: Spliceable = { text: "", values: [] };
 Object.defineProperty(empty, "toString", { value: () => token(NOTHING) });
 
-function isFragment(value: unknown): boolean {
+/** Only inlineable() adds to FRAGMENTS, and only Spliceables. */
+function isFragment<V>(value: V): value is V & Spliceable {
 	return typeof value === "object" && value !== null && FRAGMENTS.has(value);
 }
 
@@ -310,13 +311,27 @@ export function resolveFragments(
 const hex = (bytes: Uint8Array): string =>
 	Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 
+/** The part of Web Crypto the markers use. Some runtimes lack it. */
+interface RandomSource {
+	getRandomValues(array: Uint8Array<ArrayBuffer>): Uint8Array<ArrayBuffer>;
+}
+
+function isRandomSource(value: unknown): value is RandomSource {
+	return (
+		typeof value === "object" &&
+		value !== null &&
+		"getRandomValues" in value &&
+		typeof value.getRandomValues === "function"
+	);
+}
+
 /** Random bytes from crypto, or undefined where it is missing or forbidden. */
 function cryptoBytes(length: number): Uint8Array | undefined {
-	const crypto = (
-		globalThis as { crypto?: { getRandomValues(a: Uint8Array): Uint8Array } }
-	).crypto;
+	const scope = globalThis;
+	const crypto = "crypto" in scope ? scope.crypto : undefined;
+	if (!isRandomSource(crypto)) return undefined;
 	try {
-		return crypto?.getRandomValues(new Uint8Array(length));
+		return crypto.getRandomValues(new Uint8Array(length));
 	} catch {
 		// Cloudflare Workers throw in global scope.
 		return undefined;

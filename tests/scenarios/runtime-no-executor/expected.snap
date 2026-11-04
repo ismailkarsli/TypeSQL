@@ -17,13 +17,13 @@ exports[`runtime-no-executor > scenario 1`] = `
   },
   "start": {
     "status": 1,
-    "stderr": "file://<workspace>/packages/core/dist/query.js:22
+    "stderr": "file://<workspace>/packages/core/dist/query.js:32
             throw new Error("typesql: no executor: pass one to createSql(executor) or to execute(executor)");
                   ^
 
 Error: typesql: no executor: pass one to createSql(executor) or to execute(executor)
-    at pick (file://<workspace>/packages/core/dist/query.js:22:19)
-    at Object.execute (file://<workspace>/packages/core/dist/query.js:26:30)
+    at pick (file://<workspace>/packages/core/dist/query.js:32:19)
+    at Object.execute (file://<workspace>/packages/core/dist/query.js:36:30)
     at file://<scenario>/dist/app.js:4:28
     at ModuleJob.run (node:internal/modules/esm/module_job:569:25)
     at async node:internal/modules/esm/loader:650:26

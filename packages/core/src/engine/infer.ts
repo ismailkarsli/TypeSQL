@@ -23,12 +23,12 @@ export type RowOf<E extends EngineTypes, DB, TM, Q extends string> = AnalysisOf<
 	: never;
 
 // Share parameter uses and conversions across arguments, carried values and results.
-export interface ParamData {
+interface ParamData {
 	readonly type: unknown;
 	readonly arg: unknown;
 	readonly uses: unknown;
 }
-export type ParamDataOf<E extends EngineTypes, DB, TM, Q extends string> =
+type ParamDataOf<E extends EngineTypes, DB, TM, Q extends string> =
 	AnalysisOf<E, DB, Q> extends { readonly max: infer N extends number }
 		? BuildParamData<
 				E,
@@ -108,6 +108,7 @@ type NonArrayValue =
 	| null
 	| undefined
 	| (object & { readonly length?: never })
+	// biome-ignore lint/plugin: object literals of any shape are valid JSON parameters.
 	| { readonly length?: never; readonly [key: string]: unknown };
 
 interface ArraysNeedSqlJson {

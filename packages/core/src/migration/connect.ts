@@ -1,4 +1,4 @@
-import type { SQLInputValue } from "node:sqlite";
+import type { SQLInputValue, SQLOutputValue } from "node:sqlite";
 import { paramNumbers, sqliteValue } from "../adapter.js";
 import type { Executor } from "../query.js";
 import { runtimeImport } from "./node.js";
@@ -10,13 +10,30 @@ interface Connection {
 
 // pg rejects a refused `localhost` connection (IPv4 and IPv6) with an
 // AggregateError whose own message is empty.
-const message = (err: unknown): string => {
-	if (!(err instanceof Error)) return String(err);
-	if (err.message) return err.message;
-	if (err instanceof AggregateError && err.errors.length > 0)
-		return Array.from(new Set(err.errors.map(message))).join("; ");
-	return (err as { code?: string }).code ?? err.name;
+const message = (cause: unknown): string => {
+	if (!(cause instanceof Error)) return String(cause);
+	if (cause.message) return cause.message;
+	if (cause instanceof AggregateError && cause.errors.length > 0)
+		return Array.from(new Set(cause.errors.map(message))).join("; ");
+	return "code" in cause && typeof cause.code === "string"
+		? cause.code
+		: cause.name;
 };
+
+type Pg = typeof import("pg");
+
+/** Whether `module` is the `pg` package, with its `Client`. */
+function isPg(module: unknown): module is Pg {
+	return (
+		typeof module === "object" &&
+		module !== null &&
+		"default" in module &&
+		typeof module.default === "object" &&
+		module.default !== null &&
+		"Client" in module.default &&
+		typeof module.default.Client === "function"
+	);
+}
 
 /** One `pg` client for a migrator call. */
 export async function connectPostgres(url: string): Promise<Connection> {
@@ -24,9 +41,9 @@ export async function connectPostgres(url: string): Promise<Connection> {
 		throw new Error(
 			`typesql: invalid connection URL ${JSON.stringify(url)} (expected postgres://user:password@host:port/database)`,
 		);
-	let Client: typeof import("pg").Client;
+	let Client: Pg["Client"];
 	try {
-		({ Client } = ((await runtimeImport("pg")) as typeof import("pg")).default);
+		({ Client } = (await runtimeImport("pg", isPg)).default);
 	} catch (cause) {
 		throw new Error(
 			'typesql: url connects with the "pg" package, which is not installed: npm install pg',
@@ -56,22 +73,25 @@ export async function connectPostgres(url: string): Promise<Connection> {
 			if (lost) throw lost;
 			const result = await client
 				.query(sql, [...values])
-				.catch((error: unknown) => {
+				.catch((cause: unknown) => {
 					// A session ended during a query rejects it with the server's
 					// FATAL error; later queries get pg's own "connection
 					// terminated" errors, so the server's message is the one to keep.
-					const { severity } = error as { severity?: unknown };
-					if (severity === "FATAL" || severity === "PANIC")
-						lost ??= error as Error;
-					throw error;
+					if (
+						cause instanceof Error &&
+						"severity" in cause &&
+						(cause.severity === "FATAL" || cause.severity === "PANIC")
+					)
+						lost ??= cause;
+					throw cause;
 				});
 			return Array.isArray(result)
 				? (result.at(-1) ?? { rows: [], rowCount: 0 })
 				: result;
 		},
 		close: async () => {
-			await client.end().catch((error: unknown) => {
-				if (!lost) throw error;
+			await client.end().catch((cause: unknown) => {
+				if (!lost) throw cause;
 			});
 		},
 	};
@@ -91,13 +111,37 @@ async function whenFree<T>(step: () => T): Promise<T> {
 		try {
 			return step();
 		} catch (error) {
-			const { errcode } = error as { errcode?: unknown };
 			// SQLITE_BUSY and its extended codes.
-			const busy = typeof errcode === "number" && (errcode & 0xff) === 5;
+			const busy =
+				typeof error === "object" &&
+				error !== null &&
+				"errcode" in error &&
+				typeof error.errcode === "number" &&
+				(error.errcode & 0xff) === 5;
 			if (!busy || Date.now() - start >= BUSY_LIMIT) throw error;
 		}
 		await new Promise((resolve) => setTimeout(resolve, delay));
 	}
+}
+
+/** Whether node:sqlite can bind `value` to a parameter. */
+function isSqliteInput(value: unknown): value is SQLInputValue {
+	return (
+		value === null ||
+		typeof value === "number" ||
+		typeof value === "bigint" ||
+		typeof value === "string" ||
+		ArrayBuffer.isView(value)
+	);
+}
+
+/** Parameter `number` (1-based) of `values`, as node:sqlite binds it. */
+function bindable(values: readonly unknown[], number: number): SQLInputValue {
+	const value = values[number - 1];
+	if (isSqliteInput(value)) return value;
+	throw new TypeError(
+		`typesql: SQLite cannot bind ${typeof value} to parameter ${number}`,
+	);
 }
 
 /** One `node:sqlite` database for a migrator call. */
@@ -107,7 +151,7 @@ export async function connectSqlite(file: string): Promise<Connection> {
 	return {
 		execute: async (sql, values) => {
 			let rest = sql;
-			let rows: Record<string, unknown>[] = [];
+			let rows: Record<string, SQLOutputValue>[] = [];
 			let rowCount = 0;
 			while (rest.trim()) {
 				rest = rest.replace(
@@ -120,24 +164,24 @@ export async function connectSqlite(file: string): Promise<Connection> {
 				const consumed = statement.sourceSQL.length;
 				if (!consumed) break;
 				const numbers = paramNumbers(statement.sourceSQL);
+				const converted = values.map(sqliteValue);
 				const bindings: Record<string, SQLInputValue> = {};
 				for (const number of numbers)
-					bindings[`$${number}`] = sqliteValue(
-						values[number - 1],
-					) as SQLInputValue;
-				const positional = values.map(sqliteValue) as SQLInputValue[];
+					bindings[`$${number}`] = bindable(converted, number);
+				const positional = () =>
+					converted.map((_, index) => bindable(converted, index + 1));
 				if (statement.columns().length) {
 					rows = await whenFree(() =>
 						numbers.length
 							? statement.all(bindings)
-							: statement.all(...positional),
+							: statement.all(...positional()),
 					);
 					rowCount = rows.length;
 				} else {
 					const result = await whenFree(() =>
 						numbers.length
 							? statement.run(bindings)
-							: statement.run(...positional),
+							: statement.run(...positional()),
 					);
 					rows = [];
 					rowCount = Number(result.changes);

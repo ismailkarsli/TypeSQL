@@ -1,7 +1,15 @@
 import type { Nx } from "../../../engine/parse.js";
 import type { ColInfo, Scope } from "../../../engine/types.js";
 import type { AnyErr, SqlError } from "../../../errors.js";
-import type { Call, ColRef, Expr, SelectStmt } from "../ast.js";
+import type {
+	Call,
+	ColRef,
+	Expr,
+	InTable,
+	Like,
+	RowCtor,
+	SelectStmt,
+} from "../ast.js";
 import type {
 	LookupRelation,
 	RelationItem,
@@ -87,13 +95,13 @@ type TypeComplex<E extends Expr, C extends SqCtx> = E extends {
 								: E extends { readonly t: "between" }
 									? Pred<[E["e"], E["lo"], E["hi"]], C, true>
 									: E extends { readonly t: "like" }
-										? TypeLike<E, C>
+										? TypeLike<Extract<E, Like>, C>
 										: E extends { readonly t: "in" }
 											? Pred<[E["e"], ...E["list"]], C, true>
 											: E extends { readonly t: "insub" }
 												? TypeInSub<E["e"], E["q"], C>
 												: E extends { readonly t: "intable" }
-													? TypeInTable<E, C>
+													? TypeInTable<Extract<E, InTable>, C>
 													: E extends { readonly t: "sub" }
 														? SubqueryCol<E["q"], C> extends infer X extends
 																ColInfo
@@ -146,7 +154,7 @@ type Pred<
 		? Info<"integer", Propagate extends true ? AnyNull<X> : false>
 		: TypeList<L, C>;
 
-type TypeLike<E extends Expr, C extends SqCtx> = E["kind"] extends "regexp"
+type TypeLike<E extends Like, C extends SqCtx> = E["kind"] extends "regexp"
 	? DeclaredFn<C["db"], "regexp"> extends null
 		? SqlError<"no such function: REGEXP", null>
 		: Pred<[E["e"], E["pat"]], C, true>
@@ -182,7 +190,7 @@ type InWidth<N extends number> = N extends 1
 	? Info<"integer", true>
 	: SqlError<`sub-select returns ${N} columns - expected 1`, null>;
 
-type TypeInTable<E extends Expr, C extends SqCtx> =
+type TypeInTable<E extends InTable, C extends SqCtx> =
 	TypeOf<E["e"], C> extends ColInfo
 		? E["args"] extends readonly Expr[]
 			? E["table"] extends "json_each" | "json_tree"
@@ -264,7 +272,7 @@ type TypeBin<Op, L extends Expr, R extends Expr, C extends SqCtx> = Op extends
 	| "<="
 	| ">="
 	? L extends { readonly t: "row" }
-		? RowCompare<L, R, C>
+		? RowCompare<Extract<L, RowCtor>, R, C>
 		: R extends { readonly t: "row" }
 			? SqlError<"row value misused", null>
 			: Pred<[L, R], C, true>
@@ -316,7 +324,11 @@ type BinType<Op, A extends string, B extends string> = Op extends "and" | "or"
 							: "integer"
 					: Arith<A, B>;
 
-type RowCompare<L extends Expr, R extends Expr, C extends SqCtx> = R extends {
+type RowCompare<
+	L extends RowCtor,
+	R extends Expr,
+	C extends SqCtx,
+> = R extends {
 	readonly t: "row";
 }
 	? L["items"]["length"] extends R["items"]["length"]

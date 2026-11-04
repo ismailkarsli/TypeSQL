@@ -56,7 +56,8 @@ type FragArgs<Text extends string> =
 	]
 		? Names extends []
 			? UnknownTuple<M>
-			: [params: { readonly [K in Names[number]]: unknown }]
+			: // biome-ignore lint/plugin: named fragment parameters accept any value; the SQL decides their types.
+				[params: { readonly [K in Names[number]]: unknown }]
 		: readonly unknown[];
 
 type FragCount<Text extends string> =

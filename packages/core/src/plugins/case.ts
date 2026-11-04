@@ -88,33 +88,29 @@ export interface CasePluginTypes extends IdentityPluginTypes {
 	readonly output: CamelCaseKeys<this["value"]>;
 }
 
-function mapKeys(value: unknown, map: (key: string) => string): unknown {
+/**
+ * A copy of a plain object or class instance with its own enumerable keys
+ * renamed; anything else as is. fromEntries defines each key, so `__proto__`
+ * stays a key.
+ */
+function mapKeys<V>(value: V, map: (key: string) => string) {
 	if (value === null || typeof value !== "object" || Array.isArray(value))
 		return value;
-	const out: Record<string, unknown> = {};
-	for (const key of Object.keys(value)) {
-		const mapped = map(key);
-		const item = (value as Record<string, unknown>)[key];
-		if (mapped === "__proto__") {
-			Object.defineProperty(out, mapped, {
-				value: item,
-				enumerable: true,
-				configurable: true,
-				writable: true,
-			});
-		} else out[mapped] = item;
-	}
-	return out;
+	return Object.fromEntries(
+		Object.entries(value).map(([key, item]) => [map(key), item]),
+	);
 }
 
 /** Camel-case application row/write keys; snake-case database write keys. JSON is untouched. */
 export class CasePlugin implements SqlPlugin<CasePluginTypes> {
 	declare readonly types?: CasePluginTypes;
+	// biome-ignore lint/plugin: implements the public `SqlPlugin.transformInput` signature.
 	transformInput(value: unknown, context: InputContext): unknown {
 		return context.kind === "set" || context.kind === "values"
 			? mapKeys(value, snakeCase)
 			: value;
 	}
+	// biome-ignore lint/plugin: implements the public `SqlPlugin.transformOutput` signature.
 	transformOutput(row: unknown): unknown {
 		return mapKeys(row, camelCase);
 	}

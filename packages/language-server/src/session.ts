@@ -14,7 +14,7 @@ import { type Highlight, highlightsIn } from "./highlight/index.js";
 
 export interface TypeScriptModules {
 	readonly API: typeof API;
-	readonly SyntaxKind: Readonly<Record<string, number>>;
+	readonly SyntaxKind: Readonly<Record<string, number | string>>;
 	readonly dir: string;
 	readonly version: string;
 }
@@ -30,24 +30,25 @@ export async function typescriptModules(
 ): Promise<TypeScriptModules> {
 	const req = createRequire(from);
 	const manifest = req.resolve("typescript/package.json");
-	const load = async (spec: string): Promise<Record<string, unknown>> =>
-		(await import(pathToFileURL(req.resolve(spec)).href)) as Record<
-			string,
-			unknown
-		>;
-	const pkg = req(manifest) as { version?: string };
-	const [api, ast] = await Promise.all([
-		load("typescript/async"),
-		load("typescript/ast"),
-	]).catch((e: unknown) => {
+	const load = async (spec: string) =>
+		import(pathToFileURL(req.resolve(spec)).href);
+	const pkg: { version?: string } = req(manifest);
+	let api: typeof import("typescript/async");
+	let ast: typeof import("typescript/ast");
+	try {
+		[api, ast] = await Promise.all([
+			load("typescript/async"),
+			load("typescript/ast"),
+		]);
+	} catch (e) {
 		throw new Error(
 			`typescript ${pkg.version ?? "unknown"} at ${realpathSync(dirname(manifest))} has no API client (completions need TypeScript 7.1)`,
 			{ cause: e },
 		);
-	});
+	}
 	return {
-		API: api.API as typeof API,
-		SyntaxKind: ast.SyntaxKind as Record<string, number>,
+		API: api.API,
+		SyntaxKind: ast.SyntaxKind,
 		dir: realpathSync(dirname(manifest)),
 		version: pkg.version ?? "unknown",
 	};
@@ -78,11 +79,21 @@ export class Session {
 	}
 
 	private connect(uri: string, fileName: string): Promise<Connection | null> {
-		this.connection ??= this.open(uri, fileName).catch((e: unknown) => {
+		this.connection ??= this.openOrForget(uri, fileName);
+		return this.connection;
+	}
+
+	/** Opens a connection; a failed attempt is forgotten so the next call retries. */
+	private async openOrForget(
+		uri: string,
+		fileName: string,
+	): Promise<Connection | null> {
+		try {
+			return await this.open(uri, fileName);
+		} catch (e) {
 			this.connection = undefined;
 			throw e;
-		});
-		return this.connection;
+		}
 	}
 
 	private async open(

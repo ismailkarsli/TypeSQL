@@ -61,15 +61,17 @@ export async function main(
 	try {
 		parsed = parse(argv);
 	} catch (error) {
-		io.stderr(`${(error as Error).message}\n\n${USAGE}`);
+		io.stderr(
+			`${error instanceof Error ? error.message : String(error)}\n\n${USAGE}`,
+		);
 		return 2;
 	}
 	const { values, tokens, positionals } = parsed;
 	if (values.version === true && positionals.length === 0) {
-		const pkg = createRequire(import.meta.url)("../package.json") as {
-			version: string;
-		};
-		io.stdout(`${pkg.version}\n`);
+		const pkg: { readonly version?: unknown } = createRequire(import.meta.url)(
+			"../package.json",
+		);
+		io.stdout(`${String(pkg.version)}\n`);
 		return 0;
 	}
 	const help = values.help === true;

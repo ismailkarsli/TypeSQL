@@ -2,6 +2,8 @@ import type { NullTest, ParamEntry } from "../../../engine/params.js";
 import type { Nx } from "../../../engine/parse.js";
 import type { ColInfo, QueryContext, Scope } from "../../../engine/types.js";
 import type {
+	Call,
+	CaseExpr,
 	Expr,
 	FromItem,
 	SelectBody,
@@ -116,9 +118,9 @@ type ParamsComplex<E extends Expr, C extends SqCtx> = E extends {
 													Info<"text", false>
 												>
 											: E extends { readonly t: "case" }
-												? CaseParams<E, C>
+												? CaseParams<Extract<E, CaseExpr>, C>
 												: E extends { readonly t: "call" }
-													? CallParams<E, C>
+													? CallParams<Extract<E, Call>, C>
 													: E extends { readonly t: "sub" | "exists" }
 														? ParamsOfSelect<E["q"], C>
 														: E extends { readonly t: "row" }
@@ -239,7 +241,7 @@ type InSubParams<L extends Expr, Q extends SelectStmt, C extends SqCtx> =
 				>)
 	| ParamsOfSelect<Q, C>;
 
-type CaseParams<E extends Expr, C extends SqCtx> = (
+type CaseParams<E extends CaseExpr, C extends SqCtx> = (
 	E["operand"] extends Expr
 		? E["operand"]
 		: null
@@ -257,7 +259,7 @@ type CaseParams<E extends Expr, C extends SqCtx> = (
 			: M2
 		: never
 	: never;
-type CaseValueType<E extends Expr, C extends SqCtx> =
+type CaseValueType<E extends CaseExpr, C extends SqCtx> =
 	CaseValues<E["whens"], E["else"], C, 0, []> extends infer L extends
 		readonly ColInfo[]
 		? Common<L> extends infer T extends string
@@ -359,7 +361,7 @@ type NumFns =
 	| "avg";
 type SameFns = "coalesce" | "ifnull" | "nullif" | "max" | "min";
 
-type CallParams<E extends Expr, C extends SqCtx> =
+type CallParams<E extends Call, C extends SqCtx> =
 	| ParamsOfExpr<E["filter"], C>
 	| FnArgs<E["args"], C, never, CallSlots<E, C>>
 	| ParamsOfList<E["order"], C>
@@ -369,7 +371,7 @@ type CallParams<E extends Expr, C extends SqCtx> =
 	  }
 			? ParamsOfList<[...P, ...O], C>
 			: never);
-type CallSlots<E extends Expr, C extends SqCtx> =
+type CallSlots<E extends Call, C extends SqCtx> =
 	DeclaredFn<C["db"], E["name"]> extends infer D extends {}
 		? SigSlots<PickSig<D, E["args"]["length"]>, E["args"]>
 		: E["name"] extends SameFns

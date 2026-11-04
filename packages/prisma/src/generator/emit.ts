@@ -25,58 +25,58 @@ export interface SchemaField {
 	};
 }
 
-const SCALAR_TYPES: Readonly<Record<string, string>> = {
-	Int: "int4",
-	BigInt: "int8",
-	Float: "float8",
-	Decimal: "numeric",
-	String: "text",
-	Boolean: "bool",
-	DateTime: "timestamp",
-	Json: "jsonb",
-	Bytes: "bytea",
-};
+const SCALAR_TYPES: ReadonlyMap<string, string> = new Map([
+	["Int", "int4"],
+	["BigInt", "int8"],
+	["Float", "float8"],
+	["Decimal", "numeric"],
+	["String", "text"],
+	["Boolean", "bool"],
+	["DateTime", "timestamp"],
+	["Json", "jsonb"],
+	["Bytes", "bytea"],
+]);
 
-const SQLITE_SCALAR_TYPES: Readonly<Record<string, string>> = {
-	Int: "integer",
-	BigInt: "bigint",
-	Float: "real",
-	Decimal: "decimal",
-	String: "text",
-	Boolean: "boolean",
-	DateTime: "datetime",
-	Json: "jsonb",
-	Bytes: "blob",
-};
+const SQLITE_SCALAR_TYPES: ReadonlyMap<string, string> = new Map([
+	["Int", "integer"],
+	["BigInt", "bigint"],
+	["Float", "real"],
+	["Decimal", "decimal"],
+	["String", "text"],
+	["Boolean", "boolean"],
+	["DateTime", "datetime"],
+	["Json", "jsonb"],
+	["Bytes", "blob"],
+]);
 
-const NATIVE_TYPES: Readonly<Record<string, string>> = {
-	Text: "text",
-	Char: "bpchar",
-	VarChar: "varchar",
-	Bit: "bit",
-	VarBit: "varbit",
-	Uuid: "uuid",
-	Xml: "xml",
-	Inet: "inet",
-	Citext: "text",
-	Boolean: "bool",
-	Integer: "int4",
-	SmallInt: "int2",
-	Oid: "oid",
-	BigInt: "int8",
-	DoublePrecision: "float8",
-	Real: "float4",
-	Decimal: "numeric",
-	Money: "money",
-	Timestamp: "timestamp",
-	Timestamptz: "timestamptz",
-	Date: "date",
-	Time: "time",
-	Timetz: "timetz",
-	Json: "json",
-	JsonB: "jsonb",
-	ByteA: "bytea",
-};
+const NATIVE_TYPES: ReadonlyMap<string, string> = new Map([
+	["Text", "text"],
+	["Char", "bpchar"],
+	["VarChar", "varchar"],
+	["Bit", "bit"],
+	["VarBit", "varbit"],
+	["Uuid", "uuid"],
+	["Xml", "xml"],
+	["Inet", "inet"],
+	["Citext", "text"],
+	["Boolean", "bool"],
+	["Integer", "int4"],
+	["SmallInt", "int2"],
+	["Oid", "oid"],
+	["BigInt", "int8"],
+	["DoublePrecision", "float8"],
+	["Real", "float4"],
+	["Decimal", "numeric"],
+	["Money", "money"],
+	["Timestamp", "timestamp"],
+	["Timestamptz", "timestamptz"],
+	["Date", "date"],
+	["Time", "time"],
+	["Timetz", "timetz"],
+	["Json", "json"],
+	["JsonB", "jsonb"],
+	["ByteA", "bytea"],
+]);
 
 const DB_DEFAULT_FUNCTIONS = new Set(["autoincrement", "now", "dbgenerated"]);
 
@@ -127,15 +127,16 @@ function pgTypeOf(
 ): string {
 	if (field.kind === "enum") return enumNames.get(field.type) ?? field.type;
 	const native = field.nativeType?.[0];
-	if (native !== undefined) return NATIVE_TYPES[native] ?? native.toLowerCase();
-	return SCALAR_TYPES[field.type] ?? field.type.toLowerCase();
+	if (native !== undefined)
+		return NATIVE_TYPES.get(native) ?? native.toLowerCase();
+	return SCALAR_TYPES.get(field.type) ?? field.type.toLowerCase();
 }
 
 function hasDbDefault(field: DmmfField): boolean {
 	if (!field.hasDefaultValue) return false;
 	const d = field.default;
 	if (d !== null && typeof d === "object" && !Array.isArray(d))
-		return DB_DEFAULT_FUNCTIONS.has((d as { name: string }).name);
+		return "name" in d && DB_DEFAULT_FUNCTIONS.has(d.name);
 	return true;
 }
 
@@ -154,7 +155,7 @@ function sqliteTypeOf(field: DmmfField, enums: readonly DmmfEnum[]): string {
 		const values = (e?.values ?? []).map((v) => str(v.dbName ?? v.name));
 		return `Typed<"text", ${values.join(" | ") || "never"}>`;
 	}
-	return str(SQLITE_SCALAR_TYPES[field.type] ?? field.type.toLowerCase());
+	return str(SQLITE_SCALAR_TYPES.get(field.type) ?? field.type.toLowerCase());
 }
 
 export function generateSource(

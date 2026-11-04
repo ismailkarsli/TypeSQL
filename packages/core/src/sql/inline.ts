@@ -42,7 +42,7 @@ type HoldsMarker<T, Depth extends readonly unknown[] = []> = 0 extends 1 & T
 			? false
 			: T extends `\u0000${string}\u0000`
 				? true
-				: T extends (...args: never) => unknown
+				: T extends (...args: never) => void
 					? false
 					: T extends readonly unknown[]
 						? HoldsMarker<T[number], [...Depth, 0]>
@@ -157,7 +157,7 @@ type ShapesEnc<
 	: Acc;
 type ShapeEnc<T, O, Depth extends unknown[]> = O extends (
 	...args: never
-) => unknown
+) => void
 	? "o"
 	: string extends keyof O
 		? `<${Depth["length"]}*=${ElemEnc<T, O[string & keyof O], Depth>}>${Depth["length"]}`

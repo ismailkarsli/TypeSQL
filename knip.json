@@ -68,8 +68,7 @@
 		},
 		"packages/docs": {
 			"entry": ["*.paths.ts", "cloudflare.config.ts", "wrangler.config.ts"],
-			"project": ["*.ts", ".vitepress/**/*.{ts,mts,vue}"],
-			"ignoreDependencies": ["vue"]
+			"project": ["*.ts", ".vitepress/**/*.{ts,mts,vue}"]
 		},
 		"tests": {
 			"entry": ["scenario.test.ts", "support/observe.ts", "support/runtime.ts"],

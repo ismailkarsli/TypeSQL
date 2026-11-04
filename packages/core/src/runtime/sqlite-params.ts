@@ -10,7 +10,7 @@ export function paramNumbers(text: string): number[] {
 	return [...seen];
 }
 
-export function sqliteValue(value: unknown): unknown {
+export function sqliteValue<V>(value: V): V | string | 0 | 1 {
 	if (value instanceof JsonParam) return JSON.stringify(value.value);
 	if (typeof value === "boolean") return value ? 1 : 0;
 	if (value instanceof Date)
@@ -25,10 +25,11 @@ export interface SplitStatement {
 	readonly values: readonly unknown[];
 }
 
-export function splitParams(
+/** `map` converts each value for the driver; sqliteValue by default. */
+export function splitParams<V, R>(
 	text: string,
-	values: readonly unknown[],
-	map: (value: unknown) => unknown = sqliteValue,
+	values: readonly V[],
+	map?: (value: V | undefined) => R,
 ): SplitStatement {
 	const parts: string[] = [];
 	const out: unknown[] = [];
@@ -36,18 +37,25 @@ export function splitParams(
 	for (const m of text.matchAll(PARAMS)) {
 		if (m[1] === undefined) continue;
 		parts.push(text.slice(last, m.index));
-		out.push(map(values[Number(m[1]) - 1]));
+		const value = values[Number(m[1]) - 1];
+		out.push(map ? map(value) : sqliteValue(value));
 		last = m.index + m[0].length;
 	}
 	parts.push(text.slice(last));
 	return { parts, values: out };
 }
 
-export function positional(
+/** SQL text with `?` placeholders, and the value for each. */
+export interface PositionalStatement {
+	readonly text: string;
+	readonly values: unknown[];
+}
+
+export function positional<V, R>(
 	text: string,
-	values: readonly unknown[],
-	map: (value: unknown) => unknown = sqliteValue,
-): { readonly text: string; readonly values: unknown[] } {
+	values: readonly V[],
+	map?: (value: V | undefined) => R,
+): PositionalStatement {
 	const split = splitParams(text, values, map);
 	return { text: split.parts.join("?"), values: [...split.values] };
 }

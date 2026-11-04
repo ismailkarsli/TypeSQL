@@ -52,7 +52,7 @@ const SQL_TOKENS: TokenNames = {
 };
 
 interface LegacyAPI {
-	onLanguageServerInitialized(listener: () => unknown): vscode.Disposable;
+	onLanguageServerInitialized(listener: () => void): vscode.Disposable;
 	initializeAPIConnection(pipe?: string): Promise<string>;
 }
 
@@ -71,13 +71,10 @@ export async function activate(
 		return;
 	}
 	const api = await ts.activate();
-	const hasMiddleware =
-		typeof (api as Partial<ExtensionAPI> | undefined)?.registerLspMiddleware ===
-		"function";
+	const hasMiddleware = hasLspMiddleware(api);
 	if (
 		typeof api?.onLanguageServerInitialized !== "function" ||
-		(!hasMiddleware &&
-			typeof (api as LegacyAPI).initializeAPIConnection !== "function")
+		(!hasMiddleware && typeof api.initializeAPIConnection !== "function")
 	) {
 		log.warn(
 			`${TYPESCRIPT_EXTENSION} ${String(ts.packageJSON.version)} has no API for other extensions; no completions`,
@@ -182,7 +179,7 @@ export async function activate(
 	};
 
 	if (hasMiddleware) {
-		const full = api as ExtensionAPI;
+		const full = api;
 		context.subscriptions.push(
 			full.onLanguageServerInitialized((sdk: TypeScriptSDK) => {
 				log.info(`TypeScript ${sdk.version} language server initialized`);
@@ -200,7 +197,7 @@ export async function activate(
 								: "(TypeScript 7 extension)";
 							return {
 								API: async.API,
-								SyntaxKind: ast.SyntaxKind as unknown as Record<string, number>,
+								SyntaxKind: ast.SyntaxKind,
 								dir,
 								version: sdk.version,
 							};
@@ -233,7 +230,7 @@ export async function activate(
 		return;
 	}
 
-	const legacy = api as LegacyAPI;
+	const legacy = api;
 	log.info(
 		`${TYPESCRIPT_EXTENSION} ${String(ts.packageJSON.version)} has no LSP middleware: completions come from a separate provider, and TypeScript's item with the statement text stays in the list`,
 	);
@@ -269,6 +266,18 @@ export async function activate(
 
 export function deactivate(): void {}
 
+// Versions of the TypeScript 7 extension before LSP middleware expose only LegacyAPI.
+function hasLspMiddleware(
+	api: ExtensionAPI | LegacyAPI | undefined,
+): api is ExtensionAPI {
+	return (
+		typeof api === "object" &&
+		api !== null &&
+		"registerLspMiddleware" in api &&
+		typeof api.registerLspMiddleware === "function"
+	);
+}
+
 function legacyCandidates(
 	fileName: string,
 	nightlyPath: string | undefined,
@@ -293,14 +302,14 @@ function legacyCandidates(
 	return candidates;
 }
 
-const KINDS: { readonly [K in SqlItem["kind"]]: vscode.CompletionItemKind } = {
+const KINDS = {
 	table: vscode.CompletionItemKind.Struct,
 	view: vscode.CompletionItemKind.Interface,
 	cte: vscode.CompletionItemKind.Struct,
 	namespace: vscode.CompletionItemKind.Module,
 	column: vscode.CompletionItemKind.Field,
 	alias: vscode.CompletionItemKind.Variable,
-};
+} satisfies { readonly [K in SqlItem["kind"]]: vscode.CompletionItemKind };
 
 function toItem(i: SqlItem, c: Completions): vscode.CompletionItem {
 	const item = new vscode.CompletionItem(i.label, KINDS[i.kind]);

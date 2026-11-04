@@ -51,15 +51,25 @@ export interface IntrospectOptions {
 	readonly viewNotNull?: NullabilityOptions["notNull"];
 }
 
-const KINDS: Readonly<Record<string, RelationKind>> = {
-	r: "table",
-	p: "partitioned table",
-	v: "view",
-	m: "materialized view",
-	f: "foreign table",
-};
+const KINDS: ReadonlyMap<string, RelationKind> = new Map([
+	["r", "table"],
+	["p", "partitioned table"],
+	["v", "view"],
+	["m", "materialized view"],
+	["f", "foreign table"],
+]);
 
-const TYPE_ALIASES: Readonly<Record<string, string>> = { citext: "text" };
+const TYPE_ALIASES: ReadonlyMap<string, string> = new Map([["citext", "text"]]);
+
+// Rows of the catalog queries below, as node-postgres returns them.
+
+interface VersionRow {
+	readonly version: string;
+}
+
+interface NameRow {
+	readonly name: string;
+}
 
 interface TypeRow {
 	readonly oid: string;
@@ -71,6 +81,105 @@ interface TypeRow {
 	readonly array: string;
 	readonly notnull: boolean;
 }
+
+interface RelationRow {
+	readonly oid: string;
+	readonly schema: string;
+	readonly name: string;
+	readonly relkind: string;
+	readonly comment: string | null;
+}
+
+interface ColumnRow {
+	readonly relid: string;
+	readonly name: string;
+	readonly typid: string;
+	readonly declared: string;
+	readonly notnull: boolean;
+	readonly identity: string;
+	readonly generated: string;
+	readonly default: string | null;
+	readonly comment: string | null;
+}
+
+interface EnumRow {
+	readonly oid: string;
+	readonly schema: string;
+	readonly name: string;
+	readonly values: readonly string[];
+}
+
+const isVersionRow = (row: unknown): row is VersionRow =>
+	typeof row === "object" &&
+	row !== null &&
+	"version" in row &&
+	typeof row.version === "string";
+
+const isNameRow = (row: unknown): row is NameRow =>
+	typeof row === "object" &&
+	row !== null &&
+	"name" in row &&
+	typeof row.name === "string";
+
+const isTypeRow = (row: unknown): row is TypeRow =>
+	isNameRow(row) &&
+	"oid" in row &&
+	typeof row.oid === "string" &&
+	"schema" in row &&
+	typeof row.schema === "string" &&
+	"typtype" in row &&
+	typeof row.typtype === "string" &&
+	"basetype" in row &&
+	typeof row.basetype === "string" &&
+	"elem" in row &&
+	typeof row.elem === "string" &&
+	"array" in row &&
+	typeof row.array === "string" &&
+	"notnull" in row &&
+	typeof row.notnull === "boolean";
+
+const isComment = (comment: unknown): comment is string | null =>
+	comment === null || typeof comment === "string";
+
+const isRelationRow = (row: unknown): row is RelationRow =>
+	isNameRow(row) &&
+	"oid" in row &&
+	typeof row.oid === "string" &&
+	"schema" in row &&
+	typeof row.schema === "string" &&
+	"relkind" in row &&
+	typeof row.relkind === "string" &&
+	"comment" in row &&
+	isComment(row.comment);
+
+const isColumnRow = (row: unknown): row is ColumnRow =>
+	isNameRow(row) &&
+	"relid" in row &&
+	typeof row.relid === "string" &&
+	"typid" in row &&
+	typeof row.typid === "string" &&
+	"declared" in row &&
+	typeof row.declared === "string" &&
+	"notnull" in row &&
+	typeof row.notnull === "boolean" &&
+	"identity" in row &&
+	typeof row.identity === "string" &&
+	"generated" in row &&
+	typeof row.generated === "string" &&
+	"default" in row &&
+	isComment(row.default) &&
+	"comment" in row &&
+	isComment(row.comment);
+
+const isEnumRow = (row: unknown): row is EnumRow =>
+	isNameRow(row) &&
+	"oid" in row &&
+	typeof row.oid === "string" &&
+	"schema" in row &&
+	typeof row.schema === "string" &&
+	"values" in row &&
+	Array.isArray(row.values) &&
+	row.values.every((value) => typeof value === "string");
 
 interface ResolvedType {
 	readonly type: string;
@@ -103,7 +212,7 @@ function resolver(types: ReadonlyMap<string, TypeRow>) {
 			};
 		}
 		return {
-			type: TYPE_ALIASES[t.name] ?? t.name,
+			type: TYPE_ALIASES.get(t.name) ?? t.name,
 			notnull: false,
 			scalarOid: t.oid,
 			domain: null,
@@ -118,19 +227,31 @@ export async function introspect(
 	client: PgQueryable,
 	options: IntrospectOptions = {},
 ): Promise<IntrospectedDatabase> {
-	const q = async <R>(text: string, values?: unknown[]): Promise<R[]> =>
-		(await client.query(text, values)).rows as R[];
+	const q = async <R>(
+		isRow: (row: unknown) => row is R,
+		text: string,
+		values?: unknown[],
+	): Promise<R[]> => {
+		const { rows } = await client.query(text, values);
+		if (rows.every(isRow)) return rows;
+		throw new Error("unexpected row from a system catalog query");
+	};
 
-	const [{ version }] = (await q<{ version: string }>(
+	const [setting] = await q(
+		isVersionRow,
 		`SELECT current_setting('server_version') AS version`,
-	)) as [{ version: string }];
+	);
+	if (!setting) throw new Error("the server did not report its version");
+	const { version } = setting;
 	const schemaRows = options.schemas
-		? await q<{ name: string }>(
+		? await q(
+				isNameRow,
 				`SELECT n.nspname AS name FROM unnest($1::text[]) WITH ORDINALITY AS s(name, i)
            JOIN pg_namespace n ON n.nspname = s.name ORDER BY s.i`,
 				[[...options.schemas]],
 			)
-		: await q<{ name: string }>(
+		: await q(
+				isNameRow,
 				`SELECT n.nspname AS name FROM pg_namespace n WHERE ${USER_SCHEMAS}
           ORDER BY n.nspname <> 'public', n.nspname`,
 			);
@@ -143,7 +264,8 @@ export async function introspect(
 
 	const types = new Map(
 		(
-			await q<TypeRow>(
+			await q(
+				isTypeRow,
 				`SELECT t.oid::int8::text AS oid, t.typname AS name, n.nspname AS schema, t.typtype,
               t.typbasetype::int8::text AS basetype, t.typelem::int8::text AS elem,
               t.typarray::int8::text AS array, t.typnotnull AS notnull
@@ -155,13 +277,8 @@ export async function introspect(
 
 	const excluded = options.exclude?.map(globRegExp);
 	const relRows = (
-		await q<{
-			oid: string;
-			schema: string;
-			name: string;
-			relkind: string;
-			comment: string | null;
-		}>(
+		await q(
+			isRelationRow,
 			`SELECT c.oid::int8::text AS oid, n.nspname AS schema, c.relname AS name, c.relkind,
             obj_description(c.oid, 'pg_class') AS comment
        FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
@@ -175,17 +292,8 @@ export async function introspect(
 				(re) => re.test(r.name) || re.test(`${r.schema}.${r.name}`),
 			),
 	);
-	const colRows = await q<{
-		relid: string;
-		name: string;
-		typid: string;
-		declared: string;
-		notnull: boolean;
-		identity: string;
-		generated: string;
-		default: string | null;
-		comment: string | null;
-	}>(
+	const colRows = await q(
+		isColumnRow,
 		`SELECT a.attrelid::int8::text AS relid, a.attname AS name, a.atttypid::int8::text AS typid,
             format_type(a.atttypid, a.atttypmod) AS declared, a.attnotnull AS notnull,
             a.attidentity AS identity, a.attgenerated AS generated,
@@ -207,7 +315,7 @@ export async function introspect(
 	const usedTypes = new Set<string>();
 	const relations: IntrospectedRelation[] = [];
 	for (const rel of relRows) {
-		const kind = KINDS[rel.relkind]!;
+		const kind = KINDS.get(rel.relkind)!;
 		const isView = kind === "view" || kind === "materialized view";
 		const viewNotNull = isView ? await views.notNull(rel.oid) : null;
 		const columns = (colsByRel.get(rel.oid) ?? []).map(
@@ -245,12 +353,8 @@ export async function introspect(
 		});
 	}
 
-	const enumRows = await q<{
-		oid: string;
-		schema: string;
-		name: string;
-		values: string[];
-	}>(
+	const enumRows = await q(
+		isEnumRow,
 		`SELECT t.oid::int8::text AS oid, n.nspname AS schema, t.typname AS name,
             array_agg(e.enumlabel::text ORDER BY e.enumsortorder) AS values
        FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace JOIN pg_enum e ON e.enumtypid = t.oid

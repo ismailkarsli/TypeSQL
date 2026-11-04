@@ -1,10 +1,4 @@
-import type {
-	CallExpression,
-	Identifier,
-	Node,
-	PropertyAccessExpression,
-	SourceFile,
-} from "typescript/ast";
+import type { CallExpression, Node, SourceFile } from "typescript/ast";
 import type {
 	Checker,
 	DocumentIdentifier,
@@ -13,7 +7,10 @@ import type {
 } from "typescript/async";
 import {
 	type EditorKinds,
+	isCall,
 	isCoreRef,
+	isIdentifier,
+	isPropertyAccess,
 	isSqlLiteral,
 	textOf,
 } from "../complete/call.js";
@@ -31,14 +28,14 @@ export interface Highlight {
 
 // Types whose call takes SQL, and methods that take SQL on them.
 const CALLABLE = ["Sql", "TransactionalSql", "SqlApi", "MigrationContext"];
-const METHODS: Readonly<Record<string, readonly string[]>> = {
-	as: CALLABLE,
-	fragment: CALLABLE,
-	prepare: CALLABLE,
-	raw: CALLABLE,
-	ddl: ["MigrationContext"],
-	add: ["MigrationContext", "Migrations"],
-};
+const METHODS = new Map<string, readonly string[]>([
+	["as", CALLABLE],
+	["fragment", CALLABLE],
+	["prepare", CALLABLE],
+	["raw", CALLABLE],
+	["ddl", ["MigrationContext"]],
+	["add", ["MigrationContext", "Migrations"]],
+]);
 
 // What the VS Code grammar colors without types, so its colors are kept for
 // TypeSQL calls and undone for others: calls of sql, tx and names ending in
@@ -120,8 +117,8 @@ export async function highlightsIn(
 function collect(file: SourceFile, kinds: EditorKinds): Candidate[] {
 	const out: Candidate[] = [];
 	const visit = (n: Node): void => {
-		if (n.kind === kinds.CallExpression) {
-			const c = candidate(file, n as CallExpression, kinds);
+		if (isCall(n, kinds)) {
+			const c = candidate(file, n, kinds);
 			if (c) out.push(c);
 		}
 		n.forEachChild(visit);
@@ -143,16 +140,13 @@ function candidate(
 	const body = src.slice(open + 1, literal.end);
 	const firstLine = body.slice(0, body.search(/\n|$/));
 	const callee = call.expression;
-	const member =
-		callee.kind === kinds.PropertyAccessExpression
-			? (callee as PropertyAccessExpression)
-			: null;
-	const method = member && Object.hasOwn(METHODS, member.name.text);
+	const member = isPropertyAccess(callee, kinds) ? callee : null;
+	const methodTypes = member ? METHODS.get(member.name.text) : undefined;
 	const nameOf = (n: Node): string | null =>
-		n.kind === kinds.Identifier
-			? (n as Identifier).text
-			: n.kind === kinds.PropertyAccessExpression
-				? (n as PropertyAccessExpression).name.text
+		isIdentifier(n, kinds)
+			? n.text
+			: isPropertyAccess(n, kinds)
+				? n.name.text
 				: null;
 	const name = nameOf(callee);
 	const grammar =
@@ -169,12 +163,13 @@ function candidate(
 	// A call that the grammar leaves alone needs a type only if it could be a
 	// TypeSQL call: a method that takes SQL, or a string that starts like a
 	// statement, past any blank lines.
-	if (!grammar && !method && !STATEMENT_ANY.test(body.trimStart())) return null;
-	return method
+	if (!grammar && !methodTypes && !STATEMENT_ANY.test(body.trimStart()))
+		return null;
+	return member && methodTypes
 		? {
 				literal,
 				target: member.expression,
-				types: METHODS[member.name.text]!,
+				types: methodTypes,
 				grammar,
 			}
 		: { literal, target: callee, types: CALLABLE, grammar };
@@ -188,14 +183,13 @@ function outside(
 ): [number, number][] {
 	let parts: [number, number][] = [[start, end]];
 	for (const [hs, he] of holes)
-		parts = parts.flatMap(([s, e]): [number, number][] =>
-			he <= s || hs >= e
-				? [[s, e]]
-				: [
-						...(s < hs ? [[s, hs] as [number, number]] : []),
-						...(he < e ? [[he, e] as [number, number]] : []),
-					],
-		);
+		parts = parts.flatMap(([s, e]): [number, number][] => {
+			if (he <= s || hs >= e) return [[s, e]];
+			const kept: [number, number][] = [];
+			if (s < hs) kept.push([s, hs]);
+			if (he < e) kept.push([he, e]);
+			return kept;
+		});
 	return parts;
 }
 

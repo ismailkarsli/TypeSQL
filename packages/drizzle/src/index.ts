@@ -9,7 +9,12 @@ import type {
 	TransactionalSql as SqliteTransactionalSql,
 	DefaultTypeMap as SqliteTypeMap,
 } from "@typesql/core/sqlite";
-import { type DrizzleDatabase, driver } from "./client.js";
+import {
+	type DrizzleDatabase,
+	driver,
+	isDrizzleDatabase,
+	isSqliteDatabase,
+} from "./client.js";
 import type { FromDrizzle, FromDrizzleOptions } from "./from-drizzle.js";
 import type { FromDrizzleSqlite } from "./from-drizzle-sqlite.js";
 import { type DrizzleSqliteDatabase, sqliteDriver } from "./sqlite-client.js";
@@ -71,16 +76,17 @@ export function createSql<
 export function createSql(
 	dialect: PostgresDialect | SqliteDialect,
 	db?: DrizzleDatabase | DrizzleSqliteDatabase,
-): unknown {
-	return dialect.name === "sqlite"
-		? createTransactionalSql(
-				dialect,
-				db as DrizzleSqliteDatabase | undefined,
-				sqliteDriver,
-			)
-		: createTransactionalSql(
-				dialect,
-				db as DrizzleDatabase | undefined,
-				driver,
-			);
+): object {
+	if (dialect.name === "sqlite") {
+		if (db === undefined || isSqliteDatabase(db))
+			return createTransactionalSql(dialect, db, sqliteDriver);
+		throw new Error(
+			"typesql: createSql(sqlite, db) needs a Drizzle SQLite database (with all() and run())",
+		);
+	}
+	if (db === undefined || isDrizzleDatabase(db))
+		return createTransactionalSql(dialect, db, driver);
+	throw new Error(
+		"typesql: createSql(postgres, db) needs a Drizzle database (with a session)",
+	);
 }

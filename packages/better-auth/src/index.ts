@@ -148,7 +148,7 @@ function adapter(
 	const column = (target: ModelTarget, field: string) =>
 		quote(getFieldName({ model: keyOf(target), field }));
 
-	const assignments = (s: Statement, values: object) =>
+	const assignments = <V extends object>(s: Statement, values: V) =>
 		Object.entries(values)
 			.filter(([, value]) => value !== undefined)
 			.map(([key, value]) => `${quote(key)} = ${s.param(value)}`);
@@ -169,14 +169,15 @@ function adapter(
 		const guard = where(s, clauses);
 		return ` WHERE ${id} IN (SELECT ${id} FROM ${table(model)}${whereClause(s, clauses)} LIMIT 1)${guard === undefined ? "" : ` AND ${guard}`}`;
 	};
-	const columnsOf = (modelKey: string) => [
-		...new Set([
-			getFieldName({ model: modelKey, field: "id" }),
-			...Object.entries(schema[modelKey]?.fields ?? {}).map(
-				([field, attributes]) => attributes.fieldName || field,
-			),
-		]),
-	];
+	const columnsOf = (modelKey: string) =>
+		Array.from(
+			new Set([
+				getFieldName({ model: modelKey, field: "id" }),
+				...Object.entries(schema[modelKey]?.fields ?? {}).map(
+					([field, attributes]) => attributes.fieldName || field,
+				),
+			]),
+		);
 	const joins = (s: Statement, model: string, join: JoinConfig = {}) =>
 		Object.entries(join)
 			.map(([name, { modelKey, on, relation, limit }]) => {

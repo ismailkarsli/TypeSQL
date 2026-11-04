@@ -2,9 +2,15 @@ import {
 	hasInline,
 	resolveFragments,
 	resolveInline,
-	takeValue,
+	takeValues,
 } from "./inline.js";
-import { maxParam, rewriteNamed, type SlotValues, splice } from "./splice.js";
+import {
+	type CompiledSql,
+	maxParam,
+	rewriteNamed,
+	type SlotValues,
+	splice,
+} from "./splice.js";
 
 const NAMED_RE = /(^|[^:]):[A-Za-z_]/;
 
@@ -18,11 +24,13 @@ export function namedValues(
 			"typesql: a statement with :name parameters takes exactly one object argument",
 		);
 	}
+	// biome-ignore lint/nursery/noUnsafeTypeAssertion: named parameters are read with `in`, including inherited properties such as getters.
+	// biome-ignore lint/plugin: see above.
 	const record = obj as Record<string, unknown>;
-	return names.map((name) => {
+	return names.flatMap((name) => {
 		if (!(name in record))
 			throw new Error(`typesql: missing named parameter :${name}`);
-		return takeValue(record[name]);
+		return takeValues([record[name]]);
 	});
 }
 
@@ -30,12 +38,12 @@ export function build(
 	text: string,
 	rest: readonly unknown[],
 	transformParameters?: (args: readonly unknown[]) => readonly unknown[],
-): { text: string; values: unknown[] } {
+): CompiledSql {
 	const inlined = hasInline(text) ? resolveFragments(text) : null;
 	const slots: SlotValues | null = inlined ? inlined.slots : null;
 	const outer = transformParameters ? transformParameters(rest) : rest;
 	let positional = inlined ? inlined.text : text;
-	let values: unknown[] = outer.length === 0 ? [] : outer.map(takeValue);
+	let values: unknown[] = outer.length === 0 ? [] : takeValues(outer);
 	if (positional.includes(":") && NAMED_RE.test(positional)) {
 		const rn = rewriteNamed(positional);
 		if (rn.names.length > 0) {

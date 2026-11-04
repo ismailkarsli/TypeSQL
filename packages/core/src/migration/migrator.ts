@@ -3,10 +3,12 @@ import { createMigrationContext } from "./context.js";
 import {
 	type Dialect,
 	type Entry,
+	hasCode,
 	isMigration,
 	type Migration,
 	type SCHEMA,
 	type SchemaOf,
+	type Step,
 	toEntry,
 } from "./define.js";
 
@@ -188,20 +190,33 @@ export interface Migrator<Schema = unknown> {
 	>;
 }
 
-const MIGRATOR: unique symbol = Symbol.for("typesql.migrator") as never;
+const MIGRATOR: unique symbol = Symbol.for("typesql.migrator");
 
 /** Whether `value` is a migrator from any copy of `@typesql/core`. */
 export function isMigrator(value: unknown): value is Migrator {
 	return (
 		value !== null &&
 		typeof value === "object" &&
-		(value as { [MIGRATOR]?: unknown })[MIGRATOR] === true
+		MIGRATOR in value &&
+		value[MIGRATOR] === true
 	);
+}
+
+/**
+ * A migrator as it is at runtime. The type-only schema, and the types of
+ * `latest()` and `with()` that follow it, come from `createMigrator`'s
+ * signature.
+ */
+interface RuntimeMigrator
+	extends Omit<Migrator, typeof SCHEMA | "latest" | "with"> {
+	latest(): Promise<UpResult>;
+	with(overrides: Partial<MigratorConfig>): RuntimeMigrator;
 }
 
 interface Row {
 	readonly name: string;
-	readonly at: unknown;
+	/** When it was applied: a Date, or a timestamp's text. */
+	readonly at: Date | string | null;
 }
 
 const CONNECTIONS = ["url", "db", "execute"] as const;
@@ -267,7 +282,7 @@ export function createMigrator<
 >(
 	config: ConfigOf<Schema, M>,
 ): Migrator<[Schema] extends [Unset] ? ArraySchema<M> : Schema>;
-export function createMigrator(config: MigratorConfig): Migrator {
+export function createMigrator(config: MigratorConfig): RuntimeMigrator {
 	validate(config);
 	const settled: MigratorConfig = Object.freeze({ ...config });
 	const directory = (what: string): string => {
@@ -287,8 +302,16 @@ export function createMigrator(config: MigratorConfig): Migrator {
 			point,
 		});
 	};
-	const afterCommand = async (applied: number): Promise<SchemaWrite> => {
-		if (settled.migrationsDir === undefined || settled.generate === false)
+	/** Write the schema file after a command that `changed` the history. */
+	const afterCommand = async (
+		applied: number,
+		changed = true,
+	): Promise<SchemaWrite> => {
+		if (
+			!changed ||
+			settled.migrationsDir === undefined ||
+			settled.generate === false
+		)
 			return {};
 		try {
 			return { schemaFile: await writeSchema(applied) };
@@ -311,15 +334,15 @@ export function createMigrator(config: MigratorConfig): Migrator {
 				migration: error.migration,
 				applied: error.names,
 				rolledBack: error.rolledBack,
-				...(error.names.length > 0 ? await afterCommand(error.applied) : {}),
+				...(await afterCommand(error.applied, error.names.length > 0)),
 			});
 		}
 	};
-	const migrator: Omit<Migrator, typeof SCHEMA> = {
+	const migrator: RuntimeMigrator = {
 		config: settled,
 		async latest() {
 			const { names, ...write } = await command("latest");
-			return { applied: names, ...write } as UpResult as LatestResult;
+			return { applied: names, ...write };
 		},
 		async up() {
 			const { names, ...write } = await command("up");
@@ -346,20 +369,38 @@ export function createMigrator(config: MigratorConfig): Migrator {
 			return writeSchema("last");
 		},
 		// The schema type follows the overrides; the runtime is the same.
-		with: ((overrides: Partial<MigratorConfig>) => {
-			const next: Record<string, unknown> = { ...settled };
-			const given = Object.entries(overrides).filter(
-				([, value]) => value !== undefined,
-			);
-			for (const group of [CONNECTIONS, SOURCES] as const)
-				if (given.some(([key]) => (group as readonly string[]).includes(key)))
-					for (const key of group) delete next[key];
-			for (const [key, value] of given) next[key] = value;
-			return createMigrator<unknown>(next as unknown as MigratorConfig);
-		}) as Migrator["with"],
+		with: (overrides) => createMigrator(override(settled, overrides)),
 	};
 	Object.defineProperty(migrator, MIGRATOR, { value: true });
-	return Object.freeze(migrator) as Migrator;
+	return Object.freeze(migrator);
+}
+
+/**
+ * `config` with the overrides that aren't undefined. One that sets a
+ * connection replaces `url`, `db` and `execute`; one that sets a source
+ * replaces `migrationsDir` and `migrations`.
+ */
+function override(
+	config: MigratorConfig,
+	overrides: Partial<MigratorConfig>,
+): MigratorConfig {
+	const replaces = (group: readonly (keyof MigratorConfig)[]) =>
+		group.some((key) => overrides[key] !== undefined);
+	let base = config;
+	if (replaces(CONNECTIONS)) {
+		const { url, db, execute, ...rest } = base;
+		base = rest;
+	}
+	if (replaces(SOURCES)) {
+		const { migrationsDir, migrations, ...rest } = base;
+		base = rest;
+	}
+	return {
+		...base,
+		...Object.fromEntries(
+			Object.entries(overrides).filter(([, value]) => value !== undefined),
+		),
+	};
 }
 
 async function load(config: MigratorConfig): Promise<Entry[]> {
@@ -431,14 +472,27 @@ function identifier(name: string): string {
 	return `"${name.replaceAll('"', '""')}"`;
 }
 
+/** Whether an executor returned its rows rather than a result. */
+const isRowList = (
+	result: readonly unknown[] | ExecutorResult,
+): result is readonly unknown[] => Array.isArray(result);
+
 async function rows(
 	execute: Executor,
 	text: string,
 	values: readonly unknown[] = [],
 ): Promise<readonly unknown[]> {
 	const result = await execute(text, values);
-	return Array.isArray(result) ? result : (result as ExecutorResult).rows;
+	return isRowList(result) ? result : result.rows;
 }
+
+/** The `xid` column of the first row. */
+const firstXid = (records: readonly unknown[]) => {
+	const [row] = records;
+	return typeof row === "object" && row !== null && "xid" in row
+		? row.xid
+		: undefined;
+};
 
 function readHistory(records: readonly unknown[]): Row[] {
 	return records.map((record) => {
@@ -451,11 +505,15 @@ function readHistory(records: readonly unknown[]): Row[] {
 			throw new Error(
 				"typesql: invalid migration history: expected a string name column",
 			);
-		return { name: record.name, at: "at" in record ? record.at : null };
+		const at = "at" in record ? record.at : null;
+		return {
+			name: record.name,
+			at: at instanceof Date || typeof at === "string" ? at : null,
+		};
 	});
 }
 
-function appliedAt(value: unknown): Date | null {
+function appliedAt(value: Date | string | null): Date | null {
 	if (value instanceof Date) return value;
 	if (typeof value !== "string") return null;
 	// SQLite's text is UTC: 2026-11-01 12:00:00.000.
@@ -488,10 +546,10 @@ const sha256 = (text: string): Promise<ArrayBuffer> =>
 	crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
 
 /** PostgreSQL's in_failed_sql_transaction, from pg, postgres.js or Prisma. */
-const aborted = (error: unknown): boolean =>
-	(error as { code?: unknown }).code === "25P02" ||
+const aborted = (cause: unknown): boolean =>
+	hasCode(cause, "25P02") ||
 	/current transaction is aborted/.test(
-		error instanceof Error ? error.message : String(error),
+		cause instanceof Error ? cause.message : String(cause),
 	);
 
 const SPLIT =
@@ -522,13 +580,15 @@ class Failed extends Error {
 
 // pg rejects a refused `localhost` connection (IPv4 and IPv6) with an
 // AggregateError whose own message is empty.
-const text = (error: unknown): string => {
-	if (!(error instanceof Error)) return String(error);
-	const message = error.message
-		? error.message
-		: error instanceof AggregateError && error.errors.length > 0
-			? Array.from(new Set(error.errors.map(text))).join("; ")
-			: ((error as { code?: string }).code ?? error.name);
+const text = (cause: unknown): string => {
+	if (!(cause instanceof Error)) return String(cause);
+	const message = cause.message
+		? cause.message
+		: cause instanceof AggregateError && cause.errors.length > 0
+			? Array.from(new Set(cause.errors.map(text))).join("; ")
+			: "code" in cause && typeof cause.code === "string"
+				? cause.code
+				: cause.name;
 	return message.replace(/^typesql: /, "");
 };
 
@@ -584,11 +644,11 @@ async function openHistory(
 	 */
 	const inTransaction = async (): Promise<boolean> => {
 		if (postgres) {
-			const [row] = await rows(
-				execute,
-				"SELECT txid_current_if_assigned()::text AS xid",
+			return (
+				firstXid(
+					await rows(execute, "SELECT txid_current_if_assigned()::text AS xid"),
+				) === xid
 			);
-			return (row as { xid?: unknown } | undefined)?.xid === xid;
 		}
 		// A BEGIN fails inside a transaction. One that succeeds started a
 		// transaction where there was none; end it.
@@ -608,11 +668,13 @@ async function openHistory(
 				// a pooled connection. Its void result stays in FROM: Prisma
 				// can't read a void column.
 				if (postgres)
-					[{ xid } = {} as { xid?: unknown }] = (await rows(
-						execute,
-						"SELECT txid_current()::text AS xid FROM pg_advisory_xact_lock($1::bigint)",
-						[lock],
-					)) as { xid?: unknown }[];
+					xid = firstXid(
+						await rows(
+							execute,
+							"SELECT txid_current()::text AS xid FROM pg_advisory_xact_lock($1::bigint)",
+							[lock],
+						),
+					);
 				if (!(await inTransaction())) throw new Error(SPLIT);
 			} catch (error) {
 				// Leave no transaction, and with it the lock, open on the
@@ -632,11 +694,11 @@ async function openHistory(
 		 */
 		async rollback(): Promise<boolean> {
 			if (!transaction) return false;
-			const intact = await inTransaction().catch((error: unknown) => {
+			const intact = await inTransaction().catch((cause: unknown) => {
 				// After a failed statement PostgreSQL refuses every one but
 				// ROLLBACK: the transaction is still there.
-				if (postgres && aborted(error)) return true;
-				throw error;
+				if (postgres && aborted(cause)) return true;
+				throw cause;
 			});
 			if (intact) {
 				await execute("ROLLBACK", []);
@@ -800,7 +862,7 @@ async function connect(
 async function runStep(
 	dialect: Dialect,
 	execute: Executor,
-	step: (db: never) => unknown,
+	step: Step,
 ): Promise<void> {
 	let active = true;
 	const check = (sql: string): void => {
@@ -838,7 +900,7 @@ async function runStep(
 								await guarded(statement, []);
 						}
 					: undefined,
-			) as never,
+			),
 		);
 	} finally {
 		active = false;

@@ -1,6 +1,5 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, extname, join } from "node:path";
-import type { DmmfDatamodel } from "./dmmf.js";
 import { generateSource, schemaFields, viewNames } from "./emit.js";
 import type { GeneratorHandler, GeneratorOptions } from "./protocol.js";
 
@@ -28,7 +27,7 @@ function sourceFor(options: GeneratorOptions): string {
 		);
 	}
 	const { importFrom, typeName } = options.generator.config;
-	return generateSource(options.dmmf.datamodel as DmmfDatamodel, {
+	return generateSource(options.dmmf.datamodel, {
 		dialect: provider === "sqlite" ? "sqlite" : "postgres",
 		importFrom: configString(importFrom),
 		typeName: configString(typeName),

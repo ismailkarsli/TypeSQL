@@ -72,6 +72,7 @@ export interface DefaultTypeMap {
 	unknown: unknown;
 }
 
+// biome-ignore lint/plugin: a type map maps any SQL type name to any TypeScript type.
 export type TypeMap = { readonly [pgType: string]: unknown };
 
 export type EnumsOf<DB> = DB extends {

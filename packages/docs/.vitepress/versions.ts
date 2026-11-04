@@ -43,11 +43,12 @@ export function withVersions(
 	}
 	// Archived versions are not indexed, so only the latest site has a sitemap.
 	const { sitemap, ...rest } = config;
-	return {
+	const site: UserConfig<DefaultTheme.Config> = {
 		...rest,
-		...(sitemap && !archive ? { sitemap } : {}),
 		base: archive ? `/versions/${archive}/` : "/",
 		head,
 		themeConfig,
 	};
+	if (sitemap && !archive) site.sitemap = sitemap;
+	return site;
 }

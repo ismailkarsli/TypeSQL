@@ -5,6 +5,18 @@ export interface Spliceable {
 
 export type SlotValues = { readonly [name: string]: Spliceable };
 
+/** SQL text with the values of its `$n` parameters, in order. */
+export interface CompiledSql {
+	text: string;
+	values: unknown[];
+}
+
+/** SQL text with its `:name` parameters numbered, and the names in number order. */
+export interface NamedRewrite {
+	text: string;
+	names: string[];
+}
+
 export const QUOTED =
 	/(?<![A-Za-z0-9_$])[Ee]'(?:[^'\\]|\\[\s\S]|'')*'?|'(?:[^']|'')*'?|"(?:[^"]|"")*"?|--[^\n]*|\/\*[\s\S]*?(?:\*\/|$)/;
 export const DOLLAR_QUOTED =
@@ -82,7 +94,7 @@ export function splice(
 	text: string,
 	slots: SlotValues,
 	values: readonly unknown[],
-): { text: string; values: unknown[] } {
+): CompiledSql {
 	let offset = Math.max(maxParam(text), values.length);
 	const allValues: unknown[] = [...values];
 	const out = replaceSql(text, SLOT, (match) => {
@@ -98,7 +110,7 @@ export function splice(
 	return { text: out, values: allValues };
 }
 
-export function rewriteNamed(text: string): { text: string; names: string[] } {
+export function rewriteNamed(text: string): NamedRewrite {
 	const names: string[] = [];
 	const out = replaceSql(text, NAMED, (match) => {
 		const name = match[2];
@@ -118,7 +130,7 @@ export function quoteIdent(...parts: readonly string[]): string {
 export function joinFragments(
 	items: readonly Spliceable[],
 	separator: string,
-): { text: string; values: unknown[] } {
+): CompiledSql {
 	let text = "";
 	const values: unknown[] = [];
 	items.forEach((f, idx) => {

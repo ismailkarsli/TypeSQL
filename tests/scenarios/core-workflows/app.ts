@@ -50,7 +50,7 @@ interface Wrapped extends IdentityPluginTypes {
 }
 class Wrapper implements SqlPlugin<Wrapped> {
 	declare readonly types?: Wrapped;
-	transformOutput(row: unknown): unknown {
+	transformOutput<Row>(row: Row): Box<Row> {
 		return { data: row };
 	}
 }

@@ -146,10 +146,10 @@ function loadWorkload(): Workload {
 		}
 		if (!queries.length) throw new Error("case1 contains no statements");
 		const code = stripTypeScriptTypes(executable);
-		const build = compileFunction(
+		const build: Workload["build"] = compileFunction(
 			`${code}\nreturn () => [${queries.map((q) => `${q}()`).join(",")}];`,
 			["createSql", "postgres", "CasePlugin"],
-		)(createSql, postgres, CasePlugin) as Workload["build"];
+		)(createSql, postgres, CasePlugin);
 		return { queries, build };
 	} finally {
 		lease.dispose();

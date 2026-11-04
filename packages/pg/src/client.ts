@@ -27,10 +27,20 @@ export interface PgTransactionClient extends PgQueryable {
 	release(err?: Error | boolean): void;
 }
 
-interface ErrorEvents {
-	on?(event: "error", listener: (err: unknown) => void): unknown;
-	off?(event: "error", listener: (err: unknown) => void): unknown;
-}
+type ErrorListener = (err: Error) => void;
+
+// pg's clients are EventEmitters.
+const canOn = (
+	conn: PgTransactionClient,
+): conn is PgTransactionClient & {
+	on(event: "error", listener: ErrorListener): void;
+} => "on" in conn && typeof conn.on === "function";
+
+const canOff = (
+	conn: PgTransactionClient,
+): conn is PgTransactionClient & {
+	off(event: "error", listener: ErrorListener): void;
+} => "off" in conn && typeof conn.off === "function";
 
 export interface PgPoolLike<
 	C extends PgTransactionClient = PgTransactionClient,
@@ -72,7 +82,8 @@ export function executor(client: PgQueryable): Executor {
 
 function isPool(client: PgQueryable): client is PgQueryable & PgPoolLike {
 	return (
-		typeof (client as Partial<PgPoolLike>).connect === "function" &&
+		"connect" in client &&
+		typeof client.connect === "function" &&
 		!isConnection(client)
 	);
 }
@@ -89,15 +100,14 @@ async function inPoolTransaction<C extends PgTransactionClient, T>(
 ): Promise<T> {
 	const conn = await pool.connect();
 	let releaseWith: Error | undefined;
-	const toError = (err: unknown) =>
-		err instanceof Error ? err : new Error(String(err));
+	const toError = (cause: unknown) =>
+		cause instanceof Error ? cause : new Error(String(cause));
 	// A checked-out pg client has no pool listener, so an unhandled 'error'
 	// (a dropped connection) would crash the process. The pending query rejects.
-	const onError = (err: unknown) => {
+	const onError: ErrorListener = (err) => {
 		releaseWith ??= toError(err);
 	};
-	const events = conn as ErrorEvents;
-	events.on?.("error", onError);
+	if (canOn(conn)) conn.on("error", onError);
 	pools.set(conn, pool);
 	try {
 		return await runTransaction(on(conn), () => fn(conn), {
@@ -106,7 +116,7 @@ async function inPoolTransaction<C extends PgTransactionClient, T>(
 			},
 		});
 	} finally {
-		events.off?.("error", onError);
+		if (canOff(conn)) conn.off("error", onError);
 		conn.release(releaseWith);
 	}
 }

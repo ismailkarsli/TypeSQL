@@ -27,7 +27,9 @@ export interface IdentityPluginTypes extends PluginTypes {
 export interface SqlPlugin<T extends PluginTypes = PluginTypes> {
 	/** Type-only witness; plugins do not need to create this property at runtime. */
 	readonly types?: T;
+	// biome-ignore lint/plugin: plugins receive any query parameter; `types` carries the precise types.
 	transformInput?(value: unknown, context: InputContext): unknown;
+	// biome-ignore lint/plugin: plugins receive any result row; `types` carries the precise types.
 	transformOutput?(row: unknown): unknown;
 }
 
@@ -73,16 +75,19 @@ export type PluginOutput<
 	? PluginOutput<Apply<H, V, InputContext, "output">, R>
 	: V;
 
-export function encodeInput(
-	value: unknown,
+export function encodeInput<V>(
+	value: V,
 	plugins: readonly SqlPlugin[],
 	context: InputContext,
+	// biome-ignore lint/plugin: returns whatever the plugins' `transformInput` returns.
 ): unknown {
+	let encoded: unknown = value;
 	for (let i = plugins.length - 1; i >= 0; i--) {
 		const plugin = plugins[i]!;
-		if (plugin.transformInput) value = plugin.transformInput(value, context);
+		if (plugin.transformInput)
+			encoded = plugin.transformInput(encoded, context);
 	}
-	return value;
+	return encoded;
 }
 
 export function encodeParameters(

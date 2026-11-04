@@ -4,7 +4,7 @@ import { encodeInput, encodeParameters, type SqlPlugin } from "./plugin.js";
 import type { Executor } from "./query.js";
 import { makeFragment, makeQuery } from "./query.js";
 import { build, namedValues } from "./runtime/build.js";
-import { param, takeValue } from "./runtime/inline.js";
+import { param, takeValues } from "./runtime/inline.js";
 import { json } from "./runtime/json.js";
 import type { Spliceable } from "./runtime/splice.js";
 import {
@@ -13,7 +13,7 @@ import {
 	quoteIdent,
 	rewriteNamed,
 } from "./runtime/splice.js";
-import { buildSet, buildValues } from "./runtime/write.js";
+import { buildSet, buildValues, columnEntries } from "./runtime/write.js";
 
 export interface CreateSql {
 	// biome-ignore lint/style/useShorthandFunctionType: Dialects merge signatures into this interface.
@@ -23,6 +23,7 @@ export interface CreateSql {
 	): SqlOf<T, DB, TM>;
 }
 
+// biome-ignore lint/nursery/noUnsafeTypeAssertion: dialects merge their own overloads into `CreateSql`.
 export const createSql = createDialectSql as CreateSql;
 
 export function createDialectSql<T extends DialectTypes, DB, TM = T["typeMap"]>(
@@ -30,6 +31,18 @@ export function createDialectSql<T extends DialectTypes, DB, TM = T["typeMap"]>(
 	executor?: Executor,
 	plugins: readonly SqlPlugin[] = [],
 ): SqlOf<T, DB, TM> {
+	// The dialect's `sql` type is computed from its type parameters; the
+	// runtime API cannot be checked against it.
+	// biome-ignore lint/nursery/noUnsafeTypeAssertion: see above.
+	return createSqlApi(dialect, executor, plugins) as SqlOf<T, DB, TM>;
+}
+
+/** The runtime `sql` of `dialect`, whose type the dialect's `Sql` type describes. */
+export function createSqlApi(
+	dialect: Dialect,
+	executor: Executor | undefined,
+	plugins: readonly SqlPlugin[],
+) {
 	const pipeline = Object.freeze([...plugins]);
 	const buildInput =
 		plugins.length === 0
@@ -56,9 +69,7 @@ export function createDialectSql<T extends DialectTypes, DB, TM = T["typeMap"]>(
 						? input
 						: encodeParameters(input, plugins, query);
 				const values =
-					rn.names.length > 0
-						? namedValues(rn.names, args)
-						: args.map(takeValue);
+					rn.names.length > 0 ? namedValues(rn.names, args) : takeValues(args);
 				if (values.length !== count)
 					throw new Error(
 						`typesql: prepared query expects ${count} parameters, got ${values.length}`,
@@ -75,14 +86,14 @@ export function createDialectSql<T extends DialectTypes, DB, TM = T["typeMap"]>(
 		param:
 			plugins.length === 0
 				? param
-				: (value: unknown) =>
+				: <V>(value: V) =>
 						param(
 							isEmpty(value)
 								? value
 								: encodeInput(value, plugins, { kind: "value" }),
 						),
 		optional,
-		if: (value: unknown, then: (value: unknown) => unknown) =>
+		if: <V, R>(value: V, then: (value: V) => R) =>
 			value ? then(value) : empty,
 		json,
 		fragment: (text: string, ...rest: readonly unknown[]) => {
@@ -111,30 +122,28 @@ export function createDialectSql<T extends DialectTypes, DB, TM = T["typeMap"]>(
 		or: (items: readonly (Spliceable | Empty)[]) =>
 			bool(present(items, "or"), "OR"),
 		set: (...args: readonly unknown[]) => {
-			const [table, values] = (
-				typeof args[0] === "string" ? args : [null, args[0]]
-			) as [string | null, Readonly<Record<string, unknown>>];
+			const [first, second] = args;
+			const table = typeof first === "string" ? first : null;
+			const values = typeof first === "string" ? second : first;
 			const r = buildSet(
-				encodeInput(values, pipeline, { kind: "set", table }) as Readonly<
-					Record<string, unknown>
-				>,
+				columnEntries(
+					encodeInput(values, pipeline, { kind: "set", table }),
+					"typesql: sql.set() takes an object of column values",
+				),
 			);
 			return makeFragment(r.text, r.values);
 		},
 		values: (...args: readonly unknown[]) => {
-			const [table, rows] = (
-				typeof args[0] === "string" ? args : [null, args[0]]
-			) as [string | null, readonly Readonly<Record<string, unknown>>[]];
+			const [first, second] = args;
+			const table = typeof first === "string" ? first : null;
+			const rows = typeof first === "string" ? second : first;
+			if (!Array.isArray(rows))
+				throw new Error("typesql: sql.values() takes an array of rows");
 			const context = { kind: "values", table } as const;
 			const encoded =
-				pipeline.length === 0 || !Array.isArray(rows)
+				pipeline.length === 0
 					? rows
-					: rows.map(
-							(row) =>
-								encodeInput(row, pipeline, context) as Readonly<
-									Record<string, unknown>
-								>,
-						);
+					: rows.map((row) => encodeInput(row, pipeline, context));
 			const r = buildValues(encoded, dialect.valuesDefault !== false);
 			return makeFragment(r.text, r.values);
 		},
@@ -147,7 +156,7 @@ export function createDialectSql<T extends DialectTypes, DB, TM = T["typeMap"]>(
 		value: dialect.name,
 		enumerable: true,
 	});
-	return api as unknown as SqlOf<T, DB, TM>;
+	return api;
 }
 
 function present(

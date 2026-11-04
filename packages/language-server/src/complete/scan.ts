@@ -44,6 +44,12 @@ interface Tok {
 	readonly e: number;
 }
 
+/** The tokens before the cursor, and whether the cursor is inside one. */
+interface Lexed {
+	readonly toks: Tok[];
+	readonly inside: boolean;
+}
+
 const WORD = /[A-Za-z_\u0080-￿][A-Za-z0-9_$\u0080-￿]*/y;
 const LINE_COMMENT = /--[^\n\r]*/y;
 const STRING = /(?:([eE])|[bBxXnN]|[uU]&)?'/y;
@@ -61,7 +67,7 @@ const OPERATOR = /(?:(?!--|\/\*)[+\-*/<>=~!@#%^&|`?])+/y;
 
 const fold = (s: string): string => s.replace(/[A-Z]/g, (m) => m.toLowerCase());
 
-function lex(text: string, offset: number): { toks: Tok[]; inside: boolean } {
+function lex(text: string, offset: number): Lexed {
 	const toks: Tok[] = [];
 	let inside = false;
 	const n = text.length;
@@ -234,6 +240,17 @@ interface At {
 	relNext?: boolean;
 }
 
+interface Structure {
+	readonly at: At[];
+	readonly used: RelRef[];
+}
+
+/** A parsed level and the index of the token that ends it. */
+interface LevelEnd {
+	readonly level: Level;
+	readonly i: number;
+}
+
 const named = (t: Tok | undefined): boolean =>
 	!!t && (t.k === "q" || (t.k === "w" && !NOT_ALIAS.has(t.v)));
 
@@ -241,7 +258,7 @@ function* levels(level: Level | null): Generator<Level> {
 	for (let l = level; l; l = l.parent) yield l;
 }
 
-function structure(toks: readonly Tok[]): { at: At[]; used: RelRef[] } {
+function structure(toks: readonly Tok[]): Structure {
 	const at: At[] = [];
 	const used: RelRef[] = [];
 	const word = (i: number): string | null =>
@@ -249,10 +266,7 @@ function structure(toks: readonly Tok[]): { at: At[]; used: RelRef[] } {
 	const is = (i: number, v: string): boolean =>
 		toks[i]?.k === "o" && toks[i]!.v === v;
 
-	const level = (
-		i: number,
-		parent: Level | null,
-	): { level: Level; i: number } => {
+	const level = (i: number, parent: Level | null): LevelEnd => {
 		const fresh = (): Level => ({
 			parent,
 			items: [],

@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { ViewNullability } from "../packages/pg/src/introspect/nullability.ts";
 
 export interface PgClient {
-	query<R extends readonly unknown[] = Record<string, unknown>[]>(
+	query<R extends readonly unknown[]>(
 		text: string,
 		values?: unknown[],
 	): Promise<{ rows: R }>;
@@ -181,11 +181,13 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 	const require = createRequire(
 		new URL("../packages/core/package.json", import.meta.url),
 	);
-	const { Client } = require("pg") as {
+	const {
+		Client,
+	}: {
 		Client: new (config: {
 			connectionString: string;
 		}) => PgClient & { connect(): Promise<void>; end(): Promise<void> };
-	};
+	} = require("pg");
 	const url = process.env.TYPESQL_PG_URL;
 	if (!url) {
 		console.error(

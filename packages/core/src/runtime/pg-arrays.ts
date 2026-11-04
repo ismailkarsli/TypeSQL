@@ -8,20 +8,34 @@ export type PgLookup = (
 	values: unknown[],
 ) => Promise<{ readonly rows: readonly unknown[] }>;
 
-type Parse = (text: string) => unknown;
+/** A parsed array literal: elements, NULLs and nested arrays. */
+export type PgArray<E> = (E | null | PgArray<E>)[];
+
+/** An element of a user-defined array type: a boolean, a number, or its text. */
+type PgElement = string | number | boolean;
+
+type ParseElement = (text: string) => PgElement;
+
+type ParseArray = (text: string) => string | PgArray<PgElement>;
+
+/** A row of the LOOKUP query below. */
+interface LookupRow {
+	readonly arr: string;
+	readonly elem: string;
+}
 
 // Types created by users and extensions (enums, domains, citext) have OIDs
 // from here on. node-postgres has no parsers for their array types.
 const FIRST_USER_OID = 16384;
 
-const ELEMENTS: { readonly [oid: number]: Parse } = {
-	16: (s) => s === "t",
-	21: Number,
-	23: Number,
-	26: Number,
-	700: Number,
-	701: Number,
-};
+const ELEMENTS = new Map<number, ParseElement>([
+	[16, (s) => s === "t"],
+	[21, Number],
+	[23, Number],
+	[26, Number],
+	[700, Number],
+	[701, Number],
+]);
 
 const LOOKUP = `WITH RECURSIVE t(arr, oid, base) AS (
 	SELECT a.oid, e.oid, e.typbasetype
@@ -32,7 +46,7 @@ const LOOKUP = `WITH RECURSIVE t(arr, oid, base) AS (
 )
 SELECT arr::text AS arr, oid::text AS elem FROM t WHERE base = 0`;
 
-const caches = new WeakMap<object, Map<number, Promise<Parse | null>>>();
+const caches = new WeakMap<WeakKey, Map<number, Promise<ParseArray | null>>>();
 
 /**
  * node-postgres returns arrays of enums, domains and extension types such as
@@ -40,7 +54,7 @@ const caches = new WeakMap<object, Map<number, Promise<Parse | null>>>();
  * which user-defined types are arrays and what their element's base type is.
  */
 export async function parsePgUserArrays(
-	owner: object,
+	owner: WeakKey,
 	lookup: PgLookup,
 	fields: readonly PgField[] | undefined,
 	rows: unknown[],
@@ -51,7 +65,8 @@ export async function parsePgUserArrays(
 		(f) => f.dataTypeID >= FIRST_USER_OID,
 	);
 	if (user.length === 0 || rows.length === 0) return rows;
-	const cache = caches.get(owner) ?? new Map<number, Promise<Parse | null>>();
+	const cache =
+		caches.get(owner) ?? new Map<number, Promise<ParseArray | null>>();
 	caches.set(owner, cache);
 	const missing = new Set<number>();
 	for (const { dataTypeID } of user)
@@ -59,7 +74,7 @@ export async function parsePgUserArrays(
 	if (missing.size > 0) {
 		const found = lookupArrays(lookup, Array.from(missing)).catch(() => {
 			for (const oid of missing) cache.delete(oid);
-			return new Map<number, Parse>();
+			return new Map<number, ParseArray>();
 		});
 		for (const oid of missing)
 			cache.set(
@@ -67,39 +82,60 @@ export async function parsePgUserArrays(
 				found.then((m) => m.get(oid) ?? null),
 			);
 	}
-	const parsers = (
-		await Promise.all(
-			user.map(async (f) => [f.name, await cache.get(f.dataTypeID)] as const),
-		)
-	).filter((p): p is readonly [string, Parse] => p[1] !== null);
-	if (parsers.length === 0) return rows;
-	for (const row of rows as Record<string, unknown>[])
-		for (const [name, parse] of parsers) {
-			const value = row[name];
-			if (typeof value === "string") row[name] = parse(value);
+	const parsers = new Map(
+		(
+			await Promise.all(
+				user.map(async (f) => [f.name, await cache.get(f.dataTypeID)] as const),
+			)
+		).filter((p): p is readonly [string, ParseArray] => p[1] !== null),
+	);
+	if (parsers.size === 0) return rows;
+	for (const row of rows) {
+		// node-postgres rows are objects with an own property per column.
+		if (typeof row !== "object" || row === null) continue;
+		for (const [name, value] of Object.entries(row)) {
+			const parse = parsers.get(name);
+			if (parse && typeof value === "string")
+				Object.assign(row, { [name]: parse(value) });
 		}
+	}
 	return rows;
 }
 
 async function lookupArrays(
 	lookup: PgLookup,
 	oids: readonly number[],
-): Promise<Map<number, Parse>> {
+): Promise<Map<number, ParseArray>> {
 	const { rows } = await lookup(LOOKUP, [oids.map(String)]);
-	const parsers = new Map<number, Parse>();
-	for (const row of rows as { arr: string; elem: string }[]) {
-		const element = ELEMENTS[Number(row.elem)] ?? String;
+	const parsers = new Map<number, ParseArray>();
+	for (const row of rows) {
+		if (!isLookupRow(row)) continue;
+		const element = ELEMENTS.get(Number(row.elem)) ?? String;
 		parsers.set(Number(row.arr), (text) => parsePgArray(text, element));
 	}
 	return parsers;
 }
 
+function isLookupRow(row: unknown): row is LookupRow {
+	return (
+		typeof row === "object" &&
+		row !== null &&
+		"arr" in row &&
+		typeof row.arr === "string" &&
+		"elem" in row &&
+		typeof row.elem === "string"
+	);
+}
+
 /** Parses PostgreSQL's text form of an array, including nested arrays and NULLs. */
-export function parsePgArray(text: string, element: Parse): unknown {
+export function parsePgArray<E>(
+	text: string,
+	element: (text: string) => E,
+): string | PgArray<E> {
 	let i = text.startsWith("[") ? text.indexOf("=") + 1 : 0;
 	if (text[i] !== "{") return text;
-	const list = (): unknown[] => {
-		const out: unknown[] = [];
+	const list = (): PgArray<E> => {
+		const out: PgArray<E> = [];
 		i++;
 		if (text[i] === "}") {
 			i++;

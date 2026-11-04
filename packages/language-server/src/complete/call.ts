@@ -1,5 +1,6 @@
 import type {
 	CallExpression,
+	Identifier,
 	LineAndCharacter,
 	Node,
 	PropertyAccessExpression,
@@ -65,9 +66,8 @@ export async function sqlCallAt(
 
 	const callee = call.expression;
 	const sqlType = await checker.getTypeAtLocation(
-		callee.kind === kinds.PropertyAccessExpression &&
-			METHODS.has((callee as PropertyAccessExpression).name.text)
-			? (callee as PropertyAccessExpression).expression
+		isPropertyAccess(callee, kinds) && METHODS.has(callee.name.text)
+			? callee.expression
 			: callee,
 	);
 	const target = await sqlTarget(checker, sqlType, isCorePath);
@@ -88,8 +88,9 @@ async function sqlTarget(
 	t: Type,
 	isCorePath: (path: string) => boolean,
 ): Promise<{ db: Type; dialect: Dialect } | null> {
+	if (!t.isTypeReference()) return null;
 	if (await isCoreRef(t, ["Sql", "TransactionalSql"], isCorePath)) {
-		const db = (await checker.getTypeArguments(t as never))[0];
+		const db = (await checker.getTypeArguments(t))[0];
 		const sym = await t.getSymbol();
 		const sqlite = sym?.declarations.some((d) =>
 			/[\\/]sqlite[\\/]/.test(d.path),
@@ -98,7 +99,7 @@ async function sqlTarget(
 	}
 	// core's createSql(dialect).withPlugin(…) returns SqlApi<Engine, DB, …>.
 	if (await isCoreRef(t, ["SqlApi"], isCorePath)) {
-		const [engine, db] = await checker.getTypeArguments(t as never);
+		const [engine, db] = await checker.getTypeArguments(t);
 		const name = engine ? (await engine.getSymbol())?.name : undefined;
 		return db
 			? { db, dialect: name === "SqliteEngine" ? "sqlite" : "postgres" }
@@ -115,15 +116,26 @@ function callAt(
 	let found: CallExpression | null = null;
 	const visit = (n: Node): void => {
 		if (offset < n.pos || offset > n.end) return;
-		if (n.kind === kinds.CallExpression) {
-			if (isSqlLiteral((n as CallExpression).arguments[0], kinds))
-				found = n as CallExpression;
-		}
+		if (isCall(n, kinds) && isSqlLiteral(n.arguments[0], kinds)) found = n;
 		n.forEachChild(visit);
 	};
 	visit(file);
 	return found;
 }
+
+export const isCall = (n: Node, kinds: EditorKinds): n is CallExpression =>
+	n.kind === kinds.CallExpression;
+
+export const isPropertyAccess = (
+	n: Node,
+	kinds: EditorKinds,
+): n is PropertyAccessExpression => n.kind === kinds.PropertyAccessExpression;
+
+export const isIdentifier = (n: Node, kinds: EditorKinds): n is Identifier =>
+	n.kind === kinds.Identifier;
+
+const isTemplate = (n: Node, kinds: EditorKinds): n is TemplateExpression =>
+	n.kind === kinds.TemplateExpression;
 
 export const isSqlLiteral = (
 	n: Node | undefined,
@@ -134,16 +146,19 @@ export const isSqlLiteral = (
 		n.kind === kinds.NoSubstitutionTemplateLiteral ||
 		n.kind === kinds.TemplateExpression);
 
+/** A SQL literal's source span and text, with each `${…}` hole as `[start, end)`. */
+export interface LiteralText {
+	readonly start: number;
+	readonly end: number;
+	readonly text: string;
+	readonly holes: [number, number][];
+}
+
 export function textOf(
 	file: SourceFile,
 	literal: Node,
 	kinds: EditorKinds,
-): {
-	start: number;
-	end: number;
-	text: string;
-	holes: [number, number][];
-} {
+): LiteralText {
 	const src = file.text;
 	const open = literal.getStart(file);
 	const quote = src[open];
@@ -151,17 +166,16 @@ export function textOf(
 	let end = literal.end;
 	if (end - 1 > open && src[end - 1] === quote && !escaped(src, end - 1)) end--;
 	const holes: [number, number][] = [];
-	if (literal.kind === kinds.TemplateExpression) {
-		const t = literal as TemplateExpression;
-		let prev: Node = t.head;
-		for (const span of t.templateSpans) {
+	if (isTemplate(literal, kinds)) {
+		let prev: Node = literal.head;
+		for (const span of literal.templateSpans) {
 			holes.push([prev.end - 2, span.literal.getStart(file) + 1]);
 			prev = span.literal;
 		}
 	}
 	let text = "";
 	let i = start;
-	for (const [s, e] of [...holes, [end, end] as [number, number]]) {
+	for (const [s, e] of [...holes, [end, end] satisfies [number, number]]) {
 		text += escapes(src.slice(i, s));
 		if (e > s) text += "$0".padEnd(e - s, " ");
 		i = e;

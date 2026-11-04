@@ -1,4 +1,4 @@
-import type { Checker, Symbol as TsSymbol, Type } from "typescript/sync";
+import type { Checker, Type } from "typescript/sync";
 import type { Dialect } from "./define.js";
 import { migrationFiles } from "./files.js";
 
@@ -51,11 +51,23 @@ export async function writeSchema(options: {
 	return out;
 }
 
+/** Whether `module` is TypeScript's synchronous API, with its `API` class. */
+function isSync(module: unknown): module is Sync {
+	return (
+		typeof module === "object" &&
+		module !== null &&
+		"API" in module &&
+		typeof module.API === "function"
+	);
+}
+
 function typescript(): Sync {
 	try {
-		return process
+		const module: unknown = process
 			.getBuiltinModule("node:module")
-			.createRequire(import.meta.url)("typescript/sync") as Sync;
+			.createRequire(import.meta.url)("typescript/sync");
+		if (!isSync(module)) throw new Error("typescript/sync has no API");
+		return module;
 	} catch (cause) {
 		throw new Error(
 			"typesql: generating the schema needs the typescript package (7.1 or later); install it as a dependency",
@@ -126,6 +138,20 @@ function emit(
 	].join("\n");
 }
 
+type Specifier = Parameters<
+	Project["program"]["getResolvedModuleFromModuleSpecifier"]
+>[0];
+
+/** Whether an import or export declaration's module specifier is a string. */
+function isSpecifier(node: unknown): node is Specifier {
+	return (
+		typeof node === "object" &&
+		node !== null &&
+		"text" in node &&
+		typeof node.text === "string"
+	);
+}
+
 function migrationReader(
 	ts: Sync,
 	project: Project,
@@ -154,14 +180,9 @@ function migrationReader(
 	const imports = (file: string) => {
 		const found: { specifier: string; resolved: string | undefined }[] = [];
 		for (const statement of program.getSourceFile(file)?.statements ?? []) {
-			const specifier = (
-				statement as {
-					moduleSpecifier?: Parameters<
-						typeof program.getResolvedModuleFromModuleSpecifier
-					>[0] & { text?: unknown };
-				}
-			).moduleSpecifier;
-			if (typeof specifier?.text !== "string") continue;
+			const specifier =
+				"moduleSpecifier" in statement ? statement.moduleSpecifier : undefined;
+			if (!isSpecifier(specifier)) continue;
 			found.push({
 				specifier: specifier.text,
 				resolved: program.getResolvedModuleFromModuleSpecifier(specifier, file)
@@ -280,7 +301,7 @@ function writer(
 	const props = (t: Type, at: string): { name: string; type: Type }[] => {
 		const symbols = checker.getPropertiesOfType(t);
 		if (symbols.length === 0) return [];
-		const types = checker.getTypeOfSymbol(symbols as TsSymbol[]);
+		const types = checker.getTypeOfSymbol(symbols);
 		const entries = symbols.map((p, i) => ({ name: p.name, type: types[i]! }));
 		// Schemas have string keys only; SqlError and the missing-schema marker
 		// are keyed by unique symbols.

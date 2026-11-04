@@ -41,10 +41,10 @@ const packages: Package[] = readdirSync("packages")
 		manifestPath: join("packages", dir, "package.json"),
 	}))
 	.filter((p) => existsSync(p.manifestPath))
-	.map((p) => ({
-		...p,
-		manifest: JSON.parse(readFileSync(p.manifestPath, "utf8")) as Manifest,
-	}))
+	.map((p) => {
+		const manifest: Manifest = JSON.parse(readFileSync(p.manifestPath, "utf8"));
+		return { ...p, manifest };
+	})
 	.filter((p) => !p.manifest.private);
 
 const changed = new Set(

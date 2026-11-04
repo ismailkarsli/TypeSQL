@@ -13,24 +13,56 @@ export interface DrizzleDatabase {
 }
 
 // Drizzle's SQLite databases have all() and run(); its PostgreSQL ones don't.
-const isSqliteDatabase = (
+export const isSqliteDatabase = (
 	db: DrizzleDatabase | DrizzleSqliteDatabase,
 ): db is DrizzleSqliteDatabase =>
-	typeof (db as { all?: unknown }).all === "function" &&
-	typeof (db as { run?: unknown }).run === "function";
+	"all" in db &&
+	typeof db.all === "function" &&
+	"run" in db &&
+	typeof db.run === "function";
 
-interface DriverClient {
-	query?(text: string, values: unknown[]): Promise<unknown>;
-	unsafe?(text: string, values: unknown[]): PromiseLike<unknown>;
+// Every Drizzle database, on PostgreSQL or SQLite, has a session.
+export const isDrizzleDatabase = (
+	db: DrizzleDatabase | DrizzleSqliteDatabase,
+): db is DrizzleDatabase =>
+	"_" in db &&
+	typeof db._ === "object" &&
+	db._ !== null &&
+	"session" in db._ &&
+	typeof db._.session === "object" &&
+	db._.session !== null &&
+	typeof db.transaction === "function";
+
+interface PgQueryResult {
+	readonly rows: unknown[];
+	readonly rowCount?: number | null;
+	readonly fields?: readonly PgField[];
 }
 
+type PostgresJsResult = unknown[] & {
+	readonly count?: number | null;
+	readonly columns?: readonly {
+		readonly name: string;
+		readonly type: number;
+	}[];
+};
+
+/** The session client: node-postgres (query) or postgres.js (unsafe). */
+interface DriverClient {
+	query?(text: string, values: unknown[]): Promise<PgQueryResult>;
+	unsafe?(text: string, values: unknown[]): PromiseLike<PostgresJsResult>;
+}
+
+const isDriverClient = (client: unknown): client is DriverClient =>
+	(typeof client === "object" || typeof client === "function") &&
+	client !== null &&
+	(("unsafe" in client && typeof client.unsafe === "function") ||
+		("query" in client && typeof client.query === "function"));
+
 function clientOf(db: DrizzleDatabase): DriverClient {
-	const client = (db._.session as { readonly client?: DriverClient }).client;
-	if (
-		client &&
-		(typeof client.unsafe === "function" || typeof client.query === "function")
-	)
-		return client;
+	const { session } = db._;
+	const client = "client" in session ? session.client : undefined;
+	if (isDriverClient(client)) return client;
 	throw new Error(
 		"typesql: createSql(db) needs a Drizzle database on node-postgres or postgres.js (its session client has no query or unsafe method)",
 	);
@@ -48,20 +80,33 @@ const parseTimestamp = (text: string): Date =>
 const parseDate = (text: string): Date => new Date(text);
 const parseText = (text: string): string => text;
 
-const PARSERS: { readonly [oid: number]: (text: string) => unknown } = {
-	1082: parseDate,
-	1114: parseTimestamp,
-	1184: parseDate,
-};
-const ARRAY_PARSERS: { readonly [oid: number]: (text: string) => unknown } = {
-	1182: parseDate,
-	1115: parseTimestamp,
-	1185: parseDate,
-	1231: parseText,
-};
+const PARSERS = new Map<number, (text: string) => Date>([
+	[1082, parseDate],
+	[1114, parseTimestamp],
+	[1184, parseDate],
+]);
+const ARRAY_PARSERS = new Map<number, (text: string) => Date | string>([
+	[1182, parseDate],
+	[1115, parseTimestamp],
+	[1185, parseDate],
+	[1231, parseText],
+]);
+
+/** A value written as an element of an array literal. */
+type Literal =
+	| string
+	| number
+	| bigint
+	| boolean
+	| Date
+	| null
+	| readonly Literal[];
+
+const isList = (value: Literal): value is readonly Literal[] =>
+	Array.isArray(value);
 
 // Array elements written as an array literal, at any depth.
-const isLiteral = (value: unknown): boolean =>
+const isLiteral = (value: unknown): value is Literal =>
 	value === null ||
 	typeof value === "string" ||
 	typeof value === "number" ||
@@ -70,10 +115,14 @@ const isLiteral = (value: unknown): boolean =>
 	value instanceof Date ||
 	(Array.isArray(value) && value.every(isLiteral));
 
-function arrayLiteral(values: readonly unknown[]): string {
-	const element = (value: unknown): string => {
+const isLiteralList = (
+	values: readonly unknown[],
+): values is readonly Literal[] => values.every(isLiteral);
+
+function arrayLiteral(values: readonly Literal[]): string {
+	const element = (value: Literal): string => {
 		if (value === null) return "NULL";
-		if (Array.isArray(value)) return arrayLiteral(value);
+		if (isList(value)) return arrayLiteral(value);
 		if (typeof value === "boolean") return value ? "t" : "f";
 		const text = value instanceof Date ? value.toISOString() : String(value);
 		return `"${text.replace(/[\\"]/g, "\\$&")}"`;
@@ -81,41 +130,35 @@ function arrayLiteral(values: readonly unknown[]): string {
 	return `{${values.map(element).join(",")}}`;
 }
 
-function postgresJsParam(value: unknown): unknown {
+function postgresJsParam<V>(value: V): V | string {
 	if (value instanceof Date) return value.toISOString();
 	// The identity serializers of date, timestamp and numeric arrays would send
 	// a JS array as `'' + array`; an array literal works for every array type.
 	if (Array.isArray(value))
-		return isLiteral(value) ? arrayLiteral(value) : value;
+		return isLiteralList(value) ? arrayLiteral(value) : value;
 	if (value === null || typeof value !== "object" || ArrayBuffer.isView(value))
 		return value;
 	return JSON.stringify(value);
 }
 
-type PostgresJsResult = unknown[] & {
-	readonly count?: number | null;
-	readonly columns?: readonly {
-		readonly name: string;
-		readonly type: number;
-	}[];
-};
-
 function postgresJsRows(result: PostgresJsResult): unknown[] {
 	const rows = Array.from(result);
 	const parsers = (result.columns ?? []).flatMap(({ name, type }) => {
-		const scalar = PARSERS[type];
-		if (scalar) return [[name, scalar] as const];
-		const element = ARRAY_PARSERS[type];
-		return element
-			? [[name, (text: string) => parsePgArray(text, element)] as const]
-			: [];
+		const element = ARRAY_PARSERS.get(type);
+		const parse =
+			PARSERS.get(type) ??
+			(element && ((text: string) => parsePgArray(text, element)));
+		return parse ? [[name, parse] as const] : [];
 	});
 	if (parsers.length === 0) return rows;
-	for (const row of rows as Record<string, unknown>[])
+	for (const row of rows) {
+		if (typeof row !== "object" || row === null) continue;
 		for (const [name, parse] of parsers) {
-			const value = row[name];
-			if (typeof value === "string") row[name] = parse(value);
+			const value: unknown = Object.getOwnPropertyDescriptor(row, name)?.value;
+			if (typeof value === "string")
+				Object.assign(row, { [name]: parse(value) });
 		}
+	}
 	return rows;
 }
 
@@ -130,21 +173,14 @@ export function executor(
 	return async (text, values) => {
 		const client = clientOf(db);
 		if (client.unsafe) {
-			const result = (await client.unsafe(
-				text,
-				values.map(postgresJsParam),
-			)) as PostgresJsResult;
+			const result = await client.unsafe(text, values.map(postgresJsParam));
 			return { rows: postgresJsRows(result), rowCount: result.count ?? null };
 		}
 		const query = client.query!.bind(client);
-		const result = (await query(text, Array.from(values))) as {
-			rows: unknown[];
-			rowCount?: number | null;
-			fields?: readonly PgField[];
-		};
+		const result = await query(text, Array.from(values));
 		const rows = await parsePgUserArrays(
 			client,
-			async (text, values) => (await query(text, values)) as { rows: [] },
+			(text, values) => query(text, values),
 			result.fields,
 			result.rows,
 		);

@@ -102,7 +102,8 @@ function read(stream: Readable, onMessage: (m: Message) => void): void {
 			if (buffer.length < size) return;
 			const body = buffer.subarray(end + 4, size).toString();
 			buffer = buffer.subarray(size);
-			onMessage(JSON.parse(body) as Message);
+			const message: Message = JSON.parse(body);
+			onMessage(message);
 		}
 	});
 }

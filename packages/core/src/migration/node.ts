@@ -6,7 +6,16 @@
 /**
  * A package, imported at runtime from node_modules. Bundlers follow a
  * literal import() and would bundle it, but a Worker bundle can't resolve
- * `pg`'s Node built-ins.
+ * `pg`'s Node built-ins. `is` checks the module is the one expected.
  */
-export const runtimeImport = (specifier: string): Promise<unknown> =>
-	import(/* webpackIgnore: true */ /* @vite-ignore */ specifier);
+export async function runtimeImport<Module>(
+	specifier: string,
+	is: (module: unknown) => module is Module,
+): Promise<Module> {
+	const module: unknown = await import(
+		/* webpackIgnore: true */ /* @vite-ignore */ specifier
+	);
+	if (!is(module))
+		throw new Error(`typesql: ${specifier} is not the expected package`);
+	return module;
+}

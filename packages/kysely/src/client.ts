@@ -35,7 +35,7 @@ function run<R>(
 	const q = compile(text, values);
 	return db
 		.withoutPlugins()
-		.executeQuery(CompiledQuery.raw(q.text, q.values) as CompiledQuery<R>);
+		.executeQuery<R>(CompiledQuery.raw(q.text, q.values));
 }
 
 function rowCount(result: QueryResult<unknown>): number {
@@ -49,15 +49,23 @@ function rowCount(result: QueryResult<unknown>): number {
  * from this copy of Kysely or by name from another.
  */
 function isSqlite(db: KyselyExecutor): boolean {
-	const { getExecutor } = db as { getExecutor?: () => { adapter?: unknown } };
-	if (typeof getExecutor !== "function") return false;
-	const { adapter } = getExecutor.call(db);
+	if (!hasExecutor(db)) return false;
+	const { adapter } = db.getExecutor();
 	return (
 		adapter instanceof SqliteAdapter ||
-		(adapter as { constructor?: { name?: unknown } } | undefined)?.constructor
-			?.name === "SqliteAdapter"
+		(typeof adapter === "object" &&
+			adapter !== null &&
+			typeof adapter.constructor === "function" &&
+			adapter.constructor.name === "SqliteAdapter")
 	);
 }
+
+// A Kysely instance (not only a transaction) has getExecutor().
+const hasExecutor = (
+	db: KyselyExecutor,
+): db is KyselyExecutor & {
+	getExecutor(): { readonly adapter?: unknown };
+} => "getExecutor" in db && typeof db.getExecutor === "function";
 
 /**
  * An executor on `db`. SQLite's placeholders are used when `dialect` is

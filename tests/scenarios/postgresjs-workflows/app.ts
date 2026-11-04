@@ -18,7 +18,7 @@ try {
 		throw new Error("abort");
 	});
 } catch (error) {
-	console.log((error as Error).message);
+	console.log(error instanceof Error ? error.message : error);
 }
 export const after = await sql(
 	"SELECT id, name FROM users ORDER BY id",

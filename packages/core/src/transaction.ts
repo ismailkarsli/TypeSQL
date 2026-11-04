@@ -1,4 +1,4 @@
-import { createDialectSql } from "./create-sql.js";
+import { createSqlApi } from "./create-sql.js";
 import type { Dialect, DialectTypes, TransactionalSqlOf } from "./dialect.js";
 import type { SqlPlugin } from "./plugin.js";
 import type { Executor } from "./query.js";
@@ -60,11 +60,13 @@ function createWithPlugins<T extends DialectTypes, DB, TM, C>(
 	open?: () => boolean,
 ): TransactionalSqlOf<T, DB, TM> {
 	const executor = client === undefined ? undefined : driver.executor(client);
-	const sql = createDialectSql<T, DB, TM>(
+	const sql = createSqlApi(
 		dialect,
 		executor && open ? whileOpen(executor, open) : executor,
 		plugins,
-	) as object;
+	);
+	// The dialect's transactional `sql` type is computed from its type
+	// parameters; the runtime API cannot be checked against it.
 	return Object.assign(sql, {
 		withPlugin: (plugin: SqlPlugin) =>
 			createWithPlugins<T, DB, TM, C>(
@@ -102,15 +104,16 @@ function createWithPlugins<T extends DialectTypes, DB, TM, C>(
 				}
 			});
 		},
+		// biome-ignore lint/nursery/noUnsafeTypeAssertion: the transactional `sql` type is computed from the dialect's type parameters.
 	}) as TransactionalSqlOf<T, DB, TM>;
 }
 
-export async function runTransaction<T>(
-	run: (statement: string) => PromiseLike<unknown>,
+export async function runTransaction<T, Done = unknown>(
+	run: (statement: string) => PromiseLike<Done>,
 	fn: () => Promise<T>,
 	options: {
 		readonly savepoint?: string;
-		readonly onRollbackError?: (err: unknown) => void;
+		readonly onRollbackError?: (cause: unknown) => void;
 	} = {},
 ): Promise<T> {
 	const sp = options.savepoint;

@@ -4,20 +4,20 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 const dryRun = process.argv.includes("--dry-run");
 const currentOnly = process.argv.includes("--current");
 const summaryIndex = process.argv.indexOf("--summary");
-const justPublished = new Set(
-	summaryIndex === -1
-		? []
-		: (
-				JSON.parse(
-					readFileSync(process.argv[summaryIndex + 1]!, "utf8"),
-				) as PublishSummary
-			).publishedPackages.map((p) => `${p.name}@${p.version}`),
-);
 const LATEST = "@typesql/core";
 
 interface PublishSummary {
 	publishedPackages: { name: string; version: string }[];
 }
+
+function publishedTags(): string[] {
+	if (summaryIndex === -1) return [];
+	const summary: PublishSummary = JSON.parse(
+		readFileSync(process.argv[summaryIndex + 1]!, "utf8"),
+	);
+	return summary.publishedPackages.map((p) => `${p.name}@${p.version}`);
+}
+const justPublished = new Set(publishedTags());
 
 interface Section {
 	name: string;
@@ -110,11 +110,9 @@ for (const dir of readdirSync("packages")) {
 		name,
 		version,
 		private: isPrivate,
-	} = JSON.parse(readFileSync(manifest, "utf8")) as {
-		name: string;
-		version: string;
-		private?: boolean;
-	};
+	}: { name: string; version: string; private?: boolean } = JSON.parse(
+		readFileSync(manifest, "utf8"),
+	);
 	if (!isPrivate) {
 		changelogs.set(`packages/${dir}/CHANGELOG.md`, name);
 		currentVersions.add(`${name}@${version}`);
@@ -139,19 +137,22 @@ for (const { path, commit, time } of changedFiles("AM", [
 	}
 }
 
-const packuments = new Map<string, { versions: Record<string, unknown> }>();
+/** The part of an npm registry packument read here: its published versions. */
+interface Packument {
+	versions: Record<string, { version: string }>;
+}
+
+const packuments = new Map<string, Packument>();
 async function published(name: string, version: string): Promise<boolean> {
 	if (justPublished.has(`${name}@${version}`)) return true;
 	if (!packuments.has(name)) {
 		const res = await fetch(
 			`https://registry.npmjs.org/${name.replace("/", "%2f")}`,
 		);
-		packuments.set(
-			name,
-			res.ok
-				? ((await res.json()) as { versions: Record<string, unknown> })
-				: { versions: {} },
-		);
+		const packument: Packument = res.ok
+			? JSON.parse(await res.text())
+			: { versions: {} };
+		packuments.set(name, packument);
 	}
 	return version in packuments.get(name)!.versions;
 }
@@ -161,11 +162,16 @@ async function create(tag: string, args: string[]): Promise<string> {
 		try {
 			return run("gh", args).trim();
 		} catch (error) {
-			const e = error as Error & { stderr: string };
+			// execFileSync's error carries the command's stderr.
+			const stderr = String(
+				typeof error === "object" && error !== null && "stderr" in error
+					? error.stderr
+					: undefined,
+			);
 			if (succeeds("gh", ["release", "view", tag]))
-				return `${tag}: created (GitHub answered ${String(e.stderr).trim()})`;
-			if (attempt === 3 || !/HTTP 5\d\d/.test(String(e.stderr))) throw e;
-			console.log(`${tag}: ${String(e.stderr).trim()}, retrying`);
+				return `${tag}: created (GitHub answered ${stderr.trim()})`;
+			if (attempt === 3 || !/HTTP 5\d\d/.test(stderr)) throw error;
+			console.log(`${tag}: ${stderr.trim()}, retrying`);
 			await new Promise((r) => setTimeout(r, attempt * 5000));
 		}
 	}

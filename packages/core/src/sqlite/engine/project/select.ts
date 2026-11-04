@@ -626,13 +626,12 @@ type CheckWhere<
 > = W extends Expr
 	? TypeOf<W, MkCtx<DB, S, Ctes, "none", {}>> extends infer X
 		? X extends SqlError<`no such column: ${string}`, unknown>
-			? TypeOf<
-					W,
-					MkCtx<DB, S, Ctes, "none", AliasesOnly<Targets, DB, S, Ctes>>
-				> extends infer Y
-				? Y extends AnyErr
-					? Y
-					: true
+			? AliasesOnly<Targets, DB, S, Ctes> extends infer A extends SqColMap
+				? TypeOf<W, MkCtx<DB, S, Ctes, "none", A>> extends infer Y
+					? Y extends AnyErr
+						? Y
+						: true
+					: never
 				: never
 			: X extends AnyErr
 				? X
@@ -728,10 +727,13 @@ export type ProjectTargets<
 			: never
 	: Acc;
 
-type Unwrapped<E extends Expr> = E extends {
-	readonly t: "collate";
-	readonly e: infer X extends Expr;
-}
+// Not distributive: over the whole `Expr` union it stops instead of recursing.
+type Unwrapped<E extends Expr> = [E] extends [
+	{
+		readonly t: "collate";
+		readonly e: infer X extends Expr;
+	},
+]
 	? Unwrapped<X>
 	: E;
 

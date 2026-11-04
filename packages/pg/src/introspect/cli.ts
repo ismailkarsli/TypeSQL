@@ -46,12 +46,13 @@ const defaultIo = (): Io => ({
 
 // pg rejects a refused `localhost` connection (IPv4 and IPv6) with an
 // AggregateError whose own message is empty.
-const message = (err: unknown): string => {
-	if (!(err instanceof Error)) return String(err);
-	if (err.message) return err.message;
-	if (err instanceof AggregateError && err.errors.length > 0)
-		return Array.from(new Set(err.errors.map(message))).join("; ");
-	return (err as { code?: string }).code ?? err.name;
+const message = (cause: unknown): string => {
+	if (!(cause instanceof Error)) return String(cause);
+	if (cause.message) return cause.message;
+	if (cause instanceof AggregateError && cause.errors.length > 0)
+		return Array.from(new Set(cause.errors.map(message))).join("; ");
+	const code = "code" in cause ? cause.code : undefined;
+	return code === undefined || code === null ? cause.name : String(code);
 };
 
 const CONFIG_KEYS = new Set([
@@ -86,6 +87,75 @@ async function pgConnect(
 	return client;
 }
 
+const isStrings = (option: unknown): option is readonly string[] =>
+	Array.isArray(option) && option.every((s) => typeof s === "string");
+
+/** Whether `option` is a valid value of the configuration key `key`. */
+function isOption(
+	key: string,
+	option: unknown,
+): option is IntrospectConfig[keyof IntrospectConfig] {
+	if (option === undefined) return true;
+	switch (key) {
+		case "url":
+		case "out":
+		case "typeName":
+		case "importFrom":
+			return typeof option === "string";
+		case "schemas":
+		case "exclude":
+		case "imports":
+			return isStrings(option);
+		case "viewNotNull":
+		case "column":
+			return typeof option === "function";
+		case "columnTypes":
+			return (
+				typeof option === "function" ||
+				(typeof option === "object" &&
+					option !== null &&
+					!Array.isArray(option) &&
+					Object.values(option).every((type) => typeof type === "string"))
+			);
+		case "comments":
+			return typeof option === "boolean";
+		default:
+			return false;
+	}
+}
+
+const isIntrospectConfig = (config: unknown): config is IntrospectConfig =>
+	typeof config === "object" &&
+	config !== null &&
+	!Array.isArray(config) &&
+	Object.entries(config).every(([key, option]) => isOption(key, option));
+
+/** Imports the configuration module `file`, given on the command line as `name`. */
+async function loadConfig(
+	file: string,
+	name: string,
+): Promise<IntrospectConfig> {
+	const mod: unknown = await import(pathToFileURL(file).href);
+	const loaded =
+		typeof mod === "object" && mod !== null && "default" in mod
+			? mod.default
+			: undefined;
+	if (loaded === null || typeof loaded !== "object" || Array.isArray(loaded))
+		throw new Error(`${name} must default-export a configuration object`);
+	const unknown = Object.keys(loaded).filter((key) => !CONFIG_KEYS.has(key));
+	if (unknown.length > 0)
+		throw new Error(
+			`${name}: unknown option${unknown.length > 1 ? "s" : ""} ${unknown.join(", ")}`,
+		);
+	if (isIntrospectConfig(loaded)) return loaded;
+	const invalid = Object.entries(loaded)
+		.filter(([key, option]) => !isOption(key, option))
+		.map(([key]) => key);
+	throw new Error(
+		`${name}: invalid value for option${invalid.length > 1 ? "s" : ""} ${invalid.join(", ")}`,
+	);
+}
+
 const parse = (argv: readonly string[]) =>
 	parseArgs({
 		args: [...argv],
@@ -115,25 +185,7 @@ export async function main(
 		let configDir = io.cwd;
 		if (values.config) {
 			const file = resolve(io.cwd, values.config);
-			const mod = (await import(pathToFileURL(file).href)) as {
-				default?: unknown;
-			};
-			if (
-				mod.default === null ||
-				typeof mod.default !== "object" ||
-				Array.isArray(mod.default)
-			)
-				throw new Error(
-					`${values.config} must default-export a configuration object`,
-				);
-			const unknown = Object.keys(mod.default).filter(
-				(key) => !CONFIG_KEYS.has(key),
-			);
-			if (unknown.length > 0)
-				throw new Error(
-					`${values.config}: unknown option${unknown.length > 1 ? "s" : ""} ${unknown.join(", ")}`,
-				);
-			config = mod.default as IntrospectConfig;
+			config = await loadConfig(file, values.config);
 			configDir = dirname(file);
 		}
 		const url = values.url ?? config.url ?? io.env.DATABASE_URL;

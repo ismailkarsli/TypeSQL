@@ -89,7 +89,7 @@ export function createSql<
 export function createSql(
 	dialect: PostgresDialect | SqliteDialect,
 	db?: KyselyExecutor,
-): unknown {
+): object {
 	return dialect.name === "sqlite"
 		? createTransactionalSql(dialect, db, sqliteDriver)
 		: createTransactionalSql(dialect, db, driver);

@@ -1005,7 +1005,7 @@ type ArityOk<
 	Ps extends readonly string[],
 	As extends readonly ColInfo[],
 > = Ps extends readonly [...infer Fixed, "..."]
-	? As extends readonly [...{ [K in keyof Fixed]: unknown }, ...unknown[]]
+	? As extends readonly [...{ [K in keyof Fixed]: ColInfo }, ...ColInfo[]]
 		? true
 		: false
 	: Ps["length"] extends As["length"]

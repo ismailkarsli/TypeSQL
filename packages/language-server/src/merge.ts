@@ -11,14 +11,14 @@ import type {
 
 type Result = CompletionItem[] | CompletionList | null;
 
-const KINDS: { readonly [K in SqlItem["kind"]]: CompletionItemKind } = {
+const KINDS = {
 	table: 22,
 	view: 8,
 	cte: 22,
 	namespace: 9,
 	column: 5,
 	alias: 6,
-};
+} satisfies { readonly [K in SqlItem["kind"]]: CompletionItemKind };
 
 export function merge(result: Result, c: Completions | null): Result {
 	if (!c) return result;

@@ -1,4 +1,4 @@
-import type { Checker, Symbol as TsSymbol, Type } from "typescript/async";
+import type { Checker, Type } from "typescript/async";
 import type { RelRef } from "./scan.js";
 
 interface Relation {
@@ -37,7 +37,7 @@ export async function schemaOf(
 			(p) => !NOT_RELATIONS.has(p.name),
 		);
 		if (!props.length) return [];
-		const types = await checker.getTypeOfSymbol(props as TsSymbol[]);
+		const types = await checker.getTypeOfSymbol(props);
 		return props.map((p, i) => ({ name: p.name, type: types[i]! }));
 	};
 	const classify = async (

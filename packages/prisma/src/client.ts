@@ -18,7 +18,7 @@ export interface PrismaRawClient {
 
 // Prisma sends a JS array as a Postgres array and a string as text, so send
 // every sql.json() value as its JSON.stringify string.
-const jsonText = (value: unknown): unknown =>
+const jsonText = <V>(value: V): V | string =>
 	value instanceof JsonParam ? JSON.stringify(value.value) : value;
 
 /**
@@ -31,8 +31,7 @@ export function executor(
 ): Executor {
 	const onSqlite =
 		options.dialect === undefined
-			? (prisma as { readonly _activeProvider?: unknown })._activeProvider ===
-				"sqlite"
+			? "_activeProvider" in prisma && prisma._activeProvider === "sqlite"
 			: options.dialect === "sqlite";
 	const compile = onSqlite
 		? (text: string, values: readonly unknown[]) =>

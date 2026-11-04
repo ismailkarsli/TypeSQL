@@ -1,22 +1,26 @@
-import { takeColumnValue } from "./inline.js";
-import { quoteIdent } from "./splice.js";
+import { takeColumnValues } from "./inline.js";
+import { type CompiledSql, quoteIdent } from "./splice.js";
 
-const own = (o: object, k: string) => Object.hasOwn(o, k);
+/** A column name with the value given for it. */
+export type ColumnEntry = readonly [column: string, value: unknown];
 
-export function buildSet(values: Readonly<Record<string, unknown>>): {
-	text: string;
-	values: unknown[];
-} {
-	if (values === null || typeof values !== "object" || Array.isArray(values))
-		throw new Error("typesql: sql.set() takes an object of column values");
+/** The entries of an object of column values; anything else is rejected with `message`. */
+export function columnEntries<V>(value: V, message: string): ColumnEntry[] {
+	if (value === null || typeof value !== "object" || Array.isArray(value))
+		throw new Error(message);
+	return Object.entries(value);
+}
+
+export function buildSet(entries: readonly ColumnEntry[]): CompiledSql {
+	const taken = takeColumnValues(entries.map(([, value]) => value));
 	const parts: string[] = [];
 	const out: unknown[] = [];
-	for (const key of Object.keys(values)) {
-		const v = takeColumnValue(values[key]);
-		if (v === undefined) continue;
+	entries.forEach(([key], i) => {
+		const v = taken[i];
+		if (v === undefined) return;
 		out.push(v);
 		parts.push(`${quoteIdent(key)} = $${out.length}`);
-	}
+	});
 	if (parts.length === 0)
 		throw new Error(
 			"typesql: sql.set() got no defined values, so there is nothing to update; skip the UPDATE when the input is empty",
@@ -25,11 +29,9 @@ export function buildSet(values: Readonly<Record<string, unknown>>): {
 }
 
 export function buildValues(
-	rows: readonly Readonly<Record<string, unknown>>[],
+	rows: readonly unknown[],
 	valuesDefault = true,
-): { text: string; values: unknown[] } {
-	if (!Array.isArray(rows))
-		throw new Error("typesql: sql.values() takes an array of rows");
+): CompiledSql {
 	if (rows.length === 0)
 		throw new Error(
 			"typesql: sql.values() needs at least one row; skip the INSERT when there is nothing to insert",
@@ -39,19 +41,20 @@ export function buildValues(
 	const columns: string[] = [];
 	const seen = new Set<string>();
 	const taken = rows.map((row) => {
-		if (row === null || typeof row !== "object" || Array.isArray(row))
-			throw new Error(
-				"typesql: sql.values() rows must be objects of column values",
-			);
-		const out = Object.create(null) as Record<string, unknown>;
-		for (const key of Object.keys(row)) {
-			const v = takeColumnValue(row[key]);
-			out[key] = v;
+		const entries = columnEntries(
+			row,
+			"typesql: sql.values() rows must be objects of column values",
+		);
+		const values = takeColumnValues(entries.map(([, value]) => value));
+		const out = new Map<string, unknown>();
+		entries.forEach(([key], i) => {
+			const v = values[i];
+			out.set(key, v);
 			if (!seen.has(key) && v !== undefined) {
 				seen.add(key);
 				columns.push(key);
 			}
-		}
+		});
 		return out;
 	});
 	if (columns.length === 0) {
@@ -63,7 +66,7 @@ export function buildValues(
 	const out: unknown[] = [];
 	const tuples = taken.map((row) => {
 		const items = columns.map((c) => {
-			const v = own(row, c) ? row[c] : undefined;
+			const v = row.get(c);
 			if (v === undefined) {
 				if (valuesDefault) return "DEFAULT";
 				throw new Error(

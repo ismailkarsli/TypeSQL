@@ -33,8 +33,7 @@ jobs:
           package-manager-cache: false
           node-version: 26
       - run: pnpm install --frozen-lockfile
-      # Skipped for now: the stricter Biome rules report errors across the repository.
-      # - run: pnpm lint
+      - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm build
       - run: pnpm --filter typesql exec vsce package --no-dependencies --out "$RUNNER_TEMP/typesql.vsix"
