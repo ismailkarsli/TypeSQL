@@ -172,7 +172,7 @@ camel(`SELECT author_id, created_at FROM blog_posts WHERE id = ${camel.param(1)}
 
 Names are converted back to snake_case word by word, so a codegen name that dropped an underscore before a digit or single letter doesn't round-trip: `--camel-case` maps `a_b_c` to `aBC`, which reads back as `a_bc` (Kysely's own `CamelCasePlugin` does the same). Rename such columns, or leave `camelCase` off.
 
-For camelCase rows, as `CamelCasePlugin` would return them, attach `.withPlugin(new CasePlugin())`, importing `CasePlugin` from `@typesql/core`. Only top-level keys are renamed, not keys inside JSON values. See [camelCase row keys](./queries#camelcase-row-keys).
+For camelCase rows, as `CamelCasePlugin` would return them, attach `.withPlugin(new CasePlugin())`, importing `CasePlugin` from `@typesql/core`. Only top-level keys are renamed, not keys inside JSON values. See [camelCase row keys](./case-plugin).
 
 ```ts
 const camelRows = createSql<

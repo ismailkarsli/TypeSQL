@@ -36,7 +36,7 @@ The drivers bind a JavaScript number differently: node:sqlite and better-sqlite3
 
 The `execute*` methods work as with every adapter. `executeCount()` returns the number of changed rows for `INSERT`, `UPDATE` and `DELETE`, or the number of rows for statements that return rows.
 
-Attach `.withPlugin(new CasePlugin())` (imported from `@typesql/core`) for [camelCase row keys](../guide/queries#camelcase-row-keys).
+Attach `.withPlugin(new CasePlugin())` (imported from `@typesql/core`) for [camelCase row keys](../guide/case-plugin).
 
 ## Integers as `bigint`
 

@@ -116,6 +116,11 @@ export default withVersions({
 					{ text: "PostgreSQL", link: "/adapters/postgresql" },
 					{ text: "SQLite", link: "/adapters/sqlite" },
 					{ text: "Custom executor", link: "/adapters/custom-executor" },
+					{
+						text: "Plugins",
+						link: "/guide/plugins",
+						items: [{ text: "CasePlugin", link: "/guide/case-plugin" }],
+					},
 				],
 			},
 			{

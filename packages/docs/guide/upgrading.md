@@ -256,7 +256,7 @@ transformInput(value: unknown, context: InputContext) {
 }
 ```
 
-See [Plugins](./queries#plugins).
+See [Plugins](./plugins).
 
 ### New compile errors
 

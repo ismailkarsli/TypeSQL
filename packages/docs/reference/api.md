@@ -22,7 +22,7 @@ Returns the typed `sql` function for a schema in a [dialect](#dialects).
 - The dialect is the first argument: `postgres` from `@typesql/core/postgres` or `sqlite` from `@typesql/core/sqlite`. Each dialect adds its own `createSql` signature, so the type arguments start with `DB`.
 - `DB` is your [schema](../guide/schema). `TypeMap` turns the dialect's column types into TypeScript types ([Type mapping](./type-mapping)); it defaults to the dialect's map.
 - `executor` is what `execute*` runs on. Without one, `sql` only builds queries.
-- Use `.withPlugin(new CasePlugin())` for camelCase input and output keys, or attach a custom typed plugin. See [plugins](../guide/queries#plugins).
+- Use `.withPlugin(new CasePlugin())` for camelCase input and output keys, or attach a custom typed plugin. See [plugins](../guide/plugins).
 
 The adapters export their own `createSql`, which takes the driver client and adds [`sql.transaction(fn)`](#sql-transaction-fn):
 

@@ -48,7 +48,7 @@ export const auth = betterAuth({
 
 :::
 
-The adapter reads the database from [`sql.dialect`](../reference/api#sql-dialect), so there is nothing to keep in sync. An `sql` with a plugin, such as [`CasePlugin`](./queries#camelcase-row-keys), is a compile error, because Better Auth reads and writes its own column names. Keep a plugin-free `sql` for the adapter, and call `sql.withPlugin()` for your own queries.
+The adapter reads the database from [`sql.dialect`](../reference/api#sql-dialect), so there is nothing to keep in sync. An `sql` with a plugin, such as [`CasePlugin`](./case-plugin), is a compile error, because Better Auth reads and writes its own column names. Keep a plugin-free `sql` for the adapter, and call `sql.withPlugin()` for your own queries.
 
 | Option | Description |
 |---|---|

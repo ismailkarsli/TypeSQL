@@ -8,8 +8,8 @@ This page takes you from an empty project to a typed query in a few minutes.
 
 ## Requirements
 
-- **TypeScript 7.1 or later.** This is the native compiler; `7.1.0-beta` works. You can also use [tsrs](https://github.com/oxc-project/tsrs) (a Rust port of TypeScript 7.1). Older versions are not supported: TypeScript 7.0, 6 and 5.9 may still type-check queries, but they are not tested and the peer dependency rejects them. TypeScript 6 and 5.9 are several times slower, and editor completions need 7.1.
-- **`strictNullChecks`.** Set `"strict": true` (or at least `"strictNullChecks": true`) in `tsconfig.json`. Without it `null` and `undefined` belong to every type, so TypeSQL cannot tell nullable columns from others: every `sql()` call and `.ddl()` of a migration is then an error that says TypeSQL requires strictNullChecks. With `"skipLibCheck": false`, TypeScript also reports errors inside TypeSQL's own declaration files (TS2344, TS2589) until strictNullChecks is on.
+- **TypeScript 7.1 or later** (`7.1.0-beta` works), or [tsrs](https://github.com/oxc-project/tsrs).
+- **`"strict": true`** (or at least `"strictNullChecks": true`) in `tsconfig.json`.
 - **A supported database.** TypeSQL supports PostgreSQL and SQLite. MySQL support is planned.
 
 ## 1. Install
@@ -52,7 +52,7 @@ See [From Kysely, Drizzle or Prisma](./orms).
 
 Optional extras:
 
-- **The `typesql` command.** `@typesql/cli` requires Node.js 26 or newer and provides [`typesql introspect`](./introspect), which writes your schema from a PostgreSQL or SQLite database, and [`typesql migrate`](./migrations#the-typesql-migrate-command), which runs migration files. They import their types from `@typesql/core`: keep `@typesql/core` a dependency of your project, even though `@typesql/cli` depends on it too (pnpm doesn't let your files import it through the CLI).
+- **The `typesql` command** (`@typesql/cli`, Node.js 26+): [`typesql introspect`](./introspect) and [`typesql migrate`](./migrations#the-typesql-migrate-command). Keep `@typesql/core` in your own dependencies too.
 - **Editor support.** The [VS Code extension](./vscode), and `@typesql/language-server` in [Neovim](./neovim), complete table and column names inside your SQL strings and highlight the SQL. Types and errors work without them.
 
 Upgrading from an earlier version? See [Upgrading](./upgrading).
