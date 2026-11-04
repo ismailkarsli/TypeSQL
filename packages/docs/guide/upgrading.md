@@ -181,7 +181,7 @@ The rewrite, for each call the compiler flags:
 2. Replace each `{name}` with `${value}`, where `value` is what the slot map held under `name` (`{ where }` holds `where`; `{ w: byAuthor }` holds `byAuthor`).
 3. Delete the slot-map argument. The arguments after it (`$n` values or the `:name` object) stay as they are.
 
-The statement is still checked with the fragment spliced in. A union of fragments (`${flag ? a : b}`) is checked once per member, as a slot holding a union was. A `{name}` left in the SQL is now a syntax error, so the compiler finds any you missed; braces inside string literals, such as `'{1,2}'::int[]`, are not slots and stay as they are. See [Dynamic SQL](./dynamic-sql).
+The statement is still checked with the fragment spliced in. A union of fragments (`${flag ? a : b}`) is checked once per member, as a slot holding a union was. A `{name}` left in the SQL is now a syntax error, so the compiler finds any you missed; braces inside string literals, such as `'{1,2}'::int[]`, are not slots and stay as they are. See [Dynamic SQL](./using-sql#dynamic-sql).
 
 Update the [VS Code extension](./vscode) to 1.0 or later and `@typesql/language-server` to 0.0.10 or later: they no longer color `{name}` as a slot, and complete columns after a `${…}` table in `FROM`.
 
@@ -219,7 +219,7 @@ const where = sql.and([
 ]);
 ```
 
-`sql.if` skips every falsy value, including `""`, `0` and `false`; use `sql.optional` where those are real values, as for `minId` above. A fragment or query that can be `null` is a compile error in `sql.optional`, so the compiler points at every place that needs `?? undefined`. An optional fragment can now be interpolated directly: `${sql.optional(maybeFragment)}` splices nothing for `undefined`. See [Optional values](./writing-data#optional-values) and [Optional pieces](./dynamic-sql#optional-pieces).
+`sql.if` skips every falsy value, including `""`, `0` and `false`; use `sql.optional` where those are real values, as for `minId` above. A fragment or query that can be `null` is a compile error in `sql.optional`, so the compiler points at every place that needs `?? undefined`. An optional fragment can now be interpolated directly: `${sql.optional(maybeFragment)}` splices nothing for `undefined`. See [Optional values](./using-sql#optional-values) and [Optional pieces](./using-sql#optional-pieces).
 
 ### Fragments and queries are string types
 
@@ -284,7 +284,7 @@ const patch = sql.set("portfolio", { settings: sql.json(settings) });
 const patch = sql.set("portfolio", { settings: sql.json(settings ?? null) });
 ```
 
-Search for `sql.json(` and check each value whose type includes `undefined`; the `sql.set` and `sql.values` cases compile unchanged. See [JSON values](./parameters#json-values).
+Search for `sql.json(` and check each value whose type includes `undefined`; the `sql.set` and `sql.values` cases compile unchanged. See [JSON values](./using-sql#json-values).
 
 ### Inline values are checked against their full type
 

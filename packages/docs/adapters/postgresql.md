@@ -97,7 +97,7 @@ Attach `.withPlugin(new CasePlugin())` (imported from `@typesql/core`) for [came
 
 ## Transactions
 
-`sql.transaction(fn)` runs `fn(tx)` in a transaction; see [Transactions](../guide/transactions).
+`sql.transaction(fn)` runs `fn(tx)` in a transaction; see [Transactions](../guide/using-sql#transactions).
 
 ```ts
 const id = await sql.transaction(async (tx) => {

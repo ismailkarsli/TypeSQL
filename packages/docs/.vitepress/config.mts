@@ -102,13 +102,7 @@ export default withVersions({
 			},
 			{
 				text: "Writing queries",
-				items: [
-					{ text: "Selecting data", link: "/guide/queries" },
-					{ text: "Parameters", link: "/guide/parameters" },
-					{ text: "Inserting and updating", link: "/guide/writing-data" },
-					{ text: "Dynamic SQL", link: "/guide/dynamic-sql" },
-					{ text: "Transactions", link: "/guide/transactions" },
-				],
+				items: [{ text: "Using <code>sql</code>", link: "/guide/using-sql" }],
 			},
 			{
 				text: "Running queries",
@@ -139,7 +133,6 @@ export default withVersions({
 				items: [
 					{ text: "Errors and troubleshooting", link: "/guide/errors" },
 					{ text: "Limits", link: "/guide/limits" },
-					{ text: "SQLite", link: "/guide/sqlite" },
 					{
 						text: "Compared to",
 						collapsed: true,
@@ -157,7 +150,6 @@ export default withVersions({
 				text: "Reference",
 				items: [
 					{ text: "API", link: "/reference/api" },
-					{ text: "DDL support", link: "/reference/ddl" },
 					{ text: "Type mapping", link: "/reference/type-mapping" },
 					{ text: "Changelog", link: "/changelog" },
 				],

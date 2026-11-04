@@ -42,7 +42,7 @@ const query = sql(
 sql("SELECT emial FROM users");
 ```
 
-For SQLite, import `sqlite` and the schema markers from `@typesql/core/sqlite` and use SQLite's type names (`integer`, `text`, `real`, `blob`). See [SQLite](https://typesql.karsli.net/guide/sqlite).
+For SQLite, import `sqlite` and the schema markers from `@typesql/core/sqlite` and use SQLite's type names (`integer`, `text`, `real`, `blob`). See [SQLite](https://typesql.karsli.net/adapters/sqlite).
 
 ## Run queries
 
@@ -123,11 +123,11 @@ const query = appSql(`UPDATE users SET ${changes} RETURNING display_name`);
 // query.execute() returns rows with displayName.
 ```
 
-`withPlugin()` returns a new SQL instance and preserves transactions. Custom plugins implement `SqlPlugin<Types>` with `transformInput(value, context)` and/or `transformOutput(row)`. Their `PluginTypes` describe the accepted input, encoded database input, and returned row using `this["value"]`. Inputs encode in reverse registration order; outputs transform in registration order. Positional and named arguments, prepared queries, write helpers, and `mapRows()` use the same pipeline. See [plugins](https://typesql.karsli.net/guide/queries#plugins) and the [custom plugin example](https://github.com/ismailkarsli/TypeSQL/blob/main/packages/core/examples/plugins.ts).
+`withPlugin()` returns a new SQL instance and preserves transactions. Custom plugins implement `SqlPlugin<Types>` with `transformInput(value, context)` and/or `transformOutput(row)`. Their `PluginTypes` describe the accepted input, encoded database input, and returned row using `this["value"]`. Inputs encode in reverse registration order; outputs transform in registration order. Positional and named arguments, prepared queries, write helpers, and `mapRows()` use the same pipeline. See [plugins](https://typesql.karsli.net/guide/plugins) and the [custom plugin example](https://github.com/ismailkarsli/TypeSQL/blob/main/packages/core/examples/plugins.ts).
 
 ## Documentation
 
-The full guide is at **[typesql.karsli.net](https://typesql.karsli.net)**. It covers the [schema](https://typesql.karsli.net/guide/schema), [parameters](https://typesql.karsli.net/guide/parameters), [writing data](https://typesql.karsli.net/guide/writing-data), [dynamic SQL](https://typesql.karsli.net/guide/dynamic-sql), [migrations](https://typesql.karsli.net/guide/migrations) and [known limits](https://typesql.karsli.net/guide/limits).
+The full guide is at **[typesql.karsli.net](https://typesql.karsli.net)**. It covers the [schema](https://typesql.karsli.net/guide/schema), [writing queries](https://typesql.karsli.net/guide/using-sql), [migrations](https://typesql.karsli.net/guide/migrations) and [known limits](https://typesql.karsli.net/guide/limits).
 
 Upgrading from an earlier version? The [upgrade guide](https://typesql.karsli.net/guide/upgrading) lists every breaking change with the code to change, and the [changelog](https://typesql.karsli.net/changelog) every release since 1.0.0.
 

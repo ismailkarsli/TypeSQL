@@ -46,8 +46,7 @@ pnpm exec typesql introspect --dialect sqlite --db app.db --out src/db/schema.ts
 
 ## Documentation
 
-- [SQLite adapter](https://typesql.karsli.net/adapters/sqlite): running queries, transactions and migrations
-- [SQLite](https://typesql.karsli.net/guide/sqlite): type names, nullability, result column names and limits
+- [SQLite](https://typesql.karsli.net/adapters/sqlite): running queries, type names, nullability, transactions, migrations and limits
 
 ## License
 

@@ -36,7 +36,7 @@ const rows = await sql(
 | You write | a TypeScript schema and builder calls | a schema type and SQL |
 | Types come from | your Drizzle schema | your schema type |
 | Raw SQL | `` sql<T>`…` ``, typed by the `T` you write | checked and typed from the SQL |
-| Relations | the relational query API (`db.query…`) | joins and [JSON aggregation](../guide/queries#json) in SQL |
+| Relations | the relational query API (`db.query…`) | joins and [JSON aggregation](../guide/using-sql#json) in SQL |
 | Migrations | drizzle-kit generates them from the schema | you [write the DDL](../guide/migrations), and the schema type follows it |
 | Databases | PostgreSQL, MySQL, SQLite and more | PostgreSQL and SQLite; MySQL is planned |
 

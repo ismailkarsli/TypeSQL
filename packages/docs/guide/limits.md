@@ -12,14 +12,14 @@ When you hit a limit, [`sql.as<Row>()`](./errors#when-typesql-can-t-type-a-state
 
 - TypeSQL needs TypeScript 7.1 or later (the native compiler; `7.1.0-beta` works).
 - It needs `strictNullChecks`, which `"strict": true` turns on. Without it, every `sql()` call and migration `.ddl()` is an error that says so, and with `"skipLibCheck": false` TypeScript also reports errors inside TypeSQL's own declaration files.
-- It models PostgreSQL and SQLite. MySQL is planned. SQLite's own limits are listed in [SQLite](./sqlite#limits).
+- It models PostgreSQL and SQLite. MySQL is planned. SQLite's own limits are listed in [SQLite](../adapters/sqlite#limits).
 - The editor completions ([VS Code](./vscode), [Neovim](./neovim)) use APIs that are new in TypeScript 7.1 and may still change before 7.1 is final.
 
 ## Statement size
 
 - Query size is limited by TypeScript's instantiation depth and work budgets. Long expression chains, wide select lists, nested subqueries, many `UNION` branches and large `IN` or `VALUES` lists can reach those budgets. The practical limit depends on the statement's shape, compiler version and schema.
 - The engine tracks precise token positions below 4096 tokens. Beyond that it uses a general numeric position; this is not a guarantee that statements of that size will compile.
-- When the compiler reaches its own budget, it reports TS2589 ("Type instantiation is excessively deep and possibly infinite"), TS5114 or TS5115 instead of a SQL error. Split the statement, or give its row type with [`sql.as<Row>()`](./dynamic-sql#fully-dynamic-sql), which skips analysis.
+- When the compiler reaches its own budget, it reports TS2589 ("Type instantiation is excessively deep and possibly infinite"), TS5114 or TS5115 instead of a SQL error. Split the statement, or give its row type with [`sql.as<Row>()`](./using-sql#fully-dynamic-sql), which skips analysis.
 - Split long migration scripts across several `.ddl()` calls. Each call is checked separately against the schema returned by the previous one.
 
 ## Migrations
@@ -30,14 +30,14 @@ With `transaction: false` (Cloudflare D1, libsql's client), there is no transact
 
 ## SQL text
 
-- Only literal SQL is analysed: a string literal, or a template literal whose substitutions are compile-time constants. Anything else is an error; see [Parameters](./parameters).
+- Only literal SQL is analysed: a string literal, or a template literal whose substitutions are compile-time constants. Anything else is an error; see [Parameters](./using-sql#parameters).
 - Tagged templates (`` sql`…` ``) are not supported, because TypeScript does not expose their text to the type system.
 - Mixing `:name` and `$n` parameters in one statement is an error.
-- A colon directly followed by a name is a [named parameter](./parameters#named-name), also in an array slice: `a[1:n]` is `a[1$1]`. Write `a[1: n]` for a slice up to the column `n`.
+- A colon directly followed by a name is a [named parameter](./using-sql#parameters), also in an array slice: `a[1:n]` is `a[1$1]`. Write `a[1: n]` for a slice up to the column `n`.
 
 ## Fragments and lists
 
-- [`sql.combine` over an array](./dynamic-sql#lists-from-runtime-arrays) checks the statement once, with every distinct element once. Its cost grows with the number of distinct elements, not with the number of combinations.
+- [`sql.combine` over an array](./using-sql#lists-from-runtime-arrays) checks the statement once, with every distinct element once. Its cost grows with the number of distinct elements, not with the number of combinations.
 - In a select list (``SELECT ${cols}``), such a list counts every element as selected.
 - A fragment whose text is a union (`sql.id(name)` with `name: "a" | "b"`) is checked once per member. So two such fragments in one statement cost `n × m` checks. A generic `sql.id` over `RelationName<DB>` checks the statement against every table and view. For lists, use `sql.combine` over an array, which costs one check.
 - `sql.set` and `sql.values` are checked like `sql.combine` over an array, with every key of the input type once.
@@ -46,11 +46,11 @@ With `transaction: false` (Cloudflare D1, libsql's client), there is no transact
 
 ## Defaults and generated columns
 
-The schema does not tell identity `GENERATED ALWAYS` columns apart from other columns with a default. So writing one is accepted, though Postgres rejects it without `OVERRIDING SYSTEM VALUE`. The [DDL reference](../reference/ddl#limitations) lists the other DDL limits.
+The schema does not tell identity `GENERATED ALWAYS` columns apart from other columns with a default. So writing one is accepted, though Postgres rejects it without `OVERRIDING SYSTEM VALUE`. The [migrations guide](./migrations#what-is-supported) lists the other DDL limits.
 
 ## JSON
 
-- Typed JSON (see [JSON](./queries#json)) needs literal keys and paths. `json_build_object(col, …)` or `-> $1` on an object gives plain JSON, or the union of all members.
+- Typed JSON (see [JSON](./using-sql#json)) needs literal keys and paths. `json_build_object(col, …)` or `-> $1` on an object gives plain JSON, or the union of all members.
 - Only the string literals `'[]'`, `'{}'`, `'null'`, `'true'` and `'false'` keep their value when they meet typed JSON (`coalesce(json_agg(x), '[]')`). Any other literal makes the result `unknown`.
 - Functions that rewrite JSON (`jsonb_set`, `||`, `jsonb_strip_nulls`, `json_populate_record`, `jsonb_path_query`, `json_each`) return plain JSON. So does `row_to_json(ROW(…))`.
 - A [`Json<T>` column](./schema#typed-json-columns)'s `T` is trusted, not checked against the database. Positional and named parameters for it are typed `T` but passed to the driver as they are; only `sql.json()` makes arrays work with node-postgres.
@@ -60,7 +60,7 @@ The schema does not tell identity `GENERATED ALWAYS` columns apart from other co
 - Inside JSON, `int8` and `numeric` are numbers. `JSON.parse` rounds integers beyond 2^53, and a `float8` / `numeric` that is `NaN` or `Infinity` is serialized as a string.
 - Elements of array columns, and of arrays that columns and functions return, are typed non-null, since PostgreSQL doesn't record whether an array holds NULLs. Arrays built from nullable values have nullable elements: `array_agg(x)` over a nullable `x`, `ARRAY[…]` and `ARRAY(SELECT …)` with a nullable item, `array_append` and the other array functions given a nullable element, and `regexp_match`. Where the engine loses track of an array's elements (a view column created by DDL, a chained slice such as `x[1][1:2]`), they are typed non-null.
 - Arrays are typed one-dimensional. PostgreSQL doesn't record dimensions in a type (`int[][]` is the same type as `int[]`), so a multi-dimensional value such as `ARRAY[[1, 2], [3, 4]]` is typed `number[]` but comes back nested (`[[1, 2], [3, 4]]`). Assert the row type with `sql.as<Row>()` where you store such values.
-- In `JSON_OBJECT`, write pairs as `k VALUE v` or `k: v`. In `k:v`, the `:v` is read as a [named parameter](./parameters#named-name) when `v` is a name.
+- In `JSON_OBJECT`, write pairs as `k VALUE v` or `k: v`. In `k:v`, the `:v` is read as a [named parameter](./using-sql#parameters) when `v` is a name.
 
 ## Types and hovers
 

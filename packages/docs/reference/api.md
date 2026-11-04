@@ -40,10 +40,10 @@ Parses the statement at compile time and returns `Query<Row, Params, Text>`: `{ 
 | Type argument | Meaning |
 |---|---|
 | `Row` | the row type; `never` for `INSERT` / `UPDATE` / `DELETE` without `RETURNING`, and for DDL |
-| `Params` | the tuple of parameter types ([how they are typed](../guide/parameters)) |
+| `Params` | the tuple of parameter types ([how they are typed](../guide/using-sql#parameters)) |
 | `Text` | the final SQL literal, after `:name` rewriting and fragment splicing |
 
-- `text` must be a string literal, or a template literal whose substitutions are compile-time constants. Anything else is an error ([Only literal SQL is analysed](../guide/parameters)).
+- `text` must be a string literal, or a template literal whose substitutions are compile-time constants. Anything else is an error ([Only literal SQL is analysed](../guide/using-sql#parameters)).
 - An invalid statement makes the `text` parameter's type `SqlError<message, tokenIndex>`, so the error shows on the SQL text ([Errors](../guide/errors)).
 - Tagged templates (`` sql`…` ``) are not supported: TypeScript erases their text from the types.
 
@@ -93,7 +93,7 @@ Reuse the returned function across calls to save TypeSQL's runtime SQL assembly.
 - `sql.json()` is an error unless the parameter is `json` / `jsonb` or has no context. For a `Json<T>` column the value is checked against `T`, except as a positional or named argument. A raw array for a JSON parameter is an error with `sql.param()` and as a call argument (`NonArrayOrSqlJson<T>`).
 - A `sql.param()` value that can be an omission makes the statement be checked a second time with `DEFAULT` in its place, so it only fits a `VALUES` item or a `SET` value. `sql.fragment()` refuses such a value. `any` and `unknown` values are not checked.
 
-See [Parameters](../guide/parameters), [JSON values](../guide/parameters#json-values) and [Optional values](../guide/writing-data#optional-values).
+See [Parameters](../guide/using-sql#parameters), [JSON values](../guide/using-sql#json-values) and [Optional values](../guide/using-sql#optional-values).
 
 ## Fragments
 
@@ -113,10 +113,10 @@ const q = sql(`SELECT u.id FROM users u ${where}`);
 - Every result above and a whole query can be interpolated (`${fragment}`) into `sql()`, `sql.prepare()`, `sql.as()` and `sql.fragment()`. Inside quotes or a comment it is an error. The interpolated string belongs to one statement; the fragment can be interpolated again.
 - A fragment's `$n` are renumbered after the outer parameters, and its values are checked once spliced. `${flag ? a : b}` is checked once per member.
 - `sql.id` over a union of names is checked once per member; the row type is the union. A generic name constrained to `RelationName<DB>` is widened to every table and view. Any other non-literal name is dynamic. Quoting prevents SQL syntax injection, but does not enforce authorization: dynamic names derived from untrusted user input must come from an explicit allowlist (e.g. to prevent selecting or sorting by sensitive fields like `password_hash`).
-- `sql.combine`, `sql.and` and `sql.or` over an array check the statement once, with each distinct element once ([Lists from runtime arrays](../guide/dynamic-sql#lists-from-runtime-arrays)). The `options.separator` value is raw SQL text: never pass untrusted user input as the separator.
+- `sql.combine`, `sql.and` and `sql.or` over an array check the statement once, with each distinct element once ([Lists from runtime arrays](../guide/using-sql#lists-from-runtime-arrays)). The `options.separator` value is raw SQL text: never pass untrusted user input as the separator.
 - A dynamic fragment is rejected by `sql()`. Use `sql.as<Row>()`.
 
-See [Dynamic SQL](../guide/dynamic-sql).
+See [Dynamic SQL](../guide/using-sql#dynamic-sql).
 
 ## Write helpers
 
@@ -125,7 +125,7 @@ See [Dynamic SQL](../guide/dynamic-sql).
 | `sql.set(table, values)`, `sql.set(values)` | `"a" = $1, "b" = $2` for the defined values; throws when none is defined | `SetInput<DB, TM, table>` |
 | `sql.values(table, rows)`, `sql.values(rows)` | `("a", "b") VALUES ($1, $2), ($3, DEFAULT)`; throws on an empty array | `InsertInput<DB, TM, table>` |
 
-`table` is a `TableName<DB>`: a top-level table, or `"schema.table"`. It is used only for compile-time type checking. Without it, the fragment is checked against the target of the `UPDATE` or `INSERT` it is interpolated into: `sql.set` with every key present, `sql.values` once with every key and once with only the keys every row always sends, so a required column a row can leave out is still an error. Errors are then reported on the statement. At runtime, every enumerable key on `values` or row objects becomes a column assignment or insert value. When handling untrusted inputs (such as `req.body`), pick allowed fields explicitly to prevent mass assignment. JSON columns take `sql.json(value)` or a raw non-array value. See [Inserting and updating](../guide/writing-data).
+`table` is a `TableName<DB>`: a top-level table, or `"schema.table"`. It is used only for compile-time type checking. Without it, the fragment is checked against the target of the `UPDATE` or `INSERT` it is interpolated into: `sql.set` with every key present, `sql.values` once with every key and once with only the keys every row always sends, so a required column a row can leave out is still an error. Errors are then reported on the statement. At runtime, every enumerable key on `values` or row objects becomes a column assignment or insert value. When handling untrusted inputs (such as `req.body`), pick allowed fields explicitly to prevent mass assignment. JSON columns take `sql.json(value)` or a raw non-array value. See [Inserting and updating](../guide/using-sql#inserting-and-updating).
 
 ## `sql.as<Row>(text, ...params)`
 
@@ -139,7 +139,7 @@ Only on an adapter's `sql`. Runs `fn(tx)` in a transaction, where `tx` is the sa
 - `tx.transaction(fn)` nests with a savepoint.
 - Rejects when the `sql` has no client.
 
-See [Transactions](../guide/transactions).
+See [Transactions](../guide/using-sql#transactions).
 
 ## `sql.dialect`
 
@@ -295,7 +295,7 @@ A function call is looked up in this order:
 2. `DB["$functions"]`: functions declared on the schema, or by `CREATE FUNCTION` in migrations.
 3. The other `pg_catalog` functions: return type only, arguments not checked.
 
-Schema qualification is ignored (`public.f(x)` is `f`). Any other name is an error. The argument types pick the best-fitting overload; when none fits, one with the same number of arguments is used instead of reporting an error, so argument types are not checked (see [Expressions and functions](../guide/queries#expressions-and-functions)). When the chosen signature can't derive a return type from the arguments, the result is `unknown` (nullable); a cast fixes it. How to declare your own functions is in [Expressions and functions](../guide/queries#expressions-and-functions).
+Schema qualification is ignored (`public.f(x)` is `f`). Any other name is an error. The argument types pick the best-fitting overload; when none fits, one with the same number of arguments is used instead of reporting an error, so argument types are not checked (see [Expressions and functions](../guide/using-sql#expressions-and-functions)). When the chosen signature can't derive a return type from the arguments, the result is `unknown` (nullable); a cast fixes it. How to declare your own functions is in [Expressions and functions](../guide/using-sql#expressions-and-functions).
 
 ```ts
 interface DB {
@@ -343,7 +343,7 @@ An entry is one `Sig<Params, Return, Flags>` or a tuple of overloads.
 | `MigrationStatus` | an entry of `status()`: `{ name, applied, appliedAt: Date \| null }` |
 | `isMigrator(value)` | whether `value` is a migrator, from any copy of `@typesql/core` |
 
-The config options and the method results are described in [The migrator](../guide/migrations#the-migrator). `ApplyDdl` and `ValidateDdl` come from the dialect modules ([Statement analysis](#statement-analysis)); see [DDL support](./ddl).
+The config options and the method results are described in [The migrator](../guide/migrations#the-migrator). `ApplyDdl` and `ValidateDdl` come from the dialect modules ([Statement analysis](#statement-analysis)); see [What is supported](../guide/migrations#what-is-supported).
 
 `typesql migrate <latest|up|down|status|make <name>|generate>`, the other command of `@typesql/cli`, runs the migrator that `typesql.config.ts` default-exports. See [The `typesql migrate` command](../guide/migrations#the-typesql-migrate-command).
 
@@ -362,7 +362,7 @@ A dialect pairs the runtime that builds its `sql` function with that function's 
 
 `SqlOf<Postgres, DB, TM>` is `Sql<DB, TM>`, and `TransactionalSqlOf<Postgres, DB, TM>` is `TransactionalSql<DB, TM>`; the same holds for `Sqlite` and the `Sql` and `TransactionalSql` of `@typesql/core/sqlite`.
 
-`@typesql/core/sqlite` exports the same kinds of names as `@typesql/core/postgres`: `sqlite`, `Sql`, `TransactionalSql`, `RowOf`, `ParamsOf`, `Validate`, `ApplyDdl` and `ValidateDdl`, the write-helper types, the schema markers (`Col`, `View`), and the type maps `DefaultTypeMap`, `BigIntTypeMap` and `DefaultParamTypeMap`. It also exports `ColFlags` (the [column flags](../guide/sqlite#column-flags)), `Json<T, Flags>` and `Typed<Type, T>` ([typed values](../guide/sqlite#typed-values)), and `Sig`, `SigFlags`, `FunctionRegistry` and the augmentable `FunctionCatalog` ([functions](../guide/sqlite#functions)). Its engine types are under `@typesql/core/sqlite/engine`. See [SQLite](../guide/sqlite).
+`@typesql/core/sqlite` exports the same kinds of names as `@typesql/core/postgres`: `sqlite`, `Sql`, `TransactionalSql`, `RowOf`, `ParamsOf`, `Validate`, `ApplyDdl` and `ValidateDdl`, the write-helper types, the schema markers (`Col`, `View`), and the type maps `DefaultTypeMap`, `BigIntTypeMap` and `DefaultParamTypeMap`. It also exports `ColFlags` (the [column flags](../adapters/sqlite#column-flags)), `Json<T, Flags>` and `Typed<Type, T>` ([typed values](../adapters/sqlite#typed-values)), and `Sig`, `SigFlags`, `FunctionRegistry` and the augmentable `FunctionCatalog` ([functions](../adapters/sqlite#functions)). Its engine types are under `@typesql/core/sqlite/engine`. See [SQLite](../adapters/sqlite).
 
 ## ORM packages
 

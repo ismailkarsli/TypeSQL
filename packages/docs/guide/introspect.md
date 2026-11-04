@@ -117,7 +117,7 @@ export interface DB {
 }
 ```
 
-Rows read the column as `T`, and you write values with [`sql.json()`](./parameters#json-values):
+Rows read the column as `T`, and you write values with [`sql.json()`](./using-sql#json-values):
 
 ```ts
 const sql = createSql<DB>(pool);

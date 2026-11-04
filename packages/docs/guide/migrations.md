@@ -107,7 +107,7 @@ const q = sql(`SELECT id, display_name, bio FROM users WHERE email = ${sql.param
 
 :::
 
-`SchemaOf` is also exported from `@typesql/core`. A migration that starts from `"sqlite"` is checked with [SQLite's rules](./sqlite#schema).
+`SchemaOf` is also exported from `@typesql/core`. A migration that starts from `"sqlite"` is checked with [SQLite's rules](../adapters/sqlite#schema).
 
 ### Starting from an existing schema
 
@@ -591,4 +591,13 @@ type After = ApplyDdl<
 
 ## What is supported
 
-Tables, views, enums, schemas and `CREATE FUNCTION` change the schema. Indexes, triggers, grants and similar statements are accepted and leave it as it is. The [DDL reference](../reference/ddl) has the full list, how each column definition maps to `Col` and its flags, and the known gaps.
+- **Schema changes:** `CREATE` / `ALTER` / `DROP` of tables, views (also materialized), enums and schemas, plus `CREATE FUNCTION`, whose return type goes into `$functions`.
+- **Checked without a schema change:** `SELECT`, `INSERT`, `UPDATE` and `DELETE`.
+- **Skipped:** indexes, sequences, triggers, extensions, grants and other statements.
+- **Columns:** `NOT NULL`, `PRIMARY KEY`, `serial` and identity columns are non-null; `DEFAULT`, `serial`, identity and generated columns are optional in `INSERT`; views keep the nullability their query infers.
+
+Known gaps:
+
+- Dependencies aren't tracked: dropping a column a view uses is accepted.
+- The kind of default isn't recorded, so writing to a `GENERATED ALWAYS` column is accepted.
+- `search_path` is ignored, and composite types and domains map to `unknown` unless the type map knows them.

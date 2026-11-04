@@ -449,7 +449,7 @@ The generator also keeps `Unsupported("…")` fields, which Prisma Client leaves
 
 ## SQLite
 
-All three packages also convert SQLite schemas. Pass `sqlite` instead of `postgres`, and the schema is typed with SQLite's type names and the [SQLite dialect](./sqlite)'s rules:
+All three packages also convert SQLite schemas. Pass `sqlite` instead of `postgres`, and the schema is typed with SQLite's type names and the [SQLite dialect](../adapters/sqlite)'s rules:
 
 ```ts
 import { sqlite } from "@typesql/core/sqlite";

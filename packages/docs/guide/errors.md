@@ -25,7 +25,7 @@ The messages below are PostgreSQL's. On SQLite, TypeSQL uses SQLite's messages f
 |---|---|
 | unknown column | `column "emial" does not exist. Perhaps you meant the column "email"?` |
 | unknown table | `relation "post" does not exist. Perhaps you meant the relation "posts"?` |
-| unknown function | `function slugify(text) does not exist. Declare it in the schema's $functions or in FunctionCatalog` (see [functions](./queries#expressions-and-functions)) |
+| unknown function | `function slugify(text) does not exist. Declare it in the schema's $functions or in FunctionCatalog` (see [functions](./using-sql#expressions-and-functions)) |
 | ambiguous column | `column reference "id" is ambiguous` |
 | bad alias | `missing FROM-clause entry for table "x"` |
 | syntax | `syntax error at or near garbage`, `syntax error at end of input` |
@@ -48,7 +48,7 @@ A wrong positional argument is an ordinary TypeScript error on that argument:
 sql("SELECT id FROM users WHERE id = $1", "7");
 ```
 
-A raw array passed to a JSON parameter fails with `… parameter of type 'NonArrayOrSqlJson<Item[]>'`. Pass `sql.json(value)` instead; see [JSON values](./parameters#json-values).
+A raw array passed to a JSON parameter fails with `… parameter of type 'NonArrayOrSqlJson<Item[]>'`. Pass `sql.json(value)` instead; see [JSON values](./using-sql#json-values).
 
 A statement that does not validate accepts any arguments, so its `SqlError` is the only error on the call.
 
@@ -77,7 +77,7 @@ Use `sql.as<Row>(text, …)`. It skips inference and takes the row type you give
 const page = sql.as<{ id: number; email: string }>("FETCH 10 FROM user_cursor");
 ```
 
-Use it for SQL that TypeSQL does not support or cannot type (here, a `FETCH` from a cursor declared in another statement), and for SQL it cannot see at compile time ([dynamic SQL](./dynamic-sql)). It accepts interpolated fragments, `:name` and inline parameters, like `sql()`. With `CasePlugin`, write the row with camelCase keys.
+Use it for SQL that TypeSQL does not support or cannot type (here, a `FETCH` from a cursor declared in another statement), and for SQL it cannot see at compile time ([dynamic SQL](./using-sql#dynamic-sql)). It accepts interpolated fragments, `:name` and inline parameters, like `sql()`. With `CasePlugin`, write the row with camelCase keys.
 
 Unsupported syntax is always a compile error, never a silent `any`. See [Limits](./limits).
 

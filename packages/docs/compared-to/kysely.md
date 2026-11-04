@@ -39,7 +39,7 @@ Both give `title` as `string | null`, with no generator and no database connecti
 | You write | method calls that build SQL | the SQL itself |
 | Types come from | your `DB` interface | your schema type |
 | Raw SQL | `` sql<T>`…` ``, typed by the `T` you write | checked and typed from the SQL |
-| Dynamic queries | conditional method calls | [fragments](../guide/dynamic-sql) |
+| Dynamic queries | conditional method calls | [fragments](../guide/using-sql#dynamic-sql) |
 | Databases | PostgreSQL, MySQL, SQLite, SQL Server and community dialects | PostgreSQL and SQLite; MySQL is planned |
 
 ## Choose Kysely when

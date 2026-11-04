@@ -189,8 +189,5 @@ The number after the message is the position of the wrong token. [Errors and tro
 
 ## Next steps
 
-- [Selecting data](./queries): joins, nullability, aggregates and JSON.
-- [Parameters](./parameters): inline `${sql.param(value)}`, `$1` and `:name`.
-- [Inserting and updating](./writing-data): `INSERT`, `UPDATE`, `DELETE` and `RETURNING`.
-- [Dynamic SQL](./dynamic-sql): build statements from pieces.
+- [Using `sql`](./using-sql): joins, parameters, inserts, dynamic SQL and transactions.
 - Editor support for [VS Code](./vscode) and [Neovim](./neovim): completions and highlighting inside your SQL strings.

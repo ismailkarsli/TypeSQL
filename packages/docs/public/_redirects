@@ -1,7 +1,7 @@
 /guide/adapters /adapters/postgresql 301
 /guide/orm-schemas /guide/orms 301
 /guide/getting-started /guide/quick-start 301
-/guide/fragments /guide/dynamic-sql 301
+/guide/fragments /guide/using-sql#dynamic-sql 301
 /guide/errors-and-limits /guide/errors 301
 /guide/editor /guide/vscode 301
 /adapters/ /adapters/postgresql 301
@@ -16,5 +16,11 @@
 /adapters/pg /adapters/postgresql 301
 /adapters/postgres /adapters/postgresql 301
 /guide/installation /guide/quick-start 301
-/guide/using-sql /reference/api 301
-/guide/recipes /guide/dynamic-sql 301
+/guide/recipes /guide/using-sql#dynamic-sql 301
+/guide/parameters /guide/using-sql#parameters 301
+/guide/writing-data /guide/using-sql#inserting-and-updating 301
+/guide/dynamic-sql /guide/using-sql#dynamic-sql 301
+/guide/transactions /guide/using-sql#transactions 301
+/guide/queries /guide/using-sql 301
+/reference/ddl /guide/migrations#what-is-supported 301
+/guide/sqlite /adapters/sqlite 301

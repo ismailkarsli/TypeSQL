@@ -42,7 +42,7 @@ const rows = await sql(
 | Types come from | a running database | the TypeScript compiler, reading your schema type |
 | Extra step | `prisma generate --sql` after each query change | none |
 | Nullability | what the database reports | worked out from the SQL (`LEFT JOIN`, `WHERE x IS NOT NULL`, `COALESCE`) |
-| Dynamic queries | each file is one fixed statement | [fragments](../guide/dynamic-sql) |
+| Dynamic queries | each file is one fixed statement | [fragments](../guide/using-sql#dynamic-sql) |
 | Databases | PostgreSQL, MySQL, SQLite and others Prisma supports | PostgreSQL and SQLite; MySQL is planned |
 
 ## Choose Prisma TypedSQL when

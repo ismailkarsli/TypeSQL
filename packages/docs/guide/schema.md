@@ -58,7 +58,7 @@ export interface DB {
 
 :::
 
-SQLite has no enum or array types: `mood` is a text column whose values are typed with [`Typed`](./sqlite#typed-values), and `posts` has no `tags`. The other pages of this guide use this schema.
+SQLite has no enum or array types: `mood` is a text column whose values are typed with [`Typed`](../adapters/sqlite#typed-values), and `posts` has no `tags`. The other pages of this guide use this schema.
 
 Then create `sql` from it with the dialect, or with your adapter's `createSql<DB>(client)`:
 
@@ -98,7 +98,7 @@ export const sql = createSql<DB>(sqlite);
 
 Columns use the database's type names, not TypeScript types. This lets TypeSQL type expressions the way the database does. In PostgreSQL, `int4 + int8` is `int8`, and `timestamptz - timestamptz` is an `interval`.
 
-In SQLite, a declared type name sets the column's affinity, as in `CREATE TABLE`: `varchar` is text and `bigint` is an integer, and `integer + real` is a real. See [SQLite types](./sqlite#types).
+In SQLite, a declared type name sets the column's affinity, as in `CREATE TABLE`: `varchar` is text and `bigint` is an integer, and `integer + real` is a real. See [SQLite types](../adapters/sqlite#types).
 
 In PostgreSQL, common spellings mean the same thing: `integer`, `int` and `int4`; `bigint` and `int8`; `boolean` and `bool`; `character varying` and `varchar`; `double precision` and `float8`; `timestamp with time zone` and `timestamptz`. A name TypeSQL doesn't know, such as an extension type or a domain, is kept as it is. It maps to `unknown` unless the type map or `$types` gives it a type.
 
@@ -142,7 +142,7 @@ const sql = createSql<DB>(sqlite);
 
 `Json<T>` takes the same flags as `Col` as its second argument (`{ nullable: true }`, `{ hasDefault: true }`). On PostgreSQL, pass `"json"` as the third argument for a `json` column.
 
-On PostgreSQL, rows read the column as `T`, and `->`, `#>` and subscripts look inside it (see [JSON in queries](./queries#json)). On SQLite, rows read the column as JSON text, and `->`, `->>` and `json_extract` with a constant path take their types from `T`:
+On PostgreSQL, rows read the column as `T`, and `->`, `#>` and subscripts look inside it (see [JSON in queries](./using-sql#json)). On SQLite, rows read the column as JSON text, and `->`, `->>` and `json_extract` with a constant path take their types from `T`:
 
 ::: code-group
 
@@ -160,7 +160,7 @@ const latest = sql(
 
 :::
 
-Write values with [`sql.json()`](./parameters#json-values), which checks them against `T`:
+Write values with [`sql.json()`](./using-sql#json-values), which checks them against `T`:
 
 ```ts
 const save = sql(
@@ -191,7 +191,7 @@ interface DB {
 }
 ```
 
-Calling a function that is neither built in nor declared is an error. See [Expressions and functions](./queries#expressions-and-functions) for the other ways to declare one.
+Calling a function that is neither built in nor declared is an error. See [Expressions and functions](./using-sql#expressions-and-functions) for the other ways to declare one.
 
 ## Other schemas
 

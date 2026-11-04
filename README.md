@@ -48,7 +48,7 @@ const rows = await sql(
 sql("SELECT emial FROM users");
 ```
 
-`@typesql/postgres` works the same way with postgres.js, and `@typesql/sqlite` with node:sqlite, better-sqlite3 and bun:sqlite; see [SQLite](https://typesql.karsli.net/guide/sqlite).
+`@typesql/postgres` works the same way with postgres.js, and `@typesql/sqlite` with node:sqlite, better-sqlite3 and bun:sqlite; see [SQLite](https://typesql.karsli.net/adapters/sqlite).
 
 ## Editor support
 

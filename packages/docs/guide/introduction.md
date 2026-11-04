@@ -60,7 +60,7 @@ TypeSQL is written in TypeScript's type system. When you call `sql("…")` with 
 
 ## Dialects
 
-The core is dialect-neutral: each SQL dialect brings its own parser, type rules and type names. PostgreSQL and [SQLite](./sqlite) are supported. MySQL is planned.
+The core is dialect-neutral: each SQL dialect brings its own parser, type rules and type names. PostgreSQL and [SQLite](../adapters/sqlite) are supported. MySQL is planned.
 
 ## Next
 

@@ -42,7 +42,7 @@ const rows = await sql(
 | Types come from | a live development database, through a content mapper | the TypeScript compiler, reading your schema type |
 | Type checking needs | a running database, and `tsc --runExternalCode` | `tsc` |
 | Running queries | a preload (`--import reylo/register`) or bundler plugin, with the engine installed at runtime | `sql()` builds `{ text, values }`, and your driver sends it |
-| Dynamic queries | `CASE` on parameters, and JSON parameters described by a JSON Schema | [fragments](../guide/dynamic-sql) |
+| Dynamic queries | `CASE` on parameters, and JSON parameters described by a JSON Schema | [fragments](../guide/using-sql#dynamic-sql) |
 | Migrations | applied with your own tool | applied with your own tool, or [written as DDL](../guide/migrations) that the schema type follows |
 | Databases | PostgreSQL, MySQL, SQLite, DuckDB (preview) | PostgreSQL and SQLite; MySQL is planned |
 

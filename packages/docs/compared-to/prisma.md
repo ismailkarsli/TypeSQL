@@ -28,7 +28,7 @@ const rows = await sql(
 ).execute();
 ```
 
-Prisma returns nested objects (each user with a `posts` array). TypeSQL returns the rows your SQL produces; nest them with [JSON aggregation](../guide/queries#json) when you want that shape.
+Prisma returns nested objects (each user with a `posts` array). TypeSQL returns the rows your SQL produces; nest them with [JSON aggregation](../guide/using-sql#json) when you want that shape.
 
 ## How they differ
 
