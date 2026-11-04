@@ -13,7 +13,7 @@ const auth = betterAuth({
 	secret: "better-auth-postgres-scenario-secret",
 	telemetry: { enabled: false },
 	logger: { level: "error" },
-	database: typesqlAdapter(sql, { dialect: "postgres", transaction: true }),
+	database: typesqlAdapter(sql, { transaction: true }),
 	emailAndPassword: {
 		enabled: true,
 		sendResetPassword: async ({ token }) => {

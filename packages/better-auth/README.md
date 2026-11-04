@@ -10,7 +10,7 @@ pnpm add @typesql/core @typesql/better-auth better-auth
 
 ## Usage
 
-Create `sql` with `@typesql/pg`, `@typesql/postgres`, `@typesql/sqlite` or `@typesql/kysely`, and pass it to `typesqlAdapter`:
+Create `sql` with `@typesql/pg`, `@typesql/postgres`, `@typesql/sqlite` or `@typesql/kysely`, and pass it to `typesqlAdapter`. The adapter reads the database from `sql.dialect`:
 
 ```ts
 import { betterAuth } from "better-auth";
@@ -22,7 +22,7 @@ import type { DB } from "./db";
 const sql = createSql<DB>(new Pool());
 
 export const auth = betterAuth({
-  database: typesqlAdapter(sql, { dialect: "postgres" }),
+  database: typesqlAdapter(sql),
   emailAndPassword: { enabled: true },
 });
 ```
@@ -31,7 +31,6 @@ export const auth = betterAuth({
 
 | Option | Description |
 |---|---|
-| `dialect` | `"postgres"` or `"sqlite"`. It must match your `sql`. |
 | `transaction` | Run related writes in one transaction. Default `false`. |
 | `usePlural` | Use plural table names, like `users`. Default `false`. |
 | `debugLogs` | Log each adapter call Better Auth makes, with its input and result. `true` for every method, or an object such as `{ findOne: true }`. Default `false`. |

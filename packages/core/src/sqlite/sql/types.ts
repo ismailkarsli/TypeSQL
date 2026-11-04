@@ -10,4 +10,6 @@ export interface Sql<
 	in out Plugins extends readonly SqlPlugin[] = [],
 > extends StrictSql<SqlApi<SqliteEngine, DB, TM, Plugins>> {
 	readonly [DIALECT]?: DialectBrand<"sqlite", DB, TM, Plugins>;
+	/** The database this `sql` runs on: `"sqlite"`. */
+	readonly dialect: "sqlite";
 }

@@ -22,9 +22,7 @@ import {
 } from "./statement.js";
 
 /** Options of {@link typesqlAdapter}. */
-export interface TypesqlAdapterConfig<D extends Dialect = Dialect> {
-	/** The database `sql` runs on: `"postgres"` or `"sqlite"`. It must match the `sql`'s dialect. */
-	readonly dialect: D;
+export interface TypesqlAdapterConfig {
 	/**
 	 * Run Better Auth's multi-step writes in one `sql.transaction()`.
 	 *
@@ -45,8 +43,8 @@ export interface TypesqlAdapterConfig<D extends Dialect = Dialect> {
 	readonly debugLogs?: DBAdapterDebugLogOption | undefined;
 }
 
-type Brand<D extends Dialect> = {
-	readonly name: D;
+type Brand = {
+	readonly name: Dialect;
 	readonly inputs: (inputs: [never, never, []]) => [unknown, unknown, []];
 };
 
@@ -56,37 +54,38 @@ interface Runner {
 	as<R>(query: string, ...params: readonly unknown[]): Query<R>;
 }
 
-type Branded<D extends Dialect, Self> = [
-	Extract<keyof Self, BrandKey>,
-] extends [never]
+type Branded<Self> = [Extract<keyof Self, BrandKey>] extends [never]
 	? { readonly "a TypeSQL sql": never }
-	: { readonly [K in BrandKey]?: Brand<D> | undefined };
+	: { readonly [K in BrandKey]?: Brand | undefined };
 
-/** The `sql` of a TypeSQL driver or ORM package for dialect `D`, without plugins. */
-export type TypesqlAdapterSql<D extends Dialect, Self> = Runner &
-	Branded<D, Self> & {
+/** The `sql` of a TypeSQL driver or ORM package for PostgreSQL or SQLite, without plugins. */
+export type TypesqlAdapterSql<Self> = Runner &
+	Branded<Self> & {
+		readonly dialect: Dialect;
 		transaction<T>(fn: (tx: Self) => Promise<T>): Promise<T>;
 	};
 
 /**
  * A Better Auth database adapter that runs on a TypeSQL `sql` from
  * `@typesql/pg`, `@typesql/postgres`, `@typesql/sqlite` or `@typesql/kysely`.
+ * It reads the database from `sql.dialect`.
  *
  * @example
  * ```ts
  * const auth = betterAuth({
- *   database: typesqlAdapter(sql, { dialect: "postgres" }),
+ *   database: typesqlAdapter(sql),
  * });
  * ```
  */
-export function typesqlAdapter<
-	D extends Dialect,
-	S extends TypesqlAdapterSql<D, S>,
->(
+export function typesqlAdapter<S extends TypesqlAdapterSql<S>>(
 	sql: S,
-	config: TypesqlAdapterConfig<D>,
+	config: TypesqlAdapterConfig = {},
 ): (options: BetterAuthOptions) => DBAdapter {
-	const { dialect } = config;
+	const { dialect } = sql;
+	if (dialect !== "postgres" && dialect !== "sqlite")
+		throw new TypeError(
+			`typesql: typesqlAdapter() needs a TypeSQL sql for PostgreSQL or SQLite; this sql's dialect is ${String(dialect)}`,
+		);
 	const settings: AdapterFactoryConfig = {
 		adapterId: "typesql",
 		adapterName: "TypeSQL Adapter",

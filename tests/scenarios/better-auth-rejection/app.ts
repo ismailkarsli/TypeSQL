@@ -9,17 +9,12 @@ interface DB {
 }
 
 const pg = createPgSql<DB>();
-const sqlite = createSqliteSql<DB>();
 
-// Each `sql` with the dialect it runs on.
-export const postgresAdapter = typesqlAdapter(pg, { dialect: "postgres" });
-export const sqliteAdapter = typesqlAdapter(sqlite, { dialect: "sqlite" });
-
-// A PostgreSQL `sql` declared as SQLite, and the other way round.
-export const pgAsSqlite = typesqlAdapter(pg, { dialect: "sqlite" });
-export const sqliteAsPostgres = typesqlAdapter(sqlite, { dialect: "postgres" });
+// The adapter reads the database from sql.dialect.
+export const postgresAdapter = typesqlAdapter(pg);
+export const sqliteAdapter = typesqlAdapter(createSqliteSql<DB>(), {
+	transaction: true,
+});
 
 // Better Auth reads its own column names, so a plugin that renames them is rejected.
-export const withPlugin = typesqlAdapter(pg.withPlugin(new CasePlugin()), {
-	dialect: "postgres",
-});
+export const withPlugin = typesqlAdapter(pg.withPlugin(new CasePlugin()));

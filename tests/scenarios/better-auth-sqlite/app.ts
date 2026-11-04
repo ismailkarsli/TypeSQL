@@ -13,7 +13,7 @@ const auth = betterAuth({
 	secret: "better-auth-sqlite-scenario-secret",
 	telemetry: { enabled: false },
 	logger: { level: "error" },
-	database: typesqlAdapter(sql, { dialect: "sqlite", transaction: true }),
+	database: typesqlAdapter(sql, { transaction: true }),
 	emailAndPassword: {
 		enabled: true,
 		sendResetPassword: async ({ token }) => {

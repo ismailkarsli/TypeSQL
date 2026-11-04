@@ -12,7 +12,7 @@ pnpm add @typesql/core @typesql/better-auth better-auth
 
 ## Use the adapter
 
-Create `sql` with `@typesql/pg`, `@typesql/postgres`, `@typesql/sqlite` or `@typesql/kysely`, and pass it to `typesqlAdapter` with its dialect:
+Create `sql` with `@typesql/pg`, `@typesql/postgres`, `@typesql/sqlite` or `@typesql/kysely`, and pass it to `typesqlAdapter`:
 
 ::: code-group
 
@@ -26,7 +26,7 @@ import type { DB } from "./schema.js";
 const sql = createSql<DB>(new Pool());
 
 export const auth = betterAuth({
-	database: typesqlAdapter(sql, { dialect: "postgres" }),
+	database: typesqlAdapter(sql),
 	emailAndPassword: { enabled: true },
 });
 ```
@@ -41,18 +41,17 @@ import type { DB } from "./schema.js";
 const sql = createSql<DB>(new DatabaseSync("app.db"));
 
 export const auth = betterAuth({
-	database: typesqlAdapter(sql, { dialect: "sqlite" }),
+	database: typesqlAdapter(sql),
 	emailAndPassword: { enabled: true },
 });
 ```
 
 :::
 
-`dialect` must match the `sql`: a PostgreSQL `sql` with `dialect: "sqlite"`, or the other way round, is a compile error. So is an `sql` with a plugin, such as [`CasePlugin`](./queries#camelcase-row-keys), because Better Auth reads and writes its own column names. Keep a plugin-free `sql` for the adapter, and call `sql.withPlugin()` for your own queries.
+The adapter reads the database from [`sql.dialect`](../reference/api#sql-dialect), so there is nothing to keep in sync. An `sql` with a plugin, such as [`CasePlugin`](./queries#camelcase-row-keys), is a compile error, because Better Auth reads and writes its own column names. Keep a plugin-free `sql` for the adapter, and call `sql.withPlugin()` for your own queries.
 
 | Option | Description |
 |---|---|
-| `dialect` | `"postgres"` or `"sqlite"`. |
 | `transaction` | Run Better Auth's multi-step writes, such as creating a user and its account, in one `sql.transaction()`. Default `false`. |
 | `usePlural` | Use plural table names, like `users`. Default `false`. |
 | `debugLogs` | Log each adapter call Better Auth makes, with its input and result. `true` for every method, or an object such as `{ findOne: true }`. Default `false`. |
