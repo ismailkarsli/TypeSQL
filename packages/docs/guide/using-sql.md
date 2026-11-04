@@ -4,7 +4,42 @@ description: "Write typed SELECT, INSERT, UPDATE, DELETE and MERGE statements wi
 
 # Using `sql`
 
-TypeSQL checks every statement against your schema and infers its row type; the comments in the examples show what the compiler reports.
+`createSql<DB>(client)` from your adapter gives you `sql`. Call it with a SQL string and it checks the statement against `DB` at compile time and returns a typed query; nothing runs until you call an `execute*` method.
+
+::: code-group
+
+```ts [PostgreSQL]
+import { Pool } from "pg";
+import { createSql } from "@typesql/pg";
+
+const sql = createSql<DB>(new Pool());
+
+const query = sql(`SELECT id, email, display_name FROM users`);
+const rows = await query.execute();
+// { id: number; email: string; display_name: string | null }[]
+```
+
+```ts [SQLite]
+import { DatabaseSync } from "node:sqlite";
+import { createSql } from "@typesql/sqlite";
+
+const sql = createSql<DB>(new DatabaseSync("app.db"));
+
+const query = sql(`SELECT id, email, display_name FROM users`);
+const rows = await query.execute();
+// { id: number; email: string; display_name: string | null }[]
+```
+
+:::
+
+| Method | Returns |
+|---|---|
+| `execute()` | every row |
+| `executeTakeFirst()` | the first row, or `undefined` |
+| `executeTakeFirstOrThrow()` | the first row, or throws `NoResultError` |
+| `executeCount()` | the number of affected or returned rows |
+
+A wrong table, column or type is a compile error on the SQL string; see [Errors](./errors).
 
 ## Parameters
 
