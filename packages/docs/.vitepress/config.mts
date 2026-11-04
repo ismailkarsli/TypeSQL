@@ -1,3 +1,4 @@
+import { playgroundTypes } from "./playground-types.ts";
 import { sqlHighlighting } from "./sql-highlighting.ts";
 import { withVersions } from "./versions.ts";
 
@@ -12,6 +13,10 @@ export default withVersions({
 	cleanUrls: true,
 	sitemap: { hostname },
 	markdown: sqlHighlighting,
+	vite: {
+		plugins: [playgroundTypes()],
+		worker: { format: "es" },
+	},
 	head: [
 		["link", { rel: "icon", type: "image/svg+xml", href: "/logo.svg" }],
 		[
@@ -75,6 +80,7 @@ export default withVersions({
 				activeMatch: "/(guide|adapters|compared-to)/",
 			},
 			{ text: "Reference", link: "/reference/api", activeMatch: "/reference/" },
+			{ text: "Playground", link: "/playground" },
 			{ text: "Changelog", link: "/changelog" },
 		],
 		socialLinks: [{ icon: "github", link: github }],

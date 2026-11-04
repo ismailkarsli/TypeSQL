@@ -18,25 +18,27 @@ interface DB {
 
 const sql = createSql<DB>(postgres);
 
-const q = sql(
+// Exported queries show their row and parameter types under Types (.d.ts).
+export const q = sql(
 	`SELECT u.id, u.email, p.title
                FROM users u LEFT JOIN posts p ON p.author_id = u.id
                WHERE u.id = $1`,
 	7,
 );
-type Row = RowType<typeof q>;
-type Params = ParamsType<typeof q>;
+export type Row = RowType<typeof q>;
+export type Params = ParamsType<typeof q>;
 
-const stats = sql(
+export const stats = sql(
 	`SELECT author_id, count(*), max(title) AS latest FROM posts GROUP BY author_id`,
 );
-type Stats = RowType<typeof stats>;
+export type Stats = RowType<typeof stats>;
 
 const email = "ada@example.com";
-const created = sql(
+export const created = sql(
 	`INSERT INTO users (email) VALUES (${sql.param(email)}) RETURNING id, created_at`,
 );
-type Created = RowType<typeof created>;
+export type Created = RowType<typeof created>;
 
+// Errors: a misspelled column, and an insert without the NOT NULL author_id.
 sql(`SELECT nme FROM users`);
 sql(`INSERT INTO posts (title) VALUES ($1)`, "Hello");
