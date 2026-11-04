@@ -4,10 +4,8 @@ import {
 	existsSync,
 	mkdirSync,
 	mkdtempSync,
-	realpathSync,
 	renameSync,
 	rmSync,
-	symlinkSync,
 	writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
@@ -93,19 +91,13 @@ try {
 	for (const { tag, version: archiveVersion, files } of tags) {
 		const snapshot = join(scratch, archiveVersion);
 		mkdirSync(snapshot);
-		// The Playground checks code against the @typesql/core declarations of its own release.
-		const playground = files.includes(
-			"packages/docs/.vitepress/playground-types.ts",
-		);
 		const archive = execFileSync(
 			"git",
 			[
 				"archive",
 				tag,
 				"packages/docs",
-				...(playground
-					? ["tsconfig.base.json", "packages/core"]
-					: ["packages/core/package.json"]),
+				"packages/core/package.json",
 				...(files.some((file) => file.startsWith("tests/scenarios/"))
 					? ["tests/scenarios"]
 					: []),
@@ -123,24 +115,6 @@ try {
 		);
 		execFileSync("tar", ["-x", "-C", snapshot], { input: archive });
 		const source = join(snapshot, "packages/docs");
-		if (playground) {
-			const core = join(snapshot, "packages/core");
-			execFileSync(
-				join(docs, "node_modules/.bin/tsrs"),
-				["-p", join(core, "tsconfig.build.json")],
-				{ cwd: core, stdio: "inherit" },
-			);
-			// The Playground's plugin reads both packages from the docs package's node_modules.
-			const modules = join(source, "node_modules");
-			mkdirSync(join(modules, "@typesql"), { recursive: true });
-			mkdirSync(join(modules, "@tsrs"));
-			symlinkSync(core, join(modules, "@typesql/core"), "dir");
-			symlinkSync(
-				realpathSync(join(docs, "node_modules/@tsrs/wasm")),
-				join(modules, "@tsrs/wasm"),
-				"dir",
-			);
-		}
 		const config = join(source, ".vitepress/config.mts");
 		renameSync(config, join(source, ".vitepress/release.config.mts"));
 		writeFileSync(
