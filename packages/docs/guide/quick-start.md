@@ -1,14 +1,20 @@
 ---
-description: "Go from an empty project to a typed SQL query in a few minutes with TypeSQL and PostgreSQL or SQLite."
+description: "Install TypeSQL and go from an empty project to a typed SQL query in a few minutes with PostgreSQL or SQLite: requirements, packages and a first query."
 ---
 
 # Quick start
 
 This page takes you from an empty project to a typed query in a few minutes.
 
+## Requirements
+
+- **TypeScript 7.1 or later.** This is the native compiler; `7.1.0-beta` works. You can also use [tsrs](https://github.com/oxc-project/tsrs) (a Rust port of TypeScript 7.1). Older versions are not supported: TypeScript 7.0, 6 and 5.9 may still type-check queries, but they are not tested and the peer dependency rejects them. TypeScript 6 and 5.9 are several times slower, and editor completions need 7.1.
+- **`strictNullChecks`.** Set `"strict": true` (or at least `"strictNullChecks": true`) in `tsconfig.json`. Without it `null` and `undefined` belong to every type, so TypeSQL cannot tell nullable columns from others: every `sql()` call and `.ddl()` of a migration is then an error that says TypeSQL requires strictNullChecks. With `"skipLibCheck": false`, TypeScript also reports errors inside TypeSQL's own declaration files (TS2344, TS2589) until strictNullChecks is on.
+- **A supported database.** TypeSQL supports PostgreSQL and SQLite. MySQL support is planned.
+
 ## 1. Install
 
-The examples come in two variants: PostgreSQL with node-postgres, and SQLite with node:sqlite. Pick one in any example and the page follows. [Installation](./installation) covers postgres.js, better-sqlite3, bun:sqlite, other package managers and the requirements.
+The examples come in two variants: PostgreSQL with node-postgres, and SQLite with node:sqlite. Pick one in any example and the page follows.
 
 ::: code-group
 
@@ -23,6 +29,33 @@ pnpm add -D typescript@7.1.0-beta
 ```
 
 :::
+
+Install `@typesql/core` and the adapter for your driver:
+
+| Package | Runs queries on |
+|---|---|
+| [`@typesql/pg`](../adapters/postgresql) | node-postgres (`pg`) |
+| [`@typesql/postgres`](../adapters/postgresql) | postgres.js (`postgres`) |
+| [`@typesql/sqlite`](../adapters/sqlite) | node:sqlite, bun:sqlite or better-sqlite3 |
+
+`@typesql/core` has no runtime dependencies. Its [migrator](./migrations#the-migrator) connects from a `url` with `pg`, an optional peer dependency, and writes `db.ts` with `typescript`. The packages are ESM-only. `import` and Node's `require()` of ES modules both work, but TypeScript rejects imports from `.cts` files under `node16`/`nodenext` resolution (TS1479).
+
+If your schema is already described for Kysely, Drizzle or Prisma, install its TypeSQL package instead of writing it again:
+
+| Package | Peer dependency |
+|---|---|
+| `@typesql/kysely` | `kysely` 0.28 or later |
+| `@typesql/drizzle` | `drizzle-orm` 0.45 or later, before 1.0 |
+| `@typesql/prisma` | `@prisma/client` 7 or later |
+
+See [From Kysely, Drizzle or Prisma](./orms).
+
+Optional extras:
+
+- **The `typesql` command.** `@typesql/cli` requires Node.js 26 or newer and provides [`typesql introspect`](./introspect), which writes your schema from a PostgreSQL or SQLite database, and [`typesql migrate`](./migrations#the-typesql-migrate-command), which runs migration files. They import their types from `@typesql/core`: keep `@typesql/core` a dependency of your project, even though `@typesql/cli` depends on it too (pnpm doesn't let your files import it through the CLI).
+- **Editor support.** The [VS Code extension](./vscode), and `@typesql/language-server` in [Neovim](./neovim), complete table and column names inside your SQL strings and highlight the SQL. Types and errors work without them.
+
+Upgrading from an earlier version? See [Upgrading](./upgrading).
 
 ## 2. Describe your tables
 
@@ -136,7 +169,7 @@ const user = await sql(
 ).executeTakeFirstOrThrow();
 ```
 
-`executeTakeFirstOrThrow()` throws a `NoResultError` when there is no row. [node-postgres](../adapters/pg#run-queries) lists all the `execute*` methods, which work the same on [SQLite](../adapters/sqlite#run-queries).
+`executeTakeFirstOrThrow()` throws a `NoResultError` when there is no row. [PostgreSQL](../adapters/postgresql#run-queries) lists all the `execute*` methods, which work the same on [SQLite](../adapters/sqlite#run-queries).
 
 The text goes to the database as you wrote it, and the values go as parameters:
 

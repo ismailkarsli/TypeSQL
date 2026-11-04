@@ -1,11 +1,11 @@
-/guide/adapters /adapters/pg 301
+/guide/adapters /adapters/postgresql 301
 /guide/orm-schemas /guide/orms 301
 /guide/getting-started /guide/quick-start 301
 /guide/fragments /guide/dynamic-sql 301
 /guide/errors-and-limits /guide/errors 301
 /guide/editor /guide/vscode 301
-/adapters/ /adapters/pg 301
-/adapters /adapters/pg 301
+/adapters/ /adapters/postgresql 301
+/adapters /adapters/postgresql 301
 /adapters/kysely /guide/orms#kysely 301
 /adapters/drizzle /guide/orms#drizzle 301
 /adapters/prisma /guide/orms#prisma 301
@@ -13,3 +13,8 @@
 /guide/type-engine /guide/limits 301
 /internals/releasing https://github.com/ismailkarsli/TypeSQL/blob/main/packages/docs/internals/releasing.md 301
 /CHANGELOG /changelog 301
+/adapters/pg /adapters/postgresql 301
+/adapters/postgres /adapters/postgresql 301
+/guide/installation /guide/quick-start 301
+/guide/using-sql /reference/api 301
+/guide/recipes /guide/dynamic-sql 301

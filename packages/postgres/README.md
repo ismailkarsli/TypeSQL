@@ -28,7 +28,7 @@ If your connection parses `int8` to `bigint` (`types: { bigint: postgres.BigInt 
 
 ## Documentation
 
-- [postgres.js adapter](https://typesql.karsli.net/adapters/postgres): running queries, transactions and migrations
+- [postgres.js adapter](https://typesql.karsli.net/adapters/postgresql): running queries, transactions and migrations
 - [Type mapping](https://typesql.karsli.net/reference/type-mapping#postgres-js): the TypeScript type of every Postgres type
 
 ## Prepared statements

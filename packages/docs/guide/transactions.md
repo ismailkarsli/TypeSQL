@@ -117,4 +117,4 @@ await sql.transaction(async (tx) => {
 | `@typesql/prisma` | `prisma.$transaction(fn)` (interactive) | `SAVEPOINT` on the transaction client |
 | `@typesql/drizzle` | `db.transaction(fn)` | Drizzle's nested `tx.transaction(fn)` (a savepoint) |
 
-More on each driver: [node-postgres](../adapters/pg), [postgres.js](../adapters/postgres), [SQLite](../adapters/sqlite#transactions), and [Kysely, Drizzle and Prisma](./orms).
+More on each driver: [PostgreSQL](../adapters/postgresql#transactions) (node-postgres and postgres.js), [SQLite](../adapters/sqlite#transactions), and [Kysely, Drizzle and Prisma](./orms).

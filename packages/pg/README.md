@@ -40,7 +40,7 @@ pnpm exec typesql introspect --url postgres://localhost/app --out src/db/schema.
 
 ## Documentation
 
-- [node-postgres adapter](https://typesql.karsli.net/adapters/pg): running queries, transactions and migrations
+- [node-postgres adapter](https://typesql.karsli.net/adapters/postgresql): running queries, transactions and migrations
 - [From a live database](https://typesql.karsli.net/guide/introspect): `typesql introspect` options
 - [Type mapping](https://typesql.karsli.net/reference/type-mapping#node-postgres): the TypeScript type of every Postgres type
 

@@ -66,7 +66,6 @@ The core is dialect-neutral: each SQL dialect brings its own parser, type rules 
 
 ## Next
 
-- [Installation](./installation): requirements and the packages for your driver.
-- [Quick start](./quick-start): your first typed query.
+- [Quick start](./quick-start): requirements, installation and your first typed query.
 - [Compared to other tools](../compared-to/kysely): Kysely, Drizzle, Prisma and Reylo.
 - [Upgrading](./upgrading): moving from an earlier version, with the [changelog](/changelog).

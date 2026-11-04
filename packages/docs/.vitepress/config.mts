@@ -87,7 +87,6 @@ export default withVersions({
 				text: "Get started",
 				items: [
 					{ text: "Introduction", link: "/guide/introduction" },
-					{ text: "Installation", link: "/guide/installation" },
 					{ text: "Quick start", link: "/guide/quick-start" },
 					{ text: "Upgrading", link: "/guide/upgrading" },
 				],
@@ -104,20 +103,17 @@ export default withVersions({
 			{
 				text: "Writing queries",
 				items: [
-					{ text: "Using <code>sql</code>", link: "/guide/using-sql" },
 					{ text: "Selecting data", link: "/guide/queries" },
 					{ text: "Parameters", link: "/guide/parameters" },
 					{ text: "Inserting and updating", link: "/guide/writing-data" },
 					{ text: "Dynamic SQL", link: "/guide/dynamic-sql" },
 					{ text: "Transactions", link: "/guide/transactions" },
-					{ text: "Recipes", link: "/guide/recipes" },
 				],
 			},
 			{
 				text: "Running queries",
 				items: [
-					{ text: "node-postgres", link: "/adapters/pg" },
-					{ text: "postgres.js", link: "/adapters/postgres" },
+					{ text: "PostgreSQL", link: "/adapters/postgresql" },
 					{ text: "SQLite", link: "/adapters/sqlite" },
 					{ text: "Custom executor", link: "/adapters/custom-executor" },
 				],
@@ -139,16 +135,17 @@ export default withVersions({
 					{ text: "Errors and troubleshooting", link: "/guide/errors" },
 					{ text: "Limits", link: "/guide/limits" },
 					{ text: "SQLite", link: "/guide/sqlite" },
-				],
-			},
-			{
-				text: "Compared to",
-				items: [
-					{ text: "Kysely", link: "/compared-to/kysely" },
-					{ text: "Drizzle", link: "/compared-to/drizzle" },
-					{ text: "Prisma ORM", link: "/compared-to/prisma" },
-					{ text: "Prisma TypedSQL", link: "/compared-to/prisma-typedsql" },
-					{ text: "Reylo", link: "/compared-to/reylo" },
+					{
+						text: "Compared to",
+						collapsed: true,
+						items: [
+							{ text: "Kysely", link: "/compared-to/kysely" },
+							{ text: "Drizzle", link: "/compared-to/drizzle" },
+							{ text: "Prisma ORM", link: "/compared-to/prisma" },
+							{ text: "Prisma TypedSQL", link: "/compared-to/prisma-typedsql" },
+							{ text: "Reylo", link: "/compared-to/reylo" },
+						],
+					},
 				],
 			},
 			{

@@ -4,7 +4,7 @@ description: "Breaking changes in each TypeSQL major version and the code to cha
 
 # Upgrading
 
-This page lists breaking changes and migration guidance since the first 0.x releases, newest first, with the code to change. Apply the sections newer than your installed version, oldest first: from 4.x apply [5.0](#_5-0); from 3.x apply [4.0](#_4-0), then 5.0. From 2.x start at [3.0](#_3-0), from 1.x at [2.0](#_2-0), and from 0.x at [Upgrading from 0.x](#upgrading-from-0-x). The [changelog](/changelog) has the release notes from 1.0.0 on.
+This page lists breaking changes and migration guidance since 1.0, newest first, with the code to change. Apply the sections newer than your installed version, oldest first: from 4.x apply [5.0](#_5-0); from 3.x apply [4.0](#_4-0), then 5.0. From 2.x start at [3.0](#_3-0), from 1.x at [2.0](#_2-0), and from 0.x at [1.0](#_1-0). The [changelog](/changelog) has the release notes from 1.0.0 on; notes for 0.x releases are on the [GitHub releases page](https://github.com/ismailkarsli/TypeSQL/releases).
 
 Most breaking changes are compile errors at the call site, so after upgrading run `tsc --noEmit` (or your editor) and work through the list. The changes that compile but behave differently are marked **Runtime change**.
 
@@ -18,7 +18,7 @@ Most breaking changes are compile errors at the call site, so after upgrading ru
 
   Before 1.1.0 the adapters had their own 0.x versions (for example `@typesql/pg` 0.4.3 went with `@typesql/core` 1.0.1). `@typesql/language-server` and the VS Code extension keep their own versions.
 
-- **TypeScript 7.1 or later.** Required since `@typesql/core` 0.2.0 and declared as a peer dependency. See [Installation](./installation#requirements).
+- **TypeScript 7.1 or later.** Declared as a peer dependency. See [Requirements](./quick-start#requirements).
 
 - **tsconfig requirements.** TypeSQL needs `strictNullChecks`, which `strict: true` turns on. Without it, TypeScript removes `null` and `undefined` from every type, so a nullable column would look like a `NOT NULL` one and an optional value like a required one; TypeSQL reports a compile error instead of giving such types. If your project can't turn on `strict` yet, set `"strictNullChecks": true` on its own:
 
@@ -340,113 +340,3 @@ sed -i -E \
 ### `typesql migrate` writes `db.ts`
 
 With `@typesql/cli` 0.2.0 (released with `@typesql/core` 1.0.0), `typesql migrate up`, `down` and `latest` end by writing the schema of the last applied migration to `db.ts` beside the config. Pass `--no-generate`, or set `generate: false` in the config, to keep the old behavior; `schemaFile` or `--out` changes the path. See [The DB file](./migrations#the-db-file).
-
-## Upgrading from 0.x
-
-The 0.x releases changed the API several times. The versions below are `@typesql/core`'s; the adapters' 0.x versions moved with it. Apply the ones newer than the version you are on, then [1.0](#_1-0), [2.0](#_2-0), [3.0](#_3-0), [4.0](#_4-0) and [5.0](#_5-0).
-
-### 0.10: plugins replace `rowKeys`, `sql.param(undefined)` is rejected
-
-The `rowKeys` option of `createSql` is removed (`@typesql/pg` 0.4, `@typesql/postgres` 0.3, `@typesql/kysely` 0.4, `@typesql/sqlite` 0.1). Attach `CasePlugin`, which also converts camelCase keys in `sql.set` and `sql.values`:
-
-```ts
-// 0.9
-const sql = createSql<DB>(pool, { rowKeys: "camelCase" });
-
-// 0.10 and later
-import { CasePlugin } from "@typesql/core";
-const sql = createSql<DB>(pool).withPlugin(new CasePlugin());
-```
-
-`@typesql/postgres` keeps its options argument for `bigint`: `createSql<DB>(client, { bigint: true }).withPlugin(new CasePlugin())`. The `Keys` type argument of `Sql` and `TransactionalSql` is now the plugin tuple (`Sql<DB, TM, Plugins>`), the `SqlOptions` and `RowKeys` types are removed, and `@typesql/core/adapter` has `pluginsOf(q)` instead of `rowKeysOf(q)` and `camelCase`. See [camelCase row keys](./queries#camelcase-row-keys).
-
-`sql.param(undefined)` is rejected at compile time and throws, where it sent `DEFAULT`. Write `sql.param(sql.optional(value))` (in 0.10 to 2.x this was `sql.empty`; see [3.0](#sql-empty-is-now-sql-optional-and-sql-if)).
-
-### 0.9: the type cache is removed
-
-The optional type cache (0.2 to 0.9) is gone and queries are always checked directly. Remove the `@typesql/core` entry from `contentMappers` in your tsconfig and delete the `.typesqlcache` file. `--runExternalCode`, and `runExternalCode = true` in Neovim, were only needed for the cache.
-
-### 0.8: dialects, and the `typesql` command moves to `@typesql/cli`
-
-TypeSQL is split into a dialect-neutral core and a PostgreSQL dialect (0.8.0), and SQLite was added (0.8.1). Core's `createSql` takes the dialect first:
-
-```ts
-// 0.7
-import { createSql, type Json } from "@typesql/core";
-const sql = createSql<DB>(executor);
-
-// 0.8 and later
-import { createSql } from "@typesql/core";
-import { type Json, postgres } from "@typesql/core/postgres";
-const sql = createSql<DB>(postgres, executor);
-```
-
-- `Json`, `PgCatalog`, `migrations()`, the type maps and the function catalog are imported from `@typesql/core/postgres`, which also re-exports the schema markers. The engine types moved from `@typesql/core/engine` to `@typesql/core/postgres/engine`.
-- `@typesql/kysely`, `@typesql/drizzle` and `@typesql/prisma` take the dialect too, and read the schema from the client's type: `createSql(postgres, db)`. `createSql<DB>(postgres, db)` still picks a schema explicitly.
-- The driver adapters (`@typesql/pg`, `@typesql/postgres`) are unchanged: `createSql<DB>(pool)`.
-- The `typesql` command moved from `@typesql/pg` to `@typesql/cli`: install `@typesql/cli`, and `typesql introspect` reads PostgreSQL by default, or a SQLite file with `--dialect sqlite --db app.db`. `@typesql/pg/introspect` exports the introspection.
-
-### 0.7: `sql.join` is `sql.combine`
-
-```ts
-// 0.6
-sql.join(items, ", ");
-
-// 0.7 and later
-sql.combine(items, { separator: ", " }); // ", " is the default
-```
-
-For conditions, use `sql.and(items)` and `sql.or(items)` (1.1 and later) instead of an `" AND "` or `" OR "` separator.
-
-### 0.6: editor completions move to `@typesql/language-server`
-
-`@typesql/core/editor` is removed. Install the [VS Code extension](./vscode), which bundles `@typesql/language-server`, or use `@typesql/language-server` in [Neovim](./neovim).
-
-### 0.5: a smaller public API
-
-- The root export is the user-facing API only. The standalone `param` and `json` are removed (use `sql.param`, `sql.json`), and so are the splice and query-building helpers (`splice`, `renumberParams`, `maxParam`, `quoteIdent`, `joinFragments`, `hasSlots`, `rewriteNamed`, `makeQuery`, `makeFragment`).
-- What adapters and custom executors build on moved to `@typesql/core/adapter`: `createTransactionalSql`, `runTransaction`, `SqlDriver`, `mapRows` and `JsonParam`.
-- `sql.valueOrDefault(value)` and the standalone `valueOrDefault` are removed; today write `sql.param(sql.optional(value))`.
-- `sql.list` is merged into `sql.join` (now `sql.combine`), which throws when there are no items.
-- `@typesql/postgres`: `createBigIntSql(client)` is `createSql(client, { bigint: true })`, and `PostgresJsBigIntSql<DB>` is `PostgresJsSql<DB, PostgresJsBigIntTypeMap>`.
-- The adapters no longer re-export `NoResultError`, `Executor` and `TransactionalSql` (`@typesql/drizzle` also `Sql`, `Query`, `RowType`, `ParamsType`, `DefaultTypeMap` and `TypeMap`). In current versions, shared types come from `@typesql/core`; `Sql`, `TransactionalSql`, `DefaultTypeMap` and `TypeMap` come from the dialect module (`@typesql/core/postgres` or `@typesql/core/sqlite`).
-- `@typesql/pg/introspect` no longer exports `main`, `ViewNullability` and `parseNodeTree`; `@typesql/prisma/generator` exports only `generateSource`.
-
-### 0.2: TypeScript 7.1
-
-TypeScript 7.1 or later is required, declared as a peer dependency. See [Installation](./installation#install-typescript-7-1).
-
-### 0.1: queries run from `sql`
-
-The adapters' `query`, `one`, `maybeOne`, `many`, `execute`, `transaction` and `RowCountError` exports are removed (`@typesql/pg` and `@typesql/postgres`; `query` and `execute` of `@typesql/kysely`; `queryRaw` and `executeRaw` of `@typesql/prisma`). Bind `sql` to the client and run the query itself:
-
-```ts
-// 0.0
-const sql = createSql<DB>();
-const users = await query(pool, sql("SELECT id, email FROM users"));
-const user = await one(pool, sql("SELECT id FROM users WHERE id = $1", 7));
-const changed = await execute(pool, sql("UPDATE users SET display_name = NULL"));
-await transaction(pool, async (client) => {
-	await execute(client, sql("DELETE FROM posts WHERE author_id = $1", 7));
-});
-
-// 0.1 and later
-const sql = createSql<DB>(pool);
-const users = await sql("SELECT id, email FROM users").execute();
-const user = await sql("SELECT id FROM users WHERE id = $1", 7).executeTakeFirstOrThrow();
-const changed = await sql("UPDATE users SET display_name = NULL").executeCount();
-await sql.transaction(async (tx) => {
-	await tx("DELETE FROM posts WHERE author_id = $1", 7).execute();
-});
-```
-
-| 0.0 | 0.1 and later |
-|---|---|
-| `query(client, q)` | `q.execute()` |
-| `one(client, q)` | `q.executeTakeFirstOrThrow()`: throws `NoResultError` on no row, and returns the first of several rows instead of throwing |
-| `maybeOne(client, q)` | `q.executeTakeFirst()`: `undefined` instead of `null` for no row, and the first of several rows instead of throwing |
-| `many(client, q)` | `q.execute()`, and check `rows.length` |
-| `execute(client, q)` | `q.executeCount()` |
-| `transaction(pool, (client) => …)` | `sql.transaction((tx) => …)`; `tx.transaction` nests with a savepoint |
-
-`@typesql/drizzle`'s `createSql` takes the Drizzle database or transaction instead of an `Executor`, and has `sql.transaction`. See [node-postgres](../adapters/pg), [postgres.js](../adapters/postgres) and [From Kysely, Drizzle or Prisma](./orms).
