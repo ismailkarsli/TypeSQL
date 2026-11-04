@@ -1,0 +1,126 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`better-auth-rejection > scenario 1`] = `
+{
+  "compile": {
+    "status": 1,
+    "stderr": "",
+    "stdout": "app.ts(20,42): error TS2345: Argument of type 'TransactionalSql<DB, PgTypeMap, [CasePlugin]>' is not assignable to parameter of type 'TypesqlAdapterSql<TransactionalSql<DB, PgTypeMap, [CasePlugin]>>'.
+  Type 'TransactionalSql<DB, PgTypeMap, [CasePlugin]>' is not assignable to type '{ readonly [DIALECT]?: Brand | undefined; }'.
+    The types of '[DIALECT].inputs' are incompatible between these types.
+      Type '(inputs: [DB, PgTypeMap, [CasePlugin]]) => [DB, PgTypeMap, [CasePlugin]]' is not assignable to type '(inputs: [never, never, []]) => [unknown, unknown, []]'.
+        Types of parameters 'inputs' and 'inputs' are incompatible.
+          Type '[never, never, []]' is not assignable to type '[DB, PgTypeMap, [CasePlugin]]'.
+            Type at position 2 in source is not compatible with type at position 2 in target.
+              Type '[]' is not assignable to type '[CasePlugin]'.
+                Source has 0 element(s) but target requires 1.
+",
+  },
+  "compiler": {
+    "diagnostics": [
+      {
+        "category": 1,
+        "code": 2345,
+        "column": 42,
+        "details": [
+          {
+            "category": 1,
+            "code": 2322,
+            "column": 42,
+            "details": [
+              {
+                "category": 1,
+                "code": 2200,
+                "column": 42,
+                "details": [
+                  {
+                    "category": 1,
+                    "code": 2322,
+                    "column": 42,
+                    "details": [
+                      {
+                        "category": 1,
+                        "code": 2328,
+                        "column": 42,
+                        "details": [
+                          {
+                            "category": 1,
+                            "code": 2322,
+                            "column": 42,
+                            "details": [
+                              {
+                                "category": 1,
+                                "code": 2626,
+                                "column": 42,
+                                "details": [
+                                  {
+                                    "category": 1,
+                                    "code": 2322,
+                                    "column": 42,
+                                    "details": [
+                                      {
+                                        "category": 1,
+                                        "code": 2618,
+                                        "column": 42,
+                                        "expression": "pg.withPlugin(new CasePlugin())",
+                                        "file": "app.ts",
+                                        "line": 20,
+                                        "message": "Source has 0 element(s) but target requires 1.",
+                                      },
+                                    ],
+                                    "expression": "pg.withPlugin(new CasePlugin())",
+                                    "file": "app.ts",
+                                    "line": 20,
+                                    "message": "Type '[]' is not assignable to type '[CasePlugin]'.",
+                                  },
+                                ],
+                                "expression": "pg.withPlugin(new CasePlugin())",
+                                "file": "app.ts",
+                                "line": 20,
+                                "message": "Type at position 2 in source is not compatible with type at position 2 in target.",
+                              },
+                            ],
+                            "expression": "pg.withPlugin(new CasePlugin())",
+                            "file": "app.ts",
+                            "line": 20,
+                            "message": "Type '[never, never, []]' is not assignable to type '[DB, PgTypeMap, [CasePlugin]]'.",
+                          },
+                        ],
+                        "expression": "pg.withPlugin(new CasePlugin())",
+                        "file": "app.ts",
+                        "line": 20,
+                        "message": "Types of parameters 'inputs' and 'inputs' are incompatible.",
+                      },
+                    ],
+                    "expression": "pg.withPlugin(new CasePlugin())",
+                    "file": "app.ts",
+                    "line": 20,
+                    "message": "Type '(inputs: [DB, PgTypeMap, [CasePlugin]]) => [DB, PgTypeMap, [CasePlugin]]' is not assignable to type '(inputs: [never, never, []]) => [unknown, unknown, []]'.",
+                  },
+                ],
+                "expression": "pg.withPlugin(new CasePlugin())",
+                "file": "app.ts",
+                "line": 20,
+                "message": "The types of '[DIALECT].inputs' are incompatible between these types.",
+              },
+            ],
+            "expression": "pg.withPlugin(new CasePlugin())",
+            "file": "app.ts",
+            "line": 20,
+            "message": "Type 'TransactionalSql<DB, PgTypeMap, [CasePlugin]>' is not assignable to type '{ readonly [DIALECT]?: Brand | undefined; }'.",
+          },
+        ],
+        "expression": "pg.withPlugin(new CasePlugin())",
+        "file": "app.ts",
+        "line": 20,
+        "message": "Argument of type 'TransactionalSql<DB, PgTypeMap, [CasePlugin]>' is not assignable to parameter of type 'TypesqlAdapterSql<TransactionalSql<DB, PgTypeMap, [CasePlugin]>>'.",
+      },
+    ],
+    "types": {
+      "postgresAdapter": "(options: BetterAuthOptions) => DBAdapter",
+      "sqliteAdapter": "(options: BetterAuthOptions) => DBAdapter",
+      "withPlugin": "(options: BetterAuthOptions) => DBAdapter",
+    },
+  },
+}
+`;

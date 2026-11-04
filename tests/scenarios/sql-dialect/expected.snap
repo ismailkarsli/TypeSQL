@@ -1,0 +1,39 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`sql-dialect > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "core": ""postgres"",
+      "inTransaction": ""sqlite"",
+      "pg": ""postgres"",
+      "sqliteDialect": ""sqlite"",
+      "withPlugin": ""sqlite"",
+    },
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "{
+  core: 'postgres',
+  pg: 'postgres',
+  sqliteDialect: 'sqlite',
+  withPlugin: 'sqlite',
+  inTransaction: 'sqlite'
+}
+{
+  value: 'sqlite',
+  writable: false,
+  enumerable: true,
+  configurable: false
+}
+",
+  },
+}
+`;

@@ -143,6 +143,10 @@ export function createDialectSql<T extends DialectTypes, DB, TM = T["typeMap"]>(
 			return makeFragment(r.text, r.values);
 		},
 	});
+	Object.defineProperty(api, "dialect", {
+		value: dialect.name,
+		enumerable: true,
+	});
 	return api as unknown as SqlOf<T, DB, TM>;
 }
 

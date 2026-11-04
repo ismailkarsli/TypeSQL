@@ -141,6 +141,15 @@ Only on an adapter's `sql`. Runs `fn(tx)` in a transaction, where `tx` is the sa
 
 See [Transactions](../guide/transactions).
 
+## `sql.dialect`
+
+The database the `sql` runs on: `"postgres"` or `"sqlite"`, typed as that literal. It is read-only, and the same on every `sql` derived from it: `sql.withPlugin()`, a transaction's `tx`. Libraries that take your `sql`, such as the [Better Auth adapter](../guide/better-auth), read it instead of asking for the dialect again.
+
+```ts
+const sql = createSql<DB>(pool); // @typesql/pg
+sql.dialect; // "postgres"
+```
+
 ## Running queries
 
 | Method | Returns |

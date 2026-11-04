@@ -15,4 +15,6 @@ export interface Sql<
 	in out Plugins extends readonly SqlPlugin[] = [],
 > extends StrictSql<SqlApi<PgEngine, NormalizeSchema<DB>, TM, Plugins>> {
 	readonly [DIALECT]?: DialectBrand<"postgres", DB, TM, Plugins>;
+	/** The database this `sql` runs on: `"postgres"`. */
+	readonly dialect: "postgres";
 }

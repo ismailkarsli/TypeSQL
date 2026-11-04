@@ -8,8 +8,8 @@ the `release` workflow through npm trusted publishing, publishes. Two scripts fi
 releases. See pnpm's [release management](https://pnpm.io/versioning) docs for the full model.
 
 The published packages are `@typesql/core`, `@typesql/pg`, `@typesql/postgres`,
-`@typesql/kysely`, `@typesql/drizzle`, `@typesql/prisma`, `@typesql/sqlite`, `@typesql/cli`
-and `@typesql/language-server`. All but `@typesql/language-server` form a fixed group
+`@typesql/kysely`, `@typesql/drizzle`, `@typesql/prisma`, `@typesql/sqlite`, `@typesql/cli`,
+`@typesql/better-auth` and `@typesql/language-server`. All but `@typesql/language-server` form a fixed group
 (`versioning.fixed` in `pnpm-workspace.yaml`): they always share one version, and a release of
 any of them releases all of them, at the highest bump among their intents. Users install them
 at the same version. `@typesql/language-server` loads the user's own `@typesql/core` at runtime,
@@ -111,7 +111,7 @@ packages' GitHub releases.
 After a run, check that every bumped version is live:
 
 ```sh
-for p in core pg postgres kysely drizzle prisma language-server sqlite cli; do pnpm view @typesql/$p version; done
+for p in core pg postgres kysely drizzle prisma language-server sqlite cli better-auth; do pnpm view @typesql/$p version; done
 ```
 
 ## Documentation deployment
