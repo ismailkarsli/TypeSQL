@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
 import {
+	appendFileSync,
 	cpSync,
 	existsSync,
 	mkdirSync,
@@ -56,7 +57,8 @@ for (const tag of git(
 	const match = /^@typesql\/core@(\d+)\.(\d+)\.\d+$/.exec(tag);
 	if (!match || Number(match[1]) < 3) continue;
 	const version = `${match[1]}.${match[2]}`;
-	if (lines.has(version)) continue;
+	// The latest line is the site at `/`; archiving it too would list it twice.
+	if (version === latestVersion || lines.has(version)) continue;
 	const files = filesAt(tag);
 	if (!files.includes("packages/docs/.vitepress/config.mts")) continue;
 	lines.add(version);
@@ -133,6 +135,11 @@ try {
 			rmSync(join(output, "_redirects"));
 		cpSync(output, join(dist, "versions", archiveVersion), { recursive: true });
 	}
+	// Links into the latest line's former archive open the same page at `/`.
+	appendFileSync(
+		join(dist, "_redirects"),
+		`/versions/${latestVersion}/* /:splat 301\n/versions/${latestVersion} / 301\n`,
+	);
 } finally {
 	delete process.env.TYPESQL_DOCS_VERSION;
 	delete process.env.TYPESQL_DOCS_VERSIONS;

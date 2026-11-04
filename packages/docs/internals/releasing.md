@@ -127,8 +127,9 @@ does not qualify). Docs are deployed only through release; a docs-only
 change can be deployed by running release without pending package intents.
 
 `pnpm docs:build` builds the current documentation at `/` and an archive at
-`/versions/<major>.<minor>/` for each major/minor release line from 3.0 onward, using the
-latest stable patch tag containing the VitePress site. For example, 3.1.0 and 3.1.2 produce
+`/versions/<major>.<minor>/` for each major/minor release line from 3.0 onward except the
+current one, using the latest stable patch tag containing the VitePress site. The current line
+is the site at `/`, and its `/versions/<major>.<minor>/` URLs redirect there. For example, 3.1.0 and 3.1.2 produce
 one `3.1` entry backed by 3.1.2; 3.2.0 produces a separate `3.2` entry. Patch releases update
 their line's archive without adding selector entries. Core identifies the documentation
 version; the VS Code extension has its own version.
