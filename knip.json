@@ -69,13 +69,12 @@
 		"packages/docs": {
 			"entry": [
 				"playground/*.ts",
-				".vitepress/playground/TypeSqlPlayground.vue",
 				"*.paths.ts",
 				"cloudflare.config.ts",
 				"wrangler.config.ts"
 			],
 			"project": ["*.ts", "playground/**/*.ts", ".vitepress/**/*.{ts,mts,vue}"],
-			"ignoreDependencies": ["@typesql/drizzle"]
+			"ignoreDependencies": ["@typesql/drizzle", "vue"]
 		},
 		"tests": {
 			"entry": ["scenario.test.ts", "support/observe.ts", "support/runtime.ts"],

@@ -13,18 +13,8 @@ const sources = new Map(
 		.map((f) => [basename(f, ".ts"), readFileSync(join(sourceDir, f), "utf8")]),
 );
 
-// The TypeSQL Playground (packages/docs/playground.md) checks with TypeScript 7.1 but only has
-// @typesql/core's declarations. Examples that import adapters, drivers or ORMs open in the
-// TypeScript Playground, which installs their types.
-const onlyCore = (code: string): boolean =>
-	[...code.matchAll(/^import\s[^;]*?\sfrom\s+"([^"]+)"/gm)].every(
-		([, specifier]) =>
-			specifier === "@typesql/core" || specifier?.startsWith("@typesql/core/"),
-	);
 const playgroundUrl = (code: string): string =>
-	onlyCore(code)
-		? `https://typesql.karsli.net/playground#code/${lz.compressToEncodedURIComponent(code)}`
-		: `https://www.typescriptlang.org/play/?moduleResolution=100#code/${lz.compressToEncodedURIComponent(code)}`;
+	`https://www.typescriptlang.org/play/?moduleResolution=100#code/${lz.compressToEncodedURIComponent(code)}`;
 
 function markdownFiles(dir: string): string[] {
 	return readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
@@ -42,8 +32,7 @@ const docs = [
 	...markdownFiles(join(root, "packages")),
 ].filter((f) => !f.endsWith("CHANGELOG.md"));
 
-const LINK =
-	/https:\/\/(?:www\.typescriptlang\.org\/play\/|typesql\.karsli\.net\/playground)[^\s)"'<>]*/g;
+const LINK = /https:\/\/www\.typescriptlang\.org\/play\/[^\s)"'<>]*/g;
 const MARKER = /data-playground="([\w-]+)"/;
 const problems: string[] = [];
 const used = new Set<string>();
