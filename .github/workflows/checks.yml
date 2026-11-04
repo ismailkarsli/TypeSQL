@@ -5,55 +5,77 @@ on:
     branches: [main]
   pull_request:
 
+# Fork runs require approval for all external contributors in repository settings.
+# These jobs execute PR code: keep them read-only, secret-free and cache-free.
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
+    name: test
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          persist-credentials: false
           fetch-depth: 0
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6
         with:
+          cache: false
           standalone: true
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
+          package-manager-cache: false
           node-version: 26
-          cache: pnpm
       - run: pnpm install --frozen-lockfile
       # Skipped for now: the stricter Biome rules report errors across the repository.
-      - run: pnpm lint
-        if: false
+      # - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm build
       - run: pnpm --filter typesql exec vsce package --no-dependencies --out "$RUNNER_TEMP/typesql.vsix"
       - run: pnpm docs:build
 
   intents:
+    name: intents
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          persist-credentials: false
           fetch-depth: 0
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
+          package-manager-cache: false
           node-version: 26
       - run: node tools/check-intents.ts "$BASE"
         env:
           BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
 
   scenario:
+    name: scenario
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6
+        with:
+          cache: false
           standalone: true
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
+          package-manager-cache: false
           node-version: 26.8.1
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
+          no-cache: true
           bun-version: 1.4.3
       - run: pnpm install --frozen-lockfile
       - run: pnpm --dir tests typecheck
@@ -62,7 +84,7 @@ jobs:
       - run: pnpm test
       - name: Retain failing scenario applications and logs
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: scenario-failures
           path: tests/.artifacts/

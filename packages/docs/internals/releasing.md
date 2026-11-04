@@ -79,8 +79,10 @@ pnpm change status
 pnpm release
 ```
 
-The workflow runs only when started by hand on `main`, with `pnpm release` or **Run workflow** on
-the Actions tab; pushing publishes nothing. Scenario tests, type checks, lint and
+The workflow runs only when started by the repository owner on `main`, with `pnpm release` or
+**Run workflow** on the Actions tab; pushing publishes nothing. Reruns also require the owner:
+each publishing or deployment job checks both `github.actor` and `github.triggering_actor`,
+the canonical repository, the event and the branch. Scenario tests, type checks, lint and
 documentation builds belong to `checks.yml`, which runs on pushes and pull requests (lint remains temporarily disabled
 while repository-wide violations are addressed). Release does not rerun those checks;
 start it from a revision whose checks have passed. Its `publish` job runs `pnpm version -r` (bump
@@ -91,7 +93,8 @@ commits, so the release commit is made through GitHub's API (`tools/github-commi
 which signs it, not with `git push`. It is rejected, and nothing is published, when `main`
 moved after the run started; start it again. A commit made with the workflow's token starts no
 other workflow, so `checks` does not run on the release commit, which changes only versions and
-changelogs.
+changelogs. The build checks out the exact commit returned by the commit API, even if `main`
+advances immediately afterward; deployment jobs use that same commit.
 
 `pnpm publish -r` publishes every public package whose manifest version is not on the registry
 yet and skips the rest. A run without pending intents therefore versions nothing and publishes
@@ -118,7 +121,9 @@ for p in core pg postgres kysely drizzle prisma language-server sqlite cli bette
 
 The release workflow's `docs` job deploys to Cloudflare after `publish` succeeds. It checks
 out the exact release commit, including all tags, then runs `pnpm docs:deploy` using the
-`CLOUDFLARE_API_TOKEN` repository secret. Docs are deployed only through release; a docs-only
+`CLOUDFLARE_API_TOKEN` repository secret. The job uses the `docs` environment, whose deployment
+branch policy permits only the `main` branch, just like `npm` and `vscode` (a tag named `main`
+does not qualify). Docs are deployed only through release; a docs-only
 change can be deployed by running release without pending package intents.
 
 `pnpm docs:build` builds the current documentation at `/` and an archive at
@@ -143,6 +148,36 @@ pnpm docs:preview
 
 `pnpm docs:dev` serves the working documentation with only the current version; use the built
 preview to inspect archives. No archived sources or generated site files are committed.
+
+## CI trust boundary
+
+In repository **Settings → Actions → General**, fork workflow approval must remain set to
+**Require approval for all external contributors** (`all_external_contributors` in the API).
+This is a server-side restriction: a contributor can edit workflow YAML in a pull request,
+so a condition inside that YAML cannot replace approval. Review the exact proposed code,
+workflow changes, dependency changes and install scripts before approving execution. An
+approved PR intentionally executes its application code on a fresh GitHub-hosted runner.
+
+`checks.yml` uses `pull_request`, read-only repository permissions and no secrets or OIDC
+permission. Keep untrusted code out of `pull_request_target`, `workflow_run` and other
+privileged triggers. PR artifacts are only diagnostic output; release never consumes them.
+Repository default workflow permissions remain read-only, with permission to create or
+approve pull requests disabled.
+
+Both workflows pin actions to full commit SHAs and disable persisted checkout credentials.
+Update a pin only after reviewing the upstream change. pnpm store caching, setup-node's
+automatic caching and Bun executable caching are explicitly disabled. Release builds fresh
+from the frozen lockfile and never restores CI caches or build artifacts. This costs install
+time but removes shared caches from the publishing trust boundary. Pass event data through
+quoted environment variables or action inputs, never interpolate it into shell scripts.
+
+The `npm`, `vscode` and `docs` environments must keep their deployment policies restricted to
+the branch `main`. Keep registry trust bound to this repository, `release.yml` and the
+corresponding environment. These repository settings and registry trust settings are enforced
+outside the workflow files; copying the YAML to a fork does not grant publishing access.
+
+See GitHub's [secure use reference](https://docs.github.com/en/actions/reference/security/secure-use)
+and [fork approval settings](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/enabling-features-for-your-repository/managing-github-actions-settings-for-your-repository).
 
 ## Trusted publishing
 
