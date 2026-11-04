@@ -1,0 +1,15 @@
+{
+	"name": "compiler-lib-check",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"compile": "tsc -p tsconfig.json --pretty false --singleThreaded"
+	},
+	"dependencies": {
+		"@typesql/core": "workspace:*"
+	},
+	"devDependencies": {
+		"typescript": "catalog:",
+		"@types/node": "catalog:"
+	}
+}

@@ -423,13 +423,22 @@ interface NextTable {
 	382: 383;
 	383: 384;
 }
-/** `I + 1` for indexes below 4096, `number` otherwise. */
-export type Next<I extends number> = I extends keyof NextTable
-	? NextTable[I]
-	: number extends I
-		? number
-		: Untracked<`${I}`> extends true
+/**
+ * `I + 1` for indexes below 4096, `number` otherwise.
+ *
+ * The table is read through `infer N extends number` rather than `NextTable[I]`, so a `Next` of
+ * a type parameter is constrained by `number` instead of the union of every table value.
+ * Checking TypeSQL's declarations relates many such types, and that union filled the compiler's
+ * relation cache.
+ */
+export type Next<I extends number> = I extends unknown
+	? NextTable extends { [K in I]: infer N extends number }
+		? N
+		: number extends I
 			? number
-			: Inc<`${I}`> extends `${infer N extends number}`
-				? N
-				: never;
+			: Untracked<`${I}`> extends true
+				? number
+				: Inc<`${I}`> extends `${infer N extends number}`
+					? N
+					: never
+	: never;
