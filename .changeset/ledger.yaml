@@ -369,6 +369,10 @@
   dir: packages/core
   intents:
     - modern-cooks-compete
+"@typesql/core@6.0.2":
+  dir: packages/core
+  intents:
+    - tall-boats-clap
 "@typesql/drizzle@0.0.2":
   dir: packages/drizzle
   intents:
