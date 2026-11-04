@@ -1,5 +1,16 @@
 # @typesql/sqlite
 
+## 6.1.2
+
+### Patch Changes
+
+- The README examples pass values inline with `${sql.param(value)}` (and `tx.param(value)` in transactions) instead of positional arguments.
+
+- Introspection reports unexpected schema rows with a clear error, and the introspect command prints thrown values that are not `Error` objects.
+
+- Updated dependencies:
+  - @typesql/core@6.1.2
+
 ## 6.1.1
 
 ### Patch Changes

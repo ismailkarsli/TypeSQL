@@ -1,5 +1,16 @@
 # @typesql/postgres
 
+## 6.1.2
+
+### Patch Changes
+
+- The README examples pass values inline with `${sql.param(value)}` (and `tx.param(value)` in transactions) instead of positional arguments.
+
+- `PostgresJsTransactable.begin` returns the result type of its callback instead of `unknown`.
+
+- Updated dependencies:
+  - @typesql/core@6.1.2
+
 ## 6.1.1
 
 ### Patch Changes

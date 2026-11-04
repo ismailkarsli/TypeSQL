@@ -1,5 +1,13 @@
 # @typesql/core
 
+## 6.1.2
+
+### Patch Changes
+
+- Without `strictNullChecks`, every member of `sql` (such as `sql.begin`) reports the strictNullChecks requirement instead of returning `any`, and the built-in SQLite migration connection names the parameter it cannot bind.
+
+- The README examples pass values inline with `${sql.param(value)}` (and `tx.param(value)` in transactions) instead of positional arguments.
+
 ## 6.1.1
 
 ## 6.1.0

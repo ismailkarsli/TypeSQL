@@ -1,5 +1,16 @@
 # @typesql/pg
 
+## 6.1.2
+
+### Patch Changes
+
+- The README examples pass values inline with `${sql.param(value)}` (and `tx.param(value)` in transactions) instead of positional arguments.
+
+- Introspection reports config options of the wrong type and unexpected catalog rows with a clear error instead of failing later.
+
+- Updated dependencies:
+  - @typesql/core@6.1.2
+
 ## 6.1.1
 
 ### Patch Changes

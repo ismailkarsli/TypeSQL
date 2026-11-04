@@ -1,5 +1,16 @@
 # @typesql/cli
 
+## 6.1.2
+
+### Patch Changes
+
+- Internal type-safety cleanup with no change in behavior.
+
+- Updated dependencies:
+  - @typesql/core@6.1.2
+  - @typesql/pg@6.1.2
+  - @typesql/sqlite@6.1.2
+
 ## 6.1.1
 
 ### Patch Changes

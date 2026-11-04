@@ -1,5 +1,16 @@
 # @typesql/drizzle
 
+## 6.1.2
+
+### Patch Changes
+
+- The README examples pass values inline with `${sql.param(value)}` (and `tx.param(value)` in transactions) instead of positional arguments.
+
+- `createSql` throws right away when `db` is not a Drizzle database of the chosen dialect.
+
+- Updated dependencies:
+  - @typesql/core@6.1.2
+
 ## 6.1.1
 
 ### Patch Changes

@@ -1,5 +1,11 @@
 # @typesql/better-auth
 
+## 6.1.2
+
+### Patch Changes
+
+- Internal type-safety cleanup with no change in behavior.
+
 ## 6.1.1
 
 ## 6.1.0

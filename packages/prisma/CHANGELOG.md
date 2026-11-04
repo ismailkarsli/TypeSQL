@@ -1,5 +1,16 @@
 # @typesql/prisma
 
+## 6.1.2
+
+### Patch Changes
+
+- The README examples pass values inline with `${sql.param(value)}` (and `tx.param(value)` in transactions) instead of positional arguments.
+
+- The generator answers invalid JSON-RPC params with an error reply and ignores messages without a method.
+
+- Updated dependencies:
+  - @typesql/core@6.1.2
+
 ## 6.1.1
 
 ### Patch Changes

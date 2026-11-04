@@ -2,6 +2,10 @@
   dir: packages/better-auth
   intents:
     - hungry-donkeys-call
+"@typesql/better-auth@6.1.2":
+  dir: packages/better-auth
+  intents:
+    - tame-geese-deliver
 "@typesql/cli@0.0.1":
   dir: packages/cli
   intents:
@@ -43,6 +47,10 @@
   dir: packages/cli
   intents:
     - ancient-eggs-float
+"@typesql/cli@6.1.2":
+  dir: packages/cli
+  intents:
+    - tame-geese-deliver
 "@typesql/core@0.0.2":
   dir: packages/core
   intents:
@@ -385,6 +393,11 @@
   dir: packages/core
   intents:
     - wild-bears-lick
+"@typesql/core@6.1.2":
+  dir: packages/core
+  intents:
+    - afraid-bees-ask
+    - loud-ants-deny
 "@typesql/drizzle@0.0.2":
   dir: packages/drizzle
   intents:
@@ -464,6 +477,11 @@
   dir: packages/drizzle
   intents:
     - ancient-eggs-float
+"@typesql/drizzle@6.1.2":
+  dir: packages/drizzle
+  intents:
+    - loud-ants-deny
+    - weak-maps-rescue
 "@typesql/kysely@0.0.2":
   dir: packages/kysely
   intents:
@@ -548,6 +566,11 @@
   dir: packages/kysely
   intents:
     - smooth-teeth-punch
+"@typesql/kysely@6.1.2":
+  dir: packages/kysely
+  intents:
+    - loud-ants-deny
+    - tame-geese-deliver
 "@typesql/language-server@0.0.1":
   dir: packages/language-server
   intents:
@@ -606,6 +629,10 @@
   intents:
     - gentle-clouds-float
     - good-zebras-judge
+"@typesql/language-server@1.0.1":
+  dir: packages/language-server
+  intents:
+    - tidy-trees-buy
 "@typesql/pg@0.0.2":
   dir: packages/pg
   intents:
@@ -716,6 +743,11 @@
   dir: packages/pg
   intents:
     - modern-teeth-play
+"@typesql/pg@6.1.2":
+  dir: packages/pg
+  intents:
+    - loud-ants-deny
+    - wicked-roses-try
 "@typesql/postgres@0.0.2":
   dir: packages/postgres
   intents:
@@ -811,6 +843,11 @@
   dir: packages/postgres
   intents:
     - quiet-mugs-try
+"@typesql/postgres@6.1.2":
+  dir: packages/postgres
+  intents:
+    - loud-ants-deny
+    - modern-grapes-obey
 "@typesql/prisma@0.0.2":
   dir: packages/prisma
   intents:
@@ -900,6 +937,11 @@
   dir: packages/prisma
   intents:
     - smooth-teeth-punch
+"@typesql/prisma@6.1.2":
+  dir: packages/prisma
+  intents:
+    - loud-ants-deny
+    - rare-rivers-boil
 "@typesql/sqlite@0.0.1":
   dir: packages/sqlite
   intents:
@@ -945,6 +987,11 @@
   dir: packages/sqlite
   intents:
     - smooth-teeth-punch
+"@typesql/sqlite@6.1.2":
+  dir: packages/sqlite
+  intents:
+    - loud-ants-deny
+    - quick-clocks-fly
 typesql@0.0.1:
   dir: packages/vscode
   intents:

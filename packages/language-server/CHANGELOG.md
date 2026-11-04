@@ -1,5 +1,11 @@
 # @typesql/language-server
 
+## 1.0.1
+
+### Patch Changes
+
+- The exported `TypeScriptModules` type accepts the `SyntaxKind` enum of `typescript/ast` as it is, reverse mapping included, without a cast.
+
 ## 1.0.0
 
 ### Major Changes
