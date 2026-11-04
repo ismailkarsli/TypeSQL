@@ -10,7 +10,11 @@ TypeSQL checks every query against a schema: a TypeScript interface that lists y
 
 Each key of the interface is a table, and each column is declared with a helper:
 
-```ts
+::: code-group
+
+```ts [PostgreSQL]
+import type { Col, Enum, View } from "@typesql/core/postgres";
+
 export interface DB {
 	users: {
 		id: Col<"int4", { hasDefault: true }>;
@@ -31,14 +35,50 @@ export interface DB {
 }
 ```
 
+```ts [SQLite]
+import type { Col, Typed, View } from "@typesql/core/sqlite";
+
+export interface DB {
+	users: {
+		id: Col<"integer", { hasDefault: true }>;
+		email: Col<"text">;
+		display_name: Col<"text", { nullable: true }>;
+		mood: Col<Typed<"text", "happy" | "neutral" | "sad">, { hasDefault: true }>;
+		created_at: Col<"datetime", { hasDefault: true }>;
+	};
+	posts: {
+		id: Col<"integer", { hasDefault: true }>;
+		author_id: Col<"integer">;
+		title: Col<"text">;
+		body: Col<"text", { nullable: true }>;
+	};
+	user_stats: View<{ user_id: Col<"integer">; posts: Col<"integer"> }>;
+}
+```
+
+:::
+
+SQLite has no enum or array types: `mood` is a text column whose values are typed with [`Typed`](./sqlite#typed-values), and `posts` has no `tags`. The other pages of this guide use this schema.
+
 Then create `sql` from it with the dialect, or with your adapter's `createSql<DB>(client)`:
 
-```ts
+::: code-group
+
+```ts [PostgreSQL]
 import { createSql } from "@typesql/core";
 import { postgres } from "@typesql/core/postgres";
 
 export const sql = createSql<DB>(postgres);
 ```
+
+```ts [SQLite]
+import { createSql } from "@typesql/core";
+import { sqlite } from "@typesql/core/sqlite";
+
+export const sql = createSql<DB>(sqlite);
+```
+
+:::
 
 ## Column helpers
 
@@ -46,26 +86,31 @@ export const sql = createSql<DB>(postgres);
 |---|---|
 | `Col<"text">` | `NOT NULL`, no default |
 | `Col<"text", { nullable: true }>` | `NULL` allowed |
-| `Col<"int4", { hasDefault: true }>` | has a default (serial, identity, `DEFAULT …`), so it is optional in `INSERT` |
+| `Col<"int4", { hasDefault: true }>` | has a default (serial, identity, SQLite's `INTEGER PRIMARY KEY`, `DEFAULT …`), so it is optional in `INSERT` |
 | `Col<"text", { nullable: true; hasDefault: true }>` | both: `NULL` allowed and has a default |
-| `Col<"int4[]">` | an array column; the flags work as for any column |
-| `Enum<"mood">` | a column of an enum type, with its values listed under `$types` |
-| `Json<T>` | a `jsonb` column holding `T`; see [typed JSON columns](#typed-json-columns) |
+| `Col<"int4[]">` | PostgreSQL: an array column; the flags work as for any column |
+| `Enum<"mood">` | PostgreSQL: a column of an enum type, with its values listed under `$types` |
+| `Col<Typed<"text", T>>` | SQLite: a column of that type whose values are typed as `T` |
+| `Json<T>` | a JSON column holding `T`; see [typed JSON columns](#typed-json-columns) |
 | `View<{ … }>` | a view: you can read from it, but `INSERT`, `UPDATE` and `DELETE` on it are errors |
 
 ## Type names
 
 Columns use the database's type names, not TypeScript types. This lets TypeSQL type expressions the way the database does. In PostgreSQL, `int4 + int8` is `int8`, and `timestamptz - timestamptz` is an `interval`.
 
-Common spellings mean the same thing: `integer`, `int` and `int4`; `bigint` and `int8`; `boolean` and `bool`; `character varying` and `varchar`; `double precision` and `float8`; `timestamp with time zone` and `timestamptz`. A name TypeSQL doesn't know, such as an extension type or a domain, is kept as it is. It maps to `unknown` unless the type map or `$types` gives it a type.
+In SQLite, a declared type name sets the column's affinity, as in `CREATE TABLE`: `varchar` is text and `bigint` is an integer, and `integer + real` is a real. See [SQLite types](./sqlite#types).
+
+In PostgreSQL, common spellings mean the same thing: `integer`, `int` and `int4`; `bigint` and `int8`; `boolean` and `bool`; `character varying` and `varchar`; `double precision` and `float8`; `timestamp with time zone` and `timestamptz`. A name TypeSQL doesn't know, such as an extension type or a domain, is kept as it is. It maps to `unknown` unless the type map or `$types` gives it a type.
 
 The driver decides which TypeScript type each database type becomes (node-postgres returns `int8` as a `string`, for example). This is the driver's **type map**, and you pick it by importing `createSql` from the driver's package. See [Type mapping](../reference/type-mapping).
 
 ## Typed JSON columns
 
-A `jsonb` column is `unknown` by default. `Json<T>` says what it holds:
+A `jsonb` column is `unknown` by default, and a SQLite JSON column is text. `Json<T>` says what it holds:
 
-```ts
+::: code-group
+
+```ts [PostgreSQL]
 type HistoryItem = { at: string; state: { value: number; note?: string } };
 
 interface DB {
@@ -79,15 +124,41 @@ interface DB {
 const sql = createSql<DB>(postgres);
 ```
 
-`Json<T>` takes the same flags as `Col` as its second argument (`{ nullable: true }`, `{ hasDefault: true }`). Pass `"json"` as the third argument for a `json` column.
+```ts [SQLite]
+type HistoryItem = { at: string; state: { value: number; note?: string } };
 
-Rows read the column as `T`, and `->`, `#>` and subscripts look inside it (see [JSON in queries](./queries#json)):
+interface DB {
+	portfolio: {
+		id: Col<"integer", { hasDefault: true }>;
+		name: Col<"text">;
+		history: Json<HistoryItem[], { hasDefault: true }>;
+		settings: Json<{ theme: "dark" | "light" }, { nullable: true }>;
+	};
+}
+const sql = createSql<DB>(sqlite);
+```
 
-```ts
+:::
+
+`Json<T>` takes the same flags as `Col` as its second argument (`{ nullable: true }`, `{ hasDefault: true }`). On PostgreSQL, pass `"json"` as the third argument for a `json` column.
+
+On PostgreSQL, rows read the column as `T`, and `->`, `#>` and subscripts look inside it (see [JSON in queries](./queries#json)). On SQLite, rows read the column as JSON text, and `->`, `->>` and `json_extract` with a constant path take their types from `T`:
+
+::: code-group
+
+```ts [PostgreSQL]
 const latest = sql(
 	`SELECT id, history -> -1 -> 'state' AS state, settings ->> 'theme' AS theme FROM portfolio`,
 );
 ```
+
+```ts [SQLite]
+const latest = sql(
+	`SELECT id, history ->> '$[#-1].state.value' AS value, settings ->> '$.theme' AS theme FROM portfolio`,
+);
+```
+
+:::
 
 Write values with [`sql.json()`](./parameters#json-values), which checks them against `T`:
 
@@ -97,9 +168,11 @@ const save = sql(
 );
 ```
 
-The column is still `jsonb` to Postgres, so JSON operators and functions work as usual. `T` is trusted, not checked against the database.
+The column is still `jsonb` to Postgres and text to SQLite, so JSON operators and functions work as usual. `T` is trusted, not checked against the database.
 
 ## Enums
+
+This section is about PostgreSQL. On SQLite, declare the column as `Col<Typed<"text", "happy" | "neutral" | "sad">>`; the query below types `mood` the same way.
 
 List each enum's values under `$types`. A column declared as `Enum<"mood">` then has the type `"happy" | "neutral" | "sad"`, in rows and in parameters:
 

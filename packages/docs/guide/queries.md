@@ -22,7 +22,7 @@ const joined = sql(`
   JOIN user_stats s ON s.user_id = u.id`);
 ```
 
-Views are read like tables. `posts` is a `string` here because `count(*)`-style `int8` values are strings under node-postgres. See [Type mapping](../reference/type-mapping).
+Views are read like tables. `posts` is a `string` here because `count(*)`-style `int8` values are strings under node-postgres; on SQLite it is a `number`. See [Type mapping](../reference/type-mapping).
 
 ## Narrowing with WHERE
 
@@ -41,15 +41,32 @@ Narrowing only goes through a top-level `AND`. `OR` and `NOT` never narrow.
 
 ## Column names
 
-A column you don't alias gets the name Postgres gives it:
+A column you don't alias gets the name the database gives it:
 
-```ts
+::: code-group
+
+```ts [PostgreSQL]
 const named = sql(`
   SELECT id + 1, lower(email), id::text, count(*) OVER (),
          CASE WHEN id > 10 THEN 'big' END,
          coalesce(display_name, email) AS name
   FROM users`);
+// { "?column?": number; lower: string; id: string; count: string; case: string | null; name: string }
 ```
+
+```ts [SQLite]
+const named = sql(`
+  SELECT id + 1, lower(email), CAST(id AS TEXT), count(*) OVER (),
+         CASE WHEN id > 10 THEN 'big' END,
+         coalesce(display_name, email) AS name
+  FROM users`);
+// { "id + 1": number; "lower(email)": string; "CAST(id AS TEXT)": string;
+//   "count(*) OVER ()": number; "CASE WHEN id > 10 THEN 'big' END": string | null; name: string }
+```
+
+:::
+
+SQLite names an expression by its text, exactly as written; see [SQLite result columns](./sqlite#result-columns). Postgres names it by the rules below:
 
 | Expression | Name |
 |---|---|
@@ -69,7 +86,9 @@ When two columns have the same name, the last one wins. The drivers build their 
 
 Attach `CasePlugin` to get camelCase row keys and write input keys. The inferred types and runtime values change together. SQL text and `sql.id()` keep the database's names.
 
-```ts
+::: code-group
+
+```ts [PostgreSQL]
 import { CasePlugin } from "@typesql/core";
 
 const camel = createSql<DB>(postgres, executor).withPlugin(new CasePlugin());
@@ -78,6 +97,18 @@ const rows = await camel(
 	"SELECT id, display_name, created_at, count(*) OVER () AS total_count FROM users",
 ).execute();
 ```
+
+```ts [SQLite]
+import { CasePlugin } from "@typesql/core";
+
+const camel = createSql<DB>(sqlite, executor).withPlugin(new CasePlugin());
+
+const rows = await camel(
+	"SELECT id, display_name, created_at, count(*) OVER () AS total_count FROM users",
+).execute();
+```
+
+:::
 
 The mapping is the default of Kysely's `CamelCasePlugin`: the first character stays, every later `_` is dropped, and the character after a `_` becomes upper case.
 
@@ -154,7 +185,7 @@ const totals = sql(
 const overall = sql(`SELECT count(*) AS n, max(title) AS last FROM posts`);
 ```
 
-Result types follow Postgres: `sum` of integers is `int8` (`numeric` for `int8` input), and `avg` is `numeric`.
+Result types follow the database. On Postgres, `sum` of integers is `int8` (`numeric` for `int8` input), and `avg` is `numeric`. On SQLite, `sum` of integers is an integer and `avg` a real, and an aggregate without `GROUP BY` also makes the bare columns next to it nullable.
 
 Window aggregates also account for frames that can be empty. `row_number()`, `rank()` and similar functions are non-null `int8`. `lag()` and `lead()` without a default are nullable; with a non-null value and a non-null default, they are non-null. `first_value()`, `last_value()` and `nth_value()` are nullable because their frame may contain no matching row.
 
@@ -181,6 +212,8 @@ const structured = sql(`
 - `DECLARE c CURSOR FOR query` checks the query, but `FETCH` has no row type, because the cursor's query is another statement. Assert one with `sql.as<Row>("FETCH 10 FROM c")`.
 
 ## JSON
+
+This section is about PostgreSQL. On SQLite, `json_object`, `json_array` and `json_group_array` return JSON text, typed as `string`, and a [typed JSON column](./schema#typed-json-columns) gives `->`, `->>` and `json_extract` their types.
 
 JSON you build in SQL is typed. Nested `json_agg` subqueries can replace a second round trip:
 
@@ -257,7 +290,9 @@ sql(`SELECT slugify(email) AS slug FROM users`);
 
 Declare your own functions and extension functions next to the tables, under `$functions`. The signatures use the notation of the [function catalog](../reference/api#function-catalog):
 
-```ts
+::: code-group
+
+```ts [PostgreSQL]
 interface AppDB extends DB {
 	$functions: {
 		slugify: Sig<["text"], "text">;
@@ -269,6 +304,23 @@ const slugs = appSql(
 	`SELECT slugify(email) AS slug, slugify(display_name) AS alt, rank_in(id, 1, 2) AS r FROM users`,
 );
 ```
+
+```ts [SQLite]
+interface AppDB extends DB {
+	$functions: {
+		slugify: Sig<["text"], "text">;
+		rank_in: Sig<["integer", "..."], "integer", { nullable: false }>;
+	};
+}
+const appSql = createSql<AppDB>(sqlite);
+const slugs = appSql(
+	`SELECT slugify(email) AS slug, slugify(display_name) AS alt, rank_in(id, 1, 2) AS r FROM users`,
+);
+```
+
+:::
+
+On SQLite, register the function with your driver too (`db.function()` in node:sqlite and better-sqlite3); see [SQLite functions](./sqlite#functions).
 
 You can also:
 

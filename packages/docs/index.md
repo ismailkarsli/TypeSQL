@@ -30,7 +30,9 @@ features:
     linkText: "Set it up"
 ---
 
-```ts
+::: code-group
+
+```ts [PostgreSQL]
 import { Pool } from "pg";
 import { createSql } from "@typesql/pg";
 import type { DB } from "./schema.js";
@@ -48,3 +50,23 @@ const recent = sql(
 
 const rows = await recent.execute();
 ```
+
+```ts [SQLite]
+import { DatabaseSync } from "node:sqlite";
+import { createSql } from "@typesql/sqlite";
+import type { DB } from "./schema.js";
+
+const sql = createSql<DB>(new DatabaseSync("app.db"));
+
+const recent = sql(
+	`SELECT u.id, u.email, p.title
+   FROM users u
+   LEFT JOIN posts p ON p.author_id = u.id
+   WHERE u.created_at > $1`,
+	"2026-01-01",
+);
+
+const rows = await recent.execute();
+```
+
+:::

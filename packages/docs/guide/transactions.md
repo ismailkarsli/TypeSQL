@@ -6,7 +6,9 @@ description: "Run several typed statements in one transaction with sql.transacti
 
 `sql.transaction(fn)` runs several statements in one transaction. It works the same way with every adapter.
 
-```ts
+::: code-group
+
+```ts [PostgreSQL]
 import { Pool } from "pg";
 import { createSql } from "@typesql/pg";
 
@@ -25,6 +27,28 @@ const userId = await sql.transaction(async (tx) => {
 	return id;
 });
 ```
+
+```ts [SQLite]
+import { DatabaseSync } from "node:sqlite";
+import { createSql } from "@typesql/sqlite";
+
+const sql = createSql<DB>(new DatabaseSync("app.db"));
+
+const userId = await sql.transaction(async (tx) => {
+	const { id } = await tx(
+		"INSERT INTO users (email) VALUES ($1) RETURNING id",
+		"ada@example.com",
+	).executeTakeFirstOrThrow();
+	await tx(
+		"INSERT INTO posts (author_id, title) VALUES ($1, $2)",
+		id,
+		"Hello",
+	).execute();
+	return id;
+});
+```
+
+:::
 
 `fn` receives `tx`, the same `sql` bound to the transaction. It has the same types and helpers as `sql`.
 
@@ -93,4 +117,4 @@ await sql.transaction(async (tx) => {
 | `@typesql/prisma` | `prisma.$transaction(fn)` (interactive) | `SAVEPOINT` on the transaction client |
 | `@typesql/drizzle` | `db.transaction(fn)` | Drizzle's nested `tx.transaction(fn)` (a savepoint) |
 
-More on each driver: [node-postgres](../adapters/pg), [postgres.js](../adapters/postgres), and [Kysely, Drizzle and Prisma](./orms).
+More on each driver: [node-postgres](../adapters/pg), [postgres.js](../adapters/postgres), [SQLite](../adapters/sqlite#transactions), and [Kysely, Drizzle and Prisma](./orms).

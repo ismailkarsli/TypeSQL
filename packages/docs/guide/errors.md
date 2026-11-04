@@ -14,10 +14,12 @@ sql("SELECT emial FROM users");
 
 The error has two parts:
 
-- **The message** uses the database's wording, so it reads like the error you would get at runtime.
+- **The message** uses the database's wording, so it reads like the error you would get at runtime: `column "emial" does not exist. Perhaps you meant the column "email"?` on PostgreSQL, `no such column: emial. Perhaps you meant the column "email"?` on SQLite.
 - **The position** (`1`) is the index of the offending token, counting words, operators and literals from 0. Here, `emial` is token 1.
 
 ## Common messages
+
+The messages below are PostgreSQL's. On SQLite, TypeSQL uses SQLite's messages for the same mistakes, such as `no such table: post` and `NOT NULL constraint failed: users.email`.
 
 | Mistake | Message |
 |---|---|
@@ -92,7 +94,9 @@ error TS2883: The inferred type of 'userQuery' cannot be named without a referen
 Any of these fixes it:
 
 - Re-export TypeSQL's types from the module that calls `createSql`. TypeScript then names them through that module:
-  ```ts
+  ::: code-group
+
+  ```ts [PostgreSQL]
   import { createSql } from "@typesql/core";
   import { postgres } from "@typesql/core/postgres";
 
@@ -100,5 +104,16 @@ Any of these fixes it:
   export type * from "@typesql/core";
   export type * from "@typesql/core/postgres";
   ```
+
+  ```ts [SQLite]
+  import { createSql } from "@typesql/core";
+  import { sqlite } from "@typesql/core/sqlite";
+
+  export const sql = createSql<DB>(sqlite, executor);
+  export type * from "@typesql/core";
+  export type * from "@typesql/core/sqlite";
+  ```
+
+  :::
 - Add `@typesql/core` to the exporting package's `dependencies`.
 - Export the rows (`execute*` results) instead of the query, or annotate the return type.

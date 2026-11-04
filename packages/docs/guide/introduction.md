@@ -6,7 +6,9 @@ description: "What TypeSQL is: describe your tables once, write SQL as a string,
 
 TypeSQL gives you exact TypeScript types for the SQL you write. You describe your tables once, write SQL as a string, and the compiler tells you what comes back:
 
-```ts
+::: code-group
+
+```ts [PostgreSQL]
 import { Pool } from "pg";
 import { createSql } from "@typesql/pg";
 import type { DB } from "./schema.js";
@@ -24,6 +26,26 @@ const recent = sql(
 
 const rows = await recent.execute();
 ```
+
+```ts [SQLite]
+import { DatabaseSync } from "node:sqlite";
+import { createSql } from "@typesql/sqlite";
+import type { DB } from "./schema.js";
+
+const sql = createSql<DB>(new DatabaseSync("app.db"));
+
+const recent = sql(
+	`SELECT u.id, u.email, p.title
+   FROM users u
+   LEFT JOIN posts p ON p.author_id = u.id
+   WHERE u.created_at > $1`,
+	"2026-01-01",
+);
+
+const rows = await recent.execute();
+```
+
+:::
 
 ## How it works
 

@@ -1,5 +1,5 @@
 ---
-description: "Go from an empty project to a typed SQL query in a few minutes with TypeSQL and PostgreSQL."
+description: "Go from an empty project to a typed SQL query in a few minutes with TypeSQL and PostgreSQL or SQLite."
 ---
 
 # Quick start
@@ -12,18 +12,29 @@ This page takes you from an empty project to a typed query in a few minutes.
 
 ## 1. Install
 
-This page uses node-postgres. [Installation](./installation) covers postgres.js, other package managers and the requirements.
+The examples come in two variants: PostgreSQL with node-postgres, and SQLite with node:sqlite. Pick one in any example and the page follows. [Installation](./installation) covers postgres.js, better-sqlite3, bun:sqlite, other package managers and the requirements.
 
-```sh
+::: code-group
+
+```sh [PostgreSQL]
 pnpm add @typesql/core @typesql/pg pg
 pnpm add -D typescript@7.1.0-beta
 ```
+
+```sh [SQLite]
+pnpm add @typesql/core @typesql/sqlite
+pnpm add -D typescript@7.1.0-beta
+```
+
+:::
 
 ## 2. Describe your tables
 
 A schema is a TypeScript interface. Each key is a table, and each column has a type name from your database.
 
-```ts
+::: code-group
+
+```ts [PostgreSQL]
 import type { Col } from "@typesql/core/postgres";
 
 export interface DB {
@@ -41,9 +52,29 @@ export interface DB {
 }
 ```
 
+```ts [SQLite]
+import type { Col } from "@typesql/core/sqlite";
+
+export interface DB {
+	users: {
+		id: Col<"integer", { hasDefault: true }>;
+		email: Col<"text">;
+		display_name: Col<"text", { nullable: true }>;
+		created_at: Col<"datetime", { hasDefault: true }>;
+	};
+	posts: {
+		id: Col<"integer", { hasDefault: true }>;
+		author_id: Col<"integer">;
+		title: Col<"text">;
+	};
+}
+```
+
+:::
+
 - `Col` is a `NOT NULL` column.
 - `{ nullable: true }` allows `NULL`.
-- `{ hasDefault: true }` means it has a default (`serial`, identity, `DEFAULT …`), so `INSERT` can leave it out.
+- `{ hasDefault: true }` means it has a default (`serial`, identity, SQLite's `INTEGER PRIMARY KEY`, `DEFAULT …`), so `INSERT` can leave it out.
 
 You can also generate it [from a live database](./introspect), derive it [from your migrations](./migrations), or take it [from Kysely, Drizzle or Prisma](./orms). [Declaring tables](./schema) lists every column helper.
 
@@ -51,7 +82,9 @@ You can also generate it [from a live database](./introspect), derive it [from y
 
 Pass the schema and your driver's client to `createSql`:
 
-```ts
+::: code-group
+
+```ts [PostgreSQL]
 import { Pool } from "pg";
 import { createSql } from "@typesql/pg";
 
@@ -59,9 +92,20 @@ const pool = new Pool({ connectionString: process.env["DATABASE_URL"] });
 const sql = createSql<DB>(pool);
 ```
 
+```ts [SQLite]
+import { DatabaseSync } from "node:sqlite";
+import { createSql } from "@typesql/sqlite";
+
+const sql = createSql<DB>(new DatabaseSync("app.db"));
+```
+
+:::
+
 ## 4. Write a query
 
-```ts
+::: code-group
+
+```ts [PostgreSQL]
 const recent = sql(
 	`SELECT u.id, u.email, p.title
    FROM users u
@@ -71,7 +115,19 @@ const recent = sql(
 );
 ```
 
-The `LEFT JOIN` makes `title` nullable, because a user may have no posts. `$1` takes the type of `created_at`, so it accepts a `Date`.
+```ts [SQLite]
+const recent = sql(
+	`SELECT u.id, u.email, p.title
+   FROM users u
+   LEFT JOIN posts p ON p.author_id = u.id
+   WHERE u.created_at > $1`,
+	"2026-01-01",
+);
+```
+
+:::
+
+The `LEFT JOIN` makes `title` nullable, because a user may have no posts. `$1` takes the type of `created_at`: a `Date` on PostgreSQL, and a string on SQLite, which has no date type.
 
 ## 5. Run it
 
@@ -84,7 +140,7 @@ const user = await sql(
 ).executeTakeFirstOrThrow();
 ```
 
-`executeTakeFirstOrThrow()` throws a `NoResultError` when there is no row. [node-postgres](../adapters/pg) lists all the `execute*` methods.
+`executeTakeFirstOrThrow()` throws a `NoResultError` when there is no row. [node-postgres](../adapters/pg#run-queries) lists all the `execute*` methods, which work the same on [SQLite](../adapters/sqlite#run-queries).
 
 The text goes to the database as you wrote it, and the values go as parameters:
 

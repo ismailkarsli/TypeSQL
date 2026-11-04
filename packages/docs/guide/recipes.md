@@ -4,13 +4,15 @@ description: "Short, type-checked answers to common SQL tasks with TypeSQL: opti
 
 # Recipes
 
-Short answers to common tasks. Every example is type-checked against the schema from [Declaring tables](./schema), with `sql` from `createSql<DB>(pool)` of `@typesql/pg`.
+Short answers to common tasks. Every example is type-checked against the schema from [Declaring tables](./schema), with `sql` from `createSql<DB>(pool)` of `@typesql/pg` or `createSql<DB>(database)` of `@typesql/sqlite`.
 
 ## Optional filters
 
 Use a named parameter twice: once to check for `NULL`, once to filter. Pass `null` to skip that filter:
 
-```ts
+::: code-group
+
+```ts [PostgreSQL]
 const found = sql(
 	`SELECT id, email FROM users
    WHERE (:email::text IS NULL OR email = :email)
@@ -19,7 +21,18 @@ const found = sql(
 );
 ```
 
-The cast (`::text`, `::int4`) types the `IS NULL` check. Each name is one parameter, sent once.
+```ts [SQLite]
+const found = sql(
+	`SELECT id, email FROM users
+   WHERE (:email IS NULL OR email = :email)
+     AND (:minId IS NULL OR id >= :minId)`,
+	{ email: filters.email, minId: filters.minId },
+);
+```
+
+:::
+
+On PostgreSQL, the cast (`::text`, `::int4`) types the `IS NULL` check; SQLite takes the type from the other use. Each name is one parameter, sent once.
 
 To leave a filter out of the statement instead, combine fragments with [`sql.and`](./using-sql#sql-and-items-sql-or-items):
 
@@ -57,9 +70,11 @@ To sort by several user-picked keys, use [`sql.combine` over an array](./dynamic
 
 ## Nested results in one query
 
-Build the nested rows with `json_agg` instead of running a second query. `coalesce(…, '[]')` turns "no rows" into an empty array:
+Build the nested rows with `json_agg` (SQLite: `json_group_array`) instead of running a second query. `coalesce(…, '[]')` turns "no rows" into an empty array:
 
-```ts
+::: code-group
+
+```ts [PostgreSQL]
 const authors = sql(`
   SELECT u.id, u.email,
          coalesce(
@@ -70,7 +85,20 @@ const authors = sql(`
   FROM users u`);
 ```
 
-Inside JSON, `int8` is a `number`, because that is how Postgres writes it. See [JSON](./queries#json).
+```ts [SQLite]
+const authors = sql(`
+  SELECT u.id, u.email,
+         coalesce(
+           (SELECT json_group_array(json_object('id', p.id, 'title', p.title))
+            FROM posts p WHERE p.author_id = u.id),
+           '[]'
+         ) AS posts
+  FROM users u`);
+```
+
+:::
+
+On PostgreSQL, `posts` is typed as an array of `{ id: number; title: string }`: inside JSON, `int8` is a `number`, because that is how Postgres writes it. See [JSON](./queries#json). On SQLite, it is JSON text, a `string`, for `JSON.parse`.
 
 ## Partial update from a PATCH body
 
@@ -103,9 +131,11 @@ const rows = sql.values("posts", newPosts);
 const created = sql(`INSERT INTO posts ${rows} RETURNING id`);
 ```
 
-For very large batches, send one array per column and `unnest` them. The statement text then stays the same size, whatever the number of rows, and array elements accept `null`:
+For very large batches, send the rows as one parameter: one array per column with `unnest` on PostgreSQL, or one JSON array with `json_each` on SQLite. The statement text then stays the same size, whatever the number of rows:
 
-```ts
+::: code-group
+
+```ts [PostgreSQL]
 const authorIds = newPosts.map((p) => p.author_id);
 const titles = newPosts.map((p) => p.title);
 const createdMany = sql(
@@ -114,3 +144,16 @@ const createdMany = sql(
 	titles,
 );
 ```
+
+```ts [SQLite]
+const createdMany = sql(
+	`INSERT INTO posts (author_id, title)
+   SELECT value ->> '$.author_id', value ->> '$.title' FROM json_each($1)
+   RETURNING id`,
+	sql.json(newPosts),
+);
+```
+
+:::
+
+On PostgreSQL, array elements accept `null`. On SQLite, the values inside the JSON are not checked against the columns, so validate `newPosts` first.
