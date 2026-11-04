@@ -1,0 +1,36 @@
+{
+	"name": "better-auth-postgres",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"setup": "node setup.ts",
+		"generate": "typesql introspect --out schema.ts",
+		"compile": "tsc -p tsconfig.json --pretty false",
+		"start": "node dist/app.js"
+	},
+	"dependencies": {
+		"@typesql/core": "workspace:*",
+		"@typesql/better-auth": "workspace:*",
+		"@typesql/cli": "workspace:*",
+		"@typesql/pg": "workspace:*",
+		"better-auth": "catalog:",
+		"pg": "catalog:",
+		"@types/pg": "catalog:",
+		"@better-fetch/fetch": "catalog:",
+		"better-call": "catalog:",
+		"jose": "catalog:",
+		"kysely": "catalog:",
+		"nanostores": "catalog:",
+		"zod": "catalog:"
+	},
+	"devDependencies": {
+		"typescript": "catalog:",
+		"@types/node": "catalog:"
+	},
+	"scenario": {
+		"database": "postgres",
+		"artifacts": [
+			"schema.ts"
+		]
+	}
+}

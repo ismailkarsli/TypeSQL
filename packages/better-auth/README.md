@@ -1,6 +1,6 @@
 # @typesql/better-auth
 
-Use [Better Auth](https://better-auth.com) with [TypeSQL](https://www.npmjs.com/package/@typesql/core). Better Auth stores its users and sessions through your TypeSQL `sql`, on PostgreSQL or SQLite.
+Use [Better Auth](https://better-auth.com) with [TypeSQL](https://www.npmjs.com/package/@typesql/core). Better Auth stores its users and sessions through your TypeSQL `sql`, on PostgreSQL or SQLite. See the [guide](https://typesql.karsli.net/guide/better-auth).
 
 ## Install
 
@@ -34,27 +34,17 @@ export const auth = betterAuth({
 | `dialect` | `"postgres"` or `"sqlite"`. It must match your `sql`. |
 | `transaction` | Run related writes in one transaction. Default `false`. |
 | `usePlural` | Use plural table names, like `users`. Default `false`. |
-| `debugLogs` | Log the adapter's queries. Default `false`. |
+| `debugLogs` | Log each adapter call Better Auth makes, with its input and result. `true` for every method, or an object such as `{ findOne: true }`. Default `false`. |
 
 Pass `sql` without plugins such as `CasePlugin`.
 
 ## Create the tables
 
-Better Auth's CLI can't create tables through this adapter. Use its migrator with the same database instead:
+The adapter doesn't create or migrate tables, and Better Auth's CLI can't generate a schema for it. Create Better Auth's tables with the migrations you already use. The [core schema](https://www.better-auth.com/docs/concepts/database#core-schema) lists the `user`, `session`, `account` and `verification` tables, and each plugin's page lists the tables and columns it adds. With `rateLimit: { storage: "database" }`, Better Auth also needs a `rateLimit` table.
 
-```ts
-import { getMigrations } from "better-auth/db/migration";
+The column names are the field names (`"emailVerified"`, `"userId"`), so quote them in PostgreSQL. On SQLite, store booleans as `integer` and dates as `text` or `date`: the adapter converts them.
 
-const { runMigrations, compileMigrations } = await getMigrations({
-  ...authOptions,
-  database: pool,
-});
-
-await runMigrations(); // create the tables
-console.log(await compileMigrations()); // or print the SQL
-```
-
-To check your own queries on these tables, add the printed SQL to a TypeSQL migration.
+To check your own queries on these tables, write the DDL as a [TypeSQL migration](https://typesql.karsli.net/guide/migrations), or [introspect](https://typesql.karsli.net/guide/introspect) the database after you create them.
 
 ## License
 

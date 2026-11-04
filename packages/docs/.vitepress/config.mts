@@ -123,6 +123,10 @@ export default withVersions({
 				],
 			},
 			{
+				text: "Integrations",
+				items: [{ text: "Better Auth", link: "/guide/better-auth" }],
+			},
+			{
 				text: "Editor",
 				items: [
 					{ text: "VS Code", link: "/guide/vscode" },

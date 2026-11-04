@@ -60,7 +60,7 @@ type Branded<D extends Dialect, Self> = [
 	Extract<keyof Self, BrandKey>,
 ] extends [never]
 	? { readonly "a TypeSQL sql": never }
-	: { readonly [K in BrandKey]?: Brand<D> };
+	: { readonly [K in BrandKey]?: Brand<D> | undefined };
 
 /** The `sql` of a TypeSQL driver or ORM package for dialect `D`, without plugins. */
 export type TypesqlAdapterSql<D extends Dialect, Self> = Runner &

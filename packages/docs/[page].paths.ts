@@ -17,6 +17,7 @@ const packages = [
 	{ dir: "drizzle", name: "@typesql/drizzle" },
 	{ dir: "prisma", name: "@typesql/prisma" },
 	{ dir: "cli", name: "@typesql/cli" },
+	{ dir: "better-auth", name: "@typesql/better-auth" },
 	{ dir: "language-server", name: "@typesql/language-server" },
 	{ dir: "vscode", name: "typesql", title: "VS Code extension" },
 ];

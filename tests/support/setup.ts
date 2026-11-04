@@ -68,6 +68,7 @@ async function environment() {
 				"drizzle",
 				"prisma",
 				"cli",
+				"better-auth",
 			].flatMap((name) => ["--filter", `@typesql/${name}`]),
 			"run",
 			"build",
