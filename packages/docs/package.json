@@ -5,11 +5,11 @@
 	"type": "module",
 	"description": "Documentation site for TypeSQL (VitePress).",
 	"scripts": {
-		"dev": "vitepress dev",
-		"build": "node build.ts",
+		"dev": "pnpm --filter @typesql/core build && vitepress dev",
+		"build": "pnpm --filter @typesql/core build && node build.ts",
 		"preview": "vitepress preview",
 		"deploy": "pnpm build && cf deploy",
-		"typecheck": "tsrs -p tsconfig.json"
+		"typecheck": "tsrs -p tsconfig.json && tsrs -p .vitepress/playground/tsconfig.json"
 	},
 	"dependencies": {
 		"@typesql/core": "workspace:*",
@@ -20,9 +20,18 @@
 		"@typesql/sqlite": "workspace:*"
 	},
 	"devDependencies": {
+		"@codemirror/lang-javascript": "^6.2.5",
+		"@codemirror/language": "^6.13.1",
+		"@codemirror/lint": "^6.9.7",
+		"@codemirror/state": "^6.7.6",
+		"@codemirror/view": "^6.43.15",
+		"@lezer/highlight": "^1.2.5",
+		"@tsrs/wasm": "0.20.1-ts7.1.0-beta",
 		"@types/node": "^26.6.6",
 		"@types/pg": "^8.23.1",
 		"cf": "1.0.0-beta.26",
+		"codemirror": "^6.0.2",
+		"lz-string": "^1.5.0",
 		"pg": "^8.23.1",
 		"postgres": "^4.0.0",
 		"tsrs": "0.20.1-ts7.1.0-beta",
