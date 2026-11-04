@@ -1,5 +1,16 @@
 # @typesql/cli
 
+## 6.1.3
+
+### Patch Changes
+
+- Rebuilt with updated development dependencies, with no change in behavior.
+
+- Updated dependencies:
+  - @typesql/core@6.1.3
+  - @typesql/pg@6.1.3
+  - @typesql/sqlite@6.1.3
+
 ## 6.1.2
 
 ### Patch Changes

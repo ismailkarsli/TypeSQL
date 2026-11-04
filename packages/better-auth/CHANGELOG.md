@@ -1,5 +1,11 @@
 # @typesql/better-auth
 
+## 6.1.3
+
+### Patch Changes
+
+- Rebuilt with updated development dependencies, with no change in behavior.
+
 ## 6.1.2
 
 ### Patch Changes

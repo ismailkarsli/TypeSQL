@@ -1,6 +1,6 @@
 {
 	"name": "@typesql/pg",
-	"version": "6.1.2",
+	"version": "6.1.3",
 	"description": "node-postgres (pg) adapter for TypeSQL, with the introspection behind `typesql introspect` (@typesql/cli).",
 	"license": "MIT",
 	"repository": {

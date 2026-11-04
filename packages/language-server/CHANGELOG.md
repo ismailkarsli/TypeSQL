@@ -1,5 +1,11 @@
 # @typesql/language-server
 
+## 1.0.2
+
+### Patch Changes
+
+- Rebuilt with updated development dependencies, with no change in behavior.
+
 ## 1.0.1
 
 ### Patch Changes

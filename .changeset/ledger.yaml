@@ -6,6 +6,10 @@
   dir: packages/better-auth
   intents:
     - tame-geese-deliver
+"@typesql/better-auth@6.1.3":
+  dir: packages/better-auth
+  intents:
+    - curvy-pens-obey
 "@typesql/cli@0.0.1":
   dir: packages/cli
   intents:
@@ -51,6 +55,10 @@
   dir: packages/cli
   intents:
     - tame-geese-deliver
+"@typesql/cli@6.1.3":
+  dir: packages/cli
+  intents:
+    - curvy-pens-obey
 "@typesql/core@0.0.2":
   dir: packages/core
   intents:
@@ -398,6 +406,10 @@
   intents:
     - afraid-bees-ask
     - loud-ants-deny
+"@typesql/core@6.1.3":
+  dir: packages/core
+  intents:
+    - curvy-pens-obey
 "@typesql/drizzle@0.0.2":
   dir: packages/drizzle
   intents:
@@ -482,6 +494,10 @@
   intents:
     - loud-ants-deny
     - weak-maps-rescue
+"@typesql/drizzle@6.1.3":
+  dir: packages/drizzle
+  intents:
+    - curvy-pens-obey
 "@typesql/kysely@0.0.2":
   dir: packages/kysely
   intents:
@@ -571,6 +587,10 @@
   intents:
     - loud-ants-deny
     - tame-geese-deliver
+"@typesql/kysely@6.1.3":
+  dir: packages/kysely
+  intents:
+    - curvy-pens-obey
 "@typesql/language-server@0.0.1":
   dir: packages/language-server
   intents:
@@ -633,6 +653,10 @@
   dir: packages/language-server
   intents:
     - tidy-trees-buy
+"@typesql/language-server@1.0.2":
+  dir: packages/language-server
+  intents:
+    - curvy-pens-obey
 "@typesql/pg@0.0.2":
   dir: packages/pg
   intents:
@@ -748,6 +772,10 @@
   intents:
     - loud-ants-deny
     - wicked-roses-try
+"@typesql/pg@6.1.3":
+  dir: packages/pg
+  intents:
+    - curvy-pens-obey
 "@typesql/postgres@0.0.2":
   dir: packages/postgres
   intents:
@@ -848,6 +876,10 @@
   intents:
     - loud-ants-deny
     - modern-grapes-obey
+"@typesql/postgres@6.1.3":
+  dir: packages/postgres
+  intents:
+    - curvy-pens-obey
 "@typesql/prisma@0.0.2":
   dir: packages/prisma
   intents:
@@ -942,6 +974,10 @@
   intents:
     - loud-ants-deny
     - rare-rivers-boil
+"@typesql/prisma@6.1.3":
+  dir: packages/prisma
+  intents:
+    - curvy-pens-obey
 "@typesql/sqlite@0.0.1":
   dir: packages/sqlite
   intents:
@@ -992,6 +1028,10 @@
   intents:
     - loud-ants-deny
     - quick-clocks-fly
+"@typesql/sqlite@6.1.3":
+  dir: packages/sqlite
+  intents:
+    - curvy-pens-obey
 typesql@0.0.1:
   dir: packages/vscode
   intents:
