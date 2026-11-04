@@ -228,8 +228,22 @@ for (const release of pending) {
 		console.log(
 			`would create ${release.tag} at ${release.commit.slice(0, 7)}${release === latest ? " (latest)" : ""}\n${notes}`,
 		);
-	} else {
+	} else if (justPublished.has(release.tag)) {
 		console.log(await create(release.tag, args));
+	} else {
+		// A catch-up release for an earlier run. GitHub refuses the Actions token a tag
+		// on a commit whose workflow files differ from main, so don't fail the release.
+		try {
+			console.log(await create(release.tag, args));
+		} catch (error) {
+			const stderr =
+				typeof error === "object" && error !== null && "stderr" in error
+					? String(error.stderr).trim()
+					: String(error);
+			console.log(
+				`::warning::${release.tag}: not created at ${release.commit.slice(0, 7)} (${stderr}); create it with gh outside Actions`,
+			);
+		}
 	}
 }
 

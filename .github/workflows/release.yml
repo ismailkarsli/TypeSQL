@@ -74,7 +74,9 @@ jobs:
           message=$(comm -13 <(sort <<<"$before") <(public | sort) | node tools/release-message.ts "${extension_args[@]}")
           git add -A
           release_commit=$(node tools/github-commit.ts main "$message")
-          git fetch origin "$release_commit"
+          # Fetch main, not only the commit, so origin/main contains it and
+          # tools/github-releases.ts creates the releases in this run.
+          git fetch origin main
           git reset --hard "$release_commit"
         env:
           GH_TOKEN: ${{ github.token }}
