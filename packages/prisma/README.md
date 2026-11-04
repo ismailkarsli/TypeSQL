@@ -30,10 +30,10 @@ import type { DB } from "./db/typesql";
 
 const sql = createSql<DB>(postgres, prisma);
 
-const users = await sql("SELECT id, display_name FROM users WHERE email = $1", email).execute();
+const users = await sql(`SELECT id, display_name FROM users WHERE email = ${sql.param(email)}`).execute();
 
 await sql.transaction(async (tx) => {
-  await tx("DELETE FROM posts WHERE author_id = $1", 1).execute();
+  await tx(`DELETE FROM posts WHERE author_id = ${tx.param(1)}`).execute();
 });
 ```
 

@@ -225,9 +225,8 @@ const columns = admin(
 	`
   SELECT column_name, data_type, is_nullable
   FROM information_schema.columns
-  WHERE table_schema = 'public' AND table_name = $1
+  WHERE table_schema = 'public' AND table_name = ${admin.param("users")}
   ORDER BY ordinal_position`,
-	"users",
 );
 ```
 

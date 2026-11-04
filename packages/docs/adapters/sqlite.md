@@ -22,8 +22,7 @@ import { createSql } from "@typesql/sqlite";
 
 const sql = createSql<DB>(new DatabaseSync("app.db"));
 const posts = await sql(
-  "SELECT id, title FROM posts WHERE author_id = $1",
-  1,
+  `SELECT id, title FROM posts WHERE author_id = ${sql.param(1)}`,
 ).execute();
 ```
 

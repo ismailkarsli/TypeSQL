@@ -81,12 +81,10 @@ const counts = await big(
 
 ```ts
 const maybe = await sql(
-	"SELECT id FROM users WHERE email = $1",
-	"x",
+	`SELECT id FROM users WHERE email = ${sql.param("x")}`,
 ).executeTakeFirst();
 const user = await sql(
-	"SELECT id, email FROM users WHERE id = $1",
-	7,
+	`SELECT id, email FROM users WHERE id = ${sql.param(7)}`,
 ).executeTakeFirstOrThrow();
 const changed = await sql(
 	"UPDATE users SET display_name = NULL",
@@ -104,13 +102,10 @@ Attach `.withPlugin(new CasePlugin())` (imported from `@typesql/core`) for [came
 ```ts
 const id = await sql.transaction(async (tx) => {
 	const { id } = await tx(
-		"INSERT INTO users (email) VALUES ($1) RETURNING id",
-		"a@b.c",
+		`INSERT INTO users (email) VALUES (${tx.param("a@b.c")}) RETURNING id`,
 	).executeTakeFirstOrThrow();
 	await tx(
-		"INSERT INTO posts (author_id, title) VALUES ($1, $2)",
-		id,
-		"Hello",
+		`INSERT INTO posts (author_id, title) VALUES (${tx.param(id)}, ${tx.param("Hello")})`,
 	).execute();
 	return id;
 });

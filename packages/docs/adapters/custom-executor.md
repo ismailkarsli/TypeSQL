@@ -19,7 +19,7 @@ import pg from "pg";
 const pool = new pg.Pool();
 const sql = createSql<DB>(postgres);
 
-const q = sql("SELECT id, email FROM users WHERE id = $1", 7);
+const q = sql(`SELECT id, email FROM users WHERE id = ${sql.param(7)}`);
 q.text;
 q.values;
 
@@ -38,9 +38,9 @@ import { createSql, executor } from "@typesql/pg";
 
 const client = await pool.connect();
 try {
-	await sql("UPDATE users SET display_name = NULL WHERE id = $1", 7).execute(
-		executor(client),
-	);
+	await sql(
+		`UPDATE users SET display_name = NULL WHERE id = ${sql.param(7)}`,
+	).execute(executor(client));
 	await createSql<DB>(client)(
 		"DELETE FROM posts WHERE author_id = $1",
 		7,
@@ -65,8 +65,7 @@ const onPool: Executor = async (text, values) => {
 const db = createSql<DB>(postgres, onPool);
 const users = await db("SELECT id FROM users").execute();
 const changed = await db(
-	"DELETE FROM posts WHERE author_id = $1",
-	7,
+	`DELETE FROM posts WHERE author_id = ${db.param(7)}`,
 ).executeCount();
 ```
 

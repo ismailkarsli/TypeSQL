@@ -72,15 +72,12 @@ const sql = createSql(postgres, db);
 const q = sql(
 	`SELECT u.email, u.mood, p.id, p.title
    FROM users u JOIN posts p ON p.author_id = u.id
-   WHERE u.mood = $1 AND p.published`,
-	"happy",
+   WHERE u.mood = ${sql.param("happy")} AND p.published`,
 );
 
-sql("SELECT s.expires_at FROM auth.sessions s WHERE s.user_id = $1", 1);
+sql(`SELECT s.expires_at FROM auth.sessions s WHERE s.user_id = ${sql.param(1)}`);
 sql(
-	"INSERT INTO posts (author_id, title) VALUES ($1, $2) RETURNING id",
-	1,
-	"Hello",
+	`INSERT INTO posts (author_id, title) VALUES (${sql.param(1)}, ${sql.param("Hello")}) RETURNING id`,
 );
 ```
 
@@ -109,8 +106,7 @@ const drafts = await sql(
 
 const published = await sql.transaction((tx) =>
 	tx(
-		"UPDATE posts SET published = true WHERE author_id = $1",
-		1,
+		`UPDATE posts SET published = true WHERE author_id = ${tx.param(1)}`,
 	).executeCount(),
 );
 
@@ -171,7 +167,7 @@ const camel = createSql<
 	{},
 	{ camelCase: true }
 >(postgres, camelDb);
-camel("SELECT author_id, created_at FROM blog_posts WHERE id = $1", 1);
+camel(`SELECT author_id, created_at FROM blog_posts WHERE id = ${camel.param(1)}`);
 ```
 
 Names are converted back to snake_case word by word, so a codegen name that dropped an underscore before a digit or single letter doesn't round-trip: `--camel-case` maps `a_b_c` to `aBC`, which reads back as `a_bc` (Kysely's own `CamelCasePlugin` does the same). Rename such columns, or leave `camelCase` off.
@@ -186,8 +182,7 @@ const camelRows = createSql<
 	{ camelCase: true }
 >(postgres, camelDb).withPlugin(new CasePlugin());
 const post = await camelRows(
-	"SELECT author_id, created_at FROM blog_posts WHERE id = $1",
-	1,
+	`SELECT author_id, created_at FROM blog_posts WHERE id = ${camelRows.param(1)}`,
 ).executeTakeFirstOrThrow();
 ```
 
@@ -262,18 +257,16 @@ const sql = createSql(postgres, db);
 const q = sql(
 	`SELECT u.email, u.display_name, p.title
    FROM users u JOIN posts p ON p.author_id = u.id
-   WHERE u.mood = $1`,
-	"happy",
+   WHERE u.mood = ${sql.param("happy")}`,
 );
 
 sql(
 	"SELECT h.email FROM happy_users h JOIN auth.sessions s ON s.user_id = h.id",
 );
 sql(
-	"INSERT INTO posts (author_id, title, slug) VALUES ($1, $2, $3) RETURNING id, created_at",
-	1,
-	"Hello",
-	"hello",
+	`INSERT INTO posts (author_id, title, slug)
+  VALUES (${sql.param(1)}, ${sql.param("Hello")}, ${sql.param("hello")})
+  RETURNING id, created_at`,
 );
 ```
 
@@ -298,14 +291,12 @@ import type { PgTypeMap } from "@typesql/pg";
 
 const pgSql = createSql<typeof schema, PgTypeMap>(postgres, db);
 const rows = await pgSql(
-	"SELECT id, title FROM posts WHERE author_id = $1",
-	1,
+	`SELECT id, title FROM posts WHERE author_id = ${pgSql.param(1)}`,
 ).execute();
 
 await pgSql.transaction(async (tx) => {
 	await tx(
-		"UPDATE posts SET title = upper(title) WHERE author_id = $1",
-		1,
+		`UPDATE posts SET title = upper(title) WHERE author_id = ${tx.param(1)}`,
 	).execute();
 });
 
@@ -401,8 +392,7 @@ import { postgres } from "@typesql/core/postgres";
 const sql = createSql<DB>(postgres, prisma);
 
 const q = sql(
-	`SELECT id, display_name, "updatedAt" FROM users WHERE role = $1`,
-	"guest",
+	`SELECT id, display_name, "updatedAt" FROM users WHERE role = ${sql.param("guest")}`,
 );
 
 const rows = await q.execute();
@@ -410,7 +400,7 @@ const stats = await sql(
 	"SELECT count(*) AS n, sum(views) AS views FROM posts",
 ).execute();
 const deleted = await sql.transaction((tx) =>
-	tx("DELETE FROM posts WHERE author_id = $1", 1).executeCount(),
+	tx(`DELETE FROM posts WHERE author_id = ${tx.param(1)}`).executeCount(),
 );
 ```
 
@@ -438,7 +428,7 @@ import { postgres } from "@typesql/core/postgres";
 import type { Prisma } from "./generated/prisma/client";
 
 const sql = createSql(postgres, prisma);
-sql('SELECT id, "createdAt" FROM "User" WHERE role = $1', "ADMIN");
+sql(`SELECT id, "createdAt" FROM "User" WHERE role = ${sql.param("ADMIN")}`);
 
 type DB = FromPrisma<Prisma.TypeMap, {
   User: {
@@ -466,7 +456,7 @@ import { sqlite } from "@typesql/core/sqlite";
 import { createSql } from "@typesql/kysely"; // or @typesql/drizzle, @typesql/prisma
 
 const sql = createSql(sqlite, db);
-const rows = await sql("SELECT id, title FROM posts WHERE author_id = $1", 1).execute();
+const rows = await sql(`SELECT id, title FROM posts WHERE author_id = ${sql.param(1)}`).execute();
 ```
 
 Statements are sent through the ORM as for PostgreSQL. Since some SQLite drivers only bind positional parameters, `$1`, `$2`, … are rewritten to `?` with the values in order. `sql.json(value)` is bound as JSON text.

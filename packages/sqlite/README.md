@@ -26,10 +26,10 @@ interface DB {
 
 const sql = createSql<DB>(new DatabaseSync("app.db"));
 
-const posts = await sql("SELECT id, title FROM posts WHERE author_id = $1", 1).execute();
+const posts = await sql(`SELECT id, title FROM posts WHERE author_id = ${sql.param(1)}`).execute();
 
 await sql.transaction(async (tx) => {
-  await tx("UPDATE posts SET title = upper(title) WHERE author_id = $1", 1).execute();
+  await tx(`UPDATE posts SET title = upper(title) WHERE author_id = ${tx.param(1)}`).execute();
 });
 ```
 

@@ -190,8 +190,7 @@ interface AppMap extends Omit<DefaultTypeMap, "timestamptz"> {
 }
 const app = createSql<DB, AppMap>(postgres);
 const recent = app(
-	"SELECT id, created_at FROM users WHERE created_at > $1",
-	new Date(),
+	`SELECT id, created_at FROM users WHERE created_at > ${app.param(new Date())}`,
 );
 ```
 

@@ -100,8 +100,7 @@ Better Auth's tables are ordinary tables in your schema. Write their DDL as a [m
 
 ```ts
 const users = await sql(
-	'SELECT name, email, "emailVerified", image FROM "user" WHERE email = $1',
-	"ada@example.com",
+	`SELECT name, email, "emailVerified", image FROM "user" WHERE email = ${sql.param("ada@example.com")}`,
 ).execute();
 // ({ name: string; email: string; emailVerified: boolean; image: string | null })[]
 ```

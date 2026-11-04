@@ -30,7 +30,7 @@ export const init = migration("postgres", {
 type DB = SchemaOf<typeof init>;
 
 const sql = createSql<DB>(postgres);
-const q = sql("SELECT id, mood FROM users WHERE email = $1", "a@b.c");
+const q = sql(`SELECT id, mood FROM users WHERE email = ${sql.param("a@b.c")}`);
 ```
 
 | Piece | What it does |

@@ -129,8 +129,7 @@ const recent = sql(`
 
 declare const history: HistoryItem[];
 const save = sql(
-	`UPDATE portfolio SET history = ${sql.json(history)} WHERE name = $1`,
-	"a",
+	`UPDATE portfolio SET history = ${sql.json(history)} WHERE name = ${sql.param("a")}`,
 );
 ```
 

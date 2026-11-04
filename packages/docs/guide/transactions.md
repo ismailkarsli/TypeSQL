@@ -16,13 +16,10 @@ const sql = createSql<DB>(new Pool());
 
 const userId = await sql.transaction(async (tx) => {
 	const { id } = await tx(
-		"INSERT INTO users (email) VALUES ($1) RETURNING id",
-		"ada@example.com",
+		`INSERT INTO users (email) VALUES (${tx.param("ada@example.com")}) RETURNING id`,
 	).executeTakeFirstOrThrow();
 	await tx(
-		"INSERT INTO posts (author_id, title) VALUES ($1, $2)",
-		id,
-		"Hello",
+		`INSERT INTO posts (author_id, title) VALUES (${tx.param(id)}, ${tx.param("Hello")})`,
 	).execute();
 	return id;
 });
@@ -36,13 +33,10 @@ const sql = createSql<DB>(new DatabaseSync("app.db"));
 
 const userId = await sql.transaction(async (tx) => {
 	const { id } = await tx(
-		"INSERT INTO users (email) VALUES ($1) RETURNING id",
-		"ada@example.com",
+		`INSERT INTO users (email) VALUES (${tx.param("ada@example.com")}) RETURNING id`,
 	).executeTakeFirstOrThrow();
 	await tx(
-		"INSERT INTO posts (author_id, title) VALUES ($1, $2)",
-		id,
-		"Hello",
+		`INSERT INTO posts (author_id, title) VALUES (${tx.param(id)}, ${tx.param("Hello")})`,
 	).execute();
 	return id;
 });
@@ -50,7 +44,7 @@ const userId = await sql.transaction(async (tx) => {
 
 :::
 
-`fn` receives `tx`, the same `sql` bound to the transaction. It has the same types and helpers as `sql`.
+`fn` receives `tx`, the same `sql` bound to the transaction. It has the same types and helpers as `sql`, such as `tx.param()`.
 
 - When `fn` resolves, the transaction commits and `sql.transaction` resolves to `fn`'s result.
 - When `fn` throws, the transaction rolls back and the error is rethrown.
@@ -64,16 +58,12 @@ const userId = await sql.transaction(async (tx) => {
 ```ts
 const postId = await sql.transaction(async (tx) => {
 	const { id } = await tx(
-		"INSERT INTO posts (author_id, title) VALUES ($1, $2) RETURNING id",
-		7,
-		"Draft",
+		`INSERT INTO posts (author_id, title) VALUES (${tx.param(7)}, ${tx.param("Draft")}) RETURNING id`,
 	).executeTakeFirstOrThrow();
 	try {
 		await tx.transaction(async (inner) => {
 			await inner(
-				"UPDATE users SET display_name = $1 WHERE id = $2",
-				"Author",
-				7,
+				`UPDATE users SET display_name = ${inner.param("Author")} WHERE id = ${inner.param(7)}`,
 			).execute();
 		});
 	} catch {}
@@ -94,14 +84,10 @@ Once the callback's promise settles, executing queries on `tx` (including querie
 ```ts
 await sql.transaction(async (tx) => {
 	await tx(
-		"UPDATE users SET display_name = $1 WHERE id = $2",
-		"Ada",
-		1,
+		`UPDATE users SET display_name = ${tx.param("Ada")} WHERE id = ${tx.param(1)}`,
 	).execute();
 	await tx(
-		"UPDATE users SET display_name = $1 WHERE id = $2",
-		"Grace",
-		2,
+		`UPDATE users SET display_name = ${tx.param("Grace")} WHERE id = ${tx.param(2)}`,
 	).execute();
 });
 ```

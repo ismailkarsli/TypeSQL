@@ -139,8 +139,7 @@ const recent = sql(
 	`SELECT u.id, u.email, p.title
    FROM users u
    LEFT JOIN posts p ON p.author_id = u.id
-   WHERE u.created_at > $1`,
-	new Date("2026-01-01"),
+   WHERE u.created_at > ${sql.param(new Date("2026-01-01"))}`,
 );
 ```
 
@@ -149,14 +148,13 @@ const recent = sql(
 	`SELECT u.id, u.email, p.title
    FROM users u
    LEFT JOIN posts p ON p.author_id = u.id
-   WHERE u.created_at > $1`,
-	"2026-01-01",
+   WHERE u.created_at > ${sql.param("2026-01-01")}`,
 );
 ```
 
 :::
 
-The `LEFT JOIN` makes `title` nullable, because a user may have no posts. `$1` takes the type of `created_at`: a `Date` on PostgreSQL, and a string on SQLite, which has no date type.
+The `LEFT JOIN` makes `title` nullable, because a user may have no posts. `sql.param()` sends the date as a parameter, typed like `created_at`: a `Date` on PostgreSQL, and a string on SQLite, which has no date type.
 
 ## 5. Run it
 
@@ -164,14 +162,13 @@ The `LEFT JOIN` makes `title` nullable, because a user may have no posts. `$1` t
 const rows = await recent.execute();
 
 const user = await sql(
-	"SELECT email, display_name FROM users WHERE id = $1",
-	7,
+	`SELECT email, display_name FROM users WHERE id = ${sql.param(7)}`,
 ).executeTakeFirstOrThrow();
 ```
 
 `executeTakeFirstOrThrow()` throws a `NoResultError` when there is no row. [PostgreSQL](../adapters/postgresql#run-queries) lists all the `execute*` methods, which work the same on [SQLite](../adapters/sqlite#run-queries).
 
-The text goes to the database as you wrote it, and the values go as parameters:
+Each `sql.param()` becomes a `$n` in the text, and its value goes to the database as a parameter, never into the SQL:
 
 ```ts
 recent.text;
@@ -185,7 +182,7 @@ When the SQL is wrong, the error appears on the string, worded like the database
 ```ts
 sql("SELECT emial FROM users");
 
-sql("SELECT id FROM users WHERE id = $1", "7");
+sql(`SELECT id FROM users WHERE id = ${sql.param("7")}`);
 ```
 
 The number after the message is the position of the wrong token. [Errors and troubleshooting](./errors) explains how to read these.
@@ -193,7 +190,7 @@ The number after the message is the position of the wrong token. [Errors and tro
 ## Next steps
 
 - [Selecting data](./queries): joins, nullability, aggregates and JSON.
-- [Parameters](./parameters): `$1`, `:name` and inline `${sql.param(value)}`.
+- [Parameters](./parameters): inline `${sql.param(value)}`, `$1` and `:name`.
 - [Inserting and updating](./writing-data): `INSERT`, `UPDATE`, `DELETE` and `RETURNING`.
 - [Dynamic SQL](./dynamic-sql): build statements from pieces.
 - Editor support for [VS Code](./vscode) and [Neovim](./neovim): completions and highlighting inside your SQL strings.

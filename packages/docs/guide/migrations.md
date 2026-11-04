@@ -92,7 +92,7 @@ import { createSql } from "@typesql/pg";
 
 type DB = SchemaOf<typeof addBio>;
 const sql = createSql<DB>(pool);
-const q = sql("SELECT id, display_name, bio FROM users WHERE email = $1", "a@b.c");
+const q = sql(`SELECT id, display_name, bio FROM users WHERE email = ${sql.param("a@b.c")}`);
 ```
 
 ```ts [SQLite]
@@ -102,7 +102,7 @@ import { createSql } from "@typesql/sqlite";
 
 type DB = SchemaOf<typeof addBio>;
 const sql = createSql<DB>(new DatabaseSync("app.db"));
-const q = sql("SELECT id, display_name, bio FROM users WHERE email = $1", "a@b.c");
+const q = sql(`SELECT id, display_name, bio FROM users WHERE email = ${sql.param("a@b.c")}`);
 ```
 
 :::

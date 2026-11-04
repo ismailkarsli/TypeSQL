@@ -1,62 +1,16 @@
 ---
-description: "Pass values to SQL as positional, named or inline parameters, each typed from the column or expression it is used with."
+description: "Pass values to SQL as inline, positional or named parameters, each typed from the column or expression it is used with."
 ---
 
 # Parameters
 
-Values are always sent as parameters, never pasted into the SQL. You can write them in three ways, and in all three the parameter's type comes from where it is used.
+Values are always sent as parameters, never pasted into the SQL. You can write them in three ways, and in all three the parameter's type comes from where it is used. Inline values are the usual choice and are used throughout these docs. Positional and named parameters suit [`sql.prepare`](../reference/api#sql-prepare-text), whose values come later, and [a value used more than once](#a-value-used-more-than-once).
 
 | Style | Example | Values |
 |---|---|---|
+| Inline | ``WHERE id = ${sql.param(id)}`` | written in the SQL template |
 | Positional | `WHERE id = $1` | arguments after the SQL |
 | Named | `WHERE id = :id` | one object |
-| Inline | ``WHERE id = ${sql.param(id)}`` | written in the SQL template |
-
-## Positional: `$1`, `$2`, …
-
-The SQL is sent as written, and the values follow it as arguments:
-
-::: code-group
-
-```ts [PostgreSQL]
-const byId = sql(
-	"SELECT id, email FROM users WHERE id = $1 AND created_at > $2",
-	7,
-	new Date(),
-);
-```
-
-```ts [SQLite]
-const byId = sql(
-	"SELECT id, email FROM users WHERE id = $1 AND created_at > $2",
-	7,
-	new Date().toISOString(),
-);
-```
-
-:::
-
-SQLite's own `?`, `?NNN`, `@name` and `$name` placeholders are rejected; write `$n` or `:name` there too.
-
-A wrong argument is a normal TypeScript error:
-
-```ts
-sql("SELECT id FROM users WHERE id = $1", "7");
-```
-
-## Named: `:name`
-
-The call takes one object. TypeSQL rewrites the names to `$1`, `$2`, … in order of first use. A name used twice is one parameter.
-
-```ts
-const byEmail = sql(
-	"SELECT id FROM users WHERE email = :email OR display_name = :email",
-	{ email: "a@b.c" },
-);
-byEmail.text;
-```
-
-Only a colon directly followed by a name is one: `::` casts, `:=`, `: v` and colons inside strings, comments and dollar-quoted strings are not parameters. You can't mix `:name` and `$n` in one statement.
 
 ## Inline: `${sql.param(value)}`
 
@@ -86,7 +40,53 @@ Literals and objects are checked exactly: `sql.param("angry")` is an error for a
 A `sql.param()` value belongs to one statement. Using the same value in a second statement throws at runtime. To reuse a value, wrap it in a [fragment](./dynamic-sql), which can be spliced any number of times.
 :::
 
-Inline values mix with the other two styles: `$n` and `:name` parameters keep `$1…$k`, inline values are numbered after them, and values carried by [fragments](./dynamic-sql) come last.
+Inline values mix with positional and named parameters: `$n` and `:name` parameters keep `$1…$k`, inline values are numbered after them, and values carried by [fragments](./dynamic-sql) come last.
+
+## Positional: `$1`, `$2`, …
+
+The SQL is sent as written, and the values follow it as arguments:
+
+::: code-group
+
+```ts [PostgreSQL]
+const byId = sql(
+	"SELECT id, email FROM users WHERE id = $1 AND created_at > $2",
+	7,
+	new Date(),
+);
+```
+
+```ts [SQLite]
+const byId = sql(
+	"SELECT id, email FROM users WHERE id = $1 AND created_at > $2",
+	7,
+	new Date().toISOString(),
+);
+```
+
+:::
+
+SQLite's own `?`, `?NNN`, `@name` and `$name` placeholders are rejected; write `${sql.param()}`, `$n` or `:name` there too.
+
+A wrong argument is a normal TypeScript error:
+
+```ts
+sql("SELECT id FROM users WHERE id = $1", "7");
+```
+
+## Named: `:name`
+
+The call takes one object. TypeSQL rewrites the names to `$1`, `$2`, … in order of first use. A name used twice is one parameter.
+
+```ts
+const byEmail = sql(
+	"SELECT id FROM users WHERE email = :email OR display_name = :email",
+	{ email: "a@b.c" },
+);
+byEmail.text;
+```
+
+Only a colon directly followed by a name is one: `::` casts, `:=`, `: v` and colons inside strings, comments and dollar-quoted strings are not parameters. You can't mix `:name` and `$n` in one statement.
 
 ## A value used more than once
 

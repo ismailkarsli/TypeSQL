@@ -12,10 +12,9 @@ Every `sql.*` function that builds a fragment (`sql.fragment`, `sql.id`, `sql.co
 
 ```ts
 const column = sql.id("display_name");
-const recent = sql.fragment("u.id > $1", 10);
+const recent = sql.fragment(`u.id > ${sql.param(10)}`);
 const q = sql(
-	`SELECT ${column} FROM users u WHERE ${recent} AND u.email <> $1`,
-	"a@b.c",
+	`SELECT ${column} FROM users u WHERE ${recent} AND u.email <> ${sql.param("a@b.c")}`,
 );
 q.text;
 ```
@@ -35,8 +34,7 @@ A fragment's text is spliced in as it is, without parentheses, so operator prece
 declare const onlyRecent: boolean;
 declare const titlePrefix: string | undefined;
 const posts = sql(
-	`SELECT p.id FROM posts p WHERE p.author_id = $1 ${sql.optional(onlyRecent ? sql.fragment("AND p.id > $1", 100) : undefined)} ${sql.if(titlePrefix, (t) => sql.fragment(`AND p.title LIKE ${sql.param(`${t}%`)}`))}`,
-	7,
+	`SELECT p.id FROM posts p WHERE p.author_id = ${sql.param(7)} ${sql.optional(onlyRecent ? sql.fragment(`AND p.id > ${sql.param(100)}`) : undefined)} ${sql.if(titlePrefix, (t) => sql.fragment(`AND p.title LIKE ${sql.param(`${t}%`)}`))}`,
 );
 ```
 
@@ -56,7 +54,7 @@ byAuthor.values;
 The values a fragment carries are checked once it is spliced, whether they came as arguments, a `:name` object or `sql.param()`:
 
 ```ts
-const wrong = sql.fragment("AND p.author_id = $1", "seven");
+const wrong = sql.fragment(`AND p.author_id = ${sql.param("seven")}`);
 sql(`SELECT p.id FROM posts p WHERE true ${wrong}`);
 ```
 
@@ -65,7 +63,7 @@ Fragments can be reused in any number of statements. Each union member and each 
 To use one statement with different pieces, build it in a function:
 
 ```ts
-const mine = sql.fragment("p.author_id = $1", 7);
+const mine = sql.fragment(`p.author_id = ${sql.param(7)}`);
 const drafts = sql.fragment("p.title LIKE 'Draft%'");
 const titles = (filter: typeof mine | typeof drafts) =>
 	sql(`SELECT p.title FROM posts p WHERE ${filter}`);
@@ -77,8 +75,7 @@ You can interpolate a whole query too, for example into `IN (…)`:
 
 ```ts
 const authors = sql(
-	"SELECT author_id FROM posts GROUP BY author_id HAVING count(*) >= $1::int4",
-	3,
+	`SELECT author_id FROM posts GROUP BY author_id HAVING count(*) >= ${sql.param(3)}::int4`,
 );
 const prolific = sql(`SELECT email FROM users WHERE id IN (${authors})`);
 ```

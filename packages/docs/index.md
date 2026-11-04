@@ -44,8 +44,7 @@ const recent = sql(
 	`SELECT u.id, u.email, p.title
    FROM users u
    LEFT JOIN posts p ON p.author_id = u.id
-   WHERE u.created_at > $1`,
-	new Date("2026-01-01"),
+   WHERE u.created_at > ${sql.param(new Date("2026-01-01"))}`,
 );
 
 const rows = await recent.execute();
@@ -62,8 +61,7 @@ const recent = sql(
 	`SELECT u.id, u.email, p.title
    FROM users u
    LEFT JOIN posts p ON p.author_id = u.id
-   WHERE u.created_at > $1`,
-	"2026-01-01",
+   WHERE u.created_at > ${sql.param("2026-01-01")}`,
 );
 
 const rows = await recent.execute();

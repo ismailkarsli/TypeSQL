@@ -7,12 +7,10 @@ description: "Typed INSERT, UPDATE, DELETE and MERGE in TypeSQL, with helpers fo
 `INSERT`, `UPDATE`, `DELETE` and `MERGE` are checked against your schema like queries, and parameters take the types of the columns they are assigned to. This page covers what is checked, plus helpers for optional values, partial updates and bulk inserts.
 
 ```ts
-const created = sql(
-	"INSERT INTO users (email, display_name, mood) VALUES ($1, $2, $3) RETURNING id, created_at",
-	"a@b.c",
-	null,
-	"happy",
-);
+const created = sql(`
+  INSERT INTO users (email, display_name, mood)
+  VALUES (${sql.param("a@b.c")}, ${sql.param(null)}, ${sql.param("happy")})
+  RETURNING id, created_at`);
 ```
 
 With `RETURNING`, a statement has a row type. Without it, the row type is `never`: `execute()` resolves to `[]`, and `executeCount()` returns the number of affected rows. `executeTakeFirstOrThrow()` on such a statement always throws `NoResultError`:
@@ -21,9 +19,7 @@ With `RETURNING`, a statement has a row type. Without it, the row type is `never
 
 ```ts [PostgreSQL]
 const renamed = sql(
-	"UPDATE users SET display_name = $1 WHERE id = $2",
-	"Ada",
-	7,
+	`UPDATE users SET display_name = ${sql.param("Ada")} WHERE id = ${sql.param(7)}`,
 );
 const touched = sql(`
   UPDATE posts p SET title = upper(p.title)
@@ -34,9 +30,7 @@ const touched = sql(`
 
 ```ts [SQLite]
 const renamed = sql(
-	"UPDATE users SET display_name = $1 WHERE id = $2",
-	"Ada",
-	7,
+	`UPDATE users SET display_name = ${sql.param("Ada")} WHERE id = ${sql.param(7)}`,
 );
 const touched = sql(`
   UPDATE posts AS p SET title = upper(p.title)
@@ -104,8 +98,7 @@ declare const patch: {
 };
 const set = sql.set("users", patch);
 const patched = sql(
-	`UPDATE users SET ${set} WHERE id = $1 RETURNING id, display_name, mood`,
-	7,
+	`UPDATE users SET ${set} WHERE id = ${sql.param(7)} RETURNING id, display_name, mood`,
 );
 patched.text;
 ```
@@ -170,7 +163,7 @@ const patch = sql.set("portfolio", {
 	history: sql.json(history),
 	settings: { theme: "dark" },
 });
-const patched = sql(`UPDATE portfolio SET ${patch} WHERE id = $1`, 1);
+const patched = sql(`UPDATE portfolio SET ${patch} WHERE id = ${sql.param(1)}`);
 
 const rows = sql.values("portfolio", [
 	{ name: "a", history: sql.json(history) },
@@ -184,7 +177,7 @@ const patch = sql.set("portfolio", {
 	history: sql.json(history),
 	settings: sql.json({ theme: "dark" }),
 });
-const patched = sql(`UPDATE portfolio SET ${patch} WHERE id = $1`, 1);
+const patched = sql(`UPDATE portfolio SET ${patch} WHERE id = ${sql.param(1)}`);
 
 const rows = sql.values("portfolio", [
 	{ name: "a", history: sql.json(history) },

@@ -36,8 +36,7 @@ const sql = createSql<DB>(postgres);
 const query = sql(
   `SELECT u.email, p.title
    FROM users u LEFT JOIN posts p ON p.author_id = u.id
-   WHERE u.id = $1`,
-  7,
+   WHERE u.id = ${sql.param(7)}`,
 );
 
 sql("SELECT emial FROM users");

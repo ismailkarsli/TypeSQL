@@ -19,7 +19,7 @@ interface DB {
 }
 
 const sql = createSql<DB>(sqlite);
-const query = sql("SELECT id, email FROM users WHERE id = $1", 7);
+const query = sql(`SELECT id, email FROM users WHERE id = ${sql.param(7)}`);
 ```
 
 To run queries, use [`@typesql/sqlite`](../adapters/sqlite) (node:sqlite, better-sqlite3, bun:sqlite) or a [custom executor](../adapters/custom-executor).
