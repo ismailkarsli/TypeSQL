@@ -1,5 +1,14 @@
 # @typesql/pg
 
+## 6.0.3
+
+### Patch Changes
+
+- The READMEs no longer link to an online playground.
+
+- Updated dependencies:
+  - @typesql/core@6.0.3
+
 ## 6.0.2
 
 ### Patch Changes
