@@ -45,7 +45,7 @@ export function withVersions(
 	const { sitemap, ...rest } = config;
 	const site: UserConfig<DefaultTheme.Config> = {
 		...rest,
-		base: archive ? `/versions/${archive}/` : "/",
+		base: archive ? `/v${archive}/` : "/",
 		head,
 		themeConfig,
 	};

@@ -79,7 +79,7 @@ const versions: DocsVersion[] = [
 	},
 	...tags.map(({ version, files }) => ({
 		version,
-		base: `/versions/${version}/`,
+		base: `/v${version}/`,
 		pages: pages(files),
 	})),
 ];
@@ -133,12 +133,23 @@ try {
 		// Only the root site's redirects apply to Cloudflare's combined assets.
 		if (existsSync(join(output, "_redirects")))
 			rmSync(join(output, "_redirects"));
-		cpSync(output, join(dist, "versions", archiveVersion), { recursive: true });
+		cpSync(output, join(dist, `v${archiveVersion}`), { recursive: true });
 	}
-	// Links into the latest line's former archive open the same page at `/`.
+	// Links into the latest line's former archive open the same page at `/`,
+	// and links under the old `/versions/<line>/` prefix open its `/v<line>/`.
 	appendFileSync(
 		join(dist, "_redirects"),
-		`/versions/${latestVersion}/* /:splat 301\n/versions/${latestVersion} / 301\n`,
+		[
+			...[`/v${latestVersion}`, `/versions/${latestVersion}`].flatMap(
+				(prefix) => [`${prefix}/* /:splat 301`, `${prefix} / 301`],
+			),
+			...tags.flatMap(({ version }) => [
+				`/versions/${version}/* /v${version}/:splat 301`,
+				`/versions/${version} /v${version}/ 301`,
+			]),
+		]
+			.map((rule) => `${rule}\n`)
+			.join(""),
 	);
 } finally {
 	delete process.env.TYPESQL_DOCS_VERSION;

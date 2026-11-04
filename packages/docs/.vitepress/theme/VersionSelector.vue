@@ -26,7 +26,7 @@ function switchVersion(event: Event) {
 		<span :class="screenMenu ? 'version-label' : 'visually-hidden'">{{ screenMenu ? 'Version' : 'Documentation version' }}</span>
 		<span class="version-control">
 			<select
-				:value="theme.docsVersion === 'latest' ? '/' : `/versions/${theme.docsVersion}/`"
+				:value="theme.docsVersion === 'latest' ? '/' : `/v${theme.docsVersion}/`"
 				@change="switchVersion"
 			>
 				<option v-for="version in theme.docsVersions" :key="version.base" :value="version.base">
