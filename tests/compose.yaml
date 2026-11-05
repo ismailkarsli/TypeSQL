@@ -16,3 +16,35 @@ services:
       interval: 1s
       timeout: 5s
       retries: 60
+  mysql:
+    image: mysql:8.4@sha256:a0225d1ea6631c8bc2385dc4c2faba17bbf1834ecf369e1659a9a382bd8d5dd7
+    platform: linux/amd64
+    ports:
+      - "127.0.0.1:53306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: typesql
+      TZ: UTC
+    command: [mysqld, --default-time-zone=+00:00]
+    tmpfs:
+      - /var/lib/mysql
+    healthcheck:
+      test: [CMD-SHELL, mysqladmin ping -h 127.0.0.1 -uroot -ptypesql --silent]
+      interval: 1s
+      timeout: 5s
+      retries: 90
+  mariadb:
+    image: mariadb:11.8@sha256:c4124d1afa875e47f2892edf26b482fa54f796e2f342d3717a04ca091a22a9bd
+    platform: linux/amd64
+    ports:
+      - "127.0.0.1:53307:3306"
+    environment:
+      MARIADB_ROOT_PASSWORD: typesql
+      TZ: UTC
+    command: [mariadbd, --default-time-zone=+00:00]
+    tmpfs:
+      - /var/lib/mysql
+    healthcheck:
+      test: [CMD-SHELL, healthcheck.sh --connect --innodb_initialized]
+      interval: 1s
+      timeout: 5s
+      retries: 90

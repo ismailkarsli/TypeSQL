@@ -14,12 +14,12 @@ sql("SELECT emial FROM users");
 
 The error has two parts:
 
-- **The message** uses the database's wording, so it reads like the error you would get at runtime: `column "emial" does not exist. Perhaps you meant the column "email"?` on PostgreSQL, `no such column: emial. Perhaps you meant the column "email"?` on SQLite.
+- **The message** uses the database's wording, so it reads like the error you would get at runtime: `column "emial" does not exist. Perhaps you meant the column "email"?` on PostgreSQL, `no such column: emial. Perhaps you meant the column "email"?` on SQLite, `Unknown column 'emial'. Perhaps you meant the column "email"?` on MySQL and MariaDB.
 - **The position** (`1`) is the index of the offending token, counting words, operators and literals from 0. Here, `emial` is token 1.
 
 ## Common messages
 
-The messages below are PostgreSQL's. On SQLite, TypeSQL uses SQLite's messages for the same mistakes, such as `no such table: post` and `NOT NULL constraint failed: users.email`.
+The messages below are PostgreSQL's. On SQLite, TypeSQL uses SQLite's messages for the same mistakes, such as `no such table: post` and `NOT NULL constraint failed: users.email`, and on MySQL and MariaDB the server's, such as `Table 'post' doesn't exist` and `Field 'email' doesn't have a default value`.
 
 | Mistake | Message |
 |---|---|

@@ -8,7 +8,7 @@ Write [TypeSQL](https://www.npmjs.com/package/@typesql/core) queries against you
 pnpm add @typesql/core @typesql/drizzle drizzle-orm
 ```
 
-Requires `drizzle-orm` 0.45 or later, before 1.0: on node-postgres or postgres.js for PostgreSQL, or any Drizzle SQLite driver.
+Requires `drizzle-orm` 0.45 or later, before 1.0: on node-postgres or postgres.js for PostgreSQL, any Drizzle SQLite driver, or mysql2, PlanetScale or TiDB Cloud serverless for MySQL and MariaDB.
 
 ## Usage
 
@@ -54,6 +54,10 @@ Good to know:
 ## SQLite
 
 For a SQLite database, pass `sqlite` from `@typesql/core/sqlite` instead: `createSql(sqlite, db)`. The schema is converted to SQLite types; see [SQLite](https://typesql.karsli.net/guide/orms#sqlite).
+
+## MySQL and MariaDB
+
+For a `drizzle-orm/mysql-core` schema on `drizzle-orm/mysql2`, pass `mysql` (or `mariadb`) from `@typesql/core/mysql`: `createSql(mysql, db)`. Queries run on the database's mysql2 pool or serverless client, so rows are typed the way that driver returns them (on PlanetScale or TiDB Cloud, pass `ServerlessTypeMap` as the second type argument). Drizzle's types don't record `unsigned` or the text size; pin those columns with `mysqlType`: `mysqlType(int("n", { unsigned: true }), "int unsigned")`. See [MySQL and MariaDB](https://typesql.karsli.net/guide/orms#mysql).
 
 ## Documentation
 

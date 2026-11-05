@@ -2,6 +2,7 @@ import type { PrismaPromise } from "@prisma/client/runtime/client";
 import type { Executor } from "@typesql/core";
 import {
 	JsonParam,
+	mysqlPositional,
 	positional,
 	runTransaction,
 	type SqlDriver,
@@ -21,25 +22,35 @@ export interface PrismaRawClient {
 const jsonText = <V>(value: V): V | string =>
 	value instanceof JsonParam ? JSON.stringify(value.value) : value;
 
+type DialectName = "postgres" | "sqlite" | "mysql" | "mariadb";
+
+/** The dialect of the client's active provider; MariaDB is Prisma's `mysql`. */
+const providerOf = (prisma: PrismaRawClient): DialectName => {
+	const provider =
+		"_activeProvider" in prisma ? prisma._activeProvider : undefined;
+	return provider === "sqlite" || provider === "mysql" ? provider : "postgres";
+};
+
 /**
  * An executor on `prisma`. SQLite's placeholders are used when `dialect` is
- * `"sqlite"`, or, without `dialect`, when the client's provider is SQLite.
+ * `"sqlite"` and MySQL's when it is `"mysql"` or `"mariadb"`; without
+ * `dialect`, those of the client's provider.
  */
 export function executor(
 	prisma: PrismaRawClient,
-	options: { readonly dialect?: "postgres" | "sqlite" } = {},
+	options: { readonly dialect?: DialectName } = {},
 ): Executor {
-	const onSqlite =
-		options.dialect === undefined
-			? "_activeProvider" in prisma && prisma._activeProvider === "sqlite"
-			: options.dialect === "sqlite";
-	const compile = onSqlite
-		? (text: string, values: readonly unknown[]) =>
-				positional(text, values, jsonText)
-		: (text: string, values: readonly unknown[]) => ({
-				text,
-				values: values.map(jsonText),
-			});
+	const dialect = options.dialect ?? providerOf(prisma);
+	const compile =
+		dialect === "sqlite"
+			? (text: string, values: readonly unknown[]) =>
+					positional(text, values, jsonText)
+			: dialect === "mysql" || dialect === "mariadb"
+				? mysqlPositional
+				: (text: string, values: readonly unknown[]) => ({
+						text,
+						values: values.map(jsonText),
+					});
 	return Object.assign(
 		(text: string, values: readonly unknown[]) => {
 			const q = compile(text, values);
@@ -74,5 +85,10 @@ export const driver: SqlDriver<PrismaRawClient> = {
 
 export const sqliteDriver: SqlDriver<PrismaRawClient> = {
 	executor: (prisma) => executor(prisma, { dialect: "sqlite" }),
+	transaction,
+};
+
+export const mysqlDriver: SqlDriver<PrismaRawClient> = {
+	executor: (prisma) => executor(prisma, { dialect: "mysql" }),
 	transaction,
 };

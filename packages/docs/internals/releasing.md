@@ -4,7 +4,7 @@ Releases use pnpm's [release management](https://pnpm.io/versioning): `pnpm chan
 intents, `pnpm version -r` turns them into versions and changelogs, and the `release` workflow
 publishes. Nothing is published from a local machine.
 
-`@typesql/core`, `pg`, `postgres`, `kysely`, `drizzle`, `prisma`, `sqlite`, `cli` and
+`@typesql/core`, `pg`, `postgres`, `kysely`, `drizzle`, `prisma`, `sqlite`, `mysql`, `cli` and
 `better-auth` form a fixed group: they always share one version, released at the highest bump
 among their intents. `@typesql/language-server` and the VS Code extension (`typesql`) have their
 own versions.
@@ -19,8 +19,8 @@ pnpm change @typesql/kysely --bump patch --summary "…"
 pnpm check:intents
 ```
 
-- The summary is the changelog entry: one sentence on what users now see, identifiers in
-  backticks.
+- The summary is the changelog entry: what users now see, in as many sentences as it takes,
+  identifiers in backticks.
 - Name only the packages you changed; dependents and the fixed group follow automatically.
 - `patch` for fixes, `major` for anything that could break users, `none` only for internal
   changes.
@@ -52,7 +52,7 @@ retried with **Re-run failed jobs**.
 Check that every version is live:
 
 ```sh
-for p in core pg postgres kysely drizzle prisma language-server sqlite cli better-auth; do pnpm view @typesql/$p version; done
+for p in core pg postgres kysely drizzle prisma language-server sqlite mysql cli better-auth; do pnpm view @typesql/$p version; done
 ```
 
 ## If publishing fails

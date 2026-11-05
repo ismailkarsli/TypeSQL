@@ -5,6 +5,7 @@ import {
 	parsePgUserArrays,
 	type SqlDriver,
 } from "@typesql/core/adapter";
+import type { DrizzleMysqlDatabase } from "./mysql-client.js";
 import { type DrizzleSqliteDatabase, sqliteExecutor } from "./sqlite-client.js";
 
 export interface DrizzleDatabase {
@@ -12,25 +13,37 @@ export interface DrizzleDatabase {
 	transaction<T>(fn: (tx: DrizzleDatabase) => Promise<T>): Promise<T>;
 }
 
+type AnyDatabase =
+	| DrizzleDatabase
+	| DrizzleSqliteDatabase
+	| DrizzleMysqlDatabase;
+
 // Drizzle's SQLite databases have all() and run(); its PostgreSQL ones don't.
 export const isSqliteDatabase = (
-	db: DrizzleDatabase | DrizzleSqliteDatabase,
+	db: AnyDatabase,
 ): db is DrizzleSqliteDatabase =>
 	"all" in db &&
 	typeof db.all === "function" &&
 	"run" in db &&
 	typeof db.run === "function";
 
-// Every Drizzle database, on PostgreSQL or SQLite, has a session.
-export const isDrizzleDatabase = (
-	db: DrizzleDatabase | DrizzleSqliteDatabase,
-): db is DrizzleDatabase =>
+// Drizzle's PostgreSQL and SQLite databases keep their session under `_`.
+export const isDrizzleDatabase = (db: AnyDatabase): db is DrizzleDatabase =>
 	"_" in db &&
 	typeof db._ === "object" &&
 	db._ !== null &&
 	"session" in db._ &&
 	typeof db._.session === "object" &&
 	db._.session !== null &&
+	"transaction" in db &&
+	typeof db.transaction === "function";
+
+// Drizzle's MySQL databases keep their session on the instance.
+export const isMysqlDatabase = (db: AnyDatabase): db is DrizzleMysqlDatabase =>
+	"session" in db &&
+	typeof db.session === "object" &&
+	db.session !== null &&
+	"transaction" in db &&
 	typeof db.transaction === "function";
 
 interface PgQueryResult {

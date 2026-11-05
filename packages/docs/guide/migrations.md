@@ -68,10 +68,38 @@ export const addBio = migration(createUsers, {
 });
 ```
 
+```ts [MySQL]
+import { migration } from "@typesql/core/migration";
+
+export const createUsers = migration("mysql", {
+	name: "create-users",
+	up: async (db) => {
+		const users = await db.ddl(`CREATE TABLE users (
+			id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+			email VARCHAR(255) NOT NULL UNIQUE,
+			display_name VARCHAR(255)
+		)`);
+		await users("INSERT INTO users (email) VALUES ($1)", "ada@example.com").execute();
+		return users;
+	},
+	down: async (db) => {
+		await db.ddl("DROP TABLE users");
+	},
+});
+
+export const addBio = migration(createUsers, {
+	name: "add-bio",
+	up: async (db) => db.ddl("ALTER TABLE users ADD COLUMN bio TEXT"),
+	down: async (db) => {
+		await db.ddl("ALTER TABLE users DROP COLUMN bio");
+	},
+});
+```
+
 :::
 
 - `name` is the migration's name in the [history](#tracking). A migration in an [array](#an-array) needs one; a [migration file](#a-directory-of-files) is named by its file name and leaves it out.
-- `from` is `"postgres"` or `"sqlite"` for the first migration, which starts from an empty schema of that dialect, and the previous migration for a later one.
+- `from` is `"postgres"`, `"sqlite"`, `"mysql"` or `"mariadb"` for the first migration, which starts from an empty schema of that dialect, and the previous migration for a later one.
 - `up`'s `db` starts from the schema `from` leaves. `down`'s `db` starts from what `up` returns.
 - Await `db.ddl(ddl)`: it runs the statement and returns a new context with the changed schema. Keep it in a new `const`; reassigning a variable doesn't change its type. A wrong statement is a compile error on its string, worded like the database's error: `relation "users" already exists`, `column "age" of relation "users" does not exist`, and so on. One `.ddl()` may hold a `;`-separated script, which may also seed data: its `SELECT`, `INSERT`, `UPDATE` and `DELETE` statements are checked against the schema at that point, without changing it. For parameters or result rows, call the context instead (below). `.add()` is a deprecated alias of `.ddl()`; use `.ddl()` in new code.
 - `up` must return its final context; a no-op `up` returns `db`. If it doesn't, passing its migration to the next `migration()` is a compile error.
@@ -107,11 +135,11 @@ const q = sql(`SELECT id, display_name, bio FROM users WHERE email = ${sql.param
 
 :::
 
-`SchemaOf` is also exported from `@typesql/core`. A migration that starts from `"sqlite"` is checked with [SQLite's rules](../adapters/sqlite#schema).
+`SchemaOf` is also exported from `@typesql/core`. A migration that starts from `"sqlite"` is checked with [SQLite's rules](../adapters/sqlite#schema), and one that starts from `"mysql"` or `"mariadb"` with [MySQL's](../adapters/mysql#migrations); the two differ only where the servers do.
 
 ### Starting from an existing schema
 
-`migration()` always starts the first migration from an empty schema. If the database already has tables that no migration creates, type the first migration's `db` yourself, with `PostgresMigration<Existing>` or `SqliteMigration<Existing>` from `@typesql/core/migration`, where `Existing` is the schema (for example one written by [`typesql introspect`](./introspect)):
+`migration()` always starts the first migration from an empty schema. If the database already has tables that no migration creates, type the first migration's `db` yourself, with `PostgresMigration<Existing>`, `SqliteMigration<Existing>`, `MySqlMigration<Existing>` or `MariaDbMigration<Existing>` from `@typesql/core/migration`, where `Existing` is the schema (for example one written by [`typesql introspect`](./introspect)):
 
 ::: code-group
 
@@ -253,6 +281,17 @@ const migrator = createMigrator({
 });
 ```
 
+```ts [MySQL]
+import { createMigrator } from "@typesql/core/migration";
+import { addBio, createUsers } from "./migrations.js";
+
+const migrator = createMigrator({
+	dialect: "mysql",
+	url: process.env.DATABASE_URL,
+	migrations: [createUsers, addBio],
+});
+```
+
 :::
 
 Each migration needs a `name`, unique in the array, which the history records it by. Each must start from the one before it in the array, and the first one from the migrator's dialect; the migrator checks this before it connects, so a misordered array fails without touching the database. The schema is `SchemaOf<typeof addBio>` of the last migration: there is no generated file, and the type checker infers the chain where the schema is used. The migrator carries it too: `SchemaOf<typeof migrator>`, or `SchemaOf<typeof result>` of what `latest()` returns. Array mode needs no file system, so it also runs [outside Node](#runtimes).
@@ -291,6 +330,18 @@ const migrator = createMigrator({
 const { applied } = await migrator.latest();
 ```
 
+```ts [MySQL]
+import { createMigrator } from "@typesql/core/migration";
+
+const migrator = createMigrator({
+	dialect: "mysql",
+	url: process.env.DATABASE_URL,
+	migrationsDir: "./migrations",
+});
+
+const { applied } = await migrator.latest();
+```
+
 :::
 
 | Method | Does | Returns |
@@ -315,8 +366,8 @@ const { applied } = await migrator.latest();
 
 | Option | Meaning |
 |---|---|
-| `dialect` | `"postgres"` or `"sqlite"` |
-| `url` | PostgreSQL: a connection URL. The migrator connects with `pg`, an optional peer dependency of `@typesql/core`: install it |
+| `dialect` | `"postgres"`, `"sqlite"`, `"mysql"` or `"mariadb"` |
+| `url` | PostgreSQL, MySQL and MariaDB: a connection URL (`mysql://user:password@host:3306/db` names the database). The migrator connects with `pg` or `mysql2`, optional peer dependencies of `@typesql/core`: install the one you use |
 | `db` | SQLite: a database file, opened with `node:sqlite` |
 | `execute` | your own connection: an [executor](../adapters/custom-executor#write-an-executor), used for every call and never closed |
 | `migrationsDir` | a directory of migration files |
@@ -326,7 +377,7 @@ const { applied } = await migrator.latest();
 | `generate` | directory mode: write the DB file after `latest()`, `up()` and `down()`; default `true` |
 | `transaction` | run each migration in a transaction and lock the history; default `true`. See [Transactions and locking](#transactions-and-locking) |
 
-Set exactly one of `migrationsDir` and `migrations`, and at most one of `url`, `db` and `execute`. `url` goes with `postgres` and `db` with `sqlite`. Relative paths resolve against the working directory (the command resolves those of its config file beside the file).
+Set exactly one of `migrationsDir` and `migrations`, and at most one of `url`, `db` and `execute`. `url` goes with `postgres`, `mysql` and `mariadb` (`mysql://` and `mariadb://` URLs both work for the last two) and `db` with `sqlite`. Relative paths resolve against the working directory (the command resolves those of its config file beside the file).
 
 With `url` or `db`, each method call opens one connection, runs all its migrations on it, one after another, and closes it. With `execute`, every statement runs on your executor, so give it one dedicated connection, not a pool: `BEGIN` and `COMMIT` must reach the same session. After each `BEGIN`, and before each `COMMIT`, the migrator checks that the executor's next call is still in that transaction, and fails before anything runs when it isn't. Prisma, a Kysely on a pool and libsql's client send each call to any connection: with Kysely, run the migrator inside `db.connection().execute((connection) => …)` with `executor(connection)`; with Prisma, give it `url`; with libsql, set `transaction: false`. Each adapter's `executor(client)` builds an executor, and uses SQLite's placeholders when the client is on SQLite:
 
@@ -357,15 +408,27 @@ try {
 }
 ```
 
+```ts [MySQL]
+import { createConnection } from "mysql2/promise";
+import { executor } from "@typesql/mysql";
+
+const connection = await createConnection(process.env.DATABASE_URL!);
+try {
+	await migrator.with({ execute: executor(connection) }).latest();
+} finally {
+	await connection.end();
+}
+```
+
 :::
 
-On PostgreSQL the migrator sends each `.ddl()` and `.raw()` text as one call without values, and node-postgres and postgres.js run every statement of a `;`-separated script. On SQLite, where a prepared statement runs only the first, it sends each statement of the script as a call of its own.
+On PostgreSQL the migrator sends each `.ddl()` and `.raw()` text as one call without values, and node-postgres and postgres.js run every statement of a `;`-separated script. On SQLite, where a prepared statement runs only the first, it sends each statement of the script as a call of its own, and so on MySQL and MariaDB.
 
 `with(overrides)` returns a new migrator. Giving one of `url`, `db` and `execute` replaces the others, and giving `migrationsDir` or `migrations` replaces the other one; `undefined` values are ignored.
 
 ## The `typesql migrate` command
 
-`@typesql/cli` runs a migrator from the command line. It needs Node.js 26 or newer. Install it with `@typesql/core`, and `pg` for PostgreSQL:
+`@typesql/cli` runs a migrator from the command line. It needs Node.js 26 or newer. Install it with `@typesql/core`, and `pg` for PostgreSQL or `mysql2` for MySQL and MariaDB:
 
 ::: code-group
 
@@ -377,6 +440,11 @@ pnpm add -D @typesql/cli pg
 ```sh [SQLite]
 pnpm add @typesql/core
 pnpm add -D @typesql/cli
+```
+
+```sh [MySQL]
+pnpm add @typesql/core
+pnpm add -D @typesql/cli mysql2
 ```
 
 :::
@@ -409,6 +477,17 @@ export default createMigrator({
 });
 ```
 
+```ts [MySQL]
+// typesql.config.ts
+import { createMigrator } from "@typesql/core/migration";
+
+export default createMigrator({
+	dialect: "mysql",
+	url: process.env.DATABASE_URL,
+	migrationsDir: "./migrations",
+});
+```
+
 :::
 
 A plain config object is an error. Relative paths in the config (`migrationsDir`, `schemaFile`, `db`) resolve beside the config file, and `schemaFile` defaults to `db.ts` beside it. An array config can import its migrations as TypeScript does, `import { all } from "./migrations.js"` for `migrations.ts`: Node loads the config with type stripping, and the command maps a relative `.js` import of a `.ts` file outside `node_modules` to the `.ts` file when there is no `.js` one.
@@ -425,8 +504,8 @@ pnpm exec typesql migrate generate              # write db.ts, without a databas
 | Flag | Does |
 |---|---|
 | `--config <file>` | the config module; default `./typesql.config.ts` |
-| `--dialect <name>` | `postgres` or `sqlite` |
-| `--url <url>` | PostgreSQL URL; default `$DATABASE_URL` when neither the config nor a flag sets a connection |
+| `--dialect <name>` | `postgres`, `sqlite`, `mysql` or `mariadb` |
+| `--url <url>` | PostgreSQL, MySQL or MariaDB URL; default `$DATABASE_URL` when neither the config nor a flag sets a connection |
 | `--db <file>` | SQLite database file |
 | `--dir <directory>` | migrations directory |
 | `--out <file>` | the DB file to write |
@@ -452,7 +531,7 @@ export default migration(previous, {
 });
 ```
 
-The first file starts from `"postgres"` or `"sqlite"`, and a file after a 3.x file imports its `up`: `import { up as previous } from "./….js"`.
+The first file starts from `"postgres"`, `"sqlite"`, `"mysql"` or `"mariadb"`, and a file after a 3.x file imports its `up`: `import { up as previous } from "./….js"`.
 
 `status` prints one line per migration: `applied` or `pending`, the time it was applied, and its name.
 
@@ -460,7 +539,7 @@ The command exits with 0 on success, also when there was nothing to do and when 
 
 ## Tracking
 
-The history table has three columns: `name` (the primary key), `hash` and `applied_at`. `hash` is unused and left empty; TypeSQL 3.x stored a hash of each file there, and the column stays so 3.x tables keep working. The migrator creates the table when it is missing; on PostgreSQL it is in the connection's current schema. Rows are read in the order they were applied (`ORDER BY applied_at, name`); the migrator writes strictly increasing `applied_at` values so that two migrations applied in the same second keep their order.
+The history table has three columns: `name` (the primary key), `hash` and `applied_at`. `hash` is unused and left empty; TypeSQL 3.x stored a hash of each file there, and the column stays so 3.x tables keep working. The migrator creates the table when it is missing; on PostgreSQL it is in the connection's current schema, and on MySQL and MariaDB in the connection's database. Rows are read in the order they were applied (`ORDER BY applied_at, name`); the migrator writes strictly increasing `applied_at` values so that two migrations applied in the same second keep their order.
 
 Each database command (`latest()`, `up()`, `down()` and `status()`):
 
@@ -482,14 +561,15 @@ By default (`transaction: true`) each migration and its history row commit toget
 
 - **PostgreSQL** takes an advisory lock (`pg_advisory_xact_lock`) at the start of each migration's transaction, keyed by the database, schema and history table, and reads the history again after it, so concurrent runs apply each migration once, though their migrations may interleave. The lock ends with the transaction, so it is never left held on a pooled connection. Statements that can't run in a transaction block (`CREATE INDEX CONCURRENTLY`, `VACUUM`) fail. After `ALTER TYPE … ADD VALUE`, the new label can't be used until a later migration.
 - **SQLite** starts each migration with `BEGIN IMMEDIATE` and reads the history again after taking the write lock, so concurrent runs apply each migration once, though their migrations may interleave. `db` waits up to 30 seconds for another writer.
+- **MySQL and MariaDB** hold a `GET_LOCK` named lock for the run. They commit implicitly before and after every DDL statement (`CREATE`, `ALTER`, `DROP`, …), so a migration that fails can't be rolled back as a whole: the DDL that already ran stays applied, while the data changes since its last DDL statement roll back and no history row is written. The `MigrationError` then reports `rolledBack: false`; fix the database by hand, or write migrations whose statements can run again, before retrying.
 
 With `transaction: false`, the migrator sends no `BEGIN` or `COMMIT` and takes no lock. Use it only where the database or client doesn't support them (Cloudflare D1, libsql's client), or to apply a single migration that can't run in a transaction: `migrator.with({ transaction: false }).up()`. It is not safe for concurrent runs, and a migration that fails partway leaves its earlier statements applied and no history row, so fix the database before running it again.
 
 ## Runtimes
 
-`@typesql/core/migration` imports no Node built-ins when it loads. The Node-only parts load when they are used: reading a directory, connecting from `url` (`pg`) or `db` (`node:sqlite`), `make()` and `generate()`. So array mode with `execute` runs in Cloudflare Workers, Bun and Deno.
+`@typesql/core/migration` imports no Node built-ins when it loads. The Node-only parts load when they are used: reading a directory, connecting from `url` (`pg` or `mysql2`) or `db` (`node:sqlite`), `make()` and `generate()`. So array mode with `execute` runs in Cloudflare Workers, Bun and Deno.
 
-Bundlers (esbuild, `bun build`, Wrangler) include the Node-only parts, which reach Node's built-ins through `process.getBuiltinModule()` and so leave a Worker bundle nothing to resolve. A Node bundle runs `url`, `db` and `migrationsDir` as unbundled code does, but `pg` and `typescript` (for `generate()`) are not bundled: they load from `node_modules` at runtime, so install them beside the bundle.
+Bundlers (esbuild, `bun build`, Wrangler) include the Node-only parts, which reach Node's built-ins through `process.getBuiltinModule()` and so leave a Worker bundle nothing to resolve. A Node bundle runs `url`, `db` and `migrationsDir` as unbundled code does, but `pg`, `mysql2` and `typescript` (for `generate()`) are not bundled: they load from `node_modules` at runtime, so install them beside the bundle.
 
 Cloudflare D1 doesn't accept `BEGIN` and `COMMIT`, so set `transaction: false`:
 
@@ -549,6 +629,18 @@ export interface DB {
 }
 ```
 
+```ts [MySQL]
+// Generated by `typesql migrate generate` from 1793356800_create-users.ts. Do not edit.
+import type { Col } from "@typesql/core/mysql";
+
+export interface DB {
+	users: {
+		id: Col<"int unsigned", { autoIncrement: true; position: 0 }>;
+		email: Col<"varchar", { position: 1 }>;
+	};
+}
+```
+
 :::
 
 Import `DB` in application code instead of `SchemaOf<typeof …>`, so the type checker doesn't infer the migrations there.
@@ -563,7 +655,7 @@ In array mode there is no DB file; use `SchemaOf<typeof last>` or `SchemaOf<type
 
 ## `ApplyDdl`
 
-`ApplyDdl<DB, "…">`, from `@typesql/core/postgres` or `@typesql/core/sqlite`, is the type behind `.ddl()`. It returns the schema after one DDL statement, or after a `;`-separated script:
+`ApplyDdl<DB, "…">`, from `@typesql/core/postgres`, `@typesql/core/sqlite` or `@typesql/core/mysql`, is the type behind `.ddl()`. It returns the schema after one DDL statement, or after a `;`-separated script:
 
 ::: code-group
 
@@ -595,6 +687,8 @@ type After = ApplyDdl<
 - **Checked without a schema change:** `SELECT`, `INSERT`, `UPDATE` and `DELETE`.
 - **Skipped:** indexes, sequences, triggers, extensions, grants and other statements.
 - **Columns:** `NOT NULL`, `PRIMARY KEY`, `serial` and identity columns are non-null; `DEFAULT`, `serial`, identity and generated columns are optional in `INSERT`; views keep the nullability their query infers.
+
+This list is PostgreSQL's; what MySQL and MariaDB DDL does to the schema is in [MySQL and MariaDB](../adapters/mysql#migrations).
 
 Known gaps:
 

@@ -1,5 +1,5 @@
 import { takeColumnValues } from "./inline.js";
-import { type CompiledSql, quoteIdent } from "./splice.js";
+import { type CompiledSql, quoteIdentWith } from "./splice.js";
 
 /** A column name with the value given for it. */
 export type ColumnEntry = readonly [column: string, value: unknown];
@@ -11,7 +11,10 @@ export function columnEntries<V>(value: V, message: string): ColumnEntry[] {
 	return Object.entries(value);
 }
 
-export function buildSet(entries: readonly ColumnEntry[]): CompiledSql {
+export function buildSet(
+	entries: readonly ColumnEntry[],
+	quote: '"' | "`" = '"',
+): CompiledSql {
 	const taken = takeColumnValues(entries.map(([, value]) => value));
 	const parts: string[] = [];
 	const out: unknown[] = [];
@@ -19,7 +22,7 @@ export function buildSet(entries: readonly ColumnEntry[]): CompiledSql {
 		const v = taken[i];
 		if (v === undefined) return;
 		out.push(v);
-		parts.push(`${quoteIdent(key)} = $${out.length}`);
+		parts.push(`${quoteIdentWith(quote, [key])} = $${out.length}`);
 	});
 	if (parts.length === 0)
 		throw new Error(
@@ -31,13 +34,14 @@ export function buildSet(entries: readonly ColumnEntry[]): CompiledSql {
 export function buildValues(
 	rows: readonly unknown[],
 	valuesDefault = true,
+	quote: '"' | "`" = '"',
+	emptyRow = "DEFAULT VALUES",
 ): CompiledSql {
 	if (rows.length === 0)
 		throw new Error(
 			"typesql: sql.values() needs at least one row; skip the INSERT when there is nothing to insert",
 		);
-	if (rows.length === 1 && !(0 in rows))
-		return { text: "DEFAULT VALUES", values: [] };
+	if (rows.length === 1 && !(0 in rows)) return { text: emptyRow, values: [] };
 	const columns: string[] = [];
 	const seen = new Set<string>();
 	const taken = rows.map((row) => {
@@ -58,7 +62,7 @@ export function buildValues(
 		return out;
 	});
 	if (columns.length === 0) {
-		if (rows.length === 1) return { text: "DEFAULT VALUES", values: [] };
+		if (rows.length === 1) return { text: emptyRow, values: [] };
 		throw new Error(
 			"typesql: sql.values() rows have no values; Postgres cannot insert several all-default rows with VALUES",
 		);
@@ -79,7 +83,7 @@ export function buildValues(
 		return `(${items.join(", ")})`;
 	});
 	return {
-		text: `(${columns.map((c) => quoteIdent(c)).join(", ")}) VALUES ${tuples.join(", ")}`,
+		text: `(${columns.map((c) => quoteIdentWith(quote, [c])).join(", ")}) VALUES ${tuples.join(", ")}`,
 		values: out,
 	};
 }

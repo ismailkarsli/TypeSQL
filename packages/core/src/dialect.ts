@@ -85,4 +85,8 @@ export interface Dialect<T extends DialectTypes = DialectTypes> {
 	readonly name: string;
 	readonly types?: T;
 	readonly valuesDefault?: boolean;
+	/** The identifier quote `sql.id`, `sql.set` and `sql.values` write; default `"`. */
+	readonly quote?: '"' | "`";
+	/** What `sql.values` writes for a row of defaults; default `DEFAULT VALUES`. */
+	readonly emptyRow?: string;
 }

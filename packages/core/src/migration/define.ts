@@ -1,5 +1,9 @@
 import type {
+	AnyMigrationContext,
+	MariaDbMigration,
+	MigrationDialect,
 	MissingSchema,
+	MySqlMigration,
 	PostgresMigration,
 	SqliteMigration,
 } from "./context.js";
@@ -55,11 +59,11 @@ type From =
 	| ((db: never) => Promise<{ readonly schema: unknown }>);
 
 /**
- * Define a migration. `from` is `"postgres"` or `"sqlite"` for the first
- * migration, and the previous migration for a later one. `up`'s `db` starts
- * from the schema `from` leaves; `down`'s `db` starts from what `up` returns.
- * `name` is its name in the history, which a migration in an array needs; a
- * migration file's name is its file name.
+ * Define a migration. `from` is `"postgres"`, `"sqlite"`, `"mysql"` or
+ * `"mariadb"` for the first migration, and the previous migration for a
+ * later one. `up`'s `db` starts from the schema `from` leaves; `down`'s `db`
+ * starts from what `up` returns. `name` is its name in the history, which a
+ * migration in an array needs; a migration file's name is its file name.
  *
  * The starting schema is inferred from `from` as a function argument rather
  * than computed by a type alias, so checking a migration costs the same
@@ -73,6 +77,14 @@ export function migration<After>(
 	from: "sqlite",
 	steps: MigrationSteps<SqliteMigration, After>,
 ): Migration<SqliteMigration, After>;
+export function migration<After>(
+	from: "mysql",
+	steps: MigrationSteps<MySqlMigration, After>,
+): Migration<MySqlMigration, After>;
+export function migration<After>(
+	from: "mariadb",
+	steps: MigrationSteps<MariaDbMigration, After>,
+): Migration<MariaDbMigration, After>;
 export function migration<Before extends { readonly schema: unknown }, After>(
 	from:
 		| { readonly up: (db: never) => Promise<Before> }
@@ -84,8 +96,7 @@ export function migration(
 	steps: MigrationSteps<never, unknown>,
 ): Migration<never, unknown> {
 	if (
-		from !== "postgres" &&
-		from !== "sqlite" &&
+		!DIALECTS.includes(from) &&
 		typeof from !== "function" &&
 		(from === null ||
 			typeof from !== "object" ||
@@ -95,7 +106,7 @@ export function migration(
 			typeof from.down !== "function")
 	)
 		throw new TypeError(
-			'typesql: migration() starts from "postgres", "sqlite" or the previous migration',
+			'typesql: migration() starts from "postgres", "sqlite", "mysql", "mariadb" or the previous migration',
 		);
 	if (
 		steps === null ||
@@ -119,13 +130,16 @@ export function migration(
 	return Object.freeze(defined);
 }
 
-export type Dialect = "postgres" | "sqlite";
+export type Dialect = MigrationDialect;
+
+/** The dialects a migration can start from, as the runtime check reads them. */
+const DIALECTS: readonly unknown[] = ["postgres", "sqlite", "mysql", "mariadb"];
 
 /**
  * A migration's `up` or `down` as the runner calls it: with the context of
  * the migrator's dialect. The runner awaits what it returns.
  */
-export type Step = (db: PostgresMigration | SqliteMigration) => void;
+export type Step = (db: AnyMigrationContext) => void;
 
 /**
  * Whether `value` is a function the runner can call as a step. The chain

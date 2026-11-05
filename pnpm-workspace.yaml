@@ -20,6 +20,7 @@ versioning:
       - "@typesql/drizzle"
       - "@typesql/prisma"
       - "@typesql/sqlite"
+      - "@typesql/mysql"
       - "@typesql/cli"
       - "@typesql/better-auth"
 linkWorkspacePackages: false
@@ -47,8 +48,11 @@ catalog:
   "@prisma/client": 7.10.1
   "@prisma/adapter-pg": 7.10.1
   "@prisma/adapter-better-sqlite3": 7.10.1
+  "@prisma/adapter-mariadb": 7.10.1
   better-sqlite3: 13.0.3
   "@types/better-sqlite3": 9.6.0
+  mysql2: 3.24.6
+  mariadb: 3.5.5
   bun: tool:1.4.4
   "@types/bun": 1.4.4
   better-auth: 1.7.17
@@ -93,3 +97,4 @@ minimumReleaseAgeExclude:
   - better-auth@1.7.17
   - better-call@1.4.5
   - tsrs@0.21.0-ts7.1.0-beta
+  - mariadb@3.5.5

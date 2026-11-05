@@ -109,6 +109,7 @@ export default withVersions({
 				items: [
 					{ text: "PostgreSQL", link: "/adapters/postgresql" },
 					{ text: "SQLite", link: "/adapters/sqlite" },
+					{ text: "MySQL and MariaDB", link: "/adapters/mysql" },
 					{ text: "Custom executor", link: "/adapters/custom-executor" },
 					{
 						text: "Plugins",

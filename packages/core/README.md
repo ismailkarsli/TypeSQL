@@ -44,6 +44,8 @@ sql("SELECT emial FROM users");
 
 For SQLite, import `sqlite` and the schema markers from `@typesql/core/sqlite` and use SQLite's type names (`integer`, `text`, `real`, `blob`). See [SQLite](https://typesql.karsli.net/adapters/sqlite).
 
+For MySQL and MariaDB, import `mysql` or `mariadb` and the schema markers from `@typesql/core/mysql` and use MySQL's type names (`int`, `bigint unsigned`, `varchar`, `datetime`). See [MySQL and MariaDB](https://typesql.karsli.net/adapters/mysql).
+
 ## Run queries
 
 `@typesql/core` types your queries. To run them, add the package for your driver or ORM:
@@ -53,6 +55,7 @@ For SQLite, import `sqlite` and the schema markers from `@typesql/core/sqlite` a
 | [`@typesql/pg`](https://www.npmjs.com/package/@typesql/pg) | node-postgres |
 | [`@typesql/postgres`](https://www.npmjs.com/package/@typesql/postgres) | postgres.js |
 | [`@typesql/sqlite`](https://www.npmjs.com/package/@typesql/sqlite) | node:sqlite, better-sqlite3, bun:sqlite |
+| [`@typesql/mysql`](https://www.npmjs.com/package/@typesql/mysql) | mysql2, the mariadb connector, PlanetScale and TiDB Cloud serverless |
 | [`@typesql/kysely`](https://www.npmjs.com/package/@typesql/kysely) | Kysely, with its `DB` interface as the schema |
 | [`@typesql/drizzle`](https://www.npmjs.com/package/@typesql/drizzle) | Drizzle, with its schema |
 | [`@typesql/prisma`](https://www.npmjs.com/package/@typesql/prisma) | Prisma Client, with its schema |
@@ -66,11 +69,11 @@ const findUser = sql.prepare("SELECT id, email FROM users WHERE id = $1");
 const query = findUser(7);
 ```
 
-Named parameters and fixed fragments work too. The `pg` and `postgres` adapters also request server-side preparation when these queries execute. See the [prepared query API](https://typesql.karsli.net/reference/api#sql-prepare-text).
+Named parameters and fixed fragments work too. The `pg`, `postgres` and `mysql` adapters also request server-side preparation when these queries execute. See the [prepared query API](https://typesql.karsli.net/reference/api#sql-prepare-text).
 
 ## Migrations
 
-`@typesql/core/migration` defines migrations whose DDL is checked as you write it, and runs them with a history table. `migration(from, { up, down })` starts from `"postgres"` or `"sqlite"`, or from the previous migration:
+`@typesql/core/migration` defines migrations whose DDL is checked as you write it, and runs them with a history table. `migration(from, { up, down })` starts from `"postgres"`, `"sqlite"`, `"mysql"` or `"mariadb"`, or from the previous migration:
 
 ```ts
 import { createMigrator, migration, type SchemaOf } from "@typesql/core/migration";
@@ -106,7 +109,7 @@ await createMigrator({
 
 Await each `.ddl()` and keep the context it returns: it carries the changed schema. `up` returns its final context.
 
-`createMigrator(config)` takes the migrations as an array or as a directory of files (`migrationsDir`, one default export per file, in filename order), and connects with `url` (PostgreSQL, through the optional peer dependency `pg`), `db` (a SQLite file, through node:sqlite) or your own `execute`. `latest()`, `up()` and `down()` run each migration and its history row in one transaction, under a lock for that migration, and each database command checks that the applied migrations, recorded by name (a migration's `name` in an array, its file name in a directory), are the first ones, in order. Array mode with `execute` loads no Node built-ins, so it runs in Cloudflare Workers, Bun and Deno; set `transaction: false` for Cloudflare D1. In directory mode, the migrator also writes the schema to `db.ts`, and [`@typesql/cli`](https://www.npmjs.com/package/@typesql/cli) runs it as `typesql migrate`.
+`createMigrator(config)` takes the migrations as an array or as a directory of files (`migrationsDir`, one default export per file, in filename order), and connects with `url` (PostgreSQL through the optional peer dependency `pg`; MySQL and MariaDB through `mysql2`), `db` (a SQLite file, through node:sqlite) or your own `execute`. `latest()`, `up()` and `down()` run each migration and its history row in one transaction, under a lock for that migration (MySQL and MariaDB commit DDL implicitly, so a failed migration keeps the DDL that already ran), and each database command checks that the applied migrations, recorded by name (a migration's `name` in an array, its file name in a directory), are the first ones, in order. Array mode with `execute` loads no Node built-ins, so it runs in Cloudflare Workers, Bun and Deno; set `transaction: false` for Cloudflare D1. In directory mode, the migrator also writes the schema to `db.ts`, and [`@typesql/cli`](https://www.npmjs.com/package/@typesql/cli) runs it as `typesql migrate`.
 
 See the [migration guide](https://typesql.karsli.net/guide/migrations).
 

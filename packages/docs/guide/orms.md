@@ -9,12 +9,12 @@ If Kysely, Drizzle or Prisma already describes your database, you don't need to 
 | Package | Schema from | Runs queries on |
 |---|---|---|
 | [`@typesql/kysely`](#kysely) | your Kysely `DB` interface (kysely-codegen, prisma-kysely or hand-written) | a `Kysely` instance or transaction |
-| [`@typesql/drizzle`](#drizzle) | your Drizzle schema module (`pgTable`, `pgView`, `pgEnum`, `pgSchema`, or `sqliteTable`, `sqliteView`) | the driver client under your Drizzle database (SQLite: the database itself) |
+| [`@typesql/drizzle`](#drizzle) | your Drizzle schema module (`pgTable`, `pgView`, `pgEnum`, `pgSchema`, or `sqliteTable`, `sqliteView`, or `mysqlTable`, `mysqlView`) | the driver client under your Drizzle database (SQLite: the database itself) |
 | [`@typesql/prisma`](#prisma) | the `typesql-prisma` generator, or Prisma Client's `Prisma.TypeMap` | Prisma Client or a transaction client |
 
 An ORM's types say less than the database does, so each conversion has a few gaps, which you can fill with overrides.
 
-Each package's `createSql` takes the SQL [dialect](../reference/api#dialects) as its first argument: `postgres` from `@typesql/core/postgres`, or `sqlite` from `@typesql/core/sqlite` (see [SQLite](#sqlite)). The schema comes from the ORM's database type, so `createSql(postgres, db)` needs no type argument; pass one (`createSql<DB>(postgres, db)`) to add overrides, pick a type map or build queries without a client. The type map defaults to the dialect's (`DefaultTypeMap`); `@typesql/prisma` defaults to `PrismaTypeMap`.
+Each package's `createSql` takes the SQL [dialect](../reference/api#dialects) as its first argument: `postgres` from `@typesql/core/postgres`, `sqlite` from `@typesql/core/sqlite` (see [SQLite](#sqlite)), or `mysql` or `mariadb` from `@typesql/core/mysql` (see [MySQL and MariaDB](#mysql)). The schema comes from the ORM's database type, so `createSql(postgres, db)` needs no type argument; pass one (`createSql<DB>(postgres, db)`) to add overrides, pick a type map or build queries without a client. The type map defaults to the dialect's (`DefaultTypeMap`); `@typesql/prisma` defaults to `PrismaTypeMap`.
 
 ::: tip
 For the exact Postgres types without overrides, [generate the schema from the database](./introspect) instead, and keep the ORM for the queries it builds.
@@ -308,7 +308,7 @@ await db.transaction(async (tx) => {
 });
 ```
 
-Rows are what the driver returns: Drizzle's column mappers and logger are not involved. Only node-postgres and postgres.js databases are supported.
+Rows are what the driver returns: Drizzle's column mappers and logger are not involved. For PostgreSQL, only node-postgres and postgres.js databases are supported.
 
 `drizzle-orm/postgres-js` turns off postgres.js' JSON, date and `numeric[]` serializers and parsers on its client. On that driver TypeSQL serializes `sql.json()` values, objects, `Date` parameters and arrays itself, and parses `date`, `timestamp` and `timestamptz` columns (and arrays of them, of any dimension) back to `Date` and `numeric[]` to arrays of strings, so rows match the default type map. A `timestamp` (without time zone) is read as UTC, as Drizzle's `timestamp()` does, so a `Date` comes back unchanged whatever the process time zone.
 
@@ -349,7 +349,7 @@ The other gaps (generated-always columns, `$onUpdate`, `.$type<T>()`, `text({ en
 pnpm add @typesql/core @typesql/prisma
 ```
 
-`@prisma/client` 7 or later is a peer dependency. Install the `prisma` CLI of the same major version (`pnpm add -D prisma@7` for Prisma Client 7). The `postgresql` and `sqlite` providers are supported; this section uses PostgreSQL, and [SQLite](#sqlite) covers the differences.
+`@prisma/client` 7 or later is a peer dependency. Install the `prisma` CLI of the same major version (`pnpm add -D prisma@7` for Prisma Client 7). The `postgresql`, `sqlite` and `mysql` providers are supported; this section uses PostgreSQL, and [SQLite](#sqlite) and [MySQL and MariaDB](#mysql) cover the differences.
 
 Prisma Client's types leave out the database names and native types, so `@typesql/prisma` has a generator that writes the exact schema. Add it to `schema.prisma`:
 
@@ -410,7 +410,7 @@ Only database defaults (`autoincrement()`, `now()`, `dbgenerated()`, literals) m
 |---|---|---|
 | `output` | required | a `.ts` file, or a directory (writes `index.ts`) |
 | `typeName` | `"DB"` | name of the exported interface |
-| `importFrom` | `"@typesql/core/postgres"` for PostgreSQL, `"@typesql/core/sqlite"` for SQLite | module `Col`, `View` and `Typed` are imported from |
+| `importFrom` | `"@typesql/core/postgres"` for PostgreSQL, `"@typesql/core/sqlite"` for SQLite, `"@typesql/core/mysql"` for MySQL | module `Col`, `View` and `Typed` are imported from |
 
 ### Running queries
 
@@ -480,3 +480,38 @@ Statements are sent through the ORM as for PostgreSQL. Since some SQLite drivers
 - **Kysely**: `number` can't say whether a column is `INTEGER` or `REAL`, so it is `numeric`; rows are `number` either way. Pin a column with an override (`{ posts: { id: "integer" } }`), as for PostgreSQL. `KyselySqliteSql` and `FromKyselySqlite` are the SQLite counterparts of `KyselySql` and `FromKysely`.
 - **Drizzle**: rows are what the driver returns, so an `integer({ mode: "boolean" })` column is `0` or `1` and a `timestamp` column is a number. `generatedAlwaysAs()` columns can't be written; `$defaultFn()` columns have no database default. `createSql(sqlite, db)` works with every Drizzle SQLite driver; on better-sqlite3 and bun:sqlite, `sql.transaction(fn)` runs `BEGIN` / `COMMIT` itself, since their Drizzle transactions can't await, and on the async drivers it uses `db.transaction(fn)`. With `drizzle-orm/sqlite-proxy`, return rows as objects for `all`, since TypeSQL reads columns by name. Pin a type with `sqliteType(builder, "text")`.
 - **Prisma**: the `typesql-prisma` generator writes a SQLite schema when the datasource provider is `sqlite`, importing from `@typesql/core/sqlite`. Rows are typed with `PrismaSqliteTypeMap`, which follows what Prisma's SQLite adapters return from `$queryRaw`: `DATETIME` columns are `Date`, `BIGINT` is `bigint`, `DECIMAL` is `Decimal`, `BOOLEAN` is `boolean` and `Json` columns are parsed. A computed column has no declared type, so Prisma returns its raw value: `max(created_at)` is a string, not a `Date`, and computed integers (`count(*)`, `1 + 1`, `length(email)`, `max(id)`) are `bigint`, although they are typed `number`. Cast them in SQL (`CAST(count(*) AS REAL)`) or convert them with `Number()`. `FromPrismaSqlite` converts `Prisma.TypeMap` without the generator.
+
+## MySQL and MariaDB {#mysql}
+
+All three packages also convert MySQL schemas. Pass `mysql` or `mariadb` instead of `postgres`, and the schema is typed with MySQL's type names and the [MySQL and MariaDB](../adapters/mysql) dialect's rules:
+
+```ts
+import { mysql } from "@typesql/core/mysql";
+import { createSql } from "@typesql/kysely"; // or @typesql/drizzle, @typesql/prisma
+
+const sql = createSql(mysql, db);
+const rows = await sql(`SELECT id, title FROM posts WHERE author_id = ${sql.param(1)}`).execute();
+```
+
+Statements are sent through the ORM's driver, with `$1`, `$2`, … rewritten to `?` and the values in order. `sql.json(value)` is bound as JSON text.
+
+| Kysely | Drizzle (`mysql-core`) | Prisma | MySQL type |
+|---|---|---|---|
+| `number` | `int` | `Int` | `int` |
+| | `tinyint`, `smallint`, `mediumint` | | the same |
+| `bigint`, a string that inserts from `bigint` | `bigint` (every `mode`) | `BigInt` | `bigint` |
+| | `serial` | | `bigint unsigned` |
+| a string that inserts from `number` | `decimal` (every `mode`) | `Decimal` | `decimal` |
+| | `float`, `double`, `real` | `Float` | `float`, `double` |
+| `string` | `varchar`, `char`, `text` | `String` | `varchar`, `char`, `text` |
+| a union of string literals | `mysqlEnum`, `varchar({ enum })` | an enum | `Typed<"enum", …>` or `Typed<"varchar", …>`, typed as the literals |
+| `boolean` | `boolean` | `Boolean` | `tinyint` |
+| `Date` | `datetime`, `timestamp` (every `mode`) | `DateTime` | `datetime`, `timestamp` |
+| | `date`, `time`, `year` | | the same |
+| `Uint8Array`, `Buffer` | `binary`, `varbinary` | `Bytes` | `blob`, `binary`, `varbinary`, `longblob` (Prisma) |
+| other objects | `json().$type<T>()` | `Json` | `Typed<"json", T>`, with typed JSON paths; Prisma: `json` |
+| `unknown` | `customType` | | `json` (Kysely), `unknown` (Drizzle) |
+
+- **Kysely**: `MysqlDialect` runs on mysql2, so rows are typed with mysql2's `DefaultTypeMap`. `number` can't say which integer type a column is, so it is `int`; pin a column with an override (`{ posts: { price: "decimal" } }`), as for PostgreSQL. `KyselyMysqlSql`, `KyselyMariaDbSql` and `FromKyselyMysql` are the MySQL counterparts of `KyselySql` and `FromKysely`.
+- **Drizzle**: `createSql(mysql, db)` takes a `drizzle-orm/mysql2` database and runs queries on the driver client under it: the mysql2 pool or connection, or the transaction's connection inside `db.transaction(fn)`; the PlanetScale and TiDB Cloud serverless databases work too, with `ServerlessTypeMap` from `@typesql/core/mysql` as the second type argument. Drizzle's types don't record `unsigned` or the text size (`mediumtext`, `longtext`), so pin those columns with `mysqlType`: `mysqlType(int("n", { unsigned: true }), "int unsigned")`. `generatedAlwaysAs()` columns can't be written, `$defaultFn()` columns have no database default, and tables of a `mysqlSchema()` are under the database name (`db.table`). `DrizzleMysqlSql`, `DrizzleMariaDbSql` and `FromDrizzleMysql` are the MySQL types.
+- **Prisma**: the `typesql-prisma` generator writes a MySQL schema when the datasource provider is `mysql`, importing from `@typesql/core/mysql`, with native types (`@db.UnsignedInt` is `int unsigned`, `@db.Text` is `text`) and `autoincrement()` columns marked `autoIncrement`. Pass `mysql`, or `mariadb` for a MariaDB server; Prisma Client connects through `@prisma/adapter-mariadb`. Rows are typed with `PrismaMysqlTypeMap`, which follows what Prisma's MySQL adapter returns from `$queryRaw`: `BIGINT` and `INT UNSIGNED` are `bigint` (so `count(*)` is `bigint`), `DECIMAL` is `Decimal`, `TIME` is a `Date` on 1970-01-01, `BIT` and spatial values are bytes, and `Boolean` columns are numbers (`TINYINT`). `FromPrismaMysql` converts `Prisma.TypeMap` without the generator.

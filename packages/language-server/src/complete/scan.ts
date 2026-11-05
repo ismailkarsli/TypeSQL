@@ -1,4 +1,5 @@
 import { blockComment } from "../highlight/lex.js";
+import { type Dialect, isMySql } from "./call.js";
 
 export interface RelRef {
 	readonly schema: string | null;
@@ -65,9 +66,21 @@ const HOLE = /\$0(?![0-9])/y;
 const PUNCTUATION = /::|./sy;
 const OPERATOR = /(?:(?!--|\/\*)[+\-*/<>=~!@#%^&|`?])+/y;
 
+// MySQL and MariaDB: `-- ` comments need a space after the dashes, `#` starts
+// a comment, block comments don't nest, strings take '…' or "…" with backslash
+// escapes (after an n, x, b or _charset prefix), names are quoted with
+// backticks, and @name and @@name are variables.
+const MY_LINE_COMMENT = /(?:#|--(?=\s|$))[^\n\r]*/y;
+const MY_STRING = /(?:[nNxXbB]|_[A-Za-z0-9_]+)?(['"])/y;
+const MY_SINGLE_REST = /(?:[^'\\]|\\.|'')*'?/sy;
+const MY_DOUBLE_REST = /(?:[^"\\]|\\.|"")*"?/sy;
+const MY_QUOTED = /`((?:[^`]|``)*)`?/y;
+const MY_VARIABLE = /@@?(?:[A-Za-z0-9_$.\u0080-￿]+|`(?:[^`]|``)*`?)?/y;
+const MY_OPERATOR = /(?:(?!--\s|--$|\/\*)[+\-*/<>=~!%^&|?])+/y;
+
 const fold = (s: string): string => s.replace(/[A-Z]/g, (m) => m.toLowerCase());
 
-function lex(text: string, offset: number): Lexed {
+function lex(text: string, offset: number, my: boolean): Lexed {
 	const toks: Tok[] = [];
 	let inside = false;
 	const n = text.length;
@@ -82,6 +95,16 @@ function lex(text: string, offset: number): Lexed {
 		toks.push({ k, v, s, e: i });
 	};
 	const value = (): boolean => {
+		if (my) {
+			const string = take(MY_STRING);
+			if (string) take(string[1] === "'" ? MY_SINGLE_REST : MY_DOUBLE_REST);
+			return !!(
+				string ||
+				take(MY_VARIABLE) ||
+				take(NUMBER) ||
+				take(NAMED_PARAM)
+			);
+		}
 		const string = take(STRING);
 		if (string) {
 			take(string[1] ? ESCAPE_STRING_REST : STRING_REST);
@@ -104,8 +127,14 @@ function lex(text: string, offset: number): Lexed {
 			i++;
 			continue;
 		}
-		if (take(LINE_COMMENT)) {
+		if (take(my ? MY_LINE_COMMENT : LINE_COMMENT)) {
 			comment(s, true);
+			continue;
+		}
+		if (my && text.startsWith("/*", i)) {
+			const end = text.indexOf("*/", i + 2);
+			i = end === -1 ? n : end + 2;
+			comment(s, end === -1);
 			continue;
 		}
 		if (text.startsWith("/*", i)) {
@@ -122,14 +151,15 @@ function lex(text: string, offset: number): Lexed {
 			push("v", s);
 			continue;
 		}
-		const quoted = take(QUOTED);
+		const quoted = take(my ? MY_QUOTED : QUOTED);
 		if (quoted) {
-			push("q", s, quoted[1]!.replaceAll('""', '"'));
+			const q = my ? "`" : '"';
+			push("q", s, quoted[1]!.replaceAll(q + q, q));
 			continue;
 		}
 		if (take(WORD)) push("w", s, fold(text.slice(s, i)));
 		else {
-			if (!take(OPERATOR)) take(PUNCTUATION);
+			if (!take(my ? MY_OPERATOR : OPERATOR)) take(PUNCTUATION);
 			push("o", s);
 		}
 	}
@@ -190,6 +220,17 @@ const NOT_ALIAS = new Set([
 	"only",
 	"table",
 ]);
+// MySQL words after a table that aren't its alias: index hints, PARTITION,
+// STRAIGHT_JOIN, and the modifiers of UPDATE before its table.
+const MY_NOT_ALIAS = new Set([
+	"use",
+	"force",
+	"ignore",
+	"partition",
+	"straight_join",
+	"low_priority",
+]);
+const MY_BEFORE_TABLE = new Set(["ignore", "low_priority"]);
 const BEFORE_EXPR = new Set([
 	"select",
 	"where",
@@ -251,14 +292,21 @@ interface LevelEnd {
 	readonly i: number;
 }
 
-const named = (t: Tok | undefined): boolean =>
-	!!t && (t.k === "q" || (t.k === "w" && !NOT_ALIAS.has(t.v)));
+/** A token that can be a name: quoted, or a word that isn't a keyword after a table. */
+const named = (t: Tok | undefined, my = false): boolean =>
+	!!t &&
+	(t.k === "q" ||
+		(t.k === "w" && !NOT_ALIAS.has(t.v) && !(my && MY_NOT_ALIAS.has(t.v))));
 
 function* levels(level: Level | null): Generator<Level> {
 	for (let l = level; l; l = l.parent) yield l;
 }
 
-function structure(toks: readonly Tok[]): Structure {
+function structure(toks: readonly Tok[], my: boolean): Structure {
+	const notAlias = (w: string): boolean =>
+		NOT_ALIAS.has(w) || (my && MY_NOT_ALIAS.has(w));
+	const beforeTable = (w: string | null): boolean =>
+		w === "only" || w === "lateral" || (my && MY_BEFORE_TABLE.has(w ?? ""));
 	const at: At[] = [];
 	const used: RelRef[] = [];
 	const word = (i: number): string | null =>
@@ -376,7 +424,7 @@ function structure(toks: readonly Tok[]): Structure {
 
 			if (after) {
 				if (w === "as") continue;
-				if (!aliased && named(t) && !is(i + 1, ".")) {
+				if (!aliased && named(t, my) && !is(i + 1, ".")) {
 					after.name = t.v;
 					aliased = true;
 					continue;
@@ -386,9 +434,9 @@ function structure(toks: readonly Tok[]): Structure {
 			if (
 				expectRel &&
 				(t.k === "w" || t.k === "q" || t.k === "x") &&
-				!(w && NOT_ALIAS.has(w) && w !== "only" && w !== "lateral")
+				!(w && notAlias(w) && !beforeTable(w))
 			) {
-				if (w === "only" || w === "lateral") {
+				if (beforeTable(w)) {
 					here.relNext = true;
 					continue;
 				}
@@ -463,7 +511,12 @@ function structure(toks: readonly Tok[]): Structure {
 					clause = "from";
 					here.relNext = expectRel = true;
 					break;
+				case "straight_join":
 				case "join":
+					if (w === "straight_join" && !my) {
+						if (out) out.push(t);
+						break;
+					}
 					clause = "from";
 					here.relNext = expectRel = true;
 					break;
@@ -474,6 +527,11 @@ function structure(toks: readonly Tok[]): Structure {
 					here.relNext = expectRel = true;
 					break;
 				case "update":
+					// MySQL's INSERT … ON DUPLICATE KEY UPDATE sets the target's columns.
+					if (word(i - 1) === "key" && word(i - 2) === "duplicate") {
+						clause = "set";
+						break;
+					}
 					if (lv.target || word(i - 1) === "for" || word(i - 1) === "key")
 						break;
 					targetNext = true;
@@ -507,6 +565,14 @@ function structure(toks: readonly Tok[]): Structure {
 					lv = { ...lv, items: [] };
 					break;
 				}
+				case "replace":
+					// REPLACE INTO (MySQL, SQLite), not the replace() function.
+					if (clause !== "" || is(i + 1, "(")) {
+						if (out) out.push(t);
+						break;
+					}
+					clause = "insert";
+					break;
 				case "where":
 				case "group":
 				case "order":
@@ -547,8 +613,13 @@ function outputName(toks: readonly Tok[]): string | null {
 	return null;
 }
 
-export function contextAt(text: string, offset: number): Context {
-	const { toks, inside } = lex(text, offset);
+export function contextAt(
+	text: string,
+	offset: number,
+	dialect: Dialect = "postgres",
+): Context {
+	const my = isMySql(dialect);
+	const { toks, inside } = lex(text, offset, my);
 	let from = offset;
 	let j = toks.length - 1;
 	while (j >= 0 && toks[j]!.s >= offset) j--;
@@ -558,7 +629,7 @@ export function contextAt(text: string, offset: number): Context {
 		j--;
 	} else if (cur && cur.e > offset) return { expect: NONE, from };
 	if (inside || j < 0) return { expect: NONE, from };
-	const { at, used } = structure(toks);
+	const { at, used } = structure(toks, my);
 	return { expect: expectAfter(toks, at, used, j), from };
 }
 
@@ -625,7 +696,13 @@ function expectAfter(
 			: NONE;
 	}
 	if (t.k === "w") {
-		if (t.v === "set") return target();
+		if (
+			t.v === "set" ||
+			(t.v === "update" &&
+				toks[j - 1]?.v === "key" &&
+				toks[j - 2]?.v === "duplicate")
+		)
+			return target();
 		return BEFORE_EXPR.has(t.v) ? scope() : NONE;
 	}
 	if (t.k === "o" && t.v !== "::" && t.v !== ";" && t.v !== "]") {

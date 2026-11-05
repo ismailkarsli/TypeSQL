@@ -21,6 +21,8 @@
 				"src/postgres/engine/index.ts!",
 				"src/sqlite/index.ts!",
 				"src/sqlite/engine/index.ts!",
+				"src/mysql/index.ts!",
+				"src/mysql/engine/index.ts!",
 				"src/migration/index.ts!",
 				"examples/*.ts"
 			],
@@ -52,6 +54,16 @@
 		},
 		"packages/sqlite": {
 			"entry": ["src/index.ts!", "src/introspect/index.ts!"],
+			"project": ["src/**/*.ts!"]
+		},
+		"packages/mysql": {
+			"entry": [
+				"src/index.ts!",
+				"src/mariadb.ts!",
+				"src/planetscale.ts!",
+				"src/tidb.ts!",
+				"src/introspect/index.ts!"
+			],
 			"project": ["src/**/*.ts!"]
 		},
 		"packages/language-server": {

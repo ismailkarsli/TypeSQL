@@ -33,8 +33,9 @@ const USAGE = `Usage: typesql migrate <latest|up|down|status|make name|generate>
 
 Options:
   --config <file>     config module (default: ./typesql.config.ts)
-  --dialect <name>    postgres or sqlite; overrides config
-  --url <url>         PostgreSQL URL; overrides config (default: $DATABASE_URL)
+  --dialect <name>    postgres, sqlite, mysql or mariadb; overrides config
+  --url <url>         PostgreSQL, MySQL or MariaDB URL; overrides config
+                      (default: $DATABASE_URL)
   --db <file>         SQLite database file; overrides config
   --dir <directory>   migrations directory; overrides config
   --out <file>        schema file to write (default: config.schemaFile or db.ts)
@@ -156,6 +157,11 @@ function hasCode(
 	);
 }
 
+const DIALECTS: readonly string[] = ["postgres", "sqlite", "mysql", "mariadb"];
+
+const isDialect = (value: unknown): value is MigratorConfig["dialect"] =>
+	typeof value === "string" && DIALECTS.includes(value);
+
 /** Whether `error` is a MigrationError from any copy of `@typesql/core`. */
 function isMigrationError(error: unknown): error is MigrationError {
 	return error instanceof Error && error.name === "MigrationError";
@@ -222,11 +228,11 @@ export async function main(argv: readonly string[], io: Io): Promise<ExitCode> {
 			values.config !== undefined,
 		);
 		const dialect = values.dialect ?? migrator?.config.dialect;
-		if (dialect !== "postgres" && dialect !== "sqlite")
+		if (!isDialect(dialect))
 			throw new Error(
 				migrator === undefined
-					? "no typesql.config.ts: pass --dialect postgres or sqlite, or pass --config"
-					: `unsupported dialect: ${String(dialect)} (expected postgres or sqlite)`,
+					? "no typesql.config.ts: pass --dialect postgres, sqlite, mysql or mariadb, or pass --config"
+					: `unsupported dialect: ${String(dialect)} (expected postgres, sqlite, mysql or mariadb)`,
 			);
 		const overrides: Overrides = {};
 		if (values.dialect !== undefined) overrides.dialect = dialect;
@@ -240,8 +246,9 @@ export async function main(argv: readonly string[], io: Io): Promise<ExitCode> {
 			config?.url !== undefined ||
 			config?.db !== undefined ||
 			config?.execute !== undefined;
+		// The URL dialects fall back to DATABASE_URL, as `typesql introspect` does.
 		if (
-			dialect === "postgres" &&
+			dialect !== "sqlite" &&
 			!connected(overrides) &&
 			!(migrator !== undefined && connected(migrator.config)) &&
 			env.DATABASE_URL

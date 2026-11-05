@@ -1,10 +1,17 @@
 import type { Executor } from "@typesql/core";
 import {
+	JsonParam,
+	mysqlPositional,
 	positional,
 	runTransaction,
 	type SqlDriver,
 } from "@typesql/core/adapter";
-import { CompiledQuery, type QueryResult, SqliteAdapter } from "kysely";
+import {
+	CompiledQuery,
+	MysqlAdapter,
+	type QueryResult,
+	SqliteAdapter,
+} from "kysely";
 
 export interface KyselyExecutor {
 	withoutPlugins(): {
@@ -26,6 +33,18 @@ const numbered: Compile = (text, values) => ({
 	values: Array.from(values),
 });
 
+// `sql.json(…)` becomes JSON text. mysql2 writes a Buffer as a binary
+// literal and a plain Uint8Array as an object.
+function mysqlParam<V>(value: V): V | string | Buffer {
+	if (value instanceof JsonParam) return JSON.stringify(value.value);
+	return value instanceof Uint8Array && !Buffer.isBuffer(value)
+		? Buffer.from(value.buffer, value.byteOffset, value.byteLength)
+		: value;
+}
+
+const mysql: Compile = (text, values) =>
+	mysqlPositional(text, values, mysqlParam);
+
 function run<R>(
 	db: KyselyExecutor,
 	text: string,
@@ -44,19 +63,24 @@ function rowCount(result: QueryResult<unknown>): number {
 		: Number(result.numAffectedRows);
 }
 
+type DialectName = "postgres" | "sqlite" | "mysql" | "mariadb";
+
 /**
- * Whether `db` runs on SQLite: its dialect's adapter is Kysely's SQLite one,
- * from this copy of Kysely or by name from another.
+ * Whether `db`'s dialect adapter is `Adapter`, from this copy of Kysely or
+ * by name from another.
  */
-function isSqlite(db: KyselyExecutor): boolean {
+function hasAdapter(
+	db: KyselyExecutor,
+	Adapter: abstract new (...args: never[]) => object,
+): boolean {
 	if (!hasExecutor(db)) return false;
 	const { adapter } = db.getExecutor();
 	return (
-		adapter instanceof SqliteAdapter ||
+		adapter instanceof Adapter ||
 		(typeof adapter === "object" &&
 			adapter !== null &&
 			typeof adapter.constructor === "function" &&
-			adapter.constructor.name === "SqliteAdapter")
+			adapter.constructor.name === Adapter.name)
 	);
 }
 
@@ -67,17 +91,30 @@ const hasExecutor = (
 	getExecutor(): { readonly adapter?: unknown };
 } => "getExecutor" in db && typeof db.getExecutor === "function";
 
+/** The dialect `db` runs on, by its adapter: SQLite's, MySQL's or another (PostgreSQL's). */
+const dialectOf = (db: KyselyExecutor): DialectName =>
+	hasAdapter(db, SqliteAdapter)
+		? "sqlite"
+		: hasAdapter(db, MysqlAdapter)
+			? "mysql"
+			: "postgres";
+
 /**
  * An executor on `db`. SQLite's placeholders are used when `dialect` is
- * `"sqlite"`, or, without `dialect`, when `db` runs on SQLite.
+ * `"sqlite"` and MySQL's when it is `"mysql"` or `"mariadb"`; without
+ * `dialect`, when `db` runs on Kysely's SQLite or MySQL dialect.
  */
 export function executor(
 	db: KyselyExecutor,
-	options: { readonly dialect?: "postgres" | "sqlite" } = {},
+	options: { readonly dialect?: DialectName } = {},
 ): Executor {
-	const sqlite =
-		options.dialect === undefined ? isSqlite(db) : options.dialect === "sqlite";
-	const compile = sqlite ? positional : numbered;
+	const dialect = options.dialect ?? dialectOf(db);
+	const compile =
+		dialect === "sqlite"
+			? positional
+			: dialect === "mysql" || dialect === "mariadb"
+				? mysql
+				: numbered;
 	return async (text, values) => {
 		const result = await run<unknown>(db, text, values, compile);
 		return { rows: result.rows, rowCount: rowCount(result) };
@@ -104,5 +141,10 @@ export const driver: SqlDriver<KyselyExecutor> = {
 
 export const sqliteDriver: SqlDriver<KyselyExecutor> = {
 	executor: (db) => executor(db, { dialect: "sqlite" }),
+	transaction,
+};
+
+export const mysqlDriver: SqlDriver<KyselyExecutor> = {
+	executor: (db) => executor(db, { dialect: "mysql" }),
 	transaction,
 };

@@ -66,7 +66,7 @@
 		"statement-argument": {
 			"begin": "\\G\\s*(\\()",
 			"beginCaptures": { "1": { "name": "meta.brace.round.ts" } },
-			"end": "(?<=[`\"'])|(?=[^\\s`\"'])|(?=[\"'](?!\\s*(?:--|/\\*|\\(|(?i:alter|analyze|attach|begin|call|cluster|comment|commit|copy|create|delete|detach|do|drop|explain|grant|import|insert|listen|lock|merge|notify|pragma|reassign|refresh|reindex|release|replace|reset|revoke|rollback|savepoint|security|select|set|table|truncate|unlisten|update|vacuum|values|with)(?=[\\s;(]|$))))|(?=`(?!\\s*(?:--|/\\*|\\(|(?i:alter|analyze|attach|begin|call|cluster|comment|commit|copy|create|delete|detach|do|drop|explain|grant|import|insert|listen|lock|merge|notify|pragma|reassign|refresh|reindex|release|replace|reset|revoke|rollback|savepoint|security|select|set|table|truncate|unlisten|update|vacuum|values|with)(?=[\\s;(]|$))|\\s*$))",
+			"end": "(?<=[`\"'])|(?=[^\\s`\"'])|(?=[\"'](?!\\s*(?:--|/\\*|\\(|(?i:alter|analyze|attach|begin|call|cluster|comment|commit|copy|create|delete|describe|detach|do|drop|explain|grant|import|insert|listen|lock|merge|notify|pragma|reassign|refresh|reindex|release|rename|replace|reset|revoke|rollback|savepoint|security|select|set|show|table|truncate|unlisten|update|vacuum|values|with)(?=[\\s;(]|$))))|(?=`(?!\\s*(?:--|/\\*|\\(|(?i:alter|analyze|attach|begin|call|cluster|comment|commit|copy|create|delete|describe|detach|do|drop|explain|grant|import|insert|listen|lock|merge|notify|pragma|reassign|refresh|reindex|release|rename|replace|reset|revoke|rollback|savepoint|security|select|set|show|table|truncate|unlisten|update|vacuum|values|with)(?=[\\s;(]|$))|\\s*$))",
 			"patterns": [{ "include": "#literal" }]
 		},
 		"marked": {
@@ -103,9 +103,11 @@
 			"contentName": "meta.embedded.line.sql",
 			"patterns": [
 				{ "include": "#line-comment-double" },
+				{ "include": "#hash-comment-double" },
 				{ "include": "#block-comment-double" },
 				{ "include": "#string-double" },
 				{ "include": "#identifier-double" },
+				{ "include": "#backtick-identifier-double" },
 				{ "include": "#dollar-string-double" },
 				{ "include": "#tokens" }
 			]
@@ -126,9 +128,11 @@
 			"contentName": "meta.embedded.line.sql",
 			"patterns": [
 				{ "include": "#line-comment-single" },
+				{ "include": "#hash-comment-single" },
 				{ "include": "#block-comment-single" },
 				{ "include": "#string-single" },
 				{ "include": "#identifier-single" },
+				{ "include": "#backtick-identifier-single" },
 				{ "include": "#dollar-string-single" },
 				{ "include": "#tokens" }
 			]
@@ -150,9 +154,11 @@
 			"patterns": [
 				{ "include": "source.ts#template-substitution-element" },
 				{ "include": "#line-comment-template" },
+				{ "include": "#hash-comment-template" },
 				{ "include": "#block-comment-template" },
 				{ "include": "#string-template" },
 				{ "include": "#identifier-template" },
+				{ "include": "#backtick-identifier-template" },
 				{ "include": "#dollar-string-template" },
 				{ "include": "#tokens" }
 			]
@@ -183,6 +189,37 @@
 			},
 			"end": "(?=`)|(?<![\\\\\\n])$",
 			"name": "comment.line.double-dash.sql",
+			"patterns": [
+				{ "include": "source.ts#template-substitution-element" },
+				{ "include": "#escape" }
+			]
+		},
+		"hash-comment-double": {
+			"$comment": "MySQL's # comment, only at the start of a line and not as #>, #>>, #- or ##: elsewhere # is a PostgreSQL operator.",
+			"begin": "^\\s*(#)(?![#>\\-])",
+			"beginCaptures": {
+				"1": { "name": "punctuation.definition.comment.sql" }
+			},
+			"end": "(?=\")|(?<![\\\\\\n])$",
+			"name": "comment.line.number-sign.sql",
+			"patterns": [{ "include": "#escape" }]
+		},
+		"hash-comment-single": {
+			"begin": "^\\s*(#)(?![#>\\-])",
+			"beginCaptures": {
+				"1": { "name": "punctuation.definition.comment.sql" }
+			},
+			"end": "(?=')|(?<![\\\\\\n])$",
+			"name": "comment.line.number-sign.sql",
+			"patterns": [{ "include": "#escape" }]
+		},
+		"hash-comment-template": {
+			"begin": "^\\s*(#)(?![#>\\-])",
+			"beginCaptures": {
+				"1": { "name": "punctuation.definition.comment.sql" }
+			},
+			"end": "(?=`)|(?<![\\\\\\n])$",
+			"name": "comment.line.number-sign.sql",
 			"patterns": [
 				{ "include": "source.ts#template-substitution-element" },
 				{ "include": "#escape" }
@@ -281,6 +318,32 @@
 		"identifier-template": {
 			"begin": "\"",
 			"end": "\"|(?=`)",
+			"captures": { "0": { "name": "punctuation.definition.identifier.sql" } },
+			"name": "meta.identifier.quoted.sql",
+			"patterns": [
+				{ "include": "source.ts#template-substitution-element" },
+				{ "include": "#escape" }
+			]
+		},
+
+		"backtick-identifier-double": {
+			"$comment": "A MySQL (and SQLite) name quoted with backticks; in a template literal each backtick is escaped.",
+			"begin": "`",
+			"end": "`|(?=\")|(?<![\\\\\\n])$",
+			"captures": { "0": { "name": "punctuation.definition.identifier.sql" } },
+			"name": "meta.identifier.quoted.sql",
+			"patterns": [{ "include": "#escape" }]
+		},
+		"backtick-identifier-single": {
+			"begin": "`",
+			"end": "`|(?=')|(?<![\\\\\\n])$",
+			"captures": { "0": { "name": "punctuation.definition.identifier.sql" } },
+			"name": "meta.identifier.quoted.sql",
+			"patterns": [{ "include": "#escape" }]
+		},
+		"backtick-identifier-template": {
+			"begin": "\\\\`",
+			"end": "\\\\`|(?=`)",
 			"captures": { "0": { "name": "punctuation.definition.identifier.sql" } },
 			"name": "meta.identifier.quoted.sql",
 			"patterns": [

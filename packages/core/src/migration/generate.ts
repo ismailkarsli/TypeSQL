@@ -122,12 +122,14 @@ function emit(
 	used: ReadonlySet<string>,
 	lines: readonly string[],
 ): string {
-	const helpers = ["Col", "View"].filter((h) => used.has(h));
+	const helpers = ["Col", "Enum", "Typed", "View"].filter((h) => used.has(h));
+	// MariaDB schemas use MySQL's helpers.
+	const module = dialect === "mariadb" ? "mysql" : dialect;
 	return [
 		...header,
 		...(helpers.length > 0
 			? [
-					`import type { ${helpers.join(", ")} } from "@typesql/core/${dialect}";`,
+					`import type { ${helpers.join(", ")} } from "@typesql/core/${module}";`,
 				]
 			: []),
 		"",
@@ -329,29 +331,59 @@ function writer(
 		);
 	};
 
+	const mysql = dialect === "mysql" || dialect === "mariadb";
+	/** MySQL's `Typed<Base, T>` (`ENUM(…)` columns among them): its base and `T`. */
+	const shaped = (t: Type): { base: string; ts: string } | undefined => {
+		if (!mysql || !t.isIntersectionType()) return undefined;
+		const shape = checker.getTypeOfPropertyOfType(t, "shape");
+		const value = shape && checker.getTypeOfPropertyOfType(shape, "v");
+		const base = t.getTypes().find((part) => part.isStringLiteralType());
+		if (!value || literal(checker.getTypeOfPropertyOfType(shape, "k")) !== "ts")
+			return undefined;
+		const name = literal(base);
+		return typeof name === "string"
+			? { base: name, ts: print(value) }
+			: undefined;
+	};
+
 	const column = (t: Type, at: string): string => {
 		check(t, at);
 		props(t, at);
-		const type = flag(t, "type");
-		if (typeof type !== "string") return print(t);
-		used.add("Col");
+		const typeOf = checker.getTypeOfPropertyOfType(t, "type");
+		const type = literal(typeOf);
+		const typed = typeOf && shaped(typeOf);
+		if (typeof type !== "string" && !typed) return print(t);
 		const generated = flag(t, "generated") === true;
 		const hidden = flag(t, "hidden") === true;
+		const autoIncrement = flag(t, "autoIncrement") === true;
 		const position = flag(t, "i");
+		// Flags that imply hasDefault in the dialect's Col.
+		const impliesDefault =
+			dialect === "sqlite"
+				? generated || hidden
+				: mysql && (generated || autoIncrement);
 		const flags = [
 			flag(t, "nullable") === true ? "nullable: true" : "",
-			flag(t, "hasDefault") === true &&
-			!(dialect === "sqlite" && (generated || hidden))
+			flag(t, "hasDefault") === true && !impliesDefault
 				? "hasDefault: true"
 				: "",
 			typeof position === "number" ? `position: ${position}` : "",
 			flag(t, "rowid") === true ? "rowid: true" : "",
+			autoIncrement ? "autoIncrement: true" : "",
 			generated ? "generated: true" : "",
 			hidden ? "hidden: true" : "",
 		].filter(Boolean);
-		return flags.length > 0
-			? `Col<${JSON.stringify(type)}, { ${flags.join("; ")} }>`
-			: `Col<${JSON.stringify(type)}>`;
+		const options = flags.length > 0 ? `, { ${flags.join("; ")} }` : "";
+		if (typed?.base === "enum") {
+			used.add("Enum");
+			return `Enum<${typed.ts}${options}>`;
+		}
+		used.add("Col");
+		if (typed) {
+			used.add("Typed");
+			return `Col<Typed<${JSON.stringify(typed.base)}, ${typed.ts}>${options}>`;
+		}
+		return `Col<${JSON.stringify(type)}${options}>`;
 	};
 
 	const relation = (t: Type, indent: string, at: string): string => {

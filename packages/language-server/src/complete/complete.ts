@@ -1,6 +1,6 @@
 import type { LineAndCharacter } from "typescript/ast";
 import type { Checker, DocumentIdentifier, Program } from "typescript/async";
-import { type Dialect, type EditorKinds, sqlCallAt } from "./call.js";
+import { type Dialect, type EditorKinds, isMySql, sqlCallAt } from "./call.js";
 import { type Context, contextAt, type RelRef } from "./scan.js";
 import { type Schema, schemaOf } from "./schema.js";
 
@@ -20,7 +20,7 @@ async function completions(
 	dialect: Dialect = "postgres",
 ): Promise<CompletionItem[]> {
 	const same = (name: string): string =>
-		dialect === "sqlite" ? name.toLowerCase() : name;
+		dialect === "postgres" ? name : name.toLowerCase();
 	const e = ctx.expect;
 	const items: CompletionItem[] = [];
 	const add = (
@@ -129,11 +129,12 @@ export async function completionsAt(
 		isCorePath,
 	);
 	if (!call) return null;
-	const ctx = contextAt(call.text, call.offset - call.start);
+	const ctx = contextAt(call.text, call.offset - call.start, call.dialect);
 	const lc = (o: number): LineAndCharacter =>
 		call.file.getLineAndCharacterOfPosition(o);
 	let from = call.start + ctx.from;
-	// A quoted name typed in a "…" string starts with its escaping backslash.
+	// A quoted name typed in a "…" string, or a `…` name in a template literal,
+	// starts with its escaping backslash.
 	if (from > call.start && call.file.text[from - 1] === "\\") from--;
 	const replace = { start: from, end: call.offset };
 	const literal = { start: call.start, end: call.end };
@@ -145,7 +146,7 @@ export async function completionsAt(
 	};
 	if (ctx.expect.kind === "none") return { items: [], ...ranges };
 	const items = await completions(
-		await schemaOf(checker, call.db, call.dialect === "sqlite"),
+		await schemaOf(checker, call.db, call.dialect),
 		ctx,
 		call.dialect,
 	);
@@ -279,6 +280,11 @@ const RESERVED = new Set([
 ]);
 
 function quoteIdent(name: string, dialect: Dialect = "postgres"): string {
+	if (isMySql(dialect))
+		return /^[A-Za-z_][A-Za-z0-9_$]*$/.test(name) &&
+			!MYSQL_RESERVED.has(name.toLowerCase())
+			? name
+			: `\`${name.replaceAll("`", "``")}\``;
 	const bare =
 		dialect === "sqlite"
 			? /^[A-Za-z_][A-Za-z0-9_$]*$/.test(name) &&
@@ -289,6 +295,13 @@ function quoteIdent(name: string, dialect: Dialect = "postgres"): string {
 
 const SQLITE_RESERVED = new Set(
 	"add all alter and as autoincrement between case check collate commit constraint create default deferrable delete distinct drop else escape except exists foreign from group having in index insert intersect into is isnull join limit not nothing notnull null on or order primary references returning select set table then to transaction union unique update using values when where cross full inner left natural outer right".split(
+		" ",
+	),
+);
+
+// MySQL 8.4's reserved words, and MariaDB's that MySQL lacks.
+const MYSQL_RESERVED = new Set(
+	"accessible add all alter analyze and as asc asensitive before between bigint binary blob both by call cascade case change char character check collate column condition constraint continue convert create cross cube cume_dist current_date current_role current_time current_timestamp current_user cursor database databases day_hour day_microsecond day_minute day_second dec decimal declare default delayed delete delete_domain_id dense_rank desc describe deterministic distinct distinctrow div do_domain_ids double drop dual each else elseif empty enclosed escaped except exists exit explain false fetch first_value float float4 float8 for force foreign from fulltext function general generated get grant group grouping groups having high_priority hour_microsecond hour_minute hour_second if ignore ignore_domain_ids ignore_server_ids in index infile inner inout insensitive insert int int1 int2 int3 int4 int8 integer intersect interval into io_after_gtids io_before_gtids is iterate join json_table key keys kill lag last_value lateral lead leading leave left like limit linear lines load localtime localtimestamp lock long longblob longtext loop low_priority manual master_bind master_heartbeat_period master_ssl_verify_server_cert match maxvalue mediumblob mediumint mediumtext middleint minute_microsecond minute_second mod modifies natural not no_write_to_binlog nth_value ntile null numeric of offset on optimize optimizer_costs option optionally or order out outer outfile over page_checksum parallel parse_vcol_expr partition percent_rank position precision primary procedure purge qualify range rank read read_write reads real recursive ref_system_id references regexp release rename repeat replace require resignal restrict return returning revoke right rlike row row_number rows schema schemas second_microsecond select sensitive separator set show signal slow smallint spatial specific sql sql_big_result sql_calc_found_rows sql_small_result sqlexception sqlstate sqlwarning ssl starting stats_auto_recalc stats_persistent stats_sample_pages stored straight_join system table tablesample terminated then tinyblob tinyint tinytext to trailing trigger true undo union unique unlock unsigned update usage use using utc_date utc_time utc_timestamp values varbinary varchar varcharacter varying virtual when where while window with write xor year_month zerofill".split(
 		" ",
 	),
 );

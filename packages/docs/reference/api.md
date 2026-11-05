@@ -1,10 +1,10 @@
 ---
-description: "API reference for @typesql/core, its PostgreSQL, SQLite, adapter and migration entry points, and the adapter and ORM packages."
+description: "API reference for @typesql/core, its PostgreSQL, SQLite, MySQL, adapter and migration entry points, and the adapter and ORM packages."
 ---
 
 # API
 
-The public APIs of `@typesql/core`, `@typesql/core/postgres`, `@typesql/core/sqlite`, `@typesql/core/adapter`, `@typesql/core/migration` and the extra exports of the adapter and ORM packages. Each entry links to the guide page that explains it.
+The public APIs of `@typesql/core`, `@typesql/core/postgres`, `@typesql/core/sqlite`, `@typesql/core/mysql`, `@typesql/core/adapter`, `@typesql/core/migration` and the extra exports of the adapter and ORM packages. Each entry links to the guide page that explains it.
 
 `@typesql/core` holds what every SQL dialect shares: `createSql`, queries, fragments, executors, plugins, transactions, the schema markers and the [dialect contract](#dialects). Migrations are in `@typesql/core/migration`. Everything PostgreSQL-specific is in `@typesql/core/postgres`: the `postgres` dialect, the type engine, `Json` and `PgCatalog`, the type maps and the function catalog.
 
@@ -19,7 +19,7 @@ createSql<DB, TypeMap = DefaultTypeMap>(postgres, executor?): Sql<DB, TypeMap>
 
 Returns the typed `sql` function for a schema in a [dialect](#dialects).
 
-- The dialect is the first argument: `postgres` from `@typesql/core/postgres` or `sqlite` from `@typesql/core/sqlite`. Each dialect adds its own `createSql` signature, so the type arguments start with `DB`.
+- The dialect is the first argument: `postgres` from `@typesql/core/postgres`, `sqlite` from `@typesql/core/sqlite`, or `mysql` or `mariadb` from `@typesql/core/mysql`. Each dialect adds its own `createSql` signature, so the type arguments start with `DB`.
 - `DB` is your [schema](../guide/schema). `TypeMap` turns the dialect's column types into TypeScript types ([Type mapping](./type-mapping)); it defaults to the dialect's map.
 - `executor` is what `execute*` runs on. Without one, `sql` only builds queries.
 - Use `.withPlugin(new CasePlugin())` for camelCase input and output keys, or attach a custom typed plugin. See [plugins](../guide/plugins).
@@ -31,6 +31,7 @@ The adapters export their own `createSql`, which takes the driver client and add
 | `@typesql/pg` | `createSql<DB>(pool)`, with `PgTypeMap` |
 | `@typesql/postgres` | `createSql<DB>(sql, options?)` with `PostgresJsTypeMap`, or `PostgresJsBigIntTypeMap` with `{ bigint: true }` |
 | `@typesql/sqlite` | `createSql<DB>(db, options?)` with SQLite's `DefaultTypeMap`, or `BigIntTypeMap` with `{ bigint: true }` |
+| `@typesql/mysql` | `createSql<DB>(client, { dialect? })` on mysql2 with MySQL's `DefaultTypeMap` (`Mysql2MariaDbTypeMap` with `{ dialect: "mariadb" }`); `@typesql/mysql/mariadb` with `MariaDbTypeMap`; `@typesql/mysql/planetscale` and `@typesql/mysql/tidb` with `ServerlessTypeMap` |
 | `@typesql/kysely`, `@typesql/drizzle`, `@typesql/prisma` | see [ORM packages](#orm-packages) |
 
 ## `sql(text, ...params)`
@@ -74,7 +75,7 @@ Preparation resolves named parameters, inline values and interpolated fragments 
 
 With `@typesql/pg`, execution uses a server-side statement whose name is derived from the final SQL text. PostgreSQL fixes such a statement's result columns when it is first prepared on a connection, so after an `ALTER TABLE` a prepared `SELECT *` fails with `cached plan must not change result type` on connections that already prepared it; list the columns, or reconnect after schema changes. With `@typesql/postgres`, execution enables postgres.js preparation and extended protocol, including for queries without parameters; the client's global `prepare: false` setting still takes precedence. Preparation itself sends no SQL.
 
-With `@typesql/sqlite`, the statement is prepared on its first execution and reused. Other adapters and custom executors reuse TypeSQL's compiled query without requesting server preparation, unless their executor implements `prepare(text)`. The prepared query stays bound to the client or transaction that created it. Create it through `tx.prepare(...)` to execute in a transaction. An executor passed to `execute*` overrides that binding and runs through the supplied executor as usual.
+With `@typesql/sqlite`, the statement is prepared on its first execution and reused. With `@typesql/mysql` on mysql2 or the mariadb connector, execution uses the binary protocol (`execute()`), which prepares the statement once per connection; see [Prepared statements](../adapters/mysql#prepared-statements). Other adapters and custom executors reuse TypeSQL's compiled query without requesting server preparation, unless their executor implements `prepare(text)`. The prepared query stays bound to the client or transaction that created it. Create it through `tx.prepare(...)` to execute in a transaction. An executor passed to `execute*` overrides that binding and runs through the supplied executor as usual.
 
 Reuse the returned function across calls to save TypeSQL's runtime SQL assembly. Server preparation can also save repeated parsing, but performance depends on the query and workload; measure your application's repeated queries.
 
@@ -105,7 +106,7 @@ const q = sql(`SELECT u.id FROM users u ${where}`);
 | Function | Result |
 |---|---|
 | `sql.fragment(text, ...params)` | a piece of SQL to interpolate as `${fragment}` |
-| `sql.id("col")`, `sql.id("schema", "table")` | a quoted identifier: `"col"`, `"schema"."table"` |
+| `sql.id("col")`, `sql.id("schema", "table")` | a quoted identifier: `"col"`, `"schema"."table"` (with backticks on MySQL and MariaDB: `` `col` ``) |
 | `sql.combine(items, options?)` | the fragments combined with `", "` by default: a tuple keeps its literal text, a runtime array of fragments with literal texts is checked as a list; ignores omitted items and throws if none remain |
 | `sql.and(items)`, `sql.or(items)` | the conditions combined with `AND` or `OR`: `((a) AND (b))`, `(a)` for one, `true` or `false` for none; ignores omitted items |
 | `sql.raw(text)` | dynamic text, sent as is |
@@ -123,7 +124,7 @@ See [Dynamic SQL](../guide/using-sql#dynamic-sql).
 | Function | Builds | Input type |
 |---|---|---|
 | `sql.set(table, values)`, `sql.set(values)` | `"a" = $1, "b" = $2` for the defined values; throws when none is defined | `SetInput<DB, TM, table>` |
-| `sql.values(table, rows)`, `sql.values(rows)` | `("a", "b") VALUES ($1, $2), ($3, DEFAULT)`; throws on an empty array | `InsertInput<DB, TM, table>` |
+| `sql.values(table, rows)`, `sql.values(rows)` | `("a", "b") VALUES ($1, $2), ($3, DEFAULT)`; throws on an empty array. On MySQL and MariaDB, names get backticks and a row with no values is `() VALUES ()` | `InsertInput<DB, TM, table>` |
 
 `table` is a `TableName<DB>`: a top-level table, or `"schema.table"`. It is used only for compile-time type checking. Without it, the fragment is checked against the target of the `UPDATE` or `INSERT` it is interpolated into: `sql.set` with every key present, `sql.values` once with every key and once with only the keys every row always sends, so a required column a row can leave out is still an error. Errors are then reported on the statement. At runtime, every enumerable key on `values` or row objects becomes a column assignment or insert value. When handling untrusted inputs (such as `req.body`), pick allowed fields explicitly to prevent mass assignment. JSON columns take `sql.json(value)` or a raw non-array value. See [Inserting and updating](../guide/using-sql#inserting-and-updating).
 
@@ -143,7 +144,7 @@ See [Transactions](../guide/using-sql#transactions).
 
 ## `sql.dialect`
 
-The database the `sql` runs on: `"postgres"` or `"sqlite"`, typed as that literal. It is read-only, and the same on every `sql` derived from it: `sql.withPlugin()`, a transaction's `tx`. Libraries that take your `sql`, such as the [Better Auth adapter](../guide/better-auth), read it instead of asking for the dialect again.
+The database the `sql` runs on: `"postgres"`, `"sqlite"`, `"mysql"` or `"mariadb"`, typed as that literal. It is read-only, and the same on every `sql` derived from it: `sql.withPlugin()`, a transaction's `tx`. Libraries that take your `sql`, such as the [Better Auth adapter](../guide/better-auth), read it instead of asking for the dialect again.
 
 ```ts
 const sql = createSql<DB>(pool); // @typesql/pg
@@ -161,7 +162,7 @@ sql.dialect; // "postgres"
 
 The methods run on the executor passed to the call, or else on the one `createSql` bound. Without either, they reject. They are non-enumerable, so a query still deep-equals `{ text, values }`.
 
-Every adapter reports the row count for `executeCount`: SQLite uses the changed-row count or the number of returned rows; the others use `rowCount` (`pg`), `count` (postgres.js), `numAffectedRows` or the number of rows (Kysely), `$executeRawUnsafe` (Prisma), and for Drizzle the count of the driver underneath.
+Every adapter reports the row count for `executeCount`: SQLite uses the changed-row count or the number of returned rows; the others use `rowCount` (`pg`), `count` (postgres.js), `affectedRows` or the number of rows (`@typesql/mysql`), `numAffectedRows` or the number of rows (Kysely), `$executeRawUnsafe` (Prisma), and for Drizzle the count of the driver underneath.
 
 ### Executors
 
@@ -174,7 +175,7 @@ type Executor = ((text: string, values: readonly unknown[]) =>
 type ExecutorResult = { readonly rows: readonly unknown[]; readonly rowCount: number | null };
 ```
 
-- Each adapter exports `executor(client)`. On a SQLite client (Kysely's SQLite dialects, Prisma with the `sqlite` provider, a Drizzle SQLite database), it uses SQLite's `?` placeholders without being told; `executor(client, { dialect })` states the dialect for Kysely and Prisma.
+- Each adapter exports `executor(client)`. On a SQLite or MySQL client (Kysely's SQLite and MySQL dialects, Prisma with the `sqlite` or `mysql` provider, a Drizzle SQLite or MySQL database), it uses `?` placeholders without being told; `executor(client, { dialect })` states the dialect for Kysely and Prisma.
 - `rowCount: null` means no count, read as 0.
 - An executor that returns only rows works for everything but `executeCount`, unless it has a `count(text, values)` method.
 - An optional `prepare(text): Executor` creates an executor for server preparation. It must defer database work until execution. `sql.prepare` calls it once with the final SQL text and binds all resulting queries to that executor, including its `count` method.
@@ -205,6 +206,8 @@ What adapters and custom executors build on.
 | `globRegExp(pattern)` | an anchored name-matching expression where `*` matches any text |
 | `introspectArgs(io, usage, parse)`, `CommandIo` | shared introspection argument validation and command output callbacks |
 | `sqliteValue(value)` | a value as SQLite binds it: `sql.json()` values as JSON text, booleans as `1` / `0`; throws for a `Date` |
+| `mysqlPositional(text, values, map?)` | rewrites `$n` parameters (outside strings, quoted names and comments, with MySQL's backslash escapes) to `?` and returns the values in order, a value once for each use, mapped by `map` (default `mysqlValue`) |
+| `mysqlValue(value)` | a value as the MySQL drivers bind it: `sql.json()` values as JSON text |
 
 ## Public types
 
@@ -225,11 +228,11 @@ What adapters and custom executors build on.
 | `Fragment<Text, Params, Carried>` | a spliceable SQL piece, with carried input types for checking when spliced |
 | `QueryObject<Row, Params, Text>`, `FragmentObject<Text, Params, Carried>` | the object interfaces behind the string-branded `Query` and `Fragment` aliases |
 
-The `Sql` and `TransactionalSql` types come from `@typesql/core/postgres` or `@typesql/core/sqlite`. The remaining types above come from `@typesql/core`.
+The `Sql` and `TransactionalSql` types come from `@typesql/core/postgres`, `@typesql/core/sqlite` or `@typesql/core/mysql` (which adds `MariaDbSql` and `MariaDbTransactionalSql`). The remaining types above come from `@typesql/core`.
 
 ### Tables and write helpers
 
-These come from the dialect module, `@typesql/core/postgres` or `@typesql/core/sqlite`, not from `@typesql/core`.
+These come from the dialect module, `@typesql/core/postgres`, `@typesql/core/sqlite` or `@typesql/core/mysql`, not from `@typesql/core`.
 
 | Type | Meaning |
 |---|---|
@@ -280,8 +283,9 @@ type WithCatalog = DB & PgCatalog;
 | `DefaultParamTypeMap` | what parameters accept when a map has no `$params` |
 | `PgTypeMap`, `PgParamTypeMap` | `@typesql/pg` |
 | `PostgresJsTypeMap`, `PostgresJsBigIntTypeMap`, `PostgresJsParamTypeMap` | `@typesql/postgres` |
-| `PrismaTypeMap`, `PrismaSqliteTypeMap` | `@typesql/prisma`, for PostgreSQL and SQLite |
+| `PrismaTypeMap`, `PrismaSqliteTypeMap`, `PrismaMysqlTypeMap` | `@typesql/prisma`, for PostgreSQL, SQLite and MySQL |
 | `BigIntTypeMap` | `@typesql/core/sqlite`, for SQLite integer results read as `bigint` |
+| `DefaultTypeMap`, `Mysql2MariaDbTypeMap`, `MariaDbTypeMap`, `ServerlessTypeMap`, `BigNumberStringsTypeMap`, `DateStringsTypeMap` | `@typesql/core/mysql`: mysql2, the mariadb connector, PlanetScale and TiDB Cloud, and mysql2 with `bigNumberStrings` or `dateStrings` |
 | `ParamTypeMapOf<TM>` | the parameter map in effect for `TM` |
 | `TsParamTypeOf<TM, DB, T>` | what a parameter of Postgres type `T` accepts |
 
@@ -327,11 +331,11 @@ An entry is one `Sig<Params, Return, Flags>` or a tuple of overloads.
 
 | Export | Meaning |
 |---|---|
-| `migration(from, { name, up, down })` | a `Migration`; `from` is `"postgres"`, `"sqlite"` or the previous migration. `name` is its name in the history: needed in an array, left out in a migration file, whose name is its file name |
+| `migration(from, { name, up, down })` | a `Migration`; `from` is `"postgres"`, `"sqlite"`, `"mysql"`, `"mariadb"` or the previous migration. `name` is its name in the history: needed in an array, left out in a migration file, whose name is its file name |
 | `Migration<Before, After>` | `{ name?: string; up(db: Before): Promise<After>; down(db: After): Promise<unknown> }` |
 | `MigrationSteps<Before, After>` | the `{ up, down }` argument of `migration()` |
 | `SchemaOf<M>` | the schema after the migration `M`; also takes a migrator, the result of its `latest()`, a 3.x `up` function or a migration context. Also exported from `@typesql/core` |
-| `PostgresMigration<DB = {}>`, `SqliteMigration<DB = {}>` | the `db` of a migration: a checked query function with `ddl(ddl)`, its deprecated alias `add(ddl)`, `raw<NewSchema>(sql)` and the type-only `schema` |
+| `PostgresMigration<DB = {}>`, `SqliteMigration<DB = {}>`, `MySqlMigration<DB = {}>`, `MariaDbMigration<DB = {}>` | the `db` of a migration: a checked query function with `ddl(ddl)`, its deprecated alias `add(ddl)`, `raw<NewSchema>(sql)` and the type-only `schema` |
 | `MigrationContext<E, T, DB, TM = T["typeMap"]>` | the type behind both, for engine `E` and dialect `T` |
 | `createMigrator(config)` | a `Migrator`; never connects by itself. With a `migrations` array its schema is inferred (from an array written in the call or declared `as const`); `createMigrator<DB>(config)` states it |
 | `Migrator<Schema>` | `latest()`, `up()`, `down()`, `status()`, `make(name)`, `generate()`, `with(overrides)` and `config` |
@@ -349,20 +353,22 @@ The config options and the method results are described in [The migrator](../gui
 
 ## Dialects
 
-A dialect pairs the runtime that builds its `sql` function with that function's types: the `postgres` value (a `PostgresDialect`) and its `Postgres` types from `@typesql/core/postgres`, and the `sqlite` value (a `SqliteDialect`) and its `Sqlite` types from `@typesql/core/sqlite`.
+A dialect pairs the runtime that builds its `sql` function with that function's types: the `postgres` value (a `PostgresDialect`) and its `Postgres` types from `@typesql/core/postgres`, the `sqlite` value (a `SqliteDialect`) and its `Sqlite` types from `@typesql/core/sqlite`, and the `mysql` and `mariadb` values (a `MySqlDialect` and a `MariaDbDialect`) and their `MySql` and `MariaDb` types from `@typesql/core/mysql`.
 
 | Export of `@typesql/core` | Meaning |
 |---|---|
-| `Dialect<T>` | the runtime side, what `createSql` takes: `{ name, valuesDefault? }`. Statements are built with `$n` parameters and sent as written. `valuesDefault: false` makes `sql.values()` throw instead of writing `DEFAULT` for a missing column |
+| `Dialect<T>` | the runtime side, what `createSql` takes: `{ name, quote?, emptyRow?, valuesDefault? }`. Statements are built with `$n` parameters and sent as written. `quote` is the identifier quote `sql.id()`, `sql.set()` and `sql.values()` use (`"` by default, `` ` `` for MySQL and MariaDB), `emptyRow` what `sql.values()` writes for a row with no values (`() VALUES ()` for MySQL and MariaDB), and `valuesDefault: false` makes `sql.values()` throw instead of writing `DEFAULT` for a missing column |
 | `DialectTypes` | the type side: its default `typeMap`, and given `db`, `tm`, `plugins` and `ddl`, the `sql`, `transactionalSql`, `validateDdl` and `applyDdl` types |
 | `SqlOf<T, DB, TM, Plugins = []>`, `TransactionalSqlOf<T, DB, TM, Plugins = []>` | the `sql` function of dialect `T`, without or with `transaction(fn)` |
 | `ValidateDdlOf<T, DB, Q>`, `ApplyDdlOf<T, DB, Q>` | DDL checking and the schema after `Q`, in dialect `T` |
 | `Transactional<Self>` | the `transaction(fn)` method an adapter's `sql` adds |
 | `CreateSql` | the type of `createSql`. A dialect adds its call signatures by augmenting it, so `createSql<DB>(postgres)` picks PostgreSQL's from the `postgres` argument. A dialect without its own signatures uses the generic one: `createSql<T, DB>(dialect)` |
 
-`SqlOf<Postgres, DB, TM>` is `Sql<DB, TM>`, and `TransactionalSqlOf<Postgres, DB, TM>` is `TransactionalSql<DB, TM>`; the same holds for `Sqlite` and the `Sql` and `TransactionalSql` of `@typesql/core/sqlite`.
+`SqlOf<Postgres, DB, TM>` is `Sql<DB, TM>`, and `TransactionalSqlOf<Postgres, DB, TM>` is `TransactionalSql<DB, TM>`; the same holds for `Sqlite` and the `Sql` and `TransactionalSql` of `@typesql/core/sqlite`, for `MySql` and the `Sql` and `TransactionalSql` of `@typesql/core/mysql`, and for `MariaDb` and its `MariaDbSql` and `MariaDbTransactionalSql`.
 
 `@typesql/core/sqlite` exports the same kinds of names as `@typesql/core/postgres`: `sqlite`, `Sql`, `TransactionalSql`, `RowOf`, `ParamsOf`, `Validate`, `ApplyDdl` and `ValidateDdl`, the write-helper types, the schema markers (`Col`, `View`), and the type maps `DefaultTypeMap`, `BigIntTypeMap` and `DefaultParamTypeMap`. It also exports `ColFlags` (the [column flags](../adapters/sqlite#column-flags)), `Json<T, Flags>` and `Typed<Type, T>` ([typed values](../adapters/sqlite#typed-values)), and `Sig`, `SigFlags`, `FunctionRegistry` and the augmentable `FunctionCatalog` ([functions](../adapters/sqlite#functions)). Its engine types are under `@typesql/core/sqlite/engine`. See [SQLite](../adapters/sqlite).
+
+`@typesql/core/mysql` exports the same kinds of names for MySQL and MariaDB: `mysql`, `mariadb`, `Sql`, `MariaDbSql`, `TransactionalSql`, `MariaDbTransactionalSql`, `RowOf`, `ParamsOf`, `Validate`, `ApplyDdl` and `ValidateDdl`, the write-helper types, the schema markers (`Col`, `Enum`, `View`), `ColFlags` (the [column flags](../adapters/mysql#column-flags), with `autoIncrement`), `Json<T, Flags>` and `Typed<Type, T>` ([typed values](../adapters/mysql#typed-values)), `Sig`, `SigFlags`, `FunctionRegistry` and the augmentable `FunctionCatalog` ([functions](../adapters/mysql#functions)), `MySqlTypeName`, `Bindable`, and the type maps `DefaultTypeMap`, `Mysql2MariaDbTypeMap`, `MariaDbTypeMap`, `ServerlessTypeMap`, `BigNumberStringsTypeMap`, `DateStringsTypeMap` and `DefaultParamTypeMap`. Its engine types are under `@typesql/core/mysql/engine`. See [MySQL and MariaDB](../adapters/mysql).
 
 ## ORM packages
 
@@ -370,11 +376,11 @@ Each package wraps core's `createSql` with the schema converted from the ORM's t
 
 | Package | `createSql` | Schema type | Runs queries |
 |---|---|---|---|
-| `@typesql/kysely` | `createSql(postgres, db)` with `DB` from `Kysely<DB>`, or `createSql<DB, TM = DefaultTypeMap, Overrides = {}, Options = {}>(postgres, db?)` | `FromKysely<DB, Overrides, Options>`; with `sqlite`, `FromKyselySqlite` | on a `Kysely` or `Transaction`, plugins bypassed |
-| `@typesql/drizzle` | `createSql(postgres, db)` with the schema from `db`, or `createSql<Schema, TM = DefaultTypeMap, Options = {}>(postgres, db?)` | `FromDrizzle<Schema, Options>`; `pgType(column, "type")` pins a column. With `sqlite`, `FromDrizzleSqlite` and `sqliteType` | PostgreSQL: on the driver client under a node-postgres or postgres.js Drizzle database. SQLite: on the Drizzle database (`db.all` / `db.run`), any driver |
-| `@typesql/prisma` | `createSql(postgres, prisma)` with the client's `Prisma.TypeMap`, or `createSql<S, TM = PrismaTypeMap>(postgres, prisma?)`; `S` is a generated `DB` or a `Prisma.TypeMap` | `FromPrisma<Prisma.TypeMap, Overrides>`; with `sqlite`, `FromPrismaSqlite` and `PrismaSqliteTypeMap`; the `typesql-prisma` generator | `$queryRawUnsafe` / `$executeRawUnsafe` on Prisma Client |
+| `@typesql/kysely` | `createSql(postgres, db)` with `DB` from `Kysely<DB>`, or `createSql<DB, TM = DefaultTypeMap, Overrides = {}, Options = {}>(postgres, db?)` | `FromKysely<DB, Overrides, Options>`; with `sqlite`, `FromKyselySqlite`; with `mysql` or `mariadb`, `FromKyselyMysql` | on a `Kysely` or `Transaction`, plugins bypassed |
+| `@typesql/drizzle` | `createSql(postgres, db)` with the schema from `db`, or `createSql<Schema, TM = DefaultTypeMap, Options = {}>(postgres, db?)` | `FromDrizzle<Schema, Options>`; `pgType(column, "type")` pins a column. With `sqlite`, `FromDrizzleSqlite` and `sqliteType`; with `mysql` or `mariadb`, `FromDrizzleMysql` and `mysqlType` | PostgreSQL: on the driver client under a node-postgres or postgres.js Drizzle database. SQLite: on the Drizzle database (`db.all` / `db.run`), any driver. MySQL: on the mysql2, PlanetScale or TiDB Cloud client under the Drizzle database |
+| `@typesql/prisma` | `createSql(postgres, prisma)` with the client's `Prisma.TypeMap`, or `createSql<S, TM = PrismaTypeMap>(postgres, prisma?)`; `S` is a generated `DB` or a `Prisma.TypeMap` | `FromPrisma<Prisma.TypeMap, Overrides>`; with `sqlite`, `FromPrismaSqlite` and `PrismaSqliteTypeMap`; with `mysql` or `mariadb`, `FromPrismaMysql` and `PrismaMysqlTypeMap`; the `typesql-prisma` generator | `$queryRawUnsafe` / `$executeRawUnsafe` on Prisma Client |
 
-Each `createSql` has the same overloads with `sqlite` first; the type map then defaults to `DefaultTypeMap` of `@typesql/core/sqlite` (`PrismaSqliteTypeMap` for Prisma), and the SQL types are `KyselySqliteSql`, `DrizzleSqliteSql` and `PrismaSqliteSql`. See [SQLite](../guide/orms#sqlite).
+Each `createSql` has the same overloads with `sqlite` first; the type map then defaults to `DefaultTypeMap` of `@typesql/core/sqlite` (`PrismaSqliteTypeMap` for Prisma), and the SQL types are `KyselySqliteSql`, `DrizzleSqliteSql` and `PrismaSqliteSql`. See [SQLite](../guide/orms#sqlite). The same holds with `mysql` and `mariadb`: the type map defaults to `DefaultTypeMap` of `@typesql/core/mysql` (`Mysql2MariaDbTypeMap` with `mariadb`, `PrismaMysqlTypeMap` for Prisma), and the SQL types are `KyselyMysqlSql`, `KyselyMariaDbSql`, `DrizzleMysqlSql`, `DrizzleMariaDbSql`, `PrismaMysqlSql` and `PrismaMariaDbSql`. See [MySQL and MariaDB](../guide/orms#mysql).
 
 | Option type | Fields |
 |---|---|
@@ -383,11 +389,11 @@ Each `createSql` has the same overloads with `sqlite` first; the type map then d
 | `FromDrizzleOptions` | `casing`, `timestamp`, `time` |
 | `PrismaOverrides` | `$table`, `$schema`, per field `{ column, type, nullable, default }`, and top-level `$types` (enum values by Prisma enum name) |
 
-`@typesql/prisma/generator` exports `generateSource(datamodel, options?)`, the source the `typesql-prisma` generator writes; `{ dialect: "sqlite" }` writes a SQLite schema.
+`@typesql/prisma/generator` exports `generateSource(datamodel, options?)`, the source the `typesql-prisma` generator writes; `{ dialect: "sqlite" }` writes a SQLite schema and `{ dialect: "mysql" }` a MySQL one.
 
 ## Introspection
 
-`typesql introspect` (the bin of `@typesql/cli`) writes the schema of a live database. `--dialect postgres` (the default) reads PostgreSQL through `@typesql/pg`; `--dialect sqlite` (the default when `--db` is given) reads a SQLite file through `@typesql/sqlite`. See [From a live database](../guide/introspect) for the options. `@typesql/cli` also exports `main(argv)`, the command itself.
+`typesql introspect` (the bin of `@typesql/cli`) writes the schema of a live database. `--dialect postgres` (the default) reads PostgreSQL through `@typesql/pg`; `--dialect sqlite` (the default when `--db` is given) reads a SQLite file through `@typesql/sqlite`; `--dialect mysql` and `--dialect mariadb` (the defaults for `mysql://` and `mariadb://` URLs) read MySQL and MariaDB through `@typesql/mysql`. See [From a live database](../guide/introspect) for the options. `@typesql/cli` also exports `main(argv)`, the command itself.
 
 ```sh
 typesql introspect [--dialect postgres] [--url <url>] [--out <file>] [--schema <name>]… [--exclude <pattern>]… [--type-name DB]
@@ -410,3 +416,16 @@ typesql introspect --dialect sqlite --db <file> [--out <file>] [--exclude <patte
 |---|---|
 | `introspect(db, { exclude? })` | `IntrospectedDatabase`: `{ version, relations }`, read from a node:sqlite, better-sqlite3 or bun:sqlite database |
 | `generateSource(db, options?)` | the schema file's source; options `typeName`, `importFrom` |
+
+`typesql introspect --dialect mysql` (or `mariadb`) writes the schema of a MySQL or MariaDB database. See [Generate the schema](../adapters/mysql#generate-the-schema).
+
+```sh
+typesql introspect --dialect mysql [--url <url>] [--database <name>] [--out <file>] [--exclude <pattern>]… [--type-name DB]
+                   [--import-from @typesql/core/mysql] [--no-comments]
+```
+
+| Export of `@typesql/mysql/introspect` | Meaning |
+|---|---|
+| `introspect(client, { database?, exclude? })` | `Promise<IntrospectedDatabase>`: `{ version, mariadb, database, relations }`, read through a mysql2 or mariadb connection or pool |
+| `generateSource(db, options?)` | the schema file's source; options `typeName`, `importFrom`, `comments` |
+| `main(argv)` | the command itself |

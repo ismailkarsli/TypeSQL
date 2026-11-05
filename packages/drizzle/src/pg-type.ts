@@ -9,3 +9,5 @@ export function pgType<B>(builder: B, type: string): B {
 }
 
 export const sqliteType: typeof pgType = pgType;
+
+export const mysqlType: typeof pgType = pgType;

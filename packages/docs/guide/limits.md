@@ -12,7 +12,7 @@ When you hit a limit, [`sql.as<Row>()`](./errors#when-typesql-can-t-type-a-state
 
 - TypeSQL needs TypeScript 7.1 or later (the native compiler; `7.1.0-beta` works).
 - It needs `strictNullChecks`, which `"strict": true` turns on. Without it, every `sql()` call and migration `.ddl()` is an error that says so, and with `"skipLibCheck": false` TypeScript also reports errors inside TypeSQL's own declaration files.
-- It models PostgreSQL and SQLite. MySQL is planned. SQLite's own limits are listed in [SQLite](../adapters/sqlite#limits).
+- It models PostgreSQL, SQLite, MySQL and MariaDB. The limits of SQLite and of MySQL and MariaDB are listed in [SQLite](../adapters/sqlite#limits) and [MySQL and MariaDB](../adapters/mysql#limits).
 - The editor completions ([VS Code](./vscode), [Neovim](./neovim)) use APIs that are new in TypeScript 7.1 and may still change before 7.1 is final.
 
 ## Statement size

@@ -1,5 +1,5 @@
 ---
-description: "Install TypeSQL and go from an empty project to a typed SQL query in a few minutes with PostgreSQL or SQLite: requirements, packages and a first query."
+description: "Install TypeSQL and go from an empty project to a typed SQL query in a few minutes with PostgreSQL, SQLite, MySQL or MariaDB: requirements, packages and a first query."
 ---
 
 # Quick start
@@ -10,7 +10,7 @@ This page takes you from an empty project to a typed query in a few minutes.
 
 - **TypeScript 7.1 or later** (`7.1.0-beta` works), or [tsrs](https://github.com/oxc-project/tsrs).
 - **`"strict": true`** (or at least `"strictNullChecks": true`) in `tsconfig.json`.
-- **A supported database.** TypeSQL supports PostgreSQL and SQLite. MySQL support is planned.
+- **A supported database.** TypeSQL supports PostgreSQL, SQLite, MySQL and MariaDB.
 
 ## 1. Install
 
@@ -37,8 +37,9 @@ Install `@typesql/core` and the adapter for your driver:
 | [`@typesql/pg`](../adapters/postgresql) | node-postgres (`pg`) |
 | [`@typesql/postgres`](../adapters/postgresql) | postgres.js (`postgres`) |
 | [`@typesql/sqlite`](../adapters/sqlite) | node:sqlite, bun:sqlite or better-sqlite3 |
+| [`@typesql/mysql`](../adapters/mysql) | mysql2, the mariadb connector, PlanetScale or TiDB Cloud serverless |
 
-`@typesql/core` has no runtime dependencies. Its [migrator](./migrations#the-migrator) connects from a `url` with `pg`, an optional peer dependency, and writes `db.ts` with `typescript`. The packages are ESM-only. `import` and Node's `require()` of ES modules both work, but TypeScript rejects imports from `.cts` files under `node16`/`nodenext` resolution (TS1479).
+`@typesql/core` has no runtime dependencies. Its [migrator](./migrations#the-migrator) connects from a `url` with `pg` or `mysql2`, optional peer dependencies, and writes `db.ts` with `typescript`. The packages are ESM-only. `import` and Node's `require()` of ES modules both work, but TypeScript rejects imports from `.cts` files under `node16`/`nodenext` resolution (TS1479).
 
 If your schema is already described for Kysely, Drizzle or Prisma, install its TypeSQL package instead of writing it again:
 

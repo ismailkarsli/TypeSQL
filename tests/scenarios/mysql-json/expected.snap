@@ -1,0 +1,39 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`mysql-json > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "admins": "({ id: number })[]",
+      "inserted": "number",
+      "rows": "({ first: null | string; id: number; items: (string)[]; role: "admin" | "member"; settings: { theme: "dark" | "light"; tags: (string)[] }; tags: (string)[]; theme: "dark" | "light" })[]",
+    },
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "{
+  inserted: 1,
+  rows: [
+    {
+      id: 1,
+      settings: { tags: [ 'sql' ], theme: 'dark' },
+      items: [ 'one', 'two' ],
+      role: 'member',
+      theme: 'dark',
+      tags: [ 'sql' ],
+      first: 'one'
+    }
+  ],
+  admins: []
+}
+",
+  },
+}
+`;

@@ -5,6 +5,7 @@ const ADAPTERS = [
 	"@typesql/pg",
 	"@typesql/postgres",
 	"@typesql/sqlite",
+	"@typesql/mysql",
 	"@typesql/kysely",
 	"@typesql/drizzle",
 	"@typesql/prisma",

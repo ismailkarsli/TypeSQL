@@ -1,6 +1,6 @@
 import type { SQLInputValue, SQLOutputValue } from "node:sqlite";
-import { paramNumbers, sqliteValue } from "../adapter.js";
-import type { Executor } from "../query.js";
+import { mysqlPositional, paramNumbers, sqliteValue } from "../adapter.js";
+import type { Executor, ExecutorResult } from "../query.js";
 import { runtimeImport } from "./node.js";
 
 interface Connection {
@@ -91,6 +91,104 @@ export async function connectPostgres(url: string): Promise<Connection> {
 		},
 		close: async () => {
 			await client.end().catch((cause: unknown) => {
+				if (!lost) throw cause;
+			});
+		},
+	};
+}
+
+type Mysql2 = typeof import("mysql2/promise");
+
+/** Whether `module` is `mysql2/promise`, with its `createConnection`. */
+function isMysql2(module: unknown): module is { readonly default: Mysql2 } {
+	return (
+		typeof module === "object" &&
+		module !== null &&
+		"default" in module &&
+		typeof module.default === "object" &&
+		module.default !== null &&
+		"createConnection" in module.default &&
+		typeof module.default.createConnection === "function"
+	);
+}
+
+/** mysql2's ResultSetHeader: the result of a statement without rows. */
+interface Header {
+	readonly affectedRows?: number | bigint;
+}
+
+/** What mysql2 resolves a statement to: its rows, a header, or one of each per statement of a script. */
+type Mysql2Result = readonly unknown[] | Header;
+
+const isHeader = (item: unknown): item is Header =>
+	typeof item === "object" && item !== null && "affectedRows" in item;
+
+/** Rows of a statement that returns them, else the affected row count. */
+function mysqlResult(result: Mysql2Result): ExecutorResult {
+	if (Array.isArray(result)) {
+		// A multi-statement script's result lists its statements' results
+		// (rows or headers); the last one stands for the script.
+		const last = result.at(-1);
+		if (last !== undefined && result.every(isResult)) return mysqlResult(last);
+		return { rows: result, rowCount: result.length };
+	}
+	const affected = "affectedRows" in result ? result.affectedRows : undefined;
+	return { rows: [], rowCount: affected === undefined ? 0 : Number(affected) };
+}
+
+/** Whether an element of a script's result list is a statement's result. */
+const isResult = (item: unknown): item is Mysql2Result =>
+	Array.isArray(item) || isHeader(item);
+
+/** One `mysql2` connection for a migrator call, to MySQL or MariaDB. */
+export async function connectMysql(url: string): Promise<Connection> {
+	if (!URL.canParse(url) || !/^(mysql|mariadb):$/.test(new URL(url).protocol))
+		throw new Error(
+			`typesql: invalid connection URL ${JSON.stringify(url)} (expected mysql://user:password@host:port/database)`,
+		);
+	let createConnection: Mysql2["createConnection"];
+	try {
+		({ createConnection } = (
+			await runtimeImport("mysql2/promise", isMysql2)
+		).default);
+	} catch (cause) {
+		throw new Error(
+			'typesql: url connects with the "mysql2" package, which is not installed: npm install mysql2',
+			{ cause },
+		);
+	}
+	let connection: Awaited<ReturnType<Mysql2["createConnection"]>>;
+	try {
+		// mysql2 reads a mariadb:// URL as a mysql:// one. Multiple statements
+		// let .raw() run a script, as it does on PostgreSQL.
+		connection = await createConnection({
+			uri: `mysql${url.slice(url.indexOf(":"))}`,
+			multipleStatements: true,
+		});
+	} catch (error) {
+		throw new Error(`typesql: cannot connect to MySQL: ${message(error)}`, {
+			cause: error,
+		});
+	}
+	// The server can end the session between queries. Without a listener,
+	// mysql2's 'error' event would end the process; the next query rejects
+	// with the error instead.
+	let lost: Error | undefined;
+	connection.on("error", (error: Error) => {
+		lost ??= error;
+	});
+	return {
+		execute: async (sql, values) => {
+			if (lost) throw lost;
+			const positional = mysqlPositional(sql, values);
+			const [result] = await connection.query(
+				positional.text,
+				positional.values,
+			);
+			return mysqlResult(result);
+		},
+		close: async () => {
+			await connection.end().catch((cause: unknown) => {
 				if (!lost) throw cause;
 			});
 		},

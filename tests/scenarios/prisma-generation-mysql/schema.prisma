@@ -1,0 +1,28 @@
+generator client {
+  provider = "prisma-client"
+  output = "./generated/client"
+  moduleFormat = "esm"
+  importFileExtension = "js"
+}
+generator typesql {
+  provider = "typesql-prisma"
+  output = "./generated/schema.ts"
+}
+datasource db {
+  provider = "mysql"
+}
+enum Role {
+  USER
+  ADMIN @map("admin")
+}
+model User {
+  id Int @id @default(autoincrement())
+  name String
+  bio String? @map("display_name") @db.Text
+  role Role @default(USER)
+  balance Decimal @default(0)
+  big BigInt @default(0)
+  prefs Json?
+  createdAt DateTime @default(now()) @map("created_at")
+  @@map("users")
+}

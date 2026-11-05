@@ -63,7 +63,10 @@ type ConfigOf<Schema, M> = Omit<MigratorConfig, "migrations"> & {
 
 export interface MigratorConfig {
 	readonly dialect: Dialect;
-	/** A PostgreSQL connection URL; the migrator connects with `pg`. */
+	/**
+	 * A PostgreSQL, MySQL or MariaDB connection URL; the migrator connects
+	 * with `pg` or `mysql2`.
+	 */
 	readonly url?: string | undefined;
 	/** A SQLite database file; the migrator opens it with `node:sqlite`. */
 	readonly db?: string | undefined;
@@ -124,10 +127,13 @@ export class MigrationError extends Error {
 	readonly migration: string;
 	readonly applied: readonly string[];
 	/**
-	 * Whether the migrator rolled the migration back. Not with `transaction:
-	 * false`, nor when its statements didn't run in its transaction (an
-	 * executor on a pool) or the connection was lost, which ends the
-	 * transaction on the server.
+	 * Whether the migrator rolled the whole migration back. Not with
+	 * `transaction: false`, nor when its statements didn't run in its
+	 * transaction (an executor on a pool) or the connection was lost, which
+	 * ends the transaction on the server. On MySQL and MariaDB, which commit
+	 * implicitly before and after each DDL statement, not once the migration
+	 * ran a DDL statement: what ran up to its last DDL statement stays
+	 * applied, and only the statements after it were rolled back.
 	 */
 	readonly rolledBack: boolean;
 	readonly schemaFile?: string;
@@ -232,10 +238,16 @@ const loadFiles = () => import("./files.js");
 const loadConnect = () => import("./connect.js");
 const loadGenerate = () => import("./generate.js");
 
+const DIALECTS: readonly Dialect[] = ["postgres", "sqlite", "mysql", "mariadb"];
+
+/** MySQL and MariaDB run the same migrator; the dialect names the server. */
+const isMySql = (dialect: Dialect): boolean =>
+	dialect === "mysql" || dialect === "mariadb";
+
 function validate(config: MigratorConfig): void {
-	if (config.dialect !== "postgres" && config.dialect !== "sqlite")
+	if (!DIALECTS.includes(config.dialect))
 		throw new Error(
-			`typesql: unsupported migration dialect: ${String(config.dialect)} (expected postgres or sqlite)`,
+			`typesql: unsupported migration dialect: ${String(config.dialect)} (expected postgres, sqlite, mysql or mariadb)`,
 		);
 	const sources = SOURCES.filter((key) => config[key] !== undefined);
 	if (sources.length !== 1)
@@ -251,10 +263,14 @@ function validate(config: MigratorConfig): void {
 		throw new Error(
 			`typesql: set one of url, db and execute, not ${connections.join(" and ")}`,
 		);
-	if (config.url !== undefined && config.dialect !== "postgres")
-		throw new Error("typesql: url connects to PostgreSQL; use db for SQLite");
+	if (config.url !== undefined && config.dialect === "sqlite")
+		throw new Error(
+			"typesql: url connects to PostgreSQL, MySQL or MariaDB; use db for SQLite",
+		);
 	if (config.db !== undefined && config.dialect !== "sqlite")
-		throw new Error("typesql: db opens a SQLite file; use url for PostgreSQL");
+		throw new Error(
+			"typesql: db opens a SQLite file; use url for PostgreSQL, MySQL or MariaDB",
+		);
 	for (const key of [
 		"url",
 		"db",
@@ -466,10 +482,10 @@ function checkChain(dialect: Dialect, entries: readonly Entry[]): void {
 	});
 }
 
-function identifier(name: string): string {
+function identifier(name: string, quote: '"' | "`" = '"'): string {
 	if (name.includes("\0"))
 		throw new Error("typesql: the migration table name must not contain NUL");
-	return `"${name.replaceAll('"', '""')}"`;
+	return `${quote}${name.replaceAll(quote, quote + quote)}${quote}`;
 }
 
 /** Whether an executor returned its rows rather than a result. */
@@ -592,6 +608,30 @@ const text = (cause: unknown): string => {
 	return message.replace(/^typesql: /, "");
 };
 
+/** The first row, when it is an object. */
+const first = (records: readonly unknown[]): object | undefined => {
+	const [row] = records;
+	return typeof row === "object" && row !== null ? row : undefined;
+};
+
+/** MySQL's ER_SP_DOES_NOT_EXIST: `RELEASE SAVEPOINT` of a savepoint that isn't there. */
+const noSavepoint = (cause: unknown): boolean =>
+	(typeof cause === "object" &&
+		cause !== null &&
+		"errno" in cause &&
+		cause.errno === 1305) ||
+	/SAVEPOINT \S+ does not exist/i.test(
+		cause instanceof Error ? cause.message : String(cause),
+	);
+
+/**
+ * Why a failed migration was not rolled back: with `transaction: false`,
+ * because its statements ran outside the migration's transaction (an
+ * executor on a pool), or because MySQL's implicit commits around its DDL
+ * statements ended the transaction before it failed.
+ */
+type NotRolledBack = "none" | "split" | "implicit";
+
 /** The history table on one connection, and the transactions around it. */
 async function openHistory(
 	execute: Executor,
@@ -600,8 +640,102 @@ async function openHistory(
 	transaction: boolean,
 ) {
 	const postgres = dialect === "postgres";
+	const mysql = isMySql(dialect);
 	let table = identifier(tableName);
+	const createTable = (): string =>
+		mysql
+			? `CREATE TABLE IF NOT EXISTS ${table} (name VARCHAR(255) NOT NULL PRIMARY KEY, hash VARCHAR(64) NOT NULL, applied_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6)) DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_bin`
+			: `CREATE TABLE IF NOT EXISTS ${table} (name TEXT PRIMARY KEY NOT NULL, hash TEXT NOT NULL, applied_at ${postgres ? "TIMESTAMPTZ" : "TEXT"} NOT NULL DEFAULT CURRENT_TIMESTAMP)`;
 	let lock: string | undefined;
+	/** MySQL: the connection's id, to tell whether a call reaches the same one. */
+	let connectionId: unknown;
+	/** MySQL: the session's autocommit before the migrator turned it off. */
+	let autocommit: 0 | 1 = 1;
+	/** MySQL: the session lock held for the command, released by close(). */
+	let sessionLock: string | undefined;
+	/**
+	 * MySQL: whether this call reaches the connection the command started on.
+	 * A BEGIN inside a transaction would commit it there, so the connection's
+	 * id is compared instead.
+	 */
+	const sameConnection = async (): Promise<boolean> => {
+		const row = first(await rows(execute, "SELECT CONNECTION_ID() AS id"));
+		return row !== undefined && "id" in row && String(row.id) === connectionId;
+	};
+	if (mysql) {
+		const location = first(
+			await rows(
+				execute,
+				"SELECT DATABASE() AS db, @@autocommit AS autocommit, CONNECTION_ID() AS id",
+			),
+		);
+		if (
+			location === undefined ||
+			!("db" in location) ||
+			typeof location.db !== "string" ||
+			!("autocommit" in location) ||
+			!("id" in location)
+		)
+			throw new Error(
+				"typesql: no database selected: put the database in the connection URL",
+			);
+		// MySQL and MariaDB count identifier length in characters.
+		if (Array.from(tableName).length > 64)
+			throw new Error(
+				"typesql: the migration table name exceeds MySQL's 64-character identifier limit",
+			);
+		table = `${identifier(location.db, "`")}.${identifier(tableName, "`")}`;
+		connectionId = String(location.id);
+		autocommit = Number(location.autocommit) === 0 ? 0 : 1;
+		if (transaction) {
+			// A session-level named lock, released by close() or when the
+			// connection ends. Lock names are limited to 64 characters. MariaDB
+			// rejects a negative (infinite) timeout, so wait for up to a year.
+			const digest = await sha256(JSON.stringify([location.db, tableName]));
+			const name = `typesql_migrate_${Array.from(
+				new Uint8Array(digest).slice(0, 20),
+				(byte) => byte.toString(16).padStart(2, "0"),
+			).join("")}`;
+			// The lock belongs to a session: taken on a pooled connection that
+			// the next call doesn't get, it would stay held. An executor that
+			// changes connection is refused before taking it, and the lock is
+			// given back when it still landed elsewhere.
+			if (!(await sameConnection())) throw new Error(SPLIT);
+			const locked = first(
+				await rows(
+					execute,
+					"SELECT GET_LOCK($1, 31536000) AS locked, CONNECTION_ID() AS id",
+					[name],
+				),
+			);
+			if (
+				locked === undefined ||
+				!("locked" in locked) ||
+				Number(locked.locked) !== 1
+			)
+				throw new Error("typesql: cannot acquire the migration lock");
+			if (!("id" in locked) || String(locked.id) !== connectionId) {
+				await Promise.resolve(execute("SELECT RELEASE_LOCK($1)", [name])).catch(
+					() => {},
+				);
+				throw new Error(SPLIT);
+			}
+			sessionLock = name;
+			// DDL commits implicitly, so the history table is created before
+			// any migration's transaction. With autocommit off, the statements
+			// after a migration's last DDL statement commit together with its
+			// history record instead of one by one.
+			try {
+				await execute("SET autocommit = 0", []);
+				await execute(createTable(), []);
+			} catch (error) {
+				await Promise.resolve(
+					execute("SELECT RELEASE_LOCK($1)", [sessionLock]),
+				).catch(() => {});
+				throw error;
+			}
+		} else await execute(createTable(), []);
+	}
 	if (postgres) {
 		const [location] = await rows(
 			execute,
@@ -638,6 +772,24 @@ async function openHistory(
 	/** The transaction's id, on PostgreSQL. */
 	let xid: unknown;
 	/**
+	 * MySQL: whether the transaction begin() started is still the open one.
+	 * Its savepoint is dropped when the transaction ends: by a statement that
+	 * reached another connection, or by the implicit commit around a DDL
+	 * statement, after which (with autocommit off) the next statement
+	 * started a new transaction that ROLLBACK ends. The probe recreates the
+	 * savepoint, so it can be asked again.
+	 */
+	const sinceBegin = async (): Promise<boolean> => {
+		try {
+			await execute("RELEASE SAVEPOINT typesql_migration", []);
+		} catch (cause) {
+			if (noSavepoint(cause)) return false;
+			throw cause;
+		}
+		await execute("SAVEPOINT typesql_migration", []);
+		return true;
+	};
+	/**
 	 * Whether this call runs in the transaction begin() started. An executor
 	 * on a pool, or a client that runs each call on a connection of its own,
 	 * such as libsql's, sends each statement wherever it likes.
@@ -650,6 +802,7 @@ async function openHistory(
 				) === xid
 			);
 		}
+		if (mysql) return sameConnection();
 		// A BEGIN fails inside a transaction. One that succeeds started a
 		// transaction where there was none; end it.
 		const began = await execute("BEGIN", []).then(
@@ -662,7 +815,10 @@ async function openHistory(
 	return {
 		async begin(): Promise<void> {
 			if (!transaction) return;
-			await execute(postgres ? "BEGIN" : "BEGIN IMMEDIATE", []);
+			await execute(
+				postgres ? "BEGIN" : mysql ? "START TRANSACTION" : "BEGIN IMMEDIATE",
+				[],
+			);
 			try {
 				// The lock ends with the transaction, so it can't stay held on
 				// a pooled connection. Its void result stays in FROM: Prisma
@@ -675,7 +831,9 @@ async function openHistory(
 							[lock],
 						),
 					);
-				if (!(await inTransaction())) throw new Error(SPLIT);
+				if (mysql) await execute("SAVEPOINT typesql_migration", []);
+				if (!(await inTransaction()) || (mysql && !(await sinceBegin())))
+					throw new Error(SPLIT);
 			} catch (error) {
 				// Leave no transaction, and with it the lock, open on the
 				// caller's connection, where its later writes would be lost.
@@ -690,10 +848,12 @@ async function openHistory(
 		},
 		/**
 		 * Roll back after a failure, and tell whether it was rolled back: not
-		 * without a transaction, or when its statements didn't run in it.
+		 * without a transaction, or when its statements didn't run in it. On
+		 * MySQL, a migration that ran a DDL statement is rolled back only
+		 * after its last one: MySQL commits implicitly before and after DDL.
 		 */
-		async rollback(): Promise<boolean> {
-			if (!transaction) return false;
+		async rollback(): Promise<true | NotRolledBack> {
+			if (!transaction) return "none";
 			const intact = await inTransaction().catch((cause: unknown) => {
 				// After a failed statement PostgreSQL refuses every one but
 				// ROLLBACK: the transaction is still there.
@@ -701,25 +861,27 @@ async function openHistory(
 				throw cause;
 			});
 			if (intact) {
+				const whole = mysql ? await sinceBegin() : true;
 				await execute("ROLLBACK", []);
-				return true;
+				return whole ? true : "implicit";
 			}
 			// It may still reach the connection that holds the transaction.
 			await Promise.resolve(execute("ROLLBACK", [])).catch(() => {});
-			return false;
+			return "split";
 		},
 		/** Create the table if needed, and read it in the order it was applied. */
 		async read(): Promise<Row[]> {
-			await execute(
-				`CREATE TABLE IF NOT EXISTS ${table} (name TEXT PRIMARY KEY NOT NULL, hash TEXT NOT NULL, applied_at ${postgres ? "TIMESTAMPTZ" : "TEXT"} NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
-				[],
-			);
+			// On MySQL the table was created before the transaction: DDL
+			// would commit it.
+			if (!mysql) await execute(createTable(), []);
 			return readHistory(
 				await rows(
 					execute,
 					postgres
 						? `SELECT name, to_char(applied_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS at FROM ${table} ORDER BY applied_at, name`
-						: `SELECT name, applied_at AS at FROM ${table} ORDER BY applied_at, name`,
+						: mysql
+							? `SELECT name, DATE_FORMAT(applied_at, '%Y-%m-%dT%H:%i:%s.%fZ') AS at FROM ${table} ORDER BY applied_at, name`
+							: `SELECT name, applied_at AS at FROM ${table} ORDER BY applied_at, name`,
 				),
 			);
 		},
@@ -731,12 +893,25 @@ async function openHistory(
 			await execute(
 				postgres
 					? `INSERT INTO ${table} (name, hash, applied_at) SELECT $1, '', greatest(clock_timestamp(), max(applied_at) + interval '1 microsecond') FROM ${table}`
-					: `INSERT INTO ${table} (name, hash, applied_at) SELECT $1, '', CASE WHEN max(applied_at) IS NULL OR strftime('%Y-%m-%d %H:%M:%f', 'now') > max(applied_at) THEN strftime('%Y-%m-%d %H:%M:%f', 'now') ELSE strftime('%Y-%m-%d %H:%M:%f', max(applied_at), '+0.001 seconds') END FROM ${table}`,
+					: mysql
+						? `INSERT INTO ${table} (name, hash, applied_at) SELECT $1, '', GREATEST(UTC_TIMESTAMP(6), COALESCE(MAX(applied_at) + INTERVAL 1 MICROSECOND, UTC_TIMESTAMP(6))) FROM ${table}`
+						: `INSERT INTO ${table} (name, hash, applied_at) SELECT $1, '', CASE WHEN max(applied_at) IS NULL OR strftime('%Y-%m-%d %H:%M:%f', 'now') > max(applied_at) THEN strftime('%Y-%m-%d %H:%M:%f', 'now') ELSE strftime('%Y-%m-%d %H:%M:%f', max(applied_at), '+0.001 seconds') END FROM ${table}`,
 				[name],
 			);
 		},
 		async remove(name: string): Promise<void> {
 			await execute(`DELETE FROM ${table} WHERE name = $1`, [name]);
+		},
+		/** Release what the command held on the connection: MySQL's lock and autocommit. */
+		async close(): Promise<void> {
+			if (sessionLock === undefined) return;
+			// The connection may be gone; the server then released the lock.
+			try {
+				await execute(`SET autocommit = ${autocommit}`, []);
+			} catch {}
+			try {
+				await execute("SELECT RELEASE_LOCK($1)", [sessionLock]);
+			} catch {}
 		},
 	};
 }
@@ -754,8 +929,9 @@ async function run(
 	const names: string[] = [];
 	let applied = 0;
 	let status: MigrationStatus[] = [];
+	let history: Awaited<ReturnType<typeof openHistory>> | undefined;
 	try {
-		const history = await openHistory(
+		history = await openHistory(
 			connection.execute,
 			dialect,
 			config.migrationTable ?? "schema_migrations",
@@ -805,11 +981,15 @@ async function run(
 				let message = text(error);
 				let rolledBack = false;
 				try {
-					rolledBack = await history.rollback();
+					const outcome = await history.rollback();
+					rolledBack = outcome === true;
 					if (!rolledBack && current !== undefined)
-						message += transaction
-							? "; its statements didn't all run in the migration's transaction, so it was not rolled back and may be partly applied"
-							: "; without a transaction it was not rolled back, and may be partly applied";
+						message +=
+							outcome === "implicit"
+								? `; ${SERVERS[dialect]} commits implicitly before and after each DDL statement, so its statements up to its last DDL statement stay applied and only the ones after it were rolled back`
+								: outcome === "split"
+									? "; its statements didn't all run in the migration's transaction, so it was not rolled back and may be partly applied"
+									: "; without a transaction it was not rolled back, and may be partly applied";
 				} catch (rollbackError) {
 					// A lost connection fails the rollback with the same error.
 					if (rollbackError !== error) {
@@ -833,6 +1013,7 @@ async function run(
 			if (command !== "latest") break;
 		}
 	} finally {
+		await history?.close();
 		await connection.close();
 	}
 	return { names, applied, status };
@@ -844,19 +1025,28 @@ async function connect(
 	if (config.execute !== undefined)
 		return { execute: config.execute, close: async () => {} };
 	if (config.url !== undefined) {
-		const { connectPostgres } = await loadConnect();
-		return connectPostgres(config.url);
+		const { connectPostgres, connectMysql } = await loadConnect();
+		return isMySql(config.dialect)
+			? connectMysql(config.url)
+			: connectPostgres(config.url);
 	}
 	if (config.db !== undefined) {
 		const { connectSqlite } = await loadConnect();
 		return connectSqlite(config.db);
 	}
 	throw new Error(
-		config.dialect === "postgres"
-			? "typesql: set url (or execute) to run PostgreSQL migrations"
-			: "typesql: set db (or execute) to run SQLite migrations",
+		config.dialect === "sqlite"
+			? "typesql: set db (or execute) to run SQLite migrations"
+			: `typesql: set url (or execute) to run ${SERVERS[config.dialect]} migrations`,
 	);
 }
+
+const SERVERS: Readonly<Record<Dialect, string>> = {
+	postgres: "PostgreSQL",
+	sqlite: "SQLite",
+	mysql: "MySQL",
+	mariadb: "MariaDB",
+};
 
 /** Run one `up` or `down` on a guarded connection inside the runner's transaction. */
 async function runStep(
@@ -917,6 +1107,7 @@ function scanSql(
 	dialect: Dialect,
 	on: (token: string, end: number, start: boolean) => void,
 ): void {
+	const mysql = isMySql(dialect);
 	let start = true;
 	for (let i = 0; i < sql.length; ) {
 		const char = sql.charAt(i);
@@ -924,9 +1115,15 @@ function scanSql(
 			i++;
 			continue;
 		}
-		if (sql.startsWith("--", i)) {
-			const end = /[\r\n]/.exec(sql.slice(i + 2));
-			i = end === null ? sql.length : i + 2 + end.index + 1;
+		// MySQL's `--` comment needs whitespace after it (`--x` is subtraction
+		// of a negative), and `#` opens one too.
+		if (
+			(sql.startsWith("--", i) &&
+				(!mysql || i + 2 >= sql.length || /\s/.test(sql.charAt(i + 2)))) ||
+			(mysql && char === "#")
+		) {
+			const end = /[\r\n]/.exec(sql.slice(i + 1));
+			i = end === null ? sql.length : i + 1 + end.index + 1;
 			continue;
 		}
 		if (sql.startsWith("/*", i)) {
@@ -947,14 +1144,17 @@ function scanSql(
 		if (
 			char === "'" ||
 			char === '"' ||
-			(dialect === "sqlite" && (char === "`" || char === "["))
+			((dialect === "sqlite" || mysql) && char === "`") ||
+			(dialect === "sqlite" && char === "[")
 		) {
 			const end = char === "[" ? "]" : char;
+			// MySQL strings take backslash escapes; its quoted identifiers don't.
 			const escapes =
-				dialect === "postgres" &&
-				char === "'" &&
-				/[eE]/.test(sql[i - 1] ?? "") &&
-				!/[\w$]/.test(sql[i - 2] ?? "");
+				(mysql && char !== "`") ||
+				(dialect === "postgres" &&
+					char === "'" &&
+					/[eE]/.test(sql[i - 1] ?? "") &&
+					!/[\w$]/.test(sql[i - 2] ?? ""));
 			i++;
 			while (i < sql.length) {
 				if (escapes && sql[i] === "\\") i += 2;
@@ -1023,8 +1223,35 @@ function opensTrigger(words: readonly string[]): boolean {
 	return /^CREATE (?:TEMP |TEMPORARY )?TRIGGER$/.test(words.join(" "));
 }
 
+// The kinds of object CREATE makes. In MySQL and MariaDB, a stored program's
+// body may hold `;`-separated statements inside BEGIN … END.
+const CREATE_KINDS = new Set([
+	"TABLE",
+	"VIEW",
+	"INDEX",
+	"DATABASE",
+	"SCHEMA",
+	"SEQUENCE",
+	"USER",
+	"ROLE",
+	"SERVER",
+	"TABLESPACE",
+	"PACKAGE",
+	"PROCEDURE",
+	"FUNCTION",
+	"TRIGGER",
+	"EVENT",
+]);
+const STORED_PROGRAMS = new Set(["PROCEDURE", "FUNCTION", "TRIGGER", "EVENT"]);
+
+const controlsTransaction = (): Error =>
+	new Error(
+		"typesql: migrations cannot control transactions; each migration runs in its own transaction",
+	);
+
 /** Keep transaction ownership with the runner, including multi-statement raw SQL. */
 function assertMigrationSql(sql: string, dialect: Dialect): void {
+	const mysql = isMySql(dialect);
 	const words: string[] = [];
 	const checkRollback = (): void => {
 		if (
@@ -1040,21 +1267,76 @@ function assertMigrationSql(sql: string, dialect: Dialect): void {
 			);
 	};
 	let trigger = false;
-	scanSql(sql, dialect, (token, _end, start) => {
+	// MySQL and MariaDB: the kind of object a CREATE statement makes, and the
+	// BEGIN/CASE … END nesting of a compound statement: a stored program's
+	// body, which runs only when called, or MariaDB's BEGIN NOT ATOMIC block,
+	// which runs now.
+	let createKind: string | undefined;
+	let compound: "program" | "block" | undefined;
+	let depth = 0;
+	/** Tokens that belong to the one before them: `END CASE`'s CASE. */
+	let skip = 0;
+	scanSql(sql, dialect, (token, end, start) => {
 		if (token === ";") {
-			checkRollback();
+			if (compound !== "program" || depth === 0) checkRollback();
 			words.length = 0;
+			// A `;` inside a compound statement's BEGIN … END doesn't end it.
+			if (compound !== undefined && depth > 0) return;
+			createKind = undefined;
+			compound = undefined;
 			return;
 		}
-		if (trigger && start && token === "END") trigger = false;
+		if (skip > 0) {
+			skip--;
+			return;
+		}
+		const next = sql.slice(end);
+		if (
+			mysql &&
+			start &&
+			compound === undefined &&
+			token === "BEGIN" &&
+			/^\s+NOT\s+ATOMIC\b/i.test(next)
+		) {
+			compound = "block";
+			depth = 1;
+			skip = 2;
+			return;
+		}
+		if (compound !== undefined) {
+			if (token === "BEGIN" || token === "CASE") depth++;
+			else if (token === "END") {
+				if (/^\s+CASE\b/i.test(next)) {
+					depth--;
+					skip = 1;
+				} else if (!/^\s+(?:IF|LOOP|WHILE|REPEAT|FOR)\b/i.test(next)) depth--;
+			} else if (
+				compound === "block" &&
+				start &&
+				/^(START|COMMIT|XA)$/.test(token)
+			)
+				throw controlsTransaction();
+		} else if (trigger && start && token === "END") trigger = false;
 		else if (
 			!trigger &&
 			start &&
-			/^(BEGIN|START|COMMIT|END|ABORT)$/.test(token)
+			(/^(BEGIN|START|COMMIT|END|ABORT)$/.test(token) ||
+				(mysql && token === "XA"))
 		)
-			throw new Error(
-				"typesql: migrations cannot control transactions; each migration runs in its own transaction",
-			);
+			throw controlsTransaction();
+		if (
+			mysql &&
+			compound === undefined &&
+			words[0] === "CREATE" &&
+			createKind === undefined &&
+			CREATE_KINDS.has(token)
+		) {
+			createKind = token;
+			if (STORED_PROGRAMS.has(token)) {
+				compound = "program";
+				depth = 0;
+			}
+		}
 		if (words.length < 4) words.push(token);
 		if (words.length === 2 && words[0] === "PREPARE" && token === "TRANSACTION")
 			throw new Error("typesql: migrations cannot prepare transactions");

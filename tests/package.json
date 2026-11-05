@@ -13,6 +13,7 @@
 		"@types/node": "catalog:",
 		"pg": "catalog:",
 		"@types/pg": "catalog:",
-		"vite": "catalog:"
+		"vite": "catalog:",
+		"mysql2": "catalog:"
 	}
 }

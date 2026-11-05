@@ -1,6 +1,6 @@
 # Scenario tests
 
-Requires Linux, Node.js 26 (CI pins 26.8.1) and the repository's pnpm version. pnpm installs Bun for the scenarios that run it, at the version in the root catalog. Start PostgreSQL yourself with `docker compose -f tests/compose.yaml up -d --wait`, then run from the repository root:
+Requires Linux, Node.js 26 (CI pins 26.8.1) and the repository's pnpm version. pnpm installs Bun for the scenarios that run it, at the version in the root catalog. Start PostgreSQL, MySQL and MariaDB yourself with `docker compose -f tests/compose.yaml up -d --wait`, then run from the repository root:
 
 ```sh
 pnpm install --frozen-lockfile
@@ -9,7 +9,7 @@ pnpm test pg-left-join            # one scenario
 pnpm test pg-left-join --update   # update snapshots; review the diff
 ```
 
-Tests use PostgreSQL at `127.0.0.1:55432`; set `TYPESQL_DATABASE_URL` to use another instance.
+Tests use PostgreSQL at `127.0.0.1:55432`, MySQL 8.4 at `127.0.0.1:53306` and MariaDB 11.8 at `127.0.0.1:53307`; set `TYPESQL_DATABASE_URL`, `TYPESQL_MYSQL_URL` or `TYPESQL_MARIADB_URL` to use other instances. A scenario's `scenario.database` (`postgres`, `mysql`, `mariadb` or `sqlite`) selects the server; each run gets a database of its own in `DATABASE_URL` (with a `mysql://` or `mariadb://` scheme for those servers) or a file in `SQLITE_PATH`.
 
 Scenarios live in `tests/scenarios/`. Copy an existing one, use `workspace:*` for TypeSQL and `catalog:` for external dependencies, and import public APIs. The runner builds the libraries and runs temporary copies with the installed workspace dependencies, checking types, compiler errors, output, and generated files against `expected.snap`. Commands reuse the workspace-selected pnpm executable through `npm_execpath`, including in temporary copies outside the workspace.
 

@@ -61,6 +61,7 @@ async function environment() {
 				"pg",
 				"postgres",
 				"sqlite",
+				"mysql",
 				"kysely",
 				"drizzle",
 				"prisma",

@@ -6,7 +6,7 @@ import {
 import type { DmmfDatamodel, DmmfEnum, DmmfField, DmmfModel } from "./dmmf.js";
 
 export interface EmitOptions {
-	readonly dialect?: "postgres" | "sqlite" | undefined;
+	readonly dialect?: "postgres" | "sqlite" | "mysql" | undefined;
 	readonly importFrom?: string | undefined;
 	readonly typeName?: string | undefined;
 	readonly views?: readonly string[];
@@ -47,6 +47,53 @@ const SQLITE_SCALAR_TYPES: ReadonlyMap<string, string> = new Map([
 	["DateTime", "datetime"],
 	["Json", "jsonb"],
 	["Bytes", "blob"],
+]);
+
+const MYSQL_SCALAR_TYPES: ReadonlyMap<string, string> = new Map([
+	["Int", "int"],
+	["BigInt", "bigint"],
+	["Float", "double"],
+	["Decimal", "decimal"],
+	["String", "varchar"],
+	["Boolean", "tinyint"],
+	["DateTime", "datetime"],
+	["Json", "json"],
+	["Bytes", "longblob"],
+]);
+
+const MYSQL_NATIVE_TYPES: ReadonlyMap<string, string> = new Map([
+	["TinyInt", "tinyint"],
+	["SmallInt", "smallint"],
+	["MediumInt", "mediumint"],
+	["Int", "int"],
+	["BigInt", "bigint"],
+	["UnsignedTinyInt", "tinyint unsigned"],
+	["UnsignedSmallInt", "smallint unsigned"],
+	["UnsignedMediumInt", "mediumint unsigned"],
+	["UnsignedInt", "int unsigned"],
+	["UnsignedBigInt", "bigint unsigned"],
+	["Decimal", "decimal"],
+	["Float", "float"],
+	["Double", "double"],
+	["Bit", "bit"],
+	["Char", "char"],
+	["VarChar", "varchar"],
+	["TinyText", "tinytext"],
+	["Text", "text"],
+	["MediumText", "mediumtext"],
+	["LongText", "longtext"],
+	["Binary", "binary"],
+	["VarBinary", "varbinary"],
+	["TinyBlob", "tinyblob"],
+	["Blob", "blob"],
+	["MediumBlob", "mediumblob"],
+	["LongBlob", "longblob"],
+	["Date", "date"],
+	["DateTime", "datetime"],
+	["Timestamp", "timestamp"],
+	["Time", "time"],
+	["Year", "year"],
+	["Json", "json"],
 ]);
 
 const NATIVE_TYPES: ReadonlyMap<string, string> = new Map([
@@ -149,6 +196,22 @@ function doc(lines: readonly string[], indent: string): string {
 	return `${indent}/**\n${lines.map((l) => `${indent} * ${docText(l)}`).join("\n")}\n${indent} */\n`;
 }
 
+/** `colSource`, with MySQL's `autoIncrement` flag. */
+function column(
+	type: string,
+	nullable: boolean,
+	hasDefault: boolean,
+	autoIncrement: boolean,
+): string {
+	if (!autoIncrement) return colSource(type, nullable, hasDefault);
+	const flags = [
+		...(nullable ? ["nullable: true"] : []),
+		"hasDefault: true",
+		"autoIncrement: true",
+	];
+	return `Col<${type}, { ${flags.join("; ")} }>`;
+}
+
 function sqliteTypeOf(field: DmmfField, enums: readonly DmmfEnum[]): string {
 	if (field.kind === "enum") {
 		const e = enums.find((x) => x.name === field.type);
@@ -157,6 +220,29 @@ function sqliteTypeOf(field: DmmfField, enums: readonly DmmfEnum[]): string {
 	}
 	return str(SQLITE_SCALAR_TYPES.get(field.type) ?? field.type.toLowerCase());
 }
+
+function mysqlTypeOf(field: DmmfField, enums: readonly DmmfEnum[]): string {
+	if (field.kind === "enum") {
+		const e = enums.find((x) => x.name === field.type);
+		const values = (e?.values ?? []).map((v) => str(v.dbName ?? v.name));
+		return `Typed<"enum", ${values.join(" | ") || "never"}>`;
+	}
+	const native = field.nativeType?.[0];
+	if (native !== undefined)
+		return str(MYSQL_NATIVE_TYPES.get(native) ?? native.toLowerCase());
+	return str(MYSQL_SCALAR_TYPES.get(field.type) ?? field.type.toLowerCase());
+}
+
+const isAutoIncrement = (field: DmmfField): boolean => {
+	const d = field.default;
+	return (
+		d !== null &&
+		d !== undefined &&
+		typeof d === "object" &&
+		"name" in d &&
+		d.name === "autoincrement"
+	);
+};
 
 export function generateSource(
 	datamodel: DmmfDatamodel,
@@ -169,6 +255,7 @@ export function generateSource(
 	);
 	const used = new Set<string>();
 	const sqlite = options.dialect === "sqlite";
+	const mysql = options.dialect === "mysql";
 
 	const table = (model: DmmfModel, indent: string): string => {
 		const isView = views.has(model.name);
@@ -198,8 +285,10 @@ export function generateSource(
 			used.add("Col");
 			const type = sqlite
 				? sqliteTypeOf(f, datamodel.enums)
-				: str(pgTypeOf(f, enums) + (f.isList ? "[]" : ""));
-			if (sqlite && f.kind === "enum") used.add("Typed");
+				: mysql
+					? mysqlTypeOf(f, datamodel.enums)
+					: str(pgTypeOf(f, enums) + (f.isList ? "[]" : ""));
+			if ((sqlite || mysql) && f.kind === "enum") used.add("Typed");
 			const notes = [
 				...(f.dbName && f.dbName !== f.name
 					? [`Prisma field \`${f.name}\`.`]
@@ -210,7 +299,7 @@ export function generateSource(
 				...(f.documentation ? f.documentation.split("\n") : []),
 			];
 			cols.push(
-				`${doc(notes, `${indent}  `)}${indent}  ${key(f.dbName ?? f.name)}: ${colSource(type, nullable, !isView && hasDbDefault(f))};`,
+				`${doc(notes, `${indent}  `)}${indent}  ${key(f.dbName ?? f.name)}: ${column(type, nullable, !isView && hasDbDefault(f), mysql && !isView && isAutoIncrement(f))};`,
 			);
 		}
 		const body = `{\n${cols.join("\n")}\n${indent}}`;
@@ -233,7 +322,7 @@ export function generateSource(
 				indent,
 			)}${indent}${key(m.dbName ?? m.name)}: ${table(m, indent)};`,
 	);
-	if (!sqlite && datamodel.enums.length > 0) {
+	if (!sqlite && !mysql && datamodel.enums.length > 0) {
 		const entries = datamodel.enums.map((e) => {
 			const values = e.values.map((v) => str(v.dbName ?? v.name)).join(" | ");
 			return `${doc(e.dbName && e.dbName !== e.name ? [`Prisma enum \`${e.name}\`.`] : [], "    ")}    ${key(e.dbName ?? e.name)}: ${values || "never"};`;
@@ -244,7 +333,11 @@ export function generateSource(
 	const imports = ["Col", "Typed", "View"].filter((h) => used.has(h));
 	const from =
 		options.importFrom ??
-		(sqlite ? "@typesql/core/sqlite" : "@typesql/core/postgres");
+		(sqlite
+			? "@typesql/core/sqlite"
+			: mysql
+				? "@typesql/core/mysql"
+				: "@typesql/core/postgres");
 	return [
 		"// Generated by @typesql/prisma from the Prisma schema. Do not edit.",
 		...(imports.length > 0

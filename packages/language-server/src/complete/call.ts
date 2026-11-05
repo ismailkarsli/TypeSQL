@@ -35,7 +35,11 @@ export interface SqlCall {
 	readonly dialect: Dialect;
 }
 
-export type Dialect = "postgres" | "sqlite";
+export type Dialect = "postgres" | "sqlite" | "mysql" | "mariadb";
+
+/** MySQL and MariaDB: backtick identifiers, `#` comments, backslash escapes. */
+export const isMySql = (d: Dialect): boolean =>
+	d === "mysql" || d === "mariadb";
 
 const METHODS = new Set(["fragment", "as"]);
 
@@ -56,7 +60,7 @@ export async function sqlCallAt(
 	const call = callAt(file, offset, kinds);
 	if (!call) return null;
 	const literal = call.arguments[0]!;
-	const parts = textOf(file, literal, kinds);
+	let parts = textOf(file, literal, kinds);
 	if (
 		offset < parts.start ||
 		offset > parts.end ||
@@ -72,6 +76,8 @@ export async function sqlCallAt(
 	);
 	const target = await sqlTarget(checker, sqlType, isCorePath);
 	if (!target) return null;
+	if (isMySql(target.dialect))
+		parts = textOf(file, literal, kinds, target.dialect);
 	return {
 		file,
 		offset,
@@ -89,23 +95,71 @@ async function sqlTarget(
 	isCorePath: (path: string) => boolean,
 ): Promise<{ db: Type; dialect: Dialect } | null> {
 	if (!t.isTypeReference()) return null;
-	if (await isCoreRef(t, ["Sql", "TransactionalSql"], isCorePath)) {
-		const db = (await checker.getTypeArguments(t))[0];
-		const sym = await t.getSymbol();
-		const sqlite = sym?.declarations.some((d) =>
-			/[\\/]sqlite[\\/]/.test(d.path),
-		);
-		return db ? { db, dialect: sqlite ? "sqlite" : "postgres" } : null;
-	}
 	// core's createSql(dialect).withPlugin(…) returns SqlApi<Engine, DB, …>.
-	if (await isCoreRef(t, ["SqlApi"], isCorePath)) {
-		const [engine, db] = await checker.getTypeArguments(t);
-		const name = engine ? (await engine.getSymbol())?.name : undefined;
-		return db
-			? { db, dialect: name === "SqliteEngine" ? "sqlite" : "postgres" }
-			: null;
+	const index = (await isCoreRef(t, SQL_TYPES, isCorePath))
+		? 0
+		: (await isCoreRef(t, ["SqlApi"], isCorePath))
+			? 1
+			: -1;
+	if (index < 0) return null;
+	const db = (await checker.getTypeArguments(t))[index];
+	return db ? { db, dialect: await dialectOf(checker, t) } : null;
+}
+
+const SQL_TYPES = [
+	"Sql",
+	"TransactionalSql",
+	"MariaDbSql",
+	"MariaDbTransactionalSql",
+];
+
+const DIALECTS: ReadonlySet<string> = new Set<Dialect>([
+	"postgres",
+	"sqlite",
+	"mysql",
+	"mariadb",
+]);
+
+const isDialect = (name: string): name is Dialect => DIALECTS.has(name);
+
+// Shared generic types whose first type argument is the engine or dialect.
+const GENERIC = new Set(["SqlApi", "MigrationContext", "Migrations"]);
+
+const ENGINES = new Map<string, Dialect>([
+	["PgEngine", "postgres"],
+	["SqliteEngine", "sqlite"],
+	["MySqlEngine", "mysql"],
+	["MariaDbEngine", "mariadb"],
+	["Postgres", "postgres"],
+	["Sqlite", "sqlite"],
+	["MySql", "mysql"],
+	["MariaDb", "mariadb"],
+]);
+
+/**
+ * The dialect of a core type that takes SQL: by its `dialect` property when
+ * the type names one (each dialect's Sql does), else by its name for MariaDB's
+ * own types, by its engine or dialect type argument for the shared generic
+ * types (SqlApi, MigrationContext, Migrations), else by the dialect folder
+ * that declares it.
+ */
+export async function dialectOf(checker: Checker, t: Type): Promise<Dialect> {
+	const own = await checker.getTypeOfPropertyOfType(t, "dialect");
+	if (own?.isStringLiteralType() && isDialect(own.value)) return own.value;
+	const sym = await t.getSymbol();
+	if (!sym) return "postgres";
+	if (sym.name.startsWith("MariaDb")) return "mariadb";
+	if (GENERIC.has(sym.name) && t.isTypeReference()) {
+		const [first] = await checker.getTypeArguments(t);
+		const name = first ? (await first.getSymbol())?.name : undefined;
+		return (name && ENGINES.get(name)) || "postgres";
 	}
-	return null;
+	const path = sym.declarations.map((d) => d.path).join("\n");
+	return /[\\/](?:src|dist)[\\/]mysql[\\/]/.test(path)
+		? "mysql"
+		: /[\\/](?:src|dist)[\\/]sqlite[\\/]/.test(path)
+			? "sqlite"
+			: "postgres";
 }
 
 function callAt(
@@ -158,6 +212,7 @@ export function textOf(
 	file: SourceFile,
 	literal: Node,
 	kinds: EditorKinds,
+	dialect: Dialect = "postgres",
 ): LiteralText {
 	const src = file.text;
 	const open = literal.getStart(file);
@@ -176,7 +231,7 @@ export function textOf(
 	let text = "";
 	let i = start;
 	for (const [s, e] of [...holes, [end, end] satisfies [number, number]]) {
-		text += escapes(src.slice(i, s));
+		text += escapes(src.slice(i, s), isMySql(dialect));
 		if (e > s) text += "$0".padEnd(e - s, " ");
 		i = e;
 	}
@@ -191,10 +246,16 @@ function escaped(s: string, i: number): boolean {
 
 // Replace each escape with two characters to keep offsets. An escaped quote
 // keeps its quote and gets a space outside the SQL quote it opens or closes,
-// so `\"Users\"` reads as ` "Users" `, not ` "Users "`.
-const escapes = (s: string): string => {
+// so `\"Users\"` reads as ` "Users" `, not ` "Users "`. For MySQL, whose
+// strings take backslash escapes, a run of n escaped backslashes becomes n
+// spaces and then the n backslashes, so the last escapes what follows it.
+const escapes = (s: string, backslashes = false): string => {
 	const open = new Set<string>();
-	return s.replace(/\\(.)/gs, (_, c: string) => {
+	return s.replace(/(?:\\\\)+|\\(.)/gs, (m, c: string | undefined) => {
+		if (c === undefined)
+			return backslashes
+				? " ".repeat(m.length / 2) + "\\".repeat(m.length / 2)
+				: " ".repeat(m.length);
 		if (c !== '"' && c !== "'" && c !== "`") return "  ";
 		if (open.delete(c)) return `${c} `;
 		open.add(c);

@@ -1,0 +1,44 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`mariadb-connector > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "after": "({ id: number })[]",
+      "counted": "{ best: null | bigint; n: bigint }",
+      "deleted": "({ id: number })[]",
+      "dialect": ""mariadb"",
+      "inserted": "({ bio: null | string; id: number; name: string })[]",
+      "named": "{ name: string }",
+      "rows": "({ bio: null | string; id: number; name: string; score: bigint })[]",
+    },
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "abort
+{
+  dialect: 'mariadb',
+  inserted: [
+    { id: 1, name: 'Ada', bio: null },
+    { id: 2, name: 'Grace', bio: 'Compiler' }
+  ],
+  rows: [
+    { id: 1, name: 'Ada', bio: null, score: 0n },
+    { id: 2, name: 'Grace', bio: 'Compiler', score: 0n }
+  ],
+  counted: { n: 2n, best: 0n },
+  named: { name: 'Ada' },
+  after: [ { id: 1 }, { id: 2 } ],
+  deleted: [ { id: 2 } ]
+}
+",
+  },
+}
+`;

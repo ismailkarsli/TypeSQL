@@ -71,10 +71,18 @@ type WriteEncoded<
 
 // The write helpers' results are written as Fragment<…> so that declaration
 // emit can name them from @typesql/core.
-type SetText<P> = SetRep<P>["text"];
+type SetText<P, E> = SetRep<P, QuoteOf<E>>["text"];
 type SetCarried<P> = SetRep<P>["carried"];
-type ValuesText<R> = ValuesRep<R>["text"];
+type ValuesText<R, E> = ValuesRep<R, QuoteOf<E>, EmptyRowOf<E>>["text"];
 type ValuesCarried<R> = ValuesRep<R>["carried"];
+/** The identifier quote of a dialect: `"`, or a backtick for MySQL. */
+type QuoteOf<E> = E extends { readonly quote: infer Q extends string }
+	? Q
+	: '"';
+/** How a dialect inserts a row of defaults. */
+type EmptyRowOf<E> = E extends { readonly emptyRow: infer R extends string }
+	? R
+	: "DEFAULT VALUES";
 
 export interface SqlApi<
 	E extends EngineTypes,
@@ -137,8 +145,10 @@ export interface SqlApi<
 
 	id<const Parts extends readonly [string, ...string[]]>(
 		...parts: Parts & LiteralParts<Parts>
-	): Fragment<QuotedIdent<Parts>, [], []>;
-	id(name: RelationName<DB>): Fragment<QuotedIdent<[RelationName<DB>]>, [], []>;
+	): Fragment<QuotedIdent<Parts, QuoteOf<E>>, [], []>;
+	id(
+		name: RelationName<DB>,
+	): Fragment<QuotedIdent<[RelationName<DB>], QuoteOf<E>>, [], []>;
 	id(...parts: readonly [string, ...string[]]): Fragment<string, [], []>;
 
 	combine<
@@ -164,7 +174,7 @@ export interface SqlApi<
 				? NoExtraKeys<P, WriteInput<SetInput<E, DB, TM, T>, Plugins, "set", T>>
 				: never),
 	): Fragment<
-		SetText<WriteEncoded<P, Plugins, "set", T>>,
+		SetText<WriteEncoded<P, Plugins, "set", T>, E>,
 		readonly unknown[],
 		SetCarried<WriteEncoded<P, Plugins, "set", T>>
 	>;
@@ -172,7 +182,7 @@ export interface SqlApi<
 	set<const P extends object>(
 		values: P,
 	): Fragment<
-		SetText<WriteEncoded<P, Plugins, "set", undefined>>,
+		SetText<WriteEncoded<P, Plugins, "set", undefined>, E>,
 		readonly unknown[],
 		SetCarried<WriteEncoded<P, Plugins, "set", undefined>>
 	>;
@@ -193,7 +203,7 @@ export interface SqlApi<
 				: never;
 		},
 	): Fragment<
-		ValuesText<WriteEncoded<R[number], Plugins, "values", T>>,
+		ValuesText<WriteEncoded<R[number], Plugins, "values", T>, E>,
 		readonly unknown[],
 		ValuesCarried<WriteEncoded<R[number], Plugins, "values", T>>
 	>;
@@ -206,13 +216,14 @@ export interface SqlApi<
 		rows: R,
 	):
 		| Fragment<
-				ValuesText<WriteEncoded<R[number], Plugins, "values", undefined>>,
+				ValuesText<WriteEncoded<R[number], Plugins, "values", undefined>, E>,
 				readonly unknown[],
 				ValuesCarried<WriteEncoded<R[number], Plugins, "values", undefined>>
 		  >
 		| Fragment<
 				ValuesText<
-					SentRows<WriteEncoded<R[number], Plugins, "values", undefined>>
+					SentRows<WriteEncoded<R[number], Plugins, "values", undefined>>,
+					E
 				>,
 				readonly unknown[],
 				ValuesCarried<

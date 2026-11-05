@@ -1,0 +1,58 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`migrations-mysql > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {},
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "{
+  name: 'MigrationError',
+  message: "typesql: migration 2 (002-failure) failed: Column 'name' cannot be null; MySQL commits implicitly before and after each DDL statement, so its statements up to its last DDL statement stay applied and only the ones after it were rolled back",
+  migration: '002-failure',
+  rolledBack: false,
+  applied: [ '001-users' ]
+}
+{ history: [ { name: '001-users' } ] }
+{
+  status: [
+    { name: '001-users', applied: true },
+    { name: '002-failure', applied: false }
+  ]
+}
+{
+  tables: [
+    { name: 'schema_migrations' },
+    { name: 'temporary' },
+    { name: 'users' }
+  ]
+}
+{ again: { applied: [] } }
+{ down: { reverted: [ '001-users' ] } }
+{ history: [] }
+{
+  name: 'MigrationError',
+  migration: '002-failure',
+  rolledBack: false,
+  applied: [ '001-users' ]
+}
+{
+  tablesWithoutTransaction: [
+    { name: 'schema_migrations' },
+    { name: 'temporary' },
+    { name: 'users' }
+  ],
+  history: [ { name: '001-users' } ]
+}
+",
+  },
+}
+`;

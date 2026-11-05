@@ -7,6 +7,9 @@ import type {
 } from "../dialect.js";
 import type { EngineTypes } from "../engine/contract.js";
 import type { SqlError } from "../errors.js";
+import { mariadb, mysql } from "../mysql/dialect.js";
+import type { MariaDbEngine, MySqlEngine } from "../mysql/engine/index.js";
+import type { MariaDb, MySql, Mysql2MariaDbTypeMap } from "../mysql/index.js";
 import { postgres } from "../postgres/dialect.js";
 // The types come from the public entry points, so the declarations of a
 // project that exports a migration can name its schema's types (TS2883).
@@ -86,6 +89,26 @@ export type SqliteMigration<Base = {}> = MigrationContext<
 	Sqlite,
 	Base
 >;
+export type MySqlMigration<Base = {}> = MigrationContext<
+	MySqlEngine,
+	MySql,
+	Base
+>;
+/** MariaDB through mysql2, as the migrator runs it: mysql2's type map. */
+export type MariaDbMigration<Base = {}> = MigrationContext<
+	MariaDbEngine,
+	MariaDb,
+	Base,
+	Mysql2MariaDbTypeMap
+>;
+
+export type MigrationDialect = "postgres" | "sqlite" | "mysql" | "mariadb";
+
+export type AnyMigrationContext =
+	| PostgresMigration
+	| SqliteMigration
+	| MySqlMigration
+	| MariaDbMigration;
 
 declare const MISSING_SCHEMA: unique symbol;
 /** The schema of a migration whose `up` doesn't return its context. */
@@ -101,7 +124,7 @@ type MissingSchemaError = SqlError<
  * SQLite script into its statements there.
  */
 export function createMigrationContext(
-	dialect: "postgres" | "sqlite",
+	dialect: MigrationDialect,
 	execute: Executor,
 	step: (kind: "ddl" | "raw", statement: string) => Promise<void> = async (
 		_,
@@ -109,11 +132,13 @@ export function createMigrationContext(
 	) => {
 		await execute(statement, []);
 	},
-): PostgresMigration | SqliteMigration {
-	// Avoid comparing the two recursive SQL APIs when choosing a runtime dialect.
+): AnyMigrationContext {
+	// Avoid comparing the recursive SQL APIs when choosing a runtime dialect.
 	let sql: object;
 	if (dialect === "postgres") sql = createDialectSql(postgres, execute);
 	else if (dialect === "sqlite") sql = createDialectSql(sqlite, execute);
+	else if (dialect === "mysql") sql = createDialectSql(mysql, execute);
+	else if (dialect === "mariadb") sql = createDialectSql(mariadb, execute);
 	else throw new Error(`typesql: unsupported migration dialect: ${dialect}`);
 	const next = (kind: "ddl" | "raw") => async (statement: string) => {
 		await step(kind, statement);
@@ -134,9 +159,7 @@ export function createMigrationContext(
  * methods that run DDL. Its types are the schema's, which exist only for the
  * checker.
  */
-function isMigrationContext(
-	value: unknown,
-): value is PostgresMigration | SqliteMigration {
+function isMigrationContext(value: unknown): value is AnyMigrationContext {
 	return (
 		typeof value === "function" &&
 		"ddl" in value &&

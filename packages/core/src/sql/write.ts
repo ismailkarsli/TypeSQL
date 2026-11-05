@@ -29,24 +29,28 @@ type CarriedOfKeys<
 
 type JoinAssignments<
 	Ks extends readonly unknown[],
+	Q extends string,
 	N extends number = 1,
 	Acc extends string = "",
 > = Ks extends readonly [infer K extends string, ...infer Rest]
 	? JoinAssignments<
 			Rest,
+			Q,
 			Next<N>,
 			Acc extends ""
-				? `${QuotedIdent<[K]>} = $${N}`
-				: `${Acc}, ${QuotedIdent<[K]>} = $${N}`
+				? `${QuotedIdent<[K], Q>} = $${N}`
+				: `${Acc}, ${QuotedIdent<[K], Q>} = $${N}`
 		>
 	: Acc;
 type JoinNames<
 	Ks extends readonly unknown[],
+	Q extends string,
 	Acc extends string = "",
 > = Ks extends readonly [infer K extends string, ...infer Rest]
 	? JoinNames<
 			Rest,
-			Acc extends "" ? QuotedIdent<[K]> : `${Acc}, ${QuotedIdent<[K]>}`
+			Q,
+			Acc extends "" ? QuotedIdent<[K], Q> : `${Acc}, ${QuotedIdent<[K], Q>}`
 		>
 	: Acc;
 type JoinPlaceholders<
@@ -57,20 +61,24 @@ type JoinPlaceholders<
 	? JoinPlaceholders<Rest, Next<N>, Acc extends "" ? `$${N}` : `${Acc}, $${N}`>
 	: Acc;
 
-export type SetRep<P> =
+export type SetRep<P, Q extends string = '"'> =
 	UnionList<KeysOf<P>> extends infer Ks extends readonly unknown[]
 		? {
-				readonly text: JoinAssignments<Ks>;
+				readonly text: JoinAssignments<Ks, Q>;
 				readonly carried: CarriedOfKeys<Flat<P>, Ks>;
 			}
 		: never;
 
-export type ValuesRep<R> =
+export type ValuesRep<
+	R,
+	Q extends string = '"',
+	Empty extends string = "DEFAULT VALUES",
+> =
 	UnionList<KeysOf<R>> extends infer Ks extends readonly unknown[]
 		? Ks extends readonly []
-			? { readonly text: "DEFAULT VALUES"; readonly carried: [] }
+			? { readonly text: Empty; readonly carried: [] }
 			: {
-					readonly text: `(${JoinNames<Ks>}) VALUES (${JoinPlaceholders<Ks>})`;
+					readonly text: `(${JoinNames<Ks, Q>}) VALUES (${JoinPlaceholders<Ks>})`;
 					readonly carried: CarriedOfKeys<Flat<R>, Ks>;
 				}
 		: never;

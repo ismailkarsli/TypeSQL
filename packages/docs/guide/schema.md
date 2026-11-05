@@ -58,7 +58,7 @@ export interface DB {
 
 :::
 
-SQLite has no enum or array types: `mood` is a text column whose values are typed with [`Typed`](../adapters/sqlite#typed-values), and `posts` has no `tags`. The other pages of this guide use this schema.
+SQLite has no enum or array types: `mood` is a text column whose values are typed with [`Typed`](../adapters/sqlite#typed-values), and `posts` has no `tags`. On MySQL and MariaDB, `mood` is an `ENUM` column, `Enum<"happy" | "neutral" | "sad", { hasDefault: true }>` from `@typesql/core/mysql`, and `id` is `Col<"int unsigned", { autoIncrement: true }>`; see [MySQL and MariaDB](../adapters/mysql#schema). The other pages of this guide use this schema.
 
 Then create `sql` from it with the dialect, or with your adapter's `createSql<DB>(client)`:
 
@@ -90,7 +90,8 @@ export const sql = createSql<DB>(sqlite);
 | `Col<"text", { nullable: true; hasDefault: true }>` | both: `NULL` allowed and has a default |
 | `Col<"int4[]">` | PostgreSQL: an array column; the flags work as for any column |
 | `Enum<"mood">` | PostgreSQL: a column of an enum type, with its values listed under `$types` |
-| `Col<Typed<"text", T>>` | SQLite: a column of that type whose values are typed as `T` |
+| `Enum<"happy" \| "sad">` | MySQL and MariaDB: an `ENUM` column, typed as its values |
+| `Col<Typed<"text", T>>` | SQLite, MySQL and MariaDB: a column of that type whose values are typed as `T` |
 | `Json<T>` | a JSON column holding `T`; see [typed JSON columns](#typed-json-columns) |
 | `View<{ … }>` | a view: you can read from it, but `INSERT`, `UPDATE` and `DELETE` on it are errors |
 
@@ -100,13 +101,15 @@ Columns use the database's type names, not TypeScript types. This lets TypeSQL t
 
 In SQLite, a declared type name sets the column's affinity, as in `CREATE TABLE`: `varchar` is text and `bigint` is an integer, and `integer + real` is a real. See [SQLite types](../adapters/sqlite#types).
 
+In MySQL and MariaDB, columns use MySQL's type names in lower case without lengths, with ` unsigned` where it applies: `int`, `bigint unsigned`, `varchar`, `datetime`. Integer literals are `bigint` on MySQL and `int` on MariaDB, and `/` is a `decimal`. See [MySQL and MariaDB](../adapters/mysql#schema).
+
 In PostgreSQL, common spellings mean the same thing: `integer`, `int` and `int4`; `bigint` and `int8`; `boolean` and `bool`; `character varying` and `varchar`; `double precision` and `float8`; `timestamp with time zone` and `timestamptz`. A name TypeSQL doesn't know, such as an extension type or a domain, is kept as it is. It maps to `unknown` unless the type map or `$types` gives it a type.
 
 The driver decides which TypeScript type each database type becomes (node-postgres returns `int8` as a `string`, for example). This is the driver's **type map**, and you pick it by importing `createSql` from the driver's package. See [Type mapping](../reference/type-mapping).
 
 ## Typed JSON columns
 
-A `jsonb` column is `unknown` by default, and a SQLite JSON column is text. `Json<T>` says what it holds:
+A `jsonb` column is `unknown` by default, and a SQLite JSON column is text. `Json<T>` says what it holds (on MySQL and MariaDB, `Json<T>` from `@typesql/core/mysql` works like SQLite's; see [Typed values](../adapters/mysql#typed-values)):
 
 ::: code-group
 
@@ -172,7 +175,7 @@ The column is still `jsonb` to Postgres and text to SQLite, so JSON operators an
 
 ## Enums
 
-This section is about PostgreSQL. On SQLite, declare the column as `Col<Typed<"text", "happy" | "neutral" | "sad">>`; the query below types `mood` the same way.
+This section is about PostgreSQL. On SQLite, declare the column as `Col<Typed<"text", "happy" | "neutral" | "sad">>`, and on MySQL and MariaDB as `Enum<"happy" | "neutral" | "sad">`; the query below types `mood` the same way.
 
 List each enum's values under `$types`. A column declared as `Enum<"mood">` then has the type `"happy" | "neutral" | "sad"`, in rows and in parameters:
 

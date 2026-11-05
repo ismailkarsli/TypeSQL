@@ -1,0 +1,30 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`migrations-mariadb > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {},
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "{ latest: { applied: [ '001-users', '002-bio' ] } }
+{
+  status: [
+    { name: '001-users', applied: true },
+    { name: '002-bio', applied: true }
+  ]
+}
+{ down: { reverted: [ '002-bio' ] } }
+{ again: { applied: [ '002-bio' ] } }
+typesql: migration 1 (002-bio) starts from another migration, but it is the first one; start it from "mariadb"
+",
+  },
+}
+`;

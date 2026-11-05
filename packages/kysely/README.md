@@ -44,6 +44,10 @@ For an interface generated with `kysely-codegen --camel-case`, pass `{ camelCase
 
 For a SQLite database, pass `sqlite` from `@typesql/core/sqlite` instead: `createSql(sqlite, db)`. The schema is converted to SQLite types; see [SQLite](https://typesql.karsli.net/guide/orms#sqlite).
 
+## MySQL and MariaDB
+
+For a Kysely instance on `MysqlDialect`, pass `mysql` (or `mariadb`) from `@typesql/core/mysql`: `createSql(mysql, db)`. The schema is converted to MySQL types (`number` is `int`, `string` is `varchar`, `Date` is `datetime`) and rows are typed the way mysql2 returns them. Pin a column with an override, as for PostgreSQL. See [MySQL and MariaDB](https://typesql.karsli.net/guide/orms#mysql).
+
 ## Documentation
 
 See [From Kysely, Drizzle or Prisma](https://typesql.karsli.net/guide/orms#kysely) for how columns are converted, overrides, enums and camelCase, and [Limits](https://typesql.karsli.net/guide/limits#orm-schemas) for what the conversion can't tell.

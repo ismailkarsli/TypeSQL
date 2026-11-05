@@ -1,5 +1,7 @@
 export type {
+	MariaDbMigration,
 	MigrationContext,
+	MySqlMigration,
 	PostgresMigration,
 	SqliteMigration,
 } from "./context.js";

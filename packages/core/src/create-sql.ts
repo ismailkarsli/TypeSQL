@@ -10,7 +10,7 @@ import type { Spliceable } from "./runtime/splice.js";
 import {
 	joinFragments,
 	maxParam,
-	quoteIdent,
+	quoteIdentWith,
 	rewriteNamed,
 } from "./runtime/splice.js";
 import { buildSet, buildValues, columnEntries } from "./runtime/write.js";
@@ -103,7 +103,7 @@ export function createSqlApi(
 		id: (...parts: readonly string[]) => {
 			if (parts.some((p) => typeof p !== "string"))
 				throw new Error("typesql: sql.id() takes names as strings");
-			return makeFragment(quoteIdent(...parts), []);
+			return makeFragment(quoteIdentWith(dialect.quote ?? '"', parts), []);
 		},
 		combine: (
 			items: readonly (Spliceable | Empty)[],
@@ -130,6 +130,7 @@ export function createSqlApi(
 					encodeInput(values, pipeline, { kind: "set", table }),
 					"typesql: sql.set() takes an object of column values",
 				),
+				dialect.quote,
 			);
 			return makeFragment(r.text, r.values);
 		},
@@ -144,7 +145,12 @@ export function createSqlApi(
 				pipeline.length === 0
 					? rows
 					: rows.map((row) => encodeInput(row, pipeline, context));
-			const r = buildValues(encoded, dialect.valuesDefault !== false);
+			const r = buildValues(
+				encoded,
+				dialect.valuesDefault !== false,
+				dialect.quote,
+				dialect.emptyRow,
+			);
 			return makeFragment(r.text, r.values);
 		},
 		raw: (text: string) => {

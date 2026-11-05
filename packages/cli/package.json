@@ -1,7 +1,7 @@
 {
 	"name": "@typesql/cli",
 	"version": "6.1.4",
-	"description": "The typesql command: tracked schema migrations and schema introspection for PostgreSQL and SQLite.",
+	"description": "The typesql command: tracked schema migrations and schema introspection for PostgreSQL, SQLite, MySQL and MariaDB.",
 	"license": "MIT",
 	"repository": {
 		"type": "git",
@@ -36,14 +36,19 @@
 	},
 	"dependencies": {
 		"@typesql/core": "workspace:*",
+		"@typesql/mysql": "workspace:*",
 		"@typesql/pg": "workspace:*",
 		"@typesql/sqlite": "workspace:*"
 	},
 	"peerDependencies": {
+		"mysql2": ">=3",
 		"pg": ">=8",
 		"typescript": ">=7.1.0-0"
 	},
 	"peerDependenciesMeta": {
+		"mysql2": {
+			"optional": true
+		},
 		"pg": {
 			"optional": true
 		},
@@ -53,6 +58,7 @@
 	},
 	"devDependencies": {
 		"@types/pg": "catalog:",
+		"mysql2": "catalog:",
 		"tsrs": "catalog:",
 		"typescript": "catalog:"
 	},
@@ -66,6 +72,8 @@
 		"postgres",
 		"postgresql",
 		"sqlite",
+		"mysql",
+		"mariadb",
 		"typescript",
 		"cli",
 		"introspection"

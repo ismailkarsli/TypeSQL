@@ -1,16 +1,18 @@
 import { createRequire } from "node:module";
 import { parseArgs } from "node:util";
+import { main as mysql } from "@typesql/mysql/introspect";
 import { main as postgres } from "@typesql/pg/introspect";
 import { main as sqlite } from "@typesql/sqlite/introspect";
 
-export type Dialect = "postgres" | "sqlite";
+export type Dialect = "postgres" | "sqlite" | "mysql" | "mariadb";
 
+// MariaDB is introspected like MySQL; the server reports which one it is.
 const DIALECTS: Readonly<
 	Record<Dialect, (argv: readonly string[]) => Promise<number>>
-> = { postgres, sqlite };
+> = { postgres, sqlite, mysql, mariadb: mysql };
 
 const USAGE = `Usage: typesql migrate <latest|up|down|status|make name|generate> [options]
-       typesql introspect [--dialect postgres|sqlite] [options]
+       typesql introspect [--dialect postgres|sqlite|mysql|mariadb] [options]
        typesql --version
 
 Run tracked schema migrations, or read a database and write its TypeSQL schema.
@@ -18,6 +20,8 @@ Run \`typesql migrate --help\` for migration options.
 
   --dialect postgres  a live PostgreSQL database (--url); the default
   --dialect sqlite    a SQLite database file (--db); the default when --db is given
+  --dialect mysql     a live MySQL database (--url); the default for mysql:// URLs
+  --dialect mariadb   a live MariaDB database (--url); the default for mariadb:// URLs
 
 Run \`typesql introspect --dialect <name> --help\` for the options of each dialect.
 `;
@@ -44,6 +48,7 @@ const parse = (argv: readonly string[]) =>
 		options: {
 			dialect: { type: "string" },
 			db: { type: "string" },
+			url: { type: "string" },
 			help: { type: "boolean", short: "h" },
 			version: { type: "boolean", short: "v" },
 		},
@@ -97,11 +102,15 @@ export async function main(
 			io.stdout(USAGE);
 			return 0;
 		}
-		dialect = values.db === undefined ? "postgres" : "sqlite";
+		const scheme =
+			typeof values.url === "string"
+				? /^(mysql|mariadb):/i.exec(values.url)?.[1]?.toLowerCase()
+				: undefined;
+		dialect = values.db === undefined ? (scheme ?? "postgres") : "sqlite";
 	}
 	if (typeof dialect !== "string" || !isDialect(dialect)) {
 		io.stderr(
-			`unknown dialect: ${dialect} (expected postgres or sqlite)\n\n${USAGE}`,
+			`unknown dialect: ${dialect} (expected postgres, sqlite, mysql or mariadb)\n\n${USAGE}`,
 		);
 		return 2;
 	}

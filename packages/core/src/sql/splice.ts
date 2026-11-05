@@ -203,18 +203,21 @@ export type Take<
 		? Take<R, N, [...Acc, H]>
 		: Acc;
 
-export type QuotedIdent<Parts extends readonly string[]> =
-	Parts extends readonly [infer P extends string]
-		? `"${Dq<P>}"`
-		: Parts extends readonly [
-					infer P extends string,
-					...infer R extends readonly string[],
-				]
-			? `"${Dq<P>}".${QuotedIdent<R>}`
-			: string;
-type Dq<S extends string> = S extends `${infer A}"${infer B}`
-	? `${A}""${Dq<B>}`
-	: S;
+export type QuotedIdent<
+	Parts extends readonly string[],
+	Q extends string = '"',
+> = Parts extends readonly [infer P extends string]
+	? `${Q}${Dq<P, Q>}${Q}`
+	: Parts extends readonly [
+				infer P extends string,
+				...infer R extends readonly string[],
+			]
+		? `${Q}${Dq<P, Q>}${Q}.${QuotedIdent<R, Q>}`
+		: string;
+type Dq<
+	S extends string,
+	Q extends string,
+> = S extends `${infer A}${Q}${infer B}` ? `${A}${Q}${Q}${Dq<B, Q>}` : S;
 
 export type UnionList<U> = Members<U>;
 

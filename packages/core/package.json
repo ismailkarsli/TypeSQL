@@ -1,7 +1,7 @@
 {
 	"name": "@typesql/core",
 	"version": "6.1.4",
-	"description": "Type-level SQL inference for TypeScript: PostgreSQL and SQLite. Zero runtime dependencies.",
+	"description": "Type-level SQL inference for TypeScript: PostgreSQL, SQLite, MySQL and MariaDB. Zero runtime dependencies.",
 	"license": "MIT",
 	"repository": {
 		"type": "git",
@@ -37,6 +37,14 @@
 			"types": "./dist/sqlite/engine/index.d.ts",
 			"default": "./dist/sqlite/engine/index.js"
 		},
+		"./mysql": {
+			"types": "./dist/mysql/index.d.ts",
+			"default": "./dist/mysql/index.js"
+		},
+		"./mysql/engine": {
+			"types": "./dist/mysql/engine/index.d.ts",
+			"default": "./dist/mysql/engine/index.js"
+		},
 		"./migration": {
 			"types": "./dist/migration/index.d.ts",
 			"default": "./dist/migration/index.js"
@@ -56,16 +64,21 @@
 		"typecheck": "tsrs -p tsconfig.json --noEmit"
 	},
 	"peerDependencies": {
+		"mysql2": ">=3",
 		"pg": ">=8",
 		"typescript": ">=7.1.0-0"
 	},
 	"peerDependenciesMeta": {
+		"mysql2": {
+			"optional": true
+		},
 		"pg": {
 			"optional": true
 		}
 	},
 	"devDependencies": {
 		"@types/pg": "catalog:",
+		"mysql2": "catalog:",
 		"pg": "catalog:",
 		"tsrs": "catalog:",
 		"typescript": "catalog:"
@@ -80,6 +93,8 @@
 		"postgres",
 		"postgresql",
 		"sqlite",
+		"mysql",
+		"mariadb",
 		"typescript",
 		"type-safe",
 		"type-level",

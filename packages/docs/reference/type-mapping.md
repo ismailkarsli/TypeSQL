@@ -1,5 +1,5 @@
 ---
-description: "How TypeSQL maps PostgreSQL and SQLite types to TypeScript for each driver, what parameters accept, and how to write a custom type map."
+description: "How TypeSQL maps PostgreSQL, SQLite, MySQL and MariaDB types to TypeScript for each driver, what parameters accept, and how to write a custom type map."
 ---
 
 # Type mapping
@@ -157,6 +157,43 @@ Parameters accept the map's type and, through `DefaultParamTypeMap`, `bigint` fo
 | `blob` | `Uint8Array` |
 
 Parameters also accept `number` for `bigint`, `number | string` for `decimal`, `number` for `boolean`, and `string` for the date types.
+
+## MySQL and MariaDB
+
+The maps of `@typesql/core/mysql`. `DefaultTypeMap` matches mysql2 and is used by `@typesql/mysql` and by `createSql(mysql)`; `Mysql2MariaDbTypeMap`, for mysql2 on MariaDB, is the same map. `MariaDbTypeMap` matches the mariadb connector (`@typesql/mysql/mariadb`, `createSql(mariadb)`), and `ServerlessTypeMap` the PlanetScale and TiDB Cloud drivers (`@typesql/mysql/planetscale`, `@typesql/mysql/tidb`):
+
+| MySQL type | `DefaultTypeMap` (mysql2) | `MariaDbTypeMap` | `ServerlessTypeMap` |
+|---|---|---|---|
+| `tinyint` … `int`, `unsigned` too, `year` | `number` | `number` | `number` |
+| `bigint`, `bigint unsigned` (`count(*)`) | `number` | `bigint` | `string` |
+| `decimal` (`sum`, `avg`) | `string` | `string` | `string` |
+| `float`, `double` | `number` | `number` | `number` |
+| `char`, `varchar`, text types, `time`, `uuid`, `inet4`, `inet6` | `string` | `string` | `string` |
+| `enum` | its values | its values | its values |
+| `set` | `string` | `string[]` | `string` |
+| `date`, `datetime`, `timestamp` | `Date` | `Date` | `string` |
+| `binary`, `varbinary`, blob types, `bit` | `Uint8Array` | `Uint8Array` (`bit`: also `boolean`) | `Uint8Array` |
+| `json` | `unknown` (typed when its shape is known) | the same | the same |
+| `point` | `{ x: number; y: number }` | GeoJSON `{ type: "Point"; coordinates: number[] }` | `unknown` |
+| `geometry` and other spatial types, `vector` | `unknown` | `unknown` | `unknown` |
+
+mysql2 returns `BIGINT` as a number, which loses precision past 2^53. With `supportBigNumbers` and `bigNumberStrings` it returns a string: use `BigNumberStringsTypeMap`. With `dateStrings: true`, dates are strings: use `DateStringsTypeMap`. Binary values are `Buffer`s, a subclass of `Uint8Array`. The mariadb connector returns `BIT(1)` as a `boolean`. A type name the map doesn't have is typed by its kind: an integer type as `int`, a text type as `varchar`, a binary type as `blob`, and so on.
+
+Parameters accept the map's type and, through `DefaultParamTypeMap`, `number | bigint` for integer types (`tinyint` also `boolean`, `bigint` also `string`), `number | bigint | string` for `decimal`, `Date | string` for the date types, `Uint8Array | string` for binary types and `string` for `json`. A parameter without a type accepts `string | number | bigint | boolean | Date | Uint8Array | null`.
+
+### Prisma on MySQL
+
+`PrismaMysqlTypeMap`, the map of `@typesql/prisma` with `mysql` or `mariadb`. It describes what `$queryRaw` returns through Prisma's MySQL adapter:
+
+| MySQL type | TypeScript |
+|---|---|
+| `tinyint` … `int`, `tinyint unsigned` … `mediumint unsigned`, `year`, `float`, `double` | `number` |
+| `bigint`, `int unsigned`, `bigint unsigned` | `bigint` |
+| `decimal` | `Decimal` |
+| `date`, `datetime`, `timestamp`, `time` | `Date` (`time` on 1970-01-01) |
+| `json` | `JsonValue` |
+| text types, `enum`, `set` | `string` (enums: their values) |
+| binary types, `bit`, spatial types | `Uint8Array` |
 
 ## Parameter types
 

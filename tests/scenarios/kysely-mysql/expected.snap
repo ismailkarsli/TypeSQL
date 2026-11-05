@@ -1,0 +1,30 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`kysely-mysql > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "after": "({ id: number })[]",
+      "changed": "number",
+      "rows": "({ bio: null | string; id: number; name: string })[]",
+    },
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "abort
+{
+  rows: [ { id: 1, name: 'Ada', bio: null } ],
+  after: [ { id: 1 } ],
+  changed: 1
+}
+",
+  },
+}
+`;

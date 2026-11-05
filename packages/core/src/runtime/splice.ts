@@ -122,9 +122,10 @@ export function rewriteNamed(text: string): NamedRewrite {
 	return { text: out, names };
 }
 
-export function quoteIdent(...parts: readonly string[]): string {
-	if (parts.length === 1 && !parts[0]!.includes('"')) return `"${parts[0]}"`;
-	return parts.map((p) => `"${p.replace(/"/g, '""')}"`).join(".");
+export function quoteIdentWith(q: '"' | "`", parts: readonly string[]): string {
+	if (parts.length === 1 && !parts[0]!.includes(q))
+		return `${q}${parts[0]}${q}`;
+	return parts.map((p) => `${q}${p.replaceAll(q, q + q)}${q}`).join(".");
 }
 
 export function joinFragments(

@@ -6,10 +6,13 @@ import type {
 	Type,
 } from "typescript/async";
 import {
+	type Dialect,
+	dialectOf,
 	type EditorKinds,
 	isCall,
 	isCoreRef,
 	isIdentifier,
+	isMySql,
 	isPropertyAccess,
 	isSqlLiteral,
 	textOf,
@@ -27,7 +30,14 @@ export interface Highlight {
 }
 
 // Types whose call takes SQL, and methods that take SQL on them.
-const CALLABLE = ["Sql", "TransactionalSql", "SqlApi", "MigrationContext"];
+const CALLABLE = [
+	"Sql",
+	"TransactionalSql",
+	"MariaDbSql",
+	"MariaDbTransactionalSql",
+	"SqlApi",
+	"MigrationContext",
+];
 const METHODS = new Map<string, readonly string[]>([
 	["as", CALLABLE],
 	["fragment", CALLABLE],
@@ -43,7 +53,7 @@ const METHODS = new Map<string, readonly string[]>([
 // of a string that starts like a statement.
 const NAME = /^(?:sql|tx|[A-Za-z_$][\w$]*(?:Sql|SQL|_sql))$/;
 const STATEMENT_WORDS =
-	"alter|analyze|attach|begin|call|cluster|comment|commit|copy|create|delete|detach|do|drop|explain|grant|import|insert|listen|lock|merge|notify|pragma|reassign|refresh|reindex|release|replace|reset|revoke|rollback|savepoint|security|select|set|table|truncate|unlisten|update|vacuum|values|with";
+	"alter|analyze|attach|begin|call|cluster|comment|commit|copy|create|delete|describe|detach|do|drop|explain|grant|import|insert|listen|lock|merge|notify|pragma|reassign|refresh|reindex|release|rename|replace|reset|revoke|rollback|savepoint|security|select|set|show|table|truncate|unlisten|update|vacuum|values|with";
 const STATEMENT = new RegExp(
 	`^\\s*(?:--|/\\*|\\(|(?:${STATEMENT_WORDS})(?=[\\s;(]|$))`,
 	"i",
@@ -66,7 +76,9 @@ interface Candidate {
 /**
  * Highlights for the first-argument strings of calls in `document`: SQL tokens
  * where a TypeSQL call's string isn't colored by the grammar, and `string`
- * where the grammar colors another function's string as SQL. Strings after a
+ * where the grammar colors another function's string as SQL. MySQL and MariaDB
+ * strings always get SQL tokens, since the grammar reads PostgreSQL: there
+ * "…" is a string, not a name, and # starts a comment. Strings after a
  * `/* sql *\/` marker are left to the grammar.
  */
 export async function highlightsIn(
@@ -95,13 +107,27 @@ export async function highlightsIn(
 	const sql = await Promise.all(
 		candidates.map((c, i) => isSql(types[i]!, c.types)),
 	);
+	const dialectsOf = new Map<number, Promise<Dialect>>();
+	const dialects = await Promise.all(
+		candidates.map((_, i): Promise<Dialect> | Dialect => {
+			const t = types[i]!;
+			if (!sql[i]) return "postgres";
+			let d = dialectsOf.get(t.id);
+			if (!d) {
+				d = dialectOf(checker, t);
+				dialectsOf.set(t.id, d);
+			}
+			return d;
+		}),
+	);
 	const lines = lineStarts(file.text);
 	const out: Highlight[] = [];
 	candidates.forEach((c, i) => {
-		if (sql[i] === c.grammar) return;
-		const parts = textOf(file, c.literal, kinds);
+		const dialect = dialects[i]!;
+		if (sql[i] === c.grammar && !(sql[i] && isMySql(dialect))) return;
+		const parts = textOf(file, c.literal, kinds, dialect);
 		const spans: [number, number, TokenKind][] = sql[i]
-			? lex(parts.text).map((t) => [
+			? lex(parts.text, dialect).map((t) => [
 					parts.start + t.start,
 					parts.start + t.end,
 					t.kind,

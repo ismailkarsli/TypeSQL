@@ -98,7 +98,7 @@ const withTitles = sql(`
 
 ### Column names
 
-An unaliased column gets the name the database gives it: SQLite uses the expression's text, Postgres uses the column or function name (`lower`, `count`) or `?column?`.
+An unaliased column gets the name the database gives it: SQLite, MySQL and MariaDB use the expression's text, Postgres uses the column or function name (`lower`, `count`) or `?column?`.
 
 ::: code-group
 
@@ -193,7 +193,7 @@ const created = sql(`
 
 ### Optional values
 
-`sql.param(sql.optional(value))` sends `DEFAULT` when the value is `undefined` (Postgres only; SQLite has no `DEFAULT` there).
+`sql.param(sql.optional(value))` sends `DEFAULT` when the value is `undefined` (Postgres, MySQL and MariaDB; SQLite has no `DEFAULT` there).
 
 ```ts
 declare const mood: "happy" | "neutral" | "sad" | undefined;
@@ -216,7 +216,7 @@ const patched = sql(
 
 ### Bulk inserts: `sql.values`
 
-`sql.values(table, rows)` builds the column list and `VALUES` rows from an array of objects.
+`sql.values(table, rows)` builds the column list and `VALUES` rows from an array of objects. On Postgres, MySQL and MariaDB, a column some rows leave out is sent as `DEFAULT` (a row with no values is `() VALUES ()` on MySQL and MariaDB); on SQLite, every row needs the same keys.
 
 ```ts
 declare const imported: { email: string; display_name?: string | null }[];
@@ -240,7 +240,7 @@ const recent = sql.fragment(`u.id > ${sql.param(10)}`);
 const q = sql(`SELECT ${sql.id("display_name")} FROM users u WHERE ${recent}`);
 ```
 
-- `sql.id()` quotes an identifier, `sql.and()` / `sql.or()` join conditions, `sql.combine()` joins a list, and a whole query can be a subquery.
+- `sql.id()` quotes an identifier (with backticks on MySQL and MariaDB, as do `sql.set()` and `sql.values()`), `sql.and()` / `sql.or()` join conditions, `sql.combine()` joins a list, and a whole query can be a subquery.
 - Fragments aren't wrapped in parentheses, so put them in yourself around `OR`.
 - Allowlist names before `sql.id()`, and never pass user input as `sql.combine()`'s separator.
 

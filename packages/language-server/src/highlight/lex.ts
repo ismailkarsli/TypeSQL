@@ -1,3 +1,5 @@
+import { type Dialect, isMySql } from "../complete/call.js";
+
 export type TokenKind =
 	| "keyword"
 	| "constant"
@@ -282,6 +284,87 @@ const KEYWORDS = new Set([
 
 const CONSTANTS = new Set(["true", "false", "null"]);
 
+// MySQL and MariaDB words on top of the lists above.
+const MY_TYPES = new Set([
+	"binary",
+	"blob",
+	"datetime",
+	"dec",
+	"enum",
+	"fixed",
+	"geometry",
+	"geometrycollection",
+	"inet4",
+	"inet6",
+	"linestring",
+	"longblob",
+	"longtext",
+	"mediumblob",
+	"mediumint",
+	"mediumtext",
+	"multilinestring",
+	"multipoint",
+	"multipolygon",
+	"nchar",
+	"nvarchar",
+	"signed",
+	"tinyblob",
+	"tinyint",
+	"tinytext",
+	"unsigned",
+	"varbinary",
+	"vector",
+	"year",
+	"zerofill",
+]);
+
+const MY_KEYWORDS = new Set([
+	"algorithm",
+	"auto_increment",
+	"change",
+	"charset",
+	"columns",
+	"comment",
+	"delayed",
+	"describe",
+	"distinctrow",
+	"div",
+	"dual",
+	"duplicate",
+	"engine",
+	"force",
+	"fulltext",
+	"high_priority",
+	"ignore",
+	"invisible",
+	"keys",
+	"low_priority",
+	"member",
+	"mod",
+	"mode",
+	"modify",
+	"nested",
+	"quick",
+	"regexp",
+	"rlike",
+	"separator",
+	"show",
+	"sounds",
+	"spatial",
+	"sql_big_result",
+	"sql_buffer_result",
+	"sql_calc_found_rows",
+	"sql_no_cache",
+	"sql_small_result",
+	"straight_join",
+	"tables",
+	"unlock",
+	"use",
+	"virtual",
+	"visible",
+	"xor",
+]);
+
 const WORD = /[A-Za-z_][\w$]*/y;
 const NUMBER =
 	/(?:0[xX][0-9A-Fa-f_]+|0[oO][0-7_]+|0[bB][01_]+|(?:\d[\d_]*(?:\.[\d_]*)?|\.\d[\d_]*)(?:[eE][+-]?\d+)?)(?![\w$])/y;
@@ -290,13 +373,15 @@ const DOLLAR_TAG = /\$([A-Za-z_]\w*)?\$/y;
 const PARAM = /\$\d+/y;
 const NAMED = /:[A-Za-z_][\w$]*/y;
 const STRING_PREFIX = /(?:[eEbBxXnN]|[uU]&)'/y;
+const MY_STRING_PREFIX = /(?:[bBxXnN]|_[A-Za-z0-9_]+)['"]/y;
+const MY_VARIABLE = /@@?(?:[A-Za-z0-9_$.]+|`(?:[^`]|``)*`?)?/y;
 
 const at = (re: RegExp, s: string, i: number): string | null => {
 	re.lastIndex = i;
 	return re.exec(s)?.[0] ?? null;
 };
 
-/** Splits SQL text into tokens; whitespace is left out. */
+/** The end of the nested block comment at `i`, and whether it was closed. */
 export function blockComment(s: string, i: number): [number, boolean] {
 	let depth = 0;
 	for (let j = i; j < s.length; ) {
@@ -311,7 +396,9 @@ export function blockComment(s: string, i: number): [number, boolean] {
 	return [s.length, false];
 }
 
-export function lex(s: string): Token[] {
+/** Splits SQL text into tokens; whitespace is left out. */
+export function lex(s: string, dialect: Dialect = "postgres"): Token[] {
+	if (isMySql(dialect)) return lexMySql(s);
 	const out: { start: number; end: number; kind: TokenKind }[] = [];
 	const push = (start: number, end: number, kind: TokenKind): void => {
 		if (end <= start) return;
@@ -330,7 +417,7 @@ export function lex(s: string): Token[] {
 		}
 		const cast = afterCast;
 		afterCast = false;
-		if (s.startsWith("--", i)) {
+		if (s.startsWith("--", i) || hashComment(s, i)) {
 			const nl = s.indexOf("\n", i);
 			const end = nl < 0 ? s.length : nl;
 			push(i, end, "comment");
@@ -358,8 +445,8 @@ export function lex(s: string): Token[] {
 			i = end;
 			continue;
 		}
-		if (c === '"') {
-			const end = quoted(s, i + 1, '"');
+		if (c === '"' || c === "`") {
+			const end = quoted(s, i + 1, c);
 			push(i, end, "variable");
 			i = end;
 			continue;
@@ -434,6 +521,14 @@ export function lex(s: string): Token[] {
 	return out;
 }
 
+// A # that starts a line, as the grammar reads MySQL's comments, but not
+// PostgreSQL's #>, #>>, #- and ## operators.
+const hashComment = (s: string, i: number): boolean => {
+	if (s[i] !== "#" || /[#>-]/.test(s[i + 1] ?? "")) return false;
+	const nl = s.lastIndexOf("\n", i - 1);
+	return nl >= 0 && /^\s*$/.test(s.slice(nl + 1, i));
+};
+
 // The end of a quoted run opened before `from`; a doubled quote stays inside.
 function quoted(s: string, from: number, q: string): number {
 	let j = from;
@@ -444,3 +539,126 @@ function quoted(s: string, from: number, q: string): number {
 		j = k + 2;
 	}
 }
+
+/**
+ * MySQL and MariaDB: `#` and `-- ` comments, block comments that don't nest,
+ * '…' and "…" strings with backslash escapes, `…` names, @ and @@ variables.
+ */
+function lexMySql(s: string): Token[] {
+	const out: { start: number; end: number; kind: TokenKind }[] = [];
+	const push = (start: number, end: number, kind: TokenKind): void => {
+		if (end <= start) return;
+		const last = out[out.length - 1];
+		if (kind === "punctuation" && last?.kind === kind && last.end === start)
+			last.end = end;
+		else out.push({ start, end, kind });
+	};
+	let i = 0;
+	while (i < s.length) {
+		const c = s[i]!;
+		if (c === " " || c === "\t" || c === "\n" || c === "\r") {
+			i++;
+			continue;
+		}
+		if (c === "#" || (s.startsWith("--", i) && /^\s?$/.test(s[i + 2] ?? ""))) {
+			const nl = s.indexOf("\n", i);
+			const end = nl < 0 ? s.length : nl;
+			push(i, end, "comment");
+			i = end;
+			continue;
+		}
+		if (s.startsWith("/*", i)) {
+			const close = s.indexOf("*/", i + 2);
+			const end = close < 0 ? s.length : close + 2;
+			push(i, end, "comment");
+			i = end;
+			continue;
+		}
+		const prefix = at(MY_STRING_PREFIX, s, i);
+		if (c === "'" || c === '"' || prefix) {
+			const open = prefix ? i + prefix.length - 1 : i;
+			const q = s[open]!;
+			let from = i;
+			let j = open + 1;
+			for (; j < s.length; j++) {
+				const d = s[j]!;
+				if (d === "\\" || (d === q && s[j + 1] === q)) {
+					push(from, j, "string");
+					push(j, Math.min(j + 2, s.length), "escape");
+					from = ++j + 1;
+				} else if (d === q) break;
+			}
+			const end = Math.min(j + 1, s.length);
+			push(from, end, "string");
+			i = end;
+			continue;
+		}
+		if (c === "`") {
+			const end = quoted(s, i + 1, "`");
+			push(i, end, "variable");
+			i = end;
+			continue;
+		}
+		if (c === "@") {
+			const v = at(MY_VARIABLE, s, i)!;
+			push(i, i + v.length, "variable");
+			i += v.length;
+			continue;
+		}
+		if (c === "$") {
+			const param = at(PARAM, s, i);
+			if (param) {
+				push(i, i + param.length, "parameter");
+				i += param.length;
+				continue;
+			}
+		}
+		if (c === ":" && !/[:\w$]/.test(s[i - 1] ?? "")) {
+			const named = at(NAMED, s, i);
+			if (named) {
+				push(i, i + named.length, "parameter");
+				i += named.length;
+				continue;
+			}
+		}
+		if (!/[\w$]/.test(s[i - 1] ?? "")) {
+			const n = at(NUMBER, s, i);
+			if (n) {
+				push(i, i + n.length, "number");
+				i += n.length;
+				continue;
+			}
+		}
+		const word = at(WORD, s, i);
+		if (word) {
+			const lower = word.toLowerCase();
+			const end = i + word.length;
+			push(
+				i,
+				end,
+				TYPES.has(lower) || MY_TYPES.has(lower)
+					? "type"
+					: CONSTANTS.has(lower)
+						? "constant"
+						: KEYWORDS.has(lower) || MY_KEYWORDS.has(lower)
+							? "keyword"
+							: s[end] === "("
+								? "function"
+								: "variable",
+			);
+			i = end;
+			continue;
+		}
+		const op = at(MY_OPERATOR, s, i);
+		if (op) {
+			push(i, i + op.length, "operator");
+			i += op.length;
+			continue;
+		}
+		push(i, i + 1, "punctuation");
+		i++;
+	}
+	return out;
+}
+
+const MY_OPERATOR = /(?:(?!--\s|--$|\/\*)[-+*/<>=~!%^&|?:])+/y;

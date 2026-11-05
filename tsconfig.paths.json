@@ -10,6 +10,10 @@
 				"./packages/core/src/sqlite/engine/index.ts"
 			],
 			"@typesql/core/sqlite": ["./packages/core/src/sqlite/index.ts"],
+			"@typesql/core/mysql/engine": [
+				"./packages/core/src/mysql/engine/index.ts"
+			],
+			"@typesql/core/mysql": ["./packages/core/src/mysql/index.ts"],
 			"@typesql/core/migration": ["./packages/core/src/migration/index.ts"],
 			"@typesql/core": ["./packages/core/src/index.ts"],
 			"@typesql/pg/introspect": ["./packages/pg/src/introspect/index.ts"],
@@ -19,6 +23,11 @@
 				"./packages/sqlite/src/introspect/index.ts"
 			],
 			"@typesql/sqlite": ["./packages/sqlite/src/index.ts"],
+			"@typesql/mysql/introspect": ["./packages/mysql/src/introspect/index.ts"],
+			"@typesql/mysql/mariadb": ["./packages/mysql/src/mariadb.ts"],
+			"@typesql/mysql/planetscale": ["./packages/mysql/src/planetscale.ts"],
+			"@typesql/mysql/tidb": ["./packages/mysql/src/tidb.ts"],
+			"@typesql/mysql": ["./packages/mysql/src/index.ts"],
 			"@typesql/kysely": ["./packages/kysely/src/index.ts"],
 			"@typesql/drizzle": ["./packages/drizzle/src/index.ts"],
 			"@typesql/prisma": ["./packages/prisma/src/index.ts"]

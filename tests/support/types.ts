@@ -1,7 +1,7 @@
 export interface Scenario {
 	scripts: Record<string, string>;
 	scenario?: {
-		database?: "postgres" | "sqlite";
+		database?: "postgres" | "sqlite" | "mysql" | "mariadb";
 		failure?: { stage: "generate" | "compile" | "start"; exitCode: number };
 		artifacts?: string[];
 	};

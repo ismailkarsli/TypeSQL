@@ -1,0 +1,27 @@
+{
+	"name": "cli-introspect-mysql",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"compile": "tsc -p tsconfig.json --pretty false",
+		"start": "node dist/app.js",
+		"setup": "node setup.ts",
+		"generate": "typesql introspect --url \"$DATABASE_URL\" --out schema.ts"
+	},
+	"dependencies": {
+		"@typesql/core": "workspace:*",
+		"@typesql/cli": "workspace:*",
+		"@typesql/mysql": "workspace:*",
+		"mysql2": "catalog:"
+	},
+	"devDependencies": {
+		"typescript": "catalog:",
+		"@types/node": "catalog:"
+	},
+	"scenario": {
+		"database": "mysql",
+		"artifacts": [
+			"schema.ts"
+		]
+	}
+}

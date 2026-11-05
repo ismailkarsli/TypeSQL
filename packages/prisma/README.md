@@ -8,7 +8,7 @@ Write [TypeSQL](https://www.npmjs.com/package/@typesql/core) queries against you
 pnpm add @typesql/core @typesql/prisma
 ```
 
-Requires `@prisma/client` 7 or later, with the `postgresql` or `sqlite` provider.
+Requires `@prisma/client` 7 or later, with the `postgresql`, `sqlite` or `mysql` provider.
 
 ## Usage
 
@@ -46,6 +46,10 @@ Good to know:
 ## SQLite
 
 For a SQLite database, pass `sqlite` from `@typesql/core/sqlite` instead: `createSql(sqlite, db)`. The schema is converted to SQLite types; see [SQLite](https://typesql.karsli.net/guide/orms#sqlite).
+
+## MySQL and MariaDB
+
+For the `mysql` provider, with Prisma Client on `@prisma/adapter-mariadb`, pass `mysql` (or `mariadb`) from `@typesql/core/mysql`: `createSql<DB>(mysql, prisma)`. The generator writes MySQL types, and rows are typed the way Prisma's MySQL adapter returns them: `BIGINT` and `INT UNSIGNED` are `bigint`, `DECIMAL` is `Decimal`, `TIME` is a `Date` and `Boolean` columns are numbers. See [MySQL and MariaDB](https://typesql.karsli.net/guide/orms#mysql).
 
 ## Documentation
 

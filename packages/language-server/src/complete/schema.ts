@@ -1,4 +1,5 @@
 import type { Checker, Type } from "typescript/async";
+import { type Dialect, isMySql } from "./call.js";
 import type { RelRef } from "./scan.js";
 
 interface Relation {
@@ -19,7 +20,7 @@ export interface Schema {
 	columns(ref: RelRef): Promise<readonly Column[] | null>;
 }
 
-const NOT_RELATIONS = new Set(["$types", "$functions"]);
+const NOT_RELATIONS = new Set(["$types", "$functions", "$flavor"]);
 
 interface Entry {
 	readonly name: string;
@@ -29,8 +30,13 @@ interface Entry {
 export async function schemaOf(
 	checker: Checker,
 	db: Type,
-	ci: boolean,
+	dialect: Dialect,
 ): Promise<Schema> {
+	// SQLite and MySQL find names in any case. MySQL reads a qualifier that
+	// names no schema of DB as the current database, so `app.users` is `users`.
+	const ci = dialect !== "postgres";
+	const mysql = isMySql(dialect);
+	const defaults = ci ? ["main", "temp"] : ["public"];
 	const norm = (name: string): string => (ci ? name.toLowerCase() : name);
 	const entries = async (t: Type): Promise<Entry[]> => {
 		const props = (await checker.getPropertiesOfType(t)).filter(
@@ -108,14 +114,21 @@ export async function schemaOf(
 	return {
 		namespaces: [...namespaces.keys()],
 		async relations(schema) {
-			if (schema === null || (!ci && schema === "public")) return relations;
+			if (
+				schema === null ||
+				(!ci && schema === "public") ||
+				(mysql && !namespaces.has(norm(schema)))
+			)
+				return relations;
 			return (await namespace(norm(schema))).relations;
 		},
 		async columns(ref) {
 			const name = norm(ref.name);
 			if (
 				ref.schema === null ||
-				(ci ? ["main", "temp"] : ["public"]).includes(norm(ref.schema))
+				(mysql
+					? !namespaces.has(norm(ref.schema))
+					: defaults.includes(norm(ref.schema)))
 			) {
 				const t =
 					relTypes.get(name) ??

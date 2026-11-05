@@ -59,6 +59,8 @@
 		"postgres",
 		"postgresql",
 		"sqlite",
+		"mysql",
+		"mariadb",
 		"typescript",
 		"type-safe",
 		"type-level",

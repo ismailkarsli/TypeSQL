@@ -2,6 +2,7 @@ import { runTransaction } from "./transaction.js";
 
 export { mapRows, pluginsOf } from "./query.js";
 export { JsonParam } from "./runtime/json.js";
+export { mysqlPositional, mysqlValue } from "./runtime/mysql-params.js";
 export {
 	type PgField,
 	type PgLookup,

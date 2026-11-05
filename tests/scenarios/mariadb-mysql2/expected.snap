@@ -1,0 +1,31 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`mariadb-mysql2 > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "counted": "{ n: number }",
+      "dialect": ""mariadb"",
+      "inserted": "({ bio: null | string; id: number; name: string })[]",
+      "literal": "{ joined: string; positive: number; sum: number }",
+    },
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "{
+  dialect: 'mariadb',
+  inserted: [ { id: 1, name: 'Ada', bio: null } ],
+  counted: { n: 1 },
+  literal: { joined: 'ab', sum: 2, positive: 1 }
+}
+",
+  },
+}
+`;

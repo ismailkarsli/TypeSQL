@@ -26,5 +26,11 @@ export type OpTok<V extends string = string> = {
 	readonly v: V;
 };
 
-export type Tok = WordTok | IdTok | NumTok | StrTok | ParamTok | OpTok;
+/** A MySQL user or system variable, `@name` or `@@name`. */
+type VarTok<V extends string = string> = {
+	readonly k: "v";
+	readonly v: V;
+};
+
+export type Tok = WordTok | IdTok | NumTok | StrTok | ParamTok | OpTok | VarTok;
 export type Toks = readonly Tok[];

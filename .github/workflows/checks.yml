@@ -74,7 +74,7 @@ jobs:
           node-version: 26.8.1
       - run: pnpm install --frozen-lockfile
       - run: pnpm --dir tests typecheck
-      - name: Start PostgreSQL
+      - name: Start PostgreSQL, MySQL and MariaDB
         run: docker compose -f tests/compose.yaml up --detach --wait
       - run: pnpm test
       - name: Retain failing scenario applications and logs
@@ -85,6 +85,6 @@ jobs:
           path: tests/.artifacts/
           include-hidden-files: true
           retention-days: 7
-      - name: Stop PostgreSQL
+      - name: Stop the databases
         if: always()
         run: docker compose -f tests/compose.yaml down --volumes --remove-orphans
