@@ -39,7 +39,7 @@ Prisma returns nested objects (each user with a `posts` array). TypeSQL returns 
 | Extra step | `prisma generate` after each schema change | none |
 | Raw SQL | `$queryRaw`, typed by the type you write, or [TypedSQL](./prisma-typedsql) | checked and typed from the SQL |
 | Migrations | `prisma migrate` generates them from the schema | you [write the DDL](../guide/migrations), and the schema type follows it |
-| Databases | PostgreSQL, MySQL, SQLite, SQL Server, MongoDB, CockroachDB | PostgreSQL and SQLite; MySQL is planned |
+| Databases | PostgreSQL, MySQL, SQLite, SQL Server, MongoDB, CockroachDB | PostgreSQL, SQLite, MySQL and MariaDB |
 
 ## Choose Prisma ORM when
 

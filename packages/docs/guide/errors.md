@@ -114,6 +114,15 @@ Any of these fixes it:
   export type * from "@typesql/core/sqlite";
   ```
 
+  ```ts [MySQL]
+  import { createSql } from "@typesql/core";
+  import { mysql } from "@typesql/core/mysql";
+
+  export const sql = createSql<DB>(mysql, executor);
+  export type * from "@typesql/core";
+  export type * from "@typesql/core/mysql";
+  ```
+
   :::
 - Add `@typesql/core` to the exporting package's `dependencies`.
 - Export the rows (`execute*` results) instead of the query, or annotate the return type.

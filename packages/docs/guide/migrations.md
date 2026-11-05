@@ -133,6 +133,16 @@ const sql = createSql<DB>(new DatabaseSync("app.db"));
 const q = sql(`SELECT id, display_name, bio FROM users WHERE email = ${sql.param("a@b.c")}`);
 ```
 
+```ts [MySQL]
+import { createPool } from "mysql2/promise";
+import type { SchemaOf } from "@typesql/core/migration";
+import { createSql } from "@typesql/mysql";
+
+type DB = SchemaOf<typeof addBio>;
+const sql = createSql<DB>(createPool(process.env["DATABASE_URL"]!));
+const q = sql(`SELECT id, display_name, bio FROM users WHERE email = ${sql.param("a@b.c")}`);
+```
+
 :::
 
 `SchemaOf` is also exported from `@typesql/core`. A migration that starts from `"sqlite"` is checked with [SQLite's rules](../adapters/sqlite#schema), and one that starts from `"mysql"` or `"mariadb"` with [MySQL's](../adapters/mysql#migrations); the two differ only where the servers do.
@@ -166,6 +176,23 @@ import type { DB as Existing } from "./db/schema.js";
 
 export const baseline = {
 	up: async (db: SqliteMigration<Existing>) => db,
+	down: async () => {},
+};
+
+export const addBio = migration(baseline, {
+	up: async (db) => db.ddl("ALTER TABLE users ADD COLUMN bio TEXT"),
+	down: async (db) => {
+		await db.ddl("ALTER TABLE users DROP COLUMN bio");
+	},
+});
+```
+
+```ts [MySQL]
+import { migration, type MySqlMigration } from "@typesql/core/migration";
+import type { DB as Existing } from "./db/schema.js";
+
+export const baseline = {
+	up: async (db: MySqlMigration<Existing>) => db,
 	down: async () => {},
 };
 
@@ -217,6 +244,19 @@ export default migration("sqlite", {
 });
 ```
 
+```ts [MySQL]
+// migrations/1793356800_create-users.ts
+import { migration } from "@typesql/core/migration";
+
+export default migration("mysql", {
+	up: async (db) =>
+		db.ddl("CREATE TABLE users (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, email VARCHAR(255) NOT NULL)"),
+	down: async (db) => {
+		await db.ddl("DROP TABLE users");
+	},
+});
+```
+
 :::
 
 ::: code-group
@@ -235,6 +275,19 @@ export default migration(previous, {
 ```
 
 ```ts [SQLite]
+// migrations/1793360400_add-bio.ts
+import { migration } from "@typesql/core/migration";
+import previous from "./1793356800_create-users.js";
+
+export default migration(previous, {
+	up: async (db) => db.ddl("ALTER TABLE users ADD COLUMN bio TEXT"),
+	down: async (db) => {
+		await db.ddl("ALTER TABLE users DROP COLUMN bio");
+	},
+});
+```
+
+```ts [MySQL]
 // migrations/1793360400_add-bio.ts
 import { migration } from "@typesql/core/migration";
 import previous from "./1793356800_create-users.js";
@@ -676,6 +729,16 @@ interface Before {
 type After = ApplyDdl<
 	Before,
 	"ALTER TABLE users ADD COLUMN age INTEGER NOT NULL DEFAULT 0; ALTER TABLE users RENAME COLUMN email TO login"
+>;
+```
+
+```ts [MySQL]
+interface Before {
+	users: { id: Col<"int unsigned", { autoIncrement: true }>; email: Col<"varchar"> };
+}
+type After = ApplyDdl<
+	Before,
+	"ALTER TABLE users ADD COLUMN age INT NOT NULL DEFAULT 0; ALTER TABLE users RENAME COLUMN email TO login"
 >;
 ```
 

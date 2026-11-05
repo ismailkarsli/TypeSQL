@@ -12,7 +12,7 @@ pnpm add @typesql/core @typesql/better-auth better-auth
 
 ## Use the adapter
 
-Create `sql` with `@typesql/pg`, `@typesql/postgres`, `@typesql/sqlite` or `@typesql/kysely`, and pass it to `typesqlAdapter`:
+Create `sql` with `@typesql/pg`, `@typesql/postgres`, `@typesql/sqlite` or `@typesql/kysely` (on PostgreSQL or SQLite; the adapter doesn't support MySQL and MariaDB yet), and pass it to `typesqlAdapter`:
 
 ::: code-group
 

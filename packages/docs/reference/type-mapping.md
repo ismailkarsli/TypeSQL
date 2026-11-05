@@ -233,7 +233,7 @@ const recent = app(
 
 ## Custom type maps
 
-A type map is any object type from Postgres type names to TypeScript types. Pass it as the second type argument of core's dialect-specific `createSql` overload or an ORM package's `createSql`. Driver adapters select fixed maps; to use a custom map with one, pass its `executor(client)` to core's `createSql`:
+A type map is any object type from the database's type names to TypeScript types. Pass it as the second type argument of core's dialect-specific `createSql` overload or an ORM package's `createSql`. Driver adapters select fixed maps; to use a custom map with one, pass its `executor(client)` to core's `createSql`:
 
 ```ts
 import { createSql } from "@typesql/core";

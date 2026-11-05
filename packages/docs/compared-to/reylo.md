@@ -44,13 +44,13 @@ const rows = await sql(
 | Running queries | a preload (`--import reylo/register`) or bundler plugin, with the engine installed at runtime | `sql()` builds `{ text, values }`, and your driver sends it |
 | Dynamic queries | `CASE` on parameters, and JSON parameters described by a JSON Schema | [fragments](../guide/using-sql#dynamic-sql) |
 | Migrations | applied with your own tool | applied with your own tool, or [written as DDL](../guide/migrations) that the schema type follows |
-| Databases | PostgreSQL, MySQL, SQLite, DuckDB (preview) | PostgreSQL and SQLite; MySQL is planned |
+| Databases | PostgreSQL, MySQL, SQLite, DuckDB (preview) | PostgreSQL, SQLite, MySQL and MariaDB |
 
 Both work out nullability from outer joins and from `WHERE` conditions that reject `NULL`.
 
 ## Choose Reylo when
 
-- You use MySQL or DuckDB.
+- You use DuckDB.
 - You want your SQL in `.sql` files.
 - You want database errors typed, with `.try()` returning `{ value }` or `{ error }`.
 - You'd rather check queries against the real database than keep a schema type in sync with it.

@@ -30,6 +30,17 @@ const rows = await query.execute();
 // { id: number; email: string; display_name: string | null }[]
 ```
 
+```ts [MySQL]
+import { createPool } from "mysql2/promise";
+import { createSql } from "@typesql/mysql";
+
+const sql = createSql<DB>(createPool(process.env["DATABASE_URL"]!));
+
+const query = sql(`SELECT id, email, display_name FROM users`);
+const rows = await query.execute();
+// { id: number; email: string; display_name: string | null }[]
+```
+
 :::
 
 | Method | Returns |
@@ -65,7 +76,7 @@ sql(`SELECT id FROM users WHERE id = ${sql.param("7")}`); // error: expects numb
 
 ### JSON values
 
-Wrap `json` and `jsonb` values in `sql.json(value)`, because drivers send raw arrays and strings in ways Postgres rejects or stores wrong.
+Wrap `json` and `jsonb` values in `sql.json(value)` on every database, because drivers send raw arrays and strings in ways Postgres rejects or stores wrong; on SQLite, MySQL and MariaDB it binds the value as JSON text.
 
 ```ts
 const save = sql(
@@ -119,13 +130,22 @@ const named = sql(`
 //   "count(*) OVER ()": number; name: string }
 ```
 
+```ts [MySQL]
+const named = sql(`
+  SELECT id + 1, lower(email), CAST(id AS CHAR), count(*) OVER (),
+         coalesce(display_name, email) AS name
+  FROM users`);
+// { "id + 1": number; "lower(email)": string; "CAST(id AS CHAR)": string;
+//   "count(*) OVER ()": number; name: string }
+```
+
 :::
 
 When two columns share a name, the last one wins. For camelCase keys, see [CasePlugin](./case-plugin).
 
 ### Aggregates
 
-`count` is never null, other aggregates are nullable when their argument is or when there is no `GROUP BY`, and result types follow the database (`sum` of `int4` is `int8` on Postgres).
+`count` is never null, other aggregates are nullable when their argument is or when there is no `GROUP BY`, and result types follow the database (`sum` of `int4` is `int8` on Postgres, and `SUM` of an integer is `decimal` on MySQL and MariaDB).
 
 ```ts
 const totals = sql(
@@ -152,7 +172,7 @@ const structured = sql(`
 
 ### JSON
 
-On Postgres, JSON you build in SQL is typed (`json_build_object` is an object, `json_agg(x)` an array of `x`), and `->` reads a known shape; on SQLite, JSON functions return `string`.
+On Postgres, JSON you build in SQL is typed (`json_build_object` is an object, `json_agg(x)` an array of `x`), and `->` reads a known shape; on SQLite, JSON functions return `string`, and on MySQL and MariaDB `json`, which is `unknown` when the driver parses it (see [Type mapping](../reference/type-mapping#mysql-and-mariadb)).
 
 ```ts
 const profiles = sql(`
@@ -166,7 +186,7 @@ Values inside JSON are typed as Postgres writes them (numbers, booleans, strings
 
 ### Expressions and functions
 
-Operators and about 450 built-in functions return the types Postgres gives them, and an unknown function is an error; declare your own under `$functions`:
+Operators and the built-in functions (about 450 on Postgres) return the types the database gives them, and an unknown function is an error; declare your own under `$functions`:
 
 ```ts
 interface AppDB extends DB {
@@ -178,11 +198,11 @@ const appSql = createSql<AppDB>(postgres);
 const slugs = appSql(`SELECT slugify(email) AS slug FROM users`);
 ```
 
-On SQLite, also register the function with your driver; see [SQLite functions](../adapters/sqlite#functions).
+On SQLite, also register the function with your driver; see [SQLite functions](../adapters/sqlite#functions). On MySQL and MariaDB, declare stored functions and UDFs the same way, with `Sig` from `@typesql/core/mysql`; see [MySQL functions](../adapters/mysql#functions).
 
 ## Inserting and updating
 
-`INSERT`, `UPDATE`, `DELETE` and `MERGE` are checked like queries, and every `NOT NULL` column without a default must be set; without `RETURNING`, `execute()` resolves to `[]` and `executeCount()` gives the affected rows.
+`INSERT`, `UPDATE`, `DELETE` and `MERGE` (`REPLACE` and `ON DUPLICATE KEY UPDATE` on MySQL and MariaDB) are checked like queries, and every `NOT NULL` column without a default must be set; without `RETURNING`, `execute()` resolves to `[]` and `executeCount()` gives the affected rows.
 
 ```ts
 const created = sql(`

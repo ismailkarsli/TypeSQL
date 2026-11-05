@@ -43,12 +43,11 @@ const rows = await sql(
 | Extra step | `prisma generate --sql` after each query change | none |
 | Nullability | what the database reports | worked out from the SQL (`LEFT JOIN`, `WHERE x IS NOT NULL`, `COALESCE`) |
 | Dynamic queries | each file is one fixed statement | [fragments](../guide/using-sql#dynamic-sql) |
-| Databases | PostgreSQL, MySQL, SQLite and others Prisma supports | PostgreSQL and SQLite; MySQL is planned |
+| Databases | PostgreSQL, MySQL, SQLite and others Prisma supports | PostgreSQL, SQLite, MySQL and MariaDB |
 
 ## Choose Prisma TypedSQL when
 
 - You already use Prisma ORM and only need a few raw queries.
-- You use MySQL.
 - You'd rather check queries against the real database than keep a schema type in sync with it.
 
 ## Choose TypeSQL when

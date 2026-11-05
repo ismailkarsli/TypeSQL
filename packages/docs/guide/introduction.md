@@ -43,6 +43,23 @@ const recent = sql(
 const rows = await recent.execute();
 ```
 
+```ts [MySQL]
+import { createPool } from "mysql2/promise";
+import { createSql } from "@typesql/mysql";
+import type { DB } from "./schema.js";
+
+const sql = createSql<DB>(createPool(process.env["DATABASE_URL"]!));
+
+const recent = sql(
+	`SELECT u.id, u.email, p.title
+   FROM users u
+   LEFT JOIN posts p ON p.author_id = u.id
+   WHERE u.created_at > ${sql.param(new Date("2026-01-01"))}`,
+);
+
+const rows = await recent.execute();
+```
+
 :::
 
 ## How it works

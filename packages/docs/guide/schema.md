@@ -56,9 +56,31 @@ export interface DB {
 }
 ```
 
+```ts [MySQL]
+import type { Col, Enum, Json, View } from "@typesql/core/mysql";
+
+export interface DB {
+	users: {
+		id: Col<"int unsigned", { autoIncrement: true }>;
+		email: Col<"varchar">;
+		display_name: Col<"varchar", { nullable: true }>;
+		mood: Enum<"happy" | "neutral" | "sad", { hasDefault: true }>;
+		created_at: Col<"datetime", { hasDefault: true }>;
+	};
+	posts: {
+		id: Col<"bigint unsigned", { autoIncrement: true }>;
+		author_id: Col<"int unsigned">;
+		title: Col<"varchar">;
+		body: Col<"text", { nullable: true }>;
+		tags: Json<string[], { hasDefault: true }>;
+	};
+	user_stats: View<{ user_id: Col<"int unsigned">; posts: Col<"bigint"> }>;
+}
+```
+
 :::
 
-SQLite has no enum or array types: `mood` is a text column whose values are typed with [`Typed`](../adapters/sqlite#typed-values), and `posts` has no `tags`. On MySQL and MariaDB, `mood` is an `ENUM` column, `Enum<"happy" | "neutral" | "sad", { hasDefault: true }>` from `@typesql/core/mysql`, and `id` is `Col<"int unsigned", { autoIncrement: true }>`; see [MySQL and MariaDB](../adapters/mysql#schema). The other pages of this guide use this schema.
+SQLite has no enum or array types: `mood` is a text column whose values are typed with [`Typed`](../adapters/sqlite#typed-values), and `posts` has no `tags`. MySQL and MariaDB have `ENUM` columns but no arrays: `mood` is an `Enum` typed as its values, `tags` is a JSON column, and `id` is an `AUTO_INCREMENT` column; see [MySQL and MariaDB](../adapters/mysql#schema). The other pages of this guide use this schema.
 
 Then create `sql` from it with the dialect, or with your adapter's `createSql<DB>(client)`:
 
@@ -78,6 +100,13 @@ import { sqlite } from "@typesql/core/sqlite";
 export const sql = createSql<DB>(sqlite);
 ```
 
+```ts [MySQL]
+import { createSql } from "@typesql/core";
+import { mysql } from "@typesql/core/mysql";
+
+export const sql = createSql<DB>(mysql);
+```
+
 :::
 
 ## Column helpers
@@ -86,7 +115,7 @@ export const sql = createSql<DB>(sqlite);
 |---|---|
 | `Col<"text">` | `NOT NULL`, no default |
 | `Col<"text", { nullable: true }>` | `NULL` allowed |
-| `Col<"int4", { hasDefault: true }>` | has a default (serial, identity, SQLite's `INTEGER PRIMARY KEY`, `DEFAULT …`), so it is optional in `INSERT` |
+| `Col<"int4", { hasDefault: true }>` | has a default (serial, identity, `AUTO_INCREMENT`, SQLite's `INTEGER PRIMARY KEY`, `DEFAULT …`), so it is optional in `INSERT` |
 | `Col<"text", { nullable: true; hasDefault: true }>` | both: `NULL` allowed and has a default |
 | `Col<"int4[]">` | PostgreSQL: an array column; the flags work as for any column |
 | `Enum<"mood">` | PostgreSQL: a column of an enum type, with its values listed under `$types` |
@@ -109,7 +138,7 @@ The driver decides which TypeScript type each database type becomes (node-postgr
 
 ## Typed JSON columns
 
-A `jsonb` column is `unknown` by default, and a SQLite JSON column is text. `Json<T>` says what it holds (on MySQL and MariaDB, `Json<T>` from `@typesql/core/mysql` works like SQLite's; see [Typed values](../adapters/mysql#typed-values)):
+A `jsonb` column is `unknown` by default, so is a MySQL `json` column, and a SQLite JSON column is text. `Json<T>` says what it holds (on MySQL and MariaDB, `Json<T>` from `@typesql/core/mysql` works like SQLite's; see [Typed values](../adapters/mysql#typed-values)):
 
 ::: code-group
 
@@ -141,11 +170,25 @@ interface DB {
 const sql = createSql<DB>(sqlite);
 ```
 
+```ts [MySQL]
+type HistoryItem = { at: string; state: { value: number; note?: string } };
+
+interface DB {
+	portfolio: {
+		id: Col<"int unsigned", { autoIncrement: true }>;
+		name: Col<"varchar">;
+		history: Json<HistoryItem[], { hasDefault: true }>;
+		settings: Json<{ theme: "dark" | "light" }, { nullable: true }>;
+	};
+}
+const sql = createSql<DB>(mysql);
+```
+
 :::
 
 `Json<T>` takes the same flags as `Col` as its second argument (`{ nullable: true }`, `{ hasDefault: true }`). On PostgreSQL, pass `"json"` as the third argument for a `json` column.
 
-On PostgreSQL, rows read the column as `T`, and `->`, `#>` and subscripts look inside it (see [JSON in queries](./using-sql#json)). On SQLite, rows read the column as JSON text, and `->`, `->>` and `json_extract` with a constant path take their types from `T`:
+On PostgreSQL, rows read the column as `T`, and `->`, `#>` and subscripts look inside it (see [JSON in queries](./using-sql#json)); on MySQL and MariaDB, rows read it as `T` and `->`, `->>` and `JSON_EXTRACT` with a constant path look inside it. On SQLite, rows read the column as JSON text, and `->`, `->>` and `json_extract` with a constant path take their types from `T`:
 
 ::: code-group
 
@@ -161,6 +204,12 @@ const latest = sql(
 );
 ```
 
+```ts [MySQL]
+const latest = sql(
+	`SELECT id, history ->> '$[last].state.value' AS value, settings ->> '$.theme' AS theme FROM portfolio`,
+);
+```
+
 :::
 
 Write values with [`sql.json()`](./using-sql#json-values), which checks them against `T`:
@@ -171,7 +220,7 @@ const save = sql(
 );
 ```
 
-The column is still `jsonb` to Postgres and text to SQLite, so JSON operators and functions work as usual. `T` is trusted, not checked against the database.
+The column is still `jsonb` to Postgres, `json` to MySQL and MariaDB, and text to SQLite, so JSON operators and functions work as usual. `T` is trusted, not checked against the database.
 
 ## Enums
 
@@ -198,7 +247,7 @@ Calling a function that is neither built in nor declared is an error. See [Expre
 
 ## Other schemas
 
-Tables in a Postgres schema other than `public` go in a nested object:
+Tables in a Postgres schema other than `public`, or in another MySQL or MariaDB database, go in a nested object:
 
 ```ts
 interface DB {

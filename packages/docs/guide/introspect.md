@@ -1,5 +1,5 @@
 ---
-description: "Generate a TypeSQL schema from a live PostgreSQL or SQLite database with typesql introspect: tables, views, materialized views and enums."
+description: "Generate a TypeSQL schema from a live PostgreSQL, SQLite, MySQL or MariaDB database with typesql introspect: tables, views, materialized views and enums."
 ---
 
 # From a live database
@@ -20,6 +20,11 @@ pnpm exec typesql introspect --url postgres://localhost/app --out src/db/schema.
 ```sh [SQLite]
 pnpm add -D @typesql/cli
 pnpm exec typesql introspect --db app.db --out src/db/schema.ts
+```
+
+```sh [MySQL]
+pnpm add -D @typesql/cli mysql2
+pnpm exec typesql introspect --url mysql://root@localhost/app --out src/db/schema.ts
 ```
 
 :::
@@ -44,6 +49,14 @@ import type { DB } from "./db/schema.js";
 const sql = createSql<DB>(new DatabaseSync("app.db"));
 ```
 
+```ts [MySQL]
+import { createPool } from "mysql2/promise";
+import { createSql } from "@typesql/mysql";
+import type { DB } from "./db/schema.js";
+
+const sql = createSql<DB>(createPool(process.env["DATABASE_URL"]!));
+```
+
 :::
 
 ::: tip Why introspect?
@@ -54,7 +67,7 @@ The file has the real Postgres types: `timestamptz`, `date` and `timestamp` stay
 
 | Option | What it does |
 |---|---|
-| `--dialect <name>` | `postgres`, the default; `sqlite` reads a [database file](../adapters/sqlite#generate-the-schema) instead |
+| `--dialect <name>` | `postgres`, the default; `sqlite` reads a [database file](../adapters/sqlite#generate-the-schema) instead, and `mysql` or `mariadb` a [MySQL or MariaDB database](../adapters/mysql#generate-the-schema) |
 | `--url <url>` | connection string; default `$DATABASE_URL` |
 | `--out <file>` | output file; default stdout |
 | `--schema <name>` | schema to read; repeat it or comma-separate (`--schema public,auth`). Default: every schema except `pg_catalog`, `information_schema` and `pg_*` |

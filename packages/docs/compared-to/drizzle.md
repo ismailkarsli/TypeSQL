@@ -38,13 +38,13 @@ const rows = await sql(
 | Raw SQL | `` sql<T>`…` ``, typed by the `T` you write | checked and typed from the SQL |
 | Relations | the relational query API (`db.query…`) | joins and [JSON aggregation](../guide/using-sql#json) in SQL |
 | Migrations | drizzle-kit generates them from the schema | you [write the DDL](../guide/migrations), and the schema type follows it |
-| Databases | PostgreSQL, MySQL, SQLite and more | PostgreSQL and SQLite; MySQL is planned |
+| Databases | PostgreSQL, MySQL, SQLite and more | PostgreSQL, SQLite, MySQL and MariaDB |
 
 ## Choose Drizzle when
 
 - You want the schema, relations and migrations defined in one TypeScript file.
 - You want migrations generated from schema changes.
-- You use MySQL or another database TypeSQL doesn't support yet.
+- You use a database TypeSQL doesn't support yet.
 
 ## Choose TypeSQL when
 

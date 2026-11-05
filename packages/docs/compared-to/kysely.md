@@ -40,12 +40,12 @@ Both give `title` as `string | null`, with no generator and no database connecti
 | Types come from | your `DB` interface | your schema type |
 | Raw SQL | `` sql<T>`…` ``, typed by the `T` you write | checked and typed from the SQL |
 | Dynamic queries | conditional method calls | [fragments](../guide/using-sql#dynamic-sql) |
-| Databases | PostgreSQL, MySQL, SQLite, SQL Server and community dialects | PostgreSQL and SQLite; MySQL is planned |
+| Databases | PostgreSQL, MySQL, SQLite, SQL Server and community dialects | PostgreSQL, SQLite, MySQL and MariaDB |
 
 ## Choose Kysely when
 
 - You'd rather compose queries with method calls.
-- You use MySQL or SQL Server.
+- You use SQL Server.
 - Your team prefers TypeScript calls over SQL text.
 
 ## Choose TypeSQL when

@@ -14,7 +14,7 @@ This page takes you from an empty project to a typed query in a few minutes.
 
 ## 1. Install
 
-The examples come in two variants: PostgreSQL with node-postgres, and SQLite with node:sqlite. Pick one in any example and the page follows.
+The examples come in three variants: PostgreSQL with node-postgres, SQLite with node:sqlite, and MySQL with mysql2 (MariaDB uses the same adapter with `{ dialect: "mariadb" }`). Pick one in any example and the page follows.
 
 ::: code-group
 
@@ -25,6 +25,11 @@ pnpm add -D typescript@7.1.0-beta
 
 ```sh [SQLite]
 pnpm add @typesql/core @typesql/sqlite
+pnpm add -D typescript@7.1.0-beta
+```
+
+```sh [MySQL]
+pnpm add @typesql/core @typesql/mysql mysql2
 pnpm add -D typescript@7.1.0-beta
 ```
 
@@ -100,11 +105,29 @@ export interface DB {
 }
 ```
 
+```ts [MySQL]
+import type { Col } from "@typesql/core/mysql";
+
+export interface DB {
+	users: {
+		id: Col<"int unsigned", { autoIncrement: true }>;
+		email: Col<"varchar">;
+		display_name: Col<"varchar", { nullable: true }>;
+		created_at: Col<"datetime", { hasDefault: true }>;
+	};
+	posts: {
+		id: Col<"bigint unsigned", { autoIncrement: true }>;
+		author_id: Col<"int unsigned">;
+		title: Col<"varchar">;
+	};
+}
+```
+
 :::
 
 - `Col` is a `NOT NULL` column.
 - `{ nullable: true }` allows `NULL`.
-- `{ hasDefault: true }` means it has a default (`serial`, identity, SQLite's `INTEGER PRIMARY KEY`, `DEFAULT …`), so `INSERT` can leave it out.
+- `{ hasDefault: true }` means it has a default (`serial`, identity, SQLite's `INTEGER PRIMARY KEY`, `DEFAULT …`), so `INSERT` can leave it out. On MySQL and MariaDB, `{ autoIncrement: true }` marks an `AUTO_INCREMENT` column and implies it.
 
 You can also generate it [from a live database](./introspect), derive it [from your migrations](./migrations), or take it [from Kysely, Drizzle or Prisma](./orms). [Declaring tables](./schema) lists every column helper.
 
@@ -127,6 +150,13 @@ import { DatabaseSync } from "node:sqlite";
 import { createSql } from "@typesql/sqlite";
 
 const sql = createSql<DB>(new DatabaseSync("app.db"));
+```
+
+```ts [MySQL]
+import { createPool } from "mysql2/promise";
+import { createSql } from "@typesql/mysql";
+
+const sql = createSql<DB>(createPool(process.env["DATABASE_URL"]!));
 ```
 
 :::
@@ -153,9 +183,18 @@ const recent = sql(
 );
 ```
 
+```ts [MySQL]
+const recent = sql(
+	`SELECT u.id, u.email, p.title
+   FROM users u
+   LEFT JOIN posts p ON p.author_id = u.id
+   WHERE u.created_at > ${sql.param(new Date("2026-01-01"))}`,
+);
+```
+
 :::
 
-The `LEFT JOIN` makes `title` nullable, because a user may have no posts. `sql.param()` sends the date as a parameter, typed like `created_at`: a `Date` on PostgreSQL, and a string on SQLite, which has no date type.
+The `LEFT JOIN` makes `title` nullable, because a user may have no posts. `sql.param()` sends the date as a parameter, typed like `created_at`: a `Date` on PostgreSQL, a `Date` or a string on MySQL and MariaDB, and a string on SQLite, which has no date type.
 
 ## 5. Run it
 
@@ -167,7 +206,7 @@ const user = await sql(
 ).executeTakeFirstOrThrow();
 ```
 
-`executeTakeFirstOrThrow()` throws a `NoResultError` when there is no row. [PostgreSQL](../adapters/postgresql#run-queries) lists all the `execute*` methods, which work the same on [SQLite](../adapters/sqlite#run-queries).
+`executeTakeFirstOrThrow()` throws a `NoResultError` when there is no row. [PostgreSQL](../adapters/postgresql#run-queries) lists all the `execute*` methods, which work the same on [SQLite](../adapters/sqlite#run-queries) and on [MySQL and MariaDB](../adapters/mysql#run-queries).
 
 Each `sql.param()` becomes a `$n` in the text, and its value goes to the database as a parameter, never into the SQL:
 
