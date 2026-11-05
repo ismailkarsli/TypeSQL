@@ -11,7 +11,7 @@ TypeSQL supports PostgreSQL, SQLite, MySQL and MariaDB.
 
 <a href="https://www.npmjs.com/package/@typesql/core"><img src="https://img.shields.io/npm/v/@typesql/core" alt="npm version" height="20"></a>
 <a href="https://www.npmjs.com/package/@typesql/core"><img src="https://img.shields.io/npm/dm/@typesql/core" alt="npm downloads" height="20"></a>
-<a href="https://bundlejs.com/?q=@typesql/core"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fdeno.bundlejs.com%2F%3Fq%3D%40typesql%2Fcore&amp;query=%24.size.size&amp;label=bundle%20size" alt="bundle size" height="20"></a>
+<a href="https://bundlephobia.com/package/@typesql/core"><img src="https://badgen.net/bundlephobia/minzip/@typesql/core?label=bundle%20size" alt="bundle size" height="20"></a>
 <a href="https://github.com/ismailkarsli/TypeSQL"><img src="https://img.shields.io/github/stars/ismailkarsli/TypeSQL" alt="GitHub stars" height="20"></a>
 <a href="LICENSE"><img src="https://img.shields.io/github/license/ismailkarsli/TypeSQL" alt="License" height="20"></a>
 
