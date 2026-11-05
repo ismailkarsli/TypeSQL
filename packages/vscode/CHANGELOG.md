@@ -1,5 +1,11 @@
 # typesql
 
+## 3.1.0
+
+### Minor Changes
+
+- Completion and highlighting in MySQL and MariaDB statements: names are quoted with backticks, and `#` comments, backtick names and `"…"` strings are highlighted.
+
 ## 3.0.3
 
 ### Patch Changes

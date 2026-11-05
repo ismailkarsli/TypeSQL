@@ -1,5 +1,19 @@
 # @typesql/cli
 
+## 6.2.0
+
+### Minor Changes
+
+- `typesql introspect` and `typesql migrate` accept `--dialect mysql` and `--dialect mariadb`. A `mysql://` or `mariadb://` URL selects the dialect by itself, and `DATABASE_URL` is the default URL for MySQL and MariaDB as it is for PostgreSQL. The schema file written after a migration uses `Enum` and `Typed` where the schema has them.
+
+### Patch Changes
+
+- Updated dependencies:
+  - @typesql/core@6.2.0
+  - @typesql/mysql@6.2.0
+  - @typesql/pg@6.2.0
+  - @typesql/sqlite@6.2.0
+
 ## 6.1.4
 
 ### Patch Changes

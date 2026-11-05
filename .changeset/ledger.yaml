@@ -59,6 +59,10 @@
   dir: packages/cli
   intents:
     - curvy-pens-obey
+"@typesql/cli@6.2.0":
+  dir: packages/cli
+  intents:
+    - eager-foxes-sing
 "@typesql/core@0.0.2":
   dir: packages/core
   intents:
@@ -414,6 +418,10 @@
   dir: packages/core
   intents:
     - ancient-kiwis-wonder
+"@typesql/core@6.2.0":
+  dir: packages/core
+  intents:
+    - brave-owls-learn
 "@typesql/drizzle@0.0.2":
   dir: packages/drizzle
   intents:
@@ -502,6 +510,10 @@
   dir: packages/drizzle
   intents:
     - curvy-pens-obey
+"@typesql/drizzle@6.2.0":
+  dir: packages/drizzle
+  intents:
+    - happy-lions-climb
 "@typesql/kysely@0.0.2":
   dir: packages/kysely
   intents:
@@ -595,6 +607,10 @@
   dir: packages/kysely
   intents:
     - curvy-pens-obey
+"@typesql/kysely@6.2.0":
+  dir: packages/kysely
+  intents:
+    - gentle-moons-drift
 "@typesql/language-server@0.0.1":
   dir: packages/language-server
   intents:
@@ -661,6 +677,14 @@
   dir: packages/language-server
   intents:
     - curvy-pens-obey
+"@typesql/language-server@1.1.0":
+  dir: packages/language-server
+  intents:
+    - kind-waves-glow
+"@typesql/mysql@6.2.0":
+  dir: packages/mysql
+  intents:
+    - calm-rivers-wake
 "@typesql/pg@0.0.2":
   dir: packages/pg
   intents:
@@ -982,6 +1006,10 @@
   dir: packages/prisma
   intents:
     - curvy-pens-obey
+"@typesql/prisma@6.2.0":
+  dir: packages/prisma
+  intents:
+    - jolly-trees-shine
 "@typesql/sqlite@0.0.1":
   dir: packages/sqlite
   intents:
@@ -1121,3 +1149,7 @@ typesql@3.0.3:
   dir: packages/vscode
   intents:
     - empty-grapes-work
+typesql@3.1.0:
+  dir: packages/vscode
+  intents:
+    - lucky-birds-hum

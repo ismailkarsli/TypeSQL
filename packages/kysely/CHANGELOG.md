@@ -1,5 +1,16 @@
 # @typesql/kysely
 
+## 6.2.0
+
+### Minor Changes
+
+- `createSql(mysql, db)` and `createSql(mariadb, db)` run on a Kysely instance with `MysqlDialect`, and `FromKyselyMysql` converts its `DB` interface to a MySQL schema.
+
+### Patch Changes
+
+- Updated dependencies:
+  - @typesql/core@6.2.0
+
 ## 6.1.4
 
 ### Patch Changes

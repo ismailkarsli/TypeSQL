@@ -1,5 +1,16 @@
 # @typesql/prisma
 
+## 6.2.0
+
+### Minor Changes
+
+- `createSql(mysql, client)` and `createSql(mariadb, client)` run on Prisma Client with `@prisma/adapter-mariadb`, typed by `PrismaMysqlTypeMap` and `PrismaMariaDbTypeMap`. `FromPrismaMysql` converts a Prisma schema, and the `typesql-prisma` generator writes a MySQL schema for the `mysql` provider.
+
+### Patch Changes
+
+- Updated dependencies:
+  - @typesql/core@6.2.0
+
 ## 6.1.4
 
 ### Patch Changes
