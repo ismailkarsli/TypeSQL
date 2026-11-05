@@ -82,11 +82,8 @@ export function encodeInput<V>(
 	// biome-ignore lint/plugin: returns whatever the plugins' `transformInput` returns.
 ): unknown {
 	let encoded: unknown = value;
-	for (let i = plugins.length - 1; i >= 0; i--) {
-		const plugin = plugins[i]!;
-		if (plugin.transformInput)
-			encoded = plugin.transformInput(encoded, context);
-	}
+	for (let i = plugins.length - 1; i >= 0; i--)
+		encoded = plugins[i]?.transformInput?.(encoded, context) ?? encoded;
 	return encoded;
 }
 
@@ -97,9 +94,7 @@ export function encodeParameters(
 ): readonly unknown[] {
 	const encoded = encodeInput(args, plugins, { kind: "parameters", query });
 	if (!Array.isArray(encoded))
-		throw new Error(
-			"typesql: a plugin must encode query parameters as an array",
-		);
+		throw new Error("typesql: a plugin must encode parameters as an array");
 	return encoded;
 }
 
@@ -107,7 +102,6 @@ export function applyPlugins(
 	rows: readonly unknown[],
 	plugins: readonly SqlPlugin[],
 ): unknown[] {
-	if (plugins.length === 0) return Array.from(rows);
 	return rows.map((row) => {
 		for (const plugin of plugins)
 			if (plugin.transformOutput) row = plugin.transformOutput(row);

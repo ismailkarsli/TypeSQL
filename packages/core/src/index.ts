@@ -20,10 +20,6 @@ export type {
 	SqlPlugin,
 } from "./plugin.js";
 export {
-	CasePlugin,
-	type CasePluginTypes,
-} from "./plugins/case.js";
-export {
 	type CARRIED,
 	type Executor,
 	type ExecutorResult,

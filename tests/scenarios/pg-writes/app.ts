@@ -14,7 +14,7 @@ const sql = createSql<DB>(pool);
 await pool.query(`CREATE TABLE users (id int PRIMARY KEY, display_name text, balance int NOT NULL);
   INSERT INTO users VALUES (1, 'Ada', 100), (2, NULL, 50)`);
 
-import { CasePlugin } from "@typesql/core";
+import { CasePlugin } from "@typesql/core/plugins";
 
 const camel = sql.withPlugin(new CasePlugin());
 export const inserted = await camel(

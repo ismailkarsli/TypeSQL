@@ -12,21 +12,21 @@ exports[`runtime-inline-reuse > scenario 1`] = `
     "types": {},
   },
   "exception": {
-    "message": "typesql: this sql.param() value was already used by another statement; call sql.param() once per statement",
+    "message": "typesql: this sql.param() value was already used; call sql.param() once per statement",
     "name": "Error",
   },
   "start": {
     "status": 1,
-    "stderr": "file://<workspace>/packages/core/dist/runtime/inline.js:159
-            throw new Error("typesql: this sql.param() value was already used by another statement; call sql.param() once per statement");
-                  ^
+    "stderr": "file://<workspace>/packages/core/dist/runtime/compile.js:44
+        throw new Error(id[0] === "~"
+              ^
 
-Error: typesql: this sql.param() value was already used by another statement; call sql.param() once per statement
-    at file://<workspace>/packages/core/dist/runtime/inline.js:159:19
-    at replaceSql (file://<workspace>/packages/core/dist/runtime/splice.js:35:48)
-    at resolveInline (file://<workspace>/packages/core/dist/runtime/inline.js:145:17)
-    at build (file://<workspace>/packages/core/dist/runtime/build.js:32:19)
-    at call (file://<workspace>/packages/core/dist/create-sql.js:24:34)
+Error: typesql: this sql.param() value was already used; call sql.param() once per statement
+    at use (file://<workspace>/packages/core/dist/runtime/compile.js:44:15)
+    at file://<workspace>/packages/core/dist/runtime/compile.js:193:23
+    at scan (file://<workspace>/packages/core/dist/runtime/compile.js:148:44)
+    at compile (file://<workspace>/packages/core/dist/runtime/compile.js:182:17)
+    at call (file://<workspace>/packages/core/dist/create-sql.js:21:34)
     at file://<scenario>/dist/app.js:6:1
     at ModuleJob.run (node:internal/modules/esm/module_job:569:25)
     at async node:internal/modules/esm/loader:650:26

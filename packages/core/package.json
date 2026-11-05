@@ -48,6 +48,10 @@
 		"./migration": {
 			"types": "./dist/migration/index.d.ts",
 			"default": "./dist/migration/index.js"
+		},
+		"./plugins": {
+			"types": "./dist/plugins/index.d.ts",
+			"default": "./dist/plugins/index.js"
 		}
 	},
 	"files": [

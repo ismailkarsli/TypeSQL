@@ -24,6 +24,7 @@
 				"src/mysql/index.ts!",
 				"src/mysql/engine/index.ts!",
 				"src/migration/index.ts!",
+				"src/plugins/index.ts!",
 				"examples/*.ts"
 			],
 			"project": ["src/**/*.ts!", "examples/**/*.ts"]

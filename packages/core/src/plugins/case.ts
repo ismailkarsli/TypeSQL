@@ -22,17 +22,14 @@ type CamelCaseKeys<Row> = Row extends object
 	? { [K in keyof Row as K extends string ? CamelCase<K> : K]: Row[K] }
 	: Row;
 
-function camelCased(key: string): string {
-	let mapped = key[0]!;
+function camelCase(key: string): string {
+	if (!key.includes("_")) return key;
+	let mapped = key[0] ?? "";
 	for (let i = 1; i < key.length; i++) {
-		const c = key[i]!;
+		const c = key[i] ?? "";
 		if (c !== "_") mapped += key[i - 1] === "_" ? c.toUpperCase() : c;
 	}
 	return mapped;
-}
-
-function camelCase(key: string): string {
-	return key.includes("_") ? camelCased(key) : key;
 }
 
 type SnakeCase<S extends string> = string extends S
@@ -51,17 +48,8 @@ type SnakeRest<S extends string> =
 type SnakeChar<C extends string> =
 	C extends Lowercase<C> ? C : `_${Lowercase<C>}`;
 
-function snakeCase(key: string): string {
-	let result = "";
-	let start = 0;
-	for (let i = 0; i < key.length; i++) {
-		const code = key.charCodeAt(i);
-		if (code < 65 || code > 90) continue;
-		result += `${key.slice(start, i)}_${String.fromCharCode(code + 32)}`;
-		start = i + 1;
-	}
-	return start === 0 ? key : result + key.slice(start);
-}
+const snakeCase = (key: string): string =>
+	key.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
 
 type SnakeCaseKeys<Row> = Row extends object
 	? { [K in keyof Row as K extends string ? SnakeCase<K> : K]: Row[K] }

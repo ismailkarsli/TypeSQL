@@ -17,7 +17,7 @@ An ORM's types say less than the database does, so each conversion has a few gap
 Each package's `createSql` takes the SQL [dialect](../reference/api#dialects) as its first argument: `postgres` from `@typesql/core/postgres`, `sqlite` from `@typesql/core/sqlite` (see [SQLite](#sqlite)), or `mysql` or `mariadb` from `@typesql/core/mysql` (see [MySQL and MariaDB](#mysql)). The schema comes from the ORM's database type, so `createSql(postgres, db)` needs no type argument; pass one (`createSql<DB>(postgres, db)`) to add overrides, pick a type map or build queries without a client. The type map defaults to the dialect's (`DefaultTypeMap`); `@typesql/prisma` defaults to `PrismaTypeMap`.
 
 ::: tip
-For the exact Postgres types without overrides, [generate the schema from the database](./introspect) instead, and keep the ORM for the queries it builds.
+For the exact database types without overrides, [generate the schema from the database](./introspect) instead, and keep the ORM for the queries it builds.
 :::
 
 ## Kysely
@@ -172,7 +172,7 @@ camel(`SELECT author_id, created_at FROM blog_posts WHERE id = ${camel.param(1)}
 
 Names are converted back to snake_case word by word, so a codegen name that dropped an underscore before a digit or single letter doesn't round-trip: `--camel-case` maps `a_b_c` to `aBC`, which reads back as `a_bc` (Kysely's own `CamelCasePlugin` does the same). Rename such columns, or leave `camelCase` off.
 
-For camelCase rows, as `CamelCasePlugin` would return them, attach `.withPlugin(new CasePlugin())`, importing `CasePlugin` from `@typesql/core`. Only top-level keys are renamed, not keys inside JSON values. See [camelCase row keys](./case-plugin).
+For camelCase rows, as `CamelCasePlugin` would return them, attach `.withPlugin(new CasePlugin())`, importing `CasePlugin` from `@typesql/core/plugins`. Only top-level keys are renamed, not keys inside JSON values. See [camelCase row keys](./case-plugin).
 
 ```ts
 const camelRows = createSql<

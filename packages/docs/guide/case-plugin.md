@@ -9,7 +9,7 @@ description: "Get camelCase row keys and write camelCase input objects with Type
 ::: code-group
 
 ```ts [PostgreSQL]
-import { CasePlugin } from "@typesql/core";
+import { CasePlugin } from "@typesql/core/plugins";
 
 const camel = createSql<DB>(postgres, executor).withPlugin(new CasePlugin());
 
@@ -19,9 +19,19 @@ const rows = await camel(
 ```
 
 ```ts [SQLite]
-import { CasePlugin } from "@typesql/core";
+import { CasePlugin } from "@typesql/core/plugins";
 
 const camel = createSql<DB>(sqlite, executor).withPlugin(new CasePlugin());
+
+const rows = await camel(
+	"SELECT id, display_name, created_at, count(*) OVER () AS total_count FROM users",
+).execute();
+```
+
+```ts [MySQL]
+import { CasePlugin } from "@typesql/core/plugins";
+
+const camel = createSql<DB>(mysql, executor).withPlugin(new CasePlugin());
 
 const rows = await camel(
 	"SELECT id, display_name, created_at, count(*) OVER () AS total_count FROM users",

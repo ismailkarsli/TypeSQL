@@ -1,5 +1,5 @@
 import { applyPlugins, type SqlPlugin } from "./plugin.js";
-import { inlineable } from "./runtime/inline.js";
+import { type Spliceable, SqlFragment } from "./runtime/compile.js";
 
 export declare const ROW: unique symbol;
 export declare const PARAMS: unique symbol;
@@ -21,15 +21,6 @@ export type Executor = ((
 		values: readonly unknown[],
 	) => PromiseLike<number>;
 };
-
-export class NoResultError extends Error {
-	override readonly name = "NoResultError";
-	readonly text: string;
-	constructor(text: string) {
-		super("The query returned no rows");
-		this.text = text;
-	}
-}
 
 /** The object part of a `Query`: what a query is besides its string brand. */
 export interface QueryObject<
@@ -92,6 +83,68 @@ export type TextType<Q> = Q extends { readonly [TEXT]?: infer T extends string }
 
 const PLUGINS = Symbol.for("typesql.plugins");
 
+export class NoResultError extends Error {
+	override readonly name = "NoResultError";
+	readonly text: string;
+	constructor(text: string) {
+		super("The query returned no rows");
+		this.text = text;
+	}
+}
+
+/** A statement with its executor and plugins; its methods live on the prototype, so a query is `{ text, values }` to a spread. */
+class SqlQuery extends SqlFragment {
+	readonly #executor: Executor | undefined;
+	readonly #plugins: readonly SqlPlugin[];
+	constructor(
+		text: string,
+		values: readonly unknown[],
+		executor: Executor | undefined,
+		plugins: readonly SqlPlugin[],
+	) {
+		super(text, values);
+		this.#executor = executor;
+		this.#plugins = plugins;
+		// Under PLUGINS, which `Symbol.for` shares across copies of this module, for pluginsOf().
+		if (plugins.length > 0)
+			Object.defineProperty(this, PLUGINS, { value: plugins });
+	}
+	#pick(given?: Executor): Executor {
+		const executor = given ?? this.#executor;
+		if (!executor)
+			throw new Error(
+				"typesql: no executor; pass one to createSql() or execute()",
+			);
+		return executor;
+	}
+	async execute(executor?: Executor): Promise<unknown[]> {
+		const result = await this.#pick(executor)(this.text, this.values);
+		return applyPlugins(isRows(result) ? result : result.rows, this.#plugins);
+	}
+	async executeTakeFirst(executor?: Executor) {
+		return (await this.execute(executor))[0];
+	}
+	async executeTakeFirstOrThrow(executor?: Executor) {
+		const rows = await this.execute(executor);
+		if (rows.length === 0) throw new NoResultError(this.text);
+		return rows[0];
+	}
+	async executeCount(executor?: Executor): Promise<number> {
+		const exec = this.#pick(executor);
+		if (exec.count) return exec.count(this.text, this.values);
+		const result = await exec(this.text, this.values);
+		if (isRows(result) || result.rowCount === undefined)
+			throw new Error("typesql: the executor reported no rowCount");
+		return result.rowCount ?? 0;
+	}
+}
+
+function isRows(
+	result: readonly unknown[] | ExecutorResult,
+): result is readonly unknown[] {
+	return Array.isArray(result);
+}
+
 export function mapRows<Q extends { readonly text: string }>(
 	q: Q,
 	rows: readonly unknown[],
@@ -101,21 +154,9 @@ export function mapRows<Q extends { readonly text: string }>(
 }
 
 export function pluginsOf(q: { readonly text: string }): readonly SqlPlugin[] {
-	if (!(PLUGINS in q)) return [];
-	const plugins = q[PLUGINS];
-	return isPluginList(plugins) ? plugins : [];
-}
-
-/** makeQuery() stores its plugins under PLUGINS, which `Symbol.for` shares across copies of this module. */
-function isPluginList(value: unknown): value is readonly SqlPlugin[] {
-	return (
-		Array.isArray(value) &&
-		value.every(
-			(plugin) =>
-				(typeof plugin === "object" && plugin !== null) ||
-				typeof plugin === "function",
-		)
-	);
+	// biome-ignore lint/nursery/noUnsafeTypeAssertion: only makeQuery() stores PLUGINS, with its plugin list.
+	const plugins = PLUGINS in q ? (q[PLUGINS] as readonly SqlPlugin[]) : [];
+	return Array.isArray(plugins) ? plugins : [];
 }
 
 export function makeQuery<
@@ -128,56 +169,9 @@ export function makeQuery<
 	executor: Executor | undefined,
 	plugins: readonly SqlPlugin[] = [],
 ): Query<Row, Params, Text> {
-	const pick = (given?: Executor): Executor => {
-		const exec = given ?? executor;
-		if (!exec)
-			throw new Error(
-				"typesql: no executor: pass one to createSql(executor) or to execute(executor)",
-			);
-		return exec;
-	};
-	const execute = async (given?: Executor): Promise<unknown[]> => {
-		const result = await pick(given)(text, values);
-		return applyPlugins(isRows(result) ? result : result.rows, plugins);
-	};
-	const query = { text, values };
-	if (plugins.length > 0)
-		Object.defineProperty(query, PLUGINS, {
-			value: plugins,
-		});
-	Object.defineProperty(query, "execute", { value: execute });
-	Object.defineProperty(query, "executeCount", {
-		value: async (given?: Executor) => {
-			const exec = pick(given);
-			if (exec.count) return exec.count(text, values);
-			const result = await exec(text, values);
-			if (isRows(result) || result.rowCount === undefined) {
-				throw new Error(
-					"typesql: the executor did not report a row count: resolve to { rows, rowCount } (the adapters' executor() do)",
-				);
-			}
-			return result.rowCount ?? 0;
-		},
-	});
-	Object.defineProperty(query, "executeTakeFirst", {
-		value: async (given?: Executor) => (await execute(given))[0],
-	});
-	Object.defineProperty(query, "executeTakeFirstOrThrow", {
-		value: async (given?: Executor) => {
-			const rows = await execute(given);
-			if (rows.length === 0) throw new NoResultError(text);
-			return rows[0];
-		},
-	});
-	inlineable(query);
+	const query: Spliceable = new SqlQuery(text, values, executor, plugins);
 	// biome-ignore lint/nursery/noUnsafeTypeAssertion: `Query` carries its row and parameter types as type-only brands.
 	return query as Query<Row, Params, Text>;
-}
-
-function isRows(
-	result: readonly unknown[] | ExecutorResult,
-): result is readonly unknown[] {
-	return Array.isArray(result);
 }
 
 export function makeFragment<
@@ -185,6 +179,7 @@ export function makeFragment<
 	Params extends readonly unknown[],
 	Carried extends readonly unknown[] = readonly unknown[],
 >(text: string, values: readonly unknown[]): Fragment<Text, Params, Carried> {
+	const fragment: Spliceable = new SqlFragment(text, values);
 	// biome-ignore lint/nursery/noUnsafeTypeAssertion: `Fragment` carries its text and parameter types as type-only brands.
-	return inlineable({ text, values }) as Fragment<Text, Params, Carried>;
+	return fragment as Fragment<Text, Params, Carried>;
 }

@@ -6,7 +6,8 @@ import { stripTypeScriptTypes } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { compileFunction } from "node:vm";
-import { CasePlugin, createSql } from "@typesql/core";
+import { createSql } from "@typesql/core";
+import { CasePlugin } from "@typesql/core/plugins";
 import { postgres } from "@typesql/core/postgres";
 import {
 	isArrayTypeNode,

@@ -1,10 +1,10 @@
 import {
-	CasePlugin,
 	createSql,
 	type IdentityPluginTypes,
 	type SqlPlugin,
 } from "@typesql/core";
 import { mapRows } from "@typesql/core/adapter";
+import { CasePlugin } from "@typesql/core/plugins";
 import type { Col } from "@typesql/core/postgres";
 import { postgres } from "@typesql/core/postgres";
 import { executor } from "@typesql/pg";

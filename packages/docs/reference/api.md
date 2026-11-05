@@ -4,9 +4,9 @@ description: "API reference for @typesql/core, its PostgreSQL, SQLite, MySQL, ad
 
 # API
 
-The public APIs of `@typesql/core`, `@typesql/core/postgres`, `@typesql/core/sqlite`, `@typesql/core/mysql`, `@typesql/core/adapter`, `@typesql/core/migration` and the extra exports of the adapter and ORM packages. Each entry links to the guide page that explains it.
+The public APIs of `@typesql/core`, `@typesql/core/postgres`, `@typesql/core/sqlite`, `@typesql/core/mysql`, `@typesql/core/adapter`, `@typesql/core/migration`, `@typesql/core/plugins` and the extra exports of the adapter and ORM packages. Each entry links to the guide page that explains it.
 
-`@typesql/core` holds what every SQL dialect shares: `createSql`, queries, fragments, executors, plugins, transactions, the schema markers and the [dialect contract](#dialects). Migrations are in `@typesql/core/migration`. Everything PostgreSQL-specific is in `@typesql/core/postgres`: the `postgres` dialect, the type engine, `Json` and `PgCatalog`, the type maps and the function catalog.
+`@typesql/core` holds what every SQL dialect shares: `createSql`, queries, fragments, executors, plugins, transactions, the schema markers and the [dialect contract](#dialects). Migrations are in `@typesql/core/migration`. Everything PostgreSQL-specific is in `@typesql/core/postgres`: the `postgres` dialect, the type engine, `Json` and `PgCatalog`, the type maps and the function catalog. `@typesql/core/sqlite` and `@typesql/core/mysql` hold the same for SQLite and for MySQL and MariaDB; see [Dialects](#dialects).
 
 ## `createSql`
 
@@ -22,7 +22,7 @@ Returns the typed `sql` function for a schema in a [dialect](#dialects).
 - The dialect is the first argument: `postgres` from `@typesql/core/postgres`, `sqlite` from `@typesql/core/sqlite`, or `mysql` or `mariadb` from `@typesql/core/mysql`. Each dialect adds its own `createSql` signature, so the type arguments start with `DB`.
 - `DB` is your [schema](../guide/schema). `TypeMap` turns the dialect's column types into TypeScript types ([Type mapping](./type-mapping)); it defaults to the dialect's map.
 - `executor` is what `execute*` runs on. Without one, `sql` only builds queries.
-- Use `.withPlugin(new CasePlugin())` for camelCase input and output keys, or attach a custom typed plugin. See [plugins](../guide/plugins).
+- Use `.withPlugin(new CasePlugin())`, from `@typesql/core/plugins`, for camelCase input and output keys, or attach a custom typed plugin. See [plugins](../guide/plugins).
 
 The adapters export their own `createSql`, which takes the driver client and adds [`sql.transaction(fn)`](#sql-transaction-fn):
 
@@ -220,7 +220,7 @@ What adapters and custom executors build on.
 | `TransactionalSql<DB, TM, Plugins = []>` | an adapter's `sql`: `Sql` plus `transaction(fn)` |
 | `SqlPlugin`, `PluginTypes`, `IdentityPluginTypes`, `InputContext` | runtime hooks and type functions for custom plugins |
 | `PluginInput`, `PluginEncoded`, `PluginOutput` | apply a plugin tuple to a type |
-| `CasePlugin` | camelCase row/write keys and snake_case database write keys |
+| `CasePlugin` | camelCase row/write keys and snake_case database write keys; from `@typesql/core/plugins` |
 | `Executor` | what `execute*` runs on |
 | `ExecutorResult` | `{ rows, rowCount: number \| null }` |
 | `NoResultError` | thrown by `executeTakeFirstOrThrow` on 0 rows; carries `text` |
@@ -228,7 +228,7 @@ What adapters and custom executors build on.
 | `Fragment<Text, Params, Carried>` | a spliceable SQL piece, with carried input types for checking when spliced |
 | `QueryObject<Row, Params, Text>`, `FragmentObject<Text, Params, Carried>` | the object interfaces behind the string-branded `Query` and `Fragment` aliases |
 
-The `Sql` and `TransactionalSql` types come from `@typesql/core/postgres`, `@typesql/core/sqlite` or `@typesql/core/mysql` (which adds `MariaDbSql` and `MariaDbTransactionalSql`). The remaining types above come from `@typesql/core`.
+The `Sql` and `TransactionalSql` types come from `@typesql/core/postgres`, `@typesql/core/sqlite` or `@typesql/core/mysql` (which adds `MariaDbSql` and `MariaDbTransactionalSql`). `CasePlugin` comes from `@typesql/core/plugins`. The remaining types above come from `@typesql/core`.
 
 ### Tables and write helpers
 
@@ -287,7 +287,7 @@ type WithCatalog = DB & PgCatalog;
 | `BigIntTypeMap` | `@typesql/core/sqlite`, for SQLite integer results read as `bigint` |
 | `DefaultTypeMap`, `Mysql2MariaDbTypeMap`, `MariaDbTypeMap`, `ServerlessTypeMap`, `BigNumberStringsTypeMap`, `DateStringsTypeMap` | `@typesql/core/mysql`: mysql2, the mariadb connector, PlanetScale and TiDB Cloud, and mysql2 with `bigNumberStrings` or `dateStrings` |
 | `ParamTypeMapOf<TM>` | the parameter map in effect for `TM` |
-| `TsParamTypeOf<TM, DB, T>` | what a parameter of Postgres type `T` accepts |
+| `TsParamTypeOf<TM, DB, T>` | what a parameter of database type `T` accepts |
 
 The tables, the resolution order and custom maps are in [Type mapping](./type-mapping).
 

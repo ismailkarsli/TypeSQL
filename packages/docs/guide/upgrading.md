@@ -4,13 +4,13 @@ description: "Breaking changes in each TypeSQL major version and the code to cha
 
 # Upgrading
 
-This page lists breaking changes and migration guidance since 1.0, newest first, with the code to change. Apply the sections newer than your installed version, oldest first: from 4.x apply [5.0](#_5-0); from 3.x apply [4.0](#_4-0), then 5.0. From 2.x start at [3.0](#_3-0), from 1.x at [2.0](#_2-0), and from 0.x at [1.0](#_1-0). The [changelog](/changelog) has the release notes from 1.0.0 on; notes for 0.x releases are on the [GitHub releases page](https://github.com/ismailkarsli/TypeSQL/releases).
+This page lists breaking changes and migration guidance since 1.0, newest first, with the code to change. Apply the sections newer than your installed version, oldest first: from 5.x or 6.x apply [7.0](#_7-0); from 4.x apply [5.0](#_5-0), then 7.0; from 3.x apply [4.0](#_4-0), then 5.0 and 7.0. From 2.x start at [3.0](#_3-0), from 1.x at [2.0](#_2-0), and from 0.x at [1.0](#_1-0). The [changelog](/changelog) has the release notes from 1.0.0 on; notes for 0.x releases are on the [GitHub releases page](https://github.com/ismailkarsli/TypeSQL/releases).
 
 Most breaking changes are compile errors at the call site, so after upgrading run `tsc --noEmit` (or your editor) and work through the list. The changes that compile but behave differently are marked **Runtime change**.
 
 ## Before you upgrade
 
-- **One version for the library packages.** Since 1.1.0, `@typesql/core`, `@typesql/pg`, `@typesql/postgres`, `@typesql/sqlite`, `@typesql/kysely`, `@typesql/drizzle`, `@typesql/prisma` and `@typesql/cli` share one version and are released together. Upgrade them together, to the same version:
+- **One version for the library packages.** Since 1.1.0, `@typesql/core`, `@typesql/pg`, `@typesql/postgres`, `@typesql/sqlite`, `@typesql/mysql`, `@typesql/kysely`, `@typesql/drizzle`, `@typesql/prisma` and `@typesql/cli` share one version and are released together. Upgrade them together, to the same version:
 
   ```sh
   pnpm add @typesql/core@5 @typesql/pg@5   # and any other @typesql/* package you use
@@ -29,6 +29,20 @@ Most breaking changes are compile errors at the call site, so after upgrading ru
     }
   }
   ```
+
+## 7.0
+
+### `CasePlugin` moves to `@typesql/core/plugins`
+
+`@typesql/core` no longer exports `CasePlugin` or `CasePluginTypes`, so applications that don't rename keys don't ship the plugin. Import both from the new `@typesql/core/plugins` entry; `.withPlugin(new CasePlugin())`, the renamed keys and their types are unchanged.
+
+```ts
+import { CasePlugin } from "@typesql/core/plugins";
+
+const camel = sql.withPlugin(new CasePlugin());
+```
+
+The custom-plugin types `SqlPlugin`, `PluginTypes`, `IdentityPluginTypes` and `InputContext` stay in `@typesql/core`.
 
 ## 5.0
 

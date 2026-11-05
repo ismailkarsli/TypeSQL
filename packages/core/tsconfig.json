@@ -13,7 +13,8 @@
 			"@typesql/core/mysql": ["./src/mysql/index.ts"],
 			"@typesql/core/postgres": ["./src/postgres/index.ts"],
 			"@typesql/core": ["./src/index.ts"],
-			"@typesql/core/migration": ["./src/migration/index.ts"]
+			"@typesql/core/migration": ["./src/migration/index.ts"],
+			"@typesql/core/plugins": ["./src/plugins/index.ts"]
 		}
 	},
 	"include": ["src", "examples"]

@@ -6,7 +6,7 @@ description: "Transform TypeSQL inputs and rows with sql.withPlugin, and write y
 
 `sql.withPlugin(plugin)` returns a new SQL instance; the original is unchanged. Plugins can change input and output structures and types. Register them in the order you want database rows transformed. Inputs travel through the inverse order: `sql.withPlugin(a).withPlugin(b)` decodes rows through `a` then `b`, and encodes application inputs through `b` then `a`.
 
-TypeSQL ships [`CasePlugin`](./case-plugin) for camelCase keys. You can also write your own.
+TypeSQL ships [`CasePlugin`](./case-plugin) for camelCase keys in `@typesql/core/plugins`. You can also write your own.
 
 ## Writing a plugin
 

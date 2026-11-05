@@ -1,5 +1,4 @@
 import {
-	CasePlugin,
 	createSql,
 	type Executor,
 	type IdentityPluginTypes,
@@ -7,6 +6,7 @@ import {
 	type RowType,
 	type SqlPlugin,
 } from "@typesql/core";
+import { CasePlugin } from "@typesql/core/plugins";
 import { type Col, postgres } from "@typesql/core/postgres";
 
 type Envelope<T> = { data: T };

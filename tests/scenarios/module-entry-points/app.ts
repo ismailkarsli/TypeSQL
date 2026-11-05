@@ -3,6 +3,7 @@ import { main } from "@typesql/cli";
 import * as core from "@typesql/core";
 import * as adapter from "@typesql/core/adapter";
 import * as migrations from "@typesql/core/migration";
+import * as plugins from "@typesql/core/plugins";
 import * as postgres from "@typesql/core/postgres";
 import * as pgEngine from "@typesql/core/postgres/engine";
 import * as sqlite from "@typesql/core/sqlite";
@@ -20,6 +21,7 @@ console.log({
 	pgEngine: Object.keys(pgEngine),
 	sqliteEngine: Object.keys(sqliteEngine),
 	migrations: typeof migrations.createMigrator,
+	CasePlugin: typeof plugins.CasePlugin,
 	pgIntrospect: typeof pgIntrospect.introspect,
 	sqliteIntrospect: typeof sqliteIntrospect.introspect,
 	generateSource: typeof generator.generateSource,

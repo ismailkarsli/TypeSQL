@@ -93,7 +93,7 @@ const changed = await sql(
 
 With postgres.js, `execute()` returns a plain array, without postgres.js' result metadata (`count`, `command`, `columns`).
 
-Attach `.withPlugin(new CasePlugin())` (imported from `@typesql/core`) for [camelCase row keys](../guide/case-plugin). With postgres.js, leave its own `transform: postgres.camel` off. To run a query on another client, see [Custom executor](./custom-executor).
+Attach `.withPlugin(new CasePlugin())` (imported from `@typesql/core/plugins`) for [camelCase row keys](../guide/case-plugin). With postgres.js, leave its own `transform: postgres.camel` off. To run a query on another client, see [Custom executor](./custom-executor).
 
 ## Transactions
 

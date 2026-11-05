@@ -1,13 +1,10 @@
 import { DatabaseSync } from "node:sqlite";
-import {
-	CasePlugin,
-	type IdentityPluginTypes,
-	type SqlPlugin,
-} from "@typesql/core";
+import type { IdentityPluginTypes, SqlPlugin } from "@typesql/core";
 import {
 	createTransactionalSql,
 	serialTransaction,
 } from "@typesql/core/adapter";
+import { CasePlugin } from "@typesql/core/plugins";
 import {
 	type Col,
 	type DefaultTypeMap,

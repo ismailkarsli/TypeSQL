@@ -1,9 +1,6 @@
-import {
-	CasePlugin,
-	type IdentityPluginTypes,
-	type SqlPlugin,
-} from "@typesql/core";
+import type { IdentityPluginTypes, SqlPlugin } from "@typesql/core";
 import { createTransactionalSql, runTransaction } from "@typesql/core/adapter";
+import { CasePlugin } from "@typesql/core/plugins";
 import { type Col, type Postgres, postgres } from "@typesql/core/postgres";
 import { executor, type PgTypeMap } from "@typesql/pg";
 import pg from "pg";

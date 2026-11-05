@@ -1,4 +1,5 @@
-import { CasePlugin, createSql, type Fragment } from "@typesql/core";
+import { createSql, type Fragment } from "@typesql/core";
+import { CasePlugin } from "@typesql/core/plugins";
 import {
 	type Col,
 	type Json,

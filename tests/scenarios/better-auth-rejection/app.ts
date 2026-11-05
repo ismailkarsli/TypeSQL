@@ -1,5 +1,5 @@
 import { typesqlAdapter } from "@typesql/better-auth";
-import { CasePlugin } from "@typesql/core";
+import { CasePlugin } from "@typesql/core/plugins";
 import type { Col } from "@typesql/core/postgres";
 import { createSql as createPgSql } from "@typesql/pg";
 import { createSql as createSqliteSql } from "@typesql/sqlite";

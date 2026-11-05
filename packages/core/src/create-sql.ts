@@ -3,17 +3,17 @@ import { type Empty, empty, isEmpty, optional } from "./empty.js";
 import { encodeInput, encodeParameters, type SqlPlugin } from "./plugin.js";
 import type { Executor } from "./query.js";
 import { makeFragment, makeQuery } from "./query.js";
-import { build, namedValues } from "./runtime/build.js";
-import { param, takeValues } from "./runtime/inline.js";
-import { json } from "./runtime/json.js";
-import type { Spliceable } from "./runtime/splice.js";
 import {
-	joinFragments,
-	maxParam,
-	quoteIdentWith,
-	rewriteNamed,
-} from "./runtime/splice.js";
-import { buildSet, buildValues, columnEntries } from "./runtime/write.js";
+	bind,
+	type CompiledSql,
+	compile,
+	ident,
+	join,
+	param,
+	type Spliceable,
+} from "./runtime/compile.js";
+import { json } from "./runtime/json.js";
+import { buildSet, buildValues } from "./runtime/write.js";
 
 export interface CreateSql {
 	// biome-ignore lint/style/useShorthandFunctionType: Dialects merge signatures into this interface.
@@ -37,73 +37,60 @@ export function createDialectSql<T extends DialectTypes, DB, TM = T["typeMap"]>(
 	return createSqlApi(dialect, executor, plugins) as SqlOf<T, DB, TM>;
 }
 
+const fragmentOf = (compiled: CompiledSql) =>
+	makeFragment(compiled.text, compiled.values);
+
 /** The runtime `sql` of `dialect`, whose type the dialect's `Sql` type describes. */
 export function createSqlApi(
 	dialect: Dialect,
 	executor: Executor | undefined,
 	plugins: readonly SqlPlugin[],
 ) {
-	const pipeline = Object.freeze([...plugins]);
-	const buildInput =
-		plugins.length === 0
-			? build
-			: (query: string, rest: readonly unknown[]) =>
-					build(query, rest, (args) => encodeParameters(args, plugins, query));
+	const quote = dialect.quote ?? '"';
+	const encode = (args: readonly unknown[], query: string) =>
+		plugins.length === 0 ? args : encodeParameters(args, plugins, query);
 	const call = (query: string, ...rest: readonly unknown[]) => {
-		const { text, values } = buildInput(query, rest);
-		return makeQuery(text, values, executor, pipeline);
+		const { text, values } = compile(query, encode(rest, query));
+		return makeQuery(text, values, executor, plugins);
 	};
+	const fragment = (text: string, ...rest: readonly unknown[]) =>
+		fragmentOf(compile(text, encode(rest, text)));
 	const api = Object.assign(call, {
 		withPlugin: (plugin: SqlPlugin) =>
 			createDialectSql(dialect, executor, [...plugins, plugin]),
 		prepare: (query: string) => {
-			const rn = rewriteNamed(query);
-			const count = maxParam(rn.text);
-			const initial = new Array<unknown>(count).fill(undefined);
-			const compiled = build(rn.text, initial);
-			const fixed = compiled.values.slice(count);
+			const compiled = compile(query);
 			const prepared = executor?.prepare?.(compiled.text) ?? executor;
 			return (...input: readonly unknown[]) => {
-				const args =
-					plugins.length === 0
-						? input
-						: encodeParameters(input, plugins, query);
-				const values =
-					rn.names.length > 0 ? namedValues(rn.names, args) : takeValues(args);
-				if (values.length !== count)
+				const values = bind(compiled.names, encode(input, query));
+				if (values.length !== compiled.count)
 					throw new Error(
-						`typesql: prepared query expects ${count} parameters, got ${values.length}`,
+						`typesql: expected ${compiled.count} parameters, got ${values.length}`,
 					);
 				return makeQuery(
 					compiled.text,
-					[...values, ...fixed],
+					[...values, ...compiled.values],
 					prepared,
-					pipeline,
+					plugins,
 				);
 			};
 		},
 		as: call,
-		param:
-			plugins.length === 0
-				? param
-				: <V>(value: V) =>
-						param(
-							isEmpty(value)
-								? value
-								: encodeInput(value, plugins, { kind: "value" }),
-						),
+		param: <V>(value: V) =>
+			param(
+				plugins.length === 0 || isEmpty(value)
+					? value
+					: encodeInput(value, plugins, { kind: "value" }),
+			),
 		optional,
 		if: <V, R>(value: V, then: (value: V) => R) =>
 			value ? then(value) : empty,
 		json,
-		fragment: (text: string, ...rest: readonly unknown[]) => {
-			const r = buildInput(text, rest);
-			return makeFragment(r.text, r.values);
-		},
+		fragment,
 		id: (...parts: readonly string[]) => {
 			if (parts.some((p) => typeof p !== "string"))
-				throw new Error("typesql: sql.id() takes names as strings");
-			return makeFragment(quoteIdentWith(dialect.quote ?? '"', parts), []);
+				throw new Error("typesql: sql.id() takes strings");
+			return makeFragment(ident(quote, parts), []);
 		},
 		combine: (
 			items: readonly (Spliceable | Empty)[],
@@ -111,52 +98,33 @@ export function createSqlApi(
 		) => {
 			const defined = present(items, "combine");
 			if (defined.length === 0)
-				throw new Error(
-					"typesql: sql.combine() needs at least one item; put a fixed element first (`[base, ...rest]`) or skip the clause",
-				);
-			const r = joinFragments(defined, options?.separator ?? ", ");
-			return makeFragment(r.text, r.values);
+				throw new Error("typesql: sql.combine() got no items");
+			return fragmentOf(join(defined, options?.separator ?? ", "));
 		},
-		and: (items: readonly (Spliceable | Empty)[]) =>
-			bool(present(items, "and"), "AND"),
-		or: (items: readonly (Spliceable | Empty)[]) =>
-			bool(present(items, "or"), "OR"),
+		and: (items: readonly (Spliceable | Empty)[]) => bool(items, "AND"),
+		or: (items: readonly (Spliceable | Empty)[]) => bool(items, "OR"),
 		set: (...args: readonly unknown[]) => {
-			const [first, second] = args;
-			const table = typeof first === "string" ? first : null;
-			const values = typeof first === "string" ? second : first;
-			const r = buildSet(
-				columnEntries(
-					encodeInput(values, pipeline, { kind: "set", table }),
-					"typesql: sql.set() takes an object of column values",
-				),
-				dialect.quote,
+			const [table, input] = tabled(args);
+			return fragmentOf(
+				buildSet(encodeInput(input, plugins, { kind: "set", table }), quote),
 			);
-			return makeFragment(r.text, r.values);
 		},
 		values: (...args: readonly unknown[]) => {
-			const [first, second] = args;
-			const table = typeof first === "string" ? first : null;
-			const rows = typeof first === "string" ? second : first;
+			const [table, rows] = tabled(args);
 			if (!Array.isArray(rows))
-				throw new Error("typesql: sql.values() takes an array of rows");
+				throw new Error("typesql: sql.values() takes an array");
 			const context = { kind: "values", table } as const;
-			const encoded =
-				pipeline.length === 0
-					? rows
-					: rows.map((row) => encodeInput(row, pipeline, context));
-			const r = buildValues(
-				encoded,
-				dialect.valuesDefault !== false,
-				dialect.quote,
-				dialect.emptyRow,
+			return fragmentOf(
+				buildValues(
+					plugins.length === 0
+						? rows
+						: rows.map((row) => encodeInput(row, plugins, context)),
+					dialect,
+					quote,
+				),
 			);
-			return makeFragment(r.text, r.values);
 		},
-		raw: (text: string) => {
-			const r = build(text, []);
-			return makeFragment(r.text, r.values);
-		},
+		raw: (text: string) => fragmentOf(compile(text, [])),
 	});
 	Object.defineProperty(api, "dialect", {
 		value: dialect.name,
@@ -164,6 +132,12 @@ export function createSqlApi(
 	});
 	return api;
 }
+
+/** The `(table, input)` or `(input)` arguments of sql.set() and sql.values(). */
+const tabled = (
+	args: readonly unknown[],
+): readonly [table: string | null, input: unknown] =>
+	typeof args[0] === "string" ? [args[0], args[1]] : [null, args[0]];
 
 function present(
 	items: readonly (Spliceable | Empty)[],
@@ -174,7 +148,7 @@ function present(
 		if (isEmpty(item)) continue;
 		if (item === null || item === undefined)
 			throw new Error(
-				`typesql: sql.${name}() does not accept null or undefined; wrap an optional item in sql.optional(), which omits it when it is undefined`,
+				`typesql: sql.${name}() got null or undefined; use sql.optional()`,
 			);
 		defined.push(item);
 	}
@@ -185,22 +159,24 @@ function present(
 // parentheses.
 const GROUPED = new WeakSet<Spliceable>();
 
-function bool(items: readonly Spliceable[], op: "AND" | "OR") {
-	const r = joinFragments(
+function bool(given: readonly (Spliceable | Empty)[], op: "AND" | "OR") {
+	const items = present(given, op.toLowerCase());
+	const r = join(
 		items.map((f) =>
 			GROUPED.has(f) ? f : { text: `(${f.text})`, values: f.values },
 		),
 		` ${op} `,
 	);
-	const text =
+	const fragment = makeFragment(
 		items.length === 0
 			? op === "AND"
 				? "true"
 				: "false"
 			: items.length === 1
 				? r.text
-				: `(${r.text})`;
-	const fragment = makeFragment(text, r.values);
+				: `(${r.text})`,
+		r.values,
+	);
 	GROUPED.add(fragment);
 	return fragment;
 }

@@ -1,5 +1,6 @@
 import { DatabaseSync } from "node:sqlite";
-import { CasePlugin, createSql } from "@typesql/core";
+import { createSql } from "@typesql/core";
+import { CasePlugin } from "@typesql/core/plugins";
 import { postgres } from "@typesql/core/postgres";
 import { createSql as createPgSql } from "@typesql/pg";
 import { createSql as createSqliteSql } from "@typesql/sqlite";
