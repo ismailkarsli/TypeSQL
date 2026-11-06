@@ -63,21 +63,19 @@ function parseNodeTree(text: string): NodeValue {
 		const t = toks[p++];
 		if (t === "{") {
 			const tag = toks[p++];
-			const fields: [string, NodeValue][] = [];
+			// The labels come from the server, so no field may resolve to Object.prototype.
+			const fields: { _: string; [field: string]: NodeValue } = Object.assign(
+				Object.create(null),
+				{ _: typeof tag === "object" ? tag.str : (tag ?? "") },
+			);
 			while (p < toks.length && toks[p] !== "}") {
 				const label = toks[p++];
 				if (!isLabel(label)) continue;
-				if (toks[p] === "}" || isLabel(toks[p])) {
-					fields.push([label.slice(1), null]);
-					continue;
-				}
-				fields.push([label.slice(1), value()]);
+				fields[label.slice(1)] =
+					toks[p] === "}" || isLabel(toks[p]) ? null : value();
 			}
 			p++;
-			return {
-				_: typeof tag === "object" ? tag.str : (tag ?? ""),
-				...Object.fromEntries(fields),
-			};
+			return fields;
 		}
 		if (t === "(") {
 			const list: NodeValue[] = [];
