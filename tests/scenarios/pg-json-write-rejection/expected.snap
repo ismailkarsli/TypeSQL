@@ -5,29 +5,6 @@ exports[`pg-json-write-rejection > scenario 1`] = `
   "compile": {
     "status": 1,
     "stderr": "",
-    "stdout": "app.ts(15,5): error TS2345: Argument of type 'string' is not assignable to parameter of type 'SqlError<"parameter $1: a sql.json() { ok: true; views: \\"wrong\\" } value cannot be used as jsonb NOT NULL (expected { ok: boolean; views: number })", 5> & "UPDATE t SET doc=\\0PJ<0ok=t,0views=qwrong~>0\\0"'.
-  Type 'string' is not assignable to type 'SqlError<"parameter $1: a sql.json() { ok: true; views: \\"wrong\\" } value cannot be used as jsonb NOT NULL (expected { ok: boolean; views: number })", 5>'.
-app.ts(16,5): error TS2345: Argument of type 'string' is not assignable to parameter of type 'SqlError<"parameter $1: a sql.json() { ok: true } value cannot be used as jsonb NOT NULL (expected { ok: boolean; views: number })", 5> & "UPDATE t SET doc=\\0PJ<0ok=t>0\\0"'.
-  Type 'string' is not assignable to type 'SqlError<"parameter $1: a sql.json() { ok: true } value cannot be used as jsonb NOT NULL (expected { ok: boolean; views: number })", 5>'.
-app.ts(18,2): error TS2345: Argument of type 'string' is not assignable to parameter of type 'SqlError<"parameter $1: a sql.json() { ok: true; views: \\"wrong\\" } value cannot be used as jsonb NOT NULL (expected { ok: boolean; views: number })", 5> & \`UPDATE t SET \${Fragment<"\\"doc\\" = $1", readonly unknown[], ["J<0ok=t,0views=qwrong~>0"]>}\`'.
-  Type 'string' is not assignable to type 'SqlError<"parameter $1: a sql.json() { ok: true; views: \\"wrong\\" } value cannot be used as jsonb NOT NULL (expected { ok: boolean; views: number })", 5>'.
-app.ts(20,5): error TS2345: Argument of type 'string' is not assignable to parameter of type 'SqlError<"parameter $1: a sql.json() { ok: true } value cannot be used as jsonb NOT NULL (expected { ok: boolean; views: number })", 5> & \`UPDATE t SET \${Fragment<"\\"doc\\" = $1", readonly unknown[], ["J<0ok=t>0"]>}\`'.
-  Type 'string' is not assignable to type 'SqlError<"parameter $1: a sql.json() { ok: true } value cannot be used as jsonb NOT NULL (expected { ok: boolean; views: number })", 5>'.
-app.ts(22,2): error TS2345: Argument of type 'string' is not assignable to parameter of type 'SqlError<"parameter $1: a sql.json() { ok: true; views: \\"wrong\\" } value cannot be used as jsonb NOT NULL (expected { ok: boolean; views: number })", 10> & \`INSERT INTO t \${Fragment<"(\\"doc\\", \\"label\\") VALUES ($1, $2)", readonly unknown[], ["J<0ok=t,0views=qwrong~>0", "Jqdraft~"]>}\`'.
-  Type 'string' is not assignable to type 'SqlError<"parameter $1: a sql.json() { ok: true; views: \\"wrong\\" } value cannot be used as jsonb NOT NULL (expected { ok: boolean; views: number })", 10>'.
-app.ts(25,2): error TS2345: Argument of type 'string' is not assignable to parameter of type 'SqlError<"parameter $1: a sql.json() { ok: true } value cannot be used as jsonb NOT NULL (expected { ok: boolean; views: number })", 10> & \`INSERT INTO t \${Fragment<"(\\"doc\\", \\"label\\") VALUES ($1, $2)", readonly unknown[], ["J<0ok=t>0", "Jqdraft~"]>}\`'.
-  Type 'string' is not assignable to type 'SqlError<"parameter $1: a sql.json() { ok: true } value cannot be used as jsonb NOT NULL (expected { ok: boolean; views: number })", 10>'.
-app.ts(28,2): error TS2345: Argument of type 'string' is not assignable to parameter of type 'SqlError<"parameter $1: a sql.json() { ok: true } value cannot be used as jsonb NOT NULL (expected { ok: boolean; views: number })", 10> & "INSERT INTO t (doc, label) VALUES (\\0PJ<0ok=t>0\\0, \\0PJqdraft~\\0)"'.
-  Type 'string' is not assignable to type 'SqlError<"parameter $1: a sql.json() { ok: true } value cannot be used as jsonb NOT NULL (expected { ok: boolean; views: number })", 10>'.
-app.ts(30,5): error TS2345: Argument of type 'string' is not assignable to parameter of type 'SqlError<"parameter $1: a sql.json() { ok: true; views: \\"wrong\\" } value cannot be used as json (expected { ok: boolean; views: number } | null)", 5> & "UPDATE t SET optional=\\0PJ<0ok=t,0views=qwrong~>0\\0"'.
-  Type 'string' is not assignable to type 'SqlError<"parameter $1: a sql.json() { ok: true; views: \\"wrong\\" } value cannot be used as json (expected { ok: boolean; views: number } | null)", 5>'.
-app.ts(31,5): error TS2345: Argument of type 'string' is not assignable to parameter of type 'SqlError<"parameter $1: a sql.json() { ok: true } value cannot be used as json (expected { ok: boolean; views: number } | null)", 5> & "UPDATE t SET optional=\\0PJ<0ok=t>0\\0"'.
-  Type 'string' is not assignable to type 'SqlError<"parameter $1: a sql.json() { ok: true } value cannot be used as json (expected { ok: boolean; views: number } | null)", 5>'.
-app.ts(32,5): error TS2345: Argument of type 'string' is not assignable to parameter of type 'SqlError<"parameter $1: a sql.json() null value cannot be used as jsonb NOT NULL (expected { ok: boolean; views: number })", 5> & "UPDATE t SET doc=\\0PJ0\\0"'.
-  Type 'string' is not assignable to type 'SqlError<"parameter $1: a sql.json() null value cannot be used as jsonb NOT NULL (expected { ok: boolean; views: number })", 5>'.
-app.ts(33,5): error TS2345: Argument of type 'string' is not assignable to parameter of type 'SqlError<"parameter $1: a sql.json() \\"wrong\\" value cannot be used as jsonb NOT NULL (expected \\"draft\\" | \\"published\\")", 5> & "UPDATE t SET label=\\0PJqwrong~\\0"'.
-  Type 'string' is not assignable to type 'SqlError<"parameter $1: a sql.json() \\"wrong\\" value cannot be used as jsonb NOT NULL (expected \\"draft\\" | \\"published\\")", 5>'.
-",
   },
   "compiler": {
     "diagnostics": [
@@ -39,10 +16,6 @@ app.ts(33,5): error TS2345: Argument of type 'string' is not assignable to param
           {
             "category": 1,
             "code": 2322,
-            "column": 5,
-            "expression": "\`UPDATE t SET doc=\${sql.json({ views: "wrong", ok: true })}\`",
-            "file": "app.ts",
-            "line": 15,
             "message": "Type 'string' is not assignable to type 'SqlError<"parameter $1: a sql.json() { ok: true; views: \\"wrong\\" } value cannot be used as jsonb NOT NULL (expected { ok: boolean; views: number })", 5>'.",
           },
         ],
@@ -59,10 +32,6 @@ app.ts(33,5): error TS2345: Argument of type 'string' is not assignable to param
           {
             "category": 1,
             "code": 2322,
-            "column": 5,
-            "expression": "\`UPDATE t SET doc=\${sql.json({ ok: true })}\`",
-            "file": "app.ts",
-            "line": 16,
             "message": "Type 'string' is not assignable to type 'SqlError<"parameter $1: a sql.json() { ok: true } value cannot be used as jsonb NOT NULL (expected { ok: boolean; views: number })", 5>'.",
           },
         ],
@@ -79,10 +48,6 @@ app.ts(33,5): error TS2345: Argument of type 'string' is not assignable to param
           {
             "category": 1,
             "code": 2322,
-            "column": 2,
-            "expression": "\`UPDATE t SET \${sql.set("t", { doc: sql.json({ views: "wrong", ok: true }) })}\`",
-            "file": "app.ts",
-            "line": 18,
             "message": "Type 'string' is not assignable to type 'SqlError<"parameter $1: a sql.json() { ok: true; views: \\"wrong\\" } value cannot be used as jsonb NOT NULL (expected { ok: boolean; views: number })", 5>'.",
           },
         ],
@@ -99,10 +64,6 @@ app.ts(33,5): error TS2345: Argument of type 'string' is not assignable to param
           {
             "category": 1,
             "code": 2322,
-            "column": 5,
-            "expression": "\`UPDATE t SET \${sql.set("t", { doc: sql.json({ ok: true }) })}\`",
-            "file": "app.ts",
-            "line": 20,
             "message": "Type 'string' is not assignable to type 'SqlError<"parameter $1: a sql.json() { ok: true } value cannot be used as jsonb NOT NULL (expected { ok: boolean; views: number })", 5>'.",
           },
         ],
@@ -119,10 +80,6 @@ app.ts(33,5): error TS2345: Argument of type 'string' is not assignable to param
           {
             "category": 1,
             "code": 2322,
-            "column": 2,
-            "expression": "\`INSERT INTO t \${sql.values("t", [{ doc: sql.json({ views: "wrong", ok: true }), label: sql.json("draft") }])}\`",
-            "file": "app.ts",
-            "line": 22,
             "message": "Type 'string' is not assignable to type 'SqlError<"parameter $1: a sql.json() { ok: true; views: \\"wrong\\" } value cannot be used as jsonb NOT NULL (expected { ok: boolean; views: number })", 10>'.",
           },
         ],
@@ -139,10 +96,6 @@ app.ts(33,5): error TS2345: Argument of type 'string' is not assignable to param
           {
             "category": 1,
             "code": 2322,
-            "column": 2,
-            "expression": "\`INSERT INTO t \${sql.values("t", [{ doc: sql.json({ ok: true }), label: sql.json("draft") }])}\`",
-            "file": "app.ts",
-            "line": 25,
             "message": "Type 'string' is not assignable to type 'SqlError<"parameter $1: a sql.json() { ok: true } value cannot be used as jsonb NOT NULL (expected { ok: boolean; views: number })", 10>'.",
           },
         ],
@@ -159,10 +112,6 @@ app.ts(33,5): error TS2345: Argument of type 'string' is not assignable to param
           {
             "category": 1,
             "code": 2322,
-            "column": 2,
-            "expression": "\`INSERT INTO t (doc, label) VALUES (\${sql.json({ ok: true })}, \${sql.json("draft")})\`",
-            "file": "app.ts",
-            "line": 28,
             "message": "Type 'string' is not assignable to type 'SqlError<"parameter $1: a sql.json() { ok: true } value cannot be used as jsonb NOT NULL (expected { ok: boolean; views: number })", 10>'.",
           },
         ],
@@ -179,10 +128,6 @@ app.ts(33,5): error TS2345: Argument of type 'string' is not assignable to param
           {
             "category": 1,
             "code": 2322,
-            "column": 5,
-            "expression": "\`UPDATE t SET optional=\${sql.json({ views: "wrong", ok: true })}\`",
-            "file": "app.ts",
-            "line": 30,
             "message": "Type 'string' is not assignable to type 'SqlError<"parameter $1: a sql.json() { ok: true; views: \\"wrong\\" } value cannot be used as json (expected { ok: boolean; views: number } | null)", 5>'.",
           },
         ],
@@ -199,10 +144,6 @@ app.ts(33,5): error TS2345: Argument of type 'string' is not assignable to param
           {
             "category": 1,
             "code": 2322,
-            "column": 5,
-            "expression": "\`UPDATE t SET optional=\${sql.json({ ok: true })}\`",
-            "file": "app.ts",
-            "line": 31,
             "message": "Type 'string' is not assignable to type 'SqlError<"parameter $1: a sql.json() { ok: true } value cannot be used as json (expected { ok: boolean; views: number } | null)", 5>'.",
           },
         ],
@@ -219,10 +160,6 @@ app.ts(33,5): error TS2345: Argument of type 'string' is not assignable to param
           {
             "category": 1,
             "code": 2322,
-            "column": 5,
-            "expression": "\`UPDATE t SET doc=\${sql.json(null)}\`",
-            "file": "app.ts",
-            "line": 32,
             "message": "Type 'string' is not assignable to type 'SqlError<"parameter $1: a sql.json() null value cannot be used as jsonb NOT NULL (expected { ok: boolean; views: number })", 5>'.",
           },
         ],
@@ -239,10 +176,6 @@ app.ts(33,5): error TS2345: Argument of type 'string' is not assignable to param
           {
             "category": 1,
             "code": 2322,
-            "column": 5,
-            "expression": "\`UPDATE t SET label=\${sql.json("wrong")}\`",
-            "file": "app.ts",
-            "line": 33,
             "message": "Type 'string' is not assignable to type 'SqlError<"parameter $1: a sql.json() \\"wrong\\" value cannot be used as jsonb NOT NULL (expected \\"draft\\" | \\"published\\")", 5>'.",
           },
         ],

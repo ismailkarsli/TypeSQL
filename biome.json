@@ -12,11 +12,10 @@
 			"!!.changeset",
 			"!packages/core/src/postgres/engine/typer/pg-functions.ts",
 			"!packages/core/src/postgres/schema/pg-catalog.ts",
-			"!packages/bench/src",
+			"!packages/bench/src/case1.ts",
+			"!tools/biome/src",
 			"!pnpm-lock.yaml",
-			"!**/CHANGELOG.md",
-			"!tests/.artifacts",
-			"!tests/.vitest"
+			"!**/CHANGELOG.md"
 		]
 	},
 	"formatter": {

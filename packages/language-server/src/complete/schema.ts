@@ -1,5 +1,6 @@
+import { META_KEYS } from "@typesql/core/reserved";
 import type { Checker, Type } from "typescript/async";
-import { type Dialect, isMySql } from "./call.js";
+import type { DialectFacts } from "../sql/dialect.js";
 import type { RelRef } from "./scan.js";
 
 interface Relation {
@@ -20,7 +21,7 @@ export interface Schema {
 	columns(ref: RelRef): Promise<readonly Column[] | null>;
 }
 
-const NOT_RELATIONS = new Set(["$types", "$functions", "$flavor"]);
+const NOT_RELATIONS: ReadonlySet<string> = new Set(META_KEYS);
 
 interface Entry {
 	readonly name: string;
@@ -30,14 +31,16 @@ interface Entry {
 export async function schemaOf(
 	checker: Checker,
 	db: Type,
-	dialect: Dialect,
+	d: DialectFacts,
 ): Promise<Schema> {
-	// SQLite and MySQL find names in any case. MySQL reads a qualifier that
-	// names no schema of DB as the current database, so `app.users` is `users`.
-	const ci = dialect !== "postgres";
-	const mysql = isMySql(dialect);
-	const defaults = ci ? ["main", "temp"] : ["public"];
-	const norm = (name: string): string => (ci ? name.toLowerCase() : name);
+	const norm = (name: string): string =>
+		d.foldsCase ? name.toLowerCase() : name;
+	// Whether `schema` names DB's top level. MySQL reads a qualifier that names
+	// no schema of DB as the current database, so `app.users` is `users`.
+	const isTopLevel = (schema: string): boolean =>
+		d.qualifierMayBeDatabase
+			? !namespaces.has(norm(schema))
+			: d.defaultSchemas.includes(norm(schema));
 	const entries = async (t: Type): Promise<Entry[]> => {
 		const props = (await checker.getPropertiesOfType(t)).filter(
 			(p) => !NOT_RELATIONS.has(p.name),
@@ -114,30 +117,21 @@ export async function schemaOf(
 	return {
 		namespaces: [...namespaces.keys()],
 		async relations(schema) {
-			if (
-				schema === null ||
-				(!ci && schema === "public") ||
-				(mysql && !namespaces.has(norm(schema)))
-			)
-				return relations;
-			return (await namespace(norm(schema))).relations;
+			return schema === null || isTopLevel(schema)
+				? relations
+				: (await namespace(norm(schema))).relations;
 		},
 		async columns(ref) {
 			const name = norm(ref.name);
-			if (
-				ref.schema === null ||
-				(mysql
-					? !namespaces.has(norm(ref.schema))
-					: defaults.includes(norm(ref.schema)))
-			) {
-				const t =
-					relTypes.get(name) ??
-					(ref.schema === null && !ci
-						? (await namespace("pg_catalog")).types.get(name)
-						: undefined);
+			if (ref.schema !== null && !isTopLevel(ref.schema)) {
+				const t = (await namespace(norm(ref.schema))).types.get(name);
 				return t ? columnsOf(t) : null;
 			}
-			const t = (await namespace(norm(ref.schema))).types.get(name);
+			const t =
+				relTypes.get(name) ??
+				(ref.schema === null && d.catalog !== null
+					? (await namespace(d.catalog)).types.get(name)
+					: undefined);
 			return t ? columnsOf(t) : null;
 		},
 	};

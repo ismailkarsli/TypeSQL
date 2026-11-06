@@ -1,54 +1,29 @@
-import type { Col } from "@typesql/core/postgres";
-import type { ToCamelCase, ToSnakeCase } from "./casing.js";
+import type { FromDrizzleOptions } from "./column.js";
+import type { MysqlColumns, MysqlViewColumns } from "./from-drizzle-mysql.js";
+import type { Enums, PgColumns, PgViewColumns } from "./from-drizzle-pg.js";
+import type {
+	SqliteColumns,
+	SqliteViewColumns,
+} from "./from-drizzle-sqlite.js";
 
-export interface FromDrizzleOptions {
-	readonly casing?: "snake_case" | "camelCase" | undefined;
-	readonly timestamp?: "timestamp" | "timestamptz" | undefined;
-	readonly time?: "time" | "timetz" | undefined;
-}
+export type FromDrizzle<
+	Schema,
+	Opts extends FromDrizzleOptions = {},
+> = FromDrizzleOf<Schema, Opts, "postgres">;
 
-export interface DrizzleColumnTypes {
-	PgSmallInt: "int2";
-	PgInteger: "int4";
-	PgBigInt53: "int8";
-	PgBigInt64: "int8";
-	PgSmallSerial: "int2";
-	PgSerial: "int4";
-	PgBigSerial53: "int8";
-	PgBigSerial64: "int8";
-	PgNumeric: "numeric";
-	PgNumericNumber: "numeric";
-	PgNumericBigInt: "numeric";
-	PgReal: "float4";
-	PgDoublePrecision: "float8";
-	PgBoolean: "bool";
-	PgText: "text";
-	PgVarchar: "varchar";
-	PgChar: "bpchar";
-	PgUUID: "uuid";
-	PgDate: "date";
-	PgDateString: "date";
-	PgInterval: "interval";
-	PgJson: "json";
-	PgJsonb: "jsonb";
-	PgInet: "inet";
-	PgCidr: "cidr";
-	PgMacaddr: "macaddr";
-	PgMacaddr8: "macaddr8";
-	PgPointTuple: "point";
-	PgPointObject: "point";
-	PgLine: "line";
-	PgLineABC: "line";
-	PgGeometry: "geometry";
-	PgGeometryObject: "geometry";
-	PgVector: "vector";
-	PgHalfVector: "halfvec";
-	PgSparseVector: "sparsevec";
-	PgBinaryVector: "bit";
-	PgCustomColumn: "unknown";
-}
+export type FromDrizzleMysql<
+	Schema,
+	Opts extends FromDrizzleOptions = {},
+> = FromDrizzleOf<Schema, Opts, "mysql">;
 
-export type TableLike = {
+export type FromDrizzleSqlite<
+	Schema,
+	Opts extends FromDrizzleOptions = {},
+> = FromDrizzleOf<Schema, Opts, "sqlite">;
+
+type Dialect = "postgres" | "mysql" | "sqlite";
+
+type TableLike = {
 	readonly _: {
 		readonly brand: "Table";
 		readonly name: string;
@@ -56,180 +31,84 @@ export type TableLike = {
 		readonly columns: object;
 	};
 };
-export type ViewLike = {
+type ViewLike = {
 	readonly _: {
 		readonly brand: "View";
 		readonly name: string;
 		readonly selectedFields: object;
 	};
 };
-type EnumLike = {
-	readonly enumName: string;
-	readonly enumValues: readonly string[];
-};
-export type ColumnLike = { readonly _: ColumnConfig };
-export type ColumnConfig = {
-	readonly brand: "Column";
-	readonly name: string;
-	readonly columnType: string;
-	readonly notNull: boolean;
-	readonly hasDefault: boolean;
-	readonly hasRuntimeDefault: boolean;
-	readonly enumValues: readonly string[] | undefined;
-	readonly data: unknown;
-	readonly baseColumn: unknown;
-};
 
-type EnumValues<X> = X extends {
-	readonly enumValues: readonly [string, ...string[]];
-}
-	? X["enumValues"][number]
-	: X extends () => { readonly _: { readonly data: infer D extends string } }
-		? D
-		: never;
+// Each dialect's columns are a mapped type of their own: one whose column
+// type depends on the dialect costs more to check.
+type Columns<C, Opts, D extends Dialect, E> = D extends "mysql"
+	? MysqlColumns<C, Opts>
+	: D extends "sqlite"
+		? SqliteColumns<C, Opts>
+		: PgColumns<C, Opts, E>;
 
-type Enums<S> = {
-	-readonly [K in keyof S as S[K] extends EnumLike ? K : never]: EnumValues<
-		S[K]
-	>;
-};
+type ViewColumns<F, Opts, D extends Dialect, E> = D extends "mysql"
+	? MysqlViewColumns<F, Opts>
+	: D extends "sqlite"
+		? SqliteViewColumns<F, Opts>
+		: PgViewColumns<F, Opts, E>;
 
-type LastOf<U> = (U extends unknown ? (x: () => U) => void : never) extends (
-	x: infer F,
-) => void
-	? F extends () => infer L
-		? L
-		: never
-	: never;
-
-type EnumName<V, E> = {
-	[K in keyof E]: [E[K]] extends [V] ? ([V] extends [E[K]] ? K : never) : never;
-}[keyof E] extends infer N
-	? [N] extends [never]
-		? "text"
-		: LastOf<N> & string
-	: never;
-
-type Opt<Opts, K extends keyof FromDrizzleOptions, D> = Opts extends {
-	readonly [P in K]: infer V extends string;
-}
-	? V
-	: D;
-
-type PgTypeOf<D extends ColumnConfig, Opts = {}, E = {}> = D extends {
-	readonly typesqlType: infer T extends string;
-}
-	? T
-	: D["columnType"] extends keyof DrizzleColumnTypes
-		? DrizzleColumnTypes[D["columnType"]]
-		: D["columnType"] extends "PgArray"
-			? D["baseColumn"] extends ColumnLike
-				? `${PgTypeOf<D["baseColumn"]["_"], Opts, E>}[]`
-				: "unknown[]"
-			: D["columnType"] extends "PgTimestamp" | "PgTimestampString"
-				? Opt<Opts, "timestamp", "timestamp">
-				: D["columnType"] extends "PgTime"
-					? Opt<Opts, "time", "time">
-					: D["columnType"] extends "PgEnumColumn"
-						? EnumName<(D["enumValues"] & readonly string[])[number], E>
-						: D["columnType"] extends "PgEnumObjectColumn"
-							? EnumName<D["data"], E>
-							: "unknown";
-
-type Desc<T extends string, N, H> = N extends true
-	? H extends true
-		? Col<T, { nullable: true; hasDefault: true }>
-		: Col<T, { nullable: true }>
-	: H extends true
-		? Col<T, { hasDefault: true }>
-		: Col<T>;
-
-export type DbDefault<D extends ColumnConfig> = D["hasDefault"] extends true
-	? D["hasRuntimeDefault"] extends true
-		? false
-		: true
-	: false;
-
-type ColOf<D extends ColumnConfig, Opts, E> = Desc<
-	PgTypeOf<D, Opts, E>,
-	D["notNull"] extends true ? false : true,
-	DbDefault<D>
->;
-
-type Cased<N extends string, Opts> = Opts extends {
-	readonly casing: "snake_case";
-}
-	? ToSnakeCase<N>
-	: Opts extends { readonly casing: "camelCase" }
-		? ToCamelCase<N>
-		: N;
-
-// Drizzle types an unnamed column's name as its key. Its casing setting renames
-// only those; an explicit name that differs from the key is kept as written.
-export type ColumnKey<C, K extends keyof C, Opts> = C[K] extends ColumnLike
-	? C[K]["_"]["name"] extends K
-		? Cased<C[K]["_"]["name"], Opts>
-		: C[K]["_"]["name"]
-	: never;
-
-type Columns<C, Opts, E> = {
-	-readonly [K in keyof C as ColumnKey<C, K, Opts>]: C[K] extends ColumnLike
-		? ColOf<C[K]["_"], Opts, E>
-		: never;
-};
-
-type Aliased = { readonly _: { readonly brand: "SQL.Aliased" } };
-export type ViewKey<F, K extends keyof F, Opts> = F[K] extends ColumnLike
-	? Cased<F[K]["_"]["name"], Opts>
-	: F[K] extends Aliased
-		? K
-		: never;
-
-type ViewColumns<F, Opts, E> = {
-	-readonly [K in keyof F as ViewKey<F, K, Opts>]: F[K] extends ColumnLike
-		? Desc<
-				PgTypeOf<F[K]["_"], Opts, E>,
-				F[K]["_"]["notNull"] extends true ? false : true,
-				false
-			>
-		: Col<"unknown", { nullable: true }>;
-};
-
-type Relation<X, Opts, E> = X extends TableLike
-	? Columns<X["_"]["columns"], Opts, E>
+type Relation<X, Opts, D extends Dialect, E> = X extends TableLike
+	? Columns<X["_"]["columns"], Opts, D, E>
 	: X extends ViewLike
-		? { readonly $view: ViewColumns<X["_"]["selectedFields"], Opts, E> }
+		? { readonly $view: ViewColumns<X["_"]["selectedFields"], Opts, D, E> }
 		: never;
 
-type SchemaOf<X> = X extends TableLike
-	? Exclude<X["_"]["schema"], undefined | "public">
+// PostgreSQL leaves out the `public` schema. Tables of a `mysqlSchema()` live
+// in another database, `db.table`: MySQL has no default schema to leave out.
+// SQLite tables have no schema.
+type DefaultSchema<D extends Dialect> = D extends "postgres" ? "public" : never;
+
+/**
+ * The schema of a table that isn't in the default one: its relations are a
+ * namespace's, `db.schema.table`.
+ */
+type SchemaOf<X, Default> = X extends TableLike
+	? Exclude<X["_"]["schema"], undefined | Default>
 	: never;
 type NameIn<X, N> = X extends TableLike
 	? X["_"]["schema"] extends N
 		? X["_"]["name"]
 		: never
 	: never;
-type TopName<X> = X extends TableLike
-	? [SchemaOf<X>] extends [never]
+/** The name of a relation outside every namespace. */
+type TopName<X, Default> = X extends TableLike
+	? [SchemaOf<X, Default>] extends [never]
 		? X["_"]["name"]
 		: never
 	: X extends ViewLike
 		? X["_"]["name"]
 		: never;
 
-type Build<S, Opts, E = Enums<S>> = {
-	-readonly [K in keyof S as TopName<S[K]>]: Relation<S[K], Opts, E>;
+type Build<S, Opts, D extends Dialect, E> = {
+	-readonly [K in keyof S as TopName<S[K], DefaultSchema<D>>]: Relation<
+		S[K],
+		Opts,
+		D,
+		E
+	>;
 } & {
-	[N in { [K in keyof S]: SchemaOf<S[K]> }[keyof S]]: {
-		-readonly [K in keyof S as NameIn<S[K], N>]: Relation<S[K], Opts, E>;
+	[N in { [K in keyof S]: SchemaOf<S[K], DefaultSchema<D>> }[keyof S]]: {
+		-readonly [K in keyof S as NameIn<S[K], N>]: Relation<S[K], Opts, D, E>;
 	};
 } & (keyof E extends never ? {} : { $types: E });
 
-export type Flat<T> = { [K in keyof T]: T[K] } & {};
+type Flat<T> = { [K in keyof T]: T[K] } & {};
 
-export type FromDrizzle<
+type BuildOf<S, Opts, D extends Dialect> = Flat<
+	Build<S, Opts, D, D extends "postgres" ? Enums<S> : Record<never, never>>
+>;
+
+/** The schema of a Drizzle schema module, or of one table or view, in dialect `D`. */
+type FromDrizzleOf<
 	Schema,
-	Opts extends FromDrizzleOptions = {},
+	Opts extends FromDrizzleOptions,
+	D extends Dialect,
 > = Schema extends TableLike | ViewLike
-	? Flat<Build<{ [K in Schema["_"]["name"]]: Schema }, Opts>>
-	: Flat<Build<Schema, Opts>>;
+	? BuildOf<{ [K in Schema["_"]["name"]]: Schema }, Opts, D>
+	: BuildOf<Schema, Opts, D>;

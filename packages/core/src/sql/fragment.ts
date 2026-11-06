@@ -1,8 +1,16 @@
 import type { Empty } from "../empty.js";
+import type { Tup } from "../engine/num.js";
+import type { Members } from "../engine/object.js";
 import type { AnyErr, SqlError } from "../errors.js";
 import type { Fragment, TextType } from "../query.js";
 import type { HasDefaultable, ValueEnc } from "./inline.js";
-import type { Inlined, InlinedSlots, InlinedText } from "./inline-fragment.js";
+import type {
+	Inlined,
+	InlinedSlots,
+	InlinedText,
+	QuotedSlot,
+} from "./inline-fragment.js";
+import type { Lexis } from "./lexis.js";
 import type {
 	CarriedOf,
 	SlotCarried,
@@ -10,13 +18,7 @@ import type {
 	Slottable,
 	SlotVariants,
 } from "./slots.js";
-import type {
-	JoinedText,
-	Splice,
-	SpliceCarried,
-	UnionList,
-	UnknownTuple,
-} from "./splice.js";
+import type { JoinedText, Splice, SpliceCarried } from "./splice.js";
 import type {
 	IsLiteral,
 	NotLiteralMessage,
@@ -33,10 +35,10 @@ export type LiteralParts<Parts extends readonly string[]> = {
 			: Parts[I];
 };
 
-type FragCheck<Text extends string> =
+type FragCheck<Text extends string, L extends Lexis> =
 	IsLiteral<Text> extends false
 		? SqlError<NotLiteralMessage, 0>
-		: Prepared<Text> extends infer P
+		: Prepared<Text, L> extends infer P
 			? P extends AnyErr
 				? P
 				: HasDefaultable<Text> extends true
@@ -47,31 +49,35 @@ type FragCheck<Text extends string> =
 					: true
 			: never;
 
-type FragArgs<Text extends string> =
-	Prepared<Text> extends [
+type FragArgs<Text extends string, L extends Lexis> =
+	Prepared<Text, L> extends [
 		string,
 		infer Names extends string[],
 		readonly unknown[],
 		infer M extends number,
 	]
 		? Names extends []
-			? UnknownTuple<M>
+			? Tup<M, unknown>
 			: // biome-ignore lint/plugin: named fragment parameters accept any value; the SQL decides their types.
 				[params: { readonly [K in Names[number]]: unknown }]
 		: readonly unknown[];
 
-type FragCount<Text extends string> =
-	Prepared<Text> extends [
+type FragCount<Text extends string, L extends Lexis> =
+	Prepared<Text, L> extends [
 		string,
 		string[],
 		infer Encs extends readonly unknown[],
 		infer M extends number,
 	]
-		? [...UnknownTuple<M>, ...Encs]["length"]
+		? [...Tup<M, unknown>, ...Encs]["length"]
 		: 0;
 
-type FragCarried<Text extends string, A extends readonly unknown[]> =
-	Prepared<Text> extends [
+type FragCarried<
+	Text extends string,
+	A extends readonly unknown[],
+	L extends Lexis,
+> =
+	Prepared<Text, L> extends [
 		string,
 		infer Names extends string[],
 		infer Encs extends readonly string[],
@@ -92,21 +98,25 @@ type EncNamed<Names extends string[], O> = {
 
 type JoinedCarried<
 	Items extends readonly unknown[],
+	L extends Lexis,
 	Acc extends readonly unknown[] = [],
 > = Items extends readonly [infer H, ...infer R]
 	? JoinedCarried<
 			R,
+			L,
 			[
 				...Acc,
-				...(CarriedOf<H> extends infer C extends readonly unknown[] ? C : []),
+				...(CarriedOf<H, L> extends infer C extends readonly unknown[]
+					? C
+					: []),
 			]
 		>
 	: Acc;
 
-type ElemPairs<F, Wrap extends boolean> = F extends unknown
+type ElemPairs<F, Wrap extends boolean, L extends Lexis> = F extends unknown
 	? TextType<F> extends infer T extends string
 		? T extends unknown
-			? readonly [Wrap extends true ? Parened<F, T> : T, CarriedOf<F>]
+			? readonly [Wrap extends true ? Parened<F, T> : T, CarriedOf<F, L>]
 			: never
 		: never
 	: never;
@@ -149,16 +159,19 @@ type PairTexts<Ps extends readonly unknown[]> = {
 	};
 };
 
-export type ListRep<E, Sep extends string, Wrap extends boolean = false> = [
+export type ListRep<
 	E,
-] extends [never]
+	Sep extends string,
+	L extends Lexis,
+	Wrap extends boolean = false,
+> = [E] extends [never]
 	? { readonly text: string; readonly carried: []; readonly count: number }
-	: ElemPairs<E, Wrap> extends infer P
+	: ElemPairs<E, Wrap, L> extends infer P
 		? AnyDynamic<P> extends true
 			? { readonly text: string; readonly carried: []; readonly count: number }
-			: UnionList<P> extends infer Ps extends readonly unknown[]
+			: Members<P> extends infer Ps extends readonly unknown[]
 				? {
-						readonly text: JoinedText<PairTexts<Ps>, Sep>;
+						readonly text: JoinedText<PairTexts<Ps>, Sep, L>;
 						readonly carried: PairCarried<Ps>;
 						readonly count: Ps["length"];
 					}
@@ -189,33 +202,37 @@ type PresentItems<
 export type CombineOf<
 	Items extends readonly (Slottable | Empty)[],
 	Sep extends string,
+	L extends Lexis,
 > = CombinePresent<
 	number extends Items["length"]
 		? readonly Exclude<Items[number], Empty>[]
 		: PresentItems<Items>,
-	Sep
+	Sep,
+	L
 >;
 
 type CombinePresent<
 	Items extends readonly Slottable[],
 	Sep extends string,
+	L extends Lexis,
 > = string extends Sep
 	? Fragment<string, readonly unknown[], []>
 	: number extends Items["length"]
 		? Fragment<
-				ListRep<Items[number], Sep>["text"],
+				ListRep<Items[number], Sep, L>["text"],
 				readonly unknown[],
-				ListRep<Items[number], Sep>["carried"]
+				ListRep<Items[number], Sep, L>["carried"]
 			>
 		: Fragment<
 				JoinedText<
 					SlotTexts<Items> extends readonly { readonly text: string }[]
 						? SlotTexts<Items>
 						: never,
-					Sep
+					Sep,
+					L
 				>,
 				readonly unknown[],
-				JoinedCarried<Items>
+				JoinedCarried<Items, L>
 			>;
 
 export type CombineSeparator = ", " | (string & {});
@@ -225,18 +242,21 @@ export type CombineSeparator = ", " | (string & {});
 export type BoolOf<
 	Items extends readonly (Slottable | Empty)[],
 	Op extends "AND" | "OR",
+	L extends Lexis,
 > = BoolPresent<
 	number extends Items["length"]
 		? readonly Exclude<Items[number], Empty>[]
 		: PresentItems<Items>,
-	Op
+	Op,
+	L
 >;
 
 type BoolPresent<
 	Items extends readonly Slottable[],
 	Op extends "AND" | "OR",
+	L extends Lexis,
 > = number extends Items["length"]
-	? ListRep<Items[number], ` ${Op} `, true> extends {
+	? ListRep<Items[number], ` ${Op} `, L, true> extends {
 			readonly text: infer T extends string;
 			readonly carried: infer C extends readonly unknown[];
 			readonly count: infer N;
@@ -246,9 +266,9 @@ type BoolPresent<
 	: Items extends readonly []
 		? Fragment<Op extends "AND" ? "true" : "false", [], []> & Grouped
 		: Fragment<
-				Group<JoinedText<Parens<Items>, ` ${Op} `>, Items["length"]>,
+				Group<JoinedText<Parens<Items>, ` ${Op} `, L>, Items["length"]>,
 				readonly unknown[],
-				JoinedCarried<Items>
+				JoinedCarried<Items, L>
 			> &
 				Grouped;
 
@@ -266,36 +286,62 @@ type Group<Text extends string, N> = string extends Text
 		? Text
 		: `(${Text})`;
 
-export type GateFragCheck<Text extends string> =
-	Inlined<Text> extends infer I extends AnyErr
-		? I
-		: [InlinedText<Text>] extends [infer T2 extends string]
-			? Surface<FragCheck<T2>>
-			: never;
+export type GateFragCheck<Text extends string, L extends Lexis> =
+	Inlined<Text> extends infer I
+		? I extends AnyErr
+			? I
+			: [
+						I extends readonly [infer T2 extends string, unknown]
+							? QuotedSlot<T2, L>
+							: never,
+					] extends [infer QE]
+				? [QE] extends [never]
+					? [InlinedText<Text>] extends [infer T2 extends string]
+						? Surface<FragCheck<T2, L>>
+						: never
+					: QE
+				: never
+		: never;
 
-export type BoxFragArgs<Text extends string> = [InlinedText<Text>] extends [
-	infer T2 extends string,
-]
-	? Extract<{ [K in T2 as `${K}`]: FragArgs<K> }[`${T2}`], readonly unknown[]>
+export type BoxFragArgs<Text extends string, L extends Lexis> = [
+	InlinedText<Text>,
+] extends [infer T2 extends string]
+	? Extract<
+			{ [K in T2 as `${K}`]: FragArgs<K, L> }[`${T2}`],
+			readonly unknown[]
+		>
 	: never;
 
 /** `sql.fragment(text, ...params)`; its `${fragment}` interpolations are slots. */
-export type PlainFragment<Text extends string, A extends readonly unknown[]> =
+export type PlainFragment<
+	Text extends string,
+	A extends readonly unknown[],
+	L extends Lexis,
+> =
 	Inlined<Text> extends null
-		? Fragment<PText<Text>, UnknownTuple<FragCount<Text>>, FragCarried<Text, A>>
-		: InlinedFragment<Text, A>;
+		? Fragment<
+				PText<Text, L>,
+				Tup<FragCount<Text, L>, unknown>,
+				FragCarried<Text, A, L>
+			>
+		: InlinedFragment<Text, A, L>;
 
 /** One fragment for each combination of union fragments, so each text keeps its own values. */
-type InlinedFragment<Text extends string, A extends readonly unknown[]> = [
-	InlinedText<Text>,
-] extends [infer T2 extends string]
+type InlinedFragment<
+	Text extends string,
+	A extends readonly unknown[],
+	L extends Lexis,
+> = [InlinedText<Text>] extends [infer T2 extends string]
 	? SlotVariants<InlinedSlots<Text>> extends infer V
 		? V extends unknown
-			? Splice<PText<T2>, SlotTexts<V>> extends infer X extends string
+			? Splice<PText<T2, L>, SlotTexts<V>, L> extends infer X extends string
 				? Fragment<
 						X,
 						readonly unknown[],
-						[...FragCarried<T2, A>, ...SpliceCarried<PText<T2>, SlotCarried<V>>]
+						[
+							...FragCarried<T2, A, L>,
+							...SpliceCarried<PText<T2, L>, SlotCarried<V, L>, L>,
+						]
 					>
 				: never
 			: never

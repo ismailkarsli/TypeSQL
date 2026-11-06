@@ -1,14 +1,11 @@
+import type { Next } from "../../../engine/next.js";
+import type { Members, PickOne } from "../../../engine/object.js";
 import type { ParamEntry } from "../../../engine/params.js";
 import type {
 	ColInfo,
 	ColMap,
 	Cols,
-	CteMap,
-	Ctx,
 	Info,
-	MkCtx,
-	NullableMap,
-	QueryContext,
 	ScopeItem,
 	ScopeLevel,
 } from "../../../engine/types.js";
@@ -37,7 +34,7 @@ import type {
 import type { HasStar } from "../binder/clauses.js";
 import type { BindFrom } from "../binder/from.js";
 import type { ResolveWritableTable } from "../binder/resolve.js";
-import type { Nx } from "../parser/util.js";
+import type { NullableMap } from "../shape.js";
 import type {
 	ParamOf,
 	ParamsOfExpr,
@@ -47,6 +44,8 @@ import type {
 	ParamsOfTargets,
 } from "../typer/params.js";
 import type { TypeOf } from "../typer/typeof.js";
+import type { CteMap, Ctx, MkCtx, QueryContext } from "../types.js";
+import type { WidthCheck } from "../util.js";
 import type { ParamsOfMerge, ProjectMerge } from "./merge.js";
 import type { BindWith, ProjectSelect, ProjectTargets } from "./select.js";
 
@@ -146,50 +145,6 @@ type AssignInfo<
 		: never
 	: ColInfoOf<Tbl, Col>;
 
-export type NoSubscript =
-	| "bool"
-	| "int2"
-	| "int4"
-	| "int8"
-	| "float4"
-	| "float8"
-	| "numeric"
-	| "money"
-	| "text"
-	| "varchar"
-	| "bpchar"
-	| "char"
-	| "bytea"
-	| "date"
-	| "time"
-	| "timetz"
-	| "timestamp"
-	| "timestamptz"
-	| "interval"
-	| "uuid"
-	| "json"
-	| "xml"
-	| "inet"
-	| "cidr"
-	| "macaddr"
-	| "macaddr8"
-	| "bit"
-	| "varbit"
-	| "oid"
-	| "regclass"
-	| "regtype"
-	| "regproc"
-	| "path"
-	| "polygon"
-	| "circle"
-	| "tsvector"
-	| "tsquery"
-	| "int4range"
-	| "int8range"
-	| "numrange"
-	| "tsrange"
-	| "tstzrange"
-	| "daterange";
 type AssignParamInfo<
 	Tbl extends Table,
 	Col extends string,
@@ -197,7 +152,7 @@ type AssignParamInfo<
 	C extends Ctx,
 > = Extract<AssignInfo<Tbl, Col, Ind, C>, ColInfo>;
 
-export type AssignTargets<
+type AssignTargets<
 	Cs extends readonly string[],
 	Ind extends readonly TargetInd[] | null,
 > = {
@@ -251,50 +206,69 @@ type ProjectInsert<S extends InsertStmt, Env extends QueryContext> =
 		S["alias"],
 		"insert into"
 	> extends Target_<infer Tbl, infer Item>
-		? InsertTargetCols<
+		? CheckInsert<
 				S["columns"],
 				S["colInd"],
 				S["source"],
 				Tbl,
 				S["table"]["name"],
-				Env
-			> extends infer Cs
-			? Cs extends readonly string[] | null
-				? CheckInsertSource<
-						S["source"],
-						Cs extends readonly string[] ? Cs : [],
-						S["colInd"],
-						Tbl,
-						S["table"]["name"],
-						MkCtx<Env["db"], Env["scope"], Env["ctes"], false>
-					> extends infer Chk
-					? Chk extends AnyErr
-						? Chk
-						: CheckRequired<Tbl, Cs, S["table"]["name"]> extends AnyErr
-							? CheckRequired<Tbl, Cs, S["table"]["name"]>
-							: CheckOnConflict<
-										S["onConflict"],
-										Tbl,
-										Item,
-										S["table"]["name"],
-										Env
-									> extends infer Oc
-								? Oc extends AnyErr
-									? Oc
-									: ProjectReturning<
-											S["returning"],
-											S["retOpts"],
-											[Item],
-											Tbl,
-											true,
-											false,
-											Env
-										>
-								: never
+				Env,
+				MkCtx<Env["db"], Env["scope"], Env["ctes"], false>
+			> extends infer Chk
+			? Chk extends AnyErr
+				? Chk
+				: CheckOnConflict<
+							S["onConflict"],
+							Tbl,
+							Item,
+							S["table"]["name"],
+							Env
+						> extends infer Oc
+					? Oc extends AnyErr
+						? Oc
+						: ProjectReturning<
+								S["returning"],
+								S["retOpts"],
+								[Item],
+								Tbl,
+								true,
+								false,
+								Env
+							>
 					: never
-				: Cs
 			: never
 		: ResolveTarget<Env["db"], S["table"], S["alias"], "insert into">;
+
+/**
+ * The checks of an INSERT, also of MERGE's INSERT action: the target columns,
+ * the rows' width and values, and the NOT NULL columns left without a value.
+ * `C` is where the values are typed.
+ */
+export type CheckInsert<
+	Columns extends readonly string[] | null,
+	Ind extends readonly TargetInd[] | null,
+	Source extends InsertSource,
+	Tbl extends Table,
+	Name extends string,
+	Env extends QueryContext,
+	C extends Ctx,
+> =
+	InsertTargetCols<Columns, Ind, Source, Tbl, Name, Env> extends infer Cs
+		? Cs extends readonly string[] | null
+			? CheckInsertSource<
+					Source,
+					Cs extends readonly string[] ? Cs : [],
+					Ind,
+					Tbl,
+					Name,
+					C
+				> extends infer Chk
+				? Chk extends AnyErr
+					? Chk
+					: CheckRequired<Tbl, Cs, Name>
+				: never
+			: Cs
+		: never;
 
 type InsertTargetCols<
 	Columns extends readonly string[] | null,
@@ -324,16 +298,13 @@ type InsertTargetCols<
 				: W extends readonly []
 					? []
 					: W extends readonly unknown[]
-						? WidthCheck<W, UnionToTuple<keyof Tbl>> extends "more"
-							? SqlError<
-									"INSERT has more expressions than target columns",
-									null
-								>
+						? WidthCheck<W, Members<keyof Tbl>> extends "more"
+							? WidthResult<"more", never>
 							: null
 						: null
 		: never;
 
-export type WidthResult<R, Ok_> = R extends "eq"
+type WidthResult<R, Ok_> = R extends "eq"
 	? Ok_
 	: R extends "more"
 		? SqlError<"INSERT has more expressions than target columns", null>
@@ -375,34 +346,7 @@ type SameLength<
 		: false
 	: true;
 
-// Equal finite widths need no suffix tuples. Keep the recursive comparison
-// for unequal widths and arrays whose lengths are not fixed.
-export type WidthCheck<
-	A extends readonly unknown[],
-	B extends readonly unknown[],
-> = A extends unknown
-	? B extends unknown
-		? number extends A["length"] | B["length"]
-			? WidthCheckWalk<A, B>
-			: A["length"] extends B["length"]
-				? B["length"] extends A["length"]
-					? "eq"
-					: WidthCheckWalk<A, B>
-				: WidthCheckWalk<A, B>
-		: never
-	: never;
-type WidthCheckWalk<
-	A extends readonly unknown[],
-	B extends readonly unknown[],
-> = A extends readonly [unknown, ...infer AR]
-	? B extends readonly [unknown, ...infer BR]
-		? WidthCheckWalk<AR, BR>
-		: "more"
-	: B extends readonly [unknown, ...unknown[]]
-		? "fewer"
-		: "eq";
-
-export type CheckAssignedCols<
+type CheckAssignedCols<
 	Cs extends readonly string[],
 	Tgs extends readonly TargetInd[],
 	Tbl extends Table,
@@ -416,10 +360,10 @@ export type CheckAssignedCols<
 		? Tgs[I] extends Expr
 			? C extends Whole
 				? AssignedTwice<C, Kind>
-				: CheckAssignedCols<Cs, Tgs, Tbl, Name, Kind, Whole, Part | C, Nx<I>>
+				: CheckAssignedCols<Cs, Tgs, Tbl, Name, Kind, Whole, Part | C, Next<I>>
 			: C extends Whole | Part
 				? AssignedTwice<C, Kind>
-				: CheckAssignedCols<Cs, Tgs, Tbl, Name, Kind, Whole | C, Part, Nx<I>>
+				: CheckAssignedCols<Cs, Tgs, Tbl, Name, Kind, Whole | C, Part, Next<I>>
 		: SqlError<`column "${C}" of relation "${Name}" does not exist`, null>
 	: true;
 type AssignedTwice<C extends string, Kind> = Kind extends "insert"
@@ -444,7 +388,7 @@ type CheckInsertSource<
 		: CheckRows<Rows, Cs, AssignTargets<Cs, Ind>, Tbl, Name, C>
 	: CheckTargets<Cs, AssignTargets<Cs, Ind>, [], Tbl, Name, C>;
 
-export type CheckRows<
+type CheckRows<
 	Rows extends readonly (readonly Expr[])[],
 	Cs extends readonly string[],
 	Tgs extends readonly TargetInd[],
@@ -462,7 +406,7 @@ export type CheckRows<
 		: CheckValueItems<R, C>
 	: true;
 
-export type CheckValueItems<Es extends readonly Expr[], C extends Ctx> =
+type CheckValueItems<Es extends readonly Expr[], C extends Ctx> =
 	Es[number] extends Tag<"param" | "default">
 		? true
 		: CheckValueItemsWalk<Es, C>;
@@ -495,19 +439,19 @@ type CheckTargets<
 				? DefaultIntoInd<Tgs[I]>
 				: AssignInfo<Tbl, Col, Tgs[I], C> extends AnyErr
 					? AssignInfo<Tbl, Col, Tgs[I], C>
-					: CheckTargets<Cs, Tgs, Es, Tbl, Name, C, Nx<I>>
+					: CheckTargets<Cs, Tgs, Es, Tbl, Name, C, Next<I>>
 			: Es[I] extends Tag<"null">
 				? Tbl[Col]["nullable"] extends false
 					? NullViolation<Col, Name>
-					: CheckTargets<Cs, Tgs, Es, Tbl, Name, C, Nx<I>>
+					: CheckTargets<Cs, Tgs, Es, Tbl, Name, C, Next<I>>
 				: Es[I] extends Tag<"default">
 					? Tbl[Col] extends {
 							readonly nullable: false;
 							readonly hasDefault: false;
 						}
 						? NullViolation<Col, Name>
-						: CheckTargets<Cs, Tgs, Es, Tbl, Name, C, Nx<I>>
-					: CheckTargets<Cs, Tgs, Es, Tbl, Name, C, Nx<I>>
+						: CheckTargets<Cs, Tgs, Es, Tbl, Name, C, Next<I>>
+					: CheckTargets<Cs, Tgs, Es, Tbl, Name, C, Next<I>>
 		: SqlError<`column "${Col}" of relation "${Name}" does not exist`, null>
 	: true;
 
@@ -524,7 +468,7 @@ type DefaultIntoInd<Ind> = Ind extends { readonly e: infer In }
 		: DefaultIntoInd<In>
 	: never;
 
-export type CheckRequired<
+type CheckRequired<
 	Tbl extends Table,
 	Cs extends readonly string[] | null,
 	Name extends string,
@@ -532,7 +476,7 @@ export type CheckRequired<
 	? [MissingRequired<Tbl, Cs[number]>] extends [never]
 		? true
 		: SqlError<
-				`null value in column "${FirstOf<MissingRequired<Tbl, Cs[number]>> & string}" of relation "${Name}" violates not-null constraint`,
+				`null value in column "${PickOne<MissingRequired<Tbl, Cs[number]>> & string}" of relation "${Name}" violates not-null constraint`,
 				null
 			>
 	: true;
@@ -629,7 +573,7 @@ type CheckPlainSetAt<
 						Set,
 						Tbl,
 						Name,
-						Nx<I>,
+						Next<I>,
 						Seen | Col,
 						[Duplicate] extends [never]
 							? Col extends Seen
@@ -885,25 +829,6 @@ type RowItem<A extends string, Row extends ColMap, Null extends boolean> = {
 	readonly skip: string[];
 };
 
-export type UnionToIntersection<U> = (
-	U extends unknown
-		? (u: U) => void
-		: never
-) extends (u: infer I) => void
-	? I
-	: never;
-type FirstOf<U> =
-	UnionToIntersection<U extends unknown ? (x: U) => void : never> extends (
-		x: infer L,
-	) => void
-		? L
-		: never;
-export type UnionToTuple<U, Acc extends readonly unknown[] = []> = [U] extends [
-	never,
-]
-	? Acc
-	: UnionToTuple<Exclude<U, FirstOf<U>>, [FirstOf<U>, ...Acc]>;
-
 export type ParamsOfDml<S extends DmlStmt, DB, Ctes extends CteMap> =
 	BindWith<S["with"], QueryContext<DB, [], Ctes>> extends infer C2 extends
 		CteMap
@@ -1024,8 +949,8 @@ export type ParamsOfRowInfos<
 	? {
 			[K in keyof ET]: K extends `${number}`
 				? K extends keyof Infos
-					? ParamsOfOpt<ET[K] & Expr, C, Infos[K]>
-					: ParamsOfExpr<ET[K] & Expr, C>
+					? ParamsOfOpt<Extract<ET[K], Expr>, C, Infos[K]>
+					: ParamsOfExpr<Extract<ET[K], Expr>, C>
 				: never;
 		}[number]
 	: never;

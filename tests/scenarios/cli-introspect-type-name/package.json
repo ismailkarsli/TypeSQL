@@ -1,0 +1,22 @@
+{
+	"name": "cli-introspect-type-name",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"setup": "node setup.ts",
+		"generate": "typesql introspect --db \"$SQLITE_PATH\" --type-name my-db --out schema.ts"
+	},
+	"dependencies": {
+		"@typesql/cli": "workspace:*"
+	},
+	"devDependencies": {
+		"@types/node": "catalog:"
+	},
+	"scenario": {
+		"database": "sqlite",
+		"failure": {
+			"stage": "generate",
+			"exitCode": 2
+		}
+	}
+}

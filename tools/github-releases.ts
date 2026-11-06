@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
+import { releasedPackages } from "./packages.ts";
 
 const dryRun = process.argv.includes("--dry-run");
 const currentOnly = process.argv.includes("--current");
@@ -103,20 +104,10 @@ for (const { path, commit, time } of changedFiles("A", [
 
 const changelogs = new Map<string, string>();
 const currentVersions = new Set<string>();
-for (const dir of readdirSync("packages")) {
-	const manifest = `packages/${dir}/package.json`;
-	if (!existsSync(manifest)) continue;
-	const {
-		name,
-		version,
-		private: isPrivate,
-	}: { name: string; version: string; private?: boolean } = JSON.parse(
-		readFileSync(manifest, "utf8"),
-	);
-	if (!isPrivate) {
-		changelogs.set(`packages/${dir}/CHANGELOG.md`, name);
-		currentVersions.add(`${name}@${version}`);
-	}
+for (const { name, tag, dir, registry } of releasedPackages()) {
+	if (registry !== "npm") continue;
+	changelogs.set(`${dir}/CHANGELOG.md`, name);
+	currentVersions.add(tag);
 }
 for (const { path, commit, time } of changedFiles("AM", [
 	...changelogs.keys(),

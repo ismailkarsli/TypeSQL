@@ -1,5 +1,13 @@
-import type { Nx } from "../../../engine/parse.js";
-import type { QueryContext } from "../../../engine/types.js";
+import type {
+	LastPart,
+	NameAt,
+	NamedAt,
+} from "../../../engine/family/diagnostics.js";
+import type { RefDisplay } from "../../../engine/family/scope.js";
+import type { QueryContext } from "../../../engine/family/types.js";
+import type { Next } from "../../../engine/next.js";
+import type { Members } from "../../../engine/object.js";
+import type { Info } from "../../../engine/types.js";
 import type { AnyErr, SqlError } from "../../../errors.js";
 import type { Table, View } from "../../../schema.js";
 import type {
@@ -16,9 +24,9 @@ import type {
 } from "../ast.js";
 import type {
 	BindFrom,
+	InsertKeys,
 	InsertOrder,
 	LookupRelation,
-	RefDisplay,
 	RelationItem,
 } from "../binder/scope.js";
 import type {
@@ -31,7 +39,7 @@ import type {
 	ParamsOfTargets,
 	Slot,
 } from "../typer/params.js";
-import type { Info, TypeList, TypeOf } from "../typer/typeof.js";
+import type { TypeList, TypeOf } from "../typer/typeof.js";
 import type {
 	Cell,
 	MkCtx,
@@ -53,17 +61,23 @@ type Target_<
 	Ctes extends SqCteMap,
 > = Ref["schema"] extends null
 	? Ref["name"] extends keyof Ctes
-		? SqlError<`no such table: ${Ref["name"]}`, null>
+		? SqlError<`no such table: ${Ref["name"]}`, NamedAt<Ref["name"], "table">>
 		: Writable<DB, Ref>
 	: Writable<DB, Ref>;
 type Writable<DB, Ref extends TableRef> =
 	LookupRelation<DB, Ref> extends [infer Rel, infer K extends string]
 		? Rel extends View<Table>
-			? SqlError<`cannot modify ${K} because it is a view`, null>
+			? SqlError<`cannot modify ${K} because it is a view`, NamedAt<K>>
 			: Rel extends Table
 				? [Rel, K]
-				: SqlError<`no such table: ${RefDisplay<Ref>}`, null>
-		: SqlError<`no such table: ${RefDisplay<Ref>}`, null>;
+				: SqlError<
+						`no such table: ${RefDisplay<Ref>}`,
+						NamedAt<RefDisplay<Ref>, "table">
+					>
+		: SqlError<
+				`no such table: ${RefDisplay<Ref>}`,
+				NamedAt<RefDisplay<Ref>, "table">
+			>;
 
 type Item<Rel, Alias extends string> =
 	RelationItem<Rel, Alias> extends infer It extends SqItem ? It : never;
@@ -115,17 +129,20 @@ type NameOf<Rel, C extends string> = {
 type CheckCols<
 	Cols extends readonly string[],
 	Rel extends Table,
-	Msg extends string,
+	K extends string,
 	I extends number = 0,
 > = Cols[I] extends infer C extends string
 	? [ColOf<Rel, C>] extends [never]
-		? SqlError<`${Msg}${C}`, null>
+		? SqlError<
+				`table ${K} has no column named ${C}`,
+				NameAt<LastPart<Lowercase<K>>, "column", LastPart<Lowercase<C>>>
+			>
 		: ColOf<Rel, C> extends { readonly generated: true }
 			? SqlError<
 					`cannot INSERT into generated column "${NameOf<Rel, C>}"`,
 					null
 				>
-			: CheckCols<Cols, Rel, Msg, Nx<I>>
+			: CheckCols<Cols, Rel, K, Next<I>>
 	: true;
 
 type Width<
@@ -148,7 +165,11 @@ type Width<
 		: null;
 
 type TableWidth<Rel extends Table> =
-	InsertOrder<Rel> extends infer O extends readonly unknown[] ? O["length"] : 0;
+	InsertOrder<Rel> extends infer O extends readonly unknown[]
+		? O["length"]
+		: Members<InsertKeys<Rel>> extends infer L extends readonly unknown[]
+			? L["length"]
+			: 0;
 
 type CheckInsert<
 	S extends InsertStmt,
@@ -158,7 +179,7 @@ type CheckInsert<
 	Ctes extends SqCteMap,
 > = (
 	S["columns"] extends readonly string[]
-		? CheckCols<S["columns"], Rel, `table ${K} has no column named `>
+		? CheckCols<S["columns"], Rel, K>
 		: true
 ) extends infer E1 extends AnyErr
 	? E1
@@ -171,13 +192,13 @@ type CheckInsert<
 						? InsertRest<S, Rel, K, DB, Ctes>
 						: SqlError<
 								`${W} values for ${S["columns"]["length"]} columns`,
-								null
+								NameAt<"values">
 							>
 					: W extends TableWidth<Rel>
 						? InsertRest<S, Rel, K, DB, Ctes>
 						: SqlError<
 								`table ${K} has ${TableWidth<Rel>} columns but ${W} values were supplied`,
-								null
+								NameAt<"values">
 							>
 				: InsertRest<S, Rel, K, DB, Ctes>
 		: never;
@@ -215,7 +236,7 @@ type ValuesTyped<
 > = Rows[I] extends infer R extends readonly Expr[]
 	? TypeList<R, C> extends AnyErr
 		? TypeList<R, C>
-		: ValuesTyped<Rows, C, Nx<I>>
+		: ValuesTyped<Rows, C, Next<I>>
 	: true;
 
 type MissingRequired<
@@ -294,7 +315,7 @@ type UpsertLoop<
 							) extends infer Y
 						? Y extends AnyErr
 							? Y
-							: UpsertLoop<Us, Rel, It, DB, Ctes, Nx<I>>
+							: UpsertLoop<Us, Rel, It, DB, Ctes, Next<I>>
 						: never
 			: never
 		: never
@@ -312,7 +333,7 @@ type CheckSet<
 		: S["cols"]["length"] extends 1
 			? TypeOf<S["e"], C> extends AnyErr
 				? TypeOf<S["e"], C>
-				: CheckSet<Set, It, C, Rel, Nx<I>>
+				: CheckSet<Set, It, C, Rel, Next<I>>
 			: S["e"] extends {
 						readonly t: "row";
 						readonly items: infer Items extends readonly Expr[];
@@ -320,7 +341,7 @@ type CheckSet<
 				? Items["length"] extends S["cols"]["length"]
 					? TypeList<Items, C> extends AnyErr
 						? TypeList<Items, C>
-						: CheckSet<Set, It, C, Rel, Nx<I>>
+						: CheckSet<Set, It, C, Rel, Next<I>>
 					: SqlError<
 							`${S["cols"]["length"]} columns assigned ${Items["length"]} values`,
 							null
@@ -331,7 +352,7 @@ type CheckSet<
 						}
 					? ProjectSelect<Q, C> extends infer X extends readonly Cell[]
 						? X["length"] extends S["cols"]["length"]
-							? CheckSet<Set, It, C, Rel, Nx<I>>
+							? CheckSet<Set, It, C, Rel, Next<I>>
 							: SqlError<
 									`${S["cols"]["length"]} columns assigned ${X["length"]} values`,
 									null
@@ -358,8 +379,8 @@ type MissingCol<
 	? C extends keyof It["cols"]
 		? GenCol<Rel, C> extends true
 			? SqlError<`cannot UPDATE generated column "${NameOf<Rel, C>}"`, null>
-			: MissingCol<Cols, It, Rel, Nx<I>>
-		: SqlError<`no such column: ${C}`, null>
+			: MissingCol<Cols, It, Rel, Next<I>>
+		: SqlError<`no such column: ${C}`, NamedAt<C, "column">>
 	: true;
 
 type CheckUpdate<
@@ -457,7 +478,10 @@ type InsertParams<
 > = (
 	S["columns"] extends readonly string[]
 		? S["columns"]
-		: InsertOrder<Rel>
+		: // Without the table's column order, the values are typed `unknown`.
+			InsertOrder<Rel> extends infer O extends readonly string[]
+			? O
+			: []
 ) extends infer Cols extends readonly string[]
 	?
 			| (S["source"] extends {

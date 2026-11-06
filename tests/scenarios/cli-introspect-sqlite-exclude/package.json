@@ -1,0 +1,23 @@
+{
+	"name": "cli-introspect-sqlite-exclude",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"setup": "node setup.ts",
+		"generate": "typesql introspect --dialect sqlite --db \"$SQLITE_PATH\" --exclude \"drafts, Logs_*\" --out schema.ts"
+	},
+	"dependencies": {
+		"@typesql/core": "workspace:*",
+		"@typesql/cli": "workspace:*"
+	},
+	"devDependencies": {
+		"typescript": "catalog:",
+		"@types/node": "catalog:"
+	},
+	"scenario": {
+		"database": "sqlite",
+		"artifacts": [
+			"schema.ts"
+		]
+	}
+}

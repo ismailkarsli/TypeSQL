@@ -1,0 +1,48 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`mysql-quoted-text > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "blockComment": "{ y: null | number }",
+      "combined": "{ "$1 a": null | number; "$1 b": null | number }",
+      "doubleMinus": "{ dash: number; y: null | number }",
+      "escapedQuote": "{ d: string; s: string; y: null | number }",
+      "fragment": "{ "a:b": number; y: null | number; z: null | number }",
+      "hashComment": "{ a: number; y: null | number }",
+      "quotedDollar": "{ $2: number; a: null | number }",
+      "quotedName": "{ "a:b": number; y: null | number }",
+      "row": "{ first: number; "a:b": number; s: string; backslash: string; $1: number; last: number }",
+    },
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "{
+  first: 10,
+  'a:b': 1,
+  s: "it's :x",
+  backslash: '\\\\',
+  '$1': 2,
+  last: 20
+}
+{
+  quotedName: { 'a:b': 1, y: 2 },
+  escapedQuote: { s: "it's :x", d: 'say "hi:x"', y: 2 },
+  hashComment: { a: 1, y: 2 },
+  doubleMinus: { dash: 6, y: 2 },
+  blockComment: { y: 2 },
+  quotedDollar: { '$2': 1, a: 10 },
+  fragment: { 'a:b': 1, y: 2, z: 3 },
+  combined: { '$1 a': 1, '$1 b': 2 }
+}
+",
+  },
+}
+`;

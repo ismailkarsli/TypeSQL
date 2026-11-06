@@ -1,0 +1,88 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`sqlite-values-columns > scenario 1`] = `
+{
+  "compile": {
+    "status": 1,
+    "stderr": "",
+  },
+  "compiler": {
+    "diagnostics": [
+      {
+        "category": 1,
+        "code": 2322,
+        "column": 66,
+        "details": [
+          {
+            "category": 1,
+            "code": 2741,
+            "message": "Property 'name' is missing in type '{ id: 2; }' but required in type '{ readonly name: {} | null; }'.",
+          },
+        ],
+        "expression": "{ id: 2 }",
+        "file": "app.ts",
+        "line": 30,
+        "message": "Type '{ id: 2; }' is not assignable to type '{ readonly id: 2; } & { readonly name: {} | null; } & {}'.",
+      },
+      {
+        "category": 1,
+        "code": 2322,
+        "column": 12,
+        "details": [
+          {
+            "category": 1,
+            "code": 2322,
+            "message": "Type 'undefined' is not assignable to type 'string'.",
+          },
+        ],
+        "expression": "bio",
+        "file": "app.ts",
+        "line": 34,
+        "message": "Type 'string | undefined' is not assignable to type 'string'.",
+        "related": [
+          {
+            "category": 3,
+            "code": 6500,
+            "column": 12,
+            "expression": "bio",
+            "file": "app.ts",
+            "line": 34,
+            "message": "The expected type comes from property 'bio' which is declared here on type '{ readonly id: 1; readonly bio: string | undefined; } & { readonly bio: {} | null; }'",
+          },
+        ],
+      },
+      {
+        "category": 1,
+        "code": 2345,
+        "column": 46,
+        "details": [
+          {
+            "category": 1,
+            "code": 2322,
+            "details": [
+              {
+                "category": 1,
+                "code": 2322,
+                "details": [
+                  {
+                    "category": 1,
+                    "code": 2327,
+                    "message": "Property 'name' is optional in type '{ id: number; name?: string; }' but required in type '{ readonly name: {} | null; }'.",
+                  },
+                ],
+                "message": "Type '{ id: number; name?: string; }' is not assignable to type '{ readonly name: {} | null; }'.",
+              },
+            ],
+            "message": "Type '{ id: number; name?: string; }[]' is not assignable to type 'readonly { readonly name: {} | null; }[]'.",
+          },
+        ],
+        "expression": "rows",
+        "file": "app.ts",
+        "line": 38,
+        "message": "Argument of type '{ id: number; name?: string; }[]' is not assignable to parameter of type '{ id: number; name?: string; }[] & readonly { readonly name: {} | null; }[] & readonly ({ id: number; name?: string; } & {})[]'.",
+      },
+    ],
+    "types": {},
+  },
+}
+`;

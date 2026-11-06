@@ -1,0 +1,28 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`mysql-serverless-literals > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {},
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "default []
+"it's" true
+"say \\"hi\\"" true
+"back\\\\slash" true
+"\\\\'" true
+"tail\\\\" true
+"a\\nb" true
+NO_BACKSLASH_ESCAPES []
+",
+  },
+}
+`;

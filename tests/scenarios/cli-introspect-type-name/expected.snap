@@ -1,0 +1,17 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`cli-introspect-type-name > scenario 1`] = `
+{
+  "generate": {
+    "status": 2,
+    "stderr": "typesql introspect: the schema's type name "my-db" is not a TypeScript identifier
+",
+    "stdout": "",
+  },
+  "setup": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+}
+`;

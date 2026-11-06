@@ -1,0 +1,25 @@
+{
+	"name": "sqlite-hidden-columns",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"start": "node dist/app.js",
+		"generate": "typesql migrate latest && typesql introspect --dialect sqlite --db \"$SQLITE_PATH\" --out introspected.ts"
+	},
+	"dependencies": {
+		"@typesql/core": "workspace:*",
+		"@typesql/cli": "workspace:*",
+		"@typesql/sqlite": "workspace:*"
+	},
+	"devDependencies": {
+		"typescript": "catalog:",
+		"@types/node": "catalog:"
+	},
+	"scenario": {
+		"database": "sqlite",
+		"artifacts": [
+			"db.ts",
+			"introspected.ts"
+		]
+	}
+}

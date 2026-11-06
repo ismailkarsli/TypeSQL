@@ -1,7 +1,7 @@
+import type { Next } from "../../../engine/next.js";
 import type {
 	ColInfo,
 	ColMap,
-	CteMap,
 	Scope,
 	ScopeItem,
 	ScopeLevel,
@@ -9,8 +9,9 @@ import type {
 import type { SqlError } from "../../../errors.js";
 import type { Table, View } from "../../../schema.js";
 import type { TableRef } from "../ast.js";
-import type { Nx } from "../parser/util.js";
+import type { MetaKey } from "../db.js";
 import type { RowInfo } from "../shape.js";
+import type { CteMap } from "../types.js";
 
 export type ResolveTable<
 	DB,
@@ -26,7 +27,7 @@ export type ResolveTable<
 				: LookupTable<DB, Ref["name"]>
 	: Ref["schema"] extends "public"
 		? LookupTable<DB, Ref["name"], `public.${Ref["name"]}`>
-		: Ref["schema"] extends keyof DB
+		: Ref["schema"] extends Exclude<keyof DB, MetaKey>
 			? LookupTable<
 					DB[Ref["schema"]],
 					Ref["name"],
@@ -46,8 +47,12 @@ type LookupTable<
 		? Cols
 		: NS[Name] extends Table
 			? NS[Name]
-			: SqlError<`"${Display}" is not a table`, null>
+			: NotTable<Name, Display>
 	: SqlError<`relation "${Display}" does not exist`, null>;
+/** A key that is no relation; the schema's own declarations don't exist to SQL. */
+type NotTable<Name, Display extends string> = Name extends MetaKey
+	? SqlError<`relation "${Display}" does not exist`, null>
+	: SqlError<`"${Display}" is not a table`, null>;
 
 type InPgCatalog<DB, Name extends string> = DB extends {
 	readonly pg_catalog: infer PC;
@@ -66,13 +71,13 @@ export type ResolveWritableTable<
 			? SqlError<`cannot modify view "${Ref["name"]}"`, null>
 			: DB[Ref["name"]] extends Table
 				? DB[Ref["name"]]
-				: SqlError<`"${Ref["name"]}" is not a table`, null>
+				: NotTable<Ref["name"], Ref["name"]>
 		: Ref["schema"] extends null
 			? InPgCatalog<DB, Ref["name"]> extends true
 				? SqlError<`cannot modify view "pg_catalog.${Ref["name"]}"`, null>
 				: SqlError<`relation "${Ref["name"]}" does not exist`, null>
 			: SqlError<`relation "public.${Ref["name"]}" does not exist`, null>
-	: Ref["schema"] extends keyof DB
+	: Ref["schema"] extends Exclude<keyof DB, MetaKey>
 		? Ref["name"] extends keyof DB[Ref["schema"]]
 			? DB[Ref["schema"]][Ref["name"]] extends View<Table>
 				? SqlError<`cannot modify view "${Ref["schema"]}.${Ref["name"]}"`, null>
@@ -135,7 +140,7 @@ type ResolveQualifiedAt<
 				? L[Item]["cols"][Name]
 				: SqlError<`column ${Tbl}.${Name} does not exist`, null>
 			: FindAliasAt<L, Tbl> extends null
-				? ResolveQualifiedAt<S, Tbl, Name, Nx<Depth>>
+				? ResolveQualifiedAt<S, Tbl, Name, Next<Depth>>
 				: FindAliasAt<L, Tbl>
 		: never;
 
@@ -149,8 +154,8 @@ type FindAliasAt<
 	: L[I]["alias"] extends Tbl
 		? Found extends number
 			? SqlError<`table reference "${Tbl}" is ambiguous`, null>
-			: FindAliasAt<L, Tbl, Nx<I>, I>
-		: FindAliasAt<L, Tbl, Nx<I>, Found>;
+			: FindAliasAt<L, Tbl, Next<I>, I>
+		: FindAliasAt<L, Tbl, Next<I>, Found>;
 
 type ResolveBare<
 	S extends Scope,
@@ -169,7 +174,7 @@ type ResolveBareAt<
 		? FindBare<S[Depth], Name, null>
 		: FindBare<S[Depth], Name, null> extends "ambiguous"
 			? SqlError<`column reference "${Name}" is ambiguous`, null>
-			: ResolveBareAt<S, Name, All, Nx<Depth>>;
+			: ResolveBareAt<S, Name, All, Next<Depth>>;
 export type WholeRow<
 	S extends Scope,
 	Name extends string,
@@ -188,7 +193,7 @@ type WholeRowAt<
 		? FindAliasAt<L, Name> extends infer Item extends number
 			? RowInfo<L[Item]["cols"]>
 			: FindAliasAt<L, Name> extends null
-				? WholeRowAt<S, Name, Missing, Nx<Depth>>
+				? WholeRowAt<S, Name, Missing, Next<Depth>>
 				: FindAliasAt<L, Name>
 		: never;
 
@@ -206,12 +211,12 @@ type FindBareAt<
 > = I extends L["length"]
 	? Found
 	: Name extends L[I]["skip"][number]
-		? FindBareAt<L, Name, Found, Nx<I>>
+		? FindBareAt<L, Name, Found, Next<I>>
 		: Name extends keyof L[I]["cols"]
 			? Found extends ColInfo
 				? "ambiguous"
-				: FindBareAt<L, Name, L[I]["cols"][Name], Nx<I>>
-			: FindBareAt<L, Name, Found, Nx<I>>;
+				: FindBareAt<L, Name, L[I]["cols"][Name], Next<I>>
+			: FindBareAt<L, Name, Found, Next<I>>;
 
 export type ExpandStar<
 	S extends Scope,

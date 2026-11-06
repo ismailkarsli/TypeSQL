@@ -1,44 +1,11 @@
-type TypeAliases = {
-	int: "int4";
-	integer: "int4";
-	serial: "int4";
-	serial4: "int4";
-	smallint: "int2";
-	smallserial: "int2";
-	serial2: "int2";
-	bigint: "int8";
-	bigserial: "int8";
-	serial8: "int8";
-	real: "float4";
-	"double precision": "float8";
-	float: "float8";
-	decimal: "numeric";
-	dec: "numeric";
-	boolean: "bool";
-	citext: "text";
-	"character varying": "varchar";
-	character: "bpchar";
-	char: "bpchar";
-	"time without time zone": "time";
-	"time with time zone": "timetz";
-	"timestamp without time zone": "timestamp";
-	"timestamp with time zone": "timestamptz";
-	"bit varying": "varbit";
-};
+import type { IsRelation } from "../../schema.js";
+import type { TypeAliases } from "./type-facts.js";
 
 export type NormalizeTypeName<S extends string> = S extends `${infer E}[]`
 	? `${NormalizeTypeName<E>}[]`
 	: S extends keyof TypeAliases
 		? TypeAliases[S]
 		: S;
-
-export type SerialTypeName =
-	| "serial"
-	| "serial4"
-	| "smallserial"
-	| "serial2"
-	| "bigserial"
-	| "serial8";
 
 /** Type spellings that differ from the canonical name (`integer`, `bool`, …). */
 type AliasSpelling = keyof TypeAliases;
@@ -52,14 +19,6 @@ type IsAlias<T> = T extends string
 	: false;
 
 type SkippedKey = `$${string}` | "pg_catalog" | "information_schema";
-
-type IsRelation<R> = R extends { readonly $view: unknown }
-	? true
-	: [keyof R] extends [never]
-		? true
-		: R[keyof R] extends { readonly type: unknown }
-			? true
-			: false;
 
 type ColsHaveAlias<R> = true extends {
 	[C in keyof R]: R[C] extends { readonly type: infer T } ? IsAlias<T> : false;

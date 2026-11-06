@@ -1,0 +1,15 @@
+language js(typescript)
+
+`$value instanceof $constructor` as $check where {
+	$constructor <: or {
+		`Object`,
+		`Array`,
+		`Function`,
+		`String`,
+		`Number`,
+		`Boolean`,
+		`Symbol`,
+		`BigInt`
+	},
+	register_diagnostic(span=$check, message="An `instanceof` check against a built-in constructor probes representation and breaks across realms. Parse input at its I/O boundary, then branch on the domain value.", severity="error")
+}

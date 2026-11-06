@@ -3,6 +3,8 @@ import type { Executor } from "@typesql/core";
 import {
 	type PgField,
 	parsePgUserArrays,
+	pgResult,
+	pooledTransaction,
 	runTransaction,
 	type SqlDriver,
 } from "@typesql/core/adapter";
@@ -51,10 +53,15 @@ export interface PgPoolLike<
 // A pool's checked-out clients share the pool's cache of user-defined array types.
 const pools = new WeakMap<PgQueryable, object>();
 
+/** A result's rows, with arrays of user-defined types parsed; a script's last statement stands for it. */
 function rowsOf(
 	client: PgQueryable,
-	{ rows, rowCount, fields }: PgResult,
+	result: PgResult,
 ): Promise<{ rows: unknown[]; rowCount: number | null }> {
+	const { rows, rowCount, fields }: PgResult = pgResult(result) ?? {
+		rows: [],
+		rowCount: 0,
+	};
 	return parsePgUserArrays(
 		pools.get(client) ?? client,
 		(text, values) => client.query(text, values),
@@ -99,46 +106,41 @@ async function inPoolTransaction<C extends PgTransactionClient, T>(
 	fn: (conn: C) => Promise<T>,
 ): Promise<T> {
 	const conn = await pool.connect();
-	let releaseWith: Error | undefined;
-	const toError = (cause: unknown) =>
-		cause instanceof Error ? cause : new Error(String(cause));
+	let lost: Error | undefined;
 	// A checked-out pg client has no pool listener, so an unhandled 'error'
 	// (a dropped connection) would crash the process. The pending query rejects.
 	const onError: ErrorListener = (err) => {
-		releaseWith ??= toError(err);
+		lost ??= err;
 	};
 	if (canOn(conn)) conn.on("error", onError);
 	pools.set(conn, pool);
-	try {
-		return await runTransaction(on(conn), () => fn(conn), {
-			onRollbackError: (err) => {
-				releaseWith = toError(err);
-			},
-		});
-	} finally {
-		if (canOff(conn)) conn.off("error", onError);
-		conn.release(releaseWith);
-	}
+	return pooledTransaction(
+		conn,
+		on(conn),
+		(broken) => {
+			if (canOff(conn)) conn.off("error", onError);
+			conn.release(broken ?? lost);
+		},
+		fn,
+	);
 }
 
 function transaction<T>(
 	client: PgQueryable,
-	depth: number,
+	_depth: number,
 	fn: (tx: PgQueryable) => Promise<T>,
+	savepoint: string | undefined,
 ): Promise<T> {
-	if (depth > 0)
-		return runTransaction(on(client), () => fn(client), {
-			savepoint: `typesql_${depth}`,
-		});
-	if (isPool(client)) return inPoolTransaction(client, fn);
-	if (!isConnection(client)) {
+	if (savepoint === undefined && isPool(client))
+		return inPoolTransaction(client, fn);
+	if (savepoint === undefined && !isConnection(client)) {
 		return Promise.reject(
 			new Error(
 				"typesql: sql.transaction() needs a pg Pool, Client or PoolClient, so that BEGIN and COMMIT reach one connection",
 			),
 		);
 	}
-	return runTransaction(on(client), () => fn(client));
+	return runTransaction(on(client), () => fn(client), { savepoint });
 }
 
 export const driver: SqlDriver<PgQueryable> = { executor, transaction };

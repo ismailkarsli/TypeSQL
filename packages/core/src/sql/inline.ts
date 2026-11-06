@@ -1,8 +1,9 @@
 import type { Empty } from "../empty.js";
+import type { Next } from "../engine/next.js";
 import type { Members } from "../engine/object.js";
 import type { SqlError } from "../errors.js";
 import type { InlineFragment } from "../query.js";
-import type { Next } from "./next.js";
+import type { Lexis, Opaque, OpaqueKind, SplitFirst } from "./lexis.js";
 
 export type ParamInput<T> = unknown extends T
 	? unknown
@@ -61,12 +62,16 @@ export type JsonMarker<T> = unknown extends T
 	? `\u0000PJ${Enc<T>}\u0000`
 	: [Extract<T, undefined>] extends [never]
 		? `\u0000PJ${Enc<T>}\u0000`
-		: `\u0000DuJ${Enc<Exclude<T, undefined>>}\u0000`;
+		: `${DefaultMark}J${Enc<Exclude<T, undefined>>}\u0000`;
 export type JsonValue = `\u0000PJ${string}\u0000`;
 /** A `sql.json()` value that can be DEFAULT, which `sql.set` and `sql.values` leave out. */
-export type JsonDefaultValue = `\u0000DuJ${string}\u0000`;
+export type JsonDefaultValue = `${DefaultMark}J${string}\u0000`;
 
-export type DefaultMarker<T> = `\u0000Du${Enc<Exclude<T, Empty>>}\u0000`;
+/** How a DEFAULT marker starts: `sql.param()` of a value that can be the omission. */
+type DefaultMark = "\u0000Du";
+export type DefaultMarker<T> = `${DefaultMark}${Enc<Exclude<T, Empty>>}\u0000`;
+/** Any DEFAULT marker, which `sql.set` and `sql.values` leave out. */
+export type AnyDefaultMarker = `${DefaultMark}${string}\u0000`;
 
 /**
  * A value's type, written into the marker text so `sql()` can check it
@@ -451,118 +456,57 @@ type JoinBar<Parts extends string[]> = Parts extends [infer A]
 		? `${A} | ${JoinBar<R>}`
 		: "never";
 
-type Openers = '"' | "--" | "/*";
-
-export type SplitFirst<T extends string> = T extends `${infer A}'${infer B}`
-	? A extends `${string}${Openers}${string}`
-		? Earlier<A, "'", B>
-		: [A, "'", B]
-	: T extends `${string}${Openers}${string}`
-		? T extends `${infer A}"${infer B}`
-			? Earlier<A, '"', B>
-			: T extends `${infer A}--${infer B}`
-				? Earlier<A, "--", B>
-				: T extends `${infer A}/*${infer B}`
-					? Earlier<A, "/*", B>
-					: [T, "", ""]
-		: [T, "", ""];
-type Earlier<
-	A extends string,
-	O extends string,
-	B extends string,
-> = A extends `${infer A2}"${infer M}`
-	? Earlier<A2, '"', `${M}${O}${B}`>
-	: A extends `${infer A2}--${infer M}`
-		? Earlier<A2, "--", `${M}${O}${B}`>
-		: A extends `${infer A2}/*${infer M}`
-			? Earlier<A2, "/*", `${M}${O}${B}`>
-			: A extends `${infer A2}'${infer M}`
-				? Earlier<A2, "'", `${M}${O}${B}`>
-				: [A, O, B];
-
-export type Opaque<O extends string, S extends string> = O extends "'" | '"'
-	? CloseQuote<S, O, "">
-	: O extends "--"
-		? S extends `${infer C}\n${infer R}`
-			? [`${C}\n`, R]
-			: [S, ""]
-		: O extends "/*"
-			? CloseBlock<S, [0], "">
-			: ["", S];
-
-type CloseBlock<
-	S extends string,
-	Depth extends unknown[],
-	Acc extends string,
-> = S extends `${infer Pre}/${infer R}`
-	? Pre extends `${string}*`
-		? Depth extends [unknown, ...infer D]
-			? D extends []
-				? [`${Acc}${Pre}/`, R]
-				: CloseBlock<R, D, `${Acc}${Pre}/`>
-			: never
-		: R extends `*${infer Rest}`
-			? CloseBlock<Rest, [...Depth, 0], `${Acc}${Pre}/*`>
-			: CloseBlock<R, Depth, `${Acc}${Pre}/`>
-	: [`${Acc}${S}`, ""];
-
-type CloseQuote<
-	S extends string,
-	Q extends string,
-	Acc extends string,
-> = S extends `${infer In}${Q}${infer R}`
-	? R extends `${Q}${infer R2}`
-		? CloseQuote<R2, Q, `${Acc}${In}${Q}${Q}`>
-		: [`${Acc}${In}${Q}`, R]
-	: [`${Acc}${S}`, ""];
-
 type HasMarker<S extends string> = S extends `${string}\u0000${string}`
 	? true
 	: false;
 
-export type RewriteInlineStr<T extends string, Start extends number> =
-	HasMarker<T> extends false ? [T, []] : InlineLoop<T, "", [], Next<Start>>;
+export type RewriteInlineStr<
+	T extends string,
+	Start extends number,
+	L extends Lexis,
+> =
+	HasMarker<T> extends false ? [T, []] : InlineLoop<T, "", [], Next<Start>, L>;
 
+/**
+ * Each marker becomes parameter `$K` on: the text before a marker is read
+ * up to its first opener, whose quoted text or comment must end before the
+ * marker. Marker text, whose arrays are `[…]`, is never read for openers,
+ * nor is the text after the last marker.
+ */
 type InlineLoop<
 	T extends string,
 	Acc extends string,
 	Encs extends string[],
 	K extends number,
-> =
-	SplitFirst<T> extends [
-		infer Code extends string,
-		infer O extends string,
-		infer Rest extends string,
-	]
-		? InlineCode<Code, "", Encs, K> extends [
-				infer C extends string,
-				infer E2 extends string[],
-				infer K2 extends number,
-			]
-			? O extends ""
-				? [`${Acc}${C}`, E2]
-				: Opaque<O, Rest> extends [
-							infer Seg extends string,
-							infer After extends string,
-						]
-					? HasMarker<Seg> extends true
-						? SqlError<
-								`sql.param() cannot be used inside ${O extends "'" ? "a quoted string" : O extends '"' ? "a quoted identifier" : "a comment"}; remove the surrounding ${O extends "'" | '"' ? "quotes" : "comment"}`,
-								null
-							>
-						: InlineLoop<After, `${Acc}${C}${O}${Seg}`, E2, K2>
-					: never
-			: never
-		: never;
+	L extends Lexis,
+> = T extends `${infer Pre}\u0000${infer Body}\u0000${infer Rest}`
+	? SplitFirst<Pre, L> extends [
+			infer Code extends string,
+			infer O extends string,
+			infer PRest extends string,
+		]
+		? O extends ""
+			? InlineLoop<
+					Rest,
+					`${Acc}${Pre}$${K}`,
+					[...Encs, MarkerEnc<Body>],
+					Next<K>,
+					L
+				>
+			: Opaque<O, `${PRest}\u0000${Body}\u0000${Rest}`, L> extends [
+						infer Seg extends string,
+						infer After extends string,
+					]
+				? HasMarker<Seg> extends true
+					? SqlError<
+							`sql.param() cannot be used inside ${OpaqueKind<O, L>}; remove the surrounding ${OpaqueKind<O, L> extends "a comment" ? "comment" : "quotes"}`,
+							null
+						>
+					: InlineLoop<After, `${Acc}${Code}${O}${Seg}`, Encs, K, L>
+				: never
+		: never
+	: [`${Acc}${T}`, Encs];
 
-type InlineCode<
-	S extends string,
-	Acc extends string,
-	Encs extends string[],
-	K extends number,
-> = S extends `${infer Pre}\u0000${infer Body}\u0000${infer Rest}`
-	? InlineCode<Rest, `${Acc}${Pre}$${K}`, [...Encs, MarkerEnc<Body>], Next<K>>
-	: [`${Acc}${S}`, Encs, K];
 type MarkerEnc<B extends string> = B extends `P${infer E}`
 	? E
 	: B extends `Du${infer E}`
@@ -582,12 +526,12 @@ export type ValueEnc<V> = 0 extends 1 & V
 type MarkerEncs<M> = M extends `\u0000${infer B}\u0000` ? MarkerEnc<B> : never;
 
 export type HasDefaultable<S extends string> =
-	S extends `${string}\u0000Du${string}` ? true : false;
+	S extends `${string}${DefaultMark}${string}` ? true : false;
 
 export type WithDefaults<
 	S extends string,
 	Acc extends string = "",
-> = S extends `${infer Pre}\u0000Du${string}\u0000${infer Rest}`
+> = S extends `${infer Pre}${DefaultMark}${string}\u0000${infer Rest}`
 	? WithDefaults<Rest, `${Acc}${Pre}DEFAULT`>
 	: `${Acc}${S}`;
 

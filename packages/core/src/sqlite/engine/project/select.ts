@@ -1,6 +1,15 @@
+import type { Digit } from "../../../engine/chars.js";
+import type { NameAt } from "../../../engine/family/diagnostics.js";
+import type {
+	CellsMap,
+	NullLevel,
+	RenameCells,
+} from "../../../engine/family/scope.js";
+import type { QueryContext } from "../../../engine/family/types.js";
 import type { NarrowKeys, NarrowLevel } from "../../../engine/narrow.js";
-import type { Nx } from "../../../engine/parse.js";
-import type { ColInfo, QueryContext, Scope } from "../../../engine/types.js";
+import type { Next } from "../../../engine/next.js";
+import type { CappedLen, DigitsLE, GE, ToNum } from "../../../engine/num.js";
+import type { ColInfo, Info, Scope } from "../../../engine/types.js";
 import type { AnyErr, SqlError } from "../../../errors.js";
 import type {
 	Cte,
@@ -12,19 +21,12 @@ import type {
 	Target,
 	WithClause,
 } from "../ast.js";
-import type {
-	BindFrom,
-	CellsMap,
-	CteEntry,
-	NullLevel,
-	StarCells,
-} from "../binder/scope.js";
+import type { BindFrom, CteEntry, StarCells } from "../binder/scope.js";
 import type { IsAggCall } from "../typer/functions.js";
-import type { Common, Info, TypeList, TypeOf } from "../typer/typeof.js";
+import type { Common, TypeList, TypeOf } from "../typer/typeof.js";
 import type {
 	AggMode,
 	Cell,
-	GE,
 	MkCtx,
 	SqColMap,
 	SqColOf,
@@ -82,7 +84,7 @@ type CteLoop<
 					Env["scope"],
 					Env["ctes"] & { readonly [K in C["name"]]: CteEntry<R> }
 				>,
-				Nx<I>
+				Next<I>
 			>
 		: CteCells<C, Env>
 	: Env["ctes"];
@@ -132,21 +134,9 @@ type Renamed<
 		? RenameCells<R, C["cols"]>
 		: SqlError<
 				`table ${C["display"]} has ${R["length"]} values for ${C["cols"]["length"]} columns`,
-				null
+				NameAt<"values">
 			>
 	: R;
-
-export type RenameCells<
-	C extends readonly Cell[],
-	N extends readonly { readonly n: string }[],
-> = {
-	[I in keyof C]: {
-		readonly n: N[I & keyof N] extends { readonly n: infer X extends string }
-			? X
-			: C[I]["n"];
-		readonly t: C[I]["t"];
-	};
-};
 
 type ProjectBody<
 	B extends SelectBody,
@@ -230,15 +220,15 @@ type CompoundOrder<
 					}
 				? Lowercase<M[number]["n"]> extends infer Names
 					? N extends Names
-						? CompoundOrder<O, M, Nx<I>>
+						? CompoundOrder<O, M, Next<I>>
 						: SqlError<
-								`${Ordinal<Nx<I>>} ORDER BY term does not match any column in the result set`,
-								null
+								`${Ordinal<Next<I>>} ORDER BY term does not match any column in the result set`,
+								NameAt<"order">
 							>
 					: never
 				: SqlError<
-						`${Ordinal<Nx<I>>} ORDER BY term does not match any column in the result set`,
-						null
+						`${Ordinal<Next<I>>} ORDER BY term does not match any column in the result set`,
+						NameAt<"order">
 					>
 	: true;
 
@@ -258,18 +248,16 @@ type IntTerm<E> = E extends {
 					readonly not: infer Not;
 				}
 			? { readonly neg: false; readonly v: Not extends true ? 1 : 0 }
-			: E extends { readonly t: "un"; readonly op: "+"; readonly e: infer X }
-				? IntTerm<X>
-				: E extends { readonly t: "un"; readonly op: "-"; readonly e: infer X }
-					? IntTerm<X> extends infer R
-						? R extends IntVal
-							? {
-									readonly neg: R["neg"] extends true ? false : true;
-									readonly v: R["v"];
-								}
-							: null
+			: E extends { readonly t: "un"; readonly op: "-"; readonly e: infer X }
+				? IntTerm<X> extends infer R
+					? R extends IntVal
+						? {
+								readonly neg: R["neg"] extends true ? false : true;
+								readonly v: R["v"];
+							}
 						: null
-					: null;
+					: null
+				: null;
 
 type IntLiteral<V extends string, Neg extends boolean> = V extends `-${infer R}`
 	? IntLiteral<R, Neg extends true ? false : true>
@@ -293,62 +281,27 @@ type Digits<S extends string, Set extends string> = S extends ""
 			? Digits<R, Set>
 			: false
 		: false;
-type Dec = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9";
-type Hex = Dec | "a" | "b" | "c" | "d" | "e" | "f";
-type Len<
-	S extends string,
-	A extends unknown[] = [],
-> = S extends `${string}${infer R}`
-	? A["length"] extends 20
-		? 20
-		: Len<R, [...A, 0]>
-	: A["length"];
+type Hex = Digit | "a" | "b" | "c" | "d" | "e" | "f";
 
 type DecimalValue<D extends string> =
-	Digits<D, Dec> extends true
+	Digits<D, Digit> extends true
 		? D extends ""
 			? 0
-			: Len<D> extends 1 | 2 | 3
+			: CappedLen<D, 20> extends 1 | 2 | 3
 				? D extends `${infer K extends number}`
 					? K
 					: null
-				: Len<D> extends 4 | 5 | 6 | 7 | 8 | 9
+				: CappedLen<D, 20> extends 4 | 5 | 6 | 7 | 8 | 9
 					? "big"
-					: Len<D> extends 10
+					: CappedLen<D, 20> extends 10
 						? DigitsLE<D, "2147483647"> extends true
 							? "big"
 							: null
 						: null
 		: null;
-type DigitsLE<
-	A extends string,
-	B extends string,
-> = A extends `${infer X extends Dec}${infer AR}`
-	? B extends `${infer Y extends Dec}${infer BR}`
-		? X extends Y
-			? DigitsLE<AR, BR>
-			: DecIndex<X> extends infer XI extends number
-				? DecIndex<Y> extends infer YI extends number
-					? GE<YI, XI>
-					: false
-				: false
-		: false
-	: true;
-type DecIndex<D extends Dec> = {
-	"0": 0;
-	"1": 1;
-	"2": 2;
-	"3": 3;
-	"4": 4;
-	"5": 5;
-	"6": 6;
-	"7": 7;
-	"8": 8;
-	"9": 9;
-}[D];
 type HexIndex<H extends string> =
-	Lowercase<H> extends Dec
-		? DecIndex<Lowercase<H> & Dec>
+	Lowercase<H> extends Digit
+		? ToNum<Lowercase<H>>
 		: { a: 10; b: 11; c: 12; d: 13; e: 14; f: 15 }[Lowercase<H> &
 				("a" | "b" | "c" | "d" | "e" | "f")];
 type HexValue<H extends string> =
@@ -356,11 +309,11 @@ type HexValue<H extends string> =
 		? H extends ""
 			? 0
 			: H extends `${infer C}`
-				? Len<H> extends 1
+				? CappedLen<H, 20> extends 1
 					? HexIndex<C>
-					: Len<H> extends 2 | 3 | 4 | 5 | 6 | 7
+					: CappedLen<H, 20> extends 2 | 3 | 4 | 5 | 6 | 7
 						? "big"
-						: Len<H> extends 8
+						: CappedLen<H, 20> extends 8
 							? H extends `${"0" | "1" | "2" | "3" | "4" | "5" | "6" | "7"}${string}`
 								? "big"
 								: null
@@ -387,8 +340,8 @@ type OutOfRange<
 	N extends number,
 	W extends string,
 > = SqlError<
-	`${Ordinal<Nx<I>>} ${W} BY term out of range - should be between 1 and ${N}`,
-	null
+	`${Ordinal<Next<I>>} ${W} BY term out of range - should be between 1 and ${N}`,
+	NameAt<Lowercase<W>>
 >;
 type Ordinal<N extends number> = N extends 1
 	? "1st"
@@ -420,7 +373,7 @@ type ValuesCells<
 	R extends readonly (readonly ColInfo[])[],
 > = {
 	[I in keyof R0]: {
-		readonly n: `column${Nx<I extends `${infer K extends number}` ? K : 0>}`;
+		readonly n: `column${Next<I extends `${infer K extends number}` ? K : 0>}`;
 		readonly t: Info<
 			Common<Column<R, I>>,
 			true extends Column<R, I>[number]["nullable"] ? true : false
@@ -437,7 +390,7 @@ type ValuesRows<
 	Acc extends readonly (readonly ColInfo[])[],
 > = Rows[I] extends infer Row extends readonly Expr[]
 	? TypeList<Row, C> extends infer X extends readonly ColInfo[]
-		? ValuesRows<Rows, C, Nx<I>, [...Acc, X]>
+		? ValuesRows<Rows, C, Next<I>, [...Acc, X]>
 		: TypeList<Row, C>
 	: Acc;
 
@@ -474,8 +427,8 @@ type HasAggList<
 				? true
 				: HasAgg<V, DB> extends true
 					? true
-					: HasAggList<L, DB, Nx<I>>
-			: HasAggList<L, DB, Nx<I>>;
+					: HasAggList<L, DB, Next<I>>
+			: HasAggList<L, DB, Next<I>>;
 
 type AggModeOf<
 	S extends SimpleSelect,
@@ -533,7 +486,7 @@ type MissingWindow<S extends SimpleSelect, OrderBy extends readonly Expr[]> =
 		: null
 	: null;
 export type FirstName<U extends string> =
-	import("../../../sql/splice.js").UnionList<U> extends readonly [
+	import("../../../engine/object.js").Members<U> extends readonly [
 		infer F extends string,
 		...unknown[],
 	]
@@ -687,7 +640,7 @@ export type ProjectTargets<
 							: never
 					) extends infer S
 				? S extends readonly Cell[]
-					? ProjectTargets<Ts, L, C, Nx<I>, [...Acc, ...S], Ret>
+					? ProjectTargets<Ts, L, C, Next<I>, [...Acc, ...S], Ret>
 					: S
 				: never
 		: T extends {
@@ -701,7 +654,7 @@ export type ProjectTargets<
 						Ts,
 						L,
 						C,
-						Nx<I>,
+						Next<I>,
 						[
 							...Acc,
 							{
@@ -749,7 +702,7 @@ type DerivedName<
 				? { readonly d: N }
 				: {}
 			: Lowercase<Sp> extends "true" | "false"
-				? { readonly d: `column${Nx<K>}` }
+				? { readonly d: `column${Next<K>}` }
 				: {}
 		: {};
 
@@ -796,13 +749,13 @@ type ClauseTerms<
 	? IntTerm<E> extends infer V extends IntVal
 		? PositionOk<V, N, I, W> extends AnyErr
 			? PositionOk<V, N, I, W>
-			: ClauseTerms<O, C, N, W, Nx<I>>
+			: ClauseTerms<O, C, N, W, Next<I>>
 		: (W extends "GROUP" ? HasAgg<E, C["db"]> : false) extends true
 			? SqlError<
 					"aggregate functions are not allowed in the GROUP BY clause",
-					null
+					NameAt<"group">
 				>
 			: TypeOf<E, C> extends AnyErr
 				? TypeOf<E, C>
-				: ClauseTerms<O, C, N, W, Nx<I>>
+				: ClauseTerms<O, C, N, W, Next<I>>
 	: true;

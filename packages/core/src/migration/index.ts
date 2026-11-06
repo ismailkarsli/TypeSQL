@@ -5,12 +5,8 @@ export type {
 	PostgresMigration,
 	SqliteMigration,
 } from "./context.js";
-export {
-	type Migration,
-	type MigrationSteps,
-	migration,
-	type SchemaOf,
-} from "./define.js";
+export { type Migration, type MigrationSteps, migration } from "./define.js";
+export { loadMigrator, type MigrateOverrides, missingCore } from "./files.js";
 export {
 	createMigrator,
 	type DownResult,
@@ -22,3 +18,4 @@ export {
 	type MigratorConfig,
 	type UpResult,
 } from "./migrator.js";
+export type { SchemaOf } from "./schema.js";

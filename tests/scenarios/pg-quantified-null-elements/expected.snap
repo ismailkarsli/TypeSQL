@@ -1,0 +1,45 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`pg-quantified-null-elements > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "aggregated": "({ x: null | false | true })[]",
+      "all": "({ x: null | false | true })[]",
+      "allElements": "({ x: false | true })[]",
+      "arrayColumn": "({ x: false | true })[]",
+      "castArray": "({ x: null | false | true })[]",
+      "column": "({ x: null | false | true })[]",
+      "elements": "({ x: false | true })[]",
+      "filtered": "({ id: number })[]",
+      "literal": "({ x: null | false | true })[]",
+      "parameter": "({ x: null | false | true })[]",
+      "subquery": "({ x: null | false | true })[]",
+    },
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "{
+  parameter: [ { x: null } ],
+  castArray: [ { x: null } ],
+  column: [ { x: null } ],
+  literal: [ { x: null } ],
+  subquery: [ { x: null } ],
+  aggregated: [ { x: null } ],
+  all: [ { x: null } ],
+  elements: [ { x: true } ],
+  arrayColumn: [ { x: true } ],
+  allElements: [ { x: false } ],
+  filtered: [ { id: 1 } ]
+}
+",
+  },
+}
+`;

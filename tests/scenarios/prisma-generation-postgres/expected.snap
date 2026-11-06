@@ -14,6 +14,11 @@ export interface DB {
     /** Prisma field \`bio\`. */
     display_name: Col<"text", { nullable: true }>;
   };
+  Author: {
+    id: Col<"int4", { hasDefault: true }>;
+    name: Col<"text">;
+    bio: Col<"text", { nullable: true }>;
+  };
 }
 ",
   },
@@ -26,18 +31,13 @@ export interface DB {
     "diagnostics": [],
     "types": {
       "after": "({ id: number })[]",
+      "clientRows": "({ bio: null | string; id: number; name: string })[]",
       "rows": "({ display_name: null | string; id: number; name: string })[]",
     },
   },
   "generate": {
     "status": 0,
-    "stderr": "Loaded Prisma config from prisma.config.ts.
-
-Prisma schema loaded from schema.prisma.
-Loaded Prisma config from prisma.config.ts.
-
-Prisma schema loaded from schema.prisma.
-",
+    "stderr": "",
     "stdout": "",
   },
   "start": {
@@ -48,6 +48,7 @@ Prisma schema loaded from schema.prisma.
   rows: [ { id: 1, name: 'Ada', display_name: null } ],
   after: [ { id: 1 } ]
 }
+{ clientRows: [ { id: 1, name: 'Ada', bio: null } ] }
 ",
   },
 }

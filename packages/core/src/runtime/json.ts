@@ -19,6 +19,10 @@ export class JsonParam<T = unknown> {
 	}
 }
 
+/** A value as a driver that takes JSON as text binds it: `sql.json()` values as JSON text. */
+export const jsonText = <V>(value: V): V | string =>
+	value instanceof JsonParam ? value.toPostgres() : value;
+
 export function json<const T>(value: T): JsonMarker<T> {
 	// The marker would be stored as text, and with it its secret prefix.
 	if (holdsMarkers(value)) fail(HOLDS);

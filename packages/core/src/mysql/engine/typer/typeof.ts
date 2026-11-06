@@ -1,5 +1,24 @@
-import type { Nx } from "../../../engine/parse.js";
-import type { ColInfo, Scope } from "../../../engine/types.js";
+import type {
+	LastPart,
+	NameAt,
+	NamedAt,
+} from "../../../engine/family/diagnostics.js";
+import type {
+	ArityOk,
+	DeclaredFn,
+	PickSig,
+} from "../../../engine/family/functions.js";
+import type { JsonShapeOf, JsonStep } from "../../../engine/family/json.js";
+import type {
+	AllNull,
+	AnyNull,
+	NonZeroDigits,
+} from "../../../engine/family/typer.js";
+import type { AggCtx } from "../../../engine/family/types.js";
+import type { Next } from "../../../engine/next.js";
+import type { CappedLen, DigitsLE } from "../../../engine/num.js";
+import type { Or } from "../../../engine/object.js";
+import type { ColInfo, Info } from "../../../engine/types.js";
 import type { AnyErr, SqlError } from "../../../errors.js";
 import type { Shaped, TsShape } from "../../../schema.js";
 import type {
@@ -13,22 +32,10 @@ import type {
 } from "../ast.js";
 import type { ResolveColumn } from "../binder/scope.js";
 import type { ProjectSelect } from "../project/select.js";
-import type {
-	Cat,
-	Cell,
-	FlavorOf,
-	GE,
-	IsUnsigned,
-	MkCtx,
-	MyCtx,
-} from "../types.js";
-import type { DeclaredFn, Fn, Functions, PickSig, SigFn } from "./functions.js";
-import type { JsonGet, JsonPath, JsonShapeOf, JsonStep } from "./json.js";
+import type { Cat, Cell, FlavorOf, IsUnsigned, MyCtx } from "../types.js";
+import type { Fn, FunctionCatalog, Functions, SigFn } from "./functions.js";
+import type { JsonGet, JsonPath } from "./json.js";
 
-export type Info<T, N = false> = {
-	readonly type: T;
-	readonly nullable: N;
-};
 /** An integer that came from short literals, which MariaDB types `int`. */
 type LitInfo<T, N = false> = Info<T, N> & { readonly lit: true };
 
@@ -88,14 +95,6 @@ type NumInfo<V extends string, F> = V extends `${string}${"e" | "E"}${string}`
 						: Info<"decimal">
 			: never;
 type Unsign<V extends string> = V extends `-${infer R}` ? Unsign<R> : V;
-type Len<
-	S extends string,
-	A extends unknown[] = [],
-> = S extends `${string}${infer R}`
-	? A["length"] extends 21
-		? 21
-		: Len<R, [...A, 0]>
-	: A["length"];
 type StripZeros<S extends string> =
 	S extends `0${infer R extends `${string}${string}`}`
 		? R extends ""
@@ -103,7 +102,7 @@ type StripZeros<S extends string> =
 			: StripZeros<R>
 		: S;
 type IntLiteral<V extends string, Neg extends boolean> =
-	Len<StripZeros<V>> extends infer N extends number
+	CappedLen<StripZeros<V>, 21> extends infer N extends number
 		? N extends 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9
 			? "small"
 			: N extends 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18
@@ -125,29 +124,6 @@ type IntLiteral<V extends string, Neg extends boolean> =
 								: "decimal"
 						: "decimal"
 		: never;
-type Dec = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9";
-type DecIndex = {
-	"0": 0;
-	"1": 1;
-	"2": 2;
-	"3": 3;
-	"4": 4;
-	"5": 5;
-	"6": 6;
-	"7": 7;
-	"8": 8;
-	"9": 9;
-};
-type DigitsLE<
-	A extends string,
-	B extends string,
-> = A extends `${infer X extends Dec}${infer AR}`
-	? B extends `${infer Y extends Dec}${infer BR}`
-		? X extends Y
-			? DigitsLE<AR, BR>
-			: GE<DecIndex[Y], DecIndex[X]>
-		: false
-	: true;
 type TypeComplex<E extends Expr, C extends MyCtx> = E extends {
 	readonly t: "bin";
 }
@@ -197,50 +173,52 @@ type TypeComplex<E extends Expr, C extends MyCtx> = E extends {
 											>
 										: E extends { readonly t: "in" }
 											? TypeIn<E["e"], E["list"], C>
-											: E extends { readonly t: "insub" | "quant" }
+											: E extends { readonly t: "insub" }
 												? TypeInSub<E["e"], E["q"], C>
-												: E extends { readonly t: "member" }
-													? Pred<[E["e"], E["doc"]], C>
-													: E extends { readonly t: "match" }
-														? TypeList<
-																[...E["cols"], E["against"]],
-																C
-															> extends infer X extends AnyErr
-															? X
-															: Info<"double">
-														: E extends { readonly t: "sub" }
-															? SubqueryCol<E["q"], C> extends infer X extends
-																	ColInfo
-																? Info<X["type"], true>
-																: SubqueryCol<E["q"], C>
-															: E extends { readonly t: "exists" }
-																? ProjectSelect<
-																		E["q"],
-																		C
-																	> extends infer X extends AnyErr
-																	? X
-																	: Info<BoolT<C>>
-																: E extends { readonly t: "assign" }
-																	? TypeOf<E["e"], C> extends infer X extends
-																			ColInfo
-																		? Info<X["type"], X["nullable"]>
-																		: TypeOf<E["e"], C>
-																	: E extends { readonly t: "ctime" }
-																		? Info<CTimeType<E["fn"], Fl<C>>>
-																		: E extends { readonly t: "row" }
-																			? SqlError<
-																					"Operand should contain 1 column(s)",
-																					null
-																				>
-																			: E extends { readonly t: "interval" }
+												: E extends { readonly t: "quant" }
+													? TypeInSub<E["l"], E["r"], C>
+													: E extends { readonly t: "member" }
+														? Pred<[E["e"], E["doc"]], C>
+														: E extends { readonly t: "match" }
+															? TypeList<
+																	[...E["cols"], E["against"]],
+																	C
+																> extends infer X extends AnyErr
+																? X
+																: Info<"double">
+															: E extends { readonly t: "sub" }
+																? SubqueryCol<E["q"], C> extends infer X extends
+																		ColInfo
+																	? Info<X["type"], true>
+																	: SubqueryCol<E["q"], C>
+																: E extends { readonly t: "exists" }
+																	? ProjectSelect<
+																			E["q"],
+																			C
+																		> extends infer X extends AnyErr
+																		? X
+																		: Info<BoolT<C>>
+																	: E extends { readonly t: "assign" }
+																		? TypeOf<E["e"], C> extends infer X extends
+																				ColInfo
+																			? Info<X["type"], X["nullable"]>
+																			: TypeOf<E["e"], C>
+																		: E extends { readonly t: "ctime" }
+																			? Info<CTimeType<E["fn"], Fl<C>>>
+																			: E extends { readonly t: "row" }
 																				? SqlError<
-																						"You have an error in your SQL syntax near 'INTERVAL'",
+																						"Operand should contain 1 column(s)",
 																						null
 																					>
-																				: SqlError<
-																						"You have an error in your SQL syntax near 'DEFAULT'",
-																						null
-																					>;
+																				: E extends { readonly t: "interval" }
+																					? SqlError<
+																							"You have an error in your SQL syntax near 'INTERVAL'",
+																							null
+																						>
+																					: SqlError<
+																							"You have an error in your SQL syntax near 'DEFAULT'",
+																							null
+																						>;
 
 type TypeCast<E extends Cast, C extends MyCtx> =
 	TypeOf<E["e"], C> extends infer X extends ColInfo
@@ -274,13 +252,6 @@ export type TypeList<
 		? TypeList<R, C, [...Acc, X]>
 		: TypeOf<H, C>
 	: Acc;
-
-type AnyNull<L extends readonly ColInfo[]> = true extends L[number]["nullable"]
-	? true
-	: false;
-type AllNull<L extends readonly ColInfo[]> = false extends L[number]["nullable"]
-	? false
-	: true;
 
 type Pred<L extends readonly Expr[], C extends MyCtx> =
 	TypeList<L, C> extends infer X extends readonly ColInfo[]
@@ -464,15 +435,6 @@ type NonZero<E> = E extends {
 		? false
 		: NonZeroDigits<V>
 	: false;
-type NonZeroDigits<V extends string> = V extends `${infer H}${infer R}`
-	? H extends "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
-		? true
-		: H extends "e" | "E"
-			? false
-			: NonZeroDigits<R>
-	: false;
-
-type Or<A, B> = A extends true ? true : B extends true ? true : false;
 
 type TypeBin<Op, L extends Expr, R extends Expr, C extends MyCtx> = Op extends
 	| "="
@@ -668,7 +630,7 @@ type CaseLoop<
 	? TypeOf<W, C> extends AnyErr
 		? TypeOf<W, C>
 		: TypeOf<V, C> extends infer Y extends ColInfo
-			? CaseLoop<Whens, C, [...Acc, Y], Nx<I>>
+			? CaseLoop<Whens, C, [...Acc, Y], Next<I>>
 			: TypeOf<V, C>
 	: Acc;
 
@@ -759,14 +721,15 @@ type IntCommon<U, F> = [Extract<U, `${string} unsigned`>] extends [never]
 				? MaxRank<
 						IntRank<Exclude<U, `${string} unsigned`>>
 					> extends infer SR extends number
-					? Lt<UR, SR> extends true
+					? RankLt<UR, SR> extends true
 						? IntOfRank<SR>
 						: UR extends 5
 							? "decimal"
-							: IntOfRank<Next1<UR>>
+							: IntOfRank<NextRank<UR>>
 					: never
 				: never;
-type Lt<A, B> = A extends B
+/** Integer type ranks 1 (tinyint) to 5 (bigint). */
+type RankLt<A, B> = A extends B
 	? false
 	: A extends 1
 		? true
@@ -783,7 +746,7 @@ type Lt<A, B> = A extends B
 						? true
 						: false
 					: false;
-type Next1<R> = R extends 1 ? 2 : R extends 2 ? 3 : R extends 3 ? 4 : 5;
+type NextRank<R> = R extends 1 ? 2 : R extends 2 ? 3 : R extends 3 ? 4 : 5;
 type StringCommon<U> = "longtext" extends U
 	? "longtext"
 	: "mediumtext" extends U
@@ -800,7 +763,7 @@ type BinaryCommon<U> = "longblob" extends U | "longtext"
 			: "varbinary";
 
 type FnOf<E extends Call, C extends MyCtx> =
-	DeclaredFn<C["db"], E["name"]> extends infer D
+	DeclaredFn<C["db"], E["name"], FunctionCatalog> extends infer D
 		? D extends null
 			? E["name"] extends keyof Functions
 				? Functions[E["name"]] extends infer F extends Fn
@@ -819,10 +782,10 @@ type TypeCall<E extends Call, C extends MyCtx> =
 					[F["kind"], E["over"]] extends ["agg", null]
 						? [C["inAgg"], C["agg"]] extends [false, "group" | "whole"]
 							? CallShape<E, F, C>
-							: "Invalid use of group function"
+							: SqlError<"Invalid use of group function", null>
 						: CallShape<E, F, C>
-				) extends infer M extends string
-				? SqlError<M, null>
+				) extends infer M extends AnyErr
+				? M
 				: (
 							[F["kind"], E["over"]] extends ["agg", null]
 								? AggCtx<C>
@@ -843,7 +806,14 @@ type TypeCall<E extends Call, C extends MyCtx> =
 											: {})
 						: CallArgTypes<E, AC>
 					: never
-			: SqlError<`FUNCTION ${E["disp"]} does not exist`, null>
+			: SqlError<
+					`FUNCTION ${E["disp"]} does not exist`,
+					NameAt<
+						LastPart<Lowercase<E["disp"]>>,
+						"function",
+						Lowercase<E["disp"]>
+					>
+				>
 		: never;
 
 /** The second argument of DATE_ADD and friends may be an `INTERVAL`. */
@@ -857,16 +827,10 @@ type CallArgTypes<
 	? TypeList<[A0, A1["e"]], C>
 	: TypeList<E["args"], C>;
 
-type AggCtx<C extends MyCtx> = (
-	C extends { readonly aggScope: infer S extends Scope }
-		? S
-		: C["scope"]
-) extends infer S extends Scope
-	? MkCtx<C["db"], S, C["ctes"], "none", C["aliases"], S, true>
-	: never;
-
-type Incorrect<E extends Call> =
-	`Incorrect parameter count in the call to native function '${E["disp"]}'`;
+type Incorrect<E extends Call> = SqlError<
+	`Incorrect parameter count in the call to native function '${E["disp"]}'`,
+	NamedAt<E["disp"]>
+>;
 
 type CallShape<
 	E extends Call,
@@ -877,39 +841,45 @@ type CallShape<
 		? E["over"] extends null
 			? null
 			: null
-		: `You have an error in your SQL syntax near '*'`
+		: SqlError<`You have an error in your SQL syntax near '*'`, null>
 	: E["name"] extends "count"
 		? E["args"]["length"] extends 1
 			? null
 			: E["distinct"] extends true
 				? null
-				: `You have an error in your SQL syntax near ','`
+				: SqlError<`You have an error in your SQL syntax near ','`, null>
 		: ArityOk<E["args"]["length"], F["min"], F["max"]> extends false
 			? Incorrect<E>
 			: F["kind"] extends "win"
 				? E["name"] extends "lag" | "lead"
 					? E["args"]["length"] extends 3
 						? Fl<C> extends "mariadb"
-							? `You have an error in your SQL syntax near ','`
+							? SqlError<`You have an error in your SQL syntax near ','`, null>
 							: E["over"] extends null
-								? `You have an error in your SQL syntax near ')'`
+								? SqlError<
+										`You have an error in your SQL syntax near ')'`,
+										null
+									>
 								: null
 						: E["over"] extends null
-							? `You have an error in your SQL syntax near ')'`
+							? SqlError<`You have an error in your SQL syntax near ')'`, null>
 							: null
 					: E["over"] extends null
-						? `You have an error in your SQL syntax near ')'`
+						? SqlError<`You have an error in your SQL syntax near ')'`, null>
 						: null
 				: F["kind"] extends "agg"
 					? null
 					: E["over"] extends null
 						? E["distinct"] extends true
-							? `You have an error in your SQL syntax near 'DISTINCT'`
+							? SqlError<
+									`You have an error in your SQL syntax near 'DISTINCT'`,
+									null
+								>
 							: null
-						: `You have an error in your SQL syntax near 'OVER'`;
-
-type ArityOk<N extends number, Min extends number, Max extends number> =
-	GE<N, Min> extends true ? (Max extends 1000 ? true : GE<Max, N>) : false;
+						: SqlError<
+								`You have an error in your SQL syntax near 'OVER'`,
+								null
+							>;
 
 type CheckExtras<E extends Call, C extends MyCtx> =
 	TypeList<E["order"], C> extends AnyErr
@@ -1083,9 +1053,7 @@ type NumericRet<
 												: "longtext"
 											: R extends "jsonvalue"
 												? "varchar"
-												: R extends "jsonext"
-													? "json"
-													: R;
+												: R;
 
 type TemporalOf<A extends readonly ColInfo[]> =
 	Extract<

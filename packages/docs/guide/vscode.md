@@ -61,7 +61,7 @@ To turn suggestions off, set `"typesql.completions.enable": false`.
 - Aliases follow scope: a subquery sees its own FROM items first, then the outer query's.
 - Subqueries and CTEs offer the names of their output columns.
 - Names that the database would fold to lower case or read as a keyword are inserted in double quotes (`"UserAccounts"`, `"order"`). In MySQL and MariaDB statements, names that need quoting get backticks (`` `order` ``).
-- Suggestions work in `sql()`, in `tx()` inside `sql.transaction()`, in `sql.fragment()`, `sql.prepare()` and `sql.as()`, in template literals across lines, and between `${sql.param()}` values.
+- Suggestions work in `sql()`, in `tx()` inside `sql.transaction()`, in `sql.fragment()`, `sql.prepare()`, `sql.raw()` and `sql.as()`, in a migration's `db()`, `.ddl()`, `.add()` and `.raw()`, in template literals across lines, and between `${sql.param()}` values.
 - There are none inside string literals, comments and quoted identifiers.
 
 ## Syntax highlighting

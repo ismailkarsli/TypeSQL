@@ -1,11 +1,13 @@
-import type { OpTok, Tok, Toks } from "../../../engine/tokens.js";
-import type { QueryContext } from "../../../engine/types.js";
+import type { Next } from "../../../engine/next.js";
+import type { Tok, Toks } from "../../../engine/tokens.js";
 import type { AnyErr, SqlError } from "../../../errors.js";
 import type { DdlStmt, Stmt } from "../ast.js";
 import type { Lex } from "../lexer/lex.js";
+import type { OpTok } from "../lexer/tokens.js";
 import type { ParseStatement } from "../parser/stmt.js";
-import type { AtEnd, Nx, Ok, SyntaxErrorAt } from "../parser/util.js";
+import type { AtEnd, Ok, SyntaxErrorAt } from "../parser/util.js";
 import type { ProjectStmt } from "../project/stmt.js";
+import type { QueryContext } from "../types.js";
 import type { ApplyDdlNode } from "./apply.js";
 
 type DdlKind = DdlStmt["t"];
@@ -21,7 +23,7 @@ type ApplyLoop<DB, T extends Toks, I extends number> =
 	AtEnd<T, I> extends true
 		? DB
 		: T[I] extends OpTok<";">
-			? ApplyLoop<DB, T, Nx<I>>
+			? ApplyLoop<DB, T, Next<I>>
 			: ParseStatement<T, I> extends infer R
 				? R extends Ok<infer S, infer J>
 					? EndsAt<T, J> extends false
@@ -65,7 +67,7 @@ type LocateFrom<
 			? M extends `${string} specified more than once`
 				? F extends Start
 					? F
-					: FindTok<T, LastPart<Name>, Nx<F>, F>
+					: FindTok<T, LastPart<Name>, Next<F>, F>
 				: F
 			: Start
 		: M extends `cannot drop ${string} ${infer Name} because ${string}`
@@ -86,5 +88,5 @@ type FindTok<
 	: T[I] extends OpTok<";">
 		? Fallback
 		: T[I] extends Tok
-			? FindTok<T, Name, Nx<I>, Fallback>
+			? FindTok<T, Name, Next<I>, Fallback>
 			: Fallback;

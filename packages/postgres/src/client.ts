@@ -61,8 +61,9 @@ export function executor(sql: PostgresJsQueryable): Executor {
 
 async function transaction<T>(
 	sql: PostgresJsQueryable,
-	depth: number,
+	_depth: number,
 	fn: (tx: PostgresJsQueryable) => Promise<T>,
+	savepoint: string | undefined,
 ): Promise<T> {
 	if (canSavepoint(sql)) return sql.savepoint(fn);
 	if (canBegin(sql)) return sql.begin(fn);
@@ -71,7 +72,7 @@ async function transaction<T>(
 		return runTransaction(
 			(statement) => sql.unsafe(statement),
 			() => fn(sql),
-			depth > 0 ? { savepoint: `typesql_${depth}` } : {},
+			{ savepoint },
 		);
 	throw new Error(
 		"typesql: sql.transaction() needs a postgres.js Sql, ReservedSql or TransactionSql (with begin, savepoint or release)",

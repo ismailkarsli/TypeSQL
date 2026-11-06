@@ -1,10 +1,13 @@
 // Runs with the scenario's working directory and the workspace's pinned compiler.
+// usage: node observe.ts <output.json>
 
 import { readFileSync, writeFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
 import * as ts from "typescript/sync";
-import type { Diagnostic } from "./types.ts";
+import type { CompilerObservation, Diagnostic } from "./types.ts";
 
+const output = process.argv[2];
+if (!output) throw new Error("usage: node observe.ts <output.json>");
 const cwd = process.cwd();
 const app = resolve("app.ts");
 const api = new ts.API({ cwd });
@@ -99,27 +102,33 @@ try {
 			return [s.name, render(type)];
 		}),
 	);
-	function diagnostic(d: ts.Diagnostic): Diagnostic {
+	type Location = Pick<Diagnostic, "file" | "line" | "column" | "expression">;
+	function diagnostic(d: ts.Diagnostic, parent?: Location): Diagnostic {
 		const observation: Diagnostic = {
 			code: d.code,
 			category: d.category,
 			message: d.text,
 		};
+		let location: Location | undefined;
 		if (d.fileName) {
 			if (!d.startPosition)
 				throw new Error("File diagnostic has no start position");
-			const source = readFileSync(d.fileName, "utf8");
-			Object.assign(observation, {
-				file: relative(cwd, d.fileName),
+			location = {
+				// A path out of the scenario stays absolute: its relative form depends on $TMPDIR.
+				file: d.fileName.startsWith(`${cwd}/`)
+					? relative(cwd, d.fileName)
+					: d.fileName,
 				line: d.startPosition.line + 1,
 				column: d.startPosition.character + 1,
-				expression: source.slice(d.pos, d.end),
-			});
+				expression: readFileSync(d.fileName, "utf8").slice(d.pos, d.end),
+			};
+			if (JSON.stringify(location) !== JSON.stringify(parent))
+				Object.assign(observation, location);
 		}
 		if (d.messageChain?.length)
-			observation.details = d.messageChain.map(diagnostic);
+			observation.details = d.messageChain.map((x) => diagnostic(x, location));
 		if (d.relatedInformation?.length)
-			observation.related = d.relatedInformation.map(diagnostic);
+			observation.related = d.relatedInformation.map((x) => diagnostic(x));
 		return observation;
 	}
 	const diagnostics = [
@@ -129,14 +138,14 @@ try {
 		...program.getSyntacticDiagnostics(),
 		...program.getBindDiagnostics(),
 		...program.getSemanticDiagnostics(),
-	].map(diagnostic);
-	const unique = [
-		...new Map(diagnostics.map((d) => [JSON.stringify(d), d])).values(),
-	];
-	writeFileSync(
-		".scenario/compiler.json",
-		JSON.stringify({ types, diagnostics: unique }, null, 2),
-	);
+	].map((d) => diagnostic(d));
+	const observation: CompilerObservation = {
+		types,
+		diagnostics: [
+			...new Map(diagnostics.map((d) => [JSON.stringify(d), d])).values(),
+		],
+	};
+	writeFileSync(output, JSON.stringify(observation, null, 2));
 } finally {
 	api.close();
 }

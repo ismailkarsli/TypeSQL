@@ -1,0 +1,34 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`sqlite-negated-zero > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "divided": "({ negatedTwo: number; negatedZero: null | number; negatedZeroRemainder: null | number; negativeZero: null | number; plusTwo: number; plusZero: null | number })[]",
+    },
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "{
+  divided: [
+    [Object: null prototype] {
+      negatedZero: null,
+      negatedZeroRemainder: null,
+      negativeZero: null,
+      negatedTwo: 3,
+      plusTwo: 3,
+      plusZero: null
+    }
+  ]
+}
+",
+  },
+}
+`;

@@ -1,0 +1,25 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`drizzle-mysql-serverless > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {},
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "[
+  "SELECT 'why?' AS note, 7 AS id",
+  "SELECT 'it''s' AS quoted, 'why?' AS note",
+  'SELECT 1 AS plain'
+]
+",
+  },
+}
+`;

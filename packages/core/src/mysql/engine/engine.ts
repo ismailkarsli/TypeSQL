@@ -1,3 +1,4 @@
+import type { ShapeBase } from "../../schema.js";
 import type {
 	AnalysisFn,
 	DisplayFn,
@@ -5,7 +6,8 @@ import type {
 	ParamFn,
 	RowFn,
 	TokensFn,
-} from "../../engine/contract.js";
+} from "../../sql/contract.js";
+import type { Lexis } from "../../sql/lexis.js";
 import type { TsParamTypeOf } from "../type-map/index.js";
 import type { Analysis, RowFrom } from "./infer.js";
 import type { Lex } from "./lexer.js";
@@ -18,8 +20,25 @@ export interface MySqlEngine extends EngineTypes {
 	readonly param: MySqlParam;
 	readonly display: MySqlDisplay;
 	readonly json: "json";
+	readonly arrayNote: "";
 	readonly quote: "`";
 	readonly emptyRow: "() VALUES ()";
+	readonly valuesDefault: true;
+	readonly lexis: MySqlLexis;
+}
+
+/**
+ * MySQL's and MariaDB's text rules, as `mysqlLexis`: strings take backslash
+ * escapes, `--` starts a comment only before whitespace, `#` starts one too,
+ * and block comments don't nest.
+ */
+export interface MySqlLexis extends Lexis {
+	readonly extra: "`" | "#";
+	readonly backslash: "'" | '"';
+	readonly spacedDash: true;
+	readonly nest: false;
+	readonly dollar: false;
+	readonly names: "`";
 }
 
 /** MariaDB: the same grammar, with its own types, functions and statements. */
@@ -43,5 +62,5 @@ interface MySqlParam extends ParamFn {
 	readonly out: TsParamTypeOf<this["tm"], this["db"], this["t"]>;
 }
 interface MySqlDisplay extends DisplayFn {
-	readonly out: this["t"];
+	readonly out: ShapeBase<this["t"]>;
 }

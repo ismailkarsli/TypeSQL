@@ -1,6 +1,7 @@
 import type { Executor, ExecutorResult, SqlPlugin } from "@typesql/core";
 import {
 	createTransactionalSql,
+	mysqlInline,
 	runTransaction,
 	type SqlDriver,
 } from "@typesql/core/adapter";
@@ -10,7 +11,6 @@ import {
 	type ServerlessTypeMap,
 	type TransactionalSql,
 } from "@typesql/core/mysql";
-import { inline } from "./literal.js";
 
 interface FullResult {
 	readonly rows: readonly unknown[] | null;
@@ -55,7 +55,7 @@ async function run(
 }
 
 export function executor(client: TiDbQueryable): Executor {
-	return (text, values) => run(client, inline(text, values));
+	return (text, values) => run(client, mysqlInline(text, values));
 }
 
 const isConnection = (c: TiDbQueryable): c is TiDbConnection =>
@@ -63,14 +63,15 @@ const isConnection = (c: TiDbQueryable): c is TiDbConnection =>
 
 async function transaction<T>(
 	client: TiDbQueryable,
-	depth: number,
+	_depth: number,
 	fn: (tx: TiDbQueryable) => Promise<T>,
+	savepoint: string | undefined,
 ): Promise<T> {
-	if (depth > 0)
+	if (savepoint !== undefined)
 		return runTransaction(
 			(statement) => client.execute(statement, null, OPTIONS),
 			() => fn(client),
-			{ savepoint: `typesql_${depth}` },
+			{ savepoint },
 		);
 	if (!isConnection(client))
 		throw new Error(
@@ -83,9 +84,8 @@ async function transaction<T>(
 		await tx.commit();
 		return result;
 	} catch (err) {
-		try {
-			await tx.rollback();
-		} catch {}
+		// The error that ended the transaction is the one to report.
+		await tx.rollback().catch(() => {});
 		throw err;
 	}
 }

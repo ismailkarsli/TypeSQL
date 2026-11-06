@@ -1,7 +1,7 @@
 import type { DelKey, RenameKey, SetKey } from "../../../engine/object.js";
 import type { SqlError } from "../../../errors.js";
-import type { Table, View } from "../../../schema.js";
 import type { TableRef } from "../ast.js";
+import type { IsNamespace, IsViewVal, MetaKey } from "../db.js";
 
 type IsTop<S> = S extends null | "public" ? true : false;
 
@@ -21,16 +21,6 @@ export type NoRelation<DB, Ref extends TableRef> = MissingRel<
 	Ref,
 	SqlError<`relation "${Written<Ref>}" does not exist`, null>
 >;
-
-export type IsViewVal<X> = X extends { readonly $view: unknown } ? true : false;
-
-export type IsNamespace<X> = X extends { readonly $view: unknown }
-	? false
-	: [keyof X] extends [never]
-		? false
-		: X[keyof X] extends { readonly type: string }
-			? false
-			: true;
 
 export type IsSchemaKey<DB, K extends string> = K extends keyof DB
 	? K extends MetaKey
@@ -111,12 +101,6 @@ export type RenameRel<DB, Ref extends TableRef, To extends string> =
 				>
 			: DB;
 
-export type ColsOf<Rel> = Rel extends { readonly $view: infer C } ? C : Rel;
-
-export type Rewrap<Rel, C> = IsViewVal<Rel> extends true ? AsView<C> : C;
-
-export type AsView<C> = C extends Table ? View<C> : { readonly $view: C };
-
 export type ApplyDropRels<
 	DB,
 	Refs,
@@ -145,5 +129,3 @@ export type ApplyDropRels<
 				: SqlError<`"${R["name"]}" is not a ${Kind}`, null>
 		: never
 	: DB;
-
-export type MetaKey = "$types" | "$functions" | "$nullParams";

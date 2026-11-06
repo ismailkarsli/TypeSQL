@@ -1,6 +1,12 @@
+import type {
+	DeclaredFn,
+	PickSig,
+	SigSlots,
+} from "../../../engine/family/functions.js";
+import type { QueryContext } from "../../../engine/family/types.js";
+import type { Next } from "../../../engine/next.js";
 import type { NullTest, ParamEntry } from "../../../engine/params.js";
-import type { Nx } from "../../../engine/parse.js";
-import type { ColInfo, QueryContext, Scope } from "../../../engine/types.js";
+import type { ColInfo, Info, Scope } from "../../../engine/types.js";
 import type {
 	Call,
 	CaseExpr,
@@ -14,8 +20,8 @@ import type {
 import type { BindFrom } from "../binder/scope.js";
 import type { BindWith } from "../project/select.js";
 import type { Cat, MkCtx, MyCteMap, MyCtx, MyLevel } from "../types.js";
-import type { DeclaredFn, PickSig, SigArgType } from "./functions.js";
-import type { Common, Info, SubqueryCol, TypeOf } from "./typeof.js";
+import type { FunctionCatalog, Functions } from "./functions.js";
+import type { Common, SubqueryCol, TypeOf } from "./typeof.js";
 
 type Ctx<DB, S extends Scope, Ctes extends MyCteMap> = MkCtx<
 	DB,
@@ -108,38 +114,44 @@ type ParamsComplex<E extends Expr, C extends MyCtx> = E extends {
 							? E["e"] extends { readonly t: "row" }
 								? ParamsOfList<[E["e"], ...E["list"]], C>
 								: ListParams<[E["e"], ...E["list"]], C, false>
-							: E extends { readonly t: "insub" | "quant" }
+							: E extends { readonly t: "insub" }
 								? InSubParams<E["e"], E["q"], C>
-								: E extends { readonly t: "like" }
-									? ListParams<
-											E["esc"] extends Expr
-												? [E["e"], E["pat"], E["esc"]]
-												: [E["e"], E["pat"]],
-											C,
-											false,
-											Info<"varchar", false>
-										>
-									: E extends { readonly t: "member" }
-										?
-												| Slot<E["e"], C, Info<"unknown", false>>
-												| Slot<E["doc"], C, Info<"json", false>>
-										: E extends { readonly t: "match" }
+								: E extends { readonly t: "quant" }
+									? InSubParams<E["l"], E["r"], C>
+									: E extends { readonly t: "like" }
+										? ListParams<
+												E["esc"] extends Expr
+													? [E["e"], E["pat"], E["esc"]]
+													: [E["e"], E["pat"]],
+												C,
+												false,
+												Info<"varchar", false>
+											>
+										: E extends { readonly t: "member" }
 											?
-													| ParamsOfList<E["cols"], C>
-													| Slot<E["against"], C, Info<"varchar", false>>
-											: E extends { readonly t: "interval" }
-												? Slot<E["e"], C, Info<IntervalParam<E["unit"]>, false>>
-												: E extends { readonly t: "assign" }
-													? Slot<E["e"], C, Info<"unknown", true>>
-													: E extends { readonly t: "case" }
-														? CaseParams<Extract<E, CaseExpr>, C>
-														: E extends { readonly t: "call" }
-															? CallParams<Extract<E, Call>, C>
-															: E extends { readonly t: "sub" | "exists" }
-																? ParamsOfSelect<E["q"], C>
-																: E extends { readonly t: "row" }
-																	? ParamsOfList<E["items"], C>
-																	: never;
+													| Slot<E["e"], C, Info<"unknown", false>>
+													| Slot<E["doc"], C, Info<"json", false>>
+											: E extends { readonly t: "match" }
+												?
+														| ParamsOfList<E["cols"], C>
+														| Slot<E["against"], C, Info<"varchar", false>>
+												: E extends { readonly t: "interval" }
+													? Slot<
+															E["e"],
+															C,
+															Info<IntervalParam<E["unit"]>, false>
+														>
+													: E extends { readonly t: "assign" }
+														? Slot<E["e"], C, Info<"unknown", true>>
+														: E extends { readonly t: "case" }
+															? CaseParams<Extract<E, CaseExpr>, C>
+															: E extends { readonly t: "call" }
+																? CallParams<Extract<E, Call>, C>
+																: E extends { readonly t: "sub" | "exists" }
+																	? ParamsOfSelect<E["q"], C>
+																	: E extends { readonly t: "row" }
+																		? ParamsOfList<E["items"], C>
+																		: never;
 
 type IntervalParam<U> = U extends
 	| "microsecond"
@@ -197,7 +209,7 @@ type RowPairs<
 	I extends number,
 > = L[I] extends infer A extends Expr
 	? R[I] extends infer B extends Expr
-		? RowPairs<L, R, C, M | PairParams<A, B, C, false>, Nx<I>>
+		? RowPairs<L, R, C, M | PairParams<A, B, C, false>, Next<I>>
 		: M
 	: M;
 
@@ -255,9 +267,9 @@ type FirstSib<
 		? Sib<E, C> extends infer S
 			? S extends ColInfo
 				? S
-				: FirstSib<L, C, Nx<I>>
+				: FirstSib<L, C, Next<I>>
 			: never
-		: FirstSib<L, C, Nx<I>>
+		: FirstSib<L, C, Next<I>>
 	: null;
 export type ParamsOfList<L extends readonly Expr[], C extends MyCtx> = FnArgs<
 	L,
@@ -316,7 +328,7 @@ type CaseValues<
 			Ws,
 			Else,
 			C,
-			Nx<I>,
+			Next<I>,
 			Sib<V, C> extends infer S extends ColInfo ? [...Acc, S] : Acc
 		>
 	: Else extends Expr
@@ -338,163 +350,6 @@ type CaseLoop<Branch, C extends MyCtx, Op, VT> = Branch extends {
 						>)
 	: never;
 
-type TextFns =
-	| "ascii"
-	| "bit_length"
-	| "char_length"
-	| "character_length"
-	| "concat"
-	| "concat_ws"
-	| "elt"
-	| "field"
-	| "find_in_set"
-	| "from_base64"
-	| "hex"
-	| "instr"
-	| "lcase"
-	| "length"
-	| "locate"
-	| "lower"
-	| "ltrim"
-	| "md5"
-	| "octet_length"
-	| "ord"
-	| "position"
-	| "quote"
-	| "regexp_instr"
-	| "regexp_like"
-	| "regexp_replace"
-	| "regexp_substr"
-	| "replace"
-	| "reverse"
-	| "rtrim"
-	| "sha"
-	| "sha1"
-	| "soundex"
-	| "strcmp"
-	| "substring_index"
-	| "to_base64"
-	| "trim"
-	| "ucase"
-	| "unhex"
-	| "upper"
-	| "group_concat"
-	| "inet_aton"
-	| "inet6_aton"
-	| "uuid_to_bin"
-	| "is_uuid";
-type NumFns =
-	| "abs"
-	| "acos"
-	| "asin"
-	| "atan"
-	| "atan2"
-	| "ceil"
-	| "ceiling"
-	| "cos"
-	| "cot"
-	| "degrees"
-	| "exp"
-	| "floor"
-	| "ln"
-	| "log"
-	| "log10"
-	| "log2"
-	| "mod"
-	| "pow"
-	| "power"
-	| "radians"
-	| "round"
-	| "sign"
-	| "sin"
-	| "sqrt"
-	| "tan"
-	| "truncate"
-	| "sum"
-	| "avg"
-	| "std"
-	| "stddev"
-	| "stddev_pop"
-	| "stddev_samp"
-	| "variance"
-	| "var_pop"
-	| "var_samp"
-	| "space"
-	| "from_days"
-	| "sec_to_time"
-	| "inet_ntoa"
-	| "ntile";
-type DateFns =
-	| "date"
-	| "datediff"
-	| "day"
-	| "dayofmonth"
-	| "dayname"
-	| "dayofweek"
-	| "dayofyear"
-	| "hour"
-	| "last_day"
-	| "microsecond"
-	| "minute"
-	| "month"
-	| "monthname"
-	| "quarter"
-	| "second"
-	| "time"
-	| "timediff"
-	| "time_to_sec"
-	| "timestamp"
-	| "to_days"
-	| "to_seconds"
-	| "unix_timestamp"
-	| "week"
-	| "weekday"
-	| "weekofyear"
-	| "year"
-	| "yearweek"
-	| "date_add"
-	| "date_sub"
-	| "adddate"
-	| "subdate"
-	| "addtime"
-	| "subtime";
-type SameFns =
-	| "coalesce"
-	| "ifnull"
-	| "nvl"
-	| "nullif"
-	| "greatest"
-	| "least"
-	| "max"
-	| "min";
-type JsonFns =
-	| "json_array_append"
-	| "json_array_insert"
-	| "json_contains"
-	| "json_contains_path"
-	| "json_depth"
-	| "json_extract"
-	| "json_insert"
-	| "json_keys"
-	| "json_length"
-	| "json_merge"
-	| "json_merge_patch"
-	| "json_merge_preserve"
-	| "json_overlaps"
-	| "json_pretty"
-	| "json_remove"
-	| "json_replace"
-	| "json_search"
-	| "json_set"
-	| "json_storage_free"
-	| "json_storage_size"
-	| "json_type"
-	| "json_unquote"
-	| "json_valid"
-	| "json_value"
-	| "json_query"
-	| "json_exists";
-
 type CallParams<E extends Call, C extends MyCtx> =
 	| FnArgs<E["args"], C, never, CallSlots<E, C>>
 	| ParamsOfList<E["order"], C>
@@ -505,75 +360,22 @@ type CallParams<E extends Call, C extends MyCtx> =
 			? ParamsOfList<[...P, ...O], C>
 			: never);
 type CallSlots<E extends Call, C extends MyCtx> =
-	DeclaredFn<C["db"], E["name"]> extends infer D extends {}
+	DeclaredFn<C["db"], E["name"], FunctionCatalog> extends infer D extends {}
 		? SigSlots<PickSig<D, E["args"]["length"]>, E["args"]>
-		: E["name"] extends SameFns
-			? readonly Info<
-					FirstSib<E["args"], C, 0> extends infer S extends ColInfo
-						? S["type"]
-						: "unknown",
-					true
-				>[]
-			: E["name"] extends "if"
-				? IfSlots<E["args"], C>
-				: E["name"] extends
-							| "substr"
-							| "substring"
-							| "mid"
-							| "left"
-							| "right"
-							| "repeat"
-							| "lpad"
-							| "rpad"
-							| "insert"
-					? E["name"] extends "lpad" | "rpad"
-						? [
-								Info<"varchar", true>,
-								Info<"bigint", true>,
-								Info<"varchar", true>,
-							]
-						: E["name"] extends "insert"
-							? [
-									Info<"varchar", true>,
-									Info<"bigint", true>,
-									Info<"bigint", true>,
-									Info<"varchar", true>,
-								]
-							: [
-									Info<"varchar", true>,
-									Info<"bigint", true>,
-									Info<"bigint", true>,
-								]
-					: E["name"] extends "lag" | "lead" | "nth_value"
-						? [
-								Info<"unknown", true>,
-								Info<"bigint", false>,
-								Info<"unknown", true>,
-							]
-						: E["name"] extends
-									| "json_object"
-									| "json_array"
-									| "json_objectagg"
-									| "json_arrayagg"
-									| "json_quote"
-							? readonly Info<"unknown", true>[]
-							: E["name"] extends JsonFns
-								? [Info<"json", true>, ...Info<"unknown", true>[]]
-								: E["name"] extends TextFns
-									? readonly Info<"varchar", true>[]
-									: E["name"] extends NumFns
-										? readonly Info<"double", true>[]
-										: E["name"] extends DateFns
-											? [Info<"datetime", true>, Info<"unknown", true>]
-											: readonly Info<"unknown", true>[];
-
-type SigSlots<
-	S,
-	L extends readonly unknown[],
-	Acc extends readonly unknown[] = [],
-> = Acc["length"] extends L["length"]
-	? Acc
-	: SigSlots<S, L, [...Acc, Info<SigArgType<S, Acc["length"]>, true>]>;
+		: E["name"] extends keyof Functions
+			? Functions[E["name"]] extends { readonly args: infer A }
+				? A extends readonly unknown[]
+					? A
+					: A extends "same"
+						? readonly Info<
+								FirstSib<E["args"], C, 0> extends infer S extends ColInfo
+									? S["type"]
+									: "unknown",
+								true
+							>[]
+						: IfSlots<E["args"], C>
+				: readonly Info<"unknown", true>[]
+			: readonly Info<"unknown", true>[];
 
 export type FnArgs<
 	L extends readonly Expr[],
@@ -587,7 +389,7 @@ export type FnArgs<
 			C,
 			M | Slot<E, C, Ts[I] extends ColInfo ? Ts[I] : Info<"unknown", true>>,
 			Ts,
-			Nx<I>
+			Next<I>
 		>
 	: M;
 
@@ -612,7 +414,7 @@ type IfValueType<
 	? IfValueType<
 			L,
 			C,
-			Nx<I>,
+			Next<I>,
 			Sib<E, C> extends infer S extends ColInfo ? [...Acc, S] : Acc
 		>
 	: Common<Acc> extends infer T

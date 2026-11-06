@@ -1,47 +1,56 @@
-import { readFileSync, writeFileSync } from "node:fs";
-import { createRequire } from "node:module";
+// Writes PgFunctions, the pg_catalog functions FunctionCatalog does not type, from a
+// PostgreSQL server. usage: node tools/gen-pg-functions.ts [--check]
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import {
+	isInterfaceDeclaration,
+	isPropertySignatureDeclaration,
+} from "typescript/ast";
+import { API } from "typescript/sync";
+import { emit, withPostgres } from "./generated.ts";
 
-const require = createRequire(
-	new URL("../packages/core/package.json", import.meta.url),
+const catalog = new URL(
+	"../packages/core/src/postgres/engine/typer/catalog.ts",
+	import.meta.url,
 );
-interface PgClient {
-	connect(): Promise<void>;
-	query<R extends readonly unknown[]>(text: string): Promise<{ rows: R }>;
-	end(): Promise<void>;
-}
-const {
-	Client,
-}: { Client: new (config: { connectionString: string }) => PgClient } =
-	require("pg");
+const OUTPUT = new URL(
+	"../packages/core/src/postgres/engine/typer/pg-functions.ts",
+	import.meta.url,
+);
 
-const url = process.env.TYPESQL_PG_URL;
-if (!url) {
-	console.error(
-		"set TYPESQL_PG_URL (e.g. docker run -d -p 5432:5432 -e POSTGRES_PASSWORD=x postgres:18)",
+/** The functions FunctionCatalog types by hand. */
+function curatedFunctions(): Set<string> {
+	const api = new API();
+	const lease = api.createSourceFile(
+		fileURLToPath(catalog),
+		readFileSync(catalog, "utf8"),
 	);
-	process.exit(2);
+	try {
+		const declaration = lease.sourceFile.statements.find(
+			(s) => isInterfaceDeclaration(s) && s.name.text === "FunctionCatalog",
+		);
+		if (!declaration || !isInterfaceDeclaration(declaration))
+			throw new Error("catalog.ts declares no FunctionCatalog interface");
+		return new Set(
+			declaration.members.flatMap((member) =>
+				isPropertySignatureDeclaration(member) ? [member.name.getText()] : [],
+			),
+		);
+	} finally {
+		lease.dispose();
+		api.close();
+	}
 }
 
-const catalogSrc = readFileSync(
-	new URL(
-		"../packages/core/src/postgres/engine/typer/catalog.ts",
-		import.meta.url,
-	),
-	"utf8",
-);
-const start = catalogSrc.indexOf("export interface FunctionCatalog");
-const body = catalogSrc.slice(start, catalogSrc.indexOf("\n}\n", start));
-const curated = new Set(
-	[...body.matchAll(/(?:^|; )\s*([a-z_][a-z0-9_]*): (?:\[\s*)?E?Sig</gm)].map(
-		(m) => m[1]!,
-	),
-);
-
-const client = new Client({ connectionString: url });
-await client.connect();
-const { rows } = await client.query<
-	{ name: string; srf: boolean; kind: string; strict: boolean; ret: string }[]
->(`
+const curated = curatedFunctions();
+const rows = await withPostgres(async (client) => {
+	const result = await client.query<{
+		name: string;
+		srf: boolean;
+		kind: string;
+		strict: boolean;
+		ret: string;
+	}>(`
   WITH bad AS (
     SELECT oid FROM pg_type
      WHERE typname IN ('internal', 'cstring', 'trigger', 'event_trigger', 'language_handler', 'fdw_handler',
@@ -67,7 +76,8 @@ const { rows } = await client.query<
      AND NOT EXISTS (SELECT 1 FROM pg_conversion cv WHERE cv.conproc = p.oid)
      AND p.proname !~ '^(_|binary_upgrade_)'
    ORDER BY p.proname, p.oid`);
-await client.end();
+	return result.rows;
+});
 
 const fns = new Map<
 	string,
@@ -96,7 +106,7 @@ for (const r of rows) {
 	fns.set(r.name, f);
 }
 
-let out = `import type { Sig } from "./catalog.js";
+let out = `import type { Sig } from "../../schema/functions.js";
 
 export interface PgFunctions {
 `;
@@ -111,13 +121,8 @@ for (const [name, f] of fns) {
 	out += `  ${name}: Sig<["..."], ${JSON.stringify(ret)}${flags.length ? `, { ${flags.join("; ")} }` : ""}>;\n`;
 }
 out += "}\n";
-writeFileSync(
-	new URL(
-		"../packages/core/src/postgres/engine/typer/pg-functions.ts",
-		import.meta.url,
-	),
+emit(
+	OUTPUT,
 	out,
-);
-console.log(
-	`wrote ${fns.size} functions (${curated.size} curated in FunctionCatalog)`,
+	`${fns.size} functions, ${curated.size} curated in FunctionCatalog`,
 );

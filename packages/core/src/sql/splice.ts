@@ -1,28 +1,37 @@
-import type { Digit } from "../engine/chars.js";
-import type { Lt, Members, Tup } from "../engine/object.js";
+import type { Digit, TakeDigits } from "../engine/chars.js";
+import type { Add, Lt, ToNum, Tup } from "../engine/num.js";
 import type { SqlError } from "../errors.js";
-import type { NextOpaque } from "./named.js";
+import type { AllCode, Lexis, NextOpaque } from "./lexis.js";
 
-export type Splice<Q extends string, S> = string extends Q
+export type Splice<Q extends string, S, L extends Lexis> = string extends Q
 	? string
-	: SpliceLoop<Q, S, MaxParamStr<Q>, "">;
+	: Q extends `${string}{${string}}${string}`
+		? AllCode<Q, L> extends true
+			? SpliceCode<Q, S, MaxParamStr<Q, L>, "", L> extends infer R
+				? R extends [infer T extends string, number]
+					? T
+					: R
+				: never
+			: SpliceLoop<Q, S, MaxParamStr<Q, L>, "", L>
+		: Q;
 
 type SpliceLoop<
 	Q extends string,
 	S,
 	Off extends number,
 	Acc extends string,
+	L extends Lexis,
 > = Q extends `${string}{${string}}${string}`
-	? NextOpaque<Q> extends [
+	? NextOpaque<Q, L> extends [
 			infer Code extends string,
 			infer Seg extends string,
 			infer After extends string,
 		]
-		? SpliceCode<Code, S, Off, ""> extends infer R
+		? SpliceCode<Code, S, Off, "", L> extends infer R
 			? R extends [infer T extends string, infer NewOff extends number]
 				? Seg extends ""
 					? `${Acc}${T}`
-					: SpliceLoop<After, S, NewOff, `${Acc}${T}${Seg}`>
+					: SpliceLoop<After, S, NewOff, `${Acc}${T}${Seg}`, L>
 				: R
 			: never
 		: never
@@ -33,40 +42,54 @@ type SpliceCode<
 	S,
 	Off extends number,
 	Acc extends string,
+	L extends Lexis,
 > = Q extends `${infer Pre}{${infer Name}}${infer Post}`
 	? IsSlotName<Name> extends true
 		? Name extends keyof S
 			? S[Name] extends { readonly text: infer FT extends string }
 				? string extends FT
 					? string
-					: Renumber<FT, Off, ""> extends [
+					: Renumber<FT, Off, "", L> extends [
 								infer NT extends string,
 								infer NewOff extends number,
 							]
-						? SpliceCode<Post, S, NewOff, `${Acc}${Pre}${NT}`>
+						? SpliceCode<Post, S, NewOff, `${Acc}${Pre}${NT}`, L>
 						: never
 				: string
 			: SqlError<`unknown fragment slot {${Name}}`, null>
-		: SpliceCode<Post, S, Off, `${Acc}${Pre}{${Name}}`>
+		: SpliceCode<Post, S, Off, `${Acc}${Pre}{${Name}}`, L>
 	: [`${Acc}${Q}`, Off];
 
-/** The SQL outside strings, quoted identifiers, comments and dollar quotes. */
+/** The SQL outside strings, quoted identifiers, comments and dollar quotes, where it has slots. */
+type CodeOf<
+	Q extends string,
+	L extends Lexis,
+> = Q extends `${string}{${string}}${string}`
+	? AllCode<Q, L> extends true
+		? Q
+		: CodeOnly<Q, L>
+	: "";
 type CodeOnly<
 	Q extends string,
+	L extends Lexis,
 	Acc extends string = "",
 > = Q extends `${string}{${string}}${string}`
-	? NextOpaque<Q> extends [
+	? NextOpaque<Q, L> extends [
 			infer Code extends string,
 			infer Seg extends string,
 			infer After extends string,
 		]
 		? Seg extends ""
 			? `${Acc}${Code}`
-			: CodeOnly<After, `${Acc}${Code} `>
+			: CodeOnly<After, L, `${Acc}${Code} `>
 		: never
 	: Acc;
 
-export type SpliceCarried<Q extends string, C> = CarriedIn<CodeOnly<Q>, C, []>;
+export type SpliceCarried<Q extends string, C, L extends Lexis> = CarriedIn<
+	CodeOf<Q, L>,
+	C,
+	[]
+>;
 type CarriedIn<
 	Q extends string,
 	C,
@@ -81,13 +104,16 @@ type CarriedIn<
 		: CarriedIn<Post, C, Acc>
 	: Acc;
 
-/** Only the internal slots that interpolated fragments become; any other `{…}` is SQL text. */
-type IsSlotName<N extends string> = N extends `__typesql_inline${number}`
-	? true
-	: false;
+export type InlineName<N extends number | string> = `__typesql_inline${N}`;
 
-export type SlotNames<Q extends string> = SlotNamesIn<CodeOnly<Q>>;
-type SlotNamesIn<Q extends string> =
+/** Only the internal slots that interpolated fragments become; any other `{…}` is SQL text. */
+type IsSlotName<N extends string> = N extends InlineName<number> ? true : false;
+
+export type SlotNames<Q extends string, L extends Lexis> = SlotNamesIn<
+	CodeOf<Q, L>
+>;
+/** The internal slots in `Q`, quoted or not. */
+export type SlotNamesIn<Q extends string> =
 	Q extends `${string}{${infer Name}}${infer Post}`
 		? IsSlotName<Name> extends true
 			? Name | SlotNamesIn<Post>
@@ -98,20 +124,31 @@ type Renumber<
 	T extends string,
 	Off extends number,
 	Acc extends string,
+	L extends Lexis,
 > = T extends `${string}$${string}`
 	? Off extends 0
 		? T extends `${string}$0${string}`
-			? RenumberLoop<T, Off, Off, Acc>
-			: [`${Acc}${T}`, MaxParamStr<T>]
-		: RenumberLoop<T, Off, Off, Acc>
+			? RenumberAll<T, Off, Acc, L>
+			: [`${Acc}${T}`, MaxParamStr<T, L>]
+		: RenumberAll<T, Off, Acc, L>
 	: [`${Acc}${T}`, Off];
+type RenumberAll<
+	T extends string,
+	Off extends number,
+	Acc extends string,
+	L extends Lexis,
+> =
+	AllCode<T, L> extends true
+		? RenumberCode<T, Off, Off, Acc>
+		: RenumberLoop<T, Off, Off, Acc, L>;
 type RenumberLoop<
 	T extends string,
 	Off extends number,
 	Max extends number,
 	Acc extends string,
+	L extends Lexis,
 > =
-	NextOpaque<T> extends [
+	NextOpaque<T, L> extends [
 		infer Code extends string,
 		infer Seg extends string,
 		infer After extends string,
@@ -122,7 +159,7 @@ type RenumberLoop<
 			]
 			? Seg extends ""
 				? [`${Acc}${C}`, M]
-				: RenumberLoop<After, Off, M, `${Acc}${C}${Seg}`>
+				: RenumberLoop<After, Off, M, `${Acc}${C}${Seg}`, L>
 			: never
 		: never;
 type RenumberCode<
@@ -145,22 +182,16 @@ type RenumberCode<
 		: RenumberCode<Rest, Off, Max, `${Acc}${Pre}$`>
 	: [`${Acc}${T}`, Max];
 
-type TakeDigits<
-	S extends string,
-	Acc extends string,
-> = S extends `${infer C extends Digit}${infer R}`
-	? TakeDigits<R, `${Acc}${C}`>
-	: [Acc, S];
-type ToNum<S extends string> = S extends `${infer N extends number}`
-	? N
-	: never;
-
 export type MaxParamStr<
 	T extends string,
-	Max extends number = 0,
-> = T extends `${string}$${string}` ? MaxLoop<T, Max> : Max;
-type MaxLoop<T extends string, Max extends number> =
-	NextOpaque<T> extends [
+	L extends Lexis,
+> = T extends `${string}$${string}`
+	? AllCode<T, L> extends true
+		? MaxIn<T, 0>
+		: MaxLoop<T, 0, L>
+	: 0;
+type MaxLoop<T extends string, Max extends number, L extends Lexis> =
+	NextOpaque<T, L> extends [
 		infer Code extends string,
 		infer Seg extends string,
 		infer After extends string,
@@ -168,7 +199,7 @@ type MaxLoop<T extends string, Max extends number> =
 		? MaxIn<Code, Max> extends infer M extends number
 			? Seg extends ""
 				? M
-				: MaxLoop<After, M>
+				: MaxLoop<After, M, L>
 			: never
 		: never;
 type MaxIn<
@@ -182,16 +213,7 @@ type MaxIn<
 		: MaxIn<Rest, Max>
 	: Max;
 
-type Add<A extends number, B extends number> = [
-	...Tup<A>,
-	...Tup<B>,
-]["length"] &
-	number;
-
-export type UnknownTuple<
-	N extends number,
-	Acc extends unknown[] = [],
-> = Acc["length"] extends N ? Acc : UnknownTuple<N, [...Acc, unknown]>;
+export type UnknownTuple<N extends number> = Tup<N, unknown>;
 
 export type Take<
 	T extends readonly unknown[],
@@ -205,7 +227,7 @@ export type Take<
 
 export type QuotedIdent<
 	Parts extends readonly string[],
-	Q extends string = '"',
+	Q extends string,
 > = Parts extends readonly [infer P extends string]
 	? `${Q}${Dq<P, Q>}${Q}`
 	: Parts extends readonly [
@@ -219,11 +241,10 @@ type Dq<
 	Q extends string,
 > = S extends `${infer A}${Q}${infer B}` ? `${A}${Q}${Q}${Dq<B, Q>}` : S;
 
-export type UnionList<U> = Members<U>;
-
 export type JoinedText<
 	Items extends readonly { readonly text: string }[],
 	Sep extends string,
+	L extends Lexis,
 	Off extends number = 0,
 	Acc extends string = "",
 	First extends boolean = true,
@@ -234,13 +255,14 @@ export type JoinedText<
 	? H extends { readonly text: infer FT extends string }
 		? string extends FT
 			? string
-			: Renumber<FT, Off, ""> extends [
+			: Renumber<FT, Off, "", L> extends [
 						infer NT extends string,
 						infer NewOff extends number,
 					]
 				? JoinedText<
 						R,
 						Sep,
+						L,
 						NewOff,
 						First extends true ? NT : `${Acc}${Sep}${NT}`,
 						false

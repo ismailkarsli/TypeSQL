@@ -1,0 +1,77 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`sqlite-insert-column-order > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "AddedParams": "[unknown, unknown, unknown]",
+      "AppendedParams": "[number | bigint, string, null | string, null | string]",
+      "ListedParams": "[null | string, number | bigint, string]",
+      "PlacedParams": "[number | bigint, string, null | string]",
+      "RowsParams": "[unknown, unknown, unknown, unknown]",
+      "UnorderedParams": "[unknown, unknown]",
+      "items": "({ name: string; note: null | string; sku: number; tag: null | string })[]",
+      "placed": "({ name: string; note: null | string; sku: number; tag: null | string })[]",
+    },
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "{
+  items: [
+    [Object: null prototype] {
+      sku: 1,
+      name: 'Ada',
+      note: null,
+      tag: null
+    },
+    [Object: null prototype] {
+      sku: 2,
+      name: 'Grace',
+      note: 'SQL',
+      tag: null
+    },
+    [Object: null prototype] {
+      sku: 3,
+      name: 'Lin',
+      note: null,
+      tag: null
+    },
+    [Object: null prototype] {
+      sku: 4,
+      name: 'Ken',
+      note: null,
+      tag: null
+    },
+    [Object: null prototype] {
+      sku: 5,
+      name: 'Edsger',
+      note: null,
+      tag: 'new'
+    }
+  ],
+  placed: [
+    [Object: null prototype] {
+      sku: 1,
+      name: 'Ada',
+      note: null,
+      tag: null
+    },
+    [Object: null prototype] {
+      sku: 2,
+      name: 'Grace',
+      note: 'SQL',
+      tag: 'new'
+    }
+  ]
+}
+",
+  },
+}
+`;

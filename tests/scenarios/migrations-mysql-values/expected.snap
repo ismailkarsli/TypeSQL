@@ -1,0 +1,25 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`migrations-mysql-values > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "rows": "({ data: unknown; id: number })[]",
+    },
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "migrator: typesql: migration 1 (001-settings) failed: cannot bind [object Object] as a MySQL value; use sql.json() for JSON; MySQL commits implicitly before and after each DDL statement, so its statements up to its last DDL statement stay applied and only the ones after it were rolled back
+adapter: typesql: cannot bind [object Object] as a MySQL value; use sql.json() for JSON
+[]
+",
+  },
+}
+`;

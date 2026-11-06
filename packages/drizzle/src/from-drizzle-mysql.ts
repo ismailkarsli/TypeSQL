@@ -4,12 +4,11 @@ import type {
 	ColumnKey,
 	ColumnLike,
 	DbDefault,
-	Flat,
-	FromDrizzleOptions,
-	TableLike,
+	IsAutoIncrement,
+	IsGenerated,
+	Nullable,
 	ViewKey,
-	ViewLike,
-} from "./from-drizzle.js";
+} from "./column.js";
 
 // Drizzle's types don't record `unsigned` or the text size (`tinytext`,
 // `mediumtext`, `longtext`); pin those columns with `mysqlType`.
@@ -74,75 +73,22 @@ type MysqlTypeOf<D extends ColumnConfig> = D extends {
 						? Typed<"json", D["data"]>
 						: "unknown";
 
-type IsGenerated<D> = D extends {
-	readonly generated: { readonly type: string };
-}
-	? true
-	: false;
-
-type IsAutoIncrement<D> = D extends { readonly isAutoincrement: true }
-	? true
-	: false;
-
-type ColOf<D extends ColumnConfig> = Col<
-	MysqlTypeOf<D>,
-	{
-		nullable: D["notNull"] extends true ? false : true;
-		hasDefault: DbDefault<D>;
-		autoIncrement: IsAutoIncrement<D>;
-		generated: IsGenerated<D>;
-	}
->;
-
-type Columns<C, Opts> = {
+export type MysqlColumns<C, Opts> = {
 	-readonly [K in keyof C as ColumnKey<C, K, Opts>]: C[K] extends ColumnLike
-		? ColOf<C[K]["_"]>
+		? Col<
+				MysqlTypeOf<C[K]["_"]>,
+				{
+					nullable: Nullable<C[K]["_"]>;
+					hasDefault: DbDefault<C[K]["_"]>;
+					autoIncrement: IsAutoIncrement<C[K]["_"]>;
+					generated: IsGenerated<C[K]["_"]>;
+				}
+			>
 		: never;
 };
 
-type ViewColumns<F, Opts> = {
+export type MysqlViewColumns<F, Opts> = {
 	-readonly [K in keyof F as ViewKey<F, K, Opts>]: F[K] extends ColumnLike
-		? Col<
-				MysqlTypeOf<F[K]["_"]>,
-				{ nullable: F[K]["_"]["notNull"] extends true ? false : true }
-			>
+		? Col<MysqlTypeOf<F[K]["_"]>, { nullable: Nullable<F[K]["_"]> }>
 		: Col<"unknown", { nullable: true }>;
 };
-
-type Relation<X, Opts> = X extends TableLike
-	? Columns<X["_"]["columns"], Opts>
-	: X extends ViewLike
-		? { readonly $view: ViewColumns<X["_"]["selectedFields"], Opts> }
-		: never;
-
-// Tables of a `mysqlSchema()` live in another database: `db.table`.
-type SchemaOf<X> = X extends TableLike
-	? Exclude<X["_"]["schema"], undefined>
-	: never;
-type NameIn<X, N> = X extends TableLike
-	? X["_"]["schema"] extends N
-		? X["_"]["name"]
-		: never
-	: never;
-type TopName<X> = X extends TableLike
-	? [SchemaOf<X>] extends [never]
-		? X["_"]["name"]
-		: never
-	: X extends ViewLike
-		? X["_"]["name"]
-		: never;
-
-type Build<S, Opts> = {
-	-readonly [K in keyof S as TopName<S[K]>]: Relation<S[K], Opts>;
-} & {
-	[N in { [K in keyof S]: SchemaOf<S[K]> }[keyof S]]: {
-		-readonly [K in keyof S as NameIn<S[K], N>]: Relation<S[K], Opts>;
-	};
-};
-
-export type FromDrizzleMysql<
-	Schema,
-	Opts extends FromDrizzleOptions = {},
-> = Schema extends TableLike | ViewLike
-	? Flat<Build<{ [K in Schema["_"]["name"]]: Schema }, Opts>>
-	: Flat<Build<Schema, Opts>>;

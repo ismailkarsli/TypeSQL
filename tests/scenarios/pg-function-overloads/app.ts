@@ -41,8 +41,8 @@ export const parameterized = await sql(
 	1,
 	"i",
 ).execute();
-// Long predicates exercise structural traversal both without calls and with
-// a call nested at the bottom of the arithmetic expression.
+// Long arithmetic predicates, with and without a function call at their
+// innermost operand, still type-check.
 export const predicates = await sql(`
  SELECT id FROM items
  WHERE id + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1

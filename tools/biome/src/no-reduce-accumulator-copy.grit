@@ -1,0 +1,429 @@
+engine biome(1.0)
+language js(typescript)
+
+#include wrapped
+
+pattern wrapped_call() { wrapped(JsCallExpression(), wrapped_call()) }
+
+pattern wrapped_member() {
+	wrapped(or {
+		JsStaticMemberExpression(),
+		JsComputedMemberExpression()
+	}, wrapped_member())
+}
+
+pattern member_call($object, $name) {
+	JsCallExpression(callee=$callee) where {
+		$callee <: wrapped_member(),
+		$callee <: contains or {
+			JsStaticMemberExpression(),
+			JsComputedMemberExpression()
+		} as $member,
+		$member <: or {
+			JsStaticMemberExpression(object=$object, member=$name),
+			JsComputedMemberExpression(object=$object, member=JsStringLiteralExpression() as $literal) where {
+				$literal <: r"^[\"'](.*)[\"']$"($name)
+			}
+		}
+	}
+}
+
+pattern var_boundary() {
+	or {
+		JsParameters(),
+		JsConstructorParameters(),
+		JsFunctionBody(),
+		JsFunctionExpression(),
+		JsArrowFunctionExpression(),
+		JsSetterClassMember(),
+		JsSetterObjectMember(),
+		JsStaticInitializationBlockClassMember()
+	}
+}
+
+pattern lexical_boundary() {
+	or {
+		var_boundary(),
+		JsBlockStatement(),
+		JsSwitchStatement(),
+		JsForStatement(),
+		JsForInStatement(),
+		JsForOfStatement(),
+		JsCatchClause(),
+		JsClassExpression()
+	}
+}
+
+pattern lexical_has($target) { contains $target until lexical_boundary() }
+
+pattern hoisted_has($target) {
+	or {
+		lexical_has($target),
+		contains or {
+			JsVariableDeclaration(),
+			JsForVariableDeclaration()
+		} as $declaration where {
+			$declaration <: r"(?s)var\b.*",
+			$declaration <: lexical_has($target)
+		} until var_boundary()
+	}
+}
+
+pattern scope_has($target) {
+	or {
+		or {
+			JsModule(items=$region),
+			JsScript(statements=$region),
+			JsStaticInitializationBlockClassMember(statements=$region)
+		} where { $region <: hoisted_has($target) },
+		or {
+			JsBlockStatement(statements=$region),
+			JsSwitchStatement(cases=$region),
+			JsForStatement(initializer=$region),
+			JsForInStatement(initializer=$region),
+			JsForOfStatement(initializer=$region),
+			JsCatchClause(declaration=$region)
+		} where { $region <: lexical_has($target) },
+		or {
+			JsFunctionExpression(id=$region),
+			JsClassExpression(id=$region)
+		} where { $region <: $target },
+		or {
+			JsFunctionDeclaration(parameters=JsParameters(items=$parameters), body=JsFunctionBody(statements=$statements)),
+			JsFunctionExportDefaultDeclaration(parameters=JsParameters(items=$parameters), body=JsFunctionBody(statements=$statements)),
+			JsFunctionExpression(parameters=JsParameters(items=$parameters), body=JsFunctionBody(statements=$statements)),
+			JsArrowFunctionExpression(parameters=or {
+				JsParameters(items=$parameters),
+				$parameters
+			}, body=or {
+				JsFunctionBody(statements=$statements),
+				$statements
+			}),
+			JsMethodClassMember(parameters=JsParameters(items=$parameters), body=JsFunctionBody(statements=$statements)),
+			JsMethodObjectMember(parameters=JsParameters(items=$parameters), body=JsFunctionBody(statements=$statements)),
+			JsConstructorClassMember(parameters=JsConstructorParameters(parameters=$parameters), body=JsFunctionBody(statements=$statements)),
+			JsSetterClassMember(parameter=$parameters, body=JsFunctionBody(statements=$statements)),
+			JsSetterObjectMember(parameter=$parameters, body=JsFunctionBody(statements=$statements))
+		} where {
+			or {
+				$parameters <: lexical_has($target),
+				$statements <: hoisted_has($target)
+			}
+		},
+		or {
+			JsGetterClassMember(body=JsFunctionBody(statements=$statements)),
+			JsGetterObjectMember(body=JsFunctionBody(statements=$statements))
+		} where { $statements <: hoisted_has($target) }
+	}
+}
+
+pattern named($name) {
+	JsIdentifierBinding() as $binding where { $binding <: $name }
+}
+
+pattern write_to($name, $scope) {
+	JsIdentifierAssignment() as $write where {
+		$write <: $name,
+		$write <: within scope_has(named($name)) as $owner,
+		$owner <: $scope
+	}
+}
+
+pattern wrapped_identifier() {
+	wrapped(JsIdentifierExpression(), wrapped_identifier())
+}
+
+pattern unwrapped_identifier($target) {
+	wrapped_identifier() as $expression where {
+		$expression <: contains JsIdentifierExpression() as $identifier,
+		$identifier <: $target
+	}
+}
+
+#include function_like
+
+pattern wrapped_object() { wrapped(JsObjectExpression(), wrapped_object()) }
+
+pattern wrapped_function() {
+	wrapped(or {
+		JsArrowFunctionExpression(),
+		JsFunctionExpression()
+	}, wrapped_function())
+}
+
+pattern global($global) {
+	JsIdentifierExpression(name=$name) as $reference where {
+		$name <: $global,
+		$reference <: not within scope_has(named($name))
+	}
+}
+
+pattern accumulator_0($callback, $accumulator, $seen) {
+	JsIdentifierExpression(name=$name) as $reference where {
+		$name <: $accumulator,
+		$reference <: within scope_has(named($name)) as $scope,
+		$scope <: $callback
+	}
+}
+
+pattern accumulator_alias($seen, $declarator, $init) {
+	JsIdentifierExpression(name=$name) as $reference where {
+		$reference <: within scope_has(named($name)) as $scope,
+		$scope <: scope_has( JsVariableDeclarator(id=named($name)) as $declarator where {
+			$declarator <: not $seen,
+			$declarator <: within JsVariableDeclaration() as $statement,
+			$statement <: r"(?s)const\b.*",
+			$declarator <: JsVariableDeclarator(initializer=JsInitializerClause(expression=$init))
+		}),
+		$scope <: not contains write_to($name, $scope)
+	}
+}
+
+pattern accumulator_via($callback, $accumulator, $seen, $declarator, $previous) {
+	or {
+		accumulator_0($callback, $accumulator, $seen),
+		accumulator_alias($seen, $declarator, unwrapped_identifier($previous))
+	}
+}
+
+#repeat 1..16
+pattern accumulator_{{n}}($callback, $accumulator, $seen) {
+	accumulator_via($callback, $accumulator, $seen, $declarator, accumulator_{{n-1}}($callback, $accumulator, or {
+		$seen,
+		$declarator
+	}))
+}
+#end
+
+pattern copy_method_name() {
+	or {
+		"assign",
+		"from",
+		"concat",
+		"slice",
+		"toSpliced",
+		"toSorted",
+		"toReversed",
+		"with"
+	}
+}
+
+pattern array_method_name() {
+	or {
+		"map",
+		"filter",
+		"flatMap",
+		"slice",
+		"concat",
+		"toSorted",
+		"toReversed",
+		"toSpliced"
+	}
+}
+
+pattern array_annotation() {
+	or {
+		TsArrayType(),
+		TsTupleType(),
+		TsParenthesizedType(ty=array_annotation()),
+		TsTypeOperatorType(ty=array_annotation()) as $operator where {
+			$operator <: r"(?s)readonly\b.*"
+		},
+		TsReferenceType(name=or {
+			"Array",
+			"ReadonlyArray"
+		})
+	}
+}
+
+pattern annotated($name, $type) {
+	or {
+		JsFormalParameter(binding=named($name), type_annotation=TsTypeAnnotation(ty=$type)),
+		JsVariableDeclarator(id=named($name), variable_annotation=or {
+			TsTypeAnnotation(ty=$type),
+			TsDefiniteVariableAnnotation(type_annotation=TsTypeAnnotation(ty=$type))
+		}),
+		JsCatchDeclaration(binding=named($name), type_annotation=TsTypeAnnotation(ty=$type))
+	}
+}
+
+pattern array_method_callee() {
+	wrapped(or {
+		JsStaticMemberExpression(object=array_chain(), member=array_method_name()),
+		JsComputedMemberExpression(object=array_chain(), member=JsStringLiteralExpression() as $literal) where {
+			$literal <: r"^[\"'](.*)[\"']$"($text),
+			$text <: array_method_name()
+		}
+	}, array_method_callee())
+}
+
+pattern array_chain() {
+	wrapped(or {
+		JsArrayExpression(),
+		JsIdentifierExpression(),
+		JsCallExpression(callee=array_method_callee())
+	}, array_chain())
+}
+
+pattern array_identifier($seen, $declarator, $init) {
+	JsIdentifierExpression(name=$name) as $reference where {
+		$reference <: within scope_has(named($name)) as $scope,
+		or {
+			and {
+				$scope <: scope_has(annotated($name, array_annotation())),
+				$scope <: not scope_has(annotated($name, not array_annotation()))
+			},
+			and {
+				$scope <: not scope_has(annotated($name, $_)),
+				$scope <: scope_has( JsVariableDeclarator(id=named($name)) as $declarator where {
+					$declarator <: not $seen,
+					$declarator <: within JsVariableDeclaration() as $statement,
+					$statement <: r"(?s)const\b.*",
+					$declarator <: JsVariableDeclarator(initializer=JsInitializerClause(expression=$init))
+				})
+			}
+		},
+		$scope <: not contains write_to($name, $scope)
+	}
+}
+
+pattern known_array_0($seen) {
+	array_chain() as $expression where {
+		$expression <: contains or {
+			JsArrayExpression(),
+			JsIdentifierExpression()
+		} as $base,
+		$base <: JsArrayExpression()
+	}
+}
+
+pattern known_array_via($seen, $declarator, $previous) {
+	array_chain() as $expression where {
+		$expression <: contains or {
+			JsArrayExpression(),
+			JsIdentifierExpression()
+		} as $base,
+		$base <: or {
+			JsArrayExpression(),
+			array_identifier($seen, $declarator, $previous)
+		}
+	}
+}
+
+#repeat 1..15
+pattern known_array_{{n}}($seen) {
+	known_array_via($seen, $declarator, known_array_{{n-1}}(or {
+		$seen,
+		$declarator
+	}))
+}
+#end
+
+pattern known_array_16($seen) {
+	known_array_via($seen, $declarator, known_array_15(or {
+		$seen,
+		$declarator
+	}))
+}
+
+or {
+	JsCallExpression(callee=or {
+		JsStaticMemberExpression(member=or {
+			"map",
+			"filter"
+		}),
+		JsComputedMemberExpression(),
+		JsParenthesizedExpression(),
+		TsAsExpression(),
+		TsTypeAssertionExpression(),
+		TsNonNullAssertionExpression(),
+		TsSatisfiesExpression()
+	}) as $chain where {
+		$chain <: member_call($inner, $outer),
+		$outer <: or {
+			"map",
+			"filter"
+		},
+		$inner <: wrapped_call(),
+		$inner <: contains JsCallExpression() as $call,
+		$call <: member_call($receiver, $first),
+		or {
+			and { $outer <: "map", $first <: "filter" },
+			and { $outer <: "filter", $first <: "map" }
+		},
+		$receiver <: known_array_16(JsDebuggerStatement()),
+		register_diagnostic(span=$chain, message="Avoid consecutive array filter/map passes. Use flatMap or a loop, preserving callback order, indexes, and filtering semantics. Explicit lazy iterator pipelines are allowed.", severity="error")
+	},
+	JsCallExpression(callee=or {
+		JsStaticMemberExpression(member=copy_method_name()),
+		JsComputedMemberExpression(),
+		JsParenthesizedExpression(),
+		TsAsExpression(),
+		TsTypeAssertionExpression(),
+		TsNonNullAssertionExpression(),
+		TsSatisfiesExpression()
+	}) as $copy where {
+		$copy <: member_call($owner, $method),
+		$method <: copy_method_name(),
+		$copy <: within function_like() as $callback,
+		$callback <: or {
+			JsArrowFunctionExpression(parameters=JsParameters(items=[
+				JsFormalParameter(binding=JsIdentifierBinding() as $accumulator),
+
+				...
+			])),
+			JsArrowFunctionExpression(parameters=JsIdentifierBinding() as $accumulator),
+			JsFunctionExpression(parameters=JsParameters(items=[
+				JsFormalParameter(binding=JsIdentifierBinding() as $accumulator),
+
+				...
+			]))
+		},
+		$callback <: within JsCallExpression() as $reducer,
+		$reducer <: member_call($_, or {
+			"reduce",
+			"reduceRight"
+		}),
+		$reducer <: JsCallExpression(arguments=JsCallArguments(args=or {
+			[$first],
+			[$first, $initial]
+		})),
+		$first <: wrapped_function(),
+		$first <: contains or {
+			JsArrowFunctionExpression(),
+			JsFunctionExpression()
+		} as $function,
+		$function <: $callback,
+		$copy <: JsCallExpression(arguments=JsCallArguments(args=$arguments)),
+		or {
+			and {
+				$method <: "assign",
+				$owner <: unwrapped_identifier(global("Object")),
+				$arguments <: [wrapped_object(), ...],
+				$arguments <: some unwrapped_identifier(accumulator_16($callback, $accumulator, JsDebuggerStatement()))
+			},
+			and {
+				$method <: "from",
+				$owner <: unwrapped_identifier(global("Array")),
+				$arguments <: [
+					unwrapped_identifier(accumulator_16($callback, $accumulator, JsDebuggerStatement())),
+
+					...
+				]
+			},
+			and {
+				$method <: or {
+					"concat",
+					"slice",
+					"toSpliced",
+					"toSorted",
+					"toReversed",
+					"with"
+				},
+				$owner <: unwrapped_identifier(accumulator_16($callback, $accumulator, JsDebuggerStatement())),
+				$initial <: known_array_16(JsDebuggerStatement())
+			}
+		},
+		register_diagnostic(span=$copy, message="Do not copy the reducer accumulator on every iteration; growing copies can cause quadratic work. Mutate a fresh, locally owned accumulator and return it, or use an iterator pipeline or flatMap.", severity="error")
+	}
+}

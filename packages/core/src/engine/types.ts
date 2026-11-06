@@ -1,4 +1,4 @@
-import type { Next } from "../sql/next.js";
+import type { Next } from "./next.js";
 export type ColInfo = { readonly type: string; readonly nullable: boolean };
 
 export type ColMap = { readonly [name: string]: ColInfo };
@@ -16,25 +16,9 @@ export type ScopeItem = {
 export type ScopeLevel = readonly ScopeItem[];
 export type Scope = readonly ScopeLevel[];
 
-export type CteMap = { readonly [name: string]: ColMap };
-
-export type Ctx = {
-	readonly db: unknown;
-	readonly scope: Scope;
-	readonly ctes: CteMap;
-	readonly grouped: boolean;
-};
-
-export type Info<T extends string, N extends boolean = false> = {
+export type Info<T, N = false> = {
 	readonly type: T;
 	readonly nullable: N;
-};
-
-export type NullableMap<M extends ColMap> = {
-	readonly [K in keyof M]: {
-		readonly type: M[K]["type"];
-		readonly nullable: true;
-	};
 };
 
 export type ColsToMap<C extends Cols> = C extends readonly [
@@ -96,28 +80,3 @@ type SlowMap<C extends Cols, Acc> = C extends readonly [
 				>
 			: never
 	: { readonly [K in keyof Acc]: Acc[K] };
-
-export type Simplify<T> = { [K in keyof T]: T[K] } & {};
-
-export type MkCtx<
-	DB,
-	S extends Scope,
-	Ctes extends CteMap,
-	G extends boolean,
-> = {
-	readonly db: DB;
-	readonly scope: S;
-	readonly ctes: Ctes;
-	readonly grouped: G;
-};
-
-/** The environment shared by query binding, projection and parameter inference. */
-export type QueryContext<
-	DB = unknown,
-	S extends Scope = Scope,
-	Ctes = CteMap,
-> = {
-	readonly db: DB;
-	readonly scope: S;
-	readonly ctes: Ctes;
-};

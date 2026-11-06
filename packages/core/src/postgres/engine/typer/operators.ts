@@ -1,53 +1,47 @@
+import type { Or } from "../../../engine/object.js";
 import type { ColInfo, Info } from "../../../engine/types.js";
+import type { SqlError } from "../../../errors.js";
+import type {
+	BitT,
+	FloatT,
+	IntT,
+	JsonT,
+	NumT,
+	RangeT,
+	StrT,
+	TimeT,
+	TsT,
+	TypeFact,
+} from "../../schema/type-facts.js";
 import type { LitCommon } from "../json.js";
-import type { ArrInfo, BaseOf, ElemNull, ShapedCommon } from "../shape.js";
+import type {
+	ArithOp,
+	CompareOp,
+	JsonGetOp,
+	JsonTextOp,
+	MatchOp,
+} from "../ops.js";
+import type {
+	ArrInfo,
+	BaseOf,
+	ElemNull,
+	LitToText,
+	ShapedCommon,
+	TypeDisplay,
+} from "../shape.js";
 
-export type IntT = "int2" | "int4" | "int8";
-type FloatT = "float4" | "float8";
-export type NumT = IntT | FloatT | "numeric";
-export type StrT = "text" | "varchar" | "bpchar" | "char" | "name" | "citext";
-export type JsonT = "json" | "jsonb";
-type TsT = "timestamp" | "timestamptz";
-type TimeT = "time" | "timetz";
-export type DateTimeT = "date" | TimeT | TsT;
-type BitT = "bit" | "varbit";
-export type RangeT = `${string}range`;
 type UnknownT = "unknown" | "null";
 
-/**
- * Categories that never share a common type with another category, so CASE,
- * COALESCE, GREATEST and LEAST over two of them fail in PostgreSQL. Other types
- * (oid and reg*, domains, enums, arrays, …) may convert, so they never count.
- */
-type MatchCategory<T> = T extends NumT
-	? "numeric"
-	: T extends StrT
-		? "string"
-		: T extends "bool"
-			? "boolean"
-			: T extends DateTimeT
-				? "datetime"
-				: T extends "interval"
-					? "timespan"
-					: T extends "bytea" | "uuid"
-						? T
-						: null;
+/** Two types of different categories, which no operator compares. */
 export type Unmatchable<A extends string, B extends string> =
-	MatchCategory<A> extends infer CA extends string
-		? MatchCategory<B> extends infer CB extends string
+	TypeFact<A, "cat"> extends infer CA extends string
+		? TypeFact<B, "cat"> extends infer CB extends string
 			? CA extends CB
 				? false
 				: true
 			: false
 		: false;
 type LitT = "lit";
-export type LitToText<T extends string> = T extends LitT ? "text" : T;
-
-export type Or<A extends boolean, B extends boolean> = A extends true
-	? true
-	: B extends true
-		? true
-		: false;
 
 type NumPromote<L extends string, R extends string> = "float8" extends L | R
 	? "float8"
@@ -64,16 +58,6 @@ type NumPromote<L extends string, R extends string> = "float8" extends L | R
 				: "int4" extends L | R
 					? "int4"
 					: "int2";
-
-type NumCommon<L extends string, R extends string> = "float8" extends L | R
-	? "float8"
-	: "float4" extends L | R
-		? "float4"
-		: "numeric" extends L | R
-			? "numeric"
-			: "int8" extends L | R
-				? "int8"
-				: "int4";
 
 type Norm<A extends string> = A extends "null" | LitT ? "unknown" : A;
 
@@ -112,7 +96,7 @@ type BinOpNullable<
 	Op extends string,
 	L extends ColInfo,
 	R extends ColInfo,
-> = Op extends "->" | "->>" | "#>" | "#>>"
+> = Op extends JsonGetOp | JsonTextOp
 	? true
 	: Op extends "@@"
 		? L["type"] extends "jsonb"
@@ -124,21 +108,21 @@ type BinOpResult<
 	Op extends string,
 	L extends string,
 	R extends string,
-> = Op extends "=" | "<" | ">" | "<=" | ">=" | "<>" | "!="
+> = Op extends CompareOp
 	? "bool"
 	: Op extends "and" | "or"
 		? "bool"
-		: Op extends "~" | "~*" | "!~" | "!~*" | "~~" | "~~*" | "!~~" | "!~~*"
+		: Op extends MatchOp
 			? "bool"
-			: Op extends "+" | "-" | "*" | "/" | "%"
+			: Op extends ArithOp
 				? Arith<Op, L, R>
 				: Op extends "||"
 					? Concat<L, R>
-					: Op extends "->" | "#>"
+					: Op extends JsonGetOp
 						? L extends JsonT
 							? BaseOf<L>
 							: "unknown"
-						: Op extends "->>" | "#>>"
+						: Op extends JsonTextOp
 							? "text"
 							: Op extends "#-"
 								? "jsonb"
@@ -531,7 +515,12 @@ export type UnOpType<Op extends string, E extends ColInfo> = Op extends "not"
 									? Info<"bool", E["nullable"]>
 									: Info<"unknown", true>;
 
-export type CommonLit<A extends string, B extends string> = A extends B
+/**
+ * PostgreSQL's select_common_type for two types: a literal or NULL takes the
+ * other's type; otherwise the first type is kept when the second converts to
+ * it, and the second taken when only the first converts (TypeFact "from").
+ */
+type CommonLit<A extends string, B extends string> = A extends B
 	? ShapedCommon<A, B>
 	: A extends UnknownT
 		? B
@@ -541,227 +530,47 @@ export type CommonLit<A extends string, B extends string> = A extends B
 				? LitCommon<A, B>
 				: B extends LitT
 					? LitCommon<B, A>
-					: A extends NumT
-						? B extends NumT
-							? NumCommon<A, B>
-							: "unknown"
-						: A extends StrT
-							? B extends StrT
-								? StrCommon<A, B>
-								: "unknown"
-							: A extends BitT
-								? B extends BitT
-									? A
+					: B extends TypeFact<A, "from", never>
+						? A
+						: A extends TypeFact<B, "from", never>
+							? B
+							: A extends `${infer AE}[]`
+								? B extends `${infer BE}[]`
+									? CommonLit<AE, BE> extends infer E extends string
+										? E extends "unknown"
+											? "unknown"
+											: `${LitToText<E>}[]`
+										: never
 									: "unknown"
-								: A extends "timestamptz"
-									? B extends TsT | "date"
-										? "timestamptz"
-										: "unknown"
-									: A extends "timestamp"
-										? B extends "timestamptz"
-											? "timestamptz"
-											: B extends "date"
-												? "timestamp"
-												: "unknown"
-										: A extends "date"
-											? B extends TsT
-												? B
-												: "unknown"
-											: A extends "time"
-												? B extends "timetz"
-													? "timetz"
-													: "unknown"
-												: A extends "timetz"
-													? B extends "time"
-														? "timetz"
-														: "unknown"
-													: A extends "cidr"
-														? B extends "inet"
-															? "inet"
-															: "unknown"
-														: A extends "inet"
-															? B extends "cidr"
-																? "inet"
-																: "unknown"
-															: A extends `${infer AE}[]`
-																? B extends `${infer BE}[]`
-																	? CommonLit<AE, BE> extends infer E extends
-																			string
-																		? E extends "unknown"
-																			? "unknown"
-																			: `${LitToText<E>}[]`
-																		: never
-																	: "unknown"
-																: ShapedCommon<A, B>;
+								: ShapedCommon<A, B>;
 
-type StrCommon<A extends string, B extends string> = A extends "char"
-	? "unknown"
-	: B extends "char"
-		? "unknown"
-		: A extends "citext"
-			? B extends "text" | "varchar"
-				? B
-				: "unknown"
-			: B extends "citext"
-				? A extends "text" | "varchar"
-					? A
-					: "unknown"
-				: B extends "name"
-					? A extends "text"
-						? "text"
-						: "name"
-					: A;
+/**
+ * PostgreSQL's select_common_type for CASE, COALESCE, GREATEST, LEAST, ARRAY[],
+ * VALUES, UNION/INTERSECT/EXCEPT and CYCLE: the type both values convert to,
+ * or `Unmatched` when there is none.
+ */
+export type SelectCommon<A extends string, B extends string> =
+	CommonLit<A, B> extends infer T extends string
+		? T extends "unknown"
+			? A extends UnknownT
+				? T
+				: B extends UnknownT
+					? T
+					: Unmatched<A, B>
+			: T
+		: never;
+type Unmatched<A extends string, B extends string> = {
+	readonly unmatched: readonly [A, B];
+};
+/** PostgreSQL's error for `Unmatched` types in a `What` construct. */
+export type UnmatchedErr<What extends string, U> =
+	U extends Unmatched<infer A, infer B>
+		? SqlError<
+				`${What} types ${TypeDisplay<A>} and ${TypeDisplay<B>} cannot be matched`,
+				null
+			>
+		: never;
 
 export type CommonType<A extends string, B extends string> = LitToText<
 	CommonLit<A extends "text" ? LitT : A, B extends "text" ? LitT : B>
 >;
-
-export type NumLitType<V extends string> = V extends `-${infer D}`
-	? UnsignedLitType<NoUnderscores<D>, 1>
-	: UnsignedLitType<NoUnderscores<V>, 0>;
-type NoUnderscores<V extends string> = V extends `${infer A}_${infer B}`
-	? NoUnderscores<`${A}${B}`>
-	: V;
-
-type UnsignedLitType<D extends string, Sign extends 0 | 1> = D extends
-	| `0x${infer H}`
-	| `0X${infer H}`
-	? IntLitType<Lowercase<H>, IntBounds["hex"][Sign]>
-	: D extends `0o${infer O}` | `0O${infer O}`
-		? IntLitType<O, IntBounds["oct"][Sign]>
-		: D extends `0b${infer B}` | `0B${infer B}`
-			? IntLitType<B, IntBounds["bin"][Sign]>
-			: D extends
-						| `${string}.${string}`
-						| `${string}e${string}`
-						| `${string}E${string}`
-				? "numeric"
-				: IntLitType<D, IntBounds["dec"][Sign]>;
-
-type IntBounds = {
-	dec: [
-		["2147483647", "9223372036854775807"],
-		["2147483648", "9223372036854775808"],
-	];
-	hex: [["7fffffff", "7fffffffffffffff"], ["80000000", "8000000000000000"]];
-	oct: [
-		["17777777777", "777777777777777777777"],
-		["20000000000", "1000000000000000000000"],
-	];
-	bin: [
-		[
-			"1111111111111111111111111111111",
-			"111111111111111111111111111111111111111111111111111111111111111",
-		],
-		[
-			"10000000000000000000000000000000",
-			"1000000000000000000000000000000000000000000000000000000000000000",
-		],
-	];
-};
-
-type IntLitType<D extends string, Max extends [string, string]> =
-	ValueCmp<NoZeros<D>, Max[0]> extends "gt"
-		? ValueCmp<NoZeros<D>, Max[1]> extends "gt"
-			? "numeric"
-			: "int8"
-		: "int4";
-type NoZeros<D extends string> = D extends `0${infer R}` ? NoZeros<R> : D;
-type ValueCmp<V extends string, Max extends string> =
-	LengthCmp<V, Max> extends "eq" ? DigitsCmp<V, Max> : LengthCmp<V, Max>;
-type LengthCmp<
-	A extends string,
-	B extends string,
-> = A extends `${string}${infer AR}`
-	? B extends `${string}${infer BR}`
-		? LengthCmp<AR, BR>
-		: "gt"
-	: B extends ""
-		? "eq"
-		: "lt";
-type DigitsCmp<A extends string, B extends string> = [A, B] extends [
-	`${infer AC}${infer AR}`,
-	`${infer BC}${infer BR}`,
-]
-	? AC extends BC
-		? DigitsCmp<AR, BR>
-		: DigitRank[BC & keyof DigitRank] extends [
-					...DigitRank[AC & keyof DigitRank],
-					unknown,
-					...unknown[],
-				]
-			? "lt"
-			: "gt"
-	: "eq";
-type DigitRank = {
-	"0": [];
-	"1": [0];
-	"2": [0, 0];
-	"3": [0, 0, 0];
-	"4": [0, 0, 0, 0];
-	"5": [0, 0, 0, 0, 0];
-	"6": [0, 0, 0, 0, 0, 0];
-	"7": [0, 0, 0, 0, 0, 0, 0];
-	"8": [0, 0, 0, 0, 0, 0, 0, 0];
-	"9": [0, 0, 0, 0, 0, 0, 0, 0, 0];
-	a: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-	b: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-	c: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-	d: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-	e: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-	f: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-};
-
-export type IntLitValue<V extends string> =
-	Lowercase<
-		NoUnderscores<V>
-	> extends `0${infer P extends keyof Radix}${infer Ds}`
-		? FromRadix<Ds, Radix[P], keyof DigitRank, "0">
-		: FromRadix<Lowercase<NoUnderscores<V>>, Ten, Digit, "0">;
-type Digit = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9";
-type Ten = DigitRank["a"];
-type Radix = {
-	x: [...DigitRank["f"], 0];
-	o: DigitRank["8"];
-	b: DigitRank["2"];
-};
-type FromRadix<
-	Ds extends string,
-	R extends unknown[],
-	Dg extends keyof DigitRank,
-	Rev extends string,
-> = Ds extends `${infer C extends Dg}${infer Rest}`
-	? FromRadix<Rest, R, Dg, MulAdd<Rev, R, DigitRank[C], "">>
-	: Ds extends ""
-		? Reverse<Rev, "">
-		: null;
-type MulAdd<
-	Rev extends string,
-	R extends unknown[],
-	Carry extends unknown[],
-	Out extends string,
-> = Rev extends `${infer D extends Digit}${infer Rest}`
-	? DivMod10<[...Times<DigitRank[D], R, []>, ...Carry], []> extends [
-			infer Q extends unknown[],
-			infer M extends number,
-		]
-		? MulAdd<Rest, R, Q, `${Out}${M}`>
-		: never
-	: Carry extends []
-		? Out
-		: MulAdd<"0", R, Carry, Out>;
-type Times<
-	N extends unknown[],
-	R extends unknown[],
-	Acc extends unknown[],
-> = N extends [unknown, ...infer NR] ? Times<NR, R, [...Acc, ...R]> : Acc;
-type DivMod10<T extends unknown[], Q extends unknown[]> = T extends [
-	...Ten,
-	...infer Rest,
-]
-	? DivMod10<Rest, [...Q, 0]>
-	: [Q, T["length"]];
-type Reverse<
-	S extends string,
-	Acc extends string,
-> = S extends `${infer C}${infer R}` ? Reverse<R, `${C}${Acc}`> : Acc;

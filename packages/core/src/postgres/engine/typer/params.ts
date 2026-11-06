@@ -1,13 +1,6 @@
 import type { NullTest, ParamEntry } from "../../../engine/params.js";
-import type {
-	ColInfo,
-	CteMap,
-	Ctx,
-	Info,
-	MkCtx,
-	QueryContext,
-	ScopeLevel,
-} from "../../../engine/types.js";
+import type { ColInfo, Info, ScopeLevel } from "../../../engine/types.js";
+import type { DateTimeT } from "../../schema/type-facts.js";
 import type {
 	Call,
 	Expr,
@@ -21,11 +14,14 @@ import type {
 	WindowSpec,
 	XmlExpr,
 } from "../ast.js";
-import type { BindFrom } from "../binder/from.js";
+import type { Grouped, SetsLevel } from "../binder/clauses.js";
+import type { BindFrom, SampleMethods } from "../binder/from.js";
+import type { CompareOp, MatchOp } from "../ops.js";
 import type { ParamsOfWith } from "../project/dml.js";
 import type { BindWith } from "../project/select.js";
-import type { AnySig, LookupFn, PickSig } from "./catalog.js";
-import type { CommonType, DateTimeT } from "./operators.js";
+import type { CteMap, Ctx, MkCtx, QueryContext } from "../types.js";
+import type { AnySig, LookupFn, PickSig, PolyArgs } from "./catalog.js";
+import type { CommonType } from "./operators.js";
 import type {
 	ParamsOfJsonTable,
 	ParamsOfSqlJson,
@@ -41,24 +37,6 @@ type NullTested<E extends Expr> =
 			? ParamEntry<N, NullTest>
 			: never;
 
-type IsComparison<Op extends string> = Op extends
-	| "="
-	| "<"
-	| ">"
-	| "<="
-	| ">="
-	| "<>"
-	| "!="
-	| "~"
-	| "~*"
-	| "!~"
-	| "!~*"
-	| "~~"
-	| "~~*"
-	| "!~~"
-	| "!~~*"
-	? true
-	: false;
 type NullableOf<T> = T extends ColInfo
 	? Mk<T["type"], true>
 	: Mk<"unknown", true>;
@@ -319,7 +297,7 @@ type BinParamType<Op extends string, Other> = Other extends {
 	readonly type: infer OT;
 	readonly nullable: boolean;
 }
-	? IsComparison<Op> extends true
+	? Op extends CompareOp | MatchOp
 		? Mk<OT, true>
 		: Op extends "and" | "or"
 			? Info<"bool", true>
@@ -579,15 +557,11 @@ type PatternType<P extends string, Poly> = P extends "any" | "..."
 							: "unknown",
 				true
 			>
-		: P extends "anystring" | "jsonpath"
-			? Info<"text", true>
-			: P extends "anynumeric"
-				? Info<"float8", true>
-				: P extends "anydatetime"
-					? Info<"timestamptz", true>
-					: P extends "anyrange"
-						? Info<"unknown", true>
-						: Mk<P, true>;
+		: P extends keyof PolyArgs
+			? Info<PolyArgs[P]["param"], true>
+			: P extends "jsonpath"
+				? Info<"text", true>
+				: Mk<P, true>;
 
 export type ParamsOfTargets<
 	Ts extends readonly Target[],
@@ -617,11 +591,9 @@ type ParamsOfFromItem<F extends FromItem, C extends Ctx> =
 											F["args"],
 											C,
 											Info<
-												F["method"] extends "system_rows"
-													? "int8"
-													: F["method"] extends "system_time"
-														? "float8"
-														: "float4"
+												F["method"] extends keyof SampleMethods
+													? SampleMethods[F["method"]]
+													: "float4"
 											>
 									  >
 									| ParamsOfOpt<F["repeatable"], C, Info<"float8">>
@@ -673,13 +645,20 @@ type ParamsOfBody<
 						Env["db"],
 						[L, ...Env["scope"]],
 						Env["ctes"],
-						B["groupBy"] extends null ? false : true
+						Grouped<B["groupBy"], B["groupingSets"]>
+					>,
+					MkCtx<
+						Env["db"],
+						[SetsLevel<L, B["groupingSets"]>, ...Env["scope"]],
+						Env["ctes"],
+						Grouped<B["groupBy"], B["groupingSets"]>
 					>,
 					SkipTargets,
 					Order
 				>
 			: ParamsOfSimple<
 					Extract<B, SimpleSelect>,
+					MkCtx<Env["db"], Env["scope"], Env["ctes"], false>,
 					MkCtx<Env["db"], Env["scope"], Env["ctes"], false>,
 					SkipTargets,
 					Order
@@ -705,8 +684,10 @@ type ParamsOfRows<
 	Rows extends readonly (readonly Expr[])[],
 	C extends Ctx,
 > = ParamsOfOpt<Rows[number][number], C, null>;
+/** `C0` is the scope of FROM and WHERE, `C` the grouped rows' of the rest. */
 type ParamsOfSimple<
 	B extends SimpleSelect,
+	C0 extends Ctx,
 	C extends Ctx,
 	SkipTargets extends boolean = false,
 	Order extends readonly Expr[] = [],
@@ -714,11 +695,12 @@ type ParamsOfSimple<
 	| ParamsOfOrder<Order, C>
 	| ParamsOfOrder<B["distinct"] extends readonly Expr[] ? B["distinct"] : [], C>
 	| ParamsOfWins<B["windows"], C>
-	| ParamsOfFromItems<B["from"], C>
+	| ParamsOfFromItems<B["from"], C0>
 	| (SkipTargets extends true ? never : ParamsOfTargets<B["targets"], C>)
-	| ParamsOfOpt<B["where"] | B["having"], C, Info<"bool">>
+	| ParamsOfOpt<B["where"], C0, Info<"bool">>
+	| ParamsOfOpt<B["having"], C, Info<"bool">>
 	| ParamsOfList<
 			B["groupBy"] extends readonly Expr[] ? B["groupBy"] : [],
-			C,
+			C0,
 			null
 	  >;

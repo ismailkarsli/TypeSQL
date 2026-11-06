@@ -1,9 +1,13 @@
-import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
-import { type CommandIo, introspectArgs } from "@typesql/core/adapter";
-import type { PgQueryable } from "../client.js";
+import {
+	type CommandIo,
+	connectPostgres,
+	databaseUrl,
+	introspectCommand,
+	listOption,
+} from "@typesql/core/adapter";
 import { type GenerateOptions, generateSource } from "./emit.js";
 import { type IntrospectOptions, introspect } from "./introspect.js";
 
@@ -29,100 +33,44 @@ Options:
   -h, --help           show this help
 `;
 
-interface Io extends CommandIo {
-	readonly env: Readonly<Record<string, string | undefined>>;
-	readonly cwd: string;
-	readonly connect?: (
-		url: string,
-	) => Promise<PgQueryable & { end(): Promise<void> }>;
-}
+type Option = IntrospectConfig[keyof IntrospectConfig];
 
-const defaultIo = (): Io => ({
-	stdout: (s) => process.stdout.write(s),
-	stderr: (s) => process.stderr.write(s),
-	env: process.env,
-	cwd: process.cwd(),
-});
+const isString = (option: unknown): option is string =>
+	typeof option === "string";
+const isStrings = (option: unknown): option is readonly string[] =>
+	Array.isArray(option) && option.every(isString);
+const isFunction = (option: unknown): option is Option =>
+	typeof option === "function";
+const isColumnTypes = (option: unknown): option is Option =>
+	typeof option === "function" ||
+	(typeof option === "object" &&
+		option !== null &&
+		!Array.isArray(option) &&
+		Object.values(option).every(isString));
+const isBoolean = (option: unknown): option is boolean =>
+	typeof option === "boolean";
 
-// pg rejects a refused `localhost` connection (IPv4 and IPv6) with an
-// AggregateError whose own message is empty.
-const message = (cause: unknown): string => {
-	if (!(cause instanceof Error)) return String(cause);
-	if (cause.message) return cause.message;
-	if (cause instanceof AggregateError && cause.errors.length > 0)
-		return Array.from(new Set(cause.errors.map(message))).join("; ");
-	const code = "code" in cause ? cause.code : undefined;
-	return code === undefined || code === null ? cause.name : String(code);
+const OPTIONS: Readonly<
+	Record<keyof IntrospectConfig, (option: unknown) => option is Option>
+> = {
+	url: isString,
+	out: isString,
+	schemas: isStrings,
+	exclude: isStrings,
+	viewNotNull: isFunction,
+	typeName: isString,
+	importFrom: isString,
+	imports: isStrings,
+	columnTypes: isColumnTypes,
+	column: isFunction,
+	comments: isBoolean,
 };
 
-const CONFIG_KEYS = new Set([
-	"url",
-	"out",
-	"schemas",
-	"exclude",
-	"viewNotNull",
-	"typeName",
-	"importFrom",
-	"imports",
-	"columnTypes",
-	"column",
-	"comments",
-]);
+const isKey = (key: string): key is keyof IntrospectConfig =>
+	Object.hasOwn(OPTIONS, key);
 
-async function pgConnect(
-	url: string,
-): Promise<PgQueryable & { end(): Promise<void> }> {
-	if (!URL.canParse(url) && !url.startsWith("/"))
-		throw new Error(
-			`invalid connection URL ${JSON.stringify(url)} (expected postgres://user:password@host:port/database)`,
-		);
-	let Client: typeof import("pg").Client;
-	try {
-		({ Client } = (await import("pg")).default);
-	} catch {
-		throw new Error('the "pg" package is not installed: npm install pg');
-	}
-	const client = new Client({ connectionString: url });
-	await client.connect();
-	return client;
-}
-
-const isStrings = (option: unknown): option is readonly string[] =>
-	Array.isArray(option) && option.every((s) => typeof s === "string");
-
-/** Whether `option` is a valid value of the configuration key `key`. */
-function isOption(
-	key: string,
-	option: unknown,
-): option is IntrospectConfig[keyof IntrospectConfig] {
-	if (option === undefined) return true;
-	switch (key) {
-		case "url":
-		case "out":
-		case "typeName":
-		case "importFrom":
-			return typeof option === "string";
-		case "schemas":
-		case "exclude":
-		case "imports":
-			return isStrings(option);
-		case "viewNotNull":
-		case "column":
-			return typeof option === "function";
-		case "columnTypes":
-			return (
-				typeof option === "function" ||
-				(typeof option === "object" &&
-					option !== null &&
-					!Array.isArray(option) &&
-					Object.values(option).every((type) => typeof type === "string"))
-			);
-		case "comments":
-			return typeof option === "boolean";
-		default:
-			return false;
-	}
-}
+const isOption = (key: string, option: unknown): option is Option =>
+	option === undefined || (isKey(key) && OPTIONS[key](option));
 
 const isIntrospectConfig = (config: unknown): config is IntrospectConfig =>
 	typeof config === "object" &&
@@ -130,7 +78,6 @@ const isIntrospectConfig = (config: unknown): config is IntrospectConfig =>
 	!Array.isArray(config) &&
 	Object.entries(config).every(([key, option]) => isOption(key, option));
 
-/** Imports the configuration module `file`, given on the command line as `name`. */
 async function loadConfig(
 	file: string,
 	name: string,
@@ -142,7 +89,7 @@ async function loadConfig(
 			: undefined;
 	if (loaded === null || typeof loaded !== "object" || Array.isArray(loaded))
 		throw new Error(`${name} must default-export a configuration object`);
-	const unknown = Object.keys(loaded).filter((key) => !CONFIG_KEYS.has(key));
+	const unknown = Object.keys(loaded).filter((key) => !isKey(key));
 	if (unknown.length > 0)
 		throw new Error(
 			`${name}: unknown option${unknown.length > 1 ? "s" : ""} ${unknown.join(", ")}`,
@@ -156,9 +103,9 @@ async function loadConfig(
 	);
 }
 
-const parse = (argv: readonly string[]) =>
+const parse = (args: string[]) =>
 	parseArgs({
-		args: [...argv],
+		args,
 		allowPositionals: true,
 		options: {
 			url: { type: "string" },
@@ -173,65 +120,47 @@ const parse = (argv: readonly string[]) =>
 		},
 	});
 
-export async function main(
+/**
+ * `typesql introspect --dialect postgres`. `io` replaces the process's
+ * output, working directory and environment.
+ */
+export const main: (
 	argv: readonly string[],
-	io: Io = defaultIo(),
-): Promise<number> {
-	const values = introspectArgs(io, USAGE, () => parse(argv));
-	if (typeof values === "number") return values;
-
-	try {
-		let config: IntrospectConfig = {};
-		let configDir = io.cwd;
-		if (values.config) {
-			const file = resolve(io.cwd, values.config);
-			config = await loadConfig(file, values.config);
-			configDir = dirname(file);
-		}
-		const url = values.url ?? config.url ?? io.env.DATABASE_URL;
-		if (!url) {
-			io.stderr("typesql introspect: pass --url or set DATABASE_URL\n");
-			return 2;
-		}
-		const list = (v: string[]) =>
-			v.flatMap((s) =>
-				s
-					.split(",")
-					.map((x) => x.trim())
-					.filter(Boolean),
-			);
-		const options: IntrospectConfig = {
-			...config,
-			...(values.schema && { schemas: list(values.schema) }),
-			...(values.exclude && { exclude: list(values.exclude) }),
-			...(values["type-name"] !== undefined && {
-				typeName: values["type-name"],
-			}),
-			...(values["import-from"] !== undefined && {
-				importFrom: values["import-from"],
-			}),
-			...(values["no-comments"] && { comments: false }),
-		};
-		const client = await (io.connect ?? pgConnect)(url);
-		let source: string;
-		try {
-			source = generateSource(await introspect(client, options), options);
-		} finally {
-			await client.end();
-		}
-		// A config file's `out` is relative to the config file, like migrate's paths.
-		const out = values.out ?? config.out;
-		if (out === undefined) {
-			io.stdout(source);
-		} else {
-			const file = resolve(values.out === undefined ? configDir : io.cwd, out);
-			await mkdir(dirname(file), { recursive: true });
-			await writeFile(file, source);
-			io.stderr(`typesql introspect: wrote ${out}\n`);
-		}
-		return 0;
-	} catch (err) {
-		io.stderr(`typesql introspect: ${message(err)}\n`);
-		return 1;
+	io?: CommandIo,
+) => Promise<number> = introspectCommand(USAGE, parse, async (values, io) => {
+	let config: IntrospectConfig = {};
+	let configDir = io.cwd;
+	if (values.config) {
+		const file = resolve(io.cwd, values.config);
+		config = await loadConfig(file, values.config);
+		configDir = dirname(file);
 	}
-}
+	const url = databaseUrl(values.url ?? config.url, io);
+	const options: IntrospectConfig = {
+		...config,
+		...(values.schema && { schemas: listOption(values.schema) }),
+		...(values.exclude && { exclude: listOption(values.exclude) }),
+		...(values["type-name"] !== undefined && {
+			typeName: values["type-name"],
+		}),
+		...(values["import-from"] !== undefined && {
+			importFrom: values["import-from"],
+		}),
+		...(values["no-comments"] && { comments: false }),
+	};
+	const connection = await connectPostgres(url);
+	try {
+		return {
+			source: generateSource(
+				await introspect(connection.client, options),
+				options,
+			),
+			// A config file's `out` is relative to the config file, like
+			// migrate's paths.
+			out: values.out ?? config.out,
+			base: values.out === undefined ? configDir : io.cwd,
+		};
+	} finally {
+		await connection.close();
+	}
+});

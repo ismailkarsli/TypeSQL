@@ -11,6 +11,10 @@ exports[`sql-dialect > scenario 1`] = `
     "diagnostics": [],
     "types": {
       "core": ""postgres"",
+      "coreMariadbWithPlugin": ""mariadb"",
+      "coreMysqlWithPlugin": ""mysql"",
+      "corePostgresWithPlugin": ""postgres"",
+      "coreSqliteWithPlugin": ""sqlite"",
       "inTransaction": ""sqlite"",
       "pg": ""postgres"",
       "sqliteDialect": ""sqlite"",
@@ -25,7 +29,11 @@ exports[`sql-dialect > scenario 1`] = `
   pg: 'postgres',
   sqliteDialect: 'sqlite',
   withPlugin: 'sqlite',
-  inTransaction: 'sqlite'
+  inTransaction: 'sqlite',
+  corePostgresWithPlugin: 'postgres',
+  coreSqliteWithPlugin: 'sqlite',
+  coreMysqlWithPlugin: 'mysql',
+  coreMariadbWithPlugin: 'mariadb'
 }
 {
   value: 'sqlite',

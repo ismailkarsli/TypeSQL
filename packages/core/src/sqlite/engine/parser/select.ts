@@ -1,3 +1,16 @@
+import type {
+	AliasAt,
+	CloseOk,
+	Expect,
+	IsOp,
+	IsWord,
+	Name,
+	NamesV,
+	SpanText,
+	SyntaxErr,
+} from "../../../engine/family/parse.js";
+import type { Next } from "../../../engine/next.js";
+import type { Ok, Toks } from "../../../engine/tokens.js";
 import type { SqlError } from "../../../errors.js";
 import type {
 	Cte,
@@ -21,40 +34,28 @@ import type {
 } from "./expr.js";
 import type { Reserved } from "./keywords.js";
 import type {
-	AliasAt,
 	BareAlias,
-	CloseOk,
-	Expect,
 	Ident,
 	IdentList,
-	IsOp,
-	IsWord,
-	Name,
-	NamesV,
-	Nx,
-	Ok,
 	OptCols,
 	SkipIndexed,
-	SpanText,
-	SyntaxErr,
 	TableAlias,
 	TableRefAt,
-	Toks,
 } from "./util.js";
 
 export type ParseSubquery<T extends Toks, I extends number> =
 	IsWord<T, I, "with"> extends true
-		? ParseWith<T, Nx<I>> extends Ok<
+		? ParseWith<T, Next<I>> extends Ok<
 				infer Wc extends WithClause,
 				infer J extends number
 			>
 			? ParseSelectAfterWith<T, J, Wc>
-			: ParseWith<T, Nx<I>>
+			: ParseWith<T, Next<I>>
 		: ParseSelectAfterWith<T, I, null>;
 
 export type ParseWith<T extends Toks, I extends number> =
 	IsWord<T, I, "recursive"> extends true
-		? CteLoop<T, Nx<I>, true, []>
+		? CteLoop<T, Next<I>, true, []>
 		: CteLoop<T, I, false, []>;
 
 type CteLoop<
@@ -64,9 +65,9 @@ type CteLoop<
 	Acc extends readonly Cte[],
 > =
 	Ident<T, I> extends infer N extends Name
-		? OptCols<T, Nx<I>> extends Ok<infer Cols, infer J extends number>
+		? OptCols<T, Next<I>> extends Ok<infer Cols, infer J extends number>
 			? IsWord<T, J, "as"> extends true
-				? CteOpen<T, Nx<J>> extends infer J1 extends number
+				? CteOpen<T, Next<J>> extends infer J1 extends number
 					? ParenSubquery<T, J1> extends Ok<
 							infer S extends SelectStmt,
 							infer J2 extends number
@@ -81,21 +82,21 @@ type CteLoop<
 								},
 							] extends infer Acc2 extends readonly Cte[]
 							? IsOp<T, J2, ","> extends true
-								? CteLoop<T, Nx<J2>, Rec, Acc2>
+								? CteLoop<T, Next<J2>, Rec, Acc2>
 								: Ok<{ recursive: Rec; ctes: Acc2 }, J2>
 							: never
 						: ParenSubquery<T, J1>
-					: CteOpen<T, Nx<J>>
+					: CteOpen<T, Next<J>>
 				: SyntaxErr<T, J>
-			: OptCols<T, Nx<I>>
+			: OptCols<T, Next<I>>
 		: SyntaxErr<T, I>;
 type CteOpen<T extends Toks, I extends number> =
 	IsWord<T, I, "materialized"> extends true
-		? Expect<T, Nx<I>, "(">
+		? Expect<T, Next<I>, "(">
 		: IsWord<T, I, "not"> extends true
-			? IsWord<T, Nx<I>, "materialized"> extends true
-				? Expect<T, Nx<Nx<I>>, "(">
-				: SyntaxErr<T, Nx<I>>
+			? IsWord<T, Next<I>, "materialized"> extends true
+				? Expect<T, Next<Next<I>>, "(">
+				: SyntaxErr<T, Next<I>>
 			: Expect<T, I, "(">;
 
 export type ParenSubquery<T extends Toks, I extends number> =
@@ -120,7 +121,7 @@ export type ParseSelectAfterWith<T extends Toks, I extends number, W> =
 					readonly v: infer Op extends "union" | "intersect" | "except";
 				}
 				? SqlError<
-						`${S["orderBy"] extends readonly [] ? "LIMIT" : "ORDER BY"} clause should come after ${Uppercase<Op>}${IsWord<T, Nx<J2>, "all"> extends true ? " ALL" : ""} not before`,
+						`${S["orderBy"] extends readonly [] ? "LIMIT" : "ORDER BY"} clause should come after ${Uppercase<Op>}${IsWord<T, Next<J2>, "all"> extends true ? " ALL" : ""} not before`,
 						J2
 					>
 				: ParseTail<T, J, W, Body>
@@ -133,26 +134,26 @@ type ParseTail<T extends Toks, I extends number, W, Body> =
 		infer J extends number
 	>
 		? IsWord<T, J, "limit"> extends true
-			? ParseExpr<T, Nx<J>> extends Ok<
+			? ParseExpr<T, Next<J>> extends Ok<
 					infer Lim extends Expr,
 					infer J2 extends number
 				>
 				? IsWord<T, J2, "offset"> extends true
-					? ParseExpr<T, Nx<J2>> extends Ok<
+					? ParseExpr<T, Next<J2>> extends Ok<
 							infer Off extends Expr,
 							infer J3 extends number
 						>
 						? Ok<MkSelect<W, Body, Ord, Lim, Off>, J3>
-						: ParseExpr<T, Nx<J2>>
+						: ParseExpr<T, Next<J2>>
 					: IsOp<T, J2, ","> extends true
-						? ParseExpr<T, Nx<J2>> extends Ok<
+						? ParseExpr<T, Next<J2>> extends Ok<
 								infer Cnt extends Expr,
 								infer J3 extends number
 							>
 							? Ok<MkSelect<W, Body, Ord, Cnt, Lim>, J3>
-							: ParseExpr<T, Nx<J2>>
+							: ParseExpr<T, Next<J2>>
 						: Ok<MkSelect<W, Body, Ord, Lim, null>, J2>
-				: ParseExpr<T, Nx<J>>
+				: ParseExpr<T, Next<J>>
 			: Ok<MkSelect<W, Body, Ord, null, null>, J>
 		: OptBy<T, I, "order">;
 type MkSelect<W, Body, Ord, Lim, Off> = {
@@ -181,10 +182,10 @@ type CompoundLoop<
 }
 	? (
 			Op extends "union"
-				? IsWord<T, Nx<I>, "all"> extends true
-					? [true, Nx<Nx<I>>]
-					: [false, Nx<I>]
-				: [false, Nx<I>]
+				? IsWord<T, Next<I>, "all"> extends true
+					? [true, Next<Next<I>>]
+					: [false, Next<I>]
+				: [false, Next<I>]
 		) extends [infer All extends boolean, infer J extends number]
 		? ParseCore<T, J> extends Ok<
 				infer R extends SelectBody,
@@ -197,9 +198,9 @@ type CompoundLoop<
 
 type ParseCore<T extends Toks, I extends number> =
 	IsWord<T, I, "select"> extends true
-		? ParseSimple<T, Nx<I>>
+		? ParseSimple<T, Next<I>>
 		: IsWord<T, I, "values"> extends true
-			? ParseValues<T, Nx<I>, []>
+			? ParseValues<T, Next<I>, []>
 			: SyntaxErr<T, I>;
 
 export type ParseValues<
@@ -214,7 +215,7 @@ export type ParseValues<
 			>
 			? Expect<T, J2, ")"> extends infer J3 extends number
 				? IsOp<T, J3, ","> extends true
-					? ParseValues<T, Nx<J3>, [...Acc, Row]>
+					? ParseValues<T, Next<J3>, [...Acc, Row]>
 					: Acc extends readonly []
 						? Ok<{ t: "values"; rows: [Row] }, J3>
 						: Row["length"] extends Acc[0]["length"]
@@ -226,9 +227,9 @@ export type ParseValues<
 
 type ParseSimple<T extends Toks, I extends number> = (
 	IsWord<T, I, "distinct"> extends true
-		? [true, Nx<I>]
+		? [true, Next<I>]
 		: IsWord<T, I, "all"> extends true
-			? [false, Nx<I>]
+			? [false, Next<I>]
 			: [false, I]
 ) extends [infer D extends boolean, infer J extends number]
 	? ParseTargets<T, J, []> extends Ok<
@@ -263,7 +264,7 @@ type ParseSimple<T extends Toks, I extends number> = (
 	: never;
 
 export type OptFrom<T extends Toks, I extends number> =
-	IsWord<T, I, "from"> extends true ? ParseFrom<T, Nx<I>> : Ok<null, I>;
+	IsWord<T, I, "from"> extends true ? ParseFrom<T, Next<I>> : Ok<null, I>;
 
 type ParseGroup<T extends Toks, I extends number> =
 	IsWord<T, I, "having"> extends true
@@ -281,13 +282,13 @@ type ParseGroup<T extends Toks, I extends number> =
 				: OptHaving<T, J>
 			: OptBy<T, I, "group", null>;
 type OptHaving<T extends Toks, I extends number> =
-	IsWord<T, I, "having"> extends true ? ParseExpr<T, Nx<I>> : Ok<null, I>;
+	IsWord<T, I, "having"> extends true ? ParseExpr<T, Next<I>> : Ok<null, I>;
 
 type ParseWindows<T extends Toks, I extends number> =
 	IsWord<T, I, "window"> extends true
-		? Ident<T, Nx<I>> extends Name
-			? IsWord<T, Nx<Nx<I>>, "as"> extends true
-				? WindowLoop<T, Nx<I>, []>
+		? Ident<T, Next<I>> extends Name
+			? IsWord<T, Next<Next<I>>, "as"> extends true
+				? WindowLoop<T, Next<I>, []>
 				: Ok<[], I>
 			: Ok<[], I>
 		: Ok<[], I>;
@@ -297,18 +298,18 @@ type WindowLoop<
 	Acc extends readonly NamedWindow[],
 > =
 	Ident<T, I> extends infer N extends Name
-		? IsWord<T, Nx<I>, "as"> extends true
-			? Expect<T, Nx<Nx<I>>, "("> extends infer J extends number
+		? IsWord<T, Next<I>, "as"> extends true
+			? Expect<T, Next<Next<I>>, "("> extends infer J extends number
 				? ParseWindowSpec<T, J> extends Ok<
 						infer Spec extends WindowSpec,
 						infer J2 extends number
 					>
 					? IsOp<T, J2, ","> extends true
-						? WindowLoop<T, Nx<J2>, [...Acc, { name: N["v"]; spec: Spec }]>
+						? WindowLoop<T, Next<J2>, [...Acc, { name: N["v"]; spec: Spec }]>
 						: Ok<[...Acc, { name: N["v"]; spec: Spec }], J2>
 					: ParseWindowSpec<T, J>
-				: Expect<T, Nx<Nx<I>>, "(">
-			: SyntaxErr<T, Nx<I>>
+				: Expect<T, Next<Next<I>>, "(">
+			: SyntaxErr<T, Next<I>>
 		: SyntaxErr<T, I>;
 
 export type ParseTargets<
@@ -318,17 +319,17 @@ export type ParseTargets<
 > =
 	ParseTarget<T, I> extends Ok<infer Tg extends Target, infer J extends number>
 		? IsOp<T, J, ","> extends true
-			? ParseTargets<T, Nx<J>, [...Acc, Tg]>
+			? ParseTargets<T, Next<J>, [...Acc, Tg]>
 			: Ok<[...Acc, Tg], J>
 		: ParseTarget<T, I>;
 
 type ParseTarget<T extends Toks, I extends number> =
 	IsOp<T, I, "*"> extends true
-		? Ok<{ t: "star"; tbl: null }, Nx<I>>
-		: IsOp<T, Nx<I>, "."> extends true
-			? IsOp<T, Nx<Nx<I>>, "*"> extends true
+		? Ok<{ t: "star"; tbl: null }, Next<I>>
+		: IsOp<T, Next<I>, "."> extends true
+			? IsOp<T, Next<Next<I>>, "*"> extends true
 				? Ident<T, I> extends infer N extends Name
-					? Ok<{ t: "star"; tbl: N["v"] }, Nx<Nx<Nx<I>>>>
+					? Ok<{ t: "star"; tbl: N["v"] }, Next<Next<Next<I>>>>
 					: SyntaxErr<T, I>
 				: ParseExprTarget<T, I>
 			: ParseExprTarget<T, I>;
@@ -336,11 +337,11 @@ type ParseTarget<T extends Toks, I extends number> =
 type ParseExprTarget<T extends Toks, I extends number> =
 	ParseExpr<T, I> extends Ok<infer E extends Expr, infer J extends number>
 		? IsWord<T, J, "as"> extends true
-			? AliasAt<T, Nx<J>, Reserved> extends infer A extends Name
-				? Ok<{ t: "expr"; e: E; alias: A["n"]; span: "" }, Nx<Nx<J>>>
-				: SyntaxErr<T, Nx<J>>
+			? AliasAt<T, Next<J>, Reserved> extends infer A extends Name
+				? Ok<{ t: "expr"; e: E; alias: A["n"]; span: "" }, Next<Next<J>>>
+				: SyntaxErr<T, Next<J>>
 			: BareAlias<T, J> extends infer A extends Name
-				? Ok<{ t: "expr"; e: E; alias: A["n"]; span: "" }, Nx<J>>
+				? Ok<{ t: "expr"; e: E; alias: A["n"]; span: "" }, Next<J>>
 				: Ok<
 						{
 							t: "expr";
@@ -362,34 +363,34 @@ type ParseFrom<T extends Toks, I extends number> =
 
 type JoinOp<T extends Toks, I extends number> =
 	IsOp<T, I, ","> extends true
-		? ["cross", false, Nx<I>]
+		? ["cross", false, Next<I>]
 		: (
 					IsWord<T, I, "natural"> extends true
-						? [true, Nx<I>]
+						? [true, Next<I>]
 						: [false, I]
 				) extends [infer Nat extends boolean, infer J extends number]
 			? IsWord<T, J, "join"> extends true
-				? ["inner", Nat, Nx<J>]
+				? ["inner", Nat, Next<J>]
 				: T[J] extends {
 							readonly k: "w";
 							readonly v: infer K extends "left" | "right" | "full";
 						}
 					? (
-							IsWord<T, Nx<J>, "outer"> extends true
-								? Nx<Nx<J>>
-								: Nx<J>
+							IsWord<T, Next<J>, "outer"> extends true
+								? Next<Next<J>>
+								: Next<J>
 						) extends infer J2 extends number
 						? IsWord<T, J2, "join"> extends true
-							? [K, Nat, Nx<J2>]
+							? [K, Nat, Next<J2>]
 							: SyntaxErr<T, J2>
 						: never
 					: T[J] extends {
 								readonly k: "w";
 								readonly v: infer K extends "inner" | "cross";
 							}
-						? IsWord<T, Nx<J>, "join"> extends true
-							? [K extends "cross" ? "cross" : "inner", Nat, Nx<Nx<J>>]
-							: SyntaxErr<T, Nx<J>>
+						? IsWord<T, Next<J>, "join"> extends true
+							? [K extends "cross" ? "cross" : "inner", Nat, Next<Next<J>>]
+							: SyntaxErr<T, Next<J>>
 						: Nat extends true
 							? SyntaxErr<T, J>
 							: null
@@ -428,31 +429,31 @@ type JoinLoop<T extends Toks, I extends number, L> =
 
 type ParseJoinConstraint<T extends Toks, I extends number> =
 	IsWord<T, I, "on"> extends true
-		? ParseExpr<T, Nx<I>> extends Ok<
+		? ParseExpr<T, Next<I>> extends Ok<
 				infer E extends Expr,
 				infer J extends number
 			>
 			? Ok<[E, null], J>
-			: ParseExpr<T, Nx<I>>
+			: ParseExpr<T, Next<I>>
 		: IsWord<T, I, "using"> extends true
-			? IdentList<T, Nx<I>> extends Ok<
+			? IdentList<T, Next<I>> extends Ok<
 					infer Cols extends readonly Name[],
 					infer J extends number
 				>
 				? Ok<[null, NamesV<Cols>], J>
-				: IdentList<T, Nx<I>>
+				: IdentList<T, Next<I>>
 			: Ok<[null, null], I>;
 
 type ParseTableOrSub<T extends Toks, I extends number> =
 	IsOp<T, I, "("> extends true
-		? IsWord<T, Nx<I>, "select" | "with" | "values"> extends true
-			? ParenSubquery<T, Nx<I>> extends Ok<
+		? IsWord<T, Next<I>, "select" | "with" | "values"> extends true
+			? ParenSubquery<T, Next<I>> extends Ok<
 					infer Q extends SelectStmt,
 					infer J extends number
 				>
 				? WithAlias<T, J, { t: "sub"; q: Q }>
-				: ParenSubquery<T, Nx<I>>
-			: ParseFrom<T, Nx<I>> extends Ok<
+				: ParenSubquery<T, Next<I>>
+			: ParseFrom<T, Next<I>> extends Ok<
 						infer F extends FromItem,
 						infer J extends number
 					>
@@ -464,7 +465,7 @@ type ParseTableOrSub<T extends Toks, I extends number> =
 						? WithAlias<T, J2, F>
 						: Ok<F, J2>
 					: Expect<T, J, ")">
-				: ParseFrom<T, Nx<I>>
+				: ParseFrom<T, Next<I>>
 		: TableRefAt<T, I> extends Ok<
 					infer R extends TableRef,
 					infer J extends number
@@ -474,12 +475,12 @@ type ParseTableOrSub<T extends Toks, I extends number> =
 
 type TableTail<T extends Toks, I extends number, R extends TableRef> =
 	IsOp<T, I, "("> extends true
-		? ParenArgs<T, Nx<I>> extends Ok<
+		? ParenArgs<T, Next<I>> extends Ok<
 				infer Args extends readonly Expr[],
 				infer J extends number
 			>
 			? WithAlias<T, J, { t: "func"; name: R["name"]; args: Args }>
-			: ParenArgs<T, Nx<I>>
+			: ParenArgs<T, Next<I>>
 		: WithAlias<T, I, { t: "table"; ref: R }> extends Ok<
 					infer F,
 					infer J extends number
@@ -491,13 +492,13 @@ type TableTail<T extends Toks, I extends number, R extends TableRef> =
 
 type AliasOf<T extends Toks, I extends number> =
 	IsWord<T, I, "as"> extends true
-		? AliasAt<T, Nx<I>, Reserved> extends infer A extends Name
-			? [A["v"], Nx<Nx<I>>]
-			: SyntaxErr<T, Nx<I>>
+		? AliasAt<T, Next<I>, Reserved> extends infer A extends Name
+			? [A["v"], Next<Next<I>>]
+			: SyntaxErr<T, Next<I>>
 		: TableAlias<T, I> extends infer A extends Name
 			? IsWindowClause<T, I> extends true
 				? [null, I]
-				: [A["v"], Nx<I>]
+				: [A["v"], Next<I>]
 			: [null, I];
 
 type WithAlias<T extends Toks, I extends number, F> =
@@ -518,7 +519,7 @@ type Aliased<F, A> = F extends { readonly t: "sub"; readonly q: infer Q }
 
 type IsWindowClause<T extends Toks, I extends number> =
 	IsWord<T, I, "window"> extends true
-		? Ident<T, Nx<I>> extends Name
-			? IsWord<T, Nx<Nx<I>>, "as">
+		? Ident<T, Next<I>> extends Name
+			? IsWord<T, Next<Next<I>>, "as">
 			: false
 		: false;

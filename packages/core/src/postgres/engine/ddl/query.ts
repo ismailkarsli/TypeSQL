@@ -1,13 +1,9 @@
 import type { PickOne, Rebuild } from "../../../engine/object.js";
-import type {
-	ColInfo,
-	Cols,
-	ColsToMap,
-	QueryContext,
-} from "../../../engine/types.js";
+import type { ColInfo, Cols, ColsToMap } from "../../../engine/types.js";
 import type { SqlError } from "../../../errors.js";
 import type { SelectStmt } from "../ast.js";
 import type { ProjectSelect } from "../project/select.js";
+import type { QueryContext } from "../types.js";
 import type { MkCol, NullOf, TypeOfCol } from "./column.js";
 
 type QueryProjection<DB, Q> = Q extends SelectStmt

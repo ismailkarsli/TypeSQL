@@ -1,5 +1,8 @@
-import type { View } from "@typesql/core/postgres";
+import type { Col as MysqlCol } from "@typesql/core/mysql";
+import type { Col, View } from "@typesql/core/postgres";
 import type { ColDesc, PgScalarName } from "@typesql/core/postgres/engine";
+// MySQL's `Typed` is the same type.
+import type { Col as SqliteCol, Typed } from "@typesql/core/sqlite";
 
 export type ColumnOverride = string | Partial<ColDesc>;
 
@@ -15,18 +18,7 @@ export type FromKysely<
 	DB,
 	Overrides extends KyselyOverrides = {},
 	Options extends KyselyOptions = {},
-> = {
-	-readonly [K in (keyof DB & string) | "$types" as OuterKey<
-		K,
-		Options
-	>]-?: K extends "$types"
-		? EnumRegistry<DB, Overrides, Options>
-		: K extends `public.${string}`
-			? TableOf<DB, K, Overrides, Options>
-			: K extends `${infer S}.${string}`
-				? NamespaceOf<DB, S, Overrides, Options>
-				: TableOf<DB, K, Overrides, Options>;
-};
+> = FromKyselyOf<DB, Overrides, Options, PgDialect>;
 
 export type SnakeCase<S extends string> =
 	S extends Lowercase<S>
@@ -35,17 +27,108 @@ export type SnakeCase<S extends string> =
 			? SnakeRest<R, IsUpper<H>, Lowercase<H>>
 			: S;
 
-export type InferColumn<T> = {
-	readonly type: PgTypeOf<
-		NonNullable<Sel<T>>,
-		Exclude<Hint<T>, null | undefined>,
-		"enum"
-	>;
-	readonly nullable: null extends Sel<T> ? true : false;
-	readonly hasDefault: HasDefault<T>;
+export type InferColumn<T> = Column<T, undefined, {}, "enum">;
+
+/**
+ * How a dialect reads a kysely-codegen schema: the column types it gives
+ * the TypeScript types kysely-codegen writes, and its schemas.
+ */
+export interface KyselyDialect {
+	readonly name: "postgres" | "sqlite" | "mysql";
+	/** The schemas whose `"schema.table"` keys name a top-level table. */
+	readonly defaultSchema: string;
+	/** `"$types"` where enum columns name types of the schema. */
+	readonly registry: string;
+	/** `unknown`, which kysely-codegen writes for JSON. */
+	readonly unknown: string;
+	readonly never: string;
+	readonly string: string;
+	/** A string that inserts from a number: DECIMAL. */
+	readonly numberString: string;
+	/** A string that inserts from a bigint: BIGINT. */
+	readonly bigintString: string;
+	/** What a union of string literals is `Typed` on: an ENUM. */
+	readonly literals: string;
+	readonly number: string;
+	readonly bigint: string;
+	readonly boolean: string;
+	readonly date: string;
+	readonly bytes: string;
+}
+
+interface PgDialect extends KyselyDialect {
+	readonly name: "postgres";
+	readonly defaultSchema: "public";
+	readonly registry: "$types";
+	readonly unknown: "jsonb";
+	readonly never: "text";
+	readonly string: "text";
+	readonly numberString: "numeric";
+	readonly bigintString: "int8";
+	readonly literals: "text";
+	readonly number: "int4";
+	readonly bigint: "int8";
+	readonly boolean: "bool";
+	readonly date: "timestamptz";
+	readonly bytes: "bytea";
+}
+
+/**
+ * The schema of a kysely-codegen `DB` in dialect `L`: a `"schema.table"`
+ * key names a table of a namespace, `db.schema.table`, unless the schema is
+ * the dialect's default one.
+ */
+export type FromKyselyOf<
+	DB,
+	Overrides extends KyselyOverrides,
+	Options extends KyselyOptions,
+	L extends KyselyDialect,
+> = {
+	-readonly [K in (keyof DB & string) | L["registry"] as OuterKey<
+		K,
+		Options,
+		L
+	>]-?: K extends "$types"
+		? EnumRegistry<DB, Overrides, Options>
+		: K extends `${L["defaultSchema"]}.${string}`
+			? TableOf<DB, K, Overrides, Options, L>
+			: K extends `${infer S}.${string}`
+				? NamespaceOf<DB, S, Overrides, Options, L>
+				: TableOf<DB, K, Overrides, Options, L>;
 };
 
-export type Sn<S extends string, Opt> = Opt extends { readonly camelCase: true }
+type FlatTypeOf<S, H, L extends KyselyDialect> = unknown extends S
+	? L["unknown"]
+	: [S] extends [never]
+		? L["never"]
+		: [S] extends [string]
+			? string extends S
+				? StringKind<H, L>
+				: Typed<L["literals"], Literals<LiteralUnion<S> & string>>
+			: [S] extends [number]
+				? L["number"]
+				: [S] extends [bigint]
+					? L["bigint"]
+					: [S] extends [boolean]
+						? L["boolean"]
+						: [S] extends [Date]
+							? L["date"]
+							: [S] extends [Uint8Array]
+								? L["bytes"]
+								: Typed<"json", S>;
+
+type Literals<S extends string> = { [K in S]: K }[S];
+
+/** A string column's type, from what it inserts from. */
+type StringKind<H, L extends KyselyDialect> = [H] extends [never]
+	? L["string"]
+	: bigint extends H
+		? L["bigintString"]
+		: number extends H
+			? L["numberString"]
+			: L["string"];
+
+type Sn<S extends string, Opt> = Opt extends { readonly camelCase: true }
 	? SnakeCase<S>
 	: S;
 
@@ -62,50 +145,79 @@ type SnakeRest<
 		>
 	: Acc;
 
-type OuterKey<K extends string, Opt> = K extends "$types"
+type OuterKey<
+	K extends string,
+	Opt,
+	L extends KyselyDialect,
+> = K extends "$types"
 	? K
-	: K extends `public.${infer T}`
+	: K extends `${L["defaultSchema"]}.${infer T}`
 		? Sn<T, Opt>
 		: K extends `${infer S}.${string}`
 			? Sn<S, Opt>
 			: Sn<K, Opt>;
 
-type SqlTableName<K extends string, Opt> = K extends `public.${infer T}`
-	? Sn<T, Opt>
-	: Sn<K, Opt>;
+type SqlTableName<
+	K extends string,
+	Opt,
+	L extends KyselyDialect,
+> = K extends `${L["defaultSchema"]}.${infer T}` ? Sn<T, Opt> : Sn<K, Opt>;
 
-type NamespaceOf<DB, S extends string, O, Opt> = {
+type NamespaceOf<DB, S extends string, O, Opt, L extends KyselyDialect> = {
 	-readonly [K in keyof DB & `${S}.${string}` as K extends `${S}.${infer T}`
 		? Sn<T, Opt>
-		: never]-?: TableOf<DB, K, O, Opt>;
+		: never]-?: TableOf<DB, K, O, Opt, L>;
 };
 
-export type TableOverrides<O, K> = K extends keyof O ? O[K] : undefined;
-export type ColumnOverrideOf<TO, C> = C extends keyof TO ? TO[C] : undefined;
+type TableOverrides<O, K> = K extends keyof O ? O[K] : undefined;
+type ColumnOverrideOf<TO, C> = C extends keyof TO ? TO[C] : undefined;
 
 type Registry<O> = O extends { readonly $types: infer R } ? R : {};
 
-type TableOf<DB, K extends string, O, Opt> = K extends keyof DB
+type TableOf<
+	DB,
+	K extends string,
+	O,
+	Opt,
+	L extends KyselyDialect,
+> = K extends keyof DB
 	? TableOverrides<O, K> extends { readonly $view: true }
 		? View<
 				Columns<
 					DB[K],
 					TableOverrides<O, K>,
-					SqlTableName<K, Opt>,
+					SqlTableName<K, Opt, L>,
 					Registry<O>,
-					Opt
+					Opt,
+					L
 				>
 			>
 		: Columns<
 				DB[K],
 				TableOverrides<O, K>,
-				SqlTableName<K, Opt>,
+				SqlTableName<K, Opt, L>,
 				Registry<O>,
-				Opt
+				Opt,
+				L
 			>
 	: never;
 
-type Columns<Tbl, TO, TName extends string, Reg, Opt> = {
+// Each dialect's columns are a mapped type of their own: one whose column
+// type depends on the dialect costs more to check.
+type Columns<
+	Tbl,
+	TO,
+	TName extends string,
+	Reg,
+	Opt,
+	L extends KyselyDialect,
+> = L["name"] extends "mysql"
+	? MysqlColumns<Tbl, TO, Opt, L>
+	: L["name"] extends "sqlite"
+		? SqliteColumns<Tbl, TO, Opt, L>
+		: PgColumns<Tbl, TO, TName, Reg, Opt>;
+
+type PgColumns<Tbl, TO, TName extends string, Reg, Opt> = {
 	-readonly [C in keyof Tbl & string as Sn<C, Opt>]-?: Column<
 		Tbl[C],
 		ColumnOverrideOf<TO, C>,
@@ -114,11 +226,29 @@ type Columns<Tbl, TO, TName extends string, Reg, Opt> = {
 	>;
 };
 
-export type Sel<T> = T extends { readonly __select__: infer S }
-	? InnerSel<S>
-	: T;
+type MysqlColumns<Tbl, TO, Opt, L extends KyselyDialect> = {
+	-readonly [C in keyof Tbl & string as Sn<C, Opt>]-?: MysqlCol<
+		FlatTypeName<Tbl[C], ColumnOverrideOf<TO, C>, L>,
+		Flags<
+			NullableOf<Tbl[C], ColumnOverrideOf<TO, C>>,
+			HasDefaultOf<Tbl[C], ColumnOverrideOf<TO, C>>
+		>
+	>;
+};
+
+type SqliteColumns<Tbl, TO, Opt, L extends KyselyDialect> = {
+	-readonly [C in keyof Tbl & string as Sn<C, Opt>]-?: SqliteCol<
+		FlatTypeName<Tbl[C], ColumnOverrideOf<TO, C>, L>,
+		Flags<
+			NullableOf<Tbl[C], ColumnOverrideOf<TO, C>>,
+			HasDefaultOf<Tbl[C], ColumnOverrideOf<TO, C>>
+		>
+	>;
+};
+
+type Sel<T> = T extends { readonly __select__: infer S } ? InnerSel<S> : T;
 type InnerSel<S> = S extends { readonly __select__: infer S2 } ? S2 : S;
-export type Hint<T> = T extends {
+type Hint<T> = T extends {
 	readonly __select__: infer S;
 	readonly __insert__: infer I;
 }
@@ -137,7 +267,7 @@ type HasDefault<T> = [Extract<T, { readonly __insert__: unknown }>] extends [
 			? true
 			: false;
 
-export type LiteralUnion<S> = [S] extends [string]
+type LiteralUnion<S> = [S] extends [string]
 	? string extends S
 		? never
 		: S
@@ -171,31 +301,23 @@ type ScalarOf<S, H, E extends string> = unknown extends S
 	? "jsonb"
 	: [S] extends [string]
 		? string extends S
-			? StringKind<H>
+			? StringKind<H, PgDialect>
 			: E
 		: [S] extends [number]
-			? "int4"
+			? PgDialect["number"]
 			: [S] extends [bigint]
-				? "int8"
+				? PgDialect["bigint"]
 				: [S] extends [boolean]
-					? "bool"
+					? PgDialect["boolean"]
 					: [S] extends [Date]
-						? "timestamptz"
+						? PgDialect["date"]
 						: [S] extends [Uint8Array]
-							? "bytea"
+							? PgDialect["bytes"]
 							: [S] extends [readonly unknown[]]
 								? "jsonb"
 								: [S] extends [object]
 									? ObjectKind<S>
 									: "jsonb";
-
-type StringKind<H> = [H] extends [never]
-	? "text"
-	: bigint extends H
-		? "int8"
-		: number extends H
-			? "numeric"
-			: "text";
 
 type ObjectKind<S> = string extends keyof S
 	? "jsonb"
@@ -228,7 +350,7 @@ type IsSingle<N, All = N> = N extends unknown
 		: false
 	: never;
 
-export type OverrideType<V> = V extends string
+type OverrideType<V> = V extends string
 	? V
 	: V extends { readonly type: infer X extends string }
 		? X
@@ -244,13 +366,30 @@ type ColumnTypeName<T, V, Reg, Default extends string> = [
 		>
 	: OverrideType<V>;
 
-type Column<T, V, Reg, Default extends string> = {
-	readonly type: ColumnTypeName<T, V, Reg, Default>;
-	readonly nullable: NullableOf<T, V>;
-	readonly hasDefault: HasDefaultOf<T, V>;
-};
+type FlatTypeName<T, V, L extends KyselyDialect> = [OverrideType<V>] extends [
+	never,
+]
+	? FlatTypeOf<NonNullable<Sel<T>>, Exclude<Hint<T>, null | undefined>, L>
+	: OverrideType<V>;
 
-export type NullableOf<T, V> = [V] extends [
+type Column<T, V, Reg, Default extends string> = PgCol<
+	ColumnTypeName<T, V, Reg, Default>,
+	NullableOf<T, V>,
+	HasDefaultOf<T, V>
+>;
+
+type PgCol<T extends string, N, H> = Col<T, Flags<N, H>>;
+
+// One of four flag objects, so that columns of a type share one `Col`.
+type Flags<N, H> = N extends true
+	? H extends true
+		? { nullable: true; hasDefault: true }
+		: { nullable: true }
+	: H extends true
+		? { hasDefault: true }
+		: Record<never, never>;
+
+type NullableOf<T, V> = [V] extends [
 	{ readonly nullable: infer B extends boolean },
 ]
 	? B
@@ -258,7 +397,7 @@ export type NullableOf<T, V> = [V] extends [
 		? true
 		: false;
 
-export type HasDefaultOf<T, V> = [V] extends [
+type HasDefaultOf<T, V> = [V] extends [
 	{ readonly hasDefault: infer B extends boolean },
 ]
 	? B
@@ -293,7 +432,7 @@ type EnumEntries<DB, O, Opt> =
 			[K in keyof DB & string]-?: TableEnums<
 				DB[K],
 				TableOverrides<O, K>,
-				SqlTableName<K, Opt>,
+				SqlTableName<K, Opt, PgDialect>,
 				Registry<O>,
 				Opt
 			>;

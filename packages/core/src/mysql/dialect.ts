@@ -1,18 +1,13 @@
-import type {
-	DIALECT,
-	Dialect,
-	DialectBrand,
-	DialectTypes,
-} from "../dialect.js";
-import type { SqlPlugin } from "../plugin.js";
+import type { DdlCheck, Dialect, DialectTypes, PluginsOf } from "../dialect.js";
 import type { Executor } from "../query.js";
-import type { Transactional } from "../transaction.js";
 import type { ApplyDdl } from "./engine/infer.js";
-import type { ValidateDdl } from "./migrations.js";
-import type { MariaDbSql, Sql } from "./sql/types.js";
+import type {
+	MariaDbSql,
+	MariaDbTransactionalSql,
+	Sql,
+	TransactionalSql,
+} from "./sql/types.js";
 import type { DefaultTypeMap, MariaDbTypeMap } from "./type-map/index.js";
-
-type PluginsOf<P> = P extends readonly SqlPlugin[] ? P : [];
 
 export interface MySql extends DialectTypes {
 	readonly typeMap: DefaultTypeMap;
@@ -22,7 +17,7 @@ export interface MySql extends DialectTypes {
 		this["tm"],
 		PluginsOf<this["plugins"]>
 	>;
-	readonly validateDdl: ValidateDdl<this["db"], this["ddl"]>;
+	readonly validateDdl: DdlCheck<this, this["db"], this["ddl"]>;
 	readonly applyDdl: ApplyDdl<this["db"], this["ddl"]>;
 }
 
@@ -34,34 +29,12 @@ export interface MariaDb extends DialectTypes {
 		this["tm"],
 		PluginsOf<this["plugins"]>
 	>;
-	readonly validateDdl: ValidateDdl<this["db"], this["ddl"]>;
+	readonly validateDdl: DdlCheck<this, this["db"], this["ddl"]>;
 	readonly applyDdl: ApplyDdl<this["db"], this["ddl"]>;
 }
 
-// Invariant parameters, as on Sql.
-export interface TransactionalSql<
-	in out DB,
-	in out TM,
-	in out Plugins extends readonly SqlPlugin[] = [],
-> extends Sql<DB, TM, Plugins>,
-		Transactional<TransactionalSql<DB, TM, Plugins>> {
-	readonly [DIALECT]?: DialectBrand<"mysql", DB, TM, Plugins>;
-	withPlugin<const P extends SqlPlugin>(
-		plugin: P,
-	): TransactionalSql<DB, TM, [...Plugins, P]>;
-}
-
-export interface MariaDbTransactionalSql<
-	in out DB,
-	in out TM,
-	in out Plugins extends readonly SqlPlugin[] = [],
-> extends MariaDbSql<DB, TM, Plugins>,
-		Transactional<MariaDbTransactionalSql<DB, TM, Plugins>> {
-	readonly [DIALECT]?: DialectBrand<"mariadb", DB, TM, Plugins>;
-	withPlugin<const P extends SqlPlugin>(
-		plugin: P,
-	): MariaDbTransactionalSql<DB, TM, [...Plugins, P]>;
-}
+/** DDL script `Q` checked against schema `DB`: the script, or its error. */
+export type ValidateDdl<DB, Q extends string> = DdlCheck<MySql, DB, Q>;
 
 /** MySQL and the servers that speak its dialect: Amazon Aurora, PlanetScale, TiDB, Google Cloud SQL, Azure. */
 export interface MySqlDialect extends Dialect<MySql> {
@@ -86,14 +59,23 @@ declare module "../create-sql.js" {
 	}
 }
 
-export const mysql: MySqlDialect = {
-	name: "mysql",
-	quote: "`",
-	emptyRow: "() VALUES ()",
-};
+/**
+ * MySQL's and MariaDB's lexis (see `Dialect`): strings take backslash
+ * escapes, `--` starts a comment only before whitespace, `#` starts one too,
+ * and block comments don't nest. `$` belongs to names, so `a$1` and `$1a`
+ * are names. `MySqlLexis` states its quotes and comments for the types.
+ */
+export const mysqlLexis =
+	/(?<![\w$])\$(\d+)(?![\w$])|'(?:[^'\\]|\\[\s\S]|'')*'?|"(?:[^"\\]|\\[\s\S]|"")*"?|`(?:[^`]|``)*`?|--(?=\s|$)[^\n]*|#[^\n]*|\/\*[\s\S]*?(?:\*\/|$)/
+		.source;
 
-export const mariadb: MariaDbDialect = {
-	name: "mariadb",
+/** What MySQL and MariaDB text has in common. */
+const MYSQL_TEXT = {
 	quote: "`",
 	emptyRow: "() VALUES ()",
-};
+	lexis: mysqlLexis,
+} as const;
+
+export const mysql: MySqlDialect = { name: "mysql", ...MYSQL_TEXT };
+
+export const mariadb: MariaDbDialect = { name: "mariadb", ...MYSQL_TEXT };

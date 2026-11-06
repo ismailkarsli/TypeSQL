@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Measures how fast the current code checks and builds the case1 application.
 import { spawnSync } from "node:child_process";
-import { readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { stripTypeScriptTypes } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -164,21 +164,22 @@ const statements = queries.length;
 // Check case1 against the built package, as an application would: it reads
 // every statement's row type, as executing the statement does. The reads are
 // appended to a copy of case1, not put in a second file, which the compiler
-// would check on another checker that infers every statement again.
-const checked = "src/case1.check.ts";
-for (const compiler of ["tsrs", "tsc"]) {
-	const config = join(here, "tsconfig.case1.json");
+// would check on another checker that infers every statement again. The copy
+// lives in a scratch directory of this package, so it resolves the package's
+// dependencies.
+const scratch = mkdtempSync(join(here, ".check-"));
+try {
+	const config = join(scratch, "tsconfig.json");
 	writeFileSync(
 		config,
 		JSON.stringify({
-			extends: "./tsconfig.json",
-			compilerOptions: { paths: {} },
+			extends: "../tsconfig.json",
 			include: [],
-			files: [checked],
+			files: ["case1.check.ts"],
 		}),
 	);
 	writeFileSync(
-		join(here, checked),
+		join(scratch, "case1.check.ts"),
 		[
 			source,
 			'import type { RowType } from "@typesql/core";',
@@ -188,9 +189,9 @@ for (const compiler of ["tsrs", "tsc"]) {
 			"",
 		].join("\n"),
 	);
-	try {
+	for (const compiler of ["tsrs", "tsc"]) {
 		const proc = spawnSync(
-			join(here, "../../node_modules/.bin", compiler),
+			join(here, "node_modules", ".bin", compiler),
 			["--noEmit", "--extendedDiagnostics", "-p", config],
 			{ cwd: here, encoding: "utf8" },
 		);
@@ -205,10 +206,9 @@ for (const compiler of ["tsrs", "tsc"]) {
 		console.log(
 			`${compiler}: ${checkTimeSec} s check time, ${((checkTimeSec * 1000) / statements).toFixed(2)} ms and ${Math.round(num("Instantiations") / statements)} instantiations per statement`,
 		);
-	} finally {
-		unlinkSync(config);
-		unlinkSync(join(here, checked));
 	}
+} finally {
+	rmSync(scratch, { recursive: true, force: true });
 }
 
 const iterations = 3_000;

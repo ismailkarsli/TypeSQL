@@ -1,19 +1,14 @@
-import { cp, mkdir, writeFile } from "node:fs/promises";
-import { join, resolve } from "node:path";
-import { required, unlessMissing } from "./command.ts";
-import { ready } from "./database.ts";
-
-const workspace = resolve(import.meta.dirname, "..");
-const repository = resolve(workspace, "..");
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { required } from "./command.ts";
+import { artifacts, repository } from "./paths.ts";
 
 export default async function setup() {
+	await rm(artifacts, { recursive: true, force: true });
 	try {
-		return await environment();
+		await environment();
 	} catch (cause) {
-		const retained = join(
-			process.env.SCENARIO_ARTIFACTS ?? join(workspace, ".artifacts"),
-			"setup",
-		);
+		const retained = join(artifacts, "setup");
 		await mkdir(retained, { recursive: true });
 		await writeFile(
 			join(retained, "failure.json"),
@@ -29,14 +24,6 @@ export default async function setup() {
 				2,
 			),
 		);
-		for (const [name, cwd] of [
-			["root", repository],
-			["tests", workspace],
-		] as const) {
-			await unlessMissing(
-				cp(join(cwd, ".scenario"), join(retained, name), { recursive: true }),
-			);
-		}
 		throw new Error(
 			`Infrastructure: scenario prerequisites failed; logs retained at ${retained}`,
 			{ cause },
@@ -45,33 +32,19 @@ export default async function setup() {
 }
 
 async function environment() {
+	const node = (
+		await readFile(join(repository, ".node-version"), "utf8")
+	).trim();
 	if (
-		process.version !== "v26.8.1" ||
+		process.version !== `v${node}` ||
 		process.platform !== "linux" ||
 		process.arch !== "x64"
 	)
-		throw new Error("Infrastructure: expected Node 26.8.1 on linux/x64");
-	await ready();
+		throw new Error(`Infrastructure: expected Node ${node} on linux/x64`);
+	// Builds the TypeSQL packages the scenarios depend on.
 	await required(
 		repository,
-		[
-			"pnpm",
-			...[
-				"core",
-				"pg",
-				"postgres",
-				"sqlite",
-				"mysql",
-				"kysely",
-				"drizzle",
-				"prisma",
-				"cli",
-				"better-auth",
-			].flatMap((name) => ["--filter", `@typesql/${name}`]),
-			"run",
-			"build",
-		],
-		{},
-		300_000,
+		["pnpm", "--filter", "{./tests/scenarios/*}^...", "run", "build"],
+		{ timeout: 300_000 },
 	);
 }

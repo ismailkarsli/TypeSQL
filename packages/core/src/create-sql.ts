@@ -1,5 +1,5 @@
 import type { Dialect, DialectTypes, SqlOf } from "./dialect.js";
-import { type Empty, empty, optional } from "./empty.js";
+import { type Empty, empty } from "./empty.js";
 import { encodeInput, type InputContext, type SqlPlugin } from "./plugin.js";
 import { type Executor, SqlQuery } from "./query.js";
 import {
@@ -9,6 +9,7 @@ import {
 	fail,
 	ident,
 	join,
+	LEXIS,
 	param,
 	type Spliceable,
 	SqlFragment,
@@ -24,22 +25,12 @@ export interface CreateSql {
 }
 
 /**
- * The `sql` of `dialect`. The dialect's `sql` type is computed from its type
- * parameters; the runtime API cannot be checked against it.
+ * The `sql` of `dialect`. Its type is computed from the dialect's type
+ * parameters, and dialects merge their own overloads into `CreateSql`: the
+ * runtime API cannot be checked against them.
  */
 // biome-ignore lint/nursery/noUnsafeTypeAssertion: see above.
-export const createDialectSql = createSqlApi as <
-	T extends DialectTypes,
-	DB,
-	TM = T["typeMap"],
->(
-	dialect: Dialect<T>,
-	executor?: Executor,
-	plugins?: readonly SqlPlugin[],
-) => SqlOf<T, DB, TM>;
-
-// biome-ignore lint/nursery/noUnsafeTypeAssertion: dialects merge their own overloads into `CreateSql`.
-export const createSql = createDialectSql as CreateSql;
+export const createSql = createSqlApi as CreateSql;
 
 const fragmentOf = (compiled: Compiled) =>
 	new SqlFragment(compiled.text, compiled.values);
@@ -67,28 +58,6 @@ const columns = <V>(value: V): [string, unknown][] => {
 // parentheses.
 const GROUPED = new WeakSet<Spliceable>();
 
-const bool = (given: readonly (Spliceable | Empty)[], op: "AND" | "OR") => {
-	const items = present(given);
-	const r = join(
-		items.map((f) =>
-			GROUPED.has(f) ? f : new SqlFragment(`(${f.text})`, f.values),
-		),
-		` ${op} `,
-	);
-	const fragment = new SqlFragment(
-		items[1]
-			? `(${r.text})`
-			: items[0]
-				? r.text
-				: op === "AND"
-					? "true"
-					: "false",
-		r.values,
-	);
-	GROUPED.add(fragment);
-	return fragment;
-};
-
 const present = (items: readonly (Spliceable | Empty)[]): Spliceable[] =>
 	items.filter((item): item is Spliceable => item !== empty);
 
@@ -98,7 +67,34 @@ export function createSqlApi(
 	executor?: Executor,
 	plugins: readonly SqlPlugin[] = [],
 ) {
-	const quote = dialect.quote ?? '"';
+	const {
+		quote = `"`,
+		emptyRow = "DEFAULT VALUES",
+		valuesDefault,
+		lexis = LEXIS,
+	} = dialect;
+	const bool = (given: readonly (Spliceable | Empty)[], op: "AND" | "OR") => {
+		const items = present(given);
+		const r = join(
+			items.map((f) =>
+				GROUPED.has(f) ? f : new SqlFragment(`(${f.text})`, f.values),
+			),
+			` ${op} `,
+			lexis,
+		);
+		const fragment = new SqlFragment(
+			items[1]
+				? `(${r.text})`
+				: items[0]
+					? r.text
+					: op === "AND"
+						? "true"
+						: "false",
+			r.values,
+		);
+		GROUPED.add(fragment);
+		return fragment;
+	};
 	const encode = <V>(value: V, context: InputContext) =>
 		plugins[0] ? encodeInput(value, plugins, context) : value;
 	const encodeArgs = (args: readonly unknown[], query: string) => {
@@ -109,14 +105,16 @@ export function createSqlApi(
 			: fail("a plugin must encode parameters as an array");
 	};
 	const call = (query: string, ...rest: readonly unknown[]) => {
-		const { text, values } = compile(query, encodeArgs(rest, query));
+		const { text, values } = compile(lexis, query, encodeArgs(rest, query));
 		return new SqlQuery(text, values, executor, plugins);
 	};
 	const api = Object.assign(call, {
-		withPlugin: (plugin: SqlPlugin) =>
-			createDialectSql(dialect, executor, [...plugins, plugin]),
+		// The `sql` types of the dialects give withPlugin its type.
+		// biome-ignore lint/plugin: see above.
+		withPlugin: (plugin: SqlPlugin): unknown =>
+			createSqlApi(dialect, executor, [...plugins, plugin]),
 		prepare: (query: string) => {
-			const compiled = compile(query);
+			const compiled = compile(lexis, query);
 			const prepared = executor?.prepare?.(compiled.text) ?? executor;
 			return (...input: readonly unknown[]) =>
 				new SqlQuery(
@@ -132,12 +130,12 @@ export function createSqlApi(
 		as: call,
 		param: <V>(value: V) =>
 			param(value === empty ? value : encode(value, { kind: "value" })),
-		optional,
+		optional: <V>(value: V) => (value === undefined ? empty : value),
 		if: <V, R>(value: V, then: (value: V) => R) =>
 			value ? then(value) : empty,
 		json,
 		fragment: (text: string, ...rest: readonly unknown[]) =>
-			fragmentOf(compile(text, encodeArgs(rest, text))),
+			fragmentOf(compile(lexis, text, encodeArgs(rest, text))),
 		id: (...parts: readonly string[]) =>
 			new SqlFragment(ident(quote, parts), []),
 		combine: (
@@ -146,7 +144,7 @@ export function createSqlApi(
 		) => {
 			const defined = present(items);
 			return defined[0]
-				? join(defined, options?.separator ?? ", ")
+				? join(defined, options?.separator ?? ", ", lexis)
 				: fail("sql.combine() got no items");
 		},
 		and: (items: readonly (Spliceable | Empty)[]) => bool(items, "AND"),
@@ -169,7 +167,7 @@ export function createSqlApi(
 			const cols = Array.from(new Set(rows.flatMap((row) => [...row.keys()])));
 			if (!cols[0]) {
 				if (rows[1]) fail("sql.values() rows have no values");
-				return new SqlFragment(dialect.emptyRow ?? "DEFAULT VALUES", []);
+				return new SqlFragment(emptyRow, []);
 			}
 			const values: unknown[] = [];
 			const tuples = rows.map(
@@ -178,7 +176,7 @@ export function createSqlApi(
 						.map((column) =>
 							row.has(column)
 								? `$${values.push(row.get(column))}`
-								: dialect.valuesDefault === false
+								: valuesDefault === false
 									? fail(
 											`no DEFAULT in VALUES here; give every row "${column}"`,
 										)
@@ -191,7 +189,7 @@ export function createSqlApi(
 				values,
 			);
 		},
-		raw: (text: string) => fragmentOf(compile(text, [])),
+		raw: (text: string) => fragmentOf(compile(lexis, text, [])),
 	});
 	return Object.defineProperty(api, "dialect", {
 		value: dialect.name,

@@ -52,6 +52,10 @@
 		"./plugins": {
 			"types": "./dist/plugins/index.d.ts",
 			"default": "./dist/plugins/index.js"
+		},
+		"./reserved": {
+			"types": "./dist/reserved.d.ts",
+			"default": "./dist/reserved.js"
 		}
 	},
 	"files": [
@@ -68,11 +72,15 @@
 		"typecheck": "tsrs -p tsconfig.json --noEmit"
 	},
 	"peerDependencies": {
+		"mariadb": ">=3",
 		"mysql2": ">=3",
 		"pg": ">=8",
 		"typescript": ">=7.1.0-0"
 	},
 	"peerDependenciesMeta": {
+		"mariadb": {
+			"optional": true
+		},
 		"mysql2": {
 			"optional": true
 		},

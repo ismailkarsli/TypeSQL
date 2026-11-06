@@ -1,43 +1,42 @@
-import type {
-	NarrowKeys,
-	NarrowLevel,
-	UsingKeys,
-} from "../../../engine/narrow.js";
+import type { NarrowKeys, NarrowLevel } from "../../../engine/narrow.js";
+import type { Next } from "../../../engine/next.js";
 import type {
 	ColInfo,
 	ColMap,
 	Cols,
 	ColsToMap,
-	CteMap,
-	Ctx,
 	Info,
-	MkCtx,
-	QueryContext,
 	Scope,
 	ScopeItem,
 	ScopeLevel,
 } from "../../../engine/types.js";
 import type { AnyErr, SqlError } from "../../../errors.js";
+import type { NumT } from "../../schema/type-facts.js";
 import type {
 	ColDef,
 	Expr,
 	FromItem,
+	FromJsonTable,
 	FromTable,
 	JoinKind,
 	SelectStmt,
 	TableRef,
 	Tag,
 } from "../ast.js";
-import type { Nx } from "../parser/util.js";
 import type { ColumnName } from "../project/naming.js";
 import type { ProjectSelect } from "../project/select.js";
-import type { ArrInfo, HasNullElems, NullableMap } from "../shape.js";
-import type { SrfType } from "../typer/catalog.js";
+import type {
+	ArrInfo,
+	HasNullElems,
+	NullableLevel,
+	TypeDisplay,
+} from "../shape.js";
+import type { FunctionCatalog, SrfType } from "../typer/catalog.js";
 import type { CommonType } from "../typer/operators.js";
-import type { BindJsonTable } from "../typer/sqljson.js";
 import type { TypeList, TypeOf } from "../typer/typeof.js";
 import type { XmlTableCols } from "../typer/xml.js";
-import type { CheckCondition, TypeDisplay } from "./clauses.js";
+import type { CteMap, Ctx, MkCtx, QueryContext } from "../types.js";
+import type { CheckCondition } from "./clauses.js";
 import type { ResolveTable } from "./resolve.js";
 
 export type BindFrom<
@@ -48,7 +47,7 @@ export type BindFrom<
 > = Items[I] extends undefined
 	? Acc
 	: BindFromItem<Items[I], Env, Acc> extends infer L extends ScopeLevel
-		? BindFrom<Items, Env, [...Acc, ...L], Nx<I>>
+		? BindFrom<Items, Env, [...Acc, ...L], Next<I>>
 		: BindFromItem<Items[I], Env, Acc>;
 
 type BindFromItem<
@@ -134,10 +133,49 @@ type BindXmlTable<
 			: A
 		: never;
 
+type BindJsonTable<
+	J extends FromJsonTable["jt"],
+	Alias extends string | null,
+	CA extends readonly string[] | null,
+	Env extends QueryContext,
+	Sofar extends ScopeLevel,
+> =
+	J["path"] extends Tag<"str">
+		? DuplicateName<J["names"], never> extends infer D extends string
+			? SqlError<`duplicate JSON_TABLE column or path name: ${D}`, null>
+			: TypeList<
+						[J["ctx"], ...J["passing"], ...J["defs"]],
+						MkCtx<Env["db"], [Sofar, ...Env["scope"]], Env["ctes"], false>,
+						[]
+					> extends infer Ts
+				? Ts extends readonly ColInfo[]
+					? CheckAlias<
+							Alias extends string ? Alias : "json_table",
+							Sofar
+						> extends infer A
+						? A extends string
+							? RenamedLevel<A, J["cols"], CA, "JSON_TABLE function">
+							: A
+						: never
+					: Ts
+				: never
+		: SqlError<
+				"only string constants are supported in JSON_TABLE path specification",
+				null
+			>;
+type DuplicateName<Ns extends readonly string[], Seen> = Ns extends readonly [
+	infer N,
+	...infer R extends readonly string[],
+]
+	? N extends Seen
+		? N
+		: DuplicateName<R, Seen | N>
+	: null;
+
 type LevelOf<A, C> = C extends Cols
 	? [{ readonly alias: A; readonly cols: ColsToMap<C>; readonly skip: [] }]
 	: C;
-export type RenamedLevel<
+type RenamedLevel<
 	A,
 	Base extends Cols,
 	CA extends readonly string[] | null,
@@ -150,7 +188,7 @@ type WithOrd<Ord extends boolean, Cs extends Cols> = Ord extends true
 	? [...Cs, { readonly n: "ordinality"; readonly t: Info<"int8"> }]
 	: Cs;
 
-export type CheckAlias<
+type CheckAlias<
 	A extends string,
 	Sofar extends ScopeLevel,
 > = A extends Sofar[number]["alias"]
@@ -180,7 +218,8 @@ type BindTable<
 			: A
 		: never;
 
-type SampleMethods = {
+/** TABLESAMPLE methods and the type of their argument. */
+export type SampleMethods = {
 	system: "float4";
 	bernoulli: "float4";
 	system_rows: "int8";
@@ -242,17 +281,10 @@ type SampleArgs<
 				null
 			>
 		: TypeOf<Args[I], C> extends infer A extends ColInfo
-			? A["type"] extends
-					| "int2"
-					| "int4"
-					| "int8"
-					| "numeric"
-					| "float4"
-					| "float8"
-					| "unknown"
-				? SampleArgs<Args, Ts, C, Nx<I>>
+			? A["type"] extends NumT | "unknown"
+				? SampleArgs<Args, Ts, C, Next<I>>
 				: Args[I] extends Tag<"str">
-					? SampleArgs<Args, Ts, C, Nx<I>>
+					? SampleArgs<Args, Ts, C, Next<I>>
 					: SqlError<
 							`argument of ${I extends 0 ? "TABLESAMPLE" : "REPEATABLE"} must be type ${TypeDisplay<Ts[I]>}, not type ${TypeDisplay<A["type"] extends "null" ? "text" : A["type"]>}`,
 							null
@@ -322,35 +354,6 @@ export type RenameCols<
 				null
 			>
 	: [...Acc, ...C];
-
-type RecordSrf = {
-	json_each: [
-		{ readonly n: "key"; readonly t: Info<"text"> },
-		{ readonly n: "value"; readonly t: Info<"json"> },
-	];
-	jsonb_each: [
-		{ readonly n: "key"; readonly t: Info<"text"> },
-		{ readonly n: "value"; readonly t: Info<"jsonb"> },
-	];
-	json_each_text: [
-		{ readonly n: "key"; readonly t: Info<"text"> },
-		{ readonly n: "value"; readonly t: Info<"text", true> },
-	];
-	jsonb_each_text: [
-		{ readonly n: "key"; readonly t: Info<"text"> },
-		{ readonly n: "value"; readonly t: Info<"text", true> },
-	];
-};
-type RecordFunc =
-	| "json_to_record"
-	| "jsonb_to_record"
-	| "json_to_recordset"
-	| "jsonb_to_recordset";
-type ValueNamed =
-	| "json_array_elements"
-	| "jsonb_array_elements"
-	| "json_array_elements_text"
-	| "jsonb_array_elements_text";
 
 type BindFunc<
 	Call extends Expr,
@@ -442,18 +445,30 @@ type FuncBaseCols<
 		? ColDefsCols<CD, []>
 		: TypeList<Args, C, []>
 	: TypeList<Args, C, []> extends infer As extends readonly ColInfo[]
-		? Name extends keyof RecordSrf
-			? RecordSrf[Name]
-			: Name extends RecordFunc
-				? SqlError<
-						'a column definition list is required for functions returning "record"',
-						null
-					>
-				: Name extends "unnest"
-					? As extends readonly [ColInfo, ColInfo, ...ColInfo[]]
-						? MultiUnnest<As, []>
-						: SrfOrScalar<Name, As, Call, C>
-					: SrfOrScalar<Name, As, Call, C>
+		? (
+				Name extends keyof FunctionCatalog
+					? FunctionCatalog[Name]
+					: null
+			) extends infer F
+			? F extends { readonly cols: infer Cs extends Cols }
+				? Cs
+				: F extends { readonly coldefs: true }
+					? SqlError<
+							'a column definition list is required for functions returning "record"',
+							null
+						>
+					: Name extends "unnest"
+						? As extends readonly [ColInfo, ColInfo, ...ColInfo[]]
+							? MultiUnnest<As, []>
+							: SrfOrScalar<Name, As, Call, C, Name>
+						: SrfOrScalar<
+								Name,
+								As,
+								Call,
+								C,
+								F extends { readonly column: infer N extends string } ? N : Name
+							>
+			: never
 		: TypeList<Args, C, []>;
 
 type NonNullInfos<As extends readonly ColInfo[]> = {
@@ -465,18 +480,19 @@ type SrfOrScalar<
 	As extends readonly ColInfo[],
 	Call extends Expr,
 	C extends MkCtx<unknown, Scope, CteMap, false>,
+	Column extends string,
 > =
 	SrfType<Name, NonNullInfos<As>, C["db"]> extends infer S extends ColInfo
-		? [
-				{
-					readonly n: Name extends ValueNamed ? "value" : Name;
-					readonly t: S;
-				},
-			]
+		? [{ readonly n: Column; readonly t: S }]
 		: TypeOf<Call, C> extends infer T extends ColInfo
 			? [{ readonly n: Name; readonly t: T }]
 			: TypeOf<Call, C>;
 
+/**
+ * `unnest(a, b, ...)`, only allowed in FROM: PostgreSQL runs it as
+ * `ROWS FROM (unnest(a), unnest(b), ...)`, one nullable column per array.
+ * Typed directly; going through ROWS FROM costs a signature match per array.
+ */
 type MultiUnnest<
 	As extends readonly ColInfo[],
 	Acc extends Cols,
@@ -678,15 +694,10 @@ type ApplyNullability<
 				? NullableLevel<L>
 				: L
 			: L;
-type NullableLevel<L extends ScopeLevel> = {
-	readonly [I in keyof L]: L[I] extends ScopeItem
-		? {
-				readonly alias: L[I]["alias"];
-				readonly cols: NullableMap<L[I]["cols"]>;
-				readonly skip: L[I]["skip"];
-			}
-		: L[I];
-};
+
+type UsingKeys<U extends string> = U extends string
+	? readonly [null, U]
+	: never;
 
 type CommonNames<L extends ScopeLevel, R extends ScopeLevel> = Extract<
 	LevelKeys<L>,

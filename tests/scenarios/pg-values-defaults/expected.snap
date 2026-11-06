@@ -1,0 +1,30 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`pg-values-defaults > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "users": "({ bio: null | string; id: number; name: string })[]",
+    },
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "[
+  { id: 1, name: 'a', bio: null },
+  { id: 2, name: 'anonymous', bio: null },
+  { id: 3, name: 'anonymous', bio: null },
+  { id: 4, name: 'd', bio: null },
+  { id: 5, name: 'anonymous', bio: null },
+  { id: 6, name: 'anonymous', bio: 'f' }
+]
+",
+  },
+}
+`;

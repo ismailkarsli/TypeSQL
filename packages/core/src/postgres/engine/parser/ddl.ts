@@ -1,11 +1,6 @@
-import type {
-	OpTok,
-	StrTok,
-	Tok,
-	Toks,
-	WordTok,
-} from "../../../engine/tokens.js";
-import type { SerialTypeName } from "../../schema/normalize.js";
+import type { Next } from "../../../engine/next.js";
+import type { Tok, Toks } from "../../../engine/tokens.js";
+import type { SerialAliases } from "../../schema/type-facts.js";
 import type {
 	AlterAction,
 	ColumnDef,
@@ -14,6 +9,8 @@ import type {
 	TableRef,
 	Tag,
 } from "../ast.js";
+import type { OpTok, StrTok, WordTok } from "../lexer/tokens.js";
+import type { CompareOp } from "../ops.js";
 import type { LastOf, ParseExpr, ParseExprList } from "./expr.js";
 import type { ParseSelectStmt, RefOf } from "./select.js";
 import type { ParseTypeName } from "./typename.js";
@@ -25,7 +22,6 @@ import type {
 	Expected,
 	Fail,
 	Ident,
-	Nx,
 	Nx2,
 	Nx3,
 	Ok,
@@ -41,11 +37,11 @@ import type {
 export type ParseDdl<T extends Toks, I extends number> =
 	T[I] extends WordTok<infer W>
 		? W extends "create"
-			? ParseCreate<T, Nx<I>, false>
+			? ParseCreate<T, Next<I>, false>
 			: W extends "alter"
-				? ParseAlter<T, Nx<I>>
+				? ParseAlter<T, Next<I>>
 				: W extends "drop"
-					? ParseDrop<T, Nx<I>>
+					? ParseDrop<T, Next<I>>
 					: Noop<T, I, W>
 		: SyntaxErrorAt<T, I>;
 
@@ -63,17 +59,17 @@ type SkipUntil<
 	T[I] extends OpTok<infer O>
 		? D extends readonly [unknown, ...infer D2]
 			? O extends "("
-				? SkipUntil<T, Nx<I>, Stop, [...D, 0]>
+				? SkipUntil<T, Next<I>, Stop, [...D, 0]>
 				: O extends ")"
-					? SkipUntil<T, Nx<I>, Stop, D2>
-					: SkipUntil<T, Nx<I>, Stop, D>
+					? SkipUntil<T, Next<I>, Stop, D2>
+					: SkipUntil<T, Next<I>, Stop, D>
 			: O extends Stop
 				? I
 				: O extends "("
-					? SkipUntil<T, Nx<I>, Stop, [0]>
-					: SkipUntil<T, Nx<I>, Stop, D>
+					? SkipUntil<T, Next<I>, Stop, [0]>
+					: SkipUntil<T, Next<I>, Stop, D>
 		: T[I] extends Tok
-			? SkipUntil<T, Nx<I>, Stop, D>
+			? SkipUntil<T, Next<I>, Stop, D>
 			: I;
 
 type SkipToStmtEnd<T extends Toks, I extends number> = SkipUntil<T, I, ";">;
@@ -92,15 +88,15 @@ type SkipRoutine<T extends Toks, I extends number> =
 	T[I] extends OpTok<";">
 		? I
 		: T[I] extends WordTok<"begin">
-			? T[Nx<I>] extends WordTok<"atomic">
+			? T[Next<I>] extends WordTok<"atomic">
 				? SkipAtomic<T, Nx2<I>, []>
-				: SkipRoutine<T, Nx<I>>
+				: SkipRoutine<T, Next<I>>
 			: T[I] extends OpTok<"(">
-				? SkipToCloseParen<T, Nx<I>> extends infer J extends number
+				? SkipToCloseParen<T, Next<I>> extends infer J extends number
 					? SkipRoutine<T, J>
-					: SkipToCloseParen<T, Nx<I>>
+					: SkipToCloseParen<T, Next<I>>
 				: T[I] extends Tok
-					? SkipRoutine<T, Nx<I>>
+					? SkipRoutine<T, Next<I>>
 					: I;
 type SkipAtomic<
 	T extends Toks,
@@ -108,13 +104,13 @@ type SkipAtomic<
 	D extends readonly unknown[],
 > =
 	T[I] extends WordTok<"case">
-		? SkipAtomic<T, Nx<I>, [...D, 0]>
+		? SkipAtomic<T, Next<I>, [...D, 0]>
 		: T[I] extends WordTok<"end">
 			? D extends readonly [unknown, ...infer D2]
-				? SkipAtomic<T, Nx<I>, D2>
-				: Nx<I>
+				? SkipAtomic<T, Next<I>, D2>
+				: Next<I>
 			: T[I] extends Tok
-				? SkipAtomic<T, Nx<I>, D>
+				? SkipAtomic<T, Next<I>, D>
 				: SyntaxErrorAt<T, I>;
 
 type RoutineEnd<T extends Toks, I extends number, Node> =
@@ -123,7 +119,7 @@ type RoutineEnd<T extends Toks, I extends number, Node> =
 		: SkipRoutine<T, I>;
 
 type SkipParenOpt<T extends Toks, I extends number> =
-	T[I] extends OpTok<"("> ? SkipToCloseParen<T, Nx<I>> : I;
+	T[I] extends OpTok<"("> ? SkipToCloseParen<T, Next<I>> : I;
 
 type IfExists<T extends Toks, I extends number> =
 	EatWords<T, I, ["if", "exists"]> extends never ? [false, I] : [true, Nx2<I>];
@@ -143,14 +139,14 @@ type ParseNameList<
 	]
 		? EatOp<T, J, ","> extends never
 			? Ok<[...Acc, RefOf<Parts>], J>
-			: ParseNameList<T, Nx<J>, [...Acc, RefOf<Parts>]>
+			: ParseNameList<T, Next<J>, [...Acc, RefOf<Parts>]>
 		: Expected<"name", T, I>;
 
 type Cascade<T extends Toks, I extends number> =
 	T[I] extends WordTok<"cascade">
-		? [true, Nx<I>]
+		? [true, Next<I>]
 		: T[I] extends WordTok<"restrict">
-			? [false, Nx<I>]
+			? [false, Next<I>]
 			: [false, I];
 
 type NoopObject =
@@ -192,18 +188,18 @@ type NoopCreateObject =
 type ParseCreate<T extends Toks, I extends number, OrReplace extends boolean> =
 	T[I] extends WordTok<infer W>
 		? W extends "or"
-			? EatWord<T, Nx<I>, "replace"> extends never
-				? Expected<"REPLACE", T, Nx<I>>
+			? EatWord<T, Next<I>, "replace"> extends never
+				? Expected<"REPLACE", T, Next<I>>
 				: ParseCreate<T, Nx2<I>, true>
 			: W extends "temp" | "temporary" | "unlogged" | "global" | "local"
-				? ParseCreate<T, Nx<I>, OrReplace>
+				? ParseCreate<T, Next<I>, OrReplace>
 				: W extends "table"
-					? ParseCreateTable<T, Nx<I>>
+					? ParseCreateTable<T, Next<I>>
 					: W extends "view"
-						? ParseCreateView<T, Nx<I>, OrReplace, false, false>
+						? ParseCreateView<T, Next<I>, OrReplace, false, false>
 						: W extends "materialized"
-							? EatWord<T, Nx<I>, "view"> extends never
-								? Expected<"VIEW", T, Nx<I>>
+							? EatWord<T, Next<I>, "view"> extends never
+								? Expected<"VIEW", T, Next<I>>
 								: OrReplace extends true
 									? SyntaxErrorAt<T, I>
 									: IfNotExists<T, Nx2<I>> extends [
@@ -213,19 +209,19 @@ type ParseCreate<T extends Toks, I extends number, OrReplace extends boolean> =
 										? ParseCreateView<T, I1, false, true, Ine>
 										: never
 							: W extends "recursive"
-								? EatWord<T, Nx<I>, "view"> extends never
-									? Expected<"VIEW", T, Nx<I>>
+								? EatWord<T, Next<I>, "view"> extends never
+									? Expected<"VIEW", T, Next<I>>
 									: ParseCreateView<T, Nx2<I>, OrReplace, false, false, true>
 								: W extends "type"
-									? ParseCreateType<T, Nx<I>>
+									? ParseCreateType<T, Next<I>>
 									: W extends "schema"
-										? ParseCreateSchema<T, Nx<I>>
+										? ParseCreateSchema<T, Next<I>>
 										: W extends "function"
-											? ParseCreateFunction<T, Nx<I>>
+											? ParseCreateFunction<T, Next<I>>
 											: W extends "procedure"
 												? RoutineEnd<
 														T,
-														Nx<I>,
+														Next<I>,
 														{ t: "noop"; what: `create ${W}` }
 													>
 												: W extends NoopCreateObject
@@ -243,7 +239,7 @@ type ParseCreateFunction<T extends Toks, I extends number> =
 		infer J extends number,
 	]
 		? T[J] extends OpTok<"(">
-			? SkipToCloseParen<T, Nx<J>> extends infer J1 extends number
+			? SkipToCloseParen<T, Next<J>> extends infer J1 extends number
 				? FnReturns<T, J1> extends [
 						infer Ret,
 						infer Srf,
@@ -260,16 +256,16 @@ type ParseCreateFunction<T extends Toks, I extends number> =
 							}
 						>
 					: FnReturns<T, J1>
-				: SkipToCloseParen<T, Nx<J>>
+				: SkipToCloseParen<T, Next<J>>
 			: Expected<'"("', T, J>
 		: Expected<"function name", T, I>;
 type FnReturns<T extends Toks, I extends number> =
 	T[I] extends WordTok<"returns">
-		? T[Nx<I>] extends WordTok<"table">
+		? T[Next<I>] extends WordTok<"table">
 			? FnTableReturn<T, Nx2<I>>
-			: T[Nx<I>] extends WordTok<"setof">
+			: T[Next<I>] extends WordTok<"setof">
 				? FnRetType<T, Nx2<I>, true>
-				: FnRetType<T, Nx<I>, false>
+				: FnRetType<T, Next<I>, false>
 		: ["unknown", false, I];
 type FnRetType<T extends Toks, I extends number, Srf extends boolean> =
 	QualName<T, I> extends [
@@ -277,9 +273,9 @@ type FnRetType<T extends Toks, I extends number, Srf extends boolean> =
 		infer J extends number,
 	]
 		? T[J] extends OpTok<"%">
-			? T[Nx<J>] extends WordTok<"type">
+			? T[Next<J>] extends WordTok<"type">
 				? [`${LastOf<Parts>}%type`, Srf, Nx2<J>]
-				: SyntaxErrorAt<T, Nx<J>>
+				: SyntaxErrorAt<T, Next<J>>
 			: FnPlainRetType<T, I, Srf>
 		: FnPlainRetType<T, I, Srf>;
 type FnPlainRetType<T extends Toks, I extends number, Srf extends boolean> =
@@ -289,13 +285,13 @@ type FnPlainRetType<T extends Toks, I extends number, Srf extends boolean> =
 
 type FnTableReturn<T extends Toks, I extends number> =
 	T[I] extends OpTok<"(">
-		? Ident<T, Nx<I>> extends [string, infer J extends number]
+		? Ident<T, Next<I>> extends [string, infer J extends number]
 			? FnRetType<T, J, true> extends [infer Ty, true, infer K extends number]
 				? T[K] extends OpTok<")">
-					? [Ty, true, Nx<K>]
+					? [Ty, true, Next<K>]
 					: ["record", true, I]
 				: FnRetType<T, J, true>
-			: Expected<"column name", T, Nx<I>>
+			: Expected<"column name", T, Next<I>>
 		: Expected<'"("', T, I>;
 
 type CreateTableNode<Ine, Ref, Cols, Cons, Like, Inh, Of> = {
@@ -323,9 +319,9 @@ type ParseCreateTable<T extends Toks, I extends number> =
 				infer J extends number,
 			]
 			? T[J] extends OpTok<"(">
-				? IsCtasColList<T, Nx<J>> extends true
+				? IsCtasColList<T, Next<J>> extends true
 					? ParseCtasCols<T, J, Ine, RefOf<Parts>>
-					: ParseTableBody<T, Nx<J>, RefOf<Parts>["name"]> extends Ok<
+					: ParseTableBody<T, Next<J>, RefOf<Parts>["name"]> extends Ok<
 								[infer Cols, infer Cons, infer Like],
 								infer J2
 							>
@@ -343,9 +339,9 @@ type ParseCreateTable<T extends Toks, I extends number> =
 									J3
 								>
 							: ParseTableTail<T, J2>
-						: ParseTableBody<T, Nx<J>, RefOf<Parts>["name"]>
+						: ParseTableBody<T, Next<J>, RefOf<Parts>["name"]>
 				: T[J] extends WordTok<"of">
-					? ParseTypedTable<T, Nx<J>, Ine, RefOf<Parts>>
+					? ParseTypedTable<T, Next<J>, Ine, RefOf<Parts>>
 					: EatWords<T, J, ["partition", "of"]> extends never
 						? ParseCtasAfterCols<T, J, Ine, RefOf<Parts>, null>
 						: ParsePartitionOf<T, Nx2<J>, Ine, RefOf<Parts>>
@@ -364,7 +360,7 @@ type ParseTypedTable<
 	]
 		? (
 				T[J] extends OpTok<"(">
-					? ParseTypedElements<T, Nx<J>, Ref["name"]>
+					? ParseTypedElements<T, Next<J>, Ref["name"]>
 					: J
 			) extends infer J2
 			? J2 extends number
@@ -389,9 +385,9 @@ type ParseTypedElements<T extends Toks, I extends number, TN extends string> = (
 ) extends infer R
 	? R extends Ok<unknown, infer J>
 		? T[J] extends OpTok<",">
-			? ParseTypedElements<T, Nx<J>, TN>
+			? ParseTypedElements<T, Next<J>, TN>
 			: T[J] extends OpTok<")">
-				? Nx<J>
+				? Next<J>
 				: Expected<'"," or ")"', T, J>
 		: R
 	: never;
@@ -426,11 +422,11 @@ type ParseCtasAfterCols<
 	SkipStorage<T, I, false> extends infer I1 extends number
 		? EatWord<T, I1, "as"> extends never
 			? Expected<'"(", AS, OF or PARTITION OF', T, I1>
-			: T[Nx<I1>] extends WordTok<"execute">
+			: T[Next<I1>] extends WordTok<"execute">
 				? ParseCtasExecute<T, Nx2<I1>, Ine, Ref, Names>
-				: ParseSelectStmt<T, Nx<I1>> extends Ok<infer Q, infer J>
+				: ParseSelectStmt<T, Next<I1>> extends Ok<infer Q, infer J>
 					? Ok<CtasNode<Ine, Ref, Names, Q>, SkipWithData<T, J>>
-					: ParseSelectStmt<T, Nx<I1>>
+					: ParseSelectStmt<T, Next<I1>>
 		: SkipStorage<T, I, false>;
 
 type ParseCtasExecute<
@@ -443,7 +439,7 @@ type ParseCtasExecute<
 	Ident<T, I> extends [infer N, infer J extends number]
 		? (
 				T[J] extends OpTok<"(">
-					? ParseExprList<T, Nx<J>, []>
+					? ParseExprList<T, Next<J>, []>
 					: Ok<[], J>
 			) extends infer R
 			? R extends Ok<unknown, infer J2>
@@ -451,7 +447,7 @@ type ParseCtasExecute<
 						T[J] extends OpTok<"(">
 							? EatOp<T, J2, ")"> extends never
 								? Expected<'")"', T, J2>
-								: Nx<J2>
+								: Next<J2>
 							: J2
 					) extends infer J3
 					? J3 extends number
@@ -491,37 +487,37 @@ type ParsePartitionOf<
 
 type SkipPartitionBound<T extends Toks, I extends number> =
 	T[I] extends WordTok<"default">
-		? Nx<I>
+		? Next<I>
 		: EatWords<T, I, ["for", "values"]> extends never
 			? Expected<"FOR VALUES or DEFAULT", T, I>
 			: Nx2<I> extends infer J extends number
 				? T[J] extends WordTok<"in" | "with">
-					? T[Nx<J>] extends OpTok<"(">
+					? T[Next<J>] extends OpTok<"(">
 						? T[Nx2<J>] extends OpTok<")">
 							? SyntaxErrorAt<T, Nx2<J>>
 							: SkipToCloseParen<T, Nx2<J>>
-						: Expected<'"("', T, Nx<J>>
+						: Expected<'"("', T, Next<J>>
 					: T[J] extends WordTok<"from">
-						? T[Nx<J>] extends OpTok<"(">
+						? T[Next<J>] extends OpTok<"(">
 							? SkipToCloseParen<T, Nx2<J>> extends infer K extends number
 								? EatWord<T, K, "to"> extends never
 									? Expected<"TO", T, K>
-									: T[Nx<K>] extends OpTok<"(">
+									: T[Next<K>] extends OpTok<"(">
 										? SkipToCloseParen<T, Nx2<K>>
-										: Expected<'"("', T, Nx<K>>
+										: Expected<'"("', T, Next<K>>
 								: SkipToCloseParen<T, Nx2<J>>
-							: Expected<'"("', T, Nx<J>>
+							: Expected<'"("', T, Next<J>>
 						: Expected<"IN, FROM or WITH", T, J>
 				: never;
 
 type ParseTableTail<T extends Toks, I extends number> =
 	T[I] extends WordTok<"inherits">
-		? EatOp<T, Nx<I>, "("> extends never
-			? Expected<'"("', T, Nx<I>>
+		? EatOp<T, Next<I>, "("> extends never
+			? Expected<'"("', T, Next<I>>
 			: ParseNameList<T, Nx2<I>, []> extends Ok<infer Ps, infer J>
 				? EatOp<T, J, ")"> extends never
 					? Expected<'")"', T, J>
-					: WithInherits<Ps, PartitionTail<T, Nx<J>>>
+					: WithInherits<Ps, PartitionTail<T, Next<J>>>
 				: ParseNameList<T, Nx2<I>, []>
 		: WithInherits<[], PartitionTail<T, I>>;
 type WithInherits<Ps, J> = J extends number ? [Ps, J] : J;
@@ -532,9 +528,9 @@ type PartitionTail<T extends Toks, I extends number> =
 		: Nx2<I> extends infer J extends number
 			? Ident<T, J> extends [string, infer J1 extends number]
 				? T[J1] extends OpTok<"(">
-					? SkipToCloseParen<T, Nx<J1>> extends infer J2 extends number
+					? SkipToCloseParen<T, Next<J1>> extends infer J2 extends number
 						? SkipStorage<T, J2, false>
-						: SkipToCloseParen<T, Nx<J1>>
+						: SkipToCloseParen<T, Next<J1>>
 					: Expected<'"("', T, J1>
 				: Expected<"RANGE, LIST or HASH", T, J>
 			: never;
@@ -555,9 +551,9 @@ type SkipStorage<T extends Toks, I extends number, Mat extends boolean> =
 		: never;
 type SkipReloptions<T extends Toks, I extends number, Mat extends boolean> =
 	T[I] extends WordTok<"with">
-		? T[Nx<I>] extends OpTok<"(">
+		? T[Next<I>] extends OpTok<"(">
 			? SkipToCloseParen<T, Nx2<I>>
-			: SyntaxErrorAt<T, Nx<I>>
+			: SyntaxErrorAt<T, Next<I>>
 		: Mat extends true
 			? I
 			: SkipWords<T, I, ["without", "oids"]>;
@@ -567,10 +563,10 @@ type SkipOnCommit<T extends Toks, I extends number> =
 		: OnCommitAction<T, Nx2<I>>;
 type OnCommitAction<T extends Toks, I extends number> =
 	T[I] extends WordTok<"drop">
-		? Nx<I>
+		? Next<I>
 		: T[I] extends WordTok<"delete" | "preserve">
-			? EatWord<T, Nx<I>, "rows"> extends never
-				? Expected<"ROWS", T, Nx<I>>
+			? EatWord<T, Next<I>, "rows"> extends never
+				? Expected<"ROWS", T, Next<I>>
 				: Nx2<I>
 			: Expected<"DROP, DELETE ROWS or PRESERVE ROWS", T, I>;
 type SkipTablespace<T extends Toks, I extends number> =
@@ -578,7 +574,7 @@ type SkipTablespace<T extends Toks, I extends number> =
 
 type ParseTableBody<T extends Toks, I extends number, TN extends string> =
 	T[I] extends OpTok<")">
-		? Ok<[[], [], []], Nx<I>>
+		? Ok<[[], [], []], Next<I>>
 		: ParseTableElements<T, I, TN, [], [], []>;
 
 type ParseTableElements<
@@ -597,9 +593,9 @@ type ParseTableElements<
 			? ElementNext<T, J, TN, Cols, [...Cons, C], Like>
 			: ParseTableConstraint<T, I>
 		: T[I] extends WordTok<"like">
-			? ParseLike<T, Nx<I>> extends Ok<infer L extends LikeClause, infer J>
+			? ParseLike<T, Next<I>> extends Ok<infer L extends LikeClause, infer J>
 				? ElementNext<T, J, TN, Cols, Cons, [...Like, L]>
-				: ParseLike<T, Nx<I>>
+				: ParseLike<T, Next<I>>
 			: ParseColumnDef<T, I, TN> extends Ok<infer C extends ColumnDef, infer J>
 				? ElementNext<T, J, TN, [...Cols, C], Cons, Like>
 				: ParseColumnDef<T, I, TN>;
@@ -615,7 +611,7 @@ type IsConstraintStart<T extends Toks, I extends number> =
 	T[I] extends WordTok<ConstraintStart>
 		? true
 		: T[I] extends WordTok<"exclude">
-			? T[Nx<I>] extends WordTok<"using"> | OpTok<"(">
+			? T[Next<I>] extends WordTok<"using"> | OpTok<"(">
 				? true
 				: false
 			: false;
@@ -629,24 +625,24 @@ type ElementNext<
 	Like extends readonly LikeClause[],
 > =
 	T[I] extends OpTok<",">
-		? ParseTableElements<T, Nx<I>, TN, Cols, Cons, Like>
+		? ParseTableElements<T, Next<I>, TN, Cols, Cons, Like>
 		: T[I] extends OpTok<")">
-			? Ok<[Cols, Cons, Like], Nx<I>>
+			? Ok<[Cols, Cons, Like], Next<I>>
 			: Expected<'"," or ")"', T, I>;
 
 type ParseTableConstraint<T extends Toks, I extends number> =
 	T[I] extends WordTok<"constraint">
-		? Ident<T, Nx<I>> extends [string, infer J extends number]
+		? Ident<T, Next<I>> extends [string, infer J extends number]
 			? ParseTableConstraintBody<T, J>
-			: Expected<"constraint name", T, Nx<I>>
+			: Expected<"constraint name", T, Next<I>>
 		: ParseTableConstraintBody<T, I>;
 
 type ParseTableConstraintBody<T extends Toks, I extends number> =
 	EatWords<T, I, ["primary", "key"]> extends never
 		? T[I] extends WordTok<"not">
-			? ParseNotNullConstraint<T, Nx<I>>
+			? ParseNotNullConstraint<T, Next<I>>
 			: T[I] extends WordTok<"unique" | "check" | "foreign" | "exclude">
-				? Ok<{ t: "other" }, SkipToElementEnd<T, Nx<I>>>
+				? Ok<{ t: "other" }, SkipToElementEnd<T, Next<I>>>
 				: Expected<"table constraint", T, I>
 		: T[Nx2<I>] extends OpTok<"(">
 			? KeyColumns<T, Nx3<I>, []> extends Ok<infer Cols, infer J>
@@ -661,7 +657,7 @@ type KeyColumns<
 > =
 	Ident<T, I> extends [infer N extends string, infer J extends number]
 		? T[J] extends OpTok<",">
-			? KeyColumns<T, Nx<J>, [...Acc, N]>
+			? KeyColumns<T, Next<J>, [...Acc, N]>
 			: (
 						EatWords<T, J, ["without", "overlaps"]> extends never
 							? J
@@ -669,14 +665,14 @@ type KeyColumns<
 					) extends infer K extends number
 				? EatOp<T, K, ")"> extends never
 					? Expected<'"," or ")"', T, K>
-					: Ok<[...Acc, N], Nx<K>>
+					: Ok<[...Acc, N], Next<K>>
 				: never
 		: Expected<"column name", T, I>;
 
 type ParseNotNullConstraint<T extends Toks, I extends number> =
 	EatWord<T, I, "null"> extends never
 		? Expected<"NULL", T, I>
-		: Ident<T, Nx<I>> extends [infer C, infer J extends number]
+		: Ident<T, Next<I>> extends [infer C, infer J extends number]
 			? ConstraintAttrs<T, J, false, J> extends [
 					infer NotValid,
 					infer J2 extends number,
@@ -686,7 +682,7 @@ type ParseNotNullConstraint<T extends Toks, I extends number> =
 						J2
 					>
 				: ConstraintAttrs<T, J, false, J>
-			: Expected<"column name", T, Nx<I>>;
+			: Expected<"column name", T, Next<I>>;
 
 type ConstraintAttrs<
 	T extends Toks,
@@ -700,21 +696,21 @@ type ConstraintAttrs<
 			: W extends "enforced"
 				? NotMarked<"ENFORCED", At>
 				: W extends "initially"
-					? T[Nx<I>] extends WordTok<"immediate">
+					? T[Next<I>] extends WordTok<"immediate">
 						? ConstraintAttrs<T, Nx2<I>, NotValid, At>
-						: T[Nx<I>] extends WordTok<"deferred">
+						: T[Next<I>] extends WordTok<"deferred">
 							? NotMarked<"DEFERRABLE", At>
 							: [NotValid, I]
 					: W extends "no"
-						? T[Nx<I>] extends WordTok<"inherit">
+						? T[Next<I>] extends WordTok<"inherit">
 							? ConstraintAttrs<T, Nx2<I>, NotValid, At>
 							: [NotValid, I]
 						: W extends "not"
-							? T[Nx<I>] extends WordTok<"deferrable">
+							? T[Next<I>] extends WordTok<"deferrable">
 								? ConstraintAttrs<T, Nx2<I>, NotValid, At>
-								: T[Nx<I>] extends WordTok<"enforced">
+								: T[Next<I>] extends WordTok<"enforced">
 									? NotMarked<"NOT ENFORCED", At>
-									: T[Nx<I>] extends WordTok<"valid">
+									: T[Next<I>] extends WordTok<"valid">
 										? ConstraintAttrs<T, Nx2<I>, true, At>
 										: [NotValid, I]
 							: [NotValid, I]
@@ -752,7 +748,7 @@ type ParseLikeOptions<
 	Copies extends boolean,
 > =
 	T[I] extends WordTok<"including">
-		? T[Nx<I>] extends WordTok<infer O>
+		? T[Next<I>] extends WordTok<infer O>
 			? ParseLikeOptions<
 					T,
 					Nx2<I>,
@@ -761,16 +757,16 @@ type ParseLikeOptions<
 						: Def | Extract<O, DefaultLikeOption>,
 					O extends DefaultLikeOption | "all" ? true : Copies
 				>
-			: Expected<"LIKE option", T, Nx<I>>
+			: Expected<"LIKE option", T, Next<I>>
 		: T[I] extends WordTok<"excluding">
-			? T[Nx<I>] extends WordTok<infer O>
+			? T[Next<I>] extends WordTok<infer O>
 				? ParseLikeOptions<
 						T,
 						Nx2<I>,
 						O extends "all" ? never : Exclude<Def, O>,
 						O extends DefaultLikeOption | "all" ? false : Copies
 					>
-				: Expected<"LIKE option", T, Nx<I>>
+				: Expected<"LIKE option", T, Next<I>>
 			: [Def, I, Copies];
 
 type ParseColumnDef<T extends Toks, I extends number, TN extends string> =
@@ -793,7 +789,7 @@ type SkipCompression<T extends Toks, I extends number> =
 	T[I] extends WordTok<"compression"> ? Nx2<I> : I;
 
 type IsSerial<T extends Toks, I extends number> =
-	T[I] extends WordTok<SerialTypeName> ? true : false;
+	T[I] extends WordTok<keyof SerialAliases> ? true : false;
 
 type ColCtx = {
 	readonly tn: string;
@@ -813,11 +809,11 @@ type ParseColConstraints<
 > =
 	T[I] extends WordTok<infer W>
 		? W extends "constraint"
-			? Ident<T, Nx<I>> extends [string, infer J extends number]
+			? Ident<T, Next<I>> extends [string, infer J extends number]
 				? ParseColConstraints<T, J, C, F>
-				: Expected<"constraint name", T, Nx<I>>
+				: Expected<"constraint name", T, Next<I>>
 			: W extends "not"
-				? T[Nx<I>] extends WordTok<"null">
+				? T[Next<I>] extends WordTok<"null">
 					? "nul" extends F
 						? NullConflict<C, I>
 						: ParseColConstraints<
@@ -826,20 +822,20 @@ type ParseColConstraints<
 								C,
 								F | "nn"
 							>
-					: T[Nx<I>] extends WordTok<"deferrable" | "enforced">
+					: T[Next<I>] extends WordTok<"deferrable" | "enforced">
 						? ParseColConstraints<T, Nx2<I>, C, F>
-						: Expected<"NULL", T, Nx<I>>
+						: Expected<"NULL", T, Next<I>>
 				: W extends "null"
 					? Extract<F, "nn" | "pk"> extends never
-						? ParseColConstraints<T, Nx<I>, C, F | "nul">
+						? ParseColConstraints<T, Next<I>, C, F | "nul">
 						: NullConflict<C, I>
 					: W extends "default"
-						? ParseBExpr<T, Nx<I>> extends Ok<unknown, infer J>
+						? ParseBExpr<T, Next<I>> extends Ok<unknown, infer J>
 							? ParseColConstraints<T, J, C, F | "hd">
-							: ParseBExpr<T, Nx<I>>
+							: ParseBExpr<T, Next<I>>
 						: W extends "primary"
-							? EatWord<T, Nx<I>, "key"> extends never
-								? Expected<"KEY", T, Nx<I>>
+							? EatWord<T, Next<I>, "key"> extends never
+								? Expected<"KEY", T, Next<I>>
 								: "nul" extends F
 									? NullConflict<C, I>
 									: SkipIndexParams<T, Nx2<I>> extends infer J extends number
@@ -850,7 +846,7 @@ type ParseColConstraints<
 										T,
 										SkipFirst<
 											T,
-											Nx<I>,
+											Next<I>,
 											[["nulls", "distinct"], ["nulls", "not", "distinct"]]
 										>
 									> extends infer J
@@ -859,7 +855,7 @@ type ParseColConstraints<
 										: J
 									: never
 								: W extends "check"
-									? T[Nx<I>] extends OpTok<"(">
+									? T[Next<I>] extends OpTok<"(">
 										? SkipToCloseParen<T, Nx2<I>> extends infer J extends number
 											? ParseColConstraints<
 													T,
@@ -868,9 +864,9 @@ type ParseColConstraints<
 													F
 												>
 											: SkipToCloseParen<T, Nx2<I>>
-										: Expected<'"("', T, Nx<I>>
+										: Expected<'"("', T, Next<I>>
 									: W extends "references"
-										? QualName<T, Nx<I>> extends [
+										? QualName<T, Next<I>> extends [
 												unknown,
 												infer J extends number,
 											]
@@ -879,9 +875,9 @@ type ParseColConstraints<
 													? ParseColConstraints<T, J2, C, F>
 													: SkipRefActions<T, J1>
 												: SkipParenOpt<T, J>
-											: Expected<"referenced table", T, Nx<I>>
+											: Expected<"referenced table", T, Next<I>>
 										: W extends "generated"
-											? ParseGenerated<T, Nx<I>> extends infer G
+											? ParseGenerated<T, Next<I>> extends infer G
 												? G extends [true, infer J extends number]
 													? "nul" extends F
 														? NullConflict<C, I>
@@ -891,16 +887,16 @@ type ParseColConstraints<
 														: G
 												: never
 											: W extends "deferrable" | "enforced"
-												? ParseColConstraints<T, Nx<I>, C, F>
+												? ParseColConstraints<T, Next<I>, C, F>
 												: W extends "initially"
 													? ParseColConstraints<T, Nx2<I>, C, F>
 													: W extends "collate"
-														? QualName<T, Nx<I>> extends [
+														? QualName<T, Next<I>> extends [
 																unknown,
 																infer J extends number,
 															]
 															? ParseColConstraints<T, J, C, F>
-															: Expected<"collation name", T, Nx<I>>
+															: Expected<"collation name", T, Next<I>>
 														: Expected<"column constraint", T, I>
 		: Ok<
 				{
@@ -916,13 +912,13 @@ type ParseColConstraints<
 type ParseBExpr<T extends Toks, I extends number> =
 	ParseExpr<T, I, 7> extends infer R
 		? R extends Ok<unknown, infer J>
-			? T[J] extends OpTok<"=" | "<" | ">" | "<=" | ">=" | "<>" | "!=">
-				? ParseExpr<T, Nx<J>, 7>
+			? T[J] extends OpTok<CompareOp>
+				? ParseExpr<T, Next<J>, 7>
 				: T[J] extends WordTok<"is">
-					? EatWords<T, Nx<J>, ["distinct", "from"]> extends never
-						? EatWords<T, Nx<J>, ["not", "distinct", "from"]> extends never
+					? EatWords<T, Next<J>, ["distinct", "from"]> extends never
+						? EatWords<T, Next<J>, ["not", "distinct", "from"]> extends never
 							? R
-							: ParseExpr<T, Nx3<Nx<J>>, 7>
+							: ParseExpr<T, Nx3<Next<J>>, 7>
 						: ParseExpr<T, Nx3<J>, 7>
 					: R
 			: R
@@ -930,7 +926,7 @@ type ParseBExpr<T extends Toks, I extends number> =
 
 type SkipIndexParams<T extends Toks, I extends number> =
 	T[I] extends WordTok<"with">
-		? T[Nx<I>] extends OpTok<"(">
+		? T[Next<I>] extends OpTok<"(">
 			? SkipToCloseParen<T, Nx2<I>> extends infer J extends number
 				? SkipIndexTablespace<T, J>
 				: SkipToCloseParen<T, Nx2<I>>
@@ -945,7 +941,7 @@ type SkipRefActions<T extends Toks, I extends number> =
 	T[I] extends WordTok<"match">
 		? SkipRefActions<T, Nx2<I>>
 		: T[I] extends WordTok<"on">
-			? T[Nx<I>] extends WordTok<"delete" | "update">
+			? T[Next<I>] extends WordTok<"delete" | "update">
 				? T[Nx2<I>] extends WordTok<"no">
 					? SkipRefActions<T, Nx2<Nx2<I>>>
 					: T[Nx2<I>] extends WordTok<"set">
@@ -967,9 +963,9 @@ type ParseGenerated<T extends Toks, I extends number> =
 				? [J] extends [never]
 					? Expected<"ALWAYS or BY DEFAULT", T, I>
 					: T[J] extends OpTok<"(">
-						? SkipToCloseParen<T, Nx<J>> extends infer K extends number
+						? SkipToCloseParen<T, Next<J>> extends infer K extends number
 							? [false, SkipWord<T, K, "stored" | "virtual">]
-							: SkipToCloseParen<T, Nx<J>>
+							: SkipToCloseParen<T, Next<J>>
 						: Expected<'"(" or IDENTITY', T, J>
 				: never
 			: IdentityNext<
@@ -1013,9 +1009,9 @@ type SkipViewStorage<
 > = Mat extends true
 	? SkipStorage<T, I, true>
 	: T[I] extends WordTok<"with">
-		? T[Nx<I>] extends OpTok<"(">
+		? T[Next<I>] extends OpTok<"(">
 			? SkipToCloseParen<T, Nx2<I>>
-			: SyntaxErrorAt<T, Nx<I>>
+			: SyntaxErrorAt<T, Next<I>>
 		: I;
 
 type ParseViewAs<
@@ -1030,7 +1026,7 @@ type ParseViewAs<
 > =
 	EatWord<T, I, "as"> extends never
 		? Expected<"AS", T, I>
-		: ParseSelectStmt<T, Nx<I>> extends Ok<infer Q, infer J>
+		: ParseSelectStmt<T, Next<I>> extends Ok<infer Q, infer J>
 			? Rec extends true
 				? SkipCheckOption<T, J> extends J
 					? ViewOk<
@@ -1052,7 +1048,7 @@ type ParseViewAs<
 						Q,
 						Mat extends true ? SkipWithData<T, J> : SkipCheckOption<T, J>
 					>
-			: ParseSelectStmt<T, Nx<I>>;
+			: ParseSelectStmt<T, Next<I>>;
 type ViewOk<OrReplace, Mat, Ine, Ref, Names, Q, J extends number> = Ok<
 	{
 		t: "create_view";
@@ -1105,7 +1101,7 @@ type SkipCheckOption<T extends Toks, I extends number> =
 		? CheckOptionEnd<
 				EatWords<
 					T,
-					SkipWord<T, Nx<I>, "cascaded" | "local">,
+					SkipWord<T, Next<I>, "cascaded" | "local">,
 					["check", "option"]
 				>,
 				I
@@ -1130,24 +1126,24 @@ type ParseCreateType<T extends Toks, I extends number> =
 		: Expected<"type name", T, I>;
 
 type ParseEnumValues<T extends Toks, I extends number> =
-	T[I] extends OpTok<")"> ? Ok<[], Nx<I>> : EnumLabels<T, I, []>;
+	T[I] extends OpTok<")"> ? Ok<[], Next<I>> : EnumLabels<T, I, []>;
 type EnumLabels<
 	T extends Toks,
 	I extends number,
 	Acc extends readonly string[],
 > =
 	T[I] extends StrTok<infer V>
-		? T[Nx<I>] extends OpTok<",">
+		? T[Next<I>] extends OpTok<",">
 			? EnumLabels<T, Nx2<I>, [...Acc, V]>
-			: T[Nx<I>] extends OpTok<")">
+			: T[Next<I>] extends OpTok<")">
 				? Ok<[...Acc, V], Nx2<I>>
-				: Expected<'"," or ")"', T, Nx<I>>
+				: Expected<'"," or ")"', T, Next<I>>
 		: Expected<"enum label", T, I>;
 
 type ParseCreateSchema<T extends Toks, I extends number> =
 	IfNotExists<T, I> extends [infer Ine extends boolean, infer I1 extends number]
 		? T[I1] extends WordTok<"authorization">
-			? AnyLabel<T, Nx<I1>> extends [
+			? AnyLabel<T, Next<I1>> extends [
 					infer Role extends string,
 					infer J extends number,
 				]
@@ -1156,7 +1152,7 @@ type ParseCreateSchema<T extends Toks, I extends number> =
 						J,
 						Ine,
 						Role,
-						T[Nx<I1>] extends WordTok<
+						T[Next<I1>] extends WordTok<
 							"current_role" | "current_user" | "session_user"
 						>
 							? false
@@ -1164,12 +1160,12 @@ type ParseCreateSchema<T extends Toks, I extends number> =
 						[],
 						[]
 					>
-				: Expected<"role name", T, Nx<I1>>
+				: Expected<"role name", T, Next<I1>>
 			: Ident<T, I1> extends [infer Name extends string, infer J extends number]
 				? T[J] extends WordTok<"authorization">
-					? AnyLabel<T, Nx<J>> extends [string, infer J2 extends number]
+					? AnyLabel<T, Next<J>> extends [string, infer J2 extends number]
 						? SchemaElements<T, J2, Ine, Name, true, [], []>
-						: Expected<"role name", T, Nx<J>>
+						: Expected<"role name", T, Next<J>>
 					: SchemaElements<T, J, Ine, Name, true, [], []>
 				: Expected<"schema name", T, I1>
 		: never;
@@ -1189,14 +1185,14 @@ type SchemaElements<
 			: T[I] extends WordTok<"grant">
 				? SchemaElements<
 						T,
-						SkipElement<T, Nx<I>, I>,
+						SkipElement<T, Next<I>, I>,
 						Ine,
 						S,
 						Known,
 						Tbls,
 						Views
 					>
-				: SchemaElement<T, Nx<I>, S, Known, false, false> extends infer R
+				: SchemaElement<T, Next<I>, S, Known, false, false> extends infer R
 					? R extends Ok<infer E, infer J>
 						? E extends Tag<"create_table">
 							? SchemaElements<T, J, Ine, S, Known, [...Tbls, E], Views>
@@ -1225,13 +1221,13 @@ type SchemaElement<
 > =
 	T[I] extends WordTok<infer W>
 		? W extends "or"
-			? EatWord<T, Nx<I>, "replace"> extends never
-				? Expected<"REPLACE", T, Nx<I>>
+			? EatWord<T, Next<I>, "replace"> extends never
+				? Expected<"REPLACE", T, Next<I>>
 				: SchemaElement<T, Nx2<I>, S, Known, true, Temp>
 			: W extends "temp" | "temporary" | "local" | "global" | "unlogged"
 				? SchemaElement<
 						T,
-						Nx<I>,
+						Next<I>,
 						S,
 						Known,
 						OrR,
@@ -1245,11 +1241,11 @@ type SchemaElement<
 							>
 						: (
 									W extends "table"
-										? ParseCreateTable<T, Nx<I>>
+										? ParseCreateTable<T, Next<I>>
 										: W extends "view"
-											? ParseCreateView<T, Nx<I>, OrR, false, false>
-											: EatWord<T, Nx<I>, "view"> extends never
-												? Expected<"VIEW", T, Nx<I>>
+											? ParseCreateView<T, Next<I>, OrR, false, false>
+											: EatWord<T, Next<I>, "view"> extends never
+												? Expected<"VIEW", T, Next<I>>
 												: ParseCreateView<T, Nx2<I>, OrR, false, false, true>
 								) extends infer R
 							? R extends Ok<infer E, infer J>
@@ -1265,7 +1261,7 @@ type SchemaElement<
 												Known,
 												Ref,
 												Requalify<E, S>,
-												IfNotExists<T, Nx<I>>[1]
+												IfNotExists<T, Next<I>>[1]
 											>
 										: E extends {
 													readonly t: "create_view";
@@ -1277,13 +1273,13 @@ type SchemaElement<
 													Known,
 													Ref,
 													Requalify<E, S>,
-													W extends "view" ? Nx<I> : Nx2<I>
+													W extends "view" ? Next<I> : Nx2<I>
 												>
 											: R
 								: R
 							: never
 					: W extends "sequence"
-						? QualName<T, IfNotExists<T, Nx<I>>[1]> extends [
+						? QualName<T, IfNotExists<T, Next<I>>[1]> extends [
 								infer P extends readonly string[],
 								infer J extends number,
 							]
@@ -1291,18 +1287,18 @@ type SchemaElement<
 									T,
 									J,
 									InSchema<
-										SkipElement<T, Nx<I>, I>,
+										SkipElement<T, Next<I>, I>,
 										S,
 										Known,
 										RefOf<P>,
 										null,
-										IfNotExists<T, Nx<I>>[1]
+										IfNotExists<T, Next<I>>[1]
 									>
 								>
-							: Expected<"sequence name", T, Nx<I>>
+							: Expected<"sequence name", T, Next<I>>
 						: W extends "index" | "unique" | "trigger" | "constraint"
-							? SkipElement<T, Nx<I>, I> extends infer J extends number
-								? ElementOn<T, Nx<I>, J> extends infer K extends number
+							? SkipElement<T, Next<I>, I> extends infer J extends number
+								? ElementOn<T, Next<I>, J> extends infer K extends number
 									? QualName<T, SkipWord<T, K, "only">> extends [
 											infer P extends readonly string[],
 											infer K2 extends number,
@@ -1320,7 +1316,7 @@ type SchemaElement<
 												>
 											>
 										: SyntaxErrorAt<T, SkipWord<T, K, "only">>
-									: ElementOn<T, Nx<I>, J>
+									: ElementOn<T, Next<I>, J>
 								: never
 							: Expected<"TABLE, VIEW, INDEX, SEQUENCE or TRIGGER", T, I>
 		: Expected<"TABLE, VIEW, INDEX, SEQUENCE or TRIGGER", T, I>;
@@ -1334,7 +1330,7 @@ type Requalify<E, S extends string> = {
 };
 
 type NoDanglingDot<T extends Toks, J extends number, Then> =
-	T[J] extends OpTok<"."> ? SyntaxErrorAt<T, Nx<J>> : Then;
+	T[J] extends OpTok<"."> ? SyntaxErrorAt<T, Next<J>> : Then;
 
 type InSchema<
 	J extends number,
@@ -1361,20 +1357,20 @@ type ElementOn<
 > = I extends End
 	? SyntaxErrorAt<T, I>
 	: T[I] extends WordTok<"on">
-		? Nx<I>
+		? Next<I>
 		: T[I] extends OpTok<"(">
 			? SyntaxErrorAt<T, I>
-			: ElementOn<T, Nx<I>, End>;
+			: ElementOn<T, Next<I>, End>;
 
 type SkipElement<T extends Toks, I extends number, P extends number> =
 	T[I] extends OpTok<";">
 		? I
 		: T[I] extends WordTok<"create">
 			? T[P] extends WordTok<"grant"> | OpTok<",">
-				? SkipElement<T, Nx<I>, I>
+				? SkipElement<T, Next<I>, I>
 				: I
 			: T[I] extends Tok
-				? SkipElement<T, Nx<I>, I>
+				? SkipElement<T, Next<I>, I>
 				: I;
 
 type NoopAlterObject =
@@ -1389,15 +1385,15 @@ type NoopAlterObject =
 type ParseAlter<T extends Toks, I extends number> =
 	T[I] extends WordTok<infer W>
 		? W extends "table" | "view"
-			? ParseAlterTable<T, Nx<I>>
+			? ParseAlterTable<T, Next<I>>
 			: W extends "materialized"
-				? EatWord<T, Nx<I>, "view"> extends never
-					? Expected<"VIEW", T, Nx<I>>
+				? EatWord<T, Next<I>, "view"> extends never
+					? Expected<"VIEW", T, Next<I>>
 					: ParseAlterTable<T, Nx2<I>>
 				: W extends "type"
-					? ParseAlterType<T, Nx<I>>
+					? ParseAlterType<T, Next<I>>
 					: W extends "schema"
-						? ParseAlterSchema<T, Nx<I>>
+						? ParseAlterSchema<T, Next<I>>
 						: W extends NoopAlterObject
 							? Noop<T, I, `alter ${W}`>
 							: Expected<"TABLE, VIEW, TYPE, SCHEMA, ... after ALTER", T, I>
@@ -1414,8 +1410,8 @@ type ParseAlterSchema<T extends Toks, I extends number> =
 
 type ParseAlterTable<T extends Toks, I extends number> =
 	T[I] extends WordTok<"all">
-		? EatWords<T, Nx<I>, ["in", "tablespace"]> extends never
-			? Expected<"IN TABLESPACE", T, Nx<I>>
+		? EatWords<T, Next<I>, ["in", "tablespace"]> extends never
+			? Expected<"IN TABLESPACE", T, Next<I>>
 			: Noop<T, I, "alter table all in tablespace">
 		: IfExists<T, I> extends [
 					infer Ife extends boolean,
@@ -1425,12 +1421,15 @@ type ParseAlterTable<T extends Toks, I extends number> =
 					infer Parts extends readonly string[],
 					infer J extends number,
 				]
-				? (EatOp<T, J, "*"> extends never ? J : Nx<J>) extends infer J1 extends
-						number
+				? (
+						EatOp<T, J, "*"> extends never
+							? J
+							: Next<J>
+					) extends infer J1 extends number
 					? IsStandalone<T, J1> extends true
 						? (
 								T[J1] extends WordTok<"rename">
-									? ParseAlterRename<T, Nx<J1>>
+									? ParseAlterRename<T, Next<J1>>
 									: ParseSetSchema<T, Nx2<J1>>
 							) extends infer R
 							? R extends Ok<infer A, infer J2>
@@ -1454,7 +1453,7 @@ type IsStandalone<T extends Toks, I extends number> =
 	T[I] extends WordTok<"rename">
 		? true
 		: T[I] extends WordTok<"set">
-			? T[Nx<I>] extends WordTok<"schema">
+			? T[Next<I>] extends WordTok<"schema">
 				? true
 				: false
 			: false;
@@ -1478,7 +1477,7 @@ type ParseAlterActions<
 					infer J
 				>
 			? T[J] extends OpTok<",">
-				? ParseAlterActions<T, Nx<J>, Ref, Ife, [...Acc, A]>
+				? ParseAlterActions<T, Next<J>, Ref, Ife, [...Acc, A]>
 				: Ok<
 						{
 							t: "alter_table";
@@ -1498,14 +1497,14 @@ type NoopAction<T extends Toks, I extends number> = Ok<
 type ParseAlterAction<T extends Toks, I extends number, TN extends string> =
 	T[I] extends WordTok<infer W>
 		? W extends "add"
-			? ParseAlterAdd<T, Nx<I>, TN>
+			? ParseAlterAdd<T, Next<I>, TN>
 			: W extends "drop"
-				? ParseAlterDrop<T, Nx<I>>
+				? ParseAlterDrop<T, Next<I>>
 				: W extends "alter"
-					? ParseAlterColumn<T, Nx<I>>
+					? ParseAlterColumn<T, Next<I>>
 					: W extends "set"
-						? T[Nx<I>] extends WordTok<"with">
-							? SyntaxErrorAt<T, Nx<I>>
+						? T[Next<I>] extends WordTok<"with">
+							? SyntaxErrorAt<T, Next<I>>
 							: NoopAction<T, I>
 						: W extends
 									| "owner"
@@ -1529,9 +1528,9 @@ type ParseAlterAction<T extends Toks, I extends number, TN extends string> =
 
 type ParseAlterAdd<T extends Toks, I extends number, TN extends string> =
 	T[I] extends WordTok<"constraint">
-		? Ident<T, Nx<I>> extends [string, infer J extends number]
+		? Ident<T, Next<I>> extends [string, infer J extends number]
 			? ParseAddConstraintBody<T, J>
-			: Expected<"constraint name", T, Nx<I>>
+			: Expected<"constraint name", T, Next<I>>
 		: T[I] extends WordTok<"primary" | "not">
 			? ParseAddConstraintBody<T, I>
 			: T[I] extends WordTok<"unique" | "check" | "foreign" | "exclude">
@@ -1547,17 +1546,17 @@ type ParseAlterAdd<T extends Toks, I extends number, TN extends string> =
 
 type ParseAddConstraintBody<T extends Toks, I extends number> =
 	T[I] extends WordTok<"not">
-		? ParseNotNullConstraint<T, Nx<I>> extends Ok<infer C, infer J>
+		? ParseNotNullConstraint<T, Next<I>> extends Ok<infer C, infer J>
 			? Ok<
 					C extends { readonly col: infer N }
 						? { t: "set_not_null"; name: N }
 						: { t: "noop" },
 					J
 				>
-			: ParseNotNullConstraint<T, Nx<I>>
+			: ParseNotNullConstraint<T, Next<I>>
 		: T[I] extends WordTok<"primary">
-			? EatWord<T, Nx<I>, "key"> extends never
-				? Expected<"KEY", T, Nx<I>>
+			? EatWord<T, Next<I>, "key"> extends never
+				? Expected<"KEY", T, Next<I>>
 				: T[Nx2<I>] extends OpTok<"(">
 					? KeyColumns<T, Nx3<I>, []> extends Ok<infer Cols, infer J>
 						? Ok<{ t: "add_pk"; cols: Cols }, SkipToActionEnd<T, J>>
@@ -1579,26 +1578,26 @@ type ParseAlterDrop<T extends Toks, I extends number> =
 
 type ParseAlterRename<T extends Toks, I extends number> =
 	T[I] extends WordTok<"to">
-		? Ident<T, Nx<I>> extends [infer To, infer J extends number]
+		? Ident<T, Next<I>> extends [infer To, infer J extends number]
 			? Ok<{ t: "rename_table"; to: To }, J>
-			: Expected<"new name", T, Nx<I>>
+			: Expected<"new name", T, Next<I>>
 		: T[I] extends WordTok<"constraint">
-			? Ident<T, Nx<I>> extends [string, infer J extends number]
+			? Ident<T, Next<I>> extends [string, infer J extends number]
 				? EatWord<T, J, "to"> extends never
 					? Expected<"TO", T, J>
-					: Ident<T, Nx<J>> extends [string, infer J2 extends number]
+					: Ident<T, Next<J>> extends [string, infer J2 extends number]
 						? Ok<{ t: "noop" }, J2>
-						: Expected<"new constraint name", T, Nx<J>>
-				: Expected<"constraint name", T, Nx<I>>
+						: Expected<"new constraint name", T, Next<J>>
+				: Expected<"constraint name", T, Next<I>>
 			: Ident<T, SkipWord<T, I, "column">> extends [
 						infer From,
 						infer J extends number,
 					]
 				? EatWord<T, J, "to"> extends never
 					? Expected<"TO", T, J>
-					: Ident<T, Nx<J>> extends [infer To, infer J2 extends number]
+					: Ident<T, Next<J>> extends [infer To, infer J2 extends number]
 						? Ok<{ t: "rename_column"; from: From; to: To }, J2>
-						: Expected<"new column name", T, Nx<J>>
+						: Expected<"new column name", T, Next<J>>
 				: Expected<"column name", T, SkipWord<T, I, "column">>;
 
 type ParseAlterColumn<T extends Toks, I extends number> =
@@ -1610,29 +1609,29 @@ type ParseAlterColumn<T extends Toks, I extends number> =
 				]
 			? T[J] extends WordTok<infer W>
 				? W extends "type"
-					? ParseAlterColType<T, Nx<J>, C>
+					? ParseAlterColType<T, Next<J>, C>
 					: W extends "set"
-						? T[Nx<J>] extends WordTok<"data">
+						? T[Next<J>] extends WordTok<"data">
 							? EatWord<T, Nx2<J>, "type"> extends never
 								? Expected<"TYPE", T, Nx2<J>>
 								: ParseAlterColType<T, Nx3<J>, C>
-							: T[Nx<J>] extends WordTok<"not">
+							: T[Next<J>] extends WordTok<"not">
 								? EatWord<T, Nx2<J>, "null"> extends never
 									? Expected<"NULL", T, Nx2<J>>
 									: Ok<{ t: "set_not_null"; name: C }, Nx3<J>>
-								: T[Nx<J>] extends WordTok<"default">
+								: T[Next<J>] extends WordTok<"default">
 									? ParseExpr<T, Nx2<J>, 0> extends Ok<unknown, infer J2>
 										? Ok<{ t: "set_default"; name: C }, J2>
 										: ParseExpr<T, Nx2<J>, 0>
 									: NoopAction<T, J>
 						: W extends "drop"
-							? T[Nx<J>] extends WordTok<"not">
+							? T[Next<J>] extends WordTok<"not">
 								? EatWord<T, Nx2<J>, "null"> extends never
 									? Expected<"NULL", T, Nx2<J>>
 									: Ok<{ t: "drop_not_null"; name: C }, Nx3<J>>
-								: T[Nx<J>] extends WordTok<"default">
+								: T[Next<J>] extends WordTok<"default">
 									? Ok<{ t: "drop_default"; name: C }, Nx2<J>>
-									: T[Nx<J>] extends WordTok<"identity" | "expression">
+									: T[Next<J>] extends WordTok<"identity" | "expression">
 										? Ok<
 												{ t: "drop_default"; name: C },
 												SkipWords<T, Nx2<J>, ["if", "exists"]>
@@ -1640,11 +1639,11 @@ type ParseAlterColumn<T extends Toks, I extends number> =
 										: Expected<
 												"NOT NULL, DEFAULT, IDENTITY or EXPRESSION",
 												T,
-												Nx<J>
+												Next<J>
 											>
 							: W extends "add"
-								? EatWord<T, Nx<J>, "generated"> extends never
-									? Expected<"GENERATED", T, Nx<J>>
+								? EatWord<T, Next<J>, "generated"> extends never
+									? Expected<"GENERATED", T, Next<J>>
 									: ParseGenerated<T, Nx2<J>> extends infer G
 										? G extends [true, infer J2 extends number]
 											? Ok<{ t: "add_identity"; name: C }, J2>
@@ -1663,16 +1662,16 @@ type ParseAlterColType<T extends Toks, I extends number, C extends string> =
 		? SkipCollate<T, J> extends infer J2 extends number
 			? EatWord<T, J2, "using"> extends never
 				? Ok<{ t: "alter_type"; name: C; type: Ty }, J2>
-				: ParseExpr<T, Nx<J2>, 0> extends Ok<unknown, infer J3>
+				: ParseExpr<T, Next<J2>, 0> extends Ok<unknown, infer J3>
 					? Ok<{ t: "alter_type"; name: C; type: Ty }, J3>
-					: ParseExpr<T, Nx<J2>, 0>
+					: ParseExpr<T, Next<J2>, 0>
 			: never
 		: ParseTypeName<T, I>;
 type SkipCollate<T extends Toks, I extends number> =
 	T[I] extends WordTok<"collate">
-		? QualName<T, Nx<I>> extends [unknown, infer J]
+		? QualName<T, Next<I>> extends [unknown, infer J]
 			? J
-			: Nx<I>
+			: Next<I>
 		: I;
 
 type ParseAlterType<T extends Toks, I extends number> =
@@ -1681,7 +1680,7 @@ type ParseAlterType<T extends Toks, I extends number> =
 		infer J extends number,
 	]
 		? T[J] extends WordTok<"add">
-			? EatWord<T, Nx<J>, "value"> extends never
+			? EatWord<T, Next<J>, "value"> extends never
 				? Ok<
 						{ t: "alter_enum"; name: RefOf<Parts>; action: { t: "noop" } },
 						SkipToStmtEnd<T, J>
@@ -1694,12 +1693,12 @@ type ParseAlterType<T extends Toks, I extends number> =
 									name: RefOf<Parts>;
 									action: { t: "add_value"; value: V; ifNotExists: Ine };
 								},
-								SkipBeforeAfter<T, Nx<I1>>
+								SkipBeforeAfter<T, Next<I1>>
 							>
 						: Expected<"enum label", T, I1>
 					: never
 			: T[J] extends WordTok<"rename">
-				? T[Nx<J>] extends WordTok<"value">
+				? T[Next<J>] extends WordTok<"value">
 					? T[Nx2<J>] extends StrTok<infer From>
 						? EatWord<T, Nx3<J>, "to"> extends never
 							? Expected<"TO", T, Nx3<J>>
@@ -1714,7 +1713,7 @@ type ParseAlterType<T extends Toks, I extends number> =
 									>
 								: Expected<"enum label", T, Nx2<Nx2<J>>>
 						: Expected<"enum label", T, Nx2<J>>
-					: T[Nx<J>] extends WordTok<"to">
+					: T[Next<J>] extends WordTok<"to">
 						? Ident<T, Nx2<J>> extends [infer To, infer J2 extends number]
 							? Ok<
 									{
@@ -1738,7 +1737,7 @@ type ParseAlterType<T extends Toks, I extends number> =
 		: Expected<"type name", T, I>;
 type SkipBeforeAfter<T extends Toks, I extends number> =
 	T[I] extends WordTok<"before" | "after">
-		? T[Nx<I>] extends StrTok
+		? T[Next<I>] extends StrTok
 			? Nx2<I>
 			: I
 		: I;
@@ -1756,17 +1755,17 @@ type NoopDropObject =
 type ParseDrop<T extends Toks, I extends number> =
 	T[I] extends WordTok<infer W>
 		? W extends "table"
-			? ParseDropList<T, Nx<I>, "drop_table">
+			? ParseDropList<T, Next<I>, "drop_table">
 			: W extends "view"
-				? ParseDropList<T, Nx<I>, "drop_view">
+				? ParseDropList<T, Next<I>, "drop_view">
 				: W extends "materialized"
-					? EatWord<T, Nx<I>, "view"> extends never
-						? Expected<"VIEW", T, Nx<I>>
+					? EatWord<T, Next<I>, "view"> extends never
+						? Expected<"VIEW", T, Next<I>>
 						: ParseDropList<T, Nx2<I>, "drop_matview">
 					: W extends "type"
-						? ParseDropList<T, Nx<I>, "drop_type">
+						? ParseDropList<T, Next<I>, "drop_type">
 						: W extends "schema"
-							? ParseDropList<T, Nx<I>, "drop_schema">
+							? ParseDropList<T, Next<I>, "drop_schema">
 							: W extends NoopDropObject
 								? Noop<T, I, `drop ${W}`>
 								: Expected<

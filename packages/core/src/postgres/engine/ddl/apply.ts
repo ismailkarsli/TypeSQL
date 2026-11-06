@@ -1,20 +1,20 @@
-import type { QueryContext } from "../../../engine/types.js";
 import type { AnyErr, SqlError } from "../../../errors.js";
 import type {
 	AlterEnum,
 	AlterTable,
 	CreateEnum,
 	CreateFunction,
+	DeclareCursor,
 	DropSchema,
 	DropTable,
 	DropType,
 	DropView,
 	RenameSchema,
-	SelectStmt,
 	TableRef,
 	Tag,
 } from "../ast.js";
-import type { ProjectSelect } from "../project/select.js";
+import type { ProjectStmt } from "../project/stmt.js";
+import type { QueryContext } from "../types.js";
 import type { ApplyAlterTable } from "./alter-table.js";
 import type { ApplyCreateTableAs } from "./create-table.js";
 import type {
@@ -35,11 +35,8 @@ import type {
 export type ApplyDdlNode<DB, S> =
 	S extends Tag<"noop" | "fetch" | "move" | "close_cursor">
 		? DB
-		: S extends {
-					readonly t: "declare_cursor";
-					readonly q: infer Q extends SelectStmt;
-				}
-			? ProjectSelect<Q, QueryContext<DB, [], {}>> extends infer C
+		: S extends DeclareCursor
+			? ProjectStmt<S, QueryContext<DB, [], {}>> extends infer C
 				? C extends AnyErr
 					? C
 					: DB

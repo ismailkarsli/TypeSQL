@@ -1,0 +1,20 @@
+{
+	"name": "runner-undeclared-dependency",
+	"private": true,
+	"type": "module",
+	"dependencies": {
+		"@typesql/pg": "workspace:*",
+		"pg": "catalog:",
+		"@types/pg": "catalog:"
+	},
+	"devDependencies": {
+		"typescript": "catalog:",
+		"@types/node": "catalog:"
+	},
+	"scenario": {
+		"failure": {
+			"stage": "compile",
+			"exitCode": 1
+		}
+	}
+}

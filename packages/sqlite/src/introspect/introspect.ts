@@ -105,18 +105,14 @@ export function introspect(
 	const rows = parseRows(
 		db
 			.prepare(
-				"SELECT name, type, sql FROM sqlite_schema WHERE type IN ('table', 'view') AND name NOT LIKE 'sqlite\\_%' ESCAPE '\\' ORDER BY name",
+				"SELECT name, type, sql FROM sqlite_schema WHERE type IN ('table', 'view') AND name NOT LIKE 'sqlite\\_%' ESCAPE '\\' AND name NOT IN (SELECT name FROM pragma_table_list WHERE schema = 'main' AND type = 'shadow') ORDER BY name",
 			)
 			.all(),
 		isSchemaRow,
 	);
-	const virtualTables = rows
-		.filter((r) => /^\s*create\s+virtual\s+table\b/i.test(r.sql ?? ""))
-		.map((r) => r.name);
 	const relations: IntrospectedRelation[] = [];
 	for (const row of rows) {
 		if (excluded.some((re) => re.test(row.name.toLowerCase()))) continue;
-		if (virtualTables.some((v) => row.name.startsWith(`${v}_`))) continue;
 		const tail = options(row.sql);
 		const strict = row.type === "table" && /\bstrict\b/.test(tail);
 		const withoutRowid = /\bwithout\s+rowid\b/.test(tail);

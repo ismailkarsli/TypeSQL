@@ -4,7 +4,7 @@ description: "API reference for @typesql/core, its PostgreSQL, SQLite, MySQL, ad
 
 # API
 
-The public APIs of `@typesql/core`, `@typesql/core/postgres`, `@typesql/core/sqlite`, `@typesql/core/mysql`, `@typesql/core/adapter`, `@typesql/core/migration`, `@typesql/core/plugins` and the extra exports of the adapter and ORM packages. Each entry links to the guide page that explains it.
+The public APIs of `@typesql/core`, `@typesql/core/postgres`, `@typesql/core/sqlite`, `@typesql/core/mysql`, `@typesql/core/adapter`, `@typesql/core/migration`, `@typesql/core/plugins`, `@typesql/core/reserved` and the extra exports of the adapter and ORM packages. Each entry links to the guide page that explains it.
 
 `@typesql/core` holds what every SQL dialect shares: `createSql`, queries, fragments, executors, plugins, transactions, the schema markers and the [dialect contract](#dialects). Migrations are in `@typesql/core/migration`. Everything PostgreSQL-specific is in `@typesql/core/postgres`: the `postgres` dialect, the type engine, `Json` and `PgCatalog`, the type maps and the function catalog. `@typesql/core/sqlite` and `@typesql/core/mysql` hold the same for SQLite and for MySQL and MariaDB; see [Dialects](#dialects).
 
@@ -126,7 +126,7 @@ See [Dynamic SQL](../guide/using-sql#dynamic-sql).
 | `sql.set(table, values)`, `sql.set(values)` | `"a" = $1, "b" = $2` for the defined values; throws when none is defined | `SetInput<DB, TM, table>` |
 | `sql.values(table, rows)`, `sql.values(rows)` | `("a", "b") VALUES ($1, $2), ($3, DEFAULT)`; throws on an empty array. On MySQL and MariaDB, names get backticks and a row with no values is `() VALUES ()` | `InsertInput<DB, TM, table>` |
 
-`table` is a `TableName<DB>`: a top-level table, or `"schema.table"`. It is used only for compile-time type checking. Without it, the fragment is checked against the target of the `UPDATE` or `INSERT` it is interpolated into: `sql.set` with every key present, `sql.values` once with every key and once with only the keys every row always sends, so a required column a row can leave out is still an error. Errors are then reported on the statement. At runtime, every enumerable key on `values` or row objects becomes a column assignment or insert value. When handling untrusted inputs (such as `req.body`), pick allowed fields explicitly to prevent mass assignment. JSON columns take `sql.json(value)` or a raw non-array value. See [Inserting and updating](../guide/using-sql#inserting-and-updating).
+`table` is a `TableName<DB>`: a top-level table, or `"schema.table"`. It is used only for compile-time type checking. Without it, the fragment is checked against the target of the `UPDATE` or `INSERT` it is interpolated into: `sql.set` with every key present, `sql.values` once with every key and once with only the keys every row always sends, so a required column a row can leave out is still an error. Errors are then reported on the statement. At runtime, every enumerable key on `values` or row objects becomes a column assignment or insert value. When handling untrusted inputs (such as `req.body`), pick allowed fields explicitly to prevent mass assignment. JSON columns take `sql.json(value)`, or a raw non-array value on PostgreSQL and JSON text on SQLite, MySQL and MariaDB. On SQLite, which has no `DEFAULT` in a `VALUES` row, the rows of `sql.values` must give the same columns. See [Inserting and updating](../guide/using-sql#inserting-and-updating).
 
 ## `sql.as<Row>(text, ...params)`
 
@@ -191,9 +191,14 @@ What adapters and custom executors build on.
 | `mapRows(q, rows)` | applies the query's output plugins to driver rows, for code that runs `q.text` itself |
 | `pluginsOf(q)` | returns the query's immutable plugin list |
 | `createTransactionalSql(dialect, client, driver, depth?)` | the dialect's `sql` bound to a driver's client, with `sql.transaction(fn)`; the PostgreSQL adapters pass `postgres` from `@typesql/core/postgres` |
-| `SqlDriver<C>` | how a driver runs statements and transactions on its client `C` |
+| `createFamilySql(dialect, client, driverOf)` | the same for a dialect picked at runtime, with `driverOf(dialectFamily(dialect.name))` as its driver |
+| `dialectFamily(name)`, `DialectFamily` | `"postgres"`, `"sqlite"` or `"mysql"`: the dialects whose statements a driver writes alike (MariaDB's are MySQL's) |
+| `familyStatement[family](text, values, map?)` | a statement as a driver of `family` takes it: PostgreSQL's keeps its `$n` parameters, SQLite's and MySQL's have `?` with the values in order |
+| `SqlDriver<C>` | how a driver runs statements and transactions on its client `C`: `transaction(client, depth, fn, savepoint)` gets how many transactions enclose the `sql`, and the name of the savepoint to make instead of a transaction of its own (`undefined` when none encloses the client), which a driver can leave to its database library; the optional `inTransaction(client)` tells that a client is a transaction already, such as an ORM's, so `sql.transaction()` makes a savepoint on it |
 | `runTransaction(run, fn, options?)` | `BEGIN` / `COMMIT` / `ROLLBACK` (or a savepoint) around `fn`, for drivers without a transaction API |
+| `pooledTransaction(conn, run, release, fn)` | `runTransaction` on a connection checked out of a pool, then `release(broken)`, where `broken` is the error of a failed `ROLLBACK` |
 | `JsonParam<T>` | the runtime value `sql.json()` binds: `{ value }` with `toPostgres()`, `toJSON()`, `toString()` |
+| `jsonText(value)` | `sql.json()` values as JSON text, for drivers that take JSON as text |
 | `positional(text, values, map?)` | rewrites `$n` parameters (outside strings, quoted names and comments) to `?` and returns the values in order, mapped by `map` (default `sqliteValue`), for SQLite drivers that bind positional parameters |
 | `splitParams(text, values, map?)` | the statement split at its `$n` parameters: `{ parts, values }` |
 | `paramNumbers(text)` | the parameter numbers a statement uses, in order of first use |
@@ -202,12 +207,35 @@ What adapters and custom executors build on.
 | `parsePgArray(text, parse)` | parses a PostgreSQL array literal, including nested arrays and null elements, using an element parser |
 | `parsePgUserArrays(owner, lookup, fields, rows)` | decodes arrays of user-defined PostgreSQL types using result fields and catalog lookups |
 | `PgField`, `PgLookup` | field metadata and the catalog lookup contract for PostgreSQL array decoding |
-| `propertyKey(name)`, `colSource(type, nullable, hasDefault)`, `schemaMembers(relations, schemaOf, member)` | helpers for emitting TypeScript schema source |
+| `propertyKey(name)`, `colSource(type, nullable, hasDefault)` (deprecated: PostgreSQL's `columnSource`), `schemaMembers(relations, schemaOf, member)` | helpers for emitting TypeScript schema source |
+| `schemaWriter(dialect)`, `SchemaModule` | writes one schema module of a dialect: `col(type, flags)`, `enum(values, flags)`, `typed(base, ts, flags)` (PostgreSQL's `Json<…>`, else `Col<Typed<…>>`) and `view(body)`, then `module({ header, members, typeName?, importFrom?, imports? })`, which imports the helpers they used and rejects a `typeName` that is not an identifier |
+| `columnSource(type, flags, dialect, helper?)`, `colFlags(flags, dialect)`, `ColumnFlags` | a column's `Col<…>` (or `Enum<…>`) source with every flag; a flag the dialect's `Col` implies `hasDefault` from leaves `hasDefault` out |
+| `doc(lines, indent)`, `helperImport(used, from)`, `RESERVED_KEYS` | a JSDoc comment, the import of the column helpers a schema uses, and the schema keys that are not relations (`$types`, `$functions`) |
 | `globRegExp(pattern)` | an anchored name-matching expression where `*` matches any text |
-| `introspectArgs(io, usage, parse)`, `CommandIo` | shared introspection argument validation and command output callbacks |
+| `introspectArgs(io, usage, parse)`, `CommandIo`, `commandIo(io?)`, `CommandEnv`, `IntrospectOutput` | shared introspection argument validation, command output callbacks with the process's as defaults, and what a command reads and writes |
+| `introspectCommand(usage, parse, run)` | a dialect's `typesql introspect`, `(argv, io?) => exit code`: `io` (`stdout`, `stderr`, `cwd`, `env`) defaults to the process's |
+| `errorMessage(error)`, `listOption(values)`, `databaseUrl(url, io)`, `UsageError` | the commands' error text, comma-separated options and `--url` / `DATABASE_URL` |
+| `connectPostgres(url)`, `connectMysql(url)`, `connectSqlite(file, options?)` | one connection: `{ client, execute, close }`, with `pg`, `mysql2` (or the `mariadb` connector) and `node:sqlite`; `PgClient`, `MySqlClient`, `SqliteClient` are their clients |
+| `pgResult(result)`, `mysqlResult(result)` | a driver's result as an executor's: a script of several statements is its last statement's result |
 | `sqliteValue(value)` | a value as SQLite binds it: `sql.json()` values as JSON text, booleans as `1` / `0`; throws for a `Date` |
 | `mysqlPositional(text, values, map?)` | rewrites `$n` parameters (outside strings, quoted names and comments, with MySQL's backslash escapes) to `?` and returns the values in order, a value once for each use, mapped by `map` (default `mysqlValue`) |
 | `mysqlValue(value)` | a value as the MySQL drivers bind it: `sql.json()` values as JSON text |
+| `mysqlInline(text, values)` | MySQL text with its `$n` parameters written in as escaped literals, for drivers that bind nothing on the server |
+| `MySqlResult`, `MySqlValue` | a MySQL driver's raw result, and what `mysqlBind` returns |
+| `mysqlBind(value)` | a value as mysql2 and the mariadb connector bind it: also `undefined` as `NULL` and a `Uint8Array` as a `Buffer`; throws for any other object |
+| `mysqlSplit(text, values, map)` | MySQL text split at its `$n` parameters: `{ parts, values }` |
+| `sqliteBindings(numbers, values, bare?)` | a SQLite statement's named parameters, `{ $1: … }` (`{ 1: … }` for better-sqlite3) |
+| `SqliteInput` | what SQLite binds |
+| `SchemaDialect` | the dialects `schemaWriter` and `columnSource` write for |
+
+### `@typesql/core/reserved`
+
+Word lists for editor tooling, with nothing of the type engines at runtime.
+
+| Export | Does |
+|---|---|
+| `RESERVED_WORDS` | per dialect, the words a table, column or alias name must be quoted to be |
+| `META_KEYS` | the schema keys that are not relations |
 
 ## Public types
 
@@ -281,6 +309,7 @@ type WithCatalog = DB & PgCatalog;
 |---|---|
 | `DefaultTypeMap` | node-postgres defaults; what core's `createSql` uses with `postgres` |
 | `DefaultParamTypeMap` | what parameters accept when a map has no `$params` |
+| `NodePostgresTypeMap` | node-postgres's parsers with `bytea` as `Uint8Array`: what a PostgreSQL migration's `db` reads |
 | `PgTypeMap`, `PgParamTypeMap` | `@typesql/pg` |
 | `PostgresJsTypeMap`, `PostgresJsBigIntTypeMap`, `PostgresJsParamTypeMap` | `@typesql/postgres` |
 | `PrismaTypeMap`, `PrismaSqliteTypeMap`, `PrismaMysqlTypeMap` | `@typesql/prisma`, for PostgreSQL, SQLite and MySQL |
@@ -346,6 +375,7 @@ An entry is one `Sig<Params, Return, Flags>` or a tuple of overloads.
 | `MigrationError` | what `latest()`, `up()` and `down()` reject with when a migration fails: `{ migration, applied, rolledBack, schemaFile?, schemaError?, cause }` |
 | `MigrationStatus` | an entry of `status()`: `{ name, applied, appliedAt: Date \| null }` |
 | `isMigrator(value)` | whether `value` is a migrator, from any copy of `@typesql/core` |
+| `loadMigrator({ cwd, env, config?, overrides })` | the migrator `typesql migrate` runs: the config file's (default `typesql.config.ts`), its paths beside it, with `overrides`; `missingCore(directory)` tells why a new migration file can't import `@typesql/core` |
 
 The config options and the method results are described in [The migrator](../guide/migrations#the-migrator). `ApplyDdl` and `ValidateDdl` come from the dialect modules ([Statement analysis](#statement-analysis)); see [What is supported](../guide/migrations#what-is-supported).
 
@@ -357,7 +387,7 @@ A dialect pairs the runtime that builds its `sql` function with that function's 
 
 | Export of `@typesql/core` | Meaning |
 |---|---|
-| `Dialect<T>` | the runtime side, what `createSql` takes: `{ name, quote?, emptyRow?, valuesDefault? }`. Statements are built with `$n` parameters and sent as written. `quote` is the identifier quote `sql.id()`, `sql.set()` and `sql.values()` use (`"` by default, `` ` `` for MySQL and MariaDB), `emptyRow` what `sql.values()` writes for a row with no values (`() VALUES ()` for MySQL and MariaDB), and `valuesDefault: false` makes `sql.values()` throw instead of writing `DEFAULT` for a missing column |
+| `Dialect<T>` | the runtime side, what `createSql` takes: `{ name, quote?, emptyRow?, valuesDefault?, lexis? }`. Statements are built with `$n` parameters and sent as written. `quote` is the identifier quote `sql.id()`, `sql.set()` and `sql.values()` use (`"` by default, `` ` `` for MySQL and MariaDB), `emptyRow` what `sql.values()` writes for a row with no values (`() VALUES ()` for MySQL and MariaDB), `valuesDefault: false` makes `sql.values()` throw instead of writing `DEFAULT` for a missing column, and `lexis` is the regular expression source of the text that holds no parameters (strings, quoted names and comments, then `$n` as its first capture group), by which `:name` parameters, inline values and `$n` are read (standard SQL's by default; each dialect has its own) |
 | `DialectTypes` | the type side: its default `typeMap`, and given `db`, `tm`, `plugins` and `ddl`, the `sql`, `transactionalSql`, `validateDdl` and `applyDdl` types |
 | `SqlOf<T, DB, TM, Plugins = []>`, `TransactionalSqlOf<T, DB, TM, Plugins = []>` | the `sql` function of dialect `T`, without or with `transaction(fn)` |
 | `ValidateDdlOf<T, DB, Q>`, `ApplyDdlOf<T, DB, Q>` | DDL checking and the schema after `Q`, in dialect `T` |

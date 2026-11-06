@@ -1,16 +1,26 @@
-import type { Digit, IdStart } from "../engine/chars.js";
+import type { IdStart } from "../engine/chars.js";
 import type { SqlError } from "../errors.js";
-import type { Opaque, SplitFirst } from "./inline.js";
-import type { MaxParamStr } from "./splice.js";
+import type { AllCode, Lexis, NextOpaque, TakeName } from "./lexis.js";
+import type { MaxParamStr, Take } from "./splice.js";
 
-export type RewriteNamed<Q extends string> =
-	RewriteNamedStr<Q> extends [infer T, infer Names]
+/** `Q` with its `:name` parameters numbered, and their names; an error if it also has `$n`. */
+export type RewriteNamed<Q extends string, L extends Lexis> =
+	RewriteNamedStr<Q, L> extends [infer T, infer Names]
 		? Names extends []
 			? [T, []]
-			: MaxParamStr<Q> extends 0
+			: MaxParamStr<Q, L> extends 0
 				? [T, Names]
-				: SqlError<"cannot mix named (:name) and positional ($n) parameters", 0>
+				: SqlError<
+						"cannot mix named (:name) and positional ($n) parameters",
+						null
+					>
 		: never;
+
+/** The one object argument of a statement with named parameters, from its positional arguments. */
+export type NamedArgs<
+	Names extends readonly string[],
+	Args extends readonly unknown[],
+> = [params: NamedParams<Names, Take<Args, Names["length"]>>];
 
 type IndexOf<
 	Names extends string[],
@@ -32,8 +42,12 @@ export type NamedParams<
 	? { [K in keyof O]: O[K] }
 	: never;
 
-export type RewriteNamedStr<Text extends string> =
-	HasSingleColon<Text> extends true ? NamedLoop<Text, "", []> : [Text, []];
+export type RewriteNamedStr<Text extends string, L extends Lexis> =
+	HasSingleColon<Text> extends true
+		? AllCode<Text, L> extends true
+			? RewriteCode<Text, "", []>
+			: NamedLoop<Text, "", [], L>
+		: [Text, []];
 
 type HasSingleColon<
 	S extends string,
@@ -46,8 +60,13 @@ type HasSingleColon<
 			: true
 		: false;
 
-type NamedLoop<T extends string, Acc extends string, Names extends string[]> =
-	NextOpaque<T> extends [
+type NamedLoop<
+	T extends string,
+	Acc extends string,
+	Names extends string[],
+	L extends Lexis,
+> =
+	NextOpaque<T, L> extends [
 		infer Code extends string,
 		infer Seg extends string,
 		infer After extends string,
@@ -58,82 +77,9 @@ type NamedLoop<T extends string, Acc extends string, Names extends string[]> =
 			]
 			? Seg extends ""
 				? [`${Acc}${C}`, N2]
-				: NamedLoop<After, `${Acc}${C}${Seg}`, N2>
+				: NamedLoop<After, `${Acc}${C}${Seg}`, N2, L>
 			: never
 		: never;
-
-/**
- * Splits `T` at its first string, E-string, quoted identifier, comment or
- * dollar quote: `[code before it, the whole quoted segment, text after it]`.
- * The segment is `""` when `T` is all code.
- */
-export type NextOpaque<T extends string> =
-	SplitFirst<T> extends [
-		infer Code extends string,
-		infer O extends string,
-		infer Rest extends string,
-	]
-		? DollarOpen<Code, ""> extends [
-				infer Pre extends string,
-				infer Tag extends string,
-				infer InCode extends string,
-			]
-			? DollarBody<`${InCode}${O}${Rest}`, Tag> extends [
-					infer Seg extends string,
-					infer After extends string,
-				]
-				? [Pre, `${Tag}${Seg}`, After]
-				: never
-			: O extends ""
-				? [Code, "", ""]
-				: (
-							O extends "'"
-								? IsEString<Code> extends true
-									? EClose<Rest, "">
-									: Opaque<O, Rest>
-								: Opaque<O, Rest>
-						) extends [infer Seg extends string, infer After extends string]
-					? [Code, `${O}${Seg}`, After]
-					: never
-		: never;
-
-/** `E'…'` strings escape quotes with backslashes. */
-type IsEString<Code extends string> = Code extends `${infer C0}${"E" | "e"}`
-	? C0 extends `${string}${NChar}`
-		? false
-		: true
-	: false;
-type EClose<
-	S extends string,
-	Acc extends string,
-> = S extends `${infer In}'${infer R}`
-	? In extends `${infer A}\\${infer B}`
-		? B extends `${infer C}${infer B2}`
-			? EClose<`${B2}'${R}`, `${Acc}${A}\\${C}`>
-			: EClose<R, `${Acc}${A}\\'`>
-		: R extends `'${infer R2}`
-			? EClose<R2, `${Acc}${In}''`>
-			: [`${Acc}${In}'`, R]
-	: [`${Acc}${S}`, ""];
-
-type DollarOpen<
-	S extends string,
-	Acc extends string,
-> = S extends `${infer A}$${infer B}`
-	? B extends `$${infer R}`
-		? [`${Acc}${A}`, "$$", R]
-		: B extends `${infer C extends IdStart}${infer R}`
-			? TakeName<R, C> extends [infer Tag extends string, `$${infer R2}`]
-				? [`${Acc}${A}`, `$${Tag}$`, R2]
-				: DollarOpen<B, `${Acc}${A}$`>
-			: DollarOpen<B, `${Acc}${A}$`>
-	: null;
-type DollarBody<
-	S extends string,
-	Tag extends string,
-> = S extends `${infer Body}${Tag}${infer R}` ? [`${Body}${Tag}`, R] : [S, ""];
-
-type NChar = IdStart | Digit;
 
 type RewriteCode<
 	S extends string,
@@ -155,9 +101,3 @@ type RewriteCode<
 				: never
 			: RewriteCode<Rest, `${Acc}${Pre}:`, Names>
 	: [`${Acc}${S}`, Names];
-type TakeName<
-	S extends string,
-	Acc extends string,
-> = S extends `${infer C extends NChar}${infer R}`
-	? TakeName<R, `${Acc}${C}`>
-	: [Acc, S];

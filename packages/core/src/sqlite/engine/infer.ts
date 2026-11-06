@@ -1,8 +1,11 @@
-import type * as Shared from "../../engine/infer.js";
+import type { QueryContext } from "../../engine/family/types.js";
+import type { Simplify } from "../../engine/object.js";
 import type { MaxParam, ParamsToMap } from "../../engine/params.js";
 import type { Toks } from "../../engine/tokens.js";
-import type { Cols, QueryContext, Simplify } from "../../engine/types.js";
+import type { Cols } from "../../engine/types.js";
 import type { AnyErr } from "../../errors.js";
+import type * as Call from "../../sql/call.js";
+import type * as Shared from "../../sql/infer.js";
 import type { RewriteNamed } from "../../sql/named.js";
 import type { TsOf } from "../type-map/index.js";
 import type { DmlStmt, SelectStmt, Stmt } from "./ast.js";
@@ -10,17 +13,17 @@ import type { ApplyDdlAll, ApplyOne } from "./ddl/apply.js";
 import type { Reposition } from "./diagnostics.js";
 import type { SqliteEngine } from "./engine.js";
 import type { Lex } from "./lexer.js";
-import type { ParseProgram } from "./parser/stmt.js";
+import type { ParseProgramAt } from "./parser/stmt.js";
 import type { ParamsOfDml, ProjectDml } from "./project/dml.js";
 import type { ProjectSelect } from "./project/select.js";
 import type { ParamsOfSelect } from "./typer/params.js";
 
 export type Analyze<DB, Q extends string> =
-	RewriteNamed<Q> extends infer RN
+	RewriteNamed<Q, SqliteEngine["lexis"]> extends infer RN
 		? RN extends [infer Q1 extends string, infer Names]
 			? Lex<Q1> extends infer T
 				? T extends Toks
-					? ParseProgram<T> extends infer S
+					? ParseProgramAt<T> extends infer S
 						? S extends Stmt
 							? ProjectStmt<S, DB> extends infer C
 								? C extends Cols | null
@@ -114,3 +117,8 @@ export type Validate<DB, Q extends string> = Shared.Validate<
 export type KindOf<DB, Q extends string> = Shared.KindOf<SqliteEngine, DB, Q>;
 
 export type ApplyDdl<DB, Q extends string> = ApplyDdlAll<DB, Q>;
+
+export type SplicedText<Q extends string> = Call.SplicedText<
+	Q,
+	SqliteEngine["lexis"]
+>;

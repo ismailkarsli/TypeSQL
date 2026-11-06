@@ -2,21 +2,18 @@ import type {
 	Col,
 	ColDesc,
 	Namespace,
-	Shaped,
 	Table,
-	TsShape,
+	Typed,
 	TypeRegistry,
 	View,
 } from "../../schema.js";
-import type { Overloads } from "../engine/typer/catalog.js";
+import type { FunctionRegistry } from "./functions.js";
 
 export type Json<
 	T,
 	Flags extends Partial<ColDesc> = {},
 	Base extends "json" | "jsonb" = "jsonb",
-> = Col<Shaped<Base, TsShape<T>>, Flags>;
-
-export type FunctionRegistry = { readonly [name: string]: Overloads };
+> = Col<Typed<Base, T>, Flags>;
 
 export type Schema = {
 	readonly [key: string]:

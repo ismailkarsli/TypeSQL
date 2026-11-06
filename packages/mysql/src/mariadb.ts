@@ -1,5 +1,11 @@
 import type { Executor, SqlPlugin } from "@typesql/core";
-import { createTransactionalSql, type SqlDriver } from "@typesql/core/adapter";
+import {
+	createTransactionalSql,
+	type MySqlResult,
+	type MySqlValue,
+	mysqlResult,
+	type SqlDriver,
+} from "@typesql/core/adapter";
 import {
 	type MariaDb,
 	type MariaDbTransactionalSql,
@@ -10,25 +16,22 @@ import {
 	type TransactionalSql,
 } from "@typesql/core/mysql";
 import {
-	type DriverResult,
 	executor as executorOf,
-	type MySqlValue,
 	driver as poolDriver,
 	type Runner,
-	resultOf,
 } from "./pool.js";
 
 /** A `mariadb` Pool, PoolConnection or Connection (the promise API). */
 export interface MariaDbQueryable {
-	query(sql: string, values?: MySqlValue[]): Promise<DriverResult>;
-	execute(sql: string, values?: MySqlValue[]): Promise<DriverResult>;
+	query(sql: string, values?: MySqlValue[]): Promise<MySqlResult>;
+	execute(sql: string, values?: MySqlValue[]): Promise<MySqlResult>;
 }
 
 const runner: Runner<MariaDbQueryable> = {
 	query: async (client, text, values) =>
-		resultOf(await client.query(text, values)),
+		mysqlResult(await client.query(text, values)),
 	execute: async (client, text, values) =>
-		resultOf(await client.execute(text, values)),
+		mysqlResult(await client.execute(text, values)),
 };
 
 const driver: SqlDriver<MariaDbQueryable> = poolDriver(runner, "mariadb");

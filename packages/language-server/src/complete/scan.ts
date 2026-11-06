@@ -1,5 +1,5 @@
-import { blockComment } from "../highlight/lex.js";
-import { type Dialect, isMySql } from "./call.js";
+import type { DialectFacts } from "../sql/dialect.js";
+import { lex } from "../sql/lex.js";
 
 export interface RelRef {
 	readonly schema: string | null;
@@ -38,6 +38,7 @@ export interface Context {
 
 const NONE: Context["expect"] = { kind: "none" };
 
+/** A word, a quoted name, a value, a `${…}` hole, or an operator or punctuation. */
 interface Tok {
 	readonly k: "w" | "q" | "v" | "x" | "o";
 	readonly v: string;
@@ -45,122 +46,42 @@ interface Tok {
 	readonly e: number;
 }
 
-/** The tokens before the cursor, and whether the cursor is inside one. */
+/** The tokens, and whether the cursor is inside a comment. */
 interface Lexed {
 	readonly toks: Tok[];
 	readonly inside: boolean;
 }
 
-const WORD = /[A-Za-z_\u0080-￿][A-Za-z0-9_$\u0080-￿]*/y;
-const LINE_COMMENT = /--[^\n\r]*/y;
-const STRING = /(?:([eE])|[bBxXnN]|[uU]&)?'/y;
-const STRING_REST = /[^']*'?/y;
-const ESCAPE_STRING_REST = /(?:[^'\\]|\\.|'')*'?/sy;
-const QUOTED = /(?:[uU]&)?"((?:[^"]|"")*)"?/y;
-const DOLLAR_TAG = /\$(?:[A-Za-z_\u0080-￿][A-Za-z0-9_\u0080-￿]*)?\$/y;
-const NUMBER =
-	/(?:[0-9]|[.$][0-9])[0-9._]*(?:[eE][-+])?[A-Za-z0-9_$\u0080-￿]*/y;
-const NAMED_PARAM = /:[A-Za-z_][A-Za-z0-9_$\u0080-￿]*/y;
-/** A `${…}` hole, which the call text pads as `$0`: a value or an interpolated fragment. */
-const HOLE = /\$0(?![0-9])/y;
-const PUNCTUATION = /::|./sy;
-const OPERATOR = /(?:(?!--|\/\*)[+\-*/<>=~!@#%^&|`?])+/y;
-
-// MySQL and MariaDB: `-- ` comments need a space after the dashes, `#` starts
-// a comment, block comments don't nest, strings take '…' or "…" with backslash
-// escapes (after an n, x, b or _charset prefix), names are quoted with
-// backticks, and @name and @@name are variables.
-const MY_LINE_COMMENT = /(?:#|--(?=\s|$))[^\n\r]*/y;
-const MY_STRING = /(?:[nNxXbB]|_[A-Za-z0-9_]+)?(['"])/y;
-const MY_SINGLE_REST = /(?:[^'\\]|\\.|'')*'?/sy;
-const MY_DOUBLE_REST = /(?:[^"\\]|\\.|"")*"?/sy;
-const MY_QUOTED = /`((?:[^`]|``)*)`?/y;
-const MY_VARIABLE = /@@?(?:[A-Za-z0-9_$.\u0080-￿]+|`(?:[^`]|``)*`?)?/y;
-const MY_OPERATOR = /(?:(?!--\s|--$|\/\*)[+\-*/<>=~!%^&|?])+/y;
-
 const fold = (s: string): string => s.replace(/[A-Z]/g, (m) => m.toLowerCase());
 
-function lex(text: string, offset: number, my: boolean): Lexed {
+function tokens(text: string, offset: number, d: DialectFacts): Lexed {
 	const toks: Tok[] = [];
 	let inside = false;
-	const n = text.length;
-	let i = 0;
-	const take = (re: RegExp): RegExpExecArray | null => {
-		re.lastIndex = i;
-		const m = re.exec(text);
-		if (m) i = re.lastIndex;
-		return m;
-	};
-	const push = (k: Tok["k"], s: number, v = text.slice(s, i)): void => {
-		toks.push({ k, v, s, e: i });
-	};
-	const value = (): boolean => {
-		if (my) {
-			const string = take(MY_STRING);
-			if (string) take(string[1] === "'" ? MY_SINGLE_REST : MY_DOUBLE_REST);
-			return !!(
-				string ||
-				take(MY_VARIABLE) ||
-				take(NUMBER) ||
-				take(NAMED_PARAM)
-			);
-		}
-		const string = take(STRING);
-		if (string) {
-			take(string[1] ? ESCAPE_STRING_REST : STRING_REST);
-			return true;
-		}
-		const tag = take(DOLLAR_TAG)?.[0];
-		if (tag) {
-			const end = text.indexOf(tag, i);
-			i = end === -1 ? n : end + tag.length;
-			return true;
-		}
-		return !!(take(NUMBER) || take(NAMED_PARAM));
-	};
-	const comment = (s: number, open: boolean): void => {
-		if (s < offset && (offset < i || (open && offset === i))) inside = true;
-	};
-	while (i < n) {
-		const s = i;
-		if (/\s/.test(text[i]!)) {
-			i++;
-			continue;
-		}
-		if (take(my ? MY_LINE_COMMENT : LINE_COMMENT)) {
-			comment(s, true);
-			continue;
-		}
-		if (my && text.startsWith("/*", i)) {
-			const end = text.indexOf("*/", i + 2);
-			i = end === -1 ? n : end + 2;
-			comment(s, end === -1);
-			continue;
-		}
-		if (text.startsWith("/*", i)) {
-			const [end, closed] = blockComment(text, i);
-			i = end;
-			comment(s, !closed);
-			continue;
-		}
-		if (take(HOLE)) {
-			push("x", s);
-			continue;
-		}
-		if (value()) {
-			push("v", s);
-			continue;
-		}
-		const quoted = take(my ? MY_QUOTED : QUOTED);
-		if (quoted) {
-			const q = my ? "`" : '"';
-			push("q", s, quoted[1]!.replaceAll(q + q, q));
-			continue;
-		}
-		if (take(WORD)) push("w", s, fold(text.slice(s, i)));
-		else {
-			if (!take(my ? MY_OPERATOR : OPERATOR)) take(PUNCTUATION);
-			push("o", s);
+	for (const t of lex(text, d.lexis)) {
+		const { start: s, end: e } = t;
+		const v = text.slice(s, e);
+		switch (t.kind) {
+			case "comment":
+				if (s < offset && (offset < e || (t.open && offset === e)))
+					inside = true;
+				break;
+			case "word":
+				toks.push({ k: "w", v: fold(v), s, e });
+				break;
+			case "quoted":
+				toks.push({ k: "q", v: t.name ?? v, s, e });
+				break;
+			case "hole":
+				toks.push({ k: "x", v, s, e });
+				break;
+			case "string":
+			case "number":
+			case "parameter":
+			case "variable":
+				toks.push({ k: "v", v, s, e });
+				break;
+			default:
+				toks.push({ k: "o", v, s, e });
 		}
 	}
 	return { toks, inside };
@@ -220,17 +141,6 @@ const NOT_ALIAS = new Set([
 	"only",
 	"table",
 ]);
-// MySQL words after a table that aren't its alias: index hints, PARTITION,
-// STRAIGHT_JOIN, and the modifiers of UPDATE before its table.
-const MY_NOT_ALIAS = new Set([
-	"use",
-	"force",
-	"ignore",
-	"partition",
-	"straight_join",
-	"low_priority",
-]);
-const MY_BEFORE_TABLE = new Set(["ignore", "low_priority"]);
 const BEFORE_EXPR = new Set([
 	"select",
 	"where",
@@ -293,20 +203,32 @@ interface LevelEnd {
 }
 
 /** A token that can be a name: quoted, or a word that isn't a keyword after a table. */
-const named = (t: Tok | undefined, my = false): boolean =>
-	!!t &&
-	(t.k === "q" ||
-		(t.k === "w" && !NOT_ALIAS.has(t.v) && !(my && MY_NOT_ALIAS.has(t.v))));
+const named = (t: Tok | undefined, notAlias: (w: string) => boolean): boolean =>
+	!!t && (t.k === "q" || (t.k === "w" && !notAlias(t.v)));
+
+const commonNotAlias = (w: string): boolean => NOT_ALIAS.has(w);
 
 function* levels(level: Level | null): Generator<Level> {
 	for (let l = level; l; l = l.parent) yield l;
 }
 
-function structure(toks: readonly Tok[], my: boolean): Structure {
+/** Whether the UPDATE at `i` sets the columns of the INSERT's table. */
+function setsTarget(toks: readonly Tok[], i: number, d: DialectFacts): boolean {
+	const before = d.updateSetsTarget;
+	return (
+		before.length > 0 &&
+		before.every((w, k) => {
+			const t = toks[i - before.length + k];
+			return t?.k === "w" && t.v === w;
+		})
+	);
+}
+
+function structure(toks: readonly Tok[], d: DialectFacts): Structure {
 	const notAlias = (w: string): boolean =>
-		NOT_ALIAS.has(w) || (my && MY_NOT_ALIAS.has(w));
+		NOT_ALIAS.has(w) || d.notAlias.has(w);
 	const beforeTable = (w: string | null): boolean =>
-		w === "only" || w === "lateral" || (my && MY_BEFORE_TABLE.has(w ?? ""));
+		w === "only" || w === "lateral" || d.beforeTable.has(w ?? "");
 	const at: At[] = [];
 	const used: RelRef[] = [];
 	const word = (i: number): string | null =>
@@ -424,7 +346,7 @@ function structure(toks: readonly Tok[], my: boolean): Structure {
 
 			if (after) {
 				if (w === "as") continue;
-				if (!aliased && named(t, my) && !is(i + 1, ".")) {
+				if (!aliased && named(t, notAlias) && !is(i + 1, ".")) {
 					after.name = t.v;
 					aliased = true;
 					continue;
@@ -492,7 +414,8 @@ function structure(toks: readonly Tok[], my: boolean): Structure {
 					continue;
 				}
 			}
-			switch (w) {
+			const keyword = w !== null && d.joins.has(w) ? "join" : w;
+			switch (keyword) {
 				case "with":
 					if (clause === "") {
 						clause = "with";
@@ -501,7 +424,7 @@ function structure(toks: readonly Tok[], my: boolean): Structure {
 					break;
 				case "select":
 				case "returning":
-					clause = w;
+					clause = keyword;
 					lv.outputs = [];
 					out = [];
 					break;
@@ -511,12 +434,7 @@ function structure(toks: readonly Tok[], my: boolean): Structure {
 					clause = "from";
 					here.relNext = expectRel = true;
 					break;
-				case "straight_join":
 				case "join":
-					if (w === "straight_join" && !my) {
-						if (out) out.push(t);
-						break;
-					}
 					clause = "from";
 					here.relNext = expectRel = true;
 					break;
@@ -527,8 +445,7 @@ function structure(toks: readonly Tok[], my: boolean): Structure {
 					here.relNext = expectRel = true;
 					break;
 				case "update":
-					// MySQL's INSERT … ON DUPLICATE KEY UPDATE sets the target's columns.
-					if (word(i - 1) === "key" && word(i - 2) === "duplicate") {
+					if (setsTarget(toks, i, d)) {
 						clause = "set";
 						break;
 					}
@@ -550,7 +467,7 @@ function structure(toks: readonly Tok[], my: boolean): Structure {
 					}
 					break;
 				case "conflict":
-					clause = w;
+					clause = keyword;
 					if (lv.target?.rel)
 						lv.items.push({
 							name: "excluded",
@@ -586,7 +503,7 @@ function structure(toks: readonly Tok[], my: boolean): Structure {
 				case "insert":
 				case "merge":
 					endOutput();
-					clause = w;
+					clause = keyword;
 					break;
 				default:
 					if (out) out.push(t);
@@ -603,7 +520,7 @@ function structure(toks: readonly Tok[], my: boolean): Structure {
 function outputName(toks: readonly Tok[]): string | null {
 	const last = toks.at(-1);
 	if (!last) return null;
-	if (named(last)) {
+	if (named(last, commonNotAlias)) {
 		const before = toks.at(-2);
 		if (before?.k !== "o" || before.v === ")" || before.v === ".")
 			return last.v;
@@ -616,10 +533,9 @@ function outputName(toks: readonly Tok[]): string | null {
 export function contextAt(
 	text: string,
 	offset: number,
-	dialect: Dialect = "postgres",
+	d: DialectFacts,
 ): Context {
-	const my = isMySql(dialect);
-	const { toks, inside } = lex(text, offset, my);
+	const { toks, inside } = tokens(text, offset, d);
 	let from = offset;
 	let j = toks.length - 1;
 	while (j >= 0 && toks[j]!.s >= offset) j--;
@@ -629,8 +545,8 @@ export function contextAt(
 		j--;
 	} else if (cur && cur.e > offset) return { expect: NONE, from };
 	if (inside || j < 0) return { expect: NONE, from };
-	const { at, used } = structure(toks, my);
-	return { expect: expectAfter(toks, at, used, j), from };
+	const { at, used } = structure(toks, d);
+	return { expect: expectAfter(toks, at, used, j, d), from };
 }
 
 function expectAfter(
@@ -638,6 +554,7 @@ function expectAfter(
 	at: readonly At[],
 	used: readonly RelRef[],
 	j: number,
+	d: DialectFacts,
 ): Expect {
 	const t = toks[j]!;
 	if (t.v === ")") return NONE;
@@ -696,12 +613,7 @@ function expectAfter(
 			: NONE;
 	}
 	if (t.k === "w") {
-		if (
-			t.v === "set" ||
-			(t.v === "update" &&
-				toks[j - 1]?.v === "key" &&
-				toks[j - 2]?.v === "duplicate")
-		)
+		if (t.v === "set" || (t.v === "update" && setsTarget(toks, j, d)))
 			return target();
 		return BEFORE_EXPR.has(t.v) ? scope() : NONE;
 	}

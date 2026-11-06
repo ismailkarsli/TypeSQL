@@ -1,5 +1,23 @@
-import type { Nx } from "../../../engine/parse.js";
-import type { ColInfo, Scope } from "../../../engine/types.js";
+import type {
+	LastPart,
+	NameAt,
+	NamedAt,
+} from "../../../engine/family/diagnostics.js";
+import type {
+	ArityOk,
+	DeclaredFn,
+	PickSig,
+} from "../../../engine/family/functions.js";
+import type { JsonShapeOf, JsonStep } from "../../../engine/family/json.js";
+import type {
+	AllNull,
+	AnyNull,
+	NonZeroDigits,
+} from "../../../engine/family/typer.js";
+import type { AggCtx } from "../../../engine/family/types.js";
+import type { Next } from "../../../engine/next.js";
+import type { Or } from "../../../engine/object.js";
+import type { ColInfo, Info } from "../../../engine/types.js";
 import type { AnyErr, SqlError } from "../../../errors.js";
 import type {
 	Call,
@@ -16,22 +34,9 @@ import type {
 	ResolveColumn,
 } from "../binder/scope.js";
 import type { ProjectSelect } from "../project/select.js";
-import type {
-	Affinity,
-	Cell,
-	GE,
-	MkCtx,
-	NumClass,
-	SqCtx,
-	SqItem,
-} from "../types.js";
-import type { DeclaredFn, Fn, Functions, PickSig, SigFn } from "./functions.js";
-import type { JsonGet, JsonPath, JsonShapeOf, JsonStep } from "./json.js";
-
-export type Info<T, N = false> = {
-	readonly type: T;
-	readonly nullable: N;
-};
+import type { Affinity, Cell, NumClass, SqCtx, SqItem } from "../types.js";
+import type { Fn, FunctionCatalog, Functions, SigFn } from "./functions.js";
+import type { JsonGet, JsonPath } from "./json.js";
 
 export type TypeOf<E extends Expr, C extends SqCtx> = E extends {
 	readonly t: "col";
@@ -138,13 +143,6 @@ export type TypeList<
 		: TypeOf<H, C>
 	: Acc;
 
-type AnyNull<L extends readonly ColInfo[]> = true extends L[number]["nullable"]
-	? true
-	: false;
-type AllNull<L extends readonly ColInfo[]> = false extends L[number]["nullable"]
-	? false
-	: true;
-
 type Pred<
 	L extends readonly Expr[],
 	C extends SqCtx,
@@ -155,8 +153,8 @@ type Pred<
 		: TypeList<L, C>;
 
 type TypeLike<E extends Like, C extends SqCtx> = E["kind"] extends "regexp"
-	? DeclaredFn<C["db"], "regexp"> extends null
-		? SqlError<"no such function: REGEXP", null>
+	? DeclaredFn<C["db"], "regexp", FunctionCatalog> extends null
+		? SqlError<"no such function: REGEXP", NameAt<"regexp", "function">>
 		: Pred<[E["e"], E["pat"]], C, true>
 	: Pred<
 			E["esc"] extends Expr ? [E["e"], E["pat"], E["esc"]] : [E["e"], E["pat"]],
@@ -195,7 +193,7 @@ type TypeInTable<E extends InTable, C extends SqCtx> =
 		? E["args"] extends readonly Expr[]
 			? E["table"] extends "json_each" | "json_tree"
 				? InWidth<8>
-				: SqlError<`no such table: ${E["table"]}`, null>
+				: SqlError<`no such table: ${E["table"]}`, NamedAt<E["table"], "table">>
 			: E["table"] extends keyof C["ctes"]
 				? InWidth<C["ctes"][E["table"]]["order"]["length"]>
 				: LookupRelation<
@@ -204,8 +202,14 @@ type TypeInTable<E extends InTable, C extends SqCtx> =
 						> extends [infer Rel, string]
 					? RelationItem<Rel, "x"> extends infer It extends SqItem
 						? InWidth<It["order"]["length"]>
-						: SqlError<`no such table: ${E["table"]}`, null>
-					: SqlError<`no such table: ${E["table"]}`, null>
+						: SqlError<
+								`no such table: ${E["table"]}`,
+								NamedAt<E["table"], "table">
+							>
+					: SqlError<
+							`no such table: ${E["table"]}`,
+							NamedAt<E["table"], "table">
+						>
 		: TypeOf<E["e"], C>;
 
 type CastType<To extends string, From extends string> = From extends "null"
@@ -256,13 +260,6 @@ type Unsigned<V extends string> = V extends `${"-" | "+"}${infer R}`
 type IntPartNonZero<U extends string> = U extends `${infer I}.${string}`
 	? NonZeroDigits<I>
 	: NonZeroDigits<U>;
-type NonZeroDigits<V extends string> = V extends `${infer H}${infer R}`
-	? H extends "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
-		? true
-		: H extends "e" | "E"
-			? false
-			: NonZeroDigits<R>
-	: false;
 
 type TypeBin<Op, L extends Expr, R extends Expr, C extends SqCtx> = Op extends
 	| "="
@@ -292,8 +289,6 @@ type TypeBin<Op, L extends Expr, R extends Expr, C extends SqCtx> = Op extends
 					>
 			: TypeOf<R, C>
 		: TypeOf<L, C>;
-
-type Or<A, B> = A extends true ? true : B extends true ? true : false;
 
 type JsonOp<Op extends "->" | "->>", A extends ColInfo, R> =
 	JsonShapeOf<A["type"]> extends [infer V]
@@ -404,7 +399,7 @@ type CaseLoop<
 	? TypeOf<W, C> extends AnyErr
 		? TypeOf<W, C>
 		: TypeOf<V, C> extends infer Y extends ColInfo
-			? CaseLoop<Whens, C, [...Acc, Y], Nx<I>>
+			? CaseLoop<Whens, C, [...Acc, Y], Next<I>>
 			: TypeOf<V, C>
 	: Acc;
 
@@ -430,7 +425,7 @@ type AggOf<E extends Call> = E["name"] extends "min" | "max"
 	: Functions[E["name"] & keyof Functions];
 
 type FnOf<E extends Call, C extends SqCtx> =
-	DeclaredFn<C["db"], E["name"]> extends infer D
+	DeclaredFn<C["db"], E["name"], FunctionCatalog> extends infer D
 		? D extends null
 			? E["name"] extends keyof Functions
 				? AggOf<E>
@@ -445,10 +440,10 @@ type TypeCall<E extends Call, C extends SqCtx> =
 					[F["kind"], E["over"]] extends ["agg", null]
 						? [C["inAgg"], C["agg"]] extends [false, "group" | "whole"]
 							? CallShape<E, F>
-							: `misuse of aggregate function ${E["disp"]}()`
+							: FnErr<`misuse of aggregate function ${E["disp"]}()`, E>
 						: CallShape<E, F>
-				) extends infer M extends string
-				? SqlError<M, null>
+				) extends infer M extends AnyErr
+				? M
 				: (
 							[F["kind"], E["over"]] extends ["agg", null]
 								? AggCtx<C>
@@ -465,50 +460,57 @@ type TypeCall<E extends Call, C extends SqCtx> =
 								: Info<RetType<F["ret"], Args>, NullOf<F, E, Args, C>>
 						: TypeList<E["args"], AC>
 					: never
-			: SqlError<`no such function: ${E["disp"]}`, null>
+			: SqlError<
+					`no such function: ${E["disp"]}`,
+					NameAt<
+						LastPart<Lowercase<E["disp"]>>,
+						"function",
+						Lowercase<E["disp"]>
+					>
+				>
 		: never;
-
-type AggCtx<C extends SqCtx> = (
-	C extends { readonly aggScope: infer S extends Scope }
-		? S
-		: C["scope"]
-) extends infer S extends Scope
-	? MkCtx<C["db"], S, C["ctes"], "none", C["aliases"], S, true>
-	: never;
 
 type CallShape<E extends Call, F extends Fn> = E["star"] extends true
 	? E["name"] extends "count"
 		? E["distinct"] extends true
-			? "DISTINCT aggregates must have exactly one argument"
+			? SqlError<"DISTINCT aggregates must have exactly one argument", null>
 			: null
-		: `wrong number of arguments to function ${E["disp"]}()`
+		: FnErr<`wrong number of arguments to function ${E["disp"]}()`, E>
 	: ArityOk<E["args"]["length"], F["min"], F["max"]> extends false
-		? `wrong number of arguments to function ${E["disp"]}()`
+		? FnErr<`wrong number of arguments to function ${E["disp"]}()`, E>
 		: F["kind"] extends "agg"
 			? E["over"] extends null
 				? AggPlacement<E>
 				: E["distinct"] extends true
-					? "DISTINCT is not supported for window functions"
+					? SqlError<"DISTINCT is not supported for window functions", null>
 					: null
 			: F["kind"] extends "win"
 				? E["over"] extends null
-					? `misuse of window function ${E["disp"]}()`
+					? FnErr<`misuse of window function ${E["disp"]}()`, E>
 					: null
 				: E["over"] extends null
 					? E["filter"] extends null
 						? E["distinct"] extends true
-							? `DISTINCT aggregates must have exactly one argument`
+							? SqlError<
+									`DISTINCT aggregates must have exactly one argument`,
+									null
+								>
 							: null
-						: `FILTER may not be used with non-aggregate ${E["disp"]}()`
-					: `${E["disp"]}() may not be used as a window function`;
+						: SqlError<
+								`FILTER may not be used with non-aggregate ${E["disp"]}()`,
+								null
+							>
+					: FnErr<`${E["disp"]}() may not be used as a window function`, E>;
+/** An error about call `E`, which points at the function's name. */
+type FnErr<M extends string, E extends Call> = SqlError<
+	M,
+	NameAt<Lowercase<E["disp"]>>
+>;
 type AggPlacement<E extends Call> = E["distinct"] extends true
 	? E["args"]["length"] extends 1
 		? null
-		: "DISTINCT aggregates must have exactly one argument"
+		: SqlError<"DISTINCT aggregates must have exactly one argument", null>
 	: null;
-
-type ArityOk<N extends number, Min extends number, Max extends number> =
-	GE<N, Min> extends true ? (Max extends 1000 ? true : GE<Max, N>) : false;
 
 type CheckExtras<E extends Call, C extends SqCtx> = (
 	E["filter"] extends Expr
@@ -539,11 +541,7 @@ type RetType<R extends string, A extends readonly ColInfo[]> = R extends "arg0"
 					? Affinity<A[0]["type"]> extends "blob"
 						? "blob"
 						: "text"
-					: R extends "jsonext"
-						? A["length"] extends 2
-							? "any"
-							: "text"
-						: R;
+					: R;
 type AbsType<Aff> = [Aff] extends ["integer"]
 	? "integer"
 	: [Aff] extends ["real"]
@@ -564,8 +562,8 @@ type IifValues<
 	A extends readonly ColInfo[],
 	I extends number,
 	Acc extends readonly ColInfo[],
-> = A[Nx<I>] extends ColInfo
-	? IifValues<A, Nx<Nx<I>>, [...Acc, A[Nx<I>]]>
+> = A[Next<I>] extends ColInfo
+	? IifValues<A, Next<Next<I>>, [...Acc, A[Next<I>]]>
 	: A[I] extends ColInfo
 		? [...Acc, A[I]]
 		: Acc;

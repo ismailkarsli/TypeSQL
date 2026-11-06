@@ -1,16 +1,11 @@
-import { readFileSync, writeFileSync } from "node:fs";
-import { createRequire } from "node:module";
-import { fileURLToPath } from "node:url";
-import { ViewNullability } from "../packages/pg/src/introspect/nullability.ts";
+// Writes PgCatalog, the pg_catalog and information_schema relations a query can read,
+// from a PostgreSQL server. usage: node tools/pg-catalog-from-pg.ts [--check]
+import { columnSource, propertyKey as key } from "@typesql/core/adapter";
+import { introspect } from "@typesql/pg/introspect";
+import type pg from "pg";
+import { emit, withPostgres } from "./generated.ts";
 
-export interface PgClient {
-	query<R extends readonly unknown[]>(
-		text: string,
-		values?: unknown[],
-	): Promise<{ rows: R }>;
-}
-
-export const RELATIONS: readonly (readonly [schema: string, name: string])[] = [
+const RELATIONS: readonly (readonly [schema: string, name: string])[] = [
 	["pg_catalog", "pg_am"],
 	["pg_catalog", "pg_attrdef"],
 	["pg_catalog", "pg_attribute"],
@@ -62,7 +57,8 @@ export const RELATIONS: readonly (readonly [schema: string, name: string])[] = [
 	["information_schema", "views"],
 ];
 
-export const FUNCTION_COLUMNS_NOT_NULL = new Set([
+/** View columns from set-returning functions that never return NULL. */
+const FUNCTION_COLUMNS_NOT_NULL = new Set([
 	"pg_stat_activity.pid",
 	"pg_stat_replication.pid",
 	"pg_locks.locktype",
@@ -86,12 +82,15 @@ export const FUNCTION_COLUMNS_NOT_NULL = new Set([
 ]);
 
 async function columnsOf(
-	client: PgClient,
+	client: pg.Client,
 	relid: string,
 ): Promise<{ name: string; type: string; notnull: boolean }[]> {
-	const { rows } = await client.query<
-		{ name: string; notnull: boolean; typname: string; elem: string | null }[]
-	>(
+	const { rows } = await client.query<{
+		name: string;
+		notnull: boolean;
+		typname: string;
+		elem: string | null;
+	}>(
 		`SELECT a.attname AS name, a.attnotnull AS notnull,
             CASE WHEN t.typtype = 'd' THEN bt.typname ELSE t.typname END AS typname,
             CASE WHEN t.typtype = 'd' THEN bte.typname ELSE te.typname END AS elem
@@ -112,27 +111,22 @@ async function columnsOf(
 	}));
 }
 
-const IDENT = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
-const key = (name: string): string =>
-	IDENT.test(name) ? name : JSON.stringify(name);
-
-export async function generatePgCatalog(client: PgClient): Promise<string> {
-	const views = new ViewNullability(
-		(text, values) => client.query(text, values),
-		{
-			notNull: (view, column) =>
-				FUNCTION_COLUMNS_NOT_NULL.has(`${view}.${column}`),
-		},
-	);
-	const {
-		rows: [{ version }],
-	} = await client.query<[{ version: string }]>(
-		`SELECT current_setting('server_version') AS version`,
+async function generatePgCatalog(client: pg.Client): Promise<string> {
+	// View columns are as nullable as @typesql/pg/introspect infers from their queries.
+	const { version, relations } = await introspect(client, {
+		schemas: Array.from(new Set(RELATIONS.map(([schema]) => schema))),
+		viewNotNull: (view, column) =>
+			FUNCTION_COLUMNS_NOT_NULL.has(`${view}.${column}`),
+	});
+	const viewNotNull = new Map(
+		relations
+			.filter((r) => r.kind === "view")
+			.map((r) => [`${r.schema}.${r.name}`, r.columns.map((c) => !c.nullable)]),
 	);
 
 	const namespaces = new Map<string, string[]>();
 	for (const [schema, name] of RELATIONS) {
-		const { rows } = await client.query<{ oid: string; relkind: string }[]>(
+		const { rows } = await client.query<{ oid: string; relkind: string }>(
 			`SELECT c.oid::int8::text AS oid, c.relkind FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
         WHERE n.nspname = $1 AND c.relname = $2`,
 			[schema, name],
@@ -144,10 +138,12 @@ export async function generatePgCatalog(client: PgClient): Promise<string> {
 		const { oid, relkind } = rows[0]!;
 		const cols = await columnsOf(client, oid);
 		const notnull =
-			relkind === "v" ? await views.notNull(oid) : cols.map((c) => c.notnull);
+			relkind === "v"
+				? viewNotNull.get(`${schema}.${name}`)!
+				: cols.map((c) => c.notnull);
 		const body = cols.map(
 			(c, i) =>
-				`    ${key(c.name)}: Col<${JSON.stringify(c.type)}${notnull[i] ? "" : ", { nullable: true }"}>;`,
+				`    ${key(c.name)}: ${columnSource(JSON.stringify(c.type), { nullable: !notnull[i] }, "postgres")};`,
 		);
 
 		const lines = [`  ${key(name)}: View<{`, ...body, "  }>;"];
@@ -172,46 +168,13 @@ export async function generatePgCatalog(client: PgClient): Promise<string> {
 	].join("\n");
 }
 
-export const OUTPUT = new URL(
+const OUTPUT = new URL(
 	"../packages/core/src/postgres/schema/pg-catalog.ts",
 	import.meta.url,
 );
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-	const require = createRequire(
-		new URL("../packages/core/package.json", import.meta.url),
-	);
-	const {
-		Client,
-	}: {
-		Client: new (config: {
-			connectionString: string;
-		}) => PgClient & { connect(): Promise<void>; end(): Promise<void> };
-	} = require("pg");
-	const url = process.env.TYPESQL_PG_URL;
-	if (!url) {
-		console.error(
-			"set TYPESQL_PG_URL (e.g. docker run -d -p 5432:5432 -e POSTGRES_PASSWORD=x postgres:18)",
-		);
-		process.exit(2);
-	}
-	const client = new Client({ connectionString: url });
-	await client.connect();
-	try {
-		const source = await generatePgCatalog(client);
-		if (process.argv.includes("--check")) {
-			const current = readFileSync(OUTPUT, "utf8");
-			if (current !== source) {
-				console.error(
-					`${fileURLToPath(OUTPUT)} is out of date; run without --check to regenerate`,
-				);
-				process.exitCode = 1;
-			}
-		} else {
-			writeFileSync(OUTPUT, source);
-			console.log(`wrote ${fileURLToPath(OUTPUT)}`);
-		}
-	} finally {
-		await client.end();
-	}
-}
+emit(
+	OUTPUT,
+	await withPostgres(generatePgCatalog),
+	`${RELATIONS.length} relations`,
+);

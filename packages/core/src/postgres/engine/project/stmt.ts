@@ -1,6 +1,6 @@
-import type { QueryContext } from "../../../engine/types.js";
 import type { AnyErr } from "../../../errors.js";
 import type { DmlStmt, SelectStmt, Stmt, Tag } from "../ast.js";
+import type { QueryContext } from "../types.js";
 import type { ProjectDml } from "./dml.js";
 import type { ProjectSelect } from "./select.js";
 

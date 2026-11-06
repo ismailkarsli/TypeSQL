@@ -1,0 +1,74 @@
+engine biome(1.0)
+language js(typescript)
+
+pattern unknown_type() {
+	or {
+		TsUnknownType(),
+		TsParenthesizedType(ty=unknown_type()),
+		TsUnionType(types=some unknown_type())
+	}
+}
+
+pattern guards($name) {
+	or {
+		TsPredicateReturnType(parameter_name=$subject),
+		TsAssertsReturnType(parameter_name=$subject)
+	} where { $subject <: $name }
+}
+
+pattern guard_return($name) {
+	or {
+		TsReturnTypeAnnotation(ty=guards($name)),
+		guards($name)
+	}
+}
+
+pattern parameter_owner() {
+	or {
+		JsFunctionDeclaration(),
+		JsFunctionExpression(),
+		JsArrowFunctionExpression(),
+		JsFunctionExportDefaultDeclaration(),
+		TsDeclareFunctionDeclaration(),
+		TsDeclareFunctionExportDefaultDeclaration(),
+		JsMethodClassMember(),
+		JsMethodObjectMember(),
+		JsConstructorClassMember(),
+		JsSetterClassMember(),
+		JsSetterObjectMember(),
+		TsMethodSignatureClassMember(),
+		TsMethodSignatureTypeMember(),
+		TsCallSignatureTypeMember(),
+		TsConstructSignatureTypeMember(),
+		TsConstructorSignatureClassMember(),
+		TsSetterSignatureClassMember(),
+		TsSetterSignatureTypeMember(),
+		TsFunctionType(),
+		TsConstructorType()
+	}
+}
+
+or {
+	JsFormalParameter(binding=$binding, type_annotation=TsTypeAnnotation(ty=$type)),
+	JsRestParameter(binding=$binding, type_annotation=TsTypeAnnotation(ty=$type)),
+	TsThisParameter(type_annotation=TsTypeAnnotation(ty=$type)) as $binding
+} as $parameter where {
+	$type <: unknown_type(),
+	$binding <: not "cause",
+	$parameter <: within parameter_owner() as $owner,
+	$owner <: not or {
+		JsFunctionDeclaration(return_type_annotation=guard_return($binding)),
+		JsFunctionExpression(return_type_annotation=guard_return($binding)),
+		JsArrowFunctionExpression(return_type_annotation=guard_return($binding)),
+		JsFunctionExportDefaultDeclaration(return_type_annotation=guard_return($binding)),
+		TsDeclareFunctionDeclaration(return_type_annotation=guard_return($binding)),
+		TsDeclareFunctionExportDefaultDeclaration(return_type_annotation=guard_return($binding)),
+		JsMethodClassMember(return_type_annotation=guard_return($binding)),
+		JsMethodObjectMember(return_type_annotation=guard_return($binding)),
+		TsMethodSignatureClassMember(return_type_annotation=guard_return($binding)),
+		TsMethodSignatureTypeMember(return_type_annotation=guard_return($binding)),
+		TsCallSignatureTypeMember(return_type_annotation=guard_return($binding)),
+		TsFunctionType(return_type=guard_return($binding))
+	},
+	register_diagnostic(span=$type, message="This parameter leaves input unparsed. Accept a named domain type; run the expected schema or parser at the I/O boundary before calling this function.", severity="error")
+}

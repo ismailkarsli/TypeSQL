@@ -1,0 +1,80 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`mysql-json-object-rejection > scenario 1`] = `
+{
+  "compile": {
+    "status": 1,
+    "stderr": "",
+  },
+  "compiler": {
+    "diagnostics": [
+      {
+        "category": 1,
+        "code": 2345,
+        "column": 48,
+        "expression": "meta",
+        "file": "app.ts",
+        "line": 28,
+        "message": "Argument of type '{ theme: string; }' is not assignable to parameter of type 'NonArrayOrSqlJson<string>'.",
+      },
+      {
+        "category": 1,
+        "code": 2345,
+        "column": 48,
+        "expression": "meta",
+        "file": "app.ts",
+        "line": 29,
+        "message": "Argument of type '{ theme: string; }' is not assignable to parameter of type 'NonArrayOrSqlJson<string | null>'.",
+      },
+      {
+        "category": 1,
+        "code": 2322,
+        "column": 53,
+        "expression": "meta",
+        "file": "app.ts",
+        "line": 30,
+        "message": "Type '{ theme: string; }' is not assignable to type 'NonArrayOrSqlJson<string | null>'.",
+        "related": [
+          {
+            "category": 3,
+            "code": 6500,
+            "column": 21,
+            "expression": "{
+    [K in keyof O]: O[K];
+}",
+            "file": "<workspace>/packages/core/dist/sql/named.d.ts",
+            "line": 12,
+            "message": "The expected type comes from property 'meta' which is declared here on type '{ meta: NonArrayOrSqlJson<string | null>; }'",
+          },
+        ],
+      },
+      {
+        "category": 1,
+        "code": 2345,
+        "column": 5,
+        "details": [
+          {
+            "category": 1,
+            "code": 2322,
+            "message": "Type 'string' is not assignable to type 'SqlError<"parameter $1: a { theme: string } value for json must be passed as sql.json(value)", 5>'.",
+          },
+        ],
+        "expression": "\`UPDATE posts SET \${sql.set("posts", { meta })} WHERE id = 1\`",
+        "file": "app.ts",
+        "line": 31,
+        "message": "Argument of type 'string' is not assignable to parameter of type 'SqlError<"parameter $1: a { theme: string } value for json must be passed as sql.json(value)", 5> & \`UPDATE posts SET \${Fragment<"\`meta\` = $1", readonly unknown[], ["<0theme=s>0"]>} WHERE id = 1\`'.",
+      },
+      {
+        "category": 1,
+        "code": 2345,
+        "column": 42,
+        "expression": "{ meta }",
+        "file": "app.ts",
+        "line": 31,
+        "message": "Argument of type '{ meta: { theme: string; }; }' is not assignable to parameter of type 'never'.",
+      },
+    ],
+    "types": {},
+  },
+}
+`;

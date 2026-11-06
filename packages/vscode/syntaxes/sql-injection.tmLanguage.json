@@ -1,5 +1,5 @@
 {
-	"$comment": "SQL highlighting inside sql(), tx(), sql.fragment(), sql.as<Row>(), a migration's .ddl(), .add() and .raw() and /* sql */ string literals. Injected into TypeScript and JavaScript. Every rule inside a literal stops at the literal's closing quote, so an unterminated SQL string or comment never runs past it, and takes escapes first, so an escaped quote never closes it. In \"…\" and '…', a line ends a rule unless it ends in a backslash (a line continuation).",
+	"$comment": "SQL highlighting inside sql(), tx(), sql.fragment(), sql.as<Row>(), a migration's .ddl(), .add() and .raw() and /* sql */ string literals. Injected into TypeScript and JavaScript. Every rule inside a literal stops at the literal's closing quote, so an unterminated SQL string or comment never runs past it, and takes escapes first, so an escaped quote never closes it. In \"…\" and '…', a line ends a rule unless it ends in a backslash (a line continuation). The injection selector, call names, statement words and word lists are written by scripts/contributes.mts from @typesql/language-server (pnpm --filter typesql contributes); the build fails when they differ.",
 	"scopeName": "inline.typesql",
 	"injectionSelector": "L:source.ts -comment -string, L:source.tsx -comment -string, L:source.js -comment -string, L:source.js.jsx -comment -string",
 	"patterns": [
@@ -353,21 +353,21 @@
 		},
 
 		"dollar-string-double": {
-			"begin": "\\$([A-Za-z_][\\w]*|)\\$",
+			"begin": "\\$([A-Za-z_\\u0080-\\uffff][\\w\\u0080-\\uffff]*|)\\$",
 			"end": "\\$\\1\\$|(?=\")|(?<![\\\\\\n])$",
 			"captures": { "0": { "name": "punctuation.definition.string.sql" } },
 			"name": "string.quoted.other.dollar.sql",
 			"patterns": [{ "include": "#escape" }]
 		},
 		"dollar-string-single": {
-			"begin": "\\$([A-Za-z_][\\w]*|)\\$",
+			"begin": "\\$([A-Za-z_\\u0080-\\uffff][\\w\\u0080-\\uffff]*|)\\$",
 			"end": "\\$\\1\\$|(?=')|(?<![\\\\\\n])$",
 			"captures": { "0": { "name": "punctuation.definition.string.sql" } },
 			"name": "string.quoted.other.dollar.sql",
 			"patterns": [{ "include": "#escape" }]
 		},
 		"dollar-string-template": {
-			"begin": "\\$([A-Za-z_][\\w]*|)\\$",
+			"begin": "\\$([A-Za-z_\\u0080-\\uffff][\\w\\u0080-\\uffff]*|)\\$",
 			"end": "\\$\\1\\$|(?=`)",
 			"captures": { "0": { "name": "punctuation.definition.string.sql" } },
 			"name": "string.quoted.other.dollar.sql",
@@ -381,21 +381,21 @@
 				{ "include": "#escape" },
 				{ "match": "\\$\\d+", "name": "variable.parameter.positional.sql" },
 				{
-					"match": "(?<![:\\w$])(:)([A-Za-z_][\\w$]*)",
+					"match": "(?<![:\\w$\\u0080-\\uffff])(:)([A-Za-z_\\u0080-\\uffff][\\w$\\u0080-\\uffff]*)",
 					"captures": {
 						"1": { "name": "punctuation.definition.variable.sql" }
 					},
 					"name": "variable.parameter.named.sql"
 				},
 				{
-					"match": "(::)\\s*([A-Za-z_][\\w$]*)",
+					"match": "(::)\\s*([A-Za-z_\\u0080-\\uffff][\\w$\\u0080-\\uffff]*)",
 					"captures": {
 						"1": { "name": "keyword.operator.cast.sql" },
 						"2": { "name": "storage.type.sql" }
 					}
 				},
 				{
-					"match": "(?<![\\w$])(?:0[xX][0-9A-Fa-f_]+|0[oO][0-7_]+|0[bB][01_]+|(?:\\d[\\d_]*(?:\\.[\\d_]*)?|\\.\\d[\\d_]*)(?:[eE][+-]?\\d+)?)(?![\\w$])",
+					"match": "(?<![\\w$\\u0080-\\uffff])(?:0[xX][0-9A-Fa-f_]+|0[oO][0-7_]+|0[bB][01_]+|(?:\\d[\\d_]*(?:\\.[\\d_]*)?|\\.\\d[\\d_]*)(?:[eE][+-]?\\d+)?)(?![\\w$\\u0080-\\uffff])",
 					"name": "constant.numeric.sql"
 				},
 				{
@@ -411,14 +411,17 @@
 					"name": "keyword.other.sql"
 				},
 				{
-					"match": "[A-Za-z_][\\w$]*(?=\\()",
+					"match": "[A-Za-z_\\u0080-\\uffff][\\w$\\u0080-\\uffff]*(?=\\()",
 					"name": "entity.name.function.sql"
 				},
-				{ "match": "[-+*/<>=~!@#%^&|?]+", "name": "keyword.operator.sql" },
+				{
+					"match": "(?:(?!--|/\\*)[+\\-*/<>=~!@#%^&|?])+",
+					"name": "keyword.operator.sql"
+				},
 				{ "match": ",", "name": "punctuation.separator.comma.sql" },
 				{ "match": ";", "name": "punctuation.terminator.statement.sql" },
 				{ "match": "\\.", "name": "punctuation.accessor.sql" },
-				{ "match": "[A-Za-z_][\\w$]*" }
+				{ "match": "[A-Za-z_\\u0080-\\uffff][\\w$\\u0080-\\uffff]*" }
 			]
 		}
 	}

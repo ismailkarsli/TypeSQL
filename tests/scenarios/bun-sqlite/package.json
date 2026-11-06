@@ -3,7 +3,6 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
-		"compile": "tsc -p tsconfig.json --pretty false",
 		"start": "bun dist/app.js"
 	},
 	"dependencies": {

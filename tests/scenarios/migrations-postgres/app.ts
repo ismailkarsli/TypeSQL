@@ -9,6 +9,7 @@ const first = migration("postgres", {
 	up: async (db) =>
 		db.ddl("CREATE TABLE users (id integer PRIMARY KEY, name text NOT NULL)"),
 	down: async (db) => {
+		// add() is the deprecated name of ddl(); it keeps working.
 		await db.add("DROP TABLE users");
 	},
 });

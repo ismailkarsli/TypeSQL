@@ -1,9 +1,10 @@
-import type { IdTok, Toks, WordTok } from "../../engine/tokens.js";
+import type { Next } from "../../engine/next.js";
+import type { Toks } from "../../engine/tokens.js";
 import type { SqlError } from "../../errors.js";
+import type { IdTok, WordTok } from "./lexer/tokens.js";
+import type { IntLitValue } from "./literals.js";
 import type { IntoName } from "./parser/select.js";
-import type { Nx } from "./parser/util.js";
 import type { WithHint } from "./suggest.js";
-import type { IntLitValue } from "./typer/operators.js";
 
 export type Reposition<E, T extends Toks, DB = never> =
 	E extends SqlError<infer M, infer At>
@@ -79,21 +80,21 @@ type FindTok<T extends Toks, P, I extends number> = T[I] extends {
 }
 	? T[I] extends P
 		? I
-		: T[Nx<I>] extends P
-			? Nx<I>
-			: T[Nx<Nx<I>>] extends P
-				? Nx<Nx<I>>
-				: T[Nx<Nx<Nx<I>>>] extends P
-					? Nx<Nx<Nx<I>>>
-					: FindTok<T, P, Nx<Nx<Nx<Nx<I>>>>>
+		: T[Next<I>] extends P
+			? Next<I>
+			: T[Next<Next<I>>] extends P
+				? Next<Next<I>>
+				: T[Next<Next<Next<I>>>] extends P
+					? Next<Next<Next<I>>>
+					: FindTok<T, P, Next<Next<Next<Next<I>>>>>
 	: -1;
 
 type FindSelectInto<T extends Toks, I extends number, Prev> =
 	T[I] extends WordTok<"into">
 		? Prev extends WordTok<"insert" | "merge">
-			? FindSelectInto<T, Nx<I>, T[I]>
+			? FindSelectInto<T, Next<I>, T[I]>
 			: IntoName<T, I>
-		: FindSelectInto<T, Nx<I>, T[I]>;
+		: FindSelectInto<T, Next<I>, T[I]>;
 
 type FindNumFrom<
 	T extends Toks,
@@ -108,11 +109,11 @@ type FindNumFrom<
 			? Minus extends number
 				? Minus
 				: I
-			: FindNumFrom<T, Nx<I>, N, null>
+			: FindNumFrom<T, Next<I>, N, null>
 		: T[I] extends { readonly k: "o"; readonly v: "-" | "(" }
 			? FindNumFrom<
 					T,
-					Nx<I>,
+					Next<I>,
 					N,
 					Minus extends number
 						? Minus
@@ -120,5 +121,5 @@ type FindNumFrom<
 							? I
 							: null
 				>
-			: FindNumFrom<T, Nx<I>, N, null>
+			: FindNumFrom<T, Next<I>, N, null>
 	: 0;

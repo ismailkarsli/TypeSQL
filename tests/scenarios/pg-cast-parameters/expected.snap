@@ -1,0 +1,45 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`pg-cast-parameters > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "arrayCast": "({ x: (null | string)[] })[]",
+      "arrayRows": "({ x: null | string })[]",
+      "castCall": "({ x: null | number })[]",
+      "column": "({ tags: (string)[] })[]",
+      "compared": "({ x: number })[]",
+      "defaulted": "({ x: number })[]",
+      "defaultedArray": "({ x: (null | string)[] })[]",
+      "inserted": "({ id: number })[]",
+      "nested": "({ x: (null | number)[] })[]",
+      "nestedCommented": "({ x: (null | number)[] })[]",
+      "unnested": "({ x: null | number })[]",
+    },
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "{
+  nested: [ { x: [ null ] } ],
+  nestedCommented: [ { x: [ null ] } ],
+  unnested: [ { x: null } ],
+  castCall: [ { x: null } ],
+  arrayCast: [ { x: [ 'a', null ] } ],
+  arrayRows: [ { x: 'a' }, { x: null } ],
+  column: [ { tags: [ 'a' ] } ],
+  defaulted: [ { x: 0 } ],
+  defaultedArray: [ { x: [ 'b' ] } ],
+  compared: [ { x: 1 } ],
+  inserted: [ { id: 2 } ]
+}
+",
+  },
+}
+`;

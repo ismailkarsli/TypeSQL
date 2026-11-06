@@ -236,7 +236,7 @@ const patched = sql(
 
 ### Bulk inserts: `sql.values`
 
-`sql.values(table, rows)` builds the column list and `VALUES` rows from an array of objects. On Postgres, MySQL and MariaDB, a column some rows leave out is sent as `DEFAULT` (a row with no values is `() VALUES ()` on MySQL and MariaDB); on SQLite, every row needs the same keys.
+`sql.values(table, rows)` builds the column list and `VALUES` rows from an array of objects. On Postgres, MySQL and MariaDB, a column some rows leave out is sent as `DEFAULT` (a row with no values is `() VALUES ()` on MySQL and MariaDB); on SQLite, every row needs the same keys, each with a value that is sent, which the types check.
 
 ```ts
 declare const imported: { email: string; display_name?: string | null }[];

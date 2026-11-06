@@ -1,4 +1,4 @@
-import type { SqlError } from "./errors.js";
+import type { AnyErr, SqlError } from "./errors.js";
 import type { SqlPlugin } from "./plugin.js";
 
 /**
@@ -15,8 +15,28 @@ export type DialectBrand<Name extends string, DB, TM, Plugins> = {
 	readonly inputs: (inputs: [DB, TM, Plugins]) => [DB, TM, Plugins];
 };
 
-export type StrictNullChecksMessage =
+/**
+ * What the brand of every `sql` of dialect `Name` with `Plugins`, for any
+ * schema and type map, is assignable to.
+ */
+export type AnyDialectBrand<Name extends string, Plugins = []> = {
+	readonly name: Name;
+	readonly inputs: (
+		inputs: [never, never, Plugins],
+	) => [unknown, unknown, Plugins];
+};
+
+type StrictNullChecksMessage =
 	"TypeSQL requires strictNullChecks: set strict or strictNullChecks to true in tsconfig.json";
+
+/**
+ * The error every statement is without strictNullChecks, and `never` with
+ * it. `null extends string` holds only without strictNullChecks; it involves
+ * no type parameter, so TypeScript resolves it once, where it is declared.
+ */
+export type NonStrict = null extends string
+	? SqlError<StrictNullChecksMessage, null>
+	: never;
 
 /**
  * What an `sql` is without strictNullChecks: every call is an error saying
@@ -25,18 +45,13 @@ export type StrictNullChecksMessage =
  * deeply (TS2589).
  */
 interface NonStrictSql {
-	(
-		query: SqlError<StrictNullChecksMessage, null>,
-		...params: readonly unknown[]
-	): any;
+	(query: NonStrict, ...params: readonly unknown[]): any;
 	readonly [member: string]: NonStrictSql;
 }
 
 /**
- * `Api` with strictNullChecks on, and NonStrictSql without it.
- * `null extends string` holds only without strictNullChecks; it involves no
- * type parameter, so TypeScript resolves it once, where it is declared, and
- * it costs nothing per query.
+ * `Api` with strictNullChecks on, and NonStrictSql without it. Like
+ * NonStrict, the check is resolved once and costs nothing per query.
  */
 export type StrictSql<Api> = null extends string ? NonStrictSql : Api;
 
@@ -52,6 +67,9 @@ export interface DialectTypes {
 	readonly validateDdl: unknown;
 	readonly applyDdl: unknown;
 }
+
+/** A dialect's `plugins` slot as its `sql` takes it: a plugin list, or none. */
+export type PluginsOf<P> = P extends readonly SqlPlugin[] ? P : [];
 
 type SqlInputs<DB, TM, Plugins extends readonly SqlPlugin[]> = {
 	readonly db: DB;
@@ -81,12 +99,46 @@ export type ValidateDdlOf<T extends DialectTypes, DB, Q extends string> = (T &
 export type ApplyDdlOf<T extends DialectTypes, DB, Q extends string> = (T &
 	DdlInputs<DB, Q>)["applyDdl"];
 
+/**
+ * A DDL script checked in dialect `T`: the script, or its error. A `string`
+ * that isn't a literal is an error before `applyDdl` reads it.
+ */
+export type DdlCheck<
+	T extends DialectTypes,
+	DB,
+	Q extends string,
+> = string extends Q
+	? SqlError<
+			"migrations need a string literal; use .raw() for SQL the type checker cannot see",
+			null
+		>
+	: ApplyDdlOf<T, DB, Q> extends infer R
+		? R extends AnyErr
+			? R
+			: Q
+		: never;
+
+/**
+ * The runtime side of a dialect: its name and the facts of its SQL text. A
+ * fact it leaves out is standard SQL's: `"` quotes names, `DEFAULT VALUES`
+ * is a row of defaults, and the lexis is `LEXIS` (runtime/compile.ts).
+ */
 export interface Dialect<T extends DialectTypes = DialectTypes> {
 	readonly name: string;
 	readonly types?: T;
+	/** Whether `sql.values` may write `DEFAULT` for a column a row leaves out. */
 	readonly valuesDefault?: boolean;
-	/** The identifier quote `sql.id`, `sql.set` and `sql.values` write; default `"`. */
+	/** The identifier quote `sql.id`, `sql.set` and `sql.values` write. */
 	readonly quote?: '"' | "`";
-	/** What `sql.values` writes for a row of defaults; default `DEFAULT VALUES`. */
+	/** What `sql.values` writes for a row of defaults. */
 	readonly emptyRow?: string;
+	/**
+	 * The text that holds no parameters, as a regular expression source:
+	 * strings, quoted names and comments, then a `$n` parameter, whose number
+	 * is its first capture group. A bare `/*` alternative opens a block comment
+	 * that nests. compile() reads `:name` parameters and inline values outside
+	 * it, and the drivers' `$n` rewriters read `$n` with it. The dialect's
+	 * engine states the same rules for its types (`EngineTypes["lexis"]`).
+	 */
+	readonly lexis?: string;
 }

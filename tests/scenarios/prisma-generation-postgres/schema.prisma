@@ -17,3 +17,8 @@ model User {
   bio String? @map("display_name")
   @@map("users")
 }
+model Author {
+  id Int @id @default(autoincrement())
+  name String
+  bio String?
+}

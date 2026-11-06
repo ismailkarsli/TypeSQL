@@ -1,43 +1,25 @@
-import type { Typed } from "@typesql/core/mysql";
+import type { Col, Typed } from "@typesql/core/mysql";
 import type {
-	Column,
+	ColumnFlags,
 	ColumnName,
 	Fields,
 	Get,
-	Models,
 	NullableKeys,
 	OptionalCreateKeys,
-	PrismaOverrides,
-	PrismaTypeMapLike,
+	OverrideType,
 	Scalars,
-	TableName,
 	TypeName,
-} from "./from-prisma.js";
+} from "./model.js";
+import type { PRISMA_SCALARS } from "./scalars.js";
 
-/** Prisma's default MySQL column types; native types (`@db.Text`, …) need an override. */
-export interface PrismaScalarToMysql {
-	Int: "int";
-	BigInt: "bigint";
-	Float: "double";
-	Decimal: "decimal";
-	String: "varchar";
-	Boolean: "tinyint";
-	DateTime: "datetime";
-	Json: "json";
-	Bytes: "longblob";
-}
+export type PrismaScalarToMysql = (typeof PRISMA_SCALARS)["mysql"];
 
+// An enum field is an ENUM column of its values.
 type MysqlOf<T extends string, V> = T extends keyof PrismaScalarToMysql
 	? PrismaScalarToMysql[T]
 	: Typed<"enum", Exclude<V, null>>;
 
-type ColumnType<T extends string, V, O> = O extends string
-	? O
-	: O extends { readonly type: infer X extends string }
-		? X
-		: MysqlOf<T, V>;
-
-type ModelColumns<
+export type MysqlColumns<
 	M,
 	MO,
 	FS = Fields<M>,
@@ -45,24 +27,12 @@ type ModelColumns<
 	Null = NullableKeys<M>,
 	Opt = OptionalCreateKeys<M>,
 > = {
-	-readonly [F in keyof FS as ColumnName<F, Get<MO, F>>]: Column<
-		ColumnType<TypeName<FS[F]>, Get<S, F>, Get<MO, F>>,
-		F extends Null ? true : false,
-		F extends Opt ? true : false,
-		Get<MO, F>
-	>;
-};
-
-type TableOf<M, MO> = M extends { operations: { createMany: unknown } }
-	? ModelColumns<M, MO>
-	: { readonly $view: ModelColumns<M, MO> };
-
-export type FromPrismaMysql<
-	TM extends PrismaTypeMapLike,
-	Overrides extends PrismaOverrides<TM, Overrides> = {},
-> = {
-	-readonly [N in keyof Models<TM> as TableName<N, Get<Overrides, N>>]: TableOf<
-		Models<TM>[N],
-		Get<Overrides, N>
+	-readonly [F in keyof FS as ColumnName<F, Get<MO, F>>]: Col<
+		OverrideType<Get<MO, F>, MysqlOf<TypeName<FS[F]>, Get<S, F>>>,
+		ColumnFlags<
+			F extends Null ? true : false,
+			F extends Opt ? true : false,
+			Get<MO, F>
+		>
 	>;
 };

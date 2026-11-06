@@ -1,6 +1,14 @@
-import type { TypeRegistry } from "../../schema.js";
-import type { JsonTs } from "../engine/json.js";
-import type { AnyShaped, BaseOf, NullElems, Shaped } from "../engine/shape.js";
+import type { ColInfo } from "../../engine/types.js";
+import type { JsonAs, NullableTs, ParamMapOf, TsShape } from "../../schema.js";
+import type { SchemaTypes } from "../engine/db.js";
+import type {
+	AnyShaped,
+	BaseOf,
+	NullElems,
+	Shaped,
+	ShapeOfType,
+} from "../engine/shape.js";
+import type { RangeT, TypeFact } from "../schema/type-facts.js";
 
 export interface DefaultTypeMap {
 	bool: boolean;
@@ -34,6 +42,7 @@ export interface DefaultTypeMap {
 	uuid: string;
 	json: unknown;
 	jsonb: unknown;
+	jsonpath: string;
 	xml: string;
 	inet: string;
 	cidr: string;
@@ -45,6 +54,7 @@ export interface DefaultTypeMap {
 	regclass: string;
 	regtype: string;
 	regproc: string;
+	regconfig: string;
 	point: { x: number; y: number };
 	line: string;
 	lseg: string;
@@ -63,6 +73,9 @@ export interface DefaultTypeMap {
 	xid: string;
 	xid8: string;
 	pg_lsn: string;
+	pg_snapshot: string;
+	txid_snapshot: string;
+	refcursor: string;
 	aclitem: string;
 	int2vector: string;
 	oidvector: string;
@@ -72,14 +85,34 @@ export interface DefaultTypeMap {
 	unknown: unknown;
 }
 
+/**
+ * What node-postgres returns with its default parsers (pg-types), as the
+ * migrator's `pg` client and `@typesql/pg` read rows. `bytea` is a Node
+ * `Buffer`, typed here as the `Uint8Array` it extends.
+ */
+export interface NodePostgresTypeMap
+	extends Omit<DefaultTypeMap, "interval" | "record" | "void"> {
+	interval: {
+		years?: number;
+		months?: number;
+		days?: number;
+		hours?: number;
+		minutes?: number;
+		seconds?: number;
+		milliseconds?: number;
+		toPostgres(): string;
+		toISO(): string;
+		toISOString(): string;
+	};
+	record: string;
+	void: string;
+	// Array types without a registered parser come back as their text.
+	"aclitem[]": string;
+	"char[]": string;
+}
+
 // biome-ignore lint/plugin: a type map maps any SQL type name to any TypeScript type.
 export type TypeMap = { readonly [pgType: string]: unknown };
-
-export type EnumsOf<DB> = DB extends {
-	readonly $types: infer R extends TypeRegistry;
-}
-	? R
-	: {};
 
 export type TsTypeOf<TM, DB, T extends string> = T extends AnyShaped
 	? ShapedTs<TM, DB, T>
@@ -87,16 +120,14 @@ export type TsTypeOf<TM, DB, T extends string> = T extends AnyShaped
 		? TM[T]
 		: T extends `${infer E}[]`
 			? TsTypeOf<TM, DB, E>[]
-			: T extends keyof EnumsOf<DB>
-				? EnumsOf<DB>[T]
+			: T extends keyof SchemaTypes<DB>
+				? SchemaTypes<DB>[T]
 				: unknown;
 
 type ShapedTs<TM, DB, T extends string> =
 	T extends Shaped<"json" | "jsonb", infer S>
 		? BaseOf<T> extends infer B extends keyof TM
-			? [TM[B]] extends [string]
-				? TM[B]
-				: JsonTs<S, DB>
+			? JsonAs<TM[B], JsonTs<S, DB>>
 			: JsonTs<S, DB>
 		: TsTypeOf<TM, DB, BaseOf<T>>;
 
@@ -104,11 +135,7 @@ export type TsOf<
 	TM,
 	DB,
 	T extends { type: string; nullable: boolean },
-> = T["type"] extends "null"
-	? null
-	: T["nullable"] extends true
-		? ValueTs<TM, DB, T> | null
-		: ValueTs<TM, DB, T>;
+> = NullableTs<T, ValueTs<TM, DB, T>>;
 type ValueTs<
 	TM,
 	DB,
@@ -132,9 +159,7 @@ export interface DefaultParamTypeMap {
 	bytea: Uint8Array;
 }
 
-export type ParamTypeMapOf<TM> = TM extends { readonly $params: infer P }
-	? P
-	: DefaultParamTypeMap;
+export type ParamTypeMapOf<TM> = ParamMapOf<TM, DefaultParamTypeMap>;
 
 export type TsParamTypeOf<TM, DB, T extends string> = ParamTsOf<
 	TM,
@@ -148,6 +173,61 @@ type ParamTsOf<TM, PM, DB, T extends string> = T extends AnyShaped
 		? TM[T] | (T extends keyof PM ? PM[T] : never)
 		: T extends `${infer E}[]`
 			? readonly (ParamTsOf<TM, PM, DB, E> | null)[]
-			: T extends keyof EnumsOf<DB>
-				? EnumsOf<DB>[T]
+			: T extends keyof SchemaTypes<DB>
+				? SchemaTypes<DB>[T]
 				: unknown;
+
+/** The TypeScript type of a JSON value of shape S. */
+type JsonTs<S, DB> = S extends { readonly k: "obj"; readonly m: infer M }
+	? [keyof M] extends [never]
+		? Record<string, never>
+		: {
+				-readonly [K in keyof M]: M[K] extends ColInfo
+					? JsonValueTs<M[K], DB>
+					: never;
+			}
+	: S extends { readonly k: "arr"; readonly e: infer E extends ColInfo }
+		? JsonValueTs<E, DB>[]
+		: S extends {
+					readonly k: "tup";
+					readonly es: infer Es extends readonly ColInfo[];
+				}
+			? { -readonly [I in keyof Es]: JsonValueTs<Es[I], DB> }
+			: S extends { readonly k: "rec"; readonly v: infer V extends ColInfo }
+				? { [key: string]: JsonValueTs<V, DB> }
+				: S extends { readonly k: "val"; readonly c: infer C extends ColInfo }
+					? JsonValueTs<C, DB>
+					: S extends TsShape<infer T>
+						? T
+						: unknown;
+
+type JsonValueTs<C extends ColInfo, DB> = C extends ColInfo
+	? C["nullable"] extends true
+		? JsonOfInfo<C, DB> | null
+		: JsonOfInfo<C, DB>
+	: never;
+type JsonOfInfo<C extends ColInfo, DB> = C extends NullElems
+	? C["type"] extends `${infer E}[]`
+		? (JsonOfType<E, DB> | null)[]
+		: JsonOfType<C["type"], DB>
+	: JsonOfType<C["type"], DB>;
+
+type JsonForm = { number: number; boolean: boolean; string: string };
+
+type JsonOfType<T extends string, DB> = T extends AnyShaped
+	? ShapeOfType<T> extends infer S
+		? S extends null
+			? unknown
+			: JsonTs<S, DB>
+		: never
+	: TypeFact<T, "json"> extends infer F extends keyof JsonForm
+		? JsonForm[F]
+		: T extends "null"
+			? null
+			: T extends `${infer E}[]`
+				? JsonOfType<E, DB>[]
+				: T extends RangeT | `${string}multirange`
+					? string
+					: T extends keyof SchemaTypes<DB>
+						? SchemaTypes<DB>[T]
+						: unknown;

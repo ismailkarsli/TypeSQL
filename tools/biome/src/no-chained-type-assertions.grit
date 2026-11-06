@@ -1,0 +1,45 @@
+engine biome(1.0)
+language js(typescript)
+
+pattern assertion($type, $inner) {
+	or {
+		TsAsExpression(ty=$type, expression=$inner),
+		TsTypeAssertionExpression(ty=$type, expression=$inner)
+	}
+}
+
+pattern unparenthesized_assertion() {
+	or {
+		TsAsExpression(),
+		TsTypeAssertionExpression(),
+		JsParenthesizedExpression(expression=unparenthesized_assertion())
+	}
+}
+
+pattern non_const_chain() {
+	or {
+		JsParenthesizedExpression(expression=non_const_chain()),
+		TsAsExpression(ty=$type, expression=$inner) where {
+			or { $type <: not "const", $inner <: non_const_chain() }
+		},
+		TsTypeAssertionExpression(ty=$type, expression=$inner) where {
+			or { $type <: not "const", $inner <: non_const_chain() }
+		}
+	}
+}
+
+or {
+	TsAsExpression(expression=$inner),
+	TsTypeAssertionExpression(expression=$inner)
+} as $outer where {
+	$inner <: unparenthesized_assertion(),
+	$outer <: non_const_chain(),
+	$outer <: not within assertion($_, $wrapped) where {
+		$wrapped <: or {
+			$outer,
+			JsParenthesizedExpression(expression=$outer),
+			JsParenthesizedExpression(expression=JsParenthesizedExpression(expression=$outer))
+		}
+	},
+	register_diagnostic(span=$outer, message="This assertion chain discards type evidence. Keep the original precise type, or parse untrusted input at its boundary before narrowing it.", severity="error")
+}

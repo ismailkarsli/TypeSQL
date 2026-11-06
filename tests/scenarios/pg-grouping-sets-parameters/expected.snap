@@ -1,0 +1,26 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`pg-grouping-sets-parameters > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "GroupedParams": "[number]",
+      "RollupParams": "[null | number]",
+      "groups": "({ region: string; top: null | number })[]",
+      "rolledUp": "({ region: null | string; top: null | number })[]",
+    },
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "{ rolledUp: [ { region: null, top: null } ], groups: [] }
+",
+  },
+}
+`;

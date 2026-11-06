@@ -1,12 +1,21 @@
 import type {
+	AppendIndex,
+	ColumnPks,
+	DupName,
+	Indexed,
+	LowerAll,
+} from "../../../engine/family/ddl.js";
+import type { NamedAt, Unlocated } from "../../../engine/family/diagnostics.js";
+import type { FindKey, RenameCells } from "../../../engine/family/scope.js";
+import type { QueryContext } from "../../../engine/family/types.js";
+import type { Next } from "../../../engine/next.js";
+import type {
 	DelKey,
 	Rebuild,
 	RenameKey,
 	SetKey,
 } from "../../../engine/object.js";
-import type { Nx } from "../../../engine/parse.js";
 import type { Toks } from "../../../engine/tokens.js";
-import type { QueryContext } from "../../../engine/types.js";
 import type { AnyErr, SqlError } from "../../../errors.js";
 import type { Table, View } from "../../../schema.js";
 import type {
@@ -22,19 +31,19 @@ import type {
 	Stmt,
 	TableRef,
 } from "../ast.js";
-import type {
-	FindKey,
-	LookupRelation,
-	LowerAll,
-	UniqueCells,
-} from "../binder/scope.js";
+import type { LookupRelation, UniqueCells } from "../binder/scope.js";
 import type { Lex } from "../lexer.js";
 import type { ParseScript } from "../parser/stmt.js";
+import type { SyntaxWords } from "../parser/util.js";
 import type { ProjectDml } from "../project/dml.js";
-import type { ProjectSelect, RenameCells } from "../project/select.js";
+import type { ProjectSelect } from "../project/select.js";
 import type { Cell, NormalizeType } from "../types.js";
 
-export type ApplyDdlAll<DB, Q extends string> =
+export type ApplyDdlAll<DB, Q extends string> = Unlocated<
+	ApplyScript<DB, Q>,
+	SyntaxWords
+>;
+type ApplyScript<DB, Q extends string> =
 	Lex<Q> extends infer T extends Toks
 		? ParseScript<T> extends infer S extends readonly Stmt[]
 			? ApplyLoop<DB, S, 0>
@@ -48,7 +57,7 @@ type ApplyLoop<
 > = S[I] extends infer St extends Stmt
 	? ApplyOne<DB, St> extends AnyErr
 		? ApplyOne<DB, St>
-		: ApplyLoop<ApplyOne<DB, St>, S, Nx<I>>
+		: ApplyLoop<ApplyOne<DB, St>, S, Next<I>>
 	: DB;
 
 export type ApplyOne<DB, S extends Stmt> = S extends {
@@ -105,31 +114,6 @@ type DisplayName<S extends { readonly table: TableRef }> = S extends {
 	? D
 	: S["table"]["name"];
 
-type ColumnPks<
-	Cols extends readonly ColumnDef[],
-	Acc extends readonly string[] = [],
-> = Cols extends readonly [
-	infer H extends ColumnDef,
-	...infer R extends readonly ColumnDef[],
-]
-	? ColumnPks<
-			R,
-			H["primaryKey"] extends false ? Acc : [...Acc, Lowercase<H["name"]>]
-		>
-	: Acc;
-
-type DupName<
-	Cols extends readonly ColumnDef[],
-	Seen extends string = never,
-> = Cols extends readonly [
-	infer H extends ColumnDef,
-	...infer R extends readonly ColumnDef[],
-]
-	? Lowercase<H["name"]> extends Seen
-		? H["name"]
-		: DupName<R, Seen | Lowercase<H["name"]>>
-	: null;
-
 type StrictTypes = "int" | "integer" | "real" | "text" | "blob" | "any";
 
 type StrictCheck<
@@ -169,13 +153,6 @@ type TableFromDefs<S extends CreateTable> =
 								null
 							>
 				: never;
-
-type Indexed<L extends readonly unknown[]> = {
-	[I in keyof L]: {
-		readonly c: L[I];
-		readonly i: I extends `${infer N extends number}` ? N : 0;
-	};
-};
 
 type BuildTable<S extends CreateTable, Pk extends readonly string[]> = Rebuild<{
 	[D in Indexed<S["columns"]>[number] as D["c"]["name"]]: ColDesc<
@@ -288,7 +265,7 @@ type CtasLoop<
 	? CtasLoop<
 			Ts,
 			C,
-			Nx<I>,
+			Next<I>,
 			[
 				...Acc,
 				E extends { readonly t: "col" }
@@ -367,14 +344,14 @@ type AlterEffect<DB, S extends AlterTable> =
 					: AlterColumns<Rel, S["action"]> extends AnyErr
 						? AlterColumns<Rel, S["action"]>
 						: SetKey<DB, K, AlterColumns<Rel, S["action"]>>
-				: SqlError<`no such table: ${S["table"]["name"]}`, null>
-		: SqlError<`no such table: ${S["table"]["name"]}`, null>;
-
-type MaxIndex<Rel> = {
-	[P in keyof Rel]: Rel[P] extends { readonly i: infer N extends number }
-		? N
-		: never;
-}[keyof Rel];
+				: SqlError<
+						`no such table: ${S["table"]["name"]}`,
+						NamedAt<S["table"]["name"], "table">
+					>
+		: SqlError<
+				`no such table: ${S["table"]["name"]}`,
+				NamedAt<S["table"]["name"], "table">
+			>;
 
 type AlterColumns<Rel extends Table, A> = A extends {
 	readonly t: "rename_column";
@@ -383,7 +360,7 @@ type AlterColumns<Rel extends Table, A> = A extends {
 }
 	? FindKey<Rel, F> extends infer Old extends string
 		? [Old] extends [never]
-			? SqlError<`no such column: "${F}"`, null>
+			? SqlError<`no such column: "${F}"`, NamedAt<`"${F}"`, "column">>
 			: [FindKey<Rel, Lowercase<To>>] extends [never]
 				? RenameKey<Rel, Old, To>
 				: SqlError<`duplicate column name: ${To}`, null>
@@ -403,7 +380,7 @@ type AlterColumns<Rel extends Table, A> = A extends {
 				}
 			? FindKey<Rel, N> extends infer Old extends string
 				? [Old] extends [never]
-					? SqlError<`no such column: "${N}"`, null>
+					? SqlError<`no such column: "${N}"`, NamedAt<`"${N}"`, "column">>
 					: Rel[Old] extends { readonly rowid: true }
 						? SqlError<`cannot drop PRIMARY KEY column: "${Old}"`, null>
 						: [Exclude<keyof Rel, Old>] extends [never]
@@ -419,26 +396,9 @@ type AddedCol<C extends ColumnDef, Rel> = MkCol<
 	NormalizeType<C["type"]>,
 	C["notNull"] extends true ? false : true,
 	C["hasDefault"],
-	NextIndex<MaxIndex<Rel>>,
+	AppendIndex<Rel>,
 	C["generated"]
 >;
-// The position after the last column. Positions are 0…n-1 unless a column
-// was dropped: count up while each one exists (one membership check per
-// column), and look for the largest one only after a gap.
-type NextIndex<
-	U extends number,
-	A extends unknown[] = [],
-	Seen extends number = never,
-> = A["length"] extends U
-	? NextIndex<U, [...A, 0], Seen | A["length"]>
-	: [Exclude<U, Seen>] extends [never]
-		? A["length"]
-		: Nx<MaxOf<U>>;
-type MaxOf<U extends number, A extends unknown[] = []> = [U] extends [never]
-	? 0
-	: [Exclude<U, A["length"]>] extends [never]
-		? A["length"]
-		: MaxOf<Exclude<U, A["length"]>, [...A, 0]>;
 
 type DropEffect<DB, S extends DropStmt> = S["kind"] extends "table" | "view"
 	? LookupRelation<DB, S["name"]> extends [infer Rel, infer K extends string]
@@ -451,7 +411,10 @@ type DropEffect<DB, S extends DropStmt> = S["kind"] extends "table" | "view"
 				: SqlError<`use DROP TABLE to delete table ${K}`, null>
 		: S["ifExists"] extends true
 			? DB
-			: SqlError<`no such ${S["kind"]}: ${S["name"]["name"]}`, null>
+			: SqlError<
+					`no such ${S["kind"]}: ${S["name"]["name"]}`,
+					S["kind"] extends "table" ? NamedAt<S["name"]["name"], "table"> : null
+				>
 	: DB;
 
 type IndexEffect<DB, S> = S extends {
@@ -459,7 +422,10 @@ type IndexEffect<DB, S> = S extends {
 }
 	? Exists<DB, Ref> extends true
 		? DB
-		: SqlError<`no such table: main.${Ref["name"]}`, null>
+		: SqlError<
+				`no such table: main.${Ref["name"]}`,
+				NamedAt<`main.${Ref["name"]}`, "table">
+			>
 	: DB;
 
 type VirtualEffect<DB, S extends CreateVirtual> =

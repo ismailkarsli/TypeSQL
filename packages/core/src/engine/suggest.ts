@@ -1,16 +1,5 @@
-import type { Lt, Members, Tup } from "./object.js";
-
-export type IsRelation<X> = X extends { readonly $view: unknown }
-	? true
-	: X extends object
-		? X[keyof X] extends { readonly type: string }
-			? true
-			: false
-		: false;
-
-export type RelCols<X> = X extends { readonly $view: infer C }
-	? keyof C & string
-	: keyof X & string;
+import type { Lt, Tup } from "./num.js";
+import type { Members } from "./object.js";
 
 export type Best<
 	Name extends string,

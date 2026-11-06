@@ -1,0 +1,8 @@
+pattern unparenthesized($inner) {
+	or {
+		$inner,
+		JsParenthesizedExpression(expression=$inner),
+		JsParenthesizedExpression(expression=JsParenthesizedExpression(expression=$inner)),
+		JsParenthesizedExpression(expression=JsParenthesizedExpression(expression=JsParenthesizedExpression(expression=$inner)))
+	}
+}

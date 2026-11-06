@@ -1,6 +1,6 @@
-import type { ColOptions, Shaped, TsShape, TypeName } from "../../schema.js";
+import type { FlaggedCol, Typed, TypeName } from "../../schema.js";
 
-export type { View } from "../../schema.js";
+export type { Typed, View } from "../../schema.js";
 
 export type SqliteTypeName =
 	| "integer"
@@ -21,31 +21,12 @@ export type ColFlags = {
 	readonly hidden?: boolean;
 };
 
-// Options are read through ColOptions (see there) so columns with different
-// options compare by these properties. An unset rowid, generated, hidden or
-// position is an optional `never` property, so a column that has it is not
-// assignable to one that does not.
-export type Col<T extends TypeName, F extends ColFlags = {}> = {
-	readonly type: T;
-	readonly nullable: ColOptions<F> extends { nullable: true } ? true : false;
-	readonly hasDefault: ColOptions<F> extends { hasDefault: true }
-		? true
-		: ColOptions<F> extends { generated: true }
-			? true
-			: false;
-} & (ColOptions<F> extends { readonly position: infer P extends number }
-	? { readonly i: P }
-	: { readonly i?: never }) &
-	(ColOptions<F> extends { readonly rowid: true }
-		? { readonly rowid: true }
-		: { readonly rowid?: never }) &
-	(ColOptions<F> extends { readonly generated: true }
-		? { readonly generated: true }
-		: { readonly generated?: never }) &
-	(ColOptions<F> extends { readonly hidden: true }
-		? { readonly hidden: true }
-		: { readonly hidden?: never });
+export type Col<T extends TypeName, F extends ColFlags = {}> = FlaggedCol<
+	T,
+	F,
+	"rowid",
+	false
+>;
 
-export type Typed<Base extends string, T> = Shaped<Base, TsShape<T>>;
-
+/** A JSON column holding documents of type `T`. */
 export type Json<T, F extends ColFlags = {}> = Col<Typed<"json", T>, F>;

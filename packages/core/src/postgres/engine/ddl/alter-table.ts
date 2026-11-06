@@ -1,3 +1,4 @@
+import type { Next } from "../../../engine/next.js";
 import type {
 	DelKey,
 	Rebuild,
@@ -5,7 +6,8 @@ import type {
 	SetKey,
 } from "../../../engine/object.js";
 import type { AnyErr, SqlError } from "../../../errors.js";
-import type { ColumnDef, TableRef } from "../ast.js";
+import type { AlterAction, ColumnDef, TableRef } from "../ast.js";
+import type { ColsOf, IsViewVal, Rewrap } from "../db.js";
 import type {
 	DescOf,
 	FirstMissing,
@@ -15,15 +17,12 @@ import type {
 	WithType,
 } from "./column.js";
 import type {
-	ColsOf,
 	DelRel,
 	GetRel,
-	IsViewVal,
 	NoRelation,
 	NoSchema,
 	PutRel,
 	RenameRel,
-	Rewrap,
 	SchemaClash,
 	SchemaExists,
 } from "./relation.js";
@@ -127,22 +126,39 @@ type ViewActionError<As, TN extends string> = As extends readonly [
 		: ViewActionError<R, TN>
 	: null;
 
+/**
+ * PostgreSQL's ALTER TABLE pass for each action that changes columns (drops,
+ * type changes, additions, constraints, defaults), so a statement's actions
+ * apply in that order whatever their order in the statement. Every such kind
+ * must be listed.
+ */
+type PassOf = Passes<{
+	drop_column: 0;
+	drop_not_null: 0;
+	drop_default: 0;
+	alter_type: 1;
+	add_column: 2;
+	set_not_null: 3;
+	add_identity: 3;
+	add_pk: 3;
+	set_default: 4;
+}>;
+/** The kinds ApplyAlterTable handles alone, before any pass. */
+type SoleKind = "rename_column" | "rename_table" | "set_schema" | "noop";
+type Passes<
+	P extends { readonly [K in Exclude<AlterAction["t"], SoleKind>]: number },
+> = P;
+
 type RunPasses<
 	Tbl,
 	As,
 	TN extends string,
-	Ps = [
-		"drop_column" | "drop_not_null" | "drop_default",
-		"alter_type",
-		"add_column",
-		"set_not_null" | "add_identity" | "add_pk",
-		"set_default",
-	],
-> = Ps extends readonly [infer K, ...infer R]
+	K extends number = 0,
+> = K extends PassOf[keyof PassOf]
 	? RunPass<Tbl, As, TN, K> extends infer T2
 		? T2 extends AnyErr
 			? T2
-			: RunPasses<T2, As, TN, R>
+			: RunPasses<T2, As, TN, Next<K>>
 		: never
 	: Tbl;
 
@@ -150,12 +166,14 @@ type RunPass<Tbl, As, TN extends string, K> = As extends readonly [
 	infer A,
 	...infer R,
 ]
-	? A extends { readonly t: K }
-		? ColAction<Tbl, A, TN> extends infer T2
-			? T2 extends AnyErr
-				? T2
-				: RunPass<T2, R, TN, K>
-			: never
+	? A extends { readonly t: infer Kind extends keyof PassOf }
+		? PassOf[Kind] extends K
+			? ColAction<Tbl, A, TN> extends infer T2
+				? T2 extends AnyErr
+					? T2
+					: RunPass<T2, R, TN, K>
+				: never
+			: RunPass<Tbl, R, TN, K>
 		: RunPass<Tbl, R, TN, K>
 	: Tbl;
 

@@ -1,12 +1,4 @@
-import type {
-	CteMap,
-	Ctx,
-	Info,
-	MkCtx,
-	QueryContext,
-	ScopeItem,
-	ScopeLevel,
-} from "../../../engine/types.js";
+import type { Info, ScopeItem, ScopeLevel } from "../../../engine/types.js";
 import type { AnyErr, SqlError } from "../../../errors.js";
 import type { Table } from "../../../schema.js";
 import type {
@@ -18,17 +10,14 @@ import type {
 	TargetInd,
 } from "../ast.js";
 import type { BindFrom } from "../binder/from.js";
-import type { NullableMap } from "../shape.js";
+import type { NullableLevel } from "../shape.js";
 import type { ParamsOfFromItems, ParamsOfOpt } from "../typer/params.js";
 import type { TypeOf } from "../typer/typeof.js";
+import type { CteMap, Ctx, MkCtx, QueryContext } from "../types.js";
 import type {
-	AssignTargets,
-	CheckAssignedCols,
+	CheckInsert,
 	CheckOptExpr,
-	CheckRequired,
-	CheckRows,
 	CheckSet,
-	CheckValueItems,
 	DmlCtx,
 	ParamsOfInds,
 	ParamsOfReturning,
@@ -38,9 +27,6 @@ import type {
 	ResolveTarget,
 	Target_,
 	TargetInfos,
-	UnionToTuple,
-	WidthCheck,
-	WidthResult,
 } from "./dml.js";
 
 export type ProjectMerge<S extends MergeStmt, Env extends QueryContext> =
@@ -92,14 +78,6 @@ type ReturningSource<Ws extends readonly MergeWhen[], L extends ScopeLevel> = [
 ] extends [never]
 	? L
 	: NullableLevel<L>;
-
-type NullableLevel<L extends ScopeLevel> = {
-	readonly [I in keyof L]: {
-		readonly alias: L[I]["alias"];
-		readonly cols: NullableMap<L[I]["cols"]>;
-		readonly skip: L[I]["skip"];
-	};
-};
 
 type HasAction<Ws extends readonly MergeWhen[], A extends string> = [
 	Extract<Ws[number]["action"], { readonly t: A }>,
@@ -198,37 +176,17 @@ type CheckMergeInsert<
 	Tbl extends Table,
 	Name extends string,
 	C extends Ctx,
-> = Vals extends readonly Expr[]
-	? Cols extends readonly string[]
-		? CheckAssignedCols<
-				Cols,
-				AssignTargets<Cols, Ind>,
-				Tbl,
-				Name,
-				"insert"
-			> extends infer E
-			? E extends AnyErr
-				? E
-				: WidthResult<
-						WidthCheck<Vals, Cols>,
-						CheckRows<
-							[Vals],
-							Cols,
-							AssignTargets<Cols, Ind>,
-							Tbl,
-							Name,
-							C
-						> extends infer V
-							? V extends AnyErr
-								? V
-								: CheckRequired<Tbl, Cols, Name>
-							: never
-					>
-			: never
-		: WidthCheck<Vals, UnionToTuple<keyof Tbl>> extends "more"
-			? SqlError<"INSERT has more expressions than target columns", null>
-			: CheckValueItems<Vals, C>
-	: CheckRequired<Tbl, [], Name>;
+> = CheckInsert<
+	Cols,
+	Ind,
+	Vals extends readonly Expr[]
+		? { readonly t: "values"; readonly rows: [Vals] }
+		: { readonly t: "default" },
+	Tbl,
+	Name,
+	C,
+	C
+>;
 
 export type ParamsOfMerge<S extends MergeStmt, DB, Ctes extends CteMap> =
 	ResolveTarget<DB, S["table"], S["alias"], "merge into"> extends Target_<

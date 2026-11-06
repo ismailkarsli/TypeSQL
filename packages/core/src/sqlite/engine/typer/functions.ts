@@ -1,4 +1,11 @@
-import type { GE, Tup } from "../types.js";
+import type {
+	DeclaredFn,
+	Many,
+	MaxArgs,
+	MinArgs,
+	PickSig,
+} from "../../../engine/family/functions.js";
+import type { Info } from "../../../engine/types.js";
 
 type F<
 	Min extends number,
@@ -6,13 +13,36 @@ type F<
 	Ret extends string,
 	Null extends NullRule,
 	Kind extends "scalar" | "agg" | "win" = "scalar",
+	Args = readonly Info<"unknown", true>[],
 > = {
 	readonly min: Min;
 	readonly max: Max;
 	readonly ret: Ret;
 	readonly null: Null;
 	readonly kind: Kind;
+	readonly args: Args;
 };
+
+/**
+ * The type a parameter takes in each argument position, as in `upper($1)`;
+ * `unknown` without a rule. `same`: the first typed argument's type, for all;
+ * `if`: a condition, then the type both results share.
+ */
+type Text = readonly Info<"text", true>[];
+type Num = readonly Info<"numeric", true>[];
+type JsonArgs = [Info<"json", true>, ...Info<"text", true>[]];
+type Same = "same";
+type IfArgs = "if";
+type Substr = [
+	Info<"text", true>,
+	Info<"integer", true>,
+	Info<"integer", true>,
+];
+type Offset = [
+	Info<"unknown", true>,
+	Info<"integer", false>,
+	Info<"unknown", true>,
+];
 
 type NullRule =
 	| "never"
@@ -28,10 +58,8 @@ type NullRule =
 	| "substr"
 	| "agg";
 
-type Many = 1000;
-
 export interface Functions {
-	abs: F<1, 1, "abs", "args">;
+	abs: F<1, 1, "abs", "args", "scalar", Num>;
 	// FTS5 auxiliary functions; the first argument is the FTS5 table.
 	bm25: F<1, Many, "real", "never">;
 	highlight: F<4, 4, "text", "always">;
@@ -39,49 +67,49 @@ export interface Functions {
 	unistr: F<1, 1, "text", "args">;
 	changes: F<0, 0, "integer", "never">;
 	char: F<0, Many, "text", "never">;
-	coalesce: F<2, Many, "common", "all">;
-	concat: F<1, Many, "text", "never">;
-	concat_ws: F<2, Many, "text", "arg0">;
-	format: F<1, Many, "text", "format">;
-	printf: F<1, Many, "text", "format">;
-	glob: F<2, 2, "integer", "args">;
+	coalesce: F<2, Many, "common", "all", "scalar", Same>;
+	concat: F<1, Many, "text", "never", "scalar", Text>;
+	concat_ws: F<2, Many, "text", "arg0", "scalar", Text>;
+	format: F<1, Many, "text", "format", "scalar", Text>;
+	printf: F<1, Many, "text", "format", "scalar", Text>;
+	glob: F<2, 2, "integer", "args", "scalar", Text>;
 	hex: F<1, 1, "text", "never">;
-	ifnull: F<2, 2, "common", "all">;
-	iif: F<2, Many, "iif", "iif">;
-	if: F<2, Many, "iif", "iif">;
-	instr: F<2, 2, "integer", "args">;
+	ifnull: F<2, 2, "common", "all", "scalar", Same>;
+	iif: F<2, Many, "iif", "iif", "scalar", IfArgs>;
+	if: F<2, Many, "iif", "iif", "scalar", IfArgs>;
+	instr: F<2, 2, "integer", "args", "scalar", Text>;
 	last_insert_rowid: F<0, 0, "integer", "never">;
 	length: F<1, 1, "integer", "args">;
-	like: F<2, 3, "integer", "args">;
+	like: F<2, 3, "integer", "args", "scalar", Text>;
 	likelihood: F<2, 2, "arg0", "arg0">;
 	likely: F<1, 1, "arg0", "arg0">;
-	lower: F<1, 1, "text", "args">;
-	ltrim: F<1, 2, "text", "args">;
-	max: F<1, Many, "common", "args">;
-	min: F<1, Many, "common", "args">;
-	nullif: F<2, 2, "arg0", "always">;
+	lower: F<1, 1, "text", "args", "scalar", Text>;
+	ltrim: F<1, 2, "text", "args", "scalar", Text>;
+	max: F<1, Many, "common", "args", "scalar", Same>;
+	min: F<1, Many, "common", "args", "scalar", Same>;
+	nullif: F<2, 2, "arg0", "always", "scalar", Same>;
 	octet_length: F<1, 1, "integer", "args">;
 	quote: F<1, 1, "text", "never">;
 	random: F<0, 0, "integer", "never">;
-	randomblob: F<1, 1, "blob", "never">;
-	replace: F<3, 3, "text", "args">;
-	round: F<1, 2, "real", "args">;
-	rtrim: F<1, 2, "text", "args">;
-	sign: F<1, 1, "integer", "sign">;
+	randomblob: F<1, 1, "blob", "never", "scalar", Num>;
+	replace: F<3, 3, "text", "args", "scalar", Text>;
+	round: F<1, 2, "real", "args", "scalar", Num>;
+	rtrim: F<1, 2, "text", "args", "scalar", Text>;
+	sign: F<1, 1, "integer", "sign", "scalar", Num>;
 	sqlite_compileoption_get: F<1, 1, "text", "always">;
 	sqlite_compileoption_used: F<1, 1, "integer", "args">;
 	sqlite_source_id: F<0, 0, "text", "never">;
 	sqlite_version: F<0, 0, "text", "never">;
-	substr: F<2, 3, "substr", "substr">;
-	substring: F<2, 3, "substr", "substr">;
+	substr: F<2, 3, "substr", "substr", "scalar", Substr>;
+	substring: F<2, 3, "substr", "substr", "scalar", Substr>;
 	total_changes: F<0, 0, "integer", "never">;
-	trim: F<1, 2, "text", "args">;
+	trim: F<1, 2, "text", "args", "scalar", Text>;
 	typeof: F<1, 1, "text", "never">;
-	unhex: F<1, 2, "blob", "always">;
-	unicode: F<1, 1, "integer", "always">;
+	unhex: F<1, 2, "blob", "always", "scalar", Text>;
+	unicode: F<1, 1, "integer", "always", "scalar", Text>;
 	unlikely: F<1, 1, "arg0", "arg0">;
-	upper: F<1, 1, "text", "args">;
-	zeroblob: F<1, 1, "blob", "never">;
+	upper: F<1, 1, "text", "args", "scalar", Text>;
+	zeroblob: F<1, 1, "blob", "never", "scalar", Num>;
 
 	date: F<0, Many, "text", "noargs">;
 	time: F<0, Many, "text", "noargs">;
@@ -91,72 +119,72 @@ export interface Functions {
 	strftime: F<1, Many, "text", "always">;
 	timediff: F<2, 2, "text", "always">;
 
-	acos: F<1, 1, "real", "always">;
-	acosh: F<1, 1, "real", "always">;
-	asin: F<1, 1, "real", "always">;
-	asinh: F<1, 1, "real", "numargs">;
-	atan: F<1, 1, "real", "numargs">;
-	atan2: F<2, 2, "real", "numargs">;
-	atanh: F<1, 1, "real", "always">;
-	ceil: F<1, 1, "ceil", "sign">;
-	ceiling: F<1, 1, "ceil", "sign">;
-	cos: F<1, 1, "real", "numargs">;
-	cosh: F<1, 1, "real", "numargs">;
-	degrees: F<1, 1, "real", "numargs">;
-	exp: F<1, 1, "real", "numargs">;
-	floor: F<1, 1, "ceil", "sign">;
-	ln: F<1, 1, "real", "always">;
-	log: F<1, 2, "real", "always">;
-	log10: F<1, 1, "real", "always">;
-	log2: F<1, 1, "real", "always">;
-	mod: F<2, 2, "real", "always">;
+	acos: F<1, 1, "real", "always", "scalar", Num>;
+	acosh: F<1, 1, "real", "always", "scalar", Num>;
+	asin: F<1, 1, "real", "always", "scalar", Num>;
+	asinh: F<1, 1, "real", "numargs", "scalar", Num>;
+	atan: F<1, 1, "real", "numargs", "scalar", Num>;
+	atan2: F<2, 2, "real", "numargs", "scalar", Num>;
+	atanh: F<1, 1, "real", "always", "scalar", Num>;
+	ceil: F<1, 1, "ceil", "sign", "scalar", Num>;
+	ceiling: F<1, 1, "ceil", "sign", "scalar", Num>;
+	cos: F<1, 1, "real", "numargs", "scalar", Num>;
+	cosh: F<1, 1, "real", "numargs", "scalar", Num>;
+	degrees: F<1, 1, "real", "numargs", "scalar", Num>;
+	exp: F<1, 1, "real", "numargs", "scalar", Num>;
+	floor: F<1, 1, "ceil", "sign", "scalar", Num>;
+	ln: F<1, 1, "real", "always", "scalar", Num>;
+	log: F<1, 2, "real", "always", "scalar", Num>;
+	log10: F<1, 1, "real", "always", "scalar", Num>;
+	log2: F<1, 1, "real", "always", "scalar", Num>;
+	mod: F<2, 2, "real", "always", "scalar", Num>;
 	pi: F<0, 0, "real", "never">;
-	pow: F<2, 2, "real", "always">;
-	power: F<2, 2, "real", "always">;
-	radians: F<1, 1, "real", "numargs">;
-	sin: F<1, 1, "real", "numargs">;
-	sinh: F<1, 1, "real", "numargs">;
-	sqrt: F<1, 1, "real", "always">;
-	tan: F<1, 1, "real", "numargs">;
-	tanh: F<1, 1, "real", "numargs">;
-	trunc: F<1, 1, "ceil", "sign">;
+	pow: F<2, 2, "real", "always", "scalar", Num>;
+	power: F<2, 2, "real", "always", "scalar", Num>;
+	radians: F<1, 1, "real", "numargs", "scalar", Num>;
+	sin: F<1, 1, "real", "numargs", "scalar", Num>;
+	sinh: F<1, 1, "real", "numargs", "scalar", Num>;
+	sqrt: F<1, 1, "real", "always", "scalar", Num>;
+	tan: F<1, 1, "real", "numargs", "scalar", Num>;
+	tanh: F<1, 1, "real", "numargs", "scalar", Num>;
+	trunc: F<1, 1, "ceil", "sign", "scalar", Num>;
 
-	json: F<1, 1, "text", "args">;
-	jsonb: F<1, 1, "blob", "args">;
+	json: F<1, 1, "text", "args", "scalar", JsonArgs>;
+	jsonb: F<1, 1, "blob", "args", "scalar", JsonArgs>;
 	json_array: F<0, Many, "text", "never">;
 	jsonb_array: F<0, Many, "blob", "never">;
-	json_array_length: F<1, 2, "integer", "always">;
+	json_array_length: F<1, 2, "integer", "always", "scalar", JsonArgs>;
 	json_error_position: F<1, 1, "integer", "args">;
-	json_extract: F<2, Many, "jsonext", "always">;
-	jsonb_extract: F<2, Many, "any", "always">;
+	json_extract: F<2, Many, "text", "always", "scalar", JsonArgs>;
+	jsonb_extract: F<2, Many, "any", "always", "scalar", JsonArgs>;
 	json_insert: F<1, Many, "text", "arg0">;
 	json_array_insert: F<1, Many, "text", "arg0">;
 	jsonb_insert: F<1, Many, "blob", "arg0">;
 	json_object: F<0, Many, "text", "never">;
 	jsonb_object: F<0, Many, "blob", "never">;
-	json_patch: F<2, 2, "text", "args">;
-	jsonb_patch: F<2, 2, "blob", "args">;
-	json_pretty: F<1, 2, "text", "arg0">;
+	json_patch: F<2, 2, "text", "args", "scalar", JsonArgs>;
+	jsonb_patch: F<2, 2, "blob", "args", "scalar", JsonArgs>;
+	json_pretty: F<1, 2, "text", "arg0", "scalar", JsonArgs>;
 	json_quote: F<1, 1, "text", "never">;
-	json_remove: F<1, Many, "text", "arg0">;
-	jsonb_remove: F<1, Many, "blob", "arg0">;
+	json_remove: F<1, Many, "text", "arg0", "scalar", JsonArgs>;
+	jsonb_remove: F<1, Many, "blob", "arg0", "scalar", JsonArgs>;
 	json_replace: F<1, Many, "text", "arg0">;
 	jsonb_replace: F<1, Many, "blob", "arg0">;
 	json_set: F<1, Many, "text", "arg0">;
 	jsonb_set: F<1, Many, "blob", "arg0">;
-	json_type: F<1, 2, "text", "always">;
-	json_valid: F<1, 2, "integer", "arg0">;
+	json_type: F<1, 2, "text", "always", "scalar", JsonArgs>;
+	json_valid: F<1, 2, "integer", "arg0", "scalar", JsonArgs>;
 
-	avg: F<1, 1, "real", "agg", "agg">;
+	avg: F<1, 1, "real", "agg", "agg", Num>;
 	median: F<1, 1, "real", "agg", "agg">;
 	percentile: F<2, 2, "real", "agg", "agg">;
 	percentile_cont: F<2, 2, "real", "agg", "agg">;
 	percentile_disc: F<2, 2, "real", "agg", "agg">;
 	count: F<0, 1, "integer", "never", "agg">;
-	group_concat: F<1, 2, "text", "agg", "agg">;
-	string_agg: F<2, 2, "text", "agg", "agg">;
-	sum: F<1, 1, "sum", "agg", "agg">;
-	total: F<1, 1, "real", "never", "agg">;
+	group_concat: F<1, 2, "text", "agg", "agg", Text>;
+	string_agg: F<2, 2, "text", "agg", "agg", Text>;
+	sum: F<1, 1, "sum", "agg", "agg", Num>;
+	total: F<1, 1, "real", "never", "agg", Num>;
 	json_group_array: F<1, 1, "text", "never", "agg">;
 	jsonb_group_array: F<1, 1, "blob", "never", "agg">;
 	json_group_object: F<2, 2, "text", "never", "agg">;
@@ -167,12 +195,12 @@ export interface Functions {
 	dense_rank: F<0, 0, "integer", "never", "win">;
 	percent_rank: F<0, 0, "real", "never", "win">;
 	cume_dist: F<0, 0, "real", "never", "win">;
-	ntile: F<1, 1, "integer", "never", "win">;
-	lag: F<1, 3, "arg0", "always", "win">;
-	lead: F<1, 3, "arg0", "always", "win">;
+	ntile: F<1, 1, "integer", "never", "win", Num>;
+	lag: F<1, 3, "arg0", "always", "win", Offset>;
+	lead: F<1, 3, "arg0", "always", "win", Offset>;
 	first_value: F<1, 1, "arg0", "arg0", "win">;
 	last_value: F<1, 1, "arg0", "arg0", "win">;
-	nth_value: F<2, 2, "arg0", "always", "win">;
+	nth_value: F<2, 2, "arg0", "always", "win", Offset>;
 }
 
 export type Fn = {
@@ -189,7 +217,7 @@ export type IsAggCall<E, DB> = E extends {
 	readonly over: null;
 	readonly args: readonly unknown[];
 }
-	? DeclaredFn<DB, N> extends infer D
+	? DeclaredFn<DB, N, FunctionCatalog> extends infer D
 		? D extends null
 			? N extends "min" | "max"
 				? E["args"]["length"] extends 1
@@ -232,58 +260,10 @@ export type FunctionRegistry = {
 	readonly [name: string]: AnySig | readonly AnySig[];
 };
 
-type MatchName<O, N extends string> = {
-	[K in keyof O & string]: Lowercase<K> extends N ? O[K] : never;
-}[keyof O & string];
-
-export type DeclaredFn<DB, N extends string> = (
-	DB extends { readonly $functions: infer F }
-		? MatchName<F, N>
-		: never
-) extends infer D
-	? [D] extends [never]
-		? MatchName<FunctionCatalog, N> extends infer C
-			? [C] extends [never]
-				? null
-				: C
-			: never
-		: D
-	: never;
-
-export type PickSig<D, Argc extends number> = D extends readonly unknown[]
-	? PickLoop<D, Argc, 0>
-	: D;
-type PickLoop<
-	D extends readonly unknown[],
-	Argc extends number,
-	I extends number,
-> = D[I] extends infer S extends AnySig
-	? Accepts<S["args"], Argc> extends true
-		? S
-		: PickLoop<D, Argc, [...Tup<I>, 0]["length"] & number>
-	: D[0];
-
-type Required_<A extends readonly string[]> = A extends readonly [
-	...infer H extends readonly string[],
-	"...",
-]
-	? H["length"]
-	: A["length"];
-type Accepts<
-	A extends readonly string[],
-	N extends number,
-> = A extends readonly [...unknown[], "..."]
-	? GE<N, Required_<A>>
-	: N extends A["length"]
-		? true
-		: false;
-
 export type SigFn<S> = S extends AnySig
 	? {
-			readonly min: Required_<S["args"]>;
-			readonly max: S["args"] extends readonly [...unknown[], "..."]
-				? Many
-				: S["args"]["length"];
+			readonly min: MinArgs<S["args"]>;
+			readonly max: MaxArgs<S["args"]>;
 			readonly ret: S["ret"];
 			readonly null: S["nullable"] extends true
 				? "always"
@@ -299,15 +279,3 @@ export type SigFn<S> = S extends AnySig
 					: "scalar";
 		}
 	: never;
-
-export type SigArgType<S, I extends number> = S extends AnySig
-	? S["args"][I] extends infer T extends string
-		? T extends "..."
-			? S["args"] extends readonly [...unknown[], infer P extends string, "..."]
-				? P
-				: "unknown"
-			: T
-		: S["args"] extends readonly [...unknown[], infer P extends string, "..."]
-			? P
-			: "unknown"
-	: "unknown";

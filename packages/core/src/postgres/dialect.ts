@@ -1,45 +1,23 @@
-import type {
-	DIALECT,
-	Dialect,
-	DialectBrand,
-	DialectTypes,
-} from "../dialect.js";
-import type { SqlPlugin } from "../plugin.js";
+import type { DdlCheck, Dialect, DialectTypes, PluginsOf } from "../dialect.js";
 import type { Executor } from "../query.js";
-import type { Transactional } from "../transaction.js";
 import type { ApplyDdl } from "./engine/infer.js";
-import type { ValidateDdl } from "./migrations.js";
-import type { Sql } from "./sql/types.js";
+import type { Sql, TransactionalSql } from "./sql/types.js";
 import type { DefaultTypeMap } from "./type-map/index.js";
 
 export interface Postgres extends DialectTypes {
 	readonly typeMap: DefaultTypeMap;
-	readonly sql: Sql<
-		this["db"],
-		this["tm"],
-		this["plugins"] extends readonly SqlPlugin[] ? this["plugins"] : []
-	>;
+	readonly sql: Sql<this["db"], this["tm"], PluginsOf<this["plugins"]>>;
 	readonly transactionalSql: TransactionalSql<
 		this["db"],
 		this["tm"],
-		this["plugins"] extends readonly SqlPlugin[] ? this["plugins"] : []
+		PluginsOf<this["plugins"]>
 	>;
-	readonly validateDdl: ValidateDdl<this["db"], this["ddl"]>;
+	readonly validateDdl: DdlCheck<this, this["db"], this["ddl"]>;
 	readonly applyDdl: ApplyDdl<this["db"], this["ddl"]>;
 }
 
-// Invariant parameters, as on Sql.
-export interface TransactionalSql<
-	in out DB,
-	in out TM,
-	in out Plugins extends readonly SqlPlugin[] = [],
-> extends Sql<DB, TM, Plugins>,
-		Transactional<TransactionalSql<DB, TM, Plugins>> {
-	readonly [DIALECT]?: DialectBrand<"postgres", DB, TM, Plugins>;
-	withPlugin<const P extends SqlPlugin>(
-		plugin: P,
-	): TransactionalSql<DB, TM, [...Plugins, P]>;
-}
+/** DDL script `Q` checked against schema `DB`: the script, or its error. */
+export type ValidateDdl<DB, Q extends string> = DdlCheck<Postgres, DB, Q>;
 
 export interface PostgresDialect extends Dialect<Postgres> {
 	readonly name: "postgres";
@@ -57,4 +35,11 @@ declare module "../create-sql.js" {
 
 export const postgres: PostgresDialect = {
 	name: "postgres",
+	// E'' strings take backslash escapes, block comments nest, and $tag$
+	// quotes a string up to the same tag. `$` belongs to a name after its
+	// first character, so `x$1` and `a$b$` are names. PgLexis states these
+	// rules for the types.
+	lexis:
+		/(?<![\w$])\$(\d+)|(?<![\w$])[Ee]'(?:[^'\\]|\\[\s\S]|'')*'?|'(?:[^']|'')*'?|"(?:[^"]|"")*"?|--[^\n]*|\/\*|(?<![\w$])(?<q>\$(?:[A-Za-z_]\w*)?\$)[\s\S]*?(?:\k<q>|$)/
+			.source,
 };
