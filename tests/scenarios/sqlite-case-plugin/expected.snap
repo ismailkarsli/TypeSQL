@@ -1,0 +1,30 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`sqlite-case-plugin > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "accented": "{ "caf_é_name": null | string }",
+      "text": "({ id: number; pageMeta: null | string; viewCount: null | number })[]",
+    },
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "{
+  text: [
+    { id: 1, pageMeta: '{"view_count":1}', viewCount: 1 },
+    { id: 2, pageMeta: null, viewCount: null }
+  ],
+  accented: { 'caf_é_name': 'Ada' }
+}
+",
+  },
+}
+`;

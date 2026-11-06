@@ -117,7 +117,7 @@ See the [migration guide](https://typesql.karsli.net/guide/migrations).
 
 ## Plugins
 
-Use `sql.withPlugin(new CasePlugin())` to accept camelCase write keys and return camelCase rows. Import `CasePlugin` from `@typesql/core/plugins`. The inferred input and output types follow the runtime conversion; JSON keys stay unchanged. SQL text and `sql.id()` use database identifiers. Use the original SQL instance for snake_case write objects.
+Use `sql.withPlugin(new CasePlugin())` to accept camelCase write keys and return camelCase rows. Import `CasePlugin` from `@typesql/core/plugins`. The inferred input and output types follow the runtime conversion; JSON keys stay unchanged unless you pass `{ nested: true }`, and `{ to: "snake_case" }` gives snake_case keys for camelCase columns. SQL text and `sql.id()` use database identifiers. Use the original SQL instance for snake_case write objects.
 
 ```ts
 import { CasePlugin } from "@typesql/core/plugins";
@@ -128,7 +128,7 @@ const query = appSql(`UPDATE users SET ${changes} RETURNING display_name`);
 // query.execute() returns rows with displayName.
 ```
 
-`withPlugin()` returns a new SQL instance and preserves transactions. Custom plugins implement `SqlPlugin<Types>` with `transformInput(value, context)` and/or `transformOutput(row)`. Their `PluginTypes` describe the accepted input, encoded database input, and returned row using `this["value"]`. Inputs encode in reverse registration order; outputs transform in registration order. Positional and named arguments, prepared queries, write helpers, and `mapRows()` use the same pipeline. See [plugins](https://typesql.karsli.net/guide/plugins) and the [custom plugin example](https://github.com/ismailkarsli/TypeSQL/blob/main/packages/core/examples/plugins.ts).
+`withPlugin()` returns a new SQL instance and preserves transactions. Custom plugins implement `SqlPlugin<Types>` with any of `transformInput(value, context)`, `transformOutput(row)` and `transformJson(value)`. Their `PluginTypes` describe the accepted input, encoded database input, and returned row using `this["value"]`. Inputs encode in reverse registration order; outputs transform in registration order. Positional and named arguments, prepared queries, write helpers, and `mapRows()` use the same pipeline. See [plugins](https://typesql.karsli.net/guide/plugins) and the [custom plugin example](https://github.com/ismailkarsli/TypeSQL/blob/main/packages/core/examples/plugins.ts).
 
 ## Documentation
 

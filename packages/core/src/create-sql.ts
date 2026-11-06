@@ -1,6 +1,11 @@
 import type { Dialect, DialectTypes, SqlOf } from "./dialect.js";
 import { type Empty, empty } from "./empty.js";
-import { encodeInput, type InputContext, type SqlPlugin } from "./plugin.js";
+import {
+	encodeInput,
+	encodeJson,
+	type InputContext,
+	type SqlPlugin,
+} from "./plugin.js";
 import { type Executor, SqlQuery } from "./query.js";
 import {
 	bind,
@@ -133,7 +138,7 @@ export function createSqlApi(
 		optional: <V>(value: V) => (value === undefined ? empty : value),
 		if: <V, R>(value: V, then: (value: V) => R) =>
 			value ? then(value) : empty,
-		json,
+		json: <V>(value: V) => json(encodeJson(value, plugins)),
 		fragment: (text: string, ...rest: readonly unknown[]) =>
 			fragmentOf(compile(lexis, text, encodeArgs(rest, text))),
 		id: (...parts: readonly string[]) =>

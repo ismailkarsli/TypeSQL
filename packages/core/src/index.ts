@@ -18,6 +18,7 @@ export type {
 	InputContext,
 	PluginEncoded,
 	PluginInput,
+	PluginJson,
 	PluginOutput,
 	PluginTypes,
 	SqlPlugin,

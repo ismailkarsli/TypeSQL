@@ -1,0 +1,184 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`pg-case-plugin > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "camelFlat": "{ addressLine1: null | string; displayName: null | string; profile: { home_city: string; phone_number: null | string; nick_name?: string; past_cities: readonly ({ city_name: string })[] } }",
+      "camelNestedInTransaction": "{ profile: { homeCity: string; nickName?: string; pastCities: readonly ({ cityName: string })[]; phoneNumber: null | string } }",
+      "camelNestedOptional": "{ freeForm: unknown }",
+      "camelNestedRead": "{ avatarData: null | Buffer<ArrayBufferLike>; createdAt: Date; extraDoc: null | { lastSeen: string }; freeForm: unknown; id: number; profile: { homeCity: string; nickName?: string; pastCities: readonly ({ cityName: string })[]; phoneNumber: null | string } }",
+      "camelNestedRows": "({ extraDoc: null | { lastSeen: string }; freeForm: unknown; id: number; profile: { homeCity: string; nickName?: string; pastCities: readonly ({ cityName: string })[]; phoneNumber: null | string } })[]",
+      "leafName": "undefined | string",
+      "snakeFlat": "{ _h_t_t_p_code: null | number; display_name: null | string; id: number; lower_name: null | string; settings_doc: null | { maxRetries: number; retryPolicy: { backoffMs: null | number }; allowedHosts: readonly ({ hostName: string })[] } }",
+      "snakeNestedRows": "({ display_name: null | string; id: number; settings_doc: null | { allowed_hosts: readonly ({ host_name: string })[]; max_retries: number; retry_policy: { backoff_ms: null | number } } })[]",
+      "snakeUpdated": "{ display_name: null | string }",
+      "storedAccounts": "({ id: number; settingsDoc: null | { maxRetries: number; retryPolicy: { backoffMs: null | number }; allowedHosts: readonly ({ hostName: string })[] } })[]",
+      "storedUsers": "({ extra_doc: null | { last_seen: string }; free_form: unknown; id: number; profile: { home_city: string; phone_number: null | string; nick_name?: string; past_cities: readonly ({ city_name: string })[] }; tree_root: null | string })[]",
+    },
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "{
+  camelFlat: {
+    displayName: 'Ada',
+    addressLine1: '1 Main St',
+    profile: {
+      home_city: 'London',
+      past_cities: [ { city_name: 'Paris' } ],
+      phone_number: null
+    }
+  },
+  camelNestedRead: {
+    id: 1,
+    createdAt: 2026-01-02T03:04:05.000Z,
+    avatarData: Buffer(2) [Uint8Array] [ 97, 98 ],
+    profile: {
+      homeCity: 'London',
+      pastCities: [ { cityName: 'Paris' } ],
+      phoneNumber: null
+    },
+    extraDoc: { lastSeen: 'default' },
+    freeForm: null
+  },
+  camelNestedOptional: { freeForm: { optKey: 1 } },
+  camelNestedRows: [
+    {
+      id: 1,
+      profile: {
+        homeCity: 'London',
+        pastCities: [ { cityName: 'Paris' } ],
+        phoneNumber: null
+      },
+      extraDoc: { lastSeen: 'default' },
+      freeForm: { paramKey: 1 }
+    },
+    {
+      id: 2,
+      profile: {
+        homeCity: 'Oslo',
+        nickName: 'Oz',
+        pastCities: [ { cityName: 'Rome' } ],
+        phoneNumber: '555'
+      },
+      extraDoc: { lastSeen: 'default' },
+      freeForm: { someKey: [ { innerKey: 1 } ] }
+    },
+    {
+      id: 3,
+      profile: {
+        homeCity: 'Lima',
+        pastCities: [ { cityName: 'Quito' } ],
+        phoneNumber: null
+      },
+      extraDoc: { lastSeen: 'today' },
+      freeForm: { optKey: 1 }
+    }
+  ],
+  leafName: 'leaf',
+  camelNestedInTransaction: {
+    profile: {
+      homeCity: 'Oslo',
+      nickName: 'Oz',
+      pastCities: [ { cityName: 'Rome' } ],
+      phoneNumber: '555'
+    }
+  },
+  storedUsers: [
+    {
+      id: 1,
+      profile: {
+        home_city: 'London',
+        past_cities: [ { city_name: 'Paris' } ],
+        phone_number: null
+      },
+      extra_doc: { last_seen: 'default' },
+      tree_root: null,
+      free_form: { param_key: 1 }
+    },
+    {
+      id: 2,
+      profile: {
+        home_city: 'Oslo',
+        nick_name: 'Oz',
+        past_cities: [ { city_name: 'Rome' } ],
+        phone_number: '555'
+      },
+      extra_doc: { last_seen: 'default' },
+      tree_root: 'root',
+      free_form: { some_key: [ { inner_key: 1 } ] }
+    },
+    {
+      id: 3,
+      profile: {
+        home_city: 'Lima',
+        past_cities: [ { city_name: 'Quito' } ],
+        phone_number: null
+      },
+      extra_doc: { last_seen: 'today' },
+      tree_root: null,
+      free_form: { opt_key: 1 }
+    }
+  ],
+  snakeFlat: {
+    id: 1,
+    display_name: 'Ada',
+    _h_t_t_p_code: 200,
+    lower_name: null,
+    settings_doc: {
+      maxRetries: 1,
+      retryPolicy: { backoffMs: null },
+      allowedHosts: [ { hostName: 'a.test' } ]
+    }
+  },
+  snakeUpdated: { display_name: 'Grace' },
+  snakeNestedRows: [
+    {
+      id: 1,
+      display_name: 'Grace',
+      settings_doc: {
+        max_retries: 1,
+        retry_policy: { backoff_ms: null },
+        allowed_hosts: [ { host_name: 'a.test' } ]
+      }
+    },
+    {
+      id: 2,
+      display_name: null,
+      settings_doc: {
+        max_retries: 2,
+        retry_policy: { backoff_ms: 100 },
+        allowed_hosts: [ { host_name: 'b.test' } ]
+      }
+    }
+  ],
+  storedAccounts: [
+    {
+      id: 1,
+      settingsDoc: {
+        maxRetries: 1,
+        retryPolicy: { backoffMs: null },
+        allowedHosts: [ { hostName: 'a.test' } ]
+      }
+    },
+    {
+      id: 2,
+      settingsDoc: {
+        maxRetries: 2,
+        retryPolicy: { backoffMs: 100 },
+        allowedHosts: [ { hostName: 'b.test' } ]
+      }
+    }
+  ]
+}
+",
+  },
+}
+`;

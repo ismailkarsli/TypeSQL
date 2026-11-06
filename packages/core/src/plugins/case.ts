@@ -1,3 +1,4 @@
+import { empty } from "../empty.js";
 import type {
 	IdentityPluginTypes,
 	InputContext,
@@ -17,10 +18,6 @@ type CamelRest<
 	: Up extends true
 		? Capitalize<S>
 		: S;
-
-type CamelCaseKeys<Row> = Row extends object
-	? { [K in keyof Row as K extends string ? CamelCase<K> : K]: Row[K] }
-	: Row;
 
 function camelCase(key: string): string {
 	if (!key.includes("_")) return key;
@@ -48,58 +45,183 @@ type SnakeRest<S extends string> =
 type SnakeChar<C extends string> =
 	C extends Lowercase<C> ? C : `_${Lowercase<C>}`;
 
-const snakeCase = (key: string): string =>
-	key.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
-
-type SnakeCaseKeys<Row> = Row extends object
-	? { [K in keyof Row as K extends string ? SnakeCase<K> : K]: Row[K] }
-	: Row;
-
-/**
- * Write keys: the camelCase key when it converts back to the column, else the
- * column name itself (`address_line_1`, whose camelCase `addressLine1` would
- * convert to `address_line1`). Keys without capitals are written unchanged.
- */
-type InputKey<K extends string> =
-	SnakeCase<CamelCase<K>> extends K ? CamelCase<K> : K;
-type CamelCaseInputKeys<Row> = Row extends object
-	? { [K in keyof Row as K extends string ? InputKey<K> : K]: Row[K] }
-	: Row;
-
-export interface CasePluginTypes extends IdentityPluginTypes {
-	readonly input: this["context"]["kind"] extends "set" | "values"
-		? CamelCaseInputKeys<this["value"]>
-		: this["value"];
-	readonly encoded: this["context"]["kind"] extends "set" | "values"
-		? SnakeCaseKeys<this["value"]>
-		: this["value"];
-	readonly output: CamelCaseKeys<this["value"]>;
+/** What `SnakeCase` does: `_` and the lower case of whatever has one, not only ASCII. */
+function snakeCase(key: string): string {
+	if (key === key.toLowerCase()) return key;
+	let mapped = "";
+	for (let i = 0; i < key.length; i++) {
+		const c = key[i] ?? "";
+		const lower = c.toLowerCase();
+		mapped += c === lower ? c : `_${lower}`;
+	}
+	return mapped;
 }
 
+/** The case of the application's keys. The database's keys are in the other one. */
+export type KeyCase = "camelCase" | "snake_case";
+type Opposite<To extends KeyCase> = To extends "camelCase"
+	? "snake_case"
+	: "camelCase";
+type Cased<K extends string, To extends KeyCase> = To extends "camelCase"
+	? CamelCase<K>
+	: SnakeCase<K>;
+
 /**
- * A copy of a plain object or class instance with its own enumerable keys
- * renamed; anything else as is. fromEntries defines each key, so `__proto__`
- * stays a key.
+ * Write keys: the application's key when it converts back to the database's,
+ * else the database's key itself (`address_line_1`, whose camelCase
+ * `addressLine1` would convert to `address_line1`).
  */
-function mapKeys<V>(value: V, map: (key: string) => string) {
+type InputKey<K extends string, To extends KeyCase> =
+	Cased<Cased<K, To>, Opposite<To>> extends K ? Cased<K, To> : K;
+
+/** A key `Rename` gives: `Input` for what the application writes, else for the name itself. */
+type RenamedKey<K, To extends KeyCase, Input extends boolean> = K extends string
+	? Input extends true
+		? InputKey<K, To>
+		: Cased<K, To>
+	: K;
+
+/** JSON has no functions: an object with a method (`Date`, `Buffer`, a class) keeps its keys. */
+type MethodOf<O> = {
+	[K in keyof O]-?: 0 extends 1 & O[K]
+		? never
+		: O[K] extends (...args: never) => void
+			? K
+			: never;
+}[keyof O];
+
+type RenameNested<V, To extends KeyCase, Input extends boolean> = 0 extends 1 &
+	V
+	? V
+	: V extends readonly unknown[]
+		? { [I in keyof V]: RenameNested<V[I], To, Input> }
+		: V extends object
+			? [MethodOf<V>] extends [never]
+				? {
+						[K in keyof V as RenamedKey<K, To, Input>]: RenameNested<
+							V[K],
+							To,
+							Input
+						>;
+					}
+				: V
+			: V;
+
+/** A row or write object with its keys renamed, and with `Nested` those inside its values. */
+type Rename<
+	Row,
+	To extends KeyCase,
+	Nested extends boolean,
+	Input extends boolean = false,
+> = Row extends object
+	? {
+			[K in keyof Row as RenamedKey<K, To, Input>]: Nested extends true
+				? RenameNested<Row[K], To, Input>
+				: Row[K];
+		}
+	: Row;
+
+export interface CasePluginTypes<
+	To extends KeyCase = "camelCase",
+	Nested extends boolean = false,
+> extends IdentityPluginTypes {
+	readonly input: this["context"]["kind"] extends "set" | "values"
+		? Rename<this["value"], To, Nested, true>
+		: this["value"];
+	readonly encoded: this["context"]["kind"] extends "set" | "values"
+		? Rename<this["value"], Opposite<To>, Nested>
+		: this["context"]["kind"] extends "value"
+			? Nested extends true
+				? RenameNested<this["value"], Opposite<To>, false>
+				: this["value"]
+			: this["value"];
+	readonly json: Nested extends true
+		? RenameNested<this["value"], Opposite<To>, false>
+		: this["value"];
+	readonly output: Rename<this["value"], To, Nested>;
+}
+
+export interface CasePluginOptions<
+	To extends KeyCase = "camelCase",
+	Nested extends boolean = false,
+> {
+	/**
+	 * The case of the application's keys: `"camelCase"`, by default, for
+	 * snake_case database names, or `"snake_case"` for camelCase ones.
+	 */
+	readonly to?: To;
+	/** Also rename the keys inside values, such as JSON columns. `false` by default. */
+	readonly nested?: Nested;
+}
+
+type Mapper = (key: string) => string;
+
+/**
+ * Plain objects and arrays with every key renamed, as copies; anything else,
+ * such as a `Date` or the `sql.optional()` omission, as is. fromEntries defines
+ * each key, so `__proto__` stays a key.
+ */
+// biome-ignore lint/plugin: JSON has any shape; `CasePluginTypes` carries the precise types.
+function mapNested<V>(value: V, map: Mapper): unknown {
+	if (value === null || typeof value !== "object" || Object.is(value, empty))
+		return value;
+	if (Array.isArray(value)) return value.map((item) => mapNested(item, map));
+	const proto = Object.getPrototypeOf(value);
+	return proto === null || Object.getPrototypeOf(proto) === null
+		? Object.fromEntries(
+				Object.entries(value).map(([key, item]) => [
+					map(key),
+					mapNested(item, map),
+				]),
+			)
+		: value;
+}
+
+/** A copy of a plain object or class instance with its own enumerable keys renamed; anything else as is. */
+function mapKeys<V>(value: V, map: Mapper, nested: boolean) {
 	if (value === null || typeof value !== "object" || Array.isArray(value))
 		return value;
 	return Object.fromEntries(
-		Object.entries(value).map(([key, item]) => [map(key), item]),
+		Object.entries(value).map(([key, item]) => [
+			map(key),
+			nested ? mapNested(item, map) : item,
+		]),
 	);
 }
 
-/** Camel-case application row/write keys; snake-case database write keys. JSON is untouched. */
-export class CasePlugin implements SqlPlugin<CasePluginTypes> {
-	declare readonly types?: CasePluginTypes;
+/**
+ * Renames application row and write keys one way and database write keys the
+ * other: camelCase and snake_case, by default, or the reverse with
+ * `to: "snake_case"`. JSON is untouched without `nested: true`.
+ */
+export class CasePlugin<
+	To extends KeyCase = "camelCase",
+	Nested extends boolean = false,
+> implements SqlPlugin<CasePluginTypes<To, Nested>>
+{
+	declare readonly types?: CasePluginTypes<To, Nested>;
+	readonly #toApplication: Mapper;
+	readonly #toDatabase: Mapper;
+	readonly #nested: boolean;
+
+	constructor(options: CasePluginOptions<To, Nested> = {}) {
+		const snake = options.to === "snake_case";
+		this.#toApplication = snake ? snakeCase : camelCase;
+		this.#toDatabase = snake ? camelCase : snakeCase;
+		this.#nested = options.nested === true;
+	}
 	// biome-ignore lint/plugin: implements the public `SqlPlugin.transformInput` signature.
 	transformInput(value: unknown, context: InputContext): unknown {
-		return context.kind === "set" || context.kind === "values"
-			? mapKeys(value, snakeCase)
-			: value;
+		if (context.kind === "set" || context.kind === "values")
+			return mapKeys(value, this.#toDatabase, this.#nested);
+		return context.kind === "value" ? this.transformJson(value) : value;
+	}
+	// biome-ignore lint/plugin: implements the public `SqlPlugin.transformJson` signature.
+	transformJson(value: unknown): unknown {
+		return this.#nested ? mapNested(value, this.#toDatabase) : value;
 	}
 	// biome-ignore lint/plugin: implements the public `SqlPlugin.transformOutput` signature.
 	transformOutput(row: unknown): unknown {
-		return mapKeys(row, camelCase);
+		return mapKeys(row, this.#toApplication, this.#nested);
 	}
 }

@@ -22,7 +22,7 @@ Returns the typed `sql` function for a schema in a [dialect](#dialects).
 - The dialect is the first argument: `postgres` from `@typesql/core/postgres`, `sqlite` from `@typesql/core/sqlite`, or `mysql` or `mariadb` from `@typesql/core/mysql`. Each dialect adds its own `createSql` signature, so the type arguments start with `DB`.
 - `DB` is your [schema](../guide/schema). `TypeMap` turns the dialect's column types into TypeScript types ([Type mapping](./type-mapping)); it defaults to the dialect's map.
 - `executor` is what `execute*` runs on. Without one, `sql` only builds queries.
-- Use `.withPlugin(new CasePlugin())`, from `@typesql/core/plugins`, for camelCase input and output keys, or attach a custom typed plugin. See [plugins](../guide/plugins).
+- Use `.withPlugin(new CasePlugin())`, from `@typesql/core/plugins`, for camelCase input and output keys (or [snake_case ones, and keys inside JSON](../guide/case-plugin#options)), or attach a custom typed plugin. See [plugins](../guide/plugins).
 
 The adapters export their own `createSql`, which takes the driver client and adds [`sql.transaction(fn)`](#sql-transaction-fn):
 
@@ -247,8 +247,8 @@ Word lists for editor tooling, with nothing of the type engines at runtime.
 | `Sql<DB, TM, Plugins = []>` | the `sql` function with its ordered plugin tuple |
 | `TransactionalSql<DB, TM, Plugins = []>` | an adapter's `sql`: `Sql` plus `transaction(fn)` |
 | `SqlPlugin`, `PluginTypes`, `IdentityPluginTypes`, `InputContext` | runtime hooks and type functions for custom plugins |
-| `PluginInput`, `PluginEncoded`, `PluginOutput` | apply a plugin tuple to a type |
-| `CasePlugin` | camelCase row/write keys and snake_case database write keys; from `@typesql/core/plugins` |
+| `PluginInput`, `PluginEncoded`, `PluginOutput`, `PluginJson` | apply a plugin tuple to a type |
+| `CasePlugin` | camelCase row/write keys and snake_case database write keys, or with `{ to: "snake_case" }` the reverse, with `{ nested: true }` inside JSON too; from `@typesql/core/plugins` |
 | `Executor` | what `execute*` runs on |
 | `ExecutorResult` | `{ rows, rowCount: number \| null }` |
 | `NoResultError` | thrown by `executeTakeFirstOrThrow` on 0 rows; carries `text` |

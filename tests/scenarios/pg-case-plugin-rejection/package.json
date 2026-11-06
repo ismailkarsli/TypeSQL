@@ -1,0 +1,21 @@
+{
+	"name": "pg-case-plugin-rejection",
+	"private": true,
+	"type": "module",
+	"dependencies": {
+		"@typesql/core": "workspace:*",
+		"@typesql/pg": "workspace:*",
+		"pg": "catalog:",
+		"@types/pg": "catalog:"
+	},
+	"devDependencies": {
+		"typescript": "catalog:",
+		"@types/node": "catalog:"
+	},
+	"scenario": {
+		"failure": {
+			"stage": "compile",
+			"exitCode": 1
+		}
+	}
+}

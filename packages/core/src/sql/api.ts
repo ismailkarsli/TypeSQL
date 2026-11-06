@@ -1,6 +1,11 @@
 import type { Empty } from "../empty.js";
 import type { SqlError } from "../errors.js";
-import type { PluginEncoded, PluginInput, SqlPlugin } from "../plugin.js";
+import type {
+	PluginEncoded,
+	PluginInput,
+	PluginJson,
+	SqlPlugin,
+} from "../plugin.js";
 import type { Fragment, InlineFragment, Query } from "../query.js";
 import type { RelationName, TableName } from "../schema.js";
 import type { BoxCallArgs, CallRet, GateCallCheck } from "./call.js";
@@ -166,7 +171,7 @@ export interface SqlApi<
 		| PluginEncoded<Exclude<T, Empty>, Plugins, { readonly kind: "value" }>
 	>;
 
-	json<const T>(value: T & JsonInput<T>): JsonMarker<T>;
+	json<const T>(value: T & JsonInput<T>): JsonMarker<PluginJson<T, Plugins>>;
 
 	fragment<const Text extends string, const A extends readonly unknown[]>(
 		text: GateFragCheck<Text, E["lexis"]> & Text,
