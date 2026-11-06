@@ -1,5 +1,19 @@
 # @typesql/cli
 
+## 7.1.0
+
+### Patch Changes
+
+- `main(argv, io)` writes the output of `typesql introspect` through `io`, as it does for `typesql migrate`, instead of to the process's stdout and stderr.
+
+- `typesql introspect` without `--dialect` or `--url` reads MySQL or MariaDB when `DATABASE_URL` is a `mysql://` or `mariadb://` URL, as for `--url`, instead of connecting to it as PostgreSQL.
+
+- Updated dependencies:
+  - @typesql/core@7.1.0
+  - @typesql/mysql@7.1.0
+  - @typesql/pg@7.1.0
+  - @typesql/sqlite@7.1.0
+
 ## 7.0.1
 
 ### Patch Changes

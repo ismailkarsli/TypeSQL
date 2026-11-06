@@ -1,5 +1,13 @@
 # typesql
 
+## 3.1.1
+
+### Patch Changes
+
+- Without semantic highlighting, names, `:name` parameters, casts and `$tag$` strings with non-ASCII letters are colored, and `--` or `/*` right after an operator starts a comment.
+
+- Completions work in `sql.prepare()` and `sql.raw()` strings, and in a migration's `db()`, `.ddl()`, `.add()` and `.raw()` strings. With semantic highlighting, SQLite strings are colored as SQLite (`[name]` and backtick names, `?`, `@name` and `$name` parameters), and PostgreSQL strings as PostgreSQL: backslash escapes in `E'…'` strings, and `#` and backticks as operators, not a comment and a name. In SQLite, completions after `main.` or `temp.` list the tables, with those the statement uses first.
+
 ## 3.1.0
 
 ### Minor Changes

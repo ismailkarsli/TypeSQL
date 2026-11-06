@@ -63,6 +63,11 @@
   dir: packages/cli
   intents:
     - eager-foxes-sing
+"@typesql/cli@7.1.0":
+  dir: packages/cli
+  intents:
+    - slow-poets-exist
+    - tough-pumas-count
 "@typesql/core@0.0.2":
   dir: packages/core
   intents:
@@ -431,6 +436,43 @@
   dir: packages/core
   intents:
     - fluffy-turkeys-drum
+"@typesql/core@7.1.0":
+  dir: packages/core
+  intents:
+    - afraid-mangos-carry
+    - angry-kiwis-brush
+    - angry-seas-perform
+    - brave-wolves-exist
+    - bright-boxes-exist
+    - calm-tables-yawn
+    - clever-tigers-try
+    - eager-pandas-drop
+    - early-turkeys-joke
+    - good-frogs-own
+    - good-kings-refuse
+    - heavy-olives-hear
+    - honest-melons-thank
+    - itchy-shirts-remain
+    - little-fireants-own
+    - loud-eels-hunt
+    - mighty-kings-hide
+    - new-wolves-kneel
+    - nice-bees-jam
+    - old-taxis-dig
+    - polite-turkeys-cough
+    - pretty-eggs-rest
+    - pretty-owls-heal
+    - proud-fireants-tie
+    - real-trains-love
+    - slow-turtles-live
+    - small-flowers-juggle
+    - sour-hats-enjoy
+    - tame-boxes-share
+    - tame-spiders-sneeze
+    - thick-geckos-do
+    - tiny-cats-learn
+    - wild-dodos-judge
+    - young-roses-sniff
 "@typesql/drizzle@0.0.2":
   dir: packages/drizzle
   intents:
@@ -523,6 +565,13 @@
   dir: packages/drizzle
   intents:
     - happy-lions-climb
+"@typesql/drizzle@7.1.0":
+  dir: packages/drizzle
+  intents:
+    - big-walls-wait
+    - brave-ants-drum
+    - itchy-icons-flash
+    - nice-bees-jam
 "@typesql/kysely@0.0.2":
   dir: packages/kysely
   intents:
@@ -620,6 +669,11 @@
   dir: packages/kysely
   intents:
     - gentle-moons-drift
+"@typesql/kysely@7.1.0":
+  dir: packages/kysely
+  intents:
+    - cool-boats-compete
+    - itchy-icons-flash
 "@typesql/language-server@0.0.1":
   dir: packages/language-server
   intents:
@@ -690,10 +744,22 @@
   dir: packages/language-server
   intents:
     - kind-waves-glow
+"@typesql/language-server@1.1.1":
+  dir: packages/language-server
+  intents:
+    - mighty-kings-cover
+    - thick-buses-attack
 "@typesql/mysql@6.2.0":
   dir: packages/mysql
   intents:
     - calm-rivers-wake
+"@typesql/mysql@7.1.0":
+  dir: packages/mysql
+  intents:
+    - ancient-birds-listen
+    - big-walls-wait
+    - nice-bees-jam
+    - young-roses-sniff
 "@typesql/pg@0.0.2":
   dir: packages/pg
   intents:
@@ -813,6 +879,13 @@
   dir: packages/pg
   intents:
     - curvy-pens-obey
+"@typesql/pg@7.1.0":
+  dir: packages/pg
+  intents:
+    - ancient-birds-listen
+    - big-walls-wait
+    - shaggy-rabbits-cheer
+    - young-roses-sniff
 "@typesql/postgres@0.0.2":
   dir: packages/postgres
   intents:
@@ -1019,6 +1092,12 @@
   dir: packages/prisma
   intents:
     - jolly-trees-shine
+"@typesql/prisma@7.1.0":
+  dir: packages/prisma
+  intents:
+    - fair-trees-share
+    - real-mice-invent
+    - young-roses-sniff
 "@typesql/sqlite@0.0.1":
   dir: packages/sqlite
   intents:
@@ -1077,6 +1156,14 @@
   dir: packages/sqlite
   intents:
     - little-forks-promise
+"@typesql/sqlite@7.1.0":
+  dir: packages/sqlite
+  intents:
+    - ancient-birds-listen
+    - good-frogs-own
+    - lazy-fireants-swim
+    - sharp-eels-push
+    - young-roses-sniff
 typesql@0.0.1:
   dir: packages/vscode
   intents:
@@ -1162,3 +1249,8 @@ typesql@3.1.0:
   dir: packages/vscode
   intents:
     - lucky-birds-hum
+typesql@3.1.1:
+  dir: packages/vscode
+  intents:
+    - dry-waves-tan
+    - thick-apes-greet

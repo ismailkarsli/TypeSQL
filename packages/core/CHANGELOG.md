@@ -1,5 +1,79 @@
 # @typesql/core
 
+## 7.1.0
+
+### Minor Changes
+
+- `@typesql/core/adapter` holds what the adapters share: connections (`connectPostgres`, `connectMysql`, `connectSqlite`), result normalisers (`pgResult`, `mysqlResult`), value encoders (`jsonText`, `mysqlBind`, `mysqlInline`, `sqliteBindings`), `pooledTransaction`, `createFamilySql`, the schema source writer (`schemaWriter`, `columnSource`, `doc`, …) and the `typesql introspect` shell (`introspectCommand`). `SqlDriver.transaction` also receives, after `client`, `depth` and `fn`, the name of the savepoint to make instead of a transaction of its own (`undefined` when none encloses the client), and a driver's optional `inTransaction(client)` tells that its client is a transaction already; drivers written for 7.0 keep working. A `Dialect` names the lexis of its SQL text (`lexis`). `@typesql/core/migration` exports `loadMigrator`, the config loading of `typesql migrate`.
+
+- A PostgreSQL migration's `db` reads rows as the migrator's `pg` client returns them, with the new `NodePostgresTypeMap` from `@typesql/core/postgres`: `record`, `void`, `"char"[]` and `aclitem[]` values are strings and intervals have `toPostgres()`.
+
+- `@typesql/core/adapter` exports `familyStatement`: a statement as a PostgreSQL, SQLite or MySQL driver takes it, with `$n` parameters or `?` placeholders.
+
+- A new `@typesql/core/reserved` entry point exports each dialect's reserved words and the schema keys that name no table, for editor tooling such as `@typesql/language-server`. The parsers read the same word lists.
+
+### Patch Changes
+
+- A `Json<T>` value reads by one rule on every database: as `T`, unless the type map reads JSON as a `string`, as SQLite's maps do. A MySQL map with `json: string` (mysql2's `jsonStrings`) now reads `Json<T>` columns as text, and a SQLite map that reads JSON parsed reads them as `T`.
+
+- MySQL and MariaDB: `WHERE x = ANY (SELECT …)` and `x <> SOME (SELECT …)` make `x` non-null, like `IN (SELECT …)`.
+
+- A file that imports a type such as `Col` or `SchemaOf` from `@typesql/core` no longer loads the type declarations of every dialect's engine.
+
+- TypeSQL reads MySQL, MariaDB and SQLite statements by their own rules: in `sql()`, `sql.fragment()`, `sql.raw()` and the `$n` rewriting of the MySQL and SQLite drivers, backtick- and bracket-quoted names, backslash escapes in MySQL strings, `#` comments and block comments, which these databases do not nest, no longer hide or invent `:name` parameters and inline values.
+
+- The migrator binds MySQL and MariaDB values as `@typesql/mysql` does: a plain object is refused with `cannot bind [object Object] as a MySQL value; use sql.json() for JSON` instead of being written into the statement as SQL text. With a `url`, it also connects with the mariadb connector when mysql2 is not installed.
+
+- In PostgreSQL, a cast array parameter such as `$1::text[]` has nullable elements, since it accepts and returns them: `SELECT x FROM unnest($1::text[]) AS x` gives `x: string | null`. A cast parameter that accepts `NULL` makes a column nullable in every `SELECT`; before, the result depended on whether the select list held a `$` or a comment. PostgreSQL migrations accept `CREATE FUNCTION` and `CREATE PROCEDURE` with a `BEGIN ATOMIC … END` body.
+
+- MySQL, MariaDB and SQLite: `INSERT INTO t VALUES (…)` without a column list no longer types its parameters against the wrong columns when the schema has no `position` flags; it checks the number of values and types the parameters as `unknown`. The columns of an `ON DUPLICATE KEY UPDATE` row alias with a column list (`AS new(a, b)`) now follow the table's positions, and `FIRST` / `AFTER` in a migration's `ALTER TABLE` no longer invent positions for a table without them.
+
+- `typesql migrate generate` writes a PostgreSQL JSON column a migration types with `Json<T>` (in `.raw<…>()`) as `Json<T, …>` with its import, like `typesql introspect`, instead of a schema file that does not compile.
+
+- The schema files of `typesql migrate generate` and `typesql introspect --dialect sqlite` give the hidden columns of a virtual table (FTS5's table-named column and `rank`) `hasDefault: true`, as the schema a migration leaves does: an INSERT without a column list leaves them out.
+
+- PostgreSQL: `Col<"char">`, as introspection writes it, and `"char"` in DDL and typed literals are the one-byte `"char"` type rather than `char(n)` (`bpchar`).
+
+- On SQLite, which has no `DEFAULT` in a `VALUES` row, `sql.values` rows that give different columns, or a value that can be `undefined` where another row sends one, are a type error instead of a runtime error.
+
+- The types of `sql()`, `sql.fragment()`, `sql.combine()`, `sql.and()` and `sql.or()` read MySQL, MariaDB and SQLite text by their own rules too: backtick- and bracket-quoted names, backslash escapes in MySQL strings, `#` comments, `--` without a following space in MySQL and block comments, which these databases do not nest, no longer make `sql()` require or number `:name` and `$n` parameters the database does not have.
+
+- PostgreSQL: arrays with NULL elements keep `(T | null)[]` through `VALUES` and recursive CTEs, and a parameter combined with an aggregate under `GROUP BY ROLLUP`, `CUBE` or `GROUPING SETS` accepts `null`, since the total row's aggregate can be NULL.
+
+- PostgreSQL: a `$functions` signature's `strict: [n]` checks arguments past the eighth, and an unknown function's message suggests the closest `pg_catalog` function too (`crc33` → `crc32`).
+
+- SQLite: `x / - -0` (and `%`) is nullable, since `- -0` is zero, and `x / +2` is not.
+
+- On the HTTP drivers (TiDB Cloud and PlanetScale serverless), a `'` in a value is written as `''`, so a value cannot end its string on a server with `NO_BACKSLASH_ESCAPES`. Backslashes in values are still corrupted in that mode.
+
+- PostgreSQL: `CASE`, `COALESCE`, `UNION`, `JOIN … USING` and the other constructs that find a common type follow PostgreSQL's implicit casts: of two types that convert to each other the first is kept (`coalesce(oid_col, regclass_col)` is `oid`), and `"char"` with `text` or `time` with `interval` are reported as types that cannot be matched.
+
+- PostgreSQL: `CASE`, `COALESCE`, `GREATEST`, `LEAST` and `ARRAY[]` over values with no common type are errors like `UNION` already was (`CASE types point and integer cannot be matched`), types such as `oid` and `integer` that convert implicitly combine instead of failing, and `= ANY(x)` rejects every non-array `x`.
+
+- PostgreSQL: `jsonpath`, `regconfig`, `refcursor`, `pg_snapshot` and `txid_snapshot` values are typed `string`, as node-postgres and postgres.js return them, instead of `unknown`.
+
+- The README and the npm description say how small the runtime is: under 3 kB minified and gzipped.
+
+- PostgreSQL and SQLite: a `WHERE` condition that rejects NULL in a column of an outer-joined table gives all of that table's columns their declared nullability again, as MySQL already did (`LEFT JOIN posts p … WHERE p.title = $1` makes `p.id` non-null).
+
+- `x NOT IN (SELECT …)`, `x <> ALL (…)` and SQLite's `x NOT IN ()` no longer make `x` non-null: they are true for a NULL `x` when the subquery or list is empty.
+
+- A PostgreSQL or SQLite name with `$` in it (`a$b$`, `x$1`) is read as a name: in PostgreSQL `sql()` text, `a$b$` no longer opens a dollar quote that hid the `:name` parameters and inline values after it, and `x$1` is no longer counted or renumbered as parameter `$1` when a statement runs.
+
+- PostgreSQL: a statement that reads or writes `"$types"`, `"$functions"` or `"$nullParams"` reports `relation "…" does not exist`, as PostgreSQL does, instead of `"…" is not a table`.
+
+- On MySQL and MariaDB, a plain object for a JSON parameter is a type error, as the drivers refuse it at runtime: pass `sql.json(value)` or JSON text. An inline array or object for a JSON parameter there says `must be passed as sql.json(value)`, and MySQL and SQLite messages name a `Json<T>` column type `json` instead of printing its internal type.
+
+- MySQL and MariaDB: the error for a JS array passed for a JSON parameter no longer mentions node-postgres; migration `ddl()` errors show the `SqlError` message instead of internal type names.
+
+- In PostgreSQL, a function call holding a parameter in the values of `INSERT` or `MERGE` no longer fails with an "infinitely circular" error that turned later statements in the file into `any`, nor does `(f(x)).*`. `x = ANY(array)` and `x = ALL(array)` are nullable when the array can hold `NULL` elements. In migrations, `begin` and `end` used as names (`NEW.end`, `AS end`, a parameter or routine called `begin`) no longer hide a later `COMMIT` or reject a valid trigger, and `CASE … END FOR UPDATE` ends the `CASE`.
+
+- `sql.withPlugin()` on the `sql` of `createSql()` keeps its dialect's type, as on the adapters' `sql`: its `.dialect`, and an `Sql<DB, TM, [CasePlugin]>` annotation, compile.
+
+- PostgreSQL: a window name used inside `POSITION`, `SUBSTRING`, `TRIM` or `OVERLAY` must be defined, and a built-in function called with a number of arguments none of its overloads takes is an error (`function upper(text, text) does not exist`) instead of an `unknown` column.
+
+- `typesql introspect --type-name`, `generateSource({ typeName })` and the Prisma generator's `typeName` reject a name that is not a TypeScript identifier (`typesql introspect` exits with 2) instead of writing a schema file that does not compile.
+
 ## 7.0.1
 
 ### Patch Changes

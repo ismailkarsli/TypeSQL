@@ -1,5 +1,22 @@
 # @typesql/sqlite
 
+## 7.1.0
+
+### Patch Changes
+
+- The introspection `main(argv, io?)` takes an `io` with any of `stdout`, `stderr`, `cwd` and `env`, the process's by default. `typesql introspect` reports a failed connection as `cannot connect to PostgreSQL: …` (or MySQL).
+
+- The schema files of `typesql migrate generate` and `typesql introspect --dialect sqlite` give the hidden columns of a virtual table (FTS5's table-named column and `rank`) `hasDefault: true`, as the schema a migration leaves does: an INSERT without a column list leaves them out.
+
+- `typesql introspect` keeps a table whose name starts like a virtual table's, such as `docs_archive` next to an FTS table `docs`: shadow tables are the ones SQLite reports as such (SQLite 3.37 or later).
+
+- `typesql introspect --dialect sqlite --exclude "a, b"` trims the spaces around each pattern, as the other dialects do.
+
+- `typesql introspect --type-name`, `generateSource({ typeName })` and the Prisma generator's `typeName` reject a name that is not a TypeScript identifier (`typesql introspect` exits with 2) instead of writing a schema file that does not compile.
+
+- Updated dependencies:
+  - @typesql/core@7.1.0
+
 ## 7.0.1
 
 ### Patch Changes

@@ -1,5 +1,16 @@
 # @typesql/language-server
 
+## 1.1.1
+
+### Patch Changes
+
+- Completions work in `sql.prepare()` and `sql.raw()` strings, and in a migration's `db()`, `.ddl()`, `.add()` and `.raw()` strings. SQLite strings are read as SQLite: `[name]` and backtick names, `?`, `?1`, `@name` and `$name` parameters, and block comments that don't nest; and `FROM main.` and `FROM temp.` list the tables, as their columns already resolved. In PostgreSQL, backslash escapes in `E'…'` strings no longer end the string early. Names that need quoting come from `@typesql/core`'s keyword lists.
+
+- The package ships its type declarations, which read an optional `typescript` peer (7.1 or later), and exports only its main entry point (the `typesql-language-server` command stays). In SQLite, completions after `main.` or `temp.` list the tables the statement uses first, as after `public.` in PostgreSQL.
+
+- Updated dependencies:
+  - @typesql/core@7.1.0
+
 ## 1.1.0
 
 ### Minor Changes

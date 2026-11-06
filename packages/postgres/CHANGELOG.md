@@ -1,5 +1,12 @@
 # @typesql/postgres
 
+## 7.1.0
+
+### Patch Changes
+
+- Updated dependencies:
+  - @typesql/core@7.1.0
+
 ## 7.0.1
 
 ### Patch Changes

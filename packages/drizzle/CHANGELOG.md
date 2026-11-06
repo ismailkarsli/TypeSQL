@@ -1,5 +1,20 @@
 # @typesql/drizzle
 
+## 7.1.0
+
+### Patch Changes
+
+- A script of several statements, such as one passed to `sql.as()`, resolves to its last statement's rows and count, as the migrator's `.raw()` does: node-postgres scripts no longer fail with `Cannot read properties of undefined`, and mysql2 scripts (with `multipleStatements`) no longer return every statement's result as rows.
+
+- On TiDB Cloud and PlanetScale serverless, values are written into the statement as escaped literals, as `@typesql/mysql` does: the client's own `?` substitution also replaced a `?` inside a string literal.
+
+- On MySQL and MariaDB, values are bound as `@typesql/mysql` binds them: a plain object is refused with `cannot bind [object Object] as a MySQL value; use sql.json() for JSON` instead of being written into the statement as SQL text.
+
+- On the HTTP drivers (TiDB Cloud and PlanetScale serverless), a `'` in a value is written as `''`, so a value cannot end its string on a server with `NO_BACKSLASH_ESCAPES`. Backslashes in values are still corrupted in that mode.
+
+- Updated dependencies:
+  - @typesql/core@7.1.0
+
 ## 7.0.1
 
 ### Patch Changes

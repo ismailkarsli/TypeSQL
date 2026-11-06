@@ -1,5 +1,18 @@
 # @typesql/prisma
 
+## 7.1.0
+
+### Patch Changes
+
+- The generator writes a MySQL auto-increment column as `Col<"int", { autoIncrement: true }>`, without the `hasDefault: true` that `autoIncrement` implies.
+
+- `executor(prisma)` without a `dialect` throws for a Prisma provider other than postgresql, sqlite and mysql, as the `typesql-prisma` generator does, instead of writing PostgreSQL's placeholders. `FromPrisma`, `FromPrismaMysql` and `FromPrismaSqlite` type columns as the dialect's `Col`.
+
+- `typesql introspect --type-name`, `generateSource({ typeName })` and the Prisma generator's `typeName` reject a name that is not a TypeScript identifier (`typesql introspect` exits with 2) instead of writing a schema file that does not compile.
+
+- Updated dependencies:
+  - @typesql/core@7.1.0
+
 ## 7.0.1
 
 ### Patch Changes

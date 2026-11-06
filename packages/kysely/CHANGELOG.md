@@ -1,5 +1,16 @@
 # @typesql/kysely
 
+## 7.1.0
+
+### Patch Changes
+
+- With `mysql` and `sqlite`, a `"db.table"` key of a Kysely `DB` is the table `table` of another (or attached) database, as MySQL and SQLite name it in SQL (`FROM db.table`); a SQLite `"main.table"` key is the main database's table. They were flat keys no statement could name. MySQL and SQLite columns are the dialect's `Col`.
+
+- On MySQL and MariaDB, values are bound as `@typesql/mysql` binds them: a plain object is refused with `cannot bind [object Object] as a MySQL value; use sql.json() for JSON` instead of being written into the statement as SQL text.
+
+- Updated dependencies:
+  - @typesql/core@7.1.0
+
 ## 7.0.1
 
 ### Patch Changes
