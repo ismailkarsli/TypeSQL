@@ -30,7 +30,7 @@ dedupePeerDependents: false
 resolvePeersFromWorkspaceRoot: false
 minimumReleaseAgeExcludePrune: true
 overrides:
-  "vite@5>esbuild": 0.24.2
+  "vitepress>vite": 6.4.5
 catalog:
   "@biomejs/biome": 2.6.5
   knip: 6.44.1
