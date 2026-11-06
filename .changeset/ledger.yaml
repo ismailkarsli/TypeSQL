@@ -427,6 +427,10 @@
   intents:
     - eager-horses-relate
     - silly-planes-beg
+"@typesql/core@7.0.1":
+  dir: packages/core
+  intents:
+    - fluffy-turkeys-drum
 "@typesql/drizzle@0.0.2":
   dir: packages/drizzle
   intents:
