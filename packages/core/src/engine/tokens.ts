@@ -1,36 +1,10 @@
-export type WordTok<V extends string = string> = {
-	readonly k: "w";
-	readonly v: V;
-};
-export type IdTok<V extends string = string> = {
-	readonly k: "id";
-	readonly v: V;
-};
-export type NumTok<V extends string = string> = {
-	readonly k: "n";
-	readonly v: V;
-};
-export type StrTok<V extends string = string> = {
-	readonly k: "s";
-	readonly v: V;
-};
-export type BitTok<V extends string = string> = StrTok<V> & {
-	readonly bits: true;
-};
-export type ParamTok<N extends number = number> = {
-	readonly k: "$";
-	readonly v: N;
-};
-export type OpTok<V extends string = string> = {
-	readonly k: "o";
-	readonly v: V;
-};
-
-/** A MySQL user or system variable, `@name` or `@@name`. */
-type VarTok<V extends string = string> = {
-	readonly k: "v";
-	readonly v: V;
-};
-
-export type Tok = WordTok | IdTok | NumTok | StrTok | ParamTok | OpTok | VarTok;
+/** A token of any dialect's lexer: its kind and value; dialects add fields. */
+export type Tok = { readonly k: string; readonly v: unknown };
 export type Toks = readonly Tok[];
+
+/** A parse result: the node and the index of the next token. */
+export type Ok<N, J extends number> = readonly [N, J];
+
+export type AtEnd<T extends Toks, I extends number> = T[I] extends Tok
+	? false
+	: true;

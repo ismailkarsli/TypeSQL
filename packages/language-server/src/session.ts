@@ -3,14 +3,12 @@ import { createRequire } from "node:module";
 import { dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import type { API, Snapshot } from "typescript/async";
-import type { EditorKinds } from "./complete/call.js";
-import {
-	type Completions,
-	completionsAt,
-	editorKinds,
-} from "./complete/index.js";
+import type { TypeScriptModuleLoader } from "typescript/vscode";
+import { type EditorKinds, editorKinds } from "./call.js";
+import { type Completions, completionsAt } from "./complete/complete.js";
 import { CorePaths } from "./core.js";
 import { type Highlight, highlightsIn } from "./highlight/index.js";
+import { mayBeInSqlLiteral, offsetOf, type Position } from "./literal.js";
 
 export interface TypeScriptModules {
 	readonly API: typeof API;
@@ -19,50 +17,63 @@ export interface TypeScriptModules {
 	readonly version: string;
 }
 
+/** The API modules `loader` imports, from the TypeScript package at `dir`. */
+export async function typescriptModules(
+	loader: TypeScriptModuleLoader,
+	dir: string,
+	version: string,
+): Promise<TypeScriptModules> {
+	try {
+		const [api, ast] = await Promise.all([
+			loader.importModule("typescript/async"),
+			loader.importModule("typescript/ast"),
+		]);
+		return { API: api.API, SyntaxKind: ast.SyntaxKind, dir, version };
+	} catch (e) {
+		throw new Error(
+			`typescript ${version} at ${dir} has no API client (completions need TypeScript 7.1)`,
+			{ cause: e },
+		);
+	}
+}
+
+/** The API modules of the TypeScript package that `from` resolves. */
+export async function typescriptModulesFrom(
+	from: string,
+): Promise<TypeScriptModules> {
+	const req = createRequire(from);
+	const manifest = req.resolve("typescript/package.json");
+	const pkg: { version?: string } = req(manifest);
+	return typescriptModules(
+		{ importModule: (spec) => import(pathToFileURL(req.resolve(spec)).href) },
+		realpathSync(dirname(manifest)),
+		pkg.version ?? "unknown",
+	);
+}
+
 export interface Connector {
 	pipe(): Promise<string>;
 	modules(fileName: string): readonly (() => Promise<TypeScriptModules>)[];
 	readonly upgrade?: string;
 }
 
-export async function typescriptModules(
-	from: string,
-): Promise<TypeScriptModules> {
-	const req = createRequire(from);
-	const manifest = req.resolve("typescript/package.json");
-	const load = async (spec: string) =>
-		import(pathToFileURL(req.resolve(spec)).href);
-	const pkg: { version?: string } = req(manifest);
-	let api: typeof import("typescript/async");
-	let ast: typeof import("typescript/ast");
-	try {
-		[api, ast] = await Promise.all([
-			load("typescript/async"),
-			load("typescript/ast"),
-		]);
-	} catch (e) {
-		throw new Error(
-			`typescript ${pkg.version ?? "unknown"} at ${realpathSync(dirname(manifest))} has no API client (completions need TypeScript 7.1)`,
-			{ cause: e },
-		);
-	}
-	return {
-		API: api.API,
-		SyntaxKind: ast.SyntaxKind,
-		dir: realpathSync(dirname(manifest)),
-		version: pkg.version ?? "unknown",
-	};
-}
-
-export interface Position {
-	readonly line: number;
-	readonly character: number;
-}
+export type Log = (
+	message: string,
+	level?: "trace" | "info" | "warn" | "error",
+) => void;
 
 interface Connection {
 	readonly api: API<true>;
 	readonly kinds: EditorKinds;
 }
+
+/** What one request needs: the connection, and which files are @typesql/core's. */
+interface Request extends Connection {
+	readonly isCorePath: (path: string) => boolean;
+}
+
+const COMPLETION_BUDGET_MS = 150;
+const HIGHLIGHT_BUDGET_MS = 500;
 
 const IS_7_0 = /unknown API method "getCurrentLanguageServerSnapshot"/;
 
@@ -70,20 +81,166 @@ export class Session {
 	private connection: Promise<Connection | null> | undefined;
 	private readonly cores: CorePaths;
 	private readonly connector: Connector;
-	private readonly log: (message: string) => void;
+	private readonly log: Log;
 
-	constructor(connector: Connector, log: (message: string) => void) {
+	constructor(connector: Connector, log: Log) {
 		this.connector = connector;
 		this.log = log;
 		this.cores = new CorePaths(log);
 	}
 
-	private connect(uri: string, fileName: string): Promise<Connection | null> {
-		this.connection ??= this.openOrForget(uri, fileName);
-		return this.connection;
+	/**
+	 * Tables and columns at `position` of `uri`, whose text is `text` when the
+	 * editor has it. Null when there are none, or when they fail or take longer
+	 * than the budget, which is logged.
+	 */
+	complete(
+		uri: string,
+		position: Position,
+		text?: string,
+	): Promise<Completions | null> {
+		if (
+			text !== undefined &&
+			!mayBeInSqlLiteral(text, offsetOf(text, position))
+		)
+			return Promise.resolve(null);
+		return this.within(
+			"completions",
+			COMPLETION_BUDGET_MS,
+			async () => {
+				const r = await this.request(uri);
+				return r && this.completeIn(r, uri, position, text);
+			},
+			(c) => `${c.items.length} items`,
+		);
 	}
 
-	/** Opens a connection; a failed attempt is forgotten so the next call retries. */
+	/**
+	 * SQL highlights for `uri` as the language server sees it. Null when the
+	 * file can't reach @typesql/core or has no project, or as `complete`.
+	 */
+	highlight(uri: string): Promise<Highlight[] | null> {
+		return this.within(
+			"SQL highlighting",
+			HIGHLIGHT_BUDGET_MS,
+			async () => {
+				const r = await this.request(uri);
+				if (!r) return null;
+				return this.withSnapshot(r.api, async (s) => {
+					const project = await s.getDefaultProjectForFile({ uri });
+					if (!project) return null;
+					return highlightsIn(
+						project.program,
+						project.checker,
+						r.kinds,
+						{ uri },
+						r.isCorePath,
+					);
+				});
+			},
+			(h) => `${h.length} SQL highlights`,
+		);
+	}
+
+	async close(): Promise<void> {
+		const c = this.connection;
+		this.connection = undefined;
+		const connection = await c?.catch(() => undefined);
+		await connection?.api.close().catch(() => {});
+	}
+
+	private async within<T>(
+		what: string,
+		ms: number,
+		run: () => Promise<T | null>,
+		count: (result: T) => string,
+	): Promise<T | null> {
+		let timer: NodeJS.Timeout | undefined;
+		const late = new Promise<"late">((resolve) => {
+			timer = setTimeout(() => resolve("late"), ms);
+		});
+		try {
+			const started = Date.now();
+			const result = await Promise.race([run(), late]);
+			if (result === "late") {
+				this.log(`${what} took longer than ${ms} ms; skipped`, "warn");
+				return null;
+			}
+			if (result !== null)
+				this.log(`${count(result)} in ${Date.now() - started} ms`, "trace");
+			return result;
+		} catch (e) {
+			this.log(
+				e instanceof Error ? (e.stack ?? e.message) : String(e),
+				"error",
+			);
+			return null;
+		} finally {
+			clearTimeout(timer);
+		}
+	}
+
+	private async request(uri: string): Promise<Request | null> {
+		if (!uri.startsWith("file:")) return null;
+		const fileName = fileURLToPath(uri);
+		const isCorePath = this.cores.for(fileName);
+		if (!isCorePath) return null;
+		this.connection ??= this.openOrForget(uri, fileName);
+		const connection = await this.connection;
+		return connection && { ...connection, isCorePath };
+	}
+
+	private async completeIn(
+		r: Request,
+		uri: string,
+		position: Position,
+		text: string | undefined,
+	): Promise<Completions | null> {
+		const run = async (s: Snapshot): Promise<Completions | null> => {
+			const project = await s.getDefaultProjectForFile({ uri });
+			if (!project) return null;
+			return completionsAt(
+				project.program,
+				project.checker,
+				r.kinds,
+				{ uri },
+				position,
+				r.isCorePath,
+			);
+		};
+		return this.withSnapshot(r.api, async (snapshot) => {
+			if (text !== undefined) {
+				const project = await snapshot.getDefaultProjectForFile({ uri });
+				const current = await project?.program.getSourceFile({ uri });
+				if (current && current.text !== text) {
+					let result: Completions | null = null;
+					await r.api.runWithTemporaryFileUpdate(
+						snapshot,
+						{ uri },
+						text,
+						async (s) => {
+							result = await run(s);
+						},
+					);
+					return result;
+				}
+			}
+			return run(snapshot);
+		});
+	}
+
+	private async withSnapshot<T>(
+		api: API<true>,
+		run: (s: Snapshot) => Promise<T>,
+	): Promise<T> {
+		const snapshot = await api.getCurrentLanguageServerSnapshot();
+		try {
+			return await run(snapshot);
+		} finally {
+			void snapshot.dispose();
+		}
+	}
+
 	private async openOrForget(
 		uri: string,
 		fileName: string,
@@ -118,17 +275,14 @@ export class Session {
 				pipe: await this.connector.pipe(),
 			});
 			try {
-				const snapshot = await api.getCurrentLanguageServerSnapshot();
-				try {
+				await this.withSnapshot(api, async (snapshot) => {
 					const project = await snapshot.getDefaultProjectForFile({ uri });
 					if (project)
 						await Promise.all([
 							project.program.getSourceFile({ uri }),
 							project.checker.getStringType(),
 						]);
-				} finally {
-					void snapshot.dispose();
-				}
+				});
 				this.log(
 					`API session open (client: typescript ${ts.version} at ${ts.dir})`,
 				);
@@ -151,94 +305,4 @@ export class Session {
 		);
 		return null;
 	}
-
-	async complete(
-		uri: string,
-		position: Position,
-		text?: string,
-	): Promise<Completions | null> {
-		if (!uri.startsWith("file:")) return null;
-		const fileName = fileURLToPath(uri);
-		const isCorePath = this.cores.for(fileName);
-		if (!isCorePath) return null;
-		const connection = await this.connect(uri, fileName);
-		if (!connection) return null;
-		const { api, kinds } = connection;
-		const run = async (s: Snapshot): Promise<Completions | null> => {
-			const project = await s.getDefaultProjectForFile({ uri });
-			if (!project) return null;
-			return completionsAt(
-				project.program,
-				project.checker,
-				kinds,
-				{ uri },
-				position,
-				isCorePath,
-			);
-		};
-		const snapshot = await api.getCurrentLanguageServerSnapshot();
-		try {
-			if (text !== undefined) {
-				const project = await snapshot.getDefaultProjectForFile({ uri });
-				const current = await project?.program.getSourceFile({ uri });
-				if (current && current.text !== text) {
-					let result: Completions | null = null;
-					await api.runWithTemporaryFileUpdate(
-						snapshot,
-						{ uri },
-						text,
-						async (s) => {
-							result = await run(s);
-						},
-					);
-					return result;
-				}
-			}
-			return await run(snapshot);
-		} finally {
-			void snapshot.dispose();
-		}
-	}
-
-	/**
-	 * SQL highlights for `uri` as the language server sees it, or null when the
-	 * file can't reach @typesql/core or has no project.
-	 */
-	async highlight(uri: string): Promise<Highlight[] | null> {
-		if (!uri.startsWith("file:")) return null;
-		const fileName = fileURLToPath(uri);
-		const isCorePath = this.cores.for(fileName);
-		if (!isCorePath) return null;
-		const connection = await this.connect(uri, fileName);
-		if (!connection) return null;
-		const snapshot = await connection.api.getCurrentLanguageServerSnapshot();
-		try {
-			const project = await snapshot.getDefaultProjectForFile({ uri });
-			if (!project) return null;
-			return await highlightsIn(
-				project.program,
-				project.checker,
-				connection.kinds,
-				{ uri },
-				isCorePath,
-			);
-		} finally {
-			void snapshot.dispose();
-		}
-	}
-
-	async close(): Promise<void> {
-		const c = this.connection;
-		this.connection = undefined;
-		const connection = await c?.catch(() => undefined);
-		await connection?.api.close().catch(() => {});
-	}
-}
-
-export function withBudget<T>(p: Promise<T>, ms: number): Promise<T | "late"> {
-	let timer: NodeJS.Timeout | undefined;
-	const late = new Promise<"late">(
-		(resolve) => (timer = setTimeout(() => resolve("late"), ms)),
-	);
-	return Promise.race([p, late]).finally(() => clearTimeout(timer));
 }

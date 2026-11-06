@@ -1,6 +1,7 @@
 import type { PickOne, Rebuild } from "../../../engine/object.js";
 import type { AnyErr, SqlError } from "../../../errors.js";
 import type { ColumnDef, LikeClause, TableRef } from "../ast.js";
+import type { ColsOf, IsViewVal } from "../db.js";
 import type {
 	DefOf,
 	DescOf,
@@ -16,9 +17,7 @@ import type { QueryCols, StoredType } from "./query.js";
 import type {
 	AlreadyExists,
 	CanCreate,
-	ColsOf,
 	GetRel,
-	IsViewVal,
 	NoRelation,
 	PutRel,
 } from "./relation.js";

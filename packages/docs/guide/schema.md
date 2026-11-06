@@ -132,7 +132,7 @@ In SQLite, a declared type name sets the column's affinity, as in `CREATE TABLE`
 
 In MySQL and MariaDB, columns use MySQL's type names in lower case without lengths, with ` unsigned` where it applies: `int`, `bigint unsigned`, `varchar`, `datetime`. Integer literals are `bigint` on MySQL and `int` on MariaDB, and `/` is a `decimal`. See [MySQL and MariaDB](../adapters/mysql#schema).
 
-In PostgreSQL, common spellings mean the same thing: `integer`, `int` and `int4`; `bigint` and `int8`; `boolean` and `bool`; `character varying` and `varchar`; `double precision` and `float8`; `timestamp with time zone` and `timestamptz`. A name TypeSQL doesn't know, such as an extension type or a domain, is kept as it is. It maps to `unknown` unless the type map or `$types` gives it a type.
+In PostgreSQL, common spellings mean the same thing: `integer`, `int` and `int4`; `bigint` and `int8`; `boolean` and `bool`; `character varying` and `varchar`; `double precision` and `float8`; `timestamp with time zone` and `timestamptz`; `character` and `bpchar` (`char(n)`). `char` is PostgreSQL's one-byte `"char"` type, as in `pg_type` and introspected schemas. A name TypeSQL doesn't know, such as an extension type or a domain, is kept as it is. It maps to `unknown` unless the type map or `$types` gives it a type.
 
 The driver decides which TypeScript type each database type becomes (node-postgres returns `int8` as a `string`, for example). This is the driver's **type map**, and you pick it by importing `createSql` from the driver's package. See [Type mapping](../reference/type-mapping).
 
@@ -188,7 +188,7 @@ const sql = createSql<DB>(mysql);
 
 `Json<T>` takes the same flags as `Col` as its second argument (`{ nullable: true }`, `{ hasDefault: true }`). On PostgreSQL, pass `"json"` as the third argument for a `json` column.
 
-On PostgreSQL, rows read the column as `T`, and `->`, `#>` and subscripts look inside it (see [JSON in queries](./using-sql#json)); on MySQL and MariaDB, rows read it as `T` and `->`, `->>` and `JSON_EXTRACT` with a constant path look inside it. On SQLite, rows read the column as JSON text, and `->`, `->>` and `json_extract` with a constant path take their types from `T`:
+On PostgreSQL, rows read the column as `T`, and `->`, `#>` and subscripts look inside it (see [JSON in queries](./using-sql#json)); on MySQL and MariaDB, rows read it as `T` and `->`, `->>` and `JSON_EXTRACT` with a constant path look inside it. Where the type map reads JSON as a `string`, as SQLite's maps and a MySQL map for mysql2's `jsonStrings` do, rows read the column as that text. So on SQLite, rows read the column as JSON text, and `->`, `->>` and `json_extract` with a constant path take their types from `T`:
 
 ::: code-group
 

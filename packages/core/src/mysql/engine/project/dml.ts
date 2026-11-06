@@ -1,5 +1,9 @@
-import type { Nx } from "../../../engine/parse.js";
-import type { ColInfo, QueryContext, Scope } from "../../../engine/types.js";
+import type { ColumnOrder, VisibleKeys } from "../../../engine/family/ddl.js";
+import type { NameAt, NamedAt } from "../../../engine/family/diagnostics.js";
+import type { QueryContext } from "../../../engine/family/types.js";
+import type { Next } from "../../../engine/next.js";
+import type { IsUnion } from "../../../engine/object.js";
+import type { ColInfo, Info, Scope } from "../../../engine/types.js";
 import type { AnyErr, SqlError } from "../../../errors.js";
 import type { Table, View } from "../../../schema.js";
 import type {
@@ -31,7 +35,7 @@ import type {
 	ParamsOfTargets,
 	Slot,
 } from "../typer/params.js";
-import type { Info, TypeList, TypeOf } from "../typer/typeof.js";
+import type { TypeList, TypeOf } from "../typer/typeof.js";
 import type {
 	Cell,
 	FlavorOf,
@@ -72,7 +76,10 @@ export type ProjectDml<S extends DmlStmt, DB, Ctes0 extends MyCteMap> =
 type NoReturning<DB> =
 	FlavorOf<DB> extends "mariadb"
 		? null
-		: SqlError<"You have an error in your SQL syntax near 'RETURNING'", null>;
+		: SqlError<
+				"You have an error in your SQL syntax near 'RETURNING'",
+				NameAt<"returning">
+			>;
 
 type Returning<
 	Ts extends readonly Target[],
@@ -89,7 +96,7 @@ type RetLoop<
 	? T extends { readonly t: "star" }
 		? StarCells<[It], T["tbl"]> extends infer S
 			? S extends readonly Cell[]
-				? RetLoop<Ts, It, C, Nx<I>, [...Acc, ...S]>
+				? RetLoop<Ts, It, C, Next<I>, [...Acc, ...S]>
 				: S
 			: never
 		: T extends {
@@ -106,7 +113,7 @@ type RetLoop<
 								Ts,
 								It,
 								C,
-								Nx<I>,
+								Next<I>,
 								[
 									...Acc,
 									{
@@ -131,7 +138,7 @@ type NameOf<Rel, C extends string> = {
 
 type GeneratedErr<Name extends string, K extends string> = SqlError<
 	`The value specified for generated column '${Name}' in table '${K}' is not allowed.`,
-	null
+	NamedAt<Name>
 >;
 
 type CheckCols<
@@ -142,12 +149,12 @@ type CheckCols<
 	I extends number = 0,
 > = Cols[I] extends infer C extends string
 	? [ColOf<Rel, C>] extends [never]
-		? SqlError<`Unknown column '${C}' in 'field list'`, null>
+		? SqlError<`Unknown column '${C}' in 'field list'`, NamedAt<C, "column">>
 		: ColOf<Rel, C> extends { readonly generated: true }
 			? AllDefault<Values, I> extends true
-				? CheckCols<Cols, Rel, K, Values, Nx<I>>
+				? CheckCols<Cols, Rel, K, Values, Next<I>>
 				: GeneratedErr<NameOf<Rel, C>, K>
-			: CheckCols<Cols, Rel, K, Values, Nx<I>>
+			: CheckCols<Cols, Rel, K, Values, Next<I>>
 	: true;
 /** Generated columns accept only DEFAULT. */
 type AllDefault<
@@ -184,10 +191,14 @@ type RowsMatch<
 	I extends number = 0,
 > = Rows[I] extends infer R extends readonly Expr[]
 	? R["length"] extends N
-		? RowsMatch<Rows, N, Nx<I>>
-		: SqlError<`Column count doesn't match value count at row ${Nx<I>}`, null>
+		? RowsMatch<Rows, N, Next<I>>
+		: SqlError<
+				`Column count doesn't match value count at row ${Next<I>}`,
+				NameAt<"values">
+			>
 	: true;
 
+/** The columns the statement fills, in order: `null` when the table's column order is unknown. */
 type InsertCols<S extends InsertStmt, Rel> = S["source"] extends {
 	readonly t: "set";
 	readonly set: infer Set extends readonly SetItem[];
@@ -196,6 +207,14 @@ type InsertCols<S extends InsertStmt, Rel> = S["source"] extends {
 	: S["columns"] extends readonly string[]
 		? S["columns"]
 		: InsertOrder<Rel>;
+/** The columns the statement fills, in order when it is known. */
+type FilledCols<S extends InsertStmt, Rel> =
+	InsertCols<S, Rel> extends infer C extends readonly string[]
+		? C
+		: ColumnOrder<Rel, VisibleKeys<Rel>>;
+/** The columns its values are typed against by position: none when the order is unknown. */
+type TypedCols<S extends InsertStmt, Rel> =
+	InsertCols<S, Rel> extends infer C extends readonly string[] ? C : [];
 
 type ProjectInsert<S extends InsertStmt, DB, Ctes extends MyCteMap> =
 	Target_<DB, S["table"]> extends infer Tg
@@ -213,9 +232,9 @@ type ProjectInsert<S extends InsertStmt, DB, Ctes extends MyCteMap> =
 								: null
 				) extends infer RE extends AnyErr
 				? RE
-				: InsertCols<S, Rel> extends infer Cols extends readonly string[]
+				: FilledCols<S, Rel> extends infer Cols extends readonly string[]
 					? CheckCols<
-							Cols,
+							TypedCols<S, Rel>,
 							Rel,
 							K,
 							S["source"] extends {
@@ -299,7 +318,7 @@ type InsertRest<
 													"You have an error in your SQL syntax near 'ON DUPLICATE'",
 													null
 												>
-											: OdkuCtx<S, It, DB, Ctes> extends infer C
+											: OdkuCtx<S, Rel, It, DB, Ctes> extends infer C
 												? C extends MyCtx
 													? CheckSet<S["odku"], [It], C, K>
 													: C
@@ -322,6 +341,7 @@ type InsertRest<
 // table gives that order, as SQLite's `excluded` has.
 type OdkuCtx<
 	S extends InsertStmt,
+	Rel,
 	It extends MyItem,
 	DB,
 	Ctes extends MyCteMap,
@@ -335,7 +355,7 @@ type OdkuCtx<
 				[It],
 				[
 					AC extends readonly string[]
-						? RenamedItem<It, InsertCols<S, ColsRel<It>>, AC, A>
+						? RenamedItem<It, TypedCols<S, Rel>, AC, A>
 						: {
 								readonly alias: A;
 								readonly cols: It["cols"];
@@ -347,7 +367,6 @@ type OdkuCtx<
 			Ctes
 		>
 	: Ctx<DB, [[It]], Ctes>;
-type ColsRel<It extends MyItem> = It["cols"];
 
 type RenamedItem<
 	It extends MyItem,
@@ -357,8 +376,9 @@ type RenamedItem<
 > = {
 	readonly alias: A;
 	readonly cols: {
-		readonly [I in keyof As & `${number}` as Lowercase<As[I]>]: Cols[I &
-			keyof Cols] extends infer C extends keyof It["cols"]
+		readonly [I in keyof As & `${number}` as Lowercase<As[I]>]: Lowercase<
+			Cols[I & keyof Cols] & string
+		> extends infer C extends keyof It["cols"]
 			? It["cols"][C]
 			: {
 					readonly type: "unknown";
@@ -378,7 +398,7 @@ type ValuesTyped<
 	? TypeList<NonDefault<R>, C> extends infer X
 		? X extends AnyErr
 			? X
-			: ValuesTyped<Rows, C, Nx<I>>
+			: ValuesTyped<Rows, C, Next<I>>
 		: never
 	: true;
 type NonDefault<R extends readonly Expr[]> = R extends readonly [
@@ -402,10 +422,13 @@ type MissingRequired<Rel, Cols extends readonly string[]> = {
 }[keyof Rel & string] extends infer M extends string
 	? [M] extends [never]
 		? true
-		: SqlError<`Field '${FirstOf<M>}' doesn't have a default value`, null>
+		: SqlError<
+				`Field '${FirstOf<M>}' doesn't have a default value`,
+				NamedAt<FirstOf<M>>
+			>
 	: never;
 type FirstOf<U> =
-	import("../../../sql/splice.js").UnionList<U> extends readonly [
+	import("../../../engine/object.js").Members<U> extends readonly [
 		infer F extends string,
 		...unknown[],
 	]
@@ -429,12 +452,6 @@ type SetCol<L extends MyLevel, S extends SetItem> = {
 			: never;
 }[number];
 
-type IsUnion<T, U = T> = T extends unknown
-	? [U] extends [T]
-		? false
-		: true
-	: never;
-
 type CheckSet<
 	Set extends readonly SetItem[],
 	L extends MyLevel,
@@ -446,25 +463,28 @@ type CheckSet<
 		? [Col] extends [never]
 			? SqlError<
 					`Unknown column '${S["tbl"] extends string ? `${S["tbl"]}.` : ""}${S["col"]}' in 'field list'`,
-					null
+					NamedAt<S["col"], "column">
 				>
 			: IsUnion<Col> extends true
-				? SqlError<`Column '${S["col"]}' in field list is ambiguous`, null>
+				? SqlError<
+						`Column '${S["col"]}' in field list is ambiguous`,
+						NamedAt<S["col"]>
+					>
 				: Col extends { readonly gen: true }
 					? S["e"] extends { readonly t: "default" }
-						? CheckSet<Set, L, C, K, Nx<I>>
+						? CheckSet<Set, L, C, K, Next<I>>
 						: GeneratedErr<
 								Col extends MyCol ? Col["n"] : S["col"],
 								Col extends { readonly tbl: infer T extends string } ? T : K
 							>
 					: S["e"] extends { readonly t: "default" }
-						? CheckSet<Set, L, C, K, Nx<I>>
+						? CheckSet<Set, L, C, K, Next<I>>
 						: HasAgg<S["e"], C["db"]> extends true
 							? SqlError<"Invalid use of group function", null>
 							: TypeOf<S["e"], C> extends infer X
 								? X extends AnyErr
 									? X
-									: CheckSet<Set, L, C, K, Nx<I>>
+									: CheckSet<Set, L, C, K, Next<I>>
 								: never
 		: never
 	: true;
@@ -477,7 +497,7 @@ type OrderLimitOk<
 	? S extends { readonly orderBy: readonly [unknown, ...unknown[]] }
 		? SqlError<`Incorrect usage of ${Verb} and ORDER BY`, null>
 		: S extends { readonly limit: Expr }
-			? SqlError<`Incorrect usage of ${Verb} and LIMIT`, null>
+			? SqlError<`Incorrect usage of ${Verb} and LIMIT`, NameAt<"limit">>
 			: true
 	: true;
 
@@ -535,8 +555,11 @@ type DeleteTargetsOk<
 					: false
 				: false;
 		}[number]
-		? DeleteTargetsOk<Ts, L, Nx<I>>
-		: SqlError<`Unknown table '${R["name"]}' in MULTI DELETE`, null>
+		? DeleteTargetsOk<Ts, L, Next<I>>
+		: SqlError<
+				`Unknown table '${R["name"]}' in MULTI DELETE`,
+				NamedAt<R["name"]>
+			>
 	: true;
 
 type CheckDelete<S extends DeleteStmt, DB, Ctes extends MyCteMap> = (
@@ -591,7 +614,7 @@ type ColParam<It extends MyItem, C> = C extends keyof It["cols"]
 type InsertParams<S extends InsertStmt, DB, Ctes extends MyCteMap> =
 	Target_<DB, S["table"]> extends [infer Rel, string]
 		? Item<Rel, Lowercase<S["table"]["name"]>> extends infer It extends MyItem
-			? InsertCols<S, Rel> extends infer Cols extends readonly string[]
+			? TypedCols<S, Rel> extends infer Cols extends readonly string[]
 				? Ctx<DB, [[It]], Ctes> extends infer C extends MyCtx
 					?
 							| (S["source"] extends {
@@ -612,7 +635,7 @@ type InsertParams<S extends InsertStmt, DB, Ctes extends MyCteMap> =
 											? SetParams<Set[number], [It], C>
 											: never)
 							| (S["odku"] extends readonly SetItem[]
-									? OdkuCtx<S, It, DB, Ctes> extends infer OC extends MyCtx
+									? OdkuCtx<S, Rel, It, DB, Ctes> extends infer OC extends MyCtx
 										? SetParams<S["odku"][number], [It], OC>
 										: never
 									: never)

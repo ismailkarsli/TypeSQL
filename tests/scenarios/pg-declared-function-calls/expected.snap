@@ -1,0 +1,33 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`pg-declared-function-calls > scenario 1`] = `
+{
+  "compile": {
+    "status": 1,
+    "stderr": "",
+  },
+  "compiler": {
+    "diagnostics": [
+      {
+        "category": 1,
+        "code": 2345,
+        "column": 5,
+        "details": [
+          {
+            "category": 1,
+            "code": 2322,
+            "message": "Type 'string' is not assignable to type 'SqlError<"function crc33(text) does not exist. Perhaps you meant the function \\"crc32\\"? Otherwise declare it in the schema's $functions or in FunctionCatalog", 1>'.",
+          },
+        ],
+        "expression": ""SELECT crc33(label) FROM t"",
+        "file": "app.ts",
+        "line": 22,
+        "message": "Argument of type '"SELECT crc33(label) FROM t"' is not assignable to parameter of type 'SqlError<"function crc33(text) does not exist. Perhaps you meant the function \\"crc32\\"? Otherwise declare it in the schema's $functions or in FunctionCatalog", 1> & "SELECT crc33(label) FROM t"'.",
+      },
+    ],
+    "types": {
+      "Picked": "{ all_set: string; ninth_nullable: null | string; ninth_set: string }",
+    },
+  },
+}
+`;

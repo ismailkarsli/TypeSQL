@@ -1,0 +1,69 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`sqlite-where-narrowing > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "joined": "({ body: null | string; id: null | number; name: string; title: null | string })[]",
+      "matched": "({ body: null | string; id: number; name: string; title: string })[]",
+      "notIn": "({ bio: null | string; id: number })[]",
+      "notInEmpty": "({ bio: null | string; id: number })[]",
+      "notInList": "({ bio: string; id: number })[]",
+      "right": "({ id: number; name: string; title: string })[]",
+    },
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "{
+  notIn: [
+    [Object: null prototype] { id: 1, bio: null },
+    [Object: null prototype] { id: 2, bio: 'SQL' },
+    [Object: null prototype] { id: 3, bio: 'Lisp' }
+  ],
+  notInEmpty: [
+    [Object: null prototype] { id: 1, bio: null },
+    [Object: null prototype] { id: 2, bio: 'SQL' },
+    [Object: null prototype] { id: 3, bio: 'Lisp' }
+  ],
+  notInList: [ [Object: null prototype] { id: 3, bio: 'Lisp' } ],
+  joined: [
+    [Object: null prototype] {
+      name: 'Ada',
+      id: 1,
+      title: 'SQL',
+      body: null
+    },
+    [Object: null prototype] {
+      name: 'Grace',
+      id: null,
+      title: null,
+      body: null
+    },
+    [Object: null prototype] {
+      name: 'Lin',
+      id: null,
+      title: null,
+      body: null
+    }
+  ],
+  matched: [
+    [Object: null prototype] {
+      name: 'Ada',
+      id: 1,
+      title: 'SQL',
+      body: null
+    }
+  ],
+  right: [ [Object: null prototype] { id: 1, name: 'Ada', title: 'SQL' } ]
+}
+",
+  },
+}
+`;

@@ -1,3 +1,4 @@
+import type { JsonAs, NullableTs, ParamMapOf, TsShaped } from "../../schema.js";
 import type { Affinity } from "../engine/types.js";
 
 export interface DefaultTypeMap {
@@ -37,47 +38,39 @@ export interface DefaultParamTypeMap {
 	unknown: Bindable;
 }
 
-export type ParamTypeMapOf<TM> = TM extends { readonly $params: infer P }
-	? P
-	: DefaultParamTypeMap;
+export type ParamTypeMapOf<TM> = ParamMapOf<TM, DefaultParamTypeMap>;
 
-type TsTypeOf<TM, T extends string> = T extends {
-	readonly shape: { readonly k: "ts"; readonly v: infer V };
-}
-	? T extends "json"
-		? TsTypeOf<TM, "json">
-		: V
-	: T extends keyof TM
-		? TM[T]
-		: Affinity<T> extends infer A
-			? A extends keyof TM
-				? TM[A]
-				: unknown
-			: never;
+type TsTypeOf<TM, T extends string> =
+	T extends TsShaped<infer V>
+		? T extends "json"
+			? JsonAs<TsTypeOf<TM, "json">, V>
+			: V
+		: T extends keyof TM
+			? TM[T]
+			: Affinity<T> extends infer A
+				? A extends keyof TM
+					? TM[A]
+					: unknown
+				: never;
 
 export type TsOf<
 	TM,
 	_DB,
 	T extends { type: string; nullable: boolean },
-> = T["type"] extends "null"
-	? null
-	: T["nullable"] extends true
-		? TsTypeOf<TM, T["type"]> | null
-		: TsTypeOf<TM, T["type"]>;
+> = NullableTs<T, TsTypeOf<TM, T["type"]>>;
 
 export type TsParamTypeOf<TM, _DB, T extends string> = ParamTs<
 	TM,
 	ParamTypeMapOf<TM>,
 	T
 >;
-type ParamTs<TM, PM, T extends string> = T extends {
-	readonly shape: { readonly k: "ts"; readonly v: infer V };
-}
-	? T extends "json"
-		? ParamTs<TM, PM, "json">
-		: V
-	: T extends keyof TM
-		? TM[T] | (T extends keyof PM ? PM[T] : never)
-		: Affinity<T> extends infer A extends string
-			? ParamTs<TM, PM, A>
-			: never;
+type ParamTs<TM, PM, T extends string> =
+	T extends TsShaped<infer V>
+		? T extends "json"
+			? JsonAs<ParamTs<TM, PM, "json">, V>
+			: V
+		: T extends keyof TM
+			? TM[T] | (T extends keyof PM ? PM[T] : never)
+			: Affinity<T> extends infer A extends string
+				? ParamTs<TM, PM, A>
+				: never;

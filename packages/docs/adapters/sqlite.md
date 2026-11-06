@@ -49,7 +49,7 @@ interface DB {
 | Flag | Effect |
 |---|---|
 | `nullable`, `hasDefault` | `NULL` allowed; optional in `INSERT` |
-| `position` | column order, used by `SELECT *` and `INSERT … VALUES` without a column list |
+| `position` | column order, used by `SELECT *` and `INSERT … VALUES` without a column list once every column has one |
 | `rowid` | the `INTEGER PRIMARY KEY`, so `rowid` resolves to it |
 | `generated` | readable, but rejected in `INSERT` and `UPDATE` |
 | `hidden` | usable by name, but not in `SELECT *` |
@@ -135,6 +135,6 @@ await createMigrator({
 
 ## Limits
 
-- Without `position` flags, `SELECT *` order is unspecified, so name your columns or generate the schema.
+- Without `position` flags, `SELECT *` order is unspecified and `INSERT INTO t VALUES (…)` without a column list checks only the number of values and types its parameters as `unknown`, so name your columns or generate the schema.
 - `sql.values()` rows must all have the same keys, because SQLite has no `DEFAULT` inside `VALUES`.
 - `ON CONFLICT` targets aren't checked against unique constraints.

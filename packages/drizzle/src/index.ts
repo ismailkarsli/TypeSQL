@@ -1,4 +1,4 @@
-import { createTransactionalSql } from "@typesql/core/adapter";
+import { createFamilySql, dialectFamily } from "@typesql/core/adapter";
 import type {
 	MariaDbDialect,
 	MariaDbTransactionalSql,
@@ -24,26 +24,25 @@ import {
 	isMysqlDatabase,
 	isSqliteDatabase,
 } from "./client.js";
-import type { FromDrizzle, FromDrizzleOptions } from "./from-drizzle.js";
-import type { FromDrizzleMysql } from "./from-drizzle-mysql.js";
-import type { FromDrizzleSqlite } from "./from-drizzle-sqlite.js";
+import type { FromDrizzleOptions } from "./column.js";
+import type {
+	FromDrizzle,
+	FromDrizzleMysql,
+	FromDrizzleSqlite,
+} from "./from-drizzle.js";
 import { type DrizzleMysqlDatabase, mysqlDriver } from "./mysql-client.js";
 import { type DrizzleSqliteDatabase, sqliteDriver } from "./sqlite-client.js";
 
 export { type DrizzleDatabase, executor } from "./client.js";
+export type { FromDrizzleOptions } from "./column.js";
 export type {
-	DrizzleColumnTypes,
 	FromDrizzle,
-	FromDrizzleOptions,
-} from "./from-drizzle.js";
-export type {
-	DrizzleMysqlColumnTypes,
 	FromDrizzleMysql,
-} from "./from-drizzle-mysql.js";
-export type {
-	DrizzleSqliteColumnTypes,
 	FromDrizzleSqlite,
-} from "./from-drizzle-sqlite.js";
+} from "./from-drizzle.js";
+export type { DrizzleMysqlColumnTypes } from "./from-drizzle-mysql.js";
+export type { DrizzleColumnTypes } from "./from-drizzle-pg.js";
+export type { DrizzleSqliteColumnTypes } from "./from-drizzle-sqlite.js";
 export { type DrizzleMysqlDatabase, mysqlExecutor } from "./mysql-client.js";
 export { mysqlType, pgType, sqliteType } from "./pg-type.js";
 export { type DrizzleSqliteDatabase, sqliteExecutor } from "./sqlite-client.js";
@@ -78,11 +77,6 @@ export type DrizzleSchema<D> = D extends {
 }
 	? S
 	: never;
-
-const notMysql = (dialect: string): Error =>
-	new Error(
-		`typesql: createSql(${dialect}, db) needs a Drizzle MySQL database (with a session)`,
-	);
 
 export function createSql<
 	D extends DrizzleMysqlDatabase & {
@@ -137,24 +131,22 @@ export function createSql(
 	dialect: PostgresDialect | SqliteDialect | MySqlDialect | MariaDbDialect,
 	db?: DrizzleDatabase | DrizzleSqliteDatabase | DrizzleMysqlDatabase,
 ): object {
-	switch (dialect.name) {
+	switch (dialectFamily(dialect.name)) {
 		case "sqlite":
 			if (db === undefined || isSqliteDatabase(db))
-				return createTransactionalSql(dialect, db, sqliteDriver);
+				return createFamilySql(dialect, db, () => sqliteDriver);
 			throw new Error(
 				"typesql: createSql(sqlite, db) needs a Drizzle SQLite database (with all() and run())",
 			);
 		case "mysql":
 			if (db === undefined || isMysqlDatabase(db))
-				return createTransactionalSql(dialect, db, mysqlDriver);
-			throw notMysql(dialect.name);
-		case "mariadb":
-			if (db === undefined || isMysqlDatabase(db))
-				return createTransactionalSql(dialect, db, mysqlDriver);
-			throw notMysql(dialect.name);
+				return createFamilySql(dialect, db, () => mysqlDriver);
+			throw new Error(
+				`typesql: createSql(${dialect.name}, db) needs a Drizzle MySQL database (with a session)`,
+			);
 		default:
 			if (db === undefined || isDrizzleDatabase(db))
-				return createTransactionalSql(dialect, db, driver);
+				return createFamilySql(dialect, db, () => driver);
 			throw new Error(
 				"typesql: createSql(postgres, db) needs a Drizzle database (with a session)",
 			);

@@ -1,0 +1,31 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`mysql-json-strings > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "rows": "({ extra: null | string; id: number; meta: string; theme: string })[]",
+    },
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "[
+  {
+    id: 1,
+    meta: '{"theme": "dark"}',
+    extra: '{"tags": ["a"]}',
+    theme: 'dark'
+  },
+  { id: 2, meta: '{"theme": "light"}', extra: null, theme: 'light' }
+]
+",
+  },
+}
+`;

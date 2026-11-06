@@ -152,16 +152,16 @@ pattern unwrapped_identifier($target) {
 pattern function_like() {
 	or {
 		JsFunctionDeclaration(),
-		JsFunctionExportDefaultDeclaration(),
 		JsFunctionExpression(),
 		JsArrowFunctionExpression(),
+		JsFunctionExportDefaultDeclaration(),
 		JsMethodClassMember(),
 		JsMethodObjectMember(),
-		JsConstructorClassMember(),
 		JsGetterClassMember(),
-		JsSetterClassMember(),
 		JsGetterObjectMember(),
-		JsSetterObjectMember()
+		JsSetterClassMember(),
+		JsSetterObjectMember(),
+		JsConstructorClassMember()
 	}
 }
 

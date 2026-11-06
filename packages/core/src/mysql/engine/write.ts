@@ -1,11 +1,11 @@
-import type * as Shared from "../../engine/write.js";
+import type * as Shared from "../../sql/write.js";
 import type { MySqlEngine } from "./engine.js";
 
 export type {
 	RelationName,
 	TableName,
 	TableOf,
-} from "../../engine/write.js";
+} from "../../schema.js";
 
 export type SetInput<DB, TM, T extends string> = Shared.SetInput<
 	MySqlEngine,

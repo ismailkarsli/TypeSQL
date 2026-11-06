@@ -7,7 +7,8 @@ export type {
 	TypeRegistry,
 	View,
 } from "../../schema.js";
-export type { FunctionRegistry, Json, Schema } from "./column.js";
+export type { Json, Schema } from "./column.js";
+export type { FunctionRegistry, Sig, SigFlags } from "./functions.js";
 export type { NormalizeTypeName } from "./normalize.js";
 export type {
 	InformationSchemaNamespace,

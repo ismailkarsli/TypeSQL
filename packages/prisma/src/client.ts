@@ -1,12 +1,14 @@
 import type { PrismaPromise } from "@prisma/client/runtime/client";
 import type { Executor } from "@typesql/core";
 import {
-	JsonParam,
-	mysqlPositional,
-	positional,
+	type DialectFamily,
+	dialectFamily,
+	familyStatement,
+	jsonText,
 	runTransaction,
 	type SqlDriver,
 } from "@typesql/core/adapter";
+import { providerDialect } from "./provider.js";
 
 export interface PrismaRawClient {
 	$queryRawUnsafe<T = unknown>(
@@ -17,19 +19,26 @@ export interface PrismaRawClient {
 	$transaction?<R>(fn: (tx: PrismaRawClient) => Promise<R>): Promise<R>;
 }
 
-// Prisma sends a JS array as a Postgres array and a string as text, so send
-// every sql.json() value as its JSON.stringify string.
-const jsonText = <V>(value: V): V | string =>
-	value instanceof JsonParam ? JSON.stringify(value.value) : value;
+const providerOf = (prisma: PrismaRawClient): DialectFamily =>
+	providerDialect(
+		"_activeProvider" in prisma && typeof prisma._activeProvider === "string"
+			? prisma._activeProvider
+			: undefined,
+	);
 
-type DialectName = "postgres" | "sqlite" | "mysql" | "mariadb";
-
-/** The dialect of the client's active provider; MariaDB is Prisma's `mysql`. */
-const providerOf = (prisma: PrismaRawClient): DialectName => {
-	const provider =
-		"_activeProvider" in prisma ? prisma._activeProvider : undefined;
-	return provider === "sqlite" || provider === "mysql" ? provider : "postgres";
-};
+// Prisma sends a JS array as a Postgres array and a string as text, so
+// sql.json() values are sent as JSON text; its MySQL adapter takes them as
+// mysqlValue converts them.
+const compile = (
+	family: DialectFamily,
+	text: string,
+	values: readonly unknown[],
+) =>
+	familyStatement[family](
+		text,
+		values,
+		family === "mysql" ? undefined : jsonText,
+	);
 
 /**
  * An executor on `prisma`. SQLite's placeholders are used when `dialect` is
@@ -38,27 +47,19 @@ const providerOf = (prisma: PrismaRawClient): DialectName => {
  */
 export function executor(
 	prisma: PrismaRawClient,
-	options: { readonly dialect?: DialectName } = {},
+	options: { readonly dialect?: DialectFamily | "mariadb" } = {},
 ): Executor {
-	const dialect = options.dialect ?? providerOf(prisma);
-	const compile =
-		dialect === "sqlite"
-			? (text: string, values: readonly unknown[]) =>
-					positional(text, values, jsonText)
-			: dialect === "mysql" || dialect === "mariadb"
-				? mysqlPositional
-				: (text: string, values: readonly unknown[]) => ({
-						text,
-						values: values.map(jsonText),
-					});
+	const family = options.dialect
+		? dialectFamily(options.dialect)
+		: providerOf(prisma);
 	return Object.assign(
 		(text: string, values: readonly unknown[]) => {
-			const q = compile(text, values);
+			const q = compile(family, text, values);
 			return prisma.$queryRawUnsafe<unknown[]>(q.text, ...q.values);
 		},
 		{
 			count: (text: string, values: readonly unknown[]) => {
-				const q = compile(text, values);
+				const q = compile(family, text, values);
 				return prisma.$executeRawUnsafe(q.text, ...q.values);
 			},
 		},
@@ -67,28 +68,25 @@ export function executor(
 
 function transaction<T>(
 	prisma: PrismaRawClient,
-	depth: number,
+	_depth: number,
 	fn: (tx: PrismaRawClient) => Promise<T>,
+	savepoint: string | undefined,
 ): Promise<T> {
-	if (prisma.$transaction) return prisma.$transaction(fn);
+	if (savepoint === undefined && prisma.$transaction)
+		return prisma.$transaction(fn);
 	return runTransaction(
 		(statement) => prisma.$executeRawUnsafe(statement),
 		() => fn(prisma),
-		{ savepoint: `typesql_${depth + 1}` },
+		{ savepoint },
 	);
 }
 
-export const driver: SqlDriver<PrismaRawClient> = {
-	executor: (prisma) => executor(prisma),
+/** The driver for a `sql` of the dialect family `dialect`. */
+export const driverOf = (
+	dialect: DialectFamily,
+): SqlDriver<PrismaRawClient> => ({
+	executor: (prisma) => executor(prisma, { dialect }),
 	transaction,
-};
-
-export const sqliteDriver: SqlDriver<PrismaRawClient> = {
-	executor: (prisma) => executor(prisma, { dialect: "sqlite" }),
-	transaction,
-};
-
-export const mysqlDriver: SqlDriver<PrismaRawClient> = {
-	executor: (prisma) => executor(prisma, { dialect: "mysql" }),
-	transaction,
-};
+	// An interactive transaction's client has no $transaction.
+	inTransaction: (prisma) => !prisma.$transaction,
+});

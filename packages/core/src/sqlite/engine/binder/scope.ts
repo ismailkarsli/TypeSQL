@@ -1,8 +1,28 @@
-import type { Nx } from "../../../engine/parse.js";
-import type { QueryContext, Scope } from "../../../engine/types.js";
+import type {
+	ColumnOrder,
+	KnownOrder,
+	VisibleKeys,
+} from "../../../engine/family/ddl.js";
+import type { HintKind, NamedAt } from "../../../engine/family/diagnostics.js";
+import type {
+	AllCells,
+	BareIn,
+	CellsMap,
+	FindKey,
+	ItemCells,
+	LevelCol,
+	LevelHas,
+	NaturalCols,
+	NullLevel,
+	RefDisplay,
+	SkipIn,
+} from "../../../engine/family/scope.js";
+import type { QueryContext } from "../../../engine/family/types.js";
+import type { Next } from "../../../engine/next.js";
+import type { IsUnion } from "../../../engine/object.js";
+import type { Scope } from "../../../engine/types.js";
 import type { AnyErr, SqlError } from "../../../errors.js";
 import type { Table, View } from "../../../schema.js";
-import type { UnionList } from "../../../sql/splice.js";
 import type { Expr, FromItem, FromJoin, TableRef } from "../ast.js";
 import type { ProjectSelect } from "../project/select.js";
 import type { CheckBool, TypeList } from "../typer/typeof.js";
@@ -15,16 +35,6 @@ import type {
 	SqItem,
 	SqLevel,
 } from "../types.js";
-
-export type FindKey<O, Lc extends string> = Lc extends keyof O
-	? Lc
-	: {
-			[K in keyof O & string]: K extends `$${string}`
-				? never
-				: Lowercase<K> extends Lc
-					? K
-					: never;
-		}[keyof O & string];
 
 type MainSchema = "main" | "temp";
 
@@ -48,10 +58,6 @@ export type LookupRelation<
 				: null
 		: null;
 
-export type RefDisplay<Ref extends TableRef> = Ref["schema"] extends string
-	? `${Ref["schema"]}.${Ref["name"]}`
-	: Ref["name"];
-
 type TableCols<Tbl> = {
 	readonly [K in keyof Tbl & string as Lowercase<K>]: SqColOf<
 		Tbl[K] extends { readonly type: infer T } ? T : "any",
@@ -60,60 +66,15 @@ type TableCols<Tbl> = {
 	>;
 };
 
-type TableOrder<Tbl> =
-	VisibleKeys<Tbl> extends infer V extends string
-		? [V] extends [never]
-			? []
-			: Tbl[V & keyof Tbl] extends { readonly i: number }
-				? ByIndex<PositionMap<Tbl>, 0, []>
-				: LowerAll<UnionList<V>>
-		: never;
-type VisibleKeys<Tbl> = {
-	[K in keyof Tbl & string]: Tbl[K] extends { readonly hidden: true }
+/** The columns `INSERT INTO t VALUES (…)` without a column list fills, in order: all but hidden and generated ones. */
+export type InsertOrder<Tbl> = KnownOrder<Tbl, InsertKeys<Tbl>>;
+export type InsertKeys<Tbl> = {
+	[K in keyof Tbl & string]: Tbl[K] extends
+		| { readonly hidden: true }
+		| { readonly generated: true }
 		? never
 		: K;
 }[keyof Tbl & string];
-
-export type InsertOrder<Tbl> =
-	TableOrder<Tbl> extends infer O extends readonly string[]
-		? WithoutGenerated<O, GeneratedKeys<Tbl>>
-		: [];
-type GeneratedKeys<Tbl> = {
-	[K in keyof Tbl & string]: Tbl[K] extends { readonly generated: true }
-		? Lowercase<K>
-		: never;
-}[keyof Tbl & string];
-type WithoutGenerated<O, G> = O extends readonly [
-	infer H extends string,
-	...infer R,
-]
-	? H extends G
-		? WithoutGenerated<R, G>
-		: [H, ...WithoutGenerated<R, G>]
-	: [];
-// Each column's name by its position, built once: walking it is one lookup
-// per column, where scanning every column for each position is quadratic.
-// A dropped column leaves a gap; the walk goes on while a position is left.
-type PositionMap<Tbl> = {
-	[K in keyof Tbl & string as Tbl[K] extends {
-		readonly i: infer I extends number;
-	}
-		? I
-		: never]: Lowercase<K>;
-};
-type ByIndex<
-	M,
-	N extends number,
-	Acc extends readonly string[],
-	Seen extends number = never,
-> = N extends keyof M
-	? ByIndex<M, Nx<N>, [...Acc, M[N] & string], Seen | N>
-	: [Exclude<keyof M, Seen>] extends [never]
-		? Acc
-		: ByIndex<M, Nx<N>, Acc, Seen>;
-export type LowerAll<L extends readonly unknown[]> = {
-	[I in keyof L]: Lowercase<L[I] & string>;
-};
 
 type RowidName<Tbl> = {
 	[K in keyof Tbl & string]: Tbl[K] extends { readonly rowid: true }
@@ -135,7 +96,7 @@ type TableItem<Tbl, Alias extends string, Rowid> = {
 	readonly alias: Alias;
 	readonly cols: TableCols<Tbl>;
 	readonly skip: [];
-	readonly order: TableOrder<Tbl>;
+	readonly order: ColumnOrder<Tbl, VisibleKeys<Tbl>>;
 	readonly rowid: Rowid;
 };
 
@@ -157,8 +118,14 @@ type BindDbTable<DB, Ref extends TableRef, Alias extends string | null> =
 				Alias extends string ? Alias : Ref["name"]
 			> extends infer It extends SqItem
 			? [It]
-			: SqlError<`no such table: ${RefDisplay<Ref>}`, null>
-		: SqlError<`no such table: ${RefDisplay<Ref>}`, null>;
+			: SqlError<
+					`no such table: ${RefDisplay<Ref>}`,
+					NamedAt<RefDisplay<Ref>, "table">
+				>
+		: SqlError<
+				`no such table: ${RefDisplay<Ref>}`,
+				NamedAt<RefDisplay<Ref>, "table">
+			>;
 
 type EntryItem<
 	E extends { readonly cols: unknown; readonly order: unknown },
@@ -169,14 +136,6 @@ type EntryItem<
 	readonly skip: [];
 	readonly order: E["order"];
 	readonly rowid: null;
-};
-
-export type CellsMap<C extends readonly Cell[]> = {
-	readonly [E in C[number] as Lowercase<E["n"]>]: SqColOf<
-		E["t"]["type"],
-		E["t"]["nullable"],
-		E["n"]
-	>;
 };
 
 export type UniqueCells<
@@ -209,7 +168,7 @@ type DerivedName<C extends Cell> = C extends {
 	? D
 	: C["n"];
 type Renamed<N extends string, Seen extends string, K extends number> =
-	Lowercase<`${N}:${K}`> extends Seen ? Renamed<N, Seen, Nx<K>> : `${N}:${K}`;
+	Lowercase<`${N}:${K}`> extends Seen ? Renamed<N, Seen, Next<K>> : `${N}:${K}`;
 
 export type CteEntry<C extends readonly Cell[]> =
 	UniqueCells<C> extends infer U extends readonly Cell[]
@@ -271,7 +230,7 @@ type BindFunc<
 					},
 				]
 		: SqlError<`too many arguments on ${Name}() - max 2`, null>
-	: SqlError<`no such table: ${Name}`, null>;
+	: SqlError<`no such table: ${Name}`, NamedAt<Name, "table">>;
 
 export type BindFrom<
 	F extends FromItem | null,
@@ -327,16 +286,6 @@ type JoinUsing<
 		? CheckUsing<F["using"], L, R>
 		: null;
 
-type LevelHas<L extends SqLevel, C extends string> = true extends {
-	[I in keyof L]: C extends keyof L[I]["cols"]
-		? C extends L[I]["skip"][number]
-			? false
-			: true
-		: false;
-}[number]
-	? true
-	: false;
-
 type CheckUsing<
 	U extends readonly string[],
 	L extends SqLevel,
@@ -344,73 +293,12 @@ type CheckUsing<
 	I extends number = 0,
 > = U[I] extends infer C extends string
 	? [LevelHas<L, C>, LevelHas<R, C>] extends [true, true]
-		? CheckUsing<U, L, R, Nx<I>>
+		? CheckUsing<U, L, R, Next<I>>
 		: SqlError<
 				`cannot join using column ${C} - column not present in both tables`,
 				null
 			>
 	: U;
-
-type NaturalCols<L extends SqLevel, R extends SqLevel> =
-	LevelNames<R> extends infer RN extends string
-		? FilterNames<LevelOrder<L>, RN>
-		: never;
-type LevelNames<L extends SqLevel> = {
-	[I in keyof L]: Exclude<L[I]["order"][number], L[I]["skip"][number]>;
-}[number];
-type LevelOrder<
-	L extends SqLevel,
-	I extends number = 0,
-	Acc extends readonly string[] = [],
-> = L[I] extends SqItem
-	? LevelOrder<
-			L,
-			Nx<I>,
-			[...Acc, ...WithoutSkip<L[I]["order"], L[I]["skip"][number]>]
-		>
-	: Acc;
-type WithoutSkip<O extends readonly string[], S> = O extends readonly [
-	infer H extends string,
-	...infer R extends readonly string[],
-]
-	? H extends S
-		? WithoutSkip<R, S>
-		: [H, ...WithoutSkip<R, S>]
-	: [];
-type FilterNames<O extends readonly string[], Keep> = O extends readonly [
-	infer H extends string,
-	...infer R extends readonly string[],
-]
-	? H extends Keep
-		? [H, ...FilterNames<R, Keep>]
-		: FilterNames<R, Keep>
-	: [];
-
-type NullItem<It extends SqItem> = {
-	readonly alias: It["alias"];
-	readonly cols: {
-		readonly [K in keyof It["cols"]]: SqColOf<
-			It["cols"][K]["type"],
-			true,
-			It["cols"][K]["n"]
-		>;
-	};
-	readonly skip: It["skip"];
-	readonly order: It["order"];
-	readonly rowid: It["rowid"];
-	readonly nullRowid: true;
-};
-export type NullLevel<L extends SqLevel> = {
-	readonly [I in keyof L]: NullItem<L[I]>;
-};
-
-type SkipIn<L extends SqLevel, U extends string> = {
-	readonly [I in keyof L]: {
-		readonly [P in keyof L[I]]: P extends "skip"
-			? [...L[I]["skip"], ...Extract<U, keyof L[I]["cols"]>[]]
-			: L[I][P];
-	};
-};
 
 type SubstIn<L extends SqLevel, M> = {
 	readonly [I in keyof L]: L[I] & { readonly subst: M };
@@ -468,9 +356,6 @@ type MergedUsing<
 	readonly order: [];
 	readonly rowid: null;
 };
-type LevelCol<L extends SqLevel, C extends string> = {
-	[I in keyof L]: C extends keyof L[I]["cols"] ? L[I]["cols"][C] : never;
-}[number];
 
 export type ResolveColumn<
 	S extends Scope,
@@ -482,36 +367,39 @@ export type ResolveColumn<
 	Disp extends string,
 	Aliases extends SqColMap = {},
 > = Ref["tbl"] extends string
-	? ResolveQualified<S, Ref["schema"], Ref["tbl"], Ref["name"], Disp>
-	: ResolveBare<S, Ref["name"], Disp, Aliases>;
+	? ResolveQualified<S, Ref["schema"], Ref["tbl"], Ref["name"], Disp, Disp>
+	: Ref extends { readonly quoted: true }
+		? ResolveBare<
+				S,
+				Ref["name"],
+				`"${Disp}" - should this be a string literal in single-quotes?`,
+				Aliases,
+				Disp,
+				null
+			>
+		: ResolveBare<S, Ref["name"], Disp, Aliases, Disp>;
 
 type ResolveBare<
 	S extends Scope,
 	Name extends string,
 	Disp extends string,
 	Aliases extends SqColMap,
+	/** The name as written, which errors point at. */
+	Raw extends string,
+	H extends HintKind = "column",
 > = S extends readonly [infer L extends SqLevel, ...infer Rest extends Scope]
 	? BareIn<L, Name> extends infer M
 		? [M] extends [never]
 			? Name extends RowidAlias
-				? RowidIn<L, Disp, Rest, Aliases, Name>
-				: ResolveBare<Rest, Name, Disp, Aliases>
+				? RowidIn<L, Disp, Rest, Aliases, Name, Raw, H>
+				: ResolveBare<Rest, Name, Disp, Aliases, Raw, H>
 			: IsUnion<M> extends true
-				? SqlError<`ambiguous column name: ${Disp}`, null>
+				? SqlError<`ambiguous column name: ${Disp}`, NamedAt<Raw>>
 				: M
 		: never
 	: Name extends keyof Aliases
 		? Aliases[Name]
-		: SqlError<`no such column: ${Disp}`, null>;
-
-type BareIn<L extends SqLevel, Name extends string> = {
-	[I in keyof L]: Name extends keyof L[I]["cols"]
-		? Name extends L[I]["skip"][number]
-			? never
-			: Tag<L[I]["cols"][Name], I>
-		: never;
-}[number];
-type Tag<C, I> = C & { readonly at: I };
+		: SqlError<`no such column: ${Disp}`, NamedAt<Raw, H>>;
 
 type RowidAlias = "rowid" | "oid" | "_rowid_";
 type RowidIn<
@@ -520,20 +408,23 @@ type RowidIn<
 	Rest extends Scope,
 	Aliases extends SqColMap,
 	Name extends string,
+	/** The name as written, which errors point at. */
+	Raw extends string,
+	H extends HintKind,
 > = {
 	[I in keyof L]: L[I]["rowid"] extends string
 		? RowidCol<L[I]> & { readonly at: I }
 		: never;
 }[number] extends infer M
 	? [M] extends [never]
-		? ResolveBare<Rest, Name, Disp, Aliases>
+		? ResolveBare<Rest, Name, Disp, Aliases, Raw, H>
 		: IsUnion<M> extends true
-			? SqlError<`ambiguous column name: ${Disp}`, null>
+			? SqlError<`ambiguous column name: ${Disp}`, NamedAt<Raw>>
 			: M
 	: never;
 type RowidCol<It extends SqItem> = {
 	readonly type: "integer";
-	readonly nullable: It extends { readonly nullRowid: true } ? true : false;
+	readonly nullable: It extends { readonly orig: unknown } ? true : false;
 	readonly n: It["rowid"] & string;
 };
 
@@ -543,31 +434,27 @@ type ResolveQualified<
 	Tbl extends string,
 	Name extends string,
 	Disp extends string,
+	/** The name as written, which errors point at. */
+	Raw extends string,
 > = S extends readonly [infer L extends SqLevel, ...infer Rest extends Scope]
 	? {
 			[I in keyof L]: L[I]["alias"] extends Tbl ? L[I] : never;
 		}[number] extends infer It
 		? [It] extends [never]
-			? ResolveQualified<Rest, Schema, Tbl, Name, Disp>
+			? ResolveQualified<Rest, Schema, Tbl, Name, Disp, Raw>
 			: IsUnion<It> extends true
-				? SqlError<`ambiguous column name: ${Disp}`, null>
+				? SqlError<`ambiguous column name: ${Disp}`, NamedAt<Raw>>
 				: It extends SqItem
 					? Name extends keyof It["cols"]
 						? It["cols"][Name]
 						: Name extends RowidAlias
 							? It["rowid"] extends string
 								? RowidCol<It>
-								: SqlError<`no such column: ${Disp}`, null>
-							: SqlError<`no such column: ${Disp}`, null>
+								: SqlError<`no such column: ${Disp}`, NamedAt<Raw, "column">>
+							: SqlError<`no such column: ${Disp}`, NamedAt<Raw, "column">>
 					: never
 		: never
-	: SqlError<`no such column: ${Disp}`, null>;
-
-type IsUnion<T, U = T> = T extends unknown
-	? [U] extends [T]
-		? false
-		: true
-	: never;
+	: SqlError<`no such column: ${Disp}`, NamedAt<Raw, "column">>;
 
 export type StarCells<
 	L extends SqLevel,
@@ -577,7 +464,7 @@ export type StarCells<
 			[I in keyof L]: L[I]["alias"] extends Tbl ? L[I] : never;
 		}[number] extends infer It
 		? [It] extends [never]
-			? SqlError<`no such table: ${Tbl}`, null>
+			? SqlError<`no such table: ${Tbl}`, NamedAt<Tbl, "table">>
 			: IsUnion<It> extends true
 				? AmbiguousStar<Tbl, It>
 				: It extends SqItem
@@ -597,76 +484,15 @@ type DupAlias<L extends SqLevel, I extends number, Seen> = L[I] extends SqItem
 	? L[I]["alias"] extends string
 		? L[I]["alias"] extends Seen
 			? L[I]["alias"]
-			: DupAlias<L, Nx<I>, Seen | L[I]["alias"]>
-		: DupAlias<L, Nx<I>, Seen>
+			: DupAlias<L, Next<I>, Seen | L[I]["alias"]>
+		: DupAlias<L, Next<I>, Seen>
 	: null;
-type AmbiguousStar<Tbl extends string, It> = SqlError<
-	`ambiguous column name: main.${Tbl}.${It extends SqItem
+type AmbiguousStar<Tbl extends string, It> = (
+	It extends SqItem
 		? It["order"][0] extends infer C extends keyof It["cols"]
 			? It["cols"][C]["n"]
 			: ""
-		: ""}`,
-	null
->;
-
-type AllCells<
-	L extends SqLevel,
-	I extends number,
-	Acc extends readonly Cell[],
-> = L[I] extends SqItem
-	? AllCells<
-			L,
-			Nx<I>,
-			[...Acc, ...ItemCells<L[I], L[I]["order"], L[I]["skip"][number]>]
-		>
-	: Acc;
-type ItemCells<
-	It extends SqItem,
-	O extends readonly string[],
-	Skip,
-	Acc extends readonly Cell[] = [],
-> = O extends readonly [
-	infer H extends string,
-	...infer R extends readonly string[],
-]
-	? H extends Skip
-		? (
-				It extends { readonly subst: infer S }
-					? H extends keyof S
-						? S[H]
-						: null
-					: null
-			) extends {
-				readonly type: infer T extends string;
-				readonly nullable: infer N extends boolean;
-				readonly n: infer D extends string;
-			}
-			? ItemCells<
-					It,
-					R,
-					Skip,
-					[
-						...Acc,
-						{
-							readonly n: D;
-							readonly t: { readonly type: T; readonly nullable: N };
-						},
-					]
-				>
-			: ItemCells<It, R, Skip, Acc>
-		: ItemCells<
-				It,
-				R,
-				Skip,
-				[
-					...Acc,
-					{
-						readonly n: It["cols"][H]["n"];
-						readonly t: {
-							readonly type: It["cols"][H]["type"];
-							readonly nullable: It["cols"][H]["nullable"];
-						};
-					},
-				]
-			>
-	: Acc;
+		: ""
+) extends infer C extends string
+	? SqlError<`ambiguous column name: main.${Tbl}.${C}`, NamedAt<C>>
+	: never;

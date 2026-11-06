@@ -6,20 +6,33 @@ import type {
 	Type,
 } from "typescript/async";
 import {
-	type Dialect,
+	calleeOf,
 	dialectOf,
 	type EditorKinds,
 	isCall,
-	isCoreRef,
 	isIdentifier,
-	isMySql,
 	isPropertyAccess,
 	isSqlLiteral,
+	sqlTypeOf,
 	textOf,
-} from "../complete/call.js";
-import { lex, type TokenKind } from "./lex.js";
+} from "../call.js";
+import { DIALECTS, type Dialect, type DialectFacts } from "../sql/dialect.js";
+import { lex } from "../sql/lex.js";
+import { GRAMMAR } from "./grammar.js";
 
-export type { TokenKind } from "./lex.js";
+export type TokenKind =
+	| "keyword"
+	| "constant"
+	| "type"
+	| "function"
+	| "number"
+	| "string"
+	| "escape"
+	| "comment"
+	| "operator"
+	| "parameter"
+	| "variable"
+	| "punctuation";
 
 /** A run of one kind on one line, in UTF-16 code units. */
 export interface Highlight {
@@ -29,31 +42,8 @@ export interface Highlight {
 	readonly kind: TokenKind;
 }
 
-// Types whose call takes SQL, and methods that take SQL on them.
-const CALLABLE = [
-	"Sql",
-	"TransactionalSql",
-	"MariaDbSql",
-	"MariaDbTransactionalSql",
-	"SqlApi",
-	"MigrationContext",
-];
-const METHODS = new Map<string, readonly string[]>([
-	["as", CALLABLE],
-	["fragment", CALLABLE],
-	["prepare", CALLABLE],
-	["raw", CALLABLE],
-	["ddl", ["MigrationContext"]],
-	["add", ["MigrationContext", "Migrations"]],
-]);
-
-// What the VS Code grammar colors without types, so its colors are kept for
-// TypeSQL calls and undone for others: calls of sql, tx and names ending in
-// Sql, SQL or _sql, their .fragment() and .as(), and .ddl(), .add() and .raw()
-// of a string that starts like a statement.
-const NAME = /^(?:sql|tx|[A-Za-z_$][\w$]*(?:Sql|SQL|_sql))$/;
-const STATEMENT_WORDS =
-	"alter|analyze|attach|begin|call|cluster|comment|commit|copy|create|delete|describe|detach|do|drop|explain|grant|import|insert|listen|lock|merge|notify|pragma|reassign|refresh|reindex|release|rename|replace|reset|revoke|rollback|savepoint|security|select|set|show|table|truncate|unlisten|update|vacuum|values|with";
+const NAME = new RegExp(`^${GRAMMAR.name}$`);
+const STATEMENT_WORDS = GRAMMAR.statementWords.join("|");
 const STATEMENT = new RegExp(
 	`^\\s*(?:--|/\\*|\\(|(?:${STATEMENT_WORDS})(?=[\\s;(]|$))`,
 	"i",
@@ -64,22 +54,25 @@ const STATEMENT_ANY = new RegExp(
 	"i",
 );
 const MARKER = /\/\*\s*sql\s*\*\//i;
+const NAME_METHODS: ReadonlySet<string> = new Set(GRAMMAR.nameMethods);
+const STATEMENT_METHODS: ReadonlySet<string> = new Set(
+	GRAMMAR.statementMethods,
+);
 
 interface Candidate {
 	readonly literal: Node;
-	/** The node whose type decides, and the type names that make it SQL. */
+	/** The node whose type decides, and the method called on it. */
 	readonly target: Node;
-	readonly types: readonly string[];
+	readonly method: string | null;
 	readonly grammar: boolean;
 }
 
 /**
  * Highlights for the first-argument strings of calls in `document`: SQL tokens
- * where a TypeSQL call's string isn't colored by the grammar, and `string`
- * where the grammar colors another function's string as SQL. MySQL and MariaDB
- * strings always get SQL tokens, since the grammar reads PostgreSQL: there
- * "…" is a string, not a name, and # starts a comment. Strings after a
- * `/* sql *\/` marker are left to the grammar.
+ * where a TypeSQL call's string isn't colored by the grammar or the grammar
+ * reads its dialect wrong, and `string` where the grammar colors another
+ * function's string as SQL. Strings after a `/* sql *\/` marker are left to
+ * the grammar.
  */
 export async function highlightsIn(
 	program: Program,
@@ -95,50 +88,104 @@ export async function highlightsIn(
 	const types = await checker.getTypeAtLocation(
 		candidates.map((c) => c.target),
 	);
-	const verdicts = new Map<string, Promise<boolean>>();
-	const isSql = (t: Type, names: readonly string[]): Promise<boolean> => {
-		const key = `${t.id} ${names.join()}`;
-		const known = verdicts.get(key);
-		if (known) return known;
-		const v = isCoreRef(t, names, isCorePath);
-		verdicts.set(key, v);
-		return v;
+	const dialects = new Map<string, Promise<Dialect | null>>();
+	const dialectFor = (t: Type, method: string | null) => {
+		const key = `${t.id} ${method}`;
+		let d = dialects.get(key);
+		if (!d) {
+			d = sqlTypeOf(t, method, isCorePath).then((entry) =>
+				entry ? dialectOf(checker, t, entry) : null,
+			);
+			dialects.set(key, d);
+		}
+		return d;
 	};
-	const sql = await Promise.all(
-		candidates.map((c, i) => isSql(types[i]!, c.types)),
-	);
-	const dialectsOf = new Map<number, Promise<Dialect>>();
-	const dialects = await Promise.all(
-		candidates.map((_, i): Promise<Dialect> | Dialect => {
-			const t = types[i]!;
-			if (!sql[i]) return "postgres";
-			let d = dialectsOf.get(t.id);
-			if (!d) {
-				d = dialectOf(checker, t);
-				dialectsOf.set(t.id, d);
-			}
-			return d;
-		}),
+	const found = await Promise.all(
+		candidates.map((c, i) => dialectFor(types[i]!, c.method)),
 	);
 	const lines = lineStarts(file.text);
 	const out: Highlight[] = [];
 	candidates.forEach((c, i) => {
-		const dialect = dialects[i]!;
-		if (sql[i] === c.grammar && !(sql[i] && isMySql(dialect))) return;
-		const parts = textOf(file, c.literal, kinds, dialect);
-		const spans: [number, number, TokenKind][] = sql[i]
-			? lex(parts.text, dialect).map((t) => [
-					parts.start + t.start,
-					parts.start + t.end,
-					t.kind,
+		const dialect = found[i];
+		const d = dialect ? DIALECTS[dialect] : null;
+		if (d ? c.grammar && d.grammarColors : !c.grammar) return;
+		const sql = textOf(file, c.literal, kinds);
+		const spans: [number, number, TokenKind][] = d
+			? tokensOf(sql.text, d).map(([s, e, kind]) => [
+					sql.start + s,
+					sql.start + e,
+					kind,
 				])
-			: [[parts.start, parts.end, "string"]];
+			: [[sql.start, sql.end, "string"]];
 		for (const [start, end, kind] of spans)
-			for (const [s, e] of outside(start, end, parts.holes))
+			for (const [s, e] of outside(start, end, sql.holes))
 				split(file.text, lines, s, e, kind, out);
 	});
 	return out.sort((a, b) => a.line - b.line || a.character - b.character);
 }
+
+/** The highlight of each token, with adjacent punctuation joined. */
+function tokensOf(
+	text: string,
+	d: DialectFacts,
+): [number, number, TokenKind][] {
+	const out: [number, number, TokenKind][] = [];
+	const push = (start: number, end: number, kind: TokenKind): void => {
+		if (end <= start) return;
+		const last = out.at(-1);
+		if (kind === "punctuation" && last?.[2] === kind && last[1] === start)
+			last[1] = end;
+		else out.push([start, end, kind]);
+	};
+	let afterCast = false;
+	for (const t of lex(text, d.lexis)) {
+		const cast = afterCast;
+		afterCast = t.kind === "cast";
+		switch (t.kind) {
+			case "word": {
+				const word = text.slice(t.start, t.end).toLowerCase();
+				push(
+					t.start,
+					t.end,
+					cast || d.types.has(word)
+						? "type"
+						: CONSTANT.has(word)
+							? "constant"
+							: d.keywords.has(word)
+								? "keyword"
+								: text[t.end] === "("
+									? "function"
+									: "variable",
+				);
+				break;
+			}
+			case "string": {
+				let from = t.start;
+				for (const [s, e] of t.escapes ?? []) {
+					push(from, s, "string");
+					push(s, e, "escape");
+					from = e;
+				}
+				push(from, t.end, "string");
+				break;
+			}
+			case "quoted":
+				push(t.start, t.end, "variable");
+				break;
+			case "hole":
+				push(t.start, t.end, "parameter");
+				break;
+			case "cast":
+				push(t.start, t.end, "operator");
+				break;
+			default:
+				push(t.start, t.end, t.kind);
+		}
+	}
+	return out;
+}
+
+const CONSTANT: ReadonlySet<string> = new Set(GRAMMAR.constants);
 
 function collect(file: SourceFile, kinds: EditorKinds): Candidate[] {
 	const out: Candidate[] = [];
@@ -167,7 +214,6 @@ function candidate(
 	const firstLine = body.slice(0, body.search(/\n|$/));
 	const callee = call.expression;
 	const member = isPropertyAccess(callee, kinds) ? callee : null;
-	const methodTypes = member ? METHODS.get(member.name.text) : undefined;
 	const nameOf = (n: Node): string | null =>
 		isIdentifier(n, kinds)
 			? n.text
@@ -178,30 +224,18 @@ function candidate(
 	const grammar =
 		(name !== null && NAME.test(name)) ||
 		(!!member &&
-			(member.name.text === "fragment" || member.name.text === "as") &&
+			NAME_METHODS.has(member.name.text) &&
 			NAME.test(nameOf(member.expression) ?? "")) ||
 		(!!member &&
-			(member.name.text === "ddl" ||
-				member.name.text === "add" ||
-				member.name.text === "raw") &&
+			STATEMENT_METHODS.has(member.name.text) &&
 			(STATEMENT.test(firstLine) ||
 				(src[open] === "`" && /^\s*$/.test(firstLine))));
-	// A call that the grammar leaves alone needs a type only if it could be a
-	// TypeSQL call: a method that takes SQL, or a string that starts like a
-	// statement, past any blank lines.
-	if (!grammar && !methodTypes && !STATEMENT_ANY.test(body.trimStart()))
+	const { node, method } = calleeOf(call, kinds);
+	if (!grammar && method === null && !STATEMENT_ANY.test(body.trimStart()))
 		return null;
-	return member && methodTypes
-		? {
-				literal,
-				target: member.expression,
-				types: methodTypes,
-				grammar,
-			}
-		: { literal, target: callee, types: CALLABLE, grammar };
+	return { literal, target: node, method, grammar };
 }
 
-// The parts of [start, end) outside the template literal's `${…}` holes.
 function outside(
 	start: number,
 	end: number,

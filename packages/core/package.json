@@ -1,7 +1,7 @@
 {
 	"name": "@typesql/core",
 	"version": "7.0.1",
-	"description": "Type-level SQL inference for TypeScript: PostgreSQL, SQLite, MySQL and MariaDB. Zero runtime dependencies.",
+	"description": "Type-level SQL inference for TypeScript: PostgreSQL, SQLite, MySQL and MariaDB. Tiny (under 3 kB) with zero runtime dependencies.",
 	"license": "MIT",
 	"repository": {
 		"type": "git",
@@ -52,6 +52,10 @@
 		"./plugins": {
 			"types": "./dist/plugins/index.d.ts",
 			"default": "./dist/plugins/index.js"
+		},
+		"./reserved": {
+			"types": "./dist/reserved.d.ts",
+			"default": "./dist/reserved.js"
 		}
 	},
 	"files": [
@@ -68,11 +72,15 @@
 		"typecheck": "tsrs -p tsconfig.json --noEmit"
 	},
 	"peerDependencies": {
+		"mariadb": ">=3",
 		"mysql2": ">=3",
 		"pg": ">=8",
 		"typescript": ">=7.1.0-0"
 	},
 	"peerDependenciesMeta": {
+		"mariadb": {
+			"optional": true
+		},
 		"mysql2": {
 			"optional": true
 		},

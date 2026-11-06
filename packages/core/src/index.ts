@@ -1,15 +1,18 @@
 export { type CreateSql, createSql } from "./create-sql.js";
 export type {
+	AnyDialectBrand,
 	ApplyDdlOf,
+	DIALECT,
 	Dialect,
+	DialectBrand,
 	DialectTypes,
 	SqlOf,
 	TransactionalSqlOf,
 	ValidateDdlOf,
 } from "./dialect.js";
-export type { Empty, EmptyFragment, Optional } from "./empty.js";
+export type { Empty } from "./empty.js";
 export type { AnyErr, ErrAt, ErrMsg, IsErr, SqlError } from "./errors.js";
-export type { SchemaOf } from "./migration/define.js";
+export type { SchemaOf } from "./migration/schema.js";
 export type {
 	IdentityPluginTypes,
 	InputContext,
@@ -38,7 +41,6 @@ export {
 	type TEXT,
 	type TextType,
 } from "./query.js";
-
 export type {
 	Col,
 	ColDesc,
@@ -50,4 +52,5 @@ export type {
 	TypeRegistry,
 	View,
 } from "./schema.js";
+export type { EmptyFragment, Optional } from "./sql/api.js";
 export type { SqlDriver, Transactional } from "./transaction.js";

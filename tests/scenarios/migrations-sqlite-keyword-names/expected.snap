@@ -1,0 +1,22 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`migrations-sqlite-keyword-names > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {},
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "typesql: migration 2 (002-commit) failed: migrations cannot control transactions; each migration runs in its own transaction
+applied 002-trigger
+",
+  },
+}
+`;

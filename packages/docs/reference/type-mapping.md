@@ -6,7 +6,7 @@ description: "How TypeSQL maps PostgreSQL, SQLite, MySQL and MariaDB types to Ty
 
 Your schema uses the database's type names (in PostgreSQL, `int8`, `timestamptz`). A **type map** says which TypeScript type each one becomes. This page lists the maps for each driver, what parameters accept, and how to write your own map.
 
-Each adapter's `createSql` picks the map that matches its driver. `createSql` from `@typesql/core` with the `postgres` dialect uses `DefaultTypeMap`, which matches node-postgres.
+Each adapter's `createSql` picks the map that matches its driver. `createSql` from `@typesql/core` with the `postgres` dialect uses `DefaultTypeMap`, which matches node-postgres. A migration's `db` reads rows as the migrator's own connection returns them: `NodePostgresTypeMap` (node-postgres, with `bytea` as `Uint8Array`), mysql2's `DefaultTypeMap` and `Mysql2MariaDbTypeMap`, and SQLite's `DefaultTypeMap`.
 
 ## At a glance
 
@@ -32,7 +32,7 @@ The common types under each driver's default parsers:
 
 Kysely and Drizzle run on one of these two drivers. With Kysely's `PostgresDialect` (node-postgres), pass `PgTypeMap` for the exact `pg` types. With `drizzle-orm/postgres-js`, pass `PostgresJsTypeMap` (`interval` is a string there); `@typesql/drizzle` parses dates back to `Date` on that driver. See [From Kysely, Drizzle or Prisma](../guide/orms).
 
-A `json` / `jsonb` value with a known shape ([`Json<T>` columns](../guide/schema#typed-json-columns), JSON built in SQL) is typed from that shape, unless the map reads the type as a `string`.
+A `json` / `jsonb` value with a known shape ([`Json<T>` columns](../guide/schema#typed-json-columns), JSON built in SQL) is typed from that shape, unless the map reads the type as a `string`: then it is that text. This holds on every database: SQLite's maps read JSON as text, and so does a MySQL map with `json: string` for mysql2's `jsonStrings`. A parameter for it takes the same type, where the parameter map allows: on MySQL and MariaDB, whose drivers bind no objects, a JSON parameter takes JSON text or `sql.json(value)`.
 
 ## node-postgres
 
@@ -57,7 +57,7 @@ A `json` / `jsonb` value with a known shape ([`Json<T>` columns](../guide/schema
 Arrays are mapped element by element (`T[]` becomes the element's type `[]`), which is right for every array type `pg-types` registers. Two cases differ at runtime under the default map; exact array entries in a custom map can describe them:
 
 - `numeric[]` is parsed with `parseFloat`, so it is `number[]` at runtime but typed `string[]`.
-- Array types without a registered parser come back as the raw `{…}` string: `name[]`, `"char"[]`, `xml[]`, `bit[]`, `varbit[]`, `tsvector[]`, `tsquery[]`, `circle[]`, `line[]`, `lseg[]`, `box[]`, `path[]`, `polygon[]`, `int4range[]`, `int8range[]`, `tsrange[]`, `tstzrange[]`, `daterange[]`, `macaddr8[]`, `regclass[]`, `record[]`.
+- Array types without a registered parser come back as the raw `{…}` string: `name[]`, `"char"[]`, `xml[]`, `bit[]`, `varbit[]`, `tsvector[]`, `tsquery[]`, `circle[]`, `line[]`, `lseg[]`, `box[]`, `path[]`, `polygon[]`, `int4range[]`, `int8range[]`, `tsrange[]`, `tstzrange[]`, `daterange[]`, `macaddr8[]`, `regclass[]`, `regconfig[]`, `jsonpath[]`, `refcursor[]`, `pg_snapshot[]`, `txid_snapshot[]`, `record[]`.
 
 Arrays of user-defined and extension types (enums, domains, `citext`) have no parser in `pg-types` either. `@typesql/pg`, and `@typesql/drizzle` on node-postgres, parse them: the first time a result has such a column, they look up in `pg_type` which of its types are arrays (once per pool or client), then parse the `{…}` text with the element's base type (numbers for `int2`/`int4`/`oid`/`float4`/`float8` domains, booleans for `bool`, strings otherwise). Kysely and Prisma on node-postgres don't expose the result's column types, so there these arrays stay raw `{…}` strings, although they are typed as arrays; cast them in SQL (`moods::text[]`) to get an array.
 

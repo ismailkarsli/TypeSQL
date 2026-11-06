@@ -1,4 +1,7 @@
-import type { Position } from "./session.js";
+export interface Position {
+	readonly line: number;
+	readonly character: number;
+}
 
 // A call whose first argument is a string, optionally after comments such as
 // the `/* sql */` marker.

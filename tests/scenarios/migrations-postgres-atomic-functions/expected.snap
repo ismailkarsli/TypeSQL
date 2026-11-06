@@ -1,0 +1,29 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`migrations-postgres-atomic-functions > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {},
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "[ { two: 2 } ]
+typesql: migration 2 (002-commit-after-atomic) failed: migrations cannot control transactions; each migration runs in its own transaction
+typesql: migration 2 (002-commit-after-quoted) failed: migrations cannot control transactions; each migration runs in its own transaction
+typesql: migration 2 (002-bare-begin) failed: migrations cannot control transactions; each migration runs in its own transaction
+typesql: migration 2 (002-commit-after-parameter) failed: migrations cannot control transactions; each migration runs in its own transaction
+typesql: migration 2 (002-commit-after-name) failed: migrations cannot control transactions; each migration runs in its own transaction
+typesql: migration 2 (002-commit-after-alias) failed: migrations cannot control transactions; each migration runs in its own transaction
+typesql: migration 2 (002-commit-after-locking) failed: migrations cannot control transactions; each migration runs in its own transaction
+applied
+",
+  },
+}
+`;

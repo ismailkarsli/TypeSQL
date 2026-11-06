@@ -1,0 +1,22 @@
+{
+	"name": "dollar-identifiers",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"start": "node dist/app.js"
+	},
+	"dependencies": {
+		"@typesql/core": "workspace:*",
+		"@typesql/pg": "workspace:*",
+		"@typesql/sqlite": "workspace:*",
+		"pg": "catalog:",
+		"@types/pg": "catalog:"
+	},
+	"devDependencies": {
+		"typescript": "catalog:",
+		"@types/node": "catalog:"
+	},
+	"scenario": {
+		"database": "postgres"
+	}
+}

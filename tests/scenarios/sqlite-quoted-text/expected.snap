@@ -1,0 +1,43 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`sqlite-quoted-text > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "backticks": "{ "a:b": number; y: null | number }",
+      "blockComment": "{ y: null | number }",
+      "brackets": "{ "c:d": number; "it's": number; y: null | number }",
+      "combined": "{ "$1 a": null | number; "$1 b": null | number }",
+      "jsonArray": "{ "c:d": number; n: null | number }",
+      "quotedDollar": "{ $2: number; a: null | number }",
+      "row": "{ first: number; "a:b": number; "c:d": number; $1: number; last: number }",
+    },
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "[Object: null prototype] {
+  first: 10,
+  'a:b': 1,
+  'c:d': 2,
+  '$1': 3,
+  last: 20
+}
+{
+  backticks: [Object: null prototype] { 'a:b': 1, y: 2 },
+  brackets: [Object: null prototype] { 'c:d': 2, "it's": 3, y: 2 },
+  blockComment: [Object: null prototype] { y: 2 },
+  quotedDollar: [Object: null prototype] { '$2': 1, a: 10 },
+  combined: [Object: null prototype] { '$1 a': 1, '$1 b': 2 },
+  jsonArray: [Object: null prototype] { n: 2, 'c:d': 3 }
+}
+",
+  },
+}
+`;

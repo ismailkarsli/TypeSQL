@@ -1,5 +1,12 @@
-import type { NameOf } from "../tokens.js";
-import type { Expect, IsOp, IsWord, Nx, Ok, SyntaxErr, Toks } from "./util.js";
+import type { NameOf } from "../../../engine/family/lex.js";
+import type {
+	Expect,
+	IsOp,
+	IsWord,
+	SyntaxErr,
+} from "../../../engine/family/parse.js";
+import type { Next } from "../../../engine/next.js";
+import type { Ok, Toks } from "../../../engine/tokens.js";
 
 /**
  * A column type in `CREATE TABLE`, normalized to the name TypeSQL types it by:
@@ -41,40 +48,43 @@ type TypeWords<T extends Toks, I extends number> = T[I] extends {
 	readonly v: infer W extends string;
 }
 	? W extends "double"
-		? IsWord<T, Nx<I>, "precision"> extends true
-			? ["double", Nx<Nx<I>>]
-			: ["double", Nx<I>]
+		? IsWord<T, Next<I>, "precision"> extends true
+			? ["double", Next<Next<I>>]
+			: ["double", Next<I>]
 		: W extends "character" | "char"
-			? IsWord<T, Nx<I>, "varying"> extends true
-				? ["varchar", Nx<Nx<I>>]
-				: [W, Nx<I>]
+			? IsWord<T, Next<I>, "varying"> extends true
+				? ["varchar", Next<Next<I>>]
+				: [W, Next<I>]
 			: W extends "national"
-				? T[Nx<I>] extends {
+				? T[Next<I>] extends {
 						readonly k: "w";
 						readonly v: infer W2 extends "char" | "character" | "varchar";
 					}
-					? IsWord<T, Nx<Nx<I>>, "varying"> extends true
-						? ["varchar", Nx<Nx<Nx<I>>>]
-						: [W2, Nx<Nx<I>>]
-					: [W, Nx<I>]
+					? IsWord<T, Next<Next<I>>, "varying"> extends true
+						? ["varchar", Next<Next<Next<I>>>]
+						: [W2, Next<Next<I>>]
+					: [W, Next<I>]
 				: W extends "nchar"
-					? IsWord<T, Nx<I>, "varying" | "varchar"> extends true
-						? ["varchar", Nx<Nx<I>>]
-						: ["char", Nx<I>]
+					? IsWord<T, Next<I>, "varying" | "varchar"> extends true
+						? ["varchar", Next<Next<I>>]
+						: ["char", Next<I>]
 					: W extends "long"
-						? T[Nx<I>] extends {
+						? T[Next<I>] extends {
 								readonly k: "w";
 								readonly v: infer W2 extends "varchar" | "varbinary";
 							}
-							? [W2 extends "varchar" ? "mediumtext" : "mediumblob", Nx<Nx<I>>]
-							: IsWord<T, Nx<I>, "char"> extends true
-								? IsWord<T, Nx<Nx<I>>, "varying"> extends true
-									? ["mediumtext", Nx<Nx<Nx<I>>>]
-									: ["mediumtext", Nx<Nx<I>>]
-								: ["mediumtext", Nx<I>]
-						: [W, Nx<I>]
+							? [
+									W2 extends "varchar" ? "mediumtext" : "mediumblob",
+									Next<Next<I>>,
+								]
+							: IsWord<T, Next<I>, "char"> extends true
+								? IsWord<T, Next<Next<I>>, "varying"> extends true
+									? ["mediumtext", Next<Next<Next<I>>>]
+									: ["mediumtext", Next<Next<I>>]
+								: ["mediumtext", Next<I>]
+						: [W, Next<I>]
 	: T[I] extends { readonly k: "id" }
-		? [Lowercase<NameOf<T[I]> & string>, Nx<I>]
+		? [Lowercase<NameOf<T[I]> & string>, Next<I>]
 		: null;
 
 type Canon<W extends string> = W extends
@@ -151,24 +161,24 @@ type Canon<W extends string> = W extends
 
 type TypeArgs<T extends Toks, I extends number> =
 	IsOp<T, I, "("> extends true
-		? T[Nx<I>] extends { readonly k: "n"; readonly v: infer A extends string }
-			? IsOp<T, Nx<Nx<I>>, ","> extends true
-				? T[Nx<Nx<Nx<I>>>] extends {
+		? T[Next<I>] extends { readonly k: "n"; readonly v: infer A extends string }
+			? IsOp<T, Next<Next<I>>, ","> extends true
+				? T[Next<Next<Next<I>>>] extends {
 						readonly k: "n";
 						readonly v: infer B extends string;
 					}
-					? Expect<T, Nx<Nx<Nx<Nx<I>>>>, ")"> extends infer J
+					? Expect<T, Next<Next<Next<Next<I>>>>, ")"> extends infer J
 						? J extends number
 							? Ok<[A, B], J>
 							: J
 						: never
-					: SyntaxErr<T, Nx<Nx<Nx<I>>>>
-				: Expect<T, Nx<Nx<I>>, ")"> extends infer J
+					: SyntaxErr<T, Next<Next<Next<I>>>>
+				: Expect<T, Next<Next<I>>, ")"> extends infer J
 					? J extends number
 						? Ok<[A], J>
 						: J
 					: never
-			: SyntaxErr<T, Nx<I>>
+			: SyntaxErr<T, Next<I>>
 		: Ok<[], I>;
 
 type Modifiers<
@@ -177,9 +187,9 @@ type Modifiers<
 	U extends boolean,
 > = T[I] extends { readonly k: "w"; readonly v: infer W extends string }
 	? W extends "unsigned"
-		? Modifiers<T, Nx<I>, true>
+		? Modifiers<T, Next<I>, true>
 		: W extends "signed" | "zerofill"
-			? Modifiers<T, Nx<I>, U>
+			? Modifiers<T, Next<I>, U>
 			: [U, I]
 	: [U, I];
 
@@ -201,16 +211,18 @@ type Final<
 
 /** `ENUM('a', 'b')` and `SET('a', 'b')`: the values, joined by `\u0000`. */
 type EnumValues<T extends Toks, I extends number, C extends string> =
-	IsOp<T, I, "("> extends true ? EnumLoop<T, Nx<I>, C, never> : SyntaxErr<T, I>;
+	IsOp<T, I, "("> extends true
+		? EnumLoop<T, Next<I>, C, never>
+		: SyntaxErr<T, I>;
 type EnumLoop<
 	T extends Toks,
 	I extends number,
 	C extends string,
 	Acc extends string,
 > = T[I] extends { readonly k: "s"; readonly v: infer V extends string }
-	? IsOp<T, Nx<I>, ","> extends true
-		? EnumLoop<T, Nx<Nx<I>>, C, Acc | V>
-		: Expect<T, Nx<I>, ")"> extends infer J
+	? IsOp<T, Next<I>, ","> extends true
+		? EnumLoop<T, Next<Next<I>>, C, Acc | V>
+		: Expect<T, Next<I>, ")"> extends infer J
 			? J extends number
 				? Ok<{ type: C; enumValues: Acc | V }, J>
 				: J
@@ -224,25 +236,25 @@ export type ParseCastType<T extends Toks, I extends number> = T[I] extends {
 }
 	? W extends "signed" | "unsigned"
 		? (
-				IsWord<T, Nx<I>, "integer" | "int"> extends true
-					? Nx<Nx<I>>
-					: Nx<I>
+				IsWord<T, Next<I>, "integer" | "int"> extends true
+					? Next<Next<I>>
+					: Next<I>
 			) extends infer J extends number
 			? Ok<W extends "signed" ? "bigint" : "bigint unsigned", J>
 			: never
 		: W extends "integer" | "int"
-			? Ok<"bigint", Nx<I>>
+			? Ok<"bigint", Next<I>>
 			: W extends "char" | "nchar" | "varchar" | "character" | "national"
 				? CastLength<
 						T,
-						W extends "national" ? Nx<Nx<I>> : Nx<I>
+						W extends "national" ? Next<Next<I>> : Next<I>
 					> extends infer J
 					? J extends number
 						? Ok<"varchar", SkipCharset<T, J>>
 						: J
 					: never
 				: W extends "binary" | "varbinary"
-					? CastLength<T, Nx<I>> extends infer J
+					? CastLength<T, Next<I>> extends infer J
 						? J extends number
 							? Ok<"varbinary", J>
 							: J
@@ -258,11 +270,11 @@ export type ParseCastType<T extends Toks, I extends number> = T[I] extends {
 								| "json"
 								| "year"
 								| "dec"
-						? CastArgs<T, Nx<I>> extends infer J
+						? CastArgs<T, Next<I>> extends infer J
 							? J extends number
 								? Ok<
-										CastOf<W, T, Nx<I>>,
-										IsWord<T, J, "precision"> extends true ? Nx<J> : J
+										CastOf<W, T, Next<I>>,
+										IsWord<T, J, "precision"> extends true ? Next<J> : J
 									>
 								: J
 							: never
@@ -276,7 +288,7 @@ type CastOf<W extends string, T extends Toks, I extends number> = W extends
 		? "decimal"
 		: W extends "float"
 			? IsOp<T, I, "("> extends true
-				? T[Nx<I>] extends {
+				? T[Next<I>] extends {
 						readonly v: `${"25" | "26" | "27" | "28" | "29" | "3" | "4" | "5"}${string}`;
 					}
 					? "double"
@@ -285,9 +297,9 @@ type CastOf<W extends string, T extends Toks, I extends number> = W extends
 			: W;
 type CastLength<T extends Toks, I extends number> =
 	IsOp<T, I, "("> extends true
-		? T[Nx<I>] extends { readonly k: "n" }
-			? Expect<T, Nx<Nx<I>>, ")">
-			: SyntaxErr<T, Nx<I>>
+		? T[Next<I>] extends { readonly k: "n" }
+			? Expect<T, Next<Next<I>>, ")">
+			: SyntaxErr<T, Next<I>>
 		: I;
 type CastArgs<T extends Toks, I extends number> =
 	TypeArgs<T, I> extends infer A
@@ -297,11 +309,11 @@ type CastArgs<T extends Toks, I extends number> =
 		: never;
 type SkipCharset<T extends Toks, I extends number> =
 	IsWord<T, I, "character"> extends true
-		? IsWord<T, Nx<I>, "set"> extends true
-			? Nx<Nx<Nx<I>>>
+		? IsWord<T, Next<I>, "set"> extends true
+			? Next<Next<Next<I>>>
 			: I
 		: IsWord<T, I, "charset"> extends true
-			? Nx<Nx<I>>
+			? Next<Next<I>>
 			: IsWord<T, I, "ascii" | "unicode" | "binary"> extends true
-				? Nx<I>
+				? Next<I>
 				: I;

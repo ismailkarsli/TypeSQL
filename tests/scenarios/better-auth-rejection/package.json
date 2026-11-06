@@ -2,9 +2,6 @@
 	"name": "better-auth-rejection",
 	"private": true,
 	"type": "module",
-	"scripts": {
-		"compile": "tsc -p tsconfig.json --pretty false"
-	},
 	"dependencies": {
 		"@typesql/core": "workspace:*",
 		"@typesql/better-auth": "workspace:*",

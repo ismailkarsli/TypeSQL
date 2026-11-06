@@ -43,7 +43,10 @@ const rows = await sql(
 | Extra step | `prisma generate --sql` after each query change | none |
 | Nullability | what the database reports | worked out from the SQL (`LEFT JOIN`, `WHERE x IS NOT NULL`, `COALESCE`) |
 | Dynamic queries | each file is one fixed statement | [fragments](../guide/using-sql#dynamic-sql) |
+| Runtime size (minified and gzipped) | Prisma Client: about 66 kB of JavaScript, plus a WebAssembly query compiler of 0.7 to 1.1 MB | `@typesql/core` is tiny (under 3 kB); under 5 kB with `@typesql/pg` |
 | Databases | PostgreSQL, MySQL, SQLite and others Prisma supports | PostgreSQL, SQLite, MySQL and MariaDB |
+
+Sizes are for Prisma Client 7.10.1 and `@typesql/pg` 7.0.1, without the driver. The query compiler is 0.7 MB with `compilerBuild = "small"` and 1.1 MB with the default build.
 
 ## Choose Prisma TypedSQL when
 

@@ -1,0 +1,29 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`migrations-postgres-values > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "Read": "{ bytes: Uint8Array<ArrayBufferLike>; chars: string; pair: string; slept: string; span: { years?: number; months?: number; days?: number; hours?: number; minutes?: number; seconds?: number; milliseconds?: number; toPostgres: () => string; toISO: () => string; toISOString: () => string } }",
+    },
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "{
+  bytes: true,
+  chars: '{a,b}',
+  pair: '(1,a)',
+  slept: '',
+  span: '1 days'
+}
+",
+  },
+}
+`;

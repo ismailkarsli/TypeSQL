@@ -51,5 +51,35 @@ console.log({
 	pgInline,
 	postgresInline,
 });
+// The drivers themselves skip a nested comment, and so do queries whose types
+// are given with sql.as().
+const native = "SELECT 1 AS n /* outer /* inner */ :ignored */ WHERE 1=$1";
+console.log("native pg", (await pool.query(native, [1])).rows);
+console.log("native postgres", Array.from(await client.unsafe(native, [1])));
+for (const [adapter, sql] of [
+	["pg", pgSql],
+	["postgres", postgresSql],
+] as const) {
+	try {
+		const query = sql.as<{ n: number }>(
+			"SELECT 1 AS n /* outer /* inner */ :ignored */ WHERE 1=:id",
+			{ id: 1 },
+		);
+		console.log(adapter, "named", query.text, query.values);
+		console.log(adapter, "named rows", await query.execute());
+	} catch (error) {
+		console.log(adapter, "named error", String(error));
+	}
+	try {
+		const query = sql.as<{ n: number }>(
+			`SELECT 1 AS n /* outer /* inner */ $99 */ WHERE 1=$1 ${sql.fragment("AND 1=$1", 1)}`,
+			1,
+		);
+		console.log(adapter, "fragment", query.text, query.values);
+		console.log(adapter, "fragment rows", await query.execute());
+	} catch (error) {
+		console.log(adapter, "fragment error", String(error));
+	}
+}
 await pool.end();
 await client.end();

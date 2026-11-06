@@ -5,10 +5,8 @@
 		"moduleResolution": "nodenext",
 		"verbatimModuleSyntax": false,
 		"noEmit": true,
-		"types": ["node", "vscode"],
-		"paths": {
-			"@typesql/language-server": ["../language-server/src/index.ts"]
-		}
+		"allowImportingTsExtensions": true,
+		"types": ["node", "vscode"]
 	},
-	"include": ["src"]
+	"include": ["src", "scripts"]
 }

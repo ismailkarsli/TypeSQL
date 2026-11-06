@@ -1,4 +1,14 @@
 import type {
+	AliasAt,
+	IsOp,
+	IsWord,
+	Name,
+	NamesV,
+	SyntaxErr,
+} from "../../../engine/family/parse.js";
+import type { Next } from "../../../engine/next.js";
+import type { Ok, Toks } from "../../../engine/tokens.js";
+import type {
 	Expr,
 	FromItem,
 	SelectStmt,
@@ -15,20 +25,7 @@ import type {
 	ParseTargets,
 	ParseValues,
 } from "./select.js";
-import type {
-	AliasAt,
-	Ident,
-	IdentList,
-	IsOp,
-	IsWord,
-	Name,
-	NamesV,
-	Nx,
-	Ok,
-	SyntaxErr,
-	TableRefAt,
-	Toks,
-} from "./util.js";
+import type { Ident, IdentList, TableRefAt } from "./util.js";
 
 type SkipWords<
 	T extends Toks,
@@ -37,35 +34,38 @@ type SkipWords<
 	Ignore extends boolean = false,
 > = T[I] extends { readonly k: "w"; readonly v: infer V }
 	? V extends W
-		? SkipWords<T, Nx<I>, W, V extends "ignore" ? true : Ignore>
+		? SkipWords<T, Next<I>, W, V extends "ignore" ? true : Ignore>
 		: [Ignore, I]
 	: [Ignore, I];
 
 type SkipPartition<T extends Toks, I extends number> =
 	IsWord<T, I, "partition"> extends true
-		? IdentList<T, Nx<I>> extends Ok<unknown, infer J extends number>
+		? IdentList<T, Next<I>> extends Ok<unknown, infer J extends number>
 			? J
-			: IdentList<T, Nx<I>>
+			: IdentList<T, Next<I>>
 		: I;
 
 /** `(a, b)`, `()` or a parenthesized query (no column list) after the table. */
 type InsertCols<T extends Toks, I extends number> =
 	IsOp<T, I, "("> extends true
-		? IsSubqueryParen<T, Nx<I>> extends true
+		? IsSubqueryParen<T, Next<I>> extends true
 			? Ok<null, I>
-			: IsOp<T, Nx<I>, ")"> extends true
-				? Ok<[], Nx<Nx<I>>>
+			: IsOp<T, Next<I>, ")"> extends true
+				? Ok<[], Next<Next<I>>>
 				: IdentList<T, I>
 		: Ok<null, I>;
 
 export type ParseInsert<T extends Toks, I extends number> =
 	SkipWords<
 		T,
-		Nx<I>,
+		Next<I>,
 		"low_priority" | "delayed" | "high_priority" | "ignore"
 	> extends [infer Ignore extends boolean, infer J0 extends number]
-		? (IsWord<T, J0, "into"> extends true ? Nx<J0> : J0) extends infer J extends
-				number
+		? (
+				IsWord<T, J0, "into"> extends true
+					? Next<J0>
+					: J0
+			) extends infer J extends number
 			? TableRefAt<T, J> extends Ok<infer Table, infer J2 extends number>
 				? SkipPartition<T, J2> extends infer J3 extends number
 					? InsertCols<T, J3> extends Ok<infer Cols, infer J4 extends number>
@@ -105,16 +105,16 @@ export type ParseInsert<T extends Toks, I extends number> =
 
 type InsertSource<T extends Toks, I extends number> =
 	IsWord<T, I, "values" | "value"> extends true
-		? ParseValues<T, Nx<I>, [], IsWord<T, Nx<I>, "row">> extends Ok<
+		? ParseValues<T, Next<I>, [], IsWord<T, Next<I>, "row">> extends Ok<
 				infer Rows extends readonly (readonly Expr[])[],
 				infer J extends number
 			>
 			? Ok<{ t: "values"; rows: Rows }, J>
-			: ParseValues<T, Nx<I>, [], IsWord<T, Nx<I>, "row">>
+			: ParseValues<T, Next<I>, [], IsWord<T, Next<I>, "row">>
 		: IsWord<T, I, "set"> extends true
-			? ParseSet<T, Nx<I>, []> extends Ok<infer Set, infer J extends number>
+			? ParseSet<T, Next<I>, []> extends Ok<infer Set, infer J extends number>
 				? Ok<{ t: "set"; set: Set }, J>
-				: ParseSet<T, Nx<I>, []>
+				: ParseSet<T, Next<I>, []>
 			: IsWord<T, I, "select" | "with" | "table"> extends true
 				? SelectSource<T, I>
 				: IsOp<T, I, "("> extends true
@@ -131,27 +131,27 @@ type SelectSource<T extends Toks, I extends number> =
 /** `AS new [(a, b)]` after the inserted rows. */
 type RowAlias<T extends Toks, I extends number> =
 	IsWord<T, I, "as"> extends true
-		? Ident<T, Nx<I>> extends infer N extends Name
-			? IsOp<T, Nx<Nx<I>>, "("> extends true
-				? IdentList<T, Nx<Nx<I>>> extends Ok<
+		? Ident<T, Next<I>> extends infer N extends Name
+			? IsOp<T, Next<Next<I>>, "("> extends true
+				? IdentList<T, Next<Next<I>>> extends Ok<
 						infer Cols extends readonly Name[],
 						infer J extends number
 					>
 					? Ok<{ name: N["v"]; cols: NamesV<Cols> }, J>
-					: IdentList<T, Nx<Nx<I>>>
-				: Ok<{ name: N["v"]; cols: null }, Nx<Nx<I>>>
-			: SyntaxErr<T, Nx<I>>
+					: IdentList<T, Next<Next<I>>>
+				: Ok<{ name: N["v"]; cols: null }, Next<Next<I>>>
+			: SyntaxErr<T, Next<I>>
 		: Ok<null, I>;
 
 type Odku<T extends Toks, I extends number> =
 	IsWord<T, I, "on"> extends true
-		? IsWord<T, Nx<I>, "duplicate"> extends true
-			? IsWord<T, Nx<Nx<I>>, "key"> extends true
-				? IsWord<T, Nx<Nx<Nx<I>>>, "update"> extends true
-					? ParseSet<T, Nx<Nx<Nx<Nx<I>>>>, []>
-					: SyntaxErr<T, Nx<Nx<Nx<I>>>>
-				: SyntaxErr<T, Nx<Nx<I>>>
-			: SyntaxErr<T, Nx<I>>
+		? IsWord<T, Next<I>, "duplicate"> extends true
+			? IsWord<T, Next<Next<I>>, "key"> extends true
+				? IsWord<T, Next<Next<Next<I>>>, "update"> extends true
+					? ParseSet<T, Next<Next<Next<Next<I>>>>, []>
+					: SyntaxErr<T, Next<Next<Next<I>>>>
+				: SyntaxErr<T, Next<Next<I>>>
+			: SyntaxErr<T, Next<I>>
 		: Ok<null, I>;
 
 /** `a = 1, t.b = DEFAULT, …`. */
@@ -172,42 +172,42 @@ type ParseSet<
 				? [...Acc, { tbl: Tbl; col: Col; e: E }] extends infer Acc2 extends
 						readonly SetItem[]
 					? IsOp<T, J3, ","> extends true
-						? ParseSet<T, Nx<J3>, Acc2>
+						? ParseSet<T, Next<J3>, Acc2>
 						: Ok<Acc2, J3>
 					: never
 				: ParseExpr<T, J2>
 			: SetEq<T, J>
 		: SetTarget<T, I>;
 type SetEq<T extends Toks, I extends number> =
-	IsOp<T, I, "=" | ":="> extends true ? Nx<I> : SyntaxErr<T, I>;
+	IsOp<T, I, "=" | ":="> extends true ? Next<I> : SyntaxErr<T, I>;
 type SetTarget<T extends Toks, I extends number> =
 	Ident<T, I> extends infer A extends Name
-		? IsOp<T, Nx<I>, "."> extends true
-			? Ident<T, Nx<Nx<I>>> extends infer B extends Name
-				? IsOp<T, Nx<Nx<Nx<I>>>, "."> extends true
-					? Ident<T, Nx<Nx<Nx<Nx<I>>>>> extends infer C extends Name
-						? Ok<[B["v"], C["v"]], Nx<Nx<Nx<Nx<Nx<I>>>>>>
-						: SyntaxErr<T, Nx<Nx<Nx<Nx<I>>>>>
-					: Ok<[A["v"], B["v"]], Nx<Nx<Nx<I>>>>
-				: SyntaxErr<T, Nx<Nx<I>>>
-			: Ok<[null, A["v"]], Nx<I>>
+		? IsOp<T, Next<I>, "."> extends true
+			? Ident<T, Next<Next<I>>> extends infer B extends Name
+				? IsOp<T, Next<Next<Next<I>>>, "."> extends true
+					? Ident<T, Next<Next<Next<Next<I>>>>> extends infer C extends Name
+						? Ok<[B["v"], C["v"]], Next<Next<Next<Next<Next<I>>>>>>
+						: SyntaxErr<T, Next<Next<Next<Next<I>>>>>
+					: Ok<[A["v"], B["v"]], Next<Next<Next<I>>>>
+				: SyntaxErr<T, Next<Next<I>>>
+			: Ok<[null, A["v"]], Next<I>>
 		: SyntaxErr<T, I>;
 
 type Returning<T extends Toks, I extends number> =
 	IsWord<T, I, "returning"> extends true
-		? ParseTargets<T, Nx<I>, []> extends Ok<
+		? ParseTargets<T, Next<I>, []> extends Ok<
 				infer Tg extends readonly Target[],
 				infer J extends number
 			>
 			? Ok<Tg, J>
-			: ParseTargets<T, Nx<I>, []>
+			: ParseTargets<T, Next<I>, []>
 		: Ok<null, I>;
 
 type OptOrder<T extends Toks, I extends number> =
 	IsWord<T, I, "order"> extends true
-		? IsWord<T, Nx<I>, "by"> extends true
-			? ParseOrderList<T, Nx<Nx<I>>, []>
-			: SyntaxErr<T, Nx<I>>
+		? IsWord<T, Next<I>, "by"> extends true
+			? ParseOrderList<T, Next<Next<I>>, []>
+			: SyntaxErr<T, Next<I>>
 		: Ok<[], I>;
 
 /** `[ORDER BY …] [LIMIT n]` of a single-table UPDATE or DELETE: no OFFSET. */
@@ -224,7 +224,7 @@ type OrderLimit<T extends Toks, I extends number> =
 		: OptOrder<T, I>;
 
 type Where<T extends Toks, I extends number> =
-	IsWord<T, I, "where"> extends true ? ParseExpr<T, Nx<I>> : Ok<null, I>;
+	IsWord<T, I, "where"> extends true ? ParseExpr<T, Next<I>> : Ok<null, I>;
 
 export type ParseUpdate<T extends Toks, I extends number, W> =
 	SkipWords<T, I, "low_priority" | "ignore"> extends [
@@ -236,7 +236,7 @@ export type ParseUpdate<T extends Toks, I extends number, W> =
 				infer J2 extends number
 			>
 			? IsWord<T, J2, "set"> extends true
-				? ParseSet<T, Nx<J2>, []> extends Ok<
+				? ParseSet<T, Next<J2>, []> extends Ok<
 						infer Set extends readonly SetItem[],
 						infer J3 extends number
 					>
@@ -259,7 +259,7 @@ export type ParseUpdate<T extends Toks, I extends number, W> =
 								>
 							: OrderLimit<T, J4>
 						: Where<T, J3>
-					: ParseSet<T, Nx<J2>, []>
+					: ParseSet<T, Next<J2>, []>
 				: SyntaxErr<T, J2>
 			: ParseFrom<T, J>
 		: never;
@@ -276,15 +276,15 @@ type DeleteTargets<
 	>
 		? SkipDotStar<T, J> extends infer J2 extends number
 			? IsOp<T, J2, ","> extends true
-				? DeleteTargets<T, Nx<J2>, [...Acc, Ref]>
+				? DeleteTargets<T, Next<J2>, [...Acc, Ref]>
 				: Ok<[...Acc, Ref], J2>
 			: SkipDotStar<T, J>
 		: TableRefAt<T, I>;
 type SkipDotStar<T extends Toks, I extends number> =
 	IsOp<T, I, "."> extends true
-		? IsOp<T, Nx<I>, "*"> extends true
-			? Nx<Nx<I>>
-			: SyntaxErr<T, Nx<I>>
+		? IsOp<T, Next<I>, "*"> extends true
+			? Next<Next<I>>
+			: SyntaxErr<T, Next<I>>
 		: I;
 
 export type ParseDelete<T extends Toks, I extends number, W> =
@@ -293,22 +293,22 @@ export type ParseDelete<T extends Toks, I extends number, W> =
 		infer J extends number,
 	]
 		? IsWord<T, J, "from"> extends true
-			? DeleteTargets<T, Nx<J>, []> extends Ok<
+			? DeleteTargets<T, Next<J>, []> extends Ok<
 					infer Targets extends readonly TableRef[],
 					infer J2 extends number
 				>
 				? IsWord<T, J2, "using"> extends true
-					? MultiDelete<T, Nx<J2>, W, Targets>
+					? MultiDelete<T, Next<J2>, W, Targets>
 					: Targets extends readonly [infer Ref extends TableRef]
-						? SingleDelete<T, Nx<J>, W, Ref>
+						? SingleDelete<T, Next<J>, W, Ref>
 						: SyntaxErr<T, J2>
-				: DeleteTargets<T, Nx<J>, []>
+				: DeleteTargets<T, Next<J>, []>
 			: DeleteTargets<T, J, []> extends Ok<
 						infer Targets extends readonly TableRef[],
 						infer J2 extends number
 					>
 				? IsWord<T, J2, "from"> extends true
-					? MultiDelete<T, Nx<J2>, W, Targets>
+					? MultiDelete<T, Next<J2>, W, Targets>
 					: SyntaxErr<T, J2>
 				: DeleteTargets<T, J, []>
 		: never;
@@ -316,13 +316,13 @@ export type ParseDelete<T extends Toks, I extends number, W> =
 /** The optional alias of a single-table DELETE's target. */
 type DeleteAlias<T extends Toks, I extends number> =
 	IsWord<T, I, "as"> extends true
-		? AliasAt<T, Nx<I>, Reserved> extends infer A extends Name
-			? Ok<A["v"], Nx<Nx<I>>>
-			: SyntaxErr<T, Nx<I>>
+		? AliasAt<T, Next<I>, Reserved> extends infer A extends Name
+			? Ok<A["v"], Next<Next<I>>>
+			: SyntaxErr<T, Next<I>>
 		: Ident<T, I> extends infer A extends Name
 			? A["v"] extends "returning" | "partition" | "order" | "limit"
 				? Ok<null, I>
-				: Ok<A["v"], Nx<I>>
+				: Ok<A["v"], Next<I>>
 			: Ok<null, I>;
 
 type SingleDelete<T extends Toks, I extends number, W, Ref extends TableRef> =

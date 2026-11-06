@@ -1,0 +1,26 @@
+{
+	"name": "migrations-postgres-json-generate",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"start": "node dist/app.js",
+		"generate": "typesql migrate latest && typesql migrate generate"
+	},
+	"dependencies": {
+		"@typesql/core": "workspace:*",
+		"@typesql/cli": "workspace:*",
+		"@typesql/pg": "workspace:*",
+		"pg": "catalog:",
+		"@types/pg": "catalog:"
+	},
+	"devDependencies": {
+		"typescript": "catalog:",
+		"@types/node": "catalog:"
+	},
+	"scenario": {
+		"database": "postgres",
+		"artifacts": [
+			"db.ts"
+		]
+	}
+}

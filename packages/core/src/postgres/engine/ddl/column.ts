@@ -29,28 +29,6 @@ export type WithDefault<C, H> = MkCol<TypeOfCol<C>, NullOf<C>, H>;
 
 export type WithType<C, Ty extends string> = MkCol<Ty, NullOf<C>, DefOf<C>>;
 
-type PgDisplay = {
-	int2: "smallint";
-	int4: "integer";
-	int8: "bigint";
-	float4: "real";
-	float8: "double precision";
-	bool: "boolean";
-	varchar: "character varying";
-	bpchar: "character";
-	varbit: "bit varying";
-	timestamp: "timestamp without time zone";
-	timestamptz: "timestamp with time zone";
-	time: "time without time zone";
-	timetz: "time with time zone";
-};
-
-export type DisplayType<T extends string> = T extends `${infer E}[]`
-	? `${DisplayType<E>}[]`
-	: T extends keyof PgDisplay
-		? PgDisplay[T]
-		: T;
-
 export type TypeConflict<A, B> = {
 	[K in keyof A & keyof B]: TypeOfCol<A[K]> extends TypeOfCol<B[K]>
 		? TypeOfCol<B[K]> extends TypeOfCol<A[K]>

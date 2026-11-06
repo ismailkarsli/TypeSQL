@@ -1,0 +1,8 @@
+language js(typescript)
+
+or {
+	`[...new Set($args)]`,
+	`[...new Set<$type>($args)]`
+} as $array where {
+	register_diagnostic(span=$array, message="Use `Array.from(new Set(...))` instead of spreading a Set into an array literal.", severity="error")
+}

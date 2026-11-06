@@ -75,3 +75,24 @@ export type NonIdAscii =
 	| "|"
 	| "?"
 	| ":";
+
+export type TakeDigits<
+	S extends string,
+	Acc extends string,
+> = S extends `${infer C extends Digit}${infer R}`
+	? TakeDigits<R, `${Acc}${C}`>
+	: [Acc, S];
+
+/** The identifier characters at the start of `R`. */
+export type IdRun<
+	R extends string,
+	Acc extends string = "",
+> = R extends `${infer C}${infer R1}`
+	? C extends NonIdAscii
+		? Acc
+		: IdRun<R1, `${Acc}${C}`>
+	: Acc;
+
+export type TrimEnd<S extends string> = S extends `${infer R}${Ws}`
+	? TrimEnd<R>
+	: S;

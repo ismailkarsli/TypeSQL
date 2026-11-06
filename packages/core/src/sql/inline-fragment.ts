@@ -1,10 +1,9 @@
 import type { Empty } from "../empty.js";
 import type { AnyErr, SqlError } from "../errors.js";
 import type { Fragment, InlineFragment } from "../query.js";
-import type { SlotNames } from "./splice.js";
+import type { Lexis } from "./lexis.js";
+import type { InlineName, SlotNames, SlotNamesIn } from "./splice.js";
 import type { NotLiteralMessage } from "./text.js";
-
-type InlineName<N extends number | string> = `__typesql_inline${N}`;
 
 /**
  * A statement with `${fragment}` / `${query}` interpolations as
@@ -68,20 +67,15 @@ type Finish<R> = R extends [
 	infer A extends string,
 	infer F extends readonly unknown[],
 ]
-	? Quoted<A, F> extends true
-		? SqlError<
-				"a fragment cannot be interpolated inside a quoted string, quoted identifier, dollar-quoted string or comment; remove the surrounding quotes or comment",
-				null
-			>
-		: [
-				A,
-				{
-					readonly [I in keyof F &
-						`${number}` as `__typesql_inline${I}`]: F[I] extends Empty
-						? Fragment<"", [], []>
-						: F[I];
-				},
-			]
+	? [
+			A,
+			{
+				readonly [I in keyof F &
+					`${number}` as InlineName<I>]: F[I] extends Empty
+					? Fragment<"", [], []>
+					: F[I];
+			},
+		]
 	: R;
 
 type LiftChars<
@@ -102,12 +96,18 @@ type LiftChars<
 			? [Acc, Fs]
 			: SqlError<NotLiteralMessage, 0>;
 
-/** Whether a fragment's slot landed where `{name}` is not a slot. */
-type Quoted<T extends string, Fs extends readonly unknown[]> = [
-	Exclude<InlineName<Extract<keyof Fs, `${number}`>>, SlotNames<T>>,
-] extends [never]
-	? false
-	: true;
+/**
+ * The error for a statement `T` (Inlined text) with a fragment's slot where
+ * `{name}` is not a slot, which lexis `L` reads as quoted text or a comment.
+ */
+export type QuotedSlot<T extends string, L extends Lexis> = T extends unknown
+	? [Exclude<SlotNamesIn<T>, SlotNames<T, L>>] extends [never]
+		? never
+		: SqlError<
+				"a fragment cannot be interpolated inside a quoted string, quoted identifier, dollar-quoted string or comment; remove the surrounding quotes or comment",
+				null
+			>
+	: never;
 
 /** The members of a union of statements (`${flag ? a : b}`) as one statement with union slots. */
 type Merge<L> = [Extract<L, AnyErr>] extends [never]

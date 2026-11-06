@@ -1,12 +1,18 @@
-import type { CheckCarried } from "../engine/carried.js";
-import type { EngineTypes } from "../engine/contract.js";
-import type { ArgsOf, ParamsOf, RowOf, Validate } from "../engine/infer.js";
 import type { AnyErr, SqlError } from "../errors.js";
 import type { PluginInput, PluginOutput, SqlPlugin } from "../plugin.js";
 import type { Query } from "../query.js";
+import type { CheckCarried } from "./carried.js";
+import type { EngineTypes } from "./contract.js";
+import type { ArgsOf, ParamsOf, RowOf, Validate } from "./infer.js";
 import type { HasDefaultable, Skip, WithDefaults } from "./inline.js";
-import type { Inlined, InlinedSlots, InlinedText } from "./inline-fragment.js";
-import type { NamedParams } from "./named.js";
+import type {
+	Inlined,
+	InlinedSlots,
+	InlinedText,
+	QuotedSlot,
+} from "./inline-fragment.js";
+import type { Lexis } from "./lexis.js";
+import type { NamedArgs } from "./named.js";
 import type { SlotCarried, SlotTexts, SlotVariants } from "./slots.js";
 import type { Splice, SpliceCarried, Take } from "./splice.js";
 import type {
@@ -32,7 +38,7 @@ type ArgsFor<
 		: [S, Encs] extends [null, readonly []]
 			? ArgsOf<E, DB, TM, X>
 			: Take<ArgsOf<E, DB, TM, X>, M>
-	: [params: NamedParams<Names, Take<ArgsOf<E, DB, TM, X>, Names["length"]>>];
+	: NamedArgs<Names, ArgsOf<E, DB, TM, X>>;
 
 type Carried<
 	E extends EngineTypes,
@@ -45,9 +51,12 @@ type Carried<
 type DefaultsCheck<E extends EngineTypes, DB, Q extends string, S> =
 	HasDefaultable<Q> extends false
 		? true
-		: PText<WithDefaults<Q>> extends infer X extends string
-			? (S extends null ? X : Splice<X, SlotTexts<S>>) extends infer X2 extends
-					string
+		: PText<WithDefaults<Q>, E["lexis"]> extends infer X extends string
+			? (
+					S extends null
+						? X
+						: Splice<X, SlotTexts<S>, E["lexis"]>
+				) extends infer X2 extends string
 				? Extract<Validate<E, DB, X2>, AnyErr> extends infer Err
 					? [Err] extends [never]
 						? true
@@ -70,10 +79,10 @@ type DefaultErr<Err> =
  * spliced together, a union fragment's parameters would leave the offset of
  * the next fragment's parameters a union, and mix their numbers.
  */
-export type SplicedText<Q extends string> =
+export type SplicedText<Q extends string, L extends Lexis> =
 	SlotVariants<InlinedSlots<Q>> extends infer V
 		? V extends unknown
-			? Splice<PText<InlinedText<Q>>, SlotTexts<V>>
+			? Splice<PText<InlinedText<Q>, L>, SlotTexts<V>, L>
 			: never
 		: never;
 
@@ -81,14 +90,14 @@ export type SplicedText<Q extends string> =
 type SpliceCheck<E extends EngineTypes, DB, TM, Q extends string, S> =
 	IsLiteral<Q> extends false
 		? SqlError<NotLiteralMessage, 0>
-		: Prepared<Q> extends infer P
+		: Prepared<Q, E["lexis"]> extends infer P
 			? P extends [
 					infer T2 extends string,
 					string[],
 					infer Encs extends readonly string[],
 					infer M extends number,
 				]
-				? Spliced<T2, S> extends infer X
+				? Spliced<T2, S, E["lexis"]> extends infer X
 					? X extends string
 						? Validate<E, DB, X> extends AnyErr
 							? Validate<E, DB, X>
@@ -102,7 +111,11 @@ type SpliceCheck<E extends EngineTypes, DB, TM, Q extends string, S> =
 											...Encs,
 											...([S] extends [null]
 												? []
-												: SpliceCarried<T2, SlotCarried<S>>),
+												: SpliceCarried<
+														T2,
+														SlotCarried<S, E["lexis"]>,
+														E["lexis"]
+													>),
 										]
 									> extends infer K
 								? K extends AnyErr
@@ -114,9 +127,9 @@ type SpliceCheck<E extends EngineTypes, DB, TM, Q extends string, S> =
 				: P
 			: never;
 
-type Spliced<T2 extends string, S> = [S] extends [null]
+type Spliced<T2 extends string, S, L extends Lexis> = [S] extends [null]
 	? T2
-	: Splice<T2, SlotTexts<S>> extends infer X
+	: Splice<T2, SlotTexts<S>, L> extends infer X
 		? X extends string
 			? string extends X
 				? SqlError<
@@ -134,13 +147,13 @@ type Spliced<T2 extends string, S> = [S] extends [null]
 type SpliceArgs<E extends EngineTypes, DB, TM, Q extends string, S> =
 	IsLiteral<Q> extends false
 		? readonly unknown[]
-		: Prepared<Q> extends [
+		: Prepared<Q, E["lexis"]> extends [
 					infer T2 extends string,
 					infer Names extends string[],
 					infer Encs extends readonly string[],
 					infer M extends number,
 				]
-			? Spliced<T2, S> extends infer X extends string
+			? Spliced<T2, S, E["lexis"]> extends infer X extends string
 				? Validate<E, DB, X> extends AnyErr
 					? readonly unknown[]
 					: ArgsFor<E, DB, TM, X, Names, Encs, M, S>
@@ -156,13 +169,17 @@ export type GateCallCheck<E extends EngineTypes, DB, TM, Q extends string> = [
 			: I extends AnyErr
 				? I
 				: I extends readonly [infer T2 extends string, infer S2]
-					? Surface<
-							SlotVariants<S2> extends infer V
-								? V extends unknown
-									? SpliceCheck<E, DB, TM, T2, V>
-									: never
-								: never
-						>
+					? [QuotedSlot<T2, E["lexis"]>] extends [infer QE]
+						? [QE] extends [never]
+							? Surface<
+									SlotVariants<S2> extends infer V
+										? V extends unknown
+											? SpliceCheck<E, DB, TM, T2, V>
+											: never
+										: never
+								>
+							: QE
+						: never
 					: never
 		: never
 	: never;
@@ -192,14 +209,16 @@ export type BoxCallArgs<E extends EngineTypes, DB, TM, Q extends string> = [
 	: never;
 
 /** The text sql() types: interpolated fragments spliced in. */
-type CallText<Q extends string> = [Q] extends [infer Q2 extends string]
+type CallText<Q extends string, L extends Lexis> = [Q] extends [
+	infer Q2 extends string,
+]
 	? Inlined<Q2> extends null
-		? PText<Q2>
-		: SplicedOr<Q2>
+		? PText<Q2, L>
+		: SplicedOr<Q2, L>
 	: never;
 
-type SplicedOr<Q extends string> =
-	SplicedText<Q> extends infer X extends string ? X : string;
+type SplicedOr<Q extends string, L extends Lexis> =
+	SplicedText<Q, L> extends infer X extends string ? X : string;
 
 /**
  * Resolved to `Query<Row, Params, Text>`, so declaration emit names only the
@@ -212,7 +231,7 @@ export type CallRet<
 	TM,
 	Q extends string,
 	Plugins extends readonly SqlPlugin[] = [],
-> = [CallText<Q>] extends [infer X extends string]
+> = [CallText<Q, E["lexis"]>] extends [infer X extends string]
 	? Query<
 			PluginOutput<RowOf<E, DB, TM, X>, Plugins>,
 			Extract<

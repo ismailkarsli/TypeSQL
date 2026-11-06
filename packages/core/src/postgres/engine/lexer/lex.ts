@@ -1,11 +1,17 @@
 import type {
 	Digit,
 	HexDigit,
+	IdRun,
 	IdStart,
 	NonIdAscii,
+	TakeDigits,
 	Upper,
 	Ws,
 } from "../../../engine/chars.js";
+import type { Next } from "../../../engine/next.js";
+import type { ToNum } from "../../../engine/num.js";
+import type { Tok } from "../../../engine/tokens.js";
+import type { SqlError } from "../../../errors.js";
 import type {
 	BitTok,
 	IdTok,
@@ -13,19 +19,14 @@ import type {
 	OpTok,
 	ParamTok,
 	StrTok,
-	Tok,
 	WordTok,
-} from "../../../engine/tokens.js";
-import type { SqlError } from "../../../errors.js";
-import type { Next } from "../../../sql/next.js";
+} from "./tokens.js";
 import type {
 	CheckEscapes,
 	CheckUEscapes,
 	DecodeU,
 	UEscape,
 } from "./unicode.js";
-
-type Nx<I extends number> = Next<I>;
 
 export type Lex<Q extends string> = LexLines<Q, []>;
 
@@ -40,7 +41,7 @@ type LexLines<
 			? LexCommas<S, Acc>
 			: LexCommas<TrimIndent<Line>, []> extends infer R extends
 						readonly unknown[]
-				? LexLines<Rest, [...Acc, ...R], Nx<B>>
+				? LexLines<Rest, [...Acc, ...R], Next<B>>
 				: LexCommas<S, Acc>
 		: LexCommas<TrimIndent<S>, Acc>;
 
@@ -54,7 +55,7 @@ type LexCommas<
 		? Part extends `${string}--${string}`
 			? LexSpaces<S, Acc>
 			: LexSpaces<Part, []> extends infer R extends readonly unknown[]
-				? LexCommas<Rest, [...Acc, ...R, OpTok<",">], Nx<B>>
+				? LexCommas<Rest, [...Acc, ...R, OpTok<",">], Next<B>>
 				: LexSpaces<S, Acc>
 		: LexSpaces<S, Acc>;
 
@@ -74,7 +75,7 @@ type LexSpaceLoop<
 	? LexAll<S, Acc>
 	: S extends `${infer Part} ${infer Rest}`
 		? LexAll<Part, []> extends infer R extends readonly unknown[]
-			? LexSpaceLoop<Rest, [...Acc, ...R], Nx<B>>
+			? LexSpaceLoop<Rest, [...Acc, ...R], Next<B>>
 			: LexAll<S, Acc>
 		: LexAll<S, Acc>;
 type LexSpacesSlow<
@@ -90,7 +91,7 @@ type LexSpacesSlow<
 				? LexAll<S, Acc>
 				: LexAll<Part, []> extends infer R
 					? R extends readonly unknown[]
-						? LexSpacesSlow<Rest, [...Acc, ...R], Nx<B>>
+						? LexSpacesSlow<Rest, [...Acc, ...R], Next<B>>
 						: LexAll<S, Acc>
 					: never
 			: LexAll<S, Acc>;
@@ -108,7 +109,7 @@ type CanSplitLine<
 type NextLineQuote<S extends string, B extends number = 0> = B extends ChunkSize
 	? true
 	: S extends `${Ws}${infer R}`
-		? NextLineQuote<R, Nx<B>>
+		? NextLineQuote<R, Next<B>>
 		: S extends `'${string}`
 			? true
 			: false;
@@ -142,7 +143,7 @@ type LexChunk<
 	? ["done", Acc]
 	: B extends ChunkSize
 		? ["more", Acc, S]
-		: LexStep<S, Acc, Nx<B>>;
+		: LexStep<S, Acc, Next<B>>;
 
 type Err<M extends string, Acc extends readonly Tok[]> = ["err", M, Acc];
 
@@ -365,14 +366,6 @@ type JunkAt<R extends string> = R extends `${infer C}${infer R1}`
 		? null
 		: `${C}${IdRun<R1>}`
 	: null;
-type IdRun<
-	R extends string,
-	Acc extends string = "",
-> = R extends `${infer C}${infer R1}`
-	? C extends NonIdAscii
-		? Acc
-		: IdRun<R1, `${Acc}${C}`>
-	: Acc;
 
 type LexWord<
 	R extends string,
@@ -545,15 +538,6 @@ type TakeWord<
 
 type FoldChar<C extends string> = C extends Upper ? Lowercase<C> : C;
 
-type TakeDigits<
-	S extends string,
-	Acc extends string,
-> = S extends `${infer C}${infer R}`
-	? C extends Digit
-		? TakeDigits<R, `${Acc}${C}`>
-		: [Acc, S]
-	: [Acc, S];
-
 type TakeNumber<S extends string> =
 	S extends `0${infer P extends "x" | "X" | "o" | "O" | "b" | "B"}${infer R}`
 		? Lowercase<P> extends "x"
@@ -629,16 +613,12 @@ type TakeExponent<
 			: never
 	: [V, S];
 
-type ToNum<S extends string> = S extends `${infer N extends number}`
-	? N
-	: never;
-
 type TrimIndent<S extends string, B extends number = 0> = B extends 128
 	? S
 	: S extends `\t\t\t\t${infer R}`
-		? TrimIndent<R, Nx<B>>
+		? TrimIndent<R, Next<B>>
 		: S extends `\t${infer R}`
-			? TrimIndent<R, Nx<B>>
+			? TrimIndent<R, Next<B>>
 			: S extends ` ${infer R}`
-				? TrimIndent<R, Nx<B>>
+				? TrimIndent<R, Next<B>>
 				: S;

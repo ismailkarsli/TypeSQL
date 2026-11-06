@@ -1,53 +1,54 @@
 import type { ColInfo, Info } from "../../../engine/types.js";
 import type { SqlError } from "../../../errors.js";
-import type { TypeDisplay } from "../binder/clauses.js";
-import type { JsonRet } from "../json.js";
-import type { ArrInfo, ElemNull, HasNullElems } from "../shape.js";
+import type { DeclaredSig, Sig, SigFlags } from "../../schema/functions.js";
 import type {
-	CommonLit,
 	DateTimeT,
-	IntT,
 	JsonT,
-	LitToText,
 	NumT,
+	PgTypeFacts,
 	RangeT,
 	StrT,
-	Unmatchable,
-} from "./operators.js";
+} from "../../schema/type-facts.js";
+import type { SchemaFunctions } from "../db.js";
+import type { JsonRet } from "../json.js";
+import type {
+	ArrInfo,
+	ElemNull,
+	HasNullElems,
+	LitToText,
+	TypeDisplay,
+} from "../shape.js";
+import type { SelectCommon, UnmatchedErr } from "./operators.js";
 import type { PgFunctions } from "./pg-functions.js";
 
-export type Sig<
-	Args extends readonly string[],
-	Ret extends string,
-	Flags extends SigFlags = {},
-> = {
-	readonly args: Args;
-	readonly ret: Ret;
-} & Flags;
-export type SigFlags = {
-	readonly strict?: boolean | readonly number[];
-	readonly nullable?: boolean;
-	readonly agg?: boolean;
-	readonly window?: boolean;
-	readonly srf?: boolean;
+/** Behaviour only built-in functions declare. */
+type CatalogFlags = {
+	/**
+	 * The result array's elements can be NULL, always or when one of these
+	 * arguments (1-based) can be NULL or is an array whose elements can be.
+	 */
+	readonly elems?: true | readonly number[];
+	/** The first argument is anyelement: an untyped literal or NULL can't fill it. */
+	readonly poly?: true;
+	/** A hypothetical-set aggregate, which needs WITHIN GROUP. */
+	readonly hypothetical?: true;
+	/** NULL for an argument of type unknown (COLLATION FOR). */
+	readonly untypedNull?: true;
+	/** Builds an object whose keys are the literal odd arguments. */
+	readonly object?: true;
+	/** A set-returning function's columns in FROM. */
+	readonly cols?: readonly { readonly n: string; readonly t: ColInfo }[];
+	/** In FROM, its one column is named this rather than after the function. */
+	readonly column?: string;
+	/** Returns record: FROM needs a column definition list. */
+	readonly coldefs?: true;
 };
-/**
- * Catalog only: the result array's elements can be NULL, always or when one of
- * these arguments (1-based) can be NULL or is an array whose elements can be.
- */
-type ElemsFlag = { readonly elems?: true | readonly number[] };
-/** `Sig` with `ElemsFlag`. */
 type ESig<
 	Args extends readonly string[],
 	Ret extends string,
-	Flags extends SigFlags & ElemsFlag,
+	Flags extends SigFlags & CatalogFlags,
 > = { readonly args: Args; readonly ret: Ret } & Flags;
-export type AnySig = {
-	readonly args: readonly string[];
-	readonly ret: string;
-} & SigFlags &
-	ElemsFlag;
-export type Overloads = AnySig | readonly AnySig[];
+export type AnySig = DeclaredSig & CatalogFlags;
 
 type Agg = { agg: true };
 /** array_agg: the elements are the argument's values. */
@@ -57,21 +58,27 @@ type AggNN = { agg: true; nullable: false };
 /** NULL even over non-null input, e.g. for a single row or zero variance. */
 type AggNullable = { agg: true; nullable: true };
 type Win = { window: true; nullable: false };
-type WinNullable = { window: true; nullable: true };
+/** A window function over anyelement. */
+type WinPoly = { window: true; nullable: true; poly: true };
+type Hypothetical = { agg: true; nullable: false; hypothetical: true };
 type NN = { nullable: false };
 type Nullable = { nullable: true };
 type Srf = { srf: true };
 /** regexp_match(es): a group that takes no part in the match is NULL. */
 type NullableElems = { nullable: true; elems: true };
 type SrfElems = { srf: true; elems: true };
-type SrfNullable = { srf: true; nullable: true };
+/** json_each's columns. */
+type KeyValue<V extends string, N extends boolean = false> = [
+	{ readonly n: "key"; readonly t: Info<"text"> },
+	{ readonly n: "value"; readonly t: Info<V, N> },
+];
 
 /** Ordered overloads for each supported number of trailing optional arguments. */
 type OptionalArgs<
 	Args extends readonly string[],
 	Optional extends readonly string[],
 	Ret extends string,
-	Flags extends SigFlags & ElemsFlag = {},
+	Flags extends SigFlags & CatalogFlags = {},
 > = [
 	ESig<Args, Ret, Flags>,
 	...(Optional extends readonly [
@@ -105,7 +112,7 @@ export interface FunctionCatalog {
 	];
 	min: Sig<["any"], "$1", Agg>;
 	max: Sig<["any"], "$1", Agg>;
-	any_value: Sig<["any"], "$1", Agg>;
+	any_value: ESig<["any"], "$1", { agg: true; poly: true }>;
 	array_agg: ESig<["any"], "$arr1", AggElems>;
 	string_agg: [
 		Sig<["bytea", "bytea"], "bytea", Agg>,
@@ -169,23 +176,32 @@ export interface FunctionCatalog {
 	xmlagg: Sig<["xml"], "xml", Agg>;
 
 	row_number: Sig<[], "int8", Win>;
-	rank: [Sig<[], "int8", Win>, Sig<["any", "..."], "int8", AggNN>];
-	dense_rank: [Sig<[], "int8", Win>, Sig<["any", "..."], "int8", AggNN>];
-	percent_rank: [Sig<[], "float8", Win>, Sig<["any", "..."], "float8", AggNN>];
-	cume_dist: [Sig<[], "float8", Win>, Sig<["any", "..."], "float8", AggNN>];
+	rank: [Sig<[], "int8", Win>, ESig<["any", "..."], "int8", Hypothetical>];
+	dense_rank: [
+		Sig<[], "int8", Win>,
+		ESig<["any", "..."], "int8", Hypothetical>,
+	];
+	percent_rank: [
+		Sig<[], "float8", Win>,
+		ESig<["any", "..."], "float8", Hypothetical>,
+	];
+	cume_dist: [
+		Sig<[], "float8", Win>,
+		ESig<["any", "..."], "float8", Hypothetical>,
+	];
 	ntile: Sig<["int4"], "int4", { window: true }>;
 	lag: [
-		Sig<["any"], "$1", WinNullable>,
-		Sig<["any", "int4"], "$1", WinNullable>,
+		ESig<["any"], "$1", WinPoly>,
+		ESig<["any", "int4"], "$1", WinPoly>,
 		Sig<["any", "int4", "any"], "$1", { window: true }>,
 	];
 	lead: FunctionCatalog["lag"];
-	first_value: Sig<["any"], "$1", WinNullable>;
-	last_value: Sig<["any"], "$1", WinNullable>;
-	nth_value: Sig<["any", "int4"], "$1", WinNullable>;
+	first_value: ESig<["any"], "$1", WinPoly>;
+	last_value: ESig<["any"], "$1", WinPoly>;
+	nth_value: ESig<["any", "int4"], "$1", WinPoly>;
 
 	coalesce: Sig<["..."], "$common", { strict: false }>;
-	nullif: Sig<["any", "any"], "$common", Nullable>;
+	nullif: Sig<["any", "any"], "$eq", Nullable>;
 	greatest: Sig<["any", "..."], "$common", { strict: false }>;
 	least: Sig<["any", "..."], "$common", { strict: false }>;
 	grouping: Sig<["..."], "int4", NN>;
@@ -334,7 +350,11 @@ export interface FunctionCatalog {
 	unistr: Sig<["anystring"], "text">;
 	normalize: OptionalArgs<["anystring"], ["anystring"], "text">;
 	is_normalized: OptionalArgs<["anystring"], ["anystring"], "bool">;
-	pg_collation_for: Sig<["any"], "text", NN>;
+	pg_collation_for: ESig<
+		["any"],
+		"text",
+		{ nullable: false; untypedNull: true }
+	>;
 	convert_from: Sig<["bytea", "anystring"], "text">;
 	convert_to: Sig<["anystring", "anystring"], "bytea">;
 	convert: Sig<["bytea", "anystring", "anystring"], "bytea">;
@@ -660,8 +680,8 @@ export interface FunctionCatalog {
 
 	to_json: Sig<["any"], "$jval:json">;
 	to_jsonb: Sig<["any"], "$jval:jsonb">;
-	json_build_object: Sig<["..."], "json", NN>;
-	jsonb_build_object: Sig<["..."], "jsonb", NN>;
+	json_build_object: ESig<["..."], "json", { nullable: false; object: true }>;
+	jsonb_build_object: ESig<["..."], "jsonb", { nullable: false; object: true }>;
 	json_build_array: Sig<["..."], "$jtup:json", NN>;
 	jsonb_build_array: Sig<["..."], "$jtup:jsonb", NN>;
 	json_object: OptionalArgs<["text[]"], ["text[]"], "json">;
@@ -713,10 +733,38 @@ export interface FunctionCatalog {
 	jsonb_path_query_tz: FunctionCatalog["jsonb_path_query"];
 	jsonb_path_query_array_tz: FunctionCatalog["jsonb_path_query_array"];
 	jsonb_path_query_first_tz: FunctionCatalog["jsonb_path_query_first"];
-	json_array_elements: Sig<["json"], "$jelem:json", Srf>;
-	jsonb_array_elements: Sig<["jsonb"], "$jelem:jsonb", Srf>;
-	json_array_elements_text: Sig<["json"], "text", SrfNullable>;
-	jsonb_array_elements_text: Sig<["jsonb"], "text", SrfNullable>;
+	json_array_elements: ESig<
+		["json"],
+		"$jelem:json",
+		{ srf: true; column: "value" }
+	>;
+	jsonb_array_elements: ESig<
+		["jsonb"],
+		"$jelem:jsonb",
+		{ srf: true; column: "value" }
+	>;
+	json_array_elements_text: ESig<
+		["json"],
+		"text",
+		{ srf: true; nullable: true; column: "value" }
+	>;
+	jsonb_array_elements_text: ESig<
+		["jsonb"],
+		"text",
+		{ srf: true; nullable: true; column: "value" }
+	>;
+	json_each: ESig<["json"], "record", { srf: true; cols: KeyValue<"json"> }>;
+	jsonb_each: ESig<["jsonb"], "record", { srf: true; cols: KeyValue<"jsonb"> }>;
+	json_each_text: ESig<
+		["json"],
+		"record",
+		{ srf: true; cols: KeyValue<"text", true> }
+	>;
+	jsonb_each_text: ESig<
+		["jsonb"],
+		"record",
+		{ srf: true; cols: KeyValue<"text", true> }
+	>;
 	json_object_keys: Sig<["json"], "text", Srf>;
 	jsonb_object_keys: Sig<["jsonb"], "text", Srf>;
 	row_to_json: OptionalArgs<["any"], ["bool"], "$jval:json">;
@@ -724,10 +772,10 @@ export interface FunctionCatalog {
 	jsonb_populate_record: Sig<["any", "jsonb"], "$1">;
 	json_populate_recordset: OptionalArgs<["any", "json"], ["bool"], "$1", Srf>;
 	jsonb_populate_recordset: Sig<["any", "jsonb"], "$1", Srf>;
-	json_to_record: Sig<["json"], "record">;
-	jsonb_to_record: Sig<["jsonb"], "record">;
-	json_to_recordset: Sig<["json"], "record", Srf>;
-	jsonb_to_recordset: Sig<["jsonb"], "record", Srf>;
+	json_to_record: ESig<["json"], "record", { coldefs: true }>;
+	jsonb_to_record: ESig<["jsonb"], "record", { coldefs: true }>;
+	json_to_recordset: ESig<["json"], "record", { srf: true; coldefs: true }>;
+	jsonb_to_recordset: ESig<["jsonb"], "record", { srf: true; coldefs: true }>;
 	jsonb_exists: Sig<["jsonb", "anystring"], "bool">;
 	jsonb_exists_any: Sig<["jsonb", "text[]"], "bool">;
 	jsonb_exists_all: Sig<["jsonb", "text[]"], "bool">;
@@ -738,6 +786,7 @@ export interface FunctionCatalog {
 		Sig<["jsonb", "anystring"], "jsonb">,
 		Sig<["jsonb", "int4"], "jsonb">,
 		Sig<["jsonb", "text[]"], "jsonb">,
+		Sig<["jsonb", "anystring", "..."], "jsonb">,
 	];
 	jsonb_delete_path: Sig<["jsonb", "text[]"], "jsonb">;
 	json_scalar: Sig<["any"], "json">;
@@ -900,8 +949,8 @@ export type MatchKind<P extends string, A extends string> = A extends
 			: "c"
 		: P extends "any" | "..."
 			? "c"
-			: P extends keyof PolyCat
-				? A extends PolyCat[P]
+			: P extends keyof PolyAccepts
+				? A extends PolyAccepts[P]
 					? "x"
 					: false
 				: A extends P
@@ -914,40 +963,27 @@ export type MatchKind<P extends string, A extends string> = A extends
 									? false
 									: "c"
 								: false
-							: P extends keyof ImplicitFrom
-								? A extends ImplicitFrom[P]
-									? "c"
+							: P extends keyof PgTypeFacts
+								? PgTypeFacts[P] extends { readonly from: infer F }
+									? A extends F
+										? "c"
+										: false
 									: false
 								: false;
-type PolyCat = {
-	anynumeric: NumT;
-	anystring: StrT;
-	anyarray: `${string}[]`;
-	anyjson: JsonT;
-	anydatetime: DateTimeT;
-	anyrange: RangeT;
+/**
+ * The catalog's argument categories: the types each accepts, and the type a
+ * parameter passed for it gets (`unknown` when no one type fits; anyarray's
+ * follows the other arguments).
+ */
+type PolyAccepts = { [P in keyof PolyArgs]: PolyArgs[P]["accepts"] };
+export type PolyArgs = {
+	anynumeric: { accepts: NumT; param: "float8" };
+	anystring: { accepts: StrT; param: "text" };
+	anyarray: { accepts: `${string}[]`; param: "unknown" };
+	anyjson: { accepts: JsonT; param: "unknown" };
+	anydatetime: { accepts: DateTimeT; param: "timestamptz" };
+	anyrange: { accepts: RangeT; param: "unknown" };
 };
-type ImplicitFrom = {
-	int4: "int2";
-	int8: "int2" | "int4";
-	numeric: IntT;
-	float4: IntT | "numeric";
-	float8: IntT | "numeric" | "float4";
-	text: StrT;
-	varchar: StrT;
-	bpchar: StrT;
-	timestamptz: "date" | "timestamp";
-	timestamp: "date";
-	timetz: "time";
-	interval: "time";
-	inet: "cidr";
-	oid: IntT;
-	regclass: IntT;
-	regtype: IntT;
-	regproc: IntT;
-	regconfig: IntT;
-};
-
 type ArgsMatch<
 	Ps extends readonly string[],
 	As extends readonly ColInfo[],
@@ -1033,14 +1069,17 @@ type TypeAt<
 	As extends readonly ColInfo[],
 	I extends number,
 > = As[I] extends ColInfo ? LitToText<As[I]["type"]> : "unknown";
+/** The common type of the arguments, or `Unmatched` for the first two that have none. */
 export type CommonOf<
 	As extends readonly ColInfo[],
-	Acc extends string,
+	Acc extends string = "unknown",
 > = As extends readonly [
 	infer A extends ColInfo,
 	...infer R extends readonly ColInfo[],
 ]
-	? CommonOf<R, CommonLit<Acc, A["type"]>>
+	? SelectCommon<Acc, A["type"]> extends infer T extends string
+		? CommonOf<R, T>
+		: SelectCommon<Acc, A["type"]>
 	: LitToText<Acc>;
 
 type ElemOf<T extends string> = T extends `${infer E}[]`
@@ -1101,8 +1140,10 @@ type Ret<
 			? ElemOf<TypeAt<As, 0>>
 			: R extends "$arr1"
 				? ArrOf<TypeAt<As, 0>>
-				: R extends "$common"
-					? CommonOf<As, "unknown">
+				: R extends "$common" | "$eq"
+					? CommonOf<As> extends infer T extends string
+						? T
+						: "unknown"
 					: R extends "$rangeelem1"
 						? RangeElem<TypeAt<As, 0>>
 						: R extends "$multirange1"
@@ -1140,15 +1181,15 @@ export type AllNullable<As extends readonly ColInfo[]> = As extends readonly [
 		? AllNullable<R>
 		: false
 	: true;
-type Prev = { 1: 0; 2: 1; 3: 2; 4: 3; 5: 4; 6: 5; 7: 6; 8: 7 };
+type ArgAt<As extends readonly ColInfo[], I extends number> = [never, ...As][I];
 type AnyNullableAt<
 	As extends readonly ColInfo[],
 	Idx extends readonly number[],
 > = Idx extends readonly [
-	infer I extends keyof Prev,
+	infer I extends number,
 	...infer R extends readonly number[],
 ]
-	? As[Prev[I]] extends { readonly nullable: true }
+	? ArgAt<As, I> extends { readonly nullable: true }
 		? true
 		: AnyNullableAt<As, R>
 	: false;
@@ -1182,16 +1223,14 @@ type CallNullable<
 					: AnyNullable<As>;
 
 type CallInfo<
-	Name extends string,
 	S extends AnySig,
 	As extends readonly ColInfo[],
 	C extends CallCtx,
 > = ArrInfo<
 	Ret<S["ret"], As, C>,
-	NullableCall<Name, S, As, C> extends true ? true : ElemRetNull<S, As>,
+	NullableCall<S, As, C> extends true ? true : ElemRetNull<S, As>,
 	RetElemsNull<S, As>
 >;
-/** Whether the elements of the array a call returns can be NULL. */
 type RetElemsNull<
 	S extends AnySig,
 	As extends readonly ColInfo[],
@@ -1204,10 +1243,10 @@ type ElemsNullable<
 	E extends true | readonly number[],
 	As extends readonly ColInfo[],
 > = E extends readonly [
-	infer I extends keyof Prev,
+	infer I extends number,
 	...infer R extends readonly number[],
 ]
-	? As[Prev[I]] extends infer A extends ColInfo
+	? ArgAt<As, I> extends infer A extends ColInfo
 		? ElemNull<A> extends true
 			? true
 			: ElemsNullable<R, As>
@@ -1223,7 +1262,7 @@ type PassedElems<
 	? HasNullElems<As[0]>
 	: R extends keyof RetArg
 		? HasNullElems<As[RetArg[R]]>
-		: R extends "$common"
+		: R extends "$common" | "$eq"
 			? HasNullElems<As[number]> extends false
 				? false
 				: true
@@ -1234,19 +1273,30 @@ type ElemRetNull<
 	As extends readonly ColInfo[],
 > = S["ret"] extends "$elem1" ? HasNullElems<As[0]> : false;
 
-/** COLLATION FOR returns NULL for an argument of type unknown. */
 type NullableCall<
-	Name extends string,
 	S extends AnySig,
 	As extends readonly ColInfo[],
 	C extends CallCtx,
-> = Name extends "pg_collation_for"
+> = S["untypedNull"] extends true
 	? As extends readonly [{ readonly type: "lit" | "null" | "unknown" }]
 		? true
 		: CallNullable<S, As, C>
 	: CallNullable<S, As, C>;
 
-type SchemaFunctions<DB> = DB extends { readonly $functions: infer F } ? F : {};
+/** The functions whose odd arguments are object keys (json_build_object). */
+export type ObjectBuilders = {
+	[K in keyof FunctionCatalog]: FunctionCatalog[K] extends {
+		readonly object: true;
+	}
+		? K
+		: never;
+}[keyof FunctionCatalog];
+
+/** The names LookupFn finds, which an unknown name's hint picks from. */
+export type FunctionName<DB> =
+	| keyof FunctionCatalog
+	| keyof SchemaFunctions<DB>
+	| keyof PgFunctions;
 
 export type LookupFn<
 	DB,
@@ -1292,54 +1342,20 @@ export type CallType<
 		: PickSig<LookupFn<DB, Name>, As> extends infer S extends AnySig
 			? CallMisuse<Name, S, As, C> extends infer M extends string
 				? SqlError<M, null>
-				: UnknownPolymorphic<Name, As, C> extends true
+				: [C["untypedFirst"], S["poly"]] extends [true, true]
 					? SqlError<
 							"could not determine polymorphic type because input has type unknown",
 							null
 						>
 					: S["ret"] extends "$common"
-						? CommonMismatch<Name, As, "unknown"> extends infer M extends string
-							? SqlError<M, null>
-							: CallInfo<Name, S, As, C>
-						: CallInfo<Name, S, As, C>
-			: Info<"unknown", true>;
-
-/** An anyelement argument that only an untyped literal or NULL fills. */
-type UnknownPolymorphic<
-	Name extends string,
-	As extends readonly ColInfo[],
-	C extends CallCtx,
-> = C["untypedFirst"] extends true ? PolymorphicArity<Name, As> : false;
-type PolymorphicArity<
-	Name extends string,
-	As extends readonly ColInfo[],
-> = Name extends
-	| "first_value"
-	| "last_value"
-	| "nth_value"
-	| "any_value"
-	| "lag"
-	| "lead"
-	? As["length"] extends 1 | 2
-		? true
-		: false
-	: false;
-
-/** PostgreSQL's select_common_type error for coalesce, greatest and least. */
-type CommonMismatch<
-	Name extends string,
-	As extends readonly ColInfo[],
-	Acc extends string,
-> = Name extends "coalesce" | "greatest" | "least"
-	? As extends readonly [
-			infer A extends ColInfo,
-			...infer R extends readonly ColInfo[],
-		]
-		? Unmatchable<Acc, A["type"]> extends true
-			? `${Uppercase<Name>} types ${TypeDisplay<Acc>} and ${TypeDisplay<A["type"]>} cannot be matched`
-			: CommonMismatch<Name, R, CommonLit<Acc, A["type"]>>
-		: null
-	: null;
+						? CommonOf<As> extends string
+							? CallInfo<S, As, C>
+							: UnmatchedErr<Uppercase<Name>, CommonOf<As>>
+						: CallInfo<S, As, C>
+			: SqlError<
+					`function ${Name}(${ArgList<As, "", true>}) does not exist`,
+					null
+				>;
 
 type CallMisuse<
 	Name extends string,
@@ -1351,7 +1367,7 @@ type CallMisuse<
 		? AggMisuse<Name, As, C>
 		: S["ret"] extends "$wg" | "$wgarr" | "$pct" | "$pctarr"
 			? `function ${Name}(${ArgList<As, "", true>}) does not exist`
-			: Name extends "rank" | "dense_rank" | "percent_rank" | "cume_dist"
+			: S["hypothetical"] extends true
 				? `WITHIN GROUP is required for ordered-set aggregate ${Name}`
 				: AggMisuse<Name, As, C>
 	: S["window"] extends true

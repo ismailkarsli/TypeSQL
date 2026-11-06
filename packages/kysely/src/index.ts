@@ -1,5 +1,5 @@
 import type { SqlPlugin } from "@typesql/core";
-import { createTransactionalSql } from "@typesql/core/adapter";
+import { createFamilySql } from "@typesql/core/adapter";
 import type {
 	MariaDbDialect,
 	MariaDbTransactionalSql,
@@ -19,12 +19,7 @@ import type {
 	DefaultTypeMap as SqliteTypeMap,
 } from "@typesql/core/sqlite";
 import type { ControlledTransaction, Kysely, Transaction } from "kysely";
-import {
-	driver,
-	type KyselyExecutor,
-	mysqlDriver,
-	sqliteDriver,
-} from "./client.js";
+import { driverOf, type KyselyExecutor } from "./client.js";
 import type {
 	FromKysely,
 	KyselyOptions,
@@ -152,14 +147,5 @@ export function createSql(
 	dialect: PostgresDialect | SqliteDialect | MySqlDialect | MariaDbDialect,
 	db?: KyselyExecutor,
 ): object {
-	switch (dialect.name) {
-		case "sqlite":
-			return createTransactionalSql(dialect, db, sqliteDriver);
-		case "mysql":
-			return createTransactionalSql(dialect, db, mysqlDriver);
-		case "mariadb":
-			return createTransactionalSql(dialect, db, mysqlDriver);
-		default:
-			return createTransactionalSql(dialect, db, driver);
-	}
+	return createFamilySql(dialect, db, driverOf);
 }

@@ -1,17 +1,15 @@
 import type { NarrowKeys, NarrowLevel } from "../../../engine/narrow.js";
+import type { Next } from "../../../engine/next.js";
 import type {
 	ColInfo,
 	ColMap,
 	Cols,
 	ColsToMap,
-	CteMap,
-	Ctx,
 	Info,
-	MkCtx,
-	QueryContext,
 	ScopeLevel,
 } from "../../../engine/types.js";
 import type { AnyErr, SqlError } from "../../../errors.js";
+import type { TypeFact } from "../../schema/type-facts.js";
 import type {
 	Cte,
 	CteCycle,
@@ -35,24 +33,26 @@ import type {
 	CheckOutputOrder,
 	CheckWindowClause,
 	CheckWindowRefs,
+	Grouped,
 	HasStar,
 	ResolveSortKeys,
+	SetsLevel,
 	TargetExprs,
-	TypeDisplay,
 	WindowDefs,
 } from "../binder/clauses.js";
 import type { BindFrom, RenameCols } from "../binder/from.js";
 import type { ExpandStar } from "../binder/resolve.js";
-import type { Nx } from "../parser/util.js";
 import type {
 	ArrInfo,
 	HasNullElems,
+	LitToText,
 	NullableMap,
 	ObjShape,
 	Shaped,
 } from "../shape.js";
-import type { CommonLit, LitToText } from "../typer/operators.js";
+import type { SelectCommon, UnmatchedErr } from "../typer/operators.js";
 import type { TypeOf } from "../typer/typeof.js";
+import type { CteMap, Ctx, MkCtx, QueryContext } from "../types.js";
 import type { ColumnName } from "./naming.js";
 import type { ProjectStmt } from "./stmt.js";
 
@@ -106,7 +106,7 @@ type BindCtes<
 						AddCte<Env["ctes"], Cs[I]["name"], M>
 					>,
 					Seen | Cs[I]["name"],
-					Nx<I>
+					Next<I>
 				>
 			: BindCte<Cs[I], Rec, Env>;
 
@@ -259,15 +259,10 @@ type CycleMarkType<To, Def> = [To, Def] extends [
 ]
 	? ConstType<V> extends infer A extends string
 		? ConstType<D> extends infer B extends string
-			? CommonLit<A, B> extends infer T extends string
+			? SelectCommon<A, B> extends infer T extends string
 				? T extends "unknown"
-					? B extends "unknown"
-						? "text"
-						: SqlError<
-								`CYCLE types ${TypeDisplay<A>} and ${TypeDisplay<B>} cannot be matched`,
-								null
-							>
-					: LitToText<T> extends NoEquality
+					? "text"
+					: TypeFact<LitToText<T>, "eq", true> extends false
 						? SqlError<
 								`could not identify an equality operator for type ${LitToText<T>}`,
 								null
@@ -278,24 +273,10 @@ type CycleMarkType<To, Def> = [To, Def] extends [
 									null
 								>
 							: LitToText<T>
-				: never
+				: UnmatchedErr<"CYCLE", SelectCommon<A, B>>
 			: never
 		: never
 	: "bool";
-type NoEquality =
-	| "box"
-	| "circle"
-	| "json"
-	| "jsonpath"
-	| "line"
-	| "lseg"
-	| "path"
-	| "pg_snapshot"
-	| "point"
-	| "polygon"
-	| "refcursor"
-	| "txid_snapshot"
-	| "xml";
 type ConstType<E extends Expr> =
 	E extends Tag<"str">
 		? "lit"
@@ -400,13 +381,17 @@ type WithExtra<M extends ColMap, X extends ColMap> = M & X extends infer All
 	? { readonly [K in keyof All]: All[K] }
 	: never;
 type FixStep<M0 extends ColMap, Full extends ColMap> = {
-	readonly [K in keyof M0]: {
-		readonly type: M0[K]["type"];
-		readonly nullable: Full[K & string]["nullable"];
-	};
+	readonly [K in keyof M0]: ArrInfo<
+		M0[K]["type"],
+		Full[K & string]["nullable"],
+		HasNullElems<M0[K]> extends true ? true : HasNullElems<Full[K & string]>
+	>;
 };
 type Changed<A extends ColMap, B extends ColMap> = {
-	[K in keyof A]: [A[K]["nullable"]] extends [B[K & string]["nullable"]]
+	[K in keyof A]: [A[K]["nullable"], HasNullElems<A[K]>] extends [
+		B[K & string]["nullable"],
+		HasNullElems<B[K & string]>,
+	]
 		? never
 		: K;
 }[keyof A];
@@ -551,20 +536,15 @@ type AlignCols<
 				readonly t: infer LT extends ColInfo;
 			}
 		? R[I] extends { readonly t: infer RT extends ColInfo }
-			? CommonLit<LT["type"], RT["type"]> extends infer T extends string
+			? SelectCommon<LT["type"], RT["type"]> extends infer T extends string
 				? T extends "unknown"
-					? RT["type"] extends "unknown"
-						? AlignSetOp<
-								L,
-								R,
-								Op,
-								[...Acc, { readonly n: N; readonly t: Info<"unknown", true> }],
-								Nx<I>
-							>
-						: SqlError<
-								`${Op} types ${TypeDisplay<LT["type"]>} and ${TypeDisplay<RT["type"]>} cannot be matched`,
-								null
-							>
+					? AlignSetOp<
+							L,
+							R,
+							Op,
+							[...Acc, { readonly n: N; readonly t: Info<"unknown", true> }],
+							Next<I>
+						>
 					: AlignSetOp<
 							L,
 							R,
@@ -580,9 +560,9 @@ type AlignCols<
 									>;
 								},
 							],
-							Nx<I>
+							Next<I>
 						>
-				: never
+				: UnmatchedErr<Op, SelectCommon<LT["type"], RT["type"]>>
 			: R[I] extends undefined
 				? CountErr<Op>
 				: RestFrom<L, I, Acc>
@@ -595,7 +575,7 @@ type RestFrom<
 	C extends Cols,
 	I extends number,
 	Acc extends Cols,
-> = C[I] extends undefined ? Acc : RestFrom<C, Nx<I>, [...Acc, C[I]]>;
+> = C[I] extends undefined ? Acc : RestFrom<C, Next<I>, [...Acc, C[I]]>;
 
 type ProjectValues<
 	Rows extends readonly (readonly Expr[])[],
@@ -667,7 +647,7 @@ type OperandRow<
 					: TypeOf<Row[I], C>
 			) extends infer T
 		? T extends ColInfo
-			? OperandRow<Row, C, [...Acc, T], Nx<I>>
+			? OperandRow<Row, C, [...Acc, T], Next<I>>
 			: T
 		: never;
 
@@ -680,7 +660,7 @@ type MergeRows<
 	? OperandRow<Rows[I], C, [], 0> extends infer Us extends readonly ColInfo[]
 		? Us["length"] extends Acc["length"]
 			? ZipCommon<Acc, Us, [], 0> extends infer Z extends readonly ColInfo[]
-				? MergeRows<Rows, Z, C, Nx<I>>
+				? MergeRows<Rows, Z, C, Next<I>>
 				: ZipCommon<Acc, Us, [], 0>
 			: SqlError<"VALUES lists must all be the same length", null>
 		: OperandRow<Rows[I], C, [], 0>
@@ -692,24 +672,23 @@ type ZipCommon<
 	Acc extends readonly ColInfo[],
 	I extends number,
 > = A[I] extends ColInfo
-	? CommonLit<A[I]["type"], B[I]["type"]> extends infer T extends string
+	? SelectCommon<A[I]["type"], B[I]["type"]> extends infer T extends string
 		? T extends "unknown"
-			? B[I]["type"] extends "unknown"
-				? ZipCommon<A, B, [...Acc, Info<"unknown", true>], Nx<I>>
-				: SqlError<
-						`VALUES types ${TypeDisplay<A[I]["type"]>} and ${TypeDisplay<B[I]["type"]>} cannot be matched`,
-						null
-					>
+			? ZipCommon<A, B, [...Acc, Info<"unknown", true>], Next<I>>
 			: ZipCommon<
 					A,
 					B,
 					[
 						...Acc,
-						Info<T, A[I]["nullable"] extends true ? true : B[I]["nullable"]>,
+						ArrInfo<
+							T,
+							A[I]["nullable"] extends true ? true : B[I]["nullable"],
+							HasNullElems<A[I]> extends true ? true : HasNullElems<B[I]>
+						>,
 					],
-					Nx<I>
+					Next<I>
 				>
-		: never
+		: UnmatchedErr<"VALUES", SelectCommon<A[I]["type"], B[I]["type"]>>
 	: Acc;
 
 type ValuesCols<
@@ -722,12 +701,16 @@ type ValuesCols<
 ]
 	? ValuesCols<
 			R,
-			Nx<I>,
+			Next<I>,
 			[
 				...Acc,
 				{
 					readonly n: `column${I}`;
-					readonly t: Info<LitToText<T["type"]>, T["nullable"]>;
+					readonly t: ArrInfo<
+						LitToText<T["type"]>,
+						T["nullable"],
+						HasNullElems<T>
+					>;
 				},
 			]
 		>
@@ -804,40 +787,6 @@ type ProjectSimple<
 				: never
 			: never
 		: BindFrom<From, Env>;
-
-type Grouped<GroupBy, Sets> = Sets extends false
-	? GroupBy extends null
-		? false
-		: true
-	: false;
-
-type SetsLevel<L extends ScopeLevel, Sets> = Sets extends false
-	? L
-	: NullLevel<L, Sets extends readonly unknown[] ? LeftOut<L, Sets> : string>;
-type LeftOut<
-	L extends ScopeLevel,
-	Is extends readonly unknown[],
-> = Is extends readonly [infer H, ...infer R]
-	? H extends { readonly t: "col"; readonly name: infer N }
-		? N extends LevelNames<L>
-			? N | LeftOut<L, R>
-			: string
-		: string
-	: never;
-type LevelNames<L extends ScopeLevel> = {
-	[I in keyof L]: keyof L[I]["cols"];
-}[number];
-type NullLevel<L extends ScopeLevel, Names> = {
-	readonly [I in keyof L]: {
-		readonly alias: L[I]["alias"];
-		readonly cols: {
-			readonly [K in keyof L[I]["cols"]]: K extends Names
-				? { readonly type: L[I]["cols"][K]["type"]; readonly nullable: true }
-				: L[I]["cols"][K];
-		};
-		readonly skip: L[I]["skip"];
-	};
-};
 
 type CheckSimple<
 	Distinct,
@@ -921,7 +870,7 @@ export type ProjectTargets<
 > = Ts[I] extends infer Tg extends Target
 	? ProjectStarTarget<Tg["e"], C> extends infer R
 		? R extends { readonly star: ColMap }
-			? ProjectTargets<Ts, C, [...Acc, R], Nx<I>, Lit>
+			? ProjectTargets<Ts, C, [...Acc, R], Next<I>, Lit>
 			: R extends "typed"
 				? (
 						Lit extends true
@@ -936,7 +885,7 @@ export type ProjectTargets<
 									Ts,
 									C,
 									[...Acc, { readonly n: N; readonly t: Ty }],
-									Nx<I>,
+									Next<I>,
 									Lit
 								>
 							: ColumnName<Tg["e"], Tg["alias"], C>
@@ -953,7 +902,7 @@ type ProjectStarTarget<E, C extends Ctx> = E extends {
 		? { readonly star: M }
 		: ExpandStar<C["scope"], Tbl>
 	: E extends { readonly t: "field"; readonly name: "*"; readonly e: infer F }
-		? FieldStar<TypeOf<F & Expr, C>> extends infer M extends ColMap
+		? FieldStar<TypeOf<Extract<F, Expr>, C>> extends infer M extends ColMap
 			? { readonly star: M }
-			: FieldStar<TypeOf<F & Expr, C>>
+			: FieldStar<TypeOf<Extract<F, Expr>, C>>
 		: "typed";

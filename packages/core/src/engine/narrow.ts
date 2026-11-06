@@ -1,6 +1,10 @@
-import type { Nx } from "./parse.js";
+import type { Next } from "./next.js";
 import type { ColMap, ScopeItem, ScopeLevel } from "./types.js";
 
+/**
+ * The columns a WHERE, ON or FILTER condition `E` proves non-null: those a
+ * conjunct rejects NULL in, as `[table or null, column]`.
+ */
 export type NarrowKeys<E> = AndKeys<E, never>;
 
 type AndKeys<E, Acc> = E extends {
@@ -12,6 +16,7 @@ type AndKeys<E, Acc> = E extends {
 	? AndKeys<E["l"], Acc | AndKeys<E["r"], never>>
 	: Acc | ConjunctKeys<E>;
 
+// Comparisons that are NULL when an operand is NULL, of every dialect.
 type StrictBoolOp =
 	| "="
 	| "=="
@@ -81,8 +86,18 @@ type ConjunctKeys<E> = E extends { readonly t: "col" }
 						? ColKey<X>
 						: ColKey<X> | ColKey<Lo> | ColKey<Hi>
 					: E extends { readonly t: "in" | "insub"; readonly e: infer X }
-						? ColKey<X>
-						: E extends { readonly t: "quant"; readonly l: infer X }
+						? // `NULL NOT IN ()` and `NULL NOT IN (empty subquery)` are true
+							E extends { readonly not: false }
+							? ColKey<X>
+							: E extends { readonly list: readonly [unknown, ...unknown[]] }
+								? ColKey<X>
+								: never
+						: // `NULL <> ALL (empty subquery)` is true
+							E extends {
+									readonly t: "quant";
+									readonly q: "any";
+									readonly l: infer X;
+								}
 							? ColKey<X>
 							: never;
 
@@ -95,10 +110,6 @@ type ColKey<E> = E extends {
 	: E extends { readonly t: "cast" | "collate"; readonly e: infer X }
 		? ColKey<X>
 		: never;
-
-export type UsingKeys<U extends string> = U extends string
-	? readonly [null, U]
-	: never;
 
 export type NarrowLevel<L extends ScopeLevel, Keys> = [Keys] extends [never]
 	? L
@@ -127,7 +138,7 @@ type AnyHit<
 > = L[I] extends ScopeItem
 	? true extends KeyHits<L[I], Keys>
 		? true
-		: AnyHit<L, Keys, Nx<I>>
+		: AnyHit<L, Keys, Next<I>>
 	: false;
 type KeyHits<It extends ScopeItem, Keys> = Keys extends readonly [
 	unknown,
@@ -142,9 +153,17 @@ type KeyHits<It extends ScopeItem, Keys> = Keys extends readonly [
 			: false
 	: false;
 
+// An item an outer join made nullable keeps its own columns in `orig`. A
+// condition that rejects NULL in one of its columns drops the rows where it
+// had no match, so the columns get back their own nullability.
 type NarrowItem<It extends ScopeItem, Keys> = {
 	readonly [P in keyof It]: P extends "cols"
-		? NarrowCols<It["cols"], It["alias"], It["skip"][number], Keys>
+		? NarrowCols<
+				It extends { readonly orig: ColMap } ? It["orig"] : It["cols"],
+				It["alias"],
+				It["skip"][number],
+				Keys
+			>
 		: It[P];
 };
 type NarrowCols<M extends ColMap, A, Skip, Keys> = {

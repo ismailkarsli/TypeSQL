@@ -1,0 +1,30 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`kysely-sqlite-attached > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "inserted": "number",
+      "rows": "({ id: number; name: string; note: null | string })[]",
+    },
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "{
+  inserted: 1,
+  rows: [
+    { id: 1, note: null, name: 'Ada' },
+    { id: 2, note: 'login', name: 'Ada' }
+  ]
+}
+",
+  },
+}
+`;

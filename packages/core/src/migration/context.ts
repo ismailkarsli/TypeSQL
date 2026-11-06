@@ -1,16 +1,14 @@
-import { createDialectSql } from "../create-sql.js";
+import { createSqlApi } from "../create-sql.js";
 import type {
 	ApplyDdlOf,
+	Dialect,
 	DialectTypes,
-	StrictNullChecksMessage,
+	NonStrict,
 	ValidateDdlOf,
 } from "../dialect.js";
-import type { EngineTypes } from "../engine/contract.js";
 import type { SqlError } from "../errors.js";
-import { mariadb, mysql } from "../mysql/dialect.js";
 import type { MariaDbEngine, MySqlEngine } from "../mysql/engine/index.js";
-import type { MariaDb, MySql, Mysql2MariaDbTypeMap } from "../mysql/index.js";
-import { postgres } from "../postgres/dialect.js";
+import type { MariaDb, MySql } from "../mysql/index.js";
 // The types come from the public entry points, so the declarations of a
 // project that exports a migration can name its schema's types (TS2883).
 import type { PgEngine } from "../postgres/engine/index.js";
@@ -18,18 +16,18 @@ import type { Postgres } from "../postgres/index.js";
 import type { Executor } from "../query.js";
 import type { SqlApi } from "../sql/api.js";
 import type { BoxCallArgs, CallRet, GateCallCheck } from "../sql/call.js";
-import { sqlite } from "../sqlite/dialect.js";
+import type { EngineTypes } from "../sql/contract.js";
 import type { SqliteEngine } from "../sqlite/engine/index.js";
 import type { Sqlite } from "../sqlite/index.js";
+import type { MariaDbRows, MySqlRows } from "./dialects/mysql.js";
+import type { PostgresRows } from "./dialects/postgres.js";
+import type { SqliteRows } from "./dialects/sqlite.js";
+import type { MissingSchema } from "./schema.js";
 
-// Without strictNullChecks every query and DDL statement is this error, as
-// for `sql` (see StrictSql).
-type NonStrict = null extends string
-	? SqlError<StrictNullChecksMessage, null>
-	: never;
-
-// The strictNullChecks check sits inside the [DB, Q] inference: as the outer
-// conditional, the editor's string completion in `.ddl("…")` took about 35s.
+// Without strictNullChecks every query and DDL statement is NonStrict's
+// error, as for `sql` (see StrictSql). The strictNullChecks check sits inside
+// the [DB, Q] inference: as the outer conditional, the editor's string
+// completion in `.ddl("…")` took about 35s.
 type GateDdl<T extends DialectTypes, DB, Q extends string> = [DB, Q] extends [
 	infer D,
 	infer Text extends string,
@@ -79,30 +77,32 @@ export interface MigrationContext<
 	): Promise<MigrationContext<E, T, NewSchema, TM>>;
 }
 
+// Each runs on the connection its migrator dialect opens, so its rows are
+// typed as that connection returns them.
 export type PostgresMigration<Base = {}> = MigrationContext<
 	PgEngine,
 	Postgres,
-	Base
+	Base,
+	PostgresRows
 >;
 export type SqliteMigration<Base = {}> = MigrationContext<
 	SqliteEngine,
 	Sqlite,
-	Base
+	Base,
+	SqliteRows
 >;
 export type MySqlMigration<Base = {}> = MigrationContext<
 	MySqlEngine,
 	MySql,
-	Base
+	Base,
+	MySqlRows
 >;
-/** MariaDB through mysql2, as the migrator runs it: mysql2's type map. */
 export type MariaDbMigration<Base = {}> = MigrationContext<
 	MariaDbEngine,
 	MariaDb,
 	Base,
-	Mysql2MariaDbTypeMap
+	MariaDbRows
 >;
-
-export type MigrationDialect = "postgres" | "sqlite" | "mysql" | "mariadb";
 
 export type AnyMigrationContext =
 	| PostgresMigration
@@ -110,9 +110,6 @@ export type AnyMigrationContext =
 	| MySqlMigration
 	| MariaDbMigration;
 
-declare const MISSING_SCHEMA: unique symbol;
-/** The schema of a migration whose `up` doesn't return its context. */
-export type MissingSchema = { readonly [MISSING_SCHEMA]: true };
 type MissingSchemaError = SqlError<
 	"the previous migration's up() does not return its migration context, so its schema is unknown; end it with `return db`",
 	0
@@ -120,35 +117,20 @@ type MissingSchemaError = SqlError<
 
 /**
  * Internal factory: execution is bound to the runner's active transaction.
- * `step` runs each `.ddl()` and `.raw()` statement; the runner splits a
- * SQLite script into its statements there.
+ * `script` runs each `.ddl()` and `.raw()` script.
  */
 export function createMigrationContext(
-	dialect: MigrationDialect,
+	dialect: Dialect,
 	execute: Executor,
-	step: (kind: "ddl" | "raw", statement: string) => Promise<void> = async (
-		_,
-		statement,
-	) => {
-		await execute(statement, []);
-	},
+	script: (text: string) => Promise<void>,
 ): AnyMigrationContext {
-	// Avoid comparing the recursive SQL APIs when choosing a runtime dialect.
-	let sql: object;
-	if (dialect === "postgres") sql = createDialectSql(postgres, execute);
-	else if (dialect === "sqlite") sql = createDialectSql(sqlite, execute);
-	else if (dialect === "mysql") sql = createDialectSql(mysql, execute);
-	else if (dialect === "mariadb") sql = createDialectSql(mariadb, execute);
-	else throw new Error(`typesql: unsupported migration dialect: ${dialect}`);
-	const next = (kind: "ddl" | "raw") => async (statement: string) => {
-		await step(kind, statement);
-		return createMigrationContext(dialect, execute, step);
+	// An object: comparing the dialects' recursive SQL APIs is too deep.
+	const sql: object = createSqlApi(dialect, execute);
+	const next = async (text: string) => {
+		await script(text);
+		return createMigrationContext(dialect, execute, script);
 	};
-	Object.assign(sql, {
-		ddl: next("ddl"),
-		add: next("ddl"),
-		raw: next("raw"),
-	});
+	Object.assign(sql, { ddl: next, add: next, raw: next });
 	if (!isMigrationContext(sql))
 		throw new Error("typesql: cannot create the migration context");
 	return sql;

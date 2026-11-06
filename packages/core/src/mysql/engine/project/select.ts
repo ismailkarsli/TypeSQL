@@ -1,6 +1,10 @@
+import type { NameAt, NamedAt } from "../../../engine/family/diagnostics.js";
+import type { NullLevel, RenameCells } from "../../../engine/family/scope.js";
+import type { QueryContext } from "../../../engine/family/types.js";
 import type { NarrowKeys, NarrowLevel } from "../../../engine/narrow.js";
-import type { Nx } from "../../../engine/parse.js";
-import type { ColInfo, QueryContext, Scope } from "../../../engine/types.js";
+import type { Next } from "../../../engine/next.js";
+import type { Tup } from "../../../engine/num.js";
+import type { ColInfo, Info, Scope } from "../../../engine/types.js";
 import type { AnyErr, SqlError } from "../../../errors.js";
 import type {
 	Cte,
@@ -17,12 +21,10 @@ import type {
 	BindFrom,
 	CteEntry,
 	DupCell,
-	NullLevel,
-	RenameCells,
 	StarCells,
 } from "../binder/scope.js";
 import type { IsAggCall } from "../typer/functions.js";
-import type { Common, Info, TypeList, TypeOf } from "../typer/typeof.js";
+import type { Common, TypeList, TypeOf } from "../typer/typeof.js";
 import type {
 	AggMode,
 	Cell,
@@ -32,7 +34,6 @@ import type {
 	MyColOf,
 	MyCteMap,
 	MyCtx,
-	MyItem,
 	MyLevel,
 } from "../types.js";
 
@@ -65,9 +66,12 @@ type LimitOk<E> = E extends null
 		? true
 		: E extends { readonly t: "num"; readonly v: infer V extends string }
 			? V extends `${string}${"." | "e" | "E" | "-"}${string}`
-				? SqlError<"Incorrect arguments to LIMIT", null>
+				? SqlError<"Incorrect arguments to LIMIT", NameAt<"limit">>
 				: true
-			: SqlError<"You have an error in your SQL syntax near LIMIT", null>;
+			: SqlError<
+					"You have an error in your SQL syntax near LIMIT",
+					NameAt<"limit">
+				>;
 
 export type BindWith<
 	W,
@@ -89,7 +93,7 @@ type CteLoop<
 						Env["scope"],
 						Env["ctes"] & { readonly [K in C["name"]]: CteEntry<R> }
 					>,
-					Nx<I>
+					Next<I>
 				>
 		: CteCells<C, Env>
 	: Env["ctes"];
@@ -249,11 +253,17 @@ type CompoundOrder<
 					readonly name: infer N extends string;
 				}
 			? N extends Lowercase<M[number]["n"]>
-				? CompoundOrder<O, M, Nx<I>>
-				: SqlError<`Unknown column '${E["disp"]}' in 'order clause'`, null>
+				? CompoundOrder<O, M, Next<I>>
+				: SqlError<
+						`Unknown column '${E["disp"]}' in 'order clause'`,
+						NamedAt<E["disp"], "column">
+					>
 			: E extends { readonly t: "col" }
-				? SqlError<`Unknown column '${E["disp"]}' in 'order clause'`, null>
-				: CompoundOrder<O, M, Nx<I>>
+				? SqlError<
+						`Unknown column '${E["disp"]}' in 'order clause'`,
+						NamedAt<E["disp"], "column">
+					>
+				: CompoundOrder<O, M, Next<I>>
 	: true;
 
 type PositionOk<
@@ -263,21 +273,14 @@ type PositionOk<
 > = V extends `${infer K extends number}`
 	? `${K}` extends V
 		? K extends 0
-			? SqlError<`Unknown column '${V}' in '${Where}'`, null>
-			: PosGE<N, K> extends true
+			? SqlError<`Unknown column '${V}' in '${Where}'`, NamedAt<V, "column">>
+			: // A position from a literal may be any size, so only the result's
+				// columns are counted: `K` is one of 1…N.
+				`${K}` extends keyof [0, ...Tup<N>]
 				? true
-				: SqlError<`Unknown column '${V}' in '${Where}'`, null>
+				: SqlError<`Unknown column '${V}' in '${Where}'`, NamedAt<V, "column">>
 		: true
 	: true;
-// A position from a literal may be any size: the tuple stops at 64, past
-// which no result has a column anyway.
-type PosGE<A extends number, B extends number> =
-	PosTup<A> extends [...PosTup<B>, ...unknown[]] ? true : false;
-type PosTup<N extends number, A extends unknown[] = []> = A["length"] extends N
-	? A
-	: A["length"] extends 64
-		? A
-		: PosTup<N, [...A, 0]>;
 
 type ProjectValues<
 	B extends ValuesBody,
@@ -333,7 +336,7 @@ type ValuesRows<
 	Acc extends readonly (readonly ColInfo[])[],
 > = Rows[I] extends infer Row extends readonly Expr[]
 	? TypeList<Row, C> extends infer X extends readonly ColInfo[]
-		? ValuesRows<Rows, C, Nx<I>, [...Acc, X]>
+		? ValuesRows<Rows, C, Next<I>, [...Acc, X]>
 		: TypeList<Row, C>
 	: Acc;
 
@@ -341,7 +344,9 @@ export type HasAgg<E, DB> = E extends { readonly t: string }
 	? IsAggCall<E, DB> extends true
 		? true
 		: E extends { readonly t: "sub" | "exists" | "insub" | "quant" }
-			? E extends { readonly t: "insub" | "quant"; readonly e: infer X }
+			? E extends
+					| { readonly t: "insub"; readonly e: infer X }
+					| { readonly t: "quant"; readonly l: infer X }
 				? HasAgg<X, DB>
 				: false
 			: true extends HasAggIn<E, DB>
@@ -370,8 +375,8 @@ type HasAggList<
 				? true
 				: HasAgg<V, DB> extends true
 					? true
-					: HasAggList<L, DB, Nx<I>>
-			: HasAggList<L, DB, Nx<I>>;
+					: HasAggList<L, DB, Next<I>>
+			: HasAggList<L, DB, Next<I>>;
 
 /** A column reference outside any aggregate (and outside subqueries). */
 type BareCol<E, DB> = E extends {
@@ -386,7 +391,9 @@ type BareCol<E, DB> = E extends {
 				? never
 				: E extends { readonly t: "sub" | "exists" }
 					? never
-					: E extends { readonly t: "insub" | "quant"; readonly e: infer X }
+					: E extends
+								| { readonly t: "insub"; readonly e: infer X }
+								| { readonly t: "quant"; readonly l: infer X }
 						? BareCol<X, DB>
 						: BareColIn<E, DB>
 		: never;
@@ -431,14 +438,14 @@ type FullGroupBy<
 	? T extends { readonly t: "expr"; readonly e: infer E }
 		? BareCol<E, DB> extends infer D extends string
 			? [D] extends [never]
-				? FullGroupBy<Ts, DB, Nx<I>>
+				? FullGroupBy<Ts, DB, Next<I>>
 				: SqlError<
-						`In aggregated query without GROUP BY, expression #${Nx<I>} of SELECT list contains nonaggregated column '${FirstName<D>}'; this is incompatible with sql_mode=only_full_group_by`,
+						`In aggregated query without GROUP BY, expression #${Next<I>} of SELECT list contains nonaggregated column '${FirstName<D>}'; this is incompatible with sql_mode=only_full_group_by`,
 						null
 					>
 			: never
 		: SqlError<
-				`In aggregated query without GROUP BY, expression #${Nx<I>} of SELECT list contains nonaggregated column; this is incompatible with sql_mode=only_full_group_by`,
+				`In aggregated query without GROUP BY, expression #${Next<I>} of SELECT list contains nonaggregated column; this is incompatible with sql_mode=only_full_group_by`,
 				null
 			>
 	: true;
@@ -446,7 +453,9 @@ type FullGroupBy<
 /** Names of windows referenced as `OVER name`, outside subqueries. */
 type WindowRefs<E> = E extends { readonly t: string }
 	? E extends { readonly t: "sub" | "exists" | "insub" | "quant" }
-		? E extends { readonly t: "insub" | "quant"; readonly e: infer X }
+		? E extends
+				| { readonly t: "insub"; readonly e: infer X }
+				| { readonly t: "quant"; readonly l: infer X }
 			? WindowRefs<X>
 			: never
 		:
@@ -483,7 +492,7 @@ type MissingWindow<S extends SimpleSelect, OrderBy extends readonly Expr[]> =
 		: null
 	: null;
 type FirstName<U extends string> =
-	import("../../../sql/splice.js").UnionList<U> extends readonly [
+	import("../../../engine/object.js").Members<U> extends readonly [
 		infer F extends string,
 		...unknown[],
 	]
@@ -516,7 +525,7 @@ type ProjectSimpleChecked<
 				: (
 							S["where"] extends Expr
 								? NarrowKeys<S["where"]> extends infer Keys
-									? NarrowLevel<RestoreOuter<L, Keys>, Keys>
+									? NarrowLevel<L, Keys>
 									: never
 								: L
 						) extends infer NL extends MyLevel
@@ -583,42 +592,6 @@ type ProjectSimpleChecked<
 			: never
 		: BindFrom<S["from"], Env>;
 
-/**
- * A WHERE condition that rejects NULL in a column of a table an outer join
- * made nullable only keeps rows where that table matched: its columns get
- * back their own nullability, as if the join were an inner join.
- */
-type RestoreOuter<L extends MyLevel, Keys> = [Keys] extends [never]
-	? L
-	: {
-			readonly [I in keyof L]: L[I] extends {
-				readonly orig: infer O extends MyColMap;
-			}
-				? Matched<L[I], Keys> extends true
-					? {
-							readonly [P in keyof L[I]]: P extends "cols" ? O : L[I][P];
-						}
-					: L[I]
-				: L[I];
-		};
-type Matched<It extends MyItem, Keys> = true extends (
-	Keys extends readonly [infer T, infer C extends string]
-		? C extends keyof It["cols"]
-			? T extends null
-				? C extends It["skip"][number]
-					? false
-					: true
-				: It["alias"] extends string
-					? Lowercase<It["alias"]> extends T
-						? true
-						: false
-					: false
-			: false
-		: false
-)
-	? true
-	: false;
-
 /** WHERE sees the tables only: MySQL resolves no SELECT alias there. */
 type CheckWhere<W, DB, S extends Scope, Ctes extends MyCteMap> = W extends Expr
 	? HasAgg<W, DB> extends true
@@ -658,7 +631,7 @@ type ProjectTargets<
 					: never
 			) extends infer S
 			? S extends readonly Cell[]
-				? ProjectTargets<Ts, L, C, Nx<I>, [...Acc, ...S], Ret>
+				? ProjectTargets<Ts, L, C, Next<I>, [...Acc, ...S], Ret>
 				: S
 			: never
 		: T extends {
@@ -673,7 +646,7 @@ type ProjectTargets<
 						Ts,
 						L,
 						C,
-						Nx<I>,
+						Next<I>,
 						[
 							...Acc,
 							{
@@ -758,10 +731,10 @@ type ClauseTerms<
 	? E extends { readonly t: "num"; readonly v: infer V extends string }
 		? PositionOk<V, N, W> extends AnyErr
 			? PositionOk<V, N, W>
-			: ClauseTerms<O, C, N, W, Nx<I>>
+			: ClauseTerms<O, C, N, W, Next<I>>
 		: (W extends "group statement" ? HasAgg<E, C["db"]> : false) extends true
 			? SqlError<"Can't group on aggregate", null>
 			: TypeOf<E, C> extends AnyErr
 				? TypeOf<E, C>
-				: ClauseTerms<O, C, N, W, Nx<I>>
+				: ClauseTerms<O, C, N, W, Next<I>>
 	: true;

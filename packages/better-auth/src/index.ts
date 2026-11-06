@@ -1,5 +1,4 @@
-import type { Query } from "@typesql/core";
-import type { Sql } from "@typesql/core/postgres";
+import type { AnyDialectBrand, DIALECT, Query } from "@typesql/core";
 import type { BetterAuthOptions } from "better-auth";
 import {
 	type AdapterFactoryConfig,
@@ -13,6 +12,7 @@ import {
 	type ModelTarget,
 } from "better-auth/adapters";
 import {
+	DIALECTS,
 	type Dialect,
 	quote,
 	Statement,
@@ -43,12 +43,9 @@ export interface TypesqlAdapterConfig {
 	readonly debugLogs?: DBAdapterDebugLogOption | undefined;
 }
 
-type Brand = {
-	readonly name: Dialect;
-	readonly inputs: (inputs: [never, never, []]) => [unknown, unknown, []];
-};
+type Brand = AnyDialectBrand<Dialect>;
 
-type BrandKey = Extract<keyof Sql<unknown, unknown>, symbol>;
+type BrandKey = typeof DIALECT;
 
 interface Runner {
 	as<R>(query: string, ...params: readonly unknown[]): Query<R>;
@@ -67,8 +64,9 @@ export type TypesqlAdapterSql<Self> = Runner &
 
 /**
  * A Better Auth database adapter that runs on a TypeSQL `sql` from
- * `@typesql/pg`, `@typesql/postgres`, `@typesql/sqlite` or `@typesql/kysely`.
- * It reads the database from `sql.dialect`.
+ * `@typesql/pg`, `@typesql/postgres`, `@typesql/sqlite`, `@typesql/kysely`,
+ * `@typesql/drizzle` or `@typesql/prisma`. It reads the database from
+ * `sql.dialect`.
  *
  * @example
  * ```ts
@@ -82,7 +80,7 @@ export function typesqlAdapter<S extends TypesqlAdapterSql<S>>(
 	config: TypesqlAdapterConfig = {},
 ): (options: BetterAuthOptions) => DBAdapter {
 	const { dialect } = sql;
-	if (dialect !== "postgres" && dialect !== "sqlite")
+	if (!Object.hasOwn(DIALECTS, dialect))
 		throw new TypeError(
 			`typesql: typesqlAdapter() needs a TypeSQL sql for PostgreSQL or SQLite; this sql's dialect is ${String(dialect)}`,
 		);
@@ -91,10 +89,10 @@ export function typesqlAdapter<S extends TypesqlAdapterSql<S>>(
 		adapterName: "TypeSQL Adapter",
 		usePlural: config.usePlural ?? false,
 		debugLogs: config.debugLogs ?? false,
-		supportsUUIDs: dialect === "postgres",
-		supportsDates: dialect === "postgres",
-		supportsBooleans: dialect === "postgres",
-		supportsJSON: dialect === "postgres",
+		supportsUUIDs: DIALECTS[dialect].native,
+		supportsDates: DIALECTS[dialect].native,
+		supportsBooleans: DIALECTS[dialect].native,
+		supportsJSON: DIALECTS[dialect].native,
 		supportsArrays: false,
 		customTransformOutput: ({ data, field, fieldAttributes }) => {
 			if (field === "id" || fieldAttributes.references) return data;
@@ -183,17 +181,11 @@ function adapter(
 			.map(([name, { modelKey, on, relation, limit }]) => {
 				const many = relation !== "one-to-one";
 				const rows = `SELECT * FROM ${table(name)} AS "_j" WHERE "_j".${quote(on.to)} = ${table(model)}.${quote(on.from)} LIMIT ${s.param(many ? (limit ?? 100) : 1)}`;
-				const row =
-					dialect === "postgres"
-						? `to_json("j")`
-						: `json_object(${columnsOf(modelKey ?? getDefaultModelName(name))
-								.map((c) => `${s.param(c)}, "j".${quote(c)}`)
-								.join(", ")})`;
-				const value = !many
-					? row
-					: dialect === "postgres"
-						? `COALESCE(json_agg(${row}), '[]')`
-						: `json_group_array(${row})`;
+				const row = s.dialect.row(
+					() => columnsOf(modelKey ?? getDefaultModelName(name)),
+					s,
+				);
+				const value = many ? s.dialect.rows(row) : row;
 				return `, (SELECT ${value} FROM (${rows}) AS "j") AS ${quote(name)}`;
 			})
 			.join("");

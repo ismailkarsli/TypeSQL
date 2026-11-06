@@ -9,7 +9,7 @@ import type { Col, Typed } from "@typesql/core/mysql";
 export interface DB {
   /** Prisma model \`User\`. */
   users: {
-    id: Col<"int", { hasDefault: true; autoIncrement: true }>;
+    id: Col<"int", { autoIncrement: true }>;
     name: Col<"varchar">;
     /** Prisma field \`bio\`. */
     display_name: Col<"text", { nullable: true }>;
@@ -19,6 +19,11 @@ export interface DB {
     prefs: Col<"json", { nullable: true }>;
     /** Prisma field \`createdAt\`. */
     created_at: Col<"datetime", { hasDefault: true }>;
+  };
+  Author: {
+    id: Col<"int", { autoIncrement: true }>;
+    name: Col<"varchar">;
+    bio: Col<"varchar", { nullable: true }>;
   };
 }
 ",
@@ -32,18 +37,13 @@ export interface DB {
     "diagnostics": [],
     "types": {
       "after": "({ id: number })[]",
+      "clientRows": "({ bio: null | string; id: number; name: string })[]",
       "rows": "({ balance: Decimal; big: bigint; display_name: null | string; id: number; name: string; role: "USER" | "admin" })[]",
     },
   },
   "generate": {
     "status": 0,
-    "stderr": "Loaded Prisma config from prisma.config.ts.
-
-Prisma schema loaded from schema.prisma.
-Loaded Prisma config from prisma.config.ts.
-
-Prisma schema loaded from schema.prisma.
-",
+    "stderr": "",
     "stdout": "",
   },
   "start": {
@@ -64,6 +64,7 @@ Prisma schema loaded from schema.prisma.
   after: [ { id: 1 } ],
   prefs: [ { prefs: null } ]
 }
+{ clientRows: [ { id: 1, name: 'Ada', bio: null } ] }
 ",
   },
 }

@@ -1,0 +1,10 @@
+pattern wrapped($leaf, $self) {
+	or {
+		$leaf,
+		JsParenthesizedExpression(expression=$self),
+		TsAsExpression(expression=$self),
+		TsTypeAssertionExpression(expression=$self),
+		TsNonNullAssertionExpression(expression=$self),
+		TsSatisfiesExpression(expression=$self)
+	}
+}

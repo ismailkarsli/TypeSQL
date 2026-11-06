@@ -1,0 +1,33 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`pg-null-array-elements > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "recursive": "({ a: (null | number)[]; i: number })[]",
+      "recursiveWithoutNull": "({ a: (string)[]; i: number })[]",
+      "union": "({ tags: (null | string)[] })[]",
+      "values": "({ a: (null | number)[] })[]",
+      "valuesWithoutNull": "({ a: (number)[] })[]",
+    },
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "{
+  values: [ { a: [ 1, null ] }, { a: [ 2 ] } ],
+  valuesWithoutNull: [ { a: [ 1 ] }, { a: [ 2 ] } ],
+  union: [ { tags: [ 'a' ] }, { tags: [ 'b', null ] } ],
+  recursive: [ { a: [ 1, null ], i: 1 }, { a: [ 1, null ], i: 2 } ],
+  recursiveWithoutNull: [ { a: [ 'a' ], i: 1 }, { a: [ 'a' ], i: 2 } ]
+}
+",
+  },
+}
+`;

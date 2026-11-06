@@ -1,12 +1,11 @@
 import type {
 	AnyMigrationContext,
 	MariaDbMigration,
-	MigrationDialect,
-	MissingSchema,
 	MySqlMigration,
 	PostgresMigration,
 	SqliteMigration,
 } from "./context.js";
+import { DIALECTS, type DialectName, isDialectName } from "./dialects/index.js";
 
 /**
  * A migration: `up` takes the schema the previous migration leaves and
@@ -29,32 +28,12 @@ export interface MigrationSteps<Before, After> {
 	readonly down: (db: NoInfer<After>) => Promise<unknown>;
 }
 
-type ContextSchema<C> = C extends { readonly schema: infer Schema }
-	? Schema
-	: MissingSchema;
-
-/** Type-only: the schema a migrator or its `latest()` result leaves. */
-export declare const SCHEMA: unique symbol;
-
-/**
- * The schema after a migration: `SchemaOf<typeof m>`. It also takes a
- * migrator or its `latest()` result (the schema after the last migration),
- * a 3.x migration's `up` function, or a migration context.
- */
-export type SchemaOf<M> = M extends { readonly [SCHEMA]: infer Schema }
-	? Schema
-	: M extends { readonly up: (db: never) => Promise<infer After> }
-		? ContextSchema<After>
-		: M extends (db: never) => Promise<infer After>
-			? ContextSchema<After>
-			: ContextSchema<M>;
-
 /** Where a migration starts; the runner checks the chain with it. */
 const MIGRATION_FROM: unique symbol = Symbol.for("typesql.migration.from");
 
 /** What `migration()` starts from, as its overloads take it. */
 type From =
-	| Dialect
+	| DialectName
 	| { readonly up: (db: never) => Promise<{ readonly schema: unknown }> }
 	| ((db: never) => Promise<{ readonly schema: unknown }>);
 
@@ -95,27 +74,13 @@ export function migration(
 	from: From,
 	steps: MigrationSteps<never, unknown>,
 ): Migration<never, unknown> {
-	if (
-		!DIALECTS.includes(from) &&
-		typeof from !== "function" &&
-		(from === null ||
-			typeof from !== "object" ||
-			!("up" in from) ||
-			typeof from.up !== "function" ||
-			!("down" in from) ||
-			typeof from.down !== "function")
-	)
+	if (!isDialectName(from) && typeof from !== "function" && !isMigration(from))
 		throw new TypeError(
-			'typesql: migration() starts from "postgres", "sqlite", "mysql", "mariadb" or the previous migration',
+			`typesql: migration() starts from ${Object.keys(DIALECTS)
+				.map((name) => JSON.stringify(name))
+				.join(", ")} or the previous migration`,
 		);
-	if (
-		steps === null ||
-		typeof steps !== "object" ||
-		!("up" in steps) ||
-		typeof steps.up !== "function" ||
-		!("down" in steps) ||
-		typeof steps.down !== "function"
-	)
+	if (!isMigration(steps))
 		throw new TypeError(
 			"typesql: migration() takes { up, down } with async functions",
 		);
@@ -129,11 +94,6 @@ export function migration(
 	Object.defineProperty(defined, MIGRATION_FROM, { value: from });
 	return Object.freeze(defined);
 }
-
-export type Dialect = MigrationDialect;
-
-/** The dialects a migration can start from, as the runtime check reads them. */
-const DIALECTS: readonly unknown[] = ["postgres", "sqlite", "mysql", "mariadb"];
 
 /**
  * A migration's `up` or `down` as the runner calls it: with the context of
@@ -177,21 +137,8 @@ export function toEntry(name: string, migration: Runnable): Entry {
 	};
 }
 
-/** Whether `error` carries the `code` Node and the database drivers set. */
-export function hasCode(
-	error: unknown,
-	code: string,
-): error is { readonly code: string } {
-	return (
-		typeof error === "object" &&
-		error !== null &&
-		"code" in error &&
-		error.code === code
-	);
-}
-
 /** Whether `value` has a migration's `up` and `down` functions. */
-export function isMigration(value: unknown): value is Runnable {
+export function isMigration<V>(value: V): value is V & Runnable {
 	return (
 		value !== null &&
 		typeof value === "object" &&

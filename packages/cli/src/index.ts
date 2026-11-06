@@ -1,14 +1,16 @@
 import { createRequire } from "node:module";
 import { parseArgs } from "node:util";
+import { type CommandIo, commandIo, errorMessage } from "@typesql/core/adapter";
+import type { MigratorConfig } from "@typesql/core/migration";
 import { main as mysql } from "@typesql/mysql/introspect";
 import { main as postgres } from "@typesql/pg/introspect";
 import { main as sqlite } from "@typesql/sqlite/introspect";
 
-export type Dialect = "postgres" | "sqlite" | "mysql" | "mariadb";
+export type Dialect = MigratorConfig["dialect"];
 
 // MariaDB is introspected like MySQL; the server reports which one it is.
 const DIALECTS: Readonly<
-	Record<Dialect, (argv: readonly string[]) => Promise<number>>
+	Record<Dialect, (argv: readonly string[], io: CommandIo) => Promise<number>>
 > = { postgres, sqlite, mysql, mariadb: mysql };
 
 const USAGE = `Usage: typesql migrate <latest|up|down|status|make name|generate> [options]
@@ -25,16 +27,6 @@ Run \`typesql migrate --help\` for migration options.
 
 Run \`typesql introspect --dialect <name> --help\` for the options of each dialect.
 `;
-
-interface Io {
-	readonly stdout: (s: string) => void;
-	readonly stderr: (s: string) => void;
-}
-
-const defaultIo = (): Io => ({
-	stdout: (s) => process.stdout.write(s),
-	stderr: (s) => process.stderr.write(s),
-});
 
 const isDialect = (s: string): s is Dialect => Object.hasOwn(DIALECTS, s);
 
@@ -56,8 +48,9 @@ const parse = (argv: readonly string[]) =>
 
 export async function main(
 	argv: readonly string[],
-	io: Io = defaultIo(),
+	given?: CommandIo,
 ): Promise<number> {
+	const io = commandIo(given);
 	if (argv[0] === "migrate") {
 		const { main: migrate } = await import("./migrate.js");
 		return migrate(argv.slice(1), io);
@@ -66,9 +59,7 @@ export async function main(
 	try {
 		parsed = parse(argv);
 	} catch (error) {
-		io.stderr(
-			`${error instanceof Error ? error.message : String(error)}\n\n${USAGE}`,
-		);
+		io.stderr(`${errorMessage(error)}\n\n${USAGE}`);
 		return 2;
 	}
 	const { values, tokens, positionals } = parsed;
@@ -102,10 +93,12 @@ export async function main(
 			io.stdout(USAGE);
 			return 0;
 		}
+		const url =
+			typeof values.url === "string" ? values.url : io.env.DATABASE_URL;
 		const scheme =
-			typeof values.url === "string"
-				? /^(mysql|mariadb):/i.exec(values.url)?.[1]?.toLowerCase()
-				: undefined;
+			url === undefined
+				? undefined
+				: /^(mysql|mariadb):/i.exec(url)?.[1]?.toLowerCase();
 		dialect = values.db === undefined ? (scheme ?? "postgres") : "sqlite";
 	}
 	if (typeof dialect !== "string" || !isDialect(dialect)) {
@@ -114,5 +107,5 @@ export async function main(
 		);
 		return 2;
 	}
-	return DIALECTS[dialect](rest);
+	return DIALECTS[dialect](rest, io);
 }

@@ -1,7 +1,8 @@
-import type { ColInfo, Cols, Ctx, Info } from "../../../engine/types.js";
+import type { ColInfo, Cols, Info } from "../../../engine/types.js";
 import type { SqlError } from "../../../errors.js";
 import type { Expr, Tag, XmlExpr, XmlTableCol } from "../ast.js";
-import type { TypeDisplay } from "../binder/clauses.js";
+import type { TypeDisplay } from "../shape.js";
+import type { Ctx } from "../types.js";
 import type { AllNullable } from "./catalog.js";
 import type { ParamsOfList, ParamsOfOpt } from "./params.js";
 import type { TypeList, TypeOf } from "./typeof.js";

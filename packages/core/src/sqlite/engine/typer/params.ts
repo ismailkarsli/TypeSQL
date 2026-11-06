@@ -1,6 +1,12 @@
+import type {
+	DeclaredFn,
+	PickSig,
+	SigSlots,
+} from "../../../engine/family/functions.js";
+import type { QueryContext } from "../../../engine/family/types.js";
+import type { Next } from "../../../engine/next.js";
 import type { NullTest, ParamEntry } from "../../../engine/params.js";
-import type { Nx } from "../../../engine/parse.js";
-import type { ColInfo, QueryContext, Scope } from "../../../engine/types.js";
+import type { ColInfo, Info, Scope } from "../../../engine/types.js";
 import type {
 	Call,
 	CaseExpr,
@@ -14,8 +20,8 @@ import type {
 import type { BindFrom } from "../binder/scope.js";
 import type { BindWith } from "../project/select.js";
 import type { Affinity, MkCtx, SqCteMap, SqCtx, SqLevel } from "../types.js";
-import type { DeclaredFn, PickSig, SigArgType } from "./functions.js";
-import type { Common, Info, SubqueryCol, TypeOf } from "./typeof.js";
+import type { FunctionCatalog, Functions } from "./functions.js";
+import type { Common, SubqueryCol, TypeOf } from "./typeof.js";
 
 type Ctx<DB, S extends Scope, Ctes extends SqCteMap> = MkCtx<
 	DB,
@@ -29,17 +35,9 @@ type ParamN<E> = E extends {
 	readonly n: infer N extends number;
 }
 	? N
-	: E extends {
-				readonly t: "collate" | "un";
-				readonly op?: "+";
-				readonly e: infer X;
-			}
+	: E extends { readonly t: "collate"; readonly e: infer X }
 		? X extends { readonly t: "param"; readonly n: infer N extends number }
-			? E extends { readonly t: "un"; readonly op: infer O }
-				? O extends "+"
-					? N
-					: never
-				: N
+			? N
 			: never
 		: never;
 
@@ -164,7 +162,7 @@ type RowPairs<
 	I extends number,
 > = L[I] extends infer A extends Expr
 	? R[I] extends infer B extends Expr
-		? RowPairs<L, R, C, M | PairParams<A, B, C, false>, Nx<I>>
+		? RowPairs<L, R, C, M | PairParams<A, B, C, false>, Next<I>>
 		: M
 	: M;
 
@@ -219,9 +217,9 @@ type FirstSib<
 		? Sib<E, C> extends infer S
 			? S extends ColInfo
 				? S
-				: FirstSib<L, C, Nx<I>>
+				: FirstSib<L, C, Next<I>>
 			: never
-		: FirstSib<L, C, Nx<I>>
+		: FirstSib<L, C, Next<I>>
 	: null;
 export type ParamsOfList<L extends readonly Expr[], C extends SqCtx> = FnArgs<
 	L,
@@ -280,7 +278,7 @@ type CaseValues<
 			Ws,
 			Else,
 			C,
-			Nx<I>,
+			Next<I>,
 			Sib<V, C> extends infer S extends ColInfo ? [...Acc, S] : Acc
 		>
 	: Else extends Expr
@@ -302,65 +300,6 @@ type CaseLoop<Branch, C extends SqCtx, Op, VT> = Branch extends {
 						>)
 	: never;
 
-type TextFns =
-	| "lower"
-	| "upper"
-	| "ltrim"
-	| "rtrim"
-	| "trim"
-	| "replace"
-	| "instr"
-	| "like"
-	| "glob"
-	| "unicode"
-	| "unhex"
-	| "soundex"
-	| "concat"
-	| "concat_ws"
-	| "format"
-	| "printf"
-	| "group_concat"
-	| "string_agg";
-type NumFns =
-	| "abs"
-	| "round"
-	| "sign"
-	| "ceil"
-	| "ceiling"
-	| "floor"
-	| "trunc"
-	| "acos"
-	| "acosh"
-	| "asin"
-	| "asinh"
-	| "atan"
-	| "atan2"
-	| "atanh"
-	| "cos"
-	| "cosh"
-	| "degrees"
-	| "exp"
-	| "ln"
-	| "log"
-	| "log10"
-	| "log2"
-	| "mod"
-	| "pow"
-	| "power"
-	| "radians"
-	| "sin"
-	| "sinh"
-	| "sqrt"
-	| "tan"
-	| "tanh"
-	| "zeroblob"
-	| "randomblob"
-	| "ntile"
-	| "sum"
-	| "total"
-	| "avg";
-type SameFns = "coalesce" | "ifnull" | "nullif" | "max" | "min";
-
 type CallParams<E extends Call, C extends SqCtx> =
 	| ParamsOfExpr<E["filter"], C>
 	| FnArgs<E["args"], C, never, CallSlots<E, C>>
@@ -372,52 +311,22 @@ type CallParams<E extends Call, C extends SqCtx> =
 			? ParamsOfList<[...P, ...O], C>
 			: never);
 type CallSlots<E extends Call, C extends SqCtx> =
-	DeclaredFn<C["db"], E["name"]> extends infer D extends {}
+	DeclaredFn<C["db"], E["name"], FunctionCatalog> extends infer D extends {}
 		? SigSlots<PickSig<D, E["args"]["length"]>, E["args"]>
-		: E["name"] extends SameFns
-			? readonly Info<
-					FirstSib<E["args"], C, 0> extends infer S extends ColInfo
-						? S["type"]
-						: "unknown",
-					true
-				>[]
-			: E["name"] extends "iif" | "if"
-				? IifSlots<E["args"], Info<IifValueType<E["args"], C, 1, []>, true>>
-				: E["name"] extends "substr" | "substring"
-					? [Info<"text", true>, Info<"integer", true>, Info<"integer", true>]
-					: E["name"] extends "lag" | "lead" | "nth_value"
-						? [
-								Info<"unknown", true>,
-								Info<"integer", false>,
-								Info<"unknown", true>,
-							]
-						: E["name"] extends
-									| "json_extract"
-									| "jsonb_extract"
-									| "json_type"
-									| "json_array_length"
-									| "json_remove"
-									| "jsonb_remove"
-									| "json_valid"
-									| "json"
-									| "jsonb"
-									| "json_patch"
-									| "jsonb_patch"
-									| "json_pretty"
-							? [Info<"json", true>, ...Info<"text", true>[]]
-							: E["name"] extends TextFns
-								? readonly Info<"text", true>[]
-								: E["name"] extends NumFns
-									? readonly Info<"numeric", true>[]
-									: readonly Info<"unknown", true>[];
-
-type SigSlots<
-	S,
-	L extends readonly unknown[],
-	Acc extends readonly unknown[] = [],
-> = Acc["length"] extends L["length"]
-	? Acc
-	: SigSlots<S, L, [...Acc, Info<SigArgType<S, Acc["length"]>, true>]>;
+		: E["name"] extends keyof Functions
+			? Functions[E["name"]] extends { readonly args: infer A }
+				? A extends readonly unknown[]
+					? A
+					: A extends "same"
+						? readonly Info<
+								FirstSib<E["args"], C, 0> extends infer S extends ColInfo
+									? S["type"]
+									: "unknown",
+								true
+							>[]
+						: IifSlots<E["args"], Info<IifValueType<E["args"], C, 1, []>, true>>
+				: readonly Info<"unknown", true>[]
+			: readonly Info<"unknown", true>[];
 
 export type FnArgs<
 	L extends readonly Expr[],
@@ -431,7 +340,7 @@ export type FnArgs<
 			C,
 			M | Slot<E, C, Ts[I] extends ColInfo ? Ts[I] : Info<"unknown", true>>,
 			Ts,
-			Nx<I>
+			Next<I>
 		>
 	: M;
 
@@ -444,7 +353,7 @@ type IifValueType<
 	? IifValueType<
 			L,
 			C,
-			Nx<Nx<I>>,
+			Next<Next<I>>,
 			Sib<E, C> extends infer S extends ColInfo ? [...Acc, S] : Acc
 		>
 	: Common<Acc>;
@@ -469,7 +378,7 @@ type IsCond<L extends readonly Expr[], I extends number> = I extends
 	| 6
 	| 8
 	| 10
-	? L[Nx<I>] extends Expr
+	? L[Next<I>] extends Expr
 		? true
 		: false
 	: false;

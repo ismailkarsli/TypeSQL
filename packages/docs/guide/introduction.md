@@ -72,7 +72,7 @@ TypeSQL is written in TypeScript's type system. When you call `sql("…")` with 
 - **Parameter types.** Inline `${sql.param(value)}`, `$1` and `:name` each take their type from where they are used.
 - **Compile errors.** An unknown column, a missing `NOT NULL` value or a syntax error shows up on the string, worded like the database's error.
 - **The whole statement language.** From joins and CTEs to `MERGE` and SQL/JSON.
-- **A thin runtime.** `@typesql/core` has no dependencies. Adapters run queries on node-postgres, postgres.js, SQLite (node:sqlite, better-sqlite3, bun:sqlite), MySQL and MariaDB (mysql2, the mariadb connector, PlanetScale, TiDB Cloud), Kysely, Drizzle or Prisma.
+- **A tiny runtime.** `@typesql/core` is tiny (under 3 kB minified and gzipped) and has no dependencies. Adapters run queries on node-postgres, postgres.js, SQLite (node:sqlite, better-sqlite3, bun:sqlite), MySQL and MariaDB (mysql2, the mariadb connector, PlanetScale, TiDB Cloud), Kysely, Drizzle or Prisma.
 - **Editor support.** The optional editor support for [VS Code](./vscode) and [Neovim](./neovim) completes table and column names and highlights the SQL.
 
 ## Dialects

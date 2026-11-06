@@ -1,0 +1,21 @@
+{
+	"name": "kysely-mysql-databases",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"start": "node dist/app.js"
+	},
+	"dependencies": {
+		"@typesql/core": "workspace:*",
+		"@typesql/kysely": "workspace:*",
+		"kysely": "catalog:",
+		"mysql2": "catalog:"
+	},
+	"devDependencies": {
+		"typescript": "catalog:",
+		"@types/node": "catalog:"
+	},
+	"scenario": {
+		"database": "mysql"
+	}
+}

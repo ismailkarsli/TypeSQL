@@ -15,20 +15,172 @@ exports[`module-entry-points > scenario 1`] = `
     "status": 0,
     "stderr": "",
     "stdout": "{
-  createSql: 'function',
-  positional: 'function',
-  postgres: 'postgres',
-  sqlite: 'sqlite',
-  pgEngine: [],
-  sqliteEngine: [],
-  migrations: 'function',
-  CasePlugin: 'function',
-  pgIntrospect: 'function',
-  sqliteIntrospect: 'function',
-  generateSource: 'function',
-  cli: 'function',
-  requireEsm: 'function'
+  "@typesql/better-auth": {
+    "typesqlAdapter": "function"
+  },
+  "@typesql/cli": {
+    "main": "function"
+  },
+  "@typesql/core": {
+    "NoResultError": "function",
+    "createSql": "function",
+    "mapRows": "function",
+    "pluginsOf": "function"
+  },
+  "@typesql/core/adapter": {
+    "JsonParam": "function",
+    "RESERVED_KEYS": "object",
+    "UsageError": "function",
+    "colFlags": "function",
+    "colSource": "function",
+    "columnSource": "function",
+    "commandIo": "function",
+    "connectMysql": "function",
+    "connectPostgres": "function",
+    "connectSqlite": "function",
+    "createFamilySql": "function",
+    "createTransactionalSql": "function",
+    "databaseUrl": "function",
+    "dialectFamily": "function",
+    "doc": "function",
+    "errorMessage": "function",
+    "familyStatement": "object",
+    "globRegExp": "function",
+    "helperImport": "function",
+    "introspectArgs": "function",
+    "introspectCommand": "function",
+    "jsonText": "function",
+    "listOption": "function",
+    "mapRows": "function",
+    "mysqlBind": "function",
+    "mysqlInline": "function",
+    "mysqlPositional": "function",
+    "mysqlResult": "function",
+    "mysqlSplit": "function",
+    "mysqlValue": "function",
+    "paramNumbers": "function",
+    "parsePgArray": "function",
+    "parsePgUserArrays": "function",
+    "pgResult": "function",
+    "pluginsOf": "function",
+    "pooledTransaction": "function",
+    "positional": "function",
+    "propertyKey": "function",
+    "runTransaction": "function",
+    "schemaMembers": "function",
+    "schemaWriter": "function",
+    "serialTransaction": "function",
+    "splitParams": "function",
+    "sqliteBindings": "function",
+    "sqliteValue": "function"
+  },
+  "@typesql/core/migration": {
+    "MigrationError": "function",
+    "createMigrator": "function",
+    "isMigrator": "function",
+    "loadMigrator": "function",
+    "migration": "function",
+    "missingCore": "function"
+  },
+  "@typesql/core/mysql": {
+    "mariadb": "object",
+    "mysql": "object"
+  },
+  "@typesql/core/mysql/engine": {},
+  "@typesql/core/plugins": {
+    "CasePlugin": "function"
+  },
+  "@typesql/core/postgres": {
+    "postgres": "object"
+  },
+  "@typesql/core/postgres/engine": {},
+  "@typesql/core/reserved": {
+    "META_KEYS": "object",
+    "RESERVED_WORDS": "object"
+  },
+  "@typesql/core/sqlite": {
+    "sqlite": "object"
+  },
+  "@typesql/core/sqlite/engine": {},
+  "@typesql/drizzle": {
+    "createSql": "function",
+    "executor": "function",
+    "mysqlExecutor": "function",
+    "mysqlType": "function",
+    "pgType": "function",
+    "sqliteExecutor": "function",
+    "sqliteType": "function"
+  },
+  "@typesql/kysely": {
+    "createSql": "function",
+    "executor": "function"
+  },
+  "@typesql/language-server": {
+    "GRAMMAR": "object",
+    "Session": "function",
+    "lspItems": "function",
+    "merge": "function",
+    "mergeTokens": "function",
+    "typescriptModules": "function",
+    "typescriptModulesFrom": "function"
+  },
+  "@typesql/mysql": {
+    "createSql": "function",
+    "executor": "function"
+  },
+  "@typesql/mysql/introspect": {
+    "enumValues": "function",
+    "generateSource": "function",
+    "introspect": "function",
+    "main": "function",
+    "normalizeType": "function"
+  },
+  "@typesql/mysql/mariadb": {
+    "createSql": "function",
+    "executor": "function"
+  },
+  "@typesql/mysql/planetscale": {
+    "createSql": "function",
+    "executor": "function"
+  },
+  "@typesql/mysql/tidb": {
+    "createSql": "function",
+    "executor": "function"
+  },
+  "@typesql/pg": {
+    "createSql": "function",
+    "executor": "function"
+  },
+  "@typesql/pg/introspect": {
+    "generateSource": "function",
+    "introspect": "function",
+    "main": "function"
+  },
+  "@typesql/postgres": {
+    "createSql": "function",
+    "executor": "function"
+  },
+  "@typesql/prisma": {
+    "createSql": "function",
+    "executor": "function"
+  },
+  "@typesql/prisma/generator": {
+    "generateSource": "function"
+  },
+  "@typesql/sqlite": {
+    "createSql": "function",
+    "executor": "function"
+  },
+  "@typesql/sqlite/introspect": {
+    "generateSource": "function",
+    "introspect": "function",
+    "main": "function",
+    "normalizeType": "function"
+  }
 }
+{ unlisted: [] }
+{ undeclared: [] }
+{ requireEsm: 'function' }
 ",
   },
 }

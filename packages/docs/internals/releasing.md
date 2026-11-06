@@ -22,12 +22,14 @@ pnpm check:intents
 - The summary is the changelog entry: what users now see, in as many sentences as it takes,
   identifiers in backticks.
 - Name only the packages you changed; dependents and the fixed group follow automatically.
+  The extension bundles `packages/language-server`, so a change to its `src` also names `typesql`.
 - `patch` for fixes, `major` for anything that could break users, `none` only for internal
   changes.
 - One change, one intent file in `.changeset/`. Edit the file to fix its summary before release.
-- The VS Code extension is not checked by `check:intents`: add `pnpm change typesql …` with every
-  user-facing change to `packages/vscode`, or to `packages/language-server` when VS Code users
-  see it. Prerelease versions are rejected by its registries.
+- `check:intents` covers the VS Code extension (`typesql`) too: its packaged files are the
+  `.vscodeignore` entries, `src` and the `src` of the workspace packages it bundles. Use
+  `--bump none` for a language-server change that VS Code users don't see. Prerelease versions
+  are rejected by its registries.
 
 ## Cutting a release
 
@@ -52,7 +54,7 @@ retried with **Re-run failed jobs**.
 Check that every version is live:
 
 ```sh
-for p in core pg postgres kysely drizzle prisma language-server sqlite mysql cli better-auth; do pnpm view @typesql/$p version; done
+for p in $(node tools/packages.ts npm name); do pnpm view "$p" version; done
 ```
 
 ## If publishing fails

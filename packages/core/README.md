@@ -2,6 +2,8 @@
 
 Write SQL in TypeScript and get exact types for rows and parameters. TypeSQL parses your SQL inside the type checker: no codegen, no database connection, no build step.
 
+It supports PostgreSQL, SQLite, MySQL and MariaDB. The runtime is tiny (under 3 kB minified and gzipped) and has no dependencies.
+
 ## Install
 
 ```sh

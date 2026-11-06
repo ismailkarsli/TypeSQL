@@ -1,0 +1,51 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`mysql-where-narrowing > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "all": "({ bio: null | string; id: number })[]",
+      "any": "({ bio: string; id: number })[]",
+      "joined": "({ body: null | string; id: null | number; name: string; title: null | string })[]",
+      "matched": "({ body: null | string; id: number; name: string; title: string })[]",
+      "notIn": "({ bio: null | string; id: number })[]",
+      "notInList": "({ bio: string; id: number })[]",
+      "right": "({ id: number; name: string; title: string })[]",
+      "some": "({ bio: string; id: number })[]",
+    },
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "{
+  any: [ { id: 2, bio: 'SQL' } ],
+  some: [ { id: 3, bio: 'Lisp' } ],
+  all: [
+    { id: 1, bio: null },
+    { id: 2, bio: 'SQL' },
+    { id: 3, bio: 'Lisp' }
+  ],
+  notIn: [
+    { id: 1, bio: null },
+    { id: 2, bio: 'SQL' },
+    { id: 3, bio: 'Lisp' }
+  ],
+  notInList: [ { id: 3, bio: 'Lisp' } ],
+  joined: [
+    { name: 'Ada', id: 1, title: 'SQL', body: null },
+    { name: 'Grace', id: null, title: null, body: null },
+    { name: 'Lin', id: null, title: null, body: null }
+  ],
+  matched: [ { name: 'Ada', id: 1, title: 'SQL', body: null } ],
+  right: [ { id: 1, name: 'Ada', title: 'SQL' } ]
+}
+",
+  },
+}
+`;

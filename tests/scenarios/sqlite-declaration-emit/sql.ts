@@ -2,6 +2,7 @@ import { DatabaseSync } from "node:sqlite";
 import type { IdentityPluginTypes, SqlPlugin } from "@typesql/core";
 import {
 	createTransactionalSql,
+	type SqlDriver,
 	serialTransaction,
 } from "@typesql/core/adapter";
 import { CasePlugin } from "@typesql/core/plugins";
@@ -47,20 +48,26 @@ class FrozenRows implements SqlPlugin<FrozenRowTypes> {
 
 export const db = new DatabaseSync(process.env.SQLITE_PATH!);
 
+const driver: SqlDriver<SqliteDatabase> = {
+	executor: (client) => executor(client, { bigint: true }),
+	transaction: (client, depth, fn) =>
+		serialTransaction(
+			client,
+			depth,
+			async (statement) => {
+				client.exec(statement);
+			},
+			() => fn(client),
+		),
+};
+
+// A driver may pass its calls on, as written before `savepoint` came.
 export const sql = createTransactionalSql<Sqlite, DB, TypeMap, SqliteDatabase>(
 	sqlite,
 	db,
 	{
-		executor: (client) => executor(client, { bigint: true }),
-		transaction: (client, depth, fn) =>
-			serialTransaction(
-				client,
-				depth,
-				async (statement) => {
-					client.exec(statement);
-				},
-				() => fn(client),
-			),
+		executor: driver.executor,
+		transaction: (client, depth, fn) => driver.transaction(client, depth, fn),
 	},
 )
 	.withPlugin(new CasePlugin())

@@ -1,0 +1,25 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`migrations-mysql-keyword-names > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {},
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "typesql: migration 2 (002-commit-0) failed: migrations cannot control transactions; each migration runs in its own transaction
+typesql: migration 2 (002-commit-1) failed: migrations cannot control transactions; each migration runs in its own transaction
+typesql: migration 2 (002-commit-2) failed: migrations cannot control transactions; each migration runs in its own transaction
+typesql: migration 2 (002-commit-3) failed: migrations cannot control transactions; each migration runs in its own transaction
+applied 002-trigger
+",
+  },
+}
+`;

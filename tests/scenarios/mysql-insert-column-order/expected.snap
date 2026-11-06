@@ -1,0 +1,43 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`mysql-insert-column-order > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "AfterParams": "[number | bigint, null | string, string, null | string]",
+      "FirstParams": "[null | string | number | bigint | false | true | Date | Uint8Array<ArrayBufferLike>, null | string | number | bigint | false | true | Date | Uint8Array<ArrayBufferLike>, null | string | number | bigint | false | true | Date | Uint8Array<ArrayBufferLike>]",
+      "ListedParams": "[null | string, number | bigint, string]",
+      "PlacedParams": "[number | bigint, string, null | string]",
+      "RowsParams": "[null | string | number | bigint | false | true | Date | Uint8Array<ArrayBufferLike>, null | string | number | bigint | false | true | Date | Uint8Array<ArrayBufferLike>, null | string | number | bigint | false | true | Date | Uint8Array<ArrayBufferLike>, null | string | number | bigint | false | true | Date | Uint8Array<ArrayBufferLike>]",
+      "UnorderedParams": "[null | string | number | bigint | false | true | Date | Uint8Array<ArrayBufferLike>, null | string | number | bigint | false | true | Date | Uint8Array<ArrayBufferLike>]",
+      "UpsertParams": "[number | bigint, string, null | string, null | string]",
+      "items": "({ name: string; note: null | string; sku: number; tag: null | string })[]",
+      "placed": "({ name: string; note: null | string; sku: number; tag: null | string })[]",
+    },
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "{
+  items: [
+    { tag: null, sku: 1, name: 'Ada', note: null },
+    { tag: null, sku: 2, name: 'Grace', note: 'SQL' },
+    { tag: null, sku: 3, name: 'Lin', note: null },
+    { tag: null, sku: 4, name: 'Ken', note: null },
+    { tag: 'new', sku: 5, name: 'Edsger', note: null }
+  ],
+  placed: [
+    { sku: 1, tag: null, name: 'Ada', note: 'kept' },
+    { sku: 2, tag: 'new', name: 'Grace', note: 'SQL' }
+  ]
+}
+",
+  },
+}
+`;

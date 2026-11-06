@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, extname, join } from "node:path";
+import { providerDialect } from "../provider.js";
 import { generateSource, schemaFields, viewNames } from "./emit.js";
 import type { GeneratorHandler, GeneratorOptions } from "./protocol.js";
 
@@ -14,23 +15,12 @@ function outputFile(output: string): string {
 }
 
 function sourceFor(options: GeneratorOptions): string {
-	const provider =
-		options.datasources[0]?.activeProvider ?? options.datasources[0]?.provider;
-	if (
-		provider !== undefined &&
-		provider !== "postgresql" &&
-		provider !== "postgres" &&
-		provider !== "sqlite" &&
-		provider !== "mysql"
-	) {
-		throw new Error(
-			`typesql-prisma: only the postgresql, sqlite and mysql providers are supported (got "${provider}")`,
-		);
-	}
+	const dialect = providerDialect(
+		options.datasources[0]?.activeProvider ?? options.datasources[0]?.provider,
+	);
 	const { importFrom, typeName } = options.generator.config;
 	return generateSource(options.dmmf.datamodel, {
-		dialect:
-			provider === "sqlite" || provider === "mysql" ? provider : "postgres",
+		dialect,
 		importFrom: configString(importFrom),
 		typeName: configString(typeName),
 		views: viewNames(options.datamodel),

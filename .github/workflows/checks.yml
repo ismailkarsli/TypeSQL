@@ -31,11 +31,12 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           package-manager-cache: false
-          node-version: 26
+          node-version-file: .node-version
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm build
       - run: pnpm typecheck
+      - run: pnpm knip
       - run: pnpm --filter typesql exec vsce package --no-dependencies --out "$RUNNER_TEMP/typesql.vsix"
       - run: pnpm docs:build
 
@@ -51,7 +52,7 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           package-manager-cache: false
-          node-version: 26
+          node-version-file: .node-version
       - run: node tools/check-intents.ts "$BASE"
         env:
           BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
@@ -71,12 +72,16 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           package-manager-cache: false
-          node-version: 26.8.1
+          node-version-file: .node-version
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --dir tests typecheck
       - name: Start PostgreSQL, MySQL and MariaDB
         run: docker compose -f tests/compose.yaml up --detach --wait
       - run: pnpm test
+      - name: Check the sources generated from PostgreSQL
+        run: |
+          pnpm --filter @typesql/core --filter @typesql/pg run build
+          node tools/gen-pg-functions.ts --check
+          node tools/pg-catalog-from-pg.ts --check
       - name: Retain failing scenario applications and logs
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7

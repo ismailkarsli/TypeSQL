@@ -1,37 +1,43 @@
-import type { ColInfo, Cols, Ctx } from "../../../engine/types.js";
+import type { Next } from "../../../engine/next.js";
+import type { ColInfo, Cols, ScopeLevel } from "../../../engine/types.js";
 import type { AnyErr, ErrMsg, SqlError } from "../../../errors.js";
 import type { Expr, NamedWindow, Tag, Target, WindowSpec } from "../ast.js";
-import type { Nx } from "../parser/util.js";
-import type { AnyShaped, BaseOf } from "../shape.js";
+import type { IntLitValue, NumLitType } from "../literals.js";
+import type { NullableLevel, TypeDisplay } from "../shape.js";
 import type { LookupFn } from "../typer/catalog.js";
-import type { IntLitValue, NumLitType } from "../typer/operators.js";
 import type { TypeList, TypeOf } from "../typer/typeof.js";
+import type { Ctx } from "../types.js";
 
-type DisplayNames = {
-	int2: "smallint";
-	int4: "integer";
-	int8: "bigint";
-	float4: "real";
-	float8: "double precision";
-	bool: "boolean";
-	varchar: "character varying";
-	bpchar: "character";
-	char: '"char"';
-	varbit: "bit varying";
-	timestamptz: "timestamp with time zone";
-	timestamp: "timestamp without time zone";
-	timetz: "time with time zone";
-	time: "time without time zone";
-	lit: "text";
-	null: "unknown";
-};
-export type TypeDisplay<T extends string> = T extends AnyShaped
-	? BaseOf<T>
-	: T extends `${infer E}[]`
-		? `${TypeDisplay<E>}[]`
-		: T extends keyof DisplayNames
-			? DisplayNames[T]
-			: T;
+/**
+ * Whether aggregates see a group of rows. A grouping set can be empty (the
+ * total row of ROLLUP), so an aggregate under GROUPING SETS may see no rows.
+ */
+export type Grouped<GroupBy, Sets> = Sets extends false
+	? GroupBy extends null
+		? false
+		: true
+	: false;
+
+/** The FROM columns as GROUP BY's grouping sets leave them: nullable when a set leaves them out. */
+export type SetsLevel<L extends ScopeLevel, Sets> = Sets extends false
+	? L
+	: NullableLevel<
+			L,
+			Sets extends readonly unknown[] ? LeftOut<L, Sets> : string
+		>;
+type LeftOut<
+	L extends ScopeLevel,
+	Is extends readonly unknown[],
+> = Is extends readonly [infer H, ...infer R]
+	? H extends { readonly t: "col"; readonly name: infer N }
+		? N extends LevelNames<L>
+			? N | LeftOut<L, R>
+			: string
+		: string
+	: never;
+type LevelNames<L extends ScopeLevel> = {
+	[I in keyof L]: keyof L[I]["cols"];
+}[number];
 
 export type CheckCondition<
 	Clause extends string,
@@ -62,7 +68,7 @@ type OutputExprs<
 > = Cs[I] extends undefined
 	? Acc
 	: Cs[I] extends { readonly n: N }
-		? OutputExprs<Ts, Cs, N, [...Acc, Ts[I]["e"]], Nx<I>>
+		? OutputExprs<Ts, Cs, N, [...Acc, Ts[I]["e"]], Next<I>>
 		: Cs[I] extends { readonly star: infer M }
 			? N extends keyof M
 				? OutputExprs<
@@ -70,10 +76,10 @@ type OutputExprs<
 						Cs,
 						N,
 						[...Acc, { t: "col"; tbl: null; name: N }],
-						Nx<I>
+						Next<I>
 					>
-				: OutputExprs<Ts, Cs, N, Acc, Nx<I>>
-			: OutputExprs<Ts, Cs, N, Acc, Nx<I>>;
+				: OutputExprs<Ts, Cs, N, Acc, Next<I>>
+			: OutputExprs<Ts, Cs, N, Acc, Next<I>>;
 
 type SameExpr<A, B> = A extends {
 	readonly t: "col";
@@ -231,7 +237,7 @@ export type ResolveSortKeys<
 	: ResolveSortKey<Items[I], Clause, Ts, Cs, C> extends infer K
 		? K extends AnyErr
 			? K
-			: ResolveSortKeys<Items, Clause, Ts, Cs, C, [...Acc, K], Nx<I>>
+			: ResolveSortKeys<Items, Clause, Ts, Cs, C, [...Acc, K], Next<I>>
 		: never;
 
 export type CheckGroupBy<
@@ -245,7 +251,7 @@ export type CheckGroupBy<
 		? true
 		: ResolveGroupKey<Items[I], Ts, Cs, C> extends AnyErr
 			? ResolveGroupKey<Items[I], Ts, Cs, C>
-			: CheckGroupBy<Items, Ts, Cs, C, Nx<I>>
+			: CheckGroupBy<Items, Ts, Cs, C, Next<I>>
 	: true;
 
 export type CheckDistinctOnOrder<
@@ -269,8 +275,8 @@ type DistinctWalk<
 	: InList<O[I], D> extends true
 		? Skipped extends true
 			? DistinctOnErr
-			: DistinctWalk<D, O, false, [...Seen, O[I]], Nx<I>>
-		: DistinctWalk<D, O, true, Seen, Nx<I>>;
+			: DistinctWalk<D, O, false, [...Seen, O[I]], Next<I>>
+		: DistinctWalk<D, O, true, Seen, Next<I>>;
 type AllIn<
 	D extends readonly unknown[],
 	Seen extends readonly unknown[],
@@ -300,11 +306,11 @@ type DistinctOrderWalk<
 > = O[I] extends undefined
 	? true
 	: O[I] extends null
-		? DistinctOrderWalk<O, Es, Star, Nx<I>>
+		? DistinctOrderWalk<O, Es, Star, Next<I>>
 		: InList<O[I], Es> extends true
-			? DistinctOrderWalk<O, Es, Star, Nx<I>>
+			? DistinctOrderWalk<O, Es, Star, Next<I>>
 			: [Star, O[I]] extends [true, Tag<"col">]
-				? DistinctOrderWalk<O, Es, Star, Nx<I>>
+				? DistinctOrderWalk<O, Es, Star, Next<I>>
 				: SqlError<
 						"for SELECT DISTINCT, ORDER BY expressions must appear in select list",
 						null
@@ -318,7 +324,7 @@ export type CheckOutputOrder<
 	? true
 	: OutputOrderItem<Items[I], Cs> extends AnyErr
 		? OutputOrderItem<Items[I], Cs>
-		: CheckOutputOrder<Items, Cs, Nx<I>>;
+		: CheckOutputOrder<Items, Cs, Next<I>>;
 type OutputOrderItem<E extends Expr, Cs extends Cols> =
 	SignedNum<E, false> extends [
 		infer Neg extends boolean,
@@ -348,10 +354,10 @@ type OutputNameCount<
 > = Cs[I] extends undefined
 	? Acc
 	: Cs[I] extends { readonly n: N }
-		? OutputNameCount<Cs, N, [...Acc, 0], Nx<I>>
+		? OutputNameCount<Cs, N, [...Acc, 0], Next<I>>
 		: Cs[I] extends { readonly star: infer M }
-			? OutputNameCount<Cs, N, N extends keyof M ? [...Acc, 0] : Acc, Nx<I>>
-			: OutputNameCount<Cs, N, Acc, Nx<I>>;
+			? OutputNameCount<Cs, N, N extends keyof M ? [...Acc, 0] : Acc, Next<I>>
+			: OutputNameCount<Cs, N, Acc, Next<I>>;
 
 export type WindowDefs = { readonly [name: string]: boolean };
 
@@ -369,7 +375,7 @@ export type CheckWindowClause<
 					Ws,
 					C,
 					Defs & { readonly [K in Ws[I]["name"]]: R },
-					Nx<I>
+					Next<I>
 				>
 			: CheckWindowSpec<Ws[I]["spec"], Defs, C>;
 
@@ -419,18 +425,28 @@ type CheckWindowRefsAt<
 	I extends number,
 > = Es[I] extends undefined
 	? true
-	: CheckSpecs<Wins<Es[I], []>, Defs, C> extends AnyErr
-		? CheckSpecs<Wins<Es[I], []>, Defs, C>
-		: CheckWindowRefsAt<Es, Defs, C, Nx<I>>;
+	: CheckSpecs<Wins<Es[I]>, Defs, C> extends infer R
+		? [R] extends [true]
+			? CheckWindowRefsAt<Es, Defs, C, Next<I>>
+			: Exclude<R, true>
+		: never;
 type CheckSpecs<
-	Ss,
+	S,
 	Defs extends WindowDefs,
 	C extends Ctx,
-> = Ss extends readonly [infer S extends WindowSpec, ...infer R]
-	? CheckWindowSpec<S, Defs, C> extends boolean
-		? CheckSpecs<R, Defs, C>
-		: CheckWindowSpec<S, Defs, C>
+> = S extends WindowSpec
+	? CheckWindowSpec<S, Defs, C> extends infer R
+		? R extends boolean
+			? true
+			: R
+		: never
 	: true;
+type Wins<E> =
+	Calls<E> extends infer K
+		? K extends { readonly win: infer S extends WindowSpec }
+			? S
+			: never
+		: never;
 
 type ScalarLeaf = {
 	readonly t:
@@ -444,87 +460,6 @@ type ScalarLeaf = {
 		| "typed"
 		| "default";
 };
-type Wins<E, Acc> = E extends ScalarLeaf
-	? Acc
-	: E extends {
-				readonly t: "call";
-				readonly args: readonly unknown[];
-				readonly win: unknown;
-			}
-		? WinsOf<E["args"], Acc, 0> extends infer A extends readonly unknown[]
-			? E["win"] extends WindowSpec
-				? [...A, E["win"]]
-				: A
-			: never
-		: E extends {
-					readonly t: "bin" | "isdistinct" | "quant";
-					readonly l: unknown;
-					readonly r: unknown;
-				}
-			? Wins<E["r"], Wins<E["l"], Acc>>
-			: E extends {
-						readonly t: "array" | "row";
-						readonly items: readonly unknown[];
-					}
-				? WinsOf<E["items"], Acc, 0>
-				: E extends {
-							readonly t: "case";
-							readonly operand: unknown;
-							readonly whens: readonly {
-								readonly when: unknown;
-								readonly then: unknown;
-							}[];
-							readonly else: unknown;
-						}
-					? Wins<E["else"], WhenWins<E["whens"], Wins<E["operand"], Acc>, 0>>
-					: E extends {
-								readonly t: "between";
-								readonly e: unknown;
-								readonly lo: unknown;
-								readonly hi: unknown;
-							}
-						? Wins<E["hi"], Wins<E["lo"], Wins<E["e"], Acc>>>
-						: E extends {
-									readonly t: "in";
-									readonly e: unknown;
-									readonly list: readonly unknown[];
-								}
-							? WinsOf<E["list"], Wins<E["e"], Acc>, 0>
-							: E extends {
-										readonly t: "like";
-										readonly e: unknown;
-										readonly pat: unknown;
-									}
-								? Wins<E["pat"], Wins<E["e"], Acc>>
-								: E extends {
-											readonly t: "idx";
-											readonly e: unknown;
-											readonly i: unknown;
-										}
-									? Wins<E["i"], Wins<E["e"], Acc>>
-									: E extends {
-												readonly t: "attz";
-												readonly e: unknown;
-												readonly zone: unknown;
-											}
-										? Wins<E["zone"], Wins<E["e"], Acc>>
-										: E extends { readonly e: unknown }
-											? Wins<E["e"], Acc>
-											: Acc;
-type WinsOf<
-	L extends readonly unknown[],
-	Acc,
-	I extends number,
-> = L[I] extends undefined ? Acc : WinsOf<L, Wins<L[I], Acc>, Nx<I>>;
-type WhenWins<
-	L extends readonly { readonly when: unknown; readonly then: unknown }[],
-	Acc,
-	I extends number,
-> = L[I] extends undefined
-	? Acc
-	: WhenWins<L, Wins<L[I]["then"], Wins<L[I]["when"], Acc>>, Nx<I>>;
-
-/** A bare constant other than an integer: a string, `true`/`false` or `NULL`. */
 
 type IsAggName<DB, N extends string> =
 	LookupFn<DB, N> extends infer O
@@ -610,13 +545,11 @@ type Kind<U, DB> = U extends { readonly t: "call"; readonly over: true }
 		? never
 		: "agg";
 
-/** `"agg"` and `"win"` for the aggregate and window calls in E, outside subqueries. */
 type CallKinds<U, DB> = Kind<Calls<U>, DB>;
 // Collect once without a database context, then classify the calls as needed.
 type Calls<U, Acc = never> = [U] extends [never]
 	? Acc
 	: Calls<Children<U>, Acc | Extract<U, { readonly t: "call" }>>;
-/** Aggregate calls outside subqueries. */
 type AggCalls<U, DB> = AggCall<Calls<U>, DB>;
 
 /**

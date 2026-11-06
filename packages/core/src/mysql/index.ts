@@ -1,12 +1,11 @@
 export {
 	type MariaDb,
 	type MariaDbDialect,
-	type MariaDbTransactionalSql,
 	type MySql,
 	type MySqlDialect,
 	mariadb,
 	mysql,
-	type TransactionalSql,
+	type ValidateDdl,
 } from "./dialect.js";
 export type {
 	ApplyDdl,
@@ -27,7 +26,6 @@ export type {
 	TableName,
 	TableOf,
 } from "./engine/write.js";
-export type { ValidateDdl } from "./migrations.js";
 export type {
 	Col,
 	ColFlags,
@@ -37,7 +35,12 @@ export type {
 	Typed,
 	View,
 } from "./schema/index.js";
-export type { MariaDbSql, Sql } from "./sql/types.js";
+export type {
+	MariaDbSql,
+	MariaDbTransactionalSql,
+	Sql,
+	TransactionalSql,
+} from "./sql/types.js";
 export type {
 	BigNumberStringsTypeMap,
 	Bindable,

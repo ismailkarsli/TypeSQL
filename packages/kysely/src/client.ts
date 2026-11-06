@@ -1,8 +1,10 @@
 import type { Executor } from "@typesql/core";
 import {
-	JsonParam,
-	mysqlPositional,
-	positional,
+	type DialectFamily,
+	dialectFamily,
+	familyStatement,
+	mysqlBind,
+	type PositionalStatement,
 	runTransaction,
 	type SqlDriver,
 } from "@typesql/core/adapter";
@@ -26,30 +28,23 @@ export interface KyselyExecutor {
 type Compile = (
 	text: string,
 	values: readonly unknown[],
-) => { readonly text: string; readonly values: unknown[] };
+) => PositionalStatement;
 
-const numbered: Compile = (text, values) => ({
-	text,
-	values: Array.from(values),
-});
-
-// `sql.json(…)` becomes JSON text. mysql2 writes a Buffer as a binary
-// literal and a plain Uint8Array as an object.
-function mysqlParam<V>(value: V): V | string | Buffer {
-	if (value instanceof JsonParam) return JSON.stringify(value.value);
-	return value instanceof Uint8Array && !Buffer.isBuffer(value)
-		? Buffer.from(value.buffer, value.byteOffset, value.byteLength)
-		: value;
-}
-
-const mysql: Compile = (text, values) =>
-	mysqlPositional(text, values, mysqlParam);
+const compileFor =
+	(family: DialectFamily): Compile =>
+	(text, values) =>
+		// Kysely's MysqlDialect runs on mysql2, which binds a Buffer, not a Uint8Array.
+		familyStatement[family](
+			text,
+			values,
+			family === "mysql" ? mysqlBind : undefined,
+		);
 
 function run<R>(
 	db: KyselyExecutor,
 	text: string,
 	values: readonly unknown[],
-	compile: Compile = numbered,
+	compile: Compile = compileFor("postgres"),
 ): Promise<QueryResult<R>> {
 	const q = compile(text, values);
 	return db
@@ -62,8 +57,6 @@ function rowCount(result: QueryResult<unknown>): number {
 		? result.rows.length
 		: Number(result.numAffectedRows);
 }
-
-type DialectName = "postgres" | "sqlite" | "mysql" | "mariadb";
 
 /**
  * Whether `db`'s dialect adapter is `Adapter`, from this copy of Kysely or
@@ -91,8 +84,7 @@ const hasExecutor = (
 	getExecutor(): { readonly adapter?: unknown };
 } => "getExecutor" in db && typeof db.getExecutor === "function";
 
-/** The dialect `db` runs on, by its adapter: SQLite's, MySQL's or another (PostgreSQL's). */
-const dialectOf = (db: KyselyExecutor): DialectName =>
+const dialectOf = (db: KyselyExecutor): DialectFamily =>
 	hasAdapter(db, SqliteAdapter)
 		? "sqlite"
 		: hasAdapter(db, MysqlAdapter)
@@ -106,45 +98,37 @@ const dialectOf = (db: KyselyExecutor): DialectName =>
  */
 export function executor(
 	db: KyselyExecutor,
-	options: { readonly dialect?: DialectName } = {},
+	options: { readonly dialect?: DialectFamily | "mariadb" } = {},
 ): Executor {
-	const dialect = options.dialect ?? dialectOf(db);
-	const compile =
-		dialect === "sqlite"
-			? positional
-			: dialect === "mysql" || dialect === "mariadb"
-				? mysql
-				: numbered;
+	const compile = compileFor(
+		options.dialect ? dialectFamily(options.dialect) : dialectOf(db),
+	);
 	return async (text, values) => {
 		const result = await run<unknown>(db, text, values, compile);
 		return { rows: result.rows, rowCount: rowCount(result) };
 	};
 }
 
+// A Kysely transaction (`trx`, or one the user passed) gets a savepoint.
 function transaction<T>(
 	db: KyselyExecutor,
-	depth: number,
+	_depth: number,
 	fn: (trx: KyselyExecutor) => Promise<T>,
+	savepoint: string | undefined,
 ): Promise<T> {
-	if (!db.isTransaction) return db.transaction().execute(fn);
+	if (savepoint === undefined) return db.transaction().execute(fn);
 	return runTransaction(
 		(statement) => run(db, statement, []),
 		() => fn(db),
-		{ savepoint: `typesql_${depth + 1}` },
+		{ savepoint },
 	);
 }
 
-export const driver: SqlDriver<KyselyExecutor> = {
-	executor: (db) => executor(db),
+/** The driver for a `sql` of the dialect family `dialect`. */
+export const driverOf = (
+	dialect: DialectFamily,
+): SqlDriver<KyselyExecutor> => ({
+	executor: (db) => executor(db, { dialect }),
 	transaction,
-};
-
-export const sqliteDriver: SqlDriver<KyselyExecutor> = {
-	executor: (db) => executor(db, { dialect: "sqlite" }),
-	transaction,
-};
-
-export const mysqlDriver: SqlDriver<KyselyExecutor> = {
-	executor: (db) => executor(db, { dialect: "mysql" }),
-	transaction,
-};
+	inTransaction: (db) => db.isTransaction,
+});

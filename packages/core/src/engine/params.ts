@@ -1,4 +1,4 @@
-import type { Next } from "../sql/next.js";
+import type { Next } from "./next.js";
 import type { Toks } from "./tokens.js";
 import type { ColInfo } from "./types.js";
 

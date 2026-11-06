@@ -1,0 +1,1020 @@
+language js(typescript)
+
+pattern transparent($inner) {
+	or {
+		$inner,
+		TsParenthesizedType(ty=$inner),
+		TsTypeOperatorType(ty=$inner) as $operator where {
+			$operator <: r"(?s)readonly\s.*"
+		},
+		TsParenthesizedType(ty=TsParenthesizedType(ty=$inner)),
+		TsParenthesizedType(ty= TsTypeOperatorType(ty=$inner) as $operator where {
+			$operator <: r"(?s)readonly\s.*"
+		}),
+		TsTypeOperatorType(ty=TsParenthesizedType(ty=$inner)) as $operator where {
+			$operator <: r"(?s)readonly\s.*"
+		},
+		TsParenthesizedType(ty=TsParenthesizedType(ty=TsParenthesizedType(ty=$inner))),
+		TsParenthesizedType(ty=TsParenthesizedType(ty= TsTypeOperatorType(ty=$inner) as $operator where {
+			$operator <: r"(?s)readonly\s.*"
+		})),
+		TsParenthesizedType(ty= TsTypeOperatorType(ty=TsParenthesizedType(ty=$inner)) as $operator where {
+			$operator <: r"(?s)readonly\s.*"
+		}),
+		TsTypeOperatorType(ty=TsParenthesizedType(ty=TsParenthesizedType(ty=$inner))) as $operator where {
+			$operator <: r"(?s)readonly\s.*"
+		},
+		TsParenthesizedType(ty=TsParenthesizedType(ty=TsParenthesizedType(ty=TsParenthesizedType(ty=$inner)))),
+		TsParenthesizedType(ty=TsParenthesizedType(ty=TsParenthesizedType(ty=TsParenthesizedType(ty=TsParenthesizedType(ty=$inner))))),
+		TsParenthesizedType(ty=TsParenthesizedType(ty=TsParenthesizedType(ty=TsParenthesizedType(ty=TsParenthesizedType(ty=TsParenthesizedType(ty=$inner))))))
+	}
+}
+
+pattern known_terminal() {
+	or {
+		JsObjectExpression(),
+		JsArrayExpression(),
+		JsArrowFunctionExpression(),
+		JsClassExpression(),
+		JsFunctionExpression(),
+		JsNewExpression(),
+		JsStringLiteralExpression(),
+		JsNumberLiteralExpression(),
+		JsBigintLiteralExpression(),
+		JsBooleanLiteralExpression(),
+		JsNullLiteralExpression(),
+		JsRegexLiteralExpression(),
+		JsTemplateExpression(tag=.),
+		JsUnaryExpression()
+	}
+}
+
+#include wrapped
+
+pattern known_value() { wrapped(known_terminal(), known_value()) }
+
+pattern empty_object() {
+	wrapped(JsObjectExpression(members=[]), empty_object())
+}
+
+pattern identifier_value() {
+	wrapped(JsIdentifierExpression(), identifier_value())
+}
+
+pattern function_value() {
+	wrapped(or {
+		JsArrowFunctionExpression(),
+		JsFunctionExpression()
+	}, function_value())
+}
+
+pattern declared($declaration) {
+	or {
+		$declaration,
+		JsVariableStatement(declaration=$declaration),
+		JsExport(export_clause=or {
+			$declaration,
+			JsVariableDeclarationClause(declaration=$declaration),
+			TsExportDeclareClause(declaration=or {
+				$declaration,
+				JsVariableDeclarationClause(declaration=$declaration)
+			}),
+			JsExportDefaultDeclarationClause(declaration=$declaration)
+		}),
+		TsDeclareStatement(declaration=or {
+			$declaration,
+			JsVariableDeclarationClause(declaration=$declaration)
+		})
+	}
+}
+
+pattern binding_named($name) {
+	or {
+		JsIdentifierBinding() as $id where { $id <: $name },
+		or {
+			JsObjectBindingPattern(),
+			JsArrayBindingPattern()
+		} as $x where {
+			$x <: contains JsIdentifierBinding() as $id where {
+				$id <: $name
+			} until JsInitializerClause()
+		}
+	}
+}
+
+pattern value_entry($name) {
+	or {
+		declared(or {
+			JsVariableDeclaration(declarators=some JsVariableDeclarator(id=binding_named($name))),
+			JsFunctionDeclaration(id= $id where { $id <: $name }),
+			TsDeclareFunctionDeclaration(id= $id where { $id <: $name }),
+			JsClassDeclaration(id= $id where { $id <: $name }),
+			TsEnumDeclaration(id= $id where { $id <: $name }),
+			TsModuleDeclaration(name= $id where { $id <: $name }),
+			TsImportEqualsDeclaration(id= $id where { $id <: $name }),
+			JsFunctionExportDefaultDeclaration(id= $id where { $id <: $name }),
+			JsClassExportDefaultDeclaration(id= $id where { $id <: $name })
+		}),
+		JsImport() as $x where {
+			$x <: contains JsIdentifierBinding() as $id where { $id <: $name }
+		},
+		JsFormalParameter(binding=binding_named($name)),
+		JsRestParameter(binding=binding_named($name)),
+		TsPropertyParameter(formal_parameter=JsFormalParameter(binding=binding_named($name))),
+		JsIdentifierBinding() as $id where { $id <: $name },
+		JsForVariableDeclaration(declarator=JsVariableDeclarator(id=binding_named($name))),
+		JsCatchDeclaration(binding=binding_named($name))
+	}
+}
+
+pattern hoisted_var($name) {
+	JsFunctionBody() as $x where {
+		$x <: contains JsVariableDeclaration(declarators=some JsVariableDeclarator(id=binding_named($name))) as $y where {
+			$y <: r"(?s)var\s.*"
+		} until or {
+			function_like(),
+			JsClassExpression(),
+			JsClassDeclaration()
+		}
+	}
+}
+
+pattern type_scope($entry) {
+	or {
+		JsModule(items=some $entry),
+		JsScript(statements=some $entry),
+		TsModuleBlock(items=some $entry),
+		JsFunctionBody(statements=some $entry),
+		JsBlockStatement(statements=some $entry),
+		JsStaticInitializationBlockClassMember(statements=some $entry),
+		JsSwitchStatement(cases=some or {
+			JsCaseClause(consequent=some $entry),
+			JsDefaultClause(consequent=some $entry)
+		})
+	}
+}
+
+pattern value_scope($entry) {
+	or {
+		type_scope($entry),
+		JsFunctionDeclaration(parameters=JsParameters(items=some $entry)),
+		JsFunctionExpression(parameters=JsParameters(items=some $entry)),
+		JsFunctionExportDefaultDeclaration(parameters=JsParameters(items=some $entry)),
+		JsArrowFunctionExpression(parameters=or {
+			JsParameters(items=some $entry),
+			$entry
+		}),
+		JsMethodClassMember(parameters=JsParameters(items=some $entry)),
+		JsMethodObjectMember(parameters=JsParameters(items=some $entry)),
+		JsConstructorClassMember(parameters=JsConstructorParameters(parameters=some $entry)),
+		JsSetterClassMember(parameter=$entry),
+		JsSetterObjectMember(parameter=$entry),
+		JsForStatement(initializer=$entry),
+		JsForOfStatement(initializer=$entry),
+		JsForInStatement(initializer=$entry),
+		JsCatchClause(declaration=$entry)
+	}
+}
+
+pattern value_scope_twice($first, $second) {
+	or {
+		JsModule(items=[..., $first, ..., $second, ...]),
+		JsScript(statements=[..., $first, ..., $second, ...]),
+		TsModuleBlock(items=[..., $first, ..., $second, ...]),
+		JsFunctionBody(statements=[..., $first, ..., $second, ...]),
+		JsBlockStatement(statements=[..., $first, ..., $second, ...]),
+		JsStaticInitializationBlockClassMember(statements=[
+			..., $first, ..., $second, ...
+		]),
+		JsSwitchStatement(cases=some or {
+			JsCaseClause(consequent=[..., $first, ..., $second, ...]),
+			JsDefaultClause(consequent=[..., $first, ..., $second, ...])
+		})
+	}
+}
+
+predicate scope_of($node, $name, $scope) {
+	$node <: within value_scope(value_entry($name)) as $scope
+}
+
+predicate not_hoisted($node, $name, $scope) {
+	$node <: not within JsFunctionBody() as $x where {
+		$scope <: not within $x,
+		$x <: hoisted_var($name)
+	}
+}
+
+predicate const_initializer($node, $name, $initializer) {
+	scope_of($node, $name, $x),
+	$x <: value_scope(declared( JsVariableDeclaration(declarators=some JsVariableDeclarator(id=binding_named($name), initializer=JsInitializerClause(expression=$initializer))) as $y where {
+		$y <: r"(?s)const\s.*"
+	})),
+	not_hoisted($node, $name, $x)
+}
+
+predicate annotated_binding($node, $name, $annotation) {
+	scope_of($node, $name, $x),
+	$x <: value_scope(or {
+		declared(JsVariableDeclaration(declarators=some JsVariableDeclarator(id= JsIdentifierBinding() as $y where {
+			$y <: $name
+		}, variable_annotation=TsTypeAnnotation(ty=$annotation)))),
+		JsFormalParameter(binding= JsIdentifierBinding() as $y where {
+			$y <: $name
+		}, type_annotation=TsTypeAnnotation(ty=$annotation)),
+		JsRestParameter(binding= JsIdentifierBinding() as $y where {
+			$y <: $name
+		}, type_annotation=TsTypeAnnotation(ty=$annotation)),
+		TsPropertyParameter(formal_parameter=JsFormalParameter(binding= JsIdentifierBinding() as $y where {
+			$y <: $name
+		}, type_annotation=TsTypeAnnotation(ty=$annotation)))
+	}),
+	not_hoisted($node, $name, $x)
+}
+
+pattern function_named($name, $parameters, $returns) {
+	or {
+		JsFunctionDeclaration(id= $id where {
+			$id <: $name
+		}, return_type_annotation=$returns, parameters=JsParameters(items=$parameters)),
+		TsDeclareFunctionDeclaration(id= $id where {
+			$id <: $name
+		}, return_type_annotation=$returns, parameters=JsParameters(items=$parameters)),
+		JsVariableDeclaration(declarators=some JsVariableDeclarator(id= JsIdentifierBinding() as $id where {
+			$id <: $name
+		}, initializer=JsInitializerClause(expression=function_signature($parameters, $returns))))
+	}
+}
+
+pattern function_signature($parameters, $returns) {
+	function_value() as $x where {
+		$x <: contains or {
+			JsArrowFunctionExpression(return_type_annotation=$returns, parameters=JsParameters(items=$parameters)),
+			JsFunctionExpression(return_type_annotation=$returns, parameters=JsParameters(items=$parameters))
+		} until or {
+			JsArrowFunctionExpression(),
+			JsFunctionExpression()
+		}
+	}
+}
+
+predicate local_function($callee, $parameters, $returns) {
+	or {
+		$callee <: function_signature($parameters, $returns),
+		and {
+			$callee <: identifier_value(),
+			$callee <: contains JsIdentifierExpression(name=$n) as $r,
+			scope_of($r, $n, $x),
+			$x <: value_scope(declared(function_named($n, $parameters, $returns))),
+			$x <: not value_scope_twice(declared(or {
+				JsFunctionDeclaration(id= $y where { $y <: $n }),
+				TsDeclareFunctionDeclaration(id= $y where { $y <: $n })
+			}), declared(or {
+				JsFunctionDeclaration(id= $z where { $z <: $n }),
+				TsDeclareFunctionDeclaration(id= $z where { $z <: $n })
+			})),
+			not_hoisted($r, $n, $x)
+		}
+	}
+}
+
+pattern declares_type_parameter($name) {
+	TsTypeParameters(items=some TsTypeParameter(name= $x where { $x <: $name }))
+}
+
+predicate type_parameter_shadowed($node, $name) {
+	$node <: within or {
+		JsFunctionDeclaration(type_parameters=declares_type_parameter($name)),
+		JsFunctionExpression(type_parameters=declares_type_parameter($name)),
+		JsArrowFunctionExpression(type_parameters=declares_type_parameter($name)),
+		JsFunctionExportDefaultDeclaration(type_parameters=declares_type_parameter($name)),
+		TsDeclareFunctionDeclaration(type_parameters=declares_type_parameter($name)),
+		TsDeclareFunctionExportDefaultDeclaration(type_parameters=declares_type_parameter($name)),
+		JsClassDeclaration(type_parameters=declares_type_parameter($name)),
+		JsClassExpression(type_parameters=declares_type_parameter($name)),
+		JsClassExportDefaultDeclaration(type_parameters=declares_type_parameter($name)),
+		TsInterfaceDeclaration(type_parameters=declares_type_parameter($name)),
+		TsTypeAliasDeclaration(type_parameters=declares_type_parameter($name)),
+		JsMethodClassMember(type_parameters=declares_type_parameter($name)),
+		JsMethodObjectMember(type_parameters=declares_type_parameter($name)),
+		TsMethodSignatureClassMember(type_parameters=declares_type_parameter($name)),
+		TsMethodSignatureTypeMember(type_parameters=declares_type_parameter($name)),
+		TsCallSignatureTypeMember(type_parameters=declares_type_parameter($name)),
+		TsConstructSignatureTypeMember(type_parameters=declares_type_parameter($name)),
+		TsFunctionType(type_parameters=declares_type_parameter($name)),
+		TsConstructorType(type_parameters=declares_type_parameter($name)),
+		TsMappedType(property_name=$x, keys_type=$y) where {
+			$x <: $name,
+			$node <: not within $y
+		},
+		TsConditionalType(extends_type=$y, true_type=$z) where {
+			$y <: contains TsInferType(name= $x where { $x <: $name }),
+			$node <: within $z
+		}
+	}
+}
+
+pattern type_entry($name) {
+	or {
+		declared(or {
+			TsTypeAliasDeclaration(binding_identifier= $id where { $id <: $name }),
+			TsInterfaceDeclaration(id= $id where { $id <: $name }),
+			TsEnumDeclaration(id= $id where { $id <: $name }),
+			JsClassDeclaration(id= $id where { $id <: $name }),
+			JsClassExportDefaultDeclaration(id= $id where { $id <: $name })
+		}),
+		JsImport() as $x where {
+			$x <: contains JsIdentifierBinding() as $id where { $id <: $name }
+		}
+	}
+}
+
+predicate find_alias($node, $name, $parameters, $body) {
+	not type_parameter_shadowed($node, $name),
+	$node <: within type_scope(type_entry($name)) as $x,
+	$x <: type_scope(declared(TsTypeAliasDeclaration(binding_identifier= $id where {
+		$id <: $name
+	}, type_parameters=$parameters, ty=$body)))
+}
+
+predicate builtin($node, $name) {
+	not type_parameter_shadowed($node, $name),
+	$node <: not within type_scope(type_entry($name))
+}
+
+pattern utility_of($inner) {
+	TsReferenceType(name=$n) as $r where {
+		$n <: r"Readonly|Partial|Required|NonNullable",
+		builtin($r, $n),
+		$r <: TsReferenceType(type_arguments=TsTypeArguments(ts_type_argument_list=[
+			$inner, ...
+		]))
+	}
+}
+
+pattern alias_reference($name, $parameters, $body) {
+	TsReferenceType(name=$name) as $r where {
+		or {
+			$name <: not r"Record|Readonly|Partial|Required|NonNullable|PropertyKey",
+			not builtin($r, $name)
+		},
+		find_alias($r, $name, $parameters, $body)
+	}
+}
+
+pattern broad_key_terminal() {
+	or {
+		TsStringType(),
+		TsNumberType(),
+		TsSymbolType(),
+		TsReferenceType(name=$n, type_arguments=.) as $r where {
+			$n <: r"PropertyKey",
+			builtin($r, $n)
+		}
+	}
+}
+
+pattern broad_key_0() { transparent(broad_key_terminal()) }
+
+pattern broad_key_via($previous) {
+	transparent(or {
+		broad_key_terminal(),
+		TsUnionType(types=some $previous),
+		alias_reference($_, ., $b) where { $b <: $previous }
+	})
+}
+
+pattern broad_key_1() { broad_key_via(broad_key_0()) }
+
+pattern broad_key_2() { broad_key_via(broad_key_1()) }
+
+pattern broad_key_3() { broad_key_via(broad_key_2()) }
+
+pattern broad_key_4() { broad_key_via(broad_key_3()) }
+
+pattern defaulted($argument) {
+	TsTypeParameter(default=TsDefaultTypeClause(ty=$argument))
+}
+
+predicate parameter_argument($parameters, $arguments, $name, $argument) {
+	or {
+		and {
+			$parameters <: [TsTypeParameter(name=$x), ...],
+			$x <: $name,
+			or {
+				$arguments <: [$argument, ...],
+				and {
+					$arguments <: not [$_, ...],
+					$parameters <: [defaulted($argument), ...]
+				}
+			}
+		},
+		and {
+			$parameters <: [$_, TsTypeParameter(name=$x), ...],
+			$x <: $name,
+			or {
+				$arguments <: [$_, $argument, ...],
+				and {
+					$arguments <: not [$_, $_, ...],
+					$parameters <: [$_, defaulted($argument), ...]
+				}
+			}
+		},
+		and {
+			$parameters <: [$_, $_, TsTypeParameter(name=$x), ...],
+			$x <: $name,
+			or {
+				$arguments <: [$_, $_, $argument, ...],
+				and {
+					$arguments <: not [$_, $_, $_, ...],
+					$parameters <: [$_, $_, defaulted($argument), ...]
+				}
+			}
+		},
+		and {
+			$parameters <: [$_, $_, $_, TsTypeParameter(name=$x), ...],
+			$x <: $name,
+			or {
+				$arguments <: [$_, $_, $_, $argument, ...],
+				and {
+					$arguments <: not [$_, $_, $_, $_, ...],
+					$parameters <: [$_, $_, $_, defaulted($argument), ...]
+				}
+			}
+		},
+		and {
+			$parameters <: [$_, $_, $_, $_, TsTypeParameter(name=$x), ...],
+			$x <: $name,
+			or {
+				$arguments <: [$_, $_, $_, $_, $argument, ...],
+				and {
+					$arguments <: not [$_, $_, $_, $_, $_, ...],
+					$parameters <: [$_, $_, $_, $_, defaulted($argument), ...]
+				}
+			}
+		},
+		and {
+			$parameters <: [$_, $_, $_, $_, $_, TsTypeParameter(name=$x), ...],
+			$x <: $name,
+			or {
+				$arguments <: [$_, $_, $_, $_, $_, $argument, ...],
+				and {
+					$arguments <: not [$_, $_, $_, $_, $_, $_, ...],
+					$parameters <: [$_, $_, $_, $_, $_, defaulted($argument), ...]
+				}
+			}
+		}
+	}
+}
+
+pattern parameter_reference($items) {
+	TsReferenceType(name=$n, type_arguments=.) where {
+		$items <: some TsTypeParameter(name= $x where { $x <: $n })
+	}
+}
+
+pattern substituted_parameter($items, $arguments) {
+	parameter_reference($items) as $r where {
+		$r <: TsReferenceType(name=$n),
+		parameter_argument($items, $arguments, $n, broad_key_4())
+	}
+}
+
+pattern broad_key_or($parameter) {
+	transparent(or {
+		$parameter,
+		broad_key_4(),
+		TsUnionType(types=some or {
+			$parameter,
+			broad_key_4()
+		})
+	})
+}
+
+pattern record_keyed($key) {
+	TsReferenceType(name=$n) as $r where {
+		$n <: r"Record",
+		builtin($r, $n),
+		$r <: TsReferenceType(type_arguments=or {
+			.,
+			TsTypeArguments(ts_type_argument_list=[$key, ...])
+		})
+	}
+}
+
+pattern open_with($key) {
+	transparent(or {
+		TsObjectType(members=some TsIndexSignatureTypeMember()),
+		TsMappedType(keys_type=$key),
+		record_keyed($key)
+	})
+}
+
+pattern substituted_open($items, $arguments) {
+	open_with(broad_key_or(substituted_parameter($items, $arguments)))
+}
+
+predicate chained_argument($inner_items, $inner_arguments, $items, $arguments, $name, $result) {
+	parameter_argument($inner_items, $inner_arguments, $name, $x),
+	or {
+		and {
+			$x <: parameter_reference($items),
+			$x <: TsReferenceType(name=$y),
+			parameter_argument($items, $arguments, $y, $result)
+		},
+		and { $x <: not parameter_reference($items), $x <: $result }
+	}
+}
+
+pattern chained_open($inner_items, $inner_arguments, $items, $arguments) {
+	open_with(broad_key_or( parameter_reference($inner_items) as $r where {
+		$r <: TsReferenceType(name=$n),
+		chained_argument($inner_items, $inner_arguments, $items, $arguments, $n, broad_key_4())
+	}))
+}
+
+predicate applied_arguments($parameters, $type_arguments, $items, $arguments) {
+	$parameters <: TsTypeParameters(items=$items),
+	or {
+		$type_arguments <: TsTypeArguments(ts_type_argument_list=$arguments),
+		and {
+			$type_arguments <: .,
+			$items <: every TsTypeParameter(default=TsDefaultTypeClause()),
+			$arguments = []
+		}
+	}
+}
+
+predicate generic_simple($parameters, $type_arguments, $body) {
+	applied_arguments($parameters, $type_arguments, $i, $a),
+	$body <: or {
+		substituted_open($i, $a),
+		transparent(utility_of(substituted_open($i, $a)))
+	}
+}
+
+pattern alias_broad_terminal($kind) {
+	or {
+		TsUnknownType() where { $kind = "strict" },
+		TsNonPrimitiveType() where { $kind = "strict" },
+		TsObjectType(members=some TsIndexSignatureTypeMember()) where {
+			$kind = "dict"
+		},
+		TsMappedType(keys_type=broad_key_4()) where { $kind = "dict" },
+		record_keyed(broad_key_4()) where { $kind = "dict" }
+	}
+}
+
+predicate generic_open($parameters, $type_arguments, $body) {
+	applied_arguments($parameters, $type_arguments, $items, $arguments),
+	$body <: or {
+		substituted_open($items, $arguments),
+		transparent(utility_of(substituted_open($items, $arguments))),
+		transparent( parameter_reference($items) as $r where {
+			$r <: TsReferenceType(name=$n),
+			parameter_argument($items, $arguments, $n, alias_broad_4($kind)),
+			$kind <: "dict"
+		}),
+		transparent( alias_reference($_, ., $b) where {
+			$b <: alias_broad_4($kind),
+			$kind <: "dict"
+		}),
+		transparent( alias_reference($_, TsTypeParameters(items=$inner_items), $b) as $r where {
+			$r <: TsReferenceType(type_arguments=$t),
+			or {
+				$t <: TsTypeArguments(ts_type_argument_list=$inner_arguments),
+				and { $t <: ., $inner_arguments = [] }
+			},
+			$b <: or {
+				transparent( parameter_reference($inner_items) as $s where {
+					$s <: TsReferenceType(name=$n),
+					chained_argument($inner_items, $inner_arguments, $items, $arguments, $n, alias_broad_4($kind)),
+					$kind <: "dict"
+				}),
+				chained_open($inner_items, $inner_arguments, $items, $arguments),
+				// `$r` is still bound to the enclosing alias reference, unlike in `utility_of`.
+				transparent( TsReferenceType(name=$n) as $r where {
+					$n <: r"Readonly|Partial|Required|NonNullable",
+					builtin($r, $n),
+					$r <: TsReferenceType(type_arguments=TsTypeArguments(ts_type_argument_list=[
+						chained_open($inner_items, $inner_arguments, $items, $arguments),
+
+						...
+					]))
+				})
+			}
+		})
+	}
+}
+
+predicate generic_pass($parameters, $type_arguments, $body, $kind, $broad) {
+	applied_arguments($parameters, $type_arguments, $i, $a),
+	$body <: transparent( parameter_reference($i) as $r where {
+		$r <: TsReferenceType(name=$n),
+		parameter_argument($i, $a, $n, $broad),
+		$kind <: "dict"
+	})
+}
+
+pattern alias_broad_0($kind) {
+	transparent(or {
+		alias_broad_terminal($kind),
+		utility_of(transparent(alias_broad_terminal($kind)))
+	})
+}
+
+pattern alias_broad_via($kind, $previous, $pass_kind, $pass_previous) {
+	transparent(or {
+		alias_broad_terminal($kind),
+		utility_of($previous),
+		alias_reference($_, $p, $b) as $r where {
+			or {
+				and { $p <: ., $b <: $previous },
+				and {
+					$r <: TsReferenceType(type_arguments=$t),
+					or {
+						generic_simple($p, $t, $b),
+						generic_pass($p, $t, $b, $pass_kind, $pass_previous)
+					},
+					$kind = "dict"
+				}
+			}
+		}
+	})
+}
+
+#repeat 1..4
+pattern alias_broad_{{n}}($kind) {
+	alias_broad_via($kind, alias_broad_{{n-1}}($kind), $k, alias_broad_{{n-1}}($k))
+}
+#end
+
+pattern direct_target($kind) {
+	or {
+		TsUnknownType() where { $kind = "strict" },
+		TsNonPrimitiveType() where { $kind = "strict" },
+		TsObjectType(members=$t) where {
+			or {
+				and { $t <: some TsIndexSignatureTypeMember(), $kind = "dict" },
+				and { $t <: [$_, ...], $kind = "strict" }
+			}
+		},
+		TsMappedType() where { $kind = "dict" },
+		record_keyed(broad_key_4()) where { $kind = "dict" },
+		alias_reference($_, $p, $b) as $r where {
+			or {
+				and { $p <: ., $b <: alias_broad_4($kind) },
+				and {
+					$r <: TsReferenceType(type_arguments=$t),
+					generic_open($p, $t, $b),
+					$kind = "dict"
+				}
+			}
+		}
+	}
+}
+
+pattern target_0($kind) { transparent(direct_target($kind)) }
+
+pattern target_1($kind) {
+	transparent(or {
+		direct_target($kind),
+		utility_of(target_0($kind))
+	})
+}
+
+#repeat 2..4
+pattern target_{{n}}($kind) {
+	transparent(or {
+		direct_target($kind),
+		utility_of(target_{{n-1}}($kind))
+	})
+}
+#end
+
+pattern known_via($previous) {
+	or {
+		known_value(),
+		identifier_value() as $v where {
+			$v <: contains JsIdentifierExpression(name=$n),
+			const_initializer($v, $n, $i),
+			$i <: $previous
+		}
+	}
+}
+
+pattern known_1() { known_via(known_value()) }
+
+pattern known_2() { known_via(known_1()) }
+
+pattern known_3() { known_via(known_2()) }
+
+pattern known_4() { known_via(known_3()) }
+
+pattern known_5() { known_via(known_4()) }
+
+predicate widens($type, $value) {
+	$value <: or {
+		known_value(),
+		identifier_value()
+	},
+	$type <: target_4($kind),
+	or { $kind <: "strict", $value <: not empty_object() },
+	$value <: known_5()
+}
+
+pattern never_member() {
+	TsPropertySignatureTypeMember(type_annotation=TsTypeAnnotation(ty=transparent(TsNeverType()))) as $member where {
+		$member <: r"(?s)[^:]*\?\s*:.*"
+	}
+}
+
+pattern unsafe_0() {
+	transparent(or {
+		TsUnknownType(),
+		TsAnyType(),
+		TsNonPrimitiveType(),
+		TsObjectType(members=every never_member())
+	})
+}
+
+predicate module_interface($node, $name, $declaration) {
+	$node <: within or {
+		JsModule(),
+		JsScript()
+	} as $x,
+	$x <: or {
+		JsModule(items=some declared(TsInterfaceDeclaration(id= $id where {
+			$id <: $name
+		}) as $declaration)),
+		JsScript(statements=some declared(TsInterfaceDeclaration(id= $id where {
+			$id <: $name
+		}) as $declaration))
+	}
+}
+
+pattern interface_named($name, $id) {
+	declared(TsInterfaceDeclaration(id= $id where { $id <: $name }))
+}
+
+predicate empty_interface($node, $name) {
+	module_interface($node, $name, $x),
+	$x <: TsInterfaceDeclaration(extends_clause=., members=every never_member()),
+	$node <: within or {
+		JsModule(),
+		JsScript()
+	} as $y,
+	$y <: not or {
+		JsModule(items=[
+			..., interface_named($name, $z), ..., interface_named($name, $id), ...
+		]),
+		JsScript(statements=[
+			..., interface_named($name, $z), ..., interface_named($name, $id), ...
+		])
+	}
+}
+
+pattern unsafe_via($previous) {
+	transparent(or {
+		unsafe_0(),
+		TsUnionType(types=some $previous),
+		TsIntersectionType(types=$t) where {
+			or { $t <: some transparent(TsAnyType()), $t <: every not not $previous }
+		},
+		utility_of($previous),
+		TsReferenceType(name=$n) as $r where {
+			or {
+				$n <: not r"Readonly|Partial|Required|NonNullable",
+				not builtin($r, $n)
+			},
+			or {
+				empty_interface($r, $n),
+				and {
+					not module_interface($r, $n, $_),
+					find_alias($r, $n, ., $t),
+					$t <: $previous
+				}
+			}
+		}
+	})
+}
+
+pattern unsafe_1() { unsafe_via(unsafe_0()) }
+
+pattern unsafe_2() { unsafe_via(unsafe_1()) }
+
+pattern unsafe_3() { unsafe_via(unsafe_2()) }
+
+pattern informative() { not unsafe_3() }
+
+pattern argument_evidence($self, $identifier) {
+	or {
+		JsParenthesizedExpression(expression=$self),
+		TsNonNullAssertionExpression(expression=$self),
+		TsSatisfiesExpression(expression=$self),
+		TsAsExpression(ty=informative()),
+		TsTypeAssertionExpression(ty=informative()),
+		JsCallExpression(callee=$r) where {
+			local_function($r, $_, TsReturnTypeAnnotation(ty=informative()))
+		},
+		known_terminal(),
+		$identifier
+	}
+}
+
+pattern identifier_evidence($previous) {
+	JsIdentifierExpression(name=$n) as $r where {
+		or {
+			and { annotated_binding($r, $n, $a), $a <: informative() },
+			and {
+				not annotated_binding($r, $n, $_),
+				const_initializer($r, $n, $a),
+				$a <: $previous
+			}
+		}
+	}
+}
+
+pattern argument_evidence_0() {
+	argument_evidence(argument_evidence_0(), or {})
+}
+
+#repeat 1..5
+pattern argument_evidence_{{n}}() {
+	argument_evidence(argument_evidence_{{n}}(), identifier_evidence(argument_evidence_{{n-1}}()))
+}
+#end
+
+pattern contains_unknown() {
+	or {
+		TsUnknownType(),
+		TsParenthesizedType(ty=contains_unknown()),
+		TsUnionType(types=some contains_unknown())
+	}
+}
+
+pattern unknown_parameter($binding) {
+	JsFormalParameter(binding=$binding, type_annotation=TsTypeAnnotation(ty=contains_unknown()))
+}
+
+predicate predicate_argument($parameters, $arguments, $subject, $argument) {
+	or {
+		and {
+			$parameters <: [unknown_parameter($x), ...],
+			$x <: $subject,
+			$arguments <: [$argument, ...]
+		},
+		and {
+			$parameters <: [$_, unknown_parameter($x), ...],
+			$x <: $subject,
+			$arguments <: [$_, $argument, ...]
+		},
+		and {
+			$parameters <: [$_, $_, unknown_parameter($x), ...],
+			$x <: $subject,
+			$arguments <: [$_, $_, $argument, ...]
+		},
+		and {
+			$parameters <: [$_, $_, $_, unknown_parameter($x), ...],
+			$x <: $subject,
+			$arguments <: [$_, $_, $_, $argument, ...]
+		},
+		and {
+			$parameters <: [$_, $_, $_, $_, unknown_parameter($x), ...],
+			$x <: $subject,
+			$arguments <: [$_, $_, $_, $_, $argument, ...]
+		},
+		and {
+			$parameters <: [$_, $_, $_, $_, $_, unknown_parameter($x), ...],
+			$x <: $subject,
+			$arguments <: [$_, $_, $_, $_, $_, $argument, ...]
+		},
+		and {
+			$parameters <: [$_, $_, $_, $_, $_, $_, unknown_parameter($x), ...],
+			$x <: $subject,
+			$arguments <: [$_, $_, $_, $_, $_, $_, $argument, ...]
+		},
+		and {
+			$parameters <: [$_, $_, $_, $_, $_, $_, $_, unknown_parameter($x), ...],
+			$x <: $subject,
+			$arguments <: [$_, $_, $_, $_, $_, $_, $_, $argument, ...]
+		}
+	}
+}
+
+pattern predicate_shape() {
+	function_named($_, some JsFormalParameter(type_annotation=TsTypeAnnotation(ty=contains_unknown())), TsReturnTypeAnnotation(ty=or {
+		TsPredicateReturnType(),
+		TsAssertsReturnType()
+	}))
+}
+
+pattern assertion_in_parentheses() {
+	or {
+		TsAsExpression(),
+		TsTypeAssertionExpression(),
+		JsParenthesizedExpression(expression=assertion_in_parentheses())
+	}
+}
+
+#include function_like
+
+pattern return_type($type) {
+	or {
+		JsFunctionDeclaration(return_type_annotation=TsReturnTypeAnnotation(ty=$type)),
+		JsFunctionExpression(return_type_annotation=TsReturnTypeAnnotation(ty=$type)),
+		JsArrowFunctionExpression(return_type_annotation=TsReturnTypeAnnotation(ty=$type)),
+		JsFunctionExportDefaultDeclaration(return_type_annotation=TsReturnTypeAnnotation(ty=$type)),
+		JsMethodClassMember(return_type_annotation=TsReturnTypeAnnotation(ty=$type)),
+		JsMethodObjectMember(return_type_annotation=TsReturnTypeAnnotation(ty=$type)),
+		JsGetterClassMember(return_type=TsTypeAnnotation(ty=$type)),
+		JsGetterObjectMember(return_type=TsTypeAnnotation(ty=$type))
+	}
+}
+
+or {
+	JsVariableDeclarator(id=JsIdentifierBinding(), variable_annotation=TsTypeAnnotation(ty=$type), initializer=JsInitializerClause(expression=$value)) where {
+		widens($type, $value)
+	},
+	JsPropertyClassMember(property_annotation=or {
+		TsTypeAnnotation(ty=$type),
+		TsOptionalPropertyAnnotation(type_annotation=TsTypeAnnotation(ty=$type))
+	}, value=JsInitializerClause(expression=$value)) where {
+		widens($type, $value)
+	},
+	JsAssignmentExpression(left=JsIdentifierAssignment() as $x, right=$value) as $node where {
+		$node <: r"(?s)[\w$]+\s*=[^=].*",
+		$value <: or {
+			known_value(),
+			identifier_value()
+		},
+		scope_of($node, $x, $y),
+		$y <: value_scope(declared(JsVariableDeclaration(declarators=some JsVariableDeclarator(id= JsIdentifierBinding() as $z where {
+			$z <: $x
+		}, variable_annotation=TsTypeAnnotation(ty=$type))))),
+		not_hoisted($node, $x, $y),
+		widens($type, $value)
+	},
+	JsReturnStatement(argument=$value) as $node where {
+		$value <: or {
+			known_value(),
+			identifier_value()
+		},
+		$node <: within function_like() as $x,
+		$x <: return_type($type),
+		widens($type, $value)
+	},
+	JsArrowFunctionExpression(return_type_annotation=TsReturnTypeAnnotation(ty=$type), body=$value) where {
+		$value <: not JsFunctionBody(),
+		widens($type, $value)
+	},
+	or {
+		TsAsExpression(expression=$value, ty=$type),
+		TsTypeAssertionExpression(expression=$value, ty=$type)
+	} as $node where {
+		$value <: or {
+			known_value(),
+			identifier_value()
+		},
+		or {
+			$node <: not within or {
+				TsAsExpression(),
+				TsTypeAssertionExpression()
+			} as $x where { $x <: not $node },
+			and {
+				$node <: within or {
+					TsAsExpression(),
+					TsTypeAssertionExpression()
+				} as $x where { $x <: not $node },
+				$x <: not or {
+					TsAsExpression(expression=assertion_in_parentheses()),
+					TsTypeAssertionExpression(expression=assertion_in_parentheses())
+				}
+			}
+		},
+		widens($type, $value)
+	},
+	JsCallExpression(callee=$x, arguments=JsCallArguments(args=$y)) as $node where {
+		$y <: [$_, ...],
+		or {
+			$x <: function_value(),
+			and {
+				$x <: identifier_value(),
+				$node <: within or {
+					JsModule(),
+					JsScript()
+				} as $w,
+				$w <: r"(?s).*\bunknown\b.*\)\s*:\s*(?:asserts\s+[A-Za-z_$][\w$]*|[A-Za-z_$][\w$]*\s+is)\b.*",
+				$node <: within type_scope(declared(predicate_shape()))
+			}
+		},
+		local_function($x, $z, TsReturnTypeAnnotation(ty=or {
+			TsPredicateReturnType(parameter_name=$type),
+			TsAssertsReturnType(parameter_name=$type)
+		})),
+		predicate_argument($z, $y, $type, $value),
+		$value <: not JsSpread(),
+		$value <: argument_evidence_5()
+	}
+} where {
+	register_diagnostic(span=$value, message="This explicit broad type can discard known type evidence. Keep inference, validate with `satisfies`, or use a named owner contract.", severity="error")
+}

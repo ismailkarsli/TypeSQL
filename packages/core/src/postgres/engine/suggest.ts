@@ -1,7 +1,9 @@
-import type { Best, IsRelation, RelCols } from "../../engine/suggest.js";
+import type { Next } from "../../engine/next.js";
+import type { Best } from "../../engine/suggest.js";
 import type { Toks } from "../../engine/tokens.js";
-import type { Nx } from "./parser/util.js";
-import type { FunctionCatalog } from "./typer/catalog.js";
+import type { IsRelation, RelCols } from "../../schema.js";
+import type { MetaKey } from "./db.js";
+import type { FunctionName } from "./typer/catalog.js";
 
 export type WithHint<
 	M extends string,
@@ -24,15 +26,14 @@ export type WithHint<
 			: M extends `relation "${infer Name}" does not exist`
 				? Hinted<M, Best<Name, RelNames<DB>>, "relation">
 				: M extends `function ${infer Name}(${infer Args}) does not exist. Declare it ${infer Rest}`
-					? Best<Name, SameStart<Name, FnNames<DB>>> extends infer S extends
-							string
+					? Best<
+							Name,
+							SameStart<Name, FunctionName<DB>>
+						> extends infer S extends string
 						? `function ${Name}(${Args}) does not exist. Perhaps you meant the function "${S}"? Otherwise declare it ${Rest}`
 						: M
 					: M;
 
-type FnNames<DB> =
-	| (keyof FunctionCatalog & string)
-	| (DB extends { readonly $functions: infer F } ? keyof F & string : never);
 type SameStart<Name extends string, Cands> = Name extends `${infer C}${string}`
 	? Extract<Cands, `${C}${string}`>
 	: never;
@@ -44,7 +45,12 @@ type Hinted<M extends string, S, What extends string> = S extends string
 type MentionedRels<T extends Toks, DB, I extends number, Acc> = T[I] extends {
 	readonly k: string;
 }
-	? MentionedRels<T, DB, Nx<Nx<I>>, Acc | RelAt<T, Nx<I>, DB> | RelAt<T, I, DB>>
+	? MentionedRels<
+			T,
+			DB,
+			Next<Next<I>>,
+			Acc | RelAt<T, Next<I>, DB> | RelAt<T, I, DB>
+		>
 	: Acc;
 type RelAt<T extends Toks, I extends number, DB> = T[I] extends {
 	readonly k: "w" | "id";
@@ -56,7 +62,7 @@ type RelAt<T extends Toks, I extends number, DB> = T[I] extends {
 	: never;
 
 type RelNames<DB> = {
-	[K in keyof DB & string]: K extends "$types" | "$functions" | "$nullParams"
+	[K in keyof DB & string]: K extends MetaKey
 		? never
 		: IsRelation<DB[K]> extends true
 			? K

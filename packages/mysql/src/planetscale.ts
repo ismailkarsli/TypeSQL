@@ -1,6 +1,7 @@
 import type { Executor, ExecutorResult, SqlPlugin } from "@typesql/core";
 import {
 	createTransactionalSql,
+	mysqlInline,
 	runTransaction,
 	type SqlDriver,
 } from "@typesql/core/adapter";
@@ -10,7 +11,6 @@ import {
 	type ServerlessTypeMap,
 	type TransactionalSql,
 } from "@typesql/core/mysql";
-import { inline } from "./literal.js";
 
 export interface PlanetScaleResult {
 	readonly rows: readonly unknown[];
@@ -42,7 +42,7 @@ async function run(
 }
 
 export function executor(client: PlanetScaleQueryable): Executor {
-	return (text, values) => run(client, inline(text, values));
+	return (text, values) => run(client, mysqlInline(text, values));
 }
 
 const isClient = (c: PlanetScaleQueryable): c is PlanetScaleClient =>
@@ -50,14 +50,15 @@ const isClient = (c: PlanetScaleQueryable): c is PlanetScaleClient =>
 
 function transaction<T>(
 	client: PlanetScaleQueryable,
-	depth: number,
+	_depth: number,
 	fn: (tx: PlanetScaleQueryable) => Promise<T>,
+	savepoint: string | undefined,
 ): Promise<T> {
-	if (depth > 0)
+	if (savepoint !== undefined)
 		return runTransaction(
 			(statement) => client.execute(statement),
 			() => fn(client),
-			{ savepoint: `typesql_${depth}` },
+			{ savepoint },
 		);
 	if (!isClient(client))
 		return Promise.reject(

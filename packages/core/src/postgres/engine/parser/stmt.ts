@@ -1,10 +1,12 @@
-import type { OpTok, Toks, WordTok } from "../../../engine/tokens.js";
+import type { Next } from "../../../engine/next.js";
+import type { Toks } from "../../../engine/tokens.js";
 import type { WithClause } from "../ast.js";
+import type { OpTok, WordTok } from "../lexer/tokens.js";
 import type { ParseDdl } from "./ddl.js";
 import type { ParseDelete, ParseInsert, ParseUpdate } from "./dml.js";
 import type { ParseMerge } from "./merge.js";
 import type { ParseSelectAfterWith, ParseWith } from "./select.js";
-import type { AtEnd, EatOp, Expected, Fail, Near, Nx, Ok } from "./util.js";
+import type { AtEnd, EatOp, Expected, Fail, Near, Ok } from "./util.js";
 import type { ParseCursorStmt } from "./utility.js";
 
 export type ParseProgram<T extends Toks> =
@@ -14,11 +16,11 @@ export type ParseProgram<T extends Toks> =
 				? S
 				: EatOp<T, J, ";"> extends never
 					? Fail<`syntax error at or near ${Near<T, J>}`, J>
-					: AtEnd<T, Nx<J>> extends true
+					: AtEnd<T, Next<J>> extends true
 						? S
 						: Fail<
-								`syntax error at or near ${Near<T, Nx<J>>}: only one statement is allowed`,
-								Nx<J>
+								`syntax error at or near ${Near<T, Next<J>>}: only one statement is allowed`,
+								Next<J>
 							>
 			: X
 		: never;
@@ -65,32 +67,50 @@ type DdlKeyword =
 	| "abort"
 	| "reassign";
 
+/**
+ * The statement at I, after the WITH clause `W` if any: a query or DML
+ * statement, or (without WITH) DDL and cursor statements.
+ */
 export type ParseStatement<
 	T extends Toks,
 	I extends number,
 	Into extends boolean = true,
+	W extends WithClause | null = null,
 > =
-	T[I] extends WordTok<infer W>
-		? W extends "select" | "values" | "table"
-			? SelectInto<ParseSelectAfterWith<T, I, null>, Into>
-			: W extends "with"
-				? ParseWithStatement<T, Nx<I>, Into>
-				: W extends "insert"
-					? ParseInsert<T, Nx<I>, null>
-					: W extends "update"
-						? ParseUpdate<T, Nx<I>, null>
-						: W extends "delete"
-							? ParseDelete<T, Nx<I>, null>
-							: W extends "merge"
-								? ParseMerge<T, Nx<I>, null>
-								: W extends DdlKeyword
-									? ParseDdl<T, I>
-									: W extends "declare" | "fetch" | "move" | "close"
-										? ParseCursorStmt<T, I>
-										: Fail<`syntax error at or near ${Near<T, I>}`, I>
+	T[I] extends WordTok<infer K>
+		? K extends "select" | "values" | "table"
+			? SelectInto<ParseSelectAfterWith<T, I, W>, Into>
+			: K extends "insert"
+				? ParseInsert<T, Next<I>, W>
+				: K extends "update"
+					? ParseUpdate<T, Next<I>, W>
+					: K extends "delete"
+						? ParseDelete<T, Next<I>, W>
+						: K extends "merge"
+							? ParseMerge<T, Next<I>, W>
+							: W extends null
+								? K extends "with"
+									? ParseWith<T, Next<I>> extends infer X
+										? X extends Ok<infer Wc extends WithClause, infer J>
+											? ParseStatement<T, J, Into, Wc>
+											: X
+										: never
+									: K extends DdlKeyword
+										? ParseDdl<T, I>
+										: K extends "declare" | "fetch" | "move" | "close"
+											? ParseCursorStmt<T, I>
+											: Fail<`syntax error at or near ${Near<T, I>}`, I>
+								: AfterWith<T, I>
 		: T[I] extends OpTok<"(">
-			? SelectInto<ParseSelectAfterWith<T, I, null>, Into>
-			: Expected<"a SQL statement", T, I>;
+			? SelectInto<ParseSelectAfterWith<T, I, W>, Into>
+			: W extends null
+				? Expected<"a SQL statement", T, I>
+				: AfterWith<T, I>;
+type AfterWith<T extends Toks, I extends number> = Expected<
+	"SELECT, INSERT, UPDATE, DELETE or MERGE after WITH",
+	T,
+	I
+>;
 
 type SelectInto<R, Into extends boolean> = Into extends false
 	? R
@@ -111,32 +131,3 @@ type SelectInto<R, Into extends boolean> = Into extends false
 				J
 			>
 		: R;
-
-type ParseWithStatement<
-	T extends Toks,
-	I extends number,
-	Into extends boolean,
-> =
-	ParseWith<T, I> extends infer W
-		? W extends Ok<infer Wc extends WithClause, infer J>
-			? T[J] extends WordTok<infer K>
-				? K extends "select" | "values" | "table"
-					? SelectInto<ParseSelectAfterWith<T, J, Wc>, Into>
-					: K extends "insert"
-						? ParseInsert<T, Nx<J>, Wc>
-						: K extends "update"
-							? ParseUpdate<T, Nx<J>, Wc>
-							: K extends "delete"
-								? ParseDelete<T, Nx<J>, Wc>
-								: K extends "merge"
-									? ParseMerge<T, Nx<J>, Wc>
-									: Expected<
-											"SELECT, INSERT, UPDATE, DELETE or MERGE after WITH",
-											T,
-											J
-										>
-				: T[J] extends OpTok<"(">
-					? SelectInto<ParseSelectAfterWith<T, J, Wc>, Into>
-					: Expected<"SELECT, INSERT, UPDATE, DELETE or MERGE after WITH", T, J>
-			: W
-		: never;

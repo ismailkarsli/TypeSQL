@@ -5,20 +5,6 @@ exports[`mysql-dialect-rejection > scenario 1`] = `
   "compile": {
     "status": 1,
     "stderr": "",
-    "stdout": "app.ts(14,9): error TS2345: Argument of type '"SELECT emial FROM users"' is not assignable to parameter of type 'SqlError<"Unknown column 'emial'. Perhaps you meant the column \\"email\\"?", 1> & "SELECT emial FROM users"'.
-  Type 'string' is not assignable to type 'SqlError<"Unknown column 'emial'. Perhaps you meant the column \\"email\\"?", 1>'.
-app.ts(15,9): error TS2345: Argument of type '"SELECT id FROM users WHERE id = ?"' is not assignable to parameter of type 'SqlError<"TypeSQL parameters are written $1 or :name, not \\"?\\"", 7> & "SELECT id FROM users WHERE id = ?"'.
-  Type 'string' is not assignable to type 'SqlError<"TypeSQL parameters are written $1 or :name, not \\"?\\"", 7>'.
-app.ts(16,9): error TS2345: Argument of type '"INSERT INTO users (id, email) VALUES ($1, $2) RETURNING id"' is not assignable to parameter of type 'SqlError<"You have an error in your SQL syntax near 'RETURNING'", 14> & "INSERT INTO users (id, email) VALUES ($1, $2) RETURNING id"'.
-  Type 'string' is not assignable to type 'SqlError<"You have an error in your SQL syntax near 'RETURNING'", 14>'.
-app.ts(17,9): error TS2345: Argument of type '"SELECT email, COUNT(*) FROM users"' is not assignable to parameter of type 'SqlError<"In aggregated query without GROUP BY, expression #1 of SELECT list contains nonaggregated column 'email'; this is incompatible with sql_mode=only_full_group_by", 0> & "SELECT email, COUNT(*) FROM users"'.
-  Type 'string' is not assignable to type 'SqlError<"In aggregated query without GROUP BY, expression #1 of SELECT list contains nonaggregated column 'email'; this is incompatible with sql_mode=only_full_group_by", 0>'.
-app.ts(18,47): error TS2345: Argument of type 'string' is not assignable to parameter of type 'number | bigint'.
-app.ts(20,11): error TS2345: Argument of type '"SELECT settings -> '$.theme' AS theme FROM users"' is not assignable to parameter of type 'SqlError<"You have an error in your SQL syntax near '->'", 0> & "SELECT settings -> '$.theme' AS theme FROM users"'.
-  Type 'string' is not assignable to type 'SqlError<"You have an error in your SQL syntax near '->'", 0>'.
-app.ts(21,11): error TS2345: Argument of type '"SELECT * FROM users AS u LATERAL"' is not assignable to parameter of type 'SqlError<"You have an error in your SQL syntax near 'LATERAL'", 6> & "SELECT * FROM users AS u LATERAL"'.
-  Type 'string' is not assignable to type 'SqlError<"You have an error in your SQL syntax near 'LATERAL'", 6>'.
-",
   },
   "compiler": {
     "diagnostics": [
@@ -30,10 +16,6 @@ app.ts(21,11): error TS2345: Argument of type '"SELECT * FROM users AS u LATERAL
           {
             "category": 1,
             "code": 2322,
-            "column": 9,
-            "expression": ""SELECT emial FROM users"",
-            "file": "app.ts",
-            "line": 14,
             "message": "Type 'string' is not assignable to type 'SqlError<"Unknown column 'emial'. Perhaps you meant the column \\"email\\"?", 1>'.",
           },
         ],
@@ -50,10 +32,6 @@ app.ts(21,11): error TS2345: Argument of type '"SELECT * FROM users AS u LATERAL
           {
             "category": 1,
             "code": 2322,
-            "column": 9,
-            "expression": ""SELECT id FROM users WHERE id = ?"",
-            "file": "app.ts",
-            "line": 15,
             "message": "Type 'string' is not assignable to type 'SqlError<"TypeSQL parameters are written $1 or :name, not \\"?\\"", 7>'.",
           },
         ],
@@ -70,10 +48,6 @@ app.ts(21,11): error TS2345: Argument of type '"SELECT * FROM users AS u LATERAL
           {
             "category": 1,
             "code": 2322,
-            "column": 9,
-            "expression": ""INSERT INTO users (id, email) VALUES ($1, $2) RETURNING id"",
-            "file": "app.ts",
-            "line": 16,
             "message": "Type 'string' is not assignable to type 'SqlError<"You have an error in your SQL syntax near 'RETURNING'", 14>'.",
           },
         ],
@@ -90,10 +64,6 @@ app.ts(21,11): error TS2345: Argument of type '"SELECT * FROM users AS u LATERAL
           {
             "category": 1,
             "code": 2322,
-            "column": 9,
-            "expression": ""SELECT email, COUNT(*) FROM users"",
-            "file": "app.ts",
-            "line": 17,
             "message": "Type 'string' is not assignable to type 'SqlError<"In aggregated query without GROUP BY, expression #1 of SELECT list contains nonaggregated column 'email'; this is incompatible with sql_mode=only_full_group_by", 0>'.",
           },
         ],
@@ -119,10 +89,6 @@ app.ts(21,11): error TS2345: Argument of type '"SELECT * FROM users AS u LATERAL
           {
             "category": 1,
             "code": 2322,
-            "column": 11,
-            "expression": ""SELECT settings -> '$.theme' AS theme FROM users"",
-            "file": "app.ts",
-            "line": 20,
             "message": "Type 'string' is not assignable to type 'SqlError<"You have an error in your SQL syntax near '->'", 0>'.",
           },
         ],
@@ -139,10 +105,6 @@ app.ts(21,11): error TS2345: Argument of type '"SELECT * FROM users AS u LATERAL
           {
             "category": 1,
             "code": 2322,
-            "column": 11,
-            "expression": ""SELECT * FROM users AS u LATERAL"",
-            "file": "app.ts",
-            "line": 21,
             "message": "Type 'string' is not assignable to type 'SqlError<"You have an error in your SQL syntax near 'LATERAL'", 6>'.",
           },
         ],

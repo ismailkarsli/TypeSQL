@@ -1,6 +1,15 @@
-import type { LineAndCharacter } from "typescript/ast";
+import type { CallExpression, LineAndCharacter, Node } from "typescript/ast";
 import type { Checker, DocumentIdentifier, Program } from "typescript/async";
-import { type Dialect, type EditorKinds, isMySql, sqlCallAt } from "./call.js";
+import {
+	calleeOf,
+	type EditorKinds,
+	isCall,
+	isSqlLiteral,
+	sqlTypeOf,
+	targetOf,
+	textOf,
+} from "../call.js";
+import { DIALECTS, type DialectFacts, quoteName } from "../sql/dialect.js";
 import { type Context, contextAt, type RelRef } from "./scan.js";
 import { type Schema, schemaOf } from "./schema.js";
 
@@ -17,10 +26,10 @@ const MAX_ITEMS = 1000;
 async function completions(
 	schema: Schema,
 	ctx: Context,
-	dialect: Dialect = "postgres",
+	d: DialectFacts,
 ): Promise<CompletionItem[]> {
 	const same = (name: string): string =>
-		dialect === "postgres" ? name : name.toLowerCase();
+		d.foldsCase ? name.toLowerCase() : name;
 	const e = ctx.expect;
 	const items: CompletionItem[] = [];
 	const add = (
@@ -34,7 +43,7 @@ async function completions(
 				label,
 				kind,
 				detail,
-				insertText: quoteIdent(label, dialect),
+				insertText: quoteName(label, d),
 				sortText: sort,
 			});
 	};
@@ -47,7 +56,9 @@ async function completions(
 				.filter(
 					(r) =>
 						(r.schema ?? null) === e.schema ||
-						(e.schema === "public" && r.schema === null),
+						(r.schema === null &&
+							e.schema !== null &&
+							d.defaultSchemas.includes(e.schema)),
 				)
 				.map((r) => same(r.name)),
 		);
@@ -99,17 +110,17 @@ async function completions(
 	return items;
 }
 
-interface Range<T> {
-	readonly start: T;
-	readonly end: T;
+interface Range {
+	readonly start: LineAndCharacter;
+	readonly end: LineAndCharacter;
 }
 
 export interface Completions {
 	readonly items: readonly CompletionItem[];
-	readonly replace: Range<number>;
-	readonly replaceRange: Range<LineAndCharacter>;
-	readonly literal: Range<number>;
-	readonly literalRange: Range<LineAndCharacter>;
+	/** The text the items replace: the name typed so far. */
+	readonly replaceRange: Range;
+	/** The SQL literal's text, which TypeScript's own items replace. */
+	readonly literalRange: Range;
 }
 
 export async function completionsAt(
@@ -120,43 +131,70 @@ export async function completionsAt(
 	at: number | LineAndCharacter,
 	isCorePath: (path: string) => boolean,
 ): Promise<Completions | null> {
-	const call = await sqlCallAt(
-		program,
-		checker,
-		kinds,
-		document,
-		at,
-		isCorePath,
-	);
+	const file = await program.getSourceFile(document);
+	if (!file) return null;
+	const offset =
+		typeof at === "number"
+			? at
+			: file.getPositionOfLineAndCharacter(at.line, at.character);
+	const call = callAt(file, offset, kinds);
 	if (!call) return null;
-	const ctx = contextAt(call.text, call.offset - call.start, call.dialect);
+	const literal = call.arguments[0]!;
+	const sql = textOf(file, literal, kinds);
+	if (
+		offset < sql.start ||
+		offset > sql.end ||
+		sql.holes.some(([s, e]) => offset > s && offset < e)
+	)
+		return null;
+	const callee = calleeOf(call, kinds);
+	const t = await checker.getTypeAtLocation(callee.node);
+	const entry = await sqlTypeOf(t, callee.method, isCorePath);
+	const target = entry && (await targetOf(checker, t, entry));
+	if (!target) return null;
+	const d = DIALECTS[target.dialect];
+
+	const ctx = contextAt(sql.text, offset - sql.start, d);
 	const lc = (o: number): LineAndCharacter =>
-		call.file.getLineAndCharacterOfPosition(o);
-	let from = call.start + ctx.from;
+		file.getLineAndCharacterOfPosition(o);
+	let from = sql.start + ctx.from;
 	// A quoted name typed in a "…" string, or a `…` name in a template literal,
 	// starts with its escaping backslash.
-	if (from > call.start && call.file.text[from - 1] === "\\") from--;
-	const replace = { start: from, end: call.offset };
-	const literal = { start: call.start, end: call.end };
+	if (from > sql.start && file.text[from - 1] === "\\") from--;
 	const ranges = {
-		replace,
-		replaceRange: { start: lc(replace.start), end: lc(replace.end) },
-		literal,
-		literalRange: { start: lc(literal.start), end: lc(literal.end) },
+		replaceRange: { start: lc(from), end: lc(offset) },
+		literalRange: { start: lc(sql.start), end: lc(sql.end) },
 	};
 	if (ctx.expect.kind === "none") return { items: [], ...ranges };
 	const items = await completions(
-		await schemaOf(checker, call.db, call.dialect),
+		await schemaOf(checker, target.db, d),
 		ctx,
-		call.dialect,
+		d,
 	);
+	const quote = file.text[literal.getStart(file)]!;
 	return {
 		items: items.map((i) => ({
 			...i,
-			insertText: escapeFor(call.quote, i.insertText),
+			insertText: escapeFor(quote, i.insertText),
 		})),
 		...ranges,
 	};
+}
+
+/** The innermost call around `offset` whose first argument is a string. */
+function callAt(
+	file: Node,
+	offset: number,
+	kinds: EditorKinds,
+): CallExpression | null {
+	let found: CallExpression | null = null;
+	const visit = (n: Node): void => {
+		if (offset < n.pos || offset > n.end) return;
+		if (isCall(n, kinds) && isSqlLiteral(n.arguments[0], kinds)) found = n;
+		n.forEachChild(visit);
+	};
+	visit(file);
+	return found;
 }
 
 /** Escape inserted SQL for the TypeScript string literal it goes into. */
@@ -174,134 +212,3 @@ function dedupe(items: CompletionItem[]): CompletionItem[] {
 	const seen = new Set<string>();
 	return items.filter((i) => !seen.has(i.label) && !!seen.add(i.label));
 }
-
-const RESERVED = new Set([
-	"all",
-	"analyse",
-	"analyze",
-	"and",
-	"any",
-	"array",
-	"as",
-	"asc",
-	"asymmetric",
-	"authorization",
-	"binary",
-	"both",
-	"case",
-	"cast",
-	"check",
-	"collate",
-	"collation",
-	"column",
-	"concurrently",
-	"constraint",
-	"create",
-	"cross",
-	"current_catalog",
-	"current_date",
-	"current_role",
-	"current_schema",
-	"current_time",
-	"current_timestamp",
-	"current_user",
-	"default",
-	"deferrable",
-	"desc",
-	"distinct",
-	"do",
-	"else",
-	"end",
-	"except",
-	"false",
-	"fetch",
-	"for",
-	"foreign",
-	"freeze",
-	"from",
-	"full",
-	"grant",
-	"group",
-	"having",
-	"ilike",
-	"in",
-	"initially",
-	"inner",
-	"intersect",
-	"into",
-	"is",
-	"isnull",
-	"join",
-	"lateral",
-	"leading",
-	"left",
-	"like",
-	"limit",
-	"localtime",
-	"localtimestamp",
-	"natural",
-	"not",
-	"notnull",
-	"null",
-	"offset",
-	"on",
-	"only",
-	"or",
-	"order",
-	"outer",
-	"overlaps",
-	"placing",
-	"primary",
-	"references",
-	"returning",
-	"right",
-	"select",
-	"session_user",
-	"similar",
-	"some",
-	"symmetric",
-	"system_user",
-	"table",
-	"tablesample",
-	"then",
-	"to",
-	"trailing",
-	"true",
-	"union",
-	"unique",
-	"user",
-	"using",
-	"variadic",
-	"verbose",
-	"when",
-	"where",
-	"window",
-	"with",
-]);
-
-function quoteIdent(name: string, dialect: Dialect = "postgres"): string {
-	if (isMySql(dialect))
-		return /^[A-Za-z_][A-Za-z0-9_$]*$/.test(name) &&
-			!MYSQL_RESERVED.has(name.toLowerCase())
-			? name
-			: `\`${name.replaceAll("`", "``")}\``;
-	const bare =
-		dialect === "sqlite"
-			? /^[A-Za-z_][A-Za-z0-9_$]*$/.test(name) &&
-				!SQLITE_RESERVED.has(name.toLowerCase())
-			: /^[a-z_][a-z0-9_$]*$/.test(name) && !RESERVED.has(name);
-	return bare ? name : `"${name.replaceAll('"', '""')}"`;
-}
-
-const SQLITE_RESERVED = new Set(
-	"add all alter and as autoincrement between case check collate commit constraint create default deferrable delete distinct drop else escape except exists foreign from group having in index insert intersect into is isnull join limit not nothing notnull null on or order primary references returning select set table then to transaction union unique update using values when where cross full inner left natural outer right".split(
-		" ",
-	),
-);
-
-// MySQL 8.4's reserved words, and MariaDB's that MySQL lacks.
-const MYSQL_RESERVED = new Set(
-	"accessible add all alter analyze and as asc asensitive before between bigint binary blob both by call cascade case change char character check collate column condition constraint continue convert create cross cube cume_dist current_date current_role current_time current_timestamp current_user cursor database databases day_hour day_microsecond day_minute day_second dec decimal declare default delayed delete delete_domain_id dense_rank desc describe deterministic distinct distinctrow div do_domain_ids double drop dual each else elseif empty enclosed escaped except exists exit explain false fetch first_value float float4 float8 for force foreign from fulltext function general generated get grant group grouping groups having high_priority hour_microsecond hour_minute hour_second if ignore ignore_domain_ids ignore_server_ids in index infile inner inout insensitive insert int int1 int2 int3 int4 int8 integer intersect interval into io_after_gtids io_before_gtids is iterate join json_table key keys kill lag last_value lateral lead leading leave left like limit linear lines load localtime localtimestamp lock long longblob longtext loop low_priority manual master_bind master_heartbeat_period master_ssl_verify_server_cert match maxvalue mediumblob mediumint mediumtext middleint minute_microsecond minute_second mod modifies natural not no_write_to_binlog nth_value ntile null numeric of offset on optimize optimizer_costs option optionally or order out outer outfile over page_checksum parallel parse_vcol_expr partition percent_rank position precision primary procedure purge qualify range rank read read_write reads real recursive ref_system_id references regexp release rename repeat replace require resignal restrict return returning revoke right rlike row row_number rows schema schemas second_microsecond select sensitive separator set show signal slow smallint spatial specific sql sql_big_result sql_calc_found_rows sql_small_result sqlexception sqlstate sqlwarning ssl starting stats_auto_recalc stats_persistent stats_sample_pages stored straight_join system table tablesample terminated then tinyblob tinyint tinytext to trailing trigger true undo union unique unlock unsigned update usage use using utc_date utc_time utc_timestamp values varbinary varchar varcharacter varying virtual when where while window with write xor year_month zerofill".split(
-		" ",
-	),
-);

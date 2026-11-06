@@ -1,7 +1,8 @@
+export type Database = "postgres" | "sqlite" | "mysql" | "mariadb";
 export interface Scenario {
-	scripts: Record<string, string>;
+	scripts?: Record<string, string>;
 	scenario?: {
-		database?: "postgres" | "sqlite" | "mysql" | "mariadb";
+		database?: Database;
 		failure?: { stage: "generate" | "compile" | "start"; exitCode: number };
 		artifacts?: string[];
 	};
@@ -30,8 +31,10 @@ export interface ApplicationException {
 }
 interface CommandObservation {
 	status: number;
-	stdout: string;
-	stderr: string;
+	/** Left out of a failed compilation, whose output repeats `compiler.diagnostics`. */
+	stdout?: string;
+	/** Left out of a failed start, whose output repeats `exception` with a stack trace. */
+	stderr?: string;
 }
 export interface Observation {
 	setup?: CommandObservation;

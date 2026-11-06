@@ -1,0 +1,18 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`sqlite-json-type-map > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "Parsed": "({ extra: null | { tags: (string)[] }; meta: { theme: string } })[]",
+      "Text": "({ extra: null | string; meta: string })[]",
+    },
+  },
+}
+`;

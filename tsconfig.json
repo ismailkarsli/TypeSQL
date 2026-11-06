@@ -5,5 +5,5 @@
 		"allowImportingTsExtensions": true,
 		"types": ["node"]
 	},
-	"include": ["*.ts", "tools"]
+	"include": ["knip.ts", "tools", "tests/*.ts", "tests/support"]
 }

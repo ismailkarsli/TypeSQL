@@ -1,15 +1,12 @@
 import type { Readable, Writable } from "node:stream";
-import { mayBeInSqlLiteral, offsetOf } from "./literal.js";
+import type { Position } from "./literal.js";
 import { merge } from "./merge.js";
 import {
 	type Connector,
-	type Position,
+	type Log,
 	Session,
-	typescriptModules,
-	withBudget,
+	typescriptModulesFrom,
 } from "./session.js";
-
-const BUDGET_MS = 150;
 
 interface Peer {
 	readonly readable: Readable;
@@ -35,50 +32,24 @@ export function start(pipe: string): void {
 		{ readable: process.stdin, writable: process.stdout },
 		{
 			pipe: async () => pipe,
-			modules: (fileName) => [() => typescriptModules(fileName)],
+			modules: (fileName) => [() => typescriptModulesFrom(fileName)],
 		},
 		(m) => process.stderr.write(`typesql: ${m}\n`),
 	);
 }
 
-function serve(
-	client: Peer,
-	connector: Connector,
-	log: (message: string) => void,
-	budget = BUDGET_MS,
-): void {
+function serve(client: Peer, connector: Connector, log: Log): void {
 	const session = new Session(connector, log);
-	const answer = async ({
-		uri,
-		position,
-		text,
-		// Lua clients drop a nil `result`; a missing one is TypeScript's null.
-		result = null,
-	}: CompletionParams): Promise<Result> => {
-		if (!mayBeInSqlLiteral(text, offsetOf(text, position))) return result;
-		try {
-			const started = Date.now();
-			const ours = await withBudget(
-				session.complete(uri, position, text),
-				budget,
-			);
-			if (ours === "late") {
-				log(`completions took longer than ${budget} ms; skipped`);
-				return result;
-			}
-			if (ours) log(`${ours.items.length} items in ${Date.now() - started} ms`);
-			return merge(result, ours);
-		} catch (e) {
-			log(e instanceof Error ? (e.stack ?? e.message) : String(e));
-			return result;
-		}
-	};
 	read(client.readable, (m) => {
 		const id = m.id;
 		if (id === undefined) return;
-		void answer(m.params).then((result) =>
-			client.writable.write(frame({ id, result })),
-		);
+		// Lua clients drop a nil `result`; a missing one is TypeScript's null.
+		const { uri, position, text, result = null } = m.params;
+		void session
+			.complete(uri, position, text)
+			.then((ours) =>
+				client.writable.write(frame({ id, result: merge(result, ours) })),
+			);
 	});
 	client.readable.on("end", () => {
 		void session.close();

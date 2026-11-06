@@ -1,0 +1,19 @@
+{
+	"name": "cli-main-io",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"setup": "node setup.ts",
+		"start": "node dist/app.js"
+	},
+	"dependencies": {
+		"@typesql/cli": "workspace:*"
+	},
+	"devDependencies": {
+		"typescript": "catalog:",
+		"@types/node": "catalog:"
+	},
+	"scenario": {
+		"database": "sqlite"
+	}
+}

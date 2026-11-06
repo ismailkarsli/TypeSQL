@@ -1,28 +1,40 @@
 import type {
 	Digit,
 	HexDigit,
+	IdRun,
 	IdStart,
 	NonIdAscii,
 	Ws,
 } from "../../engine/chars.js";
-import type { SqlError } from "../../errors.js";
-import type { Next } from "../../sql/next.js";
 import type {
-	MyBlob,
-	MyIdent,
-	MyNum,
-	MyOp,
-	MyParam,
-	MyStr,
-	MyVar,
-	MyWord,
-} from "./tokens.js";
-
-type Nx<I extends number> = Next<I>;
+	BadParam,
+	Blob,
+	ChunkSize,
+	DollarParam,
+	Escape,
+	Ident,
+	IsHex,
+	LexErr,
+	Num,
+	Op,
+	Param,
+	Str,
+	TakeQuoted,
+	TakeWord,
+	Word,
+} from "../../engine/family/lex.js";
+import type { Next } from "../../engine/next.js";
+import type { SqlError } from "../../errors.js";
 
 export type Lex<Q extends string> = LexAll<Q, [], "">;
 
-type ChunkSize = 200;
+/** A user variable (`@name`) or system variable (`@@name`). */
+type MyVar<V extends string, R extends string, G extends string> = {
+	readonly k: "v";
+	readonly v: V;
+	readonly r: R;
+	readonly g: G;
+};
 
 type LexAll<
 	S extends string,
@@ -48,7 +60,6 @@ type LexAll<
 					: never
 		: never;
 
-type Err<M extends string, Acc extends readonly unknown[]> = ["err", M, Acc];
 type Unrecognized<T extends string> =
 	`You have an error in your SQL syntax near '${T}'`;
 
@@ -61,7 +72,7 @@ type LexChunk<
 	? ["done", Acc]
 	: B extends ChunkSize
 		? ["more", Acc, S, G]
-		: LexStep<S, Acc, Nx<B>, G>;
+		: LexStep<S, Acc, Next<B>, G>;
 
 type Punct = "(" | ")" | "," | ";" | "~" | "+" | "*" | "%" | "^";
 
@@ -78,7 +89,7 @@ type LexStep<
 			: C extends Digit
 				? LexNumber<S, Acc, B, G>
 				: C extends Punct
-					? LexChunk<R, [...Acc, MyOp<C, G>], B, "">
+					? LexChunk<R, [...Acc, Op<C, G>], B, "">
 					: C extends "'" | '"'
 						? LexString<R, C, C, "", Acc, B, G>
 						: C extends "`"
@@ -86,7 +97,7 @@ type LexStep<
 							: C extends "."
 								? R extends `${Digit}${string}`
 									? LexNumber<S, Acc, B, G>
-									: LexChunk<R, [...Acc, MyOp<".", G>], B, "">
+									: LexChunk<R, [...Acc, Op<".", G>], B, "">
 								: LexSymbol<C, R, Acc, B, G>
 	: never;
 
@@ -124,7 +135,7 @@ type LexLetter<
 								B,
 								G
 							>
-						: LexChunk<R2, [...Acc, MyWord<Lowercase<W>, W, G>], B, "">
+						: LexChunk<R2, [...Acc, Word<Lowercase<W>, W, G>], B, "">
 					: never
 				: LexWord<R, C, Acc, B, G>;
 
@@ -140,12 +151,12 @@ type LexSymbol<
 			? R1 extends `${infer Line}\n${infer R2}`
 				? LexChunk<R2, Acc, B, `${G}--${Line}\n`>
 				: LexChunk<"", Acc, B, `${G}--${R1}`>
-			: LexChunk<R, [...Acc, MyOp<"-", G>], B, "">
+			: LexChunk<R, [...Acc, Op<"-", G>], B, "">
 		: R extends `>>${infer R1}`
-			? LexChunk<R1, [...Acc, MyOp<"->>", G>], B, "">
+			? LexChunk<R1, [...Acc, Op<"->>", G>], B, "">
 			: R extends `>${infer R1}`
-				? LexChunk<R1, [...Acc, MyOp<"->", G>], B, "">
-				: LexChunk<R, [...Acc, MyOp<"-", G>], B, "">
+				? LexChunk<R1, [...Acc, Op<"->", G>], B, "">
+				: LexChunk<R, [...Acc, Op<"-", G>], B, "">
 	: C extends "#"
 		? R extends `${infer Line}\n${infer R2}`
 			? LexChunk<R2, Acc, B, `${G}#${Line}\n`>
@@ -154,50 +165,44 @@ type LexSymbol<
 			? R extends `*${infer R1}`
 				? R1 extends `${infer Body}*/${infer R2}`
 					? LexChunk<R2, Acc, B, `${G}/*${Body}*/`>
-					: Err<"Unclosed comment", Acc>
-				: LexChunk<R, [...Acc, MyOp<"/", G>], B, "">
+					: LexErr<"Unclosed comment", Acc>
+				: LexChunk<R, [...Acc, Op<"/", G>], B, "">
 			: C extends "|"
 				? R extends `|${infer R1}`
-					? LexChunk<R1, [...Acc, MyOp<"||", G>], B, "">
-					: LexChunk<R, [...Acc, MyOp<"|", G>], B, "">
+					? LexChunk<R1, [...Acc, Op<"||", G>], B, "">
+					: LexChunk<R, [...Acc, Op<"|", G>], B, "">
 				: C extends "&"
 					? R extends `&${infer R1}`
-						? LexChunk<R1, [...Acc, MyOp<"&&", G>], B, "">
-						: LexChunk<R, [...Acc, MyOp<"&", G>], B, "">
+						? LexChunk<R1, [...Acc, Op<"&&", G>], B, "">
+						: LexChunk<R, [...Acc, Op<"&", G>], B, "">
 					: C extends "<"
 						? R extends `=>${infer R1}`
-							? LexChunk<R1, [...Acc, MyOp<"<=>", G>], B, "">
+							? LexChunk<R1, [...Acc, Op<"<=>", G>], B, "">
 							: R extends `${infer O extends "=" | ">" | "<"}${infer R1}`
-								? LexChunk<R1, [...Acc, MyOp<`<${O}`, G>], B, "">
-								: LexChunk<R, [...Acc, MyOp<"<", G>], B, "">
+								? LexChunk<R1, [...Acc, Op<`<${O}`, G>], B, "">
+								: LexChunk<R, [...Acc, Op<"<", G>], B, "">
 						: C extends ">"
 							? R extends `${infer O extends "=" | ">"}${infer R1}`
-								? LexChunk<R1, [...Acc, MyOp<`>${O}`, G>], B, "">
-								: LexChunk<R, [...Acc, MyOp<">", G>], B, "">
+								? LexChunk<R1, [...Acc, Op<`>${O}`, G>], B, "">
+								: LexChunk<R, [...Acc, Op<">", G>], B, "">
 							: C extends "="
-								? LexChunk<R, [...Acc, MyOp<"=", G>], B, "">
+								? LexChunk<R, [...Acc, Op<"=", G>], B, "">
 								: C extends "!"
 									? R extends `=${infer R1}`
-										? LexChunk<R1, [...Acc, MyOp<"!=", G>], B, "">
-										: LexChunk<R, [...Acc, MyOp<"!", G>], B, "">
+										? LexChunk<R1, [...Acc, Op<"!=", G>], B, "">
+										: LexChunk<R, [...Acc, Op<"!", G>], B, "">
 									: C extends ":"
 										? R extends `=${infer R1}`
-											? LexChunk<R1, [...Acc, MyOp<":=", G>], B, "">
-											: Err<
-													`TypeSQL parameters are written $1 or :name, not ":${IdRun<R>}"`,
-													Acc
-												>
+											? LexChunk<R1, [...Acc, Op<":=", G>], B, "">
+											: LexErr<BadParam<`:${IdRun<R>}`>, Acc>
 										: C extends "$"
 											? LexDollar<R, Acc, B, G>
 											: C extends "@"
 												? LexVar<R, Acc, B, G>
 												: C extends "?"
-													? Err<
-															`TypeSQL parameters are written $1 or :name, not "?"`,
-															Acc
-														>
+													? LexErr<BadParam<"?">, Acc>
 													: C extends NonIdAscii
-														? Err<Unrecognized<`${C}${Head<R>}`>, Acc>
+														? LexErr<Unrecognized<`${C}${Head<R>}`>, Acc>
 														: LexWord<R, C, Acc, B, G>;
 
 type Head<R extends string> =
@@ -210,16 +215,10 @@ type LexDollar<
 	Acc extends readonly unknown[],
 	B extends number,
 	G extends string,
-> = R extends `${infer D extends Digit}${infer R1}`
-	? TakeDigits<R1, D> extends [infer V extends string, infer R2 extends string]
-		? IdRun<R2> extends ""
-			? LexChunk<R2, [...Acc, MyParam<ToNum<V>, G>], B, "">
-			: Err<
-					`TypeSQL parameters are written $1 or :name, not "$${V}${IdRun<R2>}"`,
-					Acc
-				>
-		: never
-	: Err<`TypeSQL parameters are written $1 or :name, not "$${IdRun<R>}"`, Acc>;
+> =
+	DollarParam<R> extends [infer N extends number, infer R2 extends string]
+		? LexChunk<R2, [...Acc, Param<N, "?", G>], B, "">
+		: LexErr<DollarParam<R> & string, Acc>;
 
 /** `@name`, `@'name'`, `@@name`, `@@session.name`. */
 type LexVar<
@@ -228,11 +227,14 @@ type LexVar<
 	B extends number,
 	G extends string,
 > = R extends `@${infer R1}`
-	? VarName<R1> extends [infer N extends string, infer R2 extends string]
+	? TakeWord<R1, ""> extends [infer N extends string, infer R2 extends string]
 		? N extends ""
-			? Err<Unrecognized<"@@">, Acc>
+			? LexErr<Unrecognized<"@@">, Acc>
 			: R2 extends `.${infer R3}`
-				? VarName<R3> extends [infer N2 extends string, infer R4 extends string]
+				? TakeWord<R3, ""> extends [
+						infer N2 extends string,
+						infer R4 extends string,
+					]
 					? LexChunk<
 							R4,
 							[...Acc, MyVar<`@@${Lowercase<N2>}`, `@@${N}.${N2}`, G>],
@@ -250,20 +252,12 @@ type LexVar<
 					B,
 					""
 				>
-			: Err<Unrecognized<`@${Q}`>, Acc>
-		: VarName<R> extends [infer N extends string, infer R2 extends string]
+			: LexErr<Unrecognized<`@${Q}`>, Acc>
+		: TakeWord<R, ""> extends [infer N extends string, infer R2 extends string]
 			? N extends ""
-				? Err<Unrecognized<"@">, Acc>
+				? LexErr<Unrecognized<"@">, Acc>
 				: LexChunk<R2, [...Acc, MyVar<`@${Lowercase<N>}`, `@${N}`, G>], B, "">
 			: never;
-type VarName<
-	S extends string,
-	Acc extends string = "",
-> = S extends `${infer C}${infer R}`
-	? C extends NonIdAscii
-		? [Acc, S]
-		: VarName<R, `${Acc}${C}`>
-	: [Acc, S];
 
 type LexWord<
 	R extends string,
@@ -273,7 +267,7 @@ type LexWord<
 	G extends string,
 > =
 	TakeWord<R, C> extends [infer W extends string, infer R2 extends string]
-		? LexChunk<R2, [...Acc, MyWord<Lowercase<W>, W, G>], B, "">
+		? LexChunk<R2, [...Acc, Word<Lowercase<W>, W, G>], B, "">
 		: never;
 
 type LexHexString<
@@ -284,17 +278,9 @@ type LexHexString<
 	G extends string,
 > = R1 extends `${infer Hex}'${infer R2}`
 	? IsHex<Hex, true> extends true
-		? LexChunk<R2, [...Acc, MyBlob<Hex, `${X}'${Hex}'`, G>], B, "">
-		: Err<Unrecognized<`${X}'${Hex}'`>, Acc>
-	: Err<Unrecognized<`${X}'${R1}`>, Acc>;
-type IsHex<
-	S extends string,
-	Even extends boolean,
-> = S extends `${infer C}${infer R}`
-	? C extends HexDigit
-		? IsHex<R, Even extends true ? false : true>
-		: false
-	: Even;
+		? LexChunk<R2, [...Acc, Blob<Hex, `${X}'${Hex}'`, G>], B, "">
+		: LexErr<Unrecognized<`${X}'${Hex}'`>, Acc>
+	: LexErr<Unrecognized<`${X}'${R1}`>, Acc>;
 
 type LexBitString<
 	R1 extends string,
@@ -304,9 +290,9 @@ type LexBitString<
 	G extends string,
 > = R1 extends `${infer Bits}'${infer R2}`
 	? IsBits<Bits> extends true
-		? LexChunk<R2, [...Acc, MyBlob<Bits, `${X}'${Bits}'`, G>], B, "">
-		: Err<Unrecognized<`${X}'${Bits}'`>, Acc>
-	: Err<Unrecognized<`${X}'${R1}`>, Acc>;
+		? LexChunk<R2, [...Acc, Blob<Bits, `${X}'${Bits}'`, G>], B, "">
+		: LexErr<Unrecognized<`${X}'${Bits}'`>, Acc>
+	: LexErr<Unrecognized<`${X}'${R1}`>, Acc>;
 type IsBits<S extends string> = S extends `${infer C}${infer R}`
 	? C extends "0" | "1"
 		? IsBits<R>
@@ -341,14 +327,14 @@ type LexString<
 					[
 						...Acc,
 						Kind extends "blob"
-							? MyBlob<`${V}${V2}`, `${Open}${Raw}${Q}${Raw2}`, G>
-							: MyStr<`${V}${V2}`, `${Open}${Raw}${Q}${Raw2}`, G, V>,
+							? Blob<`${V}${V2}`, `${Open}${Raw}${Q}${Raw2}`, G>
+							: Str<`${V}${V2}`, `${Open}${Raw}${Q}${Raw2}`, G, V>,
 					],
 					B,
 					""
 				>
 			: never
-		: Err<Unrecognized<`${Open}${Head<R>}`>, Acc>;
+		: LexErr<Unrecognized<`${Open}${Head<R>}`>, Acc>;
 
 /** MySQL joins adjacent string literals: `'a' 'b'` is `'ab'`. */
 type AdjacentString<
@@ -421,32 +407,14 @@ type LexQuoted<
 		infer R2 extends string,
 	]
 		? V extends ""
-			? Err<Unrecognized<"``">, Acc>
+			? LexErr<Unrecognized<"``">, Acc>
 			: LexChunk<
 					R2,
-					[...Acc, MyIdent<Lowercase<V>, V, `\`${Escape<V, "`">}\``, G>],
+					[...Acc, Ident<Lowercase<V>, V, `\`${Escape<V, "`">}\``, G>],
 					B,
 					""
 				>
-		: Err<Unrecognized<`\`${Head<R>}`>, Acc>;
-
-type TakeQuoted<
-	S extends string,
-	Qc extends string,
-	Acc extends string,
-> = S extends `${infer Body}${Qc}${infer R}`
-	? R extends `${Qc}${infer R2}`
-		? TakeQuoted<R2, Qc, `${Acc}${Body}${Qc}`>
-		: [`${Acc}${Body}`, R]
-	: null;
-
-type Escape<
-	S extends string,
-	Q extends string,
-	Acc extends string = "",
-> = S extends `${infer A}${Q}${infer B}`
-	? Escape<B, Q, `${Acc}${A}${Q}${Q}`>
-	: `${Acc}${S}`;
+		: LexErr<Unrecognized<`\`${Head<R>}`>, Acc>;
 
 /**
  * A number, or a word that starts with digits (MySQL identifiers may), and the
@@ -465,17 +433,17 @@ type LexNumber<
 		? H extends ""
 			? LexWord<R, `0${P}`, Acc, B, G>
 			: IdRun<R2> extends ""
-				? LexChunk<R2, [...Acc, MyBlob<H, `0${P}${H}`, G>], B, "">
+				? LexChunk<R2, [...Acc, Blob<H, `0${P}${H}`, G>], B, "">
 				: LexWord<R, `0${P}`, Acc, B, G>
 		: never
 	: TakeDecimal<S> extends [infer V extends string, infer R2 extends string]
 		? IdRun<R2> extends ""
-			? LexChunk<R2, [...Acc, MyNum<V, G>], B, "">
+			? LexChunk<R2, [...Acc, Num<V, G>], B, "">
 			: V extends `${string}${"." | "e" | "E"}${string}`
-				? Err<Unrecognized<`${V}${IdRun<R2>}`>, Acc>
+				? LexErr<Unrecognized<`${V}${IdRun<R2>}`>, Acc>
 				: LexWord<R2, V, Acc, B, G>
 		: TakeDecimal<S> extends infer Bad extends string
-			? Err<Unrecognized<Bad>, Acc>
+			? LexErr<Unrecognized<Bad>, Acc>
 			: never;
 type HexRun<
 	S extends string,
@@ -522,42 +490,3 @@ type TakeExponent<
 				: [`${V}${E}${X}`, R3]
 			: never
 	: [V, S];
-
-type TakeDigits<
-	S extends string,
-	Acc extends string,
-> = S extends `${infer C extends Digit}${infer R}`
-	? TakeDigits<R, `${Acc}${C}`>
-	: [Acc, S];
-
-type IdRun<
-	R extends string,
-	Acc extends string = "",
-> = R extends `${infer C}${infer R1}`
-	? C extends NonIdAscii
-		? Acc
-		: IdRun<R1, `${Acc}${C}`>
-	: Acc;
-
-type TakeWord<
-	S extends string,
-	Acc extends string,
-> = S extends `${infer A}${infer B}${infer C}${infer D}${infer R}`
-	? A extends NonIdAscii
-		? [Acc, S]
-		: B extends NonIdAscii
-			? [`${Acc}${A}`, `${B}${C}${D}${R}`]
-			: C extends NonIdAscii
-				? [`${Acc}${A}${B}`, `${C}${D}${R}`]
-				: D extends NonIdAscii
-					? [`${Acc}${A}${B}${C}`, `${D}${R}`]
-					: TakeWord<R, `${Acc}${A}${B}${C}${D}`>
-	: S extends `${infer C}${infer R}`
-		? C extends NonIdAscii
-			? [Acc, S]
-			: TakeWord<R, `${Acc}${C}`>
-		: [Acc, S];
-
-type ToNum<S extends string> = S extends `${infer N extends number}`
-	? N
-	: never;

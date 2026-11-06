@@ -1,3 +1,4 @@
+import type { JsonAs, NullableTs, ParamMapOf, TsShaped } from "../../schema.js";
 import type { Cat } from "../engine/types.js";
 
 /**
@@ -145,6 +146,7 @@ export interface DefaultParamTypeMap {
 	blob: Uint8Array | string;
 	mediumblob: Uint8Array | string;
 	longblob: Uint8Array | string;
+	/** JSON text: drivers bind no objects, so a document is `sql.json(value)`. */
 	json: string;
 	bool: boolean | number;
 	/** `LIMIT` and `OFFSET` take only numbers: drivers send a string quoted. */
@@ -152,9 +154,7 @@ export interface DefaultParamTypeMap {
 	unknown: Bindable;
 }
 
-export type ParamTypeMapOf<TM> = TM extends { readonly $params: infer P }
-	? P
-	: DefaultParamTypeMap;
+export type ParamTypeMapOf<TM> = ParamMapOf<TM, DefaultParamTypeMap>;
 
 type Fallback<C> = C extends "int"
 	? "int"
@@ -176,43 +176,44 @@ type Fallback<C> = C extends "int"
 									? "geometry"
 									: "unknown";
 
-type TsTypeOf<TM, T> = T extends {
-	readonly shape: { readonly k: "ts"; readonly v: infer V };
-}
-	? V
-	: T extends keyof TM
-		? TM[T]
-		: Fallback<Cat<T>> extends infer K extends string
-			? K extends keyof TM
-				? TM[K]
-				: unknown
-			: never;
+type TsTypeOf<TM, T> =
+	T extends TsShaped<infer V>
+		? T extends "json"
+			? JsonAs<TsTypeOf<TM, "json">, V>
+			: V
+		: T extends keyof TM
+			? TM[T]
+			: Fallback<Cat<T>> extends infer K extends string
+				? K extends keyof TM
+					? TM[K]
+					: unknown
+				: never;
 
 export type TsOf<
 	TM,
 	_DB,
 	T extends { type: string; nullable: boolean },
-> = T["type"] extends "null"
-	? null
-	: T["nullable"] extends true
-		? TsTypeOf<TM, T["type"]> | null
-		: TsTypeOf<TM, T["type"]>;
+> = NullableTs<T, TsTypeOf<TM, T["type"]>>;
 
 export type TsParamTypeOf<TM, _DB, T extends string> = ParamTs<
 	TM,
 	ParamTypeMapOf<TM>,
 	T
 >;
-type ParamTs<TM, PM, T> = T extends {
-	readonly shape: { readonly k: "ts"; readonly v: infer V };
-}
-	? V
-	: T extends "bool" | "limit" | "unknown"
-		? T extends keyof PM
-			? PM[T]
-			: unknown
-		: T extends keyof TM
-			? TM[T] | (T extends keyof PM ? PM[T] : never)
-			: Fallback<Cat<T>> extends infer K extends string
-				? ParamTs<TM, PM, K>
-				: never;
+// A parameter takes its read type and the parameter map's extras, except
+// where the read type is no value a driver binds: JSON, read parsed, binds as
+// text.
+type ParamTs<TM, PM, T> =
+	T extends TsShaped<infer V>
+		? T extends "json"
+			? JsonAs<ParamTs<TM, PM, "json">, V>
+			: V
+		: T extends "bool" | "limit" | "unknown" | "json"
+			? T extends keyof PM
+				? PM[T]
+				: unknown
+			: T extends keyof TM
+				? TM[T] | (T extends keyof PM ? PM[T] : never)
+				: Fallback<Cat<T>> extends infer K extends string
+					? ParamTs<TM, PM, K>
+					: never;

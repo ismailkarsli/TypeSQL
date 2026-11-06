@@ -1,0 +1,15 @@
+pattern function_like() {
+	or {
+		JsFunctionDeclaration(),
+		JsFunctionExpression(),
+		JsArrowFunctionExpression(),
+		JsFunctionExportDefaultDeclaration(),
+		JsMethodClassMember(),
+		JsMethodObjectMember(),
+		JsGetterClassMember(),
+		JsGetterObjectMember(),
+		JsSetterClassMember(),
+		JsSetterObjectMember(),
+		JsConstructorClassMember()
+	}
+}

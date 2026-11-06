@@ -3,6 +3,7 @@ import {
 	type PgField,
 	parsePgArray,
 	parsePgUserArrays,
+	pgResult,
 	type SqlDriver,
 } from "@typesql/core/adapter";
 import type { DrizzleMysqlDatabase } from "./mysql-client.js";
@@ -118,7 +119,6 @@ type Literal =
 const isList = (value: Literal): value is readonly Literal[] =>
 	Array.isArray(value);
 
-// Array elements written as an array literal, at any depth.
 const isLiteral = (value: unknown): value is Literal =>
 	value === null ||
 	typeof value === "string" ||
@@ -190,7 +190,9 @@ export function executor(
 			return { rows: postgresJsRows(result), rowCount: result.count ?? null };
 		}
 		const query = client.query!.bind(client);
-		const result = await query(text, Array.from(values));
+		const result = pgResult(await query(text, Array.from(values))) ?? {
+			rows: [],
+		};
 		const rows = await parsePgUserArrays(
 			client,
 			(text, values) => query(text, values),
@@ -203,5 +205,6 @@ export function executor(
 
 export const driver: SqlDriver<DrizzleDatabase> = {
 	executor,
+	// Drizzle nests transactions with savepoints itself.
 	transaction: (db, _depth, fn) => db.transaction(fn),
 };

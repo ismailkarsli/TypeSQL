@@ -39,7 +39,10 @@ Prisma returns nested objects (each user with a `posts` array). TypeSQL returns 
 | Extra step | `prisma generate` after each schema change | none |
 | Raw SQL | `$queryRaw`, typed by the type you write, or [TypedSQL](./prisma-typedsql) | checked and typed from the SQL |
 | Migrations | `prisma migrate` generates them from the schema | you [write the DDL](../guide/migrations), and the schema type follows it |
+| Runtime size (minified and gzipped) | about 66 kB of JavaScript, plus a WebAssembly query compiler of 0.7 to 1.1 MB | `@typesql/core` is tiny (under 3 kB); under 5 kB with `@typesql/pg` |
 | Databases | PostgreSQL, MySQL, SQLite, SQL Server, MongoDB, CockroachDB | PostgreSQL, SQLite, MySQL and MariaDB |
+
+Sizes are for Prisma Client 7.10.1 and `@typesql/pg` 7.0.1, without the driver. The query compiler is 0.7 MB with `compilerBuild = "small"` and 1.1 MB with the default build.
 
 ## Choose Prisma ORM when
 

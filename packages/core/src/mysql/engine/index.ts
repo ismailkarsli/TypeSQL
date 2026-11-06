@@ -1,9 +1,8 @@
 export type * from "../../index.js";
-export type { SplicedText } from "../../sql/call.js";
 export type * from "../index.js";
 export type { Col, Enum } from "../schema/index.js";
 export type * as Ast from "./ast.js";
-export type { MariaDbEngine, MySqlEngine } from "./engine.js";
+export type { MariaDbEngine, MySqlEngine, MySqlLexis } from "./engine.js";
 export type {
 	Analysis,
 	Analyze,
@@ -12,6 +11,7 @@ export type {
 	KindOf,
 	NamesOf,
 	ParamsArgs,
+	SplicedText,
 } from "./infer.js";
 export type { Lex } from "./lexer.js";
 export type { ParseProgram, ParseStatement } from "./parser/stmt.js";

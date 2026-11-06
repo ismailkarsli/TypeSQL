@@ -3,18 +3,34 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
-		"compile": "tsc -p tsconfig.json --pretty false",
 		"start": "node dist/app.js"
 	},
 	"dependencies": {
-		"@typesql/core": "workspace:*",
+		"@typesql/better-auth": "workspace:*",
 		"@typesql/cli": "workspace:*",
+		"@typesql/core": "workspace:*",
+		"@typesql/drizzle": "workspace:*",
+		"@typesql/kysely": "workspace:*",
+		"@typesql/language-server": "workspace:*",
+		"@typesql/mysql": "workspace:*",
 		"@typesql/pg": "workspace:*",
-		"@typesql/sqlite": "workspace:*",
+		"@typesql/postgres": "workspace:*",
 		"@typesql/prisma": "workspace:*",
+		"@typesql/sqlite": "workspace:*",
+		"@better-fetch/fetch": "catalog:",
 		"@prisma/client": "catalog:",
+		"@types/pg": "catalog:",
+		"better-auth": "catalog:",
+		"better-call": "catalog:",
+		"drizzle-orm": "catalog:",
+		"jose": "catalog:",
+		"kysely": "catalog:",
+		"mariadb": "catalog:",
+		"mysql2": "catalog:",
+		"nanostores": "catalog:",
 		"pg": "catalog:",
-		"@types/pg": "catalog:"
+		"postgres": "catalog:",
+		"zod": "catalog:"
 	},
 	"devDependencies": {
 		"typescript": "catalog:",

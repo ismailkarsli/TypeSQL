@@ -5,7 +5,6 @@
 	"scripts": {
 		"setup": "node setup.ts",
 		"generate": "typesql introspect --out schema.ts",
-		"compile": "tsc -p tsconfig.json --pretty false",
 		"start": "node dist/app.js"
 	},
 	"dependencies": {

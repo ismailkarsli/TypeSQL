@@ -1,4 +1,17 @@
 import type {
+	CloseOk,
+	IfExists,
+	IfNotExists,
+	IsOp,
+	IsWord,
+	Name,
+	SkipColumn,
+	SkipStatement,
+	SyntaxErr,
+} from "../../../engine/family/parse.js";
+import type { Next } from "../../../engine/next.js";
+import type { Ok, Toks } from "../../../engine/tokens.js";
+import type {
 	AlterAction,
 	ColumnDef,
 	ColumnPlace,
@@ -8,45 +21,7 @@ import type {
 import type { IsSubqueryParen } from "./expr.js";
 import type { ParseSubquery } from "./select.js";
 import type { ParseColumnType } from "./typename.js";
-import type {
-	CloseOk,
-	Ident,
-	IsOp,
-	IsWord,
-	Name,
-	Nx,
-	Ok,
-	OptCols,
-	SyntaxErr,
-	TableRefAt,
-	Toks,
-} from "./util.js";
-
-type IfNotExists<T extends Toks, I extends number> =
-	IsWord<T, I, "if"> extends true
-		? IsWord<T, Nx<I>, "not"> extends true
-			? IsWord<T, Nx<Nx<I>>, "exists"> extends true
-				? [true, Nx<Nx<Nx<I>>>]
-				: SyntaxErr<T, Nx<Nx<I>>>
-			: SyntaxErr<T, Nx<I>>
-		: [false, I];
-type IfExists<T extends Toks, I extends number> =
-	IsWord<T, I, "if"> extends true
-		? IsWord<T, Nx<I>, "exists"> extends true
-			? [true, Nx<Nx<I>>]
-			: SyntaxErr<T, Nx<I>>
-		: [false, I];
-
-/** Skips to the end of the statement. */
-export type SkipStatement<
-	T extends Toks,
-	I extends number,
-	What extends string,
-> = T[I] extends { readonly k: "o"; readonly v: ";" }
-	? Ok<{ t: "noop"; what: What }, I>
-	: T[I] extends { readonly k: string }
-		? SkipStatement<T, Nx<I>, What>
-		: Ok<{ t: "noop"; what: What }, I>;
+import type { Ident, OptCols, TableRefAt } from "./util.js";
 
 /** Skips the rest of the input: a stored program body can contain `;`. */
 type SkipAll<
@@ -54,7 +29,7 @@ type SkipAll<
 	I extends number,
 	What extends string,
 > = T[I] extends { readonly k: string }
-	? SkipAll<T, Nx<I>, What>
+	? SkipAll<T, Next<I>, What>
 	: Ok<{ t: "noop"; what: What }, I>;
 
 /** Skips a parenthesized group starting at `(`; returns the index after `)`. */
@@ -63,15 +38,15 @@ type SkipParens<
 	I extends number,
 	Depth extends readonly unknown[] = [],
 > = T[I] extends { readonly k: "o"; readonly v: "(" }
-	? SkipParens<T, Nx<I>, [...Depth, 0]>
+	? SkipParens<T, Next<I>, [...Depth, 0]>
 	: T[I] extends { readonly k: "o"; readonly v: ")" }
 		? Depth extends readonly [unknown, ...infer D]
 			? D extends readonly []
-				? Nx<I>
-				: SkipParens<T, Nx<I>, D>
+				? Next<I>
+				: SkipParens<T, Next<I>, D>
 			: SyntaxErr<T, I>
 		: T[I] extends { readonly k: string }
-			? SkipParens<T, Nx<I>, Depth>
+			? SkipParens<T, Next<I>, Depth>
 			: SyntaxErr<T, I>;
 
 /** Skips to the `,` or `)` that ends a table element or alter action. */
@@ -85,34 +60,34 @@ type SkipItem<T extends Toks, I extends number> = T[I] extends {
 			? SkipParens<T, I> extends infer J extends number
 				? SkipItem<T, J>
 				: SkipParens<T, I>
-			: SkipItem<T, Nx<I>>
+			: SkipItem<T, Next<I>>
 	: T[I] extends { readonly k: string }
-		? SkipItem<T, Nx<I>>
+		? SkipItem<T, Next<I>>
 		: I;
 
 export type ParseCreate<T extends Toks, I extends number> = (
 	IsWord<T, I, "or"> extends true
-		? IsWord<T, Nx<I>, "replace"> extends true
-			? [true, Nx<Nx<I>>]
-			: SyntaxErr<T, Nx<I>>
+		? IsWord<T, Next<I>, "replace"> extends true
+			? [true, Next<Next<I>>]
+			: SyntaxErr<T, Next<I>>
 		: [false, I]
 ) extends [infer OrReplace extends boolean, infer I1 extends number]
 	? SkipViewOptions<T, I1> extends infer I2 extends number
 		? IsWord<T, I2, "view"> extends true
-			? ParseCreateView<T, Nx<I2>, OrReplace>
+			? ParseCreateView<T, Next<I2>, OrReplace>
 			: (
 						IsWord<T, I2, "temporary"> extends true
-							? Nx<I2>
+							? Next<I2>
 							: I2
 					) extends infer J extends number
 				? IsWord<T, J, "table"> extends true
-					? ParseCreateTable<T, Nx<J>>
+					? ParseCreateTable<T, Next<J>>
 					: IsWord<T, J, "index"> extends true
-						? ParseCreateIndex<T, Nx<J>>
+						? ParseCreateIndex<T, Next<J>>
 						: IsWord<T, J, "unique" | "fulltext" | "spatial"> extends true
-							? IsWord<T, Nx<J>, "index"> extends true
-								? ParseCreateIndex<T, Nx<Nx<J>>>
-								: SyntaxErr<T, Nx<J>>
+							? IsWord<T, Next<J>, "index"> extends true
+								? ParseCreateIndex<T, Next<Next<J>>>
+								: SyntaxErr<T, Next<J>>
 							: IsWord<
 										T,
 										J,
@@ -150,25 +125,25 @@ type SkipViewOptions<T extends Toks, I extends number> = T[I] extends {
 	readonly v: infer W;
 }
 	? W extends "algorithm" | "definer"
-		? IsOp<T, Nx<I>, "="> extends true
-			? SkipDefinerValue<T, Nx<Nx<I>>>
-			: SyntaxErr<T, Nx<I>>
+		? IsOp<T, Next<I>, "="> extends true
+			? SkipDefinerValue<T, Next<Next<I>>>
+			: SyntaxErr<T, Next<I>>
 		: W extends "sql"
-			? IsWord<T, Nx<I>, "security"> extends true
-				? SkipViewOptions<T, Nx<Nx<Nx<I>>>>
-				: SyntaxErr<T, Nx<I>>
+			? IsWord<T, Next<I>, "security"> extends true
+				? SkipViewOptions<T, Next<Next<Next<I>>>>
+				: SyntaxErr<T, Next<I>>
 			: I
 	: I;
 /** `user`, `'user'@'host'`, `current_user[()]`. */
-type SkipDefinerValue<T extends Toks, I extends number> = T[Nx<I>] extends {
+type SkipDefinerValue<T extends Toks, I extends number> = T[Next<I>] extends {
 	readonly k: "v";
 }
-	? SkipViewOptions<T, Nx<Nx<I>>>
-	: IsOp<T, Nx<I>, "("> extends true
-		? IsOp<T, Nx<Nx<I>>, ")"> extends true
-			? SkipViewOptions<T, Nx<Nx<Nx<I>>>>
-			: SkipViewOptions<T, Nx<I>>
-		: SkipViewOptions<T, Nx<I>>;
+	? SkipViewOptions<T, Next<Next<I>>>
+	: IsOp<T, Next<I>, "("> extends true
+		? IsOp<T, Next<Next<I>>, ")"> extends true
+			? SkipViewOptions<T, Next<Next<Next<I>>>>
+			: SkipViewOptions<T, Next<I>>
+		: SkipViewOptions<T, Next<I>>;
 
 type ParseCreateTable<T extends Toks, I extends number> =
 	IfNotExists<T, I> extends [infer Ine extends boolean, infer J extends number]
@@ -177,18 +152,18 @@ type ParseCreateTable<T extends Toks, I extends number> =
 				infer J2 extends number
 			>
 			? IsWord<T, J2, "like"> extends true
-				? CreateLike<T, Nx<J2>, Ine, Table>
+				? CreateLike<T, Next<J2>, Ine, Table>
 				: IsOp<T, J2, "("> extends true
-					? IsWord<T, Nx<J2>, "like"> extends true
-						? CreateLike<T, Nx<Nx<J2>>, Ine, Table> extends Ok<
+					? IsWord<T, Next<J2>, "like"> extends true
+						? CreateLike<T, Next<Next<J2>>, Ine, Table> extends Ok<
 								infer S,
 								infer J3 extends number
 							>
 							? CloseOk<T, J3, S>
-							: CreateLike<T, Nx<Nx<J2>>, Ine, Table>
-						: IsSubqueryParen<T, Nx<J2>> extends true
+							: CreateLike<T, Next<Next<J2>>, Ine, Table>
+						: IsSubqueryParen<T, Next<J2>> extends true
 							? CtasQuery<T, J2, Ine, Table, []>
-							: TableElements<T, Nx<J2>, [], []> extends Ok<
+							: TableElements<T, Next<J2>, [], []> extends Ok<
 										[
 											infer Cols extends readonly ColumnDef[],
 											infer Pk extends readonly string[],
@@ -209,7 +184,7 @@ type ParseCreateTable<T extends Toks, I extends number> =
 												J4
 											>
 									: never
-								: TableElements<T, Nx<J2>, [], []>
+								: TableElements<T, Next<J2>, [], []>
 					: SkipTableOptions<T, J2> extends infer J3 extends number
 						? AtQuery<T, J3> extends true
 							? CtasQuery<T, J3, Ine, Table, []>
@@ -249,10 +224,10 @@ type CtasQuery<
 	Cols extends readonly ColumnDef[],
 > = (
 	IsWord<T, I, "ignore" | "replace"> extends true
-		? Nx<I>
+		? Next<I>
 		: I
 ) extends infer J extends number
-	? (IsWord<T, J, "as"> extends true ? Nx<J> : J) extends infer J2 extends
+	? (IsWord<T, J, "as"> extends true ? Next<J> : J) extends infer J2 extends
 			number
 		? ParseSubquery<T, J2> extends Ok<
 				infer S extends SelectStmt,
@@ -283,7 +258,7 @@ type SkipTableOptions<T extends Toks, I extends number> =
 					? SkipTableOptions<T, J>
 					: I
 				: T[I] extends { readonly k: string }
-					? SkipTableOptions<T, Nx<I>>
+					? SkipTableOptions<T, Next<I>>
 					: I;
 
 type ApplyPk<
@@ -306,7 +281,7 @@ type TableElements<
 		infer J extends number
 	>
 		? IsOp<T, J, ","> extends true
-			? TableElements<T, Nx<J>, [...Cols, ...C2], [...Pk, ...P2]>
+			? TableElements<T, Next<J>, [...Cols, ...C2], [...Pk, ...P2]>
 			: CloseOk<T, J, [[...Cols, ...C2], [...Pk, ...P2]]>
 		: TableElement<T, I>;
 /** One column definition or constraint: its columns and primary key names. */
@@ -332,7 +307,7 @@ type IsConstraintStart<T extends Toks, I extends number> =
 		| "spatial"
 		| "period"
 	> extends true
-		? IsOp<T, Nx<I>, "."> extends true
+		? IsOp<T, Next<I>, "."> extends true
 			? false
 			: true
 		: false;
@@ -340,29 +315,33 @@ type IsConstraintStart<T extends Toks, I extends number> =
 /** A table constraint or index: only `PRIMARY KEY (…)` changes the columns. */
 type TableConstraint<T extends Toks, I extends number> = (
 	IsWord<T, I, "constraint"> extends true
-		? IsWord<T, Nx<I>, "primary" | "unique" | "foreign" | "check"> extends true
-			? Nx<I>
-			: Nx<Nx<I>>
+		? IsWord<
+				T,
+				Next<I>,
+				"primary" | "unique" | "foreign" | "check"
+			> extends true
+			? Next<I>
+			: Next<Next<I>>
 		: I
 ) extends infer J extends number
 	? IsWord<T, J, "primary"> extends true
-		? IsWord<T, Nx<J>, "key"> extends true
-			? KeyParts<T, Nx<Nx<J>>> extends Ok<
+		? IsWord<T, Next<J>, "key"> extends true
+			? KeyParts<T, Next<Next<J>>> extends Ok<
 					infer Cols extends readonly string[],
 					infer J2 extends number
 				>
 				? Ok<[[], Cols], SkipItem<T, J2>>
-				: KeyParts<T, Nx<Nx<J>>>
-			: SyntaxErr<T, Nx<J>>
+				: KeyParts<T, Next<Next<J>>>
+			: SyntaxErr<T, Next<J>>
 		: Ok<[[], []], SkipItem<T, J>>
 	: never;
 
 /** `[USING BTREE] (a, b(10) DESC, (expr))`: the plain column names. */
 type KeyParts<T extends Toks, I extends number> =
 	IsOp<T, I, "("> extends true
-		? KeyPartLoop<T, Nx<I>, []>
+		? KeyPartLoop<T, Next<I>, []>
 		: T[I] extends { readonly k: "w" | "id" }
-			? KeyParts<T, Nx<I>>
+			? KeyParts<T, Next<I>>
 			: SyntaxErr<T, I>;
 type KeyPartLoop<
 	T extends Toks,
@@ -372,13 +351,13 @@ type KeyPartLoop<
 	KeyPart<T, I> extends [infer C extends readonly string[], infer J]
 		? J extends number
 			? IsOp<T, J, ","> extends true
-				? KeyPartLoop<T, Nx<J>, [...Acc, ...C]>
+				? KeyPartLoop<T, Next<J>, [...Acc, ...C]>
 				: CloseOk<T, J, [...Acc, ...C]>
 			: J
 		: KeyPart<T, I>;
 type KeyPart<T extends Toks, I extends number> =
 	Ident<T, I> extends infer N extends Name
-		? [[N["v"]], SkipKeyPart<T, Nx<I>>]
+		? [[N["v"]], SkipKeyPart<T, Next<I>>]
 		: IsOp<T, I, "("> extends true
 			? [[], SkipKeyPart<T, I>]
 			: SyntaxErr<T, I>;
@@ -394,7 +373,7 @@ type SkipKeyPart<T extends Toks, I extends number> = T[I] extends {
 				: SkipParens<T, I>
 			: SyntaxErr<T, I>
 	: T[I] extends { readonly k: "w"; readonly v: "asc" | "desc" }
-		? SkipKeyPart<T, Nx<I>>
+		? SkipKeyPart<T, Next<I>>
 		: SyntaxErr<T, I>;
 
 type ColState = {
@@ -425,7 +404,7 @@ type SerialInit = With<
 
 type ParseColumnDef<T extends Toks, I extends number> =
 	Ident<T, I> extends infer N extends Name
-		? ParseColumnType<T, Nx<I>> extends Ok<
+		? ParseColumnType<T, Next<I>> extends Ok<
 				{
 					readonly type: infer Ty extends string;
 					readonly enumValues: infer Ev;
@@ -451,7 +430,7 @@ type ParseColumnDef<T extends Toks, I extends number> =
 						J2
 					>
 				: ColumnAttrs<T, J, Ty extends "serial" ? SerialInit : Init>
-			: ParseColumnType<T, Nx<I>>
+			: ParseColumnType<T, Next<I>>
 		: SyntaxErr<T, I>;
 
 type ColumnAttrs<
@@ -460,45 +439,47 @@ type ColumnAttrs<
 	S extends ColState,
 > = T[I] extends { readonly k: "w"; readonly v: infer W extends string }
 	? W extends "not"
-		? IsWord<T, Nx<I>, "null"> extends true
-			? ColumnAttrs<T, Nx<Nx<I>>, With<S, "notNull", true>>
-			: SyntaxErr<T, Nx<I>>
+		? IsWord<T, Next<I>, "null"> extends true
+			? ColumnAttrs<T, Next<Next<I>>, With<S, "notNull", true>>
+			: SyntaxErr<T, Next<I>>
 		: W extends "null"
 			? ColumnAttrs<
 					T,
-					Nx<I>,
+					Next<I>,
 					With<S, "notNull", S["primaryKey"] extends true ? true : false>
 				>
 			: W extends "default"
-				? AttrsAt<T, SkipDefault<T, Nx<I>>, With<S, "hasDefault", true>>
+				? AttrsAt<T, SkipDefault<T, Next<I>>, With<S, "hasDefault", true>>
 				: W extends "auto_increment"
 					? ColumnAttrs<
 							T,
-							Nx<I>,
+							Next<I>,
 							With<With<S, "autoInc", true>, "hasDefault", true>
 						>
 					: W extends "primary"
-						? IsWord<T, Nx<I>, "key"> extends true
-							? ColumnAttrs<T, Nx<Nx<I>>, With<S, "primaryKey", true>>
-							: SyntaxErr<T, Nx<I>>
+						? IsWord<T, Next<I>, "key"> extends true
+							? ColumnAttrs<T, Next<Next<I>>, With<S, "primaryKey", true>>
+							: SyntaxErr<T, Next<I>>
 						: W extends "key"
-							? ColumnAttrs<T, Nx<I>, With<S, "primaryKey", true>>
+							? ColumnAttrs<T, Next<I>, With<S, "primaryKey", true>>
 							: W extends "unique"
 								? ColumnAttrs<
 										T,
-										IsWord<T, Nx<I>, "key"> extends true ? Nx<Nx<I>> : Nx<I>,
+										IsWord<T, Next<I>, "key"> extends true
+											? Next<Next<I>>
+											: Next<I>,
 										S
 									>
 								: W extends "generated"
-									? IsWord<T, Nx<I>, "always"> extends true
-										? IsWord<T, Nx<Nx<I>>, "as"> extends true
-											? Generated<T, Nx<Nx<Nx<I>>>, S>
-											: SyntaxErr<T, Nx<Nx<I>>>
-										: SyntaxErr<T, Nx<I>>
+									? IsWord<T, Next<I>, "always"> extends true
+										? IsWord<T, Next<Next<I>>, "as"> extends true
+											? Generated<T, Next<Next<Next<I>>>, S>
+											: SyntaxErr<T, Next<Next<I>>>
+										: SyntaxErr<T, Next<I>>
 									: W extends "as"
-										? Generated<T, Nx<I>, S>
+										? Generated<T, Next<I>, S>
 										: W extends "invisible"
-											? ColumnAttrs<T, Nx<I>, With<S, "invisible", true>>
+											? ColumnAttrs<T, Next<I>, With<S, "invisible", true>>
 											: W extends
 														| "visible"
 														| "virtual"
@@ -511,7 +492,7 @@ type ColumnAttrs<
 														| "unsigned"
 														| "signed"
 														| "zerofill"
-												? ColumnAttrs<T, Nx<I>, S>
+												? ColumnAttrs<T, Next<I>, S>
 												: W extends
 															| "comment"
 															| "collate"
@@ -524,21 +505,21 @@ type ColumnAttrs<
 															| "compressed"
 													? ColumnAttrs<
 															T,
-															IsOp<T, Nx<I>, "="> extends true
-																? Nx<Nx<Nx<I>>>
-																: Nx<Nx<I>>,
+															IsOp<T, Next<I>, "="> extends true
+																? Next<Next<Next<I>>>
+																: Next<Next<I>>,
 															S
 														>
 													: W extends "character"
-														? IsWord<T, Nx<I>, "set"> extends true
-															? ColumnAttrs<T, Nx<Nx<Nx<I>>>, S>
-															: SyntaxErr<T, Nx<I>>
+														? IsWord<T, Next<I>, "set"> extends true
+															? ColumnAttrs<T, Next<Next<Next<I>>>, S>
+															: SyntaxErr<T, Next<I>>
 														: W extends "on"
-															? IsWord<T, Nx<I>, "update"> extends true
-																? AttrsAt<T, SkipCallable<T, Nx<Nx<I>>>, S>
-																: SyntaxErr<T, Nx<I>>
+															? IsWord<T, Next<I>, "update"> extends true
+																? AttrsAt<T, SkipCallable<T, Next<Next<I>>>, S>
+																: SyntaxErr<T, Next<I>>
 															: W extends "references"
-																? TableRefAt<T, Nx<I>> extends Ok<
+																? TableRefAt<T, Next<I>> extends Ok<
 																		unknown,
 																		infer J extends number
 																	>
@@ -549,24 +530,24 @@ type ColumnAttrs<
 																				: J,
 																			S
 																		>
-																	: SyntaxErr<T, Nx<I>>
+																	: SyntaxErr<T, Next<I>>
 																: W extends "constraint"
 																	? ColumnAttrs<
 																			T,
-																			IsWord<T, Nx<I>, "check"> extends true
-																				? Nx<I>
-																				: Nx<Nx<I>>,
+																			IsWord<T, Next<I>, "check"> extends true
+																				? Next<I>
+																				: Next<Next<I>>,
 																			S
 																		>
 																	: W extends "check"
-																		? IsOp<T, Nx<I>, "("> extends true
+																		? IsOp<T, Next<I>, "("> extends true
 																			? SkipParens<
 																					T,
-																					Nx<I>
+																					Next<I>
 																				> extends infer J extends number
 																				? ColumnAttrs<T, SkipEnforced<T, J>, S>
-																				: SkipParens<T, Nx<I>>
-																			: SyntaxErr<T, Nx<I>>
+																				: SkipParens<T, Next<I>>
+																			: SyntaxErr<T, Next<I>>
 																		: Ok<S, I>
 	: T[I] extends { readonly k: "o"; readonly v: "," | ")" | ";" }
 		? Ok<S, I>
@@ -580,22 +561,22 @@ type AttrsAt<T extends Toks, J, S extends ColState> = J extends number
 
 type SkipEnforced<T extends Toks, I extends number> =
 	IsWord<T, I, "enforced"> extends true
-		? Nx<I>
+		? Next<I>
 		: IsWord<T, I, "not"> extends true
-			? IsWord<T, Nx<I>, "enforced"> extends true
-				? Nx<Nx<I>>
+			? IsWord<T, Next<I>, "enforced"> extends true
+				? Next<Next<I>>
 				: I
 			: I;
 
 /** `REFERENCES t (a) [MATCH x] [ON DELETE action] [ON UPDATE action]`. */
 type SkipReference<T extends Toks, I, S extends ColState> = I extends number
 	? IsWord<T, I, "match"> extends true
-		? SkipReference<T, Nx<Nx<I>>, S>
+		? SkipReference<T, Next<Next<I>>, S>
 		: IsWord<T, I, "on"> extends true
-			? IsWord<T, Nx<I>, "delete" | "update"> extends true
-				? IsWord<T, Nx<Nx<I>>, "set" | "no"> extends true
-					? SkipReference<T, Nx<Nx<Nx<Nx<I>>>>, S>
-					: SkipReference<T, Nx<Nx<Nx<I>>>, S>
+			? IsWord<T, Next<I>, "delete" | "update"> extends true
+				? IsWord<T, Next<Next<I>>, "set" | "no"> extends true
+					? SkipReference<T, Next<Next<Next<Next<I>>>>, S>
+					: SkipReference<T, Next<Next<Next<I>>>, S>
 				: ColumnAttrs<T, I, S>
 			: ColumnAttrs<T, I, S>
 	: I;
@@ -614,22 +595,22 @@ type SkipDefault<T extends Toks, I extends number> =
 	IsOp<T, I, "("> extends true
 		? SkipParens<T, I>
 		: IsOp<T, I, "-" | "+"> extends true
-			? T[Nx<I>] extends { readonly k: "n" }
-				? Nx<Nx<I>>
-				: SyntaxErr<T, Nx<I>>
+			? T[Next<I>] extends { readonly k: "n" }
+				? Next<Next<I>>
+				: SyntaxErr<T, Next<I>>
 			: T[I] extends { readonly k: "n" | "s" }
-				? Nx<I>
+				? Next<I>
 				: T[I] extends { readonly k: "w" }
 					? SkipCallable<T, I>
 					: SyntaxErr<T, I>;
 type SkipCallable<T extends Toks, I extends number> = T[I] extends {
 	readonly k: "w";
 }
-	? IsOp<T, Nx<I>, "("> extends true
-		? SkipParens<T, Nx<I>>
-		: T[Nx<I>] extends { readonly k: "s" }
-			? Nx<Nx<I>>
-			: Nx<I>
+	? IsOp<T, Next<I>, "("> extends true
+		? SkipParens<T, Next<I>>
+		: T[Next<I>] extends { readonly k: "s" }
+			? Next<Next<I>>
+			: Next<I>
 	: SyntaxErr<T, I>;
 
 type ParseCreateView<
@@ -641,7 +622,7 @@ type ParseCreateView<
 		? TableRefAt<T, J> extends Ok<infer View, infer J2 extends number>
 			? OptCols<T, J2> extends Ok<infer Cols, infer J3 extends number>
 				? IsWord<T, J3, "as"> extends true
-					? ParseSubquery<T, Nx<J3>> extends Ok<
+					? ParseSubquery<T, Next<J3>> extends Ok<
 							infer S extends SelectStmt,
 							infer J4 extends number
 						>
@@ -656,7 +637,7 @@ type ParseCreateView<
 								},
 								SkipCheckOption<T, J4>
 							>
-						: ParseSubquery<T, Nx<J3>>
+						: ParseSubquery<T, Next<J3>>
 					: SyntaxErr<T, J3>
 				: OptCols<T, J2>
 			: TableRefAt<T, J>
@@ -665,13 +646,13 @@ type ParseCreateView<
 type SkipCheckOption<T extends Toks, I extends number> =
 	IsWord<T, I, "with"> extends true
 		? (
-				IsWord<T, Nx<I>, "cascaded" | "local"> extends true
-					? Nx<Nx<I>>
-					: Nx<I>
+				IsWord<T, Next<I>, "cascaded" | "local"> extends true
+					? Next<Next<I>>
+					: Next<I>
 			) extends infer J extends number
 			? IsWord<T, J, "check"> extends true
-				? IsWord<T, Nx<J>, "option"> extends true
-					? Nx<Nx<J>>
+				? IsWord<T, Next<J>, "option"> extends true
+					? Next<Next<J>>
 					: I
 				: I
 			: I
@@ -682,12 +663,12 @@ type ParseCreateIndex<T extends Toks, I extends number> =
 	IfNotExists<T, I> extends [boolean, infer I0 extends number]
 		? Ident<T, I0> extends Name
 			? (
-					IsWord<T, Nx<I0>, "using"> extends true
-						? Nx<Nx<Nx<I0>>>
-						: Nx<I0>
+					IsWord<T, Next<I0>, "using"> extends true
+						? Next<Next<Next<I0>>>
+						: Next<I0>
 				) extends infer J extends number
 				? IsWord<T, J, "on"> extends true
-					? TableRefAt<T, Nx<J>> extends Ok<
+					? TableRefAt<T, Next<J>> extends Ok<
 							infer Table,
 							infer J2 extends number
 						>
@@ -699,7 +680,7 @@ type ParseCreateIndex<T extends Toks, I extends number> =
 								? Ok<{ t: "create_index"; table: Table }, J3>
 								: never
 							: SyntaxErr<T, J2>
-						: TableRefAt<T, Nx<J>>
+						: TableRefAt<T, Next<J>>
 					: SyntaxErr<T, J>
 				: never
 			: SyntaxErr<T, I0>
@@ -707,14 +688,14 @@ type ParseCreateIndex<T extends Toks, I extends number> =
 
 export type ParseDrop<T extends Toks, I extends number> = (
 	IsWord<T, I, "temporary"> extends true
-		? Nx<I>
+		? Next<I>
 		: I
 ) extends infer J extends number
 	? T[J] extends {
 			readonly k: "w";
 			readonly v: infer K extends "table" | "view" | "tables";
 		}
-		? IfExists<T, Nx<J>> extends [
+		? IfExists<T, Next<J>> extends [
 				infer Ie extends boolean,
 				infer J2 extends number,
 			]
@@ -726,12 +707,12 @@ export type ParseDrop<T extends Toks, I extends number> = (
 							ifExists: Ie;
 							names: Names;
 						},
-						IsWord<T, J3, "restrict" | "cascade"> extends true ? Nx<J3> : J3
+						IsWord<T, J3, "restrict" | "cascade"> extends true ? Next<J3> : J3
 					>
 				: DropNames<T, J2, []>
-			: IfExists<T, Nx<J>>
+			: IfExists<T, Next<J>>
 		: IsWord<T, J, "index" | "key"> extends true
-			? ParseDropIndex<T, Nx<J>>
+			? ParseDropIndex<T, Next<J>>
 			: SkipStatement<T, J, "drop">
 	: never;
 
@@ -745,15 +726,15 @@ type DropNames<
 		infer J extends number
 	>
 		? IsOp<T, J, ","> extends true
-			? DropNames<T, Nx<J>, [...Acc, Ref]>
+			? DropNames<T, Next<J>, [...Acc, Ref]>
 			: Ok<[...Acc, Ref], J>
 		: TableRefAt<T, I>;
 
 type ParseDropIndex<T extends Toks, I extends number> =
 	IfExists<T, I> extends [boolean, infer I0 extends number]
 		? Ident<T, I0> extends Name
-			? IsWord<T, Nx<I0>, "on"> extends true
-				? TableRefAt<T, Nx<Nx<I0>>> extends Ok<
+			? IsWord<T, Next<I0>, "on"> extends true
+				? TableRefAt<T, Next<Next<I0>>> extends Ok<
 						infer Table,
 						infer J extends number
 					>
@@ -763,14 +744,14 @@ type ParseDropIndex<T extends Toks, I extends number> =
 						>
 						? Ok<{ t: "drop_index"; table: Table }, J2>
 						: never
-					: TableRefAt<T, Nx<Nx<I0>>>
-				: SyntaxErr<T, Nx<I0>>
+					: TableRefAt<T, Next<Next<I0>>>
+				: SyntaxErr<T, Next<I0>>
 			: SyntaxErr<T, I0>
 		: IfExists<T, I>;
 
 export type ParseRename<T extends Toks, I extends number> =
 	IsWord<T, I, "table" | "tables"> extends true
-		? RenamePairs<T, Nx<I>, []>
+		? RenamePairs<T, Next<I>, []>
 		: SkipStatement<T, I, "rename">;
 type RenamePairs<
 	T extends Toks,
@@ -779,9 +760,9 @@ type RenamePairs<
 > =
 	TableRefAt<T, I> extends Ok<infer From, infer J extends number>
 		? IsWord<T, J, "to"> extends true
-			? TableRefAt<T, Nx<J>> extends Ok<infer To, infer J2 extends number>
+			? TableRefAt<T, Next<J>> extends Ok<infer To, infer J2 extends number>
 				? IsOp<T, J2, ","> extends true
-					? RenamePairs<T, Nx<J2>, [...Acc, { from: From; to: To }]>
+					? RenamePairs<T, Next<J2>, [...Acc, { from: From; to: To }]>
 					: Ok<
 							{
 								t: "rename_table";
@@ -789,13 +770,13 @@ type RenamePairs<
 							},
 							J2
 						>
-				: TableRefAt<T, Nx<J>>
+				: TableRefAt<T, Next<J>>
 			: SyntaxErr<T, J>
 		: TableRefAt<T, I>;
 
 export type ParseTruncate<T extends Toks, I extends number> = (
 	IsWord<T, I, "table"> extends true
-		? Nx<I>
+		? Next<I>
 		: I
 ) extends infer J extends number
 	? TableRefAt<T, J> extends Ok<infer Table, infer J2 extends number>
@@ -805,11 +786,11 @@ export type ParseTruncate<T extends Toks, I extends number> = (
 
 export type ParseAlter<T extends Toks, I extends number> = (
 	IsWord<T, I, "online" | "ignore"> extends true
-		? Nx<I>
+		? Next<I>
 		: I
 ) extends infer I1 extends number
 	? IsWord<T, I1, "table"> extends true
-		? IfExists<T, Nx<I1>> extends [boolean, infer J extends number]
+		? IfExists<T, Next<I1>> extends [boolean, infer J extends number]
 			? TableRefAt<T, J> extends Ok<infer Table, infer J2 extends number>
 				? AlterActions<T, J2, []> extends Ok<
 						infer Actions,
@@ -818,10 +799,10 @@ export type ParseAlter<T extends Toks, I extends number> = (
 					? Ok<{ t: "alter_table"; table: Table; actions: Actions }, J3>
 					: AlterActions<T, J2, []>
 				: TableRefAt<T, J>
-			: IfExists<T, Nx<I1>>
+			: IfExists<T, Next<I1>>
 		: SkipViewOptions<T, I1> extends infer I2 extends number
 			? IsWord<T, I2, "view"> extends true
-				? ParseCreateView<T, Nx<I2>, true>
+				? ParseCreateView<T, Next<I2>, true>
 				: SkipStatement<T, I1, "alter">
 			: SkipViewOptions<T, I1>
 	: never;
@@ -838,18 +819,18 @@ type AlterActions<
 					infer J extends number
 				>
 			? IsOp<T, J, ","> extends true
-				? AlterActions<T, Nx<J>, [...Acc, ...As]>
+				? AlterActions<T, Next<J>, [...Acc, ...As]>
 				: Ok<[...Acc, ...As], J>
 			: AlterAction_<T, I>
 	: Ok<Acc, I>;
 
 type Place<T extends Toks, I extends number> =
 	IsWord<T, I, "first"> extends true
-		? Ok<{ t: "first" }, Nx<I>>
+		? Ok<{ t: "first" }, Next<I>>
 		: IsWord<T, I, "after"> extends true
-			? Ident<T, Nx<I>> extends infer N extends Name
-				? Ok<{ t: "after"; col: N["v"] }, Nx<Nx<I>>>
-				: SyntaxErr<T, Nx<I>>
+			? Ident<T, Next<I>> extends infer N extends Name
+				? Ok<{ t: "after"; col: N["v"] }, Next<Next<I>>>
+				: SyntaxErr<T, Next<I>>
 			: Ok<null, I>;
 
 type ColumnWithPlace<T extends Toks, I extends number> =
@@ -865,25 +846,22 @@ type ColumnWithPlace<T extends Toks, I extends number> =
 			: Place<T, J>
 		: ParseColumnDef<T, I>;
 
-type SkipColumn<T extends Toks, I extends number> =
-	IsWord<T, I, "column"> extends true ? Nx<I> : I;
-
 type AlterAction_<T extends Toks, I extends number> = T[I] extends {
 	readonly k: "w";
 	readonly v: infer W extends string;
 }
 	? W extends "add"
-		? AddAction<T, Nx<I>>
+		? AddAction<T, Next<I>>
 		: W extends "drop"
-			? DropAction<T, Nx<I>>
+			? DropAction<T, Next<I>>
 			: W extends "modify"
-				? ChangeAction<T, SkipColumn<T, Nx<I>>, false>
+				? ChangeAction<T, SkipColumn<T, Next<I>>, false>
 				: W extends "change"
-					? ChangeAction<T, SkipColumn<T, Nx<I>>, true>
+					? ChangeAction<T, SkipColumn<T, Next<I>>, true>
 					: W extends "rename"
-						? RenameAction<T, Nx<I>>
+						? RenameAction<T, Next<I>>
 						: W extends "alter"
-							? AlterColumnAction<T, Nx<I>>
+							? AlterColumnAction<T, Next<I>>
 							: Ok<[{ t: "noop" }], SkipItem<T, I>>
 	: SyntaxErr<T, I>;
 
@@ -891,12 +869,12 @@ type AlterAction_<T extends Toks, I extends number> = T[I] extends {
 type ChangeAction<T extends Toks, I extends number, Renames extends boolean> =
 	IfExists<T, I> extends [boolean, infer J1 extends number]
 		? Ident<T, J1> extends infer N extends Name
-			? ColumnWithPlace<T, Renames extends true ? Nx<J1> : J1> extends Ok<
+			? ColumnWithPlace<T, Renames extends true ? Next<J1> : J1> extends Ok<
 					[infer Col, infer Pl],
 					infer J2 extends number
 				>
 				? Ok<[{ t: "change_column"; from: N["v"]; col: Col; place: Pl }], J2>
-				: ColumnWithPlace<T, Renames extends true ? Nx<J1> : J1>
+				: ColumnWithPlace<T, Renames extends true ? Next<J1> : J1>
 			: SyntaxErr<T, J1>
 		: IfExists<T, I>;
 
@@ -919,7 +897,7 @@ type AddAction<T extends Toks, I extends number> =
 			: AddConstraint<T, I>
 		: SkipColumn<T, I> extends infer J extends number
 			? IsOp<T, J, "("> extends true
-				? AddColumnList<T, Nx<J>, []>
+				? AddColumnList<T, Next<J>, []>
 				: IfNotExists<T, J> extends [
 							infer Ine extends boolean,
 							infer J1 extends number,
@@ -945,7 +923,7 @@ type AddColumnList<
 		infer J extends number
 	>
 		? IsOp<T, J, ","> extends true
-			? AddColumnList<T, Nx<J>, [...Acc, A]>
+			? AddColumnList<T, Next<J>, [...Acc, A]>
 			: CloseOk<T, J, [...Acc, A]>
 		: AddListItem<T, I>;
 type AddListItem<T extends Toks, I extends number> =
@@ -976,9 +954,9 @@ type DropAction<T extends Toks, I extends number> =
 				? Ident<T, J1> extends infer N extends Name
 					? Ok<
 							[{ t: "drop_column"; name: N["v"]; ifExists: Ie }],
-							IsWord<T, Nx<J1>, "restrict" | "cascade"> extends true
-								? Nx<Nx<J1>>
-								: Nx<J1>
+							IsWord<T, Next<J1>, "restrict" | "cascade"> extends true
+								? Next<Next<J1>>
+								: Next<J1>
 						>
 					: SyntaxErr<T, J1>
 				: IfExists<T, J>
@@ -986,21 +964,21 @@ type DropAction<T extends Toks, I extends number> =
 
 type RenameAction<T extends Toks, I extends number> =
 	IsWord<T, I, "column"> extends true
-		? Ident<T, Nx<I>> extends infer A extends Name
-			? IsWord<T, Nx<Nx<I>>, "to"> extends true
-				? Ident<T, Nx<Nx<Nx<I>>>> extends infer B extends Name
+		? Ident<T, Next<I>> extends infer A extends Name
+			? IsWord<T, Next<Next<I>>, "to"> extends true
+				? Ident<T, Next<Next<Next<I>>>> extends infer B extends Name
 					? Ok<
 							[{ t: "rename_column"; from: A["v"]; to: B["n"] }],
-							Nx<Nx<Nx<Nx<I>>>>
+							Next<Next<Next<Next<I>>>>
 						>
-					: SyntaxErr<T, Nx<Nx<Nx<I>>>>
-				: SyntaxErr<T, Nx<Nx<I>>>
-			: SyntaxErr<T, Nx<I>>
+					: SyntaxErr<T, Next<Next<Next<I>>>>
+				: SyntaxErr<T, Next<Next<I>>>
+			: SyntaxErr<T, Next<I>>
 		: IsWord<T, I, "index" | "key"> extends true
 			? Ok<[{ t: "noop" }], SkipItem<T, I>>
 			: (
 						IsWord<T, I, "to" | "as"> extends true
-							? Nx<I>
+							? Next<I>
 							: I
 					) extends infer J extends number
 				? TableRefAt<T, J> extends Ok<infer To, infer J2 extends number>
@@ -1013,30 +991,31 @@ type AlterColumnAction<T extends Toks, I extends number> =
 		? Ok<[{ t: "noop" }], SkipItem<T, I>>
 		: SkipColumn<T, I> extends infer J extends number
 			? Ident<T, J> extends infer N extends Name
-				? IsWord<T, Nx<J>, "set"> extends true
-					? IsWord<T, Nx<Nx<J>>, "default"> extends true
-						? SkipDefault<T, Nx<Nx<Nx<J>>>> extends infer J2 extends number
+				? IsWord<T, Next<J>, "set"> extends true
+					? IsWord<T, Next<Next<J>>, "default"> extends true
+						? SkipDefault<T, Next<Next<Next<J>>>> extends infer J2 extends
+								number
 							? Ok<[{ t: "column_default"; name: N["v"]; has: true }], J2>
-							: SkipDefault<T, Nx<Nx<Nx<J>>>>
-						: IsWord<T, Nx<Nx<J>>, "visible" | "invisible"> extends true
+							: SkipDefault<T, Next<Next<Next<J>>>>
+						: IsWord<T, Next<Next<J>>, "visible" | "invisible"> extends true
 							? Ok<
 									[
 										{
 											t: "column_visibility";
 											name: N["v"];
-											invisible: IsWord<T, Nx<Nx<J>>, "invisible">;
+											invisible: IsWord<T, Next<Next<J>>, "invisible">;
 										},
 									],
-									Nx<Nx<Nx<J>>>
+									Next<Next<Next<J>>>
 								>
-							: SyntaxErr<T, Nx<Nx<J>>>
-					: IsWord<T, Nx<J>, "drop"> extends true
-						? IsWord<T, Nx<Nx<J>>, "default"> extends true
+							: SyntaxErr<T, Next<Next<J>>>
+					: IsWord<T, Next<J>, "drop"> extends true
+						? IsWord<T, Next<Next<J>>, "default"> extends true
 							? Ok<
 									[{ t: "column_default"; name: N["v"]; has: false }],
-									Nx<Nx<Nx<J>>>
+									Next<Next<Next<J>>>
 								>
-							: SyntaxErr<T, Nx<Nx<J>>>
-						: SyntaxErr<T, Nx<J>>
+							: SyntaxErr<T, Next<Next<J>>>
+						: SyntaxErr<T, Next<J>>
 				: SyntaxErr<T, J>
 			: never;

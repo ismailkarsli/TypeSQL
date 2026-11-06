@@ -1,0 +1,34 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`pg-text-types > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "row": "{ config: string; cursor: string; no_config: null | string; no_cursor: null | string; no_path: null | string; no_snapshot: null | string; no_txid_snapshot: null | string; path: string; snapshot: string; txid_snapshot: string }",
+    },
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "{
+  path: '$."a"',
+  no_path: null,
+  config: 'english',
+  no_config: null,
+  cursor: 'c',
+  no_cursor: null,
+  snapshot: '10:20:10,14,15',
+  no_snapshot: null,
+  txid_snapshot: '10:20:10,14,15',
+  no_txid_snapshot: null
+}
+",
+  },
+}
+`;

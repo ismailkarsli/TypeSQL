@@ -14,6 +14,14 @@
 	},
 	"author": "İsmail Karslı",
 	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"default": "./dist/index.js"
+		}
+	},
 	"bin": {
 		"typesql-language-server": "./dist/bin.js"
 	},
@@ -29,6 +37,17 @@
 	"scripts": {
 		"build": "tsrs -p tsconfig.build.json",
 		"typecheck": "tsrs -p tsconfig.json --noEmit"
+	},
+	"dependencies": {
+		"@typesql/core": "workspace:*"
+	},
+	"peerDependencies": {
+		"typescript": ">=7.1.0-0"
+	},
+	"peerDependenciesMeta": {
+		"typescript": {
+			"optional": true
+		}
 	},
 	"devDependencies": {
 		"@types/node": "catalog:",

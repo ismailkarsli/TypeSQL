@@ -26,11 +26,17 @@ export interface Result {
 	stdout: string;
 	stderr: string;
 }
+export interface Options {
+	env?: NodeJS.ProcessEnv;
+	/** Kills the command after this many milliseconds; a scenario's test timeout aborts it otherwise. */
+	timeout?: number;
+	/** Directory to write the command's result to. */
+	logs?: string;
+}
 export async function command(
 	cwd: string,
 	argv: string[],
-	env: NodeJS.ProcessEnv = {},
-	timeout = 120_000,
+	{ env = {}, timeout, logs }: Options = {},
 ): Promise<Result> {
 	const signal = cancellation.getStore();
 	signal?.throwIfAborted();
@@ -70,7 +76,10 @@ export async function command(
 		};
 		const abort = () => kill("test aborted");
 		signal?.addEventListener("abort", abort, { once: true });
-		const timer = setTimeout(() => kill(`timeout after ${timeout}ms`), timeout);
+		const timer =
+			timeout === undefined
+				? undefined
+				: setTimeout(() => kill(`timeout after ${timeout}ms`), timeout);
 		child.stdout.on("data", (chunk) => {
 			stdout += chunk;
 			if (stdout.length > 10_000_000) kill("output exceeded 10MB");
@@ -91,19 +100,19 @@ export async function command(
 			signal?.removeEventListener("abort", abort);
 			const result = { command: argv, status: status ?? -1, stdout, stderr };
 			try {
-				await mkdir(join(cwd, ".scenario", "logs"), { recursive: true });
-				await writeFile(
-					join(
-						cwd,
-						".scenario",
-						"logs",
-						`${argv
-							.map((x) => x.replace(/[^a-z0-9-]/gi, "_"))
-							.join("-")
-							.slice(0, 140)}.json`,
-					),
-					JSON.stringify(result, null, 2),
-				);
+				if (logs) {
+					await mkdir(logs, { recursive: true });
+					await writeFile(
+						join(
+							logs,
+							`${argv
+								.map((x) => x.replace(/[^a-z0-9-]/gi, "_"))
+								.join("-")
+								.slice(0, 140)}.json`,
+						),
+						JSON.stringify(result, null, 2),
+					);
+				}
 				if (fault || exitSignal)
 					reject(
 						fault ??
@@ -116,13 +125,8 @@ export async function command(
 		});
 	});
 }
-export async function required(
-	cwd: string,
-	argv: string[],
-	env: NodeJS.ProcessEnv = {},
-	timeout?: number,
-) {
-	const result = await command(cwd, argv, env, timeout);
+export async function required(cwd: string, argv: string[], options?: Options) {
+	const result = await command(cwd, argv, options);
 	if (result.status !== 0)
 		throw new Error(
 			`Infrastructure/prerequisite: ${argv.join(" ")} failed (${result.status})\n${result.stdout}${result.stderr}`,

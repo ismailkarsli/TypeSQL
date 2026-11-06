@@ -3,7 +3,7 @@ import {
 	paramNumbers,
 	type SqlDriver,
 	serialTransaction,
-	sqliteValue,
+	sqliteBindings,
 } from "@typesql/core/adapter";
 
 export interface SqliteStatement {
@@ -76,14 +76,7 @@ function prepared(db: SqliteDatabase, text: string, bigint: boolean): Prepared {
 }
 
 function bind(p: Prepared, values: readonly unknown[]): unknown[] {
-	if (p.names.length === 0) return [];
-	const params = Object.fromEntries(
-		p.names.map((n) => [
-			p.bare ? String(n) : `$${n}`,
-			sqliteValue(values[n - 1]),
-		]),
-	);
-	return [params];
+	return p.names.length === 0 ? [] : [sqliteBindings(p.names, values, p.bare)];
 }
 
 export interface ExecutorOptions {
@@ -99,7 +92,6 @@ export function executor(
 		async (text: string, values: readonly unknown[]) =>
 			run(prepared(db, text, bigint), values),
 		{
-			// sql.prepare(): prepare the statement once and reuse it.
 			prepare: (text: string): Executor => {
 				let p: Prepared | undefined;
 				return async (_text, values) => {

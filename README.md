@@ -7,7 +7,7 @@
 
 Write SQL in TypeScript and get exact types for rows and parameters. TypeSQL parses your SQL inside the type checker: no codegen, no database connection, no build step.
 
-TypeSQL supports PostgreSQL, SQLite, MySQL and MariaDB.
+TypeSQL supports PostgreSQL, SQLite, MySQL and MariaDB. The `@typesql/core` runtime is tiny (under 3 kB minified and gzipped) and has no dependencies.
 
 <a href="https://www.npmjs.com/package/@typesql/core"><img src="https://img.shields.io/npm/v/@typesql/core" alt="npm version" height="20"></a>
 <a href="https://www.npmjs.com/package/@typesql/core"><img src="https://img.shields.io/npm/dm/@typesql/core" alt="npm downloads" height="20"></a>

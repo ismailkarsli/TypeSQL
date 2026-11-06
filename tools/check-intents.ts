@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { type Package, releasedPackages } from "./packages.ts";
 
 const git = (...args: string[]): string =>
 	execFileSync("git", args, { encoding: "utf8" });
@@ -24,28 +24,7 @@ if (
 }
 const base = git("merge-base", arg, "HEAD").trim();
 
-interface Manifest {
-	name: string;
-	private?: boolean;
-	files?: string[];
-}
-interface Package {
-	dir: string;
-	manifestPath: string;
-	manifest: Manifest;
-}
-
-const packages: Package[] = readdirSync("packages")
-	.map((dir) => ({
-		dir: `packages/${dir}`,
-		manifestPath: join("packages", dir, "package.json"),
-	}))
-	.filter((p) => existsSync(p.manifestPath))
-	.map((p) => {
-		const manifest: Manifest = JSON.parse(readFileSync(p.manifestPath, "utf8"));
-		return { ...p, manifest };
-	})
-	.filter((p) => !p.manifest.private);
+const packages = releasedPackages();
 
 const changed = new Set(
 	[
@@ -64,9 +43,7 @@ const withoutVersion = (text: string): string => {
 
 function shippedChange(pkg: Package): string | undefined {
 	for (const file of changed) {
-		if (!file.startsWith(`${pkg.dir}/`)) continue;
-		const rel = file.slice(pkg.dir.length + 1);
-		if (rel === "package.json") {
+		if (file === `${pkg.dir}/package.json`) {
 			const before = tryGit("show", `${base}:${file}`);
 			const after = existsSync(file) ? readFileSync(file, "utf8") : undefined;
 			if (
@@ -76,8 +53,8 @@ function shippedChange(pkg: Package): string | undefined {
 			)
 				return file;
 		} else if (
-			(pkg.manifest.files ?? []).some(
-				(entry) => rel === entry || rel.startsWith(`${entry}/`),
+			pkg.shipped.some(
+				(entry) => file === entry || file.startsWith(`${entry}/`),
 			)
 		) {
 			return file;
@@ -120,7 +97,7 @@ const covered = new Set(intentTexts.flatMap(intentTargets));
 
 const missing = packages.flatMap((pkg) => {
 	const file = shippedChange(pkg);
-	return file && !covered.has(pkg.manifest.name) && !covered.has(pkg.dir)
+	return file && !covered.has(pkg.name) && !covered.has(pkg.dir)
 		? [{ pkg, file }]
 		: [];
 });
@@ -131,11 +108,10 @@ if (missing.length === 0) {
 }
 
 console.error(
-	`check-intents: published packages changed since ${base.slice(0, 7)} without a change intent:\n`,
+	`check-intents: released packages changed since ${base.slice(0, 7)} without a change intent:\n`,
 );
-for (const { pkg, file } of missing)
-	console.error(`  ${pkg.manifest.name}  (${file})`);
-const names = missing.map(({ pkg }) => pkg.manifest.name).join(" ");
+for (const { pkg, file } of missing) console.error(`  ${pkg.name}  (${file})`);
+const names = missing.map(({ pkg }) => pkg.name).join(" ");
 console.error(`
 Record one and commit it with the change:
 

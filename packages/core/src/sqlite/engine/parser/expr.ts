@@ -1,22 +1,21 @@
-import type { SqlError } from "../../../errors.js";
-import type { Expr, SelectStmt, TableRef, WindowSpec } from "../ast.js";
-import type { NameOf } from "../tokens.js";
-import type { GE, Tup } from "../types.js";
-import type { Reserved } from "./keywords.js";
-import type { ParenSubquery } from "./select.js";
+import type { NameOf } from "../../../engine/family/lex.js";
 import type {
 	CloseOk,
 	Expect,
-	Ident,
 	IsOp,
 	IsWord,
 	Name,
-	Nx,
-	Ok,
+	Negate,
 	SyntaxErr,
-	TableRefAt,
-	Toks,
-} from "./util.js";
+} from "../../../engine/family/parse.js";
+import type { Next } from "../../../engine/next.js";
+import type { GE } from "../../../engine/num.js";
+import type { Ok, Toks } from "../../../engine/tokens.js";
+import type { SqlError } from "../../../errors.js";
+import type { Expr, SelectStmt, TableRef, WindowSpec } from "../ast.js";
+import type { Reserved } from "./keywords.js";
+import type { ParenSubquery } from "./select.js";
+import type { Ident, TableRefAt } from "./util.js";
 
 type Prec = {
 	readonly or: 1;
@@ -48,29 +47,33 @@ type ParsePrefix<T extends Toks, I extends number> = T[I] extends {
 	readonly v: infer O;
 }
 	? O extends "-" | "+" | "~"
-		? ParseExprPrec<T, Nx<I>, Prec["unary"]> extends Ok<
+		? ParseExprPrec<T, Next<I>, Prec["unary"]> extends Ok<
 				infer E extends Expr,
 				infer J extends number
 			>
 			? Ok<Unary<O, E>, J>
-			: ParseExprPrec<T, Nx<I>, Prec["unary"]>
+			: ParseExprPrec<T, Next<I>, Prec["unary"]>
 		: O extends "("
-			? ParseParen<T, Nx<I>>
+			? ParseParen<T, Next<I>>
 			: SyntaxErr<T, I>
 	: T[I] extends { readonly k: "w"; readonly v: "not" }
-		? ParseExprPrec<T, Nx<I>, Prec["not"]> extends Ok<
+		? ParseExprPrec<T, Next<I>, Prec["not"]> extends Ok<
 				infer E extends Expr,
 				infer J extends number
 			>
 			? Ok<{ t: "un"; op: "not"; e: E }, J>
-			: ParseExprPrec<T, Nx<I>, Prec["not"]>
+			: ParseExprPrec<T, Next<I>, Prec["not"]>
 		: ParsePrimary<T, I>;
 
+// Unary plus is no-op the typer would see through everywhere; it stays only on a
+// column, which SQLite then names by the expression's text instead of the column's.
 type Unary<O, E extends Expr> = O extends "-"
-	? E extends { readonly t: "num"; readonly v: infer V extends string }
-		? { t: "num"; v: `-${V}` }
-		: { t: "un"; op: "-"; e: E }
-	: { t: "un"; op: O; e: E };
+	? Negate<E>
+	: O extends "+"
+		? E extends { readonly t: "col" }
+			? { t: "un"; op: O; e: E }
+			: E
+		: { t: "un"; op: O; e: E };
 
 type ParseParen<T extends Toks, I extends number> = T[I] extends {
 	readonly k: "w";
@@ -102,7 +105,7 @@ export type ParseExprList<
 > =
 	ParseExpr<T, I> extends Ok<infer E extends Expr, infer J extends number>
 		? IsOp<T, J, ","> extends true
-			? ParseExprList<T, Nx<J>, [...Acc, E]>
+			? ParseExprList<T, Next<J>, [...Acc, E]>
 			: Ok<[...Acc, E], J>
 		: ParseExpr<T, I>;
 
@@ -110,13 +113,13 @@ type ParsePrimary<T extends Toks, I extends number> = T[I] extends {
 	readonly k: "n";
 	readonly v: infer V extends string;
 }
-	? Ok<{ t: "num"; v: V }, Nx<I>>
+	? Ok<{ t: "num"; v: V }, Next<I>>
 	: T[I] extends { readonly k: "s"; readonly v: infer V extends string }
 		? T[I] extends { readonly blob: true }
-			? Ok<{ t: "blob"; v: V }, Nx<I>>
-			: Ok<{ t: "str"; v: V }, Nx<I>>
+			? Ok<{ t: "blob"; v: V }, Next<I>>
+			: Ok<{ t: "str"; v: V }, Next<I>>
 		: T[I] extends { readonly k: "$"; readonly v: infer N extends number }
-			? Ok<{ t: "param"; n: N }, Nx<I>>
+			? Ok<{ t: "param"; n: N }, Next<I>>
 			: T[I] extends { readonly k: "w"; readonly v: infer W extends string }
 				? ParseWordPrimary<T, I, W>
 				: T[I] extends { readonly k: "id" }
@@ -128,40 +131,43 @@ type ParseWordPrimary<
 	I extends number,
 	W extends string,
 > = W extends "null"
-	? Ok<{ t: "null" }, Nx<I>>
+	? Ok<{ t: "null" }, Next<I>>
 	: W extends "current_time" | "current_date" | "current_timestamp"
-		? Ok<{ t: "ctime"; fn: W }, Nx<I>>
+		? Ok<{ t: "ctime"; fn: W }, Next<I>>
 		: W extends "cast"
-			? ParseCast<T, Nx<I>>
+			? ParseCast<T, Next<I>>
 			: W extends "case"
-				? ParseCase<T, Nx<I>>
+				? ParseCase<T, Next<I>>
 				: W extends "exists"
-					? Expect<T, Nx<I>, "("> extends infer J extends number
+					? Expect<T, Next<I>, "("> extends infer J extends number
 						? ParenSubquery<T, J> extends Ok<
 								infer Q extends SelectStmt,
 								infer J2 extends number
 							>
 							? Ok<{ t: "exists"; q: Q }, J2>
 							: ParenSubquery<T, J>
-						: Expect<T, Nx<I>, "(">
+						: Expect<T, Next<I>, "(">
 					: W extends "raise"
 						? SqlError<"RAISE() may only be used within a trigger-program", I>
-						: IsOp<T, Nx<I>, "("> extends true
+						: IsOp<T, Next<I>, "("> extends true
 							? W extends Reserved
 								? SyntaxErr<T, I>
 								: ParseCall<T, I, [W, NameOf<T[I]> & string]>
 							: W extends "true" | "false"
-								? IsOp<T, Nx<I>, "."> extends true
+								? IsOp<T, Next<I>, "."> extends true
 									? ParseColumnRef<T, I>
-									: Ok<{ t: "bool"; v: W extends "true" ? true : false }, Nx<I>>
+									: Ok<
+											{ t: "bool"; v: W extends "true" ? true : false },
+											Next<I>
+										>
 								: ParseColumnRef<T, I>;
 
 type ParseColumnRef<T extends Toks, I extends number> =
 	Ident<T, I> extends infer A extends Name
-		? IsOp<T, Nx<I>, "."> extends true
-			? Ident<T, Nx<Nx<I>>> extends infer B extends Name
-				? IsOp<T, Nx<Nx<Nx<I>>>, "."> extends true
-					? Ident<T, Nx<Nx<Nx<Nx<I>>>>> extends infer C extends Name
+		? IsOp<T, Next<I>, "."> extends true
+			? Ident<T, Next<Next<I>>> extends infer B extends Name
+				? IsOp<T, Next<Next<Next<I>>>, "."> extends true
+					? Ident<T, Next<Next<Next<Next<I>>>>> extends infer C extends Name
 						? Ok<
 								{
 									t: "col";
@@ -170,9 +176,9 @@ type ParseColumnRef<T extends Toks, I extends number> =
 									name: C["v"];
 									disp: `${A["n"]}.${B["n"]}.${C["n"]}`;
 								},
-								Nx<Nx<Nx<Nx<Nx<I>>>>>
+								Next<Next<Next<Next<Next<I>>>>>
 							>
-						: SyntaxErr<T, Nx<Nx<Nx<Nx<I>>>>>
+						: SyntaxErr<T, Next<Next<Next<Next<I>>>>>
 					: Ok<
 							{
 								t: "col";
@@ -181,20 +187,21 @@ type ParseColumnRef<T extends Toks, I extends number> =
 								name: B["v"];
 								disp: `${A["n"]}.${B["n"]}`;
 							},
-							Nx<Nx<Nx<I>>>
+							Next<Next<Next<I>>>
 						>
-				: SyntaxErr<T, Nx<Nx<I>>>
+				: SyntaxErr<T, Next<Next<I>>>
 			: Ok<
-					{
-						t: "col";
-						schema: null;
-						tbl: null;
-						name: A["v"];
-						disp: T[I] extends { readonly r: `"${string}` }
-							? `"${A["n"]}" - should this be a string literal in single-quotes?`
-							: A["n"];
-					},
-					Nx<I>
+					T[I] extends { readonly r: `"${string}` }
+						? {
+								t: "col";
+								schema: null;
+								tbl: null;
+								name: A["v"];
+								disp: A["n"];
+								quoted: true;
+							}
+						: { t: "col"; schema: null; tbl: null; name: A["v"]; disp: A["n"] },
+					Next<I>
 				>
 		: SyntaxErr<T, I>;
 
@@ -211,10 +218,10 @@ type TypeWords<
 	? T[I] extends { readonly k: "w"; readonly v: TypeStop }
 		? TypeArgs<T, I, Acc>
 		: NameOf<T[I]> extends infer V extends string
-			? TypeWords<T, Nx<I>, Acc extends "" ? V : `${Acc} ${V}`>
+			? TypeWords<T, Next<I>, Acc extends "" ? V : `${Acc} ${V}`>
 			: never
 	: T[I] extends { readonly k: "s"; readonly v: infer V extends string }
-		? TypeWords<T, Nx<I>, Acc extends "" ? V : `${Acc} ${V}`>
+		? TypeWords<T, Next<I>, Acc extends "" ? V : `${Acc} ${V}`>
 		: TypeArgs<T, I, Acc>;
 type TypeStop =
 	| "constraint"
@@ -232,37 +239,37 @@ type TypeArgs<T extends Toks, I extends number, Acc extends string> =
 	IsOp<T, I, "("> extends true
 		? Acc extends ""
 			? SyntaxErr<T, I>
-			: TypeArg<T, Nx<I>> extends infer J extends number
+			: TypeArg<T, Next<I>> extends infer J extends number
 				? IsOp<T, J, ","> extends true
-					? TypeArg<T, Nx<J>> extends infer J2 extends number
+					? TypeArg<T, Next<J>> extends infer J2 extends number
 						? CloseOk<T, J2, Acc>
-						: TypeArg<T, Nx<J>>
+						: TypeArg<T, Next<J>>
 					: CloseOk<T, J, Acc>
-				: TypeArg<T, Nx<I>>
+				: TypeArg<T, Next<I>>
 		: Ok<Acc, I>;
 type TypeArg<T extends Toks, I extends number> = T[I] extends {
 	readonly k: "o";
 	readonly v: "+" | "-";
 }
-	? T[Nx<I>] extends { readonly k: "n" }
-		? Nx<Nx<I>>
-		: SyntaxErr<T, Nx<I>>
+	? T[Next<I>] extends { readonly k: "n" }
+		? Next<Next<I>>
+		: SyntaxErr<T, Next<I>>
 	: T[I] extends { readonly k: "n" }
-		? Nx<I>
+		? Next<I>
 		: T[I] extends { readonly k: "w" | "id" }
-			? Nx<I>
+			? Next<I>
 			: SyntaxErr<T, I>;
 
 type ParseCast<T extends Toks, I extends number> =
 	Expect<T, I, "("> extends infer J extends number
 		? ParseExpr<T, J> extends Ok<infer E extends Expr, infer J2 extends number>
 			? IsWord<T, J2, "as"> extends true
-				? ParseTypeName<T, Nx<J2>> extends Ok<
+				? ParseTypeName<T, Next<J2>> extends Ok<
 						infer Ty extends string,
 						infer J3 extends number
 					>
 					? CloseOk<T, J3, { t: "cast"; e: E; to: Ty }>
-					: ParseTypeName<T, Nx<J2>>
+					: ParseTypeName<T, Next<J2>>
 				: SyntaxErr<T, J2>
 			: ParseExpr<T, J>
 		: Expect<T, I, "(">;
@@ -282,48 +289,48 @@ type ParseWhens<
 	Acc extends readonly unknown[],
 > =
 	IsWord<T, I, "when"> extends true
-		? ParseExpr<T, Nx<I>> extends Ok<
+		? ParseExpr<T, Next<I>> extends Ok<
 				infer C extends Expr,
 				infer J extends number
 			>
 			? IsWord<T, J, "then"> extends true
-				? ParseExpr<T, Nx<J>> extends Ok<
+				? ParseExpr<T, Next<J>> extends Ok<
 						infer V extends Expr,
 						infer J2 extends number
 					>
 					? ParseWhens<T, J2, Operand, [...Acc, { when: C; then: V }]>
-					: ParseExpr<T, Nx<J>>
+					: ParseExpr<T, Next<J>>
 				: SyntaxErr<T, J>
-			: ParseExpr<T, Nx<I>>
+			: ParseExpr<T, Next<I>>
 		: Acc extends readonly []
 			? SyntaxErr<T, I>
 			: IsWord<T, I, "else"> extends true
-				? ParseExpr<T, Nx<I>> extends Ok<
+				? ParseExpr<T, Next<I>> extends Ok<
 						infer E extends Expr,
 						infer J extends number
 					>
 					? IsWord<T, J, "end"> extends true
-						? Ok<{ t: "case"; operand: Operand; whens: Acc; else: E }, Nx<J>>
+						? Ok<{ t: "case"; operand: Operand; whens: Acc; else: E }, Next<J>>
 						: SyntaxErr<T, J>
-					: ParseExpr<T, Nx<I>>
+					: ParseExpr<T, Next<I>>
 				: IsWord<T, I, "end"> extends true
-					? Ok<{ t: "case"; operand: Operand; whens: Acc; else: null }, Nx<I>>
+					? Ok<{ t: "case"; operand: Operand; whens: Acc; else: null }, Next<I>>
 					: SyntaxErr<T, I>;
 
 type ParseCall<T extends Toks, I extends number, Name> =
-	IsOp<T, Nx<Nx<I>>, ")"> extends true
-		? CallTail<T, Nx<Nx<Nx<I>>>, Name, [], false, false, []>
-		: IsOp<T, Nx<Nx<I>>, "*"> extends true
-			? Expect<T, Nx<Nx<Nx<I>>>, ")"> extends infer J extends number
+	IsOp<T, Next<Next<I>>, ")"> extends true
+		? CallTail<T, Next<Next<Next<I>>>, Name, [], false, false, []>
+		: IsOp<T, Next<Next<I>>, "*"> extends true
+			? Expect<T, Next<Next<Next<I>>>, ")"> extends infer J extends number
 				? CallTail<T, J, Name, [], true, false, []>
-				: Expect<T, Nx<Nx<Nx<I>>>, ")">
+				: Expect<T, Next<Next<Next<I>>>, ")">
 			: CallArgs<
 					T,
-					IsWord<T, Nx<Nx<I>>, "distinct" | "all"> extends true
-						? Nx<Nx<Nx<I>>>
-						: Nx<Nx<I>>,
+					IsWord<T, Next<Next<I>>, "distinct" | "all"> extends true
+						? Next<Next<Next<I>>>
+						: Next<Next<I>>,
 					Name,
-					IsWord<T, Nx<Nx<I>>, "distinct">
+					IsWord<T, Next<Next<I>>, "distinct">
 				>;
 type CallArgs<
 	T extends Toks,
@@ -336,16 +343,16 @@ type CallArgs<
 		infer J extends number
 	>
 		? IsWord<T, J, "order"> extends true
-			? IsWord<T, Nx<J>, "by"> extends true
-				? ParseOrderList<T, Nx<Nx<J>>, []> extends Ok<
+			? IsWord<T, Next<J>, "by"> extends true
+				? ParseOrderList<T, Next<Next<J>>, []> extends Ok<
 						infer Ord extends readonly Expr[],
 						infer J2 extends number
 					>
 					? Expect<T, J2, ")"> extends infer J3 extends number
 						? CallTail<T, J3, Name, Args, false, Distinct, Ord>
 						: Expect<T, J2, ")">
-					: ParseOrderList<T, Nx<Nx<J>>, []>
-				: SyntaxErr<T, Nx<J>>
+					: ParseOrderList<T, Next<Next<J>>, []>
+				: SyntaxErr<T, Next<J>>
 			: Expect<T, J, ")"> extends infer J3 extends number
 				? CallTail<T, J3, Name, Args, false, Distinct, []>
 				: Expect<T, J, ")">
@@ -361,18 +368,18 @@ type CallTail<
 	Ord extends readonly Expr[],
 > =
 	IsWord<T, I, "filter"> extends true
-		? Expect<T, Nx<I>, "("> extends infer J extends number
+		? Expect<T, Next<I>, "("> extends infer J extends number
 			? IsWord<T, J, "where"> extends true
-				? ParseExpr<T, Nx<J>> extends Ok<
+				? ParseExpr<T, Next<J>> extends Ok<
 						infer F extends Expr,
 						infer J2 extends number
 					>
 					? Expect<T, J2, ")"> extends infer J3 extends number
 						? CallOver<T, J3, Name, Args, Star, Distinct, Ord, F>
 						: Expect<T, J2, ")">
-					: ParseExpr<T, Nx<J>>
+					: ParseExpr<T, Next<J>>
 				: SyntaxErr<T, J>
-			: Expect<T, Nx<I>, "(">
+			: Expect<T, Next<I>, "(">
 		: CallOver<T, I, Name, Args, Star, Distinct, Ord, null>;
 
 type CallOver<
@@ -386,12 +393,12 @@ type CallOver<
 	Filter,
 > =
 	IsWord<T, I, "over"> extends true
-		? ParseOver<T, Nx<I>> extends Ok<
+		? ParseOver<T, Next<I>> extends Ok<
 				infer Spec extends WindowSpec,
 				infer J extends number
 			>
 			? Ok<MkCall<Name, Args, Star, Distinct, Ord, Filter, Spec>, J>
-			: ParseOver<T, Nx<I>>
+			: ParseOver<T, Next<I>>
 		: Ok<MkCall<Name, Args, Star, Distinct, Ord, Filter, null>, I>;
 type MkCall<Name, Args, Star, Distinct, Ord, Filter, Over> = {
 	t: "call";
@@ -407,9 +414,9 @@ type MkCall<Name, Args, Star, Distinct, Ord, Filter, Over> = {
 
 type ParseOver<T extends Toks, I extends number> =
 	Ident<T, I> extends infer N extends Name
-		? Ok<{ name: N["v"]; partition: []; order: [] }, Nx<I>>
+		? Ok<{ name: N["v"]; partition: []; order: [] }, Next<I>>
 		: IsOp<T, I, "("> extends true
-			? ParseWindowSpec<T, Nx<I>>
+			? ParseWindowSpec<T, Next<I>>
 			: SyntaxErr<T, I>;
 
 export type ParseWindowSpec<T extends Toks, I extends number> = (
@@ -420,7 +427,7 @@ export type ParseWindowSpec<T extends Toks, I extends number> = (
 				"partition" | "order" | "rows" | "range" | "groups"
 			> extends true
 			? [null, I]
-			: [N["v"], Nx<I>]
+			: [N["v"], Next<I>]
 		: [null, I]
 ) extends [infer Base, infer I1 extends number]
 	? OptBy<T, I1, "partition"> extends Ok<
@@ -445,19 +452,19 @@ export type OptBy<
 	Absent = [],
 > =
 	IsWord<T, I, W> extends true
-		? IsWord<T, Nx<I>, "by"> extends true
+		? IsWord<T, Next<I>, "by"> extends true
 			? W extends "order"
-				? ParseOrderList<T, Nx<Nx<I>>, []>
-				: ParseExprList<T, Nx<Nx<I>>, []>
-			: SyntaxErr<T, Nx<I>>
+				? ParseOrderList<T, Next<Next<I>>, []>
+				: ParseExprList<T, Next<Next<I>>, []>
+			: SyntaxErr<T, Next<I>>
 		: Ok<Absent, I>;
 
 export type OptWhere<T extends Toks, I extends number> =
-	IsWord<T, I, "where"> extends true ? ParseExpr<T, Nx<I>> : Ok<null, I>;
+	IsWord<T, I, "where"> extends true ? ParseExpr<T, Next<I>> : Ok<null, I>;
 
 export type ParenArgs<T extends Toks, I extends number> =
 	IsOp<T, I, ")"> extends true
-		? Ok<[], Nx<I>>
+		? Ok<[], Next<I>>
 		: ParseExprList<T, I, []> extends Ok<
 					infer A extends readonly Expr[],
 					infer J extends number
@@ -470,13 +477,13 @@ type SkipFrame<
 	I extends number,
 	Depth extends readonly unknown[],
 > = T[I] extends { readonly k: "o"; readonly v: "(" }
-	? SkipFrame<T, Nx<I>, [...Depth, 0]>
+	? SkipFrame<T, Next<I>, [...Depth, 0]>
 	: T[I] extends { readonly k: "o"; readonly v: ")" }
 		? Depth extends readonly [unknown, ...infer D]
-			? SkipFrame<T, Nx<I>, D>
-			: Nx<I>
+			? SkipFrame<T, Next<I>, D>
+			: Next<I>
 		: T[I] extends { readonly k: string }
-			? SkipFrame<T, Nx<I>, Depth>
+			? SkipFrame<T, Next<I>, Depth>
 			: SyntaxErr<T, I>;
 
 export type ParseOrderList<
@@ -487,19 +494,19 @@ export type ParseOrderList<
 	ParseExpr<T, I> extends Ok<infer E extends Expr, infer J extends number>
 		? OrderSuffix<T, J> extends infer J2 extends number
 			? IsOp<T, J2, ","> extends true
-				? ParseOrderList<T, Nx<J2>, [...Acc, E]>
+				? ParseOrderList<T, Next<J2>, [...Acc, E]>
 				: Ok<[...Acc, E], J2>
 			: OrderSuffix<T, J>
 		: ParseExpr<T, I>;
 type OrderSuffix<T extends Toks, I extends number> = (
 	IsWord<T, I, "asc" | "desc"> extends true
-		? Nx<I>
+		? Next<I>
 		: I
 ) extends infer J extends number
 	? IsWord<T, J, "nulls"> extends true
-		? IsWord<T, Nx<J>, "first" | "last"> extends true
-			? Nx<Nx<J>>
-			: SyntaxErr<T, Nx<J>>
+		? IsWord<T, Next<J>, "first" | "last"> extends true
+			? Next<Next<J>>
+			: SyntaxErr<T, Next<J>>
 		: J
 	: never;
 
@@ -537,7 +544,7 @@ type InfixOp<
 > =
 	BinPrec<O> extends infer P extends number
 		? GE<P, Min> extends true
-			? ParseExprPrec<T, Nx<I>, Next1<P>> extends Ok<
+			? ParseExprPrec<T, Next<I>, Next<P>> extends Ok<
 					infer E extends Expr,
 					infer J extends number
 				>
@@ -552,11 +559,9 @@ type InfixOp<
 						},
 						Min
 					>
-				: ParseExprPrec<T, Nx<I>, Next1<P>>
+				: ParseExprPrec<T, Next<I>, Next<P>>
 			: Ok<L, I>
 		: Ok<L, I>;
-
-type Next1<P extends number> = [...Tup<P>, 0]["length"] & number;
 
 type LikeOp = "like" | "glob" | "match" | "regexp";
 
@@ -568,39 +573,39 @@ type InfixWord<
 	W extends string,
 > = W extends "or" | "and"
 	? GE<W extends "or" ? 1 : 2, Min> extends true
-		? ParseExprPrec<T, Nx<I>, W extends "or" ? 2 : 3> extends Ok<
+		? ParseExprPrec<T, Next<I>, W extends "or" ? 2 : 3> extends Ok<
 				infer E extends Expr,
 				infer J extends number
 			>
 			? ParseInfix<T, J, { t: "bin"; op: W; l: L; r: E }, Min>
-			: ParseExprPrec<T, Nx<I>, W extends "or" ? 2 : 3>
+			: ParseExprPrec<T, Next<I>, W extends "or" ? 2 : 3>
 		: Ok<L, I>
 	: W extends "collate"
 		? GE<Prec["collate"], Min> extends true
-			? Ident<T, Nx<I>> extends infer N extends Name
+			? Ident<T, Next<I>> extends infer N extends Name
 				? ParseInfix<
 						T,
-						Nx<Nx<I>>,
+						Next<Next<I>>,
 						{ t: "collate"; e: L; collation: N["v"] },
 						Min
 					>
-				: T[Nx<I>] extends {
+				: T[Next<I>] extends {
 							readonly k: "s";
 							readonly v: infer V extends string;
 						}
 					? ParseInfix<
 							T,
-							Nx<Nx<I>>,
+							Next<Next<I>>,
 							{ t: "collate"; e: L; collation: Lowercase<V> },
 							Min
 						>
-					: SyntaxErr<T, Nx<I>>
+					: SyntaxErr<T, Next<I>>
 			: Ok<L, I>
 		: GE<Prec["eq"], Min> extends true
 			? W extends "isnull" | "notnull"
 				? ParseInfix<
 						T,
-						Nx<I>,
+						Next<I>,
 						{
 							t: "is";
 							e: L;
@@ -610,25 +615,25 @@ type InfixWord<
 						Min
 					>
 				: W extends "is"
-					? ParseIs<T, Nx<I>, L, Min>
+					? ParseIs<T, Next<I>, L, Min>
 					: W extends "not"
-						? T[Nx<I>] extends {
+						? T[Next<I>] extends {
 								readonly k: "w";
 								readonly v: infer W2 extends string;
 							}
 							? W2 extends "null"
 								? ParseInfix<
 										T,
-										Nx<Nx<I>>,
+										Next<Next<I>>,
 										{ t: "is"; e: L; what: "null"; not: true },
 										Min
 									>
 								: W2 extends "in" | "between" | LikeOp
-									? ParsePredicate<T, Nx<Nx<I>>, L, Min, W2, true>
+									? ParsePredicate<T, Next<Next<I>>, L, Min, W2, true>
 									: Ok<L, I>
 							: Ok<L, I>
 						: W extends "in" | "between" | LikeOp
-							? ParsePredicate<T, Nx<I>, L, Min, W, false>
+							? ParsePredicate<T, Next<I>, L, Min, W, false>
 							: Ok<L, I>
 			: Ok<L, I>;
 
@@ -637,13 +642,13 @@ type ParseIs<
 	I extends number,
 	L extends Expr,
 	Min extends number,
-> = (IsWord<T, I, "not"> extends true ? [true, Nx<I>] : [false, I]) extends [
+> = (IsWord<T, I, "not"> extends true ? [true, Next<I>] : [false, I]) extends [
 	infer Not extends boolean,
 	infer J extends number,
 ]
 	? IsWord<T, J, "distinct"> extends true
-		? IsWord<T, Nx<J>, "from"> extends true
-			? ParseExprPrec<T, Nx<Nx<J>>, Prec["cmp"]> extends Ok<
+		? IsWord<T, Next<J>, "from"> extends true
+			? ParseExprPrec<T, Next<Next<J>>, Prec["cmp"]> extends Ok<
 					infer E extends Expr,
 					infer J2 extends number
 				>
@@ -658,8 +663,8 @@ type ParseIs<
 						},
 						Min
 					>
-				: ParseExprPrec<T, Nx<Nx<J>>, Prec["cmp"]>
-			: SyntaxErr<T, Nx<J>>
+				: ParseExprPrec<T, Next<Next<J>>, Prec["cmp"]>
+			: SyntaxErr<T, Next<J>>
 		: ParseExprPrec<T, J, Prec["cmp"]> extends Ok<
 					infer E extends Expr,
 					infer J2 extends number
@@ -693,7 +698,7 @@ type ParsePredicate<
 			infer J extends number
 		>
 		? IsWord<T, J, "and"> extends true
-			? ParseExprPrec<T, Nx<J>, Prec["cmp"]> extends Ok<
+			? ParseExprPrec<T, Next<J>, Prec["cmp"]> extends Ok<
 					infer HiE extends Expr,
 					infer J2 extends number
 				>
@@ -703,7 +708,7 @@ type ParsePredicate<
 						{ t: "between"; e: L; lo: LoE; hi: HiE; not: Not },
 						Min
 					>
-				: ParseExprPrec<T, Nx<J>, Prec["cmp"]>
+				: ParseExprPrec<T, Next<J>, Prec["cmp"]>
 			: SyntaxErr<T, J>
 		: ParseExprPrec<T, I, Prec["not"]>
 	: W extends "in"
@@ -714,7 +719,7 @@ type ParsePredicate<
 					infer J extends number
 				>
 				? IsWord<T, J, "escape"> extends true
-					? ParseExprPrec<T, Nx<J>, Prec["cmp"]> extends Ok<
+					? ParseExprPrec<T, Next<J>, Prec["cmp"]> extends Ok<
 							infer EsE extends Expr,
 							infer J2 extends number
 						>
@@ -724,7 +729,7 @@ type ParsePredicate<
 								{ t: "like"; e: L; pat: Pat; esc: EsE; kind: W; not: Not },
 								Min
 							>
-						: ParseExprPrec<T, Nx<J>, Prec["cmp"]>
+						: ParseExprPrec<T, Next<J>, Prec["cmp"]>
 					: ParseInfix<
 							T,
 							J,
@@ -742,19 +747,19 @@ type ParseIn<
 	Not extends boolean,
 > =
 	IsOp<T, I, "("> extends true
-		? IsWord<T, Nx<I>, "select" | "with" | "values"> extends true
-			? ParenSubquery<T, Nx<I>> extends Ok<
+		? IsWord<T, Next<I>, "select" | "with" | "values"> extends true
+			? ParenSubquery<T, Next<I>> extends Ok<
 					infer Q extends SelectStmt,
 					infer J extends number
 				>
 				? ParseInfix<T, J, { t: "insub"; e: L; q: Q; not: Not }, Min>
-				: ParenSubquery<T, Nx<I>>
-			: ParenArgs<T, Nx<I>> extends Ok<
+				: ParenSubquery<T, Next<I>>
+			: ParenArgs<T, Next<I>> extends Ok<
 						infer List extends readonly Expr[],
 						infer J extends number
 					>
 				? ParseInfix<T, J, { t: "in"; e: L; list: List; not: Not }, Min>
-				: ParenArgs<T, Nx<I>>
+				: ParenArgs<T, Next<I>>
 		: TableRefAt<T, I> extends Ok<
 					infer R extends TableRef,
 					infer J extends number
@@ -769,7 +774,11 @@ type InTable<
 	Not extends boolean,
 	R extends TableRef,
 > =
-	(IsOp<T, I, "("> extends true ? ParenArgs<T, Nx<I>> : Ok<null, I>) extends Ok<
+	(
+		IsOp<T, I, "("> extends true
+			? ParenArgs<T, Next<I>>
+			: Ok<null, I>
+	) extends Ok<
 		infer Args extends readonly Expr[] | null,
 		infer J extends number
 	>
@@ -786,4 +795,4 @@ type InTable<
 				},
 				Min
 			>
-		: ParenArgs<T, Nx<I>>;
+		: ParenArgs<T, Next<I>>;

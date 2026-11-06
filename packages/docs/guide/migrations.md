@@ -420,7 +420,7 @@ const { applied } = await migrator.latest();
 | Option | Meaning |
 |---|---|
 | `dialect` | `"postgres"`, `"sqlite"`, `"mysql"` or `"mariadb"` |
-| `url` | PostgreSQL, MySQL and MariaDB: a connection URL (`mysql://user:password@host:3306/db` names the database). The migrator connects with `pg` or `mysql2`, optional peer dependencies of `@typesql/core`: install the one you use |
+| `url` | PostgreSQL, MySQL and MariaDB: a connection URL (`mysql://user:password@host:3306/db` names the database). The migrator connects with `pg` or `mysql2`, optional peer dependencies of `@typesql/core`: install the one you use. A migration's `db` types rows as these return them ([type maps](../reference/type-mapping)) |
 | `db` | SQLite: a database file, opened with `node:sqlite` |
 | `execute` | your own connection: an [executor](../adapters/custom-executor#write-an-executor), used for every call and never closed |
 | `migrationsDir` | a directory of migration files |

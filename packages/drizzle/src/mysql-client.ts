@@ -1,7 +1,9 @@
 import type { Executor } from "@typesql/core";
 import {
-	JsonParam,
+	mysqlBind,
+	mysqlInline,
 	mysqlPositional,
+	mysqlResult,
 	type SqlDriver,
 } from "@typesql/core/adapter";
 
@@ -31,7 +33,7 @@ interface DriverClient {
 	/** PlanetScale's and TiDB Cloud's serverless clients. */
 	execute?(
 		text: string,
-		values: unknown[],
+		values: null,
 		options: { readonly fullResult: true },
 	): Promise<ServerlessResult>;
 }
@@ -54,28 +56,18 @@ function clientOf(db: DrizzleMysqlDatabase): DriverClient {
 	);
 }
 
-// `sql.json(…)` becomes JSON text. mysql2 writes a Buffer as a binary
-// literal and a plain Uint8Array as an object.
-function param<V>(value: V): V | string | Buffer {
-	if (value instanceof JsonParam) return JSON.stringify(value.value);
-	return value instanceof Uint8Array && !Buffer.isBuffer(value)
-		? Buffer.from(value.buffer, value.byteOffset, value.byteLength)
-		: value;
-}
-
 // Queries go to the driver itself: Drizzle's mysql2 session reads dates as
 // strings for its own mapping, and the type maps describe the driver's values.
 export function mysqlExecutor(db: DrizzleMysqlDatabase): Executor {
 	return async (text, values) => {
 		const client = clientOf(db);
-		const q = mysqlPositional(text, values, param);
 		if (client.query) {
+			const q = mysqlPositional(text, values, mysqlBind);
 			const [result] = await client.query(q.text, q.values);
-			return Array.isArray(result)
-				? { rows: result, rowCount: result.length }
-				: { rows: [], rowCount: result.affectedRows ?? null };
+			return mysqlResult(result);
 		}
-		const result = await client.execute!(q.text, q.values, {
+		// Their own `?` substitution also replaces a `?` inside a string literal.
+		const result = await client.execute!(mysqlInline(text, values), null, {
 			fullResult: true,
 		});
 		const rows = result.rows ?? [];

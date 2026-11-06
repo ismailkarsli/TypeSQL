@@ -17,19 +17,6 @@ exports[`pg-ended-transaction > scenario 1`] = `
   },
   "start": {
     "status": 1,
-    "stderr": "file://<workspace>/packages/core/dist/transaction.js:10
-            throw new Error(ENDED);
-                  ^
-
-Error: typesql: this transaction has ended; run later queries on the sql that started it
-    at check (file://<workspace>/packages/core/dist/transaction.js:10:19)
-    at run (file://<workspace>/packages/core/dist/transaction.js:13:9)
-    at SqlQuery.execute (file://<workspace>/packages/core/dist/query.js:25:50)
-    at file://<scenario>/dist/app.js:7:34
-    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
-
-Node.js v26.8.1
-",
     "stdout": "",
   },
 }

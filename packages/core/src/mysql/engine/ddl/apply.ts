@@ -1,15 +1,31 @@
 import type {
+	AppendIndex,
+	ColumnPks,
+	DupName,
+	Indexed,
+	LowerAll,
+	PositionOrder,
+	Without,
+} from "../../../engine/family/ddl.js";
+import type {
+	NameAt,
+	NamedAt,
+	Unlocated,
+} from "../../../engine/family/diagnostics.js";
+import type { FindKey, RenameCells } from "../../../engine/family/scope.js";
+import type { QueryContext } from "../../../engine/family/types.js";
+import type { Next } from "../../../engine/next.js";
+import type { Add } from "../../../engine/num.js";
+import type {
 	DelKey,
 	Rebuild,
 	RenameKey,
 	SetKey,
+	Simplify,
 } from "../../../engine/object.js";
-import type { Nx } from "../../../engine/parse.js";
 import type { Toks } from "../../../engine/tokens.js";
-import type { QueryContext, Simplify } from "../../../engine/types.js";
 import type { AnyErr, SqlError } from "../../../errors.js";
 import type { Shaped, Table, TsShape, View } from "../../../schema.js";
-import type { UnionList } from "../../../sql/splice.js";
 import type {
 	AlterAction,
 	AlterTable,
@@ -26,22 +42,19 @@ import type {
 	Stmt,
 	TableRef,
 } from "../ast.js";
-import type {
-	ByIndex,
-	DupCell,
-	FindKey,
-	LookupRelation,
-	LowerAll,
-	NoTable,
-	RenameCells,
-} from "../binder/scope.js";
+import type { DupCell, LookupRelation, NoTable } from "../binder/scope.js";
 import type { Lex } from "../lexer.js";
 import type { ParseScript } from "../parser/stmt.js";
+import type { SyntaxWords } from "../parser/util.js";
 import type { ProjectDml } from "../project/dml.js";
 import type { ProjectSelect } from "../project/select.js";
-import type { Cell, Tup } from "../types.js";
+import type { Cell } from "../types.js";
 
-export type ApplyDdlAll<DB, Q extends string> =
+export type ApplyDdlAll<DB, Q extends string> = Unlocated<
+	ApplyScript<DB, Q>,
+	SyntaxWords
+>;
+type ApplyScript<DB, Q extends string> =
 	Lex<Q> extends infer T extends Toks
 		? ParseScript<T> extends infer S extends readonly Stmt[]
 			? ApplyLoop<DB, S, 0>
@@ -55,7 +68,7 @@ type ApplyLoop<
 > = S[I] extends infer St extends Stmt
 	? ApplyOne<DB, St> extends AnyErr
 		? ApplyOne<DB, St>
-		: ApplyLoop<ApplyOne<DB, St>, S, Nx<I>>
+		: ApplyLoop<ApplyOne<DB, St>, S, Next<I>>
 	: DB;
 
 type TopEnv<DB> = QueryContext<DB, [], {}>;
@@ -104,7 +117,7 @@ type Exists<DB, Ref extends TableRef> =
 
 type AlreadyExists<Ref extends TableRef> = SqlError<
 	`Table '${Ref["name"]}' already exists`,
-	null
+	NamedAt<Ref["name"]>
 >;
 
 type CreateTableEffect<DB, S extends CreateTable> =
@@ -120,38 +133,13 @@ type CreateTableEffect<DB, S extends CreateTable> =
 					TableFromDefs<S["columns"], LowerAll<S["pk"]>>
 				>;
 
-type ColumnPks<
-	Cols extends readonly ColumnDef[],
-	Acc extends readonly string[] = [],
-> = Cols extends readonly [
-	infer H extends ColumnDef,
-	...infer R extends readonly ColumnDef[],
-]
-	? ColumnPks<
-			R,
-			H["primaryKey"] extends true ? [...Acc, Lowercase<H["name"]>] : Acc
-		>
-	: Acc;
-
-type DupName<
-	Cols extends readonly ColumnDef[],
-	Seen extends string = never,
-> = Cols extends readonly [
-	infer H extends ColumnDef,
-	...infer R extends readonly ColumnDef[],
-]
-	? Lowercase<H["name"]> extends Seen
-		? H["name"]
-		: DupName<R, Seen | Lowercase<H["name"]>>
-	: null;
-
 type TableFromDefs<
 	Cols extends readonly ColumnDef[],
 	Pk extends readonly string[],
 > = Cols extends readonly []
 	? SqlError<"A table must have at least 1 column", null>
 	: DupName<Cols> extends infer D extends string
-		? SqlError<`Duplicate column name '${D}'`, null>
+		? SqlError<`Duplicate column name '${D}'`, NameAt<Lowercase<D>>>
 		: ColumnPks<Cols> extends infer CP extends readonly string[]
 			? CP["length"] extends 0
 				? BuildTable<Cols, Pk>
@@ -159,13 +147,6 @@ type TableFromDefs<
 					? BuildTable<Cols, CP>
 					: SqlError<"Multiple primary key defined", null>
 			: never;
-
-type Indexed<L extends readonly unknown[]> = {
-	[I in keyof L]: {
-		readonly c: L[I];
-		readonly i: I extends `${infer N extends number}` ? N : 0;
-	};
-};
 
 type BuildTable<
 	Cols extends readonly ColumnDef[],
@@ -317,11 +298,6 @@ type CtasTable<
 		>;
 	}
 >;
-type Add<A extends number, B extends number> = [
-	...Tup<A>,
-	...Tup<B>,
-]["length"] &
-	number;
 
 type ViewCols<C extends readonly Cell[]> = Rebuild<{
 	[D in Indexed<C>[number] as D["c"]["n"]]: MkCol<
@@ -390,57 +366,12 @@ type AlterLoop<
 		}
 		? Exists<DB, To> extends true
 			? AlreadyExists<To>
-			: AlterLoop<RenameKey<DB, K, To["name"]>, To["name"], Rel, A, Nx<I>>
+			: AlterLoop<RenameKey<DB, K, To["name"]>, To["name"], Rel, A, Next<I>>
 		: AlterColumns<Rel, Act, K> extends AnyErr
 			? AlterColumns<Rel, Act, K>
-			: AlterLoop<DB, K, AlterColumns<Rel, Act, K>, A, Nx<I>>
+			: AlterLoop<DB, K, AlterColumns<Rel, Act, K>, A, Next<I>>
 	: SetKey<DB, K, Rel>;
 
-/** Column names in table order, as written in the schema. */
-type OrderOf<Rel> = Rel[keyof Rel] extends { readonly i: number }
-	? ByIndex<PositionMap<Rel>, 0, []>
-	: UnionList<keyof Rel & string> extends infer L extends readonly string[]
-		? L
-		: [];
-type PositionMap<Rel> = {
-	[K in keyof Rel & string as Rel[K] extends {
-		readonly i: infer I extends number;
-	}
-		? I
-		: never]: K;
-};
-
-type MaxIndex<Rel> = {
-	[P in keyof Rel]: Rel[P] extends { readonly i: infer N extends number }
-		? N
-		: never;
-}[keyof Rel];
-// The position after the last column. Positions are 0…n-1 unless a column
-// was dropped: count up while each one exists (one membership check per
-// column), and look for the largest one only after a gap.
-type NextIndex<
-	U extends number,
-	A extends unknown[] = [],
-	Seen extends number = never,
-> = A["length"] extends U
-	? NextIndex<U, [...A, 0], Seen | A["length"]>
-	: [Exclude<U, Seen>] extends [never]
-		? A["length"]
-		: Nx<MaxOf<U>>;
-type MaxOf<U extends number, A extends unknown[] = []> = [U] extends [never]
-	? 0
-	: [Exclude<U, A["length"]>] extends [never]
-		? A["length"]
-		: MaxOf<Exclude<U, A["length"]>, [...A, 0]>;
-
-type Without<O extends readonly string[], X> = O extends readonly [
-	infer H extends string,
-	...infer R extends readonly string[],
-]
-	? H extends X
-		? Without<R, X>
-		: [H, ...Without<R, X>]
-	: [];
 type InsertAt<
 	O extends readonly string[],
 	Name extends string,
@@ -463,8 +394,6 @@ type AfterLoop<
 		? [...Acc, H, Name, ...R]
 		: AfterLoop<R, Name, A, [...Acc, H]>
 	: null;
-// Every column's position from the new order, built once, then one lookup
-// per column.
 type Positions<O extends readonly string[]> = {
 	[D in Indexed<O>[number] as D["c"] & string]: D["i"];
 };
@@ -478,20 +407,34 @@ type Reindex<Rel, O extends readonly string[]> =
 			}>
 		: never;
 
-/** `Name` with `Desc` at `P`: appended at the end, or placed FIRST / AFTER with every column renumbered. */
+/**
+ * `Name` with `Desc` at `P`: appended at the end, or placed FIRST / AFTER with
+ * every column renumbered. A table written without positions has no order to
+ * place it in, and stays without one.
+ */
 type Placed<
 	Rel,
 	Name extends string,
 	Desc,
 	P extends ColumnPlace,
 > = P extends null
-	? SetKey<Rel, Name, Remake<Desc, { readonly i: NextIndex<MaxIndex<Rel>> }>>
-	: InsertAt<Without<OrderOf<Rel>, Name>, Name, P> extends infer O extends
+	? SetKey<Rel, Name, Remake<Desc, { readonly i: AppendIndex<Rel> }>>
+	: PositionOrder<Rel, keyof Rel & string> extends infer O extends
 				readonly string[]
-		? Reindex<SetKey<Rel, Name, Desc>, O>
+		? InsertAt<Without<O, Name>, Name, P> extends infer O2 extends
+				readonly string[]
+			? Reindex<SetKey<Rel, Name, Desc>, O2>
+			: UnknownAfter<P, Name>
 		: P extends { readonly col: infer A extends string }
-			? SqlError<`Unknown column '${A}' in '${Name}'`, null>
-			: never;
+			? [Exclude<FindKey<Rel, A>, Name>] extends [never]
+				? UnknownAfter<P, Name>
+				: SetKey<Rel, Name, Desc>
+			: SetKey<Rel, Name, Desc>;
+type UnknownAfter<P, Name extends string> = P extends {
+	readonly col: infer A extends string;
+}
+	? SqlError<`Unknown column '${A}' in '${Name}'`, NamedAt<A, "column">>
+	: never;
 
 type AddedCol<C extends ColumnDef> = ColDesc<C, 0, []>;
 
@@ -502,10 +445,10 @@ type AlterColumns<Rel, A, K extends string> = A extends {
 }
 	? FindKey<Rel, F> extends infer Old extends string
 		? [Old] extends [never]
-			? SqlError<`Unknown column '${F}' in '${K}'`, null>
+			? SqlError<`Unknown column '${F}' in '${K}'`, NamedAt<F, "column">>
 			: [Exclude<FindKey<Rel, Lowercase<To>>, Old>] extends [never]
 				? RenameKey<Rel, Old, To>
-				: SqlError<`Duplicate column name '${To}'`, null>
+				: SqlError<`Duplicate column name '${To}'`, NameAt<Lowercase<To>>>
 		: never
 	: A extends {
 				readonly t: "add_column";
@@ -521,7 +464,10 @@ type AlterColumns<Rel, A, K extends string> = A extends {
 				: Placed<Rel, C["name"], AddedCol<C>, P>
 			: Ine extends true
 				? Rel
-				: SqlError<`Duplicate column name '${C["name"]}'`, null>
+				: SqlError<
+						`Duplicate column name '${C["name"]}'`,
+						NameAt<Lowercase<C["name"]>>
+					>
 		: A extends {
 					readonly t: "change_column";
 					readonly from: infer F extends string;
@@ -530,7 +476,7 @@ type AlterColumns<Rel, A, K extends string> = A extends {
 				}
 			? FindKey<Rel, F> extends infer Old extends string & keyof Rel
 				? [Old] extends [never]
-					? SqlError<`Unknown column '${F}' in '${K}'`, null>
+					? SqlError<`Unknown column '${F}' in '${K}'`, NamedAt<F, "column">>
 					: [Exclude<FindKey<Rel, Lowercase<C["name"]>>, Old>] extends [never]
 						? P extends null
 							? SetKey<
@@ -544,7 +490,10 @@ type AlterColumns<Rel, A, K extends string> = A extends {
 									AddedCol<C>,
 									P
 								>
-						: SqlError<`Duplicate column name '${C["name"]}'`, null>
+						: SqlError<
+								`Duplicate column name '${C["name"]}'`,
+								NameAt<Lowercase<C["name"]>>
+							>
 				: never
 			: A extends {
 						readonly t: "drop_column";
@@ -573,7 +522,10 @@ type AlterColumns<Rel, A, K extends string> = A extends {
 						}
 					? FindKey<Rel, N> extends infer Old extends string & keyof Rel
 						? [Old] extends [never]
-							? SqlError<`Unknown column '${N}' in '${K}'`, null>
+							? SqlError<
+									`Unknown column '${N}' in '${K}'`,
+									NamedAt<N, "column">
+								>
 							: SetKey<Rel, Old, Remake<Rel[Old], { readonly hasDefault: H }>>
 						: never
 					: A extends {
@@ -583,7 +535,10 @@ type AlterColumns<Rel, A, K extends string> = A extends {
 							}
 						? FindKey<Rel, N> extends infer Old extends string & keyof Rel
 							? [Old] extends [never]
-								? SqlError<`Unknown column '${N}' in '${K}'`, null>
+								? SqlError<
+										`Unknown column '${N}' in '${K}'`,
+										NamedAt<N, "column">
+									>
 								: SetKey<Rel, Old, Remake<Rel[Old], { readonly hidden: V }>>
 							: never
 						: A extends {
@@ -600,7 +555,7 @@ type PositionOf<Rel, K extends keyof Rel> = Rel[K] extends {
 	readonly i: infer I extends number;
 }
 	? I
-	: NextIndex<MaxIndex<Rel>>;
+	: AppendIndex<Rel>;
 
 /** Not tracked: a primary key added by ALTER can't be detected twice. */
 type HasPk<_Rel> = false;
@@ -622,7 +577,7 @@ type RenameEffect<
 	? LookupRelation<DB, F> extends [unknown, infer K extends string]
 		? Exists<DB, T> extends true
 			? AlreadyExists<T>
-			: RenameEffect<RenameKey<DB, K, T["name"]>, P, Nx<I>>
+			: RenameEffect<RenameKey<DB, K, T["name"]>, P, Next<I>>
 		: NoTable<F>
 	: DB;
 
@@ -634,12 +589,12 @@ type DropEffect<
 	? LookupRelation<DB, Ref> extends [infer Rel, infer K extends string]
 		? S["kind"] extends "table"
 			? Rel extends View<Table>
-				? SqlError<`Unknown table '${K}'`, null>
-				: DropEffect<DelKey<DB, K>, S, Nx<I>>
+				? SqlError<`Unknown table '${K}'`, NamedAt<K>>
+				: DropEffect<DelKey<DB, K>, S, Next<I>>
 			: Rel extends View<Table>
-				? DropEffect<DelKey<DB, K>, S, Nx<I>>
+				? DropEffect<DelKey<DB, K>, S, Next<I>>
 				: SqlError<`'${K}' is not VIEW`, null>
 		: S["ifExists"] extends true
-			? DropEffect<DB, S, Nx<I>>
-			: SqlError<`Unknown table '${Ref["name"]}'`, null>
+			? DropEffect<DB, S, Next<I>>
+			: SqlError<`Unknown table '${Ref["name"]}'`, NamedAt<Ref["name"]>>
 	: DB;

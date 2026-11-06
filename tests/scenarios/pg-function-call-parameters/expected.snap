@@ -1,0 +1,38 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`pg-function-call-parameters > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "after": "({ id: number; n: null | number })[]",
+      "casted": "({ n: null | number })[]",
+      "coalesced": "({ id: number; n: null | number })[]",
+      "lowered": "({ name: null | string })[]",
+      "merged": "number",
+    },
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "{
+  coalesced: [ { id: 1, n: 5 } ],
+  lowered: [ { name: 'ada' } ],
+  casted: [ { n: 3 } ],
+  merged: 1,
+  after: [
+    { id: 1, n: 5 },
+    { id: 2, n: null },
+    { id: 3, n: 3 },
+    { id: 4, n: 4 }
+  ]
+}
+",
+  },
+}
+`;

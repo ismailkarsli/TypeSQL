@@ -1,13 +1,43 @@
 import type { CleanedWhere } from "better-auth/adapters";
 
-export type Dialect = "postgres" | "sqlite";
+/** Where the databases the adapter runs on differ. */
+interface DialectFacts {
+	/** UUIDs, dates, booleans and JSON are the database's own types. */
+	readonly native: boolean;
+	/** A row of the joined relation `j`, which has `columns`, as JSON. */
+	row(columns: () => readonly string[], s: Statement): string;
+	/** The JSON rows `row` as a JSON array, `[]` without rows. */
+	rows(row: string): string;
+	/** Whether LIKE ignores case: SQLite's does (for ASCII), and GLOB doesn't. */
+	readonly likeIgnoresCase: boolean;
+}
+
+export const DIALECTS = {
+	postgres: {
+		native: true,
+		row: () => 'to_json("j")',
+		rows: (row) => `COALESCE(json_agg(${row}), '[]')`,
+		likeIgnoresCase: false,
+	},
+	sqlite: {
+		native: false,
+		row: (columns, s) =>
+			`json_object(${columns()
+				.map((c) => `${s.param(c)}, "j".${quote(c)}`)
+				.join(", ")})`,
+		rows: (row) => `json_group_array(${row})`,
+		likeIgnoresCase: true,
+	},
+} as const satisfies Readonly<Record<string, DialectFacts>>;
+
+export type Dialect = keyof typeof DIALECTS;
 
 export class Statement {
-	readonly dialect: Dialect;
+	readonly dialect: DialectFacts;
 	readonly values: unknown[] = [];
 
 	constructor(dialect: Dialect) {
-		this.dialect = dialect;
+		this.dialect = DIALECTS[dialect];
 	}
 
 	param<V>(value: V): string {
@@ -103,9 +133,9 @@ function match(
 			: operator === "ends_with"
 				? `${any}${escaped}`
 				: `${any}${escaped}${any}`;
-	if (s.dialect === "sqlite" && !insensitive)
+	if (s.dialect.likeIgnoresCase && !insensitive)
 		return `${column} GLOB ${s.param(wrap(value.replace(/[*?[]/g, "[$&]"), "*"))}`;
-	const like = s.dialect === "postgres" && insensitive ? "ILIKE" : "LIKE";
+	const like = insensitive && !s.dialect.likeIgnoresCase ? "ILIKE" : "LIKE";
 	const pattern = wrap(value.replace(/[!%_]/g, "!$&"), "%");
 	return `${column} ${like} ${s.param(pattern)} ESCAPE '!'`;
 }

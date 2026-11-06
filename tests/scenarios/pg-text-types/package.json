@@ -1,0 +1,21 @@
+{
+	"name": "pg-text-types",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"start": "node dist/app.js"
+	},
+	"dependencies": {
+		"@typesql/core": "workspace:*",
+		"@typesql/pg": "workspace:*",
+		"pg": "catalog:",
+		"@types/pg": "catalog:"
+	},
+	"devDependencies": {
+		"typescript": "catalog:",
+		"@types/node": "catalog:"
+	},
+	"scenario": {
+		"database": "postgres"
+	}
+}

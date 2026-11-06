@@ -1,14 +1,24 @@
-import type { Simplify } from "./types.js";
+export type Simplify<T> = { [K in keyof T]: T[K] } & {};
 
 type Single<K extends PropertyKey, V> = { [P in K]: V };
 
-type U2I<U> = (U extends unknown ? (x: U) => void : never) extends (
-	x: infer I,
-) => void
+type UnionToIntersection<U> = (
+	U extends unknown
+		? (x: U) => void
+		: never
+) extends (x: infer I) => void
 	? I
 	: never;
 
-type Build<U> = [U] extends [never] ? {} : Simplify<U2I<U>>;
+export type IsUnion<T, U = T> = T extends unknown
+	? [U] extends [T]
+		? false
+		: true
+	: never;
+
+export type Or<A, B> = A extends true ? true : B extends true ? true : false;
+
+type Build<U> = [U] extends [never] ? {} : Simplify<UnionToIntersection<U>>;
 
 export type Rebuild<O> = Build<
 	{ [K in keyof O]: Single<K & string, O[K]> }[keyof O]
@@ -82,13 +92,3 @@ type LastFour<U> = (U extends unknown ? (x: () => U) => void : never) extends (
 		? [D, Exclude<C, D>, Exclude<B, C | D>, Exclude<A, B | C | D>]
 		: never
 	: never;
-
-export type Tup<
-	N extends number,
-	A extends unknown[] = [],
-> = A["length"] extends N ? A : Tup<N, [...A, 0]>;
-export type Lt<A extends number, B extends number> = A extends B
-	? false
-	: Tup<B> extends [...Tup<A>, ...unknown[]]
-		? true
-		: false;

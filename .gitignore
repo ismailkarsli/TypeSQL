@@ -8,12 +8,8 @@ pnpm-publish-summary.json
 **/.vitepress/cache/
 .wrangler/
 .cloudflare/
-
-!docs/
 *.vsix
 reports/
-
 .consumer/
 .scenario/
 tests/.artifacts/
-tests/.vitest/

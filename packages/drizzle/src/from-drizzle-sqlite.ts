@@ -4,12 +4,10 @@ import type {
 	ColumnKey,
 	ColumnLike,
 	DbDefault,
-	Flat,
-	FromDrizzleOptions,
-	TableLike,
+	IsGenerated,
+	Nullable,
 	ViewKey,
-	ViewLike,
-} from "./from-drizzle.js";
+} from "./column.js";
 
 export interface DrizzleSqliteColumnTypes {
 	SQLiteInteger: "integer";
@@ -41,52 +39,21 @@ type SqliteTypeOf<D extends ColumnConfig> = D extends {
 				? Typed<"json", D["data"]>
 				: "any";
 
-type IsGenerated<D> = D extends {
-	readonly generated: { readonly type: string };
-}
-	? true
-	: false;
-
-type ColOf<D extends ColumnConfig> = Col<
-	SqliteTypeOf<D>,
-	{
-		nullable: D["notNull"] extends true ? false : true;
-		hasDefault: DbDefault<D>;
-		generated: IsGenerated<D>;
-	}
->;
-
-type Columns<C, Opts> = {
+export type SqliteColumns<C, Opts> = {
 	-readonly [K in keyof C as ColumnKey<C, K, Opts>]: C[K] extends ColumnLike
-		? ColOf<C[K]["_"]>
+		? Col<
+				SqliteTypeOf<C[K]["_"]>,
+				{
+					nullable: Nullable<C[K]["_"]>;
+					hasDefault: DbDefault<C[K]["_"]>;
+					generated: IsGenerated<C[K]["_"]>;
+				}
+			>
 		: never;
 };
 
-type ViewColumns<F, Opts> = {
+export type SqliteViewColumns<F, Opts> = {
 	-readonly [K in keyof F as ViewKey<F, K, Opts>]: F[K] extends ColumnLike
-		? Col<
-				SqliteTypeOf<F[K]["_"]>,
-				{ nullable: F[K]["_"]["notNull"] extends true ? false : true }
-			>
+		? Col<SqliteTypeOf<F[K]["_"]>, { nullable: Nullable<F[K]["_"]> }>
 		: Col<"any", { nullable: true }>;
 };
-
-type Relation<X, Opts> = X extends TableLike
-	? Columns<X["_"]["columns"], Opts>
-	: X extends ViewLike
-		? { readonly $view: ViewColumns<X["_"]["selectedFields"], Opts> }
-		: never;
-
-type NameOf<X> = X extends TableLike | ViewLike ? X["_"]["name"] : never;
-
-export type FromDrizzleSqlite<
-	Schema,
-	Opts extends FromDrizzleOptions = {},
-> = Schema extends TableLike | ViewLike
-	? Flat<{ -readonly [N in NameOf<Schema>]: Relation<Schema, Opts> }>
-	: Flat<{
-			-readonly [K in keyof Schema as NameOf<Schema[K]>]: Relation<
-				Schema[K],
-				Opts
-			>;
-		}>;

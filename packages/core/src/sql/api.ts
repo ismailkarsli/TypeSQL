@@ -1,21 +1,10 @@
-import type {
-	Empty,
-	EmptyFragment,
-	Optional,
-	OptionalInput,
-	Truthy,
-} from "../empty.js";
-import type { EngineTypes } from "../engine/contract.js";
-import type {
-	InsertInput,
-	RelationName,
-	SetInput,
-	TableName,
-} from "../engine/write.js";
+import type { Empty } from "../empty.js";
 import type { SqlError } from "../errors.js";
 import type { PluginEncoded, PluginInput, SqlPlugin } from "../plugin.js";
-import type { Fragment, Query } from "../query.js";
+import type { Fragment, InlineFragment, Query } from "../query.js";
+import type { RelationName, TableName } from "../schema.js";
 import type { BoxCallArgs, CallRet, GateCallCheck } from "./call.js";
+import type { EngineTypes } from "./contract.js";
 import type {
 	BoolOf,
 	BoxFragArgs,
@@ -33,7 +22,52 @@ import type {
 } from "./inline.js";
 import type { Slottable } from "./slots.js";
 import type { QuotedIdent } from "./splice.js";
-import type { NoExtraKeys, SentRows, SetRep, ValuesRep } from "./write.js";
+import type {
+	InsertInput,
+	NoExtraKeys,
+	SameColumns,
+	SentRows,
+	SetInput,
+	SetRep,
+	ValuesRep,
+} from "./write.js";
+
+/**
+ * The omission of an optional fragment or query, which splices nothing as
+ * `${…}`. Only it carries the string brand a template keeps: a branded
+ * omission next to a `string` value (`x ?? omission`, `flag ? omission : x`)
+ * would be reduced away with the DEFAULT it stands for.
+ */
+export type EmptyFragment = Empty & InlineFragment;
+
+/**
+ * `undefined` becomes the omission and `null` stays SQL `NULL`, as in
+ * sql.set, sql.values and sql.json.
+ */
+export type Optional<T> =
+	| Exclude<T, undefined>
+	| ([Extract<T, undefined>] extends [never]
+			? never
+			: [Exclude<T, undefined | null>] extends [never]
+				? Empty
+				: [Exclude<T, undefined | null>] extends [Slottable]
+					? EmptyFragment
+					: Empty);
+
+/** A `null` fragment would splice the text `null`, so it is an error. */
+type OptionalInput<T> = [Extract<T, null>] extends [never]
+	? unknown
+	: [Exclude<T, undefined | null>] extends [never]
+		? unknown
+		: [Exclude<T, undefined | null>] extends [Slottable]
+			? SqlError<
+					"use undefined, not null, to omit a fragment or query with sql.optional()",
+					null
+				>
+			: unknown;
+
+/** What `sql.if(value, then)` hands `then`: `value` without its falsy members. */
+type Truthy<V> = Exclude<V, null | undefined | false | 0 | 0n | "">;
 
 type Parameters<Input, P extends readonly SqlPlugin[]> = Extract<
 	PluginInput<
@@ -71,28 +105,24 @@ type WriteEncoded<
 
 // The write helpers' results are written as Fragment<…> so that declaration
 // emit can name them from @typesql/core.
-type SetText<P, E> = SetRep<P, QuoteOf<E>>["text"];
-type SetCarried<P> = SetRep<P>["carried"];
-type ValuesText<R, E> = ValuesRep<R, QuoteOf<E>, EmptyRowOf<E>>["text"];
-type ValuesCarried<R> = ValuesRep<R>["carried"];
-/** The identifier quote of a dialect: `"`, or a backtick for MySQL. */
-type QuoteOf<E> = E extends { readonly quote: infer Q extends string }
-	? Q
-	: '"';
-/** How a dialect inserts a row of defaults. */
-type EmptyRowOf<E> = E extends { readonly emptyRow: infer R extends string }
-	? R
-	: "DEFAULT VALUES";
-
+type SetText<P, E extends EngineTypes> = SetRep<P, E["quote"]>["text"];
+type SetCarried<P, E extends EngineTypes> = SetRep<P, E["quote"]>["carried"];
+type ValuesText<R, E extends EngineTypes> = ValuesRep<
+	R,
+	E["quote"],
+	E["emptyRow"]
+>["text"];
+type ValuesCarried<R, E extends EngineTypes> = ValuesRep<
+	R,
+	E["quote"],
+	E["emptyRow"]
+>["carried"];
 export interface SqlApi<
 	E extends EngineTypes,
 	DB,
 	TM,
 	Plugins extends readonly SqlPlugin[] = [],
 > {
-	withPlugin<const P extends SqlPlugin>(
-		plugin: P,
-	): SqlApi<E, DB, TM, [...Plugins, P]>;
 	<const Q extends string>(
 		query: GateCallCheck<E, DB, TM, Q> & Q,
 		...params: Parameters<BoxCallArgs<E, DB, TM, Q>, Plugins>
@@ -139,16 +169,16 @@ export interface SqlApi<
 	json<const T>(value: T & JsonInput<T>): JsonMarker<T>;
 
 	fragment<const Text extends string, const A extends readonly unknown[]>(
-		text: GateFragCheck<Text> & Text,
-		...params: A & Parameters<BoxFragArgs<Text>, Plugins>
-	): PlainFragment<Text, EncodedParameters<A, Plugins>>;
+		text: GateFragCheck<Text, E["lexis"]> & Text,
+		...params: A & Parameters<BoxFragArgs<Text, E["lexis"]>, Plugins>
+	): PlainFragment<Text, EncodedParameters<A, Plugins>, E["lexis"]>;
 
 	id<const Parts extends readonly [string, ...string[]]>(
 		...parts: Parts & LiteralParts<Parts>
-	): Fragment<QuotedIdent<Parts, QuoteOf<E>>, [], []>;
+	): Fragment<QuotedIdent<Parts, E["quote"]>, [], []>;
 	id(
 		name: RelationName<DB>,
-	): Fragment<QuotedIdent<[RelationName<DB>], QuoteOf<E>>, [], []>;
+	): Fragment<QuotedIdent<[RelationName<DB>], E["quote"]>, [], []>;
 	id(...parts: readonly [string, ...string[]]): Fragment<string, [], []>;
 
 	combine<
@@ -157,15 +187,15 @@ export interface SqlApi<
 	>(
 		items: Items,
 		options?: { readonly separator?: Sep },
-	): CombineOf<Items, Sep>;
+	): CombineOf<Items, Sep, E["lexis"]>;
 
 	and<const Items extends readonly (Slottable | Empty)[]>(
 		items: Items,
-	): BoolOf<Items, "AND">;
+	): BoolOf<Items, "AND", E["lexis"]>;
 
 	or<const Items extends readonly (Slottable | Empty)[]>(
 		items: Items,
-	): BoolOf<Items, "OR">;
+	): BoolOf<Items, "OR", E["lexis"]>;
 
 	set<const T extends TableName<DB>, const P>(
 		table: T,
@@ -176,7 +206,7 @@ export interface SqlApi<
 	): Fragment<
 		SetText<WriteEncoded<P, Plugins, "set", T>, E>,
 		readonly unknown[],
-		SetCarried<WriteEncoded<P, Plugins, "set", T>>
+		SetCarried<WriteEncoded<P, Plugins, "set", T>, E>
 	>;
 	/** Checked against the table of the `UPDATE` it is interpolated into. */
 	set<const P extends object>(
@@ -184,41 +214,22 @@ export interface SqlApi<
 	): Fragment<
 		SetText<WriteEncoded<P, Plugins, "set", undefined>, E>,
 		readonly unknown[],
-		SetCarried<WriteEncoded<P, Plugins, "set", undefined>>
+		SetCarried<WriteEncoded<P, Plugins, "set", undefined>, E>
 	>;
 
-	values<const T extends TableName<DB>, const R extends readonly unknown[]>(
-		table: T,
-		rows: R & {
-			readonly [I in keyof R]: R[I] extends WriteInput<
-				InsertInput<E, DB, TM, T>,
-				Plugins,
-				"values",
-				T
-			>
-				? NoExtraKeys<
-						R[I],
-						WriteInput<InsertInput<E, DB, TM, T>, Plugins, "values", T>
-					>
-				: never;
-		},
-	): Fragment<
-		ValuesText<WriteEncoded<R[number], Plugins, "values", T>, E>,
-		readonly unknown[],
-		ValuesCarried<WriteEncoded<R[number], Plugins, "values", T>>
-	>;
 	/**
 	 * Checked against the table of the `INSERT` it is interpolated into: once
 	 * with every column, and once with only the columns every row always
 	 * sends, so a required column a row can leave out is an error there.
+	 * Declared first: a call that fails is reported, and typed, as this one.
 	 */
 	values<const R extends readonly object[]>(
-		rows: R,
+		rows: R & SameColumns<E, R>,
 	):
 		| Fragment<
 				ValuesText<WriteEncoded<R[number], Plugins, "values", undefined>, E>,
 				readonly unknown[],
-				ValuesCarried<WriteEncoded<R[number], Plugins, "values", undefined>>
+				ValuesCarried<WriteEncoded<R[number], Plugins, "values", undefined>, E>
 		  >
 		| Fragment<
 				ValuesText<
@@ -227,9 +238,31 @@ export interface SqlApi<
 				>,
 				readonly unknown[],
 				ValuesCarried<
-					SentRows<WriteEncoded<R[number], Plugins, "values", undefined>>
+					SentRows<WriteEncoded<R[number], Plugins, "values", undefined>>,
+					E
 				>
 		  >;
+	values<const T extends TableName<DB>, const R extends readonly unknown[]>(
+		table: T,
+		rows: R &
+			SameColumns<E, R> & {
+				readonly [I in keyof R]: R[I] extends WriteInput<
+					InsertInput<E, DB, TM, T>,
+					Plugins,
+					"values",
+					T
+				>
+					? NoExtraKeys<
+							R[I],
+							WriteInput<InsertInput<E, DB, TM, T>, Plugins, "values", T>
+						>
+					: never;
+			},
+	): Fragment<
+		ValuesText<WriteEncoded<R[number], Plugins, "values", T>, E>,
+		readonly unknown[],
+		ValuesCarried<WriteEncoded<R[number], Plugins, "values", T>, E>
+	>;
 
 	raw(text: string): Fragment<string, [], []>;
 }

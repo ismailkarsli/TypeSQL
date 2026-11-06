@@ -1,151 +1,62 @@
-export interface PrismaScalarToPg {
-	Int: "int4";
-	BigInt: "int8";
-	Float: "float8";
-	Decimal: "numeric";
-	String: "text";
-	Boolean: "bool";
-	DateTime: "timestamp";
-	Json: "jsonb";
-	Bytes: "bytea";
-}
+import type { MysqlColumns } from "./from-prisma-mysql.js";
+import type { Enums, PgColumns } from "./from-prisma-pg.js";
+import type { SqliteColumns } from "./from-prisma-sqlite.js";
+import type {
+	Get,
+	Models,
+	PrismaOverrides,
+	PrismaTypeMapLike,
+	TableName,
+} from "./model.js";
 
-export interface PrismaTypeMapLike {
-	readonly model: {
-		readonly [model: string]: {
-			readonly payload: { readonly scalars: object };
-			readonly fields: object;
-			readonly operations: object;
-		};
-	};
-}
-
-export type FieldOverride =
-	| string
-	| {
-			readonly column?: string;
-			readonly type?: string;
-			readonly nullable?: boolean;
-			readonly default?: boolean;
-	  };
-
-export type ModelOverride<Fields = {}> = {
-	readonly $table?: string;
-	readonly $schema?: string;
-} & { readonly [F in keyof Fields]?: FieldOverride };
-
-type KnownKeys<O, Allowed> = {
-	readonly [K in Exclude<keyof O, Allowed>]: never;
-};
-
-export type PrismaOverrides<
-	TM extends PrismaTypeMapLike = PrismaTypeMapLike,
-	O = {},
-> = {
-	readonly [M in keyof TM["model"]]?: ModelOverride<TM["model"][M]["fields"]> &
-		KnownKeys<Get<O, M>, keyof TM["model"][M]["fields"] | "$table" | "$schema">;
-} & { readonly $types?: { readonly [name: string]: string } } & KnownKeys<
-		O,
-		keyof TM["model"] | "$types"
-	>;
-
-export type Models<TM extends PrismaTypeMapLike> = TM["model"];
-export type Scalars<M> = M extends { payload: { scalars: infer S } }
-	? S
-	: never;
-export type Fields<M> = M extends { fields: infer F } ? F : never;
-export type TypeName<R> = R extends {
-	readonly typeName: infer T extends string;
-}
-	? T
-	: never;
-export type Get<O, K> = K extends keyof O ? O[K] : undefined;
-
-export type OptionalCreateKeys<M> = M extends {
-	operations: { createMany: { args: { data: infer D } } };
-}
-	? Exclude<D, readonly unknown[]> extends infer I
-		? { [K in keyof I]-?: {} extends Pick<I, K> ? K : never }[keyof I]
-		: never
+/**
+ * The PostgreSQL schema of a Prisma client's `Prisma.TypeMap`: a model with
+ * a `$schema` override is a table of that namespace, and enums are types.
+ */
+export type FromPrisma<
+	TM extends PrismaTypeMapLike,
+	Overrides extends PrismaOverrides<TM, Overrides> = {},
+> = TopLevel<TM, Overrides> &
+	Namespaced<TM, Overrides> & { $types: Enums<TM, Overrides> } extends infer DB
+	? { [K in keyof DB]: DB[K] }
 	: never;
 
-export type NullableKeys<M> = M extends {
-	operations: { findMany: { args: { orderBy?: infer O } } };
+export type FromPrismaMysql<
+	TM extends PrismaTypeMapLike,
+	Overrides extends PrismaOverrides<TM, Overrides> = {},
+> = Tables<TM, Overrides, "mysql">;
+
+export type FromPrismaSqlite<
+	TM extends PrismaTypeMapLike,
+	Overrides extends PrismaOverrides<TM, Overrides> = {},
+> = Tables<TM, Overrides, "sqlite">;
+
+type Dialect = "postgres" | "mysql" | "sqlite";
+
+// Each dialect's columns are a mapped type of their own: one whose column
+// type depends on the dialect costs more to check.
+type Columns<M, MO, D extends Dialect> = D extends "mysql"
+	? MysqlColumns<M, MO>
+	: D extends "sqlite"
+		? SqliteColumns<M, MO>
+		: PgColumns<M, MO>;
+
+// A model Prisma can't create rows of is a view.
+type TableOf<M, MO, D extends Dialect> = M extends {
+	operations: { createMany: unknown };
 }
-	? Exclude<O, readonly unknown[] | undefined> extends infer I
-		? { [K in keyof I]-?: { sort: "asc" } extends I[K] ? K : never }[keyof I]
-		: never
-	: never;
+	? Columns<M, MO, D>
+	: { readonly $view: Columns<M, MO, D> };
 
-type PgOf<T extends string> = T extends keyof PrismaScalarToPg
-	? PrismaScalarToPg[T]
-	: T;
-type ElemName<T extends string> = T extends `${infer E}[]` ? E : T;
-type IsList<T extends string> = T extends `${string}[]` ? true : false;
-
-export type ColumnName<F, O> = O extends {
-	readonly column: infer C extends string;
-}
-	? C
-	: F;
-type ListOf<T extends string, E extends string> =
-	IsList<T> extends true ? `${E}[]` : E;
-type ColumnType<T extends string, O> = ListOf<
-	T,
-	O extends string
-		? O
-		: O extends { readonly type: infer X extends string }
-			? X
-			: PgOf<ElemName<T>>
->;
-
-export type Column<
-	Type,
-	Nullable extends boolean,
-	Optional extends boolean,
-	O,
-> = (
-	O extends { readonly nullable: infer N extends boolean }
-		? N
-		: Nullable
-) extends infer N extends boolean
-	? {
-			readonly type: Type;
-			readonly nullable: N;
-			readonly hasDefault: O extends {
-				readonly default: infer D extends boolean;
-			}
-				? D
-				: N extends true
-					? false
-					: Optional;
-		}
-	: never;
-
-type ModelColumns<
-	M,
-	MO,
-	FS = Fields<M>,
-	Null = NullableKeys<M>,
-	Opt = OptionalCreateKeys<M>,
-> = {
-	-readonly [F in keyof FS as ColumnName<F, Get<MO, F>>]: Column<
-		ColumnType<TypeName<FS[F]>, Get<MO, F>>,
-		IsList<TypeName<FS[F]>> extends true ? true : F extends Null ? true : false,
-		F extends Opt ? true : false,
-		Get<MO, F>
+/** Every model as a top-level table. */
+type Tables<TM extends PrismaTypeMapLike, O, D extends Dialect> = {
+	-readonly [N in keyof Models<TM> as TableName<N, Get<O, N>>]: TableOf<
+		Models<TM>[N],
+		Get<O, N>,
+		D
 	>;
 };
 
-type TableOf<M, MO> = M extends { operations: { createMany: unknown } }
-	? ModelColumns<M, MO>
-	: { readonly $view: ModelColumns<M, MO> };
-
-export type TableName<N, MO> = MO extends {
-	readonly $table: infer T extends string;
-}
-	? T
-	: N & string;
 type SchemaName<MO> = MO extends { readonly $schema: infer S extends string }
 	? S extends "public"
 		? never
@@ -155,7 +66,7 @@ type SchemaName<MO> = MO extends { readonly $schema: infer S extends string }
 type TopLevel<TM extends PrismaTypeMapLike, O> = {
 	-readonly [N in keyof Models<TM> as [SchemaName<Get<O, N>>] extends [never]
 		? TableName<N, Get<O, N>>
-		: never]: TableOf<Models<TM>[N], Get<O, N>>;
+		: never]: TableOf<Models<TM>[N], Get<O, N>, "postgres">;
 };
 type Namespaced<TM extends PrismaTypeMapLike, O> = {
 	-readonly [S in {
@@ -163,43 +74,6 @@ type Namespaced<TM extends PrismaTypeMapLike, O> = {
 	}[keyof Models<TM>]]: {
 		-readonly [N in keyof Models<TM> as SchemaName<Get<O, N>> extends S
 			? TableName<N, Get<O, N>>
-			: never]: TableOf<Models<TM>[N], Get<O, N>>;
+			: never]: TableOf<Models<TM>[N], Get<O, N>, "postgres">;
 	};
 };
-
-type EnumEntries<TM extends PrismaTypeMapLike> = {
-	[N in keyof Models<TM>]: ModelEnums<
-		Fields<Models<TM>[N]>,
-		Scalars<Models<TM>[N]>
-	>;
-}[keyof Models<TM>];
-type ModelEnums<FS, S> = {
-	[F in keyof FS]: ElemName<TypeName<FS[F]>> extends infer E extends string
-		? E extends keyof PrismaScalarToPg
-			? never
-			: {
-					name: E;
-					values: Exclude<Get<S, F>, null> extends infer V
-						? V extends readonly (infer X)[]
-							? X
-							: V
-						: never;
-				}
-		: never;
-}[keyof FS];
-type Enums<TM extends PrismaTypeMapLike, O> = {
-	-readonly [E in EnumEntries<TM> as E["name"]]: E["name"] extends keyof Get<
-		O,
-		"$types"
-	>
-		? Get<O, "$types">[E["name"]]
-		: E["values"];
-};
-
-export type FromPrisma<
-	TM extends PrismaTypeMapLike,
-	Overrides extends PrismaOverrides<TM, Overrides> = {},
-> = TopLevel<TM, Overrides> &
-	Namespaced<TM, Overrides> & { $types: Enums<TM, Overrides> } extends infer DB
-	? { [K in keyof DB]: DB[K] }
-	: never;

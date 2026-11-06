@@ -1,15 +1,21 @@
 import type { NarrowKeys, NarrowLevel } from "../../../engine/narrow.js";
+import type { Next } from "../../../engine/next.js";
+import type { IsUnion, Or } from "../../../engine/object.js";
 import type {
 	ColInfo,
 	ColMap,
 	Cols,
-	Ctx,
 	Info,
-	MkCtx,
 	Scope,
 	ScopeLevel,
 } from "../../../engine/types.js";
 import type { AnyErr, SqlError } from "../../../errors.js";
+import type {
+	JsonT,
+	KnownType,
+	StrT,
+	TypeFact,
+} from "../../schema/type-facts.js";
 import type {
 	Call,
 	CaseWhen,
@@ -20,33 +26,31 @@ import type {
 	VariadicArg,
 	XmlExpr,
 } from "../ast.js";
-import type { HasStar, TypeDisplay } from "../binder/clauses.js";
+import type { HasStar } from "../binder/clauses.js";
 import type { ResolveColumn, WholeRow } from "../binder/resolve.js";
+import type { SchemaTypes } from "../db.js";
 import type { BuildObject, JsonArrow, JsonLitCast, LitType } from "../json.js";
-import type { Nx } from "../parser/util.js";
-import type {
-	NoSubscript,
-	UnionToIntersection,
-	WidthCheck,
-} from "../project/dml.js";
+import type { NumLitType } from "../literals.js";
+import type { CompareOp, JsonGetOp, NonBoolOp } from "../ops.js";
 import type { ProjectSelect } from "../project/select.js";
 import type {
 	ArrInfo,
 	BaseOf,
 	ElemNull,
 	HasNullElems,
+	LitToText,
 	ObjShape,
 	Shaped,
+	TypeDisplay,
 } from "../shape.js";
+import type { Ctx, MkCtx } from "../types.js";
+import type { WidthCheck } from "../util.js";
 import type { AnyNullable, CallType, CommonOf } from "./catalog.js";
 import type {
 	BinOpType,
-	CommonLit,
-	LitToText,
-	NumLitType,
-	Or,
-	StrT,
+	SelectCommon,
 	Unmatchable,
+	UnmatchedErr,
 	UnOpType,
 } from "./operators.js";
 import type { SqlJsonExpr, TypeSqlJson } from "./sqljson.js";
@@ -80,7 +84,7 @@ export type TypeOf<E extends Expr, C extends Ctx> =
 															readonly t: "param";
 															readonly n: infer N;
 														}
-														? Info<E["to"], ParamNullable<C["db"], N>>
+														? ArrInfo<E["to"], ParamNullable<C["db"], N>, true>
 														: E["e"] extends {
 																	readonly t: "str";
 																	readonly v: infer V extends string;
@@ -259,7 +263,7 @@ type TypeQuant<
 > = A extends ColInfo
 	? B extends ColInfo
 		? R extends "expr"
-			? B["type"] extends ScalarType
+			? B["type"] extends KnownType
 				? SqlError<"op ANY/ALL (array) requires array on right side", null>
 				: QuantOp<Op, A, B>
 			: QuantOp<Op, A, B>
@@ -271,29 +275,7 @@ type QuantOp<
 	B extends ColInfo,
 > = Op extends NonBoolOp
 	? SqlError<"op ANY/ALL (array) requires operator to yield boolean", null>
-	: Info<"bool", Or<A["nullable"], B["nullable"]>>;
-type ScalarType =
-	| "int2"
-	| "int4"
-	| "int8"
-	| "numeric"
-	| "float4"
-	| "float8"
-	| "bool"
-	| "text"
-	| "varchar"
-	| "bpchar"
-	| "date"
-	| "time"
-	| "timetz"
-	| "timestamp"
-	| "timestamptz"
-	| "interval"
-	| "uuid"
-	| "bytea"
-	| "json"
-	| "jsonb";
-type NonBoolOp = "+" | "-" | "*" | "/" | "%" | "^" | "||";
+	: Info<"bool", Or<Or<A["nullable"], B["nullable"]>, HasNullElems<B>>>;
 
 type StringResult<A, B, D> = A extends ColInfo
 	? B extends ColInfo | null
@@ -397,7 +379,7 @@ type PairwiseOp<
 		? NoCompare<Op, L["type"], R["type"]> extends infer Err extends AnyErr
 			? Err
 			: BinOpType<Op, L, R>["type"] extends "bool" | "unknown"
-				? PairwiseOp<Op, LR, RR, Nx<I>>
+				? PairwiseOp<Op, LR, RR, Next<I>>
 				: SqlError<
 						`row comparison operator must yield type boolean, not type ${TypeDisplay<BinOpType<Op, L, R>["type"]>}`,
 						null
@@ -411,7 +393,6 @@ type PairwiseOp<
 					`could not determine interpretation of row comparison operator ${Op}`,
 					null
 				>;
-type CompareOp = "=" | "<>" | "!=" | "<" | ">" | "<=" | ">=";
 /**
  * PostgreSQL has no comparison operator between two of the categories that
  * never share a common type, and casts neither side to the other implicitly.
@@ -457,7 +438,7 @@ type TypeBinOperands<
 		? TypeOperand<R, C> extends infer RT extends ColInfo
 			? NoCompare<Op, LT["type"], RT["type"]> extends infer Err extends AnyErr
 				? Err
-				: Op extends "->" | "#>"
+				: Op extends JsonGetOp
 					? JsonArrow<Op, LT, R, RT> extends infer J extends ColInfo
 						? J
 						: BinOpType<Op, LT, RT>
@@ -504,8 +485,8 @@ type CastItemsNull<Items, C extends Ctx> = Items extends readonly Expr[]
 type TypeOfCast<To extends string, E extends Expr, C extends Ctx> =
 	TypeOf<E, C> extends infer T extends ColInfo
 		? ArrInfo<
-				To extends "json" | "jsonb"
-					? T["type"] extends Shaped<"json" | "jsonb", infer S>
+				To extends JsonT
+					? T["type"] extends Shaped<JsonT, infer S>
 						? Shaped<To, S>
 						: To
 					: To,
@@ -513,7 +494,7 @@ type TypeOfCast<To extends string, E extends Expr, C extends Ctx> =
 				HasNullElems<T>
 			>
 		: TypeOf<E, C>;
-type LitCast<To extends string, V extends string> = To extends "json" | "jsonb"
+type LitCast<To extends string, V extends string> = To extends JsonT
 	? JsonLitCast<To, V> extends infer J extends string
 		? J
 		: To
@@ -545,7 +526,9 @@ type TypeArrayCtor<
 > = Items extends readonly [] ? EmptyArrayErr : TypeArrayItems<Items, C>;
 type TypeArrayItems<Items extends readonly Expr[], C extends Ctx> =
 	TypeList<Items, C, [], true> extends infer Ls extends readonly ColInfo[]
-		? ArrInfo<ArrayTypeOf<CommonOf<Ls, "unknown">>, false, AnyElemNull<Ls>>
+		? CommonOf<Ls> extends infer T extends string
+			? ArrInfo<ArrayTypeOf<T>, false, AnyElemNull<Ls>>
+			: UnmatchedErr<"ARRAY", CommonOf<Ls>>
 		: TypeList<Items, C, [], true>;
 /** A NULL item is a NULL element; a NULL sub-array adds no elements. */
 type AnyElemNull<Ls extends readonly ColInfo[]> = Ls extends readonly [
@@ -571,16 +554,13 @@ type TypeIdx<E extends Expr, I extends Expr, C extends Ctx> =
 						? ArrInfo<`${El}[]`, Or<B["nullable"], N>, HasNullElems<A>>
 						: never
 					: Info<El, true>
-				: BaseOf<A["type"]> extends NoSubscript | EnumName<C["db"]>
-					? NoSubscriptErr<A["type"]>
-					: JsonArrow<"->", A, I, B> extends infer J extends ColInfo
-						? J
-						: Info<
-								BaseOf<A["type"]> extends keyof SubscriptElem
-									? SubscriptElem[BaseOf<A["type"]>]
-									: "unknown",
-								true
-							>
+				: SubscriptOf<A["type"], C["db"]> extends infer E
+					? E extends AnyErr
+						? E
+						: JsonArrow<"->", A, I, B> extends infer J extends ColInfo
+							? J
+							: Info<E extends string ? E : "unknown", true>
+					: never
 			: TypeOf<I, C>
 		: TypeOf<E, C>;
 type ChainOverArray<E extends Expr, C extends Ctx> =
@@ -610,25 +590,25 @@ type ChainNullable<E extends Expr, C extends Ctx> = E extends {
 	: TypeOf<E, C> extends infer T
 		? NullableOpt<T>
 		: never;
-type EnumName<DB> = DB extends { readonly $types: infer T } ? keyof T : never;
 type ChainSliced<E> =
 	E extends Tag<"slice">
 		? true
 		: E extends { readonly t: "idx"; readonly e: infer X }
 			? ChainSliced<X>
 			: false;
-type SubscriptElem = {
-	jsonb: "jsonb";
-	point: "float8";
-	line: "float8";
-	lseg: "point";
-	box: "point";
-	name: "char";
-};
-type NoSubscriptErr<T extends string> = SqlError<
-	`cannot subscript type ${TypeDisplay<T>} because it does not support subscripting`,
-	null
->;
+/**
+ * What a subscript of type T gives (its `sub` fact, null when the table has
+ * none), or PostgreSQL's error for a type without subscripting, enums included.
+ */
+type SubscriptOf<T extends string, DB> =
+	TypeFact<BaseOf<T>, "sub", null> extends infer E
+		? [E, BaseOf<T>] extends [false, string] | [unknown, keyof SchemaTypes<DB>]
+			? SqlError<
+					`cannot subscript type ${TypeDisplay<T>} because it does not support subscripting`,
+					null
+				>
+			: E
+		: never;
 type TypeSlice<
 	E extends Expr,
 	Lo extends Expr | null,
@@ -646,19 +626,21 @@ type TypeSlice<
 								HasNullElems<A>
 							>
 						: never
-					: BaseOf<A["type"]> extends NoSubscript | EnumName<C["db"]>
-						? NoSubscriptErr<A["type"]>
-						: BaseOf<A["type"]> extends "jsonb"
-							? SqlError<"jsonb subscript does not support slices", null>
-							: BaseOf<A["type"]> extends keyof SubscriptElem
-								? SqlError<
-										"slices of fixed-length arrays not implemented",
-										null
-									>
-								: Info<
-										A["type"],
-										Or<A["nullable"], Or<NullableOpt<B>, NullableOpt<D>>>
-									>
+					: SubscriptOf<A["type"], C["db"]> extends infer E
+						? E extends AnyErr
+							? E
+							: BaseOf<A["type"]> extends "jsonb"
+								? SqlError<"jsonb subscript does not support slices", null>
+								: E extends string
+									? SqlError<
+											"slices of fixed-length arrays not implemented",
+											null
+										>
+									: Info<
+											A["type"],
+											Or<A["nullable"], Or<NullableOpt<B>, NullableOpt<D>>>
+										>
+						: never
 				: TypeOpt<Hi, C>
 			: TypeOpt<Lo, C>
 		: TypeOf<E, C>;
@@ -742,7 +724,6 @@ type StarCol<M extends ColMap, TooMany extends string> = [keyof M] extends [
 	: IsUnion<keyof M> extends true
 		? SqlError<TooMany, null>
 		: M[keyof M];
-type IsUnion<U> = [U] extends [UnionToIntersection<U>] ? false : true;
 
 type TypeCase<
 	Operand extends Expr | null,
@@ -788,18 +769,9 @@ type TypeWhens<
 ]
 	? TypeOf<W["when"], C> extends ColInfo
 		? TypeOperand<W["then"], C> extends infer TT extends ColInfo
-			? Unmatchable<T, TT["type"]> extends true
-				? SqlError<
-						`CASE types ${TypeDisplay<T>} and ${TypeDisplay<TT["type"]>} cannot be matched`,
-						null
-					>
-				: TypeWhens<
-						R,
-						C,
-						CommonLit<T, TT["type"]>,
-						Or<N, TT["nullable"]>,
-						Or<NE, HasNullElems<TT>>
-					>
+			? SelectCommon<T, TT["type"]> extends infer T2 extends string
+				? TypeWhens<R, C, T2, Or<N, TT["nullable"]>, Or<NE, HasNullElems<TT>>>
+				: UnmatchedErr<"CASE", SelectCommon<T, TT["type"]>>
 			: TypeOperand<W["then"], C>
 		: TypeOf<W["when"], C>
 	: readonly [T, N, NE];

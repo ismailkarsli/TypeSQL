@@ -1,14 +1,16 @@
+import type { Next } from "../../../engine/next.js";
+import type { Toks } from "../../../engine/tokens.js";
+import type { NormalizeTypeName } from "../../schema/normalize.js";
+import type { IsTest, Tag } from "../ast.js";
 import type {
 	IdTok,
 	NumTok,
 	OpTok,
 	ParamTok,
 	StrTok,
-	Toks,
 	WordTok,
-} from "../../../engine/tokens.js";
-import type { NormalizeTypeName } from "../../schema/normalize.js";
-import type { IsTest, Tag } from "../ast.js";
+} from "../lexer/tokens.js";
+import type { CompareOp } from "../ops.js";
 import type { JsonFuncWord, ParseJsonFunc, SkipUniqueKeys } from "./json.js";
 import type {
 	NotBareLabel,
@@ -37,7 +39,6 @@ import type {
 	Expected,
 	Fail,
 	FuncName,
-	Nx,
 	Nx2,
 	Nx3,
 	Ok,
@@ -135,15 +136,15 @@ export type ParseExpr<
 	Min extends MinPrec = 0,
 > =
 	T[I] extends ParamTok<infer N>
-		? T[Nx<I>] extends OpTok<Terminator> | undefined
-			? Ok<ParamNode<N>, Nx<I>>
-			: ParseInfix<T, ParamNode<N>, Nx<I>, Min>
+		? T[Next<I>] extends OpTok<Terminator> | undefined
+			? Ok<ParamNode<N>, Next<I>>
+			: ParseInfix<T, ParamNode<N>, Next<I>, Min>
 		: T[I] extends WordTok | IdTok
 			? T[I] extends WordTok<PrefixKeyword>
 				? ParseExprSlow<T, I, Min>
-				: ColumnPrefix<T[I], T[Nx<I>], T[Nx2<I>], T[Nx3<I>]> extends infer P
+				: ColumnPrefix<T[I], T[Next<I>], T[Nx2<I>], T[Nx3<I>]> extends infer P
 					? P extends [infer L, infer N]
-						? ParseInfix<T, L, N extends 1 ? Nx<I> : Nx3<I>, Min>
+						? ParseInfix<T, L, N extends 1 ? Next<I> : Nx3<I>, Min>
 						: ParseExprSlow<T, I, Min>
 					: never
 			: ParseExprSlow<T, I, Min>;
@@ -194,7 +195,6 @@ type NextPrec = {
 	13: 13;
 };
 
-type ComparisonOp = "=" | "<" | ">" | "<=" | ">=" | "<>" | "!=";
 type NotPrefixOp =
 	| "/"
 	| "%"
@@ -224,9 +224,9 @@ type ParseInfix<T extends Toks, L, I extends number, Min extends MinPrec> =
 			? T[I] extends WordTok<infer W>
 				? W extends NotBareLabel
 					? ParseInfixAt<T, L, I, Min>
-					: T[Nx<I>] extends OpTok<",">
+					: T[Next<I>] extends OpTok<",">
 						? Ok<L, I>
-						: EndsTargetList<T, Nx<I>> extends true
+						: EndsTargetList<T, Next<I>> extends true
 							? Ok<L, I>
 							: ParseInfixAt<T, L, I, Min>
 				: ParseInfixAt<T, L, I, Min>
@@ -244,7 +244,7 @@ type InfixAction<H, Min extends MinPrec> =
 					? "subscript"
 					: O extends "."
 						? "field"
-						: O extends ComparisonOp
+						: O extends CompareOp
 							? Binds<5, Min> extends true
 								? "comparison"
 								: "done"
@@ -295,37 +295,39 @@ type InfixOps<
 	O extends string,
 > = {
 	done: Ok<L, I>;
-	cast: ParseCastSuffix<T, L, Nx<I>, Min>;
+	cast: ParseCastSuffix<T, L, Next<I>, Min>;
 	subscript: L extends Indirectable | Tag<"col" | "param">
-		? ParseSubscript<T, L, Nx<I>, Min>
+		? ParseSubscript<T, L, Next<I>, Min>
 		: Ok<L, I>;
-	field: L extends Indirectable ? ParseFieldAccess<T, L, Nx<I>, Min> : Ok<L, I>;
-	comparison: ParseComparisonRhs<T, L, O, Nx<I>, Min>;
-	add: BinRhs<T, L, O, 8, I, Nx<I>, Min>;
-	multiply: BinRhs<T, L, O, 9, I, Nx<I>, Min>;
-	power: BinRhs<T, L, O, 10, I, Nx<I>, Min>;
-	binary: BinRhs<T, L, O, 7, I, Nx<I>, Min>;
-	and: ParseChain<T, "and", 3, [L], Nx<I>, Min>;
-	or: ParseChain<T, "or", 2, [L], Nx<I>, Min>;
-	is: ParseIs<T, L, Nx<I>, Min>;
-	isnull: ParseInfix<T, IsTest_<L, "null", false>, Nx<I>, Min>;
-	notnull: ParseInfix<T, IsTest_<L, "null", true>, Nx<I>, Min>;
-	not: ParseNegated<T, L, Nx<I>, Min, I>;
-	in: ParseIn<T, L, Nx<I>, Min, false>;
-	like: ParseLike<T, L, Nx<I>, Min, "like", false>;
-	ilike: ParseLike<T, L, Nx<I>, Min, "ilike", false>;
-	similar: EatWord<T, Nx<I>, "to"> extends never
+	field: L extends Indirectable
+		? ParseFieldAccess<T, L, Next<I>, Min>
+		: Ok<L, I>;
+	comparison: ParseComparisonRhs<T, L, O, Next<I>, Min>;
+	add: BinRhs<T, L, O, 8, I, Next<I>, Min>;
+	multiply: BinRhs<T, L, O, 9, I, Next<I>, Min>;
+	power: BinRhs<T, L, O, 10, I, Next<I>, Min>;
+	binary: BinRhs<T, L, O, 7, I, Next<I>, Min>;
+	and: ParseChain<T, "and", 3, [L], Next<I>, Min>;
+	or: ParseChain<T, "or", 2, [L], Next<I>, Min>;
+	is: ParseIs<T, L, Next<I>, Min>;
+	isnull: ParseInfix<T, IsTest_<L, "null", false>, Next<I>, Min>;
+	notnull: ParseInfix<T, IsTest_<L, "null", true>, Next<I>, Min>;
+	not: ParseNegated<T, L, Next<I>, Min, I>;
+	in: ParseIn<T, L, Next<I>, Min, false>;
+	like: ParseLike<T, L, Next<I>, Min, "like", false>;
+	ilike: ParseLike<T, L, Next<I>, Min, "ilike", false>;
+	similar: EatWord<T, Next<I>, "to"> extends never
 		? Ok<L, I>
 		: ParseLike<T, L, Nx2<I>, Min, "similar", false>;
-	between: ParseBetween<T, L, Nx<I>, Min, false>;
-	at: ParseAtTimeZone<T, L, Nx<I>, Min>;
-	collate: ParseCollate<T, L, Nx<I>, Min>;
-	operator: ParseOperatorSyntax<T, L, Nx<I>, Min, I>;
+	between: ParseBetween<T, L, Next<I>, Min, false>;
+	at: ParseAtTimeZone<T, L, Next<I>, Min>;
+	collate: ParseCollate<T, L, Next<I>, Min>;
+	operator: ParseOperatorSyntax<T, L, Next<I>, Min, I>;
 	overlaps: L extends {
 		readonly t: "row";
 		readonly items: infer Ls extends readonly unknown[];
 	}
-		? ParseOverlaps<T, Ls, Nx<I>, Min>
+		? ParseOverlaps<T, Ls, Next<I>, Min>
 		: Ok<L, I>;
 };
 
@@ -339,7 +341,7 @@ type NonAssoc<
 	P extends 4 | 5 | 6,
 > = PrecAt<T, J> extends P ? SyntaxErrorAt<T, J> : ParseInfix<T, L, J, Min>;
 type PrecAt<T extends Toks, J extends number> =
-	T[J] extends OpTok<ComparisonOp>
+	T[J] extends OpTok<CompareOp>
 		? 5
 		: T[J] extends WordTok<infer W>
 			? W extends "is" | "isnull" | "notnull"
@@ -347,7 +349,7 @@ type PrecAt<T extends Toks, J extends number> =
 				: W extends Prec6Word
 					? 6
 					: W extends "not"
-						? T[Nx<J>] extends WordTok<Prec6Word>
+						? T[Next<J>] extends WordTok<Prec6Word>
 							? 6
 							: 0
 						: 0
@@ -372,12 +374,12 @@ type ParseChain<
 	ParseExpr<T, I, P> extends Ok<infer E, infer J>
 		? T[J] extends WordTok<Op>
 			? Min extends "target"
-				? T[Nx<J>] extends OpTok<",">
+				? T[Next<J>] extends OpTok<",">
 					? Ok<Balance<[...Items, E], Op>, J>
-					: EndsTargetList<T, Nx<J>> extends true
+					: EndsTargetList<T, Next<J>> extends true
 						? Ok<Balance<[...Items, E], Op>, J>
-						: ParseChain<T, Op, P, [...Items, E], Nx<J>, Min>
-				: ParseChain<T, Op, P, [...Items, E], Nx<J>, Min>
+						: ParseChain<T, Op, P, [...Items, E], Next<J>, Min>
+				: ParseChain<T, Op, P, [...Items, E], Next<J>, Min>
 			: ParseInfix<T, Balance<[...Items, E], Op>, J, Min>
 		: ParseExpr<T, I, P>;
 type Balance<
@@ -405,9 +407,9 @@ type BinRhs<
 > =
 	Binds<Bp, Min> extends true
 		? T[I] extends WordTok<infer Q extends "any" | "some" | "all">
-			? T[Nx<I>] extends OpTok<"(">
+			? T[Next<I>] extends OpTok<"(">
 				? ParseQuantified<T, L, O, Q extends "all" ? "all" : "any", Nx2<I>, Min>
-				: SyntaxErrorAt<T, Nx<I>>
+				: SyntaxErrorAt<T, Next<I>>
 			: ParseExpr<T, I, NextPrec[Bp]> extends Ok<infer Rhs, infer J>
 				? ParseInfix<T, BinNode<O, L, Rhs>, J, Min>
 				: ParseExpr<T, I, NextPrec[Bp]>
@@ -421,9 +423,9 @@ type ParseComparisonRhs<
 	Min extends MinPrec,
 > =
 	T[I] extends WordTok<infer Q extends "any" | "some" | "all">
-		? T[Nx<I>] extends OpTok<"(">
+		? T[Next<I>] extends OpTok<"(">
 			? ParseQuantified<T, L, O, Q extends "all" ? "all" : "any", Nx2<I>, Min>
-			: SyntaxErrorAt<T, Nx<I>>
+			: SyntaxErrorAt<T, Next<I>>
 		: ParseExpr<T, I, 6> extends Ok<infer Rhs, infer J>
 			? NonAssoc<T, BinNode<O, L, Rhs>, J, Min, 5>
 			: ParseExpr<T, I, 6>;
@@ -439,7 +441,7 @@ type ParseQuantified<
 	ParseSelectStmt<T, I> extends Ok<infer S, infer J>
 		? EatOp<T, J, ")"> extends never
 			? ParseQuantifiedExpr<T, L, O, Q, I, Min>
-			: ParseInfix<T, QuantNode<L, O, Q, S>, Nx<J>, Min>
+			: ParseInfix<T, QuantNode<L, O, Q, S>, Next<J>, Min>
 		: ParseQuantifiedExpr<T, L, O, Q, I, Min>;
 type ParseQuantifiedExpr<
 	T extends Toks,
@@ -452,7 +454,7 @@ type ParseQuantifiedExpr<
 	ParseExpr<T, I, 0> extends Ok<infer A, infer J>
 		? EatOp<T, J, ")"> extends never
 			? Expected<'")"', T, J>
-			: ParseInfix<T, QuantNode<L, O, Q, A>, Nx<J>, Min>
+			: ParseInfix<T, QuantNode<L, O, Q, A>, Next<J>, Min>
 		: ParseExpr<T, I, 0>;
 
 type ParseCastSuffix<T extends Toks, L, I extends number, Min extends MinPrec> =
@@ -470,16 +472,16 @@ export type ParseBracket<T extends Toks, L, I extends number> =
 			? EatOp<T, J, "]"> extends never
 				? EatOp<T, J, ":"> extends never
 					? Expected<'"]"', T, J>
-					: ParseSliceHi<T, L, Ix, Nx<J>>
-				: Ok<IdxNode<L, Ix>, Nx<J>>
+					: ParseSliceHi<T, L, Ix, Next<J>>
+				: Ok<IdxNode<L, Ix>, Next<J>>
 			: ParseExpr<T, I, 0>
-		: ParseSliceHi<T, L, null, Nx<I>>;
+		: ParseSliceHi<T, L, null, Next<I>>;
 type ParseSliceHi<T extends Toks, L, Lo, I extends number> =
 	EatOp<T, I, "]"> extends never
 		? ParseExpr<T, I, 0> extends Ok<infer Hi, infer J>
 			? Close<T, J, SliceNode<L, Lo, Hi>, "]">
 			: ParseExpr<T, I, 0>
-		: Ok<SliceNode<L, Lo, null>, Nx<I>>;
+		: Ok<SliceNode<L, Lo, null>, Next<I>>;
 
 type ParseFieldAccess<
 	T extends Toks,
@@ -488,7 +490,7 @@ type ParseFieldAccess<
 	Min extends MinPrec,
 > =
 	T[I] extends OpTok<"*">
-		? ParseInfix<T, FieldNode<L, "*">, Nx<I>, Min>
+		? ParseInfix<T, FieldNode<L, "*">, Next<I>, Min>
 		: AnyLabel<T, I> extends [infer N, infer J extends number]
 			? ParseInfix<T, FieldNode<L, N>, J, Min>
 			: Expected<"field name", T, I>;
@@ -496,7 +498,7 @@ type ParseFieldAccess<
 type ParseIs<T extends Toks, L, I extends number, Min extends MinPrec> =
 	EatWord<T, I, "not"> extends never
 		? ParseIsBody<T, L, I, Min, false>
-		: ParseIsBody<T, L, Nx<I>, Min, true>;
+		: ParseIsBody<T, L, Next<I>, Min, true>;
 type ParseIsBody<
 	T extends Toks,
 	L,
@@ -506,16 +508,16 @@ type ParseIsBody<
 > =
 	T[I] extends WordTok<infer W>
 		? W extends "null" | "true" | "false" | "unknown"
-			? ParseInfix<T, IsTest_<L, W, Not>, Nx<I>, Min>
+			? ParseInfix<T, IsTest_<L, W, Not>, Next<I>, Min>
 			: W extends "document"
-				? ParseInfix<T, XmlIsDocument<L, Not>, Nx<I>, Min>
+				? ParseInfix<T, XmlIsDocument<L, Not>, Next<I>, Min>
 				: W extends "json"
 					? ParseInfix<
 							T,
 							IsJsonNode<L, Not>,
 							SkipUniqueKeys<
 								T,
-								SkipWord<T, Nx<I>, "value" | "scalar" | "array" | "object">
+								SkipWord<T, Next<I>, "value" | "scalar" | "array" | "object">
 							>,
 							Min
 						>
@@ -523,11 +525,11 @@ type ParseIsBody<
 						? ParseInfix<
 								T,
 								NotIf<CallOf<"is_normalized", [L]>, Not>,
-								Nx<I>,
+								Next<I>,
 								Min
 							>
 						: W extends "nfc" | "nfd" | "nfkc" | "nfkd"
-							? T[Nx<I>] extends WordTok<"normalized">
+							? T[Next<I>] extends WordTok<"normalized">
 								? ParseInfix<
 										T,
 										NotIf<
@@ -537,10 +539,10 @@ type ParseIsBody<
 										Nx2<I>,
 										Min
 									>
-								: Expected<"NORMALIZED", T, Nx<I>>
+								: Expected<"NORMALIZED", T, Next<I>>
 							: W extends "distinct"
-								? EatWord<T, Nx<I>, "from"> extends never
-									? Expected<"FROM", T, Nx<I>>
+								? EatWord<T, Next<I>, "from"> extends never
+									? Expected<"FROM", T, Next<I>>
 									: ParseExpr<T, Nx2<I>, 5> extends Ok<infer Rhs, infer J>
 										? NonAssoc<T, DistinctNode<L, Rhs, Not>, J, Min, 4>
 										: ParseExpr<T, Nx2<I>, 5>
@@ -561,15 +563,15 @@ type ParseNegated<
 > =
 	T[I] extends WordTok<infer W>
 		? W extends "in"
-			? ParseIn<T, L, Nx<I>, Min, true>
+			? ParseIn<T, L, Next<I>, Min, true>
 			: W extends "like" | "ilike"
-				? ParseLike<T, L, Nx<I>, Min, W, true>
+				? ParseLike<T, L, Next<I>, Min, W, true>
 				: W extends "similar"
-					? EatWord<T, Nx<I>, "to"> extends never
-						? Expected<"TO", T, Nx<I>>
+					? EatWord<T, Next<I>, "to"> extends never
+						? Expected<"TO", T, Next<I>>
 						: ParseLike<T, L, Nx2<I>, Min, "similar", true>
 					: W extends "between"
-						? ParseBetween<T, L, Nx<I>, Min, true>
+						? ParseBetween<T, L, Next<I>, Min, true>
 						: Ok<L, I0>
 		: Ok<L, I0>;
 
@@ -582,15 +584,15 @@ type ParseIn<
 > =
 	EatOp<T, I, "("> extends never
 		? Expected<'"("', T, I>
-		: IsSelectStart<T, Nx<I>> extends true
-			? ParseSelectStmt<T, Nx<I>> extends Ok<infer S, infer J>
+		: IsSelectStart<T, Next<I>> extends true
+			? ParseSelectStmt<T, Next<I>> extends Ok<infer S, infer J>
 				? EatOp<T, J, ")"> extends never
-					? T[Nx<I>] extends OpTok<"(">
-						? ParseInList<T, L, Nx<I>, Min, Not>
+					? T[Next<I>] extends OpTok<"(">
+						? ParseInList<T, L, Next<I>, Min, Not>
 						: Expected<'")"', T, J>
-					: ParseInfix<T, InSubNode<L, S, Not>, Nx<J>, Min>
-				: ParseSelectStmt<T, Nx<I>>
-			: ParseInList<T, L, Nx<I>, Min, Not>;
+					: ParseInfix<T, InSubNode<L, S, Not>, Next<J>, Min>
+				: ParseSelectStmt<T, Next<I>>
+			: ParseInList<T, L, Next<I>, Min, Not>;
 type ParseInList<
 	T extends Toks,
 	L,
@@ -601,7 +603,7 @@ type ParseInList<
 	ParseExprList<T, I, []> extends Ok<infer List, infer J>
 		? EatOp<T, J, ")"> extends never
 			? Expected<'")"', T, J>
-			: ParseInfix<T, InNode<L, List, Not>, Nx<J>, Min>
+			: ParseInfix<T, InNode<L, List, Not>, Next<J>, Min>
 		: ParseExprList<T, I, []>;
 
 type ParseLike<
@@ -615,7 +617,7 @@ type ParseLike<
 	T[I] extends WordTok<infer Q extends "any" | "some" | "all">
 		? Kind extends "similar"
 			? SyntaxErrorAt<T, I>
-			: T[Nx<I>] extends OpTok<"(">
+			: T[Next<I>] extends OpTok<"(">
 				? ParseQuantified<
 						T,
 						L,
@@ -624,13 +626,13 @@ type ParseLike<
 						Nx2<I>,
 						Min
 					>
-				: SyntaxErrorAt<T, Nx<I>>
+				: SyntaxErrorAt<T, Next<I>>
 		: ParseExpr<T, I, 7> extends Ok<infer Pat, infer J>
 			? EatWord<T, J, "escape"> extends never
 				? NonAssoc<T, LikeNode<L, Pat, Kind, Not>, J, Min, 6>
-				: ParseExpr<T, Nx<J>, 7> extends Ok<unknown, infer J2>
+				: ParseExpr<T, Next<J>, 7> extends Ok<unknown, infer J2>
 					? NonAssoc<T, LikeNode<L, Pat, Kind, Not>, J2, Min, 6>
-					: ParseExpr<T, Nx<J>, 7>
+					: ParseExpr<T, Next<J>, 7>
 			: ParseExpr<T, I, 7>;
 
 type LikeOp<Kind extends string, Not extends boolean> = Kind extends "ilike"
@@ -654,14 +656,14 @@ type ParseBetween<
 	>
 		? EatWord<T, J, "and"> extends never
 			? Expected<"AND", T, J>
-			: ParseExpr<T, Nx<J>, 7> extends Ok<infer Hi, infer J2>
+			: ParseExpr<T, Next<J>, 7> extends Ok<infer Hi, infer J2>
 				? NonAssoc<T, BetweenNode<L, Lo, Hi, Not>, J2, Min, 6>
-				: ParseExpr<T, Nx<J>, 7>
+				: ParseExpr<T, Next<J>, 7>
 		: ParseExpr<T, SkipWord<T, I, "symmetric" | "asymmetric">, 7>;
 
 type ParseAtTimeZone<T extends Toks, L, I extends number, Min extends MinPrec> =
 	T[I] extends WordTok<"local">
-		? ParseInfix<T, CallOf<"timezone", [L]>, Nx<I>, Min>
+		? ParseInfix<T, CallOf<"timezone", [L]>, Next<I>, Min>
 		: EatWords<T, I, ["time", "zone"]> extends never
 			? Expected<"TIME ZONE or LOCAL", T, I>
 			: ParseExpr<T, Nx2<I>, 11> extends Ok<infer Z, infer J>
@@ -714,18 +716,21 @@ type ParseOperatorSyntax<
 	I0 extends number,
 > =
 	T[I] extends OpTok<"(">
-		? QualOp<T, Nx<I>> extends [infer O extends string, infer J extends number]
+		? QualOp<T, Next<I>> extends [
+				infer O extends string,
+				infer J extends number,
+			]
 			? BinRhs<T, L, O, 7, I0, J, Min>
-			: SyntaxErrorAt<T, Extract<QualOp<T, Nx<I>>, number>>
+			: SyntaxErrorAt<T, Extract<QualOp<T, Next<I>>, number>>
 		: Ok<L, I0>;
 type QualOp<T extends Toks, I extends number> =
 	T[I] extends OpTok<infer O>
-		? T[Nx<I>] extends OpTok<")">
+		? T[Next<I>] extends OpTok<")">
 			? [O, Nx2<I>]
-			: Nx<I>
-		: T[Nx<I>] extends OpTok<".">
+			: Next<I>
+		: T[Next<I>] extends OpTok<".">
 			? QualOp<T, Nx2<I>>
-			: Nx<I>;
+			: Next<I>;
 type ParseQualPrefix<T extends Toks, I extends number> =
 	QualOp<T, I> extends [infer O, infer J extends number]
 		? ParseExpr<T, J, 8> extends Ok<infer E, infer J2>
@@ -758,23 +763,23 @@ type PrefixKeyword =
 
 type ParsePrefix<T extends Toks, I extends number> =
 	T[I] extends NumTok<infer V>
-		? Ok<NumNode<V>, Nx<I>>
+		? Ok<NumNode<V>, Next<I>>
 		: T[I] extends StrTok<infer V>
 			? T[I] extends { readonly bits: true }
-				? Ok<{ t: "typed"; type: "bit"; v: V; bits: true }, Nx<I>>
-				: Ok<StrNode<V>, Nx<I>>
+				? Ok<{ t: "typed"; type: "bit"; v: V; bits: true }, Next<I>>
+				: Ok<StrNode<V>, Next<I>>
 			: T[I] extends ParamTok<infer N>
-				? Ok<ParamNode<N>, Nx<I>>
+				? Ok<ParamNode<N>, Next<I>>
 				: T[I] extends OpTok<infer O>
 					? O extends "("
-						? ParseParen<T, Nx<I>>
+						? ParseParen<T, Next<I>>
 						: O extends "*"
-							? Ok<StarNode<null>, Nx<I>>
+							? Ok<StarNode<null>, Next<I>>
 							: O extends "["
-								? ParseArrayLiteral<T, Nx<I>>
+								? ParseArrayLiteral<T, Next<I>>
 								: O extends NotPrefixOp
 									? SyntaxErrorAt<T, I>
-									: ParseUnary<T, O, Nx<I>>
+									: ParseUnary<T, O, Next<I>>
 					: T[I] extends IdTok
 						? ParseNameExpr<T, I>
 						: T[I] extends WordTok<infer W>
@@ -786,29 +791,29 @@ type ParseKeywordPrefix<
 	I extends number,
 	W extends string,
 > = W extends ParenFormWord
-	? T[Nx<I>] extends OpTok<"(">
+	? T[Next<I>] extends OpTok<"(">
 		? ParenForms<T, Nx2<I>>[W]
 		: ParseNameExpr<T, I>
 	: W extends keyof PrefixWords
-		? Ok<PrefixWords[W], Nx<I>>
+		? Ok<PrefixWords[W], Next<I>>
 		: W extends "not"
-			? ParseUnary<T, "not", Nx<I>>
+			? ParseUnary<T, "not", Next<I>>
 			: W extends "case"
-				? ParseCase<T, Nx<I>>
+				? ParseCase<T, Next<I>>
 				: W extends "cast"
-					? ParseCast<T, Nx<I>>
+					? ParseCast<T, Next<I>>
 					: W extends "array"
-						? ParseArray<T, Nx<I>>
+						? ParseArray<T, Next<I>>
 						: W extends SpecialValueFunction
 							? ParseSpecialValue<T, W, I>
 							: W extends XmlFuncKeyword
-								? T[Nx<I>] extends OpTok<"(">
+								? T[Next<I>] extends OpTok<"(">
 									? ParseXmlFunc<T, W, Nx2<I>>
 									: ParseNameExpr<T, I>
 								: W extends ConstTypeWord
 									? ParseConstTypeLit<T, I>
 									: W extends "collation"
-										? T[Nx<I>] extends WordTok<"for">
+										? T[Next<I>] extends WordTok<"for">
 											? ParseCollationFor<T, Nx2<I>>
 											: ParseNameExpr<T, I>
 										: W extends ReservedKeyword
@@ -854,38 +859,38 @@ type ParseConstTypeLit<T extends Toks, I extends number> =
 				? ParseNameExpr<T, I>
 				: Ty extends "interval"
 					? ParseIntervalLit<T, I, V, J>
-					: Ok<TypedNode<Ty, V>, Nx<J>>
+					: Ok<TypedNode<Ty, V>, Next<J>>
 			: ParseNameExpr<T, I>
 		: ParseNameExpr<T, I>;
 
 type ParseIntervalLit<T extends Toks, I extends number, V, J extends number> =
-	T[Nx<I>] extends OpTok<"(">
-		? Ok<TypedNode<"interval", V>, Nx<J>>
-		: Nx<I> extends J
-			? IntervalFields<T, Nx<J>> extends infer K extends number
+	T[Next<I>] extends OpTok<"(">
+		? Ok<TypedNode<"interval", V>, Next<J>>
+		: Next<I> extends J
+			? IntervalFields<T, Next<J>> extends infer K extends number
 				? Ok<TypedNode<"interval", V>, K>
-				: IntervalFields<T, Nx<J>>
-			: SyntaxErrorAt<T, Nx<I>>;
+				: IntervalFields<T, Next<J>>
+			: SyntaxErrorAt<T, Next<I>>;
 
 type ParseCollationFor<T extends Toks, I extends number> =
 	EatOp<T, I, "("> extends never
 		? Expected<'"("', T, I>
-		: ParseExpr<T, Nx<I>, 0> extends Ok<infer E, infer J>
+		: ParseExpr<T, Next<I>, 0> extends Ok<infer E, infer J>
 			? Close<T, J, CallOf<"pg_collation_for", [E]>>
-			: ParseExpr<T, Nx<I>, 0>;
+			: ParseExpr<T, Next<I>, 0>;
 
 type ParseNormalize<T extends Toks, I extends number> =
 	ParseExpr<T, I, 0> extends Ok<infer E, infer J>
 		? T[J] extends OpTok<")">
-			? Ok<CallOf<"normalize", [E]>, Nx<J>>
+			? Ok<CallOf<"normalize", [E]>, Next<J>>
 			: T[J] extends OpTok<",">
-				? T[Nx<J>] extends WordTok<
+				? T[Next<J>] extends WordTok<
 						infer F extends "nfc" | "nfd" | "nfkc" | "nfkd"
 					>
 					? T[Nx2<J>] extends OpTok<")">
 						? Ok<CallOf<"normalize", [E, StrNode<Uppercase<F>>]>, Nx3<J>>
 						: Expected<'")"', T, Nx2<J>>
-					: Expected<"NFC, NFD, NFKC or NFKD", T, Nx<J>>
+					: Expected<"NFC, NFD, NFKC or NFKD", T, Next<J>>
 				: Expected<'")"', T, J>
 		: ParseExpr<T, I, 0>;
 
@@ -910,15 +915,15 @@ type PrecisionValueFunction =
 	| "localtimestamp";
 
 type ParseSpecialValue<T extends Toks, W extends string, I extends number> =
-	T[Nx<I>] extends OpTok<"(">
+	T[Next<I>] extends OpTok<"(">
 		? W extends "current_schema"
 			? ParseNameExpr<T, I>
 			: W extends PrecisionValueFunction
 				? ParsePrecision<T, Nx2<I>> extends infer J extends number
 					? SpecialValue<W, J>
 					: ParsePrecision<T, Nx2<I>>
-				: SyntaxErrorAt<T, Nx<I>>
-		: SpecialValue<W, Nx<I>>;
+				: SyntaxErrorAt<T, Next<I>>
+		: SpecialValue<W, Next<I>>;
 
 type SpecialValue<W extends string, J extends number> = Ok<
 	CallNode<W, [], false, null, false, null, null>,
@@ -944,7 +949,7 @@ type ParseParen<T extends Toks, I extends number> =
 					T[I] extends OpTok<"(">
 					? ParseParenExpr<T, I>
 					: Expected<'")"', T, J>
-				: Ok<SubNode<S>, Nx<J>>
+				: Ok<SubNode<S>, Next<J>>
 			: ParseSelectStmt<T, I>
 		: ParseParenExpr<T, I>;
 type ParseParenExpr<T extends Toks, I extends number> =
@@ -952,18 +957,18 @@ type ParseParenExpr<T extends Toks, I extends number> =
 		? EatOp<T, J, ")"> extends never
 			? EatOp<T, J, ","> extends never
 				? Expected<'")"', T, J>
-				: ParseExprList<T, Nx<J>, [E]> extends Ok<infer Items, infer J2>
+				: ParseExprList<T, Next<J>, [E]> extends Ok<infer Items, infer J2>
 					? Close<T, J2, RowNode<Items>>
-					: ParseExprList<T, Nx<J>, [E]>
-			: T[Nx<J>] extends OpTok<".">
+					: ParseExprList<T, Next<J>, [E]>
+			: T[Next<J>] extends OpTok<".">
 				? ParseParenField<T, E, Nx2<J>>
-				: T[Nx<J>] extends OpTok<"[">
+				: T[Next<J>] extends OpTok<"[">
 					? ParseSubscript<T, E, Nx2<J>, 13>
-					: Ok<E, Nx<J>>
+					: Ok<E, Next<J>>
 		: ParseExpr<T, I, 0>;
 type ParseParenField<T extends Toks, E, I extends number> =
 	T[I] extends OpTok<"*">
-		? Ok<FieldNode<E, "*">, Nx<I>>
+		? Ok<FieldNode<E, "*">, Next<I>>
 		: AnyLabel<T, I> extends [infer N, infer J extends number]
 			? Ok<FieldNode<E, N>, J>
 			: Expected<"field name", T, I>;
@@ -983,9 +988,9 @@ type ColumnPrefix<H, A, B, C> = H extends IdTok<infer N> | WordTok<infer N>
 	: null;
 
 type ParseNameExpr<T extends Toks, I extends number> =
-	ColumnPrefix<T[I], T[Nx<I>], T[Nx2<I>], T[Nx3<I>]> extends infer R
+	ColumnPrefix<T[I], T[Next<I>], T[Nx2<I>], T[Nx3<I>]> extends infer R
 		? R extends [infer E, infer N]
-			? Ok<E, N extends 1 ? Nx<I> : Nx3<I>>
+			? Ok<E, N extends 1 ? Next<I> : Nx3<I>>
 			: ParseNameExprSlow<T, I>
 		: never;
 
@@ -996,20 +1001,20 @@ type ParseNameExprSlow<T extends Toks, I extends number> =
 	]
 		? T[J] extends OpTok<"(">
 			? T[I] extends WordTok<infer W extends JsonFuncWord>
-				? T[Nx<I>] extends OpTok<"(">
+				? T[Next<I>] extends OpTok<"(">
 					? ParseJsonFunc<T, W, I>
-					: ParseCall<T, LastOf<Parts>, Nx<J>>
-				: ParseCall<T, LastOf<Parts>, Nx<J>>
+					: ParseCall<T, LastOf<Parts>, Next<J>>
+				: ParseCall<T, LastOf<Parts>, Next<J>>
 			: T[J] extends OpTok<".">
-				? T[Nx<J>] extends OpTok<"*">
+				? T[Next<J>] extends OpTok<"*">
 					? Ok<StarNode<LastOf<Parts>>, Nx2<J>>
-					: SyntaxErrorAt<T, Nx<J>>
+					: SyntaxErrorAt<T, Next<J>>
 				: T[J] extends StrTok<infer V>
 					? Parts["length"] extends 1 | 2
-						? Ok<TypedNode<NormalizeTypeName<LastOf<Parts>>, V>, Nx<J>>
+						? Ok<TypedNode<NormalizeTypeName<LastOf<Parts>>, V>, Next<J>>
 						: SyntaxErrorAt<T, J>
 					: Ok<ColRefOf<Parts>, J>
-		: SyntaxErrorAt<T, Nx<I>>;
+		: SyntaxErrorAt<T, Next<I>>;
 
 export type LastOf<Parts extends readonly string[]> = Parts extends readonly [
 	...string[],
@@ -1022,14 +1027,14 @@ type ColRefOf<Parts extends readonly string[]> =
 
 export type ParseCall<T extends Toks, Name extends string, I extends number> =
 	T[I] extends OpTok<")">
-		? ParseCallSuffix<T, Name, [], false, Nx<I>>
+		? ParseCallSuffix<T, Name, [], false, Next<I>>
 		: T[I] extends OpTok<"*">
-			? T[Nx<I>] extends OpTok<")">
+			? T[Next<I>] extends OpTok<")">
 				? ParseCallSuffix<T, Name, [StarNode<null>], false, Nx2<I>>
-				: SyntaxErrorAt<T, Nx<I>>
+				: SyntaxErrorAt<T, Next<I>>
 			: EatWord<T, I, "distinct"> extends never
 				? ParseCallArgs<T, Name, SkipWord<T, I, "all">, false>
-				: ParseCallArgs<T, Name, Nx<I>, true>;
+				: ParseCallArgs<T, Name, Next<I>, true>;
 
 type ParseCallArgs<
 	T extends Toks,
@@ -1041,7 +1046,7 @@ type ParseCallArgs<
 		? SkipAggOrderBy<T, J> extends infer J2 extends number
 			? EatOp<T, J2, ")"> extends never
 				? Expected<'")"', T, J2>
-				: ParseCallSuffix<T, Name, Args, Distinct, Nx<J2>>
+				: ParseCallSuffix<T, Name, Args, Distinct, Next<J2>>
 			: SkipAggOrderBy<T, J>
 		: ParseArgList<T, I, [], never>;
 
@@ -1052,15 +1057,15 @@ type ParseArgList<
 	Names extends string,
 > =
 	T[I] extends WordTok<"variadic">
-		? ParseArg<T, Nx<I>, Names> extends Ok<infer E, infer J>
+		? ParseArg<T, Next<I>, Names> extends Ok<infer E, infer J>
 			? Ok<[...Acc, VariadicNode<E>], J>
-			: ParseArg<T, Nx<I>, Names>
+			: ParseArg<T, Next<I>, Names>
 		: ParseArg<T, I, Names> extends Ok<infer E, infer J>
 			? EatOp<T, J, ","> extends never
 				? Ok<[...Acc, E], J>
 				: ParseArgList<
 						T,
-						Nx<J>,
+						Next<J>,
 						[...Acc, E],
 						| Names
 						| (E extends {
@@ -1072,7 +1077,7 @@ type ParseArgList<
 					>
 			: ParseArg<T, I, Names>;
 type ParseArg<T extends Toks, I extends number, Names extends string> =
-	T[Nx<I>] extends OpTok<"=>" | ":=">
+	T[Next<I>] extends OpTok<"=>" | ":=">
 		? ArgName<T, I> extends infer N extends string
 			? N extends Names
 				? Fail<`argument name "${N}" used more than once`, I>
@@ -1081,7 +1086,7 @@ type ParseArg<T extends Toks, I extends number, Names extends string> =
 					: ParseExpr<T, Nx2<I>, 0>
 			: T[I] extends WordTok<ReservedKeyword>
 				? SyntaxErrorAt<T, I>
-				: SyntaxErrorAt<T, Nx<I>>
+				: SyntaxErrorAt<T, Next<I>>
 		: [Names] extends [never]
 			? ParseExpr<T, I, 0>
 			: ParseExpr<T, I, 0> extends Ok<unknown, number>
@@ -1156,8 +1161,8 @@ type ParseWithinGroup<T extends Toks, I extends number> =
 export type ParseFilter<T extends Toks, I extends number> =
 	EatWord<T, I, "filter"> extends never
 		? Ok<null, I>
-		: EatOp<T, Nx<I>, "("> extends never
-			? Expected<'"("', T, Nx<I>>
+		: EatOp<T, Next<I>, "("> extends never
+			? Expected<'"("', T, Next<I>>
 			: EatWord<T, Nx2<I>, "where"> extends never
 				? Expected<"WHERE", T, Nx2<I>>
 				: ParseExpr<T, Nx3<I>, 0> extends Ok<infer E, infer J>
@@ -1167,11 +1172,11 @@ export type ParseFilter<T extends Toks, I extends number> =
 export type ParseOver<T extends Toks, I extends number> =
 	EatWord<T, I, "over"> extends never
 		? Ok<null, I>
-		: T[Nx<I>] extends OpTok<"(">
+		: T[Next<I>] extends OpTok<"(">
 			? ParseWindowSpec<T, Nx2<I>>
-			: T[Nx<I>] extends WordTok<infer W> | IdTok<infer W>
+			: T[Next<I>] extends WordTok<infer W> | IdTok<infer W>
 				? Ok<{ name: W; partition: []; order: [] }, Nx2<I>>
-				: Expected<"window specification", T, Nx<I>>;
+				: Expected<"window specification", T, Next<I>>;
 
 export type ParseWindowSpec<T extends Toks, I extends number> =
 	WindowBaseName<T, I> extends [infer Name, infer I1 extends number]
@@ -1201,11 +1206,11 @@ export type ParseWindowSpec<T extends Toks, I extends number> =
 		: never;
 type WindowBaseName<T extends Toks, I extends number> =
 	T[I] extends IdTok<infer V>
-		? [V, Nx<I>]
+		? [V, Next<I>]
 		: T[I] extends WordTok<infer W>
 			? W extends "partition" | "order" | "rows" | "range" | "groups"
 				? [null, I]
-				: [W, Nx<I>]
+				: [W, Next<I>]
 			: [null, I];
 type ParseWindowPartition<T extends Toks, I extends number> =
 	EatWords<T, I, ["partition", "by"]> extends never
@@ -1223,8 +1228,8 @@ type FrameInfo = { readonly kinds: unknown; readonly empty: boolean };
 type ParseFrame<T extends Toks, I extends number> =
 	EatWord<T, I, "rows" | "range" | "groups"> extends never
 		? Ok<{ kinds: never; empty: false }, I>
-		: EatWord<T, Nx<I>, "between"> extends never
-			? ParseFrameBound<T, Nx<I>> extends readonly [
+		: EatWord<T, Next<I>, "between"> extends never
+			? ParseFrameBound<T, Next<I>> extends readonly [
 					infer S,
 					infer J extends number,
 				]
@@ -1236,14 +1241,14 @@ type ParseFrame<T extends Toks, I extends number> =
 								I
 							>
 						: FrameExclusion<T, S, false, J>
-				: ParseFrameBound<T, Nx<I>>
+				: ParseFrameBound<T, Next<I>>
 			: ParseFrameBound<T, Nx2<I>> extends readonly [
 						infer S,
 						infer J extends number,
 					]
 				? EatWord<T, J, "and"> extends never
 					? Expected<"AND", T, J>
-					: ParseFrameBound<T, Nx<J>> extends readonly [
+					: ParseFrameBound<T, Next<J>> extends readonly [
 								infer E,
 								infer J2 extends number,
 							]
@@ -1259,7 +1264,7 @@ type ParseFrame<T extends Toks, I extends number> =
 											: false,
 									J2
 								>
-						: ParseFrameBound<T, Nx<J>>
+						: ParseFrameBound<T, Next<J>>
 				: ParseFrameBound<T, Nx2<I>>;
 type FrameExclusion<
 	T extends Toks,
@@ -1275,8 +1280,8 @@ type FrameExclusion<
 						? true
 						: EatWord<T, I, "exclude"> extends never
 							? false
-							: EatWords<T, Nx<I>, ["current", "row"]> extends never
-								? EatWord<T, Nx<I>, "group"> extends never
+							: EatWords<T, Next<I>, ["current", "row"]> extends never
+								? EatWord<T, Next<I>, "group"> extends never
 									? false
 									: true
 								: true;
@@ -1315,7 +1320,7 @@ type ParseFrameBound<T extends Toks, I extends number> =
 			? EatWords<T, I, ["current", "row"]> extends never
 				? ParseExpr<T, I, 0> extends Ok<unknown, infer J>
 					? T[J] extends WordTok<infer D extends "preceding" | "following">
-						? [D, Nx<J>]
+						? [D, Next<J>]
 						: Expected<"PRECEDING or FOLLOWING", T, J>
 					: ParseExpr<T, I, 0>
 				: ["current row", Nx2<I>]
@@ -1324,10 +1329,10 @@ type ParseFrameBound<T extends Toks, I extends number> =
 type SkipExclude<T extends Toks, I extends number> =
 	EatWord<T, I, "exclude"> extends never
 		? I
-		: EatWords<T, Nx<I>, ["current", "row"]> extends never
-			? EatWords<T, Nx<I>, ["no", "others"]> extends never
-				? EatWord<T, Nx<I>, "group" | "ties"> extends never
-					? Expected<"CURRENT ROW, GROUP, TIES or NO OTHERS", T, Nx<I>>
+		: EatWords<T, Next<I>, ["current", "row"]> extends never
+			? EatWords<T, Next<I>, ["no", "others"]> extends never
+				? EatWord<T, Next<I>, "group" | "ties"> extends never
+					? Expected<"CURRENT ROW, GROUP, TIES or NO OTHERS", T, Next<I>>
 					: Nx2<I>
 				: Nx3<I>
 			: Nx3<I>;
@@ -1348,30 +1353,30 @@ type ParseCaseWhens<
 		? EatWord<T, I, "else"> extends never
 			? EatWord<T, I, "end"> extends never
 				? Expected<"WHEN, ELSE or END", T, I>
-				: Ok<CaseNode<Operand, Acc, null>, Nx<I>>
-			: ParseExpr<T, Nx<I>, 0> extends Ok<infer E, infer J>
+				: Ok<CaseNode<Operand, Acc, null>, Next<I>>
+			: ParseExpr<T, Next<I>, 0> extends Ok<infer E, infer J>
 				? EatWord<T, J, "end"> extends never
 					? Expected<"END", T, J>
-					: Ok<CaseNode<Operand, Acc, E>, Nx<J>>
-				: ParseExpr<T, Nx<I>, 0>
-		: ParseExpr<T, Nx<I>, 0> extends Ok<infer W, infer J>
+					: Ok<CaseNode<Operand, Acc, E>, Next<J>>
+				: ParseExpr<T, Next<I>, 0>
+		: ParseExpr<T, Next<I>, 0> extends Ok<infer W, infer J>
 			? EatWord<T, J, "then"> extends never
 				? Expected<"THEN", T, J>
-				: ParseExpr<T, Nx<J>, 0> extends Ok<infer Th, infer J2>
+				: ParseExpr<T, Next<J>, 0> extends Ok<infer Th, infer J2>
 					? ParseCaseWhens<T, Operand, J2, [...Acc, { when: W; then: Th }]>
-					: ParseExpr<T, Nx<J>, 0>
-			: ParseExpr<T, Nx<I>, 0>;
+					: ParseExpr<T, Next<J>, 0>
+			: ParseExpr<T, Next<I>, 0>;
 
 type ParseCast<T extends Toks, I extends number> =
 	EatOp<T, I, "("> extends never
 		? Expected<'"("', T, I>
-		: ParseExpr<T, Nx<I>, 0> extends Ok<infer E, infer J>
+		: ParseExpr<T, Next<I>, 0> extends Ok<infer E, infer J>
 			? EatWord<T, J, "as"> extends never
 				? Expected<"AS", T, J>
-				: ParseTypeName<T, Nx<J>> extends Ok<infer Ty, infer J2>
+				: ParseTypeName<T, Next<J>> extends Ok<infer Ty, infer J2>
 					? Close<T, J2, CastNode<E, Ty>>
-					: ParseTypeName<T, Nx<J>>
-			: ParseExpr<T, Nx<I>, 0>;
+					: ParseTypeName<T, Next<J>>
+			: ParseExpr<T, Next<I>, 0>;
 
 type ParseExists<T extends Toks, I extends number> =
 	ParseSelectStmt<T, I> extends Ok<infer S, infer J>
@@ -1382,29 +1387,29 @@ type ParseArray<T extends Toks, I extends number> =
 	EatOp<T, I, "["> extends never
 		? EatOp<T, I, "("> extends never
 			? Expected<'"[" or "("', T, I>
-			: ParseSelectStmt<T, Nx<I>> extends Ok<infer S, infer J>
+			: ParseSelectStmt<T, Next<I>> extends Ok<infer S, infer J>
 				? Close<T, J, ArraySubNode<S>>
-				: ParseSelectStmt<T, Nx<I>>
-		: ParseArrayLiteral<T, Nx<I>>;
+				: ParseSelectStmt<T, Next<I>>
+		: ParseArrayLiteral<T, Next<I>>;
 type ParseArrayLiteral<T extends Toks, I extends number> =
 	EatOp<T, I, "]"> extends never
 		? ParseExprList<T, I, []> extends Ok<infer Items, infer J>
 			? Close<T, J, ArrayNode<Items>, "]">
 			: ParseExprList<T, I, []>
-		: Ok<ArrayNode<[]>, Nx<I>>;
+		: Ok<ArrayNode<[]>, Next<I>>;
 
 type ParseRow<T extends Toks, I extends number> =
 	EatOp<T, I, ")"> extends never
 		? ParseExprList<T, I, []> extends Ok<infer Items, infer J>
 			? Close<T, J, RowNode<Items>>
 			: ParseExprList<T, I, []>
-		: Ok<RowNode<[]>, Nx<I>>;
+		: Ok<RowNode<[]>, Next<I>>;
 
 type ParseExtract<T extends Toks, I extends number> = T[I] extends
 	| WordTok<infer F>
 	| StrTok<infer F>
-	? EatWord<T, Nx<I>, "from"> extends never
-		? Expected<"FROM", T, Nx<I>>
+	? EatWord<T, Next<I>, "from"> extends never
+		? Expected<"FROM", T, Next<I>>
 		: ParseExpr<T, Nx2<I>, 0> extends Ok<infer E, infer J>
 			? Close<T, J, ExtractNode<F, E>>
 			: ParseExpr<T, Nx2<I>, 0>
@@ -1414,16 +1419,16 @@ type ParsePosition<T extends Toks, I extends number> =
 	ParseExpr<T, I, 7> extends Ok<infer Sub, infer J>
 		? EatWord<T, J, "in"> extends never
 			? Expected<"IN", T, J>
-			: ParseExpr<T, Nx<J>, 0> extends Ok<infer In, infer J2>
+			: ParseExpr<T, Next<J>, 0> extends Ok<infer In, infer J2>
 				? Close<T, J2, PositionNode<Sub, In>>
-				: ParseExpr<T, Nx<J>, 0>
+				: ParseExpr<T, Next<J>, 0>
 		: ParseExpr<T, I, 7>;
 
 type ParseSubstring<T extends Toks, I extends number> =
 	ParseExpr<T, I, 0> extends Ok<infer E, infer J>
 		? EatOp<T, J, ","> extends never
 			? ParseSubstringFromFor<T, E, J>
-			: ParseExprList<T, Nx<J>, []> extends Ok<
+			: ParseExprList<T, Next<J>, []> extends Ok<
 						readonly [infer From, ...infer More],
 						infer J2
 					>
@@ -1434,40 +1439,40 @@ type ParseSubstring<T extends Toks, I extends number> =
 						More extends readonly [infer For, ...unknown[]] ? For : null,
 						J2
 					>
-				: ParseExprList<T, Nx<J>, []>
+				: ParseExprList<T, Next<J>, []>
 		: ParseExpr<T, I, 0>;
 type ParseSubstringFromFor<T extends Toks, E, I extends number> =
 	EatWord<T, I, "from"> extends never
 		? EatWord<T, I, "for"> extends never
 			? EatWord<T, I, "similar"> extends never
 				? CloseSubstring<T, E, null, null, I>
-				: SubstringOperands<T, Nx<I>, "escape"> extends Ok<
+				: SubstringOperands<T, Next<I>, "escape"> extends Ok<
 							{ a: infer P; b: infer C },
 							infer J
 						>
 					? C extends null
 						? Expected<"ESCAPE", T, J>
 						: CloseSubstring<T, E, P, C, J>
-					: SubstringOperands<T, Nx<I>, "escape">
-			: SubstringOperands<T, Nx<I>, "from"> extends Ok<
+					: SubstringOperands<T, Next<I>, "escape">
+			: SubstringOperands<T, Next<I>, "from"> extends Ok<
 						{ a: infer For; b: infer From },
 						infer J
 					>
 				? CloseSubstring<T, E, From, For, J>
-				: SubstringOperands<T, Nx<I>, "from">
-		: SubstringOperands<T, Nx<I>, "for"> extends Ok<
+				: SubstringOperands<T, Next<I>, "from">
+		: SubstringOperands<T, Next<I>, "for"> extends Ok<
 					{ a: infer From; b: infer For },
 					infer J
 				>
 			? CloseSubstring<T, E, From, For, J>
-			: SubstringOperands<T, Nx<I>, "for">;
+			: SubstringOperands<T, Next<I>, "for">;
 type SubstringOperands<T extends Toks, I extends number, W extends string> =
 	ParseExpr<T, I, 0> extends Ok<infer A, infer J>
 		? EatWord<T, J, W> extends never
 			? Ok<{ a: A; b: null }, J>
-			: ParseExpr<T, Nx<J>, 0> extends Ok<infer B, infer J2>
+			: ParseExpr<T, Next<J>, 0> extends Ok<infer B, infer J2>
 				? Ok<{ a: A; b: B }, J2>
-				: ParseExpr<T, Nx<J>, 0>
+				: ParseExpr<T, Next<J>, 0>
 		: ParseExpr<T, I, 0>;
 type CloseSubstring<T extends Toks, E, From, For, I extends number> = Close<
 	T,
@@ -1477,7 +1482,7 @@ type CloseSubstring<T extends Toks, E, From, For, I extends number> = Close<
 
 type ParseTrim<T extends Toks, I extends number> =
 	T[I] extends WordTok<infer Side extends "both" | "leading" | "trailing">
-		? ParseTrimBody<T, Nx<I>, Side>
+		? ParseTrimBody<T, Next<I>, Side>
 		: ParseTrimBody<T, I, "both">;
 type ParseTrimBody<T extends Toks, I extends number, Side extends string> =
 	EatWord<T, I, "from"> extends never
@@ -1485,32 +1490,32 @@ type ParseTrimBody<T extends Toks, I extends number, Side extends string> =
 			? EatWord<T, J, "from"> extends never
 				? EatOp<T, J, ","> extends never
 					? Close<T, J, TrimNode<E1, null, Side>>
-					: ParseExpr<T, Nx<J>, 0> extends Ok<infer C, infer J2>
+					: ParseExpr<T, Next<J>, 0> extends Ok<infer C, infer J2>
 						? Close<T, J2, TrimNode<E1, C, Side>>
-						: ParseExpr<T, Nx<J>, 0>
-				: ParseExpr<T, Nx<J>, 0> extends Ok<infer E, infer J2>
+						: ParseExpr<T, Next<J>, 0>
+				: ParseExpr<T, Next<J>, 0> extends Ok<infer E, infer J2>
 					? Close<T, J2, TrimNode<E, E1, Side>>
-					: ParseExpr<T, Nx<J>, 0>
+					: ParseExpr<T, Next<J>, 0>
 			: ParseExpr<T, I, 0>
-		: ParseExpr<T, Nx<I>, 0> extends Ok<infer E, infer J>
+		: ParseExpr<T, Next<I>, 0> extends Ok<infer E, infer J>
 			? Close<T, J, TrimNode<E, null, Side>>
-			: ParseExpr<T, Nx<I>, 0>;
+			: ParseExpr<T, Next<I>, 0>;
 
 type ParseOverlay<T extends Toks, I extends number> =
 	ParseExpr<T, I, 0> extends Ok<infer E, infer J>
 		? EatWord<T, J, "placing"> extends never
 			? Expected<"PLACING", T, J>
-			: ParseExpr<T, Nx<J>, 0> extends Ok<infer P, infer J2>
+			: ParseExpr<T, Next<J>, 0> extends Ok<infer P, infer J2>
 				? EatWord<T, J2, "from"> extends never
 					? Expected<"FROM", T, J2>
-					: ParseExpr<T, Nx<J2>, 0> extends Ok<infer From, infer J3>
+					: ParseExpr<T, Next<J2>, 0> extends Ok<infer From, infer J3>
 						? EatWord<T, J3, "for"> extends never
 							? CloseOverlay<T, E, P, From, null, J3>
-							: ParseExpr<T, Nx<J3>, 0> extends Ok<infer For, infer J4>
+							: ParseExpr<T, Next<J3>, 0> extends Ok<infer For, infer J4>
 								? CloseOverlay<T, E, P, From, For, J4>
-								: ParseExpr<T, Nx<J3>, 0>
-						: ParseExpr<T, Nx<J2>, 0>
-				: ParseExpr<T, Nx<J>, 0>
+								: ParseExpr<T, Next<J3>, 0>
+						: ParseExpr<T, Next<J2>, 0>
+				: ParseExpr<T, Next<J>, 0>
 		: ParseExpr<T, I, 0>;
 type CloseOverlay<T extends Toks, E, P, From, For, I extends number> = Close<
 	T,
@@ -1526,7 +1531,7 @@ export type ParseExprList<
 	ParseExpr<T, I, 0> extends Ok<infer E, infer J>
 		? EatOp<T, J, ","> extends never
 			? Ok<[...Acc, E], J>
-			: ParseExprList<T, Nx<J>, [...Acc, E]>
+			: ParseExprList<T, Next<J>, [...Acc, E]>
 		: ParseExpr<T, I, 0>;
 
 type ParseOrderList<
@@ -1537,16 +1542,16 @@ type ParseOrderList<
 	ParseExpr<T, I, 0> extends Ok<infer E, infer J>
 		? EatOp<T, SkipOrderTail<T, J>, ","> extends never
 			? Ok<[...Acc, E], SkipOrderTail<T, J>>
-			: ParseOrderList<T, Nx<SkipOrderTail<T, J>>, [...Acc, E]>
+			: ParseOrderList<T, Next<SkipOrderTail<T, J>>, [...Acc, E]>
 		: ParseExpr<T, I, 0>;
 type SkipOrderTail<T extends Toks, I extends number> = SkipFirst<
 	T,
 	EatWord<T, I, "asc" | "desc"> extends never
 		? T[I] extends WordTok<"using">
-			? T[Nx<I>] extends OpTok
+			? T[Next<I>] extends OpTok
 				? Nx2<I>
 				: I
 			: I
-		: Nx<I>,
+		: Next<I>,
 	[["nulls", "first"], ["nulls", "last"]]
 >;

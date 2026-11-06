@@ -90,7 +90,7 @@ The names are `tinyint`, `smallint`, `mediumint`, `int`, `bigint`, `decimal`, `f
 | Flag | Effect |
 |---|---|
 | `nullable`, `hasDefault` | `NULL` allowed; optional in `INSERT` |
-| `position` | column order, used by `SELECT *` and `INSERT … VALUES` without a column list |
+| `position` | column order, used by `SELECT *` and `INSERT … VALUES` without a column list once every column has one |
 | `autoIncrement` | an `AUTO_INCREMENT` column; implies `hasDefault` |
 | `generated` | a `GENERATED ALWAYS AS` column: readable, but rejected in `INSERT` and `UPDATE`; implies `hasDefault` |
 | `hidden` | an `INVISIBLE` column: usable by name, but not in `SELECT *` or `INSERT … VALUES` without a column list |
@@ -149,7 +149,7 @@ The dialect is `mysql` for a `mysql://` URL and `mariadb` for a `mariadb://` URL
 | `--database <name>` | the database to read; default the one in the URL |
 | `--out <file>` | output file; default stdout |
 | `--exclude <pattern>` | relation to leave out, where `*` matches anything; repeat it or comma-separate |
-| `--type-name <name>` | name of the interface; default `DB` |
+| `--type-name <name>` | name of the interface, a TypeScript identifier; default `DB` |
 | `--import-from <module>` | where `Col`, `Enum` and `View` are imported from; default `@typesql/core/mysql` |
 | `--no-comments` | leave out the JSDoc (comments, generated and invisible columns) |
 
@@ -224,7 +224,7 @@ Row keys are the column names the server reports:
 
 Use `$1`, `:name` or `${sql.param()}`; `?` is rejected with an error that says so, because fragments and inline values are numbered with `$n`. The adapters rewrite `$n` to `?` before the statement reaches the driver.
 
-Parameters take their type from where they are used. Integer parameters accept `number | bigint` (`BIGINT` also a `string`), `DECIMAL` accepts `number | bigint | string`, date types accept `Date | string`, binary types accept `Uint8Array | string`, and a parameter without context accepts any value the drivers bind. `sql.json(value)` binds the value as JSON text.
+Parameters take their type from where they are used. Integer parameters accept `number | bigint` (`BIGINT` also a `string`), `DECIMAL` accepts `number | bigint | string`, date types accept `Date | string`, binary types accept `Uint8Array | string`, and a parameter without context accepts any value the drivers bind. `sql.json(value)` binds the value as JSON text; a JSON parameter takes it or JSON text, not a plain object, which the drivers can't bind.
 
 ## Statements
 
@@ -298,7 +298,7 @@ The schema a migration leaves follows MySQL's rules:
 
 ## Limits
 
-- Without `position` flags, `SELECT *` order is unspecified and `INSERT INTO t VALUES (…)` without a column list may type its values against the wrong columns, so name your columns or generate the schema.
+- Without `position` flags, `SELECT *` order is unspecified, `INSERT INTO t VALUES (…)` without a column list checks only the number of values and types its parameters as any value MySQL can bind, and `FIRST` / `AFTER` in `ALTER TABLE` leave the table without positions, so name your columns or generate the schema.
 - `sql()` on mysql2 and the mariadb connector, and every query on the HTTP drivers, write the values into the statement before the server sees it, so an unaliased expression with a parameter is named after its value (`n + 7`), not `n + ?`. Give such expressions an alias.
 - A string literal that contains `\'` confuses `:name` rewriting and fragment interpolation. Write `''` instead.
 - `/*! … */` executable comments are treated as comments.

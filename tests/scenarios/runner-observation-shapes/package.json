@@ -1,0 +1,10 @@
+{
+	"name": "runner-observation-shapes",
+	"private": true,
+	"type": "module",
+	"dependencies": {},
+	"devDependencies": {
+		"typescript": "catalog:",
+		"@types/node": "catalog:"
+	}
+}

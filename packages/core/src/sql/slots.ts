@@ -1,6 +1,8 @@
+import type { IsUnion, Members } from "../engine/object.js";
 import type { CARRIED, Fragment, Query, TextType } from "../query.js";
 import type { Skip } from "./inline.js";
-import type { MaxParamStr, UnionList } from "./splice.js";
+import type { Lexis } from "./lexis.js";
+import type { MaxParamStr } from "./splice.js";
 
 /** A value that can be interpolated into SQL text, and an item of sql.combine/and/or. */
 export type Slottable =
@@ -11,21 +13,20 @@ export type SlotTexts<S> = {
 	readonly [K in keyof S]: { readonly text: TextType<S[K]> };
 };
 
-export type CarriedOf<F> = F extends { readonly [CARRIED]?: infer C }
+export type CarriedOf<F, L extends Lexis> = F extends {
+	readonly [CARRIED]?: infer C;
+}
 	? C extends readonly unknown[]
 		? number extends C["length"]
-			? Skip<MaxParamStr<TextType<F>>>
+			? Skip<MaxParamStr<TextType<F>, L>>
 			: C
-		: Skip<MaxParamStr<TextType<F>>>
-	: Skip<MaxParamStr<TextType<F>>>;
+		: Skip<MaxParamStr<TextType<F>, L>>
+	: Skip<MaxParamStr<TextType<F>, L>>;
 
-export type SlotCarried<S> = { readonly [K in keyof S]: CarriedOf<S[K]> };
+export type SlotCarried<S, L extends Lexis> = {
+	readonly [K in keyof S]: CarriedOf<S[K], L>;
+};
 
-type IsUnion<T, U = T> = T extends unknown
-	? [U] extends [T]
-		? false
-		: true
-	: never;
 type UnionSlots<S> = {
 	[K in keyof S]: true extends IsUnion<S[K]> ? K : never;
 }[keyof S];
@@ -46,4 +47,4 @@ type Expand<S, Ks extends readonly unknown[]> = Ks extends readonly [
  */
 export type SlotVariants<S> = [UnionSlots<S>] extends [never]
 	? S
-	: Expand<S, UnionList<UnionSlots<S>>>;
+	: Expand<S, Members<UnionSlots<S>>>;

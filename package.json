@@ -9,10 +9,10 @@
 	"scripts": {
 		"build": "pnpm -r --filter './packages/*' --filter '!@typesql/docs' run build",
 		"typecheck": "pnpm -r --filter './packages/*' run typecheck && tsrs -p tsconfig.json",
-		"lint": "biome check",
-		"lint:fix": "biome check --write",
+		"lint": "node tools/biome/build.ts --check && biome check",
+		"lint:fix": "node tools/biome/build.ts && biome check --write",
 		"knip": "knip",
-		"test": "node tests/run.ts",
+		"test": "pnpm --dir tests test",
 		"bench": "pnpm --filter @typesql/bench run bench",
 		"check:intents": "node tools/check-intents.ts",
 		"release": "gh workflow run release.yml --ref main && echo \"Release started: https://github.com/ismailkarsli/typesql/actions/workflows/release.yml\"",
@@ -24,7 +24,11 @@
 	"devDependencies": {
 		"@biomejs/biome": "catalog:",
 		"@types/node": "catalog:",
+		"@types/pg": "catalog:",
+		"@typesql/core": "workspace:*",
+		"@typesql/pg": "workspace:*",
 		"knip": "catalog:",
+		"pg": "catalog:",
 		"tsrs": "catalog:",
 		"typescript": "catalog:"
 	}

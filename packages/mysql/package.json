@@ -71,7 +71,6 @@
 		}
 	},
 	"devDependencies": {
-		"mariadb": "catalog:",
 		"mysql2": "catalog:",
 		"tsrs": "catalog:",
 		"typescript": "catalog:"

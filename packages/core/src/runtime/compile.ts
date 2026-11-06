@@ -127,18 +127,29 @@ export function bind(
 }
 
 /**
- * The tokens compile() reads past or rewrites: quoted strings, identifiers
- * and comments (kept as they are), then `$n`, `::`, `:name` and markers.
+ * The lexis (see `Dialect`) of a dialect that leaves it out: standard SQL's
+ * strings, quoted names and comments.
  */
-const TOKEN =
-	/(?<![\w$])[Ee]'(?:[^'\\]|\\.|'')*'?|'(?:[^']|'')*'?|"(?:[^"]|"")*"?|--[^\n]*|\/\*|(\$(?:[A-Za-z_]\w*)?\$).*?(?:\1|$)|\$(\d+)|::+|:([A-Za-z_]\w*)|\0typesql([^\0]+)\0/gs;
+export const LEXIS =
+	/\$(\d+)|'(?:[^']|'')*'|"(?:[^"]|"")*"|--.*|\/\*[\s\S]*?\*\//.source;
 
-/** `text` with each token replaced; a block comment runs to its outer closing delimiter, as it nests. */
-function scan(
+/**
+ * TypeSQL's own syntax, read before a dialect's lexis: `::` (a cast, kept),
+ * `:name` parameters and markers.
+ */
+const TYPESQL = /::+|:([A-Za-z_]\w*)|\0typesql([^\0]+)\0|/.source;
+
+/**
+ * `text` with each token of `lexis` (a dialect's, see `Dialect`) replaced;
+ * a block comment that a bare `/*` token opens runs to its outer closing
+ * delimiter, as it nests.
+ */
+export function scan(
 	text: string,
 	replace: (match: RegExpExecArray) => string,
+	lexis: string,
 ): string {
-	const pattern = new RegExp(TOKEN);
+	const pattern = new RegExp(lexis, "g");
 	let out = "";
 	let last = 0;
 	for (let m = pattern.exec(text); m; m = pattern.exec(text)) {
@@ -158,9 +169,63 @@ function scan(
 	return out + text.slice(last);
 }
 
-const renumber = (text: string, offset: number): string =>
+/** A statement split at its `$n` parameters, and the value each one takes. */
+export interface SplitStatement {
+	readonly parts: readonly string[];
+	readonly values: readonly unknown[];
+}
+
+/**
+ * `text` split at the `$n` parameters that `lexis` reads, for drivers that
+ * bind `?`: each parameter's value, mapped by `map`, once for each use.
+ */
+export function splitAt<V, R>(
+	text: string,
+	values: readonly V[],
+	map: (value: V | undefined) => R,
+	lexis: string,
+): SplitStatement {
+	const parts: string[] = [];
+	const out: R[] = [];
+	let last = 0;
+	scan(
+		text,
+		(m) => {
+			const n = m[1];
+			if (n) {
+				parts.push(text.slice(last, m.index));
+				out.push(map(values[+n - 1]));
+				last = m.index + m[0].length;
+			}
+			return "";
+		},
+		lexis,
+	);
+	parts.push(text.slice(last));
+	return { parts, values: out };
+}
+
+/** SQL text with `?` placeholders, and the value for each. */
+export interface PositionalStatement {
+	readonly text: string;
+	readonly values: unknown[];
+}
+
+/** `text` with `?` for each `$n` parameter that `lexis` reads (see splitAt). */
+export function positionalAt<V, R>(
+	text: string,
+	values: readonly V[],
+	map: (value: V | undefined) => R,
+	lexis: string,
+): PositionalStatement {
+	if (!text.includes("$")) return { text, values: [] };
+	const split = splitAt(text, values, map, lexis);
+	return { text: split.parts.join("?"), values: [...split.values] };
+}
+
+const renumber = (text: string, offset: number, lexis: string): string =>
 	offset && text.includes("$")
-		? scan(text, (m) => (m[2] ? `$${+m[2] + offset}` : m[0]))
+		? scan(text, ([t, n]) => (n ? `$${+n + offset}` : t), lexis)
 		: text;
 
 /**
@@ -168,40 +233,54 @@ const renumber = (text: string, offset: number): string =>
  * (positional or, with `:name` parameters, one object) first, then each
  * inline sql.param() in order, then each interpolated fragment's. Without
  * `args` the statement is prepared: its own parameters stay for later.
+ * `lexis` is the dialect's (see `Dialect`).
  */
-export function compile(text: string, args?: readonly unknown[]): Compiled {
+export function compile(
+	lexis: string,
+	text: string,
+	args?: readonly unknown[],
+): Compiled {
+	const tokens = TYPESQL + lexis;
 	const names: string[] = [];
 	let count = 0;
 	let inline = 0;
-	scan(text, ([, , n, name, id]) => {
-		if (n) count = Math.max(count, +n);
-		else if (name) names.includes(name) || names.push(name);
-		else if (id && id[0] !== "~" && pending.get(id) !== empty) inline++;
-		return "";
-	});
+	scan(
+		text,
+		([, name, id, n]) => {
+			if (n) count = Math.max(count, +n);
+			else if (name) names.includes(name) || names.push(name);
+			else if (id && id[0] !== "~" && pending.get(id) !== empty) inline++;
+			return "";
+		},
+		tokens,
+	);
 	const values = args ? bind(names, args) : [];
 	count = Math.max(count, args ? values.length : names.length);
 	const carried: unknown[] = [];
 	let k = count;
 	let offset = count + inline;
-	const out = scan(text, ([t, , n, name, id]) => {
-		if (name) return `$${names.indexOf(name) + 1}`;
-		if (!id)
-			return n || !t.includes(MARK)
-				? t
-				: fail("sql.param() or fragment inside a string or comment");
-		const value = use(id);
-		if (id[0] !== "~") {
-			if (value === empty) return "DEFAULT";
-			values.push(value);
-			return `$${++k}`;
-		}
-		// biome-ignore lint/nursery/noUnsafeTypeAssertion: only toString() above marks a "~" id, with a fragment.
-		const fragment = value as Spliceable;
-		carried.push(...fragment.values);
-		offset += fragment.values.length;
-		return renumber(fragment.text, offset - fragment.values.length);
-	});
+	const out = scan(
+		text,
+		([t, name, id, n]) => {
+			if (name) return `$${names.indexOf(name) + 1}`;
+			if (!id)
+				return n || !t.includes(MARK)
+					? t
+					: fail("sql.param() or fragment inside a string or comment");
+			const value = use(id);
+			if (id[0] !== "~") {
+				if (value === empty) return "DEFAULT";
+				values.push(value);
+				return `$${++k}`;
+			}
+			// biome-ignore lint/nursery/noUnsafeTypeAssertion: only toString() above marks a "~" id, with a fragment.
+			const fragment = value as Spliceable;
+			carried.push(...fragment.values);
+			offset += fragment.values.length;
+			return renumber(fragment.text, offset - fragment.values.length, lexis);
+		},
+		tokens,
+	);
 	if (out.includes("\0")) fail("NUL in SQL text");
 	return { text: out, values: [...values, ...carried], names, count };
 }
@@ -216,11 +295,14 @@ export const ident = (quote: string, parts: readonly string[]): string =>
 export function join(
 	items: readonly Spliceable[],
 	separator: string,
+	lexis: string,
 ): SqlFragment {
 	const values: unknown[] = [];
 	return new SqlFragment(
 		items
-			.map((f) => renumber(f.text, values.push(...f.values) - f.values.length))
+			.map((f) =>
+				renumber(f.text, values.push(...f.values) - f.values.length, lexis),
+			)
 			.join(separator),
 		values,
 	);

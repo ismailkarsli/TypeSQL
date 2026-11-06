@@ -4,6 +4,8 @@ export type ColRef = {
 	readonly tbl: string | null;
 	readonly name: string;
 	readonly disp: string;
+	/** A double-quoted bare name, which SQLite would take as a string if no column has it. */
+	readonly quoted?: true;
 };
 
 export type NumLit = { readonly t: "num"; readonly v: string };

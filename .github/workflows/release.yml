@@ -40,38 +40,31 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           package-manager-cache: false
-          node-version: 26
+          node-version-file: .node-version
       - run: pnpm install --frozen-lockfile
       - name: Version pending change intents
         run: |
-          public() {
-            pnpm -r ls --depth -1 --json | node -e '
-              for (const p of JSON.parse(require("fs").readFileSync(0)))
-                if (!p.private) console.log(`${p.name}@${p.version}`)'
-          }
-          before=$(public)
-          for pkg in $before; do
+          before=$(node tools/packages.ts npm)
+          while read -r pkg dir; do
             if ! pnpm view "$pkg" version >/dev/null 2>&1; then
-              name=${pkg%@*}
-              dir="packages/${name##*/}"
               if [ -f "$dir/CHANGELOG.md" ]; then
                 echo "::notice::$pkg has an unpublished release; publishing without versioning"
                 exit 0
               fi
               echo "::notice::$pkg is a first release; versioning its pending intents"
             fi
-          done
+          done < <(node tools/packages.ts npm tag dir)
           pnpm change status
           pnpm version -r
           if [ -z "$(git status --porcelain)" ]; then
             exit 0
           fi
-          extension=$(node -p 'require("./packages/vscode/package.json").version')
+          read -r extension extension_dir < <(node tools/packages.ts vscode version dir)
           extension_args=()
-          if [ "$extension" != "$(git show HEAD:packages/vscode/package.json | node -p 'JSON.parse(require("fs").readFileSync(0)).version')" ]; then
+          if [ "$extension" != "$(git show "HEAD:$extension_dir/package.json" | node -p 'JSON.parse(require("fs").readFileSync(0)).version')" ]; then
             extension_args=(--extension "$extension")
           fi
-          message=$(comm -13 <(sort <<<"$before") <(public | sort) | node tools/release-message.ts "${extension_args[@]}")
+          message=$(comm -13 <(sort <<<"$before") <(node tools/packages.ts npm | sort) | node tools/release-message.ts "${extension_args[@]}")
           git add -A
           release_commit=$(node tools/github-commit.ts main "$message")
           # Fetch main, not only the commit, so origin/main contains it and
@@ -85,9 +78,7 @@ jobs:
       - run: pnpm build
       - name: Publish packages with trusted publishing
         run: |
-          mapfile -t packages < <(pnpm -r ls --depth -1 --json | node -e '
-            for (const p of JSON.parse(require("fs").readFileSync(0)))
-              if (!p.private) console.log(p.name)')
+          mapfile -t packages < <(node tools/packages.ts npm name)
           filters=()
           new=()
           for pkg in "${packages[@]}"; do
@@ -137,7 +128,7 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           package-manager-cache: false
-          node-version: 26
+          node-version-file: .node-version
       - run: pnpm install --frozen-lockfile
       - run: pnpm docs:deploy
         env:
@@ -172,7 +163,7 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           package-manager-cache: false
-          node-version: 26
+          node-version-file: .node-version
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter "typesql..." run build
       - run: pnpm exec vsce package --no-dependencies --out typesql.vsix

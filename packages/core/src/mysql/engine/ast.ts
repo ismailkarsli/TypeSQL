@@ -92,13 +92,13 @@ export type InSub = {
 	readonly q: SelectStmt;
 	readonly not: boolean;
 };
-/** `e op ANY (SELECT …)` / `e op ALL (SELECT …)`. */
+/** `l op ANY (SELECT …)` / `l op ALL (SELECT …)`; `SOME` is `ANY`. */
 export type Quantified = {
 	readonly t: "quant";
+	readonly l: Expr;
 	readonly op: string;
-	readonly all: boolean;
-	readonly e: Expr;
-	readonly q: SelectStmt;
+	readonly q: "any" | "all";
+	readonly r: SelectStmt;
 };
 export type Like = {
 	readonly t: "like";

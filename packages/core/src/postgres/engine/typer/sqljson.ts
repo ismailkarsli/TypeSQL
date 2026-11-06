@@ -1,12 +1,8 @@
-import type {
-	ColInfo,
-	Ctx,
-	Info,
-	MkCtx,
-	QueryContext,
-	ScopeLevel,
-} from "../../../engine/types.js";
+import type { Next } from "../../../engine/next.js";
+import type { Or } from "../../../engine/object.js";
+import type { ColInfo, Info } from "../../../engine/types.js";
 import type { AnyErr, SqlError } from "../../../errors.js";
+import type { DateTimeT, JsonT, NumT } from "../../schema/type-facts.js";
 import type {
 	Expr,
 	FromJsonTable,
@@ -17,12 +13,9 @@ import type {
 	SelectStmt,
 	Tag,
 } from "../ast.js";
-import type { TypeDisplay } from "../binder/clauses.js";
-import type { CheckAlias, RenamedLevel } from "../binder/from.js";
 import type { BuildObject, JsonLitCast, JsonRet } from "../json.js";
-import type { Nx } from "../parser/util.js";
-import type { BaseOf } from "../shape.js";
-import type { DateTimeT, NumT, Or } from "./operators.js";
+import type { BaseOf, TypeDisplay } from "../shape.js";
+import type { Ctx } from "../types.js";
 import type { ParamsOfList, ParamsOfOpt, ParamsOfSelect } from "./params.js";
 import type { FirstColOf, TypeList, TypeOf } from "./typeof.js";
 
@@ -50,7 +43,7 @@ type NonString =
 	| `${string}range`;
 
 type TypeFormat<A> = A extends ColInfo
-	? BaseOf<A["type"]> extends "json" | "jsonb"
+	? BaseOf<A["type"]> extends JsonT
 		? A
 		: A["type"] extends NonString
 			? SqlError<
@@ -71,7 +64,7 @@ type TypeIsJson<A> = A extends ColInfo
 
 type AggResult<A, Ret> = A extends ColInfo
 	? Ret extends string
-		? Ret extends "json" | "jsonb"
+		? Ret extends JsonT
 			? A
 			: Info<Ret, A["nullable"]>
 		: A
@@ -142,9 +135,9 @@ type CheckKeys<
 	As extends readonly ColInfo[],
 	I extends number,
 > = As[I] extends ColInfo
-	? As[I]["type"] extends "json" | "jsonb" | "record" | `${string}[]`
+	? As[I]["type"] extends JsonT | "record" | `${string}[]`
 		? SqlError<"key value must be scalar, not array, composite, or json", null>
-		: CheckKeys<As, Nx<Nx<I>>>
+		: CheckKeys<As, Next<Next<I>>>
 	: true;
 type NullableValue<
 	As extends readonly ColInfo[],
@@ -152,7 +145,7 @@ type NullableValue<
 > = As[I] extends ColInfo
 	? As[I]["nullable"] extends true
 		? true
-		: NullableValue<As, Nx<Nx<I>>>
+		: NullableValue<As, Next<Next<I>>>
 	: false;
 
 type TypeObject<
@@ -169,7 +162,7 @@ type TypeObject<
 					As
 				> extends infer O
 			? O extends ColInfo
-				? R extends "json" | "jsonb"
+				? R extends JsonT
 					? Absent extends true
 						? NullableValue<As, 1> extends true
 							? Info<R>
@@ -185,7 +178,7 @@ type TypeArray<
 	R extends string,
 	As extends readonly ColInfo[],
 	Absent,
-> = R extends "json" | "jsonb"
+> = R extends JsonT
 	? Absent extends true
 		? AnyNull<As> extends true
 			? Info<R>
@@ -194,7 +187,7 @@ type TypeArray<
 	: Info<R>;
 
 type TypeArrayQuery<R extends string, A> = A extends ColInfo
-	? Info<R extends "json" | "jsonb" ? JsonRet<`arrnn:${R}`, [A]> : R, true>
+	? Info<R extends JsonT ? JsonRet<`arrnn:${R}`, [A]> : R, true>
 	: A;
 
 export type ParamsOfSqlJson<E extends SqlJsonExpr, C extends Ctx> =
@@ -213,45 +206,6 @@ type ParamsOfJsonFn<E extends JsonFn, C extends Ctx> =
 			C,
 			Info<"text", true>
 	  >;
-
-export type BindJsonTable<
-	J extends FromJsonTable["jt"],
-	Alias extends string | null,
-	CA extends readonly string[] | null,
-	Env extends QueryContext,
-	Sofar extends ScopeLevel,
-> =
-	J["path"] extends Tag<"str">
-		? DuplicateName<J["names"], never> extends infer D extends string
-			? SqlError<`duplicate JSON_TABLE column or path name: ${D}`, null>
-			: TypeList<
-						[J["ctx"], ...J["passing"], ...J["defs"]],
-						MkCtx<Env["db"], [Sofar, ...Env["scope"]], Env["ctes"], false>,
-						[]
-					> extends infer Ts
-				? Ts extends readonly ColInfo[]
-					? CheckAlias<
-							Alias extends string ? Alias : "json_table",
-							Sofar
-						> extends infer A
-						? A extends string
-							? RenamedLevel<A, J["cols"], CA, "JSON_TABLE function">
-							: A
-						: never
-					: Ts
-				: never
-		: SqlError<
-				"only string constants are supported in JSON_TABLE path specification",
-				null
-			>;
-type DuplicateName<Ns extends readonly string[], Seen> = Ns extends readonly [
-	infer N,
-	...infer R extends readonly string[],
-]
-	? N extends Seen
-		? N
-		: DuplicateName<R, Seen | N>
-	: null;
 
 export type ParamsOfJsonTable<
 	J extends FromJsonTable["jt"],

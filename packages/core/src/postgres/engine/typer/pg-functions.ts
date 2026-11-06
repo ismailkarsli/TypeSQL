@@ -1,4 +1,4 @@
-import type { Sig } from "./catalog.js";
+import type { Sig } from "../../schema/functions.js";
 
 export interface PgFunctions {
   acldefault: Sig<["..."], "aclitem[]">;
@@ -70,11 +70,7 @@ export interface PgFunctions {
   isparallel: Sig<["..."], "bool">;
   isperp: Sig<["..."], "bool">;
   isvertical: Sig<["..."], "bool">;
-  json_each: Sig<["..."], "record", { srf: true }>;
-  json_each_text: Sig<["..."], "record", { srf: true }>;
   json_to_tsvector: Sig<["..."], "tsvector">;
-  jsonb_each: Sig<["..."], "record", { srf: true }>;
-  jsonb_each_text: Sig<["..."], "record", { srf: true }>;
   jsonb_populate_record_valid: Sig<["..."], "bool", { nullable: true }>;
   jsonb_to_tsvector: Sig<["..."], "tsvector">;
   lgamma: Sig<["..."], "float8">;

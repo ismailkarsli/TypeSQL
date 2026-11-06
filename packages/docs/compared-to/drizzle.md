@@ -38,7 +38,10 @@ const rows = await sql(
 | Raw SQL | `` sql<T>`…` ``, typed by the `T` you write | checked and typed from the SQL |
 | Relations | the relational query API (`db.query…`) | joins and [JSON aggregation](../guide/using-sql#json) in SQL |
 | Migrations | drizzle-kit generates them from the schema | you [write the DDL](../guide/migrations), and the schema type follows it |
+| Runtime size (minified and gzipped) | about 22 kB | `@typesql/core` is tiny (under 3 kB); under 5 kB with `@typesql/pg` |
 | Databases | PostgreSQL, MySQL, SQLite and more | PostgreSQL, SQLite, MySQL and MariaDB |
+
+Sizes are for drizzle-orm 0.45.4 and `@typesql/pg` 7.0.1: a select with a join on node-postgres, bundled with esbuild, without the driver.
 
 ## Choose Drizzle when
 

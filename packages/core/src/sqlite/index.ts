@@ -2,7 +2,7 @@ export {
 	type Sqlite,
 	type SqliteDialect,
 	sqlite,
-	type TransactionalSql,
+	type ValidateDdl,
 } from "./dialect.js";
 export type {
 	ApplyDdl,
@@ -23,7 +23,6 @@ export type {
 	TableName,
 	TableOf,
 } from "./engine/write.js";
-export type { ValidateDdl } from "./migrations.js";
 export type {
 	Col,
 	ColFlags,
@@ -32,7 +31,7 @@ export type {
 	Typed,
 	View,
 } from "./schema/index.js";
-export type { Sql } from "./sql/types.js";
+export type { Sql, TransactionalSql } from "./sql/types.js";
 export type {
 	BigIntTypeMap,
 	Bindable,

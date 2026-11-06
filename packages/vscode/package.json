@@ -335,7 +335,8 @@
 		}
 	},
 	"scripts": {
-		"build": "esbuild src/extension.ts --bundle --platform=node --target=node22 --format=cjs --external:vscode --sourcemap --outfile=dist/extension.js",
+		"build": "node scripts/contributes.mts --check && esbuild src/extension.ts --bundle --platform=node --target=node22 --format=cjs --external:vscode --sourcemap --outfile=dist/extension.js",
+		"contributes": "node scripts/contributes.mts",
 		"typecheck": "tsrs -p tsconfig.json --noEmit",
 		"package": "pnpm run build && vsce package --no-dependencies --out typesql.vsix"
 	},

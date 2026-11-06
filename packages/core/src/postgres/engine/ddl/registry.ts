@@ -5,21 +5,19 @@ import type {
 	SetKey,
 } from "../../../engine/object.js";
 import type { SqlError } from "../../../errors.js";
+import type { Sig } from "../../schema/functions.js";
 import type { TableRef } from "../ast.js";
-import type { Sig } from "../typer/catalog.js";
-import type { TypeOfCol, WithType } from "./column.js";
 import type {
-	AlreadyExists,
 	AsView,
 	ColsOf,
 	IsNamespace,
 	IsViewVal,
 	MetaKey,
-} from "./relation.js";
-
-type Types<DB> = DB extends { readonly $types: infer R } ? R : {};
-
-type Fns<DB> = DB extends { readonly $functions: infer F } ? F : {};
+	SchemaFunctions,
+	SchemaTypes,
+} from "../db.js";
+import type { TypeOfCol, WithType } from "./column.js";
+import type { AlreadyExists } from "./relation.js";
 
 export type ApplyCreateFunction<
 	DB,
@@ -30,7 +28,7 @@ export type ApplyCreateFunction<
 	DB,
 	"$functions",
 	SetKey<
-		Fns<DB>,
+		SchemaFunctions<DB>,
 		Name,
 		Srf extends true ? Sig<["..."], Ret, { srf: true }> : Sig<["..."], Ret>
 	>
@@ -41,14 +39,14 @@ export type ApplyCreateEnum<
 	Name extends string,
 	Vs extends readonly string[],
 > =
-	Types<DB> extends infer R
+	SchemaTypes<DB> extends infer R
 		? Name extends keyof R
 			? SqlError<`type "${Name}" already exists`, null>
 			: SetKey<DB, "$types", SetKey<R, Name, Vs[number]>>
 		: never;
 
 export type ApplyAlterEnum<DB, Name extends string, Act> =
-	Types<DB> extends infer R
+	SchemaTypes<DB> extends infer R
 		? Name extends keyof R
 			? Act extends {
 					readonly t: "add_value";
@@ -84,16 +82,16 @@ type RetypeDeep<DB, F extends string, To extends string> = Rebuild<{
 		? RenameKey<DB[K], F, To>
 		: K extends "$functions"
 			? DB[K]
-			: DB[K] extends { readonly $view: infer C }
-				? AsView<RetypeCols<C, F, To>>
+			: IsViewVal<DB[K]> extends true
+				? AsView<RetypeCols<ColsOf<DB[K]>, F, To>>
 				: IsNamespace<DB[K]> extends true
 					? RetypeNs<DB[K], F, To>
 					: RetypeCols<DB[K], F, To>;
 }>;
 
 type RetypeNs<NS, F extends string, To extends string> = Rebuild<{
-	[K in keyof NS]: NS[K] extends { readonly $view: infer C }
-		? AsView<RetypeCols<C, F, To>>
+	[K in keyof NS]: IsViewVal<NS[K]> extends true
+		? AsView<RetypeCols<ColsOf<NS[K]>, F, To>>
 		: RetypeCols<NS[K], F, To>;
 }>;
 
@@ -109,7 +107,7 @@ export type ApplyDropTypes<DB, Refs, Ife, Casc> = Refs extends readonly [
 	infer N extends TableRef,
 	...infer Rest,
 ]
-	? Types<DB> extends infer R
+	? SchemaTypes<DB> extends infer R
 		? N["name"] extends keyof R
 			? UsesType<DB, N["name"]> extends true
 				? Casc extends true

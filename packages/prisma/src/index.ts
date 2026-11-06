@@ -1,4 +1,4 @@
-import { createTransactionalSql } from "@typesql/core/adapter";
+import { createFamilySql } from "@typesql/core/adapter";
 import type {
 	MariaDbDialect,
 	MariaDbTransactionalSql,
@@ -10,15 +10,13 @@ import type {
 	SqliteDialect,
 	TransactionalSql as SqliteTransactionalSql,
 } from "@typesql/core/sqlite";
-import {
-	driver,
-	mysqlDriver,
-	type PrismaRawClient,
-	sqliteDriver,
-} from "./client.js";
-import type { FromPrisma, PrismaTypeMapLike } from "./from-prisma.js";
-import type { FromPrismaMysql } from "./from-prisma-mysql.js";
-import type { FromPrismaSqlite } from "./from-prisma-sqlite.js";
+import { driverOf, type PrismaRawClient } from "./client.js";
+import type {
+	FromPrisma,
+	FromPrismaMysql,
+	FromPrismaSqlite,
+} from "./from-prisma.js";
+import type { PrismaTypeMapLike } from "./model.js";
 import type {
 	PrismaMariaDbTypeMap,
 	PrismaMysqlTypeMap,
@@ -28,21 +26,19 @@ import type { PrismaTypeMap } from "./type-map.js";
 
 export { executor, type PrismaRawClient } from "./client.js";
 export type {
-	FieldOverride,
 	FromPrisma,
+	FromPrismaMysql,
+	FromPrismaSqlite,
+} from "./from-prisma.js";
+export type { PrismaScalarToMysql } from "./from-prisma-mysql.js";
+export type { PrismaScalarToPg } from "./from-prisma-pg.js";
+export type { PrismaScalarToSqlite } from "./from-prisma-sqlite.js";
+export type {
+	FieldOverride,
 	ModelOverride,
 	PrismaOverrides,
-	PrismaScalarToPg,
 	PrismaTypeMapLike,
-} from "./from-prisma.js";
-export type {
-	FromPrismaMysql,
-	PrismaScalarToMysql,
-} from "./from-prisma-mysql.js";
-export type {
-	FromPrismaSqlite,
-	PrismaScalarToSqlite,
-} from "./from-prisma-sqlite.js";
+} from "./model.js";
 export type {
 	PrismaMariaDbTypeMap,
 	PrismaMysqlTypeMap,
@@ -135,14 +131,5 @@ export function createSql(
 	dialect: PostgresDialect | SqliteDialect | MySqlDialect | MariaDbDialect,
 	prisma?: PrismaRawClient,
 ): object {
-	switch (dialect.name) {
-		case "sqlite":
-			return createTransactionalSql(dialect, prisma, sqliteDriver);
-		case "mysql":
-			return createTransactionalSql(dialect, prisma, mysqlDriver);
-		case "mariadb":
-			return createTransactionalSql(dialect, prisma, mysqlDriver);
-		default:
-			return createTransactionalSql(dialect, prisma, driver);
-	}
+	return createFamilySql(dialect, prisma, driverOf);
 }

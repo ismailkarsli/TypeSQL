@@ -1,11 +1,25 @@
+import { hasCode } from "../command.js";
+import { type Entry, isMigration, isStep, toEntry } from "./define.js";
 import {
-	type Dialect,
-	type Entry,
-	hasCode,
-	isMigration,
-	isStep,
-	toEntry,
-} from "./define.js";
+	DIALECT_LIST,
+	DIALECTS,
+	type DialectName,
+	isDialectName,
+} from "./dialects/index.js";
+import {
+	createMigrator,
+	isMigrator,
+	MEMORY,
+	type Migrator,
+	type MigratorConfig,
+	PATH_KEYS,
+	type PathKey,
+	SCHEMA_FILE,
+} from "./migrator.js";
+
+/** What a project that can't import @typesql/core is told to do. */
+export const ADD_CORE =
+	"add @typesql/core to the project's dependencies (npm install @typesql/core, or pnpm add @typesql/core)";
 
 /** The migration files of a directory, in the order they run. */
 export async function migrationFiles(migrationsDir: string): Promise<string[]> {
@@ -32,39 +46,38 @@ export async function migrationFiles(migrationsDir: string): Promise<string[]> {
 		.sort();
 }
 
-/** File URLs of the migration directories whose imports are mapped. */
-const directories = new Set<string>();
+let mapped = false;
 
 /**
- * Migrations import each other as `./name.js`, which TypeScript resolves to
- * `./name.ts`. Node doesn't, so a relative `.js` import that a migration
- * makes and that doesn't exist loads the `.ts` file beside it instead.
+ * A TypeScript project's files import each other as `./name.js`, which
+ * TypeScript resolves to `./name.ts`; Node doesn't. Once mapped, such an
+ * import from a `.ts` file outside node_modules (a migration, or a config
+ * that imports its migrations) loads the `.ts` file when there is no `.js`
+ * one.
  */
-function mapMigrationImports(directory: string): void {
+function mapTypeScriptImports(): void {
 	// Bun and Deno load the `.ts` file themselves, and have no registerHooks.
 	const { registerHooks } = process.getBuiltinModule("node:module");
-	if (typeof registerHooks !== "function") return;
-	if (directories.size === 0)
-		registerHooks({
-			resolve(specifier, context, nextResolve) {
-				try {
-					return nextResolve(specifier, context);
-				} catch (error) {
-					const parent = context.parentURL;
-					if (
-						!hasCode(error, "ERR_MODULE_NOT_FOUND") ||
-						!/^\.\.?\/.*\.js$/.test(specifier) ||
-						parent === undefined ||
-						!directories.has(new URL(".", parent).href)
-					)
-						throw error;
-					return nextResolve(`${specifier.slice(0, -3)}.ts`, context);
-				}
-			},
-		});
-	directories.add(
-		process.getBuiltinModule("node:url").pathToFileURL(`${directory}/`).href,
-	);
+	if (mapped || typeof registerHooks !== "function") return;
+	mapped = true;
+	registerHooks({
+		resolve(specifier, context, nextResolve) {
+			try {
+				return nextResolve(specifier, context);
+			} catch (error) {
+				const parent = context.parentURL;
+				if (
+					!hasCode(error, "ERR_MODULE_NOT_FOUND") ||
+					!/^\.\.?\/.*\.[cm]?js$/.test(specifier) ||
+					parent === undefined ||
+					!/^file:.*\.[cm]?ts$/.test(parent) ||
+					parent.includes("/node_modules/")
+				)
+					throw error;
+				return nextResolve(specifier.replace(/js$/, "ts"), context);
+			}
+		},
+	});
 }
 
 /** What the runner reads of a migration file's exports. */
@@ -84,7 +97,7 @@ export async function loadMigrations(migrationsDir: string): Promise<Entry[]> {
 	const { pathToFileURL } = process.getBuiltinModule("node:url");
 	const directory = resolve(migrationsDir);
 	const names = await migrationFiles(directory);
-	mapMigrationImports(directory);
+	mapTypeScriptImports();
 	const loaded: Entry[] = [];
 	for (const name of names) {
 		let module: MigrationModule;
@@ -98,7 +111,7 @@ export async function loadMigrations(migrationsDir: string): Promise<Entry[]> {
 				String(error).includes("'@typesql/core")
 			)
 				throw new Error(
-					`${"message" in error ? error.message : undefined}; add @typesql/core to the project's dependencies (npm install @typesql/core, or pnpm add @typesql/core)`,
+					`${"message" in error ? error.message : undefined}; ${ADD_CORE}`,
 					{ cause: error },
 				);
 			throw error;
@@ -131,7 +144,7 @@ export async function loadMigrations(migrationsDir: string): Promise<Entry[]> {
 export async function makeMigration(
 	migrationsDir: string,
 	name: string,
-	dialect: Dialect,
+	dialect: DialectName,
 ): Promise<string> {
 	if (!name.trim() || /[\\/\p{Cc}]/u.test(name))
 		throw new Error(
@@ -182,4 +195,137 @@ export async function makeMigration(
 	const file = resolve(directory, filename);
 	await writeFile(file, source, { flag: "wx" });
 	return file;
+}
+
+/** The config file `typesql migrate` reads without `--config`. */
+const CONFIG_FILE = "typesql.config.ts";
+
+/** What `typesql migrate` sets of the config: paths relative to `cwd`. */
+export interface MigrateOverrides {
+	readonly dialect?: string | undefined;
+	readonly url?: string | undefined;
+	readonly db?: string | undefined;
+	readonly migrationsDir?: string | undefined;
+	readonly schemaFile?: string | undefined;
+	readonly generate?: boolean | undefined;
+}
+
+/**
+ * The migrator of `typesql migrate`: the one `config` (default:
+ * typesql.config.ts in `cwd`, if there is one) default-exports, with its
+ * relative paths resolved beside it, and `overrides` replacing its config.
+ * Without a config file, the migrations are in ./migrations and the schema
+ * file is db.ts. A server dialect without a connection connects to
+ * DATABASE_URL.
+ */
+export async function loadMigrator(options: {
+	readonly cwd: string;
+	readonly env: Readonly<Record<string, string | undefined>>;
+	readonly config?: string | undefined;
+	readonly overrides: MigrateOverrides;
+}): Promise<Migrator> {
+	const { resolve } = process.getBuiltinModule("node:path");
+	const { cwd, env, overrides } = options;
+	const file = resolve(cwd, options.config ?? CONFIG_FILE);
+	const configured = await loadConfig(file, options.config !== undefined);
+	const dialect = overrides.dialect ?? configured?.config.dialect;
+	if (!isDialectName(dialect))
+		throw new Error(
+			configured === undefined
+				? `no ${CONFIG_FILE}: pass --dialect ${DIALECT_LIST}, or pass --config`
+				: `unsupported dialect: ${String(dialect)} (expected ${DIALECT_LIST})`,
+		);
+	const flags: Partial<MigratorConfig> = { dialect };
+	for (const [key, value] of Object.entries(overrides))
+		if (value !== undefined) Object.assign(flags, { [key]: value });
+	const config: Partial<MigratorConfig> = withPaths(flags, (path) =>
+		resolve(cwd, path),
+	);
+	const connected = (c: Partial<MigratorConfig> | undefined) =>
+		c?.url !== undefined || c?.db !== undefined || c?.execute !== undefined;
+	const url =
+		DIALECTS[dialect].target === "url" &&
+		!connected(config) &&
+		!connected(configured?.config)
+			? env.DATABASE_URL || undefined
+			: undefined;
+	return configured === undefined
+		? createMigrator<unknown>({
+				migrationsDir: resolve(cwd, "migrations"),
+				schemaFile: resolve(cwd, SCHEMA_FILE),
+				...config,
+				...(url && { url }),
+				dialect,
+			})
+		: configured.with<unknown>({ ...config, ...(url && { url }) });
+}
+
+/** The migrator a config file default-exports, its paths resolved beside it. */
+async function loadConfig(
+	file: string,
+	explicit: boolean,
+): Promise<Migrator | undefined> {
+	const { stat } = process.getBuiltinModule("node:fs/promises");
+	const { dirname, resolve } = process.getBuiltinModule("node:path");
+	try {
+		await stat(file);
+	} catch (error) {
+		if (!explicit && hasCode(error, "ENOENT")) return undefined;
+		throw error;
+	}
+	mapTypeScriptImports();
+	const module: { readonly default?: unknown } = await import(
+		process.getBuiltinModule("node:url").pathToFileURL(file).href
+	);
+	const migrator = module.default;
+	if (!isMigrator(migrator))
+		throw new Error(
+			`${file} must default-export a migrator: export default createMigrator({ … }) from @typesql/core/migration`,
+		);
+	const base = dirname(file);
+	const { config } = migrator;
+	return migrator.with(
+		withPaths(
+			config.schemaFile === undefined && config.migrationsDir !== undefined
+				? { ...config, schemaFile: SCHEMA_FILE }
+				: config,
+			(path) => resolve(base, path),
+		),
+	);
+}
+
+/**
+ * The file paths of `config`, made absolute with `resolve`. A SQLite
+ * `:memory:` database is not a file.
+ */
+function withPaths<C extends Partial<Record<PathKey, string | undefined>>>(
+	config: C,
+	resolve: (path: string) => string,
+): C {
+	const paths: Partial<Record<PathKey, string>> = {};
+	for (const key of PATH_KEYS) {
+		const value = config[key];
+		if (value !== undefined && value !== MEMORY) paths[key] = resolve(value);
+	}
+	return { ...config, ...paths };
+}
+
+/**
+ * Why the migration file just created in `directory` can't run: it imports
+ * @typesql/core/migration, which a package manager with strict layouts
+ * (pnpm) doesn't expose there when only @typesql/cli is installed.
+ */
+export async function missingCore(
+	directory: string,
+): Promise<string | undefined> {
+	const { stat } = process.getBuiltinModule("node:fs/promises");
+	const { dirname, join } = process.getBuiltinModule("node:path");
+	for (let dir = directory; ; dir = dirname(dir)) {
+		try {
+			await stat(join(dir, "node_modules", "@typesql/core", "package.json"));
+			return undefined;
+		} catch {}
+		if (dirname(dir) === dir)
+			return `@typesql/core/migration cannot be found from ${directory}, so the migration can't run and its types are unchecked; ${ADD_CORE}`;
+	}
 }

@@ -1,9 +1,13 @@
-import { mkdir, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { resolve } from "node:path";
 import { parseArgs } from "node:util";
-import { type CommandIo, introspectArgs } from "@typesql/core/adapter";
-import type { SqliteDatabase } from "../client.js";
-import { type GenerateOptions, generateSource } from "./emit.js";
+import {
+	type CommandIo,
+	connectSqlite,
+	introspectCommand,
+	listOption,
+	UsageError,
+} from "@typesql/core/adapter";
+import { generateSource } from "./emit.js";
 import { introspect } from "./introspect.js";
 
 const USAGE = `Usage: typesql introspect --dialect sqlite --db <file> [options]
@@ -19,27 +23,9 @@ Options:
   -h, --help           show this help
 `;
 
-interface Io extends CommandIo {
-	readonly cwd: string;
-	readonly open?: (file: string) => Promise<SqliteDatabase & { close(): void }>;
-}
-
-const defaultIo = (): Io => ({
-	stdout: (s) => process.stdout.write(s),
-	stderr: (s) => process.stderr.write(s),
-	cwd: process.cwd(),
-});
-
-async function openReadOnly(
-	file: string,
-): Promise<SqliteDatabase & { close(): void }> {
-	const { DatabaseSync } = await import("node:sqlite");
-	return new DatabaseSync(file, { readOnly: true });
-}
-
-const parse = (argv: readonly string[]) =>
+const parse = (args: string[]) =>
 	parseArgs({
-		args: [...argv],
+		args,
 		allowPositionals: true,
 		options: {
 			db: { type: "string" },
@@ -51,44 +37,32 @@ const parse = (argv: readonly string[]) =>
 		},
 	});
 
-export async function main(
+/**
+ * `typesql introspect --dialect sqlite`. `io` replaces the process's
+ * output and working directory.
+ */
+export const main: (
 	argv: readonly string[],
-	io: Io = defaultIo(),
-): Promise<number> {
-	const values = introspectArgs(io, USAGE, () => parse(argv));
-	if (typeof values === "number") return values;
-	if (!values.db) {
-		io.stderr(`typesql introspect: pass --db <file>\n`);
-		return 2;
-	}
+	io?: CommandIo,
+) => Promise<number> = introspectCommand(USAGE, parse, async (values, io) => {
+	if (!values.db) throw new UsageError("pass --db <file>");
+	const connection = await connectSqlite(resolve(io.cwd, values.db), {
+		readOnly: true,
+	});
 	try {
-		const db = await (io.open ?? openReadOnly)(resolve(io.cwd, values.db));
-		let source: string;
-		try {
-			const options: GenerateOptions = {
-				...(values["type-name"] && { typeName: values["type-name"] }),
-				...(values["import-from"] && { importFrom: values["import-from"] }),
-			};
-			source = generateSource(
-				introspect(db, {
-					exclude: (values.exclude ?? []).flatMap((e) => e.split(",")),
+		return {
+			source: generateSource(
+				introspect(connection.client, {
+					exclude: listOption(values.exclude),
 				}),
-				options,
-			);
-		} finally {
-			db.close();
-		}
-		if (values.out) {
-			const out = resolve(io.cwd, values.out);
-			await mkdir(dirname(out), { recursive: true });
-			await writeFile(out, source);
-			io.stderr(`typesql introspect: wrote ${values.out}\n`);
-		} else io.stdout(source);
-		return 0;
-	} catch (err) {
-		io.stderr(
-			`typesql introspect: ${err instanceof Error ? err.message : String(err)}\n`,
-		);
-		return 1;
+				{
+					...(values["type-name"] && { typeName: values["type-name"] }),
+					...(values["import-from"] && { importFrom: values["import-from"] }),
+				},
+			),
+			out: values.out || undefined,
+		};
+	} finally {
+		await connection.close();
 	}
-}
+});

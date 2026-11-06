@@ -32,7 +32,7 @@ export const sqlHighlighting: MarkdownOptions = {
 			...grammar,
 			name: "typesql-inline",
 			embeddedLangs: ["sql"],
-			injectTo: ["source.ts", "source.tsx", "source.js", "source.js.jsx"],
+			injectTo: manifest.contributes.grammars[0].injectTo,
 		});
 		for (const [name, rules] of Object.entries(themes)) {
 			const theme = shiki.getTheme(name);

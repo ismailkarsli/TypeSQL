@@ -1,16 +1,11 @@
 import type { PickOne } from "../../../engine/object.js";
 import type { AnyErr, SqlError } from "../../../errors.js";
 import type { TableRef } from "../ast.js";
-import type { DisplayType, TypeConflict, TypeOfCol } from "./column.js";
+import type { AsView, ColsOf, IsViewVal } from "../db.js";
+import type { TypeDisplay } from "../shape.js";
+import type { TypeConflict, TypeOfCol } from "./column.js";
 import type { QueryCols, ViewTable } from "./query.js";
-import type {
-	AsView,
-	CanCreate,
-	ColsOf,
-	GetRel,
-	IsViewVal,
-	PutRel,
-} from "./relation.js";
+import type { CanCreate, GetRel, PutRel } from "./relation.js";
 
 export type ApplyCreateView<
 	DB,
@@ -59,7 +54,7 @@ type CheckReplace<Old, New> = [Exclude<keyof Old, keyof New>] extends [never]
 			? null
 			: K extends keyof Old & keyof New
 				? SqlError<
-						`cannot change data type of view column "${K & string}" from ${DisplayType<TypeOfCol<Old[K]>>} to ${DisplayType<TypeOfCol<New[K]>>}`,
+						`cannot change data type of view column "${K & string}" from ${TypeDisplay<TypeOfCol<Old[K]>>} to ${TypeDisplay<TypeOfCol<New[K]>>}`,
 						null
 					>
 				: null

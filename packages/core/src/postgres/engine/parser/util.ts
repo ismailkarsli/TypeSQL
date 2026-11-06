@@ -1,16 +1,18 @@
+import type { Next } from "../../../engine/next.js";
+import type { Ok, Tok, Toks } from "../../../engine/tokens.js";
+import type { SqlError } from "../../../errors.js";
 import type {
-	AnyLabel,
-	EatOp,
-	EatWords,
-	Expected,
-	Nx,
-	Ok,
-} from "../../../engine/parse.js";
-import type { IdTok, OpTok, Toks, WordTok } from "../../../engine/tokens.js";
+	IdTok,
+	NumTok,
+	OpTok,
+	ParamTok,
+	StrTok,
+	WordTok,
+} from "../lexer/tokens.js";
 import type { NotColId, TypeFuncNameKeyword } from "./keywords.js";
 
 export type Ident<T extends Toks, I extends number> =
-	IdentName<T[I]> extends infer V extends string ? [V, Nx<I>] : null;
+	IdentName<T[I]> extends infer V extends string ? [V, Next<I>] : null;
 
 type IdentName<H> =
 	H extends IdTok<infer V>
@@ -32,7 +34,7 @@ type QualParts<
 > =
 	EatOp<T, I, "."> extends never
 		? [Acc, I]
-		: AnyLabel<T, Nx<I>> extends [
+		: AnyLabel<T, Next<I>> extends [
 					infer B extends string,
 					infer J extends number,
 				]
@@ -43,8 +45,8 @@ type QualParts<
 
 export type FuncName<T extends Toks, I extends number> =
 	FuncKeyword<T[I]> extends infer V extends string
-		? T[Nx<I>] extends OpTok<"(">
-			? [[V], Nx<I>]
+		? T[Next<I>] extends OpTok<"(">
+			? [[V], Next<I>]
 			: null
 		: QualName<T, I>;
 type FuncKeyword<H> =
@@ -64,12 +66,12 @@ export type SkipFirst<
 	: I;
 
 export type Close<T extends Toks, I extends number, N, C extends string = ")"> =
-	EatOp<T, I, C> extends never ? Expected<`"${C}"`, T, I> : Ok<N, Nx<I>>;
+	EatOp<T, I, C> extends never ? Expected<`"${C}"`, T, I> : Ok<N, Next<I>>;
 
 export type ParenIdentList<T extends Toks, I extends number> =
 	EatOp<T, I, "("> extends never
 		? Expected<'"("', T, I>
-		: IdentListLoop<T, Nx<I>, []>;
+		: IdentListLoop<T, Next<I>, []>;
 type IdentListLoop<
 	T extends Toks,
 	I extends number,
@@ -79,25 +81,91 @@ type IdentListLoop<
 		? EatOp<T, J, ","> extends never
 			? EatOp<T, J, ")"> extends never
 				? Expected<'"," or ")"', T, J>
-				: Ok<[...Acc, N], Nx<J>>
-			: IdentListLoop<T, Nx<J>, [...Acc, N]>
+				: Ok<[...Acc, N], Next<J>>
+			: IdentListLoop<T, Next<J>, [...Acc, N]>
 		: Expected<"identifier", T, I>;
 
-export type {
-	AnyLabel,
-	AtEnd,
-	EatOp,
-	EatWord,
-	EatWords,
-	Expected,
-	Fail,
-	Near,
-	Nx,
-	Nx2,
-	Nx3,
-	Ok,
-	SkipToCloseParen,
-	SkipWord,
-	SkipWords,
-	SyntaxErrorAt,
-} from "../../../engine/parse.js";
+export type { AtEnd, Ok } from "../../../engine/tokens.js";
+
+export type Nx2<I extends number> = Next<Next<I>>;
+export type Nx3<I extends number> = Next<Nx2<I>>;
+
+export type Fail<Message extends string, I extends number> = SqlError<
+	Message,
+	I
+>;
+
+export type Near<T extends Toks, I extends number> = T[I] extends infer H
+	? H extends WordTok<infer V>
+		? V
+		: H extends IdTok<infer V>
+			? `"${V}"`
+			: H extends OpTok<infer V>
+				? V
+				: H extends NumTok<infer V>
+					? V
+					: H extends StrTok<infer V>
+						? `'${V}'`
+						: H extends ParamTok<infer V>
+							? `$${V}`
+							: "end of input"
+	: never;
+
+export type SyntaxErrorAt<T extends Toks, I extends number> = Fail<
+	`syntax error at or near ${Near<T, I>}`,
+	I
+>;
+export type Expected<
+	What extends string,
+	T extends Toks,
+	I extends number,
+> = Fail<`syntax error: expected ${What} at or near ${Near<T, I>}`, I>;
+
+export type EatWord<
+	T extends Toks,
+	I extends number,
+	W extends string,
+> = T[I] extends { readonly k: "w"; readonly v: W } ? Next<I> : never;
+export type EatOp<
+	T extends Toks,
+	I extends number,
+	O extends string,
+> = T[I] extends { readonly k: "o"; readonly v: O } ? Next<I> : never;
+export type EatWords<
+	T extends Toks,
+	I extends number,
+	Ws extends readonly string[],
+> = Ws extends readonly [
+	infer W extends string,
+	...infer R extends readonly string[],
+]
+	? EatWord<T, I, W> extends never
+		? never
+		: EatWords<T, EatWord<T, I, W>, R>
+	: I;
+export type SkipWord<T extends Toks, I extends number, W extends string> =
+	EatWord<T, I, W> extends never ? I : EatWord<T, I, W>;
+export type SkipWords<
+	T extends Toks,
+	I extends number,
+	Ws extends readonly string[],
+> = EatWords<T, I, Ws> extends never ? I : EatWords<T, I, Ws>;
+
+export type AnyLabel<T extends Toks, I extends number> =
+	LabelName<T[I]> extends infer V extends string ? [V, Next<I>] : null;
+type LabelName<H> = H extends IdTok<infer V> | WordTok<infer V> ? V : null;
+
+export type SkipToCloseParen<
+	T extends Toks,
+	I extends number,
+	Depth extends readonly unknown[] = [],
+> =
+	T[I] extends OpTok<"(">
+		? SkipToCloseParen<T, Next<I>, [...Depth, 0]>
+		: T[I] extends OpTok<")">
+			? Depth extends readonly [unknown, ...infer D2]
+				? SkipToCloseParen<T, Next<I>, D2>
+				: Next<I>
+			: T[I] extends Tok
+				? SkipToCloseParen<T, Next<I>, Depth>
+				: SyntaxErrorAt<T, I>;

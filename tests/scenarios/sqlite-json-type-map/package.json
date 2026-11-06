@@ -1,0 +1,12 @@
+{
+	"name": "sqlite-json-type-map",
+	"private": true,
+	"type": "module",
+	"dependencies": {
+		"@typesql/core": "workspace:*"
+	},
+	"devDependencies": {
+		"typescript": "catalog:",
+		"@types/node": "catalog:"
+	}
+}
