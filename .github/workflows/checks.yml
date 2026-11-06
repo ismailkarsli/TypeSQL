@@ -34,8 +34,8 @@ jobs:
           node-version: 26
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
-      - run: pnpm typecheck
       - run: pnpm build
+      - run: pnpm typecheck
       - run: pnpm --filter typesql exec vsce package --no-dependencies --out "$RUNNER_TEMP/typesql.vsix"
       - run: pnpm docs:build
 

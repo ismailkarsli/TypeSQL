@@ -9,7 +9,7 @@ export type PgLookup = (
 ) => Promise<{ readonly rows: readonly unknown[] }>;
 
 /** A parsed array literal: elements, NULLs and nested arrays. */
-export type PgArray<E> = (E | null | PgArray<E>)[];
+type PgArray<E> = (E | null | PgArray<E>)[];
 
 /** An element of a user-defined array type: a boolean, a number, or its text. */
 type PgElement = string | number | boolean;
