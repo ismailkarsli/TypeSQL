@@ -1,6 +1,6 @@
 import { empty } from "../empty.js";
 import type { JsonMarker } from "../sql/inline.js";
-import { HOLDS, holdsMarkers, param } from "./compile.js";
+import { fail, HOLDS, holdsMarkers, param } from "./compile.js";
 
 export class JsonParam<T = unknown> {
 	declare readonly value: T;
@@ -21,7 +21,7 @@ export class JsonParam<T = unknown> {
 
 export function json<const T>(value: T): JsonMarker<T> {
 	// The marker would be stored as text, and with it its secret prefix.
-	if (holdsMarkers(value)) throw new Error(HOLDS);
+	if (holdsMarkers(value)) fail(HOLDS);
 	return param(
 		value === undefined ? empty : value === null ? null : new JsonParam(value),
 		// biome-ignore lint/nursery/noUnsafeTypeAssertion: the marker is a string branded with the value's type.

@@ -17,16 +17,17 @@ exports[`runtime-inline-reuse > scenario 1`] = `
   },
   "start": {
     "status": 1,
-    "stderr": "file://<workspace>/packages/core/dist/runtime/compile.js:44
-        throw new Error(id[0] === "~"
-              ^
+    "stderr": "file://<workspace>/packages/core/dist/runtime/compile.js:3
+    throw new Error(\`typesql: \${message}\`);
+          ^
 
 Error: typesql: this sql.param() value was already used; call sql.param() once per statement
-    at use (file://<workspace>/packages/core/dist/runtime/compile.js:44:15)
-    at file://<workspace>/packages/core/dist/runtime/compile.js:193:23
-    at scan (file://<workspace>/packages/core/dist/runtime/compile.js:148:44)
-    at compile (file://<workspace>/packages/core/dist/runtime/compile.js:182:17)
-    at call (file://<workspace>/packages/core/dist/create-sql.js:21:34)
+    at fail (file://<workspace>/packages/core/dist/runtime/compile.js:3:11)
+    at use (file://<workspace>/packages/core/dist/runtime/compile.js:36:9)
+    at file://<workspace>/packages/core/dist/runtime/compile.js:146:23
+    at scan (file://<workspace>/packages/core/dist/runtime/compile.js:107:44)
+    at compile (file://<workspace>/packages/core/dist/runtime/compile.js:139:17)
+    at call (file://<workspace>/packages/core/dist/create-sql.js:55:34)
     at file://<scenario>/dist/app.js:6:1
     at ModuleJob.run (node:internal/modules/esm/module_job:569:25)
     at async node:internal/modules/esm/loader:650:26

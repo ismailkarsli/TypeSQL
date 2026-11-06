@@ -75,36 +75,24 @@ export type PluginOutput<
 	? PluginOutput<Apply<H, V, InputContext, "output">, R>
 	: V;
 
-export function encodeInput<V>(
+export const encodeInput = <V>(
 	value: V,
 	plugins: readonly SqlPlugin[],
 	context: InputContext,
 	// biome-ignore lint/plugin: returns whatever the plugins' `transformInput` returns.
-): unknown {
-	let encoded: unknown = value;
-	for (let i = plugins.length - 1; i >= 0; i--)
-		encoded = plugins[i]?.transformInput?.(encoded, context) ?? encoded;
-	return encoded;
-}
+): unknown =>
+	plugins.reduceRight<unknown>(
+		(encoded, plugin) => plugin.transformInput?.(encoded, context) ?? encoded,
+		value,
+	);
 
-export function encodeParameters(
-	args: readonly unknown[],
-	plugins: readonly SqlPlugin[],
-	query: string,
-): readonly unknown[] {
-	const encoded = encodeInput(args, plugins, { kind: "parameters", query });
-	if (!Array.isArray(encoded))
-		throw new Error("typesql: a plugin must encode parameters as an array");
-	return encoded;
-}
-
-export function applyPlugins(
+export const applyPlugins = (
 	rows: readonly unknown[],
 	plugins: readonly SqlPlugin[],
-): unknown[] {
-	return rows.map((row) => {
-		for (const plugin of plugins)
-			if (plugin.transformOutput) row = plugin.transformOutput(row);
-		return row;
-	});
-}
+): unknown[] =>
+	rows.map((row) =>
+		plugins.reduce(
+			(r, plugin) => (plugin.transformOutput ? plugin.transformOutput(r) : r),
+			row,
+		),
+	);

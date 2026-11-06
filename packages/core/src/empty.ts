@@ -2,7 +2,7 @@ import type { SqlError } from "./errors.js";
 import type { InlineFragment } from "./query.js";
 import type { Slottable } from "./sql/slots.js";
 
-const EMPTY: unique symbol = Symbol("typesql.empty");
+declare const EMPTY: unique symbol;
 
 /** What `sql.optional(value)` gives for `undefined`: DEFAULT in sql.param, a skipped item in sql.combine/and/or. */
 export interface Empty {
@@ -47,13 +47,9 @@ export type OptionalInput<T> = [Extract<T, null>] extends [never]
 export type Truthy<V> = Exclude<V, null | undefined | false | 0 | 0n | "">;
 
 /** The sentinel itself; only sql.optional, sql.if and sql.json(undefined) hand it out. */
-export const empty: Empty = { [EMPTY]: true };
+// biome-ignore lint/nursery/noUnsafeTypeAssertion: `Empty` is a type-only brand; the sentinel is known by identity.
+export const empty = {} as Empty;
 
-export function optional<const T>(value: T): Optional<T> {
+export const optional = <const T>(value: T): Optional<T> =>
 	// biome-ignore lint/nursery/noUnsafeTypeAssertion: `Optional<T>` is a conditional type that the value cannot be checked against.
-	return (value === undefined ? empty : value) as never;
-}
-
-export function isEmpty(value: unknown): value is Empty {
-	return value === empty;
-}
+	(value === undefined ? empty : value) as never;

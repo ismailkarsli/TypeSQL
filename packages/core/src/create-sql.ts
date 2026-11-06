@@ -1,19 +1,19 @@
 import type { Dialect, DialectTypes, SqlOf } from "./dialect.js";
-import { type Empty, empty, isEmpty, optional } from "./empty.js";
-import { encodeInput, encodeParameters, type SqlPlugin } from "./plugin.js";
-import type { Executor } from "./query.js";
-import { makeFragment, makeQuery } from "./query.js";
+import { type Empty, empty, optional } from "./empty.js";
+import { encodeInput, type InputContext, type SqlPlugin } from "./plugin.js";
+import { type Executor, SqlQuery } from "./query.js";
 import {
 	bind,
-	type CompiledSql,
+	type Compiled,
 	compile,
+	fail,
 	ident,
 	join,
 	param,
 	type Spliceable,
+	SqlFragment,
 } from "./runtime/compile.js";
 import { json } from "./runtime/json.js";
-import { buildSet, buildValues } from "./runtime/write.js";
 
 export interface CreateSql {
 	// biome-ignore lint/style/useShorthandFunctionType: Dialects merge signatures into this interface.
@@ -23,115 +23,26 @@ export interface CreateSql {
 	): SqlOf<T, DB, TM>;
 }
 
+/**
+ * The `sql` of `dialect`. The dialect's `sql` type is computed from its type
+ * parameters; the runtime API cannot be checked against it.
+ */
+// biome-ignore lint/nursery/noUnsafeTypeAssertion: see above.
+export const createDialectSql = createSqlApi as <
+	T extends DialectTypes,
+	DB,
+	TM = T["typeMap"],
+>(
+	dialect: Dialect<T>,
+	executor?: Executor,
+	plugins?: readonly SqlPlugin[],
+) => SqlOf<T, DB, TM>;
+
 // biome-ignore lint/nursery/noUnsafeTypeAssertion: dialects merge their own overloads into `CreateSql`.
 export const createSql = createDialectSql as CreateSql;
 
-export function createDialectSql<T extends DialectTypes, DB, TM = T["typeMap"]>(
-	dialect: Dialect<T>,
-	executor?: Executor,
-	plugins: readonly SqlPlugin[] = [],
-): SqlOf<T, DB, TM> {
-	// The dialect's `sql` type is computed from its type parameters; the
-	// runtime API cannot be checked against it.
-	// biome-ignore lint/nursery/noUnsafeTypeAssertion: see above.
-	return createSqlApi(dialect, executor, plugins) as SqlOf<T, DB, TM>;
-}
-
-const fragmentOf = (compiled: CompiledSql) =>
-	makeFragment(compiled.text, compiled.values);
-
-/** The runtime `sql` of `dialect`, whose type the dialect's `Sql` type describes. */
-export function createSqlApi(
-	dialect: Dialect,
-	executor: Executor | undefined,
-	plugins: readonly SqlPlugin[],
-) {
-	const quote = dialect.quote ?? '"';
-	const encode = (args: readonly unknown[], query: string) =>
-		plugins.length === 0 ? args : encodeParameters(args, plugins, query);
-	const call = (query: string, ...rest: readonly unknown[]) => {
-		const { text, values } = compile(query, encode(rest, query));
-		return makeQuery(text, values, executor, plugins);
-	};
-	const fragment = (text: string, ...rest: readonly unknown[]) =>
-		fragmentOf(compile(text, encode(rest, text)));
-	const api = Object.assign(call, {
-		withPlugin: (plugin: SqlPlugin) =>
-			createDialectSql(dialect, executor, [...plugins, plugin]),
-		prepare: (query: string) => {
-			const compiled = compile(query);
-			const prepared = executor?.prepare?.(compiled.text) ?? executor;
-			return (...input: readonly unknown[]) => {
-				const values = bind(compiled.names, encode(input, query));
-				if (values.length !== compiled.count)
-					throw new Error(
-						`typesql: expected ${compiled.count} parameters, got ${values.length}`,
-					);
-				return makeQuery(
-					compiled.text,
-					[...values, ...compiled.values],
-					prepared,
-					plugins,
-				);
-			};
-		},
-		as: call,
-		param: <V>(value: V) =>
-			param(
-				plugins.length === 0 || isEmpty(value)
-					? value
-					: encodeInput(value, plugins, { kind: "value" }),
-			),
-		optional,
-		if: <V, R>(value: V, then: (value: V) => R) =>
-			value ? then(value) : empty,
-		json,
-		fragment,
-		id: (...parts: readonly string[]) => {
-			if (parts.some((p) => typeof p !== "string"))
-				throw new Error("typesql: sql.id() takes strings");
-			return makeFragment(ident(quote, parts), []);
-		},
-		combine: (
-			items: readonly (Spliceable | Empty)[],
-			options?: { readonly separator?: string },
-		) => {
-			const defined = present(items, "combine");
-			if (defined.length === 0)
-				throw new Error("typesql: sql.combine() got no items");
-			return fragmentOf(join(defined, options?.separator ?? ", "));
-		},
-		and: (items: readonly (Spliceable | Empty)[]) => bool(items, "AND"),
-		or: (items: readonly (Spliceable | Empty)[]) => bool(items, "OR"),
-		set: (...args: readonly unknown[]) => {
-			const [table, input] = tabled(args);
-			return fragmentOf(
-				buildSet(encodeInput(input, plugins, { kind: "set", table }), quote),
-			);
-		},
-		values: (...args: readonly unknown[]) => {
-			const [table, rows] = tabled(args);
-			if (!Array.isArray(rows))
-				throw new Error("typesql: sql.values() takes an array");
-			const context = { kind: "values", table } as const;
-			return fragmentOf(
-				buildValues(
-					plugins.length === 0
-						? rows
-						: rows.map((row) => encodeInput(row, plugins, context)),
-					dialect,
-					quote,
-				),
-			);
-		},
-		raw: (text: string) => fragmentOf(compile(text, [])),
-	});
-	Object.defineProperty(api, "dialect", {
-		value: dialect.name,
-		enumerable: true,
-	});
-	return api;
-}
+const fragmentOf = (compiled: Compiled) =>
+	new SqlFragment(compiled.text, compiled.values);
 
 /** The `(table, input)` or `(input)` arguments of sql.set() and sql.values(). */
 const tabled = (
@@ -139,44 +50,151 @@ const tabled = (
 ): readonly [table: string | null, input: unknown] =>
 	typeof args[0] === "string" ? [args[0], args[1]] : [null, args[0]];
 
-function present(
-	items: readonly (Spliceable | Empty)[],
-	name: string,
-): Spliceable[] {
-	const defined: Spliceable[] = [];
-	for (const item of items) {
-		if (isEmpty(item)) continue;
-		if (item === null || item === undefined)
-			throw new Error(
-				`typesql: sql.${name}() got null or undefined; use sql.optional()`,
-			);
-		defined.push(item);
-	}
-	return defined;
-}
+/** The column values of an object that are not DEFAULT. */
+const columns = <V>(value: V): [string, unknown][] => {
+	const list = Object.entries(Object(value));
+	const taken = bind(
+		[],
+		list.map((e) => e[1]),
+		true,
+	);
+	return list
+		.map(([key], i): [string, unknown] => [key, taken[i]])
+		.filter((e) => e[1] !== undefined);
+};
 
 // sql.and / sql.or results are one condition already; nesting them adds no
 // parentheses.
 const GROUPED = new WeakSet<Spliceable>();
 
-function bool(given: readonly (Spliceable | Empty)[], op: "AND" | "OR") {
-	const items = present(given, op.toLowerCase());
+const bool = (given: readonly (Spliceable | Empty)[], op: "AND" | "OR") => {
+	const items = present(given);
 	const r = join(
 		items.map((f) =>
-			GROUPED.has(f) ? f : { text: `(${f.text})`, values: f.values },
+			GROUPED.has(f) ? f : new SqlFragment(`(${f.text})`, f.values),
 		),
 		` ${op} `,
 	);
-	const fragment = makeFragment(
-		items.length === 0
-			? op === "AND"
-				? "true"
-				: "false"
-			: items.length === 1
+	const fragment = new SqlFragment(
+		items[1]
+			? `(${r.text})`
+			: items[0]
 				? r.text
-				: `(${r.text})`,
+				: op === "AND"
+					? "true"
+					: "false",
 		r.values,
 	);
 	GROUPED.add(fragment);
 	return fragment;
+};
+
+const present = (items: readonly (Spliceable | Empty)[]): Spliceable[] =>
+	items.filter((item): item is Spliceable => item !== empty);
+
+/** The runtime `sql` of `dialect`, whose type the dialect's `Sql` type describes. */
+export function createSqlApi(
+	dialect: Dialect,
+	executor?: Executor,
+	plugins: readonly SqlPlugin[] = [],
+) {
+	const quote = dialect.quote ?? '"';
+	const encode = <V>(value: V, context: InputContext) =>
+		plugins[0] ? encodeInput(value, plugins, context) : value;
+	const encodeArgs = (args: readonly unknown[], query: string) => {
+		if (!plugins[0]) return args;
+		const encoded = encodeInput(args, plugins, { kind: "parameters", query });
+		return Array.isArray(encoded)
+			? encoded
+			: fail("a plugin must encode parameters as an array");
+	};
+	const call = (query: string, ...rest: readonly unknown[]) => {
+		const { text, values } = compile(query, encodeArgs(rest, query));
+		return new SqlQuery(text, values, executor, plugins);
+	};
+	const api = Object.assign(call, {
+		withPlugin: (plugin: SqlPlugin) =>
+			createDialectSql(dialect, executor, [...plugins, plugin]),
+		prepare: (query: string) => {
+			const compiled = compile(query);
+			const prepared = executor?.prepare?.(compiled.text) ?? executor;
+			return (...input: readonly unknown[]) =>
+				new SqlQuery(
+					compiled.text,
+					[
+						...bind(compiled.names, encodeArgs(input, query)),
+						...compiled.values,
+					],
+					prepared,
+					plugins,
+				);
+		},
+		as: call,
+		param: <V>(value: V) =>
+			param(value === empty ? value : encode(value, { kind: "value" })),
+		optional,
+		if: <V, R>(value: V, then: (value: V) => R) =>
+			value ? then(value) : empty,
+		json,
+		fragment: (text: string, ...rest: readonly unknown[]) =>
+			fragmentOf(compile(text, encodeArgs(rest, text))),
+		id: (...parts: readonly string[]) =>
+			new SqlFragment(ident(quote, parts), []),
+		combine: (
+			items: readonly (Spliceable | Empty)[],
+			options?: { readonly separator?: string },
+		) => {
+			const defined = present(items);
+			return defined[0]
+				? join(defined, options?.separator ?? ", ")
+				: fail("sql.combine() got no items");
+		},
+		and: (items: readonly (Spliceable | Empty)[]) => bool(items, "AND"),
+		or: (items: readonly (Spliceable | Empty)[]) => bool(items, "OR"),
+		set: (...args: readonly unknown[]) => {
+			const [table, input] = tabled(args);
+			const cols = columns(encode(input, { kind: "set", table }));
+			if (!cols[0]) fail("sql.set() got no values; skip the UPDATE");
+			return new SqlFragment(
+				cols.map(([key], i) => `${ident(quote, [key])} = $${i + 1}`).join(", "),
+				cols.map((e) => e[1]),
+			);
+		},
+		values: (...args: readonly unknown[]) => {
+			const [table, given] = tabled(args);
+			const rows = [...Object(given)].map(
+				(row) => new Map(columns(encode(row, { kind: "values", table }))),
+			);
+			if (!rows[0]) fail("sql.values() got no rows; skip the INSERT");
+			const cols = Array.from(new Set(rows.flatMap((row) => [...row.keys()])));
+			if (!cols[0]) {
+				if (rows[1]) fail("sql.values() rows have no values");
+				return new SqlFragment(dialect.emptyRow ?? "DEFAULT VALUES", []);
+			}
+			const values: unknown[] = [];
+			const tuples = rows.map(
+				(row) =>
+					`(${cols
+						.map((column) =>
+							row.has(column)
+								? `$${values.push(row.get(column))}`
+								: dialect.valuesDefault === false
+									? fail(
+											`no DEFAULT in VALUES here; give every row "${column}"`,
+										)
+									: "DEFAULT",
+						)
+						.join(", ")})`,
+			);
+			return new SqlFragment(
+				`(${cols.map((c) => ident(quote, [c])).join(", ")}) VALUES ${tuples.join(", ")}`,
+				values,
+			);
+		},
+		raw: (text: string) => fragmentOf(compile(text, [])),
+	});
+	return Object.defineProperty(api, "dialect", {
+		value: dialect.name,
+		enumerable: true,
+	});
 }
