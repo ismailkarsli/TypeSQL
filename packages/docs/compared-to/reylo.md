@@ -44,7 +44,10 @@ const rows = await sql(
 | Running queries | a preload (`--import reylo/register`) or bundler plugin, with the engine installed at runtime | `sql()` builds `{ text, values }`, and your driver sends it |
 | Dynamic queries | `CASE` on parameters, and JSON parameters described by a JSON Schema | [fragments](../guide/using-sql#dynamic-sql) |
 | Migrations | applied with your own tool | applied with your own tool, or [written as DDL](../guide/migrations) that the schema type follows |
+| Runtime size | a native engine of 19 MB (Linux x64, unpacked) | `@typesql/core` is tiny (under 3 kB minified and gzipped); under 5 kB with `@typesql/pg` |
 | Databases | PostgreSQL, MySQL, SQLite, DuckDB (preview) | PostgreSQL, SQLite, MySQL and MariaDB |
+
+Sizes are for Reylo 0.7.0 and `@typesql/pg` 7.0.1. Reylo's engine is the `@reylosql/engine-linux-x64` package. TypeSQL's size is a select with a join on node-postgres, bundled with esbuild, without the driver.
 
 Both work out nullability from outer joins and from `WHERE` conditions that reject `NULL`.
 

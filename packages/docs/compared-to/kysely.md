@@ -40,7 +40,10 @@ Both give `title` as `string | null`, with no generator and no database connecti
 | Types come from | your `DB` interface | your schema type |
 | Raw SQL | `` sql<T>`…` ``, typed by the `T` you write | checked and typed from the SQL |
 | Dynamic queries | conditional method calls | [fragments](../guide/using-sql#dynamic-sql) |
+| Runtime size (minified and gzipped) | about 31 kB | `@typesql/core` is tiny (under 3 kB); under 5 kB with `@typesql/pg` |
 | Databases | PostgreSQL, MySQL, SQLite, SQL Server and community dialects | PostgreSQL, SQLite, MySQL and MariaDB |
+
+Sizes are for Kysely 0.29.8 and `@typesql/pg` 7.0.1: a select with a join on node-postgres, bundled with esbuild, without the driver.
 
 ## Choose Kysely when
 

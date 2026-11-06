@@ -44,7 +44,7 @@ Install `@typesql/core` and the adapter for your driver:
 | [`@typesql/sqlite`](../adapters/sqlite) | node:sqlite, bun:sqlite or better-sqlite3 |
 | [`@typesql/mysql`](../adapters/mysql) | mysql2, the mariadb connector, PlanetScale or TiDB Cloud serverless |
 
-`@typesql/core` has no runtime dependencies. Its [migrator](./migrations#the-migrator) connects from a `url` with `pg` or `mysql2`, optional peer dependencies, and writes `db.ts` with `typescript`. The packages are ESM-only. `import` and Node's `require()` of ES modules both work, but TypeScript rejects imports from `.cts` files under `node16`/`nodenext` resolution (TS1479).
+`@typesql/core` is tiny (under 3 kB minified and gzipped) and has no runtime dependencies. Its [migrator](./migrations#the-migrator) connects from a `url` with `pg` or `mysql2`, optional peer dependencies, and writes `db.ts` with `typescript`. The packages are ESM-only. `import` and Node's `require()` of ES modules both work, but TypeScript rejects imports from `.cts` files under `node16`/`nodenext` resolution (TS1479).
 
 If your schema is already described for Kysely, Drizzle or Prisma, install its TypeSQL package instead of writing it again:
 

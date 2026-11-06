@@ -5,7 +5,7 @@ layout: home
 hero:
   name: "TypeSQL"
   text: "Typed SQL for TypeScript"
-  tagline: "Write plain SQL and get exact types for rows and parameters. No codegen, no database connection, no build step."
+  tagline: "Write plain SQL and get exact types for rows and parameters. No codegen, no database connection, no build step. The runtime is tiny (under 3 kB)."
   image:
     src: /logo.svg
     alt: "TypeSQL logo"
