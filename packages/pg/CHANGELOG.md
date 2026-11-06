@@ -1,5 +1,12 @@
 # @typesql/pg
 
+## 7.0.0
+
+### Patch Changes
+
+- Updated dependencies:
+  - @typesql/core@7.0.0
+
 ## 6.2.0
 
 ### Patch Changes

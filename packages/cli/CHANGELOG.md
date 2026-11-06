@@ -1,5 +1,15 @@
 # @typesql/cli
 
+## 7.0.0
+
+### Patch Changes
+
+- Updated dependencies:
+  - @typesql/core@7.0.0
+  - @typesql/mysql@7.0.0
+  - @typesql/pg@7.0.0
+  - @typesql/sqlite@7.0.0
+
 ## 6.2.0
 
 ### Minor Changes

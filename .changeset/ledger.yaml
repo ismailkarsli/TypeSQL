@@ -422,6 +422,11 @@
   dir: packages/core
   intents:
     - brave-owls-learn
+"@typesql/core@7.0.0":
+  dir: packages/core
+  intents:
+    - eager-horses-relate
+    - silly-planes-beg
 "@typesql/drizzle@0.0.2":
   dir: packages/drizzle
   intents:

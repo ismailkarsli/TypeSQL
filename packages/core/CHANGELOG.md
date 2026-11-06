@@ -1,5 +1,15 @@
 # @typesql/core
 
+## 7.0.0
+
+### Major Changes
+
+- Breaking: `CasePlugin` and `CasePluginTypes` move from `@typesql/core` to the new `@typesql/core/plugins` entry, so applications that don't rename keys don't ship the plugin: `@typesql/core` is about 3.4 kB minified and gzipped. Change the import to `import { CasePlugin } from "@typesql/core/plugins"`; `.withPlugin(new CasePlugin())`, the renamed keys and their types are unchanged, and the custom-plugin types `SqlPlugin`, `PluginTypes`, `IdentityPluginTypes` and `InputContext` stay in `@typesql/core`.
+
+### Patch Changes
+
+- The runtime is smaller: `@typesql/core` is about 3.6 kB minified and gzipped, down from 5.2 kB, with the same API. Its error messages are shorter. Queries and fragments are now class instances, so `console.log(query)` prints `SqlQuery { text, values }`, and `execute()`, `executeTakeFirst()`, `executeTakeFirstOrThrow()` and `executeCount()` are methods on their prototype: call them on the query rather than detaching them.
+
 ## 6.2.0
 
 ### Minor Changes
