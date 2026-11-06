@@ -15,6 +15,7 @@
 			],
 			"@typesql/core/mysql": ["./packages/core/src/mysql/index.ts"],
 			"@typesql/core/migration": ["./packages/core/src/migration/index.ts"],
+			"@typesql/core/plugins": ["./packages/core/src/plugins/index.ts"],
 			"@typesql/core": ["./packages/core/src/index.ts"],
 			"@typesql/pg/introspect": ["./packages/pg/src/introspect/index.ts"],
 			"@typesql/pg": ["./packages/pg/src/index.ts"],
