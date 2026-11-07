@@ -13,7 +13,8 @@ export {
 	formatSql,
 	type HoleSource,
 	type KeywordCase,
+	type Position,
 	type SourceEdit,
 	type SqlText,
 } from "./sql/format.js";
-export { DEFAULT_WIDTH, formatLiteral } from "./sql/layout.js";
+export { advance, DEFAULT_WIDTH, formatLiteral } from "./sql/layout.js";

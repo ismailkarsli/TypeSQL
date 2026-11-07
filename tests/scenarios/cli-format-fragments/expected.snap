@@ -1,0 +1,96 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`cli-format-fragments > scenario 1`] = `
+{
+  "artifacts": {
+    "app.ts": "import type { Col } from "@typesql/core/postgres";
+import { createSql } from "@typesql/pg";
+import { Pool } from "pg";
+
+interface DB {
+	user: { id: Col<"int4">; email: Col<"text"> };
+	user_subscription: { user_id: Col<"int4">; plan_key: Col<"text"> };
+}
+
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+await pool.query(\`
+	CREATE TABLE "user" (id int4 PRIMARY KEY, email text NOT NULL);
+	CREATE TABLE user_subscription (user_id int4 NOT NULL, plan_key text NOT NULL);
+	INSERT INTO "user" VALUES (1, 'b@example.com'), (2, 'a@example.com'), (3, 'c@example.com');
+	INSERT INTO user_subscription VALUES (1, 'pro'), (3, 'free');
+\`);
+const sql = createSql<DB>(pool);
+const plan = "pro";
+
+// The whitespace at a fragment's edges separates it from the fragment before it.
+export const ordered = await sql(
+	\`SELECT * FROM "user" ORDER BY "email" \${sql.fragment(\`ASC\`)}\${sql.fragment(\` LIMIT 2 \`)}\`,
+).execute();
+
+// A fragment in a hole breaks over lines where it ends up, if it doesn't fit there.
+export const subscribed = await sql(
+	\`
+		SELECT "id"
+		FROM "user"
+		WHERE \${sql.fragment(\`
+			EXISTS (
+				SELECT "user_subscription"."user_id"
+				FROM "user_subscription"
+				WHERE "user_subscription"."user_id" = "user"."id"
+					AND "user_subscription"."plan_key" = \${sql.param(plan)}
+			)
+		\`)}
+	\`,
+).execute();
+
+// So does one on its own, and one without whitespace at its edges stays without.
+const subscriber = sql.fragment(
+	\`EXISTS (
+		SELECT 1
+		FROM user_subscription s
+		WHERE s.user_id = "user".id AND s.plan_key <> 'free' AND s.user_id > 0
+	)\`,
+);
+export const paying = await sql(
+	\`SELECT id FROM "user" WHERE \${subscriber}\`,
+).execute();
+
+console.log({ ordered, subscribed, paying });
+await pool.end();
+",
+  },
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "ordered": "({ id: number; email: string })[]",
+      "paying": "({ id: number })[]",
+      "subscribed": "({ id: number })[]",
+    },
+  },
+  "generate": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "typesql format: formatted app.ts
+typesql format: every file is formatted
+",
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "{
+  ordered: [
+    { id: 2, email: 'a@example.com' },
+    { id: 1, email: 'b@example.com' }
+  ],
+  subscribed: [ { id: 1 } ],
+  paying: [ { id: 1 } ]
+}
+",
+  },
+}
+`;

@@ -96,7 +96,21 @@ db.ddl(`
 
 SQL that leaves one line goes into a template literal, with a line break after its opening backtick and before its closing one. A string written in `"…"` or `'…'` becomes one when it is too long, and a backtick or `${` in it is escaped; one that fits keeps its quotes. A template literal that already starts on its own line keeps the indentation of its first line and closing backtick; otherwise the SQL is indented one level deeper than the line the string starts on, with a tab or spaces as that line is indented. An escaped line break, as `\n` in a `"…"` string, is a line break like any other.
 
-A line comment keeps a line break after it, so SQL with one is never on one line. A string spliced into a `${…}` hole of another, such as `sql.fragment("…")` inside `sql.and([…])`, stays on one line. In SQLite, MySQL and MariaDB, the SQL keeps its line breaks as written if an unaliased select item, whose text names its column, is written over several lines.
+A line comment keeps a line break after it, so SQL with one is never on one line. A string in a `${…}` hole of another, such as `sql.fragment("…")` inside `sql.and([…])`, is laid out where it ends up: on one line if it fits there, and otherwise indented from that line.
+
+A fragment keeps the whitespace at its edges, since it separates the fragment from what it is spliced next to: `${sql.fragment("ASC")}${sql.fragment(" LIMIT 10")}` must not become `ASCLIMIT 10`. On one line that whitespace is one space; over lines it is the line breaks after the opening backtick and before the closing one. A fragment without it starts right after the backtick and ends right before the closing one:
+
+```ts
+const subscriber = sql.fragment(
+  `EXISTS (
+    SELECT 1
+    FROM user_subscription s
+    WHERE s.user_id = "user".id AND s.plan_key <> 'free' AND s.user_id > 0
+  )`,
+);
+```
+
+In SQLite, MySQL and MariaDB, the SQL keeps its line breaks as written if an unaliased select item, whose text names its column, is written over several lines.
 
 `format.width` in the config, or `--width`, sets the width.
 

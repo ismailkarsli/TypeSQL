@@ -97,7 +97,7 @@ export const commented = await sql(\`
 \`).execute();
 
 // A fragment and the \${…} holes it is spliced into.
-const titled = sql.fragment(\`p.title IS NOT NULL\`);
+const titled = sql.fragment(\` p.title IS NOT NULL \`);
 export const joined = await sql(
 	\`
 		SELECT p.id, u.name

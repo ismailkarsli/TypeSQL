@@ -129,6 +129,7 @@ exports[`module-entry-points > scenario 1`] = `
   },
   "@typesql/language-server/format": {
     "DEFAULT_WIDTH": "number",
+    "advance": "function",
     "editorKinds": "function",
     "formatLiteral": "function",
     "formatSql": "function",

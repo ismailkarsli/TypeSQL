@@ -5,6 +5,7 @@ import {
 	formatSql,
 	type HoleSource,
 	keepHoles,
+	type Position,
 	recased,
 	type SourceEdit,
 	type SqlText,
@@ -22,6 +23,12 @@ export const DEFAULT_WIDTH = 80;
  * the literal's quotes. SQL that can't be laid out, as an unaliased select
  * item written over lines in SQLite, MySQL or MariaDB, keeps its line breaks
  * as `formatSql` does.
+ *
+ * A fragment keeps the whitespace at its edges, which separates it from what
+ * it is spliced next to: one space on one line, a line break over lines.
+ * Each `${…}` hole is measured as `hole(start, end)` gives it and written as
+ * `hole(start, end, position)` gives it at its position in the result, so a
+ * literal in it can be laid out where it ends up.
  */
 export function formatLiteral(
 	source: string,
@@ -61,28 +68,62 @@ function layoutLiteral(
 	const doc = new Builder(read.units).build();
 
 	const width = options.width ?? DEFAULT_WIDTH;
-	const lineStart = source.lastIndexOf("\n", sql.start - 2) + 1;
-	const before = source.slice(lineStart, sql.start - 1);
-	const callIndent = /^[ \t]*/.exec(before)![0];
+	const { column, indent: callIndent } =
+		options.position ?? positionOf(source, sql.start - 1);
+	// A fragment's whitespace at its edges separates it from its neighbours.
+	const lead = !options.fragment || read.leading !== "";
+	const trail = !options.fragment || read.trailing !== "";
 	const flat = breaks(doc) ? null : flatten(doc);
-	if (flat !== null && columns(before) + columns(flat) + 2 <= width)
-		return {
-			start: sql.start - 1,
-			end: sql.end + 1,
-			text: quote + flat + quote,
-		};
+	if (flat !== null) {
+		const text = `${options.fragment && lead ? " " : ""}${flat}${options.fragment && trail ? " " : ""}`;
+		if (column + columns(text) + 2 <= width)
+			return {
+				start: sql.start - 1,
+				end: sql.end + 1,
+				text: quote + text + quote,
+			};
+	}
 
-	const unit = indentUnit(source, callIndent);
-	const template = quote === "`";
-	const base = (template ? lastLine(read.leading) : null) ?? callIndent + unit;
-	const closing = (template ? lastLine(read.trailing) : null) ?? callIndent;
-	const printed = print(forceBreak(doc), width, base, unit);
-	const content = `\n${printed}\n${closing}`;
+	// A template literal in place keeps the indentation it is written with;
+	// one in a hole is indented from where it ends up.
+	const keep = quote === "`" && options.position === undefined;
+	const written = keep ? lastLine(read.leading) : null;
+	const unit = indentUnit(source, written || callIndent);
+	// SQL that starts after the backtick continues at its line's indentation.
+	const base = written ?? (lead ? callIndent + unit : callIndent);
+	const closing = (keep ? lastLine(read.trailing) : null) ?? callIndent;
+	const printed = print(forceBreak(doc), {
+		width,
+		base,
+		unit,
+		// Without a line break after the backtick, the SQL starts on its line.
+		first: lead
+			? { text: base, column: columns(base), indent: base }
+			: { text: "", column: column + 1, indent: callIndent },
+		hole,
+	});
+	const content = `${lead ? "\n" : ""}${printed}${trail ? `\n${closing}` : ""}`;
 	return {
 		start: sql.start - 1,
 		end: sql.end + 1,
-		text: `\`${template ? content : toTemplate(content, quote)}\``,
+		text: `\`${quote === "`" ? content : toTemplate(content, quote)}\``,
 	};
+}
+
+/** Where `text` ends when it is written at `position`. */
+export function advance(position: Position, text: string): Position {
+	const at = Math.max(text.lastIndexOf("\n"), text.lastIndexOf("\r"));
+	if (at < 0)
+		return { column: position.column + columns(text), indent: position.indent };
+	const line = text.slice(at + 1);
+	return { column: columns(line), indent: /^[ \t]*/.exec(line)![0] };
+}
+
+/** The column of `source` at `offset` and the indentation of its line. */
+function positionOf(source: string, offset: number): Position {
+	const lineStart = source.lastIndexOf("\n", offset - 1) + 1;
+	const before = source.slice(lineStart, offset);
+	return { column: columns(before), indent: /^[ \t]*/.exec(before)![0] };
 }
 
 /** The indentation after a whitespace's last line break, if it has one. */
@@ -93,9 +134,9 @@ function lastLine(space: string): string | null {
 	return /^[ \t]*$/.test(indent) ? indent : null;
 }
 
-/** One level of indentation: a tab or spaces, as the source indents. */
-function indentUnit(source: string, callIndent: string) {
-	const sample = callIndent || /^[ \t]+(?=\S)/m.exec(source)?.[0] || "";
+/** One level of indentation: a tab or spaces, as `indent` or else the source indents. */
+function indentUnit(source: string, indent: string) {
+	const sample = indent || /^[ \t]+(?=\S)/m.exec(source)?.[0] || "";
 	if (sample.startsWith("\t")) return "\t";
 	return sample.length % 4 === 0 && sample.length > 0 ? "    " : "  ";
 }
@@ -109,7 +150,7 @@ const toTemplate = (s: string, quote: string): string =>
 // Documents, laid out as in Philip Wadler's "A prettier printer": a group
 // is printed on one line if it fits, and otherwise each of its lines breaks.
 
-type Doc = string | readonly Doc[] | Group | Indent | Line;
+type Doc = string | readonly Doc[] | Group | Indent | Line | Hole;
 
 interface Group {
 	readonly kind: "group";
@@ -131,6 +172,14 @@ interface Line {
 	readonly hard: boolean;
 }
 
+/** A `${…}` hole: `text` as measured, and its source span to write it from. */
+interface Hole {
+	readonly kind: "hole";
+	readonly text: string;
+	readonly start: number;
+	readonly end: number;
+}
+
 const LINE: Line = { kind: "line", flat: " ", hard: false };
 const SOFTLINE: Line = { kind: "line", flat: "", hard: false };
 const HARDLINE: Line = { kind: "line", flat: "", hard: true };
@@ -139,6 +188,7 @@ const isDocs = (d: Doc): d is readonly Doc[] => Array.isArray(d);
 
 function breaks(d: Doc): boolean {
 	if (typeof d === "string") return /[\r\n]/.test(d);
+	if (!isDocs(d) && d.kind === "hole") return /[\r\n]/.test(d.text);
 	if (isDocs(d)) return d.some(breaks);
 	if (d.kind === "line") return d.hard;
 	if (d.kind === "group") return d.breaks;
@@ -164,6 +214,7 @@ function flatten(d: Doc): string {
 	if (typeof d === "string") return d;
 	if (isDocs(d)) return d.map(flatten).join("");
 	if (d.kind === "line") return d.flat;
+	if (d.kind === "hole") return d.text;
 	return flatten(d.doc);
 }
 
@@ -180,17 +231,34 @@ interface Command {
 	readonly doc: Doc;
 }
 
+interface PrintOptions {
+	readonly width: number;
+	/** The indentation of each line after the first. */
+	readonly base: string;
+	readonly unit: string;
+	/** The first line: its text so far, column and indentation. */
+	readonly first: { readonly text: string } & Position;
+	readonly hole: HoleSource;
+}
+
 /** `doc` on lines of `width` columns, each indented by `base` and `unit` per level. */
-function print(doc: Doc, width: number, base: string, unit: string): string {
-	let out = base;
-	let column = columns(base);
+function print(doc: Doc, options: PrintOptions): string {
+	const { width, base, unit, first, hole } = options;
+	let out = first.text;
+	let column = first.column;
+	let lineIndent = first.indent;
 	// A line comment needs a line break before the next text.
 	let pending = false;
 	const newline = (level: number) => {
-		const indentation = base + unit.repeat(level);
-		out = `${out.replace(/[ \t]+$/, "")}\n${indentation}`;
-		column = columns(indentation);
+		lineIndent = base + unit.repeat(level);
+		out = `${out.replace(/[ \t]+$/, "")}\n${lineIndent}`;
+		column = columns(lineIndent);
 		pending = false;
+	};
+	const write = (s: string) => {
+		out += s;
+		const at = Math.max(s.lastIndexOf("\n"), s.lastIndexOf("\r"));
+		column = at < 0 ? column + columns(s) : columns(s.slice(at + 1));
 	};
 	const stack: Command[] = [{ level: 0, flat: false, doc }];
 	for (let c = stack.pop(); c !== undefined; c = stack.pop()) {
@@ -198,12 +266,13 @@ function print(doc: Doc, width: number, base: string, unit: string): string {
 		if (typeof d === "string") {
 			if (d === "" || (pending && d === " ")) continue;
 			if (pending) newline(level);
-			out += d;
-			const at = Math.max(d.lastIndexOf("\n"), d.lastIndexOf("\r"));
-			column = at < 0 ? column + columns(d) : columns(d.slice(at + 1));
+			write(d);
 		} else if (isDocs(d)) {
 			for (let i = d.length - 1; i >= 0; i--)
 				stack.push({ level, flat, doc: d[i]! });
+		} else if (d.kind === "hole") {
+			if (pending) newline(level);
+			write(hole(d.start, d.end, { column, indent: lineIndent }));
 		} else if (d.kind === "indent") {
 			stack.push({ level: level + 1, flat, doc: d.doc });
 		} else if (d.kind === "group") {
@@ -232,7 +301,11 @@ function fits(next: Command, rest: readonly Command[], width: number): boolean {
 			if (r === 0) return true;
 			c = rest[--r]!;
 		}
-		const { level, flat, doc: d } = c;
+		const { level, flat, doc: c2 } = c;
+		const d =
+			!isDocs(c2) && typeof c2 !== "string" && c2.kind === "hole"
+				? c2.text
+				: c2;
 		if (typeof d === "string") {
 			const at = d.search(/[\r\n]/);
 			if (at >= 0) return !flat && left >= columns(d.slice(0, at));
@@ -266,6 +339,8 @@ interface Unit {
 	readonly space: string;
 	/** The source has a line break before it. */
 	readonly newline: boolean;
+	/** A `${…}` hole's source span. */
+	readonly hole: readonly [number, number] | undefined;
 }
 
 /** Spaces and line breaks, escaped or not, between quotes that escapes split off a token. */
@@ -323,6 +398,8 @@ function unitsOf(
 					? ""
 					: spacing(prev, t, space, a.isBinary(i - 1) || a.isBinary(i)),
 			newline,
+			hole:
+				r < 0 && t.kind === "hole" ? [base + t.start, base + t.end] : undefined,
 		});
 		glue = gap[3]!;
 		space = gap[2] ? " " : "";
@@ -412,7 +489,11 @@ class Builder {
 				k = close;
 				continue;
 			}
-			out.push(u.text);
+			out.push(
+				u.hole
+					? { kind: "hole", text: u.text, start: u.hole[0], end: u.hole[1] }
+					: u.text,
+			);
 			if (u.lineComment) out.push(HARDLINE);
 		}
 		return out;

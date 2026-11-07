@@ -7,6 +7,7 @@ import { parseArgs } from "node:util";
 import { type CommandIo, commandIo, errorMessage } from "@typesql/core/adapter";
 import { loadConfig, type MigratorConfig } from "@typesql/core/migration";
 import {
+	advance,
 	DEFAULT_WIDTH,
 	type Dialect,
 	type EditorKinds,
@@ -16,6 +17,7 @@ import {
 	isCall,
 	isSqlLiteral,
 	type KeywordCase,
+	type Position,
 	type SqlText,
 	textOf,
 } from "@typesql/language-server/format";
@@ -126,10 +128,11 @@ export async function main(
 				path: file.path,
 				bom: file.bom,
 				before: file.source,
-				after: formatFile(file, (dialect) => ({
+				after: formatFile(file, ({ dialect, fragment }) => ({
 					dialect: dialect ?? fallback,
 					keywordCase,
 					width,
+					fragment,
 				})),
 			}))
 			.filter((file) => file.after !== file.before);
@@ -189,14 +192,19 @@ interface FileSql {
 	readonly literals: readonly FoundSql[];
 }
 
-interface FoundSql {
+interface FoundSql extends SqlParam {
 	readonly sql: SqlText;
-	/** The dialect its type names, if it names one. */
-	readonly dialect: Dialect | null;
 }
 
-/** The SQL parameters of a callee's type: the index of each, and its dialect. */
-type SqlParams = ReadonlyMap<number, Dialect | null>;
+interface SqlParam {
+	/** The dialect its type names, if it names one. */
+	readonly dialect: Dialect | null;
+	/** It takes a fragment, as `sql.fragment()` does, rather than a statement. */
+	readonly fragment: boolean;
+}
+
+/** The SQL parameters of a callee's type, by index. */
+type SqlParams = ReadonlyMap<number, SqlParam>;
 
 /**
  * The files of `project` and the projects it references (or only those at
@@ -297,10 +305,10 @@ async function sqlIn(
 	const params = await Promise.all(types.map((t) => sqlParams(t)));
 	const literals: FoundSql[] = [];
 	calls.forEach((call, i) => {
-		for (const [index, dialect] of params[i] ?? []) {
+		for (const [index, param] of params[i] ?? []) {
 			const literal = call.arguments[index];
 			if (isSqlLiteral(literal, kinds))
-				literals.push({ sql: textOf(file, literal, kinds), dialect });
+				literals.push({ ...param, sql: textOf(file, literal, kinds) });
 		}
 	});
 	// TypeScript reads a file without its byte order mark; it is written back.
@@ -312,7 +320,8 @@ async function sqlIn(
 /**
  * Which parameters of a callee take SQL: those of a signature TypeSQL
  * declares whose type is a string type parameter checked by a TypeSQL type,
- * as `query: GateCallCheck<…, Q> & Q` is. Cached by type.
+ * as `query: GateCallCheck<…, Q> & Q` is, and `text: GateFragCheck<…> & Text`
+ * for a fragment. Cached by type.
  */
 function sqlParamsOf(
 	ts: TypeScript,
@@ -320,7 +329,7 @@ function sqlParamsOf(
 	isTypeSql: (path: string) => boolean,
 ): (t: Type) => Promise<SqlParams> {
 	const cache = new Map<number, Promise<SqlParams>>();
-	const sqlParam = async (t: Type): Promise<Dialect | null | undefined> => {
+	const sqlParam = async (t: Type): Promise<SqlParam | undefined> => {
 		if (!t.isIntersectionType()) return undefined;
 		const members = (await t.getTypes()) ?? [];
 		const checked = await Promise.all(
@@ -331,15 +340,19 @@ function sqlParamsOf(
 			}),
 		);
 		if (!checked.includes(true)) return undefined;
-		for (const m of members) {
-			if (m.isTypeParameter()) continue;
+		const checks = members.filter((m) => !m.isTypeParameter());
+		const names = await Promise.all(
+			checks.map(async (m) => (await m.getAliasSymbol())?.name),
+		);
+		const fragment = names.includes("GateFragCheck");
+		for (const m of checks) {
 			const dialect = await dialectOf(m);
-			if (dialect) return dialect;
+			if (dialect) return { dialect, fragment };
 		}
-		return null;
+		return { dialect: null, fragment };
 	};
 	const analyze = async (t: Type): Promise<SqlParams> => {
-		const out = new Map<number, Dialect | null>();
+		const out = new Map<number, SqlParam>();
 		const signatures = await checker.getSignaturesOfType(
 			t,
 			ts.SignatureKind.Call,
@@ -351,8 +364,8 @@ function sqlParamsOf(
 			if (parameters.length === 0) continue;
 			const types = await checker.getTypeOfSymbol(parameters);
 			const found = await Promise.all(types.map(sqlParam));
-			found.forEach((dialect, index) => {
-				if (dialect !== undefined && !out.has(index)) out.set(index, dialect);
+			found.forEach((param, index) => {
+				if (param !== undefined && !out.has(index)) out.set(index, param);
 			});
 		}
 		return out;
@@ -410,59 +423,50 @@ function typeSqlPaths(): (path: string) => boolean {
 
 /**
  * A file's source with each literal formatted. A literal inside another's
- * `${…}` is formatted first, and the outer one keeps it.
+ * `${…}` hole is formatted on one line to lay out the outer one, and then
+ * again where it ends up in it.
  */
 function formatFile(
 	file: FileSql,
-	options: (dialect: Dialect | null) => FormatOptions,
+	options: (found: FoundSql) => FormatOptions,
 ): string {
 	const { source } = file;
-	const edits: Edit[] = [];
-	const inner = [...file.literals].sort(
-		(a, b) => a.sql.end - a.sql.start - (b.sql.end - b.sql.start),
+	// In source order, each literal before those in its holes.
+	const literals = [...file.literals].sort(
+		(a, b) => a.sql.start - b.sql.start || b.sql.end - a.sql.end,
 	);
-	// A literal in another's ${…} hole moves when that one is laid out, so it
-	// stays on one line.
-	const nested = (sql: SqlText) =>
-		file.literals.some((outer) =>
-			outer.sql.holes.some(([s, e]) => sql.start >= s && sql.end <= e),
-		);
-	for (const { sql, dialect } of inner) {
-		const given = options(dialect);
-		edits.push(
-			formatLiteral(
+	/**
+	 * `source` from `start` to `end` with each outermost literal in it
+	 * formatted: where it is in the source, on one line to measure it, or
+	 * after `at`, where `start` ends up.
+	 */
+	const render = (
+		start: number,
+		end: number,
+		at: "source" | "measure" | Position,
+	): string => {
+		let out = "";
+		let next = start;
+		for (const found of literals) {
+			const open = found.sql.start - 1;
+			if (open < next || found.sql.end >= end) continue;
+			out += source.slice(next, open);
+			const placed =
+				at === "source"
+					? {}
+					: at === "measure"
+						? { width: Number.POSITIVE_INFINITY }
+						: { position: advance(at, out) };
+			const edit = formatLiteral(
 				source,
-				sql,
-				nested(sql) ? { ...given, width: Number.POSITIVE_INFINITY } : given,
-				(s, e) => applyEdits(source, edits, s, e),
-			),
-		);
-	}
-	return applyEdits(source, edits, 0, source.length);
-}
-
-interface Edit {
-	readonly start: number;
-	readonly end: number;
-	readonly text: string;
-}
-
-/** `source` from `start` to `end`, with the outermost edits inside it applied. */
-function applyEdits(
-	source: string,
-	edits: readonly Edit[],
-	start: number,
-	end: number,
-): string {
-	const within = edits
-		.filter((e) => e.start >= start && e.end <= end)
-		.sort((a, b) => a.start - b.start || b.end - a.end);
-	let out = "";
-	let at = start;
-	for (const edit of within) {
-		if (edit.start < at) continue;
-		out += source.slice(at, edit.start) + edit.text;
-		at = edit.end;
-	}
-	return out + source.slice(at, end);
+				found.sql,
+				{ ...options(found), ...placed },
+				(s, e, position) => render(s, e, position ?? "measure"),
+			);
+			out += source.slice(open, edit.start) + edit.text;
+			next = edit.end;
+		}
+		return out + source.slice(next, end);
+	};
+	return render(0, source.length, "source");
 }

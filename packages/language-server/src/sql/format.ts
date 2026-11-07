@@ -9,6 +9,19 @@ export interface FormatOptions {
 	readonly keywordCase: KeywordCase;
 	/** The column a line of SQL ends at (default: 80); a tab counts as 4. */
 	readonly width?: number | undefined;
+	/**
+	 * The text is a fragment, which keeps the whitespace at its edges: it
+	 * separates the fragment from what it is spliced next to.
+	 */
+	readonly fragment?: boolean | undefined;
+	/** Where the literal's opening quote ends up, if not where it is in the source. */
+	readonly position?: Position | undefined;
+}
+
+/** A column, and the indentation of its line. */
+export interface Position {
+	readonly column: number;
+	readonly indent: string;
 }
 
 /** A SQL string literal as `textOf` reads it from its source. */
@@ -30,8 +43,15 @@ export interface SourceEdit {
 	readonly text: string;
 }
 
-/** The source of the `${…}` hole at `[start, end)`. */
-export type HoleSource = (start: number, end: number) => string;
+/**
+ * The source of the `${…}` hole at `[start, end)`: at `position` in the
+ * result if given, and otherwise to measure on one line.
+ */
+export type HoleSource = (
+	start: number,
+	end: number,
+	position?: Position,
+) => string;
 
 export const keepHoles =
 	(source: string): HoleSource =>
