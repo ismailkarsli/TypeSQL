@@ -80,6 +80,10 @@
   dir: packages/cli
   intents:
     - shaggy-rabbits-drive
+"@typesql/cli@7.7.0":
+  dir: packages/cli
+  intents:
+    - great-trees-grow
 "@typesql/core@0.0.2":
   dir: packages/core
   intents:
@@ -812,6 +816,10 @@
   dir: packages/language-server
   intents:
     - wide-maps-crash
+"@typesql/language-server@1.4.0":
+  dir: packages/language-server
+  intents:
+    - vast-queens-tan
 "@typesql/mysql@6.2.0":
   dir: packages/mysql
   intents:
@@ -957,6 +965,10 @@
   dir: packages/pg
   intents:
     - kind-hairs-try
+"@typesql/pg@7.7.0":
+  dir: packages/pg
+  intents:
+    - kind-queens-shave
 "@typesql/postgres@0.0.2":
   dir: packages/postgres
   intents:

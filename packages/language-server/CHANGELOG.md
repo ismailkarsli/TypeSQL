@@ -1,5 +1,16 @@
 # @typesql/language-server
 
+## 1.4.0
+
+### Minor Changes
+
+- `formatLiteral()` takes `fragment`, to keep the whitespace at a fragment's edges, and `position`, where the literal ends up; its `hole` callback gets the position of each `${…}` hole it writes. `advance()` moves a position past a text.
+
+### Patch Changes
+
+- Updated dependencies:
+  - @typesql/core@7.7.0
+
 ## 1.3.0
 
 ### Minor Changes

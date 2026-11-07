@@ -1,5 +1,18 @@
 # @typesql/cli
 
+## 7.7.0
+
+### Patch Changes
+
+- `typesql format` keeps the whitespace at the edges of a fragment, which separates it from what it is spliced next to, so `${sql.fragment("ASC")}${sql.fragment(" LIMIT 10")}` no longer becomes `ASCLIMIT 10`. A fragment in another's `${…}` hole is laid out where it ends up and breaks over lines if it doesn't fit there, rather than staying on one line of any length. A template literal's SQL is indented with the template's own tabs or spaces.
+
+- Updated dependencies:
+  - @typesql/core@7.7.0
+  - @typesql/language-server@1.4.0
+  - @typesql/mysql@7.7.0
+  - @typesql/pg@7.7.0
+  - @typesql/sqlite@7.7.0
+
 ## 7.6.0
 
 ### Minor Changes

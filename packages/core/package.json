@@ -1,6 +1,6 @@
 {
 	"name": "@typesql/core",
-	"version": "7.6.0",
+	"version": "7.7.0",
 	"description": "Type-level SQL inference for TypeScript: PostgreSQL, SQLite, MySQL and MariaDB. Tiny (under 3 kB) with zero runtime dependencies.",
 	"license": "MIT",
 	"repository": {
