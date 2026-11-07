@@ -15,10 +15,12 @@ const DIALECTS: Readonly<
 
 const USAGE = `Usage: typesql migrate <latest|up|down|status|make name|generate> [options]
        typesql introspect [--dialect postgres|sqlite|mysql|mariadb] [options]
+       typesql format [files or directories…] [options]
        typesql --version
 
-Run tracked schema migrations, or read a database and write its TypeSQL schema.
-Run \`typesql migrate --help\` for migration options.
+Run tracked schema migrations, read a database and write its TypeSQL schema,
+or format the SQL of TypeSQL calls. Run \`typesql migrate --help\` for
+migration options and \`typesql format --help\` for formatting options.
 
   --dialect postgres  a live PostgreSQL database (--url); the default
   --dialect sqlite    a SQLite database file (--db); the default when --db is given
@@ -55,6 +57,10 @@ export async function main(
 		const { main: migrate } = await import("./migrate.js");
 		return migrate(argv.slice(1), io);
 	}
+	if (argv[0] === "format") {
+		const { main: format } = await import("./format.js");
+		return format(argv.slice(1), io);
+	}
 	let parsed: ReturnType<typeof parse>;
 	try {
 		parsed = parse(argv);
@@ -85,7 +91,9 @@ export async function main(
 	let dialect = values.dialect;
 	if (dialect === undefined) {
 		if (rest.length === 0) {
-			io.stderr(`missing command: expected migrate or introspect\n\n${USAGE}`);
+			io.stderr(
+				`missing command: expected migrate, introspect or format\n\n${USAGE}`,
+			);
 			return 2;
 		}
 		// `typesql introspect --help` shows the default dialect's options.

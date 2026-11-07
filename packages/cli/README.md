@@ -1,6 +1,6 @@
 # @typesql/cli
 
-The `typesql` command runs schema migrations and introspects databases. Requires Node.js 26 or newer. `typesql introspect` reads a PostgreSQL, SQLite, MySQL or MariaDB database and writes its [TypeSQL](https://www.npmjs.com/package/@typesql/core) schema to a TypeScript file.
+The `typesql` command runs schema migrations, introspects databases and formats the SQL of TypeSQL calls. Requires Node.js 26 or newer. `typesql introspect` reads a PostgreSQL, SQLite, MySQL or MariaDB database and writes its [TypeSQL](https://www.npmjs.com/package/@typesql/core) schema to a TypeScript file.
 
 ## Install
 
@@ -77,12 +77,25 @@ The history is recorded in `schema_migrations` (`migrationTable` changes the nam
 
 The command exits with 0 on success, 1 on configuration, connection or migration errors, and 2 on invalid usage. If only `db.ts` can't be written after a successful migration, it warns and exits with 0; fix the cause and run `pnpm exec typesql migrate generate`. Progress goes to stdout and errors to stderr.
 
+## Formatting
+
+```sh
+pnpm exec typesql format           # every file of ./tsconfig.json and the projects it references
+pnpm exec typesql format src/db    # the project's files under src/db
+pnpm exec typesql format --check   # write nothing; exit with 1 if a file would change
+```
+
+`typesql format` writes the keywords of the SQL that TypeSQL checks in one case and tidies the spaces between its tokens. TypeScript's types find that SQL: the string argument of every call whose parameter TypeSQL types as SQL, such as `sql()`, `sql.fragment()`, `sql.prepare()` and a migration's `db.ddl()`, whatever the variable is named. Names, types, functions, strings, comments and line breaks stay as written, and so does the text of an unaliased select item in SQLite, MySQL and MariaDB, which name the column after it. It needs `typescript` 7.1 or later.
+
+Keywords are upper case unless the config sets `format: { keywordCase: "lower" }`; `--keyword-case upper|lower` overrides it. `--project <file>` reads another `tsconfig.json` and `--config <file>` another config.
+
 ## Documentation
 
 - [From migrations](https://typesql.karsli.net/guide/migrations): migration files, the config and `typesql migrate`
 - [From a live database](https://typesql.karsli.net/guide/introspect): PostgreSQL options
 - [SQLite](https://typesql.karsli.net/adapters/sqlite#generate-the-schema): SQLite options
 - [MySQL and MariaDB](https://typesql.karsli.net/adapters/mysql#generate-the-schema): MySQL and MariaDB options
+- [Formatting SQL](https://typesql.karsli.net/guide/format): `typesql format`
 
 ## License
 

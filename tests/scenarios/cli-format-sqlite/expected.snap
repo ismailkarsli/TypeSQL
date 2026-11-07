@@ -1,0 +1,93 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`cli-format-sqlite > scenario 1`] = `
+{
+  "artifacts": {
+    "app.ts": "import { DatabaseSync } from "node:sqlite";
+import { createSql } from "@typesql/sqlite";
+import { count, type DB } from "./other.js";
+
+const db = new DatabaseSync(process.env.SQLITE_PATH!);
+db.exec(
+	"CREATE TABLE items (id integer PRIMARY KEY, price integer NOT NULL, qty integer NOT NULL)",
+);
+const sql = createSql<DB>(db);
+await sql("INSERT INTO items VALUES (1, 3, 2), (2, 5, 1)").execute();
+
+// SQLite names an unaliased column after its text, so that text stays as written.
+export const rows = await sql(
+	"SELECT id, price*qty, cast(price as text), qty AS q FROM items WHERE qty > 0 ORDER BY id",
+).execute();
+// So does a fragment that may be spliced into a select list.
+const total = sql.fragment("sum(price*qty)");
+export const totals = await sql(\`SELECT \${total} FROM items\`).execute();
+export const both = await sql(
+	\`SELECT \${total} AS total FROM items WHERE id IN (SELECT id FROM items WHERE qty IS NOT NULL)\`,
+).execute();
+console.log({ rows, totals, both, count: await count(db) });
+db.close();
+",
+    "other.ts": "import type { DatabaseSync } from "node:sqlite";
+import type { Col } from "@typesql/core/sqlite";
+import { createSql } from "@typesql/sqlite";
+
+export interface DB {
+	items: {
+		id: Col<"integer">;
+		price: Col<"integer">;
+		qty: Col<"integer">;
+	};
+}
+
+export const count = (db: DatabaseSync) =>
+	createSql<DB>(db)(
+		"select count(*) as n from items",
+	).executeTakeFirstOrThrow();
+",
+  },
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "both": "({ total: null | number })[]",
+      "rows": "({ "cast(price as text)": string; id: number; "price*qty": number; q: number })[]",
+      "totals": "({ "sum(price*qty)": null | number })[]",
+    },
+  },
+  "generate": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "typesql format: formatted app.ts
+typesql format: other.ts is not formatted
+",
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "{
+  rows: [
+    [Object: null prototype] {
+      id: 1,
+      'price*qty': 6,
+      'cast(price as text)': '3',
+      q: 2
+    },
+    [Object: null prototype] {
+      id: 2,
+      'price*qty': 5,
+      'cast(price as text)': '5',
+      q: 1
+    }
+  ],
+  totals: [ [Object: null prototype] { 'sum(price*qty)': 11 } ],
+  both: [ [Object: null prototype] { total: 11 } ],
+  count: [Object: null prototype] { n: 2 }
+}
+",
+  },
+}
+`;

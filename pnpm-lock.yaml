@@ -344,6 +344,9 @@ importers:
       '@typesql/core':
         specifier: workspace:*
         version: link:../core
+      '@typesql/language-server':
+        specifier: workspace:*
+        version: link:../language-server
       '@typesql/mysql':
         specifier: workspace:*
         version: link:../mysql
@@ -821,6 +824,72 @@ importers:
       bun:
         specifier: 'catalog:'
         version: runtime:1.4.4
+      typescript:
+        specifier: 'catalog:'
+        version: 7.1.0-beta
+
+  tests/scenarios/cli-format-mysql:
+    dependencies:
+      '@typesql/cli':
+        specifier: workspace:*
+        version: link:../../../packages/cli
+      '@typesql/core':
+        specifier: workspace:*
+        version: link:../../../packages/core
+      '@typesql/mysql':
+        specifier: workspace:*
+        version: link:../../../packages/mysql
+      mysql2:
+        specifier: 'catalog:'
+        version: 3.24.6(@types/node@26.6.6)
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.6.6
+      typescript:
+        specifier: 'catalog:'
+        version: 7.1.0-beta
+
+  tests/scenarios/cli-format-postgres:
+    dependencies:
+      '@types/pg':
+        specifier: 'catalog:'
+        version: 8.23.1
+      '@typesql/cli':
+        specifier: workspace:*
+        version: link:../../../packages/cli
+      '@typesql/core':
+        specifier: workspace:*
+        version: link:../../../packages/core
+      '@typesql/pg':
+        specifier: workspace:*
+        version: link:../../../packages/pg
+      pg:
+        specifier: 'catalog:'
+        version: 8.23.1
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.6.6
+      typescript:
+        specifier: 'catalog:'
+        version: 7.1.0-beta
+
+  tests/scenarios/cli-format-sqlite:
+    dependencies:
+      '@typesql/cli':
+        specifier: workspace:*
+        version: link:../../../packages/cli
+      '@typesql/core':
+        specifier: workspace:*
+        version: link:../../../packages/core
+      '@typesql/sqlite':
+        specifier: workspace:*
+        version: link:../../../packages/sqlite
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.6.6
       typescript:
         specifier: 'catalog:'
         version: 7.1.0-beta

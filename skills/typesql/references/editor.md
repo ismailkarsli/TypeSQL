@@ -1,5 +1,7 @@
 # Editor support
 
+`pnpm exec typesql format` (from `@typesql/cli`) sets one keyword case and tidies spacing in every SQL string TypeSQL checks, found by type; `--check` for CI. The case comes from `format: { keywordCase: "upper" | "lower" }` in `typesql.config.ts`.
+
 Errors, hovers and row types need no setup. Completions and highlighting need a language server on TypeScript 7.1+; 7.0 is the usual reason they're missing. Restart it after upgrading `@typesql/core` or `typescript`.
 
 ## VS Code (1.144+)

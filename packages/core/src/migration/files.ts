@@ -227,7 +227,7 @@ export async function loadMigrator(options: {
 	const { resolve } = process.getBuiltinModule("node:path");
 	const { cwd, env, overrides } = options;
 	const file = resolve(cwd, options.config ?? CONFIG_FILE);
-	const configured = await loadConfig(file, options.config !== undefined);
+	const configured = await migratorOf(file, options.config !== undefined);
 	const dialect = overrides.dialect ?? configured?.config.dialect;
 	if (!isDialectName(dialect))
 		throw new Error(
@@ -260,8 +260,21 @@ export async function loadMigrator(options: {
 		: configured.with<unknown>({ ...config, ...(url && { url }) });
 }
 
+/**
+ * The config that `config` (default: typesql.config.ts in `cwd`, if there is
+ * one) default-exports, as `typesql format` reads it.
+ */
+export async function loadConfig(options: {
+	readonly cwd: string;
+	readonly config?: string | undefined;
+}): Promise<MigratorConfig | undefined> {
+	const { resolve } = process.getBuiltinModule("node:path");
+	const file = resolve(options.cwd, options.config ?? CONFIG_FILE);
+	return (await migratorOf(file, options.config !== undefined))?.config;
+}
+
 /** The migrator a config file default-exports, its paths resolved beside it. */
-async function loadConfig(
+async function migratorOf(
 	file: string,
 	explicit: boolean,
 ): Promise<Migrator | undefined> {

@@ -187,13 +187,35 @@ const RULES: readonly Rule[] = [
 	rule("operator", (l) => l.operator),
 ];
 
+const isSpace = (c: number): boolean =>
+	c === 32 ||
+	(c >= 9 && c <= 13) ||
+	(c >= 0x80 && /\s/.test(String.fromCharCode(c)));
+
+/** A–Z, a–z, `_` or any non-ASCII character: what a name starts with. */
+const isNameStart = (c: number): boolean =>
+	(c >= 65 && c <= 90) || (c >= 97 && c <= 122) || c === 95 || c >= 0x80;
+
 /** Splits SQL text into tokens; whitespace is left out. */
 export function lex(text: string, lexis: Lexis): Token[] {
 	const out: Token[] = [];
 	for (let i = 0; i < text.length; ) {
-		if (/\s/.test(text[i]!)) {
+		const c = text.charCodeAt(i);
+		if (isSpace(c)) {
 			i++;
 			continue;
+		}
+		// A name, unless it prefixes a string or quoted name (E'…', U&"…").
+		if (isNameStart(c)) {
+			WORD.lastIndex = i;
+			WORD.test(text);
+			const end = WORD.lastIndex;
+			const after = text.charCodeAt(end);
+			if (after !== 39 && after !== 34 && after !== 38) {
+				out.push({ kind: "word", start: i, end, open: false });
+				i = end;
+				continue;
+			}
 		}
 		let token: Token = {
 			kind: "punctuation",

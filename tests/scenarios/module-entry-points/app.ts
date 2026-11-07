@@ -17,6 +17,7 @@ import * as coreSqliteEngine from "@typesql/core/sqlite/engine";
 import * as drizzle from "@typesql/drizzle";
 import * as kysely from "@typesql/kysely";
 import * as languageServer from "@typesql/language-server";
+import * as languageServerFormat from "@typesql/language-server/format";
 import * as mysql from "@typesql/mysql";
 import * as mysqlIntrospect from "@typesql/mysql/introspect";
 import * as mysqlMariadb from "@typesql/mysql/mariadb";
@@ -50,6 +51,7 @@ const entryPoints = {
 	"@typesql/drizzle": drizzle,
 	"@typesql/kysely": kysely,
 	"@typesql/language-server": languageServer,
+	"@typesql/language-server/format": languageServerFormat,
 	"@typesql/mysql": mysql,
 	"@typesql/mysql/introspect": mysqlIntrospect,
 	"@typesql/mysql/mariadb": mysqlMariadb,

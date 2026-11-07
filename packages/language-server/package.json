@@ -20,6 +20,10 @@
 		".": {
 			"types": "./dist/index.d.ts",
 			"default": "./dist/index.js"
+		},
+		"./format": {
+			"types": "./dist/format.d.ts",
+			"default": "./dist/format.js"
 		}
 	},
 	"bin": {

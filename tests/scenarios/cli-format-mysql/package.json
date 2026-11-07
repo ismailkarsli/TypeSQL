@@ -1,0 +1,25 @@
+{
+	"name": "cli-format-mysql",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"generate": "typesql format",
+		"start": "node dist/app.js"
+	},
+	"dependencies": {
+		"@typesql/core": "workspace:*",
+		"@typesql/cli": "workspace:*",
+		"@typesql/mysql": "workspace:*",
+		"mysql2": "catalog:"
+	},
+	"devDependencies": {
+		"typescript": "catalog:",
+		"@types/node": "catalog:"
+	},
+	"scenario": {
+		"database": "mysql",
+		"artifacts": [
+			"app.ts"
+		]
+	}
+}

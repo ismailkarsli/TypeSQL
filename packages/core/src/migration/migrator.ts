@@ -100,6 +100,13 @@ export interface MigratorConfig {
 	readonly generate?: boolean | undefined;
 	/** Run each migration in a transaction and lock the history (default: true). */
 	readonly transaction?: boolean | undefined;
+	/** How `typesql format` writes the SQL of TypeSQL calls. */
+	readonly format?: FormatConfig | undefined;
+}
+
+export interface FormatConfig {
+	/** `"upper"` writes keywords as `SELECT`, `"lower"` as `select` (default: `"upper"`). */
+	readonly keywordCase?: "upper" | "lower" | undefined;
 }
 
 /** What writing the schema file after a command did: its path, or why it failed. */
@@ -301,6 +308,16 @@ function validate(config: MigratorConfig): void {
 		if (value !== undefined && typeof value !== "boolean")
 			throw new Error(`typesql: ${key} must be a boolean`);
 	}
+	const { format } = config;
+	if (format !== undefined && (typeof format !== "object" || format === null))
+		throw new Error("typesql: format must be an object");
+	const keywordCase = format?.keywordCase;
+	if (
+		keywordCase !== undefined &&
+		keywordCase !== "upper" &&
+		keywordCase !== "lower"
+	)
+		throw new Error('typesql: format.keywordCase must be "upper" or "lower"');
 }
 
 /** The servers a connection target reaches: "PostgreSQL, MySQL or MariaDB". */

@@ -369,13 +369,15 @@ An entry is one `Sig<Params, Return, Flags>` or a tuple of overloads.
 | `MigrationContext<E, T, DB, TM = T["typeMap"]>` | the type behind both, for engine `E` and dialect `T` |
 | `createMigrator(config)` | a `Migrator`; never connects by itself. With a `migrations` array its schema is inferred (from an array written in the call or declared `as const`); `createMigrator<DB>(config)` states it |
 | `Migrator<Schema>` | `latest()`, `up()`, `down()`, `status()`, `make(name)`, `generate()`, `with(overrides)` and `config` |
-| `MigratorConfig` | `dialect`; `url`, `db` or `execute`; `migrationsDir` or `migrations`; `migrationTable`, `schemaFile`, `generate`, `transaction` |
+| `MigratorConfig` | `dialect`; `url`, `db` or `execute`; `migrationsDir` or `migrations`; `migrationTable`, `schemaFile`, `generate`, `transaction`, `format` |
+| `FormatConfig` | `format` of the config: `{ keywordCase?: "upper" \| "lower" }`, the keyword case of [`typesql format`](../guide/format) |
 | `LatestResult<Schema>` | what `latest()` resolves to: `{ applied, schemaFile?, schemaError? }`, and the type-only schema after the last migration |
 | `UpResult` | what `up()` resolves to: `{ applied, schemaFile?, schemaError? }` |
 | `DownResult` | what `down()` resolves to: `{ reverted, schemaFile?, schemaError? }` |
 | `MigrationError` | what `latest()`, `up()` and `down()` reject with when a migration fails: `{ migration, applied, rolledBack, schemaFile?, schemaError?, cause }` |
 | `MigrationStatus` | an entry of `status()`: `{ name, applied, appliedAt: Date \| null }` |
 | `isMigrator(value)` | whether `value` is a migrator, from any copy of `@typesql/core` |
+| `loadConfig({ cwd, config? })` | the config `typesql format` reads: what the config file (default `typesql.config.ts`) default-exports, or `undefined` without one |
 | `loadMigrator({ cwd, env, config?, overrides })` | the migrator `typesql migrate` runs: the config file's (default `typesql.config.ts`), its paths beside it, with `overrides`; `missingCore(directory)` tells why a new migration file can't import `@typesql/core` |
 
 The config options and the method results are described in [The migrator](../guide/migrations#the-migrator). `ApplyDdl` and `ValidateDdl` come from the dialect modules ([Statement analysis](#statement-analysis)); see [What is supported](../guide/migrations#what-is-supported).

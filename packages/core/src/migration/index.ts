@@ -6,10 +6,16 @@ export type {
 	SqliteMigration,
 } from "./context.js";
 export { type Migration, type MigrationSteps, migration } from "./define.js";
-export { loadMigrator, type MigrateOverrides, missingCore } from "./files.js";
+export {
+	loadConfig,
+	loadMigrator,
+	type MigrateOverrides,
+	missingCore,
+} from "./files.js";
 export {
 	createMigrator,
 	type DownResult,
+	type FormatConfig,
 	isMigrator,
 	type LatestResult,
 	MigrationError,

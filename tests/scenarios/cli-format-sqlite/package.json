@@ -1,0 +1,25 @@
+{
+	"name": "cli-format-sqlite",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"generate": "typesql format --keyword-case upper app.ts && typesql format --check other.ts; test $? -eq 1",
+		"start": "node dist/app.js"
+	},
+	"dependencies": {
+		"@typesql/core": "workspace:*",
+		"@typesql/cli": "workspace:*",
+		"@typesql/sqlite": "workspace:*"
+	},
+	"devDependencies": {
+		"typescript": "catalog:",
+		"@types/node": "catalog:"
+	},
+	"scenario": {
+		"database": "sqlite",
+		"artifacts": [
+			"app.ts",
+			"other.ts"
+		]
+	}
+}

@@ -1,0 +1,128 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`cli-format-postgres > scenario 1`] = `
+{
+  "artifacts": {
+    "app.ts": "import type { Col } from "@typesql/core/postgres";
+import { createSql } from "@typesql/pg";
+import { Pool } from "pg";
+import migrator from "./typesql.config.js";
+
+interface DB {
+	users: {
+		id: Col<"int4">;
+		name: Col<"text">;
+		type: Col<"text", { nullable: true }>;
+	};
+	posts: {
+		id: Col<"int4">;
+		author_id: Col<"int4">;
+		title: Col<"text", { nullable: true }>;
+	};
+}
+
+await migrator.latest();
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const sql = createSql<DB>(pool);
+
+// TypeSQL's own functions, under any name.
+const query = sql;
+const repo = { run: sql, fragment: sql.fragment };
+await query(
+	"insert into users (id, name, type) values ($1, $2, $3), (2, 'Grace', null)",
+	1,
+	"Ada",
+	"Admin",
+).execute();
+await repo
+	.run("insert into posts values (1, 1, 'SELECT * FROM users')")
+	.execute();
+
+const titled = repo.fragment("P.Title is not null");
+export const joined = await sql(
+	\`select U.Name, P.Title as "Select"
+	from users U left join posts P on P.author_id = U.id -- the author's posts
+	where \${sql.and([titled, sql.fragment("U.id >= $1", 1)])}
+	order by U.id desc nulls last\`,
+).execute();
+const byId = sql.prepare(
+	"select name, type from users where id = $1 or name = 'where'",
+);
+export const prepared = await byId(2).execute();
+export const typed = await sql.transaction(async (tx) =>
+	tx(
+		"select type, count(*) as n from users group by type order by type",
+	).execute(),
+);
+export const escaped = await sql(
+	"select id\\nfrom users where id = 1",
+).execute();
+
+// SQL that TypeSQL doesn't check stays as written.
+export const raw = await sql.as<{ one: number }>("SELECT 1 AS one").execute();
+const other = await pool.query("SELECT 2 AS two");
+const echo = (text: string) => text;
+console.log({
+	joined,
+	prepared,
+	typed,
+	escaped,
+	raw,
+	other: other.rows,
+	echo: echo("SELECT 3"),
+});
+await pool.end();
+",
+    "migrations/001-users.ts": "import { migration } from "@typesql/core/migration";
+
+export default migration("postgres", {
+	up: async (db) =>
+		db.ddl(\`
+			create table users (id int primary key, name text not null, type text);
+			create table posts (id int primary key, author_id int not null references users(id), title text)
+		\`),
+	down: async (db) => {
+		await db.ddl("drop table posts; drop table users");
+	},
+});
+",
+  },
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "escaped": "({ id: number })[]",
+      "joined": "({ Select: string; name: string })[]",
+      "prepared": "({ name: string; type: null | string })[]",
+      "raw": "({ one: number })[]",
+      "typed": "({ n: string; type: null | string })[]",
+    },
+  },
+  "generate": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "typesql format: formatted app.ts
+typesql format: formatted migrations/001-users.ts
+typesql format: every file is formatted
+",
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "{
+  joined: [ { name: 'Ada', Select: 'SELECT * FROM users' } ],
+  prepared: [ { name: 'Grace', type: null } ],
+  typed: [ { type: 'Admin', n: '1' }, { type: null, n: '1' } ],
+  escaped: [ { id: 1 } ],
+  raw: [ { one: 1 } ],
+  other: [ { two: 2 } ],
+  echo: 'SELECT 3'
+}
+",
+  },
+}
+`;

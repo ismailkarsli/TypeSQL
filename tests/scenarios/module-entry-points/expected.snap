@@ -79,6 +79,7 @@ exports[`module-entry-points > scenario 1`] = `
     "MigrationError": "function",
     "createMigrator": "function",
     "isMigrator": "function",
+    "loadConfig": "function",
     "loadMigrator": "function",
     "migration": "function",
     "missingCore": "function"
@@ -125,6 +126,13 @@ exports[`module-entry-points > scenario 1`] = `
     "mergeTokens": "function",
     "typescriptModules": "function",
     "typescriptModulesFrom": "function"
+  },
+  "@typesql/language-server/format": {
+    "editorKinds": "function",
+    "formatSql": "function",
+    "isCall": "function",
+    "isSqlLiteral": "function",
+    "textOf": "function"
   },
   "@typesql/mysql": {
     "createSql": "function",

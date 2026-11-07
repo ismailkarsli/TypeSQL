@@ -132,6 +132,7 @@ export default withVersions({
 			{
 				text: "Going further",
 				items: [
+					{ text: "Formatting SQL", link: "/guide/format" },
 					{ text: "Errors and troubleshooting", link: "/guide/errors" },
 					{ text: "Limits", link: "/guide/limits" },
 					{

@@ -36,6 +36,7 @@
 	},
 	"dependencies": {
 		"@typesql/core": "workspace:*",
+		"@typesql/language-server": "workspace:*",
 		"@typesql/mysql": "workspace:*",
 		"@typesql/pg": "workspace:*",
 		"@typesql/sqlite": "workspace:*"
