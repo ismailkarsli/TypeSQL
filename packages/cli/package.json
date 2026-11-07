@@ -1,6 +1,6 @@
 {
 	"name": "@typesql/cli",
-	"version": "7.5.0",
+	"version": "7.6.0",
 	"description": "The typesql command: tracked schema migrations and schema introspection for PostgreSQL, SQLite, MySQL and MariaDB.",
 	"license": "MIT",
 	"repository": {

@@ -1,5 +1,16 @@
 # @typesql/language-server
 
+## 1.3.0
+
+### Minor Changes
+
+- `@typesql/language-server/format` exports `formatLiteral()`, which formats a SQL literal and lays out its lines as `typesql format` does and may turn it into a template literal, and `DEFAULT_WIDTH`.
+
+### Patch Changes
+
+- Updated dependencies:
+  - @typesql/core@7.6.0
+
 ## 1.2.0
 
 ### Minor Changes

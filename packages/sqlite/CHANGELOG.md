@@ -1,5 +1,12 @@
 # @typesql/sqlite
 
+## 7.6.0
+
+### Patch Changes
+
+- Updated dependencies:
+  - @typesql/core@7.6.0
+
 ## 7.5.0
 
 ### Patch Changes

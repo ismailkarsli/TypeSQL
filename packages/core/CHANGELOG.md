@@ -1,5 +1,11 @@
 # @typesql/core
 
+## 7.6.0
+
+### Minor Changes
+
+- The migrator config's `format` takes `width`, the column `typesql format` ends a line of SQL at (default: 80).
+
 ## 7.5.0
 
 ### Minor Changes
