@@ -10,6 +10,10 @@
   dir: packages/better-auth
   intents:
     - curvy-pens-obey
+"@typesql/better-auth@7.4.0":
+  dir: packages/better-auth
+  intents:
+    - calm-maps-peel
 "@typesql/cli@0.0.1":
   dir: packages/cli
   intents:
@@ -481,6 +485,16 @@
   dir: packages/core
   intents:
     - famous-geese-think
+"@typesql/core@7.4.0":
+  dir: packages/core
+  intents:
+    - kind-hairs-try
+    - polite-cats-press
+    - proud-maps-hang
+    - rare-swans-end
+    - real-doors-win
+    - shaggy-jars-arrive
+    - weak-worms-act
 "@typesql/drizzle@0.0.2":
   dir: packages/drizzle
   intents:
@@ -580,6 +594,10 @@
     - brave-ants-drum
     - itchy-icons-flash
     - nice-bees-jam
+"@typesql/drizzle@7.4.0":
+  dir: packages/drizzle
+  intents:
+    - kind-hairs-try
 "@typesql/kysely@0.0.2":
   dir: packages/kysely
   intents:
@@ -682,6 +700,10 @@
   intents:
     - cool-boats-compete
     - itchy-icons-flash
+"@typesql/kysely@7.4.0":
+  dir: packages/kysely
+  intents:
+    - ancient-tools-unite
 "@typesql/language-server@0.0.1":
   dir: packages/language-server
   intents:
@@ -757,6 +779,10 @@
   intents:
     - mighty-kings-cover
     - thick-buses-attack
+"@typesql/language-server@1.1.4":
+  dir: packages/language-server
+  intents:
+    - tough-cherries-teach
 "@typesql/mysql@6.2.0":
   dir: packages/mysql
   intents:
@@ -768,6 +794,10 @@
     - big-walls-wait
     - nice-bees-jam
     - young-roses-sniff
+"@typesql/mysql@7.4.0":
+  dir: packages/mysql
+  intents:
+    - kind-hairs-try
 "@typesql/pg@0.0.2":
   dir: packages/pg
   intents:
@@ -894,6 +924,10 @@
     - big-walls-wait
     - shaggy-rabbits-cheer
     - young-roses-sniff
+"@typesql/pg@7.4.0":
+  dir: packages/pg
+  intents:
+    - kind-hairs-try
 "@typesql/postgres@0.0.2":
   dir: packages/postgres
   intents:
@@ -998,6 +1032,10 @@
   dir: packages/postgres
   intents:
     - curvy-pens-obey
+"@typesql/postgres@7.4.0":
+  dir: packages/postgres
+  intents:
+    - kind-hairs-try
 "@typesql/prisma@0.0.2":
   dir: packages/prisma
   intents:
@@ -1172,6 +1210,10 @@
     - lazy-fireants-swim
     - sharp-eels-push
     - young-roses-sniff
+"@typesql/sqlite@7.4.0":
+  dir: packages/sqlite
+  intents:
+    - kind-hairs-try
 typesql@0.0.1:
   dir: packages/vscode
   intents:
@@ -1262,3 +1304,7 @@ typesql@3.1.1:
   intents:
     - dry-waves-tan
     - thick-apes-greet
+typesql@3.1.2:
+  dir: packages/vscode
+  intents:
+    - tough-cherries-teach

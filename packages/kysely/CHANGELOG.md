@@ -1,5 +1,16 @@
 # @typesql/kysely
 
+## 7.4.0
+
+### Minor Changes
+
+- `@typesql/kysely` exports `driverOf`, so `createTransactionalSql(postgres, db, driverOf("postgres"))` runs on Kysely with a TypeSQL schema, such as one from `typesql introspect`, without `FromKysely`.
+
+### Patch Changes
+
+- Updated dependencies:
+  - @typesql/core@7.4.0
+
 ## 7.3.0
 
 ### Patch Changes

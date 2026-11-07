@@ -1,5 +1,25 @@
 # @typesql/core
 
+## 7.4.0
+
+### Minor Changes
+
+- `sql.transaction()` rejects while a transaction is open on the same connection (a pg `Client` or `PoolClient`, a mysql2 or mariadb connection, a postgres.js `ReservedSql`, a SQLite database), including one on the outer `sql` inside a transaction. Before, overlapping calls on PostgreSQL and MySQL shared one transaction, so the first `COMMIT` also committed the second one's writes, and on SQLite they waited in a queue, where one on the outer `sql` never ended. Use `tx` inside a transaction, wait for the other to end, or use a pool. mysql2 and mariadb connections now use their own `beginTransaction()`, `commit()` and `rollback()`. In `@typesql/core/adapter`, `exclusiveTransaction` replaces `serialTransaction`.
+
+- `@typesql/core/adapter` exports `snakeCase`, the conversion `CasePlugin` uses for `to: "snake_case"`.
+
+- The `nested` option of `CasePlugin` takes `"output"`, which renames keys inside values in rows only, `"input"`, which renames them in `sql.json()`, `sql.param()` and the values of `sql.set()` and `sql.values()` only, or `"all"` for both. With `"output"` these values are stored as written and their input types stay the plain `T`. `nested: true` is replaced by `nested: "all"`: it is now a compile error, and throws in untyped code.
+
+### Patch Changes
+
+- With `CasePlugin`'s `nested`, a recursive type such as `string | number | boolean | null | JSONType[] | { [key: string]: JSONType }` no longer fails with TS5114 ("appear infinitely circular"), which also made unrelated rows checked after it keep their snake_case keys or become `any`. A type that takes every JSON value stays that type.
+
+- A statement that fails to compile now uses up its `sql.param()` values, as one that runs does, so they no longer stay in memory. Running the same text again fails with "this sql.param() value was already used".
+
+- `CasePlugin` throws when two keys of one write object rename to the same key, such as `{ SASA: 1, sasa: 2 }` with `nested`, or a `displayName` and `display_name` column in `sql.set()`. Before, the earlier value was silently lost.
+
+- The migrator leaves your connection as it found it after a failure. With `execute`, MySQL gets its autocommit setting back when the history table can't be created, PostgreSQL leaves no transaction open when the migration lock can't be taken, and a failed migration is rolled back even when checking its state fails, where MySQL could otherwise commit it.
+
 ## 7.3.0
 
 ### Minor Changes
