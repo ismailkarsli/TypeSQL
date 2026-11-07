@@ -4,6 +4,7 @@ import type {
 	AlterTable,
 	CreateEnum,
 	CreateFunction,
+	CreateIndex,
 	DeclareCursor,
 	DropSchema,
 	DropTable,
@@ -35,7 +36,7 @@ import type {
 export type ApplyDdlNode<DB, S> =
 	S extends Tag<"noop" | "fetch" | "move" | "close_cursor">
 		? DB
-		: S extends DeclareCursor
+		: S extends DeclareCursor | CreateIndex
 			? ProjectStmt<S, QueryContext<DB, [], {}>> extends infer C
 				? C extends AnyErr
 					? C

@@ -1,0 +1,179 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`migrations-index-columns > scenario 1`] = `
+{
+  "compile": {
+    "status": 1,
+    "stderr": "",
+  },
+  "compiler": {
+    "diagnostics": [
+      {
+        "category": 1,
+        "code": 2345,
+        "column": 27,
+        "details": [
+          {
+            "category": 1,
+            "code": 2322,
+            "message": "Type 'string' is not assignable to type 'SqlError<"column \\"emial\\" does not exist", 6>'.",
+          },
+        ],
+        "expression": ""CREATE INDEX users_email ON users (emial)"",
+        "file": "app.ts",
+        "line": 23,
+        "message": "Argument of type '"CREATE INDEX users_email ON users (emial)"' is not assignable to parameter of type 'SqlError<"column \\"emial\\" does not exist", 6> & "CREATE INDEX users_email ON users (emial)"'.",
+      },
+      {
+        "category": 1,
+        "code": 2345,
+        "column": 27,
+        "details": [
+          {
+            "category": 1,
+            "code": 2322,
+            "message": "Type 'string' is not assignable to type 'SqlError<"column \\"emial\\" does not exist", 8>'.",
+          },
+        ],
+        "expression": ""CREATE INDEX users_email ON users (lower(emial))"",
+        "file": "app.ts",
+        "line": 28,
+        "message": "Argument of type '"CREATE INDEX users_email ON users (lower(emial))"' is not assignable to parameter of type 'SqlError<"column \\"emial\\" does not exist", 8> & "CREATE INDEX users_email ON users (lower(emial))"'.",
+      },
+      {
+        "category": 1,
+        "code": 2345,
+        "column": 10,
+        "details": [
+          {
+            "category": 1,
+            "code": 2322,
+            "message": "Type 'string' is not assignable to type 'SqlError<"column \\"created\\" does not exist", 10>'.",
+          },
+        ],
+        "expression": ""CREATE INDEX users_email ON users (email) INCLUDE (created)"",
+        "file": "app.ts",
+        "line": 34,
+        "message": "Argument of type '"CREATE INDEX users_email ON users (email) INCLUDE (created)"' is not assignable to parameter of type 'SqlError<"column \\"created\\" does not exist", 10> & "CREATE INDEX users_email ON users (email) INCLUDE (created)"'.",
+      },
+      {
+        "category": 1,
+        "code": 2345,
+        "column": 10,
+        "details": [
+          {
+            "category": 1,
+            "code": 2322,
+            "message": "Type 'string' is not assignable to type 'SqlError<"column \\"deleted\\" does not exist", 9>'.",
+          },
+        ],
+        "expression": ""CREATE INDEX users_email ON users (email) WHERE deleted IS NULL"",
+        "file": "app.ts",
+        "line": 40,
+        "message": "Argument of type '"CREATE INDEX users_email ON users (email) WHERE deleted IS NULL"' is not assignable to parameter of type 'SqlError<"column \\"deleted\\" does not exist", 9> & "CREATE INDEX users_email ON users (email) WHERE deleted IS NULL"'.",
+      },
+      {
+        "category": 1,
+        "code": 2345,
+        "column": 27,
+        "details": [
+          {
+            "category": 1,
+            "code": 2322,
+            "message": "Type 'string' is not assignable to type 'SqlError<"relation \\"accounts\\" does not exist", 4>'.",
+          },
+        ],
+        "expression": ""CREATE INDEX users_email ON accounts (email)"",
+        "file": "app.ts",
+        "line": 45,
+        "message": "Argument of type '"CREATE INDEX users_email ON accounts (email)"' is not assignable to parameter of type 'SqlError<"relation \\"accounts\\" does not exist", 4> & "CREATE INDEX users_email ON accounts (email)"'.",
+      },
+      {
+        "category": 1,
+        "code": 2345,
+        "column": 27,
+        "details": [
+          {
+            "category": 1,
+            "code": 2322,
+            "message": "Type 'string' is not assignable to type 'SqlError<"Key column 'emial' doesn't exist in table", null>'.",
+          },
+        ],
+        "expression": ""CREATE INDEX users_email ON users (emial(10))"",
+        "file": "app.ts",
+        "line": 67,
+        "message": "Argument of type '"CREATE INDEX users_email ON users (emial(10))"' is not assignable to parameter of type 'SqlError<"Key column 'emial' doesn't exist in table", null> & "CREATE INDEX users_email ON users (emial(10))"'.",
+      },
+      {
+        "category": 1,
+        "code": 2345,
+        "column": 10,
+        "details": [
+          {
+            "category": 1,
+            "code": 2322,
+            "message": "Type 'string' is not assignable to type 'SqlError<"Unknown column 'emial' in 'functional index'", null>'.",
+          },
+        ],
+        "expression": ""CREATE INDEX users_email ON users ((lower(emial)))"",
+        "file": "app.ts",
+        "line": 73,
+        "message": "Argument of type '"CREATE INDEX users_email ON users ((lower(emial)))"' is not assignable to parameter of type 'SqlError<"Unknown column 'emial' in 'functional index'", null> & "CREATE INDEX users_email ON users ((lower(emial)))"'.",
+      },
+      {
+        "category": 1,
+        "code": 2345,
+        "column": 27,
+        "details": [
+          {
+            "category": 1,
+            "code": 2322,
+            "message": "Type 'string' is not assignable to type 'SqlError<"no such column: emial", null>'.",
+          },
+        ],
+        "expression": ""CREATE INDEX users_email ON users (emial)"",
+        "file": "app.ts",
+        "line": 95,
+        "message": "Argument of type '"CREATE INDEX users_email ON users (emial)"' is not assignable to parameter of type 'SqlError<"no such column: emial", null> & "CREATE INDEX users_email ON users (emial)"'.",
+      },
+      {
+        "category": 1,
+        "code": 2345,
+        "column": 10,
+        "details": [
+          {
+            "category": 1,
+            "code": 2322,
+            "message": "Type 'string' is not assignable to type 'SqlError<"no such column: deleted", null>'.",
+          },
+        ],
+        "expression": ""CREATE INDEX users_email ON users (email) WHERE deleted IS NULL"",
+        "file": "app.ts",
+        "line": 101,
+        "message": "Argument of type '"CREATE INDEX users_email ON users (email) WHERE deleted IS NULL"' is not assignable to parameter of type 'SqlError<"no such column: deleted", null> & "CREATE INDEX users_email ON users (email) WHERE deleted IS NULL"'.",
+      },
+      {
+        "category": 1,
+        "code": 2345,
+        "column": 27,
+        "details": [
+          {
+            "category": 1,
+            "code": 2322,
+            "message": "Type 'string' is not assignable to type 'SqlError<"views may not be indexed", null>'.",
+          },
+        ],
+        "expression": ""CREATE INDEX live_id ON live (id)"",
+        "file": "app.ts",
+        "line": 106,
+        "message": "Argument of type '"CREATE INDEX live_id ON live (id)"' is not assignable to parameter of type 'SqlError<"views may not be indexed", null> & "CREATE INDEX live_id ON live (id)"'.",
+      },
+    ],
+    "types": {
+      "liteIndexes": "{ readonly name?: undefined | string; readonly up: (db: MigrationContext<SqliteEngine, Sqlite, { live: View<{ id: { readonly type: "integer"; readonly nullable: false; readonly hasDefault: false; readonly i: 0; }; }>; users: { deleted_at: { readonly type: "text"; readonly nullable: true; readonly hasDefault: false; readonly i: 2; }; email: { readonly type: "text"; readonly nullable: false; readonly hasDefault: false; readonly i: 1; }; id: RowidCol<0>; }; }, DefaultTypeMap>) => Promise<MigrationContext<SqliteEngine, Sqlite, { live: View<{ id: { readonly type: "integer"; readonly nullable: false; readonly hasDefault: false; readonly i: 0; }; }>; users: { deleted_at: { readonly type: "text"; readonly nullable: true; readonly hasDefault: false; readonly i: 2; }; email: { readonly type: "text"; readonly nullable: false; readonly hasDefault: false; readonly i: 1; }; id: RowidCol<0>; }; }, DefaultTypeMap>>; readonly down: (db: MigrationContext<SqliteEngine, Sqlite, { live: View<{ id: { readonly type: "integer"; readonly nullable: false; readonly hasDefault: false; readonly i: 0; }; }>; users: { deleted_at: { readonly type: "text"; readonly nullable: true; readonly hasDefault: false; readonly i: 2; }; email: { readonly type: "text"; readonly nullable: false; readonly hasDefault: false; readonly i: 1; }; id: RowidCol<0>; }; }, DefaultTypeMap>) => Promise<unknown> }",
+      "myIndexes": "{ readonly name?: undefined | string; readonly up: (db: MigrationContext<MySqlEngine, MySql, { users: { email: { readonly type: "varchar"; readonly nullable: false; readonly hasDefault: false; readonly i: 1; }; id: { readonly type: "int"; readonly nullable: false; readonly hasDefault: false; readonly i: 0; }; }; }, DefaultTypeMap>) => Promise<MigrationContext<MySqlEngine, MySql, { users: { email: { readonly type: "varchar"; readonly nullable: false; readonly hasDefault: false; readonly i: 1; }; id: { readonly type: "int"; readonly nullable: false; readonly hasDefault: false; readonly i: 0; }; }; }, DefaultTypeMap>>; readonly down: (db: MigrationContext<MySqlEngine, MySql, { users: { email: { readonly type: "varchar"; readonly nullable: false; readonly hasDefault: false; readonly i: 1; }; id: { readonly type: "int"; readonly nullable: false; readonly hasDefault: false; readonly i: 0; }; }; }, DefaultTypeMap>) => Promise<unknown> }",
+      "pgIndexes": "{ readonly name?: undefined | string; readonly up: (db: MigrationContext<PgEngine, Postgres, { users: { created_at: Col<"timestamptz", { nullable: true; }>; deleted_at: Col<"timestamptz", { nullable: true; }>; email: Col<"text">; id: Col<"int4">; }; }, NodePostgresTypeMap>) => Promise<MigrationContext<PgEngine, Postgres, { users: { created_at: Col<"timestamptz", { nullable: true; }>; deleted_at: Col<"timestamptz", { nullable: true; }>; email: Col<"text">; id: Col<"int4">; }; }, NodePostgresTypeMap>>; readonly down: (db: MigrationContext<PgEngine, Postgres, { users: { created_at: Col<"timestamptz", { nullable: true; }>; deleted_at: Col<"timestamptz", { nullable: true; }>; email: Col<"text">; id: Col<"int4">; }; }, NodePostgresTypeMap>) => Promise<unknown> }",
+    },
+  },
+}
+`;

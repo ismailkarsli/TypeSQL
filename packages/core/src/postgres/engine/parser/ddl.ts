@@ -175,8 +175,7 @@ type NoopObject =
 	| "conversion"
 	| "tablespace";
 type NoopCreateObject =
-	| NoopObject
-	| "unique"
+	| Exclude<NoopObject, "index">
 	| "constraint"
 	| "cast"
 	| "access"
@@ -218,20 +217,161 @@ type ParseCreate<T extends Toks, I extends number, OrReplace extends boolean> =
 										? ParseCreateSchema<T, Next<I>>
 										: W extends "function"
 											? ParseCreateFunction<T, Next<I>>
-											: W extends "procedure"
-												? RoutineEnd<
-														T,
-														Next<I>,
-														{ t: "noop"; what: `create ${W}` }
-													>
-												: W extends NoopCreateObject
-													? Noop<T, I, `create ${W}`>
-													: Expected<
-															"TABLE, VIEW, TYPE, SCHEMA, INDEX, FUNCTION, ... after CREATE",
-															T,
-															I
-														>
+											: W extends "index"
+												? ParseCreateIndex<T, Next<I>>
+												: W extends "unique"
+													? EatWord<T, Next<I>, "index"> extends never
+														? Expected<"INDEX", T, Next<I>>
+														: ParseCreateIndex<T, Nx2<I>>
+													: W extends "procedure"
+														? RoutineEnd<
+																T,
+																Next<I>,
+																{ t: "noop"; what: `create ${W}` }
+															>
+														: W extends NoopCreateObject
+															? Noop<T, I, `create ${W}`>
+															: Expected<
+																	"TABLE, VIEW, TYPE, SCHEMA, INDEX, FUNCTION, ... after CREATE",
+																	T,
+																	I
+																>
 		: Expected<"object type after CREATE", T, I>;
+
+/**
+ * `CREATE [UNIQUE] INDEX [CONCURRENTLY] [[IF NOT EXISTS] name] ON [ONLY] t [USING m] (…) …`.
+ * The node holds `SELECT <key expressions and INCLUDE columns> FROM t WHERE <predicate>`,
+ * which names the same columns and functions; the index itself changes no schema.
+ */
+type ParseCreateIndex<T extends Toks, I extends number> =
+	IndexName<
+		T,
+		EatWord<T, I, "concurrently"> extends never ? I : Next<I>
+	> extends infer J extends number
+		? EatWord<T, J, "on"> extends never
+			? Expected<"ON", T, J>
+			: QualName<
+						T,
+						EatWord<T, Next<J>, "only"> extends never ? Next<J> : Nx2<J>
+					> extends [
+						infer Parts extends readonly string[],
+						infer J1 extends number,
+					]
+				? (
+						EatWord<T, J1, "using"> extends never
+							? J1
+							: Ident<T, Next<J1>> extends [string, infer J2 extends number]
+								? J2
+								: Expected<"access method", T, Next<J1>>
+					) extends infer J2
+					? J2 extends number
+						? EatOp<T, J2, "("> extends never
+							? Expected<'"("', T, J2>
+							: IndexElems<T, Next<J2>, []> extends Ok<
+										infer Es extends readonly unknown[],
+										infer J3 extends number
+									>
+								? IndexTail<T, J3, Es> extends Ok<
+										[infer Es2, infer W],
+										infer J4 extends number
+									>
+									? Ok<IndexNode<RefOf<Parts>, Es2, W>, J4>
+									: IndexTail<T, J3, Es>
+								: IndexElems<T, Next<J2>, []>
+						: J2
+					: never
+				: Expected<"table name", T, Next<J>>
+		: IndexName<T, I>;
+
+/** Skips `[IF NOT EXISTS] name`; the name is optional without `IF NOT EXISTS`. */
+type IndexName<T extends Toks, I extends number> =
+	IfNotExists<T, I> extends [infer Ine extends boolean, infer J extends number]
+		? T[J] extends WordTok<"on">
+			? Ine extends true
+				? Expected<"index name", T, J>
+				: J
+			: Ident<T, J> extends [string, infer J1 extends number]
+				? J1
+				: Expected<"index name", T, J>
+		: never;
+
+/** `elem [, …] )`: each element's expression; collation, operator class and order are skipped. */
+type IndexElems<
+	T extends Toks,
+	I extends number,
+	Acc extends readonly unknown[],
+> =
+	ParseExpr<T, I> extends Ok<infer E, infer J extends number>
+		? SkipToElementEnd<T, J> extends infer K extends number
+			? T[K] extends OpTok<",">
+				? IndexElems<T, Next<K>, [...Acc, E]>
+				: T[K] extends OpTok<")">
+					? Ok<[...Acc, E], Next<K>>
+					: Expected<'"," or ")"', T, K>
+			: never
+		: ParseExpr<T, I>;
+
+/** `INCLUDE (…)`, `NULLS [NOT] DISTINCT`, `WITH (…)`, `TABLESPACE x` and `WHERE predicate`. */
+type IndexTail<
+	T extends Toks,
+	I extends number,
+	Es extends readonly unknown[],
+> =
+	T[I] extends WordTok<"include">
+		? EatOp<T, Next<I>, "("> extends never
+			? Expected<'"("', T, Next<I>>
+			: ParseExprList<T, Nx2<I>, Es> extends Ok<
+						infer Es2 extends readonly unknown[],
+						infer J extends number
+					>
+				? EatOp<T, J, ")"> extends never
+					? Expected<'"," or ")"', T, J>
+					: IndexTail<T, Next<J>, Es2>
+				: ParseExprList<T, Nx2<I>, Es>
+		: T[I] extends WordTok<"nulls">
+			? EatWords<T, Next<I>, ["not", "distinct"]> extends never
+				? EatWord<T, Next<I>, "distinct"> extends never
+					? Expected<"DISTINCT", T, Next<I>>
+					: IndexTail<T, Nx2<I>, Es>
+				: IndexTail<T, Nx3<I>, Es>
+			: T[I] extends WordTok<"with">
+				? EatOp<T, Next<I>, "("> extends never
+					? Expected<'"("', T, Next<I>>
+					: SkipToCloseParen<T, Nx2<I>> extends infer J extends number
+						? IndexTail<T, J, Es>
+						: SkipToCloseParen<T, Nx2<I>>
+				: T[I] extends WordTok<"tablespace">
+					? Ident<T, Next<I>> extends [string, infer J extends number]
+						? IndexTail<T, J, Es>
+						: Expected<"tablespace name", T, Next<I>>
+					: T[I] extends WordTok<"where">
+						? ParseExpr<T, Next<I>> extends Ok<infer W, infer J extends number>
+							? Ok<[Es, W], J>
+							: ParseExpr<T, Next<I>>
+						: Ok<[Es, null], I>;
+
+type IndexNode<Ref, Es, W> = {
+	t: "create_index";
+	table: Ref;
+	q: {
+		t: "select";
+		with: null;
+		body: {
+			t: "simple";
+			distinct: false;
+			targets: { [K in keyof Es]: { e: Es[K]; alias: null } };
+			from: [{ t: "table"; ref: Ref; alias: null; colAliases: null }];
+			where: W;
+			groupBy: null;
+			groupingSets: false;
+			having: null;
+			windows: [];
+		};
+		orderBy: [];
+		limit: null;
+		offset: null;
+	};
+};
 
 type ParseCreateFunction<T extends Toks, I extends number> =
 	QualName<T, I> extends [

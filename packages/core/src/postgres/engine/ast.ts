@@ -659,6 +659,13 @@ export type CreateFunction = {
 };
 export type NoopStmt = { readonly t: "noop"; readonly what: string };
 
+/** `CREATE INDEX`, as the query that names its columns, functions and predicate. */
+export type CreateIndex = {
+	readonly t: "create_index";
+	readonly table: TableRef;
+	readonly q: SelectStmt;
+};
+
 export type DeclareCursor = {
 	readonly t: "declare_cursor";
 	readonly name: string;
@@ -687,6 +694,7 @@ export type DdlStmt =
 	| DropSchema
 	| RenameSchema
 	| CreateFunction
+	| CreateIndex
 	| NoopStmt
 	| DeclareCursor
 	| FetchStmt

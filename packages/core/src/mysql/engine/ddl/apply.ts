@@ -23,7 +23,7 @@ import type {
 	SetKey,
 	Simplify,
 } from "../../../engine/object.js";
-import type { Toks } from "../../../engine/tokens.js";
+import type { Toks, TooLong, TooManyTokens } from "../../../engine/tokens.js";
 import type { AnyErr, SqlError } from "../../../errors.js";
 import type { Shaped, Table, TsShape, View } from "../../../schema.js";
 import type {
@@ -31,12 +31,14 @@ import type {
 	AlterTable,
 	ColumnDef,
 	ColumnPlace,
+	CreateIndex,
 	CreateTable,
 	CreateTableAs,
 	CreateTableLike,
 	CreateView,
 	DmlStmt,
 	DropStmt,
+	Expr,
 	RenameTable,
 	SelectStmt,
 	Stmt,
@@ -56,9 +58,11 @@ export type ApplyDdlAll<DB, Q extends string> = Unlocated<
 >;
 type ApplyScript<DB, Q extends string> =
 	Lex<Q> extends infer T extends Toks
-		? ParseScript<T> extends infer S extends readonly Stmt[]
-			? ApplyLoop<DB, S, 0>
-			: ParseScript<T>
+		? TooManyTokens<T> extends true
+			? TooLong<T>
+			: ParseScript<T> extends infer S extends readonly Stmt[]
+				? ApplyLoop<DB, S, 0>
+				: ParseScript<T>
 		: Lex<Q>;
 
 type ApplyLoop<
@@ -89,28 +93,92 @@ export type ApplyOne<DB, S extends Stmt> = S extends {
 						? RenameEffect<DB, Extract<S, RenameTable>["pairs"], 0>
 						: S extends { readonly t: "drop" }
 							? DropEffect<DB, Extract<S, DropStmt>, 0>
-							: S extends {
-										readonly t: "create_index" | "drop_index" | "truncate";
-									}
-								? S extends { readonly table: infer Ref extends TableRef }
-									? Exists<DB, Ref> extends true
-										? DB
-										: NoTable<Ref>
-									: DB
-								: S extends { readonly t: "select" }
-									? ProjectSelect<
-											Extract<S, SelectStmt>,
-											TopEnv<DB>
-										> extends infer X
-										? X extends AnyErr
-											? X
-											: DB
-										: never
-									: S extends { readonly t: "insert" | "update" | "delete" }
-										? ProjectDml<Extract<S, DmlStmt>, DB, {}> extends AnyErr
-											? ProjectDml<Extract<S, DmlStmt>, DB, {}>
-											: DB
-										: DB;
+							: S extends { readonly t: "create_index" }
+								? IndexEffect<DB, Extract<S, CreateIndex>>
+								: S extends { readonly t: "drop_index" | "truncate" }
+									? S extends { readonly table: infer Ref extends TableRef }
+										? Exists<DB, Ref> extends true
+											? DB
+											: NoTable<Ref>
+										: DB
+									: S extends { readonly t: "select" }
+										? ProjectSelect<
+												Extract<S, SelectStmt>,
+												TopEnv<DB>
+											> extends infer X
+											? X extends AnyErr
+												? X
+												: DB
+											: never
+										: S extends { readonly t: "insert" | "update" | "delete" }
+											? ProjectDml<Extract<S, DmlStmt>, DB, {}> extends AnyErr
+												? ProjectDml<Extract<S, DmlStmt>, DB, {}>
+												: DB
+											: DB;
+
+type IndexEffect<DB, S extends CreateIndex> =
+	LookupRelation<DB, S["table"]> extends [infer Rel, string]
+		? MissingKey<Rel, S["cols"][number]> extends infer N extends string
+			? [N] extends [never]
+				? FunctionalIndex<DB, S>
+				: SqlError<
+						`Key column '${N}' doesn't exist in table`,
+						NamedAt<N, "column">
+					>
+			: never
+		: NoTable<S["table"]>;
+
+/** A named key column the relation doesn't have (MySQL's names are case-insensitive). */
+type MissingKey<Rel, N extends string> = N extends N
+	? [FindKey<Rel, Lowercase<N>>] extends [never]
+		? N
+		: never
+	: never;
+
+/** The functional key parts, checked as `SELECT <expressions> FROM <table>`. */
+type FunctionalIndex<DB, S extends CreateIndex> = S["exprs"] extends readonly []
+	? DB
+	: ProjectSelect<
+				{
+					readonly t: "select";
+					readonly with: null;
+					readonly body: {
+						readonly t: "simple";
+						readonly distinct: false;
+						readonly targets: ExprTargets<S["exprs"]>;
+						readonly from: {
+							readonly t: "table";
+							readonly ref: S["table"];
+							readonly alias: null;
+						};
+						readonly where: null;
+						readonly groupBy: null;
+						readonly rollup: false;
+						readonly having: null;
+						readonly windows: [];
+					};
+					readonly orderBy: [];
+					readonly limit: null;
+					readonly offset: null;
+				},
+				TopEnv<DB>
+			> extends infer C
+		? C extends SqlError<`Unknown column '${infer N}'${string}`, infer At>
+			? SqlError<`Unknown column '${N}' in 'functional index'`, At>
+			: C extends AnyErr
+				? C
+				: DB
+		: never;
+
+type ExprTargets<Es extends readonly Expr[]> = {
+	readonly [K in keyof Es]: {
+		readonly t: "expr";
+		readonly e: Es[K];
+		readonly alias: null;
+		readonly span: "";
+		readonly tail: "";
+	};
+};
 
 type Exists<DB, Ref extends TableRef> =
 	LookupRelation<DB, Ref> extends [unknown, string] ? true : false;

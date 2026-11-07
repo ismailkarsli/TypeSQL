@@ -747,8 +747,8 @@ type After = ApplyDdl<
 ## What is supported
 
 - **Schema changes:** `CREATE` / `ALTER` / `DROP` of tables, views (also materialized), enums and schemas, plus `CREATE FUNCTION`, whose return type goes into `$functions`.
-- **Checked without a schema change:** `SELECT`, `INSERT`, `UPDATE` and `DELETE`.
-- **Skipped:** indexes, sequences, triggers, extensions, grants and other statements.
+- **Checked without a schema change:** `SELECT`, `INSERT`, `UPDATE` and `DELETE`, and `CREATE INDEX`, whose table, key columns and expressions, `INCLUDE` columns and `WHERE` predicate must exist.
+- **Skipped:** other index statements (`DROP INDEX`, `ALTER INDEX`), sequences, triggers, extensions, grants and other statements.
 - **Columns:** `NOT NULL`, `PRIMARY KEY`, `serial` and identity columns are non-null; `DEFAULT`, `serial`, identity and generated columns are optional in `INSERT`; views keep the nullability their query infers.
 
 This list is PostgreSQL's; what MySQL and MariaDB DDL does to the schema is in [MySQL and MariaDB](../adapters/mysql#migrations).

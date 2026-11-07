@@ -6,7 +6,8 @@ Config: `{ dialect: "postgres", url: process.env.DATABASE_URL, migrationsDir: ".
 
 **DDL:**
 - Changes the schema: tables, views, enums, schemas, `CREATE FUNCTION`.
-- Skipped: indexes, sequences, triggers, extensions, grants.
+- Checked, no schema change: `CREATE INDEX` columns, expressions, `INCLUDE` and `WHERE`.
+- Skipped: other index statements, sequences, triggers, extensions, grants.
 - Not tracked: view dependencies, `search_path`, composite types.
 
 **Transactions:** each migration is atomic, with an advisory lock.

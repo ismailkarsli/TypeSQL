@@ -1,6 +1,6 @@
 import type { Simplify } from "../../engine/object.js";
 import type { MaxParam, NullTest, ParamsToMap } from "../../engine/params.js";
-import type { Toks } from "../../engine/tokens.js";
+import type { Toks, TooLong, TooManyTokens } from "../../engine/tokens.js";
 import type { Cols } from "../../engine/types.js";
 import type * as Call from "../../sql/call.js";
 import type * as Frag from "../../sql/fragment.js";
@@ -52,32 +52,37 @@ export type Analyze<DB, Q extends string> =
 type AnalyzeGeneral<DB, Q1 extends string, Names> =
 	Lex<Q1> extends infer T
 		? T extends Toks
-			? ParseProgram<T> extends infer S
-				? S extends Stmt
-					? (
-							MaxParam<T> extends 0
-								? {}
-								: ParamsToMap<ParamsOfStmt<S, DB>>
-						) extends infer P
-						? ProjectStmt<
-								S,
-								QueryContext<ProjectionDb<DB, P, Q1>, [], {}>
-							> extends infer C
-							? C extends Cols | null
-								? {
-										readonly kind: S["t"];
-										readonly cols: C;
-										readonly params: P;
-										readonly max: MaxParam<T>;
-										readonly names: Names;
-										readonly stmt: S;
-									}
-								: Reposition<C, T, DB>
-							: never
-						: never
-					: Reposition<S, T, DB>
-				: never
+			? TooManyTokens<T> extends true
+				? TooLong<T>
+				: AnalyzeTokens<DB, Q1, Names, T>
 			: T
+		: never;
+
+type AnalyzeTokens<DB, Q1 extends string, Names, T extends Toks> =
+	ParseProgram<T> extends infer S
+		? S extends Stmt
+			? (
+					MaxParam<T> extends 0
+						? {}
+						: ParamsToMap<ParamsOfStmt<S, DB>>
+				) extends infer P
+				? ProjectStmt<
+						S,
+						QueryContext<ProjectionDb<DB, P, Q1>, [], {}>
+					> extends infer C
+					? C extends Cols | null
+						? {
+								readonly kind: S["t"];
+								readonly cols: C;
+								readonly params: P;
+								readonly max: MaxParam<T>;
+								readonly names: Names;
+								readonly stmt: S;
+							}
+						: Reposition<C, T, DB>
+					: never
+				: never
+			: Reposition<S, T, DB>
 		: never;
 
 // Only casts read which parameters accept NULL; a text that merely looks like one costs a little.

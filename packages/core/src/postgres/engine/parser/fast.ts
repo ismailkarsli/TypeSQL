@@ -1,6 +1,6 @@
 import type { Ws } from "../../../engine/chars.js";
 import type { MaxParam } from "../../../engine/params.js";
-import type { Toks } from "../../../engine/tokens.js";
+import type { Toks, TooManyTokens } from "../../../engine/tokens.js";
 import type { Lex } from "../lexer/lex.js";
 import type {
 	ParseSelectTail,
@@ -44,11 +44,13 @@ type AllTargets<S extends string> = S extends `${string}$${string}`
 type ParsedTargets<S extends string> =
 	Lex<S> extends infer T
 		? T extends Toks
-			? ParseTargetList<T, 0, []> extends Ok<infer Cs, infer J>
-				? T[J] extends undefined
-					? Cs
+			? TooManyTokens<T> extends true
+				? null
+				: ParseTargetList<T, 0, []> extends Ok<infer Cs, infer J>
+					? T[J] extends undefined
+						? Cs
+						: null
 					: null
-				: null
 			: null
 		: null;
 
@@ -95,35 +97,43 @@ type OrderTail<
 type SplitOrder<Ts, Body extends string, Order extends string> =
 	Lex<`FROM ${Body}`> extends infer BT
 		? BT extends Toks
-			? ParseSimpleAfterTargets<BT, 0, false, Ts> extends Ok<infer B, infer J>
-				? BT[J] extends undefined
-					? Lex<`ORDER BY${Order}`> extends infer OT
-						? OT extends Toks
-							? ParseSelectTail<OT, B, null, 0> extends Ok<
-									infer Stmt,
-									infer End
-								>
-								? OT[End] extends undefined
-									? { stmt: Stmt; max: MaxParam<[...BT, ...OT]> }
+			? TooManyTokens<BT> extends true
+				? never
+				: ParseSimpleAfterTargets<BT, 0, false, Ts> extends Ok<infer B, infer J>
+					? BT[J] extends undefined
+						? Lex<`ORDER BY${Order}`> extends infer OT
+							? OT extends Toks
+								? ParseSelectTail<OT, B, null, 0> extends Ok<
+										infer Stmt,
+										infer End
+									>
+									? OT[End] extends undefined
+										? { stmt: Stmt; max: MaxParam<[...BT, ...OT]> }
+										: never
 									: never
 								: never
 							: never
 						: never
 					: never
-				: never
 			: never
 		: never;
 
+// A text past the token limit is left to the general path, which reports it.
 type WholeTail<Ts, Rest extends string> =
 	Lex<`FROM ${Rest}`> extends infer T
 		? T extends Toks
-			? ParseSimpleAfterTargets<T, 0, false, Ts> extends Ok<infer Body, infer J>
-				? ParseSelectTail<T, Body, null, J> extends Ok<infer Stmt, infer End>
-					? T[End] extends undefined
-						? { stmt: Stmt; max: MaxParam<T> }
+			? TooManyTokens<T> extends true
+				? never
+				: ParseSimpleAfterTargets<T, 0, false, Ts> extends Ok<
+							infer Body,
+							infer J
+						>
+					? ParseSelectTail<T, Body, null, J> extends Ok<infer Stmt, infer End>
+						? T[End] extends undefined
+							? { stmt: Stmt; max: MaxParam<T> }
+							: never
 						: never
 					: never
-				: never
 			: never
 		: never;
 

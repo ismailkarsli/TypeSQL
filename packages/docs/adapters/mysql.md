@@ -235,7 +235,7 @@ The SQL is MySQL's: names are quoted with backticks, `'…'` and `"…"` are str
 - `INSERT` and `REPLACE` with `VALUES`, `VALUE`, `SET` or a query, `IGNORE`, and `ON DUPLICATE KEY UPDATE` with `VALUES(col)` or a row alias (`AS new`, MySQL). `RETURNING` on MariaDB; on MySQL it is an error.
 - `UPDATE`, including multi-table `UPDATE a JOIN b … SET`, and `ORDER BY` / `LIMIT` (single-table on MySQL).
 - `DELETE` from one table (with `ORDER BY`, `LIMIT`, and `RETURNING` on MariaDB) or several (`DELETE t1 FROM …`, `DELETE FROM t1 USING …`).
-- In migrations: `CREATE TABLE` (column attributes, table constraints and options, `LIKE`, `AS SELECT`), `ALTER TABLE` (`ADD`, `DROP`, `MODIFY`, `CHANGE` and `RENAME COLUMN`, `FIRST` / `AFTER`, `ALTER … SET` / `DROP DEFAULT`, `SET VISIBLE` / `INVISIBLE`, `RENAME TO`; index and constraint changes are accepted), `RENAME TABLE`, `DROP TABLE` / `VIEW`, `CREATE [OR REPLACE] VIEW`, `CREATE` / `DROP INDEX` and `TRUNCATE`. `SET`, `START TRANSACTION`, `LOCK TABLES` and similar statements are accepted without effect on the schema.
+- In migrations: `CREATE TABLE` (column attributes, table constraints and options, `LIKE`, `AS SELECT`), `ALTER TABLE` (`ADD`, `DROP`, `MODIFY`, `CHANGE` and `RENAME COLUMN`, `FIRST` / `AFTER`, `ALTER … SET` / `DROP DEFAULT`, `SET VISIBLE` / `INVISIBLE`, `RENAME TO`; index and constraint changes are accepted), `RENAME TABLE`, `DROP TABLE` / `VIEW`, `CREATE [OR REPLACE] VIEW`, `CREATE INDEX` (its key columns and functional key parts must exist in the table), `DROP INDEX` and `TRUNCATE`. `SET`, `START TRANSACTION`, `LOCK TABLES` and similar statements are accepted without effect on the schema.
 
 ## Differences between the servers
 

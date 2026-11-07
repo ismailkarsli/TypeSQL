@@ -15,10 +15,11 @@ import type {
 	AlterAction,
 	ColumnDef,
 	ColumnPlace,
+	Expr,
 	SelectStmt,
 	TableRef,
 } from "../ast.js";
-import type { IsSubqueryParen } from "./expr.js";
+import type { IsSubqueryParen, ParseExpr } from "./expr.js";
 import type { ParseSubquery } from "./select.js";
 import type { ParseColumnType } from "./typename.js";
 import type { Ident, OptCols, TableRefAt } from "./util.js";
@@ -658,7 +659,7 @@ type SkipCheckOption<T extends Toks, I extends number> =
 			: I
 		: I;
 
-/** `CREATE INDEX name [USING x] ON t (…)`: checks the table exists. */
+/** `CREATE INDEX name [USING x] ON t (key_part, …) [options]`: its columns and expressions. */
 type ParseCreateIndex<T extends Toks, I extends number> =
 	IfNotExists<T, I> extends [boolean, infer I0 extends number]
 		? Ident<T, I0> extends Name
@@ -673,18 +674,62 @@ type ParseCreateIndex<T extends Toks, I extends number> =
 							infer J2 extends number
 						>
 						? IsOp<T, J2, "("> extends true
-							? SkipStatement<T, J2, "index"> extends Ok<
-									unknown,
+							? IndexParts<T, Next<J2>, [], []> extends Ok<
+									[infer Cols, infer Exprs],
 									infer J3 extends number
 								>
-								? Ok<{ t: "create_index"; table: Table }, J3>
-								: never
+								? SkipStatement<T, J3, "index"> extends Ok<
+										unknown,
+										infer J4 extends number
+									>
+									? Ok<
+											{
+												t: "create_index";
+												table: Table;
+												cols: Cols;
+												exprs: Exprs;
+											},
+											J4
+										>
+									: never
+								: IndexParts<T, Next<J2>, [], []>
 							: SyntaxErr<T, J2>
 						: TableRefAt<T, Next<J>>
 					: SyntaxErr<T, J>
 				: never
 			: SyntaxErr<T, I0>
 		: IfNotExists<T, I>;
+
+/**
+ * `a, b(10) DESC, ((expr)))`: the plain column names and the functional key parts' expressions,
+ * up to and past the closing parenthesis.
+ */
+type IndexParts<
+	T extends Toks,
+	I extends number,
+	Cols extends readonly string[],
+	Exprs extends readonly Expr[],
+> = (
+	Ident<T, I> extends infer N extends Name
+		? [[...Cols, N["v"]], Exprs, SkipKeyPart<T, Next<I>>]
+		: IsOp<T, I, "("> extends true
+			? ParseExpr<T, I> extends Ok<infer E extends Expr, infer J extends number>
+				? [Cols, [...Exprs, E], SkipKeyPart<T, J>]
+				: ParseExpr<T, I>
+			: SyntaxErr<T, I>
+) extends infer R
+	? R extends [
+			infer C extends readonly string[],
+			infer E extends readonly Expr[],
+			infer J,
+		]
+		? J extends number
+			? IsOp<T, J, ","> extends true
+				? IndexParts<T, Next<J>, C, E>
+				: CloseOk<T, J, [C, E]>
+			: J
+		: R
+	: never;
 
 export type ParseDrop<T extends Toks, I extends number> = (
 	IsWord<T, I, "temporary"> extends true

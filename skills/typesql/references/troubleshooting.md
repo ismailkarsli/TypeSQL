@@ -10,6 +10,7 @@
 | `function f(text) does not exist` | declare it in `$functions` |
 | `null value in column … violates not-null` | set the column, or flag `hasDefault` if it has a default |
 | `DEFAULT is not allowed in this context` | `sql.optional` outside a `VALUES` item or `SET` value |
+| `the SQL text has … tokens, more than the 4096 TypeSQL can check` | split the statement or `.ddl()` script, or use `sql.as<Row>()` |
 | `TS2589`, `TS5114`, `TS5115` | compiler budget: split the statement, or use `sql.as<Row>()` |
 | `TS2883` in a package exporting queries | add `@typesql/core` to its dependencies, or export rows |
 | `TS1479` | ESM-only; not importable from `.cts` |

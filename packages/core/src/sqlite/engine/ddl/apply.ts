@@ -15,18 +15,20 @@ import type {
 	RenameKey,
 	SetKey,
 } from "../../../engine/object.js";
-import type { Toks } from "../../../engine/tokens.js";
+import type { Toks, TooLong, TooManyTokens } from "../../../engine/tokens.js";
 import type { AnyErr, SqlError } from "../../../errors.js";
 import type { Table, View } from "../../../schema.js";
 import type {
 	AlterTable,
 	ColumnDef,
+	CreateIndex,
 	CreateTable,
 	CreateTableAs,
 	CreateView,
 	CreateVirtual,
 	DmlStmt,
 	DropStmt,
+	Expr,
 	SelectStmt,
 	Stmt,
 	TableRef,
@@ -45,9 +47,11 @@ export type ApplyDdlAll<DB, Q extends string> = Unlocated<
 >;
 type ApplyScript<DB, Q extends string> =
 	Lex<Q> extends infer T extends Toks
-		? ParseScript<T> extends infer S extends readonly Stmt[]
-			? ApplyLoop<DB, S, 0>
-			: ParseScript<T>
+		? TooManyTokens<T> extends true
+			? TooLong<T>
+			: ParseScript<T> extends infer S extends readonly Stmt[]
+				? ApplyLoop<DB, S, 0>
+				: ParseScript<T>
 		: Lex<Q>;
 
 type ApplyLoop<
@@ -75,7 +79,7 @@ export type ApplyOne<DB, S extends Stmt> = S extends {
 					: S extends { readonly t: "virtual" }
 						? VirtualEffect<DB, Extract<S, CreateVirtual>>
 						: S extends { readonly t: "create_index" }
-							? IndexEffect<DB, S>
+							? IndexEffect<DB, Extract<S, CreateIndex>>
 							: S extends { readonly t: "select" }
 								? ProjectSelect<
 										Extract<S, SelectStmt>,
@@ -417,16 +421,50 @@ type DropEffect<DB, S extends DropStmt> = S["kind"] extends "table" | "view"
 				>
 	: DB;
 
-type IndexEffect<DB, S> = S extends {
-	readonly table: infer Ref extends TableRef;
-}
-	? Exists<DB, Ref> extends true
-		? DB
+type IndexEffect<DB, S extends CreateIndex> =
+	LookupRelation<DB, S["table"]> extends [infer Rel, string]
+		? Rel extends View<Table>
+			? SqlError<"views may not be indexed", null>
+			: ProjectSelect<IndexedQuery<S>, QueryContext<DB, [], {}>> extends infer C
+				? C extends AnyErr
+					? C
+					: DB
+				: never
 		: SqlError<
-				`no such table: main.${Ref["name"]}`,
-				NamedAt<`main.${Ref["name"]}`, "table">
-			>
-	: DB;
+				`no such table: main.${S["table"]["name"]}`,
+				NamedAt<`main.${S["table"]["name"]}`, "table">
+			>;
+
+/** `SELECT <indexed expressions> FROM <table> WHERE <predicate>`, which names the same columns. */
+type IndexedQuery<S extends CreateIndex> = {
+	readonly t: "select";
+	readonly with: null;
+	readonly body: {
+		readonly t: "simple";
+		readonly distinct: false;
+		readonly targets: ExprTargets<S["cols"]>;
+		readonly from: {
+			readonly t: "table";
+			readonly ref: S["table"];
+			readonly alias: null;
+		};
+		readonly where: S["where"];
+		readonly groupBy: null;
+		readonly having: null;
+		readonly windows: [];
+	};
+	readonly orderBy: [];
+	readonly limit: null;
+	readonly offset: null;
+};
+type ExprTargets<Es extends readonly Expr[]> = {
+	readonly [K in keyof Es]: {
+		readonly t: "expr";
+		readonly e: Es[K];
+		readonly alias: null;
+		readonly span: "";
+	};
+};
 
 type VirtualEffect<DB, S extends CreateVirtual> =
 	Exists<DB, S["table"]> extends true

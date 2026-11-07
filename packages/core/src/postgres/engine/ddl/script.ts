@@ -1,5 +1,10 @@
 import type { Next } from "../../../engine/next.js";
-import type { Tok, Toks } from "../../../engine/tokens.js";
+import type {
+	Tok,
+	Toks,
+	TooLong,
+	TooManyTokens,
+} from "../../../engine/tokens.js";
 import type { AnyErr, SqlError } from "../../../errors.js";
 import type { DdlStmt, Stmt } from "../ast.js";
 import type { Lex } from "../lexer/lex.js";
@@ -15,7 +20,9 @@ type DdlKind = DdlStmt["t"];
 export type ApplyDdlAll<DB, Q extends string> =
 	Lex<Q> extends infer T
 		? T extends Toks
-			? ApplyLoop<DB, T, 0>
+			? TooManyTokens<T> extends true
+				? TooLong<T>
+				: ApplyLoop<DB, T, 0>
 			: Plain<T>
 		: never;
 

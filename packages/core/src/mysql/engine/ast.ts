@@ -446,6 +446,10 @@ export type CreateView = {
 export type CreateIndex = {
 	readonly t: "create_index";
 	readonly table: TableRef;
+	/** The key parts that name a column. */
+	readonly cols: readonly string[];
+	/** The functional key parts' expressions. */
+	readonly exprs: readonly Expr[];
 };
 export type DropIndex = {
 	readonly t: "drop_index";

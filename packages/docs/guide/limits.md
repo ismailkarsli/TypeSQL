@@ -18,7 +18,7 @@ When you hit a limit, [`sql.as<Row>()`](./errors#when-typesql-can-t-type-a-state
 ## Statement size
 
 - Query size is limited by TypeScript's instantiation depth and work budgets. Long expression chains, wide select lists, nested subqueries, many `UNION` branches and large `IN` or `VALUES` lists can reach those budgets. The practical limit depends on the statement's shape, compiler version and schema.
-- The engine tracks precise token positions below 4096 tokens. Beyond that it uses a general numeric position; this is not a guarantee that statements of that size will compile.
+- A statement, or the script of one `.ddl()` call, can have at most 4096 tokens. A longer one is the error `the SQL text has … tokens, more than the 4096 TypeSQL can check`. Below that, the compiler's budgets may still stop a statement first.
 - When the compiler reaches its own budget, it reports TS2589 ("Type instantiation is excessively deep and possibly infinite"), TS5114 or TS5115 instead of a SQL error. Split the statement, or give its row type with [`sql.as<Row>()`](./using-sql#fully-dynamic-sql), which skips analysis.
 - Split long migration scripts across several `.ddl()` calls. Each call is checked separately against the schema returned by the previous one.
 

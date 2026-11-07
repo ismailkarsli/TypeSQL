@@ -9,7 +9,7 @@ export type ProjectStmt<S extends Stmt, Env extends QueryContext> =
 		? ProjectSelect<Extract<S, SelectStmt>, Env>
 		: S extends DmlStmt
 			? ProjectDml<S, Env>
-			: S extends Tag<"declare_cursor">
+			: S extends Tag<"declare_cursor" | "create_index">
 				? ProjectSelect<S["q"], Env> extends AnyErr
 					? ProjectSelect<S["q"], Env>
 					: null

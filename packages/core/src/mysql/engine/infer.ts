@@ -1,7 +1,7 @@
 import type { QueryContext } from "../../engine/family/types.js";
 import type { Simplify } from "../../engine/object.js";
 import type { MaxParam, ParamsToMap } from "../../engine/params.js";
-import type { Toks } from "../../engine/tokens.js";
+import type { Toks, TooLong, TooManyTokens } from "../../engine/tokens.js";
 import type { Cols } from "../../engine/types.js";
 import type { AnyErr } from "../../errors.js";
 import type * as Call from "../../sql/call.js";
@@ -23,23 +23,25 @@ export type Analyze<DB, Q extends string> =
 		? RN extends [infer Q1 extends string, infer Names]
 			? Lex<Q1> extends infer T
 				? T extends Toks
-					? ParseProgramAt<T> extends infer S
-						? S extends Stmt
-							? ProjectStmt<S, DB> extends infer C
-								? C extends Cols | null
-									? {
-											readonly kind: S["t"];
-											readonly cols: C;
-											readonly params: MaxParam<T> extends 0
-												? {}
-												: ParamsToMap<ParamsOfStmt<S, DB>>;
-											readonly max: MaxParam<T>;
-											readonly names: Names;
-										}
-									: Reposition<C, T, DB>
-								: never
-							: Reposition<S, T, DB>
-						: never
+					? TooManyTokens<T> extends true
+						? TooLong<T>
+						: ParseProgramAt<T> extends infer S
+							? S extends Stmt
+								? ProjectStmt<S, DB> extends infer C
+									? C extends Cols | null
+										? {
+												readonly kind: S["t"];
+												readonly cols: C;
+												readonly params: MaxParam<T> extends 0
+													? {}
+													: ParamsToMap<ParamsOfStmt<S, DB>>;
+												readonly max: MaxParam<T>;
+												readonly names: Names;
+											}
+										: Reposition<C, T, DB>
+									: never
+								: Reposition<S, T, DB>
+							: never
 					: T
 				: never
 			: RN
