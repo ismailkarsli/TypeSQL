@@ -20,6 +20,8 @@ exports[`pg-case-plugin > scenario 1`] = `
       "snakeNestedRows": "({ display_name: null | string; id: number; settings_doc: null | { allowed_hosts: readonly ({ host_name: string })[]; max_retries: number; retry_policy: { backoff_ms: null | number } } })[]",
       "snakeUpdated": "{ display_name: null | string }",
       "storedAccounts": "({ id: number; settingsDoc: null | { maxRetries: number; retryPolicy: { backoffMs: null | number }; allowedHosts: readonly ({ hostName: string })[] } })[]",
+      "storedNamedParameter": "{ free_form: unknown }",
+      "storedPositionalParameter": "{ free_form: unknown }",
       "storedUsers": "({ extra_doc: null | { last_seen: string }; free_form: unknown; id: number; profile: { home_city: string; phone_number: null | string; nick_name?: string; past_cities: readonly ({ city_name: string })[] }; tree_root: null | string })[]",
     },
   },
@@ -50,6 +52,8 @@ exports[`pg-case-plugin > scenario 1`] = `
     freeForm: null
   },
   camelNestedOptional: { freeForm: { optKey: 1 } },
+  storedNamedParameter: { free_form: { camelKey: 2, named_key: 1 } },
+  storedPositionalParameter: { free_form: { camelKey: 2, param_key: 1 } },
   camelNestedRows: [
     {
       id: 1,
@@ -59,7 +63,7 @@ exports[`pg-case-plugin > scenario 1`] = `
         phoneNumber: null
       },
       extraDoc: { lastSeen: 'default' },
-      freeForm: { paramKey: 1 }
+      freeForm: { camelKey: 2, paramKey: 1 }
     },
     {
       id: 2,
@@ -102,7 +106,7 @@ exports[`pg-case-plugin > scenario 1`] = `
       },
       extra_doc: { last_seen: 'default' },
       tree_root: null,
-      free_form: { param_key: 1 }
+      free_form: { camelKey: 2, param_key: 1 }
     },
     {
       id: 2,

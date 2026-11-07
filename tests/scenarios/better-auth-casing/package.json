@@ -1,0 +1,29 @@
+{
+	"name": "better-auth-casing",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"start": "node dist/app.js"
+	},
+	"dependencies": {
+		"@typesql/core": "workspace:*",
+		"@typesql/better-auth": "workspace:*",
+		"@typesql/pg": "workspace:*",
+		"better-auth": "catalog:",
+		"pg": "catalog:",
+		"@types/pg": "catalog:",
+		"@better-fetch/fetch": "catalog:",
+		"better-call": "catalog:",
+		"jose": "catalog:",
+		"kysely": "catalog:",
+		"nanostores": "catalog:",
+		"zod": "catalog:"
+	},
+	"devDependencies": {
+		"typescript": "catalog:",
+		"@types/node": "catalog:"
+	},
+	"scenario": {
+		"database": "postgres"
+	}
+}

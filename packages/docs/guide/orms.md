@@ -123,6 +123,21 @@ await db.transaction().execute(async (trx) => {
 });
 ```
 
+To use a schema from [`typesql introspect`](./introspect) instead of Kysely's types, or a client you resolve yourself, pass `driverOf` to `createTransactionalSql`. It runs on Kysely the same way, without `FromKysely`:
+
+```ts
+import { createTransactionalSql } from "@typesql/core/adapter";
+import { type DefaultTypeMap, type Postgres, postgres } from "@typesql/core/postgres";
+import { driverOf, type KyselyExecutor } from "@typesql/kysely";
+import type { DB } from "./schema.js"; // from typesql introspect
+
+const sql = createTransactionalSql<Postgres, DB, DefaultTypeMap, KyselyExecutor>(
+	postgres,
+	db,
+	driverOf("postgres"),
+);
+```
+
 Queries run through `db.withoutPlugins()`, so logging, the dialect and the pool apply, but result transformers such as `CamelCasePlugin` don't. Kysely's `PostgresDialect` runs on `pg`: for the exact `pg` types (`Buffer` for `bytea`, interval objects), use `createSql<DB, PgTypeMap>(postgres, db)`.
 
 ### Overrides

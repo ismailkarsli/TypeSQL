@@ -19,7 +19,7 @@ db.exec(`CREATE TABLE posts (
 const sql = createSql<DB>(db);
 
 // SQLite returns JSON as text, which stays text; what is written still converts.
-const camel = sql.withPlugin(new CasePlugin({ nested: true }));
+const camel = sql.withPlugin(new CasePlugin({ nested: "all" }));
 await camel(
 	`INSERT INTO posts ${camel.values("posts", [
 		{ id: 1, pageMeta: camel.json({ viewCount: 1 }) },

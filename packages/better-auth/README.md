@@ -34,6 +34,7 @@ export const auth = betterAuth({
 | `transaction` | Run related writes in one transaction. Default `false`. |
 | `usePlural` | Use plural table names, like `users`. Default `false`. |
 | `debugLogs` | Log each adapter call Better Auth makes, with its input and result. `true` for every method, or an object such as `{ findOne: true }`. Default `false`. |
+| `casing` | The case of table and column names. `"snake_case"` converts model names, core fields, `additionalFields` and plugin schemas the way [`CasePlugin`](https://typesql.karsli.net/guide/case-plugin) does: `twoFactor` is `two_factor` and `requirePKCE` is `require_pkce`. Your application still uses Better Auth's names. Default: Better Auth's own names. |
 
 Pass `sql` without plugins such as `CasePlugin`.
 

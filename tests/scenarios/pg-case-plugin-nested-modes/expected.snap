@@ -1,0 +1,87 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`pg-case-plugin-nested-modes > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "allRead": "{ id: number; profile: null | { homeCity: string } }",
+      "allStored": "{ extra: { last_seen: string; past_cities: readonly ({ city_name: string })[] }; holdings: null | { [key: string]: string | number }; profile: null | { home_city: string } }",
+      "flatRead": "{ id: number; profile: null | { home_city: string } }",
+      "inputRead": "{ extra: { last_seen: string; past_cities: readonly ({ city_name: string })[] }; id: number; profile: null | { home_city: string } }",
+      "inputStored": "{ extra: { last_seen: string; past_cities: readonly ({ city_name: string })[] }; holdings: null | { [key: string]: string | number }; profile: null | { home_city: string } }",
+      "outputRead": "({ extra: { lastSeen: string; pastCities: readonly ({ cityName: string })[] }; holdings: null | { [key: string]: string | number }; id: number; profile: null | { homeCity: string } })[]",
+      "outputStored": "({ extra: { last_seen: string; past_cities: readonly ({ city_name: string })[] }; holdings: null | { [key: string]: string | number }; profile: null | { home_city: string } })[]",
+      "snakeRead": "{ settings_doc: null | { max_retries: number } }",
+    },
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "typesql: CasePlugin's nested option is "input", "output", "all" or false, not true
+{
+  outputRead: [
+    {
+      id: 1,
+      holdings: { SASA: 1, 'SISE.IS': 2, startDate: 'x' },
+      profile: { homeCity: 'Oslo' },
+      extra: { lastSeen: 'today', pastCities: [ { cityName: 'Rome' } ] }
+    },
+    {
+      id: 2,
+      holdings: { SASA: 1, 'SISE.IS': 2, startDate: 'x' },
+      profile: null,
+      extra: { lastSeen: 'never', pastCities: [] }
+    },
+    {
+      id: 3,
+      holdings: { SASA: 1, 'SISE.IS': 2, startDate: 'x' },
+      profile: { homeCity: 'Lima' },
+      extra: { lastSeen: 'never', pastCities: [] }
+    }
+  ],
+  outputStored: [
+    {
+      holdings: { SASA: 1, 'SISE.IS': 2, startDate: 'x' },
+      profile: { home_city: 'Oslo' },
+      extra: { last_seen: 'today', past_cities: [ { city_name: 'Rome' } ] }
+    },
+    {
+      holdings: { SASA: 1, 'SISE.IS': 2, startDate: 'x' },
+      profile: null,
+      extra: { last_seen: 'never', past_cities: [] }
+    },
+    {
+      holdings: { SASA: 1, 'SISE.IS': 2, startDate: 'x' },
+      profile: { home_city: 'Lima' },
+      extra: { last_seen: 'never', past_cities: [] }
+    }
+  ],
+  inputRead: {
+    id: 4,
+    profile: { home_city: 'Oslo' },
+    extra: { last_seen: 'today', past_cities: [ { city_name: 'Rome' } ] }
+  },
+  inputStored: {
+    holdings: null,
+    profile: { home_city: 'Oslo' },
+    extra: { last_seen: 'today', past_cities: [ { city_name: 'Rome' } ] }
+  },
+  allRead: { id: 5, profile: { homeCity: 'Oslo' } },
+  allStored: {
+    holdings: null,
+    profile: { home_city: 'Oslo' },
+    extra: { last_seen: 'never', past_cities: [] }
+  },
+  flatRead: { id: 6, profile: { home_city: 'Oslo' } },
+  snakeRead: { settings_doc: { max_retries: 1 } }
+}
+",
+  },
+}
+`;

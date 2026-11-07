@@ -28,7 +28,7 @@ import type {
 import type { FromKyselyMysql } from "./from-kysely-mysql.js";
 import type { FromKyselySqlite } from "./from-kysely-sqlite.js";
 
-export { executor, type KyselyExecutor } from "./client.js";
+export { driverOf, executor, type KyselyExecutor } from "./client.js";
 export type {
 	ColumnOverride,
 	FromKysely,

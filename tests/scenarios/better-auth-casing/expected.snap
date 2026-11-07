@@ -1,0 +1,36 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`better-auth-casing > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {},
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "sign up: ada@example.com Countess
+sign in: 200
+session: Ada Countess
+two factor: codes true
+oauth client: true
+stored: {
+  preferred_name: 'Countess',
+  email_verified: false,
+  session_user_id: true,
+  session_active: true,
+  provider_id: 'credential',
+  backup_codes: 'codes',
+  client_id: 'app',
+  require_pkce: true
+}
+rate_limit rows: true
+",
+  },
+}
+`;

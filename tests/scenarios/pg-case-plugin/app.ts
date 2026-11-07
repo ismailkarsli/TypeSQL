@@ -97,7 +97,7 @@ export const camelFlat = await camel(
 ).executeTakeFirstOrThrow();
 
 // nested: rows, sql.json(), sql.param() and plain write values all convert.
-const camelNested = sql.withPlugin(new CasePlugin({ nested: true }));
+const camelNested = sql.withPlugin(new CasePlugin({ nested: "all" }));
 export const camelNestedRead = await camelNested(
 	"SELECT id, created_at, avatar_data, profile, extra_doc, free_form FROM users WHERE id = 1",
 ).executeTakeFirstOrThrow();
@@ -143,10 +143,20 @@ export const camelNestedOptional = await camelNested(
 		freeForm: camelNested.json({ optKey: 1 }),
 	})} WHERE id = 3 RETURNING free_form`,
 ).executeTakeFirstOrThrow();
-// Parameters keep the names of the database.
+// Parameters keep the names of the database, positional and named alike.
+await camelNested("UPDATE users SET free_form = :doc WHERE id = 1", {
+	doc: { named_key: 1, camelKey: 2 },
+}).execute();
+export const storedNamedParameter = await sql(
+	"SELECT free_form FROM users WHERE id = 1",
+).executeTakeFirstOrThrow();
 await camelNested("UPDATE users SET free_form = $1 WHERE id = 1", {
 	param_key: 1,
+	camelKey: 2,
 }).execute();
+export const storedPositionalParameter = await sql(
+	"SELECT free_form FROM users WHERE id = 1",
+).executeTakeFirstOrThrow();
 export const camelNestedRows = await camelNested(
 	"SELECT id, profile, extra_doc, free_form FROM users ORDER BY id",
 ).execute();
@@ -192,7 +202,7 @@ export const snakeUpdated = await snake(
 ).executeTakeFirstOrThrow();
 
 const snakeNested = sql.withPlugin(
-	new CasePlugin({ to: "snake_case", nested: true }),
+	new CasePlugin({ to: "snake_case", nested: "all" }),
 );
 await snakeNested(
 	`INSERT INTO accounts ${snakeNested.values("accounts", [
@@ -218,6 +228,8 @@ console.dir(
 		camelFlat,
 		camelNestedRead,
 		camelNestedOptional,
+		storedNamedParameter,
+		storedPositionalParameter,
 		camelNestedRows,
 		leafName,
 		camelNestedInTransaction,

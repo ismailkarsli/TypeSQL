@@ -190,6 +190,7 @@ What adapters and custom executors build on.
 |---|---|
 | `mapRows(q, rows)` | applies the query's output plugins to driver rows, for code that runs `q.text` itself |
 | `pluginsOf(q)` | returns the query's immutable plugin list |
+| `snakeCase(key)` | converts a key the way `CasePlugin` does for `to: "snake_case"`: `userID` is `user_id` and `HTTPCode` is `http_code` |
 | `createTransactionalSql(dialect, client, driver, depth?)` | the dialect's `sql` bound to a driver's client, with `sql.transaction(fn)`; the PostgreSQL adapters pass `postgres` from `@typesql/core/postgres` |
 | `createFamilySql(dialect, client, driverOf)` | the same for a dialect picked at runtime, with `driverOf(dialectFamily(dialect.name))` as its driver |
 | `dialectFamily(name)`, `DialectFamily` | `"postgres"`, `"sqlite"` or `"mysql"`: the dialects whose statements a driver writes alike (MariaDB's are MySQL's) |
@@ -248,7 +249,7 @@ Word lists for editor tooling, with nothing of the type engines at runtime.
 | `TransactionalSql<DB, TM, Plugins = []>` | an adapter's `sql`: `Sql` plus `transaction(fn)` |
 | `SqlPlugin`, `PluginTypes`, `IdentityPluginTypes`, `InputContext` | runtime hooks and type functions for custom plugins |
 | `PluginInput`, `PluginEncoded`, `PluginOutput`, `PluginJson` | apply a plugin tuple to a type |
-| `CasePlugin` | camelCase row/write keys and snake_case database write keys, or with `{ to: "snake_case" }` the reverse, with `{ nested: true }` inside JSON too; from `@typesql/core/plugins` |
+| `CasePlugin` | camelCase row/write keys and snake_case database write keys, or with `{ to: "snake_case" }` the reverse, with `{ nested: "output" | "input" | "all" }` inside JSON too; from `@typesql/core/plugins` |
 | `Executor` | what `execute*` runs on |
 | `ExecutorResult` | `{ rows, rowCount: number \| null }` |
 | `NoResultError` | thrown by `executeTakeFirstOrThrow` on 0 rows; carries `text` |
@@ -409,6 +410,8 @@ Each package wraps core's `createSql` with the schema converted from the ORM's t
 | `@typesql/kysely` | `createSql(postgres, db)` with `DB` from `Kysely<DB>`, or `createSql<DB, TM = DefaultTypeMap, Overrides = {}, Options = {}>(postgres, db?)` | `FromKysely<DB, Overrides, Options>`; with `sqlite`, `FromKyselySqlite`; with `mysql` or `mariadb`, `FromKyselyMysql` | on a `Kysely` or `Transaction`, plugins bypassed |
 | `@typesql/drizzle` | `createSql(postgres, db)` with the schema from `db`, or `createSql<Schema, TM = DefaultTypeMap, Options = {}>(postgres, db?)` | `FromDrizzle<Schema, Options>`; `pgType(column, "type")` pins a column. With `sqlite`, `FromDrizzleSqlite` and `sqliteType`; with `mysql` or `mariadb`, `FromDrizzleMysql` and `mysqlType` | PostgreSQL: on the driver client under a node-postgres or postgres.js Drizzle database. SQLite: on the Drizzle database (`db.all` / `db.run`), any driver. MySQL: on the mysql2, PlanetScale or TiDB Cloud client under the Drizzle database |
 | `@typesql/prisma` | `createSql(postgres, prisma)` with the client's `Prisma.TypeMap`, or `createSql<S, TM = PrismaTypeMap>(postgres, prisma?)`; `S` is a generated `DB` or a `Prisma.TypeMap` | `FromPrisma<Prisma.TypeMap, Overrides>`; with `sqlite`, `FromPrismaSqlite` and `PrismaSqliteTypeMap`; with `mysql` or `mariadb`, `FromPrismaMysql` and `PrismaMysqlTypeMap`; the `typesql-prisma` generator | `$queryRawUnsafe` / `$executeRawUnsafe` on Prisma Client |
+
+`@typesql/kysely` also exports `driverOf(family)`, the driver for `createTransactionalSql(dialect, client, driver)`, to use a TypeSQL schema without `FromKysely`.
 
 Each `createSql` has the same overloads with `sqlite` first; the type map then defaults to `DefaultTypeMap` of `@typesql/core/sqlite` (`PrismaSqliteTypeMap` for Prisma), and the SQL types are `KyselySqliteSql`, `DrizzleSqliteSql` and `PrismaSqliteSql`. See [SQLite](../guide/orms#sqlite). The same holds with `mysql` and `mariadb`: the type map defaults to `DefaultTypeMap` of `@typesql/core/mysql` (`Mysql2MariaDbTypeMap` with `mariadb`, `PrismaMysqlTypeMap` for Prisma), and the SQL types are `KyselyMysqlSql`, `KyselyMariaDbSql`, `DrizzleMysqlSql`, `DrizzleMariaDbSql`, `PrismaMysqlSql` and `PrismaMariaDbSql`. See [MySQL and MariaDB](../guide/orms#mysql).
 

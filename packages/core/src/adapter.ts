@@ -47,6 +47,7 @@ export {
 	mysqlSplit,
 	mysqlValue,
 } from "./mysql/driver.js";
+export { snakeCase } from "./plugins/case.js";
 export {
 	connectPostgres,
 	type PgClient,

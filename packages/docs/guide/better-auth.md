@@ -55,6 +55,7 @@ The adapter reads the database from [`sql.dialect`](../reference/api#sql-dialect
 | `transaction` | Run Better Auth's multi-step writes, such as creating a user and its account, in one `sql.transaction()`. Default `false`. On one connection, such as a SQLite database, requests that overlap are [rejected](./using-sql#transactions). |
 | `usePlural` | Use plural table names, like `users`. Default `false`. |
 | `debugLogs` | Log each adapter call Better Auth makes, with its input and result. `true` for every method, or an object such as `{ findOne: true }`. Default `false`. |
+| `casing` | The case of table and column names. `"snake_case"` converts model names, core fields, `additionalFields` and plugin schemas the way [`CasePlugin`](./case-plugin) does: `twoFactor` is `two_factor` and `requirePKCE` is `require_pkce`. Your application still uses Better Auth's names. Default: Better Auth's own names. |
 
 The adapter supports Better Auth's [joins](https://www.better-auth.com/docs/concepts/database#joins): with `advanced: { database: { joins: true } }`, reading a session and its user is one query. Single-use tokens, such as a password reset, are consumed in one statement, and database rate limits are counted in one statement, so two concurrent requests can't both use the same token or slip under the limit.
 
@@ -62,7 +63,7 @@ The adapter supports Better Auth's [joins](https://www.better-auth.com/docs/conc
 
 The adapter doesn't create or migrate tables, and Better Auth's CLI can't generate a schema for it. Create Better Auth's tables with the migrations you already use. The [core schema](https://www.better-auth.com/docs/concepts/database#core-schema) lists the `user`, `session`, `account` and `verification` tables, and each plugin's page lists the tables and columns it adds. With `rateLimit: { storage: "database" }`, Better Auth also needs a `rateLimit` table.
 
-The column names are the field names (`"emailVerified"`, `"userId"`), so quote them in PostgreSQL:
+The column names are the field names (`"emailVerified"`, `"userId"`), so quote them in PostgreSQL, or use snake_case names (`email_verified`, `user_id`) with the `casing: "snake_case"` option:
 
 ::: code-group
 

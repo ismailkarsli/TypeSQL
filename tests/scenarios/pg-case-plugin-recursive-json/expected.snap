@@ -1,0 +1,38 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`pg-case-plugin-recursive-json > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "nullableData": "null | "set"",
+      "opName": "undefined | string",
+      "rebalance": "undefined | { id: number; outperformSymbols: (string)[]; periodicValue: number }",
+      "stringData": "string",
+    },
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "{
+  kept: { someKey: [ { innerKey: 1 }, 'text', null ] },
+  keptOptional: null,
+  expr: { opName: 'add', argList: [ 'a', [ 'b' ] ] },
+  opName: 'add',
+  rebalance: { id: 1, periodicValue: 30, outperformSymbols: [ 'XU100' ] },
+  stored: [
+    {
+      data: { some_key: [ { inner_key: 1 }, 'text', null ] },
+      expr: { op_name: 'add', arg_list: [ 'a', [ 'b' ] ] }
+    }
+  ]
+}
+",
+  },
+}
+`;

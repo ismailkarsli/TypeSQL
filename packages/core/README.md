@@ -117,7 +117,7 @@ See the [migration guide](https://typesql.karsli.net/guide/migrations).
 
 ## Plugins
 
-Use `sql.withPlugin(new CasePlugin())` to accept camelCase write keys and return camelCase rows. Import `CasePlugin` from `@typesql/core/plugins`. The inferred input and output types follow the runtime conversion; JSON keys stay unchanged unless you pass `{ nested: true }`, and `{ to: "snake_case" }` gives snake_case keys for camelCase columns. SQL text and `sql.id()` use database identifiers. Use the original SQL instance for snake_case write objects.
+Use `sql.withPlugin(new CasePlugin())` to accept camelCase write keys and return camelCase rows. Import `CasePlugin` from `@typesql/core/plugins`. The inferred input and output types follow the runtime conversion; JSON keys stay unchanged unless you pass `{ nested: "output" }` for rows, `"input"` for writes or `"all"` for both, and `{ to: "snake_case" }` gives snake_case keys for camelCase columns. SQL text and `sql.id()` use database identifiers. Use the original SQL instance for snake_case write objects.
 
 ```ts
 import { CasePlugin } from "@typesql/core/plugins";

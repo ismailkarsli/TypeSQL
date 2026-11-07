@@ -1,4 +1,5 @@
 import type { AnyDialectBrand, DIALECT, Query } from "@typesql/core";
+import { snakeCase } from "@typesql/core/adapter";
 import type { BetterAuthOptions } from "better-auth";
 import {
 	type AdapterFactoryConfig,
@@ -11,6 +12,7 @@ import {
 	type JoinConfig,
 	type ModelTarget,
 } from "better-auth/adapters";
+import { type DBFieldAttribute, getAuthTables } from "better-auth/db";
 import {
 	DIALECTS,
 	type Dialect,
@@ -41,6 +43,77 @@ export interface TypesqlAdapterConfig {
 	 * @default false
 	 */
 	readonly debugLogs?: DBAdapterDebugLogOption | undefined;
+	/**
+	 * The case of the table and column names, which are otherwise Better Auth's
+	 * own (`twoFactor`, `userId`). `"snake_case"` converts them the way `CasePlugin`
+	 * does, including names you set: `two_factor`, `user_id`, `require_pkce`.
+	 */
+	readonly casing?: "snake_case" | undefined;
+}
+
+/** `options` with every model and field in snake_case: the core tables, plugins' and additional fields. */
+function snakeCaseNames(options: BetterAuthOptions): BetterAuthOptions {
+	const tables = getAuthTables(options);
+	const fields = (attributes: Record<string, DBFieldAttribute> = {}) =>
+		Object.fromEntries(
+			Object.entries(attributes).map(([name, field]) => [
+				name,
+				{ ...field, fieldName: snakeCase(field.fieldName ?? name) },
+			]),
+		);
+	const core = (model: string) => {
+		const { modelName = model, fields: attributes = {} } = tables[model] ?? {};
+		return {
+			modelName: snakeCase(modelName),
+			fields: Object.fromEntries(
+				Object.entries(attributes).map(([name, field]) => [
+					name,
+					snakeCase(field.fieldName ?? name),
+				]),
+			),
+		};
+	};
+	return {
+		...options,
+		user: {
+			...options.user,
+			...core("user"),
+			additionalFields: fields(options.user?.additionalFields),
+		},
+		session: {
+			...options.session,
+			...core("session"),
+			additionalFields: fields(options.session?.additionalFields),
+		},
+		account: {
+			...options.account,
+			...core("account"),
+			additionalFields: fields(options.account?.additionalFields),
+		},
+		verification: {
+			...options.verification,
+			...core("verification"),
+			additionalFields: fields(options.verification?.additionalFields),
+		},
+		rateLimit: { ...options.rateLimit, ...core("rateLimit") },
+		plugins: options.plugins?.map((plugin) =>
+			plugin.schema
+				? {
+						...plugin,
+						schema: Object.fromEntries(
+							Object.entries(plugin.schema).map(([model, table]) => [
+								model,
+								{
+									...table,
+									modelName: snakeCase(table.modelName ?? model),
+									fields: fields(table.fields),
+								},
+							]),
+						),
+					}
+				: plugin,
+		),
+	};
 }
 
 type Brand = AnyDialectBrand<Dialect>;
@@ -105,7 +178,11 @@ export function typesqlAdapter<S extends TypesqlAdapterSql<S>>(
 			return data;
 		},
 	};
-	return (options) => {
+	return (authOptions) => {
+		const options =
+			config.casing === "snake_case"
+				? snakeCaseNames(authOptions)
+				: authOptions;
 		const create = (
 			db: Runner,
 			transaction: AdapterFactoryConfig["transaction"],

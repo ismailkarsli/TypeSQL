@@ -70,6 +70,7 @@ exports[`module-entry-points > scenario 1`] = `
     "runTransaction": "function",
     "schemaMembers": "function",
     "schemaWriter": "function",
+    "snakeCase": "function",
     "splitParams": "function",
     "sqliteBindings": "function",
     "sqliteValue": "function"
@@ -113,6 +114,7 @@ exports[`module-entry-points > scenario 1`] = `
   },
   "@typesql/kysely": {
     "createSql": "function",
+    "driverOf": "function",
     "executor": "function"
   },
   "@typesql/language-server": {

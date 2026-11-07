@@ -1,0 +1,35 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`pg-case-plugin-key-collisions > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "row": "{ displayName: number }",
+      "stored": "({ doc: null | { [key: string]: number }; id: number })[]",
+    },
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "sql.json rejected: typesql: CasePlugin would write "SASA" and "sasa" as one key, "sasa", and lose a value
+sql.param rejected: typesql: CasePlugin would write "aB" and "a_b" as one key, "a_b", and lose a value
+deep sql.json rejected: typesql: CasePlugin would write "aB" and "a_b" as one key, "a_b", and lose a value
+sql.set value rejected: typesql: CasePlugin would write "aB" and "a_b" as one key, "a_b", and lose a value
+sql.values value rejected: typesql: CasePlugin would write "aB" and "a_b" as one key, "a_b", and lose a value
+sql.set columns rejected: typesql: CasePlugin would write "displayName" and "display_name" as one key, "display_name", and lose a value
+sql.values columns rejected: typesql: CasePlugin would write "displayName" and "display_name" as one key, "display_name", and lose a value
+snake_case columns rejected: typesql: CasePlugin would write "display_name" and "displayName" as one key, "displayName", and lose a value
+flat sql.json accepted
+flat sql.set value accepted
+distinct accepted
+{ row: { displayName: 2 }, stored: [ { id: 1, doc: {} } ] }
+",
+  },
+}
+`;

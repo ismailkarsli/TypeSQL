@@ -1,0 +1,31 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`kysely-driver > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "after": "({ display_name: null | string })[]",
+      "inTransaction": "{ display_name: null | string }",
+      "rows": "({ display_name: null | string; id: number; settings: { retry_count: number } })[]",
+    },
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "inner abort
+savepoint abort
+{
+  rows: [ { id: 1, display_name: null, settings: { retry_count: 1 } } ],
+  inTransaction: { display_name: 'Ada' },
+  after: [ { display_name: 'Ada' } ]
+}
+",
+  },
+}
+`;
