@@ -27,7 +27,7 @@ await sql.transaction(async (tx) => {
 });
 ```
 
-`createSql` takes a `Pool`, a `Client` or a `PoolClient`. As in `pg`, `int8` (so `count(*)`), `numeric` and `money` come back as strings.
+`createSql` takes a `Pool`, a `Client` or a `PoolClient`. As in `pg`, `int8` (so `count(*)`), `numeric` and `money` come back as strings. A client with its own type parsers takes a type map that matches them: `createSql<DB, MyTypeMap>(pool)`.
 
 ## Generate your schema
 

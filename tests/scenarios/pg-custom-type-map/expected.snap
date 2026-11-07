@@ -1,0 +1,28 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`pg-custom-type-map > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "defaults": "() => Promise<{ absent: string | null; big: string; decimal: string; }[]>",
+      "fromDriver": "({ absent: null | bigint; big: bigint; decimal: number })[]",
+      "parsed": "({ absent: null | bigint; big: bigint; decimal: number })[]",
+    },
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "{
+  parsed: [ { big: 9007199254740993n, decimal: 1.25, absent: null } ],
+  fromDriver: [ { big: 9007199254740993n, decimal: 1.25, absent: null } ]
+}
+",
+  },
+}
+`;

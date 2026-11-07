@@ -161,6 +161,7 @@ exports[`module-entry-points > scenario 1`] = `
   },
   "@typesql/pg": {
     "createSql": "function",
+    "driver": "object",
     "executor": "function"
   },
   "@typesql/pg/introspect": {

@@ -70,6 +70,29 @@ const counts = await big(
 ).execute();
 ```
 
+### node-postgres with type parsers
+
+If your pool parses some types itself, pass a type map that says what they become. Extend `PgTypeMap`, pg's defaults:
+
+```ts
+import pg from "pg";
+import { createSql, type PgTypeMap } from "@typesql/pg";
+
+const types = new pg.TypeOverrides();
+types.setTypeParser(pg.types.builtins.INT8, BigInt);
+const pool = new pg.Pool({ types });
+
+interface BigIntTypeMap extends Omit<PgTypeMap, "int8"> {
+	int8: bigint;
+}
+const sql = createSql<DB, BigIntTypeMap>(pool);
+const counts = await sql(
+	"SELECT author_id, count(*) AS n FROM posts GROUP BY author_id",
+).execute(); // n: bigint
+```
+
+`PgSql<DB, Plugins, TM>` is the type of that `sql`. `driver` is exported too, for building the API with `createTransactionalSql` from `@typesql/core/adapter`.
+
 ## Run queries
 
 | Method | Returns |

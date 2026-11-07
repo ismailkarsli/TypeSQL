@@ -28,7 +28,7 @@ The adapters export their own `createSql`, which takes the driver client and add
 
 | Package | `createSql` |
 |---|---|
-| `@typesql/pg` | `createSql<DB>(pool)`, with `PgTypeMap` |
+| `@typesql/pg` | `createSql<DB, TM = PgTypeMap>(pool)` |
 | `@typesql/postgres` | `createSql<DB>(sql, options?)` with `PostgresJsTypeMap`, or `PostgresJsBigIntTypeMap` with `{ bigint: true }` |
 | `@typesql/sqlite` | `createSql<DB>(db, options?)` with SQLite's `DefaultTypeMap`, or `BigIntTypeMap` with `{ bigint: true }` |
 | `@typesql/mysql` | `createSql<DB>(client, { dialect? })` on mysql2 with MySQL's `DefaultTypeMap` (`Mysql2MariaDbTypeMap` with `{ dialect: "mariadb" }`); `@typesql/mysql/mariadb` with `MariaDbTypeMap`; `@typesql/mysql/planetscale` and `@typesql/mysql/tidb` with `ServerlessTypeMap` |
