@@ -1,5 +1,11 @@
 # typesql
 
+## 3.1.3
+
+### Patch Changes
+
+- SQL highlighting tokenizes names faster.
+
 ## 3.1.2
 
 ### Patch Changes

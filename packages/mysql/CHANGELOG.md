@@ -1,5 +1,12 @@
 # @typesql/mysql
 
+## 7.5.0
+
+### Patch Changes
+
+- Updated dependencies:
+  - @typesql/core@7.5.0
+
 ## 7.4.1
 
 ### Patch Changes

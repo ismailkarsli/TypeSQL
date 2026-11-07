@@ -1,5 +1,16 @@
 # @typesql/language-server
 
+## 1.2.0
+
+### Minor Changes
+
+- `@typesql/language-server/format` exports `formatSql()`, the SQL formatter of `typesql format`. SQL highlighting tokenizes names faster.
+
+### Patch Changes
+
+- Updated dependencies:
+  - @typesql/core@7.5.0
+
 ## 1.1.5
 
 ### Patch Changes

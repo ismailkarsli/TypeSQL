@@ -1,6 +1,6 @@
 {
 	"name": "@typesql/mysql",
-	"version": "7.4.1",
+	"version": "7.5.0",
 	"description": "MySQL and MariaDB adapter for TypeSQL: mysql2, the mariadb connector, PlanetScale and TiDB Cloud serverless, with the introspection behind `typesql introspect --dialect mysql` (@typesql/cli).",
 	"license": "MIT",
 	"repository": {

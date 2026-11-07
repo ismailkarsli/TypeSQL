@@ -72,6 +72,10 @@
   intents:
     - slow-poets-exist
     - tough-pumas-count
+"@typesql/cli@7.5.0":
+  dir: packages/cli
+  intents:
+    - wet-cats-hammer
 "@typesql/core@0.0.2":
   dir: packages/core
   intents:
@@ -500,6 +504,10 @@
   intents:
     - large-tips-beam
     - orange-lemons-drum
+"@typesql/core@7.5.0":
+  dir: packages/core
+  intents:
+    - pretty-melons-serve
 "@typesql/drizzle@0.0.2":
   dir: packages/drizzle
   intents:
@@ -788,6 +796,10 @@
   dir: packages/language-server
   intents:
     - tough-cherries-teach
+"@typesql/language-server@1.2.0":
+  dir: packages/language-server
+  intents:
+    - curvy-owls-happen
 "@typesql/mysql@6.2.0":
   dir: packages/mysql
   intents:
@@ -1313,3 +1325,7 @@ typesql@3.1.2:
   dir: packages/vscode
   intents:
     - tough-cherries-teach
+typesql@3.1.3:
+  dir: packages/vscode
+  intents:
+    - tough-rabbits-argue
