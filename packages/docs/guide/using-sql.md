@@ -262,6 +262,7 @@ const q = sql(`SELECT ${sql.id("display_name")} FROM users u WHERE ${recent}`);
 
 - `sql.id()` quotes an identifier (with backticks on MySQL and MariaDB, as do `sql.set()` and `sql.values()`), `sql.and()` / `sql.or()` join conditions, `sql.combine()` joins a list, and a whole query can be a subquery.
 - Fragments aren't wrapped in parentheses, so put them in yourself around `OR`.
+- A query made with `sql()` is checked on its own where it's defined, so a correlated subquery has to be a fragment, which is only checked once interpolated: `const hasPosts = sql.fragment("SELECT 1 FROM posts p WHERE p.author_id = u.id")`, then `` sql(`SELECT u.id, EXISTS (${hasPosts}) AS has FROM users u`) ``.
 - Allowlist names before `sql.id()`, and never pass user input as `sql.combine()`'s separator.
 
 ### Optional pieces

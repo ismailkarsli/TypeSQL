@@ -18,6 +18,7 @@ const total = sql(`SELECT count(*) AS n FROM posts p WHERE ${where}`); // fragme
 ```
 
 - `sql.fragment` adds no parentheses, so add them around `OR`. `sql.and` and `sql.or` add their own, and give `true`/`false` when empty.
+- A subquery made with `sql()` is checked on its own where it's defined, so a correlated one (using an outer alias) has to be a `sql.fragment`.
 - `sql.if(value, fn)` narrows `value`; a falsy value splices nothing, including `0` and `""`.
 - `sql.combine` throws when empty, so keep a fixed element.
 - `sql.id("col")` quotes a name. Quoting doesn't authorize: map untrusted input through an allowlist.
