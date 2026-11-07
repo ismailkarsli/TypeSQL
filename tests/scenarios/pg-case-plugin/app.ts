@@ -9,6 +9,7 @@ interface DB {
 		id: Col<"int4">;
 		display_name: Col<"text", { nullable: true }>;
 		address_line_1: Col<"text", { nullable: true }>;
+		point_x_y: Col<"int4", { nullable: true }>;
 		created_at: Col<"timestamptz", { hasDefault: true }>;
 		avatar_data: Col<"bytea", { nullable: true }>;
 		profile: Json<{
@@ -28,6 +29,12 @@ interface DB {
 		id: Col<"int4">;
 		displayName: Col<"text", { nullable: true }>;
 		HTTPCode: Col<"int4", { nullable: true }>;
+		userID: Col<"int4", { nullable: true }>;
+		Id: Col<"int4", { nullable: true }>;
+		fooBAR: Col<"int4", { nullable: true }>;
+		XMLHttpRequest: Col<"int4", { nullable: true }>;
+		HTTP2Code: Col<"int4", { nullable: true }>;
+		userIDs: Col<"int4", { nullable: true }>;
 		lower_name: Col<"text", { nullable: true }>;
 		settingsDoc: Json<
 			{
@@ -44,6 +51,7 @@ await pool.query(`CREATE TABLE users (
 	id int PRIMARY KEY,
 	display_name text,
 	address_line_1 text,
+	point_x_y int,
 	created_at timestamptz NOT NULL DEFAULT '2026-01-02T03:04:05Z',
 	avatar_data bytea,
 	profile jsonb NOT NULL,
@@ -55,6 +63,12 @@ CREATE TABLE accounts (
 	id int PRIMARY KEY,
 	"displayName" text,
 	"HTTPCode" int,
+	"userID" int,
+	"Id" int,
+	"fooBAR" int,
+	"XMLHttpRequest" int,
+	"HTTP2Code" int,
+	"userIDs" int,
 	lower_name text,
 	"settingsDoc" jsonb
 )`);
@@ -68,6 +82,7 @@ await camel(
 			id: 1,
 			displayName: "Ada",
 			address_line_1: "1 Main St",
+			point_x_y: 7,
 			avatarData: Buffer.from("ab"),
 			profile: camel.json({
 				home_city: "London",
@@ -78,7 +93,7 @@ await camel(
 	])}`,
 ).execute();
 export const camelFlat = await camel(
-	"SELECT display_name, address_line_1, profile FROM users WHERE id = 1",
+	"SELECT display_name, address_line_1, point_x_y, profile FROM users WHERE id = 1",
 ).executeTakeFirstOrThrow();
 
 // nested: rows, sql.json(), sql.param() and plain write values all convert.
@@ -155,6 +170,12 @@ await snake(
 			id: 1,
 			display_name: "Ada",
 			HTTPCode: 200,
+			userID: 1,
+			Id: 2,
+			fooBAR: 3,
+			XMLHttpRequest: 4,
+			HTTP2Code: 5,
+			user_i_ds: 6,
 			settings_doc: snake.json({
 				maxRetries: 1,
 				retryPolicy: { backoffMs: null },
@@ -164,7 +185,7 @@ await snake(
 	])}`,
 ).execute();
 export const snakeFlat = await snake(
-	`SELECT id, "displayName", "HTTPCode", lower_name, "settingsDoc" FROM accounts`,
+	`SELECT "displayName", "HTTPCode", "userID", "Id", "fooBAR", "XMLHttpRequest", "HTTP2Code", "userIDs", lower_name, "settingsDoc" FROM accounts`,
 ).executeTakeFirstOrThrow();
 export const snakeUpdated = await snake(
 	`UPDATE accounts SET ${snake.set("accounts", { display_name: "Grace" })} WHERE id = 1 RETURNING "displayName"`,

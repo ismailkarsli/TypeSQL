@@ -33,26 +33,49 @@ type SnakeCase<S extends string> = string extends S
 	? string
 	: S extends Lowercase<S>
 		? S
-		: SnakeRest<S>;
-type SnakeRest<S extends string> =
-	S extends Lowercase<S>
-		? S
-		: S extends `${infer A}${infer B}${infer C}${infer D}${infer Tail}`
-			? `${SnakeChar<A>}${SnakeChar<B>}${SnakeChar<C>}${SnakeChar<D>}${SnakeRest<Tail>}`
-			: S extends `${infer Head}${infer Tail}`
-				? `${SnakeChar<Head>}${SnakeRest<Tail>}`
-				: S;
-type SnakeChar<C extends string> =
-	C extends Lowercase<C> ? C : `_${Lowercase<C>}`;
+		: S extends `${infer H}${infer R}`
+			? SnakeRest<R, IsUpper<H>, Lowercase<H>>
+			: S;
+type IsUpper<C extends string> = C extends Lowercase<C> ? false : true;
+type StartsLower<S extends string> = S extends `${infer C}${string}`
+	? C extends Uppercase<C>
+		? false
+		: true
+	: false;
+type SnakeRest<
+	S extends string,
+	PrevUpper extends boolean,
+	Acc extends string,
+> = S extends `${infer C}${infer R}`
+	? SnakeRest<
+			R,
+			IsUpper<C>,
+			`${Acc}${IsUpper<C> extends true
+				? [PrevUpper, StartsLower<R>] extends [true, false]
+					? Lowercase<C>
+					: `_${Lowercase<C>}`
+				: C}`
+		>
+	: Acc;
 
-/** What `SnakeCase` does: `_` and the lower case of whatever has one, not only ASCII. */
+const isUpper = (c: string): boolean => c !== c.toLowerCase();
+const isLower = (c: string): boolean => c !== c.toUpperCase();
+
+/**
+ * What `SnakeCase` does. A run of capitals is one word and the first character
+ * takes no `_`; a capital that ends a run before a lower case letter starts the
+ * next word: `userID` is `user_id`, `HTTPCode` is `http_code`.
+ */
 function snakeCase(key: string): string {
 	if (key === key.toLowerCase()) return key;
-	let mapped = "";
-	for (let i = 0; i < key.length; i++) {
+	let mapped = (key[0] ?? "").toLowerCase();
+	for (let i = 1; i < key.length; i++) {
 		const c = key[i] ?? "";
-		const lower = c.toLowerCase();
-		mapped += c === lower ? c : `_${lower}`;
+		mapped += !isUpper(c)
+			? c
+			: isUpper(key[i - 1] ?? "") && !isLower(key[i + 1] ?? "")
+				? c.toLowerCase()
+				: `_${c.toLowerCase()}`;
 	}
 	return mapped;
 }
@@ -69,7 +92,8 @@ type Cased<K extends string, To extends KeyCase> = To extends "camelCase"
 /**
  * Write keys: the application's key when it converts back to the database's,
  * else the database's key itself (`address_line_1`, whose camelCase
- * `addressLine1` would convert to `address_line1`).
+ * `addressLine1` would convert to `address_line1`, and `point_x_y`, whose
+ * `pointXY` would convert to `point_xy`).
  */
 type InputKey<K extends string, To extends KeyCase> =
 	Cased<Cased<K, To>, Opposite<To>> extends K ? Cased<K, To> : K;

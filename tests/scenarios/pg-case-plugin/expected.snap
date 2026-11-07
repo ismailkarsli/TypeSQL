@@ -10,13 +10,13 @@ exports[`pg-case-plugin > scenario 1`] = `
   "compiler": {
     "diagnostics": [],
     "types": {
-      "camelFlat": "{ addressLine1: null | string; displayName: null | string; profile: { home_city: string; phone_number: null | string; nick_name?: string; past_cities: readonly ({ city_name: string })[] } }",
+      "camelFlat": "{ addressLine1: null | string; displayName: null | string; pointXY: null | number; profile: { home_city: string; phone_number: null | string; nick_name?: string; past_cities: readonly ({ city_name: string })[] } }",
       "camelNestedInTransaction": "{ profile: { homeCity: string; nickName?: string; pastCities: readonly ({ cityName: string })[]; phoneNumber: null | string } }",
       "camelNestedOptional": "{ freeForm: unknown }",
       "camelNestedRead": "{ avatarData: null | Buffer<ArrayBufferLike>; createdAt: Date; extraDoc: null | { lastSeen: string }; freeForm: unknown; id: number; profile: { homeCity: string; nickName?: string; pastCities: readonly ({ cityName: string })[]; phoneNumber: null | string } }",
       "camelNestedRows": "({ extraDoc: null | { lastSeen: string }; freeForm: unknown; id: number; profile: { homeCity: string; nickName?: string; pastCities: readonly ({ cityName: string })[]; phoneNumber: null | string } })[]",
       "leafName": "undefined | string",
-      "snakeFlat": "{ _h_t_t_p_code: null | number; display_name: null | string; id: number; lower_name: null | string; settings_doc: null | { maxRetries: number; retryPolicy: { backoffMs: null | number }; allowedHosts: readonly ({ hostName: string })[] } }",
+      "snakeFlat": "{ display_name: null | string; foo_bar: null | number; http2_code: null | number; http_code: null | number; id: null | number; lower_name: null | string; settings_doc: null | { maxRetries: number; retryPolicy: { backoffMs: null | number }; allowedHosts: readonly ({ hostName: string })[] }; user_i_ds: null | number; user_id: null | number; xml_http_request: null | number }",
       "snakeNestedRows": "({ display_name: null | string; id: number; settings_doc: null | { allowed_hosts: readonly ({ host_name: string })[]; max_retries: number; retry_policy: { backoff_ms: null | number } } })[]",
       "snakeUpdated": "{ display_name: null | string }",
       "storedAccounts": "({ id: number; settingsDoc: null | { maxRetries: number; retryPolicy: { backoffMs: null | number }; allowedHosts: readonly ({ hostName: string })[] } })[]",
@@ -30,6 +30,7 @@ exports[`pg-case-plugin > scenario 1`] = `
   camelFlat: {
     displayName: 'Ada',
     addressLine1: '1 Main St',
+    pointXY: 7,
     profile: {
       home_city: 'London',
       past_cities: [ { city_name: 'Paris' } ],
@@ -128,9 +129,14 @@ exports[`pg-case-plugin > scenario 1`] = `
     }
   ],
   snakeFlat: {
-    id: 1,
     display_name: 'Ada',
-    _h_t_t_p_code: 200,
+    http_code: 200,
+    user_id: 1,
+    id: 2,
+    foo_bar: 3,
+    xml_http_request: 4,
+    http2_code: 5,
+    user_i_ds: 6,
     lower_name: null,
     settings_doc: {
       maxRetries: 1,

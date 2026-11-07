@@ -6,6 +6,7 @@ import { Pool } from "pg";
 interface DB {
 	users: {
 		display_name: Col<"text", { nullable: true }>;
+		point_x_y: Col<"int4", { nullable: true }>;
 		profile: Json<{ home_city: string }, { nullable: true }>;
 	};
 	accounts: {
@@ -22,6 +23,8 @@ const flatRow = await flat(
 	"SELECT profile FROM users",
 ).executeTakeFirstOrThrow();
 flatRow.profile?.homeCity;
+// `pointXY` would convert to point_xy, so point_x_y is written by its own name.
+flat(`UPDATE users SET ${flat.set("users", { pointXY: 1 })}`);
 
 // With it, the values are still checked against the column's shape.
 const nested = sql.withPlugin(new CasePlugin({ nested: true }));

@@ -70,14 +70,16 @@ const row = await snake(
 // row is { display_name: string | null; created_at: Date }
 ```
 
-Every capital becomes `_` and its lower case, so alias a column whose name doesn't suit that.
+A capital starts a new word and the first character takes no `_`. A run of capitals is one word, and a capital that ends a run before a lower case letter starts the next word. Alias a column whose name doesn't suit that.
 
 | Column | Key |
 |---|---|
 | `displayName` | `display_name` |
 | `addressLine1` | `address_line1` |
-| `userID` | `user_i_d` |
-| `Id` | `_id` |
+| `userID`, `fooBAR` | `user_id`, `foo_bar` |
+| `HTTPCode`, `XMLHttpRequest` | `http_code`, `xml_http_request` |
+| `Id` | `id` |
+| `userIDs` | `user_i_ds` |
 | `display_name`, `count` | unchanged |
 
 ### `nested`
@@ -115,5 +117,5 @@ Writes convert in `sql.json()`, `sql.param()`, and the values of `sql.set()` and
 - `sql.as<Row>()` takes the row as returned, so give it the renamed keys.
 - `RowOf<DB, TM, Q>` still uses the database's names. `RowType<typeof q>` is the renamed row.
 - All adapters support `.withPlugin(new CasePlugin())`, and transactions retain the plugins, including nested transactions.
-- `sql.set()` and `sql.values()` accept camelCase objects and encode conventional snake_case column names. A column whose camelCase name wouldn't convert back to it, such as `address_line_1` (`addressLine1` would become `address_line1`), takes its own snake_case name as the key. Use the original SQL instance for other snake_case write objects or quoted mixed-case database columns. With `to: "snake_case"` the same holds the other way round: `HTTPCode` takes its own name as the key, and a `lower_name` column needs the original SQL instance to be written.
+- `sql.set()` and `sql.values()` accept camelCase objects and encode conventional snake_case column names. A column whose camelCase name wouldn't convert back to it, such as `address_line_1` (`addressLine1` would become `address_line1`), takes its own snake_case name as the key, and so does `point_x_y` (`pointXY` would become `point_xy`). Use the original SQL instance for other snake_case write objects or quoted mixed-case database columns. With `to: "snake_case"` the same holds the other way round: `HTTPCode` reads as `http_code` and `userID` as `user_id`, but each takes its own name as the key, because `http_code` would become `httpCode`. A `lower_name` column needs the original SQL instance to be written.
 - Turn off renaming in the driver, such as postgres.js' `transform: postgres.camel`. The types assume the driver returns the database's names. `@typesql/kysely` already bypasses Kysely plugins such as `CamelCasePlugin`.

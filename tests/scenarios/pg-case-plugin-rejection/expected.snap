@@ -21,7 +21,7 @@ exports[`pg-case-plugin-rejection > scenario 1`] = `
         ],
         "expression": "\`UPDATE users SET profile=\${flat.json({ homeCity: "Oslo" })}\`",
         "file": "app.ts",
-        "line": 20,
+        "line": 21,
         "message": "Argument of type 'string' is not assignable to parameter of type 'SqlError<"parameter $1: a sql.json() { homeCity: \\"Oslo\\" } value cannot be used as jsonb (expected { home_city: string } | null)", 5> & "UPDATE users SET profile=\\0PJ<0homeCity=qOslo~>0\\0"'.",
       },
       {
@@ -30,7 +30,7 @@ exports[`pg-case-plugin-rejection > scenario 1`] = `
         "column": 18,
         "expression": "homeCity",
         "file": "app.ts",
-        "line": 24,
+        "line": 25,
         "message": "Property 'homeCity' does not exist on type '{ home_city: string; }'. Did you mean 'home_city'?",
         "related": [
           {
@@ -39,10 +39,35 @@ exports[`pg-case-plugin-rejection > scenario 1`] = `
             "column": 19,
             "expression": "home_city",
             "file": "app.ts",
-            "line": 9,
+            "line": 10,
             "message": "'home_city' is declared here.",
           },
         ],
+      },
+      {
+        "category": 1,
+        "code": 2345,
+        "column": 6,
+        "details": [
+          {
+            "category": 1,
+            "code": 2322,
+            "message": "Type 'string' is not assignable to type 'SqlError<"column \\"point_xy\\" of relation \\"users\\" does not exist. Perhaps you meant the column \\"point_x_y\\"?", 3>'.",
+          },
+        ],
+        "expression": "\`UPDATE users SET \${flat.set("users", { pointXY: 1 })}\`",
+        "file": "app.ts",
+        "line": 27,
+        "message": "Argument of type 'string' is not assignable to parameter of type 'SqlError<"column \\"point_xy\\" of relation \\"users\\" does not exist. Perhaps you meant the column \\"point_x_y\\"?", 3> & \`UPDATE users SET \${Fragment<"\\"point_xy\\" = $1", readonly unknown[], ["m1~"]>}\`'.",
+      },
+      {
+        "category": 1,
+        "code": 2345,
+        "column": 44,
+        "expression": "{ pointXY: 1 }",
+        "file": "app.ts",
+        "line": 27,
+        "message": "Argument of type '{ pointXY: number; }' is not assignable to parameter of type 'never'.",
       },
       {
         "category": 1,
@@ -57,7 +82,7 @@ exports[`pg-case-plugin-rejection > scenario 1`] = `
         ],
         "expression": "\`UPDATE users SET profile=\${nested.json({ homeCity: 1 })}\`",
         "file": "app.ts",
-        "line": 28,
+        "line": 31,
         "message": "Argument of type 'string' is not assignable to parameter of type 'SqlError<"parameter $1: a sql.json() { home_city: 1 } value cannot be used as jsonb (expected { home_city: string } | null)", 5> & "UPDATE users SET profile=\\0PJ<0home_city=m1~>0\\0"'.",
       },
       {
@@ -73,7 +98,7 @@ exports[`pg-case-plugin-rejection > scenario 1`] = `
         ],
         "expression": "\`UPDATE users SET profile=\${nested.json({ otherKey: "Oslo" })}\`",
         "file": "app.ts",
-        "line": 29,
+        "line": 32,
         "message": "Argument of type 'string' is not assignable to parameter of type 'SqlError<"parameter $1: a sql.json() { other_key: \\"Oslo\\" } value cannot be used as jsonb (expected { home_city: string } | null)", 5> & "UPDATE users SET profile=\\0PJ<0other_key=qOslo~>0\\0"'.",
       },
       {
@@ -89,7 +114,7 @@ exports[`pg-case-plugin-rejection > scenario 1`] = `
         ],
         "expression": "\`UPDATE users SET \${nested.set("users", { profile: { homeCity: 1 } })}\`",
         "file": "app.ts",
-        "line": 30,
+        "line": 33,
         "message": "Argument of type 'string' is not assignable to parameter of type 'SqlError<"parameter $1: a { home_city: 1 } value cannot be used as jsonb (expected { home_city: string } | null)", 5> & \`UPDATE users SET \${Fragment<"\\"profile\\" = $1", readonly unknown[], ["<0home_city=m1~>0"]>}\`'.",
       },
       {
@@ -98,7 +123,7 @@ exports[`pg-case-plugin-rejection > scenario 1`] = `
         "column": 48,
         "expression": "{ profile: { homeCity: 1 } }",
         "file": "app.ts",
-        "line": 30,
+        "line": 33,
         "message": "Argument of type '{ profile: { homeCity: number; }; }' is not assignable to parameter of type 'never'.",
       },
       {
@@ -107,7 +132,7 @@ exports[`pg-case-plugin-rejection > scenario 1`] = `
         "column": 20,
         "expression": "home_city",
         "file": "app.ts",
-        "line": 34,
+        "line": 37,
         "message": "Property 'home_city' does not exist on type '{ homeCity: string; }'. Did you mean 'homeCity'?",
       },
       {
@@ -116,7 +141,7 @@ exports[`pg-case-plugin-rejection > scenario 1`] = `
         "column": 52,
         "expression": "{ displayName: "Ada" }",
         "file": "app.ts",
-        "line": 38,
+        "line": 41,
         "message": "Argument of type '{ displayName: string; }' is not assignable to parameter of type 'never'.",
       },
       {
@@ -125,7 +150,7 @@ exports[`pg-case-plugin-rejection > scenario 1`] = `
         "column": 10,
         "expression": "displayName",
         "file": "app.ts",
-        "line": 42,
+        "line": 45,
         "message": "Property 'displayName' does not exist on type '{ display_name: string | null; }'. Did you mean 'display_name'?",
       },
     ],
