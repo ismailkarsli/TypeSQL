@@ -1,5 +1,13 @@
 # @typesql/core
 
+## 7.4.1
+
+### Patch Changes
+
+- A statement or `.ddl()` script of more than 4096 tokens is the error `the SQL text has 4110 tokens, more than the 4096 TypeSQL can check`. Before, it was a syntax error at a valid token, such as a quoted `"group"` column.
+
+- Migrations check `CREATE INDEX` against the table: a misspelled column in a key, an expression, `INCLUDE` or the `WHERE` predicate is a compile error, such as `column "emial" does not exist` on PostgreSQL, `Key column 'emial' doesn't exist in table` on MySQL and MariaDB and `no such column: emial` on SQLite. Before, PostgreSQL skipped the statement and MySQL and SQLite checked only the table, so the typo failed when the migration ran.
+
 ## 7.4.0
 
 ### Minor Changes
