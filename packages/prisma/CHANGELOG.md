@@ -1,5 +1,12 @@
 # @typesql/prisma
 
+## 7.3.0
+
+### Patch Changes
+
+- Updated dependencies:
+  - @typesql/core@7.3.0
+
 ## 7.2.0
 
 ### Patch Changes

@@ -477,6 +477,10 @@
   dir: packages/core
   intents:
     - kind-donkeys-help
+"@typesql/core@7.3.0":
+  dir: packages/core
+  intents:
+    - famous-geese-think
 "@typesql/drizzle@0.0.2":
   dir: packages/drizzle
   intents:
