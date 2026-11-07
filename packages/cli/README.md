@@ -85,9 +85,9 @@ pnpm exec typesql format src/db    # the project's files under src/db
 pnpm exec typesql format --check   # write nothing; exit with 1 if a file would change
 ```
 
-`typesql format` writes the keywords of the SQL that TypeSQL checks in one case and tidies the spaces between its tokens. TypeScript's types find that SQL: the string argument of every call whose parameter TypeSQL types as SQL, such as `sql()`, `sql.fragment()`, `sql.prepare()` and a migration's `db.ddl()`, whatever the variable is named. Names, types, functions, strings, comments and line breaks stay as written, and so does the text of an unaliased select item in SQLite, MySQL and MariaDB, which name the column after it. It needs `typescript` 7.1 or later.
+`typesql format` writes the keywords of the SQL that TypeSQL checks in one case, tidies the spaces between its tokens and lays out its lines: the SQL goes on one line if it fits within 80 columns, and otherwise on a clause per line, with an item or condition per line in a clause that is still too long. SQL that leaves one line goes into a template literal. TypeScript's types find that SQL: the string argument of every call whose parameter TypeSQL types as SQL, such as `sql()`, `sql.fragment()`, `sql.prepare()` and a migration's `db.ddl()`, whatever the variable is named. Names, types, functions, strings and comments stay as written, and so does the text of an unaliased select item in SQLite, MySQL and MariaDB, which name the column after it. It needs `typescript` 7.1 or later.
 
-Keywords are upper case unless the config sets `format: { keywordCase: "lower" }`; `--keyword-case upper|lower` overrides it. `--project <file>` reads another `tsconfig.json` and `--config <file>` another config.
+Keywords are upper case unless the config sets `format: { keywordCase: "lower" }`; `--keyword-case upper|lower` overrides it. `format: { width }` or `--width <columns>` sets the width of a line, 80 by default. `--project <file>` reads another `tsconfig.json` and `--config <file>` another config.
 
 ## Documentation
 

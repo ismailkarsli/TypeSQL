@@ -429,7 +429,7 @@ const { applied } = await migrator.latest();
 | `schemaFile` | directory mode: where the DB file is written; default `db.ts` |
 | `generate` | directory mode: write the DB file after `latest()`, `up()` and `down()`; default `true` |
 | `transaction` | run each migration in a transaction and lock the history; default `true`. See [Transactions and locking](#transactions-and-locking) |
-| `format` | `{ keywordCase: "upper" \| "lower" }`: the keyword case of [`typesql format`](./format); default `"upper"` |
+| `format` | `{ keywordCase?, width? }`: how [`typesql format`](./format) writes SQL; keywords `"upper"` (default) or `"lower"`, lines of up to 80 columns by default |
 
 Set exactly one of `migrationsDir` and `migrations`, and at most one of `url`, `db` and `execute`. `url` goes with `postgres`, `mysql` and `mariadb` (`mysql://` and `mariadb://` URLs both work for the last two) and `db` with `sqlite`. Relative paths resolve against the working directory (the command resolves those of its config file beside the file).
 

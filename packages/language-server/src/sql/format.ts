@@ -7,6 +7,8 @@ export type KeywordCase = "upper" | "lower";
 export interface FormatOptions {
 	readonly dialect: Dialect;
 	readonly keywordCase: KeywordCase;
+	/** The column a line of SQL ends at (default: 80); a tab counts as 4. */
+	readonly width?: number | undefined;
 }
 
 /** A SQL string literal as `textOf` reads it from its source. */
@@ -21,6 +23,87 @@ export interface SqlText {
 	readonly holes: readonly (readonly [number, number])[];
 }
 
+/** Source text to put in place of `[start, end)`. */
+export interface SourceEdit {
+	readonly start: number;
+	readonly end: number;
+	readonly text: string;
+}
+
+/** The source of the `${…}` hole at `[start, end)`. */
+export type HoleSource = (start: number, end: number) => string;
+
+export const keepHoles =
+	(source: string): HoleSource =>
+	(s, e) =>
+		source.slice(s, e);
+
+/** The tokens of a literal, and what `formatSql` and `layoutLiteral` know about each. */
+export interface Analysis {
+	readonly tokens: readonly SqlToken[];
+	/** The tokens but comments. */
+	readonly sig: readonly SqlToken[];
+	/** The verbatim range each token is in, or -1. */
+	readonly range: Int32Array;
+	readonly ranges: readonly (readonly [number, number])[];
+	/** Whether token `i` is a binary operator or the operand of one. */
+	readonly isBinary: (i: number) => boolean;
+	/** Whether token `i` is a keyword to recase. */
+	readonly isKeyword: (i: number) => boolean;
+}
+
+export function analyze(sql: SqlText, options: FormatOptions): Analysis {
+	const d = DIALECTS[options.dialect];
+	const tokens = tokensOf(sql, d);
+	// The tokens but comments, and each token's index among them (or -1).
+	const sig: SqlToken[] = [];
+	const sigOf = new Int32Array(tokens.length).fill(-1);
+	tokens.forEach((t, i) => {
+		if (t.kind === "comment") return;
+		sigOf[i] = sig.length;
+		sig.push(t);
+	});
+	const { keyword, operand } = classify(sig, options.dialect, d);
+	const binary = binaryOperators(sig, operand);
+	const range = new Int32Array(tokens.length).fill(-1);
+	let ranges: [number, number][] = [];
+	if (namesAsWritten(options.dialect)) {
+		ranges = outermost(verbatimRanges(sig, keyword));
+		let r = 0;
+		tokens.forEach((t, i) => {
+			while (r < ranges.length && ranges[r]![1] < t.end) r++;
+			const span = ranges[r];
+			if (span && t.start >= span[0] && t.end <= span[1]) range[i] = r;
+		});
+	}
+	return {
+		tokens,
+		sig,
+		range,
+		ranges,
+		isBinary: (i) => {
+			const s = sigOf[i]!;
+			return s >= 0 && binary[s] === true;
+		},
+		isKeyword: (i) => {
+			const s = sigOf[i]!;
+			return range[i]! < 0 && s >= 0 && keyword[s] === true;
+		},
+	};
+}
+
+/** A word in the configured case if it is a keyword to recase. */
+export const recased = (
+	written: string,
+	keyword: boolean,
+	upper: boolean,
+): string =>
+	keyword && PLAIN_WORD.test(written)
+		? upper
+			? written.toUpperCase()
+			: written.toLowerCase()
+		: written;
+
 /**
  * The SQL of a string literal, formatted: its keywords in `keywordCase` and
  * the whitespace between its tokens tidied, as source text to put between
@@ -33,48 +116,19 @@ export function formatSql(
 	source: string,
 	sql: SqlText,
 	options: FormatOptions,
-	hole: (start: number, end: number) => string = (s, e) => source.slice(s, e),
+	hole: HoleSource = keepHoles(source),
 ): string {
-	const d = DIALECTS[options.dialect];
-	const tokens = tokensOf(sql, d);
+	const { tokens, range, isBinary, isKeyword } = analyze(sql, options);
 	const base = sql.start;
 	const last = tokens.at(-1);
 	if (last === undefined) return source.slice(base, sql.end);
-	// The tokens but comments, and each token's index among them (or -1).
-	const sig: SqlToken[] = [];
-	const sigOf = new Int32Array(tokens.length).fill(-1);
-	tokens.forEach((t, i) => {
-		if (t.kind === "comment") return;
-		sigOf[i] = sig.length;
-		sig.push(t);
-	});
-	const { keyword, operand } = classify(sig, options.dialect, d);
-	const binary = binaryOperators(sig, operand);
-	// The verbatim range each token is in, or -1.
-	const range = new Int32Array(tokens.length).fill(-1);
-	if (namesAsWritten(options.dialect)) {
-		const ranges = outermost(verbatimRanges(sig, keyword));
-		let r = 0;
-		tokens.forEach((t, i) => {
-			while (r < ranges.length && ranges[r]![1] < t.end) r++;
-			const span = ranges[r];
-			if (span && t.start >= span[0] && t.end <= span[1]) range[i] = r;
-		});
-	}
 	const upper = options.keywordCase === "upper";
-	const isBinary = (i: number): boolean => {
-		const s = sigOf[i]!;
-		return s >= 0 && binary[s] === true;
-	};
 
 	let out = trimLineEnds(source.slice(base, base + tokens[0]!.start));
 	tokens.forEach((t, i) => {
-		const s = sigOf[i]!;
 		const written = source.slice(base + t.start, base + t.end);
 		if (t.kind === "hole") out += hole(base + t.start, base + t.end);
-		else if (range[i]! < 0 && s >= 0 && keyword[s] && PLAIN_WORD.test(written))
-			out += upper ? written.toUpperCase() : written.toLowerCase();
-		else out += written;
+		else out += recased(written, isKeyword(i), upper);
 		const next = tokens[i + 1];
 		if (next === undefined) return;
 		const between = source.slice(base + t.end, base + next.start);
@@ -87,7 +141,7 @@ export function formatSql(
 }
 
 /** The whitespace `written` between tokens `a` and `b`, tidied. */
-function spacing(
+export function spacing(
 	a: SqlToken,
 	b: SqlToken,
 	written: string,

@@ -107,6 +107,8 @@ export interface MigratorConfig {
 export interface FormatConfig {
 	/** `"upper"` writes keywords as `SELECT`, `"lower"` as `select` (default: `"upper"`). */
 	readonly keywordCase?: "upper" | "lower" | undefined;
+	/** The column a line of SQL ends at (default: 80); a tab counts as 4. */
+	readonly width?: number | undefined;
 }
 
 /** What writing the schema file after a command did: its path, or why it failed. */
@@ -318,6 +320,9 @@ function validate(config: MigratorConfig): void {
 		keywordCase !== "lower"
 	)
 		throw new Error('typesql: format.keywordCase must be "upper" or "lower"');
+	const width = format?.width;
+	if (width !== undefined && (!Number.isInteger(width) || width <= 0))
+		throw new Error("typesql: format.width must be a positive integer");
 }
 
 /** The servers a connection target reaches: "PostgreSQL, MySQL or MariaDB". */

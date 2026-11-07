@@ -40,10 +40,13 @@ await repo
 
 const titled = repo.fragment("P.Title is not null");
 export const joined = await sql(
-	\`select U.Name, P.Title as "Select"
-	from users U left join posts P on P.author_id = U.id -- the author's posts
-	where \${sql.and([titled, sql.fragment("U.id >= $1", 1)])}
-	order by U.id desc nulls last\`,
+	\`
+		select U.Name, P.Title as "Select"
+		from users U
+		left join posts P on P.author_id = U.id -- the author's posts
+		where \${sql.and([titled, sql.fragment("U.id >= $1", 1)])}
+		order by U.id desc nulls last
+	\`,
 ).execute();
 const byId = sql.prepare(
 	"select name, type from users where id = $1 or name = 'where'",
@@ -55,7 +58,7 @@ export const typed = await sql.transaction(async (tx) =>
 	).execute(),
 );
 export const escaped = await sql(
-	"select id\\nfrom users where id = 1",
+	"select id from users where id = 1",
 ).execute();
 
 // SQL that TypeSQL doesn't check stays as written.
@@ -78,8 +81,16 @@ await pool.end();
 export default migration("postgres", {
 	up: async (db) =>
 		db.ddl(\`
-			create table users (id int primary key, name text not null, type text);
-			create table posts (id int primary key, author_id int not null references users(id), title text)
+			create table users (
+				id int primary key,
+				name text not null,
+				type text
+			);
+			create table posts (
+				id int primary key,
+				author_id int not null references users(id),
+				title text
+			)
 		\`),
 	down: async (db) => {
 		await db.ddl("drop table posts; drop table users");

@@ -1,0 +1,215 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`cli-format-layout > scenario 1`] = `
+{
+  "artifacts": {
+    "app.ts": "import { createSql } from "@typesql/pg";
+import { Pool } from "pg";
+import type { DB } from "./db.js";
+import migrator from "./typesql.config.js";
+
+await migrator.latest();
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const sql = createSql<DB>(pool);
+
+// Long one-line strings break into a template literal, a clause per line,
+// and a clause that is still too long puts an item per line.
+await sql(
+	\`
+		INSERT INTO users (id, name, email, active)
+		VALUES
+			(1, 'Ada', 'ada@example.com', TRUE),
+			(2, 'Grace', NULL, TRUE),
+			(3, 'Linus', 'linus@example.com', FALSE)
+	\`,
+).execute();
+await sql(
+	\`
+		INSERT INTO posts (id, author_id, title)
+		VALUES (1, 1, 'Notes'), (2, 1, NULL), (3, 2, 'Compilers')
+	\`,
+).execute();
+
+// A short query written over several lines becomes one line.
+export const one = await sql(
+	\`SELECT id, name FROM users WHERE id = $1\`,
+	1,
+).execute();
+
+// A long query gets a clause per line; blank lines and trailing spaces go.
+export const counts = await sql(\`
+    SELECT u.id, u.name, count(p.id) AS posts
+    FROM users u
+    LEFT JOIN posts p ON p.author_id = u.id
+    WHERE u.active = TRUE AND u.email IS NOT NULL
+    GROUP BY u.id, u.name
+    ORDER BY posts DESC
+    LIMIT 10
+  \`).execute();
+
+// A select list that is too long for its line gets an item per line.
+export const wide = await sql(
+	\`
+		SELECT
+			u.id AS user_id,
+			u.name AS user_name,
+			u.email AS user_email,
+			p.title AS post_title
+		FROM users u
+		JOIN posts p ON p.author_id = u.id
+		WHERE p.title IS NOT NULL
+		ORDER BY p.id
+	\`,
+).execute();
+
+// A subquery that fits stays on its line; one that doesn't is indented.
+export const recent = await sql(\`
+	WITH recent AS (
+		SELECT * FROM posts WHERE created_at > now() - interval '7 days'
+	)
+	SELECT author_id, count(*) AS n
+	FROM recent
+	GROUP BY author_id
+	ORDER BY author_id
+\`).execute();
+export const nested = await sql(
+	\`
+		SELECT name
+		FROM users
+		WHERE id IN (
+			SELECT author_id
+			FROM posts
+			WHERE title IS NOT NULL
+				AND created_at > now() - interval '30 days'
+				AND author_id > $1
+		)
+		ORDER BY name
+	\`,
+	0,
+).execute();
+
+// A line comment keeps a line break after it.
+export const commented = await sql(\`
+	SELECT id
+	FROM users -- active only
+	WHERE active
+	ORDER BY id
+\`).execute();
+
+// A fragment and the \${…} holes it is spliced into.
+const titled = sql.fragment(\`p.title IS NOT NULL\`);
+export const joined = await sql(
+	\`
+		SELECT p.id, u.name
+		FROM posts p
+		JOIN users u ON u.id = p.author_id
+		WHERE \${sql.and([titled, sql.fragment("p.id >= $1", 1)])}
+	\`,
+).execute();
+
+// An upsert gets a clause per line too.
+export const upserted = await sql(
+	\`
+		INSERT INTO users (id, name, email)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (id)
+		DO UPDATE SET name = excluded.name, email = excluded.email
+		RETURNING id, name, email
+	\`,
+	1,
+	"Ada Lovelace",
+	null,
+).execute();
+
+console.log({
+	one,
+	counts,
+	wide,
+	recent,
+	nested,
+	commented,
+	joined,
+	upserted,
+});
+await pool.end();
+",
+    "migrations/001-schema.ts": "import { migration } from "@typesql/core/migration";
+
+export default migration("postgres", {
+	up: async (db) =>
+		db.ddl(\`
+			CREATE TABLE users (
+				id int PRIMARY KEY,
+				name text NOT NULL,
+				email text,
+				active boolean NOT NULL DEFAULT TRUE
+			);
+			CREATE TABLE posts (
+				id int PRIMARY KEY,
+				author_id int NOT NULL REFERENCES users(id),
+				title text,
+				created_at timestamptz NOT NULL DEFAULT now()
+			)
+		\`),
+	down: async (db) => {
+		await db.ddl(\`DROP TABLE posts; DROP TABLE users\`);
+	},
+});
+",
+  },
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "commented": "({ id: number })[]",
+      "counts": "({ id: number; name: string; posts: string })[]",
+      "joined": "({ id: number; name: string })[]",
+      "nested": "({ name: string })[]",
+      "one": "({ id: number; name: string })[]",
+      "recent": "({ author_id: number; n: string })[]",
+      "upserted": "({ email: null | string; id: number; name: string })[]",
+      "wide": "({ post_title: string; user_email: null | string; user_id: number; user_name: string })[]",
+    },
+  },
+  "generate": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "typesql format: formatted app.ts
+typesql format: formatted migrations/001-schema.ts
+typesql format: every file is formatted
+",
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "{
+  one: [ { id: 1, name: 'Ada' } ],
+  counts: [ { id: 1, name: 'Ada', posts: '2' } ],
+  wide: [
+    {
+      user_id: 1,
+      user_name: 'Ada',
+      user_email: 'ada@example.com',
+      post_title: 'Notes'
+    },
+    {
+      user_id: 2,
+      user_name: 'Grace',
+      user_email: null,
+      post_title: 'Compilers'
+    }
+  ],
+  recent: [ { author_id: 1, n: '2' }, { author_id: 2, n: '1' } ],
+  nested: [ { name: 'Ada' }, { name: 'Grace' } ],
+  commented: [ { id: 1 }, { id: 2 } ],
+  joined: [ { id: 1, name: 'Ada' }, { id: 3, name: 'Grace' } ],
+  upserted: [ { id: 1, name: 'Ada Lovelace', email: null } ]
+}
+",
+  },
+}
+`;

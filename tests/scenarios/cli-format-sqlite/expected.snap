@@ -16,15 +16,27 @@ await sql("INSERT INTO items VALUES (1, 3, 2), (2, 5, 1)").execute();
 
 // SQLite names an unaliased column after its text, so that text stays as written.
 export const rows = await sql(
-	"SELECT id, price*qty, cast(price as text), qty AS q FROM items WHERE qty > 0 ORDER BY id",
+	\`
+		SELECT id, price*qty, cast(price as text), qty AS q
+		FROM items
+		WHERE qty > 0
+		ORDER BY id
+	\`,
 ).execute();
 // So does a fragment that may be spliced into a select list.
 const total = sql.fragment("sum(price*qty)");
 export const totals = await sql(\`SELECT \${total} FROM items\`).execute();
 export const both = await sql(
-	\`SELECT \${total} AS total FROM items WHERE id IN (SELECT id FROM items WHERE qty IS NOT NULL)\`,
+	\`
+		SELECT \${total} AS total
+		FROM items
+		WHERE id IN (SELECT id FROM items WHERE qty IS NOT NULL)
+	\`,
 ).execute();
-console.log({ rows, totals, both, count: await count(db) });
+// An unaliased item written over lines keeps the lines of the whole text.
+export const lines = await sql(\`SELECT id, price *
+  qty FROM items WHERE id = 1\`).execute();
+console.log({ rows, totals, both, lines, count: await count(db) });
 db.close();
 ",
     "other.ts": "import type { DatabaseSync } from "node:sqlite";
@@ -54,6 +66,7 @@ export const count = (db: DatabaseSync) =>
     "diagnostics": [],
     "types": {
       "both": "({ total: null | number })[]",
+      "lines": "({ id: number; "price *\\n  qty": number })[]",
       "rows": "({ "cast(price as text)": string; id: number; "price*qty": number; q: number })[]",
       "totals": "({ "sum(price*qty)": null | number })[]",
     },
@@ -85,6 +98,7 @@ typesql format: other.ts is not formatted
   ],
   totals: [ [Object: null prototype] { 'sum(price*qty)': 11 } ],
   both: [ [Object: null prototype] { total: 11 } ],
+  lines: [ [Object: null prototype] { id: 1, 'price *\\n  qty': 6 } ],
   count: [Object: null prototype] { n: 2 }
 }
 ",

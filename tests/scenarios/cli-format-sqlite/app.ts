@@ -19,5 +19,8 @@ export const totals = await sql(`select ${total} from items`).execute();
 export const both = await sql(
 	`select ${total} as total from items where id in (select id from items where qty is not null)`,
 ).execute();
-console.log({ rows, totals, both, count: await count(db) });
+// An unaliased item written over lines keeps the lines of the whole text.
+export const lines = await sql(`select id, price *
+  qty from items where id = 1`).execute();
+console.log({ rows, totals, both, lines, count: await count(db) });
 db.close();

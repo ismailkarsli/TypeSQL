@@ -1,0 +1,27 @@
+{
+	"name": "cli-format-layout",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"generate": "typesql format && typesql format --check",
+		"start": "node dist/app.js"
+	},
+	"dependencies": {
+		"@typesql/core": "workspace:*",
+		"@typesql/cli": "workspace:*",
+		"@typesql/pg": "workspace:*",
+		"pg": "catalog:",
+		"@types/pg": "catalog:"
+	},
+	"devDependencies": {
+		"typescript": "catalog:",
+		"@types/node": "catalog:"
+	},
+	"scenario": {
+		"database": "postgres",
+		"artifacts": [
+			"app.ts",
+			"migrations/001-schema.ts"
+		]
+	}
+}

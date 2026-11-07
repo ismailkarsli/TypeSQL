@@ -7,10 +7,12 @@ import { parseArgs } from "node:util";
 import { type CommandIo, commandIo, errorMessage } from "@typesql/core/adapter";
 import { loadConfig, type MigratorConfig } from "@typesql/core/migration";
 import {
+	DEFAULT_WIDTH,
 	type Dialect,
 	type EditorKinds,
 	editorKinds,
-	formatSql,
+	type FormatOptions,
+	formatLiteral,
 	isCall,
 	isSqlLiteral,
 	type KeywordCase,
@@ -24,14 +26,18 @@ const USAGE = `Usage: typesql format [files or directories…] [options]
 
 Format the SQL that TypeSQL checks: the string argument of every call whose
 parameter TypeSQL types as SQL, whatever the function, method or variable is
-named. Keywords get one case and the spaces between tokens are tidied; line
-breaks, indentation, comments, strings and names stay as written.
+named. Keywords get one case and the spaces between tokens are tidied. The
+SQL goes on one line if it fits, and otherwise on a clause per line, with an
+item or condition per line in a clause that is still too long. Comments,
+strings and names stay as written.
 
 Options:
   --project <file>        tsconfig.json of the files (default: ./tsconfig.json)
   --config <file>         config module (default: ./typesql.config.ts)
   --keyword-case <case>   upper or lower; overrides config.format.keywordCase
                           (default: upper)
+  --width <columns>       the column a line of SQL ends at; overrides
+                          config.format.width (default: 80)
   --check                 write nothing, and exit with 1 if a file would change
   -h, --help              show this help
 
@@ -47,6 +53,7 @@ const parse = (argv: readonly string[]) =>
 			project: { type: "string" },
 			config: { type: "string" },
 			"keyword-case": { type: "string" },
+			width: { type: "string" },
 			check: { type: "boolean" },
 			help: { type: "boolean", short: "h" },
 		},
@@ -82,6 +89,15 @@ export async function main(
 		);
 		return 2;
 	}
+	const flagWidth =
+		values.width === undefined ? undefined : Number(values.width);
+	if (
+		flagWidth !== undefined &&
+		(!Number.isInteger(flagWidth) || flagWidth <= 0)
+	) {
+		io.stderr(`typesql format: --width must be a positive integer\n\n${USAGE}`);
+		return 2;
+	}
 	const print = (text: string) => io.stdout(`typesql format: ${text}\n`);
 	// Importing the config runs it; that overlaps with TypeScript's work.
 	const config: Promise<MigratorConfig | undefined> = loadConfig({
@@ -103,6 +119,7 @@ export async function main(
 		}
 		const configured = await config;
 		const keywordCase = flagCase ?? configured?.format?.keywordCase ?? "upper";
+		const width = flagWidth ?? configured?.format?.width ?? DEFAULT_WIDTH;
 		const fallback: Dialect = configured?.dialect ?? "postgres";
 		const changed = files
 			.map((file) => ({
@@ -112,6 +129,7 @@ export async function main(
 				after: formatFile(file, (dialect) => ({
 					dialect: dialect ?? fallback,
 					keywordCase,
+					width,
 				})),
 			}))
 			.filter((file) => file.after !== file.before);
@@ -396,24 +414,30 @@ function typeSqlPaths(): (path: string) => boolean {
  */
 function formatFile(
 	file: FileSql,
-	options: (dialect: Dialect | null) => {
-		dialect: Dialect;
-		keywordCase: KeywordCase;
-	},
+	options: (dialect: Dialect | null) => FormatOptions,
 ): string {
 	const { source } = file;
 	const edits: Edit[] = [];
 	const inner = [...file.literals].sort(
 		(a, b) => a.sql.end - a.sql.start - (b.sql.end - b.sql.start),
 	);
-	for (const { sql, dialect } of inner)
-		edits.push({
-			start: sql.start,
-			end: sql.end,
-			text: formatSql(source, sql, options(dialect), (s, e) =>
-				applyEdits(source, edits, s, e),
+	// A literal in another's ${…} hole moves when that one is laid out, so it
+	// stays on one line.
+	const nested = (sql: SqlText) =>
+		file.literals.some((outer) =>
+			outer.sql.holes.some(([s, e]) => sql.start >= s && sql.end <= e),
+		);
+	for (const { sql, dialect } of inner) {
+		const given = options(dialect);
+		edits.push(
+			formatLiteral(
+				source,
+				sql,
+				nested(sql) ? { ...given, width: Number.POSITIVE_INFINITY } : given,
+				(s, e) => applyEdits(source, edits, s, e),
 			),
-		});
+		);
+	}
 	return applyEdits(source, edits, 0, source.length);
 }
 

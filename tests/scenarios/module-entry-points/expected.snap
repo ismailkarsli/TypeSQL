@@ -128,7 +128,9 @@ exports[`module-entry-points > scenario 1`] = `
     "typescriptModulesFrom": "function"
   },
   "@typesql/language-server/format": {
+    "DEFAULT_WIDTH": "number",
     "editorKinds": "function",
+    "formatLiteral": "function",
     "formatSql": "function",
     "isCall": "function",
     "isSqlLiteral": "function",

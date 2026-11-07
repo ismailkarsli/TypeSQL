@@ -370,7 +370,7 @@ An entry is one `Sig<Params, Return, Flags>` or a tuple of overloads.
 | `createMigrator(config)` | a `Migrator`; never connects by itself. With a `migrations` array its schema is inferred (from an array written in the call or declared `as const`); `createMigrator<DB>(config)` states it |
 | `Migrator<Schema>` | `latest()`, `up()`, `down()`, `status()`, `make(name)`, `generate()`, `with(overrides)` and `config` |
 | `MigratorConfig` | `dialect`; `url`, `db` or `execute`; `migrationsDir` or `migrations`; `migrationTable`, `schemaFile`, `generate`, `transaction`, `format` |
-| `FormatConfig` | `format` of the config: `{ keywordCase?: "upper" \| "lower" }`, the keyword case of [`typesql format`](../guide/format) |
+| `FormatConfig` | `format` of the config: `{ keywordCase?: "upper" \| "lower"; width?: number }`, how [`typesql format`](../guide/format) writes SQL |
 | `LatestResult<Schema>` | what `latest()` resolves to: `{ applied, schemaFile?, schemaError? }`, and the type-only schema after the last migration |
 | `UpResult` | what `up()` resolves to: `{ applied, schemaFile?, schemaError? }` |
 | `DownResult` | what `down()` resolves to: `{ reverted, schemaFile?, schemaError? }` |
