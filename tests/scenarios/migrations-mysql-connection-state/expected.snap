@@ -1,0 +1,26 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`migrations-mysql-connection-state > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {},
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "autocommit before 1
+open failed: Incorrect table name 'history '
+autocommit after a failed open 1
+failed migration: 002-failure false
+rows after the failed migration []
+autocommit after the failed migration 1
+",
+  },
+}
+`;

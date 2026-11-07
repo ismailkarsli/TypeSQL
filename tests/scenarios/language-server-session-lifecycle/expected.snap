@@ -1,0 +1,30 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`language-server-session-lifecycle > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {},
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "connected { opened: 1, closed: 0 }
+died during a request { opened: 1, closed: 0 }
+found out the pipe is dead { opened: 1, closed: 1 }
+next request reconnects { opened: 2, closed: 1 }
+closed { opened: 2, closed: 2 }
+a request after close opens nothing { opened: 2, closed: 2 }
+[
+  'Error: the pipe closed during the request',
+  'Error: the pipe is closed'
+]
+",
+  },
+}
+`;

@@ -44,6 +44,7 @@ exports[`module-entry-points > scenario 1`] = `
     "dialectFamily": "function",
     "doc": "function",
     "errorMessage": "function",
+    "exclusiveTransaction": "function",
     "familyStatement": "object",
     "globRegExp": "function",
     "helperImport": "function",
@@ -69,7 +70,6 @@ exports[`module-entry-points > scenario 1`] = `
     "runTransaction": "function",
     "schemaMembers": "function",
     "schemaWriter": "function",
-    "serialTransaction": "function",
     "splitParams": "function",
     "sqliteBindings": "function",
     "sqliteValue": "function"

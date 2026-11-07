@@ -1375,6 +1375,41 @@ importers:
         specifier: 'catalog:'
         version: 7.1.0-beta
 
+  tests/scenarios/language-server-completion-statements:
+    dependencies:
+      '@typesql/core':
+        specifier: workspace:*
+        version: link:../../../packages/core
+      '@typesql/language-server':
+        specifier: workspace:*
+        version: link:../../../packages/language-server
+      '@typesql/pg':
+        specifier: workspace:*
+        version: link:../../../packages/pg
+      typescript:
+        specifier: 'catalog:'
+        version: 7.1.0-beta
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.6.6
+
+  tests/scenarios/language-server-session-lifecycle:
+    dependencies:
+      '@typesql/core':
+        specifier: workspace:*
+        version: link:../../../packages/core
+      '@typesql/language-server':
+        specifier: workspace:*
+        version: link:../../../packages/language-server
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.6.6
+      typescript:
+        specifier: 'catalog:'
+        version: 7.1.0-beta
+
   tests/scenarios/mariadb-connector:
     dependencies:
       '@typesql/core':
@@ -1434,6 +1469,25 @@ importers:
       '@typesql/core':
         specifier: workspace:*
         version: link:../../../packages/core
+      mysql2:
+        specifier: 'catalog:'
+        version: 3.24.6(@types/node@26.6.6)
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.6.6
+      typescript:
+        specifier: 'catalog:'
+        version: 7.1.0-beta
+
+  tests/scenarios/migrations-mysql-connection-state:
+    dependencies:
+      '@typesql/core':
+        specifier: workspace:*
+        version: link:../../../packages/core
+      '@typesql/mysql':
+        specifier: workspace:*
+        version: link:../../../packages/mysql
       mysql2:
         specifier: 'catalog:'
         version: 3.24.6(@types/node@26.6.6)
@@ -1526,6 +1580,28 @@ importers:
       '@typesql/cli':
         specifier: workspace:*
         version: link:../../../packages/cli
+      '@typesql/core':
+        specifier: workspace:*
+        version: link:../../../packages/core
+      '@typesql/pg':
+        specifier: workspace:*
+        version: link:../../../packages/pg
+      pg:
+        specifier: 'catalog:'
+        version: 8.23.1
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.6.6
+      typescript:
+        specifier: 'catalog:'
+        version: 7.1.0-beta
+
+  tests/scenarios/migrations-postgres-lock-failure:
+    dependencies:
+      '@types/pg':
+        specifier: 'catalog:'
+        version: 8.23.1
       '@typesql/core':
         specifier: workspace:*
         version: link:../../../packages/core
@@ -1662,6 +1738,25 @@ importers:
       zod:
         specifier: 'catalog:'
         version: 4.6.7
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.6.6
+      typescript:
+        specifier: 'catalog:'
+        version: 7.1.0-beta
+
+  tests/scenarios/mysql-connection-overlapping-transactions:
+    dependencies:
+      '@typesql/core':
+        specifier: workspace:*
+        version: link:../../../packages/core
+      '@typesql/mysql':
+        specifier: workspace:*
+        version: link:../../../packages/mysql
+      mysql2:
+        specifier: 'catalog:'
+        version: 3.24.6(@types/node@26.6.6)
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -1948,6 +2043,28 @@ importers:
       '@typesql/core':
         specifier: workspace:*
         version: link:../../../packages/core
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.6.6
+      typescript:
+        specifier: 'catalog:'
+        version: 7.1.0-beta
+
+  tests/scenarios/pg-client-overlapping-transactions:
+    dependencies:
+      '@types/pg':
+        specifier: 'catalog:'
+        version: 8.23.1
+      '@typesql/core':
+        specifier: workspace:*
+        version: link:../../../packages/core
+      '@typesql/pg':
+        specifier: workspace:*
+        version: link:../../../packages/pg
+      pg:
+        specifier: 'catalog:'
+        version: 8.23.1
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -2564,6 +2681,25 @@ importers:
         specifier: 'catalog:'
         version: 7.1.0-beta
 
+  tests/scenarios/postgresjs-reserved-overlapping-transactions:
+    dependencies:
+      '@typesql/core':
+        specifier: workspace:*
+        version: link:../../../packages/core
+      '@typesql/postgres':
+        specifier: workspace:*
+        version: link:../../../packages/postgres
+      postgres:
+        specifier: 'catalog:'
+        version: 4.0.0
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.6.6
+      typescript:
+        specifier: 'catalog:'
+        version: 7.1.0-beta
+
   tests/scenarios/postgresjs-workflows:
     dependencies:
       '@typesql/core':
@@ -2749,6 +2885,22 @@ importers:
         specifier: 'catalog:'
         version: 7.1.0-beta
 
+  tests/scenarios/sql-failed-statement-markers:
+    dependencies:
+      '@typesql/core':
+        specifier: workspace:*
+        version: link:../../../packages/core
+      '@typesql/sqlite':
+        specifier: workspace:*
+        version: link:../../../packages/sqlite
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.6.6
+      typescript:
+        specifier: 'catalog:'
+        version: 7.1.0-beta
+
   tests/scenarios/sqlite-aggregate-traversal:
     dependencies:
       '@typesql/core':
@@ -2885,6 +3037,28 @@ importers:
       '@typesql/sqlite':
         specifier: workspace:*
         version: link:../../../packages/sqlite
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.6.6
+      typescript:
+        specifier: 'catalog:'
+        version: 7.1.0-beta
+
+  tests/scenarios/sqlite-overlapping-transactions:
+    dependencies:
+      '@types/better-sqlite3':
+        specifier: 'catalog:'
+        version: 9.6.0
+      '@typesql/core':
+        specifier: workspace:*
+        version: link:../../../packages/core
+      '@typesql/sqlite':
+        specifier: workspace:*
+        version: link:../../../packages/sqlite
+      better-sqlite3:
+        specifier: 'catalog:'
+        version: 13.0.3
     devDependencies:
       '@types/node':
         specifier: 'catalog:'

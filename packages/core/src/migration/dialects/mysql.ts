@@ -65,8 +65,16 @@ async function open(
 	const connectionId = String(location.id);
 	/** The session's autocommit before the migrator turned it off. */
 	const autocommit = Number(location.autocommit) === 0 ? 0 : 1;
-	/** The session lock held for the command, released by close(). */
+	/** The session lock held for the command, released by giveBack(). */
 	let sessionLock: string | undefined;
+	/**
+	 * Restores what the command changed on the session. The connection may be
+	 * gone; the server then released the lock.
+	 */
+	const giveBack = async (): Promise<void> => {
+		await tryRun(execute, `SET autocommit = ${autocommit}`);
+		await tryRun(execute, "SELECT RELEASE_LOCK($1)", [sessionLock]);
+	};
 	/**
 	 * Whether this call reaches the connection the command started on. A
 	 * BEGIN inside a transaction would commit it there, so the connection's
@@ -115,7 +123,8 @@ async function open(
 			await execute("SET autocommit = 0", []);
 			await execute(createTable, []);
 		} catch (error) {
-			await tryRun(execute, "SELECT RELEASE_LOCK($1)", [sessionLock]);
+			// No session is returned, so its close() never runs.
+			await giveBack();
 			throw error;
 		}
 	} else await execute(createTable, []);
@@ -127,7 +136,12 @@ async function open(
 		created: true,
 		async begin() {
 			await execute("START TRANSACTION", []);
-			await execute("SAVEPOINT typesql_migration", []);
+			try {
+				await execute("SAVEPOINT typesql_migration", []);
+			} catch (error) {
+				await tryRun(execute, "ROLLBACK");
+				throw error;
+			}
 		},
 		inTransaction: sameConnection,
 		/**
@@ -148,11 +162,8 @@ async function open(
 			await execute("SAVEPOINT typesql_migration", []);
 			return true;
 		},
-		// The connection may be gone; the server then released the lock.
 		async close() {
-			if (sessionLock === undefined) return;
-			await tryRun(execute, `SET autocommit = ${autocommit}`);
-			await tryRun(execute, "SELECT RELEASE_LOCK($1)", [sessionLock]);
+			if (sessionLock !== undefined) await giveBack();
 		},
 	};
 }

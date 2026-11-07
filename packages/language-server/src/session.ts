@@ -67,6 +67,25 @@ interface Connection {
 	readonly kinds: EditorKinds;
 }
 
+/**
+ * The session's link to the language server's API:
+ *
+ *     none -> opening -> open -> none (the connection was lost)
+ *               |    \-> unavailable (nothing to connect with, until a restart)
+ *               \-> none (opening failed; the next request tries again)
+ *
+ * and from any of them to closed, which is final.
+ */
+type Link =
+	| { readonly state: "none" }
+	| {
+			readonly state: "opening";
+			readonly opened: Promise<Connection | null>;
+	  }
+	| { readonly state: "open"; readonly connection: Connection }
+	| { readonly state: "unavailable" }
+	| { readonly state: "closed" };
+
 /** What one request needs: the connection, and which files are @typesql/core's. */
 interface Request extends Connection {
 	readonly isCorePath: (path: string) => boolean;
@@ -78,7 +97,7 @@ const HIGHLIGHT_BUDGET_MS = 500;
 const IS_7_0 = /unknown API method "getCurrentLanguageServerSnapshot"/;
 
 export class Session {
-	private connection: Promise<Connection | null> | undefined;
+	private link: Link = { state: "none" };
 	private readonly cores: CorePaths;
 	private readonly connector: Connector;
 	private readonly log: Log;
@@ -143,9 +162,14 @@ export class Session {
 	}
 
 	async close(): Promise<void> {
-		const c = this.connection;
-		this.connection = undefined;
-		const connection = await c?.catch(() => undefined);
+		const link = this.link;
+		this.link = { state: "closed" };
+		const connection =
+			link.state === "open"
+				? link.connection
+				: link.state === "opening"
+					? await link.opened.catch(() => null)
+					: null;
 		await connection?.api.close().catch(() => {});
 	}
 
@@ -185,9 +209,49 @@ export class Session {
 		const fileName = fileURLToPath(uri);
 		const isCorePath = this.cores.for(fileName);
 		if (!isCorePath) return null;
-		this.connection ??= this.openOrForget(uri, fileName);
-		const connection = await this.connection;
+		const connection = await this.connected(uri, fileName);
 		return connection && { ...connection, isCorePath };
+	}
+
+	private connected(uri: string, fileName: string): Promise<Connection | null> {
+		const link = this.link;
+		switch (link.state) {
+			case "none":
+				return this.connect(uri, fileName);
+			case "opening":
+				return link.opened;
+			case "open":
+				return Promise.resolve(link.connection);
+			case "unavailable":
+			case "closed":
+				return Promise.resolve(null);
+		}
+	}
+
+	private connect(uri: string, fileName: string): Promise<Connection | null> {
+		const opened = this.open(uri, fileName);
+		const link: Link = { state: "opening", opened };
+		this.link = link;
+		// Closing while it opens leaves closed as it is, and closes what opens.
+		const settle = (next: Link): void => {
+			if (this.link === link) this.link = next;
+		};
+		void opened.then(
+			(connection) =>
+				settle(
+					connection ? { state: "open", connection } : { state: "unavailable" },
+				),
+			() => settle({ state: "none" }),
+		);
+		return opened;
+	}
+
+	/** `api` no longer answers: close it, and let the next request open another. */
+	private lost(api: API<true>): void {
+		const link = this.link;
+		if (link.state !== "open" || link.connection.api !== api) return;
+		this.link = { state: "none" };
+		void api.close().catch(() => {});
 	}
 
 	private async completeIn(
@@ -233,23 +297,18 @@ export class Session {
 		api: API<true>,
 		run: (s: Snapshot) => Promise<T>,
 	): Promise<T> {
-		const snapshot = await api.getCurrentLanguageServerSnapshot();
+		let snapshot: Snapshot;
+		try {
+			snapshot = await api.getCurrentLanguageServerSnapshot();
+		} catch (e) {
+			this.lost(api);
+			throw e;
+		}
 		try {
 			return await run(snapshot);
 		} finally {
-			void snapshot.dispose();
-		}
-	}
-
-	private async openOrForget(
-		uri: string,
-		fileName: string,
-	): Promise<Connection | null> {
-		try {
-			return await this.open(uri, fileName);
-		} catch (e) {
-			this.connection = undefined;
-			throw e;
+			// With the connection gone it rejects, and nobody is left to care.
+			void snapshot.dispose().catch(() => {});
 		}
 	}
 

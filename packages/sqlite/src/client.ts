@@ -1,8 +1,8 @@
 import type { Executor } from "@typesql/core";
 import {
 	paramNumbers,
+	runTransaction,
 	type SqlDriver,
-	serialTransaction,
 	sqliteBindings,
 } from "@typesql/core/adapter";
 
@@ -115,16 +115,18 @@ function run(p: Prepared, values: readonly unknown[]) {
 
 async function transaction<T>(
 	db: SqliteDatabase,
-	depth: number,
+	_depth: number,
 	fn: (tx: SqliteDatabase) => Promise<T>,
+	savepoint: string | undefined,
 ): Promise<T> {
-	return serialTransaction(
-		db,
-		depth,
+	// Its drivers' transaction() runs synchronous functions only. SQLite itself
+	// rejects a BEGIN in a transaction under way.
+	return runTransaction(
 		async (statement) => {
 			db.exec(statement);
 		},
 		() => fn(db),
+		{ savepoint },
 	);
 }
 

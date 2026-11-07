@@ -1,7 +1,7 @@
 import type { Executor } from "@typesql/core";
 import {
+	runTransaction,
 	type SqlDriver,
-	serialTransaction,
 	splitParams,
 } from "@typesql/core/adapter";
 import { Param, SQL, type SQLChunk, StringChunk } from "drizzle-orm";
@@ -101,17 +101,19 @@ export function sqliteExecutor(db: DrizzleSqliteDatabase): Executor {
 
 function transaction<T>(
 	db: DrizzleSqliteDatabase,
-	depth: number,
+	_depth: number,
 	fn: (tx: DrizzleSqliteDatabase) => Promise<T>,
+	savepoint: string | undefined,
 ): Promise<T> {
 	if (isAsync(db)) return runner(db).transaction(fn);
-	return serialTransaction(
-		db,
-		depth,
+	// A synchronous driver's transaction() can't await `fn`. SQLite itself
+	// rejects a BEGIN in a transaction under way.
+	return runTransaction(
 		async (sql) => {
 			await runner(db).run(new SQL([new StringChunk(sql)]));
 		},
 		() => fn(db),
+		{ savepoint },
 	);
 }
 

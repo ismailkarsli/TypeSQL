@@ -201,28 +201,32 @@ export async function pooledTransaction<C, T, Done>(
 	}
 }
 
-const queues = new WeakMap<WeakKey, Promise<unknown>>();
+const inTransaction = new WeakSet<WeakKey>();
+
+const ALREADY_OPEN =
+	"typesql: this connection is already in a transaction: inside it use its tx, or let it end first, or give sql a pool, which gives each transaction a connection of its own";
 
 /**
- * Run `fn` in a transaction with `run`'s statements, one top-level
- * transaction at a time on `client`: for drivers whose connection is one
- * object that every caller shares, such as SQLite's. Below depth 0 it makes
- * a savepoint in the transaction under way.
+ * Run `fn` in a transaction with `run`'s statements on `client`, one
+ * connection that every caller of the `sql` shares, for a driver without a
+ * transaction API. A second BEGIN there wouldn't fail: PostgreSQL only warns
+ * and MySQL commits the first, and the first COMMIT would end both, so it is
+ * rejected here. Below depth 0 it makes a savepoint in the transaction under
+ * way.
  */
-export function serialTransaction<T>(
+export async function exclusiveTransaction<T, Done = unknown>(
 	client: WeakKey,
 	depth: number,
-	run: (statement: string) => Promise<void>,
+	run: (statement: string) => PromiseLike<Done>,
 	fn: () => Promise<T>,
 ): Promise<T> {
 	if (depth > 0)
 		return runTransaction(run, fn, { savepoint: savepointName(depth) });
-	const current = (queues.get(client) ?? Promise.resolve()).then(() =>
-		runTransaction(run, fn),
-	);
-	queues.set(
-		client,
-		current.catch(() => undefined),
-	);
-	return current;
+	if (inTransaction.has(client)) throw new Error(ALREADY_OPEN);
+	inTransaction.add(client);
+	try {
+		return await runTransaction(run, fn);
+	} finally {
+		inTransaction.delete(client);
+	}
 }

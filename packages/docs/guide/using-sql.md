@@ -314,5 +314,7 @@ const userId = await sql.transaction(async (tx) => {
 ```
 
 ::: warning
-Run statements in a transaction one after another, not with `Promise.all`.
+Run statements and nested transactions in a transaction one after another, not with `Promise.all`.
+
+A `sql` on a pool gives each transaction a connection of its own, and a client with a transaction method of its own (Kysely, Drizzle, Prisma, a postgres.js `Sql`) uses that method, with that client's behavior. On one connection (a pg `Client` or `PoolClient`, a mysql2 or mariadb connection, a postgres.js `ReservedSql`, a SQLite database), `sql.transaction()` is rejected while a transaction is open on it, including one on the outer `sql` inside a transaction: use `tx` there, wait for the other to end, or use a pool. A query on the outer `sql` runs on the same connection, so it joins the open transaction.
 :::

@@ -2,8 +2,8 @@ import { DatabaseSync } from "node:sqlite";
 import type { IdentityPluginTypes, SqlPlugin } from "@typesql/core";
 import {
 	createTransactionalSql,
+	exclusiveTransaction,
 	type SqlDriver,
-	serialTransaction,
 } from "@typesql/core/adapter";
 import { CasePlugin } from "@typesql/core/plugins";
 import {
@@ -51,7 +51,7 @@ export const db = new DatabaseSync(process.env.SQLITE_PATH!);
 const driver: SqlDriver<SqliteDatabase> = {
 	executor: (client) => executor(client, { bigint: true }),
 	transaction: (client, depth, fn) =>
-		serialTransaction(
+		exclusiveTransaction(
 			client,
 			depth,
 			async (statement) => {

@@ -616,18 +616,28 @@ async function openHistory(
 		 */
 		async rollback(): Promise<true | NotRolledBack> {
 			if (!transaction) return "none";
-			const intact = await session.inTransaction().catch((cause: unknown) => {
-				if (session.aborted?.(cause)) return true;
-				throw cause;
-			});
-			if (intact) {
-				const all = await whole();
-				await execute("ROLLBACK", []);
-				return all ? true : "implicit";
+			let intact: boolean;
+			let all = false;
+			try {
+				intact = await session.inTransaction().catch((cause: unknown) => {
+					if (session.aborted?.(cause)) return true;
+					throw cause;
+				});
+				if (intact) all = await whole();
+			} catch (error) {
+				// Asking how it stands failed. Leave no transaction open: closing
+				// the session could commit it (MySQL's SET autocommit = 1), and
+				// the caller's later writes on its connection would join it.
+				await tryRun(execute, "ROLLBACK");
+				throw error;
 			}
-			// It may still reach the connection that holds the transaction.
-			await tryRun(execute, "ROLLBACK");
-			return "split";
+			if (!intact) {
+				// It may still reach the connection that holds the transaction.
+				await tryRun(execute, "ROLLBACK");
+				return "split";
+			}
+			await execute("ROLLBACK", []);
+			return all ? true : "implicit";
 		},
 		/** Create the table if needed, and read it in the order it was applied. */
 		async read(): Promise<Row[]> {
@@ -741,8 +751,11 @@ async function run(
 			if (command !== "latest") break;
 		}
 	} finally {
-		await history?.close();
-		await connection.close();
+		try {
+			await history?.close();
+		} finally {
+			await connection.close();
+		}
 	}
 	return { names, applied, status };
 }

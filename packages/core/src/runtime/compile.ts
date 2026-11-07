@@ -42,6 +42,7 @@ declare const crypto: { randomUUID(): string };
 let prefix: string | undefined;
 let counter = 0;
 const pending = new Map<string, unknown>();
+const MARKER = /\0typesql([^\0]+)\0/g;
 
 function mark<V>(value: V, kind = ""): string {
 	prefix ??= crypto.randomUUID();
@@ -236,6 +237,23 @@ const renumber = (text: string, offset: number, lexis: string): string =>
  * `lexis` is the dialect's (see `Dialect`).
  */
 export function compile(
+	lexis: string,
+	text: string,
+	args?: readonly unknown[],
+): Compiled {
+	try {
+		return compileStatement(lexis, text, args);
+	} catch (error) {
+		// A statement that fails has had its markers, as one that runs has;
+		// nothing else would ever take them out of `pending`.
+		for (const source of [text, ...(args ?? [])])
+			if (typeof source === "string")
+				for (const [, id] of source.matchAll(MARKER)) pending.delete(id ?? "");
+		throw error;
+	}
+}
+
+function compileStatement(
 	lexis: string,
 	text: string,
 	args?: readonly unknown[],

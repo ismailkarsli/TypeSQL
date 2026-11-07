@@ -1,0 +1,26 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`postgresjs-reserved-overlapping-transactions > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {},
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "[
+  'fulfilled',
+  'Error: typesql: this connection is already in a transaction: inside it use its tx, or let it end first, or give sql a pool, which gives each transaction a connection of its own'
+]
+nested: typesql: this connection is already in a transaction: inside it use its tx, or let it end first, or give sql a pool, which gives each transaction a connection of its own
+[ { body: 'kept' }, { body: 'later' } ]
+",
+  },
+}
+`;

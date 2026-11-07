@@ -1,5 +1,5 @@
 import type { Executor } from "@typesql/core";
-import { runTransaction, type SqlDriver } from "@typesql/core/adapter";
+import { exclusiveTransaction, type SqlDriver } from "@typesql/core/adapter";
 
 export type PostgresJsRows = readonly unknown[] & {
 	readonly count: number | null;
@@ -61,18 +61,18 @@ export function executor(sql: PostgresJsQueryable): Executor {
 
 async function transaction<T>(
 	sql: PostgresJsQueryable,
-	_depth: number,
+	depth: number,
 	fn: (tx: PostgresJsQueryable) => Promise<T>,
-	savepoint: string | undefined,
 ): Promise<T> {
 	if (canSavepoint(sql)) return sql.savepoint(fn);
 	if (canBegin(sql)) return sql.begin(fn);
 	// A ReservedSql is one connection without begin or savepoint.
 	if (isReserved(sql))
-		return runTransaction(
+		return exclusiveTransaction(
+			sql,
+			depth,
 			(statement) => sql.unsafe(statement),
 			() => fn(sql),
-			{ savepoint },
 		);
 	throw new Error(
 		"typesql: sql.transaction() needs a postgres.js Sql, ReservedSql or TransactionSql (with begin, savepoint or release)",

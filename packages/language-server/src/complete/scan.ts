@@ -169,6 +169,29 @@ const BEFORE_EXPR = new Set([
 
 type ParenKind = "target" | "names" | "values" | "expr";
 
+/** The part of a statement the scanner is in; "" before its first keyword. */
+type Clause =
+	| ""
+	| "with"
+	| "select"
+	| "returning"
+	| "from"
+	| "from-call"
+	| "into"
+	| "set"
+	| "conflict"
+	| "insert"
+	| "where"
+	| "group"
+	| "order"
+	| "having"
+	| "window"
+	| "limit"
+	| "offset"
+	| "values"
+	| "delete"
+	| "merge";
+
 interface Item {
 	name: string;
 	readonly rel: RelRef | null;
@@ -185,7 +208,7 @@ interface Level {
 
 interface At {
 	readonly level: Level;
-	readonly clause: string;
+	readonly clause: Clause;
 	readonly paren: ParenKind | null;
 	opens?: ParenKind;
 	relNext?: boolean;
@@ -246,7 +269,7 @@ function structure(toks: readonly Tok[], d: DialectFacts): Structure {
 		});
 		const first = fresh();
 		let lv = first;
-		let clause = "";
+		let clause: Clause = "";
 		const parens: { kind: ParenKind; item: Item | null }[] = [];
 		let expectRel = false;
 		let targetNext = false;
@@ -260,6 +283,18 @@ function structure(toks: readonly Tok[], d: DialectFacts): Structure {
 			if (!out) return;
 			const name = outputName(out);
 			if (name !== null) lv.outputs!.push(name);
+			out = null;
+		};
+		/** Nothing of the statement a `;` ended carries into the next one. */
+		const startStatement = (): void => {
+			lv = fresh();
+			clause = "";
+			expectRel = false;
+			targetNext = false;
+			after = null;
+			aliased = undefined;
+			cteNext = undefined;
+			cte = null;
 			out = null;
 		};
 		const visibleCte = (name: string): Item | undefined =>
@@ -401,9 +436,7 @@ function structure(toks: readonly Tok[], d: DialectFacts): Structure {
 				continue;
 			}
 			if (t.k === "o" && t.v === ";") {
-				out = null;
-				lv = fresh();
-				clause = "";
+				startStatement();
 				continue;
 			}
 			if (clause === "with" && cteNext && w !== "recursive") {

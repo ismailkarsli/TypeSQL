@@ -1,11 +1,11 @@
 import { createHash } from "node:crypto";
 import type { Executor } from "@typesql/core";
 import {
+	exclusiveTransaction,
 	type PgField,
 	parsePgUserArrays,
 	pgResult,
 	pooledTransaction,
-	runTransaction,
 	type SqlDriver,
 } from "@typesql/core/adapter";
 
@@ -127,7 +127,7 @@ async function inPoolTransaction<C extends PgTransactionClient, T>(
 
 function transaction<T>(
 	client: PgQueryable,
-	_depth: number,
+	depth: number,
 	fn: (tx: PgQueryable) => Promise<T>,
 	savepoint: string | undefined,
 ): Promise<T> {
@@ -140,7 +140,7 @@ function transaction<T>(
 			),
 		);
 	}
-	return runTransaction(on(client), () => fn(client), { savepoint });
+	return exclusiveTransaction(client, depth, on(client), () => fn(client));
 }
 
 export const driver: SqlDriver<PgQueryable> = { executor, transaction };

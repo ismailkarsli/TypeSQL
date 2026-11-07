@@ -52,7 +52,7 @@ The adapter reads the database from [`sql.dialect`](../reference/api#sql-dialect
 
 | Option | Description |
 |---|---|
-| `transaction` | Run Better Auth's multi-step writes, such as creating a user and its account, in one `sql.transaction()`. Default `false`. |
+| `transaction` | Run Better Auth's multi-step writes, such as creating a user and its account, in one `sql.transaction()`. Default `false`. On one connection, such as a SQLite database, requests that overlap are [rejected](./using-sql#transactions). |
 | `usePlural` | Use plural table names, like `users`. Default `false`. |
 | `debugLogs` | Log each adapter call Better Auth makes, with its input and result. `true` for every method, or an object such as `{ findOne: true }`. Default `false`. |
 

@@ -203,7 +203,7 @@ What adapters and custom executors build on.
 | `splitParams(text, values, map?)` | the statement split at its `$n` parameters: `{ parts, values }` |
 | `paramNumbers(text)` | the parameter numbers a statement uses, in order of first use |
 | `SplitStatement` | the `{ parts, values }` result of `splitParams` |
-| `serialTransaction(client, depth, run, fn)` | serializes top-level transactions on one client object; nested calls use savepoints |
+| `exclusiveTransaction(client, depth, run, fn)` | `runTransaction` on one connection that callers share: rejects a top-level transaction while one is open on `client`; nested calls use savepoints |
 | `parsePgArray(text, parse)` | parses a PostgreSQL array literal, including nested arrays and null elements, using an element parser |
 | `parsePgUserArrays(owner, lookup, fields, rows)` | decodes arrays of user-defined PostgreSQL types using result fields and catalog lookups |
 | `PgField`, `PgLookup` | field metadata and the catalog lookup contract for PostgreSQL array decoding |

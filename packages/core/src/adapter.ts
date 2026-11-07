@@ -72,8 +72,8 @@ export {
 export {
 	createFamilySql,
 	createTransactionalSql,
+	exclusiveTransaction,
 	pooledTransaction,
 	runTransaction,
 	type SqlDriver,
-	serialTransaction,
 } from "./transaction.js";

@@ -1,0 +1,23 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`language-server-completion-statements > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {},
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "one statement: [ 'email', 'id', 'users' ]
+after a cut-off WITH: [ 'email', 'id', 'users' ]
+after a cut-off INSERT: [ 'email', 'id', 'users' ]
+",
+  },
+}
+`;

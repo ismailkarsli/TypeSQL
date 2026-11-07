@@ -9,6 +9,7 @@ import {
 	rows,
 	type Session,
 	sha256,
+	tryRun,
 } from "./session.js";
 
 /** The `xid` column of the first row: a transaction id's text. */
@@ -67,16 +68,21 @@ async function open(
 		created: false,
 		async begin() {
 			await execute("BEGIN", []);
-			// The lock ends with the transaction, so it can't stay held on a
-			// pooled connection. Its void result stays in FROM: Prisma can't
-			// read a void column.
-			xid = xidOf(
-				await rows(
-					execute,
-					"SELECT txid_current()::text AS xid FROM pg_advisory_xact_lock($1::bigint)",
-					[lock],
-				),
-			);
+			try {
+				// The lock ends with the transaction, so it can't stay held on a
+				// pooled connection. Its void result stays in FROM: Prisma can't
+				// read a void column.
+				xid = xidOf(
+					await rows(
+						execute,
+						"SELECT txid_current()::text AS xid FROM pg_advisory_xact_lock($1::bigint)",
+						[lock],
+					),
+				);
+			} catch (error) {
+				await tryRun(execute, "ROLLBACK");
+				throw error;
+			}
 		},
 		inTransaction: async () =>
 			xidOf(

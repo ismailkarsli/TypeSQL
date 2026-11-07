@@ -1,10 +1,10 @@
 import type { Executor, ExecutorResult } from "@typesql/core";
 import {
+	exclusiveTransaction,
 	type MySqlValue,
 	mysqlBind,
 	mysqlPositional,
 	pooledTransaction,
-	runTransaction,
 	type SqlDriver,
 } from "@typesql/core/adapter";
 
@@ -62,14 +62,44 @@ const isConnection = <C>(client: C): boolean =>
 		("beginTransaction" in client &&
 			typeof client.beginTransaction === "function"));
 
+/** What mysql2 and the mariadb connector have on a connection, not on a pool. */
+interface NativeTransactions {
+	beginTransaction(): Promise<void>;
+	commit(): Promise<void>;
+	rollback(): Promise<void>;
+}
+
+const hasTransactions = <C>(conn: C): conn is C & NativeTransactions =>
+	typeof conn === "object" &&
+	conn !== null &&
+	"beginTransaction" in conn &&
+	typeof conn.beginTransaction === "function" &&
+	"commit" in conn &&
+	typeof conn.commit === "function" &&
+	"rollback" in conn &&
+	typeof conn.rollback === "function";
+
 const isCheckout = <C>(conn: C): conn is C & Checkout =>
 	typeof conn === "object" &&
 	conn !== null &&
 	"release" in conn &&
 	typeof conn.release === "function";
 
-export function driver<C>(runner: Runner<C>, name: string): SqlDriver<C> {
-	const on = (c: C) => (statement: string) => runner.query(c, statement, []);
+export function driver<C extends object>(
+	runner: Runner<C>,
+	name: string,
+): SqlDriver<C> {
+	// The driver's own methods where it has them; savepoints are statements.
+	const on =
+		(c: C) =>
+		(statement: string): Promise<ExecutorResult | void> => {
+			if (hasTransactions(c)) {
+				if (statement === "BEGIN") return c.beginTransaction();
+				if (statement === "COMMIT") return c.commit();
+				if (statement === "ROLLBACK") return c.rollback();
+			}
+			return runner.query(c, statement, []);
+		};
 
 	async function inPoolTransaction<T>(
 		pool: PoolLike<C>,
@@ -93,7 +123,7 @@ export function driver<C>(runner: Runner<C>, name: string): SqlDriver<C> {
 
 	function transaction<T>(
 		client: C,
-		_depth: number,
+		depth: number,
 		fn: (tx: C) => Promise<T>,
 		savepoint: string | undefined,
 	): Promise<T> {
@@ -105,7 +135,7 @@ export function driver<C>(runner: Runner<C>, name: string): SqlDriver<C> {
 					`typesql: sql.transaction() needs a ${name} Pool, PoolConnection or Connection, so that BEGIN and COMMIT reach one connection`,
 				),
 			);
-		return runTransaction(on(client), () => fn(client), { savepoint });
+		return exclusiveTransaction(client, depth, on(client), () => fn(client));
 	}
 
 	return { executor: (client) => executor(runner, client), transaction };

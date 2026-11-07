@@ -21,7 +21,10 @@ export interface Session {
 	readonly insert: string;
 	/** Whether open() created the table, outside any transaction. */
 	readonly created: boolean;
-	/** Starts a migration's transaction, with its lock. */
+	/**
+	 * Starts a migration's transaction, with its lock. When it rejects, it has
+	 * left no transaction of its own open.
+	 */
 	begin(): Promise<void>;
 	/** Whether this call runs in the transaction begin() started. */
 	inTransaction(): Promise<boolean>;

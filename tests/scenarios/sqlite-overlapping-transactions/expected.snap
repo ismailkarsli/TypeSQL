@@ -1,0 +1,26 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`sqlite-overlapping-transactions > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {},
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "[
+  'fulfilled',
+  'SqliteError: cannot start a transaction within a transaction'
+]
+nested: cannot start a transaction within a transaction
+[ { body: 'kept' }, { body: 'later' } ]
+",
+  },
+}
+`;
