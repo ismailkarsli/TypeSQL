@@ -110,6 +110,11 @@ export function createSqlApi(
 			: fail("a plugin must encode parameters as an array");
 	};
 	const call = (query: string, ...rest: readonly unknown[]) => {
+		// sql`…` passes its strings as an array.
+		if (Array.isArray(query))
+			fail(
+				"call sql(`…`) with parentheses; sql`…` is not supported due to this issue: https://github.com/microsoft/TypeScript/issues/33304",
+			);
 		const { text, values } = compile(lexis, query, encodeArgs(rest, query));
 		return new SqlQuery(text, values, executor, plugins);
 	};

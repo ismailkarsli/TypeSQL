@@ -1,0 +1,47 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`tagged-template-rejection > scenario 1`] = `
+{
+  "compile": {
+    "status": 1,
+    "stderr": "",
+  },
+  "compiler": {
+    "diagnostics": [
+      {
+        "category": 1,
+        "code": 2345,
+        "column": 4,
+        "details": [
+          {
+            "category": 1,
+            "code": 2739,
+            "message": "Type 'TemplateStringsArray' is missing the following properties from type 'SqlError<"call sql(\`…\`) with parentheses; sql\`…\` is not supported due to this issue: https://github.com/microsoft/TypeScript/issues/33304", null>': [ERR], position",
+          },
+        ],
+        "expression": "\`SELECT id FROM users\`",
+        "file": "app.ts",
+        "line": 10,
+        "message": "Argument of type 'TemplateStringsArray' is not assignable to parameter of type 'SqlError<"call sql(\`…\`) with parentheses; sql\`…\` is not supported due to this issue: https://github.com/microsoft/TypeScript/issues/33304", null> & TemplateStringsArray'.",
+      },
+      {
+        "category": 1,
+        "code": 2345,
+        "column": 4,
+        "details": [
+          {
+            "category": 1,
+            "code": 2739,
+            "message": "Type 'TemplateStringsArray' is missing the following properties from type 'SqlError<"call sql(\`…\`) with parentheses; sql\`…\` is not supported due to this issue: https://github.com/microsoft/TypeScript/issues/33304", null>': [ERR], position",
+          },
+        ],
+        "expression": "\`SELECT name FROM users WHERE id = \${sql.param(id)}\`",
+        "file": "app.ts",
+        "line": 11,
+        "message": "Argument of type 'TemplateStringsArray' is not assignable to parameter of type 'SqlError<"call sql(\`…\`) with parentheses; sql\`…\` is not supported due to this issue: https://github.com/microsoft/TypeScript/issues/33304", null> & TemplateStringsArray'.",
+      },
+    ],
+    "types": {},
+  },
+}
+`;

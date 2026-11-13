@@ -128,7 +128,8 @@ export interface SqlApi<
 	TM,
 	Plugins extends readonly SqlPlugin[] = [],
 > {
-	<const Q extends string>(
+	// `Q` admits a TemplateStringsArray only to reject sql`…` with a message.
+	<const Q extends string | TemplateStringsArray>(
 		query: GateCallCheck<E, DB, TM, Q> & Q,
 		...params: Parameters<BoxCallArgs<E, DB, TM, Q>, Plugins>
 	): CallRet<E, DB, TM, Q, Plugins>;

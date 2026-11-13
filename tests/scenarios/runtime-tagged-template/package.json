@@ -1,0 +1,21 @@
+{
+	"name": "runtime-tagged-template",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"start": "node dist/app.js"
+	},
+	"dependencies": {
+		"@typesql/core": "workspace:*"
+	},
+	"devDependencies": {
+		"typescript": "catalog:",
+		"@types/node": "catalog:"
+	},
+	"scenario": {
+		"failure": {
+			"stage": "start",
+			"exitCode": 1
+		}
+	}
+}

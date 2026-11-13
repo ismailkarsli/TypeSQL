@@ -72,7 +72,8 @@ sql(`SELECT id FROM users WHERE id = ${sql.param("7")}`); // error: expects numb
 
 - A `sql.param()` value belongs to one statement; a `:name` used twice is one parameter.
 - `null` is accepted wherever the database accepts it, except for `NOT NULL` columns.
-- The SQL must be a literal (constants are folded in), so a value can't end up in the SQL text by accident; tagged templates aren't supported.
+- The SQL must be a literal (constants are folded in), so a value can't end up in the SQL text by accident.
+- `sql` is a function, not a template tag: `` sql`…` `` is a compile error (and a runtime error in JavaScript) that asks for `` sql(`…`) ``.
 
 ### JSON values
 

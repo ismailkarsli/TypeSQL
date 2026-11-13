@@ -1,0 +1,23 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`runtime-tagged-template > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {},
+  },
+  "exception": {
+    "message": "typesql: call sql(\`…\`) with parentheses; sql\`…\` is not supported due to this issue: https://github.com/microsoft/TypeScript/issues/33304",
+    "name": "Error",
+  },
+  "start": {
+    "status": 1,
+    "stdout": "",
+  },
+}
+`;

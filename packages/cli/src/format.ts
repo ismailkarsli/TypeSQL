@@ -319,9 +319,10 @@ async function sqlIn(
 
 /**
  * Which parameters of a callee take SQL: those of a signature TypeSQL
- * declares whose type is a string type parameter checked by a TypeSQL type,
- * as `query: GateCallCheck<…, Q> & Q` is, and `text: GateFragCheck<…> & Text`
- * for a fragment. Cached by type.
+ * declares whose type is a string type parameter (sql()'s also admits a
+ * TemplateStringsArray) checked by a TypeSQL type, as
+ * `query: GateCallCheck<…, Q> & Q` is, and `text: GateFragCheck<…> & Text` for
+ * a fragment. Cached by type.
  */
 function sqlParamsOf(
 	ts: TypeScript,
@@ -336,7 +337,10 @@ function sqlParamsOf(
 			members.map(async (m) => {
 				if (!m.isTypeParameter()) return false;
 				const c = await checker.getConstraintOfTypeParameter(m);
-				return c !== undefined && (c.flags & ts.TypeFlags.String) !== 0;
+				if (c === undefined) return false;
+				// sql()'s Q also admits a TemplateStringsArray, to reject sql`…`.
+				const options = c.isUnionType() ? await c.getTypes() : [c];
+				return options.some((o) => (o.flags & ts.TypeFlags.String) !== 0);
 			}),
 		);
 		if (!checked.includes(true)) return undefined;

@@ -160,9 +160,20 @@ type SpliceArgs<E extends EngineTypes, DB, TM, Q extends string, S> =
 				: readonly unknown[]
 			: readonly unknown[];
 
-export type GateCallCheck<E extends EngineTypes, DB, TM, Q extends string> = [
-	Q,
-] extends [infer Q2 extends string]
+/**
+ * sql`…` hands the call a TemplateStringsArray, whose text types cannot read.
+ * Not an alias of SqlError: diagnostics would name it instead of the message.
+ */
+type TaggedTemplateMessage =
+	"call sql(`…`) with parentheses; sql`…` is not supported due to this issue: https://github.com/microsoft/TypeScript/issues/33304";
+
+/** `Q` is a TemplateStringsArray when sql is used as a template tag. */
+export type GateCallCheck<
+	E extends EngineTypes,
+	DB,
+	TM,
+	Q extends string | TemplateStringsArray,
+> = [Q] extends [infer Q2 extends string]
 	? Inlined<Q2> extends infer I
 		? [I] extends [null]
 			? InferredCheck<E, DB, TM, Q2>
@@ -182,15 +193,18 @@ export type GateCallCheck<E extends EngineTypes, DB, TM, Q extends string> = [
 						: never
 					: never
 		: never
-	: never;
+	: SqlError<TaggedTemplateMessage, null>;
 
 type InferredCheck<E extends EngineTypes, DB, TM, Q extends string> = Surface<
 	SpliceCheck<E, DB, TM, Q, null>
 >;
 
-export type BoxCallArgs<E extends EngineTypes, DB, TM, Q extends string> = [
-	Q,
-] extends [infer Q2 extends string]
+export type BoxCallArgs<
+	E extends EngineTypes,
+	DB,
+	TM,
+	Q extends string | TemplateStringsArray,
+> = [Q] extends [infer Q2 extends string]
 	? Inlined<Q2> extends infer I
 		? [I] extends [null]
 			? Extract<
@@ -206,7 +220,7 @@ export type BoxCallArgs<E extends EngineTypes, DB, TM, Q extends string> = [
 						>
 					: never
 		: never
-	: never;
+	: readonly unknown[];
 
 /** The text sql() types: interpolated fragments spliced in. */
 type CallText<Q extends string, L extends Lexis> = [Q] extends [
@@ -229,8 +243,18 @@ export type CallRet<
 	E extends EngineTypes,
 	DB,
 	TM,
-	Q extends string,
+	Q extends string | TemplateStringsArray,
 	Plugins extends readonly SqlPlugin[] = [],
+> = [Q] extends [infer Q2 extends string]
+	? CallQuery<E, DB, TM, Q2, Plugins>
+	: SqlError<TaggedTemplateMessage, null>;
+
+type CallQuery<
+	E extends EngineTypes,
+	DB,
+	TM,
+	Q extends string,
+	Plugins extends readonly SqlPlugin[],
 > = [CallText<Q, E["lexis"]>] extends [infer X extends string]
 	? Query<
 			PluginOutput<RowOf<E, DB, TM, X>, Plugins>,
