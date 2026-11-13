@@ -1,5 +1,18 @@
 # @typesql/cli
 
+## 7.7.1
+
+### Patch Changes
+
+- `typesql format` finds the SQL of `sql()` calls with the `@typesql/core` release that rejects `` sql`…` ``, whose `sql()` type also admits a template tag's strings.
+
+- Updated dependencies:
+  - @typesql/core@7.7.1
+  - @typesql/language-server@1.4.1
+  - @typesql/mysql@7.7.1
+  - @typesql/pg@7.7.1
+  - @typesql/sqlite@7.7.1
+
 ## 7.7.0
 
 ### Patch Changes

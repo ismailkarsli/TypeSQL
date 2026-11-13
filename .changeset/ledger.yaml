@@ -84,6 +84,10 @@
   dir: packages/cli
   intents:
     - great-trees-grow
+"@typesql/cli@7.7.1":
+  dir: packages/cli
+  intents:
+    - sharp-dogs-jump
 "@typesql/core@0.0.2":
   dir: packages/core
   intents:
@@ -520,6 +524,10 @@
   dir: packages/core
   intents:
     - weak-bears-raise
+"@typesql/core@7.7.1":
+  dir: packages/core
+  intents:
+    - soft-ducks-roll
 "@typesql/drizzle@0.0.2":
   dir: packages/drizzle
   intents:
