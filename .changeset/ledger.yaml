@@ -528,6 +528,10 @@
   dir: packages/core
   intents:
     - soft-ducks-roll
+"@typesql/core@8.0.0":
+  dir: packages/core
+  intents:
+    - sweet-wolves-return
 "@typesql/drizzle@0.0.2":
   dir: packages/drizzle
   intents:
@@ -631,6 +635,10 @@
   dir: packages/drizzle
   intents:
     - kind-hairs-try
+"@typesql/drizzle@8.0.0":
+  dir: packages/drizzle
+  intents:
+    - curvy-rats-shave
 "@typesql/kysely@0.0.2":
   dir: packages/kysely
   intents:
@@ -737,6 +745,10 @@
   dir: packages/kysely
   intents:
     - ancient-tools-unite
+"@typesql/kysely@8.0.0":
+  dir: packages/kysely
+  intents:
+    - famous-icons-film
 "@typesql/language-server@0.0.1":
   dir: packages/language-server
   intents:
@@ -843,6 +855,10 @@
   dir: packages/mysql
   intents:
     - kind-hairs-try
+"@typesql/mysql@8.0.0":
+  dir: packages/mysql
+  intents:
+    - smooth-snails-greet
 "@typesql/pg@0.0.2":
   dir: packages/pg
   intents:
@@ -977,6 +993,10 @@
   dir: packages/pg
   intents:
     - kind-queens-shave
+"@typesql/pg@8.0.0":
+  dir: packages/pg
+  intents:
+    - little-teeth-bake
 "@typesql/postgres@0.0.2":
   dir: packages/postgres
   intents:
@@ -1085,6 +1105,10 @@
   dir: packages/postgres
   intents:
     - kind-hairs-try
+"@typesql/postgres@8.0.0":
+  dir: packages/postgres
+  intents:
+    - pretty-onions-learn
 "@typesql/prisma@0.0.2":
   dir: packages/prisma
   intents:
@@ -1193,6 +1217,10 @@
     - fair-trees-share
     - real-mice-invent
     - young-roses-sniff
+"@typesql/prisma@8.0.0":
+  dir: packages/prisma
+  intents:
+    - wide-bears-destroy
 "@typesql/sqlite@0.0.1":
   dir: packages/sqlite
   intents:
@@ -1263,6 +1291,10 @@
   dir: packages/sqlite
   intents:
     - kind-hairs-try
+"@typesql/sqlite@8.0.0":
+  dir: packages/sqlite
+  intents:
+    - warm-socks-count
 typesql@0.0.1:
   dir: packages/vscode
   intents:

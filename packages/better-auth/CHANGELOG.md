@@ -1,5 +1,12 @@
 # @typesql/better-auth
 
+## 8.0.0
+
+### Patch Changes
+
+- Updated dependencies:
+  - @typesql/core@8.0.0
+
 ## 7.7.1
 
 ## 7.7.0
