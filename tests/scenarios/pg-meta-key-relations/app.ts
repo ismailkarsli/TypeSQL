@@ -1,12 +1,12 @@
 import { createSql, type RowType } from "@typesql/core";
-import { type Col, postgres, type Sig } from "@typesql/core/postgres";
+import { type Col, postgresDialect, type Sig } from "@typesql/core/postgres";
 
 interface DB {
 	t: { id: Col<"int4"> };
 	$types: { mood: "happy" | "sad" };
 	$functions: { slugify: Sig<["text"], "text"> };
 }
-const sql = createSql<DB>(postgres);
+const sql = createSql<DB>(postgresDialect);
 
 const rows = sql("SELECT id FROM t");
 export type Rows = RowType<typeof rows>;

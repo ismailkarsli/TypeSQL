@@ -33,7 +33,7 @@ declare module "../create-sql.js" {
 	}
 }
 
-export const postgres: PostgresDialect = {
+export const postgresDialect: PostgresDialect = {
 	name: "postgres",
 	// E'' strings take backslash escapes, block comments nest, and $tag$
 	// quotes a string up to the same tag. `$` belongs to a name after its

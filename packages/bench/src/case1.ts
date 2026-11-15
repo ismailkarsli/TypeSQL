@@ -6,7 +6,7 @@ import {
 	type View,
 	type DefaultTypeMap,
 	type PgCatalog,
-	postgres,
+	postgresDialect,
 	type Sig,
 } from "@typesql/core/postgres";
 
@@ -988,7 +988,7 @@ interface TypeMap
 	timestamp: string;
 	timestamptz: string;
 }
-const sql = createSql<DB & PgCatalog, TypeMap>(postgres).withPlugin(
+const sql = createSql<DB & PgCatalog, TypeMap>(postgresDialect).withPlugin(
 	new CasePlugin(),
 );
 

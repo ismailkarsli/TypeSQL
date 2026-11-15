@@ -1,5 +1,5 @@
 import type { Executor } from "../../query.js";
-import { sqlite as sql } from "../../sqlite/dialect.js";
+import { sqliteDialect as sql } from "../../sqlite/dialect.js";
 import type { DefaultTypeMap } from "../../sqlite/type-map/index.js";
 import {
 	type MigratorDialect,

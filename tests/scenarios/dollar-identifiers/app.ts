@@ -1,6 +1,6 @@
 import { DatabaseSync } from "node:sqlite";
 import { createSql as createCoreSql } from "@typesql/core";
-import { mysql } from "@typesql/core/mysql";
+import { mysqlDialect } from "@typesql/core/mysql";
 import { createSql } from "@typesql/pg";
 import { createSql as createSqliteSql } from "@typesql/sqlite";
 import { Pool } from "pg";
@@ -41,7 +41,7 @@ const sqliteQuery = sqlite.as<{ x$1: number; p: number }>(
 console.log(sqliteQuery.text, sqliteQuery.values);
 console.log(await sqliteQuery.executeTakeFirstOrThrow());
 
-const my = createCoreSql<DB>(mysql);
+const my = createCoreSql<DB>(mysqlDialect);
 const myQuery = my.as<{ x$1: number; p: number }>(
 	`SELECT 3 AS x$1, ${my.param(4)} AS p`,
 );

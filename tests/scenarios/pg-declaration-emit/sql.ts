@@ -1,7 +1,11 @@
 import type { IdentityPluginTypes, SqlPlugin } from "@typesql/core";
 import { createTransactionalSql, runTransaction } from "@typesql/core/adapter";
 import { CasePlugin } from "@typesql/core/plugins";
-import { type Col, type Postgres, postgres } from "@typesql/core/postgres";
+import {
+	type Col,
+	type Postgres,
+	postgresDialect,
+} from "@typesql/core/postgres";
 import { executor, type PgTypeMap } from "@typesql/pg";
 import pg from "pg";
 
@@ -44,7 +48,7 @@ export const client = new pg.Client({
 });
 
 export const sql = createTransactionalSql<Postgres, DB, TypeMap, pg.Client>(
-	postgres,
+	postgresDialect,
 	client,
 	{
 		executor,

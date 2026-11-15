@@ -1,5 +1,9 @@
 import { createSql } from "@typesql/core";
-import { type DefaultTypeMap, type Json, sqlite } from "@typesql/core/sqlite";
+import {
+	type DefaultTypeMap,
+	type Json,
+	sqliteDialect,
+} from "@typesql/core/sqlite";
 
 interface DB {
 	posts: {
@@ -8,7 +12,7 @@ interface DB {
 	};
 }
 // SQLite drivers return JSON as text, which the default map says.
-const text = createSql<DB>(sqlite)("SELECT meta, extra FROM posts");
+const text = createSql<DB>(sqliteDialect)("SELECT meta, extra FROM posts");
 export type Text = Awaited<ReturnType<typeof text.execute>>;
 
 // An executor that returns JSON parsed says so in its map; a typed JSON
@@ -16,7 +20,7 @@ export type Text = Awaited<ReturnType<typeof text.execute>>;
 interface ParsedJsonTypeMap extends Omit<DefaultTypeMap, "json"> {
 	json: unknown;
 }
-const parsed = createSql<DB, ParsedJsonTypeMap>(sqlite)(
+const parsed = createSql<DB, ParsedJsonTypeMap>(sqliteDialect)(
 	"SELECT meta, extra FROM posts",
 );
 export type Parsed = Awaited<ReturnType<typeof parsed.execute>>;

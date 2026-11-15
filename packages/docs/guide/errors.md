@@ -98,27 +98,27 @@ Any of these fixes it:
 
   ```ts [PostgreSQL]
   import { createSql } from "@typesql/core";
-  import { postgres } from "@typesql/core/postgres";
+  import { postgresDialect } from "@typesql/core/postgres";
 
-  export const sql = createSql<DB>(postgres, executor);
+  export const sql = createSql<DB>(postgresDialect, executor);
   export type * from "@typesql/core";
   export type * from "@typesql/core/postgres";
   ```
 
   ```ts [SQLite]
   import { createSql } from "@typesql/core";
-  import { sqlite } from "@typesql/core/sqlite";
+  import { sqliteDialect } from "@typesql/core/sqlite";
 
-  export const sql = createSql<DB>(sqlite, executor);
+  export const sql = createSql<DB>(sqliteDialect, executor);
   export type * from "@typesql/core";
   export type * from "@typesql/core/sqlite";
   ```
 
   ```ts [MySQL]
   import { createSql } from "@typesql/core";
-  import { mysql } from "@typesql/core/mysql";
+  import { mysqlDialect } from "@typesql/core/mysql";
 
-  export const sql = createSql<DB>(mysql, executor);
+  export const sql = createSql<DB>(mysqlDialect, executor);
   export type * from "@typesql/core";
   export type * from "@typesql/core/mysql";
   ```

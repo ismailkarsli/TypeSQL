@@ -6,7 +6,7 @@ await client.unsafe(
 	"CREATE TABLE users (id serial PRIMARY KEY, display_name text NOT NULL, bio text)",
 );
 
-import { postgres } from "@typesql/core/postgres";
+import { postgresDialect } from "@typesql/core/postgres";
 import { createSql } from "@typesql/drizzle";
 import { pgTable, serial, text } from "drizzle-orm/pg-core";
 
@@ -17,7 +17,7 @@ const users = pgTable("users", {
 });
 const db = drizzle(client, { schema: { users } });
 await db.insert(users).values({ displayName: "Ada", bio: null });
-const sql = createSql(postgres, db);
+const sql = createSql(postgresDialect, db);
 export const rows = await sql(
 	"SELECT id, display_name, bio FROM users ORDER BY id",
 ).execute();

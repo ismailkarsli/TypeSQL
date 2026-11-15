@@ -8,16 +8,16 @@ An executor is the function a query runs on. The adapters build one from your dr
 
 ## Build queries without a client
 
-`createSql<DB>(postgres)` from `@typesql/core` takes no client. Its queries are plain data, `{ text, values }` with the types attached, so you can run them however you like:
+`createSql<DB>(postgresDialect)` from `@typesql/core` takes no client. Its queries are plain data, `{ text, values }` with the types attached, so you can run them however you like:
 
 ```ts
 import { createSql } from "@typesql/core";
 import { mapRows } from "@typesql/core/adapter";
-import { postgres } from "@typesql/core/postgres";
+import { postgresDialect } from "@typesql/core/postgres";
 import pg from "pg";
 
 const pool = new pg.Pool();
-const sql = createSql<DB>(postgres);
+const sql = createSql<DB>(postgresDialect);
 
 const q = sql(`SELECT id, email FROM users WHERE id = ${sql.param(7)}`);
 q.text;
@@ -62,7 +62,7 @@ const onPool: Executor = async (text, values) => {
 	return { rows: result.rows, rowCount: result.rowCount };
 };
 
-const db = createSql<DB>(postgres, onPool);
+const db = createSql<DB>(postgresDialect, onPool);
 const users = await db("SELECT id FROM users").execute();
 const changed = await db(
 	`DELETE FROM posts WHERE author_id = ${db.param(7)}`,
@@ -77,7 +77,7 @@ A wrapper around an adapter's executor can return its result unchanged, so the c
 
 ```ts
 import { createSql as createCoreSql, type Executor } from "@typesql/core";
-import { postgres } from "@typesql/core/postgres";
+import { postgresDialect } from "@typesql/core/postgres";
 import { executor, type PgTypeMap } from "@typesql/pg";
 
 const onPool = executor(pool);
@@ -89,7 +89,7 @@ const logged: Executor = async (text, values) => {
 		console.debug(`${Math.round(performance.now() - started)} ms`, text);
 	}
 };
-const sqlLogged = createCoreSql<DB, PgTypeMap>(postgres, logged);
+const sqlLogged = createCoreSql<DB, PgTypeMap>(postgresDialect, logged);
 ```
 
 ## Change the rows
@@ -98,8 +98,8 @@ The row types describe what the driver returns, and `execute*` returns the execu
 
 Pick the narrowest fix:
 
-1. **camelCase keys.** Use [`CasePlugin`](../guide/case-plugin) and keep the executor plain. With Kysely, use `@typesql/kysely`'s `createSql(postgres, db).withPlugin(new CasePlugin())` or `executor(db)`, which bypass plugins, instead of an executor that runs `CamelCasePlugin`.
-2. **Different value types** from your driver's parsers (say, `timestamptz` parsed to a string). Use a [type map](../reference/type-mapping#custom-type-maps) that says so: `createSql<DB, MyTypeMap>(postgres, executor)`.
+1. **camelCase keys.** Use [`CasePlugin`](../guide/case-plugin) and keep the executor plain. With Kysely, use `@typesql/kysely`'s `createSql(postgresDialect, db).withPlugin(new CasePlugin())` or `executor(db)`, which bypass plugins, instead of an executor that runs `CamelCasePlugin`.
+2. **Different value types** from your driver's parsers (say, `timestamptz` parsed to a string). Use a [type map](../reference/type-mapping#custom-type-maps) that says so: `createSql<DB, MyTypeMap>(postgresDialect, executor)`.
 3. **Anything else.** Keep the executor plain and transform the rows in a typed helper built on `RowType<Q>`:
 
 ```ts

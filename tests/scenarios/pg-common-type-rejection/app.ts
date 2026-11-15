@@ -1,5 +1,5 @@
 import { createSql, type RowType } from "@typesql/core";
-import { type Col, postgres } from "@typesql/core/postgres";
+import { type Col, postgresDialect } from "@typesql/core/postgres";
 
 interface DB {
 	t: {
@@ -12,7 +12,7 @@ interface DB {
 	};
 	u: { o: Col<"regclass"> };
 }
-const sql = createSql<DB>(postgres);
+const sql = createSql<DB>(postgresDialect);
 
 // Of two types that convert to each other, the first one is kept.
 const kept = sql(

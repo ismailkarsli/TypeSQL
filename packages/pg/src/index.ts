@@ -2,7 +2,7 @@ import type { SqlPlugin } from "@typesql/core";
 import { createTransactionalSql } from "@typesql/core/adapter";
 import {
 	type Postgres,
-	postgres,
+	postgresDialect,
 	type TransactionalSql,
 } from "@typesql/core/postgres";
 import { driver, type PgQueryable } from "./client.js";
@@ -33,7 +33,7 @@ export function createSql<DB, TM = PgTypeMap>(
 	client?: PgQueryable,
 ): PgSql<DB, [], TM> {
 	return createTransactionalSql<Postgres, DB, TM, PgQueryable>(
-		postgres,
+		postgresDialect,
 		client,
 		driver,
 	);

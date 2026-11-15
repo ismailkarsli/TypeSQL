@@ -1,5 +1,5 @@
 import { connect } from "@tidbcloud/serverless";
-import { mysql } from "@typesql/core/mysql";
+import { mysqlDialect } from "@typesql/core/mysql";
 import { createSql } from "@typesql/drizzle";
 import { drizzle } from "drizzle-orm/tidb-serverless";
 
@@ -15,7 +15,7 @@ const client = connect({
 		);
 	},
 });
-const sql = createSql(mysql, drizzle({ client }));
+const sql = createSql(mysqlDialect, drizzle({ client }));
 
 // A `?` in a string is text, whichever side of a parameter it is on.
 await sql("SELECT 'why?' AS note, $1 AS id", 7).execute();

@@ -1,4 +1,4 @@
-import { mysql } from "@typesql/core/mysql";
+import { mysqlDialect } from "@typesql/core/mysql";
 import { createSql } from "@typesql/drizzle";
 import { int, mysqlTable, text, varchar } from "drizzle-orm/mysql-core";
 import { drizzle } from "drizzle-orm/mysql2";
@@ -15,7 +15,7 @@ const users = mysqlTable("users", {
 });
 const db = drizzle({ client, schema: { users }, mode: "default" });
 await db.insert(users).values({ displayName: "Ada", bio: null });
-const sql = createSql(mysql, db);
+const sql = createSql(mysqlDialect, db);
 export const rows = await sql(
 	"SELECT id, display_name, bio FROM users ORDER BY id",
 ).execute();

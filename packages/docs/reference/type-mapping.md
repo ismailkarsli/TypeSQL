@@ -6,7 +6,7 @@ description: "How TypeSQL maps PostgreSQL, SQLite, MySQL and MariaDB types to Ty
 
 Your schema uses the database's type names (in PostgreSQL, `int8`, `timestamptz`). A **type map** says which TypeScript type each one becomes. This page lists the maps for each driver, what parameters accept, and how to write your own map.
 
-Each adapter's `createSql` picks the map that matches its driver. `createSql` from `@typesql/core` with the `postgres` dialect uses `DefaultTypeMap`, which matches node-postgres. A migration's `db` reads rows as the migrator's own connection returns them: `NodePostgresTypeMap` (node-postgres, with `bytea` as `Uint8Array`), mysql2's `DefaultTypeMap` and `Mysql2MariaDbTypeMap`, and SQLite's `DefaultTypeMap`.
+Each adapter's `createSql` picks the map that matches its driver. `createSql` from `@typesql/core` with `postgresDialect` uses `DefaultTypeMap`, which matches node-postgres. A migration's `db` reads rows as the migrator's own connection returns them: `NodePostgresTypeMap` (node-postgres, with `bytea` as `Uint8Array`), mysql2's `DefaultTypeMap` and `Mysql2MariaDbTypeMap`, and SQLite's `DefaultTypeMap`.
 
 ## At a glance
 
@@ -125,7 +125,7 @@ Prisma throws "Unsupported column type" for other types (`interval`, geometric t
 
 ## SQLite
 
-`DefaultTypeMap` of `@typesql/core/sqlite`, used by `@typesql/sqlite` and by `createSql(sqlite)`. node:sqlite, better-sqlite3 and bun:sqlite return the same JavaScript values for values that fit (better-sqlite3 returns blobs as `Buffer`, a subclass of `Uint8Array`). Integers beyond `Number.MAX_SAFE_INTEGER` make node:sqlite throw and lose precision on the other two, unless you read them as `bigint`:
+`DefaultTypeMap` of `@typesql/core/sqlite`, used by `@typesql/sqlite` and by `createSql(sqliteDialect)`. node:sqlite, better-sqlite3 and bun:sqlite return the same JavaScript values for values that fit (better-sqlite3 returns blobs as `Buffer`, a subclass of `Uint8Array`). Integers beyond `Number.MAX_SAFE_INTEGER` make node:sqlite throw and lose precision on the other two, unless you read them as `bigint`:
 
 | SQLite type | TypeScript |
 |---|---|
@@ -143,7 +143,7 @@ Parameters accept the map's type and, through `DefaultParamTypeMap`, `bigint` fo
 
 ### Prisma on SQLite
 
-`PrismaSqliteTypeMap`, the map of `@typesql/prisma` with `sqlite`. It describes what `$queryRaw` returns through Prisma's SQLite adapters, which convert by declared column type:
+`PrismaSqliteTypeMap`, the map of `@typesql/prisma` with `sqliteDialect`. It describes what `$queryRaw` returns through Prisma's SQLite adapters, which convert by declared column type:
 
 | SQLite type | TypeScript |
 |---|---|
@@ -160,7 +160,7 @@ Parameters also accept `number` for `bigint`, `number | string` for `decimal`, `
 
 ## MySQL and MariaDB
 
-The maps of `@typesql/core/mysql`. `DefaultTypeMap` matches mysql2 and is used by `@typesql/mysql` and by `createSql(mysql)`; `Mysql2MariaDbTypeMap`, for mysql2 on MariaDB, is the same map. `MariaDbTypeMap` matches the mariadb connector (`@typesql/mysql/mariadb`, `createSql(mariadb)`), and `ServerlessTypeMap` the PlanetScale and TiDB Cloud drivers (`@typesql/mysql/planetscale`, `@typesql/mysql/tidb`):
+The maps of `@typesql/core/mysql`. `DefaultTypeMap` matches mysql2 and is used by `@typesql/mysql` and by `createSql(mysqlDialect)`; `Mysql2MariaDbTypeMap`, for mysql2 on MariaDB, is the same map. `MariaDbTypeMap` matches the mariadb connector (`@typesql/mysql/mariadb`, `createSql(mariadbDialect)`), and `ServerlessTypeMap` the PlanetScale and TiDB Cloud drivers (`@typesql/mysql/planetscale`, `@typesql/mysql/tidb`):
 
 | MySQL type | `DefaultTypeMap` (mysql2) | `MariaDbTypeMap` | `ServerlessTypeMap` |
 |---|---|---|---|
@@ -183,7 +183,7 @@ Parameters accept the map's type and, through `DefaultParamTypeMap`, `number | b
 
 ### Prisma on MySQL
 
-`PrismaMysqlTypeMap`, the map of `@typesql/prisma` with `mysql` or `mariadb`. It describes what `$queryRaw` returns through Prisma's MySQL adapter:
+`PrismaMysqlTypeMap`, the map of `@typesql/prisma` with `mysqlDialect` or `mariadbDialect`. It describes what `$queryRaw` returns through Prisma's MySQL adapter:
 
 | MySQL type | TypeScript |
 |---|---|
@@ -225,7 +225,7 @@ interface AppMap extends Omit<DefaultTypeMap, "timestamptz"> {
 	timestamptz: string;
 	$params: AppParams;
 }
-const app = createSql<DB, AppMap>(postgres);
+const app = createSql<DB, AppMap>(postgresDialect);
 const recent = app(
 	`SELECT id, created_at FROM users WHERE created_at > ${app.param(new Date())}`,
 );
@@ -237,14 +237,14 @@ A type map is any object type from the database's type names to TypeScript types
 
 ```ts
 import { createSql } from "@typesql/core";
-import { type DefaultTypeMap, postgres } from "@typesql/core/postgres";
+import { type DefaultTypeMap, postgresDialect } from "@typesql/core/postgres";
 
 interface MyMap extends Omit<DefaultTypeMap, "int8"> {
 	int8: number;
 	"int8[]": number[];
 }
-const sql = createSql<DB, MyMap>(postgres);
-// Bind it to a client with createSql<DB, MyMap>(postgres, executor(client)).
+const sql = createSql<DB, MyMap>(postgresDialect);
+// Bind it to a client with createSql<DB, MyMap>(postgresDialect, executor(client)).
 const counts = sql(
 	"SELECT author_id, count(*) AS n FROM posts GROUP BY author_id",
 );

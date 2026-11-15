@@ -25,10 +25,10 @@ Every `prisma generate` then writes a `DB` type with the database's own table an
 
 ```ts
 import { createSql } from "@typesql/prisma";
-import { postgres } from "@typesql/core/postgres";
+import { postgresDialect } from "@typesql/core/postgres";
 import type { DB } from "./db/typesql";
 
-const sql = createSql<DB>(postgres, prisma);
+const sql = createSql<DB>(postgresDialect, prisma);
 
 const users = await sql(`SELECT id, display_name FROM users WHERE email = ${sql.param(email)}`).execute();
 
@@ -41,15 +41,15 @@ Good to know:
 
 - Rows are typed the way Prisma's raw queries return them: `int8` (so `count(*)`) is `bigint`, `numeric` is `Decimal`.
 - `uuid()`, `cuid()`, `nanoid()`, `ulid()` and `@updatedAt` are filled in by Prisma Client, not the database, so a SQL `INSERT` must set them.
-- Without the generator, `createSql(postgres, prisma)` reads the types Prisma Client already generates. They don't record `@map` names or native types, so you may need overrides.
+- Without the generator, `createSql(postgresDialect, prisma)` reads the types Prisma Client already generates. They don't record `@map` names or native types, so you may need overrides.
 
 ## SQLite
 
-For a SQLite database, pass `sqlite` from `@typesql/core/sqlite` instead: `createSql(sqlite, db)`. The schema is converted to SQLite types; see [SQLite](https://typesql.karsli.net/guide/orms#sqlite).
+For a SQLite database, pass `sqliteDialect` from `@typesql/core/sqlite` instead: `createSql(sqliteDialect, db)`. The schema is converted to SQLite types; see [SQLite](https://typesql.karsli.net/guide/orms#sqlite).
 
 ## MySQL and MariaDB
 
-For the `mysql` provider, with Prisma Client on `@prisma/adapter-mariadb`, pass `mysql` (or `mariadb`) from `@typesql/core/mysql`: `createSql<DB>(mysql, prisma)`. The generator writes MySQL types, and rows are typed the way Prisma's MySQL adapter returns them: `BIGINT` and `INT UNSIGNED` are `bigint`, `DECIMAL` is `Decimal`, `TIME` is a `Date` and `Boolean` columns are numbers. See [MySQL and MariaDB](https://typesql.karsli.net/guide/orms#mysql).
+For the `mysql` provider, with Prisma Client on `@prisma/adapter-mariadb`, pass `mysqlDialect` (or `mariadbDialect`) from `@typesql/core/mysql`: `createSql<DB>(mysqlDialect, prisma)`. The generator writes MySQL types, and rows are typed the way Prisma's MySQL adapter returns them: `BIGINT` and `INT UNSIGNED` are `bigint`, `DECIMAL` is `Decimal`, `TIME` is a `Date` and `Boolean` columns are numbers. See [MySQL and MariaDB](https://typesql.karsli.net/guide/orms#mysql).
 
 ## Documentation
 

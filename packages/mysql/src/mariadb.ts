@@ -11,8 +11,8 @@ import {
 	type MariaDbTransactionalSql,
 	type MariaDbTypeMap,
 	type MySql,
-	mariadb,
-	mysql,
+	mariadbDialect,
+	mysqlDialect,
 	type TransactionalSql,
 } from "@typesql/core/mysql";
 import {
@@ -71,12 +71,12 @@ export function createSql<DB, TM>(
 ): MySqlSql<DB, TM> | MariaDbSql<DB, TM> {
 	return options?.dialect === "mysql"
 		? createTransactionalSql<MySql, DB, TM, MariaDbQueryable>(
-				mysql,
+				mysqlDialect,
 				client,
 				driver,
 			)
 		: createTransactionalSql<MariaDb, DB, TM, MariaDbQueryable>(
-				mariadb,
+				mariadbDialect,
 				client,
 				driver,
 			);

@@ -1,6 +1,6 @@
 import { createSql, type ParamsType, type RowType } from "@typesql/core";
-import { type Col, postgres } from "@typesql/core/postgres";
-import { type Col as SqliteCol, sqlite } from "@typesql/core/sqlite";
+import { type Col, postgresDialect } from "@typesql/core/postgres";
+import { type Col as SqliteCol, sqliteDialect } from "@typesql/core/sqlite";
 
 interface PgDB {
 	users: {
@@ -23,8 +23,8 @@ interface SqliteDB {
 	};
 }
 
-const pg = createSql<PgDB>(postgres);
-const lite = createSql<SqliteDB>(sqlite);
+const pg = createSql<PgDB>(postgresDialect);
+const lite = createSql<SqliteDB>(sqliteDialect);
 
 const authors = pg(
 	`SELECT u.id, u.email, u.display_name, p.title

@@ -1,5 +1,5 @@
 import { createSql } from "@typesql/core";
-import { type Col, type Json, mysql } from "@typesql/core/mysql";
+import { type Col, type Json, mysqlDialect } from "@typesql/core/mysql";
 
 interface DB {
 	posts: {
@@ -8,7 +8,7 @@ interface DB {
 		meta: Json<{ theme: string }, { nullable: true }>;
 	};
 }
-const sql = createSql<DB>(mysql);
+const sql = createSql<DB>(mysqlDialect);
 const meta = { theme: "dark" };
 
 // MySQL drivers bind JSON as text: sql.json() writes it, a plain object

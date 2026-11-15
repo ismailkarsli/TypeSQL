@@ -1,4 +1,4 @@
-import { sqlite } from "@typesql/core/sqlite";
+import { sqliteDialect } from "@typesql/core/sqlite";
 import { createSql } from "@typesql/kysely";
 import Database from "better-sqlite3";
 import { type Generated, Kysely, SqliteDialect } from "kysely";
@@ -28,7 +28,7 @@ await db
 	.values({ user_id: 1, note: null })
 	.execute();
 
-const sql = createSql(sqlite, db);
+const sql = createSql(sqliteDialect, db);
 export const inserted = await sql(
 	"INSERT INTO archive.events (user_id, note) VALUES ($1, $2)",
 	1,

@@ -11,7 +11,7 @@ description: "Rename row and write keys between camelCase and snake_case with Ty
 ```ts [PostgreSQL]
 import { CasePlugin } from "@typesql/core/plugins";
 
-const camel = createSql<DB>(postgres, executor).withPlugin(new CasePlugin());
+const camel = createSql<DB>(postgresDialect, executor).withPlugin(new CasePlugin());
 
 const rows = await camel(
 	"SELECT id, display_name, created_at, count(*) OVER () AS total_count FROM users",
@@ -21,7 +21,7 @@ const rows = await camel(
 ```ts [SQLite]
 import { CasePlugin } from "@typesql/core/plugins";
 
-const camel = createSql<DB>(sqlite, executor).withPlugin(new CasePlugin());
+const camel = createSql<DB>(sqliteDialect, executor).withPlugin(new CasePlugin());
 
 const rows = await camel(
 	"SELECT id, display_name, created_at, count(*) OVER () AS total_count FROM users",
@@ -31,7 +31,7 @@ const rows = await camel(
 ```ts [MySQL]
 import { CasePlugin } from "@typesql/core/plugins";
 
-const camel = createSql<DB>(mysql, executor).withPlugin(new CasePlugin());
+const camel = createSql<DB>(mysqlDialect, executor).withPlugin(new CasePlugin());
 
 const rows = await camel(
 	"SELECT id, display_name, created_at, count(*) OVER () AS total_count FROM users",

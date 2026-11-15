@@ -6,7 +6,7 @@ client.exec(
 	"CREATE TABLE users (id integer PRIMARY KEY, display_name text NOT NULL, bio text)",
 );
 
-import { sqlite } from "@typesql/core/sqlite";
+import { sqliteDialect } from "@typesql/core/sqlite";
 import { createSql } from "@typesql/drizzle";
 import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
@@ -17,7 +17,7 @@ const users = sqliteTable("users", {
 });
 const db = drizzle(client, { schema: { users } });
 await db.insert(users).values({ displayName: "Ada", bio: null });
-const sql = createSql(sqlite, db);
+const sql = createSql(sqliteDialect, db);
 export const rows = await sql(
 	"SELECT id, display_name, bio FROM users ORDER BY id",
 ).execute();

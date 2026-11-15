@@ -1,5 +1,5 @@
 import { PrismaPg } from "@prisma/adapter-pg";
-import { postgres } from "@typesql/core/postgres";
+import { postgresDialect } from "@typesql/core/postgres";
 import { createSql } from "@typesql/prisma";
 import { PrismaClient } from "./generated/client/client.js";
 
@@ -8,9 +8,9 @@ const client = new PrismaClient({ adapter });
 
 import type { DB } from "./generated/schema.js";
 
-const sql = createSql<DB>(postgres, client);
+const sql = createSql<DB>(postgresDialect, client);
 // Without a generated schema, the Prisma client's models are the tables.
-const fromClient = createSql(postgres, client);
+const fromClient = createSql(postgresDialect, client);
 await client.user.create({ data: { name: "Ada" } });
 await client.author.create({ data: { name: "Ada" } });
 export const rows = await sql(

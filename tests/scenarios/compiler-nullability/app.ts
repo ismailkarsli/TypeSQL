@@ -1,5 +1,5 @@
 import { createSql } from "@typesql/core";
-import { type Col, postgres } from "@typesql/core/postgres";
+import { type Col, postgresDialect } from "@typesql/core/postgres";
 
 interface DB {
 	users: {
@@ -8,7 +8,7 @@ interface DB {
 		bio: Col<"text", { nullable: true }>;
 	};
 }
-const sql = createSql<DB>(postgres);
+const sql = createSql<DB>(postgresDialect);
 sql("INSERT INTO users (id, name) VALUES ($1, $2)", 1, null);
 sql("INSERT INTO users (id) VALUES ($1)", 1);
 sql(`UPDATE users SET name = ${sql.param(null)}`);

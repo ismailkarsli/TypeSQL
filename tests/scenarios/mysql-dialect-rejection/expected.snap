@@ -21,7 +21,7 @@ exports[`mysql-dialect-rejection > scenario 1`] = `
         ],
         "expression": ""SELECT emial FROM users"",
         "file": "app.ts",
-        "line": 14,
+        "line": 19,
         "message": "Argument of type '"SELECT emial FROM users"' is not assignable to parameter of type 'SqlError<"Unknown column 'emial'. Perhaps you meant the column \\"email\\"?", 1> & "SELECT emial FROM users"'.",
       },
       {
@@ -37,7 +37,7 @@ exports[`mysql-dialect-rejection > scenario 1`] = `
         ],
         "expression": ""SELECT id FROM users WHERE id = ?"",
         "file": "app.ts",
-        "line": 15,
+        "line": 20,
         "message": "Argument of type '"SELECT id FROM users WHERE id = ?"' is not assignable to parameter of type 'SqlError<"TypeSQL parameters are written $1 or :name, not \\"?\\"", 7> & "SELECT id FROM users WHERE id = ?"'.",
       },
       {
@@ -53,7 +53,7 @@ exports[`mysql-dialect-rejection > scenario 1`] = `
         ],
         "expression": ""INSERT INTO users (id, email) VALUES ($1, $2) RETURNING id"",
         "file": "app.ts",
-        "line": 16,
+        "line": 21,
         "message": "Argument of type '"INSERT INTO users (id, email) VALUES ($1, $2) RETURNING id"' is not assignable to parameter of type 'SqlError<"You have an error in your SQL syntax near 'RETURNING'", 14> & "INSERT INTO users (id, email) VALUES ($1, $2) RETURNING id"'.",
       },
       {
@@ -69,7 +69,7 @@ exports[`mysql-dialect-rejection > scenario 1`] = `
         ],
         "expression": ""SELECT email, COUNT(*) FROM users"",
         "file": "app.ts",
-        "line": 17,
+        "line": 22,
         "message": "Argument of type '"SELECT email, COUNT(*) FROM users"' is not assignable to parameter of type 'SqlError<"In aggregated query without GROUP BY, expression #1 of SELECT list contains nonaggregated column 'email'; this is incompatible with sql_mode=only_full_group_by", 0> & "SELECT email, COUNT(*) FROM users"'.",
       },
       {
@@ -78,7 +78,7 @@ exports[`mysql-dialect-rejection > scenario 1`] = `
         "column": 47,
         "expression": ""wrong"",
         "file": "app.ts",
-        "line": 18,
+        "line": 23,
         "message": "Argument of type 'string' is not assignable to parameter of type 'number | bigint'.",
       },
       {
@@ -94,7 +94,7 @@ exports[`mysql-dialect-rejection > scenario 1`] = `
         ],
         "expression": ""SELECT settings -> '$.theme' AS theme FROM users"",
         "file": "app.ts",
-        "line": 20,
+        "line": 25,
         "message": "Argument of type '"SELECT settings -> '$.theme' AS theme FROM users"' is not assignable to parameter of type 'SqlError<"You have an error in your SQL syntax near '->'", 0> & "SELECT settings -> '$.theme' AS theme FROM users"'.",
       },
       {
@@ -110,7 +110,7 @@ exports[`mysql-dialect-rejection > scenario 1`] = `
         ],
         "expression": ""SELECT * FROM users AS u LATERAL"",
         "file": "app.ts",
-        "line": 21,
+        "line": 26,
         "message": "Argument of type '"SELECT * FROM users AS u LATERAL"' is not assignable to parameter of type 'SqlError<"You have an error in your SQL syntax near 'LATERAL'", 6> & "SELECT * FROM users AS u LATERAL"'.",
       },
     ],

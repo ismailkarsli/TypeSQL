@@ -1,10 +1,10 @@
 import { createSql, type RowType } from "@typesql/core";
-import { type Col, postgres } from "@typesql/core/postgres";
+import { type Col, postgresDialect } from "@typesql/core/postgres";
 
 interface DB {
 	t: { id: Col<"int4">; k: Col<"text"> };
 }
-const sql = createSql<DB>(postgres);
+const sql = createSql<DB>(postgresDialect);
 
 // A window reference inside the SQL-standard string syntaxes must exist.
 const named = sql(

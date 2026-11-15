@@ -1,5 +1,5 @@
 import { createSql, type RowType } from "@typesql/core";
-import { type Col, postgres, type Sig } from "@typesql/core/postgres";
+import { type Col, postgresDialect, type Sig } from "@typesql/core/postgres";
 
 type T = "text";
 interface DB {
@@ -9,7 +9,7 @@ interface DB {
 		pick9: Sig<[T, T, T, T, T, T, T, T, T], "text", { strict: [9] }>;
 	};
 }
-const sql = createSql<DB>(postgres);
+const sql = createSql<DB>(postgresDialect);
 
 const picked = sql(`
 	SELECT pick9(label, label, label, label, label, label, label, label, maybe) AS ninth_nullable,

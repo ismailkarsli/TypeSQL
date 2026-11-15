@@ -1,5 +1,5 @@
 import { PrismaMariaDb } from "@prisma/adapter-mariadb";
-import { mysql } from "@typesql/core/mysql";
+import { mysqlDialect } from "@typesql/core/mysql";
 import { createSql } from "@typesql/prisma";
 import { PrismaClient } from "./generated/client/client.js";
 
@@ -16,9 +16,9 @@ const client = new PrismaClient({ adapter });
 
 import type { DB } from "./generated/schema.js";
 
-const sql = createSql<DB>(mysql, client);
+const sql = createSql<DB>(mysqlDialect, client);
 // Without a generated schema, the Prisma client's models are the tables.
-const fromClient = createSql(mysql, client);
+const fromClient = createSql(mysqlDialect, client);
 await client.user.create({ data: { name: "Ada", big: 9007199254740993n } });
 await client.author.create({ data: { name: "Ada" } });
 export const rows = await sql(

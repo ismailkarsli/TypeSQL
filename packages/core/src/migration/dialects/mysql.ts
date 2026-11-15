@@ -1,6 +1,6 @@
 import {
-	mariadb as mariadbSql,
-	mysql as mysqlSql,
+	mariadbDialect as mariadbSql,
+	mysqlDialect as mysqlSql,
 } from "../../mysql/dialect.js";
 import type {
 	DefaultTypeMap,

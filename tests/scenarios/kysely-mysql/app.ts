@@ -1,4 +1,4 @@
-import { mysql } from "@typesql/core/mysql";
+import { mysqlDialect } from "@typesql/core/mysql";
 import { createSql } from "@typesql/kysely";
 import { type Generated, Kysely, MysqlDialect } from "kysely";
 import { createPool } from "mysql2";
@@ -15,7 +15,7 @@ await db.schema
 	.addColumn("name", "varchar(100)", (c) => c.notNull())
 	.addColumn("bio", "varchar(100)")
 	.execute();
-const sql = createSql(mysql, db);
+const sql = createSql(mysqlDialect, db);
 await db.insertInto("users").values({ name: "Ada", bio: null }).execute();
 export const rows = await sql(
 	"SELECT id, name, bio FROM users ORDER BY id",

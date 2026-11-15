@@ -21,7 +21,7 @@ exports[`pg-char-type > scenario 1`] = `
         ],
         "expression": ""SELECT upper(flag, 1) FROM t"",
         "file": "app.ts",
-        "line": 23,
+        "line": 27,
         "message": "Argument of type '"SELECT upper(flag, 1) FROM t"' is not assignable to parameter of type 'SqlError<"function upper(\\"char\\", integer) does not exist", 1> & "SELECT upper(flag, 1) FROM t"'.",
       },
       {
@@ -37,7 +37,7 @@ exports[`pg-char-type > scenario 1`] = `
         ],
         "expression": ""SELECT upper(code, 1) FROM t"",
         "file": "app.ts",
-        "line": 24,
+        "line": 28,
         "message": "Argument of type '"SELECT upper(code, 1) FROM t"' is not assignable to parameter of type 'SqlError<"function upper(character, integer) does not exist", 1> & "SELECT upper(code, 1) FROM t"'.",
       },
       {
@@ -53,7 +53,7 @@ exports[`pg-char-type > scenario 1`] = `
         ],
         "expression": ""SELECT upper(flag, 1) FROM t"",
         "file": "app.ts",
-        "line": 25,
+        "line": 29,
         "message": "Argument of type '"SELECT upper(flag, 1) FROM t"' is not assignable to parameter of type 'SqlError<"function upper(\\"char\\", integer) does not exist", 1> & "SELECT upper(flag, 1) FROM t"'.",
       },
       {
@@ -69,7 +69,7 @@ exports[`pg-char-type > scenario 1`] = `
         ],
         "expression": ""SELECT upper(code, 1) FROM t"",
         "file": "app.ts",
-        "line": 26,
+        "line": 30,
         "message": "Argument of type '"SELECT upper(code, 1) FROM t"' is not assignable to parameter of type 'SqlError<"function upper(character, integer) does not exist", 1> & "SELECT upper(code, 1) FROM t"'.",
       },
       {
@@ -85,7 +85,7 @@ exports[`pg-char-type > scenario 1`] = `
         ],
         "expression": "\`SELECT upper("char" 'a', 1)\`",
         "file": "app.ts",
-        "line": 27,
+        "line": 31,
         "message": "Argument of type '"SELECT upper(\\"char\\" 'a', 1)"' is not assignable to parameter of type 'SqlError<"function upper(\\"char\\", integer) does not exist", 1> & "SELECT upper(\\"char\\" 'a', 1)"'.",
       },
       {
@@ -101,7 +101,7 @@ exports[`pg-char-type > scenario 1`] = `
         ],
         "expression": ""SELECT upper(char 'a', 1)"",
         "file": "app.ts",
-        "line": 28,
+        "line": 32,
         "message": "Argument of type '"SELECT upper(char 'a', 1)"' is not assignable to parameter of type 'SqlError<"function upper(character, integer) does not exist", 1> & "SELECT upper(char 'a', 1)"'.",
       },
       {
@@ -117,7 +117,7 @@ exports[`pg-char-type > scenario 1`] = `
         ],
         "expression": "\`SELECT upper('a'::"char", 1)\`",
         "file": "app.ts",
-        "line": 29,
+        "line": 33,
         "message": "Argument of type '"SELECT upper('a'::\\"char\\", 1)"' is not assignable to parameter of type 'SqlError<"function upper(\\"char\\", integer) does not exist", 1> & "SELECT upper('a'::\\"char\\", 1)"'.",
       },
     ],

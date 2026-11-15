@@ -7,7 +7,7 @@ import {
 	type SqlPlugin,
 } from "@typesql/core";
 import { CasePlugin } from "@typesql/core/plugins";
-import { type Col, postgres } from "@typesql/core/postgres";
+import { type Col, postgresDialect } from "@typesql/core/postgres";
 
 type Envelope<T> = { data: T };
 
@@ -48,7 +48,7 @@ export class EnvelopePlugin implements SqlPlugin<EnvelopeTypes> {
 interface DB {
 	users: { id: Col<"int4">; display_name: Col<"text", { nullable: true }> };
 }
-const sql = createSql<DB>(postgres)
+const sql = createSql<DB>(postgresDialect)
 	.withPlugin(new CasePlugin())
 	.withPlugin(new EnvelopePlugin());
 

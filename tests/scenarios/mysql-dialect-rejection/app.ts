@@ -1,5 +1,10 @@
 import { createSql } from "@typesql/core";
-import { type Col, type Json, mariadb, mysql } from "@typesql/core/mysql";
+import {
+	type Col,
+	type Json,
+	mariadbDialect,
+	mysqlDialect,
+} from "@typesql/core/mysql";
 
 interface DB {
 	users: {
@@ -8,8 +13,8 @@ interface DB {
 		settings: Json<{ theme: string }>;
 	};
 }
-const onMysql = createSql<DB>(mysql);
-const onMariaDb = createSql<DB>(mariadb);
+const onMysql = createSql<DB>(mysqlDialect);
+const onMariaDb = createSql<DB>(mariadbDialect);
 
 onMysql("SELECT emial FROM users");
 onMysql("SELECT id FROM users WHERE id = ?");

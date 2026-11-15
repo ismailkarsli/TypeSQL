@@ -85,15 +85,15 @@ exports[`module-entry-points > scenario 1`] = `
     "missingCore": "function"
   },
   "@typesql/core/mysql": {
-    "mariadb": "object",
-    "mysql": "object"
+    "mariadbDialect": "object",
+    "mysqlDialect": "object"
   },
   "@typesql/core/mysql/engine": {},
   "@typesql/core/plugins": {
     "CasePlugin": "function"
   },
   "@typesql/core/postgres": {
-    "postgres": "object"
+    "postgresDialect": "object"
   },
   "@typesql/core/postgres/engine": {},
   "@typesql/core/reserved": {
@@ -101,7 +101,7 @@ exports[`module-entry-points > scenario 1`] = `
     "RESERVED_WORDS": "object"
   },
   "@typesql/core/sqlite": {
-    "sqlite": "object"
+    "sqliteDialect": "object"
   },
   "@typesql/core/sqlite/engine": {},
   "@typesql/drizzle": {

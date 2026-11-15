@@ -195,7 +195,7 @@ interface AppDB extends DB {
 		slugify: Sig<["text"], "text">;
 	};
 }
-const appSql = createSql<AppDB>(postgres);
+const appSql = createSql<AppDB>(postgresDialect);
 const slugs = appSql(`SELECT slugify(email) AS slug FROM users`);
 ```
 

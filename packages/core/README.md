@@ -18,7 +18,7 @@ Describe your tables with your database's type names, then write queries:
 
 ```ts
 import { createSql } from "@typesql/core";
-import { type Col, postgres } from "@typesql/core/postgres";
+import { type Col, postgresDialect } from "@typesql/core/postgres";
 
 interface DB {
   users: {
@@ -33,7 +33,7 @@ interface DB {
   };
 }
 
-const sql = createSql<DB>(postgres);
+const sql = createSql<DB>(postgresDialect);
 
 const query = sql(
   `SELECT u.email, p.title
@@ -44,9 +44,9 @@ const query = sql(
 sql("SELECT emial FROM users");
 ```
 
-For SQLite, import `sqlite` and the schema markers from `@typesql/core/sqlite` and use SQLite's type names (`integer`, `text`, `real`, `blob`). See [SQLite](https://typesql.karsli.net/adapters/sqlite).
+For SQLite, import `sqliteDialect` and the schema markers from `@typesql/core/sqlite` and use SQLite's type names (`integer`, `text`, `real`, `blob`). See [SQLite](https://typesql.karsli.net/adapters/sqlite).
 
-For MySQL and MariaDB, import `mysql` or `mariadb` and the schema markers from `@typesql/core/mysql` and use MySQL's type names (`int`, `bigint unsigned`, `varchar`, `datetime`). See [MySQL and MariaDB](https://typesql.karsli.net/adapters/mysql).
+For MySQL and MariaDB, import `mysqlDialect` or `mariadbDialect` and the schema markers from `@typesql/core/mysql` and use MySQL's type names (`int`, `bigint unsigned`, `varchar`, `datetime`). See [MySQL and MariaDB](https://typesql.karsli.net/adapters/mysql).
 
 ## Run queries
 

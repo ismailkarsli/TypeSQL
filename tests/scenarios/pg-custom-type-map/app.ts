@@ -1,5 +1,5 @@
 import { createTransactionalSql } from "@typesql/core/adapter";
-import { type Postgres, postgres } from "@typesql/core/postgres";
+import { type Postgres, postgresDialect } from "@typesql/core/postgres";
 import {
 	createSql,
 	driver,
@@ -29,7 +29,7 @@ export const parsed = await sql(query).execute();
 
 // The driver builds the same API on createTransactionalSql.
 const direct = createTransactionalSql<Postgres, {}, ParsedTypeMap, PgQueryable>(
-	postgres,
+	postgresDialect,
 	pool,
 	driver,
 );

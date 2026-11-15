@@ -1,5 +1,5 @@
 import { hasCode } from "../../command.js";
-import { postgres as sql } from "../../postgres/dialect.js";
+import { postgresDialect as sql } from "../../postgres/dialect.js";
 import type { NodePostgresTypeMap } from "../../postgres/type-map/index.js";
 import type { Executor } from "../../query.js";
 import {

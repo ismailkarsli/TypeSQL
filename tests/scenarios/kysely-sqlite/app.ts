@@ -1,4 +1,4 @@
-import { sqlite } from "@typesql/core/sqlite";
+import { sqliteDialect } from "@typesql/core/sqlite";
 import { createSql } from "@typesql/kysely";
 import Database from "better-sqlite3";
 import { type Generated, Kysely, SqliteDialect } from "kysely";
@@ -12,7 +12,7 @@ interface DB {
 	users: { id: Generated<number>; name: string; bio: string | null };
 }
 const db = new Kysely<DB>({ dialect });
-const sql = createSql(sqlite, db);
+const sql = createSql(sqliteDialect, db);
 await db.insertInto("users").values({ name: "Ada", bio: null }).execute();
 export const rows = await sql(
 	"SELECT id, name, bio FROM users ORDER BY id",

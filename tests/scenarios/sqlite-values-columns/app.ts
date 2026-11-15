@@ -1,5 +1,5 @@
 import { createSql } from "@typesql/core";
-import { type Col, sqlite } from "@typesql/core/sqlite";
+import { type Col, sqliteDialect } from "@typesql/core/sqlite";
 
 interface DB {
 	users: {
@@ -8,7 +8,7 @@ interface DB {
 		bio: Col<"text", { nullable: true }>;
 	};
 }
-const sql = createSql<DB>(sqlite);
+const sql = createSql<DB>(sqliteDialect);
 declare const bio: string | undefined;
 declare const rows: { id: number; name?: string }[];
 

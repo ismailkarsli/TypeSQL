@@ -4,7 +4,7 @@ import {
 	type BigIntTypeMap,
 	type DefaultTypeMap,
 	type Sqlite,
-	sqlite,
+	sqliteDialect,
 	type TransactionalSql,
 } from "@typesql/core/sqlite";
 import { driver, type SqliteDatabase } from "./client.js";
@@ -35,7 +35,7 @@ export function createSql<DB>(
 	options?: { readonly bigint?: boolean },
 ): SqliteSql<DB, DefaultTypeMap> | SqliteSql<DB, BigIntTypeMap> {
 	return createTransactionalSql<Sqlite, DB, DefaultTypeMap, SqliteDatabase>(
-		sqlite,
+		sqliteDialect,
 		client,
 		driver({ bigint: options?.bigint === true }),
 	);

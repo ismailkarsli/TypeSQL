@@ -175,7 +175,7 @@ Each `createSql` types rows with the map of its driver, from `@typesql/core/mysq
 | the mariadb connector | `MariaDbTypeMap` |
 | PlanetScale, TiDB Cloud | `ServerlessTypeMap` |
 
-mysql2 returns `DECIMAL` as a string and `BIGINT` as a number, which loses precision past 2^53. Pass the map that matches the pool's options as the second type argument: `createSql<DB, BigNumberStringsTypeMap>(pool)` for `supportBigNumbers` with `bigNumberStrings`, and `DateStringsTypeMap` for `dateStrings`. The mariadb connector returns `BIGINT` as `bigint`, and `createSql<DB>(mariadb)` from `@typesql/core` uses its map. The HTTP drivers return 64-bit integers, decimals and dates as strings. See [Type mapping](../reference/type-mapping#mysql-and-mariadb).
+mysql2 returns `DECIMAL` as a string and `BIGINT` as a number, which loses precision past 2^53. Pass the map that matches the pool's options as the second type argument: `createSql<DB, BigNumberStringsTypeMap>(pool)` for `supportBigNumbers` with `bigNumberStrings`, and `DateStringsTypeMap` for `dateStrings`. The mariadb connector returns `BIGINT` as `bigint`, and `createSql<DB>(mariadbDialect)` from `@typesql/core` uses its map. The HTTP drivers return 64-bit integers, decimals and dates as strings. See [Type mapping](../reference/type-mapping#mysql-and-mariadb).
 
 ## Functions
 

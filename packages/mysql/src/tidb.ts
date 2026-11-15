@@ -7,7 +7,7 @@ import {
 } from "@typesql/core/adapter";
 import {
 	type MySql,
-	mysql,
+	mysqlDialect,
 	type ServerlessTypeMap,
 	type TransactionalSql,
 } from "@typesql/core/mysql";
@@ -102,7 +102,7 @@ export function createSql<DB, TM = ServerlessTypeMap>(
 	client?: TiDbQueryable,
 ): TiDbSql<DB, TM> {
 	return createTransactionalSql<MySql, DB, TM, TiDbQueryable>(
-		mysql,
+		mysqlDialect,
 		client,
 		driver,
 	);

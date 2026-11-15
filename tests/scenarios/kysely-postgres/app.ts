@@ -1,4 +1,4 @@
-import { postgres } from "@typesql/core/postgres";
+import { postgresDialect } from "@typesql/core/postgres";
 import { createSql } from "@typesql/kysely";
 import { type Generated, Kysely, PostgresDialect } from "kysely";
 import { Pool } from "pg";
@@ -12,7 +12,7 @@ interface DB {
 	users: { id: Generated<number>; name: string; bio: string | null };
 }
 const db = new Kysely<DB>({ dialect });
-const sql = createSql(postgres, db);
+const sql = createSql(postgresDialect, db);
 await db.insertInto("users").values({ name: "Ada", bio: null }).execute();
 export const rows = await sql(
 	"SELECT id, name, bio FROM users ORDER BY id",

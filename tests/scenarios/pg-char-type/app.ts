@@ -1,5 +1,9 @@
 import { createSql, type RowType } from "@typesql/core";
-import { type ApplyDdl, type Col, postgres } from "@typesql/core/postgres";
+import {
+	type ApplyDdl,
+	type Col,
+	postgresDialect,
+} from "@typesql/core/postgres";
 
 // "char" is PostgreSQL's one-byte type, as introspection writes it; bpchar is
 // char(n), which SQL spells char or character.
@@ -11,8 +15,8 @@ type Created = ApplyDdl<
 	`CREATE TABLE t (flag "char" NOT NULL, code char(2) NOT NULL)`
 >;
 
-const introspected = createSql<Introspected>(postgres);
-const created = createSql<Created>(postgres);
+const introspected = createSql<Introspected>(postgresDialect);
+const created = createSql<Created>(postgresDialect);
 
 const rows = introspected("SELECT flag, code FROM t");
 export type Rows = RowType<typeof rows>;

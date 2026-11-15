@@ -6,7 +6,7 @@ import {
 import { mapRows } from "@typesql/core/adapter";
 import { CasePlugin } from "@typesql/core/plugins";
 import type { Col } from "@typesql/core/postgres";
-import { postgres } from "@typesql/core/postgres";
+import { postgresDialect } from "@typesql/core/postgres";
 import { executor } from "@typesql/pg";
 import { Pool } from "pg";
 
@@ -18,7 +18,7 @@ interface DB {
 	};
 }
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-const sql = createSql<DB>(postgres, executor(pool));
+const sql = createSql<DB>(postgresDialect, executor(pool));
 await pool.query(`CREATE TABLE users (id int PRIMARY KEY, display_name text, balance int NOT NULL);
   INSERT INTO users VALUES (1, 'Ada', 100), (2, NULL, 50)`);
 const where = sql.fragment("WHERE id >= $1", 1);
@@ -37,7 +37,7 @@ export const inline = await sql(
 ).execute();
 export const text = query.text;
 export const values = query.values;
-const unbound = createSql<DB>(postgres);
+const unbound = createSql<DB>(postgresDialect);
 const rawQuery = unbound("SELECT id FROM users ORDER BY id");
 export const mapped = mapRows(
 	rawQuery,

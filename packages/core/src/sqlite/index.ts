@@ -1,7 +1,7 @@
 export {
 	type Sqlite,
 	type SqliteDialect,
-	sqlite,
+	sqliteDialect,
 	type ValidateDdl,
 } from "./dialect.js";
 export type {

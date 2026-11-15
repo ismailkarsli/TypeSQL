@@ -43,7 +43,7 @@ export const sqliteLexis =
 	/(?<![\w$])\$(\d+)|'(?:[^']|'')*'?|"(?:[^"]|"")*"?|`(?:[^`]|``)*`?|\[[^\]]*\]?|--[^\n]*|\/\*[\s\S]*?(?:\*\/|$)/
 		.source;
 
-export const sqlite: SqliteDialect = {
+export const sqliteDialect: SqliteDialect = {
 	name: "sqlite",
 	// SQLite has no DEFAULT in a VALUES row.
 	valuesDefault: false,

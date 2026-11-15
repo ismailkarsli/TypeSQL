@@ -4,7 +4,7 @@ description: "Run TypeSQL on node:sqlite, better-sqlite3 or bun:sqlite with @typ
 
 # SQLite
 
-`@typesql/sqlite` runs queries on node:sqlite, better-sqlite3 or bun:sqlite, and the `sqlite` dialect from `@typesql/core/sqlite` types them with SQLite 3.53's rules.
+`@typesql/sqlite` runs queries on node:sqlite, better-sqlite3 or bun:sqlite, and `sqliteDialect` from `@typesql/core/sqlite` types them with SQLite 3.53's rules.
 
 ```sh
 pnpm add @typesql/core @typesql/sqlite

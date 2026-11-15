@@ -76,6 +76,9 @@ const MYSQL_TEXT = {
 	lexis: mysqlLexis,
 } as const;
 
-export const mysql: MySqlDialect = { name: "mysql", ...MYSQL_TEXT };
+export const mysqlDialect: MySqlDialect = { name: "mysql", ...MYSQL_TEXT };
 
-export const mariadb: MariaDbDialect = { name: "mariadb", ...MYSQL_TEXT };
+export const mariadbDialect: MariaDbDialect = {
+	name: "mariadb",
+	...MYSQL_TEXT,
+};

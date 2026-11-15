@@ -83,7 +83,7 @@ These rules read the text, so they color as soon as you type and need neither th
 
 With the TypeScript 7 extension and `@typesql/core` in the project, the extension then checks each call's type and corrects the colors, so in the end only TypeSQL's functions are SQL:
 
-- A call is SQL when its function comes from TypeSQL, whatever its name: `const camel = createSql<DB>(postgres)` makes `camel("…")` SQL, and in a migration so does `users("INSERT …")` on the context that `db.ddl()` returns. Their `.fragment()`, `.as()`, `.prepare()` and `.raw()` are SQL too, and so are `.ddl()` and `.add()` on a migration context.
+- A call is SQL when its function comes from TypeSQL, whatever its name: `const camel = createSql<DB>(postgresDialect)` makes `camel("…")` SQL, and in a migration so does `users("INSERT …")` on the context that `db.ddl()` returns. Their `.fragment()`, `.as()`, `.prepare()` and `.raw()` are SQL too, and so are `.ddl()` and `.add()` on a migration context.
 - A call that the rules above color but that isn't TypeSQL's, such as your own `sql()` function or `set.add("drop it")`, goes back to a plain string.
 - Strings after `/* sql */` stay SQL either way.
 

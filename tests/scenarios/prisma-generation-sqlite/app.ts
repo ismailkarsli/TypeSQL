@@ -1,5 +1,5 @@
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
-import { sqlite } from "@typesql/core/sqlite";
+import { sqliteDialect } from "@typesql/core/sqlite";
 import { createSql } from "@typesql/prisma";
 import { PrismaClient } from "./generated/client/client.js";
 
@@ -10,9 +10,9 @@ const client = new PrismaClient({ adapter });
 
 import type { DB } from "./generated/schema.js";
 
-const sql = createSql<DB>(sqlite, client);
+const sql = createSql<DB>(sqliteDialect, client);
 // Without a generated schema, the Prisma client's models are the tables.
-const fromClient = createSql(sqlite, client);
+const fromClient = createSql(sqliteDialect, client);
 await client.user.create({ data: { name: "Ada" } });
 await client.author.create({ data: { name: "Ada" } });
 export const rows = await sql(

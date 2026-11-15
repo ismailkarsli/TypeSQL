@@ -10,7 +10,7 @@ import {
 	type Col,
 	type DefaultTypeMap,
 	type Sqlite,
-	sqlite,
+	sqliteDialect,
 } from "@typesql/core/sqlite";
 import { executor, type SqliteDatabase } from "@typesql/sqlite";
 
@@ -63,7 +63,7 @@ const driver: SqlDriver<SqliteDatabase> = {
 
 // A driver may pass its calls on, as written before `savepoint` came.
 export const sql = createTransactionalSql<Sqlite, DB, TypeMap, SqliteDatabase>(
-	sqlite,
+	sqliteDialect,
 	db,
 	{
 		executor: driver.executor,

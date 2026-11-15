@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 import { compileFunction } from "node:vm";
 import { createSql } from "@typesql/core";
 import { CasePlugin } from "@typesql/core/plugins";
-import { postgres } from "@typesql/core/postgres";
+import { postgresDialect } from "@typesql/core/postgres";
 import {
 	isArrayTypeNode,
 	isCallExpression,
@@ -149,8 +149,8 @@ function loadWorkload(): Workload {
 		const code = stripTypeScriptTypes(executable);
 		const build: Workload["build"] = compileFunction(
 			`${code}\nreturn () => [${queries.map((q) => `${q}()`).join(",")}];`,
-			["createSql", "postgres", "CasePlugin"],
-		)(createSql, postgres, CasePlugin);
+			["createSql", "postgresDialect", "CasePlugin"],
+		)(createSql, postgresDialect, CasePlugin);
 		return { queries, build };
 	} finally {
 		lease.dispose();

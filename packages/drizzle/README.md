@@ -32,11 +32,11 @@ export const posts = pgTable("posts", {
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { createSql } from "@typesql/drizzle";
-import { postgres } from "@typesql/core/postgres";
+import { postgresDialect } from "@typesql/core/postgres";
 import * as schema from "./schema";
 
 const db = drizzle(new Pool(), { schema });
-const sql = createSql(postgres, db);
+const sql = createSql(postgresDialect, db);
 
 const rows = await sql(
   `SELECT u.email, u.display_name, p.title
@@ -53,11 +53,11 @@ Good to know:
 
 ## SQLite
 
-For a SQLite database, pass `sqlite` from `@typesql/core/sqlite` instead: `createSql(sqlite, db)`. The schema is converted to SQLite types; see [SQLite](https://typesql.karsli.net/guide/orms#sqlite).
+For a SQLite database, pass `sqliteDialect` from `@typesql/core/sqlite` instead: `createSql(sqliteDialect, db)`. The schema is converted to SQLite types; see [SQLite](https://typesql.karsli.net/guide/orms#sqlite).
 
 ## MySQL and MariaDB
 
-For a `drizzle-orm/mysql-core` schema on `drizzle-orm/mysql2`, pass `mysql` (or `mariadb`) from `@typesql/core/mysql`: `createSql(mysql, db)`. Queries run on the database's mysql2 pool or serverless client, so rows are typed the way that driver returns them (on PlanetScale or TiDB Cloud, pass `ServerlessTypeMap` as the second type argument). Drizzle's types don't record `unsigned` or the text size; pin those columns with `mysqlType`: `mysqlType(int("n", { unsigned: true }), "int unsigned")`. See [MySQL and MariaDB](https://typesql.karsli.net/guide/orms#mysql).
+For a `drizzle-orm/mysql-core` schema on `drizzle-orm/mysql2`, pass `mysqlDialect` (or `mariadbDialect`) from `@typesql/core/mysql`: `createSql(mysqlDialect, db)`. Queries run on the database's mysql2 pool or serverless client, so rows are typed the way that driver returns them (on PlanetScale or TiDB Cloud, pass `ServerlessTypeMap` as the second type argument). Drizzle's types don't record `unsigned` or the text size; pin those columns with `mysqlType`: `mysqlType(int("n", { unsigned: true }), "int unsigned")`. See [MySQL and MariaDB](https://typesql.karsli.net/guide/orms#mysql).
 
 ## Documentation
 

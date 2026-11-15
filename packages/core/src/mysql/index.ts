@@ -3,8 +3,8 @@ export {
 	type MariaDbDialect,
 	type MySql,
 	type MySqlDialect,
-	mariadb,
-	mysql,
+	mariadbDialect,
+	mysqlDialect,
 	type ValidateDdl,
 } from "./dialect.js";
 export type {

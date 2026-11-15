@@ -88,23 +88,23 @@ Then create `sql` from it with the dialect, or with your adapter's `createSql<DB
 
 ```ts [PostgreSQL]
 import { createSql } from "@typesql/core";
-import { postgres } from "@typesql/core/postgres";
+import { postgresDialect } from "@typesql/core/postgres";
 
-export const sql = createSql<DB>(postgres);
+export const sql = createSql<DB>(postgresDialect);
 ```
 
 ```ts [SQLite]
 import { createSql } from "@typesql/core";
-import { sqlite } from "@typesql/core/sqlite";
+import { sqliteDialect } from "@typesql/core/sqlite";
 
-export const sql = createSql<DB>(sqlite);
+export const sql = createSql<DB>(sqliteDialect);
 ```
 
 ```ts [MySQL]
 import { createSql } from "@typesql/core";
-import { mysql } from "@typesql/core/mysql";
+import { mysqlDialect } from "@typesql/core/mysql";
 
-export const sql = createSql<DB>(mysql);
+export const sql = createSql<DB>(mysqlDialect);
 ```
 
 :::
@@ -153,7 +153,7 @@ interface DB {
 		settings: Json<{ theme: "dark" | "light" }, { nullable: true }>;
 	};
 }
-const sql = createSql<DB>(postgres);
+const sql = createSql<DB>(postgresDialect);
 ```
 
 ```ts [SQLite]
@@ -167,7 +167,7 @@ interface DB {
 		settings: Json<{ theme: "dark" | "light" }, { nullable: true }>;
 	};
 }
-const sql = createSql<DB>(sqlite);
+const sql = createSql<DB>(sqliteDialect);
 ```
 
 ```ts [MySQL]
@@ -181,7 +181,7 @@ interface DB {
 		settings: Json<{ theme: "dark" | "light" }, { nullable: true }>;
 	};
 }
-const sql = createSql<DB>(mysql);
+const sql = createSql<DB>(mysqlDialect);
 ```
 
 :::
@@ -265,7 +265,7 @@ interface DB {
 ```ts
 import type { PgCatalog } from "@typesql/core/postgres";
 
-const admin = createSql<DB & PgCatalog>(postgres);
+const admin = createSql<DB & PgCatalog>(postgresDialect);
 
 const connections = admin(`
   SELECT state, count(*)::int AS total

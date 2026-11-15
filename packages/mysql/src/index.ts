@@ -6,8 +6,8 @@ import {
 	type MariaDbTransactionalSql,
 	type MySql,
 	type Mysql2MariaDbTypeMap,
-	mariadb,
-	mysql,
+	mariadbDialect,
+	mysqlDialect,
 	type TransactionalSql,
 } from "@typesql/core/mysql";
 import { driver, type Mysql2Queryable } from "./mysql2.js";
@@ -50,12 +50,12 @@ export function createSql<DB, TM>(
 ): MySqlSql<DB, TM> | MariaDbSql<DB, TM> {
 	return options?.dialect === "mariadb"
 		? createTransactionalSql<MariaDb, DB, TM, Mysql2Queryable>(
-				mariadb,
+				mariadbDialect,
 				client,
 				driver,
 			)
 		: createTransactionalSql<MySql, DB, TM, Mysql2Queryable>(
-				mysql,
+				mysqlDialect,
 				client,
 				driver,
 			);

@@ -4,7 +4,7 @@ import {
 	type DefaultTypeMap,
 	type Json,
 	type Postgres,
-	postgres,
+	postgresDialect,
 } from "@typesql/core/postgres";
 import { driverOf, type KyselyExecutor } from "@typesql/kysely";
 import { CamelCasePlugin, Kysely, PostgresDialect } from "kysely";
@@ -32,7 +32,7 @@ const sql = createTransactionalSql<
 	DB,
 	DefaultTypeMap,
 	KyselyExecutor
->(postgres, db, driverOf("postgres"));
+>(postgresDialect, db, driverOf("postgres"));
 
 await sql(
 	`INSERT INTO users ${sql.values("users", [
@@ -62,7 +62,7 @@ await db.transaction().execute(async (trx) => {
 		DB,
 		DefaultTypeMap,
 		KyselyExecutor
-	>(postgres, trx, driverOf("postgres"));
+	>(postgresDialect, trx, driverOf("postgres"));
 	await onTrx
 		.transaction(async (tx) => {
 			await tx("UPDATE users SET display_name = 'Linus'").execute();

@@ -1,7 +1,7 @@
 export {
 	type Postgres,
 	type PostgresDialect,
-	postgres,
+	postgresDialect,
 	type ValidateDdl,
 } from "./dialect.js";
 export type { ApplyDdl, ParamsOf, RowOf, Validate } from "./engine/infer.js";

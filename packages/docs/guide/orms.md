@@ -14,7 +14,7 @@ If Kysely, Drizzle or Prisma already describes your database, you don't need to 
 
 An ORM's types say less than the database does, so each conversion has a few gaps, which you can fill with overrides.
 
-Each package's `createSql` takes the SQL [dialect](../reference/api#dialects) as its first argument: `postgres` from `@typesql/core/postgres`, `sqlite` from `@typesql/core/sqlite` (see [SQLite](#sqlite)), or `mysql` or `mariadb` from `@typesql/core/mysql` (see [MySQL and MariaDB](#mysql)). The schema comes from the ORM's database type, so `createSql(postgres, db)` needs no type argument; pass one (`createSql<DB>(postgres, db)`) to add overrides, pick a type map or build queries without a client. The type map defaults to the dialect's (`DefaultTypeMap`); `@typesql/prisma` defaults to `PrismaTypeMap`.
+Each package's `createSql` takes the SQL [dialect](../reference/api#dialects) as its first argument: `postgresDialect` from `@typesql/core/postgres`, `sqliteDialect` from `@typesql/core/sqlite` (see [SQLite](#sqlite)), or `mysqlDialect` or `mariadbDialect` from `@typesql/core/mysql` (see [MySQL and MariaDB](#mysql)). The schema comes from the ORM's database type, so `createSql(postgresDialect, db)` needs no type argument; pass one (`createSql<DB>(postgresDialect, db)`) to add overrides, pick a type map or build queries without a client. The type map defaults to the dialect's (`DefaultTypeMap`); `@typesql/prisma` defaults to `PrismaTypeMap`.
 
 ::: tip
 For the exact database types without overrides, [generate the schema from the database](./introspect) instead, and keep the ORM for the queries it builds.
@@ -65,9 +65,9 @@ export interface DB {
 
 ```ts
 import { createSql } from "@typesql/kysely";
-import { postgres } from "@typesql/core/postgres";
+import { postgresDialect } from "@typesql/core/postgres";
 
-const sql = createSql(postgres, db);
+const sql = createSql(postgresDialect, db);
 
 const q = sql(
 	`SELECT u.email, u.mood, p.id, p.title
@@ -116,7 +116,7 @@ await db.transaction().execute(async (trx) => {
 		.set({ published: false })
 		.where("author_id", "=", 1)
 		.execute();
-	await createSql(postgres, trx)(
+	await createSql(postgresDialect, trx)(
 		"DELETE FROM posts WHERE author_id = $1 AND NOT published",
 		1,
 	).execute();
@@ -127,18 +127,18 @@ To use a schema from [`typesql introspect`](./introspect) instead of Kysely's ty
 
 ```ts
 import { createTransactionalSql } from "@typesql/core/adapter";
-import { type DefaultTypeMap, type Postgres, postgres } from "@typesql/core/postgres";
+import { type DefaultTypeMap, type Postgres, postgresDialect } from "@typesql/core/postgres";
 import { driverOf, type KyselyExecutor } from "@typesql/kysely";
 import type { DB } from "./schema.js"; // from typesql introspect
 
 const sql = createTransactionalSql<Postgres, DB, DefaultTypeMap, KyselyExecutor>(
-	postgres,
+	postgresDialect,
 	db,
 	driverOf("postgres"),
 );
 ```
 
-Queries run through `db.withoutPlugins()`, so logging, the dialect and the pool apply, but result transformers such as `CamelCasePlugin` don't. Kysely's `PostgresDialect` runs on `pg`: for the exact `pg` types (`Buffer` for `bytea`, interval objects), use `createSql<DB, PgTypeMap>(postgres, db)`.
+Queries run through `db.withoutPlugins()`, so logging, the dialect and the pool apply, but result transformers such as `CamelCasePlugin` don't. Kysely's `PostgresDialect` runs on `pg`: for the exact `pg` types (`Buffer` for `bytea`, interval objects), use `createSql<DB, PgTypeMap>(postgresDialect, db)`.
 
 ### Overrides
 
@@ -152,7 +152,7 @@ const sqlx = createSql<
 		posts: { score: "float8" };
 		$types: { mood: Mood };
 	}
->(postgres, db);
+>(postgresDialect, db);
 
 sql("SELECT avg(score) FROM posts");
 sqlx("SELECT avg(score) FROM posts");
@@ -181,7 +181,7 @@ const camel = createSql<
 	DefaultTypeMap,
 	{},
 	{ camelCase: true }
->(postgres, camelDb);
+>(postgresDialect, camelDb);
 camel(`SELECT author_id, created_at FROM blog_posts WHERE id = ${camel.param(1)}`);
 ```
 
@@ -195,7 +195,7 @@ const camelRows = createSql<
 	DefaultTypeMap,
 	{},
 	{ camelCase: true }
->(postgres, camelDb).withPlugin(new CasePlugin());
+>(postgresDialect, camelDb).withPlugin(new CasePlugin());
 const post = await camelRows(
 	`SELECT author_id, created_at FROM blog_posts WHERE id = ${camelRows.param(1)}`,
 ).executeTakeFirstOrThrow();
@@ -264,10 +264,10 @@ export const usersRelations = relations(users, ({ many }) => ({
 
 ```ts
 import { createSql } from "@typesql/drizzle";
-import { postgres } from "@typesql/core/postgres";
+import { postgresDialect } from "@typesql/core/postgres";
 import type * as schema from "./orm-drizzle-schema.js";
 
-const sql = createSql(postgres, db);
+const sql = createSql(postgresDialect, db);
 
 const q = sql(
 	`SELECT u.email, u.display_name, p.title
@@ -299,12 +299,12 @@ The Postgres type comes from the column kind: `integer` is `int4`, `doublePrecis
 
 ### Running queries
 
-`createSql(postgres, db)` reads the schema from `db`'s type (the `schema` you passed to `drizzle()`; without one, every query fails with `relation "…" does not exist`) and runs queries on the driver client under `db`: the `Pool`, `Client` or postgres.js `sql` you passed to `drizzle()`, or the transaction's connection inside `db.transaction(fn)`. Pass the driver's type map as the second type argument:
+`createSql(postgresDialect, db)` reads the schema from `db`'s type (the `schema` you passed to `drizzle()`; without one, every query fails with `relation "…" does not exist`) and runs queries on the driver client under `db`: the `Pool`, `Client` or postgres.js `sql` you passed to `drizzle()`, or the transaction's connection inside `db.transaction(fn)`. Pass the driver's type map as the second type argument:
 
 ```ts
 import type { PgTypeMap } from "@typesql/pg";
 
-const pgSql = createSql<typeof schema, PgTypeMap>(postgres, db);
+const pgSql = createSql<typeof schema, PgTypeMap>(postgresDialect, db);
 const rows = await pgSql(
 	`SELECT id, title FROM posts WHERE author_id = ${pgSql.param(1)}`,
 ).execute();
@@ -316,7 +316,7 @@ await pgSql.transaction(async (tx) => {
 });
 
 await db.transaction(async (tx) => {
-	await createSql<typeof schema, PgTypeMap>(postgres, tx)(
+	await createSql<typeof schema, PgTypeMap>(postgresDialect, tx)(
 		"DELETE FROM posts WHERE author_id = $1",
 		1,
 	).execute();
@@ -349,10 +349,10 @@ createSql<
 		casing: "snake_case";
 		timestamp: "timestamptz";
 	}
->(postgres, db);
+>(postgresDialect, db);
 ```
 
-Drizzle's types don't record `drizzle(…, { casing })`, so pass `casing` here; `createSql(postgres, db)` without type arguments can't see it. Like Drizzle, casing renames only columns declared without a name. An explicit name (`legacy: text("legacyName")`) is kept. The one case the types can't tell apart is an explicit name equal to the key (`legacyName: text("legacyName")`), which is renamed like an unnamed column; give such a column a different key.
+Drizzle's types don't record `drizzle(…, { casing })`, so pass `casing` here; `createSql(postgresDialect, db)` without type arguments can't see it. Like Drizzle, casing renames only columns declared without a name. An explicit name (`legacy: text("legacyName")`) is kept. The one case the types can't tell apart is an explicit name equal to the key (`legacyName: text("legacyName")`), which is renamed like an unnamed column; give such a column a different key.
 
 Enums are found by matching an exported `pgEnum`. Name the export after the SQL type (`export const mood = pgEnum("mood", …)`) so casts like `'happy'::mood` resolve. A column whose enum isn't exported is `text`.
 
@@ -402,9 +402,9 @@ export interface DB {
 
 ```ts
 import { createSql } from "@typesql/prisma";
-import { postgres } from "@typesql/core/postgres";
+import { postgresDialect } from "@typesql/core/postgres";
 
-const sql = createSql<DB>(postgres, prisma);
+const sql = createSql<DB>(postgresDialect, prisma);
 
 const q = sql(
 	`SELECT id, display_name, "updatedAt" FROM users WHERE role = ${sql.param("guest")}`,
@@ -429,20 +429,20 @@ Only database defaults (`autoincrement()`, `now()`, `dbgenerated()`, literals) m
 
 ### Running queries
 
-`createSql<DB>(postgres, prisma)` takes a `PrismaClient`, an extended client or a transaction client. Queries run with `$queryRawUnsafe` and `$executeRawUnsafe`; despite the names, values are always sent as bind parameters. `sql.transaction(fn)` runs in an interactive `prisma.$transaction(fn)`.
+`createSql<DB>(postgresDialect, prisma)` takes a `PrismaClient`, an extended client or a transaction client. Queries run with `$queryRawUnsafe` and `$executeRawUnsafe`; despite the names, values are always sent as bind parameters. `sql.transaction(fn)` runs in an interactive `prisma.$transaction(fn)`.
 
 Rows are typed with what `$queryRaw` returns: `int8` (so `count(*)`) is `bigint`, `numeric` is `Decimal`, and dates are `Date` (full table in [Type mapping](../reference/type-mapping#prisma)). Prisma rejects some types (`interval`, geometric types, ranges), so cast them in SQL (`duration::text`). To run queries on another driver, use that driver's `createSql<DB>(client)` with the generated `DB`.
 
 ### Without the generator: `FromPrisma`
 
-`createSql(postgres, prisma)` without a type argument, or `createSql<Prisma.TypeMap>(postgres)` without a client, converts the client Prisma already generates. Its types don't record database names or native types, so tables and columns are the model and field names (quote them in SQL, since Postgres folds unquoted names to lower case), and types are the connector's defaults (`DateTime` is `timestamp`). Supply what's missing as overrides:
+`createSql(postgresDialect, prisma)` without a type argument, or `createSql<Prisma.TypeMap>(postgresDialect)` without a client, converts the client Prisma already generates. Its types don't record database names or native types, so tables and columns are the model and field names (quote them in SQL, since Postgres folds unquoted names to lower case), and types are the connector's defaults (`DateTime` is `timestamp`). Supply what's missing as overrides:
 
 ```ts
 import { createSql, type FromPrisma } from "@typesql/prisma";
-import { postgres } from "@typesql/core/postgres";
+import { postgresDialect } from "@typesql/core/postgres";
 import type { Prisma } from "./generated/prisma/client";
 
-const sql = createSql(postgres, prisma);
+const sql = createSql(postgresDialect, prisma);
 sql(`SELECT id, "createdAt" FROM "User" WHERE role = ${sql.param("ADMIN")}`);
 
 type DB = FromPrisma<Prisma.TypeMap, {
@@ -464,13 +464,13 @@ The generator also keeps `Unsupported("…")` fields, which Prisma Client leaves
 
 ## SQLite
 
-All three packages also convert SQLite schemas. Pass `sqlite` instead of `postgres`, and the schema is typed with SQLite's type names and the [SQLite dialect](../adapters/sqlite)'s rules:
+All three packages also convert SQLite schemas. Pass `sqliteDialect` instead of `postgresDialect`, and the schema is typed with SQLite's type names and the [SQLite dialect](../adapters/sqlite)'s rules:
 
 ```ts
-import { sqlite } from "@typesql/core/sqlite";
+import { sqliteDialect } from "@typesql/core/sqlite";
 import { createSql } from "@typesql/kysely"; // or @typesql/drizzle, @typesql/prisma
 
-const sql = createSql(sqlite, db);
+const sql = createSql(sqliteDialect, db);
 const rows = await sql(`SELECT id, title FROM posts WHERE author_id = ${sql.param(1)}`).execute();
 ```
 
@@ -493,18 +493,18 @@ Statements are sent through the ORM as for PostgreSQL. Since some SQLite drivers
 | `unknown` | `customType` | | `any` (Kysely's `unknown`: `Typed<"json", {}>`) |
 
 - **Kysely**: `number` can't say whether a column is `INTEGER` or `REAL`, so it is `numeric`; rows are `number` either way. Pin a column with an override (`{ posts: { id: "integer" } }`), as for PostgreSQL. A `"schema.table"` key is a table of an attached database, `schema.table`, and a `"main.table"` key a table of the main one. `KyselySqliteSql` and `FromKyselySqlite` are the SQLite counterparts of `KyselySql` and `FromKysely`.
-- **Drizzle**: rows are what the driver returns, so an `integer({ mode: "boolean" })` column is `0` or `1` and a `timestamp` column is a number. `generatedAlwaysAs()` columns can't be written; `$defaultFn()` columns have no database default. `createSql(sqlite, db)` works with every Drizzle SQLite driver; on better-sqlite3 and bun:sqlite, `sql.transaction(fn)` runs `BEGIN` / `COMMIT` itself, since their Drizzle transactions can't await, and on the async drivers it uses `db.transaction(fn)`. With `drizzle-orm/sqlite-proxy`, return rows as objects for `all`, since TypeSQL reads columns by name. Pin a type with `sqliteType(builder, "text")`.
+- **Drizzle**: rows are what the driver returns, so an `integer({ mode: "boolean" })` column is `0` or `1` and a `timestamp` column is a number. `generatedAlwaysAs()` columns can't be written; `$defaultFn()` columns have no database default. `createSql(sqliteDialect, db)` works with every Drizzle SQLite driver; on better-sqlite3 and bun:sqlite, `sql.transaction(fn)` runs `BEGIN` / `COMMIT` itself, since their Drizzle transactions can't await, and on the async drivers it uses `db.transaction(fn)`. With `drizzle-orm/sqlite-proxy`, return rows as objects for `all`, since TypeSQL reads columns by name. Pin a type with `sqliteType(builder, "text")`.
 - **Prisma**: the `typesql-prisma` generator writes a SQLite schema when the datasource provider is `sqlite`, importing from `@typesql/core/sqlite`. Rows are typed with `PrismaSqliteTypeMap`, which follows what Prisma's SQLite adapters return from `$queryRaw`: `DATETIME` columns are `Date`, `BIGINT` is `bigint`, `DECIMAL` is `Decimal`, `BOOLEAN` is `boolean` and `Json` columns are parsed. A computed column has no declared type, so Prisma returns its raw value: `max(created_at)` is a string, not a `Date`, and computed integers (`count(*)`, `1 + 1`, `length(email)`, `max(id)`) are `bigint`, although they are typed `number`. Cast them in SQL (`CAST(count(*) AS REAL)`) or convert them with `Number()`. `FromPrismaSqlite` converts `Prisma.TypeMap` without the generator.
 
 ## MySQL and MariaDB {#mysql}
 
-All three packages also convert MySQL schemas. Pass `mysql` or `mariadb` instead of `postgres`, and the schema is typed with MySQL's type names and the [MySQL and MariaDB](../adapters/mysql) dialect's rules:
+All three packages also convert MySQL schemas. Pass `mysqlDialect` or `mariadbDialect` instead of `postgresDialect`, and the schema is typed with MySQL's type names and the [MySQL and MariaDB](../adapters/mysql) dialect's rules:
 
 ```ts
-import { mysql } from "@typesql/core/mysql";
+import { mysqlDialect } from "@typesql/core/mysql";
 import { createSql } from "@typesql/kysely"; // or @typesql/drizzle, @typesql/prisma
 
-const sql = createSql(mysql, db);
+const sql = createSql(mysqlDialect, db);
 const rows = await sql(`SELECT id, title FROM posts WHERE author_id = ${sql.param(1)}`).execute();
 ```
 
@@ -528,5 +528,5 @@ Statements are sent through the ORM's driver, with `$1`, `$2`, … rewritten to 
 | `unknown` | `customType` | | `json` (Kysely), `unknown` (Drizzle) |
 
 - **Kysely**: `MysqlDialect` runs on mysql2, so rows are typed with mysql2's `DefaultTypeMap`. `number` can't say which integer type a column is, so it is `int`; pin a column with an override (`{ posts: { price: "decimal" } }`), as for PostgreSQL. A `"db.table"` key is a table of another database, `db.table`. `KyselyMysqlSql`, `KyselyMariaDbSql` and `FromKyselyMysql` are the MySQL counterparts of `KyselySql` and `FromKysely`.
-- **Drizzle**: `createSql(mysql, db)` takes a `drizzle-orm/mysql2` database and runs queries on the driver client under it: the mysql2 pool or connection, or the transaction's connection inside `db.transaction(fn)`; the PlanetScale and TiDB Cloud serverless databases work too, with `ServerlessTypeMap` from `@typesql/core/mysql` as the second type argument. Drizzle's types don't record `unsigned` or the text size (`mediumtext`, `longtext`), so pin those columns with `mysqlType`: `mysqlType(int("n", { unsigned: true }), "int unsigned")`. `generatedAlwaysAs()` columns can't be written, `$defaultFn()` columns have no database default, and tables of a `mysqlSchema()` are under the database name (`db.table`). `DrizzleMysqlSql`, `DrizzleMariaDbSql` and `FromDrizzleMysql` are the MySQL types.
+- **Drizzle**: `createSql(mysqlDialect, db)` takes a `drizzle-orm/mysql2` database and runs queries on the driver client under it: the mysql2 pool or connection, or the transaction's connection inside `db.transaction(fn)`; the PlanetScale and TiDB Cloud serverless databases work too, with `ServerlessTypeMap` from `@typesql/core/mysql` as the second type argument. Drizzle's types don't record `unsigned` or the text size (`mediumtext`, `longtext`), so pin those columns with `mysqlType`: `mysqlType(int("n", { unsigned: true }), "int unsigned")`. `generatedAlwaysAs()` columns can't be written, `$defaultFn()` columns have no database default, and tables of a `mysqlSchema()` are under the database name (`db.table`). `DrizzleMysqlSql`, `DrizzleMariaDbSql` and `FromDrizzleMysql` are the MySQL types.
 - **Prisma**: the `typesql-prisma` generator writes a MySQL schema when the datasource provider is `mysql`, importing from `@typesql/core/mysql`, with native types (`@db.UnsignedInt` is `int unsigned`, `@db.Text` is `text`) and `autoincrement()` columns marked `autoIncrement`. Pass `mysql`, or `mariadb` for a MariaDB server; Prisma Client connects through `@prisma/adapter-mariadb`. Rows are typed with `PrismaMysqlTypeMap`, which follows what Prisma's MySQL adapter returns from `$queryRaw`: `BIGINT` and `INT UNSIGNED` are `bigint` (so `count(*)` is `bigint`), `DECIMAL` is `Decimal`, `TIME` is a `Date` on 1970-01-01, `BIT` and spatial values are bytes, and `Boolean` columns are numbers (`TINYINT`). `FromPrismaMysql` converts `Prisma.TypeMap` without the generator.

@@ -1,4 +1,4 @@
-import { mysql } from "@typesql/core/mysql";
+import { mysqlDialect } from "@typesql/core/mysql";
 import { createSql } from "@typesql/kysely";
 import { type Generated, Kysely, sql as kysql, MysqlDialect } from "kysely";
 import { createPool } from "mysql2";
@@ -28,7 +28,7 @@ await db
 	.values({ user_id: 1, note: null })
 	.execute();
 
-const sql = createSql(mysql, db);
+const sql = createSql(mysqlDialect, db);
 export const inserted = await sql(
 	"INSERT INTO typesql_archive.events (user_id, note) VALUES ($1, $2)",
 	1,

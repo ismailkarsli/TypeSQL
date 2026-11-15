@@ -12,10 +12,10 @@ pnpm add @typesql/core @typesql/kysely kysely
 
 ```ts
 import { createSql } from "@typesql/kysely";
-import { postgres } from "@typesql/core/postgres";
+import { postgresDialect } from "@typesql/core/postgres";
 import type { DB } from "./db";
 
-const sql = createSql(postgres, db);
+const sql = createSql(postgresDialect, db);
 
 const posts = await sql(
   `SELECT u.email, p.title
@@ -35,18 +35,18 @@ Kysely describes columns with TypeScript types, so TypeSQL guesses the Postgres 
 ```ts
 import type { DefaultTypeMap } from "@typesql/core/postgres";
 
-const sql = createSql<DB, DefaultTypeMap, { posts: { score: "float8" } }>(postgres, db);
+const sql = createSql<DB, DefaultTypeMap, { posts: { score: "float8" } }>(postgresDialect, db);
 ```
 
 For an interface generated with `kysely-codegen --camel-case`, pass `{ camelCase: true }` as the fourth type argument.
 
 ## SQLite
 
-For a SQLite database, pass `sqlite` from `@typesql/core/sqlite` instead: `createSql(sqlite, db)`. The schema is converted to SQLite types; see [SQLite](https://typesql.karsli.net/guide/orms#sqlite).
+For a SQLite database, pass `sqliteDialect` from `@typesql/core/sqlite` instead: `createSql(sqliteDialect, db)`. The schema is converted to SQLite types; see [SQLite](https://typesql.karsli.net/guide/orms#sqlite).
 
 ## MySQL and MariaDB
 
-For a Kysely instance on `MysqlDialect`, pass `mysql` (or `mariadb`) from `@typesql/core/mysql`: `createSql(mysql, db)`. The schema is converted to MySQL types (`number` is `int`, `string` is `varchar`, `Date` is `datetime`) and rows are typed the way mysql2 returns them. Pin a column with an override, as for PostgreSQL. See [MySQL and MariaDB](https://typesql.karsli.net/guide/orms#mysql).
+For a Kysely instance on `MysqlDialect`, pass `mysqlDialect` (or `mariadbDialect`) from `@typesql/core/mysql`: `createSql(mysqlDialect, db)`. The schema is converted to MySQL types (`number` is `int`, `string` is `varchar`, `Date` is `datetime`) and rows are typed the way mysql2 returns them. Pin a column with an override, as for PostgreSQL. See [MySQL and MariaDB](https://typesql.karsli.net/guide/orms#mysql).
 
 ## Documentation
 
