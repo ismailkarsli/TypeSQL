@@ -1,4 +1,10 @@
-import type { DdlCheck, Dialect, DialectTypes, PluginsOf } from "../dialect.js";
+import type {
+	DdlCheck,
+	Dialect,
+	DialectTypes,
+	PluginsOf,
+	StatementKindOf,
+} from "../dialect.js";
 import type { Executor } from "../query.js";
 import type { ApplyDdl } from "./engine/infer.js";
 import type {
@@ -11,7 +17,12 @@ import type { DefaultTypeMap, MariaDbTypeMap } from "./type-map/index.js";
 
 export interface MySql extends DialectTypes {
 	readonly typeMap: DefaultTypeMap;
-	readonly sql: Sql<this["db"], this["tm"], PluginsOf<this["plugins"]>>;
+	readonly sql: Sql<
+		this["db"],
+		this["tm"],
+		PluginsOf<this["plugins"]>,
+		StatementKindOf<this["statement"]>
+	>;
 	readonly transactionalSql: TransactionalSql<
 		this["db"],
 		this["tm"],
@@ -23,7 +34,12 @@ export interface MySql extends DialectTypes {
 
 export interface MariaDb extends DialectTypes {
 	readonly typeMap: MariaDbTypeMap;
-	readonly sql: MariaDbSql<this["db"], this["tm"], PluginsOf<this["plugins"]>>;
+	readonly sql: MariaDbSql<
+		this["db"],
+		this["tm"],
+		PluginsOf<this["plugins"]>,
+		StatementKindOf<this["statement"]>
+	>;
 	readonly transactionalSql: MariaDbTransactionalSql<
 		this["db"],
 		this["tm"],

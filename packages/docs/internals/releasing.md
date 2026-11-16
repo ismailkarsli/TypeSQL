@@ -4,8 +4,8 @@ Releases use pnpm's [release management](https://pnpm.io/versioning): `pnpm chan
 intents, `pnpm version -r` turns them into versions and changelogs, and the `release` workflow
 publishes. Nothing is published from a local machine.
 
-`@typesql/core`, `pg`, `postgres`, `kysely`, `drizzle`, `prisma`, `sqlite`, `mysql`, `cli` and
-`better-auth` form a fixed group: they always share one version, released at the highest bump
+`@typesql/core`, `pg`, `postgres`, `kysely`, `drizzle`, `prisma`, `sqlite`, `mysql`, `cli`,
+`better-auth` and `effect` form a fixed group: they always share one version, released at the highest bump
 among their intents. `@typesql/language-server` and the VS Code extension (`typesql`) have their
 own versions.
 

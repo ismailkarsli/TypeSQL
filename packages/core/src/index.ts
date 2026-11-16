@@ -30,6 +30,7 @@ export {
 	type Fragment,
 	type FragmentObject,
 	type InlineFragment,
+	type InlineStatement,
 	mapRows,
 	NoResultError,
 	type PARAMS,
@@ -37,8 +38,10 @@ export {
 	pluginsOf,
 	type Query,
 	type QueryObject,
+	type QueryStatement,
 	type ROW,
 	type RowType,
+	type StatementObject,
 	type TEXT,
 	type TextType,
 } from "./query.js";

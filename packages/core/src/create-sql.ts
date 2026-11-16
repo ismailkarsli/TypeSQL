@@ -20,6 +20,7 @@ import {
 	SqlFragment,
 } from "./runtime/compile.js";
 import { json } from "./runtime/json.js";
+import type { StatementFn } from "./sql/contract.js";
 
 export interface CreateSql {
 	// biome-ignore lint/style/useShorthandFunctionType: Dialects merge signatures into this interface.
@@ -36,6 +37,26 @@ export interface CreateSql {
  */
 // biome-ignore lint/nursery/noUnsafeTypeAssertion: see above.
 export const createSql = createSqlApi as CreateSql;
+
+/** Makes the statement `sql()` returns. */
+export type StatementFactory = (
+	text: string,
+	values: readonly unknown[],
+	plugins: readonly SqlPlugin[],
+) => SqlFragment;
+
+/** The `sql` of `dialect` whose statements `statement` makes; `S` is their kind. */
+export const createStatementSql = <
+	T extends DialectTypes,
+	DB,
+	TM,
+	S extends StatementFn,
+>(
+	dialect: Dialect<T>,
+	statement: StatementFactory,
+): SqlOf<T, DB, TM, [], S> =>
+	// biome-ignore lint/nursery/noUnsafeTypeAssertion: see above.
+	createSqlApi(dialect, undefined, [], statement) as SqlOf<T, DB, TM, [], S>;
 
 const fragmentOf = (compiled: Compiled) =>
 	new SqlFragment(compiled.text, compiled.values);
@@ -71,6 +92,7 @@ export function createSqlApi(
 	dialect: Dialect,
 	executor?: Executor,
 	plugins: readonly SqlPlugin[] = [],
+	statement?: StatementFactory,
 ) {
 	const {
 		quote = `"`,
@@ -100,6 +122,13 @@ export function createSqlApi(
 		GROUPED.add(fragment);
 		return fragment;
 	};
+	const make = (
+		text: string,
+		values: readonly unknown[],
+		on = executor,
+	): SqlFragment =>
+		statement?.(text, values, plugins) ??
+		new SqlQuery(text, values, on, plugins);
 	const encode = <V>(value: V, context: InputContext) =>
 		plugins[0] ? encodeInput(value, plugins, context) : value;
 	const encodeArgs = (args: readonly unknown[], query: string) => {
@@ -116,25 +145,24 @@ export function createSqlApi(
 				"call sql(`…`) with parentheses; sql`…` is not supported due to this issue: https://github.com/microsoft/TypeScript/issues/33304",
 			);
 		const { text, values } = compile(lexis, query, encodeArgs(rest, query));
-		return new SqlQuery(text, values, executor, plugins);
+		return make(text, values);
 	};
 	const api = Object.assign(call, {
 		// The `sql` types of the dialects give withPlugin its type.
 		// biome-ignore lint/plugin: see above.
 		withPlugin: (plugin: SqlPlugin): unknown =>
-			createSqlApi(dialect, executor, [...plugins, plugin]),
+			createSqlApi(dialect, executor, [...plugins, plugin], statement),
 		prepare: (query: string) => {
 			const compiled = compile(lexis, query);
 			const prepared = executor?.prepare?.(compiled.text) ?? executor;
 			return (...input: readonly unknown[]) =>
-				new SqlQuery(
+				make(
 					compiled.text,
 					[
 						...bind(compiled.names, encodeArgs(input, query)),
 						...compiled.values,
 					],
 					prepared,
-					plugins,
 				);
 		},
 		as: call,

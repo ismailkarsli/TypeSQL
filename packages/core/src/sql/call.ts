@@ -1,8 +1,8 @@
 import type { AnyErr, SqlError } from "../errors.js";
 import type { PluginInput, PluginOutput, SqlPlugin } from "../plugin.js";
-import type { Query } from "../query.js";
+import type { QueryStatement } from "../query.js";
 import type { CheckCarried } from "./carried.js";
-import type { EngineTypes } from "./contract.js";
+import type { EngineTypes, StatementFn, StatementOf } from "./contract.js";
 import type { ArgsOf, ParamsOf, RowOf, Validate } from "./infer.js";
 import type { HasDefaultable, Skip, WithDefaults } from "./inline.js";
 import type {
@@ -245,8 +245,9 @@ export type CallRet<
 	TM,
 	Q extends string | TemplateStringsArray,
 	Plugins extends readonly SqlPlugin[] = [],
+	S extends StatementFn = QueryStatement,
 > = [Q] extends [infer Q2 extends string]
-	? CallQuery<E, DB, TM, Q2, Plugins>
+	? CallQuery<E, DB, TM, Q2, Plugins, S>
 	: SqlError<TaggedTemplateMessage, null>;
 
 type CallQuery<
@@ -255,8 +256,10 @@ type CallQuery<
 	TM,
 	Q extends string,
 	Plugins extends readonly SqlPlugin[],
+	S extends StatementFn,
 > = [CallText<Q, E["lexis"]>] extends [infer X extends string]
-	? Query<
+	? StatementOf<
+			S,
 			PluginOutput<RowOf<E, DB, TM, X>, Plugins>,
 			Extract<
 				PluginInput<

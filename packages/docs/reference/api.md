@@ -33,6 +33,7 @@ The adapters export their own `createSql`, which takes the driver client and add
 | `@typesql/sqlite` | `createSql<DB>(db, options?)` with SQLite's `DefaultTypeMap`, or `BigIntTypeMap` with `{ bigint: true }` |
 | `@typesql/mysql` | `createSql<DB>(client, { dialect? })` on mysql2 with MySQL's `DefaultTypeMap` (`Mysql2MariaDbTypeMap` with `{ dialect: "mariadb" }`); `@typesql/mysql/mariadb` with `MariaDbTypeMap`; `@typesql/mysql/planetscale` and `@typesql/mysql/tidb` with `ServerlessTypeMap` |
 | `@typesql/kysely`, `@typesql/drizzle`, `@typesql/prisma` | see [ORM packages](#orm-packages) |
+| `@typesql/effect` | `createSql<DB, TM>(dialect, client?)` on an Effect `SqlClient`, with `EffectPgTypeMap`, SQLite's `DefaultTypeMap` or `EffectMysqlTypeMap`; its statements are Effects and it has `sql.withTransaction(effect)` instead ([Effect](../adapters/effect)) |
 
 ## `sql(text, ...params)`
 
@@ -192,6 +193,9 @@ What adapters and custom executors build on.
 | `pluginsOf(q)` | returns the query's immutable plugin list |
 | `snakeCase(key)` | converts a key the way `CasePlugin` does for `to: "snake_case"`: `userID` is `user_id` and `HTTPCode` is `http_code` |
 | `createTransactionalSql(dialect, client, driver, depth?)` | the dialect's `sql` bound to a driver's client, with `sql.transaction(fn)`; the PostgreSQL adapters pass `postgresDialect` from `@typesql/core/postgres` |
+| `createStatementSql<T, DB, TM, S>(dialect, statement)` | the dialect's `sql` whose statements `statement(text, values, plugins)` makes, for an adapter whose statements are not `Query`s, as `@typesql/effect`'s Effects; `S` is their kind |
+| `SqlStatement` | the class such a statement extends: it splices as `${statement}` and gives `mapRows` its plugins |
+| `StatementFn`, `StatementOf<S, Row, Params, Text>`, `StatementParams<P>`, `StatementFactory` | a statement kind (`out` is the statement of its `row`, `params` and `text`), the statement of one, its `params` as a tuple, and what `createStatementSql` takes |
 | `createFamilySql(dialect, client, driverOf)` | the same for a dialect picked at runtime, with `driverOf(dialectFamily(dialect.name))` as its driver |
 | `dialectFamily(name)`, `DialectFamily` | `"postgres"`, `"sqlite"` or `"mysql"`: the dialects whose statements a driver writes alike (MariaDB's are MySQL's) |
 | `familyStatement[family](text, values, map?)` | a statement as a driver of `family` takes it: PostgreSQL's keeps its `$n` parameters, SQLite's and MySQL's have `?` with the values in order |
@@ -245,7 +249,9 @@ Word lists for editor tooling, with nothing of the type engines at runtime.
 | Type | Meaning |
 |---|---|
 | `Query<Row, Params, Text>` | the runtime query object, with phantom types and `execute*` methods |
-| `Sql<DB, TM, Plugins = []>` | the `sql` function with its ordered plugin tuple |
+| `Sql<DB, TM, Plugins = [], S = QueryStatement>` | the `sql` function with its ordered plugin tuple, and the kind of statement it returns |
+| `QueryStatement` | the statement kind of `Query`s; an adapter with statements of its own passes another to `SqlOf<T, DB, TM, Plugins, S>` |
+| `InlineStatement`, `StatementObject<Text>` | what an adapter's own statement is to `${statement}`: a number brand where `Query` has a string one, for statements that are iterable, and the `{ text, values }` it carries |
 | `TransactionalSql<DB, TM, Plugins = []>` | an adapter's `sql`: `Sql` plus `transaction(fn)` |
 | `SqlPlugin`, `PluginTypes`, `IdentityPluginTypes`, `InputContext` | runtime hooks and type functions for custom plugins |
 | `PluginInput`, `PluginEncoded`, `PluginOutput`, `PluginJson` | apply a plugin tuple to a type |
@@ -253,7 +259,7 @@ Word lists for editor tooling, with nothing of the type engines at runtime.
 | `Executor` | what `execute*` runs on |
 | `ExecutorResult` | `{ rows, rowCount: number \| null }` |
 | `NoResultError` | thrown by `executeTakeFirstOrThrow` on 0 rows; carries `text` |
-| `RowType<Q>`, `ParamsType<Q>`, `TextType<Q>` | the row, parameters and text of a `Query` or `Fragment` type |
+| `RowType<Q>`, `ParamsType<Q>`, `TextType<Q>` | the row, parameters and text of a `Query`, an adapter's statement or a `Fragment` type |
 | `Fragment<Text, Params, Carried>` | a spliceable SQL piece, with carried input types for checking when spliced |
 | `QueryObject<Row, Params, Text>`, `FragmentObject<Text, Params, Carried>` | the object interfaces behind the string-branded `Query` and `Fragment` aliases |
 

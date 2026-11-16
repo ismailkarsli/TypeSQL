@@ -1,5 +1,6 @@
 import { applyPlugins, type SqlPlugin } from "./plugin.js";
 import { fail, SqlFragment } from "./runtime/compile.js";
+import type { StatementFn, StatementParams } from "./sql/contract.js";
 
 export declare const ROW: unique symbol;
 export declare const PARAMS: unique symbol;
@@ -59,6 +60,16 @@ export interface FragmentObject<
  */
 export type InlineFragment = "\u0000typesql-fragment\u0000";
 
+/** InlineFragment for an iterable statement, whose iterator a string's would clash with. */
+export type InlineStatement = 0;
+
+/** What `${statement}` reads of a statement. */
+export interface StatementObject<Text extends string = string> {
+	readonly text: string;
+	readonly values: readonly unknown[];
+	readonly [TEXT]?: Text;
+}
+
 /** A statement; `${query}` splices it in place as a subquery. */
 export type Query<
 	Row,
@@ -72,8 +83,20 @@ export type Fragment<
 	Carried extends readonly unknown[] = readonly unknown[],
 > = FragmentObject<Text, Params, Carried> & InlineFragment;
 
+export interface QueryStatement extends StatementFn {
+	readonly out: Query<
+		this["row"],
+		StatementParams<this["params"]>,
+		this["text"]
+	>;
+}
+
 export type RowType<Q> =
-	Q extends Query<infer R, readonly unknown[], string> ? R : never;
+	Q extends Query<infer R, readonly unknown[], string>
+		? R
+		: Q extends { readonly [ROW]?: infer R }
+			? R
+			: never;
 export type ParamsType<Q> = Q extends { readonly [PARAMS]?: infer P }
 	? P
 	: never;
@@ -92,8 +115,21 @@ export class NoResultError extends Error {
 	}
 }
 
+/** What an adapter's own statement extends. */
+export class SqlStatement extends SqlFragment {
+	constructor(
+		text: string,
+		values: readonly unknown[],
+		plugins: readonly SqlPlugin[],
+	) {
+		super(text, values);
+		// Under PLUGINS, which `Symbol.for` shares across copies of this module, for pluginsOf().
+		if (plugins[0]) Object.defineProperty(this, PLUGINS, { value: plugins });
+	}
+}
+
 /** A statement with its executor and plugins; its methods live on the prototype, so a query is `{ text, values }` to a spread. */
-export class SqlQuery extends SqlFragment {
+export class SqlQuery extends SqlStatement {
 	readonly #executor: Executor | undefined;
 	constructor(
 		text: string,
@@ -101,10 +137,8 @@ export class SqlQuery extends SqlFragment {
 		executor: Executor | undefined,
 		plugins: readonly SqlPlugin[],
 	) {
-		super(text, values);
+		super(text, values, plugins);
 		this.#executor = executor;
-		// Under PLUGINS, which `Symbol.for` shares across copies of this module, for pluginsOf().
-		if (plugins[0]) Object.defineProperty(this, PLUGINS, { value: plugins });
 	}
 	#pick(executor = this.#executor): Executor {
 		return (
@@ -141,5 +175,5 @@ export const mapRows = <Q extends { readonly text: string }>(
 	applyPlugins(rows, pluginsOf(q)) as RowType<Q>[];
 
 export const pluginsOf = (q: { readonly text: string }): readonly SqlPlugin[] =>
-	// biome-ignore lint/nursery/noUnsafeTypeAssertion: only SqlQuery stores PLUGINS, with its plugin list.
+	// biome-ignore lint/nursery/noUnsafeTypeAssertion: only SqlStatement stores PLUGINS, with its plugin list.
 	(PLUGINS in q && (q[PLUGINS] as readonly SqlPlugin[])) || [];

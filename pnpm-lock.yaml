@@ -170,6 +170,15 @@ catalogs:
     '@biomejs/biome':
       specifier: 2.6.7
       version: 2.6.7
+    '@effect/sql-mysql2':
+      specifier: 4.1.4
+      version: 4.1.4
+    '@effect/sql-pg':
+      specifier: 4.1.4
+      version: 4.1.4
+    '@effect/sql-sqlite-node':
+      specifier: 4.1.4
+      version: 4.1.4
     '@prisma/adapter-better-sqlite3':
       specifier: 7.10.1
       version: 7.10.1
@@ -218,6 +227,9 @@ catalogs:
     drizzle-orm:
       specifier: 0.45.4
       version: 0.45.4
+    effect:
+      specifier: 4.1.4
+      version: 4.1.4
     esbuild:
       specifier: 0.28.2
       version: 0.28.2
@@ -431,6 +443,22 @@ importers:
       pg:
         specifier: 'catalog:'
         version: 8.23.1
+      tsrs:
+        specifier: 'catalog:'
+        version: 0.25.0-ts7.1.0-beta
+      typescript:
+        specifier: 'catalog:'
+        version: 7.1.0-beta
+
+  packages/effect:
+    dependencies:
+      '@typesql/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      effect:
+        specifier: 'catalog:'
+        version: 4.1.4
       tsrs:
         specifier: 'catalog:'
         version: 0.25.0-ts7.1.0-beta
@@ -1422,6 +1450,91 @@ importers:
         specifier: 'catalog:'
         version: 7.1.0-beta
 
+  tests/scenarios/effect-mysql:
+    dependencies:
+      '@effect/sql-mysql2':
+        specifier: 'catalog:'
+        version: 4.1.4(@types/node@26.6.6)(effect@4.1.4)
+      '@typesql/core':
+        specifier: workspace:*
+        version: link:../../../packages/core
+      '@typesql/effect':
+        specifier: workspace:*
+        version: link:../../../packages/effect
+      effect:
+        specifier: 'catalog:'
+        version: 4.1.4
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.6.6
+      typescript:
+        specifier: 'catalog:'
+        version: 7.1.0-beta
+
+  tests/scenarios/effect-postgres:
+    dependencies:
+      '@effect/sql-pg':
+        specifier: 'catalog:'
+        version: 4.1.4(effect@4.1.4)
+      '@typesql/core':
+        specifier: workspace:*
+        version: link:../../../packages/core
+      '@typesql/effect':
+        specifier: workspace:*
+        version: link:../../../packages/effect
+      effect:
+        specifier: 'catalog:'
+        version: 4.1.4
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.6.6
+      typescript:
+        specifier: 'catalog:'
+        version: 7.1.0-beta
+
+  tests/scenarios/effect-rejection:
+    dependencies:
+      '@typesql/core':
+        specifier: workspace:*
+        version: link:../../../packages/core
+      '@typesql/effect':
+        specifier: workspace:*
+        version: link:../../../packages/effect
+      effect:
+        specifier: 'catalog:'
+        version: 4.1.4
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.6.6
+      typescript:
+        specifier: 'catalog:'
+        version: 7.1.0-beta
+
+  tests/scenarios/effect-sqlite:
+    dependencies:
+      '@effect/sql-sqlite-node':
+        specifier: 'catalog:'
+        version: 4.1.4(effect@4.1.4)
+      '@typesql/core':
+        specifier: workspace:*
+        version: link:../../../packages/core
+      '@typesql/effect':
+        specifier: workspace:*
+        version: link:../../../packages/effect
+      effect:
+        specifier: 'catalog:'
+        version: 4.1.4
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.6.6
+      typescript:
+        specifier: 'catalog:'
+        version: 7.1.0-beta
+
   tests/scenarios/kysely-driver:
     dependencies:
       '@types/pg':
@@ -1901,6 +2014,9 @@ importers:
       '@typesql/drizzle':
         specifier: workspace:*
         version: link:../../../packages/drizzle
+      '@typesql/effect':
+        specifier: workspace:*
+        version: link:../../../packages/effect
       '@typesql/kysely':
         specifier: workspace:*
         version: link:../../../packages/kysely
@@ -1931,6 +2047,9 @@ importers:
       drizzle-orm:
         specifier: 'catalog:'
         version: 0.45.4(@prisma/client@7.10.1(typescript@7.1.0-beta))(@types/pg@8.23.1)(kysely@0.29.9)(mysql2@3.24.6(@types/node@26.6.6))(pg@8.23.1)(postgres@4.1.1)
+      effect:
+        specifier: 'catalog:'
+        version: 4.1.4
       jose:
         specifier: 'catalog:'
         version: 6.2.17
@@ -3855,6 +3974,21 @@ packages:
         optional: true
       search-insights:
         optional: true
+
+  '@effect/sql-mysql2@4.1.4':
+    resolution: {integrity: sha512-RZ/j8m3d8742q80rZn5YfWwoPUos7fkRPGnJv8XapKgGhAk7O1wxH6yHoB2aR+pVaMdrzG/MN856OIF5BPxzNQ==}
+    peerDependencies:
+      effect: ^4.1.4
+
+  '@effect/sql-pg@4.1.4':
+    resolution: {integrity: sha512-DHsmpIfJeCYiJVk3JwMQFAWaQAmKV/elUbBCjHFP7qeZtJ8dViUV/y/AHdUaZ+OmMwtr8J7ZXA7AlsKZ9hPiQA==}
+    peerDependencies:
+      effect: ^4.1.4
+
+  '@effect/sql-sqlite-node@4.1.4':
+    resolution: {integrity: sha512-vEB3Xv7TftvZscuyee8doM1rXr0Dle5jxpuvjaEBlZkGAsUt0YvGudnOfEvUHMicE8wEuDQfpjWXM1q9HjNKUA==}
+    peerDependencies:
+      effect: ^4.1.4
 
   '@electric-sql/pglite-socket@0.1.3':
     resolution: {integrity: sha512-LAciWM0M1dCL8hlsxu2venbVZcdxema0BtDfpWYVqr+Y468UADw0pFWidhKw1M8sfJ8rdLT71tjMmnirf/IZRQ==}
@@ -6464,6 +6598,9 @@ packages:
   effect@3.20.0:
     resolution: {integrity: sha512-qMLfDJscrNG8p/aw+IkT9W7fgj50Z4wG5bLBy0Txsxz8iUHjDIkOgO3SV0WZfnQbNG2VJYb0b+rDLMrhM4+Krw==}
 
+  effect@4.1.4:
+    resolution: {integrity: sha512-Tgrv/9FN+TZYyOn8XSli+fVqAfwDrDAkiX5Uu9vztINb675VTQdhD0gWI5Kzvhlh9QqzjZvw72iugqw5pwoghQ==}
+
   elkjs@0.11.1:
     resolution: {integrity: sha512-zxxR9k+rx5ktMwT/FwyLdPCrq7xN6e4VGGHH8hA01vVYKjTFik7nHOxBnAYtrgYUB1RpAiLvA1/U2YraWxyKKg==}
 
@@ -8179,6 +8316,21 @@ snapshots:
       algoliasearch: 5.64.0
     transitivePeerDependencies:
       - '@algolia/client-search'
+
+  '@effect/sql-mysql2@4.1.4(@types/node@26.6.6)(effect@4.1.4)':
+    dependencies:
+      effect: 4.1.4
+      mysql2: 3.24.6(@types/node@26.6.6)
+    transitivePeerDependencies:
+      - '@types/node'
+
+  '@effect/sql-pg@4.1.4(effect@4.1.4)':
+    dependencies:
+      effect: 4.1.4
+
+  '@effect/sql-sqlite-node@4.1.4(effect@4.1.4)':
+    dependencies:
+      effect: 4.1.4
 
   '@electric-sql/pglite-socket@0.1.3(@electric-sql/pglite@0.4.3)':
     dependencies:
@@ -10138,6 +10290,8 @@ snapshots:
     dependencies:
       '@standard-schema/spec': 1.1.0
       fast-check: 3.23.2
+
+  effect@4.1.4: {}
 
   elkjs@0.11.1: {}
 

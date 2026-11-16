@@ -2,7 +2,7 @@ import type { Empty } from "../empty.js";
 import type { Next } from "../engine/next.js";
 import type { Members } from "../engine/object.js";
 import type { SqlError } from "../errors.js";
-import type { InlineFragment } from "../query.js";
+import type { InlineFragment, InlineStatement } from "../query.js";
 import type { Lexis, Opaque, OpaqueKind, SplitFirst } from "./lexis.js";
 
 export type ParamInput<T> = unknown extends T
@@ -12,7 +12,9 @@ export type ParamInput<T> = unknown extends T
 				"sql.param() does not accept undefined; use sql.optional(value) for DEFAULT or null for SQL NULL",
 				null
 			>
-		: [Extract<Exclude<T, Empty>, InlineFragment>] extends [never]
+		: [Extract<Exclude<T, Empty>, InlineFragment | InlineStatement>] extends [
+					never,
+				]
 			? true extends HoldsMarker<Exclude<T, Empty>>
 				? SqlError<
 						"sql.param() takes a value, not another sql.param() or sql.json(); pass the value itself",

@@ -6,10 +6,10 @@ import type {
 	PluginJson,
 	SqlPlugin,
 } from "../plugin.js";
-import type { Fragment, InlineFragment, Query } from "../query.js";
+import type { Fragment, InlineFragment, QueryStatement } from "../query.js";
 import type { RelationName, TableName } from "../schema.js";
 import type { BoxCallArgs, CallRet, GateCallCheck } from "./call.js";
-import type { EngineTypes } from "./contract.js";
+import type { EngineTypes, StatementFn, StatementOf } from "./contract.js";
 import type {
 	BoolOf,
 	BoxFragArgs,
@@ -127,12 +127,13 @@ export interface SqlApi<
 	DB,
 	TM,
 	Plugins extends readonly SqlPlugin[] = [],
+	S extends StatementFn = QueryStatement,
 > {
 	// `Q` admits a TemplateStringsArray only to reject sql`…` with a message.
 	<const Q extends string | TemplateStringsArray>(
 		query: GateCallCheck<E, DB, TM, Q> & Q,
 		...params: Parameters<BoxCallArgs<E, DB, TM, Q>, Plugins>
-	): CallRet<E, DB, TM, Q, Plugins>;
+	): CallRet<E, DB, TM, Q, Plugins, S>;
 	/**
 	 * Never matches a call (it takes no arguments), so errors are reported
 	 * against the signature above. A second call signature keeps TypeScript
@@ -145,12 +146,12 @@ export interface SqlApi<
 		query: GateCallCheck<E, DB, TM, Q> & Q,
 	): (
 		...params: Parameters<BoxCallArgs<E, DB, TM, Q>, Plugins>
-	) => CallRet<E, DB, TM, Q, Plugins>;
+	) => CallRet<E, DB, TM, Q, Plugins, S>;
 
 	as<Row>(
 		query: string,
 		...params: readonly unknown[]
-	): Query<Row, readonly unknown[]>;
+	): StatementOf<S, Row, readonly unknown[], string>;
 
 	/** `undefined` becomes an omission: DEFAULT in sql.param, a skipped item in sql.combine/and/or, nothing as `${…}`. `null` stays SQL `NULL`. */
 	optional<const T>(value: T & OptionalInput<T>): Optional<T>;

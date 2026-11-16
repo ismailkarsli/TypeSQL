@@ -1,0 +1,51 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`effect-sqlite > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "result": "{ inserted: number; rows: ({ active: number; avatar: null | Uint8Array<ArrayBufferLike>; display_name: null | string; id: number; score: number; settings: string })[]; first: { id: number; retries: number }; returned: number; aborted: string; inTransaction: ({ display_name: null | string })[]; fromBound: { n: number; total: null | number } }",
+    },
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "{
+  inserted: 2,
+  rows: [
+    [Object: null prototype] {
+      id: 1,
+      display_name: null,
+      settings: '{"retry_count":1}',
+      active: 1,
+      score: 1.5,
+      avatar: Uint8Array(2) [ 1, 2 ]
+    },
+    [Object: null prototype] {
+      id: 2,
+      display_name: 'Grace',
+      settings: '{"retry_count":2}',
+      active: 0,
+      score: 2,
+      avatar: null
+    }
+  ],
+  first: [Object: null prototype] { id: 1, retries: 1 },
+  returned: 1,
+  aborted: 'rolled back',
+  inTransaction: [
+    [Object: null prototype] { display_name: 'Barbara' },
+    [Object: null prototype] { display_name: 'Grace' }
+  ],
+  fromBound: [Object: null prototype] { n: 2, total: 3.5 }
+}
+",
+  },
+}
+`;

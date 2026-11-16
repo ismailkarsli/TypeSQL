@@ -1,0 +1,21 @@
+{
+	"name": "effect-sqlite",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"start": "node dist/app.js"
+	},
+	"dependencies": {
+		"@typesql/core": "workspace:*",
+		"@typesql/effect": "workspace:*",
+		"effect": "catalog:",
+		"@effect/sql-sqlite-node": "catalog:"
+	},
+	"devDependencies": {
+		"typescript": "catalog:",
+		"@types/node": "catalog:"
+	},
+	"scenario": {
+		"database": "sqlite"
+	}
+}

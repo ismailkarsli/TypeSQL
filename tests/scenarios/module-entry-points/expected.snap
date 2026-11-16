@@ -30,6 +30,7 @@ exports[`module-entry-points > scenario 1`] = `
   "@typesql/core/adapter": {
     "JsonParam": "function",
     "RESERVED_KEYS": "object",
+    "SqlStatement": "function",
     "UsageError": "function",
     "colFlags": "function",
     "colSource": "function",
@@ -39,6 +40,7 @@ exports[`module-entry-points > scenario 1`] = `
     "connectPostgres": "function",
     "connectSqlite": "function",
     "createFamilySql": "function",
+    "createStatementSql": "function",
     "createTransactionalSql": "function",
     "databaseUrl": "function",
     "dialectFamily": "function",
@@ -112,6 +114,10 @@ exports[`module-entry-points > scenario 1`] = `
     "pgType": "function",
     "sqliteExecutor": "function",
     "sqliteType": "function"
+  },
+  "@typesql/effect": {
+    "NoResultError": "function",
+    "createSql": "function"
   },
   "@typesql/kysely": {
     "createSql": "function",

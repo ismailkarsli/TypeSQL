@@ -1,9 +1,14 @@
 import type { Empty } from "../empty.js";
 import type { AnyErr, SqlError } from "../errors.js";
-import type { Fragment, InlineFragment } from "../query.js";
+import type { Fragment, InlineFragment, InlineStatement } from "../query.js";
 import type { Lexis } from "./lexis.js";
 import type { InlineName, SlotNames, SlotNamesIn } from "./splice.js";
 import type { NotLiteralMessage } from "./text.js";
+
+type Inline = InlineFragment | InlineStatement;
+
+// An `infer` without this constraint reads an InlineStatement as `string`.
+type Part = string | InlineStatement;
 
 /**
  * A statement with `${fragment}` / `${query}` interpolations as
@@ -27,10 +32,10 @@ export type InlinedSlots<Q extends string> =
 	Inlined<Q> extends readonly [string, infer F] ? F : {};
 
 type Lift<
-	Q extends string,
+	Q extends Part,
 	Acc extends string,
 	Fs extends readonly unknown[],
-> = Q extends `${infer Line}\n${infer Rest}`
+> = Q extends `${infer Line extends Part}\n${infer Rest extends Part}`
 	? {} extends Record<Line, 1>
 		? LiftLine<Line, Acc, Fs> extends [
 				infer A extends string,
@@ -44,14 +49,14 @@ type Lift<
 		: never;
 
 type LiftLine<
-	Q extends string,
+	Q extends Part,
 	Acc extends string,
 	Fs extends readonly unknown[],
 > =
 	{} extends Record<Q, 1>
-		? Q extends InlineFragment
+		? Q extends Inline
 			? [`${Acc}{${InlineName<Fs["length"]>}}`, [...Fs, Q]]
-			: Q extends `${infer Word} ${infer Rest}`
+			: Q extends `${infer Word extends Part} ${infer Rest extends Part}`
 				? {} extends Record<Word, 1>
 					? LiftChars<Word, Acc, Fs> extends [
 							infer A extends string,
@@ -79,16 +84,16 @@ type Finish<R> = R extends [
 	: R;
 
 type LiftChars<
-	W extends string,
+	W extends Part,
 	Acc extends string,
 	Fs extends readonly unknown[],
-> = W extends InlineFragment
+> = W extends Inline
 	? [`${Acc}{${InlineName<Fs["length"]>}}`, [...Fs, W]]
-	: W extends `${infer C}${infer R}`
-		? C extends InlineFragment
+	: W extends `${infer C extends Part}${infer R extends Part}`
+		? C extends Inline
 			? LiftChars<R, `${Acc}{${InlineName<Fs["length"]>}}`, [...Fs, C]>
 			: {} extends Record<C, 1>
-				? C extends `${infer F extends InlineFragment}`
+				? C extends `${infer F extends Inline}`
 					? LiftChars<R, `${Acc}{${InlineName<Fs["length"]>}}`, [...Fs, F]>
 					: SqlError<NotLiteralMessage, 0>
 				: LiftChars<R, `${Acc}${C}`, Fs>

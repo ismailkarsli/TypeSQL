@@ -1,5 +1,12 @@
 import type { IsUnion, Members } from "../engine/object.js";
-import type { CARRIED, Fragment, Query, TextType } from "../query.js";
+import type {
+	CARRIED,
+	Fragment,
+	InlineStatement,
+	Query,
+	StatementObject,
+	TextType,
+} from "../query.js";
 import type { Skip } from "./inline.js";
 import type { Lexis } from "./lexis.js";
 import type { MaxParamStr } from "./splice.js";
@@ -7,7 +14,8 @@ import type { MaxParamStr } from "./splice.js";
 /** A value that can be interpolated into SQL text, and an item of sql.combine/and/or. */
 export type Slottable =
 	| Fragment<string, readonly unknown[], readonly unknown[]>
-	| Query<unknown, readonly unknown[], string>;
+	| Query<unknown, readonly unknown[], string>
+	| (StatementObject & InlineStatement);
 
 export type SlotTexts<S> = {
 	readonly [K in keyof S]: { readonly text: TextType<S[K]> };
