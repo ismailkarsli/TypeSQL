@@ -532,6 +532,10 @@
   dir: packages/core
   intents:
     - sweet-wolves-return
+"@typesql/core@8.1.0":
+  dir: packages/core
+  intents:
+    - shiny-seals-bathe
 "@typesql/drizzle@0.0.2":
   dir: packages/drizzle
   intents:
@@ -639,6 +643,10 @@
   dir: packages/drizzle
   intents:
     - curvy-rats-shave
+"@typesql/effect@8.1.0":
+  dir: packages/effect
+  intents:
+    - sharp-camels-agree
 "@typesql/kysely@0.0.2":
   dir: packages/kysely
   intents:
