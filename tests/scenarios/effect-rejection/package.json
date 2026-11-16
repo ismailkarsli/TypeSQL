@@ -1,0 +1,20 @@
+{
+	"name": "effect-rejection",
+	"private": true,
+	"type": "module",
+	"dependencies": {
+		"@typesql/core": "workspace:*",
+		"@typesql/effect": "workspace:*",
+		"effect": "catalog:"
+	},
+	"devDependencies": {
+		"typescript": "catalog:",
+		"@types/node": "catalog:"
+	},
+	"scenario": {
+		"failure": {
+			"stage": "compile",
+			"exitCode": 1
+		}
+	}
+}

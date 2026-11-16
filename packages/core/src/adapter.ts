@@ -30,6 +30,7 @@ export {
 	UsageError,
 } from "./command.js";
 export type { Connection } from "./connect.js";
+export { createStatementSql, type StatementFactory } from "./create-sql.js";
 export {
 	type DialectFamily,
 	dialectFamily,
@@ -57,9 +58,14 @@ export {
 	parsePgUserArrays,
 	pgResult,
 } from "./postgres/driver.js";
-export { mapRows, pluginsOf } from "./query.js";
+export { mapRows, pluginsOf, SqlStatement } from "./query.js";
 export type { PositionalStatement, SplitStatement } from "./runtime/compile.js";
 export { JsonParam, jsonText } from "./runtime/json.js";
+export type {
+	StatementFn,
+	StatementOf,
+	StatementParams,
+} from "./sql/contract.js";
 export {
 	connectSqlite,
 	paramNumbers,

@@ -48,7 +48,7 @@ const rows = await sql(
 sql("SELECT emial FROM users");
 ```
 
-`@typesql/postgres` works the same way with postgres.js, `@typesql/sqlite` with node:sqlite, better-sqlite3 and bun:sqlite, and `@typesql/mysql` with mysql2, the mariadb connector, PlanetScale and TiDB Cloud; see [SQLite](https://typesql.karsli.net/adapters/sqlite) and [MySQL and MariaDB](https://typesql.karsli.net/adapters/mysql).
+`@typesql/postgres` works the same way with postgres.js, `@typesql/sqlite` with node:sqlite, better-sqlite3 and bun:sqlite, and `@typesql/mysql` with mysql2, the mariadb connector, PlanetScale and TiDB Cloud; see [SQLite](https://typesql.karsli.net/adapters/sqlite) and [MySQL and MariaDB](https://typesql.karsli.net/adapters/mysql). `@typesql/effect` runs queries as Effects on an Effect `SqlClient`; see [Effect](https://typesql.karsli.net/adapters/effect).
 
 ## Editor support
 

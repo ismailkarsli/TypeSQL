@@ -1,29 +1,44 @@
 import type { AnyErr, SqlError } from "./errors.js";
 import type { SqlPlugin } from "./plugin.js";
+import type { QueryStatement } from "./query.js";
+import type { StatementFn } from "./sql/contract.js";
 
 /**
  * Type-only key of a dialect's `Sql` interface. Its value names the dialect
- * and holds the schema, type map and plugins invariantly, so two `sql`s
- * compare by this one property: a PostgreSQL `sql` is not a SQLite one, and
- * an `sql` for one schema is not one for another, without relating every
- * overloaded member (which is too deep, and too loose for generic members).
+ * and holds the schema, type map, plugins and statement kind invariantly, so
+ * two `sql`s compare by this one property: a PostgreSQL `sql` is not a SQLite
+ * one, and an `sql` for one schema is not one for another, without relating
+ * every overloaded member (which is too deep, and too loose for generic
+ * members).
  */
 export declare const DIALECT: unique symbol;
 
-export type DialectBrand<Name extends string, DB, TM, Plugins> = {
+export type DialectBrand<
+	Name extends string,
+	DB,
+	TM,
+	Plugins,
+	S extends StatementFn = QueryStatement,
+> = {
 	readonly name: Name;
 	readonly inputs: (inputs: [DB, TM, Plugins]) => [DB, TM, Plugins];
+	readonly statement: (statement: S) => S;
 };
 
 /**
  * What the brand of every `sql` of dialect `Name` with `Plugins`, for any
  * schema and type map, is assignable to.
  */
-export type AnyDialectBrand<Name extends string, Plugins = []> = {
+export type AnyDialectBrand<
+	Name extends string,
+	Plugins = [],
+	S extends StatementFn = QueryStatement,
+> = {
 	readonly name: Name;
 	readonly inputs: (
 		inputs: [never, never, Plugins],
 	) => [unknown, unknown, Plugins];
+	readonly statement: (statement: S) => S;
 };
 
 type StrictNullChecksMessage =
@@ -61,6 +76,7 @@ export interface DialectTypes {
 	readonly tm: unknown;
 	// SqlInputs constrains this slot; keeping it unknown preserves exact plugin tuples.
 	readonly plugins: unknown;
+	readonly statement: unknown;
 	readonly ddl: string;
 	readonly sql: unknown;
 	readonly transactionalSql: unknown;
@@ -71,10 +87,19 @@ export interface DialectTypes {
 /** A dialect's `plugins` slot as its `sql` takes it: a plugin list, or none. */
 export type PluginsOf<P> = P extends readonly SqlPlugin[] ? P : [];
 
-type SqlInputs<DB, TM, Plugins extends readonly SqlPlugin[]> = {
+/** A dialect's `statement` slot as its `sql` takes it. */
+export type StatementKindOf<S> = S extends StatementFn ? S : QueryStatement;
+
+type SqlInputs<
+	DB,
+	TM,
+	Plugins extends readonly SqlPlugin[],
+	S extends StatementFn,
+> = {
 	readonly db: DB;
 	readonly tm: TM;
 	readonly plugins: Plugins;
+	readonly statement: S;
 };
 
 type DdlInputs<DB, Q extends string> = { readonly db: DB; readonly ddl: Q };
@@ -84,14 +109,15 @@ export type SqlOf<
 	DB,
 	TM,
 	Plugins extends readonly SqlPlugin[] = [],
-> = (T & SqlInputs<DB, TM, Plugins>)["sql"];
+	S extends StatementFn = QueryStatement,
+> = (T & SqlInputs<DB, TM, Plugins, S>)["sql"];
 
 export type TransactionalSqlOf<
 	T extends DialectTypes,
 	DB,
 	TM,
 	Plugins extends readonly SqlPlugin[] = [],
-> = (T & SqlInputs<DB, TM, Plugins>)["transactionalSql"];
+> = (T & SqlInputs<DB, TM, Plugins, QueryStatement>)["transactionalSql"];
 
 export type ValidateDdlOf<T extends DialectTypes, DB, Q extends string> = (T &
 	DdlInputs<DB, Q>)["validateDdl"];

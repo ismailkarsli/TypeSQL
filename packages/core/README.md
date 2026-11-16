@@ -58,6 +58,7 @@ For MySQL and MariaDB, import `mysqlDialect` or `mariadbDialect` and the schema 
 | [`@typesql/postgres`](https://www.npmjs.com/package/@typesql/postgres) | postgres.js |
 | [`@typesql/sqlite`](https://www.npmjs.com/package/@typesql/sqlite) | node:sqlite, better-sqlite3, bun:sqlite |
 | [`@typesql/mysql`](https://www.npmjs.com/package/@typesql/mysql) | mysql2, the mariadb connector, PlanetScale and TiDB Cloud serverless |
+| [`@typesql/effect`](https://www.npmjs.com/package/@typesql/effect) | an Effect `SqlClient`, with statements as Effects |
 | [`@typesql/kysely`](https://www.npmjs.com/package/@typesql/kysely) | Kysely, with its `DB` interface as the schema |
 | [`@typesql/drizzle`](https://www.npmjs.com/package/@typesql/drizzle) | Drizzle, with its schema |
 | [`@typesql/prisma`](https://www.npmjs.com/package/@typesql/prisma) | Prisma Client, with its schema |

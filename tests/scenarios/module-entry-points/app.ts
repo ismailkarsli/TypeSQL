@@ -15,6 +15,7 @@ import * as coreReserved from "@typesql/core/reserved";
 import * as coreSqlite from "@typesql/core/sqlite";
 import * as coreSqliteEngine from "@typesql/core/sqlite/engine";
 import * as drizzle from "@typesql/drizzle";
+import * as effect from "@typesql/effect";
 import * as kysely from "@typesql/kysely";
 import * as languageServer from "@typesql/language-server";
 import * as languageServerFormat from "@typesql/language-server/format";
@@ -49,6 +50,7 @@ const entryPoints = {
 	"@typesql/core/sqlite": coreSqlite,
 	"@typesql/core/sqlite/engine": coreSqliteEngine,
 	"@typesql/drizzle": drizzle,
+	"@typesql/effect": effect,
 	"@typesql/kysely": kysely,
 	"@typesql/language-server": languageServer,
 	"@typesql/language-server/format": languageServerFormat,

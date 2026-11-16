@@ -110,6 +110,7 @@ export default withVersions({
 					{ text: "PostgreSQL", link: "/adapters/postgresql" },
 					{ text: "SQLite", link: "/adapters/sqlite" },
 					{ text: "MySQL and MariaDB", link: "/adapters/mysql" },
+					{ text: "Effect", link: "/adapters/effect" },
 					{ text: "Custom executor", link: "/adapters/custom-executor" },
 					{
 						text: "Plugins",

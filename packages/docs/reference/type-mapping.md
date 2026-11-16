@@ -107,6 +107,36 @@ postgres.js 3 and 4 differ in two more places:
 - A `timestamp` (without time zone) is local time on 3 and UTC on 4.
 - `'infinity'` and `'-infinity'` are an `Invalid Date` on 3 and the numbers `Infinity` and `-Infinity` on 4, although the map says `Date`. Cast them in SQL, or filter them out, if your data has them.
 
+## Effect
+
+`EffectPgTypeMap`, the map of `@typesql/effect` on PostgreSQL. Verified against `@effect/sql-pg@4.1.4`, which reads results in PostgreSQL's binary format with its own codecs (`PgTypes`):
+
+| Postgres | TypeScript | Why |
+|---|---|---|
+| `int2`, `int4`, `oid`, `float4`, `float8` | `number` | |
+| `int8` | `bigint` | so `count(*)` and `sum(int4)` are too |
+| `numeric` | `string` | |
+| `bool` | `boolean` | |
+| `timestamp`, `timestamptz` | `Date` | `'infinity'` is an invalid `Date` |
+| `date` | `string` | its text, `"2020-01-02"` |
+| `time` | `bigint` | microseconds since midnight |
+| `timetz` | `string` | |
+| `interval` | `EffectPgInterval` | `{ months, days, microseconds }`, with `microseconds` a `bigint` |
+| `json`, `jsonb` | `unknown` | `JSON.parse` |
+| `bytea` | `Uint8Array` | |
+| `regclass` | `number` | its OID |
+| `text`, `varchar`, `bpchar`, `name`, `uuid`, `inet`, `cidr`, `xml`, enums | `string` | |
+| `void` | `string` | `""` |
+| `money`, `jsonpath`, `macaddr`, `macaddr8`, `bit`, `varbit`, `regtype`, `regproc`, `regconfig`, `point`, `line`, `lseg`, `box`, `path`, `polygon`, `circle`, `tsvector`, `tsquery`, the range types, `xid`, `xid8`, `pg_lsn`, `pg_snapshot`, `txid_snapshot`, `aclitem`, `int2vector`, `oidvector`, `record` | `unknown` | no codec |
+
+A statement that returns a type without a codec fails (`Failed to decode row`). Cast the value in SQL (`price::text`), or register a codec in the client's `types` registry and give `createSql` a [custom type map](#custom-type-maps) with its type.
+
+Arrays are read element by element, so `int8[]` is `bigint[]`. The driver reads no array of more than one dimension, and no array of a type without a codec, which includes enums: cast those to `text[]`.
+
+`EffectPgParamTypeMap` lists what parameters accept besides the row type ([table](#parameter-types)). The driver names a parameter's type from its value: a number is an `int4`, `int8` or `float8`, a `bigint` an `int8`, a `Date` a `timestamptz`, a `Uint8Array` a `bytea`, and a string has no type, so the server reads it as the parameter's. `@typesql/effect` sends an array as PostgreSQL's array text, `sql.json()` as JSON text and an `EffectPgInterval` as interval text, which the server reads the same way. A `time` parameter takes its text (`"03:04:05"`): the `bigint` a row has would be sent as an `int8`.
+
+On MySQL and MariaDB the map is `EffectMysqlTypeMap`: [mysql2's](#mysql-and-mariadb), with `BIGINT` as `number | string`, since `@effect/sql-mysql2` sets `supportBigNumbers` and a value past 2^53 comes back as a string. On SQLite it is SQLite's [`DefaultTypeMap`](#sqlite).
+
 ## Prisma
 
 `PrismaTypeMap`, the map of `@typesql/prisma`. It describes what `$queryRaw` returns:

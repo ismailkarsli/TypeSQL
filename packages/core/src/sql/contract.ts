@@ -25,6 +25,16 @@ export interface DisplayFn {
 	readonly t: string;
 	readonly out: string;
 }
+/** The statement `sql()` returns. */
+export interface StatementFn {
+	readonly row: unknown;
+	// Not `readonly unknown[]`, which would stay in the statement's type.
+	readonly params: unknown;
+	readonly text: string;
+	readonly out: unknown;
+}
+
+export type StatementParams<P> = P extends readonly unknown[] ? P : never;
 
 export interface EngineTypes {
 	readonly analysis: AnalysisFn;
@@ -70,6 +80,17 @@ export type TsParamTypeOf<
 	DB,
 	T extends string,
 > = (E["param"] & { readonly tm: TM; readonly db: DB; readonly t: T })["out"];
+
+export type StatementOf<
+	S extends StatementFn,
+	Row,
+	Params extends readonly unknown[],
+	Text extends string,
+> = (S & {
+	readonly row: Row;
+	readonly params: Params;
+	readonly text: Text;
+})["out"];
 
 export type TypeDisplayOf<
 	E extends EngineTypes,

@@ -20,6 +20,7 @@ All paths are under `references/`. Rules differ per database, so skip the rest.
   - mysql2: `adapter-mysql2.md`
   - mariadb: `adapter-mariadb.md`
   - PlanetScale, TiDB Cloud: `adapter-mysql-serverless.md`
+  - an Effect `SqlClient` (`@effect/sql-pg`, `-sqlite-node`, `-mysql2`): `adapter-effect.md`
   - anything else: `custom-executor.md`
 - **ORM** (replaces the adapter file): `kysely.md`, `drizzle.md` or `prisma.md`, plus `<orm>-<postgresql|sqlite|mysql>.md`
 - **Migrations:** `migrations.md`, plus `migrations-<postgresql|sqlite|mysql>.md`

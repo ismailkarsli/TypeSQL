@@ -1,0 +1,73 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`effect-postgres > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "result": "{ rows: ({ created_at: Date; display_name: null | string; id: number; settings: { retry_count: number }; tags: (string)[] })[]; first: { display_name: null | string; id: number }; missing: undefined | { id: number }; noResult: string; updated: number; byExternalId: ({ id: number })[]; spliced: ({ n: bigint })[]; names: (string)[]; streamed: ({ id: number })[]; aborted: string; inTransaction: ({ display_name: null | string })[]; values: { absent: null | string; big: bigint; bigs: (bigint)[]; bytes: Uint8Array<ArrayBufferLike>; day: string; decimal: string; span: { months: number; days: number; microseconds: bigint } }; roundTrip: { bigs: (null | bigint)[]; span: { months: number; days: number; microseconds: bigint }; times: (null | Date)[] }; camelCased: ({ displayName: string; externalId: string })[]; camelStreamed: ({ displayName: null | string })[]; fromBound: ({ n: number })[]; statement: string }",
+    },
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "{
+  rows: [
+    {
+      id: 1,
+      display_name: null,
+      settings: { retry_count: 1 },
+      tags: [ 'a', 'b "quoted"' ],
+      created_at: 2020-01-02T03:04:05.000Z
+    },
+    {
+      id: 2,
+      display_name: 'Grace',
+      settings: { retry_count: 2 },
+      tags: [],
+      created_at: 2021-01-02T03:04:05.000Z
+    }
+  ],
+  first: { id: 1, display_name: null },
+  missing: undefined,
+  noResult: 'NoResultError: The query returned no rows',
+  updated: 1,
+  byExternalId: [ { id: 1 }, { id: 2 } ],
+  spliced: [ { n: 2n } ],
+  names: [ 'Grace', 'Ada' ],
+  streamed: [ { id: 1 }, { id: 2 } ],
+  aborted: 'rolled back',
+  inTransaction: [ { display_name: 'Barbara' }, { display_name: 'Grace' } ],
+  values: {
+    big: 9007199254740993n,
+    decimal: '1.25',
+    bytes: Uint8Array(2) [ 1, 2 ],
+    span: { months: 0, days: 1, microseconds: 7200000000n },
+    day: '2020-01-02',
+    bigs: [ 1n, 2n ],
+    absent: null
+  },
+  roundTrip: {
+    span: { months: 0, days: 1, microseconds: 7200000000n },
+    bigs: [ 1n, 2n ],
+    times: [ 2020-01-02T03:04:05.000Z, null ]
+  },
+  camelCased: [
+    {
+      displayName: 'Grace',
+      externalId: '0b0e1a3c-58a4-4a7e-9d59-7a4f5d9a0002'
+    }
+  ],
+  camelStreamed: [ { displayName: 'Barbara' }, { displayName: 'Grace' } ],
+  fromBound: [ { n: 2 } ],
+  statement: '{"text":"SELECT count(*)::int4 AS n FROM users","values":[]}'
+}
+",
+  },
+}
+`;
