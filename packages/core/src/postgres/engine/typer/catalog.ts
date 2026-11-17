@@ -1298,6 +1298,32 @@ export type FunctionName<DB> =
 	| keyof SchemaFunctions<DB>
 	| keyof PgFunctions;
 
+/**
+ * The name a call is looked up by: `s.f` for a schema-qualified call when
+ * `$functions` declares that key, and otherwise `f`, so a bare key and the
+ * built-in functions answer qualified calls too.
+ */
+export type FnKey<DB, E> = E extends {
+	readonly schema: infer S extends string;
+	readonly name: infer N extends string;
+}
+	? `${S}.${N}` extends keyof SchemaFunctions<DB>
+		? `${S}.${N}`
+		: N
+	: E extends { readonly name: infer N extends string }
+		? N
+		: never;
+
+/** The function's name as the call wrote it, for messages. */
+export type FnDisplay<E> = E extends {
+	readonly schema: infer S extends string;
+	readonly name: infer N extends string;
+}
+	? `${S}.${N}`
+	: E extends { readonly name: infer N extends string }
+		? N
+		: never;
+
 export type LookupFn<
 	DB,
 	Name extends string,
@@ -1336,9 +1362,10 @@ export type CallType<
 	As extends readonly ColInfo[],
 	C extends CallCtx,
 	DB = {},
+	Display extends string = Name,
 > =
 	LookupFn<DB, Name> extends null
-		? UnknownFunction<Name, As>
+		? UnknownFunction<Display, As>
 		: PickSig<LookupFn<DB, Name>, As> extends infer S extends AnySig
 			? CallMisuse<Name, S, As, C> extends infer M extends string
 				? SqlError<M, null>

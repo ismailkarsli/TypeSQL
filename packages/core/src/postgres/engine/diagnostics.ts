@@ -17,7 +17,7 @@ type LocateIdent<
 	M extends string,
 	T extends Toks,
 > = M extends `function ${infer Name}(${string}`
-	? FindTokOr<T, Name, 0>
+	? FindTokOr<T, Unqualified<Name>, 0>
 	: M extends
 				| `${infer Name}(*) ${string}`
 				| `window function ${infer Name} requires ${string}`
@@ -42,6 +42,11 @@ type LocateIdent<
 							: M extends `${infer Op} types ${string} cannot be matched`
 								? FindKwOr<T, Lowercase<Op>, 0>
 								: LocateQuoted<M, T>;
+
+/** A schema-qualified function is found by its own name's token. */
+type Unqualified<Name extends string> = Name extends `${string}.${infer N}`
+	? Unqualified<N>
+	: Name;
 
 type LocateQuoted<
 	M extends string,

@@ -245,9 +245,12 @@ interface DB {
 
 Calling a function that is neither built in nor declared is an error. See [Expressions and functions](./using-sql#expressions-and-functions) for the other ways to declare one.
 
-In `FROM`, a function returning a table's row type has that table's columns (all nullable without `srf: true`). For `RETURNS TABLE`, list them under `columns`:
+A function in another schema can be declared under its qualified name, `"app.slugify": Sig<["text"], "text">`, which a call must then qualify too: `app.slugify(name)`. A bare key also answers qualified calls.
+
+In `FROM`, a function returning a table's row type has that table's columns. Without `srf: true` it returns one row, which is all NULL when the function returns NULL, so every column is nullable; declare `nullable: false` for a function that never returns NULL (it raises instead), and the columns keep the table's nullability. For `RETURNS TABLE`, list them under `columns`:
 
 ```ts
+create_user: Sig<["text"], "users", { nullable: false }>;
 user_cards: Sig<["int4"], "record", { srf: true; columns: { id: Col<"int4">; label: "text" } }>;
 ```
 

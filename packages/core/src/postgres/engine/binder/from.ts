@@ -34,7 +34,7 @@ import type {
 	NullableMap,
 	TypeDisplay,
 } from "../shape.js";
-import type { FunctionCatalog, SrfType } from "../typer/catalog.js";
+import type { FnKey, FunctionCatalog, SrfType } from "../typer/catalog.js";
 import type { CommonType } from "../typer/operators.js";
 import type { TypeList, TypeOf } from "../typer/typeof.js";
 import type { XmlTableCols } from "../typer/xml.js";
@@ -374,7 +374,7 @@ type BindFunc<
 			> extends infer A
 			? A extends string
 				? FuncBaseCols<
-						Call["name"],
+						FnKey<Env["db"], Call>,
 						Call["args"],
 						CD,
 						Call,
@@ -483,16 +483,19 @@ type FuncBaseCols<
 /**
  * A declared function as a FROM item. Its rows are those of `columns`, or of
  * the table or view its return type names: all of them for SETOF, and one row
- * that is all NULL when the function returns NULL otherwise. `record` without
- * `columns` needs a column definition list, as in PostgreSQL. Any other
- * function is typed by its return type, as before.
+ * that is all NULL when the function returns NULL otherwise, unless it is
+ * declared `nullable: false`. `record` without `columns` needs a column
+ * definition list, as in PostgreSQL. Any other function is typed by its
+ * return type, as before.
  */
 type DeclaredRow<F, DB> = F extends { readonly columns: FunctionColumns }
 	? F
 	: F extends { readonly ret: infer R extends string }
 		? ReturnedRelation<DB, R> extends infer M extends ColMap
 			? {
-					readonly columns: F extends { readonly srf: true }
+					readonly columns: F extends
+						| { readonly srf: true }
+						| { readonly nullable: false }
 						? M
 						: NullableMap<M>;
 				}
@@ -627,7 +630,7 @@ type RowsFromCols<
 ]
 	? F["call"] extends Tag<"call">
 		? FuncBaseCols<
-				F["call"]["name"],
+				FnKey<C["db"], F["call"]>,
 				F["call"]["args"],
 				F["colDefs"],
 				F["call"],

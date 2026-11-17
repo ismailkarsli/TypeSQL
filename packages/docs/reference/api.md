@@ -331,11 +331,12 @@ The tables, the resolution order and custom maps are in [Type mapping](./type-ma
 
 A function call is looked up in this order:
 
-1. `FunctionCatalog`: the built-in signatures, plus your augmentations.
-2. `DB["$functions"]`: functions declared on the schema, or by `CREATE FUNCTION` in migrations.
-3. The other `pg_catalog` functions: return type only, arguments not checked.
+1. `DB["$functions"]` under the qualified name, for a qualified call: `app.f(x)` finds a key `"app.f"`.
+2. `FunctionCatalog`: the built-in signatures, plus your augmentations.
+3. `DB["$functions"]`: functions declared on the schema, or by `CREATE FUNCTION` in migrations.
+4. The other `pg_catalog` functions: return type only, arguments not checked.
 
-Schema qualification is ignored (`public.f(x)` is `f`). Any other name is an error. The argument types pick the best-fitting overload; when none fits, one with the same number of arguments is used instead of reporting an error, so argument types are not checked (see [Expressions and functions](../guide/using-sql#expressions-and-functions)). When the chosen signature can't derive a return type from the arguments, the result is `unknown` (nullable); a cast fixes it. How to declare your own functions is in [Expressions and functions](../guide/using-sql#expressions-and-functions).
+Otherwise schema qualification is ignored (`public.f(x)` is `f`). Any other name is an error. The argument types pick the best-fitting overload; when none fits, one with the same number of arguments is used instead of reporting an error, so argument types are not checked (see [Expressions and functions](../guide/using-sql#expressions-and-functions)). When the chosen signature can't derive a return type from the arguments, the result is `unknown` (nullable); a cast fixes it. How to declare your own functions is in [Expressions and functions](../guide/using-sql#expressions-and-functions).
 
 ```ts
 interface DB {
@@ -359,7 +360,7 @@ An entry is one `Sig<Params, Return, Flags>` or a tuple of overloads.
 | Parameter patterns | an exact type name, `any`, `anynumeric`, `anystring`, `anyarray`, `anyjson`, `anydatetime`, `...` (variadic) |
 | Return patterns | an exact name, `$1`..`$4`, `$elem1`, `$arr1`, `$common`, `$sum1`, `$avg1` |
 | Typed-JSON return patterns | `$jval:json` (`to_json`), `$jarr:json` (`json_agg`), `$jrec:json` (`json_object_agg`), `$jtup:json` (`json_build_array`), `$jelem:json` (`json_array_elements`); `jsonb` for the jsonb variants |
-| Flags | `strict` (default `true`: nullable if any argument is; `false` disables this; an array of 1-based argument numbers checks only those arguments), `nullable`, `agg`, `window`, `srf`, `columns` (a `record` function's columns in `FROM`) |
+| Flags | `strict` (default `true`: nullable if any argument is; `false` disables this; an array of 1-based argument numbers checks only those arguments), `nullable` (`false`: never NULL, and a function returning a table's row keeps that table's nullability in `FROM`), `agg`, `window`, `srf`, `columns` (a `record` function's columns in `FROM`) |
 
 ## Migrations
 

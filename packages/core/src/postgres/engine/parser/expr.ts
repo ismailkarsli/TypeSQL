@@ -1003,8 +1003,8 @@ type ParseNameExprSlow<T extends Toks, I extends number> =
 			? T[I] extends WordTok<infer W extends JsonFuncWord>
 				? T[Next<I>] extends OpTok<"(">
 					? ParseJsonFunc<T, W, I>
-					: ParseCall<T, LastOf<Parts>, Next<J>>
-				: ParseCall<T, LastOf<Parts>, Next<J>>
+					: WithSchema<ParseCall<T, LastOf<Parts>, Next<J>>, Parts>
+				: WithSchema<ParseCall<T, LastOf<Parts>, Next<J>>, Parts>
 			: T[J] extends OpTok<".">
 				? T[Next<J>] extends OpTok<"*">
 					? Ok<StarNode<LastOf<Parts>>, Nx2<J>>
@@ -1024,6 +1024,17 @@ export type LastOf<Parts extends readonly string[]> = Parts extends readonly [
 	: never;
 type ColRefOf<Parts extends readonly string[]> =
 	RefOf<Parts> extends RefNode<infer Tb, infer C> ? ColNode<Tb, C> : never;
+
+/** A schema-qualified call (`s.f()`, `db.s.f()`) keeps its schema. */
+type WithSchema<R, Parts extends readonly string[]> = Parts extends readonly [
+	...string[],
+	infer S extends string,
+	string,
+]
+	? R extends Ok<infer E, infer J>
+		? Ok<E & { readonly schema: S }, J>
+		: R
+	: R;
 
 export type ParseCall<T extends Toks, Name extends string, I extends number> =
 	T[I] extends OpTok<")">

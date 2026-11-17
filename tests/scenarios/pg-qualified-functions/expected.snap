@@ -1,0 +1,33 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`pg-qualified-functions > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "byId": "({ id: null | number; name: null | string })[]",
+      "cards": "({ id: number; card: null | string })[]",
+      "counted": "({ n: string })[]",
+      "greeting": "({ g: null | string })[]",
+      "labels": "({ app_label: null | string; audit_label: null | number })[]",
+    },
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "{
+  counted: [ { n: '2' } ],
+  byId: [ { id: 2, name: 'alan' } ],
+  cards: [ { id: 1, card: 'user ada' }, { id: 2, card: 'user alan' } ],
+  labels: [ { app_label: 'label 3', audit_label: 30 } ],
+  greeting: [ { g: 'hello grace' } ]
+}
+",
+  },
+}
+`;

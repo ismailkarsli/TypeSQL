@@ -2671,6 +2671,19 @@ importers:
         specifier: 'catalog:'
         version: 7.1.0-beta
 
+  tests/scenarios/pg-function-name-rejection:
+    dependencies:
+      '@typesql/core':
+        specifier: workspace:*
+        version: link:../../../packages/core
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.6.6
+      typescript:
+        specifier: 'catalog:'
+        version: 7.1.0-beta
+
   tests/scenarios/pg-function-overloads:
     dependencies:
       '@types/pg':
@@ -2694,6 +2707,28 @@ importers:
         version: 7.1.0-beta
 
   tests/scenarios/pg-function-rows:
+    dependencies:
+      '@types/pg':
+        specifier: 'catalog:'
+        version: 8.23.1
+      '@typesql/core':
+        specifier: workspace:*
+        version: link:../../../packages/core
+      '@typesql/pg':
+        specifier: workspace:*
+        version: link:../../../packages/pg
+      pg:
+        specifier: 'catalog:'
+        version: 8.23.1
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.6.6
+      typescript:
+        specifier: 'catalog:'
+        version: 7.1.0-beta
+
+  tests/scenarios/pg-function-rows-not-null:
     dependencies:
       '@types/pg':
         specifier: 'catalog:'
@@ -2965,6 +3000,28 @@ importers:
         version: 7.1.0-beta
 
   tests/scenarios/pg-prepared:
+    dependencies:
+      '@types/pg':
+        specifier: 'catalog:'
+        version: 8.23.1
+      '@typesql/core':
+        specifier: workspace:*
+        version: link:../../../packages/core
+      '@typesql/pg':
+        specifier: workspace:*
+        version: link:../../../packages/pg
+      pg:
+        specifier: 'catalog:'
+        version: 8.23.1
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.6.6
+      typescript:
+        specifier: 'catalog:'
+        version: 7.1.0-beta
+
+  tests/scenarios/pg-qualified-functions:
     dependencies:
       '@types/pg':
         specifier: 'catalog:'

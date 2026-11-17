@@ -68,7 +68,7 @@ type LocateFrom<
 	T extends Toks,
 	Start extends number,
 > = M extends `function ${infer Name}(${string}`
-	? FindTok<T, Name, Start, Start>
+	? FindTok<T, LastPart<Name>, Start, Start>
 	: M extends `${string}"${infer Name}"${string}`
 		? FindTok<T, LastPart<Name>, Start, Start> extends infer F extends number
 			? M extends `${string} specified more than once`

@@ -1,4 +1,5 @@
 import type { Next } from "../../engine/next.js";
+import type { Members } from "../../engine/object.js";
 import type { Best } from "../../engine/suggest.js";
 import type { Toks } from "../../engine/tokens.js";
 import type { IsRelation, RelCols } from "../../schema.js";
@@ -26,13 +27,25 @@ export type WithHint<
 			: M extends `relation "${infer Name}" does not exist`
 				? Hinted<M, Best<Name, RelNames<DB>>, "relation">
 				: M extends `function ${infer Name}(${infer Args}) does not exist. Declare it ${infer Rest}`
-					? Best<
-							Name,
-							SameStart<Name, FunctionName<DB>>
-						> extends infer S extends string
+					? FunctionHint<Name, DB> extends infer S extends string
 						? `function ${Name}(${Args}) does not exist. Perhaps you meant the function "${S}"? Otherwise declare it ${Rest}`
 						: M
 					: M;
+
+/**
+ * The function an unknown name likely meant: the same name declared under a
+ * schema (`app.f` for `f()`), or else the closest known name.
+ */
+type FunctionHint<Name extends string, DB> =
+	Members<
+		Exclude<Extract<FunctionName<DB>, `${string}.${BareName<Name>}`>, Name>,
+		1
+	> extends readonly [infer S extends string]
+		? S
+		: Best<Name, SameStart<Name, FunctionName<DB>>>;
+type BareName<Name extends string> = Name extends `${string}.${infer N}`
+	? BareName<N>
+	: Name;
 
 type SameStart<Name extends string, Cands> = Name extends `${infer C}${string}`
 	? Extract<Cands, `${C}${string}`>

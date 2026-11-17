@@ -4,7 +4,7 @@ import type { AnyErr, ErrMsg, SqlError } from "../../../errors.js";
 import type { Expr, NamedWindow, Tag, Target, WindowSpec } from "../ast.js";
 import type { IntLitValue, NumLitType } from "../literals.js";
 import type { NullableLevel, TypeDisplay } from "../shape.js";
-import type { LookupFn } from "../typer/catalog.js";
+import type { FnKey, LookupFn } from "../typer/catalog.js";
 import type { TypeList, TypeOf } from "../typer/typeof.js";
 import type { Ctx } from "../types.js";
 
@@ -532,10 +532,9 @@ type Children<U> = U extends CallFree | { readonly t: "select" }
 			: never;
 type AggCall<U, DB> = U extends {
 	readonly t: "call";
-	readonly name: infer N extends string;
 	readonly over: false;
 }
-	? IsAggName<DB, N> extends true
+	? IsAggName<DB, FnKey<DB, U>> extends true
 		? U
 		: never
 	: never;

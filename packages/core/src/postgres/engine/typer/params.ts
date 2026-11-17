@@ -20,7 +20,7 @@ import type { CompareOp, MatchOp } from "../ops.js";
 import type { ParamsOfWith } from "../project/dml.js";
 import type { BindWith } from "../project/select.js";
 import type { CteMap, Ctx, MkCtx, QueryContext } from "../types.js";
-import type { AnySig, LookupFn, PickSig, PolyArgs } from "./catalog.js";
+import type { AnySig, FnKey, LookupFn, PickSig, PolyArgs } from "./catalog.js";
 import type { CommonType } from "./operators.js";
 import type {
 	ParamsOfJsonTable,
@@ -423,11 +423,14 @@ type ParamsOfCall<E extends Call, C extends Ctx> = [
 	? ParamsOfList<E["args"], C, null> | ParamsOfCallRest<E, C>
 	: ParamsOfCallHints<E, C>;
 type ParamsOfCallHints<E extends Call, C extends Ctx> =
-	LookupFn<C["db"], E["name"]> extends null
+	LookupFn<C["db"], FnKey<C["db"], E>> extends null
 		? ParamsOfList<E["args"], C, null> | ParamsOfCallRest<E, C>
 		: TypeList<NonStarArgs<E["args"]>, C, []> extends infer As extends
 					readonly ColInfo[]
-			? PickSig<LookupFn<C["db"], E["name"]>, As> extends infer S extends AnySig
+			? PickSig<
+					LookupFn<C["db"], FnKey<C["db"], E>>,
+					As
+				> extends infer S extends AnySig
 				?
 						| ParamsOfArgs<
 								E["args"],

@@ -29,4 +29,5 @@ Generate: `typesql introspect --url postgres://… --out src/db/schema.ts` (`@ty
 - **Colons:** `a[1:n]` reads `:n` as a parameter; write `a[1: n]`.
 - **Not checked:** aggregate `ORDER BY`, window frames, `GROUPING SETS`, writes to `GENERATED ALWAYS`.
 - **Arrays:** typed one-dimensional, with non-null elements from columns.
-- **Functions in FROM:** `ret` naming a table gives its columns; for `RETURNS TABLE`, declare `columns: { id: Col<"int4"> }`.
+- **Functions in FROM:** `ret` naming a table gives its columns (nullable unless `srf: true` or `nullable: false`); for `RETURNS TABLE`, declare `columns: { id: Col<"int4"> }`.
+- **Qualified functions:** a `$functions` key may be `"app.f"`, matched by `app.f()`; a bare key `f` matches `f()` and any `s.f()`.

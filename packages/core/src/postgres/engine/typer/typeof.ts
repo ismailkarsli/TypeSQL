@@ -45,7 +45,13 @@ import type {
 } from "../shape.js";
 import type { Ctx, MkCtx } from "../types.js";
 import type { WidthCheck } from "../util.js";
-import type { AnyNullable, CallType, CommonOf } from "./catalog.js";
+import type {
+	AnyNullable,
+	CallType,
+	CommonOf,
+	FnDisplay,
+	FnKey,
+} from "./catalog.js";
 import type {
 	BinOpType,
 	SelectCommon,
@@ -840,7 +846,7 @@ type TypeCall<E extends Call, C extends Ctx> =
 							E,
 							As,
 							CallType<
-								E["name"],
+								FnKey<C["db"], E>,
 								As,
 								{
 									readonly grouped: C["grouped"];
@@ -866,7 +872,8 @@ type TypeCall<E extends Call, C extends Ctx> =
 										? true
 										: false;
 								},
-								C["db"]
+								C["db"],
+								FnDisplay<E>
 							>
 						>
 					: TypeWithinGroup<E["withinGroup"], C>

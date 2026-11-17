@@ -1,0 +1,29 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`pg-function-rows-not-null > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "created": "({ id: number; name: string; bio: null | string })[]",
+      "createdColumns": "({ bio: null | string; id: number })[]",
+      "maybe": "({ id: null | number; name: null | string })[]",
+    },
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "{
+  created: [ { id: 1, name: 'ada', bio: null } ],
+  createdColumns: [ { id: 2, bio: null } ],
+  maybe: [ { id: 3, name: 'grace' } ]
+}
+",
+  },
+}
+`;

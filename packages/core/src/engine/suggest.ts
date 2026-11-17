@@ -35,24 +35,41 @@ type Dist<A extends string, B extends string> =
 	Abs<Len<A>, Len<B>> extends infer D extends number
 		? Lt<2, D> extends true
 			? 3
-			: Lev<Chars<A>, Chars<B>>
+			: Lev<Chars<A>, Chars<B>, 2>
 		: never;
 
-type Lev<A extends string[], B extends string[]> = A extends []
+/**
+ * The edit distance, exact up to `K` edits and 3 (or more than `K`) beyond:
+ * only a distance under 3 names a suggestion. Equal heads recurse in tail
+ * position, and each edit spends one of `K`, so the nesting stays within `K`
+ * levels whatever the length of the names.
+ */
+type Lev<
+	A extends string[],
+	B extends string[],
+	K extends Budget,
+> = A extends []
 	? Cap<B["length"]>
 	: B extends []
 		? Cap<A["length"]>
 		: A extends [infer AH, ...infer AT extends string[]]
 			? B extends [infer BH, ...infer BT extends string[]]
 				? AH extends BH
-					? Lev<AT, BT>
-					: Min3<Lev<AT, B>, Lev<A, BT>, Lev<AT, BT>> extends infer M extends
-								number
-						? Cap<Inc<M>>
-						: never
+					? Lev<AT, BT, K>
+					: K extends 0
+						? 3
+						: Min3<
+									Lev<AT, B, Dec<K>>,
+									Lev<A, BT, Dec<K>>,
+									Lev<AT, BT, Dec<K>>
+								> extends infer M extends number
+							? Cap<Inc<M>>
+							: never
 				: never
 			: never;
 
+type Budget = 0 | 1 | 2;
+type Dec<K extends Budget> = K extends 2 ? 1 : 0;
 type Cap<N extends number> = Lt<N, 3> extends true ? N : 3;
 type Inc<N extends number> = N extends 0 ? 1 : N extends 1 ? 2 : 3;
 type Min3<A extends number, B extends number, C extends number> = Min<
