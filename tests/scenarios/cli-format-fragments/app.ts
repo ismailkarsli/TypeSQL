@@ -22,7 +22,7 @@ export const ordered = await sql(
 	`select * from "user" order by "email" ${sql.fragment(`asc`)}${sql.fragment(`
     limit 2
 `)}`,
-).execute();
+).exec();
 
 // A fragment in a hole breaks over lines where it ends up, if it doesn't fit there.
 export const subscribed = await sql(
@@ -34,7 +34,7 @@ export const subscribed = await sql(
             and "user_subscription"."plan_key" = ${sql.param(plan)}
     )
 `)}`,
-).execute();
+).exec();
 
 // So does one on its own, and one without whitespace at its edges stays without.
 const subscriber = sql.fragment(
@@ -42,7 +42,7 @@ const subscriber = sql.fragment(
 );
 export const paying = await sql(
 	`select id from "user" where ${subscriber}`,
-).execute();
+).exec();
 
 console.log({ ordered, subscribed, paying });
 await pool.end();

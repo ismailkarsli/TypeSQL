@@ -22,19 +22,19 @@ await sql(
 			(2, 'Grace', NULL, TRUE),
 			(3, 'Linus', 'linus@example.com', FALSE)
 	\`,
-).execute();
+).exec();
 await sql(
 	\`
 		INSERT INTO posts (id, author_id, title)
 		VALUES (1, 1, 'Notes'), (2, 1, NULL), (3, 2, 'Compilers')
 	\`,
-).execute();
+).exec();
 
 // A short query written over several lines becomes one line.
 export const one = await sql(
 	\`SELECT id, name FROM users WHERE id = $1\`,
 	1,
-).execute();
+).exec();
 
 // A long query gets a clause per line; blank lines and trailing spaces go.
 export const counts = await sql(\`
@@ -45,7 +45,7 @@ export const counts = await sql(\`
     GROUP BY u.id, u.name
     ORDER BY posts DESC
     LIMIT 10
-  \`).execute();
+  \`).exec();
 
 // A select list that is too long for its line gets an item per line.
 export const wide = await sql(
@@ -60,7 +60,7 @@ export const wide = await sql(
 		WHERE p.title IS NOT NULL
 		ORDER BY p.id
 	\`,
-).execute();
+).exec();
 
 // A subquery that fits stays on its line; one that doesn't is indented.
 export const recent = await sql(\`
@@ -71,7 +71,7 @@ export const recent = await sql(\`
 	FROM recent
 	GROUP BY author_id
 	ORDER BY author_id
-\`).execute();
+\`).exec();
 export const nested = await sql(
 	\`
 		SELECT name
@@ -86,7 +86,7 @@ export const nested = await sql(
 		ORDER BY name
 	\`,
 	0,
-).execute();
+).exec();
 
 // A line comment keeps a line break after it.
 export const commented = await sql(\`
@@ -94,7 +94,7 @@ export const commented = await sql(\`
 	FROM users -- active only
 	WHERE active
 	ORDER BY id
-\`).execute();
+\`).exec();
 
 // A fragment and the \${…} holes it is spliced into.
 const titled = sql.fragment(\` p.title IS NOT NULL \`);
@@ -105,7 +105,7 @@ export const joined = await sql(
 		JOIN users u ON u.id = p.author_id
 		WHERE \${sql.and([titled, sql.fragment("p.id >= $1", 1)])}
 	\`,
-).execute();
+).exec();
 
 // An upsert gets a clause per line too.
 export const upserted = await sql(
@@ -119,7 +119,7 @@ export const upserted = await sql(
 	1,
 	"Ada Lovelace",
 	null,
-).execute();
+).exec();
 
 console.log({
 	one,

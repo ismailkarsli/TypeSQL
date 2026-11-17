@@ -42,7 +42,7 @@ const rows = await sql(
   `SELECT u.email, u.display_name, p.title
    FROM users u JOIN posts p ON p.author_id = u.id
    WHERE u.id = ${sql.param(1)}`,
-).execute();
+).exec();
 ```
 
 Good to know:

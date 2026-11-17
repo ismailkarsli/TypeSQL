@@ -9,9 +9,9 @@ export const inserted = await sql(
 	"INSERT INTO posts (author_id, title) VALUES ($1, $2)",
 	1,
 	"SQL",
-).executeCount();
+).execCount();
 export const rows = await sql(
 	"SELECT u.id, u.name, u.role, u.bio, p.title FROM users u LEFT JOIN posts p ON p.author_id = u.id ORDER BY u.id",
-).execute();
+).exec();
 console.log({ inserted, rows });
 await pool.end();

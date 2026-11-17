@@ -34,10 +34,10 @@ export interface QueryObject<
 	readonly [ROW]?: Row;
 	readonly [PARAMS]?: Params;
 	readonly [TEXT]?: Text;
-	execute(executor?: Executor): Promise<Row[]>;
-	executeTakeFirst(executor?: Executor): Promise<Row | undefined>;
-	executeTakeFirstOrThrow(executor?: Executor): Promise<Row>;
-	executeCount(executor?: Executor): Promise<number>;
+	exec(executor?: Executor): Promise<Row[]>;
+	execTakeFirstOrNone(executor?: Executor): Promise<Row | undefined>;
+	execTakeFirst(executor?: Executor): Promise<Row>;
+	execCount(executor?: Executor): Promise<number>;
 }
 
 /** The object part of a `Fragment`: what a fragment is besides its string brand. */
@@ -141,23 +141,21 @@ export class SqlQuery extends SqlStatement {
 		this.#executor = executor;
 	}
 	#pick(executor = this.#executor): Executor {
-		return (
-			executor ?? fail("no executor; pass one to createSql() or execute()")
-		);
+		return executor ?? fail("no executor; pass one to createSql() or exec()");
 	}
-	async execute(executor?: Executor): Promise<unknown[]> {
+	async exec(executor?: Executor): Promise<unknown[]> {
 		const result = await this.#pick(executor)(this.text, this.values);
 		return mapRows(this, "rows" in result ? result.rows : result);
 	}
-	async executeTakeFirst(executor?: Executor) {
-		return (await this.execute(executor))[0];
+	async execTakeFirstOrNone(executor?: Executor) {
+		return (await this.exec(executor))[0];
 	}
-	async executeTakeFirstOrThrow(executor?: Executor) {
-		const rows = await this.execute(executor);
+	async execTakeFirst(executor?: Executor) {
+		const rows = await this.exec(executor);
 		if (!rows.length) throw new NoResultError(this.text);
 		return rows[0];
 	}
-	async executeCount(executor?: Executor): Promise<number> {
+	async execCount(executor?: Executor): Promise<number> {
 		const exec = this.#pick(executor);
 		if (exec.count) return exec.count(this.text, this.values);
 		const result = await exec(this.text, this.values);

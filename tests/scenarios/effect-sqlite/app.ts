@@ -40,17 +40,17 @@ const program = Effect.gen(function* () {
 				avatar: null,
 			},
 		])}`,
-	).executeCount();
+	).execCount();
 	const rows = yield* sql(
 		"SELECT id, display_name, settings, active, score, avatar FROM users ORDER BY id",
 	);
 	const first = yield* sql(
 		`SELECT id, settings ->> 'retry_count' AS retries FROM users WHERE id = ${sql.param(1)} AND active = ${sql.param(1)}`,
-	).executeTakeFirstOrThrow();
+	).execTakeFirst();
 	const returned = yield* sql(
 		"UPDATE users SET display_name = 'Ada' WHERE id = :id RETURNING id, display_name",
 		{ id: 1 },
-	).executeCount();
+	).execCount();
 
 	// A failed transaction rolls back; inside one, another is a savepoint.
 	const aborted = yield* sql
@@ -82,7 +82,7 @@ const program = Effect.gen(function* () {
 	const bound = createSql<DB>(sqliteDialect, client);
 	const fromBound = yield* bound(
 		"SELECT count(*) AS n, sum(score) AS total FROM users",
-	).executeTakeFirstOrThrow();
+	).execTakeFirst();
 
 	return {
 		inserted,

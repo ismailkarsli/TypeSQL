@@ -34,7 +34,7 @@ Run `tsc --noEmit`; errors land on the SQL string. To see inferred types, add `c
 
 ```ts
 const q = sql(`SELECT id, email FROM users WHERE id = ${sql.param(userId)}`);
-const rows = await q.execute(); // also executeTakeFirst, executeTakeFirstOrThrow, executeCount
+const rows = await q.exec(); // also execTakeFirstOrNone, execTakeFirst, execCount
 
 sql("SELECT id FROM users WHERE id = $1", 7);
 sql("SELECT id FROM users WHERE email = :email", { email: "a@b.c" });
@@ -53,7 +53,7 @@ Nullability is inferred from outer joins, `WHERE` narrowing through top-level `A
 ## Gotchas
 
 - `` sql`…` `` is a compile error. It's a function: `` sql(`…`) ``.
-- `await sql("…")` compiles but returns the query. Call `execute*`.
+- `await sql("…")` compiles but returns the query. Call `exec*`.
 - `${value}` or a `string` variable as SQL fails with `the SQL text is not a string literal`. Use `sql.param()`, `sql.id()` or a fragment.
 - Placeholders are `$1` on every database; `?` is rejected.
 - Schema columns use database type names: `Col<"text">`, not `Col<string>`.

@@ -48,17 +48,17 @@ const program = Effect.gen(function* () {
 				created_at: "2021-01-02 03:04:05",
 			},
 		])}`,
-	).executeCount();
+	).execCount();
 	const rows = yield* sql(
 		"SELECT id, display_name, settings, active, balance, visits, avatar, created_at FROM users ORDER BY id",
 	);
 	const first = yield* sql(
 		`SELECT id, display_name FROM users WHERE id = ${sql.param(1)}`,
-	).executeTakeFirstOrThrow();
+	).execTakeFirst();
 	const updated = yield* sql(
 		"UPDATE users SET display_name = 'Ada' WHERE id = :id",
 		{ id: 1 },
-	).executeCount();
+	).execCount();
 	const streamed = yield* Stream.runCollect(
 		sql("SELECT id FROM users ORDER BY id").stream(),
 	);
@@ -93,7 +93,7 @@ const program = Effect.gen(function* () {
 	const bound = createSql<DB>(mysqlDialect, client);
 	const fromBound = yield* bound(
 		"SELECT count(*) AS n, sum(balance) AS total FROM users",
-	).executeTakeFirstOrThrow();
+	).execTakeFirst();
 
 	return {
 		inserted,

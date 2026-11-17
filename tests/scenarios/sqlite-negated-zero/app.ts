@@ -16,6 +16,6 @@ export const divided = await sql(`
 		id / -0 AS negativeZero, id / - -2 AS negatedTwo, id / +2 AS plusTwo,
 		id / +0 AS plusZero
 	FROM items
-`).execute();
+`).exec();
 console.dir({ divided }, { depth: null });
 db.close();

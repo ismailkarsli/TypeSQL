@@ -125,4 +125,4 @@ Any of these fixes it:
 
   :::
 - Add `@typesql/core` to the exporting package's `dependencies`.
-- Export the rows (`execute*` results) instead of the query, or annotate the return type.
+- Export the rows (`exec*` results) instead of the query, or annotate the return type.

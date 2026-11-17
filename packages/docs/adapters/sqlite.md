@@ -21,7 +21,7 @@ import { createSql } from "@typesql/sqlite";
 const sql = createSql<DB>(new DatabaseSync("app.db"));
 const posts = await sql(
   `SELECT id, title FROM posts WHERE author_id = ${sql.param(1)}`,
-).execute();
+).exec();
 ```
 
 - `true` / `false` are sent as `1` / `0`, and a `Date` throws; pass `date.toISOString()` instead.

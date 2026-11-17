@@ -20,15 +20,15 @@ await db.insert(users).values({ displayName: "Ada", bio: null });
 const sql = createSql(postgresDialect, db);
 export const rows = await sql(
 	"SELECT id, display_name, bio FROM users ORDER BY id",
-).execute();
+).exec();
 try {
 	await sql.transaction(async (tx) => {
-		await tx("DELETE FROM users WHERE id = $1", 1).execute();
+		await tx("DELETE FROM users WHERE id = $1", 1).exec();
 		throw new Error("abort");
 	});
 } catch (error) {
 	console.log(error instanceof Error ? error.message : error);
 }
-export const after = await sql("SELECT id FROM users ORDER BY id").execute();
+export const after = await sql("SELECT id FROM users ORDER BY id").exec();
 console.log({ rows, after });
 await client.end();

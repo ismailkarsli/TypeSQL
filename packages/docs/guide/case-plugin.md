@@ -15,7 +15,7 @@ const camel = createSql<DB>(postgresDialect, executor).withPlugin(new CasePlugin
 
 const rows = await camel(
 	"SELECT id, display_name, created_at, count(*) OVER () AS total_count FROM users",
-).execute();
+).exec();
 ```
 
 ```ts [SQLite]
@@ -25,7 +25,7 @@ const camel = createSql<DB>(sqliteDialect, executor).withPlugin(new CasePlugin()
 
 const rows = await camel(
 	"SELECT id, display_name, created_at, count(*) OVER () AS total_count FROM users",
-).execute();
+).exec();
 ```
 
 ```ts [MySQL]
@@ -35,7 +35,7 @@ const camel = createSql<DB>(mysqlDialect, executor).withPlugin(new CasePlugin())
 
 const rows = await camel(
 	"SELECT id, display_name, created_at, count(*) OVER () AS total_count FROM users",
-).execute();
+).exec();
 ```
 
 :::
@@ -66,7 +66,7 @@ const snake = sql.withPlugin(new CasePlugin({ to: "snake_case" }));
 
 const row = await snake(
 	`UPDATE accounts SET ${snake.set("accounts", { display_name: "Ada" })} WHERE id = 1 RETURNING "displayName", "createdAt"`,
-).executeTakeFirstOrThrow();
+).execTakeFirst();
 // row is { display_name: string | null; created_at: Date }
 ```
 
@@ -101,14 +101,14 @@ const camel = sql.withPlugin(new CasePlugin({ nested: "all" }));
 // profile is stored as {"home_city": "Oslo", "past_cities": [{"city_name": "Rome"}]}
 const { profile } = await camel(
 	"SELECT profile FROM users WHERE id = 1",
-).executeTakeFirstOrThrow();
+).execTakeFirst();
 // profile is { homeCity: string; pastCities: { cityName: string }[] }
 
 await camel(
 	`UPDATE users SET ${camel.set("users", {
 		profile: camel.json({ homeCity: "Lima", pastCities: [] }),
 	})} WHERE id = 1`,
-).execute();
+).exec();
 // stored as {"home_city": "Lima", "past_cities": []}
 ```
 

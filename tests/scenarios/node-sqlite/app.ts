@@ -16,28 +16,28 @@ db.exec(
 const sql = createSql<DB>(db);
 export const rows = await sql(
 	"SELECT id, name, bio FROM users ORDER BY id",
-).execute();
+).exec();
 export const named = await sql("SELECT name FROM users WHERE id = :id", {
 	id: 1,
-}).executeTakeFirstOrThrow();
+}).execTakeFirst();
 try {
 	await sql.transaction(async (tx) => {
-		await tx("DELETE FROM users WHERE id = $1", 1).execute();
+		await tx("DELETE FROM users WHERE id = $1", 1).exec();
 		throw new Error("abort");
 	});
 } catch (error) {
 	console.log(error instanceof Error ? error.message : error);
 }
-export const after = await sql("SELECT id FROM users ORDER BY id").execute();
+export const after = await sql("SELECT id FROM users ORDER BY id").exec();
 export const changed = await sql(
 	"UPDATE users SET bio = $1 WHERE id = $2",
 	"Engineer",
 	1,
-).executeCount();
+).execCount();
 const prepared = sql.prepare("SELECT id, name FROM users WHERE id = $1");
-export const reused = await prepared(2).execute();
+export const reused = await prepared(2).exec();
 const big = createSql<DB>(db, { bigint: true });
-export const bigRows = await big("SELECT 9007199254740993 AS id").execute();
-export const division = await sql("SELECT 7 / $1 AS divided", 2).execute();
+export const bigRows = await big("SELECT 9007199254740993 AS id").exec();
+export const division = await sql("SELECT 7 / $1 AS divided", 2).exec();
 console.log({ rows, named, after, changed, reused, bigRows, division });
 db.close();

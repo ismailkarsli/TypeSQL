@@ -46,30 +46,30 @@ await pool.query(`
 // that may not exist is all NULL then, so its columns are nullable.
 export const found = await sql(
 	`SELECT * FROM user_by_id(${sql.param(2)})`,
-).execute();
+).exec();
 export const missing = await sql(
 	`SELECT u.id, u.name FROM user_by_id(${sql.param(9)}) u`,
-).execute();
+).exec();
 // SETOF keeps the table's own nullability.
 export const named = await sql(
 	`SELECT * FROM users_named(${sql.param("a")}) u`,
-).execute();
+).exec();
 // RETURNS TABLE: the declared columns, aliased like any relation.
 export const cards = await sql(
 	`SELECT c.id, c.label FROM user_cards(${sql.param(1)}) AS c`,
-).execute();
+).exec();
 
 // A function argument accepts NULL, positional or named, cast or not.
 const nobody = process.env.TYPESQL_NO_SUCH_NAME ?? null;
 export const positional = await sql(
 	`SELECT greet(${sql.param(nobody)}::text) AS g`,
-).execute();
+).exec();
 export const namedCast = await sql(
 	`SELECT greet(name => ${sql.param(nobody)}::text) AS g`,
-).execute();
+).exec();
 export const namedValue = await sql(
 	`SELECT greet(name => ${sql.param("grace")}::text) AS g`,
-).execute();
+).exec();
 
 // Functions a migration creates are read the same way.
 const notes = migration("postgres", {
@@ -97,10 +97,10 @@ const migrated = createSql<SchemaOf<typeof notes>>(pool);
 await pool.query("INSERT INTO notes VALUES (1, 'first'), (2, 'second')");
 export const migratedRow = await migrated(
 	"SELECT n.id, n.title FROM note_by_id(1) n",
-).execute();
+).exec();
 export const migratedTable = await migrated(
 	"SELECT * FROM note_cards() c",
-).execute();
+).exec();
 
 console.dir(
 	{

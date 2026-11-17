@@ -4,7 +4,7 @@ description: "Write typed SELECT, INSERT, UPDATE, DELETE and MERGE statements wi
 
 # Using `sql`
 
-`createSql<DB>(client)` from your adapter gives you `sql`. Call it with a SQL string and it checks the statement against `DB` at compile time and returns a typed query; nothing runs until you call an `execute*` method.
+`createSql<DB>(client)` from your adapter gives you `sql`. Call it with a SQL string and it checks the statement against `DB` at compile time and returns a typed query; nothing runs until you call an `exec*` method.
 
 ::: code-group
 
@@ -15,7 +15,7 @@ import { createSql } from "@typesql/pg";
 const sql = createSql<DB>(new Pool());
 
 const query = sql(`SELECT id, email, display_name FROM users`);
-const rows = await query.execute();
+const rows = await query.exec();
 // { id: number; email: string; display_name: string | null }[]
 ```
 
@@ -26,7 +26,7 @@ import { createSql } from "@typesql/sqlite";
 const sql = createSql<DB>(new DatabaseSync("app.db"));
 
 const query = sql(`SELECT id, email, display_name FROM users`);
-const rows = await query.execute();
+const rows = await query.exec();
 // { id: number; email: string; display_name: string | null }[]
 ```
 
@@ -37,7 +37,7 @@ import { createSql } from "@typesql/mysql";
 const sql = createSql<DB>(createPool(process.env["DATABASE_URL"]!));
 
 const query = sql(`SELECT id, email, display_name FROM users`);
-const rows = await query.execute();
+const rows = await query.exec();
 // { id: number; email: string; display_name: string | null }[]
 ```
 
@@ -45,10 +45,10 @@ const rows = await query.execute();
 
 | Method | Returns |
 |---|---|
-| `execute()` | every row |
-| `executeTakeFirst()` | the first row, or `undefined` |
-| `executeTakeFirstOrThrow()` | the first row, or throws `NoResultError` |
-| `executeCount()` | the number of affected or returned rows |
+| `exec()` | every row |
+| `execTakeFirstOrNone()` | the first row, or `undefined` |
+| `execTakeFirst()` | the first row, or throws `NoResultError` |
+| `execCount()` | the number of affected or returned rows |
 
 A wrong table, column or type is a compile error on the SQL string; see [Errors](./errors).
 
@@ -203,7 +203,7 @@ On SQLite, also register the function with your driver; see [SQLite functions](.
 
 ## Inserting and updating
 
-`INSERT`, `UPDATE`, `DELETE` and `MERGE` (`REPLACE` and `ON DUPLICATE KEY UPDATE` on MySQL and MariaDB) are checked like queries, and every `NOT NULL` column without a default must be set; without `RETURNING`, `execute()` resolves to `[]` and `executeCount()` gives the affected rows.
+`INSERT`, `UPDATE`, `DELETE` and `MERGE` (`REPLACE` and `ON DUPLICATE KEY UPDATE` on MySQL and MariaDB) are checked like queries, and every `NOT NULL` column without a default must be set; without `RETURNING`, `exec()` resolves to `[]` and `execCount()` gives the affected rows.
 
 ```ts
 const created = sql(`
@@ -307,10 +307,10 @@ const dynamic = sql.as<{ [column: string]: unknown }>(`SELECT ${sql.raw(columns)
 const userId = await sql.transaction(async (tx) => {
 	const { id } = await tx(
 		`INSERT INTO users (email) VALUES (${tx.param("ada@example.com")}) RETURNING id`,
-	).executeTakeFirstOrThrow();
+	).execTakeFirst();
 	await tx(
 		`INSERT INTO posts (author_id, title) VALUES (${tx.param(id)}, ${tx.param("Hello")})`,
-	).execute();
+	).exec();
 	return id;
 });
 ```

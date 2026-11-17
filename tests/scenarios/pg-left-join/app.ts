@@ -17,8 +17,8 @@ await pool.query(`CREATE TABLE users (id int PRIMARY KEY, name text NOT NULL, bi
   INSERT INTO users VALUES (1, 'Ada', NULL), (2, 'Grace', 'Compiler');
   INSERT INTO posts VALUES (1, 1, 'SQL');`);
 export const rows = await sql(`SELECT u.id, u.name, p.title FROM users u
-  LEFT JOIN posts p ON p.author_id = u.id ORDER BY u.id`).execute();
+  LEFT JOIN posts p ON p.author_id = u.id ORDER BY u.id`).exec();
 export const narrowed = await sql(`SELECT u.id, p.title FROM users u
-  LEFT JOIN posts p ON p.author_id = u.id WHERE p.title IS NOT NULL ORDER BY u.id`).execute();
+  LEFT JOIN posts p ON p.author_id = u.id WHERE p.title IS NOT NULL ORDER BY u.id`).exec();
 console.log({ rows, narrowed });
 await pool.end();

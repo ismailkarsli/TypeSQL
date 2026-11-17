@@ -8,6 +8,6 @@ import type { DB } from "./schema.js";
 const sql = createSql<DB>(db);
 export const rows = await sql(
 	"SELECT id, name, bio FROM users ORDER BY id",
-).execute();
+).exec();
 console.log(rows);
 db.close();

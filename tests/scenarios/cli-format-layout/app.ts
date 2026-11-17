@@ -11,10 +11,10 @@ const sql = createSql<DB>(pool);
 // and a clause that is still too long puts an item per line.
 await sql(
 	"insert into users (id, name, email, active) values (1, 'Ada', 'ada@example.com', true), (2, 'Grace', null, true), (3, 'Linus', 'linus@example.com', false)",
-).execute();
+).exec();
 await sql(
 	"insert into posts (id, author_id, title) values (1, 1, 'Notes'), (2, 1, null), (3, 2, 'Compilers')",
-).execute();
+).exec();
 
 // A short query written over several lines becomes one line.
 export const one = await sql(
@@ -24,7 +24,7 @@ export const one = await sql(
 	where id = $1
 `,
 	1,
-).execute();
+).exec();
 
 // A long query gets a clause per line; blank lines and trailing spaces go.
 export const counts = await sql(`
@@ -35,27 +35,27 @@ export const counts = await sql(`
 
     where u.active = true and u.email is not null   
     group by u.id, u.name order by posts desc limit 10
-  `).execute();
+  `).exec();
 
 // A select list that is too long for its line gets an item per line.
 export const wide = await sql(
 	"select u.id as user_id, u.name as user_name, u.email as user_email, p.title as post_title from users u join posts p on p.author_id = u.id where p.title is not null order by p.id",
-).execute();
+).exec();
 
 // A subquery that fits stays on its line; one that doesn't is indented.
 export const recent = await sql(`with recent as (select * from posts
-  where created_at > now() - interval '7 days') select author_id, count(*) as n from recent group by author_id order by author_id`).execute();
+  where created_at > now() - interval '7 days') select author_id, count(*) as n from recent group by author_id order by author_id`).exec();
 export const nested = await sql(
 	"select name from users where id in (select author_id from posts where title is not null and created_at > now() - interval '30 days' and author_id > $1) order by name",
 	0,
-).execute();
+).exec();
 
 // A line comment keeps a line break after it.
 export const commented = await sql(`
 	select id
 	from users   -- active only
 	where active order by id
-`).execute();
+`).exec();
 
 // A fragment and the ${…} holes it is spliced into.
 const titled = sql.fragment(`
@@ -63,7 +63,7 @@ const titled = sql.fragment(`
 `);
 export const joined = await sql(
 	`select p.id, u.name from posts p join users u on u.id = p.author_id where ${sql.and([titled, sql.fragment("p.id >= $1", 1)])}`,
-).execute();
+).exec();
 
 // An upsert gets a clause per line too.
 export const upserted = await sql(
@@ -71,7 +71,7 @@ export const upserted = await sql(
 	1,
 	"Ada Lovelace",
 	null,
-).execute();
+).exec();
 
 console.log({
 	one,

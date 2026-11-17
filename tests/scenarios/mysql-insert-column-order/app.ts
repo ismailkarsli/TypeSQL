@@ -30,27 +30,27 @@ const sql = createSql<DB>(pool);
 
 const unordered = sql.prepare("INSERT INTO items VALUES (1, $1, $2)");
 export type UnorderedParams = Parameters<typeof unordered>;
-await unordered("Ada", null).execute();
+await unordered("Ada", null).exec();
 
 const rows = sql.prepare("INSERT INTO items VALUES (2, $1, $2), (3, $3, $4)");
 export type RowsParams = Parameters<typeof rows>;
-await rows("Grace", "SQL", "Lin", null).execute();
+await rows("Grace", "SQL", "Lin", null).exec();
 
 const listed = sql.prepare(
 	"INSERT INTO items (note, sku, name) VALUES ($1, $2, $3)",
 );
 export type ListedParams = Parameters<typeof listed>;
-await listed(null, 4, "Ken").execute();
+await listed(null, 4, "Ken").exec();
 
 const positioned = sql.prepare("INSERT INTO placed VALUES ($1, $2, $3)");
 export type PlacedParams = Parameters<typeof positioned>;
-await positioned(1, "Ada", null).execute();
+await positioned(1, "Ada", null).exec();
 
 const upsert = sql.prepare(
 	"INSERT INTO placed VALUES ($1, $2, $3) AS new(a, b, c) ON DUPLICATE KEY UPDATE note = COALESCE(new.c, $4)",
 );
 export type UpsertParams = Parameters<typeof upsert>;
-await upsert(1, "Ada", null, "kept").execute();
+await upsert(1, "Ada", null, "kept").exec();
 
 const baseline = {
 	up: async (db: MySqlMigration<DB>) => db,
@@ -70,17 +70,17 @@ const altered = createSql<SchemaOf<typeof tagged>>(pool);
 
 const first = altered.prepare("INSERT INTO items VALUES ($1, 5, $2, $3)");
 export type FirstParams = Parameters<typeof first>;
-await first("new", "Edsger", null).execute();
+await first("new", "Edsger", null).exec();
 
 const after = altered.prepare("INSERT INTO placed VALUES ($1, $2, $3, $4)");
 export type AfterParams = Parameters<typeof after>;
-await after(2, "new", "Grace", "SQL").execute();
+await after(2, "new", "Grace", "SQL").exec();
 
 export const items = await altered(
 	"SELECT tag, sku, name, note FROM items ORDER BY sku",
-).execute();
+).exec();
 export const placed = await altered(
 	"SELECT sku, tag, name, note FROM placed ORDER BY sku",
-).execute();
+).exec();
 console.log({ items, placed });
 await pool.end();

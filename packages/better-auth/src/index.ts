@@ -213,11 +213,11 @@ function adapter(
 	}: Parameters<AdapterFactoryCustomizeAdapterCreator>[0],
 ): CustomAdapter {
 	const all = <T>(s: Statement, text: string) =>
-		db.as<T>(text, ...s.values).execute();
+		db.as<T>(text, ...s.values).exec();
 	const one = async <T>(s: Statement, text: string) =>
 		(await all<T>(s, text))[0] ?? null;
 	const changed = (s: Statement, text: string) =>
-		db.as(text, ...s.values).executeCount();
+		db.as(text, ...s.values).execCount();
 	const keyOf = ({ model, modelKey }: ModelTarget) =>
 		modelKey ?? getDefaultModelName(model);
 	const column = (target: ModelTarget, field: string) =>

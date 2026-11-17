@@ -47,18 +47,18 @@ const program = Effect.gen(function* () {
 			{ displayName: "Ada" },
 			{ displayName: null },
 		])}`,
-	).executeCount();
+	).execCount();
 	const rows = yield* sql("SELECT id, display_name FROM users ORDER BY id");
 
 	const named = yield* withSql(client, (sql) =>
 		sql(
 			`SELECT display_name FROM users WHERE id = ${sql.param(1)}`,
-		).executeTakeFirstOrThrow(),
+		).execTakeFirst(),
 	);
 
 	const counted = yield* onFiber(
 		"SELECT count(*) AS user_count FROM users",
-	).executeTakeFirstOrThrow();
+	).execTakeFirst();
 
 	return { inserted, rows, named, counted };
 });

@@ -25,7 +25,7 @@ const query =
 	"SELECT 9007199254740993::int8 AS big, 1.25::numeric AS decimal, NULL::int8 AS absent";
 
 const sql: PgSql<{}, [], ParsedTypeMap> = createSql<{}, ParsedTypeMap>(pool);
-export const parsed = await sql(query).execute();
+export const parsed = await sql(query).exec();
 
 // The driver builds the same API on createTransactionalSql.
 const direct = createTransactionalSql<Postgres, {}, ParsedTypeMap, PgQueryable>(
@@ -33,10 +33,10 @@ const direct = createTransactionalSql<Postgres, {}, ParsedTypeMap, PgQueryable>(
 	pool,
 	driver,
 );
-export const fromDriver = await direct(query).execute();
+export const fromDriver = await direct(query).exec();
 
 // Without a type map, rows are typed with PgTypeMap, pg's defaults.
-export const defaults = () => createSql<{}>(pool)(query).execute();
+export const defaults = () => createSql<{}>(pool)(query).exec();
 
 console.log({ parsed, fromDriver });
 await pool.end();

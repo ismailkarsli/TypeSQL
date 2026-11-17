@@ -13,7 +13,7 @@ interface DB {
 }
 // SQLite drivers return JSON as text, which the default map says.
 const text = createSql<DB>(sqliteDialect)("SELECT meta, extra FROM posts");
-export type Text = Awaited<ReturnType<typeof text.execute>>;
+export type Text = Awaited<ReturnType<typeof text.exec>>;
 
 // An executor that returns JSON parsed says so in its map; a typed JSON
 // column then reads as its type.
@@ -23,4 +23,4 @@ interface ParsedJsonTypeMap extends Omit<DefaultTypeMap, "json"> {
 const parsed = createSql<DB, ParsedJsonTypeMap>(sqliteDialect)(
 	"SELECT meta, extra FROM posts",
 );
-export type Parsed = Awaited<ReturnType<typeof parsed.execute>>;
+export type Parsed = Awaited<ReturnType<typeof parsed.exec>>;

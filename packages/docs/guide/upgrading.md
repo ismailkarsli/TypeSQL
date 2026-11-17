@@ -4,7 +4,7 @@ description: "Breaking changes in each TypeSQL major version and the code to cha
 
 # Upgrading
 
-This page lists breaking changes and migration guidance since 1.0, newest first, with the code to change. Apply the sections newer than your installed version, oldest first: from 5.x or 6.x apply [7.0](#_7-0); from 4.x apply [5.0](#_5-0), then 7.0; from 3.x apply [4.0](#_4-0), then 5.0 and 7.0. From 2.x start at [3.0](#_3-0), from 1.x at [2.0](#_2-0), and from 0.x at [1.0](#_1-0). The [changelog](/changelog) has the release notes from 1.0.0 on; notes for 0.x releases are on the [GitHub releases page](https://github.com/ismailkarsli/TypeSQL/releases).
+This page lists breaking changes and migration guidance since 1.0, newest first, with the code to change. Apply the sections newer than your installed version, oldest first: from 7.x or 8.x apply [9.0](#_9-0); from 5.x or 6.x apply [7.0](#_7-0), then 9.0; from 4.x apply [5.0](#_5-0), then 7.0 and 9.0; from 3.x apply [4.0](#_4-0), then 5.0, 7.0 and 9.0. From 2.x start at [3.0](#_3-0), from 1.x at [2.0](#_2-0), and from 0.x at [1.0](#_1-0). The [changelog](/changelog) has the release notes from 1.0.0 on; notes for 0.x releases are on the [GitHub releases page](https://github.com/ismailkarsli/TypeSQL/releases).
 
 Most breaking changes are compile errors at the call site, so after upgrading run `tsc --noEmit` (or your editor) and work through the list. The changes that compile but behave differently are marked **Runtime change**.
 
@@ -29,6 +29,19 @@ Most breaking changes are compile errors at the call site, so after upgrading ru
     }
   }
   ```
+
+## 9.0
+
+### The `execute*` methods are renamed to `exec*`
+
+| Before | After |
+|---|---|
+| `q.execute()` | `q.exec()` |
+| `q.executeTakeFirstOrThrow()` | `q.execTakeFirst()` |
+| `q.executeTakeFirst()` | `q.execTakeFirstOrNone()` |
+| `q.executeCount()` | `q.execCount()` |
+
+They take the same optional executor and return the same values, and `@typesql/effect` statements have the same names. `execTakeFirstOrNone()` still resolves to `undefined` when there is no row, and `execTakeFirst()` still rejects with `NoResultError`.
 
 ## 7.0
 

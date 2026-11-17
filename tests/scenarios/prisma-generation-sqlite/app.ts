@@ -17,19 +17,19 @@ await client.user.create({ data: { name: "Ada" } });
 await client.author.create({ data: { name: "Ada" } });
 export const rows = await sql(
 	"SELECT id, name, display_name FROM users ORDER BY id",
-).execute();
+).exec();
 try {
 	await sql.transaction(async (tx) => {
-		await tx("DELETE FROM users WHERE id = $1", 1).execute();
+		await tx("DELETE FROM users WHERE id = $1", 1).exec();
 		throw new Error("abort");
 	});
 } catch (error) {
 	console.log(error instanceof Error ? error.message : error);
 }
-export const after = await sql("SELECT id FROM users ORDER BY id").execute();
+export const after = await sql("SELECT id FROM users ORDER BY id").exec();
 export const clientRows = await fromClient(
 	'SELECT id, name, bio FROM "Author" ORDER BY id',
-).execute();
+).exec();
 console.log({ rows, after });
 console.log({ clientRows });
 await client.$disconnect();

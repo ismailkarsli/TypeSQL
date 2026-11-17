@@ -61,7 +61,7 @@ const rows = await sql(
   `SELECT u.email, p.title
    FROM users u LEFT JOIN posts p ON p.author_id = u.id
    WHERE u.id = ${sql.param(userId)}`,
-).execute();
+).exec();
 
 // Compile error: column "emial" does not exist. Perhaps you meant the column "email"?
 sql("SELECT emial FROM users");

@@ -43,17 +43,17 @@ await pool.query(`
 		LANGUAGE sql AS $$ SELECT 'hello ' || name $$;
 `);
 
-export const counted = await sql("SELECT app.user_count() AS n").execute();
+export const counted = await sql("SELECT app.user_count() AS n").exec();
 export const byId = await sql(
 	`SELECT u.id, u.name FROM app.user_by_id(${sql.param(2)}) u`,
-).execute();
-export const cards = await sql("SELECT * FROM app.user_cards() c").execute();
+).exec();
+export const cards = await sql("SELECT * FROM app.user_cards() c").exec();
 export const labels = await sql(
 	`SELECT app.label(${sql.param(3)}) AS app_label, audit.label(${sql.param(3)}) AS audit_label`,
-).execute();
+).exec();
 export const greeting = await sql(
 	`SELECT app.greet(${sql.param("grace")}) AS g`,
-).execute();
+).exec();
 
 console.dir({ counted, byId, cards, labels, greeting }, { depth: null });
 await pool.end();

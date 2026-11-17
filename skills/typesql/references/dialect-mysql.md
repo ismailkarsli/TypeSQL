@@ -29,8 +29,8 @@ Generate: `typesql introspect --url mysql://… --out src/db/schema.ts` (`@types
 - **Inserted id on MySQL:** no `RETURNING`. On a pool, read it in a transaction:
   ```ts
   const { id } = await sql.transaction(async (tx) => {
-  	await tx(`INSERT INTO users (email) VALUES (${tx.param("a@b.c")})`).execute();
-  	return tx("SELECT LAST_INSERT_ID() AS id").executeTakeFirstOrThrow();
+  	await tx(`INSERT INTO users (email) VALUES (${tx.param("a@b.c")})`).exec();
+  	return tx("SELECT LAST_INSERT_ID() AS id").execTakeFirst();
   });
   ```
 - **Upsert:** `ON DUPLICATE KEY UPDATE title = VALUES(title)`.

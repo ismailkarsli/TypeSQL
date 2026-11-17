@@ -18,10 +18,10 @@ const sql = createSql<DB>({
 	},
 });
 const attack = "x' OR 1=1 -- ";
-const lookup = () => sql("SELECT k FROM notes WHERE k = $1", attack).execute();
+const lookup = () => sql("SELECT k FROM notes WHERE k = $1", attack).exec();
 const echo = (value: string) =>
 	sql("SELECT $1 AS v", value)
-		.execute()
+		.exec()
 		.then(([row]) => row?.v === value);
 
 // A value can't end its string, whichever way the server reads backslashes.

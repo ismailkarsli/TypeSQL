@@ -10,7 +10,7 @@ import type { DB } from "./db/schema.js";
 const sql = createSql<DB>(new Pool());
 ```
 
-Takes a `Pool`, `Client` or `PoolClient`. `executor(client)` runs one query elsewhere: `q.execute(executor(client))`.
+Takes a `Pool`, `Client` or `PoolClient`. `executor(client)` runs one query elsewhere: `q.exec(executor(client))`.
 
 **Rows:**
 - `string`: `int8` (`count(*)`), `numeric`, `money`, `uuid`, `time`, ranges.

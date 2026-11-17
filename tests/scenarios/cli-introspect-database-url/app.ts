@@ -7,6 +7,6 @@ import type { DB } from "./schema.js";
 
 const pool = createPool(String(process.env.DATABASE_URL));
 const sql = createSql<DB>(pool);
-export const rows = await sql("SELECT id, email, bio FROM users").execute();
+export const rows = await sql("SELECT id, email, bio FROM users").exec();
 console.log(rows);
 await pool.end();

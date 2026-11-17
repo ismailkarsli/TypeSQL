@@ -38,21 +38,21 @@ await sql(
 	`INSERT INTO users ${sql.values("users", [
 		{ id: 1, display_name: null, settings: sql.json({ retry_count: 1 }) },
 	])}`,
-).execute();
+).exec();
 export const rows = await sql(
 	"SELECT id, display_name, settings FROM users",
-).execute();
+).exec();
 
 // A transaction, and a savepoint inside it that rolls back alone.
 export const inTransaction = await sql.transaction(async (tx) => {
-	await tx("UPDATE users SET display_name = 'Ada' WHERE id = 1").execute();
+	await tx("UPDATE users SET display_name = 'Ada' WHERE id = 1").exec();
 	await tx
 		.transaction(async (inner) => {
-			await inner("UPDATE users SET display_name = 'Grace'").execute();
+			await inner("UPDATE users SET display_name = 'Grace'").exec();
 			throw new Error("inner abort");
 		})
 		.catch((error: Error) => console.log(error.message));
-	return tx("SELECT display_name FROM users").executeTakeFirstOrThrow();
+	return tx("SELECT display_name FROM users").execTakeFirst();
 });
 
 // One the caller opened on Kysely takes a savepoint too.
@@ -65,12 +65,12 @@ await db.transaction().execute(async (trx) => {
 	>(postgresDialect, trx, driverOf("postgres"));
 	await onTrx
 		.transaction(async (tx) => {
-			await tx("UPDATE users SET display_name = 'Linus'").execute();
+			await tx("UPDATE users SET display_name = 'Linus'").exec();
 			throw new Error("savepoint abort");
 		})
 		.catch((error: Error) => console.log(error.message));
 });
-export const after = await sql("SELECT display_name FROM users").execute();
+export const after = await sql("SELECT display_name FROM users").exec();
 
 console.dir({ rows, inTransaction, after }, { depth: null });
 await db.destroy();

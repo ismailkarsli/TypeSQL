@@ -21,10 +21,10 @@ const posts = await sql(
   `SELECT u.email, p.title
    FROM users u JOIN posts p ON p.author_id = u.id
    WHERE u.id = ${sql.param(1)}`,
-).execute();
+).exec();
 
 await sql.transaction(async (tx) => {
-  await tx(`UPDATE posts SET published = true WHERE author_id = ${tx.param(1)}`).execute();
+  await tx(`UPDATE posts SET published = true WHERE author_id = ${tx.param(1)}`).exec();
 });
 ```
 

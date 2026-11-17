@@ -9,7 +9,7 @@ import { createSql } from "@typesql/kysely";
 const sql = createSql(postgres, db);
 
 await db.transaction().execute(async (trx) => {
-	await createSql(postgres, trx)("DELETE FROM posts WHERE author_id = $1", 1).execute();
+	await createSql(postgres, trx)("DELETE FROM posts WHERE author_id = $1", 1).exec();
 });
 ```
 

@@ -10,7 +10,7 @@ import type { PgTypeMap } from "@typesql/pg";
 const sql = createSql<typeof schema, PgTypeMap>(postgres, db);
 
 await db.transaction(async (tx) => {
-	await createSql<typeof schema, PgTypeMap>(postgres, tx)("DELETE FROM posts WHERE author_id = $1", 1).execute();
+	await createSql<typeof schema, PgTypeMap>(postgres, tx)("DELETE FROM posts WHERE author_id = $1", 1).exec();
 });
 ```
 

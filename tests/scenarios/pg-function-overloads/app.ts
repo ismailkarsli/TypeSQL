@@ -27,20 +27,20 @@ export const rows = await sql(`
 			lead(optional_label) OVER (ORDER BY id) AS following_optional,
 			jsonb_path_match('true'::jsonb, '$'::jsonpath, '{}'::jsonb, true) AS path_match
 		FROM items ORDER BY id
-	`).execute();
+	`).exec();
 export const statistics = await sql(`
 		SELECT stddev_samp(id)::float8 AS deviation,
 			variance(id)::float8 AS variance,
 			var_samp(id)::float8 AS sample,
 			var_pop(id)::float8 AS population
 		FROM items
-	`).executeTakeFirstOrThrow();
+	`).execTakeFirst();
 export const parameterized = await sql(
 	"SELECT regexp_count(label, $1, $2, $3) AS matches FROM items ORDER BY id",
 	"a",
 	1,
 	"i",
-).execute();
+).exec();
 // Long arithmetic predicates, with and without a function call at their
 // innermost operand, still type-check.
 export const predicates = await sql(`
@@ -55,6 +55,6 @@ export const predicates = await sql(`
    AND id IN (SELECT id FROM items)
    AND EXISTS (SELECT 1 FROM items WHERE length(label) > 0)
  ORDER BY id
-`).execute();
+`).exec();
 console.dir({ rows, statistics, parameterized, predicates }, { depth: null });
 await pool.end();

@@ -14,13 +14,10 @@ const first = migration("mysql", {
 		const next = await db.ddl(
 			"CREATE TABLE settings (id INT PRIMARY KEY, data JSON NOT NULL)",
 		);
-		await next(
-			"INSERT INTO settings VALUES (1, $1)",
-			db.json(settings),
-		).execute();
+		await next("INSERT INTO settings VALUES (1, $1)", db.json(settings)).exec();
 		await next
 			.as("UPDATE settings SET data = $1 WHERE id = 1", settings)
-			.execute();
+			.exec();
 		return next;
 	},
 	down: async (db) => {
@@ -44,12 +41,10 @@ interface DB {
 const pool = createPool(process.env.DATABASE_URL!);
 const sql = createSql<DB>(pool);
 try {
-	await sql
-		.as("UPDATE settings SET data = $1 WHERE id = 1", settings)
-		.execute();
+	await sql.as("UPDATE settings SET data = $1 WHERE id = 1", settings).exec();
 } catch (error) {
 	console.log("adapter:", error instanceof Error ? error.message : error);
 }
-export const rows = await sql("SELECT id, data FROM settings").execute();
+export const rows = await sql("SELECT id, data FROM settings").exec();
 console.log(rows);
 await pool.end();

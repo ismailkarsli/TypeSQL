@@ -19,39 +19,37 @@ export const row = await sql
 		$1: number;
 		last: number;
 	}>(`SELECT $1 AS first, ${columns} /* /* */, ${sql.param(20)} AS last`, 10)
-	.executeTakeFirstOrThrow();
+	.execTakeFirst();
 console.log(row);
 
 // sql() reads its text, and that of its fragments, by the same rules.
 export const quotedName = await sql("SELECT 1 AS `a:b`, :y + 0 AS y", {
 	y: 2,
-}).executeTakeFirstOrThrow();
+}).execTakeFirst();
 export const escapedQuote = await sql(
 	'SELECT \'it\\\'s :x\' AS s, "say \\"hi:x\\"" AS d, :y + 0 AS y',
 	{ y: 2 },
-).executeTakeFirstOrThrow();
+).execTakeFirst();
 export const hashComment = await sql("SELECT 1 AS a # not :x\n, :y + 0 AS y", {
 	y: 2,
-}).executeTakeFirstOrThrow();
+}).execTakeFirst();
 export const doubleMinus = await sql("SELECT 5--1 AS dash, :y + 0 AS y", {
 	y: 2,
-}).executeTakeFirstOrThrow();
+}).execTakeFirst();
 export const blockComment = await sql("SELECT /* /* */ :y + 0 AS y", {
 	y: 2,
-}).executeTakeFirstOrThrow();
+}).execTakeFirst();
 const dollar = sql.fragment("1 AS `$2`, $1 + 0 AS a", 10);
-export const quotedDollar = await sql(
-	`SELECT ${dollar}`,
-).executeTakeFirstOrThrow();
+export const quotedDollar = await sql(`SELECT ${dollar}`).execTakeFirst();
 const name = sql.fragment("1 AS `a:b`, :y + 0 AS y", { y: 2 });
 export const fragment = await sql(
 	`SELECT ${name}, ${sql.param(3)} + 0 AS z`,
-).executeTakeFirstOrThrow();
+).execTakeFirst();
 const pair = sql.combine([
 	sql.fragment("$1 + 0 AS `$1 a`", 1),
 	sql.fragment("$1 + 0 AS `$1 b`", 2),
 ]);
-export const combined = await sql(`SELECT ${pair}`).executeTakeFirstOrThrow();
+export const combined = await sql(`SELECT ${pair}`).execTakeFirst();
 console.log({
 	quotedName,
 	escapedQuote,

@@ -30,21 +30,21 @@ const sql = createSql<DB>(db);
 
 const unordered = sql.prepare("INSERT INTO items VALUES (1, $1, $2)");
 export type UnorderedParams = Parameters<typeof unordered>;
-await unordered("Ada", null).execute();
+await unordered("Ada", null).exec();
 
 const rows = sql.prepare("INSERT INTO items VALUES (2, $1, $2), (3, $3, $4)");
 export type RowsParams = Parameters<typeof rows>;
-await rows("Grace", "SQL", "Lin", null).execute();
+await rows("Grace", "SQL", "Lin", null).exec();
 
 const listed = sql.prepare(
 	"INSERT INTO items (note, sku, name) VALUES ($1, $2, $3)",
 );
 export type ListedParams = Parameters<typeof listed>;
-await listed(null, 4, "Ken").execute();
+await listed(null, 4, "Ken").exec();
 
 const positioned = sql.prepare("INSERT INTO placed VALUES ($1, $2, $3)");
 export type PlacedParams = Parameters<typeof positioned>;
-await positioned(1, "Ada", null).execute();
+await positioned(1, "Ada", null).exec();
 
 const baseline = {
 	up: async (db: SqliteMigration<DB>) => db,
@@ -64,17 +64,17 @@ const altered = createSql<SchemaOf<typeof tagged>>(db);
 
 const added = altered.prepare("INSERT INTO items VALUES (5, $1, $2, $3)");
 export type AddedParams = Parameters<typeof added>;
-await added("Edsger", null, "new").execute();
+await added("Edsger", null, "new").exec();
 
 const appended = altered.prepare("INSERT INTO placed VALUES ($1, $2, $3, $4)");
 export type AppendedParams = Parameters<typeof appended>;
-await appended(2, "Grace", "SQL", "new").execute();
+await appended(2, "Grace", "SQL", "new").exec();
 
 export const items = await altered(
 	"SELECT sku, name, note, tag FROM items ORDER BY sku",
-).execute();
+).exec();
 export const placed = await altered(
 	"SELECT sku, name, note, tag FROM placed ORDER BY sku",
-).execute();
+).exec();
 console.log({ items, placed });
 db.close();

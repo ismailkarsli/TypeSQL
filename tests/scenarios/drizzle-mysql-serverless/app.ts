@@ -18,7 +18,7 @@ const client = connect({
 const sql = createSql(mysqlDialect, drizzle({ client }));
 
 // A `?` in a string is text, whichever side of a parameter it is on.
-await sql("SELECT 'why?' AS note, $1 AS id", 7).execute();
-await sql("SELECT $1 AS quoted, 'why?' AS note", "it's").execute();
-await sql("SELECT 1 AS plain").execute();
+await sql("SELECT 'why?' AS note, $1 AS id", 7).exec();
+await sql("SELECT $1 AS quoted, 'why?' AS note", "it's").exec();
+await sql("SELECT 1 AS plain").exec();
 console.dir(sent, { depth: null });

@@ -20,37 +20,33 @@ await pool.query(`
 export const parameter = await sql(
 	"SELECT 2 = ANY(ARRAY[$1::int4]) AS x",
 	null,
-).execute();
+).exec();
 export const castArray = await sql(
 	"SELECT 2 = ANY(COALESCE($1::int4[], ARRAY[1])) AS x",
 	[1, null],
-).execute();
+).exec();
 export const column = await sql(
 	"SELECT 1 = ANY(ARRAY[n]) AS x FROM items",
-).execute();
-export const literal = await sql(
-	"SELECT 2 = ANY(ARRAY[1, NULL]) AS x",
-).execute();
+).exec();
+export const literal = await sql("SELECT 2 = ANY(ARRAY[1, NULL]) AS x").exec();
 export const subquery = await sql(
 	"SELECT 2 = ANY(ARRAY(SELECT n FROM items)) AS x",
-).execute();
+).exec();
 export const aggregated = await sql(
 	"SELECT 2 = ANY(array_agg(n)) AS x FROM items",
-).execute();
-export const all = await sql("SELECT 1 = ALL(ARRAY[1, NULL]) AS x").execute();
+).exec();
+export const all = await sql("SELECT 1 = ALL(ARRAY[1, NULL]) AS x").exec();
 
 // Without NULL elements it is true or false.
-export const elements = await sql("SELECT 1 = ANY(ARRAY[1, 2]) AS x").execute();
+export const elements = await sql("SELECT 1 = ANY(ARRAY[1, 2]) AS x").exec();
 export const arrayColumn = await sql(
 	"SELECT 'a' = ANY(tags) AS x FROM items",
-).execute();
-export const allElements = await sql(
-	"SELECT 1 = ALL(ARRAY[1, 2]) AS x",
-).execute();
+).exec();
+export const allElements = await sql("SELECT 1 = ALL(ARRAY[1, 2]) AS x").exec();
 // WHERE only keeps true rows, whatever the array holds.
 export const filtered = await sql(
 	"SELECT id FROM items WHERE 1 = ANY(ARRAY[n, 1])",
-).execute();
+).exec();
 console.dir(
 	{
 		parameter,

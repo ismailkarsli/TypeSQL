@@ -33,10 +33,10 @@ export const inserted = await sql(
 	"INSERT INTO typesql_archive.events (user_id, note) VALUES ($1, $2)",
 	1,
 	"login",
-).executeCount();
+).execCount();
 export const rows = await sql(
 	"SELECT e.id, e.note, u.name FROM typesql_archive.events e JOIN users u ON u.id = e.user_id ORDER BY e.id",
-).execute();
+).exec();
 console.log({ inserted, rows });
 await kysql`DROP DATABASE typesql_archive`.execute(db);
 await db.destroy();

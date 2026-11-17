@@ -33,10 +33,8 @@ await query(
 	1,
 	"Ada",
 	"Admin",
-).execute();
-await repo
-	.run("insert into posts values (1, 1, 'SELECT * FROM users')")
-	.execute();
+).exec();
+await repo.run("insert into posts values (1, 1, 'SELECT * FROM users')").exec();
 
 const titled = repo.fragment("P.Title is not null");
 export const joined = await sql(
@@ -47,22 +45,20 @@ export const joined = await sql(
 		where \${sql.and([titled, sql.fragment("U.id >= $1", 1)])}
 		order by U.id desc nulls last
 	\`,
-).execute();
+).exec();
 const byId = sql.prepare(
 	"select name, type from users where id = $1 or name = 'where'",
 );
-export const prepared = await byId(2).execute();
+export const prepared = await byId(2).exec();
 export const typed = await sql.transaction(async (tx) =>
 	tx(
 		"select type, count(*) as n from users group by type order by type",
-	).execute(),
+	).exec(),
 );
-export const escaped = await sql(
-	"select id from users where id = 1",
-).execute();
+export const escaped = await sql("select id from users where id = 1").exec();
 
 // SQL that TypeSQL doesn't check stays as written.
-export const raw = await sql.as<{ one: number }>("SELECT 1 AS one").execute();
+export const raw = await sql.as<{ one: number }>("SELECT 1 AS one").exec();
 const other = await pool.query("SELECT 2 AS two");
 const echo = (text: string) => text;
 console.log({

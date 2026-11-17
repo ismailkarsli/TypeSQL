@@ -18,13 +18,13 @@ const sql = createSql<DB>(pool);
 export const inserted = await sql(
 	`INSERT INTO users (id, settings, items) VALUES ($1, ${sql.json({ theme: "dark", tags: ["sql"] })}, ${sql.json(["one", "two"])})`,
 	1,
-).executeCount();
+).execCount();
 export const rows = await sql(
 	"SELECT id, settings, items, role, settings ->> '$.theme' AS theme, settings -> '$.tags' AS tags, JSON_EXTRACT(items, '$[0]') AS first FROM users ORDER BY id",
-).execute();
+).exec();
 export const admins = await sql(
 	"SELECT id FROM users WHERE role = $1",
 	"admin",
-).execute();
+).exec();
 console.dir({ inserted, rows, admins }, { depth: null });
 await pool.end();

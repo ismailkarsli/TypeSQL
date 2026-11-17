@@ -75,6 +75,6 @@ console.log("over the limit:", (await signIn("second-password")).status);
 
 export const users = await sql(
 	'SELECT name, email, "emailVerified", image FROM "user"',
-).execute();
+).exec();
 console.log(users);
 db.close();

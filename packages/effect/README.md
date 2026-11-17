@@ -22,12 +22,12 @@ import type { DB } from "./db/schema.js";
 const sql = createSql<DB>(postgresDialect);
 
 const program = Effect.gen(function* () {
-  // A statement is an Effect: yield it, or call execute().
+  // A statement is an Effect: yield it, or call exec().
   const users = yield* sql("SELECT id, email FROM users");
 
   const user = yield* sql(
     `SELECT id, email FROM users WHERE id = ${sql.param(1)}`,
-  ).executeTakeFirstOrThrow();
+  ).execTakeFirst();
 
   yield* sql.withTransaction(
     sql(`UPDATE posts SET published = true WHERE author_id = ${sql.param(user.id)}`),
@@ -43,7 +43,7 @@ await Effect.runPromise(
 ```
 
 - Without a client, statements run on the fiber's `SqlClient` and require it. `createSql<DB>(postgresDialect, client)` binds one, and its statements require nothing.
-- `execute()`, `executeTakeFirst()`, `executeTakeFirstOrThrow()` and `executeCount()` return Effects, and `stream()` a `Stream`. `executeTakeFirstOrThrow()` fails with the tagged `NoResultError`.
+- `exec()`, `execTakeFirstOrNone()`, `execTakeFirst()` and `execCount()` return Effects, and `stream()` a `Stream`. `execTakeFirst()` fails with the tagged `NoResultError`.
 - `sql.withTransaction(effect)` is the client's `withTransaction`: a failure rolls back, and inside another transaction it is a savepoint.
 - `${query}` splices a statement as a subquery, as on every TypeSQL adapter.
 - Rows keep the database's column names; attach `CasePlugin` from `@typesql/core/plugins` for camelCase keys.

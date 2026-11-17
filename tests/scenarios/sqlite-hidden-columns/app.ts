@@ -17,10 +17,10 @@ await sql(
 	"INSERT INTO docs (title, body) VALUES ($1, $2)",
 	"SQL",
 	"typed queries",
-).execute();
+).exec();
 export const found = await sql(
 	"SELECT title FROM docs WHERE docs MATCH $1",
 	"typed",
-).execute();
+).exec();
 console.log(found);
 db.close();

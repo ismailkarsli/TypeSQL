@@ -27,14 +27,14 @@ const optional = condition ? sql.fragment("AND balance > $1", 0) : undefined;
 const query = sql(
 	`SELECT id, display_name FROM users ${where} ${sql.optional(optional)} ORDER BY ${sql.id("id")}`,
 );
-export const rows = await query.execute();
+export const rows = await query.exec();
 export const named = await sql(
 	"SELECT id FROM users WHERE id = :id OR id = :id",
 	{ id: 1 },
-).execute();
+).exec();
 export const inline = await sql(
 	`SELECT id FROM users WHERE id = ${sql.param(2)}`,
-).execute();
+).exec();
 export const text = query.text;
 export const values = query.values;
 const unbound = createSql<DB>(postgresDialect);
@@ -43,7 +43,7 @@ export const mapped = mapRows(
 	rawQuery,
 	(await pool.query(rawQuery.text, [...rawQuery.values])).rows,
 );
-export const overridden = await rawQuery.execute(executor(pool));
+export const overridden = await rawQuery.exec(executor(pool));
 type Box<T> = { data: T };
 interface Wrapped extends IdentityPluginTypes {
 	readonly output: Box<this["value"]>;
@@ -58,7 +58,7 @@ const transformed = sql.withPlugin(new CasePlugin()).withPlugin(new Wrapper());
 export const wrapped = await transformed(
 	"SELECT display_name FROM users WHERE id = $1",
 	1,
-).executeTakeFirstOrThrow();
+).execTakeFirst();
 console.dir(
 	{ rows, named, inline, text, values, mapped, overridden, wrapped },
 	{ depth: null },

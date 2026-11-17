@@ -11,22 +11,20 @@ await client.unsafe(
 );
 const sql = createSql<DB>(client);
 const find = sql.prepare("SELECT id, name FROM users WHERE id = $1");
-export const rows = await find(1).execute();
+export const rows = await find(1).exec();
 try {
 	await sql.transaction(async (tx) => {
-		await tx("DELETE FROM users WHERE id = $1", 2).execute();
+		await tx("DELETE FROM users WHERE id = $1", 2).exec();
 		throw new Error("abort");
 	});
 } catch (error) {
 	console.log(error instanceof Error ? error.message : error);
 }
-export const after = await sql(
-	"SELECT id, name FROM users ORDER BY id",
-).execute();
+export const after = await sql("SELECT id, name FROM users ORDER BY id").exec();
 const big = createSql<{}>(client);
 export const values = await big(
 	"SELECT 9007199254740993::int8 AS big, '2020-01-02T03:04:05Z'::timestamptz AS at",
-).execute();
+).exec();
 console.log({ rows, after });
 await client.end();
 const bigintClient = postgres(process.env.DATABASE_URL!, {
@@ -34,6 +32,6 @@ const bigintClient = postgres(process.env.DATABASE_URL!, {
 });
 export const bigRows = await createSql<{}>(bigintClient, { bigint: true })(
 	"SELECT 9007199254740993::int8 AS big",
-).execute();
+).exec();
 console.log({ values, bigRows });
 await bigintClient.end();

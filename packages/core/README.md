@@ -85,7 +85,7 @@ export const createUsers = migration("postgres", {
   name: "create-users",
   up: async (db) => {
     const users = await db.ddl("CREATE TABLE users (id serial PRIMARY KEY, name text NOT NULL)");
-    await users("INSERT INTO users (name) VALUES ($1)", "Ada").execute();
+    await users("INSERT INTO users (name) VALUES ($1)", "Ada").exec();
     return users;
   },
   down: async (db) => {
@@ -126,7 +126,7 @@ import { CasePlugin } from "@typesql/core/plugins";
 const appSql = sql.withPlugin(new CasePlugin());
 const changes = appSql.set("users", { displayName: "Ada" });
 const query = appSql(`UPDATE users SET ${changes} RETURNING display_name`);
-// query.execute() returns rows with displayName.
+// query.exec() returns rows with displayName.
 ```
 
 `withPlugin()` returns a new SQL instance and preserves transactions. Custom plugins implement `SqlPlugin<Types>` with any of `transformInput(value, context)`, `transformOutput(row)` and `transformJson(value)`. Their `PluginTypes` describe the accepted input, encoded database input, and returned row using `this["value"]`. Inputs encode in reverse registration order; outputs transform in registration order. Positional and named arguments, prepared queries, write helpers, and `mapRows()` use the same pipeline. See [plugins](https://typesql.karsli.net/guide/plugins) and the [custom plugin example](https://github.com/ismailkarsli/TypeSQL/blob/main/packages/core/examples/plugins.ts).

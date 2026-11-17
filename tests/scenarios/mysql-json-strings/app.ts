@@ -26,9 +26,9 @@ await sql(
 	sql.json({ theme: "dark" }),
 	sql.json({ tags: ["a"] }),
 	sql.json({ theme: "light" }),
-).execute();
+).exec();
 export const rows = await sql(
 	"SELECT id, meta, extra, meta ->> '$.theme' AS theme FROM posts ORDER BY id",
-).execute();
+).exec();
 console.log(rows);
 await pool.end();

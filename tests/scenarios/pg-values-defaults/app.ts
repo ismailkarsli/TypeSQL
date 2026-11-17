@@ -21,16 +21,16 @@ const rows: { id: number; name?: string }[] = [{ id: 4, name: "d" }, { id: 5 }];
 // PostgreSQL writes DEFAULT for a column a row leaves out.
 await sql(
 	`INSERT INTO users ${sql.values("users", [{ id: 1, name: "a" }, { id: 2 }])}`,
-).execute();
+).exec();
 await sql(
 	`INSERT INTO users ${sql.values([
 		{ id: 3, bio },
 		{ id: 6, bio: "f" },
 	])}`,
-).execute();
-await sql(`INSERT INTO users ${sql.values("users", rows)}`).execute();
+).exec();
+await sql(`INSERT INTO users ${sql.values("users", rows)}`).exec();
 export const users = await sql(
 	"SELECT id, name, bio FROM users ORDER BY id",
-).execute();
+).exec();
 console.log(users);
 await client.end();

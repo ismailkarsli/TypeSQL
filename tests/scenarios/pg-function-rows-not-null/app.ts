@@ -32,14 +32,14 @@ await pool.query(`
 // Declared never NULL: the row keeps the table's nullability.
 export const created = await sql(
 	`SELECT * FROM create_user(${sql.param("ada")}) u`,
-).execute();
+).exec();
 export const createdColumns = await sql(
 	`SELECT u.id, u.bio FROM create_user(${sql.param("alan")}) AS u`,
-).execute();
+).exec();
 // Not declared: one row that may be all NULL, so every column is nullable.
 export const maybe = await sql(
 	`SELECT u.id, u.name FROM create_user_maybe(${sql.param("grace")}) u`,
-).execute();
+).exec();
 
 console.dir({ created, createdColumns, maybe }, { depth: null });
 await pool.end();

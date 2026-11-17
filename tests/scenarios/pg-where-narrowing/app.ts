@@ -23,27 +23,27 @@ await pool.query(`CREATE TABLE users (id int PRIMARY KEY, name text NOT NULL, bi
 const sql = createSql<DB>(pool);
 export const any = await sql(
 	"SELECT id, bio FROM users WHERE bio = ANY (SELECT title FROM posts) ORDER BY id",
-).execute();
+).exec();
 export const all = await sql(
 	"SELECT id, bio FROM users WHERE bio <> ALL (SELECT title FROM posts WHERE id > 1) ORDER BY id",
-).execute();
+).exec();
 export const allArray = await sql(
 	"SELECT id, bio FROM users WHERE bio <> ALL ($1::text[]) ORDER BY id",
 	[],
-).execute();
+).exec();
 export const notIn = await sql(
 	"SELECT id, bio FROM users WHERE bio NOT IN (SELECT title FROM posts WHERE id > 1) ORDER BY id",
-).execute();
+).exec();
 export const notInList = await sql(
 	"SELECT id, bio FROM users WHERE bio NOT IN ('SQL') ORDER BY id",
-).execute();
+).exec();
 export const joined =
 	await sql(`SELECT u.name, p.id, p.title, p.body FROM users u
-  LEFT JOIN posts p ON p.author_id = u.id ORDER BY u.id`).execute();
+  LEFT JOIN posts p ON p.author_id = u.id ORDER BY u.id`).exec();
 export const matched =
 	await sql(`SELECT u.name, p.id, p.title, p.body FROM users u
-  LEFT JOIN posts p ON p.author_id = u.id WHERE p.title = 'SQL' ORDER BY u.id`).execute();
+  LEFT JOIN posts p ON p.author_id = u.id WHERE p.title = 'SQL' ORDER BY u.id`).exec();
 export const right = await sql(`SELECT u.id, u.name, p.title FROM posts p
-  RIGHT JOIN users u ON p.author_id = u.id WHERE p.id IS NOT NULL`).execute();
+  RIGHT JOIN users u ON p.author_id = u.id WHERE p.id IS NOT NULL`).exec();
 console.log({ any, all, allArray, notIn, notInList, joined, matched, right });
 await pool.end();

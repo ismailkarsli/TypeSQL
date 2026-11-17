@@ -25,7 +25,7 @@ import { createSql } from "@typesql/mysql";
 const sql = createSql<DB>(createPool(process.env["DATABASE_URL"]!));
 const posts = await sql(
   `SELECT id, title FROM posts WHERE author_id = ${sql.param(1)}`,
-).execute();
+).exec();
 ```
 
 - The adapter rewrites `$1`, `$2`, … to `?`, and mysql2 escapes the values into the statement (`query()`), so every statement works, `LIMIT $1` and DDL included.

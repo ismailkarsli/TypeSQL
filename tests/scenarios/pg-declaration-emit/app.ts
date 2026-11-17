@@ -9,6 +9,6 @@ export function activeSubscriptionQuery(userId: string) {
 await client.connect();
 await client.query(`CREATE TABLE subscriptions (id int8 PRIMARY KEY, user_id text NOT NULL, plan_name text NOT NULL, ended_at timestamptz);
   INSERT INTO subscriptions VALUES (1, 'ada', 'pro', NULL), (2, 'ada', 'free', '2026-01-01T00:00:00Z');`);
-export const active = await activeSubscriptionQuery("ada").execute();
+export const active = await activeSubscriptionQuery("ada").exec();
 console.log(active, Object.isFrozen(active[0]));
 await client.end();

@@ -91,16 +91,16 @@ await camel(
 			}),
 		},
 	])}`,
-).execute();
+).exec();
 export const camelFlat = await camel(
 	"SELECT display_name, address_line_1, point_x_y, profile FROM users WHERE id = 1",
-).executeTakeFirstOrThrow();
+).execTakeFirst();
 
 // nested: rows, sql.json(), sql.param() and plain write values all convert.
 const camelNested = sql.withPlugin(new CasePlugin({ nested: "all" }));
 export const camelNestedRead = await camelNested(
 	"SELECT id, created_at, avatar_data, profile, extra_doc, free_form FROM users WHERE id = 1",
-).executeTakeFirstOrThrow();
+).execTakeFirst();
 await camelNested(
 	`INSERT INTO users ${camelNested.values("users", [
 		{
@@ -119,14 +119,14 @@ await camelNested(
 			freeForm: camelNested.json({ someKey: [{ innerKey: 1 }] }),
 		},
 	])}`,
-).execute();
+).exec();
 await camelNested(
 	`INSERT INTO users (id, profile, extra_doc) VALUES (3, ${camelNested.param({
 		homeCity: "Rome",
 		phoneNumber: null,
 		pastCities: [],
 	})}, ${camelNested.json(null)})`,
-).execute();
+).exec();
 await camelNested(
 	`UPDATE users SET ${camelNested.set("users", {
 		profile: {
@@ -136,41 +136,41 @@ await camelNested(
 		},
 		extraDoc: { lastSeen: "today" },
 	})} WHERE id = 3`,
-).execute();
+).exec();
 export const camelNestedOptional = await camelNested(
 	`UPDATE users SET ${camelNested.set({
 		displayName: camelNested.param(camelNested.optional(undefined)),
 		freeForm: camelNested.json({ optKey: 1 }),
 	})} WHERE id = 3 RETURNING free_form`,
-).executeTakeFirstOrThrow();
+).execTakeFirst();
 // Parameters keep the names of the database, positional and named alike.
 await camelNested("UPDATE users SET free_form = :doc WHERE id = 1", {
 	doc: { named_key: 1, camelKey: 2 },
-}).execute();
+}).exec();
 export const storedNamedParameter = await sql(
 	"SELECT free_form FROM users WHERE id = 1",
-).executeTakeFirstOrThrow();
+).execTakeFirst();
 await camelNested("UPDATE users SET free_form = $1 WHERE id = 1", {
 	param_key: 1,
 	camelKey: 2,
-}).execute();
+}).exec();
 export const storedPositionalParameter = await sql(
 	"SELECT free_form FROM users WHERE id = 1",
-).executeTakeFirstOrThrow();
+).execTakeFirst();
 export const camelNestedRows = await camelNested(
 	"SELECT id, profile, extra_doc, free_form FROM users ORDER BY id",
-).execute();
+).exec();
 // A recursive JSON type converts as far down as it is read.
 const { familyTree } = await camelNested(
 	"SELECT family_tree FROM users WHERE id = 2",
-).executeTakeFirstOrThrow();
+).execTakeFirst();
 export const leafName = familyTree?.childNodes[0]?.nodeName;
 export const camelNestedInTransaction = await camelNested.transaction((tx) =>
-	tx("SELECT profile FROM users WHERE id = 2").executeTakeFirstOrThrow(),
+	tx("SELECT profile FROM users WHERE id = 2").execTakeFirst(),
 );
 export const storedUsers = await sql(
 	"SELECT id, profile, extra_doc, family_tree ->> 'node_name' AS tree_root, free_form FROM users ORDER BY id",
-).execute();
+).exec();
 
 // to: snake_case names camelCase columns the other way round.
 const snake = sql.withPlugin(new CasePlugin({ to: "snake_case" }));
@@ -193,13 +193,13 @@ await snake(
 			}),
 		},
 	])}`,
-).execute();
+).exec();
 export const snakeFlat = await snake(
 	`SELECT "displayName", "HTTPCode", "userID", "Id", "fooBAR", "XMLHttpRequest", "HTTP2Code", "userIDs", lower_name, "settingsDoc" FROM accounts`,
-).executeTakeFirstOrThrow();
+).execTakeFirst();
 export const snakeUpdated = await snake(
 	`UPDATE accounts SET ${snake.set("accounts", { display_name: "Grace" })} WHERE id = 1 RETURNING "displayName"`,
-).executeTakeFirstOrThrow();
+).execTakeFirst();
 
 const snakeNested = sql.withPlugin(
 	new CasePlugin({ to: "snake_case", nested: "all" }),
@@ -215,13 +215,13 @@ await snakeNested(
 			}),
 		},
 	])}`,
-).execute();
+).exec();
 export const snakeNestedRows = await snakeNested(
 	`SELECT id, "displayName", "settingsDoc" FROM accounts ORDER BY id`,
-).execute();
+).exec();
 export const storedAccounts = await sql(
 	`SELECT id, "settingsDoc" FROM accounts ORDER BY id`,
-).execute();
+).exec();
 
 console.dir(
 	{

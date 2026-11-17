@@ -20,13 +20,13 @@ const rollup = sql.prepare(
 	"SELECT region, max(amount) + $1 AS top FROM sales GROUP BY ROLLUP (region)",
 );
 export type RollupParams = Parameters<typeof rollup>;
-export const rolledUp = await rollup(null).execute();
+export const rolledUp = await rollup(null).exec();
 
 // With a plain GROUP BY each group has a row, so max(amount) is not NULL.
 const grouped = sql.prepare(
 	"SELECT region, max(amount) + $1 AS top FROM sales GROUP BY region",
 );
 export type GroupedParams = Parameters<typeof grouped>;
-export const groups = await grouped(1).execute();
+export const groups = await grouped(1).exec();
 console.dir({ rolledUp, groups }, { depth: null });
 await pool.end();

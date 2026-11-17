@@ -12,11 +12,9 @@ const script: string = [
 	"INSERT INTO notes VALUES (1, 'one'), (2, 'two')",
 	"SELECT id, body FROM notes ORDER BY id",
 ].join("; ");
-export const rows = await sql
-	.as<{ id: number; body: string }>(script)
-	.execute();
+export const rows = await sql.as<{ id: number; body: string }>(script).exec();
 export const changed = await sql
 	.as("UPDATE notes SET body = upper(body); DELETE FROM notes WHERE id = 1")
-	.executeCount();
+	.execCount();
 console.log({ rows, changed });
 await client.end();

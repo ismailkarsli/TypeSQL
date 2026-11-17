@@ -10,7 +10,7 @@ import type { DB } from "./db/schema.js";
 const sql = createSql<DB>(new DatabaseSync("app.db"));
 ```
 
-A better-sqlite3 or bun:sqlite `Database` works the same. `execute*` is still async.
+A better-sqlite3 or bun:sqlite `Database` works the same. `exec*` is still async.
 
 **Rows:**
 - `number`: integer, real and numeric affinity, so `count(*)`.

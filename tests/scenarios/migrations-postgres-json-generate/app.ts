@@ -9,6 +9,6 @@ export const rows = await sql(
 	"INSERT INTO settings (id, value) VALUES ($1, $2) RETURNING value, backup",
 	1,
 	sql.json({ theme: "dark" }),
-).execute();
+).exec();
 console.log(rows);
 await pool.end();

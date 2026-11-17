@@ -59,14 +59,14 @@ const users = Effect.gen(function* () {
 
 ## Run queries
 
-A statement is an Effect, the same one as `execute()`: yield it, pipe it, or pass it to any function that takes an Effect.
+A statement is an Effect, the same one as `exec()`: yield it, pipe it, or pass it to any function that takes an Effect.
 
 | | Effect of | Fails with |
 |---|---|---|
-| `yield* q`, `q.execute()` | `Row[]` | `SqlError` |
-| `q.executeTakeFirst()` | `Row \| undefined` | `SqlError` |
-| `q.executeTakeFirstOrThrow()` | `Row` | `SqlError \| NoResultError` |
-| `q.executeCount()` | `number`: the rows changed or returned | `SqlError` |
+| `yield* q`, `q.exec()` | `Row[]` | `SqlError` |
+| `q.execTakeFirstOrNone()` | `Row \| undefined` | `SqlError` |
+| `q.execTakeFirst()` | `Row` | `SqlError \| NoResultError` |
+| `q.execCount()` | `number`: the rows changed or returned | `SqlError` |
 | `q.stream()` | a `Stream` of `Row` | `SqlError` |
 
 ```ts
@@ -75,7 +75,7 @@ import { Effect, Stream } from "effect";
 const program = Effect.gen(function* () {
 	const user = yield* sql(
 		`SELECT id, email FROM users WHERE id = ${sql.param(7)}`,
-	).executeTakeFirstOrThrow();
+	).execTakeFirst();
 
 	const emails = yield* sql("SELECT email FROM users").pipe(
 		Effect.map((users) => users.map((user) => user.email)),
@@ -83,7 +83,7 @@ const program = Effect.gen(function* () {
 
 	const changed = yield* sql(
 		"UPDATE users SET display_name = NULL",
-	).executeCount();
+	).execCount();
 
 	yield* sql("SELECT id FROM users").stream().pipe(
 		Stream.runForEach((user) => Effect.log(user.id)),
@@ -92,7 +92,7 @@ const program = Effect.gen(function* () {
 ```
 
 - `NoResultError`, from `@typesql/effect`, is a tagged error with the statement's `text`: handle it with `Effect.catchTag("NoResultError", …)`.
-- `stream()` reads rows as the driver streams them. `@effect/sql-sqlite-node` has no streaming, so there it dies; use `execute()`.
+- `stream()` reads rows as the driver streams them. `@effect/sql-sqlite-node` has no streaming, so there it dies; use `exec()`.
 - `${query}` splices a statement as a [subquery](../guide/using-sql#fragments), and everything else on `sql` (`sql.param`, `sql.fragment`, `sql.values`, `sql.prepare`, …) works as on every adapter.
 - Statements run through the client's `unsafe`, so they are traced like the client's own.
 
@@ -105,7 +105,7 @@ const id = yield* sql.withTransaction(
 	Effect.gen(function* () {
 		const { id } = yield* sql(
 			`INSERT INTO users (email) VALUES (${sql.param("a@b.c")}) RETURNING id`,
-		).executeTakeFirstOrThrow();
+		).execTakeFirst();
 		yield* sql(
 			`INSERT INTO posts (author_id, title) VALUES (${sql.param(id)}, ${sql.param("Hello")})`,
 		);

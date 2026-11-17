@@ -27,11 +27,11 @@ const result = await pool.query(q.text, [...q.values]);
 const rows = mapRows(q, result.rows);
 ```
 
-`mapRows(q, rows)`, from `@typesql/core/adapter`, types the driver's rows as the query's rows and applies its [output plugins](../guide/plugins). The `execute*` methods of such a query reject unless you pass them an executor, and so does `sql.transaction`.
+`mapRows(q, rows)`, from `@typesql/core/adapter`, types the driver's rows as the query's rows and applies its [output plugins](../guide/plugins). The `exec*` methods of such a query reject unless you pass them an executor, and so does `sql.transaction`.
 
 ## Run on another client
 
-Every `execute*` method takes an executor, which wins over the bound one. Each adapter exports `executor(client)` to build one from any client its `createSql` accepts. You can also bind a new `sql` to that client:
+Every `exec*` method takes an executor, which wins over the bound one. Each adapter exports `executor(client)` to build one from any client its `createSql` accepts. You can also bind a new `sql` to that client:
 
 ```ts
 import { createSql, executor } from "@typesql/pg";
@@ -40,11 +40,11 @@ const client = await pool.connect();
 try {
 	await sql(
 		`UPDATE users SET display_name = NULL WHERE id = ${sql.param(7)}`,
-	).execute(executor(client));
+	).exec(executor(client));
 	await createSql<DB>(client)(
 		"DELETE FROM posts WHERE author_id = $1",
 		7,
-	).execute();
+	).exec();
 } finally {
 	client.release();
 }
@@ -63,15 +63,15 @@ const onPool: Executor = async (text, values) => {
 };
 
 const db = createSql<DB>(postgresDialect, onPool);
-const users = await db("SELECT id FROM users").execute();
+const users = await db("SELECT id FROM users").exec();
 const changed = await db(
 	`DELETE FROM posts WHERE author_id = ${db.param(7)}`,
-).executeCount();
+).execCount();
 ```
 
-- Return `{ rows, rowCount }` when the driver reports a row count. `executeCount()` returns it. `rowCount: null` means the statement has no count (DDL, `BEGIN`), and `executeCount()` returns 0.
-- Return the rows alone when you have no count. Everything except `executeCount()` works; `executeCount()` rejects.
-- Or give the executor a `count(text, values)` method that resolves to a number. `executeCount()` then calls it instead. `@typesql/prisma` does this with `$executeRawUnsafe`.
+- Return `{ rows, rowCount }` when the driver reports a row count. `execCount()` returns it. `rowCount: null` means the statement has no count (DDL, `BEGIN`), and `execCount()` returns 0.
+- Return the rows alone when you have no count. Everything except `execCount()` works; `execCount()` rejects.
+- Or give the executor a `count(text, values)` method that resolves to a number. `execCount()` then calls it instead. `@typesql/prisma` does this with `$executeRawUnsafe`.
 
 A wrapper around an adapter's executor can return its result unchanged, so the count keeps working. For example, to log how long each query takes:
 
@@ -94,7 +94,7 @@ const sqlLogged = createCoreSql<DB, PgTypeMap>(postgresDialect, logged);
 
 ## Change the rows
 
-The row types describe what the driver returns, and `execute*` returns the executor's rows as they are (before applying TypeSQL plugins). So an executor that reshapes rows, for example one that keeps Kysely plugins or post-processes values, makes the types wrong.
+The row types describe what the driver returns, and `exec*` returns the executor's rows as they are (before applying TypeSQL plugins). So an executor that reshapes rows, for example one that keeps Kysely plugins or post-processes values, makes the types wrong.
 
 Pick the narrowest fix:
 
@@ -118,21 +118,21 @@ const toWire = (row: object) =>
 async function wire<Q extends Query<object>>(
 	q: Q,
 ): Promise<Wire<RowType<Q>>[]> {
-	return (await q.execute()).map(toWire) as Wire<RowType<Q>>[];
+	return (await q.exec()).map(toWire) as Wire<RowType<Q>>[];
 }
 
 const payload = await wire(sql("SELECT id, created_at FROM users"));
 ```
 
 ::: warning Augmenting `QueryObject`
-`Query` is a type alias. You can augment its `QueryObject` interface to change what `execute*` returns for every query in the program:
+`Query` is a type alias. You can augment its `QueryObject` interface to change what `exec*` returns for every query in the program:
 
 ```ts
 declare module "@typesql/core" {
   interface QueryObject<Row, Params extends readonly unknown[], Text extends string> {
-    execute(executor?: Executor): Promise<Wire<Row>[]>;
-    executeTakeFirst(executor?: Executor): Promise<Wire<Row> | undefined>;
-    executeTakeFirstOrThrow(executor?: Executor): Promise<Wire<Row>>;
+    exec(executor?: Executor): Promise<Wire<Row>[]>;
+    execTakeFirstOrNone(executor?: Executor): Promise<Wire<Row> | undefined>;
+    execTakeFirst(executor?: Executor): Promise<Wire<Row>>;
   }
 }
 ```

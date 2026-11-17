@@ -6,8 +6,8 @@
 import { CasePlugin } from "@typesql/core/plugins";
 
 const camel = sql.withPlugin(new CasePlugin());
-const row = await camel("SELECT id, display_name FROM users").executeTakeFirstOrThrow(); // row.displayName
-await camel(`UPDATE users SET ${camel.set("users", { displayName: "Ada" })} WHERE id = ${camel.param(7)}`).execute();
+const row = await camel("SELECT id, display_name FROM users").execTakeFirst(); // row.displayName
+await camel(`UPDATE users SET ${camel.set("users", { displayName: "Ada" })} WHERE id = ${camel.param(7)}`).exec();
 ```
 
 SQL keeps database names; rows and write objects are renamed.

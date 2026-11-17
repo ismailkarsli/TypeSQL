@@ -19,12 +19,12 @@ export const inserted = await sql(
 	"INSERT INTO users (name, bio) VALUES ($1, $2) RETURNING id, name, bio",
 	"Ada",
 	null,
-).execute();
+).exec();
 export const counted = await sql(
 	"SELECT COUNT(*) AS n FROM users",
-).executeTakeFirstOrThrow();
+).execTakeFirst();
 export const literal = await sql(
 	"SELECT 'a' 'b' AS joined, 1 + 1 AS sum, id > 0 AS positive FROM users",
-).executeTakeFirstOrThrow();
+).execTakeFirst();
 console.log({ dialect, inserted, counted, literal });
 await pool.end();

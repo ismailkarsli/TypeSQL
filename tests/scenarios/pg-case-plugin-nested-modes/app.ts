@@ -28,7 +28,7 @@ const sql = createSql<DB>(pool);
 const stored = (id: number) =>
 	sql(
 		`SELECT holdings, profile, extra FROM docs WHERE id = ${sql.param(id)}`,
-	).executeTakeFirstOrThrow();
+	).execTakeFirst();
 
 const holdings = { SASA: 1, "SISE.IS": 2, startDate: "x" };
 
@@ -46,19 +46,17 @@ await output(
 			}),
 		},
 	])}`,
-).execute();
+).exec();
 await output(
 	`INSERT INTO docs (id, holdings, profile) VALUES (2, ${output.param(holdings)}, ${output.json(null)})`,
-).execute();
-await output(
-	`INSERT INTO docs (id) VALUES (3) ON CONFLICT DO NOTHING`,
-).execute();
+).exec();
+await output(`INSERT INTO docs (id) VALUES (3) ON CONFLICT DO NOTHING`).exec();
 await output(
 	`UPDATE docs SET ${output.set("docs", { holdings, profile: { home_city: "Lima" } })} WHERE id = 3`,
-).execute();
+).exec();
 export const outputRead = await output(
 	"SELECT id, holdings, profile, extra FROM docs ORDER BY id",
-).execute();
+).exec();
 export const outputStored = [await stored(1), await stored(2), await stored(3)];
 
 // "input": what is written is renamed, and rows keep the database's keys.
@@ -74,30 +72,30 @@ await input(
 			},
 		},
 	])}`,
-).execute();
+).exec();
 export const inputRead = await input(
 	"SELECT id, profile, extra FROM docs WHERE id = 4",
-).executeTakeFirstOrThrow();
+).execTakeFirst();
 export const inputStored = await stored(4);
 
 // "all": both.
 const all = sql.withPlugin(new CasePlugin({ nested: "all" }));
 await all(
 	`INSERT INTO docs (id, profile) VALUES (5, ${all.param({ homeCity: "Oslo" })})`,
-).execute();
+).exec();
 export const allRead = await all(
 	"SELECT id, profile FROM docs WHERE id = 5",
-).executeTakeFirstOrThrow();
+).execTakeFirst();
 export const allStored = await stored(5);
 
 // Left out, or false, keys inside values stay as they are both ways.
 const flat = sql.withPlugin(new CasePlugin({ nested: false }));
 await flat(
 	`INSERT INTO docs (id, profile) VALUES (6, ${flat.json({ home_city: "Oslo" })})`,
-).execute();
+).exec();
 export const flatRead = await flat(
 	"SELECT id, profile FROM docs WHERE id = 6",
-).executeTakeFirstOrThrow();
+).execTakeFirst();
 
 // The modes work the same way round with to: "snake_case".
 const snake = sql.withPlugin(
@@ -105,10 +103,10 @@ const snake = sql.withPlugin(
 );
 await snake(
 	`INSERT INTO accounts (id, "settingsDoc") VALUES (1, ${snake.json({ maxRetries: 1 })})`,
-).execute();
+).exec();
 export const snakeRead = await snake(
 	`SELECT "settingsDoc" FROM accounts`,
-).executeTakeFirstOrThrow();
+).execTakeFirst();
 
 // Plugin options arrive from untyped code too.
 try {

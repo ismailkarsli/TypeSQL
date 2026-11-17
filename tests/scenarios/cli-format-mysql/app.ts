@@ -17,14 +17,14 @@ await pool.query(
 const sql = createSql<DB>(pool);
 await sql(
 	"insert into users (id,name,visits) values (1,\"Ada\",1),(2,'Bob',1),(3,'Cy',1)",
-).execute();
+).exec();
 await sql(
 	`insert into users (id, name, visits) values (1, "Ada", 1) as new # "…" is a string
 	on duplicate key update visits=users.visits+new.visits`,
-).execute();
+).exec();
 // MySQL names an unaliased column after its text.
 export const rows = await sql(
 	"select id, visits+0, Visits, `name` as `Name` from users where visits div 1 >= 1",
-).execute();
+).exec();
 console.log(rows);
 await pool.end();

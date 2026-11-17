@@ -23,7 +23,7 @@ const recent = sql(
    WHERE u.created_at > ${sql.param(new Date("2026-01-01"))}`,
 );
 
-const rows = await recent.execute();
+const rows = await recent.exec();
 ```
 
 ```ts [SQLite]
@@ -40,7 +40,7 @@ const recent = sql(
    WHERE u.created_at > ${sql.param("2026-01-01")}`,
 );
 
-const rows = await recent.execute();
+const rows = await recent.exec();
 ```
 
 ```ts [MySQL]
@@ -57,7 +57,7 @@ const recent = sql(
    WHERE u.created_at > ${sql.param(new Date("2026-01-01"))}`,
 );
 
-const rows = await recent.execute();
+const rows = await recent.exec();
 ```
 
 :::

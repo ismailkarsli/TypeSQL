@@ -11,7 +11,7 @@ Two adapters run your queries on PostgreSQL:
 | `@typesql/pg` | node-postgres (`pg` 8.x) |
 | `@typesql/postgres` | postgres.js (`postgres` 3.x or 4.x) |
 
-Both give you the same `sql` function, `execute*` methods and `sql.transaction`. They differ in the clients they accept, how transactions run, how rows are typed, and how migrations get a connection. Pick a driver in any example and the page follows.
+Both give you the same `sql` function, `exec*` methods and `sql.transaction`. They differ in the clients they accept, how transactions run, how rows are typed, and how migrations get a connection. Pick a driver in any example and the page follows.
 
 ::: code-group
 
@@ -38,7 +38,7 @@ import { createSql } from "@typesql/pg";
 const pool = new Pool();
 const sql = createSql<DB>(pool);
 
-const users = await sql("SELECT id, email FROM users").execute();
+const users = await sql("SELECT id, email FROM users").exec();
 ```
 
 ```ts [postgres.js]
@@ -48,7 +48,7 @@ import { createSql } from "@typesql/postgres";
 const db = postgres(process.env["DATABASE_URL"]!);
 const sql = createSql<DB>(db);
 
-const users = await sql("SELECT id, email FROM users").execute();
+const users = await sql("SELECT id, email FROM users").exec();
 ```
 
 :::
@@ -67,7 +67,7 @@ const dbBig = postgres(process.env["DATABASE_URL"]!, {
 const big = createSql<DB>(dbBig, { bigint: true });
 const counts = await big(
 	"SELECT author_id, count(*) AS n FROM posts GROUP BY author_id",
-).execute();
+).exec();
 ```
 
 ### node-postgres with type parsers
@@ -88,7 +88,7 @@ interface BigIntTypeMap extends Omit<PgTypeMap, "int8"> {
 const sql = createSql<DB, BigIntTypeMap>(pool);
 const counts = await sql(
 	"SELECT author_id, count(*) AS n FROM posts GROUP BY author_id",
-).execute(); // n: bigint
+).exec(); // n: bigint
 ```
 
 `PgSql<DB, Plugins, TM>` is the type of that `sql`. `driver` is exported too, for building the API with `createTransactionalSql` from `@typesql/core/adapter`.
@@ -97,24 +97,24 @@ const counts = await sql(
 
 | Method | Returns |
 |---|---|
-| `q.execute()` | `Promise<Row[]>` |
-| `q.executeTakeFirst()` | `Promise<Row \| undefined>` |
-| `q.executeTakeFirstOrThrow()` | `Promise<Row>`, or rejects with `NoResultError` when there is no row |
-| `q.executeCount()` | `Promise<number>`: the rows changed or returned, 0 for DDL |
+| `q.exec()` | `Promise<Row[]>` |
+| `q.execTakeFirstOrNone()` | `Promise<Row \| undefined>` |
+| `q.execTakeFirst()` | `Promise<Row>`, or rejects with `NoResultError` when there is no row |
+| `q.execCount()` | `Promise<number>`: the rows changed or returned, 0 for DDL |
 
 ```ts
 const maybe = await sql(
 	`SELECT id FROM users WHERE email = ${sql.param("x")}`,
-).executeTakeFirst();
+).execTakeFirstOrNone();
 const user = await sql(
 	`SELECT id, email FROM users WHERE id = ${sql.param(7)}`,
-).executeTakeFirstOrThrow();
+).execTakeFirst();
 const changed = await sql(
 	"UPDATE users SET display_name = NULL",
-).executeCount();
+).execCount();
 ```
 
-With postgres.js, `execute()` returns a plain array, without postgres.js' result metadata (`count`, `command`, `columns`).
+With postgres.js, `exec()` returns a plain array, without postgres.js' result metadata (`count`, `command`, `columns`).
 
 Attach `.withPlugin(new CasePlugin())` (imported from `@typesql/core/plugins`) for [camelCase row keys](../guide/case-plugin). With postgres.js, leave its own `transform: postgres.camel` off. To run a query on another client, see [Custom executor](./custom-executor).
 
@@ -126,10 +126,10 @@ Attach `.withPlugin(new CasePlugin())` (imported from `@typesql/core/plugins`) f
 const id = await sql.transaction(async (tx) => {
 	const { id } = await tx(
 		`INSERT INTO users (email) VALUES (${tx.param("a@b.c")}) RETURNING id`,
-	).executeTakeFirstOrThrow();
+	).execTakeFirst();
 	await tx(
 		`INSERT INTO posts (author_id, title) VALUES (${tx.param(id)}, ${tx.param("Hello")})`,
-	).execute();
+	).exec();
 	return id;
 });
 ```

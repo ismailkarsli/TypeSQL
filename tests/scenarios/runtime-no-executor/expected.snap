@@ -12,7 +12,7 @@ exports[`runtime-no-executor > scenario 1`] = `
     "types": {},
   },
   "exception": {
-    "message": "typesql: no executor; pass one to createSql() or execute()",
+    "message": "typesql: no executor; pass one to createSql() or exec()",
     "name": "Error",
   },
   "start": {

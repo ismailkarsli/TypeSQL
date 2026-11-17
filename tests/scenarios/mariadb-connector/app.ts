@@ -22,31 +22,31 @@ export const inserted = await sql(
 	null,
 	"Grace",
 	"Compiler",
-).execute();
+).exec();
 export const rows = await sql(
 	"SELECT id, name, bio, score FROM users ORDER BY id",
-).execute();
+).exec();
 export const counted = await sql(
 	"SELECT COUNT(*) AS n, MAX(score) AS best FROM users",
-).executeTakeFirstOrThrow();
+).execTakeFirst();
 export const named = await sql("SELECT name FROM users WHERE id = :id", {
 	id: 1,
-}).executeTakeFirstOrThrow();
+}).execTakeFirst();
 try {
 	await sql.transaction(async (tx) => {
-		await tx("DELETE FROM users WHERE id = $1", 1).execute();
+		await tx("DELETE FROM users WHERE id = $1", 1).exec();
 		await tx.transaction(async (inner) => {
-			await inner("DELETE FROM users WHERE id = $1", 2).execute();
+			await inner("DELETE FROM users WHERE id = $1", 2).exec();
 		});
 		throw new Error("abort");
 	});
 } catch (error) {
 	console.log(error instanceof Error ? error.message : error);
 }
-export const after = await sql("SELECT id FROM users ORDER BY id").execute();
+export const after = await sql("SELECT id FROM users ORDER BY id").exec();
 export const deleted = await sql(
 	"DELETE FROM users WHERE id = $1 RETURNING id",
 	2,
-).execute();
+).exec();
 console.log({ dialect, inserted, rows, counted, named, after, deleted });
 await pool.end();

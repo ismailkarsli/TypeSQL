@@ -14,7 +14,7 @@ const sql = createSql<DB>(pool);
 
 const named = sql("SELECT 1 AS a$b$, :y::int AS y", { y: 2 });
 console.log(named.text, named.values);
-export const namedRows = await named.execute();
+export const namedRows = await named.exec();
 
 // A dollar quote after an operator or a space is still one.
 const quoted = sql(
@@ -22,13 +22,13 @@ const quoted = sql(
 	{ w: 6 },
 );
 console.log(quoted.text, quoted.values);
-export const quotedRows = await quoted.execute();
+export const quotedRows = await quoted.exec();
 
 const inline = sql.as<{ x$1: number; p: number }>(
 	`SELECT 3 AS x$1, ${sql.param(4)}::int AS p`,
 );
 console.log(inline.text, inline.values);
-export const inlineRows = await inline.execute();
+export const inlineRows = await inline.exec();
 
 console.log({ namedRows, quotedRows, inlineRows });
 await pool.end();
@@ -39,7 +39,7 @@ const sqliteQuery = sqlite.as<{ x$1: number; p: number }>(
 	`SELECT 3 AS x$1, ${sqlite.param(4)} AS p`,
 );
 console.log(sqliteQuery.text, sqliteQuery.values);
-console.log(await sqliteQuery.executeTakeFirstOrThrow());
+console.log(await sqliteQuery.execTakeFirst());
 
 const my = createCoreSql<DB>(mysqlDialect);
 const myQuery = my.as<{ x$1: number; p: number }>(

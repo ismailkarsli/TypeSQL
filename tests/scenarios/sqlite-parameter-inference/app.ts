@@ -21,13 +21,13 @@ const selected = sql.prepare(
 	"WITH ids AS (SELECT id FROM users WHERE id >= $1), names AS (SELECT name FROM users WHERE name = $2) SELECT ids.id, names.name FROM ids CROSS JOIN names ORDER BY ids.id + $3 LIMIT $4",
 );
 export type SelectParams = Parameters<typeof selected>;
-export const rows = await selected(1, "Ada", 0, 1).execute();
+export const rows = await selected(1, "Ada", 0, 1).exec();
 
 const values = sql.prepare(
 	"SELECT column1 AS id, column2 AS name FROM (VALUES ($1, upper($2)), ($3, lower($4))) ORDER BY column1",
 );
 export type ValuesParams = Parameters<typeof values>;
-export const pairs = await values(3, "ada", 4, "GRACE").execute();
+export const pairs = await values(3, "ada", 4, "GRACE").exec();
 
 const written = sql.prepare(
 	"INSERT INTO users (id, name, bio) VALUES ($1, $2, $3), ($4, $5, $6) ON CONFLICT (id) DO UPDATE SET name = upper($7), bio = $8 WHERE id > $9 RETURNING id, name, bio",
@@ -43,12 +43,12 @@ export const inserted = await written(
 	"updated",
 	null,
 	0,
-).execute();
+).exec();
 
 const conditional = sql.prepare(
 	"SELECT CASE WHEN $1 THEN $2 ELSE id END AS value FROM users WHERE id = $3",
 );
 export type CaseParams = Parameters<typeof conditional>;
-export const chosen = await conditional(1, 7, 1).execute();
+export const chosen = await conditional(1, 7, 1).exec();
 console.log({ rows, pairs, inserted, chosen });
 db.close();

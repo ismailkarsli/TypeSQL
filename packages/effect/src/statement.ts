@@ -36,14 +36,14 @@ export interface EffectQueryObject<
 > extends StatementObject<Text> {
 	readonly [ROW]?: Row;
 	readonly [PARAMS]?: Params;
-	execute(): Effect.Effect<Row[], SqlError, R>;
-	executeTakeFirst(): Effect.Effect<Row | undefined, SqlError, R>;
-	executeTakeFirstOrThrow(): Effect.Effect<Row, SqlError | NoResultError, R>;
-	executeCount(): Effect.Effect<number, SqlError, R>;
+	exec(): Effect.Effect<Row[], SqlError, R>;
+	execTakeFirstOrNone(): Effect.Effect<Row | undefined, SqlError, R>;
+	execTakeFirst(): Effect.Effect<Row, SqlError | NoResultError, R>;
+	execCount(): Effect.Effect<number, SqlError, R>;
 	stream(): Stream.Stream<Row, SqlError, R>;
 }
 
-/** A statement: the Effect of its rows, as `execute()` is. */
+/** A statement: the Effect of its rows, as `exec()` is. */
 export type EffectQuery<
 	Row,
 	Params extends readonly unknown[] = readonly unknown[],
@@ -99,7 +99,7 @@ function countOf<Raw>(family: DialectFamily, raw: Raw, driver: string): number {
 				return Number(count);
 		}
 	throw new Error(
-		`typesql: the "${driver}" SqlClient driver gave no row count; use execute()`,
+		`typesql: the "${driver}" SqlClient driver gave no row count; use exec()`,
 	);
 }
 
@@ -125,30 +125,26 @@ class Statement extends Effectable.Mixin(SqlStatement) {
 		);
 	}
 	asEffect(): Effect.Effect<unknown[], SqlError, SqlClient> {
-		return this.execute();
+		return this.exec();
 	}
-	execute(): Effect.Effect<unknown[], SqlError, SqlClient> {
+	exec(): Effect.Effect<unknown[], SqlError, SqlClient> {
 		return this.#run((client, q) =>
 			Effect.map(client.unsafe(q.text, q.values).withoutTransform, (rows) =>
 				mapRows(this, rows),
 			),
 		);
 	}
-	executeTakeFirst(): Effect.Effect<unknown, SqlError, SqlClient> {
-		return Effect.map(this.execute(), (rows) => rows[0]);
+	execTakeFirstOrNone(): Effect.Effect<unknown, SqlError, SqlClient> {
+		return Effect.map(this.exec(), (rows) => rows[0]);
 	}
-	executeTakeFirstOrThrow(): Effect.Effect<
-		unknown,
-		SqlError | NoResultError,
-		SqlClient
-	> {
-		return Effect.flatMap(this.execute(), (rows) =>
+	execTakeFirst(): Effect.Effect<unknown, SqlError | NoResultError, SqlClient> {
+		return Effect.flatMap(this.exec(), (rows) =>
 			rows.length
 				? Effect.succeed(rows[0])
 				: Effect.fail(new NoResultError({ text: this.text })),
 		);
 	}
-	executeCount(): Effect.Effect<number, SqlError, SqlClient> {
+	execCount(): Effect.Effect<number, SqlError, SqlClient> {
 		return this.#run((client, q) =>
 			Effect.map(client.unsafe(q.text, q.values).raw, (raw) =>
 				countOf(this.#family, raw, client.driver),

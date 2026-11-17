@@ -31,7 +31,7 @@ const rows = await sql(
    from users u
    left join posts p on p.author_id = u.id
    where u.created_at > ${sql.param(new Date("2026-01-01"))}`,
-).execute();
+).exec();
 ```
 
 ## How they differ

@@ -19,14 +19,14 @@ import { CasePlugin } from "@typesql/core/plugins";
 const camel = sql.withPlugin(new CasePlugin());
 export const inserted = await camel(
 	`INSERT INTO users ${camel.values("users", [{ id: 3, displayName: "Lin", balance: 0 }])} RETURNING id, display_name`,
-).execute();
+).exec();
 export const updated = await camel(
 	`UPDATE users SET ${camel.set("users", { displayName: "Grace" })} WHERE id = $1 RETURNING id, display_name`,
 	2,
-).executeTakeFirstOrThrow();
+).execTakeFirst();
 export const deleted = await sql(
 	"DELETE FROM users WHERE id = $1",
 	3,
-).executeCount();
+).execCount();
 console.log({ inserted, updated, deleted });
 await pool.end();

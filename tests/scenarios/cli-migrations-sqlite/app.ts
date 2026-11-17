@@ -10,6 +10,6 @@ export const rows = await sql(
 	"INSERT INTO users (id, name) VALUES ($1, $2) RETURNING id, name, bio",
 	1,
 	"Ada",
-).execute();
+).exec();
 console.log(rows);
 db.close();

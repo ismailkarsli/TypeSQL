@@ -13,7 +13,7 @@ TypeSQL ships [`CasePlugin`](./case-plugin) for camelCase and snake_case keys in
 A plugin implements `SqlPlugin<Types>` from `@typesql/core`. Its optional runtime hooks are synchronous:
 
 - `transformInput(value, context)`: converts application input to database input. `context.kind` is `"set"` or `"values"` for each write object (`context.table` identifies the destination, or is `null` for `sql.set(values)` and `sql.values(rows)`), `"parameters"` for the entire argument array (`context.query` is the original SQL), or `"value"` for `sql.param(value)`.
-- `transformOutput(row)`: converts one database row to the application result. It runs for `execute()`, `executeTakeFirst()`, `executeTakeFirstOrThrow()` and `mapRows()`. Counts and missing rows are unaffected.
+- `transformOutput(row)`: converts one database row to the application result. It runs for `exec()`, `execTakeFirstOrNone()`, `execTakeFirst()` and `mapRows()`. Counts and missing rows are unaffected.
 - `transformJson(value)`: converts the value of `sql.json(value)`, when it runs, before the marker is created. It doesn't run for `null` or `undefined`, which send no JSON.
 
 Parameter input includes positional arguments or a single named-parameter object. It excludes interpolated fragments. The encoded result must be an array; named SQL still expects a single object in that array. A write object's encoded result must be a column-value object. Fragments and write helpers encode their values when created; placing them in another query does not encode those values again. `sql.json()` remains an explicit JSON marker, which `transformInput` sees only as text: leave markers intact, and convert JSON in `transformJson`, unless nested JSON is meant to stay as it is.
@@ -45,7 +45,7 @@ class WrappedPlugin implements SqlPlugin<WrappedTypes> {
 
 const wrapped = sql.withPlugin(new WrappedPlugin());
 const row = await wrapped("SELECT display_name FROM users")
-  .executeTakeFirstOrThrow();
+  .execTakeFirst();
 // row.data.display_name is string | null.
 ```
 

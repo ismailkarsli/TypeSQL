@@ -6,6 +6,6 @@ const db = new DatabaseSync(process.env.SQLITE_PATH!);
 const sql = createSql<DB>(db);
 export const archived = await sql(
 	"SELECT id, title FROM docs_archive ORDER BY id",
-).execute();
+).exec();
 console.log(archived);
 db.close();

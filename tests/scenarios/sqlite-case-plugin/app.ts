@@ -25,17 +25,17 @@ await camel(
 		{ id: 1, pageMeta: camel.json({ viewCount: 1 }) },
 		{ id: 2, pageMeta: camel.json(null) },
 	])}`,
-).execute();
+).exec();
 export const text = await camel(
 	"SELECT id, page_meta, page_meta ->> '$.view_count' AS view_count FROM posts ORDER BY id",
-).execute();
+).exec();
 
 // A capital outside ASCII is one to the type and at runtime alike.
 const snake = sql.withPlugin(new CasePlugin({ to: "snake_case" }));
-await snake(`UPDATE posts SET "cafÉName" = 'Ada'`).execute();
+await snake(`UPDATE posts SET "cafÉName" = 'Ada'`).exec();
 export const accented = await snake(
 	`SELECT "cafÉName" FROM posts WHERE id = 1`,
-).executeTakeFirstOrThrow();
+).execTakeFirst();
 
 console.log({ text, accented });
 db.close();

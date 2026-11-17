@@ -23,7 +23,7 @@ export const createUsers = migration("postgres", {
 			email text NOT NULL UNIQUE,
 			display_name text
 		)`);
-		await users("INSERT INTO users (email) VALUES ($1)", "ada@example.com").execute();
+		await users("INSERT INTO users (email) VALUES ($1)", "ada@example.com").exec();
 		return users;
 	},
 	down: async (db) => {
@@ -51,7 +51,7 @@ export const createUsers = migration("sqlite", {
 			email TEXT NOT NULL UNIQUE,
 			display_name TEXT
 		)`);
-		await users("INSERT INTO users (email) VALUES ($1)", "ada@example.com").execute();
+		await users("INSERT INTO users (email) VALUES ($1)", "ada@example.com").exec();
 		return users;
 	},
 	down: async (db) => {
@@ -79,7 +79,7 @@ export const createUsers = migration("mysql", {
 			email VARCHAR(255) NOT NULL UNIQUE,
 			display_name VARCHAR(255)
 		)`);
-		await users("INSERT INTO users (email) VALUES ($1)", "ada@example.com").execute();
+		await users("INSERT INTO users (email) VALUES ($1)", "ada@example.com").exec();
 		return users;
 	},
 	down: async (db) => {
@@ -104,7 +104,7 @@ export const addBio = migration(createUsers, {
 - Await `db.ddl(ddl)`: it runs the statement and returns a new context with the changed schema. Keep it in a new `const`; reassigning a variable doesn't change its type. A wrong statement is a compile error on its string, worded like the database's error: `relation "users" already exists`, `column "age" of relation "users" does not exist`, and so on. One `.ddl()` may hold a `;`-separated script, which may also seed data: its `SELECT`, `INSERT`, `UPDATE` and `DELETE` statements are checked against the schema at that point, without changing it. For parameters or result rows, call the context instead (below). `.add()` is a deprecated alias of `.ddl()`; use `.ddl()` in new code.
 - `up` must return its final context; a no-op `up` returns `db`. If it doesn't, passing its migration to the next `migration()` is a compile error.
 - `down` is required, may be empty, and need not restore the earlier schema type.
-- Calling the context runs a checked query, as with `sql`: `users("…", …)` returns a query with `.execute()` and inferred rows.
+- Calling the context runs a checked query, as with `sql`: `users("…", …)` returns a query with `.exec()` and inferred rows.
 - `.raw<NewSchema>(sql)` runs SQL the type checker can't see (dynamic or unsupported statements) and returns a context with the schema you state; without a type argument the schema stays the same.
 - The runner owns the transaction, so a migration that sends `BEGIN`, `COMMIT` or `ROLLBACK` fails (`ROLLBACK TO` a savepoint is fine). Await every query and `.ddl()` before `up` or `down` returns; the context rejects statements after its migration has finished.
 

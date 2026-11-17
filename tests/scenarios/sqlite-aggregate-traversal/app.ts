@@ -17,15 +17,15 @@ export const aggregate = await sql(`
 	SELECT CASE WHEN count(*) > 0 THEN sum(value) ELSE 0 END AS total,
 		sum(id) IN (SELECT id FROM items) AS contained
 	FROM items
-`).execute();
+`).exec();
 export const subquery = await sql(`
 	SELECT id, (SELECT max(value) FROM items) AS maximum
 	FROM items ORDER BY id
-`).execute();
+`).exec();
 export const windows = await sql(`
 	SELECT id, CASE WHEN id > 0 THEN sum(value) OVER running ELSE 0 END AS total,
 		CASE WHEN id > 0 THEN sum(id) OVER running ELSE 0 END AS ids
 	FROM items WINDOW running AS (ORDER BY id) ORDER BY id
-`).execute();
+`).exec();
 console.dir({ aggregate, subquery, windows }, { depth: null });
 db.close();

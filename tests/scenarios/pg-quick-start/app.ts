@@ -19,13 +19,13 @@ await pool.query(`CREATE TABLE users (id int PRIMARY KEY, name text NOT NULL, bi
 export const rows = await sql(
 	"SELECT id, name, bio FROM users WHERE id = $1",
 	1,
-).execute();
+).exec();
 export const first = await sql(
 	"SELECT id FROM users ORDER BY id",
-).executeTakeFirst();
+).execTakeFirstOrNone();
 export const missing = await sql(
 	"SELECT id FROM users WHERE id = $1",
 	99,
-).executeTakeFirst();
+).execTakeFirstOrNone();
 console.log({ rows, first, missing });
 await pool.end();

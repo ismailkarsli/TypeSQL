@@ -200,14 +200,14 @@ The `LEFT JOIN` makes `title` nullable, because a user may have no posts. `sql.p
 ## 5. Run it
 
 ```ts
-const rows = await recent.execute();
+const rows = await recent.exec();
 
 const user = await sql(
 	`SELECT email, display_name FROM users WHERE id = ${sql.param(7)}`,
-).executeTakeFirstOrThrow();
+).execTakeFirst();
 ```
 
-`executeTakeFirstOrThrow()` throws a `NoResultError` when there is no row. [PostgreSQL](../adapters/postgresql#run-queries) lists all the `execute*` methods, which work the same on [SQLite](../adapters/sqlite#run-queries) and on [MySQL and MariaDB](../adapters/mysql#run-queries).
+`execTakeFirst()` throws a `NoResultError` when there is no row. [PostgreSQL](../adapters/postgresql#run-queries) lists all the `exec*` methods, which work the same on [SQLite](../adapters/sqlite#run-queries) and on [MySQL and MariaDB](../adapters/mysql#run-queries).
 
 Each `sql.param()` becomes a `$n` in the text, and its value goes to the database as a parameter, never into the SQL:
 

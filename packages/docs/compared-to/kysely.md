@@ -27,7 +27,7 @@ const rows = await sql(
    FROM users u
    LEFT JOIN posts p ON p.author_id = u.id
    WHERE u.created_at > ${sql.param(new Date("2026-01-01"))}`,
-).execute();
+).exec();
 ```
 
 Both give `title` as `string | null`, with no generator and no database connection.

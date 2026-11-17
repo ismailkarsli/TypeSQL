@@ -21,7 +21,7 @@ Returns the typed `sql` function for a schema in a [dialect](#dialects).
 
 - The dialect is the first argument: `postgresDialect` from `@typesql/core/postgres`, `sqliteDialect` from `@typesql/core/sqlite`, or `mysqlDialect` or `mariadbDialect` from `@typesql/core/mysql`. Each dialect adds its own `createSql` signature, so the type arguments start with `DB`.
 - `DB` is your [schema](../guide/schema). `TypeMap` turns the dialect's column types into TypeScript types ([Type mapping](./type-mapping)); it defaults to the dialect's map.
-- `executor` is what `execute*` runs on. Without one, `sql` only builds queries.
+- `executor` is what `exec*` runs on. Without one, `sql` only builds queries.
 - Use `.withPlugin(new CasePlugin())`, from `@typesql/core/plugins`, for camelCase input and output keys (or [snake_case ones, and keys inside JSON](../guide/case-plugin#options)), or attach a custom typed plugin. See [plugins](../guide/plugins).
 
 The adapters export their own `createSql`, which takes the driver client and adds [`sql.transaction(fn)`](#sql-transaction-fn):
@@ -65,18 +65,18 @@ Compile a reusable query, then call it with the same parameter arguments that `s
 
 ```ts
 const findUser = sql.prepare("SELECT id, email FROM users WHERE id = $1");
-const first = await findUser(1).executeTakeFirst();
-const second = await findUser(2).executeTakeFirst();
+const first = await findUser(1).execTakeFirstOrNone();
+const second = await findUser(2).execTakeFirstOrNone();
 
 const byEmail = sql.prepare("SELECT id FROM users WHERE email = :email");
-await byEmail({ email: "a@example.com" }).execute();
+await byEmail({ email: "a@example.com" }).exec();
 ```
 
-Preparation resolves named parameters, inline values and interpolated fragments once. The returned function checks each binding's parameter types and returns a normal `Query` with all four `execute*` methods. Every binding gets a fresh values array. Inline and fragment values are captured at preparation; pass changing values as positional or named parameters. Captured objects retain their references.
+Preparation resolves named parameters, inline values and interpolated fragments once. The returned function checks each binding's parameter types and returns a normal `Query` with all four `exec*` methods. Every binding gets a fresh values array. Inline and fragment values are captured at preparation; pass changing values as positional or named parameters. Captured objects retain their references.
 
 With `@typesql/pg`, execution uses a server-side statement whose name is derived from the final SQL text. PostgreSQL fixes such a statement's result columns when it is first prepared on a connection, so after an `ALTER TABLE` a prepared `SELECT *` fails with `cached plan must not change result type` on connections that already prepared it; list the columns, or reconnect after schema changes. With `@typesql/postgres`, execution enables postgres.js preparation and extended protocol, including for queries without parameters; the client's global `prepare: false` setting still takes precedence. Preparation itself sends no SQL.
 
-With `@typesql/sqlite`, the statement is prepared on its first execution and reused. With `@typesql/mysql` on mysql2 or the mariadb connector, execution uses the binary protocol (`execute()`), which prepares the statement once per connection; see [Prepared statements](../adapters/mysql#prepared-statements). Other adapters and custom executors reuse TypeSQL's compiled query without requesting server preparation, unless their executor implements `prepare(text)`. The prepared query stays bound to the client or transaction that created it. Create it through `tx.prepare(...)` to execute in a transaction. An executor passed to `execute*` overrides that binding and runs through the supplied executor as usual.
+With `@typesql/sqlite`, the statement is prepared on its first execution and reused. With `@typesql/mysql` on mysql2 or the mariadb connector, execution uses the binary protocol (`execute()`), which prepares the statement once per connection; see [Prepared statements](../adapters/mysql#prepared-statements). Other adapters and custom executors reuse TypeSQL's compiled query without requesting server preparation, unless their executor implements `prepare(text)`. The prepared query stays bound to the client or transaction that created it. Create it through `tx.prepare(...)` to execute in a transaction. An executor passed to `exec*` overrides that binding and runs through the supplied executor as usual.
 
 Reuse the returned function across calls to save TypeSQL's runtime SQL assembly. Server preparation can also save repeated parsing, but performance depends on the query and workload; measure your application's repeated queries.
 
@@ -156,14 +156,14 @@ sql.dialect; // "postgres"
 
 | Method | Returns |
 |---|---|
-| `q.execute(executor?)` | `Promise<Row[]>` |
-| `q.executeTakeFirst(executor?)` | `Promise<Row \| undefined>` |
-| `q.executeTakeFirstOrThrow(executor?)` | `Promise<Row>`; rejects with `NoResultError` (carrying `text`) on 0 rows |
-| `q.executeCount(executor?)` | `Promise<number>`: rows affected by `INSERT` / `UPDATE` / `DELETE` / `MERGE`, rows returned by `SELECT`, 0 for DDL |
+| `q.exec(executor?)` | `Promise<Row[]>` |
+| `q.execTakeFirstOrNone(executor?)` | `Promise<Row \| undefined>` |
+| `q.execTakeFirst(executor?)` | `Promise<Row>`; rejects with `NoResultError` (carrying `text`) on 0 rows |
+| `q.execCount(executor?)` | `Promise<number>`: rows affected by `INSERT` / `UPDATE` / `DELETE` / `MERGE`, rows returned by `SELECT`, 0 for DDL |
 
 The methods run on the executor passed to the call, or else on the one `createSql` bound. Without either, they reject. They are non-enumerable, so a query still deep-equals `{ text, values }`.
 
-Every adapter reports the row count for `executeCount`: SQLite uses the changed-row count or the number of returned rows; the others use `rowCount` (`pg`), `count` (postgres.js), `affectedRows` or the number of rows (`@typesql/mysql`), `numAffectedRows` or the number of rows (Kysely), `$executeRawUnsafe` (Prisma), and for Drizzle the count of the driver underneath.
+Every adapter reports the row count for `execCount`: SQLite uses the changed-row count or the number of returned rows; the others use `rowCount` (`pg`), `count` (postgres.js), `affectedRows` or the number of rows (`@typesql/mysql`), `numAffectedRows` or the number of rows (Kysely), `$executeRawUnsafe` (Prisma), and for Drizzle the count of the driver underneath.
 
 ### Executors
 
@@ -178,7 +178,7 @@ type ExecutorResult = { readonly rows: readonly unknown[]; readonly rowCount: nu
 
 - Each adapter exports `executor(client)`. On a SQLite or MySQL client (Kysely's SQLite and MySQL dialects, Prisma with the `sqlite` or `mysql` provider, a Drizzle SQLite or MySQL database), it uses `?` placeholders without being told; `executor(client, { dialect })` states the dialect for Kysely and Prisma.
 - `rowCount: null` means no count, read as 0.
-- An executor that returns only rows works for everything but `executeCount`, unless it has a `count(text, values)` method.
+- An executor that returns only rows works for everything but `execCount`, unless it has a `count(text, values)` method.
 - An optional `prepare(text): Executor` creates an executor for server preparation. It must defer database work until execution. `sql.prepare` calls it once with the final SQL text and binds all resulting queries to that executor, including its `count` method.
 
 See [Custom executor](../adapters/custom-executor).
@@ -248,7 +248,7 @@ Word lists for editor tooling, with nothing of the type engines at runtime.
 
 | Type | Meaning |
 |---|---|
-| `Query<Row, Params, Text>` | the runtime query object, with phantom types and `execute*` methods |
+| `Query<Row, Params, Text>` | the runtime query object, with phantom types and `exec*` methods |
 | `Sql<DB, TM, Plugins = [], S = QueryStatement>` | the `sql` function with its ordered plugin tuple, and the kind of statement it returns |
 | `QueryStatement` | the statement kind of `Query`s; an adapter with statements of its own passes another to `SqlOf<T, DB, TM, Plugins, S>` |
 | `InlineStatement`, `StatementObject<Text>` | what an adapter's own statement is to `${statement}`: a number brand where `Query` has a string one, for statements that are iterable, and the `{ text, values }` it carries |
@@ -256,9 +256,9 @@ Word lists for editor tooling, with nothing of the type engines at runtime.
 | `SqlPlugin`, `PluginTypes`, `IdentityPluginTypes`, `InputContext` | runtime hooks and type functions for custom plugins |
 | `PluginInput`, `PluginEncoded`, `PluginOutput`, `PluginJson` | apply a plugin tuple to a type |
 | `CasePlugin` | camelCase row/write keys and snake_case database write keys, or with `{ to: "snake_case" }` the reverse, with `{ nested: "output" | "input" | "all" }` inside JSON too; from `@typesql/core/plugins` |
-| `Executor` | what `execute*` runs on |
+| `Executor` | what `exec*` runs on |
 | `ExecutorResult` | `{ rows, rowCount: number \| null }` |
-| `NoResultError` | thrown by `executeTakeFirstOrThrow` on 0 rows; carries `text` |
+| `NoResultError` | thrown by `execTakeFirst` on 0 rows; carries `text` |
 | `RowType<Q>`, `ParamsType<Q>`, `TextType<Q>` | the row, parameters and text of a `Query`, an adapter's statement or a `Fragment` type |
 | `Fragment<Text, Params, Carried>` | a spliceable SQL piece, with carried input types for checking when spliced |
 | `QueryObject<Row, Params, Text>`, `FragmentObject<Text, Params, Carried>` | the object interfaces behind the string-branded `Query` and `Fragment` aliases |

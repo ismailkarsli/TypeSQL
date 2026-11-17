@@ -10,6 +10,6 @@ export const row = await sql(`
 		'c'::refcursor AS cursor, NULL::refcursor AS no_cursor,
 		'10:20:10,14,15'::pg_snapshot AS snapshot, NULL::pg_snapshot AS no_snapshot,
 		'10:20:10,14,15'::txid_snapshot AS txid_snapshot, NULL::txid_snapshot AS no_txid_snapshot
-`).executeTakeFirstOrThrow();
+`).execTakeFirst();
 console.log(row);
 await pool.end();

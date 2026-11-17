@@ -10,12 +10,12 @@ try {
 
 	const results = await Promise.allSettled([
 		sql.transaction(async (tx) => {
-			await tx("INSERT INTO notes (body) VALUES ('kept')").execute();
+			await tx("INSERT INTO notes (body) VALUES ('kept')").exec();
 			await sleep(10);
 		}),
 		// The connection is one session: this can't start while the first is open.
 		sql.transaction(async (tx) => {
-			await tx("INSERT INTO notes (body) VALUES ('never')").execute();
+			await tx("INSERT INTO notes (body) VALUES ('never')").exec();
 		}),
 	]);
 	console.log(
@@ -27,16 +27,16 @@ try {
 	// Neither can one on the outer `sql` inside a transaction, which rolls back.
 	await sql
 		.transaction(async (tx) => {
-			await tx("INSERT INTO notes (body) VALUES ('rolled back')").execute();
+			await tx("INSERT INTO notes (body) VALUES ('rolled back')").exec();
 			await sql.transaction(async () => {});
 		})
 		.catch((error: Error) => console.log("nested:", error.message));
 
 	// One that starts after the others ended runs.
 	await sql.transaction(async (tx) => {
-		await tx("INSERT INTO notes (body) VALUES ('later')").execute();
+		await tx("INSERT INTO notes (body) VALUES ('later')").exec();
 	});
-	console.log(await sql("SELECT body FROM notes ORDER BY body").execute());
+	console.log(await sql("SELECT body FROM notes ORDER BY body").exec());
 } finally {
 	database.close();
 }

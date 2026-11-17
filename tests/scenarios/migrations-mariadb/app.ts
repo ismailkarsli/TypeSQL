@@ -22,7 +22,7 @@ const second = migration(first, {
 			"INSERT INTO users (name, bio) VALUES ($1, $2) RETURNING id",
 			"Ada",
 			null,
-		).execute();
+		).exec();
 		return next;
 	},
 	down: async (db) => {

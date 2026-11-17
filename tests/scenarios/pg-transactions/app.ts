@@ -19,12 +19,12 @@ try {
 			"UPDATE users SET balance = balance - $1 WHERE id = $2",
 			10,
 			1,
-		).execute();
+		).exec();
 		await tx(
 			"UPDATE users SET balance = balance + $1 WHERE id = $2",
 			10,
 			2,
-		).execute();
+		).exec();
 		throw new Error("abort transfer");
 	});
 } catch (error) {
@@ -35,10 +35,10 @@ await sql.transaction(async (tx) => {
 		"UPDATE users SET balance = balance + $1 WHERE id = $2",
 		1,
 		1,
-	).execute();
+	).exec();
 	try {
 		await tx.transaction(async (inner) => {
-			await inner("DELETE FROM users WHERE id = $1", 2).execute();
+			await inner("DELETE FROM users WHERE id = $1", 2).exec();
 			throw new Error("abort savepoint");
 		});
 	} catch (error) {
@@ -47,6 +47,6 @@ await sql.transaction(async (tx) => {
 });
 export const balances = await sql(
 	"SELECT id, balance FROM users ORDER BY id",
-).execute();
+).exec();
 console.log(balances);
 await pool.end();

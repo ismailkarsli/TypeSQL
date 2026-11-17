@@ -18,7 +18,7 @@ import previous from "./1793356800_create-users.js"; // .js resolves to the .ts
 export default migration(previous, {
 	up: async (db) => {
 		const next = await db.ddl("ALTER TABLE users ADD COLUMN bio text");
-		await next("UPDATE users SET bio = $1", "").execute();
+		await next("UPDATE users SET bio = $1", "").exec();
 		return next;
 	},
 	down: async (db) => {

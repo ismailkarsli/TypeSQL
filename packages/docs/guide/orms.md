@@ -102,12 +102,12 @@ Kysely describes columns with TypeScript types, so TypeSQL reads the Postgres ty
 ```ts
 const drafts = await sql(
 	"SELECT id, title FROM posts WHERE NOT published",
-).execute();
+).exec();
 
 const published = await sql.transaction((tx) =>
 	tx(
 		`UPDATE posts SET published = true WHERE author_id = ${tx.param(1)}`,
-	).executeCount(),
+	).execCount(),
 );
 
 await db.transaction().execute(async (trx) => {
@@ -119,7 +119,7 @@ await db.transaction().execute(async (trx) => {
 	await createSql(postgresDialect, trx)(
 		"DELETE FROM posts WHERE author_id = $1 AND NOT published",
 		1,
-	).execute();
+	).exec();
 });
 ```
 
@@ -198,7 +198,7 @@ const camelRows = createSql<
 >(postgresDialect, camelDb).withPlugin(new CasePlugin());
 const post = await camelRows(
 	`SELECT author_id, created_at FROM blog_posts WHERE id = ${camelRows.param(1)}`,
-).executeTakeFirstOrThrow();
+).execTakeFirst();
 ```
 
 ## Drizzle
@@ -307,19 +307,19 @@ import type { PgTypeMap } from "@typesql/pg";
 const pgSql = createSql<typeof schema, PgTypeMap>(postgresDialect, db);
 const rows = await pgSql(
 	`SELECT id, title FROM posts WHERE author_id = ${pgSql.param(1)}`,
-).execute();
+).exec();
 
 await pgSql.transaction(async (tx) => {
 	await tx(
 		`UPDATE posts SET title = upper(title) WHERE author_id = ${tx.param(1)}`,
-	).execute();
+	).exec();
 });
 
 await db.transaction(async (tx) => {
 	await createSql<typeof schema, PgTypeMap>(postgresDialect, tx)(
 		"DELETE FROM posts WHERE author_id = $1",
 		1,
-	).execute();
+	).exec();
 });
 ```
 
@@ -410,12 +410,12 @@ const q = sql(
 	`SELECT id, display_name, "updatedAt" FROM users WHERE role = ${sql.param("guest")}`,
 );
 
-const rows = await q.execute();
+const rows = await q.exec();
 const stats = await sql(
 	"SELECT count(*) AS n, sum(views) AS views FROM posts",
-).execute();
+).exec();
 const deleted = await sql.transaction((tx) =>
-	tx(`DELETE FROM posts WHERE author_id = ${tx.param(1)}`).executeCount(),
+	tx(`DELETE FROM posts WHERE author_id = ${tx.param(1)}`).execCount(),
 );
 ```
 
@@ -471,7 +471,7 @@ import { sqliteDialect } from "@typesql/core/sqlite";
 import { createSql } from "@typesql/kysely"; // or @typesql/drizzle, @typesql/prisma
 
 const sql = createSql(sqliteDialect, db);
-const rows = await sql(`SELECT id, title FROM posts WHERE author_id = ${sql.param(1)}`).execute();
+const rows = await sql(`SELECT id, title FROM posts WHERE author_id = ${sql.param(1)}`).exec();
 ```
 
 Statements are sent through the ORM as for PostgreSQL. Since some SQLite drivers only bind positional parameters, `$1`, `$2`, … are rewritten to `?` with the values in order. `sql.json(value)` is bound as JSON text.
@@ -505,7 +505,7 @@ import { mysqlDialect } from "@typesql/core/mysql";
 import { createSql } from "@typesql/kysely"; // or @typesql/drizzle, @typesql/prisma
 
 const sql = createSql(mysqlDialect, db);
-const rows = await sql(`SELECT id, title FROM posts WHERE author_id = ${sql.param(1)}`).execute();
+const rows = await sql(`SELECT id, title FROM posts WHERE author_id = ${sql.param(1)}`).exec();
 ```
 
 Statements are sent through the ORM's driver, with `$1`, `$2`, … rewritten to `?` and the values in order. `sql.json(value)` is bound as JSON text.

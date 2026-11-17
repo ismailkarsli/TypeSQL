@@ -17,12 +17,12 @@ const sql = createSql<DB>(pool);
 await sql(
 	`INSERT INTO users (id, settings, items) VALUES ($1, ${sql.json({ theme: "dark" })}, ${sql.json(["one", "two"])})`,
 	1,
-).execute();
+).exec();
 export const rows = await sql(
 	"SELECT id, settings, items, settings ->> 'theme' AS theme FROM users ORDER BY id",
-).execute();
+).exec();
 export const shaped = await sql(
 	"SELECT json_build_object('id', id, 'settings', settings) AS profile FROM users ORDER BY id",
-).execute();
+).exec();
 console.dir({ rows, shaped }, { depth: null });
 await pool.end();

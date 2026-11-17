@@ -18,13 +18,13 @@ await pool.query(`
 // An array with a NULL element in any row keeps NULL elements in the column.
 export const values = await sql(
 	"SELECT a FROM (VALUES (ARRAY[2]), (ARRAY[1, NULL])) AS v(a) ORDER BY a",
-).execute();
+).exec();
 export const valuesWithoutNull = await sql(
 	"SELECT a FROM (VALUES (ARRAY[2]), (ARRAY[1])) AS v(a) ORDER BY a",
-).execute();
+).exec();
 export const union = await sql(
 	"SELECT tags FROM items UNION ALL SELECT ARRAY['b', NULL]",
-).execute();
+).exec();
 export const recursive = await sql(`
 	WITH RECURSIVE r(a, i) AS (
 		SELECT ARRAY[1, NULL], 1
@@ -32,7 +32,7 @@ export const recursive = await sql(`
 		SELECT a, i + 1 FROM r WHERE i < 2
 	)
 	SELECT a, i FROM r ORDER BY i
-`).execute();
+`).exec();
 export const recursiveWithoutNull = await sql(`
 	WITH RECURSIVE r(a, i) AS (
 		SELECT tags, 1 FROM items
@@ -40,7 +40,7 @@ export const recursiveWithoutNull = await sql(`
 		SELECT a, i + 1 FROM r WHERE i < 2
 	)
 	SELECT a, i FROM r ORDER BY i
-`).execute();
+`).exec();
 console.dir(
 	{ values, valuesWithoutNull, union, recursive, recursiveWithoutNull },
 	{ depth: null },

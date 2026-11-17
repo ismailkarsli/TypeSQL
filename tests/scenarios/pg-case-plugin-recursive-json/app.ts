@@ -40,15 +40,15 @@ await nested(
 	`INSERT INTO docs (id, data, optional_data, expr) VALUES (1, ${nested.json(value)}, ${nested.json(null)}, ${nested.json(
 		{ opName: "add", argList: ["a", ["b"]] },
 	)})`,
-).execute();
+).exec();
 const { data, optionalData, expr } = await nested(
 	"SELECT data, optional_data, expr FROM docs",
-).executeTakeFirstOrThrow();
+).execTakeFirst();
 const kept: JSONType = data;
 const keptOptional: JSONType = optionalData;
 const [row] = await nested(
 	`SELECT to_json("rebalance") AS "rebalance", data FROM rebalance, docs`,
-).execute();
+).exec();
 
 // Each of these is `any` if the recursive type collapses.
 export const stringData = typeof data === "string" ? data : "other";

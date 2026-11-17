@@ -24,9 +24,7 @@ const sql = createSql<DB>(new Pool());
 // Without nested, JSON keeps the names of the database.
 const flat = sql.withPlugin(new CasePlugin());
 flat(`UPDATE users SET profile=${flat.json({ homeCity: "Oslo" })}`);
-const flatRow = await flat(
-	"SELECT profile FROM users",
-).executeTakeFirstOrThrow();
+const flatRow = await flat("SELECT profile FROM users").execTakeFirst();
 flatRow.profile?.homeCity;
 // `pointXY` would convert to point_xy, so point_x_y is written by its own name.
 flat(`UPDATE users SET ${flat.set("users", { pointXY: 1 })}`);
@@ -36,9 +34,7 @@ const nested = sql.withPlugin(new CasePlugin({ nested: "all" }));
 nested(`UPDATE users SET profile=${nested.json({ homeCity: 1 })}`);
 nested(`UPDATE users SET profile=${nested.json({ otherKey: "Oslo" })}`);
 nested(`UPDATE users SET ${nested.set("users", { profile: { homeCity: 1 } })}`);
-const nestedRow = await nested(
-	"SELECT profile FROM users",
-).executeTakeFirstOrThrow();
+const nestedRow = await nested("SELECT profile FROM users").execTakeFirst();
 nestedRow.profile?.home_city;
 
 // to: "snake_case" takes snake_case keys and returns them.
@@ -46,7 +42,7 @@ const snake = sql.withPlugin(new CasePlugin({ to: "snake_case" }));
 snake(`UPDATE accounts SET ${snake.set("accounts", { displayName: "Ada" })}`);
 const snakeRow = await snake(
 	`SELECT "displayName" FROM accounts`,
-).executeTakeFirstOrThrow();
+).execTakeFirst();
 snakeRow.displayName;
 
 // The key a read returns isn't a write key when it doesn't convert back to the
@@ -63,15 +59,11 @@ output(`UPDATE users SET profile=${output.json({ homeCity: "Oslo" })}`);
 output(
 	`UPDATE users SET ${output.set("users", { profile: { homeCity: "Oslo" } })}`,
 );
-const outputRow = await output(
-	"SELECT profile FROM users",
-).executeTakeFirstOrThrow();
+const outputRow = await output("SELECT profile FROM users").execTakeFirst();
 outputRow.profile?.home_city;
 const input = sql.withPlugin(new CasePlugin({ nested: "input" }));
 input(`UPDATE users SET profile=${input.json({ home_city: "Oslo" })}`);
-const inputRow = await input(
-	"SELECT profile FROM users",
-).executeTakeFirstOrThrow();
+const inputRow = await input("SELECT profile FROM users").execTakeFirst();
 inputRow.profile?.homeCity;
 
 // nested takes a mode, not a boolean.

@@ -25,7 +25,7 @@ const rows = await sql(
    FROM users u
    LEFT JOIN posts p ON p.author_id = u.id
    WHERE u.created_at > ${sql.param(new Date("2026-01-01"))}`,
-).execute();
+).exec();
 ```
 
 Prisma returns nested objects (each user with a `posts` array). TypeSQL returns the rows your SQL produces; nest them with [JSON aggregation](../guide/using-sql#json) when you want that shape.

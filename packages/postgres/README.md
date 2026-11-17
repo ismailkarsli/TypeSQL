@@ -17,10 +17,10 @@ import type { DB } from "./schema";
 
 const sql = createSql<DB>(postgres(process.env.DATABASE_URL!));
 
-const posts = await sql(`SELECT id, title FROM posts WHERE author_id = ${sql.param(1)}`).execute();
+const posts = await sql(`SELECT id, title FROM posts WHERE author_id = ${sql.param(1)}`).exec();
 
 await sql.transaction(async (tx) => {
-  await tx(`UPDATE posts SET title = upper(title) WHERE author_id = ${tx.param(1)}`).execute();
+  await tx(`UPDATE posts SET title = upper(title) WHERE author_id = ${tx.param(1)}`).exec();
 });
 ```
 
@@ -35,10 +35,10 @@ If your connection parses `int8` to `bigint` (`types: { bigint: postgres.BigInt 
 
 ```ts
 const findPost = sql.prepare("SELECT id, title FROM posts WHERE author_id = $1");
-const posts = await findPost(7).execute();
+const posts = await findPost(7).exec();
 ```
 
-Reuse `findPost` with new values. TypeSQL assembles the SQL once and enables postgres.js prepared statements for execution, including queries without parameters. The driver's global `prepare: false` option is respected. All `execute*` methods work. Named parameters and fixed fragments are supported too. Inside a transaction, use `tx.prepare(...)` to bind it to that transaction.
+Reuse `findPost` with new values. TypeSQL assembles the SQL once and enables postgres.js prepared statements for execution, including queries without parameters. The driver's global `prepare: false` option is respected. All `exec*` methods work. Named parameters and fixed fragments are supported too. Inside a transaction, use `tx.prepare(...)` to bind it to that transaction.
 
 ## License
 

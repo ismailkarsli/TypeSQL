@@ -15,7 +15,7 @@ sql("SELECT id FROM users WHERE id = $1", "one");
 sql(`SELECT email FROM (${users}) AS u`);
 
 // A statement is an Effect, not a Promise.
-const awaited: Promise<{ id: number }[]> = users.execute();
+const awaited: Promise<{ id: number }[]> = users.exec();
 
 // Without a client, a statement requires the SqlClient.
 const run = Effect.runPromise(users);
