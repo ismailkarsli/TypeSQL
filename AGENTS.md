@@ -33,6 +33,17 @@ Snapshot changes require an explicit `--update` and review. Never accept current
 
 Do not create GitHub issues or post issue comments automatically. Create them only when explicitly requested.
 
+## Before pushing
+
+Run what CI runs (`.github/workflows/checks.yml`) and push only when it passes:
+
+```sh
+pnpm check     # lint, build, typecheck, knip, change intents, extension package, docs build
+pnpm check:db  # scenario suite and generated PostgreSQL sources; needs tests/compose.yaml running
+```
+
+When you change `checks.yml`, change these scripts with it.
+
 ## Releases
 
 Don't release, publish, tag, or edit `.changeset/ledger.yaml` or `.changeset/changelogs/`

@@ -14,6 +14,8 @@
 		"knip": "knip",
 		"test": "pnpm --dir tests test",
 		"bench": "pnpm --filter @typesql/bench run bench",
+		"check": "pnpm lint && pnpm build && pnpm typecheck && pnpm knip && pnpm check:intents && pnpm --filter typesql exec vsce package --no-dependencies --out \"$(mktemp -d)/typesql.vsix\" && pnpm docs:build",
+		"check:db": "pnpm test && node tools/gen-pg-functions.ts --check && node tools/pg-catalog-from-pg.ts --check",
 		"check:intents": "node tools/check-intents.ts",
 		"release": "gh workflow run release.yml --ref main && echo \"Release started: https://github.com/ismailkarsli/typesql/actions/workflows/release.yml\"",
 		"docs:dev": "pnpm --filter @typesql/docs run dev",
