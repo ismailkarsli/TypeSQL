@@ -384,6 +384,7 @@ type ParseCreateFunction<T extends Toks, I extends number> =
 						infer Ret,
 						infer Srf,
 						infer K extends number,
+						infer Columns,
 					]
 					? RoutineEnd<
 							T,
@@ -393,20 +394,27 @@ type ParseCreateFunction<T extends Toks, I extends number> =
 								name: RefOf<Parts>;
 								ret: Ret;
 								srf: Srf;
+								columns: Columns;
 							}
 						>
 					: FnReturns<T, J1>
 				: SkipToCloseParen<T, Next<J>>
 			: Expected<'"("', T, J>
 		: Expected<"function name", T, I>;
+/** `[return type, set-returning, next token, RETURNS TABLE columns or null]`. */
 type FnReturns<T extends Toks, I extends number> =
 	T[I] extends WordTok<"returns">
 		? T[Next<I>] extends WordTok<"table">
 			? FnTableReturn<T, Nx2<I>>
-			: T[Next<I>] extends WordTok<"setof">
-				? FnRetType<T, Nx2<I>, true>
-				: FnRetType<T, Next<I>, false>
-		: ["unknown", false, I];
+			: WithoutColumns<
+					T[Next<I>] extends WordTok<"setof">
+						? FnRetType<T, Nx2<I>, true>
+						: FnRetType<T, Next<I>, false>
+				>
+		: ["unknown", false, I, null];
+type WithoutColumns<R> = R extends readonly [infer Ty, infer Srf, infer K]
+	? [Ty, Srf, K, null]
+	: R;
 type FnRetType<T extends Toks, I extends number, Srf extends boolean> =
 	QualName<T, I> extends [
 		infer Parts extends readonly string[],
@@ -423,16 +431,34 @@ type FnPlainRetType<T extends Toks, I extends number, Srf extends boolean> =
 		? [Ty, Srf, J]
 		: ParseTypeName<T, I>;
 
+// One column returns its type; more return records with those columns.
 type FnTableReturn<T extends Toks, I extends number> =
-	T[I] extends OpTok<"(">
-		? Ident<T, Next<I>> extends [string, infer J extends number]
-			? FnRetType<T, J, true> extends [infer Ty, true, infer K extends number]
-				? T[K] extends OpTok<")">
-					? [Ty, true, Next<K>]
-					: ["record", true, I]
-				: FnRetType<T, J, true>
-			: Expected<"column name", T, Next<I>>
-		: Expected<'"("', T, I>;
+	T[I] extends OpTok<"("> ? FnTableCols<T, Next<I>, []> : Expected<'"("', T, I>;
+type FnTableCols<
+	T extends Toks,
+	I extends number,
+	Acc extends readonly (readonly [string, string])[],
+> =
+	Ident<T, I> extends [infer Name extends string, infer J extends number]
+		? FnRetType<T, J, true> extends [
+				infer Ty extends string,
+				true,
+				infer K extends number,
+			]
+			? T[K] extends OpTok<",">
+				? FnTableCols<T, Next<K>, [...Acc, [Name, Ty]]>
+				: T[K] extends OpTok<")">
+					? Acc extends readonly []
+						? [Ty, true, Next<K>, null]
+						: [
+								"record",
+								true,
+								Next<K>,
+								{ [C in [...Acc, [Name, Ty]][number] as C[0]]: C[1] },
+							]
+					: SyntaxErrorAt<T, K>
+			: FnRetType<T, J, true>
+		: Expected<"column name", T, I>;
 
 type CreateTableNode<Ine, Ref, Cols, Cons, Like, Inh, Of> = {
 	t: "create_table";

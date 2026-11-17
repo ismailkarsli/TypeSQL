@@ -154,17 +154,23 @@ type ParamsOfExprMore<E extends Expr, C extends Ctx> =
 											?
 													| ParamsOfOpt<E["e"], C, Info<"timestamptz", true>>
 													| ParamsOfOpt<E["zone"], C, Info<"text", true>>
-											: E extends Tag<
-														"collate" | "field" | "named" | "variadic"
+											: E extends Tag<"named">
+												? // A function argument accepts NULL, named as positional (ParamsOfArgs).
+													E["e"] extends CastParamOf<
+														infer N extends number,
+														infer T
 													>
-												? ParamsOfExpr<E["e"], C>
-												: E extends Tag<"xml">
-													? ParamsOfXml<Extract<E, XmlExpr>, C>
-													: E extends Tag<
-																"jsonfn" | "jsonagg" | "isjson" | "jsonfmt"
-															>
-														? ParamsOfSqlJson<Extract<E, SqlJsonExpr>, C>
-														: never;
+													? ParamEntry<N, Mk<T, true>>
+													: ParamsOfExpr<E["e"], C>
+												: E extends Tag<"collate" | "field" | "variadic">
+													? ParamsOfExpr<E["e"], C>
+													: E extends Tag<"xml">
+														? ParamsOfXml<Extract<E, XmlExpr>, C>
+														: E extends Tag<
+																	"jsonfn" | "jsonagg" | "isjson" | "jsonfmt"
+																>
+															? ParamsOfSqlJson<Extract<E, SqlJsonExpr>, C>
+															: never;
 type ParamsOfMember<
 	X extends Expr,
 	Es extends readonly Expr[],

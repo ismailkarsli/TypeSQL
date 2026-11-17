@@ -11,6 +11,7 @@ import type {
 	ScopeLevel,
 } from "../../../engine/types.js";
 import type { AnyErr, SqlError } from "../../../errors.js";
+import type { FunctionColumns } from "../../schema/functions.js";
 import type { NumT } from "../../schema/type-facts.js";
 import type {
 	ColDef,
@@ -23,12 +24,14 @@ import type {
 	TableRef,
 	Tag,
 } from "../ast.js";
+import type { SchemaFunctions } from "../db.js";
 import type { ColumnName } from "../project/naming.js";
 import type { ProjectSelect } from "../project/select.js";
 import type {
 	ArrInfo,
 	HasNullElems,
 	NullableLevel,
+	NullableMap,
 	TypeDisplay,
 } from "../shape.js";
 import type { FunctionCatalog, SrfType } from "../typer/catalog.js";
@@ -448,7 +451,9 @@ type FuncBaseCols<
 		? (
 				Name extends keyof FunctionCatalog
 					? FunctionCatalog[Name]
-					: null
+					: Name extends keyof SchemaFunctions<C["db"]>
+						? DeclaredRow<SchemaFunctions<C["db"]>[Name], C["db"]>
+						: null
 			) extends infer F
 			? F extends { readonly cols: infer Cs extends Cols }
 				? Cs
@@ -457,19 +462,55 @@ type FuncBaseCols<
 							'a column definition list is required for functions returning "record"',
 							null
 						>
-					: Name extends "unnest"
-						? As extends readonly [ColInfo, ColInfo, ...ColInfo[]]
-							? MultiUnnest<As, []>
-							: SrfOrScalar<Name, As, Call, C, Name>
-						: SrfOrScalar<
-								Name,
-								As,
-								Call,
-								C,
-								F extends { readonly column: infer N extends string } ? N : Name
-							>
+					: F extends { readonly columns: infer Cs extends FunctionColumns }
+						? [{ readonly star: ColumnsMap<Cs> }]
+						: Name extends "unnest"
+							? As extends readonly [ColInfo, ColInfo, ...ColInfo[]]
+								? MultiUnnest<As, []>
+								: SrfOrScalar<Name, As, Call, C, Name>
+							: SrfOrScalar<
+									Name,
+									As,
+									Call,
+									C,
+									F extends { readonly column: infer N extends string }
+										? N
+										: Name
+								>
 			: never
 		: TypeList<Args, C, []>;
+
+/**
+ * A declared function as a FROM item. Its rows are those of `columns`, or of
+ * the table or view its return type names: all of them for SETOF, and one row
+ * that is all NULL when the function returns NULL otherwise. `record` without
+ * `columns` needs a column definition list, as in PostgreSQL. Any other
+ * function is typed by its return type, as before.
+ */
+type DeclaredRow<F, DB> = F extends { readonly columns: FunctionColumns }
+	? F
+	: F extends { readonly ret: infer R extends string }
+		? ReturnedRelation<DB, R> extends infer M extends ColMap
+			? {
+					readonly columns: F extends { readonly srf: true }
+						? M
+						: NullableMap<M>;
+				}
+			: R extends "record"
+				? { readonly coldefs: true }
+				: F
+		: F;
+type ReturnedRelation<DB, R extends string> = ResolveTable<
+	DB,
+	R extends `${infer S}.${infer N}`
+		? { readonly schema: S; readonly name: N }
+		: { readonly schema: null; readonly name: R },
+	{}
+>;
+/** Declared columns: a bare type name is nullable, a `Col` keeps its flags. */
+type ColumnsMap<Cs extends FunctionColumns> = {
+	readonly [K in keyof Cs]: Cs[K] extends ColInfo ? Cs[K] : Info<Cs[K], true>;
+};
 
 type NonNullInfos<As extends readonly ColInfo[]> = {
 	readonly [K in keyof As]: ArrInfo<As[K]["type"], false, HasNullElems<As[K]>>;

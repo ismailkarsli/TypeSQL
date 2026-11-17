@@ -245,6 +245,12 @@ interface DB {
 
 Calling a function that is neither built in nor declared is an error. See [Expressions and functions](./using-sql#expressions-and-functions) for the other ways to declare one.
 
+In `FROM`, a function returning a table's row type has that table's columns (all nullable without `srf: true`). For `RETURNS TABLE`, list them under `columns`:
+
+```ts
+user_cards: Sig<["int4"], "record", { srf: true; columns: { id: Col<"int4">; label: "text" } }>;
+```
+
 ## Other schemas
 
 Tables in a Postgres schema other than `public`, or in another MySQL or MariaDB database, go in a nested object:

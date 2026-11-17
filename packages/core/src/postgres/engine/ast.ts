@@ -656,6 +656,8 @@ export type CreateFunction = {
 	readonly name: TableRef;
 	readonly ret: string;
 	readonly srf: boolean;
+	/** The columns of `RETURNS TABLE (...)` with more than one. */
+	readonly columns: { readonly [name: string]: string } | null;
 };
 export type NoopStmt = { readonly t: "noop"; readonly what: string };
 

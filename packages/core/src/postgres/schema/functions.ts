@@ -1,3 +1,5 @@
+import type { ColInfo } from "../../engine/types.js";
+
 /** Behaviour a declared function can state besides its signature. */
 export type SigFlags = {
 	readonly strict?: boolean | readonly number[];
@@ -5,7 +7,16 @@ export type SigFlags = {
 	readonly agg?: boolean;
 	readonly window?: boolean;
 	readonly srf?: boolean;
+	/**
+	 * The columns of a function that returns rows of no table (`RETURNS TABLE
+	 * (...)`, OUT parameters), as it reads in FROM: a type name, which is
+	 * nullable, or a `Col`.
+	 */
+	readonly columns?: FunctionColumns;
 };
+
+/** The columns a function returns: a type name (nullable) or a `Col`, by name. */
+export type FunctionColumns = { readonly [name: string]: string | ColInfo };
 
 export type Sig<
 	Args extends readonly string[],

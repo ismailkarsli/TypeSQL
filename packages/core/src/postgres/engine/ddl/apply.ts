@@ -101,6 +101,7 @@ export type ApplyDdlNode<DB, S> =
 																	DB,
 																	S["name"]["name"],
 																	S["ret"],
-																	S["srf"]
+																	S["srf"],
+																	S["columns"]
 																>
 															: SqlError<"unsupported DDL statement", null>;

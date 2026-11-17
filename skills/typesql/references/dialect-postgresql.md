@@ -29,3 +29,4 @@ Generate: `typesql introspect --url postgres://… --out src/db/schema.ts` (`@ty
 - **Colons:** `a[1:n]` reads `:n` as a parameter; write `a[1: n]`.
 - **Not checked:** aggregate `ORDER BY`, window frames, `GROUPING SETS`, writes to `GENERATED ALWAYS`.
 - **Arrays:** typed one-dimensional, with non-null elements from columns.
+- **Functions in FROM:** `ret` naming a table gives its columns; for `RETURNS TABLE`, declare `columns: { id: Col<"int4"> }`.

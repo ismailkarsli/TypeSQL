@@ -359,7 +359,7 @@ An entry is one `Sig<Params, Return, Flags>` or a tuple of overloads.
 | Parameter patterns | an exact type name, `any`, `anynumeric`, `anystring`, `anyarray`, `anyjson`, `anydatetime`, `...` (variadic) |
 | Return patterns | an exact name, `$1`..`$4`, `$elem1`, `$arr1`, `$common`, `$sum1`, `$avg1` |
 | Typed-JSON return patterns | `$jval:json` (`to_json`), `$jarr:json` (`json_agg`), `$jrec:json` (`json_object_agg`), `$jtup:json` (`json_build_array`), `$jelem:json` (`json_array_elements`); `jsonb` for the jsonb variants |
-| Flags | `strict` (default `true`: nullable if any argument is; `false` disables this; an array of 1-based argument numbers checks only those arguments), `nullable`, `agg`, `window`, `srf` |
+| Flags | `strict` (default `true`: nullable if any argument is; `false` disables this; an array of 1-based argument numbers checks only those arguments), `nullable`, `agg`, `window`, `srf`, `columns` (a `record` function's columns in `FROM`) |
 
 ## Migrations
 

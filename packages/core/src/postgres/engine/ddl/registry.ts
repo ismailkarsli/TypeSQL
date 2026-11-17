@@ -24,13 +24,18 @@ export type ApplyCreateFunction<
 	Name extends string,
 	Ret extends string,
 	Srf,
+	Columns = null,
 > = SetKey<
 	DB,
 	"$functions",
 	SetKey<
 		SchemaFunctions<DB>,
 		Name,
-		Srf extends true ? Sig<["..."], Ret, { srf: true }> : Sig<["..."], Ret>
+		Columns extends { readonly [name: string]: string }
+			? Sig<["..."], Ret, { srf: true; columns: Columns }>
+			: Srf extends true
+				? Sig<["..."], Ret, { srf: true }>
+				: Sig<["..."], Ret>
 	>
 >;
 

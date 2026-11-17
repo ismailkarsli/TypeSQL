@@ -1,0 +1,44 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`pg-function-rows > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "cards": "({ id: number; label: null | string })[]",
+      "found": "({ id: null | number; name: null | string; bio: null | string })[]",
+      "migratedRow": "({ id: null | number; title: null | string })[]",
+      "migratedTable": "({ id: null | number; title: null | string })[]",
+      "missing": "({ id: null | number; name: null | string })[]",
+      "named": "({ id: number; name: string; bio: null | string })[]",
+      "namedCast": "({ g: string })[]",
+      "namedValue": "({ g: string })[]",
+      "positional": "({ g: string })[]",
+    },
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "{
+  found: [ { id: 2, name: 'alan', bio: 'computing' } ],
+  missing: [ { id: null, name: null } ],
+  named: [
+    { id: 1, name: 'ada', bio: null },
+    { id: 2, name: 'alan', bio: 'computing' }
+  ],
+  cards: [ { id: 1, label: 'ada: -' }, { id: 2, label: 'alan: computing' } ],
+  positional: [ { g: 'hello anonymous' } ],
+  namedCast: [ { g: 'hello anonymous' } ],
+  namedValue: [ { g: 'hello grace' } ],
+  migratedRow: [ { id: 1, title: 'first' } ],
+  migratedTable: [ { id: 1, title: 'FIRST' }, { id: 2, title: 'SECOND' } ]
+}
+",
+  },
+}
+`;
