@@ -1,6 +1,6 @@
 {
 	"name": "@typesql/effect",
-	"version": "8.1.0",
+	"version": "8.2.0",
 	"description": "Run TypeSQL queries as Effects on an Effect SqlClient.",
 	"license": "MIT",
 	"repository": {

@@ -1,5 +1,12 @@
 # @typesql/effect
 
+## 8.2.0
+
+### Patch Changes
+
+- Updated dependencies:
+  - @typesql/core@8.2.0
+
 ## 8.1.0
 
 ### Minor Changes
