@@ -19,6 +19,25 @@ TypeSQL supports PostgreSQL, SQLite, MySQL and MariaDB. The `@typesql/core` runt
 
 ## Get started
 
+### Install
+
+Install `@typesql/core`, the adapter for your driver and TypeScript 7.1 or later:
+
+```sh
+# PostgreSQL with node-postgres
+npm install @typesql/core @typesql/pg pg
+
+# SQLite with node:sqlite, better-sqlite3 or bun:sqlite
+npm install @typesql/core @typesql/sqlite
+
+# MySQL or MariaDB with mysql2
+npm install @typesql/core @typesql/mysql mysql2
+
+npm install --save-dev typescript@7.1.0-beta
+```
+
+Enable `"strict": true` (or at least `"strictNullChecks": true`) in `tsconfig.json`. See the [quick start](https://typesql.karsli.net/guide/quick-start) for every adapter and optional package.
+
 ### Get your schema
 
 TypeSQL checks queries against a `DB` type that describes your tables. Derive it [from your migrations](https://typesql.karsli.net/guide/migrations), generate it [from a live database](https://typesql.karsli.net/guide/introspect), or take it [from Kysely, Drizzle or Prisma](https://typesql.karsli.net/guide/orms).
