@@ -1494,6 +1494,28 @@ importers:
         specifier: 'catalog:'
         version: 7.1.0-beta
 
+  tests/scenarios/effect-postgres-plugin-types:
+    dependencies:
+      '@effect/sql-pg':
+        specifier: 'catalog:'
+        version: 4.1.4(effect@4.1.4)
+      '@typesql/core':
+        specifier: workspace:*
+        version: link:../../../packages/core
+      '@typesql/effect':
+        specifier: workspace:*
+        version: link:../../../packages/effect
+      effect:
+        specifier: 'catalog:'
+        version: 4.1.4
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.6.6
+      typescript:
+        specifier: 'catalog:'
+        version: 7.1.0-beta
+
   tests/scenarios/effect-rejection:
     dependencies:
       '@typesql/core':
@@ -1514,6 +1536,28 @@ importers:
         version: 7.1.0-beta
 
   tests/scenarios/effect-sqlite:
+    dependencies:
+      '@effect/sql-sqlite-node':
+        specifier: 'catalog:'
+        version: 4.1.4(effect@4.1.4)
+      '@typesql/core':
+        specifier: workspace:*
+        version: link:../../../packages/core
+      '@typesql/effect':
+        specifier: workspace:*
+        version: link:../../../packages/effect
+      effect:
+        specifier: 'catalog:'
+        version: 4.1.4
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.6.6
+      typescript:
+        specifier: 'catalog:'
+        version: 7.1.0-beta
+
+  tests/scenarios/effect-sqlite-plugin-types:
     dependencies:
       '@effect/sql-sqlite-node':
         specifier: 'catalog:'

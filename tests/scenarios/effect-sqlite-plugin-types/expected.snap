@@ -1,0 +1,28 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`effect-sqlite-plugin-types > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "result": "{ inserted: number; rows: ({ displayName: null | string; id: number })[]; named: { displayName: null | string }; counted: { userCount: number } }",
+    },
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "{
+  inserted: 2,
+  rows: [ { id: 1, displayName: 'Ada' }, { id: 2, displayName: null } ],
+  named: { displayName: 'Ada' },
+  counted: { userCount: 2 }
+}
+",
+  },
+}
+`;
