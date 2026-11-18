@@ -1,5 +1,14 @@
 # @typesql/sqlite
 
+## 9.0.1
+
+### Patch Changes
+
+- On node:sqlite and bun:sqlite, a query of several statements, such as `sql.as("INSERT …; DELETE …")`, is an error. Before, only the first statement ran.
+
+- Updated dependencies:
+  - @typesql/core@9.0.1
+
 ## 9.0.0
 
 ### Patch Changes

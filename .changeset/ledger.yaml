@@ -552,6 +552,10 @@
     - happy-donkeys-pump
     - quick-rabbits-happen
     - quiet-plums-learn
+"@typesql/core@9.0.1":
+  dir: packages/core
+  intents:
+    - angry-shoes-matter
 "@typesql/drizzle@0.0.2":
   dir: packages/drizzle
   intents:
@@ -1352,6 +1356,10 @@
   dir: packages/sqlite
   intents:
     - funny-melons-work
+"@typesql/sqlite@9.0.1":
+  dir: packages/sqlite
+  intents:
+    - angry-shoes-matter
 typesql@0.0.1:
   dir: packages/vscode
   intents:
