@@ -1,6 +1,6 @@
 // Pages generated at build time from files elsewhere in the repository.
 // `/changelog` is rendered from the `CHANGELOG.md` files that `pnpm version -r`
-// writes (see internals/releasing.md), so it never needs editing by hand. It
+// writes, so it never needs editing by hand. It
 // starts at 1.0.0; earlier notes are on the GitHub releases page.
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";

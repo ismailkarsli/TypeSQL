@@ -118,5 +118,5 @@ Record one and commit it with the change:
   pnpm change ${names} --bump patch --summary "…"
   pnpm change ${names} --bump none --summary "…"   # if the change needs no release
 
-See packages/docs/internals/releasing.md.`);
+See CONTRIBUTING.md.`);
 process.exit(1);

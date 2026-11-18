@@ -64,7 +64,7 @@ export default withVersions({
 	},
 	// CHANGELOG.md is this private package's own; `/changelog` is generated
 	// from the published packages' changelogs by `[page].paths.ts`.
-	srcExclude: ["internals/**", "CHANGELOG.md"],
+	srcExclude: ["CHANGELOG.md"],
 	themeConfig: {
 		logo: { light: "/logo-light.svg", dark: "/logo-dark.svg", alt: "TypeSQL" },
 		siteTitle: false,
