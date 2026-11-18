@@ -1,5 +1,14 @@
 # @typesql/sqlite
 
+## 9.0.0
+
+### Patch Changes
+
+- The README calls the renamed query methods of `@typesql/core` (`exec()`, `execTakeFirst()`, `execTakeFirstOrNone()`, `execCount()`); the package's own API is unchanged.
+
+- Updated dependencies:
+  - @typesql/core@9.0.0
+
 ## 8.2.0
 
 ### Patch Changes

@@ -14,6 +14,10 @@
   dir: packages/better-auth
   intents:
     - calm-maps-peel
+"@typesql/better-auth@9.0.0":
+  dir: packages/better-auth
+  intents:
+    - giant-squids-sell
 "@typesql/cli@0.0.1":
   dir: packages/cli
   intents:
@@ -541,6 +545,13 @@
   intents:
     - quick-books-remember
     - tidy-turtles-sort
+"@typesql/core@9.0.0":
+  dir: packages/core
+  intents:
+    - angry-poets-decide
+    - happy-donkeys-pump
+    - quick-rabbits-happen
+    - quiet-plums-learn
 "@typesql/drizzle@0.0.2":
   dir: packages/drizzle
   intents:
@@ -648,10 +659,19 @@
   dir: packages/drizzle
   intents:
     - curvy-rats-shave
+"@typesql/drizzle@9.0.0":
+  dir: packages/drizzle
+  intents:
+    - light-lamps-build
 "@typesql/effect@8.1.0":
   dir: packages/effect
   intents:
     - sharp-camels-agree
+"@typesql/effect@9.0.0":
+  dir: packages/effect
+  intents:
+    - tidy-toys-count
+    - wise-boxes-sleep
 "@typesql/kysely@0.0.2":
   dir: packages/kysely
   intents:
@@ -762,6 +782,10 @@
   dir: packages/kysely
   intents:
     - famous-icons-film
+"@typesql/kysely@9.0.0":
+  dir: packages/kysely
+  intents:
+    - nice-crabs-notice
 "@typesql/language-server@0.0.1":
   dir: packages/language-server
   intents:
@@ -872,6 +896,10 @@
   dir: packages/mysql
   intents:
     - smooth-snails-greet
+"@typesql/mysql@9.0.0":
+  dir: packages/mysql
+  intents:
+    - breezy-clouds-explode
 "@typesql/pg@0.0.2":
   dir: packages/pg
   intents:
@@ -1010,6 +1038,10 @@
   dir: packages/pg
   intents:
     - little-teeth-bake
+"@typesql/pg@9.0.0":
+  dir: packages/pg
+  intents:
+    - funny-rice-yell
 "@typesql/postgres@0.0.2":
   dir: packages/postgres
   intents:
@@ -1122,6 +1154,10 @@
   dir: packages/postgres
   intents:
     - pretty-onions-learn
+"@typesql/postgres@9.0.0":
+  dir: packages/postgres
+  intents:
+    - chilly-squids-argue
 "@typesql/prisma@0.0.2":
   dir: packages/prisma
   intents:
@@ -1234,6 +1270,10 @@
   dir: packages/prisma
   intents:
     - wide-bears-destroy
+"@typesql/prisma@9.0.0":
+  dir: packages/prisma
+  intents:
+    - young-monkeys-dig
 "@typesql/sqlite@0.0.1":
   dir: packages/sqlite
   intents:
@@ -1308,6 +1348,10 @@
   dir: packages/sqlite
   intents:
     - warm-socks-count
+"@typesql/sqlite@9.0.0":
+  dir: packages/sqlite
+  intents:
+    - funny-melons-work
 typesql@0.0.1:
   dir: packages/vscode
   intents:

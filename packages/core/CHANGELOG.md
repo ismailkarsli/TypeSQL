@@ -1,5 +1,21 @@
 # @typesql/core
 
+## 9.0.0
+
+### Major Changes
+
+- Query methods are renamed: `execute()` to `exec()`, `executeTakeFirstOrThrow()` to `execTakeFirst()`, `executeTakeFirst()` to `execTakeFirstOrNone()` and `executeCount()` to `execCount()`. `execTakeFirstOrNone()` still resolves to `undefined` when there is no row, and `execTakeFirst()` still rejects with `NoResultError`.
+
+### Minor Changes
+
+- `$functions` keys can be schema-qualified: `"app.label": Sig<...>` is what `app.label(x)` calls, so functions of one name in two schemas can have their own signatures. A bare key still answers qualified calls. An unknown qualified call is reported with its qualified name, and an unqualified call to a function declared only under a schema suggests the qualified name.
+
+### Patch Changes
+
+- An unknown PostgreSQL function with a long name, such as `invitation_preview(...)`, is reported as the function that does not exist, with its suggestion. Before, the hint's edit distance overflowed TypeScript (`TS5115: Instantiations ... appear infinitely circular: 'Min', 'Lev'`) and the message was lost.
+
+- A declared PostgreSQL function returning a table's row, declared `nullable: false`, keeps that table's column nullability in `FROM`, for a function that raises rather than returning NULL. Without the flag, its columns are nullable as before.
+
 ## 8.2.0
 
 ### Minor Changes

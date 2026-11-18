@@ -1,5 +1,14 @@
 # @typesql/better-auth
 
+## 9.0.0
+
+### Patch Changes
+
+- Uses the renamed query methods of `@typesql/core` (`exec()`, `execCount()`); the package's own API is unchanged.
+
+- Updated dependencies:
+  - @typesql/core@9.0.0
+
 ## 8.2.0
 
 ## 8.1.0
