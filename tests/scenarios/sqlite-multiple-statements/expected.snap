@@ -1,0 +1,25 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`sqlite-multiple-statements > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "rows": "({ id: number; body: string })[]",
+    },
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "typesql: the SQL text has 2 statements, and SQLite runs one per query; run each on its own
+typesql: the SQL text has 2 statements, and SQLite runs one per query; run each on its own
+[ [Object: null prototype] { id: 1, body: 'ONE' } ]
+",
+  },
+}
+`;

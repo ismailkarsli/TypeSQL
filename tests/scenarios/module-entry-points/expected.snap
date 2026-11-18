@@ -32,6 +32,7 @@ exports[`module-entry-points > scenario 1`] = `
     "RESERVED_KEYS": "object",
     "SqlStatement": "function",
     "UsageError": "function",
+    "assertOneStatement": "function",
     "colFlags": "function",
     "colSource": "function",
     "columnSource": "function",

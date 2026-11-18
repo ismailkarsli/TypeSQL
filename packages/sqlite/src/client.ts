@@ -1,5 +1,6 @@
 import type { Executor } from "@typesql/core";
 import {
+	assertOneStatement,
 	paramNumbers,
 	runTransaction,
 	type SqlDriver,
@@ -66,13 +67,11 @@ function readBigInts(stmt: SqliteStatement): void {
 
 function prepared(db: SqliteDatabase, text: string, bigint: boolean): Prepared {
 	const stmt = db.prepare(text);
+	const bare = isBetterSqlite3(stmt);
+	// better-sqlite3 rejects a second statement itself.
+	if (!bare) assertOneStatement(text);
 	if (bigint) readBigInts(stmt);
-	return {
-		stmt,
-		reader: isReader(stmt),
-		names: paramNumbers(text),
-		bare: isBetterSqlite3(stmt),
-	};
+	return { stmt, reader: isReader(stmt), names: paramNumbers(text), bare };
 }
 
 function bind(p: Prepared, values: readonly unknown[]): unknown[] {

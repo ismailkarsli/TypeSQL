@@ -67,6 +67,7 @@ export type {
 	StatementParams,
 } from "./sql/contract.js";
 export {
+	assertOneStatement,
 	connectSqlite,
 	paramNumbers,
 	positional,

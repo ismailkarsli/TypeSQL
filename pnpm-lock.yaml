@@ -3602,6 +3602,22 @@ importers:
         specifier: 'catalog:'
         version: 7.1.0-beta
 
+  tests/scenarios/sqlite-multiple-statements:
+    dependencies:
+      '@typesql/core':
+        specifier: workspace:*
+        version: link:../../../packages/core
+      '@typesql/sqlite':
+        specifier: workspace:*
+        version: link:../../../packages/sqlite
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.6.6
+      typescript:
+        specifier: 'catalog:'
+        version: 7.1.0-beta
+
   tests/scenarios/sqlite-negated-zero:
     dependencies:
       '@typesql/core':

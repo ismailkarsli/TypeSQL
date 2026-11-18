@@ -2,6 +2,7 @@
 // connection of the migrator and `typesql introspect`.
 
 import type { Connection } from "../connect.js";
+import { splitStatements } from "../migration/statements.js";
 import {
 	type PositionalStatement,
 	positionalAt,
@@ -10,7 +11,7 @@ import {
 	splitAt,
 } from "../runtime/compile.js";
 import { jsonText } from "../runtime/json.js";
-import { sqliteLexis } from "./dialect.js";
+import { sqliteDialect, sqliteLexis } from "./dialect.js";
 
 /** The parameter numbers a statement uses, in order of first use. */
 export function paramNumbers(text: string): number[] {
@@ -24,6 +25,19 @@ export function paramNumbers(text: string): number[] {
 		sqliteLexis,
 	);
 	return [...seen];
+}
+
+/** A `;` in a trigger's BEGIN … END doesn't end it. */
+const SCRIPT = { sql: sqliteDialect, scan: { programs: new Set(["TRIGGER"]) } };
+
+/** node:sqlite and bun:sqlite would run only the first statement. */
+export function assertOneStatement(text: string): void {
+	if (!text.includes(";")) return;
+	const count = splitStatements(text, SCRIPT).length;
+	if (count > 1)
+		throw new Error(
+			`typesql: the SQL text has ${count} statements, and SQLite runs one per query; run each on its own`,
+		);
 }
 
 export function sqliteValue<V>(value: V): V | string | 0 | 1 {
@@ -144,6 +158,7 @@ export async function connectSqlite(
 		client: db,
 		execute: async (sql, values) => {
 			const statement = await whenFree(() => db.prepare(sql));
+			assertOneStatement(sql);
 			const bindings = sqliteBindings(paramNumbers(sql), values);
 			if (statement.columns().length) {
 				const rows = await whenFree(() => statement.all(bindings));
