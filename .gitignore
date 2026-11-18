@@ -13,6 +13,5 @@ reports/
 .consumer/
 .scenario/
 tests/.artifacts/
-social/
 !packages/docs/
 .claude/settings.local.json
