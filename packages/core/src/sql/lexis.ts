@@ -39,14 +39,31 @@ export type AllCode<
 		? false
 		: NoDollarQuote<T, L>
 	: NoDollarQuote<T, L>;
-type NoDollarQuote<
+type NoDollarQuote<T extends string, L extends Lexis> =
+	DollarMaybe<T> extends false
+		? true
+		: DollarOpen<T, "", L> extends null
+			? true
+			: false;
+
+/** Whether `T` has text a dollar quote could open with: `$$` or `$` and a name. */
+export type HasOpener<
 	T extends string,
 	L extends Lexis,
-> = T extends `${string}$${string}`
-	? DollarOpen<T, "", L> extends null
-		? true
+> = T extends `${string}${"'" | Standard | L["extra"]}${string}` ? true : false;
+
+/**
+ * Whether a `$` in `S` is followed by `$` or a name's first character, which
+ * DollarOpen then reads; parameters, `$` and a digit, are skipped without the
+ * text before them, which DollarOpen builds up.
+ */
+type DollarMaybe<S extends string> = S extends `${string}$${infer B}`
+	? B extends `${infer C}${string}`
+		? C extends IdStart | "$"
+			? true
+			: DollarMaybe<B>
 		: false
-	: true;
+	: false;
 
 /**
  * Splits `T` at its first opener: `[code before it, the opener, text after
@@ -198,7 +215,7 @@ export type NextOpaque<T extends string, L extends Lexis> =
 		infer O extends string,
 		infer Rest extends string,
 	]
-		? Code extends `${string}$${string}`
+		? DollarMaybe<Code> extends true
 			? DollarOpen<Code, "", L> extends [
 					infer Pre extends string,
 					infer Tag extends string,
@@ -273,10 +290,22 @@ type DollarBody<
 
 type NChar = IdStart | Digit;
 
-/** A name's characters after its first, `Acc`, and the text after them. */
+/**
+ * A name's characters after its first, `Acc`, and the text after them. A name
+ * ends before a space, so its characters are read off the first word, not off
+ * the whole text, which each step would copy.
+ */
 export type TakeName<
 	S extends string,
 	Acc extends string,
+> = S extends `${infer W} ${infer R}`
+	? TakeNameIn<W, Acc> extends [infer N extends string, infer WR extends string]
+		? [N, `${WR} ${R}`]
+		: never
+	: TakeNameIn<S, Acc>;
+type TakeNameIn<
+	S extends string,
+	Acc extends string,
 > = S extends `${infer C extends NChar}${infer R}`
-	? TakeName<R, `${Acc}${C}`>
+	? TakeNameIn<R, `${Acc}${C}`>
 	: [Acc, S];

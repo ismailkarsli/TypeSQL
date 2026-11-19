@@ -51,9 +51,9 @@ type FragCheck<Text extends string, L extends Lexis> =
 
 type FragArgs<Text extends string, L extends Lexis> =
 	Prepared<Text, L> extends [
-		string,
+		infer _T,
 		infer Names extends string[],
-		readonly unknown[],
+		infer _E,
 		infer M extends number,
 	]
 		? Names extends []
@@ -64,8 +64,8 @@ type FragArgs<Text extends string, L extends Lexis> =
 
 type FragCount<Text extends string, L extends Lexis> =
 	Prepared<Text, L> extends [
-		string,
-		string[],
+		infer _T,
+		infer _N,
 		infer Encs extends readonly unknown[],
 		infer M extends number,
 	]
@@ -78,10 +78,10 @@ type FragCarried<
 	L extends Lexis,
 > =
 	Prepared<Text, L> extends [
-		string,
+		infer _T,
 		infer Names extends string[],
 		infer Encs extends readonly string[],
-		number,
+		infer _M,
 	]
 		? Names extends []
 			? [...EncAll<A>, ...Encs]

@@ -93,7 +93,7 @@ type SpliceCheck<E extends EngineTypes, DB, TM, Q extends string, S> =
 		: Prepared<Q, E["lexis"]> extends infer P
 			? P extends [
 					infer T2 extends string,
-					string[],
+					infer _Names,
 					infer Encs extends readonly string[],
 					infer M extends number,
 				]

@@ -413,16 +413,16 @@ type CheckValueItems<Es extends readonly Expr[], C extends Ctx> =
 type CheckValueItemsWalk<
 	Es extends readonly Expr[],
 	C extends Ctx,
-> = Es extends readonly [
-	infer E extends Expr,
-	...infer R extends readonly Expr[],
-]
-	? E extends Tag<"default">
-		? CheckValueItemsWalk<R, C>
-		: TypeOf<E, C> extends ColInfo
-			? CheckValueItemsWalk<R, C>
-			: TypeOf<E, C>
-	: true;
+	I extends number = 0,
+> = I extends Es["length"]
+	? true
+	: Es[I] extends infer E extends Expr
+		? E extends Tag<"default">
+			? CheckValueItemsWalk<Es, C, Next<I>>
+			: TypeOf<E, C> extends ColInfo
+				? CheckValueItemsWalk<Es, C, Next<I>>
+				: TypeOf<E, C>
+		: true;
 
 type CheckTargets<
 	Cs extends readonly string[],
@@ -610,23 +610,23 @@ type CheckSetValues<
 type CheckSetValuesWalk<
 	Set extends readonly SetItem[],
 	C extends Ctx,
-> = Set extends readonly [
-	infer S extends SetItem,
-	...infer R extends readonly SetItem[],
-]
-	? (
-			S extends {
-				readonly t: "setmulti";
-				readonly cols: infer Cols extends readonly string[];
-			}
-				? CheckMultiSource<S["e"], Cols, C>
-				: CheckValueItems<[S["e"]], C>
-		) extends infer X
-		? X extends AnyErr
-			? X
-			: CheckSetValuesWalk<R, C>
-		: never
-	: true;
+	I extends number = 0,
+> = I extends Set["length"]
+	? true
+	: Set[I] extends infer S extends SetItem
+		? (
+				S extends {
+					readonly t: "setmulti";
+					readonly cols: infer Cols extends readonly string[];
+				}
+					? CheckMultiSource<S["e"], Cols, C>
+					: CheckValueItems<[S["e"]], C>
+			) extends infer X
+			? X extends AnyErr
+				? X
+				: CheckSetValuesWalk<Set, C, Next<I>>
+			: never
+		: true;
 type SetTargets<
 	Set extends readonly SetItem[],
 	Cs extends readonly string[],

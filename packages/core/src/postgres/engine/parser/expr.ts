@@ -382,12 +382,62 @@ type ParseChain<
 				: ParseChain<T, Op, P, [...Items, E], Next<J>, Min>
 			: ParseInfix<T, Balance<[...Items, E], Op>, J, Min>
 		: ParseExpr<T, I, P>;
+// Chains of up to eight items, the common case, are paired by fixed-length
+// patterns: they match the mutable tuple itself, so the checker resolves no
+// tuple members, as `readonly [A, B, ...Rest]` makes it do at every step.
 type Balance<
+	Items extends readonly unknown[],
+	Op extends string,
+> = Items extends [infer A, infer B]
+	? BinNode<Op, A, B>
+	: Items extends [infer A, infer B, infer C]
+		? BinNode<Op, BinNode<Op, A, B>, C>
+		: Items extends [infer A, infer B, infer C, infer D]
+			? BinNode<Op, BinNode<Op, A, B>, BinNode<Op, C, D>>
+			: Items extends [infer A, infer B, infer C, infer D, infer E]
+				? BinNode<Op, BinNode<Op, BinNode<Op, A, B>, BinNode<Op, C, D>>, E>
+				: Items extends [infer A, infer B, infer C, infer D, infer E, infer F]
+					? BinNode<
+							Op,
+							BinNode<Op, BinNode<Op, A, B>, BinNode<Op, C, D>>,
+							BinNode<Op, E, F>
+						>
+					: Items extends [
+								infer A,
+								infer B,
+								infer C,
+								infer D,
+								infer E,
+								infer F,
+								infer G,
+							]
+						? BinNode<
+								Op,
+								BinNode<Op, BinNode<Op, A, B>, BinNode<Op, C, D>>,
+								BinNode<Op, BinNode<Op, E, F>, G>
+							>
+						: Items extends [
+									infer A,
+									infer B,
+									infer C,
+									infer D,
+									infer E,
+									infer F,
+									infer G,
+									infer H,
+								]
+							? BinNode<
+									Op,
+									BinNode<Op, BinNode<Op, A, B>, BinNode<Op, C, D>>,
+									BinNode<Op, BinNode<Op, E, F>, BinNode<Op, G, H>>
+								>
+							: BalanceSlow<Items, Op>;
+type BalanceSlow<
 	Items extends readonly unknown[],
 	Op extends string,
 > = Items extends readonly [infer Only]
 	? Only
-	: Balance<PairUp<Items, Op, []>, Op>;
+	: BalanceSlow<PairUp<Items, Op, []>, Op>;
 type PairUp<
 	Items extends readonly unknown[],
 	Op extends string,

@@ -37,8 +37,12 @@ type WithInline<
 			: R
 		: never;
 
+// Each element is inferred, so the pattern is the prepared tuple itself and
+// the checker compares nothing; `...unknown[]` would make it compare members.
 export type PText<Q extends string, L extends Lexis> =
-	Prepared<Q, L> extends [infer X extends string, ...unknown[]] ? X : Q;
+	Prepared<Q, L> extends [infer X extends string, infer _N, infer _E, infer _M]
+		? X
+		: Q;
 
 export type Surface<R> = [Extract<R, AnyErr>] extends [never]
 	? [R] extends [never]

@@ -23,50 +23,60 @@ type ValueAt<R, K extends string> = R extends unknown
 		: never
 	: never;
 type Flat<R> = R extends unknown ? { readonly [K in keyof R]: R[K] } : never;
+// The key lists are walked by index, which resolves each list once; a
+// `[K, ...Rest]` pattern resolves every suffix.
 type CarriedOfKeys<
 	R,
 	Ks extends readonly unknown[],
 	Acc extends readonly unknown[] = [],
-> = Ks extends readonly [infer K extends string, ...infer Rest]
+	I extends number = 0,
+> = Ks[I] extends infer K extends string
 	? CarriedOfKeys<
 			R,
-			Rest,
-			[...Acc, ValueEnc<Exclude<ValueAt<R, K>, undefined>>]
+			Ks,
+			[...Acc, ValueEnc<Exclude<ValueAt<R, K>, undefined>>],
+			Next<I>
 		>
 	: Acc;
 
 type JoinAssignments<
 	Ks extends readonly unknown[],
 	Q extends string,
-	N extends number = 1,
+	I extends number = 0,
 	Acc extends string = "",
-> = Ks extends readonly [infer K extends string, ...infer Rest]
+> = Ks[I] extends infer K extends string
 	? JoinAssignments<
-			Rest,
+			Ks,
 			Q,
-			Next<N>,
+			Next<I>,
 			Acc extends ""
-				? `${QuotedIdent<[K], Q>} = $${N}`
-				: `${Acc}, ${QuotedIdent<[K], Q>} = $${N}`
+				? `${QuotedIdent<[K], Q>} = $${Next<I>}`
+				: `${Acc}, ${QuotedIdent<[K], Q>} = $${Next<I>}`
 		>
 	: Acc;
 type JoinNames<
 	Ks extends readonly unknown[],
 	Q extends string,
 	Acc extends string = "",
-> = Ks extends readonly [infer K extends string, ...infer Rest]
+	I extends number = 0,
+> = Ks[I] extends infer K extends string
 	? JoinNames<
-			Rest,
+			Ks,
 			Q,
-			Acc extends "" ? QuotedIdent<[K], Q> : `${Acc}, ${QuotedIdent<[K], Q>}`
+			Acc extends "" ? QuotedIdent<[K], Q> : `${Acc}, ${QuotedIdent<[K], Q>}`,
+			Next<I>
 		>
 	: Acc;
 type JoinPlaceholders<
 	Ks extends readonly unknown[],
-	N extends number = 1,
+	I extends number = 0,
 	Acc extends string = "",
-> = Ks extends readonly [string, ...infer Rest]
-	? JoinPlaceholders<Rest, Next<N>, Acc extends "" ? `$${N}` : `${Acc}, $${N}`>
+> = Ks[I] extends string
+	? JoinPlaceholders<
+			Ks,
+			Next<I>,
+			Acc extends "" ? `$${Next<I>}` : `${Acc}, $${Next<I>}`
+		>
 	: Acc;
 
 export type SetRep<P, Q extends string> =

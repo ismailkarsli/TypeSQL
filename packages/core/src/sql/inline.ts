@@ -3,7 +3,13 @@ import type { Next } from "../engine/next.js";
 import type { Members } from "../engine/object.js";
 import type { SqlError } from "../errors.js";
 import type { InlineFragment, InlineStatement } from "../query.js";
-import type { Lexis, Opaque, OpaqueKind, SplitFirst } from "./lexis.js";
+import type {
+	HasOpener,
+	Lexis,
+	Opaque,
+	OpaqueKind,
+	SplitFirst,
+} from "./lexis.js";
 
 export type ParamInput<T> = unknown extends T
 	? unknown
@@ -116,18 +122,23 @@ type BoolEnc<B> = [B] extends [never]
 		: [B] extends [true]
 			? "t"
 			: "f";
+// The member and key lists below are walked by index, which resolves each
+// list once; a `[H, ...R]` pattern resolves every suffix.
 type LitEnc<
 	L,
 	Tag extends string,
 	Wide extends string,
 	Acc extends string = "",
-> = L extends readonly [infer H extends string | number, ...infer R]
-	? Esc<`${H}`> extends infer X extends string
-		? LitEnc<R, Tag, Wide, `${Acc}${Tag}${X}~`>
-		: Wide
-	: L extends readonly []
+	I extends number = 0,
+> = L extends readonly unknown[]
+	? I extends L["length"]
 		? Acc
-		: Wide;
+		: L[I] extends infer H extends string | number
+			? Esc<`${H}`> extends infer X extends string
+				? LitEnc<L, Tag, Wide, `${Acc}${Tag}${X}~`, Next<I>>
+				: Wide
+			: Wide
+	: Wide;
 
 type ArrEnc<T, Depth extends unknown[]> = [
 	Extract<T, readonly unknown[]>,
@@ -159,9 +170,10 @@ type ShapesEnc<
 	Os extends readonly unknown[],
 	Depth extends unknown[],
 	Acc extends string,
-> = Os extends readonly [infer O, ...infer R]
-	? ShapesEnc<T, R, Depth, `${Acc}${ShapeEnc<T, O, Depth>}`>
-	: Acc;
+	I extends number = 0,
+> = I extends Os["length"]
+	? Acc
+	: ShapesEnc<T, Os, Depth, `${Acc}${ShapeEnc<T, Os[I], Depth>}`, Next<I>>;
 type ShapeEnc<T, O, Depth extends unknown[]> = O extends (
 	...args: never
 ) => void
@@ -182,20 +194,21 @@ type PropsEnc<
 	Ks extends readonly unknown[],
 	Depth extends unknown[],
 	Acc extends string,
-> = Ks extends readonly [
-	infer K extends keyof O & (string | number),
-	...infer R,
-]
-	? Esc<`${K}`> extends infer X extends string
-		? PropsEnc<
-				T,
-				O,
-				R,
-				Depth,
-				`${Acc}${Acc extends "" ? "" : `,${Depth["length"]}`}${X}=${{} extends Pick<O, K> ? `!${ElemEnc<T, Exclude<O[K], undefined>, Depth>}` : ElemEnc<T, O[K], Depth>}`
-			>
-		: null
-	: Acc;
+	I extends number = 0,
+> = I extends Ks["length"]
+	? Acc
+	: Ks[I] extends infer K extends keyof O & (string | number)
+		? Esc<`${K}`> extends infer X extends string
+			? PropsEnc<
+					T,
+					O,
+					Ks,
+					Depth,
+					`${Acc}${Acc extends "" ? "" : `,${Depth["length"]}`}${X}=${{} extends Pick<O, K> ? `!${ElemEnc<T, Exclude<O[K], undefined>, Depth>}` : ElemEnc<T, O[K], Depth>}`,
+					Next<I>
+				>
+			: null
+		: Acc;
 
 type EscCodes = {
 	" ": "a";
@@ -270,7 +283,7 @@ type CheckLoop<E extends string, P, InObject extends boolean> = E extends ""
 				: false
 			: E extends `<${infer D extends string}${infer R}`
 				? R extends `${infer Inner}>${D}${infer After}`
-					? ObjOk<Fields<Inner, D, []>, P> extends true
+					? ObjFieldsOk<Inner, D, P> extends true
 						? CheckLoop<After, P, InObject>
 						: false
 					: false
@@ -343,22 +356,61 @@ type ParseField<F extends string> = F extends `${infer K}=${infer E}`
 		: [Unesc<K>, false, E]
 	: ["", false, "*"];
 
-type ObjOk<Fs extends readonly Field[], P> = true extends (
+/**
+ * Whether the encoded fields `S` (separated by `,D`) fit an object member of
+ * `P`, as ObjOk of their Fields does. The fields are read off the text in one
+ * pass per member rather than built into a tuple first.
+ */
+type ObjFieldsOk<S extends string, D extends string, P> = true extends (
 	PlainObject<P> extends infer O
 		? O extends unknown
-			? ShapeOk<Fs, O>
+			? FieldScan<S, D, O, never, false>
 			: never
 		: never
 )
 	? true
 	: false;
-// A value with an index signature (`Record<string, unknown>`) has keys the
-// type doesn't list, so like a plain `string` it isn't checked for missing ones.
-type ShapeOk<Fs extends readonly Field[], O> = "*" extends Fs[number][0]
-	? FieldsOk<Fs, O>
-	: [Exclude<RequiredKeys<O>, PresentKeys<Fs>>] extends [never]
-		? FieldsOk<Fs, O>
+/**
+ * The fields left in `S` checked against `O`, with the keys `Present` the
+ * fields so far send and whether one was `*`; then the required keys of `O`
+ * must be present unless a field was `*`.
+ */
+type FieldScan<
+	S extends string,
+	D extends string,
+	O,
+	Present,
+	Star extends boolean,
+> = S extends ""
+	? FieldsSent<O, Present, Star>
+	: S extends `${infer F},${D}${infer R}`
+		? FieldOk<F, O> extends [infer K, infer Ok, infer St extends boolean]
+			? Ok extends true
+				? FieldScan<R, D, O, Present | K, St extends true ? true : Star>
+				: false
+			: never
+		: FieldOk<S, O> extends [infer K, infer Ok, infer St extends boolean]
+			? Ok extends true
+				? FieldsSent<O, Present | K, St extends true ? true : Star>
+				: false
+			: never;
+/** Whether the fields sent cover the keys `O` requires; any key may be missing after a `*` field. */
+type FieldsSent<O, Present, Star extends boolean> = Star extends true
+	? true
+	: [Exclude<RequiredKeys<O>, Present>] extends [never]
+		? true
 		: false;
+/**
+ * A field's key when it is sent (`never` when optional), whether its value
+ * fits, and whether its key is `*`.
+ */
+type FieldOk<F extends string, O> = F extends `${infer K}=${infer E}`
+	? Unesc<K> extends infer N extends string
+		? E extends `!${infer V}`
+			? [never, CheckLoop<V, PropOf<O, N>, true>, N extends "*" ? true : false]
+			: [N, CheckLoop<E, PropOf<O, N>, true>, N extends "*" ? true : false]
+		: never
+	: ["", CheckLoop<"*", PropOf<O, "">, true>, false];
 type RequiredKeys<O> = {
 	[K in keyof O]-?: {} extends Pick<O, K>
 		? never
@@ -366,19 +418,6 @@ type RequiredKeys<O> = {
 			? `${K}`
 			: never;
 }[keyof O];
-type PresentKeys<Fs extends readonly Field[]> = Fs[number] extends infer F
-	? F extends readonly [infer K, false, string]
-		? K
-		: never
-	: never;
-type FieldsOk<Fs extends readonly Field[], O> = Fs extends readonly [
-	readonly [infer K extends string, boolean, infer E extends string],
-	...infer R extends readonly Field[],
-]
-	? CheckLoop<E, PropOf<O, K>, true> extends true
-		? FieldsOk<R, O>
-		: false
-	: true;
 /** The type a property takes; `unknown` for keys the parameter doesn't list. */
 type PropOf<O, K extends string> = K extends "*"
 	? string extends keyof O
@@ -467,7 +506,21 @@ export type RewriteInlineStr<
 	Start extends number,
 	L extends Lexis,
 > =
-	HasMarker<T> extends false ? [T, []] : InlineLoop<T, "", [], Next<Start>, L>;
+	HasMarker<T> extends false
+		? [T, []]
+		: HasOpener<T, L> extends true
+			? InlineLoop<T, "", [], Next<Start>, L>
+			: InlineCode<T, "", [], Next<Start>>;
+
+/** InlineLoop for a text with no quote or comment, where every marker is a parameter. */
+type InlineCode<
+	T extends string,
+	Acc extends string,
+	Encs extends string[],
+	K extends number,
+> = T extends `${infer Pre}\u0000${infer Body}\u0000${infer Rest}`
+	? InlineCode<Rest, `${Acc}${Pre}$${K}`, [...Encs, MarkerEnc<Body>], Next<K>>
+	: [`${Acc}${T}`, Encs];
 
 /**
  * Each marker becomes parameter `$K` on: the text before a marker is read

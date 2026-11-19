@@ -3,7 +3,8 @@ import type { ColMap, ScopeItem, ScopeLevel } from "./types.js";
 
 /**
  * The columns a WHERE, ON or FILTER condition `E` proves non-null: those a
- * conjunct rejects NULL in, as `[table or null, column]`.
+ * conjunct rejects NULL in, as Key strings. Strings, unlike `[table, column]`
+ * pairs, are matched against the union of keys without comparing tuples.
  */
 export type NarrowKeys<E> = AndKeys<E, never>;
 
@@ -101,12 +102,14 @@ type ConjunctKeys<E> = E extends { readonly t: "col" }
 							? ColKey<X>
 							: never;
 
+/** A column's key: its table or `""` when unqualified, NUL, and its name; no identifier has a NUL. */
+type Key<Tb, N> = `${Tb extends string ? Tb : ""}\u0000${N & string}`;
 type ColKey<E> = E extends {
 	readonly t: "col";
 	readonly tbl: infer Tb;
 	readonly name: infer N;
 }
-	? readonly [Tb, N]
+	? Key<Tb, N>
 	: E extends { readonly t: "cast" | "collate"; readonly e: infer X }
 		? ColKey<X>
 		: never;
@@ -123,13 +126,14 @@ export type NarrowLevel<L extends ScopeLevel, Keys> = [Keys] extends [never]
 			}
 		: L;
 
-type Hit<A, K, Skip, Keys> = readonly [A, K] extends Keys
-	? true
-	: K extends Skip
-		? false
-		: readonly [null, K] extends Keys
-			? true
-			: false;
+type Hit<A, K, Skip, Keys> =
+	Key<A, K> extends Keys
+		? true
+		: K extends Skip
+			? false
+			: Key<null, K> extends Keys
+				? true
+				: false;
 
 type AnyHit<
 	L extends ScopeLevel,
@@ -140,10 +144,10 @@ type AnyHit<
 		? true
 		: AnyHit<L, Keys, Next<I>>
 	: false;
-type KeyHits<It extends ScopeItem, Keys> = Keys extends readonly [
-	unknown,
-	infer K extends string,
-]
+type KeyHits<
+	It extends ScopeItem,
+	Keys,
+> = Keys extends `${string}\u0000${infer K}`
 	? string extends K
 		? true
 		: K extends keyof It["cols"]

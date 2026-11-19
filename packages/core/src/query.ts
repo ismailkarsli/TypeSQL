@@ -91,12 +91,9 @@ export interface QueryStatement extends StatementFn {
 	>;
 }
 
-export type RowType<Q> =
-	Q extends Query<infer R, readonly unknown[], string>
-		? R
-		: Q extends { readonly [ROW]?: infer R }
-			? R
-			: never;
+// Read off the row property: relating a statement to Query, whose string brand
+// brings in String's members, costs the checker more.
+export type RowType<Q> = Q extends { readonly [ROW]?: infer R } ? R : never;
 export type ParamsType<Q> = Q extends { readonly [PARAMS]?: infer P }
 	? P
 	: never;
