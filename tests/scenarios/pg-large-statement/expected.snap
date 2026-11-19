@@ -1,0 +1,85 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`pg-large-statement > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "chain": "({ total: string })[]",
+      "joins": "({ id: number; name: string })[]",
+      "nestedCalls": "({ contact: string; id: number })[]",
+      "nestedFrom": "({ id: number; name: string })[]",
+      "nestedSubqueries": "({ top_price: null | string })[]",
+      "report": "({ average_rating: null | string; contact: string; detail: { biggest: number; last: null | string }; favourite_category: null | string; id: number; name: string; orders: string; position: string; segment: string; share: string; spent: string; waiting: false | true })[]",
+      "unions": "({ id: number; name: string })[]",
+    },
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "{
+  chain: [ { total: '1640.00' } ],
+  nestedSubqueries: [ { top_price: '40.00' } ],
+  nestedFrom: [
+    { id: 1, name: 'Internals' },
+    { id: 2, name: 'Design' },
+    { id: 3, name: 'Chess' },
+    { id: 4, name: 'Poems' }
+  ],
+  nestedCalls: [
+    { id: 1, contact: 'ada@example.com' },
+    { id: 2, contact: 'none' },
+    { id: 3, contact: 'none' }
+  ],
+  joins: [
+    { id: 1, name: 'Internals' },
+    { id: 2, name: 'Design' },
+    { id: 3, name: 'Chess' },
+    { id: 4, name: 'Poems' }
+  ],
+  unions: [
+    { id: 1, name: 'Internals' },
+    { id: 2, name: 'Design' },
+    { id: 3, name: 'Chess' },
+    { id: 4, name: 'Poems' }
+  ],
+  report: [
+    {
+      id: 1,
+      name: 'Ada',
+      contact: 'ada@example.com',
+      position: '1',
+      spent: '145.50',
+      orders: '2',
+      share: '65.7',
+      segment: 'open',
+      favourite_category: 'Books / Databases / PostgreSQL',
+      average_rating: '4.0000000000000000',
+      waiting: true,
+      detail: { biggest: 80, last: '2024-05-01T00:00:00+00:00' }
+    },
+    {
+      id: 2,
+      name: 'Grace',
+      contact: 'unknown',
+      position: '2',
+      spent: '75.96',
+      orders: '1',
+      share: '34.3',
+      segment: 'single',
+      favourite_category: 'Books',
+      average_rating: '3.0000000000000000',
+      waiting: true,
+      detail: { biggest: 39.96, last: '2024-04-12T00:00:00+00:00' }
+    }
+  ]
+}
+",
+  },
+}
+`;
