@@ -28,10 +28,10 @@ export const rows = await sql(
 ).exec();
 export const counted = await sql(
 	"SELECT COUNT(*) AS n, MAX(score) AS best FROM users",
-).execTakeFirst();
+).execOne();
 export const named = await sql("SELECT name FROM users WHERE id = :id", {
 	id: 1,
-}).execTakeFirst();
+}).execOne();
 try {
 	await sql.transaction(async (tx) => {
 		await tx("DELETE FROM users WHERE id = $1", 1).exec();

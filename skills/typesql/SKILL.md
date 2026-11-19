@@ -34,7 +34,7 @@ Run `tsc --noEmit`; errors land on the SQL string. To see inferred types, add `c
 
 ```ts
 const q = sql(`SELECT id, email FROM users WHERE id = ${sql.param(userId)}`);
-const rows = await q.exec(); // also execTakeFirstOrNone, execTakeFirst, execCount
+const rows = await q.exec(); // also execOne, execOneOrNone (both throw on 2+ rows), execCount
 
 sql("SELECT id FROM users WHERE id = $1", 7);
 sql("SELECT id FROM users WHERE email = :email", { email: "a@b.c" });

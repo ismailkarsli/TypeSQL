@@ -66,7 +66,7 @@ const snake = sql.withPlugin(new CasePlugin({ to: "snake_case" }));
 
 const row = await snake(
 	`UPDATE accounts SET ${snake.set("accounts", { display_name: "Ada" })} WHERE id = 1 RETURNING "displayName", "createdAt"`,
-).execTakeFirst();
+).execOne();
 // row is { display_name: string | null; created_at: Date }
 ```
 
@@ -101,7 +101,7 @@ const camel = sql.withPlugin(new CasePlugin({ nested: "all" }));
 // profile is stored as {"home_city": "Oslo", "past_cities": [{"city_name": "Rome"}]}
 const { profile } = await camel(
 	"SELECT profile FROM users WHERE id = 1",
-).execTakeFirst();
+).execOne();
 // profile is { homeCity: string; pastCities: { cityName: string }[] }
 
 await camel(

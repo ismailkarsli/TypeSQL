@@ -28,7 +28,7 @@ const sql = createSql<DB>(pool);
 const stored = (id: number) =>
 	sql(
 		`SELECT holdings, profile, extra FROM docs WHERE id = ${sql.param(id)}`,
-	).execTakeFirst();
+	).execOne();
 
 const holdings = { SASA: 1, "SISE.IS": 2, startDate: "x" };
 
@@ -75,7 +75,7 @@ await input(
 ).exec();
 export const inputRead = await input(
 	"SELECT id, profile, extra FROM docs WHERE id = 4",
-).execTakeFirst();
+).execOne();
 export const inputStored = await stored(4);
 
 // "all": both.
@@ -85,7 +85,7 @@ await all(
 ).exec();
 export const allRead = await all(
 	"SELECT id, profile FROM docs WHERE id = 5",
-).execTakeFirst();
+).execOne();
 export const allStored = await stored(5);
 
 // Left out, or false, keys inside values stay as they are both ways.
@@ -95,7 +95,7 @@ await flat(
 ).exec();
 export const flatRead = await flat(
 	"SELECT id, profile FROM docs WHERE id = 6",
-).execTakeFirst();
+).execOne();
 
 // The modes work the same way round with to: "snake_case".
 const snake = sql.withPlugin(
@@ -106,7 +106,7 @@ await snake(
 ).exec();
 export const snakeRead = await snake(
 	`SELECT "settingsDoc" FROM accounts`,
-).execTakeFirst();
+).execOne();
 
 // Plugin options arrive from untyped code too.
 try {

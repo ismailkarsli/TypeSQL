@@ -54,7 +54,7 @@ const program = Effect.gen(function* () {
 	);
 	const first = yield* sql(
 		`SELECT id, display_name FROM users WHERE id = ${sql.param(1)}`,
-	).execTakeFirst();
+	).execOne();
 	const updated = yield* sql(
 		"UPDATE users SET display_name = 'Ada' WHERE id = :id",
 		{ id: 1 },
@@ -93,7 +93,7 @@ const program = Effect.gen(function* () {
 	const bound = createSql<DB>(mysqlDialect, client);
 	const fromBound = yield* bound(
 		"SELECT count(*) AS n, sum(balance) AS total FROM users",
-	).execTakeFirst();
+	).execOne();
 
 	return {
 		inserted,

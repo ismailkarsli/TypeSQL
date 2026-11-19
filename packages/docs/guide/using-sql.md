@@ -46,8 +46,8 @@ const rows = await query.exec();
 | Method | Returns |
 |---|---|
 | `exec()` | every row |
-| `execTakeFirstOrNone()` | the first row, or `undefined` |
-| `execTakeFirst()` | the first row, or throws `NoResultError` |
+| `execOne()` | the only row; throws `NoResultError` on none and `TooManyRowsError` on more than one |
+| `execOneOrNone()` | the only row, or `undefined`; throws `TooManyRowsError` on more than one |
 | `execCount()` | the number of affected or returned rows |
 
 A wrong table, column or type is a compile error on the SQL string; see [Errors](./errors).
@@ -307,7 +307,7 @@ const dynamic = sql.as<{ [column: string]: unknown }>(`SELECT ${sql.raw(columns)
 const userId = await sql.transaction(async (tx) => {
 	const { id } = await tx(
 		`INSERT INTO users (email) VALUES (${tx.param("ada@example.com")}) RETURNING id`,
-	).execTakeFirst();
+	).execOne();
 	await tx(
 		`INSERT INTO posts (author_id, title) VALUES (${tx.param(id)}, ${tx.param("Hello")})`,
 	).exec();

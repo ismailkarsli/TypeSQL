@@ -14,9 +14,9 @@ const pgSql = createPgSql<{}>(pool);
 const postgresSql = createPostgresSql<{}>(client);
 const query = "SELECT ARRAY['happy']::mood[] AS a, '{sad}'::text AS a";
 console.log("native pg", (await pool.query(query)).rows);
-export const pgRow = await pgSql(query).execTakeFirst();
-export const postgresRow = await postgresSql(query).execTakeFirst();
-export const preparedRow = await pgSql.prepare(query)().execTakeFirst();
+export const pgRow = await pgSql(query).execOne();
+export const postgresRow = await postgresSql(query).execOne();
+export const preparedRow = await pgSql.prepare(query)().execOne();
 console.log({ pgRow, postgresRow, preparedRow });
 
 export const variants = await pgSql(`
@@ -27,7 +27,7 @@ export const variants = await pgSql(`
 		ARRAY[3]::score[] AS words, ARRAY['sad']::mood[] AS words,
 		ARRAY['happy']::mood[] AS absent, NULL::text AS absent,
 		ARRAY['happy']::mood[] AS unique_array
-`).execTakeFirst();
+`).execOne();
 console.log(variants);
 await client.end();
 await pool.end();

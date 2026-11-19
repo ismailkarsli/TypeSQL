@@ -94,13 +94,13 @@ await camel(
 ).exec();
 export const camelFlat = await camel(
 	"SELECT display_name, address_line_1, point_x_y, profile FROM users WHERE id = 1",
-).execTakeFirst();
+).execOne();
 
 // nested: rows, sql.json(), sql.param() and plain write values all convert.
 const camelNested = sql.withPlugin(new CasePlugin({ nested: "all" }));
 export const camelNestedRead = await camelNested(
 	"SELECT id, created_at, avatar_data, profile, extra_doc, free_form FROM users WHERE id = 1",
-).execTakeFirst();
+).execOne();
 await camelNested(
 	`INSERT INTO users ${camelNested.values("users", [
 		{
@@ -142,31 +142,31 @@ export const camelNestedOptional = await camelNested(
 		displayName: camelNested.param(camelNested.optional(undefined)),
 		freeForm: camelNested.json({ optKey: 1 }),
 	})} WHERE id = 3 RETURNING free_form`,
-).execTakeFirst();
+).execOne();
 // Parameters keep the names of the database, positional and named alike.
 await camelNested("UPDATE users SET free_form = :doc WHERE id = 1", {
 	doc: { named_key: 1, camelKey: 2 },
 }).exec();
 export const storedNamedParameter = await sql(
 	"SELECT free_form FROM users WHERE id = 1",
-).execTakeFirst();
+).execOne();
 await camelNested("UPDATE users SET free_form = $1 WHERE id = 1", {
 	param_key: 1,
 	camelKey: 2,
 }).exec();
 export const storedPositionalParameter = await sql(
 	"SELECT free_form FROM users WHERE id = 1",
-).execTakeFirst();
+).execOne();
 export const camelNestedRows = await camelNested(
 	"SELECT id, profile, extra_doc, free_form FROM users ORDER BY id",
 ).exec();
 // A recursive JSON type converts as far down as it is read.
 const { familyTree } = await camelNested(
 	"SELECT family_tree FROM users WHERE id = 2",
-).execTakeFirst();
+).execOne();
 export const leafName = familyTree?.childNodes[0]?.nodeName;
 export const camelNestedInTransaction = await camelNested.transaction((tx) =>
-	tx("SELECT profile FROM users WHERE id = 2").execTakeFirst(),
+	tx("SELECT profile FROM users WHERE id = 2").execOne(),
 );
 export const storedUsers = await sql(
 	"SELECT id, profile, extra_doc, family_tree ->> 'node_name' AS tree_root, free_form FROM users ORDER BY id",
@@ -196,10 +196,10 @@ await snake(
 ).exec();
 export const snakeFlat = await snake(
 	`SELECT "displayName", "HTTPCode", "userID", "Id", "fooBAR", "XMLHttpRequest", "HTTP2Code", "userIDs", lower_name, "settingsDoc" FROM accounts`,
-).execTakeFirst();
+).execOne();
 export const snakeUpdated = await snake(
 	`UPDATE accounts SET ${snake.set("accounts", { display_name: "Grace" })} WHERE id = 1 RETURNING "displayName"`,
-).execTakeFirst();
+).execOne();
 
 const snakeNested = sql.withPlugin(
 	new CasePlugin({ to: "snake_case", nested: "all" }),

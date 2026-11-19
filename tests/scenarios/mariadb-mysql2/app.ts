@@ -20,11 +20,9 @@ export const inserted = await sql(
 	"Ada",
 	null,
 ).exec();
-export const counted = await sql(
-	"SELECT COUNT(*) AS n FROM users",
-).execTakeFirst();
+export const counted = await sql("SELECT COUNT(*) AS n FROM users").execOne();
 export const literal = await sql(
 	"SELECT 'a' 'b' AS joined, 1 + 1 AS sum, id > 0 AS positive FROM users",
-).execTakeFirst();
+).execOne();
 console.log({ dialect, inserted, counted, literal });
 await pool.end();

@@ -19,10 +19,10 @@ const sql = createSql<DB>(new Pool());
 
 const users = await sql("SELECT id, email FROM users").exec();
 
-const user = await sql(`SELECT id, email FROM users WHERE id = ${sql.param(7)}`).execTakeFirst();
+const user = await sql(`SELECT id, email FROM users WHERE id = ${sql.param(7)}`).execOne();
 
 await sql.transaction(async (tx) => {
-  const { id } = await tx(`INSERT INTO users (email) VALUES (${tx.param("a@b.c")}) RETURNING id`).execTakeFirst();
+  const { id } = await tx(`INSERT INTO users (email) VALUES (${tx.param("a@b.c")}) RETURNING id`).execOne();
   await tx(`INSERT INTO posts (author_id, title) VALUES (${tx.param(id)}, ${tx.param("Hello")})`).exec();
 });
 ```
@@ -48,7 +48,7 @@ pnpm exec typesql introspect --url postgres://localhost/app --out src/db/schema.
 
 ```ts
 const findUser = sql.prepare("SELECT id, email FROM users WHERE id = $1");
-const user = await findUser(7).execTakeFirstOrNone();
+const user = await findUser(7).execOneOrNone();
 ```
 
 Reuse `findUser` with new values. TypeSQL assembles the SQL once and node-postgres uses a named statement per connection; the name is derived from the final SQL text. All `exec*` methods work. Named parameters and fixed fragments are supported too. Inside a transaction, use `tx.prepare(...)` to bind it to that transaction.

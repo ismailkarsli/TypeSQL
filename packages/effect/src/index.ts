@@ -36,6 +36,7 @@ export {
 	type EffectQueryObject,
 	type EffectStatement,
 	NoResultError,
+	TooManyRowsError,
 } from "./statement.js";
 export type {
 	EffectMysqlTypeMap,

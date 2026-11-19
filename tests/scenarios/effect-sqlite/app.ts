@@ -46,7 +46,7 @@ const program = Effect.gen(function* () {
 	);
 	const first = yield* sql(
 		`SELECT id, settings ->> 'retry_count' AS retries FROM users WHERE id = ${sql.param(1)} AND active = ${sql.param(1)}`,
-	).execTakeFirst();
+	).execOne();
 	const returned = yield* sql(
 		"UPDATE users SET display_name = 'Ada' WHERE id = :id RETURNING id, display_name",
 		{ id: 1 },
@@ -82,7 +82,7 @@ const program = Effect.gen(function* () {
 	const bound = createSql<DB>(sqliteDialect, client);
 	const fromBound = yield* bound(
 		"SELECT count(*) AS n, sum(score) AS total FROM users",
-	).execTakeFirst();
+	).execOne();
 
 	return {
 		inserted,

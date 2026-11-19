@@ -59,17 +59,25 @@ const program = Effect.gen(function* () {
 
 	const first = yield* sql(
 		`SELECT id, display_name FROM users WHERE id = ${sql.param(1)}`,
-	).execTakeFirst();
+	).execOne();
 	const missing = yield* sql(
 		"SELECT id FROM users WHERE id = $1",
 		99,
-	).execTakeFirstOrNone();
+	).execOneOrNone();
 	const noResult = yield* sql("SELECT id FROM users WHERE id = 99")
-		.execTakeFirst()
+		.execOne()
 		.pipe(
 			Effect.as("found"),
 			Effect.catchTag("NoResultError", (error) =>
 				Effect.succeed(`${error._tag}: ${error.message}`),
+			),
+		);
+	const tooMany = yield* sql("SELECT id FROM users")
+		.execOneOrNone()
+		.pipe(
+			Effect.as("found"),
+			Effect.catchTag("TooManyRowsError", (error) =>
+				Effect.succeed(`${error._tag}: ${error.message} (${error.count})`),
 			),
 		);
 	const updated = yield* sql(
@@ -118,7 +126,7 @@ const program = Effect.gen(function* () {
 
 	const values = yield* sql(
 		"SELECT 9007199254740993::int8 AS big, 1.25::numeric AS decimal, '\\x0102'::bytea AS bytes, '1 day 2 hours'::interval AS span, '2020-01-02'::date AS day, ARRAY[1, 2]::int8[] AS bigs, NULL::text AS absent",
-	).execTakeFirst();
+	).execOne();
 
 	// The values the driver reads are parameters too, arrays as their text.
 	const roundTrip = yield* sql(
@@ -126,7 +134,7 @@ const program = Effect.gen(function* () {
 		values.span,
 		values.bigs,
 		[new Date("2020-01-02T03:04:05Z"), null],
-	).execTakeFirst();
+	).execOne();
 
 	// Plugins apply to the rows of every way to run a statement.
 	const camel = sql.withPlugin(new CasePlugin());
@@ -147,6 +155,7 @@ const program = Effect.gen(function* () {
 		first,
 		missing,
 		noResult,
+		tooMany,
 		updated,
 		byExternalId,
 		spliced,

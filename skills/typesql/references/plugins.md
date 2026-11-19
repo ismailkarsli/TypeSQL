@@ -6,7 +6,7 @@
 import { CasePlugin } from "@typesql/core/plugins";
 
 const camel = sql.withPlugin(new CasePlugin());
-const row = await camel("SELECT id, display_name FROM users").execTakeFirst(); // row.displayName
+const row = await camel("SELECT id, display_name FROM users WHERE id = 7").execOne(); // row.displayName
 await camel(`UPDATE users SET ${camel.set("users", { displayName: "Ada" })} WHERE id = ${camel.param(7)}`).exec();
 ```
 

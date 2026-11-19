@@ -25,11 +25,11 @@ await sql(
 ).exec();
 export const defaulted = await sql(
 	"SELECT doc ->> '$.views' AS views FROM t",
-).execTakeFirst();
+).execOne();
 await sql(`UPDATE t SET doc=${sql.json({ views: 2, ok: true })}`).exec();
 export const inline = await sql(
 	"SELECT doc ->> '$.views' AS views FROM t",
-).execTakeFirst();
+).execOne();
 await sql(
 	`UPDATE t SET ${sql.set("t", { doc: sql.json({ views: 3, ok: false }), optional: sql.json({ views: 4, ok: true }) })}`,
 ).exec();
@@ -38,7 +38,7 @@ await sql(
 ).exec();
 export const set = await sql(
 	"SELECT doc ->> '$.views' AS views, optional ->> '$.views' AS optional FROM t",
-).execTakeFirst();
+).execOne();
 await sql(
 	`INSERT INTO t ${sql.values("t", [{ id: 2, doc: sql.json({ views: 5, ok: true }), optional: sql.json(null), items: sql.json([{ views: 6 }]), label: sql.json("draft"), unshaped: sql.json({ anything: [true] }) }])}`,
 ).exec();

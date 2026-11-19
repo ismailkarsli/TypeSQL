@@ -23,6 +23,7 @@ exports[`module-entry-points > scenario 1`] = `
   },
   "@typesql/core": {
     "NoResultError": "function",
+    "TooManyRowsError": "function",
     "createSql": "function",
     "mapRows": "function",
     "pluginsOf": "function"
@@ -118,6 +119,7 @@ exports[`module-entry-points > scenario 1`] = `
   },
   "@typesql/effect": {
     "NoResultError": "function",
+    "TooManyRowsError": "function",
     "createSql": "function"
   },
   "@typesql/kysely": {

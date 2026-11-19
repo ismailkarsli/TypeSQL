@@ -35,7 +35,7 @@ const snake = sql.withPlugin(new CasePlugin({ to: "snake_case" }));
 await snake(`UPDATE posts SET "cafÉName" = 'Ada'`).exec();
 export const accented = await snake(
 	`SELECT "cafÉName" FROM posts WHERE id = 1`,
-).execTakeFirst();
+).execOne();
 
 console.log({ text, accented });
 db.close();

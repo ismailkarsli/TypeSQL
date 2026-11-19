@@ -1,0 +1,47 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`pg-exec-one > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "first": "{ id: number; name: string }",
+      "firstOrNone": "undefined | { id: number; name: string }",
+      "latest": "{ id: number; name: string }",
+      "none": "undefined | { id: number; name: string }",
+      "one": "{ id: number; name: string }",
+      "oneOrNone": "undefined | { id: number; name: string }",
+    },
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "{
+  one: { id: 1, name: 'Ada' },
+  oneOrNone: { id: 2, name: 'Grace' },
+  none: undefined,
+  latest: { id: 2, name: 'Grace' },
+  tooMany: {
+    name: 'TooManyRowsError',
+    message: 'The query returned 2 rows, expected at most one',
+    text: 'SELECT id FROM users',
+    count: 2
+  },
+  tooManyOrNone: {
+    name: 'TooManyRowsError',
+    message: 'The query returned 2 rows, expected at most one',
+    text: 'SELECT id FROM users ORDER BY id',
+    count: 2
+  },
+  first: { id: 1, name: 'Ada' },
+  firstOrNone: { id: 2, name: 'Grace' }
+}
+",
+  },
+}
+`;

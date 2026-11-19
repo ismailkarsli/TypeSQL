@@ -43,7 +43,7 @@ await nested(
 ).exec();
 const { data, optionalData, expr } = await nested(
 	"SELECT data, optional_data, expr FROM docs",
-).execTakeFirst();
+).execOne();
 const kept: JSONType = data;
 const keptOptional: JSONType = optionalData;
 const [row] = await nested(

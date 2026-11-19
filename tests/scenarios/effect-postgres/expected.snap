@@ -10,7 +10,7 @@ exports[`effect-postgres > scenario 1`] = `
   "compiler": {
     "diagnostics": [],
     "types": {
-      "result": "{ rows: ({ created_at: Date; display_name: null | string; id: number; settings: { retry_count: number }; tags: (string)[] })[]; first: { display_name: null | string; id: number }; missing: undefined | { id: number }; noResult: string; updated: number; byExternalId: ({ id: number })[]; spliced: ({ n: bigint })[]; names: (string)[]; streamed: ({ id: number })[]; aborted: string; inTransaction: ({ display_name: null | string })[]; values: { absent: null | string; big: bigint; bigs: (bigint)[]; bytes: Uint8Array<ArrayBufferLike>; day: string; decimal: string; span: { months: number; days: number; microseconds: bigint } }; roundTrip: { bigs: (null | bigint)[]; span: { months: number; days: number; microseconds: bigint }; times: (null | Date)[] }; camelCased: ({ displayName: string; externalId: string })[]; camelStreamed: ({ displayName: null | string })[]; fromBound: ({ n: number })[]; statement: string }",
+      "result": "{ rows: ({ created_at: Date; display_name: null | string; id: number; settings: { retry_count: number }; tags: (string)[] })[]; first: { display_name: null | string; id: number }; missing: undefined | { id: number }; noResult: string; tooMany: string; updated: number; byExternalId: ({ id: number })[]; spliced: ({ n: bigint })[]; names: (string)[]; streamed: ({ id: number })[]; aborted: string; inTransaction: ({ display_name: null | string })[]; values: { absent: null | string; big: bigint; bigs: (bigint)[]; bytes: Uint8Array<ArrayBufferLike>; day: string; decimal: string; span: { months: number; days: number; microseconds: bigint } }; roundTrip: { bigs: (null | bigint)[]; span: { months: number; days: number; microseconds: bigint }; times: (null | Date)[] }; camelCased: ({ displayName: string; externalId: string })[]; camelStreamed: ({ displayName: null | string })[]; fromBound: ({ n: number })[]; statement: string }",
     },
   },
   "start": {
@@ -36,6 +36,7 @@ exports[`effect-postgres > scenario 1`] = `
   first: { id: 1, display_name: null },
   missing: undefined,
   noResult: 'NoResultError: The query returned no rows',
+  tooMany: 'TooManyRowsError: The query returned 2 rows, expected at most one (2)',
   updated: 1,
   byExternalId: [ { id: 1 }, { id: 2 } ],
   spliced: [ { n: 2n } ],

@@ -65,8 +65,8 @@ Compile a reusable query, then call it with the same parameter arguments that `s
 
 ```ts
 const findUser = sql.prepare("SELECT id, email FROM users WHERE id = $1");
-const first = await findUser(1).execTakeFirstOrNone();
-const second = await findUser(2).execTakeFirstOrNone();
+const first = await findUser(1).execOneOrNone();
+const second = await findUser(2).execOneOrNone();
 
 const byEmail = sql.prepare("SELECT id FROM users WHERE email = :email");
 await byEmail({ email: "a@example.com" }).exec();
@@ -157,8 +157,9 @@ sql.dialect; // "postgres"
 | Method | Returns |
 |---|---|
 | `q.exec(executor?)` | `Promise<Row[]>` |
-| `q.execTakeFirstOrNone(executor?)` | `Promise<Row \| undefined>` |
-| `q.execTakeFirst(executor?)` | `Promise<Row>`; rejects with `NoResultError` (carrying `text`) on 0 rows |
+| `q.execOne(executor?)` | `Promise<Row>`; rejects with `NoResultError` on 0 rows and `TooManyRowsError` on more than one |
+| `q.execOneOrNone(executor?)` | `Promise<Row \| undefined>`; rejects with `TooManyRowsError` on more than one row |
+| `q.execTakeFirst(executor?)`, `q.execTakeFirstOrNone(executor?)` | deprecated: the first row, ignoring the rest; use `execOne`, `execOneOrNone` or `(await q.exec())[0]` |
 | `q.execCount(executor?)` | `Promise<number>`: rows affected by `INSERT` / `UPDATE` / `DELETE` / `MERGE`, rows returned by `SELECT`, 0 for DDL |
 
 The methods run on the executor passed to the call, or else on the one `createSql` bound. Without either, they reject. They are non-enumerable, so a query still deep-equals `{ text, values }`.
@@ -258,7 +259,8 @@ Word lists for editor tooling, with nothing of the type engines at runtime.
 | `CasePlugin` | camelCase row/write keys and snake_case database write keys, or with `{ to: "snake_case" }` the reverse, with `{ nested: "output" | "input" | "all" }` inside JSON too; from `@typesql/core/plugins` |
 | `Executor` | what `exec*` runs on |
 | `ExecutorResult` | `{ rows, rowCount: number \| null }` |
-| `NoResultError` | thrown by `execTakeFirst` on 0 rows; carries `text` |
+| `NoResultError` | thrown by `execOne` on 0 rows; carries `text` |
+| `TooManyRowsError` | thrown by `execOne` and `execOneOrNone` on more than one row; carries `text` and `count` |
 | `RowType<Q>`, `ParamsType<Q>`, `TextType<Q>` | the row, parameters and text of a `Query`, an adapter's statement or a `Fragment` type |
 | `Fragment<Text, Params, Carried>` | a spliceable SQL piece, with carried input types for checking when spliced |
 | `QueryObject<Row, Params, Text>`, `FragmentObject<Text, Params, Carried>` | the object interfaces behind the string-branded `Query` and `Fragment` aliases |

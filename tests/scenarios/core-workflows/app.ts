@@ -58,7 +58,7 @@ const transformed = sql.withPlugin(new CasePlugin()).withPlugin(new Wrapper());
 export const wrapped = await transformed(
 	"SELECT display_name FROM users WHERE id = $1",
 	1,
-).execTakeFirst();
+).execOne();
 console.dir(
 	{ rows, named, inline, text, values, mapped, overridden, wrapped },
 	{ depth: null },

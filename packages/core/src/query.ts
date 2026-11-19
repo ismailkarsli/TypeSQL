@@ -35,7 +35,13 @@ export interface QueryObject<
 	readonly [PARAMS]?: Params;
 	readonly [TEXT]?: Text;
 	exec(executor?: Executor): Promise<Row[]>;
+	/** The only row; rejects with `NoResultError` on 0 rows and `TooManyRowsError` on more than one. */
+	execOne(executor?: Executor): Promise<Row>;
+	/** The only row, or `undefined` on 0 rows; rejects with `TooManyRowsError` on more than one. */
+	execOneOrNone(executor?: Executor): Promise<Row | undefined>;
+	/** @deprecated Use `execOneOrNone()`, which rejects more than one row, or `(await q.exec())[0]`. */
 	execTakeFirstOrNone(executor?: Executor): Promise<Row | undefined>;
+	/** @deprecated Use `execOne()`, which rejects more than one row, or `(await q.exec())[0]`. */
 	execTakeFirst(executor?: Executor): Promise<Row>;
 	execCount(executor?: Executor): Promise<number>;
 }
@@ -112,6 +118,17 @@ export class NoResultError extends Error {
 	}
 }
 
+export class TooManyRowsError extends Error {
+	override readonly name = "TooManyRowsError";
+	declare readonly text: string;
+	declare readonly count: number;
+	constructor(text: string, count: number) {
+		super(`The query returned ${count} rows, expected at most one`);
+		this.text = text;
+		this.count = count;
+	}
+}
+
 /** What an adapter's own statement extends. */
 export class SqlStatement extends SqlFragment {
 	constructor(
@@ -143,6 +160,19 @@ export class SqlQuery extends SqlStatement {
 	async exec(executor?: Executor): Promise<unknown[]> {
 		const result = await this.#pick(executor)(this.text, this.values);
 		return mapRows(this, "rows" in result ? result.rows : result);
+	}
+	async execOne(executor?: Executor) {
+		const rows = await this.#atMostOne(executor);
+		if (!rows.length) throw new NoResultError(this.text);
+		return rows[0];
+	}
+	async execOneOrNone(executor?: Executor) {
+		return (await this.#atMostOne(executor))[0];
+	}
+	async #atMostOne(executor: Executor | undefined) {
+		const rows = await this.exec(executor);
+		if (rows.length > 1) throw new TooManyRowsError(this.text, rows.length);
+		return rows;
 	}
 	async execTakeFirstOrNone(executor?: Executor) {
 		return (await this.exec(executor))[0];

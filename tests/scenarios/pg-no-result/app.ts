@@ -17,7 +17,7 @@ await pool.query(`CREATE TABLE users (id int PRIMARY KEY, name text NOT NULL, bi
   INSERT INTO users VALUES (1, 'Ada', NULL), (2, 'Grace', 'Compiler');
   INSERT INTO posts VALUES (1, 1, 'SQL');`);
 try {
-	await sql("SELECT id FROM users WHERE id = $1", 99).execTakeFirst();
+	await sql("SELECT id FROM users WHERE id = $1", 99).execOne();
 } finally {
 	await pool.end();
 }

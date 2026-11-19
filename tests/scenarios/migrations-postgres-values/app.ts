@@ -9,7 +9,7 @@ import {
 const read = (db: PostgresMigration) =>
 	db(
 		`SELECT '\\x01'::bytea AS bytes, '{a,b}'::"char"[] AS chars, ROW(1, 'a') AS pair, pg_sleep(0) AS slept, '1 day'::interval AS span`,
-	).execTakeFirst();
+	).execOne();
 export type Read = Awaited<ReturnType<typeof read>>;
 
 const first = migration("postgres", {

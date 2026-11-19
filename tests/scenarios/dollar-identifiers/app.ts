@@ -39,7 +39,7 @@ const sqliteQuery = sqlite.as<{ x$1: number; p: number }>(
 	`SELECT 3 AS x$1, ${sqlite.param(4)} AS p`,
 );
 console.log(sqliteQuery.text, sqliteQuery.values);
-console.log(await sqliteQuery.execTakeFirst());
+console.log(await sqliteQuery.execOne());
 
 const my = createCoreSql<DB>(mysqlDialect);
 const myQuery = my.as<{ x$1: number; p: number }>(

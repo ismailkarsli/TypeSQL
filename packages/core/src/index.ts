@@ -44,6 +44,7 @@ export {
 	type StatementObject,
 	type TEXT,
 	type TextType,
+	TooManyRowsError,
 } from "./query.js";
 export type {
 	Col,

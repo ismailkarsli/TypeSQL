@@ -23,7 +23,7 @@ export const inserted = await camel(
 export const updated = await camel(
 	`UPDATE users SET ${camel.set("users", { displayName: "Grace" })} WHERE id = $1 RETURNING id, display_name`,
 	2,
-).execTakeFirst();
+).execOne();
 export const deleted = await sql(
 	"DELETE FROM users WHERE id = $1",
 	3,

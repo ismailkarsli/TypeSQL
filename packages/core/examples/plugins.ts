@@ -56,7 +56,7 @@ export const query = sql("SELECT display_name FROM users WHERE id = $1", [7]);
 export type QueryRow = RowType<typeof query>;
 
 export async function readRow(executor: Executor): Promise<QueryRow> {
-	return query.execTakeFirst(executor);
+	return query.execOne(executor);
 }
 
 export const prepared = sql.prepare(
@@ -73,6 +73,6 @@ export const updated = sql(
 );
 
 export async function displayName(executor: Executor): Promise<string | null> {
-	const row = await query.execTakeFirst(executor);
+	const row = await query.execOne(executor);
 	return row.data.displayName;
 }

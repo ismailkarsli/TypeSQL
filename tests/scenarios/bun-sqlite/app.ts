@@ -19,7 +19,7 @@ export const rows = await sql(
 ).exec();
 export const named = await sql("SELECT name FROM users WHERE id = :id", {
 	id: 1,
-}).execTakeFirst();
+}).execOne();
 try {
 	await sql.transaction(async (tx) => {
 		await tx("DELETE FROM users WHERE id = $1", 1).exec();

@@ -12,14 +12,14 @@ const sql = createSql<DB>(postgresDialect);
 
 const program = Effect.gen(function* () {
 	const users = yield* sql("SELECT id, email FROM users");
-	const user = yield* sql("SELECT id FROM users WHERE id = $1", 1).execTakeFirst();
+	const user = yield* sql("SELECT id FROM users WHERE id = $1", 1).execOne();
 	yield* sql.withTransaction(sql("DELETE FROM posts WHERE author_id = $1", user.id));
 });
 ```
 
 - A statement is an Effect of its rows (`yield*` it); `exec*()` return Effects and `stream()` a `Stream`. Nothing is a Promise: no `await`, no `sql.transaction(fn)`, no `tx`.
 - Without a client, statements require `SqlClient` (provide the driver's layer). `createSql<DB>(dialect, client)` binds one.
-- Errors are the client's `SqlError`, plus the tagged `NoResultError` from `execTakeFirst()`.
+- Errors are the client's `SqlError`, plus the tagged `NoResultError` from `execOne()` and `TooManyRowsError` from `execOne()` and `execOneOrNone()`.
 - `sql.withTransaction(effect)` rolls back on failure and nests as a savepoint.
 - The client's `transformResultNames` is bypassed, so use TypeSQL's `CasePlugin`.
 

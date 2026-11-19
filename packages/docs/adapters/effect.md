@@ -64,8 +64,8 @@ A statement is an Effect, the same one as `exec()`: yield it, pipe it, or pass i
 | | Effect of | Fails with |
 |---|---|---|
 | `yield* q`, `q.exec()` | `Row[]` | `SqlError` |
-| `q.execTakeFirstOrNone()` | `Row \| undefined` | `SqlError` |
-| `q.execTakeFirst()` | `Row` | `SqlError \| NoResultError` |
+| `q.execOne()` | `Row` | `SqlError \| NoResultError \| TooManyRowsError` |
+| `q.execOneOrNone()` | `Row \| undefined` | `SqlError \| TooManyRowsError` |
 | `q.execCount()` | `number`: the rows changed or returned | `SqlError` |
 | `q.stream()` | a `Stream` of `Row` | `SqlError` |
 
@@ -75,7 +75,7 @@ import { Effect, Stream } from "effect";
 const program = Effect.gen(function* () {
 	const user = yield* sql(
 		`SELECT id, email FROM users WHERE id = ${sql.param(7)}`,
-	).execTakeFirst();
+	).execOne();
 
 	const emails = yield* sql("SELECT email FROM users").pipe(
 		Effect.map((users) => users.map((user) => user.email)),
@@ -91,7 +91,7 @@ const program = Effect.gen(function* () {
 });
 ```
 
-- `NoResultError`, from `@typesql/effect`, is a tagged error with the statement's `text`: handle it with `Effect.catchTag("NoResultError", …)`.
+- `NoResultError` (no row) and `TooManyRowsError` (more than one row, with their `count`), from `@typesql/effect`, are tagged errors with the statement's `text`: handle them with `Effect.catchTag("NoResultError", …)`. For the first of several rows, add `LIMIT 1` or take `[0]` of `exec()`.
 - `stream()` reads rows as the driver streams them. `@effect/sql-sqlite-node` has no streaming, so there it dies; use `exec()`.
 - `${query}` splices a statement as a [subquery](../guide/using-sql#fragments), and everything else on `sql` (`sql.param`, `sql.fragment`, `sql.values`, `sql.prepare`, …) works as on every adapter.
 - Statements run through the client's `unsafe`, so they are traced like the client's own.
@@ -105,7 +105,7 @@ const id = yield* sql.withTransaction(
 	Effect.gen(function* () {
 		const { id } = yield* sql(
 			`INSERT INTO users (email) VALUES (${sql.param("a@b.c")}) RETURNING id`,
-		).execTakeFirst();
+		).execOne();
 		yield* sql(
 			`INSERT INTO posts (author_id, title) VALUES (${sql.param(id)}, ${sql.param("Hello")})`,
 		);

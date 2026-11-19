@@ -131,8 +131,8 @@ const payload = await wire(sql("SELECT id, created_at FROM users"));
 declare module "@typesql/core" {
   interface QueryObject<Row, Params extends readonly unknown[], Text extends string> {
     exec(executor?: Executor): Promise<Wire<Row>[]>;
-    execTakeFirstOrNone(executor?: Executor): Promise<Wire<Row> | undefined>;
-    execTakeFirst(executor?: Executor): Promise<Wire<Row>>;
+    execOneOrNone(executor?: Executor): Promise<Wire<Row> | undefined>;
+    execOne(executor?: Executor): Promise<Wire<Row>>;
   }
 }
 ```

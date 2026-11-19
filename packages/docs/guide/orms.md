@@ -198,7 +198,7 @@ const camelRows = createSql<
 >(postgresDialect, camelDb).withPlugin(new CasePlugin());
 const post = await camelRows(
 	`SELECT author_id, created_at FROM blog_posts WHERE id = ${camelRows.param(1)}`,
-).execTakeFirst();
+).execOne();
 ```
 
 ## Drizzle

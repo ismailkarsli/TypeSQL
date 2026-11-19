@@ -30,7 +30,7 @@ Generate: `typesql introspect --url mysql://… --out src/db/schema.ts` (`@types
   ```ts
   const { id } = await sql.transaction(async (tx) => {
   	await tx(`INSERT INTO users (email) VALUES (${tx.param("a@b.c")})`).exec();
-  	return tx("SELECT LAST_INSERT_ID() AS id").execTakeFirst();
+  	return tx("SELECT LAST_INSERT_ID() AS id").execOne();
   });
   ```
 - **Upsert:** `ON DUPLICATE KEY UPDATE title = VALUES(title)`.

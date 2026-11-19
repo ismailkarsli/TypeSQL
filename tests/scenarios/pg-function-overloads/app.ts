@@ -34,7 +34,7 @@ export const statistics = await sql(`
 			var_samp(id)::float8 AS sample,
 			var_pop(id)::float8 AS population
 		FROM items
-	`).execTakeFirst();
+	`).execOne();
 export const parameterized = await sql(
 	"SELECT regexp_count(label, $1, $2, $3) AS matches FROM items ORDER BY id",
 	"a",

@@ -28,6 +28,14 @@ export class NoResultError extends Data.TaggedError("NoResultError")<{
 	override readonly message = "The query returned no rows";
 }
 
+export class TooManyRowsError extends Data.TaggedError("TooManyRowsError")<{
+	readonly text: string;
+	readonly count: number;
+}> {
+	override readonly message =
+		`The query returned ${this.count} rows, expected at most one`;
+}
+
 export interface EffectQueryObject<
 	Row,
 	Params extends readonly unknown[],
@@ -37,7 +45,17 @@ export interface EffectQueryObject<
 	readonly [ROW]?: Row;
 	readonly [PARAMS]?: Params;
 	exec(): Effect.Effect<Row[], SqlError, R>;
+	/** The only row; fails with `NoResultError` on 0 rows and `TooManyRowsError` on more than one. */
+	execOne(): Effect.Effect<Row, SqlError | NoResultError | TooManyRowsError, R>;
+	/** The only row, or `undefined` on 0 rows; fails with `TooManyRowsError` on more than one. */
+	execOneOrNone(): Effect.Effect<
+		Row | undefined,
+		SqlError | TooManyRowsError,
+		R
+	>;
+	/** @deprecated Use `execOneOrNone()`, which fails on more than one row, or `exec()` and take `[0]`. */
 	execTakeFirstOrNone(): Effect.Effect<Row | undefined, SqlError, R>;
+	/** @deprecated Use `execOne()`, which fails on more than one row, or `exec()` and take `[0]`. */
 	execTakeFirst(): Effect.Effect<Row, SqlError | NoResultError, R>;
 	execCount(): Effect.Effect<number, SqlError, R>;
 	stream(): Stream.Stream<Row, SqlError, R>;
@@ -132,6 +150,37 @@ class Statement extends Effectable.Mixin(SqlStatement) {
 			Effect.map(client.unsafe(q.text, q.values).withoutTransform, (rows) =>
 				mapRows(this, rows),
 			),
+		);
+	}
+	execOne(): Effect.Effect<
+		unknown,
+		SqlError | NoResultError | TooManyRowsError,
+		SqlClient
+	> {
+		return Effect.flatMap(this.#atMostOne(), (rows) =>
+			rows.length
+				? Effect.succeed(rows[0])
+				: Effect.fail(new NoResultError({ text: this.text })),
+		);
+	}
+	execOneOrNone(): Effect.Effect<
+		unknown,
+		SqlError | TooManyRowsError,
+		SqlClient
+	> {
+		return Effect.map(this.#atMostOne(), (rows) => rows[0]);
+	}
+	#atMostOne(): Effect.Effect<
+		unknown[],
+		SqlError | TooManyRowsError,
+		SqlClient
+	> {
+		return Effect.flatMap(this.exec(), (rows) =>
+			rows.length > 1
+				? Effect.fail(
+						new TooManyRowsError({ text: this.text, count: rows.length }),
+					)
+				: Effect.succeed(rows),
 		);
 	}
 	execTakeFirstOrNone(): Effect.Effect<unknown, SqlError, SqlClient> {

@@ -11,4 +11,4 @@ export interface DB {
 }
 
 export const count = (db: DatabaseSync) =>
-	createSql<DB>(db)("select count(*) as n from items").execTakeFirst();
+	createSql<DB>(db)("select count(*) as n from items").execOne();

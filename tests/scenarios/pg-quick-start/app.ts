@@ -21,11 +21,11 @@ export const rows = await sql(
 	1,
 ).exec();
 export const first = await sql(
-	"SELECT id FROM users ORDER BY id",
-).execTakeFirstOrNone();
+	"SELECT id FROM users ORDER BY id LIMIT 1",
+).execOneOrNone();
 export const missing = await sql(
 	"SELECT id FROM users WHERE id = $1",
 	99,
-).execTakeFirstOrNone();
+).execOneOrNone();
 console.log({ rows, first, missing });
 await pool.end();

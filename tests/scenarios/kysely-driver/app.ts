@@ -52,7 +52,7 @@ export const inTransaction = await sql.transaction(async (tx) => {
 			throw new Error("inner abort");
 		})
 		.catch((error: Error) => console.log(error.message));
-	return tx("SELECT display_name FROM users").execTakeFirst();
+	return tx("SELECT display_name FROM users").execOne();
 });
 
 // One the caller opened on Kysely takes a savepoint too.

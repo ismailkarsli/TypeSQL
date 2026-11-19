@@ -15,6 +15,6 @@ await pool.query(`CREATE TABLE users (id int PRIMARY KEY, display_name text, bal
   INSERT INTO users VALUES (1, 'Ada', 100), (2, NULL, 50)`);
 const find = sql.prepare("SELECT id, display_name FROM users WHERE id = :id");
 export const rows = await find({ id: 1 }).exec();
-export const second = await find({ id: 2 }).execTakeFirst();
+export const second = await find({ id: 2 }).execOne();
 console.log({ rows, second });
 await pool.end();

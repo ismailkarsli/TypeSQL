@@ -98,17 +98,17 @@ const counts = await sql(
 | Method | Returns |
 |---|---|
 | `q.exec()` | `Promise<Row[]>` |
-| `q.execTakeFirstOrNone()` | `Promise<Row \| undefined>` |
-| `q.execTakeFirst()` | `Promise<Row>`, or rejects with `NoResultError` when there is no row |
+| `q.execOne()` | `Promise<Row>`; rejects with `NoResultError` when there is no row and `TooManyRowsError` when there are more |
+| `q.execOneOrNone()` | `Promise<Row \| undefined>`; rejects with `TooManyRowsError` when there is more than one row |
 | `q.execCount()` | `Promise<number>`: the rows changed or returned, 0 for DDL |
 
 ```ts
 const maybe = await sql(
 	`SELECT id FROM users WHERE email = ${sql.param("x")}`,
-).execTakeFirstOrNone();
+).execOneOrNone();
 const user = await sql(
 	`SELECT id, email FROM users WHERE id = ${sql.param(7)}`,
-).execTakeFirst();
+).execOne();
 const changed = await sql(
 	"UPDATE users SET display_name = NULL",
 ).execCount();
@@ -126,7 +126,7 @@ Attach `.withPlugin(new CasePlugin())` (imported from `@typesql/core/plugins`) f
 const id = await sql.transaction(async (tx) => {
 	const { id } = await tx(
 		`INSERT INTO users (email) VALUES (${tx.param("a@b.c")}) RETURNING id`,
-	).execTakeFirst();
+	).execOne();
 	await tx(
 		`INSERT INTO posts (author_id, title) VALUES (${tx.param(id)}, ${tx.param("Hello")})`,
 	).exec();

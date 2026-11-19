@@ -58,7 +58,7 @@ attempt("distinct", () => nested.json({ aB: 1, inner: { aB: 2 }, cD: 3 }));
 // A row still takes the later of two columns that map to one key.
 export const row = await flat(
 	`SELECT 1 AS "displayName", 2 AS display_name`,
-).execTakeFirst();
+).execOne();
 export const stored = await sql("SELECT id, doc FROM users").exec();
 
 console.dir({ row, stored }, { depth: null });

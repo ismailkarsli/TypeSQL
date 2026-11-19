@@ -26,11 +26,11 @@ export const narrowed = await sql(`SELECT u.id, p.title FROM users u
   LEFT JOIN posts p ON p.author_id = u.id WHERE p.title IS NOT NULL ORDER BY u.id`).exec();
 export const named = await sql("SELECT name FROM users WHERE id = :id", {
 	id: 1,
-}).execTakeFirst();
+}).execOne();
 export const counted = await sql(
 	"SELECT COUNT(*) AS n, SUM(id) AS total, 7 / $1 AS divided FROM users",
 	2,
-).execTakeFirst();
+).execOne();
 try {
 	await sql.transaction(async (tx) => {
 		await tx("DELETE FROM posts WHERE id = $1", 1).exec();
