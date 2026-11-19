@@ -1,8 +1,31 @@
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import type { DefaultTheme } from "vitepress";
+import { type OgPage, ogHeight, ogWidth, renderOgImage } from "./og.ts";
 import { sqlHighlighting } from "./sql-highlighting.ts";
 import { withVersions } from "./versions.ts";
 
 const github = "https://github.com/ismailkarsli/TypeSQL";
 const hostname = "https://typesql.karsli.net";
+
+// Each page's social preview image, keyed by its path under the output
+// directory. Filled while pages render and drawn when the build ends.
+const ogImages = new Map<string, OgPage>();
+
+/** The text of the sidebar group closest to the page's link. */
+function sidebarSection(
+	items: DefaultTheme.SidebarItem[],
+	link: string,
+	group?: string,
+): string | undefined {
+	for (const item of items) {
+		if (item.link === link) return group;
+		const found =
+			item.items && sidebarSection(item.items, link, item.text ?? group);
+		if (found) return found;
+	}
+	return undefined;
+}
 
 export default withVersions({
 	lang: "en-US",
@@ -33,19 +56,7 @@ export default withVersions({
 		],
 		["meta", { property: "og:type", content: "website" }],
 		["meta", { property: "og:site_name", content: "TypeSQL" }],
-		["meta", { property: "og:image", content: `${hostname}/og-image.png` }],
-		["meta", { property: "og:image:width", content: "1200" }],
-		["meta", { property: "og:image:height", content: "630" }],
-		[
-			"meta",
-			{
-				property: "og:image:alt",
-				content:
-					"TypeSQL: Type-safe SQL for TypeScript, with no code generation or database connection.",
-			},
-		],
 		["meta", { name: "twitter:card", content: "summary_large_image" }],
-		["meta", { name: "twitter:image", content: `${hostname}/og-image.png` }],
 	],
 	transformHead({ pageData, siteConfig, title, description }) {
 		if (pageData.isNotFound) return;
@@ -53,14 +64,48 @@ export default withVersions({
 			.replace(/(^|\/)index\.md$/, "$1")
 			.replace(/\.md$/, "");
 		const url = new URL(siteConfig.site.base + path, hostname).href;
+		// The home page keeps the hand-drawn image; every other page gets one
+		// drawn from its heading, description and sidebar section.
+		let image = `${hostname}/og-image.png`;
+		let alt =
+			"TypeSQL: Type-safe SQL for TypeScript, with no code generation or database connection.";
+		if (pageData.frontmatter.layout !== "home") {
+			const file = `og/${pageData.relativePath.replace(/\.md$/, ".png")}`;
+			const source = join(siteConfig.srcDir, pageData.filePath);
+			const heading = existsSync(source)
+				? /^# (.+)$/m.exec(readFileSync(source, "utf8"))?.[1]
+				: undefined;
+			const { sidebar } = siteConfig.site.themeConfig;
+			ogImages.set(file, {
+				section: Array.isArray(sidebar)
+					? sidebarSection(sidebar, `/${path}`)
+					: undefined,
+				title: heading ?? pageData.title,
+				description,
+			});
+			image = new URL(siteConfig.site.base + file, hostname).href;
+			alt = `${pageData.title}: ${description}`;
+		}
 		return [
 			["link", { rel: "canonical", href: url }],
+			["meta", { property: "og:image", content: image }],
+			["meta", { property: "og:image:width", content: String(ogWidth) }],
+			["meta", { property: "og:image:height", content: String(ogHeight) }],
+			["meta", { property: "og:image:alt", content: alt }],
+			["meta", { name: "twitter:image", content: image }],
 			["meta", { property: "og:url", content: url }],
 			["meta", { property: "og:title", content: title }],
 			["meta", { property: "og:description", content: description }],
 			["meta", { name: "twitter:title", content: title }],
 			["meta", { name: "twitter:description", content: description }],
 		];
+	},
+	async buildEnd({ outDir }) {
+		for (const [file, page] of ogImages) {
+			const target = join(outDir, file);
+			mkdirSync(dirname(target), { recursive: true });
+			writeFileSync(target, await renderOgImage(page));
+		}
 	},
 	// CHANGELOG.md is this private package's own; `/changelog` is generated
 	// from the published packages' changelogs by `[page].paths.ts`.

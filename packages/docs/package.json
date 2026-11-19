@@ -12,8 +12,12 @@
 		"typecheck": "tsrs -p tsconfig.json"
 	},
 	"devDependencies": {
+		"@fontsource/inter": "catalog:",
+		"@fontsource/jetbrains-mono": "catalog:",
+		"@resvg/resvg-js": "catalog:",
 		"@types/node": "catalog:",
 		"cf": "catalog:",
+		"satori": "catalog:",
 		"tsrs": "catalog:",
 		"typescript": "catalog:",
 		"vitepress": "catalog:",
