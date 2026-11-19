@@ -556,6 +556,11 @@
   dir: packages/core
   intents:
     - angry-shoes-matter
+"@typesql/core@9.1.0":
+  dir: packages/core
+  intents:
+    - new-jeans-pump
+    - smart-lizards-buy
 "@typesql/drizzle@0.0.2":
   dir: packages/drizzle
   intents:
@@ -676,6 +681,10 @@
   intents:
     - tidy-toys-count
     - wise-boxes-sleep
+"@typesql/effect@9.1.0":
+  dir: packages/effect
+  intents:
+    - new-jeans-pump
 "@typesql/kysely@0.0.2":
   dir: packages/kysely
   intents:

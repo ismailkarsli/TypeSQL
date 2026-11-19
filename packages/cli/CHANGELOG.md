@@ -1,5 +1,16 @@
 # @typesql/cli
 
+## 9.1.0
+
+### Patch Changes
+
+- Updated dependencies:
+  - @typesql/core@9.1.0
+  - @typesql/language-server@1.4.7
+  - @typesql/mysql@9.1.0
+  - @typesql/pg@9.1.0
+  - @typesql/sqlite@9.1.0
+
 ## 9.0.1
 
 ### Patch Changes

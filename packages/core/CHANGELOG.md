@@ -1,5 +1,15 @@
 # @typesql/core
 
+## 9.1.0
+
+### Minor Changes
+
+- Statements have `execOne()` and `execOneOrNone()`, which reject with the new `TooManyRowsError` (carrying `text` and `count`) when the query returns more than one row; `execOne()`, like `execTakeFirst()`, rejects with `NoResultError` when there is no row. `execTakeFirst()` and `execTakeFirstOrNone()` are deprecated, since they silently drop extra rows: switch to the new methods, add `LIMIT 1` for the first of several rows, or take `[0]` of `exec()`. On `@typesql/effect` both are tagged errors.
+
+### Patch Changes
+
+- TypeScript checks statements with less work, such as fewer comparisons of tuples to array types: about 10% less check time on a large PostgreSQL application, with the same types and errors.
+
 ## 9.0.1
 
 ### Patch Changes

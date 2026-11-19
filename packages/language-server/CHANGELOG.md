@@ -1,5 +1,12 @@
 # @typesql/language-server
 
+## 1.4.7
+
+### Patch Changes
+
+- Updated dependencies:
+  - @typesql/core@9.1.0
+
 ## 1.4.6
 
 ### Patch Changes
