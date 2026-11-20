@@ -293,7 +293,7 @@ const columns = admin(
 
 `pg_catalog` relations work with or without the prefix (`FROM pg_stat_activity`), and a table of your own with the same name wins. `information_schema` relations need the prefix (`FROM information_schema.columns`). The catalogs are read-only. Column types are the ones Postgres reports, and a view column is `NOT NULL` only when its definition proves it: `pg_tables.tablename` is `string`, but `pg_tables.schemaname` is `string | null`.
 
-::: details Relations in `PgCatalog` (PostgreSQL 18)
+::: details Relations in `PgCatalog` (PostgreSQL 19)
 - **Statistics**: `pg_stat_activity`, `pg_stat_database`, `pg_stat_all_tables`, `pg_stat_user_tables`, `pg_stat_all_indexes`, `pg_stat_user_indexes`, `pg_statio_user_tables`, `pg_stat_replication`, `pg_locks`.
 - **Catalog views**: `pg_tables`, `pg_views`, `pg_matviews`, `pg_indexes`, `pg_sequences`, `pg_roles`, `pg_settings`, `pg_replication_slots`, `pg_available_extensions`.
 - **Catalog tables**: `pg_class`, `pg_namespace`, `pg_attribute`, `pg_type`, `pg_index`, `pg_constraint`, `pg_database`, `pg_proc`, `pg_enum`, `pg_attrdef`, `pg_description`, `pg_depend`, `pg_extension`, `pg_trigger`, `pg_inherits`, `pg_sequence`, `pg_am`.

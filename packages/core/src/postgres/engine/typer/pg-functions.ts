@@ -32,6 +32,7 @@ export interface PgFunctions {
   dround: Sig<["..."], "float8">;
   dtrunc: Sig<["..."], "float8">;
   enum_send: Sig<["..."], "bytea">;
+  error_on_null: Sig<["..."], "unknown", { nullable: true }>;
   fmgr_c_validator: Sig<["..."], "void">;
   fmgr_internal_validator: Sig<["..."], "void">;
   fmgr_sql_validator: Sig<["..."], "void">;
@@ -97,6 +98,7 @@ export interface PgFunctions {
   lowrite: Sig<["..."], "int4">;
   macaddr8_set7bit: Sig<["..."], "macaddr8">;
   makeaclitem: Sig<["..."], "aclitem">;
+  multirange_minus_multi: Sig<["..."], "unknown", { srf: true; nullable: true }>;
   mxid_age: Sig<["..."], "int4">;
   nameconcatoid: Sig<["..."], "name">;
   notlike: Sig<["..."], "bool">;
@@ -108,6 +110,7 @@ export interface PgFunctions {
   numeric_log: Sig<["..."], "numeric">;
   numeric_sqrt: Sig<["..."], "numeric">;
   numrange_subdiff: Sig<["..."], "float8">;
+  oid8: Sig<["..."], "oid8">;
   oidvectortypes: Sig<["..."], "text">;
   overlay: Sig<["..."], "unknown", { nullable: true }>;
   pclose: Sig<["..."], "path">;
@@ -124,6 +127,7 @@ export interface PgFunctions {
   pg_blocking_pids: Sig<["..."], "int4[]">;
   pg_char_to_encoding: Sig<["..."], "int4">;
   pg_clear_attribute_stats: Sig<["..."], "void", { nullable: true }>;
+  pg_clear_extended_stats: Sig<["..."], "void", { nullable: true }>;
   pg_clear_relation_stats: Sig<["..."], "void", { nullable: true }>;
   pg_client_encoding: Sig<["..."], "name">;
   pg_collation_actual_version: Sig<["..."], "text">;
@@ -168,6 +172,7 @@ export interface PgFunctions {
   pg_get_backend_memory_contexts: Sig<["..."], "record", { srf: true }>;
   pg_get_catalog_foreign_keys: Sig<["..."], "record", { srf: true }>;
   pg_get_constraintdef: Sig<["..."], "text">;
+  pg_get_dsm_registry_allocations: Sig<["..."], "record", { srf: true }>;
   pg_get_expr: Sig<["..."], "text">;
   pg_get_function_arg_default: Sig<["..."], "text">;
   pg_get_function_arguments: Sig<["..."], "text">;
@@ -179,9 +184,11 @@ export interface PgFunctions {
   pg_get_keywords: Sig<["..."], "record", { srf: true }>;
   pg_get_loaded_modules: Sig<["..."], "record", { srf: true }>;
   pg_get_multixact_members: Sig<["..."], "record", { srf: true }>;
+  pg_get_multixact_stats: Sig<["..."], "record">;
   pg_get_object_address: Sig<["..."], "record">;
   pg_get_partition_constraintdef: Sig<["..."], "text">;
   pg_get_partkeydef: Sig<["..."], "text">;
+  pg_get_publication_sequences: Sig<["..."], "oid", { srf: true }>;
   pg_get_publication_tables: Sig<["..."], "record", { srf: true }>;
   pg_get_replica_identity_index: Sig<["..."], "regclass">;
   pg_get_replication_slots: Sig<["..."], "record", { srf: true; nullable: true }>;
@@ -275,6 +282,7 @@ export interface PgFunctions {
   pg_replication_origin_xact_setup: Sig<["..."], "void">;
   pg_replication_slot_advance: Sig<["..."], "record">;
   pg_restore_attribute_stats: Sig<["..."], "bool", { nullable: true }>;
+  pg_restore_extended_stats: Sig<["..."], "bool", { nullable: true }>;
   pg_restore_relation_stats: Sig<["..."], "bool", { nullable: true }>;
   pg_rotate_logfile: Sig<["..."], "bool">;
   pg_safe_snapshot_blocking_pids: Sig<["..."], "int4[]">;
@@ -297,6 +305,7 @@ export interface PgFunctions {
   pg_stat_get_archiver: Sig<["..."], "record", { nullable: true }>;
   pg_stat_get_autoanalyze_count: Sig<["..."], "int8">;
   pg_stat_get_autovacuum_count: Sig<["..."], "int8">;
+  pg_stat_get_autovacuum_scores: Sig<["..."], "record", { srf: true }>;
   pg_stat_get_backend_activity: Sig<["..."], "text">;
   pg_stat_get_backend_activity_start: Sig<["..."], "timestamptz">;
   pg_stat_get_backend_client_addr: Sig<["..."], "inet">;
@@ -366,6 +375,7 @@ export interface PgFunctions {
   pg_stat_get_dead_tuples: Sig<["..."], "int8">;
   pg_stat_get_function_calls: Sig<["..."], "int8">;
   pg_stat_get_function_self_time: Sig<["..."], "float8">;
+  pg_stat_get_function_stat_reset_time: Sig<["..."], "timestamptz">;
   pg_stat_get_function_total_time: Sig<["..."], "float8">;
   pg_stat_get_ins_since_vacuum: Sig<["..."], "int8">;
   pg_stat_get_io: Sig<["..."], "record", { srf: true }>;
@@ -375,13 +385,16 @@ export interface PgFunctions {
   pg_stat_get_last_vacuum_time: Sig<["..."], "timestamptz">;
   pg_stat_get_lastscan: Sig<["..."], "timestamptz">;
   pg_stat_get_live_tuples: Sig<["..."], "int8">;
+  pg_stat_get_lock: Sig<["..."], "record", { srf: true }>;
   pg_stat_get_mod_since_analyze: Sig<["..."], "int8">;
   pg_stat_get_numscans: Sig<["..."], "int8">;
   pg_stat_get_progress_info: Sig<["..."], "record", { srf: true }>;
+  pg_stat_get_recovery: Sig<["..."], "record", { nullable: true }>;
   pg_stat_get_recovery_prefetch: Sig<["..."], "record", { srf: true }>;
   pg_stat_get_replication_slot: Sig<["..."], "record">;
   pg_stat_get_slru: Sig<["..."], "record", { srf: true; nullable: true }>;
   pg_stat_get_snapshot_timestamp: Sig<["..."], "timestamptz">;
+  pg_stat_get_stat_reset_time: Sig<["..."], "timestamptz">;
   pg_stat_get_subscription: Sig<["..."], "record", { srf: true; nullable: true }>;
   pg_stat_get_subscription_stats: Sig<["..."], "record">;
   pg_stat_get_total_analyze_time: Sig<["..."], "float8">;
@@ -461,6 +474,7 @@ export interface PgFunctions {
   query_to_xml_and_xmlschema: Sig<["..."], "xml">;
   query_to_xmlschema: Sig<["..."], "xml">;
   radius: Sig<["..."], "float8">;
+  range_minus_multi: Sig<["..."], "unknown", { srf: true; nullable: true }>;
   row_security_active: Sig<["..."], "bool">;
   satisfies_hash_partition: Sig<["..."], "bool", { nullable: true }>;
   schema_to_xml: Sig<["..."], "xml">;
@@ -475,8 +489,11 @@ export interface PgFunctions {
   table_to_xml_and_xmlschema: Sig<["..."], "xml">;
   table_to_xmlschema: Sig<["..."], "xml">;
   textlen: Sig<["..."], "int4">;
+  tid_block: Sig<["..."], "int8">;
+  tid_offset: Sig<["..."], "int4">;
   to_ascii: Sig<["..."], "text">;
   to_regcollation: Sig<["..."], "regcollation">;
+  to_regdatabase: Sig<["..."], "regdatabase">;
   to_regnamespace: Sig<["..."], "regnamespace">;
   to_regoper: Sig<["..."], "regoper">;
   to_regoperator: Sig<["..."], "regoperator">;
@@ -498,6 +515,7 @@ export interface PgFunctions {
   txid_visible_in_snapshot: Sig<["..."], "bool">;
   unicode_assigned: Sig<["..."], "bool">;
   unicode_version: Sig<["..."], "text">;
+  uuid: Sig<["..."], "uuid">;
   uuidv4: Sig<["..."], "uuid">;
   uuidv7: Sig<["..."], "uuid">;
   width: Sig<["..."], "float8">;

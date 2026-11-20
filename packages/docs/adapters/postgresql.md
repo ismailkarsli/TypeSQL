@@ -13,6 +13,8 @@ Two adapters run your queries on PostgreSQL:
 
 Both give you the same `sql` function, `exec*` methods and `sql.transaction`. They differ in the clients they accept, how transactions run, how rows are typed, and how migrations get a connection. Pick a driver in any example and the page follows.
 
+TypeSQL is tested on PostgreSQL 19, and its types for built-in functions and the [system catalogs](../guide/schema#system-catalogs) come from it. On an older server, a function or catalog column new in 19 type-checks too, but the server rejects it when the query runs.
+
 ::: code-group
 
 ```sh [node-postgres]

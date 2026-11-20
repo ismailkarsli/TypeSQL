@@ -293,6 +293,7 @@ export interface PgCatalogNamespace {
     name: Col<"name">;
     default_version: Col<"text", { nullable: true }>;
     installed_version: Col<"text", { nullable: true }>;
+    location: Col<"text", { nullable: true }>;
     comment: Col<"text", { nullable: true }>;
   }>;
   pg_indexes: View<{
@@ -351,6 +352,7 @@ export interface PgCatalogNamespace {
     invalidation_reason: Col<"text", { nullable: true }>;
     failover: Col<"bool", { nullable: true }>;
     synced: Col<"bool", { nullable: true }>;
+    slotsync_skip_reason: Col<"text", { nullable: true }>;
   }>;
   pg_roles: View<{
     rolname: Col<"name">;
@@ -433,6 +435,7 @@ export interface PgCatalogNamespace {
     last_idx_scan: Col<"timestamptz", { nullable: true }>;
     idx_tup_read: Col<"int8">;
     idx_tup_fetch: Col<"int8">;
+    stats_reset: Col<"timestamptz", { nullable: true }>;
   }>;
   pg_stat_all_tables: View<{
     relid: Col<"oid">;
@@ -465,6 +468,7 @@ export interface PgCatalogNamespace {
     total_autovacuum_time: Col<"float8">;
     total_analyze_time: Col<"float8">;
     total_autoanalyze_time: Col<"float8">;
+    stats_reset: Col<"timestamptz", { nullable: true }>;
   }>;
   pg_stat_database: View<{
     datid: Col<"oid">;
@@ -530,6 +534,7 @@ export interface PgCatalogNamespace {
     last_idx_scan: Col<"timestamptz", { nullable: true }>;
     idx_tup_read: Col<"int8">;
     idx_tup_fetch: Col<"int8">;
+    stats_reset: Col<"timestamptz", { nullable: true }>;
   }>;
   pg_stat_user_tables: View<{
     relid: Col<"oid">;
@@ -562,6 +567,7 @@ export interface PgCatalogNamespace {
     total_autovacuum_time: Col<"float8">;
     total_analyze_time: Col<"float8">;
     total_autoanalyze_time: Col<"float8">;
+    stats_reset: Col<"timestamptz", { nullable: true }>;
   }>;
   pg_statio_user_tables: View<{
     relid: Col<"oid">;
@@ -575,6 +581,7 @@ export interface PgCatalogNamespace {
     toast_blks_hit: Col<"int8", { nullable: true }>;
     tidx_blks_read: Col<"int8", { nullable: true }>;
     tidx_blks_hit: Col<"int8", { nullable: true }>;
+    stats_reset: Col<"timestamptz", { nullable: true }>;
   }>;
   pg_tables: View<{
     schemaname: Col<"name", { nullable: true }>;
