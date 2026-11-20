@@ -561,6 +561,10 @@
   intents:
     - new-jeans-pump
     - smart-lizards-buy
+"@typesql/core@9.2.0":
+  dir: packages/core
+  intents:
+    - silly-grapes-camp
 "@typesql/drizzle@0.0.2":
   dir: packages/drizzle
   intents:
