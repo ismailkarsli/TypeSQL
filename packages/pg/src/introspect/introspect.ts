@@ -38,17 +38,66 @@ export interface IntrospectedEnum {
 	readonly values: readonly string[];
 }
 
+export type FunctionKind = "function" | "aggregate" | "window";
+
+export interface IntrospectedFunction {
+	readonly schema: string;
+	readonly name: string;
+	readonly kind: FunctionKind;
+	/**
+	 * The argument types a call passes, as TypeSQL names them: `"int4"`,
+	 * `"any"` or `"anyarray"` for a polymorphic one. A `VARIADIC` argument is
+	 * its element type, followed by `"..."`.
+	 */
+	readonly args: readonly string[];
+	/** How many trailing arguments have a default and can be left out. */
+	readonly defaults: number;
+	/**
+	 * The return type: a type name, a table or view whose row it returns
+	 * (`"users"`, `"auth.sessions"`), `"record"`, `"void"`, or `"$1"`,
+	 * `"$elem1"`, … for a polymorphic one; `"unknown"` when it can't be told.
+	 */
+	readonly returns: string;
+	/** `RETURNS SETOF` or `RETURNS TABLE`. */
+	readonly set: boolean;
+	/** `STRICT`: NULL when an argument is NULL, and only then called with none. */
+	readonly strict: boolean;
+	/**
+	 * Can return NULL for arguments that aren't NULL: a function that is not
+	 * `STRICT`, unless `functionNotNull` names it.
+	 */
+	readonly nullable: boolean;
+	/** The columns of `RETURNS TABLE (…)` or OUT parameters returning `record`. */
+	readonly columns: readonly {
+		readonly name: string;
+		readonly type: string;
+	}[];
+	readonly comment: string | null;
+}
+
 export interface IntrospectedDatabase {
 	readonly version: string;
 	readonly schemas: readonly string[];
 	readonly relations: readonly IntrospectedRelation[];
 	readonly enums: readonly IntrospectedEnum[];
+	/**
+	 * Functions, aggregates and window functions, without procedures, trigger
+	 * functions and the functions of extensions.
+	 */
+	readonly functions?: readonly IntrospectedFunction[] | undefined;
 }
 
 export interface IntrospectOptions {
 	readonly schemas?: readonly string[];
 	readonly exclude?: readonly string[];
 	readonly viewNotNull?: NullabilityOptions["notNull"];
+	/**
+	 * The functions that return NULL only when an argument is NULL, which
+	 * PostgreSQL records only for `STRICT` ones.
+	 */
+	readonly functionNotNull?: (
+		fn: Omit<IntrospectedFunction, "nullable">,
+	) => boolean;
 }
 
 const KINDS: ReadonlyMap<string, RelationKind> = new Map([
@@ -99,6 +148,21 @@ interface ColumnRow {
 	readonly identity: string;
 	readonly generated: string;
 	readonly default: string | null;
+	readonly comment: string | null;
+}
+
+interface FunctionRow {
+	readonly schema: string;
+	readonly name: string;
+	readonly kind: string;
+	readonly set: boolean;
+	readonly strict: boolean;
+	readonly ret: string;
+	readonly variadic: string;
+	readonly defaults: number;
+	readonly args: readonly string[];
+	readonly outTypes: readonly string[];
+	readonly outNames: readonly string[];
 	readonly comment: string | null;
 }
 
@@ -171,6 +235,34 @@ const isColumnRow = (row: unknown): row is ColumnRow =>
 	"comment" in row &&
 	isComment(row.comment);
 
+const isStrings = (value: unknown): value is readonly string[] =>
+	Array.isArray(value) && value.every((v) => typeof v === "string");
+
+const isFunctionRow = (row: unknown): row is FunctionRow =>
+	isNameRow(row) &&
+	"schema" in row &&
+	typeof row.schema === "string" &&
+	"kind" in row &&
+	typeof row.kind === "string" &&
+	"set" in row &&
+	typeof row.set === "boolean" &&
+	"strict" in row &&
+	typeof row.strict === "boolean" &&
+	"ret" in row &&
+	typeof row.ret === "string" &&
+	"variadic" in row &&
+	typeof row.variadic === "string" &&
+	"defaults" in row &&
+	typeof row.defaults === "number" &&
+	"args" in row &&
+	isStrings(row.args) &&
+	"outTypes" in row &&
+	isStrings(row.outTypes) &&
+	"outNames" in row &&
+	isStrings(row.outNames) &&
+	"comment" in row &&
+	isComment(row.comment);
+
 const isEnumRow = (row: unknown): row is EnumRow =>
 	isNameRow(row) &&
 	"oid" in row &&
@@ -219,6 +311,53 @@ function resolver(types: ReadonlyMap<string, TypeRow>) {
 		};
 	};
 	return resolve;
+}
+
+const FUNCTION_KINDS: ReadonlyMap<string, FunctionKind> = new Map([
+	["f", "function"],
+	["a", "aggregate"],
+	["w", "window"],
+]);
+
+/** Polymorphic pseudo-types, as the argument category TypeSQL checks. */
+const POLYMORPHIC: ReadonlyMap<string, string> = new Map([
+	["any", "any"],
+	["anyelement", "any"],
+	["anynonarray", "any"],
+	["anyenum", "any"],
+	["anycompatible", "any"],
+	["anycompatiblenonarray", "any"],
+	["anymultirange", "any"],
+	["anycompatiblemultirange", "any"],
+	["anyarray", "anyarray"],
+	["anycompatiblearray", "anyarray"],
+	["anyrange", "anyrange"],
+	["anycompatiblerange", "anyrange"],
+]);
+
+/** The pseudo-types of arguments and results SQL can still pass. */
+const CALLABLE_PSEUDO = new Set([...POLYMORPHIC.keys(), "record", "void"]);
+
+const elementLike = (t: string): boolean =>
+	POLYMORPHIC.get(t) === "any" && t !== "any";
+const arrayLike = (t: string): boolean => POLYMORPHIC.get(t) === "anyarray";
+
+/**
+ * A polymorphic return type in terms of the declared arguments: `$n` for the
+ * type of argument n, `$elem1` and `$arr1` for the first one's element or
+ * array, else `unknown`.
+ */
+function polymorphicReturn(ret: string, args: readonly string[]): string {
+	const at = args.findIndex((a) =>
+		elementLike(ret)
+			? elementLike(a)
+			: POLYMORPHIC.get(a) === POLYMORPHIC.get(ret),
+	);
+	if (at >= 0 && at < 4) return `$${at + 1}`;
+	const [first = ""] = args;
+	if (elementLike(ret) && arrayLike(first)) return "$elem1";
+	if (arrayLike(ret) && elementLike(first)) return "$arr1";
+	return "unknown";
 }
 
 const USER_SCHEMAS = `n.nspname NOT IN ('pg_catalog', 'information_schema') AND n.nspname NOT LIKE 'pg\\_%'`;
@@ -353,6 +492,8 @@ export async function introspect(
 		});
 	}
 
+	const functions = await readFunctions();
+
 	const enumRows = await q(
 		isEnumRow,
 		`SELECT t.oid::int8::text AS oid, n.nspname AS schema, t.typname AS name,
@@ -368,5 +509,95 @@ export async function introspect(
 		name,
 		values,
 	}));
-	return { version, schemas, relations, enums };
+	return { version, schemas, relations, enums, functions };
+
+	async function readFunctions(): Promise<IntrospectedFunction[]> {
+		const rows = await q(
+			isFunctionRow,
+			`SELECT n.nspname AS schema, p.proname AS name, p.prokind AS kind,
+              p.proretset AS set, p.proisstrict AS strict,
+              p.prorettype::int8::text AS ret, p.provariadic::int8::text AS variadic,
+              p.pronargdefaults::int4 AS defaults,
+              p.proargtypes::oid[]::int8[]::text[] AS args,
+              array(SELECT a.t::int8::text FROM unnest(p.proallargtypes, p.proargmodes) AS a(t, m)
+                     WHERE a.m IN ('o', 'b', 't')) AS "outTypes",
+              array(SELECT coalesce(a.nm, '') FROM unnest(p.proallargtypes, p.proargmodes, p.proargnames) AS a(t, m, nm)
+                     WHERE a.m IN ('o', 'b', 't')) AS "outNames",
+              obj_description(p.oid, 'pg_proc') AS comment
+         FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+        WHERE p.prokind IN ('f', 'a', 'w') AND n.nspname = ANY($1::text[])
+          AND NOT EXISTS (SELECT FROM pg_depend d
+                           WHERE d.classid = 'pg_proc'::regclass AND d.objid = p.oid AND d.deptype = 'e')
+        ORDER BY array_position($1::text[], n.nspname::text), p.proname, p.pronargs, p.oid`,
+			[schemas],
+		);
+		/** A type as a function's argument or result, or null for one SQL can't pass. */
+		const typeName = (oid: string): string | null => {
+			const t = types.get(oid);
+			if (t?.typtype === "p")
+				return CALLABLE_PSEUDO.has(t.name)
+					? (POLYMORPHIC.get(t.name) ?? t.name)
+					: null;
+			// The row type of a table or view, which FROM reads as its columns.
+			if (t?.typtype === "c")
+				return t.schema === "public" ? t.name : `${t.schema}.${t.name}`;
+			const resolved = resolve(oid);
+			usedTypes.add(resolved.scalarOid);
+			return resolved.type;
+		};
+		const functions: IntrospectedFunction[] = [];
+		for (const row of rows) {
+			if (
+				excluded?.some(
+					(re) => re.test(row.name) || re.test(`${row.schema}.${row.name}`),
+				)
+			)
+				continue;
+			const variadic = row.variadic !== "0";
+			const args = row.args.map((oid, i) =>
+				typeName(variadic && i === row.args.length - 1 ? row.variadic : oid),
+			);
+			const retName = types.get(row.ret)?.name ?? "";
+			const returns = POLYMORPHIC.has(retName)
+				? polymorphicReturn(
+						retName,
+						row.args.map((oid) => types.get(oid)?.name ?? ""),
+					)
+				: typeName(row.ret);
+			const kind = FUNCTION_KINDS.get(row.kind);
+			// Leaves out trigger functions, and those taking or returning `internal`.
+			if (
+				kind === undefined ||
+				returns === null ||
+				args.some((a) => a === null || a === "void")
+			)
+				continue;
+			const fn: Omit<IntrospectedFunction, "nullable"> = {
+				schema: row.schema,
+				name: row.name,
+				kind,
+				args: [...args.filter((a) => a !== null), ...(variadic ? ["..."] : [])],
+				defaults: row.defaults,
+				returns,
+				set: row.set,
+				strict: row.strict,
+				columns:
+					returns === "record"
+						? row.outTypes.map((oid, i) => ({
+								// PostgreSQL's name for an unnamed OUT parameter.
+								name: row.outNames[i] || `column${i + 1}`,
+								type: typeName(oid) ?? "unknown",
+							}))
+						: [],
+				comment: row.comment,
+			};
+			// An aggregate's or window function's NULLs follow its rows.
+			const nullable =
+				kind === "function" &&
+				!row.strict &&
+				!(options.functionNotNull?.(fn) ?? false);
+			functions.push({ ...fn, nullable });
+		}
+		return functions;
+	}
 }

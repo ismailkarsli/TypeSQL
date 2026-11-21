@@ -1,0 +1,26 @@
+{
+	"name": "mysql-introspect-functions",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"start": "node dist/app.js",
+		"setup": "node setup.ts",
+		"generate": "node generate.ts"
+	},
+	"dependencies": {
+		"@typesql/core": "workspace:*",
+		"@typesql/cli": "workspace:*",
+		"@typesql/mysql": "workspace:*",
+		"mysql2": "catalog:"
+	},
+	"devDependencies": {
+		"typescript": "catalog:",
+		"@types/node": "catalog:"
+	},
+	"scenario": {
+		"database": "mysql",
+		"artifacts": [
+			"schema.ts"
+		]
+	}
+}

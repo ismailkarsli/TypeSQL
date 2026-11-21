@@ -58,6 +58,7 @@ const OPTIONS: Readonly<
 	schemas: isStrings,
 	exclude: isStrings,
 	viewNotNull: isFunction,
+	functionNotNull: isFunction,
 	typeName: isString,
 	importFrom: isString,
 	imports: isStrings,

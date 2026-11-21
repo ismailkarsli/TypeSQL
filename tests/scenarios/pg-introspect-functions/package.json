@@ -1,0 +1,27 @@
+{
+	"name": "pg-introspect-functions",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"start": "node dist/app.js",
+		"setup": "node setup.ts",
+		"generate": "typesql introspect --config typesql.config.ts --out schema.ts"
+	},
+	"dependencies": {
+		"@typesql/core": "workspace:*",
+		"@typesql/cli": "workspace:*",
+		"@typesql/pg": "workspace:*",
+		"pg": "catalog:",
+		"@types/pg": "catalog:"
+	},
+	"devDependencies": {
+		"typescript": "catalog:",
+		"@types/node": "catalog:"
+	},
+	"scenario": {
+		"database": "postgres",
+		"artifacts": [
+			"schema.ts"
+		]
+	}
+}

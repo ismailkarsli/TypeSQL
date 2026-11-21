@@ -1,10 +1,10 @@
 ---
-description: "Generate a TypeSQL schema from a live PostgreSQL, SQLite, MySQL or MariaDB database with typesql introspect: tables, views, materialized views and enums."
+description: "Generate a TypeSQL schema from a live PostgreSQL, SQLite, MySQL or MariaDB database with typesql introspect: tables, views, materialized views, enums and functions."
 ---
 
 # From a live database
 
-`typesql introspect` reads your database and writes its schema to a TypeScript file. From Postgres, you get every table, view, materialized view and enum, with the exact Postgres type of each column. From a SQLite database file, you get its tables and views with each column's declared type; [SQLite](../adapters/sqlite#generate-the-schema) has the details. From MySQL or MariaDB, you get its tables and views with each column's type, position, `ENUM` values and `AUTO_INCREMENT`, generated and invisible columns; see [MySQL and MariaDB](../adapters/mysql#generate-the-schema). The rest of this page is about PostgreSQL.
+`typesql introspect` reads your database and writes its schema to a TypeScript file. From Postgres, you get every table, view, materialized view, enum and function, with the exact Postgres type of each column. From a SQLite database file, you get its tables and views with each column's declared type; [SQLite](../adapters/sqlite#generate-the-schema) has the details. From MySQL or MariaDB, you get its tables and views with each column's type, position, `ENUM` values and `AUTO_INCREMENT`, generated and invisible columns, and its stored functions; see [MySQL and MariaDB](../adapters/mysql#generate-the-schema). The rest of this page is about PostgreSQL.
 
 ## Generate the schema
 
@@ -71,7 +71,7 @@ The file has the real Postgres types: `timestamptz`, `date` and `timestamp` stay
 | `--url <url>` | connection string; default `$DATABASE_URL` |
 | `--out <file>` | output file; default stdout |
 | `--schema <name>` | schema to read; repeat it or comma-separate (`--schema public,auth`). Default: every schema except `pg_catalog`, `information_schema` and `pg_*` |
-| `--exclude <pattern>` | relation to leave out: a name or `schema.name`, where `*` matches anything (`--exclude 'kysely_migration*'`); repeat it or comma-separate |
+| `--exclude <pattern>` | relation or function to leave out: a name or `schema.name`, where `*` matches anything (`--exclude 'kysely_migration*'`); repeat it or comma-separate |
 | `--type-name <name>` | name of the interface, a TypeScript identifier; default `DB` |
 | `--import-from <module>` | where `Col`, `View`, … are imported from; default `@typesql/core/postgres` |
 | `--config <file>` | a module whose default export holds these options and the ones below |
@@ -94,10 +94,42 @@ The file has the real Postgres types: `timestamptz`, `date` and `timestamp` stay
 | enum | its name, with the labels in `$types` in sort order |
 | `json` / `jsonb` column given a type in [`columnTypes`](#json-columns) | `Json<T>`, with its flags |
 | other types (`tstzrange`, extension types) | their name; an unknown name maps to `unknown` unless the type map has it |
-| table and column comments | JSDoc |
+| function, aggregate, window function | a [`Sig`](./schema#functions) in `$functions`; one in another schema under `"schema.name"` |
+| table, column and function comments | JSDoc |
 | a name that is not a JS identifier (`password:write`) | a quoted key |
 
 Enums are global in TypeSQL, so two enums with the same name in different schemas share one `$types` entry. A schema with the same name as a `public` table is an error, because both would be the same key of `DB`.
+
+### Functions
+
+Your functions are declared under `$functions`, so queries can call them:
+
+```sql
+CREATE FUNCTION slugify(text) RETURNS text LANGUAGE sql IMMUTABLE STRICT
+  AS $$ SELECT lower(replace($1, ' ', '-')) $$;
+CREATE FUNCTION greet(name text, greeting text DEFAULT 'Hello') RETURNS text
+  LANGUAGE sql AS $$ SELECT greeting || ', ' || name $$;
+CREATE FUNCTION user_cards() RETURNS TABLE (id int4, label text)
+  LANGUAGE sql AS $$ SELECT id, name FROM users $$;
+```
+
+```ts
+$functions: {
+  greet: [
+    Sig<["text", "text"], "text", { nullable: true }>,
+    Sig<["text"], "text", { nullable: true }>,
+  ];
+  slugify: Sig<["text"], "text">;
+  user_cards: Sig<[], "record", { nullable: true; srf: true; columns: { id: "int4"; label: "text" } }>;
+};
+```
+
+- Overloads, and the shorter calls that argument defaults allow, are a list of `Sig`s. A `VARIADIC` argument is its element type followed by `"..."`.
+- A `STRICT` function returns NULL when an argument is NULL. Any other function can return NULL for any arguments, so it is `nullable: true`. When you know a function returns NULL only for a NULL argument, name it with `functionNotNull` in the config: `functionNotNull: (fn) => ["slugify", "greet"].includes(fn.name)`. It also gets the function's `schema`, `args` and `returns`.
+- `SETOF` and `RETURNS TABLE` are `srf: true`, and `RETURNS TABLE` or OUT parameters list their `columns`. A function returning a table's row type returns that table, whose columns `FROM` reads.
+- A polymorphic argument is `"any"`, `"anyarray"` or `"anyrange"`, and a polymorphic result follows the argument of its type (`"$1"`, or `"$elem1"` for the element of a first `anyarray`).
+- Procedures, trigger functions, functions that take or return `internal`, and the functions of extensions are left out. TypeSQL knows the functions of common extensions, such as `pgcrypto`, `pg_trgm` and `uuid-ossp`.
+- `--exclude` patterns leave out functions too.
 
 ## JSON columns
 
@@ -157,7 +189,7 @@ const save = sql(
 
 `@typesql/pg/introspect` exports the two steps, so you can run them from your own script:
 
-- `introspect(client, options)` reads the database through any `pg` client. It returns plain data: relations, columns with their types, defaults, identity and generated expressions, comments and enums.
+- `introspect(client, options)` reads the database through any `pg` client. It returns plain data: relations, columns with their types, defaults, identity and generated expressions, comments, enums and functions.
 - `generateSource(data, options)` writes the file's source.
 
 ```ts

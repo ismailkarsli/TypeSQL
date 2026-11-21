@@ -446,7 +446,7 @@ typesql introspect [--dialect postgres] [--url <url>] [--out <file>] [--schema <
 
 | Export of `@typesql/pg/introspect` | Meaning |
 |---|---|
-| `introspect(client, { schemas?, exclude?, viewNotNull? })` | `Promise<IntrospectedDatabase>`: `{ version, schemas, relations, enums }` |
+| `introspect(client, { schemas?, exclude?, viewNotNull?, functionNotNull? })` | `Promise<IntrospectedDatabase>`: `{ version, schemas, relations, enums, functions }` |
 | `generateSource(db, options?)` | the schema file's source; options `typeName`, `importFrom`, `imports`, `columnTypes`, `column`, `comments` |
 | `IntrospectConfig` | the default export of a `--config` module: `url`, `out` and every option above |
 

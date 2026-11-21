@@ -4,6 +4,7 @@ export {
 	enumValues,
 	type IntrospectedColumn,
 	type IntrospectedDatabase,
+	type IntrospectedFunction,
 	type IntrospectedRelation,
 	type IntrospectOptions,
 	introspect,

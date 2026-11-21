@@ -43,6 +43,18 @@ export interface ColumnFlags {
 	readonly hidden?: boolean | undefined;
 }
 
+/** One signature of a function in a schema's `$functions`. */
+export interface FunctionSource {
+	/** Its key: the name, or `schema.name`. */
+	readonly key: string;
+	readonly args: readonly string[];
+	readonly ret: string;
+	/** `Sig`'s options, each as source: `"srf: true"`. */
+	readonly options?: readonly string[] | undefined;
+	/** JSDoc lines. */
+	readonly notes?: readonly string[] | undefined;
+}
+
 /** The dialects whose `Col` a schema module imports. */
 export type SchemaDialect = "postgres" | "sqlite" | "mysql";
 
@@ -154,6 +166,39 @@ export function schemaWriter(dialect: SchemaDialect) {
 			used.add("Json");
 			return `Json<${ts}, ${colFlags(flags, dialect) || "{}"}, "json">`;
 		},
+		/**
+		 * The schema's `$functions` member, or "" without functions. A name
+		 * declared more than once is an overload list, in the order given.
+		 */
+		functions: (
+			functions: readonly FunctionSource[],
+			comments = true,
+		): string => {
+			if (functions.length === 0) return "";
+			used.add("Sig");
+			const byKey = new Map<string, { sigs: string[]; notes: string[] }>();
+			for (const fn of functions) {
+				const entry = byKey.get(fn.key) ?? { sigs: [], notes: [] };
+				const options = fn.options ?? [];
+				const sig = [
+					`[${fn.args.map((a) => JSON.stringify(a)).join(", ")}]`,
+					JSON.stringify(fn.ret),
+					...(options.length > 0 ? [`{ ${options.join("; ")} }`] : []),
+				];
+				entry.sigs.push(`Sig<${sig.join(", ")}>`);
+				for (const note of fn.notes ?? [])
+					if (!entry.notes.includes(note)) entry.notes.push(note);
+				byKey.set(fn.key, entry);
+			}
+			const entries = [...byKey].map(([key, { sigs, notes }]) => {
+				const value =
+					sigs.length === 1
+						? sigs[0]
+						: `[\n${sigs.map((s) => `      ${s},`).join("\n")}\n    ]`;
+				return `${comments ? doc(notes, "    ") : ""}    ${propertyKey(key)}: ${value};`;
+			});
+			return `  $functions: {\n${entries.join("\n")}\n  };`;
+		},
 		/** A view of the columns `body`. */
 		view: (body: string): string => {
 			used.add("View");
@@ -209,7 +254,7 @@ export function helperImport(
 	used: ReadonlySet<string>,
 	from: string,
 ): string[] {
-	const helpers = ["Col", "Enum", "Json", "Typed", "View"].filter((h) =>
+	const helpers = ["Col", "Enum", "Json", "Sig", "Typed", "View"].filter((h) =>
 		used.has(h),
 	);
 	return helpers.length > 0

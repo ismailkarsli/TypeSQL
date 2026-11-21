@@ -148,12 +148,12 @@ The dialect is `mysql` for a `mysql://` URL and `mariadb` for a `mariadb://` URL
 | `--url <url>` | connection string, `mysql://user:password@host:port/database`; default `$DATABASE_URL` |
 | `--database <name>` | the database to read; default the one in the URL |
 | `--out <file>` | output file; default stdout |
-| `--exclude <pattern>` | relation to leave out, where `*` matches anything; repeat it or comma-separate |
+| `--exclude <pattern>` | relation or stored function to leave out, where `*` matches anything; repeat it or comma-separate |
 | `--type-name <name>` | name of the interface, a TypeScript identifier; default `DB` |
 | `--import-from <module>` | where `Col`, `Enum` and `View` are imported from; default `@typesql/core/mysql` |
 | `--no-comments` | leave out the JSDoc (comments, generated and invisible columns) |
 
-The command connects with mysql2, or with the mariadb connector when mysql2 is not installed, and reads the tables and views of one database. On MariaDB, a `LONGTEXT` column with `CHECK (json_valid(…))` (what `JSON` creates) is `json`. From code, `@typesql/mysql/introspect` exports `introspect(client, { database, exclude })`, which takes a mysql2 or mariadb connection or pool, and `generateSource(result, { typeName, importFrom, comments })`.
+The command connects with mysql2, or with the mariadb connector when mysql2 is not installed, and reads the tables, views and stored functions of one database. A stored function is declared under [`$functions`](#functions) with its parameter and return types, and `nullable: true`, because it is called with NULL arguments too and can return NULL. On MariaDB, a `LONGTEXT` column with `CHECK (json_valid(…))` (what `JSON` creates) is `json`. From code, `@typesql/mysql/introspect` exports `introspect(client, { database, exclude, functionNotNull })`, which takes a mysql2 or mariadb connection or pool, and `generateSource(result, { typeName, importFrom, comments })`. `functionNotNull: (fn) => fn.name === "slugify"` names the stored functions that return NULL only for a NULL argument, which then leave out `nullable: true`.
 
 ## Types
 

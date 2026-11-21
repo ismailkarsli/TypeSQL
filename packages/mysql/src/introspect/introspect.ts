@@ -41,12 +41,28 @@ export interface IntrospectedRelation {
 	readonly columns: readonly IntrospectedColumn[];
 }
 
+/** A stored function. */
+export interface IntrospectedFunction {
+	readonly name: string;
+	/** The parameters' type names, as columns name them. */
+	readonly args: readonly string[];
+	readonly returns: string;
+	readonly comment: string | null;
+	/**
+	 * Can return NULL for arguments that aren't NULL: a stored function is
+	 * called with any arguments, unless `functionNotNull` names it.
+	 */
+	readonly nullable: boolean;
+}
+
 export interface IntrospectedDatabase {
 	/** `VERSION()`: `"8.4.3"`, `"11.8.2-MariaDB-ubu2404"`. */
 	readonly version: string;
 	readonly mariadb: boolean;
 	readonly database: string;
 	readonly relations: readonly IntrospectedRelation[];
+	/** The database's stored functions, without procedures. */
+	readonly functions?: readonly IntrospectedFunction[] | undefined;
 }
 
 export interface IntrospectOptions {
@@ -54,6 +70,10 @@ export interface IntrospectOptions {
 	readonly database?: string;
 	/** Relations to leave out, `*` matching any characters. */
 	readonly exclude?: readonly string[];
+	/** The stored functions that return NULL only when an argument is NULL. */
+	readonly functionNotNull?: (
+		fn: Omit<IntrospectedFunction, "nullable">,
+	) => boolean;
 }
 
 const INTEGERS = new Set(["tinyint", "smallint", "mediumint", "int", "bigint"]);
@@ -105,6 +125,19 @@ interface ColumnRow {
 	readonly comment: string | null;
 }
 
+interface RoutineRow {
+	readonly name: string;
+	readonly dataType: string;
+	readonly dtd: string;
+	readonly comment: string | null;
+}
+
+interface ParameterRow {
+	readonly fn: string;
+	readonly dataType: string;
+	readonly dtd: string;
+}
+
 interface CheckRow {
 	readonly tbl: string;
 	readonly clause: string;
@@ -154,6 +187,26 @@ const isColumnRow = (row: unknown): row is ColumnRow =>
 	isText(row.genExpr) &&
 	"comment" in row &&
 	isText(row.comment);
+
+const isRoutineRow = (row: unknown): row is RoutineRow =>
+	isObject(row) &&
+	"name" in row &&
+	typeof row.name === "string" &&
+	"dataType" in row &&
+	typeof row.dataType === "string" &&
+	"dtd" in row &&
+	typeof row.dtd === "string" &&
+	"comment" in row &&
+	isText(row.comment);
+
+const isParameterRow = (row: unknown): row is ParameterRow =>
+	isObject(row) &&
+	"fn" in row &&
+	typeof row.fn === "string" &&
+	"dataType" in row &&
+	typeof row.dataType === "string" &&
+	"dtd" in row &&
+	typeof row.dtd === "string";
 
 const isCheckRow = (row: unknown): row is CheckRow =>
 	isObject(row) &&
@@ -248,7 +301,37 @@ export async function introspect(
 			columns: (byTable.get(t.name) ?? []).map((c) => column(c, view)),
 		};
 	});
-	return { version, mariadb, database, relations };
+	const routines = (
+		await q(
+			isRoutineRow,
+			`SELECT ROUTINE_NAME AS name, DATA_TYPE AS dataType,
+              DTD_IDENTIFIER AS dtd, ROUTINE_COMMENT AS comment
+         FROM information_schema.ROUTINES
+        WHERE ROUTINE_SCHEMA = ? AND ROUTINE_TYPE = 'FUNCTION'
+        ORDER BY ROUTINE_NAME`,
+			[database],
+		)
+	).filter((r) => !excluded?.some((re) => re.test(r.name)));
+	const parameters = await q(
+		isParameterRow,
+		`SELECT SPECIFIC_NAME AS fn, DATA_TYPE AS dataType, DTD_IDENTIFIER AS dtd
+       FROM information_schema.PARAMETERS
+      WHERE SPECIFIC_SCHEMA = ? AND ROUTINE_TYPE = 'FUNCTION' AND ORDINAL_POSITION > 0
+      ORDER BY SPECIFIC_NAME, ORDINAL_POSITION`,
+		[database],
+	);
+	const functions = routines.map((r): IntrospectedFunction => {
+		const fn = {
+			name: r.name,
+			args: parameters
+				.filter((p) => p.fn === r.name)
+				.map((p) => normalizeType(p.dataType, p.dtd)),
+			returns: normalizeType(r.dataType, r.dtd),
+			comment: r.comment ? r.comment : null,
+		};
+		return { ...fn, nullable: !(options.functionNotNull?.(fn) ?? false) };
+	});
+	return { version, mariadb, database, relations, functions };
 
 	function column(c: ColumnRow, view: boolean): IntrospectedColumn {
 		const extra = c.extra ?? "";

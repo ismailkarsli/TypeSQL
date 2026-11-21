@@ -8,6 +8,7 @@ export {
 	colSource,
 	columnSource,
 	doc,
+	type FunctionSource,
 	globRegExp,
 	helperImport,
 	propertyKey,
