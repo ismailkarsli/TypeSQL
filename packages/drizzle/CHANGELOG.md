@@ -1,5 +1,12 @@
 # @typesql/drizzle
 
+## 9.2.1
+
+### Patch Changes
+
+- Updated dependencies:
+  - @typesql/core@9.2.1
+
 ## 9.2.0
 
 ### Patch Changes

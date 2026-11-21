@@ -1,5 +1,11 @@
 # @typesql/core
 
+## 9.2.1
+
+### Patch Changes
+
+- `schemaWriter` in `@typesql/core/adapter` writes a `$functions` member of `Sig` declarations.
+
 ## 9.2.0
 
 ### Minor Changes

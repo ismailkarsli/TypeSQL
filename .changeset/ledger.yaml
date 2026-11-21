@@ -565,6 +565,10 @@
   dir: packages/core
   intents:
     - silly-grapes-camp
+"@typesql/core@9.2.1":
+  dir: packages/core
+  intents:
+    - short-moons-type
 "@typesql/drizzle@0.0.2":
   dir: packages/drizzle
   intents:
@@ -917,6 +921,10 @@
   dir: packages/mysql
   intents:
     - breezy-clouds-explode
+"@typesql/mysql@9.2.1":
+  dir: packages/mysql
+  intents:
+    - great-bees-know
 "@typesql/pg@0.0.2":
   dir: packages/pg
   intents:
@@ -1059,6 +1067,10 @@
   dir: packages/pg
   intents:
     - funny-rice-yell
+"@typesql/pg@9.2.1":
+  dir: packages/pg
+  intents:
+    - vast-lions-wash
 "@typesql/postgres@0.0.2":
   dir: packages/postgres
   intents:

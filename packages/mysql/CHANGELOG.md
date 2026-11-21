@@ -1,5 +1,14 @@
 # @typesql/mysql
 
+## 9.2.1
+
+### Patch Changes
+
+- `typesql introspect` now declares the stored functions of a MySQL or MariaDB database under `$functions`, with their parameter and return types. They can return NULL for any arguments, unless `introspect()`'s new `functionNotNull` option names them.
+
+- Updated dependencies:
+  - @typesql/core@9.2.1
+
 ## 9.2.0
 
 ### Patch Changes
