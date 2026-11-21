@@ -31,6 +31,12 @@ dedupePeerDependents: false
 resolvePeersFromWorkspaceRoot: false
 minimumReleaseAgeExcludePrune: true
 overrides:
+  # Prisma config pins Effect 3.20.0, affected by GHSA-7589-6fvf-x4pw.
+  # Drop once Prisma config uses Effect >=3.22.1.
+  "@prisma/config>effect": 3.22.1
+  # Satori pins fflate 0.7.3; its font parser also accepts that version.
+  # Drop once both use a version patched for GHSA-px8p-9vwx-vf98.
+  "fflate@0.7.3": 0.7.5
   # VitePress 1 needs Vite 5; 5.4.21 has dev server advisories.
   # Drop once a stable VitePress uses Vite 6+.
   "vitepress>vite": 6.4.5
