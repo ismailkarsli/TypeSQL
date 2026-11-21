@@ -1,0 +1,3 @@
+interface:
+  display_name: "TypeSQL Update"
+  short_description: "Update TypeSQL dependencies and security fixes"
