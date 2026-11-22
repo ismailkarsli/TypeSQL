@@ -1,0 +1,26 @@
+{
+	"name": "kysely-stream",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"start": "node dist/app.js"
+	},
+	"dependencies": {
+		"@typesql/core": "workspace:*",
+		"@typesql/kysely": "workspace:*",
+		"kysely": "catalog:",
+		"pg": "catalog:",
+		"pg-cursor": "catalog:",
+		"@types/pg-cursor": "catalog:",
+		"@types/pg": "catalog:",
+		"better-sqlite3": "catalog:",
+		"@types/better-sqlite3": "catalog:"
+	},
+	"devDependencies": {
+		"typescript": "catalog:",
+		"@types/node": "catalog:"
+	},
+	"scenario": {
+		"database": "postgres"
+	}
+}

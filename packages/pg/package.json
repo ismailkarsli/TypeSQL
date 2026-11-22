@@ -39,11 +39,18 @@
 		"@typesql/core": "workspace:*"
 	},
 	"peerDependencies": {
-		"pg": ">=8"
+		"pg": ">=8",
+		"pg-cursor": ">=2"
+	},
+	"peerDependenciesMeta": {
+		"pg-cursor": {
+			"optional": true
+		}
 	},
 	"devDependencies": {
 		"@types/pg": "catalog:",
 		"pg": "catalog:",
+		"pg-cursor": "catalog:",
 		"tsrs": "catalog:",
 		"typescript": "catalog:"
 	},

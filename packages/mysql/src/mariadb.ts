@@ -18,6 +18,7 @@ import {
 import {
 	executor as executorOf,
 	driver as poolDriver,
+	type RowStream,
 	type Runner,
 } from "./pool.js";
 
@@ -27,11 +28,20 @@ export interface MariaDbQueryable {
 	execute(sql: string, values?: MySqlValue[]): Promise<MySqlResult>;
 }
 
+// A connection streams; a pool does not.
+const canStream = (
+	conn: MariaDbQueryable,
+): conn is MariaDbQueryable & {
+	queryStream(sql: string, values: MySqlValue[]): RowStream;
+} => "queryStream" in conn && typeof conn.queryStream === "function";
+
 const runner: Runner<MariaDbQueryable> = {
 	query: async (client, text, values) =>
 		mysqlResult(await client.query(text, values)),
 	execute: async (client, text, values) =>
 		mysqlResult(await client.execute(text, values)),
+	stream: (conn, text, values) =>
+		canStream(conn) ? conn.queryStream(text, values) : undefined,
 };
 
 const driver: SqlDriver<MariaDbQueryable> = poolDriver(runner, "mariadb");

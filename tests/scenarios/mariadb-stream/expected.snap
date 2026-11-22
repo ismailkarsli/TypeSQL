@@ -1,0 +1,53 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`mariadb-stream > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "onConnection": "{ rows: ({ id: number; name: string })[]; prepared: ({ name: string })[]; seen: number; afterBreak: { n: bigint }; updated: ({  })[]; failed: undefined | string; inTransaction: ({ id: number; name: string })[] }",
+      "onPool": "{ rows: ({ id: number; name: string })[]; prepared: ({ name: string })[]; seen: number; afterBreak: { n: bigint }; updated: ({  })[]; failed: undefined | string; inTransaction: ({ id: number; name: string })[] }",
+    },
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "{
+  onPool: {
+    rows: [
+      { id: 2, name: 'user 2' },
+      { id: 3, name: 'user 3' },
+      { id: 4, name: 'user 4' },
+      { id: 5, name: 'user 5' }
+    ],
+    prepared: [ { name: 'user 4' } ],
+    seen: 2,
+    afterBreak: { n: 5n },
+    updated: [],
+    failed: 'ER_DUP_ENTRY',
+    inTransaction: [ { id: 1, name: 'user 1' }, { id: 2, name: 'USER 2' } ]
+  },
+  onConnection: {
+    rows: [
+      { id: 2, name: 'USER 2' },
+      { id: 3, name: 'user 3' },
+      { id: 4, name: 'user 4' },
+      { id: 5, name: 'user 5' }
+    ],
+    prepared: [ { name: 'user 4' } ],
+    seen: 2,
+    afterBreak: { n: 5n },
+    updated: [],
+    failed: 'ER_DUP_ENTRY',
+    inTransaction: [ { id: 1, name: 'user 1' }, { id: 2, name: 'USER 2' } ]
+  }
+}
+",
+  },
+}
+`;

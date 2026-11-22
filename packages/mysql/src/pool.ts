@@ -18,6 +18,18 @@ export interface Runner<C> {
 		text: string,
 		values: MySqlValue[],
 	): Promise<ExecutorResult>;
+	/** Text protocol, rows as they arrive; `undefined` when `conn`, a connection, cannot stream. */
+	stream?(conn: C, text: string, values: MySqlValue[]): RowStream | undefined;
+}
+
+/** What `stream()` uses of a driver's Node.js Readable of rows. */
+export interface RowStream {
+	iterator(options: {
+		readonly destroyOnReturn: boolean;
+	}): AsyncIterable<unknown>;
+	destroy(): void;
+	/** The mariadb connector's: skips the rest of the rows, so that the connection is free again. */
+	close?(): void;
 }
 
 interface PoolLike<C> {
@@ -43,9 +55,77 @@ export function executor<C>(runner: Runner<C>, client: C): Executor {
 			const p = mysqlPositional(text ?? given, values);
 			return send(client, p.text, p.values.map(mysqlBind));
 		};
+	const stream = (
+		text: string,
+		values: readonly unknown[],
+		batchSize: number,
+	) => streamRows(runner, client, mysqlPositional(text, values), batchSize);
 	return Object.assign(run(runner.query), {
-		prepare: (text: string): Executor => run(runner.execute, text),
+		// A stream uses the text protocol, prepared or not.
+		prepare: (text: string): Executor =>
+			Object.assign(run(runner.execute, text), { stream }),
+		stream,
 	});
+}
+
+/** Rows of `p`, on a connection checked out of `client` when it is a pool. */
+async function* streamRows<C>(
+	runner: Runner<C>,
+	client: C,
+	p: { readonly text: string; readonly values: readonly unknown[] },
+	batchSize: number,
+): AsyncGenerator<unknown[]> {
+	const open = (conn: C) =>
+		runner.stream?.(conn, p.text, p.values.map(mysqlBind)) ??
+		fail("typesql: this MySQL client cannot stream rows");
+	if (!isPool(client)) return yield* batches(open(client), batchSize);
+	const conn = await client.getConnection();
+	if (!isCheckout(conn))
+		throw new Error(
+			"typesql: the pool's connection has no release(); stream() cannot return it to the pool",
+		);
+	try {
+		yield* batches(open(conn), batchSize);
+	} finally {
+		await conn.release();
+	}
+}
+
+const fail = (message: string): never => {
+	throw new Error(message);
+};
+
+// mysql2 streams the OK packet of a statement without rows.
+const isPacket = (row: unknown): row is { readonly affectedRows: unknown } =>
+	typeof row === "object" &&
+	row !== null &&
+	"affectedRows" in row &&
+	"insertId" in row;
+
+async function* batches(
+	rows: RowStream,
+	batchSize: number,
+): AsyncGenerator<unknown[]> {
+	let ended = false;
+	try {
+		let batch: unknown[] = [];
+		for await (const row of rows.iterator({ destroyOnReturn: false })) {
+			if (isPacket(row)) continue;
+			batch.push(row);
+			if (batch.length >= batchSize) {
+				yield batch;
+				batch = [];
+			}
+		}
+		ended = true;
+		if (batch.length) yield batch;
+	} finally {
+		// Stopped early: skip the rest of the rows; mysql2 does so on destroy().
+		if (!ended) {
+			rows.close?.();
+			rows.destroy();
+		}
+	}
 }
 
 const isPool = <C>(client: C): client is C & PoolLike<C> =>

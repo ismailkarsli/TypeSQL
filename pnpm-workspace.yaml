@@ -53,6 +53,8 @@ catalog:
   vite: 8.3.8
   pg: 8.23.1
   "@types/pg": 8.23.1
+  pg-cursor: 2.22.1
+  "@types/pg-cursor": 2.7.2
   postgres: 4.1.1
   kysely: 0.29.9
   drizzle-orm: 0.45.4

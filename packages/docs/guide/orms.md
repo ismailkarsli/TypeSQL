@@ -138,7 +138,7 @@ const sql = createTransactionalSql<Postgres, DB, DefaultTypeMap, KyselyExecutor>
 );
 ```
 
-Queries run through `db.withoutPlugins()`, so logging, the dialect and the pool apply, but result transformers such as `CamelCasePlugin` don't. Kysely's `PostgresDialect` runs on `pg`: for the exact `pg` types (`Buffer` for `bytea`, interval objects), use `createSql<DB, PgTypeMap>(postgresDialect, db)`.
+Queries run through `db.withoutPlugins()`, so logging, the dialect and the pool apply, but result transformers such as `CamelCasePlugin` don't. [`q.stream()`](./using-sql#streaming-rows) streams with Kysely's own query streaming: `PostgresDialect` needs its `cursor` option (`import Cursor from "pg-cursor"`) for it, or `stream()` rejects, and the MySQL and SQLite dialects read one row at a time. Kysely's `PostgresDialect` runs on `pg`: for the exact `pg` types (`Buffer` for `bytea`, interval objects), use `createSql<DB, PgTypeMap>(postgresDialect, db)`.
 
 ### Overrides
 
@@ -323,7 +323,7 @@ await db.transaction(async (tx) => {
 });
 ```
 
-Rows are what the driver returns: Drizzle's column mappers and logger are not involved. For PostgreSQL, only node-postgres and postgres.js databases are supported.
+Rows are what the driver returns: Drizzle's column mappers and logger are not involved. `stream()` rejects on Drizzle; use the driver's adapter to stream. For PostgreSQL, only node-postgres and postgres.js databases are supported.
 
 `drizzle-orm/postgres-js` turns off postgres.js' JSON, date and `numeric[]` serializers and parsers on its client. On that driver TypeSQL serializes `sql.json()` values, objects, `Date` parameters and arrays itself, and parses `date`, `timestamp` and `timestamptz` columns (and arrays of them, of any dimension) back to `Date` and `numeric[]` to arrays of strings, so rows match the default type map. A `timestamp` (without time zone) is read as UTC, as Drizzle's `timestamp()` does, so a `Date` comes back unchanged whatever the process time zone.
 
@@ -429,7 +429,7 @@ Only database defaults (`autoincrement()`, `now()`, `dbgenerated()`, literals) m
 
 ### Running queries
 
-`createSql<DB>(postgresDialect, prisma)` takes a `PrismaClient`, an extended client or a transaction client. Queries run with `$queryRawUnsafe` and `$executeRawUnsafe`; despite the names, values are always sent as bind parameters. `sql.transaction(fn)` runs in an interactive `prisma.$transaction(fn)`.
+`createSql<DB>(postgresDialect, prisma)` takes a `PrismaClient`, an extended client or a transaction client. Queries run with `$queryRawUnsafe` and `$executeRawUnsafe`; despite the names, values are always sent as bind parameters. `sql.transaction(fn)` runs in an interactive `prisma.$transaction(fn)`. Prisma can't stream rows, so `stream()` rejects.
 
 Rows are typed with what `$queryRaw` returns: `int8` (so `count(*)`) is `bigint`, `numeric` is `Decimal`, and dates are `Date` (full table in [Type mapping](../reference/type-mapping#prisma)). Prisma rejects some types (`interval`, geometric types, ranges), so cast them in SQL (`duration::text`). To run queries on another driver, use that driver's `createSql<DB>(client)` with the generated `DB`.
 

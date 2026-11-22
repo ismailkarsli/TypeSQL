@@ -1,0 +1,62 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`sqlite-stream > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "betterSqlite3": "{ rows: ({ id: number; name: string })[]; preparedRows: ({ name: string })[]; seen: number; afterBreak: { n: number }; inserted: ({  })[]; returning: ({ id: number; name: string })[]; inTransaction: ({ id: number })[]; during: string }",
+      "nodeSqlite": "{ rows: ({ id: number; name: string })[]; preparedRows: ({ name: string })[]; seen: number; afterBreak: { n: number }; inserted: ({  })[]; returning: ({ id: number; name: string })[]; inTransaction: ({ id: number })[]; during: string }",
+    },
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "{
+  betterSqlite3: {
+    rows: [
+      { id: 2, name: 'user 2' },
+      { id: 3, name: 'user 3' },
+      { id: 4, name: 'user 4' },
+      { id: 5, name: 'user 5' }
+    ],
+    preparedRows: [ { name: 'user 4' }, { name: 'user 5' } ],
+    seen: 2,
+    afterBreak: { n: 5 },
+    inserted: [],
+    returning: [ { id: 7, name: 'user 7' } ],
+    inTransaction: [ { id: 1 }, { id: 2 }, { id: 3 } ],
+    during: 'resolved'
+  },
+  nodeSqlite: {
+    rows: [
+      [Object: null prototype] { id: 2, name: 'user 2' },
+      [Object: null prototype] { id: 3, name: 'user 3' },
+      [Object: null prototype] { id: 4, name: 'user 4' },
+      [Object: null prototype] { id: 5, name: 'user 5' }
+    ],
+    preparedRows: [
+      [Object: null prototype] { name: 'user 4' },
+      [Object: null prototype] { name: 'user 5' }
+    ],
+    seen: 2,
+    afterBreak: [Object: null prototype] { n: 5 },
+    inserted: [],
+    returning: [ [Object: null prototype] { id: 7, name: 'user 7' } ],
+    inTransaction: [
+      [Object: null prototype] { id: 1 },
+      [Object: null prototype] { id: 2 },
+      [Object: null prototype] { id: 3 }
+    ],
+    during: 'resolved'
+  }
+}
+",
+  },
+}
+`;

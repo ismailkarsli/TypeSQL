@@ -10,6 +10,8 @@ import {
 export interface SqliteStatement {
 	all(...params: unknown[]): unknown[];
 	run(...params: unknown[]): { readonly changes: number | bigint };
+	/** The rows one at a time; `stream()` needs it. */
+	iterate?(...params: unknown[]): Iterator<unknown>;
 }
 
 export interface SqliteDatabase {
@@ -93,13 +95,54 @@ export function executor(
 		{
 			prepare: (text: string): Executor => {
 				let p: Prepared | undefined;
-				return async (_text, values) => {
-					p ??= prepared(db, text, bigint);
-					return run(p, values);
-				};
+				const once = () => (p ??= prepared(db, text, bigint));
+				return Object.assign(
+					async (_text: string, values: readonly unknown[]) =>
+						run(once(), values),
+					{
+						stream: (
+							_text: string,
+							values: readonly unknown[],
+							batchSize: number,
+						) => streamRows(once(), values, batchSize),
+					},
+				);
 			},
+			stream: (text: string, values: readonly unknown[], batchSize: number) =>
+				streamRows(prepared(db, text, bigint), values, batchSize),
 		},
 	);
+}
+
+// Rows are read as the caller asks for them; the statement stays busy until
+// the last row or until the caller stops.
+async function* streamRows(
+	p: Prepared,
+	values: readonly unknown[],
+	batchSize: number,
+): AsyncGenerator<unknown[]> {
+	const args = bind(p, values);
+	if (!p.reader) {
+		p.stmt.run(...args);
+		return;
+	}
+	if (!p.stmt.iterate)
+		throw new Error("typesql: this SQLite driver cannot stream rows");
+	const rows = p.stmt.iterate(...args);
+	let batch: unknown[] = [];
+	try {
+		for (let r = rows.next(); !r.done; r = rows.next()) {
+			batch.push(r.value);
+			if (batch.length >= batchSize) {
+				yield batch;
+				batch = [];
+			}
+		}
+	} finally {
+		// Ending early resets the statement.
+		rows.return?.();
+	}
+	if (batch.length) yield batch;
 }
 
 function run(p: Prepared, values: readonly unknown[]) {

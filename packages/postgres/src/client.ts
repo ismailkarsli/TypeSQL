@@ -5,12 +5,19 @@ export type PostgresJsRows = readonly unknown[] & {
 	readonly count: number | null;
 };
 
+type Options = { readonly prepare: boolean; readonly simple: boolean };
+
+/** A postgres.js query, which runs when awaited or when `cursor()` starts it. */
+type PostgresJsPending = PromiseLike<PostgresJsRows> & {
+	readonly cursor?: (rows: number) => AsyncIterable<readonly unknown[]>;
+};
+
 export interface PostgresJsQueryable {
 	unsafe(
 		query: string,
 		parameters?: unknown[],
-		options?: { readonly prepare: boolean; readonly simple: boolean },
-	): PromiseLike<PostgresJsRows>;
+		options?: Options,
+	): PostgresJsPending;
 }
 
 export interface PostgresJsTransactable<
@@ -43,19 +50,31 @@ const isReserved = (
 ): sql is PostgresJsQueryable & PostgresJsReserved =>
 	"release" in sql && typeof sql.release === "function";
 
+const PREPARE: Options = { prepare: true, simple: false };
+// A cursor needs the extended protocol, which a query without parameters
+// would not use.
+const UNPREPARED: Options = { prepare: false, simple: false };
+
 export function executor(sql: PostgresJsQueryable): Executor {
-	const run: Executor = async (text, values) => {
-		const result = await sql.unsafe(text, Array.from(values));
-		return { rows: Array.from(result), rowCount: result.count ?? null };
-	};
-	return Object.assign(run, {
-		prepare: (): Executor => async (text, values) => {
-			const result = await sql.unsafe(text, Array.from(values), {
-				prepare: true,
-				simple: false,
-			});
+	const runner =
+		(options?: Options): Executor =>
+		async (text, values) => {
+			const result = await sql.unsafe(text, Array.from(values), options);
 			return { rows: Array.from(result), rowCount: result.count ?? null };
-		},
+		};
+	// postgres.js reserves a connection of a Sql for the cursor.
+	const stream =
+		(options: Options) =>
+		(text: string, values: readonly unknown[], batchSize: number) => {
+			const query = sql.unsafe(text, Array.from(values), options);
+			if (!query.cursor)
+				throw new Error("typesql: this postgres.js client cannot stream rows");
+			return query.cursor(batchSize);
+		};
+	return Object.assign(runner(), {
+		prepare: (): Executor =>
+			Object.assign(runner(PREPARE), { stream: stream(PREPARE) }),
+		stream: stream(UNPREPARED),
 	});
 }
 
