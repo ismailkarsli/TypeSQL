@@ -161,8 +161,9 @@ sql.dialect; // "postgres"
 | `q.execOneOrNone(executor?)` | `Promise<Row \| undefined>`; rejects with `TooManyRowsError` on more than one row |
 | `q.execTakeFirst(executor?)`, `q.execTakeFirstOrNone(executor?)` | deprecated: the first row, ignoring the rest; use `execOne`, `execOneOrNone` or `(await q.exec())[0]` |
 | `q.execCount(executor?)` | `Promise<number>`: rows affected by `INSERT` / `UPDATE` / `DELETE` / `MERGE`, rows returned by `SELECT`, 0 for DDL |
+| `q.stream({ batchSize? })` | `AsyncIterableIterator<Row>`: the rows, read `batchSize` (default 1) at a time on the bound executor; rejects when it has no `stream`. See [Streaming rows](../guide/using-sql#streaming-rows) |
 
-The methods run on the executor passed to the call, or else on the one `createSql` bound. Without either, they reject. They are non-enumerable, so a query still deep-equals `{ text, values }`.
+The methods run on the executor passed to the call, or else on the one `createSql` bound. Without either, they reject. `stream()` takes no executor: it runs on the bound one. They are non-enumerable, so a query still deep-equals `{ text, values }`.
 
 Every adapter reports the row count for `execCount`: SQLite uses the changed-row count or the number of returned rows; the others use `rowCount` (`pg`), `count` (postgres.js), `affectedRows` or the number of rows (`@typesql/mysql`), `numAffectedRows` or the number of rows (Kysely), `$executeRawUnsafe` (Prisma), and for Drizzle the count of the driver underneath.
 
@@ -173,6 +174,8 @@ type Executor = ((text: string, values: readonly unknown[]) =>
   PromiseLike<readonly unknown[] | ExecutorResult>) & {
   readonly prepare?: (text: string) => Executor;
   readonly count?: (text: string, values: readonly unknown[]) => PromiseLike<number>;
+  readonly stream?: (text: string, values: readonly unknown[], batchSize: number) =>
+    AsyncIterable<readonly unknown[]>;
 };
 type ExecutorResult = { readonly rows: readonly unknown[]; readonly rowCount: number | null };
 ```
@@ -180,6 +183,7 @@ type ExecutorResult = { readonly rows: readonly unknown[]; readonly rowCount: nu
 - Each adapter exports `executor(client)`. On a SQLite or MySQL client (Kysely's SQLite and MySQL dialects, Prisma with the `sqlite` or `mysql` provider, a Drizzle SQLite or MySQL database), it uses `?` placeholders without being told; `executor(client, { dialect })` states the dialect for Kysely and Prisma.
 - `rowCount: null` means no count, read as 0.
 - An executor that returns only rows works for everything but `execCount`, unless it has a `count(text, values)` method.
+- An optional `stream(text, values, batchSize)` yields the rows in batches of at most `batchSize` for `q.stream()`, which stops it with `return()` when the caller leaves the loop early.
 - An optional `prepare(text): Executor` creates an executor for server preparation. It must defer database work until execution. `sql.prepare` calls it once with the final SQL text and binds all resulting queries to that executor, including its `count` method.
 
 See [Custom executor](../adapters/custom-executor).

@@ -32,6 +32,7 @@ const posts = await sql(
 - `sql.json(value)` is sent as JSON text and a `Uint8Array` as binary. mysql2 writes a `Date` in the time zone of its `timezone` option.
 - On MariaDB, pass `{ dialect: "mariadb" }`, which checks statements against MariaDB's SQL (see [Differences between the servers](#differences-between-the-servers)): `createSql<DB>(pool, { dialect: "mariadb" })`.
 - Attach [`CasePlugin`](../guide/case-plugin) for camelCase keys.
+- [`q.stream()`](../guide/using-sql#streaming-rows) reads rows with mysql2's `query().stream()` or the mariadb connector's `queryStream()`, on the text protocol (queries from `sql.prepare` too). On a pool, the stream checks out a connection and releases it when the stream ends; leaving the loop early skips the rest of the rows. The HTTP drivers below can't stream, so there `stream()` rejects.
 
 ### The mariadb connector
 

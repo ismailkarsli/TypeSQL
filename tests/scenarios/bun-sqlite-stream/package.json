@@ -1,0 +1,21 @@
+{
+	"name": "bun-sqlite-stream",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"start": "bun dist/app.js"
+	},
+	"dependencies": {
+		"@typesql/core": "workspace:*",
+		"@typesql/sqlite": "workspace:*",
+		"@types/bun": "catalog:"
+	},
+	"devDependencies": {
+		"bun": "catalog:",
+		"typescript": "catalog:",
+		"@types/node": "catalog:"
+	},
+	"scenario": {
+		"database": "sqlite"
+	}
+}

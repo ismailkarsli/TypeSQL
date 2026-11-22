@@ -73,6 +73,22 @@ const changed = await db(
 - Return the rows alone when you have no count. Everything except `execCount()` works; `execCount()` rejects.
 - Or give the executor a `count(text, values)` method that resolves to a number. `execCount()` then calls it instead. `@typesql/prisma` does this with `$executeRawUnsafe`.
 
+For [`stream()`](../guide/using-sql#streaming-rows), give the executor a `stream(text, values, batchSize)` method that returns an async iterable of row arrays, at most `batchSize` rows each. `stream()` applies output plugins to each batch and calls the iterator's `return()` when the caller stops early, so close the driver's cursor in a `finally`:
+
+```ts
+const streaming: Executor = Object.assign(onPool, {
+	stream: async function* (text: string, values: readonly unknown[], batchSize: number) {
+		const cursor = openCursor(text, values);
+		try {
+			for (let rows = await cursor.read(batchSize); rows.length; rows = await cursor.read(batchSize))
+				yield rows;
+		} finally {
+			await cursor.close();
+		}
+	},
+});
+```
+
 A wrapper around an adapter's executor can return its result unchanged, so the count keeps working. For example, to log how long each query takes:
 
 ```ts

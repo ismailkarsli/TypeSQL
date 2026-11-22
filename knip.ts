@@ -45,6 +45,12 @@ export default {
 			entry: [...entries("packages/core"), "examples/*.ts"],
 			project: ["src/**/*.ts!", "examples/**/*.ts"],
 		},
+		"packages/pg": {
+			entry: entries("packages/pg"),
+			project: ["src/**/*.ts!"],
+			// stream() imports it by a variable name; scenarios resolve it from here.
+			ignoreDependencies: ["pg-cursor"],
+		},
 		"packages/vscode": {
 			project: ["src/**/*.{ts,mts}!", "scripts/*.mts"],
 			ignoreDependencies: ["ovsx"],

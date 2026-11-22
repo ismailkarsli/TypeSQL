@@ -1,0 +1,49 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`pg-stream > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "camel": "({ displayName: string; id: number })[]",
+      "enums": "({ mood: "happy" | "sad" })[]",
+      "looked": "({ moods: ("happy" | "sad")[] })[]",
+      "moods": "({ id: number; moods: ("happy" | "sad")[] })[]",
+      "rows": "({ display_name: string; id: number; mood: "happy" | "sad" })[]",
+      "updated": "({ display_name: string; id: number })[]",
+    },
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "{
+  rows: [
+    { id: 2, display_name: 'user 2', mood: 'happy' },
+    { id: 3, display_name: 'user 3', mood: 'sad' },
+    { id: 4, display_name: 'user 4', mood: 'happy' },
+    { id: 5, display_name: 'user 5', mood: 'sad' }
+  ],
+  moods: [ { id: 1, moods: [ 'sad' ] }, { id: 2, moods: [ 'happy' ] } ],
+  camel: [ { id: 3, displayName: 'user 3' } ],
+  updated: [
+    { id: 1, display_name: 'USER 1' },
+    { id: 2, display_name: 'USER 2' }
+  ],
+  afterBreak: { seen: 2, total: 2, idle: 2 },
+  failed: 'division by zero',
+  afterFailure: { total: 1, idle: 1 },
+  inTransaction: [ { id: 1 }, { id: 2 }, { id: 3 } ],
+  afterEnd: 'typesql: this transaction has ended; run later queries on the sql that started it',
+  lookup: 'typesql: stream() cannot look up the array type of column "moods" while its cursor holds the connection; stream on a pg Pool, or run a query that returns the column with exec() on this connection first',
+  looked: [ { moods: [ 'happy', 'sad' ] } ],
+  enums: [ { mood: 'sad' }, { mood: 'happy' }, { mood: 'sad' } ]
+}
+",
+  },
+}
+`;

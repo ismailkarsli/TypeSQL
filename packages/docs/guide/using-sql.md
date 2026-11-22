@@ -49,6 +49,7 @@ const rows = await query.exec();
 | `execOne()` | the only row; throws `NoResultError` on none and `TooManyRowsError` on more than one |
 | `execOneOrNone()` | the only row, or `undefined`; throws `TooManyRowsError` on more than one |
 | `execCount()` | the number of affected or returned rows |
+| `stream()` | the rows one at a time, read in batches; see [Streaming rows](#streaming-rows) |
 
 A wrong table, column or type is a compile error on the SQL string; see [Errors](./errors).
 
@@ -298,6 +299,22 @@ When the SQL is only known at runtime (`sql.raw`), use `sql.as<Row>(…)` and st
 declare const columns: string;
 const dynamic = sql.as<{ [column: string]: unknown }>(`SELECT ${sql.raw(columns)} FROM users`);
 ```
+
+## Streaming rows
+
+`stream()` reads a large result a batch at a time instead of all at once. Iterate it with `for await`:
+
+```ts
+const users = sql("SELECT id, email FROM users").stream({ batchSize: 500 });
+for await (const user of users) {
+	await notify(user.email);
+}
+```
+
+- `batchSize` (default 1) is how many rows are read from the database at a time. Each row is typed as in `exec()`, and output plugins apply to it.
+- Leaving the loop with `break`, `return` or a `throw` stops the query and frees the connection. On a pool, the stream holds a connection of its own until it ends.
+- In a transaction, finish or leave the loop before `fn` returns: an open stream keeps the connection busy, so the transaction can't commit.
+- The node-postgres (with `pg-cursor` installed), postgres.js, SQLite, mysql2 and mariadb adapters stream, and so does Kysely; see each adapter's page. Everywhere else (PlanetScale, TiDB Cloud, Drizzle, Prisma, an executor without `stream`), `stream()` rejects: use `exec()`. With `@typesql/effect`, `stream()` returns an Effect `Stream`.
 
 ## Transactions
 

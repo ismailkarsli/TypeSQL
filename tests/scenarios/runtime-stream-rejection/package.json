@@ -1,0 +1,15 @@
+{
+	"name": "runtime-stream-rejection",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"start": "node dist/app.js"
+	},
+	"dependencies": {
+		"@typesql/core": "workspace:*"
+	},
+	"devDependencies": {
+		"typescript": "catalog:",
+		"@types/node": "catalog:"
+	}
+}

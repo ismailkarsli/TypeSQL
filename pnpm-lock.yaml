@@ -224,6 +224,9 @@ catalogs:
     '@types/pg':
       specifier: 8.23.1
       version: 8.23.1
+    '@types/pg-cursor':
+      specifier: 2.7.2
+      version: 2.7.2
     '@vscode/vsce':
       specifier: 4.1.1
       version: 4.1.1
@@ -275,6 +278,9 @@ catalogs:
     pg:
       specifier: 8.23.1
       version: 8.23.1
+    pg-cursor:
+      specifier: 2.22.1
+      version: 2.22.1
     postgres:
       specifier: 4.1.1
       version: 4.1.1
@@ -561,6 +567,9 @@ importers:
       pg:
         specifier: 'catalog:'
         version: 8.23.1
+      pg-cursor:
+        specifier: 'catalog:'
+        version: 2.22.1(pg@8.23.1)
       tsrs:
         specifier: 'catalog:'
         version: 7.1.0-beta.tsrs3
@@ -871,6 +880,28 @@ importers:
         version: 7.1.0-beta
 
   tests/scenarios/bun-sqlite:
+    dependencies:
+      '@types/bun':
+        specifier: 'catalog:'
+        version: 1.4.5
+      '@typesql/core':
+        specifier: workspace:*
+        version: link:../../../packages/core
+      '@typesql/sqlite':
+        specifier: workspace:*
+        version: link:../../../packages/sqlite
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.6.6
+      bun:
+        specifier: 'catalog:'
+        version: runtime:1.4.5
+      typescript:
+        specifier: 'catalog:'
+        version: 7.1.0-beta
+
+  tests/scenarios/bun-sqlite-stream:
     dependencies:
       '@types/bun':
         specifier: 'catalog:'
@@ -1758,6 +1789,43 @@ importers:
         specifier: 'catalog:'
         version: 7.1.0-beta
 
+  tests/scenarios/kysely-stream:
+    dependencies:
+      '@types/better-sqlite3':
+        specifier: 'catalog:'
+        version: 9.6.0
+      '@types/pg':
+        specifier: 'catalog:'
+        version: 8.23.1
+      '@types/pg-cursor':
+        specifier: 'catalog:'
+        version: 2.7.2
+      '@typesql/core':
+        specifier: workspace:*
+        version: link:../../../packages/core
+      '@typesql/kysely':
+        specifier: workspace:*
+        version: link:../../../packages/kysely
+      better-sqlite3:
+        specifier: 'catalog:'
+        version: 13.2.0
+      kysely:
+        specifier: 'catalog:'
+        version: 0.29.9
+      pg:
+        specifier: 'catalog:'
+        version: 8.23.1
+      pg-cursor:
+        specifier: 'catalog:'
+        version: 2.22.1(pg@8.23.1)
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.6.6
+      typescript:
+        specifier: 'catalog:'
+        version: 7.1.0-beta
+
   tests/scenarios/language-server-completion-statements:
     dependencies:
       '@typesql/core':
@@ -1845,6 +1913,25 @@ importers:
       mysql2:
         specifier: 'catalog:'
         version: 3.24.6(@types/node@26.6.6)
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.6.6
+      typescript:
+        specifier: 'catalog:'
+        version: 7.1.0-beta
+
+  tests/scenarios/mariadb-stream:
+    dependencies:
+      '@typesql/core':
+        specifier: workspace:*
+        version: link:../../../packages/core
+      '@typesql/mysql':
+        specifier: workspace:*
+        version: link:../../../packages/mysql
+      mariadb:
+        specifier: 'catalog:'
+        version: 3.5.5
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -2378,6 +2465,25 @@ importers:
         version: 7.1.0-beta
 
   tests/scenarios/mysql-serverless-literals:
+    dependencies:
+      '@typesql/core':
+        specifier: workspace:*
+        version: link:../../../packages/core
+      '@typesql/mysql':
+        specifier: workspace:*
+        version: link:../../../packages/mysql
+      mysql2:
+        specifier: 'catalog:'
+        version: 3.24.6(@types/node@26.6.6)
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.6.6
+      typescript:
+        specifier: 'catalog:'
+        version: 7.1.0-beta
+
+  tests/scenarios/mysql-stream:
     dependencies:
       '@typesql/core':
         specifier: workspace:*
@@ -3304,6 +3410,31 @@ importers:
         specifier: 'catalog:'
         version: 7.1.0-beta
 
+  tests/scenarios/pg-stream:
+    dependencies:
+      '@types/pg':
+        specifier: 'catalog:'
+        version: 8.23.1
+      '@typesql/core':
+        specifier: workspace:*
+        version: link:../../../packages/core
+      '@typesql/pg':
+        specifier: workspace:*
+        version: link:../../../packages/pg
+      pg:
+        specifier: 'catalog:'
+        version: 8.23.1
+      pg-cursor:
+        specifier: 'catalog:'
+        version: 2.22.1(pg@8.23.1)
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.6.6
+      typescript:
+        specifier: 'catalog:'
+        version: 7.1.0-beta
+
   tests/scenarios/pg-text-types:
     dependencies:
       '@types/pg':
@@ -3415,6 +3546,25 @@ importers:
         version: 7.1.0-beta
 
   tests/scenarios/postgresjs-reserved-overlapping-transactions:
+    dependencies:
+      '@typesql/core':
+        specifier: workspace:*
+        version: link:../../../packages/core
+      '@typesql/postgres':
+        specifier: workspace:*
+        version: link:../../../packages/postgres
+      postgres:
+        specifier: 'catalog:'
+        version: 4.1.1
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.6.6
+      typescript:
+        specifier: 'catalog:'
+        version: 7.1.0-beta
+
+  tests/scenarios/postgresjs-stream:
     dependencies:
       '@typesql/core':
         specifier: workspace:*
@@ -3581,6 +3731,19 @@ importers:
         version: 7.1.0-beta
 
   tests/scenarios/runtime-no-executor:
+    dependencies:
+      '@typesql/core':
+        specifier: workspace:*
+        version: link:../../../packages/core
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.6.6
+      typescript:
+        specifier: 'catalog:'
+        version: 7.1.0-beta
+
+  tests/scenarios/runtime-stream-rejection:
     dependencies:
       '@typesql/core':
         specifier: workspace:*
@@ -3853,6 +4016,28 @@ importers:
       '@typesql/sqlite':
         specifier: workspace:*
         version: link:../../../packages/sqlite
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.6.6
+      typescript:
+        specifier: 'catalog:'
+        version: 7.1.0-beta
+
+  tests/scenarios/sqlite-stream:
+    dependencies:
+      '@types/better-sqlite3':
+        specifier: 'catalog:'
+        version: 9.6.0
+      '@typesql/core':
+        specifier: workspace:*
+        version: link:../../../packages/core
+      '@typesql/sqlite':
+        specifier: workspace:*
+        version: link:../../../packages/sqlite
+      better-sqlite3:
+        specifier: 'catalog:'
+        version: 13.2.0
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -6090,6 +6275,9 @@ packages:
   '@types/node@26.6.6':
     resolution: {integrity: sha512-MzQj+8Kx3XI40OmUAE6Qoh58ZMNstNNMwn2nfd3qWsfe7nDNSqJNzes4njhz6AHwrSHOffSLwXU6yb474Q4aog==}
 
+  '@types/pg-cursor@2.7.2':
+    resolution: {integrity: sha512-m3xT8bVFCvx98LuzbvXyuCdT/Hjdd/v8ml4jL4K1QF70Y8clOfCFdgoaEB1FWdcSwcpoFYZTJQaMD9/GQ27efQ==}
+
   '@types/pg@8.23.1':
     resolution: {integrity: sha512-fKVHpikPdg4GKks3JuLEhvwSyvwzF23hnabPy6DD8ljVbC7+6J5dQzdv4arV6jqq57djnMgs1HKBxX4P8aBI3A==}
 
@@ -7785,6 +7973,11 @@ packages:
 
   pg-connection-string@2.14.1:
     resolution: {integrity: sha512-qR3kGNPBLpCNtz0evbKA0Y/MRFXwSSdT+pTJvYp/bXTcReZbvX1kzF0IyTc1QnxqF7AZbOeBhNL8R5mYQZV/MA==}
+
+  pg-cursor@2.22.1:
+    resolution: {integrity: sha512-X10ldv3wwBONQkOSwgWEbaEITMGLd92V2Zd+xsFPhDt3nhhU3hpAT08SERBChnIFmomczLax6lKXLJrHPPXfxA==}
+    peerDependencies:
+      pg: ^8
 
   pg-int8@1.0.1:
     resolution: {integrity: sha512-WCtabS6t3c8SkpDBUlb1kjOs7l66xsGdKpIPZsg4wR+B3+u9UAum2odSsF9tnvxg80h4ZxLWMy4pRjOsFIqQpw==}
@@ -10168,6 +10361,11 @@ snapshots:
     dependencies:
       undici-types: 8.9.0
 
+  '@types/pg-cursor@2.7.2':
+    dependencies:
+      '@types/node': 26.6.6
+      '@types/pg': 8.23.1
+
   '@types/pg@8.23.1':
     dependencies:
       '@types/node': 26.6.6
@@ -11758,6 +11956,10 @@ snapshots:
     optional: true
 
   pg-connection-string@2.14.1: {}
+
+  pg-cursor@2.22.1(pg@8.23.1):
+    dependencies:
+      pg: 8.23.1
 
   pg-int8@1.0.1: {}
 

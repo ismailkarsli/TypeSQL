@@ -42,6 +42,7 @@ export {
 	type ROW,
 	type RowType,
 	type StatementObject,
+	type StreamOptions,
 	type TEXT,
 	type TextType,
 	TooManyRowsError,

@@ -21,7 +21,18 @@ export type Executor = ((
 		text: string,
 		values: readonly unknown[],
 	) => PromiseLike<number>;
+	/** The rows in batches of at most `batchSize`, for `stream()`; ending the iteration early stops the query. */
+	readonly stream?: (
+		text: string,
+		values: readonly unknown[],
+		batchSize: number,
+	) => AsyncIterable<readonly unknown[]>;
 };
+
+export interface StreamOptions {
+	/** How many rows to fetch from the database at a time (default 1). */
+	readonly batchSize?: number;
+}
 
 /** The object part of a `Query`: what a query is besides its string brand. */
 export interface QueryObject<
@@ -44,6 +55,8 @@ export interface QueryObject<
 	/** @deprecated Use `execOne()`, which rejects more than one row, or `(await q.exec())[0]`. */
 	execTakeFirst(executor?: Executor): Promise<Row>;
 	execCount(executor?: Executor): Promise<number>;
+	/** The rows one at a time, fetched `batchSize` at a time; rejects when the executor cannot stream. */
+	stream(options?: StreamOptions): AsyncIterableIterator<Row>;
 }
 
 /** The object part of a `Fragment`: what a fragment is besides its string brand. */
@@ -189,6 +202,12 @@ export class SqlQuery extends SqlStatement {
 		return "rowCount" in result && result.rowCount !== undefined
 			? (result.rowCount ?? 0)
 			: fail("executor gave no rowCount");
+	}
+	async *stream({ batchSize = 1 }: StreamOptions = {}) {
+		const stream =
+			this.#pick().stream ?? fail("this executor cannot stream rows");
+		for await (const rows of stream(this.text, this.values, batchSize))
+			yield* mapRows(this, rows);
 	}
 }
 

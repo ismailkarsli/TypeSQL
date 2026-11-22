@@ -12,12 +12,20 @@ import {
 	CompiledQuery,
 	MysqlAdapter,
 	type QueryResult,
+	SelectQueryNode,
 	SqliteAdapter,
 } from "kysely";
 
 export interface KyselyExecutor {
 	withoutPlugins(): {
 		executeQuery<R>(query: CompiledQuery<R>): Promise<QueryResult<R>>;
+		/** A Kysely instance's or a transaction's; `stream()` needs it. */
+		getExecutor?(): {
+			stream<R>(
+				query: CompiledQuery<R>,
+				chunkSize: number,
+			): AsyncIterable<QueryResult<R>>;
+		};
 	};
 	transaction(): {
 		execute<T>(fn: (trx: KyselyExecutor) => Promise<T>): Promise<T>;
@@ -100,13 +108,40 @@ export function executor(
 	db: KyselyExecutor,
 	options: { readonly dialect?: DialectFamily | "mariadb" } = {},
 ): Executor {
-	const compile = compileFor(
-		options.dialect ? dialectFamily(options.dialect) : dialectOf(db),
+	const family = options.dialect
+		? dialectFamily(options.dialect)
+		: dialectOf(db);
+	const compile = compileFor(family);
+	return Object.assign(
+		async (text: string, values: readonly unknown[]) => {
+			const result = await run<unknown>(db, text, values, compile);
+			return { rows: result.rows, rowCount: rowCount(result) };
+		},
+		{
+			stream: (text: string, values: readonly unknown[], batchSize: number) =>
+				streamRows(db, compile(text, values), batchSize, family),
+		},
 	);
-	return async (text, values) => {
-		const result = await run<unknown>(db, text, values, compile);
-		return { rows: result.rows, rowCount: rowCount(result) };
-	};
+}
+
+// Kysely checks out a connection for the stream and its dialect reads the
+// rows: PostgresDialect needs its `cursor` option for that.
+async function* streamRows(
+	db: KyselyExecutor,
+	q: PositionalStatement,
+	batchSize: number,
+	family: DialectFamily,
+): AsyncGenerator<unknown[]> {
+	const executor = db.withoutPlugins().getExecutor?.();
+	if (!executor)
+		throw new Error("typesql: this Kysely executor cannot stream rows");
+	const raw = CompiledQuery.raw(q.text, q.values);
+	// SqliteDialect streams only what its node says is a SELECT; it reads the
+	// node for nothing else, and the rows come from the statement either way.
+	const query =
+		family === "sqlite" ? { ...raw, query: SelectQueryNode.create() } : raw;
+	for await (const result of executor.stream(query, batchSize))
+		yield result.rows;
 }
 
 // A Kysely transaction (`trx`, or one the user passed) gets a savepoint.

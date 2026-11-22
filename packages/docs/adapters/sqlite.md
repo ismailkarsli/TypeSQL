@@ -27,6 +27,7 @@ const posts = await sql(
 - `true` / `false` are sent as `1` / `0`, and a `Date` throws; pass `date.toISOString()` instead.
 - bun:sqlite binds whole numbers as INTEGER and the others as REAL, so pass a `bigint` where integer arithmetic matters.
 - Attach [`CasePlugin`](../guide/case-plugin) for camelCase keys.
+- [`q.stream()`](../guide/using-sql#streaming-rows) reads rows with the statement's `iterate()`, one batch each time the loop asks for more. A statement that returns no rows runs and yields none.
 
 ## Schema
 

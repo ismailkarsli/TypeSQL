@@ -1,0 +1,38 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`postgresjs-stream > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "all": "({ n: string })[]",
+      "prepared": "({ name: string })[]",
+      "rows": "({ id: number; name: string })[]",
+    },
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "{
+  rows: [
+    { id: 2, name: 'user 2' },
+    { id: 3, name: 'user 3' },
+    { id: 4, name: 'user 4' },
+    { id: 5, name: 'user 5' }
+  ],
+  all: [ { n: '5' } ],
+  prepared: [ { name: 'user 4' } ],
+  seen: 2,
+  afterBreak: { n: '5' },
+  failed: 'division by zero',
+  inTransaction: [ { id: 1 }, { id: 2 }, { id: 3 } ]
+}
+",
+  },
+}
+`;

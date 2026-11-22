@@ -118,6 +118,19 @@ const changed = await sql(
 
 With postgres.js, `exec()` returns a plain array, without postgres.js' result metadata (`count`, `command`, `columns`).
 
+### Streaming rows
+
+[`q.stream()`](../guide/using-sql#streaming-rows) reads rows through a cursor, so a script of several statements can't stream.
+
+- **node-postgres:** install `pg-cursor` next to `pg`; `stream()` loads it the first time it runs, and rejects without it. On a `Pool` it checks out a client for the stream and releases it when the stream ends, with the error if the statement failed, as `pool.query()` does. Arrays of enums, domains and extension types are parsed after a lookup on the pool, so give the pool at least two connections. On a `Client` (or a `PoolClient` you pass yourself), the cursor holds the connection, so `stream()` rejects a column that is an array of such a type until an `exec()` on that connection has returned it once.
+- **postgres.js:** it uses postgres.js' `cursor()`, and on a `Sql` postgres.js reserves a connection for it.
+
+```ts
+for await (const user of sql("SELECT id, email FROM users").stream()) {
+	console.log(user.email);
+}
+```
+
 Attach `.withPlugin(new CasePlugin())` (imported from `@typesql/core/plugins`) for [camelCase row keys](../guide/case-plugin). With postgres.js, leave its own `transform: postgres.camel` off. To run a query on another client, see [Custom executor](./custom-executor).
 
 ## Transactions

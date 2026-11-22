@@ -1,0 +1,29 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`runtime-stream-rejection > scenario 1`] = `
+{
+  "compile": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "",
+  },
+  "compiler": {
+    "diagnostics": [],
+    "types": {
+      "rows": "({ n: number })[]",
+      "streamed": "({ n: number })[]",
+    },
+  },
+  "start": {
+    "status": 0,
+    "stderr": "",
+    "stdout": "{
+  rows: [ { n: 1 } ],
+  withoutStream: 'typesql: this executor cannot stream rows',
+  withoutExecutor: 'typesql: no executor; pass one to createSql() or exec()',
+  streamed: [ { n: 1 }, { n: 2 }, { n: 3 } ]
+}
+",
+  },
+}
+`;

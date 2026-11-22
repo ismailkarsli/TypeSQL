@@ -73,8 +73,21 @@ function whileOpen(executor: Executor, open: () => boolean): Executor {
 		check();
 		return executor(text, values);
 	};
-	const { prepare, count } = executor;
+	const { prepare, count, stream } = executor;
 	return Object.assign(run, {
+		...(stream && {
+			stream: async function* (
+				text: string,
+				values: readonly unknown[],
+				batchSize: number,
+			) {
+				check();
+				for await (const rows of stream(text, values, batchSize)) {
+					yield rows;
+					check();
+				}
+			},
+		}),
 		...(prepare && {
 			prepare: (text: string) => whileOpen(prepare(text), open),
 		}),

@@ -74,10 +74,12 @@ const caches = new WeakMap<WeakKey, Map<number, Promise<ParseArray | null>>>();
  * node-postgres returns arrays of enums, domains and extension types such as
  * citext as array literals (`"{a,b}"`). Parse them, looking up once per `owner`
  * which user-defined types are arrays and what their element's base type is.
+ * Without `lookup` (a connection busy with a cursor), an array of a type not
+ * looked up before is an error.
  */
 export async function parsePgUserArrays(
 	owner: WeakKey,
-	lookup: PgLookup,
+	lookup: PgLookup | undefined,
 	fields: readonly PgField[] | undefined,
 	rows: unknown[],
 ): Promise<unknown[]> {
@@ -94,22 +96,36 @@ export async function parsePgUserArrays(
 	for (const { dataTypeID } of user)
 		if (!cache.has(dataTypeID)) missing.add(dataTypeID);
 	if (missing.size > 0) {
-		const found = lookupArrays(lookup, Array.from(missing)).catch(() => {
-			for (const oid of missing) cache.delete(oid);
-			return new Map<number, ParseArray>();
-		});
-		for (const oid of missing)
-			cache.set(
-				oid,
-				found.then((m) => m.get(oid) ?? null),
-			);
+		if (!lookup) {
+			// Values of other user-defined types, such as enums, stay as they are.
+			const name = user.find(
+				(f) => missing.has(f.dataTypeID) && holdsArrayText(rows, f.name),
+			)?.name;
+			if (name !== undefined)
+				throw new Error(
+					`typesql: stream() cannot look up the array type of column "${name}" while its cursor holds the connection; stream on a pg Pool, or run a query that returns the column with exec() on this connection first`,
+				);
+		} else {
+			const found = lookupArrays(lookup, Array.from(missing)).catch(() => {
+				for (const oid of missing) cache.delete(oid);
+				return new Map<number, ParseArray>();
+			});
+			for (const oid of missing)
+				cache.set(
+					oid,
+					found.then((m) => m.get(oid) ?? null),
+				);
+		}
 	}
 	const parsers = new Map(
 		(
 			await Promise.all(
 				user.map(async (f) => [f.name, await cache.get(f.dataTypeID)] as const),
 			)
-		).filter((p): p is readonly [string, ParseArray] => p[1] !== null),
+		).filter(
+			(p): p is readonly [string, ParseArray] =>
+				p[1] !== null && p[1] !== undefined,
+		),
 	);
 	if (parsers.size === 0) return rows;
 	for (const row of rows) {
@@ -123,6 +139,18 @@ export async function parsePgUserArrays(
 	}
 	return rows;
 }
+
+// Text of an array value, with or without its bounds (`[0:1]={a,b}`).
+const holdsArrayText = (rows: readonly unknown[], name: string): boolean =>
+	rows.some(
+		(row) =>
+			typeof row === "object" &&
+			row !== null &&
+			Object.entries(row).some(
+				([key, value]) =>
+					key === name && typeof value === "string" && /^[{[]/.test(value),
+			),
+	);
 
 async function lookupArrays(
 	lookup: PgLookup,
